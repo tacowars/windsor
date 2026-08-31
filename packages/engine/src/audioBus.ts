@@ -1,11 +1,15 @@
 /**
  * Effect buses built from native Web Audio nodes.
  *
- * Only the FM synthesis runs in our worklet. Filtering, reverb, delay and
- * limiting all use the browser's own nodes, which execute in its audio thread
- * and cost nothing from the main-thread frame budget that
- * `docs/design/tech-demo-proposal.md` 1 identifies as the project's primary risk.
+ * Filtering, delay and limiting use the browser's own nodes; the reverb is our
+ * second worklet. All of them execute in the audio thread and cost nothing from
+ * the main-thread frame budget that `docs/design/tech-demo-proposal.md` 1
+ * identifies as the project's primary risk -- the reverb was measured at about
+ * 1% of one core per instance.
  */
+import type { ReverbSpace } from './reverbSpace';
+import { makeSpace } from './reverbSpace';
+import { REVERB_PROCESSOR_NAME } from './workletMessages';
 
 export interface BusFilterOptions {
   type?: BiquadFilterType;
@@ -20,10 +24,10 @@ export interface BusOptions {
   feedback?: number;
   delayMix?: number;
   delayDamp?: number;
-  /** Wet amount, 0..1; uses a generated impulse response. */
+  /** Wet amount, 0..1; omit or zero to leave the reverb out of the graph. */
   reverb?: number;
-  reverbSeconds?: number;
-  reverbDecay?: number;
+  /** Which room. Defaults to `DEFAULT_SPACE`. */
+  reverbSpace?: Partial<ReverbSpace>;
 }
 
 export interface AudioBus {
@@ -31,34 +35,42 @@ export interface AudioBus {
   readonly output: GainNode;
   readonly filter?: BiquadFilterNode;
   readonly delay?: DelayNode;
-  readonly reverb?: ConvolverNode;
+  readonly reverb?: AudioWorkletNode;
 }
 
 /**
- * A decaying noise burst, used as a reverb impulse.
+ * Attach the reverb, fully wet, in parallel with the dry path.
  *
- * Saves shipping an IR file -- which matters more than convenience here: the dev
- * server sets `Cross-Origin-Embedder-Policy: require-corp` for Havok, so any
- * cross-origin audio asset would need CORP headers to load at all.
+ * The node's own `dry` stays at zero and the bus mixes with `wet`, so the
+ * amount is one gain outside the plate rather than a blend inside it. That is
+ * the shape a per-part send needs, and it is why turning the amount down
+ * silences the plate's contribution without changing its tail.
+ *
+ * Requires `FmEngine.init()` to have loaded the reverb module.
  */
-export function generateImpulseResponse(
+function attachReverb(
   context: BaseAudioContext,
-  seconds = 2.4,
-  decay = 2.6,
-): AudioBuffer {
-  const length = Math.max(1, Math.floor(context.sampleRate * seconds));
-  const buffer = context.createBuffer(2, length, context.sampleRate);
-  const onsetSamples = context.sampleRate * 0.005;
+  source: AudioNode,
+  output: GainNode,
+  options: BusOptions,
+): AudioWorkletNode {
+  const reverb = new AudioWorkletNode(context, REVERB_PROCESSOR_NAME, {
+    numberOfInputs: 1,
+    numberOfOutputs: 1,
+    outputChannelCount: [2],
+  });
 
-  for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-    const data = buffer.getChannelData(channel);
-    for (let i = 0; i < length; i++) {
-      // Ramp the first few milliseconds so the onset is not a click.
-      const envelope = Math.pow(1 - i / length, decay) * Math.min(1, i / onsetSamples);
-      data[i] = (Math.random() * 2 - 1) * envelope;
-    }
+  const space = makeSpace(options.reverbSpace);
+  for (const [name, value] of Object.entries(space)) {
+    reverb.parameters.get(name)?.setValueAtTime(value, context.currentTime);
   }
-  return buffer;
+
+  const wet = context.createGain();
+  wet.gain.value = options.reverb ?? 0;
+  source.connect(reverb);
+  reverb.connect(wet);
+  wet.connect(output);
+  return reverb;
 }
 
 /** Wire a bus. Connect parts to `input`; route `output` onward. */
@@ -70,7 +82,7 @@ export function createBus(context: BaseAudioContext, options: BusOptions = {}): 
     output: GainNode;
     filter?: BiquadFilterNode;
     delay?: DelayNode;
-    reverb?: ConvolverNode;
+    reverb?: AudioWorkletNode;
   } = { input, output };
 
   let tail: AudioNode = input;
@@ -90,18 +102,7 @@ export function createBus(context: BaseAudioContext, options: BusOptions = {}): 
   }
 
   if (options.reverb && options.reverb > 0) {
-    const convolver = context.createConvolver();
-    convolver.buffer = generateImpulseResponse(
-      context,
-      options.reverbSeconds ?? 2.4,
-      options.reverbDecay ?? 2.6,
-    );
-    const wet = context.createGain();
-    wet.gain.value = options.reverb;
-    tail.connect(convolver);
-    convolver.connect(wet);
-    wet.connect(output);
-    bus.reverb = convolver;
+    bus.reverb = attachReverb(context, tail, output, options);
   }
 
   tail.connect(output);

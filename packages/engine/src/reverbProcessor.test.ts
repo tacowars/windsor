@@ -1,0 +1,161 @@
+/**
+ * Behavioural tests for `worklet/reverb-processor.js`.
+ *
+ * A reverb has no single correct output to assert against, so these pin the
+ * properties that make it usable and the two failures found while building it:
+ * a tank that grows without bound at high diffusion, and a SIZE sweep that
+ * stepped its delay lengths once per block instead of once per sample.
+ */
+import { describe, expect, it } from 'vitest';
+
+import type { Automate, Feed } from './__fixtures__/reverbHarness';
+import {
+  impulse,
+  loadReverb,
+  noiseBurst,
+  renderReverb,
+  rmsAt,
+  tailSeconds,
+} from './__fixtures__/reverbHarness';
+
+const loaded = loadReverb();
+
+describe('the tail', () => {
+  it('rings on after the input stops, in stereo, without going non-finite', () => {
+    const result = renderReverb(loaded, 4, impulse);
+
+    expect(result.nonFinite).toBe(0);
+    expect(result.stereo).toBe(true);
+    expect(rmsAt(result, 1)).toBeGreaterThan(0);
+  });
+
+  it('lengthens with decay', () => {
+    const short = tailSeconds(renderReverb(loaded, 30, impulse, { decay: 0.3 }));
+    const medium = tailSeconds(renderReverb(loaded, 30, impulse, { decay: 0.7 }));
+    const long = tailSeconds(renderReverb(loaded, 30, impulse, { decay: 0.9 }));
+
+    expect(short).toBeLessThan(medium);
+    expect(medium).toBeLessThan(long);
+  });
+
+  it('lengthens with size, which is what makes one plate cover every room', () => {
+    const box = tailSeconds(renderReverb(loaded, 30, impulse, { size: 0.1 }));
+    const room = tailSeconds(renderReverb(loaded, 30, impulse, { size: 1 }));
+    const cathedral = tailSeconds(renderReverb(loaded, 30, impulse, { size: 4 }));
+
+    expect(box).toBeLessThan(room);
+    expect(room).toBeLessThan(cathedral);
+    // The advertised range: a tight box under half a second, a cathedral past ten.
+    expect(box).toBeLessThan(0.5);
+    expect(cathedral).toBeGreaterThan(10);
+  });
+});
+
+describe('wet and dry', () => {
+  it('passes the input through untouched at dry 1, wet 0', () => {
+    const result = renderReverb(loaded, 0.1, impulse, { dry: 1, wet: 0 });
+
+    expect(result.peak).toBeCloseTo(1, 5);
+  });
+
+  it('stays inaudible on silence, so an idle send adds no noise', () => {
+    const result = renderReverb(loaded, 1, () => {}, { dry: 1, wet: 1 });
+
+    // Not exactly zero: the tank carries a +/-1e-20 offset that keeps a decaying
+    // loop out of denormal range, and the output taps sum it. Measured at 6e-21,
+    // about -400 dBFS -- below the float32 noise floor of any real signal, but
+    // an assertion of exact silence would be wrong rather than strict.
+    expect(result.peak).toBeLessThan(1e-15);
+    expect(result.nonFinite).toBe(0);
+  });
+});
+
+describe('stability', () => {
+  /**
+   * The reference implementation exposes the tank all-pass coefficients up to
+   * 0.999999, where the tank stops decaying and starts growing -- measured at
+   * peak 54 and still climbing 60 s after the input stopped. The processor caps
+   * them instead, and this is the test that says so: the harness writes raw
+   * parameter values, bypassing AudioParam clamping, so it can drive the
+   * processor past its own ceiling deliberately.
+   */
+  it('does not run away at maximum diffusion and decay', () => {
+    const result = renderReverb(loaded, 45, noiseBurst(2), {
+      decay: 1,
+      diffusionTank1: 0.8,
+      diffusionTank2: 0.8,
+      tankLowCut: 10,
+      tankHighCut: 20000,
+    });
+
+    expect(result.nonFinite).toBe(0);
+    expect(rmsAt(result, 40)).toBeLessThanOrEqual(rmsAt(result, 10));
+  });
+
+  it('holds a frozen tank steady rather than decaying or building', () => {
+    const result = renderReverb(loaded, 30, noiseBurst(0.5), { hold: 1 });
+
+    expect(result.nonFinite).toBe(0);
+    const early = rmsAt(result, 5);
+    expect(early).toBeGreaterThan(0.01);
+    // Freeze is meant to be indefinite: still within a factor of two at 30 s.
+    expect(rmsAt(result, 29)).toBeGreaterThan(early * 0.5);
+  });
+});
+
+const TONE_HZ = 220;
+const TONE_AMPLITUDE = 0.3;
+
+/** A steady 220 Hz tone, the signal the sweep is judged against. */
+const tone: Feed = (block, left, right) => {
+  for (let i = 0; i < left.length; i++) {
+    const t = (block * 128 + i) / loaded.sampleRate;
+    left[i] = right[i] = Math.sin(2 * Math.PI * TONE_HZ * t) * TONE_AMPLITUDE;
+  }
+};
+
+/** Move `size` from `from` to `to` over two seconds, then hold. */
+function sweepSize(from: number, to: number): Automate {
+  const blocks = Math.round((2 * loaded.sampleRate) / 128);
+  return (block, values) => {
+    const size = values.size;
+    if (size) size[0] = from + Math.min(1, block / blocks) * (to - from);
+  };
+}
+
+/**
+ * The largest step a clean render of this tone can show: one sample of slew at
+ * whatever peak the reverb reaches, with headroom for the plate's own texture.
+ */
+function slewCeiling(peak: number): number {
+  return ((2 * Math.PI * TONE_HZ) / loaded.sampleRate) * peak * 3;
+}
+
+describe('size automation', () => {
+  /**
+   * Sweeping SIZE moves each tank line's read point. Recomputing the lengths
+   * once per block left a step at every block boundary: on this signal it
+   * measured 0.375 against a natural slew of about 0.036 -- ten times the
+   * signal, and plainly audible. The lengths now ramp per sample, leaving only
+   * the Doppler shift a swept delay is supposed to produce.
+   */
+  it('sweeps without stepping the delay lines', () => {
+    const swept = renderReverb(loaded, 4, tone, {}, sweepSize(0.3, 3));
+
+    expect(swept.nonFinite).toBe(0);
+    expect(swept.maxStep).toBeLessThan(slewCeiling(swept.peak));
+  });
+
+  it('actually moves the tail, so the sweep above is not a no-op', () => {
+    const swept = renderReverb(loaded, 4, tone, {}, sweepSize(0.3, 3));
+    const still = renderReverb(loaded, 4, tone, { size: 0.3 });
+
+    expect(swept.trace.at(-1)).not.toBeCloseTo(still.trace.at(-1) ?? 0, 4);
+  });
+
+  it('is quiet when size holds still', () => {
+    const steady = renderReverb(loaded, 4, tone, { size: 1 });
+
+    expect(steady.maxStep).toBeLessThan(slewCeiling(steady.peak));
+  });
+});

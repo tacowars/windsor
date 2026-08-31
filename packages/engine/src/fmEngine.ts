@@ -11,7 +11,7 @@ import type { Patch } from './patch';
 import { clonePatch, makePatch } from './patch';
 import { PRESETS } from './presets';
 import type { ProcessorOptions } from './workletMessages';
-import { PROCESSOR_NAME, WORKLET_URL } from './workletMessages';
+import { PROCESSOR_NAME, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessages';
 
 export interface PartOptions {
   patch?: Patch;
@@ -56,10 +56,11 @@ export class FmEngine {
     return this.moduleLoaded;
   }
 
-  /** Load the DSP module. Must be awaited before `createPart`. */
+  /** Load the DSP modules. Must be awaited before `createPart` or `createBus`. */
   async init(): Promise<void> {
     if (this.moduleLoaded) return;
     await this.context.audioWorklet.addModule(WORKLET_URL);
+    await this.context.audioWorklet.addModule(REVERB_WORKLET_URL);
     this.moduleLoaded = true;
   }
 
@@ -103,6 +104,9 @@ export class FmEngine {
   }
 
   createBus(options: BusOptions = {}, destination?: AudioNode): AudioBus {
+    if (!this.moduleLoaded) {
+      throw new Error('FmEngine.init() must be awaited before createBus()');
+    }
     const bus = createBus(this.context, options);
     bus.output.connect(destination ?? this.master);
     return bus;

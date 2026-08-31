@@ -5,8 +5,8 @@
  * The editor must run as one file with no imports and no dev server, so this
  * inlines two things into `editor-template.html`:
  *
- *   - `worklet/fm-processor.js` verbatim, as a string the page turns into a
- *     blob or data URL for `addModule()`
+ *   - `worklet/fm-processor.js` and `worklet/reverb-processor.js` verbatim, as
+ *     strings the page turns into a blob or data URL for `addModule()`
  *   - `patch.ts` + `presets.ts`, bundled by esbuild into an IIFE
  *
  * Both come from the real client source, so the editor cannot drift from what
@@ -25,6 +25,9 @@ const AUDIO = join(HERE, '../../packages/client/src/audio');
 /** Names the template expects in scope. */
 const EXPORTS = [
   'ALGORITHMS',
+  'DEFAULT_SPACE',
+  'SPACES',
+  'SPACE_NAMES',
   'FILTER_MODE_NAMES',
   'LFO_SHAPE_NAMES',
   'LOOP_MODE_NAMES',
@@ -33,12 +36,14 @@ const EXPORTS = [
   'WAVE_NAMES',
   'clonePatch',
   'makePatch',
+  'makeSpace',
 ];
 
 const worklet = readFileSync(join(AUDIO, 'worklet/fm-processor.js'), 'utf8');
+const reverb = readFileSync(join(AUDIO, 'worklet/reverb-processor.js'), 'utf8');
 const template = readFileSync(join(HERE, 'editor-template.html'), 'utf8');
 
-for (const marker of ['/*__WORKLET__*/', '/*__PATCH__*/']) {
+for (const marker of ['/*__WORKLET__*/', '/*__REVERB__*/', '/*__PATCH__*/']) {
   if (!template.includes(marker)) throw new Error(`template is missing ${marker}`);
 }
 
@@ -65,7 +70,8 @@ const schema = `${output.text}\nconst { ${EXPORTS.join(', ')} } = __SCHEMA__;`;
 
 let html = template
   .replace('/*__PATCH__*/', () => schema)
-  .replace('/*__WORKLET__*/', () => JSON.stringify(worklet));
+  .replace('/*__WORKLET__*/', () => JSON.stringify(worklet))
+  .replace('/*__REVERB__*/', () => JSON.stringify(reverb));
 
 // The editor is published as an Artifact, which supplies its own document
 // skeleton. Match whole tags so <header> does not trip the guard.
@@ -79,4 +85,6 @@ writeFileSync(dest, html);
 
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 console.log(`built tools/patch-editor/patch-editor.html (${kb(Buffer.byteLength(html))})`);
-console.log(`  worklet: ${kb(worklet.length)}   schema bundle: ${kb(output.text.length)}`);
+console.log(
+  `  fm: ${kb(worklet.length)}   reverb: ${kb(reverb.length)}   schema bundle: ${kb(output.text.length)}`,
+);
