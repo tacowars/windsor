@@ -52,6 +52,34 @@ describe('the tail', () => {
   });
 });
 
+describe('the output taps', () => {
+  /**
+   * Dattorro's Table 2 taps are delays from where each line is written
+   * (`node48_54[266]` indexes from node 48, the input). Reading them from the
+   * other end -- as khoin/DattorroReverbNode does, and as this did until the
+   * paper was checked -- puts every tap near the far end of its line, so the
+   * plate emits *nothing* for the first 50 ms and the early reflections are
+   * gone. Measured: RMS over the first 50 ms was exactly zero, and the count of
+   * samples above 0.002 in the first 100 ms was 94 rather than 1020.
+   *
+   * The late tail is nearly identical either way, which is what made this
+   * survive a listening test; early energy is the thing to assert on.
+   */
+  it('start the plate within milliseconds, not after a whole delay line', () => {
+    const result = renderReverb(loaded, 4, impulse, { size: 1.4, decay: 0.78 });
+    const onset = result.trace.findIndex((rms) => rms > 1e-5);
+    const onsetMs = ((onset * 128) / loaded.sampleRate) * 1000;
+
+    // Reading from the wrong end put onset at block 12 (32 ms) with eleven
+    // blocks of pure silence first; reading them as delays puts it at block 3.
+    // Asserting the onset rather than a level matters: both variants reach a
+    // similar peak inside the first 50 ms, so a threshold on level passes
+    // either way and tests nothing.
+    expect(onset).toBeGreaterThanOrEqual(0);
+    expect(onsetMs).toBeLessThan(20);
+  });
+});
+
 describe('wet and dry', () => {
   it('passes the input through untouched at dry 1, wet 0', () => {
     const result = renderReverb(loaded, 0.1, impulse, { dry: 1, wet: 0 });
