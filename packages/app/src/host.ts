@@ -34,6 +34,8 @@ export class EngineHost {
   private urls: WorkletUrls | null = null;
   private building: Promise<void> = Promise.resolve();
   private generation = 0;
+  /** The most recent document handed to build(); what a retry must install. */
+  private latest: ArrangementDocument | null = null;
   private readonly log: HostLog;
 
   constructor(log: HostLog) {
@@ -63,7 +65,13 @@ export class EngineHost {
     try {
       await this.start(document, { fmUrl: blob(dsp.fm), reverbUrl: blob(dsp.reverb) });
     } catch {
-      await this.start(document, { fmUrl: data(dsp.fm), reverbUrl: data(dsp.reverb) });
+      // The latest document, not the captured one: an import or slot toggle
+      // may have queued a newer document while the blob attempt was failing,
+      // and the retry must not reinstall the older state over it.
+      await this.start(this.latest ?? document, {
+        fmUrl: data(dsp.fm),
+        reverbUrl: data(dsp.reverb),
+      });
     }
   }
 
@@ -87,6 +95,7 @@ export class EngineHost {
    * behind the model (cross-model self-review finding).
    */
   build(document: ArrangementDocument): Promise<void> {
+    this.latest = document;
     const generation = ++this.generation;
     this.building = this.building
       .catch(() => undefined)
