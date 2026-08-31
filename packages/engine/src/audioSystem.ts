@@ -9,6 +9,7 @@
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import { FmEngine } from './fmEngine';
+import { SPACES } from './reverbSpace';
 import { Scheduler } from './scheduler';
 
 export interface AudioSystemOptions {
@@ -40,7 +41,8 @@ export class AudioSystem {
     if (this.started) return;
     await this.engine.init();
     this.musicBus = this.engine.createBus({
-      reverb: 0.22,
+      reverb: 0.3,
+      reverbSpace: SPACES.hall,
       delayTime: 0.28,
       feedback: 0.3,
       delayMix: 0.18,

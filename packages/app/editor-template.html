@@ -593,6 +593,20 @@
       <canvas class="env-canvas" id="pitchEnvCanvas" width="500" height="92"></canvas>
       <div class="knob-row" id="pitchKnobs" style="margin-top: 6px"></div>
     </div>
+    <div class="section">
+      <div class="section-title"><span>Reverb Send</span></div>
+      <p class="hint" style="margin: 0 0 8px">
+        One Dattorro plate on a shared bus. The patch sends to it; the space itself is not part of
+        the patch.
+      </p>
+      <div style="display: flex; gap: 6px; margin-bottom: 8px">
+        <select class="field" id="spaceSel" style="flex: 1" aria-label="Space"></select>
+        <button class="btn" id="freezeBtn" aria-pressed="false" title="Infinite decay">
+          Freeze
+        </button>
+      </div>
+      <div class="knob-row" id="reverbKnobs"></div>
+    </div>
   </aside>
 
   <footer class="foot">
@@ -603,6 +617,7 @@
       <button class="btn" id="octUp">Oct +</button>
       <button class="btn" id="panicBtn">Panic</button>
       <button class="btn" id="jsonBtn">Patch JSON</button>
+      <button class="btn" id="spaceBtn">Space JSON</button>
     </div>
   </footer>
 </div>
@@ -630,15 +645,53 @@
    * ================================================================= */
   /*__PATCH__*/
 
-  /* Worklet source, inlined so this page is a single self-contained file. */
+  /* Worklet sources, inlined so this page is a single self-contained file. */
   const WORKLET_SRC = /*__WORKLET__*/;
+  const REVERB_SRC = /*__REVERB__*/;
 
   /* =================================================================
    * Audio
    * ================================================================= */
 
+  /**
+   * The reverb space, and this patch's send into it.
+   *
+   * Deliberately not inside `state.patch`: one plate is shared by every part,
+   * and a patch carries only how much of itself it sends there. That is an aux
+   * send, and it is what lets several instruments sit in one room.
+   *
+   * SPACES, DEFAULT_SPACE and makeSpace come from audio/reverbSpace.ts via the
+   * inlined schema bundle, so the editor's rooms are the game's rooms.
+   */
+
+  const SPACE_LABELS = {
+    plate: 'Plate', room: 'Room', hall: 'Hall',
+    cathedral: 'Cathedral', wash: 'Ambient Wash', shimmer: 'Shimmer',
+  };
+
+  /** UI ranges for the reverb worklet's AudioParams. `def` mirrors its defaults. */
+  const REVERB_KNOBS = [
+    { param: 'size',           label: 'Size',     min: 0.05, max: 4,     def: 1,     curve: 'log' },
+    { param: 'decay',          label: 'Decay',    min: 0,    max: 1,     def: 0.7 },
+    { param: 'preDelay',       label: 'Pre Dly',  min: 0,    max: 0.5,   def: 0,     fmt: 'ms' },
+    { param: 'inputLowCut',    label: 'In Low',   min: 10,   max: 1000,  def: 20,    curve: 'log', fmt: 'hz' },
+    { param: 'inputHighCut',   label: 'In High',  min: 200,  max: 20000, def: 10000, curve: 'log', fmt: 'hz' },
+    { param: 'tankLowCut',     label: 'Tk Low',   min: 10,   max: 1000,  def: 20,    curve: 'log', fmt: 'hz' },
+    { param: 'tankHighCut',    label: 'Tk High',  min: 200,  max: 20000, def: 8000,  curve: 'log', fmt: 'hz' },
+    { param: 'diffusionIn1',   label: 'Diff In1', min: 0,    max: 1,     def: 0.75 },
+    { param: 'diffusionIn2',   label: 'Diff In2', min: 0,    max: 1,     def: 0.625 },
+    { param: 'diffusionTank1', label: 'Diff Tk1', min: 0,    max: 0.8,   def: 0.7 },
+    { param: 'diffusionTank2', label: 'Diff Tk2', min: 0,    max: 0.8,   def: 0.5 },
+    { param: 'modRate',        label: 'Mod Rate', min: 0,    max: 8,     def: 0.5,   fmt: 'hz' },
+    { param: 'modDepth',       label: 'Mod Dep',  min: 0,    max: 4,     def: 0.7 },
+  ];
+
+  const REVERB_COLOR = '#9C7BD0';
+
   const state = {
     ctx: null, node: null, analyser: null, master: null,
+    reverb: null, sendGain: null,
+    space: null, send: 0.35, freeze: false,
     patch: clonePatch(PRESETS['lead-bell']),
     octave: 4,
     held: new Map(),
@@ -657,31 +710,11 @@
     const ctx = new AudioContext({ latencyHint: 'interactive' });
     state.ctx = ctx;
 
-    // The worklet source is inlined, so it has to reach addModule() as a URL.
-    // Hosts differ in which schemes their CSP allows, so try each in turn.
-    const attempts = [
-      ['blob', () => URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }))],
-      ['data', () => 'data:application/javascript;charset=utf-8,' + encodeURIComponent(WORKLET_SRC)],
-      ['file', () => '../worklet/fm-processor.js'],
-    ];
-
-    let loaded = false;
     const errors = [];
-    for (const [label, makeUrl] of attempts) {
-      let url = null;
-      try {
-        url = makeUrl();
-        await ctx.audioWorklet.addModule(url);
-        loaded = true;
-        break;
-      } catch (err) {
-        errors.push(`${label}: ${err.message}`);
-      } finally {
-        if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
-      }
-    }
+    const okFm = await addModule(ctx, WORKLET_SRC, '../worklet/fm-processor.js', errors);
+    const okReverb = await addModule(ctx, REVERB_SRC, '../worklet/reverb-processor.js', errors);
 
-    if (!loaded) {
+    if (!okFm) {
       setStatus('audio worklet blocked - ' + errors.join(' / '));
       return;
     }
@@ -699,7 +732,23 @@
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
 
+    // The send topology, with one track: the part reaches the master both dry
+    // and through a send gain into a shared reverb. Turning the send down is
+    // silence in the plate, not a wet/dry blend inside it -- which is why the
+    // reverb node itself runs fully wet.
     node.connect(master);
+    if (okReverb) {
+      const reverb = new AudioWorkletNode(ctx, 'dattorro-reverb', {
+        numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2],
+      });
+      const sendGain = ctx.createGain();
+      sendGain.gain.value = state.send;
+      node.connect(sendGain);
+      sendGain.connect(reverb);
+      reverb.connect(master);
+      state.reverb = reverb; state.sendGain = sendGain;
+      applySpace();
+    }
     master.connect(analyser);
     master.connect(limiter);
     limiter.connect(ctx.destination);
@@ -709,8 +758,54 @@
 
     $('power').textContent = 'Audio on';
     $('power').classList.remove('primary');
-    setStatus(`running - ${ctx.sampleRate} Hz - ${(ctx.baseLatency * 1000).toFixed(1)} ms latency`);
+    const reverbState = state.reverb ? 'reverb on' : 'reverb blocked (' + errors.join(' / ') + ')';
+    setStatus(
+      `running - ${ctx.sampleRate} Hz - ${(ctx.baseLatency * 1000).toFixed(1)} ms latency - ${reverbState}`,
+    );
     drawScope();
+  }
+
+  /**
+   * addModule() takes a URL, but our sources are inlined strings. Hosts differ
+   * in which schemes their CSP allows, so try each in turn.
+   */
+  async function addModule(ctx, source, filePath, errors) {
+    const attempts = [
+      ['blob', () => URL.createObjectURL(new Blob([source], { type: 'application/javascript' }))],
+      ['data', () => 'data:application/javascript;charset=utf-8,' + encodeURIComponent(source)],
+      ['file', () => filePath],
+    ];
+    for (const [label, makeUrl] of attempts) {
+      let url = null;
+      try {
+        url = makeUrl();
+        await ctx.audioWorklet.addModule(url);
+        return true;
+      } catch (err) {
+        errors.push(`${label}: ${err.message}`);
+      } finally {
+        if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+      }
+    }
+    return false;
+  }
+
+  /** Push the whole space onto the node's AudioParams. */
+  function applySpace() {
+    if (!state.reverb) return;
+    for (const [name, value] of Object.entries(state.space)) {
+      const param = state.reverb.parameters.get(name);
+      if (param) param.value = value;
+    }
+    state.reverb.parameters.get('hold').value = state.freeze ? 1 : 0;
+  }
+
+  function setSpaceParam(name, value) {
+    state.space[name] = value;
+    const param = state.reverb && state.reverb.parameters.get(name);
+    // setTargetAtTime, not .value: a knob dragged across a block boundary steps
+    // a k-rate param, and on the filter cutoffs that steps audibly.
+    if (param) param.setTargetAtTime(value, state.ctx.currentTime, 0.01);
   }
 
   function pushPatch() {
@@ -833,7 +928,9 @@
       spec.set(v);
       render();
       if (spec.onChange) spec.onChange();
-      pushPatch();
+      // Reverb knobs drive AudioParams, not the patch; re-posting a whole patch
+      // per pointermove would clone it hundreds of times for nothing.
+      if (!spec.noPush) pushPatch();
     };
 
     let dragging = false, startY = 0, startN = 0;
@@ -1395,6 +1492,30 @@
   const QWERTY = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11, k:12, o:13, l:14, p:15 };
   const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
+  function buildReverb() {
+    const row = $('reverbKnobs');
+    row.innerHTML = '';
+
+    row.appendChild(makeKnob({
+      label: 'Send', min: 0, max: 1, def: 0.35, color: REVERB_COLOR, fmt: fmt2, noPush: true,
+      get: () => state.send,
+      set: (v) => {
+        state.send = v;
+        if (state.sendGain) state.sendGain.gain.setTargetAtTime(v, state.ctx.currentTime, 0.01);
+      },
+    }));
+
+    const FORMATS = { ms: fmtMs, hz: fmtHz };
+    for (const k of REVERB_KNOBS) {
+      row.appendChild(makeKnob({
+        label: k.label, min: k.min, max: k.max, def: k.def,
+        curve: k.curve, color: REVERB_COLOR, fmt: FORMATS[k.fmt] ?? fmt2, noPush: true,
+        get: () => state.space[k.param],
+        set: (v) => setSpaceParam(k.param, v),
+      }));
+    }
+  }
+
   function buildKeys() {
     const box = $('keys');
     box.innerHTML = '';
@@ -1486,6 +1607,7 @@
     buildFilter();
     buildLfo();
     buildPitch();
+    buildReverb();
     requestAnimationFrame(redrawEnvs);
   }
 
@@ -1508,6 +1630,27 @@
     };
     $('arpBtn').onclick = () => toggleArp(!state.arp);
 
+    const spaceSel = $('spaceSel');
+    for (const key of SPACE_NAMES) spaceSel.add(new Option(SPACE_LABELS[key] ?? key, key));
+    spaceSel.value = 'hall';
+    spaceSel.onchange = () => {
+      state.space = makeSpace(SPACES[spaceSel.value]);
+      applySpace();
+      buildReverb();
+    };
+
+    $('freezeBtn').onclick = (e) => {
+      state.freeze = !state.freeze;
+      e.currentTarget.setAttribute('aria-pressed', String(state.freeze));
+      if (state.reverb) state.reverb.parameters.get('hold').value = state.freeze ? 1 : 0;
+    };
+
+    $('spaceBtn').onclick = () => {
+      $('jsonText').value = JSON.stringify({ space: state.space, send: state.send }, null, 2);
+      $('jsonStatus').textContent = 'Reverb space - Load applies it to the bus';
+      dlg.showModal();
+    };
+
     const dlg = $('jsonDlg');
     $('jsonBtn').onclick = () => {
       const out = clonePatch(state.patch);
@@ -1529,6 +1672,14 @@
     $('jsonLoad').onclick = () => {
       try {
         const parsed = JSON.parse($('jsonText').value);
+        if (parsed.space) {
+          state.space = makeSpace(parsed.space);
+          if (typeof parsed.send === 'number') state.send = parsed.send;
+          applySpace();
+          buildReverb();
+          $('jsonStatus').textContent = 'Space loaded';
+          return;
+        }
         loadPatch(makePatch(parsed));
         $('jsonStatus').textContent = 'Patch loaded';
       } catch (err) {
@@ -1536,6 +1687,7 @@
       }
     };
 
+    state.space = makeSpace(SPACES[spaceSel.value]);
     buildKeys();
     refreshAll();
     drawScope();

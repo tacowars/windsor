@@ -15,3 +15,4 @@ export {
   makePatch,
 } from './patch';
 export { PRESETS, PRESET_NAMES } from './presets';
+export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
