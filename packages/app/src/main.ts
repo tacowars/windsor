@@ -23,6 +23,7 @@ import { EngineHost } from './host';
 import { Keyboard } from './keyboard';
 import { renderMixerTab } from './mixerTab';
 import { renderPartsTab } from './partsTab';
+import { partsState } from './patchState';
 import { renderSequencersTab } from './sequencersTab';
 
 const status = (message: string): void => {
@@ -31,7 +32,8 @@ const status = (message: string): void => {
 
 const model = new DocumentModel(raw);
 const host = new EngineHost((line) => status(line));
-const keyboard = new Keyboard(() => null);
+// The keyboard plays the Parts tab's selected part, once audio is enabled.
+const keyboard = new Keyboard(() => partsState.part);
 
 const ctx: AppCtx = {
   host,

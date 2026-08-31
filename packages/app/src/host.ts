@@ -32,6 +32,8 @@ export class EngineHost {
 
   private context: AudioContext | null = null;
   private urls: WorkletUrls | null = null;
+  private building: Promise<void> = Promise.resolve();
+  private generation = 0;
   private readonly log: HostLog;
 
   constructor(log: HostLog) {
@@ -77,8 +79,22 @@ export class EngineHost {
     await this.build(document);
   }
 
-  /** (Re)build the whole system from a document. From tick 0, same context. */
-  async build(document: ArrangementDocument): Promise<void> {
+  /**
+   * (Re)build the whole system from a document — from tick 0, on the same
+   * context. Rebuilds are serialised and coalesced: overlapping calls (rapid
+   * slot toggles, an import landing mid-build) queue behind the running one
+   * and only the latest document wins, so the live graph cannot end up
+   * behind the model (cross-model self-review finding).
+   */
+  build(document: ArrangementDocument): Promise<void> {
+    const generation = ++this.generation;
+    this.building = this.building
+      .catch(() => undefined)
+      .then(() => (generation === this.generation ? this.rebuild(document) : undefined));
+    return this.building;
+  }
+
+  private async rebuild(document: ArrangementDocument): Promise<void> {
     if (!this.context || !this.urls) return;
     this.system?.dispose();
     const engine = new FmEngine(this.context);

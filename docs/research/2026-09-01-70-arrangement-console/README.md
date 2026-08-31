@@ -62,6 +62,36 @@ per the fresh-origin guidance in `docs/reference/browser-testing.md` §7.
 - Harmony tab probe: Root knob, 7 degree-weight knobs (D E F G A B C —
   dorian on root 50), scale select = `dorian`, Octave/Span per pitched part.
 
+## Game page (scope:client protocol — bridge evidence, both backends)
+
+The PR also changes runtime modules under `packages/client/src/audio`
+(generator `pattern` playback, player recorder, normaliser field), so the
+standard game-page pass ran too: bridge daemon up first, Vite dev server,
+`chrome-devtools` MCP `new_page` on `?debug=1` and `?debug=1&backend=webgl2`.
+
+- `get-system-stats`: session 1 `WebGPU1`, `[a204] engine` event
+  `"gpu":"apple metal-3 unknown version"`; session 2 `WebGL2 - Parallel
+  shader compilation`, driver `ANGLE (Apple, ANGLE Metal Renderer: Apple M4
+  Pro …)` — real hardware drivers on both, no SwiftShader/llvmpipe.
+- `query-a204-state` before and after `a204-motor {"x":0,"z":6,"seconds":3}`:
+  player z 32.03 → 49.83 on both backends, `support: "supported"`,
+  0 fallthroughs.
+- One bridge `take-screenshot` per backend (`game-webgpu-after-move.png`,
+  `game-webgl2-after-move.png`) — composition evidence only; backend proof
+  is `get-system-stats` and the `[a204] engine` event, never the PNG.
+- A trusted canvas click on the WebGPU page unlocked audio: `[a204]
+  {"event":"music","state":"started","bpm":96,"root":50,"scale":"dorian"}`
+  followed by note events for **all four parts** — the committed document
+  still plays through the game's own path with this PR's engine changes.
+- `list_console_messages`: zero errors/warnings apart from (a) the second
+  Babylon engine banner at the first screenshot — the documented `DumpTools`
+  PNG encoder, not a stray engine (§5) — and (b) an `unhandledrejection`
+  `WrongDocumentError` from `requestPointerLock()` under the automated
+  click. That was a real pre-existing gap (Chrome returns a promise,
+  `input.ts` discarded it unhandled); fixed in this PR by catching the
+  refusal, and clean on re-test. `list_network_requests`: Vite module
+  serving only, no failures.
+
 ## Screenshots (composition evidence for the maintainer)
 
 - `console-http-parts.png` — Parts tab, audio on (http origin)
