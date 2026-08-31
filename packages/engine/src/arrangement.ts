@@ -117,7 +117,7 @@ export const ARRANGEMENT: Arrangement = {
   },
   arp: {
     part: 'arp',
-    preset: 'lead-bell',
+    preset: 'saw-arp',
     velocity: 0.7,
     driver: {
       divisor: 6,
@@ -131,7 +131,7 @@ export const ARRANGEMENT: Arrangement = {
   },
   drone: {
     part: 'drone',
-    preset: 'sub-drone',
+    preset: 'drone-sqr',
     velocity: 0.8,
     driver: { divisor: 96, gate: 1, register: { octave: -1, span: 1 } },
   },

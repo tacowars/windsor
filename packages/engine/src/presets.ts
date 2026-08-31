@@ -5,6 +5,7 @@
  * group it came from; the split exists so each file stays readable.
  */
 import type { Patch } from './patch';
+import { AUTHORED_PRESETS } from './presetsAuthored';
 import { DRUMS_PRESETS } from './presetsDrums';
 import { MUSIC_PRESETS } from './presetsMusic';
 import { SFX_PRESETS } from './presetsSfx';
@@ -13,6 +14,7 @@ export const PRESETS: Record<string, Patch> = {
   ...MUSIC_PRESETS,
   ...DRUMS_PRESETS,
   ...SFX_PRESETS,
+  ...AUTHORED_PRESETS,
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);
