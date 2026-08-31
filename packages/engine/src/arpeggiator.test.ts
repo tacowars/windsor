@@ -123,6 +123,22 @@ describe('Arpeggiator', () => {
     expect(changes).toBeGreaterThan(0);
   });
 
+  it('attached mid-bar, draws its first pool at once and then only on refresh bar lines', () => {
+    const arp = make({ skipChance: 0, refreshBars: 2 });
+    const transport = new TickTransport(120);
+    const pools: { tick: number; pool: string }[] = [];
+    transport.subscribe(arp.config.divisor, (e) => {
+      arp.handleTick(e);
+      pools.push({ tick: e.tick, pool: arp.currentPool.map((p) => p.note).join(',') });
+    });
+    transport.reset(30);
+    for (let i = 0; i < 4 * TICKS_PER_BAR; i++) transport.advance(0);
+    expect(pools[0]!.pool).not.toBe('');
+    const changes = pools.filter((p, i) => i > 0 && p.pool !== pools[i - 1]!.pool);
+    expect(changes.length).toBeGreaterThan(0);
+    for (const c of changes) expect(c.tick % (2 * TICKS_PER_BAR)).toBe(0);
+  });
+
   it('keeps the pool sorted ascending and free of duplicate notes', () => {
     const arp = make({ poolSize: 12, register: { octave: 1, span: 1 } });
     run(arp, 1);
@@ -144,5 +160,7 @@ describe('Arpeggiator', () => {
     expect(() => make({ gate: 1.2 })).toThrow(RangeError);
     expect(() => make({ divisor: 7 })).toThrow(RangeError);
     expect(() => make({ poolSize: 0 })).toThrow(RangeError);
+    expect(() => make({ skipChance: 1.2 })).toThrow(RangeError);
+    expect(() => make({ skipChance: -0.1 })).toThrow(RangeError);
   });
 });

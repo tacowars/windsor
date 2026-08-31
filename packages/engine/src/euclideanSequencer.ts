@@ -82,6 +82,21 @@ export function lfoValue(shape: LfoShape, phase: number): number {
   }
 }
 
+function assertDensity(mod: DensityMod): void {
+  switch (mod.kind) {
+    case 'lfoBars':
+      if (!(mod.bars > 0)) throw new RangeError(`lfoBars.bars must be > 0, got ${mod.bars}`);
+      return;
+    case 'lfoHz':
+      if (!(mod.hz >= 0)) throw new RangeError(`lfoHz.hz must be >= 0, got ${mod.hz}`);
+      return;
+    case 'walk':
+      if (!(mod.stepChance >= 0 && mod.stepChance <= 1)) {
+        throw new RangeError(`walk.stepChance must be in [0, 1], got ${mod.stepChance}`);
+      }
+  }
+}
+
 function assertConfig(config: EuclideanConfig): void {
   const { steps, divisor, pulses } = config;
   if (!Number.isInteger(steps) || steps < 1)
@@ -91,6 +106,7 @@ function assertConfig(config: EuclideanConfig): void {
   if (!inRange(pulses.min) || !inRange(pulses.max) || pulses.min > pulses.max) {
     throw new RangeError(`pulses bounds must satisfy 0 <= min <= max <= ${steps}`);
   }
+  assertDensity(config.density);
 }
 
 export class EuclideanSequencer {
@@ -100,7 +116,6 @@ export class EuclideanSequencer {
   private readonly rng: Rng;
   private pattern: Pattern;
   private k: number;
-  private bar = -1;
 
   constructor(config: EuclideanConfig) {
     assertConfig(config);
@@ -123,12 +138,13 @@ export class EuclideanSequencer {
     return source.subscribe(this.config.divisor, (event) => this.handleTick(event));
   }
 
-  /** One step of the figure. Returns the onset it emitted, if any. */
+  /**
+   * One step of the figure. Returns the onset it emitted, if any. The figure
+   * is only ever swapped on a bar line; started or attached mid-bar, the
+   * constructor's figure plays out to the next one.
+   */
   handleTick(event: TickEvent): OnsetEvent | null {
-    if (event.bar !== this.bar) {
-      this.bar = event.bar;
-      this.regenerate(event);
-    }
+    if (event.tickInBar === 0) this.regenerate(event);
     const step = event.step % this.config.steps;
     if (!this.pattern[step]) return null;
     const onset: OnsetEvent = {
@@ -153,7 +169,7 @@ export class EuclideanSequencer {
     const mod = this.config.density;
     switch (mod.kind) {
       case 'lfoBars':
-        return this.kFromLfo(mod.shape, event.bar / Math.max(1, mod.bars));
+        return this.kFromLfo(mod.shape, event.bar / mod.bars);
       case 'lfoHz':
         return this.kFromLfo(mod.shape, event.seconds * mod.hz);
       case 'walk': {
