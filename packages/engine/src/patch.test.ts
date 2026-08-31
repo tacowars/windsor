@@ -87,7 +87,7 @@ describe('presets', () => {
   });
 
   it('reference only waveforms the worklet implements', () => {
-    const ids = new Set(Object.values(WAVE));
+    const ids = new Set<number>(Object.values(WAVE));
     for (const name of PRESET_NAMES) {
       for (const op of PRESETS[name]?.ops ?? []) {
         expect(ids.has(op.wave), `${name} uses waveform ${op.wave}`).toBe(true);

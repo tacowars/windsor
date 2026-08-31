@@ -178,10 +178,13 @@ export interface Patch {
   filter: FilterSettings;
 }
 
+/** An operator with every field optional, its envelope included; `makeOperator` completes it. */
+export type PartialOperator = Partial<Omit<Operator, 'env'>> & { env?: Partial<Envelope> };
+
 /** Every field optional, recursively -- what an editor or a preset supplies. */
 export type PartialPatch = {
   [K in keyof Patch]?: K extends 'ops'
-    ? Partial<Operator>[]
+    ? PartialOperator[]
     : Patch[K] extends object
       ? Partial<Patch[K]>
       : Patch[K];
@@ -205,7 +208,7 @@ export function makeEnvelope(o: Partial<Envelope> = {}): Envelope {
   };
 }
 
-export function makeOperator(o: Partial<Operator> = {}): Operator {
+export function makeOperator(o: PartialOperator = {}): Operator {
   return {
     wave: WAVE.SINE,
     userPartials: null,

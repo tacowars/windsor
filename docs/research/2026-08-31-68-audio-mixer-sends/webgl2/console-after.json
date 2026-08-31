@@ -1,0 +1,40 @@
+{
+  "url": "http://localhost:5173/?debug=1&backend=webgl2",
+  "console": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "BJS - [16:19:16]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"engine\",\"backend\":\"WebGL2\",\"gpu\":\"ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"debug\",\"shim\":true,\"bridge\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"bridge\",\"name\":\"Aotearoa204 WebGL2\",\"port\":4400,\"connected\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":324}"
+    },
+    {
+      "type": "log",
+      "text": "BJS - [16:19:58]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+    }
+  ],
+  "consoleErrorsOrWarnings": [],
+  "logEntries": [],
+  "logErrorsOrWarnings": []
+}
