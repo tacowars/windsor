@@ -42,6 +42,11 @@ export interface EuclideanConfig {
   /** The arrangement seed and this generator's index in the arrangement. */
   seed: number;
   generatorIndex: number;
+  /**
+   * A captured figure (issue #70, record §6): played verbatim, never
+   * regenerated, no RNG consumed. `null` or absent is generative.
+   */
+  pattern?: readonly boolean[] | null;
 }
 
 /** A defensible starting point: a 16-step figure, one bar long, breathing over 8 bars. */
@@ -107,6 +112,15 @@ function assertConfig(config: EuclideanConfig): void {
     throw new RangeError(`pulses bounds must satisfy 0 <= min <= max <= ${steps}`);
   }
   assertDensity(config.density);
+  const { pattern } = config;
+  if (pattern != null) {
+    if (pattern.length !== steps) {
+      throw new RangeError(`pattern must have ${steps} steps, got ${pattern.length}`);
+    }
+    for (const step of pattern) {
+      if (typeof step !== 'boolean') throw new RangeError('pattern steps must be booleans');
+    }
+  }
 }
 
 export class EuclideanSequencer {
@@ -114,6 +128,7 @@ export class EuclideanSequencer {
   onOnset: OnsetHandler | null = null;
 
   private readonly rng: Rng;
+  private readonly fixed: Pattern | null;
   private pattern: Pattern;
   private k: number;
 
@@ -121,8 +136,9 @@ export class EuclideanSequencer {
     assertConfig(config);
     this.config = config;
     this.rng = generatorRng(config.seed, config.generatorIndex);
-    this.k = this.clampK(config.pulses.start);
-    this.pattern = euclid(this.k, config.steps, config.rotate);
+    this.fixed = config.pattern ?? null;
+    this.k = this.fixed ? this.fixed.filter(Boolean).length : this.clampK(config.pulses.start);
+    this.pattern = this.fixed ?? euclid(this.k, config.steps, config.rotate);
   }
 
   /** The figure currently playing; swapped only on a bar line. */
@@ -144,7 +160,7 @@ export class EuclideanSequencer {
    * constructor's figure plays out to the next one.
    */
   handleTick(event: TickEvent): OnsetEvent | null {
-    if (event.tickInBar === 0) this.regenerate(event);
+    if (this.fixed === null && event.tickInBar === 0) this.regenerate(event);
     const step = event.step % this.config.steps;
     if (!this.pattern[step]) return null;
     const onset: OnsetEvent = {

@@ -45,6 +45,7 @@ export const FULL_ARRANGEMENT: FullArrangement = {
       pulses: { min: 2, max: 5, start: 4 },
       rotate: 0,
       density: { kind: 'lfoBars', bars: 8, shape: 'tri' },
+      pattern: null,
     },
   },
   hat: {
@@ -59,6 +60,7 @@ export const FULL_ARRANGEMENT: FullArrangement = {
       pulses: { min: 5, max: 12, start: 8 },
       rotate: 2,
       density: { kind: 'lfoBars', bars: 3, shape: 'sine' },
+      pattern: null,
     },
   },
   arp: {
@@ -73,12 +75,13 @@ export const FULL_ARRANGEMENT: FullArrangement = {
       skipChance: 0.3,
       register: { octave: 1, span: 2 },
       gate: 0.6,
+      pattern: null,
     },
   },
   drone: {
     part: 'drone',
     preset: 'drone-sqr',
     velocity: 0.8,
-    driver: { divisor: 96, gate: 1, register: { octave: -1, span: 1 } },
+    driver: { divisor: 96, gate: 1, register: { octave: -1, span: 1 }, pattern: null },
   },
 };

@@ -12,9 +12,10 @@
  * (`gate === 1`) and the new draw is the same MIDI note. Otherwise the held
  * note is released on this step's tick, before the new note-on.
  */
+import { assertNotePattern, type NotePattern } from './capturedPattern';
 import { generatorRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
-import type { Register, ScaleSampler } from './scaleSampler';
+import type { Register, SampledNote, ScaleSampler } from './scaleSampler';
 import { isBarDivisor, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
 
 export interface StepSequencerConfig {
@@ -25,6 +26,13 @@ export interface StepSequencerConfig {
   register: Register;
   seed: number;
   generatorIndex: number;
+  /**
+   * A captured bar (issue #70, record §6): a note or `null` (a rest) per
+   * step, looped; the sampler is unused and no RNG is consumed. Repeated
+   * equal notes tie under the same rule as sampled ones. `null` or absent is
+   * generative.
+   */
+  pattern?: NotePattern | null;
 }
 
 export const DEFAULT_STEP_SEQUENCER_CONFIG: StepSequencerConfig = {
@@ -42,6 +50,7 @@ function assertConfig(config: StepSequencerConfig): void {
   if (!(config.gate > 0 && config.gate <= 1)) {
     throw new RangeError(`gate must be in (0, 1], got ${config.gate}`);
   }
+  if (config.pattern != null) assertNotePattern(config.pattern);
 }
 
 export class StepSequencer {
@@ -75,7 +84,8 @@ export class StepSequencer {
 
   /** One step. Returns the events it emitted; an empty array is a tie. */
   handleTick(event: TickEvent): NoteEvent[] {
-    const drawn = this.sampler.sampleNote(this.rng, this.config.register);
+    const drawn = this.draw(event);
+    if (!drawn) return this.restStep(event);
     const duration = this.durationTicks;
     const holds = duration >= this.config.divisor;
     if (this.held !== null && holds && drawn.note === this.held) return [];
@@ -104,6 +114,22 @@ export class StepSequencer {
     }
     for (const e of events) this.onNote?.(e);
     return events;
+  }
+
+  /** The step's pitch: the captured bar's slot (issue #70), or a sampler draw. */
+  private draw(event: TickEvent): SampledNote | null {
+    const pattern = this.config.pattern;
+    if (pattern == null) return this.sampler.sampleNote(this.rng, this.config.register);
+    const slot = Math.floor(event.tickInBar / this.config.divisor) % pattern.length;
+    const note = pattern[slot];
+    // A captured note was not drawn from the scale; -1 marks that honestly.
+    return note == null ? null : { note, degree: -1 };
+  }
+
+  /** A captured rest: release whatever is held, play nothing. */
+  private restStep(event: TickEvent): NoteEvent[] {
+    const released = this.release(event.tick, event.time);
+    return released ? [released] : [];
   }
 
   /** Release a held note at the given tick -- what a transport stop calls. */

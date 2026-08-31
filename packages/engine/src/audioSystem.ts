@@ -33,6 +33,7 @@ import type {
 import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
+import type { NotePattern } from './capturedPattern';
 import type { PartStrip } from './channelStrip';
 import { routePart } from './channelStrip';
 import { FmEngine } from './fmEngine';
@@ -204,6 +205,14 @@ export class AudioSystem {
       counters: { kick: 0, hat: 0, arp: 0, drone: 0 },
     };
     return { ...base, muted: this.muted, running: this.scheduler.isRunning };
+  }
+
+  /** The sounding pattern of a music part (issue #70 capture); null before one exists. */
+  capturePattern(id: 'kick' | 'hat'): readonly boolean[] | null;
+  capturePattern(id: 'arp' | 'drone'): NotePattern | null;
+  capturePattern(id: MusicPartId): readonly boolean[] | NotePattern | null;
+  capturePattern(id: MusicPartId): readonly boolean[] | NotePattern | null {
+    return this.player?.capturePattern(id) ?? null;
   }
 
   /** The live strip of a part this system created. */

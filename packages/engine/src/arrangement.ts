@@ -115,6 +115,8 @@ export const FALLBACK_ARRANGEMENT: Arrangement & { readonly kick: PercussionArra
       pulses: { min: 4, max: 4, start: 4 },
       rotate: 0,
       density: { kind: 'lfoBars', bars: 1, shape: 'tri' },
+      // Not captured either: the pulse comes from E(4, 4), authored above.
+      pattern: null,
     },
   },
 };
