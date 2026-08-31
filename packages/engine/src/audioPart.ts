@@ -24,7 +24,9 @@ export class AudioPart {
 
   private patchValue: Patch;
   private nextId = 1;
+  /** note -> live handles, oldest first. Both maps are kept in step by forget(). */
   private readonly heldByNote = new Map<number, number[]>();
+  private readonly noteByHandle = new Map<number, number>();
 
   constructor(name: string, node: AudioWorkletNode, patch: Patch) {
     this.name = name;
@@ -72,11 +74,19 @@ export class AudioPart {
     const ids = this.heldByNote.get(note);
     if (ids) ids.push(id);
     else this.heldByNote.set(note, [id]);
+    this.noteByHandle.set(id, note);
     return id;
   }
 
-  /** Release a note by the handle `noteOn` returned. */
+  /**
+   * Release a note by the handle `noteOn` returned.
+   *
+   * The handle is dropped from the note lookup here, not just scheduled: a
+   * caller that mixes this with `noteOffByNote` would otherwise release an
+   * already-finished handle and leave the newer note sounding.
+   */
   noteOff(handle: number, time?: number): void {
+    this.forget(handle);
     this.schedule({
       type: 'noteOff',
       id: handle,
@@ -86,11 +96,25 @@ export class AudioPart {
 
   /** Release the oldest sounding instance of a note number (MIDI-style). */
   noteOffByNote(note: number, time?: number): void {
-    const ids = this.heldByNote.get(note);
-    const id = ids?.shift();
+    const id = this.heldByNote.get(note)?.[0];
     if (id === undefined) return;
-    if (ids && ids.length === 0) this.heldByNote.delete(note);
     this.noteOff(id, time);
+  }
+
+  /** Handles still sounding for a note, oldest first. Test and debug seam. */
+  heldHandles(note: number): readonly number[] {
+    return this.heldByNote.get(note) ?? [];
+  }
+
+  private forget(handle: number): void {
+    const note = this.noteByHandle.get(handle);
+    if (note === undefined) return;
+    this.noteByHandle.delete(handle);
+    const ids = this.heldByNote.get(note);
+    if (!ids) return;
+    const index = ids.indexOf(handle);
+    if (index >= 0) ids.splice(index, 1);
+    if (ids.length === 0) this.heldByNote.delete(note);
   }
 
   /** Fire and forget: a note of fixed length. The shape most game SFX want. */
@@ -104,12 +128,14 @@ export class AudioPart {
   allNotesOff(): void {
     this.post({ type: 'allNotesOff' });
     this.heldByNote.clear();
+    this.noteByHandle.clear();
   }
 
   /** Hard stop with no release tails. Clicks; for scene teardown, not gameplay. */
   panic(): void {
     this.post({ type: 'panic' });
     this.heldByNote.clear();
+    this.noteByHandle.clear();
   }
 
   /**
