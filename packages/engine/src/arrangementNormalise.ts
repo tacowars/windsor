@@ -1,0 +1,296 @@
+/**
+ * The section-level normalisers behind `makeArrangement`
+ * (`arrangementDocument.ts`) — the never-throws layer above the generator
+ * constructors, which throw `RangeError` on invalid config. Everything a
+ * normaliser returns satisfies those constructors' asserted ranges by
+ * construction: integers where integers are required, divisors that divide
+ * the 96-tick bar, gates in (0, 1], weights that are not all zero.
+ *
+ * Field-level clamping and the report live in `arrangementFields.ts`; this
+ * file knows the document's shape — which keys each section owns, which
+ * defaults each field takes, and which names must exist in the code.
+ *
+ * Parts are dropped, never defaulted, when they cannot play: a preset has no
+ * default on purpose (a part invented by the normaliser is exactly the
+ * invisible musical stand-in the record's §4 rejects).
+ */
+import type {
+  ArpArrangement,
+  ArpDriver,
+  ArrangementKey,
+  DroneArrangement,
+  EuclideanDriver,
+  PercussionArrangement,
+  StepDriver,
+} from './arrangement';
+import { FieldNormaliser, show } from './arrangementFields';
+import { ARP_WALK_MODES, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeggiator';
+import {
+  DEFAULT_EUCLIDEAN_CONFIG,
+  DENSITY_MOD_KINDS,
+  LFO_SHAPES,
+  type DensityMod,
+} from './euclideanSequencer';
+import type { ChannelStrip } from './mix';
+import { MIX, RETURNS, stripFor } from './mix';
+import { PRESETS } from './presets';
+import { SCALES, scaleOffsets, type ScaleName } from './scaleSampler';
+import type { Register } from './scaleSampler';
+import { DEFAULT_STEP_SEQUENCER_CONFIG } from './stepSequencer';
+
+export class ArrangementNormaliser extends FieldNormaliser {
+  key(raw: unknown): ArrangementKey {
+    const o = this.section(raw, 'key');
+    this.dropUnknown(o, ['root', 'scale', 'weights'], 'key');
+    const scale = this.scale(o.scale);
+    return {
+      root: this.int(o.root, 60, 0, 127, 'key.root'),
+      scale,
+      weights: this.weights(o.weights, scaleOffsets(scale).length),
+    };
+  }
+
+  private scale(raw: unknown): ScaleName | readonly number[] {
+    if (typeof raw === 'string' && Object.hasOwn(SCALES, raw)) return raw as ScaleName;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.map((offset, i) => this.int(offset, 0, -48, 48, `key.scale[${i}]`));
+    }
+    // The default is the root alone — audibly not a scale, never secretly musical.
+    if (raw !== undefined) {
+      this.correction(`key.scale: ${show(raw)} names no scale — using the root alone`);
+    }
+    return [0];
+  }
+
+  private weights(raw: unknown, degrees: number): readonly number[] {
+    const uniform = (): number[] => new Array<number>(degrees).fill(1);
+    if (!Array.isArray(raw)) {
+      if (raw !== undefined) {
+        this.correction('key.weights: not an array — weighting every degree equally');
+      }
+      return uniform();
+    }
+    const out: number[] = [];
+    for (let i = 0; i < degrees; i++) out.push(this.num(raw[i], 1, 0, 1e6, `key.weights[${i}]`));
+    if (raw.length !== degrees) {
+      this.correction(`key.weights: ${raw.length} weights for ${degrees} degrees — resized`);
+    }
+    if (!out.some((w) => w > 0)) {
+      this.correction('key.weights: all zero — weighting every degree equally');
+      return uniform();
+    }
+    return out;
+  }
+
+  percussion(raw: unknown, id: 'kick' | 'hat'): PercussionArrangement | null {
+    if (raw === undefined) return null;
+    const o = this.section(raw, id);
+    this.dropUnknown(o, ['part', 'preset', 'note', 'velocity', 'hold', 'driver'], id);
+    const identity = this.identity(o, id);
+    if (!identity) return null;
+    return {
+      ...identity,
+      note: this.int(o.note, 60, 0, 127, `${id}.note`),
+      velocity: this.num(o.velocity, 0.8, 0, 1, `${id}.velocity`),
+      hold: this.num(o.hold, 0.1, 0.005, 10, `${id}.hold`),
+      driver: this.euclideanDriver(o.driver, `${id}.driver`),
+    };
+  }
+
+  arp(raw: unknown): ArpArrangement | null {
+    if (raw === undefined) return null;
+    const o = this.section(raw, 'arp');
+    this.dropUnknown(o, ['part', 'preset', 'velocity', 'driver'], 'arp');
+    const identity = this.identity(o, 'arp');
+    if (!identity) return null;
+    return {
+      ...identity,
+      velocity: this.num(o.velocity, 0.8, 0, 1, 'arp.velocity'),
+      driver: this.arpDriver(o.driver),
+    };
+  }
+
+  drone(raw: unknown): DroneArrangement | null {
+    if (raw === undefined) return null;
+    const o = this.section(raw, 'drone');
+    this.dropUnknown(o, ['part', 'preset', 'velocity', 'driver'], 'drone');
+    const identity = this.identity(o, 'drone');
+    if (!identity) return null;
+    return {
+      ...identity,
+      velocity: this.num(o.velocity, 0.8, 0, 1, 'drone.velocity'),
+      driver: this.stepDriver(o.driver),
+    };
+  }
+
+  /**
+   * The two names a part cannot play without. An unknown preset drops the
+   * part (and is dangling — the gate's business); a part name with no strip
+   * still plays, through `DEFAULT_STRIP`, but is dangling too.
+   */
+  private identity(
+    o: Record<string, unknown>,
+    id: string,
+  ): { part: string; preset: string } | null {
+    const part = typeof o.part === 'string' && o.part !== '' ? o.part : id;
+    if (o.part !== undefined && o.part !== part) {
+      this.correction(`${id}.part: ${show(o.part)} is not a name — using "${id}"`);
+    }
+    if (typeof o.preset !== 'string') {
+      this.correction(`${id}: a part needs a preset, and a preset has no default — part dropped`);
+      return null;
+    }
+    if (!Object.hasOwn(PRESETS, o.preset)) {
+      this.dangling.push(`${id}.preset: no preset "${o.preset}" is defined`);
+      this.correction(`${id}: unknown preset "${o.preset}" — part dropped`);
+      return null;
+    }
+    if (!Object.hasOwn(MIX, part))
+      this.dangling.push(`${id}.part: the MIX defines no strip "${part}"`);
+    return { part, preset: o.preset };
+  }
+
+  private euclideanDriver(raw: unknown, path: string): EuclideanDriver {
+    const d = DEFAULT_EUCLIDEAN_CONFIG;
+    const o = this.section(raw, path);
+    this.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density'], path);
+    const steps = this.int(o.steps, d.steps, 1, 64, `${path}.steps`);
+    return {
+      steps,
+      divisor: this.divisor(o.divisor, d.divisor, `${path}.divisor`),
+      pulses: this.pulses(o.pulses, steps, `${path}.pulses`),
+      rotate: this.int(o.rotate, 0, -steps, steps, `${path}.rotate`),
+      density: this.density(o.density, `${path}.density`),
+    };
+  }
+
+  private pulses(
+    raw: unknown,
+    steps: number,
+    path: string,
+  ): { min: number; max: number; start: number } {
+    const d = DEFAULT_EUCLIDEAN_CONFIG.pulses;
+    const o = this.section(raw, path);
+    this.dropUnknown(o, ['min', 'max', 'start'], path);
+    const min = this.int(o.min, Math.min(d.min, steps), 0, steps, `${path}.min`);
+    let max = this.int(o.max, Math.min(d.max, steps), 0, steps, `${path}.max`);
+    if (max < min) {
+      this.correction(`${path}: max ${max} below min ${min} — raised to ${min}`);
+      max = min;
+    }
+    const start = this.int(
+      o.start,
+      Math.min(Math.max(d.start, min), max),
+      min,
+      max,
+      `${path}.start`,
+    );
+    return { min, max, start };
+  }
+
+  private density(raw: unknown, path: string): DensityMod {
+    const o = this.section(raw, path);
+    const kind = this.pick(o.kind, DENSITY_MOD_KINDS, 'lfoBars', `${path}.kind`);
+    if (kind === 'walk') {
+      this.dropUnknown(o, ['kind', 'stepChance'], path);
+      return { kind, stepChance: this.num(o.stepChance, 0.5, 0, 1, `${path}.stepChance`) };
+    }
+    if (kind === 'lfoHz') {
+      this.dropUnknown(o, ['kind', 'hz', 'shape'], path);
+      return {
+        kind,
+        hz: this.num(o.hz, 0.1, 0, 20, `${path}.hz`),
+        shape: this.pick(o.shape, LFO_SHAPES, 'tri', `${path}.shape`),
+      };
+    }
+    this.dropUnknown(o, ['kind', 'bars', 'shape'], path);
+    return {
+      kind: 'lfoBars',
+      bars: this.num(o.bars, 8, 0.25, 256, `${path}.bars`),
+      shape: this.pick(o.shape, LFO_SHAPES, 'tri', `${path}.shape`),
+    };
+  }
+
+  private arpDriver(raw: unknown): ArpDriver {
+    const d = DEFAULT_ARPEGGIATOR_CONFIG;
+    const o = this.section(raw, 'arp.driver');
+    const known = ['divisor', 'poolSize', 'refreshBars', 'walk', 'skipChance', 'register', 'gate'];
+    this.dropUnknown(o, known, 'arp.driver');
+    return {
+      divisor: this.divisor(o.divisor, d.divisor, 'arp.driver.divisor'),
+      poolSize: this.int(o.poolSize, d.poolSize, 1, 16, 'arp.driver.poolSize'),
+      refreshBars: this.int(o.refreshBars, d.refreshBars, 1, 64, 'arp.driver.refreshBars'),
+      walk: this.pick(o.walk, ARP_WALK_MODES, d.walk, 'arp.driver.walk'),
+      skipChance: this.num(o.skipChance, d.skipChance, 0, 1, 'arp.driver.skipChance'),
+      register: this.register(o.register, d.register, 'arp.driver.register'),
+      gate: this.num(o.gate, d.gate, 0.01, 1, 'arp.driver.gate'),
+    };
+  }
+
+  private stepDriver(raw: unknown): StepDriver {
+    const d = DEFAULT_STEP_SEQUENCER_CONFIG;
+    const o = this.section(raw, 'drone.driver');
+    this.dropUnknown(o, ['divisor', 'gate', 'register'], 'drone.driver');
+    return {
+      divisor: this.divisor(o.divisor, d.divisor, 'drone.driver.divisor'),
+      gate: this.num(o.gate, d.gate, 0.01, 1, 'drone.driver.gate'),
+      register: this.register(o.register, d.register, 'drone.driver.register'),
+    };
+  }
+
+  private register(raw: unknown, fallback: Register, path: string): Register {
+    const o = this.section(raw, path);
+    this.dropUnknown(o, ['octave', 'span'], path);
+    return {
+      octave: this.int(o.octave, fallback.octave, -8, 8, `${path}.octave`),
+      span: this.int(o.span, fallback.span, 1, 8, `${path}.span`),
+    };
+  }
+
+  /** Strip overlays over `MIX`. A name with no strip, or a send to no return, is dangling. */
+  mix(raw: unknown): Record<string, ChannelStrip> | undefined {
+    if (raw === undefined) return undefined;
+    const o = this.section(raw, 'mix');
+    const out: Record<string, ChannelStrip> = {};
+    for (const [name, value] of Object.entries(o)) {
+      if (!Object.hasOwn(MIX, name)) {
+        this.dangling.push(`mix.${name}: the MIX defines no strip "${name}"`);
+        this.correction(`mix.${name}: dropped`);
+        continue;
+      }
+      out[name] = this.strip(value, name);
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  }
+
+  private strip(raw: unknown, name: string): ChannelStrip {
+    const base = stripFor(MIX, name);
+    const o = this.section(raw, `mix.${name}`);
+    this.dropUnknown(o, ['level', 'pan', 'sends'], `mix.${name}`);
+    return {
+      level: this.num(o.level, base.level, 0, 4, `mix.${name}.level`),
+      pan: this.num(o.pan, base.pan, -1, 1, `mix.${name}.pan`),
+      sends: this.sends(o.sends, base.sends, `mix.${name}.sends`),
+    };
+  }
+
+  /** Sends overlay the base per return — set a send to 0 to silence it — the
+   * same only-named-fields semantics `AudioSystem.apply` uses live. */
+  private sends(raw: unknown, base: ChannelStrip['sends'], path: string): ChannelStrip['sends'] {
+    if (raw === undefined) return { ...base };
+    const o = this.section(raw, path);
+    const out: Record<string, number> = {};
+    for (const [name, amount] of Object.entries(base)) {
+      if (amount !== undefined) out[name] = amount;
+    }
+    for (const [name, amount] of Object.entries(o)) {
+      if (!Object.hasOwn(RETURNS, name)) {
+        this.dangling.push(`${path}.${name}: no return "${name}" is defined`);
+        this.correction(`${path}.${name}: dropped`);
+        continue;
+      }
+      out[name] = this.num(amount, 0, 0, 1, `${path}.${name}`);
+    }
+    return out;
+  }
+}

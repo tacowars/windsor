@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ARRANGEMENT, type Arrangement } from './arrangement';
+import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
+import type { Arrangement } from './arrangement';
 import { ArrangementPlayer, type MusicPartId, type PlayablePart } from './arrangementPlayer';
 import type { Patch } from './patch';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
@@ -54,7 +55,7 @@ interface Rig {
   run(bars: number): void;
 }
 
-function rig(arrangement: Arrangement = ARRANGEMENT): Rig {
+function rig(arrangement: Arrangement = FULL_ARRANGEMENT): Rig {
   const transport = new TickTransport(120);
   const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
   const events: Rig['events'] = [];
@@ -72,14 +73,14 @@ const kinds = (part: RecordingPart, kind: Call['kind']): Call[] =>
 
 /** One sounding degree, one octave: every drone draw is the same MIDI note. */
 const TIED: Arrangement = {
-  ...ARRANGEMENT,
+  ...FULL_ARRANGEMENT,
   key: { root: 48, scale: [0], weights: [1] },
 };
 
 describe('bindings', () => {
   it('takes the transport tempo from the arrangement', () => {
     const { transport } = rig();
-    expect(transport.bpm).toBe(ARRANGEMENT.bpm);
+    expect(transport.bpm).toBe(FULL_ARRANGEMENT.bpm);
   });
 
   it('sounds all four parts within 8 bars and announces each part once', () => {
@@ -98,9 +99,9 @@ describe('bindings', () => {
     const { parts, run } = rig();
     run(2);
     for (const call of kinds(parts.kick, 'trigger')) {
-      expect(call.note).toBe(ARRANGEMENT.kick.note);
-      expect(call.velocity).toBe(ARRANGEMENT.kick.velocity);
-      expect(call.duration).toBe(ARRANGEMENT.kick.hold);
+      expect(call.note).toBe(FULL_ARRANGEMENT.kick.note);
+      expect(call.velocity).toBe(FULL_ARRANGEMENT.kick.velocity);
+      expect(call.duration).toBe(FULL_ARRANGEMENT.kick.hold);
     }
   });
 
@@ -140,5 +141,20 @@ describe('bindings', () => {
     for (const kind of allKinds) {
       expect(['trigger', 'noteOn', 'noteOffByNote']).toContain(kind);
     }
+  });
+
+  it('plays only the parts the arrangement defines (issue #75)', () => {
+    const kickOnly: Arrangement = {
+      seed: FULL_ARRANGEMENT.seed,
+      bpm: FULL_ARRANGEMENT.bpm,
+      key: FULL_ARRANGEMENT.key,
+      kick: FULL_ARRANGEMENT.kick,
+    };
+    const { parts, player, run } = rig(kickOnly);
+    run(4);
+    expect(player.readout().counters.kick).toBeGreaterThan(0);
+    expect(parts.hat.calls).toEqual([]);
+    expect(parts.arp.calls).toEqual([]);
+    expect(parts.drone.calls).toEqual([]);
   });
 });

@@ -1,14 +1,18 @@
 /**
- * The arrangement: the four parts of
- * docs/log/2026-08-31-generative-sequencing-transport-and-pitch.md §7 as
- * exported plain data with exported types.
+ * Arrangement types, the merge, and the diagnostic fallback.
  *
- * Everything tunable lives here, not in a constructor call or a private field:
- * the arrangement console (#70) reads this to populate controls and writes it
- * back as a document overlay, and `AudioSystem.apply()` merges a partial onto
- * it live. Key, scale, degree weights, register split and LFO periods are
- * tuning by ear — these values are defensible starting points for the
- * maintainer's listen (issue #69), not the deliverable.
+ * The musical arrangement itself is not TypeScript any more (issue #75): it is
+ * a JSON document under `arrangements/`, imported at build time and normalised
+ * by `makeArrangement` (`arrangementDocument.ts`) — decision record
+ * `2026-08-31-arrangement-console-and-runtime-arrangements` §3. This file keeps
+ * what the code itself owns: the types, the apply-over-defaults merge, and
+ * `FALLBACK_ARRANGEMENT`.
+ *
+ * The four part slots are optional: a document ships only the parts it
+ * defines, an absent slot builds no generator and makes no sound, and nothing
+ * ever defaults a missing part to something musical — a hardwired musical
+ * stand-in is invisible precisely because the real arrangement is generative
+ * (record §4).
  *
  * Seeds are deliberately absent from the driver configs: the one `seed` below
  * plus a fixed per-part generator index (`GENERATOR_INDEX`,
@@ -18,6 +22,7 @@
 import type { ArpeggiatorConfig } from './arpeggiator';
 import type { EuclideanConfig } from './euclideanSequencer';
 import type { ScaleName } from './scaleSampler';
+import { DIVISORS } from './scheduler';
 import type { StepSequencerConfig } from './stepSequencer';
 
 /** A driver config as the arrangement stores it: the player injects the seed. */
@@ -69,83 +74,62 @@ export interface Arrangement {
   readonly seed: number;
   readonly bpm: number;
   readonly key: ArrangementKey;
-  readonly kick: PercussionArrangement;
-  readonly hat: PercussionArrangement;
-  readonly arp: ArpArrangement;
-  readonly drone: DroneArrangement;
+  readonly kick?: PercussionArrangement;
+  readonly hat?: PercussionArrangement;
+  readonly arp?: ArpArrangement;
+  readonly drone?: DroneArrangement;
 }
 
 /**
- * The shipped arrangement. D dorian, tonic-weighted with the fifth and the
- * minor third next, so the emergent harmony centres without a progression.
- * Kick breathes over 8 bars, hat over 3 (coprime, so the two densities agree
- * only every 24 bars — record §3); the hat figure is rotated off the kick's
- * downbeat. The arp walks up-down in the octave above the root; the drone
- * holds bar-long notes an octave below it.
+ * The fallback is a diagnostic click, not a musical default (record §4): one
+ * percussion part on a quarter-note pulse — no sends, no harmony, no
+ * generative movement. It plays only when nothing usable survives
+ * `makeArrangement`, and it is deliberately unmusical so it can never be
+ * mistaken for the arrangement. It is also more informative than silence: a
+ * click proves the context resumed, the worklets loaded, the routing works
+ * and the master path is open, which narrows the fault to the document alone.
+ *
+ * The narrow type is the "one part" guarantee: exactly the kick slot is
+ * populated, so no pitched generator exists to draw from the (unused) key.
  */
-export const ARRANGEMENT: Arrangement = {
-  seed: 204,
-  bpm: 96,
-  key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+export const FALLBACK_ARRANGEMENT: Arrangement & { readonly kick: PercussionArrangement } = {
+  seed: 0,
+  bpm: 120,
+  // No pitched part exists to draw from this; it is here because a key is
+  // structurally required, and it is a single root on purpose — nothing musical.
+  key: { root: 60, scale: [0], weights: [1] },
   kick: {
-    part: 'kick',
-    preset: 'kick',
-    note: 36,
+    // Deliberately not a MIX strip: the click routes through DEFAULT_STRIP —
+    // unity, centred, and with no sends — whatever the shipped mix says.
+    part: 'click',
+    preset: 'pickup-blip',
+    note: 76,
     velocity: 1,
-    hold: 0.2,
+    hold: 0.05,
     driver: {
-      steps: 16,
-      divisor: 6,
-      pulses: { min: 2, max: 5, start: 4 },
+      steps: 4,
+      divisor: DIVISORS.quarter,
+      // min === max: E(4,4) fires every step and the density LFO has nothing
+      // to modulate, so the pulse never varies and no RNG is consumed — the
+      // one part is not generative.
+      pulses: { min: 4, max: 4, start: 4 },
       rotate: 0,
-      density: { kind: 'lfoBars', bars: 8, shape: 'tri' },
+      density: { kind: 'lfoBars', bars: 1, shape: 'tri' },
     },
-  },
-  hat: {
-    part: 'hat',
-    preset: 'hat',
-    note: 42,
-    velocity: 0.6,
-    hold: 0.08,
-    driver: {
-      steps: 16,
-      divisor: 6,
-      pulses: { min: 5, max: 12, start: 8 },
-      rotate: 2,
-      density: { kind: 'lfoBars', bars: 3, shape: 'sine' },
-    },
-  },
-  arp: {
-    part: 'arp',
-    preset: 'saw-arp',
-    velocity: 0.7,
-    driver: {
-      divisor: 6,
-      poolSize: 4,
-      refreshBars: 4,
-      walk: 'updown',
-      skipChance: 0.3,
-      register: { octave: 1, span: 2 },
-      gate: 0.6,
-    },
-  },
-  drone: {
-    part: 'drone',
-    preset: 'drone-sqr',
-    velocity: 0.8,
-    driver: { divisor: 96, gate: 1, register: { octave: -1, span: 1 } },
   },
 };
 
 /**
  * A recursive partial of the arrangement, for `AudioSystem.apply()`. Arrays
- * (weights, an explicit scale) are replaced wholesale, never merged.
+ * (weights, an explicit scale) are replaced wholesale, never merged. The
+ * `NonNullable` unwrap is what lets a partial reach inside the optional part
+ * slots.
  */
 export type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends readonly unknown[]
+  [K in keyof T]?: NonNullable<T[K]> extends readonly unknown[]
     ? T[K]
-    : T[K] extends object
-      ? DeepPartial<T[K]>
+    : NonNullable<T[K]> extends object
+      ? DeepPartial<NonNullable<T[K]>>
       : T[K];
 };
 
@@ -168,6 +152,8 @@ function mergeValue(current: unknown, partial: unknown, path: string, ignored: s
     for (const [key, value] of Object.entries(partial)) {
       const childPath = path === '' ? key : `${path}.${key}`;
       if (!(key in current)) {
+        // Also where a partial naming an absent part slot lands: a part that
+        // was never initialised has no AudioPart and cannot be added live.
         ignored.push(childPath);
         continue;
       }

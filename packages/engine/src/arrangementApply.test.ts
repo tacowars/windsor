@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ARRANGEMENT, type Arrangement, type DeepPartial } from './arrangement';
+import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
+import type { Arrangement, DeepPartial } from './arrangement';
 import { ArrangementPlayer, type MusicPartId, type PlayablePart } from './arrangementPlayer';
 import type { Patch } from './patch';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
@@ -51,7 +52,7 @@ interface Rig {
   run(bars: number): void;
 }
 
-function rig(arrangement: Arrangement = ARRANGEMENT): Rig {
+function rig(arrangement: Arrangement = FULL_ARRANGEMENT): Rig {
   const transport = new TickTransport(120);
   const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
   const player = new ArrangementPlayer(transport, parts, arrangement);
@@ -103,7 +104,7 @@ describe('apply', () => {
     run(4);
     const after = parts.arp.calls.filter((c) => c.kind === 'noteOn').length;
     // 96 / divisor 6 = 16 steps per bar, none skipped.
-    expect(after - before).toBe(4 * (TICKS_PER_BAR / ARRANGEMENT.arp.driver.divisor));
+    expect(after - before).toBe(4 * (TICKS_PER_BAR / FULL_ARRANGEMENT.arp.driver.divisor));
   });
 
   it('swaps a preset via setPatch without rebuilding that part', () => {
@@ -112,7 +113,7 @@ describe('apply', () => {
     const patches = parts.arp.calls.filter((c) => c.kind === 'setPatch');
     expect(patches).toEqual([{ kind: 'setPatch', patch: 'Drift Pad' }]);
     expect(parts.arp.calls.filter((c) => c.kind === 'allNotesOff')).toHaveLength(0);
-    expect(player.arrangement.arp.preset).toBe('pad-drift');
+    expect(player.arrangement.arp?.preset).toBe('pad-drift');
   });
 
   it('refuses an unknown preset and changes nothing', () => {
@@ -120,7 +121,7 @@ describe('apply', () => {
     const result = player.apply({ arp: { preset: 'nope' } });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/unknown audio preset "nope"/);
-    expect(player.arrangement.arp.preset).toBe(ARRANGEMENT.arp.preset);
+    expect(player.arrangement.arp?.preset).toBe(FULL_ARRANGEMENT.arp.preset);
   });
 
   it('refuses a live part rename', () => {
@@ -135,7 +136,7 @@ describe('apply', () => {
     const result = player.apply({ key: { weights: [0, 0, 0, 0, 0, 0, 0] } });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/zero/);
-    expect(player.arrangement.key).toEqual(ARRANGEMENT.key);
+    expect(player.arrangement.key).toEqual(FULL_ARRANGEMENT.key);
     run(2);
     expect(parts.arp.calls.filter((c) => c.kind === 'noteOn').length).toBeGreaterThan(0);
   });
@@ -155,7 +156,7 @@ describe('apply', () => {
     expect(
       player.apply({ hat: { driver: { density: { kind: 'walk', stepChance: 0.5 } } } }).ok,
     ).toBe(true);
-    expect(player.arrangement.hat.driver.density).toEqual({ kind: 'walk', stepChance: 0.5 });
+    expect(player.arrangement.hat?.driver.density).toEqual({ kind: 'walk', stepChance: 0.5 });
   });
 
   it('reseeds every stream on a seed change', () => {
