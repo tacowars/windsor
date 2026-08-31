@@ -1,0 +1,13 @@
+{
+  "worklets": [
+    {
+      "url": "/src/audio/worklet/fm-processor.js",
+      "ok": true
+    },
+    {
+      "url": "/src/audio/worklet/reverb-processor.js",
+      "ok": true
+    }
+  ],
+  "engine": "booted"
+}
