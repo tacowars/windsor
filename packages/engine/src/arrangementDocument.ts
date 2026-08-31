@@ -22,6 +22,7 @@
 import type { Arrangement, ArrangementKey } from './arrangement';
 import type { ArpArrangement, DroneArrangement, PercussionArrangement } from './arrangement';
 import { FALLBACK_ARRANGEMENT } from './arrangement';
+import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
 import type { ChannelStrip } from './mix';
 
@@ -88,29 +89,60 @@ interface MutableDocument {
 
 function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-    n.correction(`document: ${JSON.stringify(raw) ?? String(raw)} is not an object`);
+    n.correction(`document: ${show(raw)} is not an object`);
     return null;
   }
   const o = raw as Record<string, unknown>;
   n.dropUnknown(o, DOCUMENT_KEYS, '');
-  const kick = n.percussion(o.kick, 'kick');
-  const hat = n.percussion(o.hat, 'hat');
-  const arp = n.arp(o.arp);
-  const drone = n.drone(o.drone);
+  const parts: NormalisedParts = {
+    kick: n.percussion(o.kick, 'kick'),
+    hat: n.percussion(o.hat, 'hat'),
+    arp: n.arp(o.arp),
+    drone: n.drone(o.drone),
+  };
+  dropDuplicateParts(parts, n);
   // No playable part left: an absent part must not be invented (record §4),
   // so this document has nothing to play and the caller falls back.
-  if (!kick && !hat && !arp && !drone) return null;
+  if (!parts.kick && !parts.hat && !parts.arp && !parts.drone) return null;
 
   const document: MutableDocument = {
     seed: n.int(o.seed, 0, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 'seed'),
     bpm: n.num(o.bpm, 120, 20, 300, 'bpm'),
     key: n.key(o.key),
   };
-  if (kick) document.kick = kick;
-  if (hat) document.hat = hat;
-  if (arp) document.arp = arp;
-  if (drone) document.drone = drone;
+  if (parts.kick) document.kick = parts.kick;
+  if (parts.hat) document.hat = parts.hat;
+  if (parts.arp) document.arp = parts.arp;
+  if (parts.drone) document.drone = parts.drone;
   const mix = n.mix(o.mix);
   if (mix) document.mix = mix;
   return document;
+}
+
+interface NormalisedParts {
+  kick: PercussionArrangement | null;
+  hat: PercussionArrangement | null;
+  arp: ArpArrangement | null;
+  drone: DroneArrangement | null;
+}
+
+/**
+ * Two slots sharing one part name would fight over one engine part and one
+ * strip — the later creation replaces the earlier in both registries, leaving
+ * the first part's strip uncontrollable and undisposed — so the later slot
+ * drops, reported.
+ */
+function dropDuplicateParts(parts: NormalisedParts, n: ArrangementNormaliser): void {
+  const used = new Map<string, string>();
+  for (const id of ['kick', 'hat', 'arp', 'drone'] as const) {
+    const section = parts[id];
+    if (!section) continue;
+    const owner = used.get(section.part);
+    if (owner !== undefined) {
+      n.correction(`${id}: part name "${section.part}" is already used by ${owner} — part dropped`);
+      parts[id] = null;
+    } else {
+      used.set(section.part, id);
+    }
+  }
 }
