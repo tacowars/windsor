@@ -1,0 +1,1361 @@
+{
+  "url": "http://localhost:5173/?debug=1",
+  "seconds": 20,
+  "console": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "BJS - [16:57:31]: Babylon.js v9.23.0 - WebGPU1 engine"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"engine\",\"backend\":\"WebGPU\",\"gpu\":\"apple metal-3 unknown version\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"debug\",\"shim\":true,\"bridge\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"bridge\",\"name\":\"Aotearoa204 WebGPU\",\"port\":4400,\"connected\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":285}"
+    }
+  ],
+  "consoleErrorsOrWarnings": [],
+  "logEntries": [],
+  "logErrorsOrWarnings": [],
+  "networkCount": 330,
+  "networkNotOk": [],
+  "network": [
+    {
+      "url": "http://localhost:5173/?debug=1",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@vite/client",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/main.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_scene.js?v=12c8ab7d",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Lights_hemisphericLight.js?v=fe1b321e",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Materials_standardMaterial.js?v=a33b11f2",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Maths_math__color.js?v=e2b980a3",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Maths_math__vector.js?v=fbf8156f",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Meshes_Builders_capsuleBuilder.js?v=b7e8ff49",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/index.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/index.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/benchMode.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/options.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/buildActions.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/buildingSystem.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/buildOptions.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/thinInstanceRenderer.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/audioShim.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/events.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/index.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/pieceShim.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/engine.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/horde/hordeOptions.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/horde/hordeSystem.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/physics/fixedStep.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/physics/havok.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/physics/pieceBodies.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/physics/pieceColliders.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/physics/terrainColliders.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/player/followCamera.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/player/havokMotor.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/player/input.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/player/movement.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/stats.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/terrain/chunkManager.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/rolldown-runtime-7_rZTKki.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/scene.pure-Cf47ib9_.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/hemisphericLight-ROBXe7xL.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/capsuleBuilder.pure-BDUMDuUu.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/standardMaterial-jrQsiL0-.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/audioSystem.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/arrangement.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/arrangementPlayer.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/musicControls.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/musicOptions.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/fmEngine.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/audioPart.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/scheduler.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/audioBus.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/mix.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/returnBus.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/channelStrip.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/stereoRotate.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/reverbSpace.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/offlineRender.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/babylonBridge.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/presets.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/patch.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/euclid.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/generatorSeed.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/scaleSampler.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/euclideanSequencer.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/arpeggiator.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/stepSequencer.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/math.color.pure-DRx7Wyus.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/terrain/heightmap.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/terrain/chunks.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/protocol.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/constants.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/pieces.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/lattice.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/ramp.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/grid.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/support.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/rules.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/building/fortLayout.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/navigation.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/flowFieldConstants.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/columnCost.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/flowField.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/hordeConstants.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/hordeState.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/spawnArc.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/separation.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/footing.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/wallBlocking.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/hordeSim.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/routeIds.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/collect.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/header.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/report.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/route.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/sampler.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/summary.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/node_modules/vite/dist/client/env.mjs",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/math.vector.pure-B5vuPJZO.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Meshes_thinInstanceMesh.js?v=7eb86846",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/instanceSet.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/pieceMeshes.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/buildInput.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/ghost.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/snapping.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/targeting.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/api.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/bridge.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/buildShim.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/commands.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/groundProbe.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Physics_joinedPhysicsEngineComponent.js?v=7206052c",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Physics_v2_physicsEngineComponent.js?v=4fe5afcc",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/node_modules/@babylonjs/havok/lib/esm/HavokPhysics_es.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Physics_v2_Plugins_havokPlugin.js?v=b4ef42b6",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Engines_engine.js?v=ca66970e",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Engines_webgpuEngine.js?v=e91011b3",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/horde/frustumCount.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/horde/hordeMatrices.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/horde/hordeRenderer.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Meshes_transformNode.js?v=1d020ff6",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Physics_v2_physicsBody.js?v=024055a9",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Physics_v2_physicsShape.js?v=6fc4aaa0",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Physics_v2_IPhysicsEnginePlugin.js?v=2c9d8af7",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/physics/heightfieldLayout.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Cameras_arcRotateCamera.js?v=7ff6499b",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/player/cameraDefaults.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Physics_v2_characterController.js?v=a9515c48",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Meshes_mesh.js?v=a2c6503c",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Meshes_mesh__vertexData.js?v=bef8db61",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/renderInstrumentation.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/terrain/chunkMesh.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/mesh.vertexData-BCzpgEwa.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/mesh.pure-CmKqesAi.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/compatibilityOptions-P84bF9CD.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/typeStore-CcUKQsoh.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/decorators-BEy4LIVs.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/decorators.serialization-Cl1H4rdq.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/node-DEi2SdzY.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/uniformBuffer--branJsP.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/lightConstants-BQi9APOZ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/workletMessages.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engineStore-7gIHQEpl.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/devTools-CKLbmJIz.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/timingTools-CLb_PF7k.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/smartArray-DLpzevPx.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/shaderStore-_ZEMPHPT.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/buffer.pure-C2gFlxlc.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/material.pure-DWFsLfPm.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_AudioV2_abstractAudio_audioEngineV2.js?v=821c5f2f",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_AudioV2_webAudio_webAudioEngine.js?v=3a3fab76",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/observable-UrcgUWqC.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/math.scalar.functions-Dk-oXBgF.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/precisionDate-DcyXMgyW.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/logger-CFMNx9DZ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/tools.pure-B6CO6Zd5.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/guid-ENO4KMa-.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/tools.functions-CqYw7cQM.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Maths_math__frustum.js?v=2849ecdb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/pickingInfo-DfkLoL80.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/sceneComponent-CDMhm3YU.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/deviceInputEvents-CrOfazF3.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/renderingManager-oUSle_0L.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/perfCounter-DK9_rFXo.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/presetsDrums.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/presetsMusic.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/audio/presetsSfx.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/columnMirror.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/packages/shared/src/horde/indexedMinHeap.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Engines_abstractEngine.js?v=dadda277",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Cameras_camera.js?v=d44392f0",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/bench/verdict.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/subMesh.pure-WOzR-sy_.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Meshes_Builders_boxBuilder.js?v=f325ffff",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/building/rampWedge.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Culling_ray.js?v=48ff128e",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/frameWindow.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/src/debug/motorScript.ts",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/performanceConfigurator-Cu9q8oSI.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/joinedPhysicsEngineComponent-0S-4fEze.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webgpuEngine.pure-CtnT4BBR.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webgpuEngine-BuUVOMvV.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/transformNode.pure-QE7U0YGY.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Maths_math__plane.js?v=befc9f9a",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engine-C4pm-umg.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/physicsRaycastResult-CSMarak5.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/instancedMesh.pure-CuMnpcbJ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/arcRotateCamera-B-FwE3up.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Engines_AbstractEngine_abstractEngine__timeQuery.js?v=fa96740b",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Engines_Extensions_engine__query.js?v=53cd6c59",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Instrumentation_engineInstrumentation.js?v=215496e9",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Instrumentation_sceneInstrumentation.js?v=0f0d03a6",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/camera.pure-2WWpIi-4.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractMesh.pure-C7tnC-fS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engine.dynamicBuffer.pure-DLzA6Yeu.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webAudioEngine-B-cLUTmp.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractEngine.pure-B-nFBszp.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/drawWrapper-BlQo3WGB.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webRequest-bajPtrLD.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/boxBuilder.pure-CDftgMwa.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/ray.pure-BCNlHpqe.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/intersectionInfo-zc1hrMn7.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractEngine.textureLoaders-BLagNw2l.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engine.query-D20EpxHh.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/clearQuad.vertex-sf3zthyF.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/clearQuad.fragment-CajtDZwL.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bakedVertexAnimationDeclaration-r0c4yI-2.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bakedVertexAnimation-BTV2D3yS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/instancesDeclaration-DPDaWQjg.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/instancesVertex-BMh5vkhD.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/helperFunctions-Dp1vZK1O.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/fresnelFunction-V0G-Vdne.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/meshUboDeclaration-DlShg0u5.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/sceneUboDeclaration-B9LOO1tB.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/decalFragment-62xA8MR3.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engine.alphaToCoverage.pure-CmqfXwww.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractEngine.renderPass.pure-DzdMFc2z.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webgpuCacheRenderPipeline-DaUnxs7W.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/textureTools-CcDUTTu2.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engine.query-D1UDmsU8.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/math.axis-B98u9zlN.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/math.size-D406vSka.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractAudioNode-D3ikWrSS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/texture.pure-aXfOLIpg.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/@fs/Volumes/Sendai/code/Aotearoa204-wt-69/node_modules/@babylonjs/havok/lib/esm/HavokPhysics.wasm",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_inspector.js?v=23990e7a",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/@babylonjs_core_Shaders_postprocess__vertex.js?v=e8cbf050",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/index-e-IsQ9rh-8CjGGdfJ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/debugLayer-CGddiI4E.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/texture-S_JfmcSl.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/constants-DUfjA-Ea.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/multiRenderTarget-vAz1GpLS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/instancedMesh-CfMv9GUY.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/tools-b1ckO7Y8.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/skyMaterial-ukJ_syRm.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/gaussianSplattingMesh.pure-C2TJA0sV.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/skeleton-BSII6kCY.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/spotLight.pure-DRtXRnn6.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/sceneLoader-DAFKcBDn.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/animation-HP0Ze7qQ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphCoordinator-BXFHSAIy.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/multiMaterial-D9kYSGL8.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/renderTargetTexture-C0xegbuR.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/glTFFileLoader.pure-B9EmSJwS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/shaderMaterial.pure-jEBgyE-F.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/linesMesh.pure-fgMWVce0.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/environmentTextureTools.pure-CoPehfN1.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/openpbrMaterial.pure-BKmPdqWQ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/pbrBaseMaterial.pure-DqfNV3hw.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/buffer-BPDj2Djw.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bone.pure-h8Is1xL9.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/rawTexture-qBZ0dS29.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engine.multiRender.pure-BlTPtcd_.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphBlock-BTMaGFYH.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphAssetsContext-ZlHtjmzv.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphExecutionBlock-DB1Pk-RS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphAsyncExecutionBlock-CYNlURno.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/utils-b5VHOVjS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphEventBlock-CdEqANjQ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/lazy-BuXZ2uNw.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/assetContainer-DpjtJFRD.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/dumpTools.pure-EcyDO-n1.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/cubemapToSphericalPolynomial-CDf2VNUT.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/brdfTextureTools-DdXjcXcB.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphInteger.pure-CdXIfSeW.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphRichTypes.pure-CIBgNQTt.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/flowGraphExecutionBlockWithOutSignal-hK_ksE59.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/clusteredLightContainer.pure-urtfVrX8.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/pointLight.pure-Sf7X5WpW.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/audioSceneComponent.pure-Ch8ffs6U.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/animationGroup.pure-CCa6Kyo4.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/sound.pure-Cfft9Dmm.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/morphTargetManager-CmlF8Ccs.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/math.vector.functions-CYSg4K9N.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/storageBuffer-DZTXq6Mr.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/rectAreaLight.pure-gqsYmrzu.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/cubeTexture.pure-C6WHMcwM.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/proceduralTexture.pure-QyFj_wB5.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/pbrMaterial.pure-D_bEA-Qp.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/engine.dynamicTexture.pure-72RzLel_.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/fogFragment-CRzJ7MXB.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/logDepthDeclaration-DHbwmurC.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/helperFunctions-CffbvRxg.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/logDepthVertex-CO33pb1J.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/chromaticAberration.fragment-Dllye4e9.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/ssaoCombine.fragment-CVz8DfK6.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/computeShader.pure-Cob2iGju.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/hdr-DCDIQC-k.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/spatialWebAudio-BxNknYUM.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webAudioSoundSource-otcAyB9c.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webAudioStaticSound-BV-A6OkX.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webAudioStreamingSound-BNIFtfQZ.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/morphTarget-Cdv0CKwA.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractSoundSource-ByVOaSZP.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/webAudioBaseSubGraph-DnKpDR-A.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractSoundInstance-CvVrDq72.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/default.vertex-D1ihwhlm.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/default.fragment-CckSm399.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bonesDeclaration-DJ8J1_3t.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bonesVertex-DDVjXrdM.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/clipPlaneVertexDeclaration-B3I_Rh25.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/shadowsVertex-oNI4rm5J.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/logDepthDeclaration-ntCM6Y4F.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/morphTargetsVertexGlobal-sstjsRWf.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/morphTargetsVertexGlobalDeclaration-m01Okp1x.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/fogVertexDeclaration-DlW9itOf.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/fogVertex-BWHPTu9J.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/logDepthVertex-Dd4a-xR6.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/vertexColorMixing-rgQ1gpg_.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/defaultUboDeclaration-H6ENFvmw.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/mainUVVaryingDeclaration-AjaH3zZK.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/samplerVertexImplementation-DQn5rbeS.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bumpVertexDeclaration-C4mr1oLF.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/lightVxFragmentDeclaration-cjtoBlSu.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/vertexPullingDeclaration-CBCjvAH8.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bumpVertex-E1VlQ_jb.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/bumpFragmentMainFunctions-CO8FU4we.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/samplerFragmentDeclaration-B6svSYw9.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/clipPlaneFragmentDeclaration-CPZanvOM.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/fogFragment-CavXDJLb.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/logDepthFragment-EcLFTgHG.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/imageProcessingFunctions-CI_Vundc.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/lightFragment-DnATmFRg.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/shadowsFragmentFunctions-o4DE3KMl.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/clusteredLightingFunctions-CYNo3Onj.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/lightsFragmentFunctions-DoVbEER1.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/reflectionFunction-OpLgQNTt.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/oitFragment-CncZLoNt.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/depthPrePass-Dv-M9FFa.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/abstractAudioBus-Go1VT2eR.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/audioBus-B15qufI5.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/mainAudioBus-C0v5MwQu.js?v=f1d71012",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:5173/node_modules/.vite/deps/glTFLoaderExtensionRegistry-C8EZiOis.js?v=f1d71012",
+      "status": 200
+    }
+  ]
+}

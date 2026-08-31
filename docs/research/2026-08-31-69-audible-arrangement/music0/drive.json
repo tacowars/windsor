@@ -1,0 +1,121 @@
+{
+  "url": "http://localhost:5173/?debug=1&music=0&bridge=0",
+  "gesture": true,
+  "steps": {
+    "readoutBeforeGesture": {
+      "bpm": 96,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 0,
+        "hat": 0,
+        "arp": 0,
+        "drone": 0
+      },
+      "muted": false,
+      "running": false
+    },
+    "readoutAfterGesture": {
+      "bpm": 96,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 0,
+        "hat": 0,
+        "arp": 0,
+        "drone": 0
+      },
+      "muted": false,
+      "running": false
+    },
+    "applyBpm90": {
+      "ok": true,
+      "ignored": []
+    },
+    "readoutAfterApply": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 0,
+        "hat": 0,
+        "arp": 0,
+        "drone": 0
+      },
+      "muted": false,
+      "running": false
+    },
+    "applyUnknownKey": {
+      "ok": true,
+      "ignored": [
+        "bogus"
+      ]
+    },
+    "readoutMuted": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 0,
+        "hat": 0,
+        "arp": 0,
+        "drone": 0
+      },
+      "muted": false,
+      "running": false
+    },
+    "readoutUnmuted": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 0,
+        "hat": 0,
+        "arp": 0,
+        "drone": 0
+      },
+      "muted": false,
+      "running": false
+    },
+    "readoutFinal": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 0,
+        "hat": 0,
+        "arp": 0,
+        "drone": 0
+      },
+      "muted": false,
+      "running": false
+    }
+  },
+  "consoleDuringDrive": [],
+  "consoleReplayedBacklog": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "BJS - [17:01:18]: Babylon.js v9.23.0 - WebGPU1 engine"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"engine\",\"backend\":\"WebGPU\",\"gpu\":\"apple metal-3 unknown version\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"debug\",\"shim\":true,\"bridge\":false}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":185}"
+    }
+  ]
+}

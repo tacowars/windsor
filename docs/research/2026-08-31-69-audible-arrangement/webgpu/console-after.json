@@ -1,0 +1,68 @@
+{
+  "url": "http://localhost:5173/?debug=1",
+  "console": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "BJS - [16:57:31]: Babylon.js v9.23.0 - WebGPU1 engine"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"engine\",\"backend\":\"WebGPU\",\"gpu\":\"apple metal-3 unknown version\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"debug\",\"shim\":true,\"bridge\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"bridge\",\"name\":\"Aotearoa204 WebGPU\",\"port\":4400,\"connected\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":285}"
+    },
+    {
+      "type": "log",
+      "text": "BJS - [16:58:26]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"started\",\"bpm\":96,\"root\":50,\"scale\":\"dorian\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"kick\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"hat\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"arp\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"drone\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"muted\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"unmuted\"}"
+    }
+  ],
+  "consoleErrorsOrWarnings": [],
+  "logEntries": [],
+  "logErrorsOrWarnings": []
+}

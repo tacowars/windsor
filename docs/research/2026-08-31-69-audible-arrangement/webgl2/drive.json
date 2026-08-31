@@ -1,0 +1,162 @@
+{
+  "url": "http://localhost:5173/?debug=1&backend=webgl2",
+  "gesture": true,
+  "steps": {
+    "readoutBeforeGesture": {
+      "bpm": 96,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 0,
+        "hat": 0,
+        "arp": 0,
+        "drone": 0
+      },
+      "muted": false,
+      "running": false
+    },
+    "readoutAfterGesture": {
+      "bpm": 96,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 4,
+        "hat": 8,
+        "arp": 10,
+        "drone": 1
+      },
+      "muted": false,
+      "running": true
+    },
+    "applyBpm90": {
+      "ok": true,
+      "ignored": []
+    },
+    "readoutAfterApply": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 4,
+        "hat": 9,
+        "arp": 11,
+        "drone": 1
+      },
+      "muted": false,
+      "running": true
+    },
+    "applyUnknownKey": {
+      "ok": true,
+      "ignored": [
+        "bogus"
+      ]
+    },
+    "readoutMuted": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 6,
+        "hat": 13,
+        "arp": 16,
+        "drone": 2
+      },
+      "muted": true,
+      "running": false
+    },
+    "readoutUnmuted": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 7,
+        "hat": 15,
+        "arp": 21,
+        "drone": 2
+      },
+      "muted": false,
+      "running": true
+    },
+    "readoutFinal": {
+      "bpm": 90,
+      "root": 50,
+      "scale": "dorian",
+      "counters": {
+        "kick": 9,
+        "hat": 18,
+        "arp": 24,
+        "drone": 2
+      },
+      "muted": false,
+      "running": true
+    }
+  },
+  "consoleDuringDrive": [
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"started\",\"bpm\":96,\"root\":50,\"scale\":\"dorian\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"kick\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"hat\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"arp\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"note\",\"part\":\"drone\",\"tick\":0}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"muted\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"music\",\"state\":\"unmuted\"}"
+    }
+  ],
+  "consoleReplayedBacklog": [
+    {
+      "type": "debug",
+      "text": "[vite] connecting..."
+    },
+    {
+      "type": "debug",
+      "text": "[vite] connected."
+    },
+    {
+      "type": "log",
+      "text": "BJS - [16:58:52]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"engine\",\"backend\":\"WebGL2\",\"gpu\":\"ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))\"}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"debug\",\"shim\":true,\"bridge\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"bridge\",\"name\":\"Aotearoa204 WebGL2\",\"port\":4400,\"connected\":true}"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":316}"
+    },
+    {
+      "type": "log",
+      "text": "BJS - [16:59:48]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+    },
+    {
+      "type": "info",
+      "text": "[a204] {\"event\":\"chunks\",\"built\":63,\"disposed\":44,\"queued\":0,\"ms\":16}"
+    }
+  ]
+}

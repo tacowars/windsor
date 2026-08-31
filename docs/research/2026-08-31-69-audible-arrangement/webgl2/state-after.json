@@ -1,0 +1,57 @@
+{
+  "backend": "WebGL2",
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))",
+  "gitCommit": "7929d64",
+  "seed": 1,
+  "player": {
+    "x": 31.930802734700954,
+    "y": 14.837192834529802,
+    "z": 67.56780433170826,
+    "support": "supported",
+    "groundError": 0.14803162294457373,
+    "fallthroughs": 0,
+    "swapRegrounds": 0
+  },
+  "camera": {
+    "x": 31.930802734700954,
+    "y": 16.456995691931247,
+    "z": 61.6551059517775,
+    "yaw": -1.5707963267948966,
+    "pitch": 1.4,
+    "fovRadians": 0.9
+  },
+  "chunks": {
+    "byRing": [
+      48,
+      404,
+      1356
+    ],
+    "queueLength": 0,
+    "lastBuildMs": 0,
+    "budgetMs": 4
+  },
+  "colliders": {
+    "bodies": 48,
+    "swaps": 0
+  },
+  "building": {
+    "pieces": 0,
+    "wall": 0,
+    "floor": 0,
+    "ramp": 0,
+    "target": "wall -> 8,5,20 wallW out-of-reach"
+  },
+  "horde": null,
+  "render": {
+    "width": 1200,
+    "height": 1999,
+    "pinned": false
+  },
+  "script": {
+    "active": false
+  },
+  "frames": {
+    "status": "idle",
+    "count": 0
+  }
+}
