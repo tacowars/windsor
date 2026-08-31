@@ -1,7 +1,7 @@
 {
   "backend": "WebGPU",
   "gpu": "apple metal-3 unknown version",
-  "gitCommit": "7929d64",
+  "gitCommit": "9b55846",
   "seed": 1,
   "player": {
     "x": 31.926960270031348,

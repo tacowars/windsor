@@ -11,7 +11,7 @@
     },
     {
       "type": "log",
-      "text": "BJS - [16:57:31]: Babylon.js v9.23.0 - WebGPU1 engine"
+      "text": "BJS - [22:19:07]: Babylon.js v9.23.0 - WebGPU1 engine"
     },
     {
       "type": "info",
@@ -27,11 +27,11 @@
     },
     {
       "type": "info",
-      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":285}"
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1786,\"disposed\":0,\"queued\":0,\"ms\":260}"
     },
     {
       "type": "log",
-      "text": "BJS - [16:58:26]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+      "text": "BJS - [22:19:59]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
     },
     {
       "type": "info",

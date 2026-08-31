@@ -11,7 +11,7 @@
     },
     {
       "type": "log",
-      "text": "BJS - [16:58:52]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+      "text": "BJS - [22:20:27]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
     },
     {
       "type": "info",
@@ -27,15 +27,11 @@
     },
     {
       "type": "info",
-      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":316}"
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":292}"
     },
     {
       "type": "log",
-      "text": "BJS - [16:59:48]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
-    },
-    {
-      "type": "info",
-      "text": "[a204] {\"event\":\"chunks\",\"built\":63,\"disposed\":44,\"queued\":0,\"ms\":16}"
+      "text": "BJS - [22:20:53]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
     },
     {
       "type": "info",
