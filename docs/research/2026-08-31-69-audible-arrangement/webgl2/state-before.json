@@ -1,7 +1,7 @@
 {
   "backend": "WebGL2",
   "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))",
-  "gitCommit": "7929d64",
+  "gitCommit": "9b55846",
   "seed": 1,
   "player": {
     "x": 31.94042669692059,

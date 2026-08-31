@@ -38,8 +38,8 @@
       "scale": "dorian",
       "counters": {
         "kick": 4,
-        "hat": 9,
-        "arp": 11,
+        "hat": 8,
+        "arp": 10,
         "drone": 1
       },
       "muted": false,
@@ -56,10 +56,10 @@
       "root": 50,
       "scale": "dorian",
       "counters": {
-        "kick": 6,
-        "hat": 13,
-        "arp": 16,
-        "drone": 2
+        "kick": 5,
+        "hat": 12,
+        "arp": 15,
+        "drone": 1
       },
       "muted": true,
       "running": false
@@ -132,7 +132,7 @@
     },
     {
       "type": "log",
-      "text": "BJS - [16:58:52]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
+      "text": "BJS - [22:20:27]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
     },
     {
       "type": "info",
@@ -148,15 +148,11 @@
     },
     {
       "type": "info",
-      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":316}"
+      "text": "[a204] {\"event\":\"chunks\",\"built\":1785,\"disposed\":0,\"queued\":0,\"ms\":292}"
     },
     {
       "type": "log",
-      "text": "BJS - [16:59:48]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
-    },
-    {
-      "type": "info",
-      "text": "[a204] {\"event\":\"chunks\",\"built\":63,\"disposed\":44,\"queued\":0,\"ms\":16}"
+      "text": "BJS - [22:20:53]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation"
     }
   ]
 }
