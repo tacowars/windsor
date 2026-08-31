@@ -42,7 +42,12 @@ export class EngineHost {
     return this.system !== null;
   }
 
-  /** First user gesture: create the context, load the DSP, build the system. */
+  /**
+   * First user gesture: create the context, load the DSP, build the system.
+   * Blob URLs first; a `file://` origin refuses blob worklet modules
+   * (observed in the #70 browser verification), so on failure retry once
+   * with data URLs on a fresh context — nothing registered on the failed one.
+   */
   async enable(document: ArrangementDocument): Promise<void> {
     if (this.context) {
       await this.system?.unlock();
@@ -51,10 +56,22 @@ export class EngineHost {
     const dsp = window.__A204_DSP__;
     const blob = (source: string): string =>
       URL.createObjectURL(new Blob([source], { type: 'application/javascript' }));
+    const data = (source: string): string =>
+      `data:application/javascript;charset=utf-8,${encodeURIComponent(source)}`;
+    try {
+      await this.start(document, { fmUrl: blob(dsp.fm), reverbUrl: blob(dsp.reverb) });
+    } catch {
+      await this.start(document, { fmUrl: data(dsp.fm), reverbUrl: data(dsp.reverb) });
+    }
+  }
+
+  /** One attempt: a fresh context and the given module URLs, kept on success.
+   * The same URLs let a rebuilt engine re-init from the context's worklet
+   * module cache without re-registering the processors. */
+  private async start(document: ArrangementDocument, urls: WorkletUrls): Promise<void> {
+    void this.context?.close();
     this.context = new AudioContext({ latencyHint: 'interactive' });
-    // Created once and kept: the same URLs let a rebuilt engine re-init from
-    // the context's worklet module cache without re-registering processors.
-    this.urls = { fmUrl: blob(dsp.fm), reverbUrl: blob(dsp.reverb) };
+    this.urls = urls;
     this.analyser = this.context.createAnalyser();
     this.analyser.fftSize = 2048;
     await this.build(document);

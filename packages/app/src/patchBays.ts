@@ -59,6 +59,7 @@ function waveAndPitchLine(i: number): HTMLElement {
   const waveWrap = el('div', 'grow', '<span class="field-label">Wave</span>');
   const waveSel = document.createElement('select');
   waveSel.className = 'field';
+  waveSel.name = `wave-op-${i}`;
   waveSel.setAttribute('aria-label', `Operator ${OP_NAMES[i]} waveform`);
   WAVE_NAMES.forEach((n, wi) => waveSel.add(new Option(n, String(wi))));
   waveSel.value = String(op(i).wave);

@@ -61,6 +61,7 @@ export function select(
   wrap.appendChild(el('span', 'field-label', label));
   const sel = document.createElement('select');
   sel.className = 'field';
+  sel.name = label.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   sel.setAttribute('aria-label', label);
   for (const option of options) sel.add(new Option(option.label, option.value));
   sel.value = current;
