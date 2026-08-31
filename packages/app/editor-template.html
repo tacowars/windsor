@@ -1,0 +1,1546 @@
+<title>Seedship FM Console</title>
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+/>
+<style>
+  :root {
+    --ground: #171b1e;
+    --panel: #1f2529;
+    --panel-hi: #262d32;
+    --inset: #121618;
+    --line: #2c3439;
+    --line-bright: #3d4950;
+    --ink: #dce3e3;
+    --ink-dim: #8b9a9e;
+    --ink-faint: #5e6b70;
+    --carrier: #e0a44e;
+    --modulator: #5fa8a0;
+    --hot: #d2643c;
+
+    --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+    --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --r: 3px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--f-ui);
+    font-size: 13px;
+    margin: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  select,
+  input {
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+  }
+  :focus-visible {
+    outline: 2px solid var(--carrier);
+    outline-offset: 2px;
+  }
+
+  /* ---------- shell ---------- */
+
+  .console {
+    display: grid;
+    grid-template-columns: 230px minmax(0, 1fr) 272px;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: 'head head head' 'rail bays mod' 'foot foot foot';
+    min-height: 100vh;
+    gap: 1px;
+    background: var(--line);
+  }
+
+  .head {
+    grid-area: head;
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+  }
+  .rail {
+    grid-area: rail;
+    background: var(--panel);
+    overflow-y: auto;
+  }
+  .bays {
+    grid-area: bays;
+    background: var(--ground);
+    overflow-y: auto;
+    padding: 12px;
+  }
+  .mod {
+    grid-area: mod;
+    background: var(--panel);
+    overflow-y: auto;
+  }
+  .foot {
+    grid-area: foot;
+    background: var(--panel);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    font-family: var(--f-panel);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+  }
+  .brand small {
+    font-family: var(--f-num);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+  }
+
+  /* ---------- panel furniture ---------- */
+
+  .section {
+    border-bottom: 1px solid var(--line);
+    padding: 12px 14px 15px;
+  }
+  .section:last-child {
+    border-bottom: 0;
+  }
+
+  .section-title {
+    font-family: var(--f-panel);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 11px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+    margin-left: 2px;
+  }
+  .section-title > span {
+    flex: none;
+  }
+
+  .knob-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 2px;
+  }
+
+  /* ---------- knob ---------- */
+
+  .knob {
+    width: 54px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 3px 0 4px;
+    border-radius: var(--r);
+    cursor: ns-resize;
+    touch-action: none;
+    user-select: none;
+  }
+  .knob:hover {
+    background: var(--panel-hi);
+  }
+  .knob svg {
+    display: block;
+  }
+  .knob .dial-track {
+    stroke: var(--line-bright);
+    stroke-width: 3;
+    fill: none;
+    stroke-linecap: round;
+  }
+  .knob .dial-arc {
+    stroke: var(--knob-color, var(--ink-dim));
+    stroke-width: 3;
+    fill: none;
+    stroke-linecap: round;
+  }
+  .knob .dial-pin {
+    stroke: var(--ink);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+  .knob .dial-face {
+    fill: var(--inset);
+    stroke: var(--line);
+  }
+
+  .knob .knob-label {
+    font-family: var(--f-panel);
+    font-size: 8.5px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .knob .knob-val {
+    font-family: var(--f-num);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    pointer-events: none;
+  }
+
+  /* ---------- controls ---------- */
+
+  .seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    background: var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .seg button {
+    min-width: 44px;
+  }
+  .seg button {
+    flex: 1;
+    background: var(--inset);
+    border: 0;
+    padding: 5px 4px;
+    cursor: pointer;
+    font-family: var(--f-panel);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+  .seg button:hover {
+    background: var(--panel-hi);
+    color: var(--ink);
+  }
+  .seg button[aria-pressed='true'] {
+    background: var(--seg-color, var(--carrier));
+    color: #111416;
+  }
+
+  select.field,
+  input.field {
+    width: 100%;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 5px 7px;
+    font-size: 12px;
+  }
+  input.field {
+    font-family: var(--f-num);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .btn {
+    background: var(--inset);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--ink-dim);
+    font-family: var(--f-panel);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .btn:hover {
+    background: var(--panel-hi);
+    color: var(--ink);
+    border-color: var(--line-bright);
+  }
+  .btn.primary {
+    background: var(--carrier);
+    border-color: var(--carrier);
+    color: #111416;
+  }
+  .btn.primary:hover {
+    background: #eeb768;
+  }
+  .btn[aria-pressed='true'] {
+    background: var(--modulator);
+    border-color: var(--modulator);
+    color: #111416;
+  }
+
+  .field-label {
+    font-family: var(--f-panel);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  /* ---------- algorithm picker ---------- */
+
+  .alg-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .alg {
+    background: var(--inset);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 4px 2px 2px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+  .alg:hover {
+    border-color: var(--line-bright);
+    background: var(--panel-hi);
+  }
+  .alg[aria-pressed='true'] {
+    border-color: var(--carrier);
+    background: #241e14;
+  }
+  .alg svg {
+    display: block;
+  }
+  .alg .alg-no {
+    font-family: var(--f-num);
+    font-size: 8px;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .alg[aria-pressed='true'] .alg-no {
+    color: var(--carrier);
+  }
+
+  /* ---------- operator bays ---------- */
+
+  .bay-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 12px;
+  }
+
+  .bay {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+  .bay-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 11px;
+    background: var(--inset);
+    border-bottom: 1px solid var(--line);
+    border-left: 3px solid var(--op-color);
+  }
+  .bay-id {
+    font-family: var(--f-panel);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--op-color);
+    line-height: 1;
+  }
+  .bay-role {
+    font-family: var(--f-panel);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--op-color) 18%, transparent);
+    color: var(--op-color);
+  }
+  .bay-off {
+    opacity: 0.48;
+  }
+  .bay-off:hover,
+  .bay-off:focus-within {
+    opacity: 1;
+  }
+  .bay-body {
+    padding: 9px 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .bay-line {
+    display: flex;
+    align-items: flex-end;
+    gap: 7px;
+  }
+  .bay-line > .grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .env-canvas {
+    width: 100%;
+    height: 46px;
+    display: block;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+  }
+
+  .adv {
+    display: none;
+  }
+  .adv.open {
+    display: flex;
+  }
+
+  /* ---------- scope + keyboard ---------- */
+
+  .scope {
+    width: 100%;
+    height: 62px;
+    display: block;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+  }
+
+  .keys {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+    min-width: 260px;
+    height: 46px;
+  }
+  .key {
+    flex: 1;
+    background: linear-gradient(180deg, #262d32, #1a2023);
+    border: 1px solid var(--line);
+    border-radius: 0 0 var(--r) var(--r);
+    cursor: pointer;
+    position: relative;
+  }
+  .key[data-black='1'] {
+    background: linear-gradient(180deg, #14181a, #0d1012);
+    flex: 0.62;
+  }
+  .key:hover {
+    border-color: var(--line-bright);
+  }
+  .key.down {
+    background: var(--carrier);
+    border-color: var(--carrier);
+  }
+
+  .status {
+    font-family: var(--f-num);
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .status b {
+    color: var(--modulator);
+    font-weight: 500;
+  }
+
+  dialog {
+    background: var(--panel);
+    color: var(--ink);
+    border: 1px solid var(--line-bright);
+    border-radius: var(--r);
+    padding: 0;
+    max-width: min(720px, 92vw);
+    width: 100%;
+  }
+  dialog::backdrop {
+    background: rgba(10, 13, 15, 0.72);
+  }
+  dialog .dlg-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+  }
+  dialog textarea {
+    width: 100%;
+    height: 46vh;
+    background: var(--inset);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 10px;
+    font-family: var(--f-num);
+    font-size: 11.5px;
+    line-height: 1.55;
+    resize: vertical;
+  }
+
+  .hint {
+    color: var(--ink-faint);
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .hint kbd {
+    font-family: var(--f-num);
+    font-size: 10.5px;
+    background: var(--inset);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 1px 4px;
+    color: var(--ink-dim);
+  }
+
+  @media (max-width: 1080px) {
+    .console {
+      grid-template-columns: 1fr;
+      grid-template-areas: 'head' 'rail' 'bays' 'mod' 'foot';
+    }
+    .rail,
+    .mod {
+      overflow: visible;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+
+<div class="console">
+  <header class="head">
+    <div class="brand">Seedship FM <small>4-OP / 11-ALG</small></div>
+    <button class="btn primary" id="power">Enable audio</button>
+    <select class="field" id="presetSel" style="width: auto; min-width: 160px"></select>
+    <button class="btn" id="holdBtn" aria-pressed="false">Hold</button>
+    <button class="btn" id="arpBtn" aria-pressed="false">Arp</button>
+    <span class="status" id="status">context suspended</span>
+  </header>
+
+  <aside class="rail">
+    <div class="section">
+      <div class="section-title"><span>Algorithm</span></div>
+      <div class="alg-grid" id="algGrid"></div>
+      <p class="hint" style="margin: 9px 0 0" id="algName"></p>
+    </div>
+    <div class="section">
+      <div class="section-title"><span>Global</span></div>
+      <div class="knob-row" id="globalKnobs"></div>
+    </div>
+    <div class="section">
+      <div class="section-title"><span>Output</span></div>
+      <canvas class="scope" id="scope" width="420" height="124"></canvas>
+    </div>
+  </aside>
+
+  <main class="bays">
+    <div class="bay-grid" id="bayGrid"></div>
+  </main>
+
+  <aside class="mod">
+    <div class="section">
+      <div class="section-title"><span>Filter</span></div>
+      <div class="seg" id="filterMode" style="margin-bottom: 8px"></div>
+      <div class="knob-row" id="filterKnobs"></div>
+      <div class="section-title" style="margin-top: 11px"><span>Filter Env</span></div>
+      <canvas class="env-canvas" id="filtEnvCanvas" width="500" height="92"></canvas>
+      <div class="knob-row" id="filterEnvKnobs" style="margin-top: 6px"></div>
+    </div>
+    <div class="section">
+      <div class="section-title"><span>LFO</span></div>
+      <div class="seg" id="lfoShape" style="margin-bottom: 8px"></div>
+      <div class="knob-row" id="lfoKnobs"></div>
+    </div>
+    <div class="section">
+      <div class="section-title"><span>Pitch Env</span></div>
+      <canvas class="env-canvas" id="pitchEnvCanvas" width="500" height="92"></canvas>
+      <div class="knob-row" id="pitchKnobs" style="margin-top: 6px"></div>
+    </div>
+  </aside>
+
+  <footer class="foot">
+    <div class="keys" id="keys"></div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <button class="btn" id="octDown">Oct &minus;</button>
+      <span class="status" id="octLabel">C4</span>
+      <button class="btn" id="octUp">Oct +</button>
+      <button class="btn" id="panicBtn">Panic</button>
+      <button class="btn" id="jsonBtn">Patch JSON</button>
+    </div>
+  </footer>
+</div>
+
+<dialog id="jsonDlg">
+  <div class="dlg-body">
+    <div class="section-title" style="margin: 0"><span>Patch JSON</span></div>
+    <p class="hint" style="margin: 0">
+      Paste this into <kbd>audio/src/patch.js</kbd> as a preset, or load it at runtime with
+      <kbd>part.setPatch(json)</kbd>. Editing the text and pressing Load applies it live.
+    </p>
+    <textarea id="jsonText" spellcheck="false" aria-label="Patch JSON"></textarea>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap">
+      <button class="btn primary" id="jsonCopy">Copy</button>
+      <button class="btn" id="jsonLoad">Load</button>
+      <button class="btn" id="jsonClose">Close</button>
+      <span class="status" id="jsonStatus"></span>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  /* =================================================================
+   * Inlined from audio/src/patch.js -- regenerate with tools/build-editor.mjs
+   * ================================================================= */
+  /*__PATCH__*/
+
+  /* Worklet source, inlined so this page is a single self-contained file. */
+  const WORKLET_SRC = /*__WORKLET__*/;
+
+  /* =================================================================
+   * Audio
+   * ================================================================= */
+
+  const state = {
+    ctx: null, node: null, analyser: null, master: null,
+    patch: clonePatch(PRESETS['lead-bell']),
+    octave: 4,
+    held: new Map(),
+    hold: false,
+    arp: false,
+    arpTimer: null,
+    arpIdx: 0,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const setStatus = (m) => { $('status').textContent = m; };
+
+  async function boot() {
+    if (state.ctx) { await state.ctx.resume(); return; }
+
+    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    state.ctx = ctx;
+
+    // The worklet source is inlined, so it has to reach addModule() as a URL.
+    // Hosts differ in which schemes their CSP allows, so try each in turn.
+    const attempts = [
+      ['blob', () => URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }))],
+      ['data', () => 'data:application/javascript;charset=utf-8,' + encodeURIComponent(WORKLET_SRC)],
+      ['file', () => '../worklet/fm-processor.js'],
+    ];
+
+    let loaded = false;
+    const errors = [];
+    for (const [label, makeUrl] of attempts) {
+      let url = null;
+      try {
+        url = makeUrl();
+        await ctx.audioWorklet.addModule(url);
+        loaded = true;
+        break;
+      } catch (err) {
+        errors.push(`${label}: ${err.message}`);
+      } finally {
+        if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+      }
+    }
+
+    if (!loaded) {
+      setStatus('audio worklet blocked - ' + errors.join(' / '));
+      return;
+    }
+
+    const node = new AudioWorkletNode(ctx, 'fm-part', {
+      numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
+      processorOptions: { maxVoices: 16, patch: structuredClone(state.patch) },
+    });
+
+    const master = ctx.createGain();
+    master.gain.value = 0.85;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6; limiter.knee.value = 0; limiter.ratio.value = 20;
+    limiter.attack.value = 0.003; limiter.release.value = 0.15;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+
+    node.connect(master);
+    master.connect(analyser);
+    master.connect(limiter);
+    limiter.connect(ctx.destination);
+
+    state.node = node; state.master = master; state.analyser = analyser;
+    await ctx.resume();
+
+    $('power').textContent = 'Audio on';
+    $('power').classList.remove('primary');
+    setStatus(`running - ${ctx.sampleRate} Hz - ${(ctx.baseLatency * 1000).toFixed(1)} ms latency`);
+    drawScope();
+  }
+
+  function pushPatch() {
+    if (state.node) state.node.port.postMessage({ type: 'patch', patch: structuredClone(state.patch) });
+  }
+
+  let nextId = 1;
+  function noteOn(note, vel = 0.9) {
+    if (!state.node) return null;
+    const id = nextId++;
+    state.node.port.postMessage({
+      type: 'noteOn', id, note, velocity: vel,
+      frame: Math.round(state.ctx.currentTime * state.ctx.sampleRate),
+    });
+    return id;
+  }
+  function noteOff(id) {
+    if (!state.node || id == null) return;
+    state.node.port.postMessage({
+      type: 'noteOff', id,
+      frame: Math.round(state.ctx.currentTime * state.ctx.sampleRate),
+    });
+  }
+  function panic() {
+    if (state.node) state.node.port.postMessage({ type: 'panic' });
+    state.held.clear();
+    document.querySelectorAll('.key.down').forEach((k) => k.classList.remove('down'));
+  }
+
+  /* =================================================================
+   * Parameter access
+   * ================================================================= */
+
+  const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+  const setPath = (obj, path, v) => {
+    const parts = path.split('.');
+    const last = parts.pop();
+    const target = parts.reduce((o, k) => o[k], obj);
+    target[last] = v;
+  };
+
+  /* =================================================================
+   * Knob
+   * ================================================================= */
+
+  const KNOB_R = 15;
+  const ARC_START = -135, ARC_END = 135;
+
+  function polar(cx, cy, r, deg) {
+    const a = ((deg - 90) * Math.PI) / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  function arcPath(cx, cy, r, a0, a1) {
+    const [x0, y0] = polar(cx, cy, r, a0);
+    const [x1, y1] = polar(cx, cy, r, a1);
+    const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+    return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+
+  const knobs = [];
+
+  /**
+   * @param {object} spec {path,label,min,max,def,curve,fmt,color,onChange}
+   */
+  function makeKnob(spec) {
+    const el = document.createElement('div');
+    el.className = 'knob';
+    el.tabIndex = 0;
+    el.setAttribute('role', 'slider');
+    el.setAttribute('aria-label', spec.label);
+    if (spec.color) el.style.setProperty('--knob-color', spec.color);
+
+    const size = KNOB_R * 2 + 8;
+    const c = size / 2;
+    el.innerHTML =
+      `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
+        `<circle class="dial-face" cx="${c}" cy="${c}" r="${KNOB_R - 3.5}"></circle>` +
+        `<path class="dial-track" d="${arcPath(c, c, KNOB_R, ARC_START, ARC_END)}"></path>` +
+        `<path class="dial-arc" d=""></path>` +
+        `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - KNOB_R + 5}"></line>` +
+      `</svg>` +
+      `<span class="knob-val"></span><span class="knob-label">${spec.label}</span>`;
+
+    const arc = el.querySelector('.dial-arc');
+    const pin = el.querySelector('.dial-pin');
+    const out = el.querySelector('.knob-val');
+
+    const toNorm = (v) => {
+      if (spec.curve === 'log') {
+        const lo = Math.log(Math.max(1e-6, spec.min)), hi = Math.log(spec.max);
+        return (Math.log(Math.max(1e-6, v)) - lo) / (hi - lo);
+      }
+      return (v - spec.min) / (spec.max - spec.min);
+    };
+    const fromNorm = (n) => {
+      n = Math.min(1, Math.max(0, n));
+      if (spec.curve === 'log') {
+        const lo = Math.log(Math.max(1e-6, spec.min)), hi = Math.log(spec.max);
+        return Math.exp(lo + n * (hi - lo));
+      }
+      return spec.min + n * (spec.max - spec.min);
+    };
+
+    const render = () => {
+      const v = spec.get();
+      const n = Math.min(1, Math.max(0, toNorm(v)));
+      const ang = ARC_START + n * (ARC_END - ARC_START);
+      const zeroN = spec.min < 0 && spec.max > 0 ? toNorm(0) : 0;
+      const zeroAng = ARC_START + zeroN * (ARC_END - ARC_START);
+      const a0 = Math.min(zeroAng, ang), a1 = Math.max(zeroAng, ang);
+      arc.setAttribute('d', Math.abs(a1 - a0) < 0.4 ? '' : arcPath(c, c, KNOB_R, a0, a1));
+      pin.setAttribute('transform', `rotate(${ang} ${c} ${c})`);
+      out.textContent = spec.fmt ? spec.fmt(v) : v.toFixed(2);
+      el.setAttribute('aria-valuenow', String(Math.round(v * 1000) / 1000));
+    };
+
+    const commit = (v) => {
+      if (spec.step) v = Math.round(v / spec.step) * spec.step;
+      v = Math.min(spec.max, Math.max(spec.min, v));
+      spec.set(v);
+      render();
+      if (spec.onChange) spec.onChange();
+      pushPatch();
+    };
+
+    let dragging = false, startY = 0, startN = 0;
+    el.addEventListener('pointerdown', (e) => {
+      dragging = true; startY = e.clientY; startN = toNorm(spec.get());
+      el.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const range = e.shiftKey ? 900 : 190;
+      commit(fromNorm(startN - (e.clientY - startY) / range));
+    });
+    const stop = (e) => { if (dragging) { dragging = false; el.releasePointerCapture(e.pointerId); } };
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+    el.addEventListener('dblclick', () => commit(spec.def));
+    el.addEventListener('keydown', (e) => {
+      const stepN = e.shiftKey ? 0.002 : 0.02;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { commit(fromNorm(toNorm(spec.get()) + stepN)); e.preventDefault(); }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { commit(fromNorm(toNorm(spec.get()) - stepN)); e.preventDefault(); }
+    });
+
+    el.title = `${spec.label} - drag, shift-drag for fine, double-click to reset`;
+    knobs.push({ render });
+    render();
+    return el;
+  }
+
+  /** Convenience: a knob bound to a patch path. */
+  function pathKnob(path, label, opts = {}) {
+    return makeKnob({
+      label,
+      min: opts.min ?? 0, max: opts.max ?? 1, def: opts.def ?? 0,
+      step: opts.step, curve: opts.curve, fmt: opts.fmt, color: opts.color,
+      onChange: opts.onChange,
+      get: () => getPath(state.patch, path) ?? 0,
+      set: (v) => setPath(state.patch, path, v),
+    });
+  }
+
+  const fmt2 = (v) => v.toFixed(2);
+  const fmtMs = (v) => (v < 1 ? (v * 1000).toFixed(0) + 'm' : v.toFixed(2) + 's');
+  const fmtHz = (v) => (v >= 1000 ? (v / 1000).toFixed(2) + 'k' : v.toFixed(0));
+  const fmtSigned = (v) => (v >= 0 ? '+' : '') + v.toFixed(2);
+
+  /* =================================================================
+   * Algorithm diagrams
+   *
+   * Depth is computed from the routing table, so the picture is generated from
+   * the same data the DSP runs on -- it can't drift out of sync.
+   * ================================================================= */
+
+  const OP_LABEL = ['A', 'B', 'C', 'D'];
+  const CARRIER_COLOR = '#E0A44E';
+  const MOD_COLOR = '#5FA8A0';
+
+  function algDepths(alg) {
+    const depth = [-1, -1, -1, -1];
+    const queue = [];
+    for (const c of alg.carriers) { depth[c] = 0; queue.push(c); }
+    while (queue.length) {
+      const i = queue.shift();
+      for (const m of alg.mods[i]) {
+        if (m === i) continue;
+        if (depth[m] < depth[i] + 1) { depth[m] = depth[i] + 1; queue.push(m); }
+      }
+    }
+    for (let i = 0; i < 4; i++) if (depth[i] < 0) depth[i] = 0;
+    return depth;
+  }
+
+  function algSvg(alg, w = 58, cell = 15) {
+    const depth = algDepths(alg);
+    const maxD = Math.max(...depth);
+    const h = (maxD + 1) * cell + 4;
+    const rows = [];
+    for (let d = 0; d <= maxD; d++) rows.push([]);
+    for (let i = 0; i < 4; i++) rows[depth[i]].push(i);
+
+    const pos = [];
+    rows.forEach((row, d) => {
+      const y = h - 4 - d * cell - cell / 2 + 2;
+      row.forEach((i, k) => {
+        pos[i] = [((k + 0.5) / row.length) * w, y];
+      });
+    });
+
+    let lines = '';
+    for (let i = 0; i < 4; i++) {
+      for (const m of alg.mods[i]) {
+        if (m === i) continue;
+        const [x1, y1] = pos[m], [x2, y2] = pos[i];
+        lines += `<line x1="${x1.toFixed(1)}" y1="${(y1 + 4).toFixed(1)}" x2="${x2.toFixed(1)}" y2="${(y2 - 4).toFixed(1)}" stroke="#4A565C" stroke-width="1"></line>`;
+      }
+    }
+
+    let boxes = '';
+    for (let i = 0; i < 4; i++) {
+      const isCar = alg.carriers.includes(i);
+      const col = isCar ? CARRIER_COLOR : MOD_COLOR;
+      const [x, y] = pos[i];
+      boxes +=
+        `<rect x="${(x - 7).toFixed(1)}" y="${(y - 4.5).toFixed(1)}" width="14" height="9" rx="1.5" fill="${col}" opacity="${isCar ? 0.9 : 0.32}"></rect>` +
+        `<text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="7" font-weight="500" fill="${isCar ? '#14181A' : col}">${OP_LABEL[i]}</text>`;
+    }
+
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${lines}${boxes}</svg>`;
+  }
+
+  function buildAlgPicker() {
+    const grid = $('algGrid');
+    grid.innerHTML = '';
+    ALGORITHMS.forEach((alg, i) => {
+      const b = document.createElement('button');
+      b.className = 'alg';
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(i === state.patch.algorithm));
+      b.setAttribute('aria-label', `Algorithm ${i + 1}: ${alg.name}, ${alg.label}`);
+      b.innerHTML = algSvg(alg) + `<span class="alg-no">${String(i + 1).padStart(2, '0')}</span>`;
+      b.onclick = () => {
+        state.patch.algorithm = i;
+        pushPatch();
+        refreshAll();
+      };
+      grid.appendChild(b);
+    });
+    const a = ALGORITHMS[state.patch.algorithm];
+    $('algName').innerHTML =
+      `<strong style="color:var(--ink)">${a.name}</strong> &middot; <span style="font-family:var(--f-num)">${a.label}</span>` +
+      `<br><span style="color:${CARRIER_COLOR}">&#9632;</span> carrier &nbsp; <span style="color:${MOD_COLOR}">&#9632;</span> modulator`;
+  }
+
+  /* =================================================================
+   * Envelope drawing
+   * ================================================================= */
+
+  function curveShape(p, k) { return p / (p + (1 - p) * k); }
+
+  function drawEnv(canvas, env, color) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || canvas.width;
+    const h = canvas.clientHeight || canvas.height;
+    if (canvas.width !== Math.round(w * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    const g = canvas.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+
+    const pad = 4;
+    const hold = 0.28;
+    const total = env.attackTime + env.decayTime + env.releaseTime;
+    const holdT = Math.max(0.02, total * hold);
+    const span = total + holdT || 1;
+    const X = (t) => pad + (t / span) * (w - pad * 2);
+    const Y = (v) => h - pad - v * (h - pad * 2);
+
+    // sustain guide
+    g.strokeStyle = '#2C3439';
+    g.lineWidth = 1;
+    g.setLineDash([2, 3]);
+    g.beginPath(); g.moveTo(pad, Y(env.sustainLevel)); g.lineTo(w - pad, Y(env.sustainLevel)); g.stroke();
+    g.setLineDash([]);
+
+    g.strokeStyle = color;
+    g.lineWidth = 1.6;
+    g.beginPath();
+    g.moveTo(X(0), Y(env.initLevel));
+
+    const seg = (t0, dur, v0, v1, curve) => {
+      if (dur <= 0) { g.lineTo(X(t0), Y(v1)); return; }
+      const k = Math.exp(curve * 3);
+      const steps = 26;
+      for (let i = 1; i <= steps; i++) {
+        const p = i / steps;
+        const s = k === 1 ? p : curveShape(p, k);
+        g.lineTo(X(t0 + p * dur), Y(v0 + (v1 - v0) * s));
+      }
+    };
+
+    let t = 0;
+    seg(t, env.attackTime, env.initLevel, env.peakLevel, env.attackCurve); t += env.attackTime;
+    seg(t, env.decayTime, env.peakLevel, env.sustainLevel, env.decayCurve); t += env.decayTime;
+    g.lineTo(X(t + holdT), Y(env.sustainLevel)); t += holdT;
+    seg(t, env.releaseTime, env.sustainLevel, env.endLevel, env.releaseCurve);
+    g.stroke();
+
+    // release marker
+    g.strokeStyle = '#3D4950';
+    g.lineWidth = 1;
+    g.beginPath();
+    const rx = X(env.attackTime + env.decayTime + holdT);
+    g.moveTo(rx, pad); g.lineTo(rx, h - pad); g.stroke();
+  }
+
+  const envCanvases = [];
+  function redrawEnvs() {
+    for (const e of envCanvases) drawEnv(e.canvas, e.get(), e.color);
+  }
+
+  /* =================================================================
+   * Envelope knob group
+   * ================================================================= */
+
+  function envKnobs(basePath, color, onChange) {
+    const frag = document.createDocumentFragment();
+    const K = (sub, label, opts) =>
+      frag.appendChild(pathKnob(`${basePath}.${sub}`, label, { ...opts, color, onChange }));
+
+    K('attackTime',  'Attack',  { min: 0.0005, max: 12, def: 0.002, curve: 'log', fmt: fmtMs });
+    K('decayTime',   'Decay',   { min: 0.001,  max: 20, def: 0.4,   curve: 'log', fmt: fmtMs });
+    K('sustainLevel','Sustain', { min: 0, max: 1, def: 0.7, fmt: fmt2 });
+    K('releaseTime', 'Release', { min: 0.001,  max: 20, def: 0.3,   curve: 'log', fmt: fmtMs });
+    return frag;
+  }
+
+  function envAdvKnobs(basePath, color, onChange) {
+    const frag = document.createDocumentFragment();
+    const K = (sub, label, opts) =>
+      frag.appendChild(pathKnob(`${basePath}.${sub}`, label, { ...opts, color, onChange }));
+
+    K('initLevel',    'Init',   { min: 0, max: 1, def: 0, fmt: fmt2 });
+    K('peakLevel',    'Peak',   { min: 0, max: 1, def: 1, fmt: fmt2 });
+    K('endLevel',     'End',    { min: 0, max: 1, def: 0, fmt: fmt2 });
+    K('attackCurve',  'A Crv',  { min: -1, max: 1, def: 0,   fmt: fmtSigned });
+    K('decayCurve',   'D Crv',  { min: -1, max: 1, def: 0.5, fmt: fmtSigned });
+    K('releaseCurve', 'R Crv',  { min: -1, max: 1, def: 0.5, fmt: fmtSigned });
+    K('keyScale',     'Key',    { min: -1, max: 1, def: 0,   fmt: fmtSigned });
+    return frag;
+  }
+
+  /* =================================================================
+   * Operator bays
+   * ================================================================= */
+
+  function buildBays() {
+    const grid = $('bayGrid');
+    grid.innerHTML = '';
+
+    for (let i = 0; i < 4; i++) {
+      const alg = ALGORITHMS[state.patch.algorithm];
+      const isCar = alg.carriers.includes(i);
+      const color = isCar ? CARRIER_COLOR : MOD_COLOR;
+
+      const bay = document.createElement('section');
+      bay.className = 'bay';
+      bay.style.setProperty('--op-color', color);
+      // An operator at zero level is inaudible; fade the bay so the eye skips it.
+      const syncActive = () => bay.classList.toggle('bay-off', state.patch.ops[i].level <= 0.0001);
+      syncActive();
+
+      const head = document.createElement('div');
+      head.className = 'bay-head';
+      head.innerHTML =
+        `<span class="bay-id">${OP_LABEL[i]}</span>` +
+        `<span class="bay-role">${isCar ? 'Carrier' : 'Modulator'}</span>` +
+        `<span style="flex:1"></span>`;
+
+      const advBtn = document.createElement('button');
+      advBtn.className = 'btn';
+      advBtn.type = 'button';
+      advBtn.textContent = 'Adv';
+      advBtn.setAttribute('aria-pressed', 'false');
+      head.appendChild(advBtn);
+
+      const body = document.createElement('div');
+      body.className = 'bay-body';
+
+      // Waveform + ratio row
+      const line1 = document.createElement('div');
+      line1.className = 'bay-line';
+
+      const waveWrap = document.createElement('div');
+      waveWrap.className = 'grow';
+      waveWrap.innerHTML = '<span class="field-label">Wave</span>';
+      const waveSel = document.createElement('select');
+      waveSel.className = 'field';
+      waveSel.setAttribute('aria-label', `Operator ${OP_LABEL[i]} waveform`);
+      waveSel.id = `wave-op-${i}`;
+      WAVE_NAMES.forEach((n, wi) => waveSel.add(new Option(n, String(wi))));
+      waveSel.value = String(state.patch.ops[i].wave);
+      waveSel.onchange = () => { state.patch.ops[i].wave = +waveSel.value; pushPatch(); };
+      waveWrap.appendChild(waveSel);
+      line1.appendChild(waveWrap);
+
+      const fixWrap = document.createElement('div');
+      fixWrap.innerHTML = '<span class="field-label">Pitch</span>';
+      const fixBtn = document.createElement('button');
+      fixBtn.className = 'btn';
+      fixBtn.type = 'button';
+      fixBtn.style.width = '76px';
+      const syncFix = () => {
+        fixBtn.textContent = state.patch.ops[i].fixed ? 'Fixed Hz' : 'Ratio';
+        fixBtn.setAttribute('aria-pressed', String(state.patch.ops[i].fixed));
+      };
+      fixBtn.onclick = () => { state.patch.ops[i].fixed = !state.patch.ops[i].fixed; syncFix(); pushPatch(); };
+      syncFix();
+      fixWrap.appendChild(fixBtn);
+      line1.appendChild(fixWrap);
+      body.appendChild(line1);
+
+      // Main knobs
+      const row1 = document.createElement('div');
+      row1.className = 'knob-row';
+      row1.appendChild(pathKnob(`ops.${i}.ratio`, 'Ratio', { min: 0.25, max: 24, def: 1, step: 0.005, curve: 'log', color, fmt: (v) => v.toFixed(3) }));
+      row1.appendChild(pathKnob(`ops.${i}.fixedHz`, 'Fixed', { min: 20, max: 8000, def: 100, curve: 'log', color, fmt: fmtHz }));
+      row1.appendChild(pathKnob(`ops.${i}.detune`, 'Detune', { min: -100, max: 100, def: 0, step: 1, color, fmt: (v) => v.toFixed(0) + 'c' }));
+      row1.appendChild(pathKnob(`ops.${i}.level`, 'Level', { min: 0, max: 1, def: i === 0 ? 1 : 0, color, fmt: fmt2, onChange: syncActive }));
+      row1.appendChild(pathKnob(`ops.${i}.feedback`, 'Fdbk', { min: 0, max: 1, def: 0, color, fmt: fmt2 }));
+      row1.appendChild(pathKnob(`ops.${i}.velSens`, 'Vel', { min: 0, max: 1, def: 0.4, color, fmt: fmt2 }));
+      body.appendChild(row1);
+
+      // Envelope
+      const canvas = document.createElement('canvas');
+      canvas.className = 'env-canvas';
+      canvas.setAttribute('aria-label', `Operator ${OP_LABEL[i]} envelope shape`);
+      body.appendChild(canvas);
+      const entry = { canvas, color, get: () => state.patch.ops[i].env };
+      envCanvases.push(entry);
+
+      const row2 = document.createElement('div');
+      row2.className = 'knob-row';
+      row2.appendChild(envKnobs(`ops.${i}.env`, color, () => drawEnv(canvas, state.patch.ops[i].env, color)));
+      body.appendChild(row2);
+
+      const adv = document.createElement('div');
+      adv.className = 'knob-row adv';
+      adv.appendChild(envAdvKnobs(`ops.${i}.env`, color, () => drawEnv(canvas, state.patch.ops[i].env, color)));
+
+      const loopWrap = document.createElement('div');
+      loopWrap.style.cssText = 'width:100%;margin-top:5px';
+      loopWrap.innerHTML = '<span class="field-label">Envelope Loop</span>';
+      const loopSeg = document.createElement('div');
+      loopSeg.className = 'seg';
+      loopSeg.style.setProperty('--seg-color', color);
+      LOOP_MODE_NAMES.forEach((n, li) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = n;
+        b.setAttribute('aria-pressed', String(state.patch.ops[i].env.loopMode === li));
+        b.onclick = () => {
+          state.patch.ops[i].env.loopMode = li;
+          [...loopSeg.children].forEach((c, ci) => c.setAttribute('aria-pressed', String(ci === li)));
+          pushPatch();
+        };
+        loopSeg.appendChild(b);
+      });
+      loopWrap.appendChild(loopSeg);
+      adv.appendChild(loopWrap);
+      body.appendChild(adv);
+
+      advBtn.onclick = () => {
+        const open = adv.classList.toggle('open');
+        advBtn.setAttribute('aria-pressed', String(open));
+      };
+
+      bay.appendChild(head);
+      bay.appendChild(body);
+      grid.appendChild(bay);
+
+      requestAnimationFrame(() => drawEnv(canvas, state.patch.ops[i].env, color));
+    }
+  }
+
+  /* =================================================================
+   * Global, filter, LFO and pitch panels
+   * ================================================================= */
+
+  function buildGlobal() {
+    const row = $('globalKnobs');
+    row.innerHTML = '';
+    row.appendChild(pathKnob('volume', 'Volume', { min: 0, max: 1.5, def: 0.8, fmt: fmt2 }));
+    row.appendChild(pathKnob('tone', 'Tone', { min: 0.02, max: 1, def: 1, fmt: fmt2 }));
+    row.appendChild(pathKnob('glide', 'Glide', { min: 0, max: 2, def: 0, curve: 'log', fmt: fmtMs }));
+    row.appendChild(pathKnob('spread', 'Spread', { min: 0, max: 50, def: 0, step: 1, fmt: (v) => v.toFixed(0) + 'c' }));
+    row.appendChild(pathKnob('pan', 'Pan', { min: -1, max: 1, def: 0, fmt: fmtSigned }));
+    row.appendChild(pathKnob('panRandom', 'Pan Rnd', { min: 0, max: 1, def: 0, fmt: fmt2 }));
+  }
+
+  function buildFilter() {
+    const seg = $('filterMode');
+    seg.innerHTML = '';
+    seg.style.setProperty('--seg-color', MOD_COLOR);
+    FILTER_MODE_NAMES.forEach((n, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = n;
+      b.setAttribute('aria-pressed', String(state.patch.filter.mode === i));
+      b.onclick = () => {
+        state.patch.filter.mode = i;
+        [...seg.children].forEach((c, ci) => c.setAttribute('aria-pressed', String(ci === i)));
+        pushPatch();
+      };
+      seg.appendChild(b);
+    });
+
+    const canvas = $('filtEnvCanvas');
+    const redraw = () => drawEnv(canvas, state.patch.filter.env, MOD_COLOR);
+    envCanvases.push({ canvas, color: MOD_COLOR, get: () => state.patch.filter.env });
+
+    const row = $('filterKnobs');
+    row.innerHTML = '';
+    const C = MOD_COLOR;
+    row.appendChild(pathKnob('filter.cutoff', 'Cutoff', { min: 30, max: 18000, def: 8000, curve: 'log', color: C, fmt: fmtHz }));
+    row.appendChild(pathKnob('filter.resonance', 'Reso', { min: 0.5, max: 12, def: 0.707, curve: 'log', color: C, fmt: fmt2 }));
+    row.appendChild(pathKnob('filter.drive', 'Drive', { min: 1, max: 6, def: 1, color: C, fmt: fmt2 }));
+    row.appendChild(pathKnob('filter.envAmount', 'Env Amt', { min: -6, max: 6, def: 0, color: C, fmt: fmtSigned }));
+    row.appendChild(pathKnob('filter.lfoAmount', 'LFO Amt', { min: -4, max: 4, def: 0, color: C, fmt: fmtSigned }));
+    row.appendChild(pathKnob('filter.keyTrack', 'Key Trk', { min: -1, max: 2, def: 0, color: C, fmt: fmtSigned }));
+
+    const slopeWrap = document.createElement('div');
+    slopeWrap.style.cssText = 'width:100%;margin-top:6px';
+    slopeWrap.innerHTML = '<span class="field-label">Slope</span>';
+    const slopeSeg = document.createElement('div');
+    slopeSeg.className = 'seg';
+    slopeSeg.style.setProperty('--seg-color', MOD_COLOR);
+    ['12 dB', '24 dB'].forEach((n, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = n;
+      b.setAttribute('aria-pressed', String(!!state.patch.filter.slope24 === !!i));
+      b.onclick = () => {
+        state.patch.filter.slope24 = !!i;
+        [...slopeSeg.children].forEach((c, ci) => c.setAttribute('aria-pressed', String(ci === i)));
+        pushPatch();
+      };
+      slopeSeg.appendChild(b);
+    });
+    slopeWrap.appendChild(slopeSeg);
+    row.appendChild(slopeWrap);
+
+    const envRow = $('filterEnvKnobs');
+    envRow.innerHTML = '';
+    envRow.appendChild(envKnobs('filter.env', MOD_COLOR, redraw));
+    envRow.appendChild(envAdvKnobs('filter.env', MOD_COLOR, redraw));
+    requestAnimationFrame(redraw);
+  }
+
+  function buildLfo() {
+    const seg = $('lfoShape');
+    seg.innerHTML = '';
+    seg.style.setProperty('--seg-color', MOD_COLOR);
+    LFO_SHAPE_NAMES.forEach((n, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = n;
+      b.setAttribute('aria-pressed', String(state.patch.lfo.shape === i));
+      b.onclick = () => {
+        state.patch.lfo.shape = i;
+        [...seg.children].forEach((c, ci) => c.setAttribute('aria-pressed', String(ci === i)));
+        pushPatch();
+      };
+      seg.appendChild(b);
+    });
+
+    const row = $('lfoKnobs');
+    row.innerHTML = '';
+    const C = MOD_COLOR;
+    row.appendChild(pathKnob('lfo.rate', 'Rate', { min: 0.02, max: 40, def: 5, curve: 'log', color: C, fmt: (v) => v.toFixed(2) + 'H' }));
+    row.appendChild(pathKnob('lfo.amount', 'Amount', { min: 0, max: 1, def: 0, color: C, fmt: fmt2 }));
+    row.appendChild(pathKnob('lfo.delay', 'Fade In', { min: 0, max: 6, def: 0, curve: 'log', color: C, fmt: fmtMs }));
+    row.appendChild(pathKnob('lfo.toPitch', 'To Pitch', { min: 0, max: 12, def: 0, color: C, fmt: (v) => v.toFixed(2) + 'st' }));
+    for (let i = 0; i < 4; i++) {
+      row.appendChild(pathKnob(`lfo.toOp.${i}`, `To ${OP_LABEL[i]}`, { min: -1, max: 1, def: 0, color: C, fmt: fmtSigned }));
+    }
+
+    const retrigWrap = document.createElement('div');
+    retrigWrap.style.cssText = 'width:100%;margin-top:6px';
+    retrigWrap.innerHTML = '<span class="field-label">Phase</span>';
+    const rSeg = document.createElement('div');
+    rSeg.className = 'seg';
+    rSeg.style.setProperty('--seg-color', MOD_COLOR);
+    ['Free', 'Retrigger'].forEach((n, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = n;
+      b.setAttribute('aria-pressed', String(!!state.patch.lfo.retrigger === !!i));
+      b.onclick = () => {
+        state.patch.lfo.retrigger = !!i;
+        [...rSeg.children].forEach((c, ci) => c.setAttribute('aria-pressed', String(ci === i)));
+        pushPatch();
+      };
+      rSeg.appendChild(b);
+    });
+    retrigWrap.appendChild(rSeg);
+    row.appendChild(retrigWrap);
+  }
+
+  function buildPitch() {
+    const canvas = $('pitchEnvCanvas');
+    const redraw = () => drawEnv(canvas, state.patch.pitchEnv, CARRIER_COLOR);
+    envCanvases.push({ canvas, color: CARRIER_COLOR, get: () => state.patch.pitchEnv });
+
+    const row = $('pitchKnobs');
+    row.innerHTML = '';
+    row.appendChild(pathKnob('pitchEnvAmount', 'Amount', { min: -48, max: 48, def: 0, step: 0.5, color: CARRIER_COLOR, fmt: (v) => fmtSigned(v) + 'st' }));
+    row.appendChild(envKnobs('pitchEnv', CARRIER_COLOR, redraw));
+    requestAnimationFrame(redraw);
+  }
+
+  /* =================================================================
+   * Scope
+   * ================================================================= */
+
+  let scopeBuf = null;
+  function drawScope() {
+    const canvas = $('scope');
+    const g = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+
+    const tick = () => {
+      requestAnimationFrame(tick);
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      if (canvas.width !== Math.round(w * dpr)) {
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+      }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.clearRect(0, 0, w, h);
+
+      g.strokeStyle = '#2C3439';
+      g.lineWidth = 1;
+      g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+
+      if (!state.analyser) return;
+      if (!scopeBuf || scopeBuf.length !== state.analyser.fftSize) {
+        scopeBuf = new Float32Array(state.analyser.fftSize);
+      }
+      state.analyser.getFloatTimeDomainData(scopeBuf);
+
+      // Trigger on a rising zero crossing so the trace holds still.
+      let start = 0;
+      const half = scopeBuf.length >> 1;
+      for (let i = 1; i < half; i++) {
+        if (scopeBuf[i - 1] <= 0 && scopeBuf[i] > 0) { start = i; break; }
+      }
+
+      let peak = 0;
+      for (let i = 0; i < scopeBuf.length; i++) peak = Math.max(peak, Math.abs(scopeBuf[i]));
+
+      g.strokeStyle = peak > 0.99 ? '#D2643C' : '#E0A44E';
+      g.lineWidth = 1.4;
+      g.beginPath();
+      const n = half;
+      for (let i = 0; i < n; i++) {
+        const v = scopeBuf[start + i] || 0;
+        const x = (i / n) * w;
+        const y = h / 2 - v * (h / 2 - 2);
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.stroke();
+    };
+    tick();
+  }
+
+  /* =================================================================
+   * Keyboard
+   * ================================================================= */
+
+  const BLACK = new Set([1, 3, 6, 8, 10]);
+  const QWERTY = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11, k:12, o:13, l:14, p:15 };
+  const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+  function buildKeys() {
+    const box = $('keys');
+    box.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+      const k = document.createElement('div');
+      k.className = 'key';
+      k.dataset.offset = String(i);
+      if (BLACK.has(i % 12)) k.dataset.black = '1';
+      k.addEventListener('pointerdown', (e) => {
+        k.setPointerCapture(e.pointerId);
+        const note = state.octave * 12 + i;
+        const id = noteOn(note, 0.9);
+        k.classList.add('down');
+        state.held.set('mouse', { id, el: k });
+      });
+      const up = () => {
+        const h = state.held.get('mouse');
+        if (h) { if (!state.hold) noteOff(h.id); h.el.classList.remove('down'); state.held.delete('mouse'); }
+      };
+      k.addEventListener('pointerup', up);
+      k.addEventListener('pointercancel', up);
+      box.appendChild(k);
+    }
+    updateOctLabel();
+  }
+
+  function updateOctLabel() { $('octLabel').textContent = 'C' + state.octave; }
+
+  addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    if (e.key === 'z') { state.octave = Math.max(0, state.octave - 1); updateOctLabel(); return; }
+    if (e.key === 'x') { state.octave = Math.min(8, state.octave + 1); updateOctLabel(); return; }
+    const off = QWERTY[e.key];
+    if (off === undefined || state.held.has(e.key)) return;
+    const note = state.octave * 12 + off;
+    const id = noteOn(note, 0.9);
+    const el = $('keys').children[off];
+    if (el) el.classList.add('down');
+    state.held.set(e.key, { id, el });
+  });
+  addEventListener('keyup', (e) => {
+    const h = state.held.get(e.key);
+    if (!h) return;
+    if (!state.hold) noteOff(h.id);
+    if (h.el) h.el.classList.remove('down');
+    state.held.delete(e.key);
+  });
+
+  /* =================================================================
+   * Arpeggiator -- a quick way to hear a patch move without playing
+   * ================================================================= */
+
+  const ARP_PATTERN = [0, 3, 7, 10, 12, 10, 7, 3];
+  function toggleArp(on) {
+    state.arp = on;
+    $('arpBtn').setAttribute('aria-pressed', String(on));
+    if (state.arpTimer) { clearInterval(state.arpTimer); state.arpTimer = null; }
+    if (!on) return;
+    state.arpIdx = 0;
+    state.arpTimer = setInterval(() => {
+      if (!state.node) return;
+      const note = state.octave * 12 + ARP_PATTERN[state.arpIdx % ARP_PATTERN.length];
+      const id = noteOn(note, 0.85);
+      setTimeout(() => noteOff(id), 170);
+      const el = $('keys').children[ARP_PATTERN[state.arpIdx % ARP_PATTERN.length]];
+      if (el) { el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 150); }
+      state.arpIdx++;
+    }, 200);
+  }
+
+  /* =================================================================
+   * Presets, JSON, wiring
+   * ================================================================= */
+
+  function loadPatch(p) {
+    state.patch = clonePatch(p);
+    pushPatch();
+    refreshAll();
+  }
+
+  function refreshAll() {
+    knobs.length = 0;
+    envCanvases.length = 0;
+    buildAlgPicker();
+    buildGlobal();
+    buildBays();
+    buildFilter();
+    buildLfo();
+    buildPitch();
+    requestAnimationFrame(redrawEnvs);
+  }
+
+  function init() {
+    const sel = $('presetSel');
+    sel.setAttribute('aria-label', 'Preset');
+    for (const key of PRESET_NAMES) sel.add(new Option(PRESETS[key].name, key));
+    sel.value = 'lead-bell';
+    sel.onchange = () => loadPatch(PRESETS[sel.value]);
+
+    $('power').onclick = () => boot();
+    $('panicBtn').onclick = panic;
+    $('octDown').onclick = () => { state.octave = Math.max(0, state.octave - 1); updateOctLabel(); };
+    $('octUp').onclick = () => { state.octave = Math.min(8, state.octave + 1); updateOctLabel(); };
+
+    $('holdBtn').onclick = (e) => {
+      state.hold = !state.hold;
+      e.target.setAttribute('aria-pressed', String(state.hold));
+      if (!state.hold) panic();
+    };
+    $('arpBtn').onclick = () => toggleArp(!state.arp);
+
+    const dlg = $('jsonDlg');
+    $('jsonBtn').onclick = () => {
+      const out = clonePatch(state.patch);
+      delete out.feedbackScratch;
+      $('jsonText').value = JSON.stringify(out, null, 2);
+      $('jsonStatus').textContent = '';
+      dlg.showModal();
+    };
+    $('jsonClose').onclick = () => dlg.close();
+    $('jsonCopy').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText($('jsonText').value);
+        $('jsonStatus').textContent = 'Copied to clipboard';
+      } catch {
+        $('jsonText').select();
+        $('jsonStatus').textContent = 'Select-all and copy manually';
+      }
+    };
+    $('jsonLoad').onclick = () => {
+      try {
+        const parsed = JSON.parse($('jsonText').value);
+        loadPatch(makePatch(parsed));
+        $('jsonStatus').textContent = 'Patch loaded';
+      } catch (err) {
+        $('jsonStatus').textContent = 'Could not parse: ' + err.message;
+      }
+    };
+
+    buildKeys();
+    refreshAll();
+    drawScope();
+    addEventListener('resize', () => requestAnimationFrame(redrawEnvs));
+  }
+
+  init();
+</script>
