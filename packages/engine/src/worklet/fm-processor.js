@@ -1066,8 +1066,12 @@ class FmPartProcessor extends AudioWorkletProcessor {
         this.schedule(msg, msg.frame);
         break;
       case 'allNotesOff':
+        // Queued future events are cancelled too: a mute or a live rebuild
+        // (#69) must not let the scheduler's look-ahead keep sounding. Unlike
+        // panic, voices already sounding still release with their tails.
         for (const v of this.voices) v.release();
         this.noteMap.clear();
+        this.events.length = 0;
         break;
       case 'panic':
         for (const v of this.voices) v.kill();
