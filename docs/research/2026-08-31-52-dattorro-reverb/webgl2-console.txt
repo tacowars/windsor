@@ -1,0 +1,4 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[log] BJS - [12:47:16]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation
+[info] [a204] {"event":"engine","backend":"WebGL2","gpu":"ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))"}
