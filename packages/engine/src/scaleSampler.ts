@@ -1,0 +1,117 @@
+/**
+ * Pitch sampled from a weighted scale (record
+ * `2026-08-31-generative-sequencing-transport-and-pitch` §4).
+ *
+ * A sampler holds a root, a scale and a weight per degree. It owns no random
+ * stream: every draw takes the caller's `Rng`, so the arp and the drone share
+ * one harmony while each keeps its own seeded stream. Register is the caller's
+ * too -- the same sampler serves an upper-octave arp and a low drone, and that
+ * split is the whole difference between them.
+ */
+import type { Rng } from './generatorSeed';
+
+/** Scales as semitone offsets from the root, one entry per degree. */
+export const SCALES = {
+  major: [0, 2, 4, 5, 7, 9, 11],
+  naturalMinor: [0, 2, 3, 5, 7, 8, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  pentatonicMajor: [0, 2, 4, 7, 9],
+  pentatonicMinor: [0, 3, 5, 7, 10],
+} as const satisfies Record<string, readonly number[]>;
+export type ScaleName = keyof typeof SCALES;
+export const SCALE_NAMES = Object.keys(SCALES) as readonly ScaleName[];
+
+export interface ScaleSamplerConfig {
+  /** MIDI note of the root in the reference octave (60 = middle C). */
+  root: number;
+  /** A named scale, or explicit semitone offsets for one not in the table. */
+  scale: ScaleName | readonly number[];
+  /** Relative weight per degree, same length as the scale; non-negative, not all zero. */
+  weights: readonly number[];
+}
+
+/** Where a part draws: `octave` offsets from the root, spread over `span` octaves upward. */
+export interface Register {
+  octave: number;
+  /** Octaves the draw may land in, `>= 1`; 1 pins every note to `octave`. */
+  span: number;
+}
+
+export interface SampledNote {
+  degree: number;
+  /** MIDI note number. */
+  note: number;
+}
+
+export const SEMITONES_PER_OCTAVE = 12;
+
+export function scaleOffsets(scale: ScaleName | readonly number[]): readonly number[] {
+  return typeof scale === 'string' ? SCALES[scale] : scale;
+}
+
+/** Equal weight per degree -- the neutral starting point before tuning by ear. */
+export function uniformWeights(scale: ScaleName | readonly number[]): number[] {
+  return new Array<number>(scaleOffsets(scale).length).fill(1);
+}
+
+export class ScaleSampler {
+  readonly root: number;
+  readonly offsets: readonly number[];
+  readonly weights: readonly number[];
+  private readonly cumulative: readonly number[];
+
+  constructor(config: ScaleSamplerConfig) {
+    this.root = config.root;
+    this.offsets = scaleOffsets(config.scale);
+    this.weights = config.weights;
+    if (this.offsets.length === 0) throw new RangeError('scale has no degrees');
+    if (config.weights.length !== this.offsets.length) {
+      throw new RangeError(
+        `weights (${config.weights.length}) must match the scale's degrees (${this.offsets.length})`,
+      );
+    }
+    let total = 0;
+    this.cumulative = config.weights.map((w) => {
+      if (!(w >= 0)) throw new RangeError(`weights must be non-negative, got ${w}`);
+      total += w;
+      return total;
+    });
+    if (total <= 0) throw new RangeError('weights must not all be zero');
+  }
+
+  get degreeCount(): number {
+    return this.offsets.length;
+  }
+
+  /** One weighted draw of a degree index; consumes one value from `rng`. */
+  sampleDegree(rng: Rng): number {
+    const total = this.cumulative[this.cumulative.length - 1] ?? 0;
+    const r = rng() * total;
+    const hit = this.cumulative.findIndex((c, i) => r < c && (this.weights[i] ?? 0) > 0);
+    return hit === -1 ? this.lastWeighted() : hit;
+  }
+
+  /** MIDI note for a degree in a register, no randomness. */
+  noteFor(degree: number, octave: number): number {
+    const offset = this.offsets[degree];
+    if (offset === undefined) throw new RangeError(`degree ${degree} is outside the scale`);
+    return this.root + offset + octave * SEMITONES_PER_OCTAVE;
+  }
+
+  /** A degree by weight, then an octave uniformly within the register. Consumes two values. */
+  sampleNote(rng: Rng, register: Register): SampledNote {
+    const degree = this.sampleDegree(rng);
+    const span = Math.max(1, Math.trunc(register.span));
+    const octave = register.octave + Math.floor(rng() * span);
+    return { degree, note: this.noteFor(degree, octave) };
+  }
+
+  private lastWeighted(): number {
+    for (let i = this.weights.length - 1; i >= 0; i--) {
+      if ((this.weights[i] ?? 0) > 0) return i;
+    }
+    return 0;
+  }
+}
