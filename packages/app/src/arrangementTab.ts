@@ -1,0 +1,153 @@
+/**
+ * Arrangement tab (#70, record §2): transport and bpm, seed, and the document
+ * itself — export downloads a file, import reads one back (record: the
+ * console is a local tool, so a page-initiated download simply works). The
+ * exported file is the normalised document; committed over
+ * `packages/client/src/audio/arrangements/bed-01.json` it is what the game
+ * imports at build time (record §3).
+ */
+import type { AppCtx } from './context';
+import { el, fmt0, section } from './dom';
+import { makeKnob } from './knob';
+
+const COLOR = '#E0A44E';
+
+function transportSection(ctx: AppCtx): HTMLElement {
+  const { root, body } = section('Transport');
+  const row = el('div', 'bar-row');
+  const mute = el('button', 'btn', 'Mute') as HTMLButtonElement;
+  mute.type = 'button';
+  mute.onclick = (): void => {
+    const system = ctx.host.system;
+    if (!system) return ctx.status('enable audio first');
+    mute.setAttribute('aria-pressed', String(system.toggleMute()));
+  };
+  row.appendChild(mute);
+  const restart = el('button', 'btn', 'Restart') as HTMLButtonElement;
+  restart.type = 'button';
+  restart.title = 'Rebuild from the document and play from tick 0';
+  restart.onclick = (): void => ctx.restructure(() => {});
+  row.appendChild(restart);
+  row.appendChild(
+    makeKnob({
+      label: 'BPM',
+      min: 20,
+      max: 300,
+      def: 96,
+      step: 1,
+      color: COLOR,
+      fmt: fmt0,
+      get: () => ctx.model.doc.bpm,
+      set: (v) => void ctx.change({ bpm: v }),
+    }),
+  );
+  const seed = el('div');
+  seed.appendChild(el('span', 'field-label', 'Seed'));
+  const seedInput = document.createElement('input');
+  seedInput.className = 'field';
+  seedInput.type = 'number';
+  seedInput.value = String(ctx.model.doc.seed);
+  seedInput.setAttribute('aria-label', 'Seed');
+  seedInput.onchange = (): void => void ctx.change({ seed: Number(seedInput.value) });
+  seed.appendChild(seedInput);
+  const reroll = el('button', 'btn', 'Reroll') as HTMLButtonElement;
+  reroll.type = 'button';
+  reroll.onclick = (): void => {
+    const next = Math.floor(Math.random() * 1e6);
+    seedInput.value = String(next);
+    ctx.change({ seed: next });
+  };
+  seed.appendChild(reroll);
+  row.appendChild(seed);
+  body.appendChild(row);
+  return root;
+}
+
+function documentSection(ctx: AppCtx): HTMLElement {
+  const { root, body } = section(
+    'Document',
+    'Export downloads the normalised document. Commit it over ' +
+      'packages/client/src/audio/arrangements/bed-01.json — the game imports it ' +
+      'at build time; npm run verify gates it.',
+  );
+  const row = el('div', 'bar-row');
+  const name = document.createElement('input');
+  name.className = 'field';
+  name.value = 'bed-01.json';
+  name.setAttribute('aria-label', 'Export file name');
+  row.appendChild(name);
+  const exportBtn = el('button', 'btn primary', 'Export') as HTMLButtonElement;
+  exportBtn.type = 'button';
+  exportBtn.onclick = (): void => {
+    const blob = new Blob([ctx.model.toJson()], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name.value || 'arrangement.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    ctx.status(`exported ${a.download}`);
+  };
+  row.appendChild(exportBtn);
+  const file = document.createElement('input');
+  file.type = 'file';
+  file.accept = '.json,application/json';
+  file.className = 'field';
+  file.setAttribute('aria-label', 'Import a document');
+  file.onchange = (): void => {
+    const chosen = file.files?.[0];
+    if (!chosen) return;
+    chosen
+      .text()
+      .then((text) => {
+        ctx.importDoc(JSON.parse(text) as unknown);
+        ctx.status(`imported ${chosen.name}`);
+      })
+      .catch((error: unknown) => ctx.status(`import failed: ${String(error)}`));
+  };
+  row.appendChild(file);
+  body.appendChild(row);
+  return root;
+}
+
+function reportSection(ctx: AppCtx): HTMLElement {
+  const { root, body } = section('Normalisation report');
+  const { corrections, dangling, usable } = ctx.model;
+  if (!usable)
+    body.appendChild(el('p', 'hint hot', 'Nothing usable — the metronome fallback is playing.'));
+  if (corrections.length === 0 && dangling.length === 0) {
+    body.appendChild(el('p', 'hint', 'Clean: nothing corrected, nothing dangling.'));
+  }
+  for (const line of corrections) body.appendChild(el('p', 'hint', `corrected: ${line}`));
+  for (const line of dangling) body.appendChild(el('p', 'hint hot', `dangling: ${line}`));
+  return root;
+}
+
+function readoutSection(ctx: AppCtx): HTMLElement {
+  const { root, body } = section('Live readout');
+  const line = el('p', 'status', 'audio not enabled');
+  body.appendChild(line);
+  const update = (): void => {
+    if (!line.isConnected) return;
+    const system = ctx.host.system;
+    if (system) {
+      const r = system.readout();
+      const counters = Object.entries(r.counters)
+        .map(([id, n]) => `${id} ${n}`)
+        .join(' · ');
+      line.textContent =
+        `${r.running ? 'running' : 'stopped'}${r.muted ? ' (muted)' : ''} — ` +
+        `bpm ${r.bpm} — root ${r.root} — ${counters}`;
+    }
+    setTimeout(update, 500);
+  };
+  update();
+  return root;
+}
+
+export function renderArrangementTab(body: HTMLElement, ctx: AppCtx): void {
+  body.innerHTML = '';
+  body.appendChild(transportSection(ctx));
+  body.appendChild(documentSection(ctx));
+  body.appendChild(reportSection(ctx));
+  body.appendChild(readoutSection(ctx));
+}

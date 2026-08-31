@@ -153,7 +153,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
   private euclideanDriver(raw: unknown, path: string): EuclideanDriver {
     const d = DEFAULT_EUCLIDEAN_CONFIG;
     const o = this.section(raw, path);
-    this.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density'], path);
+    this.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern'], path);
     const steps = this.int(o.steps, d.steps, 1, 64, `${path}.steps`);
     return {
       steps,
@@ -161,6 +161,10 @@ export class ArrangementNormaliser extends FieldNormaliser {
       pulses: this.pulses(o.pulses, steps, `${path}.pulses`),
       rotate: this.int(o.rotate, 0, -steps, steps, `${path}.rotate`),
       density: this.density(o.density, `${path}.density`),
+      // Always present, `null` when generative, so a live capture or release
+      // merges through `AudioSystem.apply` (a merge only reaches keys the
+      // current arrangement has).
+      pattern: this.stepPattern(o.pattern, steps, `${path}.pattern`),
     };
   }
 
@@ -215,7 +219,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     const d = DEFAULT_ARPEGGIATOR_CONFIG;
     const o = this.section(raw, 'arp.driver');
     const known = ['divisor', 'poolSize', 'refreshBars', 'walk', 'skipChance', 'register', 'gate'];
-    this.dropUnknown(o, known, 'arp.driver');
+    this.dropUnknown(o, [...known, 'pattern'], 'arp.driver');
     return {
       divisor: this.divisor(o.divisor, d.divisor, 'arp.driver.divisor'),
       poolSize: this.int(o.poolSize, d.poolSize, 1, 16, 'arp.driver.poolSize'),
@@ -224,17 +228,19 @@ export class ArrangementNormaliser extends FieldNormaliser {
       skipChance: this.num(o.skipChance, d.skipChance, 0, 1, 'arp.driver.skipChance'),
       register: this.register(o.register, d.register, 'arp.driver.register'),
       gate: this.num(o.gate, d.gate, 0.01, 1, 'arp.driver.gate'),
+      pattern: this.notePattern(o.pattern, 'arp.driver.pattern'),
     };
   }
 
   private stepDriver(raw: unknown): StepDriver {
     const d = DEFAULT_STEP_SEQUENCER_CONFIG;
     const o = this.section(raw, 'drone.driver');
-    this.dropUnknown(o, ['divisor', 'gate', 'register'], 'drone.driver');
+    this.dropUnknown(o, ['divisor', 'gate', 'register', 'pattern'], 'drone.driver');
     return {
       divisor: this.divisor(o.divisor, d.divisor, 'drone.driver.divisor'),
       gate: this.num(o.gate, d.gate, 0.01, 1, 'drone.driver.gate'),
       register: this.register(o.register, d.register, 'drone.driver.register'),
+      pattern: this.notePattern(o.pattern, 'drone.driver.pattern'),
     };
   }
 

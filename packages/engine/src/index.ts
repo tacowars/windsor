@@ -25,6 +25,8 @@ export type {
   MusicTransport,
   PlayablePart,
 } from './arrangementPlayer';
+export { BarRecorder, assertNotePattern } from './capturedPattern';
+export type { NotePattern } from './capturedPattern';
 export { installMusicControls } from './musicControls';
 export type { MusicLog } from './musicControls';
 export { musicEnabledFromQuery } from './musicOptions';

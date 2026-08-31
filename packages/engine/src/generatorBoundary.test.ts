@@ -23,6 +23,9 @@ const PURE_FILES = [
   'euclideanSequencer.ts',
   'arpeggiator.ts',
   'stepSequencer.ts',
+  // The captured-pattern contract and bar recorder (issue #70): data in, data
+  // out — the player records into it, but it never touches a part.
+  'capturedPattern.ts',
 ];
 
 const ALLOWED_IMPORTS = new Set([

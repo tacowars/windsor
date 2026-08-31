@@ -10,6 +10,7 @@
  * Every step that plays emits a note-on and its note-off together, so the
  * binding can queue both against the look-ahead clock at once.
  */
+import { assertNotePattern, type NotePattern } from './capturedPattern';
 import { generatorRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import type { Register, ScaleSampler } from './scaleSampler';
@@ -33,6 +34,12 @@ export interface ArpeggiatorConfig {
   gate: number;
   seed: number;
   generatorIndex: number;
+  /**
+   * A captured bar (issue #70, record §6): a note or `null` (a rest) per
+   * step, looped; pool, walk and skip are unused and no RNG is consumed.
+   * `null` or absent is generative.
+   */
+  pattern?: NotePattern | null;
 }
 
 export const DEFAULT_ARPEGGIATOR_CONFIG: ArpeggiatorConfig = {
@@ -68,6 +75,7 @@ function assertConfig(config: ArpeggiatorConfig): void {
   if (!(config.skipChance >= 0 && config.skipChance <= 1)) {
     throw new RangeError(`skipChance must be in [0, 1], got ${config.skipChance}`);
   }
+  if (config.pattern != null) assertNotePattern(config.pattern);
 }
 
 export class Arpeggiator {
@@ -103,6 +111,8 @@ export class Arpeggiator {
    * that opens a refresh period.
    */
   handleTick(event: TickEvent): NoteEvent[] {
+    const pattern = this.config.pattern;
+    if (pattern != null) return this.fixedStep(event, pattern);
     const refreshDue = event.tickInBar === 0 && event.bar % this.config.refreshBars === 0;
     if (this.pool.length === 0 || refreshDue) this.refreshPool();
     const index = this.nextIndex();
@@ -110,20 +120,28 @@ export class Arpeggiator {
     if (rest) return [];
     const chosen = this.pool[index];
     if (!chosen) return [];
+    return this.emit(event, chosen.note, chosen.degree);
+  }
+
+  /** Play the captured bar (issue #70): no pool, no walk, no RNG consumed. */
+  private fixedStep(event: TickEvent, pattern: NotePattern): NoteEvent[] {
+    const slot = Math.floor(event.tickInBar / this.config.divisor) % pattern.length;
+    const note = pattern[slot];
+    if (note == null) return [];
+    // A captured note was not drawn from the scale; -1 marks that honestly.
+    return this.emit(event, note, -1);
+  }
+
+  /** The step's note-on and its note-off, `gate` of a step later, together. */
+  private emit(event: TickEvent, note: number, degree: number): NoteEvent[] {
     const durationTicks = Math.max(1, Math.round(this.config.gate * this.config.divisor));
     const events: NoteEvent[] = [
-      {
-        kind: 'noteOn',
-        tick: event.tick,
-        time: event.time,
-        note: chosen.note,
-        degree: chosen.degree,
-      },
+      { kind: 'noteOn', tick: event.tick, time: event.time, note, degree },
       {
         kind: 'noteOff',
         tick: event.tick + durationTicks,
         time: event.time + durationTicks * event.secondsPerTick,
-        note: chosen.note,
+        note,
       },
     ];
     for (const e of events) this.onNote?.(e);

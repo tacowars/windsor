@@ -1,84 +1,106 @@
 /* global console, Buffer */
 /**
- * Generates the standalone patch editor.
+ * Generates the standalone arrangement console (#70).
  *
- * The editor must run as one file with no imports and no dev server, so this
- * inlines two things into `editor-template.html`:
+ * The console must run as one file with no imports and no dev server — from
+ * file:// or any static server — so this inlines into `editor-template.html`:
  *
  *   - `worklet/fm-processor.js` and `worklet/reverb-processor.js` verbatim, as
- *     strings the page turns into a blob or data URL for `addModule()`
- *   - `patch.ts` + `presets.ts`, bundled by esbuild into an IIFE
+ *     strings the page turns into blob URLs for `FmEngine.init()`
+ *   - the console app (`src/main.ts`), bundled by esbuild together with the
+ *     real engine via `packages/client/src/audio/index-for-editor.ts`
  *
- * Both come from the real client source, so the editor cannot drift from what
- * the game runs. Re-run after changing the DSP or the patch schema:
+ * Everything comes from the real client source, so the console cannot drift
+ * from what the game runs — and two assertions keep the two boundaries honest:
+ *
+ *   - the bundle must contain no Babylon (`index-for-editor` excludes
+ *     `babylonBridge.ts`, the sole Babylon-touching module);
+ *   - the console's own code (template + src/) must build no Web Audio nodes
+ *     for synthesis, routing or sequencing — it drives `AudioSystem`.
+ *
+ * Re-run after changing the DSP, the schema, the engine, or the console:
  *
  *   node tools/patch-editor/build-editor.mjs
  */
 import { build } from 'esbuild';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AUDIO = join(HERE, '../../packages/client/src/audio');
 
-/** Names the template expects in scope. */
-const EXPORTS = [
-  'ALGORITHMS',
-  'DEFAULT_SPACE',
-  'SPACES',
-  'SPACE_NAMES',
-  'FILTER_MODE_NAMES',
-  'LFO_SHAPE_NAMES',
-  'LOOP_MODE_NAMES',
-  'PRESETS',
-  'PRESET_NAMES',
-  'WAVE_NAMES',
-  'clonePatch',
-  'makePatch',
-  'makeSpace',
-];
-
 const worklet = readFileSync(join(AUDIO, 'worklet/fm-processor.js'), 'utf8');
 const reverb = readFileSync(join(AUDIO, 'worklet/reverb-processor.js'), 'utf8');
 const template = readFileSync(join(HERE, 'editor-template.html'), 'utf8');
 
-for (const marker of ['/*__WORKLET__*/', '/*__REVERB__*/', '/*__PATCH__*/']) {
+for (const marker of ['/*__WORKLET__*/', '/*__REVERB__*/', '/*__APP__*/']) {
   if (!template.includes(marker)) throw new Error(`template is missing ${marker}`);
 }
 
+// The console is a complete standalone document (decision record
+// `2026-08-31-arrangement-console-and-runtime-arrangements`, "local tool"):
+// it is no longer published as an Artifact, so it carries its own skeleton.
+if (!/^<!doctype html>/i.test(template.trim())) {
+  throw new Error('template must be a complete document starting with <!doctype html>');
+}
+
+// The console builds no Web Audio nodes of its own for synthesis, routing or
+// sequencing (#70 acceptance criterion, asserted by absence in the console's
+// own code — the engine bundle below legitimately contains all of these).
+const FORBIDDEN_IN_CONSOLE_CODE = [
+  'createGain(',
+  'createBiquadFilter(',
+  'new AudioWorkletNode',
+  'createDynamicsCompressor(',
+  'createOscillator(',
+  'createStereoPanner(',
+  'createDelay(',
+  'audioWorklet.addModule',
+];
+const consoleSources = [
+  ['editor-template.html', template],
+  ...readdirSync(join(HERE, 'src'))
+    .filter((name) => name.endsWith('.ts'))
+    .map((name) => [`src/${name}`, readFileSync(join(HERE, 'src', name), 'utf8')]),
+];
+for (const [name, source] of consoleSources) {
+  for (const forbidden of FORBIDDEN_IN_CONSOLE_CODE) {
+    if (source.includes(forbidden)) {
+      throw new Error(`${name} contains "${forbidden}" — drive AudioSystem, not a local graph`);
+    }
+  }
+}
+
 const bundle = await build({
-  stdin: {
-    contents: `export { ${EXPORTS.join(', ')} } from './index-for-editor';`,
-    resolveDir: AUDIO,
-    sourcefile: 'editor-entry.ts',
-    loader: 'ts',
-  },
+  entryPoints: [join(HERE, 'src/main.ts')],
   bundle: true,
   write: false,
   format: 'iife',
-  globalName: '__SCHEMA__',
   target: 'es2022',
   platform: 'browser',
   legalComments: 'none',
+  // `workletMessages.ts` builds its default URLs from `import.meta.url`,
+  // which an IIFE lacks; the host always passes blob-URL overrides, so the
+  // defaults only need to *construct* without throwing.
+  define: { 'import.meta.url': 'self.location.href' },
 });
 
 const [output] = bundle.outputFiles;
 if (!output) throw new Error('esbuild produced no output');
 
-const schema = `${output.text}\nconst { ${EXPORTS.join(', ')} } = __SCHEMA__;`;
+// Invariant: the editor entry keeps Babylon out (only babylonBridge.ts may
+// import it, and index-for-editor.ts excludes that module).
+for (const forbidden of ['@babylonjs', 'babylonBridge', 'BABYLON']) {
+  if (output.text.includes(forbidden)) {
+    throw new Error(`engine bundle contains "${forbidden}" — Babylon leaked into the console`);
+  }
+}
 
-let html = template
-  .replace('/*__PATCH__*/', () => schema)
+const html = template
+  .replace('/*__APP__*/', () => output.text)
   .replace('/*__WORKLET__*/', () => JSON.stringify(worklet))
   .replace('/*__REVERB__*/', () => JSON.stringify(reverb));
-
-// The editor is published as an Artifact, which supplies its own document
-// skeleton. Match whole tags so <header> does not trip the guard.
-for (const forbidden of [/<!doctype/i, /<html[\s>]/i, /<head[\s>]/i, /<body[\s>]/i]) {
-  const hit = html.match(forbidden);
-  if (hit) throw new Error(`generated file must not contain "${hit[0]}"`);
-}
 
 const dest = join(HERE, 'patch-editor.html');
 writeFileSync(dest, html);
@@ -86,5 +108,5 @@ writeFileSync(dest, html);
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
 console.log(`built tools/patch-editor/patch-editor.html (${kb(Buffer.byteLength(html))})`);
 console.log(
-  `  fm: ${kb(worklet.length)}   reverb: ${kb(reverb.length)}   schema bundle: ${kb(output.text.length)}`,
+  `  fm: ${kb(worklet.length)}   reverb: ${kb(reverb.length)}   app+engine bundle: ${kb(output.text.length)}`,
 );

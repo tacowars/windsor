@@ -23,6 +23,7 @@
 import { Arpeggiator } from './arpeggiator';
 import type { Arrangement, DeepPartial, EuclideanDriver } from './arrangement';
 import { mergeArrangement } from './arrangement';
+import { BarRecorder, type NotePattern } from './capturedPattern';
 import { EuclideanSequencer, type OnsetEvent } from './euclideanSequencer';
 import type { NoteEvent } from './noteEvent';
 import type { Patch } from './patch';
@@ -128,6 +129,11 @@ function validate(next: Arrangement, previous: Arrangement | null): void {
 export class ArrangementPlayer {
   private current: Arrangement;
   private built: Built;
+  /** What each pitched part actually sounded, for capture (issue #70). */
+  private readonly recorders: Record<'arp' | 'drone', BarRecorder | null> = {
+    arp: null,
+    drone: null,
+  };
   private readonly subs = new Map<MusicPartId, Unsubscribe>();
   private readonly counters: Record<MusicPartId, number> = { kick: 0, hat: 0, arp: 0, drone: 0 };
   private readonly announced = new Set<MusicPartId>();
@@ -158,6 +164,26 @@ export class ArrangementPlayer {
       scale: typeof scale === 'string' ? scale : [...scale],
       counters: { ...this.counters },
     };
+  }
+
+  /**
+   * The sounding pattern of a part as a literal array (issue #70, record §6):
+   * the percussion figure now playing, or the last bar a pitched part
+   * completed — `null` before one exists. What the console freezes into
+   * `driver.pattern`.
+   */
+  capturePattern(id: 'kick' | 'hat'): readonly boolean[] | null;
+  capturePattern(id: 'arp' | 'drone'): NotePattern | null;
+  capturePattern(id: MusicPartId): readonly boolean[] | NotePattern | null;
+  capturePattern(id: MusicPartId): readonly boolean[] | NotePattern | null {
+    if (id === 'kick' || id === 'hat') {
+      const sequencer = this.built[id];
+      return sequencer ? [...sequencer.currentPattern] : null;
+    }
+    const recorder = this.recorders[id];
+    if (!recorder) return null;
+    const held = id === 'drone' ? (this.built.drone?.heldNote ?? null) : null;
+    return recorder.capture(id === 'drone', held);
   }
 
   /** Merge a partial over the arrangement and commit it (refinement decision 3). */
@@ -266,6 +292,13 @@ export class ArrangementPlayer {
       const generator = this.built[id];
       if (generator) this.subs.set(id, generator.attach(this.transport));
     }
+    // A rebuilt pitched part gets a fresh recorder: its divisor may have
+    // changed, and the bars recorded under the old generator are history.
+    for (const id of ['arp', 'drone'] as const) {
+      if (!ids.has(id)) continue;
+      const section = this.current[id];
+      this.recorders[id] = section ? new BarRecorder(section.driver.divisor) : null;
+    }
   }
 
   private percussion(id: 'kick' | 'hat', event: OnsetEvent): void {
@@ -282,6 +315,7 @@ export class ArrangementPlayer {
     if (!config || !part) return;
     if (event.kind === 'noteOn') {
       part.noteOn(event.note, config.velocity, event.time);
+      this.recorders[id]?.record(event.tick, event.note);
       this.count(id, event.tick);
     } else {
       part.noteOffByNote(event.note, event.time);
