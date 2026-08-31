@@ -102,6 +102,34 @@ describe('voice lifecycle', () => {
   });
 });
 
+describe('allNotesOff', () => {
+  it('releases the sounding voice with a tail and cancels queued future events', () => {
+    const blip = PRESETS['pickup-blip'];
+    expect(blip).toBeDefined();
+    if (!blip) return;
+    const processor = loaded.create(blip, 8);
+
+    // One note sounding now, one queued far in the future -- the shape the
+    // #69 scheduler's look-ahead produces at the moment of a mute.
+    processor.inbox({ type: 'noteOn', id: 1, note: 60, velocity: 0.9, frame: 0 });
+    processor.inbox({ type: 'noteOn', id: 2, note: 72, velocity: 0.9, frame: 24000 });
+    const before = render(loaded, processor, 20);
+    expect(before.peak).toBeGreaterThan(0.002);
+
+    processor.inbox({ type: 'allNotesOff' } as unknown as ScheduledEvent);
+    const after = render(loaded, processor, 300);
+    expect(after.nonFinite).toBe(0);
+
+    // The queued note at frame 24000 must never sound; anything after the
+    // blip's short release is exact silence.
+    let latePeak = 0;
+    for (let i = 20000 * 2; i < after.samples.length; i++) {
+      latePeak = Math.max(latePeak, Math.abs(after.samples[i] ?? 0));
+    }
+    expect(latePeak).toBe(0);
+  });
+});
+
 describe('scheduling', () => {
   it('places a note within one sample of the requested frame', () => {
     const patch = makePatch({

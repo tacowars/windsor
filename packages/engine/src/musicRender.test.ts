@@ -143,6 +143,20 @@ describe('the audible arrangement', () => {
     expect(noteOns()).toBeGreaterThan(before);
   });
 
+  it('keeps a suppressed system silent even through the debug mute toggle', async () => {
+    const { context, system, noteOns } = await musicRig();
+    system.suppressMusic();
+    system.startMusic();
+    expect(system.musicRunning).toBe(false);
+    // Two toggles land back on unmuted; unmute must not start a suppressed page.
+    system.toggleMute();
+    system.toggleMute();
+    expect(system.musicRunning).toBe(false);
+    context.currentTime = 3;
+    system.update(0);
+    expect(noteOns()).toBe(0);
+  });
+
   it('applies bpm live through the system without a reload', async () => {
     const { system } = await musicRig();
     system.startMusic();

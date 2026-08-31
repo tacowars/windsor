@@ -57,6 +57,7 @@ export class AudioSystem {
   private started = false;
   private player: ArrangementPlayer | null = null;
   private muted = false;
+  private suppressed = false;
 
   constructor(engine?: FmEngine, options: AudioSystemOptions = {}) {
     this.engine = engine ?? new FmEngine();
@@ -115,9 +116,19 @@ export class AudioSystem {
     this.player = new ArrangementPlayer(this.scheduler, parts, arrangement, onEvent);
   }
 
-  /** Start (or resume) the transport. Called at the unlock gesture; a no-op while muted. */
+  /**
+   * `?music=0` (decision 2): keep the whole graph but never start the
+   * transport — not at unlock, and not through an unmute, the debug shim's
+   * included. Enforced here so no caller can bypass the suppression.
+   */
+  suppressMusic(): void {
+    this.suppressed = true;
+    this.scheduler.stop();
+  }
+
+  /** Start (or resume) the transport. Called at the unlock gesture; a no-op while muted or suppressed. */
   startMusic(): void {
-    if (!this.player || this.muted) return;
+    if (!this.player || this.muted || this.suppressed) return;
     this.scheduler.start(this.scheduler.transport.currentTick);
   }
 
@@ -192,6 +203,7 @@ export class AudioSystem {
     this.player?.dispose();
     this.player = null;
     this.muted = false;
+    this.suppressed = false;
     for (const strip of this.strips.values()) strip.dispose();
     this.strips.clear();
     if (this.returns) for (const bus of Object.values(this.returns)) bus.dispose();

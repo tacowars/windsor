@@ -15,6 +15,7 @@ import type { AudioSystem } from './audioSystem';
 export type MusicLog = (fields: Record<string, string | number | boolean | null>) => void;
 
 export function installMusicControls(system: AudioSystem, music: boolean, log: MusicLog): void {
+  if (!music) system.suppressMusic();
   system.initMusic(ARRANGEMENT, (part, tick) => log({ state: 'note', part, tick }));
   const unlock = (): void =>
     void system.unlock().then(() => {
@@ -27,7 +28,8 @@ export function installMusicControls(system: AudioSystem, music: boolean, log: M
   window.addEventListener('keydown', unlock, { once: true });
   if (!music) return;
   window.addEventListener('keydown', (event) => {
-    if (event.code !== 'KeyM') return;
+    // `repeat`: a held M autorepeats keydown; one press is one toggle.
+    if (event.code !== 'KeyM' || event.repeat) return;
     log({ state: system.toggleMute() ? 'muted' : 'unmuted' });
   });
 }
