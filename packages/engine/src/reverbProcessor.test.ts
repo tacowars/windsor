@@ -102,7 +102,47 @@ describe('stability', () => {
     // Freeze is meant to be indefinite: still within a factor of two at 30 s.
     expect(rmsAt(result, 29)).toBeGreaterThan(early * 0.5);
   });
+
+  /**
+   * HOLD used to bypass the tank filters by zeroing the high-pass coefficient,
+   * which froze `_dampHp` at its last value and left the tank subtracting that
+   * constant every pass -- DC into a lossless loop, which integrates.
+   *
+   * Broadband noise hides this completely, which is why the test above passed
+   * while the bug was live: noise barely charges a 20 Hz high-pass. A sustained
+   * low tone does, and took a frozen tank from 0.85 to 5.9 RMS over 55 s.
+   */
+  it.each([40, 80, 220])('does not ramp when frozen after a %i Hz tone', (hz) => {
+    const result = renderReverb(loaded, 50, sine(hz, 1), {}, holdFrom(1.2));
+
+    expect(result.nonFinite).toBe(0);
+    const early = rmsAt(result, 6);
+    expect(early).toBeGreaterThan(0.01);
+    // A DC injection climbs steadily; a frozen tank only wanders with its mod.
+    expect(rmsAt(result, 45)).toBeLessThan(early * 3);
+  });
 });
+
+/** A sine at `hz` and 0.8 amplitude for `seconds`, then silence. */
+function sine(hz: number, seconds: number): Feed {
+  const until = Math.round((seconds * loaded.sampleRate) / 128);
+  return (block, left, right) => {
+    if (block >= until) return;
+    for (let i = 0; i < left.length; i++) {
+      const t = (block * 128 + i) / loaded.sampleRate;
+      left[i] = right[i] = Math.sin(2 * Math.PI * hz * t) * 0.8;
+    }
+  };
+}
+
+/** Engage HOLD at `seconds` and leave it on. */
+function holdFrom(seconds: number): Automate {
+  const at = Math.round((seconds * loaded.sampleRate) / 128);
+  return (block, values) => {
+    const hold = values.hold;
+    if (hold) hold[0] = block >= at ? 1 : 0;
+  };
+}
 
 const TONE_HZ = 220;
 const TONE_AMPLITUDE = 0.3;

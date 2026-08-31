@@ -1,8 +1,8 @@
 # Ticket #52 — Dattorro plate reverb: browser verification
 
-Evidence that `worklet/reverb-processor.js` loads and runs in a real browser,
-that the three shipped rooms behave as their names claim, and that the patch
-editor drives them with a clean console.
+Evidence that `worklet/reverb-processor.js` loads and runs in a real browser —
+in the game client as well as the patch editor — that the three shipped rooms
+behave as their names claim, and that neither page logs an error.
 
 ## Machine and browser
 
@@ -10,50 +10,90 @@ editor drives them with a clean console.
 |---|---|
 | Machine | Apple M4 Pro (macOS 26.5.1) — **not** the target box |
 | Browser | Chromium 142 (Playwright 1.62.1, headless), `--mute-audio` |
-| Page | `tools/patch-editor/patch-editor.html`, static server on `localhost:8765` |
+| Pages | the game client (`npm run dev:client`, `localhost:5173`) and `tools/patch-editor/patch-editor.html` (`localhost:8765`) |
+| Renderer | WebGL2 on SwiftShader — headless, **software**; no WebGPU adapter available |
 | Context | `AudioContext` at 44 100 Hz; renders in `OfflineAudioContext` at 48 000 Hz |
 | Build | this branch at `292e846` plus the review fixes |
 
-## What form this evidence takes, and why it is not the usual one
+## What form this evidence takes, and where it falls short
 
-`AGENTS.md` asks a `scope:client` PR for `get-system-stats`,
-`query-a204-state` around a scripted move, a `take-screenshot` per backend, and
-a console listing — all via the Inspector CLI bridge and the `chrome-devtools`
-MCP.
+`AGENTS.md` asks a `scope:client` PR for `get-system-stats`, `query-a204-state`
+around a scripted move, a `take-screenshot` per backend, and a console listing
+with zero errors/warnings — via the Inspector CLI bridge and the
+`chrome-devtools` MCP. This is not that, and the gaps are worth naming
+precisely rather than waving at.
 
-Most of that does not apply here and the rest could not be run:
+**Covered, and it matters.** The first draft of this evidence tested only the
+patch editor, which was a real gap: `AudioSystem.init()` now loads a *second*
+worklet module, and a URL that resolves in the editor's inlined-blob path
+proves nothing about `new URL(…, import.meta.url)` under Vite. `main.ts`
+swallows an audio failure by design (`console.warn('[a204] audio unavailable')`
+and carry on silent), so the failure mode here is a quiet one. The game-client
+run below closes that.
 
-- **No renderer involvement.** This change touches no mesh, material, camera or
-  physics. `query-a204-state` and the per-backend screenshots exist to show that
-  WebGPU and WebGL2 agree about the scene; there is no scene. Web Audio has one
-  backend, and `AudioWorklet` output does not vary by graphics backend.
-- **The `chrome-devtools` MCP was unavailable** for this session — its profile
-  was already locked by a running browser (`The browser is already running for
-  .../chrome-profile`), and the Claude-in-Chrome extension was not connected.
-  Playwright drives real Chromium, so the substance (module loads, node
-  constructs, DSP runs, console is clean) is verified; the specific tooling the
-  guide names is not what produced it.
+**Not covered, and arguably not applicable.** `query-a204-state` before/after a
+scripted move, and a screenshot per backend, exist to show WebGPU and WebGL2
+agree about the scene. This change touches no mesh, material, camera or
+physics, and Web Audio has one backend — `AudioWorklet` output does not vary
+with the graphics backend.
 
-What replaces it is the audio equivalent: proof the worklet module loads over a
-blob URL, that the node constructs and processes, that the rooms are
-distinguishable and decay as designed, and a console listing.
+**Not covered, and a genuine shortfall.** The run is headless on **SwiftShader**
+with no WebGPU adapter, so it is not a hardware-driver capture and there is no
+WebGPU listing. The `chrome-devtools` MCP was unavailable this session — its
+profile was locked by a running browser (`The browser is already running for
+.../chrome-profile`) and the Claude-in-Chrome extension was not connected — so
+Playwright stood in for it. The console listing below therefore has **zero
+errors but four warnings**, every one of them a software-rendering artefact
+(`No available adapters`, `GPU stall due to ReadPixels`) rather than anything
+this change emits.
 
-A reviewer who thinks the renderer captures are needed anyway should say so —
-this is a judgement call about applicability, not a claim the requirement was
-met.
+A reviewer who wants the hardware-driver capture before merge is entitled to
+it; it needs the MCP free, not more work on the branch.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `console.txt` | Every console message and page error for the whole session |
+| `game-console.txt` | Every console message from a game-client boot |
+| `game-worklets.json` | Both `addModule` calls the client made, and their outcomes |
+| `game-boot.png` | The client, booted, with audio running |
+| `console.txt` | Every console message and page error from the patch editor |
 | `offline-render.json` | Editor status line, and the three room renders below |
 | `reverb-panel.png` | The Reverb Send panel as it renders in the editor |
 | `editor-full.png` | The whole editor with audio running |
 
-## Results
+## Results — the game client
 
-### The editor
+`AudioWorklet.prototype.addModule` was wrapped before any application code ran,
+because worklet module loads do **not** surface as page-level network requests
+(a first attempt watched the network and saw nothing, while the modules had in
+fact loaded). `game-worklets.json`:
+
+| Module | Loaded |
+|---|---|
+| `/src/audio/worklet/fm-processor.js` | ok |
+| `/src/audio/worklet/reverb-processor.js` | **ok** |
+
+Both resolve under Vite through `new URL(…, import.meta.url)`, and
+`AudioSystem.init()` ran to completion — no `[a204] audio unavailable` warning,
+which is the only symptom a failure would have produced. `createBus` therefore
+constructed the `dattorro-reverb` node against the real client's `AudioContext`.
+
+`game-console.txt` — **zero errors**. Four warnings, all from the headless
+software renderer:
+
+```
+[warning] No available adapters.                       <- no WebGPU in this environment
+[warning] GL Driver Message ... GPU stall due to ReadPixels   (x4, then suppressed)
+[info]    [a204] {"event":"engine","backend":"WebGL2","gpu":"ANGLE (Google, Vulkan 1.3.0 (SwiftShader ...
+```
+
+The `[a204]` engine line names SwiftShader explicitly: this is the software
+path, not a hardware driver.
+
+## Results — the patch editor
+
+### Status
 
 Status line after clicking **Audio on**:
 

@@ -1,0 +1,13 @@
+{
+  "worklets": [
+    {
+      "url": "http://localhost:5173/src/audio/worklet/fm-processor.js",
+      "ok": true
+    },
+    {
+      "url": "http://localhost:5173/src/audio/worklet/reverb-processor.js",
+      "ok": true
+    }
+  ],
+  "audioContextState": "constructed"
+}

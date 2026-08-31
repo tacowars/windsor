@@ -312,10 +312,18 @@ class DattorroReverb extends AudioWorkletProcessor {
     );
     const inputLp = poleCoefficient(parameters.inputHighCut[0]);
     const inputHp = poleCoefficient(parameters.inputLowCut[0]);
-    // HOLD bypasses the tank filters: an infinite decay through a damper is
-    // still a decay, just a slower and duller one.
-    const dampLp = held ? 1 : poleCoefficient(parameters.tankHighCut[0]);
-    const dampHp = held ? 0 : poleCoefficient(parameters.tankLowCut[0]);
+    // HOLD bypasses the tank filters -- an infinite decay through a damper is
+    // still a decay, just a slower and duller one -- but it bypasses their
+    // *output*, not their coefficients. Freezing the high-pass by zeroing its
+    // coefficient leaves `_dampHp` stuck at whatever it last held, and the tank
+    // then subtracts that constant on every pass: a DC injection into a
+    // lossless loop, which integrates. Measured on a 40 Hz tone it took a
+    // frozen tank from 0.85 to 5.9 RMS over 55 s, while 220 Hz and 1 kHz --
+    // which barely charge a 20 Hz high-pass -- held steady and hid it.
+    // Both states keep tracking at their real coefficients so that releasing
+    // HOLD does not step either filter.
+    const dampLp = poleCoefficient(parameters.tankHighCut[0]);
+    const dampHp = poleCoefficient(parameters.tankLowCut[0]);
 
     const diffuse1 = parameters.diffusionIn1[0];
     const diffuse2 = parameters.diffusionIn2[0];
@@ -368,23 +376,21 @@ class DattorroReverb extends AudioWorkletProcessor {
         split + decay * this._read(11, 0) + tank1 * this._readCubic(4, exc),
       );
       this._write1(5, this._readCubic(4, exc) - tank1 * node);
-      this._dampLp[0] += dampLp * (this._read(5, 0) - this._dampLp[0]);
+      const rawLeft = this._read(5, 0);
+      this._dampLp[0] += dampLp * (rawLeft - this._dampLp[0]);
       this._dampHp[0] += dampHp * (this._dampLp[0] - this._dampHp[0]);
-      node = this._write1(
-        6,
-        decay * (this._dampLp[0] - this._dampHp[0]) - tank2 * this._read(6, 0),
-      );
+      const dampedLeft = held ? rawLeft : this._dampLp[0] - this._dampHp[0];
+      node = this._write1(6, decay * dampedLeft - tank2 * this._read(6, 0));
       this._write1(7, this._read(6, 0) + tank2 * node);
 
       // Right loop.
       node = this._write1(8, split + decay * this._read(7, 0) + tank1 * this._readCubic(8, exc2));
       this._write1(9, this._readCubic(8, exc2) - tank1 * node);
-      this._dampLp[1] += dampLp * (this._read(9, 0) - this._dampLp[1]);
+      const rawRight = this._read(9, 0);
+      this._dampLp[1] += dampLp * (rawRight - this._dampLp[1]);
       this._dampHp[1] += dampHp * (this._dampLp[1] - this._dampHp[1]);
-      node = this._write1(
-        10,
-        decay * (this._dampLp[1] - this._dampHp[1]) - tank2 * this._read(10, 0),
-      );
+      const dampedRight = held ? rawRight : this._dampLp[1] - this._dampHp[1];
+      node = this._write1(10, decay * dampedRight - tank2 * this._read(10, 0));
       this._write1(11, this._read(10, 0) + tank2 * node);
 
       let left = 0;
