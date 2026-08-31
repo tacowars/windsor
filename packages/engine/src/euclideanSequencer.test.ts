@@ -162,6 +162,39 @@ describe('EuclideanSequencer', () => {
     expect(JSON.stringify(a)).not.toBe(JSON.stringify(c));
   });
 
+  it('started mid-bar, plays the constructor figure out to the next bar line', () => {
+    const config = withDensity({ kind: 'lfoBars', bars: 8, shape: 'tri' });
+    const transport = new TickTransport(120);
+    const seq = new EuclideanSequencer(config);
+    const initial = patternToString(seq.currentPattern);
+    const rows: { tick: number; k: number; pattern: string }[] = [];
+    transport.subscribe(config.divisor, (e) => {
+      seq.handleTick(e);
+      rows.push({ tick: e.tick, k: seq.currentK, pattern: patternToString(seq.currentPattern) });
+    });
+    transport.reset(48);
+    for (let i = 0; i < TICKS_PER_BAR; i++) transport.advance(0);
+    expect(seq.currentK).not.toBe(config.pulses.start); // the LFO's k, once the bar line came
+    for (const r of rows) {
+      if (r.tick < 96) {
+        expect(r.k, `tick ${r.tick}`).toBe(config.pulses.start);
+        expect(r.pattern).toBe(initial);
+      } else {
+        expect(r.k).toBe(8); // bar 1 of an 8-bar triangle
+      }
+    }
+  });
+
+  it('rejects a probability or period outside its contract', () => {
+    const bad = (density: DensityMod) => () => new EuclideanSequencer(withDensity(density));
+    expect(bad({ kind: 'walk', stepChance: 1.2 })).toThrow(RangeError);
+    expect(bad({ kind: 'walk', stepChance: -0.1 })).toThrow(RangeError);
+    expect(bad({ kind: 'lfoBars', bars: 0, shape: 'tri' })).toThrow(RangeError);
+    expect(bad({ kind: 'lfoHz', hz: -1, shape: 'sine' })).toThrow(RangeError);
+    expect(bad({ kind: 'walk', stepChance: 0 })).not.toThrow();
+    expect(bad({ kind: 'walk', stepChance: 1 })).not.toThrow();
+  });
+
   it('rejects a divisor that does not nest in the bar, and pulses outside the figure', () => {
     expect(() => new EuclideanSequencer({ ...DEFAULT_EUCLIDEAN_CONFIG, divisor: 5 })).toThrow(
       RangeError,

@@ -65,6 +65,9 @@ function assertConfig(config: ArpeggiatorConfig): void {
   if (!(config.gate > 0 && config.gate <= 1)) {
     throw new RangeError(`gate must be in (0, 1], got ${config.gate}`);
   }
+  if (!(config.skipChance >= 0 && config.skipChance <= 1)) {
+    throw new RangeError(`skipChance must be in [0, 1], got ${config.skipChance}`);
+  }
 }
 
 export class Arpeggiator {
@@ -76,7 +79,6 @@ export class Arpeggiator {
   private pool: PoolNote[] = [];
   private position = 0;
   private direction = 1;
-  private bar = -1;
 
   constructor(sampler: ScaleSampler, config: ArpeggiatorConfig) {
     assertConfig(config);
@@ -94,13 +96,15 @@ export class Arpeggiator {
     return source.subscribe(this.config.divisor, (event) => this.handleTick(event));
   }
 
-  /** One step. Returns the events it emitted: none for a rest, on + off for a note. */
+  /**
+   * One step. Returns the events it emitted: none for a rest, on + off for a
+   * note. The pool is drawn on the first step it is ever needed -- an empty
+   * pool is not a phrase to protect -- and after that only on a bar line
+   * that opens a refresh period.
+   */
   handleTick(event: TickEvent): NoteEvent[] {
-    if (event.bar !== this.bar) {
-      const due = this.bar === -1 || event.bar % this.config.refreshBars === 0;
-      this.bar = event.bar;
-      if (due) this.refreshPool();
-    }
+    const refreshDue = event.tickInBar === 0 && event.bar % this.config.refreshBars === 0;
+    if (this.pool.length === 0 || refreshDue) this.refreshPool();
     const index = this.nextIndex();
     const rest = this.rng() < this.config.skipChance;
     if (rest) return [];
