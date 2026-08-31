@@ -73,6 +73,24 @@ export function loadReverb(): LoadedReverb {
   };
 }
 
+/**
+ * The delay-line internals, for tests that need to check a read directly rather
+ * than through the tank -- which diffuses a single-sample error to about 1% at
+ * the output, far too little to assert on.
+ */
+export interface ReverbInternals {
+  _buffers: Float32Array[];
+  _write: Int32Array;
+  _length: Float32Array;
+  _read(index: number, offset: number): number;
+  _readCubic(index: number, offset: number): number;
+}
+
+/** White-box access to one processor's delay lines. */
+export function internals(processor: ReverbProcessorLike): ReverbInternals {
+  return processor as unknown as ReverbInternals;
+}
+
 /** Writes one block of input. Called with the block index and both channels. */
 export type Feed = (block: number, left: Float32Array, right: Float32Array) => void;
 

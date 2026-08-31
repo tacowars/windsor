@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import type { Automate, Feed } from './__fixtures__/reverbHarness';
 import {
   impulse,
+  internals,
   loadReverb,
   noiseBurst,
   renderReverb,
@@ -157,5 +158,40 @@ describe('size automation', () => {
     const steady = renderReverb(loaded, 4, tone, { size: 1 });
 
     expect(steady.maxStep).toBeLessThan(slewCeiling(steady.peak));
+  });
+});
+
+describe('the delay readers', () => {
+  /**
+   * `_read` and `_readCubic` must locate the same point in a line from the same
+   * (length, offset). They are separate implementations -- linear and cubic --
+   * and an earlier version of `_readCubic` floored `write - length` on its own
+   * and took its fraction from `offset` alone, silently dropping the fractional
+   * part of the length. On a ramp both interpolators are exact, so any
+   * disagreement is a positioning error and nothing else.
+   *
+   * This is asserted here rather than at the output because the tank diffuses a
+   * one-sample error down to about 1% by the time it reaches the taps -- real,
+   * but far below anything an output assertion could distinguish from texture.
+   */
+  it('agree on where they are reading from', () => {
+    const line = 4;
+    const processor = internals(loaded.create());
+    const buffer = processor._buffers[line];
+    expect(buffer).toBeDefined();
+    if (!buffer) return;
+
+    // A ramp, so exact interpolation is a linear function of the position.
+    for (let i = 0; i < buffer.length; i++) buffer[i] = i;
+    processor._write[line] = buffer.length >> 1;
+
+    for (const length of [64, 64.25, 64.5, 63.75, 100.1]) {
+      for (const offset of [0, 0.5, 1.25, 7.75]) {
+        processor._length[line] = length;
+        const linear = processor._read(line, offset);
+        const cubic = processor._readCubic(line, offset);
+        expect(cubic, `length ${length}, offset ${offset}`).toBeCloseTo(linear, 6);
+      }
+    }
   });
 });

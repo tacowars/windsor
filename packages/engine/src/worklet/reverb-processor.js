@@ -242,9 +242,16 @@ class DattorroReverb extends AudioWorkletProcessor {
   _readCubic(index, offset) {
     const buffer = this._buffers[index];
     const mask = this._mask[index];
-    const whole = offset | 0;
-    const frac = offset - whole;
-    let at = Math.floor(this._write[index] - this._length[index]) + whole - 1;
+    // Split the *whole* read position, exactly as _read does. Flooring
+    // `write - length` on its own and taking the fraction from `offset` alone
+    // drops the fractional part of the length, so every time SIZE carries the
+    // length across an integer the read point jumps a full sample -- which is
+    // the artefact the per-sample length ramp exists to remove, reintroduced on
+    // the two lines that carry the modulation.
+    const position = this._write[index] - this._length[index] + offset;
+    const whole = Math.floor(position);
+    const frac = position - whole;
+    let at = whole - 1;
 
     const x0 = buffer[at++ & mask];
     const x1 = buffer[at++ & mask];
