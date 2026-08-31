@@ -800,6 +800,21 @@
     state.reverb.parameters.get('hold').value = state.freeze ? 1 : 0;
   }
 
+  /**
+   * The send amount, in both the state and the live graph.
+   *
+   * A function rather than two call sites: the knob setter and the Space JSON
+   * loader each used to do this by hand, and the loader only did half of it --
+   * so loading a space with a different send redrew the knob while the old
+   * amount stayed audible until the knob was touched.
+   */
+  function setSend(value) {
+    state.send = value;
+    if (state.sendGain) {
+      state.sendGain.gain.setTargetAtTime(value, state.ctx.currentTime, 0.01);
+    }
+  }
+
   function setSpaceParam(name, value) {
     state.space[name] = value;
     const param = state.reverb && state.reverb.parameters.get(name);
@@ -1499,10 +1514,7 @@
     row.appendChild(makeKnob({
       label: 'Send', min: 0, max: 1, def: 0.35, color: REVERB_COLOR, fmt: fmt2, noPush: true,
       get: () => state.send,
-      set: (v) => {
-        state.send = v;
-        if (state.sendGain) state.sendGain.gain.setTargetAtTime(v, state.ctx.currentTime, 0.01);
-      },
+      set: setSend,
     }));
 
     const FORMATS = { ms: fmtMs, hz: fmtHz };
@@ -1674,7 +1686,7 @@
         const parsed = JSON.parse($('jsonText').value);
         if (parsed.space) {
           state.space = makeSpace(parsed.space);
-          if (typeof parsed.send === 'number') state.send = parsed.send;
+          if (typeof parsed.send === 'number') setSend(parsed.send);
           applySpace();
           buildReverb();
           $('jsonStatus').textContent = 'Space loaded';
