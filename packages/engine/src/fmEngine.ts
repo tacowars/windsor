@@ -23,6 +23,16 @@ export interface PartOptions {
   destination?: AudioNode | null;
 }
 
+/**
+ * Where to load the DSP from. The defaults are `new URL(…, import.meta.url)`,
+ * which Vite resolves in the dev server and the build; a standalone page such
+ * as the arrangement console (#70) has no such URL and passes its own.
+ */
+export interface WorkletUrls {
+  fmUrl?: string | URL;
+  reverbUrl?: string | URL;
+}
+
 export class FmEngine {
   readonly context: AudioContext;
 
@@ -56,11 +66,11 @@ export class FmEngine {
     return this.moduleLoaded;
   }
 
-  /** Load the DSP modules. Must be awaited before `createPart` or `createBus`. */
-  async init(): Promise<void> {
+  /** Load the DSP modules. Must be awaited before `createPart` or a reverb return. */
+  async init(urls: WorkletUrls = {}): Promise<void> {
     if (this.moduleLoaded) return;
-    await this.context.audioWorklet.addModule(WORKLET_URL);
-    await this.context.audioWorklet.addModule(REVERB_WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.fmUrl ?? WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.reverbUrl ?? REVERB_WORKLET_URL);
     this.moduleLoaded = true;
   }
 
@@ -103,10 +113,8 @@ export class FmEngine {
     return this.parts.get(name);
   }
 
+  /** A dry bus into `destination` (the master by default). Native nodes only. */
   createBus(options: BusOptions = {}, destination?: AudioNode): AudioBus {
-    if (!this.moduleLoaded) {
-      throw new Error('FmEngine.init() must be awaited before createBus()');
-    }
     const bus = createBus(this.context, options);
     bus.output.connect(destination ?? this.master);
     return bus;
