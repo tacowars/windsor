@@ -15,6 +15,10 @@
  * SFX parts get the same strip with the master as their dry destination, so
  * they skip the music bus's inserts but still have a real pan and a send.
  */
+import type { Arrangement, DeepPartial } from './arrangement';
+import { ARRANGEMENT } from './arrangement';
+import type { ApplyResult, ArrangementReadout, MusicEventHandler } from './arrangementPlayer';
+import { ArrangementPlayer } from './arrangementPlayer';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import type { PartStrip } from './channelStrip';
@@ -35,6 +39,12 @@ export interface AudioSystemOptions {
   returns?: Readonly<Record<string, ReturnSpec>>;
 }
 
+/** `__a204.audio.readout()` (issue #69): the arrangement's state plus the system's. */
+export interface MusicReadout extends ArrangementReadout {
+  muted: boolean;
+  running: boolean;
+}
+
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
@@ -45,6 +55,8 @@ export class AudioSystem {
   private returns: Readonly<Record<string, ReturnBus>> | null = null;
   private readonly strips = new Map<string, PartStrip>();
   private started = false;
+  private player: ArrangementPlayer | null = null;
+  private muted = false;
 
   constructor(engine?: FmEngine, options: AudioSystemOptions = {}) {
     this.engine = engine ?? new FmEngine();
@@ -86,6 +98,75 @@ export class AudioSystem {
     return this.route(name, preset, maxVoices, this.engine.master);
   }
 
+  /**
+   * Build the four music parts on their strips and bind the generators to the
+   * transport (issue #69). Idempotent. Nothing sounds until `startMusic()`;
+   * under `?music=0` main.ts builds this but never starts the transport, so
+   * the whole graph exists on a silent page (refinement decision 2).
+   */
+  initMusic(arrangement: Arrangement = ARRANGEMENT, onEvent?: MusicEventHandler): void {
+    if (this.player) return;
+    const parts = {
+      kick: this.createMusicPart(arrangement.kick.part, arrangement.kick.preset),
+      hat: this.createMusicPart(arrangement.hat.part, arrangement.hat.preset),
+      arp: this.createMusicPart(arrangement.arp.part, arrangement.arp.preset),
+      drone: this.createMusicPart(arrangement.drone.part, arrangement.drone.preset),
+    };
+    this.player = new ArrangementPlayer(this.scheduler, parts, arrangement, onEvent);
+  }
+
+  /** Start (or resume) the transport. Called at the unlock gesture; a no-op while muted. */
+  startMusic(): void {
+    if (!this.player || this.muted) return;
+    this.scheduler.start(this.scheduler.transport.currentTick);
+  }
+
+  get musicRunning(): boolean {
+    return this.scheduler.isRunning;
+  }
+
+  get isMuted(): boolean {
+    return this.muted;
+  }
+
+  /**
+   * Mute stops the transport and releases everything held, so tails ring out
+   * rather than cutting; unmute resumes at the tick the transport stopped on,
+   * which keeps the bar phase every regeneration hangs off.
+   */
+  setMuted(muted: boolean): void {
+    if (this.muted === muted) return;
+    this.muted = muted;
+    if (muted) {
+      this.scheduler.stop();
+      this.player?.releaseAll(this.engine.context.currentTime);
+    } else {
+      this.startMusic();
+    }
+  }
+
+  /** The M key's toggle (main.ts). Returns the new muted state. */
+  toggleMute(): boolean {
+    this.setMuted(!this.muted);
+    return this.muted;
+  }
+
+  /** Live tuning (refinement decision 3): merge a partial arrangement over the current one. */
+  apply(partial: DeepPartial<Arrangement>): ApplyResult {
+    if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
+    return this.player.apply(partial);
+  }
+
+  readout(): MusicReadout {
+    const base: ArrangementReadout = this.player?.readout() ?? {
+      bpm: this.scheduler.bpm,
+      root: NaN,
+      scale: [],
+      counters: { kick: 0, hat: 0, arp: 0, drone: 0 },
+    };
+    return { ...base, muted: this.muted, running: this.scheduler.isRunning };
+  }
+
   /** The live strip of a part this system created. */
   strip(name: string): PartStrip | undefined {
     return this.strips.get(name);
@@ -108,6 +189,9 @@ export class AudioSystem {
 
   dispose(): void {
     this.scheduler.stop();
+    this.player?.dispose();
+    this.player = null;
+    this.muted = false;
     for (const strip of this.strips.values()) strip.dispose();
     this.strips.clear();
     if (this.returns) for (const bus of Object.values(this.returns)) bus.dispose();

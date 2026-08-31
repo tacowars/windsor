@@ -1,6 +1,31 @@
 /** Public surface of the audio package. */
 export { AudioSystem } from './audioSystem';
-export type { AudioSystemOptions } from './audioSystem';
+export type { AudioSystemOptions, MusicReadout } from './audioSystem';
+export { ARRANGEMENT, mergeArrangement } from './arrangement';
+export type {
+  ArpArrangement,
+  ArpDriver,
+  Arrangement,
+  ArrangementKey,
+  DeepPartial,
+  DroneArrangement,
+  EuclideanDriver,
+  MergeResult,
+  PercussionArrangement,
+  StepDriver,
+} from './arrangement';
+export { ArrangementPlayer, GENERATOR_INDEX, MUSIC_PART_IDS } from './arrangementPlayer';
+export type {
+  ApplyResult,
+  ArrangementReadout,
+  MusicEventHandler,
+  MusicPartId,
+  MusicTransport,
+  PlayablePart,
+} from './arrangementPlayer';
+export { installMusicControls } from './musicControls';
+export type { MusicLog } from './musicControls';
+export { musicEnabledFromQuery } from './musicOptions';
 export { FmEngine } from './fmEngine';
 export type { PartOptions, WorkletUrls } from './fmEngine';
 export { AudioPart } from './audioPart';
