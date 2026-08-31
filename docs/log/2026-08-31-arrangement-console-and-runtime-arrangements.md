@@ -152,18 +152,29 @@ is a milestone measurement (invariant 3).
 | Rejected | Why not |
 |---|---|
 | Console keeps its page-local graph, bundles only data | A second implementation of #68's routing — precisely the drift the build script exists to prevent |
-| Console in-game behind `?debug=1` instead | Drives the real engine for free, but needs the dev server and is not publishable as an Artifact |
+| Console in-game behind `?debug=1` instead | Drives the real engine for free, but needs the dev server running rather than one openable file |
 | Shared UI mounted in both a standalone file and an in-game overlay | Most reach, largest build; the standalone no-imports constraint would shape the whole UI layer |
-| Copy the arrangement to the clipboard as a TypeScript literal | Keeps mix under code review and works in the Artifact sandbox, but no round-trip back in |
+| Copy the arrangement to the clipboard as a TypeScript literal | Keeps mix under code review, but no round-trip back in |
 | Copy out and paste back in | Round-trips, but still hand-carried, and needs the same validation as a document without the benefits |
-| The published Artifact persists arrangements itself | Nothing to paste, but state lives outside the repo and the game and console can silently disagree |
+| A hosted console persisting arrangements itself | Nothing to paste, but state lives outside the repo and the game and console can silently disagree |
 | Purely parametric, no capture | Smallest UI; when a phrase is almost right you can only re-roll, never keep it |
 | Per-step overrides on a grid | Finer than capture, but that is most of a tracker's UI |
 | A full grid/note editor | The largest single piece of UI in the console, and it competes with the generative design rather than completing it |
 | Fold the console into #69 | One very large PR: transport, four sequencer types, four parts and a five-tab console in one review |
 | Build the console before the parts | UI early, with almost nothing to control until the sequencers exist |
 
-Note for whoever builds #70: a page-initiated **download works in the local
-file but is silently blocked in the published Artifact sandbox**. Export must
-therefore offer a clipboard path as well, or it will appear broken to anyone
-using the Artifact.
+### The console is a local tool, not a published Artifact
+
+Decided by tacowars while this record was being written. The editor had previously
+been published to claude.ai as "Seedship FM Console"; the console is not, and
+nothing in this design targets that.
+
+Two constraints lift as a result, and #70 should take both:
+
+- **Export can simply download a file.** A page-initiated download is blocked
+  in the Artifact viewer sandbox but works normally from a local file or a
+  static server, which is how tacowars runs the editor.
+- **`build-editor.mjs`'s document guard can go.** It currently throws if the
+  generated HTML contains `<!doctype>`, `<html>`, `<head>` or `<body>`, purely
+  because the Artifact host supplied its own skeleton. Without that host the
+  console should be a complete standalone HTML document.
