@@ -9,7 +9,7 @@
 The reference point tacowars gave was **Plateau** (Valley Audio, VCV Rack), and the
 implementation tacowars linked was **`khoin/DattorroReverbNode`**. Those are not the
 same thing, and they carry different licences. This record pins which one the
-code descends from, why the difference matters legally, and the two structural
+code descends from, why the difference matters legally, and the structural
 choices that fell out — because "it's the Dattorro reverb" is the sentence a
 future reader will assume covers all of it, and it does not.
 
@@ -57,18 +57,44 @@ share the patch schema. `reverbSpace.test.ts` asserts the type cannot drift
 from the processor's `parameterDescriptors` — same duplication, same guard, as
 `patch.test.ts` gives the FM tables.
 
-### 3. Two defects in the reference behaviour, fixed and pinned
+### 3. Three defects in the reference behaviour, fixed and pinned
 
-Both were found by measurement during the spike, not by review, and both now
-have regression tests in `reverbProcessor.test.ts`.
+All now have regression tests in `reverbProcessor.test.ts`.
 
 | | Reference behaviour | Here |
 |---|---|---|
+| Output tap direction | tap index read from the *oldest* end, so `node48_54[266]` on a 4217-sample line is a delay of 3950, not 266 | read back from the write head |
 | Tank all-pass ceiling | exposed to `0.999999`, where the tank stops decaying and **grows** — measured peak 54, still climbing 60 s after input stopped | capped at `MAX_TANK_DIFFUSION` = 0.8, past Dattorro's own 0.7 / 0.5 |
 | Delay length under a Size sweep | n/a — the reference has no Size | lengths ramp **per sample**, not per block |
 
-The second needs its mechanism recorded, because the obvious fix is the wrong
-one. Sweeping Size 0.3 → 3 over two seconds moves the longest tank line's read
+The tap direction is the one worth reading the paper over, and it was found by
+the second review pass, not by listening. Dattorro writes taps as
+`node48_54[266]`: a delay line spanning node 48 to node 54, indexed from node
+48. Node numbers increase along the signal path — `node31_33` feeds
+`node33_39`, sharing node 33 as one line's output and the next one's input — so
+the index counts from the line's **input**, and is a delay.
+
+Reading from the other end puts every tap near the far end of its line, which
+deletes the early reflections. Measured on an impulse into Hall (size 1.4,
+decay 0.78):
+
+| | mirrored | as the paper has it |
+|---|---|---|
+| onset | 32 ms — eleven blocks of pure silence first | **8 ms** |
+| samples above 0.002 in the first 100 ms | 94 | **1020** |
+| time to 10% of total energy | 0.143 s | 0.107 s |
+| RMS at 0.5 s | 3.02e-3 | 2.99e-3 |
+| RMS at 2 s | 5.62e-4 | 5.45e-4 |
+
+The late tail is the same to within a percent, which is exactly why this
+survived a listening test: what was missing was the early field, and a plate
+with a 32 ms hole at the front still sounds like a good reverb — just a
+detached one. 1.3.6 calls the output tap structure "characteristic of the plate
+emulation class", so this is the part of the topology least safe to get
+backwards.
+
+The Size sweep needs its mechanism recorded too, because the obvious fix is the
+wrong one. Sweeping Size 0.3 → 3 over two seconds moves the longest tank line's read
 point about **26 samples per 128-sample block**. That is not a rounding
 artefact, so making the delay reads fractional — which was the first attempt —
 does not fix it: interpolation smooths *within* a length, and the discontinuity

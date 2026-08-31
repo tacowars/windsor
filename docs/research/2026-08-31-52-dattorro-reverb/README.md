@@ -112,16 +112,21 @@ failed the page would say `reverb blocked (…)` with the per-scheme errors.
 One full-scale stereo impulse, then silence. RMS of the left channel over a
 128-sample block at each mark (`offline-render.json`):
 
-| Space | size / decay | 1 s | 3 s | 5 s | peak | non-finite | stereo |
-|---|---|---|---|---|---|---|---|
-| Room | 0.28 / 0.45 | 6.71e-9 | 2.00e-19 | 1.97e-21 | 0.0584 | 0 | yes |
-| Hall | 1.4 / 0.78 | 1.68e-3 | 2.08e-4 | 3.02e-5 | 0.0670 | 0 | yes |
-| Cathedral | 3.0 / 0.90 | 2.66e-3 | 1.70e-3 | 1.01e-3 | 0.0651 | 0 | yes |
+| Space | size / decay | onset | 1 s | 3 s | 5 s | peak | non-finite | stereo |
+|---|---|---|---|---|---|---|---|---|
+| Room | 0.28 / 0.45 | 8.0 ms | 6.34e-9 | 1.37e-19 | 2.84e-21 | 0.0605 | 0 | yes |
+| Hall | 1.4 / 0.78 | 9.6 ms | 1.78e-3 | 2.11e-4 | 2.71e-5 | 0.0534 | 0 | yes |
+| Cathedral | 3.0 / 0.90 | 13.2 ms | 2.65e-3 | 1.74e-3 | 1.07e-3 | 0.0656 | 0 | yes |
 
 The ordering is the point: Room is already inaudible at one second and at the
 denormal floor by five; Hall is still ringing at three; Cathedral is louder at
 five seconds than Hall is at one. Size and decay do in a browser what the Node
 harness measured them doing in `reverbProcessor.test.ts`.
+
+**Onset** is recorded because it is what the output-tap correction changed. With
+the taps read from the wrong end of their lines, Hall did not emit for the first
+32 ms; read as the delays Dattorro's Table 2 specifies, it starts at 9.6 ms and
+onset scales with room size the way a listener expects.
 
 Every render is stereo-decorrelated (the two output channels differ), which is
 what the fourteen-tap output is for — a mono tail would mean the taps or the

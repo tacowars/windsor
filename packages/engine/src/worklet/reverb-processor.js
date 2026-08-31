@@ -50,7 +50,21 @@ const TANK_DELAYS = [
   0.106280031,
 ];
 
-/** Output taps: seconds into a tank line, which line, and the sign of the sum. */
+/**
+ * Output taps: delay in seconds from where a line is written, which line, and
+ * the sign of the sum.
+ *
+ * These are Dattorro's Table 2 values (at his 29.761 kHz reference: 266, 2974,
+ * 1913 ... samples). His notation is `node48_54[266]` -- a delay line spanning
+ * node 48 to node 54, indexed from node 48. Node numbers increase along the
+ * signal path (node31_33 feeds node33_39, sharing node 33 as output then
+ * input), so the index counts from the line's *input*: it is a delay.
+ *
+ * khoin/DattorroReverbNode reads them from the opposite end, so its tap of 266
+ * on a 4217-sample line is a delay of 3950 rather than 266. That inverts the
+ * whole output tap structure, which 1.3.6 calls "characteristic of the plate
+ * emulation class". `_readTap` reads back from the write head instead.
+ */
 const TAP_TIME = [
   0.008937872, 0.099929438, 0.064278754, 0.067067639, 0.066866033, 0.006283391, 0.035818689,
   0.011861161, 0.121870905, 0.041262054, 0.08981553, 0.070931756, 0.011256342, 0.004065724,
@@ -232,6 +246,24 @@ class DattorroReverb extends AudioWorkletProcessor {
   }
 
   /**
+   * Fractional read `delay` samples back from the write head.
+   *
+   * The output taps are delays, not offsets from the oldest sample, so they do
+   * not go through `_read` -- see the TAP_TIME note above.
+   */
+  _readTap(index, delay) {
+    const buffer = this._buffers[index];
+    const mask = this._mask[index];
+    const position = this._write[index] - delay;
+    const whole = Math.floor(position);
+    const frac = position - whole;
+
+    const a = buffer[whole & mask];
+    const b = buffer[(whole + 1) & mask];
+    return a + (b - a) * frac;
+  }
+
+  /**
    * Fractional read, `offset` samples forward of the line's read point.
    *
    * Cubic rather than linear because these two reads carry the tank's delay
@@ -396,7 +428,7 @@ class DattorroReverb extends AudioWorkletProcessor {
       let left = 0;
       let right = 0;
       for (let t = 0; t < TAP_TIME.length; t++) {
-        const sample = TAP_SIGN[t] * this._read(TAP_LINE[t], this._tap[t]);
+        const sample = TAP_SIGN[t] * this._readTap(TAP_LINE[t], this._tap[t]);
         if (t < TAPS_PER_SIDE) left += sample;
         else right += sample;
       }
