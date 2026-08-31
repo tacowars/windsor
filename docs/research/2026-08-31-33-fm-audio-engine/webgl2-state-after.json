@@ -1,7 +1,7 @@
 {
-  "backend": "WebGPU",
-  "gpu": "apple metal-3 unknown version",
-  "gitCommit": "672810c-dirty",
+  "backend": "WebGL2",
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))",
+  "gitCommit": "7945b95-dirty",
   "seed": 1,
   "player": {
     "x": 31.927280131664578,
@@ -31,6 +31,13 @@
   "colliders": {
     "bodies": 45,
     "swaps": 0
+  },
+  "building": {
+    "pieces": 0,
+    "wall": 0,
+    "floor": 0,
+    "ramp": 0,
+    "target": "wall -> 8,6,11 wallW ok"
   },
   "render": {
     "width": 1426,
