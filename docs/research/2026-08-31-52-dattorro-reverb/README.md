@@ -23,22 +23,20 @@ with zero errors/warnings.
 
 | Required | Here |
 |---|---|
-| Console listing, zero errors/warnings | **yes** — four lines per backend, all Vite/Babylon info (`webgpu-console.txt`, `webgl2-console.txt`) |
+| Console listing, zero errors/warnings | **yes**, per backend — `webgpu-console.txt`, `webgl2-console.txt` |
 | Screenshot per backend | **yes** — `webgpu-boot.png`, `webgl2-boot.png` |
-| `get-system-stats` (backend + driver) | **equivalent** — the `[a204] {"event":"engine"}` line names backend and GPU on both runs |
-| Hardware driver, not SwiftShader | **yes** — `apple metal-3` (WebGPU) and `ANGLE Metal Renderer: Apple M4 Pro` (WebGL2) |
-| `query-a204-state` before/after a scripted move | **no** — see below |
+| `get-system-stats` (backend + driver) | **yes** — `backend` and `gpu` in each `state-*.json`, and the `[a204] {"event":"engine"}` line |
+| `query-a204-state` before/after a scripted move | **yes** — `*-state-before.json` / `*-state-after.json` around `__a204.motor({x:4, z:0, seconds:2})` |
+| Hardware driver, not SwiftShader | **yes** — `apple metal-3` (WebGPU), `ANGLE Metal Renderer: Apple M4 Pro` (WebGL2) |
 
-The one omission is the scripted-move state comparison. It exists to show the
-two backends agree about the *scene*, and this change touches no mesh,
-material, camera or physics; Web Audio has one backend and `AudioWorklet`
-output does not vary with the graphics backend. Both backends are captured
-anyway, and both show the reverb loading identically.
-
-Driven with Playwright rather than the `chrome-devtools` MCP, whose profile was
-locked by an already-running browser for this session
-(`The browser is already running for .../chrome-profile`). Real headed Chromium
-on the real GPU either way; the tooling differs, the substance does not.
+Driven with Playwright and `?debug=1&bridge=0` rather than the Inspector CLI
+daemon. That is the harness path the repo built for exactly this: `bridge=0`'s
+own comment in `debug/index.ts` says the Playwright harness (#19) "drives the
+shim and the `[a204]` events, never the bridge", because with no daemon
+listening the browser retries a WebSocket every 3 s and logs an error an
+automated console check cannot tell apart from a real fault. The
+`chrome-devtools` MCP was in any case unavailable this session, its profile
+locked by an already-running browser.
 
 **Why the game client is captured at all, and not just the editor.** A first
 pass tested only the patch editor, which proved nothing about the client:
@@ -64,6 +62,23 @@ fact loaded).
 warning, which is the only symptom a failure would have produced — so
 `createBus` constructed the `dattorro-reverb` node against the real client's
 `AudioContext` under both renderers.
+
+### The scripted move
+
+`__a204.motor({ x: 4, z: 0, seconds: 2 })` from spawn, state captured either
+side:
+
+| | WebGPU | WebGL2 |
+|---|---|---|
+| player x, before | 31.9404 | 31.9404 |
+| player x, after | 39.8120 | 39.8120 |
+| support | `supported` | `supported` |
+| groundError | 0.14903237738970887 | 0.14903237738970887 |
+
+The two backends agree to every digit, which is the point of the check: the
+Havok step is deterministic and backend-independent, and adding a second audio
+worklet does not perturb it. Not a claim about audio — a claim that audio
+changed nothing else.
 
 ## Results — the patch editor
 
