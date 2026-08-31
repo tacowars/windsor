@@ -158,3 +158,29 @@ describe('round-trip: normalise → serialise → normalise', () => {
     expect(again.dangling).toEqual(['kick.part: the MIX defines no strip "click"']);
   });
 });
+
+describe('runtime inputs JSON cannot represent (self-review findings)', () => {
+  it('never throws on BigInt or cyclic values in a field', () => {
+    const bigint = makeArrangement({ kick: { preset: 'kick', velocity: 1n } });
+    expect(bigint.document.kick?.velocity).toBe(0.8);
+    expect(bigint.corrections.join('\n')).toMatch(/kick\.velocity/);
+
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    expect(() => makeArrangement({ kick: { preset: 'kick', velocity: cyclic } })).not.toThrow();
+    expect(() => makeArrangement(1n)).not.toThrow();
+  });
+
+  it('drops a later slot reusing an earlier slot part name', () => {
+    const result = makeArrangement({
+      kick: { part: 'kick', preset: 'kick' },
+      hat: { part: 'kick', preset: 'hat' },
+    });
+    expect(result.usable).toBe(true);
+    expect(result.document.kick).toBeDefined();
+    expect(result.document.hat).toBeUndefined();
+    expect(result.corrections.join('\n')).toMatch(
+      /hat: part name "kick" is already used by kick — part dropped/,
+    );
+  });
+});

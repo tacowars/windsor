@@ -18,7 +18,15 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export const show = (value: unknown): string => JSON.stringify(value) ?? String(value);
+/** Format a value for a correction message. Guarded: `JSON.stringify` throws
+ * on BigInt and cyclic values, and this layer must never throw. */
+export const show = (value: unknown): string => {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return String(value);
+  }
+};
 
 /** One normalisation pass: the field helpers plus the accumulated report. */
 export class FieldNormaliser {

@@ -56,7 +56,14 @@ against them.
    normalised documents), so any correction on it means the file drifted
    from what actually plays.
 
-6. **The verify gate is a vitest test** (`arrangementGate.test.ts`), not a
+6. **Part names are unique across slots.** Two slots sharing one part name
+   would fight over one engine part and one strip (the later creation
+   replaces the earlier in both registries, leaving the first strip
+   uncontrollable and undisposed — found in the cross-model self-review), so
+   the later slot drops with a correction, which also fails the committed
+   document's gate.
+
+7. **The verify gate is a vitest test** (`arrangementGate.test.ts`), not a
    script: it already runs inside `npm run verify` (typechecked by
    `tsconfig.test.json`, executed by `npm run test`) and imports the
    committed JSON exactly the way the game does — same resolver, same JSON
