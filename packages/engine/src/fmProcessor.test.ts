@@ -204,7 +204,7 @@ describe('bandlimited wavetables', () => {
 });
 
 describe('render loop', () => {
-  it('does not allocate in steady state', () => {
+  it('stays finite and bounded over a long render', () => {
     const pad = PRESETS['pad-drift'];
     expect(pad).toBeDefined();
     if (!pad) return;
@@ -212,13 +212,22 @@ describe('render loop', () => {
     const processor = loaded.create(pad, 16);
     render(loaded, processor, 50, [{ type: 'noteOn', id: 1, note: 60, velocity: 1, frame: 0 }]);
 
-    global.gc?.();
-    const before = process.memoryUsage().heapUsed;
-    render(loaded, processor, 2000, []);
-    global.gc?.();
-    const after = process.memoryUsage().heapUsed;
-
-    // A per-sample allocation would add megabytes over 256,000 frames.
-    expect(Math.abs(after - before) / 1024).toBeLessThan(2048);
+    // 2,000 blocks is 256,000 samples. Filter state, phase accumulators and
+    // envelope counters all run for the whole of it; a drift or a denormal
+    // spiral shows up here and nowhere in the short renders above.
+    const long = render(loaded, processor, 2000, [], { collectSamples: false });
+    expect(long.nonFinite).toBe(0);
+    expect(long.peak).toBeLessThanOrEqual(1);
   });
+
+  // Not tested: that the sample loop performs no allocation. It does not -- the
+  // voice pool and every buffer are preallocated, which is the whole shape of
+  // Voice and FmPartProcessor -- but the property resisted honest measurement
+  // here. `heapUsed` cannot see per-sample garbage, because the scavenger
+  // reclaims it before either reading; counting GC events does see it, but only
+  // against an ambient floor that varies per run and per machine, and the
+  // differential against an idle control was not sharp enough to fail a
+  // deliberately injected allocation. A test that passes either way is worse
+  // than no test, so the property is maintained by review, and by the note at
+  // the top of the worklet, rather than by the gate.
 });

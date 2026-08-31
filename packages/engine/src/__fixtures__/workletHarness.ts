@@ -123,13 +123,23 @@ export interface RenderResult {
   samples: Float32Array;
 }
 
+export interface RenderOptions {
+  /**
+   * Keep every rendered sample. On by default; the allocation test turns it off
+   * because the buffer itself is megabytes and would dominate what it measures.
+   */
+  collectSamples?: boolean;
+}
+
 /** Render `blocks` x 128 frames, delivering events at their frame boundaries. */
 export function render(
   loaded: LoadedProcessor,
   processor: ProcessorLike,
   blocks: number,
   events: ScheduledEvent[] = [],
+  options: RenderOptions = {},
 ): RenderResult {
+  const collect = options.collectSamples !== false;
   const left = new Float32Array(BLOCK);
   const right = new Float32Array(BLOCK);
   const outputs = [[left, right]];
@@ -140,7 +150,7 @@ export function render(
     gain: new Float32Array([1]),
   };
 
-  const samples = new Float32Array(blocks * BLOCK * 2);
+  const samples = new Float32Array(collect ? blocks * BLOCK * 2 : 0);
   let peak = 0;
   let nonFinite = 0;
   let energy = 0;
@@ -164,8 +174,10 @@ export function render(
       const magnitude = Math.max(Math.abs(l), Math.abs(r));
       if (magnitude > peak) peak = magnitude;
       energy += l * l + r * r;
-      samples[(start + i) * 2] = l;
-      samples[(start + i) * 2 + 1] = r;
+      if (collect) {
+        samples[(start + i) * 2] = l;
+        samples[(start + i) * 2 + 1] = r;
+      }
     }
   }
 
