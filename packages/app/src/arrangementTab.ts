@@ -45,6 +45,7 @@ function transportSection(ctx: AppCtx): HTMLElement {
   seed.appendChild(el('span', 'field-label', 'Seed'));
   const seedInput = document.createElement('input');
   seedInput.className = 'field';
+  seedInput.name = 'seed';
   seedInput.type = 'number';
   seedInput.value = String(ctx.model.doc.seed);
   seedInput.setAttribute('aria-label', 'Seed');
@@ -73,6 +74,7 @@ function documentSection(ctx: AppCtx): HTMLElement {
   const row = el('div', 'bar-row');
   const name = document.createElement('input');
   name.className = 'field';
+  name.name = 'export-name';
   name.value = 'bed-01.json';
   name.setAttribute('aria-label', 'Export file name');
   row.appendChild(name);
@@ -89,6 +91,7 @@ function documentSection(ctx: AppCtx): HTMLElement {
   };
   row.appendChild(exportBtn);
   const file = document.createElement('input');
+  file.name = 'import-file';
   file.type = 'file';
   file.accept = '.json,application/json';
   file.className = 'field';
@@ -140,7 +143,9 @@ function readoutSection(ctx: AppCtx): HTMLElement {
     }
     setTimeout(update, 500);
   };
-  update();
+  // Deferred: at build time the section is not yet in the DOM, and the
+  // isConnected guard above would kill the loop before it started.
+  setTimeout(update, 50);
   return root;
 }
 
