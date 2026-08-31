@@ -4,8 +4,12 @@
  * Filtering, delay and limiting use the browser's own nodes; the reverb is our
  * second worklet. All of them execute in the audio thread and cost nothing from
  * the main-thread frame budget that `docs/design/tech-demo-proposal.md` 1
- * identifies as the project's primary risk -- the reverb was measured at about
- * 1% of one core per instance.
+ * identifies as the project's primary risk.
+ *
+ * The reverb cost about 1% of one core per instance rendering 60 s of audio
+ * under Node 24 on an Apple M4 Pro -- a development machine, not the target,
+ * so this is an order-of-magnitude sanity check and not a milestone result
+ * under CLAUDE.md invariant 3. See docs/research/2026-08-31-52-dattorro-reverb/.
  */
 import type { ReverbSpace } from './reverbSpace';
 import { makeSpace } from './reverbSpace';

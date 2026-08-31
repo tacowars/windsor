@@ -1,0 +1,28 @@
+{
+  "status": "running - 44100 Hz - 5.8 ms latency - reverb on",
+  "sampleRate": 44100,
+  "room": {
+    "rms1s": "6.71e-9",
+    "rms3s": "2.00e-19",
+    "rms5s": "1.97e-21",
+    "peak": "0.0584",
+    "nonFinite": 0,
+    "stereo": true
+  },
+  "hall": {
+    "rms1s": "1.68e-3",
+    "rms3s": "2.08e-4",
+    "rms5s": "3.02e-5",
+    "peak": "0.0670",
+    "nonFinite": 0,
+    "stereo": true
+  },
+  "cathedral": {
+    "rms1s": "2.66e-3",
+    "rms3s": "1.70e-3",
+    "rms5s": "1.01e-3",
+    "peak": "0.0651",
+    "nonFinite": 0,
+    "stereo": true
+  }
+}
