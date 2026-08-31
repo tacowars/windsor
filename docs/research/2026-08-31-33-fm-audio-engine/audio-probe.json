@@ -1,0 +1,27 @@
+{
+  "note": "Audio-specific probe; the standard bridge command set has no audio coverage, and audio is this ticket's subject. Taken in the WebGPU session (1) on the Vite dev server.",
+  "workletServed": {
+    "url": "/src/audio/worklet/fm-processor.js",
+    "status": 200,
+    "bytes": 233045,
+    "bytesNote": "Vite's dev transform inflates the 38 KB source with an inline source map; the production build emits it raw at 38,598 B.",
+    "registersFmPart": true
+  },
+  "offlineRender": {
+    "sampleRate": 48000,
+    "frames": 24000,
+    "peak": 0.5429,
+    "nonFinite": 0,
+    "note": "Two-operator patch, note 60, rendered through the worklet the dev server served."
+  },
+  "audioContext": { "stateAtCreation": "running", "baseLatencyMs": 5.33 },
+  "audioUnavailableWarningInConsole": false,
+  "productionBuild": {
+    "workletAsset": "assets/fm-processor-D0Mo2pDI.js",
+    "bytes": 38598,
+    "referencedByEntryChunk": "assets/index-C_Nf4ki3.js",
+    "servedWithCoopCoep": true,
+    "crossOriginIsolated": true,
+    "addModuleRenderPeak": 0.5655
+  }
+}

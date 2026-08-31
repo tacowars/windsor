@@ -1,0 +1,47 @@
+{
+  "backend": "WebGPU",
+  "gpu": "apple metal-3 unknown version",
+  "gitCommit": "672810c-dirty",
+  "seed": 1,
+  "player": {
+    "x": 31.927280131664578,
+    "y": 17.70866677398136,
+    "z": 49.833664855694614,
+    "support": "supported",
+    "groundError": 0.14244956240616702,
+    "fallthroughs": 0,
+    "swapRegrounds": 0
+  },
+  "camera": {
+    "x": 31.93153828501829,
+    "y": 21.030243502534827,
+    "z": 55.18090732062233,
+    "yaw": 1.57
+  },
+  "chunks": {
+    "byRing": [
+      45,
+      392,
+      1352
+    ],
+    "queueLength": 0,
+    "lastBuildMs": 0,
+    "budgetMs": 4
+  },
+  "colliders": {
+    "bodies": 45,
+    "swaps": 0
+  },
+  "render": {
+    "width": 1426,
+    "height": 877,
+    "pinned": false
+  },
+  "script": {
+    "active": false
+  },
+  "frames": {
+    "status": "idle",
+    "count": 0
+  }
+}
