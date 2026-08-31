@@ -2,12 +2,27 @@
 export { AudioSystem } from './audioSystem';
 export type { AudioSystemOptions } from './audioSystem';
 export { FmEngine } from './fmEngine';
-export type { PartOptions } from './fmEngine';
+export type { PartOptions, WorkletUrls } from './fmEngine';
 export { AudioPart } from './audioPart';
 export { Scheduler } from './scheduler';
 export type { SchedulerOptions } from './scheduler';
 export { createBus } from './audioBus';
 export type { AudioBus, BusOptions } from './audioBus';
+export { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES, stripFor } from './mix';
+export type {
+  ChannelStrip,
+  DelayReturn,
+  PartName,
+  ReturnName,
+  ReturnSpec,
+  ReverbReturn,
+} from './mix';
+export { createReturn, createReturns, createSend } from './returnBus';
+export type { ReturnBus } from './returnBus';
+export { routePart } from './channelStrip';
+export type { PartStrip } from './channelStrip';
+export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
+export type { RotationGains, StereoRotate } from './stereoRotate';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
 export type { ReverbSpace, SpaceName } from './reverbSpace';
 export { renderPatchToBuffer } from './offlineRender';

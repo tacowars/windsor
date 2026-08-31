@@ -16,3 +16,5 @@ export {
 } from './patch';
 export { PRESETS, PRESET_NAMES } from './presets';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
+export { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES } from './mix';
+export type { ChannelStrip, ReturnName, ReturnSpec } from './mix';

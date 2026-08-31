@@ -108,7 +108,11 @@ packages/client/src/audio/
   audioSystem.ts        # the system: update(dt), owned by the render loop
   fmEngine.ts           # context, worklet module, parts, buses
   audioPart.ts          # one timbral part == one worklet node
-  audioBus.ts           # native-node effect buses
+  audioBus.ts           # dry buses with inserts (native nodes)
+  mix.ts                # the desk: RETURNS and MIX, typed plain data
+  returnBus.ts          # sends and returns: the plate and the delay, 100% wet
+  channelStrip.ts       # one part through its strip: fader, rotation, sends
+  stereoRotate.ts       # the pan matrix (splitter -> 4 gains -> merger)
   scheduler.ts          # look-ahead note scheduling
   offlineRender.ts      # bake a patch to an AudioBuffer
   babylonBridge.ts      # the Babylon Audio Engine v2 seam
