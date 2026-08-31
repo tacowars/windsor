@@ -1,0 +1,11 @@
+{
+  "seed": 204,
+  "bpm": 96,
+  "key": { "root": 50, "scale": "dorian", "weights": [4, 1, 2, 2, 3, 1, 2] },
+  "drone": {
+    "part": "bass",
+    "preset": "drone-sqr",
+    "velocity": 0.8,
+    "driver": { "divisor": 96, "gate": 1, "register": { "octave": -1, "span": 1 } }
+  }
+}

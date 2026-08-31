@@ -1,7 +1,9 @@
 /** Public surface of the audio package. */
 export { AudioSystem } from './audioSystem';
 export type { AudioSystemOptions, MusicReadout } from './audioSystem';
-export { ARRANGEMENT, mergeArrangement } from './arrangement';
+export { FALLBACK_ARRANGEMENT, mergeArrangement } from './arrangement';
+export { isShippable, makeArrangement } from './arrangementDocument';
+export type { ArrangementDocument, MakeArrangementResult } from './arrangementDocument';
 export type {
   ArpArrangement,
   ArpDriver,

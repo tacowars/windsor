@@ -14,11 +14,23 @@
  *
  * SFX parts get the same strip with the master as their dry destination, so
  * they skip the music bus's inserts but still have a real pan and a send.
+ *
+ * Music comes in as an `ArrangementDocument` (issue #75): the committed JSON,
+ * normalised by `makeArrangement`. `initMusic` builds a part per section the
+ * document defines, on the document's strip overlay where it has one, and
+ * `apply` takes a deep partial of the same document model — arrangement fields
+ * through the player, `mix` straight onto the live strips.
  */
-import type { Arrangement, DeepPartial } from './arrangement';
-import { ARRANGEMENT } from './arrangement';
-import type { ApplyResult, ArrangementReadout, MusicEventHandler } from './arrangementPlayer';
-import { ArrangementPlayer } from './arrangementPlayer';
+import type { DeepPartial } from './arrangement';
+import type { ArrangementDocument } from './arrangementDocument';
+import type {
+  ApplyResult,
+  ArrangementReadout,
+  MusicEventHandler,
+  MusicPartId,
+  PlayablePart,
+} from './arrangementPlayer';
+import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import type { PartStrip } from './channelStrip';
@@ -44,6 +56,10 @@ export interface MusicReadout extends ArrangementReadout {
   muted: boolean;
   running: boolean;
 }
+
+const STRIP_KEYS = ['level', 'pan', 'sends'];
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
 
 export class AudioSystem {
   readonly engine: FmEngine;
@@ -88,9 +104,9 @@ export class AudioSystem {
   }
 
   /** Create a part on its strip, dry into the music bus. */
-  createMusicPart(name: string, preset: string, maxVoices = 12): AudioPart {
+  createMusicPart(name: string, preset: string, maxVoices = 12, strip?: ChannelStrip): AudioPart {
     const { musicBus } = this.standing();
-    return this.route(name, preset, maxVoices, musicBus.input);
+    return this.route(name, preset, maxVoices, musicBus.input, strip);
   }
 
   /** Create a part on its strip, dry into the master, for UI and close-up SFX. */
@@ -100,19 +116,22 @@ export class AudioSystem {
   }
 
   /**
-   * Build the four music parts on their strips and bind the generators to the
-   * transport (issue #69). Idempotent. Nothing sounds until `startMusic()`;
-   * under `?music=0` main.ts builds this but never starts the transport, so
-   * the whole graph exists on a silent page (refinement decision 2).
+   * Build a music part per section the document defines and bind the
+   * generators to the transport (issues #69, #75). A part lands on the
+   * document's strip overlay when the `mix` section names it, on the code's
+   * `MIX` otherwise. Idempotent. Nothing sounds until `startMusic()`; under
+   * `?music=0` main.ts builds this but never starts the transport, so the
+   * whole graph exists on a silent page (refinement decision 2).
    */
-  initMusic(arrangement: Arrangement = ARRANGEMENT, onEvent?: MusicEventHandler): void {
+  initMusic(document: ArrangementDocument, onEvent?: MusicEventHandler): void {
     if (this.player) return;
-    const parts = {
-      kick: this.createMusicPart(arrangement.kick.part, arrangement.kick.preset),
-      hat: this.createMusicPart(arrangement.hat.part, arrangement.hat.preset),
-      arp: this.createMusicPart(arrangement.arp.part, arrangement.arp.preset),
-      drone: this.createMusicPart(arrangement.drone.part, arrangement.drone.preset),
-    };
+    const { mix, ...arrangement } = document;
+    const parts: Partial<Record<MusicPartId, PlayablePart>> = {};
+    for (const id of MUSIC_PART_IDS) {
+      const section = arrangement[id];
+      if (!section) continue;
+      parts[id] = this.createMusicPart(section.part, section.preset, 12, mix?.[section.part]);
+    }
     this.player = new ArrangementPlayer(this.scheduler, parts, arrangement, onEvent);
   }
 
@@ -162,10 +181,19 @@ export class AudioSystem {
     return this.muted;
   }
 
-  /** Live tuning (refinement decision 3): merge a partial arrangement over the current one. */
-  apply(partial: DeepPartial<Arrangement>): ApplyResult {
+  /**
+   * Live tuning over the document model (refinement decision 3; issue #75):
+   * merge a partial document over the current state. Arrangement fields go
+   * through the player — a merged arrangement that fails validation changes
+   * nothing — and `mix` entries land on the live strips, only the fields the
+   * partial names, with unknown names reported in `ignored`.
+   */
+  apply(partial: DeepPartial<ArrangementDocument>): ApplyResult {
     if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
-    return this.player.apply(partial);
+    const { mix, ...rest } = partial;
+    const result = this.player.apply(rest);
+    if (!result.ok || mix === undefined) return result;
+    return { ok: true, ignored: [...result.ignored, ...this.applyMix(mix)] };
   }
 
   readout(): MusicReadout {
@@ -213,6 +241,44 @@ export class AudioSystem {
     this.started = false;
   }
 
+  private applyMix(mix: DeepPartial<Readonly<Record<string, ChannelStrip>>>): string[] {
+    const ignored: string[] = [];
+    for (const [name, raw] of Object.entries(mix)) {
+      if (raw === undefined) continue;
+      const strip = this.strips.get(name);
+      if (!strip || typeof raw !== 'object' || raw === null) {
+        ignored.push(`mix.${name}`);
+        continue;
+      }
+      const o = raw as Record<string, unknown>;
+      for (const key of Object.keys(o)) {
+        if (!STRIP_KEYS.includes(key)) ignored.push(`mix.${name}.${key}`);
+      }
+      if (typeof o.level === 'number' && Number.isFinite(o.level)) {
+        strip.setLevel(clamp(o.level, 0, 4));
+      } else if (o.level !== undefined) ignored.push(`mix.${name}.level`);
+      if (typeof o.pan === 'number' && Number.isFinite(o.pan)) {
+        strip.setPan(clamp(o.pan, -1, 1));
+      } else if (o.pan !== undefined) ignored.push(`mix.${name}.pan`);
+      if (o.sends !== undefined) this.applySends(strip, name, o.sends, ignored);
+    }
+    return ignored;
+  }
+
+  private applySends(strip: PartStrip, name: string, sends: unknown, ignored: string[]): void {
+    if (typeof sends !== 'object' || sends === null) {
+      ignored.push(`mix.${name}.sends`);
+      return;
+    }
+    for (const [ret, amount] of Object.entries(sends)) {
+      if (!strip.sends.has(ret) || typeof amount !== 'number' || !Number.isFinite(amount)) {
+        ignored.push(`mix.${name}.sends.${ret}`);
+        continue;
+      }
+      strip.setSend(ret, clamp(amount, 0, 1));
+    }
+  }
+
   private standing(): { musicBus: AudioBus; returns: Readonly<Record<string, ReturnBus>> } {
     if (!this.musicBus || !this.returns) {
       throw new Error('AudioSystem.init() must be awaited first');
@@ -220,10 +286,16 @@ export class AudioSystem {
     return { musicBus: this.musicBus, returns: this.returns };
   }
 
-  private route(name: string, preset: string, maxVoices: number, dry: AudioNode): AudioPart {
+  private route(
+    name: string,
+    preset: string,
+    maxVoices: number,
+    dry: AudioNode,
+    strip?: ChannelStrip,
+  ): AudioPart {
     const { returns } = this.standing();
     const part = this.engine.createPart(name, { preset, maxVoices, destination: null });
-    this.strips.set(name, routePart(part, stripFor(this.mix, name), returns, dry));
+    this.strips.set(name, routePart(part, strip ?? stripFor(this.mix, name), returns, dry));
     return part;
   }
 }

@@ -8,6 +8,11 @@
  *            ─▶ Arpeggiator (arp)  ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
  *            ─▶ StepSequencer (drone) ─ ties: no event, the held note continues
  *
+ * The four part slots are optional (issue #75): an arrangement builds only the
+ * generators for the parts it defines, and a partial naming an absent slot is
+ * ignored and reported — a part that was never initialised has no `AudioPart`
+ * and cannot be added live.
+ *
  * `apply()` is the live tuning path (refinement decision 3): a deep partial is
  * merged over the current arrangement, validated, and committed — bpm straight
  * to the transport, a preset change via `setPatch`, and only the generators
@@ -16,7 +21,7 @@
  * validation changes nothing and is reported, never half-applied.
  */
 import { Arpeggiator } from './arpeggiator';
-import type { Arrangement, DeepPartial, PercussionArrangement } from './arrangement';
+import type { Arrangement, DeepPartial, EuclideanDriver } from './arrangement';
 import { mergeArrangement } from './arrangement';
 import { EuclideanSequencer, type OnsetEvent } from './euclideanSequencer';
 import type { NoteEvent } from './noteEvent';
@@ -73,10 +78,10 @@ export interface ArrangementReadout {
 
 interface Built {
   sampler: ScaleSampler;
-  kick: EuclideanSequencer;
-  hat: EuclideanSequencer;
-  arp: Arpeggiator;
-  drone: StepSequencer;
+  kick: EuclideanSequencer | null;
+  hat: EuclideanSequencer | null;
+  arp: Arpeggiator | null;
+  drone: StepSequencer | null;
 }
 
 interface Plan {
@@ -85,7 +90,7 @@ interface Plan {
   patchChanges: ReadonlyArray<readonly [MusicPartId, Patch]>;
 }
 
-const sig = (value: unknown): string => JSON.stringify(value);
+const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
 function presetFor(id: MusicPartId, name: string): Patch {
   const preset = PRESETS[name];
@@ -98,16 +103,21 @@ function validate(next: Arrangement, previous: Arrangement | null): void {
     throw new RangeError(`bpm must be a positive number, got ${next.bpm}`);
   }
   for (const id of MUSIC_PART_IDS) {
-    presetFor(id, next[id].preset);
-    if (previous && next[id].part !== previous[id].part) {
-      throw new Error(`${id}: a part cannot be renamed live ("${previous[id].part}")`);
+    const section = next[id];
+    if (!section) continue;
+    presetFor(id, section.preset);
+    const before = previous?.[id];
+    if (previous && before && section.part !== before.part) {
+      throw new Error(`${id}: a part cannot be renamed live ("${before.part}")`);
     }
-    if (!Number.isFinite(next[id].velocity) || next[id].velocity < 0) {
-      throw new RangeError(`${id}: velocity must be >= 0, got ${next[id].velocity}`);
+    if (!Number.isFinite(section.velocity) || section.velocity < 0) {
+      throw new RangeError(`${id}: velocity must be >= 0, got ${section.velocity}`);
     }
   }
   for (const id of ['kick', 'hat'] as const) {
-    const { note, hold } = next[id];
+    const section = next[id];
+    if (!section) continue;
+    const { note, hold } = section;
     if (!Number.isFinite(note)) throw new RangeError(`${id}: note must be finite, got ${note}`);
     if (!Number.isFinite(hold) || hold <= 0) {
       throw new RangeError(`${id}: hold must be > 0 seconds, got ${hold}`);
@@ -124,7 +134,7 @@ export class ArrangementPlayer {
 
   constructor(
     private readonly transport: MusicTransport,
-    private readonly parts: Readonly<Record<MusicPartId, PlayablePart>>,
+    private readonly parts: Readonly<Partial<Record<MusicPartId, PlayablePart>>>,
     arrangement: Arrangement,
     private readonly onEvent?: MusicEventHandler,
   ) {
@@ -160,8 +170,8 @@ export class ArrangementPlayer {
       return { ok: false, ignored, error: error instanceof Error ? error.message : String(error) };
     }
     this.transport.bpm = merged.bpm;
-    for (const [id, patch] of plan.patchChanges) this.parts[id].setPatch(patch);
-    for (const id of plan.rebuilt) this.parts[id].allNotesOff();
+    for (const [id, patch] of plan.patchChanges) this.parts[id]?.setPatch(patch);
+    for (const id of plan.rebuilt) this.parts[id]?.allNotesOff();
     this.built = plan.built;
     this.current = merged;
     this.attach(plan.rebuilt);
@@ -170,8 +180,8 @@ export class ArrangementPlayer {
 
   /** Release everything sounding — the drone's held note included. Mute and teardown call this. */
   releaseAll(time = 0): void {
-    this.built.drone.release(0, time);
-    for (const id of MUSIC_PART_IDS) this.parts[id].allNotesOff();
+    this.built.drone?.release(0, time);
+    for (const id of MUSIC_PART_IDS) this.parts[id]?.allNotesOff();
   }
 
   dispose(): void {
@@ -182,29 +192,30 @@ export class ArrangementPlayer {
 
   private buildAll(arrangement: Arrangement): Built {
     const sampler = new ScaleSampler(arrangement.key);
+    const seed = arrangement.seed;
     return {
       sampler,
-      kick: this.euclidean(arrangement, 'kick'),
-      hat: this.euclidean(arrangement, 'hat'),
-      arp: new Arpeggiator(sampler, {
-        ...arrangement.arp.driver,
-        seed: arrangement.seed,
-        generatorIndex: GENERATOR_INDEX.arp,
-      }),
-      drone: new StepSequencer(sampler, {
-        ...arrangement.drone.driver,
-        seed: arrangement.seed,
-        generatorIndex: GENERATOR_INDEX.drone,
-      }),
+      kick: arrangement.kick ? this.euclidean(arrangement.kick.driver, 'kick', seed) : null,
+      hat: arrangement.hat ? this.euclidean(arrangement.hat.driver, 'hat', seed) : null,
+      arp: arrangement.arp
+        ? new Arpeggiator(sampler, {
+            ...arrangement.arp.driver,
+            seed,
+            generatorIndex: GENERATOR_INDEX.arp,
+          })
+        : null,
+      drone: arrangement.drone
+        ? new StepSequencer(sampler, {
+            ...arrangement.drone.driver,
+            seed,
+            generatorIndex: GENERATOR_INDEX.drone,
+          })
+        : null,
     };
   }
 
-  private euclidean(arrangement: Arrangement, id: 'kick' | 'hat'): EuclideanSequencer {
-    return new EuclideanSequencer({
-      ...arrangement[id].driver,
-      seed: arrangement.seed,
-      generatorIndex: GENERATOR_INDEX[id],
-    });
+  private euclidean(driver: EuclideanDriver, id: 'kick' | 'hat', seed: number): EuclideanSequencer {
+    return new EuclideanSequencer({ ...driver, seed, generatorIndex: GENERATOR_INDEX[id] });
   }
 
   /** Everything `apply` will change, validated and constructed before anything is touched. */
@@ -213,7 +224,7 @@ export class ArrangementPlayer {
     const seedChanged = merged.seed !== this.current.seed;
     const keyChanged = seedChanged || sig(merged.key) !== sig(this.current.key);
     const driverChanged = (id: MusicPartId): boolean =>
-      sig(merged[id].driver) !== sig(this.current[id].driver);
+      sig(merged[id]?.driver) !== sig(this.current[id]?.driver);
 
     const rebuilt = new Set<MusicPartId>();
     for (const id of ['kick', 'hat'] as const) {
@@ -234,8 +245,10 @@ export class ArrangementPlayer {
 
     const patchChanges: Array<readonly [MusicPartId, Patch]> = [];
     for (const id of MUSIC_PART_IDS) {
-      if (merged[id].preset !== this.current[id].preset) {
-        patchChanges.push([id, clonePatch(presetFor(id, merged[id].preset))]);
+      const next = merged[id];
+      const before = this.current[id];
+      if (next && before && next.preset !== before.preset) {
+        patchChanges.push([id, clonePatch(presetFor(id, next.preset))]);
       }
     }
     return { built, rebuilt, patchChanges };
@@ -243,32 +256,35 @@ export class ArrangementPlayer {
 
   /** (Re)subscribe the named generators and point their events at the parts. */
   private attach(ids: ReadonlySet<MusicPartId>): void {
-    this.built.kick.onOnset = (e): void => this.percussion('kick', e);
-    this.built.hat.onOnset = (e): void => this.percussion('hat', e);
-    this.built.arp.onNote = (e): void => this.pitched('arp', e);
-    this.built.drone.onNote = (e): void => this.pitched('drone', e);
+    if (this.built.kick) this.built.kick.onOnset = (e): void => this.percussion('kick', e);
+    if (this.built.hat) this.built.hat.onOnset = (e): void => this.percussion('hat', e);
+    if (this.built.arp) this.built.arp.onNote = (e): void => this.pitched('arp', e);
+    if (this.built.drone) this.built.drone.onNote = (e): void => this.pitched('drone', e);
     for (const id of ids) {
       this.subs.get(id)?.();
-      this.subs.set(id, this.generator(id).attach(this.transport));
+      this.subs.delete(id);
+      const generator = this.built[id];
+      if (generator) this.subs.set(id, generator.attach(this.transport));
     }
   }
 
-  private generator(id: MusicPartId): { attach(source: TickSource): Unsubscribe } {
-    return this.built[id];
-  }
-
   private percussion(id: 'kick' | 'hat', event: OnsetEvent): void {
-    const config: PercussionArrangement = this.current[id];
-    this.parts[id].trigger(config.note, config.velocity, config.hold, event.time);
+    const config = this.current[id];
+    const part = this.parts[id];
+    if (!config || !part) return;
+    part.trigger(config.note, config.velocity, config.hold, event.time);
     this.count(id, event.tick);
   }
 
   private pitched(id: 'arp' | 'drone', event: NoteEvent): void {
+    const config = this.current[id];
+    const part = this.parts[id];
+    if (!config || !part) return;
     if (event.kind === 'noteOn') {
-      this.parts[id].noteOn(event.note, this.current[id].velocity, event.time);
+      part.noteOn(event.note, config.velocity, event.time);
       this.count(id, event.tick);
     } else {
-      this.parts[id].noteOffByNote(event.note, event.time);
+      part.noteOffByNote(event.note, event.time);
     }
   }
 

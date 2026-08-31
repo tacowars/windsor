@@ -20,7 +20,7 @@ import {
 } from './__fixtures__/fakeAudioContext';
 import type { FakeNode } from './__fixtures__/fakeAudioNodes';
 import { noteToneFeed } from './__fixtures__/noteFeeds';
-import { ARRANGEMENT } from './arrangement';
+import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
 import { MUSIC_PART_IDS, type MusicPartId } from './arrangementPlayer';
 import { AudioSystem } from './audioSystem';
 import { FmEngine } from './fmEngine';
@@ -31,7 +31,7 @@ afterAll(() => restore());
 /** One tone per part, far enough apart that Goertzel attribution is unambiguous. */
 const HZ: Record<MusicPartId, number> = { kick: 233, hat: 977, arp: 1447, drone: 421 };
 
-const BAR_SECONDS = (60 / ARRANGEMENT.bpm) * 4;
+const BAR_SECONDS = (60 / FULL_ARRANGEMENT.bpm) * 4;
 
 interface Rig {
   context: FakeContext;
@@ -45,16 +45,16 @@ async function musicRig(): Promise<Rig> {
   const engine = new FmEngine(context.asAudioContext());
   const system = new AudioSystem(engine);
   await system.init();
-  system.initMusic();
+  system.initMusic(FULL_ARRANGEMENT);
   for (const id of MUSIC_PART_IDS) {
-    const part = engine.getPart(ARRANGEMENT[id].part);
+    const part = engine.getPart(FULL_ARRANGEMENT[id].part);
     if (!part) throw new Error(`no part "${id}"`);
     const node = sourceOf(part);
     node.feed = noteToneFeed(node, HZ[id]);
   }
   const noteOns = (): number =>
     MUSIC_PART_IDS.reduce((total, id) => {
-      const part = engine.getPart(ARRANGEMENT[id].part);
+      const part = engine.getPart(FULL_ARRANGEMENT[id].part);
       if (!part) return total;
       return (
         total +
