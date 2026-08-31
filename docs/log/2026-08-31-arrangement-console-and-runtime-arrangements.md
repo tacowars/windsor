@@ -23,9 +23,11 @@ parts are actually making noise together*. #69 is what makes them.
 Two decisions from the mixer record are narrowed, and both should be read
 through this record from here on:
 
-- **§2, "mixing is a code edit rather than a knob."** No longer true. Mix and
-  arrangement state round-trips through a JSON document (§3 below). The typed
-  tables survive as defaults, not as the only authoring route.
+- **§2, "mixing is a code edit rather than a knob."** Narrowed, not reversed.
+  Mix and arrangement state round-trips through a JSON document (§3), so it is
+  no longer *hand-edited* — but the document is committed and imported at build
+  time, so it stays in code review and in a diff. The typed tables survive as
+  the seed, not as the only authoring route.
 - **§9, "the patch editor stays a sound-design tool."** No longer true. It
   becomes an arrangement console. The reasoning in §9 was that mixing by ear
   needs something to hear and nothing was making sound; #69 removes that.
@@ -79,41 +81,93 @@ tacowars listed LFO periods alongside the harmonic parameters; they live in
 **Sequencers**, because they modulate Euclidean density rather than pitch. The
 LFO inside a `Patch` is a different thing again and stays in Parts.
 
-### 3. An arrangement is a JSON document loaded at runtime
+### 3. An arrangement is a JSON document imported at build time
 
-Mix and arrangement state serialises to JSON, exported from the console and
-loaded by the game as an asset. This is the decision that supersedes §2.
+The console exports JSON; the file is committed; the game `import`s it as a
+module. There is **no runtime load**.
 
-Consequences, accepted deliberately:
+```ts
+import raw from './arrangements/bed-01.json';
+const arrangement = makeArrangement(raw);
+```
 
-- **This is the client's first runtime asset load.** There is no `fetch` call
-  anywhere in `packages/client/src` today and no `assets/` directory. It adds a
-  load order, a failure path, and a question about what sounds before the
-  document arrives — see §4.
-- **The arrangement leaves code review.** A JSON file is not read the way a
-  typed table is. That is the price of composing by ear, and it is worth it.
+`tsconfig.base.json` needs `resolveJsonModule`; `moduleResolution` is already
+`bundler`, and Vite bundles JSON natively.
 
-### 4. Code defaults stay, as the fallback the document overlays
+This was originally specified as a runtime `fetch`, and tacowars rejected that on an
+argument that holds: with generative audio, a document that fails to load and
+falls back to defaults is **undetectable by ear**, because sounding different
+from last time is the expected output. A runtime load needs a failure signal,
+and every available signal is bad — a console warning scrolls past, an
+on-screen badge relies on being noticed, and silence is ambiguous.
 
-The typed tables from #68 and #69 (`MIX`, `RETURNS`, the arrangement defaults)
-remain in source and remain the starting state. A loaded document **overlays**
-them field by field; it does not replace them.
+Importing at build time does not choose a better signal. It **deletes the
+failure class**: a malformed document fails `npm run build`, loudly, at the
+moment someone can act on it, and cannot reach a running game at all.
 
-So a missing document, a malformed one, or a field the schema gained since the
-document was written all degrade to a sound rather than to silence or a crash.
-The game is never one bad JSON file away from being mute.
+Three things fall out, all of them simplifications:
 
-### 5. Validation is a normaliser, not a schema library
+- **The client gains no `fetch`.** There is none in `packages/client/src`
+  today, and this no longer adds the first one, nor a load order, nor an
+  "what plays before the document arrives" question.
+- **The arrangement stays under code review.** A committed JSON file appears in
+  a diff. The §2 supersession is therefore narrower than first written: mixing
+  stops being a *hand-edit*, but it does not leave review.
+- **The composing loop gets faster, not slower.** Export from the console over
+  `arrangements/bed-01.json` and Vite's HMR reloads it immediately. The cost —
+  no arrangement hot-swap in a built game — is not a cost during a tech demo.
 
-The repo has no validation dependency and should not gain one for this. The
-established idiom is already the right one: `makeSpace(Partial<ReverbSpace>)`
-(`reverbSpace.ts:129`) and the `num(raw.volume, 0.8)` clamping in
-`fm-processor.js:946`.
+### 4. The fallback is a diagnostic click, not a musical default
 
-`makeArrangement(raw: unknown)` follows it — clamp every number to its range,
-default every absent field, drop every unknown key, and **never throw**. A
-loader that throws on a document tacowars exported five minutes earlier is worse
-than one that quietly plays the defaults for one field.
+tacowars's objection applies to fallbacks in general, not just to loading: a
+hardwired musical default standing in for the real arrangement is invisible
+precisely because the real arrangement is generative.
+
+So "defaults" splits into two things that were previously one, and they are not
+interchangeable:
+
+| | What it is | When it plays |
+|---|---|---|
+| The shipped arrangement | the actual bed — musical, committed, authored by hand in #69 and by the console from #70 on | normally |
+| `FALLBACK_ARRANGEMENT` | a bare metronome click. No sends, no harmony, no generative parts | only when no usable arrangement survives normalisation |
+
+The fallback is **deliberately unmusical**, so it can never be mistaken for the
+arrangement. It is also more informative than silence: a click proves the
+context resumed, the worklets loaded, the routing works and the master path is
+open, which narrows the fault to the document alone. Silence proves nothing —
+it is equally a suspended context, a missing gesture, a zero send, or a broken
+sequencer.
+
+That distinction is not hypothetical here. **Silence has already failed as a
+signal in this codebase**: nothing has ever called `createMusicPart`, so the
+client has been mute since the FM engine landed, and the convolver reverb in
+PR #39 shipped and merged without anyone hearing it. An error state that
+sounds like the project's normal state is not an error state.
+
+### 5. Validation never throws at runtime, and `verify` fails if the fallback would play
+
+`makeArrangement(raw: unknown)` follows the repo's established idiom rather
+than a new dependency — `makeSpace(Partial<ReverbSpace>)` (`reverbSpace.ts:129`)
+and the `num(raw.volume, 0.8)` clamping in `fm-processor.js:946`. It clamps
+every number to its range, defaults every absent field, drops unknown keys, and
+does not throw.
+
+It also **reports**: it returns the normalised arrangement alongside a list of
+what it had to correct, and distinguishes a document it repaired from one it
+could not use at all.
+
+The guard that closes the loop is a build-time assertion, not a runtime one:
+
+- **`npm run verify` fails if the committed arrangement normalises to
+  `FALLBACK_ARRANGEMENT`**, and fails on any dangling reference — a preset,
+  return or part name the document mentions and the code does not define.
+  Clamping cannot fix a dangling name; it is an error wearing a valid type.
+- A repaired-but-usable document logs what was corrected and still plays.
+
+So the fallback exists to keep a running game from crashing, and the gate exists
+to guarantee it is never what ships. This is also the answer to the obvious
+objection to §4 — "someone will eventually ship the click" — made structural
+rather than left to vigilance.
 
 ### 6. Authoring is parametric, with capture-to-fixed
 
@@ -138,10 +192,16 @@ schema — "both come from the real client source, so the editor cannot drift
 from what the game runs" — and §1 simply extends the same principle from the
 schema to the engine.
 
-The document decision (§3–§4) says the same about arrangement state: one
-schema, defaults in code, overrides in a document, one normaliser between them.
-The alternative — a console that keeps its own state and a game that keeps its
-own — is the same drift in a different costume.
+The document decision (§3–§5) says the same about arrangement state: one
+schema, one committed document, one normaliser, and one gate proving the
+document is real before it ships. The alternative — a console that keeps its own
+state and a game that keeps its own — is the same drift in a different costume.
+
+There is a second principle under §3 and §5, which is that **a failure should
+be moved to where it is loud rather than dressed in a better warning**. A
+malformed arrangement is a build error, a dangling name is a verify failure,
+and the only thing left at runtime is a fallback that announces itself by
+sounding wrong.
 
 Constraints unchanged: **audio never feeds back into simulation state**
 (CLAUDE.md invariant 1), and the console is a development tool, so nothing here
@@ -155,6 +215,11 @@ is a milestone measurement (invariant 3).
 | Console in-game behind `?debug=1` instead | Drives the real engine for free, but needs the dev server running rather than one openable file |
 | Shared UI mounted in both a standalone file and an in-game overlay | Most reach, largest build; the standalone no-imports constraint would shape the whole UI layer |
 | Copy the arrangement to the clipboard as a TypeScript literal | Keeps mix under code review, but no round-trip back in |
+| Runtime `fetch` with a lenient overlay onto musical defaults | Originally specified here and rejected: a failed load is inaudible when the content is generative |
+| Runtime `fetch` that falls silent on failure | Unmissable in principle, but silence has already gone undetected for this entire project and cannot distinguish a failed load from a suspended context |
+| Runtime `fetch` that throws with an on-screen banner | Better than silence, but still a signal someone has to notice; build-time import removes the failure instead |
+| Deleting the code-side arrangement entirely | Unambiguous, but #68 and #69 could then make no sound at all before #70 lands |
+| Keeping unnamed musical defaults | Exactly the invisibility tacowars objected to |
 | Copy out and paste back in | Round-trips, but still hand-carried, and needs the same validation as a document without the benefits |
 | A hosted console persisting arrangements itself | Nothing to paste, but state lives outside the repo and the game and console can silently disagree |
 | Purely parametric, no capture | Smallest UI; when a phrase is almost right you can only re-roll, never keep it |
