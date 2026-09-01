@@ -11,18 +11,18 @@
  * draws free-running operator phase from `Math.random` in the game, so an
  * unseeded assertion about a level is a fresh coin toss every run -- which is
  * how the `bass-digital` clip assertion failed once and passed on re-run
- * (#78). Coverage of the random space is a deliberate sweep, below, not one
- * unrepeatable draw per CI run: seeding one render and stopping there would
- * trade a rare true failure for a permanent false pass, which is worse than
- * the flake it fixes.
+ * (#78). Seeding alone would trade that rare true failure for a permanent
+ * false pass, so coverage of the random space is a deliberate sweep: it lives
+ * in fmProcessorHeadroom.test.ts, which is where the preset levels are on
+ * trial.
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_SEED, goertzel, loadProcessor, render } from './__fixtures__/workletHarness';
+import { goertzel, loadProcessor, render } from './__fixtures__/workletHarness';
 import type { ScheduledEvent } from './__fixtures__/workletHarness';
 import { ALGORITHMS, WAVE, makePatch } from './patch';
 import type { Patch } from './patch';
-import { PRESETS, PRESET_NAMES } from './presets';
+import { PRESETS } from './presets';
 
 const loaded = loadProcessor();
 const SR = loaded.sampleRate;
@@ -31,48 +31,6 @@ const held = (note: number, frames: number): ScheduledEvent[] => [
   { type: 'noteOn', id: 1, note, velocity: 0.9, frame: 0 },
   { type: 'noteOff', id: 1, frame: frames },
 ];
-
-/**
- * Seeds every preset is rendered over. A seed pins the processor's whole
- * random surface -- operator start phase, the per-voice noise seed, the LFO
- * seed, pan jitter -- so sweeping seeds samples that surface where the phase
- * search in "bass-digital headroom" can only cover a patch with no noise
- * operator and no stochastic LFO.
- *
- * 64 is a regression guard, not a bound: what justifies each preset's volume
- * is a 16,384-seed sweep run offline and reported on the PR (#78). But it is
- * 64 draws more than the one this file used to take, and it takes the same
- * 64 every run.
- */
-const SWEEP_SEEDS = 64;
-
-describe('presets render clean audio', () => {
-  it.each(PRESET_NAMES)('%s sounds, stays finite and does not clip on any seed', (name) => {
-    const patch = PRESETS[name];
-    expect(patch).toBeDefined();
-    if (!patch) return;
-
-    let nonFinite = 0;
-    let quietest = Infinity;
-    let loudest = 0;
-    let loudestSeed = -1;
-    for (let seed = 0; seed < SWEEP_SEEDS; seed++) {
-      const result = render(loaded, loaded.create(patch, 16, seed), 400, held(60, 12000), {
-        collectSamples: false,
-      });
-      nonFinite += result.nonFinite;
-      quietest = Math.min(quietest, result.peak);
-      if (result.peak > loudest) {
-        loudest = result.peak;
-        loudestSeed = seed;
-      }
-    }
-
-    expect(nonFinite).toBe(0);
-    expect(quietest).toBeGreaterThan(0.002);
-    expect(loudest, `${name} clips at seed ${loudestSeed}`).toBeLessThanOrEqual(1);
-  });
-});
 
 describe('the seed', () => {
   const bass = PRESETS['bass-digital'] as Patch;
@@ -138,58 +96,6 @@ describe('the seed', () => {
     } finally {
       spy.mockRestore();
     }
-  });
-});
-
-describe('bass-digital headroom', () => {
-  const bass = PRESETS['bass-digital'] as Patch;
-
-  /**
-   * The four free-running operator start phases are the whole of this preset's
-   * exposure to randomness (it has no noise operator, no LFO and no
-   * `panRandom`), and `phaseFree: false` lets a test name them. These are the
-   * worst of ~900 multi-start hill climbs over that space at the trimmed
-   * volume; peak there is 0.939, so the preset clears the clip line by ~6% for
-   * *every* draw, not merely for the seed this file happens to use.
-   * Measurement and the volume trim it justified:
-   * docs/log/2026-09-02-bass-digital-clip-headroom.md.
-   */
-  const WORST_PHASES = [0.8106, 0.2533, 0.3475, 0.641];
-
-  const atWorstPhases = (volumeScale = 1): Patch => {
-    const patch = structuredClone(bass);
-    patch.volume *= volumeScale;
-    patch.ops.forEach((op, i) => {
-      op.phaseFree = false;
-      op.phase = WORST_PHASES[i] ?? 0;
-    });
-    return patch;
-  };
-
-  const peakOf = (patch: Patch, seed: number = DEFAULT_SEED): number =>
-    render(loaded, loaded.create(patch, 16, seed), 400, held(60, 12000), {
-      collectSamples: false,
-    }).peak;
-
-  it('clears the clip line at its worst start phases, with margin', () => {
-    const peak = peakOf(atWorstPhases());
-    expect(peak).toBeLessThanOrEqual(1);
-    // The margin itself, so an erosion of it is a failure and not a near miss.
-    expect(peak).toBeLessThan(0.96);
-  });
-
-  it('would clip on a volume bump -- the clip assertion is not vacuous', () => {
-    // 10% is the whole headroom above. A change that quietly spent it (a hotter
-    // operator, more filter drive, a volume nudge) fails the test above rather
-    // than shipping a preset that clips on an unlucky draw.
-    expect(peakOf(atWorstPhases(1.1))).toBeGreaterThan(1);
-  });
-
-  it('stays under the line across a seed sweep', () => {
-    let worst = 0;
-    for (let seed = 0; seed < 256; seed++) worst = Math.max(worst, peakOf(bass, seed));
-    expect(worst).toBeLessThanOrEqual(1);
-    expect(worst).toBeLessThan(0.9);
   });
 });
 
