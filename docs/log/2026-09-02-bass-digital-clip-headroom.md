@@ -11,9 +11,11 @@
    (`DEFAULT_SEED`), not just the clip assertion #78 was filed against.
    `create(patch, maxVoices, null)` is the explicit opt-out and is what the
    game-path tests use.
-2. **The all-presets clip assertion becomes a 64-seed sweep**, because seeding
-   one render and stopping there would trade a rare true failure for a
-   permanent false pass. See "What seeding one render would have hidden".
+2. **The all-presets clip assertion becomes a 64-seed sweep plus each
+   preset's recorded worst seed**, because seeding one render and stopping
+   there would trade a rare true failure for a permanent false pass — and
+   because 64 samples cannot be trusted to rediscover a 1-in-900 draw. See
+   "What seeding one render would have hidden".
 3. **`bass-digital`'s `patch.volume` drops 0.17 → 0.14** (−1.68 dB). Its
    timbre — operator ratios, levels, filter drive and resonance — is
    untouched.
@@ -44,9 +46,17 @@ a weaker version of a random one — it is a *permanent* verdict on one draw.
 The cross-model review of this branch caught exactly that: with the harness
 seeded and the all-presets assertion still rendering once, `weapon-zap`
 peaked 0.730 at `DEFAULT_SEED` and 1.081 at seed 1261. The suite would have
-gone green forever over a preset that clips on roughly 1 draw in 900. So the
-assertion sweeps 64 seeds instead, which is 64 more than it took before and
-takes the same 64 every run.
+gone green forever over a preset that clips on roughly 1 draw in 900.
+
+So the assertion sweeps 64 seeds instead — and the *third* review pass showed
+that is still not enough: restored to 0.52, `weapon-zap` peaks only 0.983 over
+seeds 0..63, so the sweep would have passed the very preset it was added to
+catch. A sample of 64 cannot be relied on to rediscover a 1-in-900 draw. Each
+preset therefore also carries the seed that produced its worst peak in the
+16,384-seed sweep (`WORST_KNOWN_SEED` in `fmProcessor.test.ts`), and the two
+together are what the assertion runs. With `weapon-zap` put back to 0.52 the
+test now fails at seed 1261 with peak 1.081 — the counterexample is pinned,
+not merely hoped for.
 
 **Why the sweep the ticket asked for was not enough for `bass-digital`.** A
 seed sweep samples the peak distribution; it does not bound it. At the old
