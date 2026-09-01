@@ -1,0 +1,40 @@
+chrome-devtools MCP `list_console_messages` — WebGL2 page
+http://localhost:5251/?debug=1&server=8158&backend=webgl2   (served build d0cca67)
+
+Captured after page load, after the keypress that unlocked audio, and after
+the in-page OfflineAudioContext measurement (worklet-peaks-in-browser.json),
+before this page's bridge run. Unfiltered: every message the page produced up
+to that point.
+
+## Console messages
+Showing 1-14 of 14 (Page 1 of 1).
+msgid=1 [debug] [vite] connecting... (1 args)
+msgid=2 [debug] [vite] connected. (1 args)
+msgid=3 [info] [a204] {"event":"net","connected":true,"server":"ws://localhost:8158","playerId":2,"seed":1,"tickRate":20,"tick":3097,"revision":0,"baselinePieces":0,"latencyMs":0,"jitterMs":0} (2 args)
+msgid=4 [log] BJS - [00:34:42]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)
+msgid=5 [info] [a204] {"event":"engine","backend":"WebGL2","gpu":"ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))"} (2 args)
+msgid=6 [info] [a204] {"event":"debug","shim":true,"bridge":true} (2 args)
+msgid=7 [info] [a204] {"event":"bridge","name":"Aotearoa204 WebGL2","port":4400,"connected":true} (2 args)
+msgid=8 [info] [a204] {"event":"chunks","built":1633,"disposed":0,"queued":154,"ms":503} (2 args)
+msgid=9 [info] [a204] {"event":"chunks","built":154,"disposed":0,"queued":0,"ms":17} (2 args)
+msgid=10 [info] [a204] {"event":"music","state":"started","bpm":96,"root":50,"scale":"dorian"} (2 args)
+msgid=11 [info] [a204] {"event":"music","state":"note","part":"kick","tick":0} (2 args)
+msgid=12 [info] [a204] {"event":"music","state":"note","part":"hat","tick":0} (2 args)
+msgid=13 [info] [a204] {"event":"music","state":"note","part":"arp","tick":0} (2 args)
+msgid=14 [info] [a204] {"event":"music","state":"note","part":"drone","tick":0} (2 args)
+
+Zero [error], zero [warn], zero [issue].
+
+The driver in msgid=5 is ANGLE over Metal on the M4 Pro — hardware, not
+SwiftShader, so nothing after it is invalidated.
+
+## Same call filtered to types ["error","warn","issue"], after this page's
+## bridge run (get-system-stats, query-a204-state, a204-motor, take-screenshot)
+<no console messages found>
+
+This page's post-screenshot listing was taken with that filter rather than
+unfiltered, so the `DumpTools` banner the WebGPU listing shows as msgid=14 is
+not reproduced here; it is a [log], and the filtered result is the one that
+matters for the gate. Both pages were then closed and the machine torn down,
+so the unfiltered post-screenshot listing was not re-taken rather than being
+reconstructed after the fact.
