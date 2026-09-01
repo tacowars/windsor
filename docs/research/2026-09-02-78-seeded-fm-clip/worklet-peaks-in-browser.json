@@ -1,0 +1,44 @@
+{
+  "what": "bass-digital rendered through the real AudioWorklet in Chrome (OfflineAudioContext, 48 kHz, 51,200 frames, note 60 @ velocity 0.9, noteOff at frame 12,000) — the same signal the Node harness in fmProcessor.test.ts renders, so the two can be compared sample-peak to sample-peak.",
+  "how": "chrome-devtools MCP evaluate_script on the ?debug=1 page: import('/src/audio/presets.ts'), OfflineAudioContext.audioWorklet.addModule('/src/audio/worklet/fm-processor.js'), new AudioWorkletNode(ctx, 'fm-part', { processorOptions: { maxVoices: 16, patch, events, seed? } }).",
+  "presetVolume": 0.14,
+  "nodeHarnessReference": {
+    "defaultSeed_0xa204": 0.5915,
+    "worstPhases": 0.9393,
+    "comment": "vitest fmProcessor, packages/client/src/audio/__fixtures__/workletHarness.ts"
+  },
+  "webgpuPage": {
+    "url": "http://localhost:5251/?debug=1&server=8158",
+    "defaultSeed_0xa204": 0.5915170311927795,
+    "seed7_a": 0.6700881719589233,
+    "seed7_b": 0.6700881719589233,
+    "seed8": 0.6084981560707092,
+    "unseeded_a": 0.6753092408180237,
+    "unseeded_b": 0.6127225756645203,
+    "worstPhases": 0.9393107891082764
+  },
+  "webgl2Page": {
+    "url": "http://localhost:5251/?debug=1&server=8158&backend=webgl2",
+    "defaultSeed_0xa204": 0.5915170311927795,
+    "seed7_a": 0.6700881719589233,
+    "seed7_b": 0.6700881719589233,
+    "unseeded_a": 0.713128387928009,
+    "unseeded_b": 0.5868042707443237,
+    "worstPhases": 0.9393107891082764,
+    "musicReadout": {
+      "bpm": 96,
+      "root": 50,
+      "scale": "dorian",
+      "counters": { "kick": 21, "hat": 50, "arp": 68, "drone": 5 },
+      "muted": false,
+      "running": true
+    }
+  },
+  "reads": [
+    "seed7_a === seed7_b on both pages: the same seed is the same audio in a real AudioWorklet, not only under the Node shim.",
+    "seed8 differs from seed7: the seed is actually driving the draws.",
+    "unseeded_a !== unseeded_b on both pages: with no seed the processor still free-runs from Math.random, which is the game path and is unchanged.",
+    "defaultSeed_0xa204 and worstPhases match the Node harness to 4 decimals, so the harness's numbers are the browser's numbers and the 6.1% headroom is not an artefact of the shim.",
+    "The render is audio-only and identical across the two rendering backends, as expected: the AudioWorklet does not touch the GPU."
+  ]
+}
