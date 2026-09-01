@@ -17,6 +17,14 @@ Served on:     http://localhost:5251/   (client port 5173 + 78 % 100)
 World server:  ws://localhost:8158/     (server port 8080 + 78 % 100)
 ```
 
+**What happened after this pass.** `d0cca67` is the commit that carries the
+worklet change and the `bass-digital` trim — the change this evidence is
+about. The branch then gained a second-pass review fix (three sibling presets
+trimmed on the same measurement, and the all-presets assertion turned into a
+seed sweep). Nothing in that touches what is shown here: it is three volume
+constants and a test file, no worklet and no `bass-digital`, so the pass was
+not re-shot on a later commit rather than being re-labelled as one.
+
 Ports are derived from the ticket number per #103 decision 2 and were passed
 explicitly (`--port 5251 --strictPort`, `PORT=8158`). `lsof` showed 5251,
 8158, 4400 and 4401 all free before anything started, so no sibling agent was
