@@ -1,7 +1,7 @@
 {
   "backend": "WebGL2",
   "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))",
-  "gitCommit": "d0cca67",
+  "gitCommit": "a48f298",
   "seed": 1,
   "player": {
     "x": 32,
@@ -45,11 +45,11 @@
   "horde": null,
   "net": {
     "playerId": 2,
-    "rtt": 0.49499988555908203,
-    "serverTick": 3975,
+    "rtt": 0.4249997138977051,
+    "serverTick": 2182,
     "bytesInPerSec": 1240,
     "revision": 0,
-    "snapshots": 878
+    "snapshots": 781
   },
   "world": {
     "revision": 0

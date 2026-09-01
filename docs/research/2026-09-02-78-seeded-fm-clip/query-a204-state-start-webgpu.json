@@ -1,7 +1,7 @@
 {
   "backend": "WebGPU",
   "gpu": "apple metal-3 unknown version",
-  "gitCommit": "d0cca67",
+  "gitCommit": "a48f298",
   "seed": 1,
   "player": {
     "x": 32,
@@ -45,11 +45,11 @@
   "horde": null,
   "net": {
     "playerId": 1,
-    "rtt": 2.0099997520446777,
-    "serverTick": 821,
+    "rtt": 1.3700003623962402,
+    "serverTick": 1076,
     "bytesInPerSec": 940,
     "revision": 0,
-    "snapshots": 351
+    "snapshots": 816
   },
   "world": {
     "revision": 0
