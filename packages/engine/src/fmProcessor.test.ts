@@ -6,12 +6,20 @@
  * loop, and no discontinuity when a voice is stolen. None of them is a
  * performance claim -- see docs/design/audio-architecture.md 7 for why timing
  * measured here would not qualify under CLAUDE.md invariant 3.
+ *
+ * Every render here is seeded (workletHarness.DEFAULT_SEED). The processor
+ * draws free-running operator phase from `Math.random` in the game, so an
+ * unseeded assertion about a level is a fresh coin toss every run -- which is
+ * how the `bass-digital` clip assertion failed once and passed on re-run
+ * (#78). Coverage of the random space is a deliberate sweep, below, not one
+ * unrepeatable draw per CI run.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { goertzel, loadProcessor, render } from './__fixtures__/workletHarness';
+import { DEFAULT_SEED, goertzel, loadProcessor, render } from './__fixtures__/workletHarness';
 import type { ScheduledEvent } from './__fixtures__/workletHarness';
 import { ALGORITHMS, WAVE, makePatch } from './patch';
+import type { Patch } from './patch';
 import { PRESETS, PRESET_NAMES } from './presets';
 
 const loaded = loadProcessor();
@@ -32,6 +40,90 @@ describe('presets render clean audio', () => {
     expect(result.nonFinite).toBe(0);
     expect(result.peak).toBeGreaterThan(0.002);
     expect(result.peak).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('the seed', () => {
+  const bass = PRESETS['bass-digital'] as Patch;
+
+  it('makes a render reproducible, and different seeds differ', () => {
+    const a = render(loaded, loaded.create(bass, 16, 7), 40, held(60, 12000));
+    const b = render(loaded, loaded.create(bass, 16, 7), 40, held(60, 12000));
+    const c = render(loaded, loaded.create(bass, 16, 8), 40, held(60, 12000));
+
+    expect(a.samples).toEqual(b.samples);
+    // Otherwise the seed could be ignored entirely and the test above would
+    // still pass -- on any patch whose operators all start at phase 0.
+    expect(a.samples).not.toEqual(c.samples);
+  });
+
+  it('is absent in the game, which keeps free-running phase from Math.random', () => {
+    const free = () => render(loaded, loaded.create(bass, 16, null), 40, held(60, 12000));
+
+    // Two unseeded renders differ: that is the point of free-running phase, and
+    // it is what the game still gets.
+    expect(free().samples).not.toEqual(free().samples);
+
+    // ...and the source really is Math.random, not some other fallback: pin it
+    // and the same two renders agree again.
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.25);
+    try {
+      const pinned = free();
+      expect(pinned.samples).toEqual(free().samples);
+      expect(pinned.peak).toBeGreaterThan(0.002);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('bass-digital headroom', () => {
+  const bass = PRESETS['bass-digital'] as Patch;
+
+  /**
+   * The four free-running operator start phases are the whole of this preset's
+   * exposure to randomness (it has no noise operator, no LFO and no
+   * `panRandom`), and `phaseFree: false` lets a test name them. These are the
+   * worst of ~900 multi-start hill climbs over that space at the trimmed
+   * volume; peak there is 0.939, so the preset clears the clip line by ~6% for
+   * *every* draw, not merely for the seed this file happens to use.
+   * Measurement and the volume trim it justified:
+   * docs/log/2026-09-02-bass-digital-clip-headroom.md.
+   */
+  const WORST_PHASES = [0.8106, 0.2533, 0.3475, 0.641];
+
+  const atWorstPhases = (volumeScale = 1): Patch => {
+    const patch = structuredClone(bass);
+    patch.volume *= volumeScale;
+    patch.ops.forEach((op, i) => {
+      op.phaseFree = false;
+      op.phase = WORST_PHASES[i] ?? 0;
+    });
+    return patch;
+  };
+
+  const peakOf = (patch: Patch, seed: number = DEFAULT_SEED): number =>
+    render(loaded, loaded.create(patch, 16, seed), 400, held(60, 12000)).peak;
+
+  it('clears the clip line at its worst start phases, with margin', () => {
+    const peak = peakOf(atWorstPhases());
+    expect(peak).toBeLessThanOrEqual(1);
+    // The margin itself, so an erosion of it is a failure and not a near miss.
+    expect(peak).toBeLessThan(0.96);
+  });
+
+  it('would clip on a volume bump -- the clip assertion is not vacuous', () => {
+    // 10% is the whole headroom above. A change that quietly spent it (a hotter
+    // operator, more filter drive, a volume nudge) fails the test above rather
+    // than shipping a preset that clips on an unlucky draw.
+    expect(peakOf(atWorstPhases(1.1))).toBeGreaterThan(1);
+  });
+
+  it('stays under the line across a seed sweep', () => {
+    let worst = 0;
+    for (let seed = 0; seed < 256; seed++) worst = Math.max(worst, peakOf(bass, seed));
+    expect(worst).toBeLessThanOrEqual(1);
+    expect(worst).toBeLessThan(0.9);
   });
 });
 

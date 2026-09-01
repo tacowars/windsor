@@ -212,7 +212,13 @@ a bespoke build step.
 
 The cost is duplication: the waveform enums and the algorithm routing table exist both in
 the worklet and in `patch.ts`. `patch.test.ts` asserts the copies are identical, so they
-cannot drift silently.
+cannot drift silently. The seeded PRNG the DSP tests use (#78) is the same story: it is
+`mulberry32` copied out of `packages/shared/src/terrain/heightmap.ts`, because the worklet
+cannot import it. The game path is unchanged — absent `processorOptions.seed` the
+processor draws free-running operator phase, per-voice noise seeds and pan jitter from
+`Math.random` exactly as before, and a part whose every note started from the same phase
+would sound mechanical. Reasoning, and the headroom measurement the seed made possible:
+`docs/log/2026-09-02-bass-digital-clip-headroom.md`.
 
 ### 6.2 Cross-origin isolation is already on
 

@@ -46,6 +46,14 @@ export interface ProcessorOptions {
    * `OfflineAudioContext.startRendering()`.
    */
   events?: ScheduledMessage[];
+  /**
+   * Pins the processor's one random source — free-running operator phase, the
+   * per-voice noise seed and `panRandom` jitter — so a render is reproducible.
+   * Omitted in the game, which gets `Math.random`: a part whose every note
+   * started from the same phase would sound mechanical. The DSP tests (#78)
+   * supply it; an offline bake that wants byte-identical output may too.
+   */
+  seed?: number;
 }
 
 /** The `AudioContext` timeline is frames at the sample rate, so this is exact. */

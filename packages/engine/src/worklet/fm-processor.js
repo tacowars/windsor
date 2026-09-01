@@ -58,6 +58,49 @@ const WAVE = {
 };
 
 /* ------------------------------------------------------------------ *
+ * Randomness
+ *
+ * Three things below are drawn at random: free-running operator start phase,
+ * the per-voice noise seed, and `panRandom` jitter. All three go through one
+ * source per processor, so a test can pin every one of them at once.
+ *
+ * The game passes no seed and gets `Math.random`, exactly as before.
+ * `processorOptions.seed` swaps in mulberry32 — 32 bits of state, no
+ * allocation, and ample for phase and pan jitter. It is deliberately not a
+ * simulation-grade generator: nothing here reaches the simulation
+ * (docs/design/audio-architecture.md 4), it only has to be reproducible.
+ * ------------------------------------------------------------------ */
+
+/**
+ * `Math.random`, unless a seed is supplied; then a reproducible mulberry32 --
+ * the same algorithm, line for line, as `mulberry32` in
+ * `packages/shared/src/terrain/heightmap.ts`, so the repo has one seeded
+ * generator rather than two. It is copied rather than imported for the reason
+ * at the top of this file: the worklet must stay import-free.
+ */
+function makeRandom(seed) {
+  if (seed == null) return Math.random;
+  let state = seed >>> 0;
+  return function mulberry32() {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * A non-zero xorshift32 seed. Zero is xorshift's fixed point — a generator
+ * that drew it would emit a constant forever. It is a 2^-32 accident from
+ * `Math.random`, but a swept seed makes it reachable and reproducible, so it
+ * is excluded here rather than left to luck.
+ */
+function randomSeed32(random) {
+  return (random() * 0xffffffff) >>> 0 || 1;
+}
+
+/* ------------------------------------------------------------------ *
  * Wavetable construction
  *
  * Every non-noise, non-digital waveform is a list of harmonic amplitudes
@@ -376,13 +419,13 @@ const LFO_SINE = 0,
   LFO_DRIFT = 6;
 
 class Lfo {
-  constructor() {
+  constructor(random) {
     this.phase = 0;
     this.value = 0;
     this.held = 0;
     this.target = 0;
     this.fade = 0;
-    this.seed = (Math.random() * 0xffffffff) >>> 0;
+    this.seed = randomSeed32(random);
   }
 
   rand() {
@@ -530,8 +573,9 @@ const KIND_TABLE = 0,
   KIND_SQUARE_D = 3;
 
 class Voice {
-  constructor(sampleRate) {
+  constructor(sampleRate, random) {
     this.sr = sampleRate;
+    this.random = random; // the processor's one source; see "Randomness" above
 
     // Per-operator running state
     this.phase = new Float64Array(4);
@@ -548,11 +592,11 @@ class Voice {
     this.ampEnv = [new Envelope(), new Envelope(), new Envelope(), new Envelope()];
     this.filtEnv = new Envelope();
     this.pitchEnv = new Envelope();
-    this.lfo = new Lfo();
+    this.lfo = new Lfo(random);
     this.svfA = new Svf();
     this.svfB = new Svf();
 
-    this.noiseSeed = (Math.random() * 0xffffffff) >>> 0;
+    this.noiseSeed = randomSeed32(random);
 
     this.active = false;
     this.gate = false;
@@ -619,7 +663,7 @@ class Voice {
 
     for (let i = 0; i < 4; i++) {
       const op = patch.ops[i];
-      this.phase[i] = op.phaseFree ? Math.random() : op.phase;
+      this.phase[i] = op.phaseFree ? this.random() : op.phase;
       this.out[i] = 0;
       this.fb1[i] = 0;
       this.fb2[i] = 0;
@@ -1013,11 +1057,15 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const maxVoices = Math.max(1, Math.min(128, opts.maxVoices || 16));
     this.maxVoices = maxVoices;
 
+    // One random source for the whole part. Absent `seed` this is Math.random,
+    // which is what the game gets; see "Randomness" near the top of the file.
+    this.random = makeRandom(opts.seed);
+
     // Four reserve slots above the sounding limit so a stolen voice can fade
     // out while its replacement is already sounding.
     const poolSize = maxVoices + 4;
     this.voices = new Array(poolSize);
-    for (let i = 0; i < poolSize; i++) this.voices[i] = new Voice(sampleRate);
+    for (let i = 0; i < poolSize; i++) this.voices[i] = new Voice(sampleRate, this.random);
 
     this.patch = normalisePatch(opts.patch);
     this.waveSets = [null, null, null, null];
@@ -1161,7 +1209,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
       const v = this.allocate();
       const sign = u === 0 ? -1 : 1;
       const detune = count === 1 ? 0 : (sign * p.spread) / 100;
-      let pan = p.pan + p.panKey * ((msg.note - 60) / 48) + p.panRandom * (Math.random() * 2 - 1);
+      let pan = p.pan + p.panKey * ((msg.note - 60) / 48) + p.panRandom * (this.random() * 2 - 1);
       if (count > 1) pan += sign * 0.35 * Math.min(1, p.spread / 50);
       v.start(p, this.waveSets, msg.note, vel, detune, pan, glideFrom, id);
       list.push(v);
