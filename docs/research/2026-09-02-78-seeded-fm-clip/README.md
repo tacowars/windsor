@@ -10,14 +10,15 @@
 - Backends exercised: WebGPU (default) and WebGL2 (`&backend=webgl2`).
 
 ```
-Served build:  a48f298   (gitCommit from query-a204-state, both pages)
-Worktree HEAD: a48f298   — match (tracked files clean)
+Served build:  a993c67   (gitCommit from query-a204-state, both pages)
+Worktree HEAD: a993c67   — match (tracked files clean)
 Served on:     http://localhost:5251/   (client port 5173 + 78 % 100)
 World server:  ws://localhost:8158/     (server port 8080 + 78 % 100)
 ```
 
-`a48f298` is the branch's last commit that touches anything the browser runs.
-Only this evidence directory lands after it.
+`a993c67` is the branch's tip at capture time, rebased onto `ae234b7` so the
+page runs the current `main` — #121's client prediction included. Only this
+evidence directory lands after it.
 
 ## Ports, and the shared bridge
 
@@ -25,19 +26,19 @@ Ports are derived from the ticket number per #103 decision 2 and were passed
 explicitly (`--port 5251 --strictPort`, `PORT=8158`); 5251 and 8158 were free
 beforehand.
 
-**The bridge daemon was not this session's.** `:4400` was held by a daemon
-started from `/Volumes/Sendai/code/Aotearoa204-wt-124` — a sibling agent's
-worktree — with its own live sessions on it. Per the protocol a busy `:4400`
-is a queue rather than a wall: this session registered its own sessions
-against that daemon (ids **4** and **5**, identified by their `gitCommit`
-rather than by name, since the sibling's page also reports as
-"Aotearoa204 WebGPU") and every command below was addressed to those ids.
-**Nothing was stopped at teardown**: `--stop` is global and would have killed
-the sibling's run.
+**The bridge daemon was not this session's.** `:4400` was held throughout by a
+daemon started from `/Volumes/Sendai/code/Aotearoa204-wt-124` — a sibling
+agent's worktree. Per the protocol a busy `:4400` is a queue rather than a
+wall: this session registered its own sessions against that daemon (ids **12**
+and **13** for this pass) and addressed every command to those ids, taking the
+`gitCommit` in `query-a204-state` as the identity check rather than the
+session name, which is not unique. **Nothing was stopped at teardown**:
+`--stop` is global, and an idle daemon costs nothing where a stopped one costs
+somebody their run.
 
-The browser is likewise shared — `list_pages` showed the sibling's pages on
-`:5197` and `:5193`. Every action here was addressed to a page id matched by
-its `:5251` URL.
+The browser is shared too — earlier passes saw the sibling's pages on `:5197`
+and `:5193` in `list_pages`. Every action here was addressed to a page id
+matched by its `:5251` URL.
 
 ## Why a browser pass at all
 
@@ -54,8 +55,8 @@ browser's.
 |---|---|
 | `get-system-stats-webgpu.json` | `engine: WebGPU1` |
 | `get-system-stats-webgl2.json` | `engine: WebGL2 …`, `driver: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro …)` — a hardware driver, not SwiftShader |
-| `query-a204-state-start-*.json` | identity (`gitCommit a48f298`), player at (32, 32) supported |
-| `motor-*.json`, `query-a204-state-after-move-*.json` | scripted `a204-motor {"x":0,"z":6,"seconds":3}` → z 32 → 50.0, still `supported` |
+| `query-a204-state-start-*.json` | identity (`gitCommit a993c67`), player at spawn (WebGPU 32,32; WebGL2 35,32 — the server's second spawn point), supported |
+| `motor-*.json`, `query-a204-state-after-move-*.json` | scripted `a204-motor {"x":0,"z":6,"seconds":3}` → z 32 → 50.0 on both pages, still `supported` |
 | `game-webgpu.png`, `game-webgl2.png` | composition; `take-screenshot` is an offscreen render-target capture, so it cannot say *which* backend drew it — `get-system-stats` is the evidence for that (#26) |
 | `console-webgpu.txt`, `console-webgl2.txt` | the verbatim `list_console_messages` listings and the resource-timing pairing |
 | `worklet-peaks-in-browser.json` | the audio measurement, below |
@@ -97,5 +98,7 @@ runs on the audio thread and does not touch the GPU.
 ## Teardown
 
 Both pages closed by URL; the dev server and world server killed by the PIDs
-this session launched. The bridge daemon was **left running** — this session
-did not start it and a sibling agent had live sessions on it.
+this session launched — the `tsx watch` / `vite` supervisors as well as the
+listening children, since a supervisor left alive re-binds the port on the
+next file change (it did, once, after an earlier pass). The bridge daemon was
+**left running**: this session did not start it.

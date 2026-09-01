@@ -1,7 +1,7 @@
 {
   "backend": "WebGPU",
   "gpu": "apple metal-3 unknown version",
-  "gitCommit": "a48f298",
+  "gitCommit": "a993c67",
   "seed": 1,
   "player": {
     "x": 32,
@@ -45,11 +45,31 @@
   "horde": null,
   "net": {
     "playerId": 1,
-    "rtt": 1.3700003623962402,
-    "serverTick": 1076,
+    "rtt": 85.72869983349008,
+    "serverTick": 904,
     "bytesInPerSec": 940,
     "revision": 0,
-    "snapshots": 816
+    "snapshots": 627,
+    "lead": 2,
+    "bufferDepth": 2,
+    "arrivalMargin": 84.24526117037723,
+    "late": 4,
+    "underruns": 4,
+    "leadAdjustments": 4
+  },
+  "pred": {
+    "residual": {
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0
+    },
+    "samples": 626,
+    "blends": 0,
+    "snaps": 0,
+    "blendsUnexpected": 0,
+    "snapsUnexpected": 0,
+    "lastCause": "none"
   },
   "world": {
     "revision": 0

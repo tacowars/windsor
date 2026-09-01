@@ -1,7 +1,7 @@
 {
   "what": "Presets rendered through the real AudioWorklet in Chrome (OfflineAudioContext, 48 kHz, 51,200 frames, note 60 @ velocity 0.9, noteOff at frame 12,000) — the same signal the Node harness in fmProcessorHeadroom.test.ts renders, so the two can be compared sample-peak to sample-peak.",
   "how": "chrome-devtools MCP evaluate_script on the ?debug=1 page: import('/src/audio/presets.ts'), OfflineAudioContext.audioWorklet.addModule('/src/audio/worklet/fm-processor.js'), new AudioWorkletNode(ctx, 'fm-part', { processorOptions: { maxVoices: 16, patch, events, seed? } }).",
-  "servedBuild": "a48f298",
+  "servedBuild": "a993c67",
   "nodeReference": {
     "bass-digital defaultSeed 0xa204": 0.5915,
     "bass-digital worstPhases": 0.9393,
@@ -17,7 +17,7 @@
       "bpm": 96,
       "root": 50,
       "scale": "dorian",
-      "counters": { "kick": 25, "hat": 64, "arp": 85, "drone": 6 },
+      "counters": { "kick": 24, "hat": 59, "arp": 80, "drone": 6 },
       "muted": false,
       "running": true
     },
@@ -27,8 +27,8 @@
       "seed7_a": 0.6700881719589233,
       "seed7_b": 0.6700881719589233,
       "seed8": 0.6084981560707092,
-      "unseeded_a": 0.6500306129455566,
-      "unseeded_b": 0.6685945987701416,
+      "unseeded_a": 0.5750990509986877,
+      "unseeded_b": 0.6405273675918579,
       "worstPhases": 0.9393107891082764
     },
     "atWorstKnownSeed": {
@@ -44,7 +44,7 @@
       "bpm": 96,
       "root": 50,
       "scale": "dorian",
-      "counters": { "kick": 25, "hat": 62, "arp": 84, "drone": 6 },
+      "counters": { "kick": 23, "hat": 58, "arp": 79, "drone": 6 },
       "muted": false,
       "running": true
     },
@@ -53,8 +53,8 @@
       "defaultSeed_0xa204": 0.5915170311927795,
       "seed7_a": 0.6700881719589233,
       "seed7_b": 0.6700881719589233,
-      "unseeded_a": 0.6700885891914368,
-      "unseeded_b": 0.6706106066703796,
+      "unseeded_a": 0.5970083475112915,
+      "unseeded_b": 0.6264051795005798,
       "worstPhases": 0.9393107891082764
     },
     "atWorstKnownSeed": {

@@ -1,5 +1,5 @@
 chrome-devtools MCP `list_console_messages` — WebGL2 page
-http://localhost:5251/?debug=1&server=8158&backend=webgl2   (served build a48f298)
+http://localhost:5251/?debug=1&server=8158&backend=webgl2   (served build a993c67)
 
 Captured after page load, after the keypress that unlocked audio, after the
 in-page OfflineAudioContext measurement, and after the whole bridge run
@@ -10,19 +10,19 @@ Unfiltered: every message the page produced.
 Showing 1-15 of 15 (Page 1 of 1).
 msgid=1 [debug] [vite] connecting... (1 args)
 msgid=2 [debug] [vite] connected. (1 args)
-msgid=3 [info] [a204] {"event":"net","connected":true,"server":"ws://localhost:8158","playerId":2,"seed":1,"tickRate":20,"tick":1401,"revision":0,"baselinePieces":0,"latencyMs":0,"jitterMs":0} (2 args)
-msgid=4 [log] BJS - [01:16:33]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)
+msgid=3 [info] [a204] {"event":"net","connected":true,"server":"ws://localhost:8158","playerId":2,"seed":1,"tickRate":20,"tick":1130,"revision":0,"baselinePieces":0,"latencyMs":0,"jitterMs":0} (2 args)
+msgid=4 [log] BJS - [01:32:59]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)
 msgid=5 [info] [a204] {"event":"engine","backend":"WebGL2","gpu":"ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))"} (2 args)
 msgid=6 [info] [a204] {"event":"debug","shim":true,"bridge":true} (2 args)
 msgid=7 [info] [a204] {"event":"bridge","name":"Aotearoa204 WebGL2","port":4400,"connected":true} (2 args)
-msgid=8 [info] [a204] {"event":"chunks","built":1505,"disposed":0,"queued":282,"ms":504} (2 args)
-msgid=9 [info] [a204] {"event":"chunks","built":282,"disposed":0,"queued":0,"ms":16} (2 args)
+msgid=8 [info] [a204] {"event":"chunks","built":1625,"disposed":0,"queued":167,"ms":503} (2 args)
+msgid=9 [info] [a204] {"event":"chunks","built":167,"disposed":0,"queued":0,"ms":16} (2 args)
 msgid=10 [info] [a204] {"event":"music","state":"started","bpm":96,"root":50,"scale":"dorian"} (2 args)
 msgid=11 [info] [a204] {"event":"music","state":"note","part":"kick","tick":0} (2 args)
 msgid=12 [info] [a204] {"event":"music","state":"note","part":"hat","tick":0} (2 args)
 msgid=13 [info] [a204] {"event":"music","state":"note","part":"arp","tick":0} (2 args)
 msgid=14 [info] [a204] {"event":"music","state":"note","part":"drone","tick":0} (2 args)
-msgid=15 [log] BJS - [01:17:13]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)
+msgid=15 [log] BJS - [01:33:35]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)
 
 Zero [error], zero [warn], zero [issue].
 
