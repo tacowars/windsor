@@ -16,7 +16,7 @@ export const SFX_PRESETS: Record<string, Patch> = {
   'weapon-zap': makePatch({
     name: 'Weapon Zap',
     algorithm: 1,
-    volume: 0.52,
+    volume: 0.45,
     pitchEnvAmount: -26,
     pitchEnv: E({
       attackTime: 0.001,
@@ -57,7 +57,7 @@ export const SFX_PRESETS: Record<string, Patch> = {
   'horde-horn': makePatch({
     name: 'Horde Horn',
     algorithm: 1,
-    volume: 0.24,
+    volume: 0.23,
     glide: 0.25,
     ops: [
       {

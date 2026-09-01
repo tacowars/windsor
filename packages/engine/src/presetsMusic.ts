@@ -101,7 +101,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
   'ai-voice': makePatch({
     name: 'AI Voice',
     algorithm: 10,
-    volume: 0.66,
+    volume: 0.62,
     glide: 0.06,
     ops: [
       {

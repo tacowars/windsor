@@ -64,7 +64,8 @@ const WAVE = {
  * the per-voice noise seed, and `panRandom` jitter. All three go through one
  * source per processor, so a test can pin every one of them at once.
  *
- * The game passes no seed and gets `Math.random`, exactly as before.
+ * The game passes no seed and gets `Math.random`, as before — with one
+ * deliberate difference, the zero exclusion in `randomSeed32` below.
  * `processorOptions.seed` swaps in mulberry32 — 32 bits of state, no
  * allocation, and ample for phase and pan jitter. It is deliberately not a
  * simulation-grade generator: nothing here reaches the simulation
@@ -91,10 +92,16 @@ function makeRandom(seed) {
 }
 
 /**
- * A non-zero xorshift32 seed. Zero is xorshift's fixed point — a generator
- * that drew it would emit a constant forever. It is a 2^-32 accident from
- * `Math.random`, but a swept seed makes it reachable and reproducible, so it
- * is excluded here rather than left to luck.
+ * A non-zero xorshift32 seed. Zero is xorshift's fixed point — a voice that
+ * drew it would emit dead DC from its noise operator, and hold its sample-and-
+ * hold LFO still, for as long as it sounded.
+ *
+ * **This is the one behavioural change on the unseeded game path.** Before,
+ * that zero was kept; now it becomes 1. It is a 2^-32 accident from
+ * `Math.random` and was never worth a branch, but a swept seed makes it
+ * reachable and reproducible, so it is excluded rather than left to luck.
+ * `fmProcessor.test.ts` pins `Math.random` at 0 and asserts a noise operator
+ * still oscillates.
  */
 function randomSeed32(random) {
   return (random() * 0xffffffff) >>> 0 || 1;

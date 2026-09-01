@@ -12,7 +12,9 @@
  * unseeded assertion about a level is a fresh coin toss every run -- which is
  * how the `bass-digital` clip assertion failed once and passed on re-run
  * (#78). Coverage of the random space is a deliberate sweep, below, not one
- * unrepeatable draw per CI run.
+ * unrepeatable draw per CI run: seeding one render and stopping there would
+ * trade a rare true failure for a permanent false pass, which is worse than
+ * the flake it fixes.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -30,16 +32,45 @@ const held = (note: number, frames: number): ScheduledEvent[] => [
   { type: 'noteOff', id: 1, frame: frames },
 ];
 
+/**
+ * Seeds every preset is rendered over. A seed pins the processor's whole
+ * random surface -- operator start phase, the per-voice noise seed, the LFO
+ * seed, pan jitter -- so sweeping seeds samples that surface where the phase
+ * search in "bass-digital headroom" can only cover a patch with no noise
+ * operator and no stochastic LFO.
+ *
+ * 64 is a regression guard, not a bound: what justifies each preset's volume
+ * is a 16,384-seed sweep run offline and reported on the PR (#78). But it is
+ * 64 draws more than the one this file used to take, and it takes the same
+ * 64 every run.
+ */
+const SWEEP_SEEDS = 64;
+
 describe('presets render clean audio', () => {
-  it.each(PRESET_NAMES)('%s sounds, stays finite and does not clip', (name) => {
+  it.each(PRESET_NAMES)('%s sounds, stays finite and does not clip on any seed', (name) => {
     const patch = PRESETS[name];
     expect(patch).toBeDefined();
     if (!patch) return;
 
-    const result = render(loaded, loaded.create(patch), 400, held(60, 12000));
-    expect(result.nonFinite).toBe(0);
-    expect(result.peak).toBeGreaterThan(0.002);
-    expect(result.peak).toBeLessThanOrEqual(1);
+    let nonFinite = 0;
+    let quietest = Infinity;
+    let loudest = 0;
+    let loudestSeed = -1;
+    for (let seed = 0; seed < SWEEP_SEEDS; seed++) {
+      const result = render(loaded, loaded.create(patch, 16, seed), 400, held(60, 12000), {
+        collectSamples: false,
+      });
+      nonFinite += result.nonFinite;
+      quietest = Math.min(quietest, result.peak);
+      if (result.peak > loudest) {
+        loudest = result.peak;
+        loudestSeed = seed;
+      }
+    }
+
+    expect(nonFinite).toBe(0);
+    expect(quietest).toBeGreaterThan(0.002);
+    expect(loudest, `${name} clips at seed ${loudestSeed}`).toBeLessThanOrEqual(1);
   });
 });
 
@@ -75,6 +106,39 @@ describe('the seed', () => {
       spy.mockRestore();
     }
   });
+
+  it('never leaves a noise generator on the xorshift32 zero fixed point', () => {
+    // The per-voice noise and LFO generators are xorshift32, whose fixed point
+    // is 0: a voice seeded there emits dead DC for as long as it sounds.
+    // `randomSeed32` excludes it, and this is the one behavioural change on the
+    // unseeded game path -- so it is asserted on that path, with the draw that
+    // reaches it pinned.
+    const noisy = makePatch({
+      algorithm: 7,
+      ops: [
+        {
+          wave: WAVE.NOISE,
+          level: 1,
+          env: { attackTime: 0.001, sustainLevel: 1, decayTime: 1 },
+        },
+      ],
+    });
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const result = render(loaded, loaded.create(noisy, 4, null), 40, held(60, 12000));
+      expect(result.nonFinite).toBe(0);
+      expect(result.peak).toBeGreaterThan(0.002);
+
+      // DC has no zero crossings; noise has thousands.
+      let crossings = 0;
+      for (let i = 2; i < result.samples.length; i += 2) {
+        if ((result.samples[i] ?? 0) * (result.samples[i - 2] ?? 0) < 0) crossings++;
+      }
+      expect(crossings).toBeGreaterThan(100);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
 
 describe('bass-digital headroom', () => {
@@ -103,7 +167,9 @@ describe('bass-digital headroom', () => {
   };
 
   const peakOf = (patch: Patch, seed: number = DEFAULT_SEED): number =>
-    render(loaded, loaded.create(patch, 16, seed), 400, held(60, 12000)).peak;
+    render(loaded, loaded.create(patch, 16, seed), 400, held(60, 12000), {
+      collectSamples: false,
+    }).peak;
 
   it('clears the clip line at its worst start phases, with margin', () => {
     const peak = peakOf(atWorstPhases());
