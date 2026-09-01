@@ -48,8 +48,23 @@ export interface AlgorithmTable {
   carriers: number[];
 }
 
+/**
+ * The seed every `create()` uses unless one is passed.
+ *
+ * The processor draws free-running operator phase, per-voice noise seeds and
+ * pan jitter from `Math.random` in the game. Left alone, that makes every
+ * render here a different signal, and a test that asserts a level is then a
+ * coin toss on the tail of the distribution — which is exactly how the
+ * `bass-digital` clip assertion failed once and passed on re-run (#78). Every
+ * render through this harness is therefore seeded by default. Coverage of the
+ * random space belongs in an explicit sweep (`sweepPeaks`), not in one
+ * unrepeatable draw per CI run.
+ */
+export const DEFAULT_SEED = 0xa204;
+
 export interface LoadedProcessor {
-  create(patch: unknown, maxVoices?: number): ProcessorLike;
+  /** `seed: null` restores the game's `Math.random`; omitted means DEFAULT_SEED. */
+  create(patch: unknown, maxVoices?: number, seed?: number | null): ProcessorLike;
   setFrame(frame: number): void;
   sampleRate: number;
   algorithms: AlgorithmTable[];
@@ -104,8 +119,16 @@ export function loadProcessor(): LoadedProcessor {
   const Processor = registered as new (options: { processorOptions: unknown }) => ProcessorLike;
 
   return {
-    create: (patch, maxVoices = 16) =>
-      new Processor({ processorOptions: { maxVoices, patch: structuredClone(patch) } }),
+    create: (patch, maxVoices = 16, seed = DEFAULT_SEED) =>
+      new Processor({
+        processorOptions: {
+          maxVoices,
+          patch: structuredClone(patch),
+          // `null` is the deliberate opt-out; the worklet reads `== null` as
+          // "no seed" and falls back to Math.random, the game's path.
+          seed: seed ?? undefined,
+        },
+      }),
     setFrame: handle.setFrame,
     sampleRate: SAMPLE_RATE,
     algorithms: handle.ALGORITHMS,

@@ -178,7 +178,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
   'bass-digital': makePatch({
     name: 'Digital Bass',
     algorithm: 3,
-    volume: 0.17,
+    volume: 0.14,
     ops: [
       {
         wave: WAVE.SAW_D,
