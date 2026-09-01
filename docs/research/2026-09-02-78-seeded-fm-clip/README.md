@@ -42,10 +42,13 @@ be checked against the browser's.
 | `motor-*.json`, `query-a204-state-after-move-*.json` | scripted `a204-motor {"x":0,"z":6,"seconds":3}` → z 32 → 50.0, still `supported` |
 | `game-webgpu.png`, `game-webgl2.png` | composition; `take-screenshot` is an offscreen render-target capture, so it cannot say *which* backend drew it — `get-system-stats` is the evidence for that (#26) |
 | `worklet-peaks-in-browser.json` | the audio measurement, below |
+| `console-webgpu.txt`, `console-webgl2.txt` | the verbatim `list_console_messages` listings, plus the resource-timing pairing |
 
 **Console: zero errors, zero warnings, zero issues on both pages**, checked
 after load, after the audio gesture and after every bridge command
-(`list_console_messages` filtered to error/warn/issue returned nothing).
+(`list_console_messages` filtered to error/warn/issue returned nothing). The
+two `console-*.txt` files carry the listings verbatim, with the point in the
+run each was taken at.
 `performance.getEntriesByType('resource')` on the WebGPU page: 250 resources,
 **no status ≥ 400** — the warm-cache trap in `browser-testing.md` §7 does not
 apply here. One known non-fault appears in the WebGPU page's full listing: a
