@@ -15,6 +15,7 @@
  * so an order-of-magnitude sanity check and not a milestone result under
  * CLAUDE.md invariant 3. See docs/research/2026-08-31-52-dattorro-reverb/.
  */
+import { DELAY_FEEDBACK_MAX, DELAY_MAX_SECONDS } from './audioConstants';
 import type { DelayReturn, ReturnSpec, ReverbReturn } from './mix';
 import { REVERB_PROCESSOR_NAME } from './workletMessages';
 
@@ -130,12 +131,12 @@ function attachDelay(
   output: GainNode,
   spec: DelayReturn,
 ): DelayNode {
-  const delay = context.createDelay(5);
+  const delay = context.createDelay(DELAY_MAX_SECONDS);
   const feedback = context.createGain();
   const damp = context.createBiquadFilter();
 
   delay.delayTime.value = spec.delayTime;
-  feedback.gain.value = Math.min(0.95, spec.feedback);
+  feedback.gain.value = Math.min(DELAY_FEEDBACK_MAX, spec.feedback);
   damp.type = 'lowpass';
   damp.frequency.value = spec.damp;
 

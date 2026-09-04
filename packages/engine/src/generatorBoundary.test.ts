@@ -15,6 +15,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** The pure set. A new generator joins this list, and the allowlist below. */
 const PURE_FILES = [
+  // The area's number tables (#250): data only, it imports nothing, and it is
+  // checked here for the same forbidden identifiers so a generator can read
+  // its tunables without leaving the pure side.
+  'audioConstants.ts',
   'scheduler.ts',
   'euclid.ts',
   'generatorSeed.ts',

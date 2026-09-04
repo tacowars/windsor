@@ -19,6 +19,14 @@
  * fakes with a plain object.
  */
 
+import {
+  DEFAULT_BPM,
+  NOTES_PER_BAR,
+  SCHEDULER_LOOK_AHEAD_SECONDS,
+  SCHEDULER_START_DELAY_SECONDS,
+  SECONDS_PER_MINUTE,
+} from './audioConstants';
+
 /** Pulses per quarter note -- the MIDI-clock grid. */
 export const PPQ = 24;
 export const BEATS_PER_BAR = 4;
@@ -31,10 +39,10 @@ export const TICKS_PER_BAR = PPQ * BEATS_PER_BAR;
 export const DIVISORS = {
   bar: TICKS_PER_BAR,
   half: TICKS_PER_BAR / 2,
-  quarter: TICKS_PER_BAR / 4,
-  eighth: TICKS_PER_BAR / 8,
-  sixteenth: TICKS_PER_BAR / 16,
-  thirtySecond: TICKS_PER_BAR / 32,
+  quarter: TICKS_PER_BAR / NOTES_PER_BAR.quarter,
+  eighth: TICKS_PER_BAR / NOTES_PER_BAR.eighth,
+  sixteenth: TICKS_PER_BAR / NOTES_PER_BAR.sixteenth,
+  thirtySecond: TICKS_PER_BAR / NOTES_PER_BAR.thirtySecond,
 } as const;
 export type DivisorName = keyof typeof DIVISORS;
 export const DIVISOR_NAMES = Object.keys(DIVISORS) as readonly DivisorName[];
@@ -80,12 +88,12 @@ export class TickTransport implements TickSource {
   private seconds = 0;
   private subscribers: Subscriber[] = [];
 
-  constructor(bpm = 120) {
+  constructor(bpm = DEFAULT_BPM) {
     this.bpm = bpm;
   }
 
   get secondsPerTick(): number {
-    return 60 / this.bpm / PPQ;
+    return SECONDS_PER_MINUTE / this.bpm / PPQ;
   }
 
   /** The tick `advance()` will issue next. */
@@ -156,8 +164,8 @@ export class Scheduler implements TickSource {
 
   constructor(clock: AudioClock, options: SchedulerOptions = {}) {
     this.clock = clock;
-    this.lookAhead = options.lookAhead ?? 0.12;
-    this.transport = new TickTransport(options.bpm ?? 120);
+    this.lookAhead = options.lookAhead ?? SCHEDULER_LOOK_AHEAD_SECONDS;
+    this.transport = new TickTransport(options.bpm ?? DEFAULT_BPM);
   }
 
   get bpm(): number {
@@ -180,7 +188,7 @@ export class Scheduler implements TickSource {
     if (this.running) return;
     this.running = true;
     this.transport.reset(atTick);
-    this.nextTime = this.clock.currentTime + 0.06;
+    this.nextTime = this.clock.currentTime + SCHEDULER_START_DELAY_SECONDS;
   }
 
   stop(): void {

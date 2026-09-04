@@ -19,6 +19,8 @@
  * would land on the left input only; feed this stereo, which every part is.
  */
 
+import { PAN_ANGLE_MAX } from './audioConstants';
+
 /** Gains of the 2x2 matrix, named output·input: `lr` is R's contribution to L'. */
 export interface RotationGains {
   ll: number;
@@ -27,8 +29,7 @@ export interface RotationGains {
   rr: number;
 }
 
-/** Hard left or right is a quarter turn: a centred source lands fully on one side. */
-export const PAN_ANGLE_MAX = Math.PI / 4;
+export { PAN_ANGLE_MAX };
 
 export function clampPan(pan: number): number {
   return Math.min(1, Math.max(-1, pan));

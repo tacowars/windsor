@@ -7,6 +7,8 @@
  * top of that file). `patch.test.ts` asserts the two copies are identical, so
  * they cannot drift silently.
  */
+import { ALGORITHMS, OPERATOR_COUNT } from './audioConstants';
+import type { Algorithm } from './audioConstants';
 
 /** Operator waveform. Values must match `WAVE` in the worklet. */
 export const WAVE = {
@@ -66,32 +68,9 @@ export const LOOP_MODE_NAMES = ['None', 'Loop', 'Trigger'] as const;
 /** Operators are labelled A B C D, with A nearest the output. */
 export const OP_NAMES = ['A', 'B', 'C', 'D'] as const;
 
-export interface Algorithm {
-  readonly name: string;
-  readonly label: string;
-  /** `mods[i]` lists the operators that modulate operator `i`. */
-  readonly mods: readonly (readonly number[])[];
-  /** Operators summed to the voice output. */
-  readonly carriers: readonly number[];
-}
-
-/**
- * The 11 algorithms: the eight classic four-operator topologies plus three
- * parallel/tapped shapes. Index matches `ALGORITHMS` in the worklet.
- */
-export const ALGORITHMS: readonly Algorithm[] = [
-  { name: 'Series', label: 'D>C>B>A', mods: [[1], [2], [3], []], carriers: [0] },
-  { name: 'Twin Mod', label: '(D,C)>B>A', mods: [[1], [2, 3], [], []], carriers: [0] },
-  { name: 'Stack + Mod', label: 'C>B>A, D>A', mods: [[1, 3], [2], [], []], carriers: [0] },
-  { name: 'Pair into A', label: 'D>C>A, B>A', mods: [[2, 1], [], [3], []], carriers: [0] },
-  { name: 'Two Stacks', label: 'D>C | B>A', mods: [[1], [], [3], []], carriers: [0, 2] },
-  { name: 'One to Three', label: 'D>(C,B,A)', mods: [[3], [3], [3], []], carriers: [0, 1, 2] },
-  { name: 'Stack + Two', label: 'D>C | B | A', mods: [[], [], [3], []], carriers: [0, 1, 2] },
-  { name: 'Additive', label: 'A|B|C|D', mods: [[], [], [], []], carriers: [0, 1, 2, 3] },
-  { name: 'Series + Tap', label: 'D>C>B>A +B', mods: [[1], [2], [3], []], carriers: [0, 1] },
-  { name: 'Split Branch', label: 'D>C>(B,A)', mods: [[2], [2], [3], []], carriers: [0, 1] },
-  { name: 'Triple Mod', label: '(D,C,B)>A', mods: [[1, 2, 3], [], [], []], carriers: [0] },
-] as const;
+/** The algorithm routing table lives in `audioConstants.ts`; this is its home. */
+export { ALGORITHMS };
+export type { Algorithm };
 
 /* ------------------------------------------------------------------ */
 
@@ -230,7 +209,7 @@ export function makeOperator(o: PartialOperator = {}): Operator {
 
 export function makePatch(o: PartialPatch = {}): Patch {
   const ops: Operator[] = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
     ops.push(makeOperator({ level: i === 0 ? 1 : 0, ...(o.ops?.[i] ?? {}) }));
   }
   return {
