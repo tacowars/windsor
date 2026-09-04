@@ -4,6 +4,7 @@
  * There is exactly one `AudioContext` in the client. Babylon's audio engine is
  * handed this one rather than creating its own -- see `babylonBridge.ts`.
  */
+import { PART_MAX_VOICES_DEFAULT } from './audioConstants';
 import type { AudioBus, BusOptions } from './audioBus';
 import { createBus } from './audioBus';
 import { AudioPart } from './audioPart';
@@ -90,7 +91,7 @@ export class FmEngine {
 
     const patch = resolvePatch(options);
     const processorOptions: ProcessorOptions = {
-      maxVoices: options.maxVoices ?? 16,
+      maxVoices: options.maxVoices ?? PART_MAX_VOICES_DEFAULT,
       patch: structuredClone(patch),
     };
 

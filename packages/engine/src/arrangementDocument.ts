@@ -19,6 +19,7 @@
  * guarantees the fallback — and a document full of holes — is never what
  * ships (record §5).
  */
+import { BPM_MAX, BPM_MIN, DEFAULT_BPM } from './audioConstants';
 import type { Arrangement, ArrangementKey } from './arrangement';
 import type { ArpArrangement, DroneArrangement, PercussionArrangement } from './arrangement';
 import { FALLBACK_ARRANGEMENT } from './arrangement';
@@ -107,7 +108,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
 
   const document: MutableDocument = {
     seed: n.int(o.seed, 0, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 'seed'),
-    bpm: n.num(o.bpm, 120, 20, 300, 'bpm'),
+    bpm: n.num(o.bpm, DEFAULT_BPM, BPM_MIN, BPM_MAX, 'bpm'),
     key: n.key(o.key),
   };
   if (parts.kick) document.kick = parts.kick;

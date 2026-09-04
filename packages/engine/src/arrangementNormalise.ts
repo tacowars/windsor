@@ -23,6 +23,29 @@ import type {
   PercussionArrangement,
   StepDriver,
 } from './arrangement';
+import {
+  EUCLID_STEPS_MAX,
+  GATE_MIN,
+  HOLD_DEFAULT,
+  HOLD_MAX,
+  HOLD_MIN,
+  LFO_BARS_DEFAULT,
+  LFO_BARS_MAX,
+  LFO_BARS_MIN,
+  LFO_HZ_DEFAULT,
+  LFO_HZ_MAX,
+  MIDI_MIDDLE_C,
+  MIDI_NOTE_MAX,
+  MIX_LEVEL_MAX,
+  OCTAVE_MAX,
+  POOL_SIZE_MAX,
+  REFRESH_BARS_MAX,
+  SCALE_OFFSET_MAX,
+  SPAN_MAX,
+  VELOCITY_DEFAULT,
+  WALK_CHANCE,
+  WEIGHT_MAX,
+} from './audioConstants';
 import { FieldNormaliser, show } from './arrangementFields';
 import { ARP_WALK_MODES, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeggiator';
 import {
@@ -44,7 +67,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     this.dropUnknown(o, ['root', 'scale', 'weights'], 'key');
     const scale = this.scale(o.scale);
     return {
-      root: this.int(o.root, 60, 0, 127, 'key.root'),
+      root: this.int(o.root, MIDI_MIDDLE_C, 0, MIDI_NOTE_MAX, 'key.root'),
       scale,
       weights: this.weights(o.weights, scaleOffsets(scale).length),
     };
@@ -53,7 +76,9 @@ export class ArrangementNormaliser extends FieldNormaliser {
   private scale(raw: unknown): ScaleName | readonly number[] {
     if (typeof raw === 'string' && Object.hasOwn(SCALES, raw)) return raw as ScaleName;
     if (Array.isArray(raw) && raw.length > 0) {
-      return raw.map((offset, i) => this.int(offset, 0, -48, 48, `key.scale[${i}]`));
+      return raw.map((offset, i) =>
+        this.int(offset, 0, -SCALE_OFFSET_MAX, SCALE_OFFSET_MAX, `key.scale[${i}]`),
+      );
     }
     // The default is the root alone — audibly not a scale, never secretly musical.
     if (raw !== undefined) {
@@ -71,7 +96,9 @@ export class ArrangementNormaliser extends FieldNormaliser {
       return uniform();
     }
     const out: number[] = [];
-    for (let i = 0; i < degrees; i++) out.push(this.num(raw[i], 1, 0, 1e6, `key.weights[${i}]`));
+    for (let i = 0; i < degrees; i++) {
+      out.push(this.num(raw[i], 1, 0, WEIGHT_MAX, `key.weights[${i}]`));
+    }
     if (raw.length !== degrees) {
       this.correction(`key.weights: ${raw.length} weights for ${degrees} degrees — resized`);
     }
@@ -90,9 +117,9 @@ export class ArrangementNormaliser extends FieldNormaliser {
     if (!identity) return null;
     return {
       ...identity,
-      note: this.int(o.note, 60, 0, 127, `${id}.note`),
-      velocity: this.num(o.velocity, 0.8, 0, 1, `${id}.velocity`),
-      hold: this.num(o.hold, 0.1, 0.005, 10, `${id}.hold`),
+      note: this.int(o.note, MIDI_MIDDLE_C, 0, MIDI_NOTE_MAX, `${id}.note`),
+      velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, `${id}.velocity`),
+      hold: this.num(o.hold, HOLD_DEFAULT, HOLD_MIN, HOLD_MAX, `${id}.hold`),
       driver: this.euclideanDriver(o.driver, `${id}.driver`),
     };
   }
@@ -105,7 +132,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     if (!identity) return null;
     return {
       ...identity,
-      velocity: this.num(o.velocity, 0.8, 0, 1, 'arp.velocity'),
+      velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, 'arp.velocity'),
       driver: this.arpDriver(o.driver),
     };
   }
@@ -118,7 +145,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     if (!identity) return null;
     return {
       ...identity,
-      velocity: this.num(o.velocity, 0.8, 0, 1, 'drone.velocity'),
+      velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, 'drone.velocity'),
       driver: this.stepDriver(o.driver),
     };
   }
@@ -154,7 +181,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     const d = DEFAULT_EUCLIDEAN_CONFIG;
     const o = this.section(raw, path);
     this.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern'], path);
-    const steps = this.int(o.steps, d.steps, 1, 64, `${path}.steps`);
+    const steps = this.int(o.steps, d.steps, 1, EUCLID_STEPS_MAX, `${path}.steps`);
     return {
       steps,
       divisor: this.divisor(o.divisor, d.divisor, `${path}.divisor`),
@@ -197,20 +224,23 @@ export class ArrangementNormaliser extends FieldNormaliser {
     const kind = this.pick(o.kind, DENSITY_MOD_KINDS, 'lfoBars', `${path}.kind`);
     if (kind === 'walk') {
       this.dropUnknown(o, ['kind', 'stepChance'], path);
-      return { kind, stepChance: this.num(o.stepChance, 0.5, 0, 1, `${path}.stepChance`) };
+      return {
+        kind,
+        stepChance: this.num(o.stepChance, WALK_CHANCE, 0, 1, `${path}.stepChance`),
+      };
     }
     if (kind === 'lfoHz') {
       this.dropUnknown(o, ['kind', 'hz', 'shape'], path);
       return {
         kind,
-        hz: this.num(o.hz, 0.1, 0, 20, `${path}.hz`),
+        hz: this.num(o.hz, LFO_HZ_DEFAULT, 0, LFO_HZ_MAX, `${path}.hz`),
         shape: this.pick(o.shape, LFO_SHAPES, 'tri', `${path}.shape`),
       };
     }
     this.dropUnknown(o, ['kind', 'bars', 'shape'], path);
     return {
       kind: 'lfoBars',
-      bars: this.num(o.bars, 8, 0.25, 256, `${path}.bars`),
+      bars: this.num(o.bars, LFO_BARS_DEFAULT, LFO_BARS_MIN, LFO_BARS_MAX, `${path}.bars`),
       shape: this.pick(o.shape, LFO_SHAPES, 'tri', `${path}.shape`),
     };
   }
@@ -222,12 +252,18 @@ export class ArrangementNormaliser extends FieldNormaliser {
     this.dropUnknown(o, [...known, 'pattern'], 'arp.driver');
     return {
       divisor: this.divisor(o.divisor, d.divisor, 'arp.driver.divisor'),
-      poolSize: this.int(o.poolSize, d.poolSize, 1, 16, 'arp.driver.poolSize'),
-      refreshBars: this.int(o.refreshBars, d.refreshBars, 1, 64, 'arp.driver.refreshBars'),
+      poolSize: this.int(o.poolSize, d.poolSize, 1, POOL_SIZE_MAX, 'arp.driver.poolSize'),
+      refreshBars: this.int(
+        o.refreshBars,
+        d.refreshBars,
+        1,
+        REFRESH_BARS_MAX,
+        'arp.driver.refreshBars',
+      ),
       walk: this.pick(o.walk, ARP_WALK_MODES, d.walk, 'arp.driver.walk'),
       skipChance: this.num(o.skipChance, d.skipChance, 0, 1, 'arp.driver.skipChance'),
       register: this.register(o.register, d.register, 'arp.driver.register'),
-      gate: this.num(o.gate, d.gate, 0.01, 1, 'arp.driver.gate'),
+      gate: this.num(o.gate, d.gate, GATE_MIN, 1, 'arp.driver.gate'),
       pattern: this.notePattern(o.pattern, 'arp.driver.pattern'),
     };
   }
@@ -238,7 +274,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     this.dropUnknown(o, ['divisor', 'gate', 'register', 'pattern'], 'drone.driver');
     return {
       divisor: this.divisor(o.divisor, d.divisor, 'drone.driver.divisor'),
-      gate: this.num(o.gate, d.gate, 0.01, 1, 'drone.driver.gate'),
+      gate: this.num(o.gate, d.gate, GATE_MIN, 1, 'drone.driver.gate'),
       register: this.register(o.register, d.register, 'drone.driver.register'),
       pattern: this.notePattern(o.pattern, 'drone.driver.pattern'),
     };
@@ -248,8 +284,8 @@ export class ArrangementNormaliser extends FieldNormaliser {
     const o = this.section(raw, path);
     this.dropUnknown(o, ['octave', 'span'], path);
     return {
-      octave: this.int(o.octave, fallback.octave, -8, 8, `${path}.octave`),
-      span: this.int(o.span, fallback.span, 1, 8, `${path}.span`),
+      octave: this.int(o.octave, fallback.octave, -OCTAVE_MAX, OCTAVE_MAX, `${path}.octave`),
+      span: this.int(o.span, fallback.span, 1, SPAN_MAX, `${path}.span`),
     };
   }
 
@@ -274,7 +310,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     const o = this.section(raw, `mix.${name}`);
     this.dropUnknown(o, ['level', 'pan', 'sends'], `mix.${name}`);
     return {
-      level: this.num(o.level, base.level, 0, 4, `mix.${name}.level`),
+      level: this.num(o.level, base.level, 0, MIX_LEVEL_MAX, `mix.${name}.level`),
       pan: this.num(o.pan, base.pan, -1, 1, `mix.${name}.pan`),
       sends: this.sends(o.sends, base.sends, `mix.${name}.sends`),
     };

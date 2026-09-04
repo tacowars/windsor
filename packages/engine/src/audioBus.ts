@@ -11,6 +11,8 @@
  * identifies as the project's primary risk.
  */
 
+import { BUS_FILTER_FREQUENCY_HZ, BUS_FILTER_Q } from './audioConstants';
+
 export interface BusFilterOptions {
   type?: BiquadFilterType;
   frequency?: number;
@@ -39,8 +41,8 @@ export function createBus(context: BaseAudioContext, options: BusOptions = {}): 
   if (options.filter) {
     const filter = context.createBiquadFilter();
     filter.type = options.filter.type ?? 'lowpass';
-    filter.frequency.value = options.filter.frequency ?? 12000;
-    filter.Q.value = options.filter.Q ?? 0.707;
+    filter.frequency.value = options.filter.frequency ?? BUS_FILTER_FREQUENCY_HZ;
+    filter.Q.value = options.filter.Q ?? BUS_FILTER_Q;
     tail.connect(filter);
     tail = filter;
     bus.filter = filter;

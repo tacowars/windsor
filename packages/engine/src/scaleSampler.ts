@@ -8,18 +8,11 @@
  * too -- the same sampler serves an upper-octave arp and a low drone, and that
  * split is the whole difference between them.
  */
+import { SCALES } from './audioConstants';
 import type { Rng } from './generatorSeed';
 
-/** Scales as semitone offsets from the root, one entry per degree. */
-export const SCALES = {
-  major: [0, 2, 4, 5, 7, 9, 11],
-  naturalMinor: [0, 2, 3, 5, 7, 8, 10],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-  mixolydian: [0, 2, 4, 5, 7, 9, 10],
-  lydian: [0, 2, 4, 6, 7, 9, 11],
-  pentatonicMajor: [0, 2, 4, 7, 9],
-  pentatonicMinor: [0, 3, 5, 7, 10],
-} as const satisfies Record<string, readonly number[]>;
+/** The scale table lives in `audioConstants.ts`; re-exported here as its home. */
+export { SCALES };
 export type ScaleName = keyof typeof SCALES;
 export const SCALE_NAMES = Object.keys(SCALES) as readonly ScaleName[];
 

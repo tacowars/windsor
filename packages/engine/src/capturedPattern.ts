@@ -11,6 +11,7 @@
  * sequencer, but an arp bar exists only as the notes it emitted — so the
  * player records them here, one bar at a time.
  */
+import { MIDI_NOTE_MAX } from './audioConstants';
 import { TICKS_PER_BAR } from './scheduler';
 
 /** A captured pitched bar: a MIDI note, or `null` for a rest, per step. */
@@ -21,7 +22,7 @@ export function assertNotePattern(pattern: NotePattern): void {
   if (pattern.length < 1) throw new RangeError('pattern must have at least one step');
   for (const note of pattern) {
     if (note === null) continue;
-    if (!Number.isInteger(note) || note < 0 || note > 127) {
+    if (!Number.isInteger(note) || note < 0 || note > MIDI_NOTE_MAX) {
       throw new RangeError(`pattern notes must be MIDI notes or null, got ${note}`);
     }
   }

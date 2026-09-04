@@ -11,6 +11,7 @@
  * derived from the absolute tick (`floor(tick / divisor) mod n`), so the
  * figure stays phase-locked to the transport whatever `n * divisor` is.
  */
+import { WALK_DOWN_CHANCE } from './audioConstants';
 import { euclid, type Pattern } from './euclid';
 import { generatorRng, type Rng } from './generatorSeed';
 import { isBarDivisor, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
@@ -190,7 +191,7 @@ export class EuclideanSequencer {
         return this.kFromLfo(mod.shape, event.seconds * mod.hz);
       case 'walk': {
         if (this.rng() >= mod.stepChance) return this.k;
-        return this.clampK(this.k + (this.rng() < 0.5 ? -1 : 1));
+        return this.clampK(this.k + (this.rng() < WALK_DOWN_CHANCE ? -1 : 1));
       }
     }
   }

@@ -31,6 +31,7 @@ import type {
   PlayablePart,
 } from './arrangementPlayer';
 import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
+import { MIX_LEVEL_MAX, MUSIC_PART_MAX_VOICES } from './audioConstants';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import type { NotePattern } from './capturedPattern';
@@ -105,7 +106,12 @@ export class AudioSystem {
   }
 
   /** Create a part on its strip, dry into the music bus. */
-  createMusicPart(name: string, preset: string, maxVoices = 12, strip?: ChannelStrip): AudioPart {
+  createMusicPart(
+    name: string,
+    preset: string,
+    maxVoices = MUSIC_PART_MAX_VOICES,
+    strip?: ChannelStrip,
+  ): AudioPart {
     const { musicBus } = this.standing();
     return this.route(name, preset, maxVoices, musicBus.input, strip);
   }
@@ -131,7 +137,12 @@ export class AudioSystem {
     for (const id of MUSIC_PART_IDS) {
       const section = arrangement[id];
       if (!section) continue;
-      parts[id] = this.createMusicPart(section.part, section.preset, 12, mix?.[section.part]);
+      parts[id] = this.createMusicPart(
+        section.part,
+        section.preset,
+        MUSIC_PART_MAX_VOICES,
+        mix?.[section.part],
+      );
     }
     this.player = new ArrangementPlayer(this.scheduler, parts, arrangement, onEvent);
   }
@@ -264,7 +275,7 @@ export class AudioSystem {
         if (!STRIP_KEYS.includes(key)) ignored.push(`mix.${name}.${key}`);
       }
       if (typeof o.level === 'number' && Number.isFinite(o.level)) {
-        strip.setLevel(clamp(o.level, 0, 4));
+        strip.setLevel(clamp(o.level, 0, MIX_LEVEL_MAX));
       } else if (o.level !== undefined) ignored.push(`mix.${name}.level`);
       if (typeof o.pan === 'number' && Number.isFinite(o.pan)) {
         strip.setPan(clamp(o.pan, -1, 1));

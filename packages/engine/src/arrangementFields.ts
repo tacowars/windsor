@@ -12,6 +12,7 @@
  * `ArrangementNormaliser` (`arrangementNormalise.ts`) builds the document
  * sections on top of this vocabulary.
  */
+import { MIDI_NOTE_MAX } from './audioConstants';
 import { isBarDivisor, TICKS_PER_BAR } from './scheduler';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -141,7 +142,7 @@ export class FieldNormaliser {
     return capped.map((v: unknown, i) => {
       if (v === null) return null;
       if (typeof v === 'number' && Number.isFinite(v)) {
-        return this.int(v, 0, 0, 127, `${path}[${i}]`);
+        return this.int(v, 0, 0, MIDI_NOTE_MAX, `${path}[${i}]`);
       }
       this.correction(`${path}[${i}]: ${show(v)} is not a note — using a rest`);
       return null;
