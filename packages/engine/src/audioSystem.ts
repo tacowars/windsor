@@ -176,7 +176,7 @@ export class AudioSystem {
     }
   }
 
-  /** The M key's toggle (main.ts). Returns the new muted state. */
+  /** Scriptable toggle for `__a204.audio.toggleMute` (#69); the `M` key and `music on|off` use `setMuted`. Returns the new muted state. */
   toggleMute(): boolean {
     this.setMuted(!this.muted);
     return this.muted;
