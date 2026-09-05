@@ -24,26 +24,16 @@ it works. Making the game make noise is separate work, constrained in advance by
 
 ## 2. Why synthesis rather than sampled audio
 
-The design doc asks for three things that sampled audio serves badly:
-
-| Requirement (GDD) | Why samples struggle | What synthesis gives |
-|---|---|---|
-| §5.3 — DRG-style telegraph: ambient drop-out → rumble → horn, and *"the AI goes quiet mid-sentence"* | The tell is a continuous, parameterised transition, not a clip | Ambience is generated, so it can be bent in real time; a horn can bend pitch with wave proximity |
-| §5.3 — *"distinct audio per enemy type"*, readability over realism | Every variant is another file; families of related sounds drift apart | One patch family, parameter offsets per enemy; kinship is audible by construction |
-| §3.3 — the AI character as a persistent voice | Voice lines are the largest asset class in a browser build | A formant-ish FM voice can carry non-verbal presence without shipping audio |
-
-Two further arguments specific to a browser game:
-
-- **Bundle.** The whole engine plus its patch set is well under 100 KB. A modest sampled
-  set is megabytes. The client already budgets carefully around Babylon's size
-  (`CLAUDE.md` invariant 5, and the `@babylonjs/inspector` externalisation in
-  `packages/client/vite.config.ts`).
-- **Cross-origin isolation.** The dev server already sends
-  `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy:
-  require-corp` for Havok. Under `require-corp`, every cross-origin subresource must
-  opt in with CORP headers — which means a CDN-hosted audio asset is a live problem and
-  a generated waveform is not. This is a real constraint the project has already
-  accepted for physics, and audio inherits it.
+Settled history, kept short. Three GDD requirements make samples the wrong default:
+§5.3's DRG-style telegraph (ambient drop-out → rumble → horn, and *"the AI goes quiet
+mid-sentence"*) is a continuous parameterised transition rather than a clip; §5.3's
+*"distinct audio per enemy type"* wants one patch family with per-enemy parameter offsets,
+so kinship is audible by construction instead of drifting file by file; and §3.3's AI
+character wants a persistent voice without shipping the largest asset class in a browser
+build. Two browser-specific arguments seal it: the whole engine plus its patch set is under
+100 KB against megabytes for a modest sampled set (invariant 5), and the client already
+runs under `Cross-Origin-Embedder-Policy: require-corp` for Havok, which makes a
+CDN-hosted audio asset a live problem and a generated waveform a non-problem.
 
 The counter-argument is honest and should be recorded: **synthesised audio has a
 ceiling.** It will not produce a convincing recorded voice or a naturalistic
@@ -75,15 +65,19 @@ which is what makes saw and square usable as FM operators at all.
 
 ### Division of labour
 
-Only the FM runs in the AudioWorklet. Everything else uses native Web Audio nodes, which
-execute in the browser's own audio thread and cost nothing from the JS main-thread budget
-that [tech-demo-proposal.md](tech-demo-proposal.md) §1 identifies as the project's
-primary risk:
+**Two worklets are ours; everything else is native Web Audio nodes**, which execute in the
+browser's own audio thread and cost nothing from the JS main-thread budget that
+[tech-demo-proposal.md](tech-demo-proposal.md) §1 identifies as the project's primary
+risk. This section first said "only the FM runs in the AudioWorklet";
+`docs/log/2026-08-31-dattorro-reverb-not-plateau.md` decision 4 removed the `ConvolverNode`
+path outright — `generateImpulseResponse` and the convolver are gone — and put the reverb
+in a second worklet of its own:
 
 | Concern | Where |
 |---|---|
-| FM voices, per-voice filter, envelopes, LFO | AudioWorklet (ours) |
-| Bus tone shaping, reverb, delay, distortion, compression | `BiquadFilterNode`, `ConvolverNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
+| FM voices, per-voice filter, envelopes, LFO | AudioWorklet (ours): `worklet/fm-processor.js` |
+| Reverb | AudioWorklet (ours): `worklet/reverb-processor.js`, a Dattorro plate. **No `ConvolverNode`** — it was removed, not left beside it |
+| Bus tone shaping, delay, distortion, compression | `BiquadFilterNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
 | 3D positioning | Babylon's spatial audio, over `PannerNode` |
 
 **One worklet node per timbral *part*, never per voice.** Each node carries fixed
@@ -143,45 +137,17 @@ arbitrary `AudioNode` as a spatialised sound source. That is the whole seam: the
 owns the DSP, Babylon owns positioning and bus routing, and there is exactly one
 `AudioContext` in the process.
 
-```typescript
-import {
-  CreateAudioEngineAsync,
-  CreateSoundSourceAsync,
-} from '@babylonjs/core/AudioV2/webAudio';
+**The seam is built: `packages/client/src/audio/babylonBridge.ts`.** Read it rather than a
+sample here — it carries the working code, and its header carries the typings verification
+this section used to table (every symbol read from the installed
+`node_modules/@babylonjs/core` at 9.23.0, `CLAUDE.md` source of truth 1, cross-checked
+against the `BabylonJS/Babylon.js` repository at tag `9.23.0`).
 
-// One context for the whole client.
-const ctx = new AudioContext({ latencyHint: 'interactive' });
-await ctx.audioWorklet.addModule(workletUrl);
-
-const audio = await CreateAudioEngineAsync({ audioContext: ctx });
-await audio.unlockAsync();          // required before any play(); browser autoplay policy
-
-// A part (or the tail of its effect chain) becomes a Babylon sound source.
-const turretVoice = await CreateSoundSourceAsync('turret', partNode, {
-  spatialEnabled: true,
-}, audio);
-turretVoice.spatial.attach(turretMesh);
-```
-
-**Verification.** Read from the installed typings in
-`node_modules/@babylonjs/core` at **9.23.0**, matching the `^9.23.0` pin in
-`packages/client/package.json` — source of truth (1) in `CLAUDE.md`'s ordering. The same
-symbols were cross-checked against the `BabylonJS/Babylon.js` repository at tag `9.23.0`
-and agree.
-
-| API | Location (`node_modules/@babylonjs/core/AudioV2/…`) |
-|---|---|
-| `IWebAudioEngineOptions.audioContext: AudioContext` | `webAudio/webAudioEngine.d.ts:22` |
-| `CreateAudioEngineAsync(options)` | `webAudio/webAudioEngine.d.ts` |
-| `AudioEngineV2.createSoundSourceAsync(name, source: AudioNode, options?)` | `abstractAudio/audioEngineV2.d.ts:169` |
-| `CreateSoundSourceAsync(name, source, options?, engine?)` | `abstractAudio/audioEngineV2.d.ts:282` |
-| `unlockAsync()` | `abstractAudio/audioEngineV2.d.ts:211` |
-
-One trap worth recording: on the WebAudio engine *class*, `createSoundSourceAsync` is
-tagged `@internal` — but so is `createSoundAsync`, which is unambiguously public API. The
-public surface is the abstract declaration on `AudioEngineV2` and the free
-`CreateSoundSourceAsync` function; the tag is on the implementation override, not the
-contract.
+One trap worth recording, because it is not visible from the call site: on the WebAudio
+engine *class*, `createSoundSourceAsync` is tagged `@internal` — but so is
+`createSoundAsync`, which is unambiguously public API. The public surface is the abstract
+declaration on `AudioEngineV2` and the free `CreateSoundSourceAsync` function; the tag is
+on the implementation override, not the contract.
 
 Two notes the vendored `babylonjs` skill makes that apply directly:
 
@@ -195,17 +161,19 @@ Deep-import per invariant 5: `@babylonjs/core/AudioV2/webAudio`, never the barre
 
 ## 6. Constraints this repo imposes on the implementation
 
-### 6.1 The worklet is one file, deliberately
+### 6.1 Each worklet is one file, deliberately
 
-The DSP is ~1,150 lines against a `max-lines` cap of 300, and stays that way behind a
+There are two: `worklet/fm-processor.js` (1,302 lines) and `worklet/reverb-processor.js`
+(460), each far over the `max-lines` cap of 300 and each staying that way behind a
 file-top disable with its reasoning. Decision:
-`docs/log/2026-08-31-audio-worklet-single-file.md`.
+`docs/log/2026-08-31-audio-worklet-single-file.md`; the reverb's own
+`docs/log/2026-08-31-dattorro-reverb-not-plateau.md` decision 4.
 
 An earlier draft of this document flagged worklet bundling as an unresolved spike that
-blocked any audio ticket. **Keeping the file whole is what resolved it.** Because it has
-no `import` statements, `new URL('./worklet/fm-processor.js', import.meta.url)` resolves
+blocked any audio ticket. **Keeping each file whole is what resolved it.** Because neither
+has an `import` statement, `new URL('./worklet/<name>.js', import.meta.url)` resolves
 in both the dev server and the production build with no bundler configuration. Splitting
-it would reintroduce the problem: Vite's `?url` and `new URL(…, import.meta.url)` yield a
+one would reintroduce the problem: Vite's `?url` and `new URL(…, import.meta.url)` yield a
 URL for the file itself *without* bundling its dependency graph — fine in dev, broken in
 a build — so a split worklet needs a second Rollup input, a `?worker&url` indirection, or
 a bespoke build step.
@@ -280,15 +248,19 @@ scheduled.
 1. **Whether audio is ever authoritative for anything.** The position here is no (§4).
    Worth an explicit record, because "the horn plays when the wave spawns" invites a
    shortcut where the sound *is* the event.
-2. **Music structure.** Whether the soundtrack is a sequenced arrangement driven by the
-   scheduler, or purely reactive layers. This decides whether a transport and pattern
-   format are needed at all; `scheduler.ts` currently supports either.
-3. **Whether a sampled layer is ever added** (§2), and if so where it sits relative to
+2. **Whether a sampled layer is ever added** (§2), and if so where it sits relative to
    this one.
 
-Two questions from earlier drafts are now settled and recorded rather than pending:
-worklet bundling (§6.1, `2026-08-31-audio-worklet-single-file`) and audio's standing
-against invariant 4 (§1, `2026-08-31-audio-enters-tech-demo-scope`).
+Questions from earlier drafts that are now settled and recorded rather than pending:
+worklet bundling (§6.1, `2026-08-31-audio-worklet-single-file`), audio's standing
+against invariant 4 (§1, `2026-08-31-audio-enters-tech-demo-scope`), and **music
+structure** — a sequenced arrangement driven by the scheduler, decided across
+`2026-08-31-generative-sequencing-transport-and-pitch` (the 24 PPQ transport and its
+fan-out), `2026-08-31-arrangement-document-schema-and-optional-parts` (the arrangement
+document, `arrangementDocument.ts` and `arrangements/bed-01.json`),
+`2026-08-31-arrangement-console-and-runtime-arrangements` and
+`2026-08-31-music-mute-and-suppression-semantics` (mute defined against the transport's
+tick).
 
 ## 9. Provenance and references
 
