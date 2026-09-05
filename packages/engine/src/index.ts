@@ -1,3 +1,4 @@
+// @dir Synthesised music and SFX — bus/return graph, arrangement, sequencers. Observes, never decides.
 /** Public surface of the audio package. */
 export { AudioSystem } from './audioSystem';
 export type { AudioSystemOptions, MusicReadout } from './audioSystem';
