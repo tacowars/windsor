@@ -256,3 +256,24 @@ export function makePatch(o: PartialPatch = {}): Patch {
 export function clonePatch(p: Patch): Patch {
   return structuredClone(p);
 }
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mergeInto(current: unknown, partial: unknown): unknown {
+  if (!isPlainObject(current) || !isPlainObject(partial)) return partial;
+  const merged: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(partial)) merged[key] = mergeInto(current[key], value);
+  return merged;
+}
+
+/**
+ * A partial patch over a complete one, then completed again: objects recurse,
+ * arrays (`ops`, `toOp`, `userPartials`) are replaced wholesale. The live
+ * `patches` path of `AudioSystem.apply` merges a document's patch edit over
+ * the part's current patch with this, so a partial names only what changes.
+ */
+export function mergePatch(base: Patch, partial: PartialPatch): Patch {
+  return makePatch(mergeInto(base, partial) as PartialPatch);
+}

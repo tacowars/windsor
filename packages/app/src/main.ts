@@ -4,7 +4,9 @@
  * the real engine. It boots on the committed `bed-01.json`, drives one
  * `AudioSystem`, and every change flows through one pair of operations —
  * `change` (live apply + document merge) and `restructure` (renormalise +
- * rebuild). Export writes the normalised document; import reads one back.
+ * rebuild). Export writes the normalised document — since #435 the synth
+ * patches and the returns included, so one file is the whole piece; import
+ * reads one back.
  */
 import type {
   ApplyResult,

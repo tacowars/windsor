@@ -7,8 +7,10 @@
  * the 96-tick bar, gates in (0, 1], weights that are not all zero.
  *
  * Field-level clamping and the report live in `arrangementFields.ts`; this
- * file knows the document's shape — which keys each section owns, which
- * defaults each field takes, and which names must exist in the code.
+ * file knows the arrangement's shape — which keys each section owns, which
+ * defaults each field takes, and which names must exist in the code. The
+ * desk sections (`mix`, `returns`) are `deskNormalise.ts`'s and the `patches`
+ * section is `patchNormalise.ts`'s.
  *
  * Parts are dropped, never defaulted, when they cannot play: a preset has no
  * default on purpose (a part invented by the normaliser is exactly the
@@ -36,7 +38,6 @@ import {
   LFO_HZ_MAX,
   MIDI_MIDDLE_C,
   MIDI_NOTE_MAX,
-  MIX_LEVEL_MAX,
   OCTAVE_MAX,
   POOL_SIZE_MAX,
   REFRESH_BARS_MAX,
@@ -54,14 +55,29 @@ import {
   LFO_SHAPES,
   type DensityMod,
 } from './euclideanSequencer';
-import type { ChannelStrip } from './mix';
-import { MIX, RETURNS, stripFor } from './mix';
+import { MIX } from './mix';
+import type { Patch } from './patch';
+import { normalisePatches } from './patchNormalise';
 import { PRESETS } from './presets';
 import { SCALES, scaleOffsets, type ScaleName } from './scaleSampler';
 import type { Register } from './scaleSampler';
 import { DEFAULT_STEP_SEQUENCER_CONFIG } from './stepSequencer';
 
 export class ArrangementNormaliser extends FieldNormaliser {
+  /**
+   * The names the document's own `patches` section defines: a part's
+   * `preset` resolves against them before the code's `PRESETS`, so a document
+   * patch named like a built-in shadows it for this document's parts.
+   */
+  private localPatches: ReadonlySet<string> = new Set();
+
+  /** The `patches` section — normalised first, so the parts can name its entries. */
+  patches(raw: unknown): Record<string, Patch> | undefined {
+    const out = normalisePatches(raw, this);
+    this.localPatches = new Set(Object.keys(out ?? {}));
+    return out;
+  }
+
   key(raw: unknown): ArrangementKey {
     const o = this.section(raw, 'key');
     this.dropUnknown(o, ['root', 'scale', 'weights'], 'key');
@@ -151,9 +167,10 @@ export class ArrangementNormaliser extends FieldNormaliser {
   }
 
   /**
-   * The two names a part cannot play without. An unknown preset drops the
-   * part (and is dangling — the gate's business); a part name with no strip
-   * still plays, through `DEFAULT_STRIP`, but is dangling too.
+   * The two names a part cannot play without. A preset is looked up in the
+   * document's `patches` first, then the code's `PRESETS`; unknown in both,
+   * it drops the part (and is dangling — the gate's business). A part name
+   * with no strip still plays, through `DEFAULT_STRIP`, but is dangling too.
    */
   private identity(
     o: Record<string, unknown>,
@@ -167,7 +184,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
       this.correction(`${id}: a part needs a preset, and a preset has no default — part dropped`);
       return null;
     }
-    if (!Object.hasOwn(PRESETS, o.preset)) {
+    if (!this.localPatches.has(o.preset) && !Object.hasOwn(PRESETS, o.preset)) {
       this.dangling.push(`${id}.preset: no preset "${o.preset}" is defined`);
       this.correction(`${id}: unknown preset "${o.preset}" — part dropped`);
       return null;
@@ -287,52 +304,5 @@ export class ArrangementNormaliser extends FieldNormaliser {
       octave: this.int(o.octave, fallback.octave, -OCTAVE_MAX, OCTAVE_MAX, `${path}.octave`),
       span: this.int(o.span, fallback.span, 1, SPAN_MAX, `${path}.span`),
     };
-  }
-
-  /** Strip overlays over `MIX`. A name with no strip, or a send to no return, is dangling. */
-  mix(raw: unknown): Record<string, ChannelStrip> | undefined {
-    if (raw === undefined) return undefined;
-    const o = this.section(raw, 'mix');
-    const out: Record<string, ChannelStrip> = {};
-    for (const [name, value] of Object.entries(o)) {
-      if (!Object.hasOwn(MIX, name)) {
-        this.dangling.push(`mix.${name}: the MIX defines no strip "${name}"`);
-        this.correction(`mix.${name}: dropped`);
-        continue;
-      }
-      out[name] = this.strip(value, name);
-    }
-    return Object.keys(out).length > 0 ? out : undefined;
-  }
-
-  private strip(raw: unknown, name: string): ChannelStrip {
-    const base = stripFor(MIX, name);
-    const o = this.section(raw, `mix.${name}`);
-    this.dropUnknown(o, ['level', 'pan', 'sends'], `mix.${name}`);
-    return {
-      level: this.num(o.level, base.level, 0, MIX_LEVEL_MAX, `mix.${name}.level`),
-      pan: this.num(o.pan, base.pan, -1, 1, `mix.${name}.pan`),
-      sends: this.sends(o.sends, base.sends, `mix.${name}.sends`),
-    };
-  }
-
-  /** Sends overlay the base per return — set a send to 0 to silence it — the
-   * same only-named-fields semantics `AudioSystem.apply` uses live. */
-  private sends(raw: unknown, base: ChannelStrip['sends'], path: string): ChannelStrip['sends'] {
-    if (raw === undefined) return { ...base };
-    const o = this.section(raw, path);
-    const out: Record<string, number> = {};
-    for (const [name, amount] of Object.entries(base)) {
-      if (amount !== undefined) out[name] = amount;
-    }
-    for (const [name, amount] of Object.entries(o)) {
-      if (!Object.hasOwn(RETURNS, name)) {
-        this.dangling.push(`${path}.${name}: no return "${name}" is defined`);
-        this.correction(`${path}.${name}: dropped`);
-        continue;
-      }
-      out[name] = this.num(amount, 0, 0, 1, `${path}.${name}`);
-    }
-    return out;
   }
 }

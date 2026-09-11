@@ -1,8 +1,10 @@
 /**
- * Parts tab (#70, record §2): the FM patch editor, now driving the *real*
- * `AudioPart` of the selected slot through `setPatch` — the console builds no
- * synthesis graph of its own. Preset choice lands in the document; knob edits
- * are live sound design exported via the Patch JSON dialog.
+ * Parts tab (#70, record §2; #435): the FM patch editor, driving the *real*
+ * `AudioPart` of the selected slot — the console builds no synthesis graph
+ * of its own. Every knob edit commits the working patch to the document's
+ * `patches` section under the part's preset name (`patchLibrary.ts`), and
+ * `ctx.change` pushes it to the live part through `AudioSystem.apply`, so the
+ * export carries the sound itself.
  */
 import type {
   MusicPartId,
@@ -10,14 +12,14 @@ import type {
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
   PRESETS,
-  PRESET_NAMES,
   clonePatch,
   makePatch,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { SLOT_IDS } from './context';
-import { $, el, seg, select } from './dom';
+import { $, el, seg } from './dom';
 import type { Keyboard } from './keyboard';
+import { badgeText, libraryControls, presetPicker } from './patchLibrary';
 import { buildAlgPicker, buildFilter, buildGlobal, buildLfo, buildPitch } from './patchPanels';
 import { buildBays } from './patchBays';
 import { hooks, partsState, pushPatch } from './patchState';
@@ -75,17 +77,21 @@ const GRID_HTML = `
     </div>
   </div>`;
 
-/** Reload the working patch from the live part (or the named preset). */
+/** Reload the working patch: the document's patch, else the built-in the part plays. */
 export function loadWorkingPatch(ctx: AppCtx): void {
   const slot = ctx.model.doc[partsState.selected];
   partsState.part = slot ? ctx.host.part(slot.part) : null;
-  const preset = slot ? PRESETS[slot.preset] : undefined;
-  partsState.patch = partsState.part
-    ? clonePatch(partsState.part.patch)
-    : preset
-      ? clonePatch(preset)
-      : makePatch();
-  partsState.dirty = false;
+  const patch = slot ? (ctx.model.doc.patches?.[slot.preset] ?? PRESETS[slot.preset]) : undefined;
+  partsState.patch = patch ? clonePatch(patch) : makePatch();
+}
+
+/** The working patch into the document under the part's preset name (a built-in forks). */
+function commitPatch(ctx: AppCtx): void {
+  const slot = ctx.model.doc[partsState.selected];
+  if (!slot) return;
+  const wasDocument = ctx.model.doc.patches?.[slot.preset] !== undefined;
+  const result = ctx.change({ patches: { [slot.preset]: partsState.patch } });
+  if (result.ok && !wasDocument) syncPresetAndBadge(ctx);
 }
 
 function refreshPatchUi(): void {
@@ -124,26 +130,17 @@ function partPicker(ctx: AppCtx): HTMLElement {
 }
 
 function syncPresetAndBadge(ctx: AppCtx): void {
-  const slot = ctx.model.doc[partsState.selected];
   const presetSlot = $('presetSlot');
   presetSlot.innerHTML = '';
   presetSlot.appendChild(
-    select(
-      'Preset (in the document)',
-      PRESET_NAMES.map((name) => ({ value: name, label: PRESETS[name]?.name ?? name })),
-      slot?.preset ?? '',
-      (name) => {
-        const result = ctx.change({ [partsState.selected]: { preset: name } });
-        if (!result.ok) return;
-        loadWorkingPatch(ctx);
-        refreshPatchUi();
-        syncPresetAndBadge(ctx);
-      },
-    ),
+    presetPicker(ctx, partsState.selected, () => {
+      loadWorkingPatch(ctx);
+      refreshPatchUi();
+      syncPresetAndBadge(ctx);
+    }),
   );
-  $('patchBadge').textContent = partsState.dirty
-    ? 'Edited live — not in the document. Export via Patch JSON, land it in presetsAuthored.ts.'
-    : 'Knobs push the live patch; the document stores the preset name.';
+  presetSlot.appendChild(libraryControls(ctx, partsState.selected));
+  $('patchBadge').textContent = badgeText(ctx, partsState.selected);
 }
 
 function wireJsonDialog(ctx: AppCtx): void {
@@ -168,7 +165,7 @@ function wireJsonDialog(ctx: AppCtx): void {
       pushPatch();
       refreshPatchUi();
       syncPresetAndBadge(ctx);
-      status.textContent = 'Patch loaded (live only)';
+      status.textContent = 'Patch loaded into the document';
     } catch (error) {
       status.textContent = `Could not parse: ${String(error)}`;
     }
@@ -178,7 +175,7 @@ function wireJsonDialog(ctx: AppCtx): void {
 export function renderPartsTab(body: HTMLElement, ctx: AppCtx, keyboard: Keyboard): void {
   body.innerHTML = GRID_HTML;
   hooks.refresh = refreshPatchUi;
-  hooks.dirty = (): void => syncPresetAndBadge(ctx);
+  hooks.commit = (): void => commitPatch(ctx);
   if (!ctx.model.doc[partsState.selected]) {
     partsState.selected = SLOT_IDS.find((id) => ctx.model.doc[id] !== undefined) ?? 'kick';
   }

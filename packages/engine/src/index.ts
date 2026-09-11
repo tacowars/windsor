@@ -18,6 +18,11 @@ export type {
   StepDriver,
 } from './arrangement';
 export { ArrangementPlayer, GENERATOR_INDEX, MUSIC_PART_IDS } from './arrangementPlayer';
+export { presetFor, validateArrangement } from './arrangementValidate';
+export type { PresetTable } from './arrangementValidate';
+export { normalisePatch, normalisePatches } from './patchNormalise';
+export { applyMixLive, applyReturnsLive } from './deskApply';
+export { normaliseMix, normaliseReturns } from './deskNormalise';
 export type {
   ApplyResult,
   ArrangementReadout,
@@ -29,8 +34,10 @@ export type {
 export { BarRecorder, assertNotePattern } from './capturedPattern';
 export type { NotePattern } from './capturedPattern';
 export { installMusicControls } from './musicControls';
-export type { MusicLog } from './musicControls';
-export { musicEnabledFromQuery } from './musicOptions';
+export type { MusicChoice, MusicLog } from './musicControls';
+export { musicDocumentFromQuery, musicEnabledFromQuery } from './musicOptions';
+export { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES, selectMusic } from './arrangementLibrary';
+export type { MusicSelection } from './arrangementLibrary';
 export { FmEngine } from './fmEngine';
 export type { PartOptions, WorkletUrls } from './fmEngine';
 export { AudioPart } from './audioPart';
@@ -54,6 +61,7 @@ export type { PartStrip } from './channelStrip';
 export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
 export type { RotationGains, StereoRotate } from './stereoRotate';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
+export { DEFAULT_ARRANGEMENT_NAME, REVERB_SPACE_RANGES } from './audioConstants';
 export type { ReverbSpace, SpaceName } from './reverbSpace';
 export { renderPatchToBuffer } from './offlineRender';
 export type { BakeOptions } from './offlineRender';

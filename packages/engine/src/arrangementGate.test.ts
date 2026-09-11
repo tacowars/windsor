@@ -21,7 +21,9 @@ import nothingUsable from './__fixtures__/arrangementDocuments/nothing-usable.js
 import { FALLBACK_ARRANGEMENT } from './arrangement';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, MUSIC_PART_IDS, type PlayablePart } from './arrangementPlayer';
+import { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES } from './arrangementLibrary';
 import raw from './arrangements/bed-01.json';
+import { DEFAULT_ARRANGEMENT_NAME } from './audioConstants';
 import { TickTransport } from './scheduler';
 
 const silentPart = (): PlayablePart => ({
@@ -53,6 +55,21 @@ describe('the committed arrangement (arrangements/bed-01.json)', () => {
     for (const id of MUSIC_PART_IDS) expect(result.document[id], id).toBeDefined();
     const parts = { kick: silentPart(), hat: silentPart(), arp: silentPart(), drone: silentPart() };
     expect(() => new ArrangementPlayer(new TickTransport(), parts, result.document)).not.toThrow();
+  });
+});
+
+describe('every committed arrangements/*.json (the library `?music=<name>` selects from)', () => {
+  it('includes the default', () => {
+    expect(ARRANGEMENT_NAMES).toContain(DEFAULT_ARRANGEMENT_NAME);
+    expect(ARRANGEMENT_LIBRARY[DEFAULT_ARRANGEMENT_NAME]).toEqual(raw);
+  });
+
+  it.each(ARRANGEMENT_NAMES)('%s is shippable and correction-free', (name) => {
+    const result = makeArrangement(ARRANGEMENT_LIBRARY[name]);
+    expect(result.usable).toBe(true);
+    expect(result.dangling).toEqual([]);
+    expect(result.corrections).toEqual([]);
+    expect(isShippable(result)).toBe(true);
   });
 });
 

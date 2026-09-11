@@ -17,9 +17,11 @@
  *
  * Music comes in as an `ArrangementDocument` (issue #75): the committed JSON,
  * normalised by `makeArrangement`. `initMusic` builds a part per section the
- * document defines, on the document's strip overlay where it has one, and
- * `apply` takes a deep partial of the same document model — arrangement fields
- * through the player, `mix` straight onto the live strips.
+ * document defines — on the document's own patch where `patches` names it,
+ * on the document's strip overlay where `mix` does — and lands the `returns`
+ * overlay on the live return buses; `apply` takes a deep partial of the same
+ * document model — arrangement fields through the player, `patches` onto the
+ * parts, `mix` and `returns` onto the live desk (`deskApply.ts`).
  */
 import type { DeepPartial } from './arrangement';
 import type { ArrangementDocument } from './arrangementDocument';
@@ -31,15 +33,20 @@ import type {
   PlayablePart,
 } from './arrangementPlayer';
 import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
-import { MIX_LEVEL_MAX, MUSIC_PART_MAX_VOICES } from './audioConstants';
+import type { PresetTable } from './arrangementValidate';
+import { MUSIC_PART_MAX_VOICES } from './audioConstants';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import type { NotePattern } from './capturedPattern';
 import type { PartStrip } from './channelStrip';
 import { routePart } from './channelStrip';
+import { applyMixLive, applyReturnsLive } from './deskApply';
 import { FmEngine } from './fmEngine';
 import type { ChannelStrip, ReturnSpec } from './mix';
 import { MIX, RETURNS, stripFor } from './mix';
+import type { Patch } from './patch';
+import { clonePatch } from './patch';
+import { PRESETS } from './presets';
 import type { ReturnBus } from './returnBus';
 import { createReturns } from './returnBus';
 import { Scheduler } from './scheduler';
@@ -58,10 +65,6 @@ export interface MusicReadout extends ArrangementReadout {
   muted: boolean;
   running: boolean;
 }
-
-const STRIP_KEYS = ['level', 'pan', 'sends'];
-const clamp = (value: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, value));
 
 export class AudioSystem {
   readonly engine: FmEngine;
@@ -105,15 +108,15 @@ export class AudioSystem {
     await this.engine.unlock();
   }
 
-  /** Create a part on its strip, dry into the music bus. */
+  /** Create a part on its strip, dry into the music bus. `sound` is a preset name or a patch. */
   createMusicPart(
     name: string,
-    preset: string,
+    sound: string | Patch,
     maxVoices = MUSIC_PART_MAX_VOICES,
     strip?: ChannelStrip,
   ): AudioPart {
     const { musicBus } = this.standing();
-    return this.route(name, preset, maxVoices, musicBus.input, strip);
+    return this.route(name, sound, maxVoices, musicBus.input, strip);
   }
 
   /** Create a part on its strip, dry into the master, for UI and close-up SFX. */
@@ -132,19 +135,24 @@ export class AudioSystem {
    */
   initMusic(document: ArrangementDocument, onEvent?: MusicEventHandler): void {
     if (this.player) return;
-    const { mix, ...arrangement } = document;
+    const { mix, returns, patches, ...arrangement } = document;
+    // The document's patches over the code's presets: a name resolves here
+    // first, so a document patch shadows a built-in of the same name.
+    const presets: PresetTable = { ...PRESETS, ...patches };
     const parts: Partial<Record<MusicPartId, PlayablePart>> = {};
     for (const id of MUSIC_PART_IDS) {
       const section = arrangement[id];
       if (!section) continue;
+      const patch = presets[section.preset];
       parts[id] = this.createMusicPart(
         section.part,
-        section.preset,
+        patch ? clonePatch(patch) : section.preset,
         MUSIC_PART_MAX_VOICES,
         mix?.[section.part],
       );
     }
-    this.player = new ArrangementPlayer(this.scheduler, parts, arrangement, onEvent);
+    if (returns) applyReturnsLive(this.standing().returns, returns);
+    this.player = new ArrangementPlayer(this.scheduler, parts, arrangement, onEvent, presets);
   }
 
   /**
@@ -202,10 +210,14 @@ export class AudioSystem {
    */
   apply(partial: DeepPartial<ArrangementDocument>): ApplyResult {
     if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
-    const { mix, ...rest } = partial;
+    const { mix, returns, patches, ...rest } = partial;
     const result = this.player.apply(rest);
-    if (!result.ok || mix === undefined) return result;
-    return { ok: true, ignored: [...result.ignored, ...this.applyMix(mix)] };
+    if (!result.ok) return result;
+    const ignored = [...result.ignored];
+    if (patches !== undefined) ignored.push(...this.player.applyPatches(patches));
+    if (mix !== undefined) ignored.push(...applyMixLive(this.strips, mix));
+    if (returns !== undefined) ignored.push(...applyReturnsLive(this.standing().returns, returns));
+    return { ok: true, ignored };
   }
 
   readout(): MusicReadout {
@@ -261,44 +273,6 @@ export class AudioSystem {
     this.started = false;
   }
 
-  private applyMix(mix: DeepPartial<Readonly<Record<string, ChannelStrip>>>): string[] {
-    const ignored: string[] = [];
-    for (const [name, raw] of Object.entries(mix)) {
-      if (raw === undefined) continue;
-      const strip = this.strips.get(name);
-      if (!strip || typeof raw !== 'object' || raw === null) {
-        ignored.push(`mix.${name}`);
-        continue;
-      }
-      const o = raw as Record<string, unknown>;
-      for (const key of Object.keys(o)) {
-        if (!STRIP_KEYS.includes(key)) ignored.push(`mix.${name}.${key}`);
-      }
-      if (typeof o.level === 'number' && Number.isFinite(o.level)) {
-        strip.setLevel(clamp(o.level, 0, MIX_LEVEL_MAX));
-      } else if (o.level !== undefined) ignored.push(`mix.${name}.level`);
-      if (typeof o.pan === 'number' && Number.isFinite(o.pan)) {
-        strip.setPan(clamp(o.pan, -1, 1));
-      } else if (o.pan !== undefined) ignored.push(`mix.${name}.pan`);
-      if (o.sends !== undefined) this.applySends(strip, name, o.sends, ignored);
-    }
-    return ignored;
-  }
-
-  private applySends(strip: PartStrip, name: string, sends: unknown, ignored: string[]): void {
-    if (typeof sends !== 'object' || sends === null) {
-      ignored.push(`mix.${name}.sends`);
-      return;
-    }
-    for (const [ret, amount] of Object.entries(sends)) {
-      if (!strip.sends.has(ret) || typeof amount !== 'number' || !Number.isFinite(amount)) {
-        ignored.push(`mix.${name}.sends.${ret}`);
-        continue;
-      }
-      strip.setSend(ret, clamp(amount, 0, 1));
-    }
-  }
-
   private standing(): { musicBus: AudioBus; returns: Readonly<Record<string, ReturnBus>> } {
     if (!this.musicBus || !this.returns) {
       throw new Error('AudioSystem.init() must be awaited first');
@@ -308,13 +282,14 @@ export class AudioSystem {
 
   private route(
     name: string,
-    preset: string,
+    sound: string | Patch,
     maxVoices: number,
     dry: AudioNode,
     strip?: ChannelStrip,
   ): AudioPart {
     const { returns } = this.standing();
-    const part = this.engine.createPart(name, { preset, maxVoices, destination: null });
+    const source = typeof sound === 'string' ? { preset: sound } : { patch: sound };
+    const part = this.engine.createPart(name, { ...source, maxVoices, destination: null });
     this.strips.set(name, routePart(part, strip ?? stripFor(this.mix, name), returns, dry));
     return part;
   }

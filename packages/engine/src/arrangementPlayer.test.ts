@@ -10,6 +10,8 @@ import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
 import type { Arrangement } from './arrangement';
 import { ArrangementPlayer, type MusicPartId, type PlayablePart } from './arrangementPlayer';
 import type { Patch } from './patch';
+import { makePatch } from './patch';
+import { PRESETS } from './presets';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
 
 interface Call {
@@ -156,5 +158,37 @@ describe('bindings', () => {
     expect(parts.hat.calls).toEqual([]);
     expect(parts.arp.calls).toEqual([]);
     expect(parts.drone.calls).toEqual([]);
+  });
+});
+
+describe('the preset table (#435)', () => {
+  it('resolves a part against the table it was given, document patches first', () => {
+    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
+    const lead = makePatch({ name: 'lead' });
+    const arrangement: Arrangement = {
+      ...FULL_ARRANGEMENT,
+      arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
+    };
+    expect(() => new ArrangementPlayer(new TickTransport(), parts, arrangement)).toThrow(
+      'arp: unknown audio preset "lead"',
+    );
+    const player = new ArrangementPlayer(new TickTransport(), parts, arrangement, undefined, {
+      ...PRESETS,
+      lead,
+    });
+    expect(player.apply({ drone: { preset: 'lead' } }).ok).toBe(true);
+    expect(parts.drone.calls.at(-1)).toEqual({ kind: 'setPatch', patch: 'lead' });
+  });
+
+  it('applyPatches merges over the table entry and pushes to the parts playing it', () => {
+    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    expect(player.applyPatches({ kick: { volume: 0.2 }, junk: 4 })).toEqual(['patches.junk']);
+    expect(parts.kick.calls).toEqual([{ kind: 'setPatch', patch: PRESETS.kick?.name }]);
+    expect(parts.hat.calls).toEqual([]);
+    // The merged patch is the table's from now on: a switch away and back keeps the edit.
+    expect(player.apply({ kick: { preset: 'hat' } }).ok).toBe(true);
+    expect(player.apply({ kick: { preset: 'kick' } }).ok).toBe(true);
+    expect(parts.kick.calls.filter((c) => c.kind === 'setPatch')).toHaveLength(3);
   });
 });

@@ -1,10 +1,12 @@
 /**
- * Arrangement tab (#70, record §2): transport and bpm, seed, and the document
- * itself — export downloads a file, import reads one back (record: the
- * console is a local tool, so a page-initiated download simply works). The
- * exported file is the normalised document; committed over
- * `packages/client/src/audio/arrangements/bed-01.json` it is what the game
- * imports at build time (record §3).
+ * Arrangement tab (#70, record §2; #435): transport and bpm, seed, and the
+ * document itself — export downloads a file, import reads one back (record:
+ * the console is a local tool, so a page-initiated download simply works).
+ * The exported file is the normalised document — patches, returns, mix,
+ * sequencers, harmony, all of it; saved under
+ * `packages/client/src/audio/arrangements/<name>.json` the game bundles it
+ * at build time (record §3) and `?music=<name>` plays it, `bed-01` being the
+ * default.
  */
 import type { AppCtx } from './context';
 import { el, fmt0, section } from './dom';
@@ -67,9 +69,10 @@ function transportSection(ctx: AppCtx): HTMLElement {
 function documentSection(ctx: AppCtx): HTMLElement {
   const { root, body } = section(
     'Document',
-    'Export downloads the normalised document. Commit it over ' +
-      'packages/client/src/audio/arrangements/bed-01.json — the game imports it ' +
-      'at build time; npm run verify gates it.',
+    'Export downloads the whole piece — patches, returns, mix, sequencers, harmony — as one ' +
+      'normalised document. Save it as packages/client/src/audio/arrangements/<name>.json: the ' +
+      'game bundles every file there, ?music=<name> plays it (bed-01 is the default), and ' +
+      'npm run verify gates each one.',
   );
   const row = el('div', 'bar-row');
   const name = document.createElement('input');
