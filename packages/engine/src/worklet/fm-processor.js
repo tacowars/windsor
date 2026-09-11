@@ -728,6 +728,12 @@ class Voice {
     this.fadeInc = 0;
     for (let i = 0; i < 4; i++) {
       this.ampEnv[i].state = ST_IDLE;
+      // An idle envelope still returns its last value, and the rest of the
+      // block is rendered before `process` re-reads `active` (#453): without
+      // this the next control update ramps a killed voice straight back to
+      // full level, so the graceful steal ends in the click it exists to
+      // avoid. `noteOn` re-seeds the value, so a reused slot is unaffected.
+      this.ampEnv[i].value = 0;
       this.amp[i] = 0;
       this.ampInc[i] = 0;
     }
@@ -1003,6 +1009,7 @@ function normalisePatch(raw) {
     panRandom: num(raw.panRandom, 0),
     panKey: num(raw.panKey, 0),
     spread: num(raw.spread, 0), // cents; >0 doubles voices
+    mono: !!raw.mono, // one note at a time, with retrigger (#453)
     ops,
     lfo: {
       shape: num(lfoRaw.shape, LFO_SINE) | 0,
@@ -1201,12 +1208,34 @@ class FmPartProcessor extends AudioWorkletProcessor {
     return oldest;
   }
 
+  /**
+   * Mono (#453): fade out every voice the part has sounding -- the same 4 ms
+   * steal a full pool uses, so the cut never clicks -- and drop the note map
+   * with them. Every remaining entry points at a voice that is fading or
+   * already free, so a later noteOff for a cut note finds nothing and cannot
+   * release the note that replaced it. Allocates nothing.
+   */
+  cutSounding() {
+    const vs = this.voices;
+    for (let i = 0; i < vs.length; i++) {
+      const v = vs[i];
+      if (v.active && !v.fading) v.steal();
+    }
+    this.noteMap.clear();
+  }
+
   noteOn(msg) {
     const p = this.patch;
     const id = msg.id != null ? msg.id : msg.note;
     const vel = num(msg.velocity, 1);
     const count = p.spread > 0 ? 2 : 1;
     const glideFrom = p.glide > 0 && this.lastNote != null ? this.lastNote : null;
+
+    // One note at a time, with retrigger: the cut happens before the new note
+    // allocates, so the fading voices are in reserve slots and the new note
+    // starts fresh. `spread` still runs its detuned pair for the one note, and
+    // `glide` still slides from `lastNote`.
+    if (p.mono) this.cutSounding();
 
     let list = this.noteMap.get(id);
     if (list) this.noteOffId(id);

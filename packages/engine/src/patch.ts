@@ -151,6 +151,12 @@ export interface Patch {
   panKey: number;
   /** Cents. Above zero this doubles voice cost -- it runs two detuned voices. */
   spread: number;
+  /**
+   * One *note* at a time, with retrigger (#453): a note-on fades whatever the
+   * part has sounding and starts the new note fresh. `spread` still runs its
+   * detuned pair for that one note. For percussion and bass.
+   */
+  mono: boolean;
   ops: Operator[];
   pitchEnv: Envelope;
   lfo: LfoSettings;
@@ -223,6 +229,7 @@ export function makePatch(o: PartialPatch = {}): Patch {
     panRandom: 0,
     panKey: 0,
     spread: 0,
+    mono: false,
     ...o,
     ops,
     pitchEnv: makeEnvelope({ sustainLevel: 0, decayTime: 0.1, ...(o.pitchEnv ?? {}) }),

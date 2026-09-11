@@ -63,6 +63,13 @@ describe('makePatch', () => {
     expect(patch.ops[0]?.env.releaseTime).toBe(0.3);
   });
 
+  it('defaults mono off, and carries it when a partial sets it (#453)', () => {
+    // Polyphonic is what every patch was before mono existed, so an absent
+    // field has to stay poly -- in the code's presets and in a document alike.
+    expect(makePatch().mono).toBe(false);
+    expect(makePatch({ mono: true }).mono).toBe(true);
+  });
+
   it('does not share nested state between two patches', () => {
     const a = makePatch();
     const b = makePatch();
