@@ -174,6 +174,57 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._size = 1;
     this._inputGain = 1;
     this._applySize(1, true);
+
+    // Audio-load sampler (#445): identical to fm-processor.js's, off until a
+    // `reportLoad` message turns it on. The plate is the other standing
+    // processor on the audio thread, so a load figure that omitted it would
+    // understate what the music costs.
+    this._loadQuanta = 0;
+    this._loadCount = 0;
+    this._loadBusyMs = 0;
+    this._loadPeakMs = 0;
+    this._loadUnderruns = 0;
+    this._loadWallStart = 0;
+    this._loadBudgetMs = (128 / sampleRate) * 1000;
+    this.port.onmessage = (e) => {
+      const msg = e.data;
+      if (!msg || msg.type !== 'reportLoad') return;
+      this._loadQuanta = Math.max(0, msg.quanta | 0);
+      this._loadCount = 0;
+      this._loadBusyMs = 0;
+      this._loadPeakMs = 0;
+      this._loadWallStart = Date.now();
+    };
+  }
+
+  /** One quantum's duty-cycle sample and the once-per-interval post (#445). */
+  _sampleLoad(t0, t1) {
+    const spanMs = t1 - t0;
+    this._loadBusyMs += spanMs;
+    if (spanMs > this._loadPeakMs) this._loadPeakMs = spanMs;
+    if (spanMs >= this._loadBudgetMs) this._loadUnderruns++;
+    if (++this._loadCount < this._loadQuanta) return;
+    this.port.postMessage({
+      type: 'load',
+      busyMs: this._loadBusyMs,
+      wallMs: t1 - this._loadWallStart,
+      quanta: this._loadCount,
+      peakMs: this._loadPeakMs,
+      underruns: this._loadUnderruns,
+    });
+    this._loadCount = 0;
+    this._loadBusyMs = 0;
+    this._loadPeakMs = 0;
+    this._loadWallStart = t1;
+  }
+
+  /** The sampler wrapper; `_renderBlock` below is the plate itself. */
+  process(inputs, outputs, parameters) {
+    if (this._loadQuanta === 0) return this._renderBlock(inputs, outputs, parameters);
+    const t0 = Date.now();
+    const running = this._renderBlock(inputs, outputs, parameters);
+    this._sampleLoad(t0, Date.now());
+    return running;
   }
 
   /**
@@ -324,7 +375,7 @@ class DattorroReverb extends AudioWorkletProcessor {
      lifting the setup out would either allocate per block or scatter twenty
      coefficients across fields. Same exception, and same reason, as the voice
      loop in fm-processor.js. */
-  process(inputs, outputs, parameters) {
+  _renderBlock(inputs, outputs, parameters) {
     const output = outputs[0];
     const wet = parameters.wet[0] * OUTPUT_TRIM;
     const held = parameters.hold[0] >= 0.5;

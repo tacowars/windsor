@@ -1090,6 +1090,19 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.lastNote = null; // for legato glide
     this.running = true;
 
+    // Audio-load sampler (#445), off until a `reportLoad` message turns it on,
+    // so an offline render and the Node harness time nothing and post nothing.
+    // See workletMessages.ts for why this counts millisecond boundaries rather
+    // than timing the call: AudioWorkletGlobalScope has no performance.now(),
+    // and Date.now() cannot resolve a 2.9 ms quantum on its own.
+    this.loadQuanta = 0; // report cadence in quanta; 0 = not reporting
+    this.loadCount = 0; // quanta since the last report
+    this.loadBusyMs = 0;
+    this.loadPeakMs = 0;
+    this.loadUnderruns = 0; // cumulative, never reset
+    this.loadWallStart = 0;
+    this.loadBudgetMs = (128 / sampleRate) * 1000;
+
     // Events supplied at construction. port.postMessage() is delivered
     // asynchronously and can lose the race against OfflineAudioContext's
     // startRendering(), so offline renders must pass their notes this way.
@@ -1143,7 +1156,44 @@ class FmPartProcessor extends AudioWorkletProcessor {
       case 'stop':
         this.running = false;
         break;
+      case 'reportLoad':
+        // #445: start (or restart) the duty-cycle sampler. The cumulative
+        // underrun count survives a restart; the interval accumulators do not.
+        this.loadQuanta = Math.max(0, msg.quanta | 0);
+        this.loadCount = 0;
+        this.loadBusyMs = 0;
+        this.loadPeakMs = 0;
+        this.loadWallStart = Date.now();
+        break;
     }
+  }
+
+  /**
+   * One quantum's duty-cycle sample, and the once-per-interval post (#445).
+   * `t1 - t0` is not a duration: it is the number of integer-millisecond
+   * boundaries that fell inside the render, which is what makes this a
+   * sampler rather than a timer. Allocates only at the post.
+   */
+  sampleLoad(t0, t1) {
+    const spanMs = t1 - t0;
+    this.loadBusyMs += spanMs;
+    if (spanMs > this.loadPeakMs) this.loadPeakMs = spanMs;
+    // A quantum whose measured span reached the whole budget provably missed
+    // its deadline, whatever the sampler's resolution costs the other fields.
+    if (spanMs >= this.loadBudgetMs) this.loadUnderruns++;
+    if (++this.loadCount < this.loadQuanta) return;
+    this.port.postMessage({
+      type: 'load',
+      busyMs: this.loadBusyMs,
+      wallMs: t1 - this.loadWallStart,
+      quanta: this.loadCount,
+      peakMs: this.loadPeakMs,
+      underruns: this.loadUnderruns,
+    });
+    this.loadCount = 0;
+    this.loadBusyMs = 0;
+    this.loadPeakMs = 0;
+    this.loadWallStart = t1;
   }
 
   schedule(ev, frame) {
@@ -1263,7 +1313,20 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.noteMap.delete(id);
   }
 
+  /**
+   * The render. `renderBlock` is the whole of it; `process` is the sampler
+   * wrapper (#445) and nothing else, so the hot loop reads exactly as it did
+   * and a page that never turns the sampler on pays one branch per quantum.
+   */
   process(inputs, outputs, params) {
+    if (this.loadQuanta === 0) return this.renderBlock(inputs, outputs, params);
+    const t0 = Date.now();
+    const running = this.renderBlock(inputs, outputs, params);
+    this.sampleLoad(t0, Date.now());
+    return running;
+  }
+
+  renderBlock(inputs, outputs, params) {
     const out = outputs[0];
     if (!out || out.length === 0) return this.running;
     const outL = out[0];

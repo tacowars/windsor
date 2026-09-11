@@ -34,7 +34,66 @@ export interface ControlMessage {
   type: 'allNotesOff' | 'panic' | 'stop';
 }
 
-export type WorkletMessage = ScheduledMessage | PatchMessage | ControlMessage;
+/**
+ * Turn the audio-load sampler on in a processor (#445). Sent once, after the
+ * node is built; a processor that never receives it never times anything and
+ * never posts, which is how offline renders (`offlineRender.ts`) and the Node
+ * harness stay silent instruments.
+ *
+ * `quanta` is how many render quanta one report covers — the main thread's
+ * `AUDIO_LOAD_REPORT_SECONDS` converted with the live sample rate, because the
+ * processor has no wall clock with which to measure a second.
+ */
+export interface ReportLoadMessage {
+  type: 'reportLoad';
+  quanta: number;
+}
+
+export type WorkletMessage = ScheduledMessage | PatchMessage | ControlMessage | ReportLoadMessage;
+
+/**
+ * One processor's audio-thread cost over the interval just ended (#445) — the
+ * only message that travels worklet → main, and the reason this union exists
+ * beside `WorkletMessage`, which is main → worklet by construction.
+ *
+ * ## Why counters and not a duration
+ *
+ * Neither measurement the platform would ideally give us exists in Chrome 152
+ * (probed 2026-09-11, `docs/research/2026-09-11-445-audio-bench-arm/`):
+ * `AudioContext.renderCapacity` is absent, flagged builds included, and
+ * `AudioWorkletGlobalScope` exposes no `performance.now()`. The only clock the
+ * scope has is `Date.now()`, at one-millisecond resolution against a 2.9 ms
+ * quantum budget — so the processor does not time a call, it **samples a duty
+ * cycle**: `busyMs` counts the integer-millisecond boundaries that fell inside
+ * a `process()` call, which over an interval estimates the wall time the audio
+ * thread spent inside that processor. `audioLoad.ts` turns these into
+ * percentages and states what they are worth.
+ *
+ * Every field is an integer accumulated in the processor's own fields; the
+ * post happens once per interval, never per quantum, and `process()` still
+ * allocates nothing.
+ */
+export interface LoadReportMessage {
+  type: 'load';
+  /** Millisecond boundaries that fell inside `process()` during the interval. */
+  busyMs: number;
+  /** Wall milliseconds the interval spanned, `Date.now()` end to end. */
+  wallMs: number;
+  /** Render quanta in the interval. */
+  quanta: number;
+  /** Worst single quantum's measured span, ms — 1 ms resolution, so a lower bound. */
+  peakMs: number;
+  /**
+   * Cumulative since the processor started: quanta whose measured span reached
+   * the whole quantum budget, i.e. that provably could not have met their
+   * render deadline. Cumulative rather than per-interval so a dropped post
+   * never loses one.
+   */
+  underruns: number;
+}
+
+/** Everything a processor may post back. One member today; a union so the next lands here. */
+export type ProcessorMessage = LoadReportMessage;
 
 /** Options handed to the processor at construction. */
 export interface ProcessorOptions {

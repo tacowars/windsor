@@ -38,6 +38,8 @@ export type { MusicChoice, MusicLog } from './musicControls';
 export { musicDocumentFromQuery, musicEnabledFromQuery } from './musicOptions';
 export { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES, selectMusic } from './arrangementLibrary';
 export type { MusicSelection } from './arrangementLibrary';
+export { AudioLoadMeter, ZERO_AUDIO_LOAD, quantumBudgetMs, reportQuanta } from './audioLoad';
+export type { AudioLoadReadout } from './audioLoad';
 export { FmEngine } from './fmEngine';
 export type { PartOptions, WorkletUrls } from './fmEngine';
 export { AudioPart } from './audioPart';

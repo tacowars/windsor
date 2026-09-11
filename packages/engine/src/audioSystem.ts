@@ -35,7 +35,9 @@ import type {
 import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
 import type { PresetTable } from './arrangementValidate';
 import { lookupPreset } from './arrangementValidate';
-import { MUSIC_PART_MAX_VOICES } from './audioConstants';
+import { AUDIO_LOAD_REPORT_SECONDS, MUSIC_PART_MAX_VOICES } from './audioConstants';
+import type { AudioLoadReadout } from './audioLoad';
+import { AudioLoadMeter, meterNode } from './audioLoad';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import type { NotePattern } from './capturedPattern';
@@ -65,6 +67,8 @@ export interface AudioSystemOptions {
 export interface MusicReadout extends ArrangementReadout {
   muted: boolean;
   running: boolean;
+  /** What the DSP costs on the audio thread (#445); all zeros until it reports. */
+  load: AudioLoadReadout;
 }
 
 export class AudioSystem {
@@ -76,6 +80,7 @@ export class AudioSystem {
   private musicBus: AudioBus | null = null;
   private returns: Readonly<Record<string, ReturnBus>> | null = null;
   private readonly strips = new Map<string, PartStrip>();
+  private readonly loadMeter = new AudioLoadMeter();
   private started = false;
   private player: ArrangementPlayer | null = null;
   private muted = false;
@@ -101,12 +106,43 @@ export class AudioSystem {
     await this.engine.init();
     this.musicBus = this.engine.createBus({ filter: { type: 'highpass', frequency: 30 } });
     this.returns = createReturns(this.engine.context, this.returnSpecs, this.engine.master);
+    // The plate is a standing processor on the audio thread, so it reports too
+    // (#445): a load figure that counted only the parts would understate the
+    // music by the whole reverb.
+    for (const [name, bus] of Object.entries(this.returns)) {
+      this.meterLoad(`return:${name}`, bus.effect);
+    }
     this.started = true;
   }
 
   /** Call from a click or key handler. */
   async unlock(): Promise<void> {
     await this.engine.unlock();
+  }
+
+  /**
+   * Unlock and start the transport with no gesture behind it — bench mode
+   * (`?bench=1&audio=1`, #445), where the page has no input and Chrome is
+   * launched with `--autoplay-policy=no-user-gesture-required`. The same two
+   * steps `musicControls.ts` binds to the first pointer or key; here they run
+   * directly, and the resulting context state is what the bench header
+   * records. A page that stays `suspended` is a recorder failure, not a
+   * silent control, so the state is returned rather than swallowed.
+   */
+  async startWithoutGesture(): Promise<AudioContextState> {
+    const state = await this.engine.unlock();
+    this.startMusic();
+    return state;
+  }
+
+  /** What the DSP costs on the audio thread right now (#445). */
+  loadReadout(): AudioLoadReadout {
+    return this.loadMeter.readout();
+  }
+
+  /** Processors this system has turned load reporting on in (#445) — parts plus worklet returns. */
+  get meteredProcessors(): number {
+    return this.loadMeter.processorCount;
   }
 
   /** Create a part on its strip, dry into the music bus. `sound` is a preset name or a patch. */
@@ -227,7 +263,12 @@ export class AudioSystem {
       scale: [],
       counters: { kick: 0, hat: 0, arp: 0, drone: 0 },
     };
-    return { ...base, muted: this.muted, running: this.scheduler.isRunning };
+    return {
+      ...base,
+      muted: this.muted,
+      running: this.scheduler.isRunning,
+      load: this.loadMeter.readout(),
+    };
   }
 
   /** The sounding pattern of a music part (issue #70 capture); null before one exists. */
@@ -267,6 +308,7 @@ export class AudioSystem {
     for (const strip of this.strips.values()) strip.dispose();
     this.strips.clear();
     if (this.returns) for (const bus of Object.values(this.returns)) bus.dispose();
+    this.loadMeter.dispose();
     this.engine.dispose();
     this.musicBus = null;
     this.returns = null;
@@ -290,7 +332,13 @@ export class AudioSystem {
     const { returns } = this.standing();
     const source = typeof sound === 'string' ? { preset: sound } : { patch: sound };
     const part = this.engine.createPart(name, { ...source, maxVoices, destination: null });
+    this.meterLoad(`part:${name}`, part.node);
     this.strips.set(name, routePart(part, strip ?? stripFor(this.mix, name), returns, dry));
     return part;
+  }
+
+  /** Turn the audio-load sampler on in one node's processor (#445); `audioLoad.ts` owns the rules. */
+  private meterLoad(id: string, node: AudioNode): void {
+    meterNode(this.loadMeter, id, node, this.engine.context.sampleRate, AUDIO_LOAD_REPORT_SECONDS);
   }
 }

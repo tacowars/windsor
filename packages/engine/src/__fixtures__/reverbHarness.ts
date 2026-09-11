@@ -26,6 +26,10 @@ export interface ParameterDescriptor {
 }
 
 export interface ReverbProcessorLike {
+  /** Test-only door onto the port, standing in for postMessage (#445). */
+  inbox(message: unknown): void;
+  /** Everything the processor posted back — the load reports (#445). */
+  outbox(): unknown[];
   process(
     inputs: Float32Array[][],
     outputs: Float32Array[][],
@@ -45,7 +49,24 @@ export function loadReverb(): LoadedReverb {
 
   let registered: (new (options: unknown) => ReverbProcessorLike) | null = null;
 
-  class AudioWorkletProcessorShim {}
+  // The real scope gives every processor a port; the plate uses it for the
+  // audio-load sampler (#445), so the stand-in has to have one too.
+  class AudioWorkletProcessorShim {
+    port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
+    private readonly posted: unknown[] = [];
+
+    constructor() {
+      this.port = { postMessage: (m: unknown) => this.posted.push(m), onmessage: null };
+    }
+
+    inbox(message: unknown): void {
+      this.port.onmessage?.({ data: message });
+    }
+
+    outbox(): unknown[] {
+      return this.posted;
+    }
+  }
 
   const registerProcessor = (_name: string, cls: unknown): void => {
     registered = cls as new (options: unknown) => ReverbProcessorLike;

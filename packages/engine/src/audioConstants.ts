@@ -136,6 +136,35 @@ export const PART_MAX_VOICES_DEFAULT = 16;
 /** Chance a `walk` density modulator steps down rather than up. */
 export const WALK_DOWN_CHANCE = 0.5;
 
+/* ------------------------- the audio-load readout ------------------------ */
+
+/**
+ * Frames in one AudioWorklet render quantum. Fixed by the Web Audio spec
+ * rather than a dial — it is here because the quantum *budget*
+ * (`RENDER_QUANTUM_FRAMES / sampleRate` seconds) is what `audioLoad.ts`
+ * expresses a load as a percentage of, and `docs/design/audio-architecture.md`
+ * §7 quotes it.
+ */
+export const RENDER_QUANTUM_FRAMES = 128;
+
+/**
+ * How often a reporting processor posts its accumulated load, in seconds of
+ * audio time (#445). The processor counts quanta, so the main thread converts
+ * with the live sample rate. A whole second is long enough for the duty-cycle
+ * sampler in `audioLoad.ts` to hold a useful number of samples, and short
+ * enough that the overlay and the bench's per-frame column track the music
+ * rather than the whole run.
+ */
+export const AUDIO_LOAD_REPORT_SECONDS = 1;
+
+/**
+ * A processor whose last report is older than this has stopped reporting —
+ * disposed, or an audio thread that has stalled outright — and drops out of
+ * the readout rather than freezing its last number on the overlay. Three
+ * report intervals: one missed post is jitter, three in a row is gone.
+ */
+export const AUDIO_LOAD_STALE_MS = 3 * AUDIO_LOAD_REPORT_SECONDS * 1000;
+
 /* --------------------------- FM algorithms ------------------------------ */
 
 /** Operators per voice — the length of `OP_NAMES` in `patch.ts`. */
