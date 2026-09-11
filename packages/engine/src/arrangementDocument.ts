@@ -25,18 +25,30 @@ import type { ArpArrangement, DroneArrangement, PercussionArrangement } from './
 import { FALLBACK_ARRANGEMENT } from './arrangement';
 import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
-import type { ChannelStrip } from './mix';
+import { normaliseMix, normaliseReturns } from './deskNormalise';
+import type { ChannelStrip, ReturnSpec } from './mix';
+import type { Patch } from './patch';
 
 export { FALLBACK_ARRANGEMENT };
 
 /**
  * What a committed `arrangements/<name>.json` may hold: the arrangement, plus
- * per-part strip overlays applied over the code's `MIX` at part creation and
- * through `AudioSystem.apply`.
+ * the three sections that make it the whole piece of music in one file
+ * (record `2026-09-11-music-document-carries-patches-and-returns`) — the
+ * synth patches its parts play, and the desk: per-part strip overlays over
+ * the code's `MIX` and return overlays over the code's `RETURNS`, applied at
+ * `initMusic` and live through `AudioSystem.apply`.
  */
 export type ArrangementDocument = Arrangement & {
+  /**
+   * Named FM patches. A part's `preset` resolves here first, then in the
+   * code's `PRESETS`, so a document patch named like a built-in shadows it.
+   */
+  readonly patches?: Readonly<Record<string, Patch>>;
   /** Strip overlays by part name; an absent strip keeps the code's `MIX` entry. */
   readonly mix?: Readonly<Record<string, ChannelStrip>>;
+  /** Return settings by return name — the plate's space and level, the delay's time, feedback, damp and level. */
+  readonly returns?: Readonly<Record<string, ReturnSpec>>;
 };
 
 export interface MakeArrangementResult {
@@ -74,18 +86,31 @@ export function isShippable(result: MakeArrangementResult): boolean {
   return result.usable && result.dangling.length === 0;
 }
 
-const DOCUMENT_KEYS = ['seed', 'bpm', 'key', 'kick', 'hat', 'arp', 'drone', 'mix'];
+const DOCUMENT_KEYS = [
+  'seed',
+  'bpm',
+  'key',
+  'patches',
+  'kick',
+  'hat',
+  'arp',
+  'drone',
+  'mix',
+  'returns',
+];
 
-/** Assembled field by field because the part slots and the mix are optional. */
+/** Assembled field by field because the part slots and the desk sections are optional. */
 interface MutableDocument {
   seed: number;
   bpm: number;
   key: ArrangementKey;
+  patches?: Record<string, Patch>;
   kick?: PercussionArrangement;
   hat?: PercussionArrangement;
   arp?: ArpArrangement;
   drone?: DroneArrangement;
   mix?: Record<string, ChannelStrip>;
+  returns?: Record<string, ReturnSpec>;
 }
 
 function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument | null {
@@ -95,6 +120,8 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   }
   const o = raw as Record<string, unknown>;
   n.dropUnknown(o, DOCUMENT_KEYS, '');
+  // The patches come first: the parts' preset names resolve against them.
+  const patches = n.patches(o.patches);
   const parts: NormalisedParts = {
     kick: n.percussion(o.kick, 'kick'),
     hat: n.percussion(o.hat, 'hat'),
@@ -115,8 +142,11 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   if (parts.hat) document.hat = parts.hat;
   if (parts.arp) document.arp = parts.arp;
   if (parts.drone) document.drone = parts.drone;
-  const mix = n.mix(o.mix);
+  if (patches) document.patches = patches;
+  const mix = normaliseMix(o.mix, n);
   if (mix) document.mix = mix;
+  const returns = normaliseReturns(o.returns, n);
+  if (returns) document.returns = returns;
   return document;
 }
 

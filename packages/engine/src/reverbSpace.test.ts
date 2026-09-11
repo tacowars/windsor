@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { loadReverb } from './__fixtures__/reverbHarness';
+import { REVERB_SPACE_RANGES } from './audioConstants';
 import { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
 
 const loaded = loadReverb();
@@ -33,6 +34,14 @@ describe('ReverbSpace mirrors the worklet parameters', () => {
   it('agrees with the processor on every default', () => {
     for (const [name, value] of Object.entries(DEFAULT_SPACE)) {
       expect(byName.get(name)?.defaultValue, `default for ${name}`).toBe(value);
+    }
+  });
+
+  it('agrees with the processor on every range (REVERB_SPACE_RANGES, the document clamp)', () => {
+    expect(Object.keys(REVERB_SPACE_RANGES).sort()).toEqual(Object.keys(DEFAULT_SPACE).sort());
+    for (const [name, [min, max]] of Object.entries(REVERB_SPACE_RANGES)) {
+      expect(byName.get(name)?.minValue, `min for ${name}`).toBe(min);
+      expect(byName.get(name)?.maxValue, `max for ${name}`).toBe(max);
     }
   });
 

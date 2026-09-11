@@ -30,6 +30,10 @@ export type EuclideanDriver = Omit<EuclideanConfig, 'seed' | 'generatorIndex'>;
 export type ArpDriver = Omit<ArpeggiatorConfig, 'seed' | 'generatorIndex'>;
 export type StepDriver = Omit<StepSequencerConfig, 'seed' | 'generatorIndex'>;
 
+/** The four part slots, in play order. */
+export type MusicPartId = 'kick' | 'hat' | 'arp' | 'drone';
+export const MUSIC_PART_IDS: readonly MusicPartId[] = ['kick', 'hat', 'arp', 'drone'];
+
 /** The shared harmony every pitched part draws from (record §4). */
 export interface ArrangementKey {
   /** MIDI note of the root in the reference octave. */

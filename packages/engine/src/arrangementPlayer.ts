@@ -21,20 +21,22 @@
  * validation changes nothing and is reported, never half-applied.
  */
 import { Arpeggiator } from './arpeggiator';
-import type { Arrangement, DeepPartial, EuclideanDriver } from './arrangement';
-import { mergeArrangement } from './arrangement';
+import type { Arrangement, DeepPartial, EuclideanDriver, MusicPartId } from './arrangement';
+import { MUSIC_PART_IDS, mergeArrangement } from './arrangement';
 import { BarRecorder, type NotePattern } from './capturedPattern';
 import { EuclideanSequencer, type OnsetEvent } from './euclideanSequencer';
 import type { NoteEvent } from './noteEvent';
+import type { PresetTable } from './arrangementValidate';
+import { presetFor, validateArrangement } from './arrangementValidate';
 import type { Patch } from './patch';
-import { clonePatch } from './patch';
+import { clonePatch, makePatch, mergePatch, type PartialPatch } from './patch';
 import { PRESETS } from './presets';
 import { ScaleSampler } from './scaleSampler';
 import type { TickSource, Unsubscribe } from './scheduler';
 import { StepSequencer } from './stepSequencer';
 
-export type MusicPartId = 'kick' | 'hat' | 'arp' | 'drone';
-export const MUSIC_PART_IDS: readonly MusicPartId[] = ['kick', 'hat', 'arp', 'drone'];
+export type { MusicPartId } from './arrangement';
+export { MUSIC_PART_IDS } from './arrangement';
 
 /** Fixed stream index per part (record §4); not arrangement data, so `apply` cannot corrupt it. */
 export const GENERATOR_INDEX: Readonly<Record<MusicPartId, number>> = {
@@ -93,39 +95,6 @@ interface Plan {
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
-function presetFor(id: MusicPartId, name: string): Patch {
-  const preset = PRESETS[name];
-  if (!preset) throw new Error(`${id}: unknown audio preset "${name}"`);
-  return preset;
-}
-
-function validate(next: Arrangement, previous: Arrangement | null): void {
-  if (!Number.isFinite(next.bpm) || next.bpm <= 0) {
-    throw new RangeError(`bpm must be a positive number, got ${next.bpm}`);
-  }
-  for (const id of MUSIC_PART_IDS) {
-    const section = next[id];
-    if (!section) continue;
-    presetFor(id, section.preset);
-    const before = previous?.[id];
-    if (previous && before && section.part !== before.part) {
-      throw new Error(`${id}: a part cannot be renamed live ("${before.part}")`);
-    }
-    if (!Number.isFinite(section.velocity) || section.velocity < 0) {
-      throw new RangeError(`${id}: velocity must be >= 0, got ${section.velocity}`);
-    }
-  }
-  for (const id of ['kick', 'hat'] as const) {
-    const section = next[id];
-    if (!section) continue;
-    const { note, hold } = section;
-    if (!Number.isFinite(note)) throw new RangeError(`${id}: note must be finite, got ${note}`);
-    if (!Number.isFinite(hold) || hold <= 0) {
-      throw new RangeError(`${id}: hold must be > 0 seconds, got ${hold}`);
-    }
-  }
-}
-
 export class ArrangementPlayer {
   private current: Arrangement;
   private built: Built;
@@ -137,15 +106,19 @@ export class ArrangementPlayer {
   private readonly subs = new Map<MusicPartId, Unsubscribe>();
   private readonly counters: Record<MusicPartId, number> = { kick: 0, hat: 0, arp: 0, drone: 0 };
   private readonly announced = new Set<MusicPartId>();
+  /** The table preset names resolve against; `applyPatches` edits it live. */
+  private readonly presets: Record<string, Patch>;
 
   constructor(
     private readonly transport: MusicTransport,
     private readonly parts: Readonly<Partial<Record<MusicPartId, PlayablePart>>>,
     arrangement: Arrangement,
     private readonly onEvent?: MusicEventHandler,
+    presets: PresetTable = PRESETS,
   ) {
+    this.presets = { ...presets };
     this.current = structuredClone(arrangement);
-    validate(this.current, null);
+    validateArrangement(this.current, null, this.presets);
     this.built = this.buildAll(this.current);
     this.transport.bpm = this.current.bpm;
     this.attach(new Set(MUSIC_PART_IDS));
@@ -204,6 +177,30 @@ export class ArrangementPlayer {
     return { ok: true, ignored };
   }
 
+  /**
+   * A document's `patches` partial, live: each named patch is merged over the
+   * table's entry (or a fresh `makePatch()` for a new name) and pushed to
+   * every part whose section plays it. Returns the paths it ignored — an
+   * entry that is not an object. Not an arrangement change: no generator is
+   * rebuilt and no stream moves.
+   */
+  applyPatches(patches: Readonly<Record<string, unknown>>): string[] {
+    const ignored: string[] = [];
+    for (const [name, raw] of Object.entries(patches)) {
+      if (raw === undefined) continue;
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        ignored.push(`patches.${name}`);
+        continue;
+      }
+      const merged = mergePatch(this.presets[name] ?? makePatch({ name }), raw as PartialPatch);
+      this.presets[name] = merged;
+      for (const id of MUSIC_PART_IDS) {
+        if (this.current[id]?.preset === name) this.parts[id]?.setPatch(clonePatch(merged));
+      }
+    }
+    return ignored;
+  }
+
   /** Release everything sounding — the drone's held note included. Mute and teardown call this. */
   releaseAll(time = 0): void {
     this.built.drone?.release(0, time);
@@ -246,7 +243,7 @@ export class ArrangementPlayer {
 
   /** Everything `apply` will change, validated and constructed before anything is touched. */
   private plan(merged: Arrangement): Plan {
-    validate(merged, this.current);
+    validateArrangement(merged, this.current, this.presets);
     const seedChanged = merged.seed !== this.current.seed;
     const keyChanged = seedChanged || sig(merged.key) !== sig(this.current.key);
     const driverChanged = (id: MusicPartId): boolean =>
@@ -274,7 +271,7 @@ export class ArrangementPlayer {
       const next = merged[id];
       const before = this.current[id];
       if (next && before && next.preset !== before.preset) {
-        patchChanges.push([id, clonePatch(presetFor(id, next.preset))]);
+        patchChanges.push([id, clonePatch(presetFor(this.presets, id, next.preset))]);
       }
     }
     return { built, rebuilt, patchChanges };

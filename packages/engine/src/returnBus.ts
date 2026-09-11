@@ -17,6 +17,7 @@
  */
 import { DELAY_FEEDBACK_MAX, DELAY_MAX_SECONDS } from './audioConstants';
 import type { DelayReturn, ReturnSpec, ReverbReturn } from './mix';
+import type { ReverbSpace } from './reverbSpace';
 import { REVERB_PROCESSOR_NAME } from './workletMessages';
 
 export interface ReturnBus {
@@ -30,7 +31,19 @@ export interface ReturnBus {
   readonly level: AudioParam;
   /** The plate worklet, or the delay line. */
   readonly effect: AudioWorkletNode | DelayNode;
+  /** `output.gain`, as a setter, for the document's `returns` overlay. */
+  setLevel(level: number): void;
+  /** Plate parameters onto the worklet; a no-op on a delay. */
+  setSpace(space: Partial<ReverbSpace>): void;
+  /** The delay line's time, loop feedback and damping; a no-op on a plate. */
+  setDelay(delay: Partial<Pick<DelayReturn, 'delayTime' | 'feedback' | 'damp'>>): void;
   dispose(): void;
+}
+
+interface DelayLine {
+  readonly effect: DelayNode;
+  readonly feedback: GainNode;
+  readonly damp: BiquadFilterNode;
 }
 
 /**
@@ -49,10 +62,10 @@ export function createReturn(
   output.gain.value = spec.level;
   output.connect(destination);
 
-  const effect =
-    spec.kind === 'reverb'
-      ? attachPlate(context, input, output, spec)
-      : attachDelay(context, input, output, spec);
+  const plate = spec.kind === 'reverb' ? attachPlate(context, input, output, spec) : null;
+  const line = spec.kind === 'delay' ? attachDelay(context, input, output, spec) : null;
+  const effect = plate ?? line?.effect;
+  if (!effect) throw new Error(`return "${name}": unknown kind`);
 
   return {
     name,
@@ -61,6 +74,24 @@ export function createReturn(
     output,
     level: output.gain,
     effect,
+    setLevel(level: number): void {
+      output.gain.value = level;
+    },
+    setSpace(space: Partial<ReverbSpace>): void {
+      if (!plate) return;
+      for (const [param, value] of Object.entries(space)) {
+        const target = plate.parameters.get(param);
+        if (target && value !== undefined) target.value = value;
+      }
+    },
+    setDelay(delay): void {
+      if (!line) return;
+      if (delay.delayTime !== undefined) line.effect.delayTime.value = delay.delayTime;
+      if (delay.feedback !== undefined) {
+        line.feedback.gain.value = Math.min(DELAY_FEEDBACK_MAX, delay.feedback);
+      }
+      if (delay.damp !== undefined) line.damp.frequency.value = delay.damp;
+    },
     dispose(): void {
       input.disconnect();
       effect.disconnect();
@@ -130,7 +161,7 @@ function attachDelay(
   input: GainNode,
   output: GainNode,
   spec: DelayReturn,
-): DelayNode {
+): DelayLine {
   const delay = context.createDelay(DELAY_MAX_SECONDS);
   const feedback = context.createGain();
   const damp = context.createBiquadFilter();
@@ -145,5 +176,5 @@ function attachDelay(
   damp.connect(feedback);
   feedback.connect(delay);
   damp.connect(output);
-  return delay;
+  return { effect: delay, feedback, damp };
 }

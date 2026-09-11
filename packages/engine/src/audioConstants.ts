@@ -11,6 +11,11 @@
  * Nothing here feeds simulation state (root invariant 4): audio observes.
  */
 
+/* ------------------------------ the music ------------------------------- */
+
+/** The committed `arrangements/<name>.json` the game plays unless `?music=<name>` says otherwise. */
+export const DEFAULT_ARRANGEMENT_NAME = 'bed-01';
+
 /* ---------------------------- tempo and time ---------------------------- */
 
 /** The transport's tempo when a document or a scheduler does not name one. */
@@ -99,6 +104,32 @@ export const BUS_FILTER_Q = 0.707;
 export const DELAY_MAX_SECONDS = 5;
 /** Feedback is clamped below 1 so the loop always decays. */
 export const DELAY_FEEDBACK_MAX = 0.95;
+/** A return's gain into the master: 0..1, never a boost. */
+export const RETURN_LEVEL_MAX = 1;
+/** The delay return's damping lowpass, in hertz — the biquad's usable band. */
+export const DELAY_DAMP_MIN_HZ = 10;
+export const DELAY_DAMP_MAX_HZ = 20000;
+/**
+ * The plate's parameter ranges, `[min, max]` per `ReverbSpace` field —
+ * restated from `worklet/reverb-processor.js` `parameterDescriptors`, which
+ * must stay import-free; `reverbSpace.test.ts` asserts the two agree. What a
+ * document's `returns` section is clamped into.
+ */
+export const REVERB_SPACE_RANGES = {
+  preDelay: [0, 1],
+  inputLowCut: [10, 1000],
+  inputHighCut: [200, 20000],
+  diffusionIn1: [0, 1],
+  diffusionIn2: [0, 1],
+  size: [0.05, 4],
+  decay: [0, 1],
+  diffusionTank1: [0, 0.8],
+  diffusionTank2: [0, 0.8],
+  tankLowCut: [10, 1000],
+  tankHighCut: [200, 20000],
+  modRate: [0, 8],
+  modDepth: [0, 4],
+} as const satisfies Record<string, readonly [number, number]>;
 /** Voices a music part allocates, and the FM engine's own default. */
 export const MUSIC_PART_MAX_VOICES = 12;
 export const PART_MAX_VOICES_DEFAULT = 16;

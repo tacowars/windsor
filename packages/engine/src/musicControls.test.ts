@@ -12,7 +12,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommandRegistry } from '../debug/console/commandRegistry.js';
 import type { AudioSystem } from './audioSystem';
-import { installMusicControls, type MusicLog } from './musicControls';
+import { FALLBACK_ARRANGEMENT } from './arrangement';
+import bed01 from './arrangements/bed-01.json';
+import { installMusicControls, type MusicChoice, type MusicLog } from './musicControls';
+
+const ON: MusicChoice = { enabled: true, name: 'bed-01', raw: bed01 };
+const OFF: MusicChoice = { enabled: false, name: 'bed-01', raw: bed01 };
 
 /** The stand-in's own state, readable in the test; `AudioSystem` keeps its private. */
 interface FakeState {
@@ -30,7 +35,10 @@ function fakeAudio(): { system: AudioSystem; state: FakeState } {
       a.suppressed = true;
       a.running = false;
     },
-    initMusic(): void {},
+    initMusic(document: unknown): void {
+      a.document = document;
+    },
+    document: null as unknown,
     unlock: async (): Promise<void> => {},
     startMusic(): void {
       if (!a.muted && !a.suppressed) a.running = true;
@@ -71,14 +79,14 @@ describe('installMusicControls', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('registers nothing when no registry is passed', () => {
-    installMusicControls(fakeAudio().system, true, log);
+    installMusicControls(fakeAudio().system, ON, log);
     expect(new CommandRegistry().has('music')).toBe(false);
   });
 
   it('reports the mute and the transport without an argument', () => {
     const { system } = fakeAudio();
     const commands = new CommandRegistry();
-    installMusicControls(system, true, log, commands);
+    installMusicControls(system, ON, log, commands);
     system.startMusic();
     expect(commands.run('music')).toEqual(['music on — transport running']);
   });
@@ -86,7 +94,7 @@ describe('installMusicControls', () => {
   it('mutes and unmutes, logging what the `M` key logs', () => {
     const { system } = fakeAudio();
     const commands = new CommandRegistry();
-    installMusicControls(system, true, log, commands);
+    installMusicControls(system, ON, log, commands);
     system.startMusic();
     log.mockClear();
     expect(commands.run('music off')).toEqual(['music off — transport stopped']);
@@ -100,7 +108,7 @@ describe('installMusicControls', () => {
 
   it('logs nothing when the argument is what it already is', () => {
     const commands = new CommandRegistry();
-    installMusicControls(fakeAudio().system, true, log, commands);
+    installMusicControls(fakeAudio().system, ON, log, commands);
     log.mockClear();
     commands.run('music on');
     expect(log).not.toHaveBeenCalled();
@@ -109,14 +117,31 @@ describe('installMusicControls', () => {
   it('is registered under ?music=0 and reports the suppressed transport', () => {
     const { system, state } = fakeAudio();
     const commands = new CommandRegistry();
-    installMusicControls(system, false, log, commands);
+    installMusicControls(system, OFF, log, commands);
     expect(state.suppressed).toBe(true);
     expect(commands.run('music')).toEqual(['music on — transport stopped']);
   });
 
+  it('plays the fallback click and logs the miss for a name no committed file carries', () => {
+    const { system, state } = fakeAudio();
+    installMusicControls(system, { enabled: true, name: 'bed-99', raw: undefined }, log);
+    expect((state as { document?: unknown }).document).toEqual(FALLBACK_ARRANGEMENT);
+    expect(log).toHaveBeenCalledWith({
+      state: 'arrangement',
+      name: 'bed-99',
+      usable: false,
+      corrections: expect.stringContaining('no committed arrangements/bed-99.json') as string,
+    });
+  });
+
+  it('logs nothing about a clean committed document', () => {
+    installMusicControls(fakeAudio().system, ON, log);
+    expect(log).not.toHaveBeenCalledWith(expect.objectContaining({ state: 'arrangement' }));
+  });
+
   it('prints the parse error rather than reading a typo as off', () => {
     const commands = new CommandRegistry();
-    installMusicControls(fakeAudio().system, true, log, commands);
+    installMusicControls(fakeAudio().system, ON, log, commands);
     expect(commands.run('music mayb')).toEqual(['music: expected on or off (got "mayb")']);
   });
 });

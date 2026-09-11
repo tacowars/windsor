@@ -1,8 +1,10 @@
 /**
- * The Parts tab's working patch (#70): a clone of the selected part's patch,
- * edited by the knobs and pushed to the real `AudioPart` via `setPatch`. The
- * document stores preset *names* only, so edits here are live sound design —
- * the Patch JSON dialog is the export path (land it in `presetsAuthored.ts`).
+ * The Parts tab's working patch (#70, #435): a clone of the selected part's
+ * patch, edited by the knobs and committed to the document's `patches`
+ * section through `hooks.commit` — which `ctx.change` turns into a live
+ * `setPatch` on the real `AudioPart` and a merge into the document. The
+ * export therefore carries the sound, not a preset name that had to be
+ * hand-landed in `presetsAuthored.ts`.
  */
 import type {
   AudioPart,
@@ -16,31 +18,25 @@ interface PartsState {
   selected: MusicPartId;
   patch: Patch;
   part: AudioPart | null;
-  dirty: boolean;
 }
 
 export const partsState: PartsState = {
   selected: 'kick',
   patch: makePatch(),
   part: null,
-  dirty: false,
 };
 
 /** Cross-module callbacks the tab assembly fills in. */
 export const hooks = {
   /** Rebuild the whole patch UI (an algorithm change recolours the bays). */
   refresh: (): void => {},
-  /** The working patch diverged from the named preset. */
-  dirty: (): void => {},
+  /** Commit the working patch to the document under the selected part's preset name. */
+  commit: (_patch: Patch): void => {},
 };
 
-/** Push the working patch to the live part. Live-only by design (see above). */
+/** Push the working patch: into the document, and through it to the live part. */
 export function pushPatch(): void {
-  partsState.part?.setPatch(partsState.patch);
-  if (!partsState.dirty) {
-    partsState.dirty = true;
-    hooks.dirty();
-  }
+  hooks.commit(partsState.patch);
 }
 
 export const getPath = (obj: unknown, path: string): unknown =>
