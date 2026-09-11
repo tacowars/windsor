@@ -184,3 +184,25 @@ describe('runtime inputs JSON cannot represent (self-review findings)', () => {
     );
   });
 });
+
+describe("a document patch's mono field (#453)", () => {
+  // `patchNormalise` walks the `makePatch` template and already handles
+  // booleans, so the field needs no normaliser code -- which is exactly why it
+  // is worth pinning: nothing else would fail if the walk stopped covering it.
+  const withPatch = (patch: unknown): ReturnType<typeof makeArrangement> =>
+    makeArrangement({ kick: { part: 'kick', preset: 'kick' }, patches: { kick: patch } });
+
+  it('keeps true and false as given', () => {
+    expect(withPatch({ mono: true }).document.patches?.kick?.mono).toBe(true);
+    expect(withPatch({ mono: false }).document.patches?.kick?.mono).toBe(false);
+    expect(withPatch({ mono: true }).corrections).toEqual([]);
+  });
+
+  it('corrects a non-boolean to the default, and reads an absent field as poly', () => {
+    const junk = withPatch({ mono: 'yes' });
+    expect(junk.document.patches?.kick?.mono).toBe(false);
+    expect(junk.corrections).toEqual(['patches.kick.mono: "yes" is not a boolean — using false']);
+    // Every document written before mono existed is this case.
+    expect(withPatch({}).document.patches?.kick?.mono).toBe(false);
+  });
+});

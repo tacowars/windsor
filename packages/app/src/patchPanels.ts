@@ -12,7 +12,7 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { $, el, fmt2, fmtHz, fmtMs, fmtSigned } from './dom';
 import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
-import { hooks, partsState, pathKnob, pushPatch } from './patchState';
+import { getPath, hooks, partsState, pathKnob, pushPatch, setPath } from './patchState';
 
 export const CARRIER_COLOR = '#E0A44E';
 export const MOD_COLOR = '#5FA8A0';
@@ -32,6 +32,26 @@ const GLOBAL_KNOBS: KnobTable = [
   { f: 'pan', label: 'Pan', o: { min: -1, max: 1, def: 0, fmt: fmtSigned } },
   { f: 'panRandom', label: 'Pan Rnd', o: { min: 0, max: 1, def: 0, fmt: fmt2 } },
 ];
+
+/**
+ * Boolean globals, drawn as a two-button segment after the knobs — the shape
+ * Slope and Phase use. `off`/`on` are the button faces; the field is a boolean
+ * path in the working patch, so the table is what the test reads (#453).
+ */
+export const GLOBAL_TOGGLES: ReadonlyArray<{
+  f: string;
+  label: string;
+  off: string;
+  on: string;
+}> = [{ f: 'mono', label: 'Voicing', off: 'Poly', on: 'Mono' }];
+
+/** The segment index a toggle shows for the working patch. */
+export const toggleIndex = (field: string): number =>
+  getPath(partsState.patch, field) === true ? 1 : 0;
+
+/** What pressing one of a toggle's two buttons writes. `pushPatch` commits it. */
+export const writeToggle = (field: string, index: number): void =>
+  setPath(partsState.patch, field, index === 1);
 
 const FILTER_KNOBS: KnobTable = [
   {
@@ -146,6 +166,14 @@ export function buildGlobal(): void {
   const row = $('globalKnobs');
   row.innerHTML = '';
   for (const k of GLOBAL_KNOBS) row.appendChild(pathKnob(k.f, k.label, k.o));
+  for (const t of GLOBAL_TOGGLES) {
+    const seg = patchSeg(
+      [t.off, t.on],
+      () => toggleIndex(t.f),
+      (i) => writeToggle(t.f, i),
+    );
+    row.appendChild(labelledSeg(t.label, seg));
+  }
 }
 
 /** A segmented control writing an index or boolean into the working patch. */
