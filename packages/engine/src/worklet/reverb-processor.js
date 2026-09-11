@@ -202,7 +202,10 @@ class DattorroReverb extends AudioWorkletProcessor {
     const spanMs = t1 - t0;
     this._loadBusyMs += spanMs;
     if (spanMs > this._loadPeakMs) this._loadPeakMs = spanMs;
-    if (spanMs >= this._loadBudgetMs) this._loadUnderruns++;
+    // `spanMs - 1` is the provable lower bound on the render's duration; see
+    // fm-processor.js `sampleLoad` for why the raw crossing count may not
+    // accuse a quantum of missing its deadline.
+    if (spanMs - 1 >= this._loadBudgetMs) this._loadUnderruns++;
     if (++this._loadCount < this._loadQuanta) return;
     this.port.postMessage({
       type: 'load',

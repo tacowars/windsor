@@ -72,7 +72,10 @@ describe('AudioLoadMeter', () => {
   it('takes the worst peak and the total underruns, not the last report', () => {
     const meter = new AudioLoadMeter(() => 0);
     const budget = quantumBudgetMs(SAMPLE_RATE);
-    meter.accept('part:kick', report({ peakMs: budget, underruns: 2 }), SAMPLE_RATE);
+    // A span of N crossings proves N-1 ms, so a peak of `budget + 1` is the
+    // span that proves exactly one whole budget. Expressed from the constant,
+    // never as the number it happens to be at 48 kHz.
+    meter.accept('part:kick', report({ peakMs: budget + 1, underruns: 2 }), SAMPLE_RATE);
     meter.accept('part:arp', report({ peakMs: budget / 2, underruns: 0 }), SAMPLE_RATE);
     meter.accept('return:room', report({ peakMs: 0, underruns: 5 }), SAMPLE_RATE);
     const r = meter.readout();
@@ -80,12 +83,49 @@ describe('AudioLoadMeter', () => {
     expect(r.underruns).toBe(7);
   });
 
+  it('never lets a one-millisecond span claim any of the budget', () => {
+    const meter = new AudioLoadMeter(() => 0);
+    // One crossing proves nothing at all: the render may have taken 0.001 ms
+    // and merely straddled a boundary. It must read 0, not 34 %.
+    meter.accept('part:kick', report({ peakMs: 1 }), SAMPLE_RATE);
+    expect(meter.readout().peakPct).toBe(0);
+    // Two crossings prove one millisecond of work, and no more than that.
+    meter.accept('part:kick', report({ peakMs: 2 }), SAMPLE_RATE);
+    expect(meter.readout().peakPct).toBeCloseTo((1 / quantumBudgetMs(SAMPLE_RATE)) * 100);
+  });
+
+  it('keeps a cumulative underrun count after the processor goes quiet', () => {
+    // A window that suffered seven deadline misses suffered them; the count is
+    // history, not an instantaneous reading, so staleness must not erase it
+    // while the load and the peak correctly fall to zero.
+    let now = 0;
+    const meter = new AudioLoadMeter(() => now);
+    meter.accept('part:kick', report({ busyMs: 100, peakMs: 9, underruns: 7 }), SAMPLE_RATE);
+    now = AUDIO_LOAD_STALE_MS + 1;
+    expect(meter.readout()).toEqual({
+      loadPct: 0,
+      peakPct: 0,
+      underruns: 7,
+      processors: 0,
+    });
+  });
+
+  it('does not lose history when a processor is replaced under one id', () => {
+    const meter = new AudioLoadMeter(() => 0);
+    meter.accept('part:kick', report({ underruns: 9 }), SAMPLE_RATE);
+    // A replacement processor starts its own cumulative count at zero.
+    meter.accept('part:kick', report({ underruns: 1 }), SAMPLE_RATE);
+    expect(meter.readout().underruns).toBe(9);
+  });
+
   it("scales the peak against each processor's own sample rate", () => {
     const meter = new AudioLoadMeter(() => 0);
-    // The same millisecond is a bigger share of the smaller budget at 48 kHz.
-    meter.accept('a', report({ peakMs: 1 }), 48_000);
+    // The same proven millisecond is a bigger share of the smaller budget at
+    // 48 kHz. `peakMs: 3` proves 2 ms; a span of 1 proves nothing at either.
+    meter.accept('a', report({ peakMs: 3 }), 48_000);
     const fast = meter.readout().peakPct;
-    meter.accept('a', report({ peakMs: 1 }), 44_100);
+    expect(fast).toBeGreaterThan(0);
+    meter.accept('a', report({ peakMs: 3 }), 44_100);
     expect(meter.readout().peakPct).toBeLessThan(fast);
   });
 
@@ -118,6 +158,20 @@ describe('meterNode', () => {
     } as unknown as MessagePort;
     meterNode(meter, 'part:kick', { port } as unknown as AudioNode, SAMPLE_RATE, 1);
     expect(posted).toEqual([{ type: 'reportLoad', quanta: reportQuanta(SAMPLE_RATE, 1) }]);
+    expect(meter.processorCount).toBe(1);
+  });
+
+  it('silences the port it replaces, so the old processor stops overwriting', () => {
+    const meter = new AudioLoadMeter(() => 0);
+    const make = (): MessagePort =>
+      ({ postMessage: () => {}, onmessage: null }) as unknown as MessagePort;
+    const first = make();
+    const second = make();
+    meterNode(meter, 'part:kick', { port: first } as unknown as AudioNode, SAMPLE_RATE, 1);
+    meterNode(meter, 'part:kick', { port: second } as unknown as AudioNode, SAMPLE_RATE, 1);
+    expect(first.onmessage).toBeNull();
+    expect(second.onmessage).not.toBeNull();
+    // One id is one processor however many ports have worn it.
     expect(meter.processorCount).toBe(1);
   });
 

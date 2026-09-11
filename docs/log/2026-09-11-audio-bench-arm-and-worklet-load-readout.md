@@ -90,18 +90,31 @@ says `est`, `audioLoad.ts`'s header states the calibration, and the reference
 docs tell a reader to take a single-digit `loadPct` as "the music is cheap"
 rather than as a figure to two significant places.
 
-`peakPct` inherits the same resolution and is explicitly a **lower bound**: it
-steps in units of ~34 % of the budget and reads 0 for every quantum under a
-millisecond. It is useful exactly where it matters — a quantum near or over
-budget crosses two or more boundaries and cannot hide.
+`peakPct` inherits the same resolution and is a **lower bound**, which took a
+review round to make true. A span of N boundary crossings proves the render
+took more than `N − 1` ms and nothing about N itself, so the readout scales
+`peakMs − 1`: one crossing reads 0 % (it proves nothing — the render may have
+taken a microsecond and merely straddled a boundary), two crossings prove one
+millisecond. It is useful exactly where it matters: a quantum near or over
+budget crosses several boundaries and cannot hide.
 
 ### 4. The underrun count reports, and does not vote
 
-`underruns` is the one hard number in the readout: a quantum whose measured
-span reached the **whole** quantum budget provably could not have met its
-render deadline, whatever the estimator's bias costs the other fields. It is
-cumulative per processor, so a dropped report never loses one, and summed
-across processors in the readout.
+`underruns` is the firmest number in the readout, and it is firm only because
+it is deliberately conservative. The first draft counted a quantum whose
+measured span *reached* the budget, which the review showed is wrong: a 2.2 ms
+render from 1000.9 to 1003.1 ms crosses three millisecond boundaries and would
+have been accused of missing a 2.902 ms deadline. Since N crossings prove only
+`N − 1` ms of work, an underrun is counted when **`span − 1` reaches the whole
+budget**. That under-counts real overruns by up to a millisecond's worth and
+never invents one, which is the right direction for a number whose whole value
+is that it cannot be argued with.
+
+It is cumulative per processor, so a dropped report never loses one, and the
+meter keeps a monotone total per id: the instantaneous fields expire when a
+processor goes quiet, but a count of deadline misses is history and does not —
+a window that suffered seven must not report zero because the part was disposed
+afterwards.
 
 It does not gate, for two reasons. There is no prior: no reading in this repo
 has ever carried an underrun count, so a threshold would be invented rather

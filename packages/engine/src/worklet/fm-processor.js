@@ -1178,9 +1178,12 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const spanMs = t1 - t0;
     this.loadBusyMs += spanMs;
     if (spanMs > this.loadPeakMs) this.loadPeakMs = spanMs;
-    // A quantum whose measured span reached the whole budget provably missed
-    // its deadline, whatever the sampler's resolution costs the other fields.
-    if (spanMs >= this.loadBudgetMs) this.loadUnderruns++;
+    // N boundary crossings prove only that the render took MORE THAN N-1 ms:
+    // a 2.2 ms quantum from 1000.9 to 1003.1 crosses three and would count as
+    // an overrun of a 2.902 ms budget if the count were read as a duration.
+    // So the provable lower bound is `spanMs - 1`, and only that may accuse a
+    // quantum of missing its deadline (#445 review, pass 1 and 2).
+    if (spanMs - 1 >= this.loadBudgetMs) this.loadUnderruns++;
     if (++this.loadCount < this.loadQuanta) return;
     this.port.postMessage({
       type: 'load',
