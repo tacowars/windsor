@@ -38,16 +38,28 @@
  * two-significant-figure cost, and no gate votes on it (#445 decision: the
  * verdict stays the three frame gates).
  *
- * `underruns` is the hard number in the readout: a quantum whose measured span
- * reached the whole quantum budget provably could not have met its deadline,
- * whatever the estimator's bias. Reported, never a gate — whether it *should*
- * gate is argued in the first target reading's record.
+ * `underruns` is the firmest number in the readout, and it is firm only
+ * because it is deliberately conservative. N boundary crossings prove the
+ * render took **more than N − 1 ms** — nothing about N itself — so a 2.2 ms
+ * quantum that happens to straddle three boundaries must not be accused of
+ * missing a 2.902 ms deadline. The processors therefore count an underrun
+ * only when `span − 1` reaches the whole budget, which under-counts real
+ * overruns by up to a millisecond's worth and never invents one. `peakPct`
+ * is scaled the same way below, which is what makes it the lower bound it
+ * claims to be. Reported, never a gate — whether it *should* gate is argued
+ * in the first target reading's record.
  */
 import { AUDIO_LOAD_STALE_MS, RENDER_QUANTUM_FRAMES } from './audioConstants';
 import type { LoadReportMessage } from './workletMessages';
 
 const PERCENT = 100;
 const MS_PER_SECOND = 1000;
+/**
+ * `Date.now()`'s granularity, and therefore the uncertainty on every span the
+ * processors measure: a span of N crossings proves `N - 1` ms of work and no
+ * more. Subtracted wherever a number claims to be a floor.
+ */
+const CLOCK_RESOLUTION_MS = 1;
 
 /**
  * The audio thread's cost, as the overlay, the bench and `__a204` read it.
@@ -62,12 +74,18 @@ export interface AudioLoadReadout {
   loadPct: number;
   /**
    * The worst single quantum any processor measured in that interval, as a
-   * percentage of the quantum budget. 1 ms resolution, so a lower bound: it
-   * reads 0 for every quantum under a millisecond and steps in units of ~34 %
-   * of the budget at 44.1 kHz.
+   * percentage of the quantum budget — a **lower bound**, because a span of N
+   * boundary crossings proves only `N − 1` ms of work. So a quantum measured
+   * at 1 ms reads 0 % (it proves nothing), 2 ms reads ~34 % at 44.1 kHz, and
+   * the number never overstates what the DSP took.
    */
   peakPct: number;
-  /** Quanta that provably overran the whole budget, cumulative across processors. */
+  /**
+   * Quanta whose provable duration reached the whole budget — a deadline miss
+   * that cannot be an artefact of the clock. Cumulative across every processor
+   * this meter has ever attached, and **monotone**: it never falls because a
+   * processor went quiet (see `readout()`).
+   */
   underruns: number;
   /** How many processors reported in the interval just read. */
   processors: number;
@@ -128,6 +146,15 @@ export class AudioLoadMeter {
   private readonly entries = new Map<string, Entry>();
   private readonly sampleRates = new Map<string, number>();
   private readonly attached = new Set<string>();
+  /** The port currently authoritative for each id, so a replacement can silence the old one. */
+  private readonly ports = new Map<string, MessagePort>();
+  /**
+   * Cumulative underruns per id, monotone. Held apart from `entries` because
+   * the two have opposite lifetimes: instantaneous load must expire when a
+   * processor goes quiet, and a count of deadline misses must not — the window
+   * that suffered them still suffered them (#445 review, pass 2).
+   */
+  private readonly underrunTotals = new Map<string, number>();
 
   constructor(private readonly now: () => number = () => performance.now()) {}
 
@@ -142,7 +169,13 @@ export class AudioLoadMeter {
    * the return's); attaching the same id twice replaces the first.
    */
   attach(id: string, port: MessagePort, quanta: number, sampleRate: number): void {
+    // Replacement means replacement: the previous port's handler is detached
+    // first, or a node that is still alive keeps overwriting its successor's
+    // reports under the same id (#445 review, pass 2).
+    const previous = this.ports.get(id);
+    if (previous && previous !== port) previous.onmessage = null;
     this.attached.add(id);
+    this.ports.set(id, port);
     port.onmessage = (event: MessageEvent): void => {
       const data = event.data as LoadReportMessage | undefined;
       if (data?.type === 'load') this.accept(id, data, sampleRate);
@@ -150,10 +183,18 @@ export class AudioLoadMeter {
     port.postMessage({ type: 'reportLoad', quanta });
   }
 
-  /** Take one report. Public because the unit tests drive the meter directly. */
+  /**
+   * Take one report. Public because the unit tests drive the meter directly.
+   *
+   * The processor reports its underruns cumulatively, so the total kept here
+   * only ever rises: a replacement processor starts its own count at zero, and
+   * taking the larger of the two keeps the misses the old one really had.
+   */
   accept(id: string, report: LoadReportMessage, sampleRate: number): void {
     this.entries.set(id, { report, at: this.now() });
     this.sampleRates.set(id, sampleRate);
+    const seen = this.underrunTotals.get(id) ?? 0;
+    if (report.underruns > seen) this.underrunTotals.set(id, report.underruns);
   }
 
   /**
@@ -161,25 +202,33 @@ export class AudioLoadMeter {
    * milliseconds by the **longest** interval any of them covered — they all
    * run on the same thread over the same wall time, and the longest is the
    * conservative denominator.
+   *
+   * The three instantaneous fields read only processors that are still
+   * reporting, so a disposed part stops inflating the load. `underruns` is the
+   * exception and reads every id ever attached: a count of deadline misses is
+   * history, and a window that suffered seven must not report zero because the
+   * processor fell silent afterwards.
    */
   readout(): AudioLoadReadout {
     const cutoff = this.now() - AUDIO_LOAD_STALE_MS;
     let busyMs = 0;
     let wallMs = 0;
     let peakPct = 0;
-    let underruns = 0;
     let processors = 0;
     for (const [id, entry] of this.entries) {
       if (entry.at < cutoff) continue;
       const { report } = entry;
       processors++;
       busyMs += report.busyMs;
-      underruns += report.underruns;
       if (report.wallMs > wallMs) wallMs = report.wallMs;
       const budget = quantumBudgetMs(this.sampleRates.get(id) ?? 0);
-      const pct = budget > 0 ? (report.peakMs / budget) * PERCENT : 0;
+      // `peakMs - 1` is what the crossing count proves; see the header.
+      const provenMs = Math.max(0, report.peakMs - CLOCK_RESOLUTION_MS);
+      const pct = budget > 0 ? (provenMs / budget) * PERCENT : 0;
       if (pct > peakPct) peakPct = pct;
     }
+    let underruns = 0;
+    for (const total of this.underrunTotals.values()) underruns += total;
     return {
       loadPct: wallMs > 0 ? (busyMs / wallMs) * PERCENT : 0,
       peakPct,
@@ -190,8 +239,11 @@ export class AudioLoadMeter {
 
   /** Stop collecting; the ports themselves are closed by whoever disposes the nodes. */
   dispose(): void {
+    for (const port of this.ports.values()) port.onmessage = null;
+    this.ports.clear();
     this.entries.clear();
     this.sampleRates.clear();
     this.attached.clear();
+    this.underrunTotals.clear();
   }
 }
