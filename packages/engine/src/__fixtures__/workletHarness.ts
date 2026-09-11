@@ -40,6 +40,8 @@ export interface ProcessorLike {
   ): boolean;
   /** Test-only door onto the port, standing in for postMessage. */
   inbox(message: ScheduledEvent): void;
+  /** Everything the processor posted back — the load reports (#445). */
+  outbox(): unknown[];
 }
 
 export interface AlgorithmTable {
@@ -79,13 +81,18 @@ export function loadProcessor(): LoadedProcessor {
 
   class AudioWorkletProcessorShim {
     port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
+    private readonly posted: unknown[] = [];
 
     constructor() {
-      this.port = { postMessage: () => {}, onmessage: null };
+      this.port = { postMessage: (m: unknown) => this.posted.push(m), onmessage: null };
     }
 
     inbox(message: unknown): void {
       this.port.onmessage?.({ data: message });
+    }
+
+    outbox(): unknown[] {
+      return this.posted;
     }
   }
 

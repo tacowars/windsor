@@ -227,6 +227,36 @@ What would qualify, when audio is built:
   60 s M3-equivalent horde window, with audio scheduling under 0.5 ms of main-thread time
   per frame at p95.**
 
+**What exists now (#445).** Both halves are instrumented, and neither is a
+gate yet:
+
+- **In the frame.** `?bench=1&audio=1` builds the `AudioSystem` and plays the
+  `?music=<name>` document through the standard window, against the same rung
+  in silence: `node scripts/run-bench.mjs --audio[=<name>]`. That is the arm
+  the milestone cadence can take a music reading with; the verdict is the
+  three standing frame gates, and no audio field votes.
+  `docs/reference/client-measurement-seams.md` is the seam.
+- **On the audio thread.** `packages/client/src/audio/audioLoad.ts` owns
+  `AudioLoadReadout { loadPct, peakPct, underruns, processors }`, exposed on
+  `AudioSystem.readout().load` and `__a204.audio.readout()`, drawn as one
+  overlay line and carried into the bench JSON's `audio` block. Both worklets
+  accumulate it inside `process()` and post once per interval, so the
+  "no allocation in `process()`" rule of §6.1 still holds.
+- **What the probe found.** The two measurements this section assumes are not
+  available in Chrome 152: there is no `AudioContext.renderCapacity` (flagged
+  builds included) and no `performance.now()` in `AudioWorkletGlobalScope`, so
+  a processor cannot time its own call. The readout is therefore a
+  **duty-cycle sampler** built on `Date.now()`, whose resolution (1 ms) is a
+  third of a render quantum (2.9 ms at 44.1 kHz): it reads 0 at rest and
+  tracks the true load monotonically while over-reading it by roughly 2–3×.
+  The record and its calibration are
+  `docs/research/2026-09-11-445-audio-bench-arm/`. `underruns` — quanta whose
+  measured span reached the whole budget — is the one hard number, which is
+  why the suggested criterion above is still expressed in underruns and why
+  it is argued at the first target reading rather than asserted here.
+- **Still missing:** the main-thread scheduling cost (`audio.schedMs`, #275),
+  which lands as one more field on the same readout.
+
 Two known costs, recorded so they are not surprises:
 
 - FM sidebands alias regardless of how well the source tables are bandlimited. This is
