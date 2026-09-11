@@ -78,7 +78,7 @@ export function applyReturnsLive(
   if (!isRecord(overlay)) return ['returns'];
   for (const [name, raw] of Object.entries(overlay)) {
     if (raw === undefined) continue;
-    const bus = returns[name];
+    const bus = Object.hasOwn(returns, name) ? returns[name] : undefined;
     if (!bus || !isRecord(raw)) {
       ignored.push(`returns.${name}`);
       continue;

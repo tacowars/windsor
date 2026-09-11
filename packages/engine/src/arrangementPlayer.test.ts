@@ -180,15 +180,46 @@ describe('the preset table (#435)', () => {
     expect(parts.drone.calls.at(-1)).toEqual({ kind: 'setPatch', patch: 'lead' });
   });
 
-  it('applyPatches merges over the table entry and pushes to the parts playing it', () => {
+  it('a patches partial merges over the table entry and pushes to the parts playing it', () => {
     const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
     const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
-    expect(player.applyPatches({ kick: { volume: 0.2 }, junk: 4 })).toEqual(['patches.junk']);
+    expect(player.apply({}, { kick: { volume: 0.2 }, junk: 4 })).toEqual({
+      ok: true,
+      ignored: ['patches.junk'],
+    });
     expect(parts.kick.calls).toEqual([{ kind: 'setPatch', patch: PRESETS.kick?.name }]);
     expect(parts.hat.calls).toEqual([]);
     // The merged patch is the table's from now on: a switch away and back keeps the edit.
     expect(player.apply({ kick: { preset: 'hat' } }).ok).toBe(true);
     expect(player.apply({ kick: { preset: 'kick' } }).ok).toBe(true);
     expect(parts.kick.calls.filter((c) => c.kind === 'setPatch')).toHaveLength(3);
+  });
+
+  it('takes a preset switch and the patch it names in one partial (review finding 1)', () => {
+    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    const result = player.apply({ arp: { preset: 'fresh' } }, { fresh: { volume: 0.2 } });
+    expect(result).toEqual({ ok: true, ignored: [] });
+    expect(parts.arp.calls.filter((c) => c.kind === 'setPatch')).toEqual([
+      { kind: 'setPatch', patch: 'fresh' },
+    ]);
+  });
+
+  it('changes neither the table nor the arrangement when the merged arrangement is refused', () => {
+    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    expect(player.apply({ bpm: -1 }, { fresh: { volume: 0.2 } }).ok).toBe(false);
+    expect(parts.arp.calls).toEqual([]);
+    // The staged patch was discarded with the refused partial.
+    expect(player.apply({ arp: { preset: 'fresh' } }).ok).toBe(false);
+  });
+
+  it('never resolves an inherited object name as a preset', () => {
+    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    expect(player.apply({ arp: { preset: 'constructor' } })).toMatchObject({
+      ok: false,
+      error: 'arp: unknown audio preset "constructor"',
+    });
   });
 });

@@ -14,8 +14,13 @@ import type { Patch } from './patch';
 /** The preset table a part name resolves against: the document's patches over the code's. */
 export type PresetTable = Readonly<Record<string, Patch>>;
 
+/** An own entry of the table, or undefined — never an inherited `constructor`. */
+export function lookupPreset(presets: PresetTable, name: string): Patch | undefined {
+  return Object.hasOwn(presets, name) ? presets[name] : undefined;
+}
+
 export function presetFor(presets: PresetTable, id: MusicPartId, name: string): Patch {
-  const preset = presets[name];
+  const preset = lookupPreset(presets, name);
   if (!preset) throw new Error(`${id}: unknown audio preset "${name}"`);
   return preset;
 }

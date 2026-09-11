@@ -34,6 +34,7 @@ import type {
 } from './arrangementPlayer';
 import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
 import type { PresetTable } from './arrangementValidate';
+import { lookupPreset } from './arrangementValidate';
 import { MUSIC_PART_MAX_VOICES } from './audioConstants';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
@@ -143,7 +144,7 @@ export class AudioSystem {
     for (const id of MUSIC_PART_IDS) {
       const section = arrangement[id];
       if (!section) continue;
-      const patch = presets[section.preset];
+      const patch = lookupPreset(presets, section.preset);
       parts[id] = this.createMusicPart(
         section.part,
         patch ? clonePatch(patch) : section.preset,
@@ -211,10 +212,9 @@ export class AudioSystem {
   apply(partial: DeepPartial<ArrangementDocument>): ApplyResult {
     if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
     const { mix, returns, patches, ...rest } = partial;
-    const result = this.player.apply(rest);
+    const result = this.player.apply(rest, patches ?? {});
     if (!result.ok) return result;
     const ignored = [...result.ignored];
-    if (patches !== undefined) ignored.push(...this.player.applyPatches(patches));
     if (mix !== undefined) ignored.push(...applyMixLive(this.strips, mix));
     if (returns !== undefined) ignored.push(...applyReturnsLive(this.standing().returns, returns));
     return { ok: true, ignored };
