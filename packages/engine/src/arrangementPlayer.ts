@@ -27,7 +27,7 @@ import { BarRecorder, type NotePattern } from './capturedPattern';
 import { EuclideanSequencer, type OnsetEvent } from './euclideanSequencer';
 import type { NoteEvent } from './noteEvent';
 import type { PresetTable } from './arrangementValidate';
-import { presetFor, validateArrangement } from './arrangementValidate';
+import { lookupPreset, presetFor, validateArrangement } from './arrangementValidate';
 import type { Patch } from './patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from './patch';
 import { PRESETS } from './presets';
@@ -91,6 +91,29 @@ interface Plan {
   built: Built;
   rebuilt: ReadonlySet<MusicPartId>;
   patchChanges: ReadonlyArray<readonly [MusicPartId, Patch]>;
+  /** The preset table after the partial's `patches`, validated against. */
+  presets: Record<string, Patch>;
+}
+
+/** A `patches` partial merged over a copy of the table; junk entries reported by path. */
+function stagePatches(
+  presets: Readonly<Record<string, Patch>>,
+  patches: Readonly<Record<string, unknown>>,
+  ignored: string[],
+): Record<string, Patch> {
+  const staged = { ...presets };
+  for (const [name, raw] of Object.entries(patches)) {
+    if (raw === undefined) continue;
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+      ignored.push(`patches.${name}`);
+      continue;
+    }
+    staged[name] = mergePatch(
+      lookupPreset(presets, name) ?? makePatch({ name }),
+      raw as PartialPatch,
+    );
+  }
+  return staged;
 }
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
@@ -106,8 +129,8 @@ export class ArrangementPlayer {
   private readonly subs = new Map<MusicPartId, Unsubscribe>();
   private readonly counters: Record<MusicPartId, number> = { kick: 0, hat: 0, arp: 0, drone: 0 };
   private readonly announced = new Set<MusicPartId>();
-  /** The table preset names resolve against; `applyPatches` edits it live. */
-  private readonly presets: Record<string, Patch>;
+  /** The table preset names resolve against; a `patches` partial edits it live. */
+  private presets: Record<string, Patch>;
 
   constructor(
     private readonly transport: MusicTransport,
@@ -159,46 +182,33 @@ export class ArrangementPlayer {
     return recorder.capture(id === 'drone', held);
   }
 
-  /** Merge a partial over the arrangement and commit it (refinement decision 3). */
-  apply(partial: DeepPartial<Arrangement>): ApplyResult {
+  /**
+   * Merge a partial over the arrangement and commit it (refinement decision
+   * 3). A `patches` partial (#435) is staged into the preset table first, so
+   * a preset switch and the patch it names can arrive together; the
+   * arrangement is validated against the staged table, and on failure
+   * neither the table nor the arrangement changes.
+   */
+  apply(
+    partial: DeepPartial<Arrangement>,
+    patches: Readonly<Record<string, unknown>> = {},
+  ): ApplyResult {
     const { merged, ignored } = mergeArrangement(this.current, partial);
+    const staged = stagePatches(this.presets, patches, ignored);
     let plan: Plan;
     try {
-      plan = this.plan(merged);
+      plan = this.plan(merged, staged);
     } catch (error) {
       return { ok: false, ignored, error: error instanceof Error ? error.message : String(error) };
     }
     this.transport.bpm = merged.bpm;
+    this.presets = plan.presets;
     for (const [id, patch] of plan.patchChanges) this.parts[id]?.setPatch(patch);
     for (const id of plan.rebuilt) this.parts[id]?.allNotesOff();
     this.built = plan.built;
     this.current = merged;
     this.attach(plan.rebuilt);
     return { ok: true, ignored };
-  }
-
-  /**
-   * A document's `patches` partial, live: each named patch is merged over the
-   * table's entry (or a fresh `makePatch()` for a new name) and pushed to
-   * every part whose section plays it. Returns the paths it ignored — an
-   * entry that is not an object. Not an arrangement change: no generator is
-   * rebuilt and no stream moves.
-   */
-  applyPatches(patches: Readonly<Record<string, unknown>>): string[] {
-    const ignored: string[] = [];
-    for (const [name, raw] of Object.entries(patches)) {
-      if (raw === undefined) continue;
-      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-        ignored.push(`patches.${name}`);
-        continue;
-      }
-      const merged = mergePatch(this.presets[name] ?? makePatch({ name }), raw as PartialPatch);
-      this.presets[name] = merged;
-      for (const id of MUSIC_PART_IDS) {
-        if (this.current[id]?.preset === name) this.parts[id]?.setPatch(clonePatch(merged));
-      }
-    }
-    return ignored;
   }
 
   /** Release everything sounding — the drone's held note included. Mute and teardown call this. */
@@ -242,8 +252,8 @@ export class ArrangementPlayer {
   }
 
   /** Everything `apply` will change, validated and constructed before anything is touched. */
-  private plan(merged: Arrangement): Plan {
-    validateArrangement(merged, this.current, this.presets);
+  private plan(merged: Arrangement, presets: Record<string, Patch>): Plan {
+    validateArrangement(merged, this.current, presets);
     const seedChanged = merged.seed !== this.current.seed;
     const keyChanged = seedChanged || sig(merged.key) !== sig(this.current.key);
     const driverChanged = (id: MusicPartId): boolean =>
@@ -266,15 +276,20 @@ export class ArrangementPlayer {
       drone: rebuilt.has('drone') ? fresh.drone : this.built.drone,
     };
 
+    // A part takes a fresh patch when its preset switched, or when the patch
+    // it plays was edited in this partial.
     const patchChanges: Array<readonly [MusicPartId, Patch]> = [];
     for (const id of MUSIC_PART_IDS) {
       const next = merged[id];
       const before = this.current[id];
-      if (next && before && next.preset !== before.preset) {
-        patchChanges.push([id, clonePatch(presetFor(this.presets, id, next.preset))]);
+      if (!next || !before) continue;
+      const switched = next.preset !== before.preset;
+      const edited = lookupPreset(presets, next.preset) !== lookupPreset(this.presets, next.preset);
+      if (switched || edited) {
+        patchChanges.push([id, clonePatch(presetFor(presets, id, next.preset))]);
       }
     }
-    return { built, rebuilt, patchChanges };
+    return { built, rebuilt, patchChanges, presets };
   }
 
   /** (Re)subscribe the named generators and point their events at the parts. */

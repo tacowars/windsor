@@ -154,6 +154,12 @@ describe('the returns section', () => {
     expect(isShippable(r)).toBe(false);
   });
 
+  it('treats an inherited object name as no return at all (review finding 2)', () => {
+    const r = makeArrangement({ ...FULL_ARRANGEMENT, returns: { constructor: { level: 0.5 } } });
+    expect(r.document.returns).toBeUndefined();
+    expect(r.dangling).toEqual(['returns.constructor: no return "constructor" is defined']);
+  });
+
   it('round-trips: the normalised document normalises to itself with no corrections', () => {
     const first = makeArrangement({
       ...FULL_ARRANGEMENT,

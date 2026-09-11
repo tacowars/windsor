@@ -18,7 +18,7 @@ export type {
   StepDriver,
 } from './arrangement';
 export { ArrangementPlayer, GENERATOR_INDEX, MUSIC_PART_IDS } from './arrangementPlayer';
-export { presetFor, validateArrangement } from './arrangementValidate';
+export { lookupPreset, presetFor, validateArrangement } from './arrangementValidate';
 export type { PresetTable } from './arrangementValidate';
 export { normalisePatch, normalisePatches } from './patchNormalise';
 export { applyMixLive, applyReturnsLive } from './deskApply';

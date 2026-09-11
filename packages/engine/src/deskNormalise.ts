@@ -90,7 +90,9 @@ export function normaliseReturns(
   const o = n.section(raw, 'returns');
   const out: Record<string, ReturnSpec> = {};
   for (const [name, value] of Object.entries(o)) {
-    const base: ReturnSpec | undefined = RETURNS[name as keyof typeof RETURNS];
+    const base: ReturnSpec | undefined = Object.hasOwn(RETURNS, name)
+      ? RETURNS[name as keyof typeof RETURNS]
+      : undefined;
     if (!base) {
       n.dangling.push(`returns.${name}: no return "${name}" is defined`);
       n.correction(`returns.${name}: dropped`);

@@ -98,6 +98,20 @@ describe('apply over patches and returns', () => {
     expect(sys.strip('arp')?.part.patch.name).toBe('fresh');
   });
 
+  it('takes a new patch and the preset switch naming it in one partial', async () => {
+    const sys = await system(FULL_ARRANGEMENT);
+    const result = sys.apply({ patches: { fresh: { volume: 0.2 } }, arp: { preset: 'fresh' } });
+    expect(result).toEqual({ ok: true, ignored: [] });
+    expect(sys.strip('arp')?.part.patch.volume).toBe(0.2);
+  });
+
+  it('ignores an inherited object name on the live returns path', async () => {
+    const sys = await system(FULL_ARRANGEMENT);
+    expect(sys.apply({ returns: { constructor: { level: 0.5 } } } as never).ignored).toEqual([
+      'returns.constructor',
+    ]);
+  });
+
   it('ignores a patch entry that is not an object', async () => {
     const sys = await system(FULL_ARRANGEMENT);
     expect(sys.apply({ patches: { lead: 3 } } as never).ignored).toEqual(['patches.lead']);
