@@ -1,15 +1,20 @@
 /**
  * The Mixer tab's returns (#435): the plate's space and level, the delay's
- * time, feedback, damping and level — all in the document's `returns`
+ * time, regeneration, damping and level — all in the document's `returns`
  * section, applied live through `ctx.change` like every other field. The
  * named `SPACES` are starting points: picking one writes its numbers into the
- * document, and the knobs edit them from there.
+ * document, and the knobs edit them from there. The tempo buttons set the
+ * delay time to a note value at the document's bpm; the time is what is
+ * stored, so a later bpm change needs the button pressed again.
  */
 import type { ReturnSpec, ReverbSpace } from '../../../packages/client/src/audio/index-for-editor';
 import {
+  DELAY_FEEDBACK_MAX,
+  DELAY_MAX_SECONDS,
   RETURNS,
   RETURN_NAMES,
   REVERB_SPACE_RANGES,
+  SECONDS_PER_MINUTE,
   SPACES,
   SPACE_NAMES,
 } from '../../../packages/client/src/audio/index-for-editor';
@@ -118,10 +123,64 @@ function delayKnobs(ctx: AppCtx, name: string): HTMLElement[] {
       set: (v) => void ctx.change({ returns: { [name]: { [f]: v } } }),
     });
   return [
-    knob('Time', 'delayTime', { min: 0.02, max: 2, curve: 'log', fmt: fmtMs }),
-    knob('Feedback', 'feedback', { max: 0.95, fmt: fmt2 }),
+    knob('Time', 'delayTime', {
+      min: DELAY_TIME_MIN,
+      max: DELAY_MAX_SECONDS,
+      curve: 'log',
+      fmt: fmtMs,
+    }),
+    knob('Regen', 'feedback', { max: DELAY_FEEDBACK_MAX, fmt: fmt2 }),
     knob('Damp', 'damp', { min: 200, max: 16000, curve: 'log', fmt: fmtHz }),
   ];
+}
+
+/** The shortest delay the knob reaches; below this the line is a comb filter, not an echo. */
+const DELAY_TIME_MIN = 0.02;
+
+/** Note values as fractions of a beat (a quarter note), common echoes first. */
+const TEMPO_DIVISIONS: readonly { label: string; beats: number; title: string }[] = [
+  { label: '1/4', beats: 1, title: 'quarter note' },
+  { label: '1/8.', beats: 0.75, title: 'dotted eighth' },
+  { label: '1/8', beats: 0.5, title: 'eighth note' },
+  { label: '1/8T', beats: 1 / 3, title: 'eighth triplet' },
+  { label: '1/16', beats: 0.25, title: 'sixteenth note' },
+  { label: '1/16.', beats: 0.375, title: 'dotted sixteenth' },
+  { label: '1/4.', beats: 1.5, title: 'dotted quarter' },
+  { label: '1/2', beats: 2, title: 'half note' },
+];
+
+/** Seconds of `beats` at the document's bpm, inside the delay line's range. */
+function tempoSeconds(bpm: number, beats: number): number {
+  const seconds = (beats * SECONDS_PER_MINUTE) / bpm;
+  return Math.min(DELAY_MAX_SECONDS, Math.max(DELAY_TIME_MIN, seconds));
+}
+
+/** One button per note value: sets the delay time to that value at the current bpm. */
+function tempoRow(ctx: AppCtx, name: string): HTMLElement {
+  const row = el('div', 'bar-row');
+  row.style.marginTop = '6px';
+  row.appendChild(el('span', 'field-label', `Sync to ${ctx.model.doc.bpm} bpm`));
+  const current = (): number => {
+    const spec = returnValue(ctx, name);
+    return spec.kind === 'delay' ? spec.delayTime : NaN;
+  };
+  for (const division of TEMPO_DIVISIONS) {
+    const seconds = tempoSeconds(ctx.model.doc.bpm, division.beats);
+    const button = el('button', 'btn', division.label) as HTMLButtonElement;
+    button.type = 'button';
+    button.title = `${division.title} at ${ctx.model.doc.bpm} bpm = ${fmtMs(seconds)}`;
+    button.setAttribute('aria-pressed', String(Math.abs(current() - seconds) < 1e-6));
+    button.onclick = (): void => {
+      const result = ctx.change({ returns: { [name]: { delayTime: seconds } } });
+      if (!result.ok) return;
+      ctx.status(
+        `return "${name}" time → ${division.title} (${fmtMs(seconds)} at ${ctx.model.doc.bpm} bpm)`,
+      );
+      ctx.render();
+    };
+    row.appendChild(button);
+  }
+  return row;
 }
 
 function returnRow(ctx: AppCtx, name: string): HTMLElement {
@@ -132,6 +191,7 @@ function returnRow(ctx: AppCtx, name: string): HTMLElement {
   knobs.appendChild(levelKnob(ctx, name));
   if (spec.kind === 'delay') {
     for (const knob of delayKnobs(ctx, name)) knobs.appendChild(knob);
+    row.appendChild(tempoRow(ctx, name));
   } else {
     row.appendChild(spacePicker(ctx, name));
     for (const spec2 of SPACE_KNOBS) knobs.appendChild(spaceKnob(ctx, name, spec2));
@@ -143,7 +203,9 @@ function returnRow(ctx: AppCtx, name: string): HTMLElement {
 export function renderReturnsSection(ctx: AppCtx): HTMLElement {
   const returns = section(
     'Returns',
-    'Space, level and the delay line land in the document (returns section) and on the live buses. ' +
+    'The plate (every parameter), the delay (time, regeneration, damping) and both levels land in ' +
+      'the document (returns section) and on the live buses; the tempo buttons set the delay time to a ' +
+      'note value at the document bpm. ' +
       'Which returns exist is code-owned (packages/client/src/audio/mix.ts).',
   );
   for (const name of RETURN_NAMES) returns.body.appendChild(returnRow(ctx, name));

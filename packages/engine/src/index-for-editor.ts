@@ -68,7 +68,13 @@ export type { PartStrip } from './channelStrip';
 export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
 export type { RotationGains, StereoRotate } from './stereoRotate';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
-export { DEFAULT_ARRANGEMENT_NAME, REVERB_SPACE_RANGES } from './audioConstants';
+export {
+  DEFAULT_ARRANGEMENT_NAME,
+  DELAY_FEEDBACK_MAX,
+  DELAY_MAX_SECONDS,
+  REVERB_SPACE_RANGES,
+  SECONDS_PER_MINUTE,
+} from './audioConstants';
 export type { ReverbSpace, SpaceName } from './reverbSpace';
 export { renderPatchToBuffer } from './offlineRender';
 export type { BakeOptions } from './offlineRender';
