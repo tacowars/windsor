@@ -90,10 +90,13 @@ quantisation aliases against a periodic call pattern. It is an order-of-magnitud
 instrument and the code says so in three places (`audioLoad.ts`'s header, the
 overlay's `est`, and `browser-testing.md` §3.4).
 
-`peakPct` inherits the same resolution and is a **lower bound**: it steps in
-units of 1 ms / 2.902 ms = 34.45 % of the budget and reads 0 for every quantum
-under a millisecond. It is informative exactly where it matters — a quantum at
-or over budget crosses two or more boundaries and cannot hide.
+`peakPct` inherits the same resolution and is a **lower bound** — which took a
+review round to make true. A span of N crossings proves the render took more
+than `N − 1` ms and nothing about N itself, so the readout scales `peakMs − 1`:
+one crossing reads 0 % (it proves nothing — the render may have taken a
+microsecond and merely straddled a boundary), two crossings prove one whole
+millisecond. It is informative exactly where it matters, because a quantum at
+or over budget crosses several boundaries and cannot hide.
 
 `underruns` — quanta whose measured span reached the **whole** budget — is the
 one hard number, unaffected by the bias.
@@ -120,7 +123,7 @@ edited. Each is two back-to-back loads per arm, 1 warm-up lap and a 60 s window.
 | `audio.loadPct` p50 | 0.00 %, 0.00 % | **3.39 %, 3.50 %** |
 | `audio.loadPct` p95 | 0.00 %, 0.00 % | 4.20 %, 4.40 % |
 | `audio.loadPct` max | 0.00 %, 0.00 % | 5.41 %, 4.90 % |
-| `audio.peakPct` | 0.00 % | 34.45 % (= the 1 ms floor, i.e. no quantum provably over 1 ms) |
+| `audio.peakPct` | 0.00 % | 34.45 % **as recorded — read it as 0 %**, see the note below |
 | `audio.underruns` | 0 | **0** |
 | frame p95 | 17.2, 17.5 ms | 17.5, 17.1 ms |
 | frame p99 | 17.6, 17.7 ms | 17.7, 17.6 ms |
@@ -148,34 +151,38 @@ scene. Both arms reproduced at **0 % p50 spread**.
   is the most useful line in the table: a duty-cycle sampler that reported noise
   would not produce a clean zero across 3 600 frames of a control, so the arm's
   3.4 % is measuring the DSP rather than the instrument.
-- **Zero underruns**, and `peakPct` pinned at the resolution floor: no single
-  quantum on this machine provably took even one millisecond of its 2.9 ms.
+- **Zero underruns**, and no quantum the clock can convict of anything.
+
+> **These payloads predate a fix and are kept and labelled rather than re-taken**
+> (invariant 3: superseded readings are kept). They were recorded while
+> `peakPct` scaled the raw boundary-crossing count and an underrun was counted
+> at `span ≥ budget`. The review showed a span of N crossings proves only
+> `N − 1` ms of work — a 2.2 ms render straddling three boundaries is not a
+> missed 2.902 ms deadline — so both now subtract that millisecond. Against
+> this same data the current code reads **`peakPct` 0 %** and the same **0
+> underruns**; `loadPct` is untouched by the fix. The correction only makes the
+> two firm numbers firmer, and nothing here overstated the music's cost.
 - **It says nothing about the target box**, whose CPU is a different class and
   whose audio thread contends with a Vega 7 driver. That is the reading that
   matters and it is not this one.
 
-### The second rung, horde 300 (`…T164931Z-…-paired.json`, `allPass: false`)
+### The second rung, horde 300 (`…T164931Z-…-paired.json`)
 
 Run first because objective §8 names 300 as the M3 spot-check rung. Its audio
 numbers agree with the 400 pair almost exactly — `loadPct` p50 3.49 % / 3.59 %,
-`peakPct` 34.45 %, 0 underruns, control flat 0 — and **both of its pairs pass
-the comparison**. Its `allPass` is `false` for a reason that has nothing to do
-with audio, recorded here because the artifact would otherwise be puzzling:
+0 underruns, control flat 0 — and **both of its pairs pass the comparison**.
 
-> Both arms fail their **own stored** `verdict.pass` on epic #54 decision 7's
-> on-screen gates — `visibleP5` 258–261 against a p5 ≥ 300 threshold — with
-> every frame gate green. At `--horde=300` that gate asks for all 300 enemies
-> in frustum in 95 % of frames; the frustum holds ~86 % of the spawn at both
-> rungs (259/300 and 347/400), so it is satisfiable at 400 and unsatisfiable at
-> 300 by construction. The control fails it identically, so it is a property of
-> the rung, not of the music.
+Its stored `allPass` is `false`, for a reason that has nothing to do with
+audio: both arms fail epic #54 decision 7's on-screen gates (`visibleP5`
+258–261 against p5 ≥ 300) with every frame gate green, because the frustum
+holds ~86 % of the spawn and that gate is unsatisfiable at a 300 rung by
+construction. The control fails it identically. **That mismatch is #461.**
 
-This is why the on-screen gates deliberately do not vote in an audio pair
-(`verdict.ts`, `ArmKind`): both sides hold the same horde, so decision 7 would
-be answering the horde's question rather than this arm's. The pair comparison
-is green on both rungs either way. The rung itself is somebody else's ticket —
-noted as an integration request on the PR rather than fixed here, since
-`bench/verdict.ts`'s thresholds are out of bounds for #445.
+The payload also predates the runner fix this PR's review produced: an audio
+run's verdict is now re-derived from its own frame metrics, so the runner no
+longer fails an audio pair on a gate that does not apply to it, and this rung
+would now report a pass. The re-run to refresh the payload was skipped for
+time — the 400-rung pair above is the record, and #461 owns the rung.
 
 ---
 
