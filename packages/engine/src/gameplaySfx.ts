@@ -1,6 +1,7 @@
 import { Quaternion } from '@babylonjs/core/Maths/math.vector';
 import type { Camera } from '@babylonjs/core/Cameras/camera';
-import { cellCentre, INTERPOLATION_DELAY_MS } from '@aotearoa/shared';
+import { cellCentre, INTERPOLATION_DELAY_MS, type HordeState } from '@aotearoa/shared';
+import { ABSENT_ENEMY_Y } from '../horde/hordeConstants';
 import type { SnapshotEntry, SnapshotRing } from '../net/snapshotRing';
 import type { ServerClock } from '../net/serverClock';
 import type { Frame } from '../systems';
@@ -11,6 +12,7 @@ import type { SpatialSfx } from './spatialSfx';
 
 export interface GameplaySfxDeps {
   ring: SnapshotRing;
+  horde?: () => HordeState;
   clock: ServerClock;
   local: () => FootstepSample;
   camera: Camera;
@@ -120,7 +122,14 @@ export class GameplaySfx {
 
   private enemyPosition(entry: SnapshotEntry, slot: number): SfxPosition | undefined {
     const index = entry.slotMap[slot];
-    if (index === undefined || index < 0 || index >= entry.snap.hordeCount) return undefined;
+    if (index === undefined || index < 0 || index >= entry.snap.hordeCount) {
+      // Killing hits outlive their snapshot target. The horde presentation already
+      // retains confirmed corpse positions; reuse it rather than copying every enemy.
+      const state = this.deps.horde?.();
+      if (!state || slot < 0 || slot >= state.count || state.y[slot] === ABSENT_ENEMY_Y)
+        return undefined;
+      return { x: state.x[slot]!, y: state.y[slot]!, z: state.z[slot]! };
+    }
     const x = entry.snap.hordeX[index]!;
     const z = entry.snap.hordeZ[index]!;
     return { x, y: this.deps.height(x, z), z };
