@@ -138,6 +138,11 @@ export class FmEngine {
     for (const part of this.parts.values()) part.allNotesOff();
   }
 
+  /** Every part's `setLiveRetune`: the console's one-call opt-in after a build. */
+  setLiveRetune(enabled: boolean): void {
+    for (const part of this.parts.values()) part.setLiveRetune(enabled);
+  }
+
   dispose(): void {
     for (const part of this.parts.values()) part.dispose();
     this.parts.clear();

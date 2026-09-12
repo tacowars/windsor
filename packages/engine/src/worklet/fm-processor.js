@@ -579,6 +579,20 @@ const KIND_TABLE = 0,
   KIND_SAW_D = 2,
   KIND_SQUARE_D = 3;
 
+/** The render kind an operator's wave id selects; everything not raw or noise is a table. */
+function waveKind(wave) {
+  switch (wave) {
+    case WAVE.NOISE:
+      return KIND_NOISE;
+    case WAVE.SAW_D:
+      return KIND_SAW_D;
+    case WAVE.SQUARE_D:
+      return KIND_SQUARE_D;
+    default:
+      return KIND_TABLE;
+  }
+}
+
 class Voice {
   constructor(sampleRate, random) {
     this.sr = sampleRate;
@@ -677,20 +691,7 @@ class Voice {
       this.amp[i] = 0;
       this.ampInc[i] = 0;
 
-      switch (op.wave) {
-        case WAVE.NOISE:
-          this.kind[i] = KIND_NOISE;
-          break;
-        case WAVE.SAW_D:
-          this.kind[i] = KIND_SAW_D;
-          break;
-        case WAVE.SQUARE_D:
-          this.kind[i] = KIND_SQUARE_D;
-          break;
-        default:
-          this.kind[i] = KIND_TABLE;
-          break;
-      }
+      this.kind[i] = waveKind(op.wave);
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
 
@@ -710,6 +711,33 @@ class Voice {
     this.lfo.reset(patch.lfo.retrigger);
     this.svfA.reset();
     this.svfB.reset();
+  }
+
+  /**
+   * Re-point a sounding voice at a new patch (the console's live knobs). Phase,
+   * amplitude ramps and envelope stages carry on; only the parameter blocks
+   * they read change, so a ratio, level or filter knob is heard on the next
+   * control block instead of the next note. A wave or algorithm switch steps
+   * audibly -- acceptable while designing a sound, which is why the game never
+   * sends `liveRetune` and keeps the click-free note-on binding.
+   */
+  rebind(patch, waveSets) {
+    this.patch = patch;
+    this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
+    this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
+    const keyOffset = (this.note - 60) / 12;
+    for (let i = 0; i < 4; i++) {
+      const op = patch.ops[i];
+      this.kind[i] = waveKind(op.wave);
+      this.mips[i] = waveSets[i];
+      this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
+      // configure() swaps the parameter block and leaves the stage and value alone.
+      this.ampEnv[i].configure(op.env, this.sr);
+      this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
+    }
+    this.filtEnv.configure(patch.filter.env, this.sr);
+    this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
+    this.pitchEnv.configure(patch.pitchEnv, this.sr);
   }
 
   release() {
@@ -1089,6 +1117,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.noteMap = new Map(); // noteId -> array of voice indices
     this.lastNote = null; // for legato glide
     this.running = true;
+    // Off in the game; the console turns it on so a knob retunes ringing voices.
+    this.liveRetune = false;
 
     // Audio-load sampler (#445), off until a `reportLoad` message turns it on,
     // so an offline render and the Node harness time nothing and post nothing.
@@ -1130,10 +1160,17 @@ class FmPartProcessor extends AudioWorkletProcessor {
       case 'patch': {
         this.patch = normalisePatch(msg.patch);
         this.rebuildWaves();
-        // Live voices keep their old patch reference until they finish, which
-        // avoids clicks when tweaking a knob while notes are ringing.
+        // By default live voices keep their old patch reference until they
+        // finish, which avoids clicks when a preset swaps under a ringing note.
+        // The console opts into hearing the knob as it turns instead.
+        if (this.liveRetune) {
+          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets);
+        }
         break;
       }
+      case 'liveRetune':
+        this.liveRetune = !!msg.enabled;
+        break;
       case 'noteOn':
         this.schedule(msg, msg.frame);
         break;
