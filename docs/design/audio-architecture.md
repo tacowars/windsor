@@ -323,3 +323,24 @@ licence standing:
 The two GPL entries are listed precisely because they are the most tempting references.
 Ableton Operator informed the feature set — the waveform range, per-operator envelopes,
 the filter section, and an 11-algorithm set rather than the DX7's 32. No code is involved.
+
+
+## 10. Hybrid gameplay SFX (#489)
+
+The sampled layer anticipated in §2 is adopted by Pat's 2026-09-12 decision:
+[hybrid gameplay sound](../log/2026-09-12-hybrid-gameplay-sound.md).
+`tools/sfx/README.md` describes ElevenLabs authoring, provenance, spend and
+auditioning. This supersedes §8's open question about adopting samples.
+
+`createGameplaySfx.ts` shares the music context, loads sampled footsteps and
+impacts, and bakes `weapon-zap` through `offlineRender.ts`. `SpatialSfx` owns
+independent spatial playback slots and bounded voices; `GameplaySfx` observes
+movement and confirmed hits through the frame registry. The `sfx` console
+command controls its volume independently of music. Credentials are authoring
+only. The listener uses character position and camera orientation.
+
+First-delivery limitations: one earth/grass step bank for all surfaces, metal
+impact candidates, distance-derived contact timing and hit-confirmed gunfire.
+Misses lack a replicated event. Further surface banks, shot events, occlusion,
+reverb zones and priority voice stealing remain separate work. No target-machine
+performance claim or listening verdict is implied by unit tests.
