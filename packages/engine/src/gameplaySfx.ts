@@ -6,11 +6,13 @@ import type { SnapshotEntry, SnapshotRing } from '../net/snapshotRing';
 import type { ServerClock } from '../net/serverClock';
 import type { Frame } from '../systems';
 import { MS_PER_SECOND } from '../timeConstants';
+import { ActionSfx, type ActionSfxDeps } from './actionSfx';
 import { FootstepCadence, type FootstepSample } from './footstepCadence';
 import { SFX_LIMITS, type SfxPosition } from './sfxConstants';
 import type { SpatialSfx } from './spatialSfx';
 
 export interface GameplaySfxDeps {
+  actions?: ActionSfxDeps;
   ring: SnapshotRing;
   horde?: () => HordeState;
   clock: ServerClock;
@@ -23,17 +25,22 @@ export interface GameplaySfxDeps {
 export class GameplaySfx {
   private readonly cadence = new FootstepCadence();
   private readonly rotation = Quaternion.Identity();
+  private readonly actions?: ActionSfx;
   private lastTick: number | null = null;
 
   constructor(
     private readonly audio: Pick<SpatialSfx, 'setListener' | 'play' | 'setVolume' | 'dispose'>,
     private readonly deps: GameplaySfxDeps,
-  ) {}
+  ) {
+    if (deps.actions)
+      this.actions = new ActionSfx(deps.actions, deps.clock, (kind, p) => audio.play(kind, p));
+  }
 
   update({ dt, now }: Frame): void {
     const local = this.deps.local();
     this.deps.camera.getWorldMatrix().decompose(undefined, this.rotation);
     this.audio.setListener(local, this.rotation);
+    this.actions?.update(now, local);
     const newest = this.deps.ring.newest();
     const tick = this.deps.clock.estimate(now);
     if (!newest || tick === null) return;
@@ -82,6 +89,7 @@ export class GameplaySfx {
   /** Page teardown only: Babylon also closes the shared music AudioContext. */
   dispose(): void {
     this.cadence.clear();
+    this.actions?.dispose();
     this.audio.dispose();
   }
 

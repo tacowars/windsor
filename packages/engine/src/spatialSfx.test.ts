@@ -59,6 +59,11 @@ describe('spatial SFX playback ownership', () => {
     step: [{} as AudioBuffer],
     impact: [{} as AudioBuffer],
     weapon: [{} as AudioBuffer],
+    build: [{} as AudioBuffer],
+    repair: [{} as AudioBuffer],
+    mine: [{} as AudioBuffer],
+    deplete: [{} as AudioBuffer],
+    pickup: [{} as AudioBuffer],
   };
 
   it('keeps overlapping emitters and pitch independent', async () => {
