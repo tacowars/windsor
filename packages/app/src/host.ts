@@ -111,6 +111,8 @@ export class EngineHost {
     this.system = new AudioSystem(engine);
     await this.system.init();
     this.system.initMusic(document, (part, tick) => this.log(`${part} sounded (tick ${tick})`));
+    // The console's knobs retune the voices already ringing; the game does not.
+    engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
     await this.system.unlock();
     this.system.startMusic();

@@ -147,6 +147,14 @@ export class AudioPart {
     this.post({ type: 'patch', patch: structuredClone(patch) });
   }
 
+  /**
+   * Make later `setPatch` calls reach the voices already sounding too. The
+   * console's knobs want this; the game leaves it off (`LiveRetuneMessage`).
+   */
+  setLiveRetune(enabled: boolean): void {
+    this.post({ type: 'liveRetune', enabled });
+  }
+
   connect(destination: AudioNode): void {
     this.output.connect(destination);
   }

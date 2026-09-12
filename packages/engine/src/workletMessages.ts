@@ -35,6 +35,17 @@ export interface ControlMessage {
 }
 
 /**
+ * Whether a `patch` message also re-points the voices already sounding. Off by
+ * default: the game swaps presets rarely and a ringing voice keeping its old
+ * patch is what stops the swap clicking. The arrangement console turns it on
+ * so a knob is heard while it is being turned, not on the next note.
+ */
+export interface LiveRetuneMessage {
+  type: 'liveRetune';
+  enabled: boolean;
+}
+
+/**
  * Turn the audio-load sampler on in a processor (#445). Sent once, after the
  * node is built; a processor that never receives it never times anything and
  * never posts, which is how offline renders (`offlineRender.ts`) and the Node
@@ -49,7 +60,8 @@ export interface ReportLoadMessage {
   quanta: number;
 }
 
-export type WorkletMessage = ScheduledMessage | PatchMessage | ControlMessage | ReportLoadMessage;
+export type WorkletMessage =
+  ScheduledMessage | PatchMessage | ControlMessage | LiveRetuneMessage | ReportLoadMessage;
 
 /**
  * One processor's audio-thread cost over the interval just ended (#445) — the
