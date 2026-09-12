@@ -3,14 +3,7 @@ import { renderPatchToBuffer } from './offlineRender';
 import { SFX_PRESETS } from './presetsSfx';
 import { SFX_LIMITS } from './sfxConstants';
 
-const SAMPLE_URLS = {
-  step: [
-    new URL('../../assets/audio/step-earth-a.mp3', import.meta.url).href,
-    new URL('../../assets/audio/step-earth-b.mp3', import.meta.url).href,
-    new URL('../../assets/audio/step-earth-c.mp3', import.meta.url).href,
-  ],
-  impact: [new URL('../../assets/audio/impact-metal-a.mp3', import.meta.url).href],
-};
+import SAMPLE_URLS from 'virtual:a204-audio';
 
 export async function loadSfxBuffers(context: AudioContext): Promise<SfxBuffers> {
   const decode = async (url: string): Promise<AudioBuffer> => {
