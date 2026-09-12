@@ -8,10 +8,10 @@
  * plays it; revert drops the fork and the part falls back to the built-in.
  */
 import type { MusicPartId, Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { PRESETS, PRESET_NAMES } from '../../../packages/client/src/audio/index-for-editor';
+import { PRESETS } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { SLOT_IDS } from './context';
-import { el, select } from './dom';
+import { el } from './dom';
 
 type Slots = Record<string, { preset?: string } | undefined>;
 
@@ -23,20 +23,7 @@ export function patchHome(ctx: AppCtx, id: MusicPartId): 'document' | 'built-in'
   return PRESETS[slot.preset] ? 'built-in' : 'none';
 }
 
-export function presetPicker(ctx: AppCtx, id: MusicPartId, onPick: () => void): HTMLElement {
-  const docNames = Object.keys(ctx.model.doc.patches ?? {}).sort();
-  const options = [
-    ...docNames.map((name) => ({ value: name, label: `${name} · document` })),
-    ...PRESET_NAMES.filter((name) => !docNames.includes(name)).map((name) => ({
-      value: name,
-      label: `${PRESETS[name]?.name ?? name} · built-in`,
-    })),
-  ];
-  return select('Patch (in the document)', options, ctx.model.doc[id]?.preset ?? '', (name) => {
-    const result = ctx.change({ [id]: { preset: name } });
-    if (result.ok) onPick();
-  });
-}
+export { presetBrowser as presetPicker } from './presetBrowser';
 
 export function badgeText(ctx: AppCtx, id: MusicPartId): string {
   const preset = ctx.model.doc[id]?.preset ?? '';

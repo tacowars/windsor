@@ -130,3 +130,6 @@ export { ARP_WALK_MODES, Arpeggiator, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeg
 export type { ArpWalkMode, ArpeggiatorConfig } from './arpeggiator';
 export { DEFAULT_STEP_SEQUENCER_CONFIG, StepSequencer } from './stepSequencer';
 export type { StepSequencerConfig } from './stepSequencer';
+
+export { listPresets, filterPresets } from './presetCatalog';
+export type { PresetListing, PresetFilter } from './presetCatalog';

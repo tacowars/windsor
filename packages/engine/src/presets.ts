@@ -4,6 +4,7 @@
  * Kept as one map because callers address a preset by name and do not care which
  * group it came from; the split exists so each file stays readable.
  */
+import { SCORING_PRESETS } from './presetsScoring';
 import type { Patch } from './patch';
 import { AUTHORED_PRESETS } from './presetsAuthored';
 import { DRUMS_PRESETS } from './presetsDrums';
@@ -15,6 +16,7 @@ export const PRESETS: Record<string, Patch> = {
   ...DRUMS_PRESETS,
   ...SFX_PRESETS,
   ...AUTHORED_PRESETS,
+  ...SCORING_PRESETS,
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);
