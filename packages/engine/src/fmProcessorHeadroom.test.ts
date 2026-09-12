@@ -1,6 +1,6 @@
 /**
- * Every shipped preset clears the clip line, for every draw -- not merely for
- * the draw this run happened to take.
+ * Every shipped preset is checked across seeded draws and its worst recorded
+ * draw. A sampled sweep is evidence, not an exhaustive bound.
  *
  * Split out of fmProcessor.test.ts, which asserts DSP behaviour. This file
  * asserts a property of the patch set: it is the preset volumes that are on
@@ -17,6 +17,8 @@ import { DEFAULT_SEED, loadProcessor, render } from './__fixtures__/workletHarne
 import type { ScheduledEvent } from './__fixtures__/workletHarness';
 import type { Patch } from './patch';
 import { PRESETS, PRESET_NAMES } from './presets';
+import { SCORING_PRESETS } from './presetsScoring';
+import scoringHeadroom from './__fixtures__/scoringHeadroom.json';
 
 const loaded = loadProcessor();
 
@@ -33,12 +35,14 @@ const held = (note: number, frames: number): ScheduledEvent[] => [
  * operator and no stochastic LFO.
  *
  * 64 is a sample, not a bound: what justifies each preset's volume is a
- * 16,384-seed sweep run offline and reported on the PR (#78).
+ * 16,384-seed sweep run offline and reported on the PR (#78) for the original
+ * bank. #475 adds a 256-seed scoring-bank sweep plus full-envelope/register
+ * and chord tests; neither finite sweep is an exhaustive bound.
  */
 const SWEEP_SEEDS = 64;
 
 /**
- * The seed that produced each preset's worst peak in that 16,384-seed sweep,
+ * The seed that produced each original preset's worst peak in that 16,384-seed sweep,
  * rendered alongside the sample above.
  *
  * Without these the sweep is only lucky. `weapon-zap` is the proof: restored
@@ -65,6 +69,9 @@ const WORST_KNOWN_SEED: Record<string, number> = {
   'build-thunk': 11629,
   'saw-arp': 3684,
   'drone-sqr': 1367,
+  ...Object.fromEntries(
+    Object.entries(scoringHeadroom.results).map(([id, result]) => [id, result.seed]),
+  ),
 };
 
 describe('presets render clean audio', () => {
@@ -99,7 +106,9 @@ describe('presets render clean audio', () => {
     }
 
     expect(nonFinite).toBe(0);
-    expect(quietest).toBeGreaterThan(0.002);
+    // A quarter-second gate interrupts slow scoring swells before their attack.
+    // Full-envelope audibility and release are checked in presetsScoring.test.ts.
+    expect(quietest).toBeGreaterThan(Object.hasOwn(SCORING_PRESETS, name) ? 0 : 0.002);
     expect(loudest, `${name} clips at seed ${loudestSeed}`).toBeLessThanOrEqual(1);
   });
 });
