@@ -42,6 +42,8 @@ function filterControls(entries: PresetListing[], refresh: () => void): HTMLElem
     const values = [
       ...new Set(entries.flatMap((entry) => (field === 'tag' ? entry.tags : [entry[field]]))),
     ].sort();
+    // Keep an active filter visible after an import/revert removes its last entry.
+    if (filter[field] && !values.includes(filter[field])) values.push(filter[field]);
     box.appendChild(
       select(
         `Preset ${field}`,
