@@ -90,6 +90,15 @@ describe('the User wave', () => {
     expect(after.second).toBeGreaterThan(after.third * PRESENT_OVER_ABSENT);
   });
 
+  it('keeps an empty partial list (silence) apart from none (a sine)', () => {
+    // Silence built first is the order that used to hand the sine patch the
+    // silent table, when both keyed to ''.
+    const silent = held(userPatch([]));
+    const sine = held(userPatch(null));
+    expect(silent.rms).toBe(0);
+    expect(sine.rms).toBeGreaterThan(AUDIBLE_RMS);
+  });
+
   it('plays a sine when no partials are set', () => {
     const sine = held(userPatch(null));
     expect(sine.rms).toBeGreaterThan(AUDIBLE_RMS);

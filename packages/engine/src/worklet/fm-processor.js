@@ -208,7 +208,8 @@ function quantiseMips(mips, levels) {
  * and for a User wave by the partials themselves (#511). The key used to be the
  * patch's `userKey`, which only worked while every author picked a unique one:
  * a User wave left at the default '' shared the first such table built, and a
- * harmonic edit kept playing the old one. Equal partials still share a table,
+ * harmonic edit kept playing the old one. `null` (a sine) and `[]` (silence)
+ * keep distinct keys. Equal partials still share a table,
  * so the scoring bank's User presets render exactly as before. Only a `patch`
  * message reaches here, never the audio loop, so the string is fine.
  */
@@ -217,7 +218,9 @@ const WAVE_CACHE_LIMIT = 64;
 
 function getMips(waveId, sampleRate, tone, userPartials) {
   const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
-  const content = waveId === WAVE.USER && userPartials ? userPartials.join(',') : '';
+  // null plays a sine and [] plays silence: the two must never share a key.
+  let content = '';
+  if (waveId === WAVE.USER) content = userPartials ? '[' + userPartials.join(',') + ']' : 'null';
   const key = waveId + '|' + toneQ + '|' + content;
   let mips = WAVE_CACHE.get(key);
   if (mips) return mips;

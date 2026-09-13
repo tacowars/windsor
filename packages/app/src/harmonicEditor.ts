@@ -8,6 +8,7 @@ import { OP_NAMES, WAVE } from '../../../packages/client/src/audio/index-for-edi
 import { el, seg } from './dom';
 import {
   HARMONIC_COUNTS,
+  PREVIEW_POINTS,
   countFor,
   paintStroke,
   pointToBar,
@@ -19,7 +20,6 @@ import {
 import type { BarPoint, HarmonicCount } from './harmonicModel';
 import { partsState, pushPatch } from './patchState';
 
-const PREVIEW_POINTS = 96;
 const BAR_GAP_PX = 1;
 
 /** Give a User operator something to draw on; other waves keep whatever they carry. */
@@ -148,6 +148,12 @@ export function harmonicEditor(i: number, color: string): { root: HTMLElement; s
   foot.append(counts, preview);
   root.append(el('span', 'field-label', 'Harmonics'), bars, foot);
   attachStroke(bars, i, redraw);
+  // The rail can be rebuilt while its tab is hidden (a document import from
+  // another tab), where the canvases measure 0 × 0; a tab switch only flips
+  // `hidden`. Redraw whenever the bars canvas gains a size.
+  new ResizeObserver(() => {
+    if (bars.clientWidth > 0) redraw();
+  }).observe(bars);
   const sync = (): void => {
     const user = partsState.patch.ops[i]?.wave === WAVE.USER;
     root.style.display = user ? '' : 'none';
