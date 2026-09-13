@@ -1,9 +1,13 @@
 /**
- * The `music` console command (#119), registered by the system that owns the
- * mute. The `M` key and the command are one setter, so the test asserts they
- * log the same `music` event and that the command is registered even under
- * `?music=0`, where it reports a suppressed transport rather than going
- * missing.
+ * The music transport's two dev and startup paths, after #521 removed the `M`
+ * key: the `music` console command (#119), registered by the system that owns
+ * the transport mute, and the autoplay-unlock branch that starts the music at
+ * the first gesture. The command is registered even under `?music=0`, where
+ * it reports a suppressed transport rather than going missing.
+ *
+ * `KeyM` gets a test of its own (#521 decision 1) — a press must change
+ * neither the mute nor the transport — because the key is free now and the
+ * only player-facing music mute is the Settings panel's.
  *
  * The audio system is a stand-in with the four members the controls touch:
  * `AudioSystem` itself builds an `AudioContext`, which is exactly what does
@@ -69,6 +73,8 @@ describe('installMusicControls', () => {
   const press = (code: string, repeat = false): void => {
     for (const l of [...listeners]) l({ code, repeat } as KeyboardEvent);
   };
+  /** The unlock branch resolves a promise before it starts the transport. */
+  const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
   beforeEach(() => {
     log = vi.fn<MusicLog>();
@@ -91,7 +97,7 @@ describe('installMusicControls', () => {
     expect(commands.run('music')).toEqual(['music on — transport running']);
   });
 
-  it('mutes and unmutes, logging what the `M` key logs', () => {
+  it('stops and restarts the transport from the command, logging each move', () => {
     const { system } = fakeAudio();
     const commands = new CommandRegistry();
     installMusicControls(system, ON, log, commands);
@@ -101,9 +107,71 @@ describe('installMusicControls', () => {
     expect(system.isMuted).toBe(true);
     expect(log).toHaveBeenCalledWith({ state: 'muted' });
     log.mockClear();
-    press('KeyM');
+    expect(commands.run('music on')).toEqual(['music on — transport running']);
     expect(system.isMuted).toBe(false);
     expect(log).toHaveBeenCalledWith({ state: 'unmuted' });
+  });
+
+  it('does nothing on `KeyM` — the panel owns the player mute now (#521 decision 1)', async () => {
+    const { system } = fakeAudio();
+    const commands = new CommandRegistry();
+    installMusicControls(system, ON, log, commands);
+    commands.run('music off');
+    log.mockClear();
+
+    press('KeyM');
+    await settle();
+
+    expect(system.isMuted).toBe(true);
+    expect(system.musicRunning).toBe(false);
+    expect(log).not.toHaveBeenCalledWith({ state: 'unmuted' });
+    // Held or not, the key is inert: no listener reads it at all.
+    press('KeyM', true);
+    await settle();
+    expect(system.isMuted).toBe(true);
+    expect(log).not.toHaveBeenCalledWith({ state: 'unmuted' });
+  });
+
+  it('still starts the music at the first gesture (the unlock path)', async () => {
+    const { system } = fakeAudio();
+    installMusicControls(system, ON, log);
+
+    press('KeyM');
+    await settle();
+
+    // Even the freed key is a gesture: unlock is bound to any `keydown`.
+    expect(system.musicRunning).toBe(true);
+    expect(log).toHaveBeenCalledWith({
+      state: 'started',
+      bpm: 100,
+      root: 0,
+      scale: 'minor',
+    });
+  });
+
+  it('starts nothing at the first gesture under ?music=0', async () => {
+    const { system, state } = fakeAudio();
+    installMusicControls(system, OFF, log);
+
+    press('KeyW');
+    await settle();
+
+    expect(state.suppressed).toBe(true);
+    expect(system.musicRunning).toBe(false);
+    expect(log).not.toHaveBeenCalledWith(expect.objectContaining({ state: 'started' }));
+  });
+
+  it('starts nothing at the first gesture while the transport is stopped', async () => {
+    const { system } = fakeAudio();
+    const commands = new CommandRegistry();
+    installMusicControls(system, ON, log, commands);
+    commands.run('music off');
+
+    press('KeyW');
+    await settle();
+
+    expect(system.musicRunning).toBe(false);
+    expect(log).not.toHaveBeenCalledWith(expect.objectContaining({ state: 'started' }));
   });
 
   it('logs nothing when the argument is what it already is', () => {
