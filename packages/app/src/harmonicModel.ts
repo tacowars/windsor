@@ -11,6 +11,11 @@ export const HARMONIC_COUNTS = [16, 32, 64] as const;
 export type HarmonicCount = (typeof HARMONIC_COUNTS)[number];
 const FEWEST: HarmonicCount = 16;
 const MOST: HarmonicCount = 64;
+/**
+ * Preview samples per cycle: 8 per cycle of the highest offered harmonic, so
+ * none of the 64 aliases in the drawing (96 folded 49–64 onto lower ones).
+ */
+export const PREVIEW_POINTS = MOST * 8;
 
 /** A User wave with nothing drawn yet: the pure fundamental the worklet already plays for null. */
 export function seedPartials(count: HarmonicCount = FEWEST): number[] {

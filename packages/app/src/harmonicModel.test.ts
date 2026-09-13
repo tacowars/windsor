@@ -11,6 +11,7 @@ import { FULL_ARRANGEMENT } from '../../../packages/client/src/audio/__fixtures_
 import { WAVE, makePatch } from '../../../packages/client/src/audio/index-for-editor';
 import { DocumentModel } from './documentModel';
 import {
+  PREVIEW_POINTS,
   countFor,
   drawablePartials,
   paintStroke,
@@ -88,6 +89,19 @@ describe('harmonic bars', () => {
     expect(Math.max(...odd.map(Math.abs))).toBeCloseTo(1, 6);
     expect(odd[16]).not.toBeCloseTo(1, 2);
     expect([...waveCycle([0, 0], 8)].every((v) => v === 0)).toBe(true);
+  });
+
+  it('previews the highest harmonics without aliasing them away', () => {
+    const top = Array(64).fill(0);
+    top[0] = 1;
+    top[31] = 1;
+    top[63] = 1;
+    const withTop = waveCycle(top, PREVIEW_POINTS);
+    const sine = waveCycle([1], PREVIEW_POINTS);
+    const deviation = withTop.reduce((m, v, i) => Math.max(m, Math.abs(v - (sine[i] ?? 0))), 0);
+    expect(deviation).toBeGreaterThan(0.1);
+    // Every offered harmonic sits below the preview's Nyquist.
+    expect(PREVIEW_POINTS / 2).toBeGreaterThan(top.length);
   });
 });
 
