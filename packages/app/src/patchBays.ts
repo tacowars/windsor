@@ -7,6 +7,7 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { $, el } from './dom';
 import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
+import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import { CARRIER_COLOR, MOD_COLOR } from './patchPanels';
 import { partsState, pathKnob, pushPatch } from './patchState';
 
@@ -54,7 +55,7 @@ function bayHead(i: number, isCar: boolean, adv: HTMLElement): HTMLElement {
   return head;
 }
 
-function waveAndPitchLine(i: number): HTMLElement {
+function waveAndPitchLine(i: number, onWave: () => void): HTMLElement {
   const line = el('div', 'bay-line');
   const waveWrap = el('div', 'grow', '<span class="field-label">Wave</span>');
   const waveSel = document.createElement('select');
@@ -66,7 +67,9 @@ function waveAndPitchLine(i: number): HTMLElement {
   waveSel.onchange = (): void => {
     const target = partsState.patch.ops[i];
     if (target) target.wave = Number(waveSel.value);
+    ensureUserPartials(i);
     pushPatch();
+    onWave();
   };
   waveWrap.appendChild(waveSel);
   line.appendChild(waveWrap);
@@ -124,7 +127,9 @@ function mainKnobRow(i: number, color: string, syncActive: () => void): HTMLElem
 
 function bayBody(i: number, color: string, syncActive: () => void): HTMLElement {
   const body = el('div', 'bay-body');
-  body.appendChild(waveAndPitchLine(i));
+  const harmonics = harmonicEditor(i, color);
+  body.appendChild(waveAndPitchLine(i, harmonics.sync));
+  body.appendChild(harmonics.root);
   body.appendChild(mainKnobRow(i, color, syncActive));
 
   const canvas = el('canvas', 'env-canvas') as HTMLCanvasElement;

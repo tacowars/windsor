@@ -204,14 +204,24 @@ function quantiseMips(mips, levels) {
 
 /**
  * Shared across every processor instance in this worklet global scope, so 16
- * parts using a saw pay for the tables once. Keyed by waveform + quantised tone.
+ * parts using a saw pay for the tables once. Keyed by waveform + quantised tone,
+ * and for a User wave by the partials themselves (#511). The key used to be the
+ * patch's `userKey`, which only worked while every author picked a unique one:
+ * a User wave left at the default '' shared the first such table built, and a
+ * harmonic edit kept playing the old one. `null` (a sine) and `[]` (silence)
+ * keep distinct keys. Equal partials still share a table,
+ * so the scoring bank's User presets render exactly as before. Only a `patch`
+ * message reaches here, never the audio loop, so the string is fine.
  */
 const WAVE_CACHE = new Map();
 const WAVE_CACHE_LIMIT = 64;
 
-function getMips(waveId, sampleRate, tone, userPartials, userKey) {
+function getMips(waveId, sampleRate, tone, userPartials) {
   const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
-  const key = waveId + '|' + toneQ + '|' + (waveId === WAVE.USER ? userKey : '');
+  // null plays a sine and [] plays silence: the two must never share a key.
+  let content = '';
+  if (waveId === WAVE.USER) content = userPartials ? '[' + userPartials.join(',') + ']' : 'null';
+  const key = waveId + '|' + toneQ + '|' + content;
   let mips = WAVE_CACHE.get(key);
   if (mips) return mips;
 
@@ -1150,7 +1160,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
       if (op.wave === WAVE.NOISE || op.wave === WAVE.SAW_D || op.wave === WAVE.SQUARE_D) {
         this.waveSets[i] = null;
       } else {
-        this.waveSets[i] = getMips(op.wave, sampleRate, p.tone, op.userPartials, op.userKey);
+        this.waveSets[i] = getMips(op.wave, sampleRate, p.tone, op.userPartials);
       }
     }
   }
