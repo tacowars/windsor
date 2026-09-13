@@ -129,19 +129,25 @@ function attachKnobInput(
     node.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
+  const stop = (e: PointerEvent): void => {
+    dragging = false;
+    if (node.hasPointerCapture(e.pointerId)) node.releasePointerCapture(e.pointerId);
+  };
   node.addEventListener('pointermove', (e) => {
     if (!dragging) return;
+    // A release the knob never saw (capture lost to a window blur, a release
+    // outside the browser, a re-render) would otherwise leave the drag live,
+    // and the knob would follow the cursor whenever it hovers back.
+    if ((e.buttons & 1) === 0) {
+      stop(e);
+      return;
+    }
     const range = e.shiftKey ? 900 : 190;
     commit(scale.fromNorm(startN - (e.clientY - startY) / range));
   });
-  const stop = (e: PointerEvent): void => {
-    if (dragging) {
-      dragging = false;
-      node.releasePointerCapture(e.pointerId);
-    }
-  };
   node.addEventListener('pointerup', stop);
   node.addEventListener('pointercancel', stop);
+  node.addEventListener('lostpointercapture', stop);
   node.addEventListener('dblclick', () => commit(spec.def));
   node.addEventListener('keydown', (e) => {
     const stepN = e.shiftKey ? 0.002 : 0.02;
