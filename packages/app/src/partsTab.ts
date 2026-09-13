@@ -19,6 +19,8 @@ import type { AppCtx } from './context';
 import { SLOT_IDS } from './context';
 import { $, el, seg } from './dom';
 import type { Keyboard } from './keyboard';
+import type { MidiAccessor } from './midiAccess';
+import { midiPanel } from './midiPanel';
 import { badgeText, libraryControls, presetPicker } from './patchLibrary';
 import { buildAlgPicker, buildFilter, buildGlobal, buildLfo, buildPitch } from './patchPanels';
 import { buildBays } from './patchBays';
@@ -75,6 +77,7 @@ const GRID_HTML = `
       <button class="btn" id="panicBtn" type="button">Panic</button>
       <button class="btn" id="jsonBtn" type="button">Patch JSON</button>
     </div>
+    <div id="midiSlot"></div>
   </div>`;
 
 /** Reload the working patch: the document's patch, else the built-in the part plays. */
@@ -103,7 +106,7 @@ function refreshPatchUi(): void {
   buildPitch();
 }
 
-function partPicker(ctx: AppCtx): HTMLElement {
+function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
   const box = el('div');
   box.appendChild(el('div', 'section-title', '<span>Part</span>'));
   const present = SLOT_IDS.filter((id) => ctx.model.doc[id] !== undefined);
@@ -114,6 +117,7 @@ function partPicker(ctx: AppCtx): HTMLElement {
       (id) => {
         partsState.selected = id as MusicPartId;
         loadWorkingPatch(ctx);
+        onSwitch();
         refreshPatchUi();
         syncPresetAndBadge(ctx);
       },
@@ -172,7 +176,12 @@ function wireJsonDialog(ctx: AppCtx): void {
   };
 }
 
-export function renderPartsTab(body: HTMLElement, ctx: AppCtx, keyboard: Keyboard): void {
+export function renderPartsTab(
+  body: HTMLElement,
+  ctx: AppCtx,
+  keyboard: Keyboard,
+  midi: MidiAccessor,
+): void {
   body.innerHTML = GRID_HTML;
   hooks.refresh = refreshPatchUi;
   hooks.commit = (): void => commitPatch(ctx);
@@ -180,7 +189,9 @@ export function renderPartsTab(body: HTMLElement, ctx: AppCtx, keyboard: Keyboar
     partsState.selected = SLOT_IDS.find((id) => ctx.model.doc[id] !== undefined) ?? 'kick';
   }
   loadWorkingPatch(ctx);
-  $('partPick').appendChild(partPicker(ctx));
+  keyboard.followPart();
+  $('partPick').appendChild(partPicker(ctx, () => keyboard.followPart()));
+  $('midiSlot').appendChild(midiPanel(midi));
   syncPresetAndBadge(ctx);
   refreshPatchUi();
   startScope($('scope') as HTMLCanvasElement, () => ctx.host.analyser);

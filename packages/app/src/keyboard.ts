@@ -4,8 +4,12 @@
  */
 import type { AudioPart } from '../../../packages/client/src/audio/index-for-editor';
 import { $, el } from './dom';
+import type { PerformerSink } from './midiPerformer';
 
 const BLACK = new Set([1, 3, 6, 8, 10]);
+const KEY_COUNT = 24;
+/** What the QWERTY row and the mouse strike with; MIDI brings its own. */
+const FIXED_VELOCITY = 0.9;
 const QWERTY: Record<string, number> = {
   a: 0,
   w: 1,
@@ -68,8 +72,15 @@ export class Keyboard {
   octave = 4;
   hold = false;
 
+  /** Called after Panic, so a MIDI performer can forget notes the part no longer sounds. */
+  onPanic: (() => void) | null = null;
+
   private readonly held = new Map<string, Held>();
   private readonly getPart: () => AudioPart | null;
+  /** The part carrying the controller's bend and wheel, and their positions. */
+  private expressionPart: AudioPart | null = null;
+  private bendSemitones = 0;
+  private wheel = 0;
 
   constructor(getPart: () => AudioPart | null) {
     this.getPart = getPart;
@@ -78,7 +89,7 @@ export class Keyboard {
   /** Build the keys into `box` and wire the octave label. */
   render(box: HTMLElement): void {
     box.innerHTML = '';
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < KEY_COUNT; i++) {
       const key = el('div', 'key');
       key.dataset.offset = String(i);
       if (BLACK.has(i % 12)) key.dataset.black = '1';
@@ -119,20 +130,68 @@ export class Keyboard {
     this.getPart()?.panic();
     this.held.clear();
     document.querySelectorAll('.key.down').forEach((k) => k.classList.remove('down'));
+    this.bendSemitones = 0;
+    this.wheel = 0;
+    this.followPart();
+    this.onPanic?.();
+  }
+
+  /**
+   * Hand the controller's bend and wheel to the selected part: the part that
+   * had them returns to rest, the new one takes the current positions. The
+   * part picker calls this on a switch; every expression change does too.
+   */
+  followPart(): void {
+    const part = this.getPart();
+    if (this.expressionPart && this.expressionPart !== part) {
+      this.expressionPart.pitchBend.value = 0;
+      this.expressionPart.modWheel.value = 0;
+    }
+    this.expressionPart = part;
+    if (part) {
+      part.pitchBend.value = this.bendSemitones;
+      part.modWheel.value = this.wheel;
+    }
+  }
+
+  /** One MIDI input's view of this keyboard: real note numbers, real velocity, its own held notes. */
+  midiSink(inputId: string): PerformerSink {
+    return {
+      press: (note, velocity) => {
+        const offset = note - this.octave * 12;
+        const keys = document.getElementById('keys');
+        const keyEl = offset >= 0 && offset < KEY_COUNT ? keys?.children[offset] : undefined;
+        const el = (keyEl as HTMLElement | undefined) ?? null;
+        this.play(`midi:${inputId}:${note}`, note, velocity, el);
+      },
+      release: (note, force) => this.lift(`midi:${inputId}:${note}`, force),
+      bend: (semitones) => {
+        this.bendSemitones = semitones;
+        this.followPart();
+      },
+      modWheel: (value) => {
+        this.wheel = value;
+        this.followPart();
+      },
+    };
   }
 
   private press(source: string, offset: number, keyEl: HTMLElement | null): void {
+    this.play(source, this.octave * 12 + offset, FIXED_VELOCITY, keyEl);
+  }
+
+  private play(source: string, note: number, velocity: number, keyEl: HTMLElement | null): void {
     const part = this.getPart();
     if (!part) return;
-    const id = part.noteOn(this.octave * 12 + offset, 0.9);
+    const id = part.noteOn(note, velocity);
     keyEl?.classList.add('down');
     this.held.set(source, { id, part, el: keyEl });
   }
 
-  private lift(source: string): void {
+  private lift(source: string, force = false): void {
     const held = this.held.get(source);
     if (!held) return;
-    if (!this.hold) held.part.noteOff(held.id);
+    if (!this.hold || force) held.part.noteOff(held.id);
     held.el?.classList.remove('down');
     this.held.delete(source);
   }
