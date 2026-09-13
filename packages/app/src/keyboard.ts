@@ -154,16 +154,17 @@ export class Keyboard {
     }
   }
 
-  /** The MIDI performer's view of this keyboard: real note numbers, real velocity. */
-  midiSink(): PerformerSink {
+  /** One MIDI input's view of this keyboard: real note numbers, real velocity, its own held notes. */
+  midiSink(inputId: string): PerformerSink {
     return {
       press: (note, velocity) => {
         const offset = note - this.octave * 12;
         const keys = document.getElementById('keys');
         const keyEl = offset >= 0 && offset < KEY_COUNT ? keys?.children[offset] : undefined;
-        this.play(`midi:${note}`, note, velocity, (keyEl as HTMLElement | undefined) ?? null);
+        const el = (keyEl as HTMLElement | undefined) ?? null;
+        this.play(`midi:${inputId}:${note}`, note, velocity, el);
       },
-      release: (note) => this.lift(`midi:${note}`),
+      release: (note, force) => this.lift(`midi:${inputId}:${note}`, force),
       bend: (semitones) => {
         this.bendSemitones = semitones;
         this.followPart();
@@ -187,10 +188,10 @@ export class Keyboard {
     this.held.set(source, { id, part, el: keyEl });
   }
 
-  private lift(source: string): void {
+  private lift(source: string, force = false): void {
     const held = this.held.get(source);
     if (!held) return;
-    if (!this.hold) held.part.noteOff(held.id);
+    if (!this.hold || force) held.part.noteOff(held.id);
     held.el?.classList.remove('down');
     this.held.delete(source);
   }

@@ -9,7 +9,7 @@ function recorder(): { sink: PerformerSink; log: string[] } {
     log,
     sink: {
       press: (note, velocity) => log.push(`on ${note} ${velocity}`),
-      release: (note) => log.push(`off ${note}`),
+      release: (note, force) => log.push(force ? `off! ${note}` : `off ${note}`),
       bend: (st) => log.push(`bend ${st}`),
       modWheel: (v) => log.push(`wheel ${v}`),
     },
@@ -66,11 +66,27 @@ describe('MidiPerformer', () => {
     [pedal(true), on(60), off(60), on(67)].forEach((e) => p.handle(e));
     log.length = 0;
     p.releaseAll();
-    expect(log.sort()).toEqual(['bend 0', 'off 60', 'off 67', 'wheel 0']);
+    // Forced: a lost device's notes go even while the console's Hold latch is on.
+    expect(log.sort()).toEqual(['bend 0', 'off! 60', 'off! 67', 'wheel 0']);
     log.length = 0;
     p.handle(pedal(false));
     p.handle(off(67));
     expect(log).toEqual([]);
+  });
+
+  it('keeps two inputs apart when both hold the same pitch', () => {
+    const a = recorder();
+    const b = recorder();
+    const keys = new MidiPerformer(a.sink);
+    const pads = new MidiPerformer(b.sink);
+    keys.handle(on(60));
+    pads.handle(on(60));
+    keys.handle({ type: 'sustain', down: true });
+    pads.handle(off(60));
+    keys.handle(off(60));
+    // The pad's release is its own; the keyboard's note is held by its own pedal.
+    expect(a.log).toEqual(['on 60 0.5']);
+    expect(b.log).toEqual(['on 60 0.5', 'off 60']);
   });
 
   it('forgets after Panic without releasing again', () => {
