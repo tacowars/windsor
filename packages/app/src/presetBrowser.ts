@@ -97,21 +97,25 @@ export function presetBrowser(ctx: AppCtx, id: MusicPartId, onPick: () => void):
     results.disabled = matches.length === 0;
     describe();
   };
-  const apply = (): void => {
+  load.setAttribute('aria-label', 'Load patch');
+  // onPick rebuilds the rail, so focus is restored by label onto the new elements. A
+  // keyboard load stays in the list to keep browsing; a mouse load lands on the button,
+  // where the QWERTY keys play the new sound (they are ignored inside a select).
+  const apply = (focusLabel: string): void => {
     if (choosePreset(ctx, id, results.value)) {
       onPick();
-      document.querySelector<HTMLElement>('[aria-label="Preset results"]')?.focus();
+      document.querySelector<HTMLElement>(`[aria-label="${focusLabel}"]`)?.focus();
     }
   };
   results.onchange = describe;
-  results.ondblclick = apply;
+  results.ondblclick = (): void => apply('Load patch');
   results.onkeydown = (event): void => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      apply();
+      apply('Preset results');
     }
   };
-  load.onclick = apply;
+  load.onclick = (): void => apply('Load patch');
   box.append(current, filterControls(entries, refresh), count, results, description, load);
   refresh();
   return box;
