@@ -204,14 +204,19 @@ function quantiseMips(mips, levels) {
 
 /**
  * Shared across every processor instance in this worklet global scope, so 16
- * parts using a saw pay for the tables once. Keyed by waveform + quantised tone.
+ * parts using a saw pay for the tables once. Keyed by waveform + quantised tone,
+ * and for a User wave by the partials themselves (#511): a key the patch
+ * supplied (`userKey`, '' in every shipped patch) let two different User waves
+ * share one table and let a harmonic edit keep playing the old one. Only a
+ * `patch` message reaches here, never the audio loop, so the string is fine.
  */
 const WAVE_CACHE = new Map();
 const WAVE_CACHE_LIMIT = 64;
 
-function getMips(waveId, sampleRate, tone, userPartials, userKey) {
+function getMips(waveId, sampleRate, tone, userPartials) {
   const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
-  const key = waveId + '|' + toneQ + '|' + (waveId === WAVE.USER ? userKey : '');
+  const content = waveId === WAVE.USER && userPartials ? userPartials.join(',') : '';
+  const key = waveId + '|' + toneQ + '|' + content;
   let mips = WAVE_CACHE.get(key);
   if (mips) return mips;
 
@@ -1150,7 +1155,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
       if (op.wave === WAVE.NOISE || op.wave === WAVE.SAW_D || op.wave === WAVE.SQUARE_D) {
         this.waveSets[i] = null;
       } else {
-        this.waveSets[i] = getMips(op.wave, sampleRate, p.tone, op.userPartials, op.userKey);
+        this.waveSets[i] = getMips(op.wave, sampleRate, p.tone, op.userPartials);
       }
     }
   }

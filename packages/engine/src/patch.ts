@@ -92,7 +92,9 @@ export interface Envelope {
 
 export interface Operator {
   wave: number;
+  /** Harmonic amplitudes for the User wave, fundamental first; null plays a sine. */
   userPartials: number[] | null;
+  /** Unused since #511: the worklet caches a User wave by its partials. Kept for old documents. */
   userKey: string;
   ratio: number;
   fixed: boolean;
