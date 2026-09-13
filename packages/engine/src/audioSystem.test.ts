@@ -250,7 +250,12 @@ describe('SFX parts', () => {
     sourceOf(part).feed = MONO;
 
     expect(part.gain.value).toBe(level);
-    expect(nodesBetween(fake(live.rotation.output), fake(engine.master))).toEqual([]);
+    // One node stands between the strip and the master, and it is the SFX
+    // fader at unity (#518): still no bus insert, and the rendered level
+    // below is unchanged because multiplying by exactly 1 is exact.
+    const dryPath = nodesBetween(fake(live.rotation.output), fake(engine.master));
+    expect(dryPath.map((node) => node.kind)).toEqual(['gain']);
+    expect(gainOf(dryPath[0] as unknown as AudioNode)).toBe(1);
     expect(reaches(fake(part.output), fake(engine.master))).toBe(true);
 
     const [master] = renderGraph(context, 0.5, [fake(engine.master)]);

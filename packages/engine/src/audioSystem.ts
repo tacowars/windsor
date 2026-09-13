@@ -8,12 +8,24 @@
  *
  * The standing graph, per docs/log/2026-08-31-mixer-sends-returns-and-channel-strips.md:
  *
- *   part.output ─┬─ [rotate θ] ─▶ musicBus ─▶ [highpass] ─▶ master ─▶ limiter ─▶ out
- *                ├─ send ─▶ return "room" (plate, 100% wet) ─▶ master
- *                └─ send ─▶ return "echo" (delay)           ─▶ master
+ *   music part.output ─┬─ [rotate θ] ─▶ musicBus.input ─▶ [highpass] ─┐
+ *                      ├─ send ─▶ return "room" (plate, 100% wet) ────┤
+ *                      └─ send ─▶ return "echo" (delay) ────────────┤
+ *                                                                   ▼
+ *                                          musicBus.output  (the Music fader)
+ *                                                                   │
+ *   sfx part.output ──── [rotate θ] ─▶ sfxLevel (the SFX fader) ───┐   │
+ *                                                                   │   │
+ *                                                        master ◀───┴───┘
+ *                                                          └─▶ limiter ─▶ out
  *
- * SFX parts get the same strip with the master as their dry destination, so
- * they skip the music bus's inserts but still have a real pan and a send.
+ * SFX parts get the same strip with the SFX fader as their dry destination,
+ * so they skip the music bus's inserts but still have a real pan and a send.
+ * `musicBus.output` and `sfxLevel` are the settings panel's two channel
+ * faders (#518 decision 1): the music one is the bus's existing output gain,
+ * so the dry path gains no node, and the returns are summed into it so the
+ * room follows the music down. The engine's master is not a fader and never
+ * becomes one.
  *
  * Music comes in as an `ArrangementDocument` (issue #75): the committed JSON,
  * normalised by `makeArrangement`. `initMusic` builds a part per section the
@@ -79,6 +91,10 @@ export class AudioSystem {
   private readonly returnSpecs: Readonly<Record<string, ReturnSpec>>;
   private musicBus: AudioBus | null = null;
   private returns: Readonly<Record<string, ReturnBus>> | null = null;
+  /** The SFX strips' dry summing gain — the SFX fader (#518); built by `init()`. */
+  private sfxLevel: GainNode | null = null;
+  private musicGainValue = 1;
+  private sfxGainValue = 1;
   private readonly strips = new Map<string, PartStrip>();
   private readonly loadMeter = new AudioLoadMeter();
   private started = false;
@@ -105,7 +121,17 @@ export class AudioSystem {
     if (this.started) return;
     await this.engine.init();
     this.musicBus = this.engine.createBus({ filter: { type: 'highpass', frequency: 30 } });
-    this.returns = createReturns(this.engine.context, this.returnSpecs, this.engine.master);
+    // The returns land on the music bus's output gain rather than on the
+    // master (#518 decision 1), so the music fader — which *is* that gain —
+    // takes the room and the echo down with the parts feeding them. They sit
+    // after the bus's highpass, exactly as they did on the master.
+    this.returns = createReturns(this.engine.context, this.returnSpecs, this.musicBus.output);
+    this.sfxLevel = this.engine.context.createGain();
+    this.sfxLevel.connect(this.engine.master);
+    // A level set before `init()` (the settings read at boot) lands on the
+    // nodes the moment they exist, so no sound is ever made at the wrong one.
+    this.musicBus.output.gain.value = this.musicGainValue;
+    this.sfxLevel.gain.value = this.sfxGainValue;
     // The plate is a standing processor on the audio thread, so it reports too
     // (#445): a load figure that counted only the parts would understate the
     // music by the whole reverb.
@@ -156,10 +182,38 @@ export class AudioSystem {
     return this.route(name, sound, maxVoices, musicBus.input, strip);
   }
 
-  /** Create a part on its strip, dry into the master, for UI and close-up SFX. */
+  /**
+   * Create a part on its strip, dry into the SFX fader, for UI and close-up
+   * SFX. The fader is one `GainNode` at unity until the settings move it
+   * (#518), so a part's path to the master is otherwise what it always was.
+   */
   createSfxPart(name: string, preset: string, maxVoices = 8): AudioPart {
     this.standing();
-    return this.route(name, preset, maxVoices, this.engine.master);
+    return this.route(name, preset, maxVoices, this.sfxNode());
+  }
+
+  /**
+   * The music fader (#518 decision 1): the music bus's own output gain, which
+   * every music part and both returns pass through. Safe before `init()` —
+   * the value is held and applied when the graph is built.
+   */
+  setMusicGain(gain: number): void {
+    this.musicGainValue = gain;
+    if (this.musicBus) this.musicBus.output.gain.value = gain;
+  }
+
+  /** The SFX strips' fader; the spatial engine's half is `mixLevels.ts`. */
+  setSfxGain(gain: number): void {
+    this.sfxGainValue = gain;
+    if (this.sfxLevel) this.sfxLevel.gain.value = gain;
+  }
+
+  get musicGain(): number {
+    return this.musicGainValue;
+  }
+
+  get sfxGain(): number {
+    return this.sfxGainValue;
   }
 
   /**
@@ -312,6 +366,7 @@ export class AudioSystem {
     this.engine.dispose();
     this.musicBus = null;
     this.returns = null;
+    this.sfxLevel = null;
     this.started = false;
   }
 
@@ -320,6 +375,11 @@ export class AudioSystem {
       throw new Error('AudioSystem.init() must be awaited first');
     }
     return { musicBus: this.musicBus, returns: this.returns };
+  }
+
+  private sfxNode(): GainNode {
+    if (!this.sfxLevel) throw new Error('AudioSystem.init() must be awaited first');
+    return this.sfxLevel;
   }
 
   private route(
