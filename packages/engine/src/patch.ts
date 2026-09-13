@@ -102,7 +102,7 @@ export interface Operator {
   /** Cents. */
   detune: number;
   level: number;
-  /** Self-modulation, 0..1. */
+  /** Self-feedback, -1..1 (#529): positive towards a sawtooth, negative towards a square, 0 off. */
   feedback: number;
   velSens: number;
   levelKeyScale: number;
