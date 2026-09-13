@@ -23,6 +23,8 @@ import { DocumentModel } from './documentModel';
 import { renderHarmonyTab } from './harmonyTab';
 import { EngineHost } from './host';
 import { Keyboard } from './keyboard';
+import { MidiAccessor } from './midiAccess';
+import { MidiPerformer } from './midiPerformer';
 import { renderMixerTab } from './mixerTab';
 import { renderPartsTab } from './partsTab';
 import { partsState } from './patchState';
@@ -36,6 +38,9 @@ const model = new DocumentModel(raw);
 const host = new EngineHost((line) => status(line));
 // The keyboard plays the Parts tab's selected part, once audio is enabled.
 const keyboard = new Keyboard(() => partsState.part);
+// A MIDI controller plays through the same keyboard (#523).
+const midi = new MidiAccessor(new MidiPerformer(keyboard.midiSink()));
+keyboard.onPanic = (): void => midi.forgetNotes();
 
 const ctx: AppCtx = {
   host,
@@ -94,7 +99,7 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { id: 'parts', label: 'Parts', render: (body) => renderPartsTab(body, ctx, keyboard) },
+  { id: 'parts', label: 'Parts', render: (body) => renderPartsTab(body, ctx, keyboard, midi) },
   { id: 'mixer', label: 'Mixer', render: (body) => renderMixerTab(body, ctx) },
   { id: 'sequencers', label: 'Sequencers', render: (body) => renderSequencersTab(body, ctx) },
   { id: 'harmony', label: 'Harmony', render: (body) => renderHarmonyTab(body, ctx) },
@@ -140,6 +145,7 @@ function boot(): void {
   buildShell();
   render();
   keyboard.attachGlobalKeys();
+  void midi.resume();
   const power = $('power');
   power.onclick = (): void => {
     void host
