@@ -41,6 +41,15 @@ const MIP_BASE_HZ = 16.352; // C0
 
 const CTRL_INTERVAL = 32; // samples between control-rate updates
 const MOD_INDEX_SCALE = 8.0; // op amplitude 1.0 -> FM index 8
+/*
+ * Self-feedback depth at |feedback| = 1, in cycles of phase (#529). Positive
+ * feedback runs sin(phase + beta*y): sine towards a sawtooth, clean to ~1.25
+ * rad and noise past ~2.5. Negative runs sin(phase + beta*y^2), whose half-wave
+ * symmetry keeps only odd harmonics: sine towards a square, clean to ~2.0 rad.
+ * Measured on A2 and A5 in #529; beyond these the one-sample loop turns chaotic.
+ */
+const FEEDBACK_SAW_CYCLES = 1.25 / (2 * Math.PI);
+const FEEDBACK_SQUARE_CYCLES = 2.0 / (2 * Math.PI);
 const MIN_SEG_TIME = 0.0005; // shortest envelope segment, seconds
 
 /* Waveform ids — keep in sync with ../src/patch.js */
@@ -900,16 +909,20 @@ class Voice {
         const i = order[oi];
         const a = amp[i];
 
-        // Sum modulators plus self-feedback (averaged to damp the buzz that
-        // single-sample feedback produces).
+        // Sum modulators, then add self-feedback on the operator's last two
+        // outputs (averaged to damp the buzz single-sample feedback produces).
         let mod = 0;
         const m = mods[i];
         for (let j = 0; j < m.length; j++) {
           const src = m[j];
           mod += out[src] * amp[src];
         }
-        if (fbAmt[i] !== 0) mod += (fb1[i] + fb2[i]) * 0.5 * fbAmt[i];
         mod *= MOD_INDEX_SCALE;
+        const fb = fbAmt[i];
+        if (fb !== 0) {
+          const y = (fb1[i] + fb2[i]) * 0.5;
+          mod += fb > 0 ? y * fb * FEEDBACK_SAW_CYCLES : -y * y * fb * FEEDBACK_SQUARE_CYCLES;
+        }
 
         let ph = phase[i] + mod;
         ph -= Math.floor(ph);
@@ -1018,7 +1031,7 @@ function opDefaults(o, index) {
     fixedHz: num(o.fixedHz, 100),
     detune: num(o.detune, 0), // cents
     level: num(o.level, index === 0 ? 1 : 0),
-    feedback: num(o.feedback, 0),
+    feedback: Math.max(-1, Math.min(1, num(o.feedback, 0))), // bipolar (#529)
     velSens: num(o.velSens, 0.4),
     levelKeyScale: num(o.levelKeyScale, 0),
     phase: num(o.phase, 0),
