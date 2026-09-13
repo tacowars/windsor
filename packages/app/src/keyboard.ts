@@ -25,6 +25,39 @@ const QWERTY: Record<string, number> = {
   p: 15,
 };
 
+/**
+ * A dropdown picked with the mouse keeps focus, and the note keys above are
+ * ignored inside a select (a letter there would change its value), so every
+ * pick — wave, filter, preset category — cost a click away before auditioning.
+ * A mouse pick now hands focus back; a keyboard user arrowing through the
+ * options keeps it. Listboxes (`size` > 1) are left to their owners.
+ */
+function releaseMousePickedDropdowns(): void {
+  let pickedByMouse = false;
+  addEventListener(
+    'pointerdown',
+    (e) => {
+      pickedByMouse = e.target instanceof HTMLSelectElement;
+    },
+    true,
+  );
+  addEventListener(
+    'keydown',
+    () => {
+      pickedByMouse = false;
+    },
+    true,
+  );
+  addEventListener(
+    'change',
+    (e) => {
+      const t = e.target;
+      if (pickedByMouse && t instanceof HTMLSelectElement && !t.multiple && t.size <= 1) t.blur();
+    },
+    true,
+  );
+}
+
 interface Held {
   id: number;
   part: AudioPart;
@@ -74,6 +107,7 @@ export class Keyboard {
       this.press(e.key, off, ($('keys').children[off] as HTMLElement | undefined) ?? null);
     });
     addEventListener('keyup', (e) => this.lift(e.key));
+    releaseMousePickedDropdowns();
   }
 
   shiftOctave(by: number): void {
