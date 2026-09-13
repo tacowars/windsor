@@ -11,6 +11,7 @@ import {
   countFor,
   paintStroke,
   pointToBar,
+  drawablePartials,
   resizePartials,
   seedPartials,
   waveCycle,
@@ -81,7 +82,9 @@ function attachStroke(canvas: HTMLCanvasElement, i: number, redraw: () => void):
     const op = partsState.patch.ops[i];
     if (!op) return;
     ensureUserPartials(i);
-    const partials = op.userPartials ?? seedPartials();
+    // A stored array shorter than the bars shown (the scoring bank's 5–9
+    // harmonics under 16 bars) is padded with silence, so every bar takes paint.
+    const partials = drawablePartials(op.userPartials);
     const rect = canvas.getBoundingClientRect();
     const point = pointToBar(
       { x: e.clientX - rect.left, y: e.clientY - rect.top },

@@ -205,10 +205,12 @@ function quantiseMips(mips, levels) {
 /**
  * Shared across every processor instance in this worklet global scope, so 16
  * parts using a saw pay for the tables once. Keyed by waveform + quantised tone,
- * and for a User wave by the partials themselves (#511): a key the patch
- * supplied (`userKey`, '' in every shipped patch) let two different User waves
- * share one table and let a harmonic edit keep playing the old one. Only a
- * `patch` message reaches here, never the audio loop, so the string is fine.
+ * and for a User wave by the partials themselves (#511). The key used to be the
+ * patch's `userKey`, which only worked while every author picked a unique one:
+ * a User wave left at the default '' shared the first such table built, and a
+ * harmonic edit kept playing the old one. Equal partials still share a table,
+ * so the scoring bank's User presets render exactly as before. Only a `patch`
+ * message reaches here, never the audio loop, so the string is fine.
  */
 const WAVE_CACHE = new Map();
 const WAVE_CACHE_LIMIT = 64;

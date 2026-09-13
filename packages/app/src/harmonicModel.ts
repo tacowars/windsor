@@ -33,6 +33,15 @@ export function resizePartials(partials: readonly number[] | null, count: Harmon
   return Array.from({ length: count }, (_, i) => source[i] ?? 0);
 }
 
+/**
+ * The array a stroke paints into: padded with silence up to the bar count the
+ * editor shows, so no visible bar is inert. Longer arrays are left whole.
+ */
+export function drawablePartials(partials: readonly number[] | null): number[] {
+  const count = countFor(partials);
+  return partials && partials.length >= count ? [...partials] : resizePartials(partials, count);
+}
+
 export interface BarPoint {
   index: number;
   value: number;
