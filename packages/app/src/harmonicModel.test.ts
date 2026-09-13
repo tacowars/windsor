@@ -12,6 +12,7 @@ import { WAVE, makePatch } from '../../../packages/client/src/audio/index-for-ed
 import { DocumentModel } from './documentModel';
 import {
   countFor,
+  drawablePartials,
   paintStroke,
   pointToBar,
   resizePartials,
@@ -41,6 +42,20 @@ describe('harmonic bars', () => {
     expect(grown.slice(0, 2)).toEqual([1, 0.5]);
     expect(grown.slice(2).every((v) => v === 0)).toBe(true);
     expect(resizePartials(null, 16)).toEqual(seedPartials(16));
+  });
+
+  it('pads a short stored array so every shown bar can be drawn, and keeps long ones whole', () => {
+    const silk = [1, 0.28, 0.12, 0.06, 0.03];
+    const padded = drawablePartials(silk);
+    expect(padded).toHaveLength(16);
+    expect(padded.slice(0, 5)).toEqual(silk);
+    expect(padded).not.toBe(silk);
+    expect(drawablePartials(null)).toEqual(seedPartials());
+    const long = Array(80).fill(0.5);
+    expect(drawablePartials(long)).toEqual(long);
+    const painted = drawablePartials(silk);
+    paintStroke(painted, null, { index: 12, value: 0.6 });
+    expect(painted[12]).toBe(0.6);
   });
 
   it('maps a pointer to a bar and a height, clamped to the canvas', () => {

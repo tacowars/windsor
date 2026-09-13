@@ -94,7 +94,7 @@ export interface Operator {
   wave: number;
   /** Harmonic amplitudes for the User wave, fundamental first; null plays a sine. */
   userPartials: number[] | null;
-  /** Unused since #511: the worklet caches a User wave by its partials. Kept for old documents. */
+  /** Ignored by the worklet since #511, which caches a User wave by its partials; kept so existing patches and documents still load. */
   userKey: string;
   ratio: number;
   fixed: boolean;
