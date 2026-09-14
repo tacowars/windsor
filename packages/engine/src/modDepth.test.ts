@@ -103,9 +103,24 @@ describe('the factory bank keeps the depth it was authored with', () => {
         rescaled++;
       });
     }
-    // The survey in #543: 275 active modulators, 5 of them past the new top.
-    expect(rescaled + clamped).toBe(270 + 5);
-    expect(clamped).toBe(5);
+    // Both counts come from the fixture's own routing and levels, not from a
+    // literal: re-pointing the reference bank must not fail a correct
+    // migration. Today they are 270 rescaled and 5 clamped, of 275 active
+    // modulators (#543's survey). The `toBeGreaterThan` is the non-vacuity
+    // guard — a traversal that visited nothing would otherwise agree.
+    const expected = { rescaled: 0, clamped: 0 };
+    for (const name of names) {
+      const record = beforeLevels.presets[name as keyof typeof beforeLevels.presets];
+      rolesFor(record.algorithm).forEach((role, i) => {
+        const old = record.levels[i] ?? 0;
+        if (!role.modulates || role.carries || old === 0) return;
+        if (depthOf(old, OLD_SCALE) > depthOf(FULL_LEVEL, NEW_SCALE)) expected.clamped++;
+        else expected.rescaled++;
+      });
+    }
+    expect({ rescaled, clamped }).toEqual(expected);
+    expect(expected.rescaled).toBeGreaterThan(0);
+    expect(expected.clamped).toBeGreaterThan(0);
   });
 
   it('has no operator that is both a carrier and a modulator', () => {
