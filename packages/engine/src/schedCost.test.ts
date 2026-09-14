@@ -13,8 +13,10 @@ import { AUDIO_SCHED_QUANTILE } from './audioConstants';
 import { SchedCostMeter, ZERO_SCHED_COST } from './schedCost';
 
 /** A meter on a clock the test drives. */
-const meterAt = (clock: { t: number }, over: { windowSeconds?: number; maxSamples?: number } = {}) =>
-  new SchedCostMeter({ now: () => clock.t, ...over });
+const meterAt = (
+  clock: { t: number },
+  over: { windowSeconds?: number; maxSamples?: number } = {},
+) => new SchedCostMeter({ now: () => clock.t, ...over });
 
 describe('SchedCostMeter', () => {
   it('reports zeros before anything is timed — nothing measured is not 0 ms measured', () => {
