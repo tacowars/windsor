@@ -5,6 +5,11 @@
  * clips at velocity 1 across MIDI notes 36-84 (`fmProcessor.test.ts`). Operator
  * level, filter drive and resonance interact non-linearly with volume, so after
  * editing any of those, re-measure rather than scaling the volume to match.
+ *
+ * Modulator levels were rescaled by #543, when the engine's modulation-index
+ * scale halved: each one is its authored value times sqrt(2), exactly, so the
+ * depth is what it always was. That is why several read as long floats.
+ * Carrier levels are untouched.
  */
 import type { Patch } from './patch';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch } from './patch';
@@ -42,7 +47,7 @@ export const DRUMS_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 1,
-        level: 0.25,
+        level: 0.3535533905932738,
         env: E({ attackTime: 0.0005, decayTime: 0.03, sustainLevel: 0, releaseTime: 0.02 }),
       },
       { wave: WAVE.SINE, ratio: 1, level: 0 },
@@ -64,7 +69,7 @@ export const DRUMS_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 2.7,
-        level: 0.5,
+        level: 0.7071067811865476,
         env: E({ attackTime: 0.0008, decayTime: 0.06, sustainLevel: 0, releaseTime: 0.03 }),
       },
       {
