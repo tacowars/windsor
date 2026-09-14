@@ -66,8 +66,13 @@ describe('feature detection (#275 decision 5)', () => {
 
   it('treats a present-but-undefined property as absent', () => {
     // A browser that declares the getter and returns nothing is not a browser
-    // with the stats; it is one without them.
-    expect(snapshotPlaybackStats({ playbackStats: undefined })).toBeNull();
+    // with the stats; it is one without them. Built through Object.assign
+    // because `exactOptionalPropertyTypes` will not let an optional field be
+    // written `undefined` in a literal — which is the shape being tested.
+    const declared: PlaybackStatsHost = Object.assign({}, { playbackStats: undefined as unknown as AudioPlaybackStatsApi });
+    expect('playbackStats' in declared).toBe(true);
+    expect(snapshotPlaybackStats(declared)).toBeNull();
+    expect(hasPlaybackStats(declared)).toBe(false);
   });
 });
 
