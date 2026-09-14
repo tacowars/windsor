@@ -1,0 +1,230 @@
+{
+  "bench": "a204-m1-terrain-budget",
+  "schema": 12,
+  "header": {
+    "terrain": {
+      "seed": 1,
+      "scale": 96,
+      "octaves": 5,
+      "amplitude": 40,
+      "base": 0.52,
+      "detail": 0.12,
+      "roll": 0.15,
+      "upland": 0.22,
+      "basin": 0.3,
+      "gully": 0.15,
+      "coreRadius": 50,
+      "coreFade": 150,
+      "coreRelief": 0.45,
+      "mountain": 200
+    },
+    "routeId": "rampart-v1",
+    "gateOnScreen": true,
+    "gitCommit": "ddaf0b2e",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "babylon": "9.23.0",
+    "backend": "WebGL2",
+    "gpu": "ANGLE (AMD, AMD Radeon Graphics (radeonsi renoir ACO), OpenGL ES 3.2) (Google Inc. (AMD); WebGL 2.0 (OpenGL ES 3.0 Chromium))",
+    "motor": {
+      "dtSeconds": 0.05,
+      "maxStepsPerFrame": 4
+    },
+    "window": {
+      "innerWidth": 1896,
+      "innerHeight": 968,
+      "devicePixelRatio": 1.25,
+      "renderWidth": 1920,
+      "renderHeight": 1080
+    },
+    "camera": {
+      "fovRadians": 0.9,
+      "fovMode": "vertical",
+      "radius": 6,
+      "beta": 1.4,
+      "alpha": -1.5707963267948966
+    },
+    "lodRings": [
+      {
+        "ring": 0,
+        "maxDistance": 256,
+        "spacing": 2
+      },
+      {
+        "ring": 1,
+        "maxDistance": 768,
+        "spacing": 8
+      },
+      {
+        "ring": 2,
+        "maxDistance": 1536,
+        "spacing": 32
+      }
+    ],
+    "fog": {
+      "start": 1200,
+      "end": 4096
+    },
+    "terrainOptions": {
+      "superChunks": true,
+      "horizon": true
+    },
+    "meshBudgetMs": 4,
+    "warmup": {
+      "laps": 1,
+      "seconds": 152.87810000014306
+    },
+    "windowSeconds": 60,
+    "webgpuAdapter": "requestAdapter() returned null",
+    "building": {
+      "requested": 5000,
+      "layoutId": "fort-ring-v1",
+      "pieces": 5001,
+      "kinds": {
+        "wall": 2889,
+        "floor": 1689,
+        "ramp": 422,
+        "core": 1
+      },
+      "fortMs": 4.8999998569488525
+    },
+    "horde": {
+      "requested": 400,
+      "seed": 1,
+      "spawnRadius": 200,
+      "renderer": "capsule",
+      "vat": null
+    },
+    "audio": {
+      "document": "bed-01",
+      "contextState": "running",
+      "sampleRate": 48000,
+      "baseLatency": 0.010666666666666666,
+      "parts": 4,
+      "maxVoices": 12,
+      "processors": 5,
+      "averageLatency": 0.03515,
+      "minimumLatency": 0,
+      "maximumLatency": 0.044312
+    }
+  },
+  "route": {
+    "id": "rampart-v1",
+    "laps": 1,
+    "distanceM": 96.50566745297165,
+    "crossings": 0,
+    "minY": 23.291353225708008,
+    "maxY": 23.613475799560547
+  },
+  "heap": {
+    "beforeMB": 255.78931045532227,
+    "afterMB": 252.23437213897705
+  },
+  "frames": {
+    "count": 1718,
+    "windowMs": 59999.299999952316,
+    "meanFps": 28.633667392809006,
+    "intervalMs": {
+      "p50": 34.799999952316284,
+      "p95": 39.5,
+      "p99": 42.09999990463257,
+      "max": 61.10000014305115,
+      "mean": 34.92392316644489
+    },
+    "over33Ms": 1266,
+    "over100Ms": 0
+  },
+  "cpu": {
+    "sceneMs": {
+      "p50": 11.899999856948853,
+      "p95": 16.199999809265137,
+      "p99": 17.90000009536743,
+      "max": 24.899999856948853,
+      "mean": 11.48073341002703
+    },
+    "renderMs": {
+      "p50": 4.200000047683716,
+      "p95": 6.200000047683716,
+      "p99": 8.400000095367432,
+      "max": 11.5,
+      "mean": 4.313445872144732
+    }
+  },
+  "gpu": {
+    "samples": 430,
+    "frameMs": {
+      "p50": 30.642,
+      "p95": 33.033,
+      "p99": 34.12932,
+      "max": 35.65484,
+      "mean": 30.82500018604652
+    }
+  },
+  "scene": {
+    "drawCalls": {
+      "mean": 445.88300349243303,
+      "min": 442,
+      "max": 448
+    },
+    "activeMeshes": {
+      "mean": 363.70430733410944,
+      "min": 360,
+      "max": 366
+    },
+    "triangles": {
+      "mean": 4067577.176949942,
+      "min": 3951728,
+      "max": 4142190
+    }
+  },
+  "terrain": {
+    "builds": 0,
+    "disposes": 0,
+    "buildMsTotal": 0,
+    "buildMsMax": 0
+  },
+  "horde": {
+    "visible": {
+      "min": 313,
+      "p5": 352,
+      "mean": 385.4627473806752
+    },
+    "stepMs": {
+      "p50": 0.7000000476837158,
+      "p95": 1.3999998569488525,
+      "p99": 2.3999998569488525,
+      "max": 15.900000095367432,
+      "mean": 0.7298603038432573
+    }
+  },
+  "audio": {
+    "loadPct": {
+      "p50": 10.079840319361278,
+      "p95": 12.6,
+      "p99": 13.260219341974079,
+      "max": 13.260219341974079,
+      "mean": 9.982651425841652
+    },
+    "peakPct": 225,
+    "underruns": 4,
+    "schedMs": {
+      "p50": 0,
+      "p95": 0.10000014305114746,
+      "p99": 0.2999999523162842,
+      "max": 2.299999952316284,
+      "mean": 0.029511059399117412
+    },
+    "underrunEvents": 0,
+    "underrunDuration": 0,
+    "totalDuration": 63.152208
+  },
+  "verdict": {
+    "p95Ok": false,
+    "p99Ok": false,
+    "worstOk": true,
+    "horde": {
+      "visibleP5Ok": true,
+      "visibleMeanOk": true
+    },
+    "pass": false
+  }
+}
