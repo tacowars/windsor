@@ -73,11 +73,15 @@ the playable sound rather than disabling it merely to pass a measurement.
 
 ## Harmonic waveforms and compatibility
 
-`WAVE.USER` reads harmonic amplitudes from `userPartials`. The wavetable cache
-key uses waveform, quantized tone and **`userKey`**, not the partial array's
-contents. Different spectra need different keys; changing partials under an
-unchanged key can reuse an old table. Preserve both fields in document round
-trips. Check which editing controls exist before promising UI harmonic editing.
+`WAVE.USER` reads harmonic amplitudes from `userPartials`, fundamental first;
+the worklet sums them into a peak-normalised table and bandlimits it per
+octave, with **Tone** trimming upper harmonics as for the other waves. `null`
+plays a sine and `[]` plays silence. The wavetable cache is keyed by waveform,
+quantized tone and the partial values themselves (#511), so equal spectra
+share a table and any edit is heard; `userKey` is ignored by the worklet and
+kept only so existing patches and documents load. The console draws partials
+in each operator bay while its wave is User (16 / 32 / 64 bars, values 0–1);
+a hand-written array may be longer or negative, and is played as written.
 
 Bandlimited and deliberately unbandlimited “digital” waveforms are separate
 choices. Choose intentional aliasing for a digital texture, not by assuming

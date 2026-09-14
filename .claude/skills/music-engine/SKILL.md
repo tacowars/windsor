@@ -35,6 +35,12 @@ connection, `src/documentModel.ts` its song state, and `src/partsTab.ts` /
 which excludes Babylon. Extend that surface rather than building another
 synth, effect graph or sequencer in the console.
 
+| Console task | Read/edit |
+|---|---|
+| Operator bays, knobs, the User-wave harmonic editor | `src/patchBays.ts`, `src/knob.ts`, `src/harmonicEditor.ts`, `src/harmonicModel.ts` (pure) |
+| Preset browsing and selection | `src/presetBrowser.ts` (exported as `presetPicker` by `src/patchLibrary.ts`) |
+| Audition input: QWERTY, on-screen keys, MIDI | `src/keyboard.ts` (the one note path, Hold, Panic, bend/wheel); MIDI in `src/midiMessage.ts`, `src/midiPerformer.ts`, `src/midiInputs.ts` (pure) and `src/midiAccess.ts`, `src/midiPanel.ts` (Web MIDI, device selector) |
+
 ## Design a sound or composition
 
 Read [synth behavior](references/synth-behavior.md) before choosing operator
@@ -56,12 +62,10 @@ musical choices that remain material and unresolved.
   a long enough note gate; a short sequencer gate can interrupt a valid swell.
   Describe sonic intent separately from measured output and tacowars's verdict.
 
-**Scoring-bank extension, when present:** #475 / PR #479 introduces
-`docs/design/scoring-preset-library.md`, `audio/presetCatalog.ts`,
-`audio/presetsScoring.ts`, authored `presets*Tables.ts`, and the browser in
-`tools/patch-editor/src/presetBrowser.ts`. Check the active checkout for these
-files before using that guide or its measurement command. When absent, use
-the existing preset groups/picker; do not recreate or assume an unmerged bank.
+**Scoring bank:** `docs/design/scoring-preset-library.md` is its guide and
+measurement command; the bank is `audio/presetCatalog.ts`,
+`audio/presetsScoring.ts`, the `presetsScoring*.ts` recipes and authored
+`presets*Tables.ts`, browsed in `tools/patch-editor/src/presetBrowser.ts`.
 Catalog metadata is distinct from DSP patch data. Reuse tags, retain IDs and
 keep document overrides visible when extending the browser.
 
@@ -70,9 +74,9 @@ keep document overrides visible when extending the browser.
 Read [the document contract](../../../docs/log/2026-09-11-music-document-carries-patches-and-returns.md)
 for song or console changes. A part references a preset ID; its document's
 `patches` entry wins over the factory table. A new working sound must reach
-the document, not just the live part, to survive export. Follow the current
-selection/commit path: the older picker forks on first knob edit; PR #479's
-browser copies on selection. Test the path that exists in the checkout.
+the document, not just the live part, to survive export. The preset browser
+copies the chosen patch into the document on selection (`choosePreset`), and
+knob edits commit the working patch there through `pushPatch`.
 
 Normalize through `makeArrangement`, and inspect corrections/dangling
 references. Preserve `patches`, `returns`, mix, harmony, drivers and captured
@@ -111,4 +115,7 @@ Run the narrow checks while developing, then the repo's normal finish gate.
 Review-pass counts, full-verify cadence, visual evidence and CI handoff stay
 with the board workflow. Report a listening verdict as pending when it is
 tacowars's remaining criterion; hand back exact sounds/steps rather than waiting
-or equating passing DSP tests with musical approval.
+or equating passing DSP tests with musical approval. tacowars auditions in the
+console with a MIDI controller as well as QWERTY, so a handback can name
+velocity, pitch bend, mod wheel (which scales LFO amount through
+`lfo.modWheelDepth`) and sustain-pedal gestures, and which part to select.
