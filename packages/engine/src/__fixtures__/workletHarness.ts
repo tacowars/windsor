@@ -71,6 +71,8 @@ export interface LoadedProcessor {
   sampleRate: number;
   algorithms: AlgorithmTable[];
   waveIds: Record<string, number>;
+  /** Modulation depth at operator amplitude 1, in cycles of phase (#543). */
+  modIndexScale: number;
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
@@ -110,6 +112,7 @@ export function loadProcessor(): LoadedProcessor {
        setFrame: (f) => { currentFrame = f; },
        ALGORITHMS,
        WAVE,
+       MOD_INDEX_SCALE,
      };`,
   ) as (
     sampleRate: number,
@@ -119,6 +122,7 @@ export function loadProcessor(): LoadedProcessor {
     setFrame: (f: number) => void;
     ALGORITHMS: AlgorithmTable[];
     WAVE: Record<string, number>;
+    MOD_INDEX_SCALE: number;
   };
 
   const handle = factory(SAMPLE_RATE, AudioWorkletProcessorShim, registerProcessor);
@@ -140,6 +144,7 @@ export function loadProcessor(): LoadedProcessor {
     sampleRate: SAMPLE_RATE,
     algorithms: handle.ALGORITHMS,
     waveIds: handle.WAVE,
+    modIndexScale: handle.MOD_INDEX_SCALE,
   };
 }
 

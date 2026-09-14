@@ -18,7 +18,14 @@ export type ScoringRecipe =
   | 'pulse'
   | 'glitch'
   | 'metal';
-/** Named tuple: each row is an authored timbre, not a random variation. Times are seconds. */
+/**
+ * Named tuple: each row is an authored timbre, not a random variation. Times are
+ * seconds. `index` is the deepest modulator's Level, in the post-#543 scale
+ * where Level 1 is 4 cycles (~25 rad) of phase; each recipe weights its other
+ * modulators down from it and `depth()` clamps the result to the knob's top, so
+ * a row above 1 says "as deep as the engine goes" and still sets the weighted
+ * ones correctly.
+ */
 export type ScoringRow = readonly [
   name: string,
   recipe: ScoringRecipe,
@@ -41,6 +48,8 @@ export interface ScoringEntry {
 }
 
 const E = makeEnvelope;
+/** A modulator Level, clamped to the knob: rows may ask for more than 1 (#543). */
+const depth = (level: number): number => Math.min(1, level);
 const HARMONICS = {
   silk: [1, 0.28, 0.12, 0.06, 0.03],
   choir: [1, 0.04, 0.36, 0.08, 0.22, 0.03, 0.09],
@@ -66,7 +75,7 @@ function sustained(row: ScoringRow): Patch {
       carrier,
       {
         ratio,
-        level: index,
+        level: depth(index),
         env: E({
           attackTime: attack * 1.4,
           decayTime: decay,
@@ -77,7 +86,7 @@ function sustained(row: ScoringRow): Patch {
       { ...carrier, detune: -5, level: 0.62, ratio: recipe === 'choir' ? 2 : 1 },
       {
         ratio: ratio * 0.5,
-        level: index * 0.7,
+        level: depth(index * 0.7),
         env: E({ attackTime: attack * 0.7, sustainLevel: 0.6, releaseTime: release }),
       },
     ],
@@ -121,15 +130,17 @@ function struck(row: ScoringRow): Patch {
       { wave: recipe === 'dub' || recipe === 'reed' ? W.SAW : W.SINE, level: 0.85, env },
       {
         ratio,
-        level: index,
+        level: depth(index),
         env: E({ ...env, decayTime: decay * 0.4, sustainLevel: bass ? 0.12 : 0 }),
       },
       {
         ratio: recipe === 'dub' ? 1 : 2.01,
-        level: recipe === 'dub' ? 0.6 : index * 0.45,
+        // Two Stacks makes this one a carrier for `dub`, so its 0.6 is a volume
+        // and stays out of the modulation rescale.
+        level: recipe === 'dub' ? 0.6 : depth(index * 0.45),
         env: E({ ...env, decayTime: decay * 0.65 }),
       },
-      { ratio: 3, level: index * 0.2, env: E({ ...env, decayTime: decay * 0.2 }) },
+      { ratio: 3, level: depth(index * 0.2), env: E({ ...env, decayTime: decay * 0.2 }) },
     ],
     lfo: { shape: L.SINE, rate, amount: 1, toOp: [0, 0.12, 0, 0] },
     filter: {
@@ -177,12 +188,12 @@ function texture(row: ScoringRow): Patch {
       {
         wave: recipe === 'glitch' ? W.SINE_4BIT : W.SINE,
         ratio,
-        level: index,
+        level: depth(index),
         feedback: recipe === 'metal' ? 0.35 : 0,
         env,
       },
-      { ratio: ratio * 1.417, level: index * 0.6, env },
-      { wave: rising || falling ? W.SAW : W.SINE, ratio: 0.5, level: index * 0.2, env },
+      { ratio: ratio * 1.417, level: depth(index * 0.6), env },
+      { wave: rising || falling ? W.SAW : W.SINE, ratio: 0.5, level: depth(index * 0.2), env },
     ],
     lfo: {
       shape: recipe === 'glitch' ? L.SAMPLE_HOLD : recipe === 'pulse' ? L.SQUARE : L.DRIFT,

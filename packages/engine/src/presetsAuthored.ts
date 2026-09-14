@@ -11,6 +11,13 @@
  * the numeric enum values to their named constants. Both patches validate
  * against `Patch` with no unknown and no missing fields (issue #69,
  * re-audition iteration: simpler timbres so the key and scale read clearly).
+ *
+ * One departure from those exports, and the only kind allowed here: #543
+ * halved the engine's modulation-index scale, so each operator that is a
+ * *modulator* in its algorithm carries its exported level times sqrt(2) --
+ * exactly, at double precision -- and sounds as it did. Carriers are
+ * untouched. A future export diffs against these files with that one
+ * transform applied.
  */
 import type { Patch } from './patch';
 import { makePatch } from './patch';
@@ -123,7 +130,7 @@ export const AUTHORED_PRESETS: Record<string, Patch> = {
         fixed: false,
         fixedHz: 100,
         detune: 0,
-        level: 0.3,
+        level: 0.4242640687119285,
         feedback: 0,
         velSens: 0.4,
         levelKeyScale: 0,
@@ -243,7 +250,7 @@ export const AUTHORED_PRESETS: Record<string, Patch> = {
         fixed: false,
         fixedHz: 6620.94029304625,
         detune: 0,
-        level: 0.08947368421052632,
+        level: 0.12653489768601378,
         feedback: 0,
         velSens: 0.31578947368421056,
         levelKeyScale: 0,
@@ -301,7 +308,7 @@ export const AUTHORED_PRESETS: Record<string, Patch> = {
         fixed: false,
         fixedHz: 100,
         detune: 0,
-        level: 0.3,
+        level: 0.4242640687119285,
         feedback: 0,
         velSens: 0.4,
         levelKeyScale: 0,
