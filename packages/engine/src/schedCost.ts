@@ -17,6 +17,19 @@
  * `docs/design/audio-architecture.md` §7 wants "audio scheduling under 0.5 ms
  * of main-thread time per frame at p95". This is the number that criterion
  * will be read from; nothing here votes on a verdict.
+ *
+ * ## What the number is worth
+ *
+ * `performance.now()` is deliberately coarsened by the browser — 100 µs in
+ * Chrome, and coarser again without cross-origin isolation. The pump is
+ * cheaper than that on a quiet frame, so **most frames read exactly 0 and the
+ * p95 lands on a multiple of 0.1 ms**: a first `--audio` run on an M4 Pro read
+ * `p50 0, p95 0.100, max 0.200, mean 0.0068`. Read it as "under the clock's
+ * resolution", not as "free". The mean over a few hundred frames is the
+ * useful figure at that scale — like the duty-cycle sampler in
+ * `audioLoad.ts`, it counts clock boundaries that fell inside the call — and
+ * the p95 is what answers §7's criterion the moment the cost is large enough
+ * to be timed at all.
  */
 import {
   AUDIO_SCHED_MAX_SAMPLES,
