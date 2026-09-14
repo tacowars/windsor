@@ -48,8 +48,11 @@ import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
 import type { PresetTable } from './arrangementValidate';
 import { lookupPreset } from './arrangementValidate';
 import { AUDIO_LOAD_REPORT_SECONDS, MUSIC_PART_MAX_VOICES } from './audioConstants';
+import type { AudioCostReadout } from './audioCost';
 import type { AudioLoadReadout } from './audioLoad';
 import { AudioLoadMeter, meterNode } from './audioLoad';
+import { asPlaybackStatsHost, snapshotPlaybackStats } from './playbackStats';
+import { SchedCostMeter } from './schedCost';
 import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import type { NotePattern } from './capturedPattern';
@@ -73,6 +76,11 @@ export interface AudioSystemOptions {
   mix?: Readonly<Record<string, ChannelStrip>>;
   /** The returns to build. Defaults to `RETURNS`. */
   returns?: Readonly<Record<string, ReturnSpec>>;
+  /**
+   * The main-thread clock `update()` times itself with (#275 decision 7).
+   * Injected so a test can assert the scheduling cost without a real one.
+   */
+  now?: () => number;
 }
 
 /** `__a204.audio.readout()` (issue #69): the arrangement's state plus the system's. */
@@ -97,6 +105,9 @@ export class AudioSystem {
   private sfxGainValue = 1;
   private readonly strips = new Map<string, PartStrip>();
   private readonly loadMeter = new AudioLoadMeter();
+  /** What `update()` costs on the main thread, over the rolling window (#275). */
+  private readonly schedMeter: SchedCostMeter;
+  private readonly now: () => number;
   private started = false;
   private player: ArrangementPlayer | null = null;
   private muted = false;
@@ -107,6 +118,8 @@ export class AudioSystem {
     this.scheduler = new Scheduler(this.engine.context, { bpm: 96 });
     this.mix = options.mix ?? MIX;
     this.returnSpecs = options.returns ?? RETURNS;
+    this.now = options.now ?? ((): number => performance.now());
+    this.schedMeter = new SchedCostMeter({ now: this.now });
   }
 
   get isStarted(): boolean {
@@ -164,6 +177,23 @@ export class AudioSystem {
   /** What the DSP costs on the audio thread right now (#445). */
   loadReadout(): AudioLoadReadout {
     return this.loadMeter.readout();
+  }
+
+  /**
+   * What audio costs this page, in one call (#275): the DSP's estimated load,
+   * the main thread's measured scheduling cost, and the context's lifetime
+   * playback counters where the browser has them.
+   *
+   * This is the overlay's and the bench collector's hook (`stats.audioReadout`).
+   * `playback` is snapshotted on every call — the API hands back one live
+   * object whose fields mutate, so a held reference is not a reading.
+   */
+  costReadout(): AudioCostReadout {
+    return {
+      load: this.loadMeter.readout(),
+      sched: this.schedMeter.readout(),
+      playback: snapshotPlaybackStats(asPlaybackStatsHost(this.engine.context)),
+    };
   }
 
   /** Processors this system has turned load reporting on in (#445) — parts plus worklet returns. */
@@ -350,7 +380,12 @@ export class AudioSystem {
    */
   update(_dt: number): void {
     if (!this.started) return;
+    // Timed here rather than around the whole system because this call *is*
+    // the system's per-frame main-thread work: everything else audio does
+    // happens on the audio thread or on an event (#275 decision 7).
+    const before = this.now();
     this.scheduler.update();
+    this.schedMeter.sample(this.now() - before);
   }
 
   dispose(): void {
@@ -363,6 +398,7 @@ export class AudioSystem {
     this.strips.clear();
     if (this.returns) for (const bus of Object.values(this.returns)) bus.dispose();
     this.loadMeter.dispose();
+    this.schedMeter.reset();
     this.engine.dispose();
     this.musicBus = null;
     this.returns = null;

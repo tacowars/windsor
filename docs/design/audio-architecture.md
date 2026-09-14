@@ -222,7 +222,8 @@ What would qualify, when audio is built:
   fixed window, taken on the target machine with a backend named.
 - The main-thread cost of audio is the *scheduling* work, which belongs in `src/stats.ts`
   alongside the existing counters so it appears in the same overlay every other milestone
-  reading comes from.
+  reading comes from. It is now there: `stats/lines/audio.ts` draws it and
+  `bench/summary.ts`'s `AudioMetrics.schedMs` records it (#275).
 - Suggested criterion, to be argued when the ticket is written: **zero underruns over a
   60 s M3-equivalent horde window, with audio scheduling under 0.5 ms of main-thread time
   per frame at p95.**
@@ -254,8 +255,42 @@ gate yet:
   measured span reached the whole budget — is the one hard number, which is
   why the suggested criterion above is still expressed in underruns and why
   it is argued at the first target reading rather than asserted here.
-- **Still missing:** the main-thread scheduling cost (`audio.schedMs`, #275),
-  which lands as one more field on the same readout.
+**What exists now (#275).** The section's own criterion — "zero underruns over
+a 60 s M3-equivalent horde window, with audio scheduling under 0.5 ms of
+main-thread time per frame at p95" — is now readable off the instrumentation
+rather than estimated. Both halves come from
+`packages/client/src/audio/audioCost.ts`'s `AudioCostReadout`, which is what
+`stats.audioReadout` hands the overlay and the bench collector:
+
+- **Underruns: `AudioContext.playbackStats`** (`audio/playbackStats.ts`), the
+  source of truth for the criterion. Present by default in Chrome 152 on the
+  target box, feature-detected everywhere, and reported as `n/a` / `null`
+  where it is absent — never replaced by an estimate. The units matter and are
+  not the obvious ones: **one `underrunEvents` is one output-device callback
+  delivered short**, which on the box is 512 frames at 48 kHz = 10.667 ms =
+  exactly `baseLatency`, *not* one 128-frame render quantum;
+  `underrunDuration` is in seconds of output, and `totalDuration` is output
+  time (it holds while the context is suspended), so
+  `underrunDuration / totalDuration` is the glitch fraction of what was
+  actually played. The counters are cumulative for the context's life and lag
+  their own load by up to three seconds, so the overlay shows lifetime totals
+  and the bench reports a **delta** across the window taken after
+  `AUDIO_STATS_SETTLE_MS`. They also **saturate**: at 150 % and at 300 % of
+  the quantum budget the box read about the same ~90 events/s, so the number
+  says whether and for how long audio broke, never by how much. The record is
+  `docs/research/2026-09-14-275-playbackstats-probe/`.
+- **Scheduling cost: `audio.schedMs`** (`audio/schedCost.ts`), the p95 half of
+  the criterion. `AudioSystem.update()` times its own scheduler pump — the
+  system's whole per-frame main-thread cost — over a rolling one-second
+  window for the overlay, and per frame for the bench, whose `audio.schedMs`
+  distribution is what a milestone reading quotes.
+- The sampler's own `underruns` stays beside them, **labelled `est`**: it
+  counts something else (a render quantum that provably overran) and is the
+  conservative lower bound described above, not a second opinion on the same
+  number.
+- **Still missing:** a target-box reading. The #445 audio pair is the first
+  one to carry these fields (#275 decision 8); until it is taken, no number
+  here is a result (invariant 3).
 
 Two known costs, recorded so they are not surprises:
 
