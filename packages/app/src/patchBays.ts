@@ -5,7 +5,7 @@ import {
   OP_NAMES,
   WAVE_NAMES,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { $, el } from './dom';
+import { $, el, fmtSigned } from './dom';
 import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import { CARRIER_COLOR, MOD_COLOR } from './patchPanels';
@@ -30,7 +30,7 @@ const OP_KNOBS: ReadonlyArray<{ f: string; label: string; o: KnobOpts }> = [
     o: { min: -100, max: 100, def: 0, step: 1, fmt: (v) => `${v.toFixed(0)}c` },
   },
   { f: 'level', label: 'Level', o: { min: 0, max: 1, def: 0, fmt: fmt2 } },
-  { f: 'feedback', label: 'Fdbk', o: { min: 0, max: 1, def: 0, fmt: fmt2 } },
+  { f: 'feedback', label: 'Fdbk', o: { min: -1, max: 1, def: 0, fmt: fmtSigned } },
   { f: 'velSens', label: 'Vel', o: { min: 0, max: 1, def: 0.4, fmt: fmt2 } },
 ];
 
