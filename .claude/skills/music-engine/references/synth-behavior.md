@@ -25,6 +25,16 @@ Full-depth bipolar modulation can both silence and boost an operator.
 The LFO value also includes the patch amount and mod-wheel depth; consider
 wheel use when relevant to the patch or control being changed.
 
+## Self-feedback
+
+`feedback` is bipolar, −1…+1 (#529), and feeds an operator's own last output
+(two-sample average, including its level² × envelope × velocity) back into its
+phase. Positive runs `sin(φ + β·y)` up to 1.25 rad: sine towards a sawtooth.
+Negative runs `sin(φ + β·y²)` up to 2.0 rad: odd harmonics only, sine towards a
+softer square. Neither end reaches noise — use the Noise wave for that. Because
+the fed-back signal carries the envelope, a decaying operator gets less bright
+as it fades, and a quiet operator gets little feedback at all.
+
 ## Fixed frequency and pitch envelopes
 
 With **Fixed off**, the operator's frequency follows note pitch (including
