@@ -40,6 +40,28 @@ export { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES, selectMusic } from './arrangeme
 export type { MusicSelection } from './arrangementLibrary';
 export { AudioLoadMeter, ZERO_AUDIO_LOAD, quantumBudgetMs, reportQuanta } from './audioLoad';
 export type { AudioLoadReadout } from './audioLoad';
+export { ZERO_AUDIO_COST } from './audioCost';
+export type { AudioCostReadout } from './audioCost';
+export { SchedCostMeter, ZERO_SCHED_COST } from './schedCost';
+export type { SchedCostMeterOptions, SchedCostReadout } from './schedCost';
+export {
+  PlaybackStatsWindow,
+  asPlaybackStatsHost,
+  hasPlaybackStats,
+  playbackLatencies,
+  playbackWindowDelta,
+  snapshotPlaybackStats,
+  underrunMsPerEvent,
+} from './playbackStats';
+export type {
+  AudioPlaybackStatsApi,
+  PlaybackLatencies,
+  PlaybackStatsHost,
+  PlaybackStatsSnapshot,
+  PlaybackStatsWindowOptions,
+  PlaybackWindowDelta,
+  PlaybackWindowResult,
+} from './playbackStats';
 export { FmEngine } from './fmEngine';
 export type { PartOptions, WorkletUrls } from './fmEngine';
 export { AudioPart } from './audioPart';
@@ -63,7 +85,11 @@ export type { PartStrip } from './channelStrip';
 export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
 export type { RotationGains, StereoRotate } from './stereoRotate';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
-export { DEFAULT_ARRANGEMENT_NAME, REVERB_SPACE_RANGES } from './audioConstants';
+export {
+  AUDIO_STATS_SETTLE_MS,
+  DEFAULT_ARRANGEMENT_NAME,
+  REVERB_SPACE_RANGES,
+} from './audioConstants';
 export type { ReverbSpace, SpaceName } from './reverbSpace';
 export { renderPatchToBuffer } from './offlineRender';
 export type { BakeOptions } from './offlineRender';

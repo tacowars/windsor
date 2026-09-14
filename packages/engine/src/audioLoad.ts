@@ -38,8 +38,15 @@
  * two-significant-figure cost, and no gate votes on it (#445 decision: the
  * verdict stays the three frame gates).
  *
- * `underruns` is the firmest number in the readout, and it is firm only
- * because it is deliberately conservative. N boundary crossings prove the
+ * `underruns` is the firmest number **this** readout has, and it is firm only
+ * because it is deliberately conservative. It is no longer the page's source
+ * of truth for dropout: `playbackStats.ts` reads
+ * `AudioContext.playbackStats.underrunEvents`, which counts a different thing
+ * — one short **output-device callback**, not one render quantum — and #275
+ * decision 3 makes that the figure the overlay and the bench lead with, this
+ * one beside it labelled `est`. Neither is the other's check: this one is a
+ * lower bound on deadline misses inside the DSP, that one is what the device
+ * actually failed to play. N boundary crossings prove the
  * render took **more than N − 1 ms** — nothing about N itself — so a 2.2 ms
  * quantum that happens to straddle three boundaries must not be accused of
  * missing a 2.902 ms deadline. The processors therefore count an underrun
