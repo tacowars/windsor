@@ -4,7 +4,7 @@
  * section through `hooks.commit` — which `ctx.change` turns into a live
  * `setPatch` on the real `AudioPart` and a merge into the document. The
  * export therefore carries the sound, not a preset name that had to be
- * hand-landed in `presetsAuthored.ts`.
+ * hand-landed in the factory bank (since #561, `audio/patches/*.json`).
  */
 import type {
   AudioPart,
