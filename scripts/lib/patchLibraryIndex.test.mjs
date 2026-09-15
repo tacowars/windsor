@@ -20,10 +20,15 @@ describe('the patch library index', () => {
     // A real directory: __fixtures__/ holds .ts files and JSON that is not a patch.
     expect(() => patchIdsIn(FIXTURES)).toThrow(/only <id>\.json files belong here/);
   });
-  it('derives a legal identifier from a real id and imports it by its slug', () => {
-    expect(identifierFor('score-drowned-cellos')).toBe('patchScoreDrownedCellos');
-    expect(identifierFor('kick')).toBe('patchKick');
-    expect(renderIndex(['lead-bell'])).toContain("import patchLeadBell from './lead-bell.json';");
-    expect(renderIndex(['lead-bell'])).toContain("  'lead-bell': patchLeadBell,");
+  it('derives a legal, distinct identifier from every accepted slug', () => {
+    expect(identifierFor('score-drowned-cellos')).toBe('patch_score_drowned_cellos');
+    expect(identifierFor('kick')).toBe('patch_kick');
+    expect(identifierFor('a1')).not.toBe(identifierFor('a-1'));
+    expect(identifierFor('1st')).toMatch(/^[A-Za-z_$][\w$]*$/);
+    const index = renderIndex(['lead-bell', 'kick', '1st']);
+    expect(index).toContain("import patch_lead_bell from './lead-bell.json';");
+    expect(index).toContain("  'lead-bell': patch_lead_bell,");
+    expect(index).toContain('  kick: patch_kick,');
+    expect(index).toContain("  '1st': patch_1st,");
   });
 });

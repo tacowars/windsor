@@ -68,11 +68,10 @@ if (ids.length === 0) {
 
 for (const id of ids) {
   const file = readFile(id);
-  // Validate everything but the record we are about to write.
-  loadPatchFile(id, {
-    ...file,
-    headroom: { ...file.headroom, contentHash: patchContentHash(file.patch) },
-  });
+  // Validate everything but the record we are about to write: a placeholder
+  // stands in so a brand-new file with no record yet is swept, not refused.
+  const contentHash = patchContentHash(file.patch);
+  loadPatchFile(id, { ...file, headroom: { worstSeed: 0, peak: 0, seedsSwept: 1, contentHash } });
   const started = performance.now();
   const { worstSeed, peak } = sweepHeadroom(file.patch, seedRange(seeds));
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
