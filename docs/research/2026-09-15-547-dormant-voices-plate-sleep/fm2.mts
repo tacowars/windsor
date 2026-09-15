@@ -1,0 +1,12 @@
+import { performance } from 'node:perf_hooks';
+const [root, label, warm] = process.argv.slice(2);
+const fm = await import(`${root}/packages/client/src/audio/__fixtures__/workletHarness.ts`);
+const { makePatch } = await import(`${root}/packages/client/src/audio/patch.ts`);
+const { PRESETS } = await import(`${root}/packages/client/src/audio/presets.ts`);
+const loaded = fm.loadProcessor();
+const ev = Array.from({ length: 8 }, (_, i) => ({ type: 'noteOn', id: i + 1, note: 48 + i * 3, velocity: 0.9, frame: 0 }));
+const run = (patch: unknown, s: number) => { const p = loaded.create(patch, 16); const t0 = performance.now(); fm.render(loaded, p, Math.round(s * 48000 / 128), ev, { collectSamples: false }); return performance.now() - t0; };
+if (warm === 'dormant') for (let r = 0; r < 3; r++) run(PRESETS['score-tin-kalimba'], 10);
+const t = Array.from({ length: 7 }, () => run(makePatch(), 10)).sort((a, b) => a - b);
+const t2 = Array.from({ length: 7 }, () => run(PRESETS['score-tin-kalimba'], 10)).sort((a, b) => a - b);
+console.log(label, warm, 'pad', t[3].toFixed(1), 'kalimba', t2[3].toFixed(1));

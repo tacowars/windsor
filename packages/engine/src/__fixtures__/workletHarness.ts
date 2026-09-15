@@ -64,15 +64,40 @@ export interface AlgorithmTable {
  */
 export const DEFAULT_SEED = 0xa204;
 
+/** Construction switches the game never sets; a test flips one to build its "before" render. */
+export interface CreateOptions {
+  /** `false` renders silent held voices in full, as the part did before #547. */
+  dormancy?: boolean;
+}
+
 export interface LoadedProcessor {
   /** `seed: null` restores the game's `Math.random`; omitted means DEFAULT_SEED. */
-  create(patch: unknown, maxVoices?: number, seed?: number | null): ProcessorLike;
+  create(
+    patch: unknown,
+    maxVoices?: number,
+    seed?: number | null,
+    options?: CreateOptions,
+  ): ProcessorLike;
   setFrame(frame: number): void;
   sampleRate: number;
   algorithms: AlgorithmTable[];
   waveIds: Record<string, number>;
   /** Modulation depth at operator amplitude 1, in cycles of phase (#543). */
   modIndexScale: number;
+  /** Samples between control-rate updates: the length of every amplitude ramp (#547). */
+  ctrlInterval: number;
+  /** The envelope stage a held note settles in, `ST_SUSTAIN` (#547). */
+  sustainState: number;
+}
+
+/** What the evaluated worklet hands back: a frame setter and the constants tests read. */
+interface WorkletHandle {
+  setFrame: (f: number) => void;
+  ALGORITHMS: AlgorithmTable[];
+  WAVE: Record<string, number>;
+  MOD_INDEX_SCALE: number;
+  CTRL_INTERVAL: number;
+  ST_SUSTAIN: number;
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
@@ -113,24 +138,21 @@ export function loadProcessor(): LoadedProcessor {
        ALGORITHMS,
        WAVE,
        MOD_INDEX_SCALE,
+       CTRL_INTERVAL,
+       ST_SUSTAIN,
      };`,
   ) as (
     sampleRate: number,
     base: unknown,
     register: (name: string, cls: unknown) => void,
-  ) => {
-    setFrame: (f: number) => void;
-    ALGORITHMS: AlgorithmTable[];
-    WAVE: Record<string, number>;
-    MOD_INDEX_SCALE: number;
-  };
+  ) => WorkletHandle;
 
   const handle = factory(SAMPLE_RATE, AudioWorkletProcessorShim, registerProcessor);
   if (!registered) throw new Error('worklet did not call registerProcessor');
   const Processor = registered as new (options: { processorOptions: unknown }) => ProcessorLike;
 
   return {
-    create: (patch, maxVoices = 16, seed = DEFAULT_SEED) =>
+    create: (patch, maxVoices = 16, seed = DEFAULT_SEED, options = {}) =>
       new Processor({
         processorOptions: {
           maxVoices,
@@ -138,6 +160,7 @@ export function loadProcessor(): LoadedProcessor {
           // `null` is the deliberate opt-out; the worklet reads `== null` as
           // "no seed" and falls back to Math.random, the game's path.
           seed: seed ?? undefined,
+          ...options,
         },
       }),
     setFrame: handle.setFrame,
@@ -145,6 +168,8 @@ export function loadProcessor(): LoadedProcessor {
     algorithms: handle.ALGORITHMS,
     waveIds: handle.WAVE,
     modIndexScale: handle.MOD_INDEX_SCALE,
+    ctrlInterval: handle.CTRL_INTERVAL,
+    sustainState: handle.ST_SUSTAIN,
   };
 }
 
