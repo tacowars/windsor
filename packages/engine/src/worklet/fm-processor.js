@@ -40,7 +40,17 @@ const MIP_COUNT = 12; // one per octave from MIP_BASE_HZ
 const MIP_BASE_HZ = 16.352; // C0
 
 const CTRL_INTERVAL = 32; // samples between control-rate updates
-const MOD_INDEX_SCALE = 8.0; // op amplitude 1.0 -> FM index 8
+/*
+ * Modulation depth at operator amplitude 1.0, in cycles of phase -- the unit
+ * `phase` is kept in, so the radian index is 2*pi times this: 4 cycles is
+ * ~25.1 rad (#543). The old 8 meant ~50 rad, past Nyquist for the sidebands of
+ * anything but a low note on an engine that does not oversample, so the top
+ * third of the Level knob was aliasing rather than timbre. 4 keeps the DX-era
+ * ~4*pi useful maximum inside the knob and still reaches noise at the top.
+ * Amplitude is level^2 x envelope x velocity x key scale x LFO, so a modulator
+ * at Level 1 with its envelope open is the full 4 cycles.
+ */
+const MOD_INDEX_SCALE = 4.0;
 /*
  * Self-feedback depth at |feedback| = 1, in cycles of phase (#529). Positive
  * feedback runs sin(phase + beta*y): sine towards a sawtooth, clean to ~1.25

@@ -6,6 +6,11 @@
  * clips at velocity 1 across MIDI notes 36-84 (`fmProcessor.test.ts`). Operator
  * level, filter drive and resonance interact non-linearly with volume, so after
  * editing any of those, re-measure rather than scaling the volume to match.
+ *
+ * Modulator levels were rescaled by #543, when the engine's modulation-index
+ * scale halved: each one is its authored value times sqrt(2), exactly, so the
+ * depth is what it always was. That is why several read as long floats.
+ * Carrier levels are untouched.
  */
 import type { Patch } from './patch';
 import { FILTER_MODE, LFO_SHAPE, WAVE, makeEnvelope, makePatch } from './patch';
@@ -36,12 +41,12 @@ export const SFX_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SAW,
         ratio: 2.4,
-        level: 0.6,
+        level: 0.848528137423857,
         env: E({ attackTime: 0.001, decayTime: 0.09, sustainLevel: 0, releaseTime: 0.04 }),
       },
       {
         wave: WAVE.NOISE,
-        level: 0.35,
+        level: 0.4949747468305833,
         env: E({ attackTime: 0.001, decayTime: 0.05, sustainLevel: 0, releaseTime: 0.03 }),
       },
       { wave: WAVE.SINE, ratio: 1, level: 0 },
@@ -75,13 +80,13 @@ export const SFX_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 1,
-        level: 0.5,
+        level: 0.7071067811865476,
         env: E({ attackTime: 0.9, sustainLevel: 0.7, releaseTime: 1 }),
       },
       {
         wave: WAVE.SINE,
         ratio: 1.007,
-        level: 0.4,
+        level: 0.5656854249492381,
         env: E({ attackTime: 1.2, sustainLevel: 0.6, releaseTime: 1 }),
       },
       { wave: WAVE.SINE, ratio: 1, level: 0 },
@@ -120,7 +125,7 @@ export const SFX_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 4,
-        level: 0.35,
+        level: 0.4949747468305833,
         env: E({ attackTime: 0.001, decayTime: 0.07, sustainLevel: 0, releaseTime: 0.04 }),
       },
       { wave: WAVE.SINE, ratio: 1, level: 0 },
@@ -150,12 +155,12 @@ export const SFX_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 1.41,
-        level: 0.5,
+        level: 0.7071067811865476,
         env: E({ attackTime: 0.001, decayTime: 0.1, sustainLevel: 0, releaseTime: 0.05 }),
       },
       {
         wave: WAVE.NOISE,
-        level: 0.5,
+        level: 0.7071067811865476,
         env: E({ attackTime: 0.001, decayTime: 0.04, sustainLevel: 0, releaseTime: 0.02 }),
       },
       { wave: WAVE.SINE, ratio: 1, level: 0 },
