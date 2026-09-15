@@ -819,9 +819,13 @@ class Voice {
   }
 
   /**
-   * Dormant (#547): gated, every carrier held in sustain at level 0, its
-   * amplitude ramp at ~0 and any filter no longer ringing. The part skips its
-   * control and render work; nothing it would have rendered is audible. Read at
+   * Dormant (#547): gated, every carrier held in sustain at level 0 with an
+   * `endLevel` of 0, its amplitude ramp at ~0 and any filter no longer ringing.
+   * The part skips its control and render work; nothing it would have rendered
+   * is audible. Skipping freezes the pitch, filter and LFO state too, so the
+   * end-level condition matters: a release rising to a non-zero end level is
+   * sound, and would be heard from that frozen state. Excluding it means a
+   * dormant voice's note-off is silence, and the voice can simply end. Read at
    * control boundaries, so a live retune that raises a sustain wakes the voice
    * from its frozen state with the ordinary amplitude ramp up from ~0.
    * Allocates nothing.
@@ -833,26 +837,13 @@ class Voice {
       const i = carriers[c];
       const env = this.ampEnv[i];
       if (env.state !== ST_SUSTAIN || env.p.sustainLevel !== 0) return false;
+      if (env.p.endLevel !== 0) return false;
       if (Math.abs(this.amp[i]) > DORMANT_AMP) return false;
     }
     const f = this.patch.filter;
     if (f.mode === FILT_OFF) return true;
     if (!Svf.quiet(this.svfA)) return false;
     return !f.slope24 || Svf.quiet(this.svfB);
-  }
-
-  /**
-   * Whether a note-off may end a dormant voice outright rather than release it:
-   * true when every carrier's release would land on 0, so the release it skips
-   * is silence too. The factory bank has no carrier with an `endLevel` above 0,
-   * but the console exposes the knob, and a release rising towards one is sound.
-   */
-  get silentRelease() {
-    const carriers = this.alg.carriers;
-    for (let c = 0; c < carriers.length; c++) {
-      if (this.ampEnv[carriers[c]].p.endLevel !== 0) return false;
-    }
-    return true;
   }
 
   /** A voice that is fading out is no longer available, but still sounding. */
@@ -1455,9 +1446,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.noteMap.delete(id);
   }
 
-  /** Note-off for one voice: a dormant voice with a silent release just ends (#547). */
+  /** Note-off for one voice: a dormant voice's release is silence, so it just ends (#547). */
   releaseVoice(v) {
-    if (this.dormancy && v.active && v.dormant && v.silentRelease) v.kill();
+    if (this.dormancy && v.active && v.dormant) v.kill();
     else v.release();
   }
 

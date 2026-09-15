@@ -88,6 +88,9 @@ export interface LoadedProcessor {
   ctrlInterval: number;
   /** The envelope stage a held note settles in, `ST_SUSTAIN` (#547). */
   sustainState: number;
+  /** The dormancy floors on carrier amplitude and SVF state (#547). */
+  dormantAmp: number;
+  dormantFilterState: number;
 }
 
 /** What the evaluated worklet hands back: a frame setter and the constants tests read. */
@@ -98,9 +101,12 @@ interface WorkletHandle {
   MOD_INDEX_SCALE: number;
   CTRL_INTERVAL: number;
   ST_SUSTAIN: number;
+  DORMANT_AMP: number;
+  DORMANT_FILTER_STATE: number;
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
+// eslint-disable-next-line max-lines-per-function -- one evaluation of the worklet, read top to bottom: shim, eval, then the handle it returns (64 of 60, #225 decision 4)
 export function loadProcessor(): LoadedProcessor {
   const source = readFileSync(join(HERE, '../worklet/fm-processor.js'), 'utf8');
 
@@ -140,6 +146,8 @@ export function loadProcessor(): LoadedProcessor {
        MOD_INDEX_SCALE,
        CTRL_INTERVAL,
        ST_SUSTAIN,
+       DORMANT_AMP,
+       DORMANT_FILTER_STATE,
      };`,
   ) as (
     sampleRate: number,
@@ -170,6 +178,8 @@ export function loadProcessor(): LoadedProcessor {
     modIndexScale: handle.MOD_INDEX_SCALE,
     ctrlInterval: handle.CTRL_INTERVAL,
     sustainState: handle.ST_SUSTAIN,
+    dormantAmp: handle.DORMANT_AMP,
+    dormantFilterState: handle.DORMANT_FILTER_STATE,
   };
 }
 

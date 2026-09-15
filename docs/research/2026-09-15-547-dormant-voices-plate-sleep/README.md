@@ -51,13 +51,20 @@ The plate uses default parameters.
 
 | Scenario | Before | After |
 |---|---|---|
-| One impulse, then 60 s of silence | 591 ms | 100–103 ms |
-| 10 s of full-scale noise (never quiet) | 105–108 ms | 106–110 ms |
+| One impulse, then 60 s of silence | 597–601 ms | 95–96 ms |
+| 10 s of full-scale noise (never quiet) | 106–108 ms | 101–103 ms |
 
 The impulse render sleeps about 8.6 s in. By then the tail has been under
 1e-7 for the 1.6 s span, which is the longest tank line at `MAX_SIZE` plus
-the 1 s maximum pre-delay. The noise line is the cost of the quiet tracking
-and the settled-SIZE skip on a plate that never sleeps.
+the 1 s maximum pre-delay. The noise line is a plate that never sleeps. There
+the settled-SIZE skip saves more than the quiet tracking costs.
+
+These plate figures were taken after review pass 1. Pass 1 found that the
+first version's settled-SIZE skip never engaged: `_tap` is Float32, its
+target is a double, and so a settled tap kept a sub-ulp step that was never
+exactly 0. The skip now asks whether one add changes the stored value. With
+the skip broken, the same scenarios read 591 ms for the impulse and 105–110 ms
+for noise.
 
 ## One finding along the way
 
@@ -70,7 +77,7 @@ and it stayed slow.
 
 Dispatching the asleep quantum from a separate `_render` method, so that
 `_renderBlock` only ever sees awake quanta, brought loud input back to
-106–110 ms. That is the shipped shape. The decision record is
+106–110 ms, before the settled-SIZE fix above. That is the shipped shape. The decision record is
 `docs/log/2026-09-15-silent-voices-and-plate-sleep-floors.md`.
 
 A harness-only regression was also found and fixed before these numbers were

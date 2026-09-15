@@ -22,10 +22,11 @@ const RESIDUAL_RATIO = 1e-6;
  * defaults so tuning a default cannot starve a render of its sleep.
  */
 const PLATE = { decay: 0.5 };
-/** Long enough for PLATE's impulse tail to fall under the floor, then sleep. */
-const RENDER_S = 12;
-/** Where the second impulse lands: after the first render has slept. */
-const SECOND_IMPULSE_S = 11;
+/**
+ * A cap, not a deadline: well past the time PLATE's tail takes to fall under the
+ * floor and sleep. Where sleep actually lands is observed, never assumed.
+ */
+const RENDER_S = 30;
 const COMPARE_S = 0.5;
 
 const blockAt = (seconds: number): number => Math.round((seconds * SR) / BLOCK);
@@ -98,21 +99,25 @@ describe('sleep', () => {
   });
 
   it('wakes on the next sound and renders it exactly as a fresh plate would', () => {
-    const second = blockAt(SECOND_IMPULSE_S);
+    // Where a lone impulse's plate falls asleep, observed; the second lands after it.
+    const probe = sleepWatch();
+    renderReverb(loaded, RENDER_S, impulse, PLATE, { afterBlock: probe.afterBlock });
+    expect(probe.firstAsleep()).toBeGreaterThan(0);
+    const second = probe.firstAsleep() + 1;
+
     const twice: Feed = (block, left, right) => {
       if (block !== 0 && block !== second) return;
       left[0] = 1;
       right[0] = 1;
     };
     const watch = sleepWatch();
-    const woken = renderReverb(loaded, SECOND_IMPULSE_S + COMPARE_S, twice, PLATE, {
+    const woken = renderReverb(loaded, (second * BLOCK) / SR + COMPARE_S, twice, PLATE, {
       collectSamples: true,
       afterBlock: watch.afterBlock,
     });
     const fresh = renderReverb(loaded, COMPARE_S, impulse, PLATE, { collectSamples: true });
 
-    expect(watch.firstAsleep()).toBeGreaterThan(0);
-    expect(watch.firstAsleep()).toBeLessThan(second);
+    expect(watch.firstAsleep()).toBe(probe.firstAsleep());
     const after = woken.samples.subarray(second * BLOCK * 2);
     expect(fresh.peak).toBeGreaterThan(0);
     expect(after).toEqual(fresh.samples);
@@ -164,8 +169,17 @@ describe('settled SIZE', () => {
       left[0] = 1;
       right[0] = -1;
     };
+    let settledBlocks = 0;
+    let glidingBlocks = 0;
+    const afterBlock = (_b: number, p: ReverbProcessorLike) => {
+      if (internals(p)._stepping) glidingBlocks++;
+      else settledBlocks++;
+    };
     const opts = { collectSamples: true, automate: glide };
-    const skipping = renderReverb(loaded, 2, feed, {}, opts);
+    const skipping = renderReverb(loaded, 2, feed, {}, { ...opts, afterBlock });
+    // The skip really skipped: settled blocks ran without the bookkeeping.
+    expect(settledBlocks).toBeGreaterThan(0);
+    expect(glidingBlocks).toBeGreaterThan(0);
     const always = renderReverb(loaded, 2, feed, {}, { ...opts, create: { settledSkip: false } });
     expect(skipping.peak).toBeGreaterThan(0);
     expect(skipping.samples).toEqual(always.samples);

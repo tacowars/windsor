@@ -138,6 +138,8 @@ export interface ReverbInternals {
   /** Sleep state (#547). */
   _asleep: boolean;
   _sleepSpan: number;
+  /** Whether the last block ran the per-sample SIZE bookkeeping (#547). */
+  _stepping: boolean;
 }
 
 /** White-box access to one processor's delay lines. */
