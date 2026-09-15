@@ -26,9 +26,15 @@ export function patchIdsIn(dir) {
   return ids;
 }
 
-/** `score-drowned-cellos` → `patchScoreDrownedCellos`: a prefix keeps a slug like `new` legal. */
-export const identifierFor = (id) =>
-  'patch' + id.replace(/(^|-)([a-z0-9])/g, (_, __, letter) => letter.toUpperCase());
+/**
+ * `score-drowned-cellos` → `patch_score_drowned_cellos`. The prefix keeps a
+ * slug like `new` or `1st` legal, and hyphen → underscore is injective over
+ * slugs (a slug has no underscore), so `a1` and `a-1` never share a binding.
+ */
+export const identifierFor = (id) => `patch_${id.replaceAll('-', '_')}`;
+
+/** Prettier's quoteProps is "as-needed": only a plain identifier goes unquoted. */
+const UNQUOTED_KEY = /^[a-z][a-z0-9]*$/;
 
 /** The generated module: one default import per file, one map keyed by id. */
 export function renderIndex(ids) {
@@ -43,8 +49,8 @@ export function renderIndex(ids) {
     '/** Every library file, raw and unvalidated, keyed by id (`presets.ts` loads it). */',
   );
   lines.push('export const PATCH_FILES: Readonly<Record<string, unknown>> = {');
-  // Prettier's quoteProps is "as-needed": a plain word is an unquoted key.
-  for (const id of ids) lines.push(`  ${id.includes('-') ? `'${id}'` : id}: ${identifierFor(id)},`);
+  for (const id of ids)
+    lines.push(`  ${UNQUOTED_KEY.test(id) ? id : `'${id}'`}: ${identifierFor(id)},`);
   lines.push('};', '');
   return lines.join('\n');
 }
