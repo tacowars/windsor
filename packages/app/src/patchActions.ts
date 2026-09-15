@@ -8,11 +8,12 @@
 import type { MusicPartId, Patch } from '../../../packages/client/src/audio/index-for-editor';
 import {
   GAMEPLAY_PATCH_IDS,
+  clonePatch,
   makePatch,
   patchLeafDifferences,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
-import { INIT_PATCH_NAME, INIT_PRESET_ID } from './libraryConstants';
+import { INIT_PATCH_NAME, initPresetId, isInitPreset } from './libraryConstants';
 import type { LibraryModel } from './libraryModel';
 import { removeLibraryFile, writeLibraryFile } from './libraryModel';
 import { buildPatchFile, patchFileText } from './patchFileWriter';
@@ -38,7 +39,7 @@ export const initPatchDefaults = (): Patch => makePatch({ name: INIT_PATCH_NAME 
 export function patchOrigin({ ctx, library, partId }: PatchScope): PatchOrigin {
   const preset = ctx.model.doc[partId]?.preset;
   if (preset === undefined) return { kind: 'none' };
-  if (preset === INIT_PRESET_ID) return { kind: 'init' };
+  if (isInitPreset(preset)) return { kind: 'init' };
   if (Object.hasOwn(library.entries, preset)) return { kind: 'library', id: preset };
   return { kind: 'document', id: preset };
 }
@@ -94,31 +95,53 @@ export function copyPrefill(scope: PatchScope, working: Patch): PatchMetadata {
     : copyMetadata(current);
 }
 
-/** Load Init into the part: the sentinel document patch, replaced whole each time. */
+/** Load Init into the part: its own sentinel document patch, replaced whole each time. */
 export function initPatch({ ctx, partId }: PatchScope): Patch {
   const patch = initPatchDefaults();
-  ctx.change({ [partId]: { preset: INIT_PRESET_ID }, patches: { [INIT_PRESET_ID]: patch } });
+  const id = initPresetId(partId);
+  ctx.change({ [partId]: { preset: id }, patches: { [id]: patch } });
   return patch;
 }
 
-/** Drop the Init sentinel once no part plays it: an unsaved Init is discarded, never exported. */
+/** The preset ids the document's parts play. */
+const playedPresets = (ctx: AppCtx): Set<string> =>
+  new Set(
+    Object.values(ctx.model.doc)
+      .filter(
+        (slot): slot is { preset: string } =>
+          typeof slot === 'object' && slot !== null && 'preset' in slot,
+      )
+      .map((slot) => slot.preset),
+  );
+
+/** Drop every Init sentinel no part plays any more: an unsaved Init is discarded, never exported. */
 export function dropInit(ctx: AppCtx): void {
   const patches = ctx.model.doc.patches;
-  if (!patches || !Object.hasOwn(patches, INIT_PRESET_ID)) return;
-  const stillPlayed = Object.values(ctx.model.doc).some(
-    (slot) =>
-      typeof slot === 'object' &&
-      slot !== null &&
-      'preset' in slot &&
-      slot.preset === INIT_PRESET_ID,
-  );
-  if (stillPlayed) return;
+  if (!patches) return;
+  const played = playedPresets(ctx);
+  const stale = Object.keys(patches).filter((id) => isInitPreset(id) && !played.has(id));
+  if (stale.length === 0) return;
   ctx.restructure((draft) => {
     const drafted = draft['patches'] as Record<string, unknown> | undefined;
     if (!drafted) return;
-    delete drafted[INIT_PRESET_ID];
+    for (const id of stale) delete drafted[id];
     if (Object.keys(drafted).length === 0) delete draft['patches'];
   });
+}
+
+/**
+ * A confirmed discard: the document copy (and so the live part) goes back to
+ * the baseline — the library entry, or Init's defaults — so the edits are
+ * really gone, not merely loaded over.
+ */
+export function discardEdits(scope: PatchScope): Patch | null {
+  const origin = patchOrigin(scope);
+  const baseline = baselinePatch(scope, origin);
+  if (baseline === null || origin.kind === 'none' || origin.kind === 'document') return null;
+  const id = origin.kind === 'init' ? initPresetId(scope.partId) : origin.id;
+  const restored = clonePatch(baseline);
+  scope.ctx.change({ patches: { [id]: restored } });
+  return restored;
 }
 
 export interface WriteRequest extends PatchScope {
