@@ -45,7 +45,7 @@ describe('serialisePatchFile', () => {
     // The sweep serialises the file it read plus the record it computed; a
     // file whose keys arrived shuffled (a hand edit) is still written in the
     // contract's order.
-    const shuffled = { headroom: entry.headroom, patch: entry.patch, ...entry };
+    const shuffled = Object.fromEntries(Object.entries(entry).reverse()) as typeof entry;
     expect(serialisePatchFile(shuffled)).toBe(migrationWrites(entry));
   });
 
