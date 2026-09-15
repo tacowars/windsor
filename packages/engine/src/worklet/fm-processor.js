@@ -41,6 +41,16 @@ const MIP_BASE_HZ = 16.352; // C0
 
 const CTRL_INTERVAL = 32; // samples between control-rate updates
 /*
+ * Dormancy (#547). A held note whose carriers have all decayed to a sustain of
+ * 0 renders nothing but still costs four operators, a filter and a voice slot
+ * until its note-off. Below these it is treated as silent: its carrier
+ * amplitudes are within DORMANT_AMP of 0 and, when a filter is on, the SVF
+ * integrator states are within DORMANT_FILTER_STATE (about -180 dB), so a
+ * resonant ring still sounding after the carriers stop is never cut.
+ */
+const DORMANT_AMP = 1e-9;
+const DORMANT_FILTER_STATE = 1e-9;
+/*
  * Modulation depth at operator amplitude 1.0, in cycles of phase -- the unit
  * `phase` is kept in, so the radian index is 2*pi times this: 4 cycles is
  * ~25.1 rad (#543). The old 8 meant ~50 rad, past Nyquist for the sidebands of
@@ -554,6 +564,11 @@ class Svf {
     this.ic2 = 0;
   }
 
+  /** Both integrators below the dormancy floor: the filter has stopped ringing (#547). */
+  static quiet(svf) {
+    return Math.abs(svf.ic1) <= DORMANT_FILTER_STATE && Math.abs(svf.ic2) <= DORMANT_FILTER_STATE;
+  }
+
   /** Recompute coefficients. Called at control rate, not per sample. */
   setCoeffs(cutoffHz, q, sampleRate) {
     const nyq = sampleRate * 0.5;
@@ -801,6 +816,34 @@ class Voice {
     if (!this.active) return;
     this.gate = false;
     this.fadeInc = -1 / (0.004 * this.sr);
+  }
+
+  /**
+   * Dormant (#547): gated, every carrier held in sustain at level 0 with an
+   * `endLevel` of 0, its amplitude ramp at ~0 and any filter no longer ringing.
+   * The part skips its control and render work; nothing it would have rendered
+   * is audible. Skipping freezes the pitch, filter and LFO state too, so the
+   * end-level condition matters: a release rising to a non-zero end level is
+   * sound, and would be heard from that frozen state. Excluding it means a
+   * dormant voice's note-off is silence, and the voice can simply end. Read at
+   * control boundaries, so a live retune that raises a sustain wakes the voice
+   * from its frozen state with the ordinary amplitude ramp up from ~0.
+   * Allocates nothing.
+   */
+  get dormant() {
+    if (!this.gate || this.fadeInc !== 0) return false;
+    const carriers = this.alg.carriers;
+    for (let c = 0; c < carriers.length; c++) {
+      const i = carriers[c];
+      const env = this.ampEnv[i];
+      if (env.state !== ST_SUSTAIN || env.p.sustainLevel !== 0) return false;
+      if (env.p.endLevel !== 0) return false;
+      if (Math.abs(this.amp[i]) > DORMANT_AMP) return false;
+    }
+    const f = this.patch.filter;
+    if (f.mode === FILT_OFF) return true;
+    if (!Svf.quiet(this.svfA)) return false;
+    return !f.slope24 || Svf.quiet(this.svfB);
   }
 
   /** A voice that is fading out is no longer available, but still sounding. */
@@ -1152,6 +1195,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.running = true;
     // Off in the game; the console turns it on so a knob retunes ringing voices.
     this.liveRetune = false;
+    // Skipping silent held voices (#547). Always on in the game and the console;
+    // `dormancy: false` exists so a test can render the same part without it and
+    // prove the two renders agree.
+    this.dormancy = opts.dormancy !== false;
 
     // Audio-load sampler (#445), off until a `reportLoad` message turns it on,
     // so an offline render and the Node harness time nothing and post nothing.
@@ -1214,7 +1261,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
         // Queued future events are cancelled too: a mute or a live rebuild
         // (#69) must not let the scheduler's look-ahead keep sounding. Unlike
         // panic, voices already sounding still release with their tails.
-        for (const v of this.voices) v.release();
+        for (const v of this.voices) this.releaseVoice(v);
         this.noteMap.clear();
         this.events.length = 0;
         break;
@@ -1285,12 +1332,17 @@ class FmPartProcessor extends AudioWorkletProcessor {
    * asked to fade out (4 ms) rather than being cut dead, and the new note takes
    * a reserve slot. Only an exhausted pool falls back to a hard kill.
    *
-   * Priority for stealing: already released, oldest first; otherwise oldest.
+   * Priority for stealing: dormant (#547), oldest first, killed outright since
+   * it is silent and needs no fade; then already released, oldest first;
+   * otherwise oldest. A dormant voice counts as sounding, so the pool never
+   * holds more than the limit.
    */
   allocate() {
     const vs = this.voices;
     let free = null;
     let sounding = 0;
+    let bestDormant = null,
+      bestDormantAge = -1;
     let bestReleased = null,
       bestReleasedAge = -1;
     let bestAny = null,
@@ -1307,6 +1359,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
       if (v.fading) continue; // sounding but already on its way out
 
       sounding++;
+      if (this.dormancy && v.age > bestDormantAge && v.dormant) {
+        bestDormantAge = v.age;
+        bestDormant = v;
+      }
       if (!v.gate && v.age > bestReleasedAge) {
         bestReleasedAge = v.age;
         bestReleased = v;
@@ -1318,6 +1374,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
     }
 
     if (sounding >= this.maxVoices) {
+      if (bestDormant) {
+        bestDormant.kill();
+        return bestDormant;
+      }
       const victim = bestReleased || bestAny;
       if (victim) victim.steal();
     }
@@ -1381,9 +1441,15 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const list = this.noteMap.get(id);
     if (!list) return;
     for (let i = 0; i < list.length; i++) {
-      if (list[i].voiceId === id) list[i].release();
+      if (list[i].voiceId === id) this.releaseVoice(list[i]);
     }
     this.noteMap.delete(id);
+  }
+
+  /** Note-off for one voice: a dormant voice's release is silence, so it just ends (#547). */
+  releaseVoice(v) {
+    if (this.dormancy && v.active && v.dormant) v.kill();
+    else v.release();
   }
 
   /**
@@ -1415,6 +1481,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const gain = params.gain[0];
 
     const blockStart = currentFrame;
+    const dormancy = this.dormancy;
     const q = this.events;
     let cursor = 0;
 
@@ -1439,6 +1506,13 @@ class FmPartProcessor extends AudioWorkletProcessor {
 
         let done = 0;
         while (done < seg) {
+          // A dormant voice is skipped to the end of the segment and re-read at
+          // the next one (#547); `ctrlCount` stays 0 so that check is a control
+          // boundary. Age still runs, so stealing order holds.
+          if (v.ctrlCount === 0 && dormancy && v.dormant) {
+            v.age += seg - done;
+            break;
+          }
           if (v.ctrlCount === 0) {
             v.updateControl(CTRL_INTERVAL, bend, mw, cm);
             v.ctrlCount = CTRL_INTERVAL;

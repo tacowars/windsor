@@ -1,3 +1,7 @@
+/* eslint-disable max-lines -- 366 against 350 (#547, under the #225 decision 4
+   margin): the sleep state is a few short methods on the one processor, and a
+   worklet cannot import a second file without a bundling step (see
+   fm-processor.js and docs/log/2026-08-31-audio-worklet-single-file.md). */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate */
 
 /**
@@ -107,6 +111,18 @@ const MAX_PRE_DELAY = 1;
 /** Compensates the fourteen-tap sum, which is well above unity. */
 const OUTPUT_TRIM = 0.6;
 
+/**
+ * Sleep (#547). An input sample within SLEEP_INPUT_FLOOR of 0 is silence; a wet
+ * sample within SLEEP_OUTPUT_FLOOR (about -140 dBFS) is an inaudible tail. Both
+ * are read at wet 1 -- the tap sum before the wet gain -- so a plate turned down
+ * to wet 0 does not sleep through a tail it still holds. Once both have held for
+ * longer than anything can recirculate unseen (the longest tank line at
+ * MAX_SIZE, plus the longest pre-delay), the tank is empty to that floor and the
+ * plate stops rendering it until the input moves again.
+ */
+const SLEEP_INPUT_FLOOR = 1e-9;
+const SLEEP_OUTPUT_FLOOR = 1e-7;
+
 /** One-pole coefficient for a cutoff in Hz. */
 function poleCoefficient(hz) {
   return 1 - Math.exp((-2 * Math.PI * Math.min(hz, sampleRate * 0.49)) / sampleRate);
@@ -175,6 +191,18 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._inputGain = 1;
     this._applySize(1, true);
 
+    // Sleep (#547): samples of continuous silence in and out, the span that has
+    // to exceed, and whether the tank is asleep. `sleep: false` and
+    // `settledSkip: false` exist so a test can render the plate without either
+    // saving and prove the renders agree; nothing else sets them.
+    const opts = (options && options.processorOptions) || {};
+    this._sleepEnabled = opts.sleep !== false;
+    this._settledSkip = opts.settledSkip !== false;
+    this._sleepSpan = Math.ceil((Math.max(...TANK_DELAYS) * MAX_SIZE + MAX_PRE_DELAY) * sampleRate);
+    this._quiet = 0;
+    this._asleep = false;
+    this._stepping = false;
+
     // Audio-load sampler (#445): identical to fm-processor.js's, off until a
     // `reportLoad` message turns it on. The plate is the other standing
     // processor on the audio thread, so a load figure that omitted it would
@@ -221,11 +249,22 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._loadWallStart = t1;
   }
 
+  /**
+   * Asleep or awake (#547). The asleep quantum stays out of `_renderBlock` on
+   * purpose: folded into it, a plate that spent its first seconds asleep left
+   * V8 with a tank loop optimised on thin feedback, measured 30 % slower on
+   * loud input afterwards (dev machine, docs/research/2026-09-15-547-*).
+   */
+  _render(inputs, outputs, parameters) {
+    if (this._asleep && this._renderAsleep(inputs[0] ?? [], outputs[0], parameters)) return true;
+    return this._renderBlock(inputs, outputs, parameters);
+  }
+
   /** The sampler wrapper; `_renderBlock` below is the plate itself. */
   process(inputs, outputs, parameters) {
-    if (this._loadQuanta === 0) return this._renderBlock(inputs, outputs, parameters);
+    if (this._loadQuanta === 0) return this._render(inputs, outputs, parameters);
     const t0 = Date.now();
-    const running = this._renderBlock(inputs, outputs, parameters);
+    const running = this._render(inputs, outputs, parameters);
     this._sampleLoad(t0, Date.now());
     return running;
   }
@@ -268,10 +307,82 @@ class DattorroReverb extends AudioWorkletProcessor {
       if (immediate) this._tap[t] = target;
       this._tapStep[t] = immediate ? 0 : (target - this._tap[t]) / 128;
     }
+    // Whether this block's per-sample length and tap bookkeeping moves anything.
+    // A step is not 0 just because SIZE is still: `_tap` is Float32 and its
+    // target a double, so a settled tap keeps a sub-ulp step forever. What
+    // matters is whether one add changes the stored value -- if it does not,
+    // none of the block's identical adds will, and skipping them is exact.
+    let stepping = false;
+    for (let t = 0; t < TAP_TIME.length; t++) {
+      if (Math.fround(this._tap[t] + this._tapStep[t]) !== this._tap[t]) stepping = true;
+    }
     for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
       if (immediate) this._length[i] = this._lengthTarget[i];
       this._lengthStep[i] = immediate ? 0 : (this._lengthTarget[i] - this._length[i]) / 128;
+      if (Math.fround(this._length[i] + this._lengthStep[i]) !== this._length[i]) stepping = true;
     }
+    this._stepping = stepping;
+  }
+
+  /** True when every input sample this quantum is within the sleep floor. */
+  _inputQuiet(input) {
+    for (let c = 0; c < input.length; c++) {
+      const channel = input[c];
+      for (let i = 0; i < channel.length; i++) {
+        if (Math.abs(channel[i]) > SLEEP_INPUT_FLOOR) return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Empty the tank, once, on the way to sleep: every delay line, the pre-delay,
+   * the filter states, the write heads and the modulation phases go back to where a new
+   * processor starts, so the first sound after waking renders exactly as it
+   * would from a fresh plate. Allocation-free: `fill` writes in place.
+   */
+  _sleep() {
+    for (let line = 0; line < LINE_COUNT; line++) this._buffers[line].fill(0);
+    // Write heads too: a read's fractional position is summed against the head,
+    // so a head far from 0 rounds its last bit differently from a fresh plate's.
+    this._write.fill(0);
+    this._preDelay.fill(0);
+    this._preDelayWrite = 0;
+    this._inputLp = 0;
+    this._inputHp = 0;
+    this._dampLp[0] = this._dampLp[1] = 0;
+    this._dampHp[0] = this._dampHp[1] = 0;
+    this._excPhase = 0;
+    this._excPhase2 = 0;
+    this._denormal = ANTI_DENORMAL;
+    this._quiet = 0;
+    this._asleep = true;
+  }
+
+  /**
+   * One asleep quantum: the dry path only (silence times dry), and the
+   * block-rate SIZE smoothing, applied outright because an empty tank cannot
+   * zipper. Returns false when the input has moved, and the plate wakes.
+   */
+  _renderAsleep(input, output, parameters) {
+    if (parameters.hold[0] >= 0.5 || !this._inputQuiet(input)) {
+      this._asleep = false;
+      return false;
+    }
+    const dry = parameters.dry[0];
+    const left = output[0];
+    const right = output[1];
+    const inLeft = input[0];
+    const inRight = input.length >= 2 ? input[1] : inLeft;
+    for (let i = 0; i < 128; i++) {
+      left[i] = inLeft ? inLeft[i] * dry : 0;
+      right[i] = inRight ? inRight[i] * dry : 0;
+    }
+    const smooth = Math.min(1, 128 / (SMOOTH_SECONDS * sampleRate));
+    this._size += smooth * (parameters.size[0] - this._size);
+    this._inputGain += smooth * (1 - this._inputGain);
+    this._applySize(this._size, true);
+    return true;
   }
 
   /**
@@ -382,8 +493,14 @@ class DattorroReverb extends AudioWorkletProcessor {
     const output = outputs[0];
     const wet = parameters.wet[0] * OUTPUT_TRIM;
     const held = parameters.hold[0] >= 0.5;
+    const input = inputs[0] ?? [];
 
-    this._writeInput(inputs[0] ?? [], output, parameters.dry[0]);
+    // Read before the pre-delay write below; the tank's own silence is gathered
+    // in the sample loop as `loudest`.
+    const inputQuiet = this._sleepEnabled && !held && this._inputQuiet(input);
+    let loudest = 0;
+
+    this._writeInput(input, output, parameters.dry[0]);
 
     // Smoothing runs per block. A block is 2.7 ms at 48 kHz, so a SIZE sweep
     // steps its delay lengths in sub-sample increments rather than zippering.
@@ -428,6 +545,7 @@ class DattorroReverb extends AudioWorkletProcessor {
       this._lengthTarget[4],
       this._lengthTarget[8],
     );
+    const stepping = this._stepping || !this._settledSkip;
     const excDepth = Math.min(
       (parameters.modDepth[0] * sampleRate) / 1000,
       (shortest - MIN_LENGTH) / 2,
@@ -489,6 +607,10 @@ class DattorroReverb extends AudioWorkletProcessor {
 
       output[0][i] += left * wet;
       output[1][i] += right * wet;
+      if (inputQuiet) {
+        const magnitude = Math.max(Math.abs(left), Math.abs(right)) * OUTPUT_TRIM;
+        if (magnitude > loudest) loudest = magnitude;
+      }
 
       this._excPhase += excRate;
       if (this._excPhase >= 1) this._excPhase -= 1;
@@ -498,15 +620,24 @@ class DattorroReverb extends AudioWorkletProcessor {
 
       for (let line = 0; line < LINE_COUNT; line++) {
         this._write[line] = (this._write[line] + 1) & this._mask[line];
-        this._length[line] += this._lengthStep[line];
       }
-      for (let t = 0; t < TAP_TIME.length; t++) {
-        this._tap[t] += this._tapStep[t];
+      if (stepping) {
+        for (let line = FIRST_TANK_LINE; line < LINE_COUNT; line++) {
+          this._length[line] += this._lengthStep[line];
+        }
+        for (let t = 0; t < TAP_TIME.length; t++) {
+          this._tap[t] += this._tapStep[t];
+        }
       }
     }
 
     this._preDelayWrite = (this._preDelayWrite + 128) % this._preDelayLength;
-    // Always true: a reverb must keep rendering its tail after its input stops.
+
+    if (inputQuiet && loudest <= SLEEP_OUTPUT_FLOOR) this._quiet += 128;
+    else this._quiet = 0;
+    if (this._quiet > this._sleepSpan) this._sleep();
+    // Always true, asleep or not: a reverb must keep rendering its tail after
+    // its input stops, and must be there to wake when the input returns.
     return true;
   }
 }

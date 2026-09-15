@@ -37,10 +37,28 @@ export interface ReverbProcessorLike {
   ): boolean;
 }
 
+/** Construction switches the game never sets; a test flips one to build its "before" render (#547). */
+export interface ReverbCreateOptions {
+  /** `false` keeps the tank rendering through any length of silence. */
+  sleep?: boolean;
+  /** `false` runs the per-sample length and tap bookkeeping even when SIZE is still. */
+  settledSkip?: boolean;
+}
+
+/** The topology constants a sleep test derives its span from, read out of the worklet. */
+export interface ReverbTopology {
+  maxSize: number;
+  tankDelays: number[];
+  maxPreDelay: number;
+  sleepInputFloor: number;
+  sleepOutputFloor: number;
+}
+
 export interface LoadedReverb {
   descriptors: ParameterDescriptor[];
-  create(): ReverbProcessorLike;
+  create(options?: ReverbCreateOptions): ReverbProcessorLike;
   sampleRate: number;
+  topology: ReverbTopology;
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
@@ -76,10 +94,21 @@ export function loadReverb(): LoadedReverb {
     'sampleRate',
     'AudioWorkletProcessor',
     'registerProcessor',
-    source,
-  ) as (sampleRate: number, base: unknown, register: (name: string, cls: unknown) => void) => void;
+    `${source}
+     return {
+       maxSize: MAX_SIZE,
+       tankDelays: TANK_DELAYS,
+       maxPreDelay: MAX_PRE_DELAY,
+       sleepInputFloor: SLEEP_INPUT_FLOOR,
+       sleepOutputFloor: SLEEP_OUTPUT_FLOOR,
+     };`,
+  ) as (
+    sampleRate: number,
+    base: unknown,
+    register: (name: string, cls: unknown) => void,
+  ) => ReverbTopology;
 
-  factory(SAMPLE_RATE, AudioWorkletProcessorShim, registerProcessor);
+  const topology = factory(SAMPLE_RATE, AudioWorkletProcessorShim, registerProcessor);
   if (!registered) throw new Error('worklet did not call registerProcessor');
 
   const Processor = registered as unknown as {
@@ -89,8 +118,9 @@ export function loadReverb(): LoadedReverb {
 
   return {
     descriptors: Processor.parameterDescriptors,
-    create: () => new Processor({}),
+    create: (options = {}) => new Processor({ processorOptions: options }),
     sampleRate: SAMPLE_RATE,
+    topology,
   };
 }
 
@@ -105,6 +135,11 @@ export interface ReverbInternals {
   _length: Float32Array;
   _read(index: number, offset: number): number;
   _readCubic(index: number, offset: number): number;
+  /** Sleep state (#547). */
+  _asleep: boolean;
+  _sleepSpan: number;
+  /** Whether the last block ran the per-sample SIZE bookkeeping (#547). */
+  _stepping: boolean;
 }
 
 /** White-box access to one processor's delay lines. */
@@ -122,7 +157,19 @@ export type Feed = (block: number, left: Float32Array, right: Float32Array) => v
  */
 export type Automate = (block: number, values: Record<string, Float32Array>) => void;
 
+/** Everything past the parameters a render can take (#547). */
+export interface ReverbRenderOptions {
+  automate?: Automate;
+  create?: ReverbCreateOptions;
+  /** Keep every output sample, interleaved, in `samples`. Off by default. */
+  collectSamples?: boolean;
+  /** Called after each block renders, with the processor, for white-box reads. */
+  afterBlock?: (block: number, processor: ReverbProcessorLike) => void;
+}
+
 export interface ReverbRenderResult {
+  /** Interleaved stereo when `collectSamples` was set; empty otherwise. */
+  samples: Float32Array;
   /** Per-block RMS across both channels, so a tail can be traced over time. */
   trace: number[];
   peak: number;
@@ -146,9 +193,11 @@ export function renderReverb(
   seconds: number,
   feed: Feed,
   params: Record<string, number> = {},
-  automate?: Automate,
+  extra: Automate | ReverbRenderOptions = {},
 ): ReverbRenderResult {
-  const processor = loaded.create();
+  const options: ReverbRenderOptions = typeof extra === 'function' ? { automate: extra } : extra;
+  const { automate, afterBlock } = options;
+  const processor = loaded.create(options.create);
   const values: Record<string, Float32Array> = {};
   for (const d of loaded.descriptors) {
     values[d.name] = new Float32Array([params[d.name] ?? d.defaultValue]);
@@ -160,6 +209,8 @@ export function renderReverb(
   const inR = new Float32Array(BLOCK);
 
   const blocks = Math.round((seconds * loaded.sampleRate) / BLOCK);
+  const collect = options.collectSamples === true;
+  const samples = new Float32Array(collect ? blocks * BLOCK * 2 : 0);
   const trace: number[] = [];
   let peak = 0;
   let nonFinite = 0;
@@ -188,11 +239,16 @@ export function renderReverb(
       if (b > 4) maxStep = Math.max(maxStep, Math.abs(l - previous));
       previous = l;
       energy += l * l + r * r;
+      if (collect) {
+        samples[(b * BLOCK + i) * 2] = l;
+        samples[(b * BLOCK + i) * 2 + 1] = r;
+      }
     }
+    afterBlock?.(b, processor);
     trace.push(Math.sqrt(energy / (BLOCK * 2)));
   }
 
-  return { trace, peak, nonFinite, maxStep, stereo };
+  return { samples, trace, peak, nonFinite, maxStep, stereo };
 }
 
 /** Seconds until the trace falls to `floor` of its peak; the render length if never. */

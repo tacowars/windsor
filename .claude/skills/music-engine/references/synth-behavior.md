@@ -86,6 +86,11 @@ It is not legato envelope suppression. `glide` can still move between notes.
 Positive `spread` runs a detuned voice pair even in mono. Inspect lifecycle
 tests for late note-off, stealing and cut fades before changing these paths.
 Long release tails and repeated chords can consume the finite voice pool.
+A held note whose carriers all sit in sustain at level 0 (and whose filter
+has stopped ringing) goes **dormant** (#547): the part skips it, steals it
+first and silently, and ends it on note-off. Sustain 0 therefore does not tie
+up the pool under Hold. The plate likewise sleeps after ~1.6 s of silence in
+and out, and never under HOLD.
 
 `phaseFree` randomizes starting phase; noise, drift and pan randomization add
 other stochastic surfaces. Use the harness's explicit seeds for reproducible
