@@ -113,9 +113,10 @@ packages/client/src/audio/
   patch.ts              # schema, enums, algorithm routing table
   patchLibrary.ts       # the patches/*.json file contract and validator (#561)
   patches/              # the patch library: one <id>.json per patch, plus a generated index.ts
-  presets.ts            # the whole-bank table (PRESETS, PATCH_LIBRARY) built from the library
+  presets.ts            # the whole-bank table (PRESETS, PATCH_LIBRARY) — editor/test only (#562)
   gameplayPatches.ts    # GAMEPLAY_PATCH_IDS: the patches game code plays, imported by id
   presetCatalog.ts      # listing and filtering of the library's metadata
+  arrangementValidate.ts # PatchResolver: where a song's part presets resolve (#562)
   workletMessages.ts    # main-thread <-> worklet contract
   worklet/              # the DSP (§6.1)
   __fixtures__/         # headless worklet harness, Node-only
@@ -125,6 +126,22 @@ tools/patch-editor/     # authoring tool, outside the client bundle
 This follows the `area:*` mirroring rule in `CLAUDE.md` — an `area:audio` ticket points at
 one directory — and the systems rule: an explicit `update(dt)` owned by the loop, never
 logic inlined in `runRenderLoop`.
+
+**A song document is self-contained, and the game resolves patches from it alone**
+(#562, epic #564 decision 2). An `arrangements/<name>.json` carries a snapshot of every
+patch its parts play in its `patches` section; `PatchResolver` (`arrangementValidate.ts`)
+is the one resolver, and on the game path it is handed the document's patches and nothing
+else — a name it cannot resolve is a load error naming the part and the id, never a fall
+back to the library. So improving a `patches/<id>.json` cannot change what a shipped song
+sounds like, and no game path imports the whole-bank table: the bundler drops the library
+(#562 cut the client chunk by 245 KB). Two deliberate exceptions, both by id and both
+bundled: `gameplayPatches.ts` for the game's own sounds, which are not songs, and the
+metronome fallback, which carries its one patch the same way every other document does.
+
+The editor is the only caller that relaxes the rule, through `makeArrangement`'s one
+`libraryFill` option: a document written before #562 resolves its names from the library
+once on open, the resolved patches are embedded into the document there and then, and the
+Arrangement tab says which ids were filled. The next export is self-contained.
 
 **Audio observes; it never decides.** Simulation events flow one way — the authoritative
 server and the client sim emit events, the audio system subscribes and makes noise. No

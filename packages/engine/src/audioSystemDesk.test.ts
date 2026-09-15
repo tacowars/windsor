@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { FakeContext, installFakeAudioWorklet } from './__fixtures__/fakeAudioContext';
 import type { FakeWorkletNode } from './__fixtures__/fakeAudioContext';
-import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
 import type { ArrangementDocument } from './arrangementDocument';
 import { AudioSystem } from './audioSystem';
 import { FmEngine } from './fmEngine';
@@ -36,19 +36,19 @@ describe('initMusic with patches', () => {
   it('plays a part on the document patch its preset names', async () => {
     const lead = makePatch({ name: 'Doc Lead', volume: 0.31 });
     const sys = await system({
-      ...FULL_ARRANGEMENT,
+      ...FULL_DOCUMENT,
       arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
-      patches: { lead },
+      patches: { ...FULL_DOCUMENT.patches, lead },
     });
     expect(sys.strip('arp')?.part.patch).toEqual(lead);
-    // A part whose preset the document does not define stays on the built-in.
+    // Every other part plays the snapshot the document carries for it (#562).
     expect(sys.strip('kick')?.part.patch).toEqual(PRESETS.kick);
   });
 
-  it('lets a document patch shadow a built-in of the same name', async () => {
+  it('plays the embedded snapshot even where the library has that id', async () => {
     const sys = await system({
-      ...FULL_ARRANGEMENT,
-      patches: { kick: { ...PRESETS.kick!, volume: 0.05 } },
+      ...FULL_DOCUMENT,
+      patches: { ...FULL_DOCUMENT.patches, kick: { ...PRESETS.kick!, volume: 0.05 } },
     });
     expect(sys.strip('kick')?.part.patch.volume).toBe(0.05);
   });
@@ -57,7 +57,7 @@ describe('initMusic with patches', () => {
 describe('initMusic with returns', () => {
   it('lands the plate space, the return levels and the delay line on the live buses', async () => {
     const sys = await system({
-      ...FULL_ARRANGEMENT,
+      ...FULL_DOCUMENT,
       returns: {
         room: { kind: 'reverb', level: 0.4, space: { ...RETURNS.room.space, size: 2.5 } },
         echo: { kind: 'delay', level: 0.2, delayTime: 0.75, feedback: 0.5, damp: 1500 },
@@ -70,7 +70,7 @@ describe('initMusic with returns', () => {
   });
 
   it('keeps the code returns when the document has no overlay', async () => {
-    const sys = await system(FULL_ARRANGEMENT);
+    const sys = await system(FULL_DOCUMENT);
     expect(sys.returnBus('room')?.level.value).toBe(RETURNS.room.level);
     expect(plateOf(sys).parameters.get('size')?.value).toBe(RETURNS.room.space.size);
   });
@@ -79,10 +79,10 @@ describe('initMusic with returns', () => {
 describe('apply over patches and returns', () => {
   it('pushes an edited document patch to every part playing it', async () => {
     const sys = await system({
-      ...FULL_ARRANGEMENT,
+      ...FULL_DOCUMENT,
       arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
       drone: { ...FULL_ARRANGEMENT.drone, preset: 'lead' },
-      patches: { lead: makePatch({ name: 'lead' }) },
+      patches: { ...FULL_DOCUMENT.patches, lead: makePatch({ name: 'lead' }) },
     });
     expect(sys.apply({ patches: { lead: { volume: 0.12 } } })).toEqual({ ok: true, ignored: [] });
     expect(sys.strip('arp')?.part.patch.volume).toBe(0.12);
@@ -91,7 +91,7 @@ describe('apply over patches and returns', () => {
   });
 
   it('adds a new patch live, so a later preset switch can name it', async () => {
-    const sys = await system(FULL_ARRANGEMENT);
+    const sys = await system(FULL_DOCUMENT);
     expect(sys.apply({ patches: { fresh: { volume: 0.2 } } }).ok).toBe(true);
     expect(sys.apply({ arp: { preset: 'fresh' } }).ok).toBe(true);
     expect(sys.strip('arp')?.part.patch.volume).toBe(0.2);
@@ -99,26 +99,26 @@ describe('apply over patches and returns', () => {
   });
 
   it('takes a new patch and the preset switch naming it in one partial', async () => {
-    const sys = await system(FULL_ARRANGEMENT);
+    const sys = await system(FULL_DOCUMENT);
     const result = sys.apply({ patches: { fresh: { volume: 0.2 } }, arp: { preset: 'fresh' } });
     expect(result).toEqual({ ok: true, ignored: [] });
     expect(sys.strip('arp')?.part.patch.volume).toBe(0.2);
   });
 
   it('ignores an inherited object name on the live returns path', async () => {
-    const sys = await system(FULL_ARRANGEMENT);
+    const sys = await system(FULL_DOCUMENT);
     expect(sys.apply({ returns: { constructor: { level: 0.5 } } } as never).ignored).toEqual([
       'returns.constructor',
     ]);
   });
 
   it('ignores a patch entry that is not an object', async () => {
-    const sys = await system(FULL_ARRANGEMENT);
+    const sys = await system(FULL_DOCUMENT);
     expect(sys.apply({ patches: { lead: 3 } } as never).ignored).toEqual(['patches.lead']);
   });
 
   it('changes only the return fields the partial names, clamped', async () => {
-    const sys = await system(FULL_ARRANGEMENT);
+    const sys = await system(FULL_DOCUMENT);
     const sizeBefore = plateOf(sys).parameters.get('size')?.value;
     expect(
       sys.apply({ returns: { room: { space: { decay: 0.3 } }, echo: { feedback: 9 } } }),
@@ -132,7 +132,7 @@ describe('apply over patches and returns', () => {
   });
 
   it('reports unknown returns, wrong-kind fields and junk by path', async () => {
-    const sys = await system(FULL_ARRANGEMENT);
+    const sys = await system(FULL_DOCUMENT);
     const result = sys.apply({
       returns: { cave: { level: 1 }, room: { delayTime: 1, space: { wat: 1 }, level: 'x' } },
     } as never);

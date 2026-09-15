@@ -22,7 +22,8 @@
 import type { ArpeggiatorConfig } from './arpeggiator';
 import type { EuclideanConfig } from './euclideanSequencer';
 import type { ScaleName } from './scaleSampler';
-import { GAMEPLAY_PATCH_IDS } from './gameplayPatches';
+import { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
+import type { Patch } from './patch';
 import { DIVISORS } from './scheduler';
 import type { StepSequencerConfig } from './stepSequencer';
 
@@ -97,9 +98,16 @@ export interface Arrangement {
  * The narrow type is the "one part" guarantee: exactly the kick slot is
  * populated, so no pitched generator exists to draw from the (unused) key.
  */
-export const FALLBACK_ARRANGEMENT: Arrangement & { readonly kick: PercussionArrangement } = {
+export const FALLBACK_ARRANGEMENT: Arrangement & {
+  readonly kick: PercussionArrangement;
+  readonly patches: Readonly<Record<string, Patch>>;
+} = {
   seed: 0,
   bpm: 120,
+  // Self-contained like every other document (#562): the click carries the
+  // one patch it plays, from the gameplay table the game bundles by id, so
+  // the fallback needs no library either.
+  patches: { [GAMEPLAY_PATCH_IDS.pickupBlip]: GAMEPLAY_PATCHES[GAMEPLAY_PATCH_IDS.pickupBlip] },
   // No pitched part exists to draw from this; it is here because a key is
   // structurally required, and it is a single root on purpose — nothing musical.
   key: { root: 60, scale: [0], weights: [1] },

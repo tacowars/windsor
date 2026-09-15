@@ -45,8 +45,7 @@ import type {
   PlayablePart,
 } from './arrangementPlayer';
 import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
-import type { PresetTable } from './arrangementValidate';
-import { lookupPreset } from './arrangementValidate';
+import { PatchResolver } from './arrangementValidate';
 import { AUDIO_LOAD_REPORT_SECONDS, MUSIC_PART_MAX_VOICES } from './audioConstants';
 import type { AudioCostReadout } from './audioCost';
 import type { AudioLoadReadout } from './audioLoad';
@@ -64,7 +63,7 @@ import type { ChannelStrip, ReturnSpec } from './mix';
 import { MIX, RETURNS, stripFor } from './mix';
 import type { Patch } from './patch';
 import { clonePatch } from './patch';
-import { PRESETS } from './presets';
+import { GAMEPLAY_PATCHES, type GameplayPatchId } from './gameplayPatches';
 import type { ReturnBus } from './returnBus';
 import { createReturns } from './returnBus';
 import { Scheduler } from './scheduler';
@@ -201,15 +200,15 @@ export class AudioSystem {
     return this.loadMeter.processorCount;
   }
 
-  /** Create a part on its strip, dry into the music bus. `sound` is a preset name or a patch. */
+  /** Create a part on its strip, dry into the music bus. The patch is the caller's — no name is resolved here (#562). */
   createMusicPart(
     name: string,
-    sound: string | Patch,
+    patch: Patch,
     maxVoices = MUSIC_PART_MAX_VOICES,
     strip?: ChannelStrip,
   ): AudioPart {
     const { musicBus } = this.standing();
-    return this.route(name, sound, maxVoices, musicBus.input, strip);
+    return this.route(name, patch, maxVoices, musicBus.input, strip);
   }
 
   /**
@@ -217,9 +216,11 @@ export class AudioSystem {
    * SFX. The fader is one `GainNode` at unity until the settings move it
    * (#518), so a part's path to the master is otherwise what it always was.
    */
-  createSfxPart(name: string, preset: string, maxVoices = 8): AudioPart {
+  createSfxPart(name: string, id: GameplayPatchId, maxVoices = 8): AudioPart {
     this.standing();
-    return this.route(name, preset, maxVoices, this.sfxNode());
+    // Gameplay sounds are not songs: they still resolve by library id (#562),
+    // through the two-entry table the game bundles.
+    return this.route(name, clonePatch(GAMEPLAY_PATCHES[id]), maxVoices, this.sfxNode());
   }
 
   /**
@@ -253,27 +254,39 @@ export class AudioSystem {
    * `MIX` otherwise. Idempotent. Nothing sounds until `startMusic()`; under
    * `?music=0` main.ts builds this but never starts the transport, so the
    * whole graph exists on a silent page (refinement decision 2).
+   *
+   * Throws, naming the part and the id, when the document does not carry a
+   * patch a part names (#562). That is deliberate: a song is self-contained,
+   * and a silent fall back to the library is how improving a patch would have
+   * changed a shipped song. `arrangementGate.test.ts` fails the build long
+   * before a committed document could reach here.
    */
   initMusic(document: ArrangementDocument, onEvent?: MusicEventHandler): void {
     if (this.player) return;
     const { mix, returns, patches, ...arrangement } = document;
-    // The document's patches over the code's presets: a name resolves here
-    // first, so a document patch shadows a built-in of the same name.
-    const presets: PresetTable = { ...PRESETS, ...patches };
+    // The document and nothing else (#562): a song carries a snapshot of
+    // every patch it plays, so the library is not a runtime import and a
+    // name it does not embed is a load error, never a silent fallback.
+    const resolver = new PatchResolver(patches ?? {});
     const parts: Partial<Record<MusicPartId, PlayablePart>> = {};
     for (const id of MUSIC_PART_IDS) {
       const section = arrangement[id];
       if (!section) continue;
-      const patch = lookupPreset(presets, section.preset);
       parts[id] = this.createMusicPart(
         section.part,
-        patch ? clonePatch(patch) : section.preset,
+        clonePatch(resolver.require(id, section.preset)),
         MUSIC_PART_MAX_VOICES,
         mix?.[section.part],
       );
     }
     if (returns) applyReturnsLive(this.standing().returns, returns);
-    this.player = new ArrangementPlayer(this.scheduler, parts, arrangement, onEvent, presets);
+    this.player = new ArrangementPlayer(
+      this.scheduler,
+      parts,
+      arrangement,
+      resolver.table(),
+      onEvent,
+    );
   }
 
   /**
@@ -420,14 +433,13 @@ export class AudioSystem {
 
   private route(
     name: string,
-    sound: string | Patch,
+    patch: Patch,
     maxVoices: number,
     dry: AudioNode,
     strip?: ChannelStrip,
   ): AudioPart {
     const { returns } = this.standing();
-    const source = typeof sound === 'string' ? { preset: sound } : { patch: sound };
-    const part = this.engine.createPart(name, { ...source, maxVoices, destination: null });
+    const part = this.engine.createPart(name, { patch, maxVoices, destination: null });
     this.meterLoad(`part:${name}`, part.node);
     this.strips.set(name, routePart(part, strip ?? stripFor(this.mix, name), returns, dry));
     return part;

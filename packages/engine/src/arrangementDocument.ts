@@ -28,6 +28,7 @@ import { ArrangementNormaliser } from './arrangementNormalise';
 import { normaliseMix, normaliseReturns } from './deskNormalise';
 import type { ChannelStrip, ReturnSpec } from './mix';
 import type { Patch } from './patch';
+import type { ResolveOptions } from './arrangementValidate';
 
 export { FALLBACK_ARRANGEMENT };
 
@@ -41,8 +42,9 @@ export { FALLBACK_ARRANGEMENT };
  */
 export type ArrangementDocument = Arrangement & {
   /**
-   * Named FM patches. A part's `preset` resolves here first, then in the
-   * code's `PRESETS`, so a document patch named like a built-in shadows it.
+   * Named FM patches — the only place a part's `preset` resolves (#562).
+   * A song carries a snapshot of every patch it plays, so improving
+   * `patches/<id>.json` never changes what a shipped song sounds like.
    */
   readonly patches?: Readonly<Record<string, Patch>>;
   /** Strip overlays by part name; an absent strip keeps the code's `MIX` entry. */
@@ -57,6 +59,12 @@ export interface MakeArrangementResult {
   corrections: string[];
   /** Names the document mentions and the code does not define (record §5). */
   dangling: string[];
+  /**
+   * Patch ids a `libraryFill` supplied because the document did not embed
+   * them (#562) — now embedded in `document.patches`, so the next export
+   * carries them. Always empty on the game path, which hands no fill.
+   */
+  filled: string[];
   /** False when nothing usable survived; `document` is then `FALLBACK_ARRANGEMENT`. */
   usable: boolean;
 }
@@ -65,9 +73,15 @@ export interface MakeArrangementResult {
  * Normalise a raw document (record §5). Never throws, and every value in the
  * result satisfies the generator constructors' asserted ranges, so building
  * an `ArrangementPlayer` from it cannot throw either.
+ *
+ * With no options this is the game rule (#562): a part's `preset` resolves
+ * against the document's own `patches` and nothing else. The editor passes
+ * `{ libraryFill: PRESETS }` so a document written before #562 still opens —
+ * every name it resolves that way is embedded into the returned document and
+ * listed in `filled`.
  */
-export function makeArrangement(raw: unknown): MakeArrangementResult {
-  const n = new ArrangementNormaliser();
+export function makeArrangement(raw: unknown, options: ResolveOptions = {}): MakeArrangementResult {
+  const n = new ArrangementNormaliser(options);
   const document = normalise(raw, n);
   if (!document) {
     n.correction('nothing usable survives normalisation — falling back to the metronome');
@@ -75,10 +89,17 @@ export function makeArrangement(raw: unknown): MakeArrangementResult {
       document: FALLBACK_ARRANGEMENT,
       corrections: n.corrections,
       dangling: n.dangling,
+      filled: [...n.filled],
       usable: false,
     };
   }
-  return { document, corrections: n.corrections, dangling: n.dangling, usable: true };
+  return {
+    document,
+    corrections: n.corrections,
+    dangling: n.dangling,
+    filled: [...n.filled],
+    usable: true,
+  };
 }
 
 /** The verify gate's predicate: usable, and naming nothing the code does not define. */
@@ -121,7 +142,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   const o = raw as Record<string, unknown>;
   n.dropUnknown(o, DOCUMENT_KEYS, '');
   // The patches come first: the parts' preset names resolve against them.
-  const patches = n.patches(o.patches);
+  const embedded = n.patches(o.patches);
   const parts: NormalisedParts = {
     kick: n.percussion(o.kick, 'kick'),
     hat: n.percussion(o.hat, 'hat'),
@@ -142,7 +163,11 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   if (parts.hat) document.hat = parts.hat;
   if (parts.arp) document.arp = parts.arp;
   if (parts.drone) document.drone = parts.drone;
-  if (patches) document.patches = patches;
+  // A library fill is embedded here and nowhere else (#562): from this point
+  // the document is self-contained, so the export and the game path are the
+  // same document.
+  const patches = { ...embedded, ...n.filledPatches() };
+  if (Object.keys(patches).length > 0) document.patches = patches;
   const mix = normaliseMix(o.mix, n);
   if (mix) document.mix = mix;
   const returns = normaliseReturns(o.returns, n);

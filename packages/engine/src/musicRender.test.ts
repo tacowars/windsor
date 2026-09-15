@@ -20,7 +20,7 @@ import {
 } from './__fixtures__/fakeAudioContext';
 import type { FakeNode } from './__fixtures__/fakeAudioNodes';
 import { noteToneFeed } from './__fixtures__/noteFeeds';
-import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
 import { MUSIC_PART_IDS, type MusicPartId } from './arrangementPlayer';
 import { AudioSystem } from './audioSystem';
 import { FmEngine } from './fmEngine';
@@ -45,7 +45,7 @@ async function musicRig(): Promise<Rig> {
   const engine = new FmEngine(context.asAudioContext());
   const system = new AudioSystem(engine);
   await system.init();
-  system.initMusic(FULL_ARRANGEMENT);
+  system.initMusic(FULL_DOCUMENT);
   for (const id of MUSIC_PART_IDS) {
     const part = engine.getPart(FULL_ARRANGEMENT[id].part);
     if (!part) throw new Error(`no part "${id}"`);

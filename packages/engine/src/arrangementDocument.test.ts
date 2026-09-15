@@ -9,9 +9,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { Arrangement } from './arrangement';
 import { FALLBACK_ARRANGEMENT } from './arrangement';
+import type { ArrangementDocument } from './arrangementDocument';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
+import type { PresetTable } from './arrangementValidate';
 import { DEFAULT_STRIP, MIX, stripFor } from './mix';
+import { PRESETS } from './presets';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from './scheduler';
 
 const silentPart = (): PlayablePart => ({
@@ -22,14 +25,26 @@ const silentPart = (): PlayablePart => ({
   allNotesOff: () => {},
 });
 
+/** The document's own patches — the only table the game resolves against (#562). */
+const patchesOf = (arrangement: Arrangement): PresetTable =>
+  (arrangement as ArrangementDocument).patches ?? {};
+
 /** Building and running the player is the "usable" proof: no constructor throws. */
 function play(arrangement: Arrangement): void {
   const parts = { kick: silentPart(), hat: silentPart(), arp: silentPart(), drone: silentPart() };
   const transport = new TickTransport();
-  const player = new ArrangementPlayer(transport, parts, arrangement);
+  const player = new ArrangementPlayer(transport, parts, arrangement, patchesOf(arrangement));
   for (let i = 0; i < TICKS_PER_BAR; i++) transport.advance(0);
   player.dispose();
 }
+
+/**
+ * The library ids these normalisation cases name, embedded as `{}` — which
+ * `patchNormalise` completes from `makePatch()` without a correction. Since
+ * #562 a document resolves only its own `patches`, so a case about clamping
+ * or defaults has to carry the patches its parts play.
+ */
+const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
 const JUNK: Array<[string, unknown]> = [
   ['null', null],
@@ -65,7 +80,11 @@ describe('makeArrangement never throws', () => {
 
 describe('corrections are reported', () => {
   it('names every clamp by path', () => {
-    const result = makeArrangement({ kick: { preset: 'kick', velocity: 9 }, bpm: 9999 });
+    const result = makeArrangement({
+      patches: PATCHES,
+      kick: { preset: 'kick', velocity: 9 },
+      bpm: 9999,
+    });
     expect(result.usable).toBe(true);
     expect(result.corrections).toContain('kick.velocity: clamped 9 to 1');
     expect(result.corrections).toContain('bpm: clamped 9999 to 300');
@@ -78,13 +97,16 @@ describe('corrections are reported', () => {
   });
 
   it('replaces a divisor that does not divide the bar', () => {
-    const result = makeArrangement({ drone: { preset: 'drone-sqr', driver: { divisor: 7 } } });
+    const result = makeArrangement({
+      patches: PATCHES,
+      drone: { preset: 'drone-sqr', driver: { divisor: 7 } },
+    });
     expect(result.corrections.join('\n')).toMatch(/divisor: 7 does not divide the 96-tick bar/);
     expect(result.document.drone?.driver.divisor).toBe(96);
   });
 
   it('takes defaults for absent optional fields silently', () => {
-    const result = makeArrangement({ kick: { part: 'kick', preset: 'kick' } });
+    const result = makeArrangement({ patches: PATCHES, kick: { part: 'kick', preset: 'kick' } });
     expect(result.usable).toBe(true);
     expect(result.corrections).toEqual([]);
     expect(result.document.kick?.driver.steps).toBe(16);
@@ -122,7 +144,12 @@ describe('the fallback (record §4)', () => {
     const transport = new TickTransport(FALLBACK_ARRANGEMENT.bpm);
     let triggers = 0;
     const clicker = { ...silentPart(), trigger: () => ++triggers };
-    const player = new ArrangementPlayer(transport, { kick: clicker }, FALLBACK_ARRANGEMENT);
+    const player = new ArrangementPlayer(
+      transport,
+      { kick: clicker },
+      FALLBACK_ARRANGEMENT,
+      FALLBACK_ARRANGEMENT.patches,
+    );
     for (let i = 0; i < 4 * TICKS_PER_BAR; i++) transport.advance(0);
     expect(triggers).toBe(16);
     player.dispose();
@@ -132,6 +159,7 @@ describe('the fallback (record §4)', () => {
 describe('round-trip: normalise → serialise → normalise', () => {
   it('is equal and correction-free on the normalised object', () => {
     const messy = {
+      patches: PATCHES,
       seed: 204.4,
       bpm: 500,
       key: { root: 50, scale: 'dorian', weights: [4, 1] },
@@ -161,18 +189,21 @@ describe('round-trip: normalise → serialise → normalise', () => {
 
 describe('runtime inputs JSON cannot represent (self-review findings)', () => {
   it('never throws on BigInt or cyclic values in a field', () => {
-    const bigint = makeArrangement({ kick: { preset: 'kick', velocity: 1n } });
+    const bigint = makeArrangement({ patches: PATCHES, kick: { preset: 'kick', velocity: 1n } });
     expect(bigint.document.kick?.velocity).toBe(0.8);
     expect(bigint.corrections.join('\n')).toMatch(/kick\.velocity/);
 
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
-    expect(() => makeArrangement({ kick: { preset: 'kick', velocity: cyclic } })).not.toThrow();
+    expect(() =>
+      makeArrangement({ patches: PATCHES, kick: { preset: 'kick', velocity: cyclic } }),
+    ).not.toThrow();
     expect(() => makeArrangement(1n)).not.toThrow();
   });
 
   it('drops a later slot reusing an earlier slot part name', () => {
     const result = makeArrangement({
+      patches: PATCHES,
       kick: { part: 'kick', preset: 'kick' },
       hat: { part: 'kick', preset: 'hat' },
     });
@@ -182,6 +213,75 @@ describe('runtime inputs JSON cannot represent (self-review findings)', () => {
     expect(result.corrections.join('\n')).toMatch(
       /hat: part name "kick" is already used by kick — part dropped/,
     );
+  });
+});
+
+describe('a song resolves only its own patches (#562)', () => {
+  const OLD_DOCUMENT = {
+    seed: 204,
+    bpm: 96,
+    key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+    kick: { part: 'kick', preset: 'kick' },
+    drone: { part: 'drone', preset: 'drone-sqr' },
+  };
+
+  it('drops a part naming a library id the document does not embed, and reports it', () => {
+    const result = makeArrangement(OLD_DOCUMENT);
+    // The ids are real library patches — that is exactly what no longer helps.
+    expect(PRESETS.kick).toBeDefined();
+    expect(PRESETS['drone-sqr']).toBeDefined();
+    // Both parts drop, so nothing usable survives and the metronome plays.
+    expect(result.usable).toBe(false);
+    expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
+    expect(result.dangling).toEqual([
+      'kick.preset: no preset "kick" is defined',
+      'drone.preset: no preset "drone-sqr" is defined',
+    ]);
+    expect(result.usable).toBe(false);
+    expect(result.filled).toEqual([]);
+  });
+
+  it('opens with a library fill: resolved once, embedded, and listed', () => {
+    const result = makeArrangement(OLD_DOCUMENT, { libraryFill: PRESETS });
+    expect(result.usable).toBe(true);
+    expect(result.dangling).toEqual([]);
+    expect(result.filled).toEqual(['kick', 'drone-sqr']);
+    expect(result.document.patches?.kick).toEqual(PRESETS.kick);
+    expect(result.document.patches?.['drone-sqr']).toEqual(PRESETS['drone-sqr']);
+    // Embedded, not aliased: editing the document cannot reach the library.
+    expect(result.document.patches?.kick).not.toBe(PRESETS.kick);
+    // Only what the parts actually name is embedded, never the whole bank.
+    expect(Object.keys(result.document.patches ?? {}).sort()).toEqual(['drone-sqr', 'kick']);
+  });
+
+  it('is self-contained after the fill: the same document needs no fill again', () => {
+    const opened = makeArrangement(OLD_DOCUMENT, { libraryFill: PRESETS });
+    const exported = JSON.parse(JSON.stringify(opened.document)) as unknown;
+    const reopened = makeArrangement(exported);
+    expect(reopened.filled).toEqual([]);
+    expect(reopened.corrections).toEqual([]);
+    expect(reopened.dangling).toEqual([]);
+    expect(reopened.document).toEqual(opened.document);
+  });
+
+  it('embeds a forked patch and a library fill side by side', () => {
+    const result = makeArrangement(
+      { ...OLD_DOCUMENT, patches: { kick: { volume: 0.05 } } },
+      { libraryFill: PRESETS },
+    );
+    expect(result.filled).toEqual(['drone-sqr']);
+    // The document's own entry wins and is not refilled from the library.
+    expect(result.document.patches?.kick?.volume).toBe(0.05);
+    expect(PRESETS.kick?.volume).not.toBe(0.05);
+  });
+
+  it('leaves a name neither the document nor the library defines dangling', () => {
+    const result = makeArrangement(
+      { ...OLD_DOCUMENT, kick: { part: 'kick', preset: 'nope' } },
+      { libraryFill: PRESETS },
+    );
+    expect(result.dangling).toEqual(['kick.preset: no preset "nope" is defined']);
+    expect(result.filled).toEqual(['drone-sqr']);
   });
 });
 

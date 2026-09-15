@@ -94,7 +94,6 @@ export type { ReverbSpace, SpaceName } from './reverbSpace';
 export { renderPatchToBuffer } from './offlineRender';
 export type { BakeOptions } from './offlineRender';
 export { attachPartToBabylon, createBabylonAudio } from './babylonBridge';
-export { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
 export {
   PATCH_FILE_FORMAT,
   PATCH_ID_RULE,
@@ -105,6 +104,9 @@ export {
   patchLeafDifferences,
 } from './patchLibrary';
 export type { HeadroomRecord, LibraryEntry, PatchFile } from './patchLibrary';
+// The whole-bank table (`presets.ts`, `presetCatalog.ts`) is deliberately not
+// here: since #562 no game path resolves a patch by library id, so the bundler
+// drops the 114 files. The editor reaches them through `index-for-editor.ts`.
 export { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
 export type { GameplayPatchId } from './gameplayPatches';
 export * from './patch';

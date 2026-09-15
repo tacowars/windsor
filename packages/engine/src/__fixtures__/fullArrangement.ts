@@ -20,6 +20,9 @@ import type {
   DroneArrangement,
   PercussionArrangement,
 } from '../arrangement';
+import type { Patch } from '../patch';
+import { clonePatch } from '../patch';
+import { PRESETS } from '../presets';
 
 /** An arrangement with every part slot populated. */
 export type FullArrangement = Arrangement & {
@@ -84,4 +87,32 @@ export const FULL_ARRANGEMENT: FullArrangement = {
     velocity: 0.8,
     driver: { divisor: 96, gate: 1, register: { octave: -1, span: 1 }, pattern: null },
   },
+};
+
+/**
+ * The same arrangement as a self-contained *document* (#562): the four
+ * patches its parts play, embedded, exactly as `arrangements/bed-01.json`
+ * carries them.
+ *
+ * The snapshot is read from the library rather than spelled out, so this
+ * fixture has no hand-copied patch numbers to drift: it is the "before" case
+ * `arrangementEquality.test.ts` computes its render from, and the committed
+ * JSON is the "after". A ticket that deliberately re-tunes one of these four
+ * library patches makes that render test fail, which is the intended alarm —
+ * it is the moment someone decides whether bed-01 re-embeds the new patch or
+ * keeps the one Pat approved by ear (#564 decision 2). Any other library
+ * patch may be tuned freely: no song references it.
+ */
+export const FULL_DOCUMENT: FullArrangement & {
+  readonly patches: Readonly<Record<string, Patch>>;
+} = {
+  ...FULL_ARRANGEMENT,
+  patches: Object.fromEntries(
+    [
+      FULL_ARRANGEMENT.kick.preset,
+      FULL_ARRANGEMENT.hat.preset,
+      FULL_ARRANGEMENT.arp.preset,
+      FULL_ARRANGEMENT.drone.preset,
+    ].map((id) => [id, clonePatch(PRESETS[id] as Patch)]),
+  ),
 };
