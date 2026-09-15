@@ -20,7 +20,8 @@ import type {
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { DocumentModel } from './documentModel';
-import { INIT_PATCH_NAME, INIT_PRESET_ID } from './libraryConstants';
+import { INIT_PATCH_NAME, initPresetId } from './libraryConstants';
+import { listLibrary } from './libraryModel';
 import type { PatchFolder } from './libraryFolder';
 import type { LibraryModel } from './libraryModel';
 import { connectLibrary, pageLibrary } from './libraryModel';
@@ -32,6 +33,7 @@ import {
   copyToNew,
   deletePatch,
   deleteRefusal,
+  discardEdits,
   dropInit,
   initPatch,
   isModified,
@@ -39,6 +41,7 @@ import {
   savePatch,
   unsavedQuestion,
 } from './patchActions';
+import { revertPatch } from './patchLibrary';
 import { serialisePatchFile } from '../../../packages/client/src/audio/index-for-editor';
 
 /** An in-memory folder seeded with a few real library files. */
@@ -94,34 +97,55 @@ describe('patch origin', () => {
   });
 });
 
+const INIT_ID = initPresetId('kick');
+
 describe('Init', () => {
   it('loads makePatch defaults named Init, not saveable, not a library entry', async () => {
     const scope = await folderScope();
     const patch = initPatch(scope);
     expect(patch).toEqual(makePatch({ name: INIT_PATCH_NAME }));
-    expect(scope.ctx.model.doc.kick?.preset).toBe(INIT_PRESET_ID);
-    expect(scope.ctx.model.doc.patches?.[INIT_PRESET_ID]).toEqual(patch);
+    expect(scope.ctx.model.doc.kick?.preset).toBe(INIT_ID);
+    expect(scope.ctx.model.doc.patches?.[INIT_ID]).toEqual(patch);
     const origin = patchOrigin(scope);
     expect(canSave(origin)).toBe(false);
     expect(canCopy(origin)).toBe(true);
     expect(canDelete(origin, scope.library)).toBe(false);
-    expect(Object.keys(scope.library.entries)).not.toContain(INIT_PRESET_ID);
-    expect(scope.folder.files.has(`${INIT_PRESET_ID}.json`)).toBe(false);
+    expect(Object.keys(scope.library.entries)).not.toContain(INIT_ID);
+    expect(scope.folder.files.has(`${INIT_ID}.json`)).toBe(false);
+  });
+
+  it("is one sentinel per part, so a second part's Init leaves the first alone", async () => {
+    const scope = await folderScope();
+    const kickInit = initPatch(scope);
+    kickInit.volume = 0.1;
+    scope.ctx.change({ patches: { [INIT_ID]: kickInit } });
+    initPatch({ ...scope, partId: 'hat' });
+    expect(scope.ctx.model.doc.hat?.preset).toBe(initPresetId('hat'));
+    expect(scope.ctx.model.doc.patches?.[INIT_ID]?.volume).toBe(0.1);
+    // Neither sentinel is offered as a patch to load.
+    const listed = listLibrary(scope.library.entries, scope.ctx.model.doc.patches).map((e) => e.id);
+    expect(listed).not.toContain(INIT_ID);
+    expect(listed).not.toContain(initPresetId('hat'));
+    // Dropping clears only the sentinels no part plays.
+    scope.ctx.change({ kick: { preset: 'kick' } });
+    dropInit(scope.ctx);
+    expect(scope.ctx.model.doc.patches?.[INIT_ID]).toBeUndefined();
+    expect(scope.ctx.model.doc.patches?.[initPresetId('hat')]).toBeDefined();
   });
 
   it('is discarded when the part moves on, and Init again starts fresh', async () => {
     const scope = await folderScope();
     initPatch(scope);
-    const edited = clonePatch(scope.ctx.model.doc.patches![INIT_PRESET_ID]!);
+    const edited = clonePatch(scope.ctx.model.doc.patches![INIT_ID]!);
     edited.volume = 0.1;
-    scope.ctx.change({ patches: { [INIT_PRESET_ID]: edited } });
+    scope.ctx.change({ patches: { [INIT_ID]: edited } });
     expect(initPatch(scope).volume).toBe(makePatch().volume);
     scope.ctx.change({
       kick: { preset: 'hat' },
       patches: { hat: clonePatch(PATCH_LIBRARY['hat']!.patch) },
     });
     dropInit(scope.ctx);
-    expect(scope.ctx.model.doc.patches?.[INIT_PRESET_ID]).toBeUndefined();
+    expect(scope.ctx.model.doc.patches?.[INIT_ID]).toBeUndefined();
   });
 });
 
@@ -211,7 +235,7 @@ describe('Copy to new', () => {
     });
     expect(id).toBe('init');
     expect(scope.ctx.model.doc.kick?.preset).toBe('init');
-    expect(scope.ctx.model.doc.patches?.[INIT_PRESET_ID]).toBeUndefined();
+    expect(scope.ctx.model.doc.patches?.[INIT_ID]).toBeUndefined();
   });
 });
 
@@ -248,5 +272,43 @@ describe('the unsaved-changes guard', () => {
     expect(unsavedQuestion(scope, init)).toBeNull();
     init.volume = 0.3;
     expect(unsavedQuestion(scope, init)).toContain('Init');
+  });
+
+  it('really discards on confirm: the document copy goes back to the library entry, or to Init', async () => {
+    const scope = await folderScope();
+    const edited = clonePatch(PATCH_LIBRARY['kick']!.patch);
+    edited.volume = 0.5;
+    scope.ctx.change({ patches: { kick: edited } });
+    const restored = discardEdits(scope);
+    expect(restored).toEqual(PATCH_LIBRARY['kick']!.patch);
+    expect(scope.ctx.model.doc.patches?.['kick']?.volume).toBe(PATCH_LIBRARY['kick']!.patch.volume);
+    expect(isModified(scope, scope.ctx.model.doc.patches!['kick']!)).toBe(false);
+    const init = initPatch(scope);
+    init.volume = 0.3;
+    scope.ctx.change({ patches: { [INIT_ID]: init } });
+    expect(discardEdits(scope)).toEqual(makePatch({ name: INIT_PATCH_NAME }));
+    expect(scope.ctx.model.doc.patches?.[INIT_ID]?.volume).toBe(makePatch().volume);
+    // A document-only patch has no baseline to restore.
+    scope.ctx.change({ kick: { preset: 'mine' }, patches: { mine: makePatch({ name: 'mine' }) } });
+    expect(discardEdits(scope)).toBeNull();
+  });
+});
+
+describe('Revert to library', () => {
+  it("resets a folder-only id to the library file instead of dropping the part's only copy", async () => {
+    const scope = await folderScope();
+    const working = clonePatch(PATCH_LIBRARY['kick']!.patch);
+    const id = await copyToNew({
+      ...scope,
+      working,
+      meta: { name: 'Folder Only', category: 'Drums', tags: [], description: '' },
+    });
+    const edited = clonePatch(scope.ctx.model.doc.patches![id]!);
+    edited.volume = 0.2;
+    scope.ctx.change({ patches: { [id]: edited } });
+    revertPatch(scope.ctx, id, scope.library);
+    expect(scope.ctx.model.doc.kick?.preset).toBe(id);
+    expect(scope.ctx.model.doc.patches?.[id]?.volume).toBe(working.volume);
+    expect(scope.ctx.model.dangling).toEqual([]);
   });
 });

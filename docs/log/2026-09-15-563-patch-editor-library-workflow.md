@@ -12,12 +12,15 @@ The console's Parts tab gains Init, Save, Copy to new and Delete over the
 `patches/<id>.json` library, a metadata modal, and a Chrome folder grant.
 What the ticket left open, settled here:
 
-- **Init plays through the document under the sentinel key `(init)`.** A
-  part sounds only what the document names, so an Init patch has to be a
-  document patch; the key has parentheses, which the id rule
-  (`^[a-z0-9]+(-[a-z0-9]+)*$`) never admits, so no saved patch can collide
-  with it, and `patchOrigin` reads it as "init" rather than "library". The
-  sentinel is dropped from the document the moment no part plays it
+- **Init plays through the document under a per-part sentinel key,
+  `(init:<part>)`.** A part sounds only what the document names, so an Init
+  patch has to be a document patch; the key has parentheses, which the id
+  rule (`^[a-z0-9]+(-[a-z0-9]+)*$`) never admits, so no saved patch can
+  collide with it, and `patchOrigin` reads it as "init" rather than
+  "library". One key per part, because the player propagates a patch edit to
+  every part naming that id — a shared key let a second part's Init reset
+  the first's (Codex pass 1). The sentinels are hidden from the browser's
+  list and dropped from the document the moment no part plays them
   (`dropInit`, after a load or a Copy to new), so an unsaved Init is never
   exported and Init again always starts from `makePatch()`.
 - **Delete needs the connected folder.** In page mode there is no file to
@@ -57,6 +60,14 @@ What the ticket left open, settled here:
   when several downloads carry one id the newest wins and the rest are
   reported as skipped. A rejected file prints the loader's message and the
   exit code is 1, so a script can notice.
+- **A confirmed discard restores the baseline.** The document already holds
+  every knob edit, so a guard that only authorised the load would leave the
+  edits in place when the same preset was re-selected (Codex pass 1);
+  `discardEdits` writes the library entry (or Init's defaults) back over the
+  document copy first. **Revert to library** on a folder-only id overwrites
+  the document copy with the file rather than deleting it — the normaliser
+  resolves against the baked `PRESETS`, not the folder, and would have
+  dropped the part (Codex pass 1).
 - **Focus is a pure contract.** Tab wraps inside the dialog and close
   returns focus to the opener, else the patch controls' Load button
   (`focusTrap.ts`, tested without a DOM); the QWERTY handler ignores keys

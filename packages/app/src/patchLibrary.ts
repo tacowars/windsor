@@ -8,9 +8,11 @@
  * plays it; revert drops the fork and the part falls back to the built-in.
  */
 import type { MusicPartId, Patch } from '../../../packages/client/src/audio/index-for-editor';
+import { PRESETS, clonePatch } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { SLOT_IDS } from './context';
 import { el } from './dom';
+import type { LibraryModel } from './libraryModel';
 import { library, libraryPatch } from './libraryModel';
 
 type Slots = Record<string, { preset?: string } | undefined>;
@@ -56,8 +58,19 @@ function renamePatch(ctx: AppCtx, from: string, to: string): void {
   ctx.status(`renamed document patch "${from}" to "${to}"`);
 }
 
-/** Drop the document's fork of a built-in; the parts playing it fall back to the built-in. */
-function revertPatch(ctx: AppCtx, name: string): void {
+/**
+ * Back to the library's version. A patch baked into the page is dropped from
+ * the document and the parts playing it fall back to it; a folder-only id
+ * (#563) has no baked fallback the normaliser could resolve, so its document
+ * copy is overwritten with the library entry instead of removed.
+ */
+export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = library): void {
+  const entry = libraryPatch(model, name);
+  if (!entry) return;
+  if (!Object.hasOwn(PRESETS, name)) {
+    ctx.change({ patches: { [name]: clonePatch(entry) } });
+    return ctx.status(`document patch "${name}" reset to the library file`);
+  }
   ctx.restructure((draft) => {
     const patches = (draft.patches ?? {}) as Record<string, Patch>;
     delete patches[name];
@@ -84,9 +97,9 @@ export function libraryControls(ctx: AppCtx, id: MusicPartId): HTMLElement {
   rename.onclick = (): void => renamePatch(ctx, preset, name.value.trim());
   box.appendChild(rename);
   if (libraryPatch(library, preset)) {
-    const revert = el('button', 'btn', 'Revert to built-in') as HTMLButtonElement;
+    const revert = el('button', 'btn', 'Revert to library') as HTMLButtonElement;
     revert.type = 'button';
-    revert.title = 'Drop the document copy; parts playing it use the built-in again';
+    revert.title = 'Back to the library file; parts playing this patch follow';
     revert.onclick = (): void => revertPatch(ctx, preset);
     box.appendChild(revert);
   }

@@ -9,7 +9,7 @@ import type { Patch, PresetListing } from '../../../packages/client/src/audio/in
 import { PATCH_LIBRARY } from '../../../packages/client/src/audio/index-for-editor';
 import type { PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
-import { LIBRARY_FOLDER_PATH } from './libraryConstants';
+import { LIBRARY_FOLDER_PATH, isInitPreset } from './libraryConstants';
 import { downloadPatchFile, patchFileName } from './patchFileWriter';
 import type { LibraryEntries } from './patchMetadata';
 
@@ -92,13 +92,16 @@ export function libraryModeText(model: LibraryModel): string {
  * The preset browser's listing over these entries: what
  * `presetCatalog.listPresets` produces over the baked library, extended to a
  * folder (`libraryModel.test.ts` pins the two equal on the baked library).
- * Document copies shadow library entries, including when their ids match.
+ * Document copies shadow library entries, including when their ids match;
+ * a part's Init sentinel is not listed (it is not a patch to load).
  */
 export function listLibrary(
   entries: LibraryEntries,
   documentPatches: Readonly<Record<string, Patch>> = {},
 ): PresetListing[] {
-  const ids = [...new Set([...Object.keys(documentPatches), ...Object.keys(entries)])];
+  const ids = [...new Set([...Object.keys(documentPatches), ...Object.keys(entries)])].filter(
+    (id) => !isInitPreset(id),
+  );
   return ids
     .map((id): PresetListing => {
       const documentPatch = Object.hasOwn(documentPatches, id) ? documentPatches[id] : undefined;

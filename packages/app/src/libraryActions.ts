@@ -38,6 +38,7 @@ import {
   currentMetadata,
   deletePatch,
   deleteRefusal,
+  discardEdits,
   initPatch,
   isModified,
   patchOrigin,
@@ -75,14 +76,21 @@ export async function bootLibrary(): Promise<void> {
 
 /** The unsaved-changes guard: resolves true when loading over the working patch may go ahead. */
 export async function confirmUnsaved(ctx: AppCtx, opener?: HTMLElement): Promise<boolean> {
-  const question = unsavedQuestion(scopeFor(ctx), partsState.patch);
+  const scope = scopeFor(ctx);
+  const question = unsavedQuestion(scope, partsState.patch);
   if (question === null) return true;
-  return openConfirm({
+  const ok = await openConfirm({
     title: 'Unsaved changes',
     body: question,
     ok: 'Discard',
     opener: opener ?? null,
   });
+  if (!ok) return false;
+  // Really discard: the document copy back to the baseline, so re-selecting
+  // the same preset does not find the edits still there.
+  const restored = discardEdits(scope);
+  if (restored) partsState.patch = restored;
+  return true;
 }
 
 /** The marker beside the buttons; `hooks.afterCommit` calls this on every knob edit. */

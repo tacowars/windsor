@@ -27,10 +27,13 @@ export const LOUDNESS_SEEDS = 16;
 export const SUGGESTED_HEADROOM = 0.98;
 
 /**
- * The document key an Init patch plays under. Not a library id — the slug
- * rule admits no parentheses — so it can never collide with a saved patch.
+ * The document key a part's Init patch plays under: `(init:kick)`. Not a
+ * library id — the slug rule admits no parentheses — so it can never collide
+ * with a saved patch, and one key per part so two parts' Inits never share.
  */
-export const INIT_PRESET_ID = '(init)';
+export const INIT_PRESET_PREFIX = '(init:';
+export const initPresetId = (partId: string): string => `${INIT_PRESET_PREFIX}${partId})`;
+export const isInitPreset = (id: string): boolean => id.startsWith(INIT_PRESET_PREFIX);
 
 /** The display name Init starts with, and the base of a Copy to new from it. */
 export const INIT_PATCH_NAME = 'Init';
