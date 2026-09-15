@@ -78,7 +78,19 @@ export {
 export type { ReverbSpace, SpaceName } from './reverbSpace';
 export { renderPatchToBuffer } from './offlineRender';
 export type { BakeOptions } from './offlineRender';
-export { PRESETS, PRESET_NAMES } from './presets';
+export { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
+export {
+  PATCH_FILE_FORMAT,
+  PATCH_ID_RULE,
+  SWEEP_COMMAND,
+  loadPatchFile,
+  loadPatchLibrary,
+  patchContentHash,
+  patchLeafDifferences,
+} from './patchLibrary';
+export type { HeadroomRecord, LibraryEntry, PatchFile } from './patchLibrary';
+export { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
+export type { GameplayPatchId } from './gameplayPatches';
 export * from './patch';
 export {
   BEATS_PER_BAR,
@@ -131,5 +143,5 @@ export type { ArpWalkMode, ArpeggiatorConfig } from './arpeggiator';
 export { DEFAULT_STEP_SEQUENCER_CONFIG, StepSequencer } from './stepSequencer';
 export type { StepSequencerConfig } from './stepSequencer';
 
-export { listPresets, filterPresets } from './presetCatalog';
+export { HIDDEN_CATEGORY, PRESET_CATALOG, listPresets, filterPresets } from './presetCatalog';
 export type { PresetListing, PresetFilter } from './presetCatalog';

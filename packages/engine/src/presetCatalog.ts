@@ -1,7 +1,10 @@
-/** Browser metadata is separate from Patch: no DSP or document-schema changes. */
+/**
+ * Browser metadata is separate from Patch: no DSP or document-schema changes.
+ * Since #561 the metadata is each library file's own `category`, `tags` and
+ * `description`; this module only lists and filters.
+ */
 import type { Patch } from './patch';
-import { PRESETS } from './presets';
-import { SCORING_CATALOG } from './presetsScoring';
+import { PATCH_LIBRARY, PRESETS } from './presets';
 
 export interface PresetMetadata {
   category: string;
@@ -14,74 +17,15 @@ export interface PresetListing extends PresetMetadata {
   source: 'document' | 'built-in';
 }
 
-const LEGACY_METADATA: Record<string, PresetMetadata> = {
-  'lead-bell': {
-    category: 'Plucks',
-    tags: ['bell', 'original'],
-    description: 'Original FM bell. Try C4–C5 with sparse delay.',
-  },
-  'pad-drift': {
-    category: 'Pads',
-    tags: ['evolving', 'original'],
-    description: 'Original slow drifting pad. Hold chords for several seconds.',
-  },
-  'ai-voice': {
-    category: 'Pads',
-    tags: ['vocal', 'original'],
-    description: 'Original formant voice with fixed-frequency modulators.',
-  },
-  'sub-drone': {
-    category: 'Basses',
-    tags: ['sub', 'drone', 'original'],
-    description: 'Original low sustained drone.',
-  },
-  'bass-digital': {
-    category: 'Basses',
-    tags: ['digital', 'original'],
-    description: 'Original digital bass. Start in C2–C3.',
-  },
-  kick: { category: 'Drums', tags: ['kick', 'original'], description: 'Original FM kick.' },
-  snare: {
-    category: 'Drums',
-    tags: ['snare', 'noise', 'original'],
-    description: 'Original FM body plus noise snare.',
-  },
-  hat: {
-    category: 'Drums',
-    tags: ['hat', 'noise', 'original'],
-    description: 'Original noise hat.',
-  },
-  'saw-arp': {
-    category: 'Plucks',
-    tags: ['arp', 'authored'],
-    description: 'Existing authored saw arpeggio voice.',
-  },
-  'drone-sqr': {
-    category: 'Pads',
-    tags: ['drone', 'authored'],
-    description: 'Existing authored square drone.',
-  },
-};
-const GAME_FX = ['weapon-zap', 'horde-horn', 'pickup-blip', 'build-thunk'];
-export const PRESET_CATALOG: Record<string, PresetMetadata> = {
-  ...LEGACY_METADATA,
-  ...Object.fromEntries(
-    GAME_FX.map((id) => [
-      id,
-      {
-        category: 'Legacy game FX',
-        tags: ['legacy', 'game-fx'],
-        description: 'Retained for existing documents. Legacy gameplay sound.',
-      },
-    ]),
-  ),
-  ...Object.fromEntries(
-    SCORING_CATALOG.map(({ id, category, tags, description }) => [
-      id,
-      { category, tags, description },
-    ]),
-  ),
-};
+/** The four legacy gameplay sounds keep this category; the browser hides it unless asked. */
+export const HIDDEN_CATEGORY = 'Legacy game FX';
+
+export const PRESET_CATALOG: Record<string, PresetMetadata> = Object.fromEntries(
+  Object.values(PATCH_LIBRARY).map(({ id, category, tags, description }) => [
+    id,
+    { category, tags, description },
+  ]),
+);
 
 /** Document copies shadow factory entries, including when their IDs match. */
 export function listPresets(documentPatches: Record<string, Patch> = {}): PresetListing[] {
@@ -121,7 +65,7 @@ export function filterPresets(
 ): PresetListing[] {
   const words = filter.query.toLowerCase().trim().split(/\s+/).filter(Boolean);
   return entries.filter((entry) => {
-    if (filter.category ? entry.category !== filter.category : entry.category === 'Legacy game FX')
+    if (filter.category ? entry.category !== filter.category : entry.category === HIDDEN_CATEGORY)
       return false;
     if (filter.tag && !entry.tags.includes(filter.tag)) return false;
     if (filter.source && entry.source !== filter.source) return false;

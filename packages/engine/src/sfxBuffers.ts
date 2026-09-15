@@ -1,6 +1,6 @@
 import type { SfxBuffers } from './spatialSfx';
 import { renderPatchToBuffer } from './offlineRender';
-import { SFX_PRESETS } from './presetsSfx';
+import { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
 import { SFX_LIMITS } from './sfxConstants';
 
 import SAMPLE_URLS from 'virtual:a204-audio';
@@ -14,12 +14,12 @@ export async function loadSfxBuffers(context: AudioContext): Promise<SfxBuffers>
   const [step, impact, weapon, pickup, build, repair, mine, deplete] = await Promise.all([
     Promise.all(SAMPLE_URLS.step.map(decode)),
     Promise.all(SAMPLE_URLS.impact.map(decode)),
-    renderPatchToBuffer(SFX_PRESETS['weapon-zap']!, {
+    renderPatchToBuffer(GAMEPLAY_PATCHES[GAMEPLAY_PATCH_IDS.weaponZap], {
       duration: SFX_LIMITS.bakeDuration,
       tail: SFX_LIMITS.bakeTail,
       sampleRate: context.sampleRate,
     }),
-    renderPatchToBuffer(SFX_PRESETS['pickup-blip']!, {
+    renderPatchToBuffer(GAMEPLAY_PATCHES[GAMEPLAY_PATCH_IDS.pickupBlip], {
       duration: SFX_LIMITS.bakeDuration,
       tail: SFX_LIMITS.bakeTail,
       sampleRate: context.sampleRate,

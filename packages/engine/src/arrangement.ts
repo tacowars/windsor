@@ -22,6 +22,7 @@
 import type { ArpeggiatorConfig } from './arpeggiator';
 import type { EuclideanConfig } from './euclideanSequencer';
 import type { ScaleName } from './scaleSampler';
+import { GAMEPLAY_PATCH_IDS } from './gameplayPatches';
 import { DIVISORS } from './scheduler';
 import type { StepSequencerConfig } from './stepSequencer';
 
@@ -106,7 +107,7 @@ export const FALLBACK_ARRANGEMENT: Arrangement & { readonly kick: PercussionArra
     // Deliberately not a MIX strip: the click routes through DEFAULT_STRIP —
     // unity, centred, and with no sends — whatever the shipped mix says.
     part: 'click',
-    preset: 'pickup-blip',
+    preset: GAMEPLAY_PATCH_IDS.pickupBlip,
     note: 76,
     velocity: 1,
     hold: 0.05,

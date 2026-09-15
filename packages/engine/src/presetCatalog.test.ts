@@ -1,28 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { filterPresets, listPresets, PRESET_CATALOG } from './presetCatalog';
 import { clonePatch, makePatch } from './patch';
-import { PRESETS, PRESET_NAMES } from './presets';
-import { SCORING_CATALOG } from './presetsScoring';
+import { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
 import { makeArrangement } from './arrangementDocument';
 import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
 
 const empty = { query: '', category: '', tag: '', source: '' };
-describe('scoring catalog', () => {
-  it('adds the requested 100 unique sounds with complete metadata', () => {
-    expect(SCORING_CATALOG).toHaveLength(100);
-    expect(new Set(SCORING_CATALOG.map((entry) => entry.id)).size).toBe(SCORING_CATALOG.length);
+const LIBRARY = Object.values(PATCH_LIBRARY);
+describe('patch library catalogue', () => {
+  it('lists every library file with complete metadata', () => {
+    expect(LIBRARY.length).toBeGreaterThan(0);
     expect(Object.keys(PRESET_CATALOG).sort()).toEqual([...PRESET_NAMES].sort());
-    expect(new Set(SCORING_CATALOG.map((entry) => entry.category))).toEqual(
-      new Set(['Strings', 'Pads', 'Plucks', 'Basses', 'Soundtrack FX']),
+    expect(new Set(LIBRARY.map((entry) => entry.category))).toEqual(
+      new Set(['Strings', 'Pads', 'Plucks', 'Basses', 'Soundtrack FX', 'Drums', 'Legacy game FX']),
     );
-    for (const entry of SCORING_CATALOG) {
-      expect(entry.tags.length).toBeGreaterThan(0);
-      expect(entry.description.length).toBeGreaterThan(0);
+    for (const entry of LIBRARY) {
+      expect(entry.tags.length, entry.id).toBeGreaterThan(0);
+      expect(entry.description.length, entry.id).toBeGreaterThan(0);
       expect(PRESETS[entry.id]).toBe(entry.patch);
+      expect(PRESET_CATALOG[entry.id]).toEqual({
+        category: entry.category,
+        tags: entry.tags,
+        description: entry.description,
+      });
     }
   });
   it('has distinct synthesis settings, not just distinct names', () => {
-    const sounds = SCORING_CATALOG.map(({ patch }) => JSON.stringify({ ...patch, name: '' }));
+    const sounds = LIBRARY.map(({ patch }) => JSON.stringify({ ...patch, name: '' }));
     expect(new Set(sounds).size).toBe(sounds.length);
   });
   it('matches words across names and tags, intersects filters, and handles no matches', () => {
@@ -64,8 +68,8 @@ describe('scoring catalog', () => {
         .sort(),
     ).toEqual(['custom', 'score-concrete-chord']);
   });
-  it('normalises and round trips every new patch, including user harmonics', () => {
-    for (const { id, patch } of SCORING_CATALOG) {
+  it('normalises and round trips every library patch, including user harmonics', () => {
+    for (const { id, patch } of LIBRARY) {
       const result = makeArrangement({
         ...FULL_ARRANGEMENT,
         arp: { ...FULL_ARRANGEMENT.arp, preset: id },

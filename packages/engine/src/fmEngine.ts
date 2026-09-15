@@ -16,7 +16,7 @@ import { PROCESSOR_NAME, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessag
 
 export interface PartOptions {
   patch?: Patch;
-  /** Name from `PRESETS`. Ignored when `patch` is given. */
+  /** A library id (`patches/<id>.json`, the `PRESETS` key). Ignored when `patch` is given. */
   preset?: string;
   /** Sounding voice limit. The pool holds a few more, for steal fade-outs. */
   maxVoices?: number;
