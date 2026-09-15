@@ -1,0 +1,508 @@
+{
+  "note": "Pre-#543 operator levels, rendered from main at db39e78b, where MOD_INDEX_SCALE was 8. Roles come from ALGORITHMS.",
+  "modIndexScale": 8,
+  "algorithms": [
+    {
+      "mods": [[1], [2], [3], []],
+      "carriers": [0]
+    },
+    {
+      "mods": [[1], [2, 3], [], []],
+      "carriers": [0]
+    },
+    {
+      "mods": [[1, 3], [2], [], []],
+      "carriers": [0]
+    },
+    {
+      "mods": [[2, 1], [], [3], []],
+      "carriers": [0]
+    },
+    {
+      "mods": [[1], [], [3], []],
+      "carriers": [0, 2]
+    },
+    {
+      "mods": [[3], [3], [3], []],
+      "carriers": [0, 1, 2]
+    },
+    {
+      "mods": [[], [], [3], []],
+      "carriers": [0, 1, 2]
+    },
+    {
+      "mods": [[], [], [], []],
+      "carriers": [0, 1, 2, 3]
+    },
+    {
+      "mods": [[1], [2], [3], []],
+      "carriers": [0, 1]
+    },
+    {
+      "mods": [[2], [2], [3], []],
+      "carriers": [0, 1]
+    },
+    {
+      "mods": [[1, 2, 3], [], [], []],
+      "carriers": [0]
+    }
+  ],
+  "presets": {
+    "ai-voice": {
+      "algorithm": 10,
+      "levels": [0.85, 0.28, 0.22, 0.14]
+    },
+    "bass-digital": {
+      "algorithm": 3,
+      "levels": [1, 0.45, 0.4, 0.3]
+    },
+    "build-thunk": {
+      "algorithm": 2,
+      "levels": [1, 0.5, 0.5, 0]
+    },
+    "drone-sqr": {
+      "algorithm": 4,
+      "levels": [1, 0.08947368421052632, 0.4, 0.3]
+    },
+    "hat": {
+      "algorithm": 7,
+      "levels": [0.8, 0.3, 0.25, 0]
+    },
+    "horde-horn": {
+      "algorithm": 1,
+      "levels": [1, 0.5, 0.4, 0]
+    },
+    "kick": {
+      "algorithm": 0,
+      "levels": [1, 0.25, 0, 0]
+    },
+    "lead-bell": {
+      "algorithm": 0,
+      "levels": [1, 0.55, 0.2, 0]
+    },
+    "pad-drift": {
+      "algorithm": 4,
+      "levels": [0.9, 0.35, 0.7, 0.25]
+    },
+    "pickup-blip": {
+      "algorithm": 0,
+      "levels": [1, 0.35, 0, 0]
+    },
+    "saw-arp": {
+      "algorithm": 4,
+      "levels": [1, 0, 0.4, 0.3]
+    },
+    "score-afterimage-quartet": {
+      "algorithm": 4,
+      "levels": [0.75, 0.19, 0.62, 0.13299999999999998]
+    },
+    "score-amber-ceiling": {
+      "algorithm": 4,
+      "levels": [0.75, 0.16, 0.62, 0.11199999999999999]
+    },
+    "score-amber-stab": {
+      "algorithm": 4,
+      "levels": [0.85, 0.22, 0.6, 0.044000000000000004]
+    },
+    "score-ash-cathedral": {
+      "algorithm": 4,
+      "levels": [0.75, 0.45, 0.62, 0.315]
+    },
+    "score-black-ice-strings": {
+      "algorithm": 4,
+      "levels": [0.75, 0.48, 0.62, 0.33599999999999997]
+    },
+    "score-black-resonator": {
+      "algorithm": 0,
+      "levels": [0.8, 0.9, 0.54, 0.18000000000000002]
+    },
+    "score-blue-vapour": {
+      "algorithm": 4,
+      "levels": [0.75, 0.18, 0.62, 0.126]
+    },
+    "score-breathing-rosin": {
+      "algorithm": 4,
+      "levels": [0.75, 0.42, 0.62, 0.294]
+    },
+    "score-bright-air-riser": {
+      "algorithm": 0,
+      "levels": [0.8, 0.35, 0.21, 0.06999999999999999]
+    },
+    "score-broken-relay": {
+      "algorithm": 0,
+      "levels": [0.8, 0.7, 0.42, 0.13999999999999999]
+    },
+    "score-bronze-rain": {
+      "algorithm": 0,
+      "levels": [0.85, 0.72, 0.324, 0.144]
+    },
+    "score-buffer-drift": {
+      "algorithm": 0,
+      "levels": [0.8, 0.45, 0.27, 0.09000000000000001]
+    },
+    "score-buried-voices": {
+      "algorithm": 4,
+      "levels": [0.75, 0.4, 0.62, 0.27999999999999997]
+    },
+    "score-carbon-reed": {
+      "algorithm": 0,
+      "levels": [0.85, 0.36, 0.162, 0.072]
+    },
+    "score-concrete-chord": {
+      "algorithm": 4,
+      "levels": [0.85, 0.28, 0.6, 0.05600000000000001]
+    },
+    "score-copper-step": {
+      "algorithm": 0,
+      "levels": [0.85, 0.28, 0.12600000000000003, 0.05600000000000001]
+    },
+    "score-corrupt-clock": {
+      "algorithm": 0,
+      "levels": [0.8, 0.8, 0.48, 0.16000000000000003]
+    },
+    "score-data-fragments": {
+      "algorithm": 0,
+      "levels": [0.8, 0.55, 0.33, 0.11000000000000001]
+    },
+    "score-deep-current": {
+      "algorithm": 4,
+      "levels": [0.75, 0.2, 0.62, 0.13999999999999999]
+    },
+    "score-deep-static": {
+      "algorithm": 0,
+      "levels": [0.8, 0.5, 0.3, 0.1]
+    },
+    "score-distant-gantry": {
+      "algorithm": 0,
+      "levels": [0.8, 0.65, 0.39, 0.13]
+    },
+    "score-dockside-bass": {
+      "algorithm": 0,
+      "levels": [0.85, 0.24, 0.108, 0.048]
+    },
+    "score-drowned-cellos": {
+      "algorithm": 4,
+      "levels": [0.75, 0.16, 0.62, 0.11199999999999999]
+    },
+    "score-dry-relay": {
+      "algorithm": 4,
+      "levels": [0.85, 0.4, 0.6, 0.08000000000000002]
+    },
+    "score-dry-ticker": {
+      "algorithm": 0,
+      "levels": [0.8, 0.55, 0.33, 0.11000000000000001]
+    },
+    "score-empty-station": {
+      "algorithm": 4,
+      "levels": [0.75, 0.26, 0.62, 0.182]
+    },
+    "score-engine-pulser": {
+      "algorithm": 0,
+      "levels": [0.8, 0.65, 0.39, 0.13]
+    },
+    "score-estuary-violas": {
+      "algorithm": 4,
+      "levels": [0.75, 0.2, 0.62, 0.13999999999999999]
+    },
+    "score-faded-neon": {
+      "algorithm": 4,
+      "levels": [0.75, 0.27, 0.62, 0.189]
+    },
+    "score-felt-circuit": {
+      "algorithm": 0,
+      "levels": [0.85, 0.18, 0.081, 0.036]
+    },
+    "score-felt-sub": {
+      "algorithm": 0,
+      "levels": [0.85, 0.2, 0.09000000000000001, 0.04000000000000001]
+    },
+    "score-frozen-bow": {
+      "algorithm": 4,
+      "levels": [0.75, 0.35, 0.62, 0.24499999999999997]
+    },
+    "score-ghost-formants": {
+      "algorithm": 4,
+      "levels": [0.75, 0.38, 0.62, 0.26599999999999996]
+    },
+    "score-glass-horizon": {
+      "algorithm": 4,
+      "levels": [0.75, 0.3, 0.62, 0.21]
+    },
+    "score-glass-pebble": {
+      "algorithm": 0,
+      "levels": [0.85, 0.25, 0.1125, 0.05]
+    },
+    "score-granular-hiss": {
+      "algorithm": 0,
+      "levels": [0.8, 0.6, 0.36, 0.12]
+    },
+    "score-graphite-bass": {
+      "algorithm": 0,
+      "levels": [0.85, 0.5, 0.225, 0.1]
+    },
+    "score-harbour-fog": {
+      "algorithm": 4,
+      "levels": [0.75, 0.12, 0.62, 0.08399999999999999]
+    },
+    "score-high-tremolo": {
+      "algorithm": 4,
+      "levels": [0.75, 0.28, 0.62, 0.196]
+    },
+    "score-hollow-anchor": {
+      "algorithm": 0,
+      "levels": [0.85, 0.4, 0.18000000000000002, 0.08000000000000002]
+    },
+    "score-hollow-bows": {
+      "algorithm": 4,
+      "levels": [0.75, 0.18, 0.62, 0.126]
+    },
+    "score-hollow-droplet": {
+      "algorithm": 0,
+      "levels": [0.85, 0.58, 0.261, 0.11599999999999999]
+    },
+    "score-hollow-ticker": {
+      "algorithm": 0,
+      "levels": [0.8, 0.4, 0.24, 0.08000000000000002]
+    },
+    "score-ice-needle": {
+      "algorithm": 0,
+      "levels": [0.85, 0.34, 0.15300000000000002, 0.068]
+    },
+    "score-iron-root": {
+      "algorithm": 0,
+      "levels": [0.85, 0.58, 0.261, 0.11599999999999999]
+    },
+    "score-last-light-bell": {
+      "algorithm": 0,
+      "levels": [0.85, 0.2, 0.09000000000000001, 0.04000000000000001]
+    },
+    "score-long-downwash": {
+      "algorithm": 0,
+      "levels": [0.8, 0.15, 0.09, 0.03]
+    },
+    "score-long-dusk": {
+      "algorithm": 4,
+      "levels": [0.75, 0.14, 0.62, 0.098]
+    },
+    "score-low-transformer": {
+      "algorithm": 0,
+      "levels": [0.85, 0.46, 0.20700000000000002, 0.09200000000000001]
+    },
+    "score-low-tremolo": {
+      "algorithm": 4,
+      "levels": [0.75, 0.3, 0.62, 0.21]
+    },
+    "score-low-weather": {
+      "algorithm": 4,
+      "levels": [0.75, 0.32, 0.62, 0.22399999999999998]
+    },
+    "score-magnetic-veil": {
+      "algorithm": 4,
+      "levels": [0.75, 0.25, 0.62, 0.175]
+    },
+    "score-moss-stab": {
+      "algorithm": 4,
+      "levels": [0.85, 0.36, 0.6, 0.072]
+    },
+    "score-muted-cable": {
+      "algorithm": 0,
+      "levels": [0.85, 0.3, 0.135, 0.06]
+    },
+    "score-muted-chamber": {
+      "algorithm": 4,
+      "levels": [0.75, 0.12, 0.62, 0.08399999999999999]
+    },
+    "score-narrow-riser": {
+      "algorithm": 0,
+      "levels": [0.8, 0.3, 0.18, 0.06]
+    },
+    "score-night-choir": {
+      "algorithm": 4,
+      "levels": [0.75, 0.24, 0.62, 0.16799999999999998]
+    },
+    "score-night-rubber": {
+      "algorithm": 0,
+      "levels": [0.85, 0.6, 0.27, 0.12]
+    },
+    "score-open-sea": {
+      "algorithm": 4,
+      "levels": [0.75, 0.22, 0.62, 0.154]
+    },
+    "score-pale-monolith": {
+      "algorithm": 4,
+      "levels": [0.75, 0.5, 0.62, 0.35]
+    },
+    "score-passing-vapour": {
+      "algorithm": 0,
+      "levels": [0.8, 0.22, 0.132, 0.044000000000000004]
+    },
+    "score-polar-bloom": {
+      "algorithm": 4,
+      "levels": [0.75, 0.55, 0.62, 0.385]
+    },
+    "score-porcelain-drop": {
+      "algorithm": 0,
+      "levels": [0.85, 0.42, 0.189, 0.084]
+    },
+    "score-quick-downwash": {
+      "algorithm": 0,
+      "levels": [0.8, 0.25, 0.15, 0.05]
+    },
+    "score-quiet-reactor": {
+      "algorithm": 4,
+      "levels": [0.75, 0.36, 0.62, 0.252]
+    },
+    "score-radio-dust": {
+      "algorithm": 0,
+      "levels": [0.8, 0.45, 0.27, 0.09000000000000001]
+    },
+    "score-remote-orchestra": {
+      "algorithm": 4,
+      "levels": [0.75, 0.1, 0.62, 0.06999999999999999]
+    },
+    "score-round-foundation": {
+      "algorithm": 0,
+      "levels": [0.85, 0.12, 0.054, 0.024]
+    },
+    "score-rubber-key": {
+      "algorithm": 4,
+      "levels": [0.85, 0.48, 0.6, 0.096]
+    },
+    "score-rust-ensemble": {
+      "algorithm": 4,
+      "levels": [0.75, 0.38, 0.62, 0.26599999999999996]
+    },
+    "score-rusted-tine": {
+      "algorithm": 0,
+      "levels": [0.85, 0.65, 0.29250000000000004, 0.13]
+    },
+    "score-salt-violins": {
+      "algorithm": 4,
+      "levels": [0.75, 0.13, 0.62, 0.091]
+    },
+    "score-shortwave-chord": {
+      "algorithm": 4,
+      "levels": [0.85, 0.52, 0.6, 0.10400000000000001]
+    },
+    "score-silk-swish": {
+      "algorithm": 0,
+      "levels": [0.8, 0.16, 0.096, 0.032]
+    },
+    "score-silt-contrabass": {
+      "algorithm": 4,
+      "levels": [0.75, 0.21, 0.62, 0.147]
+    },
+    "score-silt-pulse-bass": {
+      "algorithm": 0,
+      "levels": [0.85, 0.26, 0.117, 0.052000000000000005]
+    },
+    "score-silver-dust": {
+      "algorithm": 4,
+      "levels": [0.75, 0.22, 0.62, 0.154]
+    },
+    "score-sine-weight": {
+      "algorithm": 0,
+      "levels": [0.85, 0.04, 0.018000000000000002, 0.008]
+    },
+    "score-slow-air-riser": {
+      "algorithm": 0,
+      "levels": [0.8, 0.2, 0.12, 0.04000000000000001]
+    },
+    "score-slow-beacon": {
+      "algorithm": 0,
+      "levels": [0.8, 0.3, 0.18, 0.06]
+    },
+    "score-soft-machinery": {
+      "algorithm": 4,
+      "levels": [0.75, 0.42, 0.62, 0.294]
+    },
+    "score-soft-undertow": {
+      "algorithm": 0,
+      "levels": [0.85, 0.18, 0.081, 0.036]
+    },
+    "score-stone-marimba": {
+      "algorithm": 0,
+      "levels": [0.85, 0.32, 0.14400000000000002, 0.064]
+    },
+    "score-submerged-keys": {
+      "algorithm": 4,
+      "levels": [0.85, 0.44, 0.6, 0.08800000000000001]
+    },
+    "score-suspended-steel": {
+      "algorithm": 0,
+      "levels": [0.8, 0.8, 0.48, 0.16000000000000003]
+    },
+    "score-tape-halo": {
+      "algorithm": 4,
+      "levels": [0.75, 0.32, 0.62, 0.22399999999999998]
+    },
+    "score-tidal-memory": {
+      "algorithm": 4,
+      "levels": [0.75, 0.46, 0.62, 0.322]
+    },
+    "score-tin-kalimba": {
+      "algorithm": 0,
+      "levels": [0.85, 0.5, 0.225, 0.1]
+    },
+    "score-tunnel-growl": {
+      "algorithm": 0,
+      "levels": [0.85, 0.68, 0.30600000000000005, 0.136]
+    },
+    "score-underwater-room": {
+      "algorithm": 4,
+      "levels": [0.75, 0.4, 0.62, 0.27999999999999997]
+    },
+    "score-uneasy-scale": {
+      "algorithm": 0,
+      "levels": [0.8, 0.5, 0.3, 0.1]
+    },
+    "score-velvet-airlock": {
+      "algorithm": 4,
+      "levels": [0.75, 0.12, 0.62, 0.08399999999999999]
+    },
+    "score-velvet-offbeat": {
+      "algorithm": 4,
+      "levels": [0.85, 0.16, 0.6, 0.032]
+    },
+    "score-vent-breath": {
+      "algorithm": 0,
+      "levels": [0.8, 0.12, 0.072, 0.024]
+    },
+    "score-violet-section": {
+      "algorithm": 4,
+      "levels": [0.75, 0.25, 0.62, 0.175]
+    },
+    "score-warm-pressure": {
+      "algorithm": 0,
+      "levels": [0.85, 0.18, 0.081, 0.036]
+    },
+    "score-wire-harmonics": {
+      "algorithm": 4,
+      "levels": [0.75, 0.24, 0.62, 0.16799999999999998]
+    },
+    "score-wire-harp": {
+      "algorithm": 0,
+      "levels": [0.85, 0.48, 0.216, 0.096]
+    },
+    "score-wire-stress": {
+      "algorithm": 0,
+      "levels": [0.8, 0.95, 0.57, 0.19]
+    },
+    "score-wooden-pin": {
+      "algorithm": 0,
+      "levels": [0.85, 0.28, 0.12600000000000003, 0.05600000000000001]
+    },
+    "snare": {
+      "algorithm": 4,
+      "levels": [0.7, 0.5, 0.9, 0]
+    },
+    "sub-drone": {
+      "algorithm": 6,
+      "levels": [1, 0.3, 0.12, 0.06]
+    },
+    "weapon-zap": {
+      "algorithm": 1,
+      "levels": [1, 0.6, 0.35, 0]
+    }
+  }
+}

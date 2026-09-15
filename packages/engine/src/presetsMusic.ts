@@ -5,6 +5,11 @@
  * clips at velocity 1 across MIDI notes 36-84 (`fmProcessor.test.ts`). Operator
  * level, filter drive and resonance interact non-linearly with volume, so after
  * editing any of those, re-measure rather than scaling the volume to match.
+ *
+ * Modulator levels were rescaled by #543, when the engine's modulation-index
+ * scale halved: each one is its authored value times sqrt(2), exactly, so the
+ * depth is what it always was. That is why several read as long floats.
+ * Carrier levels are untouched.
  */
 import type { Patch } from './patch';
 import { FILTER_MODE, LFO_SHAPE, WAVE, makeEnvelope, makePatch } from './patch';
@@ -32,7 +37,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 3.5,
-        level: 0.55,
+        level: 0.7778174593052024,
         env: E({
           attackTime: 0.001,
           decayTime: 1.1,
@@ -44,7 +49,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 7,
-        level: 0.2,
+        level: 0.28284271247461906,
         env: E({ attackTime: 0.001, decayTime: 0.35, sustainLevel: 0, releaseTime: 0.2 }),
       },
       { wave: WAVE.SINE, ratio: 1, level: 0 },
@@ -72,7 +77,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.TRIANGLE,
         ratio: 2.01,
-        level: 0.35,
+        level: 0.4949747468305833,
         env: E({ attackTime: 2.5, decayTime: 3, sustainLevel: 0.5, releaseTime: 2.4 }),
       },
       {
@@ -84,7 +89,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 4,
-        level: 0.25,
+        level: 0.3535533905932738,
         env: E({ attackTime: 3.5, decayTime: 4, sustainLevel: 0.4, releaseTime: 2.4 }),
       },
     ],
@@ -113,7 +118,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 2,
-        level: 0.28,
+        level: 0.39597979746446665,
         fixed: false,
         env: E({ attackTime: 0.08, sustainLevel: 0.6, releaseTime: 0.2 }),
       },
@@ -121,14 +126,14 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
         wave: WAVE.SINE,
         fixed: true,
         fixedHz: 740,
-        level: 0.22,
+        level: 0.3111269837220809,
         env: E({ attackTime: 0.03, sustainLevel: 0.5, releaseTime: 0.2 }),
       },
       {
         wave: WAVE.SINE,
         fixed: true,
         fixedHz: 1180,
-        level: 0.14,
+        level: 0.19798989873223333,
         env: E({ attackTime: 0.12, sustainLevel: 0.4, releaseTime: 0.2 }),
       },
     ],
@@ -168,7 +173,7 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 3,
-        level: 0.06,
+        level: 0.08485281374238571,
         env: E({ attackTime: 4, sustainLevel: 0.5, releaseTime: 1.5 }),
       },
     ],
@@ -189,19 +194,19 @@ export const MUSIC_PRESETS: Record<string, Patch> = {
       {
         wave: WAVE.SINE,
         ratio: 1,
-        level: 0.45,
+        level: 0.6363961030678928,
         env: E({ attackTime: 0.001, decayTime: 0.25, sustainLevel: 0.2, releaseTime: 0.12 }),
       },
       {
         wave: WAVE.SINE,
         ratio: 2,
-        level: 0.4,
+        level: 0.5656854249492381,
         env: E({ attackTime: 0.001, decayTime: 0.18, sustainLevel: 0.1, releaseTime: 0.1 }),
       },
       {
         wave: WAVE.SQUARE,
         ratio: 4,
-        level: 0.3,
+        level: 0.4242640687119285,
         env: E({ attackTime: 0.001, decayTime: 0.09, sustainLevel: 0, releaseTime: 0.1 }),
       },
     ],

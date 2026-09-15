@@ -101,6 +101,12 @@ export interface Operator {
   fixedHz: number;
   /** Cents. */
   detune: number;
+  /**
+   * 0..1, squared before the envelope and the rest of the amplitude chain.
+   * A carrier's level is its volume; a modulator's is its depth — at 1, with
+   * its envelope open, it shifts the phase it feeds by 4 cycles, ~25 rad
+   * (#543). The Level knob means both because an operator can be either.
+   */
   level: number;
   /** Self-feedback, -1..1 (#529): positive towards a sawtooth, negative towards a square, 0 off. */
   feedback: number;

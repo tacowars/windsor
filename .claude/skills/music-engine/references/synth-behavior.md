@@ -20,6 +20,17 @@ patch volume against actual renders instead of inferring output headroom
 from knob values. Native mixer gain and effects can still overload a sound
 whose dry single-note output is safe.
 
+A modulator's level is its **depth**: `level² × envelope × velocity × key
+scale × LFO`, times 4 cycles of phase — so a modulator alone at Level 1 with
+its envelope open shifts its target's phase by 4 cycles, ≈ 25 rad (#543).
+Sidebands reach roughly `2 × (β + 1) × modulator frequency` with β in radians,
+so a deep modulator on a high note or a high ratio still folds back past
+Nyquist: the engine does not oversample. Expect grit near the top of the knob
+and timbre below it, and read the factory bank as the scale of a normal sound —
+164 of its 275 active modulators sit at or below 0.354, and only 5 at 1.
+Factory presets authored before #543 carry their old level times √2; a stored
+document does not, and plays its own numbers against the current engine.
+
 Per-operator LFO depth multiplies amplitude by `max(0, 1 + lfoValue * depth)`.
 Full-depth bipolar modulation can both silence and boost an operator.
 The LFO value also includes the patch amount and mod-wheel depth; consider
