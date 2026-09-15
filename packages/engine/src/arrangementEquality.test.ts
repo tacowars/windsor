@@ -4,6 +4,12 @@
  * of the first 4 bars through the full stack on the graph stand-in. The
  * maintainer approved this exact arrangement by ear on PR #81, so any
  * difference here is a defect, not a tuning choice.
+ *
+ * What the render here proves is the *arrangement*: which part fires on which
+ * tick, through which strip and send, at which level. It cannot see a patch —
+ * every part's source is a `noteToneFeed`, not the FM processor — so the #562
+ * proof that the embedded patches sound like the library's is a separate
+ * test, `bed01PatchIdentity.test.ts`, through the real worklet.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -80,9 +86,9 @@ describe('bed-01.json equals the #69b TypeScript arrangement', () => {
   });
 
   it(`renders the first ${BARS} bars sample-identically through the full stack`, async () => {
-    // The #562 proof that embedding changed no sound: `fromTs` resolves the
-    // four patches from the library, the way the game did before this ticket,
-    // and `fromJson` plays the snapshots the document now carries.
+    // `fromTs` carries the library's patches, `fromJson` the document's
+    // snapshots; what this compares is the arrangement they play, not their
+    // timbre (`bed01PatchIdentity.test.ts` owns that).
     const fromJson = await renderBed(makeArrangement(raw).document);
     const fromTs = await renderBed(FULL_DOCUMENT);
     for (const id of MUSIC_PART_IDS) expect(fromTs.counters[id], id).toBeGreaterThan(0);

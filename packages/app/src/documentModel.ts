@@ -52,8 +52,16 @@ export class DocumentModel {
     return makeArrangement(raw, { libraryFill: PRESETS });
   }
 
-  /** Take a normalisation result wholesale — the import path. */
-  adopt(result: MakeArrangementResult): void {
+  /**
+   * Open a raw document — the import path. Private `adopt` on purpose: an
+   * outside caller normalising for itself is how the file-import path came to
+   * bypass the library fill (#562 review pass 1/2, P2).
+   */
+  open(raw: unknown): void {
+    this.adopt(this.normalise(raw));
+  }
+
+  private adopt(result: MakeArrangementResult): void {
     this.doc = result.document;
     this.corrections = result.corrections;
     this.dangling = result.dangling;

@@ -49,13 +49,16 @@ describe('the patches section', () => {
     expect(isShippable(r)).toBe(true);
     // The embedded snapshot is what plays, even when the library has a patch
     // of the same id: the document's `kick` is not the library's (#562).
+    // Half the library's level: derived, so re-tuning `kick` never fails this.
+    expect(PRESETS.kick?.volume).toBeGreaterThan(0);
+    const forked = PRESETS.kick!.volume / 2;
     const shadow = makeArrangement({
       ...SONG,
-      patches: { ...PARTS_PATCHES, kick: { volume: 0.1 } },
+      patches: { ...PARTS_PATCHES, kick: { volume: forked } },
     });
     expect(shadow.dangling).toEqual([]);
-    expect(shadow.document.patches?.kick?.volume).toBe(0.1);
-    expect(PRESETS.kick?.volume).not.toBe(0.1);
+    expect(shadow.document.patches?.kick?.volume).toBe(forked);
+    expect(forked).not.toBe(PRESETS.kick?.volume);
   });
 
   it('drops a part whose preset is in neither, reported as dangling', () => {

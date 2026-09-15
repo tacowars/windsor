@@ -64,13 +64,20 @@ song and no gameplay table names.
 
 ## The tunable this deliberately couples
 
-`arrangementEquality.test.ts` renders four bars of `bed-01.json` twice — once
-from the document's snapshots, once from `FULL_DOCUMENT`, whose patches are
-read from the library — and asserts the two renders are sample-identical. That
-is the computed proof that embedding changed no sound, and it is an in-test
-baseline rather than a pinned hash, per Pat's rule on tunables.
+`bed01PatchIdentity.test.ts` renders each of the four embedded patches through
+the seeded worklet and asserts the Float32 buffer is sample-identical, by
+`Object.is`, to a render of the library patch of the same id — plus
+`patchLeafDifferences` on the values, and a sensitivity case proving one
+changed operator ratio does move the samples. That is the computed proof that
+embedding changed no sound, and its "before" case is built in the test rather
+than pinned as a literal or a hash, per Pat's rule on tunables.
 
-It does couple that one test to four of the library's 114 patches: deliberately
+(`arrangementEquality.test.ts` proves the *arrangement* is unchanged — which
+part fires on which tick, through which strip — and deliberately cannot see a
+patch: its part sources are tone feeds, not the FM processor. Both review
+passes caught an earlier draft of this PR claiming otherwise.)
+
+It does couple that test to four of the library's 114 patches: deliberately
 re-tuning `kick`, `hat`, `saw-arp` or `drone-sqr` fails it. That failure is the
 intended alarm, not churn — it is the moment someone decides whether `bed-01`
 re-embeds the new patch or keeps the one Pat approved by ear on PR #81, which
@@ -89,6 +96,11 @@ patch is free to move: no song references it.
   the editor-open fill covers them the first time they are opened.
 - **Song-level patch metadata** (category, tags, description in the document):
   out of scope. Only `Patch` is embedded; the library keeps the metadata.
+- **`DocumentModel.adopt` is private now.** The editor's file-import path in
+  `main.ts` normalised for itself, which silently skipped the library fill;
+  both review passes reproduced it. `open(raw)` is the only way in, so the
+  bypass cannot come back. That one line in `main.ts` is the only edit outside
+  this ticket's own editor files.
 - **The editor's `patchHome` "built-in" badge** is now unreachable in practice,
   since every part's patch is embedded on open. Left alone on purpose: #563
   owns the editor's library actions and is in flight on the same file, and

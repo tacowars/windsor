@@ -265,14 +265,18 @@ describe('a song resolves only its own patches (#562)', () => {
   });
 
   it('embeds a forked patch and a library fill side by side', () => {
+    // Derived from the library rather than pinned: re-tuning `kick` to any
+    // level keeps this fork different from it.
+    expect(PRESETS.kick?.volume).toBeGreaterThan(0);
+    const forked = PRESETS.kick!.volume / 2;
     const result = makeArrangement(
-      { ...OLD_DOCUMENT, patches: { kick: { volume: 0.05 } } },
+      { ...OLD_DOCUMENT, patches: { kick: { volume: forked } } },
       { libraryFill: PRESETS },
     );
     expect(result.filled).toEqual(['drone-sqr']);
     // The document's own entry wins and is not refilled from the library.
-    expect(result.document.patches?.kick?.volume).toBe(0.05);
-    expect(PRESETS.kick?.volume).not.toBe(0.05);
+    expect(result.document.patches?.kick?.volume).toBe(forked);
+    expect(forked).not.toBe(PRESETS.kick?.volume);
   });
 
   it('leaves a name neither the document nor the library defines dangling', () => {

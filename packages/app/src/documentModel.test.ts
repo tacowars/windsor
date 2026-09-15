@@ -46,10 +46,13 @@ describe('opening a document written before #562', () => {
   });
 
   it('keeps a forked patch over the library and fills only the rest', () => {
-    const model = new DocumentModel({ ...OLD_SONG, patches: { kick: { volume: 0.05 } } });
+    // Half the library's level: derived, not pinned, so a re-tune stays free.
+    expect(PRESETS.kick?.volume).toBeGreaterThan(0);
+    const forked = PRESETS.kick!.volume / 2;
+    const model = new DocumentModel({ ...OLD_SONG, patches: { kick: { volume: forked } } });
     expect(model.filled).toEqual(['saw-arp']);
-    expect(model.doc.patches?.kick?.volume).toBe(0.05);
-    expect(PRESETS.kick?.volume).not.toBe(0.05);
+    expect(model.doc.patches?.kick?.volume).toBe(forked);
+    expect(forked).not.toBe(PRESETS.kick?.volume);
   });
 
   it('keeps the fill across a knob edit, which renormalises the whole document', () => {
