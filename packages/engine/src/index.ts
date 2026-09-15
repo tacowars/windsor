@@ -94,7 +94,19 @@ export type { ReverbSpace, SpaceName } from './reverbSpace';
 export { renderPatchToBuffer } from './offlineRender';
 export type { BakeOptions } from './offlineRender';
 export { attachPartToBabylon, createBabylonAudio } from './babylonBridge';
-export { PRESETS, PRESET_NAMES } from './presets';
+export { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
+export {
+  PATCH_FILE_FORMAT,
+  PATCH_ID_RULE,
+  SWEEP_COMMAND,
+  loadPatchFile,
+  loadPatchLibrary,
+  patchContentHash,
+  patchLeafDifferences,
+} from './patchLibrary';
+export type { HeadroomRecord, LibraryEntry, PatchFile } from './patchLibrary';
+export { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
+export type { GameplayPatchId } from './gameplayPatches';
 export * from './patch';
 // Transport and pure generators (#74). None of these import the audio graph;
 // `generatorBoundary.test.ts` enforces it.

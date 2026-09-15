@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import beforeLevels from './__fixtures__/modDepthLevels.json';
 import { loadProcessor, render } from './__fixtures__/workletHarness';
 import type { ProcessorLike, ScheduledEvent } from './__fixtures__/workletHarness';
 import { makePatch, WAVE } from './patch';
@@ -65,6 +66,14 @@ function renderChord(
 }
 
 describe('the factory bank through the kernel', () => {
+  it('runs at half the modulation-index scale the bank was authored against', () => {
+    // #543 rescaled the bank (levels x sqrt(2), engine scale / 2) and #561 froze
+    // the result as patches/*.json. The library files are authored against
+    // this constant, so the engine cannot move it without every level moving
+    // with it -- the one lasting check of the retired modDepth.test.ts.
+    expect(loaded.modIndexScale).toBe(beforeLevels.modIndexScale / 2);
+  });
+
   it.each(PRESET_NAMES)('%s renders bit-identical to the generic loop', (name) => {
     const patch = PRESETS[name]!;
     const generic = renderChord(patch, false);

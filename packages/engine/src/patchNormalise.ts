@@ -2,8 +2,9 @@
  * The `patches` section of an arrangement document: named FM patches, every
  * one normalised against the shape `makePatch()` produces. A document patch
  * is what the console's Parts tab exports, so the game plays exactly the
- * knobs Pat set rather than a preset that had to be hand-landed in
- * `presetsAuthored.ts` (record `2026-09-11-music-document-carries-patches-and-returns`).
+ * knobs Pat set rather than a preset that had to be hand-landed in the
+ * factory bank (record `2026-09-11-music-document-carries-patches-and-returns`;
+ * since #561 that bank is `patches/*.json`).
  *
  * Shape-driven, not field-driven: the template is the schema. A field takes
  * the raw value when its type matches the template's (a finite number, a

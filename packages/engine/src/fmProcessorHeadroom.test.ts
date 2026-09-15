@@ -13,12 +13,13 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { HEADROOM_RENDER, headroomEvents, peakAt } from './__fixtures__/headroomSweep';
 import { DEFAULT_SEED, loadProcessor, render } from './__fixtures__/workletHarness';
 import type { ScheduledEvent } from './__fixtures__/workletHarness';
 import type { Patch } from './patch';
-import { PRESETS, PRESET_NAMES } from './presets';
-import { SCORING_PRESETS } from './presetsScoring';
-import scoringHeadroom from './__fixtures__/scoringHeadroom.json';
+import { SWEEP_COMMAND, loadPatchFile } from './patchLibrary';
+import { PATCH_FILES } from './patches/index';
+import { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
 
 const loaded = loadProcessor();
 
@@ -42,8 +43,12 @@ const held = (note: number, frames: number): ScheduledEvent[] => [
 const SWEEP_SEEDS = 64;
 
 /**
- * The seed that produced each original preset's worst peak in that 16,384-seed sweep,
- * rendered alongside the sample above.
+ * The seed that produced each patch's worst peak in its offline sweep,
+ * rendered alongside the sample above. Since #561 it is each library file's
+ * `headroom.worstSeed`, written by `tools/patch-editor/sweep-headroom.mjs`
+ * and pinned to the patch by `headroom.contentHash`; `seedsSwept` says how
+ * wide that sweep was (16,384 for the original bank, #78; 4,096 for `saw-arp`
+ * and `drone-sqr`; 256 for the scoring bank, #475).
  *
  * Without these the sweep is only lucky. `weapon-zap` is the proof: restored
  * to its old 0.52 it peaks 0.983 over seeds 0..63 and passes, while seed 1261
@@ -51,34 +56,50 @@ const SWEEP_SEEDS = 64;
  * sample cannot be trusted to rediscover a 1-in-900 draw, so the draws already
  * known to be worst are named and kept.
  *
- * Re-derive an entry only from a fresh sweep, and say so in the PR: a seed
- * edited to make a test pass is worse than no seed at all.
+ * A record is re-derived only by that sweep, and the PR says so: a seed edited
+ * to make a test pass is worse than no seed at all.
  */
-const WORST_KNOWN_SEED: Record<string, number> = {
-  'lead-bell': 8808,
-  'pad-drift': 2181,
-  'ai-voice': 11629,
-  'sub-drone': 13714,
-  'bass-digital': 12428,
-  kick: 2765,
-  snare: 953,
-  hat: 6945,
-  'weapon-zap': 1261,
-  'horde-horn': 14891,
-  'pickup-blip': 1566,
-  'build-thunk': 11629,
-  'saw-arp': 3684,
-  'drone-sqr': 1367,
-  ...Object.fromEntries(
-    Object.entries(scoringHeadroom.results).map(([id, result]) => [id, result.seed]),
-  ),
-};
+const WORST_KNOWN_SEED: Record<string, number> = Object.fromEntries(
+  Object.values(PATCH_LIBRARY).map((entry) => [entry.id, entry.headroom.worstSeed]),
+);
+
+/** The quarter-second gate: a patch that has reached full level inside it must be audible. */
+const GATE_SECONDS = HEADROOM_RENDER.noteOffFrame / loaded.sampleRate;
+const attackSeconds = (patch: Patch): number =>
+  Math.max(...patch.ops.map((op) => op.env.attackTime), patch.filter.env.attackTime);
 
 describe('presets render clean audio', () => {
   it('has a recorded worst-case seed for every preset', () => {
     // A new preset joins PRESET_NAMES and must arrive with its own sweep, not
     // inherit the sample-only coverage of seeds 0..63.
     expect(Object.keys(WORST_KNOWN_SEED).sort()).toEqual([...PRESET_NAMES].sort());
+  });
+
+  it.each(PRESET_NAMES)('%s carries a current headroom record', (name) => {
+    // The loader refused the file already if the record were missing or its
+    // hash stale; this names the failure per patch, with the command that fixes it.
+    const entry = PATCH_LIBRARY[name];
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    expect(() => loadPatchFile(name, PATCH_FILES[name])).not.toThrow();
+    expect(entry.headroom.seedsSwept).toBeGreaterThanOrEqual(1);
+    expect(entry.headroom.peak).toBeLessThanOrEqual(1);
+    // The recorded seed still clears the line today; its recorded peak is the
+    // sweep's reading, not re-asserted here, because the hash pins the record
+    // to the patch and deliberately not to the engine.
+    expect(peakAt(loaded, entry.patch, entry.headroom.worstSeed)).toBeLessThanOrEqual(1);
+  });
+
+  it('fails a missing or stale record with the sweep command', () => {
+    const raw = PATCH_FILES['weapon-zap'] as Record<string, unknown>;
+    const withoutRecord = { ...raw };
+    delete withoutRecord['headroom'];
+    expect(() => loadPatchFile('weapon-zap', withoutRecord)).toThrow(`${SWEEP_COMMAND} weapon-zap`);
+    const patch = structuredClone(raw['patch']) as Patch;
+    patch.volume *= 1.5;
+    expect(() => loadPatchFile('weapon-zap', { ...raw, patch })).toThrow(
+      `${SWEEP_COMMAND} weapon-zap`,
+    );
   });
 
   it.each(PRESET_NAMES)('%s sounds, stays finite and does not clip on any seed', (name) => {
@@ -94,9 +115,13 @@ describe('presets render clean audio', () => {
     let loudestSeed = -1;
     for (const seed of seeds) {
       if (seed === undefined) continue;
-      const result = render(loaded, loaded.create(patch, 16, seed), 400, held(60, 12000), {
-        collectSamples: false,
-      });
+      const result = render(
+        loaded,
+        loaded.create(patch, HEADROOM_RENDER.voices, seed),
+        HEADROOM_RENDER.blocks,
+        headroomEvents(),
+        { collectSamples: false },
+      );
       nonFinite += result.nonFinite;
       quietest = Math.min(quietest, result.peak);
       if (result.peak > loudest) {
@@ -106,9 +131,10 @@ describe('presets render clean audio', () => {
     }
 
     expect(nonFinite).toBe(0);
-    // A quarter-second gate interrupts slow scoring swells before their attack.
-    // Full-envelope audibility and release are checked in presetsScoring.test.ts.
-    expect(quietest).toBeGreaterThan(Object.hasOwn(SCORING_PRESETS, name) ? 0 : 0.002);
+    // A quarter-second gate interrupts a slow swell before its attack, so the
+    // audibility floor applies only to a patch that peaks inside the gate.
+    // Full-envelope audibility and release: patchLibraryEnvelope.test.ts.
+    expect(quietest).toBeGreaterThan(attackSeconds(patch) < GATE_SECONDS ? 0.002 : 0);
     expect(loudest, `${name} clips at seed ${loudestSeed}`).toBeLessThanOrEqual(1);
   });
 });

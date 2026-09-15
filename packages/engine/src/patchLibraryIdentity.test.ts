@@ -12,37 +12,9 @@
 import { describe, expect, it } from 'vitest';
 
 import before from './__fixtures__/patchLibraryBefore561.json';
+import { patchLeafDifferences as leafDifferences } from './patchLibrary';
 import { PRESET_CATALOG } from './presetCatalog';
 import { PRESETS, PRESET_NAMES } from './presets';
-
-/** Every leaf where `actual` and `expected` are not `Object.is`-identical, by path. */
-function leafDifferences(actual: unknown, expected: unknown, path = ''): string[] {
-  if (Array.isArray(expected)) {
-    if (!Array.isArray(actual)) return [`${path}: expected an array`];
-    if (actual.length !== expected.length)
-      return [`${path}: length ${actual.length}, expected ${expected.length}`];
-    return expected.flatMap((item, i) => leafDifferences(actual[i], item, `${path}[${i}]`));
-  }
-  if (expected !== null && typeof expected === 'object') {
-    if (actual === null || typeof actual !== 'object' || Array.isArray(actual))
-      return [`${path}: expected an object`];
-    const actualKeys = Object.keys(actual).sort();
-    const expectedKeys = Object.keys(expected).sort();
-    if (actualKeys.join(',') !== expectedKeys.join(','))
-      return [`${path}: keys ${actualKeys.join(',')} ≠ ${expectedKeys.join(',')}`];
-    return expectedKeys.flatMap((key) =>
-      leafDifferences(
-        (actual as Record<string, unknown>)[key],
-        (expected as Record<string, unknown>)[key],
-        `${path}.${key}`,
-      ),
-    );
-  }
-  return Object.is(actual, expected) ? [] : [`${path}: ${show(actual)} ≠ ${show(expected)}`];
-}
-
-/** `String(-0)` is `'0'`; the one value `Object.is` distinguishes deserves its own spelling. */
-const show = (value: unknown): string => (Object.is(value, -0) ? '-0' : String(value));
 
 describe('the library is bit-identical to the pre-#561 bank', () => {
   it('holds exactly the ids the fixture recorded', () => {
