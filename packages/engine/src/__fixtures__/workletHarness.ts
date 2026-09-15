@@ -68,6 +68,8 @@ export const DEFAULT_SEED = 0xa204;
 export interface CreateOptions {
   /** `false` renders silent held voices in full, as the part did before #547. */
   dormancy?: boolean;
+  /** `false` renders every voice through the generic loop, as the part did before #548. */
+  specialise?: boolean;
 }
 
 export interface LoadedProcessor {

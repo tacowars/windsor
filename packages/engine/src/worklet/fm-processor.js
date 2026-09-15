@@ -330,6 +330,57 @@ function topoOrder(alg) {
 
 const ALG_ORDER = ALGORITHMS.map(topoOrder);
 
+/*
+ * The fixed-index voice kernel (#548). `Voice.renderKernel` evaluates the
+ * operators D, C, B, A with each one's state in locals, and reads routing as
+ * edge and carrier flags set once per render call, not as a per-sample walk
+ * of `order` and `mods`. It is the generic loop's arithmetic in the generic
+ * loop's order, so its output is bit-identical, and an algorithm qualifies
+ * only when that holds by construction:
+ *   - every modulator has a higher index than its target, so D..A computes
+ *     each modulator before it is read, as the topological order does;
+ *   - a modulator list of three is ascending (two terms commute exactly), and
+ *     so is a carrier list of three or more.
+ * The only state operators share is the voice's noise generator, so a voice
+ * with two noise operators also needs its topological order to be D..A.
+ */
+const EDGE_BA = 1,
+  EDGE_CA = 2,
+  EDGE_DA = 4,
+  EDGE_CB = 8,
+  EDGE_DB = 16,
+  EDGE_DC = 32;
+const EDGE_BIT = [
+  [0, EDGE_BA, EDGE_CA, EDGE_DA],
+  [0, 0, EDGE_CB, EDGE_DB],
+  [0, 0, 0, EDGE_DC],
+  [0, 0, 0, 0],
+];
+
+function ascending(list) {
+  for (let j = 1; j < list.length; j++) if (list[j] <= list[j - 1]) return false;
+  return true;
+}
+
+/** The algorithm's modulation edges as EDGE_* bits, or -1 when the kernel cannot render it exactly. */
+function kernelEdges(alg) {
+  let edges = 0;
+  for (let i = 0; i < 4; i++) {
+    const m = alg.mods[i];
+    if (m.length > 2 && !ascending(m)) return -1;
+    for (let j = 0; j < m.length; j++) {
+      if (m[j] <= i) return -1;
+      edges |= EDGE_BIT[i][m[j]];
+    }
+  }
+  if (alg.carriers.length > 2 && !ascending(alg.carriers)) return -1;
+  return edges;
+}
+
+const ALG_EDGES = ALGORITHMS.map(kernelEdges);
+const ALG_CARRIER_BITS = ALGORITHMS.map((alg) => alg.carriers.reduce((b, c) => b | (1 << c), 0));
+const ALG_DESCENDING = ALG_ORDER.map((o) => o[0] === D && o[1] === C && o[2] === B && o[3] === A);
+
 /* ------------------------------------------------------------------ *
  * Envelope
  *
@@ -682,6 +733,36 @@ class Voice {
     this.patch = null;
     this.alg = ALGORITHMS[0];
     this.order = ALG_ORDER[0];
+
+    // The fixed-index kernel and per-note constants (#548). `specialise` is the
+    // part's switch, on in the game and the console; `kernel` is whether the
+    // bound patch can take the kernel exactly (see `ALG_EDGES`).
+    this.specialise = true;
+    this.kernel = false;
+    this.edges = 0;
+    this.carrierBits = 0;
+    this.detuneMul = new Float64Array(4); // Math.pow(2, detune / 1200)
+    this.levelKeyAmp = new Float64Array(4); // Math.pow(2, -levelKeyScale * keyOffset)
+  }
+
+  /**
+   * Routing and per-note constants for the bound patch, after `kind` is set:
+   * called by `start` and `rebind`, so a live retune of the algorithm, a wave
+   * or a detune reaches the next control block. Allocates nothing.
+   */
+  bindConstants(patch) {
+    const algIndex = ALGORITHMS[patch.algorithm] ? patch.algorithm : 0;
+    const keyOffset = (this.note - 60) / 12;
+    let noiseOps = 0;
+    for (let i = 0; i < 4; i++) {
+      const op = patch.ops[i];
+      this.detuneMul[i] = Math.pow(2, op.detune / 1200);
+      this.levelKeyAmp[i] = Math.pow(2, -op.levelKeyScale * keyOffset);
+      if (this.kind[i] === KIND_NOISE) noiseOps++;
+    }
+    this.edges = ALG_EDGES[algIndex];
+    this.carrierBits = ALG_CARRIER_BITS[algIndex];
+    this.kernel = this.specialise && this.edges >= 0 && (noiseOps < 2 || ALG_DESCENDING[algIndex]);
   }
 
   noise() {
@@ -743,6 +824,7 @@ class Voice {
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
       this.ampEnv[i].noteOn();
     }
+    this.bindConstants(patch);
 
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
@@ -779,6 +861,7 @@ class Voice {
       this.ampEnv[i].configure(op.env, this.sr);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
     }
+    this.bindConstants(patch);
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
@@ -885,12 +968,13 @@ class Voice {
     const velCurve = this.velocity;
     const keyOffset = (this.note - 60) / 12;
 
+    const specialise = this.specialise;
     for (let i = 0; i < 4; i++) {
       const op = patch.ops[i];
 
-      const freq = op.fixed
-        ? op.fixedHz * Math.pow(2, op.detune / 1200)
-        : baseFreq * op.ratio * Math.pow(2, op.detune / 1200);
+      // The same Math.pow results, computed once per note (#548).
+      const detuneMul = specialise ? this.detuneMul[i] : Math.pow(2, op.detune / 1200);
+      const freq = op.fixed ? op.fixedHz * detuneMul : baseFreq * op.ratio * detuneMul;
       this.phaseInc[i] = freq / this.sr;
 
       if (this.kind[i] === KIND_TABLE && this.mips[i]) {
@@ -899,7 +983,7 @@ class Voice {
 
       const env = this.ampEnv[i].advance(n);
       const velAmp = 1 - op.velSens + op.velSens * velCurve;
-      const keyAmp = Math.pow(2, -op.levelKeyScale * keyOffset);
+      const keyAmp = specialise ? this.levelKeyAmp[i] : Math.pow(2, -op.levelKeyScale * keyOffset);
       const lfoAmp = 1 + lfoVal * lfoP.toOp[i];
       const target = env * op.level * op.level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
 
@@ -931,6 +1015,10 @@ class Voice {
   // more than the split reads.
   // eslint-disable-next-line max-lines-per-function -- one hot loop, see above
   render(outL, outR, off, n) {
+    if (this.kernel) {
+      this.renderKernel(outL, outR, off, n);
+      return;
+    }
     const patch = this.patch;
     const mods = this.alg.mods;
     const carriers = this.alg.carriers;
@@ -1041,6 +1129,281 @@ class Voice {
     if (fadeInc !== 0 && fade <= 0) {
       this.kill();
     }
+  }
+
+  /**
+   * `render`, with fixed operator indices (#548): see `ALG_EDGES` for why the
+   * output is the same bits. Per-operator state lives in locals for the call
+   * and is written back at the end; a Float32Array store is a `Math.fround`.
+   *
+   * An operator whose amplitude is exactly 0 and not ramping for the whole
+   * call contributes ±0 to every sum it is in, so its wave is not computed.
+   * Its phase still runs, and its feedback history becomes the ±0 the generic
+   * loop would have stored. A noise operator is never skipped: its draws
+   * advance the voice's shared noise generator.
+   */
+  // Four operators written out, then the carrier sum and the filter, over locals
+  // hoisted out of the loop. The fixed indices and the locals are the saving
+  // (docs/research/2026-09-15-548-fm-voice-loop-specialisation); a helper per
+  // operator would reload the state through `this` and give it back.
+  // eslint-disable-next-line max-lines-per-function -- one hot loop, see above
+  renderKernel(outL, outR, off, n) {
+    const patch = this.patch;
+    const nCar = this.alg.carriers.length;
+    const carGain = 1 / Math.sqrt(nCar);
+    const f = patch.filter;
+    const mode = f.mode;
+    const drive = f.drive;
+    const slope24 = f.slope24;
+    const gain = patch.volume * carGain;
+    const panL = this.panL,
+      panR = this.panR;
+
+    let fade = this.fade;
+    const fadeInc = this.fadeInc;
+
+    const phase = this.phase,
+      phaseInc = this.phaseInc,
+      out = this.out;
+    const fb1 = this.fb1,
+      fb2 = this.fb2,
+      amp = this.amp,
+      ampInc = this.ampInc;
+    const kind = this.kind,
+      tables = this.tables;
+    const fbAmt = patch.feedbackScratch;
+    const edges = this.edges,
+      carriers = this.carrierBits;
+
+    const kA = kind[A],
+      kB = kind[B],
+      kC = kind[C],
+      kD = kind[D];
+    const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0;
+    const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0;
+    const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0;
+    const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0;
+    const modBA = liveA && liveB && (edges & EDGE_BA) !== 0;
+    const modCA = liveA && liveC && (edges & EDGE_CA) !== 0;
+    const modDA = liveA && liveD && (edges & EDGE_DA) !== 0;
+    const modCB = liveB && liveC && (edges & EDGE_CB) !== 0;
+    const modDB = liveB && liveD && (edges & EDGE_DB) !== 0;
+    const modDC = liveC && liveD && (edges & EDGE_DC) !== 0;
+    const carA = (carriers & 1) !== 0,
+      carB = (carriers & 2) !== 0,
+      carC = (carriers & 4) !== 0,
+      carD = (carriers & 8) !== 0;
+
+    const tA = tables[A],
+      tB = tables[B],
+      tC = tables[C],
+      tD = tables[D];
+    const fbA = fbAmt[A],
+      fbB = fbAmt[B],
+      fbC = fbAmt[C],
+      fbD = fbAmt[D];
+    const incA = phaseInc[A],
+      incB = phaseInc[B],
+      incC = phaseInc[C],
+      incD = phaseInc[D];
+    const aiA = ampInc[A],
+      aiB = ampInc[B],
+      aiC = ampInc[C],
+      aiD = ampInc[D];
+    let phA = phase[A],
+      phB = phase[B],
+      phC = phase[C],
+      phD = phase[D];
+    let aA = amp[A],
+      aB = amp[B],
+      aC = amp[C],
+      aD = amp[D];
+    let oA = out[A],
+      oB = out[B],
+      oC = out[C],
+      oD = out[D];
+    let f1A = fb1[A],
+      f1B = fb1[B],
+      f1C = fb1[C],
+      f1D = fb1[D];
+    let f2A = fb2[A],
+      f2B = fb2[B],
+      f2C = fb2[C],
+      f2D = fb2[D];
+
+    for (let s = 0; s < n; s++) {
+      if (liveD) {
+        const a = aD;
+        let mod = 0;
+        mod *= MOD_INDEX_SCALE;
+        if (fbD !== 0) {
+          const y = (f1D + f2D) * 0.5;
+          mod += fbD > 0 ? y * fbD * FEEDBACK_SAW_CYCLES : -y * y * fbD * FEEDBACK_SQUARE_CYCLES;
+        }
+        let ph = phD + mod;
+        ph -= Math.floor(ph);
+        let v;
+        if (kD === KIND_TABLE) {
+          const fi = ph * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tD[i0];
+          v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
+        } else if (kD === KIND_NOISE) v = this.noise();
+        else if (kD === KIND_SAW_D) v = ph * 2 - 1;
+        else v = ph < 0.5 ? 1 : -1;
+        f2D = f1D;
+        f1D = Math.fround(v * a);
+        oD = Math.fround(v);
+        aD = Math.fround(a + aiD);
+      }
+      phD += incD;
+      if (phD >= 1) phD -= Math.floor(phD);
+
+      if (liveC) {
+        const a = aC;
+        let mod = 0;
+        if (modDC) mod += oD * aD;
+        mod *= MOD_INDEX_SCALE;
+        if (fbC !== 0) {
+          const y = (f1C + f2C) * 0.5;
+          mod += fbC > 0 ? y * fbC * FEEDBACK_SAW_CYCLES : -y * y * fbC * FEEDBACK_SQUARE_CYCLES;
+        }
+        let ph = phC + mod;
+        ph -= Math.floor(ph);
+        let v;
+        if (kC === KIND_TABLE) {
+          const fi = ph * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tC[i0];
+          v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
+        } else if (kC === KIND_NOISE) v = this.noise();
+        else if (kC === KIND_SAW_D) v = ph * 2 - 1;
+        else v = ph < 0.5 ? 1 : -1;
+        f2C = f1C;
+        f1C = Math.fround(v * a);
+        oC = Math.fround(v);
+        aC = Math.fround(a + aiC);
+      }
+      phC += incC;
+      if (phC >= 1) phC -= Math.floor(phC);
+
+      if (liveB) {
+        const a = aB;
+        let mod = 0;
+        if (modCB) mod += oC * aC;
+        if (modDB) mod += oD * aD;
+        mod *= MOD_INDEX_SCALE;
+        if (fbB !== 0) {
+          const y = (f1B + f2B) * 0.5;
+          mod += fbB > 0 ? y * fbB * FEEDBACK_SAW_CYCLES : -y * y * fbB * FEEDBACK_SQUARE_CYCLES;
+        }
+        let ph = phB + mod;
+        ph -= Math.floor(ph);
+        let v;
+        if (kB === KIND_TABLE) {
+          const fi = ph * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tB[i0];
+          v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
+        } else if (kB === KIND_NOISE) v = this.noise();
+        else if (kB === KIND_SAW_D) v = ph * 2 - 1;
+        else v = ph < 0.5 ? 1 : -1;
+        f2B = f1B;
+        f1B = Math.fround(v * a);
+        oB = Math.fround(v);
+        aB = Math.fround(a + aiB);
+      }
+      phB += incB;
+      if (phB >= 1) phB -= Math.floor(phB);
+
+      if (liveA) {
+        const a = aA;
+        let mod = 0;
+        if (modBA) mod += oB * aB;
+        if (modCA) mod += oC * aC;
+        if (modDA) mod += oD * aD;
+        mod *= MOD_INDEX_SCALE;
+        if (fbA !== 0) {
+          const y = (f1A + f2A) * 0.5;
+          mod += fbA > 0 ? y * fbA * FEEDBACK_SAW_CYCLES : -y * y * fbA * FEEDBACK_SQUARE_CYCLES;
+        }
+        let ph = phA + mod;
+        ph -= Math.floor(ph);
+        let v;
+        if (kA === KIND_TABLE) {
+          const fi = ph * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tA[i0];
+          v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
+        } else if (kA === KIND_NOISE) v = this.noise();
+        else if (kA === KIND_SAW_D) v = ph * 2 - 1;
+        else v = ph < 0.5 ? 1 : -1;
+        f2A = f1A;
+        f1A = Math.fround(v * a);
+        oA = Math.fround(v);
+        aA = Math.fround(a + aiA);
+      }
+      phA += incA;
+      if (phA >= 1) phA -= Math.floor(phA);
+
+      let sig = 0;
+      if (carA) sig += oA * aA;
+      if (carB) sig += oB * aB;
+      if (carC) sig += oC * aC;
+      if (carD) sig += oD * aD;
+      sig *= gain;
+
+      if (fadeInc !== 0) {
+        fade += fadeInc;
+        if (fade <= 0) {
+          fade = 0;
+        }
+        sig *= fade;
+      }
+
+      if (mode !== FILT_OFF) {
+        if (drive !== 1) sig = softClip(sig * drive);
+        sig = this.svfA.process(sig, mode);
+        if (slope24) sig = this.svfB.process(sig, mode);
+      }
+
+      const k = off + s;
+      outL[k] += sig * panL;
+      outR[k] += sig * panR;
+    }
+
+    phase[A] = phA;
+    phase[B] = phB;
+    phase[C] = phC;
+    phase[D] = phD;
+    this.storeOperator(A, liveA, n, aA, oA, f1A, f2A);
+    this.storeOperator(B, liveB, n, aB, oB, f1B, f2B);
+    this.storeOperator(C, liveC, n, aC, oC, f1C, f2C);
+    this.storeOperator(D, liveD, n, aD, oD, f1D, f2D);
+
+    this.fade = fade;
+    if (fadeInc !== 0 && fade <= 0) {
+      this.kill();
+    }
+  }
+
+  /**
+   * Write one operator's kernel locals back. A skipped operator keeps its
+   * amplitude and output, which only ever meet its amplitude of 0; its history
+   * is what the generic loop's `v * 0` stores would have left.
+   */
+  // eslint-disable-next-line max-params -- the kernel's locals for one operator, written back once per call
+  storeOperator(i, live, n, a, o, f1, f2) {
+    if (live) {
+      this.amp[i] = a;
+      this.out[i] = o;
+      this.fb1[i] = f1;
+      this.fb2[i] = f2;
+      return;
+    }
+    if (n > 1) this.fb2[i] = 0;
+    else this.fb2[i] = this.fb1[i];
+    this.fb1[i] = 0;
   }
 }
 
@@ -1199,6 +1562,11 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // `dormancy: false` exists so a test can render the same part without it and
     // prove the two renders agree.
     this.dormancy = opts.dormancy !== false;
+    // The fixed-index voice kernel and per-note constants (#548), on in the game
+    // and the console; `specialise: false` renders every voice through the
+    // generic loop, so a test can prove the two agree bit for bit.
+    const specialise = opts.specialise !== false;
+    for (let i = 0; i < poolSize; i++) this.voices[i].specialise = specialise;
 
     // Audio-load sampler (#445), off until a `reportLoad` message turns it on,
     // so an offline render and the Node harness time nothing and post nothing.
