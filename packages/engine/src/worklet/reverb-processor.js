@@ -307,15 +307,20 @@ class DattorroReverb extends AudioWorkletProcessor {
       if (immediate) this._tap[t] = target;
       this._tapStep[t] = immediate ? 0 : (target - this._tap[t]) / 128;
     }
+    // Whether this block's per-sample length and tap bookkeeping moves anything.
+    // A step is not 0 just because SIZE is still: `_tap` is Float32 and its
+    // target a double, so a settled tap keeps a sub-ulp step forever. What
+    // matters is whether one add changes the stored value -- if it does not,
+    // none of the block's identical adds will, and skipping them is exact.
     let stepping = false;
-    for (let t = 0; t < TAP_TIME.length; t++) if (this._tapStep[t] !== 0) stepping = true;
+    for (let t = 0; t < TAP_TIME.length; t++) {
+      if (Math.fround(this._tap[t] + this._tapStep[t]) !== this._tap[t]) stepping = true;
+    }
     for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
       if (immediate) this._length[i] = this._lengthTarget[i];
       this._lengthStep[i] = immediate ? 0 : (this._lengthTarget[i] - this._length[i]) / 128;
-      if (this._lengthStep[i] !== 0) stepping = true;
+      if (Math.fround(this._length[i] + this._lengthStep[i]) !== this._length[i]) stepping = true;
     }
-    // Whether this block's per-sample length and tap bookkeeping moves anything.
-    // Only while SIZE glides; settled, every step is 0 and adding it is a no-op.
     this._stepping = stepping;
   }
 

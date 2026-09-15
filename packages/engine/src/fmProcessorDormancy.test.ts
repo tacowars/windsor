@@ -19,8 +19,8 @@ const blocksFor = (seconds: number): number => Math.ceil((seconds * SR) / BLOCK_
 
 /** −120 dB, as an amplitude ratio. */
 const RESIDUAL_RATIO = 1e-6;
-/** The worklet's dormancy floors: 1e-9 on carrier amplitude and SVF state. */
-const DORMANT_FLOOR = 1e-9;
+/** The worklet's own dormancy floors, read out of it. */
+const { dormantAmp, dormantFilterState } = loaded;
 
 const NOTE = 60;
 const VELOCITY = 0.9;
@@ -163,7 +163,7 @@ describe('a resonant filter still ringing', () => {
       const silent = carriers.every(
         (c) =>
           voice.ampEnv[c]?.state === loaded.sustainState &&
-          Math.abs(voice.amp[c] ?? 1) <= DORMANT_FLOOR,
+          Math.abs(voice.amp[c] ?? 1) <= dormantAmp,
       );
       const ring = Math.max(Math.abs(voice.svfA.ic1), Math.abs(voice.svfA.ic2));
       if (silent && carriersSilentAt < 0) {
@@ -173,12 +173,12 @@ describe('a resonant filter still ringing', () => {
       }
       if (voice.dormant) {
         dormantAt = b;
-        expect(ring).toBeLessThanOrEqual(DORMANT_FLOOR);
+        expect(ring).toBeLessThanOrEqual(dormantFilterState);
       }
     }
 
     expect(carriersSilentAt).toBeGreaterThanOrEqual(0);
-    expect(ringingAtCarrierSilence).toBeGreaterThan(DORMANT_FLOOR);
+    expect(ringingAtCarrierSilence).toBeGreaterThan(dormantFilterState);
     expect(dormantAt).toBeGreaterThan(carriersSilentAt);
   });
 });
@@ -219,15 +219,26 @@ describe('allocation and note-off', () => {
     expect(off.samples.every((s) => s === 0)).toBe(true);
   });
 
-  it('releases rather than ends a dormant voice whose release rises to an end level', () => {
+  it('never sleeps a voice whose release rises to an end level, so that release is unchanged', () => {
+    // Skipping freezes pitch, filter and LFO state as well as the carriers, so
+    // a release that is sound must never start from a dormant voice.
     const patch = pluck({
       ops: [{ level: 1, env: { decayTime: DECAY_S, sustainLevel: 0, endLevel: 0.5 } }],
+      pitchEnv: { initLevel: 1, attackTime: 2, peakLevel: 0, sustainLevel: 0 },
+      pitchEnvAmount: 1,
     });
-    const processor = loaded.create(patch, 8);
-    render(loaded, processor, blocksFor(SETTLE_S), [noteOn(1)]);
-    expect(activeVoices(processor)[0]?.dormant).toBe(true);
-    const off = render(loaded, processor, blocksFor(0.2), [{ type: 'noteOff', id: 1, frame: 0 }]);
-    expect(off.peak).toBeGreaterThan(0);
+    const run = (dormancy: boolean) => {
+      const processor = loaded.create(patch, 8, undefined, { dormancy });
+      render(loaded, processor, blocksFor(SETTLE_S), [noteOn(1)]);
+      const wasDormant = activeVoices(processor).some((v) => v.dormant);
+      const off = render(loaded, processor, blocksFor(0.2), [{ type: 'noteOff', id: 1, frame: 0 }]);
+      return { wasDormant, off };
+    };
+    const before = run(false);
+    const after = run(true);
+    expect(after.wasDormant).toBe(false);
+    expect(after.off.peak).toBeGreaterThan(0);
+    expect(after.off.samples).toEqual(before.off.samples);
   });
 
   it('wakes on a live retune that raises the sustain, ramping up without a step', () => {
