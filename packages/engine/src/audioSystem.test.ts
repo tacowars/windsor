@@ -23,6 +23,7 @@ import type { ChannelStrip, ReturnSpec } from './mix';
 import { MIX, RETURNS } from './mix';
 import { SPACES } from './reverbSpace';
 import { REVERB_PROCESSOR_NAME } from './workletMessages';
+import { PRESETS } from './presets';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -62,7 +63,7 @@ async function roomRender(
 ): Promise<{ room: Capture; master: Capture; system: AudioSystem }> {
   const { system, engine } = await rig({ mix });
   for (const name of Object.keys(mix)) {
-    sourceOf(system.createMusicPart(name, 'pad-drift')).feed = feed;
+    sourceOf(system.createMusicPart(name, PRESETS['pad-drift']!)).feed = feed;
   }
   const [room, master] = renderGraph(
     system.engine.context as unknown as FakeContext,
@@ -126,7 +127,9 @@ describe('sends are per part', () => {
 
   it('refuses a send to a return that does not exist', async () => {
     const { system } = await rig({ mix: { x: strip({ nowhere: 0.5 }) } });
-    expect(() => system.createMusicPart('x', 'pad-drift')).toThrow(/unknown return "nowhere"/);
+    expect(() => system.createMusicPart('x', PRESETS['pad-drift']!)).toThrow(
+      /unknown return "nowhere"/,
+    );
     expect(() => system.strip('drone')?.setSend('nowhere', 0.1)).not.toThrow();
   });
 });
@@ -134,7 +137,7 @@ describe('sends are per part', () => {
 describe('the fader and the dry path', () => {
   it('sets MIX.level on the k-rate gain param and adds no GainNode to the dry path', async () => {
     const { system, engine } = await rig();
-    const part = system.createMusicPart('drone', 'pad-drift');
+    const part = system.createMusicPart('drone', PRESETS['pad-drift']!);
     const live = system.strip('drone');
     if (!live) throw new Error('no strip');
 
@@ -162,7 +165,7 @@ describe('the fader and the dry path', () => {
   it('applies the fader exactly once on the way to the master', async () => {
     const level = 0.8;
     const { system, engine, context } = await rig({ mix: { p: strip({}, 0, level) } });
-    const part = system.createMusicPart('p', 'pad-drift');
+    const part = system.createMusicPart('p', PRESETS['pad-drift']!);
     sourceOf(part).feed = MONO;
     const [source, master] = renderGraph(context, 0.5, [sourceOf(part), fake(engine.master)]);
     if (!source || !master) throw new Error('render produced no captures');
@@ -193,8 +196,8 @@ describe('returns', () => {
   it('instantiates exactly one plate for the default MIX, however many parts exist', async () => {
     const { system, context } = await rig();
     expect(plates(context)).toBe(1);
-    system.createMusicPart('drone', 'pad-drift');
-    system.createMusicPart('arp', 'lead-bell');
+    system.createMusicPart('drone', PRESETS['pad-drift']!);
+    system.createMusicPart('arp', PRESETS['lead-bell']!);
     system.createSfxPart('ui', 'pickup-blip');
     expect(plates(context)).toBe(1);
     expect(system.returnBus('room')?.spec).toBe(RETURNS.room);
@@ -211,7 +214,7 @@ describe('returns', () => {
 
     const { system, context } = await rig({ returns, mix });
     expect(plates(context)).toBe(2);
-    sourceOf(system.createMusicPart('p', 'pad-drift')).feed = BURST;
+    sourceOf(system.createMusicPart('p', PRESETS['pad-drift']!)).feed = BURST;
     const [short, room] = renderGraph(context, 1, [
       returnOutput(system, 'short'),
       returnOutput(system, 'room'),
@@ -224,7 +227,7 @@ describe('returns', () => {
 
   it('echoes through the delay return after delayTime, quieter each repeat', async () => {
     const { system, context } = await rig({ mix: { h: strip({ echo: 0.5 }) } });
-    sourceOf(system.createMusicPart('h', 'lead-bell')).feed = burst(MONO, 0.05);
+    sourceOf(system.createMusicPart('h', PRESETS['lead-bell']!)).feed = burst(MONO, 0.05);
     const [echo] = renderGraph(context, 1, [returnOutput(system, 'echo')]);
     if (!echo) throw new Error('render produced no captures');
 
@@ -276,10 +279,10 @@ describe('SFX parts', () => {
 describe('lifecycle', () => {
   it('refuses parts before init, and tears every strip down on dispose', async () => {
     const early = new AudioSystem(new FmEngine(new FakeContext().asAudioContext()));
-    expect(() => early.createMusicPart('x', 'pad-drift')).toThrow(/init\(\)/);
+    expect(() => early.createMusicPart('x', PRESETS['pad-drift']!)).toThrow(/init\(\)/);
 
     const { system, engine } = await rig();
-    const part = system.createMusicPart('drone', 'pad-drift');
+    const part = system.createMusicPart('drone', PRESETS['pad-drift']!);
     expect(reaches(fake(part.output), fake(engine.master))).toBe(true);
     system.dispose();
     expect(system.isStarted).toBe(false);

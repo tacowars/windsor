@@ -54,7 +54,15 @@ describe('the committed arrangement (arrangements/bed-01.json)', () => {
   it('defines all four parts and constructs every generator', () => {
     for (const id of MUSIC_PART_IDS) expect(result.document[id], id).toBeDefined();
     const parts = { kick: silentPart(), hat: silentPart(), arp: silentPart(), drone: silentPart() };
-    expect(() => new ArrangementPlayer(new TickTransport(), parts, result.document)).not.toThrow();
+    expect(
+      () =>
+        new ArrangementPlayer(
+          new TickTransport(),
+          parts,
+          result.document,
+          result.document.patches ?? {},
+        ),
+    ).not.toThrow();
   });
 });
 

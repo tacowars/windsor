@@ -4,12 +4,18 @@
  * `makeArrangement`, so what the console holds is exactly what an export
  * produces and an import reads back, and the round trip is equality by
  * construction (record §3, §5).
+ *
+ * The editor is the one caller that passes a library fill (#562): a document
+ * written before songs became self-contained names library ids with nothing
+ * embedded, and `makeArrangement` resolves those once and embeds them, so the
+ * very next export carries every patch the song plays. `filled` is what the
+ * Arrangement tab tells the user was filled that way.
  */
 import type {
   ArrangementDocument,
   MakeArrangementResult,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
+import { PRESETS, makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
 
 /**
  * Merge for the local copy: objects recurse, arrays and `null` assign
@@ -33,10 +39,17 @@ export class DocumentModel {
   doc!: ArrangementDocument;
   corrections: string[] = [];
   dangling: string[] = [];
+  /** Patch ids this document took from the library rather than carrying (#562). */
+  filled: string[] = [];
   usable = true;
 
   constructor(raw: unknown) {
-    this.adopt(makeArrangement(raw));
+    this.adopt(this.normalise(raw));
+  }
+
+  /** The editor's normalisation: the library fills what an older document omits. */
+  private normalise(raw: unknown): MakeArrangementResult {
+    return makeArrangement(raw, { libraryFill: PRESETS });
   }
 
   /** Take a normalisation result wholesale — the import path. */
@@ -44,19 +57,20 @@ export class DocumentModel {
     this.doc = result.document;
     this.corrections = result.corrections;
     this.dangling = result.dangling;
+    this.filled = result.filled;
     this.usable = result.usable;
   }
 
   /** A field-level change: merge, renormalise, keep the report. */
   merge(partial: unknown): void {
-    this.adopt(makeArrangement(deepMerge(this.doc, partial)));
+    this.adopt(this.normalise(deepMerge(this.doc, partial)));
   }
 
   /** A structural change (slot added or removed): edit a draft, renormalise. */
   mutate(edit: (draft: Record<string, unknown>) => void): void {
     const draft = JSON.parse(JSON.stringify(this.doc)) as Record<string, unknown>;
     edit(draft);
-    this.adopt(makeArrangement(draft));
+    this.adopt(this.normalise(draft));
   }
 
   /** The export payload: the normalised document, pretty-printed. */

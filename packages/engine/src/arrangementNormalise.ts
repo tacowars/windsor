@@ -57,25 +57,52 @@ import {
 } from './euclideanSequencer';
 import { MIX } from './mix';
 import type { Patch } from './patch';
+import { clonePatch } from './patch';
 import { normalisePatches } from './patchNormalise';
-import { PRESETS } from './presets';
+import { PatchResolver, type ResolveOptions } from './arrangementValidate';
 import { SCALES, scaleOffsets, type ScaleName } from './scaleSampler';
 import type { Register } from './scaleSampler';
 import { DEFAULT_STEP_SEQUENCER_CONFIG } from './stepSequencer';
 
 export class ArrangementNormaliser extends FieldNormaliser {
   /**
-   * The names the document's own `patches` section defines: a part's
-   * `preset` resolves against them before the code's `PRESETS`, so a document
-   * patch named like a built-in shadows it for this document's parts.
+   * The one resolver (#562): the document's `patches` section, plus the
+   * library only when the caller asked for the fill. Replaced by `patches()`
+   * once that section is normalised; until then nothing resolves.
    */
-  private localPatches: ReadonlySet<string> = new Set();
+  private resolver: PatchResolver;
+
+  constructor(private readonly resolve: ResolveOptions = {}) {
+    super();
+    this.resolver = new PatchResolver({}, resolve);
+  }
 
   /** The `patches` section — normalised first, so the parts can name its entries. */
   patches(raw: unknown): Record<string, Patch> | undefined {
     const out = normalisePatches(raw, this);
-    this.localPatches = new Set(Object.keys(out ?? {}));
+    this.resolver = new PatchResolver(out ?? {}, this.resolve);
     return out;
+  }
+
+  /**
+   * Library patches the parts resolved through the fill, by id — what the
+   * editor's open path embeds into the document so the next export carries
+   * them. Empty on the game path, where there is no fill.
+   */
+  filledPatches(): Record<string, Patch> {
+    const out: Record<string, Patch> = {};
+    for (const id of this.resolver.filled) {
+      const patch = this.resolver.lookup(id);
+      // Cloned: the embedded snapshot must not alias the library table, or a
+      // later document edit would reach back into `patches/<id>.json`'s value.
+      if (patch) out[id] = clonePatch(patch);
+    }
+    return out;
+  }
+
+  /** Ids the fill supplied, for the editor's report. */
+  get filled(): readonly string[] {
+    return this.resolver.filled;
   }
 
   key(raw: unknown): ArrangementKey {
@@ -167,10 +194,11 @@ export class ArrangementNormaliser extends FieldNormaliser {
   }
 
   /**
-   * The two names a part cannot play without. A preset is looked up in the
-   * document's `patches` first, then the code's `PRESETS`; unknown in both,
-   * it drops the part (and is dangling — the gate's business). A part name
-   * with no strip still plays, through `DEFAULT_STRIP`, but is dangling too.
+   * The two names a part cannot play without. A preset is looked up through
+   * the resolver — the document's `patches`, and the library only on the
+   * editor's fill path (#562); unresolved, it drops the part (and is
+   * dangling — the gate's business). A part name with no strip still plays,
+   * through `DEFAULT_STRIP`, but is dangling too.
    */
   private identity(
     o: Record<string, unknown>,
@@ -184,7 +212,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
       this.correction(`${id}: a part needs a preset, and a preset has no default — part dropped`);
       return null;
     }
-    if (!this.localPatches.has(o.preset) && !Object.hasOwn(PRESETS, o.preset)) {
+    if (!this.resolver.lookup(o.preset)) {
       this.dangling.push(`${id}.preset: no preset "${o.preset}" is defined`);
       this.correction(`${id}: unknown preset "${o.preset}" — part dropped`);
       return null;

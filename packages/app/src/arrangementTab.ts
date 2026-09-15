@@ -69,10 +69,11 @@ function transportSection(ctx: AppCtx): HTMLElement {
 function documentSection(ctx: AppCtx): HTMLElement {
   const { root, body } = section(
     'Document',
-    'Export downloads the whole piece — patches, returns, mix, sequencers, harmony — as one ' +
-      'normalised document. Save it as packages/client/src/audio/arrangements/<name>.json: the ' +
-      'game bundles every file there, ?music=<name> plays it (bed-01 is the default), and ' +
-      'npm run verify gates each one.',
+    'Export downloads the whole piece — a snapshot of every patch any part plays, plus ' +
+      'returns, mix, sequencers and harmony — as one normalised document. Save it as ' +
+      'packages/client/src/audio/arrangements/<name>.json: the game bundles every file there, ' +
+      'resolves patches from the document alone (#562), ?music=<name> plays it (bed-01 is the ' +
+      'default), and npm run verify gates each one.',
   );
   const row = el('div', 'bar-row');
   const name = document.createElement('input');
@@ -117,10 +118,23 @@ function documentSection(ctx: AppCtx): HTMLElement {
 
 function reportSection(ctx: AppCtx): HTMLElement {
   const { root, body } = section('Normalisation report');
-  const { corrections, dangling, usable } = ctx.model;
+  const { corrections, dangling, filled, usable } = ctx.model;
   if (!usable)
     body.appendChild(el('p', 'hint hot', 'Nothing usable — the metronome fallback is playing.'));
-  if (corrections.length === 0 && dangling.length === 0) {
+  // #562: a song carries every patch it plays, so a document written before
+  // that took these from the library on open. Say which, and that exporting
+  // is what makes the song self-contained.
+  if (filled.length > 0) {
+    body.appendChild(
+      el(
+        'p',
+        'hint hot',
+        `filled from the library on open: ${filled.join(', ')} — this song did not carry ` +
+          'them. They are embedded now; export to save the song with them in it.',
+      ),
+    );
+  }
+  if (corrections.length === 0 && dangling.length === 0 && filled.length === 0) {
     body.appendChild(el('p', 'hint', 'Clean: nothing corrected, nothing dangling.'));
   }
   for (const line of corrections) body.appendChild(el('p', 'hint', `corrected: ${line}`));

@@ -30,7 +30,6 @@ import type { PresetTable } from './arrangementValidate';
 import { lookupPreset, presetFor, validateArrangement } from './arrangementValidate';
 import type { Patch } from './patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from './patch';
-import { PRESETS } from './presets';
 import { ScaleSampler } from './scaleSampler';
 import type { TickSource, Unsubscribe } from './scheduler';
 import { StepSequencer } from './stepSequencer';
@@ -129,15 +128,18 @@ export class ArrangementPlayer {
   private readonly subs = new Map<MusicPartId, Unsubscribe>();
   private readonly counters: Record<MusicPartId, number> = { kick: 0, hat: 0, arp: 0, drone: 0 };
   private readonly announced = new Set<MusicPartId>();
-  /** The table preset names resolve against; a `patches` partial edits it live. */
+  /**
+   * The table preset names resolve against — the document's own patches
+   * (#562), never the library; a `patches` partial edits it live.
+   */
   private presets: Record<string, Patch>;
 
   constructor(
     private readonly transport: MusicTransport,
     private readonly parts: Readonly<Partial<Record<MusicPartId, PlayablePart>>>,
     arrangement: Arrangement,
+    presets: PresetTable,
     private readonly onEvent?: MusicEventHandler,
-    presets: PresetTable = PRESETS,
   ) {
     this.presets = { ...presets };
     this.current = structuredClone(arrangement);

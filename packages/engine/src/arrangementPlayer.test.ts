@@ -61,7 +61,7 @@ function rig(arrangement: Arrangement = FULL_ARRANGEMENT): Rig {
   const transport = new TickTransport(120);
   const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
   const events: Rig['events'] = [];
-  const player = new ArrangementPlayer(transport, parts, arrangement, (part, tick) =>
+  const player = new ArrangementPlayer(transport, parts, arrangement, PRESETS, (part, tick) =>
     events.push({ part, tick }),
   );
   const run = (bars: number): void => {
@@ -169,10 +169,10 @@ describe('the preset table (#435)', () => {
       ...FULL_ARRANGEMENT,
       arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
     };
-    expect(() => new ArrangementPlayer(new TickTransport(), parts, arrangement)).toThrow(
+    expect(() => new ArrangementPlayer(new TickTransport(), parts, arrangement, PRESETS)).toThrow(
       'arp: unknown audio preset "lead"',
     );
-    const player = new ArrangementPlayer(new TickTransport(), parts, arrangement, undefined, {
+    const player = new ArrangementPlayer(new TickTransport(), parts, arrangement, {
       ...PRESETS,
       lead,
     });
@@ -182,7 +182,7 @@ describe('the preset table (#435)', () => {
 
   it('a patches partial merges over the table entry and pushes to the parts playing it', () => {
     const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
     expect(player.apply({}, { kick: { volume: 0.2 }, junk: 4 })).toEqual({
       ok: true,
       ignored: ['patches.junk'],
@@ -197,7 +197,7 @@ describe('the preset table (#435)', () => {
 
   it('takes a preset switch and the patch it names in one partial (review finding 1)', () => {
     const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
     const result = player.apply({ arp: { preset: 'fresh' } }, { fresh: { volume: 0.2 } });
     expect(result).toEqual({ ok: true, ignored: [] });
     expect(parts.arp.calls.filter((c) => c.kind === 'setPatch')).toEqual([
@@ -207,7 +207,7 @@ describe('the preset table (#435)', () => {
 
   it('changes neither the table nor the arrangement when the merged arrangement is refused', () => {
     const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
     expect(player.apply({ bpm: -1 }, { fresh: { volume: 0.2 } }).ok).toBe(false);
     expect(parts.arp.calls).toEqual([]);
     // The staged patch was discarded with the refused partial.
@@ -216,7 +216,7 @@ describe('the preset table (#435)', () => {
 
   it('never resolves an inherited object name as a preset', () => {
     const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT);
+    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
     expect(player.apply({ arp: { preset: 'constructor' } })).toMatchObject({
       ok: false,
       error: 'arp: unknown audio preset "constructor"',

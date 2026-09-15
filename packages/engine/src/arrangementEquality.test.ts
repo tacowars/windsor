@@ -16,9 +16,9 @@ import {
   sourceOf,
 } from './__fixtures__/fakeAudioContext';
 import type { FakeNode } from './__fixtures__/fakeAudioNodes';
-import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
 import { noteToneFeed } from './__fixtures__/noteFeeds';
-import type { Arrangement } from './arrangement';
+import type { ArrangementDocument } from './arrangementDocument';
 import { makeArrangement } from './arrangementDocument';
 import { MUSIC_PART_IDS, type MusicPartId } from './arrangementPlayer';
 import raw from './arrangements/bed-01.json';
@@ -39,7 +39,7 @@ interface Render {
   counters: Record<MusicPartId, number>;
 }
 
-async function renderBed(arrangement: Arrangement): Promise<Render> {
+async function renderBed(arrangement: ArrangementDocument): Promise<Render> {
   const context = new FakeContext();
   const engine = new FmEngine(context.asAudioContext());
   const system = new AudioSystem(engine);
@@ -69,12 +69,22 @@ describe('bed-01.json equals the #69b TypeScript arrangement', () => {
     const result = makeArrangement(raw);
     expect(result.corrections).toEqual([]);
     expect(result.dangling).toEqual([]);
-    expect(result.document).toEqual(FULL_ARRANGEMENT);
+    // No fill was offered and none was needed: the committed song already
+    // carries every patch it plays (#562).
+    expect(result.filled).toEqual([]);
+    const { patches, ...arrangement } = result.document;
+    expect(arrangement).toEqual(FULL_ARRANGEMENT);
+    expect(Object.keys(patches ?? {}).sort()).toEqual(
+      [...MUSIC_PART_IDS.map((id) => FULL_ARRANGEMENT[id].preset)].sort(),
+    );
   });
 
   it(`renders the first ${BARS} bars sample-identically through the full stack`, async () => {
+    // The #562 proof that embedding changed no sound: `fromTs` resolves the
+    // four patches from the library, the way the game did before this ticket,
+    // and `fromJson` plays the snapshots the document now carries.
     const fromJson = await renderBed(makeArrangement(raw).document);
-    const fromTs = await renderBed(FULL_ARRANGEMENT);
+    const fromTs = await renderBed(FULL_DOCUMENT);
     for (const id of MUSIC_PART_IDS) expect(fromTs.counters[id], id).toBeGreaterThan(0);
     expect(fromJson.counters).toEqual(fromTs.counters);
     expect(maxAbsDiff(fromJson.capture.left, fromTs.capture.left)).toBe(0);

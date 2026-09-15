@@ -12,6 +12,7 @@ import type { Arrangement } from './arrangement';
 import { makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type MusicPartId, type PlayablePart } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
+import { PRESETS } from './presets';
 
 const silent = (): PlayablePart => ({
   noteOn: () => 0,
@@ -42,7 +43,7 @@ function rig(arrangement: Arrangement): Rig {
     arp: count('arp'),
     drone: count('drone'),
   };
-  const player = new ArrangementPlayer(transport, parts, arrangement);
+  const player = new ArrangementPlayer(transport, parts, arrangement, PRESETS);
   const run = (bars: number): void => {
     for (let i = 0; i < bars * TICKS_PER_BAR; i++) transport.advance(transport.transportSeconds);
   };
@@ -125,9 +126,13 @@ describe('player capture and release', () => {
   });
 });
 
+/** The library ids these documents name, embedded as silent `{}` fills (#562). */
+const PATCHES = { kick: {}, 'saw-arp': {}, 'drone-sqr': {} };
+
 describe('captured patterns in the document (export → import)', () => {
   it('normalises literal patterns, 0/1 accepted, junk corrected to rests', () => {
     const result = makeArrangement({
+      patches: PATCHES,
       kick: { preset: 'kick', driver: { steps: 4, pattern: [1, 0, true, 'x'] } },
       arp: { preset: 'saw-arp', driver: { pattern: [60.4, 'x', null, 200] } },
     });
@@ -139,6 +144,7 @@ describe('captured patterns in the document (export → import)', () => {
 
   it('resizes a percussion pattern to the figure and reports it', () => {
     const result = makeArrangement({
+      patches: PATCHES,
       kick: { preset: 'kick', driver: { steps: 4, pattern: [true] } },
     });
     expect(result.document.kick?.driver.pattern).toEqual([true, false, false, false]);
@@ -146,13 +152,14 @@ describe('captured patterns in the document (export → import)', () => {
   });
 
   it('defaults an absent pattern to null, silently', () => {
-    const result = makeArrangement({ kick: { part: 'kick', preset: 'kick' } });
+    const result = makeArrangement({ patches: PATCHES, kick: { part: 'kick', preset: 'kick' } });
     expect(result.corrections).toEqual([]);
     expect(result.document.kick?.driver.pattern).toBeNull();
   });
 
   it('survives the export → import round trip equal and correction-free', () => {
     const authored = {
+      patches: PATCHES,
       seed: 7,
       bpm: 100,
       key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },

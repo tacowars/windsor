@@ -24,6 +24,7 @@ import { FmEngine } from './fmEngine';
 import type { ChannelStrip } from './mix';
 import { SPATIAL_SFX_UNITY, createMixLevels, spatialVolumeFor } from './mixLevels';
 import { SFX_LIMITS } from './sfxConstants';
+import { PRESETS } from './presets';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -59,7 +60,8 @@ async function render({ levels, parts }: RenderOptions = {}): Promise<Render> {
     if (levels.music !== undefined) mix.setMusicLevel(levels.music);
     if (levels.sfx !== undefined) mix.setSfxLevel(levels.sfx);
   }
-  if (parts?.music !== false) sourceOf(system.createMusicPart('m', 'pad-drift')).feed = SIGNAL;
+  if (parts?.music !== false)
+    sourceOf(system.createMusicPart('m', PRESETS['pad-drift']!)).feed = SIGNAL;
   if (parts?.sfx !== false) sourceOf(system.createSfxPart('s', 'pickup-blip')).feed = SIGNAL;
   const room = system.returnBus('room');
   if (!room) throw new Error('no room return');

@@ -9,15 +9,17 @@ import type { AudioBus, BusOptions } from './audioBus';
 import { createBus } from './audioBus';
 import { AudioPart } from './audioPart';
 import type { Patch } from './patch';
-import { clonePatch, makePatch } from './patch';
-import { PRESETS } from './presets';
+import { makePatch } from './patch';
 import type { ProcessorOptions } from './workletMessages';
 import { PROCESSOR_NAME, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessages';
 
 export interface PartOptions {
+  /**
+   * The patch this part plays. The engine resolves no names (#562): a song's
+   * patch comes from its document and a gameplay patch from
+   * `gameplayPatches.ts`, so the whole-bank table is not a runtime import.
+   */
   patch?: Patch;
-  /** A library id (`patches/<id>.json`, the `PRESETS` key). Ignored when `patch` is given. */
-  preset?: string;
   /** Sounding voice limit. The pool holds a few more, for steal fade-outs. */
   maxVoices?: number;
   /** Defaults to the engine master. Pass `null` to leave the part unrouted. */
@@ -152,11 +154,5 @@ export class FmEngine {
 }
 
 function resolvePatch(options: PartOptions): Patch {
-  if (options.patch) return options.patch;
-  if (options.preset) {
-    const preset = PRESETS[options.preset];
-    if (!preset) throw new Error(`unknown audio preset "${options.preset}"`);
-    return clonePatch(preset);
-  }
-  return makePatch();
+  return options.patch ?? makePatch();
 }

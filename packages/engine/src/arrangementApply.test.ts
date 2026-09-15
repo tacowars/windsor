@@ -11,6 +11,7 @@ import type { Arrangement, DeepPartial } from './arrangement';
 import { ArrangementPlayer, type MusicPartId, type PlayablePart } from './arrangementPlayer';
 import type { Patch } from './patch';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
+import { PRESETS } from './presets';
 
 interface Call {
   kind: string;
@@ -55,7 +56,9 @@ interface Rig {
 function rig(arrangement: Arrangement = FULL_ARRANGEMENT): Rig {
   const transport = new TickTransport(120);
   const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-  const player = new ArrangementPlayer(transport, parts, arrangement);
+  // The player resolves only against the table it is handed (#562); these
+  // tests hand it the library so a preset swap has something to swap to.
+  const player = new ArrangementPlayer(transport, parts, arrangement, PRESETS);
   const run = (bars: number): void => {
     for (let i = 0; i < bars * TICKS_PER_BAR; i++) transport.advance(transport.transportSeconds);
   };
