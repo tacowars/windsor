@@ -32,6 +32,8 @@ export const hooks = {
   refresh: (): void => {},
   /** Commit the working patch to the document under the selected part's preset name. */
   commit: (_patch: Patch): void => {},
+  /** After a commit landed: the library row re-reads its unsaved marker (#563). */
+  afterCommit: (): void => {},
 };
 
 /** Push the working patch: into the document, and through it to the live part. */

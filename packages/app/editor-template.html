@@ -623,6 +623,56 @@
         resize: vertical;
       }
 
+      dialog textarea.meta-text {
+        height: auto;
+        min-height: 64px;
+        font-family: inherit;
+        font-size: 12.5px;
+      }
+      dialog input.field,
+      dialog select.field {
+        width: 100%;
+        min-width: 0;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-height: 22px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px 2px 8px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--inset);
+        font-size: 11.5px;
+      }
+      .chip button {
+        border: 0;
+        background: transparent;
+        color: var(--ink-dim);
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1;
+        padding: 0 2px;
+      }
+      .chip button:hover {
+        color: var(--hot);
+      }
+      .library-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+      }
+      .library-row .bar-row {
+        flex-basis: 100%;
+      }
+
       .hint {
         color: var(--ink-faint);
         font-size: 11.5px;
@@ -673,6 +723,7 @@
         <button class="btn primary" id="power" type="button">Enable audio</button>
         <nav class="tabs" id="tabBar" aria-label="Console tabs"></nav>
         <span class="status" id="status">booting</span>
+        <span class="status" id="libraryMode" aria-live="polite"></span>
       </header>
       <main class="tab-root" id="tabRoot"></main>
     </div>
@@ -691,6 +742,65 @@
           <button class="btn" id="jsonLoad" type="button">Load</button>
           <button class="btn" id="jsonClose" type="button">Close</button>
           <span class="status" id="jsonStatus"></span>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- The library workflow's modals (#563): metadata for Save / Copy to new,
+         and the page's own confirm. Never window.confirm. -->
+    <dialog id="metaDlg" aria-labelledby="metaTitle">
+      <div class="dlg-body">
+        <div class="section-title" style="margin: 0"><span id="metaTitle">Save patch</span></div>
+        <p class="hint" id="metaHint" style="margin: 0"></p>
+        <label class="field-label" for="metaName">Display name</label>
+        <input class="field" id="metaName" name="patch-display-name" autocomplete="off" />
+        <p class="hint hot" id="metaNameProblem" role="alert" style="margin: 0"></p>
+        <label class="field-label" for="metaId">Id (the file name)</label>
+        <input class="field" id="metaId" name="patch-id" readonly aria-readonly="true" />
+        <label class="field-label" for="metaCategory">Category</label>
+        <select class="field" id="metaCategory" name="patch-category"></select>
+        <input
+          class="field"
+          id="metaNewCategory"
+          name="patch-new-category"
+          placeholder="New category name"
+          aria-label="New category"
+          hidden
+        />
+        <label class="field-label" for="metaTagInput">Tags</label>
+        <div class="chips" id="metaTags"></div>
+        <input
+          class="field"
+          id="metaTagInput"
+          name="patch-tag"
+          list="metaTagList"
+          placeholder="Type a tag; Enter or comma adds it"
+          autocomplete="off"
+        />
+        <datalist id="metaTagList"></datalist>
+        <label class="field-label" for="metaDescription">Description</label>
+        <textarea
+          class="field meta-text"
+          id="metaDescription"
+          name="patch-description"
+          rows="3"
+        ></textarea>
+        <p class="hint" id="metaLoudness" role="status" style="margin: 0"></p>
+        <p class="hint" id="metaAfter" style="margin: 0"></p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button class="btn primary" id="metaConfirm" type="button">Write</button>
+          <button class="btn" id="metaCancel" type="button">Cancel</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="confirmDlg" aria-labelledby="confirmTitle">
+      <div class="dlg-body">
+        <div class="section-title" style="margin: 0"><span id="confirmTitle"></span></div>
+        <p class="hint" id="confirmBody" style="margin: 0"></p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button class="btn primary" id="confirmOk" type="button">OK</button>
+          <button class="btn" id="confirmCancel" type="button">Cancel</button>
         </div>
       </div>
     </dialog>

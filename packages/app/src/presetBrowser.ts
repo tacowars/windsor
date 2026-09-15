@@ -1,10 +1,5 @@
 /** Native keyboard-accessible browsing; filtering never changes the song. */
-import {
-  clonePatch,
-  filterPresets,
-  listPresets,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { PRESETS } from '../../../packages/client/src/audio/index-for-editor';
+import { clonePatch, filterPresets } from '../../../packages/client/src/audio/index-for-editor';
 import type {
   MusicPartId,
   PresetFilter,
@@ -12,6 +7,7 @@ import type {
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { el, select } from './dom';
+import { library, libraryPatch, listLibrary } from './libraryModel';
 
 // Retain filters when a patch selection rebuilds the Parts rail, or when changing parts.
 const filter: PresetFilter = { query: '', category: '', tag: '', source: '' };
@@ -20,7 +16,7 @@ const filter: PresetFilter = { query: '', category: '', tag: '', source: '' };
 export function choosePreset(ctx: AppCtx, id: MusicPartId, name: string): boolean {
   const existing = ctx.model.doc.patches;
   const documentPatch = existing && Object.hasOwn(existing, name) ? existing[name] : undefined;
-  const patch = documentPatch ?? (Object.hasOwn(PRESETS, name) ? PRESETS[name] : undefined);
+  const patch = documentPatch ?? libraryPatch(library, name);
   if (!patch) return false;
   return ctx.change({ [id]: { preset: name }, patches: { [name]: clonePatch(patch) } }).ok;
 }
@@ -62,9 +58,18 @@ function filterControls(entries: PresetListing[], refresh: () => void): HTMLElem
   return box;
 }
 
-export function presetBrowser(ctx: AppCtx, id: MusicPartId, onPick: () => void): HTMLElement {
+/** Runs before a load lands: the unsaved-changes guard (#563) calls `proceed` or drops the pick. */
+export type PickGuard = (proceed: () => void) => void;
+
+// eslint-disable-next-line max-lines-per-function -- one browser: the list, its filters and the load path, wired in order
+export function presetBrowser(
+  ctx: AppCtx,
+  id: MusicPartId,
+  onPick: () => void,
+  guard: PickGuard = (proceed) => proceed(),
+): HTMLElement {
   const box = el('div', 'preset-browser');
-  const entries = listPresets(ctx.model.doc.patches);
+  const entries = listLibrary(library.entries, ctx.model.doc.patches);
   const selected = ctx.model.doc[id]?.preset ?? '';
   const current = el('p', 'hint');
   current.textContent = `Current: ${entries.find((entry) => entry.id === selected)?.name ?? selected}`;
@@ -102,10 +107,12 @@ export function presetBrowser(ctx: AppCtx, id: MusicPartId, onPick: () => void):
   // keyboard load stays in the list to keep browsing; a mouse load lands on the button,
   // where the QWERTY keys play the new sound (they are ignored inside a select).
   const apply = (focusLabel: string): void => {
-    if (choosePreset(ctx, id, results.value)) {
-      onPick();
-      document.querySelector<HTMLElement>(`[aria-label="${focusLabel}"]`)?.focus();
-    }
+    guard(() => {
+      if (choosePreset(ctx, id, results.value)) {
+        onPick();
+        document.querySelector<HTMLElement>(`[aria-label="${focusLabel}"]`)?.focus();
+      }
+    });
   };
   results.onchange = describe;
   results.ondblclick = (): void => apply('Load patch');

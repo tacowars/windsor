@@ -47,9 +47,8 @@ await build({
   format: 'esm',
   define: { 'import.meta.url': JSON.stringify(pathToFileURL(entry).href) },
 });
-const { loadPatchFile, patchContentHash, seedRange, sweepHeadroom } = await import(
-  pathToFileURL(output).href
-);
+const { loadPatchFile, patchContentHash, seedRange, serialisePatchFile, sweepHeadroom } =
+  await import(pathToFileURL(output).href);
 
 const readFile = (id) => JSON.parse(readFileSync(join(PATCHES, `${id}.json`), 'utf8'));
 const isStale = (file) =>
@@ -76,7 +75,7 @@ for (const id of ids) {
   const { worstSeed, peak } = sweepHeadroom(file.patch, seedRange(seeds));
   const seconds = ((performance.now() - started) / 1000).toFixed(1);
   file.headroom = { worstSeed, peak, seedsSwept: seeds, contentHash: patchContentHash(file.patch) };
-  writeFileSync(join(PATCHES, `${id}.json`), JSON.stringify(file, null, 2) + '\n');
+  writeFileSync(join(PATCHES, `${id}.json`), serialisePatchFile(file));
   const verdict = peak > 1 ? 'CLIPS' : 'ok';
   console.log(
     `${id}: seed ${worstSeed} peak ${peak.toFixed(4)} ${verdict} (${seeds} seeds, ${seconds}s)`,

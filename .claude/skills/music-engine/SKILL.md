@@ -40,6 +40,9 @@ synth, effect graph or sequencer in the console.
 | Operator bays, knobs, the User-wave harmonic editor | `src/patchBays.ts`, `src/knob.ts`, `src/harmonicEditor.ts`, `src/harmonicModel.ts` (pure) |
 | Preset browsing and selection | `src/presetBrowser.ts` (exported as `presetPicker` by `src/patchLibrary.ts`) |
 | Audition input: QWERTY, on-screen keys, MIDI | `src/keyboard.ts` (the one note path, Hold, Panic, bend/wheel); MIDI in `src/midiMessage.ts`, `src/midiPerformer.ts`, `src/midiInputs.ts` (pure) and `src/midiAccess.ts`, `src/midiPanel.ts` (Web MIDI, device selector) |
+| Library writes: Init, Save, Copy to new, Delete (#563) | `src/patchActions.ts` (pure, over `src/libraryModel.ts`), `src/libraryActions.ts` (the row), `src/patchFileWriter.ts` (the file bytes via `audio/patchFileSerialise.ts`), `src/patchMetadata.ts` (ids, names, tags; pure), `src/libraryConstants.ts` |
+| The folder grant and the page library | `src/libraryFolder.ts` (File System Access, IndexedDB handle, `PatchFolder` fake-able), `src/libraryModel.ts` (folder or baked entries, the browser's listing); `import-patches.mjs` + `lib/importPatches.mjs` move downloads into `patches/` |
+| The metadata and confirm modals, focus | `src/metadataModal.ts` over `editor-template.html`'s `#metaDlg` / `#confirmDlg`; `src/focusTrap.ts` (pure); the loudness line is `src/loudnessCheck.ts` through `audio/offlineRender.ts` |
 
 ## Design a sound or composition
 
@@ -69,8 +72,11 @@ record `2026-09-15-561-patch-library-file-shape`); the recipe tables are
 gone. `audio/presetCatalog.ts` only lists and filters, browsed in
 `tools/patch-editor/src/presetBrowser.ts`. Reuse tags, retain IDs and keep
 document overrides visible when extending the browser. A new or edited file
-needs `node tools/patch-editor/sweep-headroom.mjs <id>` and
+needs `node tools/patch-editor/sweep-headroom.mjs <id>` (or `--stale`) and
 `node scripts/patch-library-index.mjs --write`; `npm run verify` checks both.
+The console writes files itself (#563): a Chrome folder grant on `patches/`
+makes Save and Copy to new write there, otherwise they download `<id>.json`
+for `node tools/patch-editor/import-patches.mjs`.
 
 ## Preserve the complete song
 

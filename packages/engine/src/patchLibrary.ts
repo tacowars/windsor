@@ -235,6 +235,35 @@ function refuse(id: string, problems: string[]): never {
  * throws one error naming the file and every problem found.
  */
 export function loadPatchFile(id: string, raw: unknown): LibraryEntry {
+  const entry = validatePatchFile(id, raw);
+  const headroom = headroomProblems(entry.headroom, entry.patch, id);
+  if (headroom.length) refuse(id, headroom);
+  return entry as LibraryEntry;
+}
+
+/** A validated file whose sweep has not run yet: the record is absent or stale. */
+export type UnsweptLibraryEntry = Omit<LibraryEntry, 'headroom'> & { headroom?: HeadroomRecord };
+
+/**
+ * The editor's re-read after a write (#563): every check `loadPatchFile`
+ * makes except the sweep's currency — a missing record is accepted, a stale
+ * one is carried as written, a malformed one is still refused. The game and
+ * the tests never use this; `npm run verify` stays the gate that demands the
+ * sweep.
+ */
+export function loadUnsweptPatchFile(id: string, raw: unknown): UnsweptLibraryEntry {
+  const entry = validatePatchFile(id, raw);
+  if (entry.headroom !== undefined) {
+    const problems = headroomProblems(entry.headroom, entry.patch, id).filter(
+      (problem) => !problem.startsWith('stale headroom record'),
+    );
+    if (problems.length) refuse(id, problems);
+  }
+  return entry;
+}
+
+/** Everything but the headroom record's currency; the record itself is returned as found. */
+function validatePatchFile(id: string, raw: unknown): UnsweptLibraryEntry {
   const fail = (problems: string[]): never => refuse(id, problems);
   if (!PATCH_ID_RULE.test(id))
     fail([`id "${id}" is not a slug (lower-case letters, digits and single hyphens)`]);
@@ -246,9 +275,7 @@ export function loadPatchFile(id: string, raw: unknown): LibraryEntry {
   const patch = raw['patch'] as Patch;
   if (raw['name'] !== patch.name)
     fail([`name "${show(raw['name'])}" ≠ patch.name "${patch.name}"`]);
-  const headroom = headroomProblems(raw['headroom'], patch, id);
-  if (headroom.length) fail(headroom);
-  return { id, ...(raw as unknown as PatchFile) };
+  return { id, ...(raw as unknown as Omit<UnsweptLibraryEntry, 'id'>) };
 }
 
 /** Every file of a `{ id: raw }` map, validated, keyed by id. */

@@ -111,6 +111,8 @@ export class Keyboard {
       if (e.repeat) return;
       const tag = (e.target instanceof HTMLElement ? e.target.tagName : '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      // A modal's buttons are not keys either (#563): focus is trapped there until it closes.
+      if (e.target instanceof HTMLElement && e.target.closest('dialog[open]')) return;
       if (e.key === 'z') return this.shiftOctave(-1);
       if (e.key === 'x') return this.shiftOctave(1);
       const off = QWERTY[e.key];
