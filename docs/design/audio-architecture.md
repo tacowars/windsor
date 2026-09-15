@@ -111,7 +111,11 @@ packages/client/src/audio/
   offlineRender.ts      # bake a patch to an AudioBuffer
   babylonBridge.ts      # the Babylon Audio Engine v2 seam
   patch.ts              # schema, enums, algorithm routing table
-  presets.ts            # the game's patch set
+  patchLibrary.ts       # the patches/*.json file contract and validator (#561)
+  patches/              # the patch library: one <id>.json per patch, plus a generated index.ts
+  presets.ts            # the whole-bank table (PRESETS, PATCH_LIBRARY) built from the library
+  gameplayPatches.ts    # GAMEPLAY_PATCH_IDS: the patches game code plays, imported by id
+  presetCatalog.ts      # listing and filtering of the library's metadata
   workletMessages.ts    # main-thread <-> worklet contract
   worklet/              # the DSP (§6.1)
   __fixtures__/         # headless worklet harness, Node-only

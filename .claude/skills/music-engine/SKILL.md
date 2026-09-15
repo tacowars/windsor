@@ -22,7 +22,7 @@ Within `packages/client/src/audio/`:
 | Task | Read/edit |
 |---|---|
 | Patch schema, defaults, algorithms | `patch.ts`, `audioConstants.ts`, `patchNormalise.ts` |
-| Factory sounds | `presets.ts` and the relevant `presets*.ts` group |
+| Factory sounds | `patches/<id>.json` (one file per patch, `patchLibrary.ts` is the contract); `presets.ts` builds `PRESETS` from the generated `patches/index.ts`, `gameplayPatches.ts` names what the game plays |
 | FM synthesis and voice lifecycle | `worklet/fm-processor.js`, `fmEngine.ts`, `audioPart.ts`, `workletMessages.ts` |
 | Song schema and compatibility | `arrangementDocument.ts`, `arrangementNormalise.ts`, `arrangementValidate.ts`, `arrangementPlayer.ts` |
 | Sequencing and harmony | `scheduler.ts`, `stepSequencer.ts`, `euclideanSequencer.ts`, `arpeggiator.ts`, `scaleSampler.ts`, `capturedPattern.ts` |
@@ -62,12 +62,15 @@ musical choices that remain material and unresolved.
   a long enough note gate; a short sequencer gate can interrupt a valid swell.
   Describe sonic intent separately from measured output and tacowars's verdict.
 
-**Scoring bank:** `docs/design/scoring-preset-library.md` is its guide and
-measurement command; the bank is `audio/presetCatalog.ts`,
-`audio/presetsScoring.ts`, the `presetsScoring*.ts` recipes and authored
-`presets*Tables.ts`, browsed in `tools/patch-editor/src/presetBrowser.ts`.
-Catalog metadata is distinct from DSP patch data. Reuse tags, retain IDs and
-keep document overrides visible when extending the browser.
+**Scoring bank:** `docs/design/scoring-preset-library.md` is its guide. Since
+#561 every patch, scoring or original, is one `audio/patches/<id>.json`
+carrying its own category, tags, description and headroom record (decision
+record `2026-09-15-561-patch-library-file-shape`); the recipe tables are
+gone. `audio/presetCatalog.ts` only lists and filters, browsed in
+`tools/patch-editor/src/presetBrowser.ts`. Reuse tags, retain IDs and keep
+document overrides visible when extending the browser. A new or edited file
+needs `node tools/patch-editor/sweep-headroom.mjs <id>` and
+`node scripts/patch-library-index.mjs --write`; `npm run verify` checks both.
 
 ## Preserve the complete song
 

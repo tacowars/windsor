@@ -186,32 +186,36 @@ an arbitrary arrangement, mixer gain or feedback setting will not overload.
 
 ## Extending the bank
 
-The authored rows are `packages/client/src/audio/presets*Tables.ts` and the
-voicing recipes are `presetsScoringVoice.ts`. Each row names its recipe,
-cutoff, modulation ratio/index, attack/decay/release, motion rate, tags and
-playing notes. This keeps deliberate settings separate from synthesis logic.
-The resulting `score-…` IDs are stable song references: rename a display
-name only with an explicit ID migration plan, or retain the old entry.
+Since #561 every scoring patch is one file,
+`packages/client/src/audio/patches/score-<slug>.json`, holding the full
+normalised patch with its category, tags, audition note (`description`)
+and headroom record; the recipe rows and the voicing module that expanded
+them were retired once the expanded patches were frozen as data
+(decision record `2026-09-15-561-patch-library-file-shape`). The `score-…`
+IDs are the filename slugs and stable song references: the display `name`
+may change, the id never does.
 
-`presetCatalog.ts` owns metadata and filtering; metadata is not part of the
-DSP patch or arrangement schema. Reuse existing tags where they fit. For a
-new USER spectrum, supply a unique nonempty `userKey`: the worklet cache
-keys on it, not on the partial array's contents.
+`presetCatalog.ts` only lists and filters; metadata is the file's own and is
+not part of the DSP patch or arrangement schema. Reuse existing tags where
+they fit. For a new USER spectrum, supply a unique nonempty `userKey`: the
+worklet cache keys on it, not on the partial array's contents.
 
-After changing a sound, run the real-DSP checks and regenerate sampled
-headroom evidence (from the repo root):
+After changing a sound, rewrite its headroom record and run the real-DSP
+checks (from the repo root):
 
 ```sh
-node tools/patch-editor/measure-scoring.mjs 256
-npx prettier --write packages/client/src/audio/__fixtures__/scoringHeadroom.json
-npx vitest run packages/client/src/audio/presetCatalog.test.ts packages/client/src/audio/presetsScoring.test.ts packages/client/src/audio/fmProcessorHeadroom.test.ts tools/patch-editor/src/presetBrowser.test.ts
+node tools/patch-editor/sweep-headroom.mjs <id…|--stale> [--seeds <n>]
+npx prettier --write packages/client/src/audio/patches
+npx vitest run packages/client/src/audio/presetCatalog.test.ts packages/client/src/audio/patchLibraryEnvelope.test.ts packages/client/src/audio/fmProcessorHeadroom.test.ts tools/patch-editor/src/presetBrowser.test.ts
 node tools/patch-editor/build-editor.mjs
 ```
 
-The 256-seed sweep reuses the legacy short-note test window and records the
-worst **sampled** seed for each new patch. It is not an exhaustive bound.
-The original bank retains its existing 16,384-seed evidence and worst-case
-seeds. Long-note tests complement the short window: full attacks, decays and
+The sweep's default is 16,384 seeds (about 6 s per patch on a dev machine);
+`--seeds` lowers it and the count is written to the file as `seedsSwept`, so
+a lighter sweep is a visible fact. It records the worst **sampled** seed and
+is not an exhaustive bound. The bank's records carry the seeds they were
+measured with: 16,384 for the original bank (4,096 for `saw-arp` and
+`drone-sqr`) and 256 for the scoring bank. Long-note tests complement the short window: full attacks, decays and
 release tails at low/middle/high notes, plus four-note chords. The intended
 listening verdict still belongs to tacowars; mechanical checks cannot establish
 whether a sound fits the score.
