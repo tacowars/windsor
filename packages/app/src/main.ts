@@ -14,7 +14,6 @@ import type {
   DeepPartial,
   MusicPartId,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
 import raw from '../../../packages/client/src/audio/arrangements/bed-01.json';
 import { renderArrangementTab } from './arrangementTab';
 import type { AppCtx } from './context';
@@ -61,7 +60,9 @@ const ctx: AppCtx = {
     render();
   },
   importDoc(rawDoc): void {
-    model.adopt(makeArrangement(rawDoc));
+    // Through the model, never `makeArrangement` here: the model is what
+    // applies the editor's library fill to a pre-#562 song.
+    model.open(rawDoc);
     void host.build(model.doc).then(render, (error: unknown) => status(String(error)));
     render();
   },

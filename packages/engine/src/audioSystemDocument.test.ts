@@ -67,18 +67,20 @@ describe('the document is the only patch table (#562)', () => {
   it('plays the embedded snapshot where the library patch of that id differs', async () => {
     const id = FULL_ARRANGEMENT.kick.preset;
     const fromLibrary = PRESETS[id];
-    expect(fromLibrary).toBeDefined();
-    // The snapshot this song carries is deliberately not the library's.
-    const embedded = { ...clonePatch(fromLibrary!), volume: 0.037, name: 'Snapshot Kick' };
+    expect(fromLibrary?.volume).toBeGreaterThan(0);
+    // The snapshot this song carries is deliberately not the library's — half
+    // its level, derived here rather than pinned, so re-tuning it stays free.
+    const snapshot = fromLibrary!.volume / 2;
+    const embedded = { ...clonePatch(fromLibrary!), volume: snapshot, name: 'Snapshot Kick' };
     const sys = await system({
       ...FULL_DOCUMENT,
       patches: { ...FULL_DOCUMENT.patches, [id]: embedded },
     });
-    expect(sys.strip('kick')?.part.patch.volume).toBe(0.037);
+    expect(sys.strip('kick')?.part.patch.volume).toBe(snapshot);
     expect(sys.strip('kick')?.part.patch.name).toBe('Snapshot Kick');
-    expect(fromLibrary?.volume).not.toBe(0.037);
+    expect(snapshot).not.toBe(fromLibrary?.volume);
     // A live edit to the part lands on the document's table, not the library's.
-    expect(sys.apply({ patches: { [id]: { volume: 0.5 } } }).ok).toBe(true);
+    expect(sys.apply({ patches: { [id]: { volume: snapshot / 2 } } }).ok).toBe(true);
     expect(PRESETS[id]?.volume).toBe(fromLibrary?.volume);
   });
 
