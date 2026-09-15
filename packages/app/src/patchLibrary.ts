@@ -8,10 +8,10 @@
  * plays it; revert drops the fork and the part falls back to the built-in.
  */
 import type { MusicPartId, Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { PRESETS } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { SLOT_IDS } from './context';
 import { el } from './dom';
+import { library, libraryPatch } from './libraryModel';
 
 type Slots = Record<string, { preset?: string } | undefined>;
 
@@ -20,7 +20,7 @@ export function patchHome(ctx: AppCtx, id: MusicPartId): 'document' | 'built-in'
   const slot = ctx.model.doc[id];
   if (!slot) return 'none';
   if (ctx.model.doc.patches?.[slot.preset]) return 'document';
-  return PRESETS[slot.preset] ? 'built-in' : 'none';
+  return libraryPatch(library, slot.preset) ? 'built-in' : 'none';
 }
 
 export { presetBrowser as presetPicker } from './presetBrowser';
@@ -83,7 +83,7 @@ export function libraryControls(ctx: AppCtx, id: MusicPartId): HTMLElement {
   rename.type = 'button';
   rename.onclick = (): void => renamePatch(ctx, preset, name.value.trim());
   box.appendChild(rename);
-  if (PRESETS[preset]) {
+  if (libraryPatch(library, preset)) {
     const revert = el('button', 'btn', 'Revert to built-in') as HTMLButtonElement;
     revert.type = 'button';
     revert.title = 'Drop the document copy; parts playing it use the built-in again';

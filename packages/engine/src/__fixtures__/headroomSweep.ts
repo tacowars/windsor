@@ -10,6 +10,7 @@ import type { LoadedProcessor, ScheduledEvent } from './workletHarness';
 import { loadProcessor, render } from './workletHarness';
 
 export { loadPatchFile, patchContentHash } from '../patchLibrary';
+export { serialisePatchFile } from '../patchFileSerialise';
 
 /** The headroom render: a quarter-second note at velocity 0.9, 400 blocks, 16 voices. */
 export const HEADROOM_RENDER = {

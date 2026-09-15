@@ -10,17 +10,16 @@ import type {
   MusicPartId,
   PartialPatch,
 } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  PRESETS,
-  clonePatch,
-  makePatch,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { clonePatch, makePatch } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { SLOT_IDS } from './context';
 import { $, el, seg } from './dom';
 import type { Keyboard } from './keyboard';
+import { confirmUnsaved, libraryActions } from './libraryActions';
+import { library, libraryPatch } from './libraryModel';
 import type { MidiAccessor } from './midiAccess';
 import { midiPanel } from './midiPanel';
+import { dropInit } from './patchActions';
 import { badgeText, libraryControls, presetPicker } from './patchLibrary';
 import { buildAlgPicker, buildFilter, buildGlobal, buildLfo, buildPitch } from './patchPanels';
 import { buildBays } from './patchBays';
@@ -84,7 +83,9 @@ const GRID_HTML = `
 export function loadWorkingPatch(ctx: AppCtx): void {
   const slot = ctx.model.doc[partsState.selected];
   partsState.part = slot ? ctx.host.part(slot.part) : null;
-  const patch = slot ? (ctx.model.doc.patches?.[slot.preset] ?? PRESETS[slot.preset]) : undefined;
+  const patch = slot
+    ? (ctx.model.doc.patches?.[slot.preset] ?? libraryPatch(library, slot.preset))
+    : undefined;
   partsState.patch = patch ? clonePatch(patch) : makePatch();
 }
 
@@ -95,6 +96,7 @@ function commitPatch(ctx: AppCtx): void {
   const wasDocument = ctx.model.doc.patches?.[slot.preset] !== undefined;
   const result = ctx.change({ patches: { [slot.preset]: partsState.patch } });
   if (result.ok && !wasDocument) syncPresetAndBadge(ctx);
+  if (result.ok) hooks.afterCommit();
 }
 
 function refreshPatchUi(): void {
@@ -133,17 +135,35 @@ function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
   return box;
 }
 
+/** Reload the working patch and rebuild the rail: after a load, a library action or a part switch. */
+function reloadRail(ctx: AppCtx): void {
+  loadWorkingPatch(ctx);
+  refreshPatchUi();
+  syncPresetAndBadge(ctx);
+}
+
 function syncPresetAndBadge(ctx: AppCtx): void {
   const presetSlot = $('presetSlot');
   presetSlot.innerHTML = '';
   presetSlot.appendChild(
-    presetPicker(ctx, partsState.selected, () => {
-      loadWorkingPatch(ctx);
-      refreshPatchUi();
-      syncPresetAndBadge(ctx);
-    }),
+    presetPicker(
+      ctx,
+      partsState.selected,
+      () => {
+        reloadRail(ctx);
+        // An Init no part plays any more is discarded, never exported (#563).
+        dropInit(ctx);
+      },
+      (proceed) => {
+        confirmUnsaved(ctx).then(
+          (ok) => ok && proceed(),
+          (error: unknown) => ctx.status(String(error)),
+        );
+      },
+    ),
   );
   presetSlot.appendChild(libraryControls(ctx, partsState.selected));
+  presetSlot.appendChild(libraryActions(ctx, () => reloadRail(ctx)));
   $('patchBadge').textContent = badgeText(ctx, partsState.selected);
 }
 

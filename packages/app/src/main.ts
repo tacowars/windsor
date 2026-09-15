@@ -23,6 +23,7 @@ import { DocumentModel } from './documentModel';
 import { renderHarmonyTab } from './harmonyTab';
 import { EngineHost } from './host';
 import { Keyboard } from './keyboard';
+import { bootLibrary, syncLibraryMode } from './libraryActions';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
 import { renderPartsTab } from './partsTab';
@@ -145,6 +146,14 @@ function boot(): void {
   render();
   keyboard.attachGlobalKeys();
   void midi.resume();
+  // A remembered library folder whose grant still stands is read before the
+  // first render that could show it; the row's button re-grants a dropped one.
+  bootLibrary()
+    .then(() => {
+      syncLibraryMode();
+      render();
+    })
+    .catch((error: unknown) => status(`library folder: ${String(error)}`));
   const power = $('power');
   power.onclick = (): void => {
     void host

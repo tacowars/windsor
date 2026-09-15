@@ -85,10 +85,13 @@ export {
   SWEEP_COMMAND,
   loadPatchFile,
   loadPatchLibrary,
+  loadUnsweptPatchFile,
   patchContentHash,
   patchLeafDifferences,
 } from './patchLibrary';
-export type { HeadroomRecord, LibraryEntry, PatchFile } from './patchLibrary';
+export type { HeadroomRecord, LibraryEntry, PatchFile, UnsweptLibraryEntry } from './patchLibrary';
+export { serialisePatchFile } from './patchFileSerialise';
+export type { UnsweptPatchFile } from './patchFileSerialise';
 export { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
 export type { GameplayPatchId } from './gameplayPatches';
 export * from './patch';
