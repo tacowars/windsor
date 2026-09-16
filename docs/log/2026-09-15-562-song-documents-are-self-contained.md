@@ -106,3 +106,13 @@ patch is free to move: no song references it.
   owns the editor's library actions and is in flight on the same file, and
   "Revert to built-in" still does the right thing — it drops the document's
   copy and the next normalisation refills it from the library.
+
+## Addendum, 2026-09-16 (#583): the embedding proof is history
+
+`bed01PatchIdentity.test.ts` proved the four embedded patches equal the
+library's and called a later mismatch "the intended alarm" for deciding
+whether `bed-01` re-embeds. Decision 2 already decides that: a song keeps its
+snapshot until it is re-exported, so the library drifting from the song is the
+designed state, not an alarm. tacowars's first library save (`kick`) failed the test
+on main. #583 deletes it; the proof is PR #573's history. `arrangementEquality.test.ts`
+stays, since it proves the arrangement rather than the timbre.
