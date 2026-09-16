@@ -58,9 +58,22 @@ export function split(ratio: number): RatioSplit {
 /** The two knobs' positions as one stored ratio. */
 export const join = (coarse: number, fine: number): number => clampRatio(coarse + fine);
 
-/** Turning Coarse: the fraction stays where it was. */
+/**
+ * Turning Coarse: the fraction stays where it was, capped at the pair's own
+ * Fine maximum. The cap is not cosmetic. A stored ratio a hair under a whole
+ * number — `0.9999999999999999`, which a hand-written document can hold even
+ * though no knob can produce it — carries a fraction so close to 1 that adding
+ * it to the requested coarse rounds past it: `1 + 0.9999999999999999` is
+ * exactly `2` in double precision, so asking for Coarse 1 would land on Coarse
+ * 2 with Fine zeroed (Codex pass 1, P2). `FINE_MAX` is the largest fraction
+ * the pair can represent anyway, and capping there keeps the result inside the
+ * step the user asked for — the whole promise of a coarse knob.
+ */
 export const withCoarse = (ratio: number, coarse: number): number =>
-  join(Math.min(COARSE_MAX, Math.max(COARSE_MIN, Math.round(coarse))), split(ratio).fine);
+  join(
+    Math.min(COARSE_MAX, Math.max(COARSE_MIN, Math.round(coarse))),
+    Math.min(FINE_MAX, split(ratio).fine),
+  );
 
 /** Turning Fine: the whole step stays where it was, and Fine never carries. */
 export const withFine = (ratio: number, fine: number): number =>

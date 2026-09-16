@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { PATCH_LIBRARY } from '../../../packages/client/src/audio/index-for-editor';
 import {
   COARSE_MAX,
+  COARSE_MIN,
   FINE_MAX,
   RATIO_MAX,
   RATIO_MIN,
@@ -41,8 +42,10 @@ describe('splitting a stored ratio', () => {
 
   it('round-trips every ratio in the library bit for bit', () => {
     const ratios = libraryRatios();
-    // A guard on the survey itself: an empty list would pass vacuously.
-    expect(ratios.length).toBeGreaterThan(100);
+    // A guard on the survey itself: an empty list would pass vacuously. It is
+    // deliberately not a count of today's bank — the bank is data, and a
+    // smaller one is not this test failing.
+    expect(ratios.length).toBeGreaterThan(0);
     const broken = ratios.filter((r) => {
       const { coarse, fine } = split(r);
       return !Object.is(join(coarse, fine), r);
@@ -78,11 +81,27 @@ describe('turning one knob of the pair', () => {
   });
 
   it('never carries Fine into the next whole step', () => {
-    // The knob's own max is 0.999; asking for more stays there and Coarse
-    // does not move, so no knob jumps a whole multiple by itself.
-    expect(withFine(2.999, 1)).toBe(2.999);
-    expect(withFine(2.999, FINE_MAX)).toBe(2.999);
-    expect(split(withFine(2.999, 5)).coarse).toBe(2);
+    // Fine stops at its own maximum; asking for more stays there and Coarse
+    // does not move, so no knob jumps a whole multiple by itself. The
+    // expectation is written from the constant, not from today's 0.999.
+    const top = 2 + FINE_MAX;
+    expect(withFine(top, 1)).toBe(top);
+    expect(withFine(top, FINE_MAX)).toBe(top);
+    expect(split(withFine(top, 5)).coarse).toBe(2);
+  });
+
+  it('never carries a whole step when Coarse is turned', () => {
+    // A stored ratio a hair under a whole number holds a fraction the pair
+    // cannot represent, and adding it to the requested coarse would round
+    // past that coarse and zero Fine (Codex pass 1, P2). `1 - EPSILON / 2` is
+    // the largest double below 1, and no knob can produce it — a hand-written
+    // or imported document can. Checked over the whole Coarse range:
+    const nearlyWhole = 1 - Number.EPSILON / 2;
+    for (let coarse = COARSE_MIN; coarse <= COARSE_MAX; coarse++) {
+      const turned = withCoarse(nearlyWhole, coarse);
+      expect(split(turned).coarse, `coarse ${coarse}`).toBe(coarse);
+      expect(turned, `coarse ${coarse}`).toBeLessThan(coarse + 1);
+    }
   });
 
   it('clamps to the range at both ends', () => {
