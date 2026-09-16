@@ -16,12 +16,15 @@ import type {
   ApplyResult,
   ArrangementDocument,
   AudioPart,
-  DeepPartial,
-  MusicPartId,
+  DocumentPartial,
   NotePattern,
   WorkletUrls,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { AudioSystem, FmEngine } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  AudioSystem,
+  FmEngine,
+  musicPartName,
+} from '../../../packages/client/src/audio/index-for-editor';
 
 export type HostLog = (message: string) => void;
 
@@ -110,7 +113,9 @@ export class EngineHost {
     await engine.init(this.urls);
     this.system = new AudioSystem(engine);
     await this.system.init();
-    this.system.initMusic(document, (part, tick) => this.log(`${part} sounded (tick ${tick})`));
+    this.system.initMusic(document, (part, tick) =>
+      this.log(`${part.name} sounded (slot ${part.slot}, tick ${tick})`),
+    );
     // The console's knobs retune the voices already ringing; the game does not.
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
@@ -119,17 +124,17 @@ export class EngineHost {
   }
 
   /** Live tuning over the document model; null while audio is not enabled. */
-  apply(partial: DeepPartial<ArrangementDocument>): ApplyResult | null {
+  apply(partial: DocumentPartial): ApplyResult | null {
     return this.system ? this.system.apply(partial) : null;
   }
 
-  capturePattern(id: MusicPartId): readonly boolean[] | NotePattern | null {
-    return this.system?.capturePattern(id) ?? null;
+  capturePattern(slot: number): readonly boolean[] | NotePattern | null {
+    return this.system?.capturePattern(slot) ?? null;
   }
 
-  /** The engine part behind a strip name, for the Parts tab and keyboard. */
-  part(name: string): AudioPart | null {
-    return this.system?.engine.getPart(name) ?? null;
+  /** The engine part on a slot, for the Parts tab and keyboard (#597: never by label). */
+  part(slot: number): AudioPart | null {
+    return this.system?.engine.getPart(musicPartName(slot)) ?? null;
   }
 
   /** Pump the look-ahead scheduler; driven by the page's interval timer. */

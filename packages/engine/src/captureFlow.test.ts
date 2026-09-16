@@ -7,12 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  FULL_ARRANGEMENT,
-  FULL_PARTS,
-  FULL_SLOT,
-  onlyParts,
-} from './__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_PARTS, FULL_SLOT, onlyParts } from './__fixtures__/fullArrangement';
 import type { Arrangement, MusicPart, SequencerSpec } from './arrangement';
 import { makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
@@ -85,7 +80,9 @@ describe('player capture and release', () => {
     expect(Array.isArray(pattern)).toBe(true);
     expect(pattern).toHaveLength(FULL_PARTS.kick.sequencer.steps);
     const hits = ((pattern ?? []) as unknown[]).filter(Boolean).length;
-    expect(captured.player.apply({ parts: { [kick]: freeze('euclidean', pattern) } }).ok).toBe(true);
+    expect(captured.player.apply({ parts: { [kick]: freeze('euclidean', pattern) } }).ok).toBe(
+      true,
+    );
 
     expect(perBar(captured, kick, 6)).toEqual(new Array(6).fill(hits));
     // The generative control still breathes over the same bars (density LFO).
@@ -150,16 +147,27 @@ describe('player capture and release', () => {
 /** The library ids these documents name, embedded as silent `{}` fills (#562). */
 const PATCHES = { kick: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
-const doc = (...parts: unknown[]): Record<string, unknown> => ({ version: 2, patches: PATCHES, parts });
+const doc = (...parts: unknown[]): Record<string, unknown> => ({
+  version: 2,
+  patches: PATCHES,
+  parts,
+});
 
-const sequencerOf = (result: ReturnType<typeof makeArrangement>, i: number): Record<string, unknown> =>
+const sequencerOf = (
+  result: ReturnType<typeof makeArrangement>,
+  i: number,
+): Record<string, unknown> =>
   result.document.parts[i]?.sequencer as unknown as Record<string, unknown>;
 
 describe('captured patterns in the document (export → import)', () => {
   it('normalises literal patterns, 0/1 accepted, junk corrected to rests', () => {
     const result = makeArrangement(
       doc(
-        { slot: 0, preset: 'kick', sequencer: { kind: 'euclidean', steps: 4, pattern: [1, 0, true, 'x'] } },
+        {
+          slot: 0,
+          preset: 'kick',
+          sequencer: { kind: 'euclidean', steps: 4, pattern: [1, 0, true, 'x'] },
+        },
         { slot: 2, preset: 'saw-arp', sequencer: { kind: 'arp', pattern: [60.4, 'x', null, 200] } },
       ),
     );
@@ -194,7 +202,12 @@ describe('captured patterns in the document (export → import)', () => {
           preset: 'kick',
           sequencer: { kind: 'euclidean', steps: 8, pattern: [1, 0, 0, 1, 0, 0, 1, 0] },
         },
-        { slot: 2, name: 'arp', preset: 'saw-arp', sequencer: { kind: 'arp', pattern: [62, null, 65, 69] } },
+        {
+          slot: 2,
+          name: 'arp',
+          preset: 'saw-arp',
+          sequencer: { kind: 'arp', pattern: [62, null, 65, 69] },
+        },
         { slot: 3, name: 'drone', preset: 'drone-sqr', sequencer: { kind: 'step', pattern: [38] } },
       ),
       seed: 7,
@@ -208,6 +221,15 @@ describe('captured patterns in the document (export → import)', () => {
     expect(second.document).toEqual(first.document);
     expect(second.corrections).toEqual([]);
     expect(second.dangling).toEqual([]);
-    expect(sequencerOf(second, 0).pattern).toEqual([true, false, false, true, false, false, true, false]);
+    expect(sequencerOf(second, 0).pattern).toEqual([
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+    ]);
   });
 });

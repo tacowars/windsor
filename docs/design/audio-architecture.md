@@ -103,7 +103,7 @@ packages/client/src/audio/
   fmEngine.ts           # context, worklet module, parts, buses
   audioPart.ts          # one timbral part == one worklet node
   audioBus.ts           # dry buses with inserts (native nodes)
-  mix.ts                # the desk: RETURNS and MIX, typed plain data
+  mix.ts                # the desk: RETURNS and the SFX strips (MIX), typed plain data
   returnBus.ts          # sends and returns: the plate and the delay, 100% wet
   channelStrip.ts       # one part through its strip: fader, rotation, sends
   stereoRotate.ts       # the pan matrix (splitter -> 4 gains -> merger)
@@ -116,6 +116,9 @@ packages/client/src/audio/
   presets.ts            # the whole-bank table (PRESETS, PATCH_LIBRARY) — editor/test only (#562)
   gameplayPatches.ts    # GAMEPLAY_PATCH_IDS: the patches game code plays, imported by id
   presetCatalog.ts      # listing and filtering of the library's metadata
+  arrangement.ts        # the song's part list: slot, name, preset, sequencer kind (#597)
+  arrangementDocument.ts # makeArrangement: the never-throws version-2 normaliser
+  arrangementPlayer.ts  # binds each part's sequencer to its engine part, by slot
   arrangementValidate.ts # PatchResolver: where a song's part presets resolve (#562)
   workletMessages.ts    # main-thread <-> worklet contract
   worklet/              # the DSP (§6.1)
@@ -126,6 +129,18 @@ tools/patch-editor/     # authoring tool, outside the client bundle
 This follows the `area:*` mirroring rule in `CLAUDE.md` — an `area:audio` ticket points at
 one directory — and the systems rule: an explicit `update(dt)` owned by the loop, never
 logic inlined in `runRenderLoop`.
+
+**A song is a list of parts, each with any sequencer** (#597, record
+`2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`). An
+`arrangements/<name>.json` is `version: 2` with 1–8 `parts`; each part sits on a unique
+`slot` 0–7, carries its own `strip` (level, pan, sends) and a `sequencer` whose `kind` is
+`euclidean` (a fixed-note trigger), `arp`, `step` (slow with gate 1, the drone) or `none`
+(inert: built and playable from the keyboard, never sequenced). The slot is the part's
+identity — its engine part is `music-<slot>`, its generator stream is seeded by the slot —
+so removing, reordering or renaming a part never moves another part's notes; the name is a
+label. Live partials address parts by slot (`{ parts: { 2: { velocity: 0.5 } } }`); adding
+or removing a part rebuilds. The earlier four fixed slots (`kick`, `hat`, `arp`, `drone`)
+and the top-level `mix` overlay are no longer read.
 
 **A song document is self-contained, and the game resolves patches from it alone**
 (#562, epic #564 decision 2). An `arrangements/<name>.json` carries a snapshot of every

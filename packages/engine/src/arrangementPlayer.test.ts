@@ -73,7 +73,8 @@ describe('bindings', () => {
     const { parts, player, events, run } = rig();
     run(8);
     const counters = player.readout().counters;
-    for (const slot of [kick, hat, arp, drone]) expect(counters[slot], `${slot}`).toBeGreaterThan(0);
+    for (const slot of [kick, hat, arp, drone])
+      expect(counters[slot], `${slot}`).toBeGreaterThan(0);
     expect(kinds(parts.kick, 'trigger').length).toBe(counters[kick]);
     expect(kinds(parts.hat, 'trigger').length).toBe(counters[hat]);
     expect(events.map((e) => e.slot).sort()).toEqual([kick, hat, arp, drone]);
@@ -142,9 +143,11 @@ describe('any sequencer on any slot (#597)', () => {
   /** Four arpeggiators, one per slot: each draws its own stream. */
   const FOUR_ARPS: Arrangement = {
     ...FULL_ARRANGEMENT,
-    parts: [kick, hat, arp, drone].map(
-      (slot): MusicPart => ({ ...FULL_PARTS.arp, slot, name: `arp ${slot}` }),
-    ),
+    parts: [kick, hat, arp, drone].map((slot): MusicPart => ({
+      ...FULL_PARTS.arp,
+      slot,
+      name: `arp ${slot}`,
+    })),
   };
 
   it('plays four arpeggiators, each on its own slot’s stream', () => {
@@ -165,7 +168,12 @@ describe('any sequencer on any slot (#597)', () => {
       parts: [
         FULL_PARTS.kick,
         FULL_PARTS.hat,
-        { ...FULL_PARTS.kick, slot: arp, name: 'rim', sequencer: { ...FULL_PARTS.hat.sequencer, note: 37 } },
+        {
+          ...FULL_PARTS.kick,
+          slot: arp,
+          name: 'rim',
+          sequencer: { ...FULL_PARTS.hat.sequencer, note: 37 },
+        },
         FULL_PARTS.drone,
       ],
     };
@@ -245,7 +253,10 @@ describe('the preset table (#435)', () => {
       FULL_ARRANGEMENT,
       PRESETS,
     );
-    const result = player.apply({ parts: { [arp]: { preset: 'fresh' } } }, { fresh: { volume: 0.2 } });
+    const result = player.apply(
+      { parts: { [arp]: { preset: 'fresh' } } },
+      { fresh: { volume: 0.2 } },
+    );
     expect(result).toEqual({ ok: true, ignored: [] });
     expect(kinds(parts.arp, 'setPatch')).toEqual([{ kind: 'setPatch', patch: 'fresh' }]);
   });

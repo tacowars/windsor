@@ -1,11 +1,15 @@
 /** Native keyboard-accessible browsing; filtering never changes the song. */
-import { clonePatch, filterPresets } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  clonePatch,
+  filterPresets,
+  partAt,
+} from '../../../packages/client/src/audio/index-for-editor';
 import type {
-  MusicPartId,
   PresetFilter,
   PresetListing,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
+import { partChange } from './context';
 import { el, select } from './dom';
 import { library, libraryPatch, listLibrary } from './libraryModel';
 
@@ -13,12 +17,15 @@ import { library, libraryPatch, listLibrary } from './libraryModel';
 const filter: PresetFilter = { query: '', category: '', tag: '', source: '' };
 
 /** Copy on selection: the exported song owns the sound even before its first knob edit. */
-export function choosePreset(ctx: AppCtx, id: MusicPartId, name: string): boolean {
+export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
   const existing = ctx.model.doc.patches;
   const documentPatch = existing && Object.hasOwn(existing, name) ? existing[name] : undefined;
   const patch = documentPatch ?? libraryPatch(library, name);
   if (!patch) return false;
-  return ctx.change({ [id]: { preset: name }, patches: { [name]: clonePatch(patch) } }).ok;
+  return ctx.change({
+    ...partChange(slot, { preset: name }),
+    patches: { [name]: clonePatch(patch) },
+  }).ok;
 }
 
 function filterControls(entries: PresetListing[], refresh: () => void): HTMLElement {
@@ -64,13 +71,13 @@ export type PickGuard = (proceed: () => void) => void;
 // eslint-disable-next-line max-lines-per-function -- one browser: the list, its filters and the load path, wired in order
 export function presetBrowser(
   ctx: AppCtx,
-  id: MusicPartId,
+  slot: number,
   onPick: () => void,
   guard: PickGuard = (proceed) => proceed(),
 ): HTMLElement {
   const box = el('div', 'preset-browser');
   const entries = listLibrary(library.entries, ctx.model.doc.patches);
-  const selected = ctx.model.doc[id]?.preset ?? '';
+  const selected = partAt(ctx.model.doc, slot)?.preset ?? '';
   const current = el('p', 'hint');
   current.textContent = `Current: ${entries.find((entry) => entry.id === selected)?.name ?? selected}`;
   const results = document.createElement('select');
@@ -108,7 +115,7 @@ export function presetBrowser(
   // where the QWERTY keys play the new sound (they are ignored inside a select).
   const apply = (focusLabel: string): void => {
     guard(() => {
-      if (choosePreset(ctx, id, results.value)) {
+      if (choosePreset(ctx, slot, results.value)) {
         onPick();
         document.querySelector<HTMLElement>(`[aria-label="${focusLabel}"]`)?.focus();
       }

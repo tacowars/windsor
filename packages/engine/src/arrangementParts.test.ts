@@ -1,0 +1,135 @@
+/**
+ * The version-2 part list through `makeArrangement` (#597): any sequencer kind
+ * on any slot, slot identity and its corrections, the eight-part cap, the
+ * version gate, and a song of inert `none` parts. The rest of the normaliser's
+ * contract is `arrangementDocument.test.ts`.
+ */
+import { describe, expect, it } from 'vitest';
+
+import type { Arrangement } from './arrangement';
+import type { ArrangementDocument } from './arrangementDocument';
+import { isShippable, makeArrangement } from './arrangementDocument';
+import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
+import { TICKS_PER_BAR, TickTransport } from './scheduler';
+
+const silentPart = (): PlayablePart => ({
+  noteOn: () => 0,
+  noteOffByNote: () => {},
+  trigger: () => 0,
+  setPatch: () => {},
+  allNotesOff: () => {},
+});
+
+/** Building and running the player is the "usable" proof: no constructor throws. */
+function play(arrangement: Arrangement): void {
+  const parts = new Map(arrangement.parts.map((p) => [p.slot, silentPart()]));
+  const transport = new TickTransport();
+  const patches = (arrangement as ArrangementDocument).patches ?? {};
+  const player = new ArrangementPlayer(transport, parts, arrangement, patches);
+  for (let i = 0; i < TICKS_PER_BAR; i++) transport.advance(0);
+  player.dispose();
+}
+
+/** The library ids these cases name, embedded as `{}` (#562). */
+const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
+
+const song = (parts: unknown[], rest: Record<string, unknown> = {}): Record<string, unknown> => ({
+  version: 2,
+  patches: PATCHES,
+  parts,
+  ...rest,
+});
+
+const KICK = { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } };
+
+describe('the part list (#597)', () => {
+  it('normalises any kind on any slot: four arpeggiators', () => {
+    const arps = [0, 1, 2, 3].map((slot) => ({
+      slot,
+      name: `arp ${slot}`,
+      preset: 'saw-arp',
+      sequencer: { kind: 'arp' },
+    }));
+    const result = makeArrangement(song(arps));
+    expect(result.corrections).toEqual([]);
+    expect(result.document.parts.map((p) => [p.slot, p.sequencer.kind])).toEqual([
+      [0, 'arp'],
+      [1, 'arp'],
+      [2, 'arp'],
+      [3, 'arp'],
+    ]);
+    expect(isShippable(result)).toBe(true);
+  });
+
+  it('normalises three Euclidean parts and one step part, in list order', () => {
+    const result = makeArrangement(
+      song([
+        { slot: 5, preset: 'kick', sequencer: { kind: 'euclidean', note: 36 } },
+        { slot: 2, preset: 'hat', sequencer: { kind: 'euclidean', note: 42 } },
+        { slot: 7, preset: 'hat', sequencer: { kind: 'euclidean', note: 46 } },
+        { slot: 0, preset: 'drone-sqr', sequencer: { kind: 'step' } },
+      ]),
+    );
+    expect(result.corrections).toEqual([]);
+    expect(result.document.parts.map((p) => p.slot)).toEqual([5, 2, 7, 0]);
+    expect(() => play(result.document)).not.toThrow();
+  });
+
+  it('drops a later part on a slot already used, reported', () => {
+    const result = makeArrangement(
+      song([KICK, { slot: 0, name: 'hat', preset: 'hat', sequencer: { kind: 'euclidean' } }]),
+    );
+    expect(result.document.parts.map((p) => p.name)).toEqual(['kick']);
+    expect(result.corrections).toContain('parts[1]: slot 0 is already used — part dropped');
+  });
+
+  it('drops a part with no slot or one out of range: identity has no default', () => {
+    const result = makeArrangement(
+      song([KICK, { preset: 'hat' }, { slot: 8, preset: 'hat' }, { slot: 1.5, preset: 'hat' }]),
+    );
+    expect(result.document.parts.map((p) => p.slot)).toEqual([0]);
+    expect(result.corrections).toEqual([
+      'parts[1].slot: undefined is not a slot 0–7 — part dropped',
+      'parts[2].slot: 8 is not a slot 0–7 — part dropped',
+      'parts[3].slot: 1.5 is not a slot 0–7 — part dropped',
+    ]);
+  });
+
+  it('keeps at most eight parts', () => {
+    const nine = Array.from({ length: 9 }, (_, i) => ({ slot: i % 8, preset: 'kick' }));
+    const result = makeArrangement(song(nine));
+    expect(result.document.parts).toHaveLength(8);
+    expect(result.corrections[0]).toBe('parts: 9 parts — only the first 8 are kept');
+  });
+
+  it('corrects a name that is not a string to "Part n"', () => {
+    const result = makeArrangement(song([{ ...KICK, slot: 2, name: 7 }]));
+    expect(result.document.parts[0]?.name).toBe('Part 3');
+    expect(result.corrections).toEqual(['parts[0].name: 7 is not a name — using "Part 3"']);
+  });
+
+  it('normalises a part strip over DEFAULT_STRIP', () => {
+    const result = makeArrangement(
+      song([{ ...KICK, strip: { level: 9, pan: -0.5, sends: { room: 0.4 } } }]),
+    );
+    expect(result.document.parts[0]?.strip).toEqual({ level: 4, pan: -0.5, sends: { room: 0.4 } });
+    expect(result.corrections).toEqual(['parts[0].strip.level: clamped 9 to 4']);
+  });
+
+  it('is unusable when the version is not 2', () => {
+    for (const version of [undefined, 1, '2', 3]) {
+      const result = makeArrangement({ ...song([KICK]), version });
+      expect(result.usable, String(version)).toBe(false);
+      expect(result.corrections[0]).toMatch(/^version: /);
+    }
+  });
+
+  it('is usable with only none parts, and not shippable', () => {
+    const result = makeArrangement(
+      song([{ slot: 0, preset: 'kick', sequencer: { kind: 'none' } }]),
+    );
+    expect(result.usable).toBe(true);
+    expect(isShippable(result)).toBe(false);
+    expect(() => play(result.document)).not.toThrow();
+  });
+});

@@ -13,6 +13,10 @@ export function el(tag: string, className = '', html = ''): HTMLElement {
   return node;
 }
 
+/** Text for an `innerHTML` slot: a part's name is a user label (#597), never markup. */
+export const escapeHtml = (text: string): string =>
+  text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
 /** A titled panel section, matching the template's furniture. */
 export function section(title: string, hint = ''): { root: HTMLElement; body: HTMLElement } {
   const root = el('div', 'section');

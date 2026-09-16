@@ -27,9 +27,10 @@ export const LOUDNESS_SEEDS = 16;
 export const SUGGESTED_HEADROOM = 0.98;
 
 /**
- * The document key a part's Init patch plays under: `(init:kick)`. Not a
- * library id — the slug rule admits no parentheses — so it can never collide
- * with a saved patch, and one key per part so two parts' Inits never share.
+ * The document key a part's Init patch plays under: `(init:0)` for slot 0
+ * (#597). Not a library id — the slug rule admits no parentheses — so it can
+ * never collide with a saved patch, and one key per slot so two parts' Inits
+ * never share.
  */
 export const INIT_PRESET_PREFIX = '(init:';
 export const initPresetId = (partId: string): string => `${INIT_PRESET_PREFIX}${partId})`;

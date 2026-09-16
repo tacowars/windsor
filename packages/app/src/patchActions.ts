@@ -5,14 +5,16 @@
  * Delete over the library model and the open document. The modal collects
  * the metadata; this writes the file and keeps the song in step.
  */
-import type { MusicPartId, Patch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
 import {
   GAMEPLAY_PATCH_IDS,
   clonePatch,
   makePatch,
+  partAt,
   patchLeafDifferences,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
+import { partChange } from './context';
 import { INIT_PATCH_NAME, initPresetId, isInitPreset } from './libraryConstants';
 import type { LibraryModel } from './libraryModel';
 import { removeLibraryFile, writeLibraryFile } from './libraryModel';
@@ -29,15 +31,16 @@ export type PatchOrigin =
 export interface PatchScope {
   ctx: AppCtx;
   library: LibraryModel;
-  partId: MusicPartId;
+  /** The selected part's slot (#597). */
+  slot: number;
 }
 
 /** A fresh Init patch: `makePatch()` defaults under the Init name. */
 export const initPatchDefaults = (): Patch => makePatch({ name: INIT_PATCH_NAME });
 
 /** Where the selected part's patch came from. */
-export function patchOrigin({ ctx, library, partId }: PatchScope): PatchOrigin {
-  const preset = ctx.model.doc[partId]?.preset;
+export function patchOrigin({ ctx, library, slot }: PatchScope): PatchOrigin {
+  const preset = partAt(ctx.model.doc, slot)?.preset;
   if (preset === undefined) return { kind: 'none' };
   if (isInitPreset(preset)) return { kind: 'init' };
   if (Object.hasOwn(library.entries, preset)) return { kind: 'library', id: preset };
@@ -96,23 +99,16 @@ export function copyPrefill(scope: PatchScope, working: Patch): PatchMetadata {
 }
 
 /** Load Init into the part: its own sentinel document patch, replaced whole each time. */
-export function initPatch({ ctx, partId }: PatchScope): Patch {
+export function initPatch({ ctx, slot }: PatchScope): Patch {
   const patch = initPatchDefaults();
-  const id = initPresetId(partId);
-  ctx.change({ [partId]: { preset: id }, patches: { [id]: patch } });
+  const id = initPresetId(String(slot));
+  ctx.change({ ...partChange(slot, { preset: id }), patches: { [id]: patch } });
   return patch;
 }
 
 /** The preset ids the document's parts play. */
 const playedPresets = (ctx: AppCtx): Set<string> =>
-  new Set(
-    Object.values(ctx.model.doc)
-      .filter(
-        (slot): slot is { preset: string } =>
-          typeof slot === 'object' && slot !== null && 'preset' in slot,
-      )
-      .map((slot) => slot.preset),
-  );
+  new Set(ctx.model.doc.parts.map((part) => part.preset));
 
 /** Drop every Init sentinel no part plays any more: an unsaved Init is discarded, never exported. */
 export function dropInit(ctx: AppCtx): void {
@@ -138,7 +134,7 @@ export function discardEdits(scope: PatchScope): Patch | null {
   const origin = patchOrigin(scope);
   const baseline = baselinePatch(scope, origin);
   if (baseline === null || origin.kind === 'none' || origin.kind === 'document') return null;
-  const id = origin.kind === 'init' ? initPresetId(scope.partId) : origin.id;
+  const id = origin.kind === 'init' ? initPresetId(String(scope.slot)) : origin.id;
   const restored = clonePatch(baseline);
   scope.ctx.change({ patches: { [id]: restored } });
   return restored;
@@ -165,7 +161,7 @@ export async function savePatch(request: WriteRequest): Promise<string> {
 
 /** Save the working patch as a new library entry, and switch the part to it. */
 export async function copyToNew(request: WriteRequest): Promise<string> {
-  const { ctx, library, partId, meta, working } = request;
+  const { ctx, library, slot, meta, working } = request;
   const wasInit = patchOrigin(request).kind === 'init';
   const id = uniqueId(slugify(meta.name), [
     ...Object.keys(library.entries),
@@ -173,7 +169,7 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   ]);
   const file = buildPatchFile(meta, working);
   await writeLibraryFile(library, id, patchFileText(file), request.download);
-  ctx.change({ [partId]: { preset: id }, patches: { [id]: file.patch } });
+  ctx.change({ ...partChange(slot, { preset: id }), patches: { [id]: file.patch } });
   if (wasInit) dropInit(ctx);
   return id;
 }

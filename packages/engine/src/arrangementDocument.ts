@@ -26,7 +26,13 @@ import {
   DEFAULT_BPM,
   MUSIC_PARTS_MAX,
 } from './audioConstants';
-import type { Arrangement, ArrangementKey, MusicPart, PartsPartial, DeepPartial } from './arrangement';
+import type {
+  Arrangement,
+  ArrangementKey,
+  MusicPart,
+  PartsPartial,
+  DeepPartial,
+} from './arrangement';
 import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
 import { normaliseReturns } from './deskNormalise';

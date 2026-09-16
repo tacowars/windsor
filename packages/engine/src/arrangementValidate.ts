@@ -132,7 +132,9 @@ function validateSlots(next: Arrangement, previous: Arrangement | null): void {
   const before = previous.parts.map((part) => part.slot).join(',');
   const after = next.parts.map((part) => part.slot).join(',');
   if (before !== after) {
-    throw new Error(`parts cannot be added, removed or re-slotted live (slots ${before} → ${after})`);
+    throw new Error(
+      `parts cannot be added, removed or re-slotted live (slots ${before} → ${after})`,
+    );
   }
 }
 

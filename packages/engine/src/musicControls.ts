@@ -61,7 +61,9 @@ export function installMusicControls(
   if (!usable || corrections.length > 0) {
     log({ state: 'arrangement', name: choice.name, usable, corrections: corrections.join('; ') });
   }
-  system.initMusic(document, (part, tick) => log({ state: 'note', slot: part.slot, part: part.name, tick }));
+  system.initMusic(document, (part, tick) =>
+    log({ state: 'note', slot: part.slot, part: part.name, tick }),
+  );
   commands?.register(
     'music',
     'music [on|off] — start or stop the music transport (a dev path; the player-facing' +

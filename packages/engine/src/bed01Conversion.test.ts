@@ -11,7 +11,12 @@ import { createHash } from 'node:crypto';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import baseline from './__fixtures__/bed01Conversion/baseline.json';
-import { FakeContext, installFakeAudioWorklet, renderGraph, sourceOf } from './__fixtures__/fakeAudioContext';
+import {
+  FakeContext,
+  installFakeAudioWorklet,
+  renderGraph,
+  sourceOf,
+} from './__fixtures__/fakeAudioContext';
 import type { FakeNode } from './__fixtures__/fakeAudioNodes';
 import { noteToneFeed } from './__fixtures__/noteFeeds';
 import { makeArrangement } from './arrangementDocument';
@@ -32,7 +37,9 @@ const RETIRED = [
 ] as const;
 
 const hash = (a: Float32Array): string =>
-  createHash('sha256').update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)).digest('hex');
+  createHash('sha256')
+    .update(Buffer.from(a.buffer, a.byteOffset, a.byteLength))
+    .digest('hex');
 
 describe('bed-01 version 2 renders exactly as the four-slot document did', () => {
   it('matches the pre-conversion baseline, sample for sample', async () => {
