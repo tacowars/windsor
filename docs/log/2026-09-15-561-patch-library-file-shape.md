@@ -104,3 +104,17 @@ audibility and release.
   #562. Until then the game carries the whole library (about 275 KB of JSON
   uncompressed), reported in the PR, not judged.
 - A `patches/` write path from the browser: #563 (epic decision 5).
+
+## Addendum, 2026-09-16 (#583): the identity proof is history
+
+`patchLibraryIdentity.test.ts` pinned every id and every `Patch` field to the
+pre-migration fixture. That was the migration's proof, and it stopped being a
+gate the moment the library became data the editor saves over: Pat's first
+save (`kick`, "updated kick - shorter") failed it even after the headroom
+sweep, and its id check would have failed on the 115th file. #583 deletes the
+test, the way #561 retired #543's `modDepth.test.ts`. The fixture and its
+generator stay as provenance; the proof is PR #567's history.
+
+The library's live gates are the loader (shape, name, id, headroom hash),
+`fmProcessorHeadroom.test.ts` on each file's recorded seed, and
+`patchLibraryEnvelope.test.ts` on the sustained categories.

@@ -6,14 +6,16 @@
  *     npx tsx packages/client/src/audio/__fixtures__/makePatchLibrary561Fixture.ts
  *     npx prettier --write packages/client/src/audio/__fixtures__/patchLibraryBefore561.json
  *
- * `patchLibrary.test.ts` compares the migrated library against this file field
- * by field with `Object.is`, so the numbers are written at full double
- * precision (`JSON.stringify` of the live values, never rounded — #543 showed a
- * rounding moved `bass-digital`'s transient by 10.5 dB). The output is a
- * snapshot of main at the commit named in the file, taken before the migration
- * landed; re-running it after the change would overwrite the "before" with the
- * "after" and make that test assert nothing. Only run it to move the reference
- * point on purpose, and say so in the ticket that does.
+ * The #561 identity test compared the migrated library against this
+ * file field by field with `Object.is`, so the numbers are written at full
+ * double precision (`JSON.stringify` of the live values, never rounded — #543
+ * showed a rounding moved `bass-digital`'s transient by 10.5 dB). That test was
+ * retired by #583 once the migration had merged: the library is data the editor
+ * saves over (#564 decision 6), so a test pinning it to a past capture failed on
+ * the first real edit. The proof lives in PR #567's history; this file and the
+ * fixture stay as the record of what the bank was before it became files. The
+ * output is a snapshot of main at the commit named in the file; re-running it
+ * would overwrite the "before" with the "after", so do not.
  *
  * Node-only, like everything in `__fixtures__/`: outside the client's tsc
  * build so browser code cannot reach it.

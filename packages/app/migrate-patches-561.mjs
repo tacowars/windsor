@@ -12,8 +12,9 @@
  *     node scripts/patch-library-index.mjs --write
  *
  * Those sources were deleted in the same PR, so this script no longer runs;
- * the bit-identity proof is `patchLibraryIdentity.test.ts` against
- * `__fixtures__/patchLibraryBefore561.json`. Numbers were written with
+ * the bit-identity proof was a test against
+ * `__fixtures__/patchLibraryBefore561.json`, retired by #583 once the
+ * migration had merged (PR #567 holds it). Numbers were written with
  * `JSON.stringify` of the live values, never rounded (#543).
  *
  * Headroom: every seed is the recorded one, not a re-sweep. The peak is one
