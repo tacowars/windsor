@@ -1,6 +1,6 @@
 /**
- * The desk sections of an arrangement document — `mix` (strip overlays over
- * the code's `MIX`) and `returns` (overlays over the code's `RETURNS`) —
+ * The desk sections of an arrangement document — each part's `strip` (over
+ * `DEFAULT_STRIP`, #597) and `returns` (overlays over the code's `RETURNS`) —
  * normalised the same way: only the fields the document names change, the
  * base supplies the rest, and the result is the complete strip or return
  * spec the graph is built from. A name the code does not define is dangling,
@@ -20,36 +20,22 @@ import {
   REVERB_SPACE_RANGES,
 } from './audioConstants';
 import type { ChannelStrip, DelayReturn, ReturnSpec, ReverbReturn } from './mix';
-import { MIX, RETURNS, stripFor } from './mix';
+import { DEFAULT_STRIP, RETURNS } from './mix';
 import type { ReverbSpace } from './reverbSpace';
 
-/** Strip overlays over `MIX`. A name with no strip, or a send to no return, is dangling. */
-export function normaliseMix(
-  raw: unknown,
-  n: FieldNormaliser,
-): Record<string, ChannelStrip> | undefined {
-  if (raw === undefined) return undefined;
-  const o = n.section(raw, 'mix');
-  const out: Record<string, ChannelStrip> = {};
-  for (const [name, value] of Object.entries(o)) {
-    if (!Object.hasOwn(MIX, name)) {
-      n.dangling.push(`mix.${name}: the MIX defines no strip "${name}"`);
-      n.correction(`mix.${name}: dropped`);
-      continue;
-    }
-    out[name] = strip(value, name, n);
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
-function strip(raw: unknown, name: string, n: FieldNormaliser): ChannelStrip {
-  const base = stripFor(MIX, name);
-  const o = n.section(raw, `mix.${name}`);
-  n.dropUnknown(o, ['level', 'pan', 'sends'], `mix.${name}`);
+/**
+ * A part's own strip (#597): level, pan and sends, over `DEFAULT_STRIP` —
+ * unity, centred, dry. A send to a return the code does not define is
+ * dangling.
+ */
+export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): ChannelStrip {
+  const base = DEFAULT_STRIP;
+  const o = n.section(raw, path);
+  n.dropUnknown(o, ['level', 'pan', 'sends'], path);
   return {
-    level: n.num(o.level, base.level, 0, MIX_LEVEL_MAX, `mix.${name}.level`),
-    pan: n.num(o.pan, base.pan, -1, 1, `mix.${name}.pan`),
-    sends: sends(o.sends, base.sends, `mix.${name}.sends`, n),
+    level: n.num(o.level, base.level, 0, MIX_LEVEL_MAX, `${path}.level`),
+    pan: n.num(o.pan, base.pan, -1, 1, `${path}.pan`),
+    sends: sends(o.sends, base.sends, `${path}.sends`, n),
   };
 }
 

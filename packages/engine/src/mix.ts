@@ -8,8 +8,8 @@
  * Decision: docs/log/2026-08-31-mixer-sends-returns-and-channel-strips.md §2.
  *
  * Everything here is exported plain data with an exported type. The arrangement
- * console (#70) reads it to populate controls and writes it back as a document
- * overlay, so nothing tunable may hide in a constructor call or a private field.
+ * console (#70) reads it to populate controls, so nothing tunable may hide in a
+ * constructor call or a private field.
  */
 import type { ReverbSpace } from './reverbSpace';
 import { SPACES } from './reverbSpace';
@@ -69,17 +69,11 @@ export interface ChannelStrip<R extends string = string> {
 export const DEFAULT_STRIP: ChannelStrip = { level: 1, pan: 0, sends: {} };
 
 /**
- * Where each part sits. Keyed by part name, not preset: two parts on one
- * preset can differ. The music entries are the four parts of
- * docs/log/2026-08-31-generative-sequencing-transport-and-pitch.md §7; the SFX
- * entries are the strips `createSfxPart` reaches for. Nothing plays yet, so
- * these are starting points for #69's ear, not a tuned mix.
+ * Where each SFX part sits, keyed by strip name — the strips `createSfxPart`
+ * reaches for. Music parts are not here: since #597 each music part carries
+ * its own strip in the song document, so a song's mix travels with the song.
  */
 export const MIX = {
-  kick: { level: 0.9, pan: 0, sends: {} },
-  hat: { level: 0.6, pan: 0.2, sends: { echo: 0.2 } },
-  arp: { level: 0.7, pan: -0.15, sends: { room: 0.3 } },
-  drone: { level: 0.8, pan: 0, sends: { room: 0.45 } },
   place: { level: 0.9, pan: 0.3, sends: { room: 0.08 } },
   ui: { level: 0.7, pan: 0, sends: {} },
 } satisfies Record<string, ChannelStrip<ReturnName>>;

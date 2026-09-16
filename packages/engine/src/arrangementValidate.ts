@@ -1,14 +1,17 @@
 /**
  * What a merged arrangement must satisfy before `ArrangementPlayer` commits
- * it: a positive tempo, a preset every part can resolve, no part renamed
- * live, and finite notes and holds. Throws — the player turns the throw into
+ * it: a positive tempo, 1–8 parts on unique slots 0–7, the same slots in the
+ * same order as before (a live partial cannot add, remove or move a part —
+ * #597), a preset every part can resolve, and finite velocities, notes and
+ * holds. Throws — the player turns the throw into
  * `ApplyResult.error`, and a merged arrangement that fails here changes
  * nothing. The normaliser (`arrangementDocument.ts`) is what makes a
  * *committed* document satisfy this by construction; this is the guard for
  * what a live partial produces.
  */
-import type { Arrangement, MusicPartId } from './arrangement';
-import { MUSIC_PART_IDS } from './arrangement';
+import type { Arrangement, MusicPart } from './arrangement';
+import { SEQUENCER_KINDS } from './arrangement';
+import { MUSIC_PARTS_MAX, MUSIC_SLOT_MAX } from './audioConstants';
 import type { Patch } from './patch';
 
 /** The preset table a part name resolves against: since #562, the document's patches. */
@@ -90,9 +93,13 @@ export class PatchResolver {
   }
 }
 
-export function presetFor(presets: PresetTable, id: MusicPartId, name: string): Patch {
+/** Where a validation message says a part is: its slot and label. */
+export const partLabel = (part: Pick<MusicPart, 'slot' | 'name'>): string =>
+  `part ${part.slot} ("${part.name}")`;
+
+export function presetFor(presets: PresetTable, where: string, name: string): Patch {
   const preset = lookupPreset(presets, name);
-  if (!preset) throw new Error(`${id}: unknown audio preset "${name}"`);
+  if (!preset) throw new Error(`${where}: unknown audio preset "${name}"`);
   return preset;
 }
 
@@ -104,25 +111,45 @@ export function validateArrangement(
   if (!Number.isFinite(next.bpm) || next.bpm <= 0) {
     throw new RangeError(`bpm must be a positive number, got ${next.bpm}`);
   }
-  for (const id of MUSIC_PART_IDS) {
-    const section = next[id];
-    if (!section) continue;
-    presetFor(presets, id, section.preset);
-    const before = previous?.[id];
-    if (previous && before && section.part !== before.part) {
-      throw new Error(`${id}: a part cannot be renamed live ("${before.part}")`);
-    }
-    if (!Number.isFinite(section.velocity) || section.velocity < 0) {
-      throw new RangeError(`${id}: velocity must be >= 0, got ${section.velocity}`);
-    }
+  validateSlots(next, previous);
+  for (const part of next.parts) validatePart(part, presets);
+}
+
+function validateSlots(next: Arrangement, previous: Arrangement | null): void {
+  const count = next.parts.length;
+  if (count < 1 || count > MUSIC_PARTS_MAX) {
+    throw new RangeError(`a song has 1–${MUSIC_PARTS_MAX} parts, got ${count}`);
   }
-  for (const id of ['kick', 'hat'] as const) {
-    const section = next[id];
-    if (!section) continue;
-    const { note, hold } = section;
-    if (!Number.isFinite(note)) throw new RangeError(`${id}: note must be finite, got ${note}`);
-    if (!Number.isFinite(hold) || hold <= 0) {
-      throw new RangeError(`${id}: hold must be > 0 seconds, got ${hold}`);
+  const seen = new Set<number>();
+  for (const { slot } of next.parts) {
+    if (!Number.isInteger(slot) || slot < 0 || slot > MUSIC_SLOT_MAX) {
+      throw new RangeError(`slot must be an integer 0–${MUSIC_SLOT_MAX}, got ${slot}`);
     }
+    if (seen.has(slot)) throw new Error(`slot ${slot} is used by two parts`);
+    seen.add(slot);
+  }
+  if (!previous) return;
+  const before = previous.parts.map((part) => part.slot).join(',');
+  const after = next.parts.map((part) => part.slot).join(',');
+  if (before !== after) {
+    throw new Error(`parts cannot be added, removed or re-slotted live (slots ${before} → ${after})`);
+  }
+}
+
+function validatePart(part: MusicPart, presets: PresetTable): void {
+  const where = partLabel(part);
+  presetFor(presets, where, part.preset);
+  if (!Number.isFinite(part.velocity) || part.velocity < 0) {
+    throw new RangeError(`${where}: velocity must be >= 0, got ${part.velocity}`);
+  }
+  const { sequencer } = part;
+  if (!(SEQUENCER_KINDS as readonly string[]).includes(sequencer.kind)) {
+    throw new Error(`${where}: no sequencer kind "${String(sequencer.kind)}"`);
+  }
+  if (sequencer.kind !== 'euclidean') return;
+  const { note, hold } = sequencer;
+  if (!Number.isFinite(note)) throw new RangeError(`${where}: note must be finite, got ${note}`);
+  if (!Number.isFinite(hold) || hold <= 0) {
+    throw new RangeError(`${where}: hold must be > 0 seconds, got ${hold}`);
   }
 }

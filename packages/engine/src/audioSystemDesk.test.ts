@@ -1,5 +1,5 @@
 /**
- * `AudioSystem` over the whole-music document (#435): `initMusic` plays a
+ * `AudioSystem` over the whole-music document (#435, #597): `initMusic` plays a
  * part on the document's own patch when `patches` names its preset and lands
  * the `returns` overlay on the live buses; `apply` edits patches, strips and
  * returns live, only the fields the partial names.
@@ -8,9 +8,15 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { FakeContext, installFakeAudioWorklet } from './__fixtures__/fakeAudioContext';
 import type { FakeWorkletNode } from './__fixtures__/fakeAudioContext';
-import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
+import {
+  FULL_DOCUMENT,
+  FULL_SLOT,
+  withDocumentPart,
+  type FullPartId,
+} from './__fixtures__/fullArrangement';
 import type { ArrangementDocument } from './arrangementDocument';
 import { AudioSystem } from './audioSystem';
+import { musicPartName } from './documentParts';
 import { FmEngine } from './fmEngine';
 import { RETURNS } from './mix';
 import { makePatch } from './patch';
@@ -28,6 +34,8 @@ async function system(document: ArrangementDocument): Promise<AudioSystem> {
   return sys;
 }
 
+const stripOf = (sys: AudioSystem, id: FullPartId) => sys.strip(musicPartName(FULL_SLOT[id]));
+
 const plateOf = (sys: AudioSystem): FakeWorkletNode =>
   sys.returnBus('room')?.effect as unknown as FakeWorkletNode;
 const delayOf = (sys: AudioSystem): DelayNode => sys.returnBus('echo')?.effect as DelayNode;
@@ -36,13 +44,12 @@ describe('initMusic with patches', () => {
   it('plays a part on the document patch its preset names', async () => {
     const lead = makePatch({ name: 'Doc Lead', volume: 0.31 });
     const sys = await system({
-      ...FULL_DOCUMENT,
-      arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
+      ...withDocumentPart(FULL_DOCUMENT, 'arp', { preset: 'lead' }),
       patches: { ...FULL_DOCUMENT.patches, lead },
     });
-    expect(sys.strip('arp')?.part.patch).toEqual(lead);
+    expect(stripOf(sys, 'arp')?.part.patch).toEqual(lead);
     // Every other part plays the snapshot the document carries for it (#562).
-    expect(sys.strip('kick')?.part.patch).toEqual(PRESETS.kick);
+    expect(stripOf(sys, 'kick')?.part.patch).toEqual(PRESETS.kick);
   });
 
   it('plays the embedded snapshot even where the library has that id', async () => {
@@ -50,7 +57,7 @@ describe('initMusic with patches', () => {
       ...FULL_DOCUMENT,
       patches: { ...FULL_DOCUMENT.patches, kick: { ...PRESETS.kick!, volume: 0.05 } },
     });
-    expect(sys.strip('kick')?.part.patch.volume).toBe(0.05);
+    expect(stripOf(sys, 'kick')?.part.patch.volume).toBe(0.05);
   });
 });
 
@@ -79,30 +86,33 @@ describe('initMusic with returns', () => {
 describe('apply over patches and returns', () => {
   it('pushes an edited document patch to every part playing it', async () => {
     const sys = await system({
-      ...FULL_DOCUMENT,
-      arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
-      drone: { ...FULL_ARRANGEMENT.drone, preset: 'lead' },
+      ...withDocumentPart(withDocumentPart(FULL_DOCUMENT, 'arp', { preset: 'lead' }), 'drone', {
+        preset: 'lead',
+      }),
       patches: { ...FULL_DOCUMENT.patches, lead: makePatch({ name: 'lead' }) },
     });
     expect(sys.apply({ patches: { lead: { volume: 0.12 } } })).toEqual({ ok: true, ignored: [] });
-    expect(sys.strip('arp')?.part.patch.volume).toBe(0.12);
-    expect(sys.strip('drone')?.part.patch.volume).toBe(0.12);
-    expect(sys.strip('kick')?.part.patch.volume).toBe(PRESETS.kick?.volume);
+    expect(stripOf(sys, 'arp')?.part.patch.volume).toBe(0.12);
+    expect(stripOf(sys, 'drone')?.part.patch.volume).toBe(0.12);
+    expect(stripOf(sys, 'kick')?.part.patch.volume).toBe(PRESETS.kick?.volume);
   });
 
   it('adds a new patch live, so a later preset switch can name it', async () => {
     const sys = await system(FULL_DOCUMENT);
     expect(sys.apply({ patches: { fresh: { volume: 0.2 } } }).ok).toBe(true);
-    expect(sys.apply({ arp: { preset: 'fresh' } }).ok).toBe(true);
-    expect(sys.strip('arp')?.part.patch.volume).toBe(0.2);
-    expect(sys.strip('arp')?.part.patch.name).toBe('fresh');
+    expect(sys.apply({ parts: { [FULL_SLOT.arp]: { preset: 'fresh' } } }).ok).toBe(true);
+    expect(stripOf(sys, 'arp')?.part.patch.volume).toBe(0.2);
+    expect(stripOf(sys, 'arp')?.part.patch.name).toBe('fresh');
   });
 
   it('takes a new patch and the preset switch naming it in one partial', async () => {
     const sys = await system(FULL_DOCUMENT);
-    const result = sys.apply({ patches: { fresh: { volume: 0.2 } }, arp: { preset: 'fresh' } });
+    const result = sys.apply({
+      patches: { fresh: { volume: 0.2 } },
+      parts: { [FULL_SLOT.arp]: { preset: 'fresh' } },
+    });
     expect(result).toEqual({ ok: true, ignored: [] });
-    expect(sys.strip('arp')?.part.patch.volume).toBe(0.2);
+    expect(stripOf(sys, 'arp')?.part.patch.volume).toBe(0.2);
   });
 
   it('ignores an inherited object name on the live returns path', async () => {

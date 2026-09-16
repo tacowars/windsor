@@ -1,5 +1,5 @@
 /**
- * The live desk: a document's `mix` and `returns` partials landing on the
+ * The live desk: a part's `strip` and the document's `returns` partials landing on the
  * running graph — the strips `routePart` built and the returns `createReturns`
  * built. Only the fields a partial names change, junk and unknown names are
  * reported by path in the returned `ignored` list, and every number is
@@ -32,37 +32,29 @@ const isNumber = (value: unknown): value is number =>
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** `mix` partials onto the live strips, by part name. */
-export function applyMixLive(strips: ReadonlyMap<string, PartStrip>, mix: unknown): string[] {
+/** A part's `strip` partial onto its live strip (#597); `path` prefixes what is reported. */
+export function applyStripLive(strip: PartStrip, raw: unknown, path: string): string[] {
   const ignored: string[] = [];
-  if (!isRecord(mix)) return ['mix'];
-  for (const [name, raw] of Object.entries(mix)) {
-    if (raw === undefined) continue;
-    const strip = strips.get(name);
-    if (!strip || !isRecord(raw)) {
-      ignored.push(`mix.${name}`);
-      continue;
-    }
-    for (const key of Object.keys(raw)) {
-      if (!STRIP_KEYS.includes(key)) ignored.push(`mix.${name}.${key}`);
-    }
-    if (isNumber(raw.level)) strip.setLevel(clamp(raw.level, 0, MIX_LEVEL_MAX));
-    else if (raw.level !== undefined) ignored.push(`mix.${name}.level`);
-    if (isNumber(raw.pan)) strip.setPan(clamp(raw.pan, -1, 1));
-    else if (raw.pan !== undefined) ignored.push(`mix.${name}.pan`);
-    if (raw.sends !== undefined) applySends(strip, name, raw.sends, ignored);
+  if (!isRecord(raw)) return [path];
+  for (const key of Object.keys(raw)) {
+    if (!STRIP_KEYS.includes(key)) ignored.push(`${path}.${key}`);
   }
+  if (isNumber(raw.level)) strip.setLevel(clamp(raw.level, 0, MIX_LEVEL_MAX));
+  else if (raw.level !== undefined) ignored.push(`${path}.level`);
+  if (isNumber(raw.pan)) strip.setPan(clamp(raw.pan, -1, 1));
+  else if (raw.pan !== undefined) ignored.push(`${path}.pan`);
+  if (raw.sends !== undefined) applySends(strip, path, raw.sends, ignored);
   return ignored;
 }
 
-function applySends(strip: PartStrip, name: string, sends: unknown, ignored: string[]): void {
+function applySends(strip: PartStrip, path: string, sends: unknown, ignored: string[]): void {
   if (!isRecord(sends)) {
-    ignored.push(`mix.${name}.sends`);
+    ignored.push(`${path}.sends`);
     return;
   }
   for (const [ret, amount] of Object.entries(sends)) {
     if (!strip.sends.has(ret) || !isNumber(amount)) {
-      ignored.push(`mix.${name}.sends.${ret}`);
+      ignored.push(`${path}.sends.${ret}`);
       continue;
     }
     strip.setSend(ret, clamp(amount, 0, 1));

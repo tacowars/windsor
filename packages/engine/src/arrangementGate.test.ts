@@ -1,9 +1,10 @@
 /**
  * The verify gate (issue #75, record
  * `2026-08-31-arrangement-console-and-runtime-arrangements` §5): `npm run
- * verify` fails if the committed arrangement normalises to the fallback, or
- * names a preset, return or part the code does not define — proven on
- * committed fixture documents that are valid JSON and still not shippable.
+ * verify` fails if the committed arrangement normalises to the fallback, names
+ * a preset or return the code does not define, or has nothing to play — proven
+ * on committed fixture documents that are valid JSON and still not shippable.
+ * A `none` part is inert and allowed beside sequenced ones (#597).
  * The gate is what guarantees the fallback is never what ships.
  *
  * This is a vitest test rather than a script on purpose: it already runs
@@ -14,13 +15,15 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import danglingPart from './__fixtures__/arrangementDocuments/dangling-part.json';
 import danglingPreset from './__fixtures__/arrangementDocuments/dangling-preset.json';
 import danglingReturn from './__fixtures__/arrangementDocuments/dangling-return.json';
 import nothingUsable from './__fixtures__/arrangementDocuments/nothing-usable.json';
-import { FALLBACK_ARRANGEMENT } from './arrangement';
+import retiredFourSlot from './__fixtures__/arrangementDocuments/retired-four-slot.json';
+import silentSong from './__fixtures__/arrangementDocuments/silent-song.json';
+import { FULL_PART_IDS, FULL_PARTS } from './__fixtures__/fullArrangement';
 import { isShippable, makeArrangement } from './arrangementDocument';
-import { ArrangementPlayer, MUSIC_PART_IDS, type PlayablePart } from './arrangementPlayer';
+import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
+import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES } from './arrangementLibrary';
 import raw from './arrangements/bed-01.json';
 import { DEFAULT_ARRANGEMENT_NAME } from './audioConstants';
@@ -52,8 +55,10 @@ describe('the committed arrangement (arrangements/bed-01.json)', () => {
   });
 
   it('defines all four parts and constructs every generator', () => {
-    for (const id of MUSIC_PART_IDS) expect(result.document[id], id).toBeDefined();
-    const parts = { kick: silentPart(), hat: silentPart(), arp: silentPart(), drone: silentPart() };
+    expect(result.document.parts.map((p) => [p.slot, p.sequencer.kind])).toEqual(
+      FULL_PART_IDS.map((id) => [FULL_PARTS[id].slot, FULL_PARTS[id].sequencer.kind]),
+    );
+    const parts = new Map(result.document.parts.map((p) => [p.slot, silentPart()]));
     expect(
       () =>
         new ArrangementPlayer(
@@ -89,25 +94,44 @@ describe('fixture documents: valid JSON, still rejected', () => {
     expect(isShippable(r)).toBe(false);
   });
 
+  it('rejects the retired four-slot format (#597): unusable, and says why', () => {
+    const r = makeArrangement(retiredFourSlot);
+    expect(r.usable).toBe(false);
+    expect(r.document).toEqual(FALLBACK_ARRANGEMENT);
+    expect(r.corrections[0]).toMatch(/retired four-slot format \(#597\)/);
+    expect(isShippable(r)).toBe(false);
+  });
+
   it('rejects a dangling preset name', () => {
     const r = makeArrangement(danglingPreset);
-    // The drone still plays — but the document must not ship.
+    // The step part still plays — but the document must not ship.
     expect(r.usable).toBe(true);
-    expect(r.dangling).toEqual(['kick.preset: no preset "kick-2" is defined']);
+    expect(r.dangling).toEqual(['parts[0].preset: no preset "kick-2" is defined']);
     expect(isShippable(r)).toBe(false);
   });
 
   it('rejects a dangling return name in a send', () => {
     const r = makeArrangement(danglingReturn);
     expect(r.usable).toBe(true);
-    expect(r.dangling).toEqual(['mix.hat.sends.cave: no return "cave" is defined']);
+    expect(r.dangling).toEqual(['parts[0].strip.sends.cave: no return "cave" is defined']);
     expect(isShippable(r)).toBe(false);
   });
 
-  it('rejects a part name the MIX has no strip for', () => {
-    const r = makeArrangement(danglingPart);
+  it('rejects a song whose parts are all none: usable in the console, silent in the game', () => {
+    const r = makeArrangement(silentSong);
     expect(r.usable).toBe(true);
-    expect(r.dangling).toEqual(['drone.part: the MIX defines no strip "bass"']);
+    expect(r.dangling).toEqual([]);
+    expect(r.corrections).toEqual([]);
     expect(isShippable(r)).toBe(false);
+  });
+
+  it('ships a none part beside sequenced ones: inert, not rejected', () => {
+    const r = makeArrangement({
+      ...silentSong,
+      patches: { ...silentSong.patches, kick: {} },
+      parts: [...silentSong.parts, { slot: 1, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } }],
+    });
+    expect(r.corrections).toEqual([]);
+    expect(isShippable(r)).toBe(true);
   });
 });
