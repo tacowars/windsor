@@ -532,6 +532,9 @@
         border: 1px solid var(--line);
         border-radius: var(--r);
         cursor: grab;
+        /* As `.knob` and `.harm-bars`: without it a vertical drag on a touch
+           screen pans the page, and the browser cancels the transfer (#588). */
+        touch-action: none;
       }
 
       /* #588: the curve is a drag handle — drop to copy, shift-drop to swap. */
