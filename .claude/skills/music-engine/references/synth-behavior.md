@@ -34,7 +34,12 @@ document does not, and plays its own numbers against the current engine.
 Per-operator LFO depth multiplies amplitude by `max(0, 1 + lfoValue * depth)`.
 Full-depth bipolar modulation can both silence and boost an operator.
 The LFO value also includes the patch amount and mod-wheel depth; consider
-wheel use when relevant to the patch or control being changed.
+wheel use when relevant to the patch or control being changed. The wheel has
+two destinations, each a depth rather than a switch (#586): `lfo.modWheelDepth`
+(0..1, default 1) scales the LFO amount, and `filter.modWheelDepth` (octaves,
+−6..6, default 0) adds to the filter envelope amount —
+`octaves = filtEnv × (envAmount + wheel × filter.modWheelDepth) + …`. Depth 0 on
+either side is off; both at once, or opposite signs, are allowed.
 
 ## Self-feedback
 

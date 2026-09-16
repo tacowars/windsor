@@ -138,6 +138,8 @@ export interface FilterSettings {
   slope24: boolean;
   /** Octaves. */
   envAmount: number;
+  /** Octaves the mod wheel adds to `envAmount` at full travel (#586); 0 is off. */
+  modWheelDepth: number;
   /** Octaves. */
   lfoAmount: number;
   keyTrack: number;
@@ -259,6 +261,7 @@ export function makePatch(o: PartialPatch = {}): Patch {
       drive: 1,
       slope24: false,
       envAmount: 0,
+      modWheelDepth: 0,
       lfoAmount: 0,
       keyTrack: 0,
       ...(o.filter ?? {}),

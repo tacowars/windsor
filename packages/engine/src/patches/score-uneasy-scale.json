@@ -165,6 +165,7 @@
       "drive": 1,
       "slope24": false,
       "envAmount": 0.4,
+      "modWheelDepth": 0,
       "lfoAmount": 0.25,
       "keyTrack": 0,
       "env": {
@@ -187,6 +188,6 @@
     "worstSeed": 111,
     "peak": 0.09173069149255753,
     "seedsSwept": 256,
-    "contentHash": "645fbc4e"
+    "contentHash": "c74461bc"
   }
 }
