@@ -53,7 +53,7 @@ export const toggleIndex = (field: string): number =>
 export const writeToggle = (field: string, index: number): void =>
   setPath(partsState.patch, field, index === 1);
 
-const FILTER_KNOBS: KnobTable = [
+export const FILTER_KNOBS: KnobTable = [
   {
     f: 'filter.cutoff',
     label: 'Cutoff',
@@ -66,17 +66,19 @@ const FILTER_KNOBS: KnobTable = [
   },
   { f: 'filter.drive', label: 'Drive', o: { min: 1, max: 6, def: 1, fmt: fmt2 } },
   { f: 'filter.envAmount', label: 'Env Amt', o: { min: -6, max: 6, def: 0, fmt: fmtSigned } },
+  { f: 'filter.modWheelDepth', label: 'Wheel', o: { min: -6, max: 6, def: 0, fmt: fmtSigned } },
   { f: 'filter.lfoAmount', label: 'LFO Amt', o: { min: -4, max: 4, def: 0, fmt: fmtSigned } },
   { f: 'filter.keyTrack', label: 'Key Trk', o: { min: -1, max: 2, def: 0, fmt: fmtSigned } },
 ];
 
-const LFO_KNOBS: KnobTable = [
+export const LFO_KNOBS: KnobTable = [
   {
     f: 'lfo.rate',
     label: 'Rate',
     o: { min: 0.02, max: 40, def: 5, curve: 'log', fmt: (v) => `${v.toFixed(2)}H` },
   },
   { f: 'lfo.amount', label: 'Amount', o: { min: 0, max: 1, def: 0, fmt: fmt2 } },
+  { f: 'lfo.modWheelDepth', label: 'Wheel', o: { min: 0, max: 1, def: 1, fmt: fmt2 } },
   { f: 'lfo.delay', label: 'Fade In', o: { min: 0, max: 6, def: 0, curve: 'log', fmt: fmtMs } },
   {
     f: 'lfo.toPitch',

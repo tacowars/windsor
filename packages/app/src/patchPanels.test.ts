@@ -11,8 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
 import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
-import { GLOBAL_TOGGLES, toggleIndex, writeToggle } from './patchPanels';
-import { getPath, hooks, partsState, pushPatch } from './patchState';
+import { FILTER_KNOBS, GLOBAL_TOGGLES, LFO_KNOBS, toggleIndex, writeToggle } from './patchPanels';
+import { getPath, hooks, partsState, pushPatch, setPath } from './patchState';
 
 describe('the global row toggles', () => {
   it('offers Mono over a field the patch really has, as a boolean', () => {
@@ -50,5 +50,38 @@ describe('the global row toggles', () => {
       hooks.commit = previous;
     }
     expect(committed).toEqual([true, false]);
+  });
+});
+
+describe('the Wheel knobs (#586)', () => {
+  const wheelKnobs = () => ({
+    filter: FILTER_KNOBS.find((k) => k.f === 'filter.modWheelDepth'),
+    lfo: LFO_KNOBS.find((k) => k.f === 'lfo.modWheelDepth'),
+  });
+
+  it('sit beside the amounts they add to, over fields the patch really has', () => {
+    const { filter, lfo } = wheelKnobs();
+    expect(filter?.label).toBe('Wheel');
+    expect(lfo?.label).toBe('Wheel');
+    // Signed octaves on the filter, like Env Amt; unipolar on the LFO, like Amount.
+    expect([filter?.o?.min, filter?.o?.max]).toEqual([-6, 6]);
+    expect([lfo?.o?.min, lfo?.o?.max]).toEqual([0, 1]);
+    const fresh = makePatch();
+    for (const k of [...FILTER_KNOBS, ...LFO_KNOBS]) {
+      expect(typeof getPath(fresh, k.f), k.f).toBe('number');
+    }
+    // The knob's centre is the schema's default, so a fresh patch reads as untouched.
+    expect(filter?.o?.def).toBe(fresh.filter.modWheelDepth);
+    expect(lfo?.o?.def).toBe(fresh.lfo.modWheelDepth);
+  });
+
+  it('round-trip through the JSON export and the makePatch import', () => {
+    const edited = makePatch();
+    setPath(edited, 'filter.modWheelDepth', 3);
+    setPath(edited, 'lfo.modWheelDepth', 0);
+    const imported = makePatch(JSON.parse(JSON.stringify(edited)) as Patch);
+    expect(imported.filter.modWheelDepth).toBe(3);
+    expect(imported.lfo.modWheelDepth).toBe(0);
+    expect(imported).toEqual(edited);
   });
 });

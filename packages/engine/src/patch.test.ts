@@ -70,6 +70,14 @@ describe('makePatch', () => {
     expect(makePatch({ mono: true }).mono).toBe(true);
   });
 
+  it('defaults the filter wheel depth to 0 and carries a set one (#586)', () => {
+    // Off by default, so every patch authored before the field existed keeps
+    // its render; the LFO's wheel depth keeps its own default of 1.
+    expect(makePatch().filter.modWheelDepth).toBe(0);
+    expect(makePatch().lfo.modWheelDepth).toBe(1);
+    expect(makePatch({ filter: { modWheelDepth: -3 } }).filter.modWheelDepth).toBe(-3);
+  });
+
   it('does not share nested state between two patches', () => {
     const a = makePatch();
     const b = makePatch();

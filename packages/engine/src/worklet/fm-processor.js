@@ -994,8 +994,13 @@ class Voice {
     const f = patch.filter;
     if (f.mode !== FILT_OFF) {
       const fenv = this.filtEnv.advance(n);
+      // The wheel adds to the envelope amount the way it adds to the LFO's
+      // (#586): depth 0 leaves the term exactly as it was.
       const octaves =
-        fenv * f.envAmount + lfoVal * f.lfoAmount + f.keyTrack * keyOffset + cutoffMod;
+        fenv * (f.envAmount + modWheel * f.modWheelDepth) +
+        lfoVal * f.lfoAmount +
+        f.keyTrack * keyOffset +
+        cutoffMod;
       const cutoff = f.cutoff * Math.pow(2, octaves);
       this.svfA.setCoeffs(cutoff, f.resonance, this.sr);
       if (f.slope24) this.svfB.setCoeffs(cutoff, f.resonance, this.sr);
@@ -1500,6 +1505,7 @@ function normalisePatch(raw) {
       drive: num(filtRaw.drive, 1),
       slope24: !!filtRaw.slope24,
       envAmount: num(filtRaw.envAmount, 0), // octaves
+      modWheelDepth: num(filtRaw.modWheelDepth, 0), // octaves the wheel adds to envAmount (#586)
       lfoAmount: num(filtRaw.lfoAmount, 0), // octaves
       keyTrack: num(filtRaw.keyTrack, 0),
       env: envDefaults(filtRaw.env),

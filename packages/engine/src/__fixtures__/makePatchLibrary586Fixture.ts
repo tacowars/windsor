@@ -27,6 +27,7 @@ import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import type { Patch } from '../patch';
 import { PATCH_LIBRARY, PRESET_NAMES } from '../presets';
 import { HEADROOM_RENDER, headroomEvents } from './headroomSweep';
 import { loadProcessor, render } from './workletHarness';
@@ -47,18 +48,16 @@ export interface RenderRecord {
 /** One patch's headroom render at `seed`, reduced to its record. */
 export function renderRecord(
   dsp: ReturnType<typeof loadProcessor>,
-  id: string,
+  patch: Patch,
   seed: number,
 ): RenderRecord {
-  const entry = PATCH_LIBRARY[id];
-  if (!entry) throw new Error(`no library entry for ${id}`);
   const result = render(
     dsp,
-    dsp.create(entry.patch, HEADROOM_RENDER.voices, seed),
+    dsp.create(patch, HEADROOM_RENDER.voices, seed),
     HEADROOM_RENDER.blocks,
     headroomEvents(),
   );
-  if (result.nonFinite) throw new Error(`${id}: non-finite output at seed ${seed}`);
+  if (result.nonFinite) throw new Error(`${patch.name}: non-finite output at seed ${seed}`);
   const bytes = new Uint8Array(
     result.samples.buffer,
     result.samples.byteOffset,
@@ -80,7 +79,7 @@ if (isMain) {
   for (const id of PRESET_NAMES) {
     const entry = PATCH_LIBRARY[id];
     if (!entry) throw new Error(`no library entry for ${id}`);
-    entries[id] = renderRecord(dsp, id, entry.headroom.worstSeed);
+    entries[id] = renderRecord(dsp, entry.patch, entry.headroom.worstSeed);
   }
 
   const fixture = {
