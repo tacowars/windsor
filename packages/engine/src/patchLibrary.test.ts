@@ -1,7 +1,8 @@
 /**
  * The loader against the real files in `patches/` and against the ways a
  * hand-written or editor-written file can go wrong. The bit-identity of the
- * migrated bank is `patchLibraryIdentity.test.ts`'s; this file is the contract.
+ * migrated bank was proved once, in PR #567, by a test #583 retired; this file
+ * is the standing contract.
  */
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

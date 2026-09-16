@@ -7,9 +7,10 @@
  *
  * What the render here proves is the *arrangement*: which part fires on which
  * tick, through which strip and send, at which level. It cannot see a patch —
- * every part's source is a `noteToneFeed`, not the FM processor — so the #562
- * proof that the embedded patches sound like the library's is a separate
- * test, `bed01PatchIdentity.test.ts`, through the real worklet.
+ * every part's source is a `noteToneFeed`, not the FM processor. The #562
+ * proof that the embedded patches sounded like the library's was a separate
+ * test through the real worklet, retired by #583 once the embedding had
+ * merged: a song's snapshot diverging from the library is the designed state.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -88,7 +89,7 @@ describe('bed-01.json equals the #69b TypeScript arrangement', () => {
   it(`renders the first ${BARS} bars sample-identically through the full stack`, async () => {
     // `fromTs` carries the library's patches, `fromJson` the document's
     // snapshots; what this compares is the arrangement they play, not their
-    // timbre (`bed01PatchIdentity.test.ts` owns that).
+    // timbre, which this stand-in cannot see.
     const fromJson = await renderBed(makeArrangement(raw).document);
     const fromTs = await renderBed(FULL_DOCUMENT);
     for (const id of MUSIC_PART_IDS) expect(fromTs.counters[id], id).toBeGreaterThan(0);
