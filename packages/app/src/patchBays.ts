@@ -7,6 +7,8 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { $, el, fmtSigned } from './dom';
 import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
+import { attachEnvelopeDrag } from './envelopeDrag';
+import { opEnvelopeSlot } from './envelopeTransfer';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import { CARRIER_COLOR, MOD_COLOR } from './patchPanels';
 import { partsState, pathKnob, pushPatch } from './patchState';
@@ -156,6 +158,7 @@ function bayBody(i: number, color: string, syncActive: () => void): HTMLElement 
 
   const canvas = el('canvas', 'env-canvas') as HTMLCanvasElement;
   canvas.setAttribute('aria-label', `Operator ${OP_NAMES[i]} envelope shape`);
+  attachEnvelopeDrag(canvas, opEnvelopeSlot(i), color);
   body.appendChild(canvas);
   const redraw = (): void => {
     const env = partsState.patch.ops[i]?.env;

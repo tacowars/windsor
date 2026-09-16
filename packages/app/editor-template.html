@@ -531,6 +531,50 @@
         background: var(--inset);
         border: 1px solid var(--line);
         border-radius: var(--r);
+        cursor: grab;
+      }
+
+      /* #588: the curve is a drag handle — drop to copy, shift-drop to swap. */
+      .env-canvas.drop-target {
+        outline: 2px solid var(--env-color, var(--carrier));
+        outline-offset: 1px;
+      }
+
+      .env-canvas.swap-target {
+        outline: 2px dashed var(--env-color, var(--carrier));
+        outline-offset: 1px;
+      }
+
+      body.env-dragging,
+      body.env-dragging .env-canvas {
+        cursor: grabbing;
+      }
+
+      .env-ghost {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px;
+        background: var(--inset);
+        border: 1px solid var(--line-bright);
+        border-radius: var(--r);
+        opacity: 0.92;
+        pointer-events: none;
+      }
+
+      .env-ghost-curve {
+        width: 96px;
+        height: 36px;
+        display: block;
+      }
+
+      .env-ghost-glyph {
+        font-size: 13px;
+        color: var(--ink-dim);
       }
 
       .harm-bars {
