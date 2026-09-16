@@ -12,6 +12,7 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { $, el, fmt2, fmtHz, fmtMs, fmtSigned } from './dom';
 import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
+import { attachEnvelopeDrag } from './envelopeDrag';
 import { getPath, hooks, partsState, pathKnob, pushPatch, setPath } from './patchState';
 
 export const CARRIER_COLOR = '#E0A44E';
@@ -222,6 +223,7 @@ export function buildFilter(): void {
     ),
   );
   const canvas = $('filtEnvCanvas') as HTMLCanvasElement;
+  attachEnvelopeDrag(canvas, 'filter.env', MOD_COLOR);
   const redraw = (): void => drawEnv(canvas, partsState.patch.filter.env, MOD_COLOR);
   const row = $('filterKnobs');
   row.innerHTML = '';
@@ -281,6 +283,7 @@ export function buildLfo(): void {
 
 export function buildPitch(): void {
   const canvas = $('pitchEnvCanvas') as HTMLCanvasElement;
+  attachEnvelopeDrag(canvas, 'pitchEnv', CARRIER_COLOR);
   const redraw = (): void => drawEnv(canvas, partsState.patch.pitchEnv, CARRIER_COLOR);
   const row = $('pitchKnobs');
   row.innerHTML = '';
