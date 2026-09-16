@@ -26,10 +26,10 @@ its envelope open shifts its target's phase by 4 cycles, ≈ 25 rad (#543).
 Sidebands reach roughly `2 × (β + 1) × modulator frequency` with β in radians,
 so a deep modulator on a high note or a high ratio still folds back past
 Nyquist: the engine does not oversample. Expect grit near the top of the knob
-and timbre below it, and read the factory bank as the scale of a normal sound —
-164 of its 275 active modulators sit at or below 0.354, and only 5 at 1.
-Factory presets authored before #543 carry their old level times √2; a stored
-document does not, and plays its own numbers against the current engine.
+and timbre below it; most factory modulators sit well below half travel, and
+a modulator near 1 is a deliberate choice, not a starting point. Factory
+patches authored before #543 carry their old level times √2; a stored document
+does not, and plays its own numbers against the current engine.
 
 Per-operator LFO depth multiplies amplitude by `max(0, 1 + lfoValue * depth)`.
 Full-depth bipolar modulation can both silence and boost an operator.
@@ -99,6 +99,14 @@ has stopped ringing) goes **dormant** (#547): the part skips it, steals it
 first and silently, and ends it on note-off. Sustain 0 therefore does not tie
 up the pool under Hold. The plate likewise sleeps after ~1.6 s of silence in
 and out, and never under HOLD.
+
+Every voice renders through one fixed-index kernel for all eleven algorithms
+(#548): silent operators are skipped and the per-note `Math.pow` values are
+precomputed. The older generic loop is kept as the bit-identical reference
+behind the engine option `specialise: false`, and is also the path taken when
+two Noise operators sit on an algorithm whose evaluation order is not D..A,
+because noise draws from one shared per-voice stream in evaluation order.
+A DSP change is proved against that reference, not against a recording.
 
 `phaseFree` randomizes starting phase; noise, drift and pan randomization add
 other stochastic surfaces. Use the harness's explicit seeds for reproducible
