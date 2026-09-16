@@ -46,12 +46,14 @@ describe('removePart', () => {
   });
 
   it('drops the patches section when nothing is left in it', () => {
+    const hatPatch = FULL_DOCUMENT.patches.hat;
+    if (!hatPatch) throw new Error('the fixture embeds hat');
     const two = {
       ...FULL_DOCUMENT,
       parts: FULL_DOCUMENT.parts.slice(0, 2),
-      patches: { kick: FULL_DOCUMENT.patches.kick, hat: FULL_DOCUMENT.patches.hat },
+      patches: { hat: hatPatch },
     };
-    const lone = removePart({ ...two, patches: { hat: two.patches.hat } }, hat);
+    const lone = removePart(two, hat);
     expect(lone.patches).toBeUndefined();
   });
 });
