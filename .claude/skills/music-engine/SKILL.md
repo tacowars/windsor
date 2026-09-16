@@ -58,8 +58,10 @@ musical choices that remain material and unresolved.
   Soundtrack FX include sweeps, noise, pulses, glitches and tension textures.
   Do not expand a scoring task into gameplay laser/impact sounds.
 - Start with an existing sound or `makePatch`; use `clonePatch` for an editable
-  copy. Preserve factory IDs and unrelated song settings. Keep tunable sound
-  data in the area's preset/table files, separate from synthesis logic.
+  copy. Preserve factory IDs and unrelated song settings. A sound that should
+  outlive the session is a library file, `audio/patches/<id>.json`, saved from
+  the console (Init, Save, Copy to new) or written and swept; sound data never
+  goes back into TypeScript.
 - Choose carrier/modulator envelopes for the intended articulation, then
   tune filter and modulation. Document useful register/hold time and any
   recommended mixer sends. Delay/plate belong to the song, not `Patch`.
@@ -83,11 +85,18 @@ for `node tools/patch-editor/import-patches.mjs`.
 ## Preserve the complete song
 
 Read [the document contract](../../../docs/log/2026-09-11-music-document-carries-patches-and-returns.md)
-for song or console changes. A part references a preset ID; its document's
-`patches` entry wins over the factory table. A new working sound must reach
-the document, not just the live part, to survive export. The preset browser
-copies the chosen patch into the document on selection (`choosePreset`), and
-knob edits commit the working patch there through `pushPatch`.
+and [the self-contained rule](../../../docs/log/2026-09-15-562-song-documents-are-self-contained.md)
+for song or console changes. A part references a preset ID, and since #562 a
+song carries a snapshot of every patch it plays: on the game path the one
+resolver (`PatchResolver` in `arrangementValidate.ts`) reads the document's
+`patches` section only and throws on a missing id, naming the part. The editor
+is the only caller that passes `makeArrangement(raw, { libraryFill })`; a
+pre-#562 document has its parts filled from the library once, on open, and
+embedded on the next export. A library edit therefore never changes a shipped
+song until that song is re-exported. A new working sound must reach the
+document, not just the live part, to survive export. The preset browser copies
+the chosen patch into the document on selection (`choosePreset`), and knob
+edits commit the working patch there through `pushPatch`.
 
 Normalize through `makeArrangement`, and inspect corrections/dangling
 references. Preserve `patches`, `returns`, mix, harmony, drivers and captured
@@ -105,11 +114,23 @@ bundles them at build time and chooses one with `?music=<name>`.
   samples, audibility, peaks and release completion. Cover intended registers,
   velocities, gates and chords; include retrigger/steal behavior if changed.
   A short seed sweep cannot establish slow-envelope audibility or a universal
-  clipping bound. Retain measured worst seeds and state the sampled scope.
+  clipping bound. Each patch file's `headroom` record is the retained worst
+  seed, peak and seed count, written only by `tools/patch-editor/sweep-headroom.mjs`;
+  the record's `contentHash` covers the patch, so an edited file fails
+  `fmProcessorHeadroom.test.ts` until it is re-swept, and a schema change that
+  adds a defaulted field refreshes every file's hash without a re-sweep through
+  a kept migration script (#586's record). For a bit-identity comparison the
+  harness can render with `specialise: false` (the generic voice loop, #548) or
+  `dormancy: false` (#547); both must agree with the default path sample for
+  sample. A migration proof against a captured fixture is a one-time test:
+  retire it in the PR that merges the migration, or it fails on the first
+  library edit (#583).
 - **Songs/mixer:** use `arrangementDocumentDesk.test.ts`,
   `audioSystemDesk.test.ts`, `arrangementApply.test.ts` and the relevant
-  generator/return tests. Check round trips and document-first resolution,
-  including a new patch and its preset switch in the same live change.
+  generator/return tests, plus `patchResolver.test.ts` for the two resolver
+  modes. Check round trips, document-only resolution on the game path and the
+  library fill on the editor path, including a new patch and its preset switch
+  in the same live change.
 - **Console:** test its state operations and check the affected controls in
   the browser when useful. Rebuild the tracked standalone artifact after
   engine/schema/preset/editor changes:
@@ -129,4 +150,6 @@ Pat's remaining criterion; hand back exact sounds/steps rather than waiting
 or equating passing DSP tests with musical approval. Pat auditions in the
 console with a MIDI controller as well as QWERTY, so a handback can name
 velocity, pitch bend, mod wheel (which scales LFO amount through
-`lfo.modWheelDepth`) and sustain-pedal gestures, and which part to select.
+`lfo.modWheelDepth` and adds to the filter envelope amount through
+`filter.modWheelDepth`, #586) and sustain-pedal gestures, and which part to
+select.
