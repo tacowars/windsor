@@ -2,10 +2,7 @@
   "format": 1,
   "name": "FM Kick",
   "category": "Drums",
-  "tags": [
-    "kick",
-    "original"
-  ],
+  "tags": ["kick", "original"],
   "description": "Original FM kick. Updated,",
   "patch": {
     "name": "FM Kick",
@@ -159,12 +156,7 @@
       "retrigger": false,
       "toPitch": 0,
       "modWheelDepth": 1,
-      "toOp": [
-        0,
-        0,
-        0,
-        0
-      ]
+      "toOp": [0, 0, 0, 0]
     },
     "filter": {
       "mode": 1,
@@ -192,9 +184,9 @@
     }
   },
   "headroom": {
-    "worstSeed": 2765,
-    "peak": 0.6441013216972351,
+    "worstSeed": 744,
+    "peak": 0.6465452313423157,
     "seedsSwept": 16384,
-    "contentHash": "b525ca31"
+    "contentHash": "bde7013d"
   }
 }
