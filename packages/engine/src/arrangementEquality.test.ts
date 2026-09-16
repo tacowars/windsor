@@ -88,7 +88,9 @@ describe('bed-01.json equals the #69b TypeScript arrangement', () => {
     const { patches: fixturePatches, ...fixture } = FULL_DOCUMENT;
     expect(arrangement).toEqual(fixture);
     expect(Object.keys(patches ?? {}).sort()).toEqual(Object.keys(fixturePatches).sort());
-    expect(FULL_DOCUMENT.parts.map(({ strip: _s, ...part }) => part)).toEqual(FULL_ARRANGEMENT.parts);
+    expect(FULL_DOCUMENT.parts.map(({ strip: _s, ...part }) => part)).toEqual(
+      FULL_ARRANGEMENT.parts,
+    );
     expect(FULL_PART_IDS.map((id) => FULL_PARTS[id].preset).sort()).toEqual(
       Object.keys(fixturePatches).sort(),
     );

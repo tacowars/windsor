@@ -5,7 +5,10 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT } from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
+import {
+  FULL_ARRANGEMENT,
+  FULL_SLOT,
+} from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
 import {
   GAMEPLAY_PATCH_IDS,
   PATCH_LIBRARY,
@@ -13,12 +16,11 @@ import {
   loadPatchFile,
   loadUnsweptPatchFile,
   makePatch,
+  partAt,
 } from '../../../packages/client/src/audio/index-for-editor';
-import type {
-  ArrangementDocument,
-  DeepPartial,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { DocumentPartial } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
+import { partChange } from './context';
 import { DocumentModel } from './documentModel';
 import { INIT_PATCH_NAME, initPresetId } from './libraryConstants';
 import { listLibrary } from './libraryModel';
@@ -65,10 +67,10 @@ function fakeFolder(ids: string[]): PatchFolder & { files: Map<string, string> }
 }
 
 function context(): AppCtx {
-  const model = new DocumentModel(FULL_ARRANGEMENT);
+  const model = new DocumentModel({ version: 2, ...FULL_ARRANGEMENT });
   const ctx = {
     model,
-    change: (partial: DeepPartial<ArrangementDocument>) => {
+    change: (partial: DocumentPartial) => {
       model.merge(partial);
       return { ok: true, ignored: [] };
     },
@@ -83,7 +85,7 @@ async function folderScope(ids = ['kick', 'hat', 'lead-bell']) {
   const library: LibraryModel = pageLibrary();
   await connectLibrary(library, folder);
   const ctx = context();
-  return { ctx, library, folder, partId: 'kick' as const };
+  return { ctx, library, folder, slot: FULL_SLOT.kick };
 }
 
 describe('patch origin', () => {
@@ -92,19 +94,22 @@ describe('patch origin', () => {
     expect(patchOrigin(scope)).toEqual({ kind: 'library', id: 'kick' });
     initPatch(scope);
     expect(patchOrigin(scope)).toEqual({ kind: 'init' });
-    scope.ctx.change({ kick: { preset: 'mine' }, patches: { mine: makePatch({ name: 'mine' }) } });
+    scope.ctx.change({
+      ...partChange(FULL_SLOT.kick, { preset: 'mine' }),
+      patches: { mine: makePatch({ name: 'mine' }) },
+    });
     expect(patchOrigin(scope)).toEqual({ kind: 'document', id: 'mine' });
   });
 });
 
-const INIT_ID = initPresetId('kick');
+const INIT_ID = initPresetId(String(FULL_SLOT.kick));
 
 describe('Init', () => {
   it('loads makePatch defaults named Init, not saveable, not a library entry', async () => {
     const scope = await folderScope();
     const patch = initPatch(scope);
     expect(patch).toEqual(makePatch({ name: INIT_PATCH_NAME }));
-    expect(scope.ctx.model.doc.kick?.preset).toBe(INIT_ID);
+    expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe(INIT_ID);
     expect(scope.ctx.model.doc.patches?.[INIT_ID]).toEqual(patch);
     const origin = patchOrigin(scope);
     expect(canSave(origin)).toBe(false);
@@ -119,18 +124,20 @@ describe('Init', () => {
     const kickInit = initPatch(scope);
     kickInit.volume = 0.1;
     scope.ctx.change({ patches: { [INIT_ID]: kickInit } });
-    initPatch({ ...scope, partId: 'hat' });
-    expect(scope.ctx.model.doc.hat?.preset).toBe(initPresetId('hat'));
+    initPatch({ ...scope, slot: FULL_SLOT.hat });
+    expect(partAt(scope.ctx.model.doc, FULL_SLOT.hat)?.preset).toBe(
+      initPresetId(String(FULL_SLOT.hat)),
+    );
     expect(scope.ctx.model.doc.patches?.[INIT_ID]?.volume).toBe(0.1);
     // Neither sentinel is offered as a patch to load.
     const listed = listLibrary(scope.library.entries, scope.ctx.model.doc.patches).map((e) => e.id);
     expect(listed).not.toContain(INIT_ID);
-    expect(listed).not.toContain(initPresetId('hat'));
+    expect(listed).not.toContain(initPresetId(String(FULL_SLOT.hat)));
     // Dropping clears only the sentinels no part plays.
-    scope.ctx.change({ kick: { preset: 'kick' } });
+    scope.ctx.change({ ...partChange(FULL_SLOT.kick, { preset: 'kick' }) });
     dropInit(scope.ctx);
     expect(scope.ctx.model.doc.patches?.[INIT_ID]).toBeUndefined();
-    expect(scope.ctx.model.doc.patches?.[initPresetId('hat')]).toBeDefined();
+    expect(scope.ctx.model.doc.patches?.[initPresetId(String(FULL_SLOT.hat))]).toBeDefined();
   });
 
   it('is discarded when the part moves on, and Init again starts fresh', async () => {
@@ -141,7 +148,7 @@ describe('Init', () => {
     scope.ctx.change({ patches: { [INIT_ID]: edited } });
     expect(initPatch(scope).volume).toBe(makePatch().volume);
     scope.ctx.change({
-      kick: { preset: 'hat' },
+      ...partChange(FULL_SLOT.kick, { preset: 'hat' }),
       patches: { hat: clonePatch(PATCH_LIBRARY['hat']!.patch) },
     });
     dropInit(scope.ctx);
@@ -188,7 +195,7 @@ describe('Save', () => {
   it('downloads instead when no folder is connected, and the browser still sees the save', async () => {
     const library = pageLibrary();
     const ctx = context();
-    const scope = { ctx, library, partId: 'kick' as const };
+    const scope = { ctx, library, slot: FULL_SLOT.kick };
     const downloads: string[] = [];
     const working = clonePatch(PATCH_LIBRARY['kick']!.patch);
     working.volume = 0.25;
@@ -216,7 +223,7 @@ describe('Copy to new', () => {
     expect(id).toBe('fm-kick');
     const again = await copyToNew({ ...scope, working, meta: { ...prefill, name: 'FM Kick' } });
     expect(again).toBe('fm-kick-2');
-    expect(scope.ctx.model.doc.kick?.preset).toBe('fm-kick-2');
+    expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('fm-kick-2');
     expect(scope.ctx.model.doc.patches?.['fm-kick-2']?.name).toBe('FM Kick');
     const written = JSON.parse(scope.folder.files.get('fm-kick-2.json')!);
     expect(written.headroom).toBeUndefined();
@@ -234,7 +241,7 @@ describe('Copy to new', () => {
       meta: { name: 'Init', category: 'Leads', tags: [], description: '' },
     });
     expect(id).toBe('init');
-    expect(scope.ctx.model.doc.kick?.preset).toBe('init');
+    expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('init');
     expect(scope.ctx.model.doc.patches?.[INIT_ID]).toBeUndefined();
   });
 });
@@ -252,7 +259,7 @@ describe('Delete', () => {
     expect(scope.folder.files.has('kick.json')).toBe(false);
     expect(scope.library.entries['kick']).toBeUndefined();
     // The song keeps what it carries.
-    expect(scope.ctx.model.doc.kick?.preset).toBe('kick');
+    expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('kick');
   });
 
   it('needs the folder', async () => {
@@ -289,7 +296,10 @@ describe('the unsaved-changes guard', () => {
     expect(discardEdits(scope)).toEqual(makePatch({ name: INIT_PATCH_NAME }));
     expect(scope.ctx.model.doc.patches?.[INIT_ID]?.volume).toBe(makePatch().volume);
     // A document-only patch has no baseline to restore.
-    scope.ctx.change({ kick: { preset: 'mine' }, patches: { mine: makePatch({ name: 'mine' }) } });
+    scope.ctx.change({
+      ...partChange(FULL_SLOT.kick, { preset: 'mine' }),
+      patches: { mine: makePatch({ name: 'mine' }) },
+    });
     expect(discardEdits(scope)).toBeNull();
   });
 });
@@ -307,7 +317,7 @@ describe('Revert to library', () => {
     edited.volume = 0.2;
     scope.ctx.change({ patches: { [id]: edited } });
     revertPatch(scope.ctx, id, scope.library);
-    expect(scope.ctx.model.doc.kick?.preset).toBe(id);
+    expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe(id);
     expect(scope.ctx.model.doc.patches?.[id]?.volume).toBe(working.volume);
     expect(scope.ctx.model.dangling).toEqual([]);
   });

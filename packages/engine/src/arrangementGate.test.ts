@@ -129,7 +129,10 @@ describe('fixture documents: valid JSON, still rejected', () => {
     const r = makeArrangement({
       ...silentSong,
       patches: { ...silentSong.patches, kick: {} },
-      parts: [...silentSong.parts, { slot: 1, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } }],
+      parts: [
+        ...silentSong.parts,
+        { slot: 1, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } },
+      ],
     });
     expect(r.corrections).toEqual([]);
     expect(isShippable(r)).toBe(true);

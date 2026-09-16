@@ -51,7 +51,7 @@ import { hooks, partsState } from './patchState';
 /** A handle recalled from IndexedDB whose grant the browser dropped; the button re-requests it. */
 let remembered: ChromeDirectoryHandle | null = null;
 
-const scopeFor = (ctx: AppCtx): PatchScope => ({ ctx, library, partId: partsState.selected });
+const scopeFor = (ctx: AppCtx): PatchScope => ({ ctx, library, slot: partsState.selected });
 
 /** The header's account of the mode, and the folder read's problems if any. */
 export function syncLibraryMode(): void {

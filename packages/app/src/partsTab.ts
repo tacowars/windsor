@@ -6,14 +6,10 @@
  * `ctx.change` pushes it to the live part through `AudioSystem.apply`, so the
  * export carries the sound itself.
  */
-import type {
-  MusicPartId,
-  PartialPatch,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { clonePatch, makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import type { PartialPatch } from '../../../packages/client/src/audio/index-for-editor';
+import { clonePatch, makePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
-import { SLOT_IDS } from './context';
-import { $, el, seg } from './dom';
+import { $, el, escapeHtml, seg } from './dom';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, libraryActions } from './libraryActions';
 import { library, libraryPatch } from './libraryModel';
@@ -81,20 +77,20 @@ const GRID_HTML = `
 
 /** Reload the working patch: the document's patch, else the built-in the part plays. */
 export function loadWorkingPatch(ctx: AppCtx): void {
-  const slot = ctx.model.doc[partsState.selected];
-  partsState.part = slot ? ctx.host.part(slot.part) : null;
-  const patch = slot
-    ? (ctx.model.doc.patches?.[slot.preset] ?? libraryPatch(library, slot.preset))
+  const part = partAt(ctx.model.doc, partsState.selected);
+  partsState.part = part ? ctx.host.part(part.slot) : null;
+  const patch = part
+    ? (ctx.model.doc.patches?.[part.preset] ?? libraryPatch(library, part.preset))
     : undefined;
   partsState.patch = patch ? clonePatch(patch) : makePatch();
 }
 
 /** The working patch into the document under the part's preset name (a built-in forks). */
 function commitPatch(ctx: AppCtx): void {
-  const slot = ctx.model.doc[partsState.selected];
-  if (!slot) return;
-  const wasDocument = ctx.model.doc.patches?.[slot.preset] !== undefined;
-  const result = ctx.change({ patches: { [slot.preset]: partsState.patch } });
+  const part = partAt(ctx.model.doc, partsState.selected);
+  if (!part) return;
+  const wasDocument = ctx.model.doc.patches?.[part.preset] !== undefined;
+  const result = ctx.change({ patches: { [part.preset]: partsState.patch } });
   if (result.ok && !wasDocument) syncPresetAndBadge(ctx);
   if (result.ok) hooks.afterCommit();
 }
@@ -111,13 +107,15 @@ function refreshPatchUi(): void {
 function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
   const box = el('div');
   box.appendChild(el('div', 'section-title', '<span>Part</span>'));
-  const present = SLOT_IDS.filter((id) => ctx.model.doc[id] !== undefined);
   box.appendChild(
     seg(
-      present.map((id) => ({ value: id, label: id })),
-      () => partsState.selected,
-      (id) => {
-        partsState.selected = id as MusicPartId;
+      ctx.model.doc.parts.map((part) => ({
+        value: String(part.slot),
+        label: escapeHtml(part.name),
+      })),
+      () => String(partsState.selected),
+      (slot) => {
+        partsState.selected = Number(slot);
         loadWorkingPatch(ctx);
         onSwitch();
         refreshPatchUi();
@@ -205,8 +203,8 @@ export function renderPartsTab(
   body.innerHTML = GRID_HTML;
   hooks.refresh = refreshPatchUi;
   hooks.commit = (): void => commitPatch(ctx);
-  if (!ctx.model.doc[partsState.selected]) {
-    partsState.selected = SLOT_IDS.find((id) => ctx.model.doc[id] !== undefined) ?? 'kick';
+  if (!partAt(ctx.model.doc, partsState.selected)) {
+    partsState.selected = ctx.model.doc.parts[0]?.slot ?? 0;
   }
   loadWorkingPatch(ctx);
   keyboard.followPart();

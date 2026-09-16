@@ -24,7 +24,7 @@ Within `packages/client/src/audio/`:
 | Patch schema, defaults, algorithms | `patch.ts`, `audioConstants.ts`, `patchNormalise.ts` |
 | Factory sounds | `patches/<id>.json` (one file per patch, `patchLibrary.ts` is the contract); `presets.ts` builds `PRESETS` from the generated `patches/index.ts`, `gameplayPatches.ts` names what the game plays |
 | FM synthesis and voice lifecycle | `worklet/fm-processor.js`, `fmEngine.ts`, `audioPart.ts`, `workletMessages.ts` |
-| Song schema and compatibility | `arrangementDocument.ts`, `arrangementNormalise.ts`, `arrangementValidate.ts`, `arrangementPlayer.ts` |
+| Song schema and compatibility | `arrangement.ts` (the part list: slot, name, preset, sequencer kind — #597), `arrangementDocument.ts`, `arrangementNormalise.ts`, `sequencerNormalise.ts`, `arrangementValidate.ts`, `arrangementPlayer.ts`, `documentParts.ts` (slot → engine part name, `removePart`) |
 | Sequencing and harmony | `scheduler.ts`, `stepSequencer.ts`, `euclideanSequencer.ts`, `arpeggiator.ts`, `scaleSampler.ts`, `capturedPattern.ts` |
 | Mixer, delay and plate | `mix.ts`, `channelStrip.ts`, `deskApply.ts`, `returnBus.ts`, `reverbSpace.ts`, `worklet/reverb-processor.js` |
 | Game selection and live changes | `audioSystem.ts`, `arrangementLibrary.ts`, `musicOptions.ts` |
@@ -99,8 +99,11 @@ the chosen patch into the document on selection (`choosePreset`), and knob
 edits commit the working patch there through `pushPatch`.
 
 Normalize through `makeArrangement`, and inspect corrections/dangling
-references. Preserve `patches`, `returns`, mix, harmony, drivers and captured
-patterns through export/import. A partial patch edit differs from replacing
+references. Preserve `patches`, `returns`, each part's strip, harmony,
+sequencers and captured patterns through export/import. A song is `version: 2`
+with 1–8 parts; a part is identified by its `slot` (its engine part is
+`music-<slot>` and its generator stream is seeded by it), never by its name, and
+live partials address it as `{ parts: { <slot>: … } }` (#597). A partial patch edit differs from replacing
 a full patch: recursive objects merge, while patch arrays replace wholesale
 (`mergePatch`). Return IDs/kinds are code-owned; inspect their existing bounds.
 

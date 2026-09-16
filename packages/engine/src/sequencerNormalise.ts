@@ -6,12 +6,7 @@
  * the 96-tick bar, gates in (0, 1] — so building a generator from it cannot
  * throw. `ArrangementNormaliser` (`arrangementNormalise.ts`) calls it per part.
  */
-import type {
-  ArpDriver,
-  EuclideanDriver,
-  SequencerSpec,
-  StepDriver,
-} from './arrangement';
+import type { ArpDriver, EuclideanDriver, SequencerSpec, StepDriver } from './arrangement';
 import { SEQUENCER_KINDS } from './arrangement';
 import type { FieldNormaliser } from './arrangementFields';
 import { ARP_WALK_MODES, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeggiator';
@@ -90,10 +85,10 @@ function euclideanDriver(raw: unknown, path: string, n: FieldNormaliser): Euclid
 }
 
 function pulses(
-raw: unknown,
-steps: number,
-path: string,
-n: FieldNormaliser,
+  raw: unknown,
+  steps: number,
+  path: string,
+  n: FieldNormaliser,
 ): { min: number; max: number; start: number } {
   const d = DEFAULT_EUCLIDEAN_CONFIG.pulses;
   const o = n.section(raw, path);
@@ -104,13 +99,7 @@ n: FieldNormaliser,
     n.correction(`${path}: max ${max} below min ${min} — raised to ${min}`);
     max = min;
   }
-  const start = n.int(
-    o.start,
-    Math.min(Math.max(d.start, min), max),
-    min,
-    max,
-    `${path}.start`,
-  );
+  const start = n.int(o.start, Math.min(Math.max(d.start, min), max), min, max, `${path}.start`);
   return { min, max, start };
 }
 
@@ -148,13 +137,7 @@ function arpDriver(raw: unknown, path: string, n: FieldNormaliser): ArpDriver {
   return {
     divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
     poolSize: n.int(o.poolSize, d.poolSize, 1, POOL_SIZE_MAX, `${path}.poolSize`),
-    refreshBars: n.int(
-      o.refreshBars,
-      d.refreshBars,
-      1,
-      REFRESH_BARS_MAX,
-      `${path}.refreshBars`,
-    ),
+    refreshBars: n.int(o.refreshBars, d.refreshBars, 1, REFRESH_BARS_MAX, `${path}.refreshBars`),
     walk: n.pick(o.walk, ARP_WALK_MODES, d.walk, `${path}.walk`),
     skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
     register: register(o.register, d.register, `${path}.register`, n),

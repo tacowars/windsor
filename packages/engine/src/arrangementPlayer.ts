@@ -194,10 +194,7 @@ export class ArrangementPlayer {
    * arrangement is validated against the staged table, and on failure
    * neither the table nor the arrangement changes.
    */
-  apply(
-    partial: ArrangementPartial,
-    patches: Readonly<Record<string, unknown>> = {},
-  ): ApplyResult {
+  apply(partial: ArrangementPartial, patches: Readonly<Record<string, unknown>> = {}): ApplyResult {
     const { merged, ignored } = mergeArrangement(this.current, partial);
     const staged = stagePatches(this.presets, patches, ignored);
     let plan: Plan;
@@ -274,7 +271,8 @@ export class ArrangementPlayer {
       // An inert part only rebuilds when its kind leaves or enters `none`;
       // a seed or key change has no stream of its to reset.
       const reseeded =
-        next.sequencer.kind !== 'none' && (seedChanged || (isPitched(next.sequencer) && keyChanged));
+        next.sequencer.kind !== 'none' &&
+        (seedChanged || (isPitched(next.sequencer) && keyChanged));
       if (changed || reseeded) rebuilt.add(next.slot);
     }
 
@@ -295,7 +293,10 @@ export class ArrangementPlayer {
       const switched = next.preset !== before.preset;
       const edited = lookupPreset(presets, next.preset) !== lookupPreset(this.presets, next.preset);
       if (switched || edited) {
-        patchChanges.push([next.slot, clonePatch(presetFor(presets, partLabel(next), next.preset))]);
+        patchChanges.push([
+          next.slot,
+          clonePatch(presetFor(presets, partLabel(next), next.preset)),
+        ]);
       }
     }
     return { built, rebuilt, patchChanges, presets };

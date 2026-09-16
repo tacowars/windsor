@@ -7,6 +7,12 @@
     "init-0": {}
   },
   "parts": [
-    { "slot": 0, "name": "Part 1", "preset": "init-0", "velocity": 0.8, "sequencer": { "kind": "none" } }
+    {
+      "slot": 0,
+      "name": "Part 1",
+      "preset": "init-0",
+      "velocity": 0.8,
+      "sequencer": { "kind": "none" }
+    }
   ]
 }

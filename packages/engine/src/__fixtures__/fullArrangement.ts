@@ -85,7 +85,13 @@ const DRONE: MusicPart & { sequencer: StepSpec } = {
   name: 'drone',
   preset: 'drone-sqr',
   velocity: 0.8,
-  sequencer: { kind: 'step', divisor: 96, gate: 1, register: { octave: -1, span: 1 }, pattern: null },
+  sequencer: {
+    kind: 'step',
+    divisor: 96,
+    gate: 1,
+    register: { octave: -1, span: 1 },
+    pattern: null,
+  },
 };
 
 /** Each part by its retired id, typed with its kind so tests need no guards. */

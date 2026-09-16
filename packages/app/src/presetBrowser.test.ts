@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { choosePreset } from './presetBrowser';
 import { DocumentModel } from './documentModel';
 import type { AppCtx } from './context';
-import { FULL_ARRANGEMENT } from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
-import { PRESETS, clonePatch } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  FULL_ARRANGEMENT,
+  FULL_SLOT,
+} from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
+import { PRESETS, clonePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
 
 function context(): AppCtx {
-  const model = new DocumentModel(FULL_ARRANGEMENT);
+  const model = new DocumentModel({ version: 2, ...FULL_ARRANGEMENT });
   return {
     model,
     change: (partial) => {
@@ -20,8 +23,8 @@ describe('browser selection', () => {
     const ctx = context();
     const id = 'score-concrete-chord';
     const original = PRESETS[id]!;
-    expect(choosePreset(ctx, 'arp', id)).toBe(true);
-    expect(ctx.model.doc.arp?.preset).toBe(id);
+    expect(choosePreset(ctx, FULL_SLOT.arp, id)).toBe(true);
+    expect(partAt(ctx.model.doc, FULL_SLOT.arp)?.preset).toBe(id);
     expect(ctx.model.doc.patches?.[id]).toEqual(original);
     const imported = new DocumentModel(JSON.parse(ctx.model.toJson()));
     expect(imported.doc.patches?.[id]).toEqual(original);
@@ -33,15 +36,15 @@ describe('browser selection', () => {
     const patch = clonePatch(PRESETS[id]!);
     patch.volume *= 0.5;
     ctx.model.merge({ patches: { [id]: patch } });
-    expect(choosePreset(ctx, 'drone', id)).toBe(true);
+    expect(choosePreset(ctx, FULL_SLOT.drone, id)).toBe(true);
     expect(ctx.model.doc.patches?.[id]).toEqual(patch);
     expect(PRESETS[id]?.volume).not.toBe(patch.volume);
   });
   it('rejects missing patches without touching the document', () => {
     const ctx = context();
     const before = ctx.model.toJson();
-    expect(choosePreset(ctx, 'arp', 'not-a-patch')).toBe(false);
-    expect(choosePreset(ctx, 'arp', 'constructor')).toBe(false);
+    expect(choosePreset(ctx, FULL_SLOT.arp, 'not-a-patch')).toBe(false);
+    expect(choosePreset(ctx, FULL_SLOT.arp, 'constructor')).toBe(false);
     expect(ctx.model.toJson()).toBe(before);
   });
 });

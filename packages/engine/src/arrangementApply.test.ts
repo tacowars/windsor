@@ -102,9 +102,9 @@ describe('apply', () => {
   it('applies a driver change live: skipChance 0 plays every arp step', () => {
     const { player, parts, run } = rig();
     run(1);
-    expect(player.apply({ parts: { [arp]: { sequencer: { kind: 'arp', skipChance: 0 } } } }).ok).toBe(
-      true,
-    );
+    expect(
+      player.apply({ parts: { [arp]: { sequencer: { kind: 'arp', skipChance: 0 } } } }).ok,
+    ).toBe(true);
     const before = kinds(parts.arp, 'noteOn').length;
     run(4);
     const after = kinds(parts.arp, 'noteOn').length;
@@ -157,7 +157,10 @@ describe('apply', () => {
 
   it('renames a part live: the name is a label (#597)', () => {
     const { player, parts } = rig();
-    expect(player.apply({ parts: { [kick]: { name: 'boom' } } })).toEqual({ ok: true, ignored: [] });
+    expect(player.apply({ parts: { [kick]: { name: 'boom' } } })).toEqual({
+      ok: true,
+      ignored: [],
+    });
     expect(player.arrangement.parts[kick]?.name).toBe('boom');
     expect(parts.kick.calls).toEqual([]);
   });
@@ -193,7 +196,9 @@ describe('apply', () => {
   it('keeps the density union clean across a kind swap', () => {
     const { player } = rig();
     const partial = {
-      parts: { [hat]: { sequencer: { kind: 'euclidean', density: { kind: 'walk', stepChance: 0.5 } } } },
+      parts: {
+        [hat]: { sequencer: { kind: 'euclidean', density: { kind: 'walk', stepChance: 0.5 } } },
+      },
     } as const;
     expect(player.apply(partial).ok).toBe(true);
     const sequencer = player.arrangement.parts[hat]?.sequencer;

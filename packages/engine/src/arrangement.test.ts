@@ -6,12 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  FULL_ARRANGEMENT,
-  FULL_PARTS,
-  FULL_SLOT,
-  onlyParts,
-} from './__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_PARTS, FULL_SLOT, onlyParts } from './__fixtures__/fullArrangement';
 import { mergeArrangement, type ArrangementPartial } from './arrangement';
 
 const { kick, hat, arp } = FULL_SLOT;
@@ -33,7 +28,9 @@ describe('mergeArrangement', () => {
 
   it('addresses a part by slot, not by list position', () => {
     const hatAndArp = onlyParts(FULL_ARRANGEMENT, 'hat', 'arp');
-    const { merged, ignored } = mergeArrangement(hatAndArp, { parts: { [arp]: { velocity: 0.1 } } });
+    const { merged, ignored } = mergeArrangement(hatAndArp, {
+      parts: { [arp]: { velocity: 0.1 } },
+    });
     expect(ignored).toEqual([]);
     // Slot 2 is the list's second entry here.
     expect(merged.parts.map((p) => p.velocity)).toEqual([FULL_PARTS.hat.velocity, 0.1]);
@@ -93,7 +90,9 @@ describe('mergeArrangement', () => {
 
   it('merges within a union when the kind is unchanged', () => {
     const { merged } = mergeArrangement(FULL_ARRANGEMENT, {
-      parts: { [kick]: { sequencer: { kind: 'euclidean', density: { kind: 'lfoBars', bars: 4 } } } },
+      parts: {
+        [kick]: { sequencer: { kind: 'euclidean', density: { kind: 'lfoBars', bars: 4 } } },
+      },
     });
     const sequencer = merged.parts[kick]?.sequencer;
     expect(sequencer?.kind === 'euclidean' && sequencer.density).toEqual({
