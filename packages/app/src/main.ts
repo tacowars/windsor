@@ -1,7 +1,8 @@
 /**
  * The arrangement console (#70, record
  * `2026-08-31-arrangement-console-and-runtime-arrangements`): five tabs over
- * the real engine. It boots on the committed `bed-01.json`, drives one
+ * the real engine. It boots on a new song — one part, the Init patch, no
+ * sequencer (#598) — and a committed song opens through Import. It drives one
  * `AudioSystem`, and every change flows through one pair of operations —
  * `change` (live apply + document merge) and `restructure` (renormalise +
  * rebuild). Export writes the normalised document — since #435 the synth
@@ -12,7 +13,6 @@ import type {
   ApplyResult,
   DocumentPartial,
 } from '../../../packages/client/src/audio/index-for-editor';
-import raw from '../../../packages/client/src/audio/arrangements/bed-01.json';
 import { renderArrangementTab } from './arrangementTab';
 import type { AppCtx } from './context';
 import { partChange } from './context';
@@ -27,12 +27,13 @@ import { renderMixerTab } from './mixerTab';
 import { renderPartsTab } from './partsTab';
 import { partsState } from './patchState';
 import { renderSequencersTab } from './sequencersTab';
+import { newSong } from './songParts';
 
 const status = (message: string): void => {
   $('status').textContent = message;
 };
 
-const model = new DocumentModel(raw);
+const model = new DocumentModel(newSong());
 const host = new EngineHost((line) => status(line));
 // The keyboard plays the Parts tab's selected part, once audio is enabled.
 const keyboard = new Keyboard(() => partsState.part);
@@ -164,11 +165,7 @@ function boot(): void {
   };
   // The look-ahead pump the game's render loop provides; here, a timer.
   setInterval(() => host.update(), 25);
-  status(
-    model.usable
-      ? 'audio off — enable to hear the committed arrangement'
-      : 'audio off — document unusable, the metronome fallback would play',
-  );
+  status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
 }
 
 boot();

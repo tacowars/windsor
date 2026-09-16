@@ -63,9 +63,17 @@ export class DocumentModel {
   /** Patch ids this document took from the library rather than carrying (#562). */
   filled: string[] = [];
   usable = true;
+  /** The export as it stood when this document was opened, for "changed since opened". */
+  private opened = '';
 
   constructor(raw: unknown) {
     this.adopt(this.normalise(raw));
+    this.opened = this.toJson();
+  }
+
+  /** True once any edit has moved the document away from what was opened (#598's New song guard). */
+  get changed(): boolean {
+    return this.toJson() !== this.opened;
   }
 
   /** The editor's normalisation: the library fills what an older document omits. */
@@ -80,6 +88,7 @@ export class DocumentModel {
    */
   open(raw: unknown): void {
     this.adopt(this.normalise(raw));
+    this.opened = this.toJson();
   }
 
   private adopt(result: MakeArrangementResult): void {
