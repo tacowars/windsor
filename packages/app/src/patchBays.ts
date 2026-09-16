@@ -10,20 +10,25 @@ import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import { CARRIER_COLOR, MOD_COLOR } from './patchPanels';
 import { partsState, pathKnob, pushPatch } from './patchState';
+import { ratioControls, showPitchControls } from './ratioKnobs';
 
 const fmt2 = (v: number): string => v.toFixed(2);
 const fmtHz = (v: number): string => (v >= 1000 ? `${(v / 1000).toFixed(2)}k` : v.toFixed(0));
 
 type KnobOpts = Parameters<typeof pathKnob>[2];
 
+/**
+ * The fixed-frequency half of the pitch controls. It is not in `OP_KNOBS`
+ * because the Pitch toggle swaps it against the Coarse / Fine pair (#587),
+ * which is bound through `ratioSplit` rather than to a path of its own.
+ */
+const FIXED_KNOB = {
+  label: 'Fixed',
+  o: { min: 20, max: 8000, def: 100, curve: 'log', fmt: fmtHz } as KnobOpts,
+};
+
 /** Per-operator knobs; `level` gets its per-op default and the bay-fade hook. */
 const OP_KNOBS: ReadonlyArray<{ f: string; label: string; o: KnobOpts }> = [
-  {
-    f: 'ratio',
-    label: 'Ratio',
-    o: { min: 0.25, max: 24, def: 1, step: 0.005, curve: 'log', fmt: (v) => v.toFixed(3) },
-  },
-  { f: 'fixedHz', label: 'Fixed', o: { min: 20, max: 8000, def: 100, curve: 'log', fmt: fmtHz } },
   {
     f: 'detune',
     label: 'Detune',
@@ -55,7 +60,7 @@ function bayHead(i: number, isCar: boolean, adv: HTMLElement): HTMLElement {
   return head;
 }
 
-function waveAndPitchLine(i: number, onWave: () => void): HTMLElement {
+function waveAndPitchLine(i: number, onWave: () => void, onPitchMode: () => void): HTMLElement {
   const line = el('div', 'bay-line');
   const waveWrap = el('div', 'grow', '<span class="field-label">Wave</span>');
   const waveSel = document.createElement('select');
@@ -86,6 +91,7 @@ function waveAndPitchLine(i: number, onWave: () => void): HTMLElement {
     const target = partsState.patch.ops[i];
     if (target) target.fixed = !target.fixed;
     syncFix();
+    onPitchMode();
     pushPatch();
   };
   syncFix();
@@ -116,21 +122,37 @@ function loopModePicker(i: number, color: string): HTMLElement {
   return wrap;
 }
 
-function mainKnobRow(i: number, color: string, syncActive: () => void): HTMLElement {
+/**
+ * The knob row: the pitch controls first — Coarse, Fine and their readout, or
+ * the Fixed Hz knob, whichever the operator's Pitch toggle selects — then the
+ * rest of `OP_KNOBS`. `syncPitch` is what the toggle calls to swap them.
+ */
+function mainKnobRow(
+  i: number,
+  color: string,
+  syncActive: () => void,
+): { root: HTMLElement; syncPitch: () => void } {
   const row = el('div', 'knob-row');
+  const ratioNodes = ratioControls(i, color);
+  for (const node of ratioNodes) row.appendChild(node);
+  const fixedNode = pathKnob(`ops.${i}.fixedHz`, FIXED_KNOB.label, { ...FIXED_KNOB.o, color });
+  row.appendChild(fixedNode);
   for (const k of OP_KNOBS) {
     const extra: KnobOpts = k.f === 'level' ? { onChange: syncActive, def: i === 0 ? 1 : 0 } : {};
     row.appendChild(pathKnob(`ops.${i}.${k.f}`, k.label, { ...k.o, ...extra, color }));
   }
-  return row;
+  const syncPitch = (): void => showPitchControls(op(i).fixed, ratioNodes, fixedNode);
+  syncPitch();
+  return { root: row, syncPitch };
 }
 
 function bayBody(i: number, color: string, syncActive: () => void): HTMLElement {
   const body = el('div', 'bay-body');
   const harmonics = harmonicEditor(i, color);
-  body.appendChild(waveAndPitchLine(i, harmonics.sync));
+  const knobs = mainKnobRow(i, color, syncActive);
+  body.appendChild(waveAndPitchLine(i, harmonics.sync, knobs.syncPitch));
   body.appendChild(harmonics.root);
-  body.appendChild(mainKnobRow(i, color, syncActive));
+  body.appendChild(knobs.root);
 
   const canvas = el('canvas', 'env-canvas') as HTMLCanvasElement;
   canvas.setAttribute('aria-label', `Operator ${OP_NAMES[i]} envelope shape`);

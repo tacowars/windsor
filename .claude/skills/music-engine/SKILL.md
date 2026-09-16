@@ -38,6 +38,7 @@ synth, effect graph or sequencer in the console.
 | Console task | Read/edit |
 |---|---|
 | Operator bays, knobs, the User-wave harmonic editor | `src/patchBays.ts`, `src/knob.ts`, `src/harmonicEditor.ts`, `src/harmonicModel.ts` (pure) |
+| The operator's Coarse / Fine ratio pair (#587) | `src/ratioSplit.ts` (pure: `split`/`join` over the one `ops.<i>.ratio` field), `src/ratioKnobs.ts` (the specs, the readout, the Fixed swap) |
 | Preset browsing and selection | `src/presetBrowser.ts` (exported as `presetPicker` by `src/patchLibrary.ts`) |
 | Audition input: QWERTY, on-screen keys, MIDI | `src/keyboard.ts` (the one note path, Hold, Panic, bend/wheel); MIDI in `src/midiMessage.ts`, `src/midiPerformer.ts`, `src/midiInputs.ts` (pure) and `src/midiAccess.ts`, `src/midiPanel.ts` (Web MIDI, device selector) |
 | Library writes: Init, Save, Copy to new, Delete (#563) | `src/patchActions.ts` (pure, over `src/libraryModel.ts`), `src/libraryActions.ts` (the row), `src/patchFileWriter.ts` (the file bytes via `audio/patchFileSerialise.ts`), `src/patchMetadata.ts` (ids, names, tags; pure), `src/libraryConstants.ts` |

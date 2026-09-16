@@ -300,6 +300,35 @@
         pointer-events: none;
       }
 
+      /* The combined ratio beside the Coarse / Fine pair (#587): a knob's
+         value and label without the dial, so the stored number is always
+         readable while the two halves move. */
+      .knob-readout {
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 1px;
+        padding: 3px 3px 6px;
+        min-width: 42px;
+      }
+      .knob-readout .readout-val {
+        font-family: var(--f-num);
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+      }
+      .knob-readout .readout-label {
+        font-family: var(--f-panel);
+        font-size: 8.5px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        white-space: nowrap;
+      }
+
       /* ---------- controls ---------- */
 
       .seg {
