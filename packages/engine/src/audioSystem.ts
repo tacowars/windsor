@@ -28,23 +28,22 @@
  * becomes one.
  *
  * Music comes in as an `ArrangementDocument` (issue #75): the committed JSON,
- * normalised by `makeArrangement`. `initMusic` builds a part per section the
- * document defines — on the document's own patch where `patches` names it,
- * on the document's strip overlay where `mix` does — and lands the `returns`
- * overlay on the live return buses; `apply` takes a deep partial of the same
- * document model — arrangement fields through the player, `patches` onto the
- * parts, `mix` and `returns` onto the live desk (`deskApply.ts`).
+ * normalised by `makeArrangement`. `initMusic` builds a part per entry in the
+ * document's part list — on the patch its `patches` section carries, on the
+ * part's own strip — and lands the `returns` overlay on the live return
+ * buses; `apply` takes a deep partial of the same document model —
+ * arrangement fields through the player, `patches` onto the parts, each
+ * part's `strip` and the `returns` onto the live desk (`deskApply.ts`).
  */
-import type { DeepPartial } from './arrangement';
-import type { ArrangementDocument } from './arrangementDocument';
+import type { ArrangementPartial } from './arrangement';
+import type { ArrangementDocument, DocumentPartial } from './arrangementDocument';
 import type {
   ApplyResult,
   ArrangementReadout,
   MusicEventHandler,
-  MusicPartId,
   PlayablePart,
 } from './arrangementPlayer';
-import { ArrangementPlayer, MUSIC_PART_IDS } from './arrangementPlayer';
+import { ArrangementPlayer } from './arrangementPlayer';
 import { PatchResolver } from './arrangementValidate';
 import { AUDIO_LOAD_REPORT_SECONDS, MUSIC_PART_MAX_VOICES } from './audioConstants';
 import type { AudioCostReadout } from './audioCost';
@@ -57,7 +56,8 @@ import type { AudioPart } from './audioPart';
 import type { NotePattern } from './capturedPattern';
 import type { PartStrip } from './channelStrip';
 import { routePart } from './channelStrip';
-import { applyMixLive, applyReturnsLive } from './deskApply';
+import { applyReturnsLive, applyStripLive } from './deskApply';
+import { musicPartName } from './documentParts';
 import { FmEngine } from './fmEngine';
 import type { ChannelStrip, ReturnSpec } from './mix';
 import { MIX, RETURNS, stripFor } from './mix';
@@ -67,6 +67,32 @@ import { GAMEPLAY_PATCHES, type GameplayPatchId } from './gameplayPatches';
 import type { ReturnBus } from './returnBus';
 import { createReturns } from './returnBus';
 import { Scheduler } from './scheduler';
+
+/**
+ * A document parts partial split in two (#597): what the player merges, and
+ * each slot's `strip` partial, which lands on the live graph instead.
+ */
+function splitStrips(parts: DocumentPartial['parts']): {
+  arrangementParts: Record<string, unknown> | undefined;
+  strips: Array<readonly [string, unknown]>;
+} {
+  if (parts === undefined) return { arrangementParts: undefined, strips: [] };
+  if (typeof parts !== 'object' || parts === null || Array.isArray(parts)) {
+    return { arrangementParts: parts as Record<string, unknown>, strips: [] };
+  }
+  const arrangementParts: Record<string, unknown> = {};
+  const strips: Array<readonly [string, unknown]> = [];
+  for (const [slot, raw] of Object.entries(parts as Record<string, unknown>)) {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+      arrangementParts[slot] = raw;
+      continue;
+    }
+    const { strip, ...rest } = raw as Record<string, unknown>;
+    if (strip !== undefined) strips.push([slot, strip]);
+    arrangementParts[slot] = rest;
+  }
+  return { arrangementParts, strips };
+}
 
 export interface AudioSystemOptions {
   /** Start suspended and wait for a gesture. Always true in a real page. */
@@ -248,10 +274,10 @@ export class AudioSystem {
   }
 
   /**
-   * Build a music part per section the document defines and bind the
-   * generators to the transport (issues #69, #75). A part lands on the
-   * document's strip overlay when the `mix` section names it, on the code's
-   * `MIX` otherwise. Idempotent. Nothing sounds until `startMusic()`; under
+   * Build a music part per part the document lists and bind the generators
+   * to the transport (issues #69, #75, #597). Each part lands on its own
+   * strip and is registered under its slot (`musicPartName`), never its
+   * label; a `none` part is built and playable but nothing sequences it. Idempotent. Nothing sounds until `startMusic()`; under
    * `?music=0` main.ts builds this but never starts the transport, so the
    * whole graph exists on a silent page (refinement decision 2).
    *
@@ -263,20 +289,21 @@ export class AudioSystem {
    */
   initMusic(document: ArrangementDocument, onEvent?: MusicEventHandler): void {
     if (this.player) return;
-    const { mix, returns, patches, ...arrangement } = document;
+    const { returns, patches, ...arrangement } = document;
     // The document and nothing else (#562): a song carries a snapshot of
     // every patch it plays, so the library is not a runtime import and a
     // name it does not embed is a load error, never a silent fallback.
     const resolver = new PatchResolver(patches ?? {});
-    const parts: Partial<Record<MusicPartId, PlayablePart>> = {};
-    for (const id of MUSIC_PART_IDS) {
-      const section = arrangement[id];
-      if (!section) continue;
-      parts[id] = this.createMusicPart(
-        section.part,
-        clonePatch(resolver.require(id, section.preset)),
-        MUSIC_PART_MAX_VOICES,
-        mix?.[section.part],
+    const parts = new Map<number, PlayablePart>();
+    for (const part of arrangement.parts) {
+      parts.set(
+        part.slot,
+        this.createMusicPart(
+          musicPartName(part.slot),
+          clonePatch(resolver.require(`part ${part.slot}`, part.preset)),
+          MUSIC_PART_MAX_VOICES,
+          part.strip,
+        ),
       );
     }
     if (returns) applyReturnsLive(this.standing().returns, returns);
@@ -339,16 +366,26 @@ export class AudioSystem {
    * Live tuning over the document model (refinement decision 3; issue #75):
    * merge a partial document over the current state. Arrangement fields go
    * through the player — a merged arrangement that fails validation changes
-   * nothing — and `mix` entries land on the live strips, only the fields the
-   * partial names, with unknown names reported in `ignored`.
+   * nothing — and a part's `strip` lands on its live strip, only the fields
+   * the partial names, with unknown names reported in `ignored` (#597).
    */
-  apply(partial: DeepPartial<ArrangementDocument>): ApplyResult {
+  apply(partial: DocumentPartial): ApplyResult {
     if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
-    const { mix, returns, patches, ...rest } = partial;
-    const result = this.player.apply(rest, patches ?? {});
+    const { returns, patches, parts, ...rest } = partial;
+    const { arrangementParts, strips } = splitStrips(parts);
+    const result = this.player.apply(
+      arrangementParts === undefined
+        ? rest
+        : { ...rest, parts: arrangementParts as NonNullable<ArrangementPartial['parts']> },
+      patches ?? {},
+    );
     if (!result.ok) return result;
     const ignored = [...result.ignored];
-    if (mix !== undefined) ignored.push(...applyMixLive(this.strips, mix));
+    for (const [slot, strip] of strips) {
+      const live = this.strips.get(musicPartName(Number(slot)));
+      // An absent slot was already reported by the player's merge.
+      if (live) ignored.push(...applyStripLive(live, strip, `parts.${slot}.strip`));
+    }
     if (returns !== undefined) ignored.push(...applyReturnsLive(this.standing().returns, returns));
     return { ok: true, ignored };
   }
@@ -358,7 +395,7 @@ export class AudioSystem {
       bpm: this.scheduler.bpm,
       root: NaN,
       scale: [],
-      counters: { kick: 0, hat: 0, arp: 0, drone: 0 },
+      counters: {},
     };
     return {
       ...base,
@@ -368,12 +405,9 @@ export class AudioSystem {
     };
   }
 
-  /** The sounding pattern of a music part (issue #70 capture); null before one exists. */
-  capturePattern(id: 'kick' | 'hat'): readonly boolean[] | null;
-  capturePattern(id: 'arp' | 'drone'): NotePattern | null;
-  capturePattern(id: MusicPartId): readonly boolean[] | NotePattern | null;
-  capturePattern(id: MusicPartId): readonly boolean[] | NotePattern | null {
-    return this.player?.capturePattern(id) ?? null;
+  /** The sounding pattern of the part on `slot` (issue #70 capture); null before one exists. */
+  capturePattern(slot: number): readonly boolean[] | NotePattern | null {
+    return this.player?.capturePattern(slot) ?? null;
   }
 
   /** The live strip of a part this system created. */

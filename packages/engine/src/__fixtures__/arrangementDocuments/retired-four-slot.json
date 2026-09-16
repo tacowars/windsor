@@ -6,7 +6,7 @@
     "drone-sqr": {}
   },
   "drone": {
-    "part": "bass",
+    "part": "drone",
     "preset": "drone-sqr",
     "velocity": 0.8,
     "driver": { "divisor": 96, "gate": 1, "register": { "octave": -1, "span": 1 } }

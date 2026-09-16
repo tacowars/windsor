@@ -1,71 +1,106 @@
 /**
  * `mergeArrangement` implements the apply-over-defaults contract (issue #69,
- * refinement decision 3). The shipped arrangement's own validity is asserted
- * where the arrangement now lives (issue #75): `arrangementGate.test.ts`, on
- * the committed JSON document.
+ * refinement decision 3), over a part list addressed by slot (#597). The
+ * shipped arrangement's own validity is asserted where the arrangement lives
+ * (issue #75): `arrangementGate.test.ts`, on the committed JSON document.
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
-import { mergeArrangement, type Arrangement, type DeepPartial } from './arrangement';
+import {
+  FULL_ARRANGEMENT,
+  FULL_PARTS,
+  FULL_SLOT,
+  onlyParts,
+} from './__fixtures__/fullArrangement';
+import { mergeArrangement, type ArrangementPartial } from './arrangement';
+
+const { kick, hat, arp } = FULL_SLOT;
 
 describe('mergeArrangement', () => {
   it('changes only the named fields and leaves the input untouched', () => {
     const before = JSON.stringify(FULL_ARRANGEMENT);
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, {
       bpm: 90,
-      arp: { velocity: 0.5 },
+      parts: { [arp]: { velocity: 0.5 } },
     });
     expect(ignored).toEqual([]);
     expect(merged.bpm).toBe(90);
-    expect(merged.arp?.velocity).toBe(0.5);
-    expect(merged.arp?.driver).toEqual(FULL_ARRANGEMENT.arp.driver);
-    expect(merged.kick).toEqual(FULL_ARRANGEMENT.kick);
+    expect(merged.parts[arp]?.velocity).toBe(0.5);
+    expect(merged.parts[arp]?.sequencer).toEqual(FULL_PARTS.arp.sequencer);
+    expect(merged.parts[kick]).toEqual(FULL_PARTS.kick);
     expect(JSON.stringify(FULL_ARRANGEMENT)).toBe(before);
   });
 
+  it('addresses a part by slot, not by list position', () => {
+    const hatAndArp = onlyParts(FULL_ARRANGEMENT, 'hat', 'arp');
+    const { merged, ignored } = mergeArrangement(hatAndArp, { parts: { [arp]: { velocity: 0.1 } } });
+    expect(ignored).toEqual([]);
+    // Slot 2 is the list's second entry here.
+    expect(merged.parts.map((p) => p.velocity)).toEqual([FULL_PARTS.hat.velocity, 0.1]);
+  });
+
   it('reports unknown keys by path and ignores them', () => {
-    const partial = { bogus: 1, kick: { nope: 2, velocity: 0.9 } } as DeepPartial<Arrangement>;
+    const partial = {
+      bogus: 1,
+      parts: { [kick]: { nope: 2, velocity: 0.9 } },
+    } as unknown as ArrangementPartial;
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, partial);
-    expect(ignored.sort()).toEqual(['bogus', 'kick.nope']);
-    expect(merged.kick?.velocity).toBe(0.9);
+    expect(ignored.sort()).toEqual(['bogus', 'parts.0.nope']);
+    expect(merged.parts[kick]?.velocity).toBe(0.9);
   });
 
   it('ignores and reports an object arriving where a leaf lives', () => {
-    const partial = { bpm: { oops: 1 } } as unknown as DeepPartial<Arrangement>;
+    const partial = { bpm: { oops: 1 } } as unknown as ArrangementPartial;
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, partial);
     expect(ignored).toEqual(['bpm']);
     expect(merged.bpm).toBe(FULL_ARRANGEMENT.bpm);
   });
 
-  it('ignores and reports a partial naming an absent part slot', () => {
+  it('ignores and reports a partial naming an absent slot', () => {
     // A part that was never initialised has no AudioPart; it cannot be added live.
-    const kickOnly: Arrangement = {
-      seed: FULL_ARRANGEMENT.seed,
-      bpm: FULL_ARRANGEMENT.bpm,
-      key: FULL_ARRANGEMENT.key,
-      kick: FULL_ARRANGEMENT.kick,
-    };
-    const { merged, ignored } = mergeArrangement(kickOnly, { drone: { velocity: 0.5 } });
-    expect(ignored).toEqual(['drone']);
-    expect(merged.drone).toBeUndefined();
-    expect(merged.kick).toEqual(FULL_ARRANGEMENT.kick);
+    const kickOnly = onlyParts(FULL_ARRANGEMENT, 'kick');
+    const { merged, ignored } = mergeArrangement(kickOnly, { parts: { 5: { velocity: 0.5 } } });
+    expect(ignored).toEqual(['parts.5']);
+    expect(merged.parts).toEqual(kickOnly.parts);
+  });
+
+  it('ignores a parts list: adding or removing parts is a rebuild, not a partial', () => {
+    const partial = { parts: [FULL_PARTS.kick] } as unknown as ArrangementPartial;
+    const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, partial);
+    expect(ignored).toEqual(['parts']);
+    expect(merged.parts).toEqual(FULL_ARRANGEMENT.parts);
   });
 
   it('replaces a tagged union wholesale when the kind changes', () => {
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, {
-      hat: { driver: { density: { kind: 'walk', stepChance: 0.5 } } },
+      parts: { [hat]: { sequencer: { density: { kind: 'walk', stepChance: 0.5 } } } },
     });
     expect(ignored).toEqual([]);
     // No lfoBars fields left lying around in the data (#70 round-trips it).
-    expect(merged.hat?.driver.density).toEqual({ kind: 'walk', stepChance: 0.5 });
+    const sequencer = merged.parts[hat]?.sequencer;
+    expect(sequencer?.kind === 'euclidean' && sequencer.density).toEqual({
+      kind: 'walk',
+      stepChance: 0.5,
+    });
+  });
+
+  it('replaces the sequencer wholesale when its kind changes (#597)', () => {
+    const { merged } = mergeArrangement(FULL_ARRANGEMENT, {
+      parts: { [kick]: { sequencer: { kind: 'none' } } },
+    });
+    expect(merged.parts[kick]?.sequencer).toEqual({ kind: 'none' });
   });
 
   it('merges within a union when the kind is unchanged', () => {
     const { merged } = mergeArrangement(FULL_ARRANGEMENT, {
-      kick: { driver: { density: { kind: 'lfoBars', bars: 4 } } },
+      parts: { [kick]: { sequencer: { kind: 'euclidean', density: { kind: 'lfoBars', bars: 4 } } } },
     });
-    expect(merged.kick?.driver.density).toEqual({ kind: 'lfoBars', bars: 4, shape: 'tri' });
+    const sequencer = merged.parts[kick]?.sequencer;
+    expect(sequencer?.kind === 'euclidean' && sequencer.density).toEqual({
+      kind: 'lfoBars',
+      bars: 4,
+      shape: 'tri',
+    });
   });
 
   it('replaces arrays and the scale wholesale', () => {

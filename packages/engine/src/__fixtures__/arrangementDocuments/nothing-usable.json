@@ -1,9 +1,7 @@
 {
+  "version": 2,
   "seed": 7,
   "bpm": 128,
   "key": { "root": 50, "scale": "dorian", "weights": [4, 1, 2, 2, 3, 1, 2] },
-  "kick": 12,
-  "hat": [],
-  "arp": "loud",
-  "drone": { "part": "drone", "velocity": 0.8 }
+  "parts": [12, [], "loud", { "slot": 3, "name": "drone", "velocity": 0.8 }]
 }

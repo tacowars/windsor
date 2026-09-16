@@ -1,68 +1,55 @@
 /**
  * The binding layer, driven headlessly: a `TickTransport` on one side, fake
  * parts recording calls on the other. Onset → trigger, noteOn/noteOff →
- * noteOn/noteOffByNote, and the drone's ties reach the part as *silence* —
- * no retrigger — which is the event-level half of issue #69's tie criterion.
+ * noteOn/noteOffByNote, and the step sequencer's ties reach the part as
+ * *silence* — no retrigger — which is the event-level half of issue #69's tie
+ * criterion. Since #597 any kind sits on any slot, and a `none` part is inert.
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
-import type { Arrangement } from './arrangement';
-import { ArrangementPlayer, type MusicPartId, type PlayablePart } from './arrangementPlayer';
-import type { Patch } from './patch';
+import {
+  FULL_ARRANGEMENT,
+  FULL_PARTS,
+  FULL_SLOT,
+  onlyParts,
+  slotMap,
+  withPart,
+  type FullPartId,
+} from './__fixtures__/fullArrangement';
+import { kinds, recordingPart, type RecordingPart } from './__fixtures__/recordingPart';
+import type { Arrangement, MusicPart } from './arrangement';
+import { ArrangementPlayer } from './arrangementPlayer';
 import { makePatch } from './patch';
 import { PRESETS } from './presets';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
 
-interface Call {
-  kind: 'trigger' | 'noteOn' | 'noteOffByNote' | 'setPatch' | 'allNotesOff';
-  note?: number | undefined;
-  velocity?: number | undefined;
-  duration?: number | undefined;
-  time?: number | undefined;
-  patch?: string | undefined;
-}
+const { kick, hat, arp, drone } = FULL_SLOT;
 
-type RecordingPart = PlayablePart & { calls: Call[] };
-
-function fakePart(): RecordingPart {
-  const calls: Call[] = [];
-  return {
-    calls,
-    noteOn(note, velocity, time) {
-      calls.push({ kind: 'noteOn', note, velocity, time });
-      return calls.length;
-    },
-    noteOffByNote(note, time) {
-      calls.push({ kind: 'noteOffByNote', note, time });
-    },
-    trigger(note, velocity, duration, time) {
-      calls.push({ kind: 'trigger', note, velocity, duration, time });
-      return calls.length;
-    },
-    setPatch(patch: Patch) {
-      calls.push({ kind: 'setPatch', patch: patch.name });
-    },
-    allNotesOff() {
-      calls.push({ kind: 'allNotesOff' });
-    },
-  };
-}
+const fourParts = (): Record<FullPartId, RecordingPart> => ({
+  kick: recordingPart(),
+  hat: recordingPart(),
+  arp: recordingPart(),
+  drone: recordingPart(),
+});
 
 interface Rig {
   transport: TickTransport;
-  parts: Record<MusicPartId, RecordingPart>;
+  parts: Record<FullPartId, RecordingPart>;
   player: ArrangementPlayer;
-  events: Array<{ part: MusicPartId; tick: number }>;
+  events: Array<{ slot: number; tick: number }>;
   run(bars: number): void;
 }
 
 function rig(arrangement: Arrangement = FULL_ARRANGEMENT): Rig {
   const transport = new TickTransport(120);
-  const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
+  const parts = fourParts();
   const events: Rig['events'] = [];
-  const player = new ArrangementPlayer(transport, parts, arrangement, PRESETS, (part, tick) =>
-    events.push({ part, tick }),
+  const player = new ArrangementPlayer(
+    transport,
+    slotMap(parts),
+    arrangement,
+    PRESETS,
+    (part, tick) => events.push({ slot: part.slot, tick }),
   );
   const run = (bars: number): void => {
     for (let i = 0; i < bars * TICKS_PER_BAR; i++) transport.advance(transport.transportSeconds);
@@ -70,10 +57,7 @@ function rig(arrangement: Arrangement = FULL_ARRANGEMENT): Rig {
   return { transport, parts, player, events, run };
 }
 
-const kinds = (part: RecordingPart, kind: Call['kind']): Call[] =>
-  part.calls.filter((c) => c.kind === kind);
-
-/** One sounding degree, one octave: every drone draw is the same MIDI note. */
+/** One sounding degree, one octave: every step-sequencer draw is the same MIDI note. */
 const TIED: Arrangement = {
   ...FULL_ARRANGEMENT,
   key: { root: 48, scale: [0], weights: [1] },
@@ -89,21 +73,19 @@ describe('bindings', () => {
     const { parts, player, events, run } = rig();
     run(8);
     const counters = player.readout().counters;
-    for (const id of ['kick', 'hat', 'arp', 'drone'] as const) {
-      expect(counters[id], id).toBeGreaterThan(0);
-    }
-    expect(kinds(parts.kick, 'trigger').length).toBe(counters.kick);
-    expect(kinds(parts.hat, 'trigger').length).toBe(counters.hat);
-    expect(events.map((e) => e.part).sort()).toEqual(['arp', 'drone', 'hat', 'kick']);
+    for (const slot of [kick, hat, arp, drone]) expect(counters[slot], `${slot}`).toBeGreaterThan(0);
+    expect(kinds(parts.kick, 'trigger').length).toBe(counters[kick]);
+    expect(kinds(parts.hat, 'trigger').length).toBe(counters[hat]);
+    expect(events.map((e) => e.slot).sort()).toEqual([kick, hat, arp, drone]);
   });
 
-  it('maps a percussion onset to trigger with the arrangement note, velocity and hold', () => {
+  it('maps a Euclidean onset to trigger with the part note, velocity and hold', () => {
     const { parts, run } = rig();
     run(2);
     for (const call of kinds(parts.kick, 'trigger')) {
-      expect(call.note).toBe(FULL_ARRANGEMENT.kick.note);
-      expect(call.velocity).toBe(FULL_ARRANGEMENT.kick.velocity);
-      expect(call.duration).toBe(FULL_ARRANGEMENT.kick.hold);
+      expect(call.note).toBe(FULL_PARTS.kick.sequencer.note);
+      expect(call.velocity).toBe(FULL_PARTS.kick.velocity);
+      expect(call.duration).toBe(FULL_PARTS.kick.sequencer.hold);
     }
   });
 
@@ -121,7 +103,7 @@ describe('bindings', () => {
     });
   });
 
-  it('ties the drone: one noteOn across bars, no retrigger, released on demand', () => {
+  it('ties the step part: one noteOn across bars, no retrigger, released on demand', () => {
     const { parts, player, run } = rig(TIED);
     run(4);
     expect(kinds(parts.drone, 'noteOn')).toHaveLength(1);
@@ -145,44 +127,104 @@ describe('bindings', () => {
     }
   });
 
-  it('plays only the parts the arrangement defines (issue #75)', () => {
-    const kickOnly: Arrangement = {
-      seed: FULL_ARRANGEMENT.seed,
-      bpm: FULL_ARRANGEMENT.bpm,
-      key: FULL_ARRANGEMENT.key,
-      kick: FULL_ARRANGEMENT.kick,
-    };
-    const { parts, player, run } = rig(kickOnly);
+  it('plays only the parts the arrangement lists (issue #75)', () => {
+    const { parts, player, run } = rig(onlyParts(FULL_ARRANGEMENT, 'kick'));
     run(4);
-    expect(player.readout().counters.kick).toBeGreaterThan(0);
+    expect(player.readout().counters[kick]).toBeGreaterThan(0);
+    expect(Object.keys(player.readout().counters)).toEqual([String(kick)]);
     expect(parts.hat.calls).toEqual([]);
     expect(parts.arp.calls).toEqual([]);
     expect(parts.drone.calls).toEqual([]);
   });
 });
 
+describe('any sequencer on any slot (#597)', () => {
+  /** Four arpeggiators, one per slot: each draws its own stream. */
+  const FOUR_ARPS: Arrangement = {
+    ...FULL_ARRANGEMENT,
+    parts: [kick, hat, arp, drone].map(
+      (slot): MusicPart => ({ ...FULL_PARTS.arp, slot, name: `arp ${slot}` }),
+    ),
+  };
+
+  it('plays four arpeggiators, each on its own slot’s stream', () => {
+    const { parts, run } = rig(FOUR_ARPS);
+    run(4);
+    const streams = Object.values(parts).map((p) => JSON.stringify(kinds(p, 'noteOn')));
+    for (const stream of streams) expect(stream).not.toBe('[]');
+    expect(new Set(streams).size).toBe(4);
+    // Slot 2's arpeggiator is bed-01's arp exactly: the slot is the stream.
+    const bed = rig();
+    bed.run(4);
+    expect(kinds(parts.arp, 'noteOn')).toEqual(kinds(bed.parts.arp, 'noteOn'));
+  });
+
+  it('plays three Euclidean parts and one step part', () => {
+    const mixed: Arrangement = {
+      ...FULL_ARRANGEMENT,
+      parts: [
+        FULL_PARTS.kick,
+        FULL_PARTS.hat,
+        { ...FULL_PARTS.kick, slot: arp, name: 'rim', sequencer: { ...FULL_PARTS.hat.sequencer, note: 37 } },
+        FULL_PARTS.drone,
+      ],
+    };
+    const { parts, run } = rig(mixed);
+    run(4);
+    expect(kinds(parts.arp, 'trigger').length).toBeGreaterThan(0);
+    expect(kinds(parts.arp, 'trigger').every((c) => c.note === 37)).toBe(true);
+    expect(kinds(parts.drone, 'noteOn').length).toBeGreaterThan(0);
+  });
+
+  it('keeps a part’s stream when another part is removed or the list is reordered', () => {
+    const bed = rig();
+    const without = rig(onlyParts(FULL_ARRANGEMENT, 'hat', 'drone', 'arp'));
+    const reordered = rig({ ...FULL_ARRANGEMENT, parts: [...FULL_ARRANGEMENT.parts].reverse() });
+    for (const r of [bed, without, reordered]) r.run(4);
+    expect(kinds(without.parts.arp, 'noteOn')).toEqual(kinds(bed.parts.arp, 'noteOn'));
+    expect(kinds(reordered.parts.arp, 'noteOn')).toEqual(kinds(bed.parts.arp, 'noteOn'));
+    expect(kinds(reordered.parts.hat, 'trigger')).toEqual(kinds(bed.parts.hat, 'trigger'));
+  });
+
+  it('leaves a none part inert and every other part’s notes unchanged', () => {
+    const bed = rig();
+    const inert = rig(withPart(FULL_ARRANGEMENT, 'drone', { sequencer: { kind: 'none' } }));
+    for (const r of [bed, inert]) r.run(8);
+    expect(inert.parts.drone.calls).toEqual([]);
+    expect(inert.player.readout().counters[drone]).toBe(0);
+    expect(inert.player.capturePattern(drone)).toBeNull();
+    for (const id of ['kick', 'hat', 'arp'] as const) {
+      expect(inert.parts[id].calls, id).toEqual(bed.parts[id].calls);
+    }
+    inert.player.releaseAll();
+    expect(kinds(inert.parts.drone, 'allNotesOff')).toHaveLength(1);
+  });
+});
+
 describe('the preset table (#435)', () => {
   it('resolves a part against the table it was given, document patches first', () => {
-    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
+    const parts = fourParts();
     const lead = makePatch({ name: 'lead' });
-    const arrangement: Arrangement = {
-      ...FULL_ARRANGEMENT,
-      arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
-    };
-    expect(() => new ArrangementPlayer(new TickTransport(), parts, arrangement, PRESETS)).toThrow(
-      'arp: unknown audio preset "lead"',
-    );
-    const player = new ArrangementPlayer(new TickTransport(), parts, arrangement, {
+    const arrangement = withPart(FULL_ARRANGEMENT, 'arp', { preset: 'lead' });
+    expect(
+      () => new ArrangementPlayer(new TickTransport(), slotMap(parts), arrangement, PRESETS),
+    ).toThrow('part 2 ("arp"): unknown audio preset "lead"');
+    const player = new ArrangementPlayer(new TickTransport(), slotMap(parts), arrangement, {
       ...PRESETS,
       lead,
     });
-    expect(player.apply({ drone: { preset: 'lead' } }).ok).toBe(true);
+    expect(player.apply({ parts: { [drone]: { preset: 'lead' } } }).ok).toBe(true);
     expect(parts.drone.calls.at(-1)).toEqual({ kind: 'setPatch', patch: 'lead' });
   });
 
   it('a patches partial merges over the table entry and pushes to the parts playing it', () => {
-    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
+    const parts = fourParts();
+    const player = new ArrangementPlayer(
+      new TickTransport(),
+      slotMap(parts),
+      FULL_ARRANGEMENT,
+      PRESETS,
+    );
     expect(player.apply({}, { kick: { volume: 0.2 }, junk: 4 })).toEqual({
       ok: true,
       ignored: ['patches.junk'],
@@ -190,36 +232,49 @@ describe('the preset table (#435)', () => {
     expect(parts.kick.calls).toEqual([{ kind: 'setPatch', patch: PRESETS.kick?.name }]);
     expect(parts.hat.calls).toEqual([]);
     // The merged patch is the table's from now on: a switch away and back keeps the edit.
-    expect(player.apply({ kick: { preset: 'hat' } }).ok).toBe(true);
-    expect(player.apply({ kick: { preset: 'kick' } }).ok).toBe(true);
-    expect(parts.kick.calls.filter((c) => c.kind === 'setPatch')).toHaveLength(3);
+    expect(player.apply({ parts: { [kick]: { preset: 'hat' } } }).ok).toBe(true);
+    expect(player.apply({ parts: { [kick]: { preset: 'kick' } } }).ok).toBe(true);
+    expect(kinds(parts.kick, 'setPatch')).toHaveLength(3);
   });
 
   it('takes a preset switch and the patch it names in one partial (review finding 1)', () => {
-    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
-    const result = player.apply({ arp: { preset: 'fresh' } }, { fresh: { volume: 0.2 } });
+    const parts = fourParts();
+    const player = new ArrangementPlayer(
+      new TickTransport(),
+      slotMap(parts),
+      FULL_ARRANGEMENT,
+      PRESETS,
+    );
+    const result = player.apply({ parts: { [arp]: { preset: 'fresh' } } }, { fresh: { volume: 0.2 } });
     expect(result).toEqual({ ok: true, ignored: [] });
-    expect(parts.arp.calls.filter((c) => c.kind === 'setPatch')).toEqual([
-      { kind: 'setPatch', patch: 'fresh' },
-    ]);
+    expect(kinds(parts.arp, 'setPatch')).toEqual([{ kind: 'setPatch', patch: 'fresh' }]);
   });
 
   it('changes neither the table nor the arrangement when the merged arrangement is refused', () => {
-    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
+    const parts = fourParts();
+    const player = new ArrangementPlayer(
+      new TickTransport(),
+      slotMap(parts),
+      FULL_ARRANGEMENT,
+      PRESETS,
+    );
     expect(player.apply({ bpm: -1 }, { fresh: { volume: 0.2 } }).ok).toBe(false);
     expect(parts.arp.calls).toEqual([]);
     // The staged patch was discarded with the refused partial.
-    expect(player.apply({ arp: { preset: 'fresh' } }).ok).toBe(false);
+    expect(player.apply({ parts: { [arp]: { preset: 'fresh' } } }).ok).toBe(false);
   });
 
   it('never resolves an inherited object name as a preset', () => {
-    const parts = { kick: fakePart(), hat: fakePart(), arp: fakePart(), drone: fakePart() };
-    const player = new ArrangementPlayer(new TickTransport(), parts, FULL_ARRANGEMENT, PRESETS);
-    expect(player.apply({ arp: { preset: 'constructor' } })).toMatchObject({
+    const parts = fourParts();
+    const player = new ArrangementPlayer(
+      new TickTransport(),
+      slotMap(parts),
+      FULL_ARRANGEMENT,
+      PRESETS,
+    );
+    expect(player.apply({ parts: { [arp]: { preset: 'constructor' } } })).toMatchObject({
       ok: false,
-      error: 'arp: unknown audio preset "constructor"',
+      error: 'part 2 ("arp"): unknown audio preset "constructor"',
     });
   });
 });

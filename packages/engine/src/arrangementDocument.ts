@@ -19,38 +19,55 @@
  * guarantees the fallback — and a document full of holes — is never what
  * ships (record §5).
  */
-import { BPM_MAX, BPM_MIN, DEFAULT_BPM } from './audioConstants';
-import type { Arrangement, ArrangementKey } from './arrangement';
-import type { ArpArrangement, DroneArrangement, PercussionArrangement } from './arrangement';
-import { FALLBACK_ARRANGEMENT } from './arrangement';
+import {
+  ARRANGEMENT_VERSION,
+  BPM_MAX,
+  BPM_MIN,
+  DEFAULT_BPM,
+  MUSIC_PARTS_MAX,
+} from './audioConstants';
+import type { Arrangement, ArrangementKey, MusicPart, PartsPartial, DeepPartial } from './arrangement';
 import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
-import { normaliseMix, normaliseReturns } from './deskNormalise';
+import { normaliseReturns } from './deskNormalise';
+import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import type { ChannelStrip, ReturnSpec } from './mix';
 import type { Patch } from './patch';
 import type { ResolveOptions } from './arrangementValidate';
 
 export { FALLBACK_ARRANGEMENT };
 
+/** A part as the document holds it: the player's part plus its own strip (#597). */
+export interface DocumentPart extends MusicPart {
+  /** Level, pan and sends — owned by the part, not looked up by name. */
+  readonly strip: ChannelStrip;
+}
+
 /**
- * What a committed `arrangements/<name>.json` may hold: the arrangement, plus
- * the three sections that make it the whole piece of music in one file
- * (record `2026-09-11-music-document-carries-patches-and-returns`) — the
- * synth patches its parts play, and the desk: per-part strip overlays over
- * the code's `MIX` and return overlays over the code's `RETURNS`, applied at
- * `initMusic` and live through `AudioSystem.apply`.
+ * What a committed `arrangements/<name>.json` holds: the arrangement, its
+ * parts each with their strip, plus the two sections that make it the whole
+ * piece of music in one file (record
+ * `2026-09-11-music-document-carries-patches-and-returns`) — the synth
+ * patches its parts play, and return overlays over the code's `RETURNS`,
+ * applied at `initMusic` and live through `AudioSystem.apply`.
  */
-export type ArrangementDocument = Arrangement & {
+export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
+  /** The document format (#597). Anything else — the retired four-slot shape included — is unusable. */
+  readonly version: typeof ARRANGEMENT_VERSION;
+  readonly parts: readonly DocumentPart[];
   /**
    * Named FM patches — the only place a part's `preset` resolves (#562).
    * A song carries a snapshot of every patch it plays, so improving
    * `patches/<id>.json` never changes what a shipped song sounds like.
    */
   readonly patches?: Readonly<Record<string, Patch>>;
-  /** Strip overlays by part name; an absent strip keeps the code's `MIX` entry. */
-  readonly mix?: Readonly<Record<string, ChannelStrip>>;
   /** Return settings by return name — the plate's space and level, the delay's time, feedback, damp and level. */
   readonly returns?: Readonly<Record<string, ReturnSpec>>;
+};
+
+/** A live partial of a document: parts by slot, patches and returns by name. */
+export type DocumentPartial = DeepPartial<Omit<ArrangementDocument, 'parts'>> & {
+  readonly parts?: PartsPartial<DocumentPart>;
 };
 
 export interface MakeArrangementResult {
@@ -102,35 +119,32 @@ export function makeArrangement(raw: unknown, options: ResolveOptions = {}): Mak
   };
 }
 
-/** The verify gate's predicate: usable, and naming nothing the code does not define. */
+/**
+ * The verify gate's predicate: usable, naming nothing the code does not
+ * define, and with something to play. A `none` part is inert and allowed
+ * (#597), but a song of nothing but `none` parts is silent and must not ship.
+ */
 export function isShippable(result: MakeArrangementResult): boolean {
-  return result.usable && result.dangling.length === 0;
+  return (
+    result.usable &&
+    result.dangling.length === 0 &&
+    result.document.parts.some((part) => part.sequencer.kind !== 'none')
+  );
 }
 
-const DOCUMENT_KEYS = [
-  'seed',
-  'bpm',
-  'key',
-  'patches',
-  'kick',
-  'hat',
-  'arp',
-  'drone',
-  'mix',
-  'returns',
-];
+const DOCUMENT_KEYS = ['version', 'seed', 'bpm', 'key', 'patches', 'parts', 'returns'];
 
-/** Assembled field by field because the part slots and the desk sections are optional. */
+/** The top-level keys of the retired four-slot format, named in its correction. */
+const RETIRED_SLOT_KEYS = ['kick', 'hat', 'arp', 'drone', 'mix'];
+
+/** Assembled field by field because the desk sections are optional. */
 interface MutableDocument {
+  version: typeof ARRANGEMENT_VERSION;
   seed: number;
   bpm: number;
   key: ArrangementKey;
+  parts: DocumentPart[];
   patches?: Record<string, Patch>;
-  kick?: PercussionArrangement;
-  hat?: PercussionArrangement;
-  arp?: ArpArrangement;
-  drone?: DroneArrangement;
-  mix?: Record<string, ChannelStrip>;
   returns?: Record<string, ReturnSpec>;
 }
 
@@ -140,65 +154,64 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
     return null;
   }
   const o = raw as Record<string, unknown>;
+  if (o.version !== ARRANGEMENT_VERSION) {
+    const retired = RETIRED_SLOT_KEYS.some((key) => Object.hasOwn(o, key));
+    n.correction(
+      `version: ${show(o.version)} is not ${ARRANGEMENT_VERSION}` +
+        (retired ? ' — this is the retired four-slot format (#597), which is no longer read' : ''),
+    );
+    return null;
+  }
   n.dropUnknown(o, DOCUMENT_KEYS, '');
   // The patches come first: the parts' preset names resolve against them.
   const embedded = n.patches(o.patches);
-  const parts: NormalisedParts = {
-    kick: n.percussion(o.kick, 'kick'),
-    hat: n.percussion(o.hat, 'hat'),
-    arp: n.arp(o.arp),
-    drone: n.drone(o.drone),
-  };
-  dropDuplicateParts(parts, n);
-  // No playable part left: an absent part must not be invented (record §4),
-  // so this document has nothing to play and the caller falls back.
-  if (!parts.kick && !parts.hat && !parts.arp && !parts.drone) return null;
+  const parts = normaliseParts(o.parts, n);
+  // No part left: an absent part must not be invented (record §4), so this
+  // document has nothing to play and the caller falls back.
+  if (parts.length === 0) return null;
 
   const document: MutableDocument = {
+    version: ARRANGEMENT_VERSION,
     seed: n.int(o.seed, 0, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 'seed'),
     bpm: n.num(o.bpm, DEFAULT_BPM, BPM_MIN, BPM_MAX, 'bpm'),
     key: n.key(o.key),
+    parts,
   };
-  if (parts.kick) document.kick = parts.kick;
-  if (parts.hat) document.hat = parts.hat;
-  if (parts.arp) document.arp = parts.arp;
-  if (parts.drone) document.drone = parts.drone;
   // A library fill is embedded here and nowhere else (#562): from this point
   // the document is self-contained, so the export and the game path are the
   // same document.
   const patches = { ...embedded, ...n.filledPatches() };
   if (Object.keys(patches).length > 0) document.patches = patches;
-  const mix = normaliseMix(o.mix, n);
-  if (mix) document.mix = mix;
   const returns = normaliseReturns(o.returns, n);
   if (returns) document.returns = returns;
   return document;
 }
 
-interface NormalisedParts {
-  kick: PercussionArrangement | null;
-  hat: PercussionArrangement | null;
-  arp: ArpArrangement | null;
-  drone: DroneArrangement | null;
-}
-
 /**
- * Two slots sharing one part name would fight over one engine part and one
- * strip — the later creation replaces the earlier in both registries, leaving
- * the first part's strip uncontrollable and undisposed — so the later slot
- * drops, reported.
+ * The part list: at most eight, each on a unique slot. Two parts on one slot
+ * would fight over one engine part and one generator stream — the later
+ * creation replaces the earlier, leaving the first uncontrollable and
+ * undisposed — so the later part drops, reported.
  */
-function dropDuplicateParts(parts: NormalisedParts, n: ArrangementNormaliser): void {
-  const used = new Map<string, string>();
-  for (const id of ['kick', 'hat', 'arp', 'drone'] as const) {
-    const section = parts[id];
-    if (!section) continue;
-    const owner = used.get(section.part);
-    if (owner !== undefined) {
-      n.correction(`${id}: part name "${section.part}" is already used by ${owner} — part dropped`);
-      parts[id] = null;
-    } else {
-      used.set(section.part, id);
-    }
+function normaliseParts(raw: unknown, n: ArrangementNormaliser): DocumentPart[] {
+  if (!Array.isArray(raw)) {
+    n.correction(`parts: ${show(raw)} is not a list of parts`);
+    return [];
   }
+  if (raw.length > MUSIC_PARTS_MAX) {
+    n.correction(`parts: ${raw.length} parts — only the first ${MUSIC_PARTS_MAX} are kept`);
+  }
+  const out: DocumentPart[] = [];
+  const used = new Set<number>();
+  raw.slice(0, MUSIC_PARTS_MAX).forEach((entry, i) => {
+    const part = n.part(entry, `parts[${i}]`);
+    if (!part) return;
+    if (used.has(part.slot)) {
+      n.correction(`parts[${i}]: slot ${part.slot} is already used — part dropped`);
+      return;
+    }
+    used.add(part.slot);
+    out.push(part);
+  });
+  return out;
 }

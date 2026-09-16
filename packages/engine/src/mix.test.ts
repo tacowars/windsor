@@ -13,8 +13,8 @@ const strips = Object.entries(MIX);
 const returns = Object.entries(RETURNS);
 
 describe('MIX', () => {
-  it('names at least the four parts the generative bed will create', () => {
-    expect(Object.keys(MIX)).toEqual(expect.arrayContaining(['kick', 'hat', 'arp', 'drone']));
+  it('names the SFX strips only: music parts carry their own strip in the song (#597)', () => {
+    expect(Object.keys(MIX).sort()).toEqual(['place', 'ui']);
   });
 
   it('keeps every fader inside the worklet gain range, 0..4', () => {
@@ -40,13 +40,11 @@ describe('MIX', () => {
     }
   });
 
-  it('exercises every send state: dry, delay-only, reverb', () => {
+  it('exercises a dry SFX strip and one with a send', () => {
     const dry = strips.filter(([, s]) => Object.keys(s.sends).length === 0);
-    const delayOnly = strips.filter(([, s]) => 'echo' in s.sends && !('room' in s.sends));
-    const reverb = strips.filter(([, s]) => 'room' in s.sends);
+    const sent = strips.filter(([, s]) => Object.keys(s.sends).length > 0);
     expect(dry.length).toBeGreaterThan(0);
-    expect(delayOnly.length).toBeGreaterThan(0);
-    expect(reverb.length).toBeGreaterThan(0);
+    expect(sent.length).toBeGreaterThan(0);
   });
 });
 
@@ -79,7 +77,7 @@ describe('RETURNS', () => {
 
 describe('stripFor', () => {
   it('returns the named strip, or unity-centred-dry for a part the mix does not know', () => {
-    expect(stripFor(MIX, 'drone')).toBe(MIX.drone);
+    expect(stripFor(MIX, 'ui')).toBe(MIX.ui);
     expect(stripFor(MIX, 'nobody')).toBe(DEFAULT_STRIP);
     expect(DEFAULT_STRIP).toEqual({ level: 1, pan: 0, sends: {} });
   });
