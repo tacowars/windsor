@@ -1,0 +1,812 @@
+{
+  "note": "Pre-#586 library renders: every patches/*.json at its recorded headroom seed through the headroom render, as a SHA-256 of the Float32 output bytes, captured from main at a6953a0b before filter.modWheelDepth existed.",
+  "render": {
+    "voices": 16,
+    "blocks": 400,
+    "note": 60,
+    "velocity": 0.9,
+    "noteOffFrame": 12000
+  },
+  "ids": [
+    "ai-voice",
+    "bass-digital",
+    "build-thunk",
+    "drone-sqr",
+    "hat",
+    "horde-horn",
+    "kick",
+    "lead-bell",
+    "pad-drift",
+    "pickup-blip",
+    "saw-arp",
+    "score-afterimage-quartet",
+    "score-amber-ceiling",
+    "score-amber-stab",
+    "score-ash-cathedral",
+    "score-black-ice-strings",
+    "score-black-resonator",
+    "score-blue-vapour",
+    "score-breathing-rosin",
+    "score-bright-air-riser",
+    "score-broken-relay",
+    "score-bronze-rain",
+    "score-buffer-drift",
+    "score-buried-voices",
+    "score-carbon-reed",
+    "score-concrete-chord",
+    "score-copper-step",
+    "score-corrupt-clock",
+    "score-data-fragments",
+    "score-deep-current",
+    "score-deep-static",
+    "score-distant-gantry",
+    "score-dockside-bass",
+    "score-drowned-cellos",
+    "score-dry-relay",
+    "score-dry-ticker",
+    "score-empty-station",
+    "score-engine-pulser",
+    "score-estuary-violas",
+    "score-faded-neon",
+    "score-felt-circuit",
+    "score-felt-sub",
+    "score-frozen-bow",
+    "score-ghost-formants",
+    "score-glass-horizon",
+    "score-glass-pebble",
+    "score-granular-hiss",
+    "score-graphite-bass",
+    "score-harbour-fog",
+    "score-high-tremolo",
+    "score-hollow-anchor",
+    "score-hollow-bows",
+    "score-hollow-droplet",
+    "score-hollow-ticker",
+    "score-ice-needle",
+    "score-iron-root",
+    "score-last-light-bell",
+    "score-long-downwash",
+    "score-long-dusk",
+    "score-low-transformer",
+    "score-low-tremolo",
+    "score-low-weather",
+    "score-magnetic-veil",
+    "score-moss-stab",
+    "score-muted-cable",
+    "score-muted-chamber",
+    "score-narrow-riser",
+    "score-night-choir",
+    "score-night-rubber",
+    "score-open-sea",
+    "score-pale-monolith",
+    "score-passing-vapour",
+    "score-polar-bloom",
+    "score-porcelain-drop",
+    "score-quick-downwash",
+    "score-quiet-reactor",
+    "score-radio-dust",
+    "score-remote-orchestra",
+    "score-round-foundation",
+    "score-rubber-key",
+    "score-rust-ensemble",
+    "score-rusted-tine",
+    "score-salt-violins",
+    "score-shortwave-chord",
+    "score-silk-swish",
+    "score-silt-contrabass",
+    "score-silt-pulse-bass",
+    "score-silver-dust",
+    "score-sine-weight",
+    "score-slow-air-riser",
+    "score-slow-beacon",
+    "score-soft-machinery",
+    "score-soft-undertow",
+    "score-stone-marimba",
+    "score-submerged-keys",
+    "score-suspended-steel",
+    "score-tape-halo",
+    "score-tidal-memory",
+    "score-tin-kalimba",
+    "score-tunnel-growl",
+    "score-underwater-room",
+    "score-uneasy-scale",
+    "score-velvet-airlock",
+    "score-velvet-offbeat",
+    "score-vent-breath",
+    "score-violet-section",
+    "score-warm-pressure",
+    "score-wire-harmonics",
+    "score-wire-harp",
+    "score-wire-stress",
+    "score-wooden-pin",
+    "snare",
+    "sub-drone",
+    "weapon-zap"
+  ],
+  "entries": {
+    "ai-voice": {
+      "seed": 11629,
+      "samples": 102400,
+      "peak": 0.9371675848960876,
+      "sha256": "e2787426eeacc94a6062addc8100ac87685d0e67421e7f6313f89aee5b3e1ebd"
+    },
+    "bass-digital": {
+      "seed": 12428,
+      "samples": 102400,
+      "peak": 0.8638485670089722,
+      "sha256": "f3552d1f55071ae1ddb92049fa9eac44c4421ac8be032d3cbc63b318d3a0ae0e"
+    },
+    "build-thunk": {
+      "seed": 11629,
+      "samples": 102400,
+      "peak": 0.8967841267585754,
+      "sha256": "ac36d729a5669a0dce293683a3da9bb6b0f693a28ae7d9b69906ac4a4fc9524b"
+    },
+    "drone-sqr": {
+      "seed": 1367,
+      "samples": 102400,
+      "peak": 0.6353955864906311,
+      "sha256": "d38aee2dac1b5d889823df072b37e63b4cf8e5a8a8ee5886de40c5ffca2f80d0"
+    },
+    "hat": {
+      "seed": 6945,
+      "samples": 102400,
+      "peak": 0.4534999430179596,
+      "sha256": "15551b253b7f5574e33ed7daa702a77532fec670e61747a868c0395ac9c2989b"
+    },
+    "horde-horn": {
+      "seed": 14891,
+      "samples": 102400,
+      "peak": 0.9342034459114075,
+      "sha256": "f0290e4651c41fcdbce711f22cc56952506050eade7a50e405852a5509dc8d84"
+    },
+    "kick": {
+      "seed": 744,
+      "samples": 102400,
+      "peak": 0.6465452313423157,
+      "sha256": "c7172f1406000885ddceadb34ebd3fd5bf3d9745ddca61da8601fba577bd0f32"
+    },
+    "lead-bell": {
+      "seed": 8808,
+      "samples": 102400,
+      "peak": 0.7224734425544739,
+      "sha256": "53aa60ec451190feb139794e5479a6c034a368c9009b7c8931fcf7b639a4cf1d"
+    },
+    "pad-drift": {
+      "seed": 2181,
+      "samples": 102400,
+      "peak": 0.19618746638298035,
+      "sha256": "ec87b966ca552560db56553d84db952fbf2a60c2a2bbf84e940eb59bd0e48f71"
+    },
+    "pickup-blip": {
+      "seed": 1566,
+      "samples": 102400,
+      "peak": 0.6788219809532166,
+      "sha256": "a97ec5707b492aa416e22f769b68b742df2864e7b3db268f5d0ac99e0029ac85"
+    },
+    "saw-arp": {
+      "seed": 3684,
+      "samples": 102400,
+      "peak": 0.5170947313308716,
+      "sha256": "5805c51275f290b90eefa738a4333f58ba240ad8c0a7c17f4d00d306564b6efa"
+    },
+    "score-afterimage-quartet": {
+      "seed": 155,
+      "samples": 102400,
+      "peak": 0.16098442673683167,
+      "sha256": "bf19c8e49562ca27d90075deb79e7a34d1de08572f77ae7fb516dc5aa951a947"
+    },
+    "score-amber-ceiling": {
+      "seed": 153,
+      "samples": 102400,
+      "peak": 0.048845112323760986,
+      "sha256": "b880b3f4c53290d40b1ede6182b86fb961878116f475e8bd4b9cfbd43192fa80"
+    },
+    "score-amber-stab": {
+      "seed": 134,
+      "samples": 102400,
+      "peak": 0.2569967210292816,
+      "sha256": "df4495f1b264b4895016c4f4b95bd02bad44f93d79f4b67ad02578dd25116b30"
+    },
+    "score-ash-cathedral": {
+      "seed": 55,
+      "samples": 102400,
+      "peak": 0.007198861800134182,
+      "sha256": "5e76107a6961bf7df8d17a74e1e315d674ad59afb9c6ad6acc102d3268cce9d7"
+    },
+    "score-black-ice-strings": {
+      "seed": 68,
+      "samples": 102400,
+      "peak": 0.029420984908938408,
+      "sha256": "ce383cad2a9c897664b42ddd2951fc3c801cfc273ae797522e41b64258f87ba9"
+    },
+    "score-black-resonator": {
+      "seed": 12,
+      "samples": 102400,
+      "peak": 0.023195631802082062,
+      "sha256": "02a4c3fbd74464a4a13612c805a653385fbf3642768e4ac606fdd2aa8cb2d33d"
+    },
+    "score-blue-vapour": {
+      "seed": 48,
+      "samples": 102400,
+      "peak": 0.029074329882860184,
+      "sha256": "3d468f7e6901a0114574b9b4a59d1a51f4ed6cb02e7fd65e96cd134c1593e45e"
+    },
+    "score-breathing-rosin": {
+      "seed": 6,
+      "samples": 102400,
+      "peak": 0.03204333782196045,
+      "sha256": "142bf97dd2f44ffef18347d46c2838668e1bf5d8b605903840dd61b09674395d"
+    },
+    "score-bright-air-riser": {
+      "seed": 117,
+      "samples": 102400,
+      "peak": 0.018174616619944572,
+      "sha256": "c97f081621f813f156a68868a2c41c3d13725ab2c33ece37a0e532be7062ca54"
+    },
+    "score-broken-relay": {
+      "seed": 53,
+      "samples": 102400,
+      "peak": 0.3195432722568512,
+      "sha256": "8ca603a61d85ce1962b2aba3d8cf5e3e454e3a4b56fe5a9304b62aba641afc1b"
+    },
+    "score-bronze-rain": {
+      "seed": 52,
+      "samples": 102400,
+      "peak": 0.26971590518951416,
+      "sha256": "7f1133b4599bd700d9365cfa7884036b8f8f6b6db2480ed4e14fe616e8a4e0b0"
+    },
+    "score-buffer-drift": {
+      "seed": 178,
+      "samples": 102400,
+      "peak": 0.24368411302566528,
+      "sha256": "527a2c0e55b65de8383afded0a3a6e0ae3504707ca4f84bf618edc3246557019"
+    },
+    "score-buried-voices": {
+      "seed": 8,
+      "samples": 102400,
+      "peak": 0.01484124455600977,
+      "sha256": "a214ebf501ea0e349ad95378b838fb9ad41b18c34407fc3b6a1c85158f422807"
+    },
+    "score-carbon-reed": {
+      "seed": 0,
+      "samples": 102400,
+      "peak": 0.2178240418434143,
+      "sha256": "944bc36274127e1c4544f397385e6aa56ee252552783ef942a1c9ee1b3c1e261"
+    },
+    "score-concrete-chord": {
+      "seed": 137,
+      "samples": 102400,
+      "peak": 0.24947792291641235,
+      "sha256": "03ab545e62009ace744181dc3a02df5291efe0a4478b0ac52e1a824249facfd6"
+    },
+    "score-copper-step": {
+      "seed": 96,
+      "samples": 102400,
+      "peak": 0.22051778435707092,
+      "sha256": "978dcdfe3c0f2e44e90eb97a600023a6704461d2b1323832d158cebe67883701"
+    },
+    "score-corrupt-clock": {
+      "seed": 10,
+      "samples": 102400,
+      "peak": 0.3047645092010498,
+      "sha256": "01a4752876d9c86b7e59a69dac495a4c8b277a86be11e4725e77732d26c0ed7b"
+    },
+    "score-data-fragments": {
+      "seed": 138,
+      "samples": 102400,
+      "peak": 0.3099548816680908,
+      "sha256": "f00f5a41d1a0c71ff3299e7287240e85e9cfb7227639b58065c0f2b981b11017"
+    },
+    "score-deep-current": {
+      "seed": 68,
+      "samples": 102400,
+      "peak": 0.020592134445905685,
+      "sha256": "facd5eb3096f9f19b48a23b6023f2067c169d0bbbddfebfb9f539a6cb975073c"
+    },
+    "score-deep-static": {
+      "seed": 60,
+      "samples": 102400,
+      "peak": 0.04416625574231148,
+      "sha256": "c78446060be6df0ec5649b233b3ecf540859538ec3fc101738147fd842bc8a5e"
+    },
+    "score-distant-gantry": {
+      "seed": 178,
+      "samples": 102400,
+      "peak": 0.032521627843379974,
+      "sha256": "5c45799798fe54661181aada3c4b703b9cc92690c68f5136b0170f849ef30b6c"
+    },
+    "score-dockside-bass": {
+      "seed": 103,
+      "samples": 102400,
+      "peak": 0.2202208936214447,
+      "sha256": "2f94cf55fd3c7cae8381865ea4a5f094eb9bd7dc2aee78c373d22c7c4b65400a"
+    },
+    "score-drowned-cellos": {
+      "seed": 68,
+      "samples": 102400,
+      "peak": 0.07434669137001038,
+      "sha256": "c4a974308b3e303fa9d698e49187b376170578a49c913bd5304d8a8a7d5df13e"
+    },
+    "score-dry-relay": {
+      "seed": 153,
+      "samples": 102400,
+      "peak": 0.24842190742492676,
+      "sha256": "8cee08a4b6e92e970a3a3f437099a7c6cdb4ef2d6364be55459cf9e1ab751155"
+    },
+    "score-dry-ticker": {
+      "seed": 210,
+      "samples": 102400,
+      "peak": 0.5903732776641846,
+      "sha256": "e2d55c67a85581a01ba523bd43d6b4cba4e3ab834332b8238c7e5fcc86a9f218"
+    },
+    "score-empty-station": {
+      "seed": 62,
+      "samples": 102400,
+      "peak": 0.014786391519010067,
+      "sha256": "0e7035f360003ba1c193fe5b344e19df987cb0586ab1ac411ce108536420fb38"
+    },
+    "score-engine-pulser": {
+      "seed": 182,
+      "samples": 102400,
+      "peak": 0.5699393153190613,
+      "sha256": "9be26e296f3586823ab08266d0ecf0676b93339edd0d43826b2ae98ebeb369bc"
+    },
+    "score-estuary-violas": {
+      "seed": 82,
+      "samples": 102400,
+      "peak": 0.09872680902481079,
+      "sha256": "2b2fdb8f09caa299563f974d3540b0fa85d842e3c6c28d98ba05dc18ecf4a889"
+    },
+    "score-faded-neon": {
+      "seed": 60,
+      "samples": 102400,
+      "peak": 0.1298050731420517,
+      "sha256": "63dddc7ebb2fbeba0a77c62f7e219d973fbb55503944b10dec9e341edbbc4ffc"
+    },
+    "score-felt-circuit": {
+      "seed": 85,
+      "samples": 102400,
+      "peak": 0.24473273754119873,
+      "sha256": "8b8c2c74ffcd339e8ab78a5761d7e6af116758042677ecb3fcb545b6590c63e3"
+    },
+    "score-felt-sub": {
+      "seed": 92,
+      "samples": 102400,
+      "peak": 0.23668748140335083,
+      "sha256": "a0067b67121c92665963f1ea6d6ec105e87f3ea83777d30200d36d7db49a2bb8"
+    },
+    "score-frozen-bow": {
+      "seed": 5,
+      "samples": 102400,
+      "peak": 0.04154741391539574,
+      "sha256": "662e1016b3207ecc5a98206ef3ab8b7c45b6adfdd2c145a05f290583c5c031db"
+    },
+    "score-ghost-formants": {
+      "seed": 189,
+      "samples": 102400,
+      "peak": 0.03849998116493225,
+      "sha256": "76032da8795e31a68ea82e0e24bcd3ae57c346bc1d5cd5508a2583af4172a7ca"
+    },
+    "score-glass-horizon": {
+      "seed": 219,
+      "samples": 102400,
+      "peak": 0.044859420508146286,
+      "sha256": "215c47c68399681f46cd190cfdcfccf7d4328e53c2c236fa491f862e0517cea2"
+    },
+    "score-glass-pebble": {
+      "seed": 156,
+      "samples": 102400,
+      "peak": 0.251058429479599,
+      "sha256": "e39b7964f9a0228e8ef84282012803c3c84183a3c228bff9aa6b84d91aa8e7c5"
+    },
+    "score-granular-hiss": {
+      "seed": 69,
+      "samples": 102400,
+      "peak": 0.176977276802063,
+      "sha256": "2011c4a53acb5a8508a841689b97eee860b8eadd01813c80f2e9a369cad9f8fd"
+    },
+    "score-graphite-bass": {
+      "seed": 251,
+      "samples": 102400,
+      "peak": 0.26719555258750916,
+      "sha256": "b766bd04454bab5aef27bb6ab828d223804beb1cfac2233c3f31a95b2b20a3df"
+    },
+    "score-harbour-fog": {
+      "seed": 153,
+      "samples": 102400,
+      "peak": 0.028339480981230736,
+      "sha256": "b72980043e0b243cb25862b1fb9ac977dc17237e96cdf4732ecf1ad421021d7d"
+    },
+    "score-high-tremolo": {
+      "seed": 183,
+      "samples": 102400,
+      "peak": 0.2091590017080307,
+      "sha256": "bdeaa5ff5e98144ab3771e4206cba5dc8ac765e8aaa740936b51ec3c6165d14c"
+    },
+    "score-hollow-anchor": {
+      "seed": 47,
+      "samples": 102400,
+      "peak": 0.23873984813690186,
+      "sha256": "acac14e0d6bb181e88ac7361cc4ed0f49721d019608f0a667727edc5955cf150"
+    },
+    "score-hollow-bows": {
+      "seed": 104,
+      "samples": 102400,
+      "peak": 0.028516124933958054,
+      "sha256": "7c80ad1828d5dcb7e285265d3dca121f616518ace0d927c4941d2fb11057f6dc"
+    },
+    "score-hollow-droplet": {
+      "seed": 184,
+      "samples": 102400,
+      "peak": 0.26524093747138977,
+      "sha256": "82e3597723bc3e8ab2c1f7096b0b988c430933b4867f0733470cdee377278bb8"
+    },
+    "score-hollow-ticker": {
+      "seed": 184,
+      "samples": 102400,
+      "peak": 0.5696665048599243,
+      "sha256": "fe3cca2f8197286ce6c1c7b6a7eba630d9ecc89cc3a8f3501e7f61923cd93039"
+    },
+    "score-ice-needle": {
+      "seed": 222,
+      "samples": 102400,
+      "peak": 0.2827916443347931,
+      "sha256": "70be1f82662a035d90e75e7e9678bf68da3f6be9908e8ef262bab48589a115f8"
+    },
+    "score-iron-root": {
+      "seed": 137,
+      "samples": 102400,
+      "peak": 0.19778451323509216,
+      "sha256": "198720bbabb9353fddd1dfc321af143a1144940847a78dd3382d984c9094fcb4"
+    },
+    "score-last-light-bell": {
+      "seed": 85,
+      "samples": 102400,
+      "peak": 0.23988139629364014,
+      "sha256": "c545b5d867f36231bd678902d2f84efe180a413604d79fe0f59f78e31f9749b9"
+    },
+    "score-long-downwash": {
+      "seed": 117,
+      "samples": 102400,
+      "peak": 0.12095621228218079,
+      "sha256": "7f125e204379d66aab610855e7d3a2cae8b1482384d8ce1a0229a77e34ea51df"
+    },
+    "score-long-dusk": {
+      "seed": 5,
+      "samples": 102400,
+      "peak": 0.016293426975607872,
+      "sha256": "29f0d4367955cafa61c4527316749b2a2db51092583acca11bcef59c4dcb023d"
+    },
+    "score-low-transformer": {
+      "seed": 18,
+      "samples": 102400,
+      "peak": 0.22918163239955902,
+      "sha256": "ffd7ce70dae48dee2edbcd9136a7aa5a9fb8ae60a7f0e1c930551cca732357c9"
+    },
+    "score-low-tremolo": {
+      "seed": 118,
+      "samples": 102400,
+      "peak": 0.17277266085147858,
+      "sha256": "1665c9d5ff934474ab5a57905cd1d07e7c4e5f2f36c7d701bb3f4e54a8398bd0"
+    },
+    "score-low-weather": {
+      "seed": 245,
+      "samples": 102400,
+      "peak": 0.015828363597393036,
+      "sha256": "1a008ce146c86b8cc010747a9ef998b30c0f8b235bce64e830a82db53735f6cf"
+    },
+    "score-magnetic-veil": {
+      "seed": 83,
+      "samples": 102400,
+      "peak": 0.05059259384870529,
+      "sha256": "b990c071a42c7fb22ca7b7400f1bb86f576932153d7def336c0cf8914d25c6cf"
+    },
+    "score-moss-stab": {
+      "seed": 111,
+      "samples": 102400,
+      "peak": 0.22616972029209137,
+      "sha256": "9a4a843a572764a755bf1292bb64c89f1632fb8a23159205cbb3f030302b4972"
+    },
+    "score-muted-cable": {
+      "seed": 255,
+      "samples": 102400,
+      "peak": 0.19213156402111053,
+      "sha256": "b80618afdef51fd57b6af52d34bdc882c90ba2bee62d13eb2048484ee3c62ac4"
+    },
+    "score-muted-chamber": {
+      "seed": 236,
+      "samples": 102400,
+      "peak": 0.2273322194814682,
+      "sha256": "53a122a2ade0178872ff22e14c2c521e88700d9c87f665c0f1050efe2db5a7b0"
+    },
+    "score-narrow-riser": {
+      "seed": 242,
+      "samples": 102400,
+      "peak": 0.006413334980607033,
+      "sha256": "f07945387804ae02544b1599c84532fc676c861ff636e232c7509b0a555e3350"
+    },
+    "score-night-choir": {
+      "seed": 182,
+      "samples": 102400,
+      "peak": 0.010192250832915306,
+      "sha256": "521c0232e3edc694fe77a11638b30a05255526d2ed78b33217908a9049163d56"
+    },
+    "score-night-rubber": {
+      "seed": 157,
+      "samples": 102400,
+      "peak": 0.25103673338890076,
+      "sha256": "6c079f2d30294e6f147c97f03d8ce53c6e346803a27bafa256035c11bbc49a2d"
+    },
+    "score-open-sea": {
+      "seed": 153,
+      "samples": 102400,
+      "peak": 0.021613456308841705,
+      "sha256": "34b86c1e26b94b770002c8e8a52a20140fa2e0aa080aa3e3e8cfe5a878f4f6da"
+    },
+    "score-pale-monolith": {
+      "seed": 12,
+      "samples": 102400,
+      "peak": 0.014832613989710808,
+      "sha256": "707fe6d2699f07c934c1dd09beb1c955f43c7ca32b2d0785fc0530ee5a6588fe"
+    },
+    "score-passing-vapour": {
+      "seed": 117,
+      "samples": 102400,
+      "peak": 0.04633708298206329,
+      "sha256": "f0d5580f1b4b8669b22d6b795694e08a698cc3a0fab26f04fb4bd4ebeeb1ca71"
+    },
+    "score-polar-bloom": {
+      "seed": 5,
+      "samples": 102400,
+      "peak": 0.016606643795967102,
+      "sha256": "7c9125710ffea2edd7cfc2fd46c1040703ce0b7e5a508aa6a9b2400ebc225211"
+    },
+    "score-porcelain-drop": {
+      "seed": 110,
+      "samples": 102400,
+      "peak": 0.2718745470046997,
+      "sha256": "e1f88a7ecae9673835c21ff99ab3343a4677fb135aa1bbc7da10e6fe8027b4a0"
+    },
+    "score-quick-downwash": {
+      "seed": 167,
+      "samples": 102400,
+      "peak": 0.1588985174894333,
+      "sha256": "b50a023a22ce07d5c2d3d8b50be9597f5cecbbcec3de7e3ef33994387ef2666c"
+    },
+    "score-quiet-reactor": {
+      "seed": 132,
+      "samples": 102400,
+      "peak": 0.042008135467767715,
+      "sha256": "84c2021b427fc58f6d9a65702a04106b3a46625f9e945854e2b2d06c2908fd40"
+    },
+    "score-radio-dust": {
+      "seed": 226,
+      "samples": 102400,
+      "peak": 0.18280187249183655,
+      "sha256": "fc5297862807c27d0b70d125e4383608f48a5db9b5e1b7f6626b420366389762"
+    },
+    "score-remote-orchestra": {
+      "seed": 68,
+      "samples": 102400,
+      "peak": 0.01842142641544342,
+      "sha256": "1f93d4ad0d16a962ad8fe1a46b7cac6f222053efd0b3b83892aa4fd32b48b356"
+    },
+    "score-round-foundation": {
+      "seed": 107,
+      "samples": 102400,
+      "peak": 0.26087290048599243,
+      "sha256": "72a0d06ce4738ee00685518392c8a247f3429d670f3c25a1c3e4f1e05cf9821d"
+    },
+    "score-rubber-key": {
+      "seed": 110,
+      "samples": 102400,
+      "peak": 0.2573223412036896,
+      "sha256": "a4cfd49831c39a96d51dbf5a42cb066287ba7fcf2e393a2beaf0434475e62d18"
+    },
+    "score-rust-ensemble": {
+      "seed": 128,
+      "samples": 102400,
+      "peak": 0.06450866907835007,
+      "sha256": "958cb5a2ceb08c704fb9ad90bea6e8b4221a40a518b554404bf47489a0b28f3b"
+    },
+    "score-rusted-tine": {
+      "seed": 60,
+      "samples": 102400,
+      "peak": 0.2627773582935333,
+      "sha256": "4becb7743210dd0785700026b00026d0fb934cae7760649bf2509bd2b160b607"
+    },
+    "score-salt-violins": {
+      "seed": 236,
+      "samples": 102400,
+      "peak": 0.15674389898777008,
+      "sha256": "7357852f4c7aafa56319e45a7d75eb07119145ffa03a5ed8447762fc96154622"
+    },
+    "score-shortwave-chord": {
+      "seed": 43,
+      "samples": 102400,
+      "peak": 0.2639407217502594,
+      "sha256": "ecc83d2f038f5f5a2afc1977f982e4ff63aceb68061d48352877cdb3da396f66"
+    },
+    "score-silk-swish": {
+      "seed": 178,
+      "samples": 102400,
+      "peak": 0.15418891608715057,
+      "sha256": "b2558818b140df0a505b2d213d841bcc368e1dc4345253182a55d7cc422153fb"
+    },
+    "score-silt-contrabass": {
+      "seed": 236,
+      "samples": 102400,
+      "peak": 0.03373892977833748,
+      "sha256": "bf00c10910c6a1e9f1bbfeba0ce8b2d49b282edfbfe68779c96134ba0a413261"
+    },
+    "score-silt-pulse-bass": {
+      "seed": 4,
+      "samples": 102400,
+      "peak": 0.2614187002182007,
+      "sha256": "a2d8fce37205c481e8a1cc7a3e84108fcbc84d4e56a96b867387a2c56b5ee14d"
+    },
+    "score-silver-dust": {
+      "seed": 176,
+      "samples": 102400,
+      "peak": 0.09018097817897797,
+      "sha256": "5c699a5be3f26af94633ee64254cbe0d5cbb3e060742c1df355f33ecf757deea"
+    },
+    "score-sine-weight": {
+      "seed": 88,
+      "samples": 102400,
+      "peak": 0.23211485147476196,
+      "sha256": "13103b99e9683760ef653ad720d65a2b2c82580e9380dc92fdf47de5baa4e294"
+    },
+    "score-slow-air-riser": {
+      "seed": 76,
+      "samples": 102400,
+      "peak": 0.001962837763130665,
+      "sha256": "2786933e23596dabdabdb9096fdd3ccaa7fa9a859a5ebb3a6faf017d6e890fc0"
+    },
+    "score-slow-beacon": {
+      "seed": 44,
+      "samples": 102400,
+      "peak": 0.5687606930732727,
+      "sha256": "fd706aee33d8c61a8f3ddefae8ff8add02f1055b56e3ec0de1362a23429194ba"
+    },
+    "score-soft-machinery": {
+      "seed": 74,
+      "samples": 102400,
+      "peak": 0.0969763919711113,
+      "sha256": "a28e45a810c3bf792a7cd18c6133bc91c8cf63bc9f325d1ca8363464f0abf86d"
+    },
+    "score-soft-undertow": {
+      "seed": 132,
+      "samples": 102400,
+      "peak": 0.25394365191459656,
+      "sha256": "3a83e3d573f5590116219058930dfd814ef8579e63a91ccd326569a236c3176b"
+    },
+    "score-stone-marimba": {
+      "seed": 13,
+      "samples": 102400,
+      "peak": 0.25952383875846863,
+      "sha256": "9a057ef4f14cb6a387818f741fe23503841de67042b578ac7707f719d962235a"
+    },
+    "score-submerged-keys": {
+      "seed": 192,
+      "samples": 102400,
+      "peak": 0.22738748788833618,
+      "sha256": "45d086dae653d413a86e2aedaf9d635fababf07ec10c791ef14e000c96029209"
+    },
+    "score-suspended-steel": {
+      "seed": 134,
+      "samples": 102400,
+      "peak": 0.04466130957007408,
+      "sha256": "880128683748d51cca7e806f643034026a5d6debd0840f4ff6b79b1d7537ce35"
+    },
+    "score-tape-halo": {
+      "seed": 219,
+      "samples": 102400,
+      "peak": 0.07262813299894333,
+      "sha256": "1d0b8e20eec54b876c3c9ef8a2a2d05460238a42b83c4df34c1a4924f8833e64"
+    },
+    "score-tidal-memory": {
+      "seed": 85,
+      "samples": 102400,
+      "peak": 0.0343300923705101,
+      "sha256": "2d769150825f5d80dccbd90e6ad311985616966ecc7c18b5d2cb48c6c72aa7d8"
+    },
+    "score-tin-kalimba": {
+      "seed": 22,
+      "samples": 102400,
+      "peak": 0.26623842120170593,
+      "sha256": "6b0cc06c0221513f5933c0fa4ab32fd556854f50d7223142a2ea1ca1343b49b8"
+    },
+    "score-tunnel-growl": {
+      "seed": 140,
+      "samples": 102400,
+      "peak": 0.22805660963058472,
+      "sha256": "c080aaec41cd9a11ed116c5a93839f65fb9ebc2c1f10a17dea4779d07c91eaf3"
+    },
+    "score-underwater-room": {
+      "seed": 46,
+      "samples": 102400,
+      "peak": 0.03706682473421097,
+      "sha256": "2a0054d55962446c133a69d54c0fd8ceeee11ad21784ed0c7ff269dab1a990d2"
+    },
+    "score-uneasy-scale": {
+      "seed": 111,
+      "samples": 102400,
+      "peak": 0.09173069149255753,
+      "sha256": "9acb0c95a071d48ed9b42b9a3c716b3d463f9ce726c6225ca49b6f6b491f305a"
+    },
+    "score-velvet-airlock": {
+      "seed": 146,
+      "samples": 102400,
+      "peak": 0.03883147984743118,
+      "sha256": "f6f03ed5ba88b68196a2f5aef693bd161af4b6a129214ed57410b35a2ea15024"
+    },
+    "score-velvet-offbeat": {
+      "seed": 143,
+      "samples": 102400,
+      "peak": 0.26931190490722656,
+      "sha256": "db9ba4660dc9a9a38d216db94896d38ce42a9ac13f8f752aa8869d6654533f7f"
+    },
+    "score-vent-breath": {
+      "seed": 219,
+      "samples": 102400,
+      "peak": 0.0183861181139946,
+      "sha256": "8898b88269eb29caddba29897a2c414808f6b6b292580cfa1cb8ca58e5f0a983"
+    },
+    "score-violet-section": {
+      "seed": 77,
+      "samples": 102400,
+      "peak": 0.11024146527051926,
+      "sha256": "1827baf07eff3bb0db78f626a9fbfeaf369af1080b4bd4766590d0dbf5cb48f9"
+    },
+    "score-warm-pressure": {
+      "seed": 3,
+      "samples": 102400,
+      "peak": 0.2341335564851761,
+      "sha256": "60d26b96fa228ad625a3aca5bf161f189c44e26c47d30b575e334e65ca705fbc"
+    },
+    "score-wire-harmonics": {
+      "seed": 81,
+      "samples": 102400,
+      "peak": 0.23691467940807343,
+      "sha256": "db40071604a564b081260d4b7b3e713ebfb9999261a0574e57e902a574df8b6e"
+    },
+    "score-wire-harp": {
+      "seed": 156,
+      "samples": 102400,
+      "peak": 0.26793086528778076,
+      "sha256": "68aeeea12dfe2c6b006fe21a5d4b9ee0da45fb523d001aa09b381b7c9ec94487"
+    },
+    "score-wire-stress": {
+      "seed": 224,
+      "samples": 102400,
+      "peak": 0.18030790984630585,
+      "sha256": "1da958fc070658ff09d3b44c7722b3b8cfac1ff672d5c8bdb19d8cf7f35ed96e"
+    },
+    "score-wooden-pin": {
+      "seed": 220,
+      "samples": 102400,
+      "peak": 0.26080891489982605,
+      "sha256": "94d87c67472b006c511ab36b59d9040b495e39f422e35460039f7c55656d1063"
+    },
+    "snare": {
+      "seed": 953,
+      "samples": 102400,
+      "peak": 0.8465074896812439,
+      "sha256": "9c86729742735b53c9af9d386dc08899592abd86b266e8c5ac709401e8dd10ad"
+    },
+    "sub-drone": {
+      "seed": 13714,
+      "samples": 102400,
+      "peak": 0.13495470583438873,
+      "sha256": "ff41ed406e5e51f521d586ee7879f51df6a496edc2796b3a2244104731c97205"
+    },
+    "weapon-zap": {
+      "seed": 1261,
+      "samples": 102400,
+      "peak": 0.935571551322937,
+      "sha256": "1b6462d43851d9ec0072354f106f02b54541d2d3d2405f45c47e4900665098d1"
+    }
+  }
+}
