@@ -95,6 +95,9 @@ describe('the Coarse and Fine specs', () => {
 describe('a turn of either knob', () => {
   it('commits the joined ratio to the document, and the export carries it', () => {
     withConsole('lead-bell', (c) => {
+      // The non-mutation baseline is built here rather than pinned to today's
+      // bank: what matters is that the factory entry is what it was.
+      const factoryRatio = PATCH_LIBRARY['lead-bell']!.patch.ops[1]!.ratio;
       partsState.patch.ops[1]!.ratio = 1;
       const { coarse, fine } = ratioKnobSpecs(1);
 
@@ -111,7 +114,7 @@ describe('a turn of either knob', () => {
       const roundTripped = reread.document.patches?.['lead-bell']?.ops?.[1]?.ratio;
       expect(roundTripped).toBe(2.5);
       // The library's own copy is untouched: the console edits a clone.
-      expect(PATCH_LIBRARY['lead-bell']!.patch.ops[1]!.ratio).not.toBe(2.5);
+      expect(PATCH_LIBRARY['lead-bell']!.patch.ops[1]!.ratio).toBe(factoryRatio);
     });
   });
 
