@@ -1,0 +1,214 @@
+/**
+ * The console's part-list edits (#598) through the real document model: the
+ * new song it opens on, adding parts up to eight, removing one (and the patch
+ * only it played), choosing a sequencer kind, renaming, and a mixed-kind song
+ * surviving export → import.
+ */
+import { describe, expect, it } from 'vitest';
+
+import type { PlayablePart } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  ArrangementPlayer,
+  TICKS_PER_BAR,
+  TickTransport,
+  isShippable,
+  makeArrangement,
+  partAt,
+  removePart,
+} from '../../../packages/client/src/audio/index-for-editor';
+import { DocumentModel } from './documentModel';
+import { INIT_PATCH_NAME, initPresetId } from './libraryConstants';
+import { addPart, newSong, nextFreeSlot, replaceDraft, setSequencerKind } from './songParts';
+
+/** Apply a pure edit the way `ctx.restructure` does: over a draft, renormalised. */
+const restructure = (model: DocumentModel, next: object): void =>
+  model.mutate((draft) => replaceDraft(draft, next));
+
+describe('newSong', () => {
+  it('is one part on slot 0 playing its own Init patch, with no sequencer', () => {
+    const result = makeArrangement(newSong());
+    expect(result.usable).toBe(true);
+    expect(result.corrections).toEqual([]);
+    expect(result.dangling).toEqual([]);
+    const { document } = result;
+    expect(document.version).toBe(2);
+    expect(document.parts).toHaveLength(1);
+    const [part] = document.parts;
+    expect(part).toMatchObject({ slot: 0, name: 'Part 1', preset: initPresetId('0') });
+    expect(part?.sequencer).toEqual({ kind: 'none' });
+    expect(document.patches?.[initPresetId('0')]?.name).toBe(INIT_PATCH_NAME);
+    // Silent until a sequencer is chosen, so not a song the game could ship.
+    expect(isShippable(result)).toBe(false);
+  });
+
+  it('is a fresh object each time: editing one new song never reaches the next', () => {
+    const a = newSong() as { parts: Array<{ name: string }> };
+    a.parts[0]!.name = 'changed';
+    expect((newSong() as { parts: Array<{ name: string }> }).parts[0]?.name).toBe('Part 1');
+  });
+});
+
+describe('adding parts', () => {
+  it('takes the lowest free slot', () => {
+    const doc = makeArrangement({
+      ...newSong(),
+      parts: [
+        { slot: 0, preset: initPresetId('0') },
+        { slot: 2, preset: initPresetId('0') },
+      ],
+    }).document;
+    expect(nextFreeSlot(doc)).toBe(1);
+  });
+
+  it('adds up to eight parts, each with its own Init patch, then stops', () => {
+    const model = new DocumentModel(newSong());
+    for (let i = 1; i < 8; i++) {
+      const added = addPart(model.doc);
+      expect(added?.slot).toBe(i);
+      restructure(model, added!.doc);
+    }
+    expect(model.corrections).toEqual([]);
+    expect(model.doc.parts.map((p) => p.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(model.doc.parts.map((p) => p.name)).toEqual(
+      [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Part ${n}`),
+    );
+    const presets = new Set(model.doc.parts.map((p) => p.preset));
+    expect(presets.size).toBe(8);
+    for (const preset of presets) expect(model.doc.patches?.[preset]).toBeDefined();
+    expect(nextFreeSlot(model.doc)).toBeNull();
+    expect(addPart(model.doc)).toBeNull();
+  });
+});
+
+describe('removing parts', () => {
+  it('keeps a patch another part still plays, and drops it with its last user', () => {
+    const model = new DocumentModel(newSong());
+    restructure(model, addPart(model.doc)!.doc);
+    // Both parts on one patch.
+    model.merge({ parts: { 1: { preset: initPresetId('0') } } });
+    restructure(model, removePart(model.doc, 0));
+    expect(model.doc.parts.map((p) => p.slot)).toEqual([1]);
+    expect(model.doc.patches?.[initPresetId('0')]).toBeDefined();
+    // The last part is never removed.
+    expect(removePart(model.doc, 1)).toBe(model.doc);
+  });
+
+  it('drops the removed part’s own Init patch', () => {
+    const model = new DocumentModel(newSong());
+    restructure(model, addPart(model.doc)!.doc);
+    restructure(model, removePart(model.doc, 1));
+    expect(Object.keys(model.doc.patches ?? {})).toEqual([initPresetId('0')]);
+  });
+});
+
+describe('sequencer kind', () => {
+  it('replaces the sequencer with the kind’s defaults, keeping preset, name, velocity and strip', () => {
+    const model = new DocumentModel(newSong());
+    model.merge({ parts: { 0: { name: 'Lead', velocity: 0.5, strip: { pan: 0.25 } } } });
+    const before = partAt(model.doc, 0)!;
+    restructure(model, setSequencerKind(model.doc, 0, 'arp'));
+    const after = partAt(model.doc, 0)!;
+    expect(model.corrections).toEqual([]);
+    expect(after.sequencer.kind).toBe('arp');
+    expect(after.sequencer.kind === 'arp' && after.sequencer.poolSize).toBeGreaterThan(0);
+    expect({ ...after, sequencer: null }).toEqual({ ...before, sequencer: null });
+  });
+
+  it('discards a captured pattern when the kind changes', () => {
+    const model = new DocumentModel(newSong());
+    restructure(model, setSequencerKind(model.doc, 0, 'step'));
+    model.merge({ parts: { 0: { sequencer: { pattern: [48] } } } });
+    restructure(model, setSequencerKind(model.doc, 0, 'arp'));
+    const sequencer = partAt(model.doc, 0)!.sequencer;
+    expect(sequencer.kind === 'arp' && sequencer.pattern).toBeNull();
+  });
+
+  it('is a no-op for the kind the part already has', () => {
+    const model = new DocumentModel(newSong());
+    expect(setSequencerKind(model.doc, 0, 'none')).toBe(model.doc);
+  });
+
+  it('plays: an arp on Part 1 sounds notes after the rebuild, four arps and 3 Euclidean + 1 step both build', () => {
+    const silent = (count: { n: number }): PlayablePart => ({
+      noteOn: () => ++count.n,
+      noteOffByNote: () => {},
+      trigger: () => ++count.n,
+      setPatch: () => {},
+      allNotesOff: () => {},
+    });
+    const play = (doc: DocumentModel['doc']): number => {
+      const count = { n: 0 };
+      const transport = new TickTransport(120);
+      const parts = new Map(doc.parts.map((p) => [p.slot, silent(count)]));
+      const player = new ArrangementPlayer(transport, parts, doc, doc.patches ?? {});
+      for (let i = 0; i < 4 * TICKS_PER_BAR; i++) transport.advance(transport.transportSeconds);
+      player.dispose();
+      return count.n;
+    };
+    const model = new DocumentModel(newSong());
+    expect(play(model.doc)).toBe(0);
+    restructure(model, setSequencerKind(model.doc, 0, 'arp'));
+    expect(play(model.doc)).toBeGreaterThan(0);
+
+    const arps = new DocumentModel(newSong());
+    const mixed = new DocumentModel(newSong());
+    for (let i = 1; i < 4; i++) {
+      restructure(arps, addPart(arps.doc)!.doc);
+      restructure(mixed, addPart(mixed.doc)!.doc);
+    }
+    for (const slot of [0, 1, 2, 3]) {
+      restructure(arps, setSequencerKind(arps.doc, slot, 'arp'));
+      restructure(mixed, setSequencerKind(mixed.doc, slot, slot === 3 ? 'step' : 'euclidean'));
+    }
+    expect(arps.doc.parts.every((p) => p.sequencer.kind === 'arp')).toBe(true);
+    expect(mixed.doc.parts.map((p) => p.sequencer.kind)).toEqual([
+      'euclidean',
+      'euclidean',
+      'euclidean',
+      'step',
+    ]);
+    expect(play(arps.doc)).toBeGreaterThan(0);
+    expect(play(mixed.doc)).toBeGreaterThan(0);
+  });
+});
+
+describe('renaming', () => {
+  it('changes only the name: strip, preset, sequencer and note stream stay', () => {
+    const model = new DocumentModel(newSong());
+    restructure(model, setSequencerKind(model.doc, 0, 'euclidean'));
+    const before = partAt(model.doc, 0)!;
+    model.merge({ parts: { 0: { name: 'Rim' } } });
+    expect(partAt(model.doc, 0)).toEqual({ ...before, name: 'Rim' });
+  });
+});
+
+describe('the song round trip', () => {
+  it('exports and imports a 7-part mixed-kind song equal to the model', () => {
+    const model = new DocumentModel(newSong());
+    for (let i = 1; i < 7; i++) restructure(model, addPart(model.doc)!.doc);
+    const kinds = ['arp', 'euclidean', 'step', 'none', 'euclidean', 'arp', 'step'] as const;
+    kinds.forEach((kind, slot) => restructure(model, setSequencerKind(model.doc, slot, kind)));
+    model.merge({ parts: { 4: { name: 'Hat', strip: { level: 0.5, sends: { echo: 0.3 } } } } });
+    restructure(model, removePart(model.doc, 2));
+    expect(model.doc.parts).toHaveLength(6);
+    restructure(model, addPart(model.doc)!.doc);
+    expect(model.doc.parts.map((p) => p.slot)).toEqual([0, 1, 3, 4, 5, 6, 2]);
+    const reopened = new DocumentModel(JSON.parse(model.toJson()));
+    expect(reopened.doc).toEqual(model.doc);
+    expect(reopened.corrections).toEqual([]);
+    expect(reopened.filled).toEqual([]);
+  });
+});
+
+describe('changed since opened (the New song guard)', () => {
+  it('is false on open and on a re-open, true after an edit', () => {
+    const model = new DocumentModel(newSong());
+    expect(model.changed).toBe(false);
+    model.merge({ bpm: 90 });
+    expect(model.changed).toBe(true);
+    model.open(newSong());
+    expect(model.changed).toBe(false);
+    restructure(model, addPart(model.doc)!.doc);
+    expect(model.changed).toBe(true);
+  });
+});
