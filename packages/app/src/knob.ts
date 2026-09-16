@@ -18,9 +18,21 @@ export interface KnobSpec {
   onChange?: () => void;
 }
 
+/**
+ * A knob element that can be told to re-read its value. Most knobs own their
+ * field outright and never need it; the Coarse / Fine pair (#587) share one,
+ * so a commit on either has to move the other's display.
+ */
+export interface KnobElement extends HTMLElement {
+  refresh: () => void;
+}
+
 const KNOB_R = 15;
 const ARC_START = -135;
 const ARC_END = 135;
+/** One arrow key's share of the sweep, and shift's finer share of it. */
+const KEY_STEP = 0.02;
+const KEY_STEP_FINE = 0.002;
 
 function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
   const a = ((deg - 90) * Math.PI) / 180;
@@ -60,7 +72,10 @@ interface Scale {
   fromNorm: (n: number) => number;
 }
 
-function scaleFor(spec: KnobSpec): Scale {
+/** The part of a spec that decides where a value or a key press lands. */
+export type KnobScaleSpec = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve'>;
+
+function scaleFor(spec: KnobScaleSpec): Scale {
   if (spec.curve === 'log') {
     const lo = Math.log(Math.max(1e-6, spec.min));
     const hi = Math.log(spec.max);
@@ -75,9 +90,29 @@ function scaleFor(spec: KnobSpec): Scale {
   };
 }
 
+/**
+ * Where an arrow key lands, before `commit` rounds and clamps it: the key's
+ * share of the sweep, or exactly one `step` when that share is finer than the
+ * knob's own grid. Without the fallback a coarsely stepped knob rounds
+ * straight back to where it stood and the keyboard cannot move it at all —
+ * Coarse (0..24 by 1) falls 2% of its range short, and so does shift on
+ * Detune (#587).
+ */
+export function keyTarget(
+  spec: KnobScaleSpec,
+  current: number,
+  dir: 1 | -1,
+  fine: boolean,
+): number {
+  const scale = scaleFor(spec);
+  const raw = scale.fromNorm(scale.toNorm(current) + dir * (fine ? KEY_STEP_FINE : KEY_STEP));
+  const step = spec.step ?? 0;
+  return step > 0 && Math.abs(raw - current) < step ? current + dir * step : raw;
+}
+
 /** Build one knob. The element re-renders itself after every commit. */
-export function makeKnob(spec: KnobSpec): HTMLElement {
-  const node = knobDom(spec);
+export function makeKnob(spec: KnobSpec): KnobElement {
+  const node = knobDom(spec) as KnobElement;
   const arc = node.querySelector('.dial-arc') as SVGPathElement;
   const pin = node.querySelector('.dial-pin') as SVGLineElement;
   const out = node.querySelector('.knob-val') as HTMLElement;
@@ -109,6 +144,7 @@ export function makeKnob(spec: KnobSpec): HTMLElement {
   };
 
   attachKnobInput(node, spec, { toNorm, fromNorm }, commit);
+  node.refresh = render;
   render();
   return node;
 }
@@ -149,14 +185,15 @@ function attachKnobInput(
   node.addEventListener('pointercancel', stop);
   node.addEventListener('lostpointercapture', stop);
   node.addEventListener('dblclick', () => commit(spec.def));
+  const nudge = (dir: 1 | -1, fine: boolean): void =>
+    commit(keyTarget(spec, spec.get(), dir, fine));
   node.addEventListener('keydown', (e) => {
-    const stepN = e.shiftKey ? 0.002 : 0.02;
     if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-      commit(scale.fromNorm(scale.toNorm(spec.get()) + stepN));
+      nudge(1, e.shiftKey);
       e.preventDefault();
     }
     if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
-      commit(scale.fromNorm(scale.toNorm(spec.get()) - stepN));
+      nudge(-1, e.shiftKey);
       e.preventDefault();
     }
   });

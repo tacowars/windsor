@@ -50,7 +50,10 @@ as it fades, and a quiet operator gets little feedback at all.
 
 With **Fixed off**, the operator's frequency follows note pitch (including
 glide), the global pitch envelope, bend and pitch LFO, then its ratio and
-detune. Pitch-envelope amount is in semitones. With **Fixed on**, the engine
+detune. The console shows that ratio as Operator does, as **Coarse** (the whole
+multiple) plus **Fine** (the fraction) over the one stored field, while **Level**
+is the modulation index — the two are not the same control (#587).
+Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch
 controls. A fixed-frequency modulator can still have an amplitude envelope,
 changing the sound as its modulation depth decays.
