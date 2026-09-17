@@ -13,9 +13,9 @@ import {
   removePart,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
-import { partChange } from './context';
 import { el, seg } from './dom';
 import { openConfirm } from './metadataModal';
+import { partNameField } from './partNameField';
 import { partsState } from './patchState';
 import { addPart, replaceDraft, setSequencerKind } from './songParts';
 
@@ -77,21 +77,6 @@ function addRemoveRow(ctx: AppCtx): HTMLElement {
   return row;
 }
 
-/** The selected part's label: committed on change (Enter or blur), never used as a key. */
-function nameField(ctx: AppCtx, slot: number): HTMLElement {
-  const input = document.createElement('input');
-  input.className = 'field';
-  input.name = 'part-name';
-  input.value = partAt(ctx.model.doc, slot)?.name ?? '';
-  input.setAttribute('aria-label', 'Part name');
-  input.onchange = (): void => {
-    const name = input.value.trim();
-    if (name === '' || name === partAt(ctx.model.doc, slot)?.name) return;
-    if (ctx.change(partChange(slot, { name })).ok) ctx.render();
-  };
-  return input;
-}
-
 /** None / Euclidean / Arp / Step for the selected part; a change rebuilds at the kind's defaults. */
 function kindPicker(ctx: AppCtx, slot: number): HTMLElement {
   const box = el('div');
@@ -118,7 +103,7 @@ export function partListControls(ctx: AppCtx): HTMLElement {
   if (!partAt(ctx.model.doc, slot)) return box;
   const nameRow = el('div', 'bar-row');
   nameRow.style.marginTop = '8px';
-  nameRow.appendChild(nameField(ctx, slot));
+  nameRow.appendChild(partNameField(ctx, slot));
   box.appendChild(nameRow);
   box.appendChild(kindPicker(ctx, slot));
   return box;
