@@ -70,7 +70,11 @@ function commit(strip: Strip, edit: (spec: ChordSpec) => readonly ChordStep[]): 
   if (result.ok) strip.repaint();
 }
 
-/** Pressing a step's tile sounds the step as the sequencer would play it, until release. */
+/**
+ * Pressing a step's tile sounds the step as the sequencer would play it, until
+ * release. A second press while one sounds (a second finger) releases the
+ * first before it starts, so no handle is ever left unreleased.
+ */
 function bindTileAudition(strip: Strip, node: HTMLElement, step: ChordStep): void {
   let sounding: { part: { noteOff(id: number): void }; ids: number[] } | null = null;
   const stop = (): void => {
@@ -80,6 +84,7 @@ function bindTileAudition(strip: Strip, node: HTMLElement, step: ChordStep): voi
   };
   node.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
+    stop();
     const part = strip.ctx.host.part(strip.slot);
     const spec = specOf(strip.ctx, strip.slot);
     if (!part || !spec) return;
