@@ -215,3 +215,88 @@ describe('EuclideanSequencer', () => {
     ).toThrow(RangeError);
   });
 });
+
+describe('reconfigure (#610)', () => {
+  const WALK = withDensity({ kind: 'walk', stepChance: 0.7 }, { seed: 11 });
+
+  /** `trace`, with a hook run before the tick at `at` — where a knob turn lands mid-run. */
+  function traceLive(
+    config: EuclideanConfig,
+    bars: number,
+    at: number,
+    hook: (seq: EuclideanSequencer) => void,
+  ): StepTrace[] {
+    const transport = new TickTransport(120);
+    const seq = new EuclideanSequencer(config);
+    const out: StepTrace[] = [];
+    transport.subscribe(config.divisor, (event) => {
+      if (event.tick === at) hook(seq);
+      const onset = seq.handleTick(event);
+      out.push({
+        tick: event.tick,
+        tickInBar: event.tickInBar,
+        bar: event.bar,
+        k: seq.currentK,
+        pattern: patternToString(seq.currentPattern),
+        onset,
+      });
+    });
+    for (let i = 0; i < bars * TICKS_PER_BAR; i++) transport.advance(i * transport.secondsPerTick);
+    return out;
+  }
+
+  it('a no-op reconfigure mid-run changes nothing: the stream and k carry on', () => {
+    const plain = trace(WALK, 16);
+    const live = traceLive(WALK, 16, 8 * TICKS_PER_BAR + 48, (seq) => seq.reconfigure({ ...WALK }));
+    expect(JSON.stringify(live)).toBe(JSON.stringify(plain));
+  });
+
+  it('a steps change re-cuts the figure at once, k clamped, position from the transport', () => {
+    const at = 2 * TICKS_PER_BAR + 5 * WALK.divisor; // step 5 of bar 2
+    let before = -1;
+    const rows = traceLive(WALK, 4, at, (seq) => {
+      before = seq.currentK;
+      seq.reconfigure({ ...WALK, steps: 12, pulses: { min: 2, max: 4, start: 3 } });
+    });
+    const first = rows.find((r) => r.tick === at);
+    expect(first?.pattern).toHaveLength(12);
+    expect(first?.k).toBe(Math.min(4, Math.max(2, before)));
+    for (const r of rows.filter((r) => r.tick >= at && r.bar === 2)) {
+      const step = (r.tick / WALK.divisor) % 12;
+      expect(r.onset !== null, `tick ${r.tick}`).toBe(r.pattern[step] === 'x');
+      if (r.onset) expect(r.onset).toMatchObject({ step, n: 12 });
+    }
+  });
+
+  it('a rotate change turns the figure at once', () => {
+    const seq = new EuclideanSequencer(WALK);
+    const before = seq.currentPattern;
+    seq.reconfigure({ ...WALK, rotate: 3 });
+    expect(patternToString(seq.currentPattern)).toBe(patternToString(rotatePattern(before, 3)));
+    expect(seq.currentK).toBe(WALK.pulses.start);
+  });
+
+  it('a pattern swaps to the fixed figure; null returns to generative from the current k', () => {
+    const seq = new EuclideanSequencer(WALK);
+    const fixed = [...euclid(7, 16, 1)];
+    seq.reconfigure({ ...WALK, pattern: fixed });
+    expect([...seq.currentPattern]).toEqual(fixed);
+    expect(seq.currentK).toBe(7);
+    seq.reconfigure({ ...WALK, pattern: null });
+    expect(seq.currentK).toBe(7);
+    expect(patternToString(seq.currentPattern)).toBe(patternToString(euclid(7, 16)));
+  });
+
+  it('refuses a divisor, seed or invalid config and leaves the generator unchanged', () => {
+    const seq = new EuclideanSequencer(WALK);
+    const pattern = patternToString(seq.currentPattern);
+    expect(() => seq.reconfigure({ ...WALK, divisor: 12 })).toThrow(/divisor/);
+    expect(() => seq.reconfigure({ ...WALK, seed: 12 })).toThrow(/seed/);
+    expect(() => seq.reconfigure({ ...WALK, generatorIndex: 3 })).toThrow(/seed/);
+    expect(() => seq.reconfigure({ ...WALK, pulses: { min: 3, max: 40, start: 5 } })).toThrow(
+      /pulses/,
+    );
+    expect(seq.config).toBe(WALK);
+    expect(patternToString(seq.currentPattern)).toBe(pattern);
+  });
+});

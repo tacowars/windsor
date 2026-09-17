@@ -227,6 +227,38 @@ describe('chord parts (#607)', () => {
   });
 });
 
+describe('Euclidean parts (#610)', () => {
+  it('round-trips a captured 12-step Euclidean part through export and import', () => {
+    const pattern = [true, false, false, true, false, true, false, false, true, false, true, false];
+    const model = new DocumentModel({
+      ...OLD_SONG,
+      parts: [
+        ...OLD_SONG.parts,
+        {
+          slot: 4,
+          name: 'shaker',
+          preset: 'kick',
+          sequencer: {
+            kind: 'euclidean',
+            steps: 12,
+            pulses: { min: 2, max: 6, start: 5 },
+            rotate: -3,
+            density: { kind: 'walk', stepChance: 0.4 },
+            pattern,
+          },
+        },
+      ],
+    });
+    expect(model.corrections).toEqual([]);
+    const reopened = new DocumentModel(JSON.parse(model.toJson()));
+    expect(reopened.doc).toEqual(model.doc);
+    expect(reopened.corrections).toEqual([]);
+    const shaker = reopened.doc.parts.find((p) => p.slot === 4)?.sequencer;
+    expect(shaker?.kind === 'euclidean' && shaker.pattern).toEqual(pattern);
+    expect(shaker?.kind === 'euclidean' && shaker.rotate).toBe(-3);
+  });
+});
+
 describe('deepMerge', () => {
   it('creates keys the current document lacks and replaces arrays wholesale', () => {
     expect(deepMerge({ a: { b: 1 } }, { a: { c: 2 } })).toEqual({ a: { b: 1, c: 2 } });

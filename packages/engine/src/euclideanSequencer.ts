@@ -7,9 +7,12 @@
  * part and a velocity, and a horde can read the same onsets for its footfalls.
  *
  * The pattern regenerates only on a bar line, whichever modulator drives `k`,
- * so a density change never re-cuts a figure mid-flight. Step position is
- * derived from the absolute tick (`floor(tick / divisor) mod n`), so the
- * figure stays phase-locked to the transport whatever `n * divisor` is.
+ * so a density change never re-cuts a figure mid-flight. A hand edit is
+ * different (#610): `reconfigure` re-cuts at once from the new steps and
+ * rotation, keeping `k` and the stream. Step position is derived from the
+ * absolute tick (`floor(tick / divisor) mod n`) either way, so the figure
+ * stays phase-locked to the transport whatever `n * divisor` is and a
+ * re-cut never moves the playhead.
  */
 import { WALK_DOWN_CHANCE } from './audioConstants';
 import { euclid, type Pattern } from './euclid';
@@ -103,7 +106,8 @@ function assertDensity(mod: DensityMod): void {
   }
 }
 
-function assertConfig(config: EuclideanConfig): void {
+/** Every constructor and `reconfigure` check; the player runs it inside `plan` so a bad live edit is refused before anything commits (#610). */
+export function assertEuclideanConfig(config: EuclideanConfig): void {
   const { steps, divisor, pulses } = config;
   if (!Number.isInteger(steps) || steps < 1)
     throw new RangeError(`steps must be >= 1, got ${steps}`);
@@ -124,21 +128,55 @@ function assertConfig(config: EuclideanConfig): void {
   }
 }
 
+const countOnsets = (pattern: Pattern): number => pattern.filter(Boolean).length;
+
 export class EuclideanSequencer {
-  readonly config: EuclideanConfig;
   onOnset: OnsetHandler | null = null;
 
+  private current: EuclideanConfig;
   private readonly rng: Rng;
-  private readonly fixed: Pattern | null;
+  private fixed: Pattern | null;
   private pattern: Pattern;
   private k: number;
 
   constructor(config: EuclideanConfig) {
-    assertConfig(config);
-    this.config = config;
+    assertEuclideanConfig(config);
+    this.current = config;
     this.rng = generatorRng(config.seed, config.generatorIndex);
     this.fixed = config.pattern ?? null;
-    this.k = this.fixed ? this.fixed.filter(Boolean).length : this.clampK(config.pulses.start);
+    this.k = this.fixed ? countOnsets(this.fixed) : this.clampK(config.pulses.start);
+    this.pattern = this.fixed ?? euclid(this.k, config.steps, config.rotate);
+  }
+
+  get config(): EuclideanConfig {
+    return this.current;
+  }
+
+  /**
+   * Take new fields without a rebuild (#610): the stream and the current `k`
+   * carry on — `k` clamped into the new bounds — and the figure is re-cut at
+   * once from the new steps, rotation and that `k`, so a knob turned by hand
+   * shows on the next step while the modulator still moves `k` only on a bar
+   * line. A captured `pattern` swaps to the fixed figure; `null` returns to
+   * generative from the current `k`. The divisor is the subscription and the
+   * seed is the stream: both need a rebuild.
+   */
+  reconfigure(config: EuclideanConfig): void {
+    assertEuclideanConfig(config);
+    if (config.divisor !== this.current.divisor) {
+      throw new RangeError(
+        'a divisor change rebuilds the sequencer; it cannot be reconfigured live',
+      );
+    }
+    if (
+      config.seed !== this.current.seed ||
+      config.generatorIndex !== this.current.generatorIndex
+    ) {
+      throw new RangeError('a seed change rebuilds the sequencer; it cannot be reconfigured live');
+    }
+    this.current = config;
+    this.fixed = config.pattern ?? null;
+    this.k = this.fixed ? countOnsets(this.fixed) : this.clampK(this.k);
     this.pattern = this.fixed ?? euclid(this.k, config.steps, config.rotate);
   }
 
@@ -152,7 +190,7 @@ export class EuclideanSequencer {
   }
 
   attach(source: TickSource): Unsubscribe {
-    return source.subscribe(this.config.divisor, (event) => this.handleTick(event));
+    return source.subscribe(this.current.divisor, (event) => this.handleTick(event));
   }
 
   /**
@@ -162,14 +200,14 @@ export class EuclideanSequencer {
    */
   handleTick(event: TickEvent): OnsetEvent | null {
     if (this.fixed === null && event.tickInBar === 0) this.regenerate(event);
-    const step = event.step % this.config.steps;
+    const step = event.step % this.current.steps;
     if (!this.pattern[step]) return null;
     const onset: OnsetEvent = {
       tick: event.tick,
       time: event.time,
       step,
       k: this.k,
-      n: this.config.steps,
+      n: this.current.steps,
     };
     this.onOnset?.(onset);
     return onset;
@@ -179,11 +217,11 @@ export class EuclideanSequencer {
     const next = this.nextK(event);
     if (next === this.k) return;
     this.k = next;
-    this.pattern = euclid(next, this.config.steps, this.config.rotate);
+    this.pattern = euclid(next, this.current.steps, this.current.rotate);
   }
 
   private nextK(event: TickEvent): number {
-    const mod = this.config.density;
+    const mod = this.current.density;
     switch (mod.kind) {
       case 'lfoBars':
         return this.kFromLfo(mod.shape, event.bar / mod.bars);
@@ -197,12 +235,12 @@ export class EuclideanSequencer {
   }
 
   private kFromLfo(shape: LfoShape, phase: number): number {
-    const { min, max } = this.config.pulses;
+    const { min, max } = this.current.pulses;
     return min + Math.round(lfoValue(shape, phase) * (max - min));
   }
 
   private clampK(k: number): number {
-    const { min, max } = this.config.pulses;
+    const { min, max } = this.current.pulses;
     return Math.min(max, Math.max(min, Math.trunc(k)));
   }
 }
