@@ -32,6 +32,8 @@ export type {
   EuclideanSpec,
   MergeResult,
   MusicPart,
+  ChordDriver,
+  ChordSpec,
   GridDriver,
   GridSpec,
   NoSequencer,
@@ -56,6 +58,46 @@ export {
   gridNote,
 } from './gridSequencer';
 export type { GridNoteStep, GridSequencerConfig, GridStep, GridStepKind } from './gridSequencer';
+export {
+  CHORD_STEP_KINDS,
+  ChordSequencer,
+  DEFAULT_CHORD_CONFIG,
+  assertChordConfig,
+  chordStep,
+  layoutSegments,
+  restStep,
+} from './chordSequencer';
+export type {
+  ChordChordStep,
+  ChordRestStep,
+  ChordSegment,
+  ChordSequencerConfig,
+  ChordStep,
+  ChordStepKind,
+} from './chordSequencer';
+export {
+  CHORD_SIZES,
+  chordOf,
+  chordQuality,
+  chordTones,
+  diatonicChords,
+  isChordSize,
+} from './chordTheory';
+export type { Chord, ChordSize } from './chordTheory';
+export { chordName, pitchClassName, romanNumeral, toRoman } from './chordNames';
+export { invertStack, voiceChord } from './chordVoicing';
+export type { VoiceOptions } from './chordVoicing';
+export {
+  CHORD_DIVISORS,
+  CHORD_DURATIONS,
+  CHORD_NOTE_NAMES,
+  CHORD_QUALITIES,
+  CHORD_VOICINGS,
+  CHORD_VOICING_DEFAULT,
+  CHORD_VOICING_IDS,
+  QUALITY_LABELS,
+} from './chordTables';
+export type { ChordQuality, ChordVoicing, ChordVoicingId, QualityLabel } from './chordTables';
 export { foldDegree } from './scaleSampler';
 export {
   ACCENT_MOD_DEFAULT,
@@ -63,6 +105,17 @@ export {
   GRID_DEGREE_MAX,
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
+  CHORD_DURATION_DEFAULT,
+  CHORD_GATE_DEFAULT,
+  CHORD_INVERSION_MAX,
+  CHORD_REPEAT_DEFAULT,
+  CHORD_REPEAT_MAX,
+  CHORD_SEMITONE_MAX,
+  CHORD_SIZE_SEVENTH,
+  CHORD_SIZE_TRIAD,
+  CHORD_STEPS_MAX,
+  CHORD_STEP_OCTAVE_MAX,
+  CHORD_VOICING_NOTES_MAX,
 } from './audioConstants';
 export type {
   ApplyResult,

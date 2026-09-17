@@ -10,7 +10,8 @@
  *
  * Since #597 a song is a list of 1–8 parts, each identified by its `slot`
  * (0–7) and carrying any sequencer: a Euclidean fixed-note trigger, the
- * arpeggiator, the step sequencer, the written grid (#602), or `none` — an inert part the keyboard
+ * arpeggiator, the step sequencer, the written grid (#602), the chord
+ * progression (#606), or `none` — an inert part the keyboard
  * can still play but nothing sequences. A part's name is a label and keys
  * nothing (record `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
@@ -21,6 +22,7 @@
  * world seed).
  */
 import type { ArpeggiatorConfig } from './arpeggiator';
+import type { ChordSequencerConfig } from './chordSequencer';
 import type { EuclideanConfig } from './euclideanSequencer';
 import type { GridSequencerConfig } from './gridSequencer';
 import type { ScaleName } from './scaleSampler';
@@ -31,9 +33,10 @@ export type EuclideanDriver = Omit<EuclideanConfig, 'seed' | 'generatorIndex'>;
 export type ArpDriver = Omit<ArpeggiatorConfig, 'seed' | 'generatorIndex'>;
 export type StepDriver = Omit<StepSequencerConfig, 'seed' | 'generatorIndex'>;
 export type GridDriver = Omit<GridSequencerConfig, 'seed' | 'generatorIndex'>;
+export type ChordDriver = Omit<ChordSequencerConfig, 'seed' | 'generatorIndex'>;
 
 /** What may drive a part (#597). `none` is inert: allowed anywhere, skipped by every sequencing path. */
-export const SEQUENCER_KINDS = ['none', 'euclidean', 'arp', 'step', 'grid'] as const;
+export const SEQUENCER_KINDS = ['none', 'euclidean', 'arp', 'step', 'grid', 'chord'] as const;
 export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
 
 export interface NoSequencer {
@@ -54,8 +57,10 @@ export type ArpSpec = { readonly kind: 'arp' } & ArpDriver;
 export type StepSpec = { readonly kind: 'step' } & StepDriver;
 /** The grid (#602): a written 1–32 step line of scale degrees with accent, slide, tie and rest. */
 export type GridSpec = { readonly kind: 'grid' } & GridDriver;
+/** The chord progression (#606): 0–32 written steps of diatonic chords by degree, one voicing per part. */
+export type ChordSpec = { readonly kind: 'chord' } & ChordDriver;
 
-export type SequencerSpec = NoSequencer | EuclideanSpec | ArpSpec | StepSpec | GridSpec;
+export type SequencerSpec = NoSequencer | EuclideanSpec | ArpSpec | StepSpec | GridSpec | ChordSpec;
 
 /** One part as the player sees it; the document adds its strip (`DocumentPart`). */
 export interface MusicPart {
