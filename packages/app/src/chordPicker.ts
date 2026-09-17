@@ -99,7 +99,7 @@ function labelFor(payload: ChordPayload, chips: readonly Chip[]): string {
 
 const SIZE_OPTIONS = [
   { value: String(CHORD_SIZE_TRIAD), label: 'Triads' },
-  { value: String(CHORD_SIZE_SEVENTH), label: 'Sevenths' },
+  { value: String(CHORD_SIZE_SEVENTH), label: '7ths' },
 ];
 
 const VOICING_OPTIONS = CHORD_VOICING_IDS.map((id) => ({

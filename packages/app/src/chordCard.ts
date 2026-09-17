@@ -2,7 +2,7 @@
  * The Sequencers tab's chord card (#607): the picker above, the progression
  * below as one column per step — the chord's name over its numeral, then the
  * Oct, Inv, Semi, Dur and Rep dials (click up, shift-click down) — an append
- * column that takes a drop or a click, a remove-last button, the part
+ * column that takes a drop or a click, a delete-last-step button, the part
  * velocity, gate and base-step controls, and a playhead on the audible tick.
  * Every edit goes through `ctx.change` as a whole `steps` list (arrays
  * replace wholesale in the merge); the step operations are
@@ -217,10 +217,10 @@ function tools(strip: Strip): HTMLElement {
       if (ctx.change(partChange(slot, { sequencer: { divisor: Number(v) } })).ok) strip.repaint();
     }),
   );
-  const minus = el('button', 'btn', '− last step') as HTMLButtonElement;
+  const minus = el('button', 'btn', 'Delete last step') as HTMLButtonElement;
   minus.type = 'button';
   minus.style.borderColor = PITCH_COLOR;
-  minus.title = 'remove the last step';
+  minus.title = 'delete the last step of the progression';
   minus.onclick = (): void => commit(strip, (s) => removeLast(s.steps));
   row.appendChild(minus);
   return row;
