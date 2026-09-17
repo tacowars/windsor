@@ -55,6 +55,15 @@ export class FieldNormaliser {
     }
   }
 
+  /** A boolean; `fallback` when absent or junk (a string is junk: 'false' would read as true). */
+  bool(raw: unknown, fallback: boolean, path: string): boolean {
+    if (typeof raw === 'boolean') return raw;
+    if (raw !== undefined) {
+      this.correction(`${path}: ${show(raw)} is not a boolean — using ${fallback}`);
+    }
+    return fallback;
+  }
+
   /** A finite number clamped into [min, max]; `fallback` when absent or junk. */
   num(raw: unknown, fallback: number, min: number, max: number, path: string): number {
     if (typeof raw !== 'number' || !Number.isFinite(raw)) {

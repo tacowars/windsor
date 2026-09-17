@@ -15,6 +15,18 @@ export interface NoteOnMessage {
   note: number;
   velocity: number;
   frame: number;
+  /**
+   * Per-note mod (#602): added to the `modWheel` param wherever a voice reads
+   * it, so an accent reaches `lfo.modWheelDepth` and `filter.modWheelDepth`
+   * without touching the part-wide wheel or the previous note's tail.
+   */
+  mod?: number;
+  /**
+   * A legato slide (#602): in mono mode with a voice sounding, that voice is
+   * retargeted to `note` — envelopes untouched — and rebound to this `id`.
+   * Otherwise an ordinary note-on.
+   */
+  slide?: boolean;
 }
 
 export interface NoteOffMessage {
@@ -125,6 +137,11 @@ export interface ProcessorOptions {
    * supply it; an offline bake that wants byte-identical output may too.
    */
   seed?: number;
+  /**
+   * Seconds a slid note glides when the patch's `glide` is 0 (#602). The
+   * engine passes `SLIDE_SECONDS_DEFAULT`; absent, a slide is instant.
+   */
+  slideSeconds?: number;
 }
 
 /** The `AudioContext` timeline is frames at the sample rate, so this is exact. */

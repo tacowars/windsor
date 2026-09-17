@@ -7,8 +7,16 @@
  * own native effect chain -- rather than a node per sounding note.
  */
 import type { Patch } from './patch';
-import type { ScheduledMessage, WorkletMessage } from './workletMessages';
+import type { NoteOnMessage, ScheduledMessage, WorkletMessage } from './workletMessages';
 import { frameForTime } from './workletMessages';
+
+/** What a grid note carries beyond pitch and velocity (#602). */
+export interface NoteExtras {
+  /** Per-note mod, added to the wheel for this voice; 0 or absent for a plain note. */
+  mod?: number;
+  /** Take over the held voice legato (mono patches); otherwise an ordinary note-on. */
+  slide?: boolean;
+}
 
 export class AudioPart {
   readonly name: string;
@@ -60,17 +68,22 @@ export class AudioPart {
    * Start a note. Omit `time` for "as soon as possible"; pass a context time to
    * place it exactly, which is what the scheduler does.
    *
+   * `extras` carries a grid step's accent mod and slide flag (#602).
+   *
    * @returns a handle for `noteOff`.
    */
-  noteOn(note: number, velocity = 1, time?: number): number {
+  noteOn(note: number, velocity = 1, time?: number, extras?: NoteExtras): number {
     const id = this.nextId++;
-    this.schedule({
+    const message: NoteOnMessage = {
       type: 'noteOn',
       id,
       note,
       velocity,
       frame: frameForTime(this.context, time ?? this.context.currentTime),
-    });
+    };
+    if (extras?.mod !== undefined && extras.mod !== 0) message.mod = extras.mod;
+    if (extras?.slide) message.slide = true;
+    this.schedule(message);
     const ids = this.heldByNote.get(note);
     if (ids) ids.push(id);
     else this.heldByNote.set(note, [id]);

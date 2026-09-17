@@ -1,7 +1,7 @@
 import { mulberry32 } from '@aotearoa/shared';
 import { describe, expect, it } from 'vitest';
 
-import { SCALES, SCALE_NAMES, ScaleSampler, uniformWeights } from './scaleSampler';
+import { SCALES, SCALE_NAMES, ScaleSampler, uniformWeights, foldDegree } from './scaleSampler';
 
 describe('SCALES', () => {
   it('start on the root and stay inside the octave, ascending', () => {
@@ -87,5 +87,34 @@ describe('ScaleSampler', () => {
       () => new ScaleSampler({ root: 60, scale: 'major', weights: [1, -1, 1, 1, 1, 1, 1] }),
     ).toThrow(RangeError);
     expect(() => new ScaleSampler({ root: 60, scale: [], weights: [] })).toThrow(RangeError);
+  });
+});
+
+describe('foldDegree (#602)', () => {
+  it('wraps a degree past the scale end with octave carry', () => {
+    expect(foldDegree(6, 5)).toEqual({ degree: 1, carry: 1 });
+    expect(foldDegree(7, 7)).toEqual({ degree: 0, carry: 1 });
+    expect(foldDegree(4, 7)).toEqual({ degree: 4, carry: 0 });
+    expect(foldDegree(11, 5)).toEqual({ degree: 1, carry: 2 });
+  });
+
+  it('a one-degree scale maps every degree to the root in some octave', () => {
+    const one = new ScaleSampler({ root: 60, scale: [0], weights: [1] });
+    expect(one.noteForFolded(0, 0)).toBe(60);
+    expect(one.noteForFolded(3, 0)).toBe(60 + 36);
+    expect(one.noteForFolded(2, -1)).toBe(60 + 12);
+  });
+
+  it('degree 6 in pentatonic minor is degree 1 an octave up; the same degree round-trips through seven', () => {
+    const seven = new ScaleSampler({
+      root: 48,
+      scale: 'naturalMinor',
+      weights: [1, 1, 1, 1, 1, 1, 1],
+    });
+    const five = new ScaleSampler({ root: 48, scale: 'pentatonicMinor', weights: [1, 1, 1, 1, 1] });
+    expect(seven.noteForFolded(6, 0)).toBe(48 + 10);
+    expect(five.noteForFolded(6, 0)).toBe(48 + 3 + 12);
+    // The written degree is untouched by the fold: back in seven it is the seventh again.
+    expect(seven.noteForFolded(6, 0)).toBe(seven.noteFor(6, 0));
   });
 });

@@ -88,3 +88,20 @@ describe('AudioPart note handles', () => {
     expect(part.heldHandles(72)).toEqual([]);
   });
 });
+
+describe('AudioPart note extras (#602)', () => {
+  it('posts a grid note’s mod and slide, and nothing extra for a plain note', () => {
+    const { part, sent } = makePart();
+    part.noteOn(60, 0.9, undefined, { mod: 1, slide: true });
+    part.noteOn(62, 0.9, undefined, { mod: 0, slide: false });
+    part.noteOn(64);
+    const ons = sent.filter((m) => m.type === 'noteOn') as Array<
+      Sent & { mod?: number; slide?: boolean }
+    >;
+    expect(ons[0]).toMatchObject({ note: 60, mod: 1, slide: true });
+    expect(ons[1]).not.toHaveProperty('mod');
+    expect(ons[1]).not.toHaveProperty('slide');
+    expect(ons[2]).not.toHaveProperty('mod');
+    expect(ons[2]).not.toHaveProperty('slide');
+  });
+});

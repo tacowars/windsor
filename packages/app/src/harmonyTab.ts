@@ -78,9 +78,12 @@ function registerRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
   const knobs = el('div', 'knob-row');
   const register = (): { octave: number; span: number } => {
     const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
-    const pitched = sequencer?.kind === 'arp' || sequencer?.kind === 'step';
-    return pitched ? sequencer.register : { octave: 0, span: 1 };
+    if (sequencer?.kind === 'arp' || sequencer?.kind === 'step') return sequencer.register;
+    // A grid line is written, not drawn, so it has an octave and no span (#602).
+    if (sequencer?.kind === 'grid') return { octave: sequencer.register.octave, span: 1 };
+    return { octave: 0, span: 1 };
   };
+  const spanned = partAt(ctx.model.doc, slot)?.sequencer.kind !== 'grid';
   knobs.appendChild(
     makeKnob({
       label: 'Octave',
@@ -94,21 +97,27 @@ function registerRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
       set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { octave: v } } })),
     }),
   );
-  knobs.appendChild(
-    makeKnob({
-      label: 'Span',
-      min: 1,
-      max: 4,
-      def: 1,
-      step: 1,
-      color: COLOR,
-      fmt: fmt0,
-      get: () => register().span,
-      set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { span: v } } })),
-    }),
-  );
+  if (spanned) knobs.appendChild(spanKnob(ctx, slot, register));
   row.appendChild(knobs);
   return row;
+}
+
+function spanKnob(
+  ctx: AppCtx,
+  slot: number,
+  register: () => { octave: number; span: number },
+): HTMLElement {
+  return makeKnob({
+    label: 'Span',
+    min: 1,
+    max: 4,
+    def: 1,
+    step: 1,
+    color: COLOR,
+    fmt: fmt0,
+    get: () => register().span,
+    set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { span: v } } })),
+  });
 }
 
 export function renderHarmonyTab(body: HTMLElement, ctx: AppCtx): void {
@@ -133,7 +142,7 @@ export function renderHarmonyTab(body: HTMLElement, ctx: AppCtx): void {
   );
   for (const part of ctx.model.doc.parts) {
     const { kind } = part.sequencer;
-    if (kind === 'arp' || kind === 'step') {
+    if (kind === 'arp' || kind === 'step' || kind === 'grid') {
       registers.body.appendChild(registerRow(ctx, part.slot, part.name));
     }
   }

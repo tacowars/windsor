@@ -729,6 +729,11 @@ class Voice {
     this.pitchCur = 60;
     this.pitchTarget = 60;
 
+    // Per-note accent and slide (#602): `mod` is added to the wheel wherever
+    // it is read; `glideSeconds` is a slide's own time, 0 until a retarget.
+    this.mod = 0;
+    this.glideSeconds = 0;
+
     this.ctrlCount = 0;
     this.patch = null;
     this.alg = ALGORITHMS[0];
@@ -796,6 +801,8 @@ class Voice {
     this.fadeInc = 0;
     this.age = 0;
     this.ctrlCount = 0;
+    this.mod = 0;
+    this.glideSeconds = 0;
 
     this.pitchTarget = note;
     this.pitchCur = glideFrom == null ? note : glideFrom;
@@ -865,6 +872,27 @@ class Voice {
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
+  }
+
+  /**
+   * Legato slide (#602): re-point a sounding voice at a new note. The pitch
+   * glides from wherever it is over `glideSeconds`; envelopes, LFO, phase and
+   * filter state carry on, so nothing retriggers. The constants that depend on
+   * the key offset are recomputed for the new note, as `rebind` does.
+   */
+  retarget(note, velocity, mod, glideSeconds) {
+    const patch = this.patch;
+    this.note = note;
+    this.pitchTarget = note;
+    this.velocity = velocity;
+    this.mod = mod;
+    this.glideSeconds = glideSeconds;
+    const keyOffset = (note - 60) / 12;
+    for (let i = 0; i < 4; i++) {
+      this.ampEnv[i].timeScale = Math.pow(2, -patch.ops[i].env.keyScale * keyOffset);
+    }
+    this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
+    this.bindConstants(patch);
   }
 
   release() {
@@ -947,15 +975,18 @@ class Voice {
    * samples, then set up per-sample amplitude ramps so the audio loop only
    * does adds. Also refreshes filter coefficients.
    */
-  updateControl(n, bend, modWheel, cutoffMod) {
+  updateControl(n, bend, wheel, cutoffMod) {
     const patch = this.patch;
     const lfoP = patch.lfo;
+    // The part's wheel plus this note's accent (#602); adding 0 is exact.
+    const modWheel = wheel + this.mod;
     const lfoVal =
       this.lfo.advance(lfoP, n, this.sr) * (lfoP.amount + modWheel * lfoP.modWheelDepth);
 
-    // Glide toward the target note
-    if (patch.glide > 0) {
-      const coef = 1 - Math.exp(-n / (patch.glide * this.sr));
+    // Glide toward the target note: a slide's own time first, else the patch's.
+    const glide = this.glideSeconds > 0 ? this.glideSeconds : patch.glide;
+    if (glide > 0) {
+      const coef = 1 - Math.exp(-n / (glide * this.sr));
       this.pitchCur += (this.pitchTarget - this.pitchCur) * coef;
     } else {
       this.pitchCur = this.pitchTarget;
@@ -1564,6 +1595,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.running = true;
     // Off in the game; the console turns it on so a knob retunes ringing voices.
     this.liveRetune = false;
+    // Seconds a slid note glides when the patch's `glide` is 0 (#602).
+    this.slideSeconds = num(opts.slideSeconds, 0);
     // Skipping silent held voices (#547). Always on in the game and the console;
     // `dormancy: false` exists so a test can render the same part without it and
     // prove the two renders agree.
@@ -1785,6 +1818,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const p = this.patch;
     const id = msg.id != null ? msg.id : msg.note;
     const vel = num(msg.velocity, 1);
+    const mod = num(msg.mod, 0);
     const count = p.spread > 0 ? 2 : 1;
     const glideFrom = p.glide > 0 && this.lastNote != null ? this.lastNote : null;
 
@@ -1792,6 +1826,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // allocates, so the fading voices are in reserve slots and the new note
     // starts fresh. `spread` still runs its detuned pair for the one note, and
     // `glide` still slides from `lastNote`.
+    // A slide in mono (#602): the sounding voice takes the new note legato.
+    if (msg.slide && p.mono && this.slideTo(id, msg.note, vel, mod)) return;
     if (p.mono) this.cutSounding();
 
     let list = this.noteMap.get(id);
@@ -1805,10 +1841,44 @@ class FmPartProcessor extends AudioWorkletProcessor {
       let pan = p.pan + p.panKey * ((msg.note - 60) / 48) + p.panRandom * (this.random() * 2 - 1);
       if (count > 1) pan += sign * 0.35 * Math.min(1, p.spread / 50);
       v.start(p, this.waveSets, msg.note, vel, detune, pan, glideFrom, id);
+      v.mod = mod;
       list.push(v);
     }
     this.noteMap.set(id, list);
     this.lastNote = msg.note;
+  }
+
+  /**
+   * Retarget the held note's voices to `note` under handle `id` (#602). In
+   * mono at most one handle is gated, so the first gated voice names it.
+   * False when nothing is sounding: the caller starts a fresh voice instead.
+   * Allocates nothing beyond the map's own bookkeeping, as `noteOn` does.
+   */
+  slideTo(id, note, velocity, mod) {
+    const vs = this.voices;
+    let heldId = null;
+    for (let i = 0; i < vs.length; i++) {
+      const v = vs[i];
+      if (v.active && v.gate && !v.fading) {
+        heldId = v.voiceId;
+        break;
+      }
+    }
+    if (heldId === null || heldId === id) return false;
+    const list = this.noteMap.get(heldId);
+    if (!list) return false;
+    const p = this.patch;
+    const glide = p.glide > 0 ? p.glide : this.slideSeconds;
+    for (let i = 0; i < list.length; i++) {
+      const v = list[i];
+      if (v.voiceId !== heldId) continue;
+      v.retarget(note, velocity, mod, glide);
+      v.voiceId = id;
+    }
+    this.noteMap.delete(heldId);
+    this.noteMap.set(id, list);
+    this.lastNote = note;
+    return true;
   }
 
   noteOffId(id) {

@@ -17,6 +17,16 @@ export interface NoteOnEvent {
   note: number;
   /** Scale degree the note was drawn from, for bindings that want it. */
   degree: number;
+  /**
+   * A grid accent (#602): the bump to add to the part's velocity, and the
+   * per-note mod value the voice adds to the wheel. Absent on a plain note.
+   */
+  accent?: { velocity: number; mod: number };
+  /**
+   * A grid slide (#602): the note takes over the held voice legato instead of
+   * starting a new one. Emitted before the held note's off at the same tick.
+   */
+  slide?: boolean;
 }
 
 export interface NoteOffEvent {
