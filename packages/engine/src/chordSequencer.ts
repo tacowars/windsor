@@ -15,10 +15,11 @@
  *
  * At an onset the notes still held are released on that tick, before the new
  * chord's note-ons; a rest's onset releases and plays nothing. With `gate`
- * below 1 the chord's offs are emitted at the onset with a future tick and
- * time (the step sequencer's idiom); at 1 the chord holds to the next onset.
- * Repeats retrigger — there are no ties. An empty step list is silent: its
- * first tick releases whatever a previous pattern left sounding.
+ * below 1 the chord's offs are emitted on the tick the gate ends — deferred,
+ * not scheduled ahead at the onset, so a live edit that clears or shortens
+ * the progression can still release it (Codex, #606); at 1 the chord holds to
+ * the next onset. Repeats retrigger — there are no ties. An empty step list
+ * is silent: its first tick releases whatever a previous pattern left sounding.
  *
  * Chords resolve through the song's one `ScaleSampler` at onset time, so a
  * key change re-voices the progression; `reconfigure` takes a new pattern,
@@ -205,8 +206,10 @@ export class ChordSequencer {
   private segments: ChordSegment[] = [];
   private byStart = new Map<number, ChordSegment>();
   private length = 0;
-  /** The notes sounding into the next onset, if the gate holds them. */
+  /** The notes sounding now: released at the next onset, or at `releaseTick` when the gate ends. */
   private held: number[] = [];
+  /** The tick a gated chord's offs go out on; null while the held chord runs to the next onset. */
+  private releaseTick: number | null = null;
 
   constructor(sampler: ScaleSampler, config: ChordSequencerConfig) {
     assertChordConfig(config);
@@ -231,7 +234,8 @@ export class ChordSequencer {
   /**
    * Take a new pattern, gate, voicing or register, and optionally a new
    * sampler, without a rebuild: whatever is held plays on until the next
-   * onset releases it, so an edit never cuts the sounding chord.
+   * onset, or its own gate end, releases it, so an edit never cuts the
+   * sounding chord and never strands it either.
    */
   reconfigure(config: ChordSequencerConfig, sampler: ScaleSampler = this.sampler): void {
     assertChordConfig(config);
@@ -258,10 +262,12 @@ export class ChordSequencer {
 
   /** One tick. Returns the events it emitted; most ticks emit none. */
   handleTick(event: TickEvent): NoteEvent[] {
-    if (this.length === 0)
+    const gateEnded = this.releaseTick !== null && event.tick >= this.releaseTick;
+    if (this.length === 0) {
       return this.held.length > 0 ? this.releaseHeld(event.tick, event.time) : [];
+    }
     const segment = this.byStart.get(event.tick % this.length);
-    if (!segment) return [];
+    if (!segment) return gateEnded ? this.releaseHeld(event.tick, event.time) : [];
     const step = this.current.steps[segment.step];
     const events = this.held.length > 0 ? this.releaseHeld(event.tick, event.time, false) : [];
     if (step && step.kind === 'chord') events.push(...this.onset(event, step, segment));
@@ -294,24 +300,15 @@ export class ChordSequencer {
       degree: step.degree,
     }));
     const gateTicks = Math.max(1, Math.round(this.current.gate * segment.ticks));
-    if (gateTicks >= segment.ticks) {
-      this.held = notes;
-      return events;
-    }
-    for (const note of notes) {
-      events.push({
-        kind: 'noteOff',
-        tick: event.tick + gateTicks,
-        time: event.time + gateTicks * event.secondsPerTick,
-        note,
-      });
-    }
+    this.held = notes;
+    this.releaseTick = gateTicks >= segment.ticks ? null : event.tick + gateTicks;
     return events;
   }
 
   private releaseHeld(tick: number, time: number, emit = true): NoteEvent[] {
     const events: NoteEvent[] = this.held.map((note) => ({ kind: 'noteOff', tick, time, note }));
     this.held = [];
+    this.releaseTick = null;
     if (emit) for (const e of events) this.onNote?.(e);
     return events;
   }

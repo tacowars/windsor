@@ -64,7 +64,10 @@ calls at refinement.
     change all reach the running generator through `reconfigure`, validated
     inside the player's plan; whatever is held plays on until the next onset
     releases it. An empty pattern releases what a previous one left sounding
-    on its first tick.
+    on its first tick. A gated chord's offs are therefore emitted on the tick
+    its gate ends, never scheduled ahead at the onset (a Codex finding on
+    the first cut): a pre-scheduled off cannot be pulled forward, so an edit
+    that cleared an eight-bar gated step would have left it ringing.
 
 ## Why
 
