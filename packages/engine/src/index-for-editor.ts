@@ -102,6 +102,7 @@ export { foldDegree } from './scaleSampler';
 export {
   ACCENT_MOD_DEFAULT,
   ACCENT_VELOCITY_DEFAULT,
+  EUCLID_STEPS_MAX,
   GRID_DEGREE_MAX,
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,

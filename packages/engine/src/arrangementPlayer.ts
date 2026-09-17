@@ -36,7 +36,7 @@ import type {
 } from './arrangement';
 import { driverOf, mergeArrangement } from './arrangement';
 import { BarRecorder, type NotePattern } from './capturedPattern';
-import { EuclideanSequencer, type OnsetEvent } from './euclideanSequencer';
+import { EuclideanSequencer, assertEuclideanConfig, type OnsetEvent } from './euclideanSequencer';
 import type { NoteEvent } from './noteEvent';
 import type { PresetTable } from './arrangementValidate';
 import { lookupPreset, partLabel, presetFor, validateArrangement } from './arrangementValidate';
@@ -94,9 +94,9 @@ interface Plan {
   built: Built;
   rebuilt: ReadonlySet<number>;
   /**
-   * Grid and chord parts kept live (#603, #606): each entry applies the
-   * validated config to its generator after the commit, against the sampler
-   * the commit installs.
+   * Grid, chord and Euclidean parts kept live (#603, #606, #610): each entry
+   * applies the validated config to its generator after the commit, against
+   * the sampler the commit installs.
    */
   reconfigured: ReadonlyArray<() => void>;
   patchChanges: ReadonlyArray<readonly [number, Patch]>;
@@ -129,13 +129,13 @@ const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
 /**
  * What builds a part's generator: its kind and driver, never its note, hold or
- * velocity. A grid rebuilds only on its kind or divisor (#603) and a chord
- * progression only on its kind (#606, it subscribes at every tick): every
- * other field reconfigures the live generator, so an edit never cuts the
- * held note.
+ * velocity. A grid (#603) or a Euclidean part (#610) rebuilds only on its kind
+ * or divisor and a chord progression only on its kind (#606, it subscribes at
+ * every tick): every other field reconfigures the live generator, so an edit
+ * never cuts the held note or restarts the stream.
  */
 const generatorSig = (spec: SequencerSpec): string => {
-  if (spec.kind === 'grid') return sig([spec.kind, spec.divisor]);
+  if (spec.kind === 'grid' || spec.kind === 'euclidean') return sig([spec.kind, spec.divisor]);
   if (spec.kind === 'chord') return sig([spec.kind]);
   return sig([spec.kind, driverOf(spec)]);
 };
@@ -143,14 +143,16 @@ const generatorSig = (spec: SequencerSpec): string => {
 /** Draws from the shared sampler on a rebuild; a key change rebuilds these two. */
 const isPitched = (spec: SequencerSpec): boolean => spec.kind === 'arp' || spec.kind === 'step';
 
-/** Resolves degrees through the sampler at play time and takes a new one live (#603, #606). */
-const isLive = (spec: SequencerSpec): boolean => spec.kind === 'grid' || spec.kind === 'chord';
+/** Kept live across edits (#603, #606, #610): reconfigured after a commit, never rebuilt for one. */
+const isLive = (spec: SequencerSpec): boolean =>
+  spec.kind === 'grid' || spec.kind === 'chord' || spec.kind === 'euclidean';
 
 /**
- * A grid or chord part kept live is validated here, inside the transaction:
- * a bad edit (a length past its steps, say) is refused before the tempo, the
- * patches or the arrangement change, exactly as a rebuild's constructor
- * would be. What comes back runs after the commit, against `built.sampler`.
+ * A grid, chord or Euclidean part kept live is validated here, inside the
+ * transaction: a bad edit (a length past its steps, a pulse bound past the
+ * figure) is refused before the tempo, the patches or the arrangement change,
+ * exactly as a rebuild's constructor would be. What comes back runs after the
+ * commit, against `built.sampler`.
  */
 function liveReconfigurations(
   merged: Arrangement,
@@ -171,6 +173,10 @@ function liveReconfigurations(
       const config = { ...(driverOf(sequencer) as ChordDriver), ...stream };
       assertChordConfig(config);
       out.push(() => generator.reconfigure(config, built.sampler));
+    } else if (sequencer.kind === 'euclidean' && generator instanceof EuclideanSequencer) {
+      const config = { ...(driverOf(sequencer) as EuclideanDriver), ...stream };
+      assertEuclideanConfig(config);
+      out.push(() => generator.reconfigure(config));
     }
   }
   return out;
