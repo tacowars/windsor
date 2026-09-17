@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the player's binding tests in one file: the four-slot cases and the grid's live-reconfigure cases (#603) share the rig and the fixture line; 383 of 350, inside the #225 decision 4 margin */
 /**
  * The binding layer, driven headlessly: a `TickTransport` on one side, fake
  * parts recording calls on the other. Onset → trigger, noteOn/noteOff →
@@ -313,6 +314,7 @@ describe('grid parts (#602)', () => {
                 gridNote(2, { slide: true }),
                 gridNote(4, { slide: true }),
               ],
+              length: 6,
               skipChance: 0,
               accentVelocity: 0.2,
               accentMod: 1,
@@ -381,6 +383,68 @@ describe('grid parts (#602)', () => {
         .map((c) => c.note)
         .slice(0, 4),
     ).toEqual([53, 58, 48, 63]);
+  });
+
+  it('a skip, step or accent edit reconfigures the grid live: no all-notes-off, no stream restart', () => {
+    const { parts, player, run, transport } = rig(LINE);
+    run(1);
+    const before = parts.drone.calls.length;
+    expect(player.apply({ parts: { [drone]: { sequencer: { skipChance: 0.01 } } } }, {}).ok).toBe(
+      true,
+    );
+    expect(player.apply({ parts: { [drone]: { sequencer: { accentMod: 0.5 } } } }, {}).ok).toBe(
+      true,
+    );
+    const steps = [gridNote(1), gridNote(3), gridNote(5), gridNote(1), gridNote(3), gridNote(5)];
+    expect(player.apply({ parts: { [drone]: { sequencer: { steps } } } }, {}).ok).toBe(true);
+    expect(parts.drone.calls.slice(before).filter((c) => c.kind === 'allNotesOff')).toEqual([]);
+    // Bar 2 opens on steps 4 and 5 of the new line (the line is six quarters), then wraps.
+    run(1);
+    const notes = parts.drone.calls
+      .slice(before)
+      .filter((c) => c.kind === 'noteOn')
+      .map((c) => c.note);
+    expect(notes.slice(0, 4)).toEqual([48 + 5, 48 + 8, 48 + 2, 48 + 5]);
+    expect(transport.currentTick).toBe(2 * TICKS_PER_BAR);
+
+    // A divisor change is the subscription: that one rebuilds, with an all-notes-off.
+    expect(
+      player.apply({ parts: { [drone]: { sequencer: { divisor: DIVISORS.eighth } } } }, {}).ok,
+    ).toBe(true);
+    expect(parts.drone.calls.at(-1)).toMatchObject({ kind: 'allNotesOff' });
+  });
+
+  it('an invalid live grid edit is refused whole: no tempo, no arrangement, no generator change', () => {
+    const { parts, player, run } = rig(LINE);
+    run(1);
+    const before = parts.drone.calls.length;
+    const result = player.apply({ bpm: 140, parts: { [drone]: { sequencer: { length: 0 } } } }, {});
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/length/);
+    expect(player.readout().bpm).toBe(LINE.bpm);
+    run(1);
+    // The line plays on as written: six quarters, bar 2 opens on steps 4 and 5.
+    const notes = parts.drone.calls
+      .slice(before)
+      .filter((c) => c.kind === 'noteOn')
+      .map((c) => c.note);
+    expect(notes.slice(0, 2)).toEqual([51, 55]);
+  });
+
+  it('a root change re-pitches the grid live, without an all-notes-off', () => {
+    const { parts, player, run } = rig(LINE);
+    run(1);
+    const before = parts.drone.calls.length;
+    expect(player.apply({ key: { root: 50 } }, {}).ok).toBe(true);
+    run(1);
+    const since = parts.drone.calls.slice(before);
+    expect(since.filter((c) => c.kind === 'allNotesOff')).toEqual([]);
+    expect(
+      since
+        .filter((c) => c.kind === 'noteOn')
+        .map((c) => c.note)
+        .slice(0, 2),
+    ).toEqual([50 + 3, 50 + 7]);
   });
 
   it('a transport stop releases a grid part’s held note', () => {

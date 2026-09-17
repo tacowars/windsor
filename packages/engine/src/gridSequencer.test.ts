@@ -21,7 +21,12 @@ const REST: GridStep = { kind: 'rest' };
 const TIE: GridStep = { kind: 'tie' };
 
 function make(steps: readonly GridStep[], extra: Partial<GridSequencerConfig> = {}): GridSequencer {
-  return new GridSequencer(minor, { ...DEFAULT_GRID_CONFIG, steps, ...extra });
+  return new GridSequencer(minor, {
+    ...DEFAULT_GRID_CONFIG,
+    steps,
+    length: steps.length,
+    ...extra,
+  });
 }
 
 function run(seq: GridSequencer, bars: number): NoteEvent[] {
@@ -157,6 +162,7 @@ describe('GridSequencer', () => {
     const seq = new GridSequencer(penta, {
       ...DEFAULT_GRID_CONFIG,
       steps: [gridNote(6), gridNote(4)],
+      length: 2,
     });
     // Pentatonic minor has five degrees: 6 is degree 1 (3 semitones) an octave up.
     expect(
@@ -187,6 +193,59 @@ describe('GridSequencer', () => {
     }
     // With no skip every step plays.
     expect(ons(run(make(line, { skipChance: 0 }), 4))).toHaveLength(64);
+  });
+
+  it('loops over the first `length` steps and keeps the rest written (#603)', () => {
+    const seq = make([gridNote(0), gridNote(2), gridNote(4), gridNote(6)], { length: 3 });
+    expect(seq.length).toBe(3);
+    expect(seq.stepAt(3)).toBe(0);
+    expect(
+      ons(run(seq, 1))
+        .slice(0, 6)
+        .map((e) => e.note),
+    ).toEqual([48, 51, 55, 48, 51, 55]);
+    expect(() => make([gridNote()], { length: 2 })).toThrow(RangeError);
+    expect(() => make([gridNote()], { length: 0 })).toThrow(RangeError);
+  });
+
+  it('reconfigures live: the held note and the skip stream carry on, a new sampler re-pitches (#603)', () => {
+    const line = Array.from({ length: 8 }, (_, i) => gridNote(i % 3));
+    const uninterrupted = run(make(line, { skipChance: 0.5, seed: 3 }), 4);
+    // The same line, with a mid-run reconfigure that changes nothing audible.
+    const seq = make(line, { skipChance: 0.5, seed: 3 });
+    const transport = new TickTransport(120);
+    const events: NoteEvent[] = [];
+    seq.onNote = (e) => events.push(e);
+    seq.attach(transport);
+    for (let i = 0; i < 2 * TICKS_PER_BAR; i++) transport.advance(i * transport.secondsPerTick);
+    seq.reconfigure({ ...seq.config, accentMod: 0.5 });
+    for (let i = 2 * TICKS_PER_BAR; i < 4 * TICKS_PER_BAR; i++) {
+      transport.advance(i * transport.secondsPerTick);
+    }
+    expect(events).toEqual(uninterrupted);
+
+    // A held tie survives; the next note releases it by its old pitch, and the
+    // new sampler pitches what follows.
+    const tied = make([gridNote(2), TIE, TIE, TIE]);
+    run(tied, 1);
+    expect(tied.heldNote).toBe(51);
+    tied.reconfigure({ ...tied.config, steps: [gridNote(2), gridNote(0), TIE, TIE] }, penta);
+    expect(tied.heldNote).toBe(51);
+    const after = tied.handleTick({
+      tick: 96,
+      step: 16,
+      bar: 1,
+      tickInBar: 0,
+      seconds: 0,
+      secondsPerTick: 0,
+      time: 0,
+    });
+    expect(after.map((e) => [e.kind, e.note])).toEqual([
+      ['noteOff', 51],
+      ['noteOn', 48 + 5],
+    ]);
+    expect(() => tied.reconfigure({ ...tied.config, divisor: 12 })).toThrow(RangeError);
+    expect(() => tied.reconfigure({ ...tied.config, length: 9 })).toThrow(RangeError);
   });
 
   it('releases the held note on demand — what a transport stop calls', () => {
