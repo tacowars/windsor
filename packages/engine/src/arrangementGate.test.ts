@@ -20,7 +20,6 @@ import danglingReturn from './__fixtures__/arrangementDocuments/dangling-return.
 import nothingUsable from './__fixtures__/arrangementDocuments/nothing-usable.json';
 import retiredFourSlot from './__fixtures__/arrangementDocuments/retired-four-slot.json';
 import silentSong from './__fixtures__/arrangementDocuments/silent-song.json';
-import { FULL_PART_IDS, FULL_PARTS } from './__fixtures__/fullArrangement';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
@@ -54,10 +53,10 @@ describe('the committed arrangement (arrangements/bed-01.json)', () => {
     expect(result.document).not.toEqual(FALLBACK_ARRANGEMENT);
   });
 
-  it('defines all four parts and constructs every generator', () => {
-    expect(result.document.parts.map((p) => [p.slot, p.sequencer.kind])).toEqual(
-      FULL_PART_IDS.map((id) => [FULL_PARTS[id].slot, FULL_PARTS[id].sequencer.kind]),
-    );
+  // Which parts the song has is the musician's business (#613: bed-01 is Pat's
+  // song, not the fixture's twin); that every one of them constructs is the gate's.
+  it('constructs every generator of every part', () => {
+    expect(result.document.parts.length).toBeGreaterThan(0);
     const parts = new Map(result.document.parts.map((p) => [p.slot, silentPart()]));
     expect(
       () =>
