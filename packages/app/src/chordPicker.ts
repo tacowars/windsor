@@ -126,19 +126,41 @@ function auditionHost(host: PickerHost): Pick<ChordDragHost, 'audition' | 'silen
   };
 }
 
+/**
+ * Escape cancels the drag in progress. One window listener for the page,
+ * bound once, pointing at whichever picker's controller last took a press —
+ * a listener per picker would keep every discarded card alive, since the
+ * tabs re-render by replacing their DOM.
+ */
+let active: ChordDragController | null = null;
+let keysBound = false;
+
+function bindKeys(): void {
+  if (keysBound) return;
+  keysBound = true;
+  window.addEventListener('keydown', (e) => {
+    if (active?.dragging && e.key === 'Escape') active.cancel();
+  });
+}
+
 /** Pointer capture on one chip, routed into the drag state machine. */
 function bindChip(node: HTMLElement, payload: ChordPayload, drag: ChordDragController): void {
   node.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     node.setPointerCapture(e.pointerId);
+    active = drag;
     drag.down(payload, e.clientX, e.clientY);
   });
   node.addEventListener('pointermove', (e) => drag.move(e.clientX, e.clientY));
   node.addEventListener('pointerup', (e) => {
     if (node.hasPointerCapture(e.pointerId)) node.releasePointerCapture(e.pointerId);
     drag.up(e.clientX, e.clientY);
+    if (active === drag) active = null;
   });
-  node.addEventListener('pointercancel', () => drag.cancel());
+  node.addEventListener('pointercancel', () => {
+    drag.cancel();
+    if (active === drag) active = null;
+  });
 }
 
 export function chordPicker(host: PickerHost): Picker {
@@ -156,9 +178,7 @@ export function chordPicker(host: PickerHost): Picker {
     },
     apply: (payload, index) => host.drop(payload, index),
   });
-  window.addEventListener('keydown', (e) => {
-    if (drag.dragging && e.key === 'Escape') drag.cancel();
-  });
+  bindKeys();
 
   const chipRow = el('div', 'chord-picker');
   const repaint = (): void => {
