@@ -16,7 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CommandRegistry } from '../debug/console/commandRegistry.js';
 import type { AudioSystem } from './audioSystem';
-import { FALLBACK_ARRANGEMENT } from './arrangement';
+import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import bed01 from './arrangements/bed-01.json';
 import { installMusicControls, type MusicChoice, type MusicLog } from './musicControls';
 

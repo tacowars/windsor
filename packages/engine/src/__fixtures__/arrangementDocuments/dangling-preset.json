@@ -1,28 +1,39 @@
 {
+  "version": 2,
   "seed": 204,
   "bpm": 96,
   "key": { "root": 50, "scale": "dorian", "weights": [4, 1, 2, 2, 3, 1, 2] },
   "patches": {
     "drone-sqr": {}
   },
-  "kick": {
-    "part": "kick",
-    "preset": "kick-2",
-    "note": 36,
-    "velocity": 1,
-    "hold": 0.2,
-    "driver": {
-      "steps": 16,
-      "divisor": 6,
-      "pulses": { "min": 2, "max": 5, "start": 4 },
-      "rotate": 0,
-      "density": { "kind": "lfoBars", "bars": 8, "shape": "tri" }
+  "parts": [
+    {
+      "slot": 0,
+      "name": "kick",
+      "preset": "kick-2",
+      "velocity": 1,
+      "sequencer": {
+        "kind": "euclidean",
+        "note": 36,
+        "hold": 0.2,
+        "steps": 16,
+        "divisor": 6,
+        "pulses": { "min": 2, "max": 5, "start": 4 },
+        "rotate": 0,
+        "density": { "kind": "lfoBars", "bars": 8, "shape": "tri" }
+      }
+    },
+    {
+      "slot": 3,
+      "name": "drone",
+      "preset": "drone-sqr",
+      "velocity": 0.8,
+      "sequencer": {
+        "kind": "step",
+        "divisor": 96,
+        "gate": 1,
+        "register": { "octave": -1, "span": 1 }
+      }
     }
-  },
-  "drone": {
-    "part": "drone",
-    "preset": "drone-sqr",
-    "velocity": 0.8,
-    "driver": { "divisor": 96, "gate": 1, "register": { "octave": -1, "span": 1 } }
-  }
+  ]
 }

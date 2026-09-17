@@ -3,7 +3,7 @@ import { filterPresets, listPresets, PRESET_CATALOG } from './presetCatalog';
 import { clonePatch, makePatch } from './patch';
 import { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
 import { makeArrangement } from './arrangementDocument';
-import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
+import { FULL_DOCUMENT, withDocumentPart } from './__fixtures__/fullArrangement';
 
 const empty = { query: '', category: '', tag: '', source: '' };
 const LIBRARY = Object.values(PATCH_LIBRARY);
@@ -71,8 +71,7 @@ describe('patch library catalogue', () => {
   it('normalises and round trips every library patch, including user harmonics', () => {
     for (const { id, patch } of LIBRARY) {
       const result = makeArrangement({
-        ...FULL_DOCUMENT,
-        arp: { ...FULL_ARRANGEMENT.arp, preset: id },
+        ...withDocumentPart(FULL_DOCUMENT, 'arp', { preset: id }),
         patches: { ...FULL_DOCUMENT.patches, [id]: clonePatch(patch) },
       });
       expect(result.corrections, id).toEqual([]);

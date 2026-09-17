@@ -88,6 +88,11 @@ export const GATE_MIN = 0.01;
 /** A register's octave offset from the root, and the octaves it spreads over. */
 export const OCTAVE_MAX = 8;
 export const SPAN_MAX = 8;
+/** A document's document-format version (#597: parts are a slot list). */
+export const ARRANGEMENT_VERSION = 2;
+/** How many parts a song may have, and so the highest slot (#597). */
+export const MUSIC_PARTS_MAX = 8;
+export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
 /** A mix strip's linear level: 1 is unity, 4 is +12 dB of headroom to spare. */
 export const MIX_LEVEL_MAX = 4;
 

@@ -1,25 +1,28 @@
 {
+  "version": 2,
   "seed": 204,
   "bpm": 96,
   "key": { "root": 50, "scale": "dorian", "weights": [4, 1, 2, 2, 3, 1, 2] },
   "patches": {
     "hat": {}
   },
-  "hat": {
-    "part": "hat",
-    "preset": "hat",
-    "note": 42,
-    "velocity": 0.6,
-    "hold": 0.08,
-    "driver": {
-      "steps": 16,
-      "divisor": 6,
-      "pulses": { "min": 5, "max": 12, "start": 8 },
-      "rotate": 2,
-      "density": { "kind": "lfoBars", "bars": 3, "shape": "sine" }
+  "parts": [
+    {
+      "slot": 1,
+      "name": "hat",
+      "preset": "hat",
+      "velocity": 0.6,
+      "strip": { "level": 0.6, "pan": 0.2, "sends": { "cave": 0.4 } },
+      "sequencer": {
+        "kind": "euclidean",
+        "note": 42,
+        "hold": 0.08,
+        "steps": 16,
+        "divisor": 6,
+        "pulses": { "min": 5, "max": 12, "start": 8 },
+        "rotate": 2,
+        "density": { "kind": "lfoBars", "bars": 3, "shape": "sine" }
+      }
     }
-  },
-  "mix": {
-    "hat": { "level": 0.6, "pan": 0.2, "sends": { "cave": 0.4 } }
-  }
+  ]
 }

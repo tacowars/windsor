@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT } from './__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_SLOT, withPart } from './__fixtures__/fullArrangement';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { DELAY_FEEDBACK_MAX, REVERB_SPACE_RANGES } from './audioConstants';
 import { RETURNS } from './mix';
@@ -18,7 +18,10 @@ import { PRESETS } from './presets';
 const PARTS_PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
 /** The fixture as a self-contained song: since #562 a part resolves nowhere else. */
-const SONG = { ...FULL_ARRANGEMENT, patches: PARTS_PATCHES };
+const SONG = { version: 2, ...FULL_ARRANGEMENT, patches: PARTS_PATCHES };
+
+const arpOf = (r: ReturnType<typeof makeArrangement>) =>
+  r.document.parts.find((p) => p.slot === FULL_SLOT.arp);
 
 describe('the patches section', () => {
   it('completes a partial patch against makePatch() and names it after its key', () => {
@@ -41,11 +44,11 @@ describe('the patches section', () => {
   it('resolves a part preset against the document and nowhere else', () => {
     const r = makeArrangement({
       ...SONG,
-      arp: { ...FULL_ARRANGEMENT.arp, preset: 'lead' },
+      ...withPart(FULL_ARRANGEMENT, 'arp', { preset: 'lead' }),
       patches: { ...PARTS_PATCHES, lead: { volume: 0.3 } },
     });
     expect(r.dangling).toEqual([]);
-    expect(r.document.arp?.preset).toBe('lead');
+    expect(arpOf(r)?.preset).toBe('lead');
     expect(isShippable(r)).toBe(true);
     // The embedded snapshot is what plays, even when the library has a patch
     // of the same id: the document's `kick` is not the library's (#562).
@@ -64,11 +67,11 @@ describe('the patches section', () => {
   it('drops a part whose preset is in neither, reported as dangling', () => {
     const r = makeArrangement({
       ...SONG,
-      arp: { ...FULL_ARRANGEMENT.arp, preset: 'nope' },
+      ...withPart(FULL_ARRANGEMENT, 'arp', { preset: 'nope' }),
       patches: { ...PARTS_PATCHES, lead: {} },
     });
-    expect(r.document.arp).toBeUndefined();
-    expect(r.dangling).toEqual(['arp.preset: no preset "nope" is defined']);
+    expect(arpOf(r)).toBeUndefined();
+    expect(r.dangling).toEqual(['parts[2].preset: no preset "nope" is defined']);
   });
 
   it('corrects junk fields by path, drops unknown keys, and keeps the array shapes', () => {

@@ -6,22 +6,19 @@
  * export therefore carries the sound, not a preset name that had to be
  * hand-landed in the factory bank (since #561, `audio/patches/*.json`).
  */
-import type {
-  AudioPart,
-  MusicPartId,
-  Patch,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { AudioPart, Patch } from '../../../packages/client/src/audio/index-for-editor';
 import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
 import { makeKnob, type KnobSpec } from './knob';
 
 interface PartsState {
-  selected: MusicPartId;
+  /** The selected part's slot (#597). */
+  selected: number;
   patch: Patch;
   part: AudioPart | null;
 }
 
 export const partsState: PartsState = {
-  selected: 'kick',
+  selected: 0,
   patch: makePatch(),
   part: null,
 };

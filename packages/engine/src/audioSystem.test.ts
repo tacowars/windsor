@@ -20,7 +20,7 @@ import type { AudioSystemOptions } from './audioSystem';
 import { AudioSystem } from './audioSystem';
 import { FmEngine } from './fmEngine';
 import type { ChannelStrip, ReturnSpec } from './mix';
-import { MIX, RETURNS } from './mix';
+import { RETURNS } from './mix';
 import { SPACES } from './reverbSpace';
 import { REVERB_PROCESSOR_NAME } from './workletMessages';
 import { PRESETS } from './presets';
@@ -135,14 +135,15 @@ describe('sends are per part', () => {
 });
 
 describe('the fader and the dry path', () => {
-  it('sets MIX.level on the k-rate gain param and adds no GainNode to the dry path', async () => {
+  it('sets the strip level on the k-rate gain param and adds no GainNode to the dry path', async () => {
     const { system, engine } = await rig();
-    const part = system.createMusicPart('drone', PRESETS['pad-drift']!);
+    const drone = strip({ room: 0.45 }, 0, 0.8);
+    const part = system.createMusicPart('drone', PRESETS['pad-drift']!, undefined, drone);
     const live = system.strip('drone');
     if (!live) throw new Error('no strip');
 
-    expect(MIX.drone.level).not.toBe(1);
-    expect(part.gain.value).toBe(MIX.drone.level);
+    expect(drone.level).not.toBe(1);
+    expect(part.gain.value).toBe(drone.level);
 
     const rotationPath = nodesBetween(fake(part.output), fake(live.rotation.output));
     expect(rotationPath.map((n) => n.kind).sort()).toEqual([
@@ -193,7 +194,7 @@ describe('returns', () => {
   const plates = (context: FakeContext): number =>
     context.workletNodes.filter((n) => n.name === REVERB_PROCESSOR_NAME).length;
 
-  it('instantiates exactly one plate for the default MIX, however many parts exist', async () => {
+  it('instantiates exactly one plate for the default returns, however many parts exist', async () => {
     const { system, context } = await rig();
     expect(plates(context)).toBe(1);
     system.createMusicPart('drone', PRESETS['pad-drift']!);

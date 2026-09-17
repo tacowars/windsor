@@ -2,32 +2,45 @@
 /** Public surface of the audio package. */
 export { AudioSystem } from './audioSystem';
 export type { AudioSystemOptions, MusicReadout } from './audioSystem';
-export { FALLBACK_ARRANGEMENT, mergeArrangement } from './arrangement';
+export { SEQUENCER_KINDS, driverOf, mergeArrangement, mergeParts } from './arrangement';
+export { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 export { isShippable, makeArrangement } from './arrangementDocument';
-export type { ArrangementDocument, MakeArrangementResult } from './arrangementDocument';
 export type {
-  ArpArrangement,
+  ArrangementDocument,
+  DocumentPart,
+  DocumentPartial,
+  MakeArrangementResult,
+} from './arrangementDocument';
+export { musicPartName, partAt, removePart } from './documentParts';
+export type {
   ArpDriver,
+  ArpSpec,
   Arrangement,
   ArrangementKey,
+  ArrangementPartial,
   DeepPartial,
-  DroneArrangement,
   EuclideanDriver,
+  EuclideanSpec,
   MergeResult,
-  PercussionArrangement,
+  MusicPart,
+  NoSequencer,
+  PartsPartial,
+  SequencerKind,
+  SequencerSpec,
   StepDriver,
+  StepSpec,
 } from './arrangement';
-export { ArrangementPlayer, GENERATOR_INDEX, MUSIC_PART_IDS } from './arrangementPlayer';
-export { lookupPreset, presetFor, validateArrangement } from './arrangementValidate';
+export { ArrangementPlayer } from './arrangementPlayer';
+export { lookupPreset, partLabel, presetFor, validateArrangement } from './arrangementValidate';
 export type { PresetTable } from './arrangementValidate';
 export { normalisePatch, normalisePatches } from './patchNormalise';
-export { applyMixLive, applyReturnsLive } from './deskApply';
-export { normaliseMix, normaliseReturns } from './deskNormalise';
+export { applyReturnsLive, applyStripLive } from './deskApply';
+export { normaliseReturns, normaliseStrip } from './deskNormalise';
+export { normaliseSequencer } from './sequencerNormalise';
 export type {
   ApplyResult,
   ArrangementReadout,
   MusicEventHandler,
-  MusicPartId,
   MusicTransport,
   PlayablePart,
 } from './arrangementPlayer';

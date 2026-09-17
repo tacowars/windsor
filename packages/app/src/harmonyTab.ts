@@ -4,10 +4,12 @@
  */
 import {
   SCALE_NAMES,
+  partAt,
   scaleOffsets,
   uniformWeights,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
+import { partChange } from './context';
 import { NOTE_NAMES, el, fmt0, fmt2, noteName, section, select } from './dom';
 import { makeKnob } from './knob';
 
@@ -68,12 +70,17 @@ function weightKnobs(ctx: AppCtx): HTMLElement {
   return row;
 }
 
-function registerRow(ctx: AppCtx, id: 'arp' | 'drone'): HTMLElement {
+function registerRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
   const row = el('div', 'strip-row');
-  row.appendChild(el('div', 'strip-name', id));
+  const label = el('div', 'strip-name');
+  label.textContent = name;
+  row.appendChild(label);
   const knobs = el('div', 'knob-row');
-  const register = (): { octave: number; span: number } =>
-    ctx.model.doc[id]?.driver.register ?? { octave: 0, span: 1 };
+  const register = (): { octave: number; span: number } => {
+    const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
+    const pitched = sequencer?.kind === 'arp' || sequencer?.kind === 'step';
+    return pitched ? sequencer.register : { octave: 0, span: 1 };
+  };
   knobs.appendChild(
     makeKnob({
       label: 'Octave',
@@ -84,7 +91,7 @@ function registerRow(ctx: AppCtx, id: 'arp' | 'drone'): HTMLElement {
       color: COLOR,
       fmt: fmt0,
       get: () => register().octave,
-      set: (v) => void ctx.change({ [id]: { driver: { register: { octave: v } } } }),
+      set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { octave: v } } })),
     }),
   );
   knobs.appendChild(
@@ -97,7 +104,7 @@ function registerRow(ctx: AppCtx, id: 'arp' | 'drone'): HTMLElement {
       color: COLOR,
       fmt: fmt0,
       get: () => register().span,
-      set: (v) => void ctx.change({ [id]: { driver: { register: { span: v } } } }),
+      set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { span: v } } })),
     }),
   );
   row.appendChild(knobs);
@@ -124,8 +131,11 @@ export function renderHarmonyTab(body: HTMLElement, ctx: AppCtx): void {
     'Register split',
     'Where each pitched part draws, in octaves from the root.',
   );
-  for (const id of ['arp', 'drone'] as const) {
-    if (ctx.model.doc[id]) registers.body.appendChild(registerRow(ctx, id));
+  for (const part of ctx.model.doc.parts) {
+    const { kind } = part.sequencer;
+    if (kind === 'arp' || kind === 'step') {
+      registers.body.appendChild(registerRow(ctx, part.slot, part.name));
+    }
   }
   body.appendChild(registers.root);
 }
