@@ -32,6 +32,8 @@ export type {
   EuclideanSpec,
   MergeResult,
   MusicPart,
+  GridDriver,
+  GridSpec,
   NoSequencer,
   PartsPartial,
   SequencerKind,
@@ -46,6 +48,22 @@ export { normalisePatch, normalisePatches } from './patchNormalise';
 export { applyReturnsLive, applyStripLive } from './deskApply';
 export { normaliseReturns, normaliseStrip } from './deskNormalise';
 export { normaliseSequencer } from './sequencerNormalise';
+export {
+  DEFAULT_GRID_CONFIG,
+  GRID_STEP_KINDS,
+  GridSequencer,
+  defaultGridSteps,
+  gridNote,
+} from './gridSequencer';
+export type { GridNoteStep, GridSequencerConfig, GridStep, GridStepKind } from './gridSequencer';
+export { foldDegree } from './scaleSampler';
+export {
+  ACCENT_MOD_DEFAULT,
+  ACCENT_VELOCITY_DEFAULT,
+  GRID_DEGREE_MAX,
+  GRID_STEPS_MAX,
+  GRID_STEP_OCTAVE_MAX,
+} from './audioConstants';
 export type {
   ApplyResult,
   ArrangementReadout,

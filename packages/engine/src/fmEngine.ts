@@ -4,7 +4,7 @@
  * There is exactly one `AudioContext` in the client. Babylon's audio engine is
  * handed this one rather than creating its own -- see `babylonBridge.ts`.
  */
-import { PART_MAX_VOICES_DEFAULT } from './audioConstants';
+import { PART_MAX_VOICES_DEFAULT, SLIDE_SECONDS_DEFAULT } from './audioConstants';
 import type { AudioBus, BusOptions } from './audioBus';
 import { createBus } from './audioBus';
 import { AudioPart } from './audioPart';
@@ -108,6 +108,7 @@ export class FmEngine {
     const processorOptions: ProcessorOptions = {
       maxVoices,
       patch: structuredClone(patch),
+      slideSeconds: SLIDE_SECONDS_DEFAULT,
     };
 
     const node = new AudioWorkletNode(this.context, PROCESSOR_NAME, {
