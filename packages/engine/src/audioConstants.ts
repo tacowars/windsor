@@ -110,6 +110,12 @@ export const ACCENT_MOD_DEFAULT = 1;
  * that instead.
  */
 export const SLIDE_SECONDS_DEFAULT = 0.06;
+/**
+ * Slack, in ticks, when reading the audible tick off the queue's accumulated
+ * stamps (#603): a stamp reached by repeated addition can sit a few ulps past
+ * the clock time that names it, and the playhead must not show the tick before.
+ */
+export const TICK_STAMP_EPSILON = 1e-6;
 /** A document's document-format version (#597: parts are a slot list). */
 export const ARRANGEMENT_VERSION = 2;
 /** How many parts a song may have, and so the highest slot (#597). */

@@ -21,7 +21,12 @@ const REST: GridStep = { kind: 'rest' };
 const TIE: GridStep = { kind: 'tie' };
 
 function make(steps: readonly GridStep[], extra: Partial<GridSequencerConfig> = {}): GridSequencer {
-  return new GridSequencer(minor, { ...DEFAULT_GRID_CONFIG, steps, ...extra });
+  return new GridSequencer(minor, {
+    ...DEFAULT_GRID_CONFIG,
+    steps,
+    length: steps.length,
+    ...extra,
+  });
 }
 
 function run(seq: GridSequencer, bars: number): NoteEvent[] {
@@ -157,6 +162,7 @@ describe('GridSequencer', () => {
     const seq = new GridSequencer(penta, {
       ...DEFAULT_GRID_CONFIG,
       steps: [gridNote(6), gridNote(4)],
+      length: 2,
     });
     // Pentatonic minor has five degrees: 6 is degree 1 (3 semitones) an octave up.
     expect(
@@ -187,6 +193,19 @@ describe('GridSequencer', () => {
     }
     // With no skip every step plays.
     expect(ons(run(make(line, { skipChance: 0 }), 4))).toHaveLength(64);
+  });
+
+  it('loops over the first `length` steps and keeps the rest written (#603)', () => {
+    const seq = make([gridNote(0), gridNote(2), gridNote(4), gridNote(6)], { length: 3 });
+    expect(seq.length).toBe(3);
+    expect(seq.stepAt(3)).toBe(0);
+    expect(
+      ons(run(seq, 1))
+        .slice(0, 6)
+        .map((e) => e.note),
+    ).toEqual([48, 51, 55, 48, 51, 55]);
+    expect(() => make([gridNote()], { length: 2 })).toThrow(RangeError);
+    expect(() => make([gridNote()], { length: 0 })).toThrow(RangeError);
   });
 
   it('releases the held note on demand — what a transport stop calls', () => {

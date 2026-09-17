@@ -164,6 +164,24 @@ describe('Scheduler look-ahead against a fake clock', () => {
     expect(ticks[n]).toBe(0);
   });
 
+  it('reports the audible tick behind the look-ahead queue (#603)', () => {
+    const clock = { currentTime: 10 };
+    const scheduler = new Scheduler(clock, { bpm: 120, lookAhead: 0.25 });
+    const times: number[] = [];
+    scheduler.subscribe(1, (e) => times.push(e.time));
+    scheduler.start();
+    scheduler.update();
+    // Nothing sounds before the first stamped tick; the queue itself is well ahead.
+    expect(scheduler.audibleTick(10)).toBe(0);
+    expect(scheduler.transport.currentTick).toBeGreaterThan(3);
+    // Exactly at tick 3's stamp it is audible; a hair before, tick 2 still is.
+    expect(scheduler.audibleTick(times[3]!)).toBe(3);
+    expect(scheduler.audibleTick(times[3]! - 1e-6)).toBe(2);
+    // Past every issued tick with the queue stopped, the last issued one holds.
+    scheduler.stop();
+    expect(scheduler.audibleTick(times.at(-1)! + 1)).toBe(times.length - 1);
+  });
+
   it('exposes bpm through to the transport', () => {
     const scheduler = new Scheduler({ currentTime: 0 }, { bpm: 96 });
     expect(scheduler.bpm).toBe(96);

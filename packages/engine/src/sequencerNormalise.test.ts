@@ -51,11 +51,21 @@ describe('grid sequencer normalisation (#602)', () => {
       kind: 'grid',
       divisor: 12,
       steps,
+      length: 3,
       skipChance: 0.3,
       accentVelocity: 0.5,
       accentMod: 0.4,
       register: { octave: -2 },
     });
+  });
+
+  it('a length past the steps written is clamped to them; absent, it is the whole line', () => {
+    const { spec, n } = grid({ steps: [gridNote(), gridNote(), gridNote()], length: 9 });
+    expect(spec.kind === 'grid' && spec.length).toBe(3);
+    expect(n.corrections).toEqual(['parts[0].sequencer.length: clamped 9 to 3']);
+    const short = grid({ steps: [gridNote(), gridNote(), gridNote()], length: 2 });
+    expect(short.spec.kind === 'grid' && short.spec.length).toBe(2);
+    expect(short.spec.kind === 'grid' && short.spec.steps).toHaveLength(3);
   });
 
   it('caps 33 steps to 32 and reports it', () => {

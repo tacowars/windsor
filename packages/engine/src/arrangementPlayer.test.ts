@@ -313,6 +313,7 @@ describe('grid parts (#602)', () => {
                 gridNote(2, { slide: true }),
                 gridNote(4, { slide: true }),
               ],
+              length: 6,
               skipChance: 0,
               accentVelocity: 0.2,
               accentMod: 1,

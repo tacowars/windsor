@@ -18,7 +18,8 @@
  *   so the worklet hands the voice over legato. A slide to the pitch already
  *   held is a tie.
  *
- * Position is the transport's absolute step count modulo the length, never
+ * Position is the transport's absolute step count modulo the loop `length`
+ * (at most the steps written; the rest wait, greyed, in the console), never
  * the position in the bar: a 12-step line at sixteenths drifts polymetrically
  * against the bar, and a live rebuild recomputes its place from the clock.
  * A skipped step (one draw from the part's stream per note step) is a rest.
@@ -59,8 +60,14 @@ export type GridStepKind = (typeof GRID_STEP_KINDS)[number];
 export interface GridSequencerConfig {
   /** Ticks per step. Must divide the bar (see `DIVISORS`). */
   divisor: number;
-  /** 1–`GRID_STEPS_MAX` steps, looped on their own length. */
+  /** 1–`GRID_STEPS_MAX` written steps; the line loops over the first `length` of them. */
   steps: readonly GridStep[];
+  /**
+   * The loop length, 1..`steps.length` (#603): shortening a line keeps the
+   * steps past the end in the document, greyed in the console, so lengthening
+   * it again brings them back.
+   */
+  length: number;
   /** Chance a note step rests instead, drawn from the part's stream. */
   skipChance: number;
   /** The bump an accented step adds to the part's velocity. */
@@ -86,6 +93,7 @@ export function defaultGridSteps(): GridStep[] {
 export const DEFAULT_GRID_CONFIG: GridSequencerConfig = {
   divisor: DIVISORS.sixteenth,
   steps: defaultGridSteps(),
+  length: GRID_DEFAULT_STEP_COUNT,
   skipChance: 0,
   accentVelocity: ACCENT_VELOCITY_DEFAULT,
   accentMod: ACCENT_MOD_DEFAULT,
@@ -116,6 +124,13 @@ function assertConfig(config: GridSequencerConfig): void {
     );
   }
   config.steps.forEach(assertStep);
+  if (
+    !Number.isInteger(config.length) ||
+    config.length < 1 ||
+    config.length > config.steps.length
+  ) {
+    throw new RangeError(`length must be 1..${config.steps.length}, got ${config.length}`);
+  }
   if (!(config.skipChance >= 0 && config.skipChance <= 1)) {
     throw new RangeError(`skipChance must be in [0, 1], got ${config.skipChance}`);
   }
@@ -147,8 +162,9 @@ export class GridSequencer {
     return this.held;
   }
 
+  /** The loop length — `config.length`, never more than the steps written. */
   get length(): number {
-    return this.config.steps.length;
+    return this.config.length;
   }
 
   /** The step index a transport step lands on — the console's playhead reads this too. */
