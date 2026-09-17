@@ -19,6 +19,7 @@ import {
   scaleOffsets,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { NOTE_NAMES } from './dom';
+import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
 
 export { GRID_STEPS_MAX, GRID_STEP_OCTAVE_MAX };
 
@@ -67,6 +68,47 @@ export function stepsForLength(steps: readonly GridStep[], length: number): Grid
   const target = Math.max(1, Math.min(GRID_STEPS_MAX, Math.trunc(length)));
   if (target <= steps.length) return [...steps];
   return [...steps, ...Array.from({ length: target - steps.length }, () => gridNote())];
+}
+
+/**
+ * The loop's steps turned `by` places — positive moves every step later, so
+ * the last wraps to the front — with the steps past `length` left where they
+ * are. The card's Rotate knob applies the difference since its last value, so
+ * the document holds the rotated list and no offset.
+ */
+export function rotateSteps(steps: readonly GridStep[], by: number, length: number): GridStep[] {
+  const n = Math.max(1, Math.min(Math.trunc(length), steps.length));
+  const shift = ((Math.trunc(by) % n) + n) % n;
+  if (shift === 0) return [...steps];
+  const loop = steps.slice(0, n);
+  const rotated = loop.map((_, i) => loop[(i - shift + n) % n] ?? loop[0]!);
+  return [...rotated, ...steps.slice(n)];
+}
+
+/** A uniform draw in [0, 1); the card passes `Math.random`, a test passes its own. */
+export type Draw = () => number;
+
+/**
+ * Randomize: every step a note with a degree from the current scale, an octave
+ * within ±`GRID_RANDOM_OCTAVE_SPAN`, and accent and slide each at
+ * `GRID_RANDOM_FLAG_CHANCE`. Four draws per step, in that order.
+ */
+export function randomSteps(count: number, degreeCount: number, draw: Draw): GridStep[] {
+  const degrees = Math.max(1, Math.trunc(degreeCount));
+  const span = GRID_RANDOM_OCTAVE_SPAN;
+  return Array.from({ length: Math.max(1, Math.trunc(count)) }, () =>
+    gridNote(Math.min(degrees - 1, Math.floor(draw() * degrees)), {
+      octave: Math.min(span, Math.floor(draw() * (2 * span + 1)) - span),
+      accent: draw() < GRID_RANDOM_FLAG_CHANCE,
+      slide: draw() < GRID_RANDOM_FLAG_CHANCE,
+    }),
+  );
+}
+
+/** What the card watches to know its labels are stale: the root and the scale. */
+export function keySignature(key: ArrangementKey): string {
+  const scale = typeof key.scale === 'string' ? key.scale : key.scale.join(',');
+  return `${key.root}|${scale}`;
 }
 
 /** A written degree against the current scale: where it lands, and whether it folded to get there. */

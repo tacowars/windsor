@@ -7,6 +7,9 @@ import {
   cycleOctave,
   degreeOptions,
   foldedView,
+  keySignature,
+  randomSteps,
+  rotateSteps,
   setDegree,
   stepLabel,
   stepsForLength,
@@ -49,6 +52,41 @@ describe('grid step operations (#603)', () => {
     expect(stepsForLength(steps, 4)).toEqual([gridNote(3), gridNote(5), gridNote(), gridNote()]);
     expect(stepsForLength(steps, 1)).toEqual(steps);
     expect(stepsForLength(steps, 99)).toHaveLength(32);
+  });
+
+  it('rotates the loop either way, wrapping, and leaves steps past the length alone', () => {
+    const steps = [gridNote(0), gridNote(1), gridNote(2), gridNote(3), gridNote(9)];
+    expect(rotateSteps(steps, 1, 4).map((s) => (s.kind === 'note' ? s.degree : -1))).toEqual([
+      3, 0, 1, 2, 9,
+    ]);
+    expect(rotateSteps(steps, -1, 4).map((s) => (s.kind === 'note' ? s.degree : -1))).toEqual([
+      1, 2, 3, 0, 9,
+    ]);
+    expect(rotateSteps(steps, 4, 4)).toEqual(steps);
+    expect(rotateSteps(steps, 5, 4)).toEqual(rotateSteps(steps, 1, 4));
+    expect(rotateSteps(steps, 2, 99)).toEqual(rotateSteps(steps, 2, 5));
+    expect(rotateSteps(steps, 1, 4)).not.toBe(steps);
+  });
+
+  it('randomizes every step as a note from the scale, within the octave span, with the flag chance', () => {
+    const low = randomSteps(4, 7, () => 0);
+    expect(low).toEqual(
+      Array.from({ length: 4 }, () => gridNote(0, { octave: -1, accent: true, slide: true })),
+    );
+    const high = randomSteps(3, 5, () => 0.999);
+    expect(high).toEqual(Array.from({ length: 3 }, () => gridNote(4, { octave: 1 })));
+    let n = 0;
+    const seq = [0.5, 0.2, 0.9, 0.1];
+    expect(randomSteps(1, 7, () => seq[n++ % 4]!)).toEqual([
+      gridNote(3, { octave: -1, accent: false, slide: true }),
+    ]);
+    expect(randomSteps(32, 7, Math.random).every((s) => s.kind === 'note')).toBe(true);
+  });
+
+  it('a key signature changes with the root or the scale, named or explicit', () => {
+    expect(keySignature(MINOR)).toBe('48|naturalMinor');
+    expect(keySignature({ ...MINOR, root: 50 })).not.toBe(keySignature(MINOR));
+    expect(keySignature({ ...MINOR, scale: [0, 7] })).toBe('48|0,7');
   });
 
   it('shows a degree past the scale at its folded position, flagged', () => {

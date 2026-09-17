@@ -208,6 +208,46 @@ describe('GridSequencer', () => {
     expect(() => make([gridNote()], { length: 0 })).toThrow(RangeError);
   });
 
+  it('reconfigures live: the held note and the skip stream carry on, a new sampler re-pitches (#603)', () => {
+    const line = Array.from({ length: 8 }, (_, i) => gridNote(i % 3));
+    const uninterrupted = run(make(line, { skipChance: 0.5, seed: 3 }), 4);
+    // The same line, with a mid-run reconfigure that changes nothing audible.
+    const seq = make(line, { skipChance: 0.5, seed: 3 });
+    const transport = new TickTransport(120);
+    const events: NoteEvent[] = [];
+    seq.onNote = (e) => events.push(e);
+    seq.attach(transport);
+    for (let i = 0; i < 2 * TICKS_PER_BAR; i++) transport.advance(i * transport.secondsPerTick);
+    seq.reconfigure({ ...seq.config, accentMod: 0.5 });
+    for (let i = 2 * TICKS_PER_BAR; i < 4 * TICKS_PER_BAR; i++) {
+      transport.advance(i * transport.secondsPerTick);
+    }
+    expect(events).toEqual(uninterrupted);
+
+    // A held tie survives; the next note releases it by its old pitch, and the
+    // new sampler pitches what follows.
+    const tied = make([gridNote(2), TIE, TIE, TIE]);
+    run(tied, 1);
+    expect(tied.heldNote).toBe(51);
+    tied.reconfigure({ ...tied.config, steps: [gridNote(2), gridNote(0), TIE, TIE] }, penta);
+    expect(tied.heldNote).toBe(51);
+    const after = tied.handleTick({
+      tick: 96,
+      step: 16,
+      bar: 1,
+      tickInBar: 0,
+      seconds: 0,
+      secondsPerTick: 0,
+      time: 0,
+    });
+    expect(after.map((e) => [e.kind, e.note])).toEqual([
+      ['noteOff', 51],
+      ['noteOn', 48 + 5],
+    ]);
+    expect(() => tied.reconfigure({ ...tied.config, divisor: 12 })).toThrow(RangeError);
+    expect(() => tied.reconfigure({ ...tied.config, length: 9 })).toThrow(RangeError);
+  });
+
   it('releases the held note on demand — what a transport stop calls', () => {
     const seq = make([gridNote(0), TIE, TIE, TIE]);
     run(seq, 1);

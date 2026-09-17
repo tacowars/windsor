@@ -119,8 +119,13 @@ function stagePatches(
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
-/** What builds a part's generator: its kind and driver, never its note, hold or velocity. */
-const generatorSig = (spec: SequencerSpec): string => sig([spec.kind, driverOf(spec)]);
+/**
+ * What builds a part's generator: its kind and driver, never its note, hold or
+ * velocity. A grid rebuilds only on its kind or divisor (#603): every other
+ * field reconfigures the live generator, so an edit never cuts the held note.
+ */
+const generatorSig = (spec: SequencerSpec): string =>
+  spec.kind === 'grid' ? sig([spec.kind, spec.divisor]) : sig([spec.kind, driverOf(spec)]);
 
 /** Draws from the shared sampler, so a key change rebuilds it (the grid resolves degrees through it too). */
 const isPitched = (spec: SequencerSpec): boolean =>
@@ -216,7 +221,21 @@ export class ArrangementPlayer {
     this.current = merged;
     this.index();
     this.attach(plan.rebuilt);
+    this.reconfigureGrids(plan.rebuilt);
     return { ok: true, ignored };
+  }
+
+  /** Every grid part that was not rebuilt takes its merged line and the current sampler live (#603). */
+  private reconfigureGrids(rebuilt: ReadonlySet<number>): void {
+    for (const part of this.current.parts) {
+      const generator = this.built.generators.get(part.slot);
+      if (rebuilt.has(part.slot) || !(generator instanceof GridSequencer)) continue;
+      const driver = driverOf(part.sequencer) as GridDriver;
+      generator.reconfigure(
+        { ...driver, seed: this.current.seed, generatorIndex: part.slot },
+        this.built.sampler,
+      );
+    }
   }
 
   /** Release everything sounding — step parts' held notes included. Mute and teardown call this. */
@@ -279,9 +298,11 @@ export class ArrangementPlayer {
       const changed = generatorSig(next.sequencer) !== generatorSig(before.sequencer);
       // An inert part only rebuilds when its kind leaves or enters `none`;
       // a seed or key change has no stream of its to reset.
+      // A grid takes a new sampler live (`reconfigure`), so a key change does not rebuild it.
       const reseeded =
         next.sequencer.kind !== 'none' &&
-        (seedChanged || (isPitched(next.sequencer) && keyChanged));
+        (seedChanged ||
+          (isPitched(next.sequencer) && next.sequencer.kind !== 'grid' && keyChanged));
       if (changed || reseeded) rebuilt.add(next.slot);
     }
 
