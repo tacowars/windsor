@@ -24,6 +24,7 @@ const KIND_LABELS: Record<SequencerKind, string> = {
   euclidean: 'Euclid',
   arp: 'Arp',
   step: 'Step',
+  grid: 'Grid',
 };
 
 function button(label: string, title: string, enabled: boolean): HTMLButtonElement {

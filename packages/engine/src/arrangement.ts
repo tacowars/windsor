@@ -10,7 +10,7 @@
  *
  * Since #597 a song is a list of 1–8 parts, each identified by its `slot`
  * (0–7) and carrying any sequencer: a Euclidean fixed-note trigger, the
- * arpeggiator, the step sequencer, or `none` — an inert part the keyboard
+ * arpeggiator, the step sequencer, the written grid (#602), or `none` — an inert part the keyboard
  * can still play but nothing sequences. A part's name is a label and keys
  * nothing (record `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
@@ -22,6 +22,7 @@
  */
 import type { ArpeggiatorConfig } from './arpeggiator';
 import type { EuclideanConfig } from './euclideanSequencer';
+import type { GridSequencerConfig } from './gridSequencer';
 import type { ScaleName } from './scaleSampler';
 import type { StepSequencerConfig } from './stepSequencer';
 
@@ -29,9 +30,10 @@ import type { StepSequencerConfig } from './stepSequencer';
 export type EuclideanDriver = Omit<EuclideanConfig, 'seed' | 'generatorIndex'>;
 export type ArpDriver = Omit<ArpeggiatorConfig, 'seed' | 'generatorIndex'>;
 export type StepDriver = Omit<StepSequencerConfig, 'seed' | 'generatorIndex'>;
+export type GridDriver = Omit<GridSequencerConfig, 'seed' | 'generatorIndex'>;
 
 /** What may drive a part (#597). `none` is inert: allowed anywhere, skipped by every sequencing path. */
-export const SEQUENCER_KINDS = ['none', 'euclidean', 'arp', 'step'] as const;
+export const SEQUENCER_KINDS = ['none', 'euclidean', 'arp', 'step', 'grid'] as const;
 export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
 
 export interface NoSequencer {
@@ -50,8 +52,10 @@ export type EuclideanSpec = {
 export type ArpSpec = { readonly kind: 'arp' } & ArpDriver;
 /** The step sequencer: slow, with gate 1 it is the drone — repeated notes tie. */
 export type StepSpec = { readonly kind: 'step' } & StepDriver;
+/** The grid (#602): a written 1–32 step line of scale degrees with accent, slide, tie and rest. */
+export type GridSpec = { readonly kind: 'grid' } & GridDriver;
 
-export type SequencerSpec = NoSequencer | EuclideanSpec | ArpSpec | StepSpec;
+export type SequencerSpec = NoSequencer | EuclideanSpec | ArpSpec | StepSpec | GridSpec;
 
 /** One part as the player sees it; the document adds its strip (`DocumentPart`). */
 export interface MusicPart {

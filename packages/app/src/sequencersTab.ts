@@ -152,6 +152,7 @@ const KIND_LABELS = {
   euclidean: 'Euclidean',
   arp: 'arpeggiator',
   step: 'step',
+  grid: 'grid',
 };
 
 function partCard(ctx: AppCtx, part: MusicPart): HTMLElement {
@@ -160,7 +161,16 @@ function partCard(ctx: AppCtx, part: MusicPart): HTMLElement {
   if (kind === 'euclidean') body.appendChild(euclideanCard(ctx, part.slot));
   else if (kind === 'arp') body.appendChild(arpCard(ctx, part.slot));
   else if (kind === 'step') body.appendChild(stepCard(ctx, part.slot));
-  else body.appendChild(el('p', 'hint', 'No sequencer: this part plays only from the keyboard.'));
+  else if (kind === 'grid') {
+    // The step editor is #603; until it lands the steps are edited in the exported JSON.
+    body.appendChild(
+      el(
+        'p',
+        'hint',
+        'Grid: the step editor lands in #603. Edit the steps in the exported JSON for now.',
+      ),
+    );
+  } else body.appendChild(el('p', 'hint', 'No sequencer: this part plays only from the keyboard.'));
   return root;
 }
 

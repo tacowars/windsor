@@ -6,13 +6,22 @@
  * the 96-tick bar, gates in (0, 1] — so building a generator from it cannot
  * throw. `ArrangementNormaliser` (`arrangementNormalise.ts`) calls it per part.
  */
-import type { ArpDriver, EuclideanDriver, SequencerSpec, StepDriver } from './arrangement';
+import type {
+  ArpDriver,
+  EuclideanDriver,
+  GridDriver,
+  SequencerSpec,
+  StepDriver,
+} from './arrangement';
 import { SEQUENCER_KINDS } from './arrangement';
-import type { FieldNormaliser } from './arrangementFields';
+import { show, type FieldNormaliser } from './arrangementFields';
 import { ARP_WALK_MODES, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeggiator';
 import {
   EUCLID_STEPS_MAX,
   GATE_MIN,
+  GRID_DEGREE_MAX,
+  GRID_STEPS_MAX,
+  GRID_STEP_OCTAVE_MAX,
   HOLD_DEFAULT,
   HOLD_MAX,
   HOLD_MIN,
@@ -35,6 +44,13 @@ import {
   LFO_SHAPES,
   type DensityMod,
 } from './euclideanSequencer';
+import {
+  DEFAULT_GRID_CONFIG,
+  GRID_STEP_KINDS,
+  defaultGridSteps,
+  gridNote,
+  type GridStep,
+} from './gridSequencer';
 import type { Register } from './scaleSampler';
 import { DEFAULT_STEP_SEQUENCER_CONFIG } from './stepSequencer';
 
@@ -60,6 +76,8 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
       return { kind, ...arpDriver(driver, path, n) };
     case 'step':
       return { kind, ...stepDriver(driver, path, n) };
+    case 'grid':
+      return { kind, ...gridDriver(driver, path, n) };
     default:
       n.dropUnknown(driver, [], path);
       return { kind: 'none' };
@@ -156,6 +174,60 @@ function stepDriver(raw: unknown, path: string, n: FieldNormaliser): StepDriver 
     register: register(o.register, d.register, `${path}.register`, n),
     pattern: n.notePattern(o.pattern, `${path}.pattern`),
   };
+}
+
+function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver {
+  const d = DEFAULT_GRID_CONFIG;
+  const o = n.section(raw, path);
+  const known = ['divisor', 'steps', 'skipChance', 'accentVelocity', 'accentMod', 'register'];
+  n.dropUnknown(o, known, path);
+  const reg = n.section(o.register, `${path}.register`);
+  n.dropUnknown(reg, ['octave'], `${path}.register`);
+  return {
+    divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
+    steps: gridSteps(o.steps, `${path}.steps`, n),
+    skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
+    accentVelocity: n.num(o.accentVelocity, d.accentVelocity, 0, 1, `${path}.accentVelocity`),
+    accentMod: n.num(o.accentMod, d.accentMod, 0, 1, `${path}.accentMod`),
+    register: {
+      octave: n.int(
+        reg.octave,
+        d.register.octave,
+        -OCTAVE_MAX,
+        OCTAVE_MAX,
+        `${path}.register.octave`,
+      ),
+    },
+  };
+}
+
+/** 1–32 steps. An absent or junk list is the default bar; an over-long one is capped, reported. */
+function gridSteps(raw: unknown, path: string, n: FieldNormaliser): GridStep[] {
+  if (raw === undefined) return defaultGridSteps();
+  if (!Array.isArray(raw) || raw.length === 0) {
+    n.correction(`${path}: ${show(raw)} is not a list of steps — using the default bar`);
+    return defaultGridSteps();
+  }
+  const capped: unknown[] = raw.length > GRID_STEPS_MAX ? raw.slice(0, GRID_STEPS_MAX) : raw;
+  if (capped.length !== raw.length) {
+    n.correction(`${path}: ${raw.length} steps capped to ${GRID_STEPS_MAX}`);
+  }
+  return capped.map((step, i) => gridStep(step, `${path}[${i}]`, n));
+}
+
+function gridStep(raw: unknown, path: string, n: FieldNormaliser): GridStep {
+  const o = n.section(raw, path);
+  const kind = n.pick(o.kind, GRID_STEP_KINDS, 'note', `${path}.kind`);
+  if (kind !== 'note') {
+    n.dropUnknown(o, ['kind'], path);
+    return { kind };
+  }
+  n.dropUnknown(o, ['kind', 'degree', 'octave', 'accent', 'slide'], path);
+  return gridNote(n.int(o.degree, 0, 0, GRID_DEGREE_MAX, `${path}.degree`), {
+    octave: n.int(o.octave, 0, -GRID_STEP_OCTAVE_MAX, GRID_STEP_OCTAVE_MAX, `${path}.octave`),
+    accent: n.bool(o.accent, false, `${path}.accent`),
+    slide: n.bool(o.slide, false, `${path}.slide`),
+  });
 }
 
 function register(raw: unknown, fallback: Register, path: string, n: FieldNormaliser): Register {

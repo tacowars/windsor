@@ -88,6 +88,28 @@ export const GATE_MIN = 0.01;
 /** A register's octave offset from the root, and the octaves it spreads over. */
 export const OCTAVE_MAX = 8;
 export const SPAN_MAX = 8;
+/* ------------------------ the grid sequencer (#602) ---------------------- */
+
+/** A grid line is 1–32 written steps. */
+export const GRID_STEPS_MAX = 32;
+/** A grid step's octave offset from the part's register octave. */
+export const GRID_STEP_OCTAVE_MAX = 2;
+/**
+ * A grid step's scale degree. Any non-negative integer resolves (a degree past
+ * the scale's end wraps with octave carry), so this only bounds junk.
+ */
+export const GRID_DEGREE_MAX = 48;
+/** The steps a grid part starts with when its kind is chosen: one bar of sixteenths on the root. */
+export const GRID_DEFAULT_STEP_COUNT = 16;
+/** The bump an accented grid step adds to the part velocity, and the mod value it sends. */
+export const ACCENT_VELOCITY_DEFAULT = 0.2;
+export const ACCENT_MOD_DEFAULT = 1;
+/**
+ * Seconds a slid note takes to reach its pitch when the patch's own `glide`
+ * is 0 — the 303's fixed slide, near enough. A patch with `glide` set uses
+ * that instead.
+ */
+export const SLIDE_SECONDS_DEFAULT = 0.06;
 /** A document's document-format version (#597: parts are a slot list). */
 export const ARRANGEMENT_VERSION = 2;
 /** How many parts a song may have, and so the highest slot (#597). */
