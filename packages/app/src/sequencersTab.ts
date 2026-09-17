@@ -9,6 +9,7 @@ import type { MusicPart } from '../../../packages/client/src/audio/index-for-edi
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, escapeHtml, fmt0, fmt2, noteName, section, seg } from './dom';
+import { chordCard } from './chordCard';
 import { gridCard } from './gridCard';
 import { makeKnob } from './knob';
 import {
@@ -164,16 +165,8 @@ function partCard(ctx: AppCtx, part: MusicPart): HTMLElement {
   else if (kind === 'arp') body.appendChild(arpCard(ctx, part.slot));
   else if (kind === 'step') body.appendChild(stepCard(ctx, part.slot));
   else if (kind === 'grid') body.appendChild(gridCard(ctx, part.slot));
-  else if (kind === 'chord') {
-    // The chord card — picker, drag and per-step rows — is #607; until it lands the steps are edited in the exported JSON.
-    body.appendChild(
-      el(
-        'p',
-        'hint',
-        'Chord: the chord card lands in #607. Edit the steps in the exported JSON for now.',
-      ),
-    );
-  } else body.appendChild(el('p', 'hint', 'No sequencer: this part plays only from the keyboard.'));
+  else if (kind === 'chord') body.appendChild(chordCard(ctx, part.slot));
+  else body.appendChild(el('p', 'hint', 'No sequencer: this part plays only from the keyboard.'));
   return root;
 }
 
