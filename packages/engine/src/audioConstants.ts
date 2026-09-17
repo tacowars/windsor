@@ -116,6 +116,31 @@ export const SLIDE_SECONDS_DEFAULT = 0.06;
  * the clock time that names it, and the playhead must not show the tick before.
  */
 export const TICK_STAMP_EPSILON = 1e-6;
+/* ----------------------- the chord sequencer (#606) ---------------------- */
+
+/** A chord progression is 0–32 written steps; an empty list is silent. */
+export const CHORD_STEPS_MAX = 32;
+/** How many times in a row one step plays, retriggered each time. */
+export const CHORD_REPEAT_MAX = 8;
+export const CHORD_REPEAT_DEFAULT = 1;
+/** A step's duration multiplier when the document names none: one base step. */
+export const CHORD_DURATION_DEFAULT = 1;
+/**
+ * A step's inversion: 0–3 as written. Past the chord's tone count it wraps
+ * with octave carry (inversion 3 of a triad is root position an octave up).
+ */
+export const CHORD_INVERSION_MAX = 3;
+/** A step's octave offset from the part's register octave. */
+export const CHORD_STEP_OCTAVE_MAX = 2;
+/** A step's chromatic shift of the whole chord; an octave is the octave dial. */
+export const CHORD_SEMITONE_MAX = 11;
+/** Triads and sevenths — the tones stacked in thirds over the scale. */
+export const CHORD_SIZE_TRIAD = 3;
+export const CHORD_SIZE_SEVENTH = 4;
+/** A voicing never sends more notes than this, whatever it doubles. */
+export const CHORD_VOICING_NOTES_MAX = 6;
+/** A chord's length as a fraction of its step; 1 holds it to the next onset. */
+export const CHORD_GATE_DEFAULT = 1;
 /** A document's document-format version (#597: parts are a slot list). */
 export const ARRANGEMENT_VERSION = 2;
 /** How many parts a song may have, and so the highest slot (#597). */
