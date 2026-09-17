@@ -143,10 +143,10 @@ function assertConfig(config: GridSequencerConfig): void {
 }
 
 export class GridSequencer {
-  readonly config: GridSequencerConfig;
   onNote: NoteHandler | null = null;
 
-  private readonly sampler: ScaleSampler;
+  private current: GridSequencerConfig;
+  private sampler: ScaleSampler;
   private readonly rng: Rng;
   /** The note sounding into the next step, if any. */
   private held: number | null = null;
@@ -154,8 +154,30 @@ export class GridSequencer {
   constructor(sampler: ScaleSampler, config: GridSequencerConfig) {
     assertConfig(config);
     this.sampler = sampler;
-    this.config = config;
+    this.current = config;
     this.rng = generatorRng(config.seed, config.generatorIndex);
+  }
+
+  get config(): GridSequencerConfig {
+    return this.current;
+  }
+
+  /**
+   * Take a new line, and optionally a new sampler, without a rebuild (#603):
+   * the held note and the skip stream carry on, so turning Skip, editing a
+   * step or moving the Harmony tab's root never cuts the sounding note or
+   * restarts the stream. The divisor is the subscription and needs a rebuild;
+   * so does a seed change, which is what a stream restart is for.
+   */
+  reconfigure(config: GridSequencerConfig, sampler: ScaleSampler = this.sampler): void {
+    assertConfig(config);
+    if (config.divisor !== this.current.divisor) {
+      throw new RangeError(
+        'a divisor change rebuilds the sequencer; it cannot be reconfigured live',
+      );
+    }
+    this.current = config;
+    this.sampler = sampler;
   }
 
   get heldNote(): number | null {
@@ -164,7 +186,7 @@ export class GridSequencer {
 
   /** The loop length — `config.length`, never more than the steps written. */
   get length(): number {
-    return this.config.length;
+    return this.current.length;
   }
 
   /** The step index a transport step lands on — the console's playhead reads this too. */
@@ -173,24 +195,27 @@ export class GridSequencer {
   }
 
   attach(source: TickSource): Unsubscribe {
-    return source.subscribe(this.config.divisor, (event) => this.handleTick(event));
+    return source.subscribe(this.current.divisor, (event) => this.handleTick(event));
   }
 
   /** One step. Returns the events it emitted; an empty array is a tie. */
   handleTick(event: TickEvent): NoteEvent[] {
-    const step = this.config.steps[this.stepAt(event.step)];
+    const step = this.current.steps[this.stepAt(event.step)];
     if (!step || step.kind === 'tie') return [];
     if (step.kind === 'rest') return this.restStep(event);
     // One draw per note step, whatever the rest of the line does, so an edit
     // to a rest never moves the skip pattern of the notes around it.
-    if (this.config.skipChance > 0 && this.rng() < this.config.skipChance) {
+    if (this.current.skipChance > 0 && this.rng() < this.current.skipChance) {
       return this.restStep(event);
     }
     return this.noteStep(event, step);
   }
 
   private noteStep(event: TickEvent, step: GridNoteStep): NoteEvent[] {
-    const note = this.sampler.noteForFolded(step.degree, this.config.register.octave + step.octave);
+    const note = this.sampler.noteForFolded(
+      step.degree,
+      this.current.register.octave + step.octave,
+    );
     const slide = step.slide && this.held !== null;
     if (slide && note === this.held) return [];
 
@@ -202,7 +227,7 @@ export class GridSequencer {
       degree: step.degree,
     };
     if (step.accent) {
-      on.accent = { velocity: this.config.accentVelocity, mod: this.config.accentMod };
+      on.accent = { velocity: this.current.accentVelocity, mod: this.current.accentMod };
     }
     if (slide) on.slide = true;
 

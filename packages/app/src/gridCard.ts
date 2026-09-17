@@ -12,12 +12,16 @@ import { partAt } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, fmt0, fmt2 } from './dom';
+import { GRID_ROTATE_MAX } from './gridConstants';
 import {
   GRID_STEPS_MAX,
   cycleKind,
   cycleOctave,
   degreeOptions,
   foldedView,
+  keySignature,
+  randomSteps,
+  rotateSteps,
   setDegree,
   stepLabel,
   stepsForLength,
@@ -26,11 +30,13 @@ import {
 } from './gridModel';
 import { makeKnob } from './knob';
 import { PITCH_COLOR, divisorPicker, driverKnob, sectionKnob } from './seqFields';
+import { scaleOffsets } from '../../../packages/client/src/audio/index-for-editor';
 
 const HINT =
   'Top cell cycles note → tie → rest. Pick the degree from the key — a red border means the ' +
   'written degree folded into the current scale. Oct: click up, shift-click down. ' +
-  'A accent, S slide. Steps past Length stay written, greyed.';
+  'A accent, S slide. Steps past Length stay written, greyed. Randomize rewrites every step; ' +
+  'Rotate turns the loop.';
 
 function specOf(ctx: AppCtx, slot: number): GridSpec | null {
   const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
@@ -42,6 +48,8 @@ interface Strip {
   ctx: AppCtx;
   slot: number;
   root: HTMLElement;
+  /** The column the playhead sits on, or -1; reapplied after every repaint. */
+  playing: number;
   repaint(): void;
 }
 
@@ -142,14 +150,31 @@ function paintStrip(strip: Strip): void {
   if (!spec) return;
   spec.steps.forEach((_, index) => strip.root.appendChild(column(strip, index, spec)));
   strip.root.scrollLeft = scrollLeft;
+  markPlaying(strip);
 }
 
-/** The playhead: the column of the audible tick, while the card is on screen and the transport runs. */
-function startPlayhead(strip: Strip): void {
-  let shown = -1;
+function markPlaying(strip: Strip): void {
+  [...strip.root.children].forEach((col, i) =>
+    col.classList.toggle('playing', i === strip.playing),
+  );
+}
+
+/**
+ * Per frame while the card is on screen: the playhead (the column of the
+ * audible tick while the transport runs), and a repaint when the Harmony
+ * tab's root or scale has changed since the labels were drawn — a root knob
+ * goes through `ctx.change` alone, which re-renders nothing.
+ */
+function watch(strip: Strip): void {
+  let keySig = keySignature(strip.ctx.model.doc.key);
   const tick = (): void => {
     if (!strip.root.isConnected) return;
     requestAnimationFrame(tick);
+    const sig = keySignature(strip.ctx.model.doc.key);
+    if (sig !== keySig) {
+      keySig = sig;
+      strip.repaint();
+    }
     const system = strip.ctx.host.system;
     const spec = specOf(strip.ctx, strip.slot);
     let current = -1;
@@ -157,9 +182,9 @@ function startPlayhead(strip: Strip): void {
       const audible = system.scheduler.audibleTick(system.engine.context.currentTime);
       current = Math.floor(audible / spec.divisor) % spec.length;
     }
-    if (current === shown) return;
-    shown = current;
-    [...strip.root.children].forEach((col, i) => col.classList.toggle('playing', i === current));
+    if (current === strip.playing) return;
+    strip.playing = current;
+    markPlaying(strip);
   };
   requestAnimationFrame(tick);
 }
@@ -184,6 +209,44 @@ function lengthKnob(strip: Strip): HTMLElement {
   });
 }
 
+/** Rotate applies the turn since its last value, so the document holds the rotated steps and no offset. */
+function rotateKnob(strip: Strip): HTMLElement {
+  let turned = 0;
+  return makeKnob({
+    label: 'Rotate',
+    min: -GRID_ROTATE_MAX,
+    max: GRID_ROTATE_MAX,
+    def: 0,
+    step: 1,
+    color: PITCH_COLOR,
+    fmt: (v) => (v > 0 ? `+${v.toFixed(0)}` : v.toFixed(0)),
+    get: () => turned,
+    set: (v) => {
+      const target = Math.round(v);
+      const by = target - turned;
+      if (by === 0) return;
+      turned = target;
+      commit(strip, (spec) => rotateSteps(spec.steps, by, spec.length));
+    },
+  });
+}
+
+function randomizeButton(strip: Strip): HTMLElement {
+  const button = el('button', 'btn', 'Randomize') as HTMLButtonElement;
+  button.type = 'button';
+  button.style.borderColor = PITCH_COLOR;
+  button.title = 'Every step: a random degree from the key, octave, accent and slide';
+  button.onclick = (): void =>
+    commit(strip, (spec) =>
+      randomSteps(
+        spec.steps.length,
+        scaleOffsets(strip.ctx.model.doc.key.scale).length,
+        Math.random,
+      ),
+    );
+  return button;
+}
+
 function controls(strip: Strip): HTMLElement {
   const { ctx, slot } = strip;
   const row = el('div', 'knob-row');
@@ -203,6 +266,7 @@ function controls(strip: Strip): HTMLElement {
   row.appendChild(knob('skipChance', 'Skip', 0));
   row.appendChild(knob('accentVelocity', 'Acc vel', 0.2));
   row.appendChild(knob('accentMod', 'Acc mod', 1));
+  row.appendChild(rotateKnob(strip));
   return row;
 }
 
@@ -213,13 +277,17 @@ export function gridCard(ctx: AppCtx, slot: number): HTMLElement {
     ctx,
     slot,
     root: el('div', 'grid-strip'),
+    playing: -1,
     repaint: () => paintStrip(strip),
   };
   body.appendChild(controls(strip));
-  body.appendChild(divisorPicker(ctx, slot));
+  const tools = el('div', 'capture-row');
+  tools.appendChild(divisorPicker(ctx, slot));
+  tools.appendChild(randomizeButton(strip));
+  body.appendChild(tools);
   body.appendChild(strip.root);
   body.appendChild(el('p', 'hint', HINT));
   paintStrip(strip);
-  startPlayhead(strip);
+  watch(strip);
   return body;
 }
