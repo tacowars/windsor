@@ -179,13 +179,24 @@ function stepDriver(raw: unknown, path: string, n: FieldNormaliser): StepDriver 
 function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver {
   const d = DEFAULT_GRID_CONFIG;
   const o = n.section(raw, path);
-  const known = ['divisor', 'steps', 'skipChance', 'accentVelocity', 'accentMod', 'register'];
+  const known = [
+    'divisor',
+    'steps',
+    'length',
+    'skipChance',
+    'accentVelocity',
+    'accentMod',
+    'register',
+  ];
   n.dropUnknown(o, known, path);
   const reg = n.section(o.register, `${path}.register`);
   n.dropUnknown(reg, ['octave'], `${path}.register`);
+  const steps = gridSteps(o.steps, `${path}.steps`, n);
   return {
     divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
-    steps: gridSteps(o.steps, `${path}.steps`, n),
+    steps,
+    // The whole line unless the document says shorter (#603); never past the steps written.
+    length: n.int(o.length, steps.length, 1, steps.length, `${path}.length`),
     skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
     accentVelocity: n.num(o.accentVelocity, d.accentVelocity, 0, 1, `${path}.accentVelocity`),
     accentMod: n.num(o.accentMod, d.accentMod, 0, 1, `${path}.accentMod`),

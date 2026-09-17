@@ -44,7 +44,7 @@ import { clonePatch, makePatch, mergePatch, type PartialPatch } from './patch';
 import { ScaleSampler } from './scaleSampler';
 import type { TickSource, Unsubscribe } from './scheduler';
 import { StepSequencer } from './stepSequencer';
-import { GridSequencer } from './gridSequencer';
+import { GridSequencer, assertGridConfig, type GridSequencerConfig } from './gridSequencer';
 import type { NoteExtras } from './audioPart';
 
 /** What a binding needs from a part. `AudioPart` satisfies it structurally. */
@@ -91,6 +91,8 @@ interface Built {
 interface Plan {
   built: Built;
   rebuilt: ReadonlySet<number>;
+  /** Grid parts kept live, with the validated line each takes after the commit (#603). */
+  reconfigured: ReadonlyArray<readonly [number, GridSequencerConfig]>;
   patchChanges: ReadonlyArray<readonly [number, Patch]>;
   /** The preset table after the partial's `patches`, validated against. */
   presets: Record<string, Patch>;
@@ -119,8 +121,13 @@ function stagePatches(
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
-/** What builds a part's generator: its kind and driver, never its note, hold or velocity. */
-const generatorSig = (spec: SequencerSpec): string => sig([spec.kind, driverOf(spec)]);
+/**
+ * What builds a part's generator: its kind and driver, never its note, hold or
+ * velocity. A grid rebuilds only on its kind or divisor (#603): every other
+ * field reconfigures the live generator, so an edit never cuts the held note.
+ */
+const generatorSig = (spec: SequencerSpec): string =>
+  spec.kind === 'grid' ? sig([spec.kind, spec.divisor]) : sig([spec.kind, driverOf(spec)]);
 
 /** Draws from the shared sampler, so a key change rebuilds it (the grid resolves degrees through it too). */
 const isPitched = (spec: SequencerSpec): boolean =>
@@ -216,6 +223,10 @@ export class ArrangementPlayer {
     this.current = merged;
     this.index();
     this.attach(plan.rebuilt);
+    for (const [slot, config] of plan.reconfigured) {
+      const generator = this.built.generators.get(slot);
+      if (generator instanceof GridSequencer) generator.reconfigure(config, this.built.sampler);
+    }
     return { ok: true, ignored };
   }
 
@@ -279,9 +290,11 @@ export class ArrangementPlayer {
       const changed = generatorSig(next.sequencer) !== generatorSig(before.sequencer);
       // An inert part only rebuilds when its kind leaves or enters `none`;
       // a seed or key change has no stream of its to reset.
+      // A grid takes a new sampler live (`reconfigure`), so a key change does not rebuild it.
       const reseeded =
         next.sequencer.kind !== 'none' &&
-        (seedChanged || (isPitched(next.sequencer) && keyChanged));
+        (seedChanged ||
+          (isPitched(next.sequencer) && next.sequencer.kind !== 'grid' && keyChanged));
       if (changed || reseeded) rebuilt.add(next.slot);
     }
 
@@ -292,6 +305,19 @@ export class ArrangementPlayer {
       generators.set(slot, source.generators.get(slot) ?? null);
     }
     const built: Built = { sampler: keyChanged ? fresh.sampler : this.built.sampler, generators };
+
+    // A grid kept live is validated here, inside the transaction: a bad edit
+    // (a length past its steps, say) is refused before the tempo, the patches
+    // or the arrangement change, exactly as a rebuild's constructor would be.
+    const reconfigured: Array<readonly [number, GridSequencerConfig]> = [];
+    for (const part of merged.parts) {
+      if (rebuilt.has(part.slot) || part.sequencer.kind !== 'grid') continue;
+      if (!(generators.get(part.slot) instanceof GridSequencer)) continue;
+      const driver = driverOf(part.sequencer) as GridDriver;
+      const config = { ...driver, seed: merged.seed, generatorIndex: part.slot };
+      assertGridConfig(config);
+      reconfigured.push([part.slot, config]);
+    }
 
     // A part takes a fresh patch when its preset switched, or when the patch
     // it plays was edited in this partial.
@@ -308,7 +334,7 @@ export class ArrangementPlayer {
         ]);
       }
     }
-    return { built, rebuilt, patchChanges, presets };
+    return { built, rebuilt, reconfigured, patchChanges, presets };
   }
 
   /** (Re)subscribe the named slots' generators and point their events at the parts. */

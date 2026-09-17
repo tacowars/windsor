@@ -219,6 +219,89 @@
         flex-wrap: wrap;
       }
 
+      /* ---------- the grid card (#603) ---------- */
+
+      .grid-strip {
+        display: flex;
+        gap: 3px;
+        overflow-x: auto;
+        padding: 8px 0 6px;
+        scrollbar-width: thin;
+      }
+      .grid-col {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        flex: none;
+        width: 46px;
+      }
+      .grid-col.off {
+        opacity: 0.35;
+      }
+      .grid-idx {
+        font-family: var(--f-num);
+        font-size: 9px;
+        color: var(--ink-faint);
+        text-align: center;
+        border-radius: var(--r);
+        padding: 1px 0;
+      }
+      .grid-col.playing .grid-idx {
+        background: var(--carrier);
+        color: #111416;
+      }
+      .gcell {
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        color: var(--ink-dim);
+        font-family: var(--f-panel);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        padding: 4px 0;
+        cursor: pointer;
+        text-align: center;
+        min-height: 22px;
+      }
+      .gcell:hover {
+        background: var(--panel-hi);
+        color: var(--ink);
+      }
+      .gcell[aria-pressed='true'] {
+        background: var(--modulator);
+        border-color: var(--modulator);
+        color: #111416;
+      }
+      .gcell.note {
+        color: var(--ink);
+        border-color: var(--line-bright);
+      }
+      .gcell.folded {
+        border-color: var(--hot);
+      }
+      .gcell.blank {
+        visibility: hidden;
+      }
+      .grid-col select.gsel {
+        width: 100%;
+        max-width: none;
+        font-size: 10px;
+        padding: 3px 1px;
+        font-family: var(--f-num);
+        background: var(--inset);
+        color: var(--ink);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+      }
+      .grid-col select.gsel option {
+        background: var(--panel);
+        color: var(--ink);
+      }
+      .grid-col select.gsel.folded {
+        border-color: var(--hot);
+      }
+
       /* ---------- parts grid ---------- */
 
       .parts-grid {
