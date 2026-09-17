@@ -2,13 +2,18 @@
  * Arrangement tab (#70, record §2; #435): transport and bpm, seed, and the
  * document itself — export downloads a file, import reads one back (record:
  * the console is a local tool, so a page-initiated download simply works).
- * The exported file is the normalised document — patches, returns, mix,
- * sequencers, harmony, all of it; saved under
+ * New song starts over from one Init part with no sequencer (#598), asking
+ * first when the document has changed since it was opened.
+ * The exported file is the normalised document — patches, returns, each
+ * part's strip, sequencers, harmony, all of it; saved under
  * `packages/client/src/audio/arrangements/<name>.json` the game bundles it
  * at build time (record §3) and `?music=<name>` plays it, `bed-01` being the
  * default.
  */
 import type { AppCtx } from './context';
+import { openConfirm } from './metadataModal';
+import { partsState } from './patchState';
+import { newSong } from './songParts';
 import { el, fmt0, section } from './dom';
 import { makeKnob } from './knob';
 
@@ -66,20 +71,43 @@ function transportSection(ctx: AppCtx): HTMLElement {
   return root;
 }
 
+/** Start over on a new song, asking first when this one has changed since it was opened (#598). */
+function newSongButton(ctx: AppCtx): HTMLElement {
+  const fresh = el('button', 'btn', 'New song') as HTMLButtonElement;
+  fresh.type = 'button';
+  fresh.title = 'Start over: one part, the Init patch, no sequencer';
+  fresh.onclick = (): void => {
+    const start = (): void => {
+      partsState.selected = 0;
+      ctx.importDoc(newSong());
+      ctx.status('new song — pick a sequencer for Part 1 in the Parts tab');
+    };
+    if (!ctx.model.changed) return start();
+    void openConfirm({
+      title: 'New song',
+      body: 'Discard the changes to this song? Export first to keep them.',
+      ok: 'Discard',
+      opener: fresh,
+    }).then((ok) => ok && start());
+  };
+  return fresh;
+}
+
 function documentSection(ctx: AppCtx): HTMLElement {
   const { root, body } = section(
     'Document',
     'Export downloads the whole piece — a snapshot of every patch any part plays, plus ' +
-      'returns, mix, sequencers and harmony — as one normalised document. Save it as ' +
+      "returns, every part's strip, sequencers and harmony — as one normalised document. Save it as " +
       'packages/client/src/audio/arrangements/<name>.json: the game bundles every file there, ' +
       'resolves patches from the document alone (#562), ?music=<name> plays it (bed-01 is the ' +
       'default), and npm run verify gates each one.',
   );
   const row = el('div', 'bar-row');
+  row.appendChild(newSongButton(ctx));
   const name = document.createElement('input');
   name.className = 'field';
   name.name = 'export-name';
-  name.value = 'bed-01.json';
+  name.value = 'song.json';
   name.setAttribute('aria-label', 'Export file name');
   row.appendChild(name);
   const exportBtn = el('button', 'btn primary', 'Export') as HTMLButtonElement;
@@ -151,8 +179,8 @@ function readoutSection(ctx: AppCtx): HTMLElement {
     const system = ctx.host.system;
     if (system) {
       const r = system.readout();
-      const counters = Object.entries(r.counters)
-        .map(([id, n]) => `${id} ${n}`)
+      const counters = ctx.model.doc.parts
+        .map((part) => `${part.name} ${r.counters[part.slot] ?? 0}`)
         .join(' · ');
       line.textContent =
         `${r.running ? 'running' : 'stopped'}${r.muted ? ' (muted)' : ''} — ` +
