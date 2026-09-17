@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- the player's binding tests in one file: the four-slot cases and the grid's live-reconfigure cases (#603) share the rig and the fixture line; 383 of 350, inside the #225 decision 4 margin */
+/* eslint-disable max-lines -- the player's binding tests in one file: the four-slot cases and the grid's live-reconfigure cases (#603) share the rig and the fixture line; 369 of 350, inside the #225 decision 4 margin (the Euclidean cases, #610, are their own file) */
 /**
  * The binding layer, driven headlessly: a `TickTransport` on one side, fake
  * parts recording calls on the other. Onset → trigger, noteOn/noteOff →
@@ -15,9 +15,9 @@ import {
   onlyParts,
   slotMap,
   withPart,
-  type FullPartId,
 } from './__fixtures__/fullArrangement';
-import { kinds, recordingPart, type RecordingPart } from './__fixtures__/recordingPart';
+import { fourParts, rig } from './__fixtures__/playerRig';
+import { kinds } from './__fixtures__/recordingPart';
 import type { Arrangement, MusicPart } from './arrangement';
 import { ArrangementPlayer } from './arrangementPlayer';
 import { makePatch } from './patch';
@@ -27,38 +27,6 @@ import { DIVISORS, PPQ, TICKS_PER_BAR, TickTransport } from './scheduler';
 import { SECONDS_PER_MINUTE } from './audioConstants';
 
 const { kick, hat, arp, drone } = FULL_SLOT;
-
-const fourParts = (): Record<FullPartId, RecordingPart> => ({
-  kick: recordingPart(),
-  hat: recordingPart(),
-  arp: recordingPart(),
-  drone: recordingPart(),
-});
-
-interface Rig {
-  transport: TickTransport;
-  parts: Record<FullPartId, RecordingPart>;
-  player: ArrangementPlayer;
-  events: Array<{ slot: number; tick: number }>;
-  run(bars: number): void;
-}
-
-function rig(arrangement: Arrangement = FULL_ARRANGEMENT): Rig {
-  const transport = new TickTransport(120);
-  const parts = fourParts();
-  const events: Rig['events'] = [];
-  const player = new ArrangementPlayer(
-    transport,
-    slotMap(parts),
-    arrangement,
-    PRESETS,
-    (part, tick) => events.push({ slot: part.slot, tick }),
-  );
-  const run = (bars: number): void => {
-    for (let i = 0; i < bars * TICKS_PER_BAR; i++) transport.advance(transport.transportSeconds);
-  };
-  return { transport, parts, player, events, run };
-}
 
 /** One sounding degree, one octave: every step-sequencer draw is the same MIDI note. */
 const TIED: Arrangement = {

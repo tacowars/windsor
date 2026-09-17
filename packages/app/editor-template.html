@@ -410,6 +410,46 @@
       }
       .chord-strip .grid-col.drop-target .grid-idx {
         color: var(--carrier);
+      /* ---------- the Euclidean card (#610) ---------- */
+
+      .euclid-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 3px;
+        padding: 8px 0 4px;
+      }
+      .ecell {
+        width: 20px;
+        height: 20px;
+        flex: none;
+        padding: 0;
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        cursor: pointer;
+      }
+      .ecell.beat {
+        margin-left: 6px;
+      }
+      .ecell:hover {
+        border-color: var(--line-bright);
+      }
+      .ecell.on {
+        background: var(--carrier);
+        border-color: var(--carrier);
+      }
+      .ecell.playing {
+        box-shadow: 0 0 0 2px var(--modulator);
+      }
+      .ecell.on.playing {
+        background: var(--ink);
+        border-color: var(--ink);
+      }
+      .euclid-readout {
+        font-family: var(--f-num);
+        font-size: 11px;
+        color: var(--ink-dim);
+        margin: 2px 0 6px;
       }
 
       /* ---------- parts grid ---------- */
