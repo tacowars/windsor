@@ -414,6 +414,23 @@ describe('grid parts (#602)', () => {
     expect(parts.drone.calls.at(-1)).toMatchObject({ kind: 'allNotesOff' });
   });
 
+  it('an invalid live grid edit is refused whole: no tempo, no arrangement, no generator change', () => {
+    const { parts, player, run } = rig(LINE);
+    run(1);
+    const before = parts.drone.calls.length;
+    const result = player.apply({ bpm: 140, parts: { [drone]: { sequencer: { length: 0 } } } }, {});
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/length/);
+    expect(player.readout().bpm).toBe(LINE.bpm);
+    run(1);
+    // The line plays on as written: six quarters, bar 2 opens on steps 4 and 5.
+    const notes = parts.drone.calls
+      .slice(before)
+      .filter((c) => c.kind === 'noteOn')
+      .map((c) => c.note);
+    expect(notes.slice(0, 2)).toEqual([51, 55]);
+  });
+
   it('a root change re-pitches the grid live, without an all-notes-off', () => {
     const { parts, player, run } = rig(LINE);
     run(1);

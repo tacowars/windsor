@@ -114,7 +114,8 @@ function assertStep(step: GridStep, index: number): void {
   }
 }
 
-function assertConfig(config: GridSequencerConfig): void {
+/** Every constructor and `reconfigure` check; the player runs it inside `plan` so a bad live edit is refused before anything commits (#603). */
+export function assertGridConfig(config: GridSequencerConfig): void {
   if (!isBarDivisor(config.divisor)) {
     throw new RangeError(`divisor must divide the bar, got ${config.divisor}`);
   }
@@ -152,7 +153,7 @@ export class GridSequencer {
   private held: number | null = null;
 
   constructor(sampler: ScaleSampler, config: GridSequencerConfig) {
-    assertConfig(config);
+    assertGridConfig(config);
     this.sampler = sampler;
     this.current = config;
     this.rng = generatorRng(config.seed, config.generatorIndex);
@@ -170,7 +171,7 @@ export class GridSequencer {
    * so does a seed change, which is what a stream restart is for.
    */
   reconfigure(config: GridSequencerConfig, sampler: ScaleSampler = this.sampler): void {
-    assertConfig(config);
+    assertGridConfig(config);
     if (config.divisor !== this.current.divisor) {
       throw new RangeError(
         'a divisor change rebuilds the sequencer; it cannot be reconfigured live',
