@@ -1,9 +1,14 @@
 /**
- * The committed JSON is the #69b TypeScript arrangement, exactly (issue #75):
- * structural equality of the normalised document, and offline-render equality
- * of the first 4 bars through the full stack on the graph stand-in. The
- * maintainer approved this exact arrangement by ear on PR #81, so any
- * difference here is a defect, not a tuning choice.
+ * The reference JSON document is the #69b TypeScript arrangement, exactly
+ * (issue #75): structural equality of the normalised document, and
+ * offline-render equality of the first 4 bars through the full stack on the
+ * graph stand-in. The maintainer approved this exact arrangement by ear on PR
+ * #81, so any difference here is a defect, not a tuning choice. It was the
+ * shipped `arrangements/bed-01.json` until #613, when tacowars made bed-01 tacowars's own
+ * song and the twin moved to `__fixtures__/arrangementDocuments/reference-bed.json`
+ * (record `2026-09-17-613-bed-01-is-the-owners-song-the-reference-twin-is-a-fixture`):
+ * what this proves is the JSON codec against the TypeScript fixture, which no
+ * song a musician edits should have to keep satisfying.
  *
  * What the render here proves is the *arrangement*: which part fires on which
  * tick, through which strip and send, at which level. It cannot see a patch —
@@ -34,7 +39,7 @@ import {
 import { noteToneFeed } from './__fixtures__/noteFeeds';
 import type { ArrangementDocument } from './arrangementDocument';
 import { makeArrangement } from './arrangementDocument';
-import raw from './arrangements/bed-01.json';
+import raw from './__fixtures__/arrangementDocuments/reference-bed.json';
 import { AudioSystem } from './audioSystem';
 import { musicPartName } from './documentParts';
 import { FmEngine } from './fmEngine';
@@ -76,12 +81,12 @@ async function renderBed(arrangement: ArrangementDocument): Promise<Render> {
   return { capture: master, counters: system.readout().counters };
 }
 
-describe('bed-01.json equals the #69b TypeScript arrangement', () => {
+describe('the reference document equals the #69b TypeScript arrangement', () => {
   it('normalises to exactly the fixture, with nothing corrected', () => {
     const result = makeArrangement(raw);
     expect(result.corrections).toEqual([]);
     expect(result.dangling).toEqual([]);
-    // No fill was offered and none was needed: the committed song already
+    // No fill was offered and none was needed: the reference document already
     // carries every patch it plays (#562).
     expect(result.filled).toEqual([]);
     const { patches, ...arrangement } = result.document;
