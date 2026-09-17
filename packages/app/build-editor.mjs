@@ -45,6 +45,23 @@ if (!/^<!doctype html>/i.test(template.trim())) {
   throw new Error('template must be a complete document starting with <!doctype html>');
 }
 
+// A rule that loses its closing brace swallows the rest of the stylesheet:
+// #610's Euclidean block landed inside `.chord-strip … .grid-idx` and every
+// later rule became a nested selector that matched nothing, so the console
+// rendered unstyled while the build and every test stayed green. Balance the
+// braces here, where the defect is one line instead of a whole page.
+const styleBlock = template.slice(template.indexOf('<style>'), template.indexOf('</style>'));
+const cssCode = styleBlock
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '');
+const openBraces = cssCode.split('{').length - 1;
+const closeBraces = cssCode.split('}').length - 1;
+if (openBraces !== closeBraces) {
+  throw new Error(
+    `template CSS is unbalanced: ${openBraces} "{" against ${closeBraces} "}" — a rule is missing its closing brace`,
+  );
+}
+
 // The console builds no Web Audio nodes of its own for synthesis, routing or
 // sequencing (#70 acceptance criterion, asserted by absence in the console's
 // own code — the engine bundle below legitimately contains all of these).
