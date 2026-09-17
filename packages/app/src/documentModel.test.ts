@@ -168,6 +168,65 @@ describe('grid parts (#603)', () => {
   });
 });
 
+describe('chord parts (#607)', () => {
+  it('export → import of a 32-step and a 1-step chord part equals the model’s document', () => {
+    const chord = (
+      degree: number,
+      over: Record<string, unknown> = {},
+    ): Record<string, unknown> => ({
+      kind: 'chord',
+      degree,
+      size: 3,
+      inversion: 0,
+      octave: 0,
+      semitone: 0,
+      duration: 1,
+      repeat: 1,
+      ...over,
+    });
+    const long = Array.from({ length: 32 }, (_, i) =>
+      i % 5 === 4
+        ? { kind: 'rest', duration: 0.5, repeat: 1 }
+        : chord(i % 7, {
+            size: i % 2 === 0 ? 4 : 3,
+            inversion: i % 4,
+            octave: (i % 3) - 1,
+            semitone: (i % 5) - 2,
+            duration: [0.25, 0.5, 1, 2, 4][i % 5],
+            repeat: (i % 8) + 1,
+          }),
+    );
+    const model = new DocumentModel({
+      ...OLD_SONG,
+      parts: [
+        ...OLD_SONG.parts,
+        {
+          slot: 5,
+          name: 'pad',
+          preset: 'saw-arp',
+          sequencer: { kind: 'chord', steps: long, voicing: 'drop2', gate: 0.5, divisor: 48 },
+        },
+        {
+          slot: 6,
+          name: 'one',
+          preset: 'saw-arp',
+          sequencer: { kind: 'chord', steps: [chord(4, { size: 4 })], register: { octave: -1 } },
+        },
+        { slot: 7, name: 'blank', preset: 'saw-arp', sequencer: { kind: 'chord' } },
+      ],
+    });
+    expect(model.corrections).toEqual([]);
+    const reopened = new DocumentModel(JSON.parse(model.toJson()));
+    expect(reopened.doc).toEqual(model.doc);
+    expect(reopened.corrections).toEqual([]);
+    const pad = reopened.doc.parts.find((p) => p.slot === 5)?.sequencer;
+    expect(pad?.kind === 'chord' && pad.steps).toHaveLength(32);
+    expect(pad?.kind === 'chord' && pad.voicing).toBe('drop2');
+    const blank = reopened.doc.parts.find((p) => p.slot === 7)?.sequencer;
+    expect(blank?.kind === 'chord' && blank.steps).toEqual([]);
+  });
+});
+
 describe('deepMerge', () => {
   it('creates keys the current document lacks and replaces arrays wholesale', () => {
     expect(deepMerge({ a: { b: 1 } }, { a: { c: 2 } })).toEqual({ a: { b: 1, c: 2 } });

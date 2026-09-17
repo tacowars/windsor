@@ -302,6 +302,116 @@
         border-color: var(--hot);
       }
 
+      /* ---------- the chord card (#607) ---------- */
+
+      .chord-picker-controls {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .chord-picker {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px 0 4px;
+      }
+      .chip {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        min-width: 62px;
+        padding: 5px 8px;
+        background: var(--inset);
+        border: 1px solid var(--line-bright);
+        border-top: 3px solid var(--carrier);
+        border-radius: var(--r);
+        color: var(--ink);
+        font-family: var(--f-panel);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+      }
+      .chip:hover {
+        background: var(--panel-hi);
+      }
+      .chip:active {
+        background: var(--panel-hi);
+        border-color: var(--carrier);
+      }
+      .chip.rest {
+        border-top-color: var(--line);
+        color: var(--ink-dim);
+      }
+      .chip .chip-num {
+        font-family: var(--f-num);
+        font-size: 9px;
+        color: var(--ink-faint);
+        letter-spacing: 0.06em;
+      }
+      .chord-ghost {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 20;
+        padding: 4px 8px;
+        background: var(--inset);
+        border: 1px solid var(--carrier);
+        border-radius: var(--r);
+        color: var(--ink);
+        font-family: var(--f-panel);
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.92;
+        pointer-events: none;
+        white-space: nowrap;
+      }
+      body.chord-dragging {
+        cursor: grabbing;
+      }
+      .chord-strip .grid-col {
+        width: 58px;
+      }
+      .chord-strip .gcell.chord,
+      .chord-strip .gcell.rest {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        min-height: 34px;
+        color: var(--ink);
+        border-color: var(--line-bright);
+        touch-action: none;
+        user-select: none;
+      }
+      .chord-strip .gcell.rest {
+        color: var(--ink-dim);
+        border-color: var(--line);
+      }
+      .chord-strip .gcell small {
+        font-family: var(--f-num);
+        font-size: 9px;
+        font-weight: 400;
+        color: var(--ink-faint);
+        letter-spacing: 0.06em;
+      }
+      .chord-strip .grid-col.append .gcell.append {
+        border-style: dashed;
+        font-size: 14px;
+        min-height: 34px;
+      }
+      .chord-strip .grid-col.drop-target .gcell {
+        border-color: var(--carrier);
+        background: var(--panel-hi);
+      }
+      .chord-strip .grid-col.drop-target .grid-idx {
+        color: var(--carrier);
+      }
+
       /* ---------- parts grid ---------- */
 
       .parts-grid {
