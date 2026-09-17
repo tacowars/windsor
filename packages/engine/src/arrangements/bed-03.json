@@ -6,13 +6,7 @@
     "root": 48,
     "scale": "naturalMinor",
     "weights": [
-      1.7157894736842105,
-      1,
-      1,
-      0.8526315789473684,
-      1.6105263157894738,
-      0.5789473684210527,
-      1
+      1.7157894736842105, 1, 1, 0.8526315789473684, 1.6105263157894738, 0.5789473684210527, 1
     ]
   },
   "parts": [
@@ -184,13 +178,7 @@
       "ops": [
         {
           "wave": 9,
-          "userPartials": [
-            1,
-            0.28,
-            0.12,
-            0.06,
-            0.03
-          ],
+          "userPartials": [1, 0.28, 0.12, 0.06, 0.03],
           "userKey": "a204-scoring-v1-silk",
           "ratio": 1,
           "fixed": false,
@@ -248,13 +236,7 @@
         },
         {
           "wave": 9,
-          "userPartials": [
-            1,
-            0.28,
-            0.12,
-            0.06,
-            0.03
-          ],
+          "userPartials": [1, 0.28, 0.12, 0.06, 0.03],
           "userKey": "a204-scoring-v1-silk",
           "ratio": 1,
           "fixed": false,
@@ -333,12 +315,7 @@
         "retrigger": false,
         "toPitch": 0.035,
         "modWheelDepth": 1,
-        "toOp": [
-          0.06,
-          0.25,
-          0.06,
-          0.2
-        ]
+        "toOp": [0.06, 0.25, 0.06, 0.2]
       },
       "filter": {
         "mode": 1,
@@ -518,12 +495,7 @@
         "retrigger": false,
         "toPitch": 0,
         "modWheelDepth": 1,
-        "toOp": [
-          0,
-          0,
-          0,
-          0
-        ]
+        "toOp": [0, 0, 0, 0]
       },
       "filter": {
         "mode": 0,
@@ -703,12 +675,7 @@
         "retrigger": false,
         "toPitch": 0,
         "modWheelDepth": 1,
-        "toOp": [
-          0,
-          0,
-          0,
-          0
-        ]
+        "toOp": [0, 0, 0, 0]
       },
       "filter": {
         "mode": 1,
@@ -888,12 +855,7 @@
         "retrigger": true,
         "toPitch": 12,
         "modWheelDepth": 1,
-        "toOp": [
-          0.736842105263158,
-          -0.7473684210526316,
-          0.6842105263157894,
-          -0.6947368421052632
-        ]
+        "toOp": [0.736842105263158, -0.7473684210526316, 0.6842105263157894, -0.6947368421052632]
       },
       "filter": {
         "mode": 0,
@@ -1073,12 +1035,7 @@
         "retrigger": false,
         "toPitch": 0,
         "modWheelDepth": 1,
-        "toOp": [
-          0,
-          0,
-          0,
-          0
-        ]
+        "toOp": [0, 0, 0, 0]
       },
       "filter": {
         "mode": 2,
@@ -1258,12 +1215,7 @@
         "retrigger": false,
         "toPitch": 0,
         "modWheelDepth": 1,
-        "toOp": [
-          0,
-          0,
-          0,
-          0
-        ]
+        "toOp": [0, 0, 0, 0]
       },
       "filter": {
         "mode": 1,
