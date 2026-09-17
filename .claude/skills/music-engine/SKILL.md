@@ -73,7 +73,11 @@ musical choices that remain material and unresolved.
   a long enough note gate; a short sequencer gate can interrupt a valid swell.
   Describe sonic intent separately from measured output and tacowars's verdict.
 
-**Scoring bank:** `docs/design/scoring-preset-library.md` is its guide. Since
+**Scoring bank:** `docs/design/scoring-preset-library.md` is its guide.
+**Drum bank:** `docs/design/drum-bank.md` records the 808 / 909 / EFM
+mechanisms, their sources and the engine tricks the `tr808-*`, `tr909-*` and
+`efm-*` patches use (trigger envelopes, the LFO burst gate, negative-feedback
+diode rounding). Since
 #561 every patch, scoring or original, is one `audio/patches/<id>.json`
 carrying its own category, tags, description and headroom record (decision
 record `2026-09-15-561-patch-library-file-shape`); the recipe tables are
