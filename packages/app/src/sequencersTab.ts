@@ -9,6 +9,7 @@ import type { MusicPart } from '../../../packages/client/src/audio/index-for-edi
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, escapeHtml, fmt0, fmt2, noteName, section, seg } from './dom';
+import { gridCard } from './gridCard';
 import { makeKnob } from './knob';
 import {
   PERC_COLOR,
@@ -161,16 +162,8 @@ function partCard(ctx: AppCtx, part: MusicPart): HTMLElement {
   if (kind === 'euclidean') body.appendChild(euclideanCard(ctx, part.slot));
   else if (kind === 'arp') body.appendChild(arpCard(ctx, part.slot));
   else if (kind === 'step') body.appendChild(stepCard(ctx, part.slot));
-  else if (kind === 'grid') {
-    // The step editor is #603; until it lands the steps are edited in the exported JSON.
-    body.appendChild(
-      el(
-        'p',
-        'hint',
-        'Grid: the step editor lands in #603. Edit the steps in the exported JSON for now.',
-      ),
-    );
-  } else body.appendChild(el('p', 'hint', 'No sequencer: this part plays only from the keyboard.'));
+  else if (kind === 'grid') body.appendChild(gridCard(ctx, part.slot));
+  else body.appendChild(el('p', 'hint', 'No sequencer: this part plays only from the keyboard.'));
   return root;
 }
 

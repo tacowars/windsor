@@ -25,6 +25,7 @@ import {
   SCHEDULER_LOOK_AHEAD_SECONDS,
   SCHEDULER_START_DELAY_SECONDS,
   SECONDS_PER_MINUTE,
+  TICK_STAMP_EPSILON,
 } from './audioConstants';
 
 /** Pulses per quarter note -- the MIDI-clock grid. */
@@ -182,6 +183,21 @@ export class Scheduler implements TickSource {
 
   subscribe(divisor: number, handler: TickHandler): Unsubscribe {
     return this.transport.subscribe(divisor, handler);
+  }
+
+  /**
+   * The tick sounding at clock time `now` (#603, the console's playhead). The
+   * queue runs `lookAhead` ahead of the clock, so `transport.currentTick` is
+   * where the *next issued* tick lands, not what is audible: tick `k` was
+   * stamped `nextTime - (currentTick - k) * secondsPerTick`, and the audible
+   * one is the last whose stamp is at or before `now`. 0 until the first tick
+   * sounds; the last issued tick once the queue has run ahead and stopped.
+   */
+  audibleTick(now: number): number {
+    const issued = this.transport.currentTick;
+    const ahead = (this.nextTime - now) / this.transport.secondsPerTick;
+    // Never past the last issued tick: a stopped queue does not keep counting.
+    return Math.max(0, Math.min(issued - 1, Math.floor(issued - ahead + TICK_STAMP_EPSILON)));
   }
 
   start(atTick = 0): void {

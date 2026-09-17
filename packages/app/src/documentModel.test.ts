@@ -116,6 +116,58 @@ describe('a slot-addressed merge (#597)', () => {
   });
 });
 
+describe('grid parts (#603)', () => {
+  it('round-trips a 32-step and a 7-step grid part through export and import', () => {
+    const note = (degree: number, over: Record<string, unknown> = {}) => ({
+      kind: 'note',
+      degree,
+      octave: 0,
+      accent: false,
+      slide: false,
+      ...over,
+    });
+    const long = Array.from({ length: 32 }, (_, i) =>
+      i % 4 === 3 ? { kind: 'tie' } : note(i % 7, { accent: i % 8 === 0, slide: i % 5 === 0 }),
+    );
+    const short = [
+      note(0),
+      { kind: 'rest' },
+      note(4, { octave: 1 }),
+      { kind: 'tie' },
+      note(2),
+      note(6),
+      note(9),
+    ];
+    const model = new DocumentModel({
+      ...OLD_SONG,
+      parts: [
+        ...OLD_SONG.parts,
+        {
+          slot: 5,
+          name: 'acid',
+          preset: 'saw-arp',
+          sequencer: { kind: 'grid', steps: long, length: 24, skipChance: 0.1, accentMod: 0.8 },
+        },
+        {
+          slot: 6,
+          name: 'seven',
+          preset: 'saw-arp',
+          sequencer: { kind: 'grid', divisor: 12, steps: short, register: { octave: -1 } },
+        },
+      ],
+    });
+    expect(model.corrections).toEqual([]);
+    const reopened = new DocumentModel(JSON.parse(model.toJson()));
+    expect(reopened.doc).toEqual(model.doc);
+    expect(reopened.corrections).toEqual([]);
+    const acid = reopened.doc.parts.find((p) => p.slot === 5)?.sequencer;
+    expect(acid?.kind === 'grid' && acid.length).toBe(24);
+    expect(acid?.kind === 'grid' && acid.steps).toHaveLength(32);
+    const seven = reopened.doc.parts.find((p) => p.slot === 6)?.sequencer;
+    expect(seven?.kind === 'grid' && seven.length).toBe(7);
+  });
+});
+
 describe('deepMerge', () => {
   it('creates keys the current document lacks and replaces arrays wholesale', () => {
     expect(deepMerge({ a: { b: 1 } }, { a: { c: 2 } })).toEqual({ a: { b: 1, c: 2 } });
