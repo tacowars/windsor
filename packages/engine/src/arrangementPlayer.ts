@@ -28,6 +28,7 @@ import type {
   Arrangement,
   ArrangementPartial,
   EuclideanDriver,
+  GridDriver,
   MusicPart,
   SequencerSpec,
   StepDriver,
@@ -43,10 +44,12 @@ import { clonePatch, makePatch, mergePatch, type PartialPatch } from './patch';
 import { ScaleSampler } from './scaleSampler';
 import type { TickSource, Unsubscribe } from './scheduler';
 import { StepSequencer } from './stepSequencer';
+import { GridSequencer } from './gridSequencer';
+import type { NoteExtras } from './audioPart';
 
 /** What a binding needs from a part. `AudioPart` satisfies it structurally. */
 export interface PlayablePart {
-  noteOn(note: number, velocity?: number, time?: number): number;
+  noteOn(note: number, velocity?: number, time?: number, extras?: NoteExtras): number;
   noteOffByNote(note: number, time?: number): void;
   trigger(note: number, velocity?: number, duration?: number, time?: number): number;
   setPatch(patch: Patch): void;
@@ -77,7 +80,7 @@ export interface ArrangementReadout {
   counters: Record<string, number>;
 }
 
-type Generator = EuclideanSequencer | Arpeggiator | StepSequencer;
+type Generator = EuclideanSequencer | Arpeggiator | StepSequencer | GridSequencer;
 
 interface Built {
   sampler: ScaleSampler;
@@ -119,7 +122,9 @@ const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 /** What builds a part's generator: its kind and driver, never its note, hold or velocity. */
 const generatorSig = (spec: SequencerSpec): string => sig([spec.kind, driverOf(spec)]);
 
-const isPitched = (spec: SequencerSpec): boolean => spec.kind === 'arp' || spec.kind === 'step';
+/** Draws from the shared sampler, so a key change rebuilds it (the grid resolves degrees through it too). */
+const isPitched = (spec: SequencerSpec): boolean =>
+  spec.kind === 'arp' || spec.kind === 'step' || spec.kind === 'grid';
 
 export class ArrangementPlayer {
   private current: Arrangement;
@@ -217,7 +222,9 @@ export class ArrangementPlayer {
   /** Release everything sounding — step parts' held notes included. Mute and teardown call this. */
   releaseAll(time = 0): void {
     for (const generator of this.built.generators.values()) {
-      if (generator instanceof StepSequencer) generator.release(0, time);
+      if (generator instanceof StepSequencer || generator instanceof GridSequencer) {
+        generator.release(0, time);
+      }
     }
     for (const { slot } of this.current.parts) this.parts.get(slot)?.allNotesOff();
   }
@@ -252,6 +259,8 @@ export class ArrangementPlayer {
         return new Arpeggiator(sampler, { ...(driver as ArpDriver), ...stream });
       case 'step':
         return new StepSequencer(sampler, { ...(driver as StepDriver), ...stream });
+      case 'grid':
+        return new GridSequencer(sampler, { ...(driver as GridDriver), ...stream });
       default:
         return null;
     }
@@ -337,7 +346,12 @@ export class ArrangementPlayer {
     const part = this.parts.get(slot);
     if (!config || !part) return;
     if (event.kind === 'noteOn') {
-      part.noteOn(event.note, config.velocity, event.time);
+      // A grid accent (#602) bumps the part's velocity and rides in as per-note mod.
+      const accent = event.accent;
+      const velocity = accent ? Math.min(1, config.velocity + accent.velocity) : config.velocity;
+      const extras: NoteExtras | undefined =
+        accent || event.slide ? { mod: accent?.mod ?? 0, slide: event.slide === true } : undefined;
+      part.noteOn(event.note, velocity, event.time, extras);
       this.recorders.get(slot)?.record(event.tick, event.note);
       this.count(config, event.tick);
     } else {

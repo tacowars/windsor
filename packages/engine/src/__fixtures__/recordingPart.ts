@@ -3,6 +3,7 @@
  * an `AudioPart`, so what the bindings sent can be asserted call by call.
  */
 import type { PlayablePart } from '../arrangementPlayer';
+import type { NoteExtras } from '../audioPart';
 import type { Patch } from '../patch';
 
 export interface Call {
@@ -12,6 +13,8 @@ export interface Call {
   duration?: number | undefined;
   time?: number | undefined;
   patch?: string | undefined;
+  /** A grid note's accent mod and slide flag (#602); absent on a plain note. */
+  extras?: NoteExtras | undefined;
 }
 
 export type RecordingPart = PlayablePart & { calls: Call[] };
@@ -20,8 +23,8 @@ export function recordingPart(): RecordingPart {
   const calls: Call[] = [];
   return {
     calls,
-    noteOn(note, velocity, time) {
-      calls.push({ kind: 'noteOn', note, velocity, time });
+    noteOn(note, velocity, time, extras) {
+      calls.push({ kind: 'noteOn', note, velocity, time, ...(extras ? { extras } : {}) });
       return calls.length;
     },
     noteOffByNote(note, time) {

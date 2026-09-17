@@ -21,7 +21,9 @@ import type { Arrangement, MusicPart } from './arrangement';
 import { ArrangementPlayer } from './arrangementPlayer';
 import { makePatch } from './patch';
 import { PRESETS } from './presets';
-import { TICKS_PER_BAR, TickTransport } from './scheduler';
+import { gridNote } from './gridSequencer';
+import { DIVISORS, PPQ, TICKS_PER_BAR, TickTransport } from './scheduler';
+import { SECONDS_PER_MINUTE } from './audioConstants';
 
 const { kick, hat, arp, drone } = FULL_SLOT;
 
@@ -287,5 +289,104 @@ describe('the preset table (#435)', () => {
       ok: false,
       error: 'part 2 ("arp"): unknown audio preset "constructor"',
     });
+  });
+});
+
+describe('grid parts (#602)', () => {
+  /** bed-01's drone slot driven by a written line: root, accented seventh, tie, rest, slid third. */
+  const LINE: Arrangement = {
+    ...FULL_ARRANGEMENT,
+    key: { root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] },
+    parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
+      part.slot === drone
+        ? {
+            ...part,
+            velocity: 0.7,
+            sequencer: {
+              kind: 'grid',
+              divisor: DIVISORS.quarter,
+              steps: [
+                gridNote(0),
+                gridNote(6, { accent: true }),
+                { kind: 'tie' },
+                { kind: 'rest' },
+                gridNote(2, { slide: true }),
+                gridNote(4, { slide: true }),
+              ],
+              skipChance: 0,
+              accentVelocity: 0.2,
+              accentMod: 1,
+              register: { octave: 0 },
+            },
+          }
+        : part,
+    ),
+  };
+
+  it('passes the event’s velocity, mod and slide to the part', () => {
+    const { parts, run } = rig(LINE);
+    run(2);
+    const calls = parts.drone.calls.slice(0, 7);
+    expect(calls).toEqual([
+      { kind: 'noteOn', note: 48, velocity: 0.7, time: expect.any(Number) },
+      { kind: 'noteOffByNote', note: 48, time: expect.any(Number) },
+      {
+        kind: 'noteOn',
+        note: 58,
+        velocity: expect.closeTo(0.9, 6),
+        time: expect.any(Number),
+        extras: { mod: 1, slide: false },
+      },
+      { kind: 'noteOffByNote', note: 58, time: expect.any(Number) },
+      // The slid step after the rest has nothing held, so it is a plain note.
+      { kind: 'noteOn', note: 51, velocity: 0.7, time: expect.any(Number) },
+      // A real slide: the new note-on, flagged, before the old note's off.
+      {
+        kind: 'noteOn',
+        note: 55,
+        velocity: 0.7,
+        time: expect.any(Number),
+        extras: { mod: 0, slide: true },
+      },
+      { kind: 'noteOffByNote', note: 51, time: expect.any(Number) },
+    ]);
+    // The tie held the seventh through step 2; the rest released it at step 3.
+    expect(calls[3]!.time).toBeCloseTo(
+      3 * DIVISORS.quarter * (SECONDS_PER_MINUTE / LINE.bpm / PPQ),
+      9,
+    );
+  });
+
+  it('a scale change re-pitches the line without an explicit part rebuild', () => {
+    const { parts, player, run } = rig(LINE);
+    run(1);
+    expect(
+      kinds(parts.drone, 'noteOn')
+        .map((c) => c.note)
+        .slice(0, 2),
+    ).toEqual([48, 58]);
+    const before = parts.drone.calls.length;
+    expect(
+      player.apply({ key: { scale: 'pentatonicMinor', weights: [1, 1, 1, 1, 1] } }, {}).ok,
+    ).toBe(true);
+    run(1);
+    // The six-step line runs four steps to a bar, so bar 2 opens on steps 4
+    // and 5 (degrees 2 and 4: 53, 58 in five degrees) before wrapping to the
+    // root and the seventh — which in five degrees is degree 1 an octave up,
+    // 48 + 3 + 12.
+    expect(
+      parts.drone.calls
+        .slice(before)
+        .filter((c) => c.kind === 'noteOn')
+        .map((c) => c.note)
+        .slice(0, 4),
+    ).toEqual([53, 58, 48, 63]);
+  });
+
+  it('a transport stop releases a grid part’s held note', () => {
+    const { parts, player, run } = rig(LINE);
+    run(1);
+    player.releaseAll();
+    expect(parts.drone.calls.at(-1)).toMatchObject({ kind: 'allNotesOff' });
   });
 });

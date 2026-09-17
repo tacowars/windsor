@@ -40,6 +40,19 @@ export interface SampledNote {
 
 export const SEMITONES_PER_OCTAVE = 12;
 
+/**
+ * A written degree folded into a scale of `degreeCount` degrees (#602): a
+ * degree past the end wraps with octave carry, so degree 6 in a five-degree
+ * scale is degree 1 one octave up, exactly as the eighth degree of a seven-note
+ * scale is the root an octave up. A line written in seven degrees therefore
+ * keeps its contour in five, and the step data never changes.
+ */
+export function foldDegree(degree: number, degreeCount: number): { degree: number; carry: number } {
+  const count = Math.max(1, Math.trunc(degreeCount));
+  const d = Math.max(0, Math.trunc(degree));
+  return { degree: d % count, carry: Math.floor(d / count) };
+}
+
 export function scaleOffsets(scale: ScaleName | readonly number[]): readonly number[] {
   return typeof scale === 'string' ? SCALES[scale] : scale;
 }
@@ -91,6 +104,12 @@ export class ScaleSampler {
     const offset = this.offsets[degree];
     if (offset === undefined) throw new RangeError(`degree ${degree} is outside the scale`);
     return this.root + offset + octave * SEMITONES_PER_OCTAVE;
+  }
+
+  /** MIDI note for a written degree, wrapping past the scale's end with octave carry (#602). */
+  noteForFolded(degree: number, octave: number): number {
+    const folded = foldDegree(degree, this.offsets.length);
+    return this.noteFor(folded.degree, octave + folded.carry);
   }
 
   /** A degree by weight, then an octave uniformly within the register. Consumes two values. */

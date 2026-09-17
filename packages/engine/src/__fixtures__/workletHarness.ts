@@ -23,6 +23,9 @@ export interface ScheduledEvent {
   note?: number;
   velocity?: number;
   frame: number;
+  /** Per-note mod and the legato slide flag (#602). */
+  mod?: number;
+  slide?: boolean;
 }
 
 export interface VoiceLike {
@@ -70,6 +73,8 @@ export interface CreateOptions {
   dormancy?: boolean;
   /** `false` renders every voice through the generic loop, as the part did before #548. */
   specialise?: boolean;
+  /** Seconds a slid note glides when the patch's `glide` is 0 (#602); the engine passes its default. */
+  slideSeconds?: number;
 }
 
 export interface LoadedProcessor {

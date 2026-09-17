@@ -23,6 +23,8 @@ export type {
   EuclideanSpec,
   MergeResult,
   MusicPart,
+  GridDriver,
+  GridSpec,
   NoSequencer,
   PartsPartial,
   SequencerKind,
@@ -175,3 +177,20 @@ export { ARP_WALK_MODES, Arpeggiator, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeg
 export type { ArpWalkMode, ArpeggiatorConfig } from './arpeggiator';
 export { DEFAULT_STEP_SEQUENCER_CONFIG, StepSequencer } from './stepSequencer';
 export type { StepSequencerConfig } from './stepSequencer';
+export {
+  DEFAULT_GRID_CONFIG,
+  GRID_STEP_KINDS,
+  GridSequencer,
+  defaultGridSteps,
+  gridNote,
+} from './gridSequencer';
+export type { GridNoteStep, GridSequencerConfig, GridStep, GridStepKind } from './gridSequencer';
+export { foldDegree } from './scaleSampler';
+export {
+  ACCENT_MOD_DEFAULT,
+  ACCENT_VELOCITY_DEFAULT,
+  GRID_DEGREE_MAX,
+  GRID_STEPS_MAX,
+  GRID_STEP_OCTAVE_MAX,
+  SLIDE_SECONDS_DEFAULT,
+} from './audioConstants';
