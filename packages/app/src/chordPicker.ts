@@ -148,6 +148,8 @@ function bindChip(node: HTMLElement, payload: ChordPayload, drag: ChordDragContr
   node.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     node.setPointerCapture(e.pointerId);
+    // A press in another picker takes the key over; the drag it interrupts is cancelled, not orphaned.
+    if (active && active !== drag) active.cancel();
     active = drag;
     drag.down(payload, e.clientX, e.clientY);
   });
