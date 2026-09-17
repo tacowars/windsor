@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHORD_INVERSION_MAX,
+  CHORD_REPEAT_MAX,
+  CHORD_SEMITONE_MAX,
+  CHORD_STEPS_MAX,
+  CHORD_STEP_OCTAVE_MAX,
+  OCTAVE_MAX,
+} from './audioConstants';
+import {
   ChordSequencer,
   DEFAULT_CHORD_CONFIG,
   chordStep,
@@ -16,11 +24,14 @@ import { DIVISORS, TICKS_PER_BAR, TickTransport } from './scheduler';
 /** C major from C4: I is 60 64 67, V is 67 71 74. */
 const major = new ScaleSampler({ root: 60, scale: 'major', weights: [1, 1, 1, 1, 1, 1, 1] });
 
+/** A bar per base step, so the fixture's tick numbers read straight off its durations. */
+const BAR = DIVISORS.bar;
+
 function make(
   steps: readonly ChordStep[],
   extra: Partial<ChordSequencerConfig> = {},
 ): ChordSequencer {
-  return new ChordSequencer(major, { ...DEFAULT_CHORD_CONFIG, steps, ...extra });
+  return new ChordSequencer(major, { ...DEFAULT_CHORD_CONFIG, divisor: BAR, steps, ...extra });
 }
 
 /** Advance `ticks` ticks from `from`, collecting every event the sequencer emits. */
@@ -36,21 +47,21 @@ function run(seq: ChordSequencer, ticks: number, from = 0): NoteEvent[] {
 
 const ons = (events: NoteEvent[]): NoteEvent[] => events.filter((e) => e.kind === 'noteOn');
 
-/** The ticket's fixture: C maj ×1, a rest ×1, G maj ×0.5 twice — 288 ticks at a bar per step. */
+/** The ticket's fixture: C maj ×1, a rest ×1, G maj ×0.5 twice — three bars at a bar per step. */
 const PATTERN: ChordStep[] = [chordStep(0), restStep(), chordStep(4, { duration: 0.5, repeat: 2 })];
 
 describe('ChordSequencer', () => {
   it('lays the steps out as segments and sums them into the pattern length', () => {
     const seq = make(PATTERN);
-    expect(seq.lengthTicks).toBe(288);
+    expect(seq.lengthTicks).toBe(3 * BAR);
     expect(layoutSegments(seq.config)).toEqual([
-      { step: 0, repeat: 0, start: 0, ticks: 96 },
-      { step: 1, repeat: 0, start: 96, ticks: 96 },
-      { step: 2, repeat: 0, start: 192, ticks: 48 },
-      { step: 2, repeat: 1, start: 240, ticks: 48 },
+      { step: 0, repeat: 0, start: 0, ticks: BAR },
+      { step: 1, repeat: 0, start: BAR, ticks: BAR },
+      { step: 2, repeat: 0, start: 2 * BAR, ticks: BAR / 2 },
+      { step: 2, repeat: 1, start: 2.5 * BAR, ticks: BAR / 2 },
     ]);
-    expect(seq.stepAt(250)).toEqual({ step: 2, repeat: 1 });
-    expect(seq.stepAt(288)).toEqual({ step: 0, repeat: 0 });
+    expect(seq.stepAt(2.5 * BAR + 10)).toEqual({ step: 2, repeat: 1 });
+    expect(seq.stepAt(3 * BAR)).toEqual({ step: 0, repeat: 0 });
     expect(seq.stepAt(-1)).toEqual({ step: 2, repeat: 1 });
   });
 
@@ -87,18 +98,19 @@ describe('ChordSequencer', () => {
 
   it('gate below 1 emits the offs on the tick the gate ends, not ahead at the onset', () => {
     const seq = make(PATTERN, { gate: 0.5 });
-    const events = run(seq, 97);
-    expect(events.filter((e) => e.tick < 48).map((e) => e.kind)).toEqual([
+    const events = run(seq, BAR + 1);
+    const half = BAR / 2;
+    expect(events.filter((e) => e.tick < half).map((e) => e.kind)).toEqual([
       'noteOn',
       'noteOn',
       'noteOn',
     ]);
-    const at48 = events.filter((e) => e.tick === 48);
-    expect(at48.map((e) => e.kind)).toEqual(['noteOff', 'noteOff', 'noteOff']);
-    expect(at48[0]!.time).toBeCloseTo(48 * new TickTransport(120).secondsPerTick, 9);
+    const atHalf = events.filter((e) => e.tick === half);
+    expect(atHalf.map((e) => e.kind)).toEqual(['noteOff', 'noteOff', 'noteOff']);
+    expect(atHalf[0]!.time).toBeCloseTo(half * new TickTransport(120).secondsPerTick, 9);
     expect(seq.heldNotes).toEqual([]);
-    // Nothing is held, so the rest at 96 has nothing to release.
-    expect(events.filter((e) => e.tick === 96)).toEqual([]);
+    // Nothing is held, so the rest at bar 2 has nothing to release.
+    expect(events.filter((e) => e.tick === BAR)).toEqual([]);
   });
 
   it('a gated chord still sounding is released by a live edit that clears or shortens the pattern', () => {
@@ -118,13 +130,14 @@ describe('ChordSequencer', () => {
       'noteOff',
     ]);
     // Shortened: the new pattern's next onset releases it, then plays.
+    const quarter = BAR / 4;
     seq.reconfigure({ ...seq.config, steps: [chordStep(4, { duration: 0.25 })] });
-    for (let i = 2; i <= 24; i++) transport.advance(0);
+    for (let i = 2; i <= quarter; i++) transport.advance(0);
     expect(seq.heldNotes).toEqual([67, 71, 74]);
     seq.reconfigure({ ...seq.config, steps: [chordStep(4, { duration: 8 })] });
-    for (let i = 25; i <= 36; i++) transport.advance(0);
-    // Its own gate end (24 + 12) still releases it under the longer pattern.
-    expect(events.filter((e) => e.tick === 36).map((e) => e.kind)).toEqual([
+    for (let i = quarter + 1; i <= quarter * 1.5; i++) transport.advance(0);
+    // Its own gate end (a quarter plus half of it) still releases it under the longer pattern.
+    expect(events.filter((e) => e.tick === quarter * 1.5).map((e) => e.kind)).toEqual([
       'noteOff',
       'noteOff',
       'noteOff',
@@ -146,8 +159,8 @@ describe('ChordSequencer', () => {
   });
 
   it('built mid-segment, it emits its first events at the next segment start', () => {
-    const events = run(make(PATTERN), 40, 250);
-    expect(events.map((e) => e.tick)).toEqual([288, 288, 288]);
+    const events = run(make(PATTERN), BAR / 2, 2.5 * BAR + 10);
+    expect(events.map((e) => e.tick)).toEqual([3 * BAR, 3 * BAR, 3 * BAR]);
     expect(events.map((e) => e.kind)).toEqual(['noteOn', 'noteOn', 'noteOn']);
   });
 
@@ -184,10 +197,11 @@ describe('ChordSequencer', () => {
       minor,
     );
     expect(seq.heldNotes).toEqual([60, 64, 67]);
-    expect(seq.lengthTicks).toBe(24);
-    for (let i = 10; i < 25; i++) transport.advance(0);
-    // Tick 24 is the new pattern's onset: the old C chord goes, A minor drop2 (C3 A3 E4) comes.
-    const at24 = events.filter((e) => e.tick === 24);
+    const quarter = BAR / 4;
+    expect(seq.lengthTicks).toBe(quarter);
+    for (let i = 10; i <= quarter; i++) transport.advance(0);
+    // The quarter is the new pattern's onset: the old C chord goes, A minor drop2 (C3 A3 E4) comes.
+    const at24 = events.filter((e) => e.tick === quarter);
     expect(at24.map((e) => e.kind)).toEqual([
       'noteOff',
       'noteOff',
@@ -201,7 +215,7 @@ describe('ChordSequencer', () => {
     // An empty pattern releases what was held on its first tick.
     seq.reconfigure({ ...seq.config, steps: [] });
     transport.advance(0);
-    expect(events.at(-1)).toMatchObject({ kind: 'noteOff', tick: 25 });
+    expect(events.at(-1)).toMatchObject({ kind: 'noteOff', tick: quarter + 1 });
     expect(seq.heldNotes).toEqual([]);
   });
 
@@ -209,13 +223,18 @@ describe('ChordSequencer', () => {
     expect(() => make([], { divisor: DIVISORS.sixteenth })).toThrow(/divisor/);
     expect(() => make([], { gate: 0 })).toThrow(/gate/);
     expect(() => make([chordStep(0, { duration: 0.3 })])).toThrow(/duration/);
-    expect(() => make([chordStep(0, { repeat: 9 })])).toThrow(/repeat/);
-    expect(() => make([chordStep(0, { inversion: 4 })])).toThrow(/inversion/);
-    expect(() => make([chordStep(0, { octave: 3 })])).toThrow(/octave/);
-    expect(() => make([chordStep(0, { semitone: 12 })])).toThrow(/semitone/);
+    expect(() => make([chordStep(0, { repeat: CHORD_REPEAT_MAX + 1 })])).toThrow(/repeat/);
+    expect(() => make([chordStep(0, { inversion: CHORD_INVERSION_MAX + 1 })])).toThrow(/inversion/);
+    expect(() => make([chordStep(0, { octave: CHORD_STEP_OCTAVE_MAX + 1 })])).toThrow(/octave/);
+    expect(() => make([chordStep(0, { semitone: CHORD_SEMITONE_MAX + 1 })])).toThrow(/semitone/);
     expect(() => make([chordStep(-1)])).toThrow(/degree/);
     expect(() => make([chordStep(0, { size: 5 as 3 })])).toThrow(/size/);
-    expect(() => make(Array.from({ length: 33 }, () => restStep()))).toThrow(/steps/);
+    expect(() => make(Array.from({ length: CHORD_STEPS_MAX + 1 }, () => restStep()))).toThrow(
+      /steps/,
+    );
+    expect(() => make([], { register: { octave: Number.NaN } })).toThrow(/register/);
+    expect(() => make([], { register: { octave: OCTAVE_MAX + 1 } })).toThrow(/register/);
+    expect(() => make([], { register: { octave: 0.5 } })).toThrow(/register/);
     const seq = make([]);
     expect(() => seq.reconfigure({ ...seq.config, voicing: 'nope' as 'close' })).toThrow(/voicing/);
     expect(seq.config.voicing).toBe('close');

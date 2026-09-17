@@ -136,6 +136,13 @@ describe('chord parts (#606)', () => {
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/repeat/);
     expect(player.readout().bpm).toBe(PROGRESSION.bpm);
+    const junk = player.apply(
+      { bpm: 140, parts: { [drone]: { sequencer: { register: { octave: Number.NaN } } } } },
+      {},
+    );
+    expect(junk.ok).toBe(false);
+    expect(junk.error).toMatch(/register/);
+    expect(player.readout().bpm).toBe(PROGRESSION.bpm);
     run(2);
     expect(noteOns(parts.drone).slice(3, 6)).toEqual([56, 60, 63]);
     expect(parts.drone.calls.slice(before).filter((c) => c.kind === 'allNotesOff')).toEqual([]);
