@@ -36,6 +36,7 @@ import {
   CHORD_SIZE_TRIAD,
   CHORD_STEPS_MAX,
   CHORD_STEP_OCTAVE_MAX,
+  OCTAVE_MAX,
 } from './audioConstants';
 import {
   CHORD_DIVISORS,
@@ -167,6 +168,10 @@ export function assertChordConfig(config: ChordSequencerConfig): void {
   }
   if (!CHORD_VOICING_IDS.includes(config.voicing)) {
     throw new RangeError(`voicing must be one of ${CHORD_VOICING_IDS.join('|')}`);
+  }
+  const octave = config.register.octave;
+  if (!Number.isInteger(octave) || Math.abs(octave) > OCTAVE_MAX) {
+    throw new RangeError(`register.octave must be an integer within ±${OCTAVE_MAX}, got ${octave}`);
   }
   if (config.steps.length > CHORD_STEPS_MAX) {
     throw new RangeError(

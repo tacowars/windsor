@@ -8,6 +8,12 @@ import { describe, expect, it } from 'vitest';
 import { FieldNormaliser } from './arrangementFields';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ARRANGEMENT_VERSION, CHORD_STEPS_MAX } from './audioConstants';
+import {
+  CHORD_DIVISORS,
+  CHORD_DURATIONS,
+  CHORD_VOICING_DEFAULT,
+  CHORD_VOICING_IDS,
+} from './chordTables';
 import { DEFAULT_CHORD_CONFIG, chordStep, restStep } from './chordSequencer';
 import { makePatch } from './patch';
 import { normaliseSequencer } from './sequencerNormalise';
@@ -85,16 +91,16 @@ describe('chord sequencer normalisation (#606)', () => {
       ],
     });
     expect(n.corrections).toEqual([
-      `${PATH}.divisor: 6 is not one of 96|48|24|12 — using 96`,
+      `${PATH}.divisor: 6 is not one of ${CHORD_DIVISORS.join('|')} — using ${DEFAULT_CHORD_CONFIG.divisor}`,
       `${PATH}.gate: clamped 2 to 1`,
-      `${PATH}.voicing: "wide" is not one of close|drop2|drop3|spread|octaves3rds|shell — using close`,
+      `${PATH}.voicing: "wide" is not one of ${CHORD_VOICING_IDS.join('|')} — using ${CHORD_VOICING_DEFAULT}`,
       `${PATH}.steps[0].kind: "tie" is not one of rest|chord — using rest`,
       `${PATH}.steps[1].degree: clamped -2 to 0`,
       `${PATH}.steps[1].size: 5 is not a triad (3) or a seventh (4) — using a triad`,
       `${PATH}.steps[1].inversion: clamped 4 to 3`,
       `${PATH}.steps[1].octave: clamped 3 to 2`,
       `${PATH}.steps[1].semitone: clamped -12 to -11`,
-      `${PATH}.steps[2].duration: 0.3 is not one of 0.25|0.5|0.75|1|1.5|2|3|4|6|8 — using 1`,
+      `${PATH}.steps[2].duration: 0.3 is not one of ${CHORD_DURATIONS.join('|')} — using ${restStep().duration}`,
       `${PATH}.steps[2].repeat: clamped 9 to 8`,
     ]);
     expect(spec).toEqual({
