@@ -5,6 +5,17 @@ import patch_ai_voice from './ai-voice.json';
 import patch_bass_digital from './bass-digital.json';
 import patch_build_thunk from './build-thunk.json';
 import patch_drone_sqr from './drone-sqr.json';
+import patch_efm_bell_perc from './efm-bell-perc.json';
+import patch_efm_clap from './efm-clap.json';
+import patch_efm_cowbell from './efm-cowbell.json';
+import patch_efm_crash from './efm-crash.json';
+import patch_efm_hat_closed from './efm-hat-closed.json';
+import patch_efm_hat_open from './efm-hat-open.json';
+import patch_efm_kick from './efm-kick.json';
+import patch_efm_rim from './efm-rim.json';
+import patch_efm_snare from './efm-snare.json';
+import patch_efm_tom from './efm-tom.json';
+import patch_efm_zap from './efm-zap.json';
 import patch_hat from './hat.json';
 import patch_horde_horn from './horde-horn.json';
 import patch_kick from './kick.json';
@@ -114,6 +125,32 @@ import patch_score_wire_stress from './score-wire-stress.json';
 import patch_score_wooden_pin from './score-wooden-pin.json';
 import patch_snare from './snare.json';
 import patch_sub_drone from './sub-drone.json';
+import patch_tr808_clap from './tr808-clap.json';
+import patch_tr808_clave from './tr808-clave.json';
+import patch_tr808_conga from './tr808-conga.json';
+import patch_tr808_cowbell from './tr808-cowbell.json';
+import patch_tr808_cymbal from './tr808-cymbal.json';
+import patch_tr808_hat_closed from './tr808-hat-closed.json';
+import patch_tr808_hat_open from './tr808-hat-open.json';
+import patch_tr808_kick_long from './tr808-kick-long.json';
+import patch_tr808_kick from './tr808-kick.json';
+import patch_tr808_maracas from './tr808-maracas.json';
+import patch_tr808_rimshot from './tr808-rimshot.json';
+import patch_tr808_snare from './tr808-snare.json';
+import patch_tr808_tom_high from './tr808-tom-high.json';
+import patch_tr808_tom_low from './tr808-tom-low.json';
+import patch_tr808_tom_mid from './tr808-tom-mid.json';
+import patch_tr909_clap from './tr909-clap.json';
+import patch_tr909_crash from './tr909-crash.json';
+import patch_tr909_hat_closed from './tr909-hat-closed.json';
+import patch_tr909_hat_open from './tr909-hat-open.json';
+import patch_tr909_kick_hard from './tr909-kick-hard.json';
+import patch_tr909_kick from './tr909-kick.json';
+import patch_tr909_ride from './tr909-ride.json';
+import patch_tr909_rimshot from './tr909-rimshot.json';
+import patch_tr909_snare from './tr909-snare.json';
+import patch_tr909_tom_high from './tr909-tom-high.json';
+import patch_tr909_tom_low from './tr909-tom-low.json';
 import patch_weapon_zap from './weapon-zap.json';
 
 /** Every library file, raw and unvalidated, keyed by id (`presets.ts` loads it). */
@@ -122,6 +159,17 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'bass-digital': patch_bass_digital,
   'build-thunk': patch_build_thunk,
   'drone-sqr': patch_drone_sqr,
+  'efm-bell-perc': patch_efm_bell_perc,
+  'efm-clap': patch_efm_clap,
+  'efm-cowbell': patch_efm_cowbell,
+  'efm-crash': patch_efm_crash,
+  'efm-hat-closed': patch_efm_hat_closed,
+  'efm-hat-open': patch_efm_hat_open,
+  'efm-kick': patch_efm_kick,
+  'efm-rim': patch_efm_rim,
+  'efm-snare': patch_efm_snare,
+  'efm-tom': patch_efm_tom,
+  'efm-zap': patch_efm_zap,
   hat: patch_hat,
   'horde-horn': patch_horde_horn,
   kick: patch_kick,
@@ -231,5 +279,31 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'score-wooden-pin': patch_score_wooden_pin,
   snare: patch_snare,
   'sub-drone': patch_sub_drone,
+  'tr808-clap': patch_tr808_clap,
+  'tr808-clave': patch_tr808_clave,
+  'tr808-conga': patch_tr808_conga,
+  'tr808-cowbell': patch_tr808_cowbell,
+  'tr808-cymbal': patch_tr808_cymbal,
+  'tr808-hat-closed': patch_tr808_hat_closed,
+  'tr808-hat-open': patch_tr808_hat_open,
+  'tr808-kick-long': patch_tr808_kick_long,
+  'tr808-kick': patch_tr808_kick,
+  'tr808-maracas': patch_tr808_maracas,
+  'tr808-rimshot': patch_tr808_rimshot,
+  'tr808-snare': patch_tr808_snare,
+  'tr808-tom-high': patch_tr808_tom_high,
+  'tr808-tom-low': patch_tr808_tom_low,
+  'tr808-tom-mid': patch_tr808_tom_mid,
+  'tr909-clap': patch_tr909_clap,
+  'tr909-crash': patch_tr909_crash,
+  'tr909-hat-closed': patch_tr909_hat_closed,
+  'tr909-hat-open': patch_tr909_hat_open,
+  'tr909-kick-hard': patch_tr909_kick_hard,
+  'tr909-kick': patch_tr909_kick,
+  'tr909-ride': patch_tr909_ride,
+  'tr909-rimshot': patch_tr909_rimshot,
+  'tr909-snare': patch_tr909_snare,
+  'tr909-tom-high': patch_tr909_tom_high,
+  'tr909-tom-low': patch_tr909_tom_low,
   'weapon-zap': patch_weapon_zap,
 };
