@@ -25,6 +25,7 @@ const KIND_LABELS: Record<SequencerKind, string> = {
   arp: 'Arp',
   step: 'Step',
   grid: 'Grid',
+  chord: 'Chord',
 };
 
 function button(label: string, title: string, enabled: boolean): HTMLButtonElement {

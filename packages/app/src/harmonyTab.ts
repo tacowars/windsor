@@ -79,11 +79,14 @@ function registerRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
   const register = (): { octave: number; span: number } => {
     const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
     if (sequencer?.kind === 'arp' || sequencer?.kind === 'step') return sequencer.register;
-    // A grid line is written, not drawn, so it has an octave and no span (#602).
-    if (sequencer?.kind === 'grid') return { octave: sequencer.register.octave, span: 1 };
+    // A grid line or a chord progression is written, not drawn, so it has an octave and no span (#602, #606).
+    if (sequencer?.kind === 'grid' || sequencer?.kind === 'chord') {
+      return { octave: sequencer.register.octave, span: 1 };
+    }
     return { octave: 0, span: 1 };
   };
-  const spanned = partAt(ctx.model.doc, slot)?.sequencer.kind !== 'grid';
+  const kind = partAt(ctx.model.doc, slot)?.sequencer.kind;
+  const spanned = kind !== 'grid' && kind !== 'chord';
   knobs.appendChild(
     makeKnob({
       label: 'Octave',
@@ -142,7 +145,7 @@ export function renderHarmonyTab(body: HTMLElement, ctx: AppCtx): void {
   );
   for (const part of ctx.model.doc.parts) {
     const { kind } = part.sequencer;
-    if (kind === 'arp' || kind === 'step' || kind === 'grid') {
+    if (kind === 'arp' || kind === 'step' || kind === 'grid' || kind === 'chord') {
       registers.body.appendChild(registerRow(ctx, part.slot, part.name));
     }
   }
