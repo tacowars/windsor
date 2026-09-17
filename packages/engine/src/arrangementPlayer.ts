@@ -27,6 +27,7 @@ import type {
   ArpDriver,
   Arrangement,
   ArrangementPartial,
+  ChordDriver,
   EuclideanDriver,
   GridDriver,
   MusicPart,
@@ -44,7 +45,8 @@ import { clonePatch, makePatch, mergePatch, type PartialPatch } from './patch';
 import { ScaleSampler } from './scaleSampler';
 import type { TickSource, Unsubscribe } from './scheduler';
 import { StepSequencer } from './stepSequencer';
-import { GridSequencer, assertGridConfig, type GridSequencerConfig } from './gridSequencer';
+import { GridSequencer, assertGridConfig } from './gridSequencer';
+import { ChordSequencer, assertChordConfig } from './chordSequencer';
 import type { NoteExtras } from './audioPart';
 
 /** What a binding needs from a part. `AudioPart` satisfies it structurally. */
@@ -80,7 +82,7 @@ export interface ArrangementReadout {
   counters: Record<string, number>;
 }
 
-type Generator = EuclideanSequencer | Arpeggiator | StepSequencer | GridSequencer;
+type Generator = EuclideanSequencer | Arpeggiator | StepSequencer | GridSequencer | ChordSequencer;
 
 interface Built {
   sampler: ScaleSampler;
@@ -91,8 +93,12 @@ interface Built {
 interface Plan {
   built: Built;
   rebuilt: ReadonlySet<number>;
-  /** Grid parts kept live, with the validated line each takes after the commit (#603). */
-  reconfigured: ReadonlyArray<readonly [number, GridSequencerConfig]>;
+  /**
+   * Grid and chord parts kept live (#603, #606): each entry applies the
+   * validated config to its generator after the commit, against the sampler
+   * the commit installs.
+   */
+  reconfigured: ReadonlyArray<() => void>;
   patchChanges: ReadonlyArray<readonly [number, Patch]>;
   /** The preset table after the partial's `patches`, validated against. */
   presets: Record<string, Patch>;
@@ -123,15 +129,52 @@ const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
 /**
  * What builds a part's generator: its kind and driver, never its note, hold or
- * velocity. A grid rebuilds only on its kind or divisor (#603): every other
- * field reconfigures the live generator, so an edit never cuts the held note.
+ * velocity. A grid rebuilds only on its kind or divisor (#603) and a chord
+ * progression only on its kind (#606, it subscribes at every tick): every
+ * other field reconfigures the live generator, so an edit never cuts the
+ * held note.
  */
-const generatorSig = (spec: SequencerSpec): string =>
-  spec.kind === 'grid' ? sig([spec.kind, spec.divisor]) : sig([spec.kind, driverOf(spec)]);
+const generatorSig = (spec: SequencerSpec): string => {
+  if (spec.kind === 'grid') return sig([spec.kind, spec.divisor]);
+  if (spec.kind === 'chord') return sig([spec.kind]);
+  return sig([spec.kind, driverOf(spec)]);
+};
 
-/** Draws from the shared sampler, so a key change rebuilds it (the grid resolves degrees through it too). */
-const isPitched = (spec: SequencerSpec): boolean =>
-  spec.kind === 'arp' || spec.kind === 'step' || spec.kind === 'grid';
+/** Draws from the shared sampler on a rebuild; a key change rebuilds these two. */
+const isPitched = (spec: SequencerSpec): boolean => spec.kind === 'arp' || spec.kind === 'step';
+
+/** Resolves degrees through the sampler at play time and takes a new one live (#603, #606). */
+const isLive = (spec: SequencerSpec): boolean => spec.kind === 'grid' || spec.kind === 'chord';
+
+/**
+ * A grid or chord part kept live is validated here, inside the transaction:
+ * a bad edit (a length past its steps, say) is refused before the tempo, the
+ * patches or the arrangement change, exactly as a rebuild's constructor
+ * would be. What comes back runs after the commit, against `built.sampler`.
+ */
+function liveReconfigurations(
+  merged: Arrangement,
+  rebuilt: ReadonlySet<number>,
+  built: Built,
+): Array<() => void> {
+  const out: Array<() => void> = [];
+  for (const part of merged.parts) {
+    const { sequencer } = part;
+    if (rebuilt.has(part.slot) || !isLive(sequencer)) continue;
+    const generator = built.generators.get(part.slot);
+    const stream = { seed: merged.seed, generatorIndex: part.slot };
+    if (sequencer.kind === 'grid' && generator instanceof GridSequencer) {
+      const config = { ...(driverOf(sequencer) as GridDriver), ...stream };
+      assertGridConfig(config);
+      out.push(() => generator.reconfigure(config, built.sampler));
+    } else if (sequencer.kind === 'chord' && generator instanceof ChordSequencer) {
+      const config = { ...(driverOf(sequencer) as ChordDriver), ...stream };
+      assertChordConfig(config);
+      out.push(() => generator.reconfigure(config, built.sampler));
+    }
+  }
+  return out;
+}
 
 export class ArrangementPlayer {
   private current: Arrangement;
@@ -223,17 +266,18 @@ export class ArrangementPlayer {
     this.current = merged;
     this.index();
     this.attach(plan.rebuilt);
-    for (const [slot, config] of plan.reconfigured) {
-      const generator = this.built.generators.get(slot);
-      if (generator instanceof GridSequencer) generator.reconfigure(config, this.built.sampler);
-    }
+    for (const reconfigure of plan.reconfigured) reconfigure();
     return { ok: true, ignored };
   }
 
   /** Release everything sounding — step parts' held notes included. Mute and teardown call this. */
   releaseAll(time = 0): void {
     for (const generator of this.built.generators.values()) {
-      if (generator instanceof StepSequencer || generator instanceof GridSequencer) {
+      if (
+        generator instanceof StepSequencer ||
+        generator instanceof GridSequencer ||
+        generator instanceof ChordSequencer
+      ) {
         generator.release(0, time);
       }
     }
@@ -272,6 +316,8 @@ export class ArrangementPlayer {
         return new StepSequencer(sampler, { ...(driver as StepDriver), ...stream });
       case 'grid':
         return new GridSequencer(sampler, { ...(driver as GridDriver), ...stream });
+      case 'chord':
+        return new ChordSequencer(sampler, { ...(driver as ChordDriver), ...stream });
       default:
         return null;
     }
@@ -290,11 +336,10 @@ export class ArrangementPlayer {
       const changed = generatorSig(next.sequencer) !== generatorSig(before.sequencer);
       // An inert part only rebuilds when its kind leaves or enters `none`;
       // a seed or key change has no stream of its to reset.
-      // A grid takes a new sampler live (`reconfigure`), so a key change does not rebuild it.
+      // A grid or chord part takes a new sampler live (`reconfigure`), so a key change does not rebuild it.
       const reseeded =
         next.sequencer.kind !== 'none' &&
-        (seedChanged ||
-          (isPitched(next.sequencer) && next.sequencer.kind !== 'grid' && keyChanged));
+        (seedChanged || (isPitched(next.sequencer) && keyChanged));
       if (changed || reseeded) rebuilt.add(next.slot);
     }
 
@@ -306,18 +351,7 @@ export class ArrangementPlayer {
     }
     const built: Built = { sampler: keyChanged ? fresh.sampler : this.built.sampler, generators };
 
-    // A grid kept live is validated here, inside the transaction: a bad edit
-    // (a length past its steps, say) is refused before the tempo, the patches
-    // or the arrangement change, exactly as a rebuild's constructor would be.
-    const reconfigured: Array<readonly [number, GridSequencerConfig]> = [];
-    for (const part of merged.parts) {
-      if (rebuilt.has(part.slot) || part.sequencer.kind !== 'grid') continue;
-      if (!(generators.get(part.slot) instanceof GridSequencer)) continue;
-      const driver = driverOf(part.sequencer) as GridDriver;
-      const config = { ...driver, seed: merged.seed, generatorIndex: part.slot };
-      assertGridConfig(config);
-      reconfigured.push([part.slot, config]);
-    }
+    const reconfigured = liveReconfigurations(merged, rebuilt, built);
 
     // A part takes a fresh patch when its preset switched, or when the patch
     // it plays was edited in this partial.

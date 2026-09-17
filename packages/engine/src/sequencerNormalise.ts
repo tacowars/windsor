@@ -6,6 +6,7 @@
  * the 96-tick bar, gates in (0, 1] — so building a generator from it cannot
  * throw. `ArrangementNormaliser` (`arrangementNormalise.ts`) calls it per part.
  */
+import { chordDriver } from './chordNormalise';
 import type {
   ArpDriver,
   EuclideanDriver,
@@ -76,6 +77,8 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
       return { kind, ...arpDriver(driver, path, n) };
     case 'step':
       return { kind, ...stepDriver(driver, path, n) };
+    case 'chord':
+      return { kind, ...chordDriver(driver, path, n) };
     case 'grid':
       return { kind, ...gridDriver(driver, path, n) };
     default:

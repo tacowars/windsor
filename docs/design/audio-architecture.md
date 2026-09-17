@@ -134,8 +134,10 @@ logic inlined in `runRenderLoop`.
 `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`). An
 `arrangements/<name>.json` is `version: 2` with 1–8 `parts`; each part sits on a unique
 `slot` 0–7, carries its own `strip` (level, pan, sends) and a `sequencer` whose `kind` is
-`euclidean` (a fixed-note trigger), `arp`, `step` (slow with gate 1, the drone) or `none`
-(inert: built and playable from the keyboard, never sequenced). The slot is the part's
+`euclidean` (a fixed-note trigger), `arp`, `step` (slow with gate 1, the drone), `grid` (a
+written 1–32 step line of scale degrees, #602), `chord` (a written progression of diatonic
+chords by degree with one voicing per part, #606) or `none` (inert: built and playable from
+the keyboard, never sequenced). The slot is the part's
 identity — its engine part is `music-<slot>`, its generator stream is seeded by the slot —
 so removing, reordering or renaming a part never moves another part's notes; the name is a
 label. Live partials address parts by slot (`{ parts: { 2: { velocity: 0.5 } } }`); adding
