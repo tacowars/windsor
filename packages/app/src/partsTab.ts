@@ -15,6 +15,7 @@ import { confirmUnsaved, libraryActions } from './libraryActions';
 import { library, libraryPatch } from './libraryModel';
 import type { MidiAccessor } from './midiAccess';
 import { midiPanel } from './midiPanel';
+import { partListControls } from './partListControls';
 import { dropInit } from './patchActions';
 import { badgeText, libraryControls, presetPicker } from './patchLibrary';
 import { buildAlgPicker, buildFilter, buildGlobal, buildLfo, buildPitch } from './patchPanels';
@@ -123,6 +124,9 @@ function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
       },
     ),
   );
+  const listSlot = el('div');
+  listSlot.id = 'partListSlot';
+  box.appendChild(listSlot);
   const presetSlot = el('div');
   presetSlot.id = 'presetSlot';
   presetSlot.style.marginTop = '8px';
@@ -141,6 +145,8 @@ function reloadRail(ctx: AppCtx): void {
 }
 
 function syncPresetAndBadge(ctx: AppCtx): void {
+  // The part list controls follow the selection: name and sequencer are the selected part's.
+  $('partListSlot').replaceChildren(partListControls(ctx));
   const presetSlot = $('presetSlot');
   presetSlot.innerHTML = '';
   presetSlot.appendChild(

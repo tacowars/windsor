@@ -14,6 +14,7 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, fmt2, fmtSigned, section } from './dom';
 import { makeKnob } from './knob';
+import { partNameField } from './partNameField';
 import { renderReturnsSection } from './returnsPanel';
 
 const STRIP_COLOR = '#5FA8A0';
@@ -23,11 +24,11 @@ function stripValue(ctx: AppCtx, slot: number): ChannelStrip {
   return partAt(ctx.model.doc, slot)?.strip ?? DEFAULT_STRIP;
 }
 
-function stripRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
+function stripRow(ctx: AppCtx, slot: number): HTMLElement {
   const row = el('div', 'strip-row');
   const label = el('div', 'strip-name');
-  label.textContent = name;
-  label.appendChild(el('small', '', ` (slot ${slot})`));
+  label.appendChild(partNameField(ctx, slot));
+  label.appendChild(el('small', '', ` slot ${slot}`));
   row.appendChild(label);
   const knobs = el('div', 'knob-row');
   knobs.appendChild(
@@ -76,7 +77,7 @@ export function renderMixerTab(body: HTMLElement, ctx: AppCtx): void {
   body.innerHTML = '';
   const strips = section('Strips', "Levels, pans and sends land in each part's own strip.");
   for (const part of ctx.model.doc.parts) {
-    strips.body.appendChild(stripRow(ctx, part.slot, part.name));
+    strips.body.appendChild(stripRow(ctx, part.slot));
   }
   body.appendChild(strips.root);
   body.appendChild(renderReturnsSection(ctx));
