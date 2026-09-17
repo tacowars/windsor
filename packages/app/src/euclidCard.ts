@@ -57,6 +57,8 @@ interface Card {
   key: string;
   /** The cell the playhead sits on, or -1; reapplied after every repaint. */
   playing: number;
+  /** The knobs a Steps turn can move (the `k` bounds, Rotate): re-read after it commits. */
+  dependents: KnobElement[];
 }
 
 /** The figure the player holds, or the document's preview while nothing plays. */
@@ -151,13 +153,16 @@ function stepsKnob(card: Card): HTMLElement {
     get: () => specOf(card.ctx, card.slot)?.steps ?? 16,
     set: (v) => {
       const spec = specOf(card.ctx, card.slot);
-      if (spec) card.ctx.change(partChange(card.slot, { sequencer: stepsChange(spec, v) }));
+      if (!spec) return;
+      if (card.ctx.change(partChange(card.slot, { sequencer: stepsChange(spec, v) })).ok) {
+        card.dependents.forEach((knob) => knob.refresh());
+      }
     },
   });
 }
 
 function rotateKnob(card: Card): HTMLElement {
-  return makeKnob({
+  const knob = makeKnob({
     label: 'Rotate',
     min: -EUCLID_STEPS_MAX,
     max: EUCLID_STEPS_MAX,
@@ -172,12 +177,14 @@ function rotateKnob(card: Card): HTMLElement {
       card.ctx.change(partChange(card.slot, { sequencer: { rotate: rotateChange(spec, v) } }));
     },
   });
+  card.dependents.push(knob);
+  return knob;
 }
 
 /** The three `k` knobs; a turn on one may drag another, so all three re-read after a commit. */
 function pulsesRow(card: Card): HTMLElement {
   const row = el('div', 'knob-row');
-  const knobs: KnobElement[] = [];
+  const knobs = card.dependents;
   for (const field of PULSE_FIELDS) {
     const knob = makeKnob({
       label: `k ${field}`,
@@ -271,6 +278,7 @@ export function euclidCard(ctx: AppCtx, slot: number): HTMLElement {
     captureButton: document.createElement('button'),
     key: '',
     playing: -1,
+    dependents: [],
   };
   card.strip.setAttribute('role', 'group');
   card.strip.setAttribute('aria-label', 'figure');
