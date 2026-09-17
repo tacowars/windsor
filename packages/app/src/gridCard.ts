@@ -6,6 +6,10 @@
  * and the two accent knobs, and a playhead that follows the audible tick.
  * Every edit goes through `ctx.change` as a whole `steps` list (arrays
  * replace wholesale in the merge); the step operations are `gridModel.ts`.
+ *
+ * The strip's building blocks — `stripCell`, `stripColumn`, `markPlaying` —
+ * are exported for a sibling card (the chord sequencer's, #607) so the
+ * console has one step-column layout.
  */
 import type { GridSpec } from '../../../packages/client/src/audio/index-for-editor';
 import { partAt } from '../../../packages/client/src/audio/index-for-editor';
@@ -60,10 +64,30 @@ function commit(strip: Strip, edit: (spec: GridSpec) => GridSpec['steps']): void
   if (result.ok) strip.repaint();
 }
 
-function cell(label: string, className = ''): HTMLButtonElement {
+/** One `.gcell` button; `blank` keeps a column's height where a rest or tie has no field. */
+export function stripCell(label: string, className = ''): HTMLButtonElement {
   const node = el('button', `gcell ${className}`.trim(), label) as HTMLButtonElement;
   node.type = 'button';
   return node;
+}
+
+const cell = stripCell;
+
+/** One `.grid-col`: the step number, then the cells; `active` false greys a step past the loop. */
+export function stripColumn(
+  index: number,
+  active: boolean,
+  cells: readonly HTMLElement[],
+): HTMLElement {
+  const col = el('div', active ? 'grid-col' : 'grid-col off');
+  col.appendChild(el('div', 'grid-idx', String(index + 1)));
+  for (const node of cells) col.appendChild(node);
+  return col;
+}
+
+/** Light the playhead's column of a `.grid-strip`, or none for -1. */
+export function markPlaying(strip: HTMLElement, playing: number): void {
+  [...strip.children].forEach((col, i) => col.classList.toggle('playing', i === playing));
 }
 
 function kindCell(strip: Strip, index: number, spec: GridSpec): HTMLElement {
@@ -132,14 +156,13 @@ function flagCell(
 }
 
 function column(strip: Strip, index: number, spec: GridSpec): HTMLElement {
-  const col = el('div', index < spec.length ? 'grid-col' : 'grid-col off');
-  col.appendChild(el('div', 'grid-idx', String(index + 1)));
-  col.appendChild(kindCell(strip, index, spec));
-  col.appendChild(degreeSelect(strip, index, spec));
-  col.appendChild(octaveCell(strip, index, spec));
-  col.appendChild(flagCell(strip, index, spec, 'accent'));
-  col.appendChild(flagCell(strip, index, spec, 'slide'));
-  return col;
+  return stripColumn(index, index < spec.length, [
+    kindCell(strip, index, spec),
+    degreeSelect(strip, index, spec),
+    octaveCell(strip, index, spec),
+    flagCell(strip, index, spec, 'accent'),
+    flagCell(strip, index, spec, 'slide'),
+  ]);
 }
 
 /** Redraw every column from the document, keeping the horizontal scroll where it was. */
@@ -150,13 +173,7 @@ function paintStrip(strip: Strip): void {
   if (!spec) return;
   spec.steps.forEach((_, index) => strip.root.appendChild(column(strip, index, spec)));
   strip.root.scrollLeft = scrollLeft;
-  markPlaying(strip);
-}
-
-function markPlaying(strip: Strip): void {
-  [...strip.root.children].forEach((col, i) =>
-    col.classList.toggle('playing', i === strip.playing),
-  );
+  markPlaying(strip.root, strip.playing);
 }
 
 /**
@@ -184,7 +201,7 @@ function watch(strip: Strip): void {
     }
     if (current === strip.playing) return;
     strip.playing = current;
-    markPlaying(strip);
+    markPlaying(strip.root, current);
   };
   requestAnimationFrame(tick);
 }
