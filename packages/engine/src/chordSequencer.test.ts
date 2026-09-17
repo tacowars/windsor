@@ -35,7 +35,6 @@ function run(seq: ChordSequencer, ticks: number, from = 0): NoteEvent[] {
 }
 
 const ons = (events: NoteEvent[]): NoteEvent[] => events.filter((e) => e.kind === 'noteOn');
-const offs = (events: NoteEvent[]): NoteEvent[] => events.filter((e) => e.kind === 'noteOff');
 
 /** The ticket's fixture: C maj ×1, a rest ×1, G maj ×0.5 twice — 288 ticks at a bar per step. */
 const PATTERN: ChordStep[] = [chordStep(0), restStep(), chordStep(4, { duration: 0.5, repeat: 2 })];
@@ -86,24 +85,51 @@ describe('ChordSequencer', () => {
     expect(ons(events).filter((e) => e.tick === 192)[0]).toMatchObject({ degree: 4 });
   });
 
-  it('gate below 1 emits the offs at the onset with a future tick and time', () => {
+  it('gate below 1 emits the offs on the tick the gate ends, not ahead at the onset', () => {
     const seq = make(PATTERN, { gate: 0.5 });
     const events = run(seq, 97);
-    const first = events.filter((e) => e.tick === 0 || (e.kind === 'noteOff' && e.tick === 48));
-    expect(first.map((e) => e.kind)).toEqual([
+    expect(events.filter((e) => e.tick < 48).map((e) => e.kind)).toEqual([
       'noteOn',
       'noteOn',
       'noteOn',
+    ]);
+    const at48 = events.filter((e) => e.tick === 48);
+    expect(at48.map((e) => e.kind)).toEqual(['noteOff', 'noteOff', 'noteOff']);
+    expect(at48[0]!.time).toBeCloseTo(48 * new TickTransport(120).secondsPerTick, 9);
+    expect(seq.heldNotes).toEqual([]);
+    // Nothing is held, so the rest at 96 has nothing to release.
+    expect(events.filter((e) => e.tick === 96)).toEqual([]);
+  });
+
+  it('a gated chord still sounding is released by a live edit that clears or shortens the pattern', () => {
+    const seq = make([chordStep(0, { duration: 8 })], { gate: 0.5 });
+    const transport = new TickTransport(120);
+    const events: NoteEvent[] = [];
+    seq.onNote = (e) => events.push(e);
+    seq.attach(transport);
+    transport.advance(0);
+    expect(seq.heldNotes).toEqual([60, 64, 67]);
+    // Cleared: the empty pattern's first tick releases it.
+    seq.reconfigure({ ...seq.config, steps: [] });
+    transport.advance(0);
+    expect(events.filter((e) => e.tick === 1).map((e) => e.kind)).toEqual([
       'noteOff',
       'noteOff',
       'noteOff',
     ]);
-    const off = offs(first)[0]!;
-    expect(off.tick).toBe(48);
-    expect(off.time).toBeCloseTo(48 * new TickTransport(120).secondsPerTick, 9);
+    // Shortened: the new pattern's next onset releases it, then plays.
+    seq.reconfigure({ ...seq.config, steps: [chordStep(4, { duration: 0.25 })] });
+    for (let i = 2; i <= 24; i++) transport.advance(0);
+    expect(seq.heldNotes).toEqual([67, 71, 74]);
+    seq.reconfigure({ ...seq.config, steps: [chordStep(4, { duration: 8 })] });
+    for (let i = 25; i <= 36; i++) transport.advance(0);
+    // Its own gate end (24 + 12) still releases it under the longer pattern.
+    expect(events.filter((e) => e.tick === 36).map((e) => e.kind)).toEqual([
+      'noteOff',
+      'noteOff',
+      'noteOff',
+    ]);
     expect(seq.heldNotes).toEqual([]);
-    // Nothing is held, so the rest at 96 has nothing to release.
-    expect(events.filter((e) => e.tick === 96)).toEqual([]);
   });
 
   it('a rest at step 0 with nothing held emits nothing; each onset emits the voicing’s note count', () => {
