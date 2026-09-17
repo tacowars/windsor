@@ -1,21 +1,30 @@
 /**
  * The console's document state, on the one path only the editor takes (#562):
- * opening a song written before songs carried their patches. The library
+ * opening a song that names library patches without carrying them. The library
  * fills what the document omits, the model says which ids it filled, and the
  * export is self-contained from then on.
  */
 import { describe, expect, it } from 'vitest';
 
 import { PRESETS, makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
-import { DocumentModel, deepMerge } from './documentModel';
+import { DocumentModel, deepMerge, mergeDocument } from './documentModel';
 
-/** A pre-#562 song: four parts naming library ids, no `patches` section. */
+/** A song naming library ids with no `patches` section. */
 const OLD_SONG = {
+  version: 2,
   seed: 204,
   bpm: 96,
   key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
-  kick: { part: 'kick', preset: 'kick', note: 36, velocity: 1, hold: 0.2 },
-  arp: { part: 'arp', preset: 'saw-arp', velocity: 0.7 },
+  parts: [
+    {
+      slot: 0,
+      name: 'kick',
+      preset: 'kick',
+      velocity: 1,
+      sequencer: { kind: 'euclidean', note: 36, hold: 0.2 },
+    },
+    { slot: 2, name: 'arp', preset: 'saw-arp', velocity: 0.7, sequencer: { kind: 'arp' } },
+  ],
 };
 
 describe('opening a document written before #562', () => {
@@ -62,6 +71,48 @@ describe('opening a document written before #562', () => {
     // Already embedded by the open, so the merge fills nothing new.
     expect(model.filled).toEqual([]);
     expect(Object.keys(model.doc.patches ?? {}).sort()).toEqual(['kick', 'saw-arp']);
+  });
+});
+
+describe('a slot-addressed merge (#597)', () => {
+  it('edits the part on the named slot wherever it sits in the list', () => {
+    const model = new DocumentModel(OLD_SONG);
+    model.merge({ parts: { 2: { velocity: 0.25, strip: { pan: -0.5 } } } });
+    expect(model.doc.parts.map((p) => p.velocity)).toEqual([1, 0.25]);
+    expect(model.doc.parts[1]?.strip.pan).toBe(-0.5);
+  });
+
+  it('never invents a part for a slot the song does not hold', () => {
+    const merged = mergeDocument(OLD_SONG, { parts: { 5: { velocity: 0.1 } } }) as typeof OLD_SONG;
+    expect(merged.parts).toEqual(OLD_SONG.parts);
+  });
+
+  it('renames a part without touching anything keyed to it', () => {
+    const model = new DocumentModel(OLD_SONG);
+    const before = model.doc.parts[0];
+    model.merge({ parts: { 0: { name: 'boom' } } });
+    expect(model.doc.parts[0]).toEqual({ ...before, name: 'boom' });
+  });
+
+  it('round-trips a mixed-kind song through export and import', () => {
+    const model = new DocumentModel({
+      ...OLD_SONG,
+      parts: [
+        ...OLD_SONG.parts,
+        {
+          slot: 7,
+          name: 'drone',
+          preset: 'drone-sqr',
+          strip: { level: 0.5 },
+          sequencer: { kind: 'step' },
+        },
+        { slot: 4, name: 'blank', preset: 'kick', sequencer: { kind: 'none' } },
+      ],
+    });
+    expect(model.corrections).toEqual([]);
+    const reopened = new DocumentModel(JSON.parse(model.toJson()));
+    expect(reopened.doc).toEqual(model.doc);
+    expect(reopened.corrections).toEqual([]);
   });
 });
 

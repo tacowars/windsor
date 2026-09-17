@@ -10,13 +10,12 @@
  */
 import type {
   ApplyResult,
-  ArrangementDocument,
-  DeepPartial,
-  MusicPartId,
+  DocumentPartial,
 } from '../../../packages/client/src/audio/index-for-editor';
 import raw from '../../../packages/client/src/audio/arrangements/bed-01.json';
 import { renderArrangementTab } from './arrangementTab';
 import type { AppCtx } from './context';
+import { partChange } from './context';
 import { $, el } from './dom';
 import { DocumentModel } from './documentModel';
 import { renderHarmonyTab } from './harmonyTab';
@@ -44,7 +43,7 @@ keyboard.onPanic = (): void => midi.forgetNotes();
 const ctx: AppCtx = {
   host,
   model,
-  change(partial: DeepPartial<ArrangementDocument>): ApplyResult {
+  change(partial: DocumentPartial): ApplyResult {
     const live = host.apply(partial);
     if (live && !live.ok) {
       status(`refused: ${live.error ?? 'invalid'}`);
@@ -66,24 +65,20 @@ const ctx: AppCtx = {
     void host.build(model.doc).then(render, (error: unknown) => status(String(error)));
     render();
   },
-  capture(id: MusicPartId): boolean {
-    const pattern = host.capturePattern(id);
+  capture(slot: number): boolean {
+    const pattern = host.capturePattern(slot);
     if (!pattern) return false;
-    const result = ctx.change({
-      [id]: { driver: { pattern } },
-    } as DeepPartial<ArrangementDocument>);
+    const result = ctx.change(partChange(slot, { sequencer: { pattern } }));
     if (result.ok) {
-      status(`${id}: captured — the sounding bar is now a literal array in the document`);
+      status(`part ${slot}: captured — the sounding bar is now a literal array in the document`);
       render();
     }
     return result.ok;
   },
-  release(id: MusicPartId): void {
-    const result = ctx.change({
-      [id]: { driver: { pattern: null } },
-    } as DeepPartial<ArrangementDocument>);
+  release(slot: number): void {
+    const result = ctx.change(partChange(slot, { sequencer: { pattern: null } }));
     if (result.ok) {
-      status(`${id}: released back to generative`);
+      status(`part ${slot}: released back to generative`);
       render();
     }
   },

@@ -1,30 +1,28 @@
 /**
- * Arrangement types, the merge, and the diagnostic fallback.
+ * Arrangement types and the merge.
  *
- * The musical arrangement itself is not TypeScript any more (issue #75): it is
- * a JSON document under `arrangements/`, imported at build time and normalised
- * by `makeArrangement` (`arrangementDocument.ts`) — decision record
- * `2026-08-31-arrangement-console-and-runtime-arrangements` §3. This file keeps
- * what the code itself owns: the types, the apply-over-defaults merge, and
- * `FALLBACK_ARRANGEMENT`.
+ * The musical arrangement itself is not TypeScript (issue #75): it is a JSON
+ * document under `arrangements/`, imported at build time and normalised by
+ * `makeArrangement` (`arrangementDocument.ts`) — decision record
+ * `2026-08-31-arrangement-console-and-runtime-arrangements` §3. This file
+ * keeps what the code itself owns: the types and the apply-over-defaults
+ * merge. The diagnostic fallback is `fallbackArrangement.ts`'s.
  *
- * The four part slots are optional: a document ships only the parts it
- * defines, an absent slot builds no generator and makes no sound, and nothing
- * ever defaults a missing part to something musical — a hardwired musical
- * stand-in is invisible precisely because the real arrangement is generative
- * (record §4).
+ * Since #597 a song is a list of 1–8 parts, each identified by its `slot`
+ * (0–7) and carrying any sequencer: a Euclidean fixed-note trigger, the
+ * arpeggiator, the step sequencer, or `none` — an inert part the keyboard
+ * can still play but nothing sequences. A part's name is a label and keys
+ * nothing (record `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
  * Seeds are deliberately absent from the driver configs: the one `seed` below
- * plus a fixed per-part generator index (`GENERATOR_INDEX`,
- * `arrangementPlayer.ts`) derive every stream, so re-rolling one part cannot
- * move another (record §4; refinement decision 4 — this is not the world seed).
+ * plus the part's `slot` as its generator index derive every stream, so
+ * re-rolling, removing or reordering one part cannot move another (record
+ * `2026-08-31-generative-sequencing-transport-and-pitch` §4 — this is not the
+ * world seed).
  */
 import type { ArpeggiatorConfig } from './arpeggiator';
 import type { EuclideanConfig } from './euclideanSequencer';
 import type { ScaleName } from './scaleSampler';
-import { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
-import type { Patch } from './patch';
-import { DIVISORS } from './scheduler';
 import type { StepSequencerConfig } from './stepSequencer';
 
 /** A driver config as the arrangement stores it: the player injects the seed. */
@@ -32,9 +30,40 @@ export type EuclideanDriver = Omit<EuclideanConfig, 'seed' | 'generatorIndex'>;
 export type ArpDriver = Omit<ArpeggiatorConfig, 'seed' | 'generatorIndex'>;
 export type StepDriver = Omit<StepSequencerConfig, 'seed' | 'generatorIndex'>;
 
-/** The four part slots, in play order. */
-export type MusicPartId = 'kick' | 'hat' | 'arp' | 'drone';
-export const MUSIC_PART_IDS: readonly MusicPartId[] = ['kick', 'hat', 'arp', 'drone'];
+/** What may drive a part (#597). `none` is inert: allowed anywhere, skipped by every sequencing path. */
+export const SEQUENCER_KINDS = ['none', 'euclidean', 'arp', 'step'] as const;
+export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
+
+export interface NoSequencer {
+  readonly kind: 'none';
+}
+
+/** A Euclidean sequencer triggering one fixed note, held `hold` seconds. */
+export type EuclideanSpec = {
+  readonly kind: 'euclidean';
+  /** MIDI note each onset triggers. */
+  readonly note: number;
+  /** Seconds a hit is held before its release phase. */
+  readonly hold: number;
+} & EuclideanDriver;
+/** The arpeggiator: pool + walk over the shared scale. */
+export type ArpSpec = { readonly kind: 'arp' } & ArpDriver;
+/** The step sequencer: slow, with gate 1 it is the drone — repeated notes tie. */
+export type StepSpec = { readonly kind: 'step' } & StepDriver;
+
+export type SequencerSpec = NoSequencer | EuclideanSpec | ArpSpec | StepSpec;
+
+/** One part as the player sees it; the document adds its strip (`DocumentPart`). */
+export interface MusicPart {
+  /** 0–7, unique in the song: the part's identity and its generator index. */
+  readonly slot: number;
+  /** A display label only — never a key. */
+  readonly name: string;
+  /** The `patches` id this part plays. */
+  readonly preset: string;
+  readonly velocity: number;
+  readonly sequencer: SequencerSpec;
+}
 
 /** The shared harmony every pitched part draws from (record §4). */
 export interface ArrangementKey {
@@ -45,100 +74,28 @@ export interface ArrangementKey {
   readonly weights: readonly number[];
 }
 
-/** A percussion part: a Euclidean sequencer triggering one fixed note. */
-export interface PercussionArrangement {
-  /** Part name — the `MIX` key its strip comes from. Not renameable live. */
-  readonly part: string;
-  /** `PRESETS` key. */
-  readonly preset: string;
-  /** MIDI note each onset triggers. */
-  readonly note: number;
-  readonly velocity: number;
-  /** Seconds a hit is held before its release phase. */
-  readonly hold: number;
-  readonly driver: EuclideanDriver;
-}
-
-/** The arp: pool + walk over the shared scale (record §5). */
-export interface ArpArrangement {
-  readonly part: string;
-  readonly preset: string;
-  readonly velocity: number;
-  readonly driver: ArpDriver;
-}
-
-/** The drone: the step sequencer, slow, gate 1 so notes tie (record §6). */
-export interface DroneArrangement {
-  readonly part: string;
-  readonly preset: string;
-  readonly velocity: number;
-  readonly driver: StepDriver;
-}
-
 export interface Arrangement {
   /** The arrangement seed all generator streams derive from. Fixed; not the world seed. */
   readonly seed: number;
   readonly bpm: number;
   readonly key: ArrangementKey;
-  readonly kick?: PercussionArrangement;
-  readonly hat?: PercussionArrangement;
-  readonly arp?: ArpArrangement;
-  readonly drone?: DroneArrangement;
+  /** 1–8 parts, in display and play order, each on a unique slot. */
+  readonly parts: readonly MusicPart[];
+}
+
+/** The fields of a sequencer spec that build its generator: `kind`, `note` and `hold` do not. */
+export function driverOf(spec: SequencerSpec): Record<string, unknown> {
+  const driver: Record<string, unknown> = { ...spec };
+  delete driver.kind;
+  delete driver.note;
+  delete driver.hold;
+  return driver;
 }
 
 /**
- * The fallback is a diagnostic click, not a musical default (record §4): one
- * percussion part on a quarter-note pulse — no sends, no harmony, no
- * generative movement. It plays only when nothing usable survives
- * `makeArrangement`, and it is deliberately unmusical so it can never be
- * mistaken for the arrangement. It is also more informative than silence: a
- * click proves the context resumed, the worklets loaded, the routing works
- * and the master path is open, which narrows the fault to the document alone.
- *
- * The narrow type is the "one part" guarantee: exactly the kick slot is
- * populated, so no pitched generator exists to draw from the (unused) key.
- */
-export const FALLBACK_ARRANGEMENT: Arrangement & {
-  readonly kick: PercussionArrangement;
-  readonly patches: Readonly<Record<string, Patch>>;
-} = {
-  seed: 0,
-  bpm: 120,
-  // Self-contained like every other document (#562): the click carries the
-  // one patch it plays, from the gameplay table the game bundles by id, so
-  // the fallback needs no library either.
-  patches: { [GAMEPLAY_PATCH_IDS.pickupBlip]: GAMEPLAY_PATCHES[GAMEPLAY_PATCH_IDS.pickupBlip] },
-  // No pitched part exists to draw from this; it is here because a key is
-  // structurally required, and it is a single root on purpose — nothing musical.
-  key: { root: 60, scale: [0], weights: [1] },
-  kick: {
-    // Deliberately not a MIX strip: the click routes through DEFAULT_STRIP —
-    // unity, centred, and with no sends — whatever the shipped mix says.
-    part: 'click',
-    preset: GAMEPLAY_PATCH_IDS.pickupBlip,
-    note: 76,
-    velocity: 1,
-    hold: 0.05,
-    driver: {
-      steps: 4,
-      divisor: DIVISORS.quarter,
-      // min === max: E(4,4) fires every step and the density LFO has nothing
-      // to modulate, so the pulse never varies and no RNG is consumed — the
-      // one part is not generative.
-      pulses: { min: 4, max: 4, start: 4 },
-      rotate: 0,
-      density: { kind: 'lfoBars', bars: 1, shape: 'tri' },
-      // Not captured either: the pulse comes from E(4, 4), authored above.
-      pattern: null,
-    },
-  },
-};
-
-/**
- * A recursive partial of the arrangement, for `AudioSystem.apply()`. Arrays
- * (weights, an explicit scale) are replaced wholesale, never merged. The
- * `NonNullable` unwrap is what lets a partial reach inside the optional part
- * slots.
+ * A recursive partial, for `AudioSystem.apply()`. Arrays (weights, an
+ * explicit scale) are replaced wholesale, never merged. The `NonNullable`
+ * unwrap is what lets a partial reach inside optional fields.
  */
 export type DeepPartial<T> = {
   [K in keyof T]?: NonNullable<T[K]> extends readonly unknown[]
@@ -146,6 +103,18 @@ export type DeepPartial<T> = {
     : NonNullable<T[K]> extends object
       ? DeepPartial<NonNullable<T[K]>>
       : T[K];
+};
+
+/**
+ * Live partials of a part list (#597): addressed by slot —
+ * `{ parts: { 2: { velocity: 0.5 } } }` — never by list position, so an edit
+ * cannot land on the wrong part. Adding or removing a part is not a partial;
+ * it rebuilds.
+ */
+export type PartsPartial<P> = Readonly<Record<number | string, DeepPartial<P>>>;
+
+export type ArrangementPartial = DeepPartial<Omit<Arrangement, 'parts'>> & {
+  readonly parts?: PartsPartial<MusicPart>;
 };
 
 export interface MergeResult {
@@ -161,14 +130,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function mergeValue(current: unknown, partial: unknown, path: string, ignored: string[]): unknown {
   if (isPlainObject(current) && isPlainObject(partial)) {
     // A tagged union changing kind is replaced wholesale: merging a walk onto
-    // an LFO would leave the old kind's fields lying around in the data.
+    // an LFO — or an arp onto a Euclidean — would leave the old kind's fields
+    // lying around in the data.
     if ('kind' in current && 'kind' in partial && current.kind !== partial.kind) return partial;
     const merged: Record<string, unknown> = { ...current };
     for (const [key, value] of Object.entries(partial)) {
       const childPath = path === '' ? key : `${path}.${key}`;
       if (!(key in current)) {
-        // Also where a partial naming an absent part slot lands: a part that
-        // was never initialised has no AudioPart and cannot be added live.
         ignored.push(childPath);
         continue;
       }
@@ -186,15 +154,42 @@ function mergeValue(current: unknown, partial: unknown, path: string, ignored: s
 }
 
 /**
+ * Merge a slot-keyed parts partial over a part list. A slot the list does not
+ * hold is ignored and reported: a part that was never initialised has no
+ * `AudioPart` and cannot be added live.
+ */
+export function mergeParts<P extends { readonly slot: number }>(
+  parts: readonly P[],
+  partial: unknown,
+  ignored: string[],
+): P[] {
+  if (!isPlainObject(partial)) {
+    ignored.push('parts');
+    return [...parts];
+  }
+  const merged = [...parts];
+  for (const [key, value] of Object.entries(partial)) {
+    if (value === undefined) continue;
+    const index = merged.findIndex((part) => String(part.slot) === key);
+    if (index < 0) {
+      ignored.push(`parts.${key}`);
+      continue;
+    }
+    merged[index] = mergeValue(merged[index], value, `parts.${key}`, ignored) as P;
+  }
+  return merged;
+}
+
+/**
  * Apply-over-defaults: only the fields the partial names change; unknown keys
  * are ignored and reported by path (refinement decision 3). Purely structural —
  * the player validates the merged result before committing it.
  */
-export function mergeArrangement(
-  current: Arrangement,
-  partial: DeepPartial<Arrangement>,
-): MergeResult {
+export function mergeArrangement(current: Arrangement, partial: ArrangementPartial): MergeResult {
   const ignored: string[] = [];
-  const merged = mergeValue(current, partial, '', ignored) as Arrangement;
-  return { merged, ignored };
+  const { parts, ...rest } = partial;
+  const { parts: currentParts, ...currentRest } = current;
+  const mergedRest = mergeValue(currentRest, rest, '', ignored) as Omit<Arrangement, 'parts'>;
+  const mergedParts = parts === undefined ? currentParts : mergeParts(currentParts, parts, ignored);
+  return { merged: { ...mergedRest, parts: mergedParts }, ignored };
 }

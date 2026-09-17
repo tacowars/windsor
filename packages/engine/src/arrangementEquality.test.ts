@@ -23,27 +23,34 @@ import {
   sourceOf,
 } from './__fixtures__/fakeAudioContext';
 import type { FakeNode } from './__fixtures__/fakeAudioNodes';
-import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
+import {
+  FULL_ARRANGEMENT,
+  FULL_DOCUMENT,
+  FULL_PART_IDS,
+  FULL_PARTS,
+  FULL_SLOT,
+  type FullPartId,
+} from './__fixtures__/fullArrangement';
 import { noteToneFeed } from './__fixtures__/noteFeeds';
 import type { ArrangementDocument } from './arrangementDocument';
 import { makeArrangement } from './arrangementDocument';
-import { MUSIC_PART_IDS, type MusicPartId } from './arrangementPlayer';
 import raw from './arrangements/bed-01.json';
 import { AudioSystem } from './audioSystem';
+import { musicPartName } from './documentParts';
 import { FmEngine } from './fmEngine';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
 
 /** One tone per part, as in musicRender.test.ts, so both renders speak the same voice. */
-const HZ: Record<MusicPartId, number> = { kick: 233, hat: 977, arp: 1447, drone: 421 };
+const HZ: Record<FullPartId, number> = { kick: 233, hat: 977, arp: 1447, drone: 421 };
 
 const BARS = 4;
 const BAR_SECONDS = (60 / FULL_ARRANGEMENT.bpm) * 4;
 
 interface Render {
   capture: Capture;
-  counters: Record<MusicPartId, number>;
+  counters: Record<string, number>;
 }
 
 async function renderBed(arrangement: ArrangementDocument): Promise<Render> {
@@ -52,10 +59,8 @@ async function renderBed(arrangement: ArrangementDocument): Promise<Render> {
   const system = new AudioSystem(engine);
   await system.init();
   system.initMusic(arrangement);
-  for (const id of MUSIC_PART_IDS) {
-    const section = arrangement[id];
-    if (!section) throw new Error(`arrangement has no ${id}`);
-    const part = engine.getPart(section.part);
+  for (const id of FULL_PART_IDS) {
+    const part = engine.getPart(musicPartName(FULL_SLOT[id]));
     if (!part) throw new Error(`no part "${id}"`);
     const node = sourceOf(part);
     node.feed = noteToneFeed(node, HZ[id]);
@@ -80,9 +85,14 @@ describe('bed-01.json equals the #69b TypeScript arrangement', () => {
     // carries every patch it plays (#562).
     expect(result.filled).toEqual([]);
     const { patches, ...arrangement } = result.document;
-    expect(arrangement).toEqual(FULL_ARRANGEMENT);
-    expect(Object.keys(patches ?? {}).sort()).toEqual(
-      [...MUSIC_PART_IDS.map((id) => FULL_ARRANGEMENT[id].preset)].sort(),
+    const { patches: fixturePatches, ...fixture } = FULL_DOCUMENT;
+    expect(arrangement).toEqual(fixture);
+    expect(Object.keys(patches ?? {}).sort()).toEqual(Object.keys(fixturePatches).sort());
+    expect(FULL_DOCUMENT.parts.map(({ strip: _s, ...part }) => part)).toEqual(
+      FULL_ARRANGEMENT.parts,
+    );
+    expect(FULL_PART_IDS.map((id) => FULL_PARTS[id].preset).sort()).toEqual(
+      Object.keys(fixturePatches).sort(),
     );
   });
 
@@ -92,7 +102,7 @@ describe('bed-01.json equals the #69b TypeScript arrangement', () => {
     // timbre, which this stand-in cannot see.
     const fromJson = await renderBed(makeArrangement(raw).document);
     const fromTs = await renderBed(FULL_DOCUMENT);
-    for (const id of MUSIC_PART_IDS) expect(fromTs.counters[id], id).toBeGreaterThan(0);
+    for (const id of FULL_PART_IDS) expect(fromTs.counters[FULL_SLOT[id]], id).toBeGreaterThan(0);
     expect(fromJson.counters).toEqual(fromTs.counters);
     expect(maxAbsDiff(fromJson.capture.left, fromTs.capture.left)).toBe(0);
     expect(maxAbsDiff(fromJson.capture.right, fromTs.capture.right)).toBe(0);

@@ -7,29 +7,26 @@
  * export carries it. Rename moves the document patch and every part that
  * plays it; revert drops the fork and the part falls back to the built-in.
  */
-import type { MusicPartId, Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { PRESETS, clonePatch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
+import { PRESETS, clonePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
-import { SLOT_IDS } from './context';
 import { el } from './dom';
 import type { LibraryModel } from './libraryModel';
 import { library, libraryPatch } from './libraryModel';
 
-type Slots = Record<string, { preset?: string } | undefined>;
-
 /** Where the selected part's patch lives, for the badge and the controls. */
-export function patchHome(ctx: AppCtx, id: MusicPartId): 'document' | 'built-in' | 'none' {
-  const slot = ctx.model.doc[id];
-  if (!slot) return 'none';
-  if (ctx.model.doc.patches?.[slot.preset]) return 'document';
-  return libraryPatch(library, slot.preset) ? 'built-in' : 'none';
+export function patchHome(ctx: AppCtx, slot: number): 'document' | 'built-in' | 'none' {
+  const part = partAt(ctx.model.doc, slot);
+  if (!part) return 'none';
+  if (ctx.model.doc.patches?.[part.preset]) return 'document';
+  return libraryPatch(library, part.preset) ? 'built-in' : 'none';
 }
 
 export { presetBrowser as presetPicker } from './presetBrowser';
 
-export function badgeText(ctx: AppCtx, id: MusicPartId): string {
-  const preset = ctx.model.doc[id]?.preset ?? '';
-  switch (patchHome(ctx, id)) {
+export function badgeText(ctx: AppCtx, slot: number): string {
+  const preset = partAt(ctx.model.doc, slot)?.preset ?? '';
+  switch (patchHome(ctx, slot)) {
     case 'document':
       return `Document patch "${preset}" — every knob edit lands in the export.`;
     case 'built-in':
@@ -50,9 +47,8 @@ function renamePatch(ctx: AppCtx, from: string, to: string): void {
     delete patches[from];
     patches[to] = { ...patch, name: patch.name === from ? to : patch.name };
     draft.patches = patches;
-    for (const id of SLOT_IDS) {
-      const slot = (draft as Slots)[id];
-      if (slot?.preset === from) slot.preset = to;
+    for (const part of (draft.parts ?? []) as Array<{ preset?: string }>) {
+      if (part.preset === from) part.preset = to;
     }
   });
   ctx.status(`renamed document patch "${from}" to "${to}"`);
@@ -81,11 +77,11 @@ export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = lib
 }
 
 /** Rename and revert, shown only for a document patch. */
-export function libraryControls(ctx: AppCtx, id: MusicPartId): HTMLElement {
+export function libraryControls(ctx: AppCtx, slot: number): HTMLElement {
   const box = el('div', 'bar-row');
   box.style.marginTop = '8px';
-  const preset = ctx.model.doc[id]?.preset;
-  if (preset === undefined || patchHome(ctx, id) !== 'document') return box;
+  const preset = partAt(ctx.model.doc, slot)?.preset;
+  if (preset === undefined || patchHome(ctx, slot) !== 'document') return box;
   const name = document.createElement('input');
   name.className = 'field';
   name.name = 'patch-name';

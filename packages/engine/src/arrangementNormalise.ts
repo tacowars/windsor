@@ -1,68 +1,37 @@
 /**
  * The section-level normalisers behind `makeArrangement`
  * (`arrangementDocument.ts`) — the never-throws layer above the generator
- * constructors, which throw `RangeError` on invalid config. Everything a
- * normaliser returns satisfies those constructors' asserted ranges by
- * construction: integers where integers are required, divisors that divide
- * the 96-tick bar, gates in (0, 1], weights that are not all zero.
+ * constructors, which throw `RangeError` on invalid config.
  *
  * Field-level clamping and the report live in `arrangementFields.ts`; this
- * file knows the arrangement's shape — which keys each section owns, which
- * defaults each field takes, and which names must exist in the code. The
- * desk sections (`mix`, `returns`) are `deskNormalise.ts`'s and the `patches`
- * section is `patchNormalise.ts`'s.
+ * file knows the arrangement's shape — the key, and each part's identity,
+ * patch and strip. A part's sequencer is `sequencerNormalise.ts`'s, the strip
+ * and returns are `deskNormalise.ts`'s and the `patches` section is
+ * `patchNormalise.ts`'s.
  *
- * Parts are dropped, never defaulted, when they cannot play: a preset has no
- * default on purpose (a part invented by the normaliser is exactly the
- * invisible musical stand-in the record's §4 rejects).
+ * Parts are dropped, never defaulted, when they cannot play: a slot and a
+ * preset have no default on purpose (a part invented by the normaliser is
+ * exactly the invisible musical stand-in the record's §4 rejects). An absent
+ * sequencer, by contrast, is `none` — inert, never a musical guess (#597).
  */
-import type {
-  ArpArrangement,
-  ArpDriver,
-  ArrangementKey,
-  DroneArrangement,
-  EuclideanDriver,
-  PercussionArrangement,
-  StepDriver,
-} from './arrangement';
+import type { ArrangementKey } from './arrangement';
+import type { DocumentPart } from './arrangementDocument';
+import { FieldNormaliser, show } from './arrangementFields';
 import {
-  EUCLID_STEPS_MAX,
-  GATE_MIN,
-  HOLD_DEFAULT,
-  HOLD_MAX,
-  HOLD_MIN,
-  LFO_BARS_DEFAULT,
-  LFO_BARS_MAX,
-  LFO_BARS_MIN,
-  LFO_HZ_DEFAULT,
-  LFO_HZ_MAX,
   MIDI_MIDDLE_C,
   MIDI_NOTE_MAX,
-  OCTAVE_MAX,
-  POOL_SIZE_MAX,
-  REFRESH_BARS_MAX,
+  MUSIC_SLOT_MAX,
   SCALE_OFFSET_MAX,
-  SPAN_MAX,
   VELOCITY_DEFAULT,
-  WALK_CHANCE,
   WEIGHT_MAX,
 } from './audioConstants';
-import { FieldNormaliser, show } from './arrangementFields';
-import { ARP_WALK_MODES, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeggiator';
-import {
-  DEFAULT_EUCLIDEAN_CONFIG,
-  DENSITY_MOD_KINDS,
-  LFO_SHAPES,
-  type DensityMod,
-} from './euclideanSequencer';
-import { MIX } from './mix';
+import { normaliseStrip } from './deskNormalise';
 import type { Patch } from './patch';
 import { clonePatch } from './patch';
 import { normalisePatches } from './patchNormalise';
 import { PatchResolver, type ResolveOptions } from './arrangementValidate';
 import { SCALES, scaleOffsets, type ScaleName } from './scaleSampler';
-import type { Register } from './scaleSampler';
-import { DEFAULT_STEP_SEQUENCER_CONFIG } from './stepSequencer';
+import { normaliseSequencer } from './sequencerNormalise';
 
 export class ArrangementNormaliser extends FieldNormaliser {
   /**
@@ -152,185 +121,55 @@ export class ArrangementNormaliser extends FieldNormaliser {
     return out;
   }
 
-  percussion(raw: unknown, id: 'kick' | 'hat'): PercussionArrangement | null {
-    if (raw === undefined) return null;
-    const o = this.section(raw, id);
-    this.dropUnknown(o, ['part', 'preset', 'note', 'velocity', 'hold', 'driver'], id);
-    const identity = this.identity(o, id);
-    if (!identity) return null;
+  /** One part of the list (#597): identity, patch, strip and sequencer. Null drops it, reported. */
+  part(raw: unknown, path: string): DocumentPart | null {
+    const o = this.section(raw, path);
+    this.dropUnknown(o, ['slot', 'name', 'preset', 'velocity', 'strip', 'sequencer'], path);
+    const slot = this.slot(o.slot, path);
+    if (slot === null) return null;
+    const preset = this.preset(o.preset, path);
+    if (preset === null) return null;
+    const fallbackName = `Part ${slot + 1}`;
+    if (o.name !== undefined && typeof o.name !== 'string') {
+      this.correction(`${path}.name: ${show(o.name)} is not a name — using "${fallbackName}"`);
+    }
     return {
-      ...identity,
-      note: this.int(o.note, MIDI_MIDDLE_C, 0, MIDI_NOTE_MAX, `${id}.note`),
-      velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, `${id}.velocity`),
-      hold: this.num(o.hold, HOLD_DEFAULT, HOLD_MIN, HOLD_MAX, `${id}.hold`),
-      driver: this.euclideanDriver(o.driver, `${id}.driver`),
+      slot,
+      name: typeof o.name === 'string' ? o.name : fallbackName,
+      preset,
+      velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, `${path}.velocity`),
+      strip: normaliseStrip(o.strip, `${path}.strip`, this),
+      sequencer: normaliseSequencer(o.sequencer, `${path}.sequencer`, this),
     };
   }
 
-  arp(raw: unknown): ArpArrangement | null {
-    if (raw === undefined) return null;
-    const o = this.section(raw, 'arp');
-    this.dropUnknown(o, ['part', 'preset', 'velocity', 'driver'], 'arp');
-    const identity = this.identity(o, 'arp');
-    if (!identity) return null;
-    return {
-      ...identity,
-      velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, 'arp.velocity'),
-      driver: this.arpDriver(o.driver),
-    };
-  }
-
-  drone(raw: unknown): DroneArrangement | null {
-    if (raw === undefined) return null;
-    const o = this.section(raw, 'drone');
-    this.dropUnknown(o, ['part', 'preset', 'velocity', 'driver'], 'drone');
-    const identity = this.identity(o, 'drone');
-    if (!identity) return null;
-    return {
-      ...identity,
-      velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, 'drone.velocity'),
-      driver: this.stepDriver(o.driver),
-    };
+  /** A part's identity has no default: a missing or out-of-range slot drops the part. */
+  private slot(raw: unknown, path: string): number | null {
+    if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 0 || raw > MUSIC_SLOT_MAX) {
+      this.correction(
+        `${path}.slot: ${show(raw)} is not a slot 0–${MUSIC_SLOT_MAX} — part dropped`,
+      );
+      return null;
+    }
+    return raw;
   }
 
   /**
-   * The two names a part cannot play without. A preset is looked up through
-   * the resolver — the document's `patches`, and the library only on the
-   * editor's fill path (#562); unresolved, it drops the part (and is
-   * dangling — the gate's business). A part name with no strip still plays,
-   * through `DEFAULT_STRIP`, but is dangling too.
+   * A part cannot play without a preset, and a preset has no default. It is
+   * looked up through the resolver — the document's `patches`, and the
+   * library only on the editor's fill path (#562); unresolved, it drops the
+   * part and is dangling — the gate's business.
    */
-  private identity(
-    o: Record<string, unknown>,
-    id: string,
-  ): { part: string; preset: string } | null {
-    const part = typeof o.part === 'string' && o.part !== '' ? o.part : id;
-    if (o.part !== undefined && o.part !== part) {
-      this.correction(`${id}.part: ${show(o.part)} is not a name — using "${id}"`);
-    }
-    if (typeof o.preset !== 'string') {
-      this.correction(`${id}: a part needs a preset, and a preset has no default — part dropped`);
+  private preset(raw: unknown, path: string): string | null {
+    if (typeof raw !== 'string') {
+      this.correction(`${path}: a part needs a preset, and a preset has no default — part dropped`);
       return null;
     }
-    if (!this.resolver.lookup(o.preset)) {
-      this.dangling.push(`${id}.preset: no preset "${o.preset}" is defined`);
-      this.correction(`${id}: unknown preset "${o.preset}" — part dropped`);
+    if (!this.resolver.lookup(raw)) {
+      this.dangling.push(`${path}.preset: no preset "${raw}" is defined`);
+      this.correction(`${path}: unknown preset "${raw}" — part dropped`);
       return null;
     }
-    if (!Object.hasOwn(MIX, part))
-      this.dangling.push(`${id}.part: the MIX defines no strip "${part}"`);
-    return { part, preset: o.preset };
-  }
-
-  private euclideanDriver(raw: unknown, path: string): EuclideanDriver {
-    const d = DEFAULT_EUCLIDEAN_CONFIG;
-    const o = this.section(raw, path);
-    this.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern'], path);
-    const steps = this.int(o.steps, d.steps, 1, EUCLID_STEPS_MAX, `${path}.steps`);
-    return {
-      steps,
-      divisor: this.divisor(o.divisor, d.divisor, `${path}.divisor`),
-      pulses: this.pulses(o.pulses, steps, `${path}.pulses`),
-      rotate: this.int(o.rotate, 0, -steps, steps, `${path}.rotate`),
-      density: this.density(o.density, `${path}.density`),
-      // Always present, `null` when generative, so a live capture or release
-      // merges through `AudioSystem.apply` (a merge only reaches keys the
-      // current arrangement has).
-      pattern: this.stepPattern(o.pattern, steps, `${path}.pattern`),
-    };
-  }
-
-  private pulses(
-    raw: unknown,
-    steps: number,
-    path: string,
-  ): { min: number; max: number; start: number } {
-    const d = DEFAULT_EUCLIDEAN_CONFIG.pulses;
-    const o = this.section(raw, path);
-    this.dropUnknown(o, ['min', 'max', 'start'], path);
-    const min = this.int(o.min, Math.min(d.min, steps), 0, steps, `${path}.min`);
-    let max = this.int(o.max, Math.min(d.max, steps), 0, steps, `${path}.max`);
-    if (max < min) {
-      this.correction(`${path}: max ${max} below min ${min} — raised to ${min}`);
-      max = min;
-    }
-    const start = this.int(
-      o.start,
-      Math.min(Math.max(d.start, min), max),
-      min,
-      max,
-      `${path}.start`,
-    );
-    return { min, max, start };
-  }
-
-  private density(raw: unknown, path: string): DensityMod {
-    const o = this.section(raw, path);
-    const kind = this.pick(o.kind, DENSITY_MOD_KINDS, 'lfoBars', `${path}.kind`);
-    if (kind === 'walk') {
-      this.dropUnknown(o, ['kind', 'stepChance'], path);
-      return {
-        kind,
-        stepChance: this.num(o.stepChance, WALK_CHANCE, 0, 1, `${path}.stepChance`),
-      };
-    }
-    if (kind === 'lfoHz') {
-      this.dropUnknown(o, ['kind', 'hz', 'shape'], path);
-      return {
-        kind,
-        hz: this.num(o.hz, LFO_HZ_DEFAULT, 0, LFO_HZ_MAX, `${path}.hz`),
-        shape: this.pick(o.shape, LFO_SHAPES, 'tri', `${path}.shape`),
-      };
-    }
-    this.dropUnknown(o, ['kind', 'bars', 'shape'], path);
-    return {
-      kind: 'lfoBars',
-      bars: this.num(o.bars, LFO_BARS_DEFAULT, LFO_BARS_MIN, LFO_BARS_MAX, `${path}.bars`),
-      shape: this.pick(o.shape, LFO_SHAPES, 'tri', `${path}.shape`),
-    };
-  }
-
-  private arpDriver(raw: unknown): ArpDriver {
-    const d = DEFAULT_ARPEGGIATOR_CONFIG;
-    const o = this.section(raw, 'arp.driver');
-    const known = ['divisor', 'poolSize', 'refreshBars', 'walk', 'skipChance', 'register', 'gate'];
-    this.dropUnknown(o, [...known, 'pattern'], 'arp.driver');
-    return {
-      divisor: this.divisor(o.divisor, d.divisor, 'arp.driver.divisor'),
-      poolSize: this.int(o.poolSize, d.poolSize, 1, POOL_SIZE_MAX, 'arp.driver.poolSize'),
-      refreshBars: this.int(
-        o.refreshBars,
-        d.refreshBars,
-        1,
-        REFRESH_BARS_MAX,
-        'arp.driver.refreshBars',
-      ),
-      walk: this.pick(o.walk, ARP_WALK_MODES, d.walk, 'arp.driver.walk'),
-      skipChance: this.num(o.skipChance, d.skipChance, 0, 1, 'arp.driver.skipChance'),
-      register: this.register(o.register, d.register, 'arp.driver.register'),
-      gate: this.num(o.gate, d.gate, GATE_MIN, 1, 'arp.driver.gate'),
-      pattern: this.notePattern(o.pattern, 'arp.driver.pattern'),
-    };
-  }
-
-  private stepDriver(raw: unknown): StepDriver {
-    const d = DEFAULT_STEP_SEQUENCER_CONFIG;
-    const o = this.section(raw, 'drone.driver');
-    this.dropUnknown(o, ['divisor', 'gate', 'register', 'pattern'], 'drone.driver');
-    return {
-      divisor: this.divisor(o.divisor, d.divisor, 'drone.driver.divisor'),
-      gate: this.num(o.gate, d.gate, GATE_MIN, 1, 'drone.driver.gate'),
-      register: this.register(o.register, d.register, 'drone.driver.register'),
-      pattern: this.notePattern(o.pattern, 'drone.driver.pattern'),
-    };
-  }
-
-  private register(raw: unknown, fallback: Register, path: string): Register {
-    const o = this.section(raw, path);
-    this.dropUnknown(o, ['octave', 'span'], path);
-    return {
-      octave: this.int(o.octave, fallback.octave, -OCTAVE_MAX, OCTAVE_MAX, `${path}.octave`),
-      span: this.int(o.span, fallback.span, 1, SPAN_MAX, `${path}.span`),
-    };
+    return raw;
   }
 }

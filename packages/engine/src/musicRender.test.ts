@@ -20,16 +20,22 @@ import {
 } from './__fixtures__/fakeAudioContext';
 import type { FakeNode } from './__fixtures__/fakeAudioNodes';
 import { noteToneFeed } from './__fixtures__/noteFeeds';
-import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
-import { MUSIC_PART_IDS, type MusicPartId } from './arrangementPlayer';
+import {
+  FULL_ARRANGEMENT,
+  FULL_DOCUMENT,
+  FULL_PART_IDS,
+  FULL_SLOT,
+  type FullPartId,
+} from './__fixtures__/fullArrangement';
 import { AudioSystem } from './audioSystem';
+import { musicPartName } from './documentParts';
 import { FmEngine } from './fmEngine';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
 
 /** One tone per part, far enough apart that Goertzel attribution is unambiguous. */
-const HZ: Record<MusicPartId, number> = { kick: 233, hat: 977, arp: 1447, drone: 421 };
+const HZ: Record<FullPartId, number> = { kick: 233, hat: 977, arp: 1447, drone: 421 };
 
 const BAR_SECONDS = (60 / FULL_ARRANGEMENT.bpm) * 4;
 
@@ -46,15 +52,15 @@ async function musicRig(): Promise<Rig> {
   const system = new AudioSystem(engine);
   await system.init();
   system.initMusic(FULL_DOCUMENT);
-  for (const id of MUSIC_PART_IDS) {
-    const part = engine.getPart(FULL_ARRANGEMENT[id].part);
+  for (const id of FULL_PART_IDS) {
+    const part = engine.getPart(musicPartName(FULL_SLOT[id]));
     if (!part) throw new Error(`no part "${id}"`);
     const node = sourceOf(part);
     node.feed = noteToneFeed(node, HZ[id]);
   }
   const noteOns = (): number =>
-    MUSIC_PART_IDS.reduce((total, id) => {
-      const part = engine.getPart(FULL_ARRANGEMENT[id].part);
+    FULL_PART_IDS.reduce((total, id) => {
+      const part = engine.getPart(musicPartName(FULL_SLOT[id]));
       if (!part) return total;
       return (
         total +
@@ -83,11 +89,11 @@ describe('the audible arrangement', () => {
     if (!room || !echo || !master) throw new Error('render produced no captures');
 
     const counters = system.readout().counters;
-    for (const id of MUSIC_PART_IDS) expect(counters[id], id).toBeGreaterThan(0);
+    for (const id of FULL_PART_IDS) expect(counters[FULL_SLOT[id]], id).toBeGreaterThan(0);
 
     // Orderings per return, not absolute levels (acceptance criterion).
-    const inRoom = (id: MusicPartId): number => toneLevel(room.left, HZ[id]);
-    const inEcho = (id: MusicPartId): number => toneLevel(echo.left, HZ[id]);
+    const inRoom = (id: FullPartId): number => toneLevel(room.left, HZ[id]);
+    const inEcho = (id: FullPartId): number => toneLevel(echo.left, HZ[id]);
     expect(rms(room.left)).toBeGreaterThan(1e-4);
     expect(rms(echo.left)).toBeGreaterThan(1e-4);
 
@@ -113,8 +119,8 @@ describe('the audible arrangement', () => {
 
   it('builds the whole graph but stays silent until startMusic', async () => {
     const { context, system, noteOns } = await musicRig();
-    expect(system.strip('kick')).toBeDefined();
-    expect(system.strip('drone')).toBeDefined();
+    expect(system.strip(musicPartName(FULL_SLOT.kick))).toBeDefined();
+    expect(system.strip(musicPartName(FULL_SLOT.drone))).toBeDefined();
     context.currentTime = 5;
     system.update(0);
     expect(system.musicRunning).toBe(false);

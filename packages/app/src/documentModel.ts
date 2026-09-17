@@ -35,6 +35,27 @@ export function deepMerge(current: unknown, partial: unknown): unknown {
   return merged;
 }
 
+/**
+ * `deepMerge` over a whole document (#597): the part list is merged by slot —
+ * `{ parts: { 2: { velocity: 0.5 } } }` reaches the part on slot 2 wherever it
+ * sits in the list — and a slot the list does not hold is left alone rather
+ * than invented, because adding a part is a structural edit.
+ */
+export function mergeDocument(current: unknown, partial: unknown): unknown {
+  const isRecord = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null && !Array.isArray(v);
+  if (!isRecord(current) || !isRecord(partial)) return deepMerge(current, partial);
+  const { parts, ...rest } = partial;
+  const merged = deepMerge(current, rest) as Record<string, unknown>;
+  if (!isRecord(parts) || !Array.isArray(current.parts)) return merged;
+  merged.parts = (current.parts as unknown[]).map((part) => {
+    const slot = isRecord(part) ? part.slot : undefined;
+    const edit = typeof slot === 'number' ? parts[String(slot)] : undefined;
+    return edit === undefined ? part : deepMerge(part, edit);
+  });
+  return merged;
+}
+
 export class DocumentModel {
   doc!: ArrangementDocument;
   corrections: string[] = [];
@@ -71,7 +92,7 @@ export class DocumentModel {
 
   /** A field-level change: merge, renormalise, keep the report. */
   merge(partial: unknown): void {
-    this.adopt(this.normalise(deepMerge(this.doc, partial)));
+    this.adopt(this.normalise(mergeDocument(this.doc, partial)));
   }
 
   /** A structural change (slot added or removed): edit a draft, renormalise. */

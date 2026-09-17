@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "seed": 7,
+  "bpm": 120,
+  "key": { "root": 50, "scale": "dorian", "weights": [4, 1, 2, 2, 3, 1, 2] },
+  "patches": {
+    "init-0": {}
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Part 1",
+      "preset": "init-0",
+      "velocity": 0.8,
+      "sequencer": { "kind": "none" }
+    }
+  ]
+}

@@ -3,17 +3,17 @@
  * `2026-08-31-arrangement-console-and-runtime-arrangements` §4–§5): never
  * throws, clamps and defaults with corrections reported, drops what cannot
  * play, round-trips, and yields the metronome fallback when nothing usable
- * survives.
+ * survives. Since #597 a document is `version: 2` with a slot-keyed part list.
  */
 import { describe, expect, it } from 'vitest';
 
 import type { Arrangement } from './arrangement';
-import { FALLBACK_ARRANGEMENT } from './arrangement';
 import type { ArrangementDocument } from './arrangementDocument';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import type { PresetTable } from './arrangementValidate';
-import { DEFAULT_STRIP, MIX, stripFor } from './mix';
+import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
+import { DEFAULT_STRIP } from './mix';
 import { PRESETS } from './presets';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from './scheduler';
 
@@ -31,7 +31,7 @@ const patchesOf = (arrangement: Arrangement): PresetTable =>
 
 /** Building and running the player is the "usable" proof: no constructor throws. */
 function play(arrangement: Arrangement): void {
-  const parts = { kick: silentPart(), hat: silentPart(), arp: silentPart(), drone: silentPart() };
+  const parts = new Map(arrangement.parts.map((p) => [p.slot, silentPart()]));
   const transport = new TickTransport();
   const player = new ArrangementPlayer(transport, parts, arrangement, patchesOf(arrangement));
   for (let i = 0; i < TICKS_PER_BAR; i++) transport.advance(0);
@@ -46,29 +46,55 @@ function play(arrangement: Arrangement): void {
  */
 const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
+/** A version-2 document carrying `PATCHES` and the given parts. */
+const song = (parts: unknown[], rest: Record<string, unknown> = {}): Record<string, unknown> => ({
+  version: 2,
+  patches: PATCHES,
+  parts,
+  ...rest,
+});
+
+const KICK = { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } };
+
 const JUNK: Array<[string, unknown]> = [
   ['null', null],
   ['a number', 42],
   ['a string', 'arrangement'],
   ['an array', [1, 2, 3]],
   ['an empty object', {}],
-  ['wrong types throughout', { seed: 'x', bpm: 'fast', key: 3, kick: { preset: 9 } }],
-  ['a truncated document', { kick: { part: 'kick', preset: 'kick' }, hat: { preset: 'hat' } }],
+  ['a version-2 shell with nothing in it', { version: 2 }],
+  [
+    'wrong types throughout',
+    { version: 2, seed: 'x', bpm: 'fast', key: 3, parts: [{ preset: 9 }] },
+  ],
+  ['a truncated document', song([{ slot: 0, preset: 'kick' }, { preset: 'hat' }])],
   [
     'out-of-range numbers',
-    {
-      bpm: 1e9,
-      kick: {
-        preset: 'kick',
-        note: -5,
-        velocity: 9,
-        hold: -1,
-        driver: { steps: 0, divisor: 7, pulses: { min: 9, max: 2, start: 99 } },
-      },
-    },
+    song(
+      [
+        {
+          slot: 0,
+          preset: 'kick',
+          velocity: 9,
+          sequencer: {
+            kind: 'euclidean',
+            note: -5,
+            hold: -1,
+            steps: 0,
+            divisor: 7,
+            pulses: { min: 9, max: 2, start: 99 },
+          },
+        },
+      ],
+      { bpm: 1e9 },
+    ),
   ],
-  ['a prototype-chain preset name', { kick: { preset: 'toString' } }],
-  ['unknown keys everywhere', { wat: 1, kick: { preset: 'kick', wobble: 2, driver: { flux: 3 } } }],
+  ['a prototype-chain preset name', song([{ slot: 0, preset: 'toString' }])],
+  [
+    'unknown keys everywhere',
+    song([{ ...KICK, wobble: 2, sequencer: { kind: 'euclidean', flux: 3 } }], { wat: 1 }),
+  ],
+  ['a junk sequencer kind', song([{ ...KICK, sequencer: { kind: 'theremin', gate: 1 } }])],
 ];
 
 describe('makeArrangement never throws', () => {
@@ -80,36 +106,53 @@ describe('makeArrangement never throws', () => {
 
 describe('corrections are reported', () => {
   it('names every clamp by path', () => {
-    const result = makeArrangement({
-      patches: PATCHES,
-      kick: { preset: 'kick', velocity: 9 },
-      bpm: 9999,
-    });
+    const result = makeArrangement(song([{ ...KICK, velocity: 9 }], { bpm: 9999 }));
     expect(result.usable).toBe(true);
-    expect(result.corrections).toContain('kick.velocity: clamped 9 to 1');
+    expect(result.corrections).toContain('parts[0].velocity: clamped 9 to 1');
     expect(result.corrections).toContain('bpm: clamped 9999 to 300');
   });
 
   it('names every dropped unknown key by path', () => {
-    const result = makeArrangement({ wat: 1, kick: { preset: 'kick', wobble: 2 } });
+    const result = makeArrangement(song([{ ...KICK, wobble: 2 }], { wat: 1 }));
     expect(result.corrections).toContain('wat: unknown key dropped');
-    expect(result.corrections).toContain('kick.wobble: unknown key dropped');
+    expect(result.corrections).toContain('parts[0].wobble: unknown key dropped');
+  });
+
+  it('drops a field another kind owns, by path', () => {
+    const result = makeArrangement(song([{ ...KICK, sequencer: { kind: 'arp', note: 40 } }]));
+    expect(result.corrections).toContain('parts[0].sequencer.note: unknown key dropped');
   });
 
   it('replaces a divisor that does not divide the bar', () => {
-    const result = makeArrangement({
-      patches: PATCHES,
-      drone: { preset: 'drone-sqr', driver: { divisor: 7 } },
-    });
+    const result = makeArrangement(
+      song([{ slot: 3, preset: 'drone-sqr', sequencer: { kind: 'step', divisor: 7 } }]),
+    );
     expect(result.corrections.join('\n')).toMatch(/divisor: 7 does not divide the 96-tick bar/);
-    expect(result.document.drone?.driver.divisor).toBe(96);
+    const sequencer = result.document.parts[0]?.sequencer;
+    expect(sequencer?.kind === 'step' && sequencer.divisor).toBe(96);
   });
 
   it('takes defaults for absent optional fields silently', () => {
-    const result = makeArrangement({ patches: PATCHES, kick: { part: 'kick', preset: 'kick' } });
+    const result = makeArrangement(
+      song([{ slot: 4, preset: 'kick', sequencer: { kind: 'euclidean' } }]),
+    );
     expect(result.usable).toBe(true);
     expect(result.corrections).toEqual([]);
-    expect(result.document.kick?.driver.steps).toBe(16);
+    const [part] = result.document.parts;
+    expect(part?.name).toBe('Part 5');
+    expect(part?.strip).toEqual(DEFAULT_STRIP);
+    expect(part?.sequencer.kind === 'euclidean' && part.sequencer.steps).toBe(16);
+  });
+
+  it('reads an absent sequencer as none, silently, and an unknown kind as none, reported', () => {
+    const absent = makeArrangement(song([{ slot: 0, preset: 'kick' }]));
+    expect(absent.corrections).toEqual([]);
+    expect(absent.document.parts[0]?.sequencer).toEqual({ kind: 'none' });
+    const junk = makeArrangement(
+      song([{ slot: 0, preset: 'kick', sequencer: { kind: 'theremin' } }]),
+    );
+    expect(junk.document.parts[0]?.sequencer).toEqual({ kind: 'none' });
+    expect(junk.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.kind/);
   });
 });
 
@@ -124,19 +167,16 @@ describe('the fallback (record §4)', () => {
 
   it('is one non-generative part on a quarter-note pulse, no sends, no pitched parts', () => {
     const f = FALLBACK_ARRANGEMENT;
-    expect(f.hat).toBeUndefined();
-    expect(f.arp).toBeUndefined();
-    expect(f.drone).toBeUndefined();
-    expect('mix' in f).toBe(false);
-    expect(f.kick.driver.divisor).toBe(DIVISORS.quarter);
+    expect(f.parts).toHaveLength(1);
+    const [click] = f.parts;
+    const sequencer = click.sequencer;
+    expect(sequencer.divisor).toBe(DIVISORS.quarter);
     // min === max: the density LFO has nothing to modulate — not generative.
-    expect(f.kick.driver.pulses.min).toBe(f.kick.driver.pulses.max);
+    expect(sequencer.pulses.min).toBe(sequencer.pulses.max);
     // pulses === steps: E(n, n) fires on every step — a plain pulse.
-    expect(f.kick.driver.pulses.min).toBe(f.kick.driver.steps);
-    // No sends: the click deliberately has no MIX strip, so it routes through
-    // DEFAULT_STRIP — unity, centred, sends nothing — whatever the mix says.
-    expect(Object.hasOwn(MIX, f.kick.part)).toBe(false);
-    expect(stripFor(MIX, f.kick.part)).toBe(DEFAULT_STRIP);
+    expect(sequencer.pulses.min).toBe(sequencer.steps);
+    // No sends: unity, centred, sends nothing — whatever a song's strips say.
+    expect(click.strip).toBe(DEFAULT_STRIP);
     expect(DEFAULT_STRIP.sends).toEqual({});
   });
 
@@ -146,7 +186,7 @@ describe('the fallback (record §4)', () => {
     const clicker = { ...silentPart(), trigger: () => ++triggers };
     const player = new ArrangementPlayer(
       transport,
-      { kick: clicker },
+      new Map([[0, clicker]]),
       FALLBACK_ARRANGEMENT,
       FALLBACK_ARRANGEMENT.patches,
     );
@@ -158,15 +198,14 @@ describe('the fallback (record §4)', () => {
 
 describe('round-trip: normalise → serialise → normalise', () => {
   it('is equal and correction-free on the normalised object', () => {
-    const messy = {
-      patches: PATCHES,
-      seed: 204.4,
-      bpm: 500,
-      key: { root: 50, scale: 'dorian', weights: [4, 1] },
-      kick: { preset: 'kick', velocity: 3, driver: { divisor: 5 } },
-      arp: { preset: 'saw-arp', driver: { gate: 2, walk: 'sideways' } },
-      mix: { kick: { level: 9 }, hat: { sends: { echo: 2 } } },
-    };
+    const messy = song(
+      [
+        { ...KICK, velocity: 3, strip: { level: 9 }, sequencer: { kind: 'euclidean', divisor: 5 } },
+        { slot: 2, preset: 'saw-arp', sequencer: { kind: 'arp', gate: 2, walk: 'sideways' } },
+        { slot: 1, preset: 'hat', strip: { sends: { echo: 2 } } },
+      ],
+      { seed: 204.4, bpm: 500, key: { root: 50, scale: 'dorian', weights: [4, 1] } },
+    );
     const first = makeArrangement(messy);
     expect(first.usable).toBe(true);
     expect(first.corrections.length).toBeGreaterThan(0);
@@ -180,53 +219,39 @@ describe('round-trip: normalise → serialise → normalise', () => {
     const again = makeArrangement(JSON.parse(JSON.stringify(FALLBACK_ARRANGEMENT)));
     expect(again.usable).toBe(true);
     expect(again.corrections).toEqual([]);
+    expect(again.dangling).toEqual([]);
     expect(again.document).toEqual(FALLBACK_ARRANGEMENT);
-    // The click's strip is deliberately not in the MIX, so the fallback is
-    // reported — one more way it can never quietly become the arrangement.
-    expect(again.dangling).toEqual(['kick.part: the MIX defines no strip "click"']);
   });
 });
 
 describe('runtime inputs JSON cannot represent (self-review findings)', () => {
   it('never throws on BigInt or cyclic values in a field', () => {
-    const bigint = makeArrangement({ patches: PATCHES, kick: { preset: 'kick', velocity: 1n } });
-    expect(bigint.document.kick?.velocity).toBe(0.8);
-    expect(bigint.corrections.join('\n')).toMatch(/kick\.velocity/);
+    const bigint = makeArrangement(song([{ ...KICK, velocity: 1n }]));
+    expect(bigint.document.parts[0]?.velocity).toBe(0.8);
+    expect(bigint.corrections.join('\n')).toMatch(/parts\[0\]\.velocity/);
 
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
-    expect(() =>
-      makeArrangement({ patches: PATCHES, kick: { preset: 'kick', velocity: cyclic } }),
-    ).not.toThrow();
+    expect(() => makeArrangement(song([{ ...KICK, velocity: cyclic }]))).not.toThrow();
+    expect(() => makeArrangement(song([{ ...KICK, slot: cyclic }]))).not.toThrow();
     expect(() => makeArrangement(1n)).not.toThrow();
-  });
-
-  it('drops a later slot reusing an earlier slot part name', () => {
-    const result = makeArrangement({
-      patches: PATCHES,
-      kick: { part: 'kick', preset: 'kick' },
-      hat: { part: 'kick', preset: 'hat' },
-    });
-    expect(result.usable).toBe(true);
-    expect(result.document.kick).toBeDefined();
-    expect(result.document.hat).toBeUndefined();
-    expect(result.corrections.join('\n')).toMatch(
-      /hat: part name "kick" is already used by kick — part dropped/,
-    );
   });
 });
 
 describe('a song resolves only its own patches (#562)', () => {
-  const OLD_DOCUMENT = {
+  const UNEMBEDDED = {
+    version: 2,
     seed: 204,
     bpm: 96,
     key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
-    kick: { part: 'kick', preset: 'kick' },
-    drone: { part: 'drone', preset: 'drone-sqr' },
+    parts: [
+      { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } },
+      { slot: 3, name: 'drone', preset: 'drone-sqr', sequencer: { kind: 'step' } },
+    ],
   };
 
   it('drops a part naming a library id the document does not embed, and reports it', () => {
-    const result = makeArrangement(OLD_DOCUMENT);
+    const result = makeArrangement(UNEMBEDDED);
     // The ids are real library patches — that is exactly what no longer helps.
     expect(PRESETS.kick).toBeDefined();
     expect(PRESETS['drone-sqr']).toBeDefined();
@@ -234,15 +259,14 @@ describe('a song resolves only its own patches (#562)', () => {
     expect(result.usable).toBe(false);
     expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
     expect(result.dangling).toEqual([
-      'kick.preset: no preset "kick" is defined',
-      'drone.preset: no preset "drone-sqr" is defined',
+      'parts[0].preset: no preset "kick" is defined',
+      'parts[1].preset: no preset "drone-sqr" is defined',
     ]);
-    expect(result.usable).toBe(false);
     expect(result.filled).toEqual([]);
   });
 
   it('opens with a library fill: resolved once, embedded, and listed', () => {
-    const result = makeArrangement(OLD_DOCUMENT, { libraryFill: PRESETS });
+    const result = makeArrangement(UNEMBEDDED, { libraryFill: PRESETS });
     expect(result.usable).toBe(true);
     expect(result.dangling).toEqual([]);
     expect(result.filled).toEqual(['kick', 'drone-sqr']);
@@ -255,7 +279,7 @@ describe('a song resolves only its own patches (#562)', () => {
   });
 
   it('is self-contained after the fill: the same document needs no fill again', () => {
-    const opened = makeArrangement(OLD_DOCUMENT, { libraryFill: PRESETS });
+    const opened = makeArrangement(UNEMBEDDED, { libraryFill: PRESETS });
     const exported = JSON.parse(JSON.stringify(opened.document)) as unknown;
     const reopened = makeArrangement(exported);
     expect(reopened.filled).toEqual([]);
@@ -270,7 +294,7 @@ describe('a song resolves only its own patches (#562)', () => {
     expect(PRESETS.kick?.volume).toBeGreaterThan(0);
     const forked = PRESETS.kick!.volume / 2;
     const result = makeArrangement(
-      { ...OLD_DOCUMENT, patches: { kick: { volume: forked } } },
+      { ...UNEMBEDDED, patches: { kick: { volume: forked } } },
       { libraryFill: PRESETS },
     );
     expect(result.filled).toEqual(['drone-sqr']);
@@ -281,10 +305,10 @@ describe('a song resolves only its own patches (#562)', () => {
 
   it('leaves a name neither the document nor the library defines dangling', () => {
     const result = makeArrangement(
-      { ...OLD_DOCUMENT, kick: { part: 'kick', preset: 'nope' } },
+      { ...UNEMBEDDED, parts: [{ ...UNEMBEDDED.parts[0], preset: 'nope' }, UNEMBEDDED.parts[1]] },
       { libraryFill: PRESETS },
     );
-    expect(result.dangling).toEqual(['kick.preset: no preset "nope" is defined']);
+    expect(result.dangling).toEqual(['parts[0].preset: no preset "nope" is defined']);
     expect(result.filled).toEqual(['drone-sqr']);
   });
 });
@@ -294,7 +318,7 @@ describe("a document patch's mono field (#453)", () => {
   // booleans, so the field needs no normaliser code -- which is exactly why it
   // is worth pinning: nothing else would fail if the walk stopped covering it.
   const withPatch = (patch: unknown): ReturnType<typeof makeArrangement> =>
-    makeArrangement({ kick: { part: 'kick', preset: 'kick' }, patches: { kick: patch } });
+    makeArrangement({ version: 2, parts: [KICK], patches: { kick: patch } });
 
   it('keeps true and false as given', () => {
     expect(withPatch({ mono: true }).document.patches?.kick?.mono).toBe(true);

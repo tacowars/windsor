@@ -1,9 +1,9 @@
 /**
- * `AudioSystem` over the document model (issue #75): `initMusic` builds only
- * the parts the document defines, landing each on the document's strip
- * overlay where the `mix` section names it; `apply` takes a deep partial of
- * the same model — arrangement fields through the player, `mix` straight onto
- * the live strips — changing only the fields it names, never half-applying.
+ * `AudioSystem` over the document model (issues #75, #597): `initMusic` builds
+ * only the parts the document lists, each registered under its slot and
+ * landing on its own strip; `apply` takes a deep partial of the same model —
+ * arrangement fields through the player, a part's `strip` straight onto its
+ * live strip — changing only the fields it names, never half-applying.
  *
  * Since #562 the game path resolves a part's `preset` in the document's own
  * `patches` and nowhere else: the embedded snapshot is what plays, and a name
@@ -13,11 +13,18 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { FakeContext, installFakeAudioWorklet } from './__fixtures__/fakeAudioContext';
-import { FULL_ARRANGEMENT, FULL_DOCUMENT } from './__fixtures__/fullArrangement';
+import {
+  FULL_DOCUMENT,
+  FULL_PARTS,
+  FULL_SLOT,
+  FULL_STRIPS,
+  withDocumentPart,
+  type FullPartId,
+} from './__fixtures__/fullArrangement';
 import type { ArrangementDocument } from './arrangementDocument';
 import { AudioSystem } from './audioSystem';
+import { musicPartName } from './documentParts';
 import { FmEngine } from './fmEngine';
-import { MIX } from './mix';
 import { clonePatch } from './patch';
 import { PRESETS } from './presets';
 
@@ -33,39 +40,49 @@ async function system(document: ArrangementDocument): Promise<AudioSystem> {
   return sys;
 }
 
+const stripOf = (sys: AudioSystem, id: FullPartId) => sys.strip(musicPartName(FULL_SLOT[id]));
+
+const { kick, hat, arp } = FULL_SLOT;
+
 const KICK_ONLY: ArrangementDocument = {
-  seed: FULL_ARRANGEMENT.seed,
-  bpm: FULL_ARRANGEMENT.bpm,
-  key: FULL_ARRANGEMENT.key,
-  kick: FULL_ARRANGEMENT.kick,
-  patches: FULL_DOCUMENT.patches,
+  ...FULL_DOCUMENT,
+  parts: FULL_DOCUMENT.parts.filter((part) => part.slot === kick),
 };
 
 describe('initMusic over a document', () => {
-  it('builds only the parts the document defines', async () => {
+  it('builds only the parts the document lists, under their slots', async () => {
     const sys = await system(KICK_ONLY);
-    expect(sys.strip('kick')).toBeDefined();
-    expect(sys.strip('hat')).toBeUndefined();
-    expect(sys.strip('arp')).toBeUndefined();
-    expect(sys.strip('drone')).toBeUndefined();
+    expect(stripOf(sys, 'kick')).toBeDefined();
+    expect(stripOf(sys, 'hat')).toBeUndefined();
+    expect(stripOf(sys, 'arp')).toBeUndefined();
+    expect(stripOf(sys, 'drone')).toBeUndefined();
+    // Never under the label: a name keys nothing (#597).
+    expect(sys.strip('kick')).toBeUndefined();
   });
 
-  it('lands a part on the document strip overlay when the mix names it', async () => {
-    const doc: ArrangementDocument = {
-      ...FULL_DOCUMENT,
-      mix: { hat: { level: 0.25, pan: -0.5, sends: { echo: 0.1 } } },
-    };
+  it('lands each part on its own strip', async () => {
+    const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
+      strip: { level: 0.25, pan: -0.5, sends: { echo: 0.1 } },
+    });
     const sys = await system(doc);
-    expect(sys.strip('hat')?.part.gain.value).toBe(0.25);
-    expect(sys.strip('hat')?.sends.get('echo')?.gain.value).toBe(0.1);
-    // A part the overlay does not name stays on the code's MIX.
-    expect(sys.strip('kick')?.part.gain.value).toBe(MIX.kick.level);
+    expect(stripOf(sys, 'hat')?.part.gain.value).toBe(0.25);
+    expect(stripOf(sys, 'hat')?.sends.get('echo')?.gain.value).toBe(0.1);
+    expect(stripOf(sys, 'kick')?.part.gain.value).toBe(FULL_STRIPS.kick.level);
+  });
+
+  it('builds a none part, playable from the keyboard, that nothing sequences', async () => {
+    const doc = withDocumentPart(FULL_DOCUMENT, 'arp', { sequencer: { kind: 'none' } });
+    const sys = await system(doc);
+    const part = stripOf(sys, 'arp')?.part;
+    expect(part).toBeDefined();
+    expect(() => part?.noteOn(60, 0.8)).not.toThrow();
+    expect(sys.readout().counters[arp]).toBe(0);
   });
 });
 
 describe('the document is the only patch table (#562)', () => {
   it('plays the embedded snapshot where the library patch of that id differs', async () => {
-    const id = FULL_ARRANGEMENT.kick.preset;
+    const id = FULL_PARTS.kick.preset;
     const fromLibrary = PRESETS[id];
     expect(fromLibrary?.volume).toBeGreaterThan(0);
     // The snapshot this song carries is deliberately not the library's — half
@@ -76,8 +93,8 @@ describe('the document is the only patch table (#562)', () => {
       ...FULL_DOCUMENT,
       patches: { ...FULL_DOCUMENT.patches, [id]: embedded },
     });
-    expect(sys.strip('kick')?.part.patch.volume).toBe(snapshot);
-    expect(sys.strip('kick')?.part.patch.name).toBe('Snapshot Kick');
+    expect(stripOf(sys, 'kick')?.part.patch.volume).toBe(snapshot);
+    expect(stripOf(sys, 'kick')?.part.patch.name).toBe('Snapshot Kick');
     expect(snapshot).not.toBe(fromLibrary?.volume);
     // A live edit to the part lands on the document's table, not the library's.
     expect(sys.apply({ patches: { [id]: { volume: snapshot / 2 } } }).ok).toBe(true);
@@ -85,10 +102,10 @@ describe('the document is the only patch table (#562)', () => {
   });
 
   it('fails the load naming the part and the id when the document omits a patch', async () => {
-    const { kick, ...patches } = FULL_DOCUMENT.patches;
-    expect(kick).toBeDefined();
+    const { kick: kickPatch, ...patches } = FULL_DOCUMENT.patches;
+    expect(kickPatch).toBeDefined();
     await expect(system({ ...FULL_DOCUMENT, patches })).rejects.toThrow(
-      /^kick: the song document defines no patch "kick"/,
+      /^part 0: the song document defines no patch "kick"/,
     );
     // And it is not the library that would have supplied it: the id is there.
     expect(PRESETS.kick).toBeDefined();
@@ -102,41 +119,61 @@ describe('the document is the only patch table (#562)', () => {
 });
 
 describe('apply over the document model', () => {
-  it('changes only the mix fields the partial names', async () => {
+  it('changes only the strip fields the partial names', async () => {
     const sys = await system(FULL_DOCUMENT);
-    const hat = sys.strip('hat');
-    const echoBefore = hat?.sends.get('echo')?.gain.value;
-    expect(sys.apply({ mix: { hat: { level: 0.3 } } })).toEqual({ ok: true, ignored: [] });
-    expect(hat?.part.gain.value).toBe(0.3);
-    expect(hat?.sends.get('echo')?.gain.value).toBe(echoBefore);
+    const strip = stripOf(sys, 'hat');
+    const echoBefore = strip?.sends.get('echo')?.gain.value;
+    expect(sys.apply({ parts: { [hat]: { strip: { level: 0.3 } } } })).toEqual({
+      ok: true,
+      ignored: [],
+    });
+    expect(strip?.part.gain.value).toBe(0.3);
+    expect(strip?.sends.get('echo')?.gain.value).toBe(echoBefore);
   });
 
   it('sets sends live and clamps into range', async () => {
     const sys = await system(FULL_DOCUMENT);
-    expect(sys.apply({ mix: { hat: { sends: { echo: 2 } } } }).ok).toBe(true);
-    expect(sys.strip('hat')?.sends.get('echo')?.gain.value).toBe(1);
+    expect(sys.apply({ parts: { [hat]: { strip: { sends: { echo: 2 } } } } }).ok).toBe(true);
+    expect(stripOf(sys, 'hat')?.sends.get('echo')?.gain.value).toBe(1);
   });
 
-  it('reports unknown strips, returns and fields in ignored', async () => {
+  it('sets a send the part had no amount for yet: every strip reaches every return', async () => {
+    const sys = await system(FULL_DOCUMENT);
+    expect(sys.apply({ parts: { [kick]: { strip: { sends: { room: 0.4 } } } } })).toEqual({
+      ok: true,
+      ignored: [],
+    });
+    expect(stripOf(sys, 'kick')?.sends.get('room')?.gain.value).toBe(0.4);
+  });
+
+  it('reports unknown slots, returns and fields in ignored', async () => {
     const sys = await system(FULL_DOCUMENT);
     const result = sys.apply({
-      mix: { boom: { level: 1 }, hat: { wat: 3, sends: { cave: 0.5 } } },
+      parts: { 6: { strip: { level: 1 } }, [hat]: { strip: { wat: 3, sends: { cave: 0.5 } } } },
     } as never);
     expect(result.ok).toBe(true);
-    expect(result.ignored.sort()).toEqual(['mix.boom', 'mix.hat.sends.cave', 'mix.hat.wat']);
+    expect(result.ignored.sort()).toEqual([
+      'parts.1.strip.sends.cave',
+      'parts.1.strip.wat',
+      'parts.6',
+    ]);
   });
 
-  it('does not touch the mix when the arrangement half fails validation', async () => {
+  it('does not touch a strip when the arrangement half fails validation', async () => {
     const sys = await system(FULL_DOCUMENT);
-    const before = sys.strip('hat')?.part.gain.value;
-    const result = sys.apply({ arp: { preset: 'nope' }, mix: { hat: { level: 0.1 } } });
+    const before = stripOf(sys, 'hat')?.part.gain.value;
+    const result = sys.apply({
+      parts: { [arp]: { preset: 'nope' }, [hat]: { strip: { level: 0.1 } } },
+    });
     expect(result.ok).toBe(false);
-    expect(sys.strip('hat')?.part.gain.value).toBe(before);
+    expect(stripOf(sys, 'hat')?.part.gain.value).toBe(before);
   });
 
-  it('applies arrangement fields and mix fields from one partial', async () => {
+  it('applies arrangement fields and strip fields from one partial', async () => {
     const sys = await system(FULL_DOCUMENT);
-    expect(sys.apply({ bpm: 90, mix: { kick: { pan: 0.5 } } }).ok).toBe(true);
+    expect(
+      sys.apply({ bpm: 90, parts: { [kick]: { velocity: 0.5, strip: { pan: 0.5 } } } }).ok,
+    ).toBe(true);
     expect(sys.readout().bpm).toBe(90);
   });
 });
