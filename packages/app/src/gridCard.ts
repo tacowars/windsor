@@ -32,7 +32,7 @@ import {
   withStep,
 } from './gridModel';
 import { makeKnob } from './knob';
-import { divisorPicker, knobRow } from './seqFields';
+import { divisorPicker, tableKnob } from './seqFields';
 import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
 import { scaleOffsets } from '../../../packages/client/src/audio/index-for-editor';
 
@@ -256,12 +256,12 @@ function randomizeButton(strip: Strip): HTMLElement {
 
 /** Vel first, Length second, then the rest of the table, then Rotate: the row order the card had. */
 function controls(strip: Strip): HTMLElement {
+  const { ctx, slot } = strip;
   const [velocity, ...rest] = GRID_KNOBS;
-  const row = knobRow(strip.ctx, strip.slot, velocity ? [velocity] : [], PITCH_COLOR);
+  const row = el('div', 'knob-row');
+  if (velocity) row.appendChild(tableKnob(ctx, slot, velocity, PITCH_COLOR));
   row.appendChild(lengthKnob(strip));
-  for (const knob of knobRow(strip.ctx, strip.slot, rest, PITCH_COLOR).children) {
-    row.appendChild(knob);
-  }
+  for (const entry of rest) row.appendChild(tableKnob(ctx, slot, entry, PITCH_COLOR));
   row.appendChild(rotateKnob(strip));
   return row;
 }
