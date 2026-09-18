@@ -21,7 +21,10 @@ import type { EngineHost } from './host';
 import { PartsSession } from './partsSession';
 
 /** The part of the engine host the context drives; a test's fake implements this much. */
-export type ContextHost = Pick<EngineHost, 'apply' | 'build' | 'capturePattern' | 'part'>;
+export type ContextHost = Pick<
+  EngineHost,
+  'apply' | 'build' | 'isBuilding' | 'capturePattern' | 'part'
+>;
 
 /** A tab's panel: an element, or a test's stand-in with the one flag the context flips. */
 export interface TabPanel {
@@ -101,6 +104,12 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     }
     this.model.merge(partial);
     if (live && live.ignored.length > 0) this.status(`ignored: ${live.ignored.join(', ')}`);
+    // No system to apply to because one is being built (the first enable, an
+    // Import, a Restart): that build captured an older document, so queue the
+    // current one behind it — coalesced, latest wins — or a part added or
+    // removed in that window would exist in the document only (#629 review,
+    // passes 1 and 2). With audio never enabled there is nothing to queue.
+    if (live === null && this.host.isBuilding) this.rebuild();
     return live ?? { ok: true, ignored: [] };
   }
 
