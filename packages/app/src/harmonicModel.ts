@@ -6,16 +6,18 @@
  * bar heights are relative.
  */
 
-/** The bar counts offered, Operator-style. */
-export const HARMONIC_COUNTS = [16, 32, 64] as const;
-export type HarmonicCount = (typeof HARMONIC_COUNTS)[number];
-const FEWEST: HarmonicCount = 16;
-const MOST: HarmonicCount = 64;
+import { HARMONIC_COUNTS, PREVIEW_OVERSAMPLE, type HarmonicCount } from './harmonicConstants';
+
+export { HARMONIC_COUNTS, type HarmonicCount } from './harmonicConstants';
+
+const FEWEST: HarmonicCount = HARMONIC_COUNTS[0];
+const MOST: HarmonicCount = HARMONIC_COUNTS[HARMONIC_COUNTS.length - 1] ?? FEWEST;
 /**
- * Preview samples per cycle: 8 per cycle of the highest offered harmonic, so
- * none of the 64 aliases in the drawing (96 folded 49–64 onto lower ones).
+ * Preview samples per cycle: `PREVIEW_OVERSAMPLE` per cycle of the highest
+ * offered harmonic, so none of the 64 aliases in the drawing (96 folded 49–64
+ * onto lower ones).
  */
-export const PREVIEW_POINTS = MOST * 8;
+export const PREVIEW_POINTS = MOST * PREVIEW_OVERSAMPLE;
 
 /** A User wave with nothing drawn yet: the pure fundamental the worklet already plays for null. */
 export function seedPartials(count: HarmonicCount = FEWEST): number[] {

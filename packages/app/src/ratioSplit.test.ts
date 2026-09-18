@@ -66,6 +66,24 @@ describe('splitting a stored ratio', () => {
     expect(join(COARSE_MAX, FINE_MAX)).toBe(RATIO_MAX);
     expect(join(0, 0)).toBe(RATIO_MIN);
   });
+
+  it('splits and joins at the floor and in the band the old floor cut off (#618 decision 7)', () => {
+    // The floor itself: Coarse 0, Fine the whole value, and back exactly.
+    expect(split(RATIO_MIN)).toEqual({ coarse: 0, fine: RATIO_MIN });
+    expect(join(0, RATIO_MIN)).toBe(RATIO_MIN);
+    // Between the new floor and the drum bodies' 0.25: a sub-body an octave
+    // under the kick. Written from the constant, so a lower floor keeps it.
+    const between = RATIO_MIN * 2;
+    expect(between).toBeLessThan(0.25);
+    expect(split(between)).toEqual({ coarse: 0, fine: between });
+    expect(join(0, between)).toBe(between);
+    expect(withFine(0.5, between)).toBe(between);
+    // Below the floor still clamps, so the console never writes a ratio it cannot show.
+    expect(join(0, RATIO_MIN / 2)).toBe(RATIO_MIN);
+    // The readout shows the floor in the stored field's own terms.
+    expect(fmtRatio(RATIO_MIN)).toBe(RATIO_MIN.toFixed(3));
+    expect(fmtCoarse(split(RATIO_MIN).coarse)).toBe('sub');
+  });
 });
 
 describe('turning one knob of the pair', () => {
@@ -105,10 +123,10 @@ describe('turning one knob of the pair', () => {
   });
 
   it('clamps to the range at both ends', () => {
-    expect(withCoarse(0.25, 0)).toBe(RATIO_MIN);
+    expect(withCoarse(RATIO_MIN, 0)).toBe(RATIO_MIN);
     expect(withFine(0.5, 0.25)).toBe(0.25);
-    // Coarse 0 is where the sub-ratios live, and 0.1 is below the floor.
-    expect(withFine(0.5, 0.1)).toBe(RATIO_MIN);
+    // Coarse 0 is where the sub-ratios live, and half the floor is below it.
+    expect(withFine(0.5, RATIO_MIN / 2)).toBe(RATIO_MIN);
     // Coarse below its own floor is 0, which leaves the sub-ratio standing.
     expect(withCoarse(0.5, -3)).toBe(0.5);
     expect(withCoarse(12.5, 99)).toBe(RATIO_MAX);

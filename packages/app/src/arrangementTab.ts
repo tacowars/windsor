@@ -10,15 +10,34 @@
  * at build time (record §3) and `?music=<name>` plays it, `bed-01` being the
  * default.
  */
+import { BPM_MAX, BPM_MIN } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  EXPORT_URL_TTL_MS,
+  READOUT_DEFER_MS,
+  READOUT_POLL_MS,
+  SEED_MAX,
+} from './arrangementConstants';
+import { CARRIER_COLOR } from './consoleColors';
+import { fmt0 } from './consoleFormat';
 import type { AppCtx } from './context';
+import { el, section } from './dom';
+import { makeKnob, type KnobSpec } from './knob';
 import { openConfirm } from './metadataModal';
 import { partsState } from './patchState';
 import { NEW_SONG_BPM } from './songConstants';
 import { newSong } from './songParts';
-import { el, fmt0, section } from './dom';
-import { makeKnob } from './knob';
 
-const COLOR = '#E0A44E';
+const COLOR = CARRIER_COLOR;
+
+/** The tempo knob: the engine's range, and what a new song starts at (#617). */
+export const BPM_KNOB: Pick<KnobSpec, 'label' | 'min' | 'max' | 'def' | 'step' | 'fmt'> = {
+  label: 'BPM',
+  min: BPM_MIN,
+  max: BPM_MAX,
+  def: NEW_SONG_BPM,
+  step: 1,
+  fmt: fmt0,
+};
 
 function transportSection(ctx: AppCtx): HTMLElement {
   const { root, body } = section('Transport');
@@ -38,15 +57,8 @@ function transportSection(ctx: AppCtx): HTMLElement {
   row.appendChild(restart);
   row.appendChild(
     makeKnob({
-      label: 'BPM',
-      min: 20,
-      max: 300,
-      // What a new song starts at (#617): a double-click reset used to write
-      // 96, a tempo nothing in the console chooses.
-      def: NEW_SONG_BPM,
-      step: 1,
+      ...BPM_KNOB,
       color: COLOR,
-      fmt: fmt0,
       get: () => ctx.model.doc.bpm,
       set: (v) => void ctx.change({ bpm: v }),
     }),
@@ -64,7 +76,7 @@ function transportSection(ctx: AppCtx): HTMLElement {
   const reroll = el('button', 'btn', 'Reroll') as HTMLButtonElement;
   reroll.type = 'button';
   reroll.onclick = (): void => {
-    const next = Math.floor(Math.random() * 1e6);
+    const next = Math.floor(Math.random() * SEED_MAX);
     seedInput.value = String(next);
     ctx.change({ seed: next });
   };
@@ -121,7 +133,7 @@ function documentSection(ctx: AppCtx): HTMLElement {
     a.href = URL.createObjectURL(blob);
     a.download = name.value || 'arrangement.json';
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    setTimeout(() => URL.revokeObjectURL(a.href), EXPORT_URL_TTL_MS);
     ctx.status(`exported ${a.download}`);
   };
   row.appendChild(exportBtn);
@@ -189,11 +201,11 @@ function readoutSection(ctx: AppCtx): HTMLElement {
         `${r.running ? 'running' : 'stopped'}${r.muted ? ' (muted)' : ''} — ` +
         `bpm ${r.bpm} — root ${r.root} — ${counters}`;
     }
-    setTimeout(update, 500);
+    setTimeout(update, READOUT_POLL_MS);
   };
   // Deferred: at build time the section is not yet in the DOM, and the
   // isConnected guard above would kill the loop before it started.
-  setTimeout(update, 50);
+  setTimeout(update, READOUT_DEFER_MS);
   return root;
 }
 

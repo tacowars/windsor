@@ -23,8 +23,13 @@
  * the next: turning Fine up at 0.999 stays at 0.999 and Coarse does not move.
  */
 
-/** The stored field's range, unchanged from the single Ratio knob it replaces. */
-export const RATIO_MIN = 0.25;
+/**
+ * The stored field's range. The floor is the console's alone — the engine and
+ * `patchNormalise` accept any positive ratio — and sits four octaves under the
+ * note, two under the drum bodies that `drum-bank-ratio-floor` pinned at 0.25
+ * (Pat, 2026-09-18; `2026-09-18-618-console-ratio-floor-and-the-tools-lint-fence`).
+ */
+export const RATIO_MIN = 0.0625;
 export const RATIO_MAX = 24;
 
 export const COARSE_MIN = 0;

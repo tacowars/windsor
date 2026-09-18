@@ -135,10 +135,11 @@ describe('a turn of either knob', () => {
       partsState.patch.ops[1]!.ratio = 0.5;
       const { coarse, fine } = ratioKnobSpecs(1);
       expect(coarse.get()).toBe(0);
-      fine.set(0.1);
+      // Half the floor, written from the constant: the console clamps it there.
+      fine.set(RATIO_MIN / 2);
       expect(c.ratio(1)).toBe(RATIO_MIN);
       // Which is why the pair re-reads itself after a commit: Fine was asked
-      // for 0.1 and the field now holds 0.25.
+      // for half the floor and the field now holds the floor.
       expect(fine.get()).toBe(RATIO_MIN);
     });
   });

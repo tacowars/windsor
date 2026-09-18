@@ -15,10 +15,9 @@ import type { GridSpec } from '../../../packages/client/src/audio/index-for-edit
 import { partAt } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { partChange } from './context';
-import { el, fmt0, fmt2 } from './dom';
-import { GRID_ROTATE_MAX } from './gridConstants';
+import { PITCH_COLOR } from './consoleColors';
+import { el } from './dom';
 import {
-  GRID_STEPS_MAX,
   cycleKind,
   cycleOctave,
   degreeOptions,
@@ -33,7 +32,8 @@ import {
   withStep,
 } from './gridModel';
 import { makeKnob } from './knob';
-import { PITCH_COLOR, divisorPicker, driverKnob, sectionKnob } from './seqFields';
+import { divisorPicker, knobRow } from './seqFields';
+import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
 import { scaleOffsets } from '../../../packages/client/src/audio/index-for-editor';
 
 const HINT =
@@ -208,13 +208,8 @@ function watch(strip: Strip): void {
 
 function lengthKnob(strip: Strip): HTMLElement {
   return makeKnob({
-    label: 'Length',
-    min: 1,
-    max: GRID_STEPS_MAX,
-    def: 16,
-    step: 1,
+    ...GRID_LENGTH_KNOB,
     color: PITCH_COLOR,
-    fmt: fmt0,
     get: () => specOf(strip.ctx, strip.slot)?.length ?? 1,
     set: (v) => {
       const spec = specOf(strip.ctx, strip.slot);
@@ -230,13 +225,8 @@ function lengthKnob(strip: Strip): HTMLElement {
 function rotateKnob(strip: Strip): HTMLElement {
   let turned = 0;
   return makeKnob({
-    label: 'Rotate',
-    min: -GRID_ROTATE_MAX,
-    max: GRID_ROTATE_MAX,
-    def: 0,
-    step: 1,
+    ...GRID_ROTATE_KNOB,
     color: PITCH_COLOR,
-    fmt: (v) => (v > 0 ? `+${v.toFixed(0)}` : v.toFixed(0)),
     get: () => turned,
     set: (v) => {
       const target = Math.round(v);
@@ -264,25 +254,14 @@ function randomizeButton(strip: Strip): HTMLElement {
   return button;
 }
 
+/** Vel first, Length second, then the rest of the table, then Rotate: the row order the card had. */
 function controls(strip: Strip): HTMLElement {
-  const { ctx, slot } = strip;
-  const row = el('div', 'knob-row');
-  const knob = (field: string, label: string, def: number): HTMLElement =>
-    driverKnob(ctx, slot, field, { label, min: 0, max: 1, def, color: PITCH_COLOR, fmt: fmt2 });
-  row.appendChild(
-    sectionKnob(ctx, slot, 'velocity', {
-      label: 'Vel',
-      min: 0,
-      max: 1,
-      def: 0.8,
-      color: PITCH_COLOR,
-      fmt: fmt2,
-    }),
-  );
+  const [velocity, ...rest] = GRID_KNOBS;
+  const row = knobRow(strip.ctx, strip.slot, velocity ? [velocity] : [], PITCH_COLOR);
   row.appendChild(lengthKnob(strip));
-  row.appendChild(knob('skipChance', 'Skip', 0));
-  row.appendChild(knob('accentVelocity', 'Acc vel', 0.2));
-  row.appendChild(knob('accentMod', 'Acc mod', 1));
+  for (const knob of knobRow(strip.ctx, strip.slot, rest, PITCH_COLOR).children) {
+    row.appendChild(knob);
+  }
   row.appendChild(rotateKnob(strip));
   return row;
 }

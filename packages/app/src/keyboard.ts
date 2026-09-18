@@ -3,31 +3,19 @@
  * the real engine — `part.noteOn`/`noteOff`, nothing local.
  */
 import type { AudioPart } from '../../../packages/client/src/audio/index-for-editor';
+import { SEMITONES_PER_OCTAVE } from '../../../packages/client/src/audio/index-for-editor';
 import { $, el } from './dom';
+import {
+  BLACK_KEYS,
+  FIXED_VELOCITY,
+  KEY_COUNT,
+  OCTAVE_DEFAULT,
+  OCTAVE_MAX,
+  OCTAVE_MIN,
+  QWERTY,
+} from './keyboardConstants';
+import { pitchClass } from './consoleFormat';
 import type { PerformerSink } from './midiPerformer';
-
-const BLACK = new Set([1, 3, 6, 8, 10]);
-const KEY_COUNT = 24;
-/** What the QWERTY row and the mouse strike with; MIDI brings its own. */
-const FIXED_VELOCITY = 0.9;
-const QWERTY: Record<string, number> = {
-  a: 0,
-  w: 1,
-  s: 2,
-  e: 3,
-  d: 4,
-  f: 5,
-  t: 6,
-  g: 7,
-  y: 8,
-  h: 9,
-  u: 10,
-  j: 11,
-  k: 12,
-  o: 13,
-  l: 14,
-  p: 15,
-};
 
 /**
  * A dropdown picked with the mouse keeps focus, and the note keys above are
@@ -69,7 +57,7 @@ interface Held {
 }
 
 export class Keyboard {
-  octave = 4;
+  octave = OCTAVE_DEFAULT;
   hold = false;
 
   /** Called after Panic, so a MIDI performer can forget notes the part no longer sounds. */
@@ -104,7 +92,7 @@ export class Keyboard {
     for (let i = 0; i < KEY_COUNT; i++) {
       const key = el('div', 'key');
       key.dataset.offset = String(i);
-      if (BLACK.has(i % 12)) key.dataset.black = '1';
+      if (BLACK_KEYS.has(pitchClass(i))) key.dataset.black = '1';
       key.addEventListener('pointerdown', (e) => {
         key.setPointerCapture(e.pointerId);
         this.press('mouse', i, key);
@@ -150,7 +138,7 @@ export class Keyboard {
   }
 
   shiftOctave(by: number): void {
-    this.octave = Math.min(8, Math.max(0, this.octave + by));
+    this.octave = Math.min(OCTAVE_MAX, Math.max(OCTAVE_MIN, this.octave + by));
     this.syncLabel();
   }
 
@@ -196,7 +184,7 @@ export class Keyboard {
   midiSink(inputId: string): PerformerSink {
     return {
       press: (note, velocity) => {
-        const offset = note - this.octave * 12;
+        const offset = note - this.octave * SEMITONES_PER_OCTAVE;
         const keys = document.getElementById('keys');
         const keyEl = offset >= 0 && offset < KEY_COUNT ? keys?.children[offset] : undefined;
         const el = (keyEl as HTMLElement | undefined) ?? null;
@@ -215,7 +203,7 @@ export class Keyboard {
   }
 
   private press(source: string, offset: number, keyEl: HTMLElement | null): void {
-    this.play(source, this.octave * 12 + offset, FIXED_VELOCITY, keyEl);
+    this.play(source, this.octave * SEMITONES_PER_OCTAVE + offset, FIXED_VELOCITY, keyEl);
   }
 
   private play(source: string, note: number, velocity: number, keyEl: HTMLElement | null): void {

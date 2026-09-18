@@ -16,9 +16,9 @@ import {
   GRID_STEP_OCTAVE_MAX,
   foldDegree,
   gridNote,
+  pitchClassName,
   scaleOffsets,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { NOTE_NAMES } from './dom';
 import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
 
 export { GRID_STEPS_MAX, GRID_STEP_OCTAVE_MAX };
@@ -128,7 +128,7 @@ export function foldedView(degree: number, key: ArrangementKey): FoldedDegree {
 export function degreeOptions(key: ArrangementKey): { value: string; label: string }[] {
   return scaleOffsets(key.scale).map((offset, i) => ({
     value: String(i),
-    label: `${i + 1} ${NOTE_NAMES[(((key.root + offset) % 12) + 12) % 12] ?? '?'}`,
+    label: `${i + 1} ${pitchClassName(key.root, offset)}`,
   }));
 }
 
@@ -138,7 +138,7 @@ export function stepLabel(step: GridStep, key: ArrangementKey): string {
   if (step.kind === 'tie') return '—';
   const offsets = scaleOffsets(key.scale);
   const view = foldedView(step.degree, key);
-  const name = NOTE_NAMES[(((key.root + (offsets[view.degree] ?? 0)) % 12) + 12) % 12] ?? '?';
+  const name = pitchClassName(key.root, offsets[view.degree] ?? 0);
   const octave = step.octave + view.carry;
   return octave === 0 ? name : `${name}${octave > 0 ? '+' : ''}${octave}`;
 }
