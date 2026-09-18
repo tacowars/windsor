@@ -11,15 +11,12 @@
  * The operations are `euclidModel.ts`.
  */
 import type { EuclideanSpec } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  DEFAULT_EUCLIDEAN_CONFIG,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import { PERC_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { partChange } from './context';
-import { el, fmt0, fmt2, noteName } from './dom';
+import { el } from './dom';
 import {
-  EUCLID_STEPS_MAX,
   countOnsets,
   figureKey,
   playheadStep,
@@ -33,7 +30,13 @@ import {
   type PulseField,
 } from './euclidModel';
 import { makeKnob, type KnobElement } from './knob';
-import { PERC_COLOR, densityControls, divisorPicker, driverKnob, sectionKnob } from './seqFields';
+import { densityControls, divisorPicker, knobRow as tableKnobRow } from './seqFields';
+import {
+  EUCLID_KNOBS,
+  EUCLID_ROTATE_KNOB,
+  EUCLID_STEPS_KNOB,
+  euclidPulseKnob,
+} from './sequencerKnobTables';
 
 const HINT =
   'Lit cells are the onsets of the figure the player holds; the ring is the playhead. ' +
@@ -42,13 +45,6 @@ const HINT =
   'Nothing here restarts the sequencer; only the divisor rebuilds it.';
 
 const PULSE_FIELDS: readonly PulseField[] = ['min', 'max', 'start'];
-/**
- * The engine's own bounds, read rather than restated (#617). The card carried
- * a `{ min: 2, max: 9, start: 4 }` table of its own while the sequencer starts
- * at `{ min: 3, max: 9, start: 5 }`, so a double-click reset — `knob.ts` writes
- * `spec.def` — put a value into the document the engine would never choose.
- */
-export const pulseDefault = (field: PulseField): number => DEFAULT_EUCLIDEAN_CONFIG.pulses[field];
 
 function specOf(ctx: AppCtx, slot: number): EuclideanSpec | null {
   const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
@@ -152,14 +148,9 @@ function watch(card: Card): void {
 
 function stepsKnob(card: Card): HTMLElement {
   return makeKnob({
-    label: 'Steps n',
-    min: 1,
-    max: EUCLID_STEPS_MAX,
-    def: 16,
-    step: 1,
+    ...EUCLID_STEPS_KNOB,
     color: PERC_COLOR,
-    fmt: fmt0,
-    get: () => specOf(card.ctx, card.slot)?.steps ?? 16,
+    get: () => specOf(card.ctx, card.slot)?.steps ?? EUCLID_STEPS_KNOB.def,
     set: (v) => {
       const spec = specOf(card.ctx, card.slot);
       if (!spec) return;
@@ -172,14 +163,9 @@ function stepsKnob(card: Card): HTMLElement {
 
 function rotateKnob(card: Card): HTMLElement {
   const knob = makeKnob({
-    label: 'Rotate',
-    min: -EUCLID_STEPS_MAX,
-    max: EUCLID_STEPS_MAX,
-    def: 0,
-    step: 1,
+    ...EUCLID_ROTATE_KNOB,
     color: PERC_COLOR,
-    fmt: fmt0,
-    get: () => specOf(card.ctx, card.slot)?.rotate ?? 0,
+    get: () => specOf(card.ctx, card.slot)?.rotate ?? EUCLID_ROTATE_KNOB.def,
     set: (v) => {
       const spec = specOf(card.ctx, card.slot);
       if (!spec) return;
@@ -195,15 +181,11 @@ function pulsesRow(card: Card): HTMLElement {
   const row = el('div', 'knob-row');
   const knobs = card.dependents;
   for (const field of PULSE_FIELDS) {
+    const spec = euclidPulseKnob(field);
     const knob = makeKnob({
-      label: `k ${field}`,
-      min: 0,
-      max: EUCLID_STEPS_MAX,
-      def: pulseDefault(field),
-      step: 1,
+      ...spec,
       color: PERC_COLOR,
-      fmt: fmt0,
-      get: () => specOf(card.ctx, card.slot)?.pulses[field] ?? pulseDefault(field),
+      get: () => specOf(card.ctx, card.slot)?.pulses[field] ?? spec.def,
       set: (v) => {
         const spec = specOf(card.ctx, card.slot);
         if (!spec) return;
@@ -220,41 +202,7 @@ function pulsesRow(card: Card): HTMLElement {
 }
 
 function knobRow(card: Card): HTMLElement {
-  const { ctx, slot } = card;
-  const row = el('div', 'knob-row');
-  const color = PERC_COLOR;
-  row.appendChild(
-    driverKnob(ctx, slot, 'note', {
-      label: 'Note',
-      min: 24,
-      max: 96,
-      def: 36,
-      step: 1,
-      color,
-      fmt: (v) => noteName(v),
-    }),
-  );
-  row.appendChild(
-    sectionKnob(ctx, slot, 'velocity', {
-      label: 'Vel',
-      min: 0,
-      max: 1,
-      def: 0.8,
-      color,
-      fmt: fmt2,
-    }),
-  );
-  row.appendChild(
-    driverKnob(ctx, slot, 'hold', {
-      label: 'Hold',
-      min: 0.005,
-      max: 2,
-      def: 0.1,
-      curve: 'log',
-      color,
-      fmt: (v) => `${(v * 1000).toFixed(0)}m`,
-    }),
-  );
+  const row = tableKnobRow(card.ctx, card.slot, EUCLID_KNOBS, PERC_COLOR);
   row.appendChild(stepsKnob(card));
   row.appendChild(rotateKnob(card));
   return row;

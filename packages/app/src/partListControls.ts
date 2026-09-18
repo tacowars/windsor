@@ -14,19 +14,11 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { el, seg } from './dom';
+import { KIND_LABELS } from './sequencerConstants';
 import { openConfirm } from './metadataModal';
 import { partNameField } from './partNameField';
 import { partsState } from './patchState';
 import { addPart, replaceDraft, setSequencerKind } from './songParts';
-
-const KIND_LABELS: Record<SequencerKind, string> = {
-  none: 'None',
-  euclidean: 'Euclid',
-  arp: 'Arp',
-  step: 'Step',
-  grid: 'Grid',
-  chord: 'Chord',
-};
 
 function button(label: string, title: string, enabled: boolean): HTMLButtonElement {
   const node = el('button', 'btn', label) as HTMLButtonElement;

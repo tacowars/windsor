@@ -28,10 +28,13 @@ import {
 } from './chordStepModel';
 import type { AppCtx } from './context';
 import { partChange } from './context';
-import { DIVISOR_OPTIONS, el, escapeHtml, fmt2, select } from './dom';
+import { PITCH_COLOR } from './consoleColors';
+import { el, escapeHtml, select } from './dom';
 import { markPlaying, stripCell, stripColumn } from './gridCard';
 import { keySignature } from './gridModel';
-import { PITCH_COLOR, driverKnob, sectionKnob } from './seqFields';
+import { knobRow } from './seqFields';
+import { DIVISOR_OPTIONS } from './sequencerConstants';
+import { CHORD_KNOBS } from './sequencerKnobTables';
 
 const HINT =
   'Press a chip to hear it through this part; drag it, or Rest, onto a step or the + column. ' +
@@ -189,29 +192,7 @@ function watch(strip: Strip): void {
 const BASE_STEP_OPTIONS = DIVISOR_OPTIONS.filter((o) => CHORD_DIVISORS.includes(Number(o.value)));
 
 function controls(strip: Strip): HTMLElement {
-  const { ctx, slot } = strip;
-  const row = el('div', 'knob-row');
-  row.appendChild(
-    sectionKnob(ctx, slot, 'velocity', {
-      label: 'Vel',
-      min: 0,
-      max: 1,
-      def: 0.8,
-      color: PITCH_COLOR,
-      fmt: fmt2,
-    }),
-  );
-  row.appendChild(
-    driverKnob(ctx, slot, 'gate', {
-      label: 'Gate',
-      min: 0.01,
-      max: 1,
-      def: 1,
-      color: PITCH_COLOR,
-      fmt: fmt2,
-    }),
-  );
-  return row;
+  return knobRow(strip.ctx, strip.slot, CHORD_KNOBS, PITCH_COLOR);
 }
 
 function tools(strip: Strip): HTMLElement {
@@ -274,7 +255,7 @@ export function chordCard(ctx: AppCtx, slot: number): HTMLElement {
     el(
       'p',
       'hint',
-      `${HINT} Chips sound through ${escapeHtml(partAt(ctx.model.doc, slot)?.name ?? 'this part')}.`,
+      `${HINT} Chips sound through ${partAt(ctx.model.doc, slot)?.name ?? 'this part'}.`,
     ),
   );
   paintStrip(strip);

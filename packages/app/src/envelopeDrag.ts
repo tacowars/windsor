@@ -121,7 +121,7 @@ export function createEnvelopeDrag(
 /* ---------------------------------------------------------------- the DOM */
 
 const GHOST = { offsetX: 16, offsetY: 12 };
-const SWAP_GLYPH = '&#8646;';
+const SWAP_GLYPH = '\u21C6';
 
 let ghostRoot: HTMLElement | null = null;
 let ghostFrom: HTMLCanvasElement | null = null;

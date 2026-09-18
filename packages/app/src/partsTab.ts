@@ -9,7 +9,7 @@
 import type { PartialPatch } from '../../../packages/client/src/audio/index-for-editor';
 import { clonePatch, makePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
-import { $, el, escapeHtml, seg } from './dom';
+import { $, el, seg } from './dom';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, libraryActions } from './libraryActions';
 import { library, libraryPatch } from './libraryModel';
@@ -107,12 +107,14 @@ function refreshPatchUi(): void {
 
 function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
   const box = el('div');
-  box.appendChild(el('div', 'section-title', '<span>Part</span>'));
+  const head = el('div', 'section-title');
+  head.appendChild(el('span', '', 'Part'));
+  box.appendChild(head);
   box.appendChild(
     seg(
       ctx.model.doc.parts.map((part) => ({
         value: String(part.slot),
-        label: escapeHtml(part.name),
+        label: part.name,
       })),
       () => String(partsState.selected),
       (slot) => {
