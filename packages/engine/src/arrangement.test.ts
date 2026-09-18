@@ -53,12 +53,35 @@ describe('mergeArrangement', () => {
     expect(merged.bpm).toBe(FULL_ARRANGEMENT.bpm);
   });
 
-  it('ignores and reports a partial naming an absent slot', () => {
-    // A part that was never initialised has no AudioPart; it cannot be added live.
+  it('ignores and reports a fragment naming an absent slot', () => {
+    // A fragment has nothing to merge into; only a whole part adds a slot (#629).
     const kickOnly = onlyParts(FULL_ARRANGEMENT, 'kick');
     const { merged, ignored } = mergeArrangement(kickOnly, { parts: { 5: { velocity: 0.5 } } });
     expect(ignored).toEqual(['parts.5']);
     expect(merged.parts).toEqual(kickOnly.parts);
+  });
+
+  it('appends a whole part on a free slot, and only when its slot names that slot (#629)', () => {
+    const kickOnly = onlyParts(FULL_ARRANGEMENT, 'kick');
+    const added = mergeArrangement(kickOnly, { parts: { [FULL_SLOT.hat]: FULL_PARTS.hat } });
+    expect(added.ignored).toEqual([]);
+    expect(added.merged.parts).toEqual([FULL_PARTS.kick, FULL_PARTS.hat]);
+    const mismatched = mergeArrangement(kickOnly, { parts: { 6: FULL_PARTS.hat } });
+    expect(mismatched.ignored).toEqual(['parts.6']);
+    expect(mismatched.merged.parts).toEqual(kickOnly.parts);
+  });
+
+  it('removes the part at a null slot and reports a null at an absent one (#629)', () => {
+    const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, {
+      parts: { [FULL_SLOT.arp]: null, 7: null },
+    });
+    expect(ignored).toEqual(['parts.7']);
+    expect(merged.parts.map((p) => p.slot)).toEqual([
+      FULL_SLOT.kick,
+      FULL_SLOT.hat,
+      FULL_SLOT.drone,
+    ]);
+    expect(FULL_ARRANGEMENT.parts).toHaveLength(4);
   });
 
   it('ignores a parts list: adding or removing parts is a rebuild, not a partial', () => {

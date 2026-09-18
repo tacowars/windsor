@@ -19,12 +19,14 @@ export interface AppCtx {
   /** The Parts tab's selection and working patch (#620 decision 3). */
   parts: PartsSession;
   /**
-   * A field-level change: applied to the live system (when audio is enabled)
-   * and merged into the document. Refused by the engine → nothing changes.
-   * Parts are addressed by slot: `{ parts: { 2: { velocity: 0.5 } } }` (#597).
+   * A live change: applied to the live system (when audio is enabled) and
+   * merged into the document. Refused by the engine → nothing changes.
+   * Parts are addressed by slot: `{ parts: { 2: { velocity: 0.5 } } }` (#597);
+   * a whole part at a free slot adds one, `null` at a slot or a patch id
+   * removes it (#629) — `partEdits.ts` builds those.
    */
   change(partial: DocumentPartial): ApplyResult;
-  /** A structural change: edit a draft document, renormalise, rebuild, re-render. */
+  /** A whole-document change — Import's and Restart's path (#629): edit a draft, renormalise, rebuild from tick 0, re-render. */
   restructure(edit: (draft: Record<string, unknown>) => void): void;
   /** Adopt a freshly imported raw document: normalise, rebuild, re-render. */
   importDoc(raw: unknown): void;

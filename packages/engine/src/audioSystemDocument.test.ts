@@ -177,3 +177,49 @@ describe('apply over the document model', () => {
     expect(sys.readout().bpm).toBe(90);
   });
 });
+
+describe('live add and removal (#629)', () => {
+  const { drone } = FULL_SLOT;
+  const THREE: ArrangementDocument = {
+    ...FULL_DOCUMENT,
+    parts: FULL_DOCUMENT.parts.filter((part) => part.slot !== drone),
+  };
+  const DRONE = FULL_DOCUMENT.parts.find((part) => part.slot === drone);
+  if (!DRONE) throw new Error('the fixture has a drone');
+
+  it('creates the engine part and its strip on a live add, the strip from the partial', async () => {
+    const sys = await system(THREE);
+    expect(sys.engine.getPart(musicPartName(drone))).toBeUndefined();
+    const metered = sys.meteredProcessors;
+    expect(sys.apply({ parts: { [drone]: DRONE } })).toEqual({ ok: true, ignored: [] });
+    expect(sys.engine.getPart(musicPartName(drone))).toBeDefined();
+    expect(stripOf(sys, 'drone')?.part.gain.value).toBe(FULL_STRIPS.drone.level);
+    expect(stripOf(sys, 'drone')?.sends.get('room')?.gain.value).toBe(FULL_STRIPS.drone.sends.room);
+    expect(sys.meteredProcessors).toBe(metered + 1);
+    expect(sys.readout().counters).toHaveProperty(String(drone), 0);
+  });
+
+  it('disposes the part, its strip and its meter entry on a live removal, and frees the slot', async () => {
+    const sys = await system(FULL_DOCUMENT);
+    const metered = sys.meteredProcessors;
+    expect(sys.apply({ parts: { [drone]: null } })).toEqual({ ok: true, ignored: [] });
+    expect(sys.engine.getPart(musicPartName(drone))).toBeUndefined();
+    expect(stripOf(sys, 'drone')).toBeUndefined();
+    expect(stripOf(sys, 'kick')).toBeDefined();
+    expect(sys.meteredProcessors).toBe(metered - 1);
+    expect(sys.readout().counters).not.toHaveProperty(String(drone));
+    // The slot is free again: the same part comes back under the same name.
+    expect(sys.apply({ parts: { [drone]: DRONE } })).toEqual({ ok: true, ignored: [] });
+    expect(sys.engine.getPart(musicPartName(drone))).toBeDefined();
+  });
+
+  it('a refused add creates nothing, and a refused removal disposes nothing', async () => {
+    const sys = await system(THREE);
+    const unknown = sys.apply({ parts: { [drone]: { ...DRONE, preset: 'nope' } } });
+    expect(unknown.ok).toBe(false);
+    expect(sys.engine.getPart(musicPartName(drone))).toBeUndefined();
+    const half = sys.apply({ bpm: 0, parts: { [hat]: null } });
+    expect(half.ok).toBe(false);
+    expect(stripOf(sys, 'hat')).toBeDefined();
+  });
+});

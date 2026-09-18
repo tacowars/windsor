@@ -47,13 +47,19 @@ and its extension checklists, so neither states the other's content twice.
     renormalise rather than filling them in.
   A copy drifts, and the drift reaches the document: #617's Euclidean `k`
   default put a value into songs the engine would never choose.
-- **Every edit reaches the document, or it did not happen.** A field edit is
-  `ctx.change(partial)` — applied live *and* deep-merged into the document; a
-  structural edit is `ctx.restructure(draft => …)` — mutate, renormalise,
-  rebuild the live system, re-render; an import is `ctx.importDoc(raw)`; a
-  patch knob is `PartsSession.push()`, which writes the working patch into the
-  document's `patches` section under the part's preset name. Live-only state
-  is lost on export and is a bug.
+- **Every edit reaches the document, or it did not happen — and stays live.**
+  A field edit is `ctx.change(partial)` — applied live *and* deep-merged into
+  the document; so is a structural edit since #629 — a whole part at a free
+  slot adds it, `null` at a slot or a patch id removes it, a kind change sends
+  the kind's whole default spec (`partEdits.ts`, `removePartChange`), and the
+  engine adds or disposes that one part on the running transport; a refused
+  partial changes nothing and never falls back to a rebuild.
+  `ctx.restructure(draft => …)` — mutate, renormalise, rebuild the live system
+  from tick 0, re-render — is the Restart button's and nothing else's; an
+  import is `ctx.importDoc(raw)`, the other rebuild; a patch knob is
+  `PartsSession.push()`, which writes the working patch into the document's
+  `patches` section under the part's preset name. Live-only state is lost on
+  export and is a bug.
 - **A part is addressed by its slot, never by its name** (#597):
   `{ parts: { 2: … } }`, `partAt(doc, slot)`, `musicPartName(slot)`. A rename
   touches no strip, patch, capture or note stream.
