@@ -9,6 +9,7 @@
  */
 import type {
   ApplyResult,
+  AudioPart,
   DocumentPartial,
   Patch,
 } from '../../../packages/client/src/audio/index-for-editor';
@@ -20,7 +21,7 @@ import type { EngineHost } from './host';
 import { PartsSession } from './partsSession';
 
 /** The part of the engine host the context drives; a test's fake implements this much. */
-export type ContextHost = Pick<EngineHost, 'apply' | 'build' | 'capturePattern'>;
+export type ContextHost = Pick<EngineHost, 'apply' | 'build' | 'capturePattern' | 'part'>;
 
 /** A tab's panel: an element, or a test's stand-in with the one flag the context flips. */
 export interface TabPanel {
@@ -64,6 +65,16 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
 
   get activeTab(): string | null {
     return this.active;
+  }
+
+  /**
+   * The live part the selected slot plays, resolved at the call: the keyboard
+   * and a MIDI controller audition through it, and it must follow an enable
+   * or a rebuild even while the Parts tab is hidden and its render deferred.
+   */
+  livePart(): AudioPart | null {
+    const part = partAt(this.model.doc, this.parts.selected);
+    return part ? this.host.part(part.slot) : null;
   }
 
   /** Show `id`, hide the rest, and render it if a change landed while it was hidden. */

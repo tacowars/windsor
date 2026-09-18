@@ -10,15 +10,13 @@
  * it. `commit` is a constructor parameter — the context's document write —
  * never a module hook reassigned by whichever tab rendered last.
  */
-import type { AudioPart, Patch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
 import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
 
 export class PartsSession {
   /** The selected part's slot (#597). */
   selected = 0;
   patch: Patch = makePatch();
-  /** The live part the keyboard plays, once audio is enabled. */
-  part: AudioPart | null = null;
 
   constructor(private readonly commit: (patch: Patch) => boolean) {}
 

@@ -37,7 +37,7 @@ const model = new DocumentModel(newSong());
 const host = new EngineHost(status);
 const ctx = new AppContext<HTMLElement>({ host, model, status });
 // The keyboard plays the Parts tab's selected part, once audio is enabled.
-const keyboard = new Keyboard(() => ctx.parts.part);
+const keyboard = new Keyboard(() => ctx.livePart());
 // A MIDI controller plays through the same keyboard (#523).
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
