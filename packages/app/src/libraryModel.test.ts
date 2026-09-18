@@ -96,7 +96,21 @@ describe('the model', () => {
     await writeLibraryFile(model, 'kick-2', text, (id, body) => downloads.push([id, body]));
     expect(downloads).toEqual([['kick-2', text]]);
     expect(model.entries['kick-2']?.id).toBe('kick-2');
+    expect(model.problems).toEqual([]);
     expect(PATCH_LIBRARY['kick-2']).toBeUndefined();
     await expect(removeLibraryFile(model, 'kick')).rejects.toThrow('folder');
+  });
+
+  it('refuses a page-mode write the folder path would have refused (#617)', async () => {
+    const model = pageLibrary();
+    const downloads: [string, string][] = [];
+    const half = '{"format": 1, "name": "half"}';
+    await writeLibraryFile(model, 'half-written', half, (id, body) => downloads.push([id, body]));
+    // The file still reaches the disk — it is the user's own Save — but it is
+    // not an entry, and the row says so, exactly as the folder read does.
+    expect(downloads).toEqual([['half-written', half]]);
+    expect(model.entries['half-written']).toBeUndefined();
+    expect(model.problems).toHaveLength(1);
+    expect(model.problems[0]).toContain('half-written');
   });
 });

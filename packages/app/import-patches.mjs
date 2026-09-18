@@ -10,14 +10,16 @@
  * `dir` defaults to `~/Downloads`. A downloaded file has no current headroom
  * record, so the loader used is the unswept one; the sweep then writes the
  * record, and the printed commands are what `npm run verify` needs next.
- * The logic is `lib/importPatches.mjs`, tested there.
+ * The logic is `lib/importPatches.mjs`, tested there. Exit 1 means a file that
+ * claims to be a patch was refused (#617); unrelated `.json` sitting in the
+ * folder is skipped and leaves a clean import at 0.
  */
 import { build } from 'esbuild';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { importPatches } from './lib/importPatches.mjs';
+import { importExitCode, importPatches } from './lib/importPatches.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AUDIO = resolve(HERE, '../../packages/client/src/audio');
@@ -44,17 +46,14 @@ await build({
 });
 const { loadUnsweptPatchFile } = await import(pathToFileURL(output).href);
 
-const { copied, rejected, skipped } = importPatches({
-  sourceDir,
-  patchesDir: PATCHES,
-  loadFile: loadUnsweptPatchFile,
-});
+const result = importPatches({ sourceDir, patchesDir: PATCHES, loadFile: loadUnsweptPatchFile });
+const { copied, rejected, skipped } = result;
 for (const { id, file } of copied) console.log(`copied ${file} -> patches/${id}.json`);
 for (const { file, reason } of skipped) console.log(`skipped ${file}: ${reason}`);
 for (const { file, reason } of rejected) console.error(`rejected ${file}: ${reason}`);
 if (copied.length === 0) {
   console.log(`import-patches: nothing to import from ${sourceDir}`);
-  process.exit(rejected.length ? 1 : 0);
+  process.exit(importExitCode(result));
 }
 console.log(
   [
@@ -64,4 +63,4 @@ console.log(
     '  npx prettier --write packages/client/src/audio/patches',
   ].join('\n'),
 );
-process.exit(rejected.length ? 1 : 0);
+process.exit(importExitCode(result));

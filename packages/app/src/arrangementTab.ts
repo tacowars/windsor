@@ -13,6 +13,7 @@
 import type { AppCtx } from './context';
 import { openConfirm } from './metadataModal';
 import { partsState } from './patchState';
+import { NEW_SONG_BPM } from './songConstants';
 import { newSong } from './songParts';
 import { el, fmt0, section } from './dom';
 import { makeKnob } from './knob';
@@ -40,7 +41,9 @@ function transportSection(ctx: AppCtx): HTMLElement {
       label: 'BPM',
       min: 20,
       max: 300,
-      def: 96,
+      // What a new song starts at (#617): a double-click reset used to write
+      // 96, a tempo nothing in the console chooses.
+      def: NEW_SONG_BPM,
       step: 1,
       color: COLOR,
       fmt: fmt0,

@@ -160,6 +160,23 @@ function loudnessLine(result: LoudnessResult, volume: number): string {
 const afterWriteText = (): string =>
   `The written file carries a stale or missing headroom record, so npm run verify fails until you run: ${AFTER_WRITE_COMMANDS.join('; then ')}. The sweep costs about 6 s per patch at 16,384 seeds (--seeds <n> lowers it).`;
 
+let openGeneration = 0;
+
+/**
+ * One open's claim on the loudness line (#617). The render promise is made by
+ * the caller before the modal opens and resolves seconds later, so cancelling
+ * and reopening inside that window used to print the previous patch's peak
+ * under the new patch's title — the line was written unconditionally. Every
+ * open claims the line as it builds; a writer whose open has been superseded
+ * is ignored rather than allowed to overwrite the newer answer.
+ */
+export function claimLoudnessLine(write: (line: string) => void): (line: string) => void {
+  const generation = ++openGeneration;
+  return (line: string): void => {
+    if (generation === openGeneration) write(line);
+  };
+}
+
 /**
  * Collect the metadata for a Save or a Copy to new. Resolves the metadata on
  * Write, null on Cancel or Escape. `volume` feeds the loudness line.
@@ -205,11 +222,10 @@ export async function openMetadataModal(
   };
 
   loudness.textContent = request.loudness ? 'Checking loudness…' : '';
+  const showLoudness = claimLoudnessLine((line) => (loudness.textContent = line));
   request.loudness
-    ?.then((result) => (loudness.textContent = loudnessLine(result, volume)))
-    .catch(
-      (error: unknown) => (loudness.textContent = `Loudness check unavailable: ${String(error)}`),
-    );
+    ?.then((result) => showLoudness(loudnessLine(result, volume)))
+    .catch((error: unknown) => showLoudness(`Loudness check unavailable: ${String(error)}`));
 
   let answer: PatchMetadata | null = null;
   $('metaConfirm').onclick = (): void => {
