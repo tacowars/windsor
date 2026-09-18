@@ -5,168 +5,67 @@
  * sequencer (#598) — and a committed song opens through Import. It drives one
  * `AudioSystem`, and every change flows through one pair of operations —
  * `change` (live apply + document merge) and `restructure` (renormalise +
- * rebuild). Export writes the normalised document — since #435 the synth
- * patches and the returns included, so one file is the whole piece; import
- * reads one back.
+ * rebuild) — on the `AppContext`. Export writes the normalised document —
+ * since #435 the synth patches and the returns included, so one file is the
+ * whole piece; import reads one back.
+ *
+ * Composition only (CLAUDE.md "Code structure", #620): this file constructs
+ * the systems and wires them; the behaviour is theirs.
  */
-import type {
-  ApplyResult,
-  DocumentPartial,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { AppContext } from './appContext';
 import { renderArrangementTab } from './arrangementTab';
-import type { AppCtx } from './context';
-import { partChange } from './context';
-import { $, el } from './dom';
+import { $ } from './dom';
 import { DocumentModel } from './documentModel';
 import { renderHarmonyTab } from './harmonyTab';
 import { EngineHost } from './host';
+import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { Keyboard } from './keyboard';
 import { bootLibrary, syncLibraryMode } from './libraryActions';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
-import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { renderPartsTab } from './partsTab';
-import { partsState } from './patchState';
+import { wirePowerButton } from './powerButton';
 import { renderSequencersTab } from './sequencersTab';
 import { newSong } from './songParts';
+import { mountTabShell } from './tabShell';
 
 const status = (message: string): void => {
   $('status').textContent = message;
 };
 
 const model = new DocumentModel(newSong());
-const host = new EngineHost((line) => status(line));
+const host = new EngineHost(status);
+const ctx = new AppContext<HTMLElement>({ host, model, status });
 // The keyboard plays the Parts tab's selected part, once audio is enabled.
-const keyboard = new Keyboard(() => partsState.part);
+const keyboard = new Keyboard(() => ctx.livePart());
 // A MIDI controller plays through the same keyboard (#523).
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
 
-const ctx: AppCtx = {
-  host,
-  model,
-  change(partial: DocumentPartial): ApplyResult {
-    const live = host.apply(partial);
-    if (live && !live.ok) {
-      status(`refused: ${live.error ?? 'invalid'}`);
-      return live;
-    }
-    model.merge(partial);
-    if (live && live.ignored.length > 0) status(`ignored: ${live.ignored.join(', ')}`);
-    return live ?? { ok: true, ignored: [] };
-  },
-  restructure(edit): void {
-    model.mutate(edit);
-    void host.build(model.doc).then(render, (error: unknown) => status(String(error)));
-    render();
-  },
-  importDoc(rawDoc): void {
-    // Through the model, never `makeArrangement` here: the model is what
-    // applies the editor's library fill to a pre-#562 song.
-    model.open(rawDoc);
-    void host.build(model.doc).then(render, (error: unknown) => status(String(error)));
-    render();
-  },
-  capture(slot: number): boolean {
-    const pattern = host.capturePattern(slot);
-    if (!pattern) return false;
-    const result = ctx.change(partChange(slot, { sequencer: { pattern } }));
-    if (result.ok) {
-      status(`part ${slot}: captured — the sounding bar is now a literal array in the document`);
-      render();
-    }
-    return result.ok;
-  },
-  release(slot: number): void {
-    const result = ctx.change(partChange(slot, { sequencer: { pattern: null } }));
-    if (result.ok) {
-      status(`part ${slot}: released back to generative`);
-      render();
-    }
-  },
-  render(): void {
-    render();
-  },
-  status,
-};
-
-interface Tab {
-  id: string;
-  label: string;
-  render: (body: HTMLElement) => void;
-}
-
-const TABS: Tab[] = [
-  { id: 'parts', label: 'Parts', render: (body) => renderPartsTab(body, ctx, keyboard, midi) },
-  { id: 'mixer', label: 'Mixer', render: (body) => renderMixerTab(body, ctx) },
-  { id: 'sequencers', label: 'Sequencers', render: (body) => renderSequencersTab(body, ctx) },
-  { id: 'harmony', label: 'Harmony', render: (body) => renderHarmonyTab(body, ctx) },
-  { id: 'arrangement', label: 'Arrangement', render: (body) => renderArrangementTab(body, ctx) },
-];
-
-let active = 'parts';
-const panels = new Map<string, HTMLElement>();
-
-function render(): void {
-  for (const tab of TABS) {
-    const panel = panels.get(tab.id);
-    if (panel) tab.render(panel);
-  }
-}
-
-function buildShell(): void {
-  const bar = $('tabBar');
-  const root = $('tabRoot');
-  for (const tab of TABS) {
-    const button = el('button', 'tab-btn', tab.label) as HTMLButtonElement;
-    button.type = 'button';
-    button.dataset.tab = tab.id;
-    button.onclick = (): void => {
-      active = tab.id;
-      for (const [id, panel] of panels) panel.hidden = id !== active;
-      bar
-        .querySelectorAll('.tab-btn')
-        .forEach((b) =>
-          b.setAttribute('aria-pressed', String((b as HTMLElement).dataset.tab === active)),
-        );
-    };
-    button.setAttribute('aria-pressed', String(tab.id === active));
-    bar.appendChild(button);
-    const panel = el('div', 'tab-panel');
-    panel.hidden = tab.id !== active;
-    panels.set(tab.id, panel);
-    root.appendChild(panel);
-  }
-}
-
-function boot(): void {
-  buildShell();
-  render();
-  keyboard.attachGlobalKeys();
-  void midi.resume();
-  // A remembered library folder whose grant still stands is read before the
-  // first render that could show it; the row's button re-grants a dropped one.
-  bootLibrary()
-    .then(() => {
-      syncLibraryMode();
-      render();
-    })
-    .catch((error: unknown) => status(`library folder: ${String(error)}`));
-  const power = $('power');
-  power.onclick = (): void => {
-    void host
-      .enable(model.doc)
-      .then(() => {
-        power.textContent = 'Audio on';
-        power.classList.remove('primary');
-        status('running — the real AudioSystem is playing the document');
-        render();
-      })
-      .catch((error: unknown) => status(`audio failed: ${String(error)}`));
-  };
-  // The look-ahead pump the game's render loop provides; here, a timer.
-  setInterval(() => host.update(), HOST_PUMP_INTERVAL_MS);
-  status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
-}
-
-boot();
+mountTabShell(
+  ctx,
+  [
+    { id: 'parts', label: 'Parts', render: (body) => renderPartsTab(body, ctx, keyboard, midi) },
+    { id: 'mixer', label: 'Mixer', render: (body) => renderMixerTab(body, ctx) },
+    { id: 'sequencers', label: 'Sequencers', render: (body) => renderSequencersTab(body, ctx) },
+    { id: 'harmony', label: 'Harmony', render: (body) => renderHarmonyTab(body, ctx) },
+    { id: 'arrangement', label: 'Arrangement', render: (body) => renderArrangementTab(body, ctx) },
+  ],
+  $('tabBar'),
+  $('tabRoot'),
+);
+ctx.render();
+keyboard.attachGlobalKeys();
+void midi.resume();
+// A remembered library folder whose grant still stands is read before the
+// first render that could show it; the row's button re-grants a dropped one.
+bootLibrary()
+  .then(() => {
+    syncLibraryMode();
+    ctx.render();
+  })
+  .catch((error: unknown) => status(`library folder: ${String(error)}`));
+wirePowerButton($('power'), ctx);
+// The look-ahead pump the game's render loop provides; here, a timer.
+setInterval(() => host.update(), HOST_PUMP_INTERVAL_MS);
+status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');

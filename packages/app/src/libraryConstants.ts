@@ -45,9 +45,17 @@ export const LIBRARY_FOLDER_PATH = 'packages/client/src/audio/patches';
 /** IndexedDB home of the remembered directory handle. */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;
 
-/** What to run after a write before `npm run verify` passes. */
+/**
+ * What to run after a write before `npm run verify` passes. The Node scripts
+ * print the same list from `lib/afterWriteCommands.mjs`; its test pins the two.
+ */
 export const AFTER_WRITE_COMMANDS = [
   'node tools/patch-editor/sweep-headroom.mjs --stale',
   'node scripts/patch-library-index.mjs --write',
   'npx prettier --write packages/client/src/audio/patches',
 ] as const;
+
+/** The metadata modal (#563, #620 decision 7): its category sentinel, focus-trap query and readout precision. */
+export const NEW_CATEGORY = '__new__';
+export const FOCUSABLE = 'button, input, select, textarea, [tabindex]';
+export const VOLUME_DIGITS = 3;

@@ -1,8 +1,13 @@
-/** Envelope drawing and the shared envelope knob groups (#70, ported). */
+/**
+ * The envelope display (#70, ported). The curve it draws is the engine's own
+ * `segmentLevel` (#620 decision 4): the worklet harness pins that function to
+ * `fm-processor.js`, so the drawing and the DSP cannot disagree. The knob
+ * groups beside it are `envelopeKnobs.ts`.
+ */
 import type { Envelope } from '../../../packages/client/src/audio/index-for-editor';
+import { segmentLevel } from '../../../packages/client/src/audio/index-for-editor';
 import { LINE_BRIGHT_COLOR, LINE_COLOR } from './consoleColors';
 import {
-  ENV_CURVE_STEEPNESS,
   ENV_GUIDE_DASH,
   ENV_HOLD_MIN_S,
   ENV_HOLD_SHARE,
@@ -10,12 +15,6 @@ import {
   ENV_SEGMENT_POINTS,
   ENV_TRACE_WIDTH,
 } from './envCanvasConstants';
-import { ENVELOPE_ADV_KNOBS, ENVELOPE_KNOBS, patchKnobOpts } from './patchKnobTables';
-import type { PatchKnobTable } from './patchKnobTables';
-import { pathKnob } from './patchState';
-
-const curveShape = (p: number, k: number): number => p / (p + (1 - p) * k);
-
 export function drawEnv(canvas: HTMLCanvasElement, env: Envelope, color: string): void {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth || canvas.width;
@@ -51,11 +50,9 @@ export function drawEnv(canvas: HTMLCanvasElement, env: Envelope, color: string)
   g.moveTo(X(0), Y(env.initLevel));
   const segment = (t0: number, dur: number, v0: number, v1: number, curve: number): void => {
     if (dur <= 0) return g.lineTo(X(t0), Y(v1));
-    const k = Math.exp(curve * ENV_CURVE_STEEPNESS);
     for (let i = 1; i <= ENV_SEGMENT_POINTS; i++) {
       const p = i / ENV_SEGMENT_POINTS;
-      const s = k === 1 ? p : curveShape(p, k);
-      g.lineTo(X(t0 + p * dur), Y(v0 + (v1 - v0) * s));
+      g.lineTo(X(t0 + p * dur), Y(segmentLevel(v0, v1, p, curve)));
     }
   };
   let t = 0;
@@ -75,33 +72,4 @@ export function drawEnv(canvas: HTMLCanvasElement, env: Envelope, color: string)
   g.moveTo(rx, pad);
   g.lineTo(rx, h - pad);
   g.stroke();
-}
-
-/** One envelope table's knobs under `basePath`, each defaulting to the engine's value there. */
-function envelopeRow(
-  table: PatchKnobTable,
-  basePath: string,
-  color: string,
-  onChange: () => void,
-): DocumentFragment {
-  const frag = document.createDocumentFragment();
-  for (const entry of table) {
-    const path = `${basePath}.${entry.f}`;
-    frag.appendChild(
-      pathKnob(path, entry.label, { ...patchKnobOpts(entry, path), color, onChange }),
-    );
-  }
-  return frag;
-}
-
-export function envKnobs(basePath: string, color: string, onChange: () => void): DocumentFragment {
-  return envelopeRow(ENVELOPE_KNOBS, basePath, color, onChange);
-}
-
-export function envAdvKnobs(
-  basePath: string,
-  color: string,
-  onChange: () => void,
-): DocumentFragment {
-  return envelopeRow(ENVELOPE_ADV_KNOBS, basePath, color, onChange);
 }

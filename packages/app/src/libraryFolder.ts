@@ -112,18 +112,21 @@ function openHandleDb(): Promise<IDBDatabase> {
   });
 }
 
-function handleStore<T>(
+/** One request against the handle store; the connection is closed however the request ends (#620). */
+async function handleStore<T>(
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
-  return openHandleDb().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const request = run(db.transaction(HANDLE_DB.store, mode).objectStore(HANDLE_DB.store));
-        request.onsuccess = (): void => resolve(request.result);
-        request.onerror = (): void => reject(request.error ?? new Error('IndexedDB refused'));
-      }),
-  );
+  const db = await openHandleDb();
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const request = run(db.transaction(HANDLE_DB.store, mode).objectStore(HANDLE_DB.store));
+      request.onsuccess = (): void => resolve(request.result);
+      request.onerror = (): void => reject(request.error ?? new Error('IndexedDB refused'));
+    });
+  } finally {
+    db.close();
+  }
 }
 
 export const rememberHandle = (handle: ChromeDirectoryHandle): Promise<unknown> =>

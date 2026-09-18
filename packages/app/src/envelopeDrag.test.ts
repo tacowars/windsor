@@ -21,7 +21,7 @@ import {
   createEnvelopeDrag,
 } from './envelopeDrag';
 import type { EnvelopeSlot } from './envelopeTransfer';
-import { hooks, partsState } from './patchState';
+import type { PatchEditor } from './partsSession';
 
 /** A page with an A canvas on the left, a C canvas on the right, gaps between. */
 class FakePage implements EnvelopeDragHost {
@@ -159,57 +159,50 @@ const SONG = {
 describe('a drop, all the way into the document', () => {
   it('lands the copied envelope in the exported patches and round-trips it', () => {
     const model = new DocumentModel(SONG);
-    const previousCommit = hooks.commit;
-    const previousRefresh = hooks.refresh;
     let refreshes = 0;
     let commits = 0;
-    partsState.patch = makePatch(model.doc.patches?.['drone-sqr']);
-    hooks.commit = (patch): void => {
-      commits++;
-      model.merge({ patches: { 'drone-sqr': patch } });
+    const editor: PatchEditor = {
+      patch: makePatch(model.doc.patches?.['drone-sqr']),
+      push: () => {
+        commits++;
+        model.merge({ patches: { 'drone-sqr': editor.patch } });
+      },
+      refresh: () => {
+        refreshes++;
+      },
     };
-    hooks.refresh = (): void => {
-      refreshes++;
-    };
-    try {
-      // A shape nothing else in the patch has, so finding it downstream is proof.
-      const source = partsState.patch.ops[0]?.env;
-      if (!source) throw new Error('patch has no operator A');
-      source.attackTime = 3.5;
-      source.keyScale = 0.375;
-      source.loopMode = 1;
+    // A shape nothing else in the patch has, so finding it downstream is proof.
+    const source = editor.patch.ops[0]?.env;
+    if (!source) throw new Error('patch has no operator A');
+    source.attackTime = 3.5;
+    source.keyScale = 0.375;
+    source.loopMode = 1;
 
-      expect(applyEnvelopeTransfer('copy', 'ops.0.env', 'ops.2.env')).toBe(true);
-      expect(commits).toBe(1);
-      expect(refreshes).toBe(1);
+    expect(applyEnvelopeTransfer(editor, 'copy', 'ops.0.env', 'ops.2.env')).toBe(true);
+    expect(commits).toBe(1);
+    expect(refreshes).toBe(1);
 
-      const landed = model.doc.patches?.['drone-sqr']?.ops[2]?.env;
-      expect(landed?.attackTime).toBe(source.attackTime);
-      expect(landed?.keyScale).toBe(source.keyScale);
-      expect(landed?.loopMode).toBe(source.loopMode);
+    const landed = model.doc.patches?.['drone-sqr']?.ops[2]?.env;
+    expect(landed?.attackTime).toBe(source.attackTime);
+    expect(landed?.keyScale).toBe(source.keyScale);
+    expect(landed?.loopMode).toBe(source.loopMode);
 
-      const reread = new DocumentModel(JSON.parse(model.toJson()));
-      expect(reread.usable).toBe(true);
-      expect(reread.doc.patches?.['drone-sqr']?.ops[2]?.env).toEqual(landed);
-    } finally {
-      hooks.commit = previousCommit;
-      hooks.refresh = previousRefresh;
-    }
+    const reread = new DocumentModel(JSON.parse(model.toJson()));
+    expect(reread.usable).toBe(true);
+    expect(reread.doc.patches?.['drone-sqr']?.ops[2]?.env).toEqual(landed);
   });
 
   it('commits nothing when the drop is onto the slot it came from', () => {
-    const previousCommit = hooks.commit;
     let commits = 0;
-    partsState.patch = makePatch();
-    hooks.commit = (): void => {
-      commits++;
+    const editor: PatchEditor = {
+      patch: makePatch(),
+      push: () => {
+        commits++;
+      },
+      refresh: () => undefined,
     };
-    try {
-      expect(applyEnvelopeTransfer('copy', 'filter.env', 'filter.env')).toBe(false);
-      expect(applyEnvelopeTransfer('swap', 'pitchEnv', 'pitchEnv')).toBe(false);
-      expect(commits).toBe(0);
-    } finally {
-      hooks.commit = previousCommit;
-    }
+    expect(applyEnvelopeTransfer(editor, 'copy', 'filter.env', 'filter.env')).toBe(false);
+    expect(applyEnvelopeTransfer(editor, 'swap', 'pitchEnv', 'pitchEnv')).toBe(false);
+    expect(commits).toBe(0);
   });
 });

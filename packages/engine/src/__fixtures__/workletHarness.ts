@@ -77,6 +77,18 @@ export interface CreateOptions {
   slideSeconds?: number;
 }
 
+/** The worklet's own `Envelope`, for pinning a model of it (#620): the console's curve. */
+export interface EnvelopeLike {
+  readonly value: number;
+  readonly phase: number;
+  readonly finished: boolean;
+  configure(params: unknown, sampleRate: number): void;
+  noteOn(): void;
+  noteOff(): void;
+  /** Advance by `n` samples and return the new value. */
+  advance(n: number): number;
+}
+
 export interface LoadedProcessor {
   /** `seed: null` restores the game's `Math.random`; omitted means DEFAULT_SEED. */
   create(
@@ -98,6 +110,10 @@ export interface LoadedProcessor {
   /** The dormancy floors on carrier amplitude and SVF state (#547). */
   dormantAmp: number;
   dormantFilterState: number;
+  /** A fresh envelope over `params` at the harness sample rate (#620). */
+  envelope(params: unknown): EnvelopeLike;
+  /** The floor a segment's time is held to, seconds. */
+  minSegmentTime: number;
 }
 
 /** What the evaluated worklet hands back: a frame setter and the constants tests read. */
@@ -110,10 +126,12 @@ interface WorkletHandle {
   ST_SUSTAIN: number;
   DORMANT_AMP: number;
   DORMANT_FILTER_STATE: number;
+  Envelope: new () => EnvelopeLike;
+  MIN_SEG_TIME: number;
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
-// eslint-disable-next-line max-lines-per-function -- one evaluation of the worklet, read top to bottom: shim, eval, then the handle it returns (64 of 60, #225 decision 4)
+// eslint-disable-next-line max-lines-per-function -- one evaluation of the worklet, read top to bottom: shim, eval, then the handle it returns (70 of 60, #225 decision 4; #620 added the envelope handle)
 export function loadProcessor(): LoadedProcessor {
   const source = readFileSync(join(HERE, '../worklet/fm-processor.js'), 'utf8');
 
@@ -155,6 +173,8 @@ export function loadProcessor(): LoadedProcessor {
        ST_SUSTAIN,
        DORMANT_AMP,
        DORMANT_FILTER_STATE,
+       Envelope,
+       MIN_SEG_TIME,
      };`,
   ) as (
     sampleRate: number,
@@ -187,6 +207,12 @@ export function loadProcessor(): LoadedProcessor {
     sustainState: handle.ST_SUSTAIN,
     dormantAmp: handle.DORMANT_AMP,
     dormantFilterState: handle.DORMANT_FILTER_STATE,
+    envelope: (params) => {
+      const envelope = new handle.Envelope();
+      envelope.configure(params, SAMPLE_RATE);
+      return envelope;
+    },
+    minSegmentTime: handle.MIN_SEG_TIME,
   };
 }
 

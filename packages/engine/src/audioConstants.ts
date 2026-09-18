@@ -293,3 +293,13 @@ export const ALGORITHMS: readonly Algorithm[] = [
   { name: 'Split Branch', label: 'D>C>(B,A)', mods: [[2], [2], [3], []], carriers: [0, 1] },
   { name: 'Triple Mod', label: '(D,C,B)>A', mods: [[1, 2, 3], [], [], []], carriers: [0] },
 ] as const;
+
+/* ----------------------------- the envelope ----------------------------- */
+
+/**
+ * A segment's curve control of ±1 maps to a shaping constant of `exp(±steepness)`
+ * (`envelopeCurve.ts`, `worklet/fm-processor.js`'s `Envelope.advance`): 0 is
+ * linear, positive bows the segment down, negative bows it up. The worklet is
+ * plain JS and carries the literal; `envelopeCurve.test.ts` pins the two.
+ */
+export const ENVELOPE_CURVE_STEEPNESS = 3;

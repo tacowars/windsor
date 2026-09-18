@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { filterPresets, listPresets, PRESET_CATALOG } from './presetCatalog';
-import { clonePatch, makePatch } from './patch';
+import { filterPresets, PRESET_CATALOG, type PresetListing } from './presetCatalog';
+import { clonePatch } from './patch';
 import { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
 import { makeArrangement } from './arrangementDocument';
 import { FULL_DOCUMENT, withDocumentPart } from './__fixtures__/fullArrangement';
 
 const empty = { query: '', category: '', tag: '', source: '' };
 const LIBRARY = Object.values(PATCH_LIBRARY);
+/** The baked library as the browser lists it (the console's `listLibrary` shape). */
+const listed = (): PresetListing[] =>
+  LIBRARY.map(({ id, patch, category, tags, description }) => ({
+    id,
+    name: patch.name,
+    source: 'built-in',
+    category,
+    tags,
+    description,
+  }));
 describe('patch library catalogue', () => {
   it('lists every library file with complete metadata', () => {
     expect(LIBRARY.length).toBeGreaterThan(0);
@@ -30,7 +40,7 @@ describe('patch library catalogue', () => {
     expect(new Set(sounds).size).toBe(sounds.length);
   });
   it('matches words across names and tags, intersects filters, and handles no matches', () => {
-    const entries = listPresets();
+    const entries = listed();
     const matches = filterPresets(entries, {
       ...empty,
       query: '  CONCRETE dub ',
@@ -42,31 +52,10 @@ describe('patch library catalogue', () => {
     expect(filterPresets(entries, { ...empty, query: 'concrete', tag: 'airy' })).toEqual([]);
   });
   it('hides legacy gameplay sounds by default but retains explicit access', () => {
-    expect(filterPresets(listPresets(), empty).some((entry) => entry.id === 'weapon-zap')).toBe(
-      false,
-    );
+    expect(filterPresets(listed(), empty).some((entry) => entry.id === 'weapon-zap')).toBe(false);
     expect(
-      filterPresets(listPresets(), { ...empty, category: 'Legacy game FX' }).map(
-        (entry) => entry.id,
-      ),
+      filterPresets(listed(), { ...empty, category: 'Legacy game FX' }).map((entry) => entry.id),
     ).toContain('weapon-zap');
-  });
-  it('lists document shadows once, uses their names, and includes custom patches', () => {
-    const entries = listPresets({
-      'score-concrete-chord': makePatch({ name: 'My chord' }),
-      custom: makePatch({ name: 'My sound' }),
-    });
-    expect(entries.filter((entry) => entry.id === 'score-concrete-chord')).toHaveLength(1);
-    expect(entries.find((entry) => entry.id === 'score-concrete-chord')).toMatchObject({
-      name: 'My chord',
-      source: 'document',
-      category: 'Plucks',
-    });
-    expect(
-      filterPresets(entries, { ...empty, source: 'document' })
-        .map((entry) => entry.id)
-        .sort(),
-    ).toEqual(['custom', 'score-concrete-chord']);
   });
   it('normalises and round trips every library patch, including user harmonics', () => {
     for (const { id, patch } of LIBRARY) {

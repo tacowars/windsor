@@ -14,16 +14,14 @@
  * claims to be a patch was refused (#617); unrelated `.json` sitting in the
  * folder is skipped and leaves a clean import at 0.
  */
-import { build } from 'esbuild';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { join, resolve } from 'node:path';
 
+import { AFTER_WRITE_COMMANDS } from './lib/afterWriteCommands.mjs';
+import { AUDIO_DIR, loadAudioExports } from './lib/audioBundle.mjs';
 import { importExitCode, importPatches } from './lib/importPatches.mjs';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const AUDIO = resolve(HERE, '../../packages/client/src/audio');
-const PATCHES = join(AUDIO, 'patches');
+const PATCHES = join(AUDIO_DIR, 'patches');
 
 const [dirArg] = process.argv.slice(2);
 if (dirArg === '--help' || dirArg === '-h') {
@@ -32,19 +30,10 @@ if (dirArg === '--help' || dirArg === '-h') {
 }
 const sourceDir = resolve(dirArg ?? join(homedir(), 'Downloads'));
 
-const output = resolve('node_modules/.cache-563-import-patches.mjs');
-await build({
-  stdin: {
-    contents: `export { loadUnsweptPatchFile } from './patchLibrary';`,
-    resolveDir: AUDIO,
-    loader: 'ts',
-  },
-  outfile: output,
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-});
-const { loadUnsweptPatchFile } = await import(pathToFileURL(output).href);
+const { loadUnsweptPatchFile } = await loadAudioExports(
+  `export { loadUnsweptPatchFile } from './patchLibrary';`,
+  '563-import-patches',
+);
 
 const result = importPatches({ sourceDir, patchesDir: PATCHES, loadFile: loadUnsweptPatchFile });
 const { copied, rejected, skipped } = result;
@@ -58,9 +47,7 @@ if (copied.length === 0) {
 console.log(
   [
     `import-patches: ${copied.length} file${copied.length === 1 ? '' : 's'} into ${PATCHES}. Next:`,
-    '  node tools/patch-editor/sweep-headroom.mjs --stale',
-    '  node scripts/patch-library-index.mjs --write',
-    '  npx prettier --write packages/client/src/audio/patches',
+    ...AFTER_WRITE_COMMANDS.map((command) => `  ${command}`),
   ].join('\n'),
 );
 process.exit(importExitCode(result));
