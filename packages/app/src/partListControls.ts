@@ -17,7 +17,6 @@ import { el, seg } from './dom';
 import { KIND_LABELS } from './sequencerConstants';
 import { openConfirm } from './metadataModal';
 import { partNameField } from './partNameField';
-import { partsState } from './patchState';
 import { addPart, replaceDraft, setSequencerKind } from './songParts';
 
 function button(label: string, title: string, enabled: boolean): HTMLButtonElement {
@@ -41,13 +40,13 @@ function addRemoveRow(ctx: AppCtx): HTMLElement {
   add.onclick = (): void => {
     const added = addPart(ctx.model.doc);
     if (!added) return;
-    partsState.selected = added.slot;
+    ctx.parts.selected = added.slot;
     ctx.restructure((draft) => replaceDraft(draft, added.doc));
     ctx.status(`added ${partAt(ctx.model.doc, added.slot)?.name ?? 'a part'} — pick its sequencer`);
   };
   const remove = button('Remove part', 'Remove the selected part', parts.length > 1);
   remove.onclick = (): void => {
-    const slot = partsState.selected;
+    const slot = ctx.parts.selected;
     const part = partAt(ctx.model.doc, slot);
     if (!part) return;
     void openConfirm({
@@ -62,7 +61,7 @@ function addRemoveRow(ctx: AppCtx): HTMLElement {
       if (next === ctx.model.doc) return;
       // The nearest remaining part: the one that took this index, else the last.
       const neighbour = next.parts[Math.min(index, next.parts.length - 1)];
-      partsState.selected = neighbour?.slot ?? 0;
+      ctx.parts.selected = neighbour?.slot ?? 0;
       ctx.restructure((draft) => replaceDraft(draft, next));
       ctx.status(`removed ${part.name}`);
     });
@@ -93,7 +92,7 @@ function kindPicker(ctx: AppCtx, slot: number): HTMLElement {
 export function partListControls(ctx: AppCtx): HTMLElement {
   const box = el('div');
   box.appendChild(addRemoveRow(ctx));
-  const slot = partsState.selected;
+  const slot = ctx.parts.selected;
   if (!partAt(ctx.model.doc, slot)) return box;
   const nameRow = el('div', 'bar-row');
   nameRow.style.marginTop = '8px';

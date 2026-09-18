@@ -10,7 +10,7 @@ import { OP_NAMES, makePatch } from '../../../packages/client/src/audio/index-fo
 import { fmt2, fmtHz, fmtMs, fmtSigned } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';
-import { getPath } from './patchState';
+import { getPath } from './patchPath';
 
 /** A table entry's options: the range and readout. The default is not the table's to state. */
 export type PatchKnobRange = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'fmt'>;

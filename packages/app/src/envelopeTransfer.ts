@@ -12,7 +12,7 @@
  */
 import type { Envelope, Patch } from '../../../packages/client/src/audio/index-for-editor';
 import { OP_NAMES } from '../../../packages/client/src/audio/index-for-editor';
-import { getPath, setPath } from './patchState';
+import { getPath, setPath } from './patchPath';
 
 /** Every envelope in a patch, as a path into it. */
 export const ENVELOPE_SLOTS = [

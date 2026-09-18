@@ -6,7 +6,7 @@
  * Two knobs over one field cannot be two `pathKnob`s — each has to read the
  * field, change only its own half, and write the whole thing back — so the
  * specs are built here with their own `get`/`set` closures. They still end at
- * `pushPatch()`, which is the only way a knob reaches the document
+ * the editor's push, which is the only way a knob reaches the document
  * (`2026-09-11-music-document-carries-patches-and-returns`).
  *
  * `ratioKnobSpecs` is deliberately separate from the DOM: what a knob reads
@@ -15,7 +15,7 @@
  */
 import { el } from './dom';
 import { makeKnob, type KnobElement, type KnobSpec } from './knob';
-import { partsState, pushPatch } from './patchState';
+import type { PatchEditor } from './partsSession';
 import {
   COARSE_DEF,
   COARSE_MAX,
@@ -34,15 +34,15 @@ import {
 } from './ratioSplit';
 
 /** The working patch's stored ratio for operator `i`. */
-export function readRatio(i: number): number {
-  return Number(partsState.patch.ops[i]?.ratio ?? COARSE_DEF);
+export function readRatio(editor: PatchEditor, i: number): number {
+  return Number(editor.patch.ops[i]?.ratio ?? COARSE_DEF);
 }
 
-function writeRatio(i: number, ratio: number): void {
-  const target = partsState.patch.ops[i];
+function writeRatio(editor: PatchEditor, i: number, ratio: number): void {
+  const target = editor.patch.ops[i];
   if (!target) return;
   target.ratio = ratio;
-  pushPatch();
+  editor.push();
 }
 
 /**
@@ -53,6 +53,7 @@ function writeRatio(i: number, ratio: number): void {
 const NO_OP = (): void => undefined;
 
 export function ratioKnobSpecs(
+  editor: PatchEditor,
   i: number,
   onChange: () => void = NO_OP,
 ): { coarse: KnobSpec; fine: KnobSpec } {
@@ -64,8 +65,8 @@ export function ratioKnobSpecs(
       def: COARSE_DEF,
       step: COARSE_STEP,
       fmt: fmtCoarse,
-      get: () => split(readRatio(i)).coarse,
-      set: (v) => writeRatio(i, withCoarse(readRatio(i), v)),
+      get: () => split(readRatio(editor, i)).coarse,
+      set: (v) => writeRatio(editor, i, withCoarse(readRatio(editor, i), v)),
       onChange,
     },
     fine: {
@@ -75,8 +76,8 @@ export function ratioKnobSpecs(
       def: FINE_DEF,
       step: FINE_STEP,
       fmt: fmtFine,
-      get: () => split(readRatio(i)).fine,
-      set: (v) => writeRatio(i, withFine(readRatio(i), v)),
+      get: () => split(readRatio(editor, i)).fine,
+      set: (v) => writeRatio(editor, i, withFine(readRatio(editor, i), v)),
       onChange,
     },
   };
@@ -103,12 +104,12 @@ export function showPitchControls(
 }
 
 /** The combined ratio, beside the pair, so the stored value is always visible. */
-function ratioReadout(i: number): { node: HTMLElement; sync: () => void } {
+function ratioReadout(editor: PatchEditor, i: number): { node: HTMLElement; sync: () => void } {
   const node = el('div', 'knob-readout');
   node.innerHTML = '<span class="readout-val"></span><span class="readout-label">Ratio</span>';
   const out = node.querySelector('.readout-val') as HTMLElement;
   const sync = (): void => {
-    out.textContent = fmtRatio(readRatio(i));
+    out.textContent = fmtRatio(readRatio(editor, i));
   };
   node.title = 'The stored ratio: Coarse + Fine';
   sync();
@@ -116,14 +117,14 @@ function ratioReadout(i: number): { node: HTMLElement; sync: () => void } {
 }
 
 /** Coarse, Fine and the readout, in row order. */
-export function ratioControls(i: number, color: string): HTMLElement[] {
-  const readout = ratioReadout(i);
+export function ratioControls(editor: PatchEditor, i: number, color: string): HTMLElement[] {
+  const readout = ratioReadout(editor, i);
   const pair: KnobElement[] = [];
   const afterCommit = (): void => {
     for (const knob of pair) knob.refresh();
     readout.sync();
   };
-  const specs = ratioKnobSpecs(i, afterCommit);
+  const specs = ratioKnobSpecs(editor, i, afterCommit);
   pair.push(makeKnob({ ...specs.coarse, color }), makeKnob({ ...specs.fine, color }));
   return [...pair, readout.node];
 }

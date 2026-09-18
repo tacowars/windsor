@@ -23,7 +23,7 @@ import {
   swapEnvelopes,
   transferMessage,
 } from './envelopeTransfer';
-import { hooks, partsState, pushPatch } from './patchState';
+import type { PatchEditor } from './partsSession';
 
 export type TransferKind = 'copy' | 'swap';
 
@@ -131,11 +131,20 @@ let ghostGlyph: HTMLElement | null = null;
 const canvasFor = (slot: EnvelopeSlot): HTMLCanvasElement | null =>
   document.querySelector<HTMLCanvasElement>(`canvas.env-canvas[data-env-slot="${slot}"]`);
 
+/** The editor each attached canvas edits; the filter and pitch canvases outlive a rail rebuild. */
+const editors = new WeakMap<HTMLCanvasElement, PatchEditor>();
+
+const editorFor = (slot: EnvelopeSlot): PatchEditor | null => {
+  const canvas = canvasFor(slot);
+  return (canvas && editors.get(canvas)) ?? null;
+};
+
 /** A slot's bay colour, recorded on its canvas when the drag was attached. */
 const slotColor = (slot: EnvelopeSlot): string | undefined => canvasFor(slot)?.dataset.envColor;
 
 function drawSlotInto(canvas: HTMLCanvasElement | null, slot: EnvelopeSlot): void {
-  const env = readEnvelope(partsState.patch, slot);
+  const editor = editorFor(slot);
+  const env = editor ? readEnvelope(editor.patch, slot) : null;
   const color = slotColor(slot);
   if (canvas && env && color) drawEnv(canvas, env, color);
 }
@@ -175,25 +184,27 @@ function showStatus(message: string): void {
 }
 
 /**
- * The drop itself: the model's copy or swap, one `pushPatch()` into the
- * document and the live part, then the whole patch UI so the target's knobs,
- * loop-mode picker and curve all show the new shape.
+ * The drop itself: the model's copy or swap, one push into the document and
+ * the live part, then the whole patch UI so the target's knobs, loop-mode
+ * picker and curve all show the new shape.
  */
 export function applyEnvelopeTransfer(
+  editor: PatchEditor,
   kind: TransferKind,
   from: EnvelopeSlot,
   to: EnvelopeSlot,
 ): boolean {
   const changed =
-    kind === 'swap'
-      ? swapEnvelopes(partsState.patch, from, to)
-      : copyEnvelope(partsState.patch, from, to);
+    kind === 'swap' ? swapEnvelopes(editor.patch, from, to) : copyEnvelope(editor.patch, from, to);
   if (!changed) return false;
-  pushPatch();
-  hooks.refresh();
+  editor.push();
+  editor.refresh();
   showStatus(transferMessage(kind, from, to));
   return true;
 }
+
+/** The canvas highlighted as the drop or swap target on the last frame, cleared on the next. */
+let highlighted: HTMLCanvasElement | null = null;
 
 const domHost: EnvelopeDragHost = {
   slotAt(x, y) {
@@ -203,20 +214,23 @@ const domHost: EnvelopeDragHost = {
     return isEnvelopeSlot(slot) ? slot : null;
   },
   paint(state) {
-    document.querySelectorAll('.drop-target, .swap-target').forEach((node) => {
-      node.classList.remove('drop-target', 'swap-target');
-    });
+    highlighted?.classList.remove('drop-target', 'swap-target');
+    highlighted = null;
     document.body.classList.toggle('env-dragging', state !== null);
     if (!state) {
       if (ghostRoot) ghostRoot.style.display = 'none';
       return;
     }
     if (state.over && state.over !== state.from) {
-      canvasFor(state.over)?.classList.add(state.kind === 'swap' ? 'swap-target' : 'drop-target');
+      highlighted = canvasFor(state.over);
+      highlighted?.classList.add(state.kind === 'swap' ? 'swap-target' : 'drop-target');
     }
     paintGhost(state);
   },
-  apply: applyEnvelopeTransfer,
+  apply(kind, from, to) {
+    const editor = editorFor(from);
+    if (editor) applyEnvelopeTransfer(editor, kind, from, to);
+  },
 };
 
 const controller = createEnvelopeDrag(domHost);
@@ -244,11 +258,13 @@ function bindKeys(): void {
  * second set of listeners on it.
  */
 export function attachEnvelopeDrag(
+  editor: PatchEditor,
   canvas: HTMLCanvasElement,
   slot: EnvelopeSlot,
   color: string,
 ): void {
   const alreadyBound = canvas.dataset.envSlot !== undefined;
+  editors.set(canvas, editor);
   canvas.dataset.envSlot = slot;
   canvas.dataset.envColor = color;
   canvas.style.setProperty('--env-color', color);

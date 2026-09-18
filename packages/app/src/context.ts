@@ -1,7 +1,9 @@
 /**
- * What every tab gets handed (#70): the engine host, the document model, and
- * the operations that keep the two in step. `main.ts` implements it; the
- * interface lives here so tab modules need no import cycle.
+ * What every tab gets handed (#70): the engine host, the document model, the
+ * Parts tab's session, and the operations that keep them in step.
+ * `appContext.ts` implements it; the interface lives here so tab modules need
+ * no import cycle. The names are the surface the cards and panels call, and
+ * they stay put when the implementation moves (#620).
  */
 import type {
   ApplyResult,
@@ -9,10 +11,13 @@ import type {
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
+import type { PartsSession } from './partsSession';
 
 export interface AppCtx {
   host: EngineHost;
   model: DocumentModel;
+  /** The Parts tab's selection and working patch (#620 decision 3). */
+  parts: PartsSession;
   /**
    * A field-level change: applied to the live system (when audio is enabled)
    * and merged into the document. Refused by the engine → nothing changes.
@@ -27,7 +32,7 @@ export interface AppCtx {
   capture(slot: number): boolean;
   /** Release a captured part back to generative. */
   release(slot: number): void;
-  /** Re-render every tab from the current document. */
+  /** Re-render the active tab from the current document; the rest render when shown (#620). */
   render(): void;
   status(message: string): void;
 }

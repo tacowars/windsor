@@ -5,8 +5,6 @@ export const ENV_PAD_PX = 4;
 /** The sustain hold drawn between decay and release: a share of the timed total, never shorter than this. */
 export const ENV_HOLD_SHARE = 0.28;
 export const ENV_HOLD_MIN_S = 0.02;
-/** A curve value of ±1 maps to `exp(±steepness)` in the shaping constant. */
-export const ENV_CURVE_STEEPNESS = 3;
 /** Line segments per envelope stage. */
 export const ENV_SEGMENT_POINTS = 26;
 /** The sustain guide's dash pattern and the curve's stroke width. */
