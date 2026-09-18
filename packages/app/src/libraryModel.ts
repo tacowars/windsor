@@ -6,7 +6,10 @@
  * actions, so a save shows up everywhere without a rebuild.
  */
 import type { Patch, PresetListing } from '../../../packages/client/src/audio/index-for-editor';
-import { PATCH_LIBRARY } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  PATCH_LIBRARY,
+  loadUnsweptPatchFile,
+} from '../../../packages/client/src/audio/index-for-editor';
 import type { PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
 import { LIBRARY_FOLDER_PATH, isInitPreset } from './libraryConstants';
@@ -70,7 +73,17 @@ export async function writeLibraryFile(
     return;
   }
   download(id, text);
-  model.entries = { ...model.entries, [id]: { id, ...JSON.parse(text) } };
+  // Through the loader the folder path reads with (#617), not a bare spread:
+  // page mode kept the entry in memory unchecked, so a file the folder would
+  // have refused — and counted under `problems` for the row to show — became
+  // a valid-looking entry in the browser and in every action that reads one.
+  // Refused the same way here: no entry, and the reason on the row.
+  try {
+    model.entries = { ...model.entries, [id]: loadUnsweptPatchFile(id, JSON.parse(text)) };
+    model.problems = [];
+  } catch (error) {
+    model.problems = [error instanceof Error ? error.message : String(error)];
+  }
 }
 
 /** Remove one file from the folder and re-read it; refused in page mode. */

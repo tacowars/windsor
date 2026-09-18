@@ -76,6 +76,13 @@ export class Keyboard {
   onPanic: (() => void) | null = null;
 
   private readonly held = new Map<string, Held>();
+  /**
+   * Every part this keyboard has struck a note on since the last Panic (#617).
+   * `held` is not enough: under Hold a keyup drops the entry without a
+   * `noteOff`, so the note lives on the engine alone and no map remembers
+   * which part is carrying it.
+   */
+  private readonly sounded = new Set<AudioPart>();
   private readonly getPart: () => AudioPart | null;
   /** The part carrying the controller's bend and wheel, and their positions. */
   private expressionPart: AudioPart | null = null;
@@ -84,6 +91,11 @@ export class Keyboard {
 
   constructor(getPart: () => AudioPart | null) {
     this.getPart = getPart;
+  }
+
+  /** How many notes the keyboard is holding; what Panic must leave at zero. */
+  get heldCount(): number {
+    return this.held.size;
   }
 
   /** Build the keys into `box` and wire the octave label. */
@@ -107,20 +119,34 @@ export class Keyboard {
 
   /** Global QWERTY handling; call once. */
   attachGlobalKeys(): void {
-    addEventListener('keydown', (e) => {
-      if (e.repeat) return;
-      const tag = (e.target instanceof HTMLElement ? e.target.tagName : '').toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-      // A modal's buttons are not keys either (#563): focus is trapped there until it closes.
-      if (e.target instanceof HTMLElement && e.target.closest('dialog[open]')) return;
-      if (e.key === 'z') return this.shiftOctave(-1);
-      if (e.key === 'x') return this.shiftOctave(1);
-      const off = QWERTY[e.key];
-      if (off === undefined || this.held.has(e.key)) return;
-      this.press(e.key, off, ($('keys').children[off] as HTMLElement | undefined) ?? null);
-    });
-    addEventListener('keyup', (e) => this.lift(e.key));
+    addEventListener('keydown', (e) => this.onKeyDown(e));
+    addEventListener('keyup', (e) => this.onKeyUp(e));
     releaseMousePickedDropdowns();
+  }
+
+  /**
+   * One QWERTY press. The note comes from `e.key` — the letter printed on the
+   * key — but the held note is filed under `e.code`, the physical key (#617):
+   * press `a`, take Shift to fine-drag a knob, release, and the keyup arrives
+   * as `A`. Keyed by `e.key` that release found nothing to lift, the note rang
+   * on, and every later `a` returned early because the map still held it.
+   */
+  onKeyDown(e: KeyboardEvent): void {
+    if (e.repeat) return;
+    const tag = (e.target instanceof HTMLElement ? e.target.tagName : '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+    // A modal's buttons are not keys either (#563): focus is trapped there until it closes.
+    if (e.target instanceof HTMLElement && e.target.closest('dialog[open]')) return;
+    if (e.key === 'z') return this.shiftOctave(-1);
+    if (e.key === 'x') return this.shiftOctave(1);
+    const off = QWERTY[e.key];
+    if (off === undefined || this.held.has(e.code)) return;
+    this.press(e.code, off, ($('keys').children[off] as HTMLElement | undefined) ?? null);
+  }
+
+  /** One QWERTY release, by physical key so a Shift change between the two still lifts. */
+  onKeyUp(e: KeyboardEvent): void {
+    this.lift(e.code);
   }
 
   shiftOctave(by: number): void {
@@ -128,8 +154,18 @@ export class Keyboard {
     this.syncLabel();
   }
 
+  /**
+   * Silence every part this keyboard has sounded, not just the selected one
+   * (#617): under Hold a note lives on the engine with nothing left to
+   * release it, so switching parts used to strand it — Panic reached the new
+   * part while the old one rang on. Hold keeps the latched notes across a
+   * part switch, which is what Hold is for; Panic is what lets them all go.
+   */
   panic(): void {
-    this.getPart()?.panic();
+    const selected = this.getPart();
+    if (selected) this.sounded.add(selected);
+    for (const part of this.sounded) part.panic();
+    this.sounded.clear();
     this.held.clear();
     document.querySelectorAll('.key.down').forEach((k) => k.classList.remove('down'));
     this.bendSemitones = 0;
@@ -186,6 +222,7 @@ export class Keyboard {
     const part = this.getPart();
     if (!part) return;
     const id = part.noteOn(note, velocity);
+    this.sounded.add(part);
     keyEl?.classList.add('down');
     this.held.set(source, { id, part, el: keyEl });
   }

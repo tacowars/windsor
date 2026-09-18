@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { EuclideanSpec } from '../../../packages/client/src/audio/index-for-editor';
 import {
+  DEFAULT_EUCLIDEAN_CONFIG,
   DIVISORS,
   PPQ,
   euclid,
   patternFromString,
 } from '../../../packages/client/src/audio/index-for-editor';
+import { pulseDefault } from './euclidCard';
 import {
   EUCLID_STEPS_MAX,
   countOnsets,
@@ -114,5 +116,30 @@ describe('the preview and the readout', () => {
     expect(stepsPerBeat(DIVISORS.quarter)).toBe(1);
     expect(stepsPerBeat(DIVISORS.bar)).toBe(0);
     expect(stepsPerBeat(0)).toBe(0);
+  });
+});
+
+/**
+ * The card's own reset values, not the model's (#617), but this is where the
+ * Euclidean part's numbers are pinned. `knob.ts` writes `spec.def` into the
+ * document on a double-click, so a default the card restates wrongly is an
+ * edit the player never asked for: the card carried `{ min: 2, max: 9,
+ * start: 4 }` against a sequencer that starts at `{ min: 3, max: 9, start: 5 }`.
+ */
+describe("the Euclidean card's k defaults", () => {
+  it("are the engine's own, so a double-click reset writes what the part starts at", () => {
+    const engine = DEFAULT_EUCLIDEAN_CONFIG.pulses;
+    expect(pulseDefault('min')).toBe(engine.min);
+    expect(pulseDefault('max')).toBe(engine.max);
+    expect(pulseDefault('start')).toBe(engine.start);
+  });
+
+  it('reset a spec back to a figure the sequencer would itself have made', () => {
+    // The reset is only meaningful if the engine's own bounds are consistent:
+    // `start` inside `[min, max]`, and both inside the strip.
+    const { min, max, start } = DEFAULT_EUCLIDEAN_CONFIG.pulses;
+    expect(min).toBeLessThanOrEqual(start);
+    expect(start).toBeLessThanOrEqual(max);
+    expect(max).toBeLessThanOrEqual(EUCLID_STEPS_MAX);
   });
 });
