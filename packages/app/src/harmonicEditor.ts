@@ -19,13 +19,14 @@ import {
   waveCycle,
 } from './harmonicModel';
 import type { BarPoint, HarmonicCount } from './harmonicModel';
-import { partsState, pushPatch } from './patchState';
+import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
+import type { PatchEditor } from './partsSession';
 
 const BAR_GAP_PX = 1;
 
 /** Give a User operator something to draw on; other waves keep whatever they carry. */
-export function ensureUserPartials(i: number): void {
-  const op = partsState.patch.ops[i];
+export function ensureUserPartials(patch: Patch, i: number): void {
+  const op = patch.ops[i];
   if (op && op.wave === WAVE.USER && !op.userPartials) op.userPartials = seedPartials();
 }
 
@@ -76,13 +77,18 @@ function drawCycle(canvas: HTMLCanvasElement, partials: readonly number[], color
   g.stroke();
 }
 
-function attachStroke(canvas: HTMLCanvasElement, i: number, redraw: () => void): void {
+function attachStroke(
+  editor: PatchEditor,
+  canvas: HTMLCanvasElement,
+  i: number,
+  redraw: () => void,
+): void {
   let last: BarPoint | null = null;
   let drawing = false;
   const step = (e: PointerEvent): void => {
-    const op = partsState.patch.ops[i];
+    const op = editor.patch.ops[i];
     if (!op) return;
-    ensureUserPartials(i);
+    ensureUserPartials(editor.patch, i);
     // A stored array shorter than the bars shown (the scoring bank's 5–9
     // harmonics under 16 bars) is padded with silence, so every bar takes paint.
     const partials = drawablePartials(op.userPartials);
@@ -95,7 +101,7 @@ function attachStroke(canvas: HTMLCanvasElement, i: number, redraw: () => void):
     paintStroke(partials, last, point);
     op.userPartials = partials;
     last = point;
-    pushPatch();
+    editor.push();
     redraw();
   };
   const stop = (e: PointerEvent): void => {
@@ -121,25 +127,29 @@ function attachStroke(canvas: HTMLCanvasElement, i: number, redraw: () => void):
 }
 
 /** Build the editor for operator `i`; `sync` shows it only while the wave is User. */
-export function harmonicEditor(i: number, color: string): { root: HTMLElement; sync: () => void } {
+export function harmonicEditor(
+  editor: PatchEditor,
+  i: number,
+  color: string,
+): { root: HTMLElement; sync: () => void } {
   const root = el('div', 'harm');
   const bars = el('canvas', 'harm-bars') as HTMLCanvasElement;
   bars.setAttribute('aria-label', `Operator ${OP_NAMES[i]} harmonic levels: drag to draw`);
   const preview = el('canvas', 'harm-preview') as HTMLCanvasElement;
   preview.setAttribute('aria-label', `Operator ${OP_NAMES[i]} User wave cycle`);
-  const partials = (): readonly number[] => partsState.patch.ops[i]?.userPartials ?? seedPartials();
+  const partials = (): readonly number[] => editor.patch.ops[i]?.userPartials ?? seedPartials();
   const redraw = (): void => {
     drawBars(bars, partials(), color);
     drawCycle(preview, partials(), color);
   };
   const counts = seg(
     HARMONIC_COUNTS.map((c) => ({ value: String(c), label: String(c) })),
-    () => String(countFor(partsState.patch.ops[i]?.userPartials ?? null)),
+    () => String(countFor(editor.patch.ops[i]?.userPartials ?? null)),
     (value) => {
-      const op = partsState.patch.ops[i];
+      const op = editor.patch.ops[i];
       if (!op) return;
       op.userPartials = resizePartials(op.userPartials, Number(value) as HarmonicCount);
-      pushPatch();
+      editor.push();
       redraw();
     },
     color,
@@ -148,15 +158,18 @@ export function harmonicEditor(i: number, color: string): { root: HTMLElement; s
   const foot = el('div', 'harm-foot');
   foot.append(counts, preview);
   root.append(el('span', 'field-label', 'Harmonics'), bars, foot);
-  attachStroke(bars, i, redraw);
+  attachStroke(editor, bars, i, redraw);
   // The rail can be rebuilt while its tab is hidden (a document import from
   // another tab), where the canvases measure 0 × 0; a tab switch only flips
-  // `hidden`. Redraw whenever the bars canvas gains a size.
-  new ResizeObserver(() => {
+  // `hidden`. Redraw whenever the bars canvas gains a size — and stop watching
+  // once the bay is rebuilt and the canvas has left the document (#620).
+  const resized = new ResizeObserver(() => {
+    if (!bars.isConnected) return resized.disconnect();
     if (bars.clientWidth > 0) redraw();
-  }).observe(bars);
+  });
+  resized.observe(bars);
   const sync = (): void => {
-    const user = partsState.patch.ops[i]?.wave === WAVE.USER;
+    const user = editor.patch.ops[i]?.wave === WAVE.USER;
     root.style.display = user ? '' : 'none';
     if (user) requestAnimationFrame(redraw);
   };

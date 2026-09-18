@@ -40,7 +40,7 @@ import {
 } from './harmonyTables';
 import { STRIP_LEVEL_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
-import { getPath } from './patchState';
+import { getPath } from './patchPath';
 import {
   ARP_KNOBS,
   CHORD_KNOBS,

@@ -46,12 +46,11 @@ import {
   unsavedQuestion,
 } from './patchActions';
 import { slugify, uniqueId } from './patchMetadata';
-import { hooks, partsState } from './patchState';
 
 /** A handle recalled from IndexedDB whose grant the browser dropped; the button re-requests it. */
 let remembered: ChromeDirectoryHandle | null = null;
 
-const scopeFor = (ctx: AppCtx): PatchScope => ({ ctx, library, slot: partsState.selected });
+const scopeFor = (ctx: AppCtx): PatchScope => ({ ctx, library, slot: ctx.parts.selected });
 
 /** The header's account of the mode, and the folder read's problems if any. */
 export function syncLibraryMode(): void {
@@ -77,7 +76,7 @@ export async function bootLibrary(): Promise<void> {
 /** The unsaved-changes guard: resolves true when loading over the working patch may go ahead. */
 export async function confirmUnsaved(ctx: AppCtx, opener?: HTMLElement): Promise<boolean> {
   const scope = scopeFor(ctx);
-  const question = unsavedQuestion(scope, partsState.patch);
+  const question = unsavedQuestion(scope, ctx.parts.patch);
   if (question === null) return true;
   const ok = await openConfirm({
     title: 'Unsaved changes',
@@ -89,15 +88,15 @@ export async function confirmUnsaved(ctx: AppCtx, opener?: HTMLElement): Promise
   // Really discard: the document copy back to the baseline, so re-selecting
   // the same preset does not find the edits still there.
   const restored = discardEdits(scope);
-  if (restored) partsState.patch = restored;
+  if (restored) ctx.parts.patch = restored;
   return true;
 }
 
-/** The marker beside the buttons; `hooks.afterCommit` calls this on every knob edit. */
+/** The marker beside the buttons; the Parts tab's editor calls this after every push. */
 export function syncModifiedMarker(ctx: AppCtx): void {
   const marker = document.getElementById('patchModified');
   if (!marker) return;
-  const modified = isModified(scopeFor(ctx), partsState.patch);
+  const modified = isModified(scopeFor(ctx), ctx.parts.patch);
   marker.textContent = modified ? '● unsaved edits' : '';
   marker.hidden = !modified;
 }
@@ -124,8 +123,8 @@ async function forgetFolder(ctx: AppCtx): Promise<void> {
   ctx.render();
 }
 
-const loudnessFor = (): Promise<LoudnessResult> =>
-  checkLoudness(partsState.patch, workletDataUrl(window.__A204_DSP__.fm));
+const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> =>
+  checkLoudness(ctx.parts.patch, workletDataUrl(window.__A204_DSP__.fm));
 
 async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {
   const scope = scopeFor(ctx);
@@ -135,17 +134,17 @@ async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
     {
       title: `Save over ${origin.id}.json`,
       hint: 'Writes the working patch over its library id; the open song copy follows.',
-      initial: currentMetadata(scope, partsState.patch),
+      initial: currentMetadata(scope, ctx.parts.patch),
       entries: library.entries,
       id: origin.id,
       ownId: origin.id,
-      loudness: loudnessFor(),
+      loudness: loudnessFor(ctx),
       opener,
     },
-    partsState.patch.volume,
+    ctx.parts.patch.volume,
   );
   if (!meta) return;
-  const id = await savePatch({ ...scope, working: partsState.patch, meta });
+  const id = await savePatch({ ...scope, working: ctx.parts.patch, meta });
   ctx.status(`saved ${id}.json — run the sweep before committing`);
   refresh();
 }
@@ -157,16 +156,16 @@ async function runCopy(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
     {
       title: 'Copy to new',
       hint: 'Writes the working patch as a new library file and switches this part to it.',
-      initial: copyPrefill(scope, partsState.patch),
+      initial: copyPrefill(scope, ctx.parts.patch),
       entries: library.entries,
       id: (name) => uniqueId(slugify(name), taken),
-      loudness: loudnessFor(),
+      loudness: loudnessFor(ctx),
       opener,
     },
-    partsState.patch.volume,
+    ctx.parts.patch.volume,
   );
   if (!meta) return;
-  const id = await copyToNew({ ...scope, working: partsState.patch, meta });
+  const id = await copyToNew({ ...scope, working: ctx.parts.patch, meta });
   ctx.status(`wrote ${id}.json — this part now plays it; run the sweep before committing`);
   refresh();
 }
@@ -265,7 +264,6 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     );
   }
   box.appendChild(folderRow);
-  hooks.afterCommit = (): void => syncModifiedMarker(ctx);
   queueMicrotask(() => {
     syncModifiedMarker(ctx);
     syncLibraryMode();

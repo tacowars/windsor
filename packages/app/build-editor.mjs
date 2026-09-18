@@ -1,4 +1,4 @@
-/* global console, Buffer */
+/* global console, process, Buffer */
 /**
  * Generates the standalone arrangement console (#70).
  *
@@ -7,8 +7,8 @@
  *
  *   - `worklet/fm-processor.js` and `worklet/reverb-processor.js` verbatim, as
  *     strings the page turns into blob URLs for `FmEngine.init()`
- *   - the console app (`src/main.ts`), bundled by esbuild together with the
- *     real engine via `packages/client/src/audio/index-for-editor.ts`
+ *   - the console app (`src/main.ts`), bundled (`lib/audioBundle.mjs`) together
+ *     with the real engine via `packages/client/src/audio/index-for-editor.ts`
  *
  * Everything comes from the real client source, so the console cannot drift
  * from what the game runs — and two assertions keep the two boundaries honest:
@@ -21,14 +21,20 @@
  * Re-run after changing the DSP, the schema, the engine, or the console:
  *
  *   node tools/patch-editor/build-editor.mjs
+ *
+ * The page is checked, not trusted (#620 decision 6): `--check` builds to
+ * memory and exits 1 when the tracked page differs, and `npm run verify` runs
+ * it after `build`, so a source edit without a rebuild fails the gate.
  */
-import { build } from 'esbuild';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { AUDIO_DIR, bundleConsoleApp } from './lib/audioBundle.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
-const AUDIO = join(HERE, '../../packages/client/src/audio');
+const AUDIO = AUDIO_DIR;
+const CHECK = process.argv.includes('--check');
 
 const worklet = readFileSync(join(AUDIO, 'worklet/fm-processor.js'), 'utf8');
 const reverb = readFileSync(join(AUDIO, 'worklet/reverb-processor.js'), 'utf8');
@@ -75,10 +81,12 @@ const FORBIDDEN_IN_CONSOLE_CODE = [
   'createDelay(',
   'audioWorklet.addModule',
 ];
+// The scan covers the console's code, not its tests: a test may name a
+// forbidden call in an assertion or a comment without building anything.
 const consoleSources = [
   ['editor-template.html', template],
   ...readdirSync(join(HERE, 'src'))
-    .filter((name) => name.endsWith('.ts'))
+    .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
     .map((name) => [`src/${name}`, readFileSync(join(HERE, 'src', name), 'utf8')]),
 ];
 for (const [name, source] of consoleSources) {
@@ -89,41 +97,43 @@ for (const [name, source] of consoleSources) {
   }
 }
 
-const bundle = await build({
-  entryPoints: [join(HERE, 'src/main.ts')],
-  bundle: true,
-  write: false,
-  format: 'iife',
-  target: 'es2022',
-  platform: 'browser',
-  legalComments: 'none',
-  // `workletMessages.ts` builds its default URLs from `import.meta.url`,
-  // which an IIFE lacks; the host always passes blob-URL overrides, so the
-  // defaults only need to *construct* without throwing.
-  define: { 'import.meta.url': 'self.location.href' },
-});
-
-const [output] = bundle.outputFiles;
-if (!output) throw new Error('esbuild produced no output');
+const app = await bundleConsoleApp(join(HERE, 'src/main.ts'));
 
 // Invariant: the editor entry keeps Babylon out (only babylonBridge.ts may
 // import it, and index-for-editor.ts excludes that module).
 for (const forbidden of ['@babylonjs', 'babylonBridge', 'BABYLON']) {
-  if (output.text.includes(forbidden)) {
+  if (app.includes(forbidden)) {
     throw new Error(`engine bundle contains "${forbidden}" — Babylon leaked into the console`);
   }
 }
 
 const html = template
-  .replace('/*__APP__*/', () => output.text)
+  .replace('/*__APP__*/', () => app)
   .replace('/*__WORKLET__*/', () => JSON.stringify(worklet))
   .replace('/*__REVERB__*/', () => JSON.stringify(reverb));
 
 const dest = join(HERE, 'patch-editor.html');
-writeFileSync(dest, html);
-
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;
+
+if (CHECK) {
+  const tracked = existsSync(dest) ? readFileSync(dest, 'utf8') : null;
+  if (tracked !== html) {
+    console.error(
+      tracked === null
+        ? 'build-editor --check: tools/patch-editor/patch-editor.html is missing'
+        : 'build-editor --check: tools/patch-editor/patch-editor.html is stale — its sources changed without a rebuild',
+    );
+    console.error('  run: node tools/patch-editor/build-editor.mjs, then commit the page');
+    process.exit(1);
+  }
+  console.log(
+    `build-editor --check: tools/patch-editor/patch-editor.html matches its sources (${kb(Buffer.byteLength(html))})`,
+  );
+  process.exit(0);
+}
+
+writeFileSync(dest, html);
 console.log(`built tools/patch-editor/patch-editor.html (${kb(Buffer.byteLength(html))})`);
 console.log(
-  `  fm: ${kb(worklet.length)}   reverb: ${kb(reverb.length)}   app+engine bundle: ${kb(output.text.length)}`,
+  `  fm: ${kb(worklet.length)}   reverb: ${kb(reverb.length)}   app+engine bundle: ${kb(app.length)}`,
 );
