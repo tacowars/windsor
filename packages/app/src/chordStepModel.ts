@@ -1,15 +1,15 @@
 /**
  * The chord card's step operations (#607), without the DOM: what a drop or a
- * cell click does to a `ChordSpec`'s step list, what the picker's chips and
- * a step's tile read for the song's current key, and which step the
- * transport is on. Every function returns a new list; the card writes it
- * through `ctx.change`, where arrays replace wholesale.
+ * cell click does to a `ChordSpec`'s step list, and what the picker's chips
+ * and a step's tile read for the song's current key. Every function returns a
+ * new list; the card writes it through `ctx.change`, where arrays replace
+ * wholesale. Which step the transport is on is the engine's answer, not a
+ * copy here: the card's playhead reads `host.stepAt` (#619 decision 2).
  */
 import type {
   ArrangementKey,
   ChordChordStep,
   ChordSize,
-  ChordSpec,
   ChordStep,
   ChordVoicingId,
 } from '../../../packages/client/src/audio/index-for-editor';
@@ -24,7 +24,6 @@ import {
   chordOf,
   chordStep,
   diatonicChords,
-  layoutSegments,
   restStep,
   romanNumeral,
   scaleOffsets,
@@ -197,19 +196,4 @@ export function dialLabel(step: ChordStep, dial: StepDial): string {
   if (dial === 'inversion') return `inv ${value}`;
   if (value === 0) return dial === 'octave' ? 'oct' : 'semi';
   return `${value > 0 ? '+' : ''}${value}`;
-}
-
-/** The step index the transport is on for `tick`, or -1 when the pattern is empty. */
-export function stepAtTick(spec: ChordSpec, tick: number): number {
-  const segments = layoutSegments({ ...spec, seed: 0, generatorIndex: 0 });
-  const last = segments[segments.length - 1];
-  if (!last) return -1;
-  const length = last.start + last.ticks;
-  const offset = ((tick % length) + length) % length;
-  let found = -1;
-  for (const segment of segments) {
-    if (segment.start > offset) break;
-    found = segment.step;
-  }
-  return found;
 }

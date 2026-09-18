@@ -12,7 +12,6 @@ import { pulseDefault } from './sequencerKnobTables';
 import {
   EUCLID_STEPS_MAX,
   countOnsets,
-  playheadStep,
   previewFigure,
   pulsesChange,
   rotateChange,
@@ -102,13 +101,6 @@ describe('the preview and the readout', () => {
     const fixed = patternFromString('x.x.x.x.');
     expect(previewFigure({ ...SPEC, steps: 8, pattern: fixed })).toBe(fixed);
     expect(countOnsets(fixed)).toBe(4);
-  });
-
-  it('places the playhead by the audible tick and wraps at the figure', () => {
-    const divisor = DIVISORS.sixteenth;
-    expect(playheadStep(0, divisor, 12)).toBe(0);
-    expect(playheadStep(divisor * 11 + 1, divisor, 12)).toBe(11);
-    expect(playheadStep(divisor * 12, divisor, 12)).toBe(0);
   });
 
   it('groups the strip by the beat only where the step divides it', () => {
