@@ -11,7 +11,10 @@
  * The operations are `euclidModel.ts`.
  */
 import type { EuclideanSpec } from '../../../packages/client/src/audio/index-for-editor';
-import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  DEFAULT_EUCLIDEAN_CONFIG,
+  partAt,
+} from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, fmt0, fmt2, noteName } from './dom';
@@ -39,7 +42,13 @@ const HINT =
   'Nothing here restarts the sequencer; only the divisor rebuilds it.';
 
 const PULSE_FIELDS: readonly PulseField[] = ['min', 'max', 'start'];
-const PULSE_DEFAULTS: Readonly<Record<PulseField, number>> = { min: 2, max: 9, start: 4 };
+/**
+ * The engine's own bounds, read rather than restated (#617). The card carried
+ * a `{ min: 2, max: 9, start: 4 }` table of its own while the sequencer starts
+ * at `{ min: 3, max: 9, start: 5 }`, so a double-click reset — `knob.ts` writes
+ * `spec.def` — put a value into the document the engine would never choose.
+ */
+export const pulseDefault = (field: PulseField): number => DEFAULT_EUCLIDEAN_CONFIG.pulses[field];
 
 function specOf(ctx: AppCtx, slot: number): EuclideanSpec | null {
   const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
@@ -190,11 +199,11 @@ function pulsesRow(card: Card): HTMLElement {
       label: `k ${field}`,
       min: 0,
       max: EUCLID_STEPS_MAX,
-      def: PULSE_DEFAULTS[field],
+      def: pulseDefault(field),
       step: 1,
       color: PERC_COLOR,
       fmt: fmt0,
-      get: () => specOf(card.ctx, card.slot)?.pulses[field] ?? PULSE_DEFAULTS[field],
+      get: () => specOf(card.ctx, card.slot)?.pulses[field] ?? pulseDefault(field),
       set: (v) => {
         const spec = specOf(card.ctx, card.slot);
         if (!spec) return;

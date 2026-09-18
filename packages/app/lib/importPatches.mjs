@@ -19,10 +19,29 @@ export function importIdFromName(fileName) {
 }
 
 /**
+ * Whether a parsed file claims to be a patch at all (#617). `~/Downloads` is
+ * full of `.json` that has nothing to do with the console, and every one of
+ * them used to land in `rejected` and take the exit code to 1 after a clean
+ * import. A file the editor wrote carries `format` and `patch`; a file that
+ * carries neither is somebody else's and is skipped, not failed.
+ */
+export function looksLikePatchFile(parsed) {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return false;
+  return 'format' in parsed || 'patch' in parsed;
+}
+
+/** The CLI's exit code: a patch the loader refused is a failure, nothing else is. */
+export const importExitCode = ({ rejected }) => (rejected.length > 0 ? 1 : 0);
+
+const reasonOf = (error) => (error instanceof Error ? error.message : String(error));
+
+/**
  * Validate every `<id>.json` in `sourceDir` with `loadFile(id, raw)` and copy
  * the accepted ones, bytes untouched, to `patchesDir/<id>.json`. When several
  * files map to one id (`kick.json`, `kick (1).json`), the newest is taken and
- * the others reported as skipped.
+ * the others reported as skipped. A file that is not JSON, or is JSON that
+ * claims to be no patch, is skipped rather than rejected — only a refused
+ * patch is a failure.
  */
 export function importPatches({ sourceDir, patchesDir, loadFile }) {
   const copied = [];
@@ -44,10 +63,19 @@ export function importPatches({ sourceDir, patchesDir, loadFile }) {
     byId.set(id, { name, path, mtimeMs: stat.mtimeMs });
   }
   for (const [id, { name, path }] of [...byId].sort(([a], [b]) => a.localeCompare(b))) {
+    let parsed;
     try {
-      loadFile(id, JSON.parse(readFileSync(path, 'utf8')));
+      parsed = JSON.parse(readFileSync(path, 'utf8'));
     } catch (error) {
-      rejected.push({ file: name, reason: error instanceof Error ? error.message : String(error) });
+      skipped.push({ file: name, reason: `not a patch file: ${reasonOf(error)}` });
+      continue;
+    }
+    try {
+      loadFile(id, parsed);
+    } catch (error) {
+      const entry = { file: name, reason: reasonOf(error) };
+      if (looksLikePatchFile(parsed)) rejected.push(entry);
+      else skipped.push({ file: name, reason: `not a patch file: ${entry.reason}` });
       continue;
     }
     copyFileSync(path, join(patchesDir, `${id}.json`));
