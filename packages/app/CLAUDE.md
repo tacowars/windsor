@@ -264,11 +264,16 @@ controller is offered once the browser grants access (#523).
   cache instead of re-registering the processors. `enable()` gates on the
   system and joins an in-flight build; a failed attempt tears the context down
   so the next press starts clean (#617).
-- **Hidden tabs are hidden, not detached** (#619). A card in a hidden tab
-  keeps its `watchPlayhead` loop running, so it still asks the engine for one
-  `stepAt` per frame. It is cheap and it is deliberate — the loop stops when
-  the card is removed from the DOM. If it ever shows in a profile, the fix is
-  one attached-check line in `watchPlayhead`, not a second lifecycle.
+- **Hidden tabs are hidden, not detached** (#619, #632). A card in a hidden
+  tab keeps its `watchPlayhead` loop scheduling frames, but the loop **idles**:
+  the card passes `shown` — `root.closest('[hidden]') === null`, layout-free,
+  so never `offsetParent`, `getBoundingClientRect` or `checkVisibility` per
+  frame — and a frame where it is false queues the next frame and returns,
+  before the repaint check and the engine's `stepAt`. Nothing resets on hide,
+  so the step lit when the tab went away stays lit and the first shown frame
+  moves it if the transport moved. `attached()` keeps its one meaning: the
+  loop ends when the card leaves the DOM. That is the whole lifecycle — a tab
+  hiding or showing fires no event here.
 - **Arrays replace wholesale in a merge; objects recurse.** A step list, a
   captured pattern or a partial table is committed whole (`commitSteps`), and
   `deepMerge` in `documentModel.ts` differs from the engine-side merge in one

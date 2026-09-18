@@ -120,19 +120,28 @@ describe('watchPlayhead', () => {
   const SLOT = 1;
   const DIVISOR = 6;
   const STEPS = 4;
+  /** Enough frames that an idling loop doing any work per frame would show it. */
+  const FRAMES = 5;
 
-  /** The loop over a fake frame source: `run()` runs the frame that is queued. */
-  function driven(): {
+  /**
+   * The loop over a fake frame source: `run()` runs the frame that is queued.
+   * `tracksShown` is the card that passes a `shown` check; without it the watch
+   * has no `shown` at all, which is the pre-#632 shape every case below shares.
+   */
+  function driven(options: { tracksShown?: boolean } = {}): {
     transport: { running: boolean; audible: number; now: number };
     marks: number[];
+    asked: { slot: number; tick: number }[];
     checks: number;
     attached: { value: boolean };
+    shown: { value: boolean };
     run(frames: number): void;
     pending(): boolean;
   } {
-    const { ctx, transport } = fakeCtx((tick) => Math.floor(tick / DIVISOR) % STEPS);
+    const { ctx, transport, asked } = fakeCtx((tick) => Math.floor(tick / DIVISOR) % STEPS);
     const marks: number[] = [];
     const attached = { value: true };
+    const shown = { value: true };
     const state = { checks: 0 };
     let queued: (() => void) | null = null;
     watchPlayhead({
@@ -140,15 +149,18 @@ describe('watchPlayhead', () => {
       playheadAt: () => playheadAt(ctx, SLOT),
       mark: (step) => void marks.push(step),
       repaintIf: () => void state.checks++,
+      ...(options.tracksShown === true ? { shown: () => shown.value } : {}),
       frame: (next) => void (queued = next),
     });
     return {
       transport,
       marks,
+      asked,
       get checks(): number {
         return state.checks;
       },
       attached,
+      shown,
       run(frames: number): void {
         for (let i = 0; i < frames; i++) {
           const due = queued;
@@ -210,5 +222,52 @@ describe('watchPlayhead', () => {
     // And it stays stopped: a later frame cannot revive it.
     loop.run(1);
     expect(loop.pending()).toBe(false);
+  });
+
+  it('idles while the panel is hidden: the frame is queued and nothing else runs', () => {
+    const loop = driven({ tracksShown: true });
+    loop.run(1);
+    const asked = loop.asked.length;
+    const checks = loop.checks;
+    loop.shown.value = false;
+    loop.transport.audible = DIVISOR;
+    loop.run(FRAMES);
+    expect(loop.asked.length).toBe(asked);
+    expect(loop.checks).toBe(checks);
+    expect(loop.marks).toEqual([0]);
+    // Still queued, so showing the tab again needs no lifecycle event.
+    expect(loop.pending()).toBe(true);
+  });
+
+  it('marks the step it moved to while hidden once, on the first shown frame', () => {
+    const loop = driven({ tracksShown: true });
+    loop.run(1);
+    loop.shown.value = false;
+    loop.transport.audible = DIVISOR * 2;
+    loop.run(FRAMES);
+    expect(loop.marks).toEqual([0]);
+    loop.shown.value = true;
+    loop.run(1);
+    expect(loop.marks).toEqual([0, 2]);
+    // And it stays there: the same step is not re-marked.
+    loop.run(FRAMES);
+    expect(loop.marks).toEqual([0, 2]);
+  });
+
+  it('ends for good when a hidden card leaves the document', () => {
+    const loop = driven({ tracksShown: true });
+    loop.run(1);
+    loop.shown.value = false;
+    loop.attached.value = false;
+    loop.run(1);
+    expect(loop.pending()).toBe(false);
+  });
+
+  it('works every frame for a watch with no shown check, exactly as before', () => {
+    const loop = driven();
+    loop.run(FRAMES);
+    expect(loop.asked.length).toBe(FRAMES);
+    expect(loop.checks).toBe(FRAMES);
+    expect(loop.marks).toEqual([0]);
   });
 });

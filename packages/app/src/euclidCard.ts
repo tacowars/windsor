@@ -129,6 +129,7 @@ function readoutText(card: Card, figure: Figure): string {
 function watch(card: Card): void {
   watchPlayhead({
     attached: () => card.root.isConnected,
+    shown: () => card.root.closest('[hidden]') === null,
     playheadAt: () => playheadAt(card.ctx, card.slot),
     mark: markStep(card),
     repaintIf: () => {

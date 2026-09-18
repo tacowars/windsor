@@ -149,6 +149,7 @@ function watch(strip: GridStrip): void {
   let keySig = keySignature(strip.ctx.model.doc.key);
   watchPlayhead({
     attached: () => strip.root.isConnected,
+    shown: () => strip.root.closest('[hidden]') === null,
     playheadAt: () => playheadAt(strip.ctx, strip.slot),
     mark: markStep(strip),
     repaintIf: () => {

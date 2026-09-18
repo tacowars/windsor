@@ -118,7 +118,7 @@ export type FrameSource = (run: () => void) => void;
 
 /** What one card asks the playhead loop to do each frame. */
 export interface PlayheadWatch {
-  /** True while the card is on screen; the first frame it is not, the loop ends. */
+  /** True while the card is in the document; the first frame it is not, the loop ends. */
   attached(): boolean;
   /** The step the transport is on, or -1 — `playheadAt` for every card that sounds. */
   playheadAt(): number;
@@ -126,6 +126,11 @@ export interface PlayheadWatch {
   mark(step: number): void;
   /** Checked before the playhead: a repaint the document or the player asks for. */
   repaintIf?(): void;
+  /**
+   * True while the card's panel is on screen; defaults to always shown. A frame
+   * it is false costs the frame and nothing else — no repaint, no playhead.
+   */
+  shown?(): boolean;
   /** Defaults to `requestAnimationFrame`. */
   frame?: FrameSource;
 }
@@ -136,6 +141,11 @@ export interface PlayheadWatch {
  * player holds), then the playhead, marked only when it moved. The frame after
  * the card leaves the document nothing is queued, so a card replaced by a
  * re-render takes its loop with it.
+ *
+ * While the card's panel is hidden the loop idles (#632 decision 1): the frame
+ * is still queued, so showing the tab again needs no lifecycle event, but the
+ * frame does no work. The step lit when the tab went away stays lit, and the
+ * first shown frame moves it if the transport moved meanwhile.
  */
 export function watchPlayhead(watch: PlayheadWatch): void {
   const frame = watch.frame ?? ((run: () => void): void => void requestAnimationFrame(run));
@@ -143,6 +153,7 @@ export function watchPlayhead(watch: PlayheadWatch): void {
   const tick = (): void => {
     if (!watch.attached()) return;
     frame(tick);
+    if (watch.shown && !watch.shown()) return;
     watch.repaintIf?.();
     const current = watch.playheadAt();
     if (current === playing) return;
