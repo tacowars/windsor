@@ -68,11 +68,13 @@ leans on five of its features:
   algorithm 8, Series + Tap, whose two carriers A and B are the burst and the
   tail with C and D silent; the 909 snare folds its fixed burst into the
   snappy's 24 ms hold so it needs one Noise operator.
-- **Kick bodies sit at ratio 0.25.** The console's Coarse / Fine pair floors
-  the stored ratio at 0.25 (`ratioSplit.ts`, and its test round-trips every
-  library ratio), so a body cannot be 52 Hz on C4. Every kick and the EFM
-  kick play 65 Hz on C4; the 808's 55 Hz is A3 and the 909's 52 Hz is G#3,
-  and the descriptions say so.
+- **Kick bodies sit at ratio 0.25.** By choice, not because a floor pins them
+  there: the console's Coarse / Fine pair floors the stored ratio at
+  `RATIO_MIN`, which is 0.0625 since #618 (`ratioSplit.ts`, and its test
+  round-trips every library ratio), and the engine is unclamped. The bank
+  keeps 0.25 and names the note that gives each machine's pitch: every kick
+  and the EFM kick play 65 Hz on C4; the 808's 55 Hz is A3 and the 909's
+  52 Hz is G#3, and the descriptions say so.
 - **The 808 "sigh" is the LFO too.** A retriggered saw-down LFO at 1.7 Hz
   with `toPitch` 0.5 semitones drops the kick a semitone across its decay.
   The kick's punch is the global pitch envelope: +17 semitones over 5 ms.
