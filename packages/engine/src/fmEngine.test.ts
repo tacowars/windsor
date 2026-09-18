@@ -66,3 +66,22 @@ describe('FmEngine.disposePart (#629)', () => {
     expect(engine.getPart('music-3')).toBe(second);
   });
 });
+
+describe('FmEngine.setLiveRetune', () => {
+  it('reaches the parts that exist and the ones created after it (#629)', async () => {
+    const context = new FakeContext();
+    const engine = new FmEngine(context.asAudioContext());
+    await engine.init();
+    const posted = (name: string): unknown[] =>
+      (engine.getPart(name)?.node as unknown as { posted: unknown[] }).posted;
+    engine.createPart('music-0');
+    engine.setLiveRetune(true);
+    engine.createPart('music-3');
+    const retune = { type: 'liveRetune', enabled: true };
+    expect(posted('music-0')).toContainEqual(retune);
+    expect(posted('music-3')).toContainEqual(retune);
+    engine.setLiveRetune(false);
+    engine.createPart('music-4');
+    expect(posted('music-4')).not.toContainEqual(retune);
+  });
+});

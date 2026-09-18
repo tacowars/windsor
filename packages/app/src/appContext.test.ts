@@ -41,6 +41,8 @@ interface Console {
   builds: number;
   /** The live parts the fake host hands out by slot, once "enabled". */
   liveParts: Map<number, AudioPart>;
+  /** The fake host's state: `null` from `apply` while unenabled or building; `building` says which. */
+  host: { enabled: boolean; building: boolean };
 }
 
 /** A console whose host accepts everything; `refuse` makes it reject every change instead. */
@@ -56,15 +58,20 @@ function openConsole(refuse = false): Console {
     applied,
     builds: 0,
     liveParts: new Map(),
+    host: { enabled: true, building: false },
   };
   const host: ContextHost = {
-    apply: (partial): ApplyResult => {
+    apply: (partial): ApplyResult | null => {
+      if (!console.host.enabled) return null;
       applied.push(partial);
       return refuse ? { ok: false, ignored: [], error: 'nope' } : { ok: true, ignored: [] };
     },
     build: () => {
       console.builds++;
       return Promise.resolve();
+    },
+    get isBuilding(): boolean {
+      return console.host.building;
     },
     capturePattern: () => null,
     part: (slot) => console.liveParts.get(slot) ?? null,
@@ -283,5 +290,26 @@ describe('structural edits stay live (#629)', () => {
     await flush();
     expect(c.builds).toBe(2);
     expect(c.applied).toHaveLength(0);
+  });
+});
+
+describe('a change landing while the system is being built (#629 review)', () => {
+  it('queues a build from the merged document, so the edit is not left in the document only', async () => {
+    const c = openConsole();
+    c.host.enabled = false;
+    c.host.building = true;
+    expect(addPartLive(c.ctx)).toBe(1);
+    expect(c.applied).toHaveLength(0);
+    expect(c.model.doc.parts.map((p) => p.slot)).toEqual([0, 1]);
+    await flush();
+    expect(c.builds).toBe(1);
+  });
+
+  it('queues nothing while audio has never been enabled', () => {
+    const c = openConsole();
+    c.host.enabled = false;
+    expect(c.ctx.change({ bpm: 100 } as DocumentPartial).ok).toBe(true);
+    expect(c.model.doc.bpm).toBe(100);
+    expect(c.builds).toBe(0);
   });
 });

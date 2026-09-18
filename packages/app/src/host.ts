@@ -49,6 +49,11 @@ export class EngineHost {
     return this.system !== null;
   }
 
+  /** A build is in flight: the context exists and the system it will install does not yet (#629). */
+  get isBuilding(): boolean {
+    return this.context !== null && this.system === null;
+  }
+
   /**
    * First user gesture: create the context, load the DSP, build the system.
    * Blob URLs first; a `file://` origin refuses blob worklet modules
