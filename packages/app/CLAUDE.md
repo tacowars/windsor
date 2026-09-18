@@ -223,6 +223,12 @@ and is **checked, not trusted** — `node tools/patch-editor/build-editor.mjs
 --check` builds to memory and exits 1 when the tracked file differs, and
 `npm run verify` runs it after `build`.
 
+A conflict on it is git's to resolve: `scripts/git-merge-regenerate-console-page.sh`,
+the merge driver `.gitattributes` names and `scripts/dev-bootstrap.sh` registers
+(#628), keeps a clean text merge and regenerates the page from this tree's
+sources when the text conflicts — `--check`, never the driver, is what says the
+page matches its sources.
+
 **The page bakes the whole patch library.** `documentModel.ts` imports
 `PRESETS`, which `presets.ts` builds from the generated `patches/index.ts`
 over every `packages/client/src/audio/patches/<id>.json`. So a patch file
