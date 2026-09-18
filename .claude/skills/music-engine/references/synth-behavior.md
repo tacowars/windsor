@@ -49,7 +49,13 @@ phase. Positive runs `sin(φ + β·y)` up to 1.25 rad: sine towards a sawtooth.
 Negative runs `sin(φ + β·y²)` up to 2.0 rad: odd harmonics only, sine towards a
 softer square. Neither end reaches noise — use the Noise wave for that. Because
 the fed-back signal carries the envelope, a decaying operator gets less bright
-as it fades, and a quiet operator gets little feedback at all.
+as it fades, and a quiet operator gets little feedback at all. Negative
+feedback is also how the drum bank rounds a triangle towards a sine, the way
+back-to-back diodes do in a 909: `docs/design/drum-bank.md` records that trick
+and the others the bank leans on — the clap's burst gate built from a
+retriggered saw-down LFO, the trigger envelopes, the noise algorithms — with
+the patch files as the source of the numbers. Read it there rather than
+restating it here.
 
 ## Fixed frequency and pitch envelopes
 
@@ -57,7 +63,11 @@ With **Fixed off**, the operator's frequency follows note pitch (including
 glide), the global pitch envelope, bend and pitch LFO, then its ratio and
 detune. The console shows that ratio as Operator does, as **Coarse** (the whole
 multiple) plus **Fine** (the fraction) over the one stored field, while **Level**
-is the modulation index — the two are not the same control (#587).
+is the modulation index — the two are not the same control (#587). The console
+floors the stored ratio at `RATIO_MIN`, four octaves below the note (#618,
+record `2026-09-18-618-console-ratio-floor-and-the-tools-lint-fence`); the
+engine and `patchNormalise.ts` are unclamped, so a hand-written or older file
+may sit below the floor and plays as written.
 Pitch-envelope amount is in semitones. With **Fixed on**, the engine
 uses `fixedHz * 2 ** (detune / 1200)`; it bypasses ratio and those global pitch
 controls. A fixed-frequency modulator can still have an amplitude envelope,
@@ -107,6 +117,19 @@ behind the engine option `specialise: false`, and is also the path taken when
 two Noise operators sit on an algorithm whose evaluation order is not D..A,
 because noise draws from one shared per-voice stream in evaluation order.
 A DSP change is proved against that reference, not against a recording.
+
+A part playing the chord sequencer is handed whole chords, not single notes
+(#606, record `2026-09-17-606-chord-sequencer-degrees-per-part-voicing`): the
+scale's diatonic stack for the written degree (`chordTheory.ts`), then
+inverted, voiced, transposed and range-checked by `chordVoicing.ts`. Inversion
+rotates with octave carry, so a high inversion lifts the whole chord; the
+voicing is one per part, not per step; a voicing never sends more than
+`CHORD_VOICING_NOTES_MAX` notes however much it doubles; and a note that falls
+outside MIDI 0–127 is **dropped, not clamped**, since a clamped note would
+double its neighbour at the wrong pitch. Design a chord patch against the
+register the part's voicing actually spreads it over — a wide voicing on a low
+register loses its bottom notes and its voice count with them, and a patch
+that only sounds right in one octave will not hold across a progression.
 
 `phaseFree` randomizes starting phase; noise, drift and pan randomization add
 other stochastic surfaces. Use the harness's explicit seeds for reproducible
