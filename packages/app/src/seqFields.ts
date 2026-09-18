@@ -73,7 +73,18 @@ export function sectionKnob(
   });
 }
 
-/** One card's row of table knobs, each bound to its part or sequencer field. */
+/** One table entry as a knob, bound to its part or sequencer field. */
+export const tableKnob = (
+  ctx: AppCtx,
+  slot: number,
+  entry: SequencerKnobEntry,
+  color: string,
+): HTMLElement =>
+  entry.kind === 'section'
+    ? sectionKnob(ctx, slot, entry, color)
+    : driverKnob(ctx, slot, entry, color);
+
+/** One card's row of table knobs. */
 export function knobRow(
   ctx: AppCtx,
   slot: number,
@@ -81,13 +92,7 @@ export function knobRow(
   color: string,
 ): HTMLElement {
   const row = el('div', 'knob-row');
-  for (const entry of table) {
-    row.appendChild(
-      entry.kind === 'section'
-        ? sectionKnob(ctx, slot, entry, color)
-        : driverKnob(ctx, slot, entry, color),
-    );
-  }
+  for (const entry of table) row.appendChild(tableKnob(ctx, slot, entry, color));
   return row;
 }
 
