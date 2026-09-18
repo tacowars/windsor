@@ -4,7 +4,7 @@
  * strip are registered under. A part's display name keys nothing, so the
  * engine name comes from the slot alone.
  */
-import type { ArrangementDocument, DocumentPart } from './arrangementDocument';
+import type { ArrangementDocument, DocumentPart, DocumentPartial } from './arrangementDocument';
 
 /** The `FmEngine` part and strip name for a music slot; never a song's label. */
 export const musicPartName = (slot: number): string => `music-${slot}`;
@@ -41,4 +41,24 @@ export function removePart(document: ArrangementDocument, slot: number): Arrange
   };
   if (Object.keys(patches).length === 0) delete next.patches;
   return next;
+}
+
+/**
+ * The live partial that removes the part on `slot` (#629): `null` at the slot,
+ * and `null` at its patch id when `removePart` would have pruned it — the
+ * same rule, so the document after `merge` equals the document `removePart`
+ * returns. Null when the slot holds no part or is the only one.
+ */
+export function removePartChange(
+  document: ArrangementDocument,
+  slot: number,
+): DocumentPartial | null {
+  const removed = partAt(document, slot);
+  const next = removePart(document, slot);
+  if (!removed || next === document) return null;
+  const pruned =
+    document.patches?.[removed.preset] !== undefined && !next.patches?.[removed.preset];
+  return pruned
+    ? { parts: { [slot]: null }, patches: { [removed.preset]: null } }
+    : { parts: { [slot]: null } };
 }

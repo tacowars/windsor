@@ -110,19 +110,19 @@ export function initPatch({ ctx, slot }: PatchScope): Patch {
 const playedPresets = (ctx: AppCtx): Set<string> =>
   new Set(ctx.model.doc.parts.map((part) => part.preset));
 
-/** Drop every Init sentinel no part plays any more: an unsaved Init is discarded, never exported. */
+/**
+ * Drop every Init sentinel no part plays any more: an unsaved Init is
+ * discarded, never exported. A live removal — `null` at each id (#629): this
+ * runs right after a part's first patch pick, and as a restructure it was the
+ * restart Pat heard on every sequencer.
+ */
 export function dropInit(ctx: AppCtx): void {
   const patches = ctx.model.doc.patches;
   if (!patches) return;
   const played = playedPresets(ctx);
   const stale = Object.keys(patches).filter((id) => isInitPreset(id) && !played.has(id));
   if (stale.length === 0) return;
-  ctx.restructure((draft) => {
-    const drafted = draft['patches'] as Record<string, unknown> | undefined;
-    if (!drafted) return;
-    for (const id of stale) delete drafted[id];
-    if (Object.keys(drafted).length === 0) delete draft['patches'];
-  });
+  ctx.change({ patches: Object.fromEntries(stale.map((id) => [id, null])) });
 }
 
 /**

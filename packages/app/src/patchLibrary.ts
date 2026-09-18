@@ -5,7 +5,8 @@
  * built-in copies it into the document under the same name — a document
  * patch shadows the built-in it was forked from — and from then on the
  * export carries it. Rename moves the document patch and every part that
- * plays it; revert drops the fork and the part falls back to the built-in.
+ * plays it; revert puts the library's version back under the same id. Both
+ * are live edits (#629): nothing here rebuilds the system.
  */
 import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
 import { PRESETS, clonePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
@@ -36,44 +37,45 @@ export function badgeText(ctx: AppCtx, slot: number): string {
   }
 }
 
-/** Rename the document patch the part plays, and every part playing it. */
-function renamePatch(ctx: AppCtx, from: string, to: string): void {
+/**
+ * Rename the document patch the part plays, and every part playing it — one
+ * live partial (#629): the patch under its new id, `null` under the old, and
+ * each playing part's `preset` switched, so the engine validates the three
+ * together and no part is ever left naming a patch that has gone.
+ */
+export function renamePatch(ctx: AppCtx, from: string, to: string): void {
   if (to === '' || to === from) return;
   if (ctx.model.doc.patches?.[to]) return ctx.status(`a document patch "${to}" already exists`);
-  ctx.restructure((draft) => {
-    const patches = (draft.patches ?? {}) as Record<string, Patch>;
-    const patch = patches[from];
-    if (!patch) return;
-    delete patches[from];
-    patches[to] = { ...patch, name: patch.name === from ? to : patch.name };
-    draft.patches = patches;
-    for (const part of (draft.parts ?? []) as Array<{ preset?: string }>) {
-      if (part.preset === from) part.preset = to;
-    }
-  });
+  const patch = ctx.model.doc.patches?.[from];
+  if (!patch) return;
+  const parts: Record<number, { preset: string }> = {};
+  for (const part of ctx.model.doc.parts)
+    if (part.preset === from) parts[part.slot] = { preset: to };
+  const renamed: Patch = { ...patch, name: patch.name === from ? to : patch.name };
+  const result = ctx.change({ patches: { [from]: null, [to]: renamed }, parts });
+  if (!result.ok) return;
+  ctx.render();
   ctx.status(`renamed document patch "${from}" to "${to}"`);
 }
 
 /**
- * Back to the library's version. A patch baked into the page is dropped from
- * the document and the parts playing it fall back to it; a folder-only id
- * (#563) has no baked fallback the normaliser could resolve, so its document
- * copy is overwritten with the library entry instead of removed.
+ * Back to the library's version: the document copy is overwritten with the
+ * library entry, live (#629). For an id baked into the page that is exactly
+ * what dropping the fork used to leave behind — the normaliser's library fill
+ * re-embedded the built-in under the same id on the rebuild — without the
+ * rebuild; a folder-only id (#563) has no baked fallback and took this path
+ * already.
  */
 export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = library): void {
   const entry = libraryPatch(model, name);
   if (!entry) return;
-  if (!Object.hasOwn(PRESETS, name)) {
-    ctx.change({ patches: { [name]: clonePatch(entry) } });
-    return ctx.status(`document patch "${name}" reset to the library file`);
-  }
-  ctx.restructure((draft) => {
-    const patches = (draft.patches ?? {}) as Record<string, Patch>;
-    delete patches[name];
-    if (Object.keys(patches).length === 0) delete draft.patches;
-    else draft.patches = patches;
-  });
-  ctx.status(`document patch "${name}" dropped — back on the built-in`);
+  if (!ctx.change({ patches: { [name]: clonePatch(entry) } }).ok) return;
+  ctx.render();
+  ctx.status(
+    Object.hasOwn(PRESETS, name)
+      ? `document patch "${name}" reset to the built-in`
+      : `document patch "${name}" reset to the library file`,
+  );
 }
 
 /** Rename and revert, shown only for a document patch. */

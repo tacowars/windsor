@@ -44,6 +44,8 @@ export class FmEngine {
 
   private readonly limiter: DynamicsCompressorNode;
   private readonly parts = new Map<string, AudioPart>();
+  /** What every part created from now on is told (#629); the worklet's own default is off. */
+  private liveRetune = false;
   private moduleLoaded = false;
   private maxVoicesSeen = 0;
 
@@ -119,6 +121,7 @@ export class FmEngine {
     });
 
     const part = new AudioPart(name, node, patch);
+    if (this.liveRetune) part.setLiveRetune(true);
     const destination = options.destination === undefined ? this.master : options.destination;
     if (destination) part.connect(destination);
 
@@ -128,6 +131,14 @@ export class FmEngine {
 
   getPart(name: string): AudioPart | undefined {
     return this.parts.get(name);
+  }
+
+  /** Dispose one part and forget its name, so the name can be created again (#629). No-op for an unknown name. */
+  disposePart(name: string): void {
+    const part = this.parts.get(name);
+    if (!part) return;
+    part.dispose();
+    this.parts.delete(name);
   }
 
   /** A dry bus into `destination` (the master by default). Native nodes only. */
@@ -141,8 +152,13 @@ export class FmEngine {
     for (const part of this.parts.values()) part.allNotesOff();
   }
 
-  /** Every part's `setLiveRetune`: the console's one-call opt-in after a build. */
+  /**
+   * Every part's `setLiveRetune`: the console's one-call opt-in after a build.
+   * Remembered, so a part created later — a live add (#629) — inherits it
+   * instead of the worklet's default (#629 review, passes 1 and 2).
+   */
   setLiveRetune(enabled: boolean): void {
+    this.liveRetune = enabled;
     for (const part of this.parts.values()) part.setLiveRetune(enabled);
   }
 

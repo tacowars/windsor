@@ -14,10 +14,19 @@ import type {
   AudioPart,
   DocumentPartial,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { makePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  PRESETS,
+  clonePatch,
+  makePatch,
+  partAt,
+} from '../../../packages/client/src/audio/index-for-editor';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
+import { initPresetId } from './libraryConstants';
+import { dropInit } from './patchActions';
+import { addPartLive, removePartLive, setSequencerKindLive } from './partEdits';
+import { renamePatch, revertPatch } from './patchLibrary';
 import { newSong } from './songParts';
 
 const TAB_IDS = ['parts', 'mixer', 'sequencers', 'harmony', 'arrangement'] as const;
@@ -32,6 +41,8 @@ interface Console {
   builds: number;
   /** The live parts the fake host hands out by slot, once "enabled". */
   liveParts: Map<number, AudioPart>;
+  /** The fake host's state: `null` from `apply` while unenabled or building; `building` says which. */
+  host: { enabled: boolean; building: boolean };
 }
 
 /** A console whose host accepts everything; `refuse` makes it reject every change instead. */
@@ -47,15 +58,20 @@ function openConsole(refuse = false): Console {
     applied,
     builds: 0,
     liveParts: new Map(),
+    host: { enabled: true, building: false },
   };
   const host: ContextHost = {
-    apply: (partial): ApplyResult => {
+    apply: (partial): ApplyResult | null => {
+      if (!console.host.enabled) return null;
       applied.push(partial);
       return refuse ? { ok: false, ignored: [], error: 'nope' } : { ok: true, ignored: [] };
     },
     build: () => {
       console.builds++;
       return Promise.resolve();
+    },
+    get isBuilding(): boolean {
+      return console.host.building;
     },
     capturePattern: () => null,
     part: (slot) => console.liveParts.get(slot) ?? null,
@@ -182,5 +198,118 @@ describe('AppContext changes and the parts session', () => {
     const applied = c.applied.length;
     expect(c.ctx.parts.push()).toBe(false);
     expect(c.applied).toHaveLength(applied);
+  });
+});
+
+describe('structural edits stay live (#629)', () => {
+  it('adds a part, sets its kind and removes it through host.apply, never host.build', () => {
+    const c = openConsole();
+    c.ctx.render();
+    expect(addPartLive(c.ctx)).toBe(1);
+    const added = c.applied.at(-1);
+    const part = partAt(c.model.doc, 1);
+    if (!part) throw new Error('the part landed in the document');
+    // The whole part, as the normaliser fills it — strip included — and its Init patch.
+    expect(added?.parts?.[1]).toEqual(part);
+    expect(Object.keys(added?.patches ?? {})).toEqual([part.preset]);
+    expect(c.model.doc.parts.map((p) => p.slot)).toEqual([0, 1]);
+    expect(c.ctx.parts.selected).toBe(1);
+
+    expect(setSequencerKindLive(c.ctx, 1, 'euclidean')).toBe(true);
+    // The kind's whole default spec, not a bare kind the engine would refuse.
+    expect(c.applied.at(-1)).toEqual({
+      parts: { 1: { sequencer: partAt(c.model.doc, 1)?.sequencer } },
+    });
+    expect(partAt(c.model.doc, 1)?.sequencer.kind).toBe('euclidean');
+    const applied = c.applied.length;
+    expect(setSequencerKindLive(c.ctx, 1, 'euclidean')).toBe(false);
+    expect(c.applied).toHaveLength(applied);
+
+    expect(removePartLive(c.ctx, 1)).toBe(true);
+    expect(c.applied.at(-1)).toEqual({ parts: { 1: null }, patches: { [part.preset]: null } });
+    expect(c.model.doc.parts.map((p) => p.slot)).toEqual([0]);
+    expect(c.model.doc.patches?.[part.preset]).toBeUndefined();
+    expect(c.ctx.parts.selected).toBe(0);
+
+    expect(c.builds).toBe(0);
+    expect(c.renders['parts']).toBe(4);
+  });
+
+  it('a refused live edit changes nothing and never falls back to a rebuild', () => {
+    const c = openConsole(true);
+    expect(addPartLive(c.ctx)).toBeNull();
+    expect(c.model.doc.parts).toHaveLength(1);
+    expect(setSequencerKindLive(c.ctx, 0, 'arp')).toBe(false);
+    expect(partAt(c.model.doc, 0)?.sequencer.kind).toBe('none');
+    expect(c.builds).toBe(0);
+    expect(c.status.at(-1)).toBe('refused: nope');
+  });
+
+  it('drops a stale Init live after the first patch pick — the restart Pat heard', () => {
+    const c = openConsole();
+    addPartLive(c.ctx);
+    const init = initPresetId('1');
+    expect(c.model.doc.patches?.[init]).toBeDefined();
+    c.ctx.change({
+      parts: { 1: { preset: 'kick' } },
+      patches: { kick: clonePatch(PRESETS['kick']!) },
+    });
+    dropInit(c.ctx);
+    expect(c.applied.at(-1)).toEqual({ patches: { [init]: null } });
+    expect(c.model.doc.patches?.[init]).toBeUndefined();
+    expect(partAt(c.model.doc, 1)?.preset).toBe('kick');
+    expect(c.builds).toBe(0);
+  });
+
+  it('renames and reverts a document patch live', () => {
+    const c = openConsole();
+    const from = initPresetId('0');
+    renamePatch(c.ctx, from, 'lead');
+    expect(c.applied.at(-1)).toMatchObject({
+      patches: { [from]: null },
+      parts: { 0: { preset: 'lead' } },
+    });
+    expect(partAt(c.model.doc, 0)?.preset).toBe('lead');
+    // The display name follows only when it was the old id; Init's stays "Init".
+    expect(c.model.doc.patches?.['lead']?.name).toBe('Init');
+    expect(c.model.doc.patches?.[from]).toBeUndefined();
+    c.ctx.change({
+      parts: { 0: { preset: 'kick' } },
+      patches: { kick: makePatch({ name: 'edited' }) },
+    });
+    revertPatch(c.ctx, 'kick');
+    expect(c.applied.at(-1)).toEqual({ patches: { kick: PRESETS['kick'] } });
+    expect(c.model.doc.patches?.['kick']?.name).toBe(PRESETS['kick']?.name);
+    expect(c.builds).toBe(0);
+  });
+
+  it('Import and Restart still rebuild from the document', async () => {
+    const c = openConsole();
+    c.ctx.restructure(() => undefined);
+    c.ctx.importDoc(newSong());
+    await flush();
+    expect(c.builds).toBe(2);
+    expect(c.applied).toHaveLength(0);
+  });
+});
+
+describe('a change landing while the system is being built (#629 review)', () => {
+  it('queues a build from the merged document, so the edit is not left in the document only', async () => {
+    const c = openConsole();
+    c.host.enabled = false;
+    c.host.building = true;
+    expect(addPartLive(c.ctx)).toBe(1);
+    expect(c.applied).toHaveLength(0);
+    expect(c.model.doc.parts.map((p) => p.slot)).toEqual([0, 1]);
+    await flush();
+    expect(c.builds).toBe(1);
+  });
+
+  it('queues nothing while audio has never been enabled', () => {
+    const c = openConsole();
+    c.host.enabled = false;
+    expect(c.ctx.change({ bpm: 100 } as DocumentPartial).ok).toBe(true);
+    expect(c.model.doc.bpm).toBe(100);
+    expect(c.builds).toBe(0);
   });
 });

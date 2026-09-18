@@ -19,7 +19,8 @@ import { PRESETS, makeArrangement } from '../../../packages/client/src/audio/ind
 
 /**
  * Merge for the local copy: objects recurse, arrays and `null` assign
- * wholesale, and — unlike the engine-side merge, which ignores keys the
+ * wholesale below the keyed sections (`mergeDocument` reads `null` at a slot
+ * or a patch id as removal), and — unlike the engine-side merge, which ignores keys the
  * current arrangement lacks — new keys are created, because the result is
  * renormalised immediately after (`mix` may start absent, for instance).
  */
@@ -35,24 +36,55 @@ export function deepMerge(current: unknown, partial: unknown): unknown {
   return merged;
 }
 
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** `deepMerge` over a keyed section (`patches`): `null` at an id removes the entry (#629). */
+function mergeKeyed(current: unknown, partial: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = isRecord(current) ? { ...current } : {};
+  for (const [key, value] of Object.entries(partial)) {
+    if (value === null) delete merged[key];
+    else merged[key] = key in merged ? deepMerge(merged[key], value) : value;
+  }
+  return merged;
+}
+
 /**
- * `deepMerge` over a whole document (#597): the part list is merged by slot —
- * `{ parts: { 2: { velocity: 0.5 } } }` reaches the part on slot 2 wherever it
- * sits in the list — and a slot the list does not hold is left alone rather
- * than invented, because adding a part is a structural edit.
+ * The part list merged by slot (#597, #629): a fragment edits the part on its
+ * slot wherever it sits in the list, `null` removes that part, and a whole
+ * part (its `slot` naming a slot the list lacks) is appended — the same three
+ * shapes the engine's `mergeParts` takes, so what was applied live is what
+ * lands in the document. A fragment for an absent slot is left alone.
  */
+function mergePartList(current: unknown[], partial: Record<string, unknown>): unknown[] {
+  const merged: unknown[] = [];
+  const held = new Set<string>();
+  for (const part of current) {
+    const slot = isRecord(part) && typeof part.slot === 'number' ? String(part.slot) : undefined;
+    const edit = slot === undefined ? undefined : partial[slot];
+    if (slot !== undefined) held.add(slot);
+    if (edit === null) continue;
+    merged.push(edit === undefined ? part : deepMerge(part, edit));
+  }
+  for (const [slot, edit] of Object.entries(partial)) {
+    if (!held.has(slot) && isRecord(edit) && edit.slot === Number(slot)) merged.push(edit);
+  }
+  return merged;
+}
+
+/** `deepMerge` over a whole document: parts by slot and patches by id, each with `null` as removal. */
 export function mergeDocument(current: unknown, partial: unknown): unknown {
-  const isRecord = (v: unknown): v is Record<string, unknown> =>
-    typeof v === 'object' && v !== null && !Array.isArray(v);
   if (!isRecord(current) || !isRecord(partial)) return deepMerge(current, partial);
-  const { parts, ...rest } = partial;
+  const { parts, patches, ...rest } = partial;
   const merged = deepMerge(current, rest) as Record<string, unknown>;
-  if (!isRecord(parts) || !Array.isArray(current.parts)) return merged;
-  merged.parts = (current.parts as unknown[]).map((part) => {
-    const slot = isRecord(part) ? part.slot : undefined;
-    const edit = typeof slot === 'number' ? parts[String(slot)] : undefined;
-    return edit === undefined ? part : deepMerge(part, edit);
-  });
+  if (isRecord(patches)) {
+    const table = mergeKeyed(current.patches, patches);
+    if (Object.keys(table).length > 0) merged.patches = table;
+    else delete merged.patches;
+  }
+  if (isRecord(parts) && Array.isArray(current.parts)) {
+    merged.parts = mergePartList(current.parts, parts);
+  }
   return merged;
 }
 
@@ -99,12 +131,22 @@ export class DocumentModel {
     this.usable = result.usable;
   }
 
-  /** A field-level change: merge, renormalise, keep the report. */
+  /** A live change — a field, a whole part, a removal (#629): merge, renormalise, keep the report. */
   merge(partial: unknown): void {
     this.adopt(this.normalise(mergeDocument(this.doc, partial)));
   }
 
-  /** A structural change (slot added or removed): edit a draft, renormalise. */
+  /**
+   * A raw document normalised the way `open` would, without adopting it
+   * (#629): what a live add or kind change sends the engine is the part the
+   * normaliser fills — its strip, velocity and the kind's defaults — so the
+   * console never restates one.
+   */
+  preview(raw: unknown): ArrangementDocument {
+    return this.normalise(raw).document;
+  }
+
+  /** A whole-document edit — Import's and Restart's path (#629): edit a draft, renormalise. */
   mutate(edit: (draft: Record<string, unknown>) => void): void {
     const draft = JSON.parse(JSON.stringify(this.doc)) as Record<string, unknown>;
     edit(draft);

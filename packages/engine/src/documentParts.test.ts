@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FULL_DOCUMENT, FULL_SLOT, withDocumentPart } from './__fixtures__/fullArrangement';
 import { makeArrangement } from './arrangementDocument';
-import { musicPartName, partAt, removePart } from './documentParts';
+import { musicPartName, partAt, removePart, removePartChange } from './documentParts';
 
 const { kick, hat, arp, drone } = FULL_SLOT;
 
@@ -63,5 +63,25 @@ describe('slot addressing', () => {
     expect(partAt(FULL_DOCUMENT, drone)?.name).toBe('drone');
     expect(partAt(FULL_DOCUMENT, 7)).toBeUndefined();
     expect(musicPartName(drone)).toBe('music-3');
+  });
+});
+
+describe('removePartChange (#629)', () => {
+  it('nulls the slot and the patch only it played — what removePart would prune', () => {
+    expect(removePartChange(FULL_DOCUMENT, arp)).toEqual({
+      parts: { [arp]: null },
+      patches: { 'saw-arp': null },
+    });
+  });
+
+  it('nulls only the slot when another part still plays the patch', () => {
+    const shared = withDocumentPart(FULL_DOCUMENT, 'drone', { preset: 'saw-arp' });
+    expect(removePartChange(shared, arp)).toEqual({ parts: { [arp]: null } });
+  });
+
+  it('is null for the last part and for a slot the song does not hold', () => {
+    const only = { ...FULL_DOCUMENT, parts: [FULL_DOCUMENT.parts[0]!] };
+    expect(removePartChange(only, kick)).toBeNull();
+    expect(removePartChange(FULL_DOCUMENT, 7)).toBeNull();
   });
 });

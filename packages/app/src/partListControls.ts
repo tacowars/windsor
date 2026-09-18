@@ -1,8 +1,9 @@
 /**
  * The Parts tab's part list controls (#598): add a part, remove the selected
- * one, rename it, and choose its sequencer. Structural edits go through
- * `ctx.restructure` (renormalise, rebuild, re-render) over the pure edits in
- * `songParts.ts`; a rename is a live label change. Everything addresses the
+ * one, rename it, and choose its sequencer. Since #629 every one of them is a
+ * live edit through `partEdits.ts` — a whole part or `null` at a slot, a
+ * sequencer spec at the kind's defaults — so the transport and the other
+ * parts play on; a rename is a live label change. Everything addresses the
  * part by slot — the name is only what the buttons show.
  */
 import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
@@ -10,14 +11,13 @@ import {
   MUSIC_PARTS_MAX,
   SEQUENCER_KINDS,
   partAt,
-  removePart,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { el, seg } from './dom';
 import { KIND_LABELS } from './sequencerConstants';
 import { openConfirm } from './metadataModal';
+import { addPartLive, removePartLive, setSequencerKindLive } from './partEdits';
 import { partNameField } from './partNameField';
-import { addPart, replaceDraft, setSequencerKind } from './songParts';
 
 function button(label: string, title: string, enabled: boolean): HTMLButtonElement {
   const node = el('button', 'btn', label) as HTMLButtonElement;
@@ -38,11 +38,7 @@ function addRemoveRow(ctx: AppCtx): HTMLElement {
     parts.length < MUSIC_PARTS_MAX,
   );
   add.onclick = (): void => {
-    const added = addPart(ctx.model.doc);
-    if (!added) return;
-    ctx.parts.selected = added.slot;
-    ctx.restructure((draft) => replaceDraft(draft, added.doc));
-    ctx.status(`added ${partAt(ctx.model.doc, added.slot)?.name ?? 'a part'} — pick its sequencer`);
+    addPartLive(ctx);
   };
   const remove = button('Remove part', 'Remove the selected part', parts.length > 1);
   remove.onclick = (): void => {
@@ -55,22 +51,14 @@ function addRemoveRow(ctx: AppCtx): HTMLElement {
       ok: 'Remove',
       opener: remove,
     }).then((ok) => {
-      if (!ok) return;
-      const index = ctx.model.doc.parts.findIndex((p) => p.slot === slot);
-      const next = removePart(ctx.model.doc, slot);
-      if (next === ctx.model.doc) return;
-      // The nearest remaining part: the one that took this index, else the last.
-      const neighbour = next.parts[Math.min(index, next.parts.length - 1)];
-      ctx.parts.selected = neighbour?.slot ?? 0;
-      ctx.restructure((draft) => replaceDraft(draft, next));
-      ctx.status(`removed ${part.name}`);
+      if (ok) removePartLive(ctx, slot);
     });
   };
   row.append(add, remove);
   return row;
 }
 
-/** None / Euclidean / Arp / Step for the selected part; a change rebuilds at the kind's defaults. */
+/** None / Euclidean / Arp / Step for the selected part; a change rebuilds that part alone at the kind's defaults. */
 function kindPicker(ctx: AppCtx, slot: number): HTMLElement {
   const box = el('div');
   box.style.marginTop = '8px';
@@ -80,9 +68,7 @@ function kindPicker(ctx: AppCtx, slot: number): HTMLElement {
       SEQUENCER_KINDS.map((kind) => ({ value: kind, label: KIND_LABELS[kind] })),
       () => partAt(ctx.model.doc, slot)?.sequencer.kind ?? 'none',
       (value) => {
-        const next = setSequencerKind(ctx.model.doc, slot, value as SequencerKind);
-        if (next === ctx.model.doc) return;
-        ctx.restructure((draft) => replaceDraft(draft, next));
+        setSequencerKindLive(ctx, slot, value as SequencerKind);
       },
     ),
   );

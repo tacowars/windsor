@@ -117,10 +117,12 @@ export type DeepPartial<T> = {
 /**
  * Live partials of a part list (#597): addressed by slot —
  * `{ parts: { 2: { velocity: 0.5 } } }` — never by list position, so an edit
- * cannot land on the wrong part. Adding or removing a part is not a partial;
- * it rebuilds.
+ * cannot land on the wrong part. A slot the list does not hold takes a whole
+ * part (its `slot` field naming that slot) and is appended; `null` at a slot
+ * removes the part there (#629). Anything else at an absent slot is ignored
+ * and reported.
  */
-export type PartsPartial<P> = Readonly<Record<number | string, DeepPartial<P>>>;
+export type PartsPartial<P> = Readonly<Record<number | string, DeepPartial<P> | null>>;
 
 export type ArrangementPartial = DeepPartial<Omit<Arrangement, 'parts'>> & {
   readonly parts?: PartsPartial<MusicPart>;
@@ -176,12 +178,22 @@ export function mergeParts<P extends { readonly slot: number }>(
     ignored.push('parts');
     return [...parts];
   }
-  const merged = [...parts];
+  let merged = [...parts];
   for (const [key, value] of Object.entries(partial)) {
     if (value === undefined) continue;
     const index = merged.findIndex((part) => String(part.slot) === key);
+    if (value === null) {
+      // A removal (#629): the slot leaves the list; an absent one is reported.
+      if (index < 0) ignored.push(`parts.${key}`);
+      else merged = merged.filter((_, i) => i !== index);
+      continue;
+    }
     if (index < 0) {
-      ignored.push(`parts.${key}`);
+      // A whole part on a free slot is appended (#629); a fragment for a slot
+      // the list lacks has nothing to merge into. Structural only — the
+      // player validates what the part carries.
+      if (isPlainObject(value) && value.slot === Number(key)) merged.push(value as P);
+      else ignored.push(`parts.${key}`);
       continue;
     }
     merged[index] = mergeValue(merged[index], value, `parts.${key}`, ignored) as P;
