@@ -2,12 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import type {
   ArrangementKey,
-  ChordSpec,
   ChordStep,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
   CHORD_DURATIONS,
-  DEFAULT_CHORD_CONFIG,
   chordStep,
   restStep,
 } from '../../../packages/client/src/audio/index-for-editor';
@@ -20,7 +18,6 @@ import {
   droppedStep,
   pickerChips,
   removeLast,
-  stepAtTick,
   stepLabel,
   turnDial,
 } from './chordStepModel';
@@ -35,13 +32,6 @@ const FOUR: ChordStep[] = [
   restStep({ duration: 0.5 }),
   chordStep(4, { size: 4, inversion: 1, octave: 1, semitone: -2 }),
 ];
-
-const spec = (steps: ChordStep[], over: Partial<ChordSpec> = {}): ChordSpec => ({
-  kind: 'chord',
-  ...DEFAULT_CHORD_CONFIG,
-  steps,
-  ...over,
-});
 
 describe('chordStepModel', () => {
   it('labels the picker for C natural minor as Scaler does, and five chips for a pentatonic', () => {
@@ -149,20 +139,5 @@ describe('chordStepModel', () => {
       55, 60, 63, 70,
     ]);
     expect(auditionNotes(C_MINOR, { kind: 'rest' }, 'close', 0)).toEqual([]);
-  });
-
-  it('finds the step the transport is on, across repeats and a length that does not divide the bar', () => {
-    const s = spec(FOUR);
-    // 96 | 192 ×2 = 384 | 48 | 96 → 624 ticks.
-    expect(stepAtTick(s, 0)).toBe(0);
-    expect(stepAtTick(s, 95)).toBe(0);
-    expect(stepAtTick(s, 96)).toBe(1);
-    expect(stepAtTick(s, 479)).toBe(1);
-    expect(stepAtTick(s, 480)).toBe(2);
-    expect(stepAtTick(s, 528)).toBe(3);
-    expect(stepAtTick(s, 624)).toBe(0);
-    expect(stepAtTick(s, 624 * 3 + 500)).toBe(2);
-    expect(stepAtTick(spec([]), 10)).toBe(-1);
-    expect(stepAtTick(spec([chordStep(0, { duration: 0.75 })], { divisor: 24 }), 40)).toBe(0);
   });
 });

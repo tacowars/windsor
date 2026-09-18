@@ -7,12 +7,12 @@
  * Every edit goes through `ctx.change` as a whole `steps` list (arrays
  * replace wholesale in the merge); the step operations are `gridModel.ts`.
  *
- * The strip's building blocks — `stripCell`, `stripColumn`, `markPlaying` —
- * are exported for a sibling card (the chord sequencer's, #607) so the
- * console has one step-column layout.
+ * The strip itself — its cells and columns, the lighting, the playhead loop
+ * and where the playhead is — is `stepStrip.ts` (#619), shared with the chord
+ * (#607) and Euclidean (#610) cards.
  */
 import type { GridSpec } from '../../../packages/client/src/audio/index-for-editor';
-import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import { scaleOffsets } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { PITCH_COLOR } from './consoleColors';
@@ -34,7 +34,17 @@ import {
 import { makeKnob } from './knob';
 import { divisorPicker, tableKnob } from './seqFields';
 import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
-import { scaleOffsets } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  type Strip,
+  commitSteps,
+  markStep,
+  paintStrip,
+  playheadAt,
+  specOf,
+  stripCell,
+  stripColumn,
+  watchPlayhead,
+} from './stepStrip';
 
 const HINT =
   'Top cell cycles note → tie → rest. Pick the degree from the key — a red border means the ' +
@@ -42,55 +52,15 @@ const HINT =
   'A accent, S slide. Steps past Length stay written, greyed. Randomize rewrites every step; ' +
   'Rotate turns the loop.';
 
-function specOf(ctx: AppCtx, slot: number): GridSpec | null {
-  const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
-  return sequencer?.kind === 'grid' ? sequencer : null;
-}
-
-/** The strip and what every cell needs to write a step and redraw. */
-interface Strip {
-  ctx: AppCtx;
-  slot: number;
-  root: HTMLElement;
-  /** The column the playhead sits on, or -1; reapplied after every repaint. */
-  playing: number;
-  repaint(): void;
-}
-
-function commit(strip: Strip, edit: (spec: GridSpec) => GridSpec['steps']): void {
-  const spec = specOf(strip.ctx, strip.slot);
-  if (!spec) return;
-  const result = strip.ctx.change(partChange(strip.slot, { sequencer: { steps: edit(spec) } }));
-  if (result.ok) strip.repaint();
-}
-
-/** One `.gcell` button; `blank` keeps a column's height where a rest or tie has no field. */
-export function stripCell(label: string, className = ''): HTMLButtonElement {
-  const node = el('button', `gcell ${className}`.trim(), label) as HTMLButtonElement;
-  node.type = 'button';
-  return node;
-}
+/** This card's strip: one column per written step of a `grid` spec. */
+type GridStrip = Strip<GridSpec>;
 
 const cell = stripCell;
 
-/** One `.grid-col`: the step number, then the cells; `active` false greys a step past the loop. */
-export function stripColumn(
-  index: number,
-  active: boolean,
-  cells: readonly HTMLElement[],
-): HTMLElement {
-  const col = el('div', active ? 'grid-col' : 'grid-col off');
-  col.appendChild(el('div', 'grid-idx', String(index + 1)));
-  for (const node of cells) col.appendChild(node);
-  return col;
-}
+const commit = (strip: GridStrip, edit: (spec: GridSpec) => GridSpec['steps']): void =>
+  commitSteps(strip, edit);
 
-/** Light the playhead's column of a `.grid-strip`, or none for -1. */
-export function markPlaying(strip: HTMLElement, playing: number): void {
-  [...strip.children].forEach((col, i) => col.classList.toggle('playing', i === playing));
-}
-
-function kindCell(strip: Strip, index: number, spec: GridSpec): HTMLElement {
+function kindCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   const step = spec.steps[index];
   if (!step) return cell('', 'blank');
   const key = strip.ctx.model.doc.key;
@@ -103,7 +73,7 @@ function kindCell(strip: Strip, index: number, spec: GridSpec): HTMLElement {
   return node;
 }
 
-function degreeSelect(strip: Strip, index: number, spec: GridSpec): HTMLElement {
+function degreeSelect(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   const step = spec.steps[index];
   if (!step || step.kind !== 'note') return cell('', 'blank');
   const key = strip.ctx.model.doc.key;
@@ -126,7 +96,7 @@ function degreeSelect(strip: Strip, index: number, spec: GridSpec): HTMLElement 
   return sel;
 }
 
-function octaveCell(strip: Strip, index: number, spec: GridSpec): HTMLElement {
+function octaveCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   const step = spec.steps[index];
   if (!step || step.kind !== 'note') return cell('', 'blank');
   const label = step.octave === 0 ? 'oct' : step.octave > 0 ? `+${step.octave}` : `${step.octave}`;
@@ -140,7 +110,7 @@ function octaveCell(strip: Strip, index: number, spec: GridSpec): HTMLElement {
 }
 
 function flagCell(
-  strip: Strip,
+  strip: GridStrip,
   index: number,
   spec: GridSpec,
   flag: 'accent' | 'slide',
@@ -155,7 +125,7 @@ function flagCell(
   return node;
 }
 
-function column(strip: Strip, index: number, spec: GridSpec): HTMLElement {
+function column(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   return stripColumn(index, index < spec.length, [
     kindCell(strip, index, spec),
     degreeSelect(strip, index, spec),
@@ -166,53 +136,37 @@ function column(strip: Strip, index: number, spec: GridSpec): HTMLElement {
 }
 
 /** Redraw every column from the document, keeping the horizontal scroll where it was. */
-function paintStrip(strip: Strip): void {
-  const spec = specOf(strip.ctx, strip.slot);
-  const scrollLeft = strip.root.scrollLeft;
-  strip.root.innerHTML = '';
-  if (!spec) return;
-  spec.steps.forEach((_, index) => strip.root.appendChild(column(strip, index, spec)));
-  strip.root.scrollLeft = scrollLeft;
-  markPlaying(strip.root, strip.playing);
-}
+const repaint = (strip: GridStrip): void =>
+  paintStrip(strip, (spec) => spec.steps.map((_, index) => column(strip, index, spec)));
 
 /**
- * Per frame while the card is on screen: the playhead (the column of the
- * audible tick while the transport runs), and a repaint when the Harmony
- * tab's root or scale has changed since the labels were drawn — a root knob
- * goes through `ctx.change` alone, which re-renders nothing.
+ * Per frame while the card is on screen: the playhead (the engine's own step
+ * for the audible tick), and a repaint when the Harmony tab's root or scale
+ * has changed since the labels were drawn — a root knob goes through
+ * `ctx.change` alone, which re-renders nothing.
  */
-function watch(strip: Strip): void {
+function watch(strip: GridStrip): void {
   let keySig = keySignature(strip.ctx.model.doc.key);
-  const tick = (): void => {
-    if (!strip.root.isConnected) return;
-    requestAnimationFrame(tick);
-    const sig = keySignature(strip.ctx.model.doc.key);
-    if (sig !== keySig) {
+  watchPlayhead({
+    attached: () => strip.root.isConnected,
+    playheadAt: () => playheadAt(strip.ctx, strip.slot),
+    mark: markStep(strip),
+    repaintIf: () => {
+      const sig = keySignature(strip.ctx.model.doc.key);
+      if (sig === keySig) return;
       keySig = sig;
       strip.repaint();
-    }
-    const system = strip.ctx.host.system;
-    const spec = specOf(strip.ctx, strip.slot);
-    let current = -1;
-    if (system && spec && system.scheduler.isRunning) {
-      const audible = system.scheduler.audibleTick(system.engine.context.currentTime);
-      current = Math.floor(audible / spec.divisor) % spec.length;
-    }
-    if (current === strip.playing) return;
-    strip.playing = current;
-    markPlaying(strip.root, current);
-  };
-  requestAnimationFrame(tick);
+    },
+  });
 }
 
-function lengthKnob(strip: Strip): HTMLElement {
+function lengthKnob(strip: GridStrip): HTMLElement {
   return makeKnob({
     ...GRID_LENGTH_KNOB,
     color: PITCH_COLOR,
-    get: () => specOf(strip.ctx, strip.slot)?.length ?? 1,
+    get: () => strip.spec()?.length ?? 1,
     set: (v) => {
-      const spec = specOf(strip.ctx, strip.slot);
+      const spec = strip.spec();
       if (!spec) return;
       const length = Math.round(v);
       const change = { sequencer: { length, steps: stepsForLength(spec.steps, length) } };
@@ -222,7 +176,7 @@ function lengthKnob(strip: Strip): HTMLElement {
 }
 
 /** Rotate applies the turn since its last value, so the document holds the rotated steps and no offset. */
-function rotateKnob(strip: Strip): HTMLElement {
+function rotateKnob(strip: GridStrip): HTMLElement {
   let turned = 0;
   return makeKnob({
     ...GRID_ROTATE_KNOB,
@@ -238,7 +192,7 @@ function rotateKnob(strip: Strip): HTMLElement {
   });
 }
 
-function randomizeButton(strip: Strip): HTMLElement {
+function randomizeButton(strip: GridStrip): HTMLElement {
   const button = el('button', 'btn', 'Randomize') as HTMLButtonElement;
   button.type = 'button';
   button.style.borderColor = PITCH_COLOR;
@@ -255,7 +209,7 @@ function randomizeButton(strip: Strip): HTMLElement {
 }
 
 /** Vel first, Length second, then the rest of the table, then Rotate: the row order the card had. */
-function controls(strip: Strip): HTMLElement {
+function controls(strip: GridStrip): HTMLElement {
   const { ctx, slot } = strip;
   const [velocity, ...rest] = GRID_KNOBS;
   const row = el('div', 'knob-row');
@@ -269,12 +223,13 @@ function controls(strip: Strip): HTMLElement {
 /** The card body for a `grid` part: controls, the step strip, the hint. */
 export function gridCard(ctx: AppCtx, slot: number): HTMLElement {
   const body = el('div');
-  const strip: Strip = {
+  const strip: GridStrip = {
     ctx,
     slot,
     root: el('div', 'grid-strip'),
     playing: -1,
-    repaint: () => paintStrip(strip),
+    spec: () => specOf(ctx, slot, 'grid'),
+    repaint: () => repaint(strip),
   };
   body.appendChild(controls(strip));
   const tools = el('div', 'capture-row');
@@ -283,7 +238,7 @@ export function gridCard(ctx: AppCtx, slot: number): HTMLElement {
   body.appendChild(tools);
   body.appendChild(strip.root);
   body.appendChild(el('p', 'hint', HINT));
-  paintStrip(strip);
+  repaint(strip);
   watch(strip);
   return body;
 }
