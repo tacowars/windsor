@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the binding layer in one file: #629 adds the live roster (a slot added or removed) to the same plan/commit transaction the rebuilds and reconfigures run through; 373 of 350, inside the #225 decision 4 margin, and a split would put half the transaction in a second file */
 /**
  * The binding layer (issue #69): generators emit onsets and note events on the
  * tick grid; this maps them onto parts. It is the seam of record
@@ -11,9 +12,12 @@
  * Since #597 any part carries any of those, or none: a part is found by its
  * slot, a `none` part builds no generator and is never touched here beyond
  * `releaseAll`, and a part's slot is its generator index, so removing or
- * reordering one part cannot move another's stream. A partial naming an
- * absent slot is ignored and reported — a part that was never initialised
- * has no `AudioPart` and cannot be added live.
+ * reordering one part cannot move another's stream. Since #629 a part is
+ * added and removed live too: a whole part at a free slot asks the
+ * `PartHost` for its `AudioPart` and joins the transport where it is, `null`
+ * at a slot releases that part and hands it back, and no other slot is
+ * touched by either. A fragment naming an absent slot is still ignored and
+ * reported.
  *
  * `apply()` is the live tuning path (refinement decision 3): a deep partial is
  * merged over the current arrangement, validated, and committed — bpm straight
@@ -39,7 +43,13 @@ import { BarRecorder, type NotePattern } from './capturedPattern';
 import { EuclideanSequencer, assertEuclideanConfig, type OnsetEvent } from './euclideanSequencer';
 import type { NoteEvent } from './noteEvent';
 import type { PresetTable } from './arrangementValidate';
-import { lookupPreset, partLabel, presetFor, validateArrangement } from './arrangementValidate';
+import {
+  lookupPreset,
+  partLabel,
+  presetFor,
+  validateArrangement,
+  validatePartialSlots,
+} from './arrangementValidate';
 import type { Patch } from './patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from './patch';
 import { ScaleSampler } from './scaleSampler';
@@ -56,6 +66,21 @@ export interface PlayablePart {
   trigger(note: number, velocity?: number, duration?: number, time?: number): number;
   setPatch(patch: Patch): void;
   allNotesOff(): void;
+}
+
+/**
+ * Where the player finds a slot's part, and — for a live add or removal
+ * (#629) — who builds and disposes one. A `ReadonlyMap<number, PlayablePart>`
+ * satisfies it as a fixed roster: with no `add`, a partial that adds a part
+ * is refused; with no `remove`, a removed part is released and detached and
+ * the host keeps whatever it holds.
+ */
+export interface PartHost {
+  get(slot: number): PlayablePart | undefined;
+  /** Create the part on `part.slot` playing `patch`; called after the plan validated the whole partial. */
+  add?(part: MusicPart, patch: Patch): PlayablePart;
+  /** Dispose the part on `slot` after the player has released and detached it. */
+  remove?(slot: number): void;
 }
 
 /** What the player needs from the transport. `Scheduler` and `TickTransport` both satisfy it. */
@@ -100,6 +125,10 @@ interface Plan {
    */
   reconfigured: ReadonlyArray<() => void>;
   patchChanges: ReadonlyArray<readonly [number, Patch]>;
+  /** Parts on slots the arrangement did not hold (#629), with the patch each starts on. */
+  added: ReadonlyArray<readonly [MusicPart, Patch]>;
+  /** Slots that left the arrangement (#629): released, detached, handed back to the host. */
+  removed: ReadonlySet<number>;
   /** The preset table after the partial's `patches`, validated against. */
   presets: Record<string, Patch>;
 }
@@ -113,7 +142,14 @@ function stagePatches(
   const staged = { ...presets };
   for (const [name, raw] of Object.entries(patches)) {
     if (raw === undefined) continue;
-    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    if (raw === null) {
+      // A removal (#629): the id leaves the table; a part still playing it
+      // fails validation, so nothing is dropped from under a part.
+      if (name in staged) delete staged[name];
+      else ignored.push(`patches.${name}`);
+      continue;
+    }
+    if (typeof raw !== 'object' || Array.isArray(raw)) {
       ignored.push(`patches.${name}`);
       continue;
     }
@@ -199,14 +235,14 @@ export class ArrangementPlayer {
 
   constructor(
     private readonly transport: MusicTransport,
-    private readonly parts: ReadonlyMap<number, PlayablePart>,
+    private readonly parts: PartHost,
     arrangement: Arrangement,
     presets: PresetTable,
     private readonly onEvent?: MusicEventHandler,
   ) {
     this.presets = { ...presets };
     this.current = structuredClone(arrangement);
-    validateArrangement(this.current, null, this.presets);
+    validateArrangement(this.current, this.presets);
     this.index();
     this.built = this.buildAll(this.current);
     this.transport.bpm = this.current.bpm;
@@ -279,6 +315,7 @@ export class ArrangementPlayer {
     const staged = stagePatches(this.presets, patches, ignored);
     let plan: Plan;
     try {
+      validatePartialSlots(partial);
       plan = this.plan(merged, staged);
     } catch (error) {
       return { ok: false, ignored, error: error instanceof Error ? error.message : String(error) };
@@ -286,7 +323,10 @@ export class ArrangementPlayer {
     this.transport.bpm = merged.bpm;
     this.presets = plan.presets;
     for (const [slot, patch] of plan.patchChanges) this.parts.get(slot)?.setPatch(patch);
-    for (const slot of plan.rebuilt) this.parts.get(slot)?.allNotesOff();
+    for (const slot of plan.removed) this.detach(slot);
+    // Only a part that was already sounding is cut; a part just added has nothing to cut.
+    for (const slot of plan.rebuilt) if (this.bySlot.has(slot)) this.parts.get(slot)?.allNotesOff();
+    for (const [part, patch] of plan.added) this.parts.add?.(part, patch);
     this.built = plan.built;
     this.current = merged;
     this.index();
@@ -313,6 +353,29 @@ export class ArrangementPlayer {
     for (const unsubscribe of this.subs.values()) unsubscribe();
     this.subs.clear();
     this.releaseAll();
+  }
+
+  /**
+   * A part leaving the arrangement live (#629): its held note released, its
+   * subscription and bookkeeping dropped, everything sounding cut, and the
+   * part handed back to the host to dispose. Nothing else is touched.
+   */
+  private detach(slot: number): void {
+    const generator = this.built.generators.get(slot);
+    if (
+      generator instanceof StepSequencer ||
+      generator instanceof GridSequencer ||
+      generator instanceof ChordSequencer
+    ) {
+      generator.release(0, 0);
+    }
+    this.subs.get(slot)?.();
+    this.subs.delete(slot);
+    this.recorders.delete(slot);
+    this.counters.delete(slot);
+    this.announced.delete(slot);
+    this.parts.get(slot)?.allNotesOff();
+    this.parts.remove?.(slot);
   }
 
   private index(): void {
@@ -349,15 +412,31 @@ export class ArrangementPlayer {
   }
 
   /** Everything `apply` will change, validated and constructed before anything is touched. */
+
   private plan(merged: Arrangement, presets: Record<string, Patch>): Plan {
-    validateArrangement(merged, this.current, presets);
+    validateArrangement(merged, presets);
     const seedChanged = merged.seed !== this.current.seed;
     const keyChanged = seedChanged || sig(merged.key) !== sig(this.current.key);
 
+    // A part on a slot the arrangement lacked is built like a rebuilt one
+    // (#629): same seed, same generator index, so its stream is the one a
+    // rebuild would have made (#597). It needs a host that can create parts.
+    const added: Array<readonly [MusicPart, Patch]> = [];
+    const removed = new Set<number>();
+    for (const { slot } of this.current.parts) {
+      if (!merged.parts.some((part) => part.slot === slot)) removed.add(slot);
+    }
     const rebuilt = new Set<number>();
     for (const next of merged.parts) {
       const before = this.bySlot.get(next.slot);
-      if (!before) continue;
+      if (!before) {
+        if (!this.parts.add) {
+          throw new Error(`${partLabel(next)}: this host builds parts only at init`);
+        }
+        added.push([next, clonePatch(presetFor(presets, partLabel(next), next.preset))]);
+        rebuilt.add(next.slot);
+        continue;
+      }
       const changed = generatorSig(next.sequencer) !== generatorSig(before.sequencer);
       // An inert part only rebuilds when its kind leaves or enters `none`;
       // a seed or key change has no stream of its to reset.
@@ -393,7 +472,7 @@ export class ArrangementPlayer {
         ]);
       }
     }
-    return { built, rebuilt, reconfigured, patchChanges, presets };
+    return { built, rebuilt, reconfigured, patchChanges, added, removed, presets };
   }
 
   /** (Re)subscribe the named slots' generators and point their events at the parts. */

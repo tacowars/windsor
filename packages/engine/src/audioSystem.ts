@@ -35,13 +35,13 @@
  * arrangement fields through the player, `patches` onto the parts, each
  * part's `strip` and the `returns` onto the live desk (`deskApply.ts`).
  */
-import type { ArrangementPartial } from './arrangement';
+import type { ArrangementPartial, MusicPart } from './arrangement';
 import type { ArrangementDocument, DocumentPartial } from './arrangementDocument';
 import type {
   ApplyResult,
   ArrangementReadout,
   MusicEventHandler,
-  PlayablePart,
+  PartHost,
 } from './arrangementPlayer';
 import { ArrangementPlayer } from './arrangementPlayer';
 import { PatchResolver } from './arrangementValidate';
@@ -129,6 +129,8 @@ export class AudioSystem {
   private musicGainValue = 1;
   private sfxGainValue = 1;
   private readonly strips = new Map<string, PartStrip>();
+  /** The music parts by slot — the player's roster, grown and shrunk live through `apply` (#629). */
+  private readonly musicParts = new Map<number, AudioPart>();
   private readonly loadMeter = new AudioLoadMeter();
   /** What `update()` costs on the main thread, over the rolling window (#275). */
   private readonly schedMeter: SchedCostMeter;
@@ -294,26 +296,56 @@ export class AudioSystem {
     // every patch it plays, so the library is not a runtime import and a
     // name it does not embed is a load error, never a silent fallback.
     const resolver = new PatchResolver(patches ?? {});
-    const parts = new Map<number, PlayablePart>();
     for (const part of arrangement.parts) {
-      parts.set(
-        part.slot,
-        this.createMusicPart(
-          musicPartName(part.slot),
-          clonePatch(resolver.require(`part ${part.slot}`, part.preset)),
-          MUSIC_PART_MAX_VOICES,
-          part.strip,
-        ),
+      this.addMusicPart(
+        part,
+        clonePatch(resolver.require(`part ${part.slot}`, part.preset)),
+        part.strip,
       );
     }
     if (returns) applyReturnsLive(this.standing().returns, returns);
+    // The roster the player reads and — for a live add or removal — grows and
+    // shrinks through (#629); the player calls these only after its plan has
+    // validated the whole partial, so a refused edit creates and disposes nothing.
+    const host: PartHost = {
+      get: (slot) => this.musicParts.get(slot),
+      add: (part, patch) => this.addMusicPart(part, patch),
+      remove: (slot) => this.removeMusicPart(slot),
+    };
     this.player = new ArrangementPlayer(
       this.scheduler,
-      parts,
+      host,
       arrangement,
       resolver.table(),
       onEvent,
     );
+  }
+
+  /**
+   * The `music-<slot>` engine part on its strip (#629 decision 1). At init the
+   * document's strip is handed in; a part added live starts on the desk's
+   * default strip and `apply` then lands the partial's `strip` fields on it,
+   * the way it does for every other slot.
+   */
+  private addMusicPart(part: MusicPart, patch: Patch, strip?: ChannelStrip): AudioPart {
+    const audio = this.createMusicPart(
+      musicPartName(part.slot),
+      patch,
+      MUSIC_PART_MAX_VOICES,
+      strip,
+    );
+    this.musicParts.set(part.slot, audio);
+    return audio;
+  }
+
+  /** Dispose the `music-<slot>` part, its strip and its load meter entry, and nothing else (#629 decision 1). */
+  private removeMusicPart(slot: number): void {
+    const name = musicPartName(slot);
+    this.strips.get(name)?.dispose();
+    this.strips.delete(name);
+    this.loadMeter.detach(`part:${name}`);
+    this.engine.disposePart(name);
+    this.musicParts.delete(slot);
   }
 
   /**
@@ -452,6 +484,7 @@ export class AudioSystem {
     this.suppressed = false;
     for (const strip of this.strips.values()) strip.dispose();
     this.strips.clear();
+    this.musicParts.clear();
     if (this.returns) for (const bus of Object.values(this.returns)) bus.dispose();
     this.loadMeter.dispose();
     this.schedMeter.reset();

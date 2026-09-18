@@ -191,6 +191,21 @@ export class AudioLoadMeter {
   }
 
   /**
+   * Forget a processor that is being disposed (#629): its port is silenced and
+   * its instantaneous entry dropped, so `processorCount` and the load stop
+   * counting it now rather than after the stale window. Its underruns stay —
+   * a window that suffered them still suffered them.
+   */
+  detach(id: string): void {
+    const port = this.ports.get(id);
+    if (port) port.onmessage = null;
+    this.ports.delete(id);
+    this.attached.delete(id);
+    this.entries.delete(id);
+    this.sampleRates.delete(id);
+  }
+
+  /**
    * Take one report. Public because the unit tests drive the meter directly.
    *
    * The processor reports its underruns cumulatively, so the total kept here

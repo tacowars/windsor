@@ -130,6 +130,14 @@ export class FmEngine {
     return this.parts.get(name);
   }
 
+  /** Dispose one part and forget its name, so the name can be created again (#629). No-op for an unknown name. */
+  disposePart(name: string): void {
+    const part = this.parts.get(name);
+    if (!part) return;
+    part.dispose();
+    this.parts.delete(name);
+  }
+
   /** A dry bus into `destination` (the master by default). Native nodes only. */
   createBus(options: BusOptions = {}, destination?: AudioNode): AudioBus {
     const bus = createBus(this.context, options);

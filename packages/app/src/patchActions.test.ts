@@ -75,6 +75,7 @@ function context(): AppCtx {
       return { ok: true, ignored: [] };
     },
     restructure: (edit: (draft: Record<string, unknown>) => void) => model.mutate(edit),
+    render: () => {},
     status: () => {},
   } as unknown as AppCtx;
   return ctx;

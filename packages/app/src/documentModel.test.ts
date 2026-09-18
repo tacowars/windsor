@@ -6,7 +6,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PRESETS, makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
+import {
+  PRESETS,
+  makeArrangement,
+  partAt,
+} from '../../../packages/client/src/audio/index-for-editor';
 import { DocumentModel, deepMerge, mergeDocument } from './documentModel';
 
 /** A song naming library ids with no `patches` section. */
@@ -82,7 +86,7 @@ describe('a slot-addressed merge (#597)', () => {
     expect(model.doc.parts[1]?.strip.pan).toBe(-0.5);
   });
 
-  it('never invents a part for a slot the song does not hold', () => {
+  it('leaves a fragment for a slot the song does not hold alone', () => {
     const merged = mergeDocument(OLD_SONG, { parts: { 5: { velocity: 0.1 } } }) as typeof OLD_SONG;
     expect(merged.parts).toEqual(OLD_SONG.parts);
   });
@@ -113,6 +117,63 @@ describe('a slot-addressed merge (#597)', () => {
     const reopened = new DocumentModel(JSON.parse(model.toJson()));
     expect(reopened.doc).toEqual(model.doc);
     expect(reopened.corrections).toEqual([]);
+  });
+});
+
+describe('adding and removing live (#629)', () => {
+  it('appends a whole part on a free slot — the normaliser’s own fill, so no correction', () => {
+    const model = new DocumentModel(OLD_SONG);
+    const raw = {
+      ...model.doc,
+      parts: [
+        ...model.doc.parts,
+        { slot: 5, name: 'new', preset: 'kick', sequencer: { kind: 'none' } },
+      ],
+    };
+    const part = partAt(model.preview(raw), 5);
+    if (!part) throw new Error('preview fills the new part');
+    expect(part.strip).toBeDefined();
+    model.merge({ parts: { 5: part } });
+    expect(model.doc.parts.map((p) => p.slot)).toEqual([0, 2, 5]);
+    expect(model.doc.parts[2]).toEqual(part);
+    expect(model.corrections).toEqual([]);
+    // Preview adopted nothing.
+    expect(new DocumentModel(OLD_SONG).doc.parts).toHaveLength(2);
+  });
+
+  it('removes the part at a null slot and the patch at a null id', () => {
+    const model = new DocumentModel(OLD_SONG);
+    expect(model.doc.patches?.['saw-arp']).toBeDefined();
+    model.merge({ parts: { 2: null }, patches: { 'saw-arp': null } });
+    expect(model.doc.parts.map((p) => p.slot)).toEqual([0]);
+    expect(model.doc.patches?.['saw-arp']).toBeUndefined();
+    expect(model.doc.patches?.['kick']).toBeDefined();
+    expect(model.corrections).toEqual([]);
+    expect(model.dangling).toEqual([]);
+  });
+
+  it('a null at an absent slot or id is a no-op, and a fragment never appends', () => {
+    const merged = mergeDocument(OLD_SONG, {
+      parts: { 7: null, 5: { velocity: 1 } },
+      patches: { nope: null },
+    }) as typeof OLD_SONG & { patches?: unknown };
+    expect(merged.parts).toEqual(OLD_SONG.parts);
+    expect(merged.patches).toBeUndefined();
+  });
+
+  it('round-trips an added part through export and import', () => {
+    const model = new DocumentModel(OLD_SONG);
+    const raw = {
+      ...model.doc,
+      parts: [
+        ...model.doc.parts,
+        { slot: 1, name: 'hat', preset: 'hat', sequencer: { kind: 'euclidean' } },
+      ],
+    };
+    model.merge({ parts: { 1: partAt(model.preview(raw), 1) }, patches: { hat: PRESETS['hat'] } });
+    const reopened = new DocumentModel(JSON.parse(model.toJson()) as unknown);
+    expect(reopened.toJson()).toBe(model.toJson());
+    expect(reopened.filled).toEqual([]);
   });
 });
 

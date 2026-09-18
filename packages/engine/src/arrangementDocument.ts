@@ -71,9 +71,14 @@ export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
   readonly returns?: Readonly<Record<string, ReturnSpec>>;
 };
 
-/** A live partial of a document: parts by slot, patches and returns by name. */
-export type DocumentPartial = DeepPartial<Omit<ArrangementDocument, 'parts'>> & {
+/**
+ * A live partial of a document: parts by slot, patches and returns by name.
+ * `null` at a slot or a patch id removes that entry, and a whole part at a
+ * free slot adds one (#629) — the same partial the engine's `apply` takes.
+ */
+export type DocumentPartial = DeepPartial<Omit<ArrangementDocument, 'parts' | 'patches'>> & {
   readonly parts?: PartsPartial<DocumentPart>;
+  readonly patches?: Readonly<Record<string, DeepPartial<Patch> | null>>;
 };
 
 export interface MakeArrangementResult {
