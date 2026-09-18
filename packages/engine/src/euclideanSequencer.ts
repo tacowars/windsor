@@ -189,6 +189,12 @@ export class EuclideanSequencer {
     return this.k;
   }
 
+  /** The step index a transport step lands on — the console's playhead reads this too (#619). */
+  stepAt(transportStep: number): number {
+    const { steps } = this.current;
+    return ((transportStep % steps) + steps) % steps;
+  }
+
   attach(source: TickSource): Unsubscribe {
     return source.subscribe(this.current.divisor, (event) => this.handleTick(event));
   }
@@ -200,7 +206,7 @@ export class EuclideanSequencer {
    */
   handleTick(event: TickEvent): OnsetEvent | null {
     if (this.fixed === null && event.tickInBar === 0) this.regenerate(event);
-    const step = event.step % this.current.steps;
+    const step = this.stepAt(event.step);
     if (!this.pattern[step]) return null;
     const onset: OnsetEvent = {
       tick: event.tick,

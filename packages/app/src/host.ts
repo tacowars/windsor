@@ -169,6 +169,15 @@ export class EngineHost {
     return this.system?.capturePattern(slot) ?? null;
   }
 
+  /**
+   * The step the part on `slot` sounds at transport tick `tick`, or -1 — the
+   * engine's own position rule, which the sequencer cards' playheads read
+   * instead of re-deriving one (#619 decision 2).
+   */
+  stepAt(slot: number, tick: number): number {
+    return this.system?.stepAt(slot, tick) ?? -1;
+  }
+
   /** The engine part on a slot, for the Parts tab and keyboard (#597: never by label). */
   part(slot: number): AudioPart | null {
     return this.system?.engine.getPart(musicPartName(slot)) ?? null;

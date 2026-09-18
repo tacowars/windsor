@@ -410,6 +410,15 @@ export class AudioSystem {
     return this.player?.capturePattern(slot) ?? null;
   }
 
+  /**
+   * The step the part on `slot` is sounding at transport tick `tick`, or -1
+   * (#619 decision 2). The console's playhead reads this, so it shows the
+   * engine's own position rule instead of re-deriving one.
+   */
+  stepAt(slot: number, tick: number): number {
+    return this.player?.stepAt(slot, tick) ?? -1;
+  }
+
   /** The live strip of a part this system created. */
   strip(name: string): PartStrip | undefined {
     return this.strips.get(name);
