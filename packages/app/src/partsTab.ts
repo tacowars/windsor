@@ -81,7 +81,6 @@ const GRID_HTML = `
 /** Reload the working patch: the document's patch, else the built-in the part plays. */
 export function loadWorkingPatch(ctx: AppCtx): void {
   const part = partAt(ctx.model.doc, ctx.parts.selected);
-  ctx.parts.part = part ? ctx.host.part(part.slot) : null;
   const patch = part
     ? (ctx.model.doc.patches?.[part.preset] ?? libraryPatch(library, part.preset))
     : undefined;

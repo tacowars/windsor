@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 
 import type {
   ApplyResult,
+  AudioPart,
   DocumentPartial,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { makePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
@@ -29,6 +30,8 @@ interface Console {
   status: string[];
   applied: DocumentPartial[];
   builds: number;
+  /** The live parts the fake host hands out by slot, once "enabled". */
+  liveParts: Map<number, AudioPart>;
 }
 
 /** A console whose host accepts everything; `refuse` makes it reject every change instead. */
@@ -43,6 +46,7 @@ function openConsole(refuse = false): Console {
     status,
     applied,
     builds: 0,
+    liveParts: new Map(),
   };
   const host: ContextHost = {
     apply: (partial): ApplyResult => {
@@ -54,6 +58,7 @@ function openConsole(refuse = false): Console {
       return Promise.resolve();
     },
     capturePattern: () => null,
+    part: (slot) => console.liveParts.get(slot) ?? null,
   };
   console.ctx = new AppContext<TabPanel>({
     host: host as EngineHost,
@@ -145,6 +150,23 @@ describe('AppContext changes and the parts session', () => {
     expect(refused.ctx.change({ bpm: 133 } as DocumentPartial).ok).toBe(false);
     expect(refused.model.doc.bpm).toBe(bpm);
     expect(refused.status.at(-1)).toBe('refused: nope');
+  });
+
+  it('resolves the live part at the call, so a hidden Parts tab never leaves the keyboard stale', () => {
+    const c = openConsole();
+    c.ctx.activate('mixer');
+    expect(c.ctx.livePart()).toBeNull();
+    // Audio enabled, or the system rebuilt, while Mixer is showing: the next
+    // key press reaches the part the host holds now, not the one a Parts
+    // render once captured.
+    const live = { slot: 0 } as unknown as AudioPart;
+    c.liveParts.set(0, live);
+    expect(c.ctx.livePart()).toBe(live);
+    const rebuilt = { slot: 0 } as unknown as AudioPart;
+    c.liveParts.set(0, rebuilt);
+    expect(c.ctx.livePart()).toBe(rebuilt);
+    c.ctx.parts.selected = 99;
+    expect(c.ctx.livePart()).toBeNull();
   });
 
   it("commits the working patch under the selected part's preset, and nowhere without a part", () => {
