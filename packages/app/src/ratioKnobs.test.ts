@@ -2,9 +2,10 @@
  * What the Coarse / Fine pair reads and writes (#587).
  *
  * The knobs are DOM, but the path from a turn to the export is not: each
- * spec's `set` is what a commit calls, `pushPatch` is what carries the result
- * into the document's `patches` section through `hooks.commit`, and the
- * document is what the console exports. So the assertions here land on
+ * spec's `set` is what a commit calls, the editor's push is what carries the
+ * result into the document's `patches` section (#620: a `PatchEditor` over
+ * the document model, no module hook), and the document is what the console
+ * exports. So the assertions here land on
  * `model.doc.patches`, not on a rendered element — UI movement alone is not
  * the evidence (`patchPanels.test.ts` takes the same shape).
  */
@@ -17,7 +18,7 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { DocumentModel } from './documentModel';
 import { keyTarget } from './knob';
-import { hooks, partsState } from './patchState';
+import type { PatchEditor } from './partsSession';
 import { type Hideable, ratioKnobSpecs, readRatio, showPitchControls } from './ratioKnobs';
 import {
   COARSE_DEF,
@@ -39,29 +40,39 @@ const SONG = {
   arp: { part: 'arp', preset: 'lead-bell', velocity: 0.7 },
 };
 
+/** A fresh editor over the engine's default patch, committing nowhere. */
+const freshEditor = (): PatchEditor => ({
+  patch: clonePatch(PATCH_LIBRARY['lead-bell']!.patch),
+  push: () => undefined,
+  refresh: () => undefined,
+});
+
 /** The working patch and the document, wired the way the Parts tab wires them. */
-function openConsole(id: string): { model: DocumentModel; ratio: (op: number) => number } {
+function openConsole(id: string): {
+  model: DocumentModel;
+  editor: PatchEditor;
+  ratio: (op: number) => number;
+} {
   const model = new DocumentModel(SONG);
-  partsState.patch = clonePatch(PATCH_LIBRARY[id]!.patch);
-  hooks.commit = (patch): void => model.merge({ patches: { [id]: patch } });
+  const editor: PatchEditor = {
+    patch: clonePatch(PATCH_LIBRARY[id]!.patch),
+    push: () => model.merge({ patches: { [id]: editor.patch } }),
+    refresh: () => undefined,
+  };
   return {
     model,
+    editor,
     ratio: (op) => model.doc.patches?.[id]?.ops?.[op]?.ratio ?? Number.NaN,
   };
 }
 
 function withConsole(id: string, body: (c: ReturnType<typeof openConsole>) => void): void {
-  const previous = hooks.commit;
-  try {
-    body(openConsole(id));
-  } finally {
-    hooks.commit = previous;
-  }
+  body(openConsole(id));
 }
 
 describe('the Coarse and Fine specs', () => {
   it('span the ratio in the terms the ticket set', () => {
-    const { coarse, fine } = ratioKnobSpecs(0);
+    const { coarse, fine } = ratioKnobSpecs(freshEditor(), 0);
     expect(coarse.label).toBe('Coarse');
     expect([coarse.min, coarse.max, coarse.step, coarse.def]).toEqual([
       COARSE_MIN,
@@ -81,9 +92,9 @@ describe('the Coarse and Fine specs', () => {
   });
 
   it('reads the working patch as two halves of one field', () => {
-    withConsole('lead-bell', () => {
-      partsState.patch.ops[1]!.ratio = 3.5;
-      const { coarse, fine } = ratioKnobSpecs(1);
+    withConsole('lead-bell', (c) => {
+      c.editor.patch.ops[1]!.ratio = 3.5;
+      const { coarse, fine } = ratioKnobSpecs(c.editor, 1);
       expect(coarse.get()).toBe(3);
       expect(fine.get()).toBe(0.5);
       expect(coarse.fmt?.(coarse.get())).toBe('3');
@@ -98,11 +109,11 @@ describe('a turn of either knob', () => {
       // The non-mutation baseline is built here rather than pinned to today's
       // bank: what matters is that the factory entry is what it was.
       const factoryRatio = PATCH_LIBRARY['lead-bell']!.patch.ops[1]!.ratio;
-      partsState.patch.ops[1]!.ratio = 1;
-      const { coarse, fine } = ratioKnobSpecs(1);
+      c.editor.patch.ops[1]!.ratio = 1;
+      const { coarse, fine } = ratioKnobSpecs(c.editor, 1);
 
       fine.set(0.5);
-      expect(partsState.patch.ops[1]!.ratio).toBe(1.5);
+      expect(c.editor.patch.ops[1]!.ratio).toBe(1.5);
       expect(c.ratio(1)).toBe(1.5);
 
       coarse.set(2);
@@ -120,8 +131,8 @@ describe('a turn of either knob', () => {
 
   it('leaves the other half where it was', () => {
     withConsole('lead-bell', (c) => {
-      partsState.patch.ops[2]!.ratio = 2.5;
-      const { coarse, fine } = ratioKnobSpecs(2);
+      c.editor.patch.ops[2]!.ratio = 2.5;
+      const { coarse, fine } = ratioKnobSpecs(c.editor, 2);
       coarse.set(1);
       expect(c.ratio(2)).toBe(1.5);
       fine.set(0);
@@ -132,8 +143,8 @@ describe('a turn of either knob', () => {
 
   it('clamps at the floor rather than writing a ratio the field cannot hold', () => {
     withConsole('lead-bell', (c) => {
-      partsState.patch.ops[1]!.ratio = 0.5;
-      const { coarse, fine } = ratioKnobSpecs(1);
+      c.editor.patch.ops[1]!.ratio = 0.5;
+      const { coarse, fine } = ratioKnobSpecs(c.editor, 1);
       expect(coarse.get()).toBe(0);
       // Half the floor, written from the constant: the console clamps it there.
       fine.set(RATIO_MIN / 2);
@@ -147,7 +158,7 @@ describe('a turn of either knob', () => {
   it('runs the pair through the callback that re-reads both displays', () => {
     withConsole('lead-bell', () => {
       let commits = 0;
-      const { coarse, fine } = ratioKnobSpecs(1, () => (commits += 1));
+      const { coarse, fine } = ratioKnobSpecs(freshEditor(), 1, () => (commits += 1));
       expect(coarse.onChange).toBe(fine.onChange);
       coarse.onChange?.();
       fine.onChange?.();
@@ -156,17 +167,17 @@ describe('a turn of either knob', () => {
   });
 
   it('reads a default for an operator index the patch does not have', () => {
-    withConsole('lead-bell', () => {
-      expect(readRatio(99)).toBe(COARSE_DEF);
+    withConsole('lead-bell', (c) => {
+      expect(readRatio(c.editor, 99)).toBe(COARSE_DEF);
       // And writing one is a no-op rather than a thrown bay.
-      expect(() => ratioKnobSpecs(99).coarse.set(3)).not.toThrow();
+      expect(() => ratioKnobSpecs(c.editor, 99).coarse.set(3)).not.toThrow();
     });
   });
 });
 
 describe('the keyboard on a coarsely stepped knob', () => {
   it('moves Coarse by a whole multiple in either direction', () => {
-    const { coarse, fine } = ratioKnobSpecs(0);
+    const { coarse, fine } = ratioKnobSpecs(freshEditor(), 0);
     // One arrow key is 2% of the sweep, which over 0..24 is 0.48 — less than
     // half of Coarse's own step, so without `keyTarget`'s fallback the commit
     // rounds back to where it started and the knob is unreachable by keyboard.

@@ -4,14 +4,16 @@
  * of its own. Every knob edit commits the working patch to the document's
  * `patches` section under the part's preset name (`patchLibrary.ts`), and
  * `ctx.change` pushes it to the live part through `AudioSystem.apply`, so the
- * export carries the sound itself.
+ * export carries the sound itself. The working patch is `ctx.parts` (#620
+ * decision 3); every control here is handed a `PatchEditor` over it, built
+ * once per render, whose push also keeps the rail's picker and marker honest.
  */
 import type { PartialPatch } from '../../../packages/client/src/audio/index-for-editor';
 import { clonePatch, makePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { $, el, seg } from './dom';
 import type { Keyboard } from './keyboard';
-import { confirmUnsaved, libraryActions } from './libraryActions';
+import { confirmUnsaved, libraryActions, syncModifiedMarker } from './libraryActions';
 import { library, libraryPatch } from './libraryModel';
 import type { MidiAccessor } from './midiAccess';
 import { midiPanel } from './midiPanel';
@@ -20,7 +22,7 @@ import { dropInit } from './patchActions';
 import { badgeText, libraryControls, presetPicker } from './patchLibrary';
 import { buildAlgPicker, buildFilter, buildGlobal, buildLfo, buildPitch } from './patchPanels';
 import { buildBays } from './patchBays';
-import { hooks, partsState, pushPatch } from './patchState';
+import type { PatchEditor } from './partsSession';
 import { startScope } from './scope';
 
 const GRID_HTML = `
@@ -78,34 +80,46 @@ const GRID_HTML = `
 
 /** Reload the working patch: the document's patch, else the built-in the part plays. */
 export function loadWorkingPatch(ctx: AppCtx): void {
-  const part = partAt(ctx.model.doc, partsState.selected);
-  partsState.part = part ? ctx.host.part(part.slot) : null;
+  const part = partAt(ctx.model.doc, ctx.parts.selected);
   const patch = part
     ? (ctx.model.doc.patches?.[part.preset] ?? libraryPatch(library, part.preset))
     : undefined;
-  partsState.patch = patch ? clonePatch(patch) : makePatch();
+  ctx.parts.patch = patch ? clonePatch(patch) : makePatch();
 }
 
-/** The working patch into the document under the part's preset name (a built-in forks). */
-function commitPatch(ctx: AppCtx): void {
-  const part = partAt(ctx.model.doc, partsState.selected);
-  if (!part) return;
-  const wasDocument = ctx.model.doc.patches?.[part.preset] !== undefined;
-  const result = ctx.change({ patches: { [part.preset]: partsState.patch } });
-  if (result.ok && !wasDocument) syncPresetAndBadge(ctx);
-  if (result.ok) hooks.afterCommit();
+/**
+ * The editor every control on this tab is handed: the session's working patch,
+ * a push that commits it through the context and then keeps the rail honest —
+ * a built-in that just forked into the document changes the picker and badge
+ * (#563), and the library row re-reads its unsaved marker — and the rail rebuild.
+ */
+function patchEditor(ctx: AppCtx): PatchEditor {
+  const editor: PatchEditor = {
+    get patch() {
+      return ctx.parts.patch;
+    },
+    push() {
+      const preset = partAt(ctx.model.doc, ctx.parts.selected)?.preset;
+      const wasDocument = preset !== undefined && ctx.model.doc.patches?.[preset] !== undefined;
+      if (!ctx.parts.push()) return;
+      if (!wasDocument) syncPresetAndBadge(ctx, editor);
+      syncModifiedMarker(ctx);
+    },
+    refresh: () => refreshPatchUi(editor),
+  };
+  return editor;
 }
 
-function refreshPatchUi(): void {
-  buildAlgPicker();
-  buildGlobal();
-  buildBays();
-  buildFilter();
-  buildLfo();
-  buildPitch();
+function refreshPatchUi(editor: PatchEditor): void {
+  buildAlgPicker(editor);
+  buildGlobal(editor);
+  buildBays(editor);
+  buildFilter(editor);
+  buildLfo(editor);
+  buildPitch(editor);
 }
 
-function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
+function partPicker(ctx: AppCtx, editor: PatchEditor, onSwitch: () => void): HTMLElement {
   const box = el('div');
   const head = el('div', 'section-title');
   head.appendChild(el('span', '', 'Part'));
@@ -116,13 +130,13 @@ function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
         value: String(part.slot),
         label: part.name,
       })),
-      () => String(partsState.selected),
+      () => String(ctx.parts.selected),
       (slot) => {
-        partsState.selected = Number(slot);
+        ctx.parts.selected = Number(slot);
         loadWorkingPatch(ctx);
         onSwitch();
-        refreshPatchUi();
-        syncPresetAndBadge(ctx);
+        refreshPatchUi(editor);
+        syncPresetAndBadge(ctx, editor);
       },
     ),
   );
@@ -140,13 +154,13 @@ function partPicker(ctx: AppCtx, onSwitch: () => void): HTMLElement {
 }
 
 /** Reload the working patch and rebuild the rail: after a load, a library action or a part switch. */
-function reloadRail(ctx: AppCtx): void {
+function reloadRail(ctx: AppCtx, editor: PatchEditor): void {
   loadWorkingPatch(ctx);
-  refreshPatchUi();
-  syncPresetAndBadge(ctx);
+  refreshPatchUi(editor);
+  syncPresetAndBadge(ctx, editor);
 }
 
-function syncPresetAndBadge(ctx: AppCtx): void {
+function syncPresetAndBadge(ctx: AppCtx, editor: PatchEditor): void {
   // The part list controls follow the selection: name and sequencer are the selected part's.
   $('partListSlot').replaceChildren(partListControls(ctx));
   const presetSlot = $('presetSlot');
@@ -154,9 +168,9 @@ function syncPresetAndBadge(ctx: AppCtx): void {
   presetSlot.appendChild(
     presetPicker(
       ctx,
-      partsState.selected,
+      ctx.parts.selected,
       () => {
-        reloadRail(ctx);
+        reloadRail(ctx, editor);
         // An Init no part plays any more is discarded, never exported (#563).
         dropInit(ctx);
       },
@@ -168,17 +182,17 @@ function syncPresetAndBadge(ctx: AppCtx): void {
       },
     ),
   );
-  presetSlot.appendChild(libraryControls(ctx, partsState.selected));
-  presetSlot.appendChild(libraryActions(ctx, () => reloadRail(ctx)));
-  $('patchBadge').textContent = badgeText(ctx, partsState.selected);
+  presetSlot.appendChild(libraryControls(ctx, ctx.parts.selected));
+  presetSlot.appendChild(libraryActions(ctx, () => reloadRail(ctx, editor)));
+  $('patchBadge').textContent = badgeText(ctx, ctx.parts.selected);
 }
 
-function wireJsonDialog(ctx: AppCtx): void {
+function wireJsonDialog(ctx: AppCtx, editor: PatchEditor): void {
   const dlg = $('jsonDlg') as HTMLDialogElement;
   const text = $('jsonText') as HTMLTextAreaElement;
   const status = $('jsonStatus');
   $('jsonBtn').onclick = (): void => {
-    text.value = JSON.stringify(partsState.patch, null, 2);
+    text.value = JSON.stringify(ctx.parts.patch, null, 2);
     status.textContent = '';
     dlg.showModal();
   };
@@ -191,10 +205,10 @@ function wireJsonDialog(ctx: AppCtx): void {
   };
   $('jsonLoad').onclick = (): void => {
     try {
-      partsState.patch = makePatch(JSON.parse(text.value) as PartialPatch);
-      pushPatch();
-      refreshPatchUi();
-      syncPresetAndBadge(ctx);
+      ctx.parts.patch = makePatch(JSON.parse(text.value) as PartialPatch);
+      editor.push();
+      refreshPatchUi(editor);
+      syncPresetAndBadge(ctx, editor);
       status.textContent = 'Patch loaded into the document';
     } catch (error) {
       status.textContent = `Could not parse: ${String(error)}`;
@@ -209,17 +223,16 @@ export function renderPartsTab(
   midi: MidiAccessor,
 ): void {
   body.innerHTML = GRID_HTML;
-  hooks.refresh = refreshPatchUi;
-  hooks.commit = (): void => commitPatch(ctx);
-  if (!partAt(ctx.model.doc, partsState.selected)) {
-    partsState.selected = ctx.model.doc.parts[0]?.slot ?? 0;
+  if (!partAt(ctx.model.doc, ctx.parts.selected)) {
+    ctx.parts.selected = ctx.model.doc.parts[0]?.slot ?? 0;
   }
+  const editor = patchEditor(ctx);
   loadWorkingPatch(ctx);
   keyboard.followPart();
-  $('partPick').appendChild(partPicker(ctx, () => keyboard.followPart()));
+  $('partPick').appendChild(partPicker(ctx, editor, () => keyboard.followPart()));
   $('midiSlot').appendChild(midiPanel(midi));
-  syncPresetAndBadge(ctx);
-  refreshPatchUi();
+  syncPresetAndBadge(ctx, editor);
+  refreshPatchUi(editor);
   startScope($('scope') as HTMLCanvasElement, () => ctx.host.analyser);
   keyboard.render($('keys'));
   $('octDown').onclick = (): void => keyboard.shiftOctave(-1);
@@ -231,5 +244,5 @@ export function renderPartsTab(
     hold.setAttribute('aria-pressed', String(keyboard.hold));
     if (!keyboard.hold) keyboard.panic();
   };
-  wireJsonDialog(ctx);
+  wireJsonDialog(ctx, editor);
 }

@@ -1,10 +1,11 @@
 /**
  * Browser metadata is separate from Patch: no DSP or document-schema changes.
  * Since #561 the metadata is each library file's own `category`, `tags` and
- * `description`; this module only lists and filters.
+ * `description`; this module carries the metadata and the browser's filter.
+ * The listing itself is the console's `libraryModel.listLibrary` over
+ * whichever library it has open (#620 retired the duplicate here).
  */
-import type { Patch } from './patch';
-import { PATCH_LIBRARY, PRESETS } from './presets';
+import { PATCH_LIBRARY } from './presets';
 
 export interface PresetMetadata {
   category: string;
@@ -26,32 +27,6 @@ export const PRESET_CATALOG: Record<string, PresetMetadata> = Object.fromEntries
     { category, tags, description },
   ]),
 );
-
-/** Document copies shadow factory entries, including when their IDs match. */
-export function listPresets(documentPatches: Record<string, Patch> = {}): PresetListing[] {
-  const ids = [...new Set([...Object.keys(documentPatches), ...Object.keys(PRESETS)])];
-  return ids
-    .map((id): PresetListing => {
-      const documentPatch = Object.hasOwn(documentPatches, id) ? documentPatches[id] : undefined;
-      const patch = documentPatch ?? PRESETS[id];
-      const metadata = Object.hasOwn(PRESET_CATALOG, id) ? PRESET_CATALOG[id] : undefined;
-      return {
-        id,
-        name: patch?.name ?? id,
-        source: documentPatch ? 'document' : 'built-in',
-        category: metadata?.category ?? 'Uncategorized',
-        tags: metadata?.tags ?? [],
-        description: documentPatch
-          ? 'Saved in this song. ' + (metadata?.description ?? 'Your custom patch.')
-          : (metadata?.description ?? ''),
-      };
-    })
-    .sort(
-      (a, b) =>
-        Number(b.source === 'document') - Number(a.source === 'document') ||
-        a.name.localeCompare(b.name),
-    );
-}
 
 export interface PresetFilter {
   query: string;

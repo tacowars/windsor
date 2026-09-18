@@ -23,7 +23,6 @@ import type { AppCtx } from './context';
 import { el, section } from './dom';
 import { makeKnob, type KnobSpec } from './knob';
 import { openConfirm } from './metadataModal';
-import { partsState } from './patchState';
 import { NEW_SONG_BPM } from './songConstants';
 import { newSong } from './songParts';
 
@@ -93,7 +92,7 @@ function newSongButton(ctx: AppCtx): HTMLElement {
   fresh.title = 'Start over: one part, the Init patch, no sequencer';
   fresh.onclick = (): void => {
     const start = (): void => {
-      partsState.selected = 0;
+      ctx.parts.selected = 0;
       ctx.importDoc(newSong());
       ctx.status('new song — pick a sequencer for Part 1 in the Parts tab');
     };

@@ -8,14 +8,10 @@
  */
 import { $, el } from './dom';
 import { FocusReturn, tabWrapTarget } from './focusTrap';
-import { AFTER_WRITE_COMMANDS } from './libraryConstants';
+import { AFTER_WRITE_COMMANDS, FOCUSABLE, NEW_CATEGORY, VOLUME_DIGITS } from './libraryConstants';
 import type { LoudnessResult } from './loudnessCheck';
 import type { LibraryEntries, PatchMetadata } from './patchMetadata';
 import { categoriesOf, nameProblem, normaliseTags, suggestTags } from './patchMetadata';
-
-const NEW_CATEGORY = '__new__';
-const FOCUSABLE = 'button, input, select, textarea, [tabindex]';
-const VOLUME_DIGITS = 3;
 
 /** Where focus lands after any modal: the patch controls' Load button, else the Parts rail. */
 const patchControls = (): HTMLElement | null =>
@@ -152,9 +148,10 @@ function tagInput(entries: LibraryEntries, tags: string[]): { render: () => void
 
 function loudnessLine(result: LoudnessResult, volume: number): string {
   const peak = result.peak.toFixed(VOLUME_DIGITS);
-  if (!result.clips) return `Loudness: peak ${peak} over ${result.seeds} seeds — under the line.`;
+  if (!result.clips)
+    return `Loudness: peak ${peak} over ${result.seeds} seeds of a 1 s note — under the line.`;
   const suggested = (result.suggestedVolume ?? 0).toFixed(VOLUME_DIGITS);
-  return `Loudness: peak ${peak} at seed ${result.worstSeed} over ${result.seeds} seeds — CLIPS. Suggested volume ${suggested} (now ${volume.toFixed(VOLUME_DIGITS)}). The write is still allowed; the offline sweep is the hard gate.`;
+  return `Loudness: peak ${peak} at seed ${result.worstSeed} over ${result.seeds} seeds of a 1 s note — CLIPS. Suggested volume ${suggested} (now ${volume.toFixed(VOLUME_DIGITS)}). The write is still allowed; the offline sweep is the hard gate.`;
 }
 
 const afterWriteText = (): string =>

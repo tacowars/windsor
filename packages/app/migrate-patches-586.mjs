@@ -1,7 +1,9 @@
 /* global console, process */
 /**
- * The one-off #586 migration, kept for provenance like `migrate-patches-561.mjs`:
- * the first schema change since the library became files. `filter.modWheelDepth`
+ * The one-off #586 migration, kept as the template for every later schema
+ * change (#620 decision 5 retired the #561 script and both migrations'
+ * fixtures; git and the decision records hold their provenance). It was the
+ * first schema change since the library became files. `filter.modWheelDepth`
  * (octaves the mod wheel adds to `envAmount`) joined `FilterSettings`, and the
  * loader refuses a file missing a field, so every
  * `packages/client/src/audio/patches/<id>.json` gains `"modWheelDepth": 0` in
@@ -19,20 +21,20 @@
  * re-renders `--spot-check` files (three by default) at their recorded seed
  * through the headroom render and refuses to finish if a peak differs from the
  * recorded one; the #586 PR proved all 114 against a pre-change capture
- * (`__fixtures__/patchLibraryRenders586.json`). This is the pattern for every
+ * (PR #587's `__fixtures__/patchLibraryRenders586.json`, since retired). This
+ * is the pattern for every
  * later schema change that adds a defaulted field
  * (`docs/log/2026-09-16-wheel-depth-per-destination-and-schema-migration-hash-refresh.md`).
  *
  * Idempotent: a file that already carries the field is left as it is.
  */
-import { build } from 'esbuild';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const AUDIO = resolve(HERE, '../../packages/client/src/audio');
-const PATCHES = join(AUDIO, 'patches');
+import { patchIdsIn } from '../../scripts/lib/patchLibraryIndex.mjs';
+import { AUDIO_DIR, loadAudioExports } from './lib/audioBundle.mjs';
+
+const PATCHES = join(AUDIO_DIR, 'patches');
 const FIELD = 'modWheelDepth';
 const DEFAULT = 0;
 const AFTER = 'envAmount';
@@ -40,26 +42,12 @@ const AFTER = 'envAmount';
 const spotArg = process.argv.find((a) => a.startsWith('--spot-check='));
 const SPOT_CHECK = spotArg ? Number(spotArg.slice('--spot-check='.length)) : 3;
 
-const output = resolve('node_modules/.cache-586-migrate.mjs');
-await build({
-  stdin: {
-    contents: `
-      export { patchContentHash, peakAt, serialisePatchFile } from './__fixtures__/headroomSweep';
-      export { loadProcessor } from './__fixtures__/workletHarness';
-    `,
-    resolveDir: AUDIO,
-    loader: 'ts',
-  },
-  outfile: output,
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  define: {
-    'import.meta.url': JSON.stringify(pathToFileURL(join(AUDIO, '__fixtures__/entry.ts')).href),
-  },
-});
-const { patchContentHash, peakAt, serialisePatchFile, loadProcessor } = await import(
-  pathToFileURL(output).href
+const { patchContentHash, peakAt, serialisePatchFile, loadProcessor } = await loadAudioExports(
+  `
+    export { patchContentHash, peakAt, serialisePatchFile } from './__fixtures__/headroomSweep';
+    export { loadProcessor } from './__fixtures__/workletHarness';
+  `,
+  '586-migrate',
 );
 
 /** `filter` with the new field inserted after `envAmount`, matching `makePatch()`'s order. */
@@ -73,10 +61,7 @@ function withField(filter) {
   return next;
 }
 
-const ids = readdirSync(PATCHES)
-  .filter((name) => name.endsWith('.json'))
-  .map((name) => name.slice(0, -'.json'.length))
-  .sort();
+const ids = patchIdsIn(PATCHES);
 
 let migrated = 0;
 const spotCheck = [];

@@ -187,8 +187,12 @@ export class Keyboard {
         const offset = note - this.octave * SEMITONES_PER_OCTAVE;
         const keys = document.getElementById('keys');
         const keyEl = offset >= 0 && offset < KEY_COUNT ? keys?.children[offset] : undefined;
-        const el = (keyEl as HTMLElement | undefined) ?? null;
-        this.play(`midi:${inputId}:${note}`, note, velocity, el);
+        this.play(
+          `midi:${inputId}:${note}`,
+          note,
+          velocity,
+          (keyEl as HTMLElement | undefined) ?? null,
+        );
       },
       release: (note, force) => this.lift(`midi:${inputId}:${note}`, force),
       bend: (semitones) => {

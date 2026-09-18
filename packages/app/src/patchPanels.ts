@@ -1,7 +1,7 @@
 /**
  * The Parts tab's rail and mod panels (#70, ported): algorithm picker,
  * global knobs, filter, LFO and pitch envelope. All of it edits the working
- * patch (`patchState`) and pushes it to the live part. The knob specs are
+ * patch (`partsSession`) and pushes it to the live part. The knob specs are
  * `patchKnobTables.ts`; the thumbnail geometry `patchPanelConstants.ts`.
  */
 import type { Algorithm } from '../../../packages/client/src/audio/index-for-editor';
@@ -13,8 +13,9 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { ALG_LINK_COLOR, CARRIER_COLOR, INK_ON_ACCENT, MOD_COLOR } from './consoleColors';
 import { $, el, seg } from './dom';
-import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
+import { drawEnv } from './envCanvas';
 import { attachEnvelopeDrag } from './envelopeDrag';
+import { envAdvKnobs, envKnobs } from './envelopeKnobs';
 import {
   FILTER_KNOBS,
   GLOBAL_KNOBS,
@@ -24,7 +25,9 @@ import {
   patchKnobOpts,
 } from './patchKnobTables';
 import { ALG_THUMB } from './patchPanelConstants';
-import { getPath, hooks, partsState, pathKnob, pushPatch, setPath } from './patchState';
+import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
+import type { PatchEditor } from './partsSession';
+import { getPath, pathKnob, setPath } from './patchPath';
 
 /**
  * Boolean globals, drawn as a two-button segment after the knobs — the shape
@@ -39,12 +42,12 @@ export const GLOBAL_TOGGLES: ReadonlyArray<{
 }> = [{ f: 'mono', label: 'Voicing', off: 'Poly', on: 'Mono' }];
 
 /** The segment index a toggle shows for the working patch. */
-export const toggleIndex = (field: string): number =>
-  getPath(partsState.patch, field) === true ? 1 : 0;
+export const toggleIndex = (patch: Patch, field: string): number =>
+  getPath(patch, field) === true ? 1 : 0;
 
-/** What pressing one of a toggle's two buttons writes. `pushPatch` commits it. */
-export const writeToggle = (field: string, index: number): void =>
-  setPath(partsState.patch, field, index === 1);
+/** What pressing one of a toggle's two buttons writes. The editor's push commits it. */
+export const writeToggle = (patch: Patch, field: string, index: number): void =>
+  setPath(patch, field, index === 1);
 
 function algDepths(alg: Algorithm): number[] {
   const depth = OP_NAMES.map(() => -1);
@@ -102,23 +105,23 @@ function algSvg(alg: Algorithm): string {
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${svg}</svg>`;
 }
 
-export function buildAlgPicker(): void {
+export function buildAlgPicker(editor: PatchEditor): void {
   const grid = $('algGrid');
   grid.innerHTML = '';
   ALGORITHMS.forEach((alg, i) => {
     const b = el('button', 'alg') as HTMLButtonElement;
     b.type = 'button';
-    b.setAttribute('aria-pressed', String(i === partsState.patch.algorithm));
+    b.setAttribute('aria-pressed', String(i === editor.patch.algorithm));
     b.setAttribute('aria-label', `Algorithm ${i + 1}: ${alg.name}, ${alg.label}`);
     b.innerHTML = algSvg(alg) + `<span class="alg-no">${String(i + 1).padStart(2, '0')}</span>`;
     b.onclick = (): void => {
-      partsState.patch.algorithm = i;
-      pushPatch();
-      hooks.refresh();
+      editor.patch.algorithm = i;
+      editor.push();
+      editor.refresh();
     };
     grid.appendChild(b);
   });
-  const a = ALGORITHMS[partsState.patch.algorithm];
+  const a = ALGORITHMS[editor.patch.algorithm];
   if (a) {
     $('algName').innerHTML =
       `<strong style="color:var(--ink)">${a.name}</strong> &middot; <span style="font-family:var(--f-num)">${a.label}</span>` +
@@ -128,9 +131,10 @@ export function buildAlgPicker(): void {
 
 /**
  * A segmented control writing an index or boolean into the working patch:
- * `seg` over the index as a string, with `pushPatch` in the pick (#618).
+ * `seg` over the index as a string, with the editor's push in the pick (#618).
  */
 function indexSeg(
+  editor: PatchEditor,
   names: readonly string[],
   current: () => number,
   write: (i: number) => void,
@@ -140,7 +144,7 @@ function indexSeg(
     () => String(current()),
     (value) => {
       write(Number(value));
-      pushPatch();
+      editor.push();
     },
     MOD_COLOR,
   );
@@ -154,26 +158,30 @@ function labelledSeg(label: string, segment: HTMLElement): HTMLElement {
   return wrap;
 }
 
-export function buildGlobal(): void {
+export function buildGlobal(editor: PatchEditor): void {
   const row = $('globalKnobs');
   row.innerHTML = '';
-  for (const k of GLOBAL_KNOBS) row.appendChild(pathKnob(k.f, k.label, patchKnobOpts(k)));
+  for (const k of GLOBAL_KNOBS) {
+    row.appendChild(pathKnob(editor, k.f, k.label, patchKnobOpts(k)));
+  }
   for (const t of GLOBAL_TOGGLES) {
     const segment = indexSeg(
+      editor,
       [t.off, t.on],
-      () => toggleIndex(t.f),
-      (i) => writeToggle(t.f, i),
+      () => toggleIndex(editor.patch, t.f),
+      (i) => writeToggle(editor.patch, t.f, i),
     );
     row.appendChild(labelledSeg(t.label, segment));
   }
 }
 
-export function buildFilter(): void {
+export function buildFilter(editor: PatchEditor): void {
   const segBox = $('filterMode');
   segBox.innerHTML = '';
-  const filter = (): { mode: number; slope24: boolean } => partsState.patch.filter;
+  const filter = (): { mode: number; slope24: boolean } => editor.patch.filter;
   segBox.appendChild(
     indexSeg(
+      editor,
       FILTER_MODE_NAMES,
       () => filter().mode,
       (i) => {
@@ -182,13 +190,15 @@ export function buildFilter(): void {
     ),
   );
   const canvas = $('filtEnvCanvas') as HTMLCanvasElement;
-  attachEnvelopeDrag(canvas, 'filter.env', MOD_COLOR);
-  const redraw = (): void => drawEnv(canvas, partsState.patch.filter.env, MOD_COLOR);
+  attachEnvelopeDrag(editor, canvas, 'filter.env', MOD_COLOR);
+  const redraw = (): void => drawEnv(canvas, editor.patch.filter.env, MOD_COLOR);
   const row = $('filterKnobs');
   row.innerHTML = '';
-  for (const k of FILTER_KNOBS)
-    row.appendChild(pathKnob(k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
+  for (const k of FILTER_KNOBS) {
+    row.appendChild(pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
+  }
   const slopeSeg = indexSeg(
+    editor,
     ['12 dB', '24 dB'],
     () => (filter().slope24 ? 1 : 0),
     (i) => {
@@ -198,17 +208,18 @@ export function buildFilter(): void {
   row.appendChild(labelledSeg('Slope', slopeSeg));
   const envRow = $('filterEnvKnobs');
   envRow.innerHTML = '';
-  envRow.appendChild(envKnobs('filter.env', MOD_COLOR, redraw));
-  envRow.appendChild(envAdvKnobs('filter.env', MOD_COLOR, redraw));
+  envRow.appendChild(envKnobs(editor, 'filter.env', MOD_COLOR, redraw));
+  envRow.appendChild(envAdvKnobs(editor, 'filter.env', MOD_COLOR, redraw));
   requestAnimationFrame(redraw);
 }
 
-export function buildLfo(): void {
+export function buildLfo(editor: PatchEditor): void {
   const segBox = $('lfoShape');
   segBox.innerHTML = '';
-  const lfo = (): { shape: number; retrigger: boolean } => partsState.patch.lfo;
+  const lfo = (): { shape: number; retrigger: boolean } => editor.patch.lfo;
   segBox.appendChild(
     indexSeg(
+      editor,
       LFO_SHAPE_NAMES,
       () => lfo().shape,
       (i) => {
@@ -219,9 +230,10 @@ export function buildLfo(): void {
   const row = $('lfoKnobs');
   row.innerHTML = '';
   for (const k of [...LFO_KNOBS, ...LFO_TO_OP_KNOBS]) {
-    row.appendChild(pathKnob(k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
+    row.appendChild(pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
   }
   const retrigSeg = indexSeg(
+    editor,
     ['Free', 'Retrigger'],
     () => (lfo().retrigger ? 1 : 0),
     (i) => {
@@ -231,16 +243,16 @@ export function buildLfo(): void {
   row.appendChild(labelledSeg('Phase', retrigSeg));
 }
 
-export function buildPitch(): void {
+export function buildPitch(editor: PatchEditor): void {
   const canvas = $('pitchEnvCanvas') as HTMLCanvasElement;
-  attachEnvelopeDrag(canvas, 'pitchEnv', CARRIER_COLOR);
-  const redraw = (): void => drawEnv(canvas, partsState.patch.pitchEnv, CARRIER_COLOR);
+  attachEnvelopeDrag(editor, canvas, 'pitchEnv', CARRIER_COLOR);
+  const redraw = (): void => drawEnv(canvas, editor.patch.pitchEnv, CARRIER_COLOR);
   const row = $('pitchKnobs');
   row.innerHTML = '';
   const amount = PITCH_ENV_AMOUNT_KNOB;
   row.appendChild(
-    pathKnob(amount.f, amount.label, { ...patchKnobOpts(amount), color: CARRIER_COLOR }),
+    pathKnob(editor, amount.f, amount.label, { ...patchKnobOpts(amount), color: CARRIER_COLOR }),
   );
-  row.appendChild(envKnobs('pitchEnv', CARRIER_COLOR, redraw));
+  row.appendChild(envKnobs(editor, 'pitchEnv', CARRIER_COLOR, redraw));
   requestAnimationFrame(redraw);
 }

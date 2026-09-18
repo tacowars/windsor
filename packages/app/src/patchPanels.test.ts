@@ -3,9 +3,9 @@
  *
  * The widget is DOM, but what a toggle reads and writes is not: the table
  * names a boolean path in the working patch, `writeToggle` is the write behind
- * one of its two buttons, and `pushPatch` is what carries the result into the
- * document's `patches` section through `hooks.commit`. That is the whole path
- * from a click to the export, and none of it needs a browser.
+ * one of its two buttons, and the editor's push is what carries the result
+ * into the document's `patches` section (#620). That is the whole path from a
+ * click to the export, and none of it needs a browser.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -13,7 +13,8 @@ import type { Patch } from '../../../packages/client/src/audio/index-for-editor'
 import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
 import { FILTER_KNOBS, LFO_KNOBS, patchKnobOpts } from './patchKnobTables';
 import { GLOBAL_TOGGLES, toggleIndex, writeToggle } from './patchPanels';
-import { getPath, hooks, partsState, pushPatch, setPath } from './patchState';
+import type { PatchEditor } from './partsSession';
+import { getPath, setPath } from './patchPath';
 
 describe('the global row toggles', () => {
   it('offers Mono over a field the patch really has, as a boolean', () => {
@@ -30,26 +31,22 @@ describe('the global row toggles', () => {
 
   it('shows the working patch and commits both directions', () => {
     const committed: boolean[] = [];
-    const previous = hooks.commit;
-    partsState.patch = makePatch();
-    hooks.commit = (p: Patch): void => {
-      committed.push(p.mono);
+    const editor: PatchEditor = {
+      patch: makePatch(),
+      push: () => committed.push((editor.patch as Patch).mono),
+      refresh: () => undefined,
     };
-    try {
-      expect(toggleIndex('mono')).toBe(0);
+    expect(toggleIndex(editor.patch, 'mono')).toBe(0);
 
-      writeToggle('mono', 1);
-      pushPatch();
-      expect(partsState.patch.mono).toBe(true);
-      expect(toggleIndex('mono')).toBe(1);
+    writeToggle(editor.patch, 'mono', 1);
+    editor.push();
+    expect(editor.patch.mono).toBe(true);
+    expect(toggleIndex(editor.patch, 'mono')).toBe(1);
 
-      writeToggle('mono', 0);
-      pushPatch();
-      expect(partsState.patch.mono).toBe(false);
-      expect(toggleIndex('mono')).toBe(0);
-    } finally {
-      hooks.commit = previous;
-    }
+    writeToggle(editor.patch, 'mono', 0);
+    editor.push();
+    expect(editor.patch.mono).toBe(false);
+    expect(toggleIndex(editor.patch, 'mono')).toBe(0);
     expect(committed).toEqual([true, false]);
   });
 });

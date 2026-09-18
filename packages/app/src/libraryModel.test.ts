@@ -1,14 +1,14 @@
 /**
- * The editor's library model (#563): its listing is `listPresets` over the
- * baked library (one definition, pinned by equality), a folder read replaces
- * the entries, and page mode's writes are downloads the model still reflects.
+ * The editor's library model (#563): its listing is the one definition of the
+ * preset list (#620 retired `presetCatalog.listPresets`), a folder read
+ * replaces the entries, and page mode's writes are downloads the model still
+ * reflects.
  */
 import { describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT } from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
 import {
   PATCH_LIBRARY,
-  listPresets,
   makePatch,
   serialisePatchFile,
 } from '../../../packages/client/src/audio/index-for-editor';
@@ -48,14 +48,31 @@ function memoryFolder(files: Map<string, string>): PatchFolder {
 }
 
 describe('listLibrary', () => {
-  it('equals presetCatalog.listPresets over the baked library, with and without document patches', () => {
-    expect(listLibrary(PATCH_LIBRARY)).toEqual(listPresets());
+  it('lists document shadows once and first, uses their names, and includes custom patches', () => {
     const documentPatches = {
       ...(FULL_ARRANGEMENT as { patches?: Record<string, never> }).patches,
       kick: makePatch({ name: 'My Kick' }),
       custom: makePatch({ name: 'Custom' }),
     };
-    expect(listLibrary(PATCH_LIBRARY, documentPatches)).toEqual(listPresets(documentPatches));
+    const entries = listLibrary(PATCH_LIBRARY, documentPatches);
+    expect(entries.filter((entry) => entry.id === 'kick')).toHaveLength(1);
+    expect(entries.find((entry) => entry.id === 'kick')).toMatchObject({
+      name: 'My Kick',
+      source: 'document',
+      category: PATCH_LIBRARY['kick']?.category,
+    });
+    expect(entries.find((entry) => entry.id === 'custom')).toMatchObject({
+      name: 'Custom',
+      source: 'document',
+      category: 'Uncategorized',
+    });
+    const firstBuiltIn = entries.findIndex((entry) => entry.source === 'built-in');
+    expect(entries.slice(0, firstBuiltIn).every((entry) => entry.source === 'document')).toBe(true);
+    expect(entries.slice(firstBuiltIn).every((entry) => entry.source === 'built-in')).toBe(true);
+    // The baked library alone: every entry, none of them a document copy.
+    const baked = listLibrary(PATCH_LIBRARY);
+    expect(baked.map((entry) => entry.id).sort()).toEqual(Object.keys(PATCH_LIBRARY).sort());
+    expect(baked.every((entry) => entry.source === 'built-in')).toBe(true);
   });
 });
 

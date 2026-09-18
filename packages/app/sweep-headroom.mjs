@@ -15,14 +15,13 @@
  * #563's Save path calls this. The render is `__fixtures__/headroomSweep.ts`'s,
  * the same one `fmProcessorHeadroom.test.ts` performs on the recorded seed.
  */
-import { build } from 'esbuild';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const AUDIO = resolve(HERE, '../../packages/client/src/audio');
-const PATCHES = join(AUDIO, 'patches');
+import { patchIdsIn } from '../../scripts/lib/patchLibraryIndex.mjs';
+import { AUDIO_DIR, loadAudioExports } from './lib/audioBundle.mjs';
+
+const PATCHES = join(AUDIO_DIR, 'patches');
 const DEFAULT_SEEDS = 16384;
 
 const args = process.argv.slice(2);
@@ -37,29 +36,17 @@ if (!stale && named.length === 0) {
   process.exit(2);
 }
 
-const entry = join(AUDIO, '__fixtures__/headroomSweep.ts');
-const output = resolve('node_modules/.cache-561-headroom-sweep.mjs');
-await build({
-  entryPoints: [entry],
-  outfile: output,
-  bundle: true,
-  platform: 'node',
-  format: 'esm',
-  define: { 'import.meta.url': JSON.stringify(pathToFileURL(entry).href) },
-});
 const { loadPatchFile, patchContentHash, seedRange, serialisePatchFile, sweepHeadroom } =
-  await import(pathToFileURL(output).href);
+  await loadAudioExports(
+    `export { loadPatchFile, patchContentHash, seedRange, serialisePatchFile, sweepHeadroom } from './__fixtures__/headroomSweep';`,
+    '561-headroom-sweep',
+  );
 
 const readFile = (id) => JSON.parse(readFileSync(join(PATCHES, `${id}.json`), 'utf8'));
 const isStale = (file) =>
   !file.headroom || file.headroom.contentHash !== patchContentHash(file.patch);
 
-const ids = stale
-  ? readdirSync(PATCHES)
-      .filter((name) => name.endsWith('.json'))
-      .map((name) => name.slice(0, -'.json'.length))
-      .filter((id) => isStale(readFile(id)))
-  : named;
+const ids = stale ? patchIdsIn(PATCHES).filter((id) => isStale(readFile(id))) : named;
 if (ids.length === 0) {
   console.log('sweep-headroom: every record is current');
   process.exit(0);
