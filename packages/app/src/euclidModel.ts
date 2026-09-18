@@ -86,11 +86,6 @@ export const countOnsets = (figure: Figure): number => figure.filter(Boolean).le
 /** The strip's change key — the figure as `x.` text; the card repaints only when it differs. */
 export const figureKey = patternToString;
 
-/** The step the playhead sits on for an audible tick. */
-export function playheadStep(audibleTick: number, divisor: number, steps: number): number {
-  return Math.floor(audibleTick / divisor) % steps;
-}
-
 /** Steps per beat, for the strip's grouping gap; 0 when the step does not divide the beat. */
 export function stepsPerBeat(divisor: number): number {
   return divisor > 0 && PPQ % divisor === 0 ? PPQ / divisor : 0;

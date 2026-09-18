@@ -249,6 +249,25 @@ export class ArrangementPlayer {
   }
 
   /**
+   * The step the part on `slot` is sounding at transport tick `tick`, or -1
+   * when the part has no position to show — an absent slot, a `none` or
+   * unbuilt part, an empty chord progression (#619 decision 2).
+   *
+   * Each generator's own `stepAt` answers, so the console's playhead *is* the
+   * engine's rule rather than a second copy of it: a grid or Euclidean part
+   * divides the tick by the divisor it subscribed at and folds that into its
+   * loop, and a chord part's segments carry its per-step durations.
+   */
+  stepAt(slot: number, tick: number): number {
+    const generator = this.built.generators.get(slot) ?? null;
+    if (generator instanceof ChordSequencer) return generator.stepAt(tick)?.step ?? -1;
+    if (generator instanceof GridSequencer || generator instanceof EuclideanSequencer) {
+      return generator.stepAt(Math.floor(tick / generator.config.divisor));
+    }
+    return -1;
+  }
+
+  /**
    * Merge a partial over the arrangement and commit it (refinement decision
    * 3). A `patches` partial (#435) is staged into the preset table first, so
    * a preset switch and the patch it names can arrive together; the
