@@ -1,4 +1,6 @@
 /** The output scope: draws the analyser tap on the engine master (#70). */
+import { CARRIER_COLOR, HOT_COLOR, LINE_COLOR } from './consoleColors';
+import { SCOPE_CLIP_PEAK, SCOPE_TRACE_WIDTH } from './scopeConstants';
 
 export function startScope(canvas: HTMLCanvasElement, analyser: () => AnalyserNode | null): void {
   const g = canvas.getContext('2d');
@@ -18,7 +20,7 @@ export function startScope(canvas: HTMLCanvasElement, analyser: () => AnalyserNo
     }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
-    g.strokeStyle = '#2C3439';
+    g.strokeStyle = LINE_COLOR;
     g.lineWidth = 1;
     g.beginPath();
     g.moveTo(0, h / 2);
@@ -42,8 +44,8 @@ export function startScope(canvas: HTMLCanvasElement, analyser: () => AnalyserNo
     let peak = 0;
     for (let i = 0; i < buffer.length; i++) peak = Math.max(peak, Math.abs(buffer[i] ?? 0));
 
-    g.strokeStyle = peak > 0.99 ? '#D2643C' : '#E0A44E';
-    g.lineWidth = 1.4;
+    g.strokeStyle = peak > SCOPE_CLIP_PEAK ? HOT_COLOR : CARRIER_COLOR;
+    g.lineWidth = SCOPE_TRACE_WIDTH;
     g.beginPath();
     for (let i = 0; i < half; i++) {
       const v = buffer[start + i] ?? 0;

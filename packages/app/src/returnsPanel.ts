@@ -18,15 +18,20 @@ import {
   SPACES,
   SPACE_NAMES,
 } from '../../../packages/client/src/audio/index-for-editor';
+import { RETURN_COLOR } from './consoleColors';
+import { fmt2, fmtHz, fmtMs } from './consoleFormat';
 import type { AppCtx } from './context';
-import { el, fmt2, fmtHz, section, select } from './dom';
+import { el, html, section, select } from './dom';
 import { makeKnob, type KnobSpec } from './knob';
-
-const RETURN_COLOR = '#9C7BD0';
+import {
+  DAMP_MAX,
+  DAMP_MIN,
+  DELAY_TIME_MIN,
+  TEMPO_DIVISIONS,
+  TEMPO_MATCH_TOLERANCE,
+} from './mixerTables';
 
 type SpaceKnob = { f: keyof ReverbSpace; label: string; o: Partial<KnobSpec> };
-
-const fmtMs = (v: number): string => `${(v * 1000).toFixed(0)}m`;
 
 /** The 13 plate parameters, in signal order; ranges come from the worklet's table. */
 const SPACE_KNOBS: readonly SpaceKnob[] = [
@@ -88,8 +93,11 @@ function spacePicker(ctx: AppCtx, name: string): HTMLElement {
     current.kind === 'reverb'
       ? SPACE_NAMES.find((key) => JSON.stringify(SPACES[key]) === JSON.stringify(current.space))
       : undefined;
-  const options = SPACE_NAMES.map((key) => ({ value: key, label: key }));
-  if (!match) options.unshift({ value: '', label: 'custom' } as never);
+  const options: { value: string; label: string }[] = SPACE_NAMES.map((key) => ({
+    value: key,
+    label: key,
+  }));
+  if (!match) options.unshift({ value: '', label: 'custom' });
   return select('Starting point', options, match ?? '', (key) => {
     if (key === '') return;
     const space = SPACES[key as keyof typeof SPACES];
@@ -130,24 +138,9 @@ function delayKnobs(ctx: AppCtx, name: string): HTMLElement[] {
       fmt: fmtMs,
     }),
     knob('Regen', 'feedback', { max: DELAY_FEEDBACK_MAX, fmt: fmt2 }),
-    knob('Damp', 'damp', { min: 200, max: 16000, curve: 'log', fmt: fmtHz }),
+    knob('Damp', 'damp', { min: DAMP_MIN, max: DAMP_MAX, curve: 'log', fmt: fmtHz }),
   ];
 }
-
-/** The shortest delay the knob reaches; below this the line is a comb filter, not an echo. */
-const DELAY_TIME_MIN = 0.02;
-
-/** Note values as fractions of a beat (a quarter note), common echoes first. */
-const TEMPO_DIVISIONS: readonly { label: string; beats: number; title: string }[] = [
-  { label: '1/4', beats: 1, title: 'quarter note' },
-  { label: '1/8.', beats: 0.75, title: 'dotted eighth' },
-  { label: '1/8', beats: 0.5, title: 'eighth note' },
-  { label: '1/8T', beats: 1 / 3, title: 'eighth triplet' },
-  { label: '1/16', beats: 0.25, title: 'sixteenth note' },
-  { label: '1/16.', beats: 0.375, title: 'dotted sixteenth' },
-  { label: '1/4.', beats: 1.5, title: 'dotted quarter' },
-  { label: '1/2', beats: 2, title: 'half note' },
-];
 
 /** Seconds of `beats` at the document's bpm, inside the delay line's range. */
 function tempoSeconds(bpm: number, beats: number): number {
@@ -169,7 +162,10 @@ function tempoRow(ctx: AppCtx, name: string): HTMLElement {
     const button = el('button', 'btn', division.label) as HTMLButtonElement;
     button.type = 'button';
     button.title = `${division.title} at ${ctx.model.doc.bpm} bpm = ${fmtMs(seconds)}`;
-    button.setAttribute('aria-pressed', String(Math.abs(current() - seconds) < 1e-6));
+    button.setAttribute(
+      'aria-pressed',
+      String(Math.abs(current() - seconds) < TEMPO_MATCH_TOLERANCE),
+    );
     button.onclick = (): void => {
       const result = ctx.change({ returns: { [name]: { delayTime: seconds } } });
       if (!result.ok) return;
@@ -186,7 +182,7 @@ function tempoRow(ctx: AppCtx, name: string): HTMLElement {
 function returnRow(ctx: AppCtx, name: string): HTMLElement {
   const spec = returnValue(ctx, name);
   const row = el('div', 'strip-row');
-  row.appendChild(el('div', 'strip-name', `return: ${name} <small>(${spec.kind})</small>`));
+  row.appendChild(html('div', 'strip-name', `return: ${name} <small>(${spec.kind})</small>`));
   const knobs = el('div', 'knob-row');
   knobs.appendChild(levelKnob(ctx, name));
   if (spec.kind === 'delay') {

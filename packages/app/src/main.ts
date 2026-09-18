@@ -24,6 +24,7 @@ import { Keyboard } from './keyboard';
 import { bootLibrary, syncLibraryMode } from './libraryActions';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
+import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { renderPartsTab } from './partsTab';
 import { partsState } from './patchState';
 import { renderSequencersTab } from './sequencersTab';
@@ -164,7 +165,7 @@ function boot(): void {
       .catch((error: unknown) => status(`audio failed: ${String(error)}`));
   };
   // The look-ahead pump the game's render loop provides; here, a timer.
-  setInterval(() => host.update(), 25);
+  setInterval(() => host.update(), HOST_PUMP_INTERVAL_MS);
   status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
 }
 

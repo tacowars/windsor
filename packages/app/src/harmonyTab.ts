@@ -1,29 +1,29 @@
 /**
  * Harmony tab (#70, record §2): key, scale, degree weights, and the register
  * split per pitched part. Pitch only — the density LFOs live in Sequencers.
+ * The knob specs are `harmonyTables.ts`.
  */
+import type { ScaleName } from '../../../packages/client/src/audio/index-for-editor';
 import {
   SCALE_NAMES,
   partAt,
+  pitchClassName,
   scaleOffsets,
   uniformWeights,
 } from '../../../packages/client/src/audio/index-for-editor';
+import { CARRIER_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { partChange } from './context';
-import { NOTE_NAMES, el, fmt0, fmt2, noteName, section, select } from './dom';
+import { el, section, select } from './dom';
+import { ROOT_KNOB, WEIGHT_KNOB, octaveKnob, spanKnob } from './harmonyTables';
 import { makeKnob } from './knob';
 
-const COLOR = '#E0A44E';
+const COLOR = CARRIER_COLOR;
 
 function rootKnob(ctx: AppCtx): HTMLElement {
   return makeKnob({
-    label: 'Root',
-    min: 24,
-    max: 84,
-    def: 50,
-    step: 1,
+    ...ROOT_KNOB,
     color: COLOR,
-    fmt: (v) => noteName(v),
     get: () => ctx.model.doc.key.root,
     set: (v) => void ctx.change({ key: { root: v } }),
   });
@@ -32,14 +32,16 @@ function rootKnob(ctx: AppCtx): HTMLElement {
 function scalePicker(ctx: AppCtx): HTMLElement {
   const { scale } = ctx.model.doc.key;
   const current = typeof scale === 'string' ? scale : 'custom';
-  const options = SCALE_NAMES.map((name) => ({ value: name, label: name }));
-  if (current === 'custom') options.push({ value: 'custom', label: 'custom' } as never);
+  const options: { value: string; label: string }[] = SCALE_NAMES.map((name) => ({
+    value: name,
+    label: name,
+  }));
+  if (current === 'custom') options.push({ value: 'custom', label: 'custom' });
   return select('Scale', options, current, (name) => {
-    if (name === 'custom') return;
+    const picked: ScaleName | undefined = SCALE_NAMES.find((known) => known === name);
+    if (!picked) return;
     // Weights are per degree, so a new scale gets a fresh uniform set.
-    const result = ctx.change({
-      key: { scale: name as never, weights: uniformWeights(name as never) },
-    });
+    const result = ctx.change({ key: { scale: picked, weights: uniformWeights(picked) } });
     if (result.ok) ctx.render();
   });
 }
@@ -49,15 +51,11 @@ function weightKnobs(ctx: AppCtx): HTMLElement {
   const key = ctx.model.doc.key;
   const offsets = scaleOffsets(key.scale);
   offsets.forEach((offset, degree) => {
-    const label = NOTE_NAMES[(((key.root + offset) % 12) + 12) % 12] ?? String(degree);
     row.appendChild(
       makeKnob({
-        label,
-        min: 0,
-        max: 4,
-        def: 1,
+        ...WEIGHT_KNOB,
+        label: pitchClassName(key.root, offset),
         color: COLOR,
-        fmt: fmt2,
         get: () => ctx.model.doc.key.weights[degree] ?? 0,
         set: (v) => {
           const weights = [...ctx.model.doc.key.weights];
@@ -72,9 +70,7 @@ function weightKnobs(ctx: AppCtx): HTMLElement {
 
 function registerRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
   const row = el('div', 'strip-row');
-  const label = el('div', 'strip-name');
-  label.textContent = name;
-  row.appendChild(label);
+  row.appendChild(el('div', 'strip-name', name));
   const knobs = el('div', 'knob-row');
   const register = (): { octave: number; span: number } => {
     const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
@@ -85,42 +81,28 @@ function registerRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
     }
     return { octave: 0, span: 1 };
   };
-  const kind = partAt(ctx.model.doc, slot)?.sequencer.kind;
+  const kind = partAt(ctx.model.doc, slot)?.sequencer.kind ?? 'none';
   const spanned = kind !== 'grid' && kind !== 'chord';
   knobs.appendChild(
     makeKnob({
-      label: 'Octave',
-      min: -4,
-      max: 4,
-      def: 0,
-      step: 1,
+      ...octaveKnob(kind),
       color: COLOR,
-      fmt: fmt0,
       get: () => register().octave,
       set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { octave: v } } })),
     }),
   );
-  if (spanned) knobs.appendChild(spanKnob(ctx, slot, register));
+  if (spanned) {
+    knobs.appendChild(
+      makeKnob({
+        ...spanKnob(kind),
+        color: COLOR,
+        get: () => register().span,
+        set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { span: v } } })),
+      }),
+    );
+  }
   row.appendChild(knobs);
   return row;
-}
-
-function spanKnob(
-  ctx: AppCtx,
-  slot: number,
-  register: () => { octave: number; span: number },
-): HTMLElement {
-  return makeKnob({
-    label: 'Span',
-    min: 1,
-    max: 4,
-    def: 1,
-    step: 1,
-    color: COLOR,
-    fmt: fmt0,
-    get: () => register().span,
-    set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { span: v } } })),
-  });
 }
 
 export function renderHarmonyTab(body: HTMLElement, ctx: AppCtx): void {
