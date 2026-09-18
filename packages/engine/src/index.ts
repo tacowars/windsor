@@ -46,6 +46,7 @@ export type {
   ArrangementReadout,
   MusicEventHandler,
   MusicTransport,
+  PartHost,
   PlayablePart,
 } from './arrangementPlayer';
 export { BarRecorder, assertNotePattern } from './capturedPattern';

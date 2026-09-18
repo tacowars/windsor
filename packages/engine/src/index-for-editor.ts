@@ -20,7 +20,7 @@ export type {
   DocumentPartial,
   MakeArrangementResult,
 } from './arrangementDocument';
-export { musicPartName, partAt, removePart } from './documentParts';
+export { musicPartName, partAt, removePart, removePartChange } from './documentParts';
 export type {
   ArpDriver,
   ArpSpec,
@@ -138,6 +138,7 @@ export type {
   ArrangementReadout,
   MusicEventHandler,
   MusicTransport,
+  PartHost,
   PlayablePart,
 } from './arrangementPlayer';
 export { BarRecorder, assertNotePattern } from './capturedPattern';

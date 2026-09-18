@@ -104,6 +104,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     return live ?? { ok: true, ignored: [] };
   }
 
+  /** Restart's path, and the shape Import shares (#629): every other edit is `change`, live. */
   restructure(edit: (draft: Record<string, unknown>) => void): void {
     this.model.mutate(edit);
     this.rebuild();

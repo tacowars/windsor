@@ -175,6 +175,19 @@ describe('meterNode', () => {
     expect(meter.processorCount).toBe(1);
   });
 
+  it('detach silences the port and stops counting the processor at once (#629)', () => {
+    const meter = new AudioLoadMeter(() => 0);
+    const port = { postMessage: () => {}, onmessage: null } as unknown as MessagePort;
+    meterNode(meter, 'part:music-3', { port } as unknown as AudioNode, SAMPLE_RATE, 1);
+    meter.accept('part:music-3', report({ underruns: 3 }), SAMPLE_RATE);
+    meter.detach('part:music-3');
+    expect(port.onmessage).toBeNull();
+    expect(meter.processorCount).toBe(0);
+    expect(meter.readout().processors).toBe(0);
+    // The misses are history and stay counted.
+    expect(meter.readout().underruns).toBe(3);
+  });
+
   it('leaves a native node alone — the delay return has no processor to ask', () => {
     const meter = new AudioLoadMeter(() => 0);
     meterNode(meter, 'return:echo', {} as AudioNode, SAMPLE_RATE, 1);

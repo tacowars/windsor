@@ -10,13 +10,14 @@ import {
   FULL_ARRANGEMENT,
   FULL_PARTS,
   FULL_SLOT,
+  onlyParts,
   slotMap,
   withPart,
   type FullPartId,
 } from './__fixtures__/fullArrangement';
 import { kinds, recordingPart, type RecordingPart } from './__fixtures__/recordingPart';
-import type { Arrangement, ArrangementPartial } from './arrangement';
-import { ArrangementPlayer } from './arrangementPlayer';
+import type { Arrangement, ArrangementPartial, MusicPart } from './arrangement';
+import { ArrangementPlayer, type PartHost } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
 import { PRESETS } from './presets';
 
@@ -216,5 +217,150 @@ describe('apply', () => {
     expect(kinds(parts.arp, 'allNotesOff')).toHaveLength(1);
     // A keyboard-held note on an inert part survives a reseed.
     expect(parts.drone.calls).toEqual([]);
+  });
+});
+
+interface LiveRig extends Rig {
+  /** Parts the host created for a live add, by slot. */
+  created: Map<number, RecordingPart>;
+  /** Slots the host was asked to dispose. */
+  removed: number[];
+  ticks(n: number): void;
+}
+
+/** A rig whose host builds and disposes parts live (#629): the roster starts as the arrangement's slots. */
+function liveRig(arrangement: Arrangement): LiveRig {
+  const transport = new TickTransport(120);
+  const parts = {
+    kick: recordingPart(),
+    hat: recordingPart(),
+    arp: recordingPart(),
+    drone: recordingPart(),
+  };
+  const roster = new Map(
+    [...slotMap(parts)].filter(([slot]) => arrangement.parts.some((p) => p.slot === slot)),
+  );
+  const created = new Map<number, RecordingPart>();
+  const removed: number[] = [];
+  const host: PartHost = {
+    get: (slot) => roster.get(slot),
+    add: (part) => {
+      const live = recordingPart();
+      roster.set(part.slot, live);
+      created.set(part.slot, live);
+      return live;
+    },
+    remove: (slot) => {
+      roster.delete(slot);
+      removed.push(slot);
+    },
+  };
+  const player = new ArrangementPlayer(transport, host, arrangement, PRESETS);
+  const ticks = (n: number): void => {
+    for (let i = 0; i < n; i++) transport.advance(transport.transportSeconds);
+  };
+  return {
+    transport,
+    parts,
+    player,
+    created,
+    removed,
+    ticks,
+    run: (bars) => ticks(bars * TICKS_PER_BAR),
+  };
+}
+
+const THREE = onlyParts(FULL_ARRANGEMENT, 'kick', 'hat', 'arp');
+const KEPT: FullPartId[] = ['kick', 'hat', 'arp'];
+
+describe('live add and removal (#629)', () => {
+  it('adds a part mid-bar: the three streams untouched, the new part on the transport’s step', () => {
+    const a = liveRig(THREE);
+    const b = liveRig(THREE);
+    a.run(2);
+    b.run(2);
+    a.ticks(TICKS_PER_BAR / 2);
+    b.ticks(TICKS_PER_BAR / 2);
+    const addedAt = a.transport.transportSeconds;
+    const counters = a.player.readout().counters;
+    expect(a.player.apply({ parts: { [drone]: FULL_PARTS.drone } })).toEqual({
+      ok: true,
+      ignored: [],
+    });
+    expect(a.player.arrangement.parts.map((p) => p.slot)).toEqual([kick, hat, arp, drone]);
+    expect(a.player.arrangement.parts[3]).toEqual(FULL_PARTS.drone);
+    expect(a.player.readout().counters).toEqual({ ...counters, [drone]: 0 });
+    for (const id of KEPT) expect(kinds(a.parts[id], 'allNotesOff'), id).toHaveLength(0);
+    a.run(2);
+    b.run(2);
+    for (const id of KEPT) expect(a.parts[id].calls, id).toEqual(b.parts[id].calls);
+    const live = a.created.get(drone);
+    if (!live) throw new Error('the host was not asked to build the drone');
+    expect(kinds(live, 'allNotesOff')).toHaveLength(0);
+    const first = kinds(live, 'noteOn')[0];
+    expect(first?.time).toBeGreaterThanOrEqual(addedAt);
+    expect(addedAt).toBeGreaterThan(0);
+  });
+
+  it('removes a part: that part alone is released, cut and handed back', () => {
+    const a = liveRig(FULL_ARRANGEMENT);
+    const b = liveRig(FULL_ARRANGEMENT);
+    a.run(2);
+    b.run(2);
+    expect(a.player.apply({ parts: { [drone]: null } })).toEqual({ ok: true, ignored: [] });
+    expect(a.removed).toEqual([drone]);
+    expect(kinds(a.parts.drone, 'allNotesOff')).toHaveLength(1);
+    for (const id of KEPT) expect(kinds(a.parts[id], 'allNotesOff'), id).toHaveLength(0);
+    expect(a.player.arrangement.parts.map((p) => p.slot)).toEqual([kick, hat, arp]);
+    expect(Object.keys(a.player.readout().counters)).toEqual([kick, hat, arp].map(String));
+    expect(a.player.capturePattern(drone)).toBeNull();
+    const droneCalls = a.parts.drone.calls.length;
+    a.run(2);
+    b.run(2);
+    expect(a.parts.drone.calls).toHaveLength(droneCalls);
+    for (const id of KEPT) expect(a.parts[id].calls, id).toEqual(b.parts[id].calls);
+  });
+
+  it('adds and removes in one partial, on the slot each names', () => {
+    const { player, created, removed } = liveRig(FULL_ARRANGEMENT);
+    const moved: MusicPart = { ...FULL_PARTS.drone, slot: 5, name: 'drone 2' };
+    expect(player.apply({ parts: { [drone]: null, 5: moved } })).toEqual({ ok: true, ignored: [] });
+    expect(removed).toEqual([drone]);
+    expect([...created.keys()]).toEqual([5]);
+    expect(player.arrangement.parts.map((p) => p.slot)).toEqual([kick, hat, arp, 5]);
+  });
+
+  it('refuses an add that is incomplete or names an unknown preset, and creates nothing', () => {
+    const { player, created } = liveRig(THREE);
+    const unknown = player.apply({ parts: { [drone]: { ...FULL_PARTS.drone, preset: 'nope' } } });
+    expect(unknown.ok).toBe(false);
+    expect(unknown.error).toMatch(/unknown audio preset "nope"/);
+    const bare = { slot: drone, name: 'drone', preset: 'drone-sqr' } as MusicPart;
+    const incomplete = player.apply({ parts: { [drone]: bare } });
+    expect(incomplete.ok).toBe(false);
+    expect(incomplete.error).toMatch(/velocity/);
+    expect(created.size).toBe(0);
+    expect(player.arrangement.parts).toHaveLength(3);
+  });
+
+  it('refuses the whole partial when one half fails: a removal beside a bad bpm removes nothing', () => {
+    const { player, removed, transport } = liveRig(FULL_ARRANGEMENT);
+    const bpm = transport.bpm;
+    expect(player.apply({ bpm: -1, parts: { [drone]: null } }).ok).toBe(false);
+    expect(removed).toEqual([]);
+    expect(player.arrangement.parts).toHaveLength(4);
+    expect(transport.bpm).toBe(bpm);
+  });
+
+  it('refuses an add on a fixed roster, and still ignores a fragment at an absent slot', () => {
+    const { player } = rig(THREE);
+    const add = player.apply({ parts: { [drone]: FULL_PARTS.drone } });
+    expect(add.ok).toBe(false);
+    expect(add.error).toMatch(/builds parts only at init/);
+    expect(player.arrangement.parts).toHaveLength(3);
+    expect(player.apply({ parts: { [drone]: { velocity: 0.5 } } })).toEqual({
+      ok: true,
+      ignored: [`parts.${drone}`],
+    });
   });
 });

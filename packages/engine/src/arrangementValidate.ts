@@ -9,7 +9,7 @@
  * *committed* document satisfy this by construction; this is the guard for
  * what a live partial produces.
  */
-import type { Arrangement, MusicPart } from './arrangement';
+import type { Arrangement, ArrangementPartial, MusicPart } from './arrangement';
 import { SEQUENCER_KINDS } from './arrangement';
 import { MUSIC_PARTS_MAX, MUSIC_SLOT_MAX } from './audioConstants';
 import type { Patch } from './patch';
@@ -103,19 +103,31 @@ export function presetFor(presets: PresetTable, where: string, name: string): Pa
   return preset;
 }
 
-export function validateArrangement(
-  next: Arrangement,
-  previous: Arrangement | null,
-  presets: PresetTable,
-): void {
+export function validateArrangement(next: Arrangement, presets: PresetTable): void {
   if (!Number.isFinite(next.bpm) || next.bpm <= 0) {
     throw new RangeError(`bpm must be a positive number, got ${next.bpm}`);
   }
-  validateSlots(next, previous);
+  validateSlots(next);
   for (const part of next.parts) validatePart(part, presets);
 }
 
-function validateSlots(next: Arrangement, previous: Arrangement | null): void {
+/**
+ * A live partial may add a part on a free slot or remove one (#629), but a
+ * slot is a part's identity: an edit addressed to slot 2 that carries
+ * `slot: 6` is refused before the merge, never applied as "remove 2, add 6".
+ */
+export function validatePartialSlots(partial: ArrangementPartial): void {
+  for (const [key, value] of Object.entries(partial.parts ?? {})) {
+    if (typeof value !== 'object' || value === null || !('slot' in value)) continue;
+    if (value.slot !== Number(key)) {
+      throw new Error(
+        `parts.${key}: a part cannot be re-slotted live (slot ${String(value.slot)})`,
+      );
+    }
+  }
+}
+
+function validateSlots(next: Arrangement): void {
   const count = next.parts.length;
   if (count < 1 || count > MUSIC_PARTS_MAX) {
     throw new RangeError(`a song has 1–${MUSIC_PARTS_MAX} parts, got ${count}`);
@@ -128,23 +140,23 @@ function validateSlots(next: Arrangement, previous: Arrangement | null): void {
     if (seen.has(slot)) throw new Error(`slot ${slot} is used by two parts`);
     seen.add(slot);
   }
-  if (!previous) return;
-  const before = previous.parts.map((part) => part.slot).join(',');
-  const after = next.parts.map((part) => part.slot).join(',');
-  if (before !== after) {
-    throw new Error(
-      `parts cannot be added, removed or re-slotted live (slots ${before} → ${after})`,
-    );
-  }
 }
 
 function validatePart(part: MusicPart, presets: PresetTable): void {
+  // A part arriving whole through a live add (#629) is checked field by field
+  // here: the merge is structural and appends whatever names the slot.
+  if (typeof part.name !== 'string') {
+    throw new Error(`part ${part.slot}: a part needs a name, got ${String(part.name)}`);
+  }
   const where = partLabel(part);
   presetFor(presets, where, part.preset);
   if (!Number.isFinite(part.velocity) || part.velocity < 0) {
     throw new RangeError(`${where}: velocity must be >= 0, got ${part.velocity}`);
   }
   const { sequencer } = part;
+  if (typeof sequencer !== 'object' || sequencer === null) {
+    throw new Error(`${where}: a part needs a sequencer, got ${String(sequencer)}`);
+  }
   if (!(SEQUENCER_KINDS as readonly string[]).includes(sequencer.kind)) {
     throw new Error(`${where}: no sequencer kind "${String(sequencer.kind)}"`);
   }

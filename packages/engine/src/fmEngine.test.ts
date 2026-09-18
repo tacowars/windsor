@@ -50,3 +50,19 @@ describe('FmEngine.init', () => {
     expect(bus.filter?.type).toBe('highpass');
   });
 });
+
+describe('FmEngine.disposePart (#629)', () => {
+  it('disposes the named part and frees its name; an unknown name is a no-op', async () => {
+    const context = new FakeContext();
+    const engine = new FmEngine(context.asAudioContext());
+    await engine.init();
+    const first = engine.createPart('music-3');
+    expect(engine.getPart('music-3')).toBe(first);
+    engine.disposePart('music-3');
+    expect(engine.getPart('music-3')).toBeUndefined();
+    engine.disposePart('music-3');
+    const second = engine.createPart('music-3');
+    expect(second).not.toBe(first);
+    expect(engine.getPart('music-3')).toBe(second);
+  });
+});
