@@ -1,56 +1,33 @@
-/** The four operator bays of the Parts tab (#70, ported). */
+/** The four operator bays of the Parts tab (#70, ported); the knob specs are `patchKnobTables.ts`. */
 import {
   ALGORITHMS,
   LOOP_MODE_NAMES,
   OP_NAMES,
   WAVE_NAMES,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { $, el, fmtSigned } from './dom';
+import { CARRIER_COLOR, MOD_COLOR } from './consoleColors';
+import { $, el, html, seg } from './dom';
 import { drawEnv, envAdvKnobs, envKnobs } from './envCanvas';
 import { attachEnvelopeDrag } from './envelopeDrag';
 import { opEnvelopeSlot } from './envelopeTransfer';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
-import { CARRIER_COLOR, MOD_COLOR } from './patchPanels';
+import { FIXED_HZ_KNOB, OP_KNOBS, patchKnobOpts } from './patchKnobTables';
+import { BAY_SILENT_LEVEL } from './patchPanelConstants';
 import { partsState, pathKnob, pushPatch } from './patchState';
 import { ratioControls, showPitchControls } from './ratioKnobs';
-
-const fmt2 = (v: number): string => v.toFixed(2);
-const fmtHz = (v: number): string => (v >= 1000 ? `${(v / 1000).toFixed(2)}k` : v.toFixed(0));
-
-type KnobOpts = Parameters<typeof pathKnob>[2];
-
-/**
- * The fixed-frequency half of the pitch controls. It is not in `OP_KNOBS`
- * because the Pitch toggle swaps it against the Coarse / Fine pair (#587),
- * which is bound through `ratioSplit` rather than to a path of its own.
- */
-const FIXED_KNOB = {
-  label: 'Fixed',
-  o: { min: 20, max: 8000, def: 100, curve: 'log', fmt: fmtHz } as KnobOpts,
-};
-
-/** Per-operator knobs; `level` gets its per-op default and the bay-fade hook. */
-const OP_KNOBS: ReadonlyArray<{ f: string; label: string; o: KnobOpts }> = [
-  {
-    f: 'detune',
-    label: 'Detune',
-    o: { min: -100, max: 100, def: 0, step: 1, fmt: (v) => `${v.toFixed(0)}c` },
-  },
-  { f: 'level', label: 'Level', o: { min: 0, max: 1, def: 0, fmt: fmt2 } },
-  { f: 'feedback', label: 'Fdbk', o: { min: -1, max: 1, def: 0, fmt: fmtSigned } },
-  { f: 'velSens', label: 'Vel', o: { min: 0, max: 1, def: 0.4, fmt: fmt2 } },
-];
 
 function op(i: number): { level: number; wave: number; fixed: boolean } {
   return partsState.patch.ops[i] ?? { level: 0, wave: 0, fixed: false };
 }
 
 function bayHead(i: number, isCar: boolean, adv: HTMLElement): HTMLElement {
-  const head = el('div', 'bay-head');
-  head.innerHTML =
+  const head = html(
+    'div',
+    'bay-head',
     `<span class="bay-id">${OP_NAMES[i]}</span>` +
-    `<span class="bay-role">${isCar ? 'Carrier' : 'Modulator'}</span>` +
-    `<span style="flex:1"></span>`;
+      `<span class="bay-role">${isCar ? 'Carrier' : 'Modulator'}</span>` +
+      `<span style="flex:1"></span>`,
+  );
   const advBtn = el('button', 'btn', 'Adv') as HTMLButtonElement;
   advBtn.type = 'button';
   advBtn.setAttribute('aria-pressed', 'false');
@@ -64,7 +41,8 @@ function bayHead(i: number, isCar: boolean, adv: HTMLElement): HTMLElement {
 
 function waveAndPitchLine(i: number, onWave: () => void, onPitchMode: () => void): HTMLElement {
   const line = el('div', 'bay-line');
-  const waveWrap = el('div', 'grow', '<span class="field-label">Wave</span>');
+  const waveWrap = el('div', 'grow');
+  waveWrap.appendChild(el('span', 'field-label', 'Wave'));
   const waveSel = document.createElement('select');
   waveSel.className = 'field';
   waveSel.name = `wave-op-${i}`;
@@ -81,7 +59,8 @@ function waveAndPitchLine(i: number, onWave: () => void, onPitchMode: () => void
   waveWrap.appendChild(waveSel);
   line.appendChild(waveWrap);
 
-  const fixWrap = el('div', '', '<span class="field-label">Pitch</span>');
+  const fixWrap = el('div');
+  fixWrap.appendChild(el('span', 'field-label', 'Pitch'));
   const fixBtn = el('button', 'btn') as HTMLButtonElement;
   fixBtn.type = 'button';
   fixBtn.style.width = '76px';
@@ -106,21 +85,18 @@ function loopModePicker(i: number, color: string): HTMLElement {
   const wrap = el('div');
   wrap.style.cssText = 'width:100%;margin-top:5px';
   wrap.appendChild(el('span', 'field-label', 'Envelope Loop'));
-  const seg = el('div', 'seg');
-  seg.style.setProperty('--seg-color', color);
-  LOOP_MODE_NAMES.forEach((n, li) => {
-    const b = el('button', '', n) as HTMLButtonElement;
-    b.type = 'button';
-    b.setAttribute('aria-pressed', String(partsState.patch.ops[i]?.env.loopMode === li));
-    b.onclick = (): void => {
-      const target = partsState.patch.ops[i];
-      if (target) target.env.loopMode = li;
-      [...seg.children].forEach((c, ci) => c.setAttribute('aria-pressed', String(ci === li)));
-      pushPatch();
-    };
-    seg.appendChild(b);
-  });
-  wrap.appendChild(seg);
+  wrap.appendChild(
+    seg(
+      LOOP_MODE_NAMES.map((label, li) => ({ value: String(li), label })),
+      () => String(partsState.patch.ops[i]?.env.loopMode ?? 0),
+      (value) => {
+        const target = partsState.patch.ops[i];
+        if (target) target.env.loopMode = Number(value);
+        pushPatch();
+      },
+      color,
+    ),
+  );
   return wrap;
 }
 
@@ -137,11 +113,16 @@ function mainKnobRow(
   const row = el('div', 'knob-row');
   const ratioNodes = ratioControls(i, color);
   for (const node of ratioNodes) row.appendChild(node);
-  const fixedNode = pathKnob(`ops.${i}.fixedHz`, FIXED_KNOB.label, { ...FIXED_KNOB.o, color });
+  const fixedPath = `ops.${i}.${FIXED_HZ_KNOB.f}`;
+  const fixedNode = pathKnob(fixedPath, FIXED_HZ_KNOB.label, {
+    ...patchKnobOpts(FIXED_HZ_KNOB, fixedPath),
+    color,
+  });
   row.appendChild(fixedNode);
   for (const k of OP_KNOBS) {
-    const extra: KnobOpts = k.f === 'level' ? { onChange: syncActive, def: i === 0 ? 1 : 0 } : {};
-    row.appendChild(pathKnob(`ops.${i}.${k.f}`, k.label, { ...k.o, ...extra, color }));
+    const path = `ops.${i}.${k.f}`;
+    const fade = k.f === 'level' ? { onChange: syncActive } : {};
+    row.appendChild(pathKnob(path, k.label, { ...patchKnobOpts(k, path), ...fade, color }));
   }
   const syncPitch = (): void => showPitchControls(op(i).fixed, ratioNodes, fixedNode);
   syncPitch();
@@ -180,13 +161,13 @@ export function buildBays(): void {
   const grid = $('bayGrid');
   grid.innerHTML = '';
   const alg = ALGORITHMS[partsState.patch.algorithm];
-  for (let i = 0; i < 4; i++) {
+  OP_NAMES.forEach((_, i) => {
     const isCar = alg?.carriers.includes(i) ?? false;
     const color = isCar ? CARRIER_COLOR : MOD_COLOR;
     const bay = el('section', 'bay');
     bay.style.setProperty('--op-color', color);
     const syncActive = (): void => {
-      bay.classList.toggle('bay-off', op(i).level <= 0.0001);
+      bay.classList.toggle('bay-off', op(i).level <= BAY_SILENT_LEVEL);
     };
     syncActive();
     const body = bayBody(i, color, syncActive);
@@ -194,5 +175,5 @@ export function buildBays(): void {
     bay.appendChild(bayHead(i, isCar, adv));
     bay.appendChild(body);
     grid.appendChild(bay);
-  }
+  });
 }

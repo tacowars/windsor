@@ -33,8 +33,8 @@ import {
   type Chip,
   type ChordPayload,
 } from './chordStepModel';
-import { el, escapeHtml, seg, select } from './dom';
-import { PITCH_COLOR } from './seqFields';
+import { el, escapeHtml, html, seg, select } from './dom';
+import { PITCH_COLOR } from './consoleColors';
 
 export interface PickerHost {
   key(): ArrangementKey;
@@ -57,7 +57,7 @@ export interface Picker {
 
 /** One `.chip`: the chord's name over its numeral, or the Rest tile. */
 export function chipButton(chip: Chip): HTMLButtonElement {
-  const node = el(
+  const node = html(
     'button',
     chip.payload.kind === 'rest' ? 'chip rest' : 'chip',
     `<span class="chip-name">${escapeHtml(chip.name)}</span><span class="chip-num">${escapeHtml(chip.numeral)}</span>`,

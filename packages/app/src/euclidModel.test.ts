@@ -8,7 +8,7 @@ import {
   euclid,
   patternFromString,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { pulseDefault } from './euclidCard';
+import { pulseDefault } from './sequencerKnobTables';
 import {
   EUCLID_STEPS_MAX,
   countOnsets,

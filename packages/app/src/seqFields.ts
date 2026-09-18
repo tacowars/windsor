@@ -2,96 +2,128 @@
  * The Sequencers tab's field vocabulary (#70): knobs and pickers that write
  * one sequencer or part field through `ctx.change`, the density-modulator
  * controls, and the capture/release row (record §6). Every control addresses
- * its part by slot (#597).
+ * its part by slot (#597) and a field by name the spec union knows (#618
+ * decision 8), so a typo fails typecheck instead of writing a key the
+ * normaliser drops. The specs are `sequencerKnobTables.ts`.
  */
-import type { ArrangementDocument } from '../../../packages/client/src/audio/index-for-editor';
-import { partAt, patternToString } from '../../../packages/client/src/audio/index-for-editor';
+import type {
+  ArrangementDocument,
+  DensityMod,
+  DensityModKind,
+  SequencerSpec,
+} from '../../../packages/client/src/audio/index-for-editor';
+import {
+  DEFAULT_EUCLIDEAN_CONFIG,
+  DENSITY_MOD_KINDS,
+  LFO_SHAPES,
+  partAt,
+  patternToString,
+} from '../../../packages/client/src/audio/index-for-editor';
+import { PERC_COLOR } from './consoleColors';
+import { noteName } from './consoleFormat';
 import type { AppCtx } from './context';
 import { partChange } from './context';
-import { DIVISOR_OPTIONS, el, fmt2, noteName, seg, select } from './dom';
-import { makeKnob, type KnobSpec } from './knob';
+import { el, seg, select } from './dom';
+import { makeKnob } from './knob';
+import { DIVISOR_OPTIONS } from './sequencerConstants';
+import { DENSITY_DEFAULTS, DENSITY_KNOBS } from './sequencerKnobTables';
+import type { SequencerField, SequencerKnobEntry } from './sequencerKnobTables';
 
-export const PERC_COLOR = '#E0A44E';
-export const PITCH_COLOR = '#5FA8A0';
+/** The sequencer spec of the part on `slot`, if the part exists. */
+export const driverOf = (doc: ArrangementDocument, slot: number): SequencerSpec | undefined =>
+  partAt(doc, slot)?.sequencer;
 
-export type KnobOpts = Omit<KnobSpec, 'get' | 'set' | 'label'> & { label?: string };
-
-type Fields = Record<string, unknown>;
-
-/** The sequencer fields of the part on `slot`, or `{}`. */
-export const driverOf = (doc: ArrangementDocument, slot: number): Fields =>
-  (partAt(doc, slot)?.sequencer ?? {}) as unknown as Fields;
+/** One field of a spec by name, whatever the kind; a field the kind lacks reads `undefined`. */
+const fieldOf = (spec: SequencerSpec | undefined, field: SequencerField): unknown =>
+  spec === undefined ? undefined : Reflect.get(spec, field);
 
 /** A sequencer-field partial for the part on `slot`. */
-const sequencerChange = (slot: number, fields: Fields) => partChange(slot, { sequencer: fields });
+const sequencerChange = (slot: number, fields: Record<string, unknown>) =>
+  partChange(slot, { sequencer: fields });
 
-/** A knob writing one sequencer field (note, hold, steps, gate …). */
-export function driverKnob(ctx: AppCtx, slot: number, field: string, spec: KnobOpts): HTMLElement {
+/** A knob writing one sequencer field (note, hold, gate …). */
+export function driverKnob(
+  ctx: AppCtx,
+  slot: number,
+  entry: Extract<SequencerKnobEntry, { kind: 'driver' }>,
+  color: string,
+): HTMLElement {
   return makeKnob({
-    ...spec,
-    label: spec.label ?? field,
-    get: () => Number(driverOf(ctx.model.doc, slot)[field] ?? spec.def),
-    set: (v) => void ctx.change(sequencerChange(slot, { [field]: v })),
+    ...entry.o,
+    label: entry.label,
+    color,
+    get: () => Number(fieldOf(driverOf(ctx.model.doc, slot), entry.f) ?? entry.o.def),
+    set: (v) => void ctx.change(sequencerChange(slot, { [entry.f]: v })),
   });
 }
 
 /** A knob writing one part field (velocity). */
-export function sectionKnob(ctx: AppCtx, slot: number, field: string, spec: KnobOpts): HTMLElement {
-  const partOf = (): Fields => (partAt(ctx.model.doc, slot) ?? {}) as unknown as Fields;
+export function sectionKnob(
+  ctx: AppCtx,
+  slot: number,
+  entry: Extract<SequencerKnobEntry, { kind: 'section' }>,
+  color: string,
+): HTMLElement {
   return makeKnob({
-    ...spec,
-    label: spec.label ?? field,
-    get: () => Number(partOf()[field] ?? spec.def),
-    set: (v) => void ctx.change(partChange(slot, { [field]: v })),
+    ...entry.o,
+    label: entry.label,
+    color,
+    get: () => partAt(ctx.model.doc, slot)?.[entry.f] ?? entry.o.def,
+    set: (v) => void ctx.change(partChange(slot, { [entry.f]: v })),
   });
 }
 
-export function divisorPicker(ctx: AppCtx, slot: number): HTMLElement {
-  return select(
-    'Step',
-    DIVISOR_OPTIONS,
-    String(driverOf(ctx.model.doc, slot).divisor ?? 6),
-    (v) => {
-      const result = ctx.change(sequencerChange(slot, { divisor: Number(v) }));
-      if (result.ok) ctx.render();
-    },
-  );
+/** One card's row of table knobs, each bound to its part or sequencer field. */
+export function knobRow(
+  ctx: AppCtx,
+  slot: number,
+  table: readonly SequencerKnobEntry[],
+  color: string,
+): HTMLElement {
+  const row = el('div', 'knob-row');
+  for (const entry of table) {
+    row.appendChild(
+      entry.kind === 'section'
+        ? sectionKnob(ctx, slot, entry, color)
+        : driverKnob(ctx, slot, entry, color),
+    );
+  }
+  return row;
 }
 
-const KIND_DEFAULTS: Record<string, Fields> = {
-  lfoBars: { kind: 'lfoBars', bars: 8, shape: 'tri' },
-  lfoHz: { kind: 'lfoHz', hz: 0.1, shape: 'tri' },
-  walk: { kind: 'walk', stepChance: 0.5 },
-};
+export function divisorPicker(ctx: AppCtx, slot: number): HTMLElement {
+  const spec = driverOf(ctx.model.doc, slot);
+  const divisor = spec && spec.kind !== 'none' ? spec.divisor : DEFAULT_EUCLIDEAN_CONFIG.divisor;
+  return select('Step', DIVISOR_OPTIONS, String(divisor), (v) => {
+    const result = ctx.change(sequencerChange(slot, { divisor: Number(v) }));
+    if (result.ok) ctx.render();
+  });
+}
 
-const KIND_KNOBS: Record<string, { f: string; label: string; o: KnobOpts }> = {
-  lfoBars: { f: 'bars', label: 'Bars', o: { min: 0.25, max: 64, def: 8, curve: 'log' } },
-  lfoHz: {
-    f: 'hz',
-    label: 'Rate',
-    o: { min: 0.01, max: 5, def: 0.1, curve: 'log', fmt: (v) => `${v.toFixed(2)}H` },
-  },
-  walk: { f: 'stepChance', label: 'Chance', o: { min: 0, max: 1, def: 0.5, fmt: fmt2 } },
-};
+/** The Euclidean part's density modulator, or the engine's default one when the part has none. */
+function densityOf(ctx: AppCtx, slot: number): DensityMod {
+  const spec = driverOf(ctx.model.doc, slot);
+  return spec?.kind === 'euclidean' ? spec.density : DENSITY_DEFAULTS.lfoBars;
+}
 
-function densityKnob(ctx: AppCtx, slot: number, kind: string): HTMLElement {
-  const density = (): Fields => (driverOf(ctx.model.doc, slot).density ?? {}) as Fields;
-  const k = KIND_KNOBS[kind] ?? KIND_KNOBS['lfoBars'];
-  if (!k) throw new Error('unreachable');
+function densityKnob(ctx: AppCtx, slot: number, kind: DensityModKind): HTMLElement {
+  const k = DENSITY_KNOBS[kind];
   return makeKnob({
     ...k.o,
     label: k.label,
     color: PERC_COLOR,
-    get: () => Number(density()[k.f] ?? k.o.def),
+    get: () => Number(Reflect.get(densityOf(ctx, slot), k.f) ?? k.o.def),
     set: (v) => void ctx.change(sequencerChange(slot, { density: { kind, [k.f]: v } })),
   });
 }
 
-function shapeSeg(ctx: AppCtx, slot: number, kind: string): HTMLElement {
-  const density = (): Fields => (driverOf(ctx.model.doc, slot).density ?? {}) as Fields;
+function shapeSeg(ctx: AppCtx, slot: number, kind: DensityModKind): HTMLElement {
   return seg(
-    ['tri', 'sine', 'saw'].map((s) => ({ value: s, label: s })),
-    () => String(density().shape ?? 'tri'),
+    LFO_SHAPES.map((s) => ({ value: s, label: s })),
+    () => {
+      const density = densityOf(ctx, slot);
+      return density.kind === 'walk' ? LFO_SHAPES[0] : density.shape;
+    },
     (s) => void ctx.change(sequencerChange(slot, { density: { kind, shape: s } })),
     PERC_COLOR,
   );
@@ -102,14 +134,15 @@ export function densityControls(ctx: AppCtx, slot: number): HTMLElement {
   const wrap = el('div');
   wrap.style.marginTop = '8px';
   wrap.appendChild(el('span', 'field-label', 'Density modulator'));
-  const density = (): Fields => (driverOf(ctx.model.doc, slot).density ?? {}) as Fields;
-  const kind = String(density().kind ?? 'lfoBars');
+  const kind = densityOf(ctx, slot).kind;
   wrap.appendChild(
     seg(
-      ['lfoBars', 'lfoHz', 'walk'].map((k) => ({ value: k, label: k })),
+      DENSITY_MOD_KINDS.map((k) => ({ value: k, label: k })),
       () => kind,
       (k) => {
-        const result = ctx.change(sequencerChange(slot, { density: KIND_DEFAULTS[k] }));
+        const picked = DENSITY_MOD_KINDS.find((known) => known === k);
+        if (!picked) return;
+        const result = ctx.change(sequencerChange(slot, { density: DENSITY_DEFAULTS[picked] }));
         if (result.ok) ctx.render();
       },
       PERC_COLOR,
@@ -125,8 +158,8 @@ export function densityControls(ctx: AppCtx, slot: number): HTMLElement {
 /** Capture freezes the sounding pattern into the document; release lets go. */
 export function captureControls(ctx: AppCtx, slot: number, color: string): HTMLElement {
   const wrap = el('div', 'capture-row');
-  const fields = driverOf(ctx.model.doc, slot);
-  const pattern = fields.pattern as readonly (boolean | number | null)[] | null;
+  const spec = driverOf(ctx.model.doc, slot);
+  const pattern = fieldOf(spec, 'pattern') as readonly (boolean | number | null)[] | null;
   const button = el('button', 'btn', pattern ? 'Release' : 'Capture') as HTMLButtonElement;
   button.type = 'button';
   button.style.borderColor = color;
@@ -135,7 +168,7 @@ export function captureControls(ctx: AppCtx, slot: number, color: string): HTMLE
     else if (!ctx.capture(slot)) ctx.status(`part ${slot}: nothing sounding to capture yet`);
   };
   wrap.appendChild(button);
-  const text = pattern ? patternText(fields.kind === 'euclidean', pattern) : 'generative';
+  const text = pattern ? patternText(spec?.kind === 'euclidean', pattern) : 'generative';
   wrap.appendChild(el('span', 'status', `pattern: ${text}`));
   return wrap;
 }

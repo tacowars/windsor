@@ -1,4 +1,8 @@
-/** Small DOM and formatting helpers shared by every console tab (#70). */
+/**
+ * The DOM builders every console tab shares (#70). Builders only: the number
+ * formatters are `consoleFormat.ts`, the sequencer vocabulary
+ * `sequencerConstants.ts`, the palette `consoleColors.ts` (#618).
+ */
 
 export const $ = (id: string): HTMLElement => {
   const found = document.getElementById(id);
@@ -6,10 +10,19 @@ export const $ = (id: string): HTMLElement => {
   return found;
 };
 
-export function el(tag: string, className = '', html = ''): HTMLElement {
+/** An element with a class and, optionally, its text — text, never markup (#618). */
+export function el(tag: string, className = '', text = ''): HTMLElement {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (html) node.innerHTML = html;
+  if (text) node.textContent = text;
+  return node;
+}
+
+/** The explicit opt-in: an element whose content is markup the caller wrote. */
+export function html(tag: string, className = '', markup = ''): HTMLElement {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (markup) node.innerHTML = markup;
   return node;
 }
 
@@ -20,7 +33,9 @@ export const escapeHtml = (text: string): string =>
 /** A titled panel section, matching the template's furniture. */
 export function section(title: string, hint = ''): { root: HTMLElement; body: HTMLElement } {
   const root = el('div', 'section');
-  root.appendChild(el('div', 'section-title', `<span>${title}</span>`));
+  const head = el('div', 'section-title');
+  head.appendChild(el('span', '', title));
+  root.appendChild(head);
   if (hint) root.appendChild(el('p', 'hint', hint));
   const body = el('div');
   root.appendChild(body);
@@ -73,30 +88,3 @@ export function select(
   wrap.appendChild(sel);
   return wrap;
 }
-
-export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-export const noteName = (midi: number): string =>
-  `${NOTE_NAMES[((midi % 12) + 12) % 12]}${Math.floor(midi / 12) - 1}`;
-
-export const fmt2 = (v: number): string => v.toFixed(2);
-export const fmt0 = (v: number): string => v.toFixed(0);
-export const fmtMs = (v: number): string =>
-  v < 1 ? `${(v * 1000).toFixed(0)}m` : `${v.toFixed(2)}s`;
-export const fmtHz = (v: number): string =>
-  v >= 1000 ? `${(v / 1000).toFixed(2)}k` : v.toFixed(0);
-export const fmtSigned = (v: number): string => (v >= 0 ? '+' : '') + v.toFixed(2);
-
-/** Step divisors of the 96-tick bar, longest first, with musician-facing names. */
-export const DIVISOR_OPTIONS: readonly { value: string; label: string }[] = [
-  { value: '96', label: '1 bar' },
-  { value: '48', label: '1/2' },
-  { value: '32', label: '1/2T' },
-  { value: '24', label: '1/4' },
-  { value: '16', label: '1/4T' },
-  { value: '12', label: '1/8' },
-  { value: '8', label: '1/8T' },
-  { value: '6', label: '1/16' },
-  { value: '4', label: '1/16T' },
-  { value: '3', label: '1/32' },
-];

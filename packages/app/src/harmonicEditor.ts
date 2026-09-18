@@ -6,6 +6,7 @@
  */
 import { OP_NAMES, WAVE } from '../../../packages/client/src/audio/index-for-editor';
 import { el, seg } from './dom';
+import { CYCLE_PAD_PX } from './harmonicConstants';
 import {
   HARMONIC_COUNTS,
   PREVIEW_POINTS,
@@ -68,7 +69,7 @@ function drawCycle(canvas: HTMLCanvasElement, partials: readonly number[], color
   g.beginPath();
   cycle.forEach((v, i) => {
     const x = (i / (PREVIEW_POINTS - 1)) * w;
-    const y = h / 2 - (v * (h - 4)) / 2;
+    const y = h / 2 - (v * (h - CYCLE_PAD_PX)) / 2;
     if (i === 0) g.moveTo(x, y);
     else g.lineTo(x, y);
   });

@@ -11,7 +11,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
 import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
-import { FILTER_KNOBS, GLOBAL_TOGGLES, LFO_KNOBS, toggleIndex, writeToggle } from './patchPanels';
+import { FILTER_KNOBS, LFO_KNOBS, patchKnobOpts } from './patchKnobTables';
+import { GLOBAL_TOGGLES, toggleIndex, writeToggle } from './patchPanels';
 import { getPath, hooks, partsState, pushPatch, setPath } from './patchState';
 
 describe('the global row toggles', () => {
@@ -71,8 +72,8 @@ describe('the Wheel knobs (#586)', () => {
       expect(typeof getPath(fresh, k.f), k.f).toBe('number');
     }
     // The knob's centre is the schema's default, so a fresh patch reads as untouched.
-    expect(filter?.o?.def).toBe(fresh.filter.modWheelDepth);
-    expect(lfo?.o?.def).toBe(fresh.lfo.modWheelDepth);
+    expect(filter && patchKnobOpts(filter).def).toBe(fresh.filter.modWheelDepth);
+    expect(lfo && patchKnobOpts(lfo).def).toBe(fresh.lfo.modWheelDepth);
   });
 
   it('round-trip through the JSON export and the makePatch import', () => {

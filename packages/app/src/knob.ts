@@ -27,22 +27,33 @@ export interface KnobElement extends HTMLElement {
   refresh: () => void;
 }
 
-const KNOB_R = 15;
-const ARC_START = -135;
-const ARC_END = 135;
-/** One arrow key's share of the sweep, and shift's finer share of it. */
-const KEY_STEP = 0.02;
-const KEY_STEP_FINE = 0.002;
+import {
+  ARC_END,
+  ARC_MIN_DEGREES,
+  ARC_START,
+  ARIA_VALUE_PRECISION,
+  DRAG_RANGE_FINE_PX,
+  DRAG_RANGE_PX,
+  FACE_INSET,
+  HALF_TURN_DEGREES,
+  KEY_STEP,
+  KEY_STEP_FINE,
+  KNOB_PAD_PX,
+  KNOB_R,
+  LOG_FLOOR,
+  PIN_INSET,
+  TWELVE_OCLOCK_DEGREES,
+} from './knobConstants';
 
 function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
-  const a = ((deg - 90) * Math.PI) / 180;
+  const a = ((deg - TWELVE_OCLOCK_DEGREES) * Math.PI) / HALF_TURN_DEGREES;
   return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
 }
 
 function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): string {
   const [x0, y0] = polar(cx, cy, r, a0);
   const [x1, y1] = polar(cx, cy, r, a1);
-  const large = Math.abs(a1 - a0) > 180 ? 1 : 0;
+  const large = Math.abs(a1 - a0) > HALF_TURN_DEGREES ? 1 : 0;
   return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
 }
 
@@ -53,14 +64,14 @@ function knobDom(spec: KnobSpec): HTMLElement {
   node.setAttribute('role', 'slider');
   node.setAttribute('aria-label', spec.label);
   if (spec.color) node.style.setProperty('--knob-color', spec.color);
-  const size = KNOB_R * 2 + 8;
+  const size = KNOB_R * 2 + KNOB_PAD_PX;
   const c = size / 2;
   node.innerHTML =
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
-    `<circle class="dial-face" cx="${c}" cy="${c}" r="${KNOB_R - 3.5}"></circle>` +
+    `<circle class="dial-face" cx="${c}" cy="${c}" r="${KNOB_R - FACE_INSET}"></circle>` +
     `<path class="dial-track" d="${arcPath(c, c, KNOB_R, ARC_START, ARC_END)}"></path>` +
     `<path class="dial-arc" d=""></path>` +
-    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - KNOB_R + 5}"></line>` +
+    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - KNOB_R + PIN_INSET}"></line>` +
     `</svg>` +
     `<span class="knob-val"></span><span class="knob-label">${spec.label}</span>`;
   node.title = `${spec.label} - drag, shift-drag for fine, double-click to reset`;
@@ -77,10 +88,10 @@ export type KnobScaleSpec = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve'>;
 
 function scaleFor(spec: KnobScaleSpec): Scale {
   if (spec.curve === 'log') {
-    const lo = Math.log(Math.max(1e-6, spec.min));
+    const lo = Math.log(Math.max(LOG_FLOOR, spec.min));
     const hi = Math.log(spec.max);
     return {
-      toNorm: (v) => (Math.log(Math.max(1e-6, v)) - lo) / (hi - lo),
+      toNorm: (v) => (Math.log(Math.max(LOG_FLOOR, v)) - lo) / (hi - lo),
       fromNorm: (n) => Math.exp(lo + Math.min(1, Math.max(0, n)) * (hi - lo)),
     };
   }
@@ -116,7 +127,7 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   const arc = node.querySelector('.dial-arc') as SVGPathElement;
   const pin = node.querySelector('.dial-pin') as SVGLineElement;
   const out = node.querySelector('.knob-val') as HTMLElement;
-  const size = KNOB_R * 2 + 8;
+  const size = KNOB_R * 2 + KNOB_PAD_PX;
   const c = size / 2;
   const { toNorm, fromNorm } = scaleFor(spec);
 
@@ -128,10 +139,13 @@ export function makeKnob(spec: KnobSpec): KnobElement {
     const zeroAng = ARC_START + zeroN * (ARC_END - ARC_START);
     const a0 = Math.min(zeroAng, ang);
     const a1 = Math.max(zeroAng, ang);
-    arc.setAttribute('d', Math.abs(a1 - a0) < 0.4 ? '' : arcPath(c, c, KNOB_R, a0, a1));
+    arc.setAttribute('d', Math.abs(a1 - a0) < ARC_MIN_DEGREES ? '' : arcPath(c, c, KNOB_R, a0, a1));
     pin.setAttribute('transform', `rotate(${ang} ${c} ${c})`);
     out.textContent = spec.fmt ? spec.fmt(v) : v.toFixed(2);
-    node.setAttribute('aria-valuenow', String(Math.round(v * 1000) / 1000));
+    node.setAttribute(
+      'aria-valuenow',
+      String(Math.round(v * ARIA_VALUE_PRECISION) / ARIA_VALUE_PRECISION),
+    );
   };
 
   const commit = (raw: number): void => {
@@ -178,7 +192,7 @@ function attachKnobInput(
       stop(e);
       return;
     }
-    const range = e.shiftKey ? 900 : 190;
+    const range = e.shiftKey ? DRAG_RANGE_FINE_PX : DRAG_RANGE_PX;
     commit(scale.fromNorm(startN - (e.clientY - startY) / range));
   });
   node.addEventListener('pointerup', stop);
