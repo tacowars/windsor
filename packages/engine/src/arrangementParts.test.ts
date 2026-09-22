@@ -12,6 +12,7 @@ import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from './audioConstants';
+import { DEFAULT_DRIVE } from './inserts/driveInsert';
 
 const silentPart = (): PlayablePart => ({
   noteOn: () => 0,
@@ -118,6 +119,7 @@ describe('the part list (#597)', () => {
       pan: -0.5,
       lowCut: LOW_CUT_MIN_HZ,
       sends: { room: 0.4 },
+      inserts: [],
     });
     expect(result.corrections).toEqual(['parts[0].strip.level: clamped 9 to 4']);
   });
@@ -136,6 +138,22 @@ describe('the part list (#597)', () => {
     expect(junk.corrections).toEqual([
       `parts[0].strip.lowCut: "low" is not a number — using ${LOW_CUT_MIN_HZ}`,
     ]);
+  });
+
+  it('carries strip inserts through export and import, and an unknown kind fails the gate (#641)', () => {
+    const inserts = [{ ...DEFAULT_DRIVE, drive: 20, mix: 0.6 }];
+    const first = makeArrangement(song([{ ...KICK, strip: { inserts } }]));
+    expect(first.document.parts[0]?.strip.inserts).toEqual(inserts);
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+    expect(again.document.parts[0]?.strip.inserts).toEqual(inserts);
+    expect(again.corrections).toEqual([]);
+
+    const unknown = makeArrangement(song([{ ...KICK, strip: { inserts: [{ kind: 'fuzz' }] } }]));
+    expect(unknown.document.parts[0]?.strip.inserts).toEqual([]);
+    expect(unknown.dangling).toEqual([
+      'parts[0].strip.inserts[0].kind: no insert kind "fuzz" is defined',
+    ]);
+    expect(isShippable(unknown)).toBe(false);
   });
 
   it('round-trips a strip low cut through export and import (#640)', () => {

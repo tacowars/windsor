@@ -28,6 +28,8 @@ import { FmEngine } from './fmEngine';
 import { clonePatch } from './patch';
 import { PRESETS } from './presets';
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from './audioConstants';
+import { DEFAULT_DRIVE } from './inserts/driveInsert';
+import { MAX_INSERTS } from './inserts/insertConstants';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -63,7 +65,7 @@ describe('initMusic over a document', () => {
 
   it('lands each part on its own strip', async () => {
     const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
-      strip: { level: 0.25, pan: -0.5, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.1 } },
+      strip: { level: 0.25, pan: -0.5, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.1 }, inserts: [] },
     });
     const sys = await system(doc);
     expect(stripOf(sys, 'hat')?.part.gain.value).toBe(0.25);
@@ -150,6 +152,73 @@ describe('apply over the document model', () => {
     const junk = sys.apply({ parts: { [hat]: { strip: { lowCut: 'high' } } } } as never);
     expect(junk.ignored).toEqual([`parts.${hat}.strip.lowCut`]);
     expect(cutOf()).toBe(LOW_CUT_MAX_HZ);
+  });
+
+  it('builds the document inserts on the strip, after the low cut (#641)', async () => {
+    const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
+      strip: { ...FULL_STRIPS.hat, inserts: [{ ...DEFAULT_DRIVE, drive: 18 }] },
+    });
+    const sys = await system(doc);
+    const strip = stripOf(sys, 'hat');
+    expect(strip?.inserts.map((i) => i.kind)).toEqual(['drive']);
+    expect(strip?.stages).toEqual([strip?.lowCut, strip?.inserts[0]]);
+    expect(stripOf(sys, 'kick')?.inserts).toEqual([]);
+  });
+
+  it('turns an insert knob live as a param write, with nothing rebuilt (#641)', async () => {
+    const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
+      strip: { ...FULL_STRIPS.hat, inserts: [DEFAULT_DRIVE] },
+    });
+    const sys = await system(doc);
+    const stage = stripOf(sys, 'hat')?.inserts[0];
+    const partial = { inserts: [{ ...DEFAULT_DRIVE, drive: 30 }] };
+    expect(sys.apply({ parts: { [hat]: { strip: partial } } })).toEqual({ ok: true, ignored: [] });
+    expect(stripOf(sys, 'hat')?.inserts[0]).toBe(stage);
+  });
+
+  it('adds and removes an insert live on one strip, and nothing else moves (#641)', async () => {
+    const sys = await system(FULL_DOCUMENT);
+    const hatStrip = stripOf(sys, 'hat');
+    const kickStrip = stripOf(sys, 'kick');
+    const kickPart = sys.engine.getPart(musicPartName(kick));
+    const counters = { ...sys.readout().counters };
+
+    expect(sys.apply({ parts: { [hat]: { strip: { inserts: [DEFAULT_DRIVE] } } } })).toEqual({
+      ok: true,
+      ignored: [],
+    });
+    expect(stripOf(sys, 'hat')).toBe(hatStrip);
+    expect(hatStrip?.inserts.map((i) => i.kind)).toEqual(['drive']);
+    expect(stripOf(sys, 'kick')).toBe(kickStrip);
+    expect(kickStrip?.inserts).toEqual([]);
+    expect(sys.engine.getPart(musicPartName(kick))).toBe(kickPart);
+    expect(sys.readout().counters).toEqual(counters);
+
+    sys.apply({ parts: { [hat]: { strip: { inserts: [] } } } });
+    expect(hatStrip?.inserts).toEqual([]);
+    expect(hatStrip?.tail).toBe(hatStrip?.lowCut.output);
+  });
+
+  it('reports a junk insert list, an unknown kind and a list past the limit by path (#641)', async () => {
+    const sys = await system(FULL_DOCUMENT);
+    const path = `parts.${hat}.strip.inserts`;
+    expect(
+      sys.apply({ parts: { [hat]: { strip: { inserts: 'drive' } } } } as never).ignored,
+    ).toEqual([path]);
+    const unknown = sys.apply({
+      parts: { [hat]: { strip: { inserts: [{ kind: 'fuzz' }, DEFAULT_DRIVE] } } },
+    } as never);
+    expect(unknown.ignored).toEqual([`${path}[0]`]);
+    expect(stripOf(sys, 'hat')?.inserts.map((i) => i.kind)).toEqual(['drive']);
+    const many = Array.from({ length: MAX_INSERTS + 1 }, () => DEFAULT_DRIVE);
+    const past = sys.apply({ parts: { [hat]: { strip: { inserts: many } } } });
+    expect(past.ignored).toEqual([`${path}[${MAX_INSERTS}]`]);
+    expect(stripOf(sys, 'hat')?.inserts).toHaveLength(MAX_INSERTS);
+    // A clamp is silent, as it is for every live number.
+    expect(
+      sys.apply({ parts: { [hat]: { strip: { inserts: [{ ...DEFAULT_DRIVE, drive: 999 }] } } } })
+        .ignored,
+    ).toEqual([]);
   });
 
   it('sets sends live and clamps into range', async () => {
