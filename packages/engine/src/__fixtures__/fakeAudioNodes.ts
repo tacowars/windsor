@@ -94,12 +94,22 @@ export abstract class FakeNode {
     return destination;
   }
 
-  disconnect(): void {
-    for (const connection of this.outbound) {
-      const index = connection.to.inbound.indexOf(connection);
-      if (index >= 0) connection.to.inbound.splice(index, 1);
+  /**
+   * Every outbound edge, or only those to `destination` -- which, as the spec
+   * has it, throws when there is no such edge (an `InvalidAccessError`).
+   */
+  disconnect(destination?: FakeNode): void {
+    const dropped = this.outbound.filter((c) => destination === undefined || c.to === destination);
+    if (destination !== undefined && dropped.length === 0) {
+      throw new Error(
+        `${this.kind}: InvalidAccessError, not connected to that ${destination.kind}`,
+      );
     }
-    this.outbound.length = 0;
+    for (const connection of dropped) {
+      const inbound = connection.to.inbound.indexOf(connection);
+      if (inbound >= 0) connection.to.inbound.splice(inbound, 1);
+      this.outbound.splice(this.outbound.indexOf(connection), 1);
+    }
   }
 
   /** The channels on `output` for `block`, rendered once per block. */

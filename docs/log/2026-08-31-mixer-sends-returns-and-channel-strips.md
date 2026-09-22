@@ -6,6 +6,8 @@
   extends `docs/design/audio-architecture.md` §3 ·
   scope exception on the terms of
   `docs/log/2026-08-31-audio-enters-tech-demo-scope.md`
+- Amended by `2026-09-22-639-sends-tap-the-strip-tail` (#639): §7's sends and
+  the rotation tap the strip's tail, after any strip stages, not `part.output`
 
 A design conversation with tacowars, recorded before any code exists. No
 implementation was written; this record is the brief a later ticket works from.
