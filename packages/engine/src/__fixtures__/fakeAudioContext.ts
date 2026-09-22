@@ -24,6 +24,7 @@ import {
   FakeNode,
   FakeParam,
   FakeSplitter,
+  FakeWaveShaper,
 } from './fakeAudioNodes';
 import type { Feed, LoadedReverb, ReverbProcessorLike } from './reverbHarness';
 import { loadReverb } from './reverbHarness';
@@ -89,6 +90,10 @@ export class FakeContext implements FakeHost {
 
   createBiquadFilter(): FakeBiquad {
     return new FakeBiquad(this);
+  }
+
+  createWaveShaper(): FakeWaveShaper {
+    return new FakeWaveShaper(this);
   }
 
   createDynamicsCompressor(): FakeCompressor {

@@ -11,13 +11,20 @@
  * identifies as the project's primary risk.
  */
 
-import { BUS_FILTER_FREQUENCY_HZ, BUS_FILTER_Q } from './audioConstants';
+import { BUS_FILTER_FREQUENCY_HZ, BUTTERWORTH_Q_DB } from './audioConstants';
 
 export interface BusFilterOptions {
   type?: BiquadFilterType;
   frequency?: number;
+  /**
+   * The biquad's `Q`, in the spec's unit for `type`: dB for `lowpass` and
+   * `highpass`, linear for the rest. Omitted, those two are Butterworth
+   * (`BUTTERWORTH_Q_DB`) and every other type keeps Web Audio's default.
+   */
   Q?: number;
 }
+
+const DB_Q_TYPES: readonly BiquadFilterType[] = ['lowpass', 'highpass'];
 
 export interface BusOptions {
   /** Omit to leave the filter out of the graph entirely. */
@@ -42,7 +49,8 @@ export function createBus(context: BaseAudioContext, options: BusOptions = {}): 
     const filter = context.createBiquadFilter();
     filter.type = options.filter.type ?? 'lowpass';
     filter.frequency.value = options.filter.frequency ?? BUS_FILTER_FREQUENCY_HZ;
-    filter.Q.value = options.filter.Q ?? BUS_FILTER_Q;
+    const q = options.filter.Q ?? (DB_Q_TYPES.includes(filter.type) ? BUTTERWORTH_Q_DB : undefined);
+    if (q !== undefined) filter.Q.value = q;
     tail.connect(filter);
     tail = filter;
     bus.filter = filter;

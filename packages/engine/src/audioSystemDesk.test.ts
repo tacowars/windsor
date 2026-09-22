@@ -8,6 +8,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { FakeContext, installFakeAudioWorklet } from './__fixtures__/fakeAudioContext';
 import type { FakeWorkletNode } from './__fixtures__/fakeAudioContext';
+import type { FakeNode } from './__fixtures__/fakeAudioNodes';
+import { FakeBiquad } from './__fixtures__/fakeAudioNodes';
 import {
   FULL_DOCUMENT,
   FULL_SLOT,
@@ -21,6 +23,11 @@ import { FmEngine } from './fmEngine';
 import { RETURNS } from './mix';
 import { makePatch } from './patch';
 import { PRESETS } from './presets';
+import {
+  DELAY_RESONANCE_DEFAULT_DB,
+  DELAY_RESONANCE_MAX_DB,
+  DELAY_RESONANCE_MIN_DB,
+} from './audioConstants';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -39,6 +46,12 @@ const stripOf = (sys: AudioSystem, id: FullPartId) => sys.strip(musicPartName(FU
 const plateOf = (sys: AudioSystem): FakeWorkletNode =>
   sys.returnBus('room')?.effect as unknown as FakeWorkletNode;
 const delayOf = (sys: AudioSystem): DelayNode => sys.returnBus('echo')?.effect as DelayNode;
+/** The echo's damping filter: the one node the delay line feeds. */
+const dampOf = (sys: AudioSystem): FakeBiquad => {
+  const next = (delayOf(sys) as unknown as FakeNode).outbound[0]?.to;
+  if (!(next instanceof FakeBiquad)) throw new Error('the delay line does not feed a biquad');
+  return next;
+};
 
 describe('initMusic with patches', () => {
   it('plays a part on the document patch its preset names', async () => {
@@ -67,13 +80,21 @@ describe('initMusic with returns', () => {
       ...FULL_DOCUMENT,
       returns: {
         room: { kind: 'reverb', level: 0.4, space: { ...RETURNS.room.space, size: 2.5 } },
-        echo: { kind: 'delay', level: 0.2, delayTime: 0.75, feedback: 0.5, damp: 1500 },
+        echo: {
+          kind: 'delay',
+          level: 0.2,
+          delayTime: 0.75,
+          feedback: 0.5,
+          damp: 1500,
+          resonance: 6,
+        },
       },
     });
     expect(sys.returnBus('room')?.level.value).toBe(0.4);
     expect(plateOf(sys).parameters.get('size')?.value).toBe(2.5);
     expect(sys.returnBus('echo')?.level.value).toBe(0.2);
     expect(delayOf(sys).delayTime.value).toBe(0.75);
+    expect(dampOf(sys).Q.value).toBe(6);
   });
 
   it('keeps the code returns when the document has no overlay', async () => {
@@ -139,6 +160,19 @@ describe('apply over patches and returns', () => {
     expect(plateOf(sys).parameters.get('decay')?.value).toBe(0.3);
     expect(plateOf(sys).parameters.get('size')?.value).toBe(sizeBefore);
     expect(sys.returnBus('echo')?.level.value).toBe(RETURNS.echo.level);
+  });
+
+  it('moves the echo resonance live, clamped into its range (#647)', async () => {
+    const sys = await system(FULL_DOCUMENT);
+    expect(dampOf(sys).Q.value).toBe(DELAY_RESONANCE_DEFAULT_DB);
+    expect(sys.apply({ returns: { echo: { resonance: 9 } } })).toEqual({ ok: true, ignored: [] });
+    expect(dampOf(sys).Q.value).toBe(9);
+    sys.apply({ returns: { echo: { resonance: 99 } } });
+    expect(dampOf(sys).Q.value).toBe(DELAY_RESONANCE_MAX_DB);
+    sys.apply({ returns: { echo: { resonance: -99 } } });
+    expect(dampOf(sys).Q.value).toBe(DELAY_RESONANCE_MIN_DB);
+    const wrongKind = sys.apply({ returns: { room: { resonance: 3 } } } as never);
+    expect(wrongKind.ignored).toEqual(['returns.room.resonance']);
   });
 
   it('reports unknown returns, wrong-kind fields and junk by path', async () => {

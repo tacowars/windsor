@@ -11,6 +11,8 @@ import type { ReturnSpec, ReverbSpace } from '../../../packages/client/src/audio
 import {
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
+  DELAY_RESONANCE_MAX_DB,
+  DELAY_RESONANCE_MIN_DB,
   RETURNS,
   RETURN_NAMES,
   REVERB_SPACE_RANGES,
@@ -19,7 +21,7 @@ import {
   SPACE_NAMES,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { RETURN_COLOR } from './consoleColors';
-import { fmt2, fmtHz, fmtMs } from './consoleFormat';
+import { fmt2, fmtDb, fmtHz, fmtMs } from './consoleFormat';
 import type { AppCtx } from './context';
 import { el, html, section, select } from './dom';
 import { makeKnob, type KnobSpec } from './knob';
@@ -111,13 +113,13 @@ function spacePicker(ctx: AppCtx, name: string): HTMLElement {
 
 function delayKnobs(ctx: AppCtx, name: string): HTMLElement[] {
   const base = RETURNS.echo;
-  const value = (): { delayTime: number; feedback: number; damp: number } => {
+  const value = (): { delayTime: number; feedback: number; damp: number; resonance: number } => {
     const spec = returnValue(ctx, name);
     return spec.kind === 'delay' ? spec : base;
   };
   const knob = (
     label: string,
-    f: 'delayTime' | 'feedback' | 'damp',
+    f: 'delayTime' | 'feedback' | 'damp' | 'resonance',
     o: Partial<KnobSpec>,
   ): HTMLElement =>
     makeKnob({
@@ -139,6 +141,13 @@ function delayKnobs(ctx: AppCtx, name: string): HTMLElement[] {
     }),
     knob('Regen', 'feedback', { max: DELAY_FEEDBACK_MAX, fmt: fmt2 }),
     knob('Damp', 'damp', { min: DAMP_MIN, max: DAMP_MAX, curve: 'log', fmt: fmtHz }),
+    // The emphasis at Damp (#647): at the floor the repeats always fade; above
+    // it, high Regen runs away into the loop's soft clip.
+    knob('Q', 'resonance', {
+      min: DELAY_RESONANCE_MIN_DB,
+      max: DELAY_RESONANCE_MAX_DB,
+      fmt: fmtDb,
+    }),
   ];
 }
 
