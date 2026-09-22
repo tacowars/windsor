@@ -87,6 +87,12 @@ describe('stripFor', () => {
   it('returns the named strip, or unity-centred-dry for a part the mix does not know', () => {
     expect(stripFor(MIX, 'ui')).toBe(MIX.ui);
     expect(stripFor(MIX, 'nobody')).toBe(DEFAULT_STRIP);
-    expect(DEFAULT_STRIP).toEqual({ level: 1, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} });
+    expect(DEFAULT_STRIP).toEqual({
+      level: 1,
+      pan: 0,
+      lowCut: LOW_CUT_MIN_HZ,
+      sends: {},
+      inserts: [],
+    });
   });
 });

@@ -107,6 +107,7 @@ packages/client/src/audio/
   returnBus.ts          # sends and returns: the plate, and the delay (resonant damping, soft-clipped loop), 100% wet
   channelStrip.ts       # one part through its strip: fader, stages, rotation and sends off the tail
   lowCutStage.ts        # the strip's first stage: a Butterworth highpass (#640)
+  inserts/              # strip insert kinds: the registry, drive (#641); tanhCurve.ts is their shared clip curve
   stereoRotate.ts       # the pan matrix (splitter -> 4 gains -> merger)
   scheduler.ts          # look-ahead note scheduling
   offlineRender.ts      # bake a patch to an AudioBuffer
@@ -134,7 +135,7 @@ logic inlined in `runRenderLoop`.
 **A song is a list of parts, each with any sequencer** (#597, record
 `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`). An
 `arrangements/<name>.json` is `version: 2` with 1–8 `parts`; each part sits on a unique
-`slot` 0–7, carries its own `strip` (level, pan, low cut, sends) and a `sequencer` whose `kind` is
+`slot` 0–7, carries its own `strip` (level, pan, low cut, sends, inserts) and a `sequencer` whose `kind` is
 `euclidean` (a fixed-note trigger), `arp`, `step` (slow with gate 1, the drone), `grid` (a
 written 1–32 step line of scale degrees, #602), `chord` (a written progression of diatonic
 chords by degree with one voicing per part, #606) or `none` (inert: built and playable from

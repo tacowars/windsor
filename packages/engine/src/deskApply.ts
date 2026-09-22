@@ -20,11 +20,13 @@ import {
   RETURN_LEVEL_MAX,
   REVERB_SPACE_RANGES,
 } from './audioConstants';
+import { FieldNormaliser } from './arrangementFields';
 import type { PartStrip } from './channelStrip';
+import { normaliseInserts } from './inserts/insertRegistry';
 import type { ReturnBus } from './returnBus';
 import type { ReverbSpace } from './reverbSpace';
 
-const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends'];
+const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends', 'inserts'];
 const DELAY_KEYS = ['delayTime', 'feedback', 'damp', 'resonance'];
 const RETURN_KEYS = ['kind', 'level', 'space', ...DELAY_KEYS];
 
@@ -51,8 +53,28 @@ export function applyStripLive(strip: PartStrip, raw: unknown, path: string): st
   if (isNumber(raw.lowCut)) strip.setLowCut(clamp(raw.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ));
   else if (raw.lowCut !== undefined) ignored.push(`${path}.lowCut`);
   if (raw.sends !== undefined) applySends(strip, path, raw.sends, ignored);
+  if (raw.inserts !== undefined) applyInserts(strip, `${path}.inserts`, raw.inserts, ignored);
   return ignored;
 }
+
+/**
+ * A strip's whole `inserts` list (#641; a list replaces wholesale, like every
+ * array in a partial). It goes through the document's own normaliser, so the
+ * live chain and the committed one cannot disagree. A clamp is silent, as it
+ * is for every live number; anything the normaliser dropped or replaced is
+ * reported by its path.
+ */
+function applyInserts(strip: PartStrip, path: string, raw: unknown, ignored: string[]): void {
+  const n = new FieldNormaliser();
+  const specs = normaliseInserts(raw, path, n);
+  for (const message of n.corrections) {
+    if (!CLAMP.test(message)) ignored.push(message.slice(0, message.indexOf(': ')));
+  }
+  if (Array.isArray(raw)) strip.setInserts(specs);
+}
+
+/** A normaliser correction that only moved a number into range. */
+const CLAMP = /: clamped /;
 
 function applySends(strip: PartStrip, path: string, sends: unknown, ignored: string[]): void {
   if (!isRecord(sends)) {

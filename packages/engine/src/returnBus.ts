@@ -34,6 +34,7 @@ import {
 } from './audioConstants';
 import type { DelayReturn, ReturnSpec, ReverbReturn } from './mix';
 import type { ReverbSpace } from './reverbSpace';
+import { tanhCurve } from './tanhCurve';
 import { REVERB_PROCESSOR_NAME } from './workletMessages';
 
 export interface ReturnBus {
@@ -179,22 +180,12 @@ function attachPlate(
   return plate;
 }
 
-let clipCurve: Float32Array<ArrayBuffer> | null = null;
-
 /**
  * `ceiling·tanh(x / ceiling)` over x in ±`DELAY_CLIP_RANGE`·ceiling, sampled
  * for a `WaveShaperNode` whose input is pre-scaled into [-1, 1]. Built once.
  */
 export function delayClipCurve(): Float32Array<ArrayBuffer> {
-  if (clipCurve) return clipCurve;
-  const curve = new Float32Array(DELAY_CLIP_CURVE_POINTS);
-  const last = DELAY_CLIP_CURVE_POINTS - 1;
-  for (let i = 0; i <= last; i++) {
-    const u = (2 * i) / last - 1;
-    curve[i] = DELAY_CLIP_CEILING * Math.tanh(u * DELAY_CLIP_RANGE);
-  }
-  clipCurve = curve;
-  return curve;
+  return tanhCurve(DELAY_CLIP_RANGE, DELAY_CLIP_CURVE_POINTS, DELAY_CLIP_CEILING);
 }
 
 /**
