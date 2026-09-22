@@ -1,0 +1,762 @@
+{
+  "about": "sha256 of each factory preset's interleaved Float32 render through fmProcessorGolden.test.ts, in the default, generic-loop and non-dormant voice paths. Written only by that test under A204_REFRESH_FM_GOLDEN=1, and only when a render change is intended (#643).",
+  "seed": 41476,
+  "sampleRate": 48000,
+  "hashes": {
+    "ai-voice": {
+      "default": "945a78235e5bc5902eb0cec71f9a7f9b40aeb955cd8c7491785ca66b24ff603b",
+      "generic": "945a78235e5bc5902eb0cec71f9a7f9b40aeb955cd8c7491785ca66b24ff603b",
+      "noDormancy": "945a78235e5bc5902eb0cec71f9a7f9b40aeb955cd8c7491785ca66b24ff603b"
+    },
+    "bass-digital": {
+      "default": "445c8f1b46452089bd8e78b5cdb694c578c2baca4a17bfe583145cb418d0cdf7",
+      "generic": "445c8f1b46452089bd8e78b5cdb694c578c2baca4a17bfe583145cb418d0cdf7",
+      "noDormancy": "445c8f1b46452089bd8e78b5cdb694c578c2baca4a17bfe583145cb418d0cdf7"
+    },
+    "build-thunk": {
+      "default": "b79515379ae54ff9f91ba8f92fa931ae7641ecd396703a2bf2b5ac1723903942",
+      "generic": "b79515379ae54ff9f91ba8f92fa931ae7641ecd396703a2bf2b5ac1723903942",
+      "noDormancy": "6feb30b7bc0a432111679af9be9145b0da57fb5ca41f783628d3119ac5a22d78"
+    },
+    "drone-sqr": {
+      "default": "e3a7e1a8e6059119ce7ff4a9fd4185afdbb0157ea99cf02c43deef908448aff0",
+      "generic": "e3a7e1a8e6059119ce7ff4a9fd4185afdbb0157ea99cf02c43deef908448aff0",
+      "noDormancy": "e3a7e1a8e6059119ce7ff4a9fd4185afdbb0157ea99cf02c43deef908448aff0"
+    },
+    "efm-bell-perc": {
+      "default": "0e8d92a7df2908153a0a6da7ed5b25b5be809902d63aed42c860a0fa8a631b2c",
+      "generic": "0e8d92a7df2908153a0a6da7ed5b25b5be809902d63aed42c860a0fa8a631b2c",
+      "noDormancy": "0e8d92a7df2908153a0a6da7ed5b25b5be809902d63aed42c860a0fa8a631b2c"
+    },
+    "efm-clap": {
+      "default": "f0cf7cc85eca12a2498fd0750edef0b48c550f75c40620a98d4b9643e2446ff0",
+      "generic": "f0cf7cc85eca12a2498fd0750edef0b48c550f75c40620a98d4b9643e2446ff0",
+      "noDormancy": "f0cf7cc85eca12a2498fd0750edef0b48c550f75c40620a98d4b9643e2446ff0"
+    },
+    "efm-cowbell": {
+      "default": "3e6afe56c2e5858b49d22521931463bedb9ae8e76479b72308e5e4634eca973a",
+      "generic": "3e6afe56c2e5858b49d22521931463bedb9ae8e76479b72308e5e4634eca973a",
+      "noDormancy": "3e6afe56c2e5858b49d22521931463bedb9ae8e76479b72308e5e4634eca973a"
+    },
+    "efm-crash": {
+      "default": "f99cafa96a46cab145ff844b6911ac5bb9453b820ea77530c5d1d03f8f51d7e5",
+      "generic": "f99cafa96a46cab145ff844b6911ac5bb9453b820ea77530c5d1d03f8f51d7e5",
+      "noDormancy": "f99cafa96a46cab145ff844b6911ac5bb9453b820ea77530c5d1d03f8f51d7e5"
+    },
+    "efm-hat-closed": {
+      "default": "8c459e54d96a6f325e3b8acc786b455f0b6545cba136b12803cd5ca32fb419c4",
+      "generic": "8c459e54d96a6f325e3b8acc786b455f0b6545cba136b12803cd5ca32fb419c4",
+      "noDormancy": "8c459e54d96a6f325e3b8acc786b455f0b6545cba136b12803cd5ca32fb419c4"
+    },
+    "efm-hat-open": {
+      "default": "d9e32396b16c6e049c51e3675bd3f53d530b9075f9e57f690d533559532c5819",
+      "generic": "d9e32396b16c6e049c51e3675bd3f53d530b9075f9e57f690d533559532c5819",
+      "noDormancy": "d9e32396b16c6e049c51e3675bd3f53d530b9075f9e57f690d533559532c5819"
+    },
+    "efm-kick": {
+      "default": "e10a5936d4c4f5a301c77b2fe50e255264d818b00c02257fb469d9ca951e5af0",
+      "generic": "e10a5936d4c4f5a301c77b2fe50e255264d818b00c02257fb469d9ca951e5af0",
+      "noDormancy": "e10a5936d4c4f5a301c77b2fe50e255264d818b00c02257fb469d9ca951e5af0"
+    },
+    "efm-rim": {
+      "default": "78569acac86afd5a705a7b93a0fcb08c6b5785c4aad20e4a3cb166b3e6c3dc2e",
+      "generic": "78569acac86afd5a705a7b93a0fcb08c6b5785c4aad20e4a3cb166b3e6c3dc2e",
+      "noDormancy": "78569acac86afd5a705a7b93a0fcb08c6b5785c4aad20e4a3cb166b3e6c3dc2e"
+    },
+    "efm-snare": {
+      "default": "e4a6731206586ecf652c88999441b860d40e1b288f04bc73ab1643b20021ef27",
+      "generic": "e4a6731206586ecf652c88999441b860d40e1b288f04bc73ab1643b20021ef27",
+      "noDormancy": "e4a6731206586ecf652c88999441b860d40e1b288f04bc73ab1643b20021ef27"
+    },
+    "efm-tom": {
+      "default": "c27e490bf3cde42e198c82fd1271fbfd763a2339325f83bebdbdf4bf64925045",
+      "generic": "c27e490bf3cde42e198c82fd1271fbfd763a2339325f83bebdbdf4bf64925045",
+      "noDormancy": "c27e490bf3cde42e198c82fd1271fbfd763a2339325f83bebdbdf4bf64925045"
+    },
+    "efm-zap": {
+      "default": "01001cf9877531b511ed63c2b0973fce345adfbeb7ba8197f79a91f0cda2721b",
+      "generic": "01001cf9877531b511ed63c2b0973fce345adfbeb7ba8197f79a91f0cda2721b",
+      "noDormancy": "01001cf9877531b511ed63c2b0973fce345adfbeb7ba8197f79a91f0cda2721b"
+    },
+    "hat": {
+      "default": "f01039d3ce672f68711a391208767875039e6cd57d3753152c9cf3307ed6ecce",
+      "generic": "f01039d3ce672f68711a391208767875039e6cd57d3753152c9cf3307ed6ecce",
+      "noDormancy": "f01039d3ce672f68711a391208767875039e6cd57d3753152c9cf3307ed6ecce"
+    },
+    "horde-horn": {
+      "default": "567031238fce204611fe8390e0dfe0b512ad12163e8b892c1d2f406b6fa02cbb",
+      "generic": "567031238fce204611fe8390e0dfe0b512ad12163e8b892c1d2f406b6fa02cbb",
+      "noDormancy": "567031238fce204611fe8390e0dfe0b512ad12163e8b892c1d2f406b6fa02cbb"
+    },
+    "kick": {
+      "default": "5e17bfeb4dcb6a3c5091b5946d836c2c9473e1c3b4169f6754dcf2a2249c61df",
+      "generic": "5e17bfeb4dcb6a3c5091b5946d836c2c9473e1c3b4169f6754dcf2a2249c61df",
+      "noDormancy": "dbdf8c30a3a1b924a597ba5e55aaba2a4c4564dd7f9f647ab9a7f2fec254873f"
+    },
+    "lead-bell": {
+      "default": "744a3f9c50d2290135deb3fbbd1e5cb5967abcde5597a877c169e65222052815",
+      "generic": "744a3f9c50d2290135deb3fbbd1e5cb5967abcde5597a877c169e65222052815",
+      "noDormancy": "744a3f9c50d2290135deb3fbbd1e5cb5967abcde5597a877c169e65222052815"
+    },
+    "pad-drift": {
+      "default": "7912ac29e8ad7c83a0cca1aa76926909be4bb5dbe24d112296bc8c60664cb832",
+      "generic": "7912ac29e8ad7c83a0cca1aa76926909be4bb5dbe24d112296bc8c60664cb832",
+      "noDormancy": "7912ac29e8ad7c83a0cca1aa76926909be4bb5dbe24d112296bc8c60664cb832"
+    },
+    "pickup-blip": {
+      "default": "1a58dd66edb7a6eab9cadf422063d741ffb4a9b3a1a49849364c4dd6618278b4",
+      "generic": "1a58dd66edb7a6eab9cadf422063d741ffb4a9b3a1a49849364c4dd6618278b4",
+      "noDormancy": "1a58dd66edb7a6eab9cadf422063d741ffb4a9b3a1a49849364c4dd6618278b4"
+    },
+    "saw-arp": {
+      "default": "4bfebce1270ed3a21e1c6b26d474bea57ae61e12a35c3b73da6ac225356ca40d",
+      "generic": "4bfebce1270ed3a21e1c6b26d474bea57ae61e12a35c3b73da6ac225356ca40d",
+      "noDormancy": "4bfebce1270ed3a21e1c6b26d474bea57ae61e12a35c3b73da6ac225356ca40d"
+    },
+    "score-afterimage-quartet": {
+      "default": "3849d848cf541e0b56aacba8b09b14348e3531be76954c0b920399cedbe07d5a",
+      "generic": "3849d848cf541e0b56aacba8b09b14348e3531be76954c0b920399cedbe07d5a",
+      "noDormancy": "3849d848cf541e0b56aacba8b09b14348e3531be76954c0b920399cedbe07d5a"
+    },
+    "score-amber-ceiling": {
+      "default": "b3b0d387e19879529e52a309d4b42f41a449fc8ce6d589f15ba4ede318819cbe",
+      "generic": "b3b0d387e19879529e52a309d4b42f41a449fc8ce6d589f15ba4ede318819cbe",
+      "noDormancy": "b3b0d387e19879529e52a309d4b42f41a449fc8ce6d589f15ba4ede318819cbe"
+    },
+    "score-amber-stab": {
+      "default": "8cdc274a39f3b5671291eea7ae98af09f86c8996bada80f4172f4b9cf6968767",
+      "generic": "8cdc274a39f3b5671291eea7ae98af09f86c8996bada80f4172f4b9cf6968767",
+      "noDormancy": "8cdc274a39f3b5671291eea7ae98af09f86c8996bada80f4172f4b9cf6968767"
+    },
+    "score-ash-cathedral": {
+      "default": "664b291855db95977a5cebb7cc67c0822fe78ec23edfcd772ba801010a7e8a14",
+      "generic": "664b291855db95977a5cebb7cc67c0822fe78ec23edfcd772ba801010a7e8a14",
+      "noDormancy": "664b291855db95977a5cebb7cc67c0822fe78ec23edfcd772ba801010a7e8a14"
+    },
+    "score-black-ice-strings": {
+      "default": "961df736a35106667ce97604f3070a522e571b893be10919857ce9fba5891f3e",
+      "generic": "961df736a35106667ce97604f3070a522e571b893be10919857ce9fba5891f3e",
+      "noDormancy": "961df736a35106667ce97604f3070a522e571b893be10919857ce9fba5891f3e"
+    },
+    "score-black-resonator": {
+      "default": "5e639bd20d6e64f1686c15044451e34ed00c7aea4c8e5f3e036c4e29ca7b0012",
+      "generic": "5e639bd20d6e64f1686c15044451e34ed00c7aea4c8e5f3e036c4e29ca7b0012",
+      "noDormancy": "5e639bd20d6e64f1686c15044451e34ed00c7aea4c8e5f3e036c4e29ca7b0012"
+    },
+    "score-blue-vapour": {
+      "default": "0c791f6af18e7ad5fd2f24c21ae1ba5961578b00a2188b42bf129347ae573cf8",
+      "generic": "0c791f6af18e7ad5fd2f24c21ae1ba5961578b00a2188b42bf129347ae573cf8",
+      "noDormancy": "0c791f6af18e7ad5fd2f24c21ae1ba5961578b00a2188b42bf129347ae573cf8"
+    },
+    "score-breathing-rosin": {
+      "default": "c8c5c9cc385c67024e0b7b568d54536c48f4083526d02c17afeb242671dab027",
+      "generic": "c8c5c9cc385c67024e0b7b568d54536c48f4083526d02c17afeb242671dab027",
+      "noDormancy": "c8c5c9cc385c67024e0b7b568d54536c48f4083526d02c17afeb242671dab027"
+    },
+    "score-bright-air-riser": {
+      "default": "7061b5c5892ce8d4eb4203ffa47752c1d7305aa9a57808702c8b82acc58229df",
+      "generic": "7061b5c5892ce8d4eb4203ffa47752c1d7305aa9a57808702c8b82acc58229df",
+      "noDormancy": "7061b5c5892ce8d4eb4203ffa47752c1d7305aa9a57808702c8b82acc58229df"
+    },
+    "score-broken-relay": {
+      "default": "2b295633d6292fd7feaaaefef67bd361c2de6497c7b60e946afb21b7dd1d6cf8",
+      "generic": "2b295633d6292fd7feaaaefef67bd361c2de6497c7b60e946afb21b7dd1d6cf8",
+      "noDormancy": "2b295633d6292fd7feaaaefef67bd361c2de6497c7b60e946afb21b7dd1d6cf8"
+    },
+    "score-bronze-rain": {
+      "default": "90ea1c91bfcf8e9a9cceaa3120b3e0d6523606bf2369b29e087c3c056fc55621",
+      "generic": "90ea1c91bfcf8e9a9cceaa3120b3e0d6523606bf2369b29e087c3c056fc55621",
+      "noDormancy": "90ea1c91bfcf8e9a9cceaa3120b3e0d6523606bf2369b29e087c3c056fc55621"
+    },
+    "score-buffer-drift": {
+      "default": "b6ec3ec9912556f494d3c46aba3bb2f9307e988a185f441454fa57e597da8104",
+      "generic": "b6ec3ec9912556f494d3c46aba3bb2f9307e988a185f441454fa57e597da8104",
+      "noDormancy": "b6ec3ec9912556f494d3c46aba3bb2f9307e988a185f441454fa57e597da8104"
+    },
+    "score-buried-voices": {
+      "default": "cb97c00632617feeca2f842e90c996bb3c025dce79618590d6e900c1eb417303",
+      "generic": "cb97c00632617feeca2f842e90c996bb3c025dce79618590d6e900c1eb417303",
+      "noDormancy": "cb97c00632617feeca2f842e90c996bb3c025dce79618590d6e900c1eb417303"
+    },
+    "score-carbon-reed": {
+      "default": "cccf6f159ffc6e918b5f39c34f0ddf51aa88c6b1121718e86137c5e6acdd86a3",
+      "generic": "cccf6f159ffc6e918b5f39c34f0ddf51aa88c6b1121718e86137c5e6acdd86a3",
+      "noDormancy": "cccf6f159ffc6e918b5f39c34f0ddf51aa88c6b1121718e86137c5e6acdd86a3"
+    },
+    "score-concrete-chord": {
+      "default": "22cc5a226a404b2fd3fc6ebd5637f9f21c2083fe4e1d5923e94f30198e8c5aea",
+      "generic": "22cc5a226a404b2fd3fc6ebd5637f9f21c2083fe4e1d5923e94f30198e8c5aea",
+      "noDormancy": "22cc5a226a404b2fd3fc6ebd5637f9f21c2083fe4e1d5923e94f30198e8c5aea"
+    },
+    "score-copper-step": {
+      "default": "caa1bfd01ccf81b6df0bf347e801d2e032d225493a03c67d3733025d25d71e9d",
+      "generic": "caa1bfd01ccf81b6df0bf347e801d2e032d225493a03c67d3733025d25d71e9d",
+      "noDormancy": "caa1bfd01ccf81b6df0bf347e801d2e032d225493a03c67d3733025d25d71e9d"
+    },
+    "score-corrupt-clock": {
+      "default": "06292817cc83993574791f007cc5f0bb481fa0e99bd63cb0299abe5316fb7403",
+      "generic": "06292817cc83993574791f007cc5f0bb481fa0e99bd63cb0299abe5316fb7403",
+      "noDormancy": "06292817cc83993574791f007cc5f0bb481fa0e99bd63cb0299abe5316fb7403"
+    },
+    "score-data-fragments": {
+      "default": "0f86265a2b1ff2351038839dad21dc5254a64e6e0b041209c2b5babaf923884a",
+      "generic": "0f86265a2b1ff2351038839dad21dc5254a64e6e0b041209c2b5babaf923884a",
+      "noDormancy": "0f86265a2b1ff2351038839dad21dc5254a64e6e0b041209c2b5babaf923884a"
+    },
+    "score-deep-current": {
+      "default": "e6ae469211b9232d2f28c6d31d1f91e55b8c96bbca0d29a5524178ee5a6b9ec8",
+      "generic": "e6ae469211b9232d2f28c6d31d1f91e55b8c96bbca0d29a5524178ee5a6b9ec8",
+      "noDormancy": "e6ae469211b9232d2f28c6d31d1f91e55b8c96bbca0d29a5524178ee5a6b9ec8"
+    },
+    "score-deep-static": {
+      "default": "d7c1f6b021eaf86676efdba30e63ad50c00d2ee1fc62542e96e59540a104dac5",
+      "generic": "d7c1f6b021eaf86676efdba30e63ad50c00d2ee1fc62542e96e59540a104dac5",
+      "noDormancy": "d7c1f6b021eaf86676efdba30e63ad50c00d2ee1fc62542e96e59540a104dac5"
+    },
+    "score-distant-gantry": {
+      "default": "429ae7719fc0e3be572d8ad646b7889e084d50bdffc4458bafd2c1b84bb33ed2",
+      "generic": "429ae7719fc0e3be572d8ad646b7889e084d50bdffc4458bafd2c1b84bb33ed2",
+      "noDormancy": "429ae7719fc0e3be572d8ad646b7889e084d50bdffc4458bafd2c1b84bb33ed2"
+    },
+    "score-dockside-bass": {
+      "default": "7fe404e7c716b1e888547af7dc7b73b6fc88d57dfc65a8714dfb33ea3655759e",
+      "generic": "7fe404e7c716b1e888547af7dc7b73b6fc88d57dfc65a8714dfb33ea3655759e",
+      "noDormancy": "7fe404e7c716b1e888547af7dc7b73b6fc88d57dfc65a8714dfb33ea3655759e"
+    },
+    "score-drowned-cellos": {
+      "default": "53a1dba78874361f5aa0de3ee92a00344b6f8d2c2ff7cc13a387b33266a6cc37",
+      "generic": "53a1dba78874361f5aa0de3ee92a00344b6f8d2c2ff7cc13a387b33266a6cc37",
+      "noDormancy": "53a1dba78874361f5aa0de3ee92a00344b6f8d2c2ff7cc13a387b33266a6cc37"
+    },
+    "score-dry-relay": {
+      "default": "5b68416232da9c5960e8c27ba404762e2ba1253a903bcf72ff8494b9ee1edcc3",
+      "generic": "5b68416232da9c5960e8c27ba404762e2ba1253a903bcf72ff8494b9ee1edcc3",
+      "noDormancy": "a19fdcab7128450b81b9b8be1b03af7f625249ecd57253ebb0e295386b49e76a"
+    },
+    "score-dry-ticker": {
+      "default": "12f2e0a2b7ec5a116c0ddf55a4e3b7a8ee975416eff84a7d16900045a32e6f05",
+      "generic": "12f2e0a2b7ec5a116c0ddf55a4e3b7a8ee975416eff84a7d16900045a32e6f05",
+      "noDormancy": "12f2e0a2b7ec5a116c0ddf55a4e3b7a8ee975416eff84a7d16900045a32e6f05"
+    },
+    "score-empty-station": {
+      "default": "6ca716fbdb8c545d3dc6981dc4b9954d3ca8465a515f760dfdbdd7f4e56ea884",
+      "generic": "6ca716fbdb8c545d3dc6981dc4b9954d3ca8465a515f760dfdbdd7f4e56ea884",
+      "noDormancy": "6ca716fbdb8c545d3dc6981dc4b9954d3ca8465a515f760dfdbdd7f4e56ea884"
+    },
+    "score-engine-pulser": {
+      "default": "e9e8a929a3d0b6afd5cbc6088235d6b464ddc5b5d3583cb5ebc0274590f44356",
+      "generic": "e9e8a929a3d0b6afd5cbc6088235d6b464ddc5b5d3583cb5ebc0274590f44356",
+      "noDormancy": "e9e8a929a3d0b6afd5cbc6088235d6b464ddc5b5d3583cb5ebc0274590f44356"
+    },
+    "score-estuary-violas": {
+      "default": "ce19eddaa9fb87e92fc7b8bc5d8ea8950266539be72451d6ed201fd41a0d156d",
+      "generic": "ce19eddaa9fb87e92fc7b8bc5d8ea8950266539be72451d6ed201fd41a0d156d",
+      "noDormancy": "ce19eddaa9fb87e92fc7b8bc5d8ea8950266539be72451d6ed201fd41a0d156d"
+    },
+    "score-faded-neon": {
+      "default": "a1b494cac811befeafc4b77d46f0605047a85ded7236c24393fe7201024c1e0f",
+      "generic": "a1b494cac811befeafc4b77d46f0605047a85ded7236c24393fe7201024c1e0f",
+      "noDormancy": "a1b494cac811befeafc4b77d46f0605047a85ded7236c24393fe7201024c1e0f"
+    },
+    "score-felt-circuit": {
+      "default": "f50f2b56a36f52fdcc7361e500356fe34e9b5418cfc8f006473de7a413ac5ebb",
+      "generic": "f50f2b56a36f52fdcc7361e500356fe34e9b5418cfc8f006473de7a413ac5ebb",
+      "noDormancy": "f50f2b56a36f52fdcc7361e500356fe34e9b5418cfc8f006473de7a413ac5ebb"
+    },
+    "score-felt-sub": {
+      "default": "f18d3213b097bd8715e9fb8745d800fb74c8f3b1f76fc1f2c44624c250c1886f",
+      "generic": "f18d3213b097bd8715e9fb8745d800fb74c8f3b1f76fc1f2c44624c250c1886f",
+      "noDormancy": "f18d3213b097bd8715e9fb8745d800fb74c8f3b1f76fc1f2c44624c250c1886f"
+    },
+    "score-frozen-bow": {
+      "default": "b8542f54cd0de7dc13d606732e3bbaa032d9bba85c0db6d239cb3c9a889d319f",
+      "generic": "b8542f54cd0de7dc13d606732e3bbaa032d9bba85c0db6d239cb3c9a889d319f",
+      "noDormancy": "b8542f54cd0de7dc13d606732e3bbaa032d9bba85c0db6d239cb3c9a889d319f"
+    },
+    "score-ghost-formants": {
+      "default": "96dcc25f24039a56164879327dcd778b5c4493978689fa4f2f1bcb77857b0e80",
+      "generic": "96dcc25f24039a56164879327dcd778b5c4493978689fa4f2f1bcb77857b0e80",
+      "noDormancy": "96dcc25f24039a56164879327dcd778b5c4493978689fa4f2f1bcb77857b0e80"
+    },
+    "score-glass-horizon": {
+      "default": "846c5eeddf8448faf97a1f1b62ddd3718dc6d1a1e34a914e0545802f804c55fb",
+      "generic": "846c5eeddf8448faf97a1f1b62ddd3718dc6d1a1e34a914e0545802f804c55fb",
+      "noDormancy": "846c5eeddf8448faf97a1f1b62ddd3718dc6d1a1e34a914e0545802f804c55fb"
+    },
+    "score-glass-pebble": {
+      "default": "2c01586733d700a77e1c8bd15e3019a7f102905360d475051f91d2e061398e25",
+      "generic": "2c01586733d700a77e1c8bd15e3019a7f102905360d475051f91d2e061398e25",
+      "noDormancy": "c1d699382e0a9c13f18e2a2a5b0229a166e67eb5d69c84dee0ed10069181c955"
+    },
+    "score-granular-hiss": {
+      "default": "2279e43db9022d1b9e779838f309d6c12aac178bc744b0fb291d1c47d8cfbf65",
+      "generic": "2279e43db9022d1b9e779838f309d6c12aac178bc744b0fb291d1c47d8cfbf65",
+      "noDormancy": "2279e43db9022d1b9e779838f309d6c12aac178bc744b0fb291d1c47d8cfbf65"
+    },
+    "score-graphite-bass": {
+      "default": "13bc185a6a4fca1dff212591300dff57063e2544ff80691c4a4dec733e33c9f1",
+      "generic": "13bc185a6a4fca1dff212591300dff57063e2544ff80691c4a4dec733e33c9f1",
+      "noDormancy": "13bc185a6a4fca1dff212591300dff57063e2544ff80691c4a4dec733e33c9f1"
+    },
+    "score-harbour-fog": {
+      "default": "1e3f3b1dacbd193441a83183548c6bfc68942c25c4c81353a2c58b998cf02b08",
+      "generic": "1e3f3b1dacbd193441a83183548c6bfc68942c25c4c81353a2c58b998cf02b08",
+      "noDormancy": "1e3f3b1dacbd193441a83183548c6bfc68942c25c4c81353a2c58b998cf02b08"
+    },
+    "score-high-tremolo": {
+      "default": "31a989261de04ed8b1760f4e9da0a031c54a3376b49ca3ced7b06608b670f651",
+      "generic": "31a989261de04ed8b1760f4e9da0a031c54a3376b49ca3ced7b06608b670f651",
+      "noDormancy": "31a989261de04ed8b1760f4e9da0a031c54a3376b49ca3ced7b06608b670f651"
+    },
+    "score-hollow-anchor": {
+      "default": "42a76bfa5a808ecf64546f233e177208fc967ffbb9464a2ab2c785df8bb82f13",
+      "generic": "42a76bfa5a808ecf64546f233e177208fc967ffbb9464a2ab2c785df8bb82f13",
+      "noDormancy": "42a76bfa5a808ecf64546f233e177208fc967ffbb9464a2ab2c785df8bb82f13"
+    },
+    "score-hollow-bows": {
+      "default": "9074c332c7a5c054beacbe059baf0ba57b8865877f73aee5d4d65d97bf94bea5",
+      "generic": "9074c332c7a5c054beacbe059baf0ba57b8865877f73aee5d4d65d97bf94bea5",
+      "noDormancy": "9074c332c7a5c054beacbe059baf0ba57b8865877f73aee5d4d65d97bf94bea5"
+    },
+    "score-hollow-droplet": {
+      "default": "3d4fe81f0432d6240acac9dc1013138777128a5aaacedb89bfc73bba6f0da90a",
+      "generic": "3d4fe81f0432d6240acac9dc1013138777128a5aaacedb89bfc73bba6f0da90a",
+      "noDormancy": "3d4fe81f0432d6240acac9dc1013138777128a5aaacedb89bfc73bba6f0da90a"
+    },
+    "score-hollow-ticker": {
+      "default": "1e7f2cc22120fcd27fb1aa6e7c8c9f3a5fe29b8701c7cb04e840a851b947926c",
+      "generic": "1e7f2cc22120fcd27fb1aa6e7c8c9f3a5fe29b8701c7cb04e840a851b947926c",
+      "noDormancy": "1e7f2cc22120fcd27fb1aa6e7c8c9f3a5fe29b8701c7cb04e840a851b947926c"
+    },
+    "score-ice-needle": {
+      "default": "42869577543b479277eb3316fa5dabf900f912f3a01394ffd979ae07f02a75f3",
+      "generic": "42869577543b479277eb3316fa5dabf900f912f3a01394ffd979ae07f02a75f3",
+      "noDormancy": "42869577543b479277eb3316fa5dabf900f912f3a01394ffd979ae07f02a75f3"
+    },
+    "score-iron-root": {
+      "default": "c74e123c14a6672921807ba7a8136c5233ae78e48d286bfbae879c39d2dd80d7",
+      "generic": "c74e123c14a6672921807ba7a8136c5233ae78e48d286bfbae879c39d2dd80d7",
+      "noDormancy": "c74e123c14a6672921807ba7a8136c5233ae78e48d286bfbae879c39d2dd80d7"
+    },
+    "score-last-light-bell": {
+      "default": "3a0aa3bbeaad759b96ba2683df2c7060e61d7c18c19a7b46f5c27e10222d81fd",
+      "generic": "3a0aa3bbeaad759b96ba2683df2c7060e61d7c18c19a7b46f5c27e10222d81fd",
+      "noDormancy": "3a0aa3bbeaad759b96ba2683df2c7060e61d7c18c19a7b46f5c27e10222d81fd"
+    },
+    "score-long-downwash": {
+      "default": "d454e1ab01fd346c2595f0dd85d2b2c679aea96727fed84b144d6aa43feded54",
+      "generic": "d454e1ab01fd346c2595f0dd85d2b2c679aea96727fed84b144d6aa43feded54",
+      "noDormancy": "d454e1ab01fd346c2595f0dd85d2b2c679aea96727fed84b144d6aa43feded54"
+    },
+    "score-long-dusk": {
+      "default": "458ced915c1e4c9a3a934b88750520c567a6e10a6f6e4ff506bc07b896cfd5c1",
+      "generic": "458ced915c1e4c9a3a934b88750520c567a6e10a6f6e4ff506bc07b896cfd5c1",
+      "noDormancy": "458ced915c1e4c9a3a934b88750520c567a6e10a6f6e4ff506bc07b896cfd5c1"
+    },
+    "score-low-transformer": {
+      "default": "a2f927efe6c04896aedddd61d53b831187f09528e3f15ca54b8ca202b01128cf",
+      "generic": "a2f927efe6c04896aedddd61d53b831187f09528e3f15ca54b8ca202b01128cf",
+      "noDormancy": "a2f927efe6c04896aedddd61d53b831187f09528e3f15ca54b8ca202b01128cf"
+    },
+    "score-low-tremolo": {
+      "default": "e05f8e022043f9f8aa8f0edb80efd1a03338db0406fae2347df3592fe98fa192",
+      "generic": "e05f8e022043f9f8aa8f0edb80efd1a03338db0406fae2347df3592fe98fa192",
+      "noDormancy": "e05f8e022043f9f8aa8f0edb80efd1a03338db0406fae2347df3592fe98fa192"
+    },
+    "score-low-weather": {
+      "default": "f7773af69e661a8087d3c321e4f809650fc7c9849adc75cbc4746491cb2a9a38",
+      "generic": "f7773af69e661a8087d3c321e4f809650fc7c9849adc75cbc4746491cb2a9a38",
+      "noDormancy": "f7773af69e661a8087d3c321e4f809650fc7c9849adc75cbc4746491cb2a9a38"
+    },
+    "score-magnetic-veil": {
+      "default": "1e5f19f4fee3ef75ee772b417b8dfafbe317aad67ec395dd0ee34055711f956f",
+      "generic": "1e5f19f4fee3ef75ee772b417b8dfafbe317aad67ec395dd0ee34055711f956f",
+      "noDormancy": "1e5f19f4fee3ef75ee772b417b8dfafbe317aad67ec395dd0ee34055711f956f"
+    },
+    "score-moss-stab": {
+      "default": "659ae0a94d070fc776fd79c546cb1436e575ba02c9d3d8768d1d49ff3efeb2e4",
+      "generic": "659ae0a94d070fc776fd79c546cb1436e575ba02c9d3d8768d1d49ff3efeb2e4",
+      "noDormancy": "659ae0a94d070fc776fd79c546cb1436e575ba02c9d3d8768d1d49ff3efeb2e4"
+    },
+    "score-muted-cable": {
+      "default": "a99f9b58d9be24f120306de68721194f7b800851e1d862db45452b47d48bc488",
+      "generic": "a99f9b58d9be24f120306de68721194f7b800851e1d862db45452b47d48bc488",
+      "noDormancy": "a99f9b58d9be24f120306de68721194f7b800851e1d862db45452b47d48bc488"
+    },
+    "score-muted-chamber": {
+      "default": "607cb2747aef009d9a79aabaa1af19e448098264ad9cee98f96a95b1d07e2870",
+      "generic": "607cb2747aef009d9a79aabaa1af19e448098264ad9cee98f96a95b1d07e2870",
+      "noDormancy": "607cb2747aef009d9a79aabaa1af19e448098264ad9cee98f96a95b1d07e2870"
+    },
+    "score-narrow-riser": {
+      "default": "ce01c9cda6395545999c2bf24ae80b3ad2744d2f6d170bd4ae08913312b7f13d",
+      "generic": "ce01c9cda6395545999c2bf24ae80b3ad2744d2f6d170bd4ae08913312b7f13d",
+      "noDormancy": "ce01c9cda6395545999c2bf24ae80b3ad2744d2f6d170bd4ae08913312b7f13d"
+    },
+    "score-night-choir": {
+      "default": "d99924968aea15e40098ffc97e47cc3acc9fb6f5dd2348aadce9dcb3c4207f6c",
+      "generic": "d99924968aea15e40098ffc97e47cc3acc9fb6f5dd2348aadce9dcb3c4207f6c",
+      "noDormancy": "d99924968aea15e40098ffc97e47cc3acc9fb6f5dd2348aadce9dcb3c4207f6c"
+    },
+    "score-night-rubber": {
+      "default": "a023fd9f636232ae4fe49e64d85683f44459ce19080375ec16037b58823b3e61",
+      "generic": "a023fd9f636232ae4fe49e64d85683f44459ce19080375ec16037b58823b3e61",
+      "noDormancy": "a023fd9f636232ae4fe49e64d85683f44459ce19080375ec16037b58823b3e61"
+    },
+    "score-open-sea": {
+      "default": "f79b99c0b2472b13212a6c3232382de0973c5e506357be4bcafa52e8af902225",
+      "generic": "f79b99c0b2472b13212a6c3232382de0973c5e506357be4bcafa52e8af902225",
+      "noDormancy": "f79b99c0b2472b13212a6c3232382de0973c5e506357be4bcafa52e8af902225"
+    },
+    "score-pale-monolith": {
+      "default": "0cae2cf92d1983a67447325ffc18c97ea54cc16fa5263c1a984d63ded3744be0",
+      "generic": "0cae2cf92d1983a67447325ffc18c97ea54cc16fa5263c1a984d63ded3744be0",
+      "noDormancy": "0cae2cf92d1983a67447325ffc18c97ea54cc16fa5263c1a984d63ded3744be0"
+    },
+    "score-passing-vapour": {
+      "default": "73dcb235e46e0e03dbfbd7f851818fa278fe1e074f9afee29a3af2d115cab99f",
+      "generic": "73dcb235e46e0e03dbfbd7f851818fa278fe1e074f9afee29a3af2d115cab99f",
+      "noDormancy": "73dcb235e46e0e03dbfbd7f851818fa278fe1e074f9afee29a3af2d115cab99f"
+    },
+    "score-polar-bloom": {
+      "default": "9f26b3bedac1e0938fb1f7da4f1f0ec2bc3802e0ff1838b3b5aaf60b3d7c1e26",
+      "generic": "9f26b3bedac1e0938fb1f7da4f1f0ec2bc3802e0ff1838b3b5aaf60b3d7c1e26",
+      "noDormancy": "9f26b3bedac1e0938fb1f7da4f1f0ec2bc3802e0ff1838b3b5aaf60b3d7c1e26"
+    },
+    "score-porcelain-drop": {
+      "default": "7ba73a768a3304608b71456815060585981100d4c9aef1dc5f69a5dcf4054f4e",
+      "generic": "7ba73a768a3304608b71456815060585981100d4c9aef1dc5f69a5dcf4054f4e",
+      "noDormancy": "7ba73a768a3304608b71456815060585981100d4c9aef1dc5f69a5dcf4054f4e"
+    },
+    "score-quick-downwash": {
+      "default": "5992f23f5b9bf52f243d448a9ddf541083c5713277701503c0ef44e187628c38",
+      "generic": "5992f23f5b9bf52f243d448a9ddf541083c5713277701503c0ef44e187628c38",
+      "noDormancy": "5992f23f5b9bf52f243d448a9ddf541083c5713277701503c0ef44e187628c38"
+    },
+    "score-quiet-reactor": {
+      "default": "9b9cd46fae84c85f4fb073b7dc1dc74f4d3c9b64155528490495af904e564d6e",
+      "generic": "9b9cd46fae84c85f4fb073b7dc1dc74f4d3c9b64155528490495af904e564d6e",
+      "noDormancy": "9b9cd46fae84c85f4fb073b7dc1dc74f4d3c9b64155528490495af904e564d6e"
+    },
+    "score-radio-dust": {
+      "default": "61018791ba1cd8b43833f177153a23dc1c1c13907d4eae8515a6dabef2482d5a",
+      "generic": "61018791ba1cd8b43833f177153a23dc1c1c13907d4eae8515a6dabef2482d5a",
+      "noDormancy": "61018791ba1cd8b43833f177153a23dc1c1c13907d4eae8515a6dabef2482d5a"
+    },
+    "score-remote-orchestra": {
+      "default": "079cba99a0497caddbcb4ea97fae32e0b539fc9bd365ab80ed134e339438ec54",
+      "generic": "079cba99a0497caddbcb4ea97fae32e0b539fc9bd365ab80ed134e339438ec54",
+      "noDormancy": "079cba99a0497caddbcb4ea97fae32e0b539fc9bd365ab80ed134e339438ec54"
+    },
+    "score-round-foundation": {
+      "default": "54e62d1585310cbe4d5d49dde007e861ec3a0a223bc5e6bc67d2aa52fe1de321",
+      "generic": "54e62d1585310cbe4d5d49dde007e861ec3a0a223bc5e6bc67d2aa52fe1de321",
+      "noDormancy": "54e62d1585310cbe4d5d49dde007e861ec3a0a223bc5e6bc67d2aa52fe1de321"
+    },
+    "score-rubber-key": {
+      "default": "ccb6f5582136b9e10fd68f15484459fcd4b55489b87204a5b202170808761e05",
+      "generic": "ccb6f5582136b9e10fd68f15484459fcd4b55489b87204a5b202170808761e05",
+      "noDormancy": "ccb6f5582136b9e10fd68f15484459fcd4b55489b87204a5b202170808761e05"
+    },
+    "score-rust-ensemble": {
+      "default": "76bb4236dcb2d7ad5162bd172a6ba3c3f8e630e9989c9bd61fa2eaf10aa0c7cf",
+      "generic": "76bb4236dcb2d7ad5162bd172a6ba3c3f8e630e9989c9bd61fa2eaf10aa0c7cf",
+      "noDormancy": "76bb4236dcb2d7ad5162bd172a6ba3c3f8e630e9989c9bd61fa2eaf10aa0c7cf"
+    },
+    "score-rusted-tine": {
+      "default": "d9da083ff9cc8368ebddae57fab4d1b7860a87fda864ba4d5252e08b19798531",
+      "generic": "d9da083ff9cc8368ebddae57fab4d1b7860a87fda864ba4d5252e08b19798531",
+      "noDormancy": "d9da083ff9cc8368ebddae57fab4d1b7860a87fda864ba4d5252e08b19798531"
+    },
+    "score-salt-violins": {
+      "default": "caf93cf680b2f0b972a9bd5f9d5f9f8cd3b130ebb02378b14ff814376c85d120",
+      "generic": "caf93cf680b2f0b972a9bd5f9d5f9f8cd3b130ebb02378b14ff814376c85d120",
+      "noDormancy": "caf93cf680b2f0b972a9bd5f9d5f9f8cd3b130ebb02378b14ff814376c85d120"
+    },
+    "score-shortwave-chord": {
+      "default": "f02645044ed80de925b5ce4c0d17ee8d0c38e604f972731e5af2578fec2c969d",
+      "generic": "f02645044ed80de925b5ce4c0d17ee8d0c38e604f972731e5af2578fec2c969d",
+      "noDormancy": "6f54c2133a22f3dfacb98ea5fcbf4a5487c58b2a93195c3be8b946b439e702b5"
+    },
+    "score-silk-swish": {
+      "default": "ad81e4ee042d3b17b1b389feb0fbcd5d37e08bda5467535735820c94685305c6",
+      "generic": "ad81e4ee042d3b17b1b389feb0fbcd5d37e08bda5467535735820c94685305c6",
+      "noDormancy": "ad81e4ee042d3b17b1b389feb0fbcd5d37e08bda5467535735820c94685305c6"
+    },
+    "score-silt-contrabass": {
+      "default": "bccc548b5e10c7c70b12451237990df3bc403e17e4be6a08e704e914d8e4a04a",
+      "generic": "bccc548b5e10c7c70b12451237990df3bc403e17e4be6a08e704e914d8e4a04a",
+      "noDormancy": "bccc548b5e10c7c70b12451237990df3bc403e17e4be6a08e704e914d8e4a04a"
+    },
+    "score-silt-pulse-bass": {
+      "default": "5db2797b9c47c8fc287b8039ce9e8e4ef72e042bfe29e570df6076b8ac60ef1c",
+      "generic": "5db2797b9c47c8fc287b8039ce9e8e4ef72e042bfe29e570df6076b8ac60ef1c",
+      "noDormancy": "5db2797b9c47c8fc287b8039ce9e8e4ef72e042bfe29e570df6076b8ac60ef1c"
+    },
+    "score-silver-dust": {
+      "default": "4b2621d78c43184973245ebb1f3732bc7f3c913e94652a13d3d9c6fa0d647792",
+      "generic": "4b2621d78c43184973245ebb1f3732bc7f3c913e94652a13d3d9c6fa0d647792",
+      "noDormancy": "4b2621d78c43184973245ebb1f3732bc7f3c913e94652a13d3d9c6fa0d647792"
+    },
+    "score-sine-weight": {
+      "default": "871878999b8709dbce21bde3ea5c4c1a87365e3e62abc8fe4d30fb9acf11ba9d",
+      "generic": "871878999b8709dbce21bde3ea5c4c1a87365e3e62abc8fe4d30fb9acf11ba9d",
+      "noDormancy": "871878999b8709dbce21bde3ea5c4c1a87365e3e62abc8fe4d30fb9acf11ba9d"
+    },
+    "score-slow-air-riser": {
+      "default": "403dab2adaf1d5ff8d14a8b719b5057ca78c850a31476fde10984115fa6f87c1",
+      "generic": "403dab2adaf1d5ff8d14a8b719b5057ca78c850a31476fde10984115fa6f87c1",
+      "noDormancy": "403dab2adaf1d5ff8d14a8b719b5057ca78c850a31476fde10984115fa6f87c1"
+    },
+    "score-slow-beacon": {
+      "default": "911588cdaf5f61c2a623c10b5affad810ea4348794bb28fdf5b8f30a7bc8a675",
+      "generic": "911588cdaf5f61c2a623c10b5affad810ea4348794bb28fdf5b8f30a7bc8a675",
+      "noDormancy": "911588cdaf5f61c2a623c10b5affad810ea4348794bb28fdf5b8f30a7bc8a675"
+    },
+    "score-soft-machinery": {
+      "default": "336321124a69f92f3910a53276b7e4809dbaf1ac14caf4fe0fe8e34d81e87c81",
+      "generic": "336321124a69f92f3910a53276b7e4809dbaf1ac14caf4fe0fe8e34d81e87c81",
+      "noDormancy": "336321124a69f92f3910a53276b7e4809dbaf1ac14caf4fe0fe8e34d81e87c81"
+    },
+    "score-soft-undertow": {
+      "default": "b9b66c34baf8506cc8142dc51896b70d7879af10f6a3027b42c5ea9afdd19afe",
+      "generic": "b9b66c34baf8506cc8142dc51896b70d7879af10f6a3027b42c5ea9afdd19afe",
+      "noDormancy": "b9b66c34baf8506cc8142dc51896b70d7879af10f6a3027b42c5ea9afdd19afe"
+    },
+    "score-stone-marimba": {
+      "default": "52157bbb302acdc7b996faed9e2d590780da3e65f5926dfa03acbb434992a4e9",
+      "generic": "52157bbb302acdc7b996faed9e2d590780da3e65f5926dfa03acbb434992a4e9",
+      "noDormancy": "52157bbb302acdc7b996faed9e2d590780da3e65f5926dfa03acbb434992a4e9"
+    },
+    "score-submerged-keys": {
+      "default": "a61d516b9e6c3b895a013131fd981d4a73e2bdb19602fca577607af675bf7744",
+      "generic": "a61d516b9e6c3b895a013131fd981d4a73e2bdb19602fca577607af675bf7744",
+      "noDormancy": "a61d516b9e6c3b895a013131fd981d4a73e2bdb19602fca577607af675bf7744"
+    },
+    "score-suspended-steel": {
+      "default": "42814942a40ce39026c55f1f5b7109a6e46ceaa83b8e7df479b6eccf7a743877",
+      "generic": "42814942a40ce39026c55f1f5b7109a6e46ceaa83b8e7df479b6eccf7a743877",
+      "noDormancy": "42814942a40ce39026c55f1f5b7109a6e46ceaa83b8e7df479b6eccf7a743877"
+    },
+    "score-tape-halo": {
+      "default": "0b0814f0d7e0bd4125fc21141a17114a588537ac1f0fc7662fbd0980503a11cb",
+      "generic": "0b0814f0d7e0bd4125fc21141a17114a588537ac1f0fc7662fbd0980503a11cb",
+      "noDormancy": "0b0814f0d7e0bd4125fc21141a17114a588537ac1f0fc7662fbd0980503a11cb"
+    },
+    "score-tidal-memory": {
+      "default": "0081a2a95109d8f32b3e2b54c0167867a1ea774384945cbba7f24b342c0c9db4",
+      "generic": "0081a2a95109d8f32b3e2b54c0167867a1ea774384945cbba7f24b342c0c9db4",
+      "noDormancy": "0081a2a95109d8f32b3e2b54c0167867a1ea774384945cbba7f24b342c0c9db4"
+    },
+    "score-tin-kalimba": {
+      "default": "783604c5d04a573c8ef9676ecf3ad82714414ff9323bf45ce003dc596706640f",
+      "generic": "783604c5d04a573c8ef9676ecf3ad82714414ff9323bf45ce003dc596706640f",
+      "noDormancy": "783604c5d04a573c8ef9676ecf3ad82714414ff9323bf45ce003dc596706640f"
+    },
+    "score-tunnel-growl": {
+      "default": "075a5f5b70ac04dd92f4fbc9065d4b949720b4fe79aea28a262e05f4b271c816",
+      "generic": "075a5f5b70ac04dd92f4fbc9065d4b949720b4fe79aea28a262e05f4b271c816",
+      "noDormancy": "075a5f5b70ac04dd92f4fbc9065d4b949720b4fe79aea28a262e05f4b271c816"
+    },
+    "score-underwater-room": {
+      "default": "eb2a5e69f16111f01571f712f33dec2ed699953c59bf2da0a7306d7effedb358",
+      "generic": "eb2a5e69f16111f01571f712f33dec2ed699953c59bf2da0a7306d7effedb358",
+      "noDormancy": "eb2a5e69f16111f01571f712f33dec2ed699953c59bf2da0a7306d7effedb358"
+    },
+    "score-uneasy-scale": {
+      "default": "22a6a6d75e570e11b97c36df0c546c827b3e8fc1e6a8f74f5e90994c98b6f1bb",
+      "generic": "22a6a6d75e570e11b97c36df0c546c827b3e8fc1e6a8f74f5e90994c98b6f1bb",
+      "noDormancy": "22a6a6d75e570e11b97c36df0c546c827b3e8fc1e6a8f74f5e90994c98b6f1bb"
+    },
+    "score-velvet-airlock": {
+      "default": "839821c3ef19d403b0da7be276bcb5470c71893bc9c0d8495c494ef99808e4f4",
+      "generic": "839821c3ef19d403b0da7be276bcb5470c71893bc9c0d8495c494ef99808e4f4",
+      "noDormancy": "839821c3ef19d403b0da7be276bcb5470c71893bc9c0d8495c494ef99808e4f4"
+    },
+    "score-velvet-offbeat": {
+      "default": "b6b05fc665e98f907fc8bd9a441efbb586bc73ccad30c1e5b899d705d29bbe26",
+      "generic": "b6b05fc665e98f907fc8bd9a441efbb586bc73ccad30c1e5b899d705d29bbe26",
+      "noDormancy": "b6b05fc665e98f907fc8bd9a441efbb586bc73ccad30c1e5b899d705d29bbe26"
+    },
+    "score-vent-breath": {
+      "default": "ac4d623c29e95d99a8d8dc0ef0af7f7a3499723923784b739c620d23c192c100",
+      "generic": "ac4d623c29e95d99a8d8dc0ef0af7f7a3499723923784b739c620d23c192c100",
+      "noDormancy": "ac4d623c29e95d99a8d8dc0ef0af7f7a3499723923784b739c620d23c192c100"
+    },
+    "score-violet-section": {
+      "default": "c0c4bfd85075b607279968fd3246c34dda13d72c78bcacf78acd3f99063b0ff7",
+      "generic": "c0c4bfd85075b607279968fd3246c34dda13d72c78bcacf78acd3f99063b0ff7",
+      "noDormancy": "c0c4bfd85075b607279968fd3246c34dda13d72c78bcacf78acd3f99063b0ff7"
+    },
+    "score-warm-pressure": {
+      "default": "842f3fa7da65a90e90faf346850e1f72e31c7aea6829011a471eda3077541518",
+      "generic": "842f3fa7da65a90e90faf346850e1f72e31c7aea6829011a471eda3077541518",
+      "noDormancy": "842f3fa7da65a90e90faf346850e1f72e31c7aea6829011a471eda3077541518"
+    },
+    "score-wire-harmonics": {
+      "default": "f31c423e31d592ce1be4d9068ae28246456abc2430e5f82cddda34032e00abbe",
+      "generic": "f31c423e31d592ce1be4d9068ae28246456abc2430e5f82cddda34032e00abbe",
+      "noDormancy": "f31c423e31d592ce1be4d9068ae28246456abc2430e5f82cddda34032e00abbe"
+    },
+    "score-wire-harp": {
+      "default": "a76c0009df437251184603e9b3efa77085c277c96e409073300e80dffef513b9",
+      "generic": "a76c0009df437251184603e9b3efa77085c277c96e409073300e80dffef513b9",
+      "noDormancy": "a76c0009df437251184603e9b3efa77085c277c96e409073300e80dffef513b9"
+    },
+    "score-wire-stress": {
+      "default": "3116afc67906129ebe2685375bf664f23101c569462c7138226db75e7359f2fa",
+      "generic": "3116afc67906129ebe2685375bf664f23101c569462c7138226db75e7359f2fa",
+      "noDormancy": "3116afc67906129ebe2685375bf664f23101c569462c7138226db75e7359f2fa"
+    },
+    "score-wooden-pin": {
+      "default": "4e20d63422ae437f7f73b70ac22c0980abc18fee67d3a958544f21248e0b1fc2",
+      "generic": "4e20d63422ae437f7f73b70ac22c0980abc18fee67d3a958544f21248e0b1fc2",
+      "noDormancy": "56f0780240b048bc0fb0cd417aa7b8ba4d96e9bd1fca7b738b9b8f20b3d0e727"
+    },
+    "snare": {
+      "default": "e5e61afe27fb51e812478820f1518f4a94d2073d2a8d607842946bf982423ebe",
+      "generic": "e5e61afe27fb51e812478820f1518f4a94d2073d2a8d607842946bf982423ebe",
+      "noDormancy": "abac027cd2511c9f0101665c89c44452db7c15308e9a531f76ce25b1740ea49f"
+    },
+    "sub-drone": {
+      "default": "6da66f289f00138fba3eb19628fde0045d5f14f6fdf5134598ff973e78636a08",
+      "generic": "6da66f289f00138fba3eb19628fde0045d5f14f6fdf5134598ff973e78636a08",
+      "noDormancy": "6da66f289f00138fba3eb19628fde0045d5f14f6fdf5134598ff973e78636a08"
+    },
+    "tr808-clap": {
+      "default": "89a65f2a72d168204ec677be9da1e15a2a6d74060cf550a0b4834d0920b08c2f",
+      "generic": "89a65f2a72d168204ec677be9da1e15a2a6d74060cf550a0b4834d0920b08c2f",
+      "noDormancy": "89a65f2a72d168204ec677be9da1e15a2a6d74060cf550a0b4834d0920b08c2f"
+    },
+    "tr808-clave": {
+      "default": "d87efa54b0f43195df135464a05b1d1f1ab9b3591afc705fefdaced48e1302d3",
+      "generic": "d87efa54b0f43195df135464a05b1d1f1ab9b3591afc705fefdaced48e1302d3",
+      "noDormancy": "d87efa54b0f43195df135464a05b1d1f1ab9b3591afc705fefdaced48e1302d3"
+    },
+    "tr808-conga": {
+      "default": "e1dc7a56b87882649b3b48ae438ac9d698f4e6a4ec57d026fc3ef4c5931f13df",
+      "generic": "e1dc7a56b87882649b3b48ae438ac9d698f4e6a4ec57d026fc3ef4c5931f13df",
+      "noDormancy": "e1dc7a56b87882649b3b48ae438ac9d698f4e6a4ec57d026fc3ef4c5931f13df"
+    },
+    "tr808-cowbell": {
+      "default": "30707df63b7d2de44820af94e5cdceaa59c437c24771b602f7888bfc3bff78cf",
+      "generic": "30707df63b7d2de44820af94e5cdceaa59c437c24771b602f7888bfc3bff78cf",
+      "noDormancy": "30707df63b7d2de44820af94e5cdceaa59c437c24771b602f7888bfc3bff78cf"
+    },
+    "tr808-cymbal": {
+      "default": "8a94633db6a4905f97b2b123cdb3d93b8d489de5b8aa0ca286fd9876be134cc8",
+      "generic": "8a94633db6a4905f97b2b123cdb3d93b8d489de5b8aa0ca286fd9876be134cc8",
+      "noDormancy": "8a94633db6a4905f97b2b123cdb3d93b8d489de5b8aa0ca286fd9876be134cc8"
+    },
+    "tr808-hat-closed": {
+      "default": "f1be3bff067a209d76cb9bafe3ef83ef9cc136d41a37dd7828baa9d7c9c0e426",
+      "generic": "f1be3bff067a209d76cb9bafe3ef83ef9cc136d41a37dd7828baa9d7c9c0e426",
+      "noDormancy": "f1be3bff067a209d76cb9bafe3ef83ef9cc136d41a37dd7828baa9d7c9c0e426"
+    },
+    "tr808-hat-open": {
+      "default": "7d680b00e7adecfaa36cbfa486ea24b201f0cf1c91a27f1bf305dee5f0dfebf7",
+      "generic": "7d680b00e7adecfaa36cbfa486ea24b201f0cf1c91a27f1bf305dee5f0dfebf7",
+      "noDormancy": "7d680b00e7adecfaa36cbfa486ea24b201f0cf1c91a27f1bf305dee5f0dfebf7"
+    },
+    "tr808-kick": {
+      "default": "e06a180f68f67719f5af7a8e5755e06931e84cc1faeb65f89072ad7a8512192c",
+      "generic": "e06a180f68f67719f5af7a8e5755e06931e84cc1faeb65f89072ad7a8512192c",
+      "noDormancy": "e06a180f68f67719f5af7a8e5755e06931e84cc1faeb65f89072ad7a8512192c"
+    },
+    "tr808-kick-long": {
+      "default": "e4b1f9d8370dfde66f74b4437dca1a81ea63eb22c51ffadd89bce9503312025b",
+      "generic": "e4b1f9d8370dfde66f74b4437dca1a81ea63eb22c51ffadd89bce9503312025b",
+      "noDormancy": "e4b1f9d8370dfde66f74b4437dca1a81ea63eb22c51ffadd89bce9503312025b"
+    },
+    "tr808-maracas": {
+      "default": "ec2a24794bda98d2d1cdb129da96f2df8232adad202fcb0d1e68a559494b63c6",
+      "generic": "ec2a24794bda98d2d1cdb129da96f2df8232adad202fcb0d1e68a559494b63c6",
+      "noDormancy": "ec2a24794bda98d2d1cdb129da96f2df8232adad202fcb0d1e68a559494b63c6"
+    },
+    "tr808-rimshot": {
+      "default": "0d82fe91c3b0c6a1f07085c6fd4e998707c90829908edb0c223b83047f5cf2ea",
+      "generic": "0d82fe91c3b0c6a1f07085c6fd4e998707c90829908edb0c223b83047f5cf2ea",
+      "noDormancy": "0d82fe91c3b0c6a1f07085c6fd4e998707c90829908edb0c223b83047f5cf2ea"
+    },
+    "tr808-snare": {
+      "default": "074505cfe55f55710792a17a007c65fd91798eb30d7be1f87a61cecbfb614800",
+      "generic": "074505cfe55f55710792a17a007c65fd91798eb30d7be1f87a61cecbfb614800",
+      "noDormancy": "074505cfe55f55710792a17a007c65fd91798eb30d7be1f87a61cecbfb614800"
+    },
+    "tr808-tom-high": {
+      "default": "973e1939e87c7820271cf633ed3702b9d4a41b2bc2b6296a960f86c6e15d175c",
+      "generic": "973e1939e87c7820271cf633ed3702b9d4a41b2bc2b6296a960f86c6e15d175c",
+      "noDormancy": "973e1939e87c7820271cf633ed3702b9d4a41b2bc2b6296a960f86c6e15d175c"
+    },
+    "tr808-tom-low": {
+      "default": "fab6f84e01b58dec7e0d15f3758612e802a0f3e1c6653daad28bd283b3959266",
+      "generic": "fab6f84e01b58dec7e0d15f3758612e802a0f3e1c6653daad28bd283b3959266",
+      "noDormancy": "fab6f84e01b58dec7e0d15f3758612e802a0f3e1c6653daad28bd283b3959266"
+    },
+    "tr808-tom-mid": {
+      "default": "12db2d4e91a24977630c112150ef459836067ce862ef828a44229c37fbe466d0",
+      "generic": "12db2d4e91a24977630c112150ef459836067ce862ef828a44229c37fbe466d0",
+      "noDormancy": "12db2d4e91a24977630c112150ef459836067ce862ef828a44229c37fbe466d0"
+    },
+    "tr909-clap": {
+      "default": "61e793d75e372b424a09b9204085a2e509924f51b550af5379cfa1193753219a",
+      "generic": "61e793d75e372b424a09b9204085a2e509924f51b550af5379cfa1193753219a",
+      "noDormancy": "61e793d75e372b424a09b9204085a2e509924f51b550af5379cfa1193753219a"
+    },
+    "tr909-crash": {
+      "default": "ecf311f9610163edd885c21635ff133713d7116987f1f308e226e0961f107a9a",
+      "generic": "ecf311f9610163edd885c21635ff133713d7116987f1f308e226e0961f107a9a",
+      "noDormancy": "ecf311f9610163edd885c21635ff133713d7116987f1f308e226e0961f107a9a"
+    },
+    "tr909-hat-closed": {
+      "default": "e8ac58a207b572bce9fa815c31dea173dd1c793ce00f35b8a0e6f1b850ce6829",
+      "generic": "e8ac58a207b572bce9fa815c31dea173dd1c793ce00f35b8a0e6f1b850ce6829",
+      "noDormancy": "e8ac58a207b572bce9fa815c31dea173dd1c793ce00f35b8a0e6f1b850ce6829"
+    },
+    "tr909-hat-open": {
+      "default": "f3e55a073db14935250cb99c1cd7aa164aab9c314ac834c033729e268c993e86",
+      "generic": "f3e55a073db14935250cb99c1cd7aa164aab9c314ac834c033729e268c993e86",
+      "noDormancy": "f3e55a073db14935250cb99c1cd7aa164aab9c314ac834c033729e268c993e86"
+    },
+    "tr909-kick": {
+      "default": "cf0fd88d2c824e06b32480efb616a2c829c9f5a64b43671fd7066a6cb87cf2b3",
+      "generic": "cf0fd88d2c824e06b32480efb616a2c829c9f5a64b43671fd7066a6cb87cf2b3",
+      "noDormancy": "cf0fd88d2c824e06b32480efb616a2c829c9f5a64b43671fd7066a6cb87cf2b3"
+    },
+    "tr909-kick-hard": {
+      "default": "6fd6263ffc2167435b1457309fe677e7590449650882d56ed274323bc68bf2ff",
+      "generic": "6fd6263ffc2167435b1457309fe677e7590449650882d56ed274323bc68bf2ff",
+      "noDormancy": "6fd6263ffc2167435b1457309fe677e7590449650882d56ed274323bc68bf2ff"
+    },
+    "tr909-ride": {
+      "default": "2819025632cd73e06e8323977412321d833968aa0b89709fb6c149e13b8cdb8b",
+      "generic": "2819025632cd73e06e8323977412321d833968aa0b89709fb6c149e13b8cdb8b",
+      "noDormancy": "2819025632cd73e06e8323977412321d833968aa0b89709fb6c149e13b8cdb8b"
+    },
+    "tr909-rimshot": {
+      "default": "9dfac0200ce62b3401aa10310369737162cc0479061598d2551a3a967c2750aa",
+      "generic": "9dfac0200ce62b3401aa10310369737162cc0479061598d2551a3a967c2750aa",
+      "noDormancy": "9dfac0200ce62b3401aa10310369737162cc0479061598d2551a3a967c2750aa"
+    },
+    "tr909-snare": {
+      "default": "79d3a94c141e855def1034208d97360d6653022e3ba0134bf278dc25de061fad",
+      "generic": "79d3a94c141e855def1034208d97360d6653022e3ba0134bf278dc25de061fad",
+      "noDormancy": "79d3a94c141e855def1034208d97360d6653022e3ba0134bf278dc25de061fad"
+    },
+    "tr909-tom-high": {
+      "default": "cb829a5eadc20d510a7c8221f5daa4d243f7beb3c13dd3c7bd75aaf596446614",
+      "generic": "cb829a5eadc20d510a7c8221f5daa4d243f7beb3c13dd3c7bd75aaf596446614",
+      "noDormancy": "cb829a5eadc20d510a7c8221f5daa4d243f7beb3c13dd3c7bd75aaf596446614"
+    },
+    "tr909-tom-low": {
+      "default": "abff4dc13dff2d778e720addaf9b86de3793343a90b14abb3a69ae6810058c0c",
+      "generic": "abff4dc13dff2d778e720addaf9b86de3793343a90b14abb3a69ae6810058c0c",
+      "noDormancy": "abff4dc13dff2d778e720addaf9b86de3793343a90b14abb3a69ae6810058c0c"
+    },
+    "weapon-zap": {
+      "default": "a03c78701199ccff93c4eb79920d46cce3f02f58d4319a13ad4debad4f4af0c2",
+      "generic": "a03c78701199ccff93c4eb79920d46cce3f02f58d4319a13ad4debad4f4af0c2",
+      "noDormancy": "536b7a8d99dc2a1cad5f30fa7f119c2bd904646d78cd294f344758b5f2a229de"
+    }
+  }
+}
