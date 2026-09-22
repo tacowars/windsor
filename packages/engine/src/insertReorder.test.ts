@@ -127,4 +127,24 @@ describe('routePart insert reordering', () => {
       true,
     );
   });
+
+  it('drops a re-wire that is still waiting when the strip is disposed (#652 review)', async () => {
+    const { context, part, dry } = await rig();
+    const returns = createReturns(context.asAudioContext(), RETURNS, dry);
+    const waiting: (() => void)[] = [];
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: (run) => void waiting.push(run),
+    });
+    const madeBefore = built.length;
+
+    strip.setInserts([scale(1), boost(1)]);
+    strip.dispose();
+
+    // The callback fires into a graph that has gone: it must build nothing —
+    // a chorus would leave its oscillators running — and must not throw.
+    expect(() => waiting.forEach((run) => run())).not.toThrow();
+    expect(built.length).toBe(madeBefore);
+    expect(targets(part.output)).toEqual([]);
+  });
 });
