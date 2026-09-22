@@ -12,6 +12,8 @@ import {
   DELAY_DAMP_MIN_HZ,
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
+  LOW_CUT_MAX_HZ,
+  LOW_CUT_MIN_HZ,
   MIX_LEVEL_MAX,
   RETURN_LEVEL_MAX,
   REVERB_SPACE_RANGES,
@@ -20,7 +22,7 @@ import type { PartStrip } from './channelStrip';
 import type { ReturnBus } from './returnBus';
 import type { ReverbSpace } from './reverbSpace';
 
-const STRIP_KEYS = ['level', 'pan', 'sends'];
+const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends'];
 const RETURN_KEYS = ['kind', 'level', 'space', 'delayTime', 'feedback', 'damp'];
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -43,6 +45,8 @@ export function applyStripLive(strip: PartStrip, raw: unknown, path: string): st
   else if (raw.level !== undefined) ignored.push(`${path}.level`);
   if (isNumber(raw.pan)) strip.setPan(clamp(raw.pan, -1, 1));
   else if (raw.pan !== undefined) ignored.push(`${path}.pan`);
+  if (isNumber(raw.lowCut)) strip.setLowCut(clamp(raw.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ));
+  else if (raw.lowCut !== undefined) ignored.push(`${path}.lowCut`);
   if (raw.sends !== undefined) applySends(strip, path, raw.sends, ignored);
   return ignored;
 }

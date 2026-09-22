@@ -11,6 +11,7 @@
  * console (#70) reads it to populate controls, so nothing tunable may hide in a
  * constructor call or a private field.
  */
+import { LOW_CUT_MIN_HZ } from './audioConstants';
 import type { ReverbSpace } from './reverbSpace';
 import { SPACES } from './reverbSpace';
 
@@ -61,12 +62,18 @@ export interface ChannelStrip<R extends string = string> {
   readonly level: number;
   /** -1 (hard left) .. 1 (hard right): a rotation by pan·π/4 (record §4). */
   readonly pan: number;
+  /**
+   * Highpass cutoff in Hz, `LOW_CUT_MIN_HZ`..`LOW_CUT_MAX_HZ` (#640): the
+   * strip's first stage, so the sends carry the cut signal too. The floor is
+   * the resting value and reads as off.
+   */
+  readonly lowCut: number;
   /** Send amount per return, 0..1; an absent return sends nothing (record §7). */
   readonly sends: Readonly<Partial<Record<R, number>>>;
 }
 
-/** Unity, centred, dry. What a part not named in the mix gets. */
-export const DEFAULT_STRIP: ChannelStrip = { level: 1, pan: 0, sends: {} };
+/** Unity, centred, uncut, dry. What a part not named in the mix gets. */
+export const DEFAULT_STRIP: ChannelStrip = { level: 1, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} };
 
 /**
  * Where each SFX part sits, keyed by strip name — the strips `createSfxPart`
@@ -74,8 +81,8 @@ export const DEFAULT_STRIP: ChannelStrip = { level: 1, pan: 0, sends: {} };
  * its own strip in the song document, so a song's mix travels with the song.
  */
 export const MIX = {
-  place: { level: 0.9, pan: 0.3, sends: { room: 0.08 } },
-  ui: { level: 0.7, pan: 0, sends: {} },
+  place: { level: 0.9, pan: 0.3, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.08 } },
+  ui: { level: 0.7, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} },
 } satisfies Record<string, ChannelStrip<ReturnName>>;
 
 export type PartName = keyof typeof MIX;
