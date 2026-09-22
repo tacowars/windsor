@@ -8,6 +8,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CHORUS_DEPTH_MAX_MS,
+  CHORUS_DEPTH_MIN_MS,
+  CHORUS_RATE_MAX_HZ,
+  CHORUS_RATE_MIN_HZ,
+  DEFAULT_CHORUS,
   DEFAULT_DRIVE,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
@@ -17,7 +22,7 @@ import {
   INSERT_KIND_NAMES,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { INSERT_CARDS } from './insertCards';
-import { DRIVE_KNOBS, INSERT_LABELS } from './insertKnobTables';
+import { CHORUS_KNOBS, DRIVE_KNOBS, INSERT_LABELS } from './insertKnobTables';
 
 describe('INSERT_CARDS', () => {
   it('has a card for every insert kind the engine declares, and no other', () => {
@@ -44,6 +49,28 @@ describe('DRIVE_KNOBS', () => {
       DRIVE_GAIN_MAX_DB,
     ]);
     expect([byField.tone?.min, byField.tone?.max]).toEqual([DRIVE_TONE_MIN_HZ, DRIVE_TONE_MAX_HZ]);
+    expect([byField.mix?.min, byField.mix?.max]).toEqual([0, 1]);
+  });
+});
+
+describe('CHORUS_KNOBS', () => {
+  it("covers every chorus field but the kind, each defaulting to DEFAULT_CHORUS's (#642)", () => {
+    const fields = INSERT_KINDS.chorus.fields.filter((f) => f !== 'kind');
+    expect(CHORUS_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
+    for (const { f, o } of CHORUS_KNOBS) expect(o.def, f).toBe(DEFAULT_CHORUS[f]);
+  });
+
+  it("spans the engine's ranges", () => {
+    const byField = Object.fromEntries(CHORUS_KNOBS.map((k) => [k.f, k.o]));
+    expect([byField.rate?.min, byField.rate?.max]).toEqual([
+      CHORUS_RATE_MIN_HZ,
+      CHORUS_RATE_MAX_HZ,
+    ]);
+    expect([byField.depth?.min, byField.depth?.max]).toEqual([
+      CHORUS_DEPTH_MIN_MS,
+      CHORUS_DEPTH_MAX_MS,
+    ]);
+    expect([byField.spread?.min, byField.spread?.max]).toEqual([0, 1]);
     expect([byField.mix?.min, byField.mix?.max]).toEqual([0, 1]);
   });
 });
