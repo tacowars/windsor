@@ -24,23 +24,25 @@ import {
   REVERB_SPACE_RANGES,
 } from './audioConstants';
 import type { ChannelStrip, DelayReturn, ReturnSpec, ReverbReturn } from './mix';
+import { normaliseInserts } from './inserts/insertRegistry';
 import { DEFAULT_STRIP, RETURNS } from './mix';
 import type { ReverbSpace } from './reverbSpace';
 
 /**
- * A part's own strip (#597): level, pan, low cut (#640) and sends, over
- * `DEFAULT_STRIP` — unity, centred, uncut, dry. A send to a return the code
+ * A part's own strip (#597): level, pan, low cut (#640), sends and inserts
+ * (#641), over `DEFAULT_STRIP` — unity, centred, uncut, dry, no inserts. A send to a return the code
  * does not define is dangling.
  */
 export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): ChannelStrip {
   const base = DEFAULT_STRIP;
   const o = n.section(raw, path);
-  n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends'], path);
+  n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends', 'inserts'], path);
   return {
     level: n.num(o.level, base.level, 0, MIX_LEVEL_MAX, `${path}.level`),
     pan: n.num(o.pan, base.pan, -1, 1, `${path}.pan`),
     lowCut: n.num(o.lowCut, base.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ, `${path}.lowCut`),
     sends: sends(o.sends, base.sends, `${path}.sends`, n),
+    inserts: normaliseInserts(o.inserts, `${path}.inserts`, n),
   };
 }
 

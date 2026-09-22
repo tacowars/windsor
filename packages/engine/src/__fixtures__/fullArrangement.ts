@@ -107,10 +107,10 @@ export const FULL_ARRANGEMENT: Arrangement = {
 
 /** The strips bed-01's parts carry — the `MIX` entries they had before #597. */
 export const FULL_STRIPS: Readonly<Record<FullPartId, ChannelStrip>> = {
-  kick: { level: 0.9, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} },
-  hat: { level: 0.6, pan: 0.2, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.2 } },
-  arp: { level: 0.7, pan: -0.15, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.3 } },
-  drone: { level: 0.8, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.45 } },
+  kick: { level: 0.9, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {}, inserts: [] },
+  hat: { level: 0.6, pan: 0.2, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.2 }, inserts: [] },
+  arp: { level: 0.7, pan: -0.15, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.3 }, inserts: [] },
+  drone: { level: 0.8, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.45 }, inserts: [] },
 };
 
 /**

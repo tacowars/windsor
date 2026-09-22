@@ -3,8 +3,8 @@
  * graph walks a routing assertion needs. Node-only, like the rest of this
  * directory.
  */
-import type { FakeNode } from './fakeAudioNodes';
-import { BLOCK } from './fakeAudioNodes';
+import type { FakeHost } from './fakeAudioNodes';
+import { BLOCK, FakeBiquad, FakeNode } from './fakeAudioNodes';
 import { SAMPLE_RATE } from './fakeAudioContext';
 import type { Feed } from './reverbHarness';
 
@@ -83,4 +83,41 @@ export function nodesBetween(from: FakeNode, to: FakeNode): FakeNode[] {
 /** True when a signal path exists from `from` to `to`. */
 export function reaches(from: FakeNode, to: FakeNode): boolean {
   return walk(from, (n) => n.outbound.map((c) => c.to)).has(to);
+}
+
+/** One sample of 1 at the start of block 0, then silence: the source for an impulse response. */
+class ImpulseNode extends FakeNode {
+  readonly kind = 'impulse';
+
+  constructor(context: FakeHost) {
+    super(context, 0, 1);
+  }
+
+  protected render(block: number): Float32Array[][] {
+    const channel = new Float32Array(BLOCK);
+    if (block === 0) channel[0] = 1;
+    return [[channel]];
+  }
+}
+
+/**
+ * A biquad's impulse-response L1 norm, Σ|h[n]| over `seconds`: the most it can
+ * scale any signal bounded by 1, overshoot and ringing included. A peak bound
+ * derived from it is exact, where one from the analogue step response is not
+ * (a digital filter near Nyquist rings differently).
+ */
+export function biquadL1(
+  settings: { type: BiquadFilterType; frequency: number; Q: number },
+  seconds = 1,
+): number {
+  const host: FakeHost = { sampleRate: SAMPLE_RATE, register: () => undefined };
+  const filter = new FakeBiquad(host);
+  filter.type = settings.type;
+  filter.frequency.value = settings.frequency;
+  filter.Q.value = settings.Q;
+  new ImpulseNode(host).connect(filter);
+  let sum = 0;
+  const blocks = Math.round((seconds * SAMPLE_RATE) / BLOCK);
+  for (let b = 0; b < blocks; b++) for (const v of filter.pull(b)[0] ?? []) sum += Math.abs(v);
+  return sum;
 }

@@ -80,6 +80,7 @@ const strip = (sends: ChannelStrip['sends'], pan = 0, level = 1): ChannelStrip =
   level,
   pan,
   lowCut: LOW_CUT_MIN_HZ,
+  inserts: [],
   sends,
 });
 

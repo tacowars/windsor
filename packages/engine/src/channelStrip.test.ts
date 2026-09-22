@@ -1,6 +1,6 @@
 /**
  * The strip is a chain with one tap point (#639): the low cut first (#640),
- * then whatever stages the caller adds, and the rotation and every send hang
+ * then the strip's inserts from the registry (#641), and the rotation and every send hang
  * off the last one — so a room hears what the dry path hears.
  */
 import { afterAll, describe, expect, it } from 'vitest';
@@ -8,11 +8,11 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { rms, tones } from './__fixtures__/audioAnalysis';
 import type { Capture } from './__fixtures__/fakeAudioContext';
 import { FakeContext, installFakeAudioWorklet, renderGraph } from './__fixtures__/fakeAudioContext';
-import type { FakeNode } from './__fixtures__/fakeAudioNodes';
+import type { FakeGain, FakeNode } from './__fixtures__/fakeAudioNodes';
 import { LOW_CUT_MIN_HZ } from './audioConstants';
 import { AudioPart } from './audioPart';
-import type { StripStage } from './channelStrip';
 import { routePart } from './channelStrip';
+import type { InsertKind, InsertRegistry, InsertSpec, InsertStage } from './inserts/insertRegistry';
 import type { ChannelStrip } from './mix';
 import { RETURNS, RETURN_NAMES } from './mix';
 import { makePatch } from './patch';
@@ -27,6 +27,7 @@ const STRIP: ChannelStrip = {
   pan: 0.4,
   lowCut: LOW_CUT_MIN_HZ,
   sends: { room: 0.5, echo: 0.25 },
+  inserts: [],
 };
 const STAGE_GAIN = 0.5;
 const SECONDS = 0.25;
@@ -55,23 +56,52 @@ async function rig(): Promise<{ context: FakeContext; part: AudioPart; dry: Audi
   return { context, part, dry: dry as unknown as AudioNode };
 }
 
-/** A stage that scales by `gain`: two gains in series, so input and output differ. */
-function scaleStage(context: FakeContext, gain: number): StripStage & { disposed: number } {
-  const input = context.createGain();
-  const output = context.createGain();
-  output.gain.value = gain;
-  input.connect(output);
-  const stage = {
-    input: input as unknown as AudioNode,
-    output: output as unknown as AudioNode,
-    disposed: 0,
-    dispose(): void {
-      stage.disposed++;
-      input.disconnect();
+interface ScaleSpec {
+  readonly kind: 'scale' | 'boost';
+  readonly gain: number;
+}
+
+/** What the test kinds built, so a test can count creations and disposals. */
+const built: (InsertStage<ScaleSpec> & { disposed: number; sets: number })[] = [];
+
+/** A test insert kind that scales by `gain`: two gains in series, so input and output differ. */
+function scaleKind(kind: ScaleSpec['kind']): InsertKind<ScaleSpec> {
+  return {
+    fields: ['kind', 'gain'],
+    defaults: { kind, gain: 1 },
+    normalise: (raw) => ({ kind, gain: Number(raw.gain) }),
+    create(context, spec) {
+      const input = context.createGain();
+      const output = context.createGain();
+      output.gain.value = spec.gain;
+      input.connect(output);
+      const stage = {
+        kind,
+        input,
+        output,
+        disposed: 0,
+        sets: 0,
+        set(next: ScaleSpec): void {
+          stage.sets++;
+          output.gain.value = next.gain;
+        },
+        dispose(): void {
+          stage.disposed++;
+          input.disconnect();
+        },
+      };
+      built.push(stage);
+      return stage;
     },
   };
-  return stage;
 }
+
+const TEST_KINDS = {
+  scale: scaleKind('scale'),
+  boost: scaleKind('boost'),
+} as unknown as InsertRegistry;
+const scale = (gain: number): InsertSpec => ({ kind: 'scale', gain }) as unknown as InsertSpec;
+const boost = (gain: number): InsertSpec => ({ kind: 'boost', gain }) as unknown as InsertSpec;
 
 /** Summed left and right RMS over the second half, past any filter transient. */
 function settled(capture: Capture | undefined, sampleRate: number): number {
@@ -80,13 +110,14 @@ function settled(capture: Capture | undefined, sampleRate: number): number {
   return rms(capture.left, half) + rms(capture.right, half);
 }
 
-describe('routePart with no caller stages', () => {
+describe('routePart with no inserts', () => {
   it('feeds the low cut from part.output and taps the rotation and every send from it', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
     const strip = routePart(part, { ...STRIP, lowCut: CUT_HZ }, returns, dry);
 
     expect(strip.stages).toEqual([strip.lowCut]);
+    expect(strip.inserts).toEqual([]);
     expect(strip.tail).toBe(strip.lowCut.output);
     expect(strip.lowCut.filter.frequency.value).toBe(CUT_HZ);
     expect(targets(part.output)).toEqual([fake(strip.lowCut.input)]);
@@ -140,63 +171,133 @@ describe('routePart with no caller stages', () => {
   });
 });
 
-describe('routePart with caller stages', () => {
-  it('puts the stage after the low cut and taps the rotation and every send from its output', async () => {
+describe('routePart with inserts', () => {
+  it('puts an insert after the low cut and taps the rotation and every send from its output', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const stage = scaleStage(context, STAGE_GAIN);
-    const strip = routePart(part, STRIP, returns, dry, [stage]);
+    const strip = routePart(
+      part,
+      { ...STRIP, inserts: [scale(STAGE_GAIN)] },
+      returns,
+      dry,
+      TEST_KINDS,
+    );
+    const [insert] = strip.inserts;
 
-    expect(strip.tail).toBe(stage.output);
+    expect(strip.tail).toBe(insert?.output);
     expect(targets(part.output)).toEqual([fake(strip.lowCut.input)]);
-    expect(targets(strip.lowCut.output)).toEqual([fake(stage.input)]);
-    expect(sources(strip.rotation.input)).toEqual([fake(stage.output)]);
-    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(stage.output)]);
+    expect(targets(strip.lowCut.output)).toEqual([fake(insert!.input)]);
+    expect(sources(strip.rotation.input)).toEqual([fake(insert!.output)]);
+    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(insert!.output)]);
   });
 
-  it('chains several stages in order, after the low cut', async () => {
+  it('chains several inserts in list order, after the low cut', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const first = scaleStage(context, 1);
-    const second = scaleStage(context, 1);
-    const strip = routePart(part, STRIP, returns, dry, [first, second]);
+    const strip = routePart(
+      part,
+      { ...STRIP, inserts: [scale(1), boost(1)] },
+      returns,
+      dry,
+      TEST_KINDS,
+    );
+    const [first, second] = strip.inserts;
 
+    expect(strip.inserts.map((i) => i.kind)).toEqual(['scale', 'boost']);
     expect(strip.stages).toEqual([strip.lowCut, first, second]);
-    expect(targets(strip.lowCut.output)).toEqual([fake(first.input)]);
-    expect(targets(first.output)).toEqual([fake(second.input)]);
-    expect(strip.tail).toBe(second.output);
+    expect(targets(strip.lowCut.output)).toEqual([fake(first!.input)]);
+    expect(targets(first!.output)).toEqual([fake(second!.input)]);
+    expect(strip.tail).toBe(second!.output);
   });
 
-  it('puts the stage in front of the room as well as the dry path', async () => {
-    const levels = async (stages: (c: FakeContext) => StripStage[]): Promise<number[]> => {
+  it('puts the insert in front of the room as well as the dry path', async () => {
+    const levels = async (inserts: InsertSpec[]): Promise<number[]> => {
       const { context, part, dry } = await rig();
       (part.node as unknown as { feed: unknown }).feed = tones(440, 660, AMPLITUDE);
       const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-      const strip = routePart(part, STRIP, returns, dry, stages(context));
+      const strip = routePart(part, { ...STRIP, inserts }, returns, dry, TEST_KINDS);
       const taps = [fake(strip.rotation.output), fake(strip.sends.get('room')!)];
       return renderGraph(context, SECONDS, taps).map((c) => settled(c, context.sampleRate));
     };
-    const [plainDry, plainSend] = await levels(() => []);
-    const [stagedDry, stagedSend] = await levels((c) => [scaleStage(c, STAGE_GAIN)]);
+    const [plainDry, plainSend] = await levels([]);
+    const [stagedDry, stagedSend] = await levels([scale(STAGE_GAIN)]);
     expect(plainDry).toBeGreaterThan(0);
     expect(stagedDry! / plainDry!).toBeCloseTo(STAGE_GAIN, 6);
     expect(stagedSend! / plainSend!).toBeCloseTo(STAGE_GAIN, 6);
   });
 
-  it('removes every edge it made on dispose, and disposes each stage once', async () => {
+  it('sets the same kinds in the same order on the live stages, with no change to the graph', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const first = scaleStage(context, 1);
-    const second = scaleStage(context, 1);
-    const strip = routePart(part, STRIP, returns, dry, [first, second]);
+    const strip = routePart(
+      part,
+      { ...STRIP, inserts: [scale(1), boost(1)] },
+      returns,
+      dry,
+      TEST_KINDS,
+    );
+    const live = [...strip.inserts];
+    const before = context.nodes.map((n) => [...n.outbound]);
+    strip.setInserts([scale(STAGE_GAIN), boost(2)]);
+    expect(strip.inserts).toEqual(live);
+    expect(context.nodes.map((n) => [...n.outbound])).toEqual(before);
+    expect((live[0]!.output as unknown as FakeGain).gain.value).toBe(STAGE_GAIN);
+    expect((live[1]!.output as unknown as FakeGain).gain.value).toBe(2);
+    expect((live as unknown as (typeof built)[number][]).map((i) => i.sets)).toEqual([1, 1]);
+  });
+
+  it('rebuilds only its own insert chain for a new list, and re-taps the tail', async () => {
+    const { context, part, dry } = await rig();
+    const returns = createReturns(context.asAudioContext(), RETURNS, dry);
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1)] }, returns, dry, TEST_KINDS);
+    const old = strip.inserts[0] as unknown as (typeof built)[number];
+    const rotationSplitter = fake(strip.rotation.input);
+
+    strip.setInserts([boost(1), scale(1)]);
+    const [first, second] = strip.inserts;
+    expect(old.disposed).toBe(1);
+    expect(strip.inserts.map((i) => i.kind)).toEqual(['boost', 'scale']);
+    expect(targets(strip.lowCut.output)).toEqual([fake(first!.input)]);
+    expect(targets(old.output)).toEqual([]);
+    expect(strip.tail).toBe(second!.output);
+    expect(sources(strip.rotation.input)).toEqual([fake(second!.output)]);
+    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(second!.output)]);
+    // The strip's own nodes downstream of the tail are the ones it started with.
+    expect(fake(strip.rotation.input)).toBe(rotationSplitter);
+
+    strip.setInserts([]);
+    expect(strip.tail).toBe(strip.lowCut.output);
+    expect(sources(strip.rotation.input)).toEqual([fake(strip.lowCut.output)]);
+  });
+
+  it('refuses a kind the registry lacks before touching the graph', async () => {
+    const { context, part, dry } = await rig();
+    const returns = createReturns(context.asAudioContext(), RETURNS, dry);
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1)] }, returns, dry, TEST_KINDS);
+    const before = context.nodes.map((n) => [...n.outbound]);
+    expect(() => strip.setInserts([{ kind: 'fuzz' } as unknown as InsertSpec])).toThrow(/fuzz/);
+    expect(context.nodes.map((n) => [...n.outbound])).toEqual(before);
+  });
+
+  it('removes every edge it made on dispose, and disposes each insert once', async () => {
+    const { context, part, dry } = await rig();
+    const returns = createReturns(context.asAudioContext(), RETURNS, dry);
+    const strip = routePart(
+      part,
+      { ...STRIP, inserts: [scale(1), boost(1)] },
+      returns,
+      dry,
+      TEST_KINDS,
+    );
+    const [first, second] = strip.inserts as unknown as (typeof built)[number][];
     strip.dispose();
 
     expect(targets(part.output)).toEqual([]);
     expect(targets(strip.lowCut.output)).toEqual([]);
-    expect(targets(first.output)).toEqual([]);
-    expect(targets(second.output)).toEqual([]);
-    expect(first.disposed).toBe(1);
-    expect(second.disposed).toBe(1);
+    expect(targets(first!.output)).toEqual([]);
+    expect(targets(second!.output)).toEqual([]);
+    expect(first!.disposed).toBe(1);
+    expect(second!.disposed).toBe(1);
     for (const send of strip.sends.values()) expect(sources(send)).toEqual([]);
   });
 });

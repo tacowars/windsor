@@ -6,11 +6,10 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { burst, rms, tones } from './__fixtures__/audioAnalysis';
+import { biquadL1, burst, rms, tones } from './__fixtures__/audioAnalysis';
 import type { Capture } from './__fixtures__/fakeAudioContext';
 import { FakeContext, FakeWorkletNode, renderGraph } from './__fixtures__/fakeAudioContext';
-import type { FakeNode, FakeWaveShaper } from './__fixtures__/fakeAudioNodes';
-import { BLOCK, FakeBiquad } from './__fixtures__/fakeAudioNodes';
+import type { FakeBiquad, FakeNode, FakeWaveShaper } from './__fixtures__/fakeAudioNodes';
 import {
   DELAY_CLIP_CEILING,
   DELAY_CLIP_CURVE_POINTS,
@@ -36,8 +35,6 @@ const QUIET_DBFS = -60;
 const BURST_SECONDS = 0.05;
 const TONE_HZ = 440;
 const TRANSPARENT_DB = 0.1;
-/** How long the damping filter's impulse response is summed for its L1 norm. */
-const IMPULSE_SECONDS = 1;
 
 const fromDb = (db: number): number => 10 ** (db / 20);
 const db = (ratio: number): number => 20 * Math.log10(ratio);
@@ -71,23 +68,6 @@ function peak(samples: Float32Array, from = 0, to = samples.length): number {
   let max = 0;
   for (let i = from; i < to; i++) max = Math.max(max, Math.abs(samples[i] ?? 0));
   return max;
-}
-
-/** The damping filter's impulse-response L1 norm: the most it can scale a bounded signal. */
-async function dampL1(spec: DelayReturn): Promise<number> {
-  const context = new FakeContext();
-  await context.audioWorklet.addModule('fm-processor.js');
-  const filter = new FakeBiquad(context);
-  filter.type = 'lowpass';
-  filter.frequency.value = spec.damp;
-  filter.Q.value = spec.resonance;
-  let sum = 0;
-  const blocks = Math.round((IMPULSE_SECONDS * context.sampleRate) / BLOCK);
-  const source = new FakeWorkletNode(context, PROCESSOR_NAME, { numberOfInputs: 0 });
-  source.feed = impulse(1);
-  source.connect(filter);
-  for (let b = 0; b < blocks; b++) for (const v of filter.pull(b)[0] ?? []) sum += Math.abs(v);
-  return sum;
 }
 
 describe('delayClipCurve', () => {
@@ -128,7 +108,10 @@ describe('the echo loop', () => {
   it('keeps a full runaway sounding, and bounded by the clip ceiling', async () => {
     const spec = { ...ECHO, feedback: DELAY_FEEDBACK_MAX, resonance: DELAY_RESONANCE_MAX_DB };
     const { out, context } = await renderEcho(spec, impulse(DELAY_CLIP_CEILING), RUNAWAY_SECONDS);
-    const bound = spec.level * DELAY_CLIP_CEILING * (await dampL1(spec));
+    const bound =
+      spec.level *
+      DELAY_CLIP_CEILING *
+      biquadL1({ type: 'lowpass', frequency: spec.damp, Q: spec.resonance });
     expect(out.left.every(Number.isFinite)).toBe(true);
     expect(peak(out.left)).toBeLessThanOrEqual(bound);
     const lastSecond = out.left.length - context.sampleRate;

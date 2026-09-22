@@ -1,5 +1,5 @@
 /**
- * Mixer tab (#70, record §2; #435): strips (level, pan, low cut, sends) and the
+ * Mixer tab (#70, record §2; #435): strips (level, pan, low cut, sends, inserts) and the
  * returns. Each part owns its strip (#597): a change goes through the part's
  * `strip` in the document and the live system; the returns — space, level, the delay line — go through the
  * document's `returns` section the same way (`returnsPanel.ts`).
@@ -24,6 +24,7 @@ import {
 } from './mixerTables';
 import { partNameField } from './partNameField';
 import { renderReturnsSection } from './returnsPanel';
+import { stripInserts } from './stripInserts';
 
 function stripValue(ctx: AppCtx, slot: number): ChannelStrip {
   return partAt(ctx.model.doc, slot)?.strip ?? DEFAULT_STRIP;
@@ -71,6 +72,7 @@ function stripRow(ctx: AppCtx, slot: number): HTMLElement {
     );
   }
   row.appendChild(knobs);
+  row.appendChild(stripInserts(ctx, slot));
   return row;
 }
 
@@ -78,7 +80,8 @@ export function renderMixerTab(body: HTMLElement, ctx: AppCtx): void {
   body.innerHTML = '';
   const strips = section(
     'Strips',
-    "Levels, pans, low cuts and sends land in each part's own strip.",
+    "Levels, pans, low cuts, sends and inserts land in each part's own strip. " +
+      'A strip feeds its inserts after its Level, so Level changes how hard it drives them.',
   );
   for (const part of ctx.model.doc.parts) {
     strips.body.appendChild(stripRow(ctx, part.slot));
