@@ -148,6 +148,12 @@ export const MUSIC_PARTS_MAX = 8;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
 /** A mix strip's linear level: 1 is unity, 4 is +12 dB of headroom to spare. */
 export const MIX_LEVEL_MAX = 4;
+/**
+ * A strip's low cut, in hertz (#640). The floor is the resting value and reads
+ * as off: below the music bus's own 30 Hz highpass, so nothing audible moves.
+ */
+export const LOW_CUT_MIN_HZ = 20;
+export const LOW_CUT_MAX_HZ = 500;
 
 /* --------------------------- the audio graph ---------------------------- */
 
@@ -158,6 +164,12 @@ export const PAN_ANGLE_MAX = Math.PI / 4;
 export const BUS_FILTER_FREQUENCY_HZ = 12000;
 /** 1/sqrt(2) — the Butterworth Q, flat through the passband. */
 export const BUS_FILTER_Q = 0.707;
+/**
+ * The Butterworth response as a Web Audio `lowpass` / `highpass` `Q`, which
+ * the spec reads in dB (α = sin ω₀ / (2·10^(Q/20))): 20·log₁₀(1/√2), flat to
+ * the cutoff and −3 dB at it. A linear 0.707 there is a +1.7 dB peak (#647).
+ */
+export const BUTTERWORTH_Q_DB = 20 * Math.log10(Math.SQRT1_2);
 /** The delay return's buffer length, in seconds; the ceiling on `delayTime`. */
 export const DELAY_MAX_SECONDS = 5;
 /** Feedback is clamped below 1 so the loop always decays. */

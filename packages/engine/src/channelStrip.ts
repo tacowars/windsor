@@ -1,9 +1,9 @@
 /**
  * Wiring one part through its channel strip.
  *
- *   part.output ─▶ [stage …] ─▶ tail ─┬─ [rotate θ] ─▶ dry destination (a bus, or the master)
- *                                     ├─ send ─▶ return "room"
- *                                     └─ send ─▶ return "echo"   … one send per return, at 0 unless the strip names it
+ *   part.output ─▶ [low cut] ─▶ [stage …] ─▶ tail ─┬─ [rotate θ] ─▶ dry destination (a bus, or the master)
+ *                                                  ├─ send ─▶ return "room"
+ *                                                  └─ send ─▶ return "echo"   … one send per return, at 0 unless the strip names it
  *
  * The fader is not here: `MIX.level` sets the part's k-rate `gain` param, a
  * multiply per block inside the worklet, so no `GainNode` sits in the dry path
@@ -13,13 +13,16 @@
  * dry path hears, and, because the rotation is in the dry path only, pre-pan
  * by choice: fading a part out fades its tail with it, and every part arrives
  * at the room centred (record §7, amended by
- * docs/log/2026-09-22-639-sends-tap-the-strip-tail.md). With no stages the
- * tail is `part.output` and the graph is the one #68 built.
+ * docs/log/2026-09-22-639-sends-tap-the-strip-tail.md). The low cut is
+ * always the first stage (#640, `lowCutStage.ts`); the caller's stages follow
+ * it in order.
  *
  * The part must have been created unrouted (`destination: null`); connecting it
  * to the master as well would sum it twice.
  */
 import type { AudioPart } from './audioPart';
+import type { LowCutStage } from './lowCutStage';
+import { createLowCutStage } from './lowCutStage';
 import type { ChannelStrip } from './mix';
 import type { ReturnBus } from './returnBus';
 import { createSend } from './returnBus';
@@ -40,15 +43,19 @@ export interface StripStage {
 
 export interface PartStrip {
   readonly part: AudioPart;
-  /** The strip's stages, in signal order. */
+  /** The strip's stages, in signal order: the low cut, then the caller's. */
   readonly stages: readonly StripStage[];
-  /** Where the rotation and the sends connect: the last stage's output, or `part.output`. */
+  /** The first stage (#640). */
+  readonly lowCut: LowCutStage;
+  /** Where the rotation and the sends connect: the last stage's output. */
   readonly tail: AudioNode;
   readonly rotation: StereoRotate;
   /** One send per return, by return name. */
   readonly sends: ReadonlyMap<string, GainNode>;
   setLevel(level: number): void;
   setPan(pan: number): void;
+  /** Hz; the caller clamps. */
+  setLowCut(hz: number): void;
   /** Throws for a return that does not exist; a typo must not be silent. */
   setSend(returnName: string, amount: number): void;
   dispose(): void;
@@ -74,8 +81,8 @@ function unchain(head: AudioNode, stages: readonly StripStage[]): void {
 }
 
 /**
- * Apply `strip` to `part`: fader, `stages` in order, then the rotation into
- * `dry` and a send to every return, both from the chain's tail.
+ * Apply `strip` to `part`: fader, the low cut, `stages` in order, then the
+ * rotation into `dry` and a send to every return, both from the chain's tail.
  */
 export function routePart(
   part: AudioPart,
@@ -93,7 +100,9 @@ export function routePart(
 
   part.gain.value = strip.level;
 
-  const tail = chain(part.output, stages);
+  const lowCut = createLowCutStage(context, strip.lowCut);
+  const chained: readonly StripStage[] = [lowCut, ...stages];
+  const tail = chain(part.output, chained);
 
   const rotation = createStereoRotate(context, strip.pan);
   tail.connect(rotation.input);
@@ -106,7 +115,8 @@ export function routePart(
 
   return {
     part,
-    stages,
+    stages: chained,
+    lowCut,
     tail,
     rotation,
     sends,
@@ -115,6 +125,9 @@ export function routePart(
     },
     setPan(pan: number): void {
       rotation.setPan(pan);
+    },
+    setLowCut(hz: number): void {
+      lowCut.setFrequency(hz);
     },
     setSend(returnName: string, amount: number): void {
       const send = sends.get(returnName);
@@ -131,8 +144,8 @@ export function routePart(
       }
       tail.disconnect(rotation.input);
       rotation.dispose();
-      unchain(part.output, stages);
-      for (const stage of stages) stage.dispose();
+      unchain(part.output, chained);
+      for (const stage of chained) stage.dispose();
     },
   };
 }

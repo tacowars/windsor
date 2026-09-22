@@ -11,6 +11,7 @@ import type { ArrangementDocument } from './arrangementDocument';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
+import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from './audioConstants';
 
 const silentPart = (): PlayablePart => ({
   noteOn: () => 0,
@@ -112,8 +113,36 @@ describe('the part list (#597)', () => {
     const result = makeArrangement(
       song([{ ...KICK, strip: { level: 9, pan: -0.5, sends: { room: 0.4 } } }]),
     );
-    expect(result.document.parts[0]?.strip).toEqual({ level: 4, pan: -0.5, sends: { room: 0.4 } });
+    expect(result.document.parts[0]?.strip).toEqual({
+      level: 4,
+      pan: -0.5,
+      lowCut: LOW_CUT_MIN_HZ,
+      sends: { room: 0.4 },
+    });
     expect(result.corrections).toEqual(['parts[0].strip.level: clamped 9 to 4']);
+  });
+
+  it('keeps a strip low cut in range, and rests at the floor when the strip names none (#640)', () => {
+    const cutOf = (lowCut: unknown): { cut: number | undefined; corrections: string[] } => {
+      const result = makeArrangement(song([{ ...KICK, strip: { lowCut } }]));
+      return { cut: result.document.parts[0]?.strip.lowCut, corrections: result.corrections };
+    };
+    expect(cutOf(undefined)).toEqual({ cut: LOW_CUT_MIN_HZ, corrections: [] });
+    expect(cutOf(120)).toEqual({ cut: 120, corrections: [] });
+    expect(cutOf(LOW_CUT_MAX_HZ * 2).cut).toBe(LOW_CUT_MAX_HZ);
+    expect(cutOf(1).cut).toBe(LOW_CUT_MIN_HZ);
+    const junk = cutOf('low');
+    expect(junk.cut).toBe(LOW_CUT_MIN_HZ);
+    expect(junk.corrections).toEqual([
+      `parts[0].strip.lowCut: "low" is not a number — using ${LOW_CUT_MIN_HZ}`,
+    ]);
+  });
+
+  it('round-trips a strip low cut through export and import (#640)', () => {
+    const first = makeArrangement(song([{ ...KICK, strip: { lowCut: 150 } }]));
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+    expect(again.document.parts[0]?.strip.lowCut).toBe(150);
+    expect(again.corrections).toEqual([]);
   });
 
   it('is unusable when the version is not 2', () => {

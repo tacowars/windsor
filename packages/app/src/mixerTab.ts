@@ -1,5 +1,5 @@
 /**
- * Mixer tab (#70, record §2; #435): strips (level, pan, sends) and the
+ * Mixer tab (#70, record §2; #435): strips (level, pan, low cut, sends) and the
  * returns. Each part owns its strip (#597): a change goes through the part's
  * `strip` in the document and the live system; the returns — space, level, the delay line — go through the
  * document's `returns` section the same way (`returnsPanel.ts`).
@@ -15,7 +15,13 @@ import { partChange } from './context';
 import { RETURN_COLOR, STRIP_COLOR } from './consoleColors';
 import { el, section } from './dom';
 import { makeKnob } from './knob';
-import { SEND_DEFAULT, STRIP_LEVEL_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
+import {
+  SEND_DEFAULT,
+  STRIP_LEVEL_KNOB,
+  STRIP_LOW_CUT_KNOB,
+  STRIP_PAN_KNOB,
+  sendKnob,
+} from './mixerTables';
 import { partNameField } from './partNameField';
 import { renderReturnsSection } from './returnsPanel';
 
@@ -46,6 +52,14 @@ function stripRow(ctx: AppCtx, slot: number): HTMLElement {
       set: (v) => void ctx.change(partChange(slot, { strip: { pan: v } })),
     }),
   );
+  knobs.appendChild(
+    makeKnob({
+      ...STRIP_LOW_CUT_KNOB,
+      color: STRIP_COLOR,
+      get: () => stripValue(ctx, slot).lowCut,
+      set: (v) => void ctx.change(partChange(slot, { strip: { lowCut: v } })),
+    }),
+  );
   for (const ret of RETURN_NAMES) {
     knobs.appendChild(
       makeKnob({
@@ -62,7 +76,10 @@ function stripRow(ctx: AppCtx, slot: number): HTMLElement {
 
 export function renderMixerTab(body: HTMLElement, ctx: AppCtx): void {
   body.innerHTML = '';
-  const strips = section('Strips', "Levels, pans and sends land in each part's own strip.");
+  const strips = section(
+    'Strips',
+    "Levels, pans, low cuts and sends land in each part's own strip.",
+  );
   for (const part of ctx.model.doc.parts) {
     strips.body.appendChild(stripRow(ctx, part.slot));
   }

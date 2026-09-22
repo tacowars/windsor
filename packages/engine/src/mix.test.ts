@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { BLOCK } from './__fixtures__/fakeAudioNodes';
 import { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES, stripFor } from './mix';
 import { SPACES } from './reverbSpace';
+import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from './audioConstants';
 
 const strips = Object.entries(MIX);
 const returns = Object.entries(RETURNS);
@@ -21,6 +22,13 @@ describe('MIX', () => {
     for (const [name, strip] of strips) {
       expect(strip.level, `${name}.level`).toBeGreaterThanOrEqual(0);
       expect(strip.level, `${name}.level`).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('keeps every low cut inside its range (#640)', () => {
+    for (const [name, strip] of strips) {
+      expect(strip.lowCut, `${name}.lowCut`).toBeGreaterThanOrEqual(LOW_CUT_MIN_HZ);
+      expect(strip.lowCut, `${name}.lowCut`).toBeLessThanOrEqual(LOW_CUT_MAX_HZ);
     }
   });
 
@@ -79,6 +87,6 @@ describe('stripFor', () => {
   it('returns the named strip, or unity-centred-dry for a part the mix does not know', () => {
     expect(stripFor(MIX, 'ui')).toBe(MIX.ui);
     expect(stripFor(MIX, 'nobody')).toBe(DEFAULT_STRIP);
-    expect(DEFAULT_STRIP).toEqual({ level: 1, pan: 0, sends: {} });
+    expect(DEFAULT_STRIP).toEqual({ level: 1, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} });
   });
 });
