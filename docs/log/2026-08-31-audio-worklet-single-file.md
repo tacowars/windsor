@@ -56,3 +56,4 @@ the patch schema and the message contract — and those are TypeScript, in
   thread and the editor. That is a real cost of the no-imports rule. It is
   mitigated, not hidden: `patch.test.ts` asserts the two copies are identical
   and fails the build if they diverge.
+- Amended by `2026-09-23-638-worklet-refactor-optimised-for-agents` (#638): the split it punted is taken up behind a bundle step (#643), with TypeScript (#654) and the shared tables (#656) following.
