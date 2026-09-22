@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { biquadL1, burst, rms, tones } from './__fixtures__/audioAnalysis';
 import type { Capture } from './__fixtures__/fakeAudioContext';
 import { FakeContext, FakeWorkletNode, renderGraph } from './__fixtures__/fakeAudioContext';
-import type { FakeBiquad, FakeNode, FakeWaveShaper } from './__fixtures__/fakeAudioNodes';
+import type { FakeBiquad, FakeNode } from './__fixtures__/fakeAudioNodes';
+import type { FakeWaveShaper } from './__fixtures__/fakeWaveShaper';
 import {
   DELAY_CLIP_CEILING,
   DELAY_CLIP_CURVE_POINTS,

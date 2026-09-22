@@ -25,6 +25,23 @@ export function removeInsert(list: readonly InsertSpec[], index: number): Insert
   return list.filter((_, i) => i !== index);
 }
 
+/**
+ * `list` with the insert at `index` swapped with its neighbour `delta` places
+ * along (#652): −1 towards the front of the chain, +1 towards the back. Off
+ * either end, or an index the list does not hold, returns the list unchanged.
+ */
+export function moveInsert(
+  list: readonly InsertSpec[],
+  index: number,
+  delta: number,
+): InsertSpec[] {
+  const to = index + delta;
+  const out = [...list];
+  if (index < 0 || index >= out.length || to < 0 || to >= out.length) return out;
+  [out[index], out[to]] = [out[to]!, out[index]!];
+  return out;
+}
+
 /** `list` with one field of the insert at `index` set; any other index leaves it as it was. */
 export function setInsertField(
   list: readonly InsertSpec[],

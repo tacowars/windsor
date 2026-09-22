@@ -21,15 +21,16 @@
  * to the master as well would sum it twice.
  */
 import type { AudioPart } from './audioPart';
+import { MS_PER_SECOND } from '../timeConstants';
+import { createInsertChain, createInsertUpdater } from './insertChain';
 import type { InsertRegistry, InsertSpec, InsertStage } from './inserts/insertRegistry';
-import { INSERT_KINDS, insertKind } from './inserts/insertRegistry';
+import { INSERT_KINDS } from './inserts/insertRegistry';
 import type { LowCutStage } from './lowCutStage';
 import { createLowCutStage } from './lowCutStage';
 import type { ChannelStrip } from './mix';
 import type { ReturnBus } from './returnBus';
-import { createSend } from './returnBus';
+import { createTap } from './stripTap';
 import type { StereoRotate } from './stereoRotate';
-import { createStereoRotate } from './stereoRotate';
 
 /**
  * One piece of a strip's processing between the part and the tap (#639): a
@@ -54,6 +55,12 @@ export interface PartStrip {
   /** Where the rotation and the sends connect: the last stage's output. */
   readonly tail: AudioNode;
   readonly rotation: StereoRotate;
+  /**
+   * The gain every tapped path passes through (#652): the rotation and every
+   * send hang off it, and it ramps down and up around a structural insert
+   * edit. Not the fader — that is the part's k-rate `gain`.
+   */
+  readonly head: GainNode;
   /** One send per return, by return name. */
   readonly sends: ReadonlyMap<string, GainNode>;
   setLevel(level: number): void;
@@ -71,151 +78,31 @@ export interface PartStrip {
   dispose(): void;
 }
 
-/** Connect `stages` in order after `head`; returns the chain's tail. */
-function chain(head: AudioNode, stages: readonly StripStage[]): AudioNode {
-  let tail = head;
-  for (const stage of stages) {
-    tail.connect(stage.input);
-    tail = stage.output;
-  }
-  return tail;
-}
-
-/** Remove exactly the edges `chain` made, leaving every node's other connections. */
-function unchain(head: AudioNode, stages: readonly StripStage[]): void {
-  let tail = head;
-  for (const stage of stages) {
-    tail.disconnect(stage.input);
-    tail = stage.output;
-  }
-}
-
 /**
- * The tap (#639): the rotation into `dry` and one send per return, all fed
- * from one node — the chain's tail. `move` re-feeds them from a new tail when
- * the inserts are rebuilt (#641); the rotation and the sends themselves stay.
+ * What a strip is built with beyond the mix data: the insert kinds it may
+ * build (a test injects its own), and how it waits out the fade around a
+ * structural insert edit (#652) — `setTimeout` in the browser, something
+ * immediate in a test.
  */
-interface Tap {
-  readonly rotation: StereoRotate;
-  readonly sends: ReadonlyMap<string, GainNode>;
-  readonly tail: AudioNode;
-  move(tail: AudioNode): void;
-  dispose(): void;
+export interface RouteOptions {
+  registry?: InsertRegistry;
+  defer?: (run: () => void, seconds: number) => void;
 }
 
-function createTap(
-  context: BaseAudioContext,
-  strip: ChannelStrip,
-  returns: Readonly<Record<string, ReturnBus>>,
-  dry: AudioNode,
-  from: AudioNode,
-): Tap {
-  let tail = from;
-  const rotation = createStereoRotate(context, strip.pan);
-  tail.connect(rotation.input);
-  rotation.output.connect(dry);
-  const sends = new Map<string, GainNode>();
-  for (const [name, target] of Object.entries(returns)) {
-    sends.set(name, createSend(context, tail, target, strip.sends[name] ?? 0));
-  }
-  // Only the edges the tap made leave the tail: targeted disconnects, and
-  // before any stage goes, since disconnecting an edge that no longer exists throws.
-  const untap = (): void => {
-    for (const send of sends.values()) tail.disconnect(send);
-    tail.disconnect(rotation.input);
-  };
-  return {
-    rotation,
-    sends,
-    get tail(): AudioNode {
-      return tail;
-    },
-    move(next: AudioNode): void {
-      untap();
-      tail = next;
-      tail.connect(rotation.input);
-      for (const send of sends.values()) tail.connect(send);
-    },
-    dispose(): void {
-      untap();
-      for (const send of sends.values()) send.disconnect();
-      rotation.dispose();
-    },
-  };
-}
+const laterByTimeout = (run: () => void, seconds: number): void => {
+  setTimeout(run, seconds * MS_PER_SECOND);
+};
 
-const sameKinds = (
-  live: readonly InsertStage<InsertSpec>[],
-  next: readonly InsertSpec[],
-): boolean => live.length === next.length && live.every((stage, i) => stage.kind === next[i]?.kind);
-
-/** The strip's inserts after `head`, and how a new list lands on them (#641). */
-interface InsertChain {
-  readonly stages: readonly InsertStage<InsertSpec>[];
-  readonly tail: AudioNode;
-  /**
-   * The same kinds in the same order are param writes. Any other list is
-   * built, attached beside the old chain, handed to `retap` so the tap moves
-   * across in one step, and only then is the old chain detached and disposed.
-   * A kind the registry lacks throws before anything is touched.
-   */
-  set(specs: readonly InsertSpec[], retap: (tail: AudioNode) => void): void;
-  dispose(): void;
-}
-
-function createInsertChain(
-  context: BaseAudioContext,
-  head: AudioNode,
-  specs: readonly InsertSpec[],
-  registry: InsertRegistry,
-  owner: string,
-): InsertChain {
-  const build = (list: readonly InsertSpec[]): InsertStage<InsertSpec>[] =>
-    list.map((spec) => {
-      const kind = insertKind(registry, spec.kind);
-      if (!kind) throw new Error(`part "${owner}": no insert kind "${spec.kind}"`);
-      return kind.create(context, spec);
-    });
-  let stages = build(specs);
-  let tail = chain(head, stages);
-  return {
-    get stages(): readonly InsertStage<InsertSpec>[] {
-      return stages;
-    },
-    get tail(): AudioNode {
-      return tail;
-    },
-    set(next: readonly InsertSpec[], retap: (tail: AudioNode) => void): void {
-      if (sameKinds(stages, next)) {
-        stages.forEach((stage, i) => stage.set(next[i]!));
-        return;
-      }
-      const built = build(next);
-      tail = chain(head, built);
-      retap(tail);
-      unchain(head, stages);
-      for (const stage of stages) stage.dispose();
-      stages = built;
-    },
-    dispose(): void {
-      unchain(head, stages);
-      for (const stage of stages) stage.dispose();
-    },
-  };
-}
-
-/**
- * Apply `strip` to `part`: fader, the low cut, the strip's inserts from
- * `registry`, then the rotation into `dry` and a send to every return, both
- * from the chain's tail.
- */
+// eslint-disable-next-line max-lines-per-function -- 61 lines: one strip's construction and the object that closes over it, one line past the limit (#225 decision 4)
 export function routePart(
   part: AudioPart,
   strip: ChannelStrip,
   returns: Readonly<Record<string, ReturnBus>>,
   dry: AudioNode,
-  registry: InsertRegistry = INSERT_KINDS,
+  options: RouteOptions = {},
 ): PartStrip {
+  const registry = options.registry ?? INSERT_KINDS;
+  const later = options.defer ?? laterByTimeout;
   const context = part.context;
   for (const name of Object.keys(strip.sends)) {
     if (!(name in returns)) {
@@ -229,6 +116,7 @@ export function routePart(
   part.output.connect(lowCut.input);
   const inserts = createInsertChain(context, lowCut.output, strip.inserts, registry, part.name);
   const tap = createTap(context, strip, returns, dry, inserts.tail);
+  const updates = createInsertUpdater(inserts, tap, later);
   const { rotation, sends } = tap;
 
   return {
@@ -244,6 +132,7 @@ export function routePart(
       return tap.tail;
     },
     rotation,
+    head: tap.head,
     sends,
     setLevel(level: number): void {
       part.gain.value = level;
@@ -254,15 +143,15 @@ export function routePart(
     setLowCut(hz: number): void {
       lowCut.setFrequency(hz);
     },
-    setInserts(specs: readonly InsertSpec[]): void {
-      inserts.set(specs, (tail) => tap.move(tail));
-    },
+    setInserts: (specs) => updates.set(specs),
     setSend(returnName: string, amount: number): void {
       const send = sends.get(returnName);
       if (!send) throw new Error(`part "${part.name}" has no send to return "${returnName}"`);
       send.gain.value = amount;
     },
     dispose(): void {
+      // Before the graph goes, so a fade still waiting cannot re-wire it (#652).
+      updates.cancel();
       tap.dispose();
       inserts.dispose();
       part.output.disconnect(lowCut.input);
