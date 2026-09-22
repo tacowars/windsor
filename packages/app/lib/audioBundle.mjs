@@ -6,7 +6,7 @@
  * each used to carry their own copy of this.
  *
  * `import.meta.url` is defined as a file under `__fixtures__/` so the worklet
- * harness (which reads `../worklet/fm-processor.js` relative to itself)
+ * harness (which reads `../worklet/generated/fm-processor.js` relative to itself)
  * resolves from inside the bundle; a source that never reads it is unaffected.
  */
 import { build } from 'esbuild';

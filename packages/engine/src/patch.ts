@@ -3,7 +3,7 @@
  * factory functions that fill in every field the DSP expects.
  *
  * The numeric enums and the routing table are mirrored in
- * `worklet/fm-processor.js`, which must stay import-free (see the note at the
+ * `worklet/fm/`, which imports nothing from the main thread (#656 will share them; see the note at the
  * top of that file). `patch.test.ts` asserts the two copies are identical, so
  * they cannot drift silently.
  */

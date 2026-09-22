@@ -40,7 +40,7 @@ and its extension checklists, so neither states the other's content twice.
     `AudioSystem.stepAt` → `host.stepAt`, read once in `stepStrip.ts`'s
     `playheadAt` (#619);
   - the envelope display draws the engine's `segmentLevel`, pinned
-    sample-for-sample against `worklet/fm-processor.js` by
+    sample-for-sample against the FM worklet (`worklet/fm/`) by
     `envelopeCurve.test.ts` (#620);
   - a new part's strip, velocity and sequencer fields come from the
     normaliser: `songParts.ts` returns a raw document for `DocumentModel` to
