@@ -1,7 +1,8 @@
 /**
  * A strip's inserts on the Mixer tab (#641): each insert as a box with its
- * card's knobs and a Remove button, then an Add picker that is disabled once
- * the strip holds `MAX_INSERTS`. Adding and removing are live partials like
+ * card's knobs, arrows that nudge it along the chain (#652) and a Remove
+ * button, then an Add picker that is disabled once the strip holds
+ * `MAX_INSERTS`. The boxes read left to right in signal order. Adding and removing are live partials like
  * every other strip edit: the engine rebuilds that one strip's chain, and the
  * transport and every other part keep playing.
  */
@@ -14,7 +15,7 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el } from './dom';
 import { INSERT_CARDS } from './insertCards';
-import { addInsert, canAddInsert, removeInsert } from './insertEdits';
+import { addInsert, canAddInsert, moveInsert, removeInsert } from './insertEdits';
 import { INSERT_LABELS } from './insertKnobTables';
 import { insertsOf } from './insertKnobs';
 
@@ -25,10 +26,26 @@ function commit(ctx: AppCtx, slot: number, inserts: unknown): void {
   if (result.ok) ctx.render();
 }
 
+/** One nudge along the chain: ◀ towards the front, ▶ towards the back (#652). */
+function moveButton(ctx: AppCtx, slot: number, index: number, delta: number): HTMLButtonElement {
+  const back = delta < 0;
+  const button = el('button', 'btn nudge', back ? '◀' : '▶') as HTMLButtonElement;
+  button.type = 'button';
+  const list = insertsOf(ctx, slot);
+  const kind = list[index]?.kind;
+  button.title = `Move ${kind ? INSERT_LABELS[kind] : 'this insert'} ${back ? 'earlier' : 'later'} in the chain`;
+  button.setAttribute('aria-label', button.title);
+  button.disabled = back ? index === 0 : index === list.length - 1;
+  button.onclick = (): void => commit(ctx, slot, moveInsert(insertsOf(ctx, slot), index, delta));
+  return button;
+}
+
 function insertBox(ctx: AppCtx, slot: number, index: number, kind: InsertKindName): HTMLElement {
   const box = el('div', 'insert-box');
   const head = el('div', 'insert-head');
+  head.appendChild(moveButton(ctx, slot, index, -1));
   head.appendChild(el('span', 'insert-name', `${index + 1} · ${INSERT_LABELS[kind]}`));
+  head.appendChild(moveButton(ctx, slot, index, 1));
   const remove = el('button', 'btn', 'Remove') as HTMLButtonElement;
   remove.type = 'button';
   remove.onclick = (): void => commit(ctx, slot, removeInsert(insertsOf(ctx, slot), index));

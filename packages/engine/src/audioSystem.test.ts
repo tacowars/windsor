@@ -148,7 +148,8 @@ describe('the fader and the dry path', () => {
     expect(drone.level).not.toBe(1);
     expect(part.gain.value).toBe(drone.level);
 
-    // The low cut (#640) and the rotation's four gains: no gain for the fader.
+    // The low cut (#640), the tap's fade gain (#652) and the rotation's four
+    // gains: still no gain for the fader, and the fade rests at unity.
     const rotationPath = nodesBetween(fake(part.output), fake(live.rotation.output));
     expect(rotationPath.map((n) => n.kind).sort()).toEqual([
       'biquad',
@@ -156,8 +157,10 @@ describe('the fader and the dry path', () => {
       'gain',
       'gain',
       'gain',
+      'gain',
       'splitter',
     ]);
+    expect((live.head as unknown as FakeGain).gain.value).toBe(1);
     const busPath = nodesBetween(fake(live.rotation.output), fake(engine.master));
     expect(busPath.map((n) => n.kind).sort()).toEqual(['biquad', 'gain', 'gain']);
     for (const node of busPath) {

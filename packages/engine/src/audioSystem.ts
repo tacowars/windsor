@@ -55,6 +55,7 @@ import type { AudioBus } from './audioBus';
 import type { AudioPart } from './audioPart';
 import type { NotePattern } from './capturedPattern';
 import type { PartStrip } from './channelStrip';
+import type { RouteOptions } from './channelStrip';
 import { routePart } from './channelStrip';
 import { applyReturnsLive, applyStripLive } from './deskApply';
 import { musicPartName } from './documentParts';
@@ -106,6 +107,11 @@ export interface AudioSystemOptions {
    * Injected so a test can assert the scheduling cost without a real one.
    */
   now?: () => number;
+  /**
+   * How a strip waits out the fade around a structural insert edit (#652).
+   * Defaults to `setTimeout`; a test hands in something immediate.
+   */
+  defer?: RouteOptions['defer'];
 }
 
 /** `__a204.audio.readout()` (issue #69): the arrangement's state plus the system's. */
@@ -135,6 +141,8 @@ export class AudioSystem {
   /** What `update()` costs on the main thread, over the rolling window (#275). */
   private readonly schedMeter: SchedCostMeter;
   private readonly now: () => number;
+  /** Passed to every strip: how it waits out an insert fade (#652). */
+  private readonly routeOptions: RouteOptions;
   private started = false;
   private player: ArrangementPlayer | null = null;
   private muted = false;
@@ -146,6 +154,7 @@ export class AudioSystem {
     this.mix = options.mix ?? MIX;
     this.returnSpecs = options.returns ?? RETURNS;
     this.now = options.now ?? ((): number => performance.now());
+    this.routeOptions = options.defer ? { defer: options.defer } : {};
     this.schedMeter = new SchedCostMeter({ now: this.now });
   }
 
@@ -517,7 +526,10 @@ export class AudioSystem {
     const { returns } = this.standing();
     const part = this.engine.createPart(name, { patch, maxVoices, destination: null });
     this.meterLoad(`part:${name}`, part.node);
-    this.strips.set(name, routePart(part, strip ?? stripFor(this.mix, name), returns, dry));
+    this.strips.set(
+      name,
+      routePart(part, strip ?? stripFor(this.mix, name), returns, dry, this.routeOptions),
+    );
     return part;
   }
 

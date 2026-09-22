@@ -81,7 +81,8 @@ export function renderMixerTab(body: HTMLElement, ctx: AppCtx): void {
   const strips = section(
     'Strips',
     "Levels, pans, low cuts, sends and inserts land in each part's own strip. " +
-      'A strip feeds its inserts after its Level, so Level changes how hard it drives them.',
+      'A strip feeds its inserts after its Level, so Level changes how hard it drives them. ' +
+      'Inserts run left to right; the arrows move one along the chain.',
   );
   for (const part of ctx.model.doc.parts) {
     strips.body.appendChild(stripRow(ctx, part.slot));

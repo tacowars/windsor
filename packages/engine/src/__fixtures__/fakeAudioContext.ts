@@ -14,6 +14,7 @@
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../workletMessages';
 import type { FakeHost } from './fakeAudioNodes';
 import { FakeOscillator } from './fakeOscillator';
+import { FakeWaveShaper } from './fakeWaveShaper';
 import {
   BLOCK,
   FakeBiquad,
@@ -25,7 +26,6 @@ import {
   FakeNode,
   FakeParam,
   FakeSplitter,
-  FakeWaveShaper,
 } from './fakeAudioNodes';
 import type { Feed, LoadedReverb, ReverbProcessorLike } from './reverbHarness';
 import { loadReverb } from './reverbHarness';
