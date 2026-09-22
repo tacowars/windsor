@@ -157,6 +157,18 @@ export function createInsertChain(
  * from the chain's tail.
  */
 
+/** The strip's insert edits, and the way to stop one that is still waiting. */
+export interface InsertUpdater {
+  set(specs: readonly InsertSpec[]): void;
+  /**
+   * Drop a re-wire that has not run yet. The strip calls this when it is
+   * disposed: the deferred callback would otherwise build stages onto a graph
+   * that has gone, leaving their oscillators running, and then throw on the
+   * first disconnect.
+   */
+  cancel(): void;
+}
+
 /**
  * The strip's `setInserts`: settings go straight through, and a structural
  * edit fades down, re-wires once the ramp has landed, and fades back up. A
@@ -168,10 +180,11 @@ export function createInsertUpdater(
   inserts: InsertChain,
   tap: Tap,
   later: (run: () => void, seconds: number) => void,
-): (specs: readonly InsertSpec[]) => void {
+): InsertUpdater {
   let pending: readonly InsertSpec[] | null = null;
   let fading = false;
-  return (specs: readonly InsertSpec[]): void => {
+  let cancelled = false;
+  const set = (specs: readonly InsertSpec[]): void => {
     // A kind the registry lacks is refused here, while the caller is still on
     // the stack, rather than inside the deferred re-wire.
     inserts.check(specs);
@@ -188,10 +201,18 @@ export function createInsertUpdater(
     fading = true;
     tap.fadeTo(0, INSERT_FADE_SECONDS);
     later(() => {
+      if (cancelled) return;
       inserts.set(pending ?? specs, (tail) => tap.move(tail));
       pending = null;
       tap.fadeTo(1, INSERT_FADE_SECONDS);
       fading = false;
     }, INSERT_FADE_SECONDS);
+  };
+  return {
+    set,
+    cancel(): void {
+      cancelled = true;
+      pending = null;
+    },
   };
 }

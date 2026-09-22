@@ -115,7 +115,7 @@ export function routePart(
   part.output.connect(lowCut.input);
   const inserts = createInsertChain(context, lowCut.output, strip.inserts, registry, part.name);
   const tap = createTap(context, strip, returns, dry, inserts.tail);
-  const updateInserts = createInsertUpdater(inserts, tap, later);
+  const updates = createInsertUpdater(inserts, tap, later);
   const { rotation, sends } = tap;
 
   return {
@@ -142,13 +142,15 @@ export function routePart(
     setLowCut(hz: number): void {
       lowCut.setFrequency(hz);
     },
-    setInserts: updateInserts,
+    setInserts: (specs) => updates.set(specs),
     setSend(returnName: string, amount: number): void {
       const send = sends.get(returnName);
       if (!send) throw new Error(`part "${part.name}" has no send to return "${returnName}"`);
       send.gain.value = amount;
     },
     dispose(): void {
+      // Before the graph goes, so a fade still waiting cannot re-wire it (#652).
+      updates.cancel();
       tap.dispose();
       inserts.dispose();
       part.output.disconnect(lowCut.input);
