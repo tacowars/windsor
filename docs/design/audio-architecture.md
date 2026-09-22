@@ -75,7 +75,7 @@ in a second worklet of its own:
 
 | Concern | Where |
 |---|---|
-| FM voices, per-voice filter, envelopes, LFO | AudioWorklet (ours): `worklet/fm-processor.js` |
+| FM voices, per-voice filter, envelopes, LFO | AudioWorklet (ours): `worklet/fm/`, bundled to `worklet/generated/fm-processor.js` (#643) |
 | Reverb | AudioWorklet (ours): `worklet/reverb-processor.js`, a Dattorro plate. **No `ConvolverNode`** — it was removed, not left beside it |
 | Bus tone shaping, delay, distortion, compression | `BiquadFilterNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
 | 3D positioning | Babylon's spatial audio, over `PannerNode` |
@@ -123,7 +123,7 @@ packages/client/src/audio/
   arrangementPlayer.ts  # binds each part's sequencer to its engine part, by slot
   arrangementValidate.ts # PatchResolver: where a song's part presets resolve (#562)
   workletMessages.ts    # main-thread <-> worklet contract
-  worklet/              # the DSP (§6.1)
+  worklet/              # the DSP (§6.1): fm/ is the FM source, generated/ its bundle (#643), reverb-processor.js the plate
   __fixtures__/         # headless worklet harness, Node-only
 tools/patch-editor/     # authoring tool, outside the client bundle
 ```
@@ -202,6 +202,15 @@ Deep-import per invariant 5: `@babylonjs/core/AudioV2/webAudio`, never the barre
 ## 6. Constraints this repo imposes on the implementation
 
 ### 6.1 Each worklet is one file, deliberately
+
+**Amended 2026-09-23 (#643)**: the FM worklet still *ships* as one file but is
+*written* as a source folder, `worklet/fm/`, which `scripts/build-worklets.mjs`
+bundles into `worklet/generated/fm-processor.js` (`--check` in `npm run verify`;
+`worklet/CLAUDE.md` holds the rules). The bundle transforms nothing, so the
+reasoning below still describes what the shipped file is; what it no longer
+describes is how the source is kept. Record
+`2026-09-23-643-fm-worklet-is-generated-from-a-source-folder`; the split itself
+is #644 and #645. The reverb is still one hand-written file.
 
 There are two: `worklet/fm-processor.js` (1,302 lines) and `worklet/reverb-processor.js`
 (460), each far over the `max-lines` cap of 300 and each staying that way behind a

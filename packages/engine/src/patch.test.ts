@@ -1,6 +1,6 @@
 /**
  * The patch schema is duplicated: `patch.ts` for the main thread, and the same
- * tables again inside `worklet/fm-processor.js`, which must stay import-free.
+ * tables again inside `worklet/fm/`, which imports nothing from the main thread (#656).
  * These tests are what makes the duplication safe -- they fail the moment the
  * two copies disagree.
  */

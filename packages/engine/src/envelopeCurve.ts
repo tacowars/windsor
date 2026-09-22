@@ -1,5 +1,5 @@
 /**
- * The envelope segment curve, once (#620 decision 4). `worklet/fm-processor.js`
+ * The envelope segment curve, once (#620 decision 4). The FM worklet (`worklet/fm/`)
  * shapes every attack, decay and release segment with this pair; the console's
  * envelope display (`tools/patch-editor/src/envCanvas.ts`) draws the same
  * pair, so a DSP curve change cannot leave the drawing lying. The worklet is
