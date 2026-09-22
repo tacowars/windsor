@@ -93,6 +93,7 @@ const laterByTimeout = (run: () => void, seconds: number): void => {
   setTimeout(run, seconds * MS_PER_SECOND);
 };
 
+// eslint-disable-next-line max-lines-per-function -- 61 lines: one strip's construction and the object that closes over it, one line past the limit (#225 decision 4)
 export function routePart(
   part: AudioPart,
   strip: ChannelStrip,
