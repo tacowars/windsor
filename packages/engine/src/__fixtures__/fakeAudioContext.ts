@@ -13,6 +13,7 @@
  */
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../workletMessages';
 import type { FakeHost } from './fakeAudioNodes';
+import { FakeOscillator } from './fakeOscillator';
 import {
   BLOCK,
   FakeBiquad,
@@ -90,6 +91,10 @@ export class FakeContext implements FakeHost {
 
   createBiquadFilter(): FakeBiquad {
     return new FakeBiquad(this);
+  }
+
+  createOscillator(): FakeOscillator {
+    return new FakeOscillator(this);
   }
 
   createWaveShaper(): FakeWaveShaper {

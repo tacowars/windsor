@@ -9,6 +9,7 @@ import { rms, tones } from './__fixtures__/audioAnalysis';
 import type { Capture } from './__fixtures__/fakeAudioContext';
 import { FakeContext, installFakeAudioWorklet, renderGraph } from './__fixtures__/fakeAudioContext';
 import type { FakeGain, FakeNode } from './__fixtures__/fakeAudioNodes';
+import { FakeOscillator } from './__fixtures__/fakeOscillator';
 import { LOW_CUT_MIN_HZ } from './audioConstants';
 import { AudioPart } from './audioPart';
 import { routePart } from './channelStrip';
@@ -18,6 +19,8 @@ import { RETURNS, RETURN_NAMES } from './mix';
 import { makePatch } from './patch';
 import { createReturns } from './returnBus';
 import { PROCESSOR_NAME } from './workletMessages';
+import { DEFAULT_CHORUS } from './inserts/chorusInsert';
+import { DEFAULT_DRIVE } from './inserts/driveInsert';
 
 const undo = installFakeAudioWorklet();
 afterAll(undo);
@@ -277,6 +280,24 @@ describe('routePart with inserts', () => {
     const before = context.nodes.map((n) => [...n.outbound]);
     expect(() => strip.setInserts([{ kind: 'fuzz' } as unknown as InsertSpec])).toThrow(/fuzz/);
     expect(context.nodes.map((n) => [...n.outbound])).toEqual(before);
+  });
+
+  it('stops a real chorus insert’s oscillators when a live edit takes it out (#642)', async () => {
+    const { context, part, dry } = await rig();
+    const returns = createReturns(context.asAudioContext(), RETURNS, dry);
+    const strip = routePart(
+      part,
+      { ...STRIP, inserts: [DEFAULT_DRIVE, DEFAULT_CHORUS] },
+      returns,
+      dry,
+    );
+    const lfos = context.nodes.filter((n): n is FakeOscillator => n instanceof FakeOscillator);
+    expect(strip.inserts.map((i) => i.kind)).toEqual(['drive', 'chorus']);
+    expect(lfos.length).toBeGreaterThan(0);
+    expect(lfos.every((o) => o.started && !o.stopped)).toBe(true);
+    strip.setInserts([DEFAULT_DRIVE]);
+    expect(lfos.every((o) => o.stopped)).toBe(true);
+    expect(strip.inserts.map((i) => i.kind)).toEqual(['drive']);
   });
 
   it('removes every edge it made on dispose, and disposes each insert once', async () => {

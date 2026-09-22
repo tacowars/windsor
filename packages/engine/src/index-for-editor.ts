@@ -183,6 +183,8 @@ export type {
 } from './inserts/insertRegistry';
 export { DEFAULT_DRIVE, DRIVE_INSERT, driveCompensation } from './inserts/driveInsert';
 export type { DriveSpec } from './inserts/driveInsert';
+export { CHORUS_INSERT, DEFAULT_CHORUS } from './inserts/chorusInsert';
+export type { ChorusSpec } from './inserts/chorusInsert';
 export * from './inserts/insertConstants';
 export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
 export type { RotationGains, StereoRotate } from './stereoRotate';

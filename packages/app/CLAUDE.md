@@ -172,7 +172,7 @@ Each is the whole list; a step skipped here is what a later ticket finds.
 3. The document contract holds: a song carries its returns, so the export must
    round-trip the new fields (`arrangementDocumentDesk.test.ts`).
 
-**Add a strip insert kind** (#641)
+**Add a strip insert kind** (#641; chorus, #642, is the worked second example)
 
 1. Engine: one `inserts/<kind>Insert.ts` exporting its spec type, its
    `DEFAULT_<KIND>` and an `InsertKind` (`fields`, `defaults`, `normalise`,

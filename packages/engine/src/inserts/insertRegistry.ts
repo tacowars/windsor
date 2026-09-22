@@ -7,13 +7,15 @@
  */
 import type { FieldNormaliser } from '../arrangementFields';
 import { isRecord, show } from '../arrangementFields';
+import type { ChorusSpec } from './chorusInsert';
+import { CHORUS_INSERT } from './chorusInsert';
 import type { DriveSpec } from './driveInsert';
 import { DRIVE_INSERT } from './driveInsert';
 import { MAX_INSERTS } from './insertConstants';
 import type { InsertKind, InsertStage } from './insertKind';
 
 /** Every kind's settings, discriminated on `kind`. */
-export type InsertSpec = DriveSpec;
+export type InsertSpec = DriveSpec | ChorusSpec;
 export type InsertKindName = InsertSpec['kind'];
 
 /** A registry of kinds by name. The strip takes one as a parameter, so a test can inject another. */
@@ -21,6 +23,7 @@ export type InsertRegistry = Readonly<Record<string, InsertKind<InsertSpec>>>;
 
 export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec>>> = {
   drive: DRIVE_INSERT,
+  chorus: CHORUS_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];
