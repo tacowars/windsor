@@ -28,6 +28,7 @@ import { FmEngine } from './fmEngine';
 import { clonePatch } from './patch';
 import { PRESETS } from './presets';
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from './audioConstants';
+import { DEFAULT_CHORUS } from './inserts/chorusInsert';
 import { DEFAULT_DRIVE } from './inserts/driveInsert';
 import { MAX_INSERTS } from './inserts/insertConstants';
 
@@ -37,7 +38,8 @@ afterAll(() => restore());
 async function system(document: ArrangementDocument): Promise<AudioSystem> {
   const context = new FakeContext();
   const engine = new FmEngine(context.asAudioContext());
-  const sys = new AudioSystem(engine);
+  // The strips' insert fade runs at once, so a test sees the settled graph (#652).
+  const sys = new AudioSystem(engine, { defer: (run) => run() });
   await sys.init();
   sys.initMusic(document);
   return sys;
@@ -197,6 +199,29 @@ describe('apply over the document model', () => {
     sys.apply({ parts: { [hat]: { strip: { inserts: [] } } } });
     expect(hatStrip?.inserts).toEqual([]);
     expect(hatStrip?.tail).toBe(hatStrip?.lowCut.output);
+  });
+
+  it('reorders a strip’s inserts live, moving the stages and touching nothing else (#652)', async () => {
+    const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
+      strip: { ...FULL_STRIPS.hat, inserts: [DEFAULT_DRIVE, DEFAULT_CHORUS] },
+    });
+    const sys = await system(doc);
+    const hatStrip = stripOf(sys, 'hat');
+    const live = [...(hatStrip?.inserts ?? [])];
+    const kickStrip = stripOf(sys, 'kick');
+    const kickPart = sys.engine.getPart(musicPartName(kick));
+    const counters = { ...sys.readout().counters };
+
+    const reversed = { inserts: [DEFAULT_CHORUS, DEFAULT_DRIVE] };
+    expect(sys.apply({ parts: { [hat]: { strip: reversed } } })).toEqual({ ok: true, ignored: [] });
+
+    expect(hatStrip?.inserts.map((i) => i.kind)).toEqual(['chorus', 'drive']);
+    // The same two stages, swapped: a chorus keeps its delay contents.
+    expect(hatStrip?.inserts).toEqual([live[1], live[0]]);
+    expect(hatStrip?.tail).toBe(live[0]?.output);
+    expect(stripOf(sys, 'kick')).toBe(kickStrip);
+    expect(sys.engine.getPart(musicPartName(kick))).toBe(kickPart);
+    expect(sys.readout().counters).toEqual(counters);
   });
 
   it('reports a junk insert list, an unknown kind and a list past the limit by path (#641)', async () => {

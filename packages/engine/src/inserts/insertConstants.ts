@@ -61,3 +61,12 @@ export const CHORUS_VOICE_CENTRES_MS: readonly number[] = [11, 17];
 export const CHORUS_VOICE_RATIOS: readonly number[] = [1, 1.37];
 /** The longest a voice's delay line can reach, in seconds: every centre plus the depth ceiling. */
 export const CHORUS_DELAY_MAX_SECONDS = 0.05;
+
+/* ------------------------------- the chain ------------------------------- */
+
+/**
+ * The ramp either side of a structural insert edit (#652) — an add, a removal
+ * or a reorder. Long enough that the step in the waveform is inaudible, short
+ * enough that the edit feels immediate; the strip is silent for twice this.
+ */
+export const INSERT_FADE_SECONDS = 0.012;
