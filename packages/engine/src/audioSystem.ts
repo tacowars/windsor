@@ -8,19 +8,19 @@
  *
  * The standing graph, per docs/log/2026-08-31-mixer-sends-returns-and-channel-strips.md:
  *
- *   music part.output ─┬─ [rotate θ] ─▶ musicBus.input ─▶ [highpass] ─┐
- *                      ├─ send ─▶ return "room" (plate, 100% wet) ────┤
- *                      └─ send ─▶ return "echo" (delay) ────────────┤
- *                                                                   ▼
- *                                          musicBus.output  (the Music fader)
- *                                                                   │
- *   sfx part.output ──── [rotate θ] ─▶ sfxLevel (the SFX fader) ───┐   │
- *                                                                   │   │
- *                                                        master ◀───┴───┘
- *                                                          └─▶ limiter ─▶ out
+ *   music part.output ─▶ [stages…] ─▶ tail ─┬─ [rotate θ] ─▶ musicBus.input ─▶ [highpass] ─┐
+ *                                           ├─ send ─▶ return "room" (plate, 100% wet) ────┤
+ *                                           └─ send ─▶ return "echo" (delay) ──────────────┤
+ *                                                                                          ▼
+ *                                                          musicBus.output (the Music fader)
+ *                                                                                          │
+ *   sfx part.output ─▶ [stages…] ─▶ tail ─── [rotate θ] ─▶ sfxLevel ─▶ master ◀────────────┘
+ *                                                                      └─▶ limiter ─▶ out
  *
- * SFX parts get the same strip with the SFX fader as their dry destination,
- * so they skip the music bus's inserts but still have a real pan and a send.
+ * Each strip's stages sit between the part and its tail, and the rotation and
+ * the sends both tap the tail (#639; none is built yet, so today the tail is
+ * the part's output). SFX parts get the same strip with the SFX fader as
+ * their dry destination, so they skip the music bus's inserts but still have a real pan and a send.
  * `musicBus.output` and `sfxLevel` are the settings panel's two channel
  * faders (#518 decision 1): the music one is the bus's existing output gain,
  * so the dry path gains no node, and the returns are summed into it so the
