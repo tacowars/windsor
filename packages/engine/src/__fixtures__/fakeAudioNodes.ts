@@ -31,6 +31,8 @@ export interface FakeHost {
 
 export class FakeParam {
   value: number;
+  /** Nodes connected into this param: a-rate modulation summed onto `value`, as the spec has it. */
+  readonly inputs: FakeNode[] = [];
 
   constructor(
     value: number,
@@ -58,6 +60,16 @@ export class FakeParam {
   cancelScheduledValues(): this {
     return this;
   }
+
+  /** The block's per-sample value: `value` plus every connected node's first channel. */
+  valuesAt(block: number): Float32Array {
+    const out = new Float32Array(BLOCK).fill(this.value);
+    for (const node of this.inputs) {
+      const channel = node.pull(block)[0];
+      if (channel) for (let i = 0; i < BLOCK; i++) out[i] = (out[i] ?? 0) + (channel[i] ?? 0);
+    }
+    return out;
+  }
 }
 
 export interface Connection {
@@ -71,6 +83,8 @@ export abstract class FakeNode {
   abstract readonly kind: string;
   readonly inbound: Connection[] = [];
   readonly outbound: Connection[] = [];
+  /** Params this node modulates (`connect(param)`). */
+  readonly paramOutbound: FakeParam[] = [];
   private cachedBlock = -1;
   private cached: Float32Array[][] = [];
   private rendering = false;
@@ -83,8 +97,15 @@ export abstract class FakeNode {
     context.register(this);
   }
 
-  connect(destination: FakeNode, output = 0, input = 0): FakeNode {
+  connect(destination: FakeNode, output?: number, input?: number): FakeNode;
+  connect(destination: FakeParam, output?: number): void;
+  connect(destination: FakeNode | FakeParam, output = 0, input = 0): FakeNode | void {
     if (output >= this.numberOfOutputs) throw new RangeError(`${this.kind}: no output ${output}`);
+    if (destination instanceof FakeParam) {
+      destination.inputs.push(this);
+      this.paramOutbound.push(destination);
+      return;
+    }
     if (input >= destination.numberOfInputs) {
       throw new RangeError(`${destination.kind}: no input ${input}`);
     }
@@ -98,7 +119,20 @@ export abstract class FakeNode {
    * Every outbound edge, or only those to `destination` -- which, as the spec
    * has it, throws when there is no such edge (an `InvalidAccessError`).
    */
-  disconnect(destination?: FakeNode): void {
+  disconnect(destination?: FakeNode | FakeParam): void {
+    if (destination === undefined || destination instanceof FakeParam) {
+      const params = this.paramOutbound.filter(
+        (p) => destination === undefined || p === destination,
+      );
+      if (destination !== undefined && params.length === 0) {
+        throw new Error(`${this.kind}: InvalidAccessError, not connected to that param`);
+      }
+      for (const param of params) {
+        param.inputs.splice(param.inputs.indexOf(this), 1);
+        this.paramOutbound.splice(this.paramOutbound.indexOf(param), 1);
+      }
+      if (destination !== undefined) return;
+    }
     const dropped = this.outbound.filter((c) => destination === undefined || c.to === destination);
     if (destination !== undefined && dropped.length === 0) {
       throw new Error(
@@ -211,8 +245,14 @@ export class FakeDelay extends FakeNode {
     this.ring = [new Float32Array(length), new Float32Array(length)];
   }
 
-  /** Reads the ring only; never pulls upstream, so a feedback loop can evaluate. */
-  protected render(): Float32Array[][] {
+  /**
+   * Reads the ring only; never pulls upstream through its input, so a feedback
+   * loop can evaluate. A modulated `delayTime` (a node connected into it) is
+   * read per sample, with linear interpolation between ring samples, which is
+   * what a chorus rests on.
+   */
+  protected render(block: number): Float32Array[][] {
+    if (this.delayTime.inputs.length > 0) return this.renderModulated(block);
     const samples = Math.round(this.delayTime.value * this.context.sampleRate);
     if (samples < BLOCK) {
       throw new Error(`fake DelayNode needs delayTime >= one block (${BLOCK} frames)`);
@@ -224,6 +264,26 @@ export class FakeDelay extends FakeNode {
     for (let i = 0; i < BLOCK; i++) {
       left[i] = this.ring[0][(start + i) % length] ?? 0;
       right[i] = this.ring[1][(start + i) % length] ?? 0;
+    }
+    return [[left, right]];
+  }
+
+  private renderModulated(block: number): Float32Array[][] {
+    const times = this.delayTime.valuesAt(block);
+    const length = this.ring[0].length;
+    const left = new Float32Array(BLOCK);
+    const right = new Float32Array(BLOCK);
+    for (let i = 0; i < BLOCK; i++) {
+      const lag = (times[i] ?? 0) * this.context.sampleRate;
+      if (lag < BLOCK)
+        throw new Error(`fake DelayNode needs delayTime >= one block (${BLOCK} frames)`);
+      const at = this.write + i - lag;
+      const k = Math.floor(at);
+      const f = at - k;
+      const a = ((k % length) + length) % length;
+      const b = (a + 1) % length;
+      left[i] = (1 - f) * (this.ring[0][a] ?? 0) + f * (this.ring[0][b] ?? 0);
+      right[i] = (1 - f) * (this.ring[1][a] ?? 0) + f * (this.ring[1][b] ?? 0);
     }
     return [[left, right]];
   }
