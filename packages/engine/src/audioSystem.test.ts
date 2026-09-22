@@ -24,6 +24,7 @@ import { RETURNS } from './mix';
 import { SPACES } from './reverbSpace';
 import { REVERB_PROCESSOR_NAME } from './workletMessages';
 import { PRESETS } from './presets';
+import { LOW_CUT_MIN_HZ } from './audioConstants';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -78,6 +79,7 @@ async function roomRender(
 const strip = (sends: ChannelStrip['sends'], pan = 0, level = 1): ChannelStrip => ({
   level,
   pan,
+  lowCut: LOW_CUT_MIN_HZ,
   sends,
 });
 
@@ -145,8 +147,10 @@ describe('the fader and the dry path', () => {
     expect(drone.level).not.toBe(1);
     expect(part.gain.value).toBe(drone.level);
 
+    // The low cut (#640) and the rotation's four gains: no gain for the fader.
     const rotationPath = nodesBetween(fake(part.output), fake(live.rotation.output));
     expect(rotationPath.map((n) => n.kind).sort()).toEqual([
+      'biquad',
       'gain',
       'gain',
       'gain',

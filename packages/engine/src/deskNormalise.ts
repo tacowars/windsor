@@ -15,6 +15,8 @@ import {
   DELAY_DAMP_MIN_HZ,
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
+  LOW_CUT_MAX_HZ,
+  LOW_CUT_MIN_HZ,
   MIX_LEVEL_MAX,
   RETURN_LEVEL_MAX,
   REVERB_SPACE_RANGES,
@@ -24,17 +26,18 @@ import { DEFAULT_STRIP, RETURNS } from './mix';
 import type { ReverbSpace } from './reverbSpace';
 
 /**
- * A part's own strip (#597): level, pan and sends, over `DEFAULT_STRIP` —
- * unity, centred, dry. A send to a return the code does not define is
- * dangling.
+ * A part's own strip (#597): level, pan, low cut (#640) and sends, over
+ * `DEFAULT_STRIP` — unity, centred, uncut, dry. A send to a return the code
+ * does not define is dangling.
  */
 export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): ChannelStrip {
   const base = DEFAULT_STRIP;
   const o = n.section(raw, path);
-  n.dropUnknown(o, ['level', 'pan', 'sends'], path);
+  n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends'], path);
   return {
     level: n.num(o.level, base.level, 0, MIX_LEVEL_MAX, `${path}.level`),
     pan: n.num(o.pan, base.pan, -1, 1, `${path}.pan`),
+    lowCut: n.num(o.lowCut, base.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ, `${path}.lowCut`),
     sends: sends(o.sends, base.sends, `${path}.sends`, n),
   };
 }

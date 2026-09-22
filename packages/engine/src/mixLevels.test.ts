@@ -25,6 +25,7 @@ import type { ChannelStrip } from './mix';
 import { SPATIAL_SFX_UNITY, createMixLevels, spatialVolumeFor } from './mixLevels';
 import { SFX_LIMITS } from './sfxConstants';
 import { PRESETS } from './presets';
+import { LOW_CUT_MIN_HZ } from './audioConstants';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -33,8 +34,13 @@ const fake = (node: AudioNode): FakeNode => node as unknown as FakeNode;
 const SIGNAL = burst(tones(440, 440, 0.5), 0.3);
 const SECONDS = 1.2;
 /** A music part with a real send, so the dry path and the room are both in play. */
-const MUSIC_STRIP: ChannelStrip = { level: 1, pan: 0, sends: { room: 0.4 } };
-const SFX_STRIP: ChannelStrip = { level: 1, pan: 0, sends: {} };
+const MUSIC_STRIP: ChannelStrip = {
+  level: 1,
+  pan: 0,
+  lowCut: LOW_CUT_MIN_HZ,
+  sends: { room: 0.4 },
+};
+const SFX_STRIP: ChannelStrip = { level: 1, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} };
 
 interface Render {
   master: Capture;

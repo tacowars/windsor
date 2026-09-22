@@ -99,7 +99,9 @@ export type {
 export { createReturn, createReturns, createSend } from './returnBus';
 export type { ReturnBus } from './returnBus';
 export { routePart } from './channelStrip';
-export type { PartStrip } from './channelStrip';
+export type { PartStrip, StripStage } from './channelStrip';
+export { createLowCutStage } from './lowCutStage';
+export type { LowCutStage } from './lowCutStage';
 export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
 export type { RotationGains, StereoRotate } from './stereoRotate';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
