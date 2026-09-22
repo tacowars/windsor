@@ -7,32 +7,34 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { rms, tones } from './__fixtures__/audioAnalysis';
 import type { Capture } from './__fixtures__/fakeAudioContext';
-import { FakeContext, installFakeAudioWorklet, renderGraph } from './__fixtures__/fakeAudioContext';
-import type { FakeGain, FakeNode } from './__fixtures__/fakeAudioNodes';
+import { renderGraph } from './__fixtures__/fakeAudioContext';
+import type { FakeGain } from './__fixtures__/fakeAudioNodes';
 import { FakeOscillator } from './__fixtures__/fakeOscillator';
 import { LOW_CUT_MIN_HZ } from './audioConstants';
-import { AudioPart } from './audioPart';
+import type { InsertSpec } from './inserts/insertRegistry';
+import type { built } from './__fixtures__/stripRig';
+import {
+  NOW,
+  STAGE_GAIN,
+  STRIP,
+  TEST_KINDS,
+  boost,
+  fake,
+  installWorklet,
+  rig,
+  scale,
+  sources,
+  targets,
+} from './__fixtures__/stripRig';
 import { routePart } from './channelStrip';
-import type { InsertKind, InsertRegistry, InsertSpec, InsertStage } from './inserts/insertRegistry';
-import type { ChannelStrip } from './mix';
 import { RETURNS, RETURN_NAMES } from './mix';
-import { makePatch } from './patch';
 import { createReturns } from './returnBus';
-import { PROCESSOR_NAME } from './workletMessages';
 import { DEFAULT_CHORUS } from './inserts/chorusInsert';
 import { DEFAULT_DRIVE } from './inserts/driveInsert';
 
-const undo = installFakeAudioWorklet();
+const undo = installWorklet();
 afterAll(undo);
 
-const STRIP: ChannelStrip = {
-  level: 1,
-  pan: 0.4,
-  lowCut: LOW_CUT_MIN_HZ,
-  sends: { room: 0.5, echo: 0.25 },
-  inserts: [],
-};
-const STAGE_GAIN = 0.5;
 const SECONDS = 0.25;
 const AMPLITUDE = 0.4;
 const CUT_HZ = 300;
@@ -42,69 +44,6 @@ const ABOVE_CUT_HZ = CUT_HZ * 10;
 /** A quarter of the level is −12 dB, well short of the −24 expected. */
 const CUT_RATIO_MAX = 0.25;
 const PASS_RATIO_MIN = 0.99;
-
-const fake = (node: AudioNode): FakeNode => node as unknown as FakeNode;
-const targets = (node: AudioNode): FakeNode[] => fake(node).outbound.map((c) => c.to);
-const sources = (node: AudioNode): FakeNode[] => fake(node).inbound.map((c) => c.from);
-
-async function rig(): Promise<{ context: FakeContext; part: AudioPart; dry: AudioNode }> {
-  const context = new FakeContext();
-  await context.audioWorklet.addModule('fm-processor.js');
-  await context.audioWorklet.addModule('reverb-processor.js');
-  const ctx = context.asAudioContext();
-  const node = new AudioWorkletNode(ctx, PROCESSOR_NAME, { numberOfInputs: 0 });
-  const part = new AudioPart('lead', node, makePatch());
-  const dry = context.createGain();
-  dry.connect(context.destination);
-  return { context, part, dry: dry as unknown as AudioNode };
-}
-
-interface ScaleSpec {
-  readonly kind: 'scale' | 'boost';
-  readonly gain: number;
-}
-
-/** What the test kinds built, so a test can count creations and disposals. */
-const built: (InsertStage<ScaleSpec> & { disposed: number; sets: number })[] = [];
-
-/** A test insert kind that scales by `gain`: two gains in series, so input and output differ. */
-function scaleKind(kind: ScaleSpec['kind']): InsertKind<ScaleSpec> {
-  return {
-    fields: ['kind', 'gain'],
-    defaults: { kind, gain: 1 },
-    normalise: (raw) => ({ kind, gain: Number(raw.gain) }),
-    create(context, spec) {
-      const input = context.createGain();
-      const output = context.createGain();
-      output.gain.value = spec.gain;
-      input.connect(output);
-      const stage = {
-        kind,
-        input,
-        output,
-        disposed: 0,
-        sets: 0,
-        set(next: ScaleSpec): void {
-          stage.sets++;
-          output.gain.value = next.gain;
-        },
-        dispose(): void {
-          stage.disposed++;
-          input.disconnect();
-        },
-      };
-      built.push(stage);
-      return stage;
-    },
-  };
-}
-
-const TEST_KINDS = {
-  scale: scaleKind('scale'),
-  boost: scaleKind('boost'),
-} as unknown as InsertRegistry;
-const scale = (gain: number): InsertSpec => ({ kind: 'scale', gain }) as unknown as InsertSpec;
-const boost = (gain: number): InsertSpec => ({ kind: 'boost', gain }) as unknown as InsertSpec;
 
 /** Summed left and right RMS over the second half, past any filter transient. */
 function settled(capture: Capture | undefined, sampleRate: number): number {
@@ -125,7 +64,9 @@ describe('routePart with no inserts', () => {
     expect(strip.lowCut.filter.frequency.value).toBe(CUT_HZ);
     expect(targets(part.output)).toEqual([fake(strip.lowCut.input)]);
     const sends = RETURN_NAMES.map((name) => fake(strip.sends.get(name)!));
-    expect(targets(strip.tail)).toEqual([fake(strip.rotation.input), ...sends]);
+    // The tail feeds the tap's fade gain, and everything hangs off that (#652).
+    expect(targets(strip.tail)).toEqual([fake(strip.head)]);
+    expect(targets(strip.head)).toEqual([fake(strip.rotation.input), ...sends]);
     for (const name of RETURN_NAMES) {
       const send = strip.sends.get(name)!;
       expect(targets(send)).toEqual([fake(returns[name].input)]);
@@ -178,32 +119,27 @@ describe('routePart with inserts', () => {
   it('puts an insert after the low cut and taps the rotation and every send from its output', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const strip = routePart(
-      part,
-      { ...STRIP, inserts: [scale(STAGE_GAIN)] },
-      returns,
-      dry,
-      TEST_KINDS,
-    );
+    const strip = routePart(part, { ...STRIP, inserts: [scale(STAGE_GAIN)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: NOW,
+    });
     const [insert] = strip.inserts;
 
     expect(strip.tail).toBe(insert?.output);
     expect(targets(part.output)).toEqual([fake(strip.lowCut.input)]);
     expect(targets(strip.lowCut.output)).toEqual([fake(insert!.input)]);
-    expect(sources(strip.rotation.input)).toEqual([fake(insert!.output)]);
-    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(insert!.output)]);
+    expect(sources(strip.head)).toEqual([fake(insert!.output)]);
+    expect(sources(strip.rotation.input)).toEqual([fake(strip.head)]);
+    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(strip.head)]);
   });
 
   it('chains several inserts in list order, after the low cut', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const strip = routePart(
-      part,
-      { ...STRIP, inserts: [scale(1), boost(1)] },
-      returns,
-      dry,
-      TEST_KINDS,
-    );
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1), boost(1)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: NOW,
+    });
     const [first, second] = strip.inserts;
 
     expect(strip.inserts.map((i) => i.kind)).toEqual(['scale', 'boost']);
@@ -218,7 +154,10 @@ describe('routePart with inserts', () => {
       const { context, part, dry } = await rig();
       (part.node as unknown as { feed: unknown }).feed = tones(440, 660, AMPLITUDE);
       const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-      const strip = routePart(part, { ...STRIP, inserts }, returns, dry, TEST_KINDS);
+      const strip = routePart(part, { ...STRIP, inserts }, returns, dry, {
+        registry: TEST_KINDS,
+        defer: NOW,
+      });
       const taps = [fake(strip.rotation.output), fake(strip.sends.get('room')!)];
       return renderGraph(context, SECONDS, taps).map((c) => settled(c, context.sampleRate));
     };
@@ -232,13 +171,10 @@ describe('routePart with inserts', () => {
   it('sets the same kinds in the same order on the live stages, with no change to the graph', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const strip = routePart(
-      part,
-      { ...STRIP, inserts: [scale(1), boost(1)] },
-      returns,
-      dry,
-      TEST_KINDS,
-    );
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1), boost(1)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: NOW,
+    });
     const live = [...strip.inserts];
     const before = context.nodes.map((n) => [...n.outbound]);
     strip.setInserts([scale(STAGE_GAIN), boost(2)]);
@@ -252,7 +188,10 @@ describe('routePart with inserts', () => {
   it('rebuilds only its own insert chain for a new list, and re-taps the tail', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const strip = routePart(part, { ...STRIP, inserts: [scale(1)] }, returns, dry, TEST_KINDS);
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: NOW,
+    });
     const old = strip.inserts[0] as unknown as (typeof built)[number];
     const rotationSplitter = fake(strip.rotation.input);
 
@@ -263,20 +202,23 @@ describe('routePart with inserts', () => {
     expect(targets(strip.lowCut.output)).toEqual([fake(first!.input)]);
     expect(targets(old.output)).toEqual([]);
     expect(strip.tail).toBe(second!.output);
-    expect(sources(strip.rotation.input)).toEqual([fake(second!.output)]);
-    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(second!.output)]);
+    expect(sources(strip.head)).toEqual([fake(second!.output)]);
     // The strip's own nodes downstream of the tail are the ones it started with.
     expect(fake(strip.rotation.input)).toBe(rotationSplitter);
+    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(strip.head)]);
 
     strip.setInserts([]);
     expect(strip.tail).toBe(strip.lowCut.output);
-    expect(sources(strip.rotation.input)).toEqual([fake(strip.lowCut.output)]);
+    expect(sources(strip.head)).toEqual([fake(strip.lowCut.output)]);
   });
 
   it('refuses a kind the registry lacks before touching the graph', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const strip = routePart(part, { ...STRIP, inserts: [scale(1)] }, returns, dry, TEST_KINDS);
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: NOW,
+    });
     const before = context.nodes.map((n) => [...n.outbound]);
     expect(() => strip.setInserts([{ kind: 'fuzz' } as unknown as InsertSpec])).toThrow(/fuzz/);
     expect(context.nodes.map((n) => [...n.outbound])).toEqual(before);
@@ -290,6 +232,7 @@ describe('routePart with inserts', () => {
       { ...STRIP, inserts: [DEFAULT_DRIVE, DEFAULT_CHORUS] },
       returns,
       dry,
+      { defer: NOW },
     );
     const lfos = context.nodes.filter((n): n is FakeOscillator => n instanceof FakeOscillator);
     expect(strip.inserts.map((i) => i.kind)).toEqual(['drive', 'chorus']);
@@ -303,13 +246,10 @@ describe('routePart with inserts', () => {
   it('removes every edge it made on dispose, and disposes each insert once', async () => {
     const { context, part, dry } = await rig();
     const returns = createReturns(context.asAudioContext(), RETURNS, dry);
-    const strip = routePart(
-      part,
-      { ...STRIP, inserts: [scale(1), boost(1)] },
-      returns,
-      dry,
-      TEST_KINDS,
-    );
+    const strip = routePart(part, { ...STRIP, inserts: [scale(1), boost(1)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: NOW,
+    });
     const [first, second] = strip.inserts as unknown as (typeof built)[number][];
     strip.dispose();
 

@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_DRIVE, MAX_INSERTS } from '../../../packages/client/src/audio/index-for-editor';
-import { addInsert, canAddInsert, removeInsert, setInsertField } from './insertEdits';
+import { addInsert, canAddInsert, moveInsert, removeInsert, setInsertField } from './insertEdits';
 
 describe('insert edits', () => {
   it('adds a fresh insert of the kind, and stops at the limit', () => {
@@ -23,6 +23,22 @@ describe('insert edits', () => {
     const b = { ...DEFAULT_DRIVE, drive: 9 };
     expect(removeInsert([a, b], 0)).toEqual([b]);
     expect(removeInsert([a, b], 5)).toEqual([a, b]);
+  });
+
+  it('moves an insert one place along the chain, and never off either end (#652)', () => {
+    const a = { ...DEFAULT_DRIVE, drive: 3 };
+    const b = { ...DEFAULT_DRIVE, drive: 9 };
+    const list = [a, b];
+    expect(moveInsert(list, 1, -1)).toEqual([b, a]);
+    expect(moveInsert(list, 0, 1)).toEqual([b, a]);
+    // The ends, and an index the list does not hold, leave the order alone.
+    expect(moveInsert(list, 0, -1)).toEqual(list);
+    expect(moveInsert(list, 1, 1)).toEqual(list);
+    expect(moveInsert(list, 5, -1)).toEqual(list);
+    expect(moveInsert(list, -1, 1)).toEqual(list);
+    // The input list is never touched.
+    expect(list).toEqual([a, b]);
+    expect(moveInsert(list, 0, 1)).not.toBe(list);
   });
 
   it('sets one field on one insert and leaves the input list alone', () => {
