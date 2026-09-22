@@ -11,7 +11,7 @@
  * console (#70) reads it to populate controls, so nothing tunable may hide in a
  * constructor call or a private field.
  */
-import { LOW_CUT_MIN_HZ } from './audioConstants';
+import { DELAY_RESONANCE_DEFAULT_DB, LOW_CUT_MIN_HZ } from './audioConstants';
 import type { ReverbSpace } from './reverbSpace';
 import { SPACES } from './reverbSpace';
 
@@ -32,6 +32,12 @@ export interface DelayReturn {
   readonly feedback: number;
   /** Hz. Lowpass in the feedback loop, so repeats darken. */
   readonly damp: number;
+  /**
+   * The damping lowpass's `Q`, in dB (#647): the emphasis at `damp`. Above
+   * the Butterworth floor it lifts the loop gain there, and high feedback
+   * runs away into the loop's soft clip — on purpose.
+   */
+  readonly resonance: number;
   /** Return gain, 0..1. */
   readonly level: number;
 }
@@ -45,7 +51,14 @@ export type ReturnSpec = ReverbReturn | DelayReturn;
  */
 export const RETURNS = {
   room: { kind: 'reverb', space: SPACES.hall, level: 0.9 },
-  echo: { kind: 'delay', delayTime: 0.28, feedback: 0.3, damp: 3200, level: 0.6 },
+  echo: {
+    kind: 'delay',
+    delayTime: 0.28,
+    feedback: 0.3,
+    damp: 3200,
+    resonance: DELAY_RESONANCE_DEFAULT_DB,
+    level: 0.6,
+  },
 } satisfies Record<string, ReturnSpec>;
 
 export type ReturnName = keyof typeof RETURNS;

@@ -15,6 +15,8 @@ import {
   DELAY_DAMP_MIN_HZ,
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
+  DELAY_RESONANCE_MAX_DB,
+  DELAY_RESONANCE_MIN_DB,
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
   MIX_LEVEL_MAX,
@@ -137,12 +139,19 @@ function delayReturn(
   path: string,
   n: FieldNormaliser,
 ): DelayReturn {
-  n.dropUnknown(o, ['kind', 'level', 'delayTime', 'feedback', 'damp'], path);
+  n.dropUnknown(o, ['kind', 'level', 'delayTime', 'feedback', 'damp', 'resonance'], path);
   return {
     kind: 'delay',
     level: n.num(o.level, base.level, 0, RETURN_LEVEL_MAX, `${path}.level`),
     delayTime: n.num(o.delayTime, base.delayTime, 0, DELAY_MAX_SECONDS, `${path}.delayTime`),
     feedback: n.num(o.feedback, base.feedback, 0, DELAY_FEEDBACK_MAX, `${path}.feedback`),
     damp: n.num(o.damp, base.damp, DELAY_DAMP_MIN_HZ, DELAY_DAMP_MAX_HZ, `${path}.damp`),
+    resonance: n.num(
+      o.resonance,
+      base.resonance,
+      DELAY_RESONANCE_MIN_DB,
+      DELAY_RESONANCE_MAX_DB,
+      `${path}.resonance`,
+    ),
   };
 }
