@@ -13,6 +13,7 @@ import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from './audioConstants';
 import { DEFAULT_DRIVE } from './inserts/driveInsert';
+import { DEFAULT_CHORUS } from './inserts/chorusInsert';
 
 const silentPart = (): PlayablePart => ({
   noteOn: () => 0,
@@ -141,7 +142,10 @@ describe('the part list (#597)', () => {
   });
 
   it('carries strip inserts through export and import, and an unknown kind fails the gate (#641)', () => {
-    const inserts = [{ ...DEFAULT_DRIVE, drive: 20, mix: 0.6 }];
+    const inserts = [
+      { ...DEFAULT_DRIVE, drive: 20, mix: 0.6 },
+      { ...DEFAULT_CHORUS, rate: 1.2, spread: 1 },
+    ];
     const first = makeArrangement(song([{ ...KICK, strip: { inserts } }]));
     expect(first.document.parts[0]?.strip.inserts).toEqual(inserts);
     const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));

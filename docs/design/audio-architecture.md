@@ -107,7 +107,7 @@ packages/client/src/audio/
   returnBus.ts          # sends and returns: the plate, and the delay (resonant damping, soft-clipped loop), 100% wet
   channelStrip.ts       # one part through its strip: fader, stages, rotation and sends off the tail
   lowCutStage.ts        # the strip's first stage: a Butterworth highpass (#640)
-  inserts/              # strip insert kinds: the registry, drive (#641); tanhCurve.ts is their shared clip curve
+  inserts/              # strip insert kinds: the registry, drive (#641), chorus (#642); tanhCurve.ts is their shared clip curve
   stereoRotate.ts       # the pan matrix (splitter -> 4 gains -> merger)
   scheduler.ts          # look-ahead note scheduling
   offlineRender.ts      # bake a patch to an AudioBuffer

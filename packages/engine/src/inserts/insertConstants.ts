@@ -31,3 +31,33 @@ export const DRIVE_REFERENCE_LEVEL = 0.25;
 /** The shaper curve's span, in multiples of full scale, and its size (`tanhCurve.ts`). */
 export const DRIVE_CURVE_RANGE = 8;
 export const DRIVE_CURVE_POINTS = 4097;
+
+/* --------------------------------- chorus -------------------------------- */
+
+/** The LFO rate of the first voice, in Hz; the others run at `CHORUS_VOICE_RATIOS` of it. */
+export const CHORUS_RATE_MIN_HZ = 0.05;
+export const CHORUS_RATE_MAX_HZ = 5;
+export const CHORUS_RATE_DEFAULT_HZ = 0.6;
+/** How far each voice's delay swings either side of its centre, in milliseconds. */
+export const CHORUS_DEPTH_MIN_MS = 0;
+export const CHORUS_DEPTH_MAX_MS = 4;
+export const CHORUS_DEPTH_DEFAULT_MS = 2;
+/**
+ * Stereo width: the right channel's LFO runs at `1 − 2·spread` of the left's,
+ * so 0 moves both sides together (a narrow chorus) and 1 moves them in
+ * opposite directions (the wide one). No `StereoPannerNode`: the strip is
+ * stereo, and a balance law on stereo input collapses it (record §4).
+ */
+export const CHORUS_SPREAD_DEFAULT = 0.7;
+/** Wet share: 0 is the dry signal, 1 is the voices alone. */
+export const CHORUS_MIX_DEFAULT = 0.5;
+/**
+ * The voices: each one's delay centre in ms and its LFO rate as a ratio of
+ * the Rate knob. Irrational-ish ratios keep the voices from lining up. The
+ * count is fixed per kind, so a settings change never re-wires; the centres
+ * sit far enough above the depth ceiling that a delay never nears zero.
+ */
+export const CHORUS_VOICE_CENTRES_MS: readonly number[] = [11, 17];
+export const CHORUS_VOICE_RATIOS: readonly number[] = [1, 1.37];
+/** The longest a voice's delay line can reach, in seconds: every centre plus the depth ceiling. */
+export const CHORUS_DELAY_MAX_SECONDS = 0.05;
