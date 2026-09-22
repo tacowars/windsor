@@ -160,10 +160,8 @@ export const LOW_CUT_MAX_HZ = 500;
 /** Hard left or right is a quarter turn: a centred source lands fully on one side. */
 export const PAN_ANGLE_MAX = Math.PI / 4;
 
-/** A bus filter's cutoff and resonance when the caller names neither. */
+/** A bus filter's cutoff when the caller names none. */
 export const BUS_FILTER_FREQUENCY_HZ = 12000;
-/** 1/sqrt(2) — the Butterworth Q, flat through the passband. */
-export const BUS_FILTER_Q = 0.707;
 /**
  * The Butterworth response as a Web Audio `lowpass` / `highpass` `Q`, which
  * the spec reads in dB (α = sin ω₀ / (2·10^(Q/20))): 20·log₁₀(1/√2), flat to
@@ -172,8 +170,29 @@ export const BUS_FILTER_Q = 0.707;
 export const BUTTERWORTH_Q_DB = 20 * Math.log10(Math.SQRT1_2);
 /** The delay return's buffer length, in seconds; the ceiling on `delayTime`. */
 export const DELAY_MAX_SECONDS = 5;
-/** Feedback is clamped below 1 so the loop always decays. */
+/**
+ * Feedback's ceiling. Below 1, the loop decays wherever the damping filter is
+ * flat; the filter's resonance lifts the loop gain above 1 at the damping
+ * frequency, the wanted runaway the loop's soft clip bounds (#647).
+ */
 export const DELAY_FEEDBACK_MAX = 0.95;
+/**
+ * The echo's damping resonance, as the biquad's `Q` in dB (#647). The floor
+ * is Butterworth — flat, so repeats always decay below feedback 1 — and the
+ * default is Web Audio's own `Q`, what the echo ran at before it had a knob.
+ */
+export const DELAY_RESONANCE_MIN_DB = BUTTERWORTH_Q_DB;
+export const DELAY_RESONANCE_MAX_DB = 12;
+export const DELAY_RESONANCE_DEFAULT_DB = 1;
+/**
+ * The soft clip inside the echo's loop (#647): `ceiling·tanh(x / ceiling)`,
+ * transparent well below the ceiling. The curve covers ±`RANGE` × the
+ * ceiling, past which the spec holds its end value; an odd point count puts
+ * an exact 0 in the middle.
+ */
+export const DELAY_CLIP_CEILING = 1;
+export const DELAY_CLIP_RANGE = 8;
+export const DELAY_CLIP_CURVE_POINTS = 4097;
 /** A return's gain into the master: 0..1, never a boost. */
 export const RETURN_LEVEL_MAX = 1;
 /** The delay return's damping lowpass, in hertz — the biquad's usable band. */

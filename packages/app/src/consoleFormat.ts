@@ -21,6 +21,8 @@ export const fmtMs = (v: number): string =>
 export const fmtHz = (v: number): string =>
   v >= HZ_PER_KILOHERTZ ? `${(v / HZ_PER_KILOHERTZ).toFixed(2)}k` : v.toFixed(0);
 export const fmtSigned = (v: number): string => (v >= 0 ? '+' : '') + v.toFixed(2);
+/** A level or a biquad `Q` in dB, signed, one decimal. */
+export const fmtDb = (v: number): string => `${(v >= 0 ? '+' : '') + v.toFixed(1)}dB`;
 
 /** The pitch class of a MIDI note, 0..11, for any integer. */
 export const pitchClass = (midi: number): number =>

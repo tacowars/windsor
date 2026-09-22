@@ -104,7 +104,7 @@ packages/client/src/audio/
   audioPart.ts          # one timbral part == one worklet node
   audioBus.ts           # dry buses with inserts (native nodes)
   mix.ts                # the desk: RETURNS and the SFX strips (MIX), typed plain data
-  returnBus.ts          # sends and returns: the plate and the delay, 100% wet
+  returnBus.ts          # sends and returns: the plate, and the delay (resonant damping, soft-clipped loop), 100% wet
   channelStrip.ts       # one part through its strip: fader, stages, rotation and sends off the tail
   lowCutStage.ts        # the strip's first stage: a Butterworth highpass (#640)
   stereoRotate.ts       # the pan matrix (splitter -> 4 gains -> merger)
