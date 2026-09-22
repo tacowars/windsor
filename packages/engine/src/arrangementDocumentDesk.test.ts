@@ -9,7 +9,13 @@ import { describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT, withPart } from './__fixtures__/fullArrangement';
 import { isShippable, makeArrangement } from './arrangementDocument';
-import { DELAY_FEEDBACK_MAX, REVERB_SPACE_RANGES } from './audioConstants';
+import {
+  DELAY_FEEDBACK_MAX,
+  DELAY_RESONANCE_DEFAULT_DB,
+  DELAY_RESONANCE_MAX_DB,
+  DELAY_RESONANCE_MIN_DB,
+  REVERB_SPACE_RANGES,
+} from './audioConstants';
 import { RETURNS } from './mix';
 import { makePatch } from './patch';
 import { PRESETS } from './presets';
@@ -163,6 +169,31 @@ describe('the returns section', () => {
       'returns.echo.feedback: clamped 1.5 to 0.95',
       'returns.echo.damp: clamped 1 to 10',
     ]);
+  });
+
+  it('gives the echo a resonance: the code default when absent, clamped, and round-tripped (#647)', () => {
+    const absent = makeArrangement({ ...SONG, returns: { echo: { delayTime: 0.5 } } });
+    const echo = absent.document.returns?.echo;
+    expect(echo?.kind === 'delay' && echo.resonance).toBe(DELAY_RESONANCE_DEFAULT_DB);
+    expect(RETURNS.echo.resonance).toBe(DELAY_RESONANCE_DEFAULT_DB);
+
+    const loud = makeArrangement({ ...SONG, returns: { echo: { resonance: 40 } } });
+    const quiet = makeArrangement({ ...SONG, returns: { echo: { resonance: -40 } } });
+    const set = makeArrangement({ ...SONG, returns: { echo: { resonance: 7.5 } } });
+    const res = (r: typeof loud): number | false => {
+      const e = r.document.returns?.echo;
+      return e?.kind === 'delay' && e.resonance;
+    };
+    expect(res(loud)).toBe(DELAY_RESONANCE_MAX_DB);
+    expect(res(quiet)).toBe(DELAY_RESONANCE_MIN_DB);
+    expect(res(set)).toBe(7.5);
+    expect(loud.corrections).toEqual([
+      `returns.echo.resonance: clamped 40 to ${DELAY_RESONANCE_MAX_DB}`,
+    ]);
+
+    const again = makeArrangement(JSON.parse(JSON.stringify(set.document)));
+    expect(res(again)).toBe(7.5);
+    expect(again.corrections).toEqual([]);
   });
 
   it('keeps the code kind, and drops fields of the other kind as unknown', () => {

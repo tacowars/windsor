@@ -12,6 +12,8 @@ import {
   DELAY_DAMP_MIN_HZ,
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
+  DELAY_RESONANCE_MAX_DB,
+  DELAY_RESONANCE_MIN_DB,
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
   MIX_LEVEL_MAX,
@@ -23,7 +25,8 @@ import type { ReturnBus } from './returnBus';
 import type { ReverbSpace } from './reverbSpace';
 
 const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends'];
-const RETURN_KEYS = ['kind', 'level', 'space', 'delayTime', 'feedback', 'damp'];
+const DELAY_KEYS = ['delayTime', 'feedback', 'damp', 'resonance'];
+const RETURN_KEYS = ['kind', 'level', 'space', ...DELAY_KEYS];
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -98,7 +101,7 @@ function applySpace(
   path: string,
   ignored: string[],
 ): void {
-  for (const key of ['delayTime', 'feedback', 'damp']) {
+  for (const key of DELAY_KEYS) {
     if (raw[key] !== undefined) ignored.push(`${path}.${key}`);
   }
   if (raw.space === undefined) return;
@@ -126,12 +129,15 @@ function applyDelay(
   ignored: string[],
 ): void {
   if (raw.space !== undefined) ignored.push(`${path}.space`);
-  const delay: { delayTime?: number; feedback?: number; damp?: number } = {};
+  const delay: { delayTime?: number; feedback?: number; damp?: number; resonance?: number } = {};
   if (isNumber(raw.delayTime)) delay.delayTime = clamp(raw.delayTime, 0, DELAY_MAX_SECONDS);
   else if (raw.delayTime !== undefined) ignored.push(`${path}.delayTime`);
   if (isNumber(raw.feedback)) delay.feedback = clamp(raw.feedback, 0, DELAY_FEEDBACK_MAX);
   else if (raw.feedback !== undefined) ignored.push(`${path}.feedback`);
   if (isNumber(raw.damp)) delay.damp = clamp(raw.damp, DELAY_DAMP_MIN_HZ, DELAY_DAMP_MAX_HZ);
   else if (raw.damp !== undefined) ignored.push(`${path}.damp`);
+  if (isNumber(raw.resonance)) {
+    delay.resonance = clamp(raw.resonance, DELAY_RESONANCE_MIN_DB, DELAY_RESONANCE_MAX_DB);
+  } else if (raw.resonance !== undefined) ignored.push(`${path}.resonance`);
   bus.setDelay(delay);
 }
