@@ -12,6 +12,7 @@
  * constructor call or a private field.
  */
 import { DELAY_RESONANCE_DEFAULT_DB, LOW_CUT_MIN_HZ } from './audioConstants';
+import type { InsertSpec } from './inserts/insertRegistry';
 import type { ReverbSpace } from './reverbSpace';
 import { SPACES } from './reverbSpace';
 
@@ -83,10 +84,22 @@ export interface ChannelStrip<R extends string = string> {
   readonly lowCut: number;
   /** Send amount per return, 0..1; an absent return sends nothing (record §7). */
   readonly sends: Readonly<Partial<Record<R, number>>>;
+  /**
+   * Insert effects after the low cut, in signal order, at most `MAX_INSERTS`
+   * (#641). The kinds are code-owned (`inserts/insertRegistry.ts`); which ones
+   * a strip uses, and how they are set, is the song's.
+   */
+  readonly inserts: readonly InsertSpec[];
 }
 
-/** Unity, centred, uncut, dry. What a part not named in the mix gets. */
-export const DEFAULT_STRIP: ChannelStrip = { level: 1, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} };
+/** Unity, centred, uncut, dry, no inserts. What a part not named in the mix gets. */
+export const DEFAULT_STRIP: ChannelStrip = {
+  level: 1,
+  pan: 0,
+  lowCut: LOW_CUT_MIN_HZ,
+  sends: {},
+  inserts: [],
+};
 
 /**
  * Where each SFX part sits, keyed by strip name — the strips `createSfxPart`
@@ -94,8 +107,8 @@ export const DEFAULT_STRIP: ChannelStrip = { level: 1, pan: 0, lowCut: LOW_CUT_M
  * its own strip in the song document, so a song's mix travels with the song.
  */
 export const MIX = {
-  place: { level: 0.9, pan: 0.3, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.08 } },
-  ui: { level: 0.7, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} },
+  place: { level: 0.9, pan: 0.3, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.08 }, inserts: [] },
+  ui: { level: 0.7, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {}, inserts: [] },
 } satisfies Record<string, ChannelStrip<ReturnName>>;
 
 export type PartName = keyof typeof MIX;

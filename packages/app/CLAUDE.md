@@ -172,6 +172,23 @@ Each is the whole list; a step skipped here is what a later ticket finds.
 3. The document contract holds: a song carries its returns, so the export must
    round-trip the new fields (`arrangementDocumentDesk.test.ts`).
 
+**Add a strip insert kind** (#641)
+
+1. Engine: one `inserts/<kind>Insert.ts` exporting its spec type, its
+   `DEFAULT_<KIND>` and an `InsertKind` (`fields`, `defaults`, `normalise`,
+   `create`); its ranges in `inserts/insertConstants.ts`; the spec in
+   `InsertSpec` and an appended entry in `INSERT_KINDS`
+   (`inserts/insertRegistry.ts`). `create` builds a fixed graph whose `set` is
+   param writes only; `dispose` disconnects what it built, never the edge out
+   of its `output`, and `stop()`s any source node it started. The strip, the
+   normaliser and the live path need no edit.
+2. Console: a `<kind>Card.ts` over `insertKnobs.ts`, its knob entries in
+   `insertKnobTables.ts` reading `DEFAULT_<KIND>`, its label in
+   `INSERT_LABELS`, and an entry in `INSERT_CARDS` (`insertCards.test.ts`
+   fails without one).
+3. A render test of its sound and its bounds beside the kind, and a rebuilt
+   page.
+
 **Add a harmony mode**
 
 - A **scale** is an entry in `SCALES` (`audioConstants.ts`, surfaced by

@@ -39,8 +39,15 @@ const MUSIC_STRIP: ChannelStrip = {
   pan: 0,
   lowCut: LOW_CUT_MIN_HZ,
   sends: { room: 0.4 },
+  inserts: [],
 };
-const SFX_STRIP: ChannelStrip = { level: 1, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {} };
+const SFX_STRIP: ChannelStrip = {
+  level: 1,
+  pan: 0,
+  lowCut: LOW_CUT_MIN_HZ,
+  sends: {},
+  inserts: [],
+};
 
 interface Render {
   master: Capture;

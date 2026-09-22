@@ -168,6 +168,22 @@ export { routePart } from './channelStrip';
 export type { PartStrip, StripStage } from './channelStrip';
 export { createLowCutStage } from './lowCutStage';
 export type { LowCutStage } from './lowCutStage';
+export {
+  INSERT_KINDS,
+  INSERT_KIND_NAMES,
+  insertKind,
+  normaliseInserts,
+} from './inserts/insertRegistry';
+export type {
+  InsertKind,
+  InsertKindName,
+  InsertRegistry,
+  InsertSpec,
+  InsertStage,
+} from './inserts/insertRegistry';
+export { DEFAULT_DRIVE, DRIVE_INSERT, driveCompensation } from './inserts/driveInsert';
+export type { DriveSpec } from './inserts/driveInsert';
+export * from './inserts/insertConstants';
 export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
 export type { RotationGains, StereoRotate } from './stereoRotate';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
