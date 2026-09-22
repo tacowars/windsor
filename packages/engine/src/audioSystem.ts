@@ -18,8 +18,8 @@
  *                                                                      └─▶ limiter ─▶ out
  *
  * Each strip's stages sit between the part and its tail, and the rotation and
- * the sends both tap the tail (#639; none is built yet, so today the tail is
- * the part's output). SFX parts get the same strip with the SFX fader as
+ * the sends both tap the tail (#639). The first stage is always the strip's
+ * low cut (#640), so a room hears the cut signal too. SFX parts get the same strip with the SFX fader as
  * their dry destination, so they skip the music bus's inserts but still have a real pan and a send.
  * `musicBus.output` and `sfxLevel` are the settings panel's two channel
  * faders (#518 decision 1): the music one is the bus's existing output gain,

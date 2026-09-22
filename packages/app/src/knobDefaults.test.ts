@@ -22,6 +22,8 @@ import {
   HOLD_DEFAULT,
   LFO_BARS_DEFAULT,
   LFO_HZ_DEFAULT,
+  LOW_CUT_MAX_HZ,
+  LOW_CUT_MIN_HZ,
   MIDI_MIDDLE_C,
   RETURN_NAMES,
   SEQUENCER_KINDS,
@@ -38,7 +40,7 @@ import {
   octaveKnob,
   spanKnob,
 } from './harmonyTables';
-import { STRIP_LEVEL_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
+import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
 import { getPath } from './patchPath';
 import {
@@ -162,6 +164,12 @@ describe('harmony, mixer and arrangement knobs', () => {
     expect(STRIP_LEVEL_KNOB.def).toBe(DEFAULT_STRIP.level);
     expect(STRIP_PAN_KNOB.def).toBe(DEFAULT_STRIP.pan);
     for (const ret of RETURN_NAMES) expect(sendKnob(ret).def).toBe(DEFAULT_STRIP.sends[ret] ?? 0);
+  });
+
+  it("a strip's low cut spans the engine's range and rests at DEFAULT_STRIP's (#640)", () => {
+    expect(STRIP_LOW_CUT_KNOB.def).toBe(DEFAULT_STRIP.lowCut);
+    expect(STRIP_LOW_CUT_KNOB.min).toBe(LOW_CUT_MIN_HZ);
+    expect(STRIP_LOW_CUT_KNOB.max).toBe(LOW_CUT_MAX_HZ);
   });
 
   it('BPM resets to what a new song starts at', () => {

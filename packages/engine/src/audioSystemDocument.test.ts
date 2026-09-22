@@ -27,6 +27,7 @@ import { musicPartName } from './documentParts';
 import { FmEngine } from './fmEngine';
 import { clonePatch } from './patch';
 import { PRESETS } from './presets';
+import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from './audioConstants';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -62,7 +63,7 @@ describe('initMusic over a document', () => {
 
   it('lands each part on its own strip', async () => {
     const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
-      strip: { level: 0.25, pan: -0.5, sends: { echo: 0.1 } },
+      strip: { level: 0.25, pan: -0.5, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.1 } },
     });
     const sys = await system(doc);
     expect(stripOf(sys, 'hat')?.part.gain.value).toBe(0.25);
@@ -129,6 +130,26 @@ describe('apply over the document model', () => {
     });
     expect(strip?.part.gain.value).toBe(0.3);
     expect(strip?.sends.get('echo')?.gain.value).toBe(echoBefore);
+  });
+
+  it('lands the document low cut on the strip, and moves it live, clamped (#640)', async () => {
+    const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
+      strip: { ...FULL_STRIPS.hat, lowCut: 180 },
+    });
+    const sys = await system(doc);
+    const cutOf = (): number | undefined => stripOf(sys, 'hat')?.lowCut.filter.frequency.value;
+    expect(cutOf()).toBe(180);
+    expect(stripOf(sys, 'kick')?.lowCut.filter.frequency.value).toBe(LOW_CUT_MIN_HZ);
+    expect(sys.apply({ parts: { [hat]: { strip: { lowCut: 90 } } } })).toEqual({
+      ok: true,
+      ignored: [],
+    });
+    expect(cutOf()).toBe(90);
+    sys.apply({ parts: { [hat]: { strip: { lowCut: LOW_CUT_MAX_HZ * 4 } } } });
+    expect(cutOf()).toBe(LOW_CUT_MAX_HZ);
+    const junk = sys.apply({ parts: { [hat]: { strip: { lowCut: 'high' } } } } as never);
+    expect(junk.ignored).toEqual([`parts.${hat}.strip.lowCut`]);
+    expect(cutOf()).toBe(LOW_CUT_MAX_HZ);
   });
 
   it('sets sends live and clamps into range', async () => {

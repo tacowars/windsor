@@ -3,8 +3,12 @@
  * returns' own ranges and tempo divisions. The plate's ranges are the
  * worklet's (`REVERB_SPACE_RANGES`); the delay's are here.
  */
-import { DEFAULT_STRIP } from '../../../packages/client/src/audio/index-for-editor';
-import { fmt2, fmtSigned } from './consoleFormat';
+import {
+  DEFAULT_STRIP,
+  LOW_CUT_MAX_HZ,
+  LOW_CUT_MIN_HZ,
+} from '../../../packages/client/src/audio/index-for-editor';
+import { fmt2, fmtHz, fmtSigned } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
 
 /** A strip's level reaches +6 dB; the default is unity from the engine. */
@@ -22,6 +26,18 @@ export const STRIP_PAN_KNOB: CardKnobSpec = {
   max: 1,
   def: DEFAULT_STRIP.pan,
   fmt: fmtSigned,
+};
+/**
+ * The strip's low cut (#640), on a log curve like every frequency knob here.
+ * The range and the default are the engine's, so the floor reads as off.
+ */
+export const STRIP_LOW_CUT_KNOB: CardKnobSpec = {
+  label: 'Low cut',
+  min: LOW_CUT_MIN_HZ,
+  max: LOW_CUT_MAX_HZ,
+  def: DEFAULT_STRIP.lowCut,
+  curve: 'log',
+  fmt: fmtHz,
 };
 /** A send the strip does not name is silent. */
 export const SEND_DEFAULT = 0;
