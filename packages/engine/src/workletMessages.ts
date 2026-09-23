@@ -1,5 +1,5 @@
 /**
- * The message contract between the main thread and `worklet/fm-processor.js`.
+ * The message contract between the main thread and `worklet/fm/` (the FM worklet).
  *
  * `frame` is an absolute frame index on the `AudioContext` timeline, which is
  * what makes scheduling sample-accurate: the worklet compares it against its own
@@ -149,8 +149,8 @@ export function frameForTime(context: BaseAudioContext, time: number): number {
   return Math.max(0, Math.round(time * context.sampleRate));
 }
 
-/** Where the DSP lives. No imports in that file, so Vite emits it as an asset. */
-export const WORKLET_URL = new URL('./worklet/fm-processor.js', import.meta.url);
+/** Where the DSP lives: the bundle `scripts/build-worklets.mjs` writes from `worklet/fm/`. No imports in it, so Vite emits it as an asset. */
+export const WORKLET_URL = new URL('./worklet/generated/fm-processor.js', import.meta.url);
 
 export const PROCESSOR_NAME = 'fm-part';
 
