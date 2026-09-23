@@ -6,13 +6,17 @@
  * every other strip edit: the engine rebuilds that one strip's chain, and the
  * transport and every other part keep playing.
  */
-import type { InsertKindName } from '../../../packages/client/src/audio/index-for-editor';
+import type { InsertTarget } from './insertTarget';
+import type {
+  InsertKindName,
+  InsertSpec,
+} from '../../../packages/client/src/audio/index-for-editor';
 import {
   INSERT_KIND_NAMES,
   MAX_INSERTS,
 } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
-import { partChange } from './context';
+import { insertChange } from './insertTarget';
 import { el } from './dom';
 import { INSERT_CARDS } from './insertCards';
 import { addInsert, canAddInsert, moveInsert, removeInsert } from './insertEdits';
@@ -21,13 +25,18 @@ import { insertsOf } from './insertKnobs';
 
 const ADD_PROMPT = 'Add insert…';
 
-function commit(ctx: AppCtx, slot: number, inserts: unknown): void {
-  const result = ctx.change(partChange(slot, { strip: { inserts } }));
+function commit(ctx: AppCtx, slot: InsertTarget, inserts: readonly InsertSpec[]): void {
+  const result = ctx.change(insertChange(slot, inserts));
   if (result.ok) ctx.render();
 }
 
 /** One nudge along the chain: ◀ towards the front, ▶ towards the back (#652). */
-function moveButton(ctx: AppCtx, slot: number, index: number, delta: number): HTMLButtonElement {
+function moveButton(
+  ctx: AppCtx,
+  slot: InsertTarget,
+  index: number,
+  delta: number,
+): HTMLButtonElement {
   const back = delta < 0;
   const button = el('button', 'btn nudge', back ? '◀' : '▶') as HTMLButtonElement;
   button.type = 'button';
@@ -40,7 +49,12 @@ function moveButton(ctx: AppCtx, slot: number, index: number, delta: number): HT
   return button;
 }
 
-function insertBox(ctx: AppCtx, slot: number, index: number, kind: InsertKindName): HTMLElement {
+function insertBox(
+  ctx: AppCtx,
+  slot: InsertTarget,
+  index: number,
+  kind: InsertKindName,
+): HTMLElement {
   const box = el('div', 'insert-box');
   const head = el('div', 'insert-head');
   head.appendChild(moveButton(ctx, slot, index, -1));
@@ -55,11 +69,14 @@ function insertBox(ctx: AppCtx, slot: number, index: number, kind: InsertKindNam
   return box;
 }
 
-function addPicker(ctx: AppCtx, slot: number): HTMLElement {
+function addPicker(ctx: AppCtx, slot: InsertTarget): HTMLElement {
   const picker = document.createElement('select');
   picker.className = 'field';
   picker.name = `add-insert-${slot}`;
-  picker.setAttribute('aria-label', `Add an insert to slot ${slot}`);
+  picker.setAttribute(
+    'aria-label',
+    slot === 'master' ? 'Add an insert to Master' : `Add an insert to slot ${slot}`,
+  );
   picker.add(new Option(ADD_PROMPT, ''));
   for (const kind of INSERT_KIND_NAMES) picker.add(new Option(INSERT_LABELS[kind], kind));
   const full = !canAddInsert(insertsOf(ctx, slot));
@@ -74,7 +91,7 @@ function addPicker(ctx: AppCtx, slot: number): HTMLElement {
 }
 
 /** The inserts row under a strip's knobs. */
-export function stripInserts(ctx: AppCtx, slot: number): HTMLElement {
+export function stripInserts(ctx: AppCtx, slot: InsertTarget): HTMLElement {
   const row = el('div', 'insert-row');
   insertsOf(ctx, slot).forEach((spec, index) =>
     row.appendChild(insertBox(ctx, slot, index, spec.kind)),

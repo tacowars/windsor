@@ -1,5 +1,11 @@
 # The DSP worklets
 
+`meter/peakMeterProcessor.ts` is the opt-in stereo sample meter (#666),
+bundled to `generated/peak-meter-processor.js` and checked by its own
+`meter/tsconfig.json`. It samples every quantum on a silent, view-owned tap;
+`mixer/peakMeterProcessor.test.ts` runs the generated processor and
+`mixer/peakMeter.test.ts` checks its main-thread lifetime.
+
 `compressor/compressorProcessor.ts` wraps the typed, tested compressor DSP in
 `inserts/compressorDsp.ts`; it also bundles through the table below (#660).
 

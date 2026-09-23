@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- 353 lines: the song-master lifetime adds three lines beyond the system limit; defer a split until there is a larger routing concern (#225 decision 4). */
 /**
  * The audio system: constructed by `main.ts`, updated by the render loop.
  *
@@ -12,7 +13,7 @@
  *                                           ├─ send ─▶ return "room" (plate, 100% wet) ────┤
  *                                           └─ send ─▶ return "echo" (delay) ──────────────┤
  *                                                                                          ▼
- *                                                          musicBus.output (the Music fader)
+ *                                                          song master inserts/level → musicBus.output (the Music fader)
  *                                                                                          │
  *   sfx part.output ─▶ [stages…] ─▶ tail ─── [rotate θ] ─▶ sfxLevel ─▶ master ◀────────────┘
  *                                                                      └─▶ limiter ─▶ out
@@ -122,6 +123,8 @@ export interface MusicReadout extends ArrangementReadout {
   load: AudioLoadReadout;
 }
 
+import { createMasterStrip } from '../mixer/masterStrip';
+import type { MasterStrip } from '../mixer/masterStrip';
 import { meteredInsertRegistry } from '../inserts/meteredInsertRegistry';
 
 export class AudioSystem {
@@ -131,6 +134,7 @@ export class AudioSystem {
   private readonly mix: Readonly<Record<string, ChannelStrip>>;
   private readonly returnSpecs: Readonly<Record<string, ReturnSpec>>;
   private musicBus: AudioBus | null = null;
+  private masterStripValue: MasterStrip | null = null;
   private returns: Readonly<Record<string, ReturnBus>> | null = null;
   /** The SFX strips' dry summing gain — the SFX fader (#518); built by `init()`. */
   private sfxLevel: GainNode | null = null;
@@ -163,6 +167,11 @@ export class AudioSystem {
     this.schedMeter = new SchedCostMeter({ now: this.now });
   }
 
+  /** The song master, distinct from the engine-wide safety output and settings gains. */
+  get masterStrip(): MasterStrip | null {
+    return this.masterStripValue;
+  }
+
   get isStarted(): boolean {
     return this.started;
   }
@@ -175,11 +184,13 @@ export class AudioSystem {
     if (this.started) return;
     await this.engine.init();
     this.musicBus = this.engine.createBus({ filter: { type: 'highpass', frequency: 30 } });
-    // The returns land on the music bus's output gain rather than on the
-    // master (#518 decision 1), so the music fader — which *is* that gain —
-    // takes the room and the echo down with the parts feeding them. They sit
-    // after the bus's highpass, exactly as they did on the master.
-    this.returns = createReturns(this.engine.context, this.returnSpecs, this.musicBus.output);
+    // Keep the dry-only highpass. Returns join after it, before song inserts.
+    const master = createMasterStrip(this.engine.context, this.routeOptions);
+    this.masterStripValue = master;
+    this.musicBus.filter!.disconnect(this.musicBus.output);
+    this.musicBus.filter!.connect(master.input);
+    master.output.connect(this.musicBus.output);
+    this.returns = createReturns(this.engine.context, this.returnSpecs, master.input);
     this.sfxLevel = this.engine.context.createGain();
     this.sfxLevel.connect(this.engine.master);
     // A level set before `init()` (the settings read at boot) lands on the
@@ -305,7 +316,7 @@ export class AudioSystem {
    */
   initMusic(document: ArrangementDocument, onEvent?: MusicEventHandler): void {
     if (this.player) return;
-    const { returns, patches, ...arrangement } = document;
+    const { returns, patches, master, ...arrangement } = document;
     // The document and nothing else (#562): a song carries a snapshot of
     // every patch it plays, so the library is not a runtime import and a
     // name it does not embed is a load error, never a silent fallback.
@@ -317,6 +328,7 @@ export class AudioSystem {
         part.strip,
       );
     }
+    if (master) this.masterStrip!.apply(master);
     if (returns) applyReturnsLive(this.standing().returns, returns);
     // The roster the player reads and — for a live add or removal — grows and
     // shrinks through (#629); the player calls these only after its plan has
@@ -417,7 +429,7 @@ export class AudioSystem {
    */
   apply(partial: DocumentPartial): ApplyResult {
     if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
-    const { returns, patches, parts, ...rest } = partial;
+    const { returns, patches, parts, master, ...rest } = partial;
     const { arrangementParts, strips } = splitStrips(parts);
     const result = this.player.apply(
       arrangementParts === undefined
@@ -427,6 +439,7 @@ export class AudioSystem {
     );
     if (!result.ok) return result;
     const ignored = [...result.ignored];
+    if (master !== undefined) ignored.push(...this.masterStrip!.apply(master));
     for (const [slot, strip] of strips) {
       const live = this.strips.get(musicPartName(Number(slot)));
       // An absent slot was already reported by the player's merge.
@@ -500,6 +513,12 @@ export class AudioSystem {
     this.strips.clear();
     this.musicParts.clear();
     if (this.returns) for (const bus of Object.values(this.returns)) bus.dispose();
+    this.masterStrip?.dispose();
+    this.masterStripValue = null;
+    this.musicBus?.input.disconnect();
+    this.musicBus?.filter?.disconnect();
+    this.musicBus?.output.disconnect();
+    this.sfxLevel?.disconnect();
     this.loadMeter.dispose();
     this.schedMeter.reset();
     this.engine.dispose();

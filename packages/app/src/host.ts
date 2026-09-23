@@ -86,6 +86,7 @@ export class EngineHost {
         fmUrl: blob(dsp.fm),
         reverbUrl: blob(dsp.reverb),
         compressorUrl: blob(dsp.compressor),
+        meterUrl: blob(dsp.meter),
       });
     } catch {
       try {
@@ -96,6 +97,7 @@ export class EngineHost {
           fmUrl: data(dsp.fm),
           reverbUrl: data(dsp.reverb),
           compressorUrl: data(dsp.compressor),
+          meterUrl: data(dsp.meter),
         });
       } catch (error) {
         this.discard();
