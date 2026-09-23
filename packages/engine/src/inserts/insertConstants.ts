@@ -5,7 +5,7 @@
  */
 
 /** Inserts per strip. A song cannot allocate unbounded DSP (#641). */
-export const MAX_INSERTS = 2;
+export const MAX_INSERTS = 8;
 
 /* --------------------------------- drive --------------------------------- */
 
