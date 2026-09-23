@@ -1,6 +1,7 @@
 /**
- * `ReverbSpace` restates the parameter list of `worklet/reverb-processor.js`,
- * which must stay import-free. These tests are what makes that duplication
+ * `ReverbSpace` restates the parameter list of the plate in `worklet/reverb/`
+ * (bundled to `worklet/generated/reverb-processor.js`), which the main thread
+ * does not import. These tests are what makes that duplication
  * safe: they fail the moment a parameter is added, renamed, retyped, or given a
  * different default or range on one side only.
  */
