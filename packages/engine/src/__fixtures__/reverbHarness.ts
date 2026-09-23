@@ -1,5 +1,6 @@
 /**
- * Runs `worklet/reverb-processor.js` headlessly under Node.
+ * Runs `worklet/generated/reverb-processor.js` -- the bundle of `worklet/reverb/`
+ * (#671) -- headlessly under Node.
  *
  * Same approach and the same reasons as `workletHarness.ts`: the DSP is a pure
  * function from input samples to output samples, but it only runs inside an
@@ -63,7 +64,7 @@ export interface LoadedReverb {
 
 /** Load and evaluate the worklet with a stand-in global scope. */
 export function loadReverb(): LoadedReverb {
-  const source = readFileSync(join(HERE, '../worklet/reverb-processor.js'), 'utf8');
+  const source = readFileSync(join(HERE, '../worklet/generated/reverb-processor.js'), 'utf8');
 
   let registered: (new (options: unknown) => ReverbProcessorLike) | null = null;
 
