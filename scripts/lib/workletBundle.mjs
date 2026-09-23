@@ -34,6 +34,11 @@ export const REBUILD_COMMAND = 'node scripts/build-worklets.mjs';
 export const WORKLETS = [
   { name: 'fm', entry: 'fm/fmProcessor.ts', output: 'generated/fm-processor.js' },
   {
+    name: 'meter',
+    entry: 'meter/peakMeterProcessor.ts',
+    output: 'generated/peak-meter-processor.js',
+  },
+  {
     name: 'compressor',
     entry: 'compressor/compressorProcessor.ts',
     output: 'generated/compressor-processor.js',

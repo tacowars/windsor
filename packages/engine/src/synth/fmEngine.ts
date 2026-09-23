@@ -7,7 +7,7 @@
 import { PART_MAX_VOICES_DEFAULT, SLIDE_SECONDS_DEFAULT } from '../audioConstants';
 import type { AudioBus, BusOptions } from '../mixer/audioBus';
 import { createBus } from '../mixer/audioBus';
-import { COMPRESSOR_WORKLET_URL } from './workletMessages';
+import { PEAK_METER_WORKLET_URL, COMPRESSOR_WORKLET_URL } from './workletMessages';
 import { AudioPart } from './audioPart';
 import type { Patch } from '../patch/patch';
 import { makePatch } from '../patch/patch';
@@ -36,6 +36,7 @@ export interface WorkletUrls {
   fmUrl?: string | URL;
   reverbUrl?: string | URL;
   compressorUrl?: string | URL;
+  meterUrl?: string | URL;
 }
 
 export class FmEngine {
@@ -90,6 +91,7 @@ export class FmEngine {
     await this.context.audioWorklet.addModule(urls.fmUrl ?? WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.reverbUrl ?? REVERB_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.compressorUrl ?? COMPRESSOR_WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.meterUrl ?? PEAK_METER_WORKLET_URL);
     this.moduleLoaded = true;
   }
 

@@ -178,7 +178,7 @@ export interface InsertUpdater {
  */
 export function createInsertUpdater(
   inserts: InsertChain,
-  tap: Tap,
+  tap: Pick<Tap, 'move' | 'fadeTo'>,
   later: (run: () => void, seconds: number) => void,
 ): InsertUpdater {
   let pending: readonly InsertSpec[] | null = null;

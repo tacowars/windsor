@@ -35,6 +35,8 @@ import type {
 } from './arrangement';
 import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
+import { normaliseMaster } from '../mixer/masterSpec';
+import type { MasterSpec } from '../mixer/masterSpec';
 import { normaliseReturns } from './deskNormalise';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
@@ -69,6 +71,7 @@ export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
   readonly patches?: Readonly<Record<string, Patch>>;
   /** Return settings by return name — the plate's space and level, the delay's time, feedback, damp and level. */
   readonly returns?: Readonly<Record<string, ReturnSpec>>;
+  readonly master?: MasterSpec;
 };
 
 /**
@@ -143,7 +146,7 @@ export function isShippable(result: MakeArrangementResult): boolean {
   );
 }
 
-const DOCUMENT_KEYS = ['version', 'seed', 'bpm', 'key', 'patches', 'parts', 'returns'];
+const DOCUMENT_KEYS = ['version', 'seed', 'bpm', 'key', 'patches', 'parts', 'returns', 'master'];
 
 /** The top-level keys of the retired four-slot format, named in its correction. */
 const RETIRED_SLOT_KEYS = ['kick', 'hat', 'arp', 'drone', 'mix'];
@@ -157,6 +160,7 @@ interface MutableDocument {
   parts: DocumentPart[];
   patches?: Record<string, Patch>;
   returns?: Record<string, ReturnSpec>;
+  master?: MasterSpec;
 }
 
 function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument | null {
@@ -195,6 +199,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   if (Object.keys(patches).length > 0) document.patches = patches;
   const returns = normaliseReturns(o.returns, n);
   if (returns) document.returns = returns;
+  if (o.master !== undefined) document.master = normaliseMaster(o.master, n);
   return document;
 }
 

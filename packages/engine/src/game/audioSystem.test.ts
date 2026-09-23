@@ -169,7 +169,15 @@ describe('the fader and the dry path', () => {
     ]);
     expect((live.head as unknown as FakeGain).gain.value).toBe(1);
     const busPath = nodesBetween(fake(live.rotation.output), fake(engine.master));
-    expect(busPath.map((n) => n.kind).sort()).toEqual(['biquad', 'gain', 'gain']);
+    // Dry bus input/output plus master input, structural-edit fade and level.
+    expect(busPath.map((n) => n.kind).sort()).toEqual([
+      'biquad',
+      'gain',
+      'gain',
+      'gain',
+      'gain',
+      'gain',
+    ]);
     for (const node of busPath) {
       if (node.kind === 'gain') expect((node as FakeGain).gain.value).toBe(1);
     }

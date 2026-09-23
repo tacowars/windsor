@@ -312,3 +312,8 @@ export {
   COMPRESSOR_BOUNDS,
   COMPRESSOR_DSP,
 } from './inserts/compressorConstants';
+
+export { DEFAULT_MASTER, normaliseMaster } from './mixer/masterSpec';
+export type { MasterSpec } from './mixer/masterSpec';
+export { PEAK_METER } from './mixer/peakMeterConstants';
+export type { PeakMeter } from './mixer/peakMeter';

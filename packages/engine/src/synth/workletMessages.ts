@@ -164,3 +164,9 @@ export const COMPRESSOR_WORKLET_URL = new URL(
   '../worklet/generated/compressor-processor.js',
   import.meta.url,
 );
+
+/** Opt-in song-master sample meter (#666). */
+export const PEAK_METER_WORKLET_URL = new URL(
+  '../worklet/generated/peak-meter-processor.js',
+  import.meta.url,
+);
