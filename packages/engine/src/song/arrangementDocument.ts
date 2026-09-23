@@ -33,6 +33,7 @@ import type {
   PartsPartial,
   DeepPartial,
 } from './arrangement';
+import { normaliseSongSidechains } from './sidechainNormalise';
 import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
 import { normaliseMaster } from '../mixer/masterSpec';
@@ -200,7 +201,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   const returns = normaliseReturns(o.returns, n);
   if (returns) document.returns = returns;
   if (o.master !== undefined) document.master = normaliseMaster(o.master, n);
-  return document;
+  return normaliseSongSidechains(document, n);
 }
 
 /**

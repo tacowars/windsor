@@ -26,7 +26,7 @@ import { normaliseInserts } from '../inserts/insertRegistry';
 import type { ReturnBus } from './returnBus';
 import type { ReverbSpace } from './reverbSpace';
 
-const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends', 'inserts'];
+const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output'];
 const DELAY_KEYS = ['delayTime', 'feedback', 'damp', 'resonance'];
 const RETURN_KEYS = ['kind', 'level', 'space', ...DELAY_KEYS];
 
@@ -52,6 +52,8 @@ export function applyStripLive(strip: PartStrip, raw: unknown, path: string): st
   else if (raw.pan !== undefined) ignored.push(`${path}.pan`);
   if (isNumber(raw.lowCut)) strip.setLowCut(clamp(raw.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ));
   else if (raw.lowCut !== undefined) ignored.push(`${path}.lowCut`);
+  if (raw.output === 'master' || raw.output === 'sidechain') strip.setOutput(raw.output);
+  else if (raw.output !== undefined) ignored.push(`${path}.output`);
   if (raw.sends !== undefined) applySends(strip, path, raw.sends, ignored);
   if (raw.inserts !== undefined) applyInserts(strip, `${path}.inserts`, raw.inserts, ignored);
   return ignored;

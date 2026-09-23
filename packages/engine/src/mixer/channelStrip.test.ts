@@ -66,7 +66,9 @@ describe('routePart with no inserts', () => {
     const sends = RETURN_NAMES.map((name) => fake(strip.sends.get(name)!));
     // The tail feeds the tap's fade gain, and everything hangs off that (#652).
     expect(targets(strip.tail)).toEqual([fake(strip.head)]);
-    expect(targets(strip.head)).toEqual([fake(strip.rotation.input), ...sends]);
+    const audible = targets(strip.head)[0]!;
+    expect(audible.outbound.map((edge) => edge.to)).toEqual([fake(strip.rotation.input), ...sends]);
+    expect((audible as FakeGain).gain.value).toBe(1);
     for (const name of RETURN_NAMES) {
       const send = strip.sends.get(name)!;
       expect(targets(send)).toEqual([fake(returns[name].input)]);
@@ -129,8 +131,8 @@ describe('routePart with inserts', () => {
     expect(targets(part.output)).toEqual([fake(strip.lowCut.input)]);
     expect(targets(strip.lowCut.output)).toEqual([fake(insert!.input)]);
     expect(sources(strip.head)).toEqual([fake(insert!.output)]);
-    expect(sources(strip.rotation.input)).toEqual([fake(strip.head)]);
-    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(strip.head)]);
+    expect(sources(strip.rotation.input)).toEqual(targets(strip.head));
+    for (const send of strip.sends.values()) expect(sources(send)).toEqual(targets(strip.head));
   });
 
   it('chains several inserts in list order, after the low cut', async () => {
@@ -205,7 +207,7 @@ describe('routePart with inserts', () => {
     expect(sources(strip.head)).toEqual([fake(second!.output)]);
     // The strip's own nodes downstream of the tail are the ones it started with.
     expect(fake(strip.rotation.input)).toBe(rotationSplitter);
-    for (const send of strip.sends.values()) expect(sources(send)).toEqual([fake(strip.head)]);
+    for (const send of strip.sends.values()) expect(sources(send)).toEqual(targets(strip.head));
 
     strip.setInserts([]);
     expect(strip.tail).toBe(strip.lowCut.output);

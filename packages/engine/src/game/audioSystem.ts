@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- 353 lines: the song-master lifetime adds three lines beyond the system limit; defer a split until there is a larger routing concern (#225 decision 4). */
+/* eslint-disable max-lines -- 356 lines: routing and partial splitting now have their own modules; the system retains their transport/graph transaction boundary (#225 decision 4). */
 /**
  * The audio system: constructed by `main.ts`, updated by the render loop.
  *
@@ -36,6 +36,8 @@
  * arrangement fields through the player, `patches` onto the parts, each
  * part's `strip` and the `returns` onto the live desk (`deskApply.ts`).
  */
+import { splitStrips } from '../mixer/deskPartial';
+import { SidechainDesk } from '../mixer/sidechainDesk';
 import type { ArrangementPartial, MusicPart } from '../song/arrangement';
 import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDocument';
 import type {
@@ -69,32 +71,6 @@ import { GAMEPLAY_PATCHES, type GameplayPatchId } from '../patch/gameplayPatches
 import type { ReturnBus } from '../mixer/returnBus';
 import { createReturns } from '../mixer/returnBus';
 import { Scheduler } from '../sequencing/scheduler';
-
-/**
- * A document parts partial split in two (#597): what the player merges, and
- * each slot's `strip` partial, which lands on the live graph instead.
- */
-function splitStrips(parts: DocumentPartial['parts']): {
-  arrangementParts: Record<string, unknown> | undefined;
-  strips: Array<readonly [string, unknown]>;
-} {
-  if (parts === undefined) return { arrangementParts: undefined, strips: [] };
-  if (typeof parts !== 'object' || parts === null || Array.isArray(parts)) {
-    return { arrangementParts: parts as Record<string, unknown>, strips: [] };
-  }
-  const arrangementParts: Record<string, unknown> = {};
-  const strips: Array<readonly [string, unknown]> = [];
-  for (const [slot, raw] of Object.entries(parts as Record<string, unknown>)) {
-    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
-      arrangementParts[slot] = raw;
-      continue;
-    }
-    const { strip, ...rest } = raw as Record<string, unknown>;
-    if (strip !== undefined) strips.push([slot, strip]);
-    arrangementParts[slot] = rest;
-  }
-  return { arrangementParts, strips };
-}
 
 export interface AudioSystemOptions {
   /** Start suspended and wait for a gesture. Always true in a real page. */
@@ -149,6 +125,16 @@ export class AudioSystem {
   private readonly now: () => number;
   /** Passed to every strip: how it waits out an insert fade (#652). */
   private readonly routeOptions: RouteOptions;
+  private readonly sidechains = new SidechainDesk(
+    () =>
+      new Map(
+        [...this.musicParts.keys()].flatMap((slot) => {
+          const strip = this.strips.get(musicPartName(slot));
+          return strip ? [[slot, strip] as const] : [];
+        }),
+      ),
+    () => this.masterStrip,
+  );
   private started = false;
   private player: ArrangementPlayer | null = null;
   private muted = false;
@@ -162,6 +148,7 @@ export class AudioSystem {
     this.now = options.now ?? ((): number => performance.now());
     this.routeOptions = {
       registry: meteredInsertRegistry(this.loadMeter),
+      changed: () => this.sidechains.changed(),
       ...(options.defer ? { defer: options.defer } : {}),
     };
     this.schedMeter = new SchedCostMeter({ now: this.now });
@@ -316,6 +303,8 @@ export class AudioSystem {
    */
   initMusic(document: ArrangementDocument, onEvent?: MusicEventHandler): void {
     if (this.player) return;
+    const routing = this.sidechains.check(document);
+    this.sidechains.begin();
     const { returns, patches, master, ...arrangement } = document;
     // The document and nothing else (#562): a song carries a snapshot of
     // every patch it plays, so the library is not a runtime import and a
@@ -329,6 +318,7 @@ export class AudioSystem {
       );
     }
     if (master) this.masterStrip!.apply(master);
+    this.sidechains.commit(routing);
     if (returns) applyReturnsLive(this.standing().returns, returns);
     // The roster the player reads and — for a live add or removal — grows and
     // shrinks through (#629); the player calls these only after its plan has
@@ -429,15 +419,21 @@ export class AudioSystem {
    */
   apply(partial: DocumentPartial): ApplyResult {
     if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
+    const routing = this.sidechains.plan(partial);
+    if (routing.error) return { ok: false, ignored: [], error: routing.error };
     const { returns, patches, parts, master, ...rest } = partial;
     const { arrangementParts, strips } = splitStrips(parts);
+    this.sidechains.begin();
     const result = this.player.apply(
       arrangementParts === undefined
         ? rest
         : { ...rest, parts: arrangementParts as NonNullable<ArrangementPartial['parts']> },
       patches ?? {},
     );
-    if (!result.ok) return result;
+    if (!result.ok) {
+      this.sidechains.cancel();
+      return result;
+    }
     const ignored = [...result.ignored];
     if (master !== undefined) ignored.push(...this.masterStrip!.apply(master));
     for (const [slot, strip] of strips) {
@@ -446,6 +442,7 @@ export class AudioSystem {
       if (live) ignored.push(...applyStripLive(live, strip, `parts.${slot}.strip`));
     }
     if (returns !== undefined) ignored.push(...applyReturnsLive(this.standing().returns, returns));
+    this.sidechains.commit(routing.graph);
     return { ok: true, ignored };
   }
 
@@ -509,6 +506,7 @@ export class AudioSystem {
     this.player = null;
     this.muted = false;
     this.suppressed = false;
+    this.sidechains.dispose();
     for (const strip of this.strips.values()) strip.dispose();
     this.strips.clear();
     this.musicParts.clear();

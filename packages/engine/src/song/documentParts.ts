@@ -4,6 +4,7 @@
  * strip are registered under. A part's display name keys nothing, so the
  * engine name comes from the slot alone.
  */
+import { normaliseSongSidechains } from './sidechainNormalise';
 import type { ArrangementDocument, DocumentPart, DocumentPartial } from './arrangementDocument';
 
 /** The `FmEngine` part and strip name for a music slot; never a song's label. */
@@ -30,7 +31,7 @@ export function removePart(document: ArrangementDocument, slot: number): Arrange
   const parts = document.parts.filter((part) => part.slot !== slot);
   const stillUsed = parts.some((part) => part.preset === removed.preset);
   if (stillUsed || !document.patches || !Object.hasOwn(document.patches, removed.preset)) {
-    return { ...document, parts };
+    return normaliseSongSidechains({ ...document, parts });
   }
   const patches = { ...document.patches };
   delete patches[removed.preset];
@@ -40,7 +41,7 @@ export function removePart(document: ArrangementDocument, slot: number): Arrange
     patches,
   };
   if (Object.keys(patches).length === 0) delete next.patches;
-  return next;
+  return normaliseSongSidechains(next);
 }
 
 /**
@@ -58,7 +59,17 @@ export function removePartChange(
   if (!removed || next === document) return null;
   const pruned =
     document.patches?.[removed.preset] !== undefined && !next.patches?.[removed.preset];
-  return pruned
-    ? { parts: { [slot]: null }, patches: { [removed.preset]: null } }
-    : { parts: { [slot]: null } };
+  const parts: Record<number, NonNullable<DocumentPartial['parts']>[number]> = { [slot]: null };
+  for (const part of next.parts) {
+    if (part.strip.inserts !== partAt(document, part.slot)?.strip.inserts) {
+      parts[part.slot] = { strip: { inserts: part.strip.inserts } };
+    }
+  }
+  return {
+    parts,
+    ...(pruned ? { patches: { [removed.preset]: null } } : {}),
+    ...(next.master && next.master.inserts !== document.master?.inserts
+      ? { master: { inserts: next.master.inserts } }
+      : {}),
+  };
 }
