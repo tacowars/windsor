@@ -8,16 +8,16 @@
 import { FakeContext, installFakeAudioWorklet } from './fakeAudioContext';
 import type { FakeNode } from './fakeAudioNodes';
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
-import { AudioPart } from '../audioPart';
+import { AudioPart } from '../synth/audioPart';
 import type {
   InsertKind,
   InsertRegistry,
   InsertSpec,
   InsertStage,
 } from '../inserts/insertRegistry';
-import type { ChannelStrip } from '../mix';
-import { makePatch } from '../patch';
-import { PROCESSOR_NAME } from '../workletMessages';
+import type { ChannelStrip } from '../mixer/mix';
+import { makePatch } from '../patch/patch';
+import { PROCESSOR_NAME } from '../synth/workletMessages';
 
 /** Point the global `AudioWorkletNode` at the fake for a test file's lifetime. */
 export const installWorklet = installFakeAudioWorklet;

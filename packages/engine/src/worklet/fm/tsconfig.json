@@ -5,7 +5,7 @@
   // and turn `amp[i] += x` into `amp[i] = amp[i]! + x`, so the modules would
   // stop being the line-for-line move of the JS that the golden test proves.
   // Not composite: the modules import the main thread's *types*
-  // (`../../patch`, `../../workletMessages`), and the client project, which
+  // (`../../patch/patch`, `../../synth/workletMessages`), and the client project, which
   // excludes this folder, cannot reference it back. Four modules the main
   // thread reads by value (#656: `algorithms`, `waveIds`, `envelope`,
   // `fmConstants`) are listed in the client project's `files` and compiled

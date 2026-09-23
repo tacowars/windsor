@@ -70,7 +70,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    factory preset's render in all three paths against
    `__fixtures__/fmGolden.json`. A refactor never refreshes it. A DSP change
    that is intended refreshes it with
-   `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/client/src/audio/fmProcessorGolden.test.ts`
+   `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/client/src/audio/synth/fmProcessorGolden.test.ts`
    and says so in the PR; the patch files' `headroom` records may then need
    `tools/patch-editor/sweep-headroom.mjs` too.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):

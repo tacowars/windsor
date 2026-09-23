@@ -206,7 +206,7 @@ checks (from the repo root):
 ```sh
 node tools/patch-editor/sweep-headroom.mjs <id…|--stale> [--seeds <n>]
 npx prettier --write packages/client/src/audio/patches
-npx vitest run packages/client/src/audio/presetCatalog.test.ts packages/client/src/audio/patchLibraryEnvelope.test.ts packages/client/src/audio/fmProcessorHeadroom.test.ts tools/patch-editor/src/presetBrowser.test.ts
+npx vitest run packages/client/src/audio/patch/presetCatalog.test.ts packages/client/src/audio/patch/patchLibraryEnvelope.test.ts packages/client/src/audio/synth/fmProcessorHeadroom.test.ts tools/patch-editor/src/presetBrowser.test.ts
 node tools/patch-editor/build-editor.mjs
 ```
 

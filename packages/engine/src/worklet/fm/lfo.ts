@@ -6,7 +6,7 @@
  * sine to the bit. `fmProcessorModWheel.test.ts` and the golden test pin it.
  */
 
-import type { LfoSettings } from '../../patch';
+import type { LfoSettings } from '../../patch/patch';
 import { TABLE_MASK, TABLE_SIZE } from './fmConstants';
 import { randomSeed32 } from './prng';
 import { SIN_TAB } from './waveTables';

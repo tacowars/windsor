@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { WAVE as MAIN_WAVE } from '../../patch';
+import { WAVE as MAIN_WAVE } from '../../patch/patch';
 import { MIP_COUNT, TABLE_SIZE } from './fmConstants';
 import { WAVE } from './waveIds';
 

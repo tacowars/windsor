@@ -2,9 +2,9 @@
  * A `PlayablePart` that records every call — the player tests' stand-in for
  * an `AudioPart`, so what the bindings sent can be asserted call by call.
  */
-import type { PlayablePart } from '../arrangementPlayer';
-import type { NoteExtras } from '../audioPart';
-import type { Patch } from '../patch';
+import type { PlayablePart } from '../song/arrangementPlayer';
+import type { NoteExtras } from '../synth/audioPart';
+import type { Patch } from '../patch/patch';
 
 export interface Call {
   kind: 'trigger' | 'noteOn' | 'noteOffByNote' | 'setPatch' | 'allNotesOff';

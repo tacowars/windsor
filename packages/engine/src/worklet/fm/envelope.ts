@@ -7,7 +7,7 @@
  * shares the function. `patchLibraryEnvelope.test.ts` pins release completion.
  */
 
-import type { Envelope as EnvelopeParams } from '../../patch';
+import type { Envelope as EnvelopeParams } from '../../patch/patch';
 import { ENVELOPE_CURVE_STEEPNESS, MIN_SEG_TIME } from './fmConstants';
 
 /* ------------------------------------------------------------------ *

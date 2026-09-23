@@ -99,36 +99,50 @@ deterministic and free of Babylon, DOM and Node APIs; Web Audio is a DOM API and
 output is not part of the simulation. Nothing audio-related may enter `shared`.
 
 ```
-packages/client/src/audio/
-  audioSystem.ts        # the system: update(dt), owned by the render loop
-  fmEngine.ts           # context, worklet module, parts, buses
-  audioPart.ts          # one timbral part == one worklet node
-  audioBus.ts           # dry buses with inserts (native nodes)
-  mix.ts                # the desk: RETURNS and the SFX strips (MIX), typed plain data
-  returnBus.ts          # sends and returns: the plate, and the delay (resonant damping, soft-clipped loop), 100% wet
-  channelStrip.ts       # one part through its strip: fader, stages, rotation and sends off the tail
-  lowCutStage.ts        # the strip's first stage: a Butterworth highpass (#640)
-  inserts/              # strip insert kinds: the registry, drive (#641), chorus (#642); tanhCurve.ts is their shared clip curve
-  stereoRotate.ts       # the pan matrix (splitter -> 4 gains -> merger)
-  scheduler.ts          # look-ahead note scheduling
-  offlineRender.ts      # bake a patch to an AudioBuffer
-  babylonBridge.ts      # the Babylon Audio Engine v2 seam
-  patch.ts              # schema, enums, algorithm routing table
-  patchLibrary.ts       # the patches/*.json file contract and validator (#561)
-  patches/              # the patch library: one <id>.json per patch, plus a generated index.ts
-  presets.ts            # the whole-bank table (PRESETS, PATCH_LIBRARY) — editor/test only (#562)
-  gameplayPatches.ts    # GAMEPLAY_PATCH_IDS: the patches game code plays, imported by id
-  presetCatalog.ts      # listing and filtering of the library's metadata
-  arrangement.ts        # the song's part list: slot, name, preset, sequencer kind (#597)
-  arrangementDocument.ts # makeArrangement: the never-throws version-2 normaliser
-  arrangementPlayer.ts  # binds each part's sequencer to its engine part, by slot
-  arrangementValidate.ts # PatchResolver: where a song's part presets resolve (#562)
-  workletMessages.ts    # main-thread <-> worklet contract
-  worklet/              # the DSP (§6.1): generated/ holds the bundles (#643), reverb-processor.js the plate
-    fm/                 # the FM source, TypeScript in its own project (#644, #645, #654): fmProcessor.ts (entry), voice,
-                        #   voiceControl, voiceRender, voiceKernel, fmConstants, waveTables,
-                        #   algorithms, envelope, lfo, svf, prng, patchNormalise
-  __fixtures__/         # headless worklet harness, Node-only
+packages/client/src/audio/          # folders mirror the music-engine skill's file map (#655)
+  index.ts                # the public surface the game imports
+  index-for-editor.ts     # the same minus babylonBridge, for the console
+  audioConstants.ts       # the area's tables (re-exports the worklet's data modules, #656)
+  game/                   # audioSystem.ts (the system: update(dt), owned by the render loop),
+                          #   arrangementLibrary.ts (?music= selection), musicOptions.ts,
+                          #   musicControls.ts, babylonBridge.ts (the Babylon Audio Engine v2 seam)
+  synth/                  # fmEngine.ts (context, worklet modules, parts, buses), audioPart.ts (one
+                          #   timbral part == one worklet node), workletMessages.ts (main-thread <-> worklet
+                          #   contract and the worklet URLs), the fmProcessor*.test.ts behavioural tests
+  mixer/                  # mix.ts (the desk: RETURNS and the SFX strips, typed plain data), audioBus.ts
+                          #   (dry buses with inserts), channelStrip.ts (one part through its strip: fader,
+                          #   stages, rotation and sends off the tail), lowCutStage.ts (#640), insertChain.ts
+                          #   + stripTap.ts (#639, #652), stereoRotate.ts (the pan matrix), returnBus.ts
+                          #   (the plate and the delay, 100% wet), reverbSpace.ts, deskApply.ts, mixLevels.ts,
+                          #   tanhCurve.ts (the inserts' shared clip curve)
+  inserts/                # strip insert kinds: the registry, drive (#641), chorus (#642), compressor (#660)
+  patch/                  # patch.ts (schema, enums; the algorithm table re-exported from the worklet),
+                          #   patchNormalise.ts, patchLibrary.ts (the patches/*.json contract, #561),
+                          #   presets.ts (the whole-bank table — editor/test only, #562), gameplayPatches.ts
+                          #   (the patches game code plays, by id), presetCatalog.ts, patchFileSerialise.ts
+  patches/                # the patch library: one <id>.json per patch, plus a generated index.ts
+  song/                   # arrangement.ts (the part list: slot, name, preset, sequencer kind, #597),
+                          #   arrangementDocument.ts (makeArrangement: the never-throws version-2
+                          #   normaliser) over arrangementNormalise.ts, arrangementFields.ts,
+                          #   sequencerNormalise.ts, deskNormalise.ts; arrangementValidate.ts (PatchResolver,
+                          #   #562); arrangementPlayer.ts (binds each part's sequencer to its engine part, by
+                          #   slot); documentParts.ts; fallbackArrangement.ts (the diagnostic click)
+  arrangements/           # the committed song documents, one <name>.json each
+  sequencing/             # scheduler.ts (look-ahead note scheduling) and the generators: step, grid, chord,
+                          #   euclidean, arp, over scaleSampler.ts, euclid.ts, noteEvent.ts, generatorSeed.ts;
+                          #   capturedPattern.ts; generatorBoundary.test.ts keeps them off the audio graph
+  harmony/                # chordTheory.ts, chordNames.ts, chordVoicing.ts, chordTables.ts, chordNormalise.ts
+  cost/                   # audioCost.ts (the overlay and bench readout), audioLoad.ts (audio-thread load),
+                          #   schedCost.ts (main-thread scheduler cost), playbackStats.ts (underruns)
+  sfx/                    # the gameplay SFX path (Babylon AudioV2, not the music engine's): gameplaySfx.ts,
+                          #   actionSfx.ts, spatialSfx.ts, sfxSelection.ts, sfxBuffers.ts, createGameplaySfx.ts,
+                          #   sfxConstants.ts, footstepCadence.ts; offlineRender.ts bakes a patch to an AudioBuffer
+  worklet/                # the DSP (§6.1): generated/ holds the bundles (#643), reverb-processor.js the plate
+    fm/                   # the FM source, TypeScript in its own project (#644, #645, #654): fmProcessor.ts (entry), voice,
+                          #   voiceControl, voiceRender, voiceKernel, fmConstants, waveTables,
+                          #   algorithms, envelope, lfo, svf, prng, patchNormalise
+    compressor/           # the compressor insert's processor (#660)
+  __fixtures__/           # headless worklet harness and the fake audio graph, Node-only; shared by every folder
 tools/patch-editor/     # authoring tool, outside the client bundle
 ```
 
@@ -181,7 +195,7 @@ arbitrary `AudioNode` as a spatialised sound source. That is the whole seam: the
 owns the DSP, Babylon owns positioning and bus routing, and there is exactly one
 `AudioContext` in the process.
 
-**The seam is built: `packages/client/src/audio/babylonBridge.ts`.** Read it rather than a
+**The seam is built: `packages/client/src/audio/game/babylonBridge.ts`.** Read it rather than a
 sample here — it carries the working code, and its header carries the typings verification
 this section used to table (every symbol read from the installed
 `node_modules/@babylonjs/core` at 9.23.0, `CLAUDE.md` source of truth 1, cross-checked
@@ -296,7 +310,7 @@ gate yet:
   the milestone cadence can take a music reading with; the verdict is the
   three standing frame gates, and no audio field votes.
   `docs/reference/client-measurement-seams.md` is the seam.
-- **On the audio thread.** `packages/client/src/audio/audioLoad.ts` owns
+- **On the audio thread.** `packages/client/src/audio/cost/audioLoad.ts` owns
   `AudioLoadReadout { loadPct, peakPct, underruns, processors }`, exposed on
   `AudioSystem.readout().load` and `__a204.audio.readout()`, drawn as one
   overlay line and carried into the bench JSON's `audio` block. Both worklets
@@ -318,7 +332,7 @@ gate yet:
 a 60 s M3-equivalent horde window, with audio scheduling under 0.5 ms of
 main-thread time per frame at p95" — is now readable off the instrumentation
 rather than estimated. Both halves come from
-`packages/client/src/audio/audioCost.ts`'s `AudioCostReadout`, which is what
+`packages/client/src/audio/cost/audioCost.ts`'s `AudioCostReadout`, which is what
 `stats.audioReadout` hands the overlay and the bench collector:
 
 - **Underruns: `AudioContext.playbackStats`** (`audio/playbackStats.ts`), the

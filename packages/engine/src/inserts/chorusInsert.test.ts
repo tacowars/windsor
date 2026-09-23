@@ -13,8 +13,8 @@ import { FakeContext, FakeWorkletNode, renderGraph } from '../__fixtures__/fakeA
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { FakeDelay } from '../__fixtures__/fakeAudioNodes';
 import { FakeOscillator } from '../__fixtures__/fakeOscillator';
-import { FieldNormaliser } from '../arrangementFields';
-import { PROCESSOR_NAME } from '../workletMessages';
+import { FieldNormaliser } from '../song/arrangementFields';
+import { PROCESSOR_NAME } from '../synth/workletMessages';
 import type { ChorusSpec } from './chorusInsert';
 import { CHORUS_INSERT, DEFAULT_CHORUS } from './chorusInsert';
 import {
