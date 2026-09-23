@@ -1,4 +1,3 @@
-/* eslint-disable no-magic-numbers -- DSP: the curve's exponent scale and the state ids are the envelope's shape, not tunables; the tunables are fmConstants.ts (#654) */
 /**
  * The envelope (#644): Init -> attack -> Peak -> decay -> Sustain -> held ->
  * release -> End, a curve per segment, three loop modes, advanced at control
@@ -9,7 +8,7 @@
  */
 
 import type { Envelope as EnvelopeParams } from '../../patch';
-import { MIN_SEG_TIME } from './fmConstants';
+import { ENVELOPE_CURVE_STEEPNESS, MIN_SEG_TIME } from './fmConstants';
 
 /* ------------------------------------------------------------------ *
  * Envelope
@@ -32,6 +31,22 @@ const LOOP_NONE = 0,
 /** Monotonic 0..1 curve. k == 1 is linear, k < 1 bows up, k > 1 bows down. */
 function curveShape(p: number, k: number): number {
   return p / (p + (1 - p) * k);
+}
+
+/** A segment's curve control of ±1 maps to a shaping constant of `exp(±steepness)`; 0 is linear. */
+function curveConstant(curve: number): number {
+  return Math.exp(curve * ENVELOPE_CURVE_STEEPNESS);
+}
+
+/**
+ * The level `phase` of the way from `from` to `to` under `curve` — the one
+ * envelope curve (#620, #656): `Envelope.advance` runs it and the console's
+ * display draws with it, so the two cannot disagree.
+ */
+function segmentLevel(from: number, to: number, phase: number, curve: number): number {
+  const k = curveConstant(curve);
+  const s = k === 1 ? phase : curveShape(phase, k);
+  return from + (to - from) * s;
 }
 
 class Envelope {
@@ -134,9 +149,7 @@ class Envelope {
       return this.value;
     }
 
-    const k = Math.exp(curve * 3);
-    const s = k === 1 ? this.phase : curveShape(this.phase, k);
-    this.value = this.segStart + (target - this.segStart) * s;
+    this.value = segmentLevel(this.segStart, target, this.phase, curve);
     return this.value;
   }
 }
@@ -152,5 +165,7 @@ export {
   LOOP_LOOP,
   LOOP_TRIGGER,
   curveShape,
+  curveConstant,
+  segmentLevel,
   Envelope,
 };

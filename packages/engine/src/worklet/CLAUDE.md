@@ -11,10 +11,11 @@ build output. `reverb-processor.js` is the plate, still one hand-written file
 | `voiceControl.ts` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
 | `voiceRender.ts` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
 | `voiceKernel.ts` | `renderVoiceKernel` (#548): the fixed-index kernel, one function, never sliced finer |
-| `fmConstants.ts` | the tunables every other module imports |
-| `waveTables.ts` | `WAVE`, `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
-| `algorithms.ts` | `ALGORITHMS`, the topological order, the kernel's edge and carrier tables |
-| `envelope.ts` | `Envelope`, `curveShape`, the `ST_*` and `LOOP_*` ids |
+| `fmConstants.ts` | the tunables every other module imports, and `ENVELOPE_CURVE_STEEPNESS`, which the main thread re-exports (#656) |
+| `waveIds.ts` | `WAVE`, the waveform ids, import-free: the main thread's `patch.ts` re-exports it (#656) |
+| `waveTables.ts` | `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
+| `algorithms.ts` | `ALGORITHMS` with each topology's name and label, the topological order, the kernel's edge and carrier tables; the main thread's `audioConstants.ts` re-exports the table and its type (#656) |
+| `envelope.ts` | `Envelope`, the `ST_*` and `LOOP_*` ids, and the one curve — `curveShape`, `curveConstant`, `segmentLevel` — that `advance` runs and the console's display draws with (#656) |
 | `lfo.ts` | `Lfo` and the `LFO_*` shapes |
 | `svf.ts` | `Svf`, `softClip`, the `FILT_*` modes |
 | `prng.ts` | `makeRandom`, `randomSeed32` |
@@ -65,9 +66,17 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change.
-5. **Tables mirrored on the main thread.** `patch.ts` mirrors `ALGORITHMS` and
-   `WAVE`; `envelopeCurve.ts` mirrors `Envelope`'s curve. `patch.test.ts` and
-   `envelopeCurve.test.ts` fail when a copy drifts, until #656 shares them.
+5. **Four modules are read by the main thread too** (#656): `algorithms.ts`,
+   `waveIds.ts`, `envelope.ts` and `fmConstants.ts`. `audioConstants.ts` and
+   `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
+   from them, and the console draws envelopes with `segmentLevel`, so there
+   is one table and one curve, and no pin test. The four are listed in the
+   client project's `files` and compile under its stricter flags as well:
+   an indexed read in one of them takes a `!`, and none of them may touch
+   the worklet scope (`sampleRate`) or the wave cache at load. The PRNG stays
+   a copy of the shared package's `mulberry32`, pinned by `prng.test.ts`,
+   because the worklet bundle cannot import `@aotearoa/shared` without
+   carrying the whole package.
 6. **Module shape** (#644, #645, #654): one concern per file, named after
    it, 100–350 lines, TypeScript, each opening with a header that says what it
    owns, the invariant it keeps and the test that pins it. A new concern is a

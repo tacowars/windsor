@@ -51,6 +51,12 @@ const MOD_INDEX_SCALE = 4.0;
 const FEEDBACK_SAW_CYCLES = 1.25 / (2 * Math.PI);
 const FEEDBACK_SQUARE_CYCLES = 2.0 / (2 * Math.PI);
 const MIN_SEG_TIME = 0.0005; // shortest envelope segment, seconds
+/*
+ * A segment's curve control of ±1 maps to a shaping constant of exp(±steepness)
+ * (`envelope.ts`'s `segmentLevel`, which the console's display draws with): 0
+ * is linear, positive bows the segment down, negative bows it up.
+ */
+const ENVELOPE_CURVE_STEEPNESS = 3;
 
 export {
   TABLE_SIZE,
@@ -64,4 +70,5 @@ export {
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MIN_SEG_TIME,
+  ENVELOPE_CURVE_STEEPNESS,
 };
