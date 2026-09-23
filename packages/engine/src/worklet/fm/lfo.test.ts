@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LfoSettings } from '../../patch/patch';
+import { LFO_SH, LFO_SINE, LFO_SQUARE } from './modeIds';
 import { makeRandom } from './prng';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
 Object.assign(globalThis, { sampleRate: 48000 });
-const { Lfo, LFO_SH, LFO_SINE, LFO_SQUARE } = await import('./lfo');
+const { Lfo } = await import('./lfo');
 
 const SR = 48000;
 const settings = (o: Partial<LfoSettings> = {}): LfoSettings => ({

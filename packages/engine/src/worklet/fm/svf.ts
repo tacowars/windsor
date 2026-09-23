@@ -9,18 +9,13 @@
  */
 
 import { DORMANT_FILTER_STATE } from './fmConstants';
+import { FILT_BP, FILT_HP, FILT_LP, FILT_NOTCH } from './modeIds';
 
 /* ------------------------------------------------------------------ *
  * Filter — TPT / zero-delay-feedback state variable (Simper topology).
  * One structure yields lowpass, highpass, bandpass and notch, stays stable up
  * to Nyquist, and costs a handful of multiply-adds per sample.
  * ------------------------------------------------------------------ */
-
-const FILT_OFF = 0,
-  FILT_LP = 1,
-  FILT_HP = 2,
-  FILT_BP = 3,
-  FILT_NOTCH = 4;
 
 class Svf {
   ic1: number;
@@ -91,4 +86,4 @@ function softClip(x: number): number {
   return (x * (27 + x * x)) / (27 + 9 * x * x);
 }
 
-export { FILT_OFF, FILT_LP, FILT_HP, FILT_BP, FILT_NOTCH, Svf, softClip };
+export { Svf, softClip };

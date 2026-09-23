@@ -29,11 +29,12 @@ build output. `reverb-processor.js` is the plate, still one hand-written file
 | `voiceKernel.ts` | `renderVoiceKernel` (#548): the fixed-index kernel, one function, never sliced finer |
 | `fmConstants.ts` | the tunables every other module imports, and `ENVELOPE_CURVE_STEEPNESS`, which the main thread re-exports (#656) |
 | `waveIds.ts` | `WAVE`, the waveform ids, import-free: the main thread's `patch.ts` re-exports it (#656) |
+| `modeIds.ts` | the `LOOP_*`, `FILT_*` and `LFO_*` ids and the `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE` objects built from them, import-free: `patch.ts` re-exports the objects (#669) |
 | `waveTables.ts` | `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
 | `algorithms.ts` | `ALGORITHMS` with each topology's name and label, the topological order, the kernel's edge and carrier tables; the main thread's `audioConstants.ts` re-exports the table and its type (#656) |
-| `envelope.ts` | `Envelope`, the `ST_*` and `LOOP_*` ids, and the one curve — `curveShape`, `curveConstant`, `segmentLevel` — that `advance` runs and the console's display draws with (#656) |
-| `lfo.ts` | `Lfo` and the `LFO_*` shapes |
-| `svf.ts` | `Svf`, `softClip`, the `FILT_*` modes |
+| `envelope.ts` | `Envelope`, the `ST_*` ids, and the one curve — `curveShape`, `curveConstant`, `segmentLevel` — that `advance` runs and the console's display draws with (#656) |
+| `lfo.ts` | `Lfo` |
+| `svf.ts` | `Svf`, `softClip` |
 | `prng.ts` | `makeRandom`, `randomSeed32` |
 | `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one |
 | `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
@@ -82,11 +83,12 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change.
-5. **Four modules are read by the main thread too** (#656): `algorithms.ts`,
-   `waveIds.ts`, `envelope.ts` and `fmConstants.ts`. `audioConstants.ts` and
+5. **Five modules are read by the main thread too** (#656): `algorithms.ts`,
+   `waveIds.ts`, `envelope.ts`, `fmConstants.ts` and `modeIds.ts` (#669:
+   `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`). `audioConstants.ts` and
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
    from them, and the console draws envelopes with `segmentLevel`, so there
-   is one table and one curve, and no pin test. The four are listed in the
+   is one table and one curve, and no pin test. The five are listed in the
    client project's `files` and compile under its stricter flags as well:
    an indexed read in one of them takes a `!`, and none of them may touch
    the worklet scope (`sampleRate`) or the wave cache at load. The PRNG stays
