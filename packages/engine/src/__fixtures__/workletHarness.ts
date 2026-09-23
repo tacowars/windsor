@@ -1,5 +1,5 @@
 /**
- * Runs `worklet/fm-processor.js` headlessly under Node.
+ * Runs `worklet/generated/fm-processor.js` (the bundle of `worklet/fm/`) headlessly under Node.
  *
  * The DSP is the part of the audio system most worth testing and the least
  * testable in a browser: it is a pure function from events to samples, but it
@@ -133,7 +133,7 @@ interface WorkletHandle {
 /** Load and evaluate the worklet with a stand-in global scope. */
 // eslint-disable-next-line max-lines-per-function -- one evaluation of the worklet, read top to bottom: shim, eval, then the handle it returns (70 of 60, #225 decision 4; #620 added the envelope handle)
 export function loadProcessor(): LoadedProcessor {
-  const source = readFileSync(join(HERE, '../worklet/fm-processor.js'), 'utf8');
+  const source = readFileSync(join(HERE, '../worklet/generated/fm-processor.js'), 'utf8');
 
   let registered: (new (options: { processorOptions: unknown }) => ProcessorLike) | null = null;
 
