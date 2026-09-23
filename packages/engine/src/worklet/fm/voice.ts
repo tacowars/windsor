@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history and amplitude ramps, six envelopes, an LFO, two filter stages, the

@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the generic loop's feedback average, interpolation and mip arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * The generic render loop (#645): four operators walked in the algorithm's
  * topological order, the carrier sum, the steal fade and the filter, over

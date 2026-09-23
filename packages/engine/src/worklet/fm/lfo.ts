@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the xorshift shifts and the shape arithmetic are the algorithm; the tunables are fmConstants.ts (#654) */
 /**
  * The per-voice LFO (#644): seven shapes over one phase, sample-and-hold and
  * drift from the voice's own xorshift32 stream, and a fade-in. Invariant:

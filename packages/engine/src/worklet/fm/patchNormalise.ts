@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the patch defaults are the engine's, mirrored by makePatch() until #656 shares them; the tunables are fmConstants.ts (#654) */
 /**
  * Patch normalisation (#644): the editor and the game send partial patches,
  * and every field is filled here so the audio loop never tests for undefined.

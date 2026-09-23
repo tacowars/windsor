@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: MIDI 69/440, cents and octave scales are the pitch and level arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * The voice's control-rate work (#645): `bindVoiceConstants`, the routing
  * flags and per-note `Math.pow` results computed once per note (#548), and
