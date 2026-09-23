@@ -452,3 +452,14 @@ impact candidates, distance-derived contact timing and hit-confirmed gunfire.
 Misses lack a replicated event. Further surface banks, shot events, occlusion,
 reverb zones and priority voice stealing remain separate work. No target-machine
 performance claim or listening verdict is implied by unit tests.
+
+### Song master (#666)
+
+Music dry paths retain their existing bus highpass; its output and both
+returns sum before the song master inserts and output level. The game Music
+volume follows this master, while gameplay SFX remain separate. An optional
+`master: { level, inserts }` document section stores the settings; absent means
+unity/no inserts. The console reuses insert cards for this Master strip and
+displays independent L/R sample peaks before game volume/safety compression.
+Its view-owned meter worklet runs only while visible. Ownership and compatibility
+are recorded in `docs/log/2026-09-23-666-song-master-and-stereo-meter.md`.

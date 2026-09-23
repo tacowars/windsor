@@ -24,6 +24,7 @@ import {
 } from './mixerTables';
 import { partNameField } from './partNameField';
 import { renderReturnsSection } from './returnsPanel';
+import { renderMasterStrip } from './masterStrip';
 import { stripInserts } from './stripInserts';
 
 function stripValue(ctx: AppCtx, slot: number): ChannelStrip {
@@ -89,4 +90,5 @@ export function renderMixerTab(body: HTMLElement, ctx: AppCtx): void {
   }
   body.appendChild(strips.root);
   body.appendChild(renderReturnsSection(ctx));
+  body.appendChild(renderMasterStrip(ctx));
 }

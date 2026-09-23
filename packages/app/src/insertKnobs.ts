@@ -3,23 +3,19 @@
  * index in the part's strip, and each turn sends the strip's whole next
  * insert list, which the engine takes as a param write when the kinds match.
  */
-import type { InsertSpec } from '../../../packages/client/src/audio/index-for-editor';
-import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type { InsertTarget } from './insertTarget';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
-import { partChange } from './context';
+import { insertChange, insertsOf } from './insertTarget';
+export { insertsOf } from './insertTarget';
 import { el } from './dom';
 import { setInsertField } from './insertEdits';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { makeKnob } from './knob';
 
-/** The part's insert list as the document holds it now. */
-export const insertsOf = (ctx: AppCtx, slot: number): readonly InsertSpec[] =>
-  partAt(ctx.model.doc, slot)?.strip.inserts ?? [];
-
 export function insertKnobs<S>(
   ctx: AppCtx,
-  slot: number,
+  slot: InsertTarget,
   index: number,
   entries: readonly InsertKnobEntry<S>[],
 ): HTMLElement {
@@ -37,7 +33,7 @@ export function insertKnobs<S>(
         },
         set: (v) => {
           const inserts = setInsertField(insertsOf(ctx, slot), index, f, v);
-          void ctx.change(partChange(slot, { strip: { inserts } }));
+          void ctx.change(insertChange(slot, inserts));
         },
       }),
     );
