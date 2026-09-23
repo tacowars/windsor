@@ -47,7 +47,7 @@ export function setInsertField(
   list: readonly InsertSpec[],
   index: number,
   field: string,
-  value: number,
+  value: number | boolean,
 ): InsertSpec[] {
   return list.map((spec, i) => (i === index ? ({ ...spec, [field]: value } as InsertSpec) : spec));
 }

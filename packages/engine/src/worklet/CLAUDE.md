@@ -1,5 +1,15 @@
 # The DSP worklets
 
+`compressor/compressorProcessor.ts` wraps the typed, tested compressor DSP in
+`inserts/compressorDsp.ts`; it also bundles through the table below (#660).
+
+The compressor adapter has its own `compressor/tsconfig.json`, included in
+`npm run typecheck`. Like the FM project it erases declared class fields and
+checks the audio thread separately from the main thread. It reuses
+`fm/workletGlobals.d.ts`; the core and constants under `inserts/` also compile
+under the main thread's stricter settings. `compressorDsp.test.ts` exercises
+this generated processor, including its second input and telemetry.
+
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
 build output. `reverb-processor.js` is the plate, still one hand-written file
 (its own exception is at its top). The map of `fm/` (#644):
