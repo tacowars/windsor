@@ -156,10 +156,11 @@ describe('the fader and the dry path', () => {
     expect(part.gain.value).toBe(drone.level);
 
     // The low cut (#640), the tap's fade gain (#652) and the rotation's four
-    // gains: still no gain for the fader, and the fade rests at unity.
+    // gains, plus the audible-output gate (#667): none is the strip fader.
     const rotationPath = nodesBetween(fake(part.output), fake(live.rotation.output));
     expect(rotationPath.map((n) => n.kind).sort()).toEqual([
       'biquad',
+      'gain',
       'gain',
       'gain',
       'gain',

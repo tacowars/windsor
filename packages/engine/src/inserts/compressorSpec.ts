@@ -1,4 +1,5 @@
 /** The song contract for the compressor; every setting travels with the song. */
+import { normaliseSidechain, type SidechainSource } from './sidechainSource';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import {
   COMPRESSOR_ATTACKS,
@@ -10,6 +11,7 @@ import {
 
 export interface CompressorSpec {
   readonly kind: 'compressor';
+  readonly sidechain?: SidechainSource;
   readonly threshold: number;
   readonly makeup: number;
   /** Milliseconds, from COMPRESSOR_ATTACKS. */
@@ -23,8 +25,12 @@ export interface CompressorSpec {
   readonly mix: number;
   readonly enabled: boolean;
 }
-export const DEFAULT_COMPRESSOR: CompressorSpec = { kind: 'compressor', ...COMPRESSOR_DEFAULTS };
-export const COMPRESSOR_FIELDS = ['kind', ...Object.keys(COMPRESSOR_DEFAULTS)];
+export const DEFAULT_COMPRESSOR: CompressorSpec = {
+  kind: 'compressor',
+  ...COMPRESSOR_DEFAULTS,
+  sidechain: 'internal',
+};
+export const COMPRESSOR_FIELDS = ['kind', 'sidechain', ...Object.keys(COMPRESSOR_DEFAULTS)];
 export const COMPRESSOR_NUMBERS = Object.keys(COMPRESSOR_BOUNDS) as Array<
   keyof typeof COMPRESSOR_BOUNDS
 >;
@@ -55,6 +61,7 @@ export function normaliseCompressor(
   }
   return {
     kind: 'compressor',
+    sidechain: normaliseSidechain(raw.sidechain, `${path}.sidechain`, n),
     threshold: values.threshold,
     makeup: values.makeup,
     attack: stepped(values.attack, COMPRESSOR_ATTACKS, `${path}.attack`, n),

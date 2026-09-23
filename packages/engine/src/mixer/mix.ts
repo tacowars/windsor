@@ -72,6 +72,8 @@ export const RETURN_NAMES = Object.keys(RETURNS) as ReturnName[];
  * `RETURNS` at compile time, while the routing code accepts any string.
  */
 export interface ChannelStrip<R extends string = string> {
+  /** Missing means Master; sidechain suppresses dry and sends, preserving the detector tap. */
+  readonly output?: 'master' | 'sidechain';
   /** The mix fader, 0..4: sets the part's k-rate `gain` param (record §3). */
   readonly level: number;
   /** -1 (hard left) .. 1 (hard right): a rotation by pan·π/4 (record §4). */

@@ -14,6 +14,7 @@ describe('compressor controls and document', () => {
     const fields = [
       'kind',
       'enabled',
+      'sidechain',
       ...COMPRESSOR_KNOBS.map((k) => k.f),
       ...COMPRESSOR_SELECTS.map((s) => s.field),
     ];

@@ -36,8 +36,13 @@ import type { ReverbSpace } from '../mixer/reverbSpace';
 export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): ChannelStrip {
   const base = DEFAULT_STRIP;
   const o = n.section(raw, path);
-  n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends', 'inserts'], path);
+  n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output'], path);
+  if (o.output !== undefined && o.output !== 'master' && o.output !== 'sidechain')
+    n.correction(`${path}.output: invalid output — Master`);
   return {
+    ...(o.output === undefined
+      ? {}
+      : { output: o.output === 'sidechain' ? ('sidechain' as const) : ('master' as const) }),
     level: n.num(o.level, base.level, 0, MIX_LEVEL_MAX, `${path}.level`),
     pan: n.num(o.pan, base.pan, -1, 1, `${path}.pan`),
     lowCut: n.num(o.lowCut, base.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ, `${path}.lowCut`),
