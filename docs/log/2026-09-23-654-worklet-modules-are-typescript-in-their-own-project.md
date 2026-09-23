@@ -48,7 +48,7 @@ one local alias; the golden table passed unchanged.
    filter polynomial, the xorshift shifts, MIDI and cents scales, the
    part's parameter ranges) and pointing at `fmConstants.ts` for the
    tunables, which the `*Constants.ts` pattern already exempts.
-   `algorithms.ts` carries none: its numbers are the exempt 0–2 and indices.
+   `waveTables.ts` carries none: nothing in it trips the rule as configured.
    The patch defaults in `patchNormalise.ts` are the one set of data
    literals left; #656 shares them with `patch.ts`.
 4. **Types only.** `this.x` fields are declared; parameters and returns are
