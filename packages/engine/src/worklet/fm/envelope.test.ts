@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Envelope as EnvelopeParams } from '../../patch';
 import {
+  curveConstant,
   curveShape,
   Envelope,
   LOOP_NONE,
@@ -12,6 +13,7 @@ import {
   ST_IDLE,
   ST_RELEASE,
   ST_SUSTAIN,
+  segmentLevel,
 } from './envelope';
 import { MIN_SEG_TIME } from './fmConstants';
 
@@ -73,6 +75,14 @@ describe('the envelope', () => {
     e.noteOn();
     e.noteOff();
     expect(e.state).toBe(ST_ATTACK);
+  });
+
+  it('draws the one curve the console draws with: 0 is linear, positive bows down, negative up', () => {
+    expect(curveConstant(0)).toBe(1);
+    expect(segmentLevel(0, 1, 0.5, 0)).toBe(0.5);
+    expect(segmentLevel(0, 1, 0.5, 1)).toBeLessThan(0.5);
+    expect(segmentLevel(0, 1, 0.5, -1)).toBeGreaterThan(0.5);
+    expect(segmentLevel(0.2, 0.8, 1, 0.3)).toBe(0.8);
   });
 
   it('bows the segment curve: 1 is linear, above bows down, below bows up', () => {

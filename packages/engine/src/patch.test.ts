@@ -1,45 +1,15 @@
 /**
- * The patch schema is duplicated: `patch.ts` for the main thread, and the same
- * tables again inside `worklet/fm/`, which imports nothing from the main thread (#656).
- * These tests are what makes the duplication safe -- they fail the moment the
- * two copies disagree.
+ * The patch schema: `makePatch` and its defaults, the presets it admits, and
+ * the waveform names. The tables it once mirrored from the worklet
+ * (`ALGORITHMS`, `WAVE`) are the worklet's own modules since #656, so there
+ * is no second copy to pin.
  */
 import { describe, expect, it } from 'vitest';
 
-import { loadProcessor } from './__fixtures__/workletHarness';
 import { ALGORITHMS, WAVE, WAVE_NAMES, makePatch } from './patch';
 import { PRESETS, PRESET_NAMES } from './presets';
 
-const loaded = loadProcessor();
-
-const normalise = (a: { mods: readonly (readonly number[])[]; carriers: readonly number[] }) =>
-  JSON.stringify({
-    mods: a.mods.map((m) => [...m].sort((x, y) => x - y)),
-    carriers: [...a.carriers].sort((x, y) => x - y),
-  });
-
-describe('patch schema mirrors the worklet', () => {
-  it('declares the same number of algorithms', () => {
-    expect(ALGORITHMS.length).toBe(loaded.algorithms.length);
-  });
-
-  it('routes every algorithm identically', () => {
-    for (let i = 0; i < ALGORITHMS.length; i++) {
-      const ours = ALGORITHMS[i];
-      const theirs = loaded.algorithms[i];
-      expect(ours, `algorithm ${i}`).toBeDefined();
-      expect(theirs, `algorithm ${i}`).toBeDefined();
-      if (!ours || !theirs) continue;
-      expect(normalise(ours), `algorithm ${i} (${ours.label})`).toBe(normalise(theirs));
-    }
-  });
-
-  it('uses the same waveform ids', () => {
-    for (const [name, value] of Object.entries(WAVE)) {
-      expect(loaded.waveIds[name], `waveform ${name}`).toBe(value);
-    }
-  });
-
+describe('waveform ids', () => {
   it('names every waveform id', () => {
     expect(WAVE_NAMES.length).toBe(Object.keys(WAVE).length);
   });

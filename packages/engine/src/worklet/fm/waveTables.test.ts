@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { WAVE as MAIN_WAVE } from '../../patch';
 import { MIP_COUNT, TABLE_SIZE } from './fmConstants';
+import { WAVE } from './waveIds';
 
 // The module warms the wave cache at load and reads the scope's sample rate.
 Object.assign(globalThis, { sampleRate: 48000 });
-const { getMips, KIND_NOISE, KIND_SAW_D, KIND_TABLE, mipIndex, SIN_TAB, WAVE, waveKind } =
+const { getMips, KIND_NOISE, KIND_SAW_D, KIND_TABLE, mipIndex, SIN_TAB, waveKind } =
   await import('./waveTables');
 
 describe('the wave tables', () => {
-  it('mirror the main thread’s wave ids', () => {
-    expect(WAVE).toEqual(MAIN_WAVE);
+  it('are the ids the main thread re-exports (#656)', () => {
+    expect(MAIN_WAVE).toBe(WAVE);
   });
 
   it('hold an exact sine', () => {
