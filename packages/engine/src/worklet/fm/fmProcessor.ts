@@ -26,7 +26,7 @@ import type {
   ProcessorOptions,
   ScheduledMessage,
   WorkletMessage,
-} from '../../workletMessages';
+} from '../../synth/workletMessages';
 import type { WorkletPatch } from './patchNormalise';
 import { CTRL_INTERVAL } from './fmConstants';
 import { normalisePatch, num } from './patchNormalise';

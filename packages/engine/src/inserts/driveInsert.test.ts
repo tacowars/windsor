@@ -12,7 +12,7 @@ import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import type { FakeWaveShaper } from '../__fixtures__/fakeWaveShaper';
 import { FakeBiquad } from '../__fixtures__/fakeAudioNodes';
 import { BUTTERWORTH_Q_DB } from '../audioConstants';
-import { PROCESSOR_NAME } from '../workletMessages';
+import { PROCESSOR_NAME } from '../synth/workletMessages';
 import type { DriveSpec } from './driveInsert';
 import { DEFAULT_DRIVE, DRIVE_INSERT, driveCompensation } from './driveInsert';
 import {
@@ -141,7 +141,7 @@ describe('the drive sound', () => {
 
 describe('DRIVE_INSERT.normalise', () => {
   it('fills the defaults, clamps each field and reports unknown keys', async () => {
-    const { FieldNormaliser } = await import('../arrangementFields');
+    const { FieldNormaliser } = await import('../song/arrangementFields');
     const n = new FieldNormaliser();
     const spec = DRIVE_INSERT.normalise({ kind: 'drive', drive: 99, fuzz: 1 }, 'x', n);
     expect(spec).toEqual({ ...DEFAULT_DRIVE, drive: DRIVE_GAIN_MAX_DB });

@@ -211,7 +211,7 @@ export function renderReturnsSection(ctx: AppCtx): HTMLElement {
     'The plate (every parameter), the delay (time, regeneration, damping) and both levels land in ' +
       'the document (returns section) and on the live buses; the tempo buttons set the delay time to a ' +
       'note value at the document bpm. ' +
-      'Which returns exist is code-owned (packages/client/src/audio/mix.ts).',
+      'Which returns exist is code-owned (packages/client/src/audio/mixer/mix.ts).',
   );
   for (const name of RETURN_NAMES) returns.body.appendChild(returnRow(ctx, name));
   return returns.root;

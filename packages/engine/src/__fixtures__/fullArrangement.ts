@@ -14,12 +14,12 @@
  * When the committed arrangement is deliberately re-authored (the #70
  * console), update this copy in the same PR: the diff is the review.
  */
-import type { Arrangement, ArpSpec, EuclideanSpec, MusicPart, StepSpec } from '../arrangement';
-import type { ArrangementDocument, DocumentPart } from '../arrangementDocument';
-import type { ChannelStrip } from '../mix';
-import type { Patch } from '../patch';
-import { clonePatch } from '../patch';
-import { PRESETS } from '../presets';
+import type { Arrangement, ArpSpec, EuclideanSpec, MusicPart, StepSpec } from '../song/arrangement';
+import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
+import type { ChannelStrip } from '../mixer/mix';
+import type { Patch } from '../patch/patch';
+import { clonePatch } from '../patch/patch';
+import { PRESETS } from '../patch/presets';
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
 
 /** The slots bed-01's parts sit on — the retired four-slot ids' generator indices. */

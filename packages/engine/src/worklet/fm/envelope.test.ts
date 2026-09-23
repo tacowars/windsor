@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Envelope as EnvelopeParams } from '../../patch';
+import type { Envelope as EnvelopeParams } from '../../patch/patch';
 import {
   curveConstant,
   curveShape,

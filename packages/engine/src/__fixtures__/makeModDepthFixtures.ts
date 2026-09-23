@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ALGORITHMS } from '../audioConstants';
-import { PRESETS } from '../presets';
+import { PRESETS } from '../patch/presets';
 import { DEFAULT_SEED, loadProcessor, render } from './workletHarness';
 
 const HERE = dirname(fileURLToPath(import.meta.url));

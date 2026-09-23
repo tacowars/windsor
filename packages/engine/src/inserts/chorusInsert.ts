@@ -20,7 +20,7 @@
  * subgraph alive — and disconnects what the stage built.
  */
 import { MS_PER_SECOND } from '../../timeConstants';
-import type { FieldNormaliser } from '../arrangementFields';
+import type { FieldNormaliser } from '../song/arrangementFields';
 import {
   CHORUS_DELAY_MAX_SECONDS,
   CHORUS_DEPTH_DEFAULT_MS,
