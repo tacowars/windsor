@@ -28,34 +28,39 @@ const A = 0,
 
 /** One topology: which operators modulate each, and which are summed to the output. */
 interface Algorithm {
-  name: string;
-  mods: number[][];
-  carriers: number[];
+  /** The console's name for the picker. */
+  readonly name: string;
+  /** The routing in one line, `D>C>B>A`. */
+  readonly label: string;
+  /** `mods[i]` lists the operators that modulate operator `i`, in summation order. */
+  readonly mods: readonly (readonly number[])[];
+  /** Operators summed to the voice output, in summation order. */
+  readonly carriers: readonly number[];
 }
 
-const ALGORITHMS: Algorithm[] = [
+const ALGORITHMS: readonly Algorithm[] = [
   // 0:  D -> C -> B -> A                      full series, the classic FM stack
-  { name: 'D>C>B>A', mods: [[B], [C], [D], []], carriers: [A] },
+  { name: 'Series', label: 'D>C>B>A', mods: [[B], [C], [D], []], carriers: [A] },
   // 1:  D,C -> B -> A                         two modulators sum into B
-  { name: '(D,C)>B>A', mods: [[B], [C, D], [], []], carriers: [A] },
+  { name: 'Twin Mod', label: '(D,C)>B>A', mods: [[B], [C, D], [], []], carriers: [A] },
   // 2:  C -> B -> A, D -> A                   series plus a direct modulator
-  { name: 'C>B>A, D>A', mods: [[B, D], [C], [], []], carriers: [A] },
+  { name: 'Stack + Mod', label: 'C>B>A, D>A', mods: [[B, D], [C], [], []], carriers: [A] },
   // 3:  D -> C -> A, B -> A                   two-stack and a single into A
-  { name: 'D>C>A, B>A', mods: [[C, B], [], [D], []], carriers: [A] },
+  { name: 'Pair into A', label: 'D>C>A, B>A', mods: [[C, B], [], [D], []], carriers: [A] },
   // 4:  D -> C, B -> A                        two independent 2-op stacks
-  { name: 'D>C | B>A', mods: [[B], [], [D], []], carriers: [A, C] },
+  { name: 'Two Stacks', label: 'D>C | B>A', mods: [[B], [], [D], []], carriers: [A, C] },
   // 5:  D -> C, D -> B, D -> A                one modulator, three carriers
-  { name: 'D>(C,B,A)', mods: [[D], [D], [D], []], carriers: [A, B, C] },
+  { name: 'One to Three', label: 'D>(C,B,A)', mods: [[D], [D], [D], []], carriers: [A, B, C] },
   // 6:  D -> C, B and A free                  one stack plus two sines
-  { name: 'D>C | B | A', mods: [[], [], [D], []], carriers: [A, B, C] },
+  { name: 'Stack + Two', label: 'D>C | B | A', mods: [[], [], [D], []], carriers: [A, B, C] },
   // 7:  all four parallel                     additive, no FM at all
-  { name: 'A|B|C|D', mods: [[], [], [], []], carriers: [A, B, C, D] },
+  { name: 'Additive', label: 'A|B|C|D', mods: [[], [], [], []], carriers: [A, B, C, D] },
   // 8:  D -> C -> B -> A, B also heard        series with a mid-chain tap
-  { name: 'D>C>B>A +B', mods: [[B], [C], [D], []], carriers: [A, B] },
+  { name: 'Series + Tap', label: 'D>C>B>A +B', mods: [[B], [C], [D], []], carriers: [A, B] },
   // 9:  D -> C, C -> B, C -> A                shared modulator, split output
-  { name: 'D>C>(B,A)', mods: [[C], [C], [D], []], carriers: [A, B] },
+  { name: 'Split Branch', label: 'D>C>(B,A)', mods: [[C], [C], [D], []], carriers: [A, B] },
   // 10: D,C,B -> A                            three modulators, one carrier
-  { name: '(D,C,B)>A', mods: [[B, C, D], [], [], []], carriers: [A] },
+  { name: 'Triple Mod', label: '(D,C,B)>A', mods: [[B, C, D], [], [], []], carriers: [A] },
 ];
 
 /** Evaluation order so every modulator is computed before its target. */
@@ -65,8 +70,8 @@ function topoOrder(alg: Algorithm): number[] {
   const visit = (i: number): void => {
     if (seen[i]) return;
     seen[i] = 1;
-    const m = alg.mods[i];
-    for (let j = 0; j < m.length; j++) if (m[j] !== i) visit(m[j]);
+    const m = alg.mods[i]!;
+    for (let j = 0; j < m.length; j++) if (m[j] !== i) visit(m[j]!);
     order.push(i);
   };
   for (let i = 0; i < 4; i++) visit(i);
@@ -95,15 +100,15 @@ const EDGE_BA = 1,
   EDGE_CB = 8,
   EDGE_DB = 16,
   EDGE_DC = 32;
-const EDGE_BIT = [
+const EDGE_BIT: readonly (readonly number[])[] = [
   [0, EDGE_BA, EDGE_CA, EDGE_DA],
   [0, 0, EDGE_CB, EDGE_DB],
   [0, 0, 0, EDGE_DC],
   [0, 0, 0, 0],
 ];
 
-function ascending(list: number[]): boolean {
-  for (let j = 1; j < list.length; j++) if (list[j] <= list[j - 1]) return false;
+function ascending(list: readonly number[]): boolean {
+  for (let j = 1; j < list.length; j++) if (list[j]! <= list[j - 1]!) return false;
   return true;
 }
 
@@ -111,11 +116,11 @@ function ascending(list: number[]): boolean {
 function kernelEdges(alg: Algorithm): number {
   let edges = 0;
   for (let i = 0; i < 4; i++) {
-    const m = alg.mods[i];
+    const m = alg.mods[i]!;
     if (m.length > 2 && !ascending(m)) return -1;
     for (let j = 0; j < m.length; j++) {
-      if (m[j] <= i) return -1;
-      edges |= EDGE_BIT[i][m[j]];
+      if (m[j]! <= i) return -1;
+      edges |= EDGE_BIT[i]![m[j]!]!;
     }
   }
   if (alg.carriers.length > 2 && !ascending(alg.carriers)) return -1;

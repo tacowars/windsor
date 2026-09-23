@@ -11,20 +11,9 @@ import { ALGORITHMS, OPERATOR_COUNT } from './audioConstants';
 import type { Algorithm } from './audioConstants';
 
 /** Operator waveform. Values must match `WAVE` in the worklet. */
-export const WAVE = {
-  SINE: 0,
-  SAW: 1,
-  SQUARE: 2,
-  TRIANGLE: 3,
-  NOISE: 4,
-  /** Not bandlimited -- aliases on purpose. Good for digital bass. */
-  SAW_D: 5,
-  SQUARE_D: 6,
-  SINE_4BIT: 7,
-  SINE_8BIT: 8,
-  /** Harmonic amplitudes supplied by `Operator.userPartials`. */
-  USER: 9,
-} as const;
+/** The waveform ids live with the worklet that renders them (`worklet/fm/waveIds.ts`, #656). */
+export { WAVE } from './worklet/fm/waveIds';
+import { WAVE } from './worklet/fm/waveIds';
 
 export const WAVE_NAMES = [
   'Sine',

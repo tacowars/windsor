@@ -298,39 +298,16 @@ export const AUDIO_SCHED_QUANTILE = 0.95;
 /** Operators per voice — the length of `OP_NAMES` in `patch.ts`. */
 export const OPERATOR_COUNT = 4;
 
-export interface Algorithm {
-  readonly name: string;
-  readonly label: string;
-  /** `mods[i]` lists the operators that modulate operator `i`. */
-  readonly mods: readonly (readonly number[])[];
-  /** Operators summed to the voice output. */
-  readonly carriers: readonly number[];
-}
-
 /**
- * The 11 algorithms: the eight classic four-operator topologies plus three
- * parallel/tapped shapes. Index matches `ALGORITHMS` in the worklet.
+ * The 11 algorithms and their type live with the worklet that renders them
+ * (`worklet/fm/algorithms.ts`, #656) and are re-exported here for every
+ * main-thread reader; one table, so the console's picker and the operator
+ * cannot disagree.
  */
-export const ALGORITHMS: readonly Algorithm[] = [
-  { name: 'Series', label: 'D>C>B>A', mods: [[1], [2], [3], []], carriers: [0] },
-  { name: 'Twin Mod', label: '(D,C)>B>A', mods: [[1], [2, 3], [], []], carriers: [0] },
-  { name: 'Stack + Mod', label: 'C>B>A, D>A', mods: [[1, 3], [2], [], []], carriers: [0] },
-  { name: 'Pair into A', label: 'D>C>A, B>A', mods: [[2, 1], [], [3], []], carriers: [0] },
-  { name: 'Two Stacks', label: 'D>C | B>A', mods: [[1], [], [3], []], carriers: [0, 2] },
-  { name: 'One to Three', label: 'D>(C,B,A)', mods: [[3], [3], [3], []], carriers: [0, 1, 2] },
-  { name: 'Stack + Two', label: 'D>C | B | A', mods: [[], [], [3], []], carriers: [0, 1, 2] },
-  { name: 'Additive', label: 'A|B|C|D', mods: [[], [], [], []], carriers: [0, 1, 2, 3] },
-  { name: 'Series + Tap', label: 'D>C>B>A +B', mods: [[1], [2], [3], []], carriers: [0, 1] },
-  { name: 'Split Branch', label: 'D>C>(B,A)', mods: [[2], [2], [3], []], carriers: [0, 1] },
-  { name: 'Triple Mod', label: '(D,C,B)>A', mods: [[1, 2, 3], [], [], []], carriers: [0] },
-] as const;
+export { ALGORITHMS } from './worklet/fm/algorithms';
+export type { Algorithm } from './worklet/fm/algorithms';
 
 /* ----------------------------- the envelope ----------------------------- */
 
-/**
- * A segment's curve control of ±1 maps to a shaping constant of `exp(±steepness)`
- * (`envelopeCurve.ts`, `worklet/fm-processor.js`'s `Envelope.advance`): 0 is
- * linear, positive bows the segment down, negative bows it up. The worklet is
- * plain JS and carries the literal; `envelopeCurve.test.ts` pins the two.
- */
-export const ENVELOPE_CURVE_STEEPNESS = 3;
+/** The envelope curve's steepness lives with the curve (`worklet/fm/fmConstants.ts`, #656). */
+export { ENVELOPE_CURVE_STEEPNESS } from './worklet/fm/fmConstants';

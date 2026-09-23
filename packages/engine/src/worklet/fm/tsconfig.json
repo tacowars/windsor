@@ -6,7 +6,10 @@
   // stop being the line-for-line move of the JS that the golden test proves.
   // Not composite: the modules import the main thread's *types*
   // (`../../patch`, `../../workletMessages`), and the client project, which
-  // excludes this folder, cannot reference it back. `npm run typecheck` runs
+  // excludes this folder, cannot reference it back. Four modules the main
+  // thread reads by value (#656: `algorithms`, `waveIds`, `envelope`,
+  // `fmConstants`) are listed in the client project's `files` and compiled
+  // there too, under its stricter flags. `npm run typecheck` runs
   // it as its own `tsc -p`; esbuild bundles from it; ESLint's `.ts` rules
   // apply as everywhere.
   "extends": "../../../../../../tsconfig.base.json",

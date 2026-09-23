@@ -32,7 +32,8 @@ import { CTRL_INTERVAL } from './fmConstants';
 import { normalisePatch, num } from './patchNormalise';
 import { makeRandom } from './prng';
 import { Voice } from './voice';
-import { WAVE, getMips } from './waveTables';
+import { WAVE } from './waveIds';
+import { getMips } from './waveTables';
 
 /** `processorOptions` as the part reads them: the contract's, plus the two harness-only switches (#547, #548). */
 interface FmProcessorOptions extends Partial<ProcessorOptions> {

@@ -20,7 +20,7 @@ import { ALGORITHMS } from './algorithms';
 import { LOOP_NONE } from './envelope';
 import { LFO_SINE } from './lfo';
 import { FILT_OFF } from './svf';
-import { WAVE } from './waveTables';
+import { WAVE } from './waveIds';
 
 /** The patch the voice reads: every field filled, plus the per-operator feedback scratch. */
 export interface WorkletPatch extends Patch {

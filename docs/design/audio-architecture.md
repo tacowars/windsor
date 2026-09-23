@@ -230,7 +230,13 @@ URL for the file itself *without* bundling its dependency graph — fine in dev,
 a build — so a split worklet needs a second Rollup input, a `?worker&url` indirection, or
 a bespoke build step.
 
-The cost is duplication: the waveform enums and the algorithm routing table exist both in
+**Amended 2026-09-23 (#656)**: the duplication below is gone — `patch.ts` and
+`audioConstants.ts` re-export the wave ids and the algorithm table from the
+worklet's own modules, and the console draws envelopes with the worklet's
+`segmentLevel`; the PRNG copy stays, pinned by `prng.test.ts`, because the
+worklet bundle cannot import the shared package without carrying it whole.
+
+The cost was duplication: the waveform enums and the algorithm routing table existed both in
 the worklet and in `patch.ts`. `patch.test.ts` asserts the copies are identical, so they
 cannot drift silently. The seeded PRNG the DSP tests use (#78) is the same story: it is
 `mulberry32` copied out of `packages/shared/src/terrain/heightmap.ts`, because the worklet

@@ -275,5 +275,5 @@ export type { StepSequencerConfig } from './stepSequencer';
 export { HIDDEN_CATEGORY, PRESET_CATALOG, filterPresets } from './presetCatalog';
 // The envelope curve the worklet shapes segments with (#620 decision 4): the
 // console's display draws with it, and the harness pins it to the DSP.
-export { curveShape, segmentLevel } from './envelopeCurve';
+export { curveShape, segmentLevel } from './worklet/fm/envelope';
 export type { PresetListing, PresetFilter } from './presetCatalog';
