@@ -5,7 +5,7 @@
  * The console must run as one file with no imports and no dev server — from
  * file:// or any static server — so this inlines into `editor-template.html`:
  *
- *   - `worklet/generated/fm-processor.js` (the bundle of `worklet/fm/`) and `worklet/reverb-processor.js` verbatim, as
+ *   - `worklet/generated/fm-processor.js` and `worklet/generated/reverb-processor.js` (the bundles of `worklet/fm/` and `worklet/reverb/`) verbatim, as
  *     strings the page turns into blob URLs for `FmEngine.init()`
  *   - the console app (`src/main.ts`), bundled (`lib/audioBundle.mjs`) together
  *     with the real engine via `packages/client/src/audio/index-for-editor.ts`
@@ -39,7 +39,7 @@ const CHECK = process.argv.includes('--check');
 const worklet = readFileSync(join(AUDIO, 'worklet/generated/fm-processor.js'), 'utf8');
 const meter = readFileSync(join(AUDIO, 'worklet/generated/peak-meter-processor.js'), 'utf8');
 const compressor = readFileSync(join(AUDIO, 'worklet/generated/compressor-processor.js'), 'utf8');
-const reverb = readFileSync(join(AUDIO, 'worklet/reverb-processor.js'), 'utf8');
+const reverb = readFileSync(join(AUDIO, 'worklet/generated/reverb-processor.js'), 'utf8');
 const template = readFileSync(join(HERE, 'editor-template.html'), 'utf8');
 
 for (const marker of [
