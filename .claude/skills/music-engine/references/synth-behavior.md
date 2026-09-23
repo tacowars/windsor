@@ -1,6 +1,6 @@
 # Synth behavior that affects patch design
 
-Source of truth: `packages/client/src/audio/patch.ts`, `audioConstants.ts`
+Source of truth: `packages/client/src/audio/patch/patch.ts`, `audioConstants.ts`
 and `worklet/fm/` (the FM worklet's source) in the active checkout. Inspect `Voice.updateControl`,
 `Voice.render`, `normalisePatch`, `getMips` and the envelope/LFO classes when
 changing behavior. These notes describe the implementation, not a promise

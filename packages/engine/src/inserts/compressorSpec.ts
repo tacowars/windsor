@@ -1,5 +1,5 @@
 /** The song contract for the compressor; every setting travels with the song. */
-import type { FieldNormaliser } from '../arrangementFields';
+import type { FieldNormaliser } from '../song/arrangementFields';
 import {
   COMPRESSOR_ATTACKS,
   COMPRESSOR_BOUNDS,

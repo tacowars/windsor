@@ -11,7 +11,7 @@
  *
  * Node-only, by design: excluded from the client's tsc build.
  */
-import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../workletMessages';
+import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import type { FakeHost } from './fakeAudioNodes';
 import { FakeOscillator } from './fakeOscillator';
 import { FakeWaveShaper } from './fakeWaveShaper';

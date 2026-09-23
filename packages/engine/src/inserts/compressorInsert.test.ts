@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FakeContext, FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import { FakeNode, FakeParam } from '../__fixtures__/fakeAudioNodes';
-import { AudioSystem } from '../audioSystem';
-import { FmEngine } from '../fmEngine';
-import { FieldNormaliser } from '../arrangementFields';
+import { AudioSystem } from '../game/audioSystem';
+import { FmEngine } from '../synth/fmEngine';
+import { FieldNormaliser } from '../song/arrangementFields';
 import { COMPRESSOR_INSERT, DEFAULT_COMPRESSOR } from './compressorInsert';
 import { COMPRESSOR_NAME } from './compressorConstants';
 import { compressorParams } from '../__fixtures__/compressorHarness';
-import { makePatch } from '../patch';
+import { makePatch } from '../patch/patch';
 
 class Node extends FakeNode {
   readonly kind = 'compressor';

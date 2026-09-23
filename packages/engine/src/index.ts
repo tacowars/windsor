@@ -1,17 +1,17 @@
 // @dir Synthesised music and SFX — bus/return graph, arrangement, sequencers. Observes, never decides.
 /** Public surface of the audio package. */
-export { AudioSystem } from './audioSystem';
-export type { AudioSystemOptions, MusicReadout } from './audioSystem';
-export { SEQUENCER_KINDS, driverOf, mergeArrangement, mergeParts } from './arrangement';
-export { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
-export { isShippable, makeArrangement } from './arrangementDocument';
+export { AudioSystem } from './game/audioSystem';
+export type { AudioSystemOptions, MusicReadout } from './game/audioSystem';
+export { SEQUENCER_KINDS, driverOf, mergeArrangement, mergeParts } from './song/arrangement';
+export { FALLBACK_ARRANGEMENT } from './song/fallbackArrangement';
+export { isShippable, makeArrangement } from './song/arrangementDocument';
 export type {
   ArrangementDocument,
   DocumentPart,
   DocumentPartial,
   MakeArrangementResult,
-} from './arrangementDocument';
-export { musicPartName, partAt, removePart } from './documentParts';
+} from './song/arrangementDocument';
+export { musicPartName, partAt, removePart } from './song/documentParts';
 export type {
   ArpDriver,
   ArpSpec,
@@ -33,14 +33,19 @@ export type {
   SequencerSpec,
   StepDriver,
   StepSpec,
-} from './arrangement';
-export { ArrangementPlayer } from './arrangementPlayer';
-export { lookupPreset, partLabel, presetFor, validateArrangement } from './arrangementValidate';
-export type { PresetTable } from './arrangementValidate';
-export { normalisePatch, normalisePatches } from './patchNormalise';
-export { applyReturnsLive, applyStripLive } from './deskApply';
-export { normaliseReturns, normaliseStrip } from './deskNormalise';
-export { normaliseSequencer } from './sequencerNormalise';
+} from './song/arrangement';
+export { ArrangementPlayer } from './song/arrangementPlayer';
+export {
+  lookupPreset,
+  partLabel,
+  presetFor,
+  validateArrangement,
+} from './song/arrangementValidate';
+export type { PresetTable } from './song/arrangementValidate';
+export { normalisePatch, normalisePatches } from './patch/patchNormalise';
+export { applyReturnsLive, applyStripLive } from './mixer/deskApply';
+export { normaliseReturns, normaliseStrip } from './song/deskNormalise';
+export { normaliseSequencer } from './song/sequencerNormalise';
 export type {
   ApplyResult,
   ArrangementReadout,
@@ -48,20 +53,20 @@ export type {
   MusicTransport,
   PartHost,
   PlayablePart,
-} from './arrangementPlayer';
-export { BarRecorder, assertNotePattern } from './capturedPattern';
-export type { NotePattern } from './capturedPattern';
-export { installMusicControls } from './musicControls';
-export type { MusicChoice, MusicLog } from './musicControls';
-export { musicDocumentFromQuery, musicEnabledFromQuery } from './musicOptions';
-export { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES, selectMusic } from './arrangementLibrary';
-export type { MusicSelection } from './arrangementLibrary';
-export { AudioLoadMeter, ZERO_AUDIO_LOAD, quantumBudgetMs, reportQuanta } from './audioLoad';
-export type { AudioLoadReadout } from './audioLoad';
-export { ZERO_AUDIO_COST } from './audioCost';
-export type { AudioCostReadout } from './audioCost';
-export { SchedCostMeter, ZERO_SCHED_COST } from './schedCost';
-export type { SchedCostMeterOptions, SchedCostReadout } from './schedCost';
+} from './song/arrangementPlayer';
+export { BarRecorder, assertNotePattern } from './sequencing/capturedPattern';
+export type { NotePattern } from './sequencing/capturedPattern';
+export { installMusicControls } from './game/musicControls';
+export type { MusicChoice, MusicLog } from './game/musicControls';
+export { musicDocumentFromQuery, musicEnabledFromQuery } from './game/musicOptions';
+export { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES, selectMusic } from './game/arrangementLibrary';
+export type { MusicSelection } from './game/arrangementLibrary';
+export { AudioLoadMeter, ZERO_AUDIO_LOAD, quantumBudgetMs, reportQuanta } from './cost/audioLoad';
+export type { AudioLoadReadout } from './cost/audioLoad';
+export { ZERO_AUDIO_COST } from './cost/audioCost';
+export type { AudioCostReadout } from './cost/audioCost';
+export { SchedCostMeter, ZERO_SCHED_COST } from './cost/schedCost';
+export type { SchedCostMeterOptions, SchedCostReadout } from './cost/schedCost';
 export {
   PlaybackStatsWindow,
   asPlaybackStatsHost,
@@ -70,7 +75,7 @@ export {
   playbackWindowDelta,
   snapshotPlaybackStats,
   underrunMsPerEvent,
-} from './playbackStats';
+} from './cost/playbackStats';
 export type {
   AudioPlaybackStatsApi,
   PlaybackLatencies,
@@ -79,15 +84,15 @@ export type {
   PlaybackStatsWindowOptions,
   PlaybackWindowDelta,
   PlaybackWindowResult,
-} from './playbackStats';
-export { FmEngine } from './fmEngine';
-export type { PartOptions, WorkletUrls } from './fmEngine';
-export { AudioPart } from './audioPart';
-export { Scheduler } from './scheduler';
-export type { SchedulerOptions } from './scheduler';
-export { createBus } from './audioBus';
-export type { AudioBus, BusOptions } from './audioBus';
-export { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES, stripFor } from './mix';
+} from './cost/playbackStats';
+export { FmEngine } from './synth/fmEngine';
+export type { PartOptions, WorkletUrls } from './synth/fmEngine';
+export { AudioPart } from './synth/audioPart';
+export { Scheduler } from './sequencing/scheduler';
+export type { SchedulerOptions } from './sequencing/scheduler';
+export { createBus } from './mixer/audioBus';
+export type { AudioBus, BusOptions } from './mixer/audioBus';
+export { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES, stripFor } from './mixer/mix';
 export type {
   ChannelStrip,
   DelayReturn,
@@ -95,13 +100,13 @@ export type {
   ReturnName,
   ReturnSpec,
   ReverbReturn,
-} from './mix';
-export { createReturn, createReturns, createSend } from './returnBus';
-export type { ReturnBus } from './returnBus';
-export { routePart } from './channelStrip';
-export type { PartStrip, StripStage } from './channelStrip';
-export { createLowCutStage } from './lowCutStage';
-export type { LowCutStage } from './lowCutStage';
+} from './mixer/mix';
+export { createReturn, createReturns, createSend } from './mixer/returnBus';
+export type { ReturnBus } from './mixer/returnBus';
+export { routePart } from './mixer/channelStrip';
+export type { PartStrip, StripStage } from './mixer/channelStrip';
+export { createLowCutStage } from './mixer/lowCutStage';
+export type { LowCutStage } from './mixer/lowCutStage';
 export {
   INSERT_KINDS,
   INSERT_KIND_NAMES,
@@ -120,18 +125,18 @@ export type { DriveSpec } from './inserts/driveInsert';
 export { CHORUS_INSERT, DEFAULT_CHORUS } from './inserts/chorusInsert';
 export type { ChorusSpec } from './inserts/chorusInsert';
 export * from './inserts/insertConstants';
-export { createStereoRotate, rotationAngle, rotationGains } from './stereoRotate';
-export type { RotationGains, StereoRotate } from './stereoRotate';
-export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './reverbSpace';
+export { createStereoRotate, rotationAngle, rotationGains } from './mixer/stereoRotate';
+export type { RotationGains, StereoRotate } from './mixer/stereoRotate';
+export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './mixer/reverbSpace';
 export {
   AUDIO_STATS_SETTLE_MS,
   DEFAULT_ARRANGEMENT_NAME,
   REVERB_SPACE_RANGES,
 } from './audioConstants';
-export type { ReverbSpace, SpaceName } from './reverbSpace';
-export { renderPatchToBuffer } from './offlineRender';
-export type { BakeOptions } from './offlineRender';
-export { attachPartToBabylon, createBabylonAudio } from './babylonBridge';
+export type { ReverbSpace, SpaceName } from './mixer/reverbSpace';
+export { renderPatchToBuffer } from './sfx/offlineRender';
+export type { BakeOptions } from './sfx/offlineRender';
+export { attachPartToBabylon, createBabylonAudio } from './game/babylonBridge';
 export {
   PATCH_FILE_FORMAT,
   PATCH_ID_RULE,
@@ -140,14 +145,14 @@ export {
   loadPatchLibrary,
   patchContentHash,
   patchLeafDifferences,
-} from './patchLibrary';
-export type { HeadroomRecord, LibraryEntry, PatchFile } from './patchLibrary';
+} from './patch/patchLibrary';
+export type { HeadroomRecord, LibraryEntry, PatchFile } from './patch/patchLibrary';
 // The whole-bank table (`presets.ts`, `presetCatalog.ts`) is deliberately not
 // here: since #562 no game path resolves a patch by library id, so the bundler
 // drops the 114 files. The editor reaches them through `index-for-editor.ts`.
-export { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
-export type { GameplayPatchId } from './gameplayPatches';
-export * from './patch';
+export { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './patch/gameplayPatches';
+export type { GameplayPatchId } from './patch/gameplayPatches';
+export * from './patch/patch';
 // Transport and pure generators (#74). None of these import the audio graph;
 // `generatorBoundary.test.ts` enforces it.
 export {
@@ -158,7 +163,7 @@ export {
   TICKS_PER_BAR,
   TickTransport,
   isBarDivisor,
-} from './scheduler';
+} from './sequencing/scheduler';
 export type {
   AudioClock,
   DivisorName,
@@ -166,12 +171,12 @@ export type {
   TickHandler,
   TickSource,
   Unsubscribe,
-} from './scheduler';
-export { euclid, patternFromString, patternToString, rotatePattern } from './euclid';
-export type { Pattern } from './euclid';
-export { GENERATOR_SEED_STRIDE, generatorRng, generatorSeed } from './generatorSeed';
-export type { Rng } from './generatorSeed';
-export type { NoteEvent, NoteHandler, NoteOffEvent, NoteOnEvent } from './noteEvent';
+} from './sequencing/scheduler';
+export { euclid, patternFromString, patternToString, rotatePattern } from './sequencing/euclid';
+export type { Pattern } from './sequencing/euclid';
+export { GENERATOR_SEED_STRIDE, generatorRng, generatorSeed } from './sequencing/generatorSeed';
+export type { Rng } from './sequencing/generatorSeed';
+export type { NoteEvent, NoteHandler, NoteOffEvent, NoteOnEvent } from './sequencing/noteEvent';
 export {
   SCALES,
   SCALE_NAMES,
@@ -179,15 +184,20 @@ export {
   ScaleSampler,
   scaleOffsets,
   uniformWeights,
-} from './scaleSampler';
-export type { Register, SampledNote, ScaleName, ScaleSamplerConfig } from './scaleSampler';
+} from './sequencing/scaleSampler';
+export type {
+  Register,
+  SampledNote,
+  ScaleName,
+  ScaleSamplerConfig,
+} from './sequencing/scaleSampler';
 export {
   DEFAULT_EUCLIDEAN_CONFIG,
   DENSITY_MOD_KINDS,
   EuclideanSequencer,
   LFO_SHAPES,
   lfoValue,
-} from './euclideanSequencer';
+} from './sequencing/euclideanSequencer';
 export type {
   DensityMod,
   DensityModKind,
@@ -195,19 +205,24 @@ export type {
   LfoShape,
   OnsetEvent,
   OnsetHandler,
-} from './euclideanSequencer';
-export { ARP_WALK_MODES, Arpeggiator, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeggiator';
-export type { ArpWalkMode, ArpeggiatorConfig } from './arpeggiator';
-export { DEFAULT_STEP_SEQUENCER_CONFIG, StepSequencer } from './stepSequencer';
-export type { StepSequencerConfig } from './stepSequencer';
+} from './sequencing/euclideanSequencer';
+export { ARP_WALK_MODES, Arpeggiator, DEFAULT_ARPEGGIATOR_CONFIG } from './sequencing/arpeggiator';
+export type { ArpWalkMode, ArpeggiatorConfig } from './sequencing/arpeggiator';
+export { DEFAULT_STEP_SEQUENCER_CONFIG, StepSequencer } from './sequencing/stepSequencer';
+export type { StepSequencerConfig } from './sequencing/stepSequencer';
 export {
   DEFAULT_GRID_CONFIG,
   GRID_STEP_KINDS,
   GridSequencer,
   defaultGridSteps,
   gridNote,
-} from './gridSequencer';
-export type { GridNoteStep, GridSequencerConfig, GridStep, GridStepKind } from './gridSequencer';
+} from './sequencing/gridSequencer';
+export type {
+  GridNoteStep,
+  GridSequencerConfig,
+  GridStep,
+  GridStepKind,
+} from './sequencing/gridSequencer';
 export {
   CHORD_STEP_KINDS,
   ChordSequencer,
@@ -216,7 +231,7 @@ export {
   chordStep,
   layoutSegments,
   restStep,
-} from './chordSequencer';
+} from './sequencing/chordSequencer';
 export type {
   ChordChordStep,
   ChordRestStep,
@@ -224,7 +239,7 @@ export type {
   ChordSequencerConfig,
   ChordStep,
   ChordStepKind,
-} from './chordSequencer';
+} from './sequencing/chordSequencer';
 export {
   CHORD_SIZES,
   chordOf,
@@ -232,11 +247,11 @@ export {
   chordTones,
   diatonicChords,
   isChordSize,
-} from './chordTheory';
-export type { Chord, ChordSize } from './chordTheory';
-export { chordName, pitchClassName, romanNumeral, toRoman } from './chordNames';
-export { invertStack, voiceChord } from './chordVoicing';
-export type { VoiceOptions } from './chordVoicing';
+} from './harmony/chordTheory';
+export type { Chord, ChordSize } from './harmony/chordTheory';
+export { chordName, pitchClassName, romanNumeral, toRoman } from './harmony/chordNames';
+export { invertStack, voiceChord } from './harmony/chordVoicing';
+export type { VoiceOptions } from './harmony/chordVoicing';
 export {
   CHORD_DIVISORS,
   CHORD_DURATIONS,
@@ -246,9 +261,14 @@ export {
   CHORD_VOICING_DEFAULT,
   CHORD_VOICING_IDS,
   QUALITY_LABELS,
-} from './chordTables';
-export type { ChordQuality, ChordVoicing, ChordVoicingId, QualityLabel } from './chordTables';
-export { foldDegree } from './scaleSampler';
+} from './harmony/chordTables';
+export type {
+  ChordQuality,
+  ChordVoicing,
+  ChordVoicingId,
+  QualityLabel,
+} from './harmony/chordTables';
+export { foldDegree } from './sequencing/scaleSampler';
 export {
   ACCENT_MOD_DEFAULT,
   ACCENT_VELOCITY_DEFAULT,

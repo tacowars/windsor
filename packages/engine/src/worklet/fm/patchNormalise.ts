@@ -15,7 +15,7 @@ import type {
   PartialOperator,
   PartialPatch,
   Patch,
-} from '../../patch';
+} from '../../patch/patch';
 import { ALGORITHMS } from './algorithms';
 import { LOOP_NONE } from './envelope';
 import { LFO_SINE } from './lfo';

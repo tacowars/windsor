@@ -3,10 +3,10 @@
  * on the other, and `run(bars)` to drive the transport. Shared by the binding
  * tests and the live-reconfigure cases (#603 grid, #610 Euclidean).
  */
-import type { Arrangement } from '../arrangement';
-import { ArrangementPlayer } from '../arrangementPlayer';
-import { PRESETS } from '../presets';
-import { TICKS_PER_BAR, TickTransport } from '../scheduler';
+import type { Arrangement } from '../song/arrangement';
+import { ArrangementPlayer } from '../song/arrangementPlayer';
+import { PRESETS } from '../patch/presets';
+import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import { FULL_ARRANGEMENT, slotMap, type FullPartId } from './fullArrangement';
 import { recordingPart, type RecordingPart } from './recordingPart';
 
