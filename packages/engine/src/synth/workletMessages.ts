@@ -154,8 +154,11 @@ export const WORKLET_URL = new URL('../worklet/generated/fm-processor.js', impor
 
 export const PROCESSOR_NAME = 'fm-part';
 
-/** The reverb DSP, a separate module so a part can load without it. */
-export const REVERB_WORKLET_URL = new URL('../worklet/reverb-processor.js', import.meta.url);
+/** The reverb DSP, a separate module so a part can load without it: the bundle `scripts/build-worklets.mjs` writes from `worklet/reverb/` (#671). */
+export const REVERB_WORKLET_URL = new URL(
+  '../worklet/generated/reverb-processor.js',
+  import.meta.url,
+);
 
 export const REVERB_PROCESSOR_NAME = 'dattorro-reverb';
 

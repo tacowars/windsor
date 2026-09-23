@@ -16,9 +16,18 @@ checks the audio thread separately from the main thread. It reuses
 under the main thread's stricter settings. `compressorDsp.test.ts` exercises
 this generated processor, including its second input and telemetry.
 
+`reverb/` is the plate's source (#671), bundled to
+`generated/reverb-processor.js` and checked by its own `reverb/tsconfig.json`:
+`reverbProcessor.ts` (the entry: `DattorroReverb`, its fields, the load
+sampler, `process`, the sleep, `registerProcessor`), `delayLines.ts` (allocation,
+the SIZE-scaled lengths and taps, the reads), `tank.ts` (`_writeInput` and
+`_renderBlock`, the awake render) and `reverbConstants.ts` (the tunables and the
+delay and tap tables). The delay lines and the tank are `this`-typed functions
+installed on the processor's prototype, so each body is still the method the
+hand-written file carried; `mixer/reverbGolden.test.ts` pins its render.
+
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
-build output. `reverb-processor.js` is the plate, still one hand-written file
-(its own exception is at its top). The map of `fm/` (#644):
+build output. The map of `fm/` (#644):
 
 | Module | Owns |
 |---|---|
@@ -47,14 +56,17 @@ touches a code line. These rules are stated here in full, and not
 by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
-1. **`generated/` is output. Never edit it.** After any change under `fm/`,
+1. **`generated/` is output. Never edit it.** After any change under `fm/`
+   (or `reverb/`, `compressor/`, `meter/`),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
    does `scripts/lib/workletBundle.test.mjs`. Three consumers read the
    generated file and nothing else: Vite (`workletMessages.ts`, `new URL`),
    the console (`tools/patch-editor/build-editor.mjs` inlines it behind a blob
    URL, which cannot resolve an import) and the harness
-   (`__fixtures__/workletHarness.ts`, `readFileSync` then `new Function`).
+   (`__fixtures__/workletHarness.ts`, `readFileSync` then `new Function`; the
+   plate's is `__fixtures__/reverbHarness.ts`, which reads `MAX_SIZE`,
+   `TANK_DELAYS`, `MAX_PRE_DELAY` and the sleep floors the same way).
    The harness reaches internals by their **top-level names** (`ALGORITHMS`,
    `WAVE`, `Envelope`, `ST_SUSTAIN`, …), so a name stays unique across every
    module under `fm/`: esbuild renames a collision (`WAVE2`) and the harness
@@ -79,7 +91,11 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    that is intended refreshes it with
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/client/src/audio/synth/fmProcessorGolden.test.ts`
    and says so in the PR; the patch files' `headroom` records may then need
-   `tools/patch-editor/sweep-headroom.mjs` too.
+   `tools/patch-editor/sweep-headroom.mjs` too. The plate's gate is
+   `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
+   fifteen scenarios in the default, `sleep: false` and `settledSkip: false`
+   paths, refreshed only with
+   `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/client/src/audio/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change.
@@ -103,13 +119,19 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    parameter, `this` never appears), split at per-render-call granularity:
    one call per control block or render chunk, never per sample. The kernel
    stays one function read top to bottom.
+   The plate is the one exception (#671): its delay lines and tank are
+   `this`-typed functions installed on `DattorroReverb.prototype`, because the
+   move kept every method body byte for byte; turning them into functions
+   over the plate rewrites every line and is its own change, with a bench.
 7. **Types erase; they never change the emitted code.** A class field is
    declared (`ic1: number;`) and written by the constructor, never
    initialised at the declaration: with define semantics a field would be
    emitted as `undefined` before the constructor writes a number, and V8
    then boxes every later double write to it (the #548 scenario read 336 ms
    against 182 ms, and the boxes are allocations on the audio thread), so
-   `fm/tsconfig.json` turns `useDefineForClassFields` off. A nullable field
+   `fm/tsconfig.json` turns `useDefineForClassFields` off (and so does
+   `reverb/tsconfig.json`, whose `DattorroReverb` declares its thirty-four
+   fields and `declare`s the prototype-installed functions, which emit nothing). A nullable field
    read on a hot path takes a `!` (`voice.patch!`), never a `??` (a branch)
    or a default object (an allocation). `noUncheckedIndexedAccess` is off for
    the folder so that `amp[i] += x` stays as written. The diff of
@@ -118,6 +140,6 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    change shape.
 
 Verify with the client's command, `npx tsc -p packages/client/src/audio/worklet/fm/tsconfig.json`
-(also in `npm run typecheck`), then `node scripts/build-worklets.mjs --check`
+(and `reverb/tsconfig.json`; both in `npm run typecheck`), then `node scripts/build-worklets.mjs --check`
 and `node tools/patch-editor/build-editor.mjs` (the console page bundles the
 generated file, so its bytes change with it).
