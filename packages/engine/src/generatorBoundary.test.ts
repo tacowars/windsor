@@ -19,6 +19,11 @@ const PURE_FILES = [
   // checked here for the same forbidden identifiers so a generator can read
   // its tunables without leaving the pure side.
   'audioConstants.ts',
+  // The worklet's own data modules that `audioConstants.ts` re-exports (#656):
+  // the algorithm table and the tunables, including the envelope curve's
+  // steepness. Data only, importing nothing, and checked here like the rest.
+  'worklet/fm/algorithms.ts',
+  'worklet/fm/fmConstants.ts',
   'scheduler.ts',
   'euclid.ts',
   'generatorSeed.ts',
