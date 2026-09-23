@@ -11,20 +11,7 @@
  */
 
 import { MIP_BASE_HZ, MIP_COUNT, TABLE_MASK, TABLE_SIZE } from './fmConstants';
-
-/* Waveform ids — keep in sync with ../src/patch.js */
-const WAVE = {
-  SINE: 0,
-  SAW: 1,
-  SQUARE: 2,
-  TRIANGLE: 3,
-  NOISE: 4,
-  SAW_D: 5, // unbandlimited, aliases by design
-  SQUARE_D: 6, // unbandlimited, aliases by design
-  SINE_4BIT: 7,
-  SINE_8BIT: 8,
-  USER: 9, // partials supplied by the patch
-};
+import { WAVE } from './waveIds';
 
 /* ------------------------------------------------------------------ *
  * Wavetable construction
@@ -193,14 +180,4 @@ for (const w of [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE]) {
   getMips(w, sampleRate, 1, null);
 }
 
-export {
-  WAVE,
-  SIN_TAB,
-  getMips,
-  mipIndex,
-  KIND_TABLE,
-  KIND_NOISE,
-  KIND_SAW_D,
-  KIND_SQUARE_D,
-  waveKind,
-};
+export { SIN_TAB, getMips, mipIndex, KIND_TABLE, KIND_NOISE, KIND_SAW_D, KIND_SQUARE_D, waveKind };

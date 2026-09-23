@@ -14,32 +14,33 @@ var MOD_INDEX_SCALE = 4;
 var FEEDBACK_SAW_CYCLES = 1.25 / (2 * Math.PI);
 var FEEDBACK_SQUARE_CYCLES = 2 / (2 * Math.PI);
 var MIN_SEG_TIME = 5e-4;
+var ENVELOPE_CURVE_STEEPNESS = 3;
 
 // packages/client/src/audio/worklet/fm/algorithms.ts
 var A = 0, B = 1, C = 2, D = 3;
 var ALGORITHMS = [
   // 0:  D -> C -> B -> A                      full series, the classic FM stack
-  { name: "D>C>B>A", mods: [[B], [C], [D], []], carriers: [A] },
+  { name: "Series", label: "D>C>B>A", mods: [[B], [C], [D], []], carriers: [A] },
   // 1:  D,C -> B -> A                         two modulators sum into B
-  { name: "(D,C)>B>A", mods: [[B], [C, D], [], []], carriers: [A] },
+  { name: "Twin Mod", label: "(D,C)>B>A", mods: [[B], [C, D], [], []], carriers: [A] },
   // 2:  C -> B -> A, D -> A                   series plus a direct modulator
-  { name: "C>B>A, D>A", mods: [[B, D], [C], [], []], carriers: [A] },
+  { name: "Stack + Mod", label: "C>B>A, D>A", mods: [[B, D], [C], [], []], carriers: [A] },
   // 3:  D -> C -> A, B -> A                   two-stack and a single into A
-  { name: "D>C>A, B>A", mods: [[C, B], [], [D], []], carriers: [A] },
+  { name: "Pair into A", label: "D>C>A, B>A", mods: [[C, B], [], [D], []], carriers: [A] },
   // 4:  D -> C, B -> A                        two independent 2-op stacks
-  { name: "D>C | B>A", mods: [[B], [], [D], []], carriers: [A, C] },
+  { name: "Two Stacks", label: "D>C | B>A", mods: [[B], [], [D], []], carriers: [A, C] },
   // 5:  D -> C, D -> B, D -> A                one modulator, three carriers
-  { name: "D>(C,B,A)", mods: [[D], [D], [D], []], carriers: [A, B, C] },
+  { name: "One to Three", label: "D>(C,B,A)", mods: [[D], [D], [D], []], carriers: [A, B, C] },
   // 6:  D -> C, B and A free                  one stack plus two sines
-  { name: "D>C | B | A", mods: [[], [], [D], []], carriers: [A, B, C] },
+  { name: "Stack + Two", label: "D>C | B | A", mods: [[], [], [D], []], carriers: [A, B, C] },
   // 7:  all four parallel                     additive, no FM at all
-  { name: "A|B|C|D", mods: [[], [], [], []], carriers: [A, B, C, D] },
+  { name: "Additive", label: "A|B|C|D", mods: [[], [], [], []], carriers: [A, B, C, D] },
   // 8:  D -> C -> B -> A, B also heard        series with a mid-chain tap
-  { name: "D>C>B>A +B", mods: [[B], [C], [D], []], carriers: [A, B] },
+  { name: "Series + Tap", label: "D>C>B>A +B", mods: [[B], [C], [D], []], carriers: [A, B] },
   // 9:  D -> C, C -> B, C -> A                shared modulator, split output
-  { name: "D>C>(B,A)", mods: [[C], [C], [D], []], carriers: [A, B] },
+  { name: "Split Branch", label: "D>C>(B,A)", mods: [[C], [C], [D], []], carriers: [A, B] },
   // 10: D,C,B -> A                            three modulators, one carrier
-  { name: "(D,C,B)>A", mods: [[B, C, D], [], [], []], carriers: [A] }
+  { name: "Triple Mod", label: "(D,C,B)>A", mods: [[B, C, D], [], [], []], carriers: [A] }
 ];
 function topoOrder(alg) {
   const order = [];
@@ -88,6 +89,14 @@ var ST_IDLE = 0, ST_ATTACK = 1, ST_DECAY = 2, ST_SUSTAIN = 3, ST_RELEASE = 4, ST
 var LOOP_NONE = 0, LOOP_LOOP = 1, LOOP_TRIGGER = 2;
 function curveShape(p, k) {
   return p / (p + (1 - p) * k);
+}
+function curveConstant(curve) {
+  return Math.exp(curve * ENVELOPE_CURVE_STEEPNESS);
+}
+function segmentLevel(from, to, phase, curve) {
+  const k = curveConstant(curve);
+  const s = k === 1 ? phase : curveShape(phase, k);
+  return from + (to - from) * s;
 }
 var Envelope = class {
   constructor() {
@@ -172,9 +181,7 @@ var Envelope = class {
       }
       return this.value;
     }
-    const k = Math.exp(curve * 3);
-    const s = k === 1 ? this.phase : curveShape(this.phase, k);
-    this.value = this.segStart + (target - this.segStart) * s;
+    this.value = segmentLevel(this.segStart, target, this.phase, curve);
     return this.value;
   }
 };
@@ -195,7 +202,7 @@ function randomSeed32(random) {
   return random() * 4294967295 >>> 0 || 1;
 }
 
-// packages/client/src/audio/worklet/fm/waveTables.ts
+// packages/client/src/audio/worklet/fm/waveIds.ts
 var WAVE = {
   SINE: 0,
   SAW: 1,
@@ -211,6 +218,8 @@ var WAVE = {
   USER: 9
   // partials supplied by the patch
 };
+
+// packages/client/src/audio/worklet/fm/waveTables.ts
 var SIN_TAB = new Float32Array(TABLE_SIZE);
 for (let i = 0; i < TABLE_SIZE; i++) {
   SIN_TAB[i] = Math.sin(2 * Math.PI * i / TABLE_SIZE);
