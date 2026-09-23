@@ -35,7 +35,7 @@ export const WORKLETS = [
   { name: 'fm', entry: 'fm/fmProcessor.ts', output: 'generated/fm-processor.js' },
   {
     name: 'compressor',
-    entry: 'compressor/compressorProcessor.js',
+    entry: 'compressor/compressorProcessor.ts',
     output: 'generated/compressor-processor.js',
   },
 ];

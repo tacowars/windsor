@@ -1,0 +1,18 @@
+{
+  // A separate audio-thread project, following fm/ (#654). Reuse its scope
+  // declarations; keep indexed sample reads and class-field emission unchanged.
+  "extends": "../../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false,
+    "useDefineForClassFields": false,
+    "lib": ["ES2022", "DOM"],
+    "types": []
+  },
+  "files": ["../fm/workletGlobals.d.ts"],
+  "include": ["./**/*.ts"]
+}
