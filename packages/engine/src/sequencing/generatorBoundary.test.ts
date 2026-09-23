@@ -24,6 +24,11 @@ const PURE_FILES = [
   // steepness. Data only, importing nothing, and checked here like the rest.
   '../worklet/fm/algorithms.ts',
   '../worklet/fm/fmConstants.ts',
+  // The patch defaults, whose `OPERATOR_COUNT` `audioConstants.ts` re-exports
+  // (#670), and the two import-free id modules the defaults name.
+  '../worklet/fm/patchDefaults.ts',
+  '../worklet/fm/modeIds.ts',
+  '../worklet/fm/waveIds.ts',
   'scheduler.ts',
   'euclid.ts',
   'generatorSeed.ts',
