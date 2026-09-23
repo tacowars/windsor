@@ -1,4 +1,4 @@
-/* global console, setTimeout, Buffer, URL, window, document, AudioContext, AudioWorkletNode */
+/* global console, setTimeout, Buffer, URL, window, document, AudioContext, AudioWorkletNode, process */
 import { chromium } from '@playwright/test';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { cpus, platform, release } from 'node:os';
@@ -8,6 +8,8 @@ import { execFileSync } from 'node:child_process';
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const out=root+'/docs/research/2026-09-23-660-compressor';
 await mkdir(out,{recursive:true});
+const editorOnly=process.argv.includes('--editor-only');
+const capture=editorOnly?'final-editor':'browser';
 const browser=await chromium.launch({channel:'chrome',headless:true,args:['--autoplay-policy=no-user-gesture-required']});
 const page=await browser.newPage({viewport:{width:1500,height:1100}});
 const messages=[]; const requests=[];
@@ -59,7 +61,7 @@ try {
   const measurements=[];
   // Real AudioWorklet rendering on this development browser. Meter off, fixed
   // independent stereo paths; each compressor sees the same full-level tone.
-  for(const count of [0,1,8,16]) {
+  for(const count of (editorOnly?[]:[0,1,8,16])) {
     const result=await page.evaluate(async(count)=>{
       const context=new AudioContext({latencyHint:'interactive'});
       await context.audioWorklet.addModule('data:application/javascript;charset=utf-8,'+encodeURIComponent(window.__A204_DSP__.compressor));
@@ -85,12 +87,12 @@ try {
   }
   const sourceSha256=createHash('sha256').update(await readFile(root+'/tools/patch-editor/patch-editor.html')).digest('hex');
   const result={sourceSha256,machine:{cpu:cpus()[0].model,os:platform()+' '+release(),browser:browser.version(),backend:'Chrome AudioWorklet, headless',commit:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim()},active,exported:saved,measurements};
-  await writeFile(out+'/browser.json',JSON.stringify(result,null,2)+'\n');
+  await writeFile(out+'/'+capture+'.json',JSON.stringify(result,null,2)+'\n');
   const errors=messages.filter(m=>['error','warning'].includes(m.type));
   if(errors.length)throw Error('Console errors/warnings: '+JSON.stringify(errors));
   console.log(JSON.stringify({active,exported:saved,cases:measurements.map(m=>({count:m.count,reports:m.reports.length,playback:m.playback})),consoleErrors:errors.length}));
 } finally {
-  await writeFile(out+'/console.json',JSON.stringify(messages,null,2)+'\n');
-  await writeFile(out+'/network.json',JSON.stringify(requests,null,2)+'\n');
+  await writeFile(out+'/'+capture+'-console.json',JSON.stringify(messages,null,2)+'\n');
+  await writeFile(out+'/'+capture+'-network.json',JSON.stringify(requests,null,2)+'\n');
   await browser.close();
 }

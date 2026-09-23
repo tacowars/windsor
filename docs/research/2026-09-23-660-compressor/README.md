@@ -29,6 +29,24 @@ The screenshot is for Pat; the processor values and document assertions are
 the evidence. A game-world movement/screenshot collector cannot express this
 standalone UI scenario (decision record, item 7).
 
+## Final editor check after review and rebase
+
+`final-editor.json`, `final-editor-console.json` and `final-editor-network.json`
+are the final UI check after fixing both directions of release-mode switching
+and rebasing onto the FM refactor in PR #661. `editor.png` is this final capture.
+The final page SHA-256 is `ac520fcf7f585540565d9d97173254e72020f454f4dbbb8c9a2b71ba38845b13`. Live parameter edits, positive reduction,
+bypass to zero and exported values passed again, with zero console errors or
+warnings. Reproduce without repeating the load run:
+
+```sh
+node docs/research/2026-09-23-660-compressor/collect.mjs --editor-only
+```
+
+The earlier `browser.json` retains its original page hash and load observations;
+the review fix only reconciles envelopes when Release changes and does not
+alter the measured fixed-settings processing loop. The final UI run does not
+claim to be a new load measurement.
+
 ## Audio load
 
 A separate context per case runs 0, 1, 8 or 16 independent compressor paths
