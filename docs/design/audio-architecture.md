@@ -229,7 +229,7 @@ bundles into `worklet/generated/fm-processor.js` (`--check` in `npm run verify`;
 reasoning below still describes what the shipped file is; what it no longer
 describes is how the source is kept. Record
 `2026-09-23-643-fm-worklet-is-generated-from-a-source-folder`; the split itself
-is #644 and #645. The reverb is still one hand-written file.
+is #644 and #645. The reverb was, at that point, still one hand-written file.
 
 **Amended 2026-09-23 (#671)**: no longer — the plate is written as
 `worklet/reverb/` (`reverbProcessor.ts`, `delayLines.ts`, `tank.ts`,
@@ -238,17 +238,22 @@ is #644 and #645. The reverb is still one hand-written file.
 `mixer/reverbGolden.test.ts`. Record
 `2026-09-23-671-reverb-worklet-methods-installed-on-the-prototype`.
 
-There are two: `worklet/fm-processor.js` (1,302 lines) and `worklet/reverb-processor.js`
-(460), each far over the `max-lines` cap of 300 and each staying that way behind a
-file-top disable with its reasoning. Decision:
+*History — the rule as first written, before the two amendments above.* There
+were two hand-written worklets: `worklet/fm-processor.js` (1,302 lines) and
+`worklet/reverb-processor.js` (460), each far over the `max-lines` cap of 300 and each
+kept that way behind a file-top disable with its reasoning. Decision:
 `docs/log/2026-08-31-audio-worklet-single-file.md`; the reverb's own
-`docs/log/2026-08-31-dattorro-reverb-not-plateau.md` decision 4.
+`docs/log/2026-08-31-dattorro-reverb-not-plateau.md` decision 4. Neither is hand-written
+now: each is a source folder (`worklet/fm/`, `worklet/reverb/`) bundled into
+`worklet/generated/`.
 
 An earlier draft of this document flagged worklet bundling as an unresolved spike that
-blocked any audio ticket. **Keeping each file whole is what resolved it.** Because neither
-has an `import` statement, `new URL('./worklet/<name>.js', import.meta.url)` resolves
-in both the dev server and the production build with no bundler configuration. Splitting
-one would reintroduce the problem: Vite's `?url` and `new URL(…, import.meta.url)` yield a
+blocked any audio ticket. **Keeping each file whole is what resolved it**, and the
+reasoning still holds for the generated files: because neither shipped file had an
+`import` statement, `new URL('./worklet/<name>.js', import.meta.url)` resolved in both
+the dev server and the production build with no bundler configuration, and the build
+step keeps it so by emitting import-free bundles. Letting a worklet's source split reach
+the browser as-is would reintroduce the problem: Vite's `?url` and `new URL(…, import.meta.url)` yield a
 URL for the file itself *without* bundling its dependency graph — fine in dev, broken in
 a build — so a split worklet needs a second Rollup input, a `?worker&url` indirection, or
 a bespoke build step.
