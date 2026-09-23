@@ -55,6 +55,9 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/client/src/audio/fmProcessorGolden.test.ts`
    and says so in the PR; the patch files' `headroom` records may then need
    `tools/patch-editor/sweep-headroom.mjs` too.
+   The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
+   under Node 22, nine pad and score presets hash differently because `Math`
+   differs between V8 versions. A run on the wrong Node is not a render change.
 5. **Tables mirrored on the main thread.** `patch.ts` mirrors `ALGORITHMS` and
    `WAVE`; `envelopeCurve.ts` mirrors `Envelope`'s curve. `patch.test.ts` and
    `envelopeCurve.test.ts` fail when a copy drifts, until #656 shares them.

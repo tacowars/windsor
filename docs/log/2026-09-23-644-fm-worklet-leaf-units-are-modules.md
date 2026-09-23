@@ -54,6 +54,13 @@ modules is a line of the original, 1425 both ways) is what "pure move" means
 for a reviewer who is an agent: the golden test says the bits are the same,
 the purity check says why.
 
+The Codex pass turned up one fact worth keeping: run under Node 22, nine
+presets (`pad-drift` and eight `score-*`) fail the golden table, and fail it
+against the original file too. The hashes are pinned to Node 24's V8
+(`.nvmrc`), which the laptop and CI share; `worklet/CLAUDE.md` rule 4 now
+says so, so the next agent on the wrong Node does not read it as a render
+change.
+
 ## Punted / alternatives
 
 - **Direct per-module tests.** #654: a `.ts` test importing an untyped `.js`
