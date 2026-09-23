@@ -1,5 +1,6 @@
 /**
- * Behavioural tests for `worklet/reverb-processor.js`.
+ * Behavioural tests for the plate: `worklet/reverb/`, run as its bundle
+ * `worklet/generated/reverb-processor.js`.
  *
  * A reverb has no single correct output to assert against, so these pin the
  * properties that make it usable and the two failures found while building it:

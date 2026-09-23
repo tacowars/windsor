@@ -166,8 +166,10 @@ describe('settled SIZE', () => {
     };
     const feed: Feed = (block, left, right) => {
       if (block % blockAt(0.3) !== 0) return;
+      // Same sign on both channels: the plate sums its input to mono, so
+      // opposite signs would cancel and leave the tank silent.
       left[0] = 1;
-      right[0] = -1;
+      right[0] = 1;
     };
     let settledBlocks = 0;
     let glidingBlocks = 0;
@@ -181,7 +183,8 @@ describe('settled SIZE', () => {
     expect(settledBlocks).toBeGreaterThan(0);
     expect(glidingBlocks).toBeGreaterThan(0);
     const always = renderReverb(loaded, 2, feed, {}, { ...opts, create: { settledSkip: false } });
-    expect(skipping.peak).toBeGreaterThan(0);
+    // The feed excites the tank: a cancelling feed renders below the sleep floor.
+    expect(skipping.peak).toBeGreaterThan(topology.sleepOutputFloor);
     expect(skipping.samples).toEqual(always.samples);
   });
 });

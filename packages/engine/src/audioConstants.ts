@@ -200,8 +200,9 @@ export const DELAY_DAMP_MIN_HZ = 10;
 export const DELAY_DAMP_MAX_HZ = 20000;
 /**
  * The plate's parameter ranges, `[min, max]` per `ReverbSpace` field —
- * restated from `worklet/reverb-processor.js` `parameterDescriptors`, which
- * must stay import-free; `reverbSpace.test.ts` asserts the two agree. What a
+ * restated from `parameterDescriptors` in `worklet/reverb/reverbProcessor.ts`
+ * (bundled to `worklet/generated/reverb-processor.js`), which the main thread
+ * does not import; `reverbSpace.test.ts` asserts the two agree. What a
  * document's `returns` section is clamped into.
  */
 export const REVERB_SPACE_RANGES = {

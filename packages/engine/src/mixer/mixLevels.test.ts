@@ -1,8 +1,9 @@
 /**
  * The settings' two channels against the real routing (#518 decision 1),
  * headless: `AudioSystem` and `FmEngine` run unchanged on the graph stand-in
- * and the plate return is the real `reverb-processor.js`, so what is asserted
- * here is what a browser renders.
+ * and the plate return is the real bundled plate
+ * (`worklet/generated/reverb-processor.js`, from `worklet/reverb/`), so what is
+ * asserted here is what a browser renders.
  *
  * The load-bearing case is the last one: at the shipped defaults the samples
  * are *identical* to a page with no settings at all (decision 6), which is
