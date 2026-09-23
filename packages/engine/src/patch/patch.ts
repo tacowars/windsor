@@ -1,19 +1,31 @@
 /**
- * Patch schema for the FM engine: enums, the algorithm routing table, and the
+ * Patch schema for the FM engine: the types, the display names, and the
  * factory functions that fill in every field the DSP expects.
  *
- * The numeric enums and the routing table are mirrored in
- * `worklet/fm/`, which imports nothing from the main thread (#656 will share them; see the note at the
- * top of that file). `patch.test.ts` asserts the two copies are identical, so
- * they cannot drift silently.
+ * Nothing here is a copy of the worklet's. The waveform and mode ids
+ * (`worklet/fm/waveIds.ts`, `modeIds.ts`, #656 and #669) and the algorithm
+ * table (`worklet/fm/algorithms.ts`, via `audioConstants.ts`) are re-exported
+ * from the modules the worklet reads, and every default `makePatch()` writes
+ * comes from `worklet/fm/patchDefaults.ts`, the table the worklet's
+ * `normalisePatch` fills from too (#670). `patchDefaults.test.ts` pins the two
+ * fills of an empty patch equal leaf for leaf.
  */
 import { ALGORITHMS, OPERATOR_COUNT } from '../audioConstants';
 import type { Algorithm } from '../audioConstants';
 
-/** Operator waveform. Values must match `WAVE` in the worklet. */
 /** The waveform ids live with the worklet that renders them (`worklet/fm/waveIds.ts`, #656). */
 export { WAVE } from '../worklet/fm/waveIds';
-import { WAVE } from '../worklet/fm/waveIds';
+import {
+  ENVELOPE_DEFAULTS,
+  FILTER_DEFAULTS,
+  FILTER_ENV_DEFAULTS,
+  LEAD_OPERATOR_LEVEL,
+  LFO_DEFAULTS,
+  LFO_TO_OP_DEFAULT,
+  OPERATOR_DEFAULTS,
+  PATCH_DEFAULTS,
+  PITCH_ENV_DEFAULTS,
+} from '../worklet/fm/patchDefaults';
 
 export const WAVE_NAMES = [
   'Sine',
@@ -30,7 +42,6 @@ export const WAVE_NAMES = [
 
 /** The mode ids live with the worklet that switches on them (`worklet/fm/modeIds.ts`, #669). */
 export { FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
-import { FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
 
 export const LFO_SHAPE_NAMES = [
   'Sine',
@@ -166,39 +177,16 @@ export type PartialPatch = {
       : Patch[K];
 };
 
-export function makeEnvelope(o: Partial<Envelope> = {}): Envelope {
-  return {
-    initLevel: 0,
-    attackTime: 0.002,
-    attackCurve: 0,
-    peakLevel: 1,
-    decayTime: 0.4,
-    decayCurve: 0.5,
-    sustainLevel: 0.7,
-    releaseTime: 0.3,
-    releaseCurve: 0.5,
-    endLevel: 0,
-    loopMode: LOOP_MODE.NONE,
-    keyScale: 0,
-    ...o,
-  };
+export function makeEnvelope(
+  o: Partial<Envelope> = {},
+  defaults: Envelope = ENVELOPE_DEFAULTS,
+): Envelope {
+  return { ...defaults, ...o };
 }
 
 export function makeOperator(o: PartialOperator = {}): Operator {
   return {
-    wave: WAVE.SINE,
-    userPartials: null,
-    userKey: '',
-    ratio: 1,
-    fixed: false,
-    fixedHz: 100,
-    detune: 0,
-    level: 0,
-    feedback: 0,
-    velSens: 0.4,
-    levelKeyScale: 0,
-    phase: 0,
-    phaseFree: true,
+    ...OPERATOR_DEFAULTS,
     ...o,
     env: makeEnvelope(o.env),
   };
@@ -207,46 +195,23 @@ export function makeOperator(o: PartialOperator = {}): Operator {
 export function makePatch(o: PartialPatch = {}): Patch {
   const ops: Operator[] = [];
   for (let i = 0; i < OPERATOR_COUNT; i++) {
-    ops.push(makeOperator({ level: i === 0 ? 1 : 0, ...(o.ops?.[i] ?? {}) }));
+    const level = i === 0 ? LEAD_OPERATOR_LEVEL : OPERATOR_DEFAULTS.level;
+    ops.push(makeOperator({ level, ...(o.ops?.[i] ?? {}) }));
   }
   return {
-    name: 'untitled',
-    algorithm: 0,
-    volume: 0.8,
-    tone: 1,
-    glide: 0,
-    pitchEnvAmount: 0,
-    pan: 0,
-    panRandom: 0,
-    panKey: 0,
-    spread: 0,
-    mono: false,
+    ...PATCH_DEFAULTS,
     ...o,
     ops,
-    pitchEnv: makeEnvelope({ sustainLevel: 0, decayTime: 0.1, ...(o.pitchEnv ?? {}) }),
+    pitchEnv: makeEnvelope(o.pitchEnv ?? {}, PITCH_ENV_DEFAULTS),
     lfo: {
-      shape: LFO_SHAPE.SINE,
-      rate: 5,
-      amount: 0,
-      delay: 0,
-      retrigger: false,
-      toPitch: 0,
-      modWheelDepth: 1,
-      toOp: [0, 0, 0, 0],
+      ...LFO_DEFAULTS,
+      toOp: new Array<number>(OPERATOR_COUNT).fill(LFO_TO_OP_DEFAULT),
       ...(o.lfo ?? {}),
     },
     filter: {
-      mode: FILTER_MODE.OFF,
-      cutoff: 8000,
-      resonance: 0.707,
-      drive: 1,
-      slope24: false,
-      envAmount: 0,
-      modWheelDepth: 0,
-      lfoAmount: 0,
-      keyTrack: 0,
+      ...FILTER_DEFAULTS,
       ...(o.filter ?? {}),
-      env: makeEnvelope({ sustainLevel: 0, ...(o.filter?.env ?? {}) }),
+      env: makeEnvelope(o.filter?.env ?? {}, FILTER_ENV_DEFAULTS),
     },
   };
 }
