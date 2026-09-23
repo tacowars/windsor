@@ -28,15 +28,9 @@ export const WAVE_NAMES = [
   'User',
 ] as const;
 
-export const LFO_SHAPE = {
-  SINE: 0,
-  TRIANGLE: 1,
-  SAW_UP: 2,
-  SAW_DOWN: 3,
-  SQUARE: 4,
-  SAMPLE_HOLD: 5,
-  DRIFT: 6,
-} as const;
+/** The mode ids live with the worklet that switches on them (`worklet/fm/modeIds.ts`, #669). */
+export { FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
+import { FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
 
 export const LFO_SHAPE_NAMES = [
   'Sine',
@@ -48,10 +42,8 @@ export const LFO_SHAPE_NAMES = [
   'Drift',
 ] as const;
 
-export const FILTER_MODE = { OFF: 0, LOWPASS: 1, HIGHPASS: 2, BANDPASS: 3, NOTCH: 4 } as const;
 export const FILTER_MODE_NAMES = ['Off', 'LP', 'HP', 'BP', 'Notch'] as const;
 
-export const LOOP_MODE = { NONE: 0, LOOP: 1, TRIGGER: 2 } as const;
 export const LOOP_MODE_NAMES = ['None', 'Loop', 'Trigger'] as const;
 
 /** Operators are labelled A B C D, with A nearest the output. */

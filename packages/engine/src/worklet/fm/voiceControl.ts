@@ -15,7 +15,7 @@
 import type { WorkletPatch } from './patchNormalise';
 import type { Voice } from './voice';
 import { ALGORITHMS, ALG_CARRIER_BITS, ALG_DESCENDING, ALG_EDGES } from './algorithms';
-import { FILT_OFF } from './svf';
+import { FILT_OFF } from './modeIds';
 import { KIND_NOISE, KIND_TABLE, mipIndex } from './waveTables';
 
 /**
