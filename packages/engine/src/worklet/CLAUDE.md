@@ -1,5 +1,16 @@
 # The DSP worklets
 
+`retro/` is the original ROM-free vintage reverb insert (#682), built as
+`generated/retro-reverb-processor.js`. `retroReverbProcessor.ts` owns the
+worklet lifecycle/load reports; `retroReverbDsp.ts` owns host/internal-clock
+conversion and mode blending; `retroTank.ts`, `retroReflections.ts`,
+`retroDelay.ts` and `retroFilter.ts` own the two networks and storage/filter
+primitives. Its separate `tsconfig.json` uses the same erased-field settings.
+Tests under `inserts/retroReverb*.test.ts` run the generated processor through
+`__fixtures__/retroReverbHarness.ts`. Settings and original tunables are in
+`inserts/retroReverbSpec.ts` and `retroReverbConstants.ts`; the editable
+approximation bank is `retroReverbPresets.ts` / `retroReverbPresetTables.ts`.
+
 `meter/peakMeterProcessor.ts` is the opt-in stereo sample meter (#666),
 bundled to `generated/peak-meter-processor.js` and checked by its own
 `meter/tsconfig.json`. It samples every quantum on a silent, view-owned tap;
@@ -58,7 +69,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`),
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
    does `scripts/lib/workletBundle.test.mjs`. Three consumers read the
