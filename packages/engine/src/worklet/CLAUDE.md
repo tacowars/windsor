@@ -45,7 +45,8 @@ build output. The map of `fm/` (#644):
 | `lfo.ts` | `Lfo` |
 | `svf.ts` | `Svf`, `softClip` |
 | `prng.ts` | `makeRandom`, `randomSeed32` |
-| `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one |
+| `patchDefaults.ts` | every default a patch may omit, the `tone` and feedback clamp bounds and `OPERATOR_COUNT`, import-free but for the two id modules: `normalisePatch` and the main thread's `makePatch()` both fill from it, and `audioConstants.ts` re-exports `OPERATOR_COUNT` (#670) |
+| `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one, from `patchDefaults.ts` |
 | `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
 | `tsconfig.json` | the folder's own `tsc -p` project (#654): the client's settings with `noUncheckedIndexedAccess` and `useDefineForClassFields` off, and why |
 | `*.test.ts` | direct tests of the leaf modules (#654): a module that warms the wave cache at load needs `sampleRate` on `globalThis` before a dynamic import |
@@ -99,12 +100,14 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change.
-5. **Five modules are read by the main thread too** (#656): `algorithms.ts`,
-   `waveIds.ts`, `envelope.ts`, `fmConstants.ts` and `modeIds.ts` (#669:
-   `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`). `audioConstants.ts` and
+5. **Six modules are read by the main thread too** (#656): `algorithms.ts`,
+   `waveIds.ts`, `envelope.ts`, `fmConstants.ts`, `modeIds.ts` (#669:
+   `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`) and
+   `patchDefaults.ts` (#670: `makePatch()` fills from it, and
+   `patchDefaults.test.ts` pins its fill equal to `normalisePatch`'s). `audioConstants.ts` and
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
    from them, and the console draws envelopes with `segmentLevel`, so there
-   is one table and one curve, and no pin test. The five are listed in the
+   is one table and one curve, and no pin test. The six are listed in the
    client project's `files` and compile under its stricter flags as well:
    an indexed read in one of them takes a `!`, and none of them may touch
    the worklet scope (`sampleRate`) or the wave cache at load. The PRNG stays

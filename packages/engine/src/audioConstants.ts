@@ -295,8 +295,12 @@ export const AUDIO_SCHED_QUANTILE = 0.95;
 
 /* --------------------------- FM algorithms ------------------------------ */
 
-/** Operators per voice — the length of `OP_NAMES` in `patch.ts`. */
-export const OPERATOR_COUNT = 4;
+/**
+ * Operators per voice — the length of `OP_NAMES` in `patch.ts`. It lives with
+ * the patch defaults the worklet fills from (`worklet/fm/patchDefaults.ts`,
+ * #670) and is re-exported here for every main-thread reader.
+ */
+export { OPERATOR_COUNT } from './worklet/fm/patchDefaults';
 
 /**
  * The 11 algorithms and their type live with the worklet that renders them
