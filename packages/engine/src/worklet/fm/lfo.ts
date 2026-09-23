@@ -8,20 +8,13 @@
 
 import type { LfoSettings } from '../../patch/patch';
 import { TABLE_MASK, TABLE_SIZE } from './fmConstants';
+import { LFO_DRIFT, LFO_SAW_DOWN, LFO_SAW_UP, LFO_SH, LFO_SQUARE, LFO_TRI } from './modeIds';
 import { randomSeed32 } from './prng';
 import { SIN_TAB } from './waveTables';
 
 /* ------------------------------------------------------------------ *
  * LFO
  * ------------------------------------------------------------------ */
-
-const LFO_SINE = 0,
-  LFO_TRI = 1,
-  LFO_SAW_UP = 2,
-  LFO_SAW_DOWN = 3,
-  LFO_SQUARE = 4,
-  LFO_SH = 5,
-  LFO_DRIFT = 6;
 
 class Lfo {
   phase: number;
@@ -103,4 +96,4 @@ class Lfo {
   }
 }
 
-export { LFO_SINE, LFO_TRI, LFO_SAW_UP, LFO_SAW_DOWN, LFO_SQUARE, LFO_SH, LFO_DRIFT, Lfo };
+export { Lfo };

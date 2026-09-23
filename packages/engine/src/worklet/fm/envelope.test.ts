@@ -5,8 +5,6 @@ import {
   curveConstant,
   curveShape,
   Envelope,
-  LOOP_NONE,
-  LOOP_TRIGGER,
   ST_ATTACK,
   ST_DECAY,
   ST_DONE,
@@ -16,6 +14,7 @@ import {
   segmentLevel,
 } from './envelope';
 import { MIN_SEG_TIME } from './fmConstants';
+import { LOOP_NONE, LOOP_TRIGGER } from './modeIds';
 
 const SR = 48000;
 /** Times that are exact binary fractions, so a segment ends on the sample it is meant to. */

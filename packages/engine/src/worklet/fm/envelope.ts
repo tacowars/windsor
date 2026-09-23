@@ -9,6 +9,7 @@
 
 import type { Envelope as EnvelopeParams } from '../../patch/patch';
 import { ENVELOPE_CURVE_STEEPNESS, MIN_SEG_TIME } from './fmConstants';
+import { LOOP_LOOP, LOOP_TRIGGER } from './modeIds';
 
 /* ------------------------------------------------------------------ *
  * Envelope
@@ -24,9 +25,6 @@ const ST_IDLE = 0,
   ST_SUSTAIN = 3,
   ST_RELEASE = 4,
   ST_DONE = 5;
-const LOOP_NONE = 0,
-  LOOP_LOOP = 1,
-  LOOP_TRIGGER = 2;
 
 /** Monotonic 0..1 curve. k == 1 is linear, k < 1 bows up, k > 1 bows down. */
 function curveShape(p: number, k: number): number {
@@ -161,9 +159,6 @@ export {
   ST_SUSTAIN,
   ST_RELEASE,
   ST_DONE,
-  LOOP_NONE,
-  LOOP_LOOP,
-  LOOP_TRIGGER,
   curveShape,
   curveConstant,
   segmentLevel,
