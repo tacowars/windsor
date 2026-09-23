@@ -32,7 +32,7 @@ export const REBUILD_COMMAND = 'node scripts/build-worklets.mjs';
  * to `WORKLET_DIR`. A second worklet is a second row; nothing else changes.
  */
 export const WORKLETS = [
-  { name: 'fm', entry: 'fm/fmProcessor.js', output: 'generated/fm-processor.js' },
+  { name: 'fm', entry: 'fm/fmProcessor.ts', output: 'generated/fm-processor.js' },
 ];
 
 /** The directory an agent edits instead of the generated file, relative to `WORKLET_DIR`. */

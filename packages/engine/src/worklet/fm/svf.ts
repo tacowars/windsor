@@ -7,7 +7,7 @@
  * the arithmetic.
  */
 
-import { DORMANT_FILTER_STATE } from './fmConstants.js';
+import { DORMANT_FILTER_STATE } from './fmConstants';
 
 /* ------------------------------------------------------------------ *
  * Filter — TPT / zero-delay-feedback state variable (Simper topology).
@@ -22,6 +22,13 @@ const FILT_OFF = 0,
   FILT_NOTCH = 4;
 
 class Svf {
+  ic1: number;
+  ic2: number;
+  a1: number;
+  a2: number;
+  a3: number;
+  k: number;
+
   constructor() {
     this.ic1 = 0;
     this.ic2 = 0;
@@ -31,18 +38,18 @@ class Svf {
     this.k = 0;
   }
 
-  reset() {
+  reset(): void {
     this.ic1 = 0;
     this.ic2 = 0;
   }
 
   /** Both integrators below the dormancy floor: the filter has stopped ringing (#547). */
-  static quiet(svf) {
+  static quiet(svf: Svf): boolean {
     return Math.abs(svf.ic1) <= DORMANT_FILTER_STATE && Math.abs(svf.ic2) <= DORMANT_FILTER_STATE;
   }
 
   /** Recompute coefficients. Called at control rate, not per sample. */
-  setCoeffs(cutoffHz, q, sampleRate) {
+  setCoeffs(cutoffHz: number, q: number, sampleRate: number): void {
     const nyq = sampleRate * 0.5;
     let fc = cutoffHz;
     if (fc < 20) fc = 20;
@@ -55,7 +62,7 @@ class Svf {
     this.a3 = g * this.a2;
   }
 
-  process(v0, mode) {
+  process(v0: number, mode: number): number {
     const v3 = v0 - this.ic2;
     const v1 = this.a1 * this.ic1 + this.a2 * v3;
     const v2 = this.ic2 + this.a2 * this.ic1 + this.a3 * v3;
@@ -77,7 +84,7 @@ class Svf {
 }
 
 /** Cheap odd-symmetric saturator for filter drive. */
-function softClip(x) {
+function softClip(x: number): number {
   if (x > 3) return 1;
   if (x < -3) return -1;
   return (x * (27 + x * x)) / (27 + 9 * x * x);

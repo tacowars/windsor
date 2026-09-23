@@ -124,7 +124,7 @@ packages/client/src/audio/
   arrangementValidate.ts # PatchResolver: where a song's part presets resolve (#562)
   workletMessages.ts    # main-thread <-> worklet contract
   worklet/              # the DSP (§6.1): generated/ holds the bundles (#643), reverb-processor.js the plate
-    fm/                 # the FM source (#644, #645): fmProcessor.js (entry: the part processor), voice,
+    fm/                 # the FM source, TypeScript in its own project (#644, #645, #654): fmProcessor.ts (entry), voice,
                         #   voiceControl, voiceRender, voiceKernel, fmConstants, waveTables,
                         #   algorithms, envelope, lfo, svf, prng, patchNormalise
   __fixtures__/         # headless worklet harness, Node-only
