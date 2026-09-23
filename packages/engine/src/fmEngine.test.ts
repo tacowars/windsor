@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import { FakeContext, installFakeAudioWorklet } from './__fixtures__/fakeAudioContext';
 import { FmEngine } from './fmEngine';
-import { REVERB_WORKLET_URL, WORKLET_URL } from './workletMessages';
+import { COMPRESSOR_WORKLET_URL, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessages';
 
 const restore = installFakeAudioWorklet();
 afterAll(() => restore());
@@ -21,7 +21,11 @@ describe('FmEngine.init', () => {
     await engine.init();
 
     expect(engine.isReady).toBe(true);
-    expect(context.modules).toEqual([String(WORKLET_URL), String(REVERB_WORKLET_URL)]);
+    expect(context.modules).toEqual([
+      String(WORKLET_URL),
+      String(REVERB_WORKLET_URL),
+      String(COMPRESSOR_WORKLET_URL),
+    ]);
   });
 
   it('loads each module once, however often init is awaited', async () => {
@@ -29,17 +33,25 @@ describe('FmEngine.init', () => {
     const engine = new FmEngine(context.asAudioContext());
     await engine.init();
     await engine.init();
-    expect(context.modules).toHaveLength(2);
+    expect(context.modules).toHaveLength(3);
   });
 
   it('takes override URLs, together or one at a time', async () => {
     const both = new FakeContext();
-    await new FmEngine(both.asAudioContext()).init({ fmUrl: 'blob:fm', reverbUrl: 'blob:reverb' });
-    expect(both.modules).toEqual(['blob:fm', 'blob:reverb']);
+    await new FmEngine(both.asAudioContext()).init({
+      fmUrl: 'blob:fm',
+      reverbUrl: 'blob:reverb',
+      compressorUrl: 'blob:compressor',
+    });
+    expect(both.modules).toEqual(['blob:fm', 'blob:reverb', 'blob:compressor']);
 
     const one = new FakeContext();
     await new FmEngine(one.asAudioContext()).init({ reverbUrl: new URL('blob:reverb') });
-    expect(one.modules).toEqual([String(WORKLET_URL), 'blob:reverb']);
+    expect(one.modules).toEqual([
+      String(WORKLET_URL),
+      'blob:reverb',
+      String(COMPRESSOR_WORKLET_URL),
+    ]);
   });
 
   it('refuses a part before init, but builds a native-only bus without it', () => {

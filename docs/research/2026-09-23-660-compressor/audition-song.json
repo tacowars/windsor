@@ -1,0 +1,232 @@
+{
+  "version": 2,
+  "seed": 0,
+  "bpm": 120,
+  "key": {
+    "root": 48,
+    "scale": [
+      0
+    ],
+    "weights": [
+      1
+    ]
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Compressor audition",
+      "preset": "test",
+      "velocity": 0.8,
+      "strip": {
+        "level": 1,
+        "pan": 0,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": [
+          {
+            "kind": "compressor",
+            "threshold": -30,
+            "makeup": 0,
+            "attack": 0.3,
+            "ratio": 10,
+            "release": 0.4,
+            "highpass": 0,
+            "range": 60,
+            "mix": 1,
+            "enabled": false
+          }
+        ]
+      },
+      "sequencer": {
+        "kind": "none"
+      }
+    }
+  ],
+  "patches": {
+    "test": {
+      "name": "test",
+      "algorithm": 0,
+      "volume": 0.8,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 0,
+      "pan": 0,
+      "panRandom": 0,
+      "panKey": 0,
+      "spread": 0,
+      "mono": false,
+      "ops": [
+        {
+          "wave": 0,
+          "userPartials": null,
+          "userKey": "",
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 1,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.002,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.4,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.7,
+            "releaseTime": 0.3,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "userKey": "",
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.002,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.4,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.7,
+            "releaseTime": 0.3,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "userKey": "",
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.002,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.4,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.7,
+            "releaseTime": 0.3,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "userKey": "",
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.002,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.4,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.7,
+            "releaseTime": 0.3,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        }
+      ],
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0.002,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.1,
+        "decayCurve": 0.5,
+        "sustainLevel": 0,
+        "releaseTime": 0.3,
+        "releaseCurve": 0.5,
+        "endLevel": 0,
+        "loopMode": 0,
+        "keyScale": 0
+      },
+      "lfo": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "toPitch": 0,
+        "modWheelDepth": 1,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "filter": {
+        "mode": 0,
+        "cutoff": 8000,
+        "resonance": 0.707,
+        "drive": 1,
+        "slope24": false,
+        "envAmount": 0,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "keyTrack": 0,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.002,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.4,
+          "decayCurve": 0.5,
+          "sustainLevel": 0,
+          "releaseTime": 0.3,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      }
+    }
+  }
+}

@@ -268,3 +268,13 @@ export {
   CHORD_VOICING_NOTES_MAX,
   SLIDE_SECONDS_DEFAULT,
 } from './audioConstants';
+
+export { DEFAULT_COMPRESSOR } from './inserts/compressorInsert';
+export type { CompressorSpec } from './inserts/compressorInsert';
+export {
+  COMPRESSOR_ATTACKS,
+  COMPRESSOR_RELEASES,
+  COMPRESSOR_RATIOS,
+  COMPRESSOR_BOUNDS,
+  COMPRESSOR_DSP,
+} from './inserts/compressorConstants';

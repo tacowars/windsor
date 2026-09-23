@@ -65,7 +65,7 @@ which is what makes saw and square usable as FM operators at all.
 
 ### Division of labour
 
-**Two worklets are ours; everything else is native Web Audio nodes**, which execute in the
+**FM, plate reverb and the compressor insert use our worklets; other effects use native Web Audio nodes**, which execute in the
 browser's own audio thread and cost nothing from the JS main-thread budget that
 [tech-demo-proposal.md](tech-demo-proposal.md) §1 identifies as the project's primary
 risk. This section first said "only the FM runs in the AudioWorklet";
@@ -77,7 +77,8 @@ in a second worklet of its own:
 |---|---|
 | FM voices, per-voice filter, envelopes, LFO | AudioWorklet (ours): `worklet/fm/`, bundled to `worklet/generated/fm-processor.js` (#643) |
 | Reverb | AudioWorklet (ours): `worklet/reverb-processor.js`, a Dattorro plate. **No `ConvolverNode`** — it was removed, not left beside it |
-| Bus tone shaping, delay, distortion, compression | `BiquadFilterNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
+| Glue-inspired part compressor (#660) | AudioWorklet: `worklet/compressor/`, bundled into `generated/compressor-processor.js`; feedback behavioral approximation, detector input reserved for future routing |
+| Bus tone shaping, delay, distortion, master safety compression | `BiquadFilterNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
 | 3D positioning | Babylon's spatial audio, over `PannerNode` |
 
 **One worklet node per timbral *part*, never per voice.** Each node carries fixed
