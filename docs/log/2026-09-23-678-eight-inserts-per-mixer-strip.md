@@ -4,9 +4,8 @@ Ticket #678 follows tacowars's report that a chorus plus compressor disables Add
 insert. The two-stage cap from #641 was a bounded-allocation policy; the
 chain and shared track/master editor already accept longer lists.
 
-Raise the shared `MAX_INSERTS` to eight. Eight is the implementation choice
-proposed to tacowars, retaining a finite per-strip allocation cap while allowing
-longer chains. There is no change to DSP, routing, ordering or sidechains.
+Raise the shared `MAX_INSERTS` to eight, as tacowars explicitly confirmed. This
+retains a finite per-strip allocation cap while allowing longer chains. There is no change to DSP, routing, ordering or sidechains.
 The same value controls the picker, document normalisation and live apply;
 a ninth valid insert is still dropped and reported. Existing shorter songs
 remain unchanged. The master shares this policy, amending #666's two-insert
