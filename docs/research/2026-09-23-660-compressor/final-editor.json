@@ -1,15 +1,15 @@
 {
-  "sourceSha256": "ac520fcf7f585540565d9d97173254e72020f454f4dbbb8c9a2b71ba38845b13",
+  "sourceSha256": "39e0eeb26f4e0e39ff1fddf7742569f7032cee0e186a5f53533d996b60ad0171",
   "machine": {
     "cpu": "Apple M1",
     "os": "darwin 25.5.0",
     "browser": "153.0.8010.53",
     "backend": "Chrome AudioWorklet, headless",
-    "commit": "445dd322cd11583defba6ca6ab31151215991759"
+    "commit": "5cc65bad5e09ae7498968ceb9b3ae511b5974ecb"
   },
   "active": {
-    "value": 22.6856651290622,
-    "label": "GR 22.7 dB",
+    "value": 22.184285302799335,
+    "label": "GR 22.2 dB",
     "params": {
       "makeup": 0,
       "enabled": 1,

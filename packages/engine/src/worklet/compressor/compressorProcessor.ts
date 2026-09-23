@@ -3,7 +3,10 @@
  * two stereo inputs, AudioParams, shutdown and opt-in telemetry. The render
  * loop allocates nothing; report objects are reused and posts are throttled.
  */
+/* eslint-disable no-magic-numbers -- DSP adapter: binary controls, stereo indices and milliseconds per second; tunables live in compressorConstants.ts */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate */
+import type { CompressorParams } from '../../inserts/compressorDsp';
+import type { LoadReportMessage, ReportLoadMessage } from '../../workletMessages';
 import { CompressorDsp } from '../../inserts/compressorDsp';
 import {
   COMPRESSOR_NAME,
@@ -12,24 +15,36 @@ import {
   COMPRESSOR_DSP,
 } from '../../inserts/compressorConstants';
 
+type ControlMessage = { type: 'stop' } | ReportLoadMessage | { type: 'meter'; enabled: boolean };
+
 class CompressorProcessor extends AudioWorkletProcessor {
-  static get parameterDescriptors() {
+  dsp: CompressorDsp;
+  running: boolean;
+  meter: boolean;
+  frames: number;
+  peak: number;
+  meterReport: { type: 'reduction'; db: number };
+  loadQuanta: number;
+  load: LoadReportMessage;
+  wallStart: number;
+
+  static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
       ...Object.entries(COMPRESSOR_BOUNDS).map(([name, [minValue, maxValue]]) => ({
         name,
         minValue,
         maxValue,
-        defaultValue: COMPRESSOR_DEFAULTS[name],
-        automationRate: 'k-rate',
+        defaultValue: COMPRESSOR_DEFAULTS[name as keyof typeof COMPRESSOR_BOUNDS],
+        automationRate: 'k-rate' as const,
       })),
       { name: 'enabled', minValue: 0, maxValue: 1, defaultValue: 1, automationRate: 'k-rate' },
       { name: 'external', minValue: 0, maxValue: 1, defaultValue: 0, automationRate: 'k-rate' },
     ];
   }
 
-  constructor(options) {
+  constructor(options: AudioWorkletNodeOptions) {
     super();
-    const params = {};
+    const params: CompressorParams = {};
     for (const [name, value] of Object.entries(COMPRESSOR_DEFAULTS)) {
       params[name] = new Float32Array([Number(options.parameterData?.[name] ?? value)]);
     }
@@ -42,7 +57,7 @@ class CompressorProcessor extends AudioWorkletProcessor {
     this.loadQuanta = 0;
     this.load = { type: 'load', busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
     this.wallStart = 0;
-    this.port.onmessage = ({ data }) => {
+    this.port.onmessage = ({ data }: MessageEvent<ControlMessage>) => {
       if (data.type === 'stop') this.running = false;
       if (data.type === 'meter') {
         this.meter = data.enabled;
@@ -57,7 +72,7 @@ class CompressorProcessor extends AudioWorkletProcessor {
     };
   }
 
-  process(inputs, outputs, params) {
+  process(inputs: Float32Array[][], outputs: Float32Array[][], params: CompressorParams): boolean {
     if (!this.running) return false;
     const start = this.loadQuanta ? Date.now() : 0;
     const out = outputs[0];
@@ -79,7 +94,7 @@ class CompressorProcessor extends AudioWorkletProcessor {
     return true;
   }
 
-  report(params, frames, start) {
+  report(params: CompressorParams, frames: number, start: number): void {
     if (this.meter) {
       this.frames += frames;
       if (this.frames >= sampleRate / COMPRESSOR_DSP.meterHz) {

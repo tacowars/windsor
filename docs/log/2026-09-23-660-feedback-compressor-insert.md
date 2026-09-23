@@ -43,6 +43,16 @@ with the final sonic verdict reserved for an audition against Cytomic The Glue.
    would establish this criterion. The separate Web Audio reading is development
    evidence only; target-machine performance remains unmeasured.
 
+8. After the concurrent TypeScript and shared-module refactors (#663, #664),
+   the branch is rebased onto `9efd67aa`. The adapter is TypeScript in its own
+   `tsc -p` project, reusing the existing worklet global declarations. Declared
+   fields erase (`useDefineForClassFields: false`); the emitted compressor code
+   is identical to the JS adapter after removing source comments (SHA-256:
+   `4ad45a84b3433fdd350f2e18e47f30551e9d893dc55c8e4aef7cd7a726fa2457`).
+   The core remains checked under the main thread's stricter flags too. The
+   existing FM shared tables and envelope are retained, and both generated
+   bundles and the standalone editor are rebuilt from their current sources.
+
 References: [Cytomic's technical description](https://cytomic.com/product/glue/),
 [The Glue manual](https://cytomic.com/files/TheGlue-Manual.pdf), and
 [Web Audio compressor limitations](https://www.w3.org/TR/webaudio-1.1/#DynamicsCompressorNode).
