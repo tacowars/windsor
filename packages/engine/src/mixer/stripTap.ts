@@ -1,10 +1,10 @@
 /**
+ * The tap: where a channel strip's chain meets the mix (#639, #652, #667).
  * The head also feeds external detectors, before the audible gate.
- * The tap: where a channel strip's chain meets the mix (#639, #652).
  *
  *   tail ─▶ head ─▶ audible ─┬─ [rotate θ] ─▶ dry destination
- *                 ├─ send ─▶ return "room"
- *                 └─ send ─▶ return "echo"
+ *                           ├─ send ─▶ return "room"
+ *                           └─ send ─▶ return "echo"
  *
  * One gain at the head, so a structural insert edit can fade the strip down,
  * re-wire and fade back up without a click, and so moving the tail is one
