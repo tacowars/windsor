@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the curve's exponent scale and the state ids are the envelope's shape, not tunables; the tunables are fmConstants.ts (#654) */
 /**
  * The envelope (#644): Init -> attack -> Peak -> decay -> Sustain -> held ->
  * release -> End, a curve per segment, three loop modes, advanced at control
@@ -7,7 +8,8 @@
  * shares the function. `patchLibraryEnvelope.test.ts` pins release completion.
  */
 
-import { MIN_SEG_TIME } from './fmConstants.js';
+import type { Envelope as EnvelopeParams } from '../../patch';
+import { MIN_SEG_TIME } from './fmConstants';
 
 /* ------------------------------------------------------------------ *
  * Envelope
@@ -28,11 +30,19 @@ const LOOP_NONE = 0,
   LOOP_TRIGGER = 2;
 
 /** Monotonic 0..1 curve. k == 1 is linear, k < 1 bows up, k > 1 bows down. */
-function curveShape(p, k) {
+function curveShape(p: number, k: number): number {
   return p / (p + (1 - p) * k);
 }
 
 class Envelope {
+  state: number;
+  value: number;
+  phase: number;
+  segStart: number;
+  p: EnvelopeParams | null;
+  sr: number;
+  timeScale: number;
+
   constructor() {
     this.state = ST_IDLE;
     this.value = 0;
@@ -43,42 +53,42 @@ class Envelope {
     this.timeScale = 1; // key tracking: >1 slower, <1 faster
   }
 
-  configure(params, sampleRate) {
+  configure(params: EnvelopeParams, sampleRate: number): void {
     this.p = params;
     this.sr = sampleRate;
   }
 
-  noteOn() {
-    const p = this.p;
+  noteOn(): void {
+    const p = this.p!;
     this.state = ST_ATTACK;
     this.phase = 0;
     this.value = p.initLevel;
     this.segStart = p.initLevel;
   }
 
-  noteOff() {
+  noteOff(): void {
     if (this.state === ST_DONE || this.state === ST_IDLE) return;
-    if (this.p.loopMode === LOOP_TRIGGER) return; // runs its full course
+    if (this.p!.loopMode === LOOP_TRIGGER) return; // runs its full course
     this.state = ST_RELEASE;
     this.phase = 0;
     this.segStart = this.value;
   }
 
   /** True once the envelope has finished releasing. */
-  get finished() {
+  get finished(): boolean {
     return this.state === ST_DONE || this.state === ST_IDLE;
   }
 
   /** Advance by `n` samples and return the new value. */
-  advance(n) {
-    const p = this.p;
+  advance(n: number): number {
+    const p = this.p!;
     if (this.state === ST_IDLE || this.state === ST_DONE) return this.value;
     if (this.state === ST_SUSTAIN) {
       this.value = p.sustainLevel;
       return this.value;
     }
 
-    let time, target, curve;
+    let time: number, target: number, curve: number;
     switch (this.state) {
       case ST_ATTACK:
         time = p.attackTime;

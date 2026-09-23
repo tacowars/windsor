@@ -28,7 +28,7 @@ describe('the esbuild options', () => {
   const options = bundleOptions(fm, '/w');
 
   it('bundle into one module and transform nothing else', () => {
-    expect(options.entryPoints).toEqual(['/w/fm/fmProcessor.js']);
+    expect(options.entryPoints).toEqual(['/w/fm/fmProcessor.ts']);
     expect(options.bundle).toBe(true);
     expect(options.format).toBe('esm');
     expect(options.target).toBe('esnext');

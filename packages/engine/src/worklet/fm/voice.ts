@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history and amplitude ramps, six envelopes, an LFO, two filter stages, the
@@ -11,16 +12,18 @@
  * `fmProcessor.test.ts` the stealing order.
  */
 
-import { ALGORITHMS, ALG_ORDER } from './algorithms.js';
-import { Envelope, ST_IDLE, ST_SUSTAIN } from './envelope.js';
-import { DORMANT_AMP } from './fmConstants.js';
-import { Lfo } from './lfo.js';
-import { randomSeed32 } from './prng.js';
-import { FILT_OFF, Svf } from './svf.js';
-import { bindVoiceConstants, updateVoiceControl } from './voiceControl.js';
-import { renderVoiceKernel } from './voiceKernel.js';
-import { renderVoiceGeneric } from './voiceRender.js';
-import { waveKind } from './waveTables.js';
+import type { Algorithm } from './algorithms';
+import type { WorkletPatch } from './patchNormalise';
+import { ALGORITHMS, ALG_ORDER } from './algorithms';
+import { Envelope, ST_IDLE, ST_SUSTAIN } from './envelope';
+import { DORMANT_AMP } from './fmConstants';
+import { Lfo } from './lfo';
+import { randomSeed32 } from './prng';
+import { FILT_OFF, Svf } from './svf';
+import { bindVoiceConstants, updateVoiceControl } from './voiceControl';
+import { renderVoiceKernel } from './voiceKernel';
+import { renderVoiceGeneric } from './voiceRender';
+import { waveKind } from './waveTables';
 
 /* ------------------------------------------------------------------ *
  * Voice — four operators, a filter, and the modulation that feeds them.
@@ -30,7 +33,52 @@ import { waveKind } from './waveTables.js';
  * ------------------------------------------------------------------ */
 
 class Voice {
-  constructor(sampleRate, random) {
+  sr: number;
+  random: () => number;
+  phase: Float64Array;
+  phaseInc: Float64Array;
+  out: Float32Array;
+  fb1: Float32Array;
+  fb2: Float32Array;
+  amp: Float32Array;
+  ampInc: Float32Array;
+  kind: Int32Array;
+  tables: (Float32Array | null)[];
+  mips: (Float32Array[] | null)[];
+  ampEnv: Envelope[];
+  filtEnv: Envelope;
+  pitchEnv: Envelope;
+  lfo: Lfo;
+  svfA: Svf;
+  svfB: Svf;
+  noiseSeed: number;
+  active: boolean;
+  gate: boolean;
+  fade: number;
+  fadeInc: number;
+  note: number;
+  velocity: number;
+  age: number;
+  voiceId: number;
+  detune: number;
+  panL: number;
+  panR: number;
+  pitchCur: number;
+  pitchTarget: number;
+  mod: number;
+  glideSeconds: number;
+  ctrlCount: number;
+  patch: WorkletPatch | null;
+  alg: Algorithm;
+  order: number[];
+  specialise: boolean;
+  kernel: boolean;
+  edges: number;
+  carrierBits: number;
+  detuneMul: Float64Array;
+  levelKeyAmp: Float64Array;
+
+  constructor(sampleRate: number, random: () => number) {
     this.sr = sampleRate;
     this.random = random; // the processor's one source; see "Randomness" above
 
@@ -92,11 +140,11 @@ class Voice {
   }
 
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */
-  bindConstants(patch) {
+  bindConstants(patch: WorkletPatch): void {
     bindVoiceConstants(this, patch);
   }
 
-  noise() {
+  noise(): number {
     let x = this.noiseSeed;
     x ^= x << 13;
     x >>>= 0;
@@ -113,7 +161,16 @@ class Voice {
   // all primitives written straight into preallocated fields, so there is no
   // cohesive sub-object to extract.
   // eslint-disable-next-line max-params -- allocation-free note-on, see above
-  start(patch, waveSets, note, velocity, detune, pan, glideFrom, voiceId) {
+  start(
+    patch: WorkletPatch,
+    waveSets: (Float32Array[] | null)[],
+    note: number,
+    velocity: number,
+    detune: number,
+    pan: number,
+    glideFrom: number | null,
+    voiceId: number,
+  ): void {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
@@ -151,7 +208,7 @@ class Voice {
 
       this.kind[i] = waveKind(op.wave);
       this.mips[i] = waveSets[i];
-      this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
+      this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
 
       this.ampEnv[i].configure(op.env, this.sr);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
@@ -180,7 +237,7 @@ class Voice {
    * audibly -- acceptable while designing a sound, which is why the game never
    * sends `liveRetune` and keeps the click-free note-on binding.
    */
-  rebind(patch, waveSets) {
+  rebind(patch: WorkletPatch, waveSets: (Float32Array[] | null)[]): void {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
@@ -189,7 +246,7 @@ class Voice {
       const op = patch.ops[i];
       this.kind[i] = waveKind(op.wave);
       this.mips[i] = waveSets[i];
-      this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
+      this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
       // configure() swaps the parameter block and leaves the stage and value alone.
       this.ampEnv[i].configure(op.env, this.sr);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
@@ -206,8 +263,8 @@ class Voice {
    * filter state carry on, so nothing retriggers. The constants that depend on
    * the key offset are recomputed for the new note, as `rebind` does.
    */
-  retarget(note, velocity, mod, glideSeconds) {
-    const patch = this.patch;
+  retarget(note: number, velocity: number, mod: number, glideSeconds: number): void {
+    const patch = this.patch!;
     this.note = note;
     this.pitchTarget = note;
     this.velocity = velocity;
@@ -221,7 +278,7 @@ class Voice {
     this.bindConstants(patch);
   }
 
-  release() {
+  release(): void {
     if (!this.active) return;
     this.gate = false;
     for (let i = 0; i < 4; i++) this.ampEnv[i].noteOff();
@@ -230,7 +287,7 @@ class Voice {
   }
 
   /** Immediate stop. Clicks — reserved for panic and for last-resort stealing. */
-  kill() {
+  kill(): void {
     this.active = false;
     this.gate = false;
     this.fade = 1;
@@ -249,7 +306,7 @@ class Voice {
   }
 
   /** Graceful stealing: fade out over ~4 ms, then free the slot. */
-  steal() {
+  steal(): void {
     if (!this.active) return;
     this.gate = false;
     this.fadeInc = -1 / (0.004 * this.sr);
@@ -267,28 +324,28 @@ class Voice {
    * from its frozen state with the ordinary amplitude ramp up from ~0.
    * Allocates nothing.
    */
-  get dormant() {
+  get dormant(): boolean {
     if (!this.gate || this.fadeInc !== 0) return false;
     const carriers = this.alg.carriers;
     for (let c = 0; c < carriers.length; c++) {
       const i = carriers[c];
       const env = this.ampEnv[i];
-      if (env.state !== ST_SUSTAIN || env.p.sustainLevel !== 0) return false;
-      if (env.p.endLevel !== 0) return false;
+      if (env.state !== ST_SUSTAIN || env.p!.sustainLevel !== 0) return false;
+      if (env.p!.endLevel !== 0) return false;
       if (Math.abs(this.amp[i]) > DORMANT_AMP) return false;
     }
-    const f = this.patch.filter;
+    const f = this.patch!.filter;
     if (f.mode === FILT_OFF) return true;
     if (!Svf.quiet(this.svfA)) return false;
     return !f.slope24 || Svf.quiet(this.svfB);
   }
 
   /** A voice that is fading out is no longer available, but still sounding. */
-  get fading() {
+  get fading(): boolean {
     return this.fadeInc !== 0;
   }
 
-  get finished() {
+  get finished(): boolean {
     const carriers = this.alg.carriers;
     for (let i = 0; i < carriers.length; i++) {
       if (!this.ampEnv[carriers[i]].finished) return false;
@@ -297,7 +354,7 @@ class Voice {
   }
 
   /** Control-rate update, `voiceControl.js`: envelopes, LFO, glide, ramps, filter coefficients. */
-  updateControl(n, bend, wheel, cutoffMod) {
+  updateControl(n: number, bend: number, wheel: number, cutoffMod: number): void {
     updateVoiceControl(this, n, bend, wheel, cutoffMod);
   }
 
@@ -307,7 +364,7 @@ class Voice {
    * exactly, else the generic loop (`voiceRender.js`). Both are the same
    * arithmetic in the same order; #548 says why the bits agree.
    */
-  render(outL, outR, off, n) {
+  render(outL: Float32Array, outR: Float32Array, off: number, n: number): void {
     if (this.kernel) renderVoiceKernel(this, outL, outR, off, n);
     else renderVoiceGeneric(this, outL, outR, off, n);
   }

@@ -10,7 +10,7 @@
  * and the golden test pin the tables' contents.
  */
 
-import { MIP_BASE_HZ, MIP_COUNT, TABLE_MASK, TABLE_SIZE } from './fmConstants.js';
+import { MIP_BASE_HZ, MIP_COUNT, TABLE_MASK, TABLE_SIZE } from './fmConstants';
 
 /* Waveform ids — keep in sync with ../src/patch.js */
 const WAVE = {
@@ -42,7 +42,7 @@ for (let i = 0; i < TABLE_SIZE; i++) {
 }
 
 /** Harmonic amplitude arrays. Index 0 is the fundamental. */
-function partialsFor(waveId, userPartials) {
+function partialsFor(waveId: number, userPartials: number[] | null): Float32Array {
   const N = TABLE_SIZE >> 1;
   const a = new Float32Array(N);
   switch (waveId) {
@@ -73,10 +73,10 @@ function partialsFor(waveId, userPartials) {
  * Build MIP_COUNT bandlimited tables. Each has one guard sample at the end so
  * linear interpolation never wraps-checks in the inner loop.
  */
-function buildMips(partials, sampleRate, tone) {
+function buildMips(partials: Float32Array, sampleRate: number, tone: number): Float32Array[] {
   const nyquist = sampleRate * 0.5;
   const maxPossible = TABLE_SIZE >> 1;
-  const mips = new Array(MIP_COUNT);
+  const mips: Float32Array[] = new Array(MIP_COUNT);
 
   for (let k = 0; k < MIP_COUNT; k++) {
     const topHz = MIP_BASE_HZ * Math.pow(2, k + 1);
@@ -111,7 +111,7 @@ function buildMips(partials, sampleRate, tone) {
 }
 
 /** Quantise a mip set in place to `levels` steps — the 4-bit / 8-bit sines. */
-function quantiseMips(mips, levels) {
+function quantiseMips(mips: Float32Array[], levels: number): Float32Array[] {
   for (let k = 0; k < mips.length; k++) {
     const t = mips[k];
     for (let i = 0; i <= TABLE_SIZE; i++) {
@@ -132,10 +132,15 @@ function quantiseMips(mips, levels) {
  * so the scoring bank's User presets render exactly as before. Only a `patch`
  * message reaches here, never the audio loop, so the string is fine.
  */
-const WAVE_CACHE = new Map();
+const WAVE_CACHE = new Map<string, Float32Array[]>();
 const WAVE_CACHE_LIMIT = 64;
 
-function getMips(waveId, sampleRate, tone, userPartials) {
+function getMips(
+  waveId: number,
+  sampleRate: number,
+  tone: number,
+  userPartials: number[] | null,
+): Float32Array[] {
   const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
   // null plays a sine and [] plays silence: the two must never share a key.
   let content = '';
@@ -149,14 +154,14 @@ function getMips(waveId, sampleRate, tone, userPartials) {
   else if (waveId === WAVE.SINE_8BIT) quantiseMips(mips, 128);
 
   if (WAVE_CACHE.size >= WAVE_CACHE_LIMIT) {
-    WAVE_CACHE.delete(WAVE_CACHE.keys().next().value);
+    WAVE_CACHE.delete(WAVE_CACHE.keys().next().value!);
   }
   WAVE_CACHE.set(key, mips);
   return mips;
 }
 
 /** Which octave table to read for a given frequency. */
-function mipIndex(freq) {
+function mipIndex(freq: number): number {
   if (freq <= MIP_BASE_HZ) return 0;
   const k = Math.floor(Math.log2(freq / MIP_BASE_HZ));
   return k < 0 ? 0 : k >= MIP_COUNT ? MIP_COUNT - 1 : k;
@@ -168,7 +173,7 @@ const KIND_TABLE = 0,
   KIND_SQUARE_D = 3;
 
 /** The render kind an operator's wave id selects; everything not raw or noise is a table. */
-function waveKind(wave) {
+function waveKind(wave: number): number {
   switch (wave) {
     case WAVE.NOISE:
       return KIND_NOISE;
@@ -185,7 +190,7 @@ function waveKind(wave) {
  * addModule(), before the context renders anything, so the table build never
  * stalls a live audio callback. */
 for (const w of [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE]) {
-  getMips(w, sampleRate, 1, null, '');
+  getMips(w, sampleRate, 1, null);
 }
 
 export {

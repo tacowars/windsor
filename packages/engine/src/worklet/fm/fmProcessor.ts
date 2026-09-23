@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the parameter ranges, the reserve of four voices, the pan spread and the 128-frame budget are the part's contract; the tunables are fmConstants.ts (#654) */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate, currentFrame */
 /**
  * fmProcessor.js -- the FM part processor, the entry that
@@ -19,18 +20,55 @@
  * tables are mirrored in ../../patch.ts (`patch.test.ts`, until #656).
  */
 
-import { CTRL_INTERVAL } from './fmConstants.js';
-import { normalisePatch, num } from './patchNormalise.js';
-import { makeRandom } from './prng.js';
-import { Voice } from './voice.js';
-import { WAVE, getMips } from './waveTables.js';
+import type {
+  NoteOffMessage,
+  NoteOnMessage,
+  ProcessorOptions,
+  ScheduledMessage,
+  WorkletMessage,
+} from '../../workletMessages';
+import type { WorkletPatch } from './patchNormalise';
+import { CTRL_INTERVAL } from './fmConstants';
+import { normalisePatch, num } from './patchNormalise';
+import { makeRandom } from './prng';
+import { Voice } from './voice';
+import { WAVE, getMips } from './waveTables';
+
+/** `processorOptions` as the part reads them: the contract's, plus the two harness-only switches (#547, #548). */
+interface FmProcessorOptions extends Partial<ProcessorOptions> {
+  dormancy?: boolean;
+  specialise?: boolean;
+}
+
+/** A scheduled message once queued: frame-stamped. A note-off from an older sender may carry `note` instead of `id`. */
+type QueuedEvent = (NoteOnMessage | (NoteOffMessage & { note?: number })) & { _frame: number };
 
 /* ------------------------------------------------------------------ *
  * The processor — one timbral part
  * ------------------------------------------------------------------ */
 
 class FmPartProcessor extends AudioWorkletProcessor {
-  static get parameterDescriptors() {
+  maxVoices: number;
+  random: () => number;
+  voices: Voice[];
+  patch: WorkletPatch;
+  waveSets: (Float32Array[] | null)[];
+  events: QueuedEvent[];
+  noteMap: Map<number, Voice[]>;
+  lastNote: number | null;
+  running: boolean;
+  liveRetune: boolean;
+  slideSeconds: number;
+  dormancy: boolean;
+  loadQuanta: number;
+  loadCount: number;
+  loadBusyMs: number;
+  loadPeakMs: number;
+  loadUnderruns: number;
+  loadWallStart: number;
+  loadBudgetMs: number;
+
+  static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
       { name: 'pitchBend', defaultValue: 0, minValue: -48, maxValue: 48, automationRate: 'k-rate' },
       { name: 'modWheel', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
@@ -39,9 +77,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
     ];
   }
 
-  constructor(options) {
+  constructor(options: AudioWorkletNodeOptions) {
     super();
-    const opts = (options && options.processorOptions) || {};
+    const opts: FmProcessorOptions = (options && options.processorOptions) || {};
     const maxVoices = Math.max(1, Math.min(128, opts.maxVoices || 16));
     this.maxVoices = maxVoices;
 
@@ -97,10 +135,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
       for (const ev of opts.events) this.schedule(ev, ev.frame);
     }
 
-    this.port.onmessage = (e) => this.onMessage(e.data);
+    this.port.onmessage = (e: MessageEvent<WorkletMessage>) => this.onMessage(e.data);
   }
 
-  rebuildWaves() {
+  rebuildWaves(): void {
     const p = this.patch;
     for (let i = 0; i < 4; i++) {
       const op = p.ops[i];
@@ -112,7 +150,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     }
   }
 
-  onMessage(msg) {
+  onMessage(msg: WorkletMessage): void {
     switch (msg.type) {
       case 'patch': {
         this.patch = normalisePatch(msg.patch);
@@ -168,7 +206,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
    * boundaries that fell inside the render, which is what makes this a
    * sampler rather than a timer. Allocates only at the post.
    */
-  sampleLoad(t0, t1) {
+  sampleLoad(t0: number, t1: number): void {
     const spanMs = t1 - t0;
     this.loadBusyMs += spanMs;
     if (spanMs > this.loadPeakMs) this.loadPeakMs = spanMs;
@@ -193,13 +231,14 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.loadWallStart = t1;
   }
 
-  schedule(ev, frame) {
-    ev._frame = typeof frame === 'number' ? frame : currentFrame;
+  schedule(ev: ScheduledMessage, frame: number | undefined): void {
+    const queued = ev as QueuedEvent;
+    queued._frame = typeof frame === 'number' ? frame : currentFrame;
     // Insertion sort from the back: events usually arrive in order.
     const q = this.events;
     let i = q.length;
-    while (i > 0 && q[i - 1]._frame > ev._frame) i--;
-    q.splice(i, 0, ev);
+    while (i > 0 && q[i - 1]._frame > queued._frame) i--;
+    q.splice(i, 0, queued);
   }
 
   /**
@@ -214,15 +253,15 @@ class FmPartProcessor extends AudioWorkletProcessor {
    * otherwise oldest. A dormant voice counts as sounding, so the pool never
    * holds more than the limit.
    */
-  allocate() {
+  allocate(): Voice {
     const vs = this.voices;
-    let free = null;
+    let free: Voice | null = null;
     let sounding = 0;
-    let bestDormant = null,
+    let bestDormant: Voice | null = null,
       bestDormantAge = -1;
-    let bestReleased = null,
+    let bestReleased: Voice | null = null,
       bestReleasedAge = -1;
-    let bestAny = null,
+    let bestAny: Voice | null = null,
       bestAnyAge = -1;
 
     for (let i = 0; i < vs.length; i++) {
@@ -275,7 +314,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
    * already free, so a later noteOff for a cut note finds nothing and cannot
    * release the note that replaced it. Allocates nothing.
    */
-  cutSounding() {
+  cutSounding(): void {
     const vs = this.voices;
     for (let i = 0; i < vs.length; i++) {
       const v = vs[i];
@@ -284,7 +323,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.noteMap.clear();
   }
 
-  noteOn(msg) {
+  noteOn(msg: NoteOnMessage): void {
     const p = this.patch;
     const id = msg.id != null ? msg.id : msg.note;
     const vel = num(msg.velocity, 1);
@@ -300,7 +339,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     if (msg.slide && p.mono && this.slideTo(id, msg.note, vel, mod)) return;
     if (p.mono) this.cutSounding();
 
-    let list = this.noteMap.get(id);
+    let list: Voice[] | undefined = this.noteMap.get(id);
     if (list) this.noteOffId(id);
     list = [];
 
@@ -324,9 +363,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
    * False when nothing is sounding: the caller starts a fresh voice instead.
    * Allocates nothing beyond the map's own bookkeeping, as `noteOn` does.
    */
-  slideTo(id, note, velocity, mod) {
+  slideTo(id: number, note: number, velocity: number, mod: number): boolean {
     const vs = this.voices;
-    let heldId = null;
+    let heldId: number | null = null;
     for (let i = 0; i < vs.length; i++) {
       const v = vs[i];
       if (v.active && v.gate && !v.fading) {
@@ -351,7 +390,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     return true;
   }
 
-  noteOffId(id) {
+  noteOffId(id: number): void {
     const list = this.noteMap.get(id);
     if (!list) return;
     for (let i = 0; i < list.length; i++) {
@@ -361,7 +400,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 
   /** Note-off for one voice: a dormant voice's release is silence, so it just ends (#547). */
-  releaseVoice(v) {
+  releaseVoice(v: Voice): void {
     if (this.dormancy && v.active && v.dormant) v.kill();
     else v.release();
   }
@@ -371,7 +410,11 @@ class FmPartProcessor extends AudioWorkletProcessor {
    * wrapper (#445) and nothing else, so the hot loop reads exactly as it did
    * and a page that never turns the sampler on pays one branch per quantum.
    */
-  process(inputs, outputs, params) {
+  process(
+    inputs: Float32Array[][],
+    outputs: Float32Array[][],
+    params: Record<string, Float32Array>,
+  ): boolean {
     if (this.loadQuanta === 0) return this.renderBlock(inputs, outputs, params);
     const t0 = Date.now();
     const running = this.renderBlock(inputs, outputs, params);
@@ -379,7 +422,11 @@ class FmPartProcessor extends AudioWorkletProcessor {
     return running;
   }
 
-  renderBlock(inputs, outputs, params) {
+  renderBlock(
+    inputs: Float32Array[][],
+    outputs: Float32Array[][],
+    params: Record<string, Float32Array>,
+  ): boolean {
     const out = outputs[0];
     if (!out || out.length === 0) return this.running;
     const outL = out[0];
@@ -402,9 +449,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
     while (cursor < n) {
       // Apply every event landing on this frame.
       while (q.length > 0 && q[0]._frame <= blockStart + cursor) {
-        const ev = q.shift();
+        const ev = q.shift()!;
         if (ev.type === 'noteOn') this.noteOn(ev);
-        else if (ev.type === 'noteOff') this.noteOffId(ev.id != null ? ev.id : ev.note);
+        else if (ev.type === 'noteOff') this.noteOffId(ev.id != null ? ev.id : ev.note!);
       }
 
       // Render up to the next event, the next control boundary, or block end.
