@@ -123,106 +123,180 @@ var WAVE = {
   // partials supplied by the patch
 };
 
+// packages/client/src/audio/worklet/fm/patchDefaults.ts
+var OPERATOR_COUNT = 4;
+var ENVELOPE_DEFAULTS = {
+  initLevel: 0,
+  attackTime: 2e-3,
+  attackCurve: 0,
+  peakLevel: 1,
+  decayTime: 0.4,
+  decayCurve: 0.5,
+  sustainLevel: 0.7,
+  releaseTime: 0.3,
+  releaseCurve: 0.5,
+  endLevel: 0,
+  loopMode: LOOP_NONE,
+  keyScale: 0
+};
+var PITCH_ENV_DEFAULTS = { ...ENVELOPE_DEFAULTS, sustainLevel: 0, decayTime: 0.1 };
+var FILTER_ENV_DEFAULTS = { ...ENVELOPE_DEFAULTS, sustainLevel: 0 };
+var OPERATOR_DEFAULTS = {
+  wave: WAVE.SINE,
+  userPartials: null,
+  userKey: "",
+  ratio: 1,
+  fixed: false,
+  fixedHz: 100,
+  detune: 0,
+  level: 0,
+  feedback: 0,
+  velSens: 0.4,
+  levelKeyScale: 0,
+  phase: 0,
+  phaseFree: true
+};
+var LEAD_OPERATOR_LEVEL = 1;
+var PATCH_DEFAULTS = {
+  name: "untitled",
+  algorithm: 0,
+  volume: 0.8,
+  tone: 1,
+  glide: 0,
+  pitchEnvAmount: 0,
+  pan: 0,
+  panRandom: 0,
+  panKey: 0,
+  spread: 0,
+  mono: false
+};
+var LFO_DEFAULTS = {
+  shape: LFO_SINE,
+  rate: 5,
+  amount: 0,
+  delay: 0,
+  retrigger: false,
+  toPitch: 0,
+  modWheelDepth: 1
+};
+var LFO_TO_OP_DEFAULT = 0;
+var FILTER_DEFAULTS = {
+  mode: FILT_OFF,
+  cutoff: 8e3,
+  resonance: 0.707,
+  drive: 1,
+  slope24: false,
+  envAmount: 0,
+  modWheelDepth: 0,
+  lfoAmount: 0,
+  keyTrack: 0
+};
+var TONE_RANGE = { min: 0.02, max: 1 };
+var FEEDBACK_RANGE = { min: -1, max: 1 };
+
 // packages/client/src/audio/worklet/fm/patchNormalise.ts
-function envDefaults(o) {
+function envDefaults(o, d = ENVELOPE_DEFAULTS) {
   o = o || {};
   return {
-    initLevel: num(o.initLevel, 0),
-    attackTime: num(o.attackTime, 2e-3),
-    attackCurve: num(o.attackCurve, 0),
-    peakLevel: num(o.peakLevel, 1),
-    decayTime: num(o.decayTime, 0.4),
-    decayCurve: num(o.decayCurve, 0.5),
-    sustainLevel: num(o.sustainLevel, 0.7),
-    releaseTime: num(o.releaseTime, 0.3),
-    releaseCurve: num(o.releaseCurve, 0.5),
-    endLevel: num(o.endLevel, 0),
-    loopMode: num(o.loopMode, LOOP_NONE) | 0,
-    keyScale: num(o.keyScale, 0)
+    initLevel: num(o.initLevel, d.initLevel),
+    attackTime: num(o.attackTime, d.attackTime),
+    attackCurve: num(o.attackCurve, d.attackCurve),
+    peakLevel: num(o.peakLevel, d.peakLevel),
+    decayTime: num(o.decayTime, d.decayTime),
+    decayCurve: num(o.decayCurve, d.decayCurve),
+    sustainLevel: num(o.sustainLevel, d.sustainLevel),
+    releaseTime: num(o.releaseTime, d.releaseTime),
+    releaseCurve: num(o.releaseCurve, d.releaseCurve),
+    endLevel: num(o.endLevel, d.endLevel),
+    loopMode: num(o.loopMode, d.loopMode) | 0,
+    keyScale: num(o.keyScale, d.keyScale)
   };
 }
 function num(v, d) {
   return typeof v === "number" && isFinite(v) ? v : d;
 }
+function clamp(v, range) {
+  return Math.max(range.min, Math.min(range.max, v));
+}
 function opDefaults(o, index) {
   o = o || {};
+  const d = OPERATOR_DEFAULTS;
   return {
-    wave: num(o.wave, WAVE.SINE) | 0,
-    userPartials: o.userPartials || null,
-    userKey: o.userKey || "",
-    ratio: num(o.ratio, 1),
+    wave: num(o.wave, d.wave) | 0,
+    userPartials: o.userPartials || d.userPartials,
+    userKey: o.userKey || d.userKey,
+    ratio: num(o.ratio, d.ratio),
     fixed: !!o.fixed,
-    fixedHz: num(o.fixedHz, 100),
-    detune: num(o.detune, 0),
+    fixedHz: num(o.fixedHz, d.fixedHz),
+    detune: num(o.detune, d.detune),
     // cents
-    level: num(o.level, index === 0 ? 1 : 0),
-    feedback: Math.max(-1, Math.min(1, num(o.feedback, 0))),
+    level: num(o.level, index === 0 ? LEAD_OPERATOR_LEVEL : d.level),
+    feedback: clamp(num(o.feedback, d.feedback), FEEDBACK_RANGE),
     // bipolar (#529)
-    velSens: num(o.velSens, 0.4),
-    levelKeyScale: num(o.levelKeyScale, 0),
-    phase: num(o.phase, 0),
+    velSens: num(o.velSens, d.velSens),
+    levelKeyScale: num(o.levelKeyScale, d.levelKeyScale),
+    phase: num(o.phase, d.phase),
     phaseFree: o.phaseFree !== false,
-    // free-running by default
+    // free-running by default (OPERATOR_DEFAULTS.phaseFree)
     env: envDefaults(o.env)
   };
 }
 function normalisePatch(raw) {
   raw = raw || {};
   const ops = [];
-  for (let i = 0; i < 4; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
+  for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
   const lfoRaw = raw.lfo || {};
   const filtRaw = raw.filter || {};
+  const toOp = [];
+  for (let i = 0; i < OPERATOR_COUNT; i++)
+    toOp.push(num(lfoRaw.toOp && lfoRaw.toOp[i], LFO_TO_OP_DEFAULT));
+  const pd = PATCH_DEFAULTS, ld = LFO_DEFAULTS, fd = FILTER_DEFAULTS;
   const p = {
-    name: raw.name || "untitled",
-    algorithm: Math.max(0, Math.min(ALGORITHMS.length - 1, num(raw.algorithm, 0) | 0)),
-    volume: num(raw.volume, 0.8),
-    tone: Math.max(0.02, Math.min(1, num(raw.tone, 1))),
-    glide: num(raw.glide, 0),
-    pitchEnv: envDefaults(raw.pitchEnv),
-    pitchEnvAmount: num(raw.pitchEnvAmount, 0),
+    name: raw.name || pd.name,
+    algorithm: Math.max(0, Math.min(ALGORITHMS.length - 1, num(raw.algorithm, pd.algorithm) | 0)),
+    volume: num(raw.volume, pd.volume),
+    tone: clamp(num(raw.tone, pd.tone), TONE_RANGE),
+    glide: num(raw.glide, pd.glide),
+    pitchEnv: envDefaults(raw.pitchEnv, PITCH_ENV_DEFAULTS),
+    pitchEnvAmount: num(raw.pitchEnvAmount, pd.pitchEnvAmount),
     // semitones
-    pan: num(raw.pan, 0),
-    panRandom: num(raw.panRandom, 0),
-    panKey: num(raw.panKey, 0),
-    spread: num(raw.spread, 0),
+    pan: num(raw.pan, pd.pan),
+    panRandom: num(raw.panRandom, pd.panRandom),
+    panKey: num(raw.panKey, pd.panKey),
+    spread: num(raw.spread, pd.spread),
     // cents; >0 doubles voices
     mono: !!raw.mono,
     // one note at a time, with retrigger (#453)
     ops,
     lfo: {
-      shape: num(lfoRaw.shape, LFO_SINE) | 0,
-      rate: num(lfoRaw.rate, 5),
-      amount: num(lfoRaw.amount, 0),
-      delay: num(lfoRaw.delay, 0),
+      shape: num(lfoRaw.shape, ld.shape) | 0,
+      rate: num(lfoRaw.rate, ld.rate),
+      amount: num(lfoRaw.amount, ld.amount),
+      delay: num(lfoRaw.delay, ld.delay),
       retrigger: !!lfoRaw.retrigger,
-      toPitch: num(lfoRaw.toPitch, 0),
+      toPitch: num(lfoRaw.toPitch, ld.toPitch),
       // semitones
-      modWheelDepth: num(lfoRaw.modWheelDepth, 1),
-      toOp: [
-        num(lfoRaw.toOp && lfoRaw.toOp[0], 0),
-        num(lfoRaw.toOp && lfoRaw.toOp[1], 0),
-        num(lfoRaw.toOp && lfoRaw.toOp[2], 0),
-        num(lfoRaw.toOp && lfoRaw.toOp[3], 0)
-      ]
+      modWheelDepth: num(lfoRaw.modWheelDepth, ld.modWheelDepth),
+      toOp
     },
     filter: {
-      mode: num(filtRaw.mode, FILT_OFF) | 0,
-      cutoff: num(filtRaw.cutoff, 8e3),
-      resonance: num(filtRaw.resonance, 0.707),
-      drive: num(filtRaw.drive, 1),
+      mode: num(filtRaw.mode, fd.mode) | 0,
+      cutoff: num(filtRaw.cutoff, fd.cutoff),
+      resonance: num(filtRaw.resonance, fd.resonance),
+      drive: num(filtRaw.drive, fd.drive),
       slope24: !!filtRaw.slope24,
-      envAmount: num(filtRaw.envAmount, 0),
+      envAmount: num(filtRaw.envAmount, fd.envAmount),
       // octaves
-      modWheelDepth: num(filtRaw.modWheelDepth, 0),
+      modWheelDepth: num(filtRaw.modWheelDepth, fd.modWheelDepth),
       // octaves the wheel adds to envAmount (#586)
-      lfoAmount: num(filtRaw.lfoAmount, 0),
+      lfoAmount: num(filtRaw.lfoAmount, fd.lfoAmount),
       // octaves
-      keyTrack: num(filtRaw.keyTrack, 0),
-      env: envDefaults(filtRaw.env)
+      keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
+      env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS)
     }
   };
-  p.feedbackScratch = new Float32Array(4);
-  for (let i = 0; i < 4; i++) p.feedbackScratch[i] = ops[i].feedback;
+  p.feedbackScratch = new Float32Array(OPERATOR_COUNT);
+  for (let i = 0; i < OPERATOR_COUNT; i++) p.feedbackScratch[i] = ops[i].feedback;
   return p;
 }
 
