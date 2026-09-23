@@ -1,0 +1,756 @@
+{
+  "sourceSha256": "bd8797ebfd1a7bd9abf2b4c5d946af8cdbd630e8e622b96a82eb1197c3bc0575",
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "darwin 25.5.0",
+    "browser": "153.0.8010.53",
+    "backend": "Chrome AudioWorklet, headless",
+    "commit": "99c794721e1ea5f59477c1867e055b5808929d7c"
+  },
+  "active": {
+    "value": 22.64805092733305,
+    "label": "GR 22.6 dB",
+    "params": {
+      "makeup": 0,
+      "enabled": 1,
+      "range": 60,
+      "external": 0,
+      "highpass": 0,
+      "ratio": 10,
+      "mix": 1,
+      "threshold": -30,
+      "attack": 0.30000001192092896,
+      "release": 0.4000000059604645
+    },
+    "context": "running",
+    "sampleRate": 48000
+  },
+  "exported": {
+    "kind": "compressor",
+    "threshold": -30,
+    "makeup": 0,
+    "attack": 0.3,
+    "ratio": 10,
+    "release": 0.4,
+    "highpass": 0,
+    "range": 60,
+    "mix": 1,
+    "enabled": false
+  },
+  "measurements": [
+    {
+      "count": 0,
+      "sampleRate": 48000,
+      "playback": {
+        "underrunEvents": 0,
+        "totalDuration": 3.009914
+      },
+      "reports": []
+    },
+    {
+      "count": 1,
+      "sampleRate": 48000,
+      "playback": {
+        "underrunEvents": 0,
+        "totalDuration": 3.009914
+      },
+      "reports": [
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1001,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 7,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 15,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        }
+      ]
+    },
+    {
+      "count": 8,
+      "sampleRate": 48000,
+      "playback": {
+        "underrunEvents": 0,
+        "totalDuration": 3.015246
+      },
+      "reports": [
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 4,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 4,
+          "type": "load",
+          "busyMs": 7,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 2,
+          "type": "load",
+          "busyMs": 10,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 5,
+          "type": "load",
+          "busyMs": 9,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 3,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 1,
+          "type": "load",
+          "busyMs": 3,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 7,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 6,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 998,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 4,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 2,
+          "type": "load",
+          "busyMs": 7,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 5,
+          "type": "load",
+          "busyMs": 3,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 3,
+          "type": "load",
+          "busyMs": 8,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 1,
+          "type": "load",
+          "busyMs": 10,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 7,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 6,
+          "type": "load",
+          "busyMs": 6,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 9,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 4,
+          "type": "load",
+          "busyMs": 5,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 2,
+          "type": "load",
+          "busyMs": 3,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 5,
+          "type": "load",
+          "busyMs": 1,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 3,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 1,
+          "type": "load",
+          "busyMs": 4,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 7,
+          "type": "load",
+          "busyMs": 10,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 6,
+          "type": "load",
+          "busyMs": 12,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        }
+      ]
+    },
+    {
+      "count": 16,
+      "sampleRate": 48000,
+      "playback": {
+        "underrunEvents": 0,
+        "totalDuration": 3.015246
+      },
+      "reports": [
+        {
+          "id": 15,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 2,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 9,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 14,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 7,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 10,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 3,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 12,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 8,
+          "type": "load",
+          "busyMs": 4,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 11,
+          "type": "load",
+          "busyMs": 7,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 13,
+          "type": "load",
+          "busyMs": 16,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 1,
+          "type": "load",
+          "busyMs": 7,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 6,
+          "type": "load",
+          "busyMs": 4,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 4,
+          "type": "load",
+          "busyMs": 8,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 5,
+          "type": "load",
+          "busyMs": 8,
+          "wallMs": 1002,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 15,
+          "type": "load",
+          "busyMs": 6,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 2,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 9,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 14,
+          "type": "load",
+          "busyMs": 1,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 7,
+          "type": "load",
+          "busyMs": 1,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 10,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 3,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 1,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 12,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 8,
+          "type": "load",
+          "busyMs": 1,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 11,
+          "type": "load",
+          "busyMs": 0,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 0,
+          "underruns": 0
+        },
+        {
+          "id": 13,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 1,
+          "type": "load",
+          "busyMs": 4,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 6,
+          "type": "load",
+          "busyMs": 17,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 4,
+          "type": "load",
+          "busyMs": 9,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 5,
+          "type": "load",
+          "busyMs": 6,
+          "wallMs": 997,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 15,
+          "type": "load",
+          "busyMs": 6,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 2,
+          "type": "load",
+          "busyMs": 18,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 9,
+          "type": "load",
+          "busyMs": 14,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 14,
+          "type": "load",
+          "busyMs": 6,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 7,
+          "type": "load",
+          "busyMs": 3,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 10,
+          "type": "load",
+          "busyMs": 7,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 3,
+          "type": "load",
+          "busyMs": 5,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 0,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 12,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 8,
+          "type": "load",
+          "busyMs": 3,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 11,
+          "type": "load",
+          "busyMs": 5,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 13,
+          "type": "load",
+          "busyMs": 1,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 1,
+          "type": "load",
+          "busyMs": 3,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 6,
+          "type": "load",
+          "busyMs": 3,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 4,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        },
+        {
+          "id": 5,
+          "type": "load",
+          "busyMs": 2,
+          "wallMs": 1003,
+          "quanta": 375,
+          "peakMs": 1,
+          "underruns": 0
+        }
+      ]
+    }
+  ]
+}

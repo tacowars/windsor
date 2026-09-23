@@ -277,3 +277,13 @@ export { HIDDEN_CATEGORY, PRESET_CATALOG, filterPresets } from './presetCatalog'
 // console's display draws with it, and the harness pins it to the DSP.
 export { curveShape, segmentLevel } from './worklet/fm/envelope';
 export type { PresetListing, PresetFilter } from './presetCatalog';
+
+export { DEFAULT_COMPRESSOR } from './inserts/compressorInsert';
+export type { CompressorSpec } from './inserts/compressorInsert';
+export {
+  COMPRESSOR_ATTACKS,
+  COMPRESSOR_RELEASES,
+  COMPRESSOR_RATIOS,
+  COMPRESSOR_BOUNDS,
+  COMPRESSOR_DSP,
+} from './inserts/compressorConstants';

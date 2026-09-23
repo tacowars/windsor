@@ -122,6 +122,8 @@ export interface MusicReadout extends ArrangementReadout {
   load: AudioLoadReadout;
 }
 
+import { meteredInsertRegistry } from './inserts/meteredInsertRegistry';
+
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
@@ -154,7 +156,10 @@ export class AudioSystem {
     this.mix = options.mix ?? MIX;
     this.returnSpecs = options.returns ?? RETURNS;
     this.now = options.now ?? ((): number => performance.now());
-    this.routeOptions = options.defer ? { defer: options.defer } : {};
+    this.routeOptions = {
+      registry: meteredInsertRegistry(this.loadMeter),
+      ...(options.defer ? { defer: options.defer } : {}),
+    };
     this.schedMeter = new SchedCostMeter({ now: this.now });
   }
 

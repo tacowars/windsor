@@ -1,5 +1,8 @@
 # The DSP worklets
 
+`compressor/compressorProcessor.js` wraps the typed, tested compressor DSP in
+`inserts/compressorDsp.ts`; it also bundles through the table below (#660).
+
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
 build output. `reverb-processor.js` is the plate, still one hand-written file
 (its own exception is at its top). The map of `fm/` (#644):

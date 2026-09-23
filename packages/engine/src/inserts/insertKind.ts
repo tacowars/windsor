@@ -9,6 +9,11 @@ import type { StripStage } from '../channelStrip';
 /** A live insert: a strip stage that can take its kind's settings without re-wiring. */
 export interface InsertStage<S extends { readonly kind: string }> extends StripStage {
   readonly kind: S['kind'];
+  /** Present only for a worklet effect; owned and stopped by the stage. */
+  readonly processor?: AudioWorkletNode;
+  readonly reduction?: { read(): number; setActive(enabled: boolean): void };
+  /** Mixer-owned external detector routing, separate from program audio. */
+  readonly detector?: { readonly input: AudioNode; setExternal(external: boolean): void };
   /** Param writes only; the caller has normalised `spec`. */
   set(spec: S): void;
 }

@@ -27,6 +27,7 @@ import type { SeqKnobOpts } from './sequencerKnobTables';
 export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   drive: 'Drive',
   chorus: 'Chorus',
+  compressor: 'Bus compressor',
 };
 
 export interface InsertKnobEntry<S> {

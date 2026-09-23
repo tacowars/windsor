@@ -158,3 +158,9 @@ export const PROCESSOR_NAME = 'fm-part';
 export const REVERB_WORKLET_URL = new URL('./worklet/reverb-processor.js', import.meta.url);
 
 export const REVERB_PROCESSOR_NAME = 'dattorro-reverb';
+
+/** Stereo insert processor, loaded before synchronous insert creation. */
+export const COMPRESSOR_WORKLET_URL = new URL(
+  './worklet/generated/compressor-processor.js',
+  import.meta.url,
+);
