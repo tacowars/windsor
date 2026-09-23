@@ -4,6 +4,7 @@ import { makePatch } from '../../patch/patch';
 import type { PartialPatch, Patch } from '../../patch/patch';
 import { patchLeafDifferences } from '../../patch/patchLibrary';
 import type { WorkletPatch } from './patchNormalise';
+import { TONE_RANGE } from './patchDefaults';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
 Object.assign(globalThis, { sampleRate: 48000 });
@@ -35,8 +36,9 @@ describe('the patch defaults (#670)', () => {
   });
 
   it('names the leaf where the two fills part (the comparator is not vacuous)', () => {
+    // The worklet clamps `tone` to its floor; makePatch() keeps what it is given.
     expect(patchLeafDifferences(workletFill({ tone: 0 }), makePatch({ tone: 0 }), 'p')).toEqual([
-      'p.tone: 0.02 ≠ 0',
+      `p.tone: ${TONE_RANGE.min} ≠ 0`,
     ]);
   });
 });
