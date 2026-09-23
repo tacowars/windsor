@@ -1,5 +1,6 @@
 /** The compressor's controls commit the complete insert list into the song. */
 import { DEFAULT_COMPRESSOR } from '../../../packages/client/src/audio/index-for-editor';
+import { sidechainSelector } from './sidechainSelector';
 import { compressorMeter } from './compressorMeter';
 import { COMPRESSOR_KNOBS, COMPRESSOR_SELECTS } from './compressorTables';
 import { insertChange } from './insertTarget';
@@ -37,6 +38,7 @@ export const compressorCard: InsertCard = (ctx, slot, index) => {
   switches.appendChild(bypass);
   root.append(
     switches,
+    sidechainSelector(ctx, slot, index),
     insertKnobs(ctx, slot, index, COMPRESSOR_KNOBS),
     compressorMeter(ctx, slot, index),
   );

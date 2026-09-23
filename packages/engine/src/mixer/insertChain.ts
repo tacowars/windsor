@@ -42,6 +42,7 @@ const sameKinds = (
 
 /** The strip's inserts after `head`, and how a new list lands on them (#641). */
 export interface InsertChain {
+  readonly specs: readonly InsertSpec[];
   readonly stages: readonly InsertStage<InsertSpec>[];
   readonly tail: AudioNode;
   /** Whether `specs` is the live kinds in the live order: a settings-only change. */
@@ -98,6 +99,7 @@ export function createInsertChain(
       return kind.create(context, spec);
     });
   let stages = build(specs);
+  let applied = specs;
   let tail = chain(head, stages);
   const check = (next: readonly InsertSpec[]): void => {
     for (const spec of next) {
@@ -108,8 +110,12 @@ export function createInsertChain(
   };
   const applyTo = (next: readonly InsertSpec[]): void => {
     stages.forEach((stage, i) => stage.set(next[i]!));
+    applied = next;
   };
   return {
+    get specs(): readonly InsertSpec[] {
+      return applied;
+    },
     get stages(): readonly InsertStage<InsertSpec>[] {
       return stages;
     },
@@ -143,6 +149,7 @@ export function createInsertChain(
       unchain(head, stages);
       for (const stage of stages) stage.dispose();
       stages = built;
+      applied = next;
     },
     dispose(): void {
       unchain(head, stages);
@@ -180,6 +187,7 @@ export function createInsertUpdater(
   inserts: InsertChain,
   tap: Pick<Tap, 'move' | 'fadeTo'>,
   later: (run: () => void, seconds: number) => void,
+  changed?: () => void,
 ): InsertUpdater {
   let pending: readonly InsertSpec[] | null = null;
   let fading = false;
@@ -196,6 +204,7 @@ export function createInsertUpdater(
     }
     if (inserts.matches(specs)) {
       inserts.apply(specs);
+      changed?.();
       return;
     }
     fading = true;
@@ -204,6 +213,7 @@ export function createInsertUpdater(
       if (cancelled) return;
       inserts.set(pending ?? specs, (tail) => tap.move(tail));
       pending = null;
+      changed?.();
       tap.fadeTo(1, INSERT_FADE_SECONDS);
       fading = false;
     }, INSERT_FADE_SECONDS);

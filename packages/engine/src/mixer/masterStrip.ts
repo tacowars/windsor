@@ -13,6 +13,7 @@ import type { MasterSpec } from './masterSpec';
 import { createPeakMeter } from './peakMeter';
 import type { PeakMeter } from './peakMeter';
 export interface MasterStrip {
+  readonly insertSpecs: readonly InsertSpec[];
   readonly input: GainNode;
   readonly output: GainNode;
   readonly inserts: readonly InsertStage<InsertSpec>[];
@@ -21,7 +22,7 @@ export interface MasterStrip {
   apply(raw: unknown): string[];
   dispose(): void;
 }
-// eslint-disable-next-line max-lines-per-function -- 62 lines: one master graph and the lifetime operations sharing its nodes
+// eslint-disable-next-line max-lines-per-function -- one master graph and the lifetime operations sharing its nodes
 export function createMasterStrip(
   context: BaseAudioContext,
   options: RouteOptions = {},
@@ -51,10 +52,13 @@ export function createMasterStrip(
     ((run: () => void, seconds: number): void => {
       setTimeout(run, seconds * MS_PER_SECOND);
     });
-  const updates = createInsertUpdater(chain, tap, later);
+  const updates = createInsertUpdater(chain, tap, later, options.changed);
   const meter = createPeakMeter(context, output);
   let spec = DEFAULT_MASTER;
   return {
+    get insertSpecs(): readonly InsertSpec[] {
+      return chain.specs;
+    },
     input,
     output,
     meter,

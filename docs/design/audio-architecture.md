@@ -471,3 +471,26 @@ unity/no inserts. The console reuses insert cards for this Master strip and
 displays independent L/R sample peaks before game volume/safety compression.
 Its view-owned meter worklet runs only while visible. Ownership and compatibility
 are recorded in `docs/log/2026-09-23-666-song-master-and-stereo-meter.md`.
+
+
+### Post-FX sidechains and silent triggers (#667)
+
+A compressor's `sidechain` is `"internal"` (also the meaning of an omitted
+field), or `{ "track": <slot> }`. The source is that track's stereo signal
+after Level, low cut and inserts, before pan and audible output. One track
+can feed multiple track/master compressors. `{ "track": null }` is a
+visible, disconnected external detector; silence never falls back to Internal.
+
+A strip's optional `output` is `"master"` by default or `"sidechain"`.
+Sidechain only leaves the instrument and effects running, gates dry and send
+paths together, and preserves existing return tails. The gate takes the
+insert edit fade time; the track Level stays before effects.
+
+`mixer/sidechainGraph.ts` is the common graph rule, `sidechainPlan.ts` checks
+prospective live edits, and `sidechainDesk.ts`/`sidechainRouter.ts` own the
+transaction and detector connections. `InsertChain.specs` names the settings
+actually applied: routing is reconciled after a deferred insert edit lands,
+not against an old stage order. Imports disconnect missing/cyclic references
+with a report; live cycles are refused before any song mutation. Deleting a
+source clears its references to disconnected external, so a reused slot
+cannot become the old trigger. The selector disables self/cyclic choices.
