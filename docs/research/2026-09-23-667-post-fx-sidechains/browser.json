@@ -1,0 +1,67 @@
+{
+  "pageSha256": "45406619d9bb793de322c2c341ffbdc6ce46ba978fc83a82e24c5378282c913e",
+  "parentCommit": "4381f9bbdcf4bfec7dc702ed49b5607fc597a186",
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "darwin 25.5.0",
+    "browser": "153.0.8010.53",
+    "backend": "Chrome AudioWorklet, headless"
+  },
+  "silentTriggerOnly": {
+    "masterDb": [
+      -60,
+      -60
+    ],
+    "reductionDb": [
+      5.507105483290895,
+      5.355709941358395
+    ],
+    "external": [
+      1,
+      1
+    ]
+  },
+  "silentTriggerDucking": {
+    "masterDb": [
+      -40.38236755016567,
+      -40.38236755016567
+    ],
+    "reductionDb": [
+      17.534165747238667,
+      17.53416574669415
+    ],
+    "external": [
+      1,
+      1
+    ]
+  },
+  "triggerLevelZero": {
+    "masterDb": [
+      -8.577541115806625,
+      -8.577541115806625
+    ],
+    "reductionDb": [
+      0.370882728809443,
+      0.3708827288093115
+    ],
+    "external": [
+      1,
+      1
+    ]
+  },
+  "audibleSourceDucking": {
+    "masterDb": [
+      -29.162590749799197,
+      -22.66134009571399
+    ],
+    "reductionDb": [
+      15.891027874483648,
+      15.891027874483648
+    ],
+    "external": [
+      1,
+      1
+    ]
+  },
+  "exportReimport": true
+}

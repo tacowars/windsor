@@ -46,6 +46,8 @@ export interface StripStage {
 
 export interface PartStrip {
   readonly part: AudioPart;
+  readonly insertSpecs: readonly InsertSpec[];
+  setOutput(output: ChannelStrip['output']): void;
   /** The strip's stages, in signal order: the low cut, then the inserts. */
   readonly stages: readonly StripStage[];
   /** The first stage (#640). */
@@ -86,6 +88,7 @@ export interface PartStrip {
  */
 export interface RouteOptions {
   registry?: InsertRegistry;
+  changed?: () => void;
   defer?: (run: () => void, seconds: number) => void;
 }
 
@@ -93,7 +96,7 @@ const laterByTimeout = (run: () => void, seconds: number): void => {
   setTimeout(run, seconds * MS_PER_SECOND);
 };
 
-// eslint-disable-next-line max-lines-per-function -- 61 lines: one strip's construction and the object that closes over it, one line past the limit (#225 decision 4)
+// eslint-disable-next-line max-lines-per-function -- one strip graph and its lifetime; detector metadata and output switching share the same owned tap
 export function routePart(
   part: AudioPart,
   strip: ChannelStrip,
@@ -116,11 +119,15 @@ export function routePart(
   part.output.connect(lowCut.input);
   const inserts = createInsertChain(context, lowCut.output, strip.inserts, registry, part.name);
   const tap = createTap(context, strip, returns, dry, inserts.tail);
-  const updates = createInsertUpdater(inserts, tap, later);
+  const updates = createInsertUpdater(inserts, tap, later, options.changed);
   const { rotation, sends } = tap;
 
   return {
     part,
+    get insertSpecs(): readonly InsertSpec[] {
+      return inserts.specs;
+    },
+    setOutput: (output) => tap.setOutput(output),
     get stages(): readonly StripStage[] {
       return [lowCut, ...inserts.stages];
     },

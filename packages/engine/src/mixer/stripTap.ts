@@ -1,7 +1,8 @@
 /**
+ * The head also feeds external detectors, before the audible gate.
  * The tap: where a channel strip's chain meets the mix (#639, #652).
  *
- *   tail ─▶ head ─┬─ [rotate θ] ─▶ dry destination
+ *   tail ─▶ head ─▶ audible ─┬─ [rotate θ] ─▶ dry destination
  *                 ├─ send ─▶ return "room"
  *                 └─ send ─▶ return "echo"
  *
@@ -10,6 +11,7 @@
  * edge rather than one per send. It is not the fader: that is still the
  * part's k-rate `gain` inside the worklet (mixer record §3).
  */
+import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import type { ChannelStrip } from './mix';
 import type { ReturnBus } from './returnBus';
 import { createSend } from './returnBus';
@@ -23,6 +25,7 @@ export interface Tap {
   readonly tail: AudioNode;
   /** The fade gain every tapped path passes through (#652). */
   readonly head: GainNode;
+  setOutput(output: ChannelStrip['output']): void;
   move(tail: AudioNode): void;
   /** Ramp the tapped paths to `level` over `seconds`, from wherever they are now. */
   fadeTo(level: number, seconds: number): void;
@@ -44,16 +47,28 @@ export function createTap(
   const head = context.createGain();
   tail.connect(head);
   const rotation = createStereoRotate(context, strip.pan);
-  head.connect(rotation.input);
+  const audible = context.createGain();
+  audible.gain.value = strip.output === 'sidechain' ? 0 : 1;
+  head.connect(audible);
+  audible.connect(rotation.input);
   rotation.output.connect(dry);
   const sends = new Map<string, GainNode>();
   for (const [name, target] of Object.entries(returns)) {
-    sends.set(name, createSend(context, head, target, strip.sends[name] ?? 0));
+    sends.set(name, createSend(context, audible, target, strip.sends[name] ?? 0));
   }
   return {
     rotation,
     sends,
     head,
+    setOutput(output): void {
+      const now = context.currentTime;
+      audible.gain.cancelScheduledValues(now);
+      audible.gain.setValueAtTime(audible.gain.value, now);
+      audible.gain.linearRampToValueAtTime(
+        output === 'sidechain' ? 0 : 1,
+        now + INSERT_FADE_SECONDS,
+      );
+    },
     get tail(): AudioNode {
       return tail;
     },
@@ -71,6 +86,7 @@ export function createTap(
     dispose(): void {
       tail.disconnect(head);
       head.disconnect();
+      audible.disconnect();
       for (const send of sends.values()) send.disconnect();
       rotation.dispose();
     },

@@ -7,7 +7,7 @@ import type { CompressorDsp, CompressorParams } from '../inserts/compressorDsp';
 export function compressorParams(spec: Partial<CompressorSpec> = {}): CompressorParams {
   return Object.fromEntries(
     Object.entries({ ...COMPRESSOR_DEFAULTS, ...spec, external: 0 })
-      .filter(([key]) => key !== 'kind')
+      .filter(([key]) => key !== 'kind' && key !== 'sidechain')
       .map(([key, value]) => [key, new Float32Array([Number(value)])]),
   );
 }

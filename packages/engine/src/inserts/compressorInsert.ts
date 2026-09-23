@@ -15,8 +15,12 @@ import type { InsertKind, InsertStage } from './insertKind';
 export { DEFAULT_COMPRESSOR } from './compressorSpec';
 export type { CompressorSpec } from './compressorSpec';
 
+// eslint-disable-next-line max-lines-per-function -- 62 lines: one compressor graph and its parameter/telemetry lifetime (#225 decision 4)
 function create(context: BaseAudioContext, spec: CompressorSpec): InsertStage<CompressorSpec> {
-  const parameterData: Record<string, number> = { enabled: Number(spec.enabled) };
+  const parameterData: Record<string, number> = {
+    enabled: Number(spec.enabled),
+    external: Number(spec.sidechain !== undefined && spec.sidechain !== 'internal'),
+  };
   for (const name of COMPRESSOR_NUMBERS) parameterData[name] = spec[name];
   const processor = new AudioWorkletNode(context, COMPRESSOR_NAME, {
     numberOfInputs: 2,

@@ -22,6 +22,7 @@ import {
   STRIP_PAN_KNOB,
   sendKnob,
 } from './mixerTables';
+import { trackOutput } from './trackOutput';
 import { partNameField } from './partNameField';
 import { renderReturnsSection } from './returnsPanel';
 import { renderMasterStrip } from './masterStrip';
@@ -37,6 +38,7 @@ function stripRow(ctx: AppCtx, slot: number): HTMLElement {
   label.appendChild(partNameField(ctx, slot));
   label.appendChild(el('small', '', ` slot ${slot}`));
   row.appendChild(label);
+  row.appendChild(trackOutput(ctx, slot));
   const knobs = el('div', 'knob-row');
   knobs.appendChild(
     makeKnob({
