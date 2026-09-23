@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the operator indices and edge bits are the routing table itself; the tunables are fmConstants.ts (#654) */
 /**
  * The eleven operator topologies (#644) and the tables derived from them: the
  * topological evaluation order, and for the fixed-index kernel (#548) each
@@ -25,7 +26,14 @@ const A = 0,
   C = 2,
   D = 3;
 
-const ALGORITHMS = [
+/** One topology: which operators modulate each, and which are summed to the output. */
+interface Algorithm {
+  name: string;
+  mods: number[][];
+  carriers: number[];
+}
+
+const ALGORITHMS: Algorithm[] = [
   // 0:  D -> C -> B -> A                      full series, the classic FM stack
   { name: 'D>C>B>A', mods: [[B], [C], [D], []], carriers: [A] },
   // 1:  D,C -> B -> A                         two modulators sum into B
@@ -51,10 +59,10 @@ const ALGORITHMS = [
 ];
 
 /** Evaluation order so every modulator is computed before its target. */
-function topoOrder(alg) {
-  const order = [];
+function topoOrder(alg: Algorithm): number[] {
+  const order: number[] = [];
   const seen = new Uint8Array(4);
-  const visit = (i) => {
+  const visit = (i: number): void => {
     if (seen[i]) return;
     seen[i] = 1;
     const m = alg.mods[i];
@@ -94,13 +102,13 @@ const EDGE_BIT = [
   [0, 0, 0, 0],
 ];
 
-function ascending(list) {
+function ascending(list: number[]): boolean {
   for (let j = 1; j < list.length; j++) if (list[j] <= list[j - 1]) return false;
   return true;
 }
 
 /** The algorithm's modulation edges as EDGE_* bits, or -1 when the kernel cannot render it exactly. */
-function kernelEdges(alg) {
+function kernelEdges(alg: Algorithm): number {
   let edges = 0;
   for (let i = 0; i < 4; i++) {
     const m = alg.mods[i];
@@ -118,6 +126,7 @@ const ALG_EDGES = ALGORITHMS.map(kernelEdges);
 const ALG_CARRIER_BITS = ALGORITHMS.map((alg) => alg.carriers.reduce((b, c) => b | (1 << c), 0));
 const ALG_DESCENDING = ALG_ORDER.map((o) => o[0] === D && o[1] === C && o[2] === B && o[3] === A);
 
+export type { Algorithm };
 export {
   A,
   B,

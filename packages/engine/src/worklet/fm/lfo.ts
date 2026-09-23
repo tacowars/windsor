@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the xorshift shifts and the shape arithmetic are the algorithm; the tunables are fmConstants.ts (#654) */
 /**
  * The per-voice LFO (#644): seven shapes over one phase, sample-and-hold and
  * drift from the voice's own xorshift32 stream, and a fade-in. Invariant:
@@ -5,9 +6,10 @@
  * sine to the bit. `fmProcessorModWheel.test.ts` and the golden test pin it.
  */
 
-import { TABLE_MASK, TABLE_SIZE } from './fmConstants.js';
-import { randomSeed32 } from './prng.js';
-import { SIN_TAB } from './waveTables.js';
+import type { LfoSettings } from '../../patch';
+import { TABLE_MASK, TABLE_SIZE } from './fmConstants';
+import { randomSeed32 } from './prng';
+import { SIN_TAB } from './waveTables';
 
 /* ------------------------------------------------------------------ *
  * LFO
@@ -22,7 +24,14 @@ const LFO_SINE = 0,
   LFO_DRIFT = 6;
 
 class Lfo {
-  constructor(random) {
+  phase: number;
+  value: number;
+  held: number;
+  target: number;
+  fade: number;
+  seed: number;
+
+  constructor(random: () => number) {
     this.phase = 0;
     this.value = 0;
     this.held = 0;
@@ -31,7 +40,7 @@ class Lfo {
     this.seed = randomSeed32(random);
   }
 
-  rand() {
+  rand(): number {
     // xorshift32 — deterministic, allocation free
     let x = this.seed;
     x ^= x << 13;
@@ -43,14 +52,14 @@ class Lfo {
     return x / 0xffffffff;
   }
 
-  reset(retrigger) {
+  reset(retrigger: boolean): void {
     if (retrigger) this.phase = 0;
     this.fade = 0;
     this.held = this.rand() * 2 - 1;
     this.target = this.rand() * 2 - 1;
   }
 
-  advance(p, n, sampleRate) {
+  advance(p: LfoSettings, n: number, sampleRate: number): number {
     const prev = this.phase;
     this.phase += (p.rate * n) / sampleRate;
     const wrapped = this.phase >= 1;

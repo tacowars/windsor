@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the mulberry32 and xorshift constants are the algorithms, pinned to the shared copy; the tunables are fmConstants.ts (#654) */
 /**
  * The worklet's one random source (#78, #644): `Math.random` unless a seed is
  * supplied, then mulberry32; and the non-zero 32-bit seed each voice's noise
@@ -29,7 +30,7 @@
  * generator rather than two. It is copied rather than imported for the reason
  * at the top of this file: the worklet must stay import-free.
  */
-function makeRandom(seed) {
+function makeRandom(seed: number | null | undefined): () => number {
   if (seed == null) return Math.random;
   let state = seed >>> 0;
   return function mulberry32() {
@@ -53,7 +54,7 @@ function makeRandom(seed) {
  * `fmProcessor.test.ts` pins `Math.random` at 0 and asserts a noise operator
  * still oscillates.
  */
-function randomSeed32(random) {
+function randomSeed32(random: () => number): number {
   return (random() * 0xffffffff) >>> 0 || 1;
 }
 

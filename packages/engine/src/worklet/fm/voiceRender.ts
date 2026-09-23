@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the generic loop's feedback average, interpolation and mip arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * The generic render loop (#645): four operators walked in the algorithm's
  * topological order, the carrier sum, the steal fade and the filter, over
@@ -10,14 +11,15 @@
  * on every preset; the golden test pins it.
  */
 
+import type { Voice } from './voice';
 import {
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MOD_INDEX_SCALE,
   TABLE_SIZE,
-} from './fmConstants.js';
-import { FILT_OFF, softClip } from './svf.js';
-import { KIND_NOISE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables.js';
+} from './fmConstants';
+import { FILT_OFF, softClip } from './svf';
+import { KIND_NOISE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
 
 /**
  * Render `n` samples into the part's stereo accumulators starting at `off`.
@@ -29,8 +31,14 @@ import { KIND_NOISE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables.js';
 // of the loop; calling out to helpers per sample would reload them and cost
 // more than the split reads.
 // eslint-disable-next-line max-lines-per-function -- one hot loop, see above
-function renderVoiceGeneric(voice, outL, outR, off, n) {
-  const patch = voice.patch;
+function renderVoiceGeneric(
+  voice: Voice,
+  outL: Float32Array,
+  outR: Float32Array,
+  off: number,
+  n: number,
+): void {
+  const patch = voice.patch!;
   const mods = voice.alg.mods;
   const carriers = voice.alg.carriers;
   const order = voice.order;
@@ -79,7 +87,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       let ph = phase[i] + mod;
       ph -= Math.floor(ph);
 
-      let v;
+      let v: number;
       switch (kind[i]) {
         case KIND_NOISE:
           v = voice.noise();
@@ -91,7 +99,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
           v = ph < 0.5 ? 1 : -1;
           break;
         default: {
-          const t = tables[i];
+          const t = tables[i]!;
           const fi = ph * TABLE_SIZE;
           const i0 = fi | 0;
           const frac = fi - i0;

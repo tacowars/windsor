@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: MIDI 69/440, cents and octave scales are the pitch and level arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * The voice's control-rate work (#645): `bindVoiceConstants`, the routing
  * flags and per-note `Math.pow` results computed once per note (#548), and
@@ -11,16 +12,18 @@
  * (`fmProcessorKernel.test.ts`). The golden test pins the whole update.
  */
 
-import { ALGORITHMS, ALG_CARRIER_BITS, ALG_DESCENDING, ALG_EDGES } from './algorithms.js';
-import { FILT_OFF } from './svf.js';
-import { KIND_NOISE, KIND_TABLE, mipIndex } from './waveTables.js';
+import type { WorkletPatch } from './patchNormalise';
+import type { Voice } from './voice';
+import { ALGORITHMS, ALG_CARRIER_BITS, ALG_DESCENDING, ALG_EDGES } from './algorithms';
+import { FILT_OFF } from './svf';
+import { KIND_NOISE, KIND_TABLE, mipIndex } from './waveTables';
 
 /**
  * Routing and per-note constants for the bound patch, after `kind` is set:
  * called by `start` and `rebind`, so a live retune of the algorithm, a wave
  * or a detune reaches the next control block. Allocates nothing.
  */
-function bindVoiceConstants(voice, patch) {
+function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
   const algIndex = ALGORITHMS[patch.algorithm] ? patch.algorithm : 0;
   const keyOffset = (voice.note - 60) / 12;
   let noiseOps = 0;
@@ -40,8 +43,14 @@ function bindVoiceConstants(voice, patch) {
  * samples, then set up per-sample amplitude ramps so the audio loop only
  * does adds. Also refreshes filter coefficients.
  */
-function updateVoiceControl(voice, n, bend, wheel, cutoffMod) {
-  const patch = voice.patch;
+function updateVoiceControl(
+  voice: Voice,
+  n: number,
+  bend: number,
+  wheel: number,
+  cutoffMod: number,
+): void {
+  const patch = voice.patch!;
   const lfoP = patch.lfo;
   // The part's wheel plus this note's accent (#602); adding 0 is exact.
   const modWheel = wheel + voice.mod;
@@ -74,7 +83,7 @@ function updateVoiceControl(voice, n, bend, wheel, cutoffMod) {
     voice.phaseInc[i] = freq / voice.sr;
 
     if (voice.kind[i] === KIND_TABLE && voice.mips[i]) {
-      voice.tables[i] = voice.mips[i][mipIndex(freq)];
+      voice.tables[i] = voice.mips[i]![mipIndex(freq)];
     }
 
     const env = voice.ampEnv[i].advance(n);

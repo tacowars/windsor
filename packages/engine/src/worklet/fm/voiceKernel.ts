@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the kernel's feedback average, interpolation and mip arithmetic, bit for bit the generic loop's; the tunables are fmConstants.ts (#654) */
 /**
  * The fixed-index voice kernel (#548, #645): `renderVoiceGeneric`'s
  * arithmetic in its order, with the four operators written out, their state
@@ -15,15 +16,16 @@
  * preset; the golden test pins it.
  */
 
-import { A, B, C, D, EDGE_BA, EDGE_CA, EDGE_CB, EDGE_DA, EDGE_DB, EDGE_DC } from './algorithms.js';
+import type { Voice } from './voice';
+import { A, B, C, D, EDGE_BA, EDGE_CA, EDGE_CB, EDGE_DA, EDGE_DB, EDGE_DC } from './algorithms';
 import {
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MOD_INDEX_SCALE,
   TABLE_SIZE,
-} from './fmConstants.js';
-import { FILT_OFF, softClip } from './svf.js';
-import { KIND_NOISE, KIND_SAW_D, KIND_TABLE } from './waveTables.js';
+} from './fmConstants';
+import { FILT_OFF, softClip } from './svf';
+import { KIND_NOISE, KIND_SAW_D, KIND_TABLE } from './waveTables';
 
 /**
  * `render`, with fixed operator indices (#548): see `ALG_EDGES` for why the
@@ -41,8 +43,14 @@ import { KIND_NOISE, KIND_SAW_D, KIND_TABLE } from './waveTables.js';
 // (docs/research/2026-09-15-548-fm-voice-loop-specialisation); a helper per
 // operator would reload the state through `this` and give it back.
 // eslint-disable-next-line max-lines-per-function -- one hot loop, see above
-function renderVoiceKernel(voice, outL, outR, off, n) {
-  const patch = voice.patch;
+function renderVoiceKernel(
+  voice: Voice,
+  outL: Float32Array,
+  outR: Float32Array,
+  off: number,
+  n: number,
+): void {
+  const patch = voice.patch!;
   const nCar = voice.alg.carriers.length;
   const carGain = 1 / Math.sqrt(nCar);
   const f = patch.filter;
@@ -88,10 +96,10 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
     carC = (carriers & 4) !== 0,
     carD = (carriers & 8) !== 0;
 
-  const tA = tables[A],
-    tB = tables[B],
-    tC = tables[C],
-    tD = tables[D];
+  const tA = tables[A]!,
+    tB = tables[B]!,
+    tC = tables[C]!,
+    tD = tables[D]!;
   const fbA = fbAmt[A],
     fbB = fbAmt[B],
     fbC = fbAmt[C],
@@ -136,7 +144,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       }
       let ph = phD + mod;
       ph -= Math.floor(ph);
-      let v;
+      let v: number;
       if (kD === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
@@ -164,7 +172,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       }
       let ph = phC + mod;
       ph -= Math.floor(ph);
-      let v;
+      let v: number;
       if (kC === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
@@ -193,7 +201,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       }
       let ph = phB + mod;
       ph -= Math.floor(ph);
-      let v;
+      let v: number;
       if (kB === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
@@ -223,7 +231,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       }
       let ph = phA + mod;
       ph -= Math.floor(ph);
-      let v;
+      let v: number;
       if (kA === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
@@ -287,7 +295,16 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
  * is what the generic loop's `v * 0` stores would have left.
  */
 // eslint-disable-next-line max-params -- the kernel's locals for one operator, written back once per call
-function storeOperator(voice, i, live, n, a, o, f1, f2) {
+function storeOperator(
+  voice: Voice,
+  i: number,
+  live: boolean,
+  n: number,
+  a: number,
+  o: number,
+  f1: number,
+  f2: number,
+): void {
   if (live) {
     voice.amp[i] = a;
     voice.out[i] = o;

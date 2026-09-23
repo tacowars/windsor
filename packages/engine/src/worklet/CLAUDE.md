@@ -6,19 +6,22 @@ build output. `reverb-processor.js` is the plate, still one hand-written file
 
 | Module | Owns |
 |---|---|
-| `fmProcessor.js` | the entry: `FmPartProcessor` (the port, the event queue, voice allocation, `renderBlock`) and `registerProcessor` |
-| `voice.js` | `Voice`: one note's state and lifecycle (`start`, `rebind`, `retarget`, `release`, `kill`, `steal`, `dormant`); `render` and `updateControl` stay methods and delegate |
-| `voiceControl.js` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
-| `voiceRender.js` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
-| `voiceKernel.js` | `renderVoiceKernel` (#548): the fixed-index kernel, one function, never sliced finer |
-| `fmConstants.js` | the tunables every other module imports |
-| `waveTables.js` | `WAVE`, `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
-| `algorithms.js` | `ALGORITHMS`, the topological order, the kernel's edge and carrier tables |
-| `envelope.js` | `Envelope`, `curveShape`, the `ST_*` and `LOOP_*` ids |
-| `lfo.js` | `Lfo` and the `LFO_*` shapes |
-| `svf.js` | `Svf`, `softClip`, the `FILT_*` modes |
-| `prng.js` | `makeRandom`, `randomSeed32` |
-| `patchNormalise.js` | `normalisePatch`, `num`: a partial patch to a full one |
+| `fmProcessor.ts` | the entry: `FmPartProcessor` (the port, the event queue, voice allocation, `renderBlock`) and `registerProcessor` |
+| `voice.ts` | `Voice`: one note's state and lifecycle (`start`, `rebind`, `retarget`, `release`, `kill`, `steal`, `dormant`); `render` and `updateControl` stay methods and delegate |
+| `voiceControl.ts` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
+| `voiceRender.ts` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
+| `voiceKernel.ts` | `renderVoiceKernel` (#548): the fixed-index kernel, one function, never sliced finer |
+| `fmConstants.ts` | the tunables every other module imports |
+| `waveTables.ts` | `WAVE`, `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
+| `algorithms.ts` | `ALGORITHMS`, the topological order, the kernel's edge and carrier tables |
+| `envelope.ts` | `Envelope`, `curveShape`, the `ST_*` and `LOOP_*` ids |
+| `lfo.ts` | `Lfo` and the `LFO_*` shapes |
+| `svf.ts` | `Svf`, `softClip`, the `FILT_*` modes |
+| `prng.ts` | `makeRandom`, `randomSeed32` |
+| `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one |
+| `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
+| `tsconfig.json` | the folder's own `tsc -p` project (#654): the client's settings with `noUncheckedIndexedAccess` and `useDefineForClassFields` off, and why |
+| `*.test.ts` | direct tests of the leaf modules (#654): a module that warms the wave cache at load needs `sampleRate` on `globalThis` before a dynamic import |
 
 Each module opens with a header saying what it owns, the invariant it keeps and
 the test that pins it; its exports are one list at the end, so a move never
@@ -65,16 +68,29 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
 5. **Tables mirrored on the main thread.** `patch.ts` mirrors `ALGORITHMS` and
    `WAVE`; `envelopeCurve.ts` mirrors `Envelope`'s curve. `patch.test.ts` and
    `envelopeCurve.test.ts` fail when a copy drifts, until #656 shares them.
-6. **Module shape** (#644, #645): one concern per file, named after it,
-   100–350 lines, each opening with a header that says what it owns, the
-   invariant it keeps and the test that pins it. A new concern is a new
-   module and an import where it is used, not a section in an existing file.
-   The hot paths are **functions over the voice** (`voice` is the first
+6. **Module shape** (#644, #645, #654): one concern per file, named after
+   it, 100–350 lines, TypeScript, each opening with a header that says what it
+   owns, the invariant it keeps and the test that pins it. A new concern is a
+   new module and an import where it is used, not a section in an existing
+   file. The hot paths are **functions over the voice** (`voice` is the first
    parameter, `this` never appears), split at per-render-call granularity:
    one call per control block or render chunk, never per sample. The kernel
-   stays one function read top to bottom. Plain JS until #654 converts the
-   folder.
+   stays one function read top to bottom.
+7. **Types erase; they never change the emitted code.** A class field is
+   declared (`ic1: number;`) and written by the constructor, never
+   initialised at the declaration: with define semantics a field would be
+   emitted as `undefined` before the constructor writes a number, and V8
+   then boxes every later double write to it (the #548 scenario read 336 ms
+   against 182 ms, and the boxes are allocations on the audio thread), so
+   `fm/tsconfig.json` turns `useDefineForClassFields` off. A nullable field
+   read on a hot path takes a `!` (`voice.patch!`), never a `??` (a branch)
+   or a default object (an allocation). `noUncheckedIndexedAccess` is off for
+   the folder so that `amp[i] += x` stays as written. The diff of
+   `generated/fm-processor.js` against its last JS build is the proof that
+   the types cost nothing; the bench is the proof that the emit did not
+   change shape.
 
-Verify with the client's command, then `node scripts/build-worklets.mjs --check`
+Verify with the client's command, `npx tsc -p packages/client/src/audio/worklet/fm/tsconfig.json`
+(also in `npm run typecheck`), then `node scripts/build-worklets.mjs --check`
 and `node tools/patch-editor/build-editor.mjs` (the console page bundles the
 generated file, so its bytes change with it).
