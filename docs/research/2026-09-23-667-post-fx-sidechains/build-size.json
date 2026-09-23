@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "entryBytes": 723273,
+    "entryGzipBytes": 208773,
+    "distBytesExcludingMaps": 29744583
+  },
+  "implementation": {
+    "entryBytes": 728080,
+    "entryGzipBytes": 210672,
+    "distBytesExcludingMaps": 29749390
+  },
+  "delta": {
+    "entryBytes": 4807,
+    "entryGzipBytes": 1899,
+    "distBytesExcludingMaps": 4807
+  },
+  "baselineCommit": "760bb726",
+  "machine": {
+    "system": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "backend": "Vite production build, Node 24"
+  }
+}
