@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { FILT_HP, FILT_LP, softClip, Svf } from './svf';
+import { FILT_HP, FILT_LP } from './modeIds';
+import { softClip, Svf } from './svf';
 
 const SR = 48000;
 

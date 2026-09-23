@@ -17,9 +17,7 @@ import type {
   Patch,
 } from '../../patch/patch';
 import { ALGORITHMS } from './algorithms';
-import { LOOP_NONE } from './envelope';
-import { LFO_SINE } from './lfo';
-import { FILT_OFF } from './svf';
+import { FILT_OFF, LFO_SINE, LOOP_NONE } from './modeIds';
 import { WAVE } from './waveIds';
 
 /** The patch the voice reads: every field filled, plus the per-operator feedback scratch. */

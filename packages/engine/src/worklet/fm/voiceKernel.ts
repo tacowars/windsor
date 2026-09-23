@@ -24,7 +24,8 @@ import {
   MOD_INDEX_SCALE,
   TABLE_SIZE,
 } from './fmConstants';
-import { FILT_OFF, softClip } from './svf';
+import { FILT_OFF } from './modeIds';
+import { softClip } from './svf';
 import { KIND_NOISE, KIND_SAW_D, KIND_TABLE } from './waveTables';
 
 /**
