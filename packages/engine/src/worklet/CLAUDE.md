@@ -6,7 +6,11 @@ build output. `reverb-processor.js` is the plate, still one hand-written file
 
 | Module | Owns |
 |---|---|
-| `fmProcessor.js` | the entry: `Voice` and `FmPartProcessor`, `registerProcessor` (the voice splits in #645) |
+| `fmProcessor.js` | the entry: `FmPartProcessor` (the port, the event queue, voice allocation, `renderBlock`) and `registerProcessor` |
+| `voice.js` | `Voice`: one note's state and lifecycle (`start`, `rebind`, `retarget`, `release`, `kill`, `steal`, `dormant`); `render` and `updateControl` stay methods and delegate |
+| `voiceControl.js` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
+| `voiceRender.js` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
+| `voiceKernel.js` | `renderVoiceKernel` (#548): the fixed-index kernel, one function, never sliced finer |
 | `fmConstants.js` | the tunables every other module imports |
 | `waveTables.js` | `WAVE`, `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
 | `algorithms.js` | `ALGORITHMS`, the topological order, the kernel's edge and carrier tables |
@@ -61,12 +65,15 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
 5. **Tables mirrored on the main thread.** `patch.ts` mirrors `ALGORITHMS` and
    `WAVE`; `envelopeCurve.ts` mirrors `Envelope`'s curve. `patch.test.ts` and
    `envelopeCurve.test.ts` fail when a copy drifts, until #656 shares them.
-6. **Module shape** (#644 done, #645 next): one concern per file, named
-   after it, 100–350 lines, each opening with a header that says what it owns,
-   the invariant it keeps and the test that pins it. A new concern is a new
-   module and an import in the entry, not a section in an existing file. The
-   kernel stays one function read top to bottom. Plain JS until #654 converts
-   the folder.
+6. **Module shape** (#644, #645): one concern per file, named after it,
+   100–350 lines, each opening with a header that says what it owns, the
+   invariant it keeps and the test that pins it. A new concern is a new
+   module and an import where it is used, not a section in an existing file.
+   The hot paths are **functions over the voice** (`voice` is the first
+   parameter, `this` never appears), split at per-render-call granularity:
+   one call per control block or render chunk, never per sample. The kernel
+   stays one function read top to bottom. Plain JS until #654 converts the
+   folder.
 
 Verify with the client's command, then `node scripts/build-worklets.mjs --check`
 and `node tools/patch-editor/build-editor.mjs` (the console page bundles the
