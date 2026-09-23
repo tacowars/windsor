@@ -11,6 +11,7 @@ import type { AppCtx } from './context';
 import { compressorCard } from './compressorCard';
 import { chorusCard } from './chorusCard';
 import { driveCard } from './driveCard';
+import { retroReverbCard } from './retroReverbCard';
 
 /** The knobs of the insert at `index` in the part's strip. */
 export type InsertCard = (ctx: AppCtx, slot: InsertTarget, index: number) => HTMLElement;
@@ -19,4 +20,5 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   drive: driveCard,
   chorus: chorusCard,
   compressor: compressorCard,
+  'retro-reverb': retroReverbCard,
 };

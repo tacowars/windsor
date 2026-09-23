@@ -528,6 +528,9 @@
       .knob:hover {
         background: var(--panel-hi);
       }
+      .retro-reverb-card .knob {
+        width: 64px;
+      }
       .knob svg {
         display: block;
       }
@@ -1191,7 +1194,7 @@
          dev server. The app turns them into blob URLs for FmEngine.init(). -->
     <script>
       window.__A204_DSP__ = { fm: /*__WORKLET__*/, compressor: /*__COMPRESSOR__*/, meter: /*__METER__*/,
-        reverb: /*__REVERB__*/ };
+        reverb: /*__REVERB__*/, retroReverb: /*__RETRO_REVERB__*/ };
     </script>
     <!-- The console app: tools/patch-editor/src/main.ts bundled together with
          the real engine (packages/client/src/audio via index-for-editor). -->

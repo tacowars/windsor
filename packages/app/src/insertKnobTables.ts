@@ -28,6 +28,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   drive: 'Drive',
   chorus: 'Chorus',
   compressor: 'Bus compressor',
+  'retro-reverb': 'Retro reverb',
 };
 
 export interface InsertKnobEntry<S> {
