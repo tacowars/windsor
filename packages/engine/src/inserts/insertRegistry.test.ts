@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FieldNormaliser } from '../arrangementFields';
+import { FieldNormaliser } from '../song/arrangementFields';
 import { DEFAULT_CHORUS } from './chorusInsert';
 import { DEFAULT_DRIVE } from './driveInsert';
 import { MAX_INSERTS } from './insertConstants';

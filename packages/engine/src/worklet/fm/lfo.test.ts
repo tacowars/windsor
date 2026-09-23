@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LfoSettings } from '../../patch';
+import type { LfoSettings } from '../../patch/patch';
 import { makeRandom } from './prng';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.

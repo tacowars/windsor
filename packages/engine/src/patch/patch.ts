@@ -1,0 +1,286 @@
+/**
+ * Patch schema for the FM engine: enums, the algorithm routing table, and the
+ * factory functions that fill in every field the DSP expects.
+ *
+ * The numeric enums and the routing table are mirrored in
+ * `worklet/fm/`, which imports nothing from the main thread (#656 will share them; see the note at the
+ * top of that file). `patch.test.ts` asserts the two copies are identical, so
+ * they cannot drift silently.
+ */
+import { ALGORITHMS, OPERATOR_COUNT } from '../audioConstants';
+import type { Algorithm } from '../audioConstants';
+
+/** Operator waveform. Values must match `WAVE` in the worklet. */
+/** The waveform ids live with the worklet that renders them (`worklet/fm/waveIds.ts`, #656). */
+export { WAVE } from '../worklet/fm/waveIds';
+import { WAVE } from '../worklet/fm/waveIds';
+
+export const WAVE_NAMES = [
+  'Sine',
+  'Saw',
+  'Square',
+  'Triangle',
+  'Noise',
+  'Saw D',
+  'Square D',
+  'Sine 4bit',
+  'Sine 8bit',
+  'User',
+] as const;
+
+export const LFO_SHAPE = {
+  SINE: 0,
+  TRIANGLE: 1,
+  SAW_UP: 2,
+  SAW_DOWN: 3,
+  SQUARE: 4,
+  SAMPLE_HOLD: 5,
+  DRIFT: 6,
+} as const;
+
+export const LFO_SHAPE_NAMES = [
+  'Sine',
+  'Tri',
+  'Saw Up',
+  'Saw Down',
+  'Square',
+  'S&H',
+  'Drift',
+] as const;
+
+export const FILTER_MODE = { OFF: 0, LOWPASS: 1, HIGHPASS: 2, BANDPASS: 3, NOTCH: 4 } as const;
+export const FILTER_MODE_NAMES = ['Off', 'LP', 'HP', 'BP', 'Notch'] as const;
+
+export const LOOP_MODE = { NONE: 0, LOOP: 1, TRIGGER: 2 } as const;
+export const LOOP_MODE_NAMES = ['None', 'Loop', 'Trigger'] as const;
+
+/** Operators are labelled A B C D, with A nearest the output. */
+export const OP_NAMES = ['A', 'B', 'C', 'D'] as const;
+
+/** The algorithm routing table lives in `audioConstants.ts`; this is its home. */
+export { ALGORITHMS };
+export type { Algorithm };
+
+/* ------------------------------------------------------------------ */
+
+export interface Envelope {
+  initLevel: number;
+  attackTime: number;
+  attackCurve: number;
+  peakLevel: number;
+  decayTime: number;
+  decayCurve: number;
+  sustainLevel: number;
+  releaseTime: number;
+  releaseCurve: number;
+  endLevel: number;
+  loopMode: number;
+  /** Above zero, higher notes run their envelope faster. */
+  keyScale: number;
+}
+
+export interface Operator {
+  wave: number;
+  /** Harmonic amplitudes for the User wave, fundamental first; null plays a sine. */
+  userPartials: number[] | null;
+  /** Ignored by the worklet since #511, which caches a User wave by its partials; kept so existing patches and documents still load. */
+  userKey: string;
+  ratio: number;
+  fixed: boolean;
+  fixedHz: number;
+  /** Cents. */
+  detune: number;
+  /**
+   * 0..1, squared before the envelope and the rest of the amplitude chain.
+   * A carrier's level is its volume; a modulator's is its depth — at 1, with
+   * its envelope open, it shifts the phase it feeds by 4 cycles, ~25 rad
+   * (#543). The Level knob means both because an operator can be either.
+   */
+  level: number;
+  /** Self-feedback, -1..1 (#529): positive towards a sawtooth, negative towards a square, 0 off. */
+  feedback: number;
+  velSens: number;
+  levelKeyScale: number;
+  phase: number;
+  phaseFree: boolean;
+  env: Envelope;
+}
+
+export interface LfoSettings {
+  shape: number;
+  rate: number;
+  amount: number;
+  delay: number;
+  retrigger: boolean;
+  /** Semitones. */
+  toPitch: number;
+  modWheelDepth: number;
+  /** Per-operator level modulation depth. */
+  toOp: number[];
+}
+
+export interface FilterSettings {
+  mode: number;
+  cutoff: number;
+  resonance: number;
+  drive: number;
+  slope24: boolean;
+  /** Octaves. */
+  envAmount: number;
+  /** Octaves the mod wheel adds to `envAmount` at full travel (#586); 0 is off. */
+  modWheelDepth: number;
+  /** Octaves. */
+  lfoAmount: number;
+  keyTrack: number;
+  env: Envelope;
+}
+
+export interface Patch {
+  name: string;
+  algorithm: number;
+  volume: number;
+  /** Global harmonic brightness, doubling as the anti-alias trim. */
+  tone: number;
+  /** Seconds. */
+  glide: number;
+  /** Semitones. */
+  pitchEnvAmount: number;
+  pan: number;
+  panRandom: number;
+  panKey: number;
+  /** Cents. Above zero this doubles voice cost -- it runs two detuned voices. */
+  spread: number;
+  /**
+   * One *note* at a time, with retrigger (#453): a note-on fades whatever the
+   * part has sounding and starts the new note fresh. `spread` still runs its
+   * detuned pair for that one note. For percussion and bass.
+   */
+  mono: boolean;
+  ops: Operator[];
+  pitchEnv: Envelope;
+  lfo: LfoSettings;
+  filter: FilterSettings;
+}
+
+/** An operator with every field optional, its envelope included; `makeOperator` completes it. */
+export type PartialOperator = Partial<Omit<Operator, 'env'>> & { env?: Partial<Envelope> };
+
+/** Every field optional, recursively -- what an editor or a preset supplies. */
+export type PartialPatch = {
+  [K in keyof Patch]?: K extends 'ops'
+    ? PartialOperator[]
+    : Patch[K] extends object
+      ? Partial<Patch[K]>
+      : Patch[K];
+};
+
+export function makeEnvelope(o: Partial<Envelope> = {}): Envelope {
+  return {
+    initLevel: 0,
+    attackTime: 0.002,
+    attackCurve: 0,
+    peakLevel: 1,
+    decayTime: 0.4,
+    decayCurve: 0.5,
+    sustainLevel: 0.7,
+    releaseTime: 0.3,
+    releaseCurve: 0.5,
+    endLevel: 0,
+    loopMode: LOOP_MODE.NONE,
+    keyScale: 0,
+    ...o,
+  };
+}
+
+export function makeOperator(o: PartialOperator = {}): Operator {
+  return {
+    wave: WAVE.SINE,
+    userPartials: null,
+    userKey: '',
+    ratio: 1,
+    fixed: false,
+    fixedHz: 100,
+    detune: 0,
+    level: 0,
+    feedback: 0,
+    velSens: 0.4,
+    levelKeyScale: 0,
+    phase: 0,
+    phaseFree: true,
+    ...o,
+    env: makeEnvelope(o.env),
+  };
+}
+
+export function makePatch(o: PartialPatch = {}): Patch {
+  const ops: Operator[] = [];
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    ops.push(makeOperator({ level: i === 0 ? 1 : 0, ...(o.ops?.[i] ?? {}) }));
+  }
+  return {
+    name: 'untitled',
+    algorithm: 0,
+    volume: 0.8,
+    tone: 1,
+    glide: 0,
+    pitchEnvAmount: 0,
+    pan: 0,
+    panRandom: 0,
+    panKey: 0,
+    spread: 0,
+    mono: false,
+    ...o,
+    ops,
+    pitchEnv: makeEnvelope({ sustainLevel: 0, decayTime: 0.1, ...(o.pitchEnv ?? {}) }),
+    lfo: {
+      shape: LFO_SHAPE.SINE,
+      rate: 5,
+      amount: 0,
+      delay: 0,
+      retrigger: false,
+      toPitch: 0,
+      modWheelDepth: 1,
+      toOp: [0, 0, 0, 0],
+      ...(o.lfo ?? {}),
+    },
+    filter: {
+      mode: FILTER_MODE.OFF,
+      cutoff: 8000,
+      resonance: 0.707,
+      drive: 1,
+      slope24: false,
+      envAmount: 0,
+      modWheelDepth: 0,
+      lfoAmount: 0,
+      keyTrack: 0,
+      ...(o.filter ?? {}),
+      env: makeEnvelope({ sustainLevel: 0, ...(o.filter?.env ?? {}) }),
+    },
+  };
+}
+
+/** Deep copy, so an editor can mutate a preset without touching the original. */
+export function clonePatch(p: Patch): Patch {
+  return structuredClone(p);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mergeInto(current: unknown, partial: unknown): unknown {
+  if (!isPlainObject(current) || !isPlainObject(partial)) return partial;
+  const merged: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(partial)) merged[key] = mergeInto(current[key], value);
+  return merged;
+}
+
+/**
+ * A partial patch over a complete one, then completed again: objects recurse,
+ * arrays (`ops`, `toOp`, `userPartials`) are replaced wholesale. The live
+ * `patches` path of `AudioSystem.apply` merges a document's patch edit over
+ * the part's current patch with this, so a partial names only what changes.
+ */
+export function mergePatch(base: Patch, partial: PartialPatch): Patch {
+  return makePatch(mergeInto(base, partial) as PartialPatch);
+}

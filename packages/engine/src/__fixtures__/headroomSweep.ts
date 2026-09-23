@@ -5,12 +5,12 @@
  * number in the library was measured with, so a `worstSeed` recorded by the
  * tool is the seed the test renders.
  */
-import type { Patch } from '../patch';
+import type { Patch } from '../patch/patch';
 import type { LoadedProcessor, ScheduledEvent } from './workletHarness';
 import { loadProcessor, render } from './workletHarness';
 
-export { loadPatchFile, patchContentHash } from '../patchLibrary';
-export { serialisePatchFile } from '../patchFileSerialise';
+export { loadPatchFile, patchContentHash } from '../patch/patchLibrary';
+export { serialisePatchFile } from '../patch/patchFileSerialise';
 
 /** The headroom render: a quarter-second note at velocity 0.9, 400 blocks, 16 voices. */
 export const HEADROOM_RENDER = {

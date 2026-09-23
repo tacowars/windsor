@@ -3,8 +3,8 @@
  * `insertRegistry.ts` meets. A kind is code-owned — its fields, their ranges,
  * its node graph — and a song names which kinds it uses and how they are set.
  */
-import type { FieldNormaliser } from '../arrangementFields';
-import type { StripStage } from '../channelStrip';
+import type { FieldNormaliser } from '../song/arrangementFields';
+import type { StripStage } from '../mixer/channelStrip';
 
 /** A live insert: a strip stage that can take its kind's settings without re-wiring. */
 export interface InsertStage<S extends { readonly kind: string }> extends StripStage {

@@ -31,7 +31,7 @@ if (dirArg === '--help' || dirArg === '-h') {
 const sourceDir = resolve(dirArg ?? join(homedir(), 'Downloads'));
 
 const { loadUnsweptPatchFile } = await loadAudioExports(
-  `export { loadUnsweptPatchFile } from './patchLibrary';`,
+  `export { loadUnsweptPatchFile } from './patch/patchLibrary';`,
   '563-import-patches',
 );
 

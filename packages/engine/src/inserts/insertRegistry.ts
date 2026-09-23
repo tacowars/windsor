@@ -5,8 +5,8 @@
  * that a table here did not declare. A new kind is one file under `inserts/`,
  * its constants, its `InsertSpec` member and an appended entry below.
  */
-import type { FieldNormaliser } from '../arrangementFields';
-import { isRecord, show } from '../arrangementFields';
+import type { FieldNormaliser } from '../song/arrangementFields';
+import { isRecord, show } from '../song/arrangementFields';
 import { COMPRESSOR_INSERT, type CompressorSpec } from './compressorInsert';
 import type { ChorusSpec } from './chorusInsert';
 import { CHORUS_INSERT } from './chorusInsert';

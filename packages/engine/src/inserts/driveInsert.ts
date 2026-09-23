@@ -15,9 +15,9 @@
  * changes how hard it drives this insert; the Drive knob is the trim that
  * compensates (docs/log/2026-09-22-641-strip-inserts-over-a-code-owned-registry.md).
  */
-import type { FieldNormaliser } from '../arrangementFields';
+import type { FieldNormaliser } from '../song/arrangementFields';
 import { BUTTERWORTH_Q_DB } from '../audioConstants';
-import { tanhCurve } from '../tanhCurve';
+import { tanhCurve } from '../mixer/tanhCurve';
 import {
   DRIVE_CURVE_POINTS,
   DRIVE_CURVE_RANGE,

@@ -6,7 +6,7 @@
 /* eslint-disable no-magic-numbers -- DSP adapter: binary controls, stereo indices and milliseconds per second; tunables live in compressorConstants.ts */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate */
 import type { CompressorParams } from '../../inserts/compressorDsp';
-import type { LoadReportMessage, ReportLoadMessage } from '../../workletMessages';
+import type { LoadReportMessage, ReportLoadMessage } from '../../synth/workletMessages';
 import { CompressorDsp } from '../../inserts/compressorDsp';
 import {
   COMPRESSOR_NAME,

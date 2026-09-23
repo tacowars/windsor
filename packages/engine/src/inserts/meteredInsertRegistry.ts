@@ -1,7 +1,7 @@
 /** Attach worklet inserts to the engine's load meter for exactly their lifetime. */
 import { AUDIO_LOAD_REPORT_SECONDS } from '../audioConstants';
-import { meterNode } from '../audioLoad';
-import type { AudioLoadMeter } from '../audioLoad';
+import { meterNode } from '../cost/audioLoad';
+import type { AudioLoadMeter } from '../cost/audioLoad';
 import { INSERT_KINDS } from './insertRegistry';
 import type { InsertRegistry } from './insertRegistry';
 
