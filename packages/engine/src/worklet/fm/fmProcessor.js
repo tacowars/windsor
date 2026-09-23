@@ -1,666 +1,74 @@
-/* eslint-disable max-lines -- The DSP is one unit that must ship as a single
-   dependency-free script. AudioWorklet.addModule() takes a URL, and this file
-   has no imports, so `new URL(..., import.meta.url)` resolves it correctly in
-   both the dev server and the production build with no bundler involvement.
-   Splitting it would introduce a worklet bundling step (see
-   docs/design/audio-architecture.md 6.1) to buy nothing: the operator, envelope,
-   filter and voice code is a single hot loop read top-to-bottom, and the seams
-   a split would follow are already section comments. Exception approved by the
-   maintainer; recorded in docs/log/2026-08-31-audio-worklet-single-file.md. */
+/* eslint-disable max-lines -- `Voice` and the processor share this file until
+   #645 splits the voice along its render-call seams; the leaf units left in
+   #644. This is the entry `scripts/build-worklets.mjs` bundles into
+   `../generated/fm-processor.js`, the one script every consumer reads
+   (docs/log/2026-09-23-643-fm-worklet-is-generated-from-a-source-folder.md). */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate, currentFrame */
 
 /**
- * fm-processor.js -- 4-operator FM voice engine for AudioWorklet.
+ * fmProcessor.js -- 4-operator FM voice engine for AudioWorklet.
  *
- * Runs on the audio thread. Two rules govern every line below:
+ * Runs on the audio thread. The rules for every line under `fm/` are stated
+ * in full in ../CLAUDE.md; the two that govern most edits:
  *   1. No allocation in process(): a GC pause is an audible dropout.
- *   2. No imports: see the eslint note above.
+ *   2. Bit-identity by construction: the same IEEE operations in the same
+ *      order, on every path (#548). `fmProcessorGolden.test.ts` is the gate.
  *
  * Architecture:
- *   - 4 operators, 11 algorithms, per-operator envelope + feedback
+ *   - 4 operators, 11 algorithms (`algorithms.js`), per-operator envelope
+ *     (`envelope.js`) + feedback
  *   - Operator-style waveforms built from harmonic partials, bandlimited into
- *     per-octave mipmaps (user waveforms are the same code path)
- *   - Per-voice TPT state-variable filter with its own envelope
- *   - Per-voice LFO, pitch envelope, glide
+ *     per-octave mipmaps (`waveTables.js`; user waveforms are the same path)
+ *   - Per-voice TPT state-variable filter (`svf.js`) with its own envelope
+ *   - Per-voice LFO (`lfo.js`), pitch envelope, glide
  *   - Sample-accurate note scheduling via a frame-stamped event queue
  *
  * One node == one timbral part. Instantiate several for multi-timbral use.
- * The patch schema and algorithm tables are mirrored in ../patch.ts;
- * audio/patch.test.ts asserts the two copies cannot drift.
+ * The patch schema and algorithm tables are mirrored in ../../patch.ts;
+ * audio/patch.test.ts asserts the two copies cannot drift (#656 shares them).
+ * Imports come only from modules in this folder; the bundle joins them into
+ * ../generated/fm-processor.js, which is never edited by hand.
  */
-/* ------------------------------------------------------------------ *
- * Tunables
- * ------------------------------------------------------------------ */
-
-const TABLE_BITS = 11;
-const TABLE_SIZE = 1 << TABLE_BITS; // 2048
-const TABLE_MASK = TABLE_SIZE - 1;
-
-const MIP_COUNT = 12; // one per octave from MIP_BASE_HZ
-const MIP_BASE_HZ = 16.352; // C0
-
-const CTRL_INTERVAL = 32; // samples between control-rate updates
-/*
- * Dormancy (#547). A held note whose carriers have all decayed to a sustain of
- * 0 renders nothing but still costs four operators, a filter and a voice slot
- * until its note-off. Below these it is treated as silent: its carrier
- * amplitudes are within DORMANT_AMP of 0 and, when a filter is on, the SVF
- * integrator states are within DORMANT_FILTER_STATE (about -180 dB), so a
- * resonant ring still sounding after the carriers stop is never cut.
- */
-const DORMANT_AMP = 1e-9;
-const DORMANT_FILTER_STATE = 1e-9;
-/*
- * Modulation depth at operator amplitude 1.0, in cycles of phase -- the unit
- * `phase` is kept in, so the radian index is 2*pi times this: 4 cycles is
- * ~25.1 rad (#543). The old 8 meant ~50 rad, past Nyquist for the sidebands of
- * anything but a low note on an engine that does not oversample, so the top
- * third of the Level knob was aliasing rather than timbre. 4 keeps the DX-era
- * ~4*pi useful maximum inside the knob and still reaches noise at the top.
- * Amplitude is level^2 x envelope x velocity x key scale x LFO, so a modulator
- * at Level 1 with its envelope open is the full 4 cycles.
- */
-const MOD_INDEX_SCALE = 4.0;
-/*
- * Self-feedback depth at |feedback| = 1, in cycles of phase (#529). Positive
- * feedback runs sin(phase + beta*y): sine towards a sawtooth, clean to ~1.25
- * rad and noise past ~2.5. Negative runs sin(phase + beta*y^2), whose half-wave
- * symmetry keeps only odd harmonics: sine towards a square, clean to ~2.0 rad.
- * Measured on A2 and A5 in #529; beyond these the one-sample loop turns chaotic.
- */
-const FEEDBACK_SAW_CYCLES = 1.25 / (2 * Math.PI);
-const FEEDBACK_SQUARE_CYCLES = 2.0 / (2 * Math.PI);
-const MIN_SEG_TIME = 0.0005; // shortest envelope segment, seconds
-
-/* Waveform ids — keep in sync with ../src/patch.js */
-const WAVE = {
-  SINE: 0,
-  SAW: 1,
-  SQUARE: 2,
-  TRIANGLE: 3,
-  NOISE: 4,
-  SAW_D: 5, // unbandlimited, aliases by design
-  SQUARE_D: 6, // unbandlimited, aliases by design
-  SINE_4BIT: 7,
-  SINE_8BIT: 8,
-  USER: 9, // partials supplied by the patch
-};
-
-/* ------------------------------------------------------------------ *
- * Randomness
- *
- * Three things below are drawn at random: free-running operator start phase,
- * the per-voice noise seed, and `panRandom` jitter. All three go through one
- * source per processor, so a test can pin every one of them at once.
- *
- * The game passes no seed and gets `Math.random`, as before — with one
- * deliberate difference, the zero exclusion in `randomSeed32` below.
- * `processorOptions.seed` swaps in mulberry32 — 32 bits of state, no
- * allocation, and ample for phase and pan jitter. It is deliberately not a
- * simulation-grade generator: nothing here reaches the simulation
- * (docs/design/audio-architecture.md 4), it only has to be reproducible.
- * ------------------------------------------------------------------ */
-
-/**
- * `Math.random`, unless a seed is supplied; then a reproducible mulberry32 --
- * the same algorithm, line for line, as `mulberry32` in
- * `packages/shared/src/terrain/heightmap.ts`, so the repo has one seeded
- * generator rather than two. It is copied rather than imported for the reason
- * at the top of this file: the worklet must stay import-free.
- */
-function makeRandom(seed) {
-  if (seed == null) return Math.random;
-  let state = seed >>> 0;
-  return function mulberry32() {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/**
- * A non-zero xorshift32 seed. Zero is xorshift's fixed point — a voice that
- * drew it would emit dead DC from its noise operator, and hold its sample-and-
- * hold LFO still, for as long as it sounded.
- *
- * **This is the one behavioural change on the unseeded game path.** Before,
- * that zero was kept; now it becomes 1. It is a 2^-32 accident from
- * `Math.random` and was never worth a branch, but a swept seed makes it
- * reachable and reproducible, so it is excluded rather than left to luck.
- * `fmProcessor.test.ts` pins `Math.random` at 0 and asserts a noise operator
- * still oscillates.
- */
-function randomSeed32(random) {
-  return (random() * 0xffffffff) >>> 0 || 1;
-}
-
-/* ------------------------------------------------------------------ *
- * Wavetable construction
- *
- * Every non-noise, non-digital waveform is a list of harmonic amplitudes
- * rendered into TABLE_SIZE samples, once per octave, with harmonics above
- * Nyquist dropped. `tone` (0..1) scales the surviving harmonic count, which
- * is the cheap global brightness / anti-alias control.
- * ------------------------------------------------------------------ */
-
-/** Exact sine table; sin(2*pi*h*i/N) == SIN_TAB[(h*i) & TABLE_MASK] */
-const SIN_TAB = new Float32Array(TABLE_SIZE);
-for (let i = 0; i < TABLE_SIZE; i++) {
-  SIN_TAB[i] = Math.sin((2 * Math.PI * i) / TABLE_SIZE);
-}
-
-/** Harmonic amplitude arrays. Index 0 is the fundamental. */
-function partialsFor(waveId, userPartials) {
-  const N = TABLE_SIZE >> 1;
-  const a = new Float32Array(N);
-  switch (waveId) {
-    case WAVE.SAW:
-      for (let n = 1; n <= N; n++) a[n - 1] = 1 / n;
-      break;
-    case WAVE.SQUARE:
-      for (let n = 1; n <= N; n += 2) a[n - 1] = 1 / n;
-      break;
-    case WAVE.TRIANGLE:
-      for (let n = 1, s = 1; n <= N; n += 2, s = -s) a[n - 1] = s / (n * n);
-      break;
-    case WAVE.USER:
-      if (userPartials) {
-        for (let i = 0; i < Math.min(N, userPartials.length); i++) a[i] = userPartials[i];
-      } else {
-        a[0] = 1;
-      }
-      break;
-    default: // SINE and the quantised sines start from a pure fundamental
-      a[0] = 1;
-      break;
-  }
-  return a;
-}
-
-/**
- * Build MIP_COUNT bandlimited tables. Each has one guard sample at the end so
- * linear interpolation never wraps-checks in the inner loop.
- */
-function buildMips(partials, sampleRate, tone) {
-  const nyquist = sampleRate * 0.5;
-  const maxPossible = TABLE_SIZE >> 1;
-  const mips = new Array(MIP_COUNT);
-
-  for (let k = 0; k < MIP_COUNT; k++) {
-    const topHz = MIP_BASE_HZ * Math.pow(2, k + 1);
-    let maxH = Math.floor(nyquist / topHz);
-    maxH = Math.min(maxH, maxPossible, partials.length);
-    maxH = Math.max(1, Math.floor(maxH * tone));
-
-    const t = new Float32Array(TABLE_SIZE + 1);
-    for (let h = 1; h <= maxH; h++) {
-      const amp = partials[h - 1];
-      if (amp === 0) continue;
-      let idx = 0;
-      for (let i = 0; i < TABLE_SIZE; i++) {
-        t[i] += amp * SIN_TAB[idx];
-        idx = (idx + h) & TABLE_MASK;
-      }
-    }
-
-    let peak = 0;
-    for (let i = 0; i < TABLE_SIZE; i++) {
-      const v = t[i] < 0 ? -t[i] : t[i];
-      if (v > peak) peak = v;
-    }
-    if (peak > 1e-9) {
-      const g = 1 / peak;
-      for (let i = 0; i < TABLE_SIZE; i++) t[i] *= g;
-    }
-    t[TABLE_SIZE] = t[0];
-    mips[k] = t;
-  }
-  return mips;
-}
-
-/** Quantise a mip set in place to `levels` steps — the 4-bit / 8-bit sines. */
-function quantiseMips(mips, levels) {
-  for (let k = 0; k < mips.length; k++) {
-    const t = mips[k];
-    for (let i = 0; i <= TABLE_SIZE; i++) {
-      t[i] = Math.round(t[i] * levels) / levels;
-    }
-  }
-  return mips;
-}
-
-/**
- * Shared across every processor instance in this worklet global scope, so 16
- * parts using a saw pay for the tables once. Keyed by waveform + quantised tone,
- * and for a User wave by the partials themselves (#511). The key used to be the
- * patch's `userKey`, which only worked while every author picked a unique one:
- * a User wave left at the default '' shared the first such table built, and a
- * harmonic edit kept playing the old one. `null` (a sine) and `[]` (silence)
- * keep distinct keys. Equal partials still share a table,
- * so the scoring bank's User presets render exactly as before. Only a `patch`
- * message reaches here, never the audio loop, so the string is fine.
- */
-const WAVE_CACHE = new Map();
-const WAVE_CACHE_LIMIT = 64;
-
-function getMips(waveId, sampleRate, tone, userPartials) {
-  const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
-  // null plays a sine and [] plays silence: the two must never share a key.
-  let content = '';
-  if (waveId === WAVE.USER) content = userPartials ? '[' + userPartials.join(',') + ']' : 'null';
-  const key = waveId + '|' + toneQ + '|' + content;
-  let mips = WAVE_CACHE.get(key);
-  if (mips) return mips;
-
-  mips = buildMips(partialsFor(waveId, userPartials), sampleRate, toneQ);
-  if (waveId === WAVE.SINE_4BIT) quantiseMips(mips, 8);
-  else if (waveId === WAVE.SINE_8BIT) quantiseMips(mips, 128);
-
-  if (WAVE_CACHE.size >= WAVE_CACHE_LIMIT) {
-    WAVE_CACHE.delete(WAVE_CACHE.keys().next().value);
-  }
-  WAVE_CACHE.set(key, mips);
-  return mips;
-}
-
-/** Which octave table to read for a given frequency. */
-function mipIndex(freq) {
-  if (freq <= MIP_BASE_HZ) return 0;
-  const k = Math.floor(Math.log2(freq / MIP_BASE_HZ));
-  return k < 0 ? 0 : k >= MIP_COUNT ? MIP_COUNT - 1 : k;
-}
-
-/* ------------------------------------------------------------------ *
- * Algorithms
- *
- * Operators are indexed 0..3 and labelled A B C D, with A at the bottom of the
- * diagram (nearest the output). `mods[i]` lists the operators that modulate i;
- * `carriers` lists the operators summed to the voice output.
- *
- * 0..7 are the classic four-operator topologies (as found on OPM/OPN);
- * 8..10 add the parallel/tapped shapes that make Operator expressive.
- * ------------------------------------------------------------------ */
-
-const A = 0,
-  B = 1,
-  C = 2,
-  D = 3;
-
-const ALGORITHMS = [
-  // 0:  D -> C -> B -> A                      full series, the classic FM stack
-  { name: 'D>C>B>A', mods: [[B], [C], [D], []], carriers: [A] },
-  // 1:  D,C -> B -> A                         two modulators sum into B
-  { name: '(D,C)>B>A', mods: [[B], [C, D], [], []], carriers: [A] },
-  // 2:  C -> B -> A, D -> A                   series plus a direct modulator
-  { name: 'C>B>A, D>A', mods: [[B, D], [C], [], []], carriers: [A] },
-  // 3:  D -> C -> A, B -> A                   two-stack and a single into A
-  { name: 'D>C>A, B>A', mods: [[C, B], [], [D], []], carriers: [A] },
-  // 4:  D -> C, B -> A                        two independent 2-op stacks
-  { name: 'D>C | B>A', mods: [[B], [], [D], []], carriers: [A, C] },
-  // 5:  D -> C, D -> B, D -> A                one modulator, three carriers
-  { name: 'D>(C,B,A)', mods: [[D], [D], [D], []], carriers: [A, B, C] },
-  // 6:  D -> C, B and A free                  one stack plus two sines
-  { name: 'D>C | B | A', mods: [[], [], [D], []], carriers: [A, B, C] },
-  // 7:  all four parallel                     additive, no FM at all
-  { name: 'A|B|C|D', mods: [[], [], [], []], carriers: [A, B, C, D] },
-  // 8:  D -> C -> B -> A, B also heard        series with a mid-chain tap
-  { name: 'D>C>B>A +B', mods: [[B], [C], [D], []], carriers: [A, B] },
-  // 9:  D -> C, C -> B, C -> A                shared modulator, split output
-  { name: 'D>C>(B,A)', mods: [[C], [C], [D], []], carriers: [A, B] },
-  // 10: D,C,B -> A                            three modulators, one carrier
-  { name: '(D,C,B)>A', mods: [[B, C, D], [], [], []], carriers: [A] },
-];
-
-/** Evaluation order so every modulator is computed before its target. */
-function topoOrder(alg) {
-  const order = [];
-  const seen = new Uint8Array(4);
-  const visit = (i) => {
-    if (seen[i]) return;
-    seen[i] = 1;
-    const m = alg.mods[i];
-    for (let j = 0; j < m.length; j++) if (m[j] !== i) visit(m[j]);
-    order.push(i);
-  };
-  for (let i = 0; i < 4; i++) visit(i);
-  return order;
-}
-
-const ALG_ORDER = ALGORITHMS.map(topoOrder);
-
-/*
- * The fixed-index voice kernel (#548). `Voice.renderKernel` evaluates the
- * operators D, C, B, A with each one's state in locals, and reads routing as
- * edge and carrier flags set once per render call, not as a per-sample walk
- * of `order` and `mods`. It is the generic loop's arithmetic in the generic
- * loop's order, so its output is bit-identical, and an algorithm qualifies
- * only when that holds by construction:
- *   - every modulator has a higher index than its target, so D..A computes
- *     each modulator before it is read, as the topological order does;
- *   - a modulator list of three is ascending (two terms commute exactly), and
- *     so is a carrier list of three or more.
- * The only state operators share is the voice's noise generator, so a voice
- * with two noise operators also needs its topological order to be D..A.
- */
-const EDGE_BA = 1,
-  EDGE_CA = 2,
-  EDGE_DA = 4,
-  EDGE_CB = 8,
-  EDGE_DB = 16,
-  EDGE_DC = 32;
-const EDGE_BIT = [
-  [0, EDGE_BA, EDGE_CA, EDGE_DA],
-  [0, 0, EDGE_CB, EDGE_DB],
-  [0, 0, 0, EDGE_DC],
-  [0, 0, 0, 0],
-];
-
-function ascending(list) {
-  for (let j = 1; j < list.length; j++) if (list[j] <= list[j - 1]) return false;
-  return true;
-}
-
-/** The algorithm's modulation edges as EDGE_* bits, or -1 when the kernel cannot render it exactly. */
-function kernelEdges(alg) {
-  let edges = 0;
-  for (let i = 0; i < 4; i++) {
-    const m = alg.mods[i];
-    if (m.length > 2 && !ascending(m)) return -1;
-    for (let j = 0; j < m.length; j++) {
-      if (m[j] <= i) return -1;
-      edges |= EDGE_BIT[i][m[j]];
-    }
-  }
-  if (alg.carriers.length > 2 && !ascending(alg.carriers)) return -1;
-  return edges;
-}
-
-const ALG_EDGES = ALGORITHMS.map(kernelEdges);
-const ALG_CARRIER_BITS = ALGORITHMS.map((alg) => alg.carriers.reduce((b, c) => b | (1 << c), 0));
-const ALG_DESCENDING = ALG_ORDER.map((o) => o[0] === D && o[1] === C && o[2] === B && o[3] === A);
-
-/* ------------------------------------------------------------------ *
- * Envelope
- *
- * Operator's shape: Init -> (attack) -> Peak -> (decay) -> Sustain -> held ->
- * (release) -> End, with a curve control per segment and three loop modes.
- * Advanced at control rate; the caller interpolates between control points.
- * ------------------------------------------------------------------ */
-
-const ST_IDLE = 0,
-  ST_ATTACK = 1,
-  ST_DECAY = 2,
-  ST_SUSTAIN = 3,
-  ST_RELEASE = 4,
-  ST_DONE = 5;
-const LOOP_NONE = 0,
-  LOOP_LOOP = 1,
-  LOOP_TRIGGER = 2;
-
-/** Monotonic 0..1 curve. k == 1 is linear, k < 1 bows up, k > 1 bows down. */
-function curveShape(p, k) {
-  return p / (p + (1 - p) * k);
-}
-
-class Envelope {
-  constructor() {
-    this.state = ST_IDLE;
-    this.value = 0;
-    this.phase = 0;
-    this.segStart = 0;
-    this.p = null; // parameter block, owned by the voice's patch
-    this.sr = 48000;
-    this.timeScale = 1; // key tracking: >1 slower, <1 faster
-  }
-
-  configure(params, sampleRate) {
-    this.p = params;
-    this.sr = sampleRate;
-  }
-
-  noteOn() {
-    const p = this.p;
-    this.state = ST_ATTACK;
-    this.phase = 0;
-    this.value = p.initLevel;
-    this.segStart = p.initLevel;
-  }
-
-  noteOff() {
-    if (this.state === ST_DONE || this.state === ST_IDLE) return;
-    if (this.p.loopMode === LOOP_TRIGGER) return; // runs its full course
-    this.state = ST_RELEASE;
-    this.phase = 0;
-    this.segStart = this.value;
-  }
-
-  /** True once the envelope has finished releasing. */
-  get finished() {
-    return this.state === ST_DONE || this.state === ST_IDLE;
-  }
-
-  /** Advance by `n` samples and return the new value. */
-  advance(n) {
-    const p = this.p;
-    if (this.state === ST_IDLE || this.state === ST_DONE) return this.value;
-    if (this.state === ST_SUSTAIN) {
-      this.value = p.sustainLevel;
-      return this.value;
-    }
-
-    let time, target, curve;
-    switch (this.state) {
-      case ST_ATTACK:
-        time = p.attackTime;
-        target = p.peakLevel;
-        curve = p.attackCurve;
-        break;
-      case ST_DECAY:
-        time = p.decayTime;
-        target = p.sustainLevel;
-        curve = p.decayCurve;
-        break;
-      default:
-        time = p.releaseTime;
-        target = p.endLevel;
-        curve = p.releaseCurve;
-        break;
-    }
-    time *= this.timeScale;
-    if (time < MIN_SEG_TIME) time = MIN_SEG_TIME;
-
-    this.phase += n / (time * this.sr);
-
-    if (this.phase >= 1) {
-      this.value = target;
-      this.phase = 0;
-      this.segStart = target;
-      switch (this.state) {
-        case ST_ATTACK:
-          this.state = ST_DECAY;
-          break;
-        case ST_DECAY:
-          if (p.loopMode === LOOP_LOOP) {
-            this.state = ST_ATTACK;
-            this.segStart = this.value;
-          } else if (p.loopMode === LOOP_TRIGGER) {
-            this.state = ST_RELEASE;
-          } else this.state = ST_SUSTAIN;
-          break;
-        default:
-          this.state = ST_DONE;
-          break;
-      }
-      return this.value;
-    }
-
-    const k = Math.exp(curve * 3);
-    const s = k === 1 ? this.phase : curveShape(this.phase, k);
-    this.value = this.segStart + (target - this.segStart) * s;
-    return this.value;
-  }
-}
-
-/* ------------------------------------------------------------------ *
- * LFO
- * ------------------------------------------------------------------ */
-
-const LFO_SINE = 0,
-  LFO_TRI = 1,
-  LFO_SAW_UP = 2,
-  LFO_SAW_DOWN = 3,
-  LFO_SQUARE = 4,
-  LFO_SH = 5,
-  LFO_DRIFT = 6;
-
-class Lfo {
-  constructor(random) {
-    this.phase = 0;
-    this.value = 0;
-    this.held = 0;
-    this.target = 0;
-    this.fade = 0;
-    this.seed = randomSeed32(random);
-  }
-
-  rand() {
-    // xorshift32 — deterministic, allocation free
-    let x = this.seed;
-    x ^= x << 13;
-    x >>>= 0;
-    x ^= x >> 17;
-    x ^= x << 5;
-    x >>>= 0;
-    this.seed = x;
-    return x / 0xffffffff;
-  }
-
-  reset(retrigger) {
-    if (retrigger) this.phase = 0;
-    this.fade = 0;
-    this.held = this.rand() * 2 - 1;
-    this.target = this.rand() * 2 - 1;
-  }
-
-  advance(p, n, sampleRate) {
-    const prev = this.phase;
-    this.phase += (p.rate * n) / sampleRate;
-    const wrapped = this.phase >= 1;
-    if (wrapped) this.phase -= Math.floor(this.phase);
-
-    switch (p.shape) {
-      case LFO_TRI:
-        this.value = 4 * Math.abs(this.phase - 0.5) - 1;
-        break;
-      case LFO_SAW_UP:
-        this.value = this.phase * 2 - 1;
-        break;
-      case LFO_SAW_DOWN:
-        this.value = 1 - this.phase * 2;
-        break;
-      case LFO_SQUARE:
-        this.value = this.phase < 0.5 ? 1 : -1;
-        break;
-      case LFO_SH:
-        if (wrapped || this.phase < prev) this.held = this.rand() * 2 - 1;
-        this.value = this.held;
-        break;
-      case LFO_DRIFT:
-        if (wrapped || this.phase < prev) {
-          this.held = this.target;
-          this.target = this.rand() * 2 - 1;
-        }
-        this.value = this.held + (this.target - this.held) * this.phase;
-        break;
-      default:
-        this.value = SIN_TAB[(this.phase * TABLE_SIZE) & TABLE_MASK];
-        break;
-    }
-
-    if (p.delay > 0) {
-      this.fade = Math.min(1, this.fade + n / (p.delay * sampleRate));
-    } else {
-      this.fade = 1;
-    }
-    return this.value * this.fade;
-  }
-}
-
-/* ------------------------------------------------------------------ *
- * Filter — TPT / zero-delay-feedback state variable (Simper topology).
- * One structure yields lowpass, highpass, bandpass and notch, stays stable up
- * to Nyquist, and costs a handful of multiply-adds per sample.
- * ------------------------------------------------------------------ */
-
-const FILT_OFF = 0,
-  FILT_LP = 1,
-  FILT_HP = 2,
-  FILT_BP = 3,
-  FILT_NOTCH = 4;
-
-class Svf {
-  constructor() {
-    this.ic1 = 0;
-    this.ic2 = 0;
-    this.a1 = 0;
-    this.a2 = 0;
-    this.a3 = 0;
-    this.k = 0;
-  }
-
-  reset() {
-    this.ic1 = 0;
-    this.ic2 = 0;
-  }
-
-  /** Both integrators below the dormancy floor: the filter has stopped ringing (#547). */
-  static quiet(svf) {
-    return Math.abs(svf.ic1) <= DORMANT_FILTER_STATE && Math.abs(svf.ic2) <= DORMANT_FILTER_STATE;
-  }
-
-  /** Recompute coefficients. Called at control rate, not per sample. */
-  setCoeffs(cutoffHz, q, sampleRate) {
-    const nyq = sampleRate * 0.5;
-    let fc = cutoffHz;
-    if (fc < 20) fc = 20;
-    if (fc > nyq * 0.98) fc = nyq * 0.98;
-    const g = Math.tan((Math.PI * fc) / sampleRate);
-    const k = 1 / Math.max(0.5, q);
-    this.k = k;
-    this.a1 = 1 / (1 + g * (g + k));
-    this.a2 = g * this.a1;
-    this.a3 = g * this.a2;
-  }
-
-  process(v0, mode) {
-    const v3 = v0 - this.ic2;
-    const v1 = this.a1 * this.ic1 + this.a2 * v3;
-    const v2 = this.ic2 + this.a2 * this.ic1 + this.a3 * v3;
-    this.ic1 = 2 * v1 - this.ic1;
-    this.ic2 = 2 * v2 - this.ic2;
-    switch (mode) {
-      case FILT_LP:
-        return v2;
-      case FILT_HP:
-        return v0 - this.k * v1 - v2;
-      case FILT_BP:
-        return v1;
-      case FILT_NOTCH:
-        return v0 - this.k * v1;
-      default:
-        return v0;
-    }
-  }
-}
-
-/** Cheap odd-symmetric saturator for filter drive. */
-function softClip(x) {
-  if (x > 3) return 1;
-  if (x < -3) return -1;
-  return (x * (27 + x * x)) / (27 + 9 * x * x);
-}
+import {
+  ALGORITHMS,
+  ALG_CARRIER_BITS,
+  ALG_DESCENDING,
+  ALG_EDGES,
+  ALG_ORDER,
+  A,
+  B,
+  C,
+  D,
+  EDGE_BA,
+  EDGE_CA,
+  EDGE_CB,
+  EDGE_DA,
+  EDGE_DB,
+  EDGE_DC,
+} from './algorithms.js';
+import { Envelope, ST_IDLE, ST_SUSTAIN } from './envelope.js';
+import {
+  CTRL_INTERVAL,
+  DORMANT_AMP,
+  FEEDBACK_SAW_CYCLES,
+  FEEDBACK_SQUARE_CYCLES,
+  MOD_INDEX_SCALE,
+  TABLE_SIZE,
+} from './fmConstants.js';
+import { Lfo } from './lfo.js';
+import { normalisePatch, num } from './patchNormalise.js';
+import { makeRandom, randomSeed32 } from './prng.js';
+import { FILT_OFF, Svf, softClip } from './svf.js';
+import {
+  getMips,
+  KIND_NOISE,
+  KIND_SAW_D,
+  KIND_SQUARE_D,
+  KIND_TABLE,
+  mipIndex,
+  WAVE,
+  waveKind,
+} from './waveTables.js';
 
 /* ------------------------------------------------------------------ *
  * Voice — four operators, a filter, and the modulation that feeds them.
@@ -668,25 +76,6 @@ function softClip(x) {
  * Every buffer here is allocated once at construction. render() must not
  * allocate: it runs on the audio thread and a GC pause is an audible dropout.
  * ------------------------------------------------------------------ */
-
-const KIND_TABLE = 0,
-  KIND_NOISE = 1,
-  KIND_SAW_D = 2,
-  KIND_SQUARE_D = 3;
-
-/** The render kind an operator's wave id selects; everything not raw or noise is a table. */
-function waveKind(wave) {
-  switch (wave) {
-    case WAVE.NOISE:
-      return KIND_NOISE;
-    case WAVE.SAW_D:
-      return KIND_SAW_D;
-    case WAVE.SQUARE_D:
-      return KIND_SQUARE_D;
-    default:
-      return KIND_TABLE;
-  }
-}
 
 class Voice {
   constructor(sampleRate, random) {
@@ -1441,118 +830,6 @@ class Voice {
     else this.fb2[i] = this.fb1[i];
     this.fb1[i] = 0;
   }
-}
-
-/* ------------------------------------------------------------------ *
- * Patch normalisation
- *
- * The editor and the game send partial patches; fill in every field here so
- * the audio loop never has to test for undefined.
- * ------------------------------------------------------------------ */
-
-function envDefaults(o) {
-  o = o || {};
-  return {
-    initLevel: num(o.initLevel, 0),
-    attackTime: num(o.attackTime, 0.002),
-    attackCurve: num(o.attackCurve, 0),
-    peakLevel: num(o.peakLevel, 1),
-    decayTime: num(o.decayTime, 0.4),
-    decayCurve: num(o.decayCurve, 0.5),
-    sustainLevel: num(o.sustainLevel, 0.7),
-    releaseTime: num(o.releaseTime, 0.3),
-    releaseCurve: num(o.releaseCurve, 0.5),
-    endLevel: num(o.endLevel, 0),
-    loopMode: num(o.loopMode, LOOP_NONE) | 0,
-    keyScale: num(o.keyScale, 0),
-  };
-}
-
-function num(v, d) {
-  return typeof v === 'number' && isFinite(v) ? v : d;
-}
-
-function opDefaults(o, index) {
-  o = o || {};
-  return {
-    wave: num(o.wave, WAVE.SINE) | 0,
-    userPartials: o.userPartials || null,
-    userKey: o.userKey || '',
-    ratio: num(o.ratio, 1),
-    fixed: !!o.fixed,
-    fixedHz: num(o.fixedHz, 100),
-    detune: num(o.detune, 0), // cents
-    level: num(o.level, index === 0 ? 1 : 0),
-    feedback: Math.max(-1, Math.min(1, num(o.feedback, 0))), // bipolar (#529)
-    velSens: num(o.velSens, 0.4),
-    levelKeyScale: num(o.levelKeyScale, 0),
-    phase: num(o.phase, 0),
-    phaseFree: o.phaseFree !== false, // free-running by default
-    env: envDefaults(o.env),
-  };
-}
-
-function normalisePatch(raw) {
-  raw = raw || {};
-  const ops = [];
-  for (let i = 0; i < 4; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
-
-  const lfoRaw = raw.lfo || {};
-  const filtRaw = raw.filter || {};
-
-  const p = {
-    name: raw.name || 'untitled',
-    algorithm: Math.max(0, Math.min(ALGORITHMS.length - 1, num(raw.algorithm, 0) | 0)),
-    volume: num(raw.volume, 0.8),
-    tone: Math.max(0.02, Math.min(1, num(raw.tone, 1))),
-    glide: num(raw.glide, 0),
-    pitchEnv: envDefaults(raw.pitchEnv),
-    pitchEnvAmount: num(raw.pitchEnvAmount, 0), // semitones
-    pan: num(raw.pan, 0),
-    panRandom: num(raw.panRandom, 0),
-    panKey: num(raw.panKey, 0),
-    spread: num(raw.spread, 0), // cents; >0 doubles voices
-    mono: !!raw.mono, // one note at a time, with retrigger (#453)
-    ops,
-    lfo: {
-      shape: num(lfoRaw.shape, LFO_SINE) | 0,
-      rate: num(lfoRaw.rate, 5),
-      amount: num(lfoRaw.amount, 0),
-      delay: num(lfoRaw.delay, 0),
-      retrigger: !!lfoRaw.retrigger,
-      toPitch: num(lfoRaw.toPitch, 0), // semitones
-      modWheelDepth: num(lfoRaw.modWheelDepth, 1),
-      toOp: [
-        num(lfoRaw.toOp && lfoRaw.toOp[0], 0),
-        num(lfoRaw.toOp && lfoRaw.toOp[1], 0),
-        num(lfoRaw.toOp && lfoRaw.toOp[2], 0),
-        num(lfoRaw.toOp && lfoRaw.toOp[3], 0),
-      ],
-    },
-    filter: {
-      mode: num(filtRaw.mode, FILT_OFF) | 0,
-      cutoff: num(filtRaw.cutoff, 8000),
-      resonance: num(filtRaw.resonance, 0.707),
-      drive: num(filtRaw.drive, 1),
-      slope24: !!filtRaw.slope24,
-      envAmount: num(filtRaw.envAmount, 0), // octaves
-      modWheelDepth: num(filtRaw.modWheelDepth, 0), // octaves the wheel adds to envAmount (#586)
-      lfoAmount: num(filtRaw.lfoAmount, 0), // octaves
-      keyTrack: num(filtRaw.keyTrack, 0),
-      env: envDefaults(filtRaw.env),
-    },
-  };
-
-  p.feedbackScratch = new Float32Array(4);
-  for (let i = 0; i < 4; i++) p.feedbackScratch[i] = ops[i].feedback;
-  return p;
-}
-
-/* Warm the common waveforms at module-load time — this runs inside
- * addModule(), before the context renders anything, so the table build never
- * stalls a live audio callback. */
-for (const w of [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE]) {
-  getMips(w, sampleRate, 1, null, '');
 }
 
 /* ------------------------------------------------------------------ *
