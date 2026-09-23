@@ -123,7 +123,9 @@ packages/client/src/audio/
   arrangementPlayer.ts  # binds each part's sequencer to its engine part, by slot
   arrangementValidate.ts # PatchResolver: where a song's part presets resolve (#562)
   workletMessages.ts    # main-thread <-> worklet contract
-  worklet/              # the DSP (§6.1): fm/ is the FM source, generated/ its bundle (#643), reverb-processor.js the plate
+  worklet/              # the DSP (§6.1): generated/ holds the bundles (#643), reverb-processor.js the plate
+    fm/                 # the FM source (#644): fmProcessor.js (entry: Voice + processor), fmConstants,
+                        #   waveTables, algorithms, envelope, lfo, svf, prng, patchNormalise
   __fixtures__/         # headless worklet harness, Node-only
 tools/patch-editor/     # authoring tool, outside the client bundle
 ```
