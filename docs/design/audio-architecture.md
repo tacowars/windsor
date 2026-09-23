@@ -76,7 +76,7 @@ in a second worklet of its own:
 | Concern | Where |
 |---|---|
 | FM voices, per-voice filter, envelopes, LFO | AudioWorklet (ours): `worklet/fm/`, bundled to `worklet/generated/fm-processor.js` (#643) |
-| Reverb | AudioWorklet (ours): `worklet/reverb-processor.js`, a Dattorro plate. **No `ConvolverNode`** — it was removed, not left beside it |
+| Reverb | AudioWorklet (ours): `worklet/reverb/`, bundled to `worklet/generated/reverb-processor.js` (#671), a Dattorro plate. **No `ConvolverNode`** — it was removed, not left beside it |
 | Glue-inspired part compressor (#660) | AudioWorklet: `worklet/compressor/`, bundled into `generated/compressor-processor.js`; feedback behavioral approximation, detector input reserved for future routing |
 | Bus tone shaping, delay, distortion, master safety compression | `BiquadFilterNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
 | 3D positioning | Babylon's spatial audio, over `PannerNode` |
@@ -137,11 +137,12 @@ packages/client/src/audio/          # folders mirror the music-engine skill's fi
   sfx/                    # the gameplay SFX path (Babylon AudioV2, not the music engine's): gameplaySfx.ts,
                           #   actionSfx.ts, spatialSfx.ts, sfxSelection.ts, sfxBuffers.ts, createGameplaySfx.ts,
                           #   sfxConstants.ts, footstepCadence.ts; offlineRender.ts bakes a patch to an AudioBuffer
-  worklet/                # the DSP (§6.1): generated/ holds the bundles (#643), reverb-processor.js the plate
+  worklet/                # the DSP (§6.1): generated/ holds the bundles (#643)
     fm/                   # the FM source, TypeScript in its own project (#644, #645, #654): fmProcessor.ts (entry), voice,
                           #   voiceControl, voiceRender, voiceKernel, fmConstants, waveTables,
                           #   algorithms, envelope, lfo, svf, prng, patchNormalise
     compressor/           # the compressor insert's processor (#660)
+    reverb/               # the plate's source (#671): reverbProcessor.ts (entry), delayLines, tank, reverbConstants
   __fixtures__/           # headless worklet harness and the fake audio graph, Node-only; shared by every folder
 tools/patch-editor/     # authoring tool, outside the client bundle
 ```
@@ -229,6 +230,13 @@ reasoning below still describes what the shipped file is; what it no longer
 describes is how the source is kept. Record
 `2026-09-23-643-fm-worklet-is-generated-from-a-source-folder`; the split itself
 is #644 and #645. The reverb is still one hand-written file.
+
+**Amended 2026-09-23 (#671)**: no longer — the plate is written as
+`worklet/reverb/` (`reverbProcessor.ts`, `delayLines.ts`, `tank.ts`,
+`reverbConstants.ts`, TypeScript in its own project) and bundled into
+`worklet/generated/reverb-processor.js`, pinned bit for bit by
+`mixer/reverbGolden.test.ts`. Record
+`2026-09-23-671-reverb-worklet-methods-installed-on-the-prototype`.
 
 There are two: `worklet/fm-processor.js` (1,302 lines) and `worklet/reverb-processor.js`
 (460), each far over the `max-lines` cap of 300 and each staying that way behind a
