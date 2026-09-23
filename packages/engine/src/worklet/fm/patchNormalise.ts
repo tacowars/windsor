@@ -7,11 +7,24 @@
  * audio loop, so allocation is fine.
  */
 
-import { ALGORITHMS } from './algorithms.js';
-import { LOOP_NONE } from './envelope.js';
-import { LFO_SINE } from './lfo.js';
-import { FILT_OFF } from './svf.js';
-import { WAVE } from './waveTables.js';
+import type {
+  Envelope as EnvelopeParams,
+  LfoSettings,
+  Operator,
+  PartialOperator,
+  PartialPatch,
+  Patch,
+} from '../../patch';
+import { ALGORITHMS } from './algorithms';
+import { LOOP_NONE } from './envelope';
+import { LFO_SINE } from './lfo';
+import { FILT_OFF } from './svf';
+import { WAVE } from './waveTables';
+
+/** The patch the voice reads: every field filled, plus the per-operator feedback scratch. */
+export interface WorkletPatch extends Patch {
+  feedbackScratch: Float32Array;
+}
 
 /* ------------------------------------------------------------------ *
  * Patch normalisation
@@ -20,7 +33,7 @@ import { WAVE } from './waveTables.js';
  * the audio loop never has to test for undefined.
  * ------------------------------------------------------------------ */
 
-function envDefaults(o) {
+function envDefaults(o: Partial<EnvelopeParams> | null | undefined): EnvelopeParams {
   o = o || {};
   return {
     initLevel: num(o.initLevel, 0),
@@ -38,11 +51,11 @@ function envDefaults(o) {
   };
 }
 
-function num(v, d) {
+function num(v: unknown, d: number): number {
   return typeof v === 'number' && isFinite(v) ? v : d;
 }
 
-function opDefaults(o, index) {
+function opDefaults(o: PartialOperator | null | undefined, index: number): Operator {
   o = o || {};
   return {
     wave: num(o.wave, WAVE.SINE) | 0,
@@ -62,12 +75,12 @@ function opDefaults(o, index) {
   };
 }
 
-function normalisePatch(raw) {
+function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
   raw = raw || {};
-  const ops = [];
+  const ops: Operator[] = [];
   for (let i = 0; i < 4; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
 
-  const lfoRaw = raw.lfo || {};
+  const lfoRaw: Partial<LfoSettings> = raw.lfo || {};
   const filtRaw = raw.filter || {};
 
   const p = {
@@ -111,7 +124,7 @@ function normalisePatch(raw) {
       keyTrack: num(filtRaw.keyTrack, 0),
       env: envDefaults(filtRaw.env),
     },
-  };
+  } satisfies Patch as WorkletPatch;
 
   p.feedbackScratch = new Float32Array(4);
   for (let i = 0; i < 4; i++) p.feedbackScratch[i] = ops[i].feedback;

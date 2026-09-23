@@ -1,0 +1,32 @@
+{
+  // The DSP's own project (#654): the client's settings minus
+  // `noUncheckedIndexedAccess`. The hot loops index preallocated typed arrays
+  // by construction-bounded indices; the check would put a `!` on every read
+  // and turn `amp[i] += x` into `amp[i] = amp[i]! + x`, so the modules would
+  // stop being the line-for-line move of the JS that the golden test proves.
+  // Not composite: the modules import the main thread's *types*
+  // (`../../patch`, `../../workletMessages`), and the client project, which
+  // excludes this folder, cannot reference it back. `npm run typecheck` runs
+  // it as its own `tsc -p`; esbuild bundles from it; ESLint's `.ts` rules
+  // apply as everywhere.
+  "extends": "../../../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": false,
+    // A declared field emits nothing, as in the JS this was moved from. With
+    // define semantics (the ES2022 default) esbuild would emit every field
+    // as `x;`, defining it as `undefined` before the constructor writes a
+    // number, and V8 then boxes every later double write to it: the #548
+    // scenario read 336 ms against 182 ms, and the boxes are allocations on
+    // the audio thread. So fields are declared, never initialised at the
+    // declaration; the constructor writes them, and the bundle is the JS.
+    "useDefineForClassFields": false,
+    "lib": ["ES2022", "DOM"],
+    "types": []
+  },
+  "include": ["./**/*.ts"]
+}
