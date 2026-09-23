@@ -81,9 +81,10 @@ export class CompressorDsp {
       this.attackSpeed = 1 / (attack * C.msToSeconds * this.rate);
     }
     if (initial || release !== this.release) {
-      // Leaving Auto must continue from the gain actually being heard, not
-      // from its faster envelope that may already have recovered to zero.
+      // Either direction continues from the gain being heard. In manual mode
+      // the unused slow envelope may still be high: do not restore it on Auto.
       this.fast = this.reductionDb;
+      this.slow = this.reductionDb;
       this.release = release;
       this.releaseSpeed = coeff(release || C.autoFastSeconds, this.rate);
     }

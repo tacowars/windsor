@@ -65,16 +65,19 @@ describe('feedback compressor DSP', () => {
     for (let i = 0; i < 48000 * 20; i++) sustained.tick(0, 0);
     expect(sustained.reductionDb).toBeLessThan(0.01);
   });
-  it('changing from Auto to manual release preserves the audible envelope', () => {
-    const params = compressorParams({ release: 0 });
+  it.each([
+    [0, 0.4],
+    [0.1, 0],
+  ])('release change %s → %s preserves the audible envelope', (from, to) => {
+    const params = compressorParams({ release: from });
     const dsp = new CompressorDsp(48000, params);
     for (let i = 0; i < 96000; i++) dsp.tick(1, 1);
-    for (let i = 0; i < 24000; i++) dsp.tick(0, 0);
+    for (let i = 0; i < 4800; i++) dsp.tick(0.05, 0.05);
     const before = dsp.reductionDb;
     expect(before).toBeGreaterThan(1);
-    params.release![0] = 0.4;
+    params.release![0] = to;
     dsp.configure(params);
-    dsp.tick(0, 0);
+    dsp.tick(0.05, 0.05);
     expect(Math.abs(dsp.reductionDb - before)).toBeLessThan(0.01);
   });
   it('links stereo without cancellation from opposite polarity or a silent channel', () => {

@@ -105,6 +105,7 @@ var CompressorDsp = class {
     }
     if (initial || release !== this.release) {
       this.fast = this.reductionDb;
+      this.slow = this.reductionDb;
       this.release = release;
       this.releaseSpeed = coeff(release || COMPRESSOR_DSP.autoFastSeconds, this.rate);
     }
