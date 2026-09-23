@@ -5,9 +5,10 @@
  *
  * `FmEngine` and `AudioSystem` are handed a `FakeContext` in place of an
  * `AudioContext`; nothing in them notices. The plate return runs the real
- * `worklet/reverb-processor.js` through `reverbHarness.ts`; an `fm-part` node
- * plays whatever `Feed` the test assigns, multiplied by its `gain` param the
- * way the worklet's fader is, so post-fader taps behave as they do live.
+ * plate (`worklet/reverb/`, bundled to `worklet/generated/reverb-processor.js`)
+ * through `reverbHarness.ts`; an `fm-part` node plays whatever `Feed` the test
+ * assigns, multiplied by its `gain` param the way the worklet's fader is, so
+ * post-fader taps behave as they do live.
  *
  * Node-only, by design: excluded from the client's tsc build.
  */

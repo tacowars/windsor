@@ -1,8 +1,9 @@
 /**
  * The mixer's acceptance criteria (#68), asserted on headless renders of the
  * real routing: `AudioSystem` and `FmEngine` run unchanged on the graph
- * stand-in, the plate return is the real `reverb-processor.js`, and every part
- * plays a known test signal. Nothing is listened to; #69 does that.
+ * stand-in, the plate return is the real bundled plate
+ * (`worklet/generated/reverb-processor.js`, from `worklet/reverb/`), and every
+ * part plays a known test signal. Nothing is listened to; #69 does that.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 

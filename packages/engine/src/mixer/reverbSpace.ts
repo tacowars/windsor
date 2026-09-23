@@ -1,6 +1,7 @@
 /**
- * Reverb spaces: the parameter set of `worklet/reverb-processor.js`, and the
- * named rooms the game picks from.
+ * Reverb spaces: the parameter set of the plate in `worklet/reverb/` (bundled
+ * to `worklet/generated/reverb-processor.js`), and the named rooms the game
+ * picks from.
  *
  * A space is deliberately *not* part of a `Patch`. One plate is shared by every
  * part, and a patch carries only how much of itself it sends there -- that is
