@@ -82,7 +82,11 @@ export class EngineHost {
     const data = (source: string): string =>
       `data:application/javascript;charset=utf-8,${encodeURIComponent(source)}`;
     try {
-      await this.start(document, { fmUrl: blob(dsp.fm), reverbUrl: blob(dsp.reverb) });
+      await this.start(document, {
+        fmUrl: blob(dsp.fm),
+        reverbUrl: blob(dsp.reverb),
+        compressorUrl: blob(dsp.compressor),
+      });
     } catch {
       try {
         // The latest document, not the captured one: an import or slot toggle
@@ -91,6 +95,7 @@ export class EngineHost {
         await this.start(this.latest ?? document, {
           fmUrl: data(dsp.fm),
           reverbUrl: data(dsp.reverb),
+          compressorUrl: data(dsp.compressor),
         });
       } catch (error) {
         this.discard();

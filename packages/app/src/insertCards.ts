@@ -7,6 +7,7 @@
  */
 import type { InsertKindName } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
+import { compressorCard } from './compressorCard';
 import { chorusCard } from './chorusCard';
 import { driveCard } from './driveCard';
 
@@ -16,4 +17,5 @@ export type InsertCard = (ctx: AppCtx, slot: number, index: number) => HTMLEleme
 export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   drive: driveCard,
   chorus: chorusCard,
+  compressor: compressorCard,
 };
