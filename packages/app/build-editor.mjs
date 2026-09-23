@@ -37,11 +37,18 @@ const AUDIO = AUDIO_DIR;
 const CHECK = process.argv.includes('--check');
 
 const worklet = readFileSync(join(AUDIO, 'worklet/generated/fm-processor.js'), 'utf8');
+const meter = readFileSync(join(AUDIO, 'worklet/generated/peak-meter-processor.js'), 'utf8');
 const compressor = readFileSync(join(AUDIO, 'worklet/generated/compressor-processor.js'), 'utf8');
 const reverb = readFileSync(join(AUDIO, 'worklet/reverb-processor.js'), 'utf8');
 const template = readFileSync(join(HERE, 'editor-template.html'), 'utf8');
 
-for (const marker of ['/*__WORKLET__*/', '/*__REVERB__*/', '/*__COMPRESSOR__*/', '/*__APP__*/']) {
+for (const marker of [
+  '/*__WORKLET__*/',
+  '/*__REVERB__*/',
+  '/*__COMPRESSOR__*/',
+  '/*__METER__*/',
+  '/*__APP__*/',
+]) {
   if (!template.includes(marker)) throw new Error(`template is missing ${marker}`);
 }
 
@@ -112,7 +119,8 @@ const html = template
   .replace('/*__APP__*/', () => app)
   .replace('/*__WORKLET__*/', () => JSON.stringify(worklet))
   .replace('/*__REVERB__*/', () => JSON.stringify(reverb))
-  .replace('/*__COMPRESSOR__*/', () => JSON.stringify(compressor));
+  .replace('/*__COMPRESSOR__*/', () => JSON.stringify(compressor))
+  .replace('/*__METER__*/', () => JSON.stringify(meter));
 
 const dest = join(HERE, 'patch-editor.html');
 const kb = (n) => `${(n / 1024).toFixed(0)} KB`;

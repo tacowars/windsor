@@ -3,13 +3,15 @@
  * console's frame loop; hidden/detached cards stop processor telemetry. Resolve
  * the live insert each time so a chain replacement cannot leave a stale meter.
  */
-import { COMPRESSOR_DSP, musicPartName } from '../../../packages/client/src/audio/index-for-editor';
+import type { InsertTarget } from './insertTarget';
+import { COMPRESSOR_DSP } from '../../../packages/client/src/audio/index-for-editor';
 import type { InsertSpec, InsertStage } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import { liveInsert } from './insertTarget';
 import { watchPlayhead } from './stepStrip';
 
-export function compressorMeter(ctx: AppCtx, slot: number, index: number): HTMLElement {
+export function compressorMeter(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
   const root = el('div', 'compressor-meter');
   const line = document.createElement('meter');
   line.min = 0;
@@ -35,7 +37,7 @@ export function compressorMeter(ctx: AppCtx, slot: number, index: number): HTMLE
       return false;
     },
     playheadAt: () => {
-      const stage = ctx.host.system?.strip(musicPartName(slot))?.inserts[index];
+      const stage = liveInsert(ctx, slot, index);
       const next = stage?.kind === 'compressor' ? stage.reduction : undefined;
       if (next !== active) {
         stop();

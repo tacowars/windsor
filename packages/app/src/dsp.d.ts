@@ -4,5 +4,5 @@
  * bundle runs. The host turns them into blob URLs for `FmEngine.init`.
  */
 interface Window {
-  __A204_DSP__: { fm: string; reverb: string; compressor: string };
+  __A204_DSP__: { fm: string; reverb: string; compressor: string; meter: string };
 }
