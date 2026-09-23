@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the mulberry32 and xorshift constants are the algorithms, pinned to the shared copy; the tunables are fmConstants.ts (#654) */
 /**
  * The worklet's one random source (#78, #644): `Math.random` unless a seed is
  * supplied, then mulberry32; and the non-zero 32-bit seed each voice's noise

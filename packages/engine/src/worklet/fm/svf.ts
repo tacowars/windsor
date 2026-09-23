@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the TPT filter's polynomial and clamps are the algorithm; the tunables are fmConstants.ts (#654) */
 /**
  * The per-voice filter (#644): a TPT state-variable filter (Simper topology)
  * giving lowpass, highpass, bandpass and notch from one structure, its

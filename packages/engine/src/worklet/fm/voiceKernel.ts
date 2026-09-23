@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the kernel's feedback average, interpolation and mip arithmetic, bit for bit the generic loop's; the tunables are fmConstants.ts (#654) */
 /**
  * The fixed-index voice kernel (#548, #645): `renderVoiceGeneric`'s
  * arithmetic in its order, with the four operators written out, their state

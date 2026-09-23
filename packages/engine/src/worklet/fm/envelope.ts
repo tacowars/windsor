@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the curve's exponent scale and the state ids are the envelope's shape, not tunables; the tunables are fmConstants.ts (#654) */
 /**
  * The envelope (#644): Init -> attack -> Peak -> decay -> Sustain -> held ->
  * release -> End, a curve per segment, three loop modes, advanced at control

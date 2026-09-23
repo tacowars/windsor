@@ -39,11 +39,18 @@ one local alias; the golden table passed unchanged.
    `AudioWorkletProcessor`, and `AudioParamDescriptor`, none of which
    `lib.dom` declares for the processor side. `@types/audioworklet` was not
    taken: it is written for a scope without `lib.dom` and collides with it.
-3. **`no-magic-numbers` exempts the folder**, in `eslint.config.js` with its
-   reason: the literals are the algorithms (the filter polynomial, the
-   xorshift shifts, MIDI and cents scales), and the tunables already live in
-   `fmConstants.ts`. The patch defaults in `patchNormalise.ts` are the one
-   set of data literals left; #656 shares them with `patch.ts`.
+3. **`no-magic-numbers` is disabled per file, with a reason, never in the
+   config.** `scripts/lib/eslintConfig.test.mjs` pins #246 decision 1: no
+   exemption may be re-added under `packages/*/src`, and it reads the
+   resolved severity of every file, so the folder-wide ignore this PR first
+   tried failed it. Each DSP module opens instead with a one-line
+   `eslint-disable no-magic-numbers` naming what its literals are (the
+   filter polynomial, the xorshift shifts, MIDI and cents scales, the
+   part's parameter ranges) and pointing at `fmConstants.ts` for the
+   tunables, which the `*Constants.ts` pattern already exempts.
+   `algorithms.ts` carries none: its numbers are the exempt 0–2 and indices.
+   The patch defaults in `patchNormalise.ts` are the one set of data
+   literals left; #656 shares them with `patch.ts`.
 4. **Types only.** `this.x` fields are declared; parameters and returns are
    annotated; the normalised patch is `WorkletPatch` (`Patch` plus the
    feedback scratch); the message shapes come from `workletMessages.ts` by

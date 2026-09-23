@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the operator indices and edge bits are the routing table itself; the tunables are fmConstants.ts (#654) */
 /**
  * The eleven operator topologies (#644) and the tables derived from them: the
  * topological evaluation order, and for the fixed-index kernel (#548) each

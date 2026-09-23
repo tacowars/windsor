@@ -1,3 +1,4 @@
+/* eslint-disable no-magic-numbers -- DSP: the parameter ranges, the reserve of four voices, the pan spread and the 128-frame budget are the part's contract; the tunables are fmConstants.ts (#654) */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate, currentFrame */
 /**
  * fmProcessor.js -- the FM part processor, the entry that
