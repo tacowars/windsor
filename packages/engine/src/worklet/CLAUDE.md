@@ -2,7 +2,23 @@
 
 `fm/` is the FM part processor's source. `generated/fm-processor.js` is its
 build output. `reverb-processor.js` is the plate, still one hand-written file
-(its own exception is at its top). These rules are stated here in full, and not
+(its own exception is at its top). The map of `fm/` (#644):
+
+| Module | Owns |
+|---|---|
+| `fmProcessor.js` | the entry: `Voice` and `FmPartProcessor`, `registerProcessor` (the voice splits in #645) |
+| `fmConstants.js` | the tunables every other module imports |
+| `waveTables.js` | `WAVE`, `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
+| `algorithms.js` | `ALGORITHMS`, the topological order, the kernel's edge and carrier tables |
+| `envelope.js` | `Envelope`, `curveShape`, the `ST_*` and `LOOP_*` ids |
+| `lfo.js` | `Lfo` and the `LFO_*` shapes |
+| `svf.js` | `Svf`, `softClip`, the `FILT_*` modes |
+| `prng.js` | `makeRandom`, `randomSeed32` |
+| `patchNormalise.js` | `normalisePatch`, `num`: a partial patch to a full one |
+
+Each module opens with a header saying what it owns, the invariant it keeps and
+the test that pins it; its exports are one list at the end, so a move never
+touches a code line. These rules are stated here in full, and not
 by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
@@ -39,13 +55,18 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/client/src/audio/fmProcessorGolden.test.ts`
    and says so in the PR; the patch files' `headroom` records may then need
    `tools/patch-editor/sweep-headroom.mjs` too.
+   The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
+   under Node 22, nine pad and score presets hash differently because `Math`
+   differs between V8 versions. A run on the wrong Node is not a render change.
 5. **Tables mirrored on the main thread.** `patch.ts` mirrors `ALGORITHMS` and
    `WAVE`; `envelopeCurve.ts` mirrors `Envelope`'s curve. `patch.test.ts` and
    `envelopeCurve.test.ts` fail when a copy drifts, until #656 shares them.
-6. **Module shape** (#644, #645): one concern per file, named after it,
-   100–350 lines, each opening with a header that says what it owns, the
-   invariant it keeps and the test that pins it. The kernel stays one function
-   read top to bottom. Plain JS until #654 converts the folder.
+6. **Module shape** (#644 done, #645 next): one concern per file, named
+   after it, 100–350 lines, each opening with a header that says what it owns,
+   the invariant it keeps and the test that pins it. A new concern is a new
+   module and an import in the entry, not a section in an existing file. The
+   kernel stays one function read top to bottom. Plain JS until #654 converts
+   the folder.
 
 Verify with the client's command, then `node scripts/build-worklets.mjs --check`
 and `node tools/patch-editor/build-editor.mjs` (the console page bundles the
