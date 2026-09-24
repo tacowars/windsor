@@ -618,6 +618,46 @@
       "generic": "e5e61afe27fb51e812478820f1518f4a94d2073d2a8d607842946bf982423ebe",
       "noDormancy": "abac027cd2511c9f0101665c89c44452db7c15308e9a531f76ce25b1740ea49f"
     },
+    "str-ambient-evolve": {
+      "default": "aa5f169158cb4e5ad7b3067b501966f8b97a3bc7f3c997fb7e296873a40d47c5",
+      "generic": "aa5f169158cb4e5ad7b3067b501966f8b97a3bc7f3c997fb7e296873a40d47c5",
+      "noDormancy": "aa5f169158cb4e5ad7b3067b501966f8b97a3bc7f3c997fb7e296873a40d47c5"
+    },
+    "str-d50-glass": {
+      "default": "3c185f32fd61400bb22e46ab1b7c87b668e6669dc83b43b56c49a29c276e37a4",
+      "generic": "3c185f32fd61400bb22e46ab1b7c87b668e6669dc83b43b56c49a29c276e37a4",
+      "noDormancy": "3c185f32fd61400bb22e46ab1b7c87b668e6669dc83b43b56c49a29c276e37a4"
+    },
+    "str-edm-stab": {
+      "default": "adcf2ef9d2375e6bed3062eb975c2d52ddb22507ab6ae7eb5316a485b6996a17",
+      "generic": "adcf2ef9d2375e6bed3062eb975c2d52ddb22507ab6ae7eb5316a485b6996a17",
+      "noDormancy": "adcf2ef9d2375e6bed3062eb975c2d52ddb22507ab6ae7eb5316a485b6996a17"
+    },
+    "str-jp8-strings": {
+      "default": "e8f4c0609b21d2a8aead77755f7d11c34d5bc681519b2980df9c299e4e2e2438",
+      "generic": "e8f4c0609b21d2a8aead77755f7d11c34d5bc681519b2980df9c299e4e2e2438",
+      "noDormancy": "e8f4c0609b21d2a8aead77755f7d11c34d5bc681519b2980df9c299e4e2e2438"
+    },
+    "str-juno-strings": {
+      "default": "66e94b213bf0b61d56542889975231d8cfea5c926550c6d1bcec473bffd0f33c",
+      "generic": "66e94b213bf0b61d56542889975231d8cfea5c926550c6d1bcec473bffd0f33c",
+      "noDormancy": "66e94b213bf0b61d56542889975231d8cfea5c926550c6d1bcec473bffd0f33c"
+    },
+    "str-ob-strings": {
+      "default": "83739612679a43fb836dae5ccaf4546b1a272b5dacd8877743ae8742b79a4cc7",
+      "generic": "83739612679a43fb836dae5ccaf4546b1a272b5dacd8877743ae8742b79a4cc7",
+      "noDormancy": "83739612679a43fb836dae5ccaf4546b1a272b5dacd8877743ae8742b79a4cc7"
+    },
+    "str-solina-ensemble": {
+      "default": "2d4a6aad0b7b097f72ba842665eac40f081c11b2a90fb12644ed19850f5e6bf5",
+      "generic": "2d4a6aad0b7b097f72ba842665eac40f081c11b2a90fb12644ed19850f5e6bf5",
+      "noDormancy": "2d4a6aad0b7b097f72ba842665eac40f081c11b2a90fb12644ed19850f5e6bf5"
+    },
+    "str-supersaw-trance": {
+      "default": "be2e277b8ec65c140312aa405f242f3f77002b9aa424a01ff5dcfbbf05e50d8f",
+      "generic": "be2e277b8ec65c140312aa405f242f3f77002b9aa424a01ff5dcfbbf05e50d8f",
+      "noDormancy": "be2e277b8ec65c140312aa405f242f3f77002b9aa424a01ff5dcfbbf05e50d8f"
+    },
     "sub-drone": {
       "default": "6da66f289f00138fba3eb19628fde0045d5f14f6fdf5134598ff973e78636a08",
       "generic": "6da66f289f00138fba3eb19628fde0045d5f14f6fdf5134598ff973e78636a08",

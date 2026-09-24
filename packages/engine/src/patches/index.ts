@@ -124,6 +124,14 @@ import patch_score_wire_harp from './score-wire-harp.json';
 import patch_score_wire_stress from './score-wire-stress.json';
 import patch_score_wooden_pin from './score-wooden-pin.json';
 import patch_snare from './snare.json';
+import patch_str_ambient_evolve from './str-ambient-evolve.json';
+import patch_str_d50_glass from './str-d50-glass.json';
+import patch_str_edm_stab from './str-edm-stab.json';
+import patch_str_jp8_strings from './str-jp8-strings.json';
+import patch_str_juno_strings from './str-juno-strings.json';
+import patch_str_ob_strings from './str-ob-strings.json';
+import patch_str_solina_ensemble from './str-solina-ensemble.json';
+import patch_str_supersaw_trance from './str-supersaw-trance.json';
 import patch_sub_drone from './sub-drone.json';
 import patch_tr808_clap from './tr808-clap.json';
 import patch_tr808_clave from './tr808-clave.json';
@@ -278,6 +286,14 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'score-wire-stress': patch_score_wire_stress,
   'score-wooden-pin': patch_score_wooden_pin,
   snare: patch_snare,
+  'str-ambient-evolve': patch_str_ambient_evolve,
+  'str-d50-glass': patch_str_d50_glass,
+  'str-edm-stab': patch_str_edm_stab,
+  'str-jp8-strings': patch_str_jp8_strings,
+  'str-juno-strings': patch_str_juno_strings,
+  'str-ob-strings': patch_str_ob_strings,
+  'str-solina-ensemble': patch_str_solina_ensemble,
+  'str-supersaw-trance': patch_str_supersaw_trance,
   'sub-drone': patch_sub_drone,
   'tr808-clap': patch_tr808_clap,
   'tr808-clave': patch_tr808_clave,
