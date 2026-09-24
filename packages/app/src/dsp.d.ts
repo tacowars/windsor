@@ -10,5 +10,6 @@ interface Window {
     compressor: string;
     meter: string;
     retroReverb: string;
+    phaser: string;
   };
 }

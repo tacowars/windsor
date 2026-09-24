@@ -41,6 +41,14 @@ not split).
 | Cost counters — the overlay and the bench | `cost/`: `audioCost.ts` (`AudioCostReadout`, what the overlay and the bench collector read), `audioLoad.ts` (the audio-thread load, #445), `schedCost.ts` (the scheduler's main-thread cost, #275), `playbackStats.ts` (`AudioContext.playbackStats`: whether the rendered audio was heard) |
 | Gameplay SFX — **not this skill's** | `sfx/`: `gameplaySfx.ts`, `actionSfx.ts`, `spatialSfx.ts`, `sfxSelection.ts`, `sfxBuffers.ts`, `createGameplaySfx.ts`, `sfxConstants.ts`, `footstepCadence.ts` are the client's simulation-driven sound path: Babylon AudioV2, snapshot and event listening, per-bank variation. They belong to `packages/client/CLAUDE.md` and the Babylon skill, the same boundary `game/babylonBridge.ts` draws for the music engine. `sfx/offlineRender.ts` (a patch baked to an `AudioBuffer`) is the seam the console's loudness check also uses. Read them when a music change moves a shared seam (`offlineRender.ts`, `patch/gameplayPatches.ts`, `mixer/mixLevels.ts`); do not extend them from here |
 
+The classic phaser (#687) is `inserts/phaserSpec.ts`, `phaserConstants.ts`,
+`phaserInsert.ts` and the original bank in `phaserPresetTables.ts` /
+`phaserPresets.ts`, with DSP and processor under `worklet/phaser/`. The
+console uses `src/phaserCard.ts` / `phaserTables.ts`. Rate, center, depth,
+signed feedback, feedback cut, stereo offset, envelope sweep, bass keep and
+mix are song-owned; presets preserve Mix/enabled. Tests include the shipped
+processor and real synth bass/pad input.
+
 The console lives in `tools/patch-editor/`: five tabs over the *real*
 `AudioSystem`, imported through `audio/index-for-editor.ts`, which excludes
 Babylon. Extend that surface rather than building another synth, effect graph

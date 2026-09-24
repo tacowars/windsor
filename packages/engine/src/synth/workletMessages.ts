@@ -178,3 +178,8 @@ export const PEAK_METER_WORKLET_URL = new URL(
   '../worklet/generated/peak-meter-processor.js',
   import.meta.url,
 );
+
+export const PHASER_WORKLET_URL = new URL(
+  '../worklet/generated/phaser-processor.js',
+  import.meta.url,
+);

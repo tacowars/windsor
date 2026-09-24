@@ -10,6 +10,7 @@ import { FmEngine } from './fmEngine';
 import {
   PEAK_METER_WORKLET_URL,
   RETRO_REVERB_WORKLET_URL,
+  PHASER_WORKLET_URL,
   COMPRESSOR_WORKLET_URL,
   REVERB_WORKLET_URL,
   WORKLET_URL,
@@ -33,6 +34,7 @@ describe('FmEngine.init', () => {
       String(COMPRESSOR_WORKLET_URL),
       String(PEAK_METER_WORKLET_URL),
       String(RETRO_REVERB_WORKLET_URL),
+      String(PHASER_WORKLET_URL),
     ]);
   });
 
@@ -41,7 +43,7 @@ describe('FmEngine.init', () => {
     const engine = new FmEngine(context.asAudioContext());
     await engine.init();
     await engine.init();
-    expect(context.modules).toHaveLength(5);
+    expect(context.modules).toHaveLength(6);
   });
 
   it('takes override URLs, together or one at a time', async () => {
@@ -52,6 +54,7 @@ describe('FmEngine.init', () => {
       compressorUrl: 'blob:compressor',
       meterUrl: 'blob:meter',
       retroReverbUrl: 'blob:retro',
+      phaserUrl: 'blob:phaser',
     });
     expect(both.modules).toEqual([
       'blob:fm',
@@ -59,6 +62,7 @@ describe('FmEngine.init', () => {
       'blob:compressor',
       'blob:meter',
       'blob:retro',
+      'blob:phaser',
     ]);
 
     const one = new FakeContext();
@@ -69,6 +73,7 @@ describe('FmEngine.init', () => {
       String(COMPRESSOR_WORKLET_URL),
       String(PEAK_METER_WORKLET_URL),
       String(RETRO_REVERB_WORKLET_URL),
+      String(PHASER_WORKLET_URL),
     ]);
   });
 

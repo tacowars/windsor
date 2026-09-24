@@ -1,5 +1,13 @@
 # The DSP worklets
 
+`phaser/` is the original four-stage stereo insert (#687):
+`phaserProcessor.ts` owns controls/lifecycle/load reporting and `phaserDsp.ts`
+owns the lossless lattice stages, feedback, envelope and sweep. It ships as
+`generated/phaser-processor.js`, with its own `tsconfig.json`; tests under
+`inserts/phaser*.test.ts` exercise it through `__fixtures__/phaserHarness.ts`.
+Controls/defaults live in `inserts/phaserConstants.ts` / `phaserSpec.ts`,
+and original editable starting points in `phaserPresetTables.ts`.
+
 `retro/` is the original ROM-free vintage reverb insert (#682), built as
 `generated/retro-reverb-processor.js`. `retroReverbProcessor.ts` owns the
 worklet lifecycle/load reports; `retroReverbDsp.ts` owns host/internal-clock
@@ -69,7 +77,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`),
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
    does `scripts/lib/workletBundle.test.mjs`. Three consumers read the

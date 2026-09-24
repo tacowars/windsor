@@ -45,6 +45,11 @@ export const WORKLETS = [
   },
   { name: 'reverb', entry: 'reverb/reverbProcessor.ts', output: 'generated/reverb-processor.js' },
   {
+    name: 'phaser',
+    entry: 'phaser/phaserProcessor.ts',
+    output: 'generated/phaser-processor.js',
+  },
+  {
     name: 'retro',
     entry: 'retro/retroReverbProcessor.ts',
     output: 'generated/retro-reverb-processor.js',
