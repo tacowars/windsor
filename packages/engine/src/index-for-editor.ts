@@ -328,3 +328,8 @@ export type { PeakMeter } from './mixer/peakMeter';
 
 export { canSidechain } from './mixer/sidechainGraph';
 export type { SidechainSource } from './inserts/sidechainSource';
+
+export { DEFAULT_PHASER } from './inserts/phaserSpec';
+export type { PhaserSpec } from './inserts/phaserSpec';
+export { PHASER_BOUNDS } from './inserts/phaserConstants';
+export { PHASER_PRESETS, applyPhaserPreset, matchingPhaserPreset } from './inserts/phaserPresets';

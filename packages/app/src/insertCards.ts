@@ -11,6 +11,7 @@ import type { AppCtx } from './context';
 import { compressorCard } from './compressorCard';
 import { chorusCard } from './chorusCard';
 import { driveCard } from './driveCard';
+import { phaserCard } from './phaserCard';
 import { retroReverbCard } from './retroReverbCard';
 
 /** The knobs of the insert at `index` in the part's strip. */
@@ -21,4 +22,5 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   chorus: chorusCard,
   compressor: compressorCard,
   'retro-reverb': retroReverbCard,
+  phaser: phaserCard,
 };
