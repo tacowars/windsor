@@ -88,6 +88,7 @@ export class EngineHost {
         compressorUrl: blob(dsp.compressor),
         meterUrl: blob(dsp.meter),
         retroReverbUrl: blob(dsp.retroReverb),
+        phaserUrl: blob(dsp.phaser),
       });
     } catch {
       try {
@@ -100,6 +101,7 @@ export class EngineHost {
           compressorUrl: data(dsp.compressor),
           meterUrl: data(dsp.meter),
           retroReverbUrl: data(dsp.retroReverb),
+          phaserUrl: data(dsp.phaser),
         });
       } catch (error) {
         this.discard();
