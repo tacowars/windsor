@@ -1,0 +1,105 @@
+{
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "Darwin 25.5.0",
+    "arch": "arm64"
+  },
+  "backend": "Node v24.20.0 / V8 13.6.233.17-node.53; no graphics backend",
+  "baseline": "5d7a97b1bc8a3f5e29a574001006f1c3b2dd3e62",
+  "sampleRate": 48000,
+  "blockFrames": 128,
+  "warmupSeconds": 1,
+  "scenarios": [
+    {
+      "mode": "reverb",
+      "instances": 1,
+      "msPerAudioSecond": [
+        6.040708000000002,
+        5.829208999999999,
+        5.804459000000001
+      ],
+      "checksum": 1.3360836803913116
+    },
+    {
+      "mode": "reverb",
+      "instances": 8,
+      "msPerAudioSecond": [
+        45.891250000000014,
+        45.92024999999998,
+        46.40029199999998
+      ],
+      "checksum": 1.3360836803913116
+    },
+    {
+      "mode": "reverb",
+      "instances": 16,
+      "msPerAudioSecond": [
+        90.69766700000002,
+        90.74091699999997,
+        90.964834
+      ],
+      "checksum": 1.3360836803913116
+    },
+    {
+      "mode": "gated",
+      "instances": 1,
+      "msPerAudioSecond": [
+        34.789999999999964,
+        34.77358300000003,
+        35.27054199999998
+      ],
+      "checksum": 0.3995768874883652
+    },
+    {
+      "mode": "gated",
+      "instances": 8,
+      "msPerAudioSecond": [
+        279.34583299999986,
+        276.98862499999996,
+        279.954833
+      ],
+      "checksum": 0.3995768874883652
+    },
+    {
+      "mode": "gated",
+      "instances": 16,
+      "msPerAudioSecond": [
+        558.1915410000001,
+        553.6648749999999,
+        559.4094999999998
+      ],
+      "checksum": 0.3995768874883652
+    },
+    {
+      "mode": "reverse",
+      "instances": 1,
+      "msPerAudioSecond": [
+        34.803499999999985,
+        34.50262500000008,
+        34.95600000000013
+      ],
+      "checksum": 0.4934212416410446
+    },
+    {
+      "mode": "reverse",
+      "instances": 8,
+      "msPerAudioSecond": [
+        278.56183299999975,
+        277.53233399999954,
+        279.46133400000053
+      ],
+      "checksum": 0.4934212416410446
+    },
+    {
+      "mode": "reverse",
+      "instances": 16,
+      "msPerAudioSecond": [
+        557.8177500000002,
+        554.7864170000003,
+        559.0929999999998
+      ],
+      "checksum": 0.4934212416410446
+    }
+  ],
+  "limitations": "Sequential offline callbacks, warm JIT, no other game work. Includes converter filters and resampling. No real-time scheduling, browser copy overhead, underrun verdict or target-machine claim."
+}

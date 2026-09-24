@@ -44,6 +44,11 @@ export const WORKLETS = [
     output: 'generated/compressor-processor.js',
   },
   { name: 'reverb', entry: 'reverb/reverbProcessor.ts', output: 'generated/reverb-processor.js' },
+  {
+    name: 'retro',
+    entry: 'retro/retroReverbProcessor.ts',
+    output: 'generated/retro-reverb-processor.js',
+  },
 ];
 
 /** The directory an agent edits instead of the generated file, relative to `WORKLET_DIR`. */
