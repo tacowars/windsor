@@ -219,3 +219,8 @@ measured with: 16,384 for the original bank (4,096 for `saw-arp` and
 release tails at low/middle/high notes, plus four-note chords. The intended
 listening verdict still belongs to tacowars; mechanical checks cannot establish
 whether a sound fits the score.
+
+The classic string-machine bank (`str-*`: Solina, Oberheim, Juno, D-50,
+Jupiter-8, supersaw, ambient and stab strings for EDM, ambient and trance) is a
+separate palette with its own research note,
+`docs/research/2026-09-24-classic-string-machine-patches.md` (#686).
