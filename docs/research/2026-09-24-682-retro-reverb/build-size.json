@@ -1,0 +1,20 @@
+{
+  "baselineCommit": "5d7a97b1",
+  "baseline": {
+    "asset": "index-CunH6PUb.js",
+    "bytes": 727989,
+    "gzipBytes": 210632
+  },
+  "implementation": {
+    "asset": "index-4XQ97Y9C.js",
+    "bytes": 729536,
+    "gzipBytes": 211044
+  },
+  "deltaBytes": 1547,
+  "deltaGzipBytes": 412,
+  "separateRetroWorklet": {
+    "asset": "retro-reverb-processor-4zAsHBxp.js",
+    "bytes": 15817,
+    "gzipBytes": 4117
+  }
+}

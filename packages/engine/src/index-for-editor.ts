@@ -201,6 +201,14 @@ export type { DriveSpec } from './inserts/driveInsert';
 export { CHORUS_INSERT, DEFAULT_CHORUS } from './inserts/chorusInsert';
 export type { ChorusSpec } from './inserts/chorusInsert';
 export * from './inserts/insertConstants';
+export { DEFAULT_RETRO_REVERB } from './inserts/retroReverbSpec';
+export type { RetroReverbSpec } from './inserts/retroReverbSpec';
+export { RETRO_REVERB_BOUNDS, RETRO_REVERB_MODES } from './inserts/retroReverbConstants';
+export {
+  RETRO_REVERB_PRESETS,
+  applyRetroPreset,
+  matchingRetroPreset,
+} from './inserts/retroReverbPresets';
 export { createStereoRotate, rotationAngle, rotationGains } from './mixer/stereoRotate';
 export type { RotationGains, StereoRotate } from './mixer/stereoRotate';
 export { DEFAULT_SPACE, SPACES, SPACE_NAMES, makeSpace } from './mixer/reverbSpace';

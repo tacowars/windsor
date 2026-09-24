@@ -18,6 +18,7 @@ export function insertKnobs<S>(
   slot: InsertTarget,
   index: number,
   entries: readonly InsertKnobEntry<S>[],
+  onChange?: () => void,
 ): HTMLElement {
   const row = el('div', 'knob-row');
   for (const { f, label, o } of entries) {
@@ -33,7 +34,7 @@ export function insertKnobs<S>(
         },
         set: (v) => {
           const inserts = setInsertField(insertsOf(ctx, slot), index, f, v);
-          void ctx.change(insertChange(slot, inserts));
+          if (ctx.change(insertChange(slot, inserts)).ok) onChange?.();
         },
       }),
     );
