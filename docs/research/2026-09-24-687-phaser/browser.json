@@ -1,0 +1,54 @@
+{
+  "pageSha256": "4c612e113ab8303da521e170d7a4e6d4d170e502613fe4063515dbef0eace811",
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "darwin 25.5.0",
+    "browser": "153.0.8010.53",
+    "backend": "headless Chrome AudioWorklet / OfflineAudioContext; no graphics rendering"
+  },
+  "meterDb": [
+    -6.103321862756472,
+    -6.1698694399940575
+  ],
+  "savedTrackEffect": {
+    "kind": "phaser",
+    "rate": 0.2,
+    "center": 420,
+    "depth": 3.0315789473684207,
+    "feedback": 0.7,
+    "feedbackCut": 500,
+    "stereo": 0,
+    "envelope": 0,
+    "bassKeep": 0,
+    "mix": 0.23,
+    "enabled": true
+  },
+  "savedMasterEffect": {
+    "kind": "phaser",
+    "rate": 0.06,
+    "center": 750,
+    "depth": 2.8,
+    "feedback": 0.45,
+    "feedbackCut": 180,
+    "stereo": 120,
+    "envelope": 0,
+    "bassKeep": 0.2,
+    "mix": 0.15,
+    "enabled": true
+  },
+  "exportReimport": true,
+  "offline": [
+    {
+      "stereo": 0,
+      "energy": 0.652529416091814,
+      "late": 0,
+      "peak": 0.7555400133132935
+    },
+    {
+      "stereo": 120,
+      "energy": 0.652529416091814,
+      "late": 0,
+      "peak": 0.7555400133132935
+    }
+  ]
+}

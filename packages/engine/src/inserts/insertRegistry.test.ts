@@ -21,7 +21,7 @@ function normalise(raw: unknown): { specs: unknown[]; n: FieldNormaliser } {
 
 describe('INSERT_KINDS', () => {
   it('names every shipped kind, each with its fields, defaults, normaliser and factory', () => {
-    expect(INSERT_KIND_NAMES).toEqual(['drive', 'chorus', 'compressor', 'retro-reverb']);
+    expect(INSERT_KIND_NAMES).toEqual(['drive', 'chorus', 'compressor', 'retro-reverb', 'phaser']);
     for (const name of INSERT_KIND_NAMES) {
       const kind = INSERT_KINDS[name];
       expect(kind.defaults.kind, name).toBe(name);
