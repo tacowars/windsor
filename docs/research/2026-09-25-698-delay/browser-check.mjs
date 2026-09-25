@@ -66,13 +66,30 @@ try {
     ),
   );
   assert.ok(Math.abs(params.at(-1).rightMs - 60000 / doc.bpm) < 0.01);
-  await page
-    .getByLabel('Import a document', { exact: true })
-    .setInputFiles({
-      name: 'delay-test.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify(doc)),
-    });
+  const beforeImport = await page.evaluate(() => window.delayNodes.length);
+  await page.getByLabel('Import a document', { exact: true }).setInputFiles({
+    name: 'delay-test.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(doc)),
+  });
+  await page.waitForFunction((count) => window.delayNodes.length >= count + 2, beforeImport);
+  const importedParams = await page.evaluate(
+    (count) =>
+      window.delayNodes
+        .slice(count)
+        .map((n) =>
+          Object.fromEntries([...n.parameters].map(([key, param]) => [key, param.value])),
+        ),
+    beforeImport,
+  );
+  assert.equal(importedParams[0].mode, 2);
+  assert.ok(Math.abs(importedParams[0].leftMs - doc.parts[0].strip.inserts[0].leftMs) < 0.01);
+  assert.ok(Math.abs(importedParams[0].rightMs - 60000 / doc.bpm / 3) < 0.01);
+  assert.ok(
+    Math.abs(importedParams[0].feedback - doc.parts[0].strip.inserts[0].feedback) < 0.00001,
+  );
+  assert.equal(importedParams[1].mode, 0);
+  assert.ok(Math.abs(importedParams[1].rightMs - 60000 / doc.bpm) < 0.01);
   await page.getByRole('button', { name: 'Mixer', exact: true }).click();
   await page.locator('.delay-card').first().getByLabel('Mid clock', { exact: true }).waitFor();
   assert.equal(

@@ -62,7 +62,7 @@ node docs/research/2026-09-25-698-delay/browser-check.mjs
 Node 24.20.0, macOS Apple Silicon, the lockfile-installed Vite; baseline is
 the tracked files at `0658ab90` with the same dependencies (excluding the
 maintainer's untracked local song). Client `dist/`, excluding source maps:
-29,797,715 → 29,808,906 bytes, **+11,191 bytes**. The new processor is 8,308
+29,797,715 → 29,808,969 bytes, **+11,254 bytes**. The new processor is 8,371
 bytes; the entry grows 751,746 → 754,629 bytes. No assets were added. Build
 timestamps/commit metadata may slightly change future byte totals. This is
 bundle size, not a runtime performance reading.
