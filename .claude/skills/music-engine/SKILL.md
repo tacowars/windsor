@@ -62,7 +62,8 @@ for semantics and audition steps.
 The ensemble (#695) is `inserts/ensembleSpec.ts`, `ensembleConstants.ts`,
 `ensembleInsert.ts` and `ensemblePresets.ts` / `ensemblePresetTables.ts`:
 native nodes, no worklet. Three delay lines 120° apart, each swept by a slow
-plus a fast LFO; each rate is a sine-and-cosine `PeriodicWave` pair and each
+plus a fast LFO; each rate is a sine-and-cosine `PeriodicWave` pair on one
+shared `ConstantSourceNode` frequency, and each
 line's phase two fixed weights on it, so the lines stay locked through any rate
 change (`2026-09-25-ensemble-insert-sine-cosine-basis`). Slow/fast rate and
 depth, line centre, tone, width, mix and enabled are song-owned; presets

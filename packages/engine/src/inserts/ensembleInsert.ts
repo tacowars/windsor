@@ -8,24 +8,29 @@
  *                                  ─▶ line₂ ─┴▶ pan R₂ ─▶ merge 1 ─┘              │
  *   input ─▶ dry ─────────────────────────────────────────────────────────────────┘
  *
- *   per rate r (slow, fast):  sinᵣ ─▶ depth ─┬▶ × cos φᵢ ─▶ lineᵢ.delayTime
+ *   per rate r (slow, fast):  rateᵣ (constant source) ─▶ sinᵣ.frequency, cosᵣ.frequency
+ *                             sinᵣ ─▶ depth ─┬▶ × cos φᵢ ─▶ lineᵢ.delayTime
  *                             cosᵣ ─▶ depth ─┴▶ × sin φᵢ ─▶ lineᵢ.delayTime
  *
  * **Phase lock by a sine-and-cosine basis** (decision 6): per rate, one sine
  * and one cosine oscillator (both `PeriodicWave`s, so they share the one
- * implementation path) start together and always take the same frequency, so
- * they stay in quadrature through any rate change; line i's LFO is
+ * implementation path) start at one scheduled time and take their frequency
+ * from one `ConstantSourceNode`, so a rate edit is a single param write that
+ * reaches both on the same frame — two `.value` writes could straddle a render
+ * quantum and leave a permanent phase error. Line i's LFO is
  * `cos φᵢ · sin θ + sin φᵢ · cos θ = sin(θ + φᵢ)` through two fixed-weight
- * gains. The three lines are 0°, 120° and 240° apart by construction — the
- * case staggered starts would lose on the first rate change.
+ * gains, so the three lines are 0°, 120° and 240° apart by construction, at
+ * any rate, with no start offset to compute from the rate.
  *
  * The wet input is the mono sum of the strip's stereo input, as on the
  * hardware; the dry path stays stereo. Width places the lines left / centre /
  * right with an equal-power law, and the wet gain divides by the per-side sum
- * of those gains so Width moves the image, not the level.
+ * of those gains, which holds the *coherent* level (lines in step) across
+ * Width; with the lines modulated apart the summed power still rises a little
+ * toward Width 1 (≈ 2 dB on noise at the defaults, per review).
  *
  * `set` is param writes only: the line count and the weights are the kind's.
- * `dispose` stops all four oscillators and disconnects what the stage built,
+ * `dispose` stops all four oscillators and both rate sources, and disconnects what the stage built,
  * never the edge out of `output`.
  */
 import type { InsertKind, InsertStage } from './insertKind';
@@ -40,8 +45,9 @@ import { DEFAULT_ENSEMBLE, ENSEMBLE_FIELDS, normaliseEnsemble } from './ensemble
 
 const { millisecondsPerSecond: MS, degreesPerTurn, panQuarterTurn } = ENSEMBLE_DSP;
 
-/** One rate's quadrature pair and the depth gain after each. */
+/** One rate's quadrature pair, the one source both take their frequency from, and a depth gain after each. */
 interface Basis {
+  readonly rate: ConstantSourceNode;
   readonly sin: OscillatorNode;
   readonly cos: OscillatorNode;
   readonly sinDepth: GainNode;
@@ -58,13 +64,20 @@ function oscillator(context: BaseAudioContext, real: number[], imag: number[]): 
 }
 
 function basis(context: BaseAudioContext): Basis {
+  const rate = context.createConstantSource();
   const sin = oscillator(context, [0, 0], [0, 1]);
   const cos = oscillator(context, [0, 1], [0, 0]);
+  // One frequency signal into both: a rate edit is one param write, reaching
+  // the pair on the same frame, so no render quantum can fall between them.
+  for (const osc of [sin, cos]) {
+    osc.frequency.value = 0;
+    rate.connect(osc.frequency);
+  }
   const sinDepth = context.createGain();
   const cosDepth = context.createGain();
   sin.connect(sinDepth);
   cos.connect(cosDepth);
-  return { sin, cos, sinDepth, cosDepth };
+  return { rate, sin, cos, sinDepth, cosDepth };
 }
 
 /** Line i's two fixed weights on one basis, wired into its delay time. */
@@ -116,14 +129,13 @@ interface Params {
   readonly dry: GainNode;
 }
 
-/** Param writes only: the rates to both oscillators of a pair at once, so they stay in quadrature. */
+/** Param writes only: one write per rate, into the source both oscillators of its pair follow. */
 function write({ lines, bases: [slow, fast], tone, wet, dry }: Params, next: EnsembleSpec): void {
   for (const [b, rate, depth] of [
     [slow, next.slowRate, next.slowDepth],
     [fast, next.fastRate, next.fastDepth],
   ] as const) {
-    b.sin.frequency.value = rate;
-    b.cos.frequency.value = rate;
+    b.rate.offset.value = rate;
     b.sinDepth.gain.value = depth / MS;
     b.cosDepth.gain.value = depth / MS;
   }
@@ -168,8 +180,11 @@ function create(context: BaseAudioContext, spec: EnsembleSpec): InsertStage<Ense
   wet.connect(output);
   input.connect(dry);
   dry.connect(output);
-  const oscillators = [slow.sin, slow.cos, fast.sin, fast.cos];
-  for (const osc of oscillators) osc.start();
+  // One explicit start time for every source: a pair that began apart would
+  // hold that offset forever, and its fixed weights would read it as phase.
+  const sources = [slow.rate, fast.rate, slow.sin, slow.cos, fast.sin, fast.cos];
+  const at = context.currentTime;
+  for (const source of sources) source.start(at);
 
   const set = (next: EnsembleSpec): void =>
     write({ lines, bases: [slow, fast], tone, wet, dry }, next);
@@ -184,7 +199,7 @@ function create(context: BaseAudioContext, spec: EnsembleSpec): InsertStage<Ense
     wet,
     dry,
     ...lines.flatMap((l) => [l.delay, l.toLeft, l.toRight]),
-    ...[slow, fast].flatMap((b) => [b.sin, b.cos, b.sinDepth, b.cosDepth]),
+    ...[slow, fast].flatMap((b) => [b.rate, b.sin, b.cos, b.sinDepth, b.cosDepth]),
     ...weights,
   ];
   return {
@@ -193,7 +208,7 @@ function create(context: BaseAudioContext, spec: EnsembleSpec): InsertStage<Ense
     output,
     set,
     dispose(): void {
-      for (const osc of oscillators) osc.stop();
+      for (const source of sources) source.stop();
       for (const node of built) node.disconnect();
     },
   };

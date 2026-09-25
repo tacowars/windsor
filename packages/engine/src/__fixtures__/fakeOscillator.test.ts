@@ -70,6 +70,17 @@ describe('FakeOscillator with a PeriodicWave', () => {
     expect(sinOsc.type).toBe('custom');
   });
 
+  it('begins a scheduled start at its time, so two starts apart hold that offset', () => {
+    const context = new FakeContext();
+    const early = wave(context, [0, 0], [0, 1]);
+    const late = wave(context, [0, 0], [0, 1]);
+    late.start(0.25);
+    const [a, b] = renderGraph(context, SECONDS, [early, late]);
+    const at = Math.round(0.25 * context.sampleRate);
+    expect(b!.left.subarray(0, at).every((v) => v === 0)).toBe(true);
+    expect(b!.left[at + 10]).toBeCloseTo(a!.left[10]!, 6);
+  });
+
   it('refuses a series with mismatched or too few terms, as the spec does', () => {
     const context = new FakeContext();
     expect(() => context.createPeriodicWave([0, 1], [0])).toThrow();

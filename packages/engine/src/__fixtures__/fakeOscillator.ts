@@ -57,6 +57,8 @@ export class FakeOscillator extends FakeNode {
   readonly detune = new FakeParam(0);
   started = false;
   stopped = false;
+  /** Context seconds the oscillator begins at: `start(when)`, as scheduled (#695). */
+  startTime = 0;
   wave: FakePeriodicWave | null = null;
   private phase = 0;
 
@@ -64,8 +66,9 @@ export class FakeOscillator extends FakeNode {
     super(context, 0, 1);
   }
 
-  start(): void {
+  start(when = 0): void {
     this.started = true;
+    this.startTime = when;
   }
 
   stop(): void {
@@ -77,18 +80,52 @@ export class FakeOscillator extends FakeNode {
     this.type = 'custom';
   }
 
-  protected render(): Float32Array[][] {
+  /**
+   * `frequency` is a-rate: its value plus any connected node, per sample (a
+   * shared `ConstantSourceNode` drives a quadrature pair, #695). Silent, with
+   * the phase held at 0, before `startTime`.
+   */
+  protected render(block: number): Float32Array[][] {
     const out = new Float32Array(BLOCK);
     if (!this.started || this.stopped) return [[out]];
     if (this.type !== 'sine' && this.type !== 'custom') {
       throw new Error(`fake OscillatorNode does not model type "${this.type}"`);
     }
     const wave = this.type === 'custom' ? this.wave : null;
-    const step = (2 * Math.PI * this.frequency.value) / this.context.sampleRate;
+    const hz = this.frequency.valuesAt(block);
+    const rate = this.context.sampleRate;
     for (let i = 0; i < BLOCK; i++) {
+      if ((block * BLOCK + i) / rate < this.startTime) continue;
       out[i] = wave ? wave.at(this.phase) : Math.sin(this.phase);
-      this.phase += step;
+      this.phase += (2 * Math.PI * (hz[i] ?? 0)) / rate;
     }
     return [[out]];
+  }
+}
+
+/** A `ConstantSourceNode`: its a-rate `offset`, per sample, between `start()` and `stop()` (#695). */
+export class FakeConstantSource extends FakeNode {
+  readonly kind = 'constant';
+  readonly offset = new FakeParam(1);
+  started = false;
+  stopped = false;
+  startTime = 0;
+
+  constructor(context: FakeHost) {
+    super(context, 0, 1);
+  }
+
+  start(when = 0): void {
+    this.started = true;
+    this.startTime = when;
+  }
+
+  stop(): void {
+    this.stopped = true;
+  }
+
+  protected render(block: number): Float32Array[][] {
+    if (!this.started || this.stopped) return [[new Float32Array(BLOCK)]];
+    return [[this.offset.valuesAt(block)]];
   }
 }
