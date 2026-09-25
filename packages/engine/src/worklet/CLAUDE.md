@@ -1,5 +1,13 @@
 # The DSP worklets
 
+`delay/` is the stereo/dub insert (#698), built as
+`generated/delay-processor.js`: `delayDsp.ts` owns preallocated delay/filter
+state and routing, and `delayProcessor.ts` owns controls/lifetime/telemetry.
+Tests under `inserts/delay*.test.ts` use `__fixtures__/delayHarness.ts` to
+exercise the shipped processor. Its separate `tsconfig.json` uses the
+existing erased-field settings. Controls live in `inserts/delayConstants.ts`
+and `delaySpec.ts`; song tempo is supplied through `tempoInsertRegistry.ts`.
+
 `phaser/` is the original four-stage stereo insert (#687):
 `phaserProcessor.ts` owns controls/lifecycle/load reporting and `phaserDsp.ts`
 owns the lossless lattice stages, feedback, envelope and sweep. It ships as
@@ -77,7 +85,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`),
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
    does `scripts/lib/workletBundle.test.mjs`. Three consumers read the

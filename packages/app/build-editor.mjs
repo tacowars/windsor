@@ -40,6 +40,7 @@ const worklet = readFileSync(join(AUDIO, 'worklet/generated/fm-processor.js'), '
 const meter = readFileSync(join(AUDIO, 'worklet/generated/peak-meter-processor.js'), 'utf8');
 const compressor = readFileSync(join(AUDIO, 'worklet/generated/compressor-processor.js'), 'utf8');
 const reverb = readFileSync(join(AUDIO, 'worklet/generated/reverb-processor.js'), 'utf8');
+const delay = readFileSync(join(AUDIO, 'worklet/generated/delay-processor.js'), 'utf8');
 const phaser = readFileSync(join(AUDIO, 'worklet/generated/phaser-processor.js'), 'utf8');
 const retroReverb = readFileSync(
   join(AUDIO, 'worklet/generated/retro-reverb-processor.js'),
@@ -128,6 +129,7 @@ const html = template
   .replace('/*__REVERB__*/', () => JSON.stringify(reverb))
   .replace('/*__RETRO_REVERB__*/', () => JSON.stringify(retroReverb))
   .replace('/*__PHASER__*/', () => JSON.stringify(phaser))
+  .replace('/*__DELAY__*/', () => JSON.stringify(delay))
   .replace('/*__COMPRESSOR__*/', () => JSON.stringify(compressor))
   .replace('/*__METER__*/', () => JSON.stringify(meter));
 
