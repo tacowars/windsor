@@ -32,7 +32,6 @@ export const REBUILD_COMMAND = 'node scripts/build-worklets.mjs';
  * to `WORKLET_DIR`. A second worklet is a second row; nothing else changes.
  */
 export const WORKLETS = [
-  { name: 'delay', entry: 'delay/delayProcessor.ts', output: 'generated/delay-processor.js' },
   { name: 'fm', entry: 'fm/fmProcessor.ts', output: 'generated/fm-processor.js' },
   {
     name: 'meter',
@@ -55,6 +54,7 @@ export const WORKLETS = [
     entry: 'retro/retroReverbProcessor.ts',
     output: 'generated/retro-reverb-processor.js',
   },
+  { name: 'delay', entry: 'delay/delayProcessor.ts', output: 'generated/delay-processor.js' },
 ];
 
 /** The directory an agent edits instead of the generated file, relative to `WORKLET_DIR`. */
