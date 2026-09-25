@@ -200,6 +200,7 @@ export { DEFAULT_DRIVE, DRIVE_INSERT, driveCompensation } from './inserts/driveI
 export type { DriveSpec } from './inserts/driveInsert';
 export { CHORUS_INSERT, DEFAULT_CHORUS } from './inserts/chorusInsert';
 export type { ChorusSpec } from './inserts/chorusInsert';
+export { CHORUS_PRESETS, applyChorusPreset, matchingChorusPreset } from './inserts/chorusPresets';
 export * from './inserts/insertConstants';
 export { DEFAULT_RETRO_REVERB } from './inserts/retroReverbSpec';
 export type { RetroReverbSpec } from './inserts/retroReverbSpec';
@@ -338,3 +339,12 @@ export { DEFAULT_DELAY } from './inserts/delaySpec';
 export type { DelaySpec } from './inserts/delaySpec';
 export { DELAY_BOUNDS, DELAY_DIVISIONS, DELAY_MODES } from './inserts/delayConstants';
 export { DELAY_PRESETS, applyDelayPreset, matchingDelayPreset } from './inserts/delayPresets';
+
+export { DEFAULT_ENSEMBLE } from './inserts/ensembleSpec';
+export type { EnsembleSpec } from './inserts/ensembleSpec';
+export { ENSEMBLE_BOUNDS } from './inserts/ensembleConstants';
+export {
+  ENSEMBLE_PRESETS,
+  applyEnsemblePreset,
+  matchingEnsemblePreset,
+} from './inserts/ensemblePresets';

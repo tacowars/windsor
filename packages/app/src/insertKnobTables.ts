@@ -6,6 +6,7 @@
 import type {
   ChorusSpec,
   DriveSpec,
+  EnsembleSpec,
   InsertKindName,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
@@ -15,10 +16,12 @@ import {
   CHORUS_RATE_MIN_HZ,
   DEFAULT_CHORUS,
   DEFAULT_DRIVE,
+  DEFAULT_ENSEMBLE,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
   DRIVE_TONE_MIN_HZ,
+  ENSEMBLE_BOUNDS,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { fmt2, fmtDb, fmtHz } from './consoleFormat';
 import type { SeqKnobOpts } from './sequencerKnobTables';
@@ -31,6 +34,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   'retro-reverb': 'Retro reverb',
   phaser: 'Phaser',
   delay: 'Dub delay',
+  ensemble: 'Ensemble',
 };
 
 export interface InsertKnobEntry<S> {
@@ -79,3 +83,29 @@ export const CHORUS_KNOBS: readonly InsertKnobEntry<ChorusSpec>[] = [
   { f: 'spread', label: 'Spread', o: { min: 0, max: 1, def: DEFAULT_CHORUS.spread, fmt: fmt2 } },
   { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_CHORUS.mix, fmt: fmt2 } },
 ];
+
+const ENSEMBLE_FIELDS = [
+  ['slowRate', 'Slow rate'],
+  ['slowDepth', 'Slow depth (ms)'],
+  ['fastRate', 'Fast rate'],
+  ['fastDepth', 'Fast depth (ms)'],
+  ['delay', 'Delay (ms)'],
+  ['tone', 'Tone'],
+  ['width', 'Width'],
+  ['mix', 'Mix'],
+] as const;
+const ENSEMBLE_LOG_FIELDS: ReadonlySet<string> = new Set(['slowRate', 'fastRate', 'tone']);
+
+export const ENSEMBLE_KNOBS: readonly InsertKnobEntry<EnsembleSpec>[] = ENSEMBLE_FIELDS.map(
+  ([f, label]) => ({
+    f,
+    label,
+    o: {
+      min: ENSEMBLE_BOUNDS[f][0],
+      max: ENSEMBLE_BOUNDS[f][1],
+      def: DEFAULT_ENSEMBLE[f],
+      fmt: f === 'tone' ? fmtHz : fmt2,
+      ...(ENSEMBLE_LOG_FIELDS.has(f) ? { curve: 'log' as const } : {}),
+    },
+  }),
+);

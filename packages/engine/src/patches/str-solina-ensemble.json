@@ -3,7 +3,7 @@
   "name": "Solina Ensemble",
   "category": "Strings",
   "tags": ["strings", "ambient", "edm", "solina", "ensemble", "divide-down"],
-  "description": "Solina / ARP String Ensemble: phase-locked divider saws and pulses in viola, violin (8+4 ft) and cello (16 ft) footages behind a gentle 12 dB lowpass; the animation belongs to the chorus, so spread is small. Ensemble pad — play C3–C5 in 3–4-note chords, gate 1 s or longer; mod wheel adds vibrato and opens the filter. Mixer: chorus rate 0.6 Hz, depth 3 ms, spread 1, mix 0.5, then a second chorus at rate 5 Hz, depth 0.5 ms, mix 0.3 (the Solina’s slow and fast BBD LFOs); low cut 120 Hz; plate send 0.25.",
+  "description": "Solina / ARP String Ensemble: phase-locked divider saws and pulses in viola, violin (8+4 ft) and cello (16 ft) footages behind a gentle 12 dB lowpass; the animation belongs to the chorus, so spread is small. Ensemble pad — play C3–C5 in 3–4-note chords, gate 1 s or longer; mod wheel adds vibrato and opens the filter. Mixer: the ensemble insert on its Solina preset (three delay lines 120° apart, each swept by the 0.6 Hz slow and 6 Hz fast LFOs; tone 12 kHz; width 1, mix 1); low cut 120 Hz; plate send 0.25.",
   "patch": {
     "name": "Solina Ensemble",
     "algorithm": 7,

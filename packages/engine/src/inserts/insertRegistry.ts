@@ -18,12 +18,14 @@ import { DELAY_INSERT } from './delayInsert';
 import type { DelaySpec } from './delaySpec';
 import { PHASER_INSERT } from './phaserInsert';
 import type { PhaserSpec } from './phaserSpec';
+import { ENSEMBLE_INSERT } from './ensembleInsert';
+import type { EnsembleSpec } from './ensembleSpec';
 import type { RetroReverbSpec } from './retroReverbSpec';
 import type { InsertKind, InsertStage } from './insertKind';
 
 /** Every kind's settings, discriminated on `kind`. */
 export type InsertSpec =
-  DriveSpec | ChorusSpec | CompressorSpec | RetroReverbSpec | PhaserSpec | DelaySpec;
+  DriveSpec | ChorusSpec | CompressorSpec | RetroReverbSpec | PhaserSpec | DelaySpec | EnsembleSpec;
 export type InsertKindName = InsertSpec['kind'];
 
 /** A registry of kinds by name. The strip takes one as a parameter, so a test can inject another. */
@@ -36,6 +38,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   'retro-reverb': RETRO_REVERB_INSERT,
   phaser: PHASER_INSERT,
   delay: DELAY_INSERT,
+  ensemble: ENSEMBLE_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];
