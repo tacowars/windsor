@@ -85,7 +85,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`),
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
    does `scripts/lib/workletBundle.test.mjs`. Three consumers read the

@@ -47,7 +47,8 @@ class DelayDsp {
 
   configure(params: DelayParams, _frames: number): void {
     const t = this.targets;
-    for (const key of KEYS) {
+    for (let i = 0; i < KEYS.length; i++) {
+      const key = KEYS[i];
       if (key !== 'ping' && key !== 'mid') t[key] = params[key][0];
     }
     t.ping = params.mode[0] === DELAY_MODE_IDS['ping-pong'] ? 1 : 0;
@@ -58,7 +59,7 @@ class DelayDsp {
     t.drive = C.dbBase ** (t.drive / C.dbDivisor);
     t.outputDb = C.dbBase ** (t.outputDb / C.dbDivisor);
     if (this.first) {
-      for (const key of KEYS) this.controls[key] = t[key];
+      for (let i = 0; i < KEYS.length; i++) this.controls[KEYS[i]] = t[KEYS[i]];
       this.first = false;
     }
   }
