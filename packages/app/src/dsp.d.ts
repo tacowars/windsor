@@ -11,5 +11,6 @@ interface Window {
     meter: string;
     retroReverb: string;
     phaser: string;
+    delay: string;
   };
 }

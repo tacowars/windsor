@@ -54,6 +54,7 @@ export const WORKLETS = [
     entry: 'retro/retroReverbProcessor.ts',
     output: 'generated/retro-reverb-processor.js',
   },
+  { name: 'delay', entry: 'delay/delayProcessor.ts', output: 'generated/delay-processor.js' },
 ];
 
 /** The directory an agent edits instead of the generated file, relative to `WORKLET_DIR`. */
