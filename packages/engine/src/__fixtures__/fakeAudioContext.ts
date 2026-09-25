@@ -14,7 +14,7 @@
  */
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import type { FakeHost } from './fakeAudioNodes';
-import { FakeOscillator } from './fakeOscillator';
+import { FakeOscillator, FakePeriodicWave } from './fakeOscillator';
 import { FakeWaveShaper } from './fakeWaveShaper';
 import {
   BLOCK,
@@ -96,6 +96,21 @@ export class FakeContext implements FakeHost {
 
   createOscillator(): FakeOscillator {
     return new FakeOscillator(this);
+  }
+
+  createPeriodicWave(
+    real: Float32Array | number[],
+    imag: Float32Array | number[],
+    constraints?: PeriodicWaveConstraints,
+  ): FakePeriodicWave {
+    if (real.length !== imag.length || real.length < 2) {
+      throw new Error('createPeriodicWave: real and imag must match, with at least two terms');
+    }
+    return new FakePeriodicWave(
+      Float32Array.from(real),
+      Float32Array.from(imag),
+      constraints?.disableNormalization ?? false,
+    );
   }
 
   createWaveShaper(): FakeWaveShaper {

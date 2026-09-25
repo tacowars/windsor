@@ -14,15 +14,17 @@ import {
   CHORUS_RATE_MIN_HZ,
   DEFAULT_CHORUS,
   DEFAULT_DRIVE,
+  DEFAULT_ENSEMBLE,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
   DRIVE_TONE_MIN_HZ,
+  ENSEMBLE_BOUNDS,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { INSERT_CARDS } from './insertCards';
-import { CHORUS_KNOBS, DRIVE_KNOBS, INSERT_LABELS } from './insertKnobTables';
+import { CHORUS_KNOBS, DRIVE_KNOBS, ENSEMBLE_KNOBS, INSERT_LABELS } from './insertKnobTables';
 
 describe('INSERT_CARDS', () => {
   it('has a card for every insert kind the engine declares, and no other', () => {
@@ -55,7 +57,7 @@ describe('DRIVE_KNOBS', () => {
 
 describe('CHORUS_KNOBS', () => {
   it("covers every chorus field but the kind, each defaulting to DEFAULT_CHORUS's (#642)", () => {
-    const fields = INSERT_KINDS.chorus.fields.filter((f) => f !== 'kind');
+    const fields = INSERT_KINDS.chorus.fields.filter((f) => f !== 'kind' && f !== 'enabled');
     expect(CHORUS_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
     for (const { f, o } of CHORUS_KNOBS) expect(o.def, f).toBe(DEFAULT_CHORUS[f]);
   });
@@ -72,5 +74,16 @@ describe('CHORUS_KNOBS', () => {
     ]);
     expect([byField.spread?.min, byField.spread?.max]).toEqual([0, 1]);
     expect([byField.mix?.min, byField.mix?.max]).toEqual([0, 1]);
+  });
+});
+
+describe('ENSEMBLE_KNOBS (#695)', () => {
+  it("covers every ensemble number, each spanning the engine's bounds from DEFAULT_ENSEMBLE", () => {
+    const fields = INSERT_KINDS.ensemble.fields.filter((f) => f !== 'kind' && f !== 'enabled');
+    expect(ENSEMBLE_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
+    for (const { f, o } of ENSEMBLE_KNOBS) {
+      expect(o.def, f).toBe(DEFAULT_ENSEMBLE[f]);
+      expect([o.min, o.max], f).toEqual([...ENSEMBLE_BOUNDS[f as keyof typeof ENSEMBLE_BOUNDS]]);
+    }
   });
 });
