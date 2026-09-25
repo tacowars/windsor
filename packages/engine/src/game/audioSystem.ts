@@ -101,6 +101,7 @@ export interface MusicReadout extends ArrangementReadout {
 
 import { createMasterStrip } from '../mixer/masterStrip';
 import type { MasterStrip } from '../mixer/masterStrip';
+import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import { meteredInsertRegistry } from '../inserts/meteredInsertRegistry';
 
 export class AudioSystem {
@@ -137,6 +138,7 @@ export class AudioSystem {
   );
   private started = false;
   private player: ArrangementPlayer | null = null;
+  private readonly insertTempo: ReturnType<typeof tempoInsertRegistry>;
   private muted = false;
   private suppressed = false;
 
@@ -146,8 +148,9 @@ export class AudioSystem {
     this.mix = options.mix ?? MIX;
     this.returnSpecs = options.returns ?? RETURNS;
     this.now = options.now ?? ((): number => performance.now());
+    this.insertTempo = tempoInsertRegistry(this.scheduler.bpm);
     this.routeOptions = {
-      registry: meteredInsertRegistry(this.loadMeter),
+      registry: meteredInsertRegistry(this.loadMeter, this.insertTempo.registry),
       changed: () => this.sidechains.changed(),
       ...(options.defer ? { defer: options.defer } : {}),
     };
@@ -310,6 +313,7 @@ export class AudioSystem {
     // every patch it plays, so the library is not a runtime import and a
     // name it does not embed is a load error, never a silent fallback.
     const resolver = new PatchResolver(patches ?? {});
+    this.insertTempo.setTempo(arrangement.bpm);
     for (const part of arrangement.parts) {
       this.addMusicPart(
         part,
@@ -434,6 +438,7 @@ export class AudioSystem {
       this.sidechains.cancel();
       return result;
     }
+    this.insertTempo.setTempo(this.scheduler.bpm);
     const ignored = [...result.ignored];
     if (master !== undefined) ignored.push(...this.masterStrip!.apply(master));
     for (const [slot, strip] of strips) {

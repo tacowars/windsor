@@ -16,6 +16,8 @@ export interface InsertStage<S extends { readonly kind: string }> extends StripS
   readonly detector?: { readonly input: AudioNode; setExternal(external: boolean): void };
   /** Param writes only; the caller has normalised `spec`. */
   set(spec: S): void;
+  /** Optional song tempo input; the registry initializes it and forwards live changes. */
+  setTempo?(bpm: number): void;
 }
 
 export interface InsertKind<S extends { readonly kind: string }> {

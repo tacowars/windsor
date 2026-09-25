@@ -89,6 +89,7 @@ export class EngineHost {
         meterUrl: blob(dsp.meter),
         retroReverbUrl: blob(dsp.retroReverb),
         phaserUrl: blob(dsp.phaser),
+        delayUrl: blob(dsp.delay),
       });
     } catch {
       try {
@@ -102,6 +103,7 @@ export class EngineHost {
           meterUrl: data(dsp.meter),
           retroReverbUrl: data(dsp.retroReverb),
           phaserUrl: data(dsp.phaser),
+          delayUrl: data(dsp.delay),
         });
       } catch (error) {
         this.discard();
