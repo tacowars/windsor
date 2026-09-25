@@ -28,6 +28,7 @@ describe('INSERT_KINDS', () => {
       'retro-reverb',
       'phaser',
       'delay',
+      'ensemble',
     ]);
     for (const name of INSERT_KIND_NAMES) {
       const kind = INSERT_KINDS[name];

@@ -294,24 +294,37 @@ export class FakeDelay extends FakeNode {
     return [[left, right]];
   }
 
+  /**
+   * The spec clamps the computed delay time to `[0, maxDelayTime]`, and a
+   * delay outside a cycle may be shorter than a block (#695): a lag under the
+   * sample's own offset in the block reads this block's input, pulled
+   * upstream. Inside a cycle that pull throws, as the fake's cycle rule does.
+   */
   private renderModulated(block: number): Float32Array[][] {
     const times = this.delayTime.valuesAt(block);
-    const length = this.ring[0].length;
-    const left = new Float32Array(BLOCK);
-    const right = new Float32Array(BLOCK);
+    const maxLag = this.delayTime.maxValue * this.context.sampleRate;
+    const out = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
+    let current: Float32Array[] | null = null;
+    const sample = (rel: number, c: number): number => {
+      if (rel < 0) {
+        const ring = this.ring[c] ?? this.ring[0];
+        const length = ring.length;
+        return ring[(((this.write + rel) % length) + length) % length] ?? 0;
+      }
+      current ??= this.gather(block);
+      return (current[c] ?? current[0])?.[rel] ?? 0;
+    };
     for (let i = 0; i < BLOCK; i++) {
-      const lag = (times[i] ?? 0) * this.context.sampleRate;
-      if (lag < BLOCK)
-        throw new Error(`fake DelayNode needs delayTime >= one block (${BLOCK} frames)`);
-      const at = this.write + i - lag;
+      const lag = Math.min(maxLag, Math.max(0, (times[i] ?? 0) * this.context.sampleRate));
+      const at = i - lag;
       const k = Math.floor(at);
       const f = at - k;
-      const a = ((k % length) + length) % length;
-      const b = (a + 1) % length;
-      left[i] = (1 - f) * (this.ring[0][a] ?? 0) + f * (this.ring[0][b] ?? 0);
-      right[i] = (1 - f) * (this.ring[1][a] ?? 0) + f * (this.ring[1][b] ?? 0);
+      for (let c = 0; c < 2; c++) {
+        const next = f > 0 ? sample(k + 1, c) : 0;
+        (out[c] as Float32Array)[i] = (1 - f) * sample(k, c) + f * next;
+      }
     }
-    return [[left, right]];
+    return [out];
   }
 
   /** Write this block's input. Call after every consumer has pulled the block. */
