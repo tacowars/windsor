@@ -49,6 +49,16 @@ signed feedback, feedback cut, stereo offset, envelope sweep, bass keep and
 mix are song-owned; presets preserve Mix/enabled. Tests include the shipped
 processor and real synth bass/pad input.
 
+The Dub delay (#698) is `inserts/delaySpec.ts`, `delayConstants.ts`,
+`delayInsert.ts` and `delayPresets.ts` / `delayPresetTables.ts`, with DSP under
+`worklet/delay/`. `tempoInsertRegistry.ts` carries song BPM to current and
+new/deferred inserts; tempo is not saved per insert. Stereo, ping-pong and
+mid/side modes share independently synced/free lane times, HP/LP filtering,
+saturating feedback, drive, mix and output gain. The console uses
+`src/delayCard.ts` / `delayTables.ts`; presets preserve Mix/output/enabled.
+Time changes bend pitch. See `docs/research/2026-09-25-698-delay/README.md`
+for semantics and audition steps.
+
 The console lives in `tools/patch-editor/`: five tabs over the *real*
 `AudioSystem`, imported through `audio/index-for-editor.ts`, which excludes
 Babylon. Extend that surface rather than building another synth, effect graph

@@ -1,0 +1,64 @@
+{
+  "browser": "151.0.7922.34",
+  "bpm": 126,
+  "track": {
+    "kind": "delay",
+    "mode": "mid-side",
+    "leftSync": false,
+    "rightSync": true,
+    "leftDivision": "1/2D",
+    "rightDivision": "1/8T",
+    "leftMs": 448.8415644735888,
+    "rightMs": 500,
+    "feedback": 0.9159999999999999,
+    "highpass": 120,
+    "lowpass": 3600,
+    "drive": 9,
+    "mix": 0.3,
+    "outputDb": 0,
+    "enabled": true
+  },
+  "master": {
+    "level": 1,
+    "inserts": [
+      {
+        "kind": "delay",
+        "mode": "stereo",
+        "leftSync": true,
+        "rightSync": true,
+        "leftDivision": "1/8D",
+        "rightDivision": "1/4",
+        "leftMs": 375,
+        "rightMs": 500,
+        "feedback": 0.45,
+        "highpass": 80,
+        "lowpass": 12000,
+        "drive": 0,
+        "mix": 0.3,
+        "outputDb": 0,
+        "enabled": true
+      }
+    ]
+  },
+  "offline": [
+    {
+      "mode": 0,
+      "peak": 0.3009805679321289,
+      "energy": 0.3156163823845579,
+      "first": 4800
+    },
+    {
+      "mode": 1,
+      "peak": 0.3009805679321289,
+      "energy": 0.1588393858593307,
+      "first": 4800
+    },
+    {
+      "mode": 2,
+      "peak": 0.3009805679321289,
+      "energy": 0.3187608929531615,
+      "first": 4800
+    }
+  ],
+  "errors": []
+}

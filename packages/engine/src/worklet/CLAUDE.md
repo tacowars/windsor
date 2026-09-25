@@ -1,5 +1,13 @@
 # The DSP worklets
 
+`delay/` is the stereo/dub insert (#698), built as
+`generated/delay-processor.js`: `delayDsp.ts` owns preallocated delay/filter
+state and routing, and `delayProcessor.ts` owns controls/lifetime/telemetry.
+Tests under `inserts/delay*.test.ts` use `__fixtures__/delayHarness.ts` to
+exercise the shipped processor. Its separate `tsconfig.json` uses the
+existing erased-field settings. Controls live in `inserts/delayConstants.ts`
+and `delaySpec.ts`; song tempo is supplied through `tempoInsertRegistry.ts`.
+
 `phaser/` is the original four-stage stereo insert (#687):
 `phaserProcessor.ts` owns controls/lifecycle/load reporting and `phaserDsp.ts`
 owns the lossless lattice stages, feedback, envelope and sweep. It ships as

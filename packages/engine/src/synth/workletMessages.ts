@@ -179,6 +179,10 @@ export const PEAK_METER_WORKLET_URL = new URL(
   import.meta.url,
 );
 
+export const DELAY_WORKLET_URL = new URL(
+  '../worklet/generated/delay-processor.js',
+  import.meta.url,
+);
 export const PHASER_WORKLET_URL = new URL(
   '../worklet/generated/phaser-processor.js',
   import.meta.url,

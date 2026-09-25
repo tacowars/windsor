@@ -333,3 +333,8 @@ export { DEFAULT_PHASER } from './inserts/phaserSpec';
 export type { PhaserSpec } from './inserts/phaserSpec';
 export { PHASER_BOUNDS } from './inserts/phaserConstants';
 export { PHASER_PRESETS, applyPhaserPreset, matchingPhaserPreset } from './inserts/phaserPresets';
+
+export { DEFAULT_DELAY } from './inserts/delaySpec';
+export type { DelaySpec } from './inserts/delaySpec';
+export { DELAY_BOUNDS, DELAY_DIVISIONS, DELAY_MODES } from './inserts/delayConstants';
+export { DELAY_PRESETS, applyDelayPreset, matchingDelayPreset } from './inserts/delayPresets';

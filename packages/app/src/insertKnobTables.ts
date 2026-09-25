@@ -30,6 +30,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   compressor: 'Bus compressor',
   'retro-reverb': 'Retro reverb',
   phaser: 'Phaser',
+  delay: 'Dub delay',
 };
 
 export interface InsertKnobEntry<S> {

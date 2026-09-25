@@ -11,6 +11,7 @@ import type { AppCtx } from './context';
 import { compressorCard } from './compressorCard';
 import { chorusCard } from './chorusCard';
 import { driveCard } from './driveCard';
+import { delayCard } from './delayCard';
 import { phaserCard } from './phaserCard';
 import { retroReverbCard } from './retroReverbCard';
 
@@ -23,4 +24,5 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   compressor: compressorCard,
   'retro-reverb': retroReverbCard,
   phaser: phaserCard,
+  delay: delayCard,
 };
