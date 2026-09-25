@@ -123,6 +123,12 @@ describe('the chorus sound', () => {
     expect(output.right).toEqual(input.right);
   });
 
+  it('passes the dry signal untouched when switched off, whatever its Mix (#695)', async () => {
+    const { input, output } = await render({ ...DEFAULT_CHORUS, mix: 1, enabled: false });
+    expect(output.left).toEqual(input.left);
+    expect(output.right).toEqual(input.right);
+  });
+
   it('puts sidebands at each voice’s LFO rate around a steady tone', async () => {
     const wet = { ...DEFAULT_CHORUS, rate: RATE_HZ, depth: CHORUS_DEPTH_MAX_MS, mix: 1 };
     const moving = await render(wet);
@@ -149,6 +155,22 @@ describe('the chorus sound', () => {
 });
 
 describe('CHORUS_INSERT.normalise', () => {
+  it('clamps a rate past the ceiling to it and keeps the Juno I + II rate (#695)', () => {
+    const n = new FieldNormaliser();
+    const rate = (raw: number): number =>
+      CHORUS_INSERT.normalise({ kind: 'chorus', rate: raw }, 'x', n).rate;
+    expect(CHORUS_RATE_MAX_HZ).toBe(10);
+    expect(rate(12)).toBe(CHORUS_RATE_MAX_HZ);
+    expect(rate(10)).toBe(10);
+    expect(rate(9.75)).toBe(9.75);
+    expect(n.corrections).toEqual([`x.rate: clamped 12 to ${CHORUS_RATE_MAX_HZ}`]);
+  });
+
+  it('reads a saved chorus with no enabled key as on (#695)', () => {
+    const spec = CHORUS_INSERT.normalise({ kind: 'chorus' }, 'x', new FieldNormaliser());
+    expect(spec.enabled).toBe(true);
+  });
+
   it('fills the defaults, clamps each field and reports unknown keys', () => {
     const n = new FieldNormaliser();
     const spec = CHORUS_INSERT.normalise({ kind: 'chorus', depth: 40, spread: -2, wat: 1 }, 'x', n);

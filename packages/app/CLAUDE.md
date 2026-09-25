@@ -188,6 +188,11 @@ Each is the whole list; a step skipped here is what a later ticket finds.
    fails without one).
 3. A render test of its sound and its bounds beside the kind, and a rebuilt
    page.
+4. Presets, if the kind has them: a `<kind>PresetTables.ts` of
+   `InsertPreset` entries, each citing its source, and a `<kind>Presets.ts`
+   over `inserts/insertPresets.ts`; the card is then a `presetInsertCard`
+   (the chorus and the ensemble, #695). A native-node kind (the chorus, the
+   ensemble) needs none of the worklet steps.
 
 **Add a harmony mode**
 

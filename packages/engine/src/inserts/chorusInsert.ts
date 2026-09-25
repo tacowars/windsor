@@ -15,6 +15,8 @@
  * the two sides apart instead of panning them. The LFOs run free, unsynced to
  * the transport, as a chorus's should.
  *
+ * `enabled` false is Mix 0 (#695), so a switched-off chain is the dry signal.
+ *
  * `set` is param writes only: the voice count is the kind's, so no setting
  * re-wires. `dispose` stops every oscillator — a running source keeps its
  * subgraph alive — and disconnects what the stage built.
@@ -26,6 +28,7 @@ import {
   CHORUS_DEPTH_DEFAULT_MS,
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
+  CHORUS_ENABLED_DEFAULT,
   CHORUS_MIX_DEFAULT,
   CHORUS_RATE_DEFAULT_HZ,
   CHORUS_RATE_MAX_HZ,
@@ -46,6 +49,8 @@ export interface ChorusSpec {
   readonly spread: number;
   /** 0 dry .. 1 wet. */
   readonly mix: number;
+  /** Off is the dry signal exactly, so a chain can sit in a strip for an A/B (#695). */
+  readonly enabled: boolean;
 }
 
 export const DEFAULT_CHORUS: ChorusSpec = {
@@ -54,9 +59,10 @@ export const DEFAULT_CHORUS: ChorusSpec = {
   depth: CHORUS_DEPTH_DEFAULT_MS,
   spread: CHORUS_SPREAD_DEFAULT,
   mix: CHORUS_MIX_DEFAULT,
+  enabled: CHORUS_ENABLED_DEFAULT,
 };
 
-const FIELDS = ['kind', 'rate', 'depth', 'spread', 'mix'] as const;
+const FIELDS = ['kind', 'rate', 'depth', 'spread', 'mix', 'enabled'] as const;
 
 function normalise(raw: Record<string, unknown>, path: string, n: FieldNormaliser): ChorusSpec {
   n.dropUnknown(raw, FIELDS, path);
@@ -67,6 +73,7 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
     depth: n.num(raw.depth, base.depth, CHORUS_DEPTH_MIN_MS, CHORUS_DEPTH_MAX_MS, `${path}.depth`),
     spread: n.num(raw.spread, base.spread, 0, 1, `${path}.spread`),
     mix: n.num(raw.mix, base.mix, 0, 1, `${path}.mix`),
+    enabled: n.bool(raw.enabled, base.enabled, `${path}.enabled`),
   };
 }
 
@@ -127,8 +134,9 @@ function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<Chorus
       v.depthR.gain.value = swing * (1 - 2 * next.spread);
     });
     // The voices sum into the merger, so each carries its share of the wet level.
-    wet.gain.value = next.mix / voices.length;
-    dry.gain.value = 1 - next.mix;
+    const mix = next.enabled ? next.mix : 0;
+    wet.gain.value = mix / voices.length;
+    dry.gain.value = 1 - mix;
   };
   set(spec);
 

@@ -36,7 +36,8 @@ export const DRIVE_CURVE_POINTS = 4097;
 
 /** The LFO rate of the first voice, in Hz; the others run at `CHORUS_VOICE_RATIOS` of it. */
 export const CHORUS_RATE_MIN_HZ = 0.05;
-export const CHORUS_RATE_MAX_HZ = 5;
+/** 10 Hz covers the Juno-60's Chorus I + II at 9.75 Hz (#695 decision 2). */
+export const CHORUS_RATE_MAX_HZ = 10;
 export const CHORUS_RATE_DEFAULT_HZ = 0.6;
 /** How far each voice's delay swings either side of its centre, in milliseconds. */
 export const CHORUS_DEPTH_MIN_MS = 0;
@@ -59,6 +60,8 @@ export const CHORUS_MIX_DEFAULT = 0.5;
  */
 export const CHORUS_VOICE_CENTRES_MS: readonly number[] = [11, 17];
 export const CHORUS_VOICE_RATIOS: readonly number[] = [1, 1.37];
+/** A chorus is on unless a song switches it off; off is the dry signal exactly. */
+export const CHORUS_ENABLED_DEFAULT = true;
 /** The longest a voice's delay line can reach, in seconds: every centre plus the depth ceiling. */
 export const CHORUS_DELAY_MAX_SECONDS = 0.05;
 

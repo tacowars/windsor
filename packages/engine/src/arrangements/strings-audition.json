@@ -171,8 +171,8 @@
         "inserts": [
           {
             "kind": "chorus",
-            "rate": 0.86,
-            "depth": 3.5,
+            "rate": 0.863,
+            "depth": 1.845,
             "spread": 1,
             "mix": 0.5
           }
@@ -633,18 +633,32 @@
         },
         "inserts": [
           {
+            "kind": "ensemble",
+            "slowRate": 0.6,
+            "slowDepth": 1.2,
+            "fastRate": 6,
+            "fastDepth": 0.32,
+            "delay": 5,
+            "tone": 12000,
+            "width": 1,
+            "mix": 1,
+            "enabled": true
+          },
+          {
             "kind": "chorus",
             "rate": 0.6,
             "depth": 3,
             "spread": 1,
-            "mix": 0.5
+            "mix": 0.5,
+            "enabled": false
           },
           {
             "kind": "chorus",
             "rate": 5,
             "depth": 0.5,
             "spread": 0.7,
-            "mix": 0.3
+            "mix": 0.3,
+            "enabled": false
           }
         ]
       },
@@ -692,6 +706,80 @@
             "degree": 6,
             "size": 3,
             "inversion": 0,
+            "octave": 0,
+            "semitone": 0,
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 6,
+      "name": "juno I+II",
+      "preset": "str-juno-strings",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.8,
+        "pan": -0.15,
+        "lowCut": 40,
+        "sends": {
+          "room": 0.2
+        },
+        "inserts": [
+          {
+            "kind": "chorus",
+            "rate": 9.75,
+            "depth": 0.2,
+            "spread": 0,
+            "mix": 0.5
+          }
+        ]
+      },
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 0.9,
+        "voicing": "close",
+        "register": {
+          "octave": 0
+        },
+        "steps": [
+          {
+            "kind": "chord",
+            "degree": 0,
+            "size": 4,
+            "inversion": 1,
+            "octave": 0,
+            "semitone": 0,
+            "duration": 1,
+            "repeat": 1
+          },
+          {
+            "kind": "chord",
+            "degree": 5,
+            "size": 4,
+            "inversion": 1,
+            "octave": 0,
+            "semitone": 0,
+            "duration": 1,
+            "repeat": 1
+          },
+          {
+            "kind": "chord",
+            "degree": 2,
+            "size": 4,
+            "inversion": 1,
+            "octave": 0,
+            "semitone": 0,
+            "duration": 1,
+            "repeat": 1
+          },
+          {
+            "kind": "chord",
+            "degree": 6,
+            "size": 4,
+            "inversion": 1,
             "octave": 0,
             "semitone": 0,
             "duration": 1,

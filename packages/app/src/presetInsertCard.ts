@@ -1,0 +1,67 @@
+/**
+ * An insert card with a preset picker and an on switch above its knobs (#695;
+ * the phaser's card is the shape). Presets are editable starting points: the
+ * song stores values, never a preset id, and any knob turn that leaves every
+ * preset's values reads Custom.
+ */
+import type { InsertSpec } from '../../../packages/client/src/audio/index-for-editor';
+import type { AppCtx } from './context';
+import { el } from './dom';
+import type { InsertKnobEntry } from './insertKnobTables';
+import { insertKnobs, insertsOf } from './insertKnobs';
+import type { InsertTarget } from './insertTarget';
+import { insertChange } from './insertTarget';
+
+type Switchable = Extract<InsertSpec, { readonly enabled: boolean }>;
+
+export interface PresetCardSpec<S extends Switchable> {
+  readonly kind: S['kind'];
+  /** What the on switch and the picker are called. */
+  readonly label: string;
+  readonly defaults: S;
+  readonly presets: readonly { readonly id: string; readonly label: string }[];
+  apply(spec: S, id: string): S;
+  match(spec: S): string | undefined;
+  readonly knobs: readonly InsertKnobEntry<S>[];
+}
+
+export function presetInsertCard<S extends Switchable>(
+  ctx: AppCtx,
+  slot: InsertTarget,
+  index: number,
+  card: PresetCardSpec<S>,
+): HTMLElement {
+  const root = el('div', `${card.kind}-card`);
+  const current = (): S => {
+    const spec = insertsOf(ctx, slot)[index];
+    return spec?.kind === card.kind ? (spec as S) : card.defaults;
+  };
+  const commit = (spec: S): void => {
+    const inserts = [...insertsOf(ctx, slot)];
+    if (inserts[index]?.kind !== card.kind) return;
+    inserts[index] = spec;
+    if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
+  };
+  const row = el('div', 'knob-row');
+  const preset = document.createElement('select');
+  preset.className = 'field';
+  preset.setAttribute('aria-label', `${card.label} preset`);
+  preset.add(new Option('Custom', ''));
+  for (const entry of card.presets) preset.add(new Option(entry.label, entry.id));
+  const showMatch = (): void => {
+    preset.value = String(card.match(current()) ?? '');
+  };
+  showMatch();
+  preset.onchange = (): void => commit(card.apply(current(), preset.value));
+  const presetLabel = el('label', 'field-wrap', 'Starting point');
+  presetLabel.appendChild(preset);
+  const enabled = document.createElement('input');
+  enabled.type = 'checkbox';
+  enabled.checked = current().enabled;
+  enabled.onchange = (): void => commit({ ...current(), enabled: enabled.checked });
+  const enableLabel = el('label', 'field-wrap', card.label);
+  enableLabel.appendChild(enabled);
+  row.append(presetLabel, enableLabel);
+  root.append(row, insertKnobs(ctx, slot, index, card.knobs, showMatch));
+  return root;
+}
