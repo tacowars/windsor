@@ -17,6 +17,7 @@ import { FieldNormaliser } from '../song/arrangementFields';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 import type { ChorusSpec } from './chorusInsert';
 import { CHORUS_INSERT, DEFAULT_CHORUS } from './chorusInsert';
+import { CHORUS_PRESETS } from './chorusPresets';
 import {
   CHORUS_DEPTH_MAX_MS,
   CHORUS_RATE_MAX_HZ,
@@ -159,11 +160,12 @@ describe('CHORUS_INSERT.normalise', () => {
     const n = new FieldNormaliser();
     const rate = (raw: number): number =>
       CHORUS_INSERT.normalise({ kind: 'chorus', rate: raw }, 'x', n).rate;
-    expect(CHORUS_RATE_MAX_HZ).toBe(10);
-    expect(rate(12)).toBe(CHORUS_RATE_MAX_HZ);
-    expect(rate(10)).toBe(10);
-    expect(rate(9.75)).toBe(9.75);
-    expect(n.corrections).toEqual([`x.rate: clamped 12 to ${CHORUS_RATE_MAX_HZ}`]);
+    const past = CHORUS_RATE_MAX_HZ + 2;
+    const junoFast = CHORUS_PRESETS.find((p) => p.id === 'juno-1-2')?.settings.rate ?? NaN;
+    expect(rate(past)).toBe(CHORUS_RATE_MAX_HZ);
+    expect(rate(CHORUS_RATE_MAX_HZ)).toBe(CHORUS_RATE_MAX_HZ);
+    expect(rate(junoFast)).toBe(junoFast);
+    expect(n.corrections).toEqual([`x.rate: clamped ${past} to ${CHORUS_RATE_MAX_HZ}`]);
   });
 
   it('reads a saved chorus with no enabled key as on (#695)', () => {

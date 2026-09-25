@@ -14,12 +14,14 @@
    No AudioWorklet.
 2. **Phase lock by a sine-and-cosine basis** (decision 6). Each rate is a pair
    of `OscillatorNode`s playing a sine and a cosine `PeriodicWave` (both
-   custom waves, so they share one implementation path), started together
-   and always written the same frequency. Line i's LFO is
+   custom waves, so they share one implementation path), started at one
+   scheduled time, whose frequencies both follow **one `ConstantSourceNode`**
+   (their own `frequency.value` is 0). Line i's LFO is
    `cos φᵢ · sin θ + sin φᵢ · cos θ = sin(θ + φᵢ)` through two fixed-weight
-   `GainNode`s, so the lines are locked by construction through any rate
-   change. The unit test measures the phases from the rendered delay-time
-   modulation before and after a `set` that changes both rates.
+   `GainNode`s, so the lines are locked by construction at any rate. The unit
+   tests measure the phases from the rendered delay-time modulation before and
+   after a `set` that changes both rates, run the same measurement on a pair
+   started 20 ms apart as a negative control, and pin the shared source.
 3. **Decided during implementation, beyond the issue:**
    - **The chorus gains `enabled`** (default on; off is Mix 0, the dry signal
      exactly). Decision 10 keeps the old two-chorus chain in the Solina strip
@@ -31,17 +33,22 @@
    - **Presets never write Width, Mix or the on switch**, as the phaser's and
      the delay's never write Mix. The ensemble's default Mix is 1 (the Solina
      has no dry signal) and its default Width is decision 8's 1.
-   - **The fake audio graph grew** a `PeriodicWave` (tested to render a cosine
+   - **The fake audio graph grew** a `ConstantSourceNode`, scheduled `start(when)`, an a-rate oscillator `frequency`, a `PeriodicWave` (tested to render a cosine
      as a cosine, and a sine/cosine pair in quadrature through a rate change)
      and sub-block lags on a modulated `DelayNode` outside a cycle, clamped to
      `[0, maxDelayTime]` as the spec does, so the 1 ms line centre renders.
 
 ## Why
 
-Staggered oscillator starts give the right offsets only at the rate they were
-started at: an offset of Δt is a phase of ω·Δt, which moves the moment the rate
-changes. A shared-phase basis is the only native-node way to keep three
-phases exact under live rate edits without a worklet.
+Staggered starts — one oscillator per line, started a third of a period apart
+— need the start offset computed from the rate (up to 6.7 s of silence at
+0.05 Hz), and once running they hold that offset only as long as every rate
+write reaches every oscillator on the same frame. Two `.value` writes in one
+JavaScript task carry no such guarantee: a render quantum can fall between
+them, and at 6 → 10 Hz one 128-frame quantum is a permanent 3.8° error (#695
+review, pass 2). Here the phases come from fixed weights, not from start
+times, and a rate edit is a single write into the one source both
+oscillators of a pair follow.
 
 ## Punted / alternatives
 

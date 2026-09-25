@@ -14,7 +14,7 @@
  */
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import type { FakeHost } from './fakeAudioNodes';
-import { FakeOscillator, FakePeriodicWave } from './fakeOscillator';
+import { FakeConstantSource, FakeOscillator, FakePeriodicWave } from './fakeOscillator';
 import { FakeWaveShaper } from './fakeWaveShaper';
 import {
   BLOCK,
@@ -96,6 +96,10 @@ export class FakeContext implements FakeHost {
 
   createOscillator(): FakeOscillator {
     return new FakeOscillator(this);
+  }
+
+  createConstantSource(): FakeConstantSource {
+    return new FakeConstantSource(this);
   }
 
   createPeriodicWave(

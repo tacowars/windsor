@@ -1,17 +1,24 @@
 /**
  * The ensemble insert (#695): three delay lines 120° apart, each swept by a
  * slow plus a fast LFO. Phases are read from the rendered delay-time
- * modulation — before and after a `set` that changes both rates, the case
- * that separates a sine-and-cosine basis from staggered starts.
+ * modulation, before and after a `set` that changes both rates; a pair
+ * started apart is the negative control (the fake models `start(when)`), and
+ * the shared frequency source is pinned, since the fake applies param writes
+ * on block boundaries and so cannot show two writes straddling a quantum.
  */
 import { describe, expect, it } from 'vitest';
 
 import { tones } from '../__fixtures__/audioAnalysis';
 import type { Capture } from '../__fixtures__/fakeAudioContext';
-import { FakeContext, FakeWorkletNode, renderGraph } from '../__fixtures__/fakeAudioContext';
+import {
+  FakeContext,
+  FakeWorkletNode,
+  SAMPLE_RATE,
+  renderGraph,
+} from '../__fixtures__/fakeAudioContext';
 import type { FakeNode, FakeGain } from '../__fixtures__/fakeAudioNodes';
 import { BLOCK, FakeDelay, FakeMerger } from '../__fixtures__/fakeAudioNodes';
-import { FakeOscillator } from '../__fixtures__/fakeOscillator';
+import { FakeConstantSource, FakeOscillator } from '../__fixtures__/fakeOscillator';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 import { ENSEMBLE_BOUNDS, ENSEMBLE_LINE_PHASES_DEG } from './ensembleConstants';
@@ -25,6 +32,8 @@ const WINDOW_SECONDS = 2;
 const BEFORE = { slowRate: 1, fastRate: 5 };
 const AFTER = { slowRate: 1.5, fastRate: 7 };
 const PHASE_TOLERANCE_DEG = 0.5;
+/** A start offset well inside the tolerance's reach at every rate the test uses. */
+const STAGGER_SECONDS = 0.02;
 
 const fake = (node: AudioNode): FakeNode => node as unknown as FakeNode;
 const lines = (context: FakeContext): FakeDelay[] =>
@@ -51,9 +60,11 @@ function modulation(
   spec: EnsembleSpec,
   seconds: number,
   onBlock?: (b: number, set: (s: EnsembleSpec) => void) => void,
+  tamper?: (context: FakeContext) => void,
 ): { swings: Float32Array[]; rate: number } {
   const context = new FakeContext();
   const stage = ENSEMBLE_INSERT.create(context.asAudioContext(), spec);
+  tamper?.(context);
   const delays = lines(context);
   const blocks = Math.round((seconds * context.sampleRate) / BLOCK);
   const swings = delays.map(() => new Float32Array(blocks * BLOCK));
@@ -83,31 +94,64 @@ async function render(
   return { input, output };
 }
 
+/**
+ * The worst error, in degrees, of lines 1 and 2 from their place relative to
+ * line 0, at both rates, over a window before and a window after a `set` that
+ * changes both rates.
+ */
+function worstPhaseError(tamper?: (context: FakeContext) => void): number {
+  const spec = { ...DEFAULT_ENSEMBLE, ...BEFORE, slowDepth: 2, fastDepth: 0.5, delay: 10 };
+  const perWindow = Math.round((WINDOW_SECONDS * SAMPLE_RATE) / BLOCK);
+  const onBlock = (b: number, set: (s: EnsembleSpec) => void): void => {
+    if (b === perWindow) set({ ...spec, ...AFTER });
+  };
+  const { swings, rate } = modulation(spec, 2 * WINDOW_SECONDS, onBlock, tamper);
+  const n = perWindow * BLOCK;
+  let worst = 0;
+  for (const [window, rates] of [
+    [0, BEFORE],
+    [1, AFTER],
+  ] as const) {
+    for (const hz of [rates.slowRate, rates.fastRate]) {
+      const phases = swings.map((s) => project(s.subarray(window * n, (window + 1) * n), hz, rate));
+      phases.forEach((p, i) => {
+        const apart = wrap(p.deg - phases[0]!.deg);
+        const error = Math.abs(wrap(apart - ENSEMBLE_LINE_PHASES_DEG[i]! + 180) - 180);
+        worst = Math.max(worst, error);
+      });
+    }
+  }
+  return worst;
+}
+
 describe('the ensemble phase lock', () => {
   it('holds the three lines 0°, 120° and 240° apart, through a set that changes both rates', () => {
-    const spec = { ...DEFAULT_ENSEMBLE, ...BEFORE, slowDepth: 2, fastDepth: 0.5, delay: 10 };
-    const perWindow = Math.round((WINDOW_SECONDS * 48000) / BLOCK);
-    const { swings, rate } = modulation(spec, 2 * WINDOW_SECONDS, (b, set) => {
-      if (b === perWindow) set({ ...spec, ...AFTER });
+    expect(worstPhaseError()).toBeLessThan(PHASE_TOLERANCE_DEG);
+  });
+
+  it('is a measurement that catches a quadrature pair started apart (negative control)', () => {
+    const staggered = worstPhaseError((context) => {
+      oscillators(context)[1]!.startTime = STAGGER_SECONDS;
     });
-    const n = perWindow * BLOCK;
-    for (const [window, rates] of [
-      [0, BEFORE],
-      [1, AFTER],
-    ] as const) {
-      for (const hz of [rates.slowRate, rates.fastRate]) {
-        const phases = swings.map((s) =>
-          project(s.subarray(window * n, (window + 1) * n), hz, rate),
-        );
-        phases.forEach((p, i) => {
-          const apart = wrap(p.deg - phases[0]!.deg);
-          const want = ENSEMBLE_LINE_PHASES_DEG[i]!;
-          expect(Math.abs(wrap(apart - want + 180) - 180), `line ${i} at ${hz} Hz`).toBeLessThan(
-            PHASE_TOLERANCE_DEG,
-          );
-        });
+    expect(staggered).toBeGreaterThan(PHASE_TOLERANCE_DEG);
+  });
+
+  it('drives each pair from one frequency source, so a rate edit is one write', () => {
+    const context = new FakeContext();
+    const stage = ENSEMBLE_INSERT.create(context.asAudioContext(), DEFAULT_ENSEMBLE);
+    stage.set({ ...DEFAULT_ENSEMBLE, ...AFTER });
+    const lfos = oscillators(context);
+    const sources = context.nodes.filter(
+      (n): n is FakeConstantSource => n instanceof FakeConstantSource,
+    );
+    expect(sources.map((s) => s.offset.value)).toEqual([AFTER.slowRate, AFTER.fastRate]);
+    for (let pair = 0; pair < 2; pair++) {
+      for (const osc of lfos.slice(2 * pair, 2 * pair + 2)) {
+        expect(osc.frequency.value).toBe(0);
+        expect(osc.frequency.inputs).toEqual([sources[pair]]);
       }
     }
+    expect(new Set([...lfos, ...sources].map((s) => s.startTime ?? 0)).size).toBe(1);
   });
 });
 
@@ -195,7 +239,7 @@ describe('the ensemble graph', () => {
     expect(edges()).toEqual(before);
   });
 
-  it('stops all four oscillators on dispose and leaves only the strip edge out of its output', () => {
+  it('stops every source on dispose and leaves only the strip edge out of its output', () => {
     const context = new FakeContext();
     const stage = ENSEMBLE_INSERT.create(context.asAudioContext(), DEFAULT_ENSEMBLE);
     const next = context.createGain();
@@ -203,8 +247,13 @@ describe('the ensemble graph', () => {
     const lfos = oscillators(context);
     expect(lfos).toHaveLength(4);
     expect(lfos.every((o) => o.started && !o.stopped && o.type === 'custom')).toBe(true);
+    const rates = context.nodes.filter(
+      (n): n is FakeConstantSource => n instanceof FakeConstantSource,
+    );
+    expect(rates).toHaveLength(2);
     stage.dispose();
     expect(lfos.every((o) => o.stopped)).toBe(true);
+    expect(rates.every((r) => r.started && r.stopped)).toBe(true);
     const wired = context.nodes.filter(
       (n) => n !== fake(stage.output) && (n.outbound.length > 0 || n.paramOutbound.length > 0),
     );

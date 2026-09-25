@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { tones } from './audioAnalysis';
-import { FakeContext, FakeWorkletNode, renderGraph } from './fakeAudioContext';
+import { FakeContext, FakeWorkletNode, SAMPLE_RATE, renderGraph } from './fakeAudioContext';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 
 const SECONDS = 0.1;
@@ -25,7 +25,7 @@ async function delayed(lagSeconds: number, offset = 0) {
   source.connect(delay);
   delay.connect(context.destination);
   const [input, output] = renderGraph(context, SECONDS, [source, delay]);
-  return { input: input!.left, output: output!.left, rate: context.sampleRate };
+  return { input: input!.left, output: output!.left };
 }
 
 describe('FakeDelay, modulated, under one block', () => {
@@ -36,8 +36,7 @@ describe('FakeDelay, modulated, under one block', () => {
 
   it('shifts by a whole-sample lag shorter than the block', async () => {
     const lag = 40;
-    const { input, output, rate } = await delayed(lag / 48000);
-    expect(rate).toBe(48000);
+    const { input, output } = await delayed(lag / SAMPLE_RATE);
     for (let i = lag; i < input.length; i++) expect(output[i]).toBeCloseTo(input[i - lag]!, 6);
   });
 
