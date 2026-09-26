@@ -58,10 +58,21 @@ describe('harmonyModel', () => {
     expect(setDuration(TWO, 0, 5 * BAR, SONG)).toEqual([{ ...TWO[0]!, duration: SONG }]);
   });
 
-  it('removes an event into its neighbour, never the last one', () => {
+  it('removes an event into the one before it, so later chords keep their bars; the first goes to the next', () => {
     expect(removeEvent(TWO, 1, SONG)).toEqual([{ ...TWO[0]!, duration: SONG }]);
     expect(removeEvent(TWO, 0, SONG)).toEqual([{ ...TWO[1]!, start: 0, duration: SONG }]);
     expect(removeEvent([TWO[0]!], 0, SONG)).toEqual([TWO[0]!]);
+    // C bar 1, F bar 2, G bars 3–4: deleting F leaves C holding through bar 2 and G where it was.
+    const three: HarmonyEvent[] = [
+      { start: 0, duration: BAR, degree: 0, size: 3 },
+      { start: BAR, duration: BAR, degree: 3, size: 3 },
+      { start: 2 * BAR, duration: 2 * BAR, degree: 4, size: 3 },
+    ];
+    expect(removeEvent(three, 1, SONG)).toEqual([{ ...three[0]!, duration: 2 * BAR }, three[2]!]);
+    expect(removeEvent(three, 0, SONG)).toEqual([
+      { ...three[1]!, start: 0, duration: 2 * BAR },
+      three[2]!,
+    ]);
   });
 
   it('appends a chord out of the last one’s bars, and refuses when a beat cannot be spared', () => {

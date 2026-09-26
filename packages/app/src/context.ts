@@ -32,6 +32,8 @@ export interface AppCtx {
   importDoc(raw: unknown): void;
   /** Re-render the active tab from the current document; the rest render when shown (#620). */
   render(): void;
+  /** The other tabs are out of date and render when shown; the active tab keeps its controls (a knob mid-drag). */
+  invalidate(): void;
   status(message: string): void;
 }
 

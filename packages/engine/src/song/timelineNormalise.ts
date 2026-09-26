@@ -18,7 +18,32 @@ import { CHORD_SIZE_TRIAD, HARMONY_DEGREE_MAX } from '../audioConstants';
 import type { HarmonyEvent } from '../harmony/harmonyTimeline';
 import { isChordSize, type ChordSize } from '../harmony/chordTheory';
 import type { Region } from '../sequencing/regionClock';
-import { show, type FieldNormaliser } from './arrangementFields';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import type { Arrangement } from './arrangement';
+import { FieldNormaliser, show } from './arrangementFields';
+
+/**
+ * The arrangement with its regions and events re-fitted to its own
+ * `transport.bars` — what the player runs over every merged live partial,
+ * so a song shortened live sounds as its normalised document will after
+ * export (Codex, #705). Idempotent on normalised data; a region or event
+ * left outside the song is dropped exactly as `makeArrangement` drops it.
+ */
+export function fitTimelines(arrangement: Arrangement): Arrangement {
+  const n = new FieldNormaliser();
+  const songTicks = arrangement.transport.bars * TICKS_PER_BAR;
+  return {
+    ...arrangement,
+    harmony: {
+      ...arrangement.harmony,
+      events: normaliseHarmonyEvents(arrangement.harmony.events, songTicks, 'harmony.events', n),
+    },
+    parts: arrangement.parts.map((part) => ({
+      ...part,
+      regions: normaliseRegions(part.regions, songTicks, `parts.${part.slot}.regions`, n),
+    })),
+  };
+}
 
 interface Span {
   start: number;

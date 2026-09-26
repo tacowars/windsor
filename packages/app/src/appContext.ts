@@ -88,6 +88,11 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     if (tab.dirty) this.renderTab(tab);
   }
 
+  /** Every tab but the active one is out of date: a control that must survive its own gesture calls this, not `render`. */
+  invalidate(): void {
+    for (const [id, tab] of this.tabs) if (id !== this.active) tab.dirty = true;
+  }
+
   /** Every tab is out of date; the active one catches up now, the others when shown. */
   render(): void {
     for (const tab of this.tabs.values()) tab.dirty = true;

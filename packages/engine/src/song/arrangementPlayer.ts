@@ -53,6 +53,7 @@ import type { TickSource, Unsubscribe } from '../sequencing/scheduler';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { RegionGate, type RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
+import { fitTimelines } from './timelineNormalise';
 import {
   buildGenerator,
   generatorSig,
@@ -257,7 +258,10 @@ export class ArrangementPlayer {
    * neither the table nor the arrangement changes.
    */
   apply(partial: ArrangementPartial, patches: Readonly<Record<string, unknown>> = {}): ApplyResult {
-    const { merged, ignored } = mergeArrangement(this.current, partial);
+    // The merged timelines are re-fitted to the merged length, so a live
+    // `transport.bars` edit plays what its normalised document will.
+    const { merged: raw, ignored } = mergeArrangement(this.current, partial);
+    const merged = fitTimelines(raw);
     const staged = stagePatches(this.presets, patches, ignored);
     let plan: Plan;
     try {

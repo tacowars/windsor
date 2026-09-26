@@ -7,7 +7,13 @@ import { describe, expect, it } from 'vitest';
 
 import { FieldNormaliser } from '../song/arrangementFields';
 import { isShippable, makeArrangement } from '../song/arrangementDocument';
-import { ARRANGEMENT_VERSION, CHORD_STEPS_MAX } from '../audioConstants';
+import {
+  ARRANGEMENT_VERSION,
+  CHORD_INVERSION_MAX,
+  CHORD_STEPS_MAX,
+  CHORD_STEP_OCTAVE_MAX,
+  REGISTER_OCTAVE_MAX,
+} from '../audioConstants';
 import {
   CHORD_DIVISORS,
   CHORD_DURATIONS,
@@ -89,10 +95,10 @@ describe('chord sequencer normalisation (#606)', () => {
       `${PATH}.divisor: 6 is not one of ${CHORD_DIVISORS.join('|')} — using ${DEFAULT_CHORD_CONFIG.divisor}`,
       `${PATH}.gate: clamped 2 to 1`,
       `${PATH}.voicing: "wide" is not one of ${CHORD_VOICING_IDS.join('|')} — using ${CHORD_VOICING_DEFAULT}`,
-      `${PATH}.register.octave: clamped 10 to 9`,
+      `${PATH}.register.octave: clamped 10 to ${REGISTER_OCTAVE_MAX}`,
       `${PATH}.steps[0].kind: "tie" is not one of rest|hit — using rest`,
-      `${PATH}.steps[1].inversion: clamped 4 to 3`,
-      `${PATH}.steps[1].octave: clamped 3 to 2`,
+      `${PATH}.steps[1].inversion: clamped 4 to ${CHORD_INVERSION_MAX}`,
+      `${PATH}.steps[1].octave: clamped 3 to ${CHORD_STEP_OCTAVE_MAX}`,
       `${PATH}.steps[2].duration: 0.3 is not one of ${CHORD_DURATIONS.join('|')} — using ${restStep().duration}`,
       `${PATH}.steps[2].repeat: clamped 9 to 8`,
     ]);
