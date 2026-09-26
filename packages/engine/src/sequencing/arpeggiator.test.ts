@@ -134,6 +134,33 @@ describe('the MIDI range is clipped once, after the octave expansion (#714 revie
     expect(drop2(9)).toEqual(expectedAt(root));
     expect(Math.max(...drop2(9))).toBeLessThanOrEqual(MIDI_NOTE_MAX);
   });
+
+  it('C major, degree 42 (six octaves up), register 0, close, 1 octave is the triad, not silence', () => {
+    const major = new ScaleSampler({ root: 0, scale: 'major' });
+    const harmony: Harmony = {
+      root: 0,
+      scale: 'major',
+      events: [{ start: 0, duration: SONG, degree: 42, size: 3 }],
+    };
+    const config = arpConfig({ voicing: 'close', octaves: 1, register: { octave: 0 } });
+    const top = major.rootNote(0) + 6 * SEMITONES_PER_OCTAVE;
+    expect(arpNoteList(major, config, chord(harmony))).toEqual([top, top + 4, top + 7]);
+    expect(arpNoteList(major, config, chord(harmony))).toEqual([84, 88, 91]);
+  });
+
+  it('the one-degree [0] scale keeps note 120 from a seventh at register 3', () => {
+    const unison = new ScaleSampler({ root: 0, scale: [0] });
+    const harmony: Harmony = {
+      root: 0,
+      scale: [0],
+      events: [{ start: 0, duration: SONG, degree: 0, size: 4 }],
+    };
+    const config = arpConfig({ voicing: 'close', octaves: 1, register: { octave: 3 } });
+    const root = unison.rootNote(3);
+    const expected = [0, 2, 4, 6].map((k) => root + k * SEMITONES_PER_OCTAVE);
+    expect(arpNoteList(unison, config, chord(harmony))).toEqual(expected);
+    expect(arpNoteList(unison, config, chord(harmony))).toContain(120);
+  });
 });
 
 describe('the ordered styles over L = 6, first 12 steps', () => {
