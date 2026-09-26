@@ -47,15 +47,16 @@ function tempoKnobs(ctx: AppCtx): HTMLElement[] {
     get: () => ctx.model.doc.transport.bpm,
     set: (v) => void ctx.change(bpmChange(v)),
   });
-  // A shorter song clamps every region and event into it, so the tabs that
-  // draw them are out of date — but this knob is mid-gesture, so they render
-  // when shown rather than under the pointer.
+  // The song's length reshapes what every tab draws (regions and events are
+  // clamped into it, a timeline appends at its end), so the tabs re-render —
+  // the active one included — while the strip, whose knob is mid-gesture,
+  // is left alone.
   const bars = makeKnob({
     ...BARS_KNOB,
     color: COLOR,
     get: () => ctx.model.doc.transport.bars,
     set: (v) => {
-      if (ctx.change(barsChange(v)).ok) ctx.invalidate();
+      if (ctx.change(barsChange(v)).ok) ctx.refreshTabs();
     },
   });
   return [bpm, bars];

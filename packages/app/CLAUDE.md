@@ -112,7 +112,7 @@ knows the one below it and nothing above.
    the context; **`transportStrip.ts`** (#708) is the one piece of chrome
    above every tab — BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth`
    position and ▶ ■ ‖ — registered through `ctx.addChrome`, so it renders on
-   every `render()` and never on `invalidate()`. The buttons are
+   every `render()` and never on `invalidate()` or `refreshTabs()` (the Bars knob's, which re-renders the active tab under the strip). The buttons are
    `ctx.transport` (`host.ts`'s `HostTransport`: ▶ unmute + start, ‖ the
    game's mute, ■ `AudioSystem.stopMusic` — stop, release, rewind to tick 0
    with every region gate cleared); the rules are `transportModel.ts`, the

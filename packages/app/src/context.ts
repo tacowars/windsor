@@ -53,6 +53,12 @@ export interface AppCtx {
   importDoc(raw: unknown): void;
   /** Re-render the active tab from the current document; the rest render when shown (#620). */
   render(): void;
+  /**
+   * Every tab is out of date and the active one re-renders now, the chrome
+   * (the transport strip) untouched — what a strip control mid-gesture calls
+   * when its edit reshapes what the tabs draw (#708: Bars).
+   */
+  refreshTabs(): void;
   /** The other tabs are out of date and render when shown; the active tab keeps its controls (a knob mid-drag). */
   invalidate(): void;
   status(message: string): void;

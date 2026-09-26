@@ -66,10 +66,10 @@ export class HostTransport implements ConsoleTransport {
     return true;
   }
 
+  /** A pause landing mid-rebuild (no system yet) still counts: the new system is adopted idle. */
   pause(): void {
-    const system = this.live();
-    if (!system || this.current !== 'playing') return;
-    system.setMuted(true);
+    if (this.current !== 'playing') return;
+    this.live()?.setMuted(true);
     this.current = nextTransportState(this.current, 'pause');
   }
 

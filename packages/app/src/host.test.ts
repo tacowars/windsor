@@ -215,4 +215,18 @@ describe('the console transport (#708): ▶ ■ ‖ over the live system', () =>
     transport.adopt(fakeSystem());
     expect(transport.state).toBe('idle');
   });
+
+  it('a ‖ pressed mid-rebuild, with no system yet, keeps the rebuilt system from starting', () => {
+    let live: TransportSystem | null = fakeSystem();
+    const transport = new HostTransport(() => live);
+    transport.play();
+    live = null;
+    transport.pause();
+    expect(transport.state).toBe('paused');
+    const rebuilt = fakeSystem();
+    live = rebuilt;
+    transport.adopt(rebuilt);
+    expect(rebuilt.calls).toEqual([]);
+    expect(transport.state).toBe('idle');
+  });
 });

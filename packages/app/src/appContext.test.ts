@@ -353,4 +353,18 @@ describe('the transport strip (#708)', () => {
     c.ctx.importDoc(newSong());
     expect(strips).toBe(3);
   });
+
+  it('refreshTabs re-renders the active tab (a Bars edit) and leaves the chrome alone', () => {
+    const c = openConsole();
+    let strips = 0;
+    c.ctx.addChrome(() => strips++);
+    c.ctx.render();
+    c.ctx.activate('harmony');
+    const before = c.renders['harmony'] ?? 0;
+    c.ctx.refreshTabs();
+    expect(c.renders['harmony']).toBe(before + 1);
+    expect(strips).toBe(1);
+    c.ctx.activate('mixer');
+    expect(c.renders['mixer']).toBe(1);
+  });
 });

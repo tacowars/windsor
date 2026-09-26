@@ -108,8 +108,13 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
 
   /** Every tab is out of date; the active one catches up now, the others when shown. */
   render(): void {
-    for (const tab of this.tabs.values()) tab.dirty = true;
     for (const renderChrome of this.chrome) renderChrome();
+    this.refreshTabs();
+  }
+
+  /** Every tab is out of date and the active one catches up now; the chrome is left alone. */
+  refreshTabs(): void {
+    for (const tab of this.tabs.values()) tab.dirty = true;
     const active = this.active === null ? undefined : this.tabs.get(this.active);
     if (active) this.renderTab(active);
   }
