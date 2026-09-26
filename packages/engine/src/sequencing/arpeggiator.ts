@@ -219,8 +219,9 @@ export class Arpeggiator {
 
   private onset(event: PartTickEvent, step: number, chord: HarmonyChord): NoteEvent | null {
     const list = arpNoteList(this.pitch, this.current, chord);
-    if (list.length === 0) return null;
+    // Track before the empty-pool return: a chord clipped to nothing is still a chord change (#714 review).
     this.track(step, chord, list);
+    if (list.length === 0) return null;
     const note = list[this.pick(step - this.base, list)] as number;
     const gateTicks = Math.max(1, Math.round(this.current.gate * this.current.divisor));
     this.held = note;

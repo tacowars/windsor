@@ -257,6 +257,42 @@ describe('a chord change i → VI at bar 2 (quarter notes: step 8 is the first V
   });
 });
 
+describe('a chord clipped to an empty pool is still a chord change (#714 review)', () => {
+  const major = new ScaleSampler({ root: 0, scale: 'major' });
+  /** C major I → vi → I, a bar each: at register 9 the vi (A–C–E) lies wholly above 127. */
+  const I_vi_I: Harmony = {
+    root: 0,
+    scale: 'major',
+    events: [
+      { start: 0, duration: BAR, degree: 0, size: 3 },
+      { start: BAR, duration: BAR, degree: 5, size: 3 },
+      { start: 2 * BAR, duration: 2 * BAR, degree: 0, size: 3 },
+    ],
+  };
+  const over = { style: 'up', voicing: 'close', register: { octave: 9 } } as const;
+  const pool = arpNoteList(major, arpConfig(over), chord(I_vi_I));
+  const returning = (2 * BAR) / QUARTER;
+  /** The note the returning I's first onset plays. */
+  const firstReturning = (retrigger: boolean): number | undefined => {
+    const arp = new Arpeggiator(major, arpConfig({ ...over, retrigger }));
+    return drive(arp, I_vi_I, 2 * BAR + 1).find((e) => e.kind === 'noteOn' && e.tick === 2 * BAR)
+      ?.note;
+  };
+
+  it('the pools are [120, 124, 127], [], [120, 124, 127]', () => {
+    expect(pool).toEqual([120, 124, 127]);
+    expect(arpNoteList(major, arpConfig(over), chord(I_vi_I, BAR))).toEqual([]);
+  });
+
+  it('retrigger on: the returning I restarts at n[0] (120)', () => {
+    expect(firstReturning(true)).toBe(pool[0]);
+  });
+
+  it('retrigger off: the index carries on through the silent bar — n[8 mod 3] = n[2] (127)', () => {
+    expect(firstReturning(false)).toBe(pool[returning % pool.length]);
+  });
+});
+
 describe('the seed and the stream', () => {
   it('same seed ⇒ identical line from two fresh instances; a different seed ⇒ a different line', () => {
     expect(line({ style: 'random', seed: 7 })).toEqual(line({ style: 'random', seed: 7 }));
