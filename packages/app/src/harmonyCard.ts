@@ -56,10 +56,11 @@ function chips(view: SongView, index: number): HTMLElement {
 }
 
 /**
- * The Duration dial: a bar per step, a beat with Shift — read off the
- * gesture that starts each change, so a nudge always moves at least one
- * grain away from where it is. The last event holds to the song end and has
- * no dial.
+ * The Duration dial: a bar per step, a beat with Shift. The grain is the
+ * knob's own `step`, read live off the modifier the gesture started with, so
+ * the knob quantizes from its press origin (a drag never reverses) and a
+ * keyboard nudge moves one grain. The last event holds to the song end and
+ * has no dial.
  */
 function durationDial(view: SongView, index: number): HTMLElement {
   const events = (): readonly { duration: number }[] => view.ctx.model.doc.harmony.events;
@@ -69,24 +70,17 @@ function durationDial(view: SongView, index: number): HTMLElement {
     min: PPQ,
     max: maxEventDuration(view.ctx.model.doc.harmony.events, index, view.songTicks()),
     def: TICKS_PER_BAR,
-    step: PPQ,
+    get step(): number {
+      return fine ? PPQ : TICKS_PER_BAR;
+    },
     fmt: durationLabel,
     color: PITCH_COLOR,
     get: () => events()[index]?.duration ?? 0,
     set: (v) => {
-      const grain = fine ? PPQ : TICKS_PER_BAR;
-      const current = events()[index]?.duration ?? 0;
-      const snapped =
-        v > current
-          ? Math.ceil(v / grain) * grain
-          : v < current
-            ? Math.floor(v / grain) * grain
-            : current;
-      if (snapped === current) return;
+      const next = Math.max(PPQ, v);
+      if (next === (events()[index]?.duration ?? 0)) return;
       const list = view.ctx.model.doc.harmony.events;
-      view.commit({
-        harmony: { events: setEventDuration(list, index, snapped, view.songTicks()) },
-      });
+      view.commit({ harmony: { events: setEventDuration(list, index, next, view.songTicks()) } });
     },
   });
   const readModifier = (e: PointerEvent | KeyboardEvent): void => {

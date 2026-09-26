@@ -33,28 +33,33 @@ function block(view: SongView, index: number, start: number, end: number): HTMLE
   return node;
 }
 
-/** The right edge of a block drags the event's end: a preview while dragging, one commit on release. */
+/** A press on a block selects it; its right edge drags the event's end — a preview while dragging, one commit on release. */
 function wireEdgeDrag(view: SongView, node: HTMLElement, index: number, start: number): void {
   const laneLeft = (): number => (node.parentElement ?? node).getBoundingClientRect().left;
+  const tickAt = (e: PointerEvent): number => pxToTick(e.clientX - laneLeft());
   const edgeTicks = pxToTick(REGION_EDGE_PX);
+  // A press anywhere on the block selects it on release; only a press on the right edge resizes.
+  let onEdge = false;
   pointerDrag(node, {
     accept: (e) => {
-      const tick = pxToTick(e.clientX - laneLeft());
-      return tick >= start + (node.offsetWidth > 0 ? pxToTick(node.offsetWidth) - edgeTicks : 0);
+      const width = node.offsetWidth > 0 ? pxToTick(node.offsetWidth) : 0;
+      onEdge = tickAt(e) >= start + width - edgeTicks;
+      return true;
     },
     move: (e) => {
+      if (!onEdge) return;
       const events = view.ctx.model.doc.harmony.events;
-      const tick = pxToTick(e.clientX - laneLeft());
-      const preview = setEventDuration(events, index, tick - start, view.songTicks());
+      const preview = setEventDuration(events, index, tickAt(e) - start, view.songTicks());
       const next = preview[index];
       if (next) node.style.width = `${tickToPx(next.duration) - BLOCK_GAP_PX}px`;
     },
     end: (e, moved) => {
-      if (!moved) return void view.select({ kind: 'event', index });
+      if (!moved || !onEdge) return void view.select({ kind: 'event', index });
       const events = view.ctx.model.doc.harmony.events;
-      const tick = pxToTick(e.clientX - laneLeft());
       view.commit(
-        { harmony: { events: setEventDuration(events, index, tick - start, view.songTicks()) } },
+        {
+          harmony: { events: setEventDuration(events, index, tickAt(e) - start, view.songTicks()) },
+        },
         true,
       );
     },
