@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AppCtx } from './context';
+import { HostTransport, type TransportSystem } from './host';
 import { markPlaying, playheadAt, watchPlayhead } from './stepStrip';
 
 /** A cell: its class list and a way to read what was toggled onto it. */
@@ -43,33 +44,38 @@ function fakeCtx(step: (tick: number) => number): {
 } {
   const transport = { running: true, audible: 0, now: 0 };
   const asked: { slot: number; tick: number }[] = [];
-  const ctx = {
-    host: {
-      system: {
-        scheduler: {
-          get isRunning(): boolean {
-            return transport.running;
-          },
-          audibleTick(now: number): number {
-            // The console must read the audible tick at the engine's clock time.
-            expect(now).toBe(transport.now);
-            return transport.audible;
-          },
-        },
-        engine: {
-          context: {
-            get currentTime(): number {
-              return transport.now;
-            },
-          },
+  const system = {
+    get musicRunning(): boolean {
+      return transport.running;
+    },
+    scheduler: {
+      get isRunning(): boolean {
+        return transport.running;
+      },
+      audibleTick(now: number): number {
+        // The console must read the audible tick at the engine's clock time.
+        expect(now).toBe(transport.now);
+        return transport.audible;
+      },
+    },
+    engine: {
+      context: {
+        get currentTime(): number {
+          return transport.now;
         },
       },
+    },
+  };
+  const ctx = {
+    host: {
       stepAt(slot: number, tick: number): number {
         asked.push({ slot, tick });
         return step(tick);
       },
     },
-    // Only `host` is reached on this path; the tabs' full context is `main.ts`.
+    // The real transport over the fake system: its `position()` is the one clock read.
+    transport: new HostTransport(() => system as unknown as TransportSystem),
+    // Only `host` and `transport` are reached on this path; the tabs' full context is `main.ts`.
   } as unknown as AppCtx;
   return { ctx, transport, asked };
 }
@@ -111,7 +117,10 @@ describe('playheadAt', () => {
   });
 
   it('is -1 before audio is enabled, when there is no system to ask', () => {
-    const ctx = { host: { system: null } } as unknown as AppCtx;
+    const ctx = {
+      host: { system: null },
+      transport: new HostTransport(() => null),
+    } as unknown as AppCtx;
     expect(playheadAt(ctx, SLOT)).toBe(-1);
   });
 });

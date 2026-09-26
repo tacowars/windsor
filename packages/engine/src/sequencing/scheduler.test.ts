@@ -182,6 +182,34 @@ describe('Scheduler look-ahead against a fake clock', () => {
     expect(scheduler.audibleTick(times.at(-1)! + 1)).toBe(times.length - 1);
   });
 
+  it('reset() after stop() reads tick 0 and the next start() issues tick 0 first (#708)', () => {
+    const clock = { currentTime: 0 };
+    const scheduler = new Scheduler(clock, { bpm: 120 });
+    const ticks: number[] = [];
+    scheduler.subscribe(1, (e) => ticks.push(e.tick));
+    scheduler.start();
+    clock.currentTime = 1;
+    scheduler.update();
+    scheduler.stop();
+    // stop() alone keeps the tick: the mute path resumes where it halted.
+    const halted = scheduler.transport.currentTick;
+    expect(halted).toBeGreaterThan(0);
+    clock.currentTime = 2;
+    expect(scheduler.audibleTick(clock.currentTime)).toBe(halted - 1);
+    scheduler.start(scheduler.transport.currentTick);
+    scheduler.update();
+    expect(ticks[halted]).toBe(halted);
+    scheduler.stop();
+
+    scheduler.reset();
+    expect(scheduler.isRunning).toBe(false);
+    expect(scheduler.audibleTick(clock.currentTime)).toBe(0);
+    const n = ticks.length;
+    scheduler.start(scheduler.transport.currentTick);
+    scheduler.update();
+    expect(ticks[n]).toBe(0);
+  });
+
   it('exposes bpm through to the transport', () => {
     const scheduler = new Scheduler({ currentTime: 0 }, { bpm: 96 });
     expect(scheduler.bpm).toBe(96);

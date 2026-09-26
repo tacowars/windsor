@@ -65,6 +65,12 @@
         min-height: 100vh;
       }
 
+      /* The header and the transport strip (#708): one sticky block above every tab. */
+      .chrome {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
       .head {
         background: var(--panel);
         border-bottom: 1px solid var(--line);
@@ -73,9 +79,36 @@
         gap: 16px;
         padding: 10px 16px;
         flex-wrap: wrap;
-        position: sticky;
-        top: 0;
-        z-index: 5;
+      }
+      .transport-strip {
+        background: var(--inset);
+        border-bottom: 1px solid var(--line);
+        padding: 6px 16px;
+      }
+      .transport-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .transport-meter,
+      .transport-position {
+        font-family: var(--f-num);
+        font-size: 13px;
+        color: var(--ink);
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        background: var(--panel);
+      }
+      .transport-position {
+        min-width: 7ch;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+      .transport-btn {
+        min-width: 34px;
+        font-size: 14px;
       }
 
       .brand {
@@ -1120,13 +1153,16 @@
   </head>
   <body>
     <div class="console">
-      <header class="head">
-        <div class="brand">Aotearoa204 <small>Arrangement Console</small></div>
-        <button class="btn primary" id="power" type="button">Enable audio</button>
-        <nav class="tabs" id="tabBar" aria-label="Console tabs"></nav>
-        <span class="status" id="status">booting</span>
-        <span class="status" id="libraryMode" aria-live="polite"></span>
-      </header>
+      <div class="chrome">
+        <header class="head">
+          <div class="brand">Aotearoa204 <small>Arrangement Console</small></div>
+          <button class="btn primary" id="power" type="button">Enable audio</button>
+          <nav class="tabs" id="tabBar" aria-label="Console tabs"></nav>
+          <span class="status" id="status">booting</span>
+          <span class="status" id="libraryMode" aria-live="polite"></span>
+        </header>
+        <section class="transport-strip" id="transportStrip" aria-label="Transport"></section>
+      </div>
       <main class="tab-root" id="tabRoot"></main>
     </div>
 

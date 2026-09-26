@@ -407,6 +407,19 @@ export class AudioSystem {
     }
   }
 
+  /**
+   * ■ (#708, epic #703 decision 8): stop the transport, release everything
+   * held, then rewind to tick 0 with every part's region state cleared — the
+   * next `startMusic` plays the document from bar 1 exactly as a fresh
+   * system would. The mute flag is untouched; the game never calls this.
+   */
+  stopMusic(): void {
+    this.scheduler.stop();
+    this.player?.releaseAll(this.engine.context.currentTime);
+    this.scheduler.reset();
+    this.player?.reset();
+  }
+
   /** Scriptable toggle for `__a204.audio.toggleMute` (#69); the `M` key and `music on|off` use `setMuted`. Returns the new muted state. */
   toggleMute(): boolean {
     this.setMuted(!this.muted);
