@@ -104,7 +104,10 @@ export function arpCard(ctx: AppCtx, slot: number): HTMLElement {
       label: 'Reg',
       color: PITCH_COLOR,
       get: () => spec(ctx, slot).register.octave,
-      set: (octave) => void write(ctx, slot, { register: { octave } }),
+      // The Harmony tab's Octave knob writes the same field: it re-reads it when shown.
+      set: (octave) => {
+        if (write(ctx, slot, { register: { octave } })) ctx.invalidate();
+      },
     }),
   );
   body.appendChild(knobs);
