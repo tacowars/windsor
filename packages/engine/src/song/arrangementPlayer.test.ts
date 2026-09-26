@@ -32,7 +32,7 @@ const { kick, hat, arp, drone } = FULL_SLOT;
 describe('bindings', () => {
   it('takes the transport tempo from the arrangement', () => {
     const { transport } = rig();
-    expect(transport.bpm).toBe(FULL_ARRANGEMENT.bpm);
+    expect(transport.bpm).toBe(FULL_ARRANGEMENT.transport.bpm);
   });
 
   it('sounds all four parts within 8 bars and announces each part once', () => {
@@ -110,26 +110,38 @@ describe('bindings', () => {
 });
 
 describe('any sequencer on any slot (#597)', () => {
-  /** Four grid lines, one per slot: each skips on its own stream. */
+  /** Four grid lines, one per slot: each skips on its own seed's stream (#705) — slot 2 keeps the fixture's. */
+  const seedOf = (slot: number): number =>
+    slot === arp ? FULL_PARTS.arp.sequencer.seed : 100 + slot;
   const FOUR_ARPS: Arrangement = {
     ...FULL_ARRANGEMENT,
     parts: [kick, hat, arp, drone].map((slot): MusicPart => ({
       ...FULL_PARTS.arp,
       slot,
       name: `arp ${slot}`,
+      sequencer: { ...FULL_PARTS.arp.sequencer, seed: seedOf(slot) },
     })),
   };
 
-  it('plays four grid lines, each on its own slot’s stream', () => {
+  it('plays four grid lines, each on its own seed’s stream (#705)', () => {
     const { parts, run } = rig(FOUR_ARPS);
     run(4);
     const streams = Object.values(parts).map((p) => JSON.stringify(kinds(p, 'noteOn')));
     for (const stream of streams) expect(stream).not.toBe('[]');
     expect(new Set(streams).size).toBe(4);
-    // Slot 2's line is the fixture's exactly: the slot is the stream.
+    // Slot 2's line is the fixture's exactly: the seed, not the slot, is the stream.
     const bed = rig();
     bed.run(4);
     expect(kinds(parts.arp, 'noteOn')).toEqual(kinds(bed.parts.arp, 'noteOn'));
+    // Two slots sharing a seed share a stream.
+    const shared = rig({
+      ...FOUR_ARPS,
+      parts: FOUR_ARPS.parts.map((part) =>
+        part.slot === kick ? { ...part, sequencer: { ...FULL_PARTS.arp.sequencer } } : part,
+      ),
+    });
+    shared.run(4);
+    expect(kinds(shared.parts.kick, 'noteOn')).toEqual(kinds(bed.parts.arp, 'noteOn'));
   });
 
   it('plays three Euclidean parts and one chord part', () => {
@@ -239,7 +251,7 @@ describe('the preset table (#435)', () => {
       FULL_ARRANGEMENT,
       PRESETS,
     );
-    expect(player.apply({ bpm: -1 }, { fresh: { volume: 0.2 } }).ok).toBe(false);
+    expect(player.apply({ transport: { bpm: -1 } }, { fresh: { volume: 0.2 } }).ok).toBe(false);
     expect(parts.arp.calls).toEqual([]);
     // The staged patch was discarded with the refused partial.
     expect(player.apply({ parts: { [arp]: { preset: 'fresh' } } }).ok).toBe(false);
@@ -264,7 +276,8 @@ describe('grid parts (#602)', () => {
   /** The fixture's drone slot driven by a written line: root, accented seventh, tie, rest, slid third. */
   const LINE: Arrangement = {
     ...FULL_ARRANGEMENT,
-    key: { root: 48, scale: 'naturalMinor' },
+    // C minor (pitch class 0); the line's register octave 3 puts its root on C3 = 48.
+    harmony: { ...FULL_ARRANGEMENT.harmony, root: 0, scale: 'naturalMinor' },
     parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
       part.slot === drone
         ? {
@@ -285,7 +298,9 @@ describe('grid parts (#602)', () => {
               skipChance: 0,
               accentVelocity: 0.2,
               accentMod: 1,
-              register: { octave: 0 },
+              register: { octave: 3 },
+              // The skip-edit case below turns skipChance to 0.01: this seed's stream skips nothing in bar 2.
+              seed: 204,
             },
           }
         : part,
@@ -321,7 +336,7 @@ describe('grid parts (#602)', () => {
     ]);
     // The tie held the seventh through step 2; the rest released it at step 3.
     expect(calls[3]!.time).toBeCloseTo(
-      3 * DIVISORS.quarter * (SECONDS_PER_MINUTE / LINE.bpm / PPQ),
+      3 * DIVISORS.quarter * (SECONDS_PER_MINUTE / LINE.transport.bpm / PPQ),
       9,
     );
   });
@@ -335,7 +350,7 @@ describe('grid parts (#602)', () => {
         .slice(0, 2),
     ).toEqual([48, 58]);
     const before = parts.drone.calls.length;
-    expect(player.apply({ key: { scale: 'pentatonicMinor' } }, {}).ok).toBe(true);
+    expect(player.apply({ harmony: { scale: 'pentatonicMinor' } }, {}).ok).toBe(true);
     run(1);
     // The six-step line runs four steps to a bar, so bar 2 opens on steps 4
     // and 5 (degrees 2 and 4: 53, 58 in five degrees) before wrapping to the
@@ -383,10 +398,13 @@ describe('grid parts (#602)', () => {
     const { parts, player, run } = rig(LINE);
     run(1);
     const before = parts.drone.calls.length;
-    const result = player.apply({ bpm: 140, parts: { [drone]: { sequencer: { length: 0 } } } }, {});
+    const result = player.apply(
+      { transport: { bpm: 140 }, parts: { [drone]: { sequencer: { length: 0 } } } },
+      {},
+    );
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/length/);
-    expect(player.readout().bpm).toBe(LINE.bpm);
+    expect(player.readout().bpm).toBe(LINE.transport.bpm);
     run(1);
     // The line plays on as written: six quarters, bar 2 opens on steps 4 and 5.
     const notes = parts.drone.calls
@@ -400,7 +418,9 @@ describe('grid parts (#602)', () => {
     const { parts, player, run } = rig(LINE);
     run(1);
     const before = parts.drone.calls.length;
-    expect(player.apply({ key: { root: 50 } }, {}).ok).toBe(true);
+    // #705: the root is a pitch class — D.
+    expect(player.apply({ harmony: { root: 2 } }, {}).ok).toBe(true);
+    expect(player.readout().root).toBe(2);
     run(1);
     const since = parts.drone.calls.slice(before);
     expect(since.filter((c) => c.kind === 'allNotesOff')).toEqual([]);
@@ -410,6 +430,21 @@ describe('grid parts (#602)', () => {
         .map((c) => c.note)
         .slice(0, 2),
     ).toEqual([50 + 3, 50 + 7]);
+  });
+
+  it('a seed change rebuilds that part alone: its stream restarts at once (#705)', () => {
+    const { parts, player, run } = rig(LINE);
+    run(1);
+    const others = (['kick', 'hat', 'arp'] as const).map((id) => parts[id].calls.length);
+    expect(player.apply({ parts: { [drone]: { sequencer: { seed: 9 } } } }, {}).ok).toBe(true);
+    expect(parts.drone.calls.at(-1)).toMatchObject({ kind: 'allNotesOff' });
+    (['kick', 'hat', 'arp'] as const).forEach((id, i) => {
+      expect(kinds(parts[id], 'allNotesOff'), id).toEqual([]);
+      expect(parts[id].calls.length, id).toBe(others[i]);
+    });
+    expect(player.arrangement.parts.find((p) => p.slot === drone)?.sequencer).toMatchObject({
+      seed: 9,
+    });
   });
 
   it('a transport stop releases a grid part’s held note', () => {

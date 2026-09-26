@@ -53,7 +53,7 @@ describe('advancedDrive insert and preset song contract', () => {
       const effect = applyAdvancedDrivePreset(DEFAULT_ADVANCED_DRIVE, preset.id);
       const raw = {
         ...FULL_ARRANGEMENT,
-        version: 2,
+        version: 3,
         patches: { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} },
         parts: FULL_ARRANGEMENT.parts.map((part) => ({ ...part, strip: { inserts: [effect] } })),
         master: { inserts: [effect] },

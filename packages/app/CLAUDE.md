@@ -95,7 +95,8 @@ knows the one below it and nothing above.
    registry, the `PartsSession` (whose `commit` is this context's document
    write, a constructor parameter rather than a module hook), and the
    operations every control calls — `change`, `restructure`, `importDoc`,
-   `capture` / `release`, `livePart()`. `context.ts` is the interface the tabs
+   `livePart()` (the Euclidean capture and release went with #705: the card
+   commits `host.capturePattern` through `ctx.change` itself). `context.ts` is the interface the tabs
    import, so a card needs no import cycle back to the implementation. It
    knows no DOM beyond a panel's `hidden` flag, which is why
    `appContext.test.ts` drives it with fakes.

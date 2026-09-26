@@ -1,5 +1,5 @@
 /**
- * Arrangement tab (#70, record §2; #435): transport and bpm, seed, and the
+ * Arrangement tab (#70, record §2; #435): transport, bpm and bars, and the
  * document itself — export downloads a file, import reads one back (record:
  * the console is a local tool, so a page-initiated download simply works).
  * New song starts over from one Init part with no sequencer (#598), asking
@@ -10,20 +10,20 @@
  * at build time (record §3) and `?music=<name>` plays it, `bed-01` being the
  * default.
  */
-import { BPM_MAX, BPM_MIN } from '../../../packages/client/src/audio/index-for-editor';
 import {
-  EXPORT_URL_TTL_MS,
-  READOUT_DEFER_MS,
-  READOUT_POLL_MS,
-  SEED_MAX,
-} from './arrangementConstants';
+  BARS_MAX,
+  BARS_MIN,
+  BPM_MAX,
+  BPM_MIN,
+} from '../../../packages/client/src/audio/index-for-editor';
+import { EXPORT_URL_TTL_MS, READOUT_DEFER_MS, READOUT_POLL_MS } from './arrangementConstants';
 import { CARRIER_COLOR } from './consoleColors';
 import { fmt0 } from './consoleFormat';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
 import { makeKnob, type KnobSpec } from './knob';
 import { openConfirm } from './metadataModal';
-import { NEW_SONG_BPM } from './songConstants';
+import { NEW_SONG_BARS, NEW_SONG_BPM } from './songConstants';
 import { newSong } from './songParts';
 
 const COLOR = CARRIER_COLOR;
@@ -34,6 +34,16 @@ export const BPM_KNOB: Pick<KnobSpec, 'label' | 'min' | 'max' | 'def' | 'step' |
   min: BPM_MIN,
   max: BPM_MAX,
   def: NEW_SONG_BPM,
+  step: 1,
+  fmt: fmt0,
+};
+
+/** The song's length in bars (#705, decision 5): the engine's range, and what a new song starts at. */
+export const BARS_KNOB: Pick<KnobSpec, 'label' | 'min' | 'max' | 'def' | 'step' | 'fmt'> = {
+  label: 'Bars',
+  min: BARS_MIN,
+  max: BARS_MAX,
+  def: NEW_SONG_BARS,
   step: 1,
   fmt: fmt0,
 };
@@ -58,29 +68,22 @@ function transportSection(ctx: AppCtx): HTMLElement {
     makeKnob({
       ...BPM_KNOB,
       color: COLOR,
-      get: () => ctx.model.doc.bpm,
-      set: (v) => void ctx.change({ bpm: v }),
+      get: () => ctx.model.doc.transport.bpm,
+      set: (v) => void ctx.change({ transport: { bpm: v } }),
     }),
   );
-  const seed = el('div');
-  seed.appendChild(el('span', 'field-label', 'Seed'));
-  const seedInput = document.createElement('input');
-  seedInput.className = 'field';
-  seedInput.name = 'seed';
-  seedInput.type = 'number';
-  seedInput.value = String(ctx.model.doc.seed);
-  seedInput.setAttribute('aria-label', 'Seed');
-  seedInput.onchange = (): void => void ctx.change({ seed: Number(seedInput.value) });
-  seed.appendChild(seedInput);
-  const reroll = el('button', 'btn', 'Reroll') as HTMLButtonElement;
-  reroll.type = 'button';
-  reroll.onclick = (): void => {
-    const next = Math.floor(Math.random() * SEED_MAX);
-    seedInput.value = String(next);
-    ctx.change({ seed: next });
-  };
-  seed.appendChild(reroll);
-  row.appendChild(seed);
+  // A shorter song clamps every region and event into it (the normaliser's
+  // rule), so the tabs that draw them re-render after the change.
+  row.appendChild(
+    makeKnob({
+      ...BARS_KNOB,
+      color: COLOR,
+      get: () => ctx.model.doc.transport.bars,
+      set: (v) => {
+        if (ctx.change({ transport: { bars: v } }).ok) ctx.render();
+      },
+    }),
+  );
   body.appendChild(row);
   return root;
 }

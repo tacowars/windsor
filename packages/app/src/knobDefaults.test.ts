@@ -12,6 +12,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_ARP_CONFIG,
+  DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_GRID_CONFIG,
@@ -23,14 +25,18 @@ import {
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
   MIDI_MIDDLE_C,
+  PITCH_CLASS_MAX,
+  REGISTER_OCTAVE_MAX,
+  REGISTER_OCTAVE_MIN,
   RETURN_NAMES,
   SEQUENCER_KINDS,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
+  makeArrangement,
   makePatch,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { BPM_KNOB } from './arrangementTab';
-import { REGISTER_OCTAVE_DEFAULTS, ROOT_KNOB, octaveKnob } from './harmonyTables';
+import { REGISTER_OCTAVE_DEFAULTS, ROOT_DEFAULT, ROOT_OPTIONS, octaveKnob } from './harmonyTables';
 import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
 import { getPath } from './patchPath';
@@ -126,15 +132,22 @@ describe('sequencer knobs', () => {
 });
 
 describe('harmony, mixer and arrangement knobs', () => {
-  it("the root is the normaliser's", () => {
-    expect(ROOT_KNOB.def).toBe(MIDI_MIDDLE_C);
+  it("the root is the normaliser's: C, one option per pitch class", () => {
+    expect(ROOT_DEFAULT).toBe(makeArrangement({ version: 3, parts: [] }).document.harmony.root);
+    expect(ROOT_OPTIONS.map((o) => o.value)).toEqual(
+      Array.from({ length: PITCH_CLASS_MAX + 1 }, (_, pc) => String(pc)),
+    );
   });
 
-  it("each kind's register octave knob reads that kind's engine config", () => {
+  it("each kind's register octave knob reads that kind's engine config and range", () => {
     const configs = {
       grid: DEFAULT_GRID_CONFIG,
       chord: DEFAULT_CHORD_CONFIG,
+      arp: DEFAULT_ARP_CONFIG,
+      bass: DEFAULT_BASS_CONFIG,
     };
+    expect(octaveKnob('grid').min).toBe(REGISTER_OCTAVE_MIN);
+    expect(octaveKnob('grid').max).toBe(REGISTER_OCTAVE_MAX);
     for (const kind of SEQUENCER_KINDS) {
       if (!(kind in configs)) continue;
       const config = configs[kind as keyof typeof configs];

@@ -1,11 +1,12 @@
 /**
- * The seed contract across generators: one arrangement seed, one stream per
- * generator. Re-seeding one part leaves every other part's output byte-identical.
+ * The seed contract across generators (#705): every sequencer carries its own
+ * seed and draws one stream per region entry. Re-seeding one part leaves every
+ * other part's output byte-identical.
  */
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_EUCLIDEAN_CONFIG, EuclideanSequencer } from './euclideanSequencer';
-import { GENERATOR_SEED_STRIDE, generatorRng, generatorSeed } from './generatorSeed';
+import { GENERATOR_SEED_STRIDE, hashSeed, streamRng } from './generatorSeed';
 import { DEFAULT_GRID_CONFIG, GridSequencer } from './gridSequencer';
 import { ScaleSampler } from './scaleSampler';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
@@ -19,7 +20,7 @@ interface Seeds {
 
 /** The four parts of the record's §7, driven together for `bars`, as JSON per part. */
 function arrangement(seeds: Seeds, bars = 16): Record<keyof Seeds, string> {
-  const sampler = new ScaleSampler({ root: 48, scale: 'dorian' });
+  const sampler = new ScaleSampler({ root: 0, scale: 'dorian' });
   const transport = new TickTransport(96);
   const out = {
     kick: [] as unknown[],
@@ -31,13 +32,11 @@ function arrangement(seeds: Seeds, bars = 16): Record<keyof Seeds, string> {
   const kick = new EuclideanSequencer({
     ...DEFAULT_EUCLIDEAN_CONFIG,
     seed: seeds.kick,
-    generatorIndex: 0,
     density: { kind: 'walk', stepChance: 0.8 },
   });
   const hat = new EuclideanSequencer({
     ...DEFAULT_EUCLIDEAN_CONFIG,
     seed: seeds.hat,
-    generatorIndex: 1,
     divisor: 3,
     steps: 32,
     pulses: { min: 8, max: 24, start: 12 },
@@ -49,14 +48,12 @@ function arrangement(seeds: Seeds, bars = 16): Record<keyof Seeds, string> {
     ...DEFAULT_GRID_CONFIG,
     skipChance: 0.5,
     seed: seeds.arp,
-    generatorIndex: 2,
   });
   const drone = new GridSequencer(sampler, {
     ...DEFAULT_GRID_CONFIG,
     divisor: 24,
     skipChance: 0.5,
     seed: seeds.drone,
-    generatorIndex: 3,
   });
   kick.onOnset = (e) => out.kick.push(e);
   hat.onOnset = (e) => out.hat.push(e);
@@ -76,19 +73,19 @@ function arrangement(seeds: Seeds, bars = 16): Record<keyof Seeds, string> {
   };
 }
 
-describe('generatorSeed', () => {
-  it('derives a distinct 32-bit seed per generator index', () => {
-    expect(generatorSeed(7, 0)).toBe(7);
-    expect(generatorSeed(7, 1)).toBe((7 + GENERATOR_SEED_STRIDE) >>> 0);
-    expect(generatorSeed(7, 1)).not.toBe(generatorSeed(8, 0));
-    const seeds = new Set(Array.from({ length: 64 }, (_, i) => generatorSeed(123, i)));
+describe('hashSeed', () => {
+  it('derives a distinct 32-bit seed per region index', () => {
+    expect(hashSeed(7, 0)).toBe(7);
+    expect(hashSeed(7, 1)).toBe((7 + GENERATOR_SEED_STRIDE) >>> 0);
+    expect(hashSeed(7, 1)).not.toBe(hashSeed(8, 0));
+    const seeds = new Set(Array.from({ length: 64 }, (_, i) => hashSeed(123, i)));
     expect(seeds.size).toBe(64);
   });
 
-  it('gives each index its own stream from the same arrangement seed', () => {
-    const a = generatorRng(9, 0);
-    const b = generatorRng(9, 1);
-    const again = generatorRng(9, 0);
+  it('gives each region its own stream from the same seed', () => {
+    const a = streamRng(9, 0);
+    const b = streamRng(9, 1);
+    const again = streamRng(9, 0);
     const first = Array.from({ length: 8 }, () => a());
     expect(Array.from({ length: 8 }, () => again())).toEqual(first);
     expect(Array.from({ length: 8 }, () => b())).not.toEqual(first);
@@ -116,8 +113,22 @@ describe('an arrangement of four generators', () => {
     expect(arpOnly.drone).toBe(before.drone);
   });
 
-  it('parts sharing one arrangement seed still get different streams by index', () => {
-    const one = arrangement(base);
-    expect(one.kick).not.toBe(one.hat);
+  it('one part entering a later region draws a different stream from the same seed (#705)', () => {
+    const run = (region: number): string => {
+      const transport = new TickTransport(96);
+      const out: unknown[] = [];
+      const hat = new EuclideanSequencer({
+        ...DEFAULT_EUCLIDEAN_CONFIG,
+        seed: 1000,
+        density: { kind: 'walk', stepChance: 0.9 },
+      });
+      hat.enter(region);
+      hat.onOnset = (e) => out.push(e);
+      hat.attach(transport);
+      for (let i = 0; i < 16 * TICKS_PER_BAR; i++) transport.advance(i * transport.secondsPerTick);
+      return JSON.stringify(out);
+    };
+    expect(run(0)).toBe(run(0));
+    expect(run(1)).not.toBe(run(0));
   });
 });

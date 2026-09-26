@@ -9,9 +9,16 @@
  * output contains no Babylon; a Babylon import creeping in here fails that
  * build, not the game's.
  */
+/* eslint-disable max-lines -- one export list, one entry per engine name the console may reach; a split would be two halves of the same surface */
 export { AudioSystem } from './game/audioSystem';
 export type { AudioSystemOptions, MusicReadout } from './game/audioSystem';
-export { SEQUENCER_KINDS, driverOf, mergeArrangement, mergeParts } from './song/arrangement';
+export {
+  SEEDED_KINDS,
+  SEQUENCER_KINDS,
+  driverOf,
+  mergeArrangement,
+  mergeParts,
+} from './song/arrangement';
 export { FALLBACK_ARRANGEMENT } from './song/fallbackArrangement';
 export { isShippable, makeArrangement } from './song/arrangementDocument';
 export type {
@@ -23,7 +30,11 @@ export type {
 export { musicPartName, partAt, removePart, removePartChange } from './song/documentParts';
 export type {
   Arrangement,
-  ArrangementKey,
+  ArpDriver,
+  ArpSpec,
+  BassDriver,
+  BassSpec,
+  Transport,
   ArrangementPartial,
   DeepPartial,
   EuclideanDriver,
@@ -69,12 +80,13 @@ export {
   ChordSequencer,
   DEFAULT_CHORD_CONFIG,
   assertChordConfig,
-  chordStep,
+  hitStep,
   layoutSegments,
   restStep,
+  voiceHit,
 } from './sequencing/chordSequencer';
 export type {
-  ChordChordStep,
+  ChordHitStep,
   ChordRestStep,
   ChordSegment,
   ChordSequencerConfig,
@@ -113,8 +125,11 @@ export { foldDegree } from './sequencing/scaleSampler';
 export {
   ACCENT_MOD_DEFAULT,
   ACCENT_VELOCITY_DEFAULT,
+  BARS_MAX,
+  BARS_MIN,
   BPM_MAX,
   BPM_MIN,
+  DEFAULT_BARS,
   GATE_MIN,
   HOLD_DEFAULT,
   HOLD_MAX,
@@ -124,6 +139,9 @@ export {
   LFO_HZ_DEFAULT,
   MIDI_MIDDLE_C,
   MIDI_NOTE_MAX,
+  PITCH_CLASS_MAX,
+  REGISTER_OCTAVE_MAX,
+  REGISTER_OCTAVE_MIN,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
   EUCLID_STEPS_MAX,
@@ -213,6 +231,7 @@ export {
   DELAY_RESONANCE_MIN_DB,
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
+  ARRANGEMENT_VERSION,
   MUSIC_PARTS_MAX,
   REVERB_SPACE_RANGES,
   SECONDS_PER_MINUTE,
@@ -261,7 +280,35 @@ export type {
 } from './sequencing/scheduler';
 export { euclid, patternFromString, patternToString, rotatePattern } from './sequencing/euclid';
 export type { Pattern } from './sequencing/euclid';
-export { GENERATOR_SEED_STRIDE, generatorRng, generatorSeed } from './sequencing/generatorSeed';
+export { GENERATOR_SEED_STRIDE, hashSeed, streamRng } from './sequencing/generatorSeed';
+export { NOT_LIVE, isInfiniteRegion, regionState } from './sequencing/regionClock';
+export type { Region, RegionState } from './sequencing/regionClock';
+export { RegionGate } from './sequencing/regionGate';
+export type {
+  PartTickEvent,
+  PartTickHandler,
+  PartTickSource,
+  RegionGateConfig,
+  RegionGateHooks,
+} from './sequencing/regionGate';
+export { chordAt, eventBounds } from './harmony/harmonyTimeline';
+export type { EventBounds, Harmony, HarmonyChord, HarmonyEvent } from './harmony/harmonyTimeline';
+export {
+  ARP_STYLES,
+  ArpSequencer,
+  DEFAULT_ARP_CONFIG,
+  assertArpConfig,
+} from './sequencing/arpSequencer';
+export type { ArpSequencerConfig, ArpStyle } from './sequencing/arpSequencer';
+export {
+  BASS_PITCH_MODES,
+  BassSequencer,
+  DEFAULT_BASS_CONFIG,
+  assertBassConfig,
+} from './sequencing/bassSequencer';
+export type { BassPitchMode, BassSequencerConfig } from './sequencing/bassSequencer';
+export { songTicksOf } from './song/arrangementPlayer';
+export { defaultHarmonyEvents } from './song/timelineNormalise';
 export type { Rng } from './sequencing/generatorSeed';
 export type { NoteEvent, NoteHandler, NoteOffEvent, NoteOnEvent } from './sequencing/noteEvent';
 export {

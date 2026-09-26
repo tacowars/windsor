@@ -24,7 +24,7 @@ import { PRESETS } from '../patch/presets';
 const PARTS_PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
 /** The fixture as a self-contained song: since #562 a part resolves nowhere else. */
-const SONG = { version: 2, ...FULL_ARRANGEMENT, patches: PARTS_PATCHES };
+const SONG = { version: 3, ...FULL_ARRANGEMENT, patches: PARTS_PATCHES };
 
 const arpOf = (r: ReturnType<typeof makeArrangement>) =>
   r.document.parts.find((p) => p.slot === FULL_SLOT.arp);

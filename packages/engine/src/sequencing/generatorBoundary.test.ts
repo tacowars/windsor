@@ -35,6 +35,25 @@ const PURE_FILES = [
   'noteEvent.ts',
   'scaleSampler.ts',
   'euclideanSequencer.ts',
+  // The written and performed kinds (#705): they read the key and the chord
+  // the region gate hands them, never the graph.
+  'gridSequencer.ts',
+  'chordSequencer.ts',
+  'arpSequencer.ts',
+  'bassSequencer.ts',
+  // The determinism-critical pair (#705): the position rule and the gate.
+  'regionClock.ts',
+  'regionGate.ts',
+  // Harmony, all of it: theory, names, voicing, tables, the timeline and the
+  // chord normaliser, which reaches only the field vocabulary and the types.
+  '../harmony/chordTheory.ts',
+  '../harmony/chordTables.ts',
+  '../harmony/chordNames.ts',
+  '../harmony/chordVoicing.ts',
+  '../harmony/harmonyTimeline.ts',
+  '../harmony/chordNormalise.ts',
+  '../song/arrangementFields.ts',
+  '../song/arrangement.ts',
 ];
 
 /** The pure set by absolute path, so a specifier is judged by what it resolves to, not how it is spelled. */

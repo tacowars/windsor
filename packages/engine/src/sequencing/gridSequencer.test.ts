@@ -13,9 +13,11 @@ import type { NoteEvent } from './noteEvent';
 import { ScaleSampler } from './scaleSampler';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from './scheduler';
 
-/** C minor from C3: degree 0 is 48, degree 2 is 51, degree 6 is 58. */
-const minor = new ScaleSampler({ root: 48, scale: 'naturalMinor' });
-const penta = new ScaleSampler({ root: 48, scale: 'pentatonicMinor' });
+/** C minor (root pitch class 0); at register octave 3, degree 0 is C3 = 48, degree 2 is 51, degree 6 is 58. */
+const minor = new ScaleSampler({ root: 0, scale: 'naturalMinor' });
+const penta = new ScaleSampler({ root: 0, scale: 'pentatonicMinor' });
+/** The register every line here is written at (#705: an absolute MIDI octave). */
+const C3 = { octave: 3 };
 
 const REST: GridStep = { kind: 'rest' };
 const TIE: GridStep = { kind: 'tie' };
@@ -23,6 +25,7 @@ const TIE: GridStep = { kind: 'tie' };
 function make(steps: readonly GridStep[], extra: Partial<GridSequencerConfig> = {}): GridSequencer {
   return new GridSequencer(minor, {
     ...DEFAULT_GRID_CONFIG,
+    register: C3,
     steps,
     length: steps.length,
     ...extra,
@@ -149,7 +152,7 @@ describe('GridSequencer', () => {
 
   it('a step octave adds to the register octave', () => {
     const seq = make([gridNote(0, { octave: 1 }), gridNote(0, { octave: -2 })], {
-      register: { octave: -1 },
+      register: { octave: 2 },
     });
     expect(
       ons(run(seq, 1))
@@ -161,6 +164,7 @@ describe('GridSequencer', () => {
   it('resolves degrees through the sampler, wrapping past the end with octave carry', () => {
     const seq = new GridSequencer(penta, {
       ...DEFAULT_GRID_CONFIG,
+      register: C3,
       steps: [gridNote(6), gridNote(4)],
       length: 2,
     });
@@ -174,9 +178,9 @@ describe('GridSequencer', () => {
 
   it('skipChance is deterministic per seed and a skipped step rests', () => {
     const line = Array.from({ length: 16 }, () => gridNote(0));
-    const a = run(make(line, { skipChance: 0.5, seed: 7, generatorIndex: 2 }), 4);
-    const b = run(make(line, { skipChance: 0.5, seed: 7, generatorIndex: 2 }), 4);
-    const c = run(make(line, { skipChance: 0.5, seed: 8, generatorIndex: 2 }), 4);
+    const a = run(make(line, { skipChance: 0.5, seed: 7 }), 4);
+    const b = run(make(line, { skipChance: 0.5, seed: 7 }), 4);
+    const c = run(make(line, { skipChance: 0.5, seed: 8 }), 4);
     expect(a).toEqual(b);
     expect(a).not.toEqual(c);
     const played = ons(a).length;
@@ -245,6 +249,8 @@ describe('GridSequencer', () => {
       ['noteOn', 48 + 5],
     ]);
     expect(() => tied.reconfigure({ ...tied.config, divisor: 12 })).toThrow(RangeError);
+    // #705: a seed change rebuilds the part (the stream restarts at once), never live.
+    expect(() => tied.reconfigure({ ...tied.config, seed: 12 })).toThrow(/seed/);
     expect(() => tied.reconfigure({ ...tied.config, length: 9 })).toThrow(RangeError);
   });
 

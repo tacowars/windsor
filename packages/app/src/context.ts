@@ -30,10 +30,6 @@ export interface AppCtx {
   restructure(edit: (draft: Record<string, unknown>) => void): void;
   /** Adopt a freshly imported raw document: normalise, rebuild, re-render. */
   importDoc(raw: unknown): void;
-  /** Freeze the sounding pattern of the part on `slot` into the document (record §6). */
-  capture(slot: number): boolean;
-  /** Release a captured part back to generative. */
-  release(slot: number): void;
   /** Re-render the active tab from the current document; the rest render when shown (#620). */
   render(): void;
   status(message: string): void;

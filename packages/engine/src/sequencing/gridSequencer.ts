@@ -18,20 +18,24 @@
  *   so the worklet hands the voice over legato. A slide to the pitch already
  *   held is a tie.
  *
- * Position is the transport's absolute step count modulo the loop `length`
- * (at most the steps written; the rest wait, greyed, in the console), never
- * the position in the bar: a 12-step line at sixteenths drifts polymetrically
+ * Position is the part's local step count modulo the loop `length` (at most
+ * the steps written; the rest wait, greyed, in the console), never the
+ * position in the bar: a 12-step line at sixteenths drifts polymetrically
  * against the bar, and a live rebuild recomputes its place from the clock.
- * A skipped step (one draw from the part's stream per note step) is a rest.
+ * Since #705 the ticks arrive through the part's region gate, so the count
+ * restarts when the playhead enters a region and the skip stream is minted
+ * there from `hashSeed(seed, regionIndex)` (`enter`); a single ∞ region
+ * free-runs. A skipped step (one draw per note step) is a rest.
  */
 import {
   ACCENT_MOD_DEFAULT,
   ACCENT_VELOCITY_DEFAULT,
   GRID_DEFAULT_STEP_COUNT,
+  GRID_REGISTER_OCTAVE_DEFAULT,
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
 } from '../audioConstants';
-import { generatorRng, type Rng } from './generatorSeed';
+import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import type { ScaleSampler } from './scaleSampler';
 import {
@@ -74,10 +78,10 @@ export interface GridSequencerConfig {
   accentVelocity: number;
   /** The per-note mod an accented step sends; a plain step sends 0. */
   accentMod: number;
-  /** Octaves from the root the line is written at. */
+  /** The absolute MIDI octave the line is written at (decision 11). */
   register: { octave: number };
+  /** The part's own seed (decision 16); the stream per region is `hashSeed(seed, regionIndex)`. */
   seed: number;
-  generatorIndex: number;
 }
 
 /** A plain note step on the root at the register octave. */
@@ -97,9 +101,8 @@ export const DEFAULT_GRID_CONFIG: GridSequencerConfig = {
   skipChance: 0,
   accentVelocity: ACCENT_VELOCITY_DEFAULT,
   accentMod: ACCENT_MOD_DEFAULT,
-  register: { octave: 0 },
+  register: { octave: GRID_REGISTER_OCTAVE_DEFAULT },
   seed: 0,
-  generatorIndex: 0,
 };
 
 function assertStep(step: GridStep, index: number): void {
@@ -141,6 +144,7 @@ export function assertGridConfig(config: GridSequencerConfig): void {
   if (!(config.accentMod >= 0 && config.accentMod <= 1)) {
     throw new RangeError(`accentMod must be in [0, 1], got ${config.accentMod}`);
   }
+  if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
 }
 
 export class GridSequencer {
@@ -148,7 +152,7 @@ export class GridSequencer {
 
   private current: GridSequencerConfig;
   private sampler: ScaleSampler;
-  private readonly rng: Rng;
+  private rng: Rng;
   /** The note sounding into the next step, if any. */
   private held: number | null = null;
 
@@ -156,7 +160,12 @@ export class GridSequencer {
     assertGridConfig(config);
     this.sampler = sampler;
     this.current = config;
-    this.rng = generatorRng(config.seed, config.generatorIndex);
+    this.rng = streamRng(config.seed, 0);
+  }
+
+  /** The region gate entered `regionIndex` from outside: the skip stream restarts (#705). */
+  enter(regionIndex: number): void {
+    this.rng = streamRng(this.current.seed, regionIndex);
   }
 
   get config(): GridSequencerConfig {
@@ -168,7 +177,8 @@ export class GridSequencer {
    * the held note and the skip stream carry on, so turning Skip, editing a
    * step or moving the Harmony tab's root never cuts the sounding note or
    * restarts the stream. The divisor is the subscription and needs a rebuild;
-   * so does a seed change, which is what a stream restart is for.
+   * so does a seed change, which is what a stream restart is for (#705: the
+   * player rebuilds that part, and the stream restarts at once).
    */
   reconfigure(config: GridSequencerConfig, sampler: ScaleSampler = this.sampler): void {
     assertGridConfig(config);
@@ -176,6 +186,9 @@ export class GridSequencer {
       throw new RangeError(
         'a divisor change rebuilds the sequencer; it cannot be reconfigured live',
       );
+    }
+    if (config.seed !== this.current.seed) {
+      throw new RangeError('a seed change rebuilds the sequencer; it cannot be reconfigured live');
     }
     this.current = config;
     this.sampler = sampler;
@@ -190,9 +203,9 @@ export class GridSequencer {
     return this.current.length;
   }
 
-  /** The step index a transport step lands on — the console's playhead reads this too. */
-  stepAt(transportStep: number): number {
-    return ((transportStep % this.length) + this.length) % this.length;
+  /** The step index a local step (since the region entry) lands on — the console's playhead reads this too. */
+  stepAt(localStep: number): number {
+    return ((localStep % this.length) + this.length) % this.length;
   }
 
   attach(source: TickSource): Unsubscribe {

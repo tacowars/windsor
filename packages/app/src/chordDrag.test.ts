@@ -26,14 +26,14 @@ class FakeCard implements ChordDragHost {
     this.applied.push({ payload, index });
   }
   audition(payload: ChordPayload): void {
-    this.sounds.push(`on:${payload.kind === 'chord' ? payload.degree : 'rest'}`);
+    this.sounds.push(`on:${payload.kind}`);
   }
   silence(): void {
     this.sounds.push('off');
   }
 }
 
-const CHIP: ChordPayload = { kind: 'chord', degree: 3, size: 3 };
+const CHIP: ChordPayload = { kind: 'hit' };
 const PAST = CHORD_DRAG_THRESHOLD_PX + 1;
 
 describe('chordDrag', () => {
@@ -41,11 +41,11 @@ describe('chordDrag', () => {
     const card = new FakeCard();
     const drag = createChordDrag(card);
     drag.down(CHIP, 10, 10);
-    expect(card.sounds).toEqual(['on:3']);
+    expect(card.sounds).toEqual(['on:hit']);
     drag.move(12, 11);
     expect(drag.dragging).toBe(false);
     drag.up(12, 11);
-    expect(card.sounds).toEqual(['on:3', 'off']);
+    expect(card.sounds).toEqual(['on:hit', 'off']);
     expect(card.frames).toEqual([]);
     expect(card.applied).toEqual([]);
   });
@@ -56,7 +56,7 @@ describe('chordDrag', () => {
     drag.down(CHIP, 10, 10);
     drag.move(10 + PAST, 10);
     expect(drag.dragging).toBe(true);
-    expect(card.sounds).toEqual(['on:3', 'off']);
+    expect(card.sounds).toEqual(['on:hit', 'off']);
     expect(card.frames).toEqual([{ payload: CHIP, over: null, x: 10 + PAST, y: 10 }]);
     drag.move(100, 40);
     expect(card.frames.at(-1)).toEqual({ payload: CHIP, over: 0, x: 100, y: 40 });
@@ -78,7 +78,7 @@ describe('chordDrag', () => {
     expect(card.applied).toHaveLength(1);
     expect(card.frames.at(-1)).toBeNull();
     // The rest tile auditions nothing audible but is balanced all the same.
-    expect(card.sounds).toEqual(['on:3', 'off', 'on:rest', 'off']);
+    expect(card.sounds).toEqual(['on:hit', 'off', 'on:rest', 'off']);
   });
 
   it('a release on the append zone applies with the list’s length as the index', () => {
@@ -102,8 +102,8 @@ describe('chordDrag', () => {
     expect(card.applied).toEqual([]);
 
     drag.down(CHIP, 10, 10);
-    drag.down({ kind: 'chord', degree: 5, size: 4 }, 10, 10);
-    expect(card.sounds.slice(-3)).toEqual(['on:3', 'off', 'on:5']);
+    drag.down({ kind: 'rest' }, 10, 10);
+    expect(card.sounds.slice(-3)).toEqual(['on:hit', 'off', 'on:rest']);
     drag.cancel();
     expect(card.sounds.at(-1)).toBe('off');
     drag.cancel();

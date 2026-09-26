@@ -2,7 +2,13 @@
 /** Public surface of the audio package. */
 export { AudioSystem } from './game/audioSystem';
 export type { AudioSystemOptions, MusicReadout } from './game/audioSystem';
-export { SEQUENCER_KINDS, driverOf, mergeArrangement, mergeParts } from './song/arrangement';
+export {
+  SEEDED_KINDS,
+  SEQUENCER_KINDS,
+  driverOf,
+  mergeArrangement,
+  mergeParts,
+} from './song/arrangement';
 export { FALLBACK_ARRANGEMENT } from './song/fallbackArrangement';
 export { isShippable, makeArrangement } from './song/arrangementDocument';
 export type {
@@ -14,7 +20,11 @@ export type {
 export { musicPartName, partAt, removePart } from './song/documentParts';
 export type {
   Arrangement,
-  ArrangementKey,
+  ArpDriver,
+  ArpSpec,
+  BassDriver,
+  BassSpec,
+  Transport,
   ArrangementPartial,
   DeepPartial,
   EuclideanDriver,
@@ -168,7 +178,35 @@ export type {
 } from './sequencing/scheduler';
 export { euclid, patternFromString, patternToString, rotatePattern } from './sequencing/euclid';
 export type { Pattern } from './sequencing/euclid';
-export { GENERATOR_SEED_STRIDE, generatorRng, generatorSeed } from './sequencing/generatorSeed';
+export { GENERATOR_SEED_STRIDE, hashSeed, streamRng } from './sequencing/generatorSeed';
+export { NOT_LIVE, isInfiniteRegion, regionState } from './sequencing/regionClock';
+export type { Region, RegionState } from './sequencing/regionClock';
+export { RegionGate } from './sequencing/regionGate';
+export type {
+  PartTickEvent,
+  PartTickHandler,
+  PartTickSource,
+  RegionGateConfig,
+  RegionGateHooks,
+} from './sequencing/regionGate';
+export { chordAt, eventBounds } from './harmony/harmonyTimeline';
+export type { EventBounds, Harmony, HarmonyChord, HarmonyEvent } from './harmony/harmonyTimeline';
+export {
+  ARP_STYLES,
+  ArpSequencer,
+  DEFAULT_ARP_CONFIG,
+  assertArpConfig,
+} from './sequencing/arpSequencer';
+export type { ArpSequencerConfig, ArpStyle } from './sequencing/arpSequencer';
+export {
+  BASS_PITCH_MODES,
+  BassSequencer,
+  DEFAULT_BASS_CONFIG,
+  assertBassConfig,
+} from './sequencing/bassSequencer';
+export type { BassPitchMode, BassSequencerConfig } from './sequencing/bassSequencer';
+export { songTicksOf } from './song/arrangementPlayer';
+export { defaultHarmonyEvents } from './song/timelineNormalise';
 export type { Rng } from './sequencing/generatorSeed';
 export type { NoteEvent, NoteHandler, NoteOffEvent, NoteOnEvent } from './sequencing/noteEvent';
 export {
@@ -212,12 +250,13 @@ export {
   ChordSequencer,
   DEFAULT_CHORD_CONFIG,
   assertChordConfig,
-  chordStep,
+  hitStep,
   layoutSegments,
   restStep,
+  voiceHit,
 } from './sequencing/chordSequencer';
 export type {
-  ChordChordStep,
+  ChordHitStep,
   ChordRestStep,
   ChordSegment,
   ChordSequencerConfig,

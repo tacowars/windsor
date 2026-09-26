@@ -17,14 +17,20 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT, FULL_PARTS, FULL_SLOT, withPart } from '../__fixtures__/fullArrangement';
+import {
+  FULL_ARRANGEMENT,
+  FULL_PARTS,
+  FULL_SLOT,
+  FULL_SONG_TICKS,
+  withPart,
+} from '../__fixtures__/fullArrangement';
 import { rig } from '../__fixtures__/playerRig';
 import type { Arrangement, EuclideanDriver, MusicPart } from './arrangement';
 import { driverOf } from './arrangement';
 import { SECONDS_PER_MINUTE } from '../audioConstants';
 import {
   ChordSequencer,
-  chordStep,
+  hitStep,
   restStep,
   type ChordSequencerConfig,
 } from '../sequencing/chordSequencer';
@@ -35,18 +41,19 @@ import { DIVISORS, PPQ, TICKS_PER_BAR } from '../sequencing/scheduler';
 
 const { kick, arp, drone } = FULL_SLOT;
 const BARS = 4;
-const secondsPerTick = SECONDS_PER_MINUTE / FULL_ARRANGEMENT.bpm / PPQ;
+const secondsPerTick = SECONDS_PER_MINUTE / FULL_ARRANGEMENT.transport.bpm / PPQ;
 /** The transport tick a recorded call time belongs to (the Euclidean player tests' rule). */
 const tickOf = (time: number | undefined): number => Math.round((time ?? 0) / secondsPerTick);
 
 /** A run of eight degrees a semitone apart, so a sounded note names the step that wrote it. */
+/** The ladder's root: pitch class 0 at register octave 3 (#705), C3. */
 const LADDER_ROOT = 48;
 const LADDER_DEGREES = [0, 1, 2, 3, 4, 5, 6, 7];
 
 /** The fixture's drone slot as a grid part: eight eighths, one distinct degree each. */
 const LADDER: Arrangement = {
   ...FULL_ARRANGEMENT,
-  key: { root: LADDER_ROOT, scale: LADDER_DEGREES },
+  harmony: { ...FULL_ARRANGEMENT.harmony, root: 0, scale: LADDER_DEGREES },
   parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
     part.slot === drone
       ? {
@@ -59,7 +66,8 @@ const LADDER: Arrangement = {
             skipChance: 0,
             accentVelocity: 0.2,
             accentMod: 1,
-            register: { octave: 0 },
+            register: { octave: 3 },
+            seed: 0,
           },
         }
       : part,
@@ -71,17 +79,17 @@ const CHORD_DRIVER = {
   divisor: DIVISORS.bar,
   gate: 1,
   voicing: 'close',
-  register: { octave: 0 },
+  register: { octave: 3 },
   steps: [
-    chordStep(0, { duration: 1 }),
+    hitStep({ duration: 1 }),
     restStep({ duration: 2 }),
-    chordStep(4, { duration: 0.5, repeat: 2 }),
+    hitStep({ duration: 0.5, repeat: 2 }),
   ],
 } as const;
 
 const PROGRESSION: Arrangement = {
   ...FULL_ARRANGEMENT,
-  key: { root: 48, scale: 'naturalMinor' },
+  harmony: { ...FULL_ARRANGEMENT.harmony, root: 0, scale: 'naturalMinor' },
   parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
     part.slot === drone ? { ...part, sequencer: { kind: 'chord', ...CHORD_DRIVER } } : part,
   ),
@@ -89,11 +97,10 @@ const PROGRESSION: Arrangement = {
 
 /** The same progression as a standalone sequencer: the engine's own layout of it. */
 const chordEngine = (): ChordSequencer =>
-  new ChordSequencer(new ScaleSampler(PROGRESSION.key), {
-    ...(CHORD_DRIVER as unknown as ChordSequencerConfig),
-    seed: FULL_ARRANGEMENT.seed,
-    generatorIndex: drone,
-  });
+  new ChordSequencer(
+    new ScaleSampler(PROGRESSION.harmony),
+    CHORD_DRIVER as unknown as ChordSequencerConfig,
+  );
 
 describe('ArrangementPlayer.stepAt (#619)', () => {
   it('names the grid step that sounded: every note the player sent is on stepAt’s column', () => {
@@ -110,11 +117,8 @@ describe('ArrangementPlayer.stepAt (#619)', () => {
 
   it('matches the step a Euclidean sequencer on the same transport emits, over four bars', () => {
     const { player, transport, run } = rig();
-    const config = {
-      ...(driverOf(FULL_PARTS.kick.sequencer) as EuclideanDriver),
-      seed: FULL_ARRANGEMENT.seed,
-      generatorIndex: kick,
-    };
+    // The part's own seed is in its driver (#705).
+    const config = driverOf(FULL_PARTS.kick.sequencer) as unknown as EuclideanDriver;
     const sequencer = new EuclideanSequencer(config);
     const emitted: { tick: number; step: number }[] = [];
     transport.subscribe(config.divisor, (event) => {
@@ -154,6 +158,19 @@ describe('ArrangementPlayer.stepAt (#619)', () => {
     // The progression wraps on its own total length, which is not a whole bar.
     expect(player.stepAt(drone, length)).toBe(0);
     expect(player.stepAt(drone, length * BARS + third)).toBe(2);
+  });
+
+  it('is -1 outside the part’s regions and counts local steps from each entry (#705)', () => {
+    const bar = { start: TICKS_PER_BAR, duration: TICKS_PER_BAR };
+    const { player } = rig(withPart(FULL_ARRANGEMENT, 'arp', { regions: [bar] }));
+    const divisor = FULL_PARTS.arp.sequencer.divisor;
+    expect(player.stepAt(arp, 0)).toBe(-1);
+    expect(player.stepAt(arp, bar.start - 1)).toBe(-1);
+    expect(player.stepAt(arp, bar.start)).toBe(0);
+    expect(player.stepAt(arp, bar.start + divisor)).toBe(1);
+    expect(player.stepAt(arp, bar.start + bar.duration)).toBe(-1);
+    // The next song iteration re-enters the region: the count starts again.
+    expect(player.stepAt(arp, FULL_SONG_TICKS + bar.start + 2 * divisor)).toBe(2);
   });
 
   it('has no step for a none part, or for an absent slot', () => {
