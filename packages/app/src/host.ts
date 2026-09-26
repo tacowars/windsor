@@ -89,6 +89,7 @@ export class EngineHost {
         meterUrl: blob(dsp.meter),
         retroReverbUrl: blob(dsp.retroReverb),
         phaserUrl: blob(dsp.phaser),
+        advancedDriveUrl: blob(dsp.advancedDrive),
         delayUrl: blob(dsp.delay),
       });
     } catch {
@@ -103,6 +104,7 @@ export class EngineHost {
           meterUrl: data(dsp.meter),
           retroReverbUrl: data(dsp.retroReverb),
           phaserUrl: data(dsp.phaser),
+          advancedDriveUrl: data(dsp.advancedDrive),
           delayUrl: data(dsp.delay),
         });
       } catch (error) {

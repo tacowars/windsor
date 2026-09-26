@@ -11,6 +11,7 @@ interface Window {
     meter: string;
     retroReverb: string;
     phaser: string;
+    advancedDrive: string;
     delay: string;
   };
 }

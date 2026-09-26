@@ -12,6 +12,7 @@ import {
   COMPRESSOR_WORKLET_URL,
   RETRO_REVERB_WORKLET_URL,
   PHASER_WORKLET_URL,
+  ADVANCED_DRIVE_WORKLET_URL,
   DELAY_WORKLET_URL,
 } from './workletMessages';
 import { AudioPart } from './audioPart';
@@ -45,6 +46,7 @@ export interface WorkletUrls {
   meterUrl?: string | URL;
   retroReverbUrl?: string | URL;
   phaserUrl?: string | URL;
+  advancedDriveUrl?: string | URL;
   delayUrl?: string | URL;
 }
 
@@ -103,6 +105,7 @@ export class FmEngine {
     await this.context.audioWorklet.addModule(urls.meterUrl ?? PEAK_METER_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.retroReverbUrl ?? RETRO_REVERB_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.phaserUrl ?? PHASER_WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.advancedDriveUrl ?? ADVANCED_DRIVE_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.delayUrl ?? DELAY_WORKLET_URL);
     this.moduleLoaded = true;
   }

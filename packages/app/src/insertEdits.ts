@@ -17,7 +17,7 @@ export const canAddInsert = (list: readonly InsertSpec[]): boolean => list.lengt
 /** `list` with a fresh insert of `kind` on the end, or `list` unchanged when it is full. */
 export function addInsert(list: readonly InsertSpec[], kind: InsertKindName): InsertSpec[] {
   if (!canAddInsert(list)) return [...list];
-  return [...list, { ...INSERT_KINDS[kind].defaults }];
+  return [...list, structuredClone(INSERT_KINDS[kind].defaults)];
 }
 
 /** `list` without the insert at `index`. */

@@ -187,3 +187,8 @@ export const PHASER_WORKLET_URL = new URL(
   '../worklet/generated/phaser-processor.js',
   import.meta.url,
 );
+
+export const ADVANCED_DRIVE_WORKLET_URL = new URL(
+  '../worklet/generated/advanced-drive-processor.js',
+  import.meta.url,
+);

@@ -12,6 +12,8 @@ import type { ChorusSpec } from './chorusInsert';
 import { CHORUS_INSERT } from './chorusInsert';
 import type { DriveSpec } from './driveInsert';
 import { DRIVE_INSERT } from './driveInsert';
+import { ADVANCED_DRIVE_INSERT } from './advancedDriveInsert';
+import type { AdvancedDriveSpec } from './advancedDriveSpec';
 import { MAX_INSERTS } from './insertConstants';
 import { RETRO_REVERB_INSERT } from './retroReverbInsert';
 import { DELAY_INSERT } from './delayInsert';
@@ -25,7 +27,14 @@ import type { InsertKind, InsertStage } from './insertKind';
 
 /** Every kind's settings, discriminated on `kind`. */
 export type InsertSpec =
-  DriveSpec | ChorusSpec | CompressorSpec | RetroReverbSpec | PhaserSpec | DelaySpec | EnsembleSpec;
+  | AdvancedDriveSpec
+  | DriveSpec
+  | ChorusSpec
+  | CompressorSpec
+  | RetroReverbSpec
+  | PhaserSpec
+  | DelaySpec
+  | EnsembleSpec;
 export type InsertKindName = InsertSpec['kind'];
 
 /** A registry of kinds by name. The strip takes one as a parameter, so a test can inject another. */
@@ -33,6 +42,7 @@ export type InsertRegistry = Readonly<Record<string, InsertKind<InsertSpec>>>;
 
 export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec>>> = {
   drive: DRIVE_INSERT,
+  'advanced-drive': ADVANCED_DRIVE_INSERT,
   chorus: CHORUS_INSERT,
   compressor: COMPRESSOR_INSERT,
   'retro-reverb': RETRO_REVERB_INSERT,

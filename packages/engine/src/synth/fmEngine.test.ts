@@ -11,6 +11,7 @@ import {
   PEAK_METER_WORKLET_URL,
   RETRO_REVERB_WORKLET_URL,
   PHASER_WORKLET_URL,
+  ADVANCED_DRIVE_WORKLET_URL,
   DELAY_WORKLET_URL,
   COMPRESSOR_WORKLET_URL,
   REVERB_WORKLET_URL,
@@ -36,6 +37,7 @@ describe('FmEngine.init', () => {
       String(PEAK_METER_WORKLET_URL),
       String(RETRO_REVERB_WORKLET_URL),
       String(PHASER_WORKLET_URL),
+      String(ADVANCED_DRIVE_WORKLET_URL),
       String(DELAY_WORKLET_URL),
     ]);
   });
@@ -45,7 +47,7 @@ describe('FmEngine.init', () => {
     const engine = new FmEngine(context.asAudioContext());
     await engine.init();
     await engine.init();
-    expect(context.modules).toHaveLength(7);
+    expect(context.modules).toHaveLength(8);
   });
 
   it('takes override URLs, together or one at a time', async () => {
@@ -57,6 +59,7 @@ describe('FmEngine.init', () => {
       meterUrl: 'blob:meter',
       retroReverbUrl: 'blob:retro',
       phaserUrl: 'blob:phaser',
+      advancedDriveUrl: 'blob:advanced-drive',
       delayUrl: 'blob:delay',
     });
     expect(both.modules).toEqual([
@@ -66,6 +69,7 @@ describe('FmEngine.init', () => {
       'blob:meter',
       'blob:retro',
       'blob:phaser',
+      'blob:advanced-drive',
       'blob:delay',
     ]);
 
@@ -78,6 +82,7 @@ describe('FmEngine.init', () => {
       String(PEAK_METER_WORKLET_URL),
       String(RETRO_REVERB_WORKLET_URL),
       String(PHASER_WORKLET_URL),
+      String(ADVANCED_DRIVE_WORKLET_URL),
       String(DELAY_WORKLET_URL),
     ]);
   });

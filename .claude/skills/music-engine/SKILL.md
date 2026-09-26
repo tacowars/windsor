@@ -49,6 +49,17 @@ signed feedback, feedback cut, stereo offset, envelope sweep, bass keep and
 mix are song-owned; presets preserve Mix/enabled. Tests include the shipped
 processor and real synth bass/pad input.
 
+Advanced Drive (#701) is `inserts/advancedDriveSpec.ts`,
+`advancedDriveConstants.ts`, `advancedDriveInsert.ts`, its preset tables and
+shared shaper/filter functions; DSP is `worklet/advancedDrive/`. It adds
+single, serial, parallel, three-band and mid/side routing, eight original
+shapers, five filters, an envelope follower and one free/synced LFO. The old
+`drive` stays native and is labelled Classic Drive. Stage settings survive
+route changes; active processing has 32 host samples of latency and
+phase-matched multiband dry. The console's `advancedDriveCard.ts` owns the
+stage controls and uses engine functions for base response displays. See
+`docs/research/2026-09-26-701-drive/README.md` for semantics and audition.
+
 The Dub delay (#698) is `inserts/delaySpec.ts`, `delayConstants.ts`,
 `delayInsert.ts` and `delayPresets.ts` / `delayPresetTables.ts`, with DSP under
 `worklet/delay/`. `tempoInsertRegistry.ts` carries song BPM to current and
