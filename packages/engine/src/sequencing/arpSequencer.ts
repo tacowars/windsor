@@ -1,11 +1,7 @@
 /**
- * The arpeggiator's config and a silent stub of its generator (#705; the
- * generator itself arrives with #706 — epic #703 decisions 12 and 13).
- *
- * The normaliser accepts the whole field set here so a v3 document can
- * carry an `arp` part before the performer exists; the stub subscribes at
- * the part's divisor, emits nothing and holds nothing, so the player's
- * binding, the region gate and the console's card have their seam today.
+ * The arpeggiator's config (#705; epic #703 decisions 12 and 13): the field
+ * set the normaliser accepts, its defaults and the check every constructor
+ * and live edit runs. The generator is `arpeggiator.ts` (#706).
  */
 import {
   ARP_GATE_DEFAULT,
@@ -20,9 +16,7 @@ import {
   CHORD_VOICING_IDS,
   type ChordVoicingId,
 } from '../harmony/chordTables';
-import type { NoteEvent, NoteHandler } from './noteEvent';
-import type { PartTickEvent, PartTickSource } from './regionGate';
-import { DIVISORS, isBarDivisor, type Unsubscribe } from './scheduler';
+import { DIVISORS, isBarDivisor } from './scheduler';
 
 export const ARP_STYLES = [
   'up',
@@ -91,44 +85,4 @@ export function assertArpConfig(config: ArpSequencerConfig): void {
     throw new RangeError(`register.octave must be ${REGISTER_OCTAVE_MIN}..${REGISTER_OCTAVE_MAX}`);
   }
   if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
-}
-
-/** The stub: subscribed, silent. #706 replaces the body, not the surface. */
-export class ArpSequencer {
-  onNote: NoteHandler | null = null;
-  private current: ArpSequencerConfig;
-
-  constructor(config: ArpSequencerConfig) {
-    assertArpConfig(config);
-    this.current = config;
-  }
-
-  get config(): ArpSequencerConfig {
-    return this.current;
-  }
-
-  reconfigure(config: ArpSequencerConfig): void {
-    assertArpConfig(config);
-    this.current = config;
-  }
-
-  /** The region gate entered a region: the stream restarts here (#706). */
-  enter(_regionIndex: number): void {}
-
-  /** No position to show until #706. */
-  stepAt(_localStep: number): number {
-    return -1;
-  }
-
-  attach(source: PartTickSource): Unsubscribe {
-    return source.subscribe(this.current.divisor, (event) => this.handleTick(event));
-  }
-
-  handleTick(_event: PartTickEvent): NoteEvent[] {
-    return [];
-  }
-
-  release(_tick: number, _time: number): NoteEvent[] {
-    return [];
-  }
 }

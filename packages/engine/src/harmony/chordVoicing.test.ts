@@ -49,6 +49,12 @@ describe('chordVoicing', () => {
     expect(voiceChord(MAJ7, at({ voicing: 'spread', octave: -5 }), 60)).toEqual([4, 11]);
   });
 
+  it('clip: false keeps the notes outside the MIDI range, still ascending and unique', () => {
+    expect(voiceChord(MAJ, at({ octave: 6, clip: false }), 60)).toEqual([132, 136, 139]);
+    expect(voiceChord(MAJ, at({ octave: -6, clip: false }), 60)).toEqual([-12, -8, -5]);
+    expect(voiceChord(MAJ, at({ octave: 6, clip: true }), 60)).toEqual([]);
+  });
+
   it('never exceeds the note cap, dedupes, and voices a one-note stack', () => {
     for (const voicing of CHORD_VOICING_IDS) {
       expect(voiceChord(MAJ7, at({ voicing }), 60).length).toBeLessThanOrEqual(
