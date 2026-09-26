@@ -9,7 +9,8 @@
  * the 3. The voicing (`CHORD_VOICINGS`, one per part) then transforms the
  * inverted stack. The result is ascending, without duplicates, and never more
  * than `CHORD_VOICING_NOTES_MAX` notes; a note outside 0–127 is dropped, never
- * clamped, since a clamped note would double a neighbour at the wrong pitch.
+ * clamped, since a clamped note would double a neighbour at the wrong pitch
+ * (unless `clip: false` asks for the raw notes, to clip later).
  */
 import { CHORD_VOICING_NOTES_MAX, MIDI_NOTE_MAX } from '../audioConstants';
 import { CHORD_VOICINGS, type ChordVoicing, type ChordVoicingId } from './chordTables';
@@ -24,6 +25,12 @@ export interface VoiceOptions {
   readonly semitone?: number;
   /** The most notes to keep, low to high; `CHORD_VOICING_NOTES_MAX` by default (#706's arp asks for more). */
   readonly maxNotes?: number;
+  /**
+   * Drop notes outside 0–127; on by default. The arp (#706) voices with it off
+   * and clips once after its octave expansion, so a folded degree or a
+   * downward voicing loses no tone its shifted copies bring back in range.
+   */
+  readonly clip?: boolean;
 }
 
 /** The close stack rotated `inversion` times with octave carry, still ascending. */
@@ -49,10 +56,9 @@ export function voiceChord(
 ): number[] {
   const voicing = voicings[options.voicing] ?? CHORD_VOICINGS.close;
   const shift = rootNote + options.octave * SEMITONES_PER_OCTAVE + (options.semitone ?? 0);
-  const notes = voicing
-    .voice(invertStack(stack, options.inversion))
-    .map((n) => n + shift)
-    .filter((n) => n >= 0 && n <= MIDI_NOTE_MAX);
+  const shifted = voicing.voice(invertStack(stack, options.inversion)).map((n) => n + shift);
+  const notes =
+    options.clip === false ? shifted : shifted.filter((n) => n >= 0 && n <= MIDI_NOTE_MAX);
   const maxNotes = Math.max(1, Math.trunc(options.maxNotes ?? CHORD_VOICING_NOTES_MAX));
   return [...new Set(notes)].sort((a, b) => a - b).slice(0, maxNotes);
 }
