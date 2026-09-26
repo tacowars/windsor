@@ -21,7 +21,8 @@ import type {
   SequencerSpec,
 } from './arrangement';
 import { driverOf } from './arrangement';
-import { ArpSequencer, assertArpConfig } from '../sequencing/arpSequencer';
+import { assertArpConfig } from '../sequencing/arpSequencer';
+import { Arpeggiator } from '../sequencing/arpeggiator';
 import { BassSequencer, assertBassConfig } from '../sequencing/bassSequencer';
 import { ChordSequencer, assertChordConfig } from '../sequencing/chordSequencer';
 import { EuclideanSequencer, assertEuclideanConfig } from '../sequencing/euclideanSequencer';
@@ -29,7 +30,7 @@ import { GridSequencer, assertGridConfig } from '../sequencing/gridSequencer';
 import type { ScaleSampler } from '../sequencing/scaleSampler';
 
 export type Generator =
-  EuclideanSequencer | GridSequencer | ChordSequencer | ArpSequencer | BassSequencer;
+  EuclideanSequencer | GridSequencer | ChordSequencer | Arpeggiator | BassSequencer;
 
 /** A generator emitting note events, whose held notes a region end releases. */
 export type PitchedGenerator = Exclude<Generator, EuclideanSequencer>;
@@ -63,8 +64,8 @@ export function buildGenerator(part: MusicPart, sampler: ScaleSampler): Generato
       return new GridSequencer(sampler, driver as GridDriver);
     case 'chord':
       return new ChordSequencer(sampler, driver as ChordDriver);
-    case 'arp': // #706: the arpeggiator's generator replaces the stub
-      return new ArpSequencer(driver as ArpDriver);
+    case 'arp':
+      return new Arpeggiator(sampler, driver as ArpDriver);
     case 'bass': // #707: the bass's generator replaces the stub
       return new BassSequencer(driver as BassDriver);
     default:
@@ -100,10 +101,10 @@ export function liveReconfiguration(
     assertEuclideanConfig(config);
     return () => generator.reconfigure(config);
   }
-  if (spec.kind === 'arp' && generator instanceof ArpSequencer) {
+  if (spec.kind === 'arp' && generator instanceof Arpeggiator) {
     const config = driver as ArpDriver;
     assertArpConfig(config);
-    return () => generator.reconfigure(config);
+    return () => generator.reconfigure(config, sampler);
   }
   if (spec.kind === 'bass' && generator instanceof BassSequencer) {
     const config = driver as BassDriver;

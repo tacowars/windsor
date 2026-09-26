@@ -9,12 +9,19 @@
  * holds every entry to its engine default.
  */
 import type {
+  ArpStyle,
   DensityMod,
   DensityModKind,
   MusicPart,
   SequencerSpec,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
+  ARP_OCTAVES_MAX,
+  ARP_OCTAVES_MIN,
+  ARP_STYLES,
+  CHORD_VOICINGS,
+  CHORD_VOICING_IDS,
+  DEFAULT_ARP_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_GRID_CONFIG,
@@ -173,6 +180,52 @@ export const CHORD_KNOBS: readonly SequencerKnobEntry[] = [
     o: { min: GATE_MIN, max: 1, def: DEFAULT_CHORD_CONFIG.gate, fmt: fmt2 },
   },
 ];
+
+/** The Arp card (#706): Vel, Gate and Octaves as table knobs; Reg is the Harmony tab's `octaveKnob('arp')`. */
+export const ARP_KNOBS: readonly SequencerKnobEntry[] = [
+  VELOCITY_KNOB,
+  {
+    kind: 'driver',
+    f: 'gate',
+    label: 'Gate',
+    o: { min: GATE_MIN, max: 1, def: DEFAULT_ARP_CONFIG.gate, fmt: fmt2 },
+  },
+  {
+    kind: 'driver',
+    f: 'octaves',
+    label: 'Octaves',
+    o: {
+      min: ARP_OCTAVES_MIN,
+      max: ARP_OCTAVES_MAX,
+      def: DEFAULT_ARP_CONFIG.octaves,
+      step: 1,
+      fmt: fmt0,
+    },
+  },
+];
+
+/** The nine traversals as the Style select names them, in the engine's order. */
+export const ARP_STYLE_LABELS: Readonly<Record<ArpStyle, string>> = {
+  up: 'Up',
+  down: 'Down',
+  upDown: 'Up-down',
+  downUp: 'Down-up',
+  converge: 'Converge',
+  diverge: 'Diverge',
+  random: 'Random',
+  randomOther: 'Random, no repeat',
+  randomOnce: 'Random once',
+};
+export const ARP_STYLE_OPTIONS: readonly { value: string; label: string }[] = ARP_STYLES.map(
+  (style) => ({ value: style, label: ARP_STYLE_LABELS[style] }),
+);
+
+/** The Chord Player's voicing enum, the engine's labels. */
+export const ARP_VOICING_OPTIONS: readonly { value: string; label: string }[] =
+  CHORD_VOICING_IDS.map((id) => ({ value: id, label: CHORD_VOICINGS[id].label }));
+
+/** Reseed draws from the 32-bit stream-seed space `hashSeed` folds every seed into. */
+export const ARP_RESEED_SPAN = 2 ** 32;
 
 /** The density modulator's knob ranges: the console shows less than the engine accepts. */
 export const DENSITY_BARS_MAX = 64;

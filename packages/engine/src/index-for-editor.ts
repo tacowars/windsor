@@ -159,6 +159,8 @@ export {
   CHORD_STEPS_MAX,
   CHORD_STEP_OCTAVE_MAX,
   CHORD_VOICING_NOTES_MAX,
+  ARP_OCTAVES_MAX,
+  ARP_OCTAVES_MIN,
 } from './audioConstants';
 export type {
   ApplyResult,
@@ -293,12 +295,8 @@ export type {
 } from './sequencing/regionGate';
 export { chordAt, eventBounds } from './harmony/harmonyTimeline';
 export type { EventBounds, Harmony, HarmonyChord, HarmonyEvent } from './harmony/harmonyTimeline';
-export {
-  ARP_STYLES,
-  ArpSequencer,
-  DEFAULT_ARP_CONFIG,
-  assertArpConfig,
-} from './sequencing/arpSequencer';
+export { ARP_STYLES, DEFAULT_ARP_CONFIG, assertArpConfig } from './sequencing/arpSequencer';
+export { Arpeggiator, arpNoteList } from './sequencing/arpeggiator';
 export type { ArpSequencerConfig, ArpStyle } from './sequencing/arpSequencer';
 export {
   BASS_PITCH_MODES,
