@@ -37,7 +37,7 @@ afterAll(() => restore());
 /** One tone per part, far enough apart that Goertzel attribution is unambiguous. */
 const HZ: Record<FullPartId, number> = { kick: 233, hat: 977, arp: 1447, drone: 421 };
 
-const BAR_SECONDS = (60 / FULL_ARRANGEMENT.bpm) * 4;
+const BAR_SECONDS = (60 / FULL_ARRANGEMENT.transport.bpm) * 4;
 
 interface Rig {
   context: FakeContext;
@@ -166,7 +166,7 @@ describe('the audible arrangement', () => {
   it('applies bpm live through the system without a reload', async () => {
     const { system } = await musicRig();
     system.startMusic();
-    expect(system.apply({ bpm: 90 })).toEqual({ ok: true, ignored: [] });
+    expect(system.apply({ transport: { bpm: 90 } })).toEqual({ ok: true, ignored: [] });
     expect(system.scheduler.bpm).toBe(90);
     expect(system.readout().bpm).toBe(90);
     expect(system.musicRunning).toBe(true);

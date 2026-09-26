@@ -8,6 +8,8 @@
  */
 import { chordDriver } from '../harmony/chordNormalise';
 import type { EuclideanDriver, GridDriver, SequencerSpec } from './arrangement';
+import { arpDriver, bassDriver } from './performerNormalise';
+import { registerOctave, seed } from './sequencerFields';
 import { SEQUENCER_KINDS } from './arrangement';
 import { show, type FieldNormaliser } from './arrangementFields';
 import {
@@ -25,7 +27,6 @@ import {
   LFO_HZ_MAX,
   MIDI_MIDDLE_C,
   MIDI_NOTE_MAX,
-  OCTAVE_MAX,
   WALK_CHANCE,
 } from '../audioConstants';
 import {
@@ -64,6 +65,10 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
       return { kind, ...chordDriver(driver, path, n) };
     case 'grid':
       return { kind, ...gridDriver(driver, path, n) };
+    case 'arp':
+      return { kind, ...arpDriver(driver, path, n) };
+    case 'bass':
+      return { kind, ...bassDriver(driver, path, n) };
     default:
       n.dropUnknown(driver, [], path);
       return { kind: 'none' };
@@ -73,10 +78,11 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
 function euclideanDriver(raw: unknown, path: string, n: FieldNormaliser): EuclideanDriver {
   const d = DEFAULT_EUCLIDEAN_CONFIG;
   const o = n.section(raw, path);
-  n.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern'], path);
+  n.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern', 'seed'], path);
   const steps = n.int(o.steps, d.steps, 1, EUCLID_STEPS_MAX, `${path}.steps`);
   return {
     steps,
+    seed: seed(o.seed, `${path}.seed`, n),
     divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
     pulses: pulses(o.pulses, steps, `${path}.pulses`, n),
     rotate: n.int(o.rotate, 0, -steps, steps, `${path}.rotate`),
@@ -144,10 +150,9 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
     'accentVelocity',
     'accentMod',
     'register',
+    'seed',
   ];
   n.dropUnknown(o, known, path);
-  const reg = n.section(o.register, `${path}.register`);
-  n.dropUnknown(reg, ['octave'], `${path}.register`);
   const steps = gridSteps(o.steps, `${path}.steps`, n);
   return {
     divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
@@ -157,15 +162,8 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
     skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
     accentVelocity: n.num(o.accentVelocity, d.accentVelocity, 0, 1, `${path}.accentVelocity`),
     accentMod: n.num(o.accentMod, d.accentMod, 0, 1, `${path}.accentMod`),
-    register: {
-      octave: n.int(
-        reg.octave,
-        d.register.octave,
-        -OCTAVE_MAX,
-        OCTAVE_MAX,
-        `${path}.register.octave`,
-      ),
-    },
+    register: registerOctave(o.register, d.register.octave, `${path}.register`, n),
+    seed: seed(o.seed, `${path}.seed`, n),
   };
 }
 

@@ -100,7 +100,7 @@ it('follows initial/live tempo on track, master and deferred new inserts, withou
   await system.init();
   system.initMusic({
     ...FULL_DOCUMENT,
-    bpm: 60,
+    transport: { ...FULL_DOCUMENT.transport, bpm: 60 },
     parts: FULL_DOCUMENT.parts.map((part) => ({
       ...part,
       strip: { ...part.strip!, inserts: [DEFAULT_DELAY] },
@@ -112,17 +112,17 @@ it('follows initial/live tempo on track, master and deferred new inserts, withou
   const left = () => stage.processor!.parameters.get('leftMs')!.value;
   expect(left()).toBe(750);
   expect(system.masterStrip!.inserts[0]!.processor!.parameters.get('rightMs')!.value).toBe(1000);
-  expect(system.apply({ bpm: 120 }).ok).toBe(true);
+  expect(system.apply({ transport: { bpm: 120 } }).ok).toBe(true);
   expect(left()).toBe(375);
   expect(system.strip('music-0')!.inserts[0]).toBe(stage);
-  expect(system.apply({ bpm: -1 }).ok).toBe(false);
+  expect(system.apply({ transport: { bpm: -1 } }).ok).toBe(false);
   expect(left()).toBe(375);
   expect(
     system.apply({
       master: { inserts: [DEFAULT_DELAY, { ...DEFAULT_DELAY, rightSync: false, rightMs: 123 }] },
     }).ok,
   ).toBe(true);
-  expect(system.apply({ bpm: 90 }).ok).toBe(true);
+  expect(system.apply({ transport: { bpm: 90 } }).ok).toBe(true);
   pending.splice(0).forEach((run) => run());
   const added = system.masterStrip!.inserts[1]!;
   expect(added.processor!.parameters.get('leftMs')!.value).toBe(500);

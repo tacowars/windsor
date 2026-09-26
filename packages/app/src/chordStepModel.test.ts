@@ -1,86 +1,96 @@
 import { describe, expect, it } from 'vitest';
 
 import type {
-  ArrangementKey,
   ChordStep,
+  Harmony,
+  HarmonyChord,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
   CHORD_DURATIONS,
-  chordStep,
+  CHORD_INVERSION_MAX,
+  CHORD_REPEAT_MAX,
+  CHORD_STEP_OCTAVE_MAX,
+  ScaleSampler,
+  TICKS_PER_BAR,
+  chordAt,
+  hitStep,
   restStep,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
   REST_CHIP,
   appendStep,
   auditionNotes,
+  chordLabel,
+  currentChord,
   dialLabel,
   dropOn,
   droppedStep,
-  pickerChips,
+  hitChip,
   removeLast,
   stepLabel,
+  stepNotes,
   turnDial,
 } from './chordStepModel';
 
-const C_MINOR: ArrangementKey = { root: 48, scale: 'naturalMinor' };
-const D_MINOR: ArrangementKey = { root: 50, scale: 'naturalMinor' };
-const PENTA: ArrangementKey = { root: 60, scale: 'pentatonicMajor' };
+const BAR = TICKS_PER_BAR;
+/** C natural minor: i for two bars, then VI for two. */
+const C_MINOR: Harmony = {
+  root: 0,
+  scale: 'naturalMinor',
+  events: [
+    { start: 0, duration: 2 * BAR, degree: 0, size: 3 },
+    { start: 2 * BAR, duration: 2 * BAR, degree: 5, size: 4 },
+  ],
+};
+const SONG = 4 * BAR;
+const SPEC = { voicing: 'close', register: { octave: 3 } } as const;
+const chordIn = (harmony: Harmony, tick: number): HarmonyChord => {
+  const chord = chordAt(harmony, SONG, tick);
+  if (!chord) throw new Error('no chord');
+  return chord;
+};
 
 const FOUR: ChordStep[] = [
-  chordStep(0),
-  chordStep(5, { duration: 2, repeat: 2 }),
+  hitStep(),
+  hitStep({ duration: 2, repeat: 2 }),
   restStep({ duration: 0.5 }),
-  chordStep(4, { size: 4, inversion: 1, octave: 1, semitone: -2 }),
+  hitStep({ inversion: 1, octave: 1 }),
 ];
 
 describe('chordStepModel', () => {
-  it('labels the picker for C natural minor as Scaler does, and five chips for a pentatonic', () => {
-    expect(pickerChips(C_MINOR, 3).map((c) => `${c.name} ${c.numeral}`)).toEqual([
-      'C min i',
-      'D dim ii°',
-      'D# maj III',
-      'F min iv',
-      'G min v',
-      'G# maj VI',
-      'A# maj VII',
-    ]);
-    expect(pickerChips(C_MINOR, 4)[4]).toMatchObject({
-      payload: { kind: 'chord', degree: 4, size: 4 },
-      name: 'G min7',
-      numeral: 'v7',
+  it('names the Hit tile for the chord under the playhead — the timeline’s rule, not a copy', () => {
+    expect(currentChord(C_MINOR, SONG, 0)).toEqual(chordAt(C_MINOR, SONG, 0));
+    expect(hitChip(C_MINOR, chordIn(C_MINOR, 0))).toEqual({
+      payload: { kind: 'hit' },
+      name: 'Hit',
+      numeral: 'C min i',
     });
-    const penta = pickerChips(PENTA, 3);
-    expect(penta).toHaveLength(5);
-    expect(penta.map((c) => c.numeral)).toEqual(['1', '2', '3', '4', '5']);
+    expect(chordLabel(C_MINOR, chordIn(C_MINOR, 2 * BAR))).toBe('G# maj7 VImaj7');
+    expect(chordLabel(C_MINOR, null)).toBe('');
     expect(REST_CHIP).toEqual({ payload: { kind: 'rest' }, name: 'Rest', numeral: '' });
   });
 
-  it('labels a step for the current key, and relabelling after a root change touches no step', () => {
-    expect(stepLabel(FOUR[3]!, C_MINOR)).toEqual({ name: 'G min7', numeral: 'v7' });
-    expect(stepLabel(FOUR[2]!, C_MINOR)).toEqual({ name: 'Rest', numeral: '' });
-    expect(stepLabel(FOUR[3]!, D_MINOR)).toEqual({ name: 'A min7', numeral: 'v7' });
-    expect(FOUR[3]).toEqual(chordStep(4, { size: 4, inversion: 1, octave: 1, semitone: -2 }));
+  it('labels a step Hit or Rest: the chord is the timeline’s, so a root change touches no step', () => {
+    expect(stepLabel(FOUR[3]!)).toBe('Hit');
+    expect(stepLabel(FOUR[2]!)).toBe('Rest');
+    expect(FOUR[3]).toEqual(hitStep({ inversion: 1, octave: 1 }));
   });
 
-  it('a drop writes the chip’s chord in root position and keeps the step’s timing', () => {
-    const dropped = dropOn(FOUR, 1, { kind: 'chord', degree: 2, size: 4 });
-    expect(dropped[1]).toEqual(chordStep(2, { size: 4, duration: 2, repeat: 2 }));
-    expect(dropped.filter((_, i) => i !== 1)).toEqual(FOUR.filter((_, i) => i !== 1));
-    // A rest onto a chord keeps its timing too; a chord onto a rest likewise.
+  it('a drop writes a root-position hit or a rest and keeps the step’s timing', () => {
+    const dropped = dropOn(FOUR, 2, { kind: 'hit' });
+    expect(dropped[2]).toEqual(hitStep({ duration: 0.5 }));
+    expect(dropped.filter((_, i) => i !== 2)).toEqual(FOUR.filter((_, i) => i !== 2));
     expect(dropOn(FOUR, 1, { kind: 'rest' })[1]).toEqual(restStep({ duration: 2, repeat: 2 }));
-    expect(dropOn(FOUR, 2, { kind: 'chord', degree: 0, size: 3 })[2]).toEqual(
-      chordStep(0, { duration: 0.5 }),
-    );
     // Past the last step appends; further out, or on a full list, nothing changes.
     expect(dropOn(FOUR, 4, { kind: 'rest' })).toEqual([...FOUR, restStep()]);
     expect(dropOn(FOUR, 5, { kind: 'rest' })).toEqual(FOUR);
     const full = Array.from({ length: 32 }, () => restStep());
-    expect(dropOn(full, 32, { kind: 'chord', degree: 0, size: 3 })).toEqual(full);
-    expect(droppedStep({ kind: 'chord', degree: 6, size: 3 })).toEqual(chordStep(6));
+    expect(dropOn(full, 32, { kind: 'hit' })).toEqual(full);
+    expect(droppedStep({ kind: 'hit' })).toEqual(hitStep());
   });
 
-  it('appends a copy of the last step (a rest on an empty list) and removes down to empty', () => {
-    expect(appendStep([])).toEqual([restStep()]);
+  it('appends a copy of the last step (a hit on an empty list) and removes down to empty', () => {
+    expect(appendStep([])).toEqual([hitStep()]);
     expect(appendStep(FOUR).at(-1)).toEqual(FOUR[3]);
     expect(appendStep(FOUR).at(-1)).not.toBe(FOUR[3]);
     expect(removeLast(FOUR)).toEqual(FOUR.slice(0, 3));
@@ -90,54 +100,77 @@ describe('chordStepModel', () => {
   });
 
   it('turns each dial within its bounds; a rest keeps only its timing dials', () => {
-    const step = chordStep(0);
+    const step = hitStep();
     expect(turnDial(step, 'octave', 1)).toMatchObject({ octave: 1 });
-    expect(turnDial(chordStep(0, { octave: 2 }), 'octave', 1)).toMatchObject({ octave: 2 });
-    expect(turnDial(chordStep(0, { octave: -2 }), 'octave', -1)).toMatchObject({ octave: -2 });
-    expect(turnDial(chordStep(0, { inversion: 3 }), 'inversion', 1)).toMatchObject({
+    const octaveMax = CHORD_STEP_OCTAVE_MAX;
+    const invMax = CHORD_INVERSION_MAX;
+    const at = CHORD_DURATIONS.indexOf(step.duration);
+    const longer = CHORD_DURATIONS[at + 1]!;
+    const shorter = CHORD_DURATIONS[at - 1]!;
+    const longest = CHORD_DURATIONS[CHORD_DURATIONS.length - 1]!;
+    const shortest = CHORD_DURATIONS[0]!;
+    expect(turnDial(hitStep({ octave: octaveMax }), 'octave', 1)).toMatchObject({
+      octave: octaveMax,
+    });
+    expect(turnDial(hitStep({ octave: -octaveMax }), 'octave', -1)).toMatchObject({
+      octave: -octaveMax,
+    });
+    expect(turnDial(hitStep({ inversion: invMax }), 'inversion', 1)).toMatchObject({
       inversion: 0,
     });
-    expect(turnDial(step, 'inversion', -1)).toMatchObject({ inversion: 3 });
-    expect(turnDial(chordStep(0, { semitone: 11 }), 'semitone', 1)).toMatchObject({ semitone: 11 });
-    expect(turnDial(step, 'semitone', -1)).toMatchObject({ semitone: -1 });
-    expect(turnDial(step, 'duration', 1)).toMatchObject({ duration: 1.5 });
-    expect(turnDial(step, 'duration', -1)).toMatchObject({ duration: 0.75 });
-    expect(turnDial(chordStep(0, { duration: 8 }), 'duration', 1)).toMatchObject({ duration: 8 });
-    expect(turnDial(chordStep(0, { duration: 0.25 }), 'duration', -1)).toMatchObject({
-      duration: 0.25,
+    expect(turnDial(step, 'inversion', -1)).toMatchObject({ inversion: invMax });
+    expect(turnDial(step, 'duration', 1)).toMatchObject({ duration: longer });
+    expect(turnDial(step, 'duration', -1)).toMatchObject({ duration: shorter });
+    expect(turnDial(hitStep({ duration: longest }), 'duration', 1)).toMatchObject({
+      duration: longest,
+    });
+    expect(turnDial(hitStep({ duration: shortest }), 'duration', -1)).toMatchObject({
+      duration: shortest,
     });
     expect(turnDial(step, 'repeat', 1)).toMatchObject({ repeat: 2 });
     expect(turnDial(step, 'repeat', -1)).toMatchObject({ repeat: 1 });
-    expect(turnDial(chordStep(0, { repeat: 8 }), 'repeat', 1)).toMatchObject({ repeat: 8 });
+    expect(turnDial(hitStep({ repeat: CHORD_REPEAT_MAX }), 'repeat', 1)).toMatchObject({
+      repeat: CHORD_REPEAT_MAX,
+    });
     const rest = restStep();
     expect(turnDial(rest, 'octave', 1)).toBe(rest);
     expect(turnDial(rest, 'inversion', 1)).toBe(rest);
-    expect(turnDial(rest, 'semitone', 1)).toBe(rest);
-    expect(turnDial(rest, 'duration', 1)).toEqual(restStep({ duration: 1.5 }));
+    expect(turnDial(rest, 'duration', 1)).toEqual(restStep({ duration: longer }));
     expect(turnDial(rest, 'repeat', 1)).toEqual(restStep({ repeat: 2 }));
-    expect(CHORD_DURATIONS.indexOf(1)).toBeGreaterThan(0);
+    expect(at).toBeGreaterThan(0);
   });
 
   it('reads each dial', () => {
-    const step = chordStep(0, { octave: -1, inversion: 2, semitone: 3, duration: 0.5, repeat: 4 });
+    const step = hitStep({ octave: -1, inversion: 2, duration: 0.5, repeat: 4 });
     expect(
-      ['octave', 'inversion', 'semitone', 'duration', 'repeat'].map((d) =>
-        dialLabel(step, d as 'octave'),
-      ),
-    ).toEqual(['-1', 'inv 2', '+3', '×0.5', 'r4']);
-    expect(dialLabel(chordStep(0), 'octave')).toBe('oct');
-    expect(dialLabel(chordStep(0), 'semitone')).toBe('semi');
+      ['octave', 'inversion', 'duration', 'repeat'].map((d) => dialLabel(step, d as 'octave')),
+    ).toEqual(['-1', 'inv 2', '×0.5', 'r4']);
+    expect(dialLabel(hitStep(), 'octave')).toBe('oct');
     expect(dialLabel(restStep(), 'octave')).toBe('');
     expect(dialLabel(restStep(), 'duration')).toBe('×1');
   });
 
-  it('auditions a chip in root position through the voicing at the register octave', () => {
-    expect(auditionNotes(C_MINOR, { kind: 'chord', degree: 0, size: 3 }, 'close', 0)).toEqual([
-      48, 51, 55,
+  it('auditions the current chord at the register, as the sequencer voices a hit', () => {
+    const sampler = new ScaleSampler(C_MINOR);
+    const c3 = sampler.rootNote(SPEC.register.octave);
+    // i in root position: C, E♭, G above the register root.
+    expect(auditionNotes(C_MINOR, chordIn(C_MINOR, 0), { kind: 'hit' }, SPEC)).toEqual([
+      c3,
+      c3 + 3,
+      c3 + 7,
     ]);
-    expect(auditionNotes(C_MINOR, { kind: 'chord', degree: 0, size: 4 }, 'drop2', 1)).toEqual([
-      55, 60, 63, 70,
+    // The same tile two bars on plays VI7, and a step's inversion and octave apply on top.
+    expect(auditionNotes(C_MINOR, chordIn(C_MINOR, 2 * BAR), { kind: 'hit' }, SPEC)).toEqual([
+      c3 + 8,
+      c3 + 12,
+      c3 + 15,
+      c3 + 19,
     ]);
-    expect(auditionNotes(C_MINOR, { kind: 'rest' }, 'close', 0)).toEqual([]);
+    expect(
+      stepNotes(C_MINOR, chordIn(C_MINOR, 0), hitStep({ inversion: 1, octave: 1 }), SPEC),
+    ).toEqual([c3 + 15, c3 + 19, c3 + 24]);
+    expect(auditionNotes(C_MINOR, chordIn(C_MINOR, 0), { kind: 'rest' }, SPEC)).toEqual([]);
+    expect(stepNotes(C_MINOR, chordIn(C_MINOR, 0), restStep(), SPEC)).toEqual([]);
+    expect(stepNotes(C_MINOR, null, hitStep(), SPEC)).toEqual([]);
   });
 });

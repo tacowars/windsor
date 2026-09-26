@@ -16,7 +16,7 @@
  */
 import { WALK_DOWN_CHANCE } from '../audioConstants';
 import { euclid, type Pattern } from './euclid';
-import { generatorRng, type Rng } from './generatorSeed';
+import { streamRng, type Rng } from './generatorSeed';
 import { isBarDivisor, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
 
 export const LFO_SHAPES = ['tri', 'sine', 'saw'] as const;
@@ -43,9 +43,8 @@ export interface EuclideanConfig {
   /** Static rotation of the figure in steps. Nothing modulates it. */
   rotate: number;
   density: DensityMod;
-  /** The arrangement seed and this generator's index in the arrangement. */
+  /** The part's own seed (#705, decision 16); the stream per region is `hashSeed(seed, regionIndex)`. */
   seed: number;
-  generatorIndex: number;
   /**
    * A captured figure (issue #70, record §6): played verbatim, never
    * regenerated, no RNG consumed. `null` or absent is generative.
@@ -61,7 +60,6 @@ export const DEFAULT_EUCLIDEAN_CONFIG: EuclideanConfig = {
   rotate: 0,
   density: { kind: 'lfoBars', bars: 8, shape: 'tri' },
   seed: 0,
-  generatorIndex: 0,
 };
 
 export interface OnsetEvent {
@@ -117,6 +115,7 @@ export function assertEuclideanConfig(config: EuclideanConfig): void {
     throw new RangeError(`pulses bounds must satisfy 0 <= min <= max <= ${steps}`);
   }
   assertDensity(config.density);
+  if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
   const { pattern } = config;
   if (pattern != null) {
     if (pattern.length !== steps) {
@@ -134,7 +133,7 @@ export class EuclideanSequencer {
   onOnset: OnsetHandler | null = null;
 
   private current: EuclideanConfig;
-  private readonly rng: Rng;
+  private rng: Rng;
   private fixed: Pattern | null;
   private pattern: Pattern;
   private k: number;
@@ -142,10 +141,22 @@ export class EuclideanSequencer {
   constructor(config: EuclideanConfig) {
     assertEuclideanConfig(config);
     this.current = config;
-    this.rng = generatorRng(config.seed, config.generatorIndex);
+    this.rng = streamRng(config.seed, 0);
     this.fixed = config.pattern ?? null;
     this.k = this.fixed ? countOnsets(this.fixed) : this.clampK(config.pulses.start);
     this.pattern = this.fixed ?? euclid(this.k, config.steps, config.rotate);
+  }
+
+  /**
+   * The region gate entered `regionIndex` from outside (#705): the stream
+   * restarts from `hashSeed(seed, regionIndex)` and a generative walk goes
+   * back to `pulses.start`, so the region opens the way the song did.
+   */
+  enter(regionIndex: number): void {
+    this.rng = streamRng(this.current.seed, regionIndex);
+    if (this.fixed) return;
+    this.k = this.clampK(this.current.pulses.start);
+    this.pattern = euclid(this.k, this.current.steps, this.current.rotate);
   }
 
   get config(): EuclideanConfig {
@@ -168,10 +179,7 @@ export class EuclideanSequencer {
         'a divisor change rebuilds the sequencer; it cannot be reconfigured live',
       );
     }
-    if (
-      config.seed !== this.current.seed ||
-      config.generatorIndex !== this.current.generatorIndex
-    ) {
+    if (config.seed !== this.current.seed) {
       throw new RangeError('a seed change rebuilds the sequencer; it cannot be reconfigured live');
     }
     this.current = config;
@@ -189,10 +197,10 @@ export class EuclideanSequencer {
     return this.k;
   }
 
-  /** The step index a transport step lands on — the console's playhead reads this too (#619). */
-  stepAt(transportStep: number): number {
+  /** The step index a local step (since the region entry) lands on — the console's playhead reads this too (#619). */
+  stepAt(localStep: number): number {
     const { steps } = this.current;
-    return ((transportStep % steps) + steps) % steps;
+    return ((localStep % steps) + steps) % steps;
   }
 
   attach(source: TickSource): Unsubscribe {

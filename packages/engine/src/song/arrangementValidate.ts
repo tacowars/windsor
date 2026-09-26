@@ -104,8 +104,12 @@ export function presetFor(presets: PresetTable, where: string, name: string): Pa
 }
 
 export function validateArrangement(next: Arrangement, presets: PresetTable): void {
-  if (!Number.isFinite(next.bpm) || next.bpm <= 0) {
-    throw new RangeError(`bpm must be a positive number, got ${next.bpm}`);
+  const { bpm, bars } = next.transport;
+  if (!Number.isFinite(bpm) || bpm <= 0) {
+    throw new RangeError(`transport.bpm must be a positive number, got ${bpm}`);
+  }
+  if (!Number.isInteger(bars) || bars < 1) {
+    throw new RangeError(`transport.bars must be a positive integer, got ${bars}`);
   }
   validateSlots(next);
   for (const part of next.parts) validatePart(part, presets);

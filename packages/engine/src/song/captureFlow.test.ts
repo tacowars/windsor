@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FULL_ARRANGEMENT,
   FULL_PARTS,
+  FULL_REGION,
   FULL_SLOT,
   onlyParts,
 } from '../__fixtures__/fullArrangement';
@@ -114,7 +115,7 @@ describe('player capture and release', () => {
     const pattern = r.player.capturePattern(kick);
     expect(r.player.apply({ parts: { [kick]: freeze('euclidean', pattern) } }).ok).toBe(true);
     const exported = JSON.parse(
-      JSON.stringify({ version: 2, patches: PATCHES, ...r.player.arrangement }),
+      JSON.stringify({ version: 3, patches: PATCHES, ...r.player.arrangement }),
     ) as unknown;
     const imported = makeArrangement(exported);
     expect(imported.corrections).toEqual([]);
@@ -137,10 +138,12 @@ describe('player capture and release', () => {
   });
 });
 
-const doc = (...parts: unknown[]): Record<string, unknown> => ({
-  version: 2,
+/** A version-3 document (#705) of the given parts, each live for the whole default-length song. */
+const doc = (...parts: Array<Record<string, unknown>>): Record<string, unknown> => ({
+  version: 3,
+  transport: { bpm: FULL_ARRANGEMENT.transport.bpm, bars: FULL_ARRANGEMENT.transport.bars },
   patches: PATCHES,
-  parts,
+  parts: parts.map((part) => ({ regions: [FULL_REGION], ...part })),
 });
 
 const sequencerOf = (
@@ -155,7 +158,7 @@ describe('captured patterns in the document (export → import)', () => {
       doc({
         slot: 0,
         preset: 'kick',
-        sequencer: { kind: 'euclidean', steps: 4, pattern: [1, 0, true, 'x'] },
+        sequencer: { kind: 'euclidean', seed: 0, steps: 4, pattern: [1, 0, true, 'x'] },
       }),
     );
     expect(sequencerOf(result, 0).pattern).toEqual([true, false, true, false]);
@@ -164,7 +167,11 @@ describe('captured patterns in the document (export → import)', () => {
 
   it('drops a pattern on a grid part as an unknown key (#704: no pitched capture)', () => {
     const result = makeArrangement(
-      doc({ slot: 2, preset: 'saw-arp', sequencer: { kind: 'grid', pattern: [60, null] } }),
+      doc({
+        slot: 2,
+        preset: 'saw-arp',
+        sequencer: { kind: 'grid', seed: 0, pattern: [60, null] },
+      }),
     );
     expect(sequencerOf(result, 0).pattern).toBeUndefined();
     expect(result.corrections).toContain('parts[0].sequencer.pattern: unknown key dropped');
@@ -172,7 +179,11 @@ describe('captured patterns in the document (export → import)', () => {
 
   it('resizes a Euclidean pattern to the figure and reports it', () => {
     const result = makeArrangement(
-      doc({ slot: 0, preset: 'kick', sequencer: { kind: 'euclidean', steps: 4, pattern: [true] } }),
+      doc({
+        slot: 0,
+        preset: 'kick',
+        sequencer: { kind: 'euclidean', seed: 0, steps: 4, pattern: [true] },
+      }),
     );
     expect(sequencerOf(result, 0).pattern).toEqual([true, false, false, false]);
     expect(result.corrections.join('\n')).toMatch(/1 steps for a 4-step figure — resized/);
@@ -180,7 +191,7 @@ describe('captured patterns in the document (export → import)', () => {
 
   it('defaults an absent pattern to null, silently', () => {
     const result = makeArrangement(
-      doc({ slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } }),
+      doc({ slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean', seed: 0 } }),
     );
     expect(result.corrections).toEqual([]);
     expect(sequencerOf(result, 0).pattern).toBeNull();
@@ -192,14 +203,14 @@ describe('captured patterns in the document (export → import)', () => {
         slot: 0,
         name: 'kick',
         preset: 'kick',
-        sequencer: { kind: 'euclidean', steps: 8, pattern: [1, 0, 0, 1, 0, 0, 1, 0] },
+        sequencer: { kind: 'euclidean', seed: 7, steps: 8, pattern: [1, 0, 0, 1, 0, 0, 1, 0] },
       }),
-      seed: 7,
-      bpm: 100,
-      key: { root: 50, scale: 'dorian' },
+      transport: { bpm: 100, bars: FULL_ARRANGEMENT.transport.bars },
+      harmony: { root: 2, scale: 'dorian' },
     };
     const first = makeArrangement(authored);
     expect(first.usable).toBe(true);
+    expect(first.corrections).toEqual([]);
     expect(first.dangling).toEqual([]);
     const second = makeArrangement(JSON.parse(JSON.stringify(first.document)));
     expect(second.document).toEqual(first.document);

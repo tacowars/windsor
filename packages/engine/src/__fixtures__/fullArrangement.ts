@@ -1,8 +1,9 @@
 /**
- * A known-good, fully-populated arrangement in the version-2 shape (#597)
- * for the player, apply and render tests: four parts on slots 0–3 — two
- * Euclidean, a grid line and a chord progression — with `FULL_SLOT` naming
- * them so tests need no lookups.
+ * A known-good, fully-populated arrangement in the version-3 shape (#705)
+ * for the player, apply and render tests: a four-bar song in D dorian, two
+ * chords (i for two bars, iv for two), four parts on slots 0–3 — two
+ * Euclidean, a grid line and a Chord Player — each live for the whole song
+ * (one ∞ region), with `FULL_SLOT` naming them so tests need no lookups.
  *
  * It began as the #69b song, whose committed-JSON twin
  * (`arrangementEquality.test.ts`) retired with the shipped songs in #704; the
@@ -23,21 +24,30 @@ import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
-import { chordStep } from '../sequencing/chordSequencer';
+import { hitStep } from '../sequencing/chordSequencer';
 import { gridNote } from '../sequencing/gridSequencer';
+import type { Region } from '../sequencing/regionClock';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
 
 /** The fixture's slots, named by the retired four-slot ids that were their generator indices. */
 export const FULL_SLOT = { kick: 0, hat: 1, arp: 2, drone: 3 } as const;
 export type FullPartId = keyof typeof FULL_SLOT;
 export const FULL_PART_IDS = Object.keys(FULL_SLOT) as FullPartId[];
 
+/** The fixture song's length, and the one ∞ region every part is live in. */
+export const FULL_BARS = 4;
+export const FULL_SONG_TICKS = FULL_BARS * TICKS_PER_BAR;
+export const FULL_REGION: Region = { start: 0, duration: FULL_SONG_TICKS };
+
 const KICK: MusicPart & { sequencer: EuclideanSpec } = {
   slot: FULL_SLOT.kick,
   name: 'kick',
   preset: 'kick',
   velocity: 1,
+  regions: [FULL_REGION],
   sequencer: {
     kind: 'euclidean',
+    seed: 0,
     note: 36,
     hold: 0.2,
     steps: 16,
@@ -54,8 +64,10 @@ const HAT: MusicPart & { sequencer: EuclideanSpec } = {
   name: 'hat',
   preset: 'hat',
   velocity: 0.6,
+  regions: [FULL_REGION],
   sequencer: {
     kind: 'euclidean',
+    seed: 0,
     note: 42,
     hold: 0.08,
     steps: 16,
@@ -73,31 +85,36 @@ const ARP: MusicPart & { sequencer: GridSpec } = {
   name: 'arp',
   preset: 'saw-arp',
   velocity: 0.7,
+  regions: [FULL_REGION],
   sequencer: {
     kind: 'grid',
+    seed: 0,
     divisor: 12,
     steps: [0, 2, 4, 2, 5, 4, 2, 1].map((degree) => gridNote(degree)),
     length: 8,
     skipChance: 0.3,
     accentVelocity: 0.2,
     accentMod: 0.5,
-    register: { octave: 1 },
+    // D4 = 62: the same notes the fixture sounded when the register was root-relative.
+    register: { octave: 4 },
   },
 };
 
-/** The retired `drone` slot, now a chord progression (#704): i then iv, a bar each, held. */
+/** The retired `drone` slot, now a Chord Player (#704, #705): a hit every bar over the timeline, held. */
 const DRONE: MusicPart & { sequencer: ChordSpec } = {
   slot: FULL_SLOT.drone,
   name: 'drone',
   preset: 'drone-sqr',
   velocity: 0.8,
+  regions: [FULL_REGION],
   sequencer: {
     kind: 'chord',
     divisor: 96,
     gate: 1,
     voicing: 'close',
-    register: { octave: -1 },
-    steps: [chordStep(0), chordStep(3)],
+    // D2 = 38: the octave below the grid line.
+    register: { octave: 2 },
+    steps: [hitStep(), hitStep()],
   },
 };
 
@@ -105,9 +122,16 @@ const DRONE: MusicPart & { sequencer: ChordSpec } = {
 export const FULL_PARTS = { kick: KICK, hat: HAT, arp: ARP, drone: DRONE } as const;
 
 export const FULL_ARRANGEMENT: Arrangement = {
-  seed: 204,
-  bpm: 96,
-  key: { root: 50, scale: 'dorian' },
+  transport: { bpm: 96, bars: FULL_BARS },
+  // D dorian (pitch class 2): i for bars 1–2, iv for bars 3–4.
+  harmony: {
+    root: 2,
+    scale: 'dorian',
+    events: [
+      { start: 0, duration: 2 * TICKS_PER_BAR, degree: 0, size: 3 },
+      { start: 2 * TICKS_PER_BAR, duration: 2 * TICKS_PER_BAR, degree: 3, size: 3 },
+    ],
+  },
   parts: [KICK, HAT, ARP, DRONE],
 };
 
@@ -131,7 +155,7 @@ export const FULL_DOCUMENT: ArrangementDocument & {
   readonly parts: readonly DocumentPart[];
   readonly patches: Readonly<Record<string, Patch>>;
 } = {
-  version: 2,
+  version: 3,
   ...FULL_ARRANGEMENT,
   parts: FULL_PART_IDS.map((id) => ({ ...FULL_PARTS[id], strip: FULL_STRIPS[id] })),
   patches: Object.fromEntries(

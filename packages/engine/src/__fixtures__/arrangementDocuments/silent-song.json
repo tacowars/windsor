@@ -1,8 +1,13 @@
 {
-  "version": 2,
-  "seed": 7,
-  "bpm": 120,
-  "key": { "root": 50, "scale": "dorian" },
+  "version": 3,
+  "transport": {
+    "bpm": 120,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 2,
+    "scale": "dorian"
+  },
   "patches": {
     "init-0": {}
   },
@@ -12,7 +17,15 @@
       "name": "Part 1",
       "preset": "init-0",
       "velocity": 0.8,
-      "sequencer": { "kind": "none" }
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "none"
+      }
     }
   ]
 }

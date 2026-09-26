@@ -1,5 +1,5 @@
 /**
- * `ArrangementPlayer.apply` (issue #69, refinement decision 3): bpm reaches
+ * `ArrangementPlayer.apply` (issue #69, refinement decision 3): `transport.bpm` reaches
  * the transport live, only the generators whose config actually changed are
  * rebuilt, presets swap via setPatch, and a merged arrangement that fails
  * validation changes nothing. Parts are addressed by slot (#597).
@@ -52,7 +52,7 @@ describe('apply', () => {
     const { transport, player, run } = rig();
     run(2);
     const before = player.readout().counters;
-    const result = player.apply({ bpm: 90 });
+    const result = player.apply({ transport: { bpm: 90 } });
     expect(result).toEqual({ ok: true, ignored: [] });
     expect(transport.bpm).toBe(90);
     expect(player.readout().bpm).toBe(90);
@@ -61,7 +61,7 @@ describe('apply', () => {
 
   it('reports unknown keys and applies the rest', () => {
     const { player } = rig();
-    const partial = { bpm: 90, wat: 1 } as ArrangementPartial;
+    const partial = { transport: { bpm: 90 }, wat: 1 } as ArrangementPartial;
     const result = player.apply(partial);
     expect(result.ok).toBe(true);
     expect(result.ignored).toEqual(['wat']);
@@ -176,10 +176,10 @@ describe('apply', () => {
 
   it('refuses an invalid key and keeps playing on the old one', () => {
     const { player, parts, run } = rig();
-    const result = player.apply({ key: { scale: [] } });
+    const result = player.apply({ harmony: { scale: [] } });
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/no degrees/);
-    expect(player.arrangement.key).toEqual(FULL_ARRANGEMENT.key);
+    expect(player.arrangement.harmony).toEqual(FULL_ARRANGEMENT.harmony);
     run(2);
     expect(kinds(parts.arp, 'noteOn').length).toBeGreaterThan(0);
   });
@@ -187,11 +187,14 @@ describe('apply', () => {
   it('re-pitches the grid line live when the key changes', () => {
     const { player, parts, run } = rig();
     // One degree pinned to the root: every note after the change is known.
-    expect(player.apply({ key: { root: 48, scale: [0] } }).ok).toBe(true);
+    // #705: the root is a pitch class — C — and the register places its octave.
+    expect(player.apply({ harmony: { root: 0, scale: [0] } }).ok).toBe(true);
+    expect(player.readout().root).toBe(0);
     parts.arp.calls.length = 0;
     run(4);
     const notes = new Set(kinds(parts.arp, 'noteOn').map((c) => c.note));
-    for (const note of notes) expect((note! - 48) % 12).toBe(0);
+    expect(notes.size).toBeGreaterThan(0);
+    for (const note of notes) expect(note! % 12).toBe(0);
   });
 
   it('keeps the density union clean across a kind swap', () => {
@@ -209,12 +212,21 @@ describe('apply', () => {
     });
   });
 
-  it('reseeds every stream on a seed change, and leaves a none part untouched', () => {
+  it('reseeds only the part whose seed changed, and leaves a none part untouched (#705)', () => {
     const inert = withPart(FULL_ARRANGEMENT, 'drone', { sequencer: { kind: 'none' } });
     const { player, parts } = rig(inert);
-    expect(player.apply({ seed: 999 }).ok).toBe(true);
-    expect(player.arrangement.seed).toBe(999);
+    // The song has no seed of its own any more: a top-level one names no field.
+    expect(player.apply({ seed: 999 } as ArrangementPartial)).toEqual({
+      ok: true,
+      ignored: ['seed'],
+    });
+    expect(player.apply({ parts: { [arp]: { sequencer: { seed: 999 } } } }).ok).toBe(true);
+    const arpSequencer = player.arrangement.parts[arp]?.sequencer;
+    expect(arpSequencer?.kind === 'grid' && arpSequencer.seed).toBe(999);
     expect(kinds(parts.arp, 'allNotesOff')).toHaveLength(1);
+    // The other sequenced parts keep their streams: nothing rebuilt them.
+    expect(kinds(parts.kick, 'allNotesOff')).toHaveLength(0);
+    expect(kinds(parts.hat, 'allNotesOff')).toHaveLength(0);
     // A keyboard-held note on an inert part survives a reseed.
     expect(parts.drone.calls).toEqual([]);
   });
@@ -346,7 +358,7 @@ describe('live add and removal (#629)', () => {
   it('refuses the whole partial when one half fails: a removal beside a bad bpm removes nothing', () => {
     const { player, removed, transport } = liveRig(FULL_ARRANGEMENT);
     const bpm = transport.bpm;
-    expect(player.apply({ bpm: -1, parts: { [drone]: null } }).ok).toBe(false);
+    expect(player.apply({ transport: { bpm: -1 }, parts: { [drone]: null } }).ok).toBe(false);
     expect(removed).toEqual([]);
     expect(player.arrangement.parts).toHaveLength(4);
     expect(transport.bpm).toBe(bpm);

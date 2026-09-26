@@ -22,6 +22,7 @@ import {
 
 const SPEC: EuclideanSpec = {
   kind: 'euclidean',
+  seed: 0,
   note: 36,
   hold: 0.1,
   steps: 16,

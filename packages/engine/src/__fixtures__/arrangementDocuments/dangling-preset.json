@@ -1,9 +1,11 @@
 {
-  "version": 2,
-  "seed": 204,
-  "bpm": 96,
-  "key": {
-    "root": 50,
+  "version": 3,
+  "transport": {
+    "bpm": 96,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 2,
     "scale": "dorian"
   },
   "patches": {
@@ -15,8 +17,15 @@
       "name": "kick",
       "preset": "kick-2",
       "velocity": 1,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
       "sequencer": {
         "kind": "euclidean",
+        "seed": 0,
         "note": 36,
         "hold": 0.2,
         "steps": 16,
@@ -39,15 +48,25 @@
       "name": "drone",
       "preset": "drone-sqr",
       "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
       "sequencer": {
         "kind": "chord",
         "divisor": 96,
         "gate": 1,
         "voicing": "close",
         "register": {
-          "octave": -1
+          "octave": 2
         },
-        "steps": [{ "kind": "chord", "degree": 0 }]
+        "steps": [
+          {
+            "kind": "hit"
+          }
+        ]
       }
     }
   ]

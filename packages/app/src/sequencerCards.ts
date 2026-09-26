@@ -24,10 +24,22 @@ export type SequencerCard = (ctx: AppCtx, slot: number) => HTMLElement;
 const noneCard: SequencerCard = () =>
   el('p', 'hint', 'No sequencer: this part plays only from the keyboard.');
 
+/**
+ * A kind the document carries and the engine normalises in full, whose
+ * performer and card a later ticket brings (#705): one line, no knobs, so
+ * the registry test holds and the part is not headed and left blank.
+ */
+const stubCard =
+  (label: string, ticket: string): SequencerCard =>
+  () =>
+    el('p', 'hint', `${label}: the performer and its card arrive with ${ticket}.`);
+
 /** One card per kind. A kind added to the engine is an appended entry here. */
 export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   none: noneCard,
   euclidean: euclidCard,
   grid: gridCard,
   chord: chordCard,
+  arp: stubCard('Arp', '#706'),
+  bass: stubCard('Bass', '#707'),
 };

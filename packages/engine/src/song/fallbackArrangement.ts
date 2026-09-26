@@ -10,11 +10,11 @@
  */
 import type { ArrangementDocument, DocumentPart } from './arrangementDocument';
 import type { EuclideanSpec } from './arrangement';
-import { ARRANGEMENT_VERSION } from '../audioConstants';
+import { ARRANGEMENT_VERSION, CHORD_SIZE_TRIAD } from '../audioConstants';
 import { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from '../patch/gameplayPatches';
 import { DEFAULT_STRIP } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
-import { DIVISORS } from '../sequencing/scheduler';
+import { DIVISORS, TICKS_PER_BAR } from '../sequencing/scheduler';
 
 /** The narrow type is the "one part" guarantee: exactly one Euclidean part, so no pitched generator exists. */
 export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
@@ -22,15 +22,18 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
   readonly patches: Readonly<Record<string, Patch>>;
 } = {
   version: ARRANGEMENT_VERSION,
-  seed: 0,
-  bpm: 120,
+  transport: { bpm: 120, bars: 1 },
   // Self-contained like every other document (#562): the click carries the
   // one patch it plays, from the gameplay table the game bundles by id, so
   // the fallback needs no library either.
   patches: { [GAMEPLAY_PATCH_IDS.pickupBlip]: GAMEPLAY_PATCHES[GAMEPLAY_PATCH_IDS.pickupBlip] },
-  // No pitched part exists to draw from this; it is here because a key is
+  // No pitched part exists to draw from this; it is here because a harmony is
   // structurally required, and it is a single root on purpose — nothing musical.
-  key: { root: 60, scale: [0] },
+  harmony: {
+    root: 0,
+    scale: [0],
+    events: [{ start: 0, duration: TICKS_PER_BAR, degree: 0, size: CHORD_SIZE_TRIAD }],
+  },
   parts: [
     {
       slot: 0,
@@ -39,8 +42,11 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
       velocity: 1,
       // Unity, centred, and with no sends — whatever a song's strips say.
       strip: DEFAULT_STRIP,
+      // Live for the whole one-bar song: the ∞ region, entered once.
+      regions: [{ start: 0, duration: TICKS_PER_BAR }],
       sequencer: {
         kind: 'euclidean',
+        seed: 0,
         note: 76,
         hold: 0.05,
         steps: 4,

@@ -251,6 +251,16 @@ describe('reconfigure (#610)', () => {
     expect(JSON.stringify(live)).toBe(JSON.stringify(plain));
   });
 
+  it('enter(region) restarts the stream and the walk: region 0 replays the opening, region 1 draws anew (#705)', () => {
+    const shape = (rows: StepTrace[]): string =>
+      JSON.stringify(rows.map((r) => [r.tickInBar, r.k, r.pattern, r.onset?.step ?? null]));
+    const plain = trace(WALK, 8);
+    const again = traceLive(WALK, 16, 8 * TICKS_PER_BAR, (seq) => seq.enter(0));
+    expect(shape(again.slice(plain.length))).toBe(shape(plain));
+    const other = traceLive(WALK, 16, 8 * TICKS_PER_BAR, (seq) => seq.enter(1));
+    expect(shape(other.slice(plain.length))).not.toBe(shape(plain));
+  });
+
   it('a steps change re-cuts the figure at once, k clamped, position from the transport', () => {
     const at = 2 * TICKS_PER_BAR + 5 * WALK.divisor; // step 5 of bar 2
     let before = -1;
@@ -292,7 +302,8 @@ describe('reconfigure (#610)', () => {
     const pattern = patternToString(seq.currentPattern);
     expect(() => seq.reconfigure({ ...WALK, divisor: 12 })).toThrow(/divisor/);
     expect(() => seq.reconfigure({ ...WALK, seed: 12 })).toThrow(/seed/);
-    expect(() => seq.reconfigure({ ...WALK, generatorIndex: 3 })).toThrow(/seed/);
+    // #705: the seed is the part's own and must be a safe integer.
+    expect(() => seq.reconfigure({ ...WALK, seed: 1.5 })).toThrow(/seed/);
     expect(() => seq.reconfigure({ ...WALK, pulses: { min: 3, max: 40, start: 5 } })).toThrow(
       /pulses/,
     );
@@ -315,7 +326,6 @@ describe('a fixed figure (#70 capture, moved from the retired capturedPattern.te
       // stepChance 1: a generative walk would move k every bar.
       density: { kind: 'walk', stepChance: 1 },
       seed: 5,
-      generatorIndex: 0,
       pattern: patternFromString('x..x..x.'),
     });
     const transport = new TickTransport();
@@ -338,7 +348,6 @@ describe('a fixed figure (#70 capture, moved from the retired capturedPattern.te
           rotate: 0,
           density: { kind: 'lfoBars', bars: 8, shape: 'tri' },
           seed: 0,
-          generatorIndex: 0,
           pattern: [true, false],
         }),
     ).toThrow(/pattern must have 8 steps/);

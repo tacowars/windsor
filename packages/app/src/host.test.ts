@@ -100,7 +100,7 @@ describe('EngineHost.enable when the DSP will not load', () => {
     expect(host.enabled).toBe(false);
     // `rebuild` drops the system as it disposes it, so a throwing `init`
     // cannot leave these calling into a disposed one.
-    expect(host.apply({ bpm: 90 })).toBeNull();
+    expect(host.apply({ transport: { bpm: 90 } })).toBeNull();
     expect(host.capturePattern(0)).toBeNull();
     expect(host.part(0)).toBeNull();
     expect(() => host.update()).not.toThrow();

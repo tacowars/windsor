@@ -112,7 +112,7 @@ describe('AppContext rendering', () => {
     // Once for the draft, once when the live rebuild landed — the active tab only.
     expect(c.builds).toBe(1);
     expect(c.renders).toEqual({ parts: 3, mixer: 0, sequencers: 0, harmony: 0, arrangement: 0 });
-    const result = c.ctx.change({ bpm: 120 } as DocumentPartial);
+    const result = c.ctx.change({ transport: { bpm: 120 } } as DocumentPartial);
     c.ctx.render();
     expect(result.ok).toBe(true);
     expect(c.applied).toHaveLength(1);
@@ -158,13 +158,13 @@ describe('AppContext rendering', () => {
 describe('AppContext changes and the parts session', () => {
   it('merges an accepted change and reports a refused one without merging', () => {
     const accepted = openConsole();
-    expect(accepted.ctx.change({ bpm: 133 } as DocumentPartial).ok).toBe(true);
-    expect(accepted.model.doc.bpm).toBe(133);
+    expect(accepted.ctx.change({ transport: { bpm: 133 } } as DocumentPartial).ok).toBe(true);
+    expect(accepted.model.doc.transport.bpm).toBe(133);
 
     const refused = openConsole(true);
-    const bpm = refused.model.doc.bpm;
-    expect(refused.ctx.change({ bpm: 133 } as DocumentPartial).ok).toBe(false);
-    expect(refused.model.doc.bpm).toBe(bpm);
+    const bpm = refused.model.doc.transport.bpm;
+    expect(refused.ctx.change({ transport: { bpm: 133 } } as DocumentPartial).ok).toBe(false);
+    expect(refused.model.doc.transport.bpm).toBe(bpm);
     expect(refused.status.at(-1)).toBe('refused: nope');
   });
 
@@ -308,8 +308,8 @@ describe('a change landing while the system is being built (#629 review)', () =>
   it('queues nothing while audio has never been enabled', () => {
     const c = openConsole();
     c.host.enabled = false;
-    expect(c.ctx.change({ bpm: 100 } as DocumentPartial).ok).toBe(true);
-    expect(c.model.doc.bpm).toBe(100);
+    expect(c.ctx.change({ transport: { bpm: 100 } } as DocumentPartial).ok).toBe(true);
+    expect(c.model.doc.transport.bpm).toBe(100);
     expect(c.builds).toBe(0);
   });
 });
