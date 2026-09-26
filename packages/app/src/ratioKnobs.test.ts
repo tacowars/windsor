@@ -36,7 +36,7 @@ import {
 const SONG = {
   seed: 204,
   bpm: 96,
-  key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+  key: { root: 50, scale: 'dorian' },
   arp: { part: 'arp', preset: 'lead-bell', velocity: 0.7 },
 };
 

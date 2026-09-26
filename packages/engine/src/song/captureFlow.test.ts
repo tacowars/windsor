@@ -1,9 +1,10 @@
 /**
- * Capture-to-fixed, player and document halves (issue #70, record §6):
- * capture reads what actually sounded, apply freezes it, release returns the
- * part to generative, and a captured pattern survives the export → import
- * round trip through `makeArrangement`. Capture works per sequencer kind on
- * any slot (#597). Generator-level playback is in `capturedPattern.test.ts`.
+ * The Euclidean click-to-toggle capture, player and document halves (issue
+ * #70, record §6): capture reads the figure that is sounding, apply freezes
+ * it, release returns the part to generative, and a captured figure survives
+ * the export → import round trip through `makeArrangement`. Pitched capture
+ * went with the arpeggiator and step sequencer (#704, epic #703 decision 12);
+ * generator-level playback of a fixed figure is in `euclideanSequencer.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -75,6 +76,9 @@ const patternOf = (r: Rig, slot: number): unknown =>
 const freeze = (kind: SequencerSpec['kind'], pattern: unknown) =>
   ({ sequencer: { kind, pattern } }) as unknown as Partial<MusicPart>;
 
+/** The library ids these documents name, embedded as silent `{}` fills (#562). */
+const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
+
 describe('player capture and release', () => {
   it('freezes the sounding kick figure; the pulse stops breathing', () => {
     const captured = rig(FULL_ARRANGEMENT);
@@ -94,63 +98,44 @@ describe('player capture and release', () => {
     expect(new Set(perBar(control, kick, 6)).size).toBeGreaterThan(1);
   });
 
-  it('captures the arp bar that sounded and repeats it exactly after apply', () => {
+  it('releases a frozen figure back to generative: the pulse breathes again', () => {
     const r = rig(FULL_ARRANGEMENT);
-    r.run(4);
-    const pattern = r.player.capturePattern(arp);
-    expect(Array.isArray(pattern)).toBe(true);
-    expect(pattern).toHaveLength(TICKS_PER_BAR / FULL_PARTS.arp.sequencer.divisor);
-    expect(r.player.apply({ parts: { [arp]: freeze('arp', pattern) } }).ok).toBe(true);
-    expect(patternOf(r, arp)).toEqual(pattern);
-
-    // Fixed now: every bar plays exactly the captured bar's non-rests.
-    const notes = ((pattern ?? []) as unknown[]).filter((n) => n !== null).length;
-    expect(notes).toBeGreaterThan(0);
-    expect(perBar(r, arp, 4)).toEqual(new Array(4).fill(notes));
-  });
-
-  it('captures a tied step part as its held note and release returns it to generative', () => {
-    const tied: Arrangement = { ...FULL_ARRANGEMENT, key: { root: 48, scale: [0], weights: [1] } };
-    const r = rig(tied);
-    r.run(4);
-    const pattern = r.player.capturePattern(drone);
-    expect(pattern).toEqual([36]);
-    expect(r.player.apply({ parts: { [drone]: freeze('step', pattern) } }).ok).toBe(true);
-    expect(patternOf(r, drone)).toEqual([36]);
-
-    expect(r.player.apply({ parts: { [drone]: freeze('step', null) } }).ok).toBe(true);
-    expect(patternOf(r, drone)).toBeNull();
-    const before = r.player.readout().counters[drone] ?? 0;
     r.run(2);
-    expect(r.player.readout().counters[drone]).toBeGreaterThanOrEqual(before);
-  });
-
-  it('captures an arpeggiator on a slot that used to be the kick’s (#597)', () => {
-    const arpOnKick: Arrangement = {
-      ...FULL_ARRANGEMENT,
-      parts: [{ ...FULL_PARTS.arp, slot: kick }],
-    };
-    const r = rig(arpOnKick);
-    r.run(4);
     const pattern = r.player.capturePattern(kick);
-    expect(pattern).toHaveLength(TICKS_PER_BAR / FULL_PARTS.arp.sequencer.divisor);
-    expect(r.player.apply({ parts: { [kick]: freeze('arp', pattern) } }).ok).toBe(true);
-    expect(patternOf(r, kick)).toEqual(pattern);
+    expect(r.player.apply({ parts: { [kick]: freeze('euclidean', pattern) } }).ok).toBe(true);
+    expect(r.player.apply({ parts: { [kick]: freeze('euclidean', null) } }).ok).toBe(true);
+    expect(patternOf(r, kick)).toBeNull();
+    expect(new Set(perBar(r, kick, 8)).size).toBeGreaterThan(1);
   });
 
-  it('returns null where there is nothing to capture', () => {
-    const r = rig({
+  it('round-trips a captured figure: capture → apply → export → import (#704 keeps this half)', () => {
+    const r = rig(FULL_ARRANGEMENT);
+    r.run(2);
+    const pattern = r.player.capturePattern(kick);
+    expect(r.player.apply({ parts: { [kick]: freeze('euclidean', pattern) } }).ok).toBe(true);
+    const exported = JSON.parse(
+      JSON.stringify({ version: 2, patches: PATCHES, ...r.player.arrangement }),
+    ) as unknown;
+    const imported = makeArrangement(exported);
+    expect(imported.corrections).toEqual([]);
+    const importedKick = imported.document.parts.find((p) => p.slot === kick);
+    expect((importedKick?.sequencer as { pattern?: unknown }).pattern).toEqual(pattern);
+  });
+
+  it('returns null for every part that is not Euclidean, and for an absent slot', () => {
+    const r = rig(FULL_ARRANGEMENT);
+    r.run(2);
+    // A grid line and a chord progression are written, not captured.
+    expect(r.player.capturePattern(arp)).toBeNull();
+    expect(r.player.capturePattern(drone)).toBeNull();
+    const inert = rig({
       ...onlyParts(FULL_ARRANGEMENT, 'kick'),
       parts: [FULL_PARTS.kick, { ...FULL_PARTS.drone, sequencer: { kind: 'none' } }],
     });
-    expect(r.player.capturePattern(arp)).toBeNull();
-    expect(r.player.capturePattern(drone)).toBeNull();
-    expect(r.player.capturePattern(7)).toBeNull();
+    expect(inert.player.capturePattern(drone)).toBeNull();
+    expect(inert.player.capturePattern(7)).toBeNull();
   });
 });
-
-/** The library ids these documents name, embedded as silent `{}` fills (#562). */
-const PATCHES = { kick: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
 const doc = (...parts: unknown[]): Record<string, unknown> => ({
   version: 2,
@@ -165,21 +150,24 @@ const sequencerOf = (
   result.document.parts[i]?.sequencer as unknown as Record<string, unknown>;
 
 describe('captured patterns in the document (export → import)', () => {
-  it('normalises literal patterns, 0/1 accepted, junk corrected to rests', () => {
+  it('normalises a literal figure, 0/1 accepted, junk corrected to rests', () => {
     const result = makeArrangement(
-      doc(
-        {
-          slot: 0,
-          preset: 'kick',
-          sequencer: { kind: 'euclidean', steps: 4, pattern: [1, 0, true, 'x'] },
-        },
-        { slot: 2, preset: 'saw-arp', sequencer: { kind: 'arp', pattern: [60.4, 'x', null, 200] } },
-      ),
+      doc({
+        slot: 0,
+        preset: 'kick',
+        sequencer: { kind: 'euclidean', steps: 4, pattern: [1, 0, true, 'x'] },
+      }),
     );
     expect(sequencerOf(result, 0).pattern).toEqual([true, false, true, false]);
-    expect(sequencerOf(result, 1).pattern).toEqual([60, null, null, 127]);
     expect(result.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.pattern\[3\]/);
-    expect(result.corrections.join('\n')).toMatch(/parts\[1\]\.sequencer\.pattern\[1\]/);
+  });
+
+  it('drops a pattern on a grid part as an unknown key (#704: no pitched capture)', () => {
+    const result = makeArrangement(
+      doc({ slot: 2, preset: 'saw-arp', sequencer: { kind: 'grid', pattern: [60, null] } }),
+    );
+    expect(sequencerOf(result, 0).pattern).toBeUndefined();
+    expect(result.corrections).toContain('parts[0].sequencer.pattern: unknown key dropped');
   });
 
   it('resizes a Euclidean pattern to the figure and reports it', () => {
@@ -200,24 +188,15 @@ describe('captured patterns in the document (export → import)', () => {
 
   it('survives the export → import round trip equal and correction-free', () => {
     const authored = {
-      ...doc(
-        {
-          slot: 0,
-          name: 'kick',
-          preset: 'kick',
-          sequencer: { kind: 'euclidean', steps: 8, pattern: [1, 0, 0, 1, 0, 0, 1, 0] },
-        },
-        {
-          slot: 2,
-          name: 'arp',
-          preset: 'saw-arp',
-          sequencer: { kind: 'arp', pattern: [62, null, 65, 69] },
-        },
-        { slot: 3, name: 'drone', preset: 'drone-sqr', sequencer: { kind: 'step', pattern: [38] } },
-      ),
+      ...doc({
+        slot: 0,
+        name: 'kick',
+        preset: 'kick',
+        sequencer: { kind: 'euclidean', steps: 8, pattern: [1, 0, 0, 1, 0, 0, 1, 0] },
+      }),
       seed: 7,
       bpm: 100,
-      key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+      key: { root: 50, scale: 'dorian' },
     };
     const first = makeArrangement(authored);
     expect(first.usable).toBe(true);

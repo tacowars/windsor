@@ -2,7 +2,10 @@
   "version": 2,
   "seed": 204,
   "bpm": 96,
-  "key": { "root": 50, "scale": "dorian", "weights": [4, 1, 2, 2, 3, 1, 2] },
+  "key": {
+    "root": 50,
+    "scale": "dorian"
+  },
   "patches": {
     "drone-sqr": {}
   },
@@ -18,9 +21,17 @@
         "hold": 0.2,
         "steps": 16,
         "divisor": 6,
-        "pulses": { "min": 2, "max": 5, "start": 4 },
+        "pulses": {
+          "min": 2,
+          "max": 5,
+          "start": 4
+        },
         "rotate": 0,
-        "density": { "kind": "lfoBars", "bars": 8, "shape": "tri" }
+        "density": {
+          "kind": "lfoBars",
+          "bars": 8,
+          "shape": "tri"
+        }
       }
     },
     {
@@ -29,10 +40,14 @@
       "preset": "drone-sqr",
       "velocity": 0.8,
       "sequencer": {
-        "kind": "step",
+        "kind": "chord",
         "divisor": 96,
         "gate": 1,
-        "register": { "octave": -1, "span": 1 }
+        "voicing": "close",
+        "register": {
+          "octave": -1
+        },
+        "steps": [{ "kind": "chord", "degree": 0 }]
       }
     }
   ]

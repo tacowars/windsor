@@ -22,8 +22,6 @@ export type {
 } from './song/arrangementDocument';
 export { musicPartName, partAt, removePart, removePartChange } from './song/documentParts';
 export type {
-  ArpDriver,
-  ArpSpec,
   Arrangement,
   ArrangementKey,
   ArrangementPartial,
@@ -40,8 +38,6 @@ export type {
   PartsPartial,
   SequencerKind,
   SequencerSpec,
-  StepDriver,
-  StepSpec,
 } from './song/arrangement';
 export { ArrangementPlayer } from './song/arrangementPlayer';
 export {
@@ -128,8 +124,6 @@ export {
   LFO_HZ_DEFAULT,
   MIDI_MIDDLE_C,
   MIDI_NOTE_MAX,
-  POOL_SIZE_MAX,
-  REFRESH_BARS_MAX,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
   EUCLID_STEPS_MAX,
@@ -156,8 +150,6 @@ export type {
   PartHost,
   PlayablePart,
 } from './song/arrangementPlayer';
-export { BarRecorder, assertNotePattern } from './sequencing/capturedPattern';
-export type { NotePattern } from './sequencing/capturedPattern';
 export { installMusicControls } from './game/musicControls';
 export type { MusicChoice, MusicLog } from './game/musicControls';
 export { musicDocumentFromQuery, musicEnabledFromQuery } from './game/musicOptions';
@@ -278,14 +270,8 @@ export {
   SEMITONES_PER_OCTAVE,
   ScaleSampler,
   scaleOffsets,
-  uniformWeights,
 } from './sequencing/scaleSampler';
-export type {
-  Register,
-  SampledNote,
-  ScaleName,
-  ScaleSamplerConfig,
-} from './sequencing/scaleSampler';
+export type { ScaleName, ScaleSamplerConfig } from './sequencing/scaleSampler';
 export {
   DEFAULT_EUCLIDEAN_CONFIG,
   DENSITY_MOD_KINDS,
@@ -301,10 +287,6 @@ export type {
   OnsetEvent,
   OnsetHandler,
 } from './sequencing/euclideanSequencer';
-export { ARP_WALK_MODES, Arpeggiator, DEFAULT_ARPEGGIATOR_CONFIG } from './sequencing/arpeggiator';
-export type { ArpWalkMode, ArpeggiatorConfig } from './sequencing/arpeggiator';
-export { DEFAULT_STEP_SEQUENCER_CONFIG, StepSequencer } from './sequencing/stepSequencer';
-export type { StepSequencerConfig } from './sequencing/stepSequencer';
 
 export { HIDDEN_CATEGORY, PRESET_CATALOG, filterPresets } from './patch/presetCatalog';
 // The envelope curve the worklet shapes segments with (#620 decision 4): the

@@ -8,8 +8,8 @@
 export const NEW_SONG_BPM = 120;
 
 /**
- * The new song's key: a real scale, so the first arpeggiator a part is given
- * has somewhere to go. (The normaliser's own default is the root alone, which
+ * The new song's key: a real scale, so the first grid or chord part has
+ * degrees to read. (The normaliser's own default is the root alone, which
  * is right for a damaged document and wrong for a blank page.)
  */
 export const NEW_SONG_KEY = { root: 48, scale: 'naturalMinor' } as const;

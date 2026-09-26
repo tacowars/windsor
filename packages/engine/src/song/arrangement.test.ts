@@ -132,11 +132,10 @@ describe('mergeArrangement', () => {
 
   it('replaces arrays and the scale wholesale', () => {
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, {
-      key: { scale: [0, 3, 7], weights: [3, 1, 2] },
+      key: { scale: [0, 3, 7] },
     });
     expect(ignored).toEqual([]);
     expect(merged.key.scale).toEqual([0, 3, 7]);
-    expect(merged.key.weights).toEqual([3, 1, 2]);
     expect(merged.key.root).toBe(FULL_ARRANGEMENT.key.root);
   });
 });

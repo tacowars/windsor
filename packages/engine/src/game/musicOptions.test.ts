@@ -21,7 +21,7 @@ describe('musicDocumentFromQuery', () => {
   });
 
   it('names the committed document to play otherwise', () => {
-    expect(musicDocumentFromQuery('?music=bed-02')).toBe('bed-02');
+    expect(musicDocumentFromQuery('?music=night')).toBe('night');
     expect(musicDocumentFromQuery('?debug=1&music=night')).toBe('night');
   });
 });

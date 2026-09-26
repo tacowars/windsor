@@ -7,19 +7,11 @@
  * throw. `ArrangementNormaliser` (`arrangementNormalise.ts`) calls it per part.
  */
 import { chordDriver } from '../harmony/chordNormalise';
-import type {
-  ArpDriver,
-  EuclideanDriver,
-  GridDriver,
-  SequencerSpec,
-  StepDriver,
-} from './arrangement';
+import type { EuclideanDriver, GridDriver, SequencerSpec } from './arrangement';
 import { SEQUENCER_KINDS } from './arrangement';
 import { show, type FieldNormaliser } from './arrangementFields';
-import { ARP_WALK_MODES, DEFAULT_ARPEGGIATOR_CONFIG } from '../sequencing/arpeggiator';
 import {
   EUCLID_STEPS_MAX,
-  GATE_MIN,
   GRID_DEGREE_MAX,
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
@@ -34,9 +26,6 @@ import {
   MIDI_MIDDLE_C,
   MIDI_NOTE_MAX,
   OCTAVE_MAX,
-  POOL_SIZE_MAX,
-  REFRESH_BARS_MAX,
-  SPAN_MAX,
   WALK_CHANCE,
 } from '../audioConstants';
 import {
@@ -52,8 +41,6 @@ import {
   gridNote,
   type GridStep,
 } from '../sequencing/gridSequencer';
-import type { Register } from '../sequencing/scaleSampler';
-import { DEFAULT_STEP_SEQUENCER_CONFIG } from '../sequencing/stepSequencer';
 
 /** The tagged sequencer; an absent or unknown kind is `none`, which is inert. */
 export function normaliseSequencer(raw: unknown, path: string, n: FieldNormaliser): SequencerSpec {
@@ -73,10 +60,6 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
         ...euclideanDriver(driver, path, n),
       };
     }
-    case 'arp':
-      return { kind, ...arpDriver(driver, path, n) };
-    case 'step':
-      return { kind, ...stepDriver(driver, path, n) };
     case 'chord':
       return { kind, ...chordDriver(driver, path, n) };
     case 'grid':
@@ -150,35 +133,6 @@ function density(raw: unknown, path: string, n: FieldNormaliser): DensityMod {
   };
 }
 
-function arpDriver(raw: unknown, path: string, n: FieldNormaliser): ArpDriver {
-  const d = DEFAULT_ARPEGGIATOR_CONFIG;
-  const o = n.section(raw, path);
-  const known = ['divisor', 'poolSize', 'refreshBars', 'walk', 'skipChance', 'register', 'gate'];
-  n.dropUnknown(o, [...known, 'pattern'], path);
-  return {
-    divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
-    poolSize: n.int(o.poolSize, d.poolSize, 1, POOL_SIZE_MAX, `${path}.poolSize`),
-    refreshBars: n.int(o.refreshBars, d.refreshBars, 1, REFRESH_BARS_MAX, `${path}.refreshBars`),
-    walk: n.pick(o.walk, ARP_WALK_MODES, d.walk, `${path}.walk`),
-    skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
-    register: register(o.register, d.register, `${path}.register`, n),
-    gate: n.num(o.gate, d.gate, GATE_MIN, 1, `${path}.gate`),
-    pattern: n.notePattern(o.pattern, `${path}.pattern`),
-  };
-}
-
-function stepDriver(raw: unknown, path: string, n: FieldNormaliser): StepDriver {
-  const d = DEFAULT_STEP_SEQUENCER_CONFIG;
-  const o = n.section(raw, path);
-  n.dropUnknown(o, ['divisor', 'gate', 'register', 'pattern'], path);
-  return {
-    divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
-    gate: n.num(o.gate, d.gate, GATE_MIN, 1, `${path}.gate`),
-    register: register(o.register, d.register, `${path}.register`, n),
-    pattern: n.notePattern(o.pattern, `${path}.pattern`),
-  };
-}
-
 function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver {
   const d = DEFAULT_GRID_CONFIG;
   const o = n.section(raw, path);
@@ -242,13 +196,4 @@ function gridStep(raw: unknown, path: string, n: FieldNormaliser): GridStep {
     accent: n.bool(o.accent, false, `${path}.accent`),
     slide: n.bool(o.slide, false, `${path}.slide`),
   });
-}
-
-function register(raw: unknown, fallback: Register, path: string, n: FieldNormaliser): Register {
-  const o = n.section(raw, path);
-  n.dropUnknown(o, ['octave', 'span'], path);
-  return {
-    octave: n.int(o.octave, fallback.octave, -OCTAVE_MAX, OCTAVE_MAX, `${path}.octave`),
-    span: n.int(o.span, fallback.span, 1, SPAN_MAX, `${path}.span`),
-  };
 }

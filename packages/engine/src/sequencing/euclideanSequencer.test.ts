@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { euclid, patternToString, rotatePattern } from './euclid';
+import { euclid, patternFromString, patternToString, rotatePattern } from './euclid';
 import {
   DEFAULT_EUCLIDEAN_CONFIG,
   EuclideanSequencer,
@@ -298,5 +298,49 @@ describe('reconfigure (#610)', () => {
     );
     expect(seq.config).toBe(WALK);
     expect(patternToString(seq.currentPattern)).toBe(pattern);
+  });
+});
+
+describe('a fixed figure (#70 capture, moved from the retired capturedPattern.test.ts in #704)', () => {
+  const run = (transport: TickTransport, bars: number): void => {
+    for (let i = 0; i < bars * TICKS_PER_BAR; i++) transport.advance(0);
+  };
+
+  it('plays the literal figure every bar, never regenerating', () => {
+    const sequencer = new EuclideanSequencer({
+      steps: 8,
+      divisor: 12,
+      pulses: { min: 0, max: 8, start: 3 },
+      rotate: 0,
+      // stepChance 1: a generative walk would move k every bar.
+      density: { kind: 'walk', stepChance: 1 },
+      seed: 5,
+      generatorIndex: 0,
+      pattern: patternFromString('x..x..x.'),
+    });
+    const transport = new TickTransport();
+    const steps: number[] = [];
+    sequencer.onOnset = (e) => steps.push(e.step);
+    sequencer.attach(transport);
+    run(transport, 4);
+    expect(steps).toEqual([0, 3, 6, 0, 3, 6, 0, 3, 6, 0, 3, 6]);
+    expect(sequencer.currentK).toBe(3);
+    expect(sequencer.currentPattern).toEqual(patternFromString('x..x..x.'));
+  });
+
+  it('refuses a pattern that does not match steps', () => {
+    expect(
+      () =>
+        new EuclideanSequencer({
+          steps: 8,
+          divisor: 12,
+          pulses: { min: 0, max: 8, start: 3 },
+          rotate: 0,
+          density: { kind: 'lfoBars', bars: 8, shape: 'tri' },
+          seed: 0,
+          generatorIndex: 0,
+          pattern: [true, false],
+        }),
+    ).toThrow(/pattern must have 8 steps/);
   });
 });

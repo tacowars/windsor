@@ -239,7 +239,7 @@ describe('structural edits stay live (#629)', () => {
     const c = openConsole(true);
     expect(addPartLive(c.ctx)).toBeNull();
     expect(c.model.doc.parts).toHaveLength(1);
-    expect(setSequencerKindLive(c.ctx, 0, 'arp')).toBe(false);
+    expect(setSequencerKindLive(c.ctx, 0, 'grid')).toBe(false);
     expect(partAt(c.model.doc, 0)?.sequencer.kind).toBe('none');
     expect(c.builds).toBe(0);
     expect(c.status.at(-1)).toBe('refused: nope');

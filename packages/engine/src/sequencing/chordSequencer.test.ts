@@ -22,7 +22,7 @@ import { ScaleSampler } from './scaleSampler';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from './scheduler';
 
 /** C major from C4: I is 60 64 67, V is 67 71 74. */
-const major = new ScaleSampler({ root: 60, scale: 'major', weights: [1, 1, 1, 1, 1, 1, 1] });
+const major = new ScaleSampler({ root: 60, scale: 'major' });
 
 /** A bar per base step, so the fixture's tick numbers read straight off its durations. */
 const BAR = DIVISORS.bar;
@@ -190,7 +190,6 @@ describe('ChordSequencer', () => {
     const minor = new ScaleSampler({
       root: 57,
       scale: 'naturalMinor',
-      weights: [1, 1, 1, 1, 1, 1, 1],
     });
     seq.reconfigure(
       { ...seq.config, steps: [chordStep(0, { duration: 0.25 })], voicing: 'drop2' },
