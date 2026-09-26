@@ -10,29 +10,50 @@
  *
  * Since #597 a song is a list of 1–8 parts, each identified by its `slot`
  * (0–7) and carrying any sequencer: a Euclidean fixed-note trigger, the
- * written grid (#602), the chord progression (#606), or `none` — an inert part the keyboard
- * can still play but nothing sequences. A part's name is a label and keys
- * nothing (record `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
+ * written grid (#602), the Chord Player (#606), the arpeggiator and bass
+ * (#706, #707), or `none` — an inert part the keyboard can still play but
+ * nothing sequences. A part's name is a label and keys nothing (record
+ * `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
- * Seeds are deliberately absent from the driver configs: the one `seed` below
- * plus the part's `slot` as its generator index derive every stream, so
- * re-rolling, removing or reordering one part cannot move another (record
- * `2026-08-31-generative-sequencing-transport-and-pitch` §4 — this is not the
- * world seed).
+ * Since #705 (record `2026-09-26-harmony-v2-document-v3-timeline-and-regions`)
+ * the song has an explicit length (`transport.bars`), a harmony timeline
+ * of chord events, and each part a list of `regions` saying where it is
+ * live; every generative sequencer carries its own `seed`, and its stream
+ * per region is `hashSeed(seed, regionIndex)` — none of this is the world
+ * seed.
  */
+import type { ArpSequencerConfig } from '../sequencing/arpSequencer';
+import type { BassSequencerConfig } from '../sequencing/bassSequencer';
 import type { ChordSequencerConfig } from '../sequencing/chordSequencer';
 import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
-import type { ScaleName } from '../sequencing/scaleSampler';
+import type { Harmony } from '../harmony/harmonyTimeline';
+import type { Region } from '../sequencing/regionClock';
 
-/** A driver config as the arrangement stores it: the player injects the seed. */
-export type EuclideanDriver = Omit<EuclideanConfig, 'seed' | 'generatorIndex'>;
-export type GridDriver = Omit<GridSequencerConfig, 'seed' | 'generatorIndex'>;
-export type ChordDriver = Omit<ChordSequencerConfig, 'seed' | 'generatorIndex'>;
+export type { Harmony, HarmonyEvent } from '../harmony/harmonyTimeline';
+export type { Region } from '../sequencing/regionClock';
 
-/** What may drive a part (#597). `none` is inert: allowed anywhere, skipped by every sequencing path. */
-export const SEQUENCER_KINDS = ['none', 'euclidean', 'grid', 'chord'] as const;
+/**
+ * A driver config as the arrangement stores it: since #705 the whole
+ * generator config, its own `seed` included (decision 16); the region gate
+ * hands the generator its stream per region.
+ */
+export type EuclideanDriver = EuclideanConfig;
+export type GridDriver = GridSequencerConfig;
+export type ChordDriver = ChordSequencerConfig;
+export type ArpDriver = ArpSequencerConfig;
+export type BassDriver = BassSequencerConfig;
+
+/**
+ * What may drive a part (#597, #705). `none` is inert: allowed anywhere,
+ * skipped by every sequencing path. `arp` and `bass` are normalised in full
+ * here and performed by #706 / #707.
+ */
+export const SEQUENCER_KINDS = ['none', 'euclidean', 'grid', 'chord', 'arp', 'bass'] as const;
 export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
+
+/** The kinds that draw from a stream and so carry a `seed` (decision 16); the Chord Player draws nothing. */
+export const SEEDED_KINDS: readonly SequencerKind[] = ['euclidean', 'grid', 'arp', 'bass'];
 
 export interface NoSequencer {
   readonly kind: 'none';
@@ -48,35 +69,44 @@ export type EuclideanSpec = {
 } & EuclideanDriver;
 /** The grid (#602): a written 1–32 step line of scale degrees with accent, slide, tie and rest. */
 export type GridSpec = { readonly kind: 'grid' } & GridDriver;
-/** The chord progression (#606): 0–32 written steps of diatonic chords by degree, one voicing per part. */
+/** The Chord Player (#606, #705): 0–32 written hits and rests over the harmony timeline, one voicing per part. */
 export type ChordSpec = { readonly kind: 'chord' } & ChordDriver;
+/** The arpeggiator (#706) over the current chord's tones. */
+export type ArpSpec = { readonly kind: 'arp' } & ArpDriver;
+/** The bass (#707): root, chord tone or fixed degree per step. */
+export type BassSpec = { readonly kind: 'bass' } & BassDriver;
 
-export type SequencerSpec = NoSequencer | EuclideanSpec | GridSpec | ChordSpec;
+export type SequencerSpec = NoSequencer | EuclideanSpec | GridSpec | ChordSpec | ArpSpec | BassSpec;
 
 /** One part as the player sees it; the document adds its strip (`DocumentPart`). */
 export interface MusicPart {
-  /** 0–7, unique in the song: the part's identity and its generator index. */
+  /** 0–7, unique in the song: the part's identity. */
   readonly slot: number;
   /** A display label only — never a key. */
   readonly name: string;
   /** The `patches` id this part plays. */
   readonly preset: string;
   readonly velocity: number;
+  /**
+   * Where in the song the part is live (#705, decisions 2 and 17): sorted,
+   * non-overlapping, in ticks; the one pattern cycles inside each; none is
+   * silent; one whole-song region free-runs.
+   */
+  readonly regions: readonly Region[];
   readonly sequencer: SequencerSpec;
 }
 
-/** The shared harmony every pitched part draws from (record §4). */
-export interface ArrangementKey {
-  /** MIDI note of the root in the reference octave. */
-  readonly root: number;
-  readonly scale: ScaleName | readonly number[];
+/** The song's clock: its tempo and its explicit length (decision 5). */
+export interface Transport {
+  readonly bpm: number;
+  /** 1–`BARS_MAX` bars of `TICKS_PER_BAR` ticks; every region and event sits inside. */
+  readonly bars: number;
 }
 
 export interface Arrangement {
-  /** The arrangement seed all generator streams derive from. Fixed; not the world seed. */
-  readonly seed: number;
-  readonly bpm: number;
-  readonly key: ArrangementKey;
+  readonly transport: Transport;
+  /** The key and the chord timeline every pitched part draws from. */
+  readonly harmony: Harmony;
   /** 1–8 parts, in display and play order, each on a unique slot. */
   readonly parts: readonly MusicPart[];
 }

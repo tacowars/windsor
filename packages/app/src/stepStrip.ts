@@ -168,6 +168,12 @@ export function watchPlayhead(watch: PlayheadWatch): void {
  * audible tick put through the engine's own `stepAt` (#619 decision 2). The
  * console reads the scheduler here and nowhere else.
  */
+/** The transport's audible tick, or 0 before audio is enabled — what the chord card's Hit tile auditions at (#705). */
+export function audibleTick(ctx: AppCtx): number {
+  const system = ctx.host.system;
+  return system ? system.scheduler.audibleTick(system.engine.context.currentTime) : 0;
+}
+
 export function playheadAt(ctx: AppCtx, slot: number): number {
   const system = ctx.host.system;
   if (!system || !system.scheduler.isRunning) return -1;

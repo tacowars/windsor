@@ -135,8 +135,38 @@ export const CHORD_SIZE_SEVENTH = 4;
 export const CHORD_VOICING_NOTES_MAX = 6;
 /** A chord's length as a fraction of its step; 1 holds it to the next onset. */
 export const CHORD_GATE_DEFAULT = 1;
-/** A document's document-format version (#597: parts are a slot list). */
-export const ARRANGEMENT_VERSION = 2;
+/* ------------- the song: transport bars, harmony timeline, regions (#705) ------------- */
+
+/** Song length in bars (`transport.bars`, epic #703 decision 5); `songTicks = bars × TICKS_PER_BAR`. */
+export const BARS_MIN = 1;
+export const BARS_MAX = 256;
+export const DEFAULT_BARS = 4;
+/** The key root is a pitch class (decision 11): 0 = C … 11 = B. */
+export const PITCH_CLASS_MAX = 11;
+/**
+ * A part's register octave is absolute MIDI octave numbering (decision 11):
+ * `noteFor(degree, octave) = 12 × (octave + 1) + root + offset`, so octave 3
+ * at root 0 is C3 = 48. -1 is MIDI's lowest octave, 9 its highest.
+ */
+export const REGISTER_OCTAVE_MIN = -1;
+export const REGISTER_OCTAVE_MAX = 9;
+/** Where each pitched kind opens: bass lines low, pads in the middle, arps above. */
+export const GRID_REGISTER_OCTAVE_DEFAULT = 2;
+export const CHORD_REGISTER_OCTAVE_DEFAULT = 3;
+export const ARP_REGISTER_OCTAVE_DEFAULT = 4;
+export const BASS_REGISTER_OCTAVE_DEFAULT = 1;
+/** A harmony event's scale degree; like the grid's, only bounds junk. */
+export const HARMONY_DEGREE_MAX = 48;
+/** The arpeggiator (#706) spans 1–4 octaves of the voiced chord. */
+export const ARP_OCTAVES_MIN = 1;
+export const ARP_OCTAVES_MAX = 4;
+export const ARP_GATE_DEFAULT = 0.5;
+/** The bass (#707): its chance to sound a step, and how far it leans on the chord root. */
+export const BASS_DENSITY_DEFAULT = 1;
+export const BASS_ROOT_BIAS_DEFAULT = 0.7;
+export const BASS_GATE_DEFAULT = 0.8;
+/** A document's document-format version (#705: transport bars, the harmony timeline, regions). */
+export const ARRANGEMENT_VERSION = 3;
 /** How many parts a song may have, and so the highest slot (#597). */
 export const MUSIC_PARTS_MAX = 8;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

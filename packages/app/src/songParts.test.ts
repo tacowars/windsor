@@ -32,7 +32,7 @@ describe('newSong', () => {
     expect(result.corrections).toEqual([]);
     expect(result.dangling).toEqual([]);
     const { document } = result;
-    expect(document.version).toBe(2);
+    expect(document.version).toBe(3);
     expect(document.parts).toHaveLength(1);
     const [part] = document.parts;
     expect(part).toMatchObject({ slot: 0, name: 'Part 1', preset: initPresetId('0') });
@@ -207,7 +207,7 @@ describe('changed since opened (the New song guard)', () => {
   it('is false on open and on a re-open, true after an edit', () => {
     const model = new DocumentModel(newSong());
     expect(model.changed).toBe(false);
-    model.merge({ bpm: 90 });
+    model.merge({ transport: { bpm: 90 } });
     expect(model.changed).toBe(true);
     model.open(newSong());
     expect(model.changed).toBe(false);

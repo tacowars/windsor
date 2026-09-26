@@ -15,7 +15,7 @@ export type ScaleName = keyof typeof SCALES;
 export const SCALE_NAMES = Object.keys(SCALES) as readonly ScaleName[];
 
 export interface ScaleSamplerConfig {
-  /** MIDI note of the root in the reference octave (60 = middle C). */
+  /** Pitch class 0–11 of the root (#705, epic #703 decision 11): 0 = C. */
   root: number;
   /** A named scale, or explicit semitone offsets for one not in the table. */
   scale: ScaleName | readonly number[];
@@ -54,11 +54,20 @@ export class ScaleSampler {
     return this.offsets.length;
   }
 
-  /** MIDI note for a degree in a register, no randomness. */
+  /**
+   * The MIDI note of the root in an absolute octave (decision 11): MIDI
+   * octave numbering, so octave 3 at root 0 is C3 = 48 and octave -1 is
+   * note 0 — `12 × (octave + 1) + root`.
+   */
+  rootNote(octave: number): number {
+    return (octave + 1) * SEMITONES_PER_OCTAVE + this.root;
+  }
+
+  /** MIDI note for a degree in an absolute octave, no randomness: `rootNote(octave) + offset`. */
   noteFor(degree: number, octave: number): number {
     const offset = this.offsets[degree];
     if (offset === undefined) throw new RangeError(`degree ${degree} is outside the scale`);
-    return this.root + offset + octave * SEMITONES_PER_OCTAVE;
+    return this.rootNote(octave) + offset;
   }
 
   /** MIDI note for a written degree, wrapping past the scale's end with octave carry (#602). */

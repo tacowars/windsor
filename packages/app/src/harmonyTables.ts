@@ -1,45 +1,46 @@
 /**
- * The Harmony tab's knob specs (#618): the root and each pitched part's
- * register octave. A default is the engine's — the normaliser's root, the
- * kind's `DEFAULT_*_CONFIG` register.
+ * The Harmony tab's specs (#618, #705): the root as a pitch-class select,
+ * and each pitched part's absolute register octave. A default is the
+ * engine's — the normaliser's root, the kind's `DEFAULT_*_CONFIG` register,
+ * the octave range `REGISTER_OCTAVE_MIN..MAX` (decision 11).
  */
 import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
 import {
+  DEFAULT_ARP_CONFIG,
+  DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_GRID_CONFIG,
-  MIDI_MIDDLE_C,
+  PITCH_CLASS_MAX,
+  REGISTER_OCTAVE_MAX,
+  REGISTER_OCTAVE_MIN,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { fmt0, noteName } from './consoleFormat';
+import { fmt0 } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
+import { NOTE_NAMES } from './sequencerConstants';
 
-/** The root knob's reach: C1 to C6 around the engine's middle-C default. */
-export const ROOT_MIN = 24;
-export const ROOT_MAX = 84;
+/** The normaliser's root when the document names none: C. */
+export const ROOT_DEFAULT = 0;
 
-export const ROOT_KNOB: CardKnobSpec = {
-  label: 'Root',
-  min: ROOT_MIN,
-  max: ROOT_MAX,
-  def: MIDI_MIDDLE_C,
-  step: 1,
-  fmt: noteName,
-};
-
-/** Octaves from the root a register may sit at, either way. */
-export const REGISTER_OCTAVE_MAX = 4;
+/** The twelve pitch classes as the root select's options, in the engine's spelling. */
+export const ROOT_OPTIONS: readonly { value: string; label: string }[] = NOTE_NAMES.slice(
+  0,
+  PITCH_CLASS_MAX + 1,
+).map((name, pc) => ({ value: String(pc), label: name }));
 
 /** The kinds with a register, and the octave each starts at in the engine. */
 export const REGISTER_OCTAVE_DEFAULTS: Readonly<Partial<Record<SequencerKind, number>>> = {
   grid: DEFAULT_GRID_CONFIG.register.octave,
   chord: DEFAULT_CHORD_CONFIG.register.octave,
+  arp: DEFAULT_ARP_CONFIG.register.octave,
+  bass: DEFAULT_BASS_CONFIG.register.octave,
 };
 
-/** The Octave knob for a part of `kind`, defaulting to where the engine puts that kind. */
+/** The Octave knob for a part of `kind`: absolute MIDI octaves, defaulting to where the engine puts that kind. */
 export const octaveKnob = (kind: SequencerKind): CardKnobSpec => ({
   label: 'Octave',
-  min: -REGISTER_OCTAVE_MAX,
+  min: REGISTER_OCTAVE_MIN,
   max: REGISTER_OCTAVE_MAX,
-  def: REGISTER_OCTAVE_DEFAULTS[kind] ?? 0,
+  def: REGISTER_OCTAVE_DEFAULTS[kind] ?? DEFAULT_CHORD_CONFIG.register.octave,
   step: 1,
   fmt: fmt0,
 });

@@ -13,21 +13,31 @@ import {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { DocumentModel, deepMerge, mergeDocument } from './documentModel';
 
+/** Live for the whole four-bar song: what every fixture part carries (#705). */
+const WHOLE = [{ start: 0, duration: 4 * 96 }];
+
 /** A song naming library ids with no `patches` section. */
 const OLD_SONG = {
-  version: 2,
-  seed: 204,
-  bpm: 96,
-  key: { root: 50, scale: 'dorian' },
+  version: 3,
+  transport: { bpm: 96, bars: 4 },
+  harmony: { root: 2, scale: 'dorian' },
   parts: [
     {
       slot: 0,
       name: 'kick',
       preset: 'kick',
       velocity: 1,
-      sequencer: { kind: 'euclidean', note: 36, hold: 0.2 },
+      regions: WHOLE,
+      sequencer: { kind: 'euclidean', seed: 0, note: 36, hold: 0.2 },
     },
-    { slot: 2, name: 'arp', preset: 'saw-arp', velocity: 0.7, sequencer: { kind: 'grid' } },
+    {
+      slot: 2,
+      name: 'arp',
+      preset: 'saw-arp',
+      velocity: 0.7,
+      regions: WHOLE,
+      sequencer: { kind: 'grid', seed: 0 },
+    },
   ],
 };
 
@@ -70,8 +80,8 @@ describe('opening a document written before #562', () => {
 
   it('keeps the fill across a knob edit, which renormalises the whole document', () => {
     const model = new DocumentModel(OLD_SONG);
-    model.merge({ bpm: 100 });
-    expect(model.doc.bpm).toBe(100);
+    model.merge({ transport: { bpm: 100 } });
+    expect(model.doc.transport.bpm).toBe(100);
     // Already embedded by the open, so the merge fills nothing new.
     expect(model.filled).toEqual([]);
     expect(Object.keys(model.doc.patches ?? {}).sort()).toEqual(['kick', 'saw-arp']);
@@ -108,9 +118,10 @@ describe('a slot-addressed merge (#597)', () => {
           name: 'drone',
           preset: 'drone-sqr',
           strip: { level: 0.5 },
+          regions: WHOLE,
           sequencer: { kind: 'chord' },
         },
-        { slot: 4, name: 'blank', preset: 'kick', sequencer: { kind: 'none' } },
+        { slot: 4, name: 'blank', preset: 'kick', regions: WHOLE, sequencer: { kind: 'none' } },
       ],
     });
     expect(model.corrections).toEqual([]);
@@ -127,7 +138,7 @@ describe('adding and removing live (#629)', () => {
       ...model.doc,
       parts: [
         ...model.doc.parts,
-        { slot: 5, name: 'new', preset: 'kick', sequencer: { kind: 'none' } },
+        { slot: 5, name: 'new', preset: 'kick', regions: WHOLE, sequencer: { kind: 'none' } },
       ],
     };
     const part = partAt(model.preview(raw), 5);
@@ -167,7 +178,13 @@ describe('adding and removing live (#629)', () => {
       ...model.doc,
       parts: [
         ...model.doc.parts,
-        { slot: 1, name: 'hat', preset: 'hat', sequencer: { kind: 'euclidean' } },
+        {
+          slot: 1,
+          name: 'hat',
+          preset: 'hat',
+          regions: WHOLE,
+          sequencer: { kind: 'euclidean', seed: 0 },
+        },
       ],
     };
     model.merge({ parts: { 1: partAt(model.preview(raw), 1) }, patches: { hat: PRESETS['hat'] } });
@@ -207,13 +224,22 @@ describe('grid parts (#603)', () => {
           slot: 5,
           name: 'acid',
           preset: 'saw-arp',
-          sequencer: { kind: 'grid', steps: long, length: 24, skipChance: 0.1, accentMod: 0.8 },
+          regions: WHOLE,
+          sequencer: {
+            kind: 'grid',
+            seed: 7,
+            steps: long,
+            length: 24,
+            skipChance: 0.1,
+            accentMod: 0.8,
+          },
         },
         {
           slot: 6,
           name: 'seven',
           preset: 'saw-arp',
-          sequencer: { kind: 'grid', divisor: 12, steps: short, register: { octave: -1 } },
+          regions: WHOLE,
+          sequencer: { kind: 'grid', seed: 0, divisor: 12, steps: short, register: { octave: 1 } },
         },
       ],
     });
@@ -231,16 +257,10 @@ describe('grid parts (#603)', () => {
 
 describe('chord parts (#607)', () => {
   it('export → import of a 32-step and a 1-step chord part equals the model’s document', () => {
-    const chord = (
-      degree: number,
-      over: Record<string, unknown> = {},
-    ): Record<string, unknown> => ({
-      kind: 'chord',
-      degree,
-      size: 3,
+    const hit = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+      kind: 'hit',
       inversion: 0,
       octave: 0,
-      semitone: 0,
       duration: 1,
       repeat: 1,
       ...over,
@@ -248,11 +268,9 @@ describe('chord parts (#607)', () => {
     const long = Array.from({ length: 32 }, (_, i) =>
       i % 5 === 4
         ? { kind: 'rest', duration: 0.5, repeat: 1 }
-        : chord(i % 7, {
-            size: i % 2 === 0 ? 4 : 3,
+        : hit({
             inversion: i % 4,
             octave: (i % 3) - 1,
-            semitone: (i % 5) - 2,
             duration: [0.25, 0.5, 1, 2, 4][i % 5],
             repeat: (i % 8) + 1,
           }),
@@ -265,15 +283,20 @@ describe('chord parts (#607)', () => {
           slot: 5,
           name: 'pad',
           preset: 'saw-arp',
+          regions: WHOLE,
           sequencer: { kind: 'chord', steps: long, voicing: 'drop2', gate: 0.5, divisor: 48 },
         },
         {
           slot: 6,
           name: 'one',
           preset: 'saw-arp',
-          sequencer: { kind: 'chord', steps: [chord(4, { size: 4 })], register: { octave: -1 } },
+          regions: [
+            { start: 96, duration: 96 },
+            { start: 288, duration: 96 },
+          ],
+          sequencer: { kind: 'chord', steps: [hit({ inversion: 2 })], register: { octave: 1 } },
         },
-        { slot: 7, name: 'blank', preset: 'saw-arp', sequencer: { kind: 'chord' } },
+        { slot: 7, name: 'blank', preset: 'saw-arp', regions: WHOLE, sequencer: { kind: 'chord' } },
       ],
     });
     expect(model.corrections).toEqual([]);
@@ -299,8 +322,10 @@ describe('Euclidean parts (#610)', () => {
           slot: 4,
           name: 'shaker',
           preset: 'kick',
+          regions: WHOLE,
           sequencer: {
             kind: 'euclidean',
+            seed: 3,
             steps: 12,
             pulses: { min: 2, max: 6, start: 5 },
             rotate: -3,

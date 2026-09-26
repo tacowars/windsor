@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ArrangementKey, GridStep } from '../../../packages/client/src/audio/index-for-editor';
+import type { GridStep, Harmony } from '../../../packages/client/src/audio/index-for-editor';
+
+type Key = Pick<Harmony, 'root' | 'scale'>;
 import { gridNote } from '../../../packages/client/src/audio/index-for-editor';
 import {
   cycleKind,
@@ -17,8 +19,8 @@ import {
   withStep,
 } from './gridModel';
 
-const MINOR: ArrangementKey = { root: 48, scale: 'naturalMinor' };
-const PENTA: ArrangementKey = { root: 48, scale: 'pentatonicMinor' };
+const MINOR: Key = { root: 0, scale: 'naturalMinor' };
+const PENTA: Key = { root: 0, scale: 'pentatonicMinor' };
 const REST: GridStep = { kind: 'rest' };
 const TIE: GridStep = { kind: 'tie' };
 
@@ -84,9 +86,9 @@ describe('grid step operations (#603)', () => {
   });
 
   it('a key signature changes with the root or the scale, named or explicit', () => {
-    expect(keySignature(MINOR)).toBe('48|naturalMinor');
-    expect(keySignature({ ...MINOR, root: 50 })).not.toBe(keySignature(MINOR));
-    expect(keySignature({ ...MINOR, scale: [0, 7] })).toBe('48|0,7');
+    expect(keySignature(MINOR)).toBe('0|naturalMinor');
+    expect(keySignature({ ...MINOR, root: 2 })).not.toBe(keySignature(MINOR));
+    expect(keySignature({ ...MINOR, scale: [0, 7] })).toBe('0|0,7');
   });
 
   it('shows a degree past the scale at its folded position, flagged', () => {
@@ -106,7 +108,7 @@ describe('grid step operations (#603)', () => {
       '7 A#',
     ]);
     expect(degreeOptions(PENTA)).toHaveLength(5);
-    expect(degreeOptions({ ...MINOR, root: 57 }).map((o) => o.label)[0]).toBe('1 A');
+    expect(degreeOptions({ ...MINOR, root: 9 }).map((o) => o.label)[0]).toBe('1 A');
   });
 
   it('labels a step by what it will sound: name, fold carry and octave', () => {

@@ -18,10 +18,12 @@ import { SEMITONES_PER_OCTAVE } from '../sequencing/scaleSampler';
 export interface VoiceOptions {
   readonly inversion: number;
   readonly voicing: ChordVoicingId;
-  /** Octaves added to every note (the part's register plus the step's own). */
+  /** Octaves added to every note above `rootNote` (a step's own offset; the register is in `rootNote`). */
   readonly octave: number;
-  /** Semitones added to every note. */
-  readonly semitone: number;
+  /** Semitones added to every note; none by default (#705 — harmony events carry no semitone). */
+  readonly semitone?: number;
+  /** The most notes to keep, low to high; `CHORD_VOICING_NOTES_MAX` by default (#706's arp asks for more). */
+  readonly maxNotes?: number;
 }
 
 /** The close stack rotated `inversion` times with octave carry, still ascending. */
@@ -38,7 +40,7 @@ export function invertStack(stack: readonly number[], inversion: number): number
   return rotated.map((n) => n + carry * SEMITONES_PER_OCTAVE);
 }
 
-/** MIDI notes for a chord stack under the options, at a scale root of `rootNote`. */
+/** MIDI notes for a chord stack under the options, above the MIDI note `rootNote` of the key root at the part's register. */
 export function voiceChord(
   stack: readonly number[],
   options: VoiceOptions,
@@ -46,10 +48,11 @@ export function voiceChord(
   voicings: Readonly<Record<string, ChordVoicing>> = CHORD_VOICINGS,
 ): number[] {
   const voicing = voicings[options.voicing] ?? CHORD_VOICINGS.close;
-  const shift = rootNote + options.octave * SEMITONES_PER_OCTAVE + options.semitone;
+  const shift = rootNote + options.octave * SEMITONES_PER_OCTAVE + (options.semitone ?? 0);
   const notes = voicing
     .voice(invertStack(stack, options.inversion))
     .map((n) => n + shift)
     .filter((n) => n >= 0 && n <= MIDI_NOTE_MAX);
-  return [...new Set(notes)].sort((a, b) => a - b).slice(0, CHORD_VOICING_NOTES_MAX);
+  const maxNotes = Math.max(1, Math.trunc(options.maxNotes ?? CHORD_VOICING_NOTES_MAX));
+  return [...new Set(notes)].sort((a, b) => a - b).slice(0, maxNotes);
 }

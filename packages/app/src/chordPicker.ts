@@ -1,21 +1,19 @@
 /**
- * The chord picker (#607): the key's diatonic chords as chips — name over
- * Roman numeral — at the picker's size (triads or sevenths), the part's
- * voicing, and a Rest tile. Pressing a chip sounds it through the chord part
- * the card belongs to (epic #605 decision 8); dragging it, or the Rest tile,
- * carries a ghost onto a step of the card's strip. The press-and-drag
+ * The chord picker (#607, #705): one Hit tile — named for the chord the
+ * harmony timeline holds under the playhead — one Rest tile, and the part's
+ * voicing. Pressing the Hit tile sounds the current chord through the chord
+ * part the card belongs to (epic #605 decision 8); dragging it, or the Rest
+ * tile, carries a ghost onto a step of the card's strip. The press-and-drag
  * behaviour is `chordDrag.ts`'s state machine; this file is its DOM.
  */
 import type {
-  ArrangementKey,
   AudioPart,
-  ChordSize,
   ChordSpec,
   ChordVoicingId,
+  Harmony,
+  HarmonyChord,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
-  CHORD_SIZE_SEVENTH,
-  CHORD_SIZE_TRIAD,
   CHORD_VOICINGS,
   CHORD_VOICING_IDS,
 } from '../../../packages/client/src/audio/index-for-editor';
@@ -26,18 +24,13 @@ import {
   type ChordDragPaint,
   createChordDrag,
 } from './chordDrag';
-import {
-  REST_CHIP,
-  auditionNotes,
-  pickerChips,
-  type Chip,
-  type ChordPayload,
-} from './chordStepModel';
-import { el, escapeHtml, html, seg, select } from './dom';
-import { PITCH_COLOR } from './consoleColors';
+import { REST_CHIP, auditionNotes, hitChip, type Chip, type ChordPayload } from './chordStepModel';
+import { el, escapeHtml, html, select } from './dom';
 
 export interface PickerHost {
-  key(): ArrangementKey;
+  harmony(): Harmony;
+  /** The chord under the playhead now: what the Hit tile names and sounds. */
+  currentChord(): HarmonyChord | null;
   spec(): ChordSpec | null;
   /** The engine part the chips sound through: the chord part itself. */
   part(): AudioPart | null;
@@ -51,7 +44,7 @@ export interface PickerHost {
 
 export interface Picker {
   readonly root: HTMLElement;
-  /** Redraw the chips from the host's key; the size and voicing controls stay. */
+  /** Redraw the tiles for the current chord; the voicing control stays. */
   repaint(): void;
 }
 
@@ -66,7 +59,7 @@ export function chipButton(chip: Chip): HTMLButtonElement {
   node.title =
     chip.payload.kind === 'rest'
       ? 'Drag onto a step to make it a rest'
-      : 'Press to hear, drag onto a step to place';
+      : 'Press to hear the current chord, drag onto a step to place a hit';
   return node;
 }
 
@@ -88,26 +81,19 @@ function paintGhost(state: ChordDragPaint | null, label: string): void {
   ghost.style.transform = `translate(${state.x + CHORD_GHOST_OFFSET.x}px, ${state.y + CHORD_GHOST_OFFSET.y}px)`;
 }
 
-/** What a payload reads on the ghost, from the chips drawn for the current key. */
-function labelFor(payload: ChordPayload, chips: readonly Chip[]): string {
-  if (payload.kind === 'rest') return REST_CHIP.name;
-  const chip = chips.find((c) => c.payload.kind === 'chord' && c.payload.degree === payload.degree);
-  return chip ? `${chip.name} ${chip.numeral}` : `degree ${payload.degree + 1}`;
+/** What a payload reads on the ghost. */
+function labelFor(payload: ChordPayload): string {
+  return payload.kind === 'rest' ? REST_CHIP.name : 'Hit';
 }
 
 /* ---------------------------------------------------------------- the picker */
-
-const SIZE_OPTIONS = [
-  { value: String(CHORD_SIZE_TRIAD), label: 'Triads' },
-  { value: String(CHORD_SIZE_SEVENTH), label: '7ths' },
-];
 
 const VOICING_OPTIONS = CHORD_VOICING_IDS.map((id) => ({
   value: id,
   label: CHORD_VOICINGS[id].label,
 }));
 
-/** The engine side of a chip press: which notes to sound through the chord part, and letting them go. */
+/** The engine side of a tile press: the current chord's notes through the chord part, and letting them go. */
 function auditionHost(host: PickerHost): Pick<ChordDragHost, 'audition' | 'silence'> {
   let sounding: { part: AudioPart; ids: number[] } | null = null;
   return {
@@ -115,7 +101,7 @@ function auditionHost(host: PickerHost): Pick<ChordDragHost, 'audition' | 'silen
       const part = host.part();
       const spec = host.spec();
       if (!part || !spec) return;
-      const notes = auditionNotes(host.key(), payload, spec.voicing, spec.register.octave);
+      const notes = auditionNotes(host.harmony(), host.currentChord(), payload, spec);
       sounding = { part, ids: notes.map((note) => part.noteOn(note, CHORD_AUDITION_VELOCITY)) };
     },
     silence() {
@@ -167,8 +153,6 @@ function bindChip(node: HTMLElement, payload: ChordPayload, drag: ChordDragContr
 
 export function chordPicker(host: PickerHost): Picker {
   const root = el('div', 'chord-picker-wrap');
-  let size: ChordSize = CHORD_SIZE_TRIAD;
-  let chips: Chip[] = [];
 
   const drag = createChordDrag({
     ...auditionHost(host),
@@ -176,7 +160,7 @@ export function chordPicker(host: PickerHost): Picker {
     paint(state) {
       host.highlight(state?.over ?? null);
       document.body.classList.toggle('chord-dragging', state !== null);
-      paintGhost(state, state ? labelFor(state.payload, chips) : '');
+      paintGhost(state, state ? labelFor(state.payload) : '');
     },
     apply: (payload, index) => host.drop(payload, index),
   });
@@ -184,9 +168,9 @@ export function chordPicker(host: PickerHost): Picker {
 
   const chipRow = el('div', 'chord-picker');
   const repaint = (): void => {
-    chips = pickerChips(host.key(), size);
+    const chips: Chip[] = [hitChip(host.harmony(), host.currentChord()), REST_CHIP];
     chipRow.innerHTML = '';
-    for (const chip of [...chips, REST_CHIP]) {
+    for (const chip of chips) {
       const node = chipButton(chip);
       bindChip(node, chip.payload, drag);
       chipRow.appendChild(node);
@@ -194,17 +178,6 @@ export function chordPicker(host: PickerHost): Picker {
   };
 
   const controls = el('div', 'chord-picker-controls');
-  controls.appendChild(
-    seg(
-      SIZE_OPTIONS,
-      () => String(size),
-      (value) => {
-        size = Number(value) === CHORD_SIZE_SEVENTH ? CHORD_SIZE_SEVENTH : CHORD_SIZE_TRIAD;
-        repaint();
-      },
-      PITCH_COLOR,
-    ),
-  );
   controls.appendChild(
     select('Voicing', VOICING_OPTIONS, host.spec()?.voicing ?? CHORD_VOICING_IDS[0]!, (value) =>
       host.setVoicing(value as ChordVoicingId),

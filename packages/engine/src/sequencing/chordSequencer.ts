@@ -1,17 +1,24 @@
 /**
- * The chord sequencer (#606, record
- * `2026-09-17-606-chord-sequencer-degrees-per-part-voicing`): a written
- * progression of 0–32 steps, each a rest or a diatonic chord of the song's
- * key given as a scale degree, played through the part's voicing.
+ * The Chord Player (#606, refactored by #705 — epic #703 decision 15): a
+ * written rhythm of 0–32 steps, each a rest or a *hit*, and a hit voices
+ * whatever chord the song's harmony timeline holds on that tick.
  *
- * A step is `{ duration, repeat }` and, for a chord, `{ degree, size,
- * inversion, octave, semitone }`: `duration` is a multiple of the part's base
- * step (`divisor` ticks) and `repeat` plays the step that many times in a
- * row, retriggered each time. The steps are laid out as *segments*, one per
- * repeat, and the pattern's length is their sum in ticks. Position is the
- * transport's absolute tick modulo that length, so a 3-bar progression drifts
- * against nothing and a live rebuild recomputes its place from the clock;
- * the generator subscribes at every tick and acts only on a segment's first.
+ * A step is `{ duration, repeat }` and, for a hit, `{ inversion, octave }`:
+ * `duration` is a multiple of the part's base step (`divisor` ticks) and
+ * `repeat` plays the step that many times in a row, retriggered each time.
+ * The steps are laid out as *segments*, one per repeat, and the pattern's
+ * length is their sum in ticks. Position is the part's local tick (since its
+ * region entry, through the region gate) modulo that length; the generator
+ * subscribes at every tick and acts only on a segment's first.
+ *
+ * The chord itself is not in the step: the gate hands every tick the
+ * `HarmonyChord` at the transport tick (`chordAt`), and a hit's onset takes
+ * its degree and size from there, voices it through `chordTones` +
+ * `voiceChord` with the step's `inversion` and `octave` and the part's
+ * `voicing`, above the key root at the part's absolute register octave. A
+ * chord change never restarts anything: a hit sustaining across a harmony
+ * boundary keeps its notes to its own end (decision 2 — only future onsets
+ * change).
  *
  * At an onset the notes still held are released on that tick, before the new
  * chord's note-ons; a rest's onset releases and plays nothing. With `gate`
@@ -20,23 +27,21 @@
  * the progression can still release it (Codex, #606); at 1 the chord holds to
  * the next onset. Repeats retrigger — there are no ties. An empty step list
  * is silent: its first tick releases whatever a previous pattern left sounding.
- *
- * Chords resolve through the song's one `ScaleSampler` at onset time, so a
- * key change re-voices the progression; `reconfigure` takes a new pattern,
- * voicing, gate, register or sampler live, without a rebuild (#603's rule:
- * an edit never cuts the sounding chord). Nothing here is random.
+ * `reconfigure` takes a new pattern, voicing, gate, register or sampler live,
+ * without a rebuild (#603's rule: an edit never cuts the sounding chord).
+ * Nothing here is random.
  */
 import {
   CHORD_DURATION_DEFAULT,
   CHORD_GATE_DEFAULT,
   CHORD_INVERSION_MAX,
+  CHORD_REGISTER_OCTAVE_DEFAULT,
   CHORD_REPEAT_DEFAULT,
   CHORD_REPEAT_MAX,
-  CHORD_SEMITONE_MAX,
-  CHORD_SIZE_TRIAD,
   CHORD_STEPS_MAX,
   CHORD_STEP_OCTAVE_MAX,
-  OCTAVE_MAX,
+  REGISTER_OCTAVE_MAX,
+  REGISTER_OCTAVE_MIN,
 } from '../audioConstants';
 import {
   CHORD_DIVISORS,
@@ -45,11 +50,13 @@ import {
   CHORD_VOICING_IDS,
   type ChordVoicingId,
 } from '../harmony/chordTables';
-import { chordTones, isChordSize, type ChordSize } from '../harmony/chordTheory';
+import { chordTones } from '../harmony/chordTheory';
 import { voiceChord } from '../harmony/chordVoicing';
+import type { HarmonyChord } from '../harmony/harmonyTimeline';
 import type { NoteEvent, NoteHandler } from './noteEvent';
+import type { PartTickEvent, PartTickSource } from './regionGate';
 import type { ScaleSampler } from './scaleSampler';
-import { DIVISORS, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
+import { DIVISORS, type Unsubscribe } from './scheduler';
 
 interface StepTiming {
   /** A multiple of the part's base step, from `CHORD_DURATIONS`. */
@@ -62,22 +69,18 @@ export interface ChordRestStep extends StepTiming {
   readonly kind: 'rest';
 }
 
-export interface ChordChordStep extends StepTiming {
-  readonly kind: 'chord';
-  /** Index into the song's scale; past its end it wraps with octave carry. */
-  readonly degree: number;
-  readonly size: ChordSize;
+/** A hit: the current harmony chord, voiced with this step's inversion and octave. */
+export interface ChordHitStep extends StepTiming {
+  readonly kind: 'hit';
   /** 0–`CHORD_INVERSION_MAX` as written; wraps with octave carry past the tone count. */
   readonly inversion: number;
   /** Octaves above the part's register octave, `±CHORD_STEP_OCTAVE_MAX`. */
   readonly octave: number;
-  /** Chromatic shift of the whole chord, `±CHORD_SEMITONE_MAX`. */
-  readonly semitone: number;
 }
 
-export type ChordStep = ChordRestStep | ChordChordStep;
+export type ChordStep = ChordRestStep | ChordHitStep;
 
-export const CHORD_STEP_KINDS = ['rest', 'chord'] as const;
+export const CHORD_STEP_KINDS = ['rest', 'hit'] as const;
 export type ChordStepKind = (typeof CHORD_STEP_KINDS)[number];
 
 export interface ChordSequencerConfig {
@@ -87,26 +90,18 @@ export interface ChordSequencerConfig {
   gate: number;
   /** One voicing for the whole progression (epic #605 decision 6). */
   voicing: ChordVoicingId;
-  /** Octaves from the root the progression is written at. */
+  /** The absolute MIDI octave the hits are voiced at (decision 11). */
   register: { octave: number };
   /** 0–`CHORD_STEPS_MAX` steps; empty is silent. */
   steps: readonly ChordStep[];
-  seed: number;
-  generatorIndex: number;
 }
 
-/** A chord step on `degree`: a root-position triad, one base step, once. */
-export function chordStep(
-  degree = 0,
-  over: Partial<Omit<ChordChordStep, 'kind'>> = {},
-): ChordChordStep {
+/** A hit of one base step, once, in root position at the register. */
+export function hitStep(over: Partial<Omit<ChordHitStep, 'kind'>> = {}): ChordHitStep {
   return {
-    kind: 'chord',
-    degree,
-    size: CHORD_SIZE_TRIAD,
+    kind: 'hit',
     inversion: 0,
     octave: 0,
-    semitone: 0,
     duration: CHORD_DURATION_DEFAULT,
     repeat: CHORD_REPEAT_DEFAULT,
     ...over,
@@ -122,10 +117,8 @@ export const DEFAULT_CHORD_CONFIG: ChordSequencerConfig = {
   divisor: DIVISORS.bar,
   gate: CHORD_GATE_DEFAULT,
   voicing: CHORD_VOICING_DEFAULT,
-  register: { octave: 0 },
+  register: { octave: CHORD_REGISTER_OCTAVE_DEFAULT },
   steps: [],
-  seed: 0,
-  generatorIndex: 0,
 };
 
 function assertStep(step: ChordStep, index: number): void {
@@ -136,11 +129,7 @@ function assertStep(step: ChordStep, index: number): void {
   if (!Number.isInteger(step.repeat) || step.repeat < 1 || step.repeat > CHORD_REPEAT_MAX) {
     throw new RangeError(`${where}.repeat must be an integer 1..${CHORD_REPEAT_MAX}`);
   }
-  if (step.kind !== 'chord') return;
-  if (!Number.isInteger(step.degree) || step.degree < 0) {
-    throw new RangeError(`${where}.degree must be a non-negative integer, got ${step.degree}`);
-  }
-  if (!isChordSize(step.size)) throw new RangeError(`${where}.size must be a triad or seventh`);
+  if (step.kind !== 'hit') return;
   if (
     !Number.isInteger(step.inversion) ||
     step.inversion < 0 ||
@@ -150,9 +139,6 @@ function assertStep(step: ChordStep, index: number): void {
   }
   if (!Number.isInteger(step.octave) || Math.abs(step.octave) > CHORD_STEP_OCTAVE_MAX) {
     throw new RangeError(`${where}.octave must be within ±${CHORD_STEP_OCTAVE_MAX}`);
-  }
-  if (!Number.isInteger(step.semitone) || Math.abs(step.semitone) > CHORD_SEMITONE_MAX) {
-    throw new RangeError(`${where}.semitone must be within ±${CHORD_SEMITONE_MAX}`);
   }
 }
 
@@ -170,8 +156,10 @@ export function assertChordConfig(config: ChordSequencerConfig): void {
     throw new RangeError(`voicing must be one of ${CHORD_VOICING_IDS.join('|')}`);
   }
   const octave = config.register.octave;
-  if (!Number.isInteger(octave) || Math.abs(octave) > OCTAVE_MAX) {
-    throw new RangeError(`register.octave must be an integer within ±${OCTAVE_MAX}, got ${octave}`);
+  if (!Number.isInteger(octave) || octave < REGISTER_OCTAVE_MIN || octave > REGISTER_OCTAVE_MAX) {
+    throw new RangeError(
+      `register.octave must be an integer ${REGISTER_OCTAVE_MIN}..${REGISTER_OCTAVE_MAX}, got ${octave}`,
+    );
   }
   if (config.steps.length > CHORD_STEPS_MAX) {
     throw new RangeError(
@@ -203,6 +191,25 @@ export function layoutSegments(config: ChordSequencerConfig): ChordSegment[] {
   return segments;
 }
 
+/**
+ * The MIDI notes a hit sounds for `chord` under the part's voicing and
+ * register: what an onset plays, and what the console auditions when a Hit
+ * tile is pressed.
+ */
+export function voiceHit(
+  sampler: ScaleSampler,
+  config: ChordSequencerConfig,
+  step: Pick<ChordHitStep, 'inversion' | 'octave'>,
+  chord: HarmonyChord,
+): number[] {
+  const stack = chordTones(sampler.offsets, chord.event.degree, chord.event.size);
+  return voiceChord(
+    stack,
+    { inversion: step.inversion, voicing: config.voicing, octave: step.octave },
+    sampler.rootNote(config.register.octave),
+  );
+}
+
 export class ChordSequencer {
   onNote: NoteHandler | null = null;
 
@@ -213,7 +220,7 @@ export class ChordSequencer {
   private length = 0;
   /** The notes sounding now: released at the next onset, or at `releaseTick` when the gate ends. */
   private held: number[] = [];
-  /** The tick a gated chord's offs go out on; null while the held chord runs to the next onset. */
+  /** The local tick a gated chord's offs go out on; null while the held chord runs to the next onset. */
   private releaseTick: number | null = null;
 
   constructor(sampler: ScaleSampler, config: ChordSequencerConfig) {
@@ -249,7 +256,10 @@ export class ChordSequencer {
     this.layout();
   }
 
-  /** The step and repeat a transport tick falls in — the console's playhead; null when empty. */
+  /** Nothing to restart: the Chord Player draws nothing, and the gate released what it held. */
+  enter(_regionIndex: number): void {}
+
+  /** The step and repeat a local tick falls in — the console's playhead; null when empty. */
   stepAt(tick: number): { step: number; repeat: number } | null {
     if (this.length === 0) return null;
     const offset = ((tick % this.length) + this.length) % this.length;
@@ -261,12 +271,12 @@ export class ChordSequencer {
     return found ? { step: found.step, repeat: found.repeat } : null;
   }
 
-  attach(source: TickSource): Unsubscribe {
+  attach(source: PartTickSource): Unsubscribe {
     return source.subscribe(1, (event) => this.handleTick(event));
   }
 
-  /** One tick. Returns the events it emitted; most ticks emit none. */
-  handleTick(event: TickEvent): NoteEvent[] {
+  /** One local tick. Returns the events it emitted; most ticks emit none. */
+  handleTick(event: PartTickEvent): NoteEvent[] {
     const gateEnded = this.releaseTick !== null && event.tick >= this.releaseTick;
     if (this.length === 0) {
       return this.held.length > 0 ? this.releaseHeld(event.tick, event.time) : [];
@@ -275,34 +285,31 @@ export class ChordSequencer {
     if (!segment) return gateEnded ? this.releaseHeld(event.tick, event.time) : [];
     const step = this.current.steps[segment.step];
     const events = this.held.length > 0 ? this.releaseHeld(event.tick, event.time, false) : [];
-    if (step && step.kind === 'chord') events.push(...this.onset(event, step, segment));
+    if (step && step.kind === 'hit' && event.chord) {
+      events.push(...this.onset(event, step, segment, event.chord));
+    }
     for (const e of events) this.onNote?.(e);
     return events;
   }
 
-  /** Release everything held at the given tick — what a transport stop calls. */
+  /** Release everything held at the given tick — what a transport stop or a region end calls. */
   release(tick: number, time: number): NoteEvent[] {
     return this.releaseHeld(tick, time);
   }
 
-  private onset(event: TickEvent, step: ChordChordStep, segment: ChordSegment): NoteEvent[] {
-    const stack = chordTones(this.sampler.offsets, step.degree, step.size);
-    const notes = voiceChord(
-      stack,
-      {
-        inversion: step.inversion,
-        voicing: this.current.voicing,
-        octave: this.current.register.octave + step.octave,
-        semitone: step.semitone,
-      },
-      this.sampler.root,
-    );
+  private onset(
+    event: PartTickEvent,
+    step: ChordHitStep,
+    segment: ChordSegment,
+    chord: HarmonyChord,
+  ): NoteEvent[] {
+    const notes = voiceHit(this.sampler, this.current, step, chord);
     const events: NoteEvent[] = notes.map((note) => ({
       kind: 'noteOn',
       tick: event.tick,
       time: event.time,
       note,
-      degree: step.degree,
+      degree: chord.event.degree,
     }));
     const gateTicks = Math.max(1, Math.round(this.current.gate * segment.ticks));
     this.held = notes;

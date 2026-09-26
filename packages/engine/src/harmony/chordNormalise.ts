@@ -1,25 +1,24 @@
 /**
- * A chord part's sequencer, normalised (#606): the `chord` branch of
- * `normaliseSequencer` (`sequencerNormalise.ts`), in its own file because
- * the steps carry more fields than any other kind. Everything returned
- * satisfies `assertChordConfig` by construction — a divisor from the table,
- * a gate in (0, 1], a known voicing, 0–32 steps each with a table duration,
- * a repeat 1–8 and, for a chord, a size of 3 or 4 and bounded inversion,
- * octave and semitone — so building the generator cannot throw. An absent
- * `steps` is empty: a chord part opens blank (epic #605 decision 10).
+ * A Chord Player part's sequencer, normalised (#606, #705): the `chord`
+ * branch of `normaliseSequencer` (`sequencerNormalise.ts`), in its own file
+ * because the steps carry more fields than any other kind. Everything
+ * returned satisfies `assertChordConfig` by construction — a divisor from
+ * the table, a gate in (0, 1], a known voicing, an absolute register octave,
+ * 0–32 steps each with a table duration, a repeat 1–8 and, for a hit, a
+ * bounded inversion and octave — so building the generator cannot throw. A
+ * step carries no pitch (epic #703 decision 15): the chord is the harmony
+ * timeline's. An absent `steps` is empty: a chord part opens blank.
  */
 import type { ChordDriver } from '../song/arrangement';
 import { show, type FieldNormaliser } from '../song/arrangementFields';
 import {
   CHORD_INVERSION_MAX,
   CHORD_REPEAT_MAX,
-  CHORD_SEMITONE_MAX,
-  CHORD_SIZE_TRIAD,
   CHORD_STEPS_MAX,
   CHORD_STEP_OCTAVE_MAX,
   GATE_MIN,
-  GRID_DEGREE_MAX,
-  OCTAVE_MAX,
+  REGISTER_OCTAVE_MAX,
+  REGISTER_OCTAVE_MIN,
 } from '../audioConstants';
 import {
   CHORD_DIVISORS,
@@ -30,11 +29,10 @@ import {
 import {
   CHORD_STEP_KINDS,
   DEFAULT_CHORD_CONFIG,
-  chordStep,
+  hitStep,
   restStep,
   type ChordStep,
 } from '../sequencing/chordSequencer';
-import { isChordSize, type ChordSize } from './chordTheory';
 
 export function chordDriver(raw: unknown, path: string, n: FieldNormaliser): ChordDriver {
   const d = DEFAULT_CHORD_CONFIG;
@@ -50,8 +48,8 @@ export function chordDriver(raw: unknown, path: string, n: FieldNormaliser): Cho
       octave: n.int(
         reg.octave,
         d.register.octave,
-        -OCTAVE_MAX,
-        OCTAVE_MAX,
+        REGISTER_OCTAVE_MIN,
+        REGISTER_OCTAVE_MAX,
         `${path}.register.octave`,
       ),
     },
@@ -95,17 +93,11 @@ function chordStepOf(raw: unknown, path: string, n: FieldNormaliser): ChordStep 
     n.dropUnknown(o, ['kind', 'duration', 'repeat'], path);
     return restStep(timing);
   }
-  n.dropUnknown(
-    o,
-    ['kind', 'degree', 'size', 'inversion', 'octave', 'semitone', 'duration', 'repeat'],
-    path,
-  );
-  return chordStep(n.int(o.degree, 0, 0, GRID_DEGREE_MAX, `${path}.degree`), {
+  n.dropUnknown(o, ['kind', 'inversion', 'octave', 'duration', 'repeat'], path);
+  return hitStep({
     ...timing,
-    size: size(o.size, `${path}.size`, n),
     inversion: n.int(o.inversion, 0, 0, CHORD_INVERSION_MAX, `${path}.inversion`),
     octave: n.int(o.octave, 0, -CHORD_STEP_OCTAVE_MAX, CHORD_STEP_OCTAVE_MAX, `${path}.octave`),
-    semitone: n.int(o.semitone, 0, -CHORD_SEMITONE_MAX, CHORD_SEMITONE_MAX, `${path}.semitone`),
   });
 }
 
@@ -118,12 +110,4 @@ function duration(raw: unknown, path: string, n: FieldNormaliser): number {
     `${path}: ${show(raw)} is not one of ${CHORD_DURATIONS.join('|')} — using ${fallback}`,
   );
   return fallback;
-}
-
-/** A triad or a seventh; anything else is a triad, reported. */
-function size(raw: unknown, path: string, n: FieldNormaliser): ChordSize {
-  if (raw === undefined) return CHORD_SIZE_TRIAD;
-  if (typeof raw === 'number' && isChordSize(raw)) return raw;
-  n.correction(`${path}: ${show(raw)} is not a triad (3) or a seventh (4) — using a triad`);
-  return CHORD_SIZE_TRIAD;
 }

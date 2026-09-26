@@ -4,42 +4,39 @@
  * `2026-08-31-generative-sequencing-transport-and-pitch` §2 — the sequencers
  * know nothing about audio, and everything that does know lives here.
  *
- *   transport ─▶ EuclideanSequencer ─ onset ─▶ part.trigger
- *            ─▶ GridSequencer      ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
- *            ─▶ ChordSequencer     ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
+ *   transport ─▶ RegionGate ─▶ EuclideanSequencer ─ onset ─▶ part.trigger
+ *                          ─▶ GridSequencer      ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
+ *                          ─▶ ChordSequencer     ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
+ *                          ─▶ Arp / Bass (#706, #707)
  *
- * Since #597 any part carries any of those, or none: a part is found by its
+ * Since #705 every part's generator sits behind its own `RegionGate`
+ * (`sequencing/regionGate.ts`): the gate applies the part's `regions` to the
+ * transport tick, hands the generator its local position and the harmony
+ * timeline's current chord, restarts its stream on a region entry and, on
+ * the tick a region ends, releases what the part holds through
+ * `release()`. The player never reads a tick itself; `stepAt` folds the
+ * console's playhead through the same gate (#619's one position rule).
+ *
+ * Since #597 any part carries any kind, or none: a part is found by its
  * slot, a `none` part builds no generator and is never touched here beyond
- * `releaseAll`, and a part's slot is its generator index, so removing or
- * reordering one part cannot move another's stream. Since #629 a part is
- * added and removed live too: a whole part at a free slot asks the
- * `PartHost` for its `AudioPart` and joins the transport where it is, `null`
- * at a slot releases that part and hands it back, and no other slot is
- * touched by either. A fragment naming an absent slot is still ignored and
- * reported.
+ * `releaseAll`. Since #629 a part is added and removed live too: a whole part
+ * at a free slot asks the `PartHost` for its `AudioPart` and joins the
+ * transport where it is, `null` at a slot releases that part and hands it
+ * back, and no other slot is touched by either. A fragment naming an absent
+ * slot is still ignored and reported.
  *
  * `apply()` is the live tuning path (refinement decision 3): a deep partial is
  * merged over the current arrangement, validated, and committed — bpm straight
  * to the transport, a preset change via `setPatch`, and only the generators
- * whose config (or shared key/seed) actually changed are rebuilt, so tuning
- * one part cannot reset another's stream. A merged arrangement that fails
- * validation changes nothing and is reported, never half-applied.
+ * whose kind, divisor or seed changed are rebuilt (`generatorSig`); a
+ * `regions`, `transport.bars` or harmony edit reaches every gate live and
+ * rebuilds nothing, and a key change re-pitches through the sampler. A
+ * merged arrangement that fails validation changes nothing and is reported,
+ * never half-applied.
  */
-import type {
-  Arrangement,
-  ArrangementPartial,
-  ChordDriver,
-  EuclideanDriver,
-  GridDriver,
-  MusicPart,
-  SequencerSpec,
-} from './arrangement';
-import { driverOf, mergeArrangement } from './arrangement';
-import {
-  EuclideanSequencer,
-  assertEuclideanConfig,
-  type OnsetEvent,
-} from '../sequencing/euclideanSequencer';
+import type { Arrangement, ArrangementPartial, MusicPart } from './arrangement';
+import { mergeArrangement } from './arrangement';
+import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
 import type { NoteEvent } from '../sequencing/noteEvent';
 import type { PresetTable } from './arrangementValidate';
 import {
@@ -53,9 +50,17 @@ import type { Patch } from '../patch/patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from '../patch/patch';
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import type { TickSource, Unsubscribe } from '../sequencing/scheduler';
-import { GridSequencer, assertGridConfig } from '../sequencing/gridSequencer';
-import { ChordSequencer, assertChordConfig } from '../sequencing/chordSequencer';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { RegionGate, type RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
+import {
+  buildGenerator,
+  generatorSig,
+  generatorStepAt,
+  isPitched,
+  liveReconfiguration,
+  type Generator,
+} from './partGenerators';
 
 /** What a binding needs from a part. `AudioPart` satisfies it structurally. */
 export interface PlayablePart {
@@ -105,22 +110,22 @@ export interface ArrangementReadout {
   counters: Record<string, number>;
 }
 
-type Generator = EuclideanSequencer | GridSequencer | ChordSequencer;
+/** A part's generator behind its region gate. */
+interface Bound {
+  generator: Generator;
+  gate: RegionGate;
+}
 
 interface Built {
   sampler: ScaleSampler;
   /** By slot; `null` for a `none` part. */
-  generators: ReadonlyMap<number, Generator | null>;
+  bound: ReadonlyMap<number, Bound | null>;
 }
 
 interface Plan {
   built: Built;
   rebuilt: ReadonlySet<number>;
-  /**
-   * Grid, chord and Euclidean parts kept live (#603, #606, #610): each entry
-   * applies the validated config to its generator after the commit, against
-   * the sampler the commit installs.
-   */
+  /** Parts kept live: each entry applies the validated config to its generator after the commit. */
   reconfigured: ReadonlyArray<() => void>;
   patchChanges: ReadonlyArray<readonly [number, Patch]>;
   /** Parts on slots the arrangement did not hold (#629), with the patch each starts on. */
@@ -161,55 +166,17 @@ function stagePatches(
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
-/**
- * What builds a part's generator: its kind, never its note, hold or velocity.
- * A grid (#603) or a Euclidean part (#610) rebuilds only on its kind or
- * divisor and a chord progression only on its kind (#606, it subscribes at
- * every tick): every other field reconfigures the live generator, so an edit
- * never cuts the held note or restarts the stream.
- */
-const generatorSig = (spec: SequencerSpec): string => {
-  if (spec.kind === 'grid' || spec.kind === 'euclidean') return sig([spec.kind, spec.divisor]);
-  return sig([spec.kind]);
-};
+/** The song's length in ticks, from its explicit `transport.bars` (decision 5). */
+export const songTicksOf = (arrangement: Arrangement): number =>
+  arrangement.transport.bars * TICKS_PER_BAR;
 
-/** Kept live across edits (#603, #606, #610): reconfigured after a commit, never rebuilt for one. */
-const isLive = (spec: SequencerSpec): boolean =>
-  spec.kind === 'grid' || spec.kind === 'chord' || spec.kind === 'euclidean';
-
-/**
- * A grid, chord or Euclidean part kept live is validated here, inside the
- * transaction: a bad edit (a length past its steps, a pulse bound past the
- * figure) is refused before the tempo, the patches or the arrangement change,
- * exactly as a rebuild's constructor would be. What comes back runs after the
- * commit, against `built.sampler`.
- */
-function liveReconfigurations(
-  merged: Arrangement,
-  rebuilt: ReadonlySet<number>,
-  built: Built,
-): Array<() => void> {
-  const out: Array<() => void> = [];
-  for (const part of merged.parts) {
-    const { sequencer } = part;
-    if (rebuilt.has(part.slot) || !isLive(sequencer)) continue;
-    const generator = built.generators.get(part.slot);
-    const stream = { seed: merged.seed, generatorIndex: part.slot };
-    if (sequencer.kind === 'grid' && generator instanceof GridSequencer) {
-      const config = { ...(driverOf(sequencer) as GridDriver), ...stream };
-      assertGridConfig(config);
-      out.push(() => generator.reconfigure(config, built.sampler));
-    } else if (sequencer.kind === 'chord' && generator instanceof ChordSequencer) {
-      const config = { ...(driverOf(sequencer) as ChordDriver), ...stream };
-      assertChordConfig(config);
-      out.push(() => generator.reconfigure(config, built.sampler));
-    } else if (sequencer.kind === 'euclidean' && generator instanceof EuclideanSequencer) {
-      const config = { ...(driverOf(sequencer) as EuclideanDriver), ...stream };
-      assertEuclideanConfig(config);
-      out.push(() => generator.reconfigure(config));
-    }
-  }
-  return out;
+/** What a part's gate reads: its regions over the song's length and harmony. */
+function gateConfig(arrangement: Arrangement, part: MusicPart): RegionGateConfig {
+  return {
+    regions: part.regions,
+    songTicks: songTicksOf(arrangement),
+    harmony: arrangement.harmony,
+  };
 }
 
 export class ArrangementPlayer {
@@ -237,7 +204,7 @@ export class ArrangementPlayer {
     validateArrangement(this.current, this.presets);
     this.index();
     this.built = this.buildAll(this.current);
-    this.transport.bpm = this.current.bpm;
+    this.transport.bpm = this.current.transport.bpm;
     this.attach(new Set(this.current.parts.map((part) => part.slot)));
   }
 
@@ -247,12 +214,12 @@ export class ArrangementPlayer {
   }
 
   readout(): ArrangementReadout {
-    const { scale } = this.current.key;
+    const { root, scale } = this.current.harmony;
     const counters: Record<string, number> = {};
     for (const { slot } of this.current.parts) counters[slot] = this.counters.get(slot) ?? 0;
     return {
       bpm: this.transport.bpm,
-      root: this.current.key.root,
+      root,
       scale: typeof scale === 'string' ? scale : [...scale],
       counters,
     };
@@ -261,32 +228,25 @@ export class ArrangementPlayer {
   /**
    * A Euclidean part's sounding figure as a literal array (issue #70, record
    * §6) — what the console's click-to-toggle freezes into the sequencer's
-   * `pattern`. `null` for any other kind or an absent slot: pitched capture
-   * went with the arpeggiator and step sequencer (#704).
+   * `pattern`. `null` for any other kind or an absent slot.
    */
   capturePattern(slot: number): readonly boolean[] | null {
-    const generator = this.built.generators.get(slot) ?? null;
-    if (this.bySlot.get(slot)?.sequencer.kind !== 'euclidean') return null;
+    const generator = this.built.bound.get(slot)?.generator ?? null;
     return generator instanceof EuclideanSequencer ? [...generator.currentPattern] : null;
   }
 
   /**
    * The step the part on `slot` is sounding at transport tick `tick`, or -1
    * when the part has no position to show — an absent slot, a `none` or
-   * unbuilt part, an empty chord progression (#619 decision 2).
-   *
-   * Each generator's own `stepAt` answers, so the console's playhead *is* the
-   * engine's rule rather than a second copy of it: a grid or Euclidean part
-   * divides the tick by the divisor it subscribed at and folds that into its
-   * loop, and a chord part's segments carry its per-step durations.
+   * unbuilt part, a tick outside the part's regions, an empty Chord Player
+   * (#619 decision 2). The tick goes through the part's gate first, so the
+   * playhead and the performer agree on the local position (#705).
    */
   stepAt(slot: number, tick: number): number {
-    const generator = this.built.generators.get(slot) ?? null;
-    if (generator instanceof ChordSequencer) return generator.stepAt(tick)?.step ?? -1;
-    if (generator instanceof GridSequencer || generator instanceof EuclideanSequencer) {
-      return generator.stepAt(Math.floor(tick / generator.config.divisor));
-    }
-    return -1;
+    const bound = this.built.bound.get(slot);
+    if (!bound) return -1;
+    const state = bound.gate.stateAt(tick);
+    return state.live ? generatorStepAt(bound.generator, state.localTick) : -1;
   }
 
   /**
@@ -306,7 +266,7 @@ export class ArrangementPlayer {
     } catch (error) {
       return { ok: false, ignored, error: error instanceof Error ? error.message : String(error) };
     }
-    this.transport.bpm = merged.bpm;
+    this.transport.bpm = merged.transport.bpm;
     this.presets = plan.presets;
     for (const [slot, patch] of plan.patchChanges) this.parts.get(slot)?.setPatch(patch);
     for (const slot of plan.removed) this.detach(slot);
@@ -318,15 +278,17 @@ export class ArrangementPlayer {
     this.index();
     this.attach(plan.rebuilt);
     for (const reconfigure of plan.reconfigured) reconfigure();
+    // Regions, song length and harmony are live on every gate (#705): the next tick reads them.
+    for (const part of merged.parts) {
+      this.built.bound.get(part.slot)?.gate.reconfigure(gateConfig(merged, part));
+    }
     return { ok: true, ignored };
   }
 
-  /** Release everything sounding — grid and chord parts' held notes included. Mute and teardown call this. */
+  /** Release everything sounding — every pitched part's held notes included. Mute and teardown call this. */
   releaseAll(time = 0): void {
-    for (const generator of this.built.generators.values()) {
-      if (generator instanceof GridSequencer || generator instanceof ChordSequencer) {
-        generator.release(0, time);
-      }
+    for (const bound of this.built.bound.values()) {
+      if (bound && isPitched(bound.generator)) bound.generator.release(0, time);
     }
     for (const { slot } of this.current.parts) this.parts.get(slot)?.allNotesOff();
   }
@@ -343,10 +305,8 @@ export class ArrangementPlayer {
    * part handed back to the host to dispose. Nothing else is touched.
    */
   private detach(slot: number): void {
-    const generator = this.built.generators.get(slot);
-    if (generator instanceof GridSequencer || generator instanceof ChordSequencer) {
-      generator.release(0, 0);
-    }
+    const generator = this.built.bound.get(slot)?.generator ?? null;
+    if (isPitched(generator)) generator.release(0, 0);
     this.subs.get(slot)?.();
     this.subs.delete(slot);
     this.counters.delete(slot);
@@ -360,40 +320,40 @@ export class ArrangementPlayer {
   }
 
   private buildAll(arrangement: Arrangement): Built {
-    const sampler = new ScaleSampler(arrangement.key);
-    const generators = new Map<number, Generator | null>();
-    for (const part of arrangement.parts) {
-      generators.set(part.slot, this.build(part, sampler, arrangement.seed));
-    }
-    return { sampler, generators };
+    const sampler = new ScaleSampler(arrangement.harmony);
+    const bound = new Map<number, Bound | null>();
+    for (const part of arrangement.parts)
+      bound.set(part.slot, this.build(arrangement, part, sampler));
+    return { sampler, bound };
   }
 
-  /** The part's slot is its generator index (#597): its stream is its own. */
-  private build(part: MusicPart, sampler: ScaleSampler, seed: number): Generator | null {
-    const stream = { seed, generatorIndex: part.slot };
-    const driver = driverOf(part.sequencer);
-    switch (part.sequencer.kind) {
-      case 'euclidean':
-        return new EuclideanSequencer({ ...(driver as EuclideanDriver), ...stream });
-      case 'grid':
-        return new GridSequencer(sampler, { ...(driver as GridDriver), ...stream });
-      case 'chord':
-        return new ChordSequencer(sampler, { ...(driver as ChordDriver), ...stream });
-      default:
-        return null;
-    }
+  /**
+   * The part's generator behind its gate: the gate restarts the generator's
+   * stream on a region entry and releases its held notes on a region end —
+   * the note-offs go out through the same `pitched` binding as any other.
+   */
+  private build(arrangement: Arrangement, part: MusicPart, sampler: ScaleSampler): Bound | null {
+    const generator = buildGenerator(part, sampler);
+    if (!generator) return null;
+    const gate = new RegionGate(this.transport, gateConfig(arrangement, part), {
+      onEnter: (regionIndex) => generator.enter(regionIndex),
+      onLeave: (tick, time) => {
+        if (isPitched(generator)) generator.release(tick, time);
+      },
+    });
+    return { generator, gate };
   }
 
   /** Everything `apply` will change, validated and constructed before anything is touched. */
-
   private plan(merged: Arrangement, presets: Record<string, Patch>): Plan {
     validateArrangement(merged, presets);
-    const seedChanged = merged.seed !== this.current.seed;
-    const keyChanged = seedChanged || sig(merged.key) !== sig(this.current.key);
+    const keyChanged =
+      sig([merged.harmony.root, merged.harmony.scale]) !==
+      sig([this.current.harmony.root, this.current.harmony.scale]);
 
     // A part on a slot the arrangement lacked is built like a rebuilt one
-    // (#629): same seed, same generator index, so its stream is the one a
-    // rebuild would have made (#597). It needs a host that can create parts.
+    // (#629): its stream is the one a rebuild would have made. It needs a
+    // host that can create parts.
     const added: Array<readonly [MusicPart, Patch]> = [];
     const removed = new Set<number>();
     for (const { slot } of this.current.parts) {
@@ -410,23 +370,24 @@ export class ArrangementPlayer {
         rebuilt.add(next.slot);
         continue;
       }
-      const changed = generatorSig(next.sequencer) !== generatorSig(before.sequencer);
-      // An inert part only rebuilds when its kind leaves or enters `none`;
-      // a seed change has no stream of its to reset. A grid or chord part
-      // takes a new sampler live (`reconfigure`), so a key change rebuilds nothing.
-      const reseeded = next.sequencer.kind !== 'none' && seedChanged;
-      if (changed || reseeded) rebuilt.add(next.slot);
+      if (generatorSig(next.sequencer) !== generatorSig(before.sequencer)) rebuilt.add(next.slot);
     }
 
     const fresh = rebuilt.size > 0 || keyChanged ? this.buildAll(merged) : this.built;
-    const generators = new Map<number, Generator | null>();
+    const bound = new Map<number, Bound | null>();
     for (const { slot } of merged.parts) {
       const source = rebuilt.has(slot) ? fresh : this.built;
-      generators.set(slot, source.generators.get(slot) ?? null);
+      bound.set(slot, source.bound.get(slot) ?? null);
     }
-    const built: Built = { sampler: keyChanged ? fresh.sampler : this.built.sampler, generators };
+    const built: Built = { sampler: keyChanged ? fresh.sampler : this.built.sampler, bound };
 
-    const reconfigured = liveReconfigurations(merged, rebuilt, built);
+    const reconfigured: Array<() => void> = [];
+    for (const part of merged.parts) {
+      if (rebuilt.has(part.slot)) continue;
+      const generator = built.bound.get(part.slot)?.generator ?? null;
+      const live = liveReconfiguration(generator, part.sequencer, built.sampler);
+      if (live) reconfigured.push(live);
+    }
 
     // A part takes a fresh patch when its preset switched, or when the patch
     // it plays was edited in this partial.
@@ -446,21 +407,22 @@ export class ArrangementPlayer {
     return { built, rebuilt, reconfigured, patchChanges, added, removed, presets };
   }
 
-  /** (Re)subscribe the named slots' generators and point their events at the parts. */
+  /** (Re)subscribe the named slots' generators to their gates and point their events at the parts. */
   private attach(slots: ReadonlySet<number>): void {
-    for (const [slot, generator] of this.built.generators) {
-      if (generator instanceof EuclideanSequencer) {
-        generator.onOnset = (e): void => this.percussion(slot, e);
-      } else if (generator) {
-        generator.onNote = (e): void => this.pitched(slot, e);
+    for (const [slot, bound] of this.built.bound) {
+      if (!bound) continue;
+      if (bound.generator instanceof EuclideanSequencer) {
+        bound.generator.onOnset = (e): void => this.percussion(slot, e);
+      } else {
+        bound.generator.onNote = (e): void => this.pitched(slot, e);
       }
     }
     for (const { slot } of this.current.parts) {
       if (!slots.has(slot)) continue;
       this.subs.get(slot)?.();
       this.subs.delete(slot);
-      const generator = this.built.generators.get(slot);
-      if (generator) this.subs.set(slot, generator.attach(this.transport));
+      const bound = this.built.bound.get(slot);
+      if (bound) this.subs.set(slot, bound.generator.attach(bound.gate));
     }
   }
 

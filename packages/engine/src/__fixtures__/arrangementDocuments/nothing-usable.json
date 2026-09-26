@@ -1,7 +1,27 @@
 {
-  "version": 2,
-  "seed": 7,
-  "bpm": 128,
-  "key": { "root": 50, "scale": "dorian" },
-  "parts": [12, [], "loud", { "slot": 3, "name": "drone", "velocity": 0.8 }]
+  "version": 3,
+  "transport": {
+    "bpm": 128,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 2,
+    "scale": "dorian"
+  },
+  "parts": [
+    12,
+    [],
+    "loud",
+    {
+      "slot": 3,
+      "name": "drone",
+      "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ]
+    }
+  ]
 }

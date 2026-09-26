@@ -1,5 +1,5 @@
 /**
- * The version-2 part list through `makeArrangement` (#597): any sequencer kind
+ * The part list through `makeArrangement` (#597; version 3 since #705): any sequencer kind
  * on any slot, slot identity and its corrections, the eight-part cap, the
  * version gate, and a song of inert `none` parts. The rest of the normaliser's
  * contract is `arrangementDocument.test.ts`.
@@ -11,7 +11,7 @@ import type { ArrangementDocument } from './arrangementDocument';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
-import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '../audioConstants';
+import { DEFAULT_BARS, LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '../audioConstants';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 
@@ -36,14 +36,22 @@ function play(arrangement: Arrangement): void {
 /** The library ids these cases name, embedded as `{}` (#562). */
 const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
+/** The whole default-length song (#705): the one ∞ region every part here is live in. */
+const ALL = [{ start: 0, duration: DEFAULT_BARS * TICKS_PER_BAR }];
+
+/** A version-3 document; every part that is an object and names no regions lives the whole song. */
 const song = (parts: unknown[], rest: Record<string, unknown> = {}): Record<string, unknown> => ({
-  version: 2,
+  version: 3,
   patches: PATCHES,
-  parts,
+  parts: parts.map((part) =>
+    typeof part === 'object' && part !== null && !('regions' in part)
+      ? { regions: ALL, ...part }
+      : part,
+  ),
   ...rest,
 });
 
-const KICK = { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } };
+const KICK = { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean', seed: 0 } };
 
 describe('the part list (#597)', () => {
   it('normalises any kind on any slot: four grid lines', () => {
@@ -51,7 +59,7 @@ describe('the part list (#597)', () => {
       slot,
       name: `grid ${slot}`,
       preset: 'saw-arp',
-      sequencer: { kind: 'grid' },
+      sequencer: { kind: 'grid', seed: slot },
     }));
     const result = makeArrangement(song(grids));
     expect(result.corrections).toEqual([]);
@@ -67,9 +75,9 @@ describe('the part list (#597)', () => {
   it('normalises three Euclidean parts and one chord part, in list order', () => {
     const result = makeArrangement(
       song([
-        { slot: 5, preset: 'kick', sequencer: { kind: 'euclidean', note: 36 } },
-        { slot: 2, preset: 'hat', sequencer: { kind: 'euclidean', note: 42 } },
-        { slot: 7, preset: 'hat', sequencer: { kind: 'euclidean', note: 46 } },
+        { slot: 5, preset: 'kick', sequencer: { kind: 'euclidean', note: 36, seed: 5 } },
+        { slot: 2, preset: 'hat', sequencer: { kind: 'euclidean', note: 42, seed: 2 } },
+        { slot: 7, preset: 'hat', sequencer: { kind: 'euclidean', note: 46, seed: 7 } },
         { slot: 0, preset: 'drone-sqr', sequencer: { kind: 'chord' } },
       ]),
     );
@@ -80,7 +88,10 @@ describe('the part list (#597)', () => {
 
   it('drops a later part on a slot already used, reported', () => {
     const result = makeArrangement(
-      song([KICK, { slot: 0, name: 'hat', preset: 'hat', sequencer: { kind: 'euclidean' } }]),
+      song([
+        KICK,
+        { slot: 0, name: 'hat', preset: 'hat', sequencer: { kind: 'euclidean', seed: 0 } },
+      ]),
     );
     expect(result.document.parts.map((p) => p.name)).toEqual(['kick']);
     expect(result.corrections).toContain('parts[1]: slot 0 is already used — part dropped');
@@ -167,8 +178,8 @@ describe('the part list (#597)', () => {
     expect(again.corrections).toEqual([]);
   });
 
-  it('is unusable when the version is not 2', () => {
-    for (const version of [undefined, 1, '2', 3]) {
+  it('is unusable when the version is not 3', () => {
+    for (const version of [undefined, 1, 2, '3', 4]) {
       const result = makeArrangement({ ...song([KICK]), version });
       expect(result.usable, String(version)).toBe(false);
       expect(result.corrections[0]).toMatch(/^version: /);

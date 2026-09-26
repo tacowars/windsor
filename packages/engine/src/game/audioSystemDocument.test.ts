@@ -287,7 +287,10 @@ describe('apply over the document model', () => {
   it('applies arrangement fields and strip fields from one partial', async () => {
     const sys = await system(FULL_DOCUMENT);
     expect(
-      sys.apply({ bpm: 90, parts: { [kick]: { velocity: 0.5, strip: { pan: 0.5 } } } }).ok,
+      sys.apply({
+        transport: { bpm: 90 },
+        parts: { [kick]: { velocity: 0.5, strip: { pan: 0.5 } } },
+      }).ok,
     ).toBe(true);
     expect(sys.readout().bpm).toBe(90);
   });
@@ -333,7 +336,7 @@ describe('live add and removal (#629)', () => {
     const unknown = sys.apply({ parts: { [drone]: { ...DRONE, preset: 'nope' } } });
     expect(unknown.ok).toBe(false);
     expect(sys.engine.getPart(musicPartName(drone))).toBeUndefined();
-    const half = sys.apply({ bpm: 0, parts: { [hat]: null } });
+    const half = sys.apply({ transport: { bpm: 0 }, parts: { [hat]: null } });
     expect(half.ok).toBe(false);
     expect(stripOf(sys, 'hat')).toBeDefined();
   });

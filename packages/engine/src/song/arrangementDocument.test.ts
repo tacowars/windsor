@@ -3,59 +3,21 @@
  * `2026-08-31-arrangement-console-and-runtime-arrangements` §4–§5): never
  * throws, clamps and defaults with corrections reported, drops what cannot
  * play, round-trips, and yields the metronome fallback when nothing usable
- * survives. Since #597 a document is `version: 2` with a slot-keyed part list.
+ * survives. Since #597 a document carries a slot-keyed part list; since #705
+ * it is `version: 3` — `transport`, `harmony`, per-part `regions` and a
+ * per-sequencer `seed` — and a version-2 document is refused.
  */
 import { describe, expect, it } from 'vitest';
 
-import type { Arrangement } from './arrangement';
-import type { ArrangementDocument } from './arrangementDocument';
 import { isShippable, makeArrangement } from './arrangementDocument';
-import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
-import type { PresetTable } from './arrangementValidate';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { DEFAULT_STRIP } from '../mixer/mix';
 import { PRESETS } from '../patch/presets';
 import { DEFAULT_GRID_CONFIG } from '../sequencing/gridSequencer';
+import { DEFAULT_BARS } from '../audioConstants';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
-
-const silentPart = (): PlayablePart => ({
-  noteOn: () => 0,
-  noteOffByNote: () => {},
-  trigger: () => 0,
-  setPatch: () => {},
-  allNotesOff: () => {},
-});
-
-/** The document's own patches — the only table the game resolves against (#562). */
-const patchesOf = (arrangement: Arrangement): PresetTable =>
-  (arrangement as ArrangementDocument).patches ?? {};
-
-/** Building and running the player is the "usable" proof: no constructor throws. */
-function play(arrangement: Arrangement): void {
-  const parts = new Map(arrangement.parts.map((p) => [p.slot, silentPart()]));
-  const transport = new TickTransport();
-  const player = new ArrangementPlayer(transport, parts, arrangement, patchesOf(arrangement));
-  for (let i = 0; i < TICKS_PER_BAR; i++) transport.advance(0);
-  player.dispose();
-}
-
-/**
- * The library ids these normalisation cases name, embedded as `{}` — which
- * `patchNormalise` completes from `makePatch()` without a correction. Since
- * #562 a document resolves only its own `patches`, so a case about clamping
- * or defaults has to carry the patches its parts play.
- */
-const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
-
-/** A version-2 document carrying `PATCHES` and the given parts. */
-const song = (parts: unknown[], rest: Record<string, unknown> = {}): Record<string, unknown> => ({
-  version: 2,
-  patches: PATCHES,
-  parts,
-  ...rest,
-});
-
-const KICK = { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } };
+import { ArrangementPlayer } from './arrangementPlayer';
+import { ALL, KICK, PATCHES, play, silentPart, song } from '../__fixtures__/documentCases';
 
 const JUNK: Array<[string, unknown]> = [
   ['null', null],
@@ -63,10 +25,11 @@ const JUNK: Array<[string, unknown]> = [
   ['a string', 'arrangement'],
   ['an array', [1, 2, 3]],
   ['an empty object', {}],
-  ['a version-2 shell with nothing in it', { version: 2 }],
+  ['a version-2 document', { version: 2, seed: 1, bpm: 96, parts: [KICK], patches: PATCHES }],
+  ['a version-3 shell with nothing in it', { version: 3 }],
   [
     'wrong types throughout',
-    { version: 2, seed: 'x', bpm: 'fast', key: 3, parts: [{ preset: 9 }] },
+    { version: 3, transport: 'fast', harmony: 3, parts: [{ preset: 9, regions: 'all' }] },
   ],
   ['a truncated document', song([{ slot: 0, preset: 'kick' }, { preset: 'hat' }])],
   [
@@ -87,7 +50,22 @@ const JUNK: Array<[string, unknown]> = [
           },
         },
       ],
-      { bpm: 1e9 },
+      { transport: { bpm: 1e9, bars: -2 } },
+    ),
+  ],
+  [
+    'overlapping regions and a junk harmony',
+    song(
+      [
+        {
+          ...KICK,
+          regions: [
+            { start: 96, duration: 1e6 },
+            { start: 0, duration: 200 },
+          ],
+        },
+      ],
+      { harmony: { root: 40, scale: 'nope', events: [{ start: -3, degree: 'ii' }] } },
     ),
   ],
   ['a prototype-chain preset name', song([{ slot: 0, preset: 'toString' }])],
@@ -107,10 +85,10 @@ describe('makeArrangement never throws', () => {
 
 describe('corrections are reported', () => {
   it('names every clamp by path', () => {
-    const result = makeArrangement(song([{ ...KICK, velocity: 9 }], { bpm: 9999 }));
+    const result = makeArrangement(song([{ ...KICK, velocity: 9 }], { transport: { bpm: 9999 } }));
     expect(result.usable).toBe(true);
     expect(result.corrections).toContain('parts[0].velocity: clamped 9 to 1');
-    expect(result.corrections).toContain('bpm: clamped 9999 to 300');
+    expect(result.corrections).toContain('transport.bpm: clamped 9999 to 300');
   });
 
   it('names every dropped unknown key by path', () => {
@@ -135,7 +113,7 @@ describe('corrections are reported', () => {
 
   it('takes defaults for absent optional fields silently', () => {
     const result = makeArrangement(
-      song([{ slot: 4, preset: 'kick', sequencer: { kind: 'euclidean' } }]),
+      song([{ slot: 4, preset: 'kick', sequencer: { kind: 'euclidean', seed: 0 } }]),
     );
     expect(result.usable).toBe(true);
     expect(result.corrections).toEqual([]);
@@ -156,26 +134,26 @@ describe('corrections are reported', () => {
     expect(junk.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.kind/);
   });
 
-  it('reads a deleted arp or step part as none, reported (#704)', () => {
-    for (const kind of ['arp', 'step']) {
-      const result = makeArrangement(song([{ slot: 2, preset: 'saw-arp', sequencer: { kind } }]));
-      expect(result.document.parts[0]?.sequencer).toEqual({ kind: 'none' });
-      expect(result.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.kind/);
-    }
+  it('reads a deleted step part as none, reported (#704; #705 brought `arp` back as its own kind)', () => {
+    const result = makeArrangement(
+      song([{ slot: 2, preset: 'saw-arp', sequencer: { kind: 'step' } }]),
+    );
+    expect(result.document.parts[0]?.sequencer).toEqual({ kind: 'none' });
+    expect(result.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.kind/);
   });
 
-  it('reports key.weights as an unknown key and changes nothing else (#704)', () => {
-    const key = { root: 50, scale: 'dorian' };
-    const plain = makeArrangement(song([KICK], { key }));
+  it('reports harmony.weights as an unknown key and changes nothing else (#704, #705)', () => {
+    const harmony = { root: 2, scale: 'dorian' };
+    const plain = makeArrangement(song([KICK], { harmony }));
     const weighted = makeArrangement(
-      song([KICK], { key: { ...key, weights: [4, 1, 2, 2, 3, 1, 2] } }),
+      song([KICK], { harmony: { ...harmony, weights: [4, 1, 2, 2, 3, 1, 2] } }),
     );
     expect(weighted.corrections).toEqual([
       ...plain.corrections,
-      'key.weights: unknown key dropped',
+      'harmony.weights: unknown key dropped',
     ]);
     expect(weighted.document).toEqual(plain.document);
-    expect(weighted.document.key).toEqual(key);
+    expect(weighted.document.harmony).toMatchObject(harmony);
   });
 });
 
@@ -204,7 +182,7 @@ describe('the fallback (record §4)', () => {
   });
 
   it('clicks exactly once per quarter note, unvarying', () => {
-    const transport = new TickTransport(FALLBACK_ARRANGEMENT.bpm);
+    const transport = new TickTransport(FALLBACK_ARRANGEMENT.transport.bpm);
     let triggers = 0;
     const clicker = { ...silentPart(), trigger: () => ++triggers };
     const player = new ArrangementPlayer(
@@ -223,11 +201,19 @@ describe('round-trip: normalise → serialise → normalise', () => {
   it('is equal and correction-free on the normalised object', () => {
     const messy = song(
       [
-        { ...KICK, velocity: 3, strip: { level: 9 }, sequencer: { kind: 'euclidean', divisor: 5 } },
+        {
+          ...KICK,
+          velocity: 3,
+          strip: { level: 9 },
+          sequencer: { kind: 'euclidean', divisor: 5, seed: 204.4 },
+        },
         { slot: 2, preset: 'saw-arp', sequencer: { kind: 'grid', skipChance: 2, length: 99 } },
-        { slot: 1, preset: 'hat', strip: { sends: { echo: 2 } } },
+        { slot: 1, preset: 'hat', strip: { sends: { echo: 2 } }, regions: [{ start: 400 }] },
       ],
-      { seed: 204.4, bpm: 500, key: { root: 50, scale: 'dorian' } },
+      {
+        transport: { bpm: 500, bars: 4.5 },
+        harmony: { root: 14, scale: 'dorian', events: [{ start: 200, degree: 3, duration: 5 }] },
+      },
     );
     const first = makeArrangement(messy);
     expect(first.usable).toBe(true);
@@ -263,13 +249,18 @@ describe('runtime inputs JSON cannot represent (self-review findings)', () => {
 
 describe('a song resolves only its own patches (#562)', () => {
   const UNEMBEDDED = {
-    version: 2,
-    seed: 204,
-    bpm: 96,
-    key: { root: 50, scale: 'dorian' },
+    version: 3,
+    transport: { bpm: 96, bars: DEFAULT_BARS },
+    harmony: { root: 2, scale: 'dorian' },
     parts: [
-      { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } },
-      { slot: 3, name: 'drone', preset: 'drone-sqr', sequencer: { kind: 'chord' } },
+      {
+        slot: 0,
+        name: 'kick',
+        preset: 'kick',
+        regions: ALL,
+        sequencer: { kind: 'euclidean', seed: 204 },
+      },
+      { slot: 3, name: 'drone', preset: 'drone-sqr', regions: ALL, sequencer: { kind: 'chord' } },
     ],
   };
 
@@ -341,7 +332,7 @@ describe("a document patch's mono field (#453)", () => {
   // booleans, so the field needs no normaliser code -- which is exactly why it
   // is worth pinning: nothing else would fail if the walk stopped covering it.
   const withPatch = (patch: unknown): ReturnType<typeof makeArrangement> =>
-    makeArrangement({ version: 2, parts: [KICK], patches: { kick: patch } });
+    makeArrangement({ version: 3, parts: [KICK], patches: { kick: patch } });
 
   it('keeps true and false as given', () => {
     expect(withPatch({ mono: true }).document.patches?.kick?.mono).toBe(true);

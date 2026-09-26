@@ -63,7 +63,7 @@ const commit = (strip: GridStrip, edit: (spec: GridSpec) => GridSpec['steps']): 
 function kindCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   const step = spec.steps[index];
   if (!step) return cell('', 'blank');
-  const key = strip.ctx.model.doc.key;
+  const key = strip.ctx.model.doc.harmony;
   const folded = step.kind === 'note' && foldedView(step.degree, key).folded;
   const node = cell(stepLabel(step, key), step.kind === 'note' ? 'note' : '');
   if (folded) node.classList.add('folded');
@@ -76,7 +76,7 @@ function kindCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement 
 function degreeSelect(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   const step = spec.steps[index];
   if (!step || step.kind !== 'note') return cell('', 'blank');
-  const key = strip.ctx.model.doc.key;
+  const key = strip.ctx.model.doc.harmony;
   const sel = document.createElement('select');
   sel.className = 'gsel';
   sel.setAttribute('aria-label', `step ${index + 1} degree`);
@@ -146,14 +146,14 @@ const repaint = (strip: GridStrip): void =>
  * `ctx.change` alone, which re-renders nothing.
  */
 function watch(strip: GridStrip): void {
-  let keySig = keySignature(strip.ctx.model.doc.key);
+  let keySig = keySignature(strip.ctx.model.doc.harmony);
   watchPlayhead({
     attached: () => strip.root.isConnected,
     shown: () => strip.root.closest('[hidden]') === null,
     playheadAt: () => playheadAt(strip.ctx, strip.slot),
     mark: markStep(strip),
     repaintIf: () => {
-      const sig = keySignature(strip.ctx.model.doc.key);
+      const sig = keySignature(strip.ctx.model.doc.harmony);
       if (sig === keySig) return;
       keySig = sig;
       strip.repaint();
@@ -202,7 +202,7 @@ function randomizeButton(strip: GridStrip): HTMLElement {
     commit(strip, (spec) =>
       randomSteps(
         spec.steps.length,
-        scaleOffsets(strip.ctx.model.doc.key.scale).length,
+        scaleOffsets(strip.ctx.model.doc.harmony.scale).length,
         Math.random,
       ),
     );

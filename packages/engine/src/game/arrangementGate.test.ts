@@ -25,8 +25,8 @@ import { ArrangementPlayer, type PlayablePart } from '../song/arrangementPlayer'
 import { FALLBACK_ARRANGEMENT } from '../song/fallbackArrangement';
 import { ARRANGEMENT_LIBRARY, ARRANGEMENT_NAMES } from './arrangementLibrary';
 import raw from '../arrangements/bed-01.json';
-import { DEFAULT_ARRANGEMENT_NAME } from '../audioConstants';
-import { TickTransport } from '../sequencing/scheduler';
+import { DEFAULT_ARRANGEMENT_NAME, DEFAULT_BARS } from '../audioConstants';
+import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 
 const silentPart = (): PlayablePart => ({
   noteOn: () => 0,
@@ -130,7 +130,14 @@ describe('fixture documents: valid JSON, still rejected', () => {
       patches: { ...silentSong.patches, kick: {} },
       parts: [
         ...silentSong.parts,
-        { slot: 1, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } },
+        {
+          slot: 1,
+          name: 'kick',
+          preset: 'kick',
+          // The whole song at the default length (#705).
+          regions: [{ start: 0, duration: DEFAULT_BARS * TICKS_PER_BAR }],
+          sequencer: { kind: 'euclidean', seed: 0 },
+        },
       ],
     });
     expect(r.corrections).toEqual([]);

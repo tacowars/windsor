@@ -1,109 +1,108 @@
 /**
- * The chord card's step operations (#607), without the DOM: what a drop or a
- * cell click does to a `ChordSpec`'s step list, and what the picker's chips
- * and a step's tile read for the song's current key. Every function returns a
- * new list; the card writes it through `ctx.change`, where arrays replace
+ * The chord card's step operations (#607, #705), without the DOM: what a drop
+ * or a cell click does to a `ChordSpec`'s step list, and what the Hit tile
+ * and a step's tile sound. Since #705 a step carries no pitch (epic #703
+ * decision 15): a hit voices the chord the song's harmony timeline holds at
+ * the transport tick, so the picker is one Hit tile and one Rest tile, and
+ * an audition asks the engine (`chordAt`, `voiceHit`) for the current chord
+ * and its notes — never a copy of either rule. Every function returns a new
+ * list; the card writes it through `ctx.change`, where arrays replace
  * wholesale. Which step the transport is on is the engine's answer, not a
  * copy here: the card's playhead reads `host.stepAt` (#619 decision 2).
  */
 import type {
-  ArrangementKey,
-  ChordChordStep,
-  ChordSize,
+  ChordHitStep,
+  ChordSpec,
   ChordStep,
-  ChordVoicingId,
+  Harmony,
+  HarmonyChord,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
   CHORD_DURATIONS,
   CHORD_INVERSION_MAX,
   CHORD_REPEAT_MAX,
-  CHORD_SEMITONE_MAX,
   CHORD_STEPS_MAX,
   CHORD_STEP_OCTAVE_MAX,
+  ScaleSampler,
+  chordAt,
   chordName,
   chordOf,
-  chordStep,
-  diatonicChords,
+  hitStep,
   restStep,
   romanNumeral,
   scaleOffsets,
-  voiceChord,
+  voiceHit,
 } from '../../../packages/client/src/audio/index-for-editor';
 
 export { CHORD_STEPS_MAX };
 
-/** What a chip carries, and what a drop writes: a chord of the key, or a rest. */
-export type ChordPayload = { kind: 'chord'; degree: number; size: ChordSize } | { kind: 'rest' };
+/** What a tile carries, and what a drop writes: a hit of the current chord, or a rest. */
+export type ChordPayload = { kind: 'hit' } | { kind: 'rest' };
 
 export interface Chip {
   readonly payload: ChordPayload;
-  /** `C min`, or `Rest`. */
+  /** `Hit` or `Rest`. */
   readonly name: string;
-  /** `i`, `V7`; empty for the rest tile. */
+  /** The current chord's name and numeral under the Hit tile; empty for Rest. */
   readonly numeral: string;
-}
-
-/** One chip per degree of the current scale, at the picker's size. */
-export function pickerChips(key: ArrangementKey, size: ChordSize): Chip[] {
-  const offsets = scaleOffsets(key.scale);
-  return diatonicChords(offsets, size).map((chord) => ({
-    payload: { kind: 'chord', degree: chord.degree, size },
-    name: chordName(key.root, chord),
-    numeral: romanNumeral(chord.degree, chord.quality, offsets.length),
-  }));
 }
 
 export const REST_CHIP: Chip = { payload: { kind: 'rest' }, name: 'Rest', numeral: '' };
 
-/** A step's tile: its name and numeral for the current key, or `Rest`. */
-export function stepLabel(step: ChordStep, key: ArrangementKey): { name: string; numeral: string } {
-  if (step.kind === 'rest') return { name: 'Rest', numeral: '' };
-  const offsets = scaleOffsets(key.scale);
-  const chord = chordOf(offsets, step.degree, step.size);
-  return {
-    name: chordName(key.root, chord),
-    numeral: romanNumeral(step.degree, chord.quality, offsets.length),
-  };
+/** The chord the song holds at `tick` — the engine's timeline rule, for the tile and the audition. */
+export function currentChord(
+  harmony: Harmony,
+  songTicks: number,
+  tick: number,
+): HarmonyChord | null {
+  return chordAt(harmony, songTicks, tick);
 }
 
-/** The notes a chip sounds when pressed: root position, the part's voicing, at its register octave. */
-export function auditionNotes(
-  key: ArrangementKey,
-  payload: ChordPayload,
-  voicing: ChordVoicingId,
-  octave: number,
-): number[] {
-  if (payload.kind === 'rest') return [];
-  const chord = chordOf(scaleOffsets(key.scale), payload.degree, payload.size);
-  return voiceChord(chord.stack, { inversion: 0, voicing, octave, semitone: 0 }, key.root);
+/** `C min i`, from the harmony's key; empty with no chord. */
+export function chordLabel(harmony: Harmony, chord: HarmonyChord | null): string {
+  if (!chord) return '';
+  const offsets = scaleOffsets(harmony.scale);
+  const named = chordOf(offsets, chord.event.degree, chord.event.size);
+  return `${chordName(harmony.root, named)} ${romanNumeral(chord.event.degree, named.quality, offsets.length)}`;
 }
 
-/** The notes a step's tile sounds when pressed: the step as the sequencer would play it. */
+/** The Hit tile: named for the chord under the playhead now. */
+export function hitChip(harmony: Harmony, chord: HarmonyChord | null): Chip {
+  return { payload: { kind: 'hit' }, name: 'Hit', numeral: chordLabel(harmony, chord) };
+}
+
+/** A step's tile reads `Hit` or `Rest`: the chord is the timeline's, not the step's. */
+export function stepLabel(step: ChordStep): string {
+  return step.kind === 'hit' ? 'Hit' : 'Rest';
+}
+
+/** The notes a tile sounds when pressed: the current chord as the sequencer would play `step`; none for a rest or no chord. */
 export function stepNotes(
-  key: ArrangementKey,
-  step: ChordStep,
-  voicing: ChordVoicingId,
-  octave: number,
+  harmony: Harmony,
+  chord: HarmonyChord | null,
+  step: Pick<ChordHitStep, 'inversion' | 'octave'> | ChordStep,
+  spec: Pick<ChordSpec, 'voicing' | 'register'>,
 ): number[] {
-  if (step.kind === 'rest') return [];
-  const chord = chordOf(scaleOffsets(key.scale), step.degree, step.size);
-  return voiceChord(
-    chord.stack,
-    {
-      inversion: step.inversion,
-      voicing,
-      octave: octave + step.octave,
-      semitone: step.semitone,
-    },
-    key.root,
-  );
+  if (!chord || ('kind' in step && step.kind === 'rest')) return [];
+  const hit = 'kind' in step ? step : hitStep(step);
+  const config = { ...spec, divisor: 1, gate: 1, steps: [] };
+  return voiceHit(new ScaleSampler(harmony), config, hit, chord);
 }
 
-/** The step a drop writes: the payload's chord (root position, no shift) over the step's timing. */
+/** The notes the Hit tile sounds: the current chord in root position at the register. */
+export function auditionNotes(
+  harmony: Harmony,
+  chord: HarmonyChord | null,
+  payload: ChordPayload,
+  spec: Pick<ChordSpec, 'voicing' | 'register'>,
+): number[] {
+  return payload.kind === 'rest' ? [] : stepNotes(harmony, chord, hitStep(), spec);
+}
+
+/** The step a drop writes: a root-position hit or a rest, over the step's timing. */
 export function droppedStep(payload: ChordPayload, over?: ChordStep): ChordStep {
   const timing = over ? { duration: over.duration, repeat: over.repeat } : {};
-  if (payload.kind === 'rest') return restStep(timing);
-  return chordStep(payload.degree, { size: payload.size, ...timing });
+  return payload.kind === 'rest' ? restStep(timing) : hitStep(timing);
 }
 
 export function withStep(steps: readonly ChordStep[], index: number, step: ChordStep): ChordStep[] {
@@ -125,11 +124,11 @@ export function dropOn(
   return [...steps];
 }
 
-/** A copy of the last step appended (a rest on an empty list); a full list is unchanged. */
+/** A copy of the last step appended (a hit on an empty list); a full list is unchanged. */
 export function appendStep(steps: readonly ChordStep[]): ChordStep[] {
   if (steps.length >= CHORD_STEPS_MAX) return [...steps];
   const last = steps[steps.length - 1];
-  return [...steps, last ? { ...last } : restStep()];
+  return [...steps, last ? { ...last } : hitStep()];
 }
 
 /** The list without its last step; an empty list stays empty. */
@@ -137,42 +136,37 @@ export function removeLast(steps: readonly ChordStep[]): ChordStep[] {
   return steps.slice(0, -1);
 }
 
-/** The per-step fields a cell turns, and how far each goes. */
-export type StepDial = 'octave' | 'inversion' | 'semitone' | 'duration' | 'repeat';
+/** The per-step fields a cell turns, and how far each goes. Semi went with the step's pitch (#705). */
+export type StepDial = 'octave' | 'inversion' | 'duration' | 'repeat';
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
 
-/** A chord-only edit; a rest is returned unchanged. */
-function editChord(step: ChordStep, edit: (chord: ChordChordStep) => ChordChordStep): ChordStep {
-  return step.kind === 'chord' ? edit(step) : step;
+/** A hit-only edit; a rest is returned unchanged. */
+function editHit(step: ChordStep, edit: (hit: ChordHitStep) => ChordHitStep): ChordStep {
+  return step.kind === 'hit' ? edit(step) : step;
 }
 
 /**
- * Turn one dial by `direction`: octave, inversion and semitone stop at their
- * bounds (inversion wraps past `CHORD_INVERSION_MAX` back to 0, so a click
- * cycles it); duration walks the table; repeat counts 1–`CHORD_REPEAT_MAX`.
- * Octave, inversion and semitone are chord-only; a rest keeps its timing dials.
+ * Turn one dial by `direction`: octave stops at its bounds, inversion wraps
+ * past `CHORD_INVERSION_MAX` back to 0 (so a click cycles it), duration walks
+ * the table, repeat counts 1–`CHORD_REPEAT_MAX`. Octave and inversion are
+ * hit-only; a rest keeps its timing dials.
  */
 export function turnDial(step: ChordStep, dial: StepDial, direction: 1 | -1): ChordStep {
   switch (dial) {
     case 'octave':
-      return editChord(step, (c) => ({
-        ...c,
-        octave: clamp(c.octave + direction, -CHORD_STEP_OCTAVE_MAX, CHORD_STEP_OCTAVE_MAX),
+      return editHit(step, (h) => ({
+        ...h,
+        octave: clamp(h.octave + direction, -CHORD_STEP_OCTAVE_MAX, CHORD_STEP_OCTAVE_MAX),
       }));
     case 'inversion': {
       const span = CHORD_INVERSION_MAX + 1;
-      return editChord(step, (c) => ({
-        ...c,
-        inversion: (((c.inversion + direction) % span) + span) % span,
+      return editHit(step, (h) => ({
+        ...h,
+        inversion: (((h.inversion + direction) % span) + span) % span,
       }));
     }
-    case 'semitone':
-      return editChord(step, (c) => ({
-        ...c,
-        semitone: clamp(c.semitone + direction, -CHORD_SEMITONE_MAX, CHORD_SEMITONE_MAX),
-      }));
     case 'duration': {
       const at = CHORD_DURATIONS.indexOf(step.duration);
       const next = clamp(
@@ -191,9 +185,9 @@ export function turnDial(step: ChordStep, dial: StepDial, direction: 1 | -1): Ch
 export function dialLabel(step: ChordStep, dial: StepDial): string {
   if (dial === 'duration') return `×${step.duration}`;
   if (dial === 'repeat') return `r${step.repeat}`;
-  if (step.kind !== 'chord') return '';
-  const value = step[dial];
-  if (dial === 'inversion') return `inv ${value}`;
-  if (value === 0) return dial === 'octave' ? 'oct' : 'semi';
+  if (step.kind !== 'hit') return '';
+  if (dial === 'inversion') return `inv ${step.inversion}`;
+  const value = step.octave;
+  if (value === 0) return 'oct';
   return `${value > 0 ? '+' : ''}${value}`;
 }
