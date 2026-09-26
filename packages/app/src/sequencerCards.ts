@@ -12,6 +12,7 @@
  */
 import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
 import { arpCard } from './arpCard';
+import { bassCard } from './bassCard';
 import { chordCard } from './chordCard';
 import type { AppCtx } from './context';
 import { el } from './dom';
@@ -25,16 +26,6 @@ export type SequencerCard = (ctx: AppCtx, slot: number) => HTMLElement;
 const noneCard: SequencerCard = () =>
   el('p', 'hint', 'No sequencer: this part plays only from the keyboard.');
 
-/**
- * A kind the document carries and the engine normalises in full, whose
- * performer and card a later ticket brings (#705): one line, no knobs, so
- * the registry test holds and the part is not headed and left blank.
- */
-const stubCard =
-  (label: string, ticket: string): SequencerCard =>
-  () =>
-    el('p', 'hint', `${label}: the performer and its card arrive with ${ticket}.`);
-
 /** One card per kind. A kind added to the engine is an appended entry here. */
 export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   none: noneCard,
@@ -42,5 +33,5 @@ export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   grid: gridCard,
   chord: chordCard,
   arp: arpCard,
-  bass: stubCard('Bass', '#707'),
+  bass: bassCard,
 };
