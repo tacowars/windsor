@@ -348,3 +348,10 @@ export {
   applyEnsemblePreset,
   matchingEnsemblePreset,
 } from './inserts/ensemblePresets';
+
+export { DEFAULT_ADVANCED_DRIVE, DEFAULT_DRIVE_STAGE } from './inserts/advancedDriveSpec';
+export type { AdvancedDriveSpec, DriveStageSpec } from './inserts/advancedDriveSpec';
+export * from './inserts/advancedDriveConstants';
+export { driveShape } from './inserts/advancedDriveCurves';
+export { DriveFilter } from './inserts/advancedDriveFilter';
+export * from './inserts/advancedDrivePresets';

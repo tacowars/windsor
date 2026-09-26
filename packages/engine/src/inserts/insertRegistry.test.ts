@@ -23,6 +23,7 @@ describe('INSERT_KINDS', () => {
   it('names every shipped kind, each with its fields, defaults, normaliser and factory', () => {
     expect(INSERT_KIND_NAMES).toEqual([
       'drive',
+      'advanced-drive',
       'chorus',
       'compressor',
       'retro-reverb',

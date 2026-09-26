@@ -28,7 +28,8 @@ import type { SeqKnobOpts } from './sequencerKnobTables';
 
 /** What each kind is called on its card and in the Add picker. */
 export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
-  drive: 'Drive',
+  drive: 'Classic Drive',
+  'advanced-drive': 'Advanced Drive',
   chorus: 'Chorus',
   compressor: 'Bus compressor',
   'retro-reverb': 'Retro reverb',

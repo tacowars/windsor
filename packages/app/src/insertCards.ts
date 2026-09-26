@@ -10,6 +10,7 @@ import type { InsertKindName } from '../../../packages/client/src/audio/index-fo
 import type { AppCtx } from './context';
 import { compressorCard } from './compressorCard';
 import { chorusCard } from './chorusCard';
+import { advancedDriveCard } from './advancedDriveCard';
 import { driveCard } from './driveCard';
 import { delayCard } from './delayCard';
 import { ensembleCard } from './ensembleCard';
@@ -21,6 +22,7 @@ export type InsertCard = (ctx: AppCtx, slot: InsertTarget, index: number) => HTM
 
 export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   drive: driveCard,
+  'advanced-drive': advancedDriveCard,
   chorus: chorusCard,
   compressor: compressorCard,
   'retro-reverb': retroReverbCard,
