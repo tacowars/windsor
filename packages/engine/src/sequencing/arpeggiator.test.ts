@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { MIDI_NOTE_MAX } from '../audioConstants';
 import { chordAt, type Harmony, type HarmonyChord } from '../harmony/harmonyTimeline';
 import { DEFAULT_CHORD_CONFIG, voiceHit } from './chordSequencer';
 import { DEFAULT_ARP_CONFIG, type ArpSequencerConfig, type ArpStyle } from './arpSequencer';
@@ -108,6 +109,30 @@ describe('the note list', () => {
     const arp = arpNoteList(sampler, arpConfig({ voicing: 'drop2', octaves: 1 }), chord(seventh));
     expect(arp).toEqual(hit);
     expect(arp).not.toEqual(arpNoteList(sampler, arpConfig({ octaves: 1 }), chord(seventh)));
+  });
+});
+
+describe('the MIDI range is clipped once, after the octave expansion (#714 review)', () => {
+  const [C, EB, G] = [0, 3, 7];
+  const drop2 = (octave: number) =>
+    arpNoteList(sampler, arpConfig({ voicing: 'drop2', register: { octave } }), chord(TONIC));
+  /** drop2 of C–E♭–G drops E♭ an octave — [E♭−12, C, G] — plus its copy an octave up, clipped once. */
+  const expectedAt = (root: number): number[] => {
+    const unclipped = [root + EB - SEMITONES_PER_OCTAVE, root + C, root + G];
+    const expanded = [...unclipped, ...unclipped.map((n) => n + SEMITONES_PER_OCTAVE)];
+    return expanded.filter((n) => n >= 0 && n <= MIDI_NOTE_MAX).sort((a, b) => a - b);
+  };
+
+  it('register −1, drop2, 2 octaves keeps the E♭ the voicing dropped below 0', () => {
+    const root = sampler.rootNote(-1);
+    expect(drop2(-1)).toEqual(expectedAt(root));
+    expect(drop2(-1)).toContain(root + EB);
+  });
+
+  it('register 9, drop2, 2 octaves keeps every in-range tone and nothing above 127', () => {
+    const root = sampler.rootNote(9);
+    expect(drop2(9)).toEqual(expectedAt(root));
+    expect(Math.max(...drop2(9))).toBeLessThanOrEqual(MIDI_NOTE_MAX);
   });
 });
 

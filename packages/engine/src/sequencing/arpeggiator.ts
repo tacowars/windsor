@@ -6,7 +6,7 @@
  * once by `voiceChord` — the Chord Player's own path, the same voicing enum,
  * at the part's register, with the six-note cap lifted — then duplicated up
  * `octaves − 1` octaves, and the result kept ascending without duplicates and
- * inside MIDI. That ordered list `n[0..L−1]` is what the style walks. It is
+ * clipped to MIDI once, after the expansion. That ordered list `n[0..L−1]` is what the style walks. It is
  * rebuilt at an onset only, so a held note is never retuned (epic decision 2).
  *
  * **The walk** (the issue's decisions 1–4), over the traversal index `i` —
@@ -54,16 +54,23 @@ export function arpNoteList(
   chord: HarmonyChord,
 ): number[] {
   const stack = chordTones(pitch.offsets, chord.event.degree, chord.event.size);
+  // Voice at a whole-octave lift that lands the root mid-MIDI, so `voiceChord`'s
+  // own 0–127 clip never bites; the lift comes off after the octave expansion
+  // and the range is clipped once, at the end — a tone a downward voicing puts
+  // below 0 still reaches the list through its shifted copies (#714 review).
+  const root = pitch.rootNote(config.register.octave);
+  const lift = SEMITONES_PER_OCTAVE * Math.round((MIDI_NOTE_MAX / 2 - root) / SEMITONES_PER_OCTAVE);
   const voiced = voiceChord(
     stack,
     { inversion: 0, voicing: config.voicing, octave: 0, maxNotes: Number.POSITIVE_INFINITY },
-    pitch.rootNote(config.register.octave),
+    root + lift,
   );
   const notes: number[] = [];
   for (let k = 0; k < config.octaves; k++) {
-    for (const note of voiced) notes.push(note + k * SEMITONES_PER_OCTAVE);
+    for (const note of voiced) notes.push(note - lift + k * SEMITONES_PER_OCTAVE);
   }
-  return [...new Set(notes.filter((n) => n <= MIDI_NOTE_MAX))].sort((a, b) => a - b);
+  const inMidi = notes.filter((n) => n >= 0 && n <= MIDI_NOTE_MAX);
+  return [...new Set(inMidi)].sort((a, b) => a - b);
 }
 
 /** Position `k` of one converge cycle over `length`: 0, L−1, 1, L−2, … */
