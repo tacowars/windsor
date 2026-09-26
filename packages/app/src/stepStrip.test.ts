@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AppCtx } from './context';
 import { HostTransport, type TransportSystem } from './host';
-import { markPlaying, playheadAt, watchPlayhead } from './stepStrip';
+import { createFrameDriver, markPlaying, playheadAt, watchPlayhead } from './stepStrip';
 
 /** A cell: its class list and a way to read what was toggled onto it. */
 function fakeCell(): { classList: { toggle(token: string, on: boolean): void }; on: Set<string> } {
@@ -278,5 +278,84 @@ describe('watchPlayhead', () => {
     expect(loop.asked.length).toBe(FRAMES);
     expect(loop.checks).toBe(FRAMES);
     expect(loop.marks).toEqual([0]);
+  });
+});
+
+describe('createFrameDriver (#709 decision 5)', () => {
+  function driver(): {
+    frame: ReturnType<typeof createFrameDriver>;
+    requests: number;
+    run(): void;
+  } {
+    let queued: (() => void) | null = null;
+    const state = { requests: 0 };
+    const frame = createFrameDriver((next) => {
+      state.requests++;
+      queued = next;
+    });
+    return {
+      frame,
+      get requests(): number {
+        return state.requests;
+      },
+      run(): void {
+        const due = queued;
+        queued = null;
+        due?.();
+      },
+    };
+  }
+
+  it('runs every watch that joined on one frame request, and the next frame on one more', () => {
+    const d = driver();
+    const ran: string[] = [];
+    const a = (): void => {
+      ran.push('a');
+      d.frame(a);
+    };
+    const b = (): void => {
+      ran.push('b');
+      d.frame(b);
+    };
+    d.frame(a);
+    d.frame(b);
+    expect(d.requests).toBe(1);
+    d.run();
+    expect(ran).toEqual(['a', 'b']);
+    expect(d.requests).toBe(2);
+    d.run();
+    expect(ran).toEqual(['a', 'b', 'a', 'b']);
+  });
+
+  it('requests nothing once the last watch has left', () => {
+    const d = driver();
+    let more = true;
+    const a = (): void => {
+      if (more) d.frame(a);
+    };
+    d.frame(a);
+    d.run();
+    expect(d.requests).toBe(2);
+    more = false;
+    d.run();
+    d.run();
+    expect(d.requests).toBe(2);
+  });
+
+  it('drives two playhead watches from one request each frame', () => {
+    const d = driver();
+    const { ctx } = fakeCtx((tick) => tick);
+    const marks: number[][] = [[], []];
+    for (const i of [0, 1]) {
+      watchPlayhead({
+        attached: () => true,
+        playheadAt: () => playheadAt(ctx, i),
+        mark: (step) => void marks[i]?.push(step),
+        frame: d.frame,
+      });
+    }
+    d.run();
+    expect(d.requests).toBe(2);
+    expect(marks).toEqual([[0], [0]]);
   });
 });

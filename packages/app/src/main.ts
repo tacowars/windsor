@@ -1,11 +1,10 @@
 /**
  * The arrangement console (#70, record
- * `2026-08-31-arrangement-console-and-runtime-arrangements`): five tabs over
- * the real engine. It boots on a new song — one part, the Init patch, no
+ * `2026-08-31-arrangement-console-and-runtime-arrangements`): four tabs over
+ * the real engine — Parts, Mixer, Song (#709), Arrangement. It boots on a new song — one part, the Init patch, no
  * sequencer (#598) — and a committed song opens through Import. It drives one
- * `AudioSystem`, and every change flows through one pair of operations —
- * `change` (live apply + document merge) and `restructure` (renormalise +
- * rebuild) — on the `AppContext`. Export writes the normalised document —
+ * `AudioSystem`, and every change flows through `change` (live apply +
+ * document merge) on the `AppContext`; Import is the one rebuild. Export writes the normalised document —
  * since #435 the synth patches and the returns included, so one file is the
  * whole piece; import reads one back.
  *
@@ -16,7 +15,6 @@ import { AppContext } from './appContext';
 import { renderArrangementTab } from './arrangementTab';
 import { $ } from './dom';
 import { DocumentModel } from './documentModel';
-import { renderHarmonyTab } from './harmonyTab';
 import { EngineHost } from './host';
 import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { Keyboard } from './keyboard';
@@ -25,8 +23,8 @@ import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
 import { renderPartsTab } from './partsTab';
 import { wirePowerButton } from './powerButton';
-import { renderSequencersTab } from './sequencersTab';
 import { newSong } from './songParts';
+import { songTab } from './songTab';
 import { mountTabShell } from './tabShell';
 import { mountTransportStrip } from './transportStrip';
 
@@ -49,8 +47,7 @@ mountTabShell(
   [
     { id: 'parts', label: 'Parts', render: (body) => renderPartsTab(body, ctx, keyboard, midi) },
     { id: 'mixer', label: 'Mixer', render: (body) => renderMixerTab(body, ctx) },
-    { id: 'sequencers', label: 'Sequencers', render: (body) => renderSequencersTab(body, ctx) },
-    { id: 'harmony', label: 'Harmony', render: (body) => renderHarmonyTab(body, ctx) },
+    { id: 'song', label: 'Song', render: songTab(ctx) },
     { id: 'arrangement', label: 'Arrangement', render: (body) => renderArrangementTab(body, ctx) },
   ],
   $('tabBar'),

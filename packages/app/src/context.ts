@@ -47,9 +47,7 @@ export interface AppCtx {
    * removes it (#629) — `partEdits.ts` builds those.
    */
   change(partial: DocumentPartial): ApplyResult;
-  /** A whole-document change — Import's shape (#629; Restart's button went with #708): edit a draft, renormalise, rebuild from tick 0, re-render. */
-  restructure(edit: (draft: Record<string, unknown>) => void): void;
-  /** Adopt a freshly imported raw document: normalise, rebuild, re-render. */
+  /** Adopt a freshly imported raw document: normalise, rebuild, re-render — the one rebuild the UI offers (#629; Restart went with #708, `restructure` with #709). */
   importDoc(raw: unknown): void;
   /** Re-render the active tab from the current document; the rest render when shown (#620). */
   render(): void;

@@ -25,18 +25,16 @@ import {
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
   MIDI_MIDDLE_C,
-  PITCH_CLASS_MAX,
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
   RETURN_NAMES,
   SEQUENCER_KINDS,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
-  makeArrangement,
   makePatch,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { BARS_KNOB, BPM_KNOB } from './transportTables';
-import { REGISTER_OCTAVE_DEFAULTS, ROOT_DEFAULT, ROOT_OPTIONS, octaveKnob } from './harmonyTables';
+import { REGISTER_OCTAVE_DEFAULTS, octaveKnob } from './harmonyTables';
 import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
 import { getPath } from './patchPath';
@@ -135,13 +133,6 @@ describe('sequencer knobs', () => {
 });
 
 describe('harmony, mixer and arrangement knobs', () => {
-  it("the root is the normaliser's: C, one option per pitch class", () => {
-    expect(ROOT_DEFAULT).toBe(makeArrangement({ version: 3, parts: [] }).document.harmony.root);
-    expect(ROOT_OPTIONS.map((o) => o.value)).toEqual(
-      Array.from({ length: PITCH_CLASS_MAX + 1 }, (_, pc) => String(pc)),
-    );
-  });
-
   it("each kind's register octave knob reads that kind's engine config and range", () => {
     const configs = {
       grid: DEFAULT_GRID_CONFIG,
