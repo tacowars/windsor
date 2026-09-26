@@ -1,7 +1,8 @@
 /**
  * The Sequencers tab's field vocabulary (#70): knobs and pickers that write
- * one sequencer or part field through `ctx.change`, the density-modulator
- * controls, and the capture/release row (record §6). Every control addresses
+ * one sequencer or part field through `ctx.change`, and the density-modulator
+ * controls. The pitched capture/release row went with the arp and step cards
+ * (#704); the Euclidean card captures by click-to-toggle. Every control addresses
  * its part by slot (#597) and a field by name the spec union knows (#618
  * decision 8), so a typo fails typecheck instead of writing a key the
  * normaliser drops. The specs are `sequencerKnobTables.ts`.
@@ -17,10 +18,8 @@ import {
   DENSITY_MOD_KINDS,
   LFO_SHAPES,
   partAt,
-  patternToString,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { PERC_COLOR } from './consoleColors';
-import { noteName } from './consoleFormat';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, seg, select } from './dom';
@@ -158,29 +157,4 @@ export function densityControls(ctx: AppCtx, slot: number): HTMLElement {
   wrap.appendChild(row);
   if (kind !== 'walk') wrap.appendChild(shapeSeg(ctx, slot, kind));
   return wrap;
-}
-
-/** Capture freezes the sounding pattern into the document; release lets go. */
-export function captureControls(ctx: AppCtx, slot: number, color: string): HTMLElement {
-  const wrap = el('div', 'capture-row');
-  const spec = driverOf(ctx.model.doc, slot);
-  const pattern = fieldOf(spec, 'pattern') as readonly (boolean | number | null)[] | null;
-  const button = el('button', 'btn', pattern ? 'Release' : 'Capture') as HTMLButtonElement;
-  button.type = 'button';
-  button.style.borderColor = color;
-  button.onclick = (): void => {
-    if (pattern) ctx.release(slot);
-    else if (!ctx.capture(slot)) ctx.status(`part ${slot}: nothing sounding to capture yet`);
-  };
-  wrap.appendChild(button);
-  const text = pattern ? patternText(spec?.kind === 'euclidean', pattern) : 'generative';
-  wrap.appendChild(el('span', 'status', `pattern: ${text}`));
-  return wrap;
-}
-
-function patternText(onsets: boolean, pattern: readonly (boolean | number | null)[]): string {
-  if (onsets) return patternToString(pattern as readonly boolean[]);
-  return (pattern as readonly (number | null)[])
-    .map((n) => (n === null ? '·' : noteName(n)))
-    .join(' ');
 }

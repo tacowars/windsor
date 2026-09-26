@@ -61,8 +61,6 @@ export const SCALES = {
 
 /* --------------------- arrangement document bounds ---------------------- */
 
-/** A degree weight is relative, so only its magnitude is capped. */
-export const WEIGHT_MAX = 1e6;
 /** A part's note velocity when the document does not name one. */
 export const VELOCITY_DEFAULT = 0.8;
 /** How long a percussion note is held, in seconds. */
@@ -80,14 +78,10 @@ export const LFO_HZ_MAX = 20;
 export const LFO_BARS_DEFAULT = 8;
 export const LFO_BARS_MIN = 0.25;
 export const LFO_BARS_MAX = 256;
-/** How many notes the arpeggiator draws into its pool, and how often it redraws. */
-export const POOL_SIZE_MAX = 16;
-export const REFRESH_BARS_MAX = 64;
 /** A gate is a fraction of the step; zero would sound nothing. */
 export const GATE_MIN = 0.01;
-/** A register's octave offset from the root, and the octaves it spreads over. */
+/** A register's octave offset from the root. */
 export const OCTAVE_MAX = 8;
-export const SPAN_MAX = 8;
 /* ------------------------ the grid sequencer (#602) ---------------------- */
 
 /** A grid line is 1–32 written steps. */

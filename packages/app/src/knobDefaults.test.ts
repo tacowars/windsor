@@ -12,11 +12,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_ARPEGGIATOR_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_GRID_CONFIG,
-  DEFAULT_STEP_SEQUENCER_CONFIG,
   DEFAULT_STRIP,
   DENSITY_MOD_KINDS,
   HOLD_DEFAULT,
@@ -30,21 +28,13 @@ import {
   VELOCITY_DEFAULT,
   WALK_CHANCE,
   makePatch,
-  uniformWeights,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { BPM_KNOB } from './arrangementTab';
-import {
-  REGISTER_OCTAVE_DEFAULTS,
-  ROOT_KNOB,
-  WEIGHT_KNOB,
-  octaveKnob,
-  spanKnob,
-} from './harmonyTables';
+import { REGISTER_OCTAVE_DEFAULTS, ROOT_KNOB, octaveKnob } from './harmonyTables';
 import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
 import { getPath } from './patchPath';
 import {
-  ARP_KNOBS,
   CHORD_KNOBS,
   DENSITY_DEFAULTS,
   DENSITY_KNOBS,
@@ -53,7 +43,6 @@ import {
   EUCLID_STEPS_KNOB,
   GRID_KNOBS,
   GRID_LENGTH_KNOB,
-  STEP_KNOBS,
   euclidPulseKnob,
   type SequencerKnobEntry,
 } from './sequencerKnobTables';
@@ -97,8 +86,6 @@ function engineDefault(config: object, entry: SequencerKnobEntry): unknown {
 
 describe('sequencer knobs', () => {
   const tables: [string, readonly SequencerKnobEntry[], object][] = [
-    ['arp', ARP_KNOBS, DEFAULT_ARPEGGIATOR_CONFIG],
-    ['step', STEP_KNOBS, DEFAULT_STEP_SEQUENCER_CONFIG],
     ['euclidean', EUCLID_KNOBS, DEFAULT_EUCLIDEAN_CONFIG],
     ['grid', GRID_KNOBS, DEFAULT_GRID_CONFIG],
     ['chord', CHORD_KNOBS, DEFAULT_CHORD_CONFIG],
@@ -139,15 +126,12 @@ describe('sequencer knobs', () => {
 });
 
 describe('harmony, mixer and arrangement knobs', () => {
-  it("the root is the normaliser's, a weight the uniform set's", () => {
+  it("the root is the normaliser's", () => {
     expect(ROOT_KNOB.def).toBe(MIDI_MIDDLE_C);
-    expect(WEIGHT_KNOB.def).toBe(uniformWeights('major')[0]);
   });
 
-  it("each kind's register knobs read that kind's engine config", () => {
+  it("each kind's register octave knob reads that kind's engine config", () => {
     const configs = {
-      arp: DEFAULT_ARPEGGIATOR_CONFIG,
-      step: DEFAULT_STEP_SEQUENCER_CONFIG,
       grid: DEFAULT_GRID_CONFIG,
       chord: DEFAULT_CHORD_CONFIG,
     };
@@ -156,7 +140,6 @@ describe('harmony, mixer and arrangement knobs', () => {
       const config = configs[kind as keyof typeof configs];
       expect(REGISTER_OCTAVE_DEFAULTS[kind], kind).toBe(config.register.octave);
       expect(octaveKnob(kind).def, kind).toBe(config.register.octave);
-      if ('span' in config.register) expect(spanKnob(kind).def, kind).toBe(config.register.span);
     }
   });
 

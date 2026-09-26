@@ -10,8 +10,6 @@ import { CHORD_NOTE_NAMES } from '../../../packages/client/src/audio/index-for-e
 export const KIND_LABELS: Readonly<Record<SequencerKind, string>> = {
   none: 'None',
   euclidean: 'Euclidean',
-  arp: 'Arp',
-  step: 'Step',
   grid: 'Grid',
   chord: 'Chord',
 };

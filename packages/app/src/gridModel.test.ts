@@ -17,8 +17,8 @@ import {
   withStep,
 } from './gridModel';
 
-const MINOR: ArrangementKey = { root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] };
-const PENTA: ArrangementKey = { root: 48, scale: 'pentatonicMinor', weights: [1, 1, 1, 1, 1] };
+const MINOR: ArrangementKey = { root: 48, scale: 'naturalMinor' };
+const PENTA: ArrangementKey = { root: 48, scale: 'pentatonicMinor' };
 const REST: GridStep = { kind: 'rest' };
 const TIE: GridStep = { kind: 'tie' };
 

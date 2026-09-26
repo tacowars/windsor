@@ -10,8 +10,7 @@
  *
  * Since #597 a song is a list of 1–8 parts, each identified by its `slot`
  * (0–7) and carrying any sequencer: a Euclidean fixed-note trigger, the
- * arpeggiator, the step sequencer, the written grid (#602), the chord
- * progression (#606), or `none` — an inert part the keyboard
+ * written grid (#602), the chord progression (#606), or `none` — an inert part the keyboard
  * can still play but nothing sequences. A part's name is a label and keys
  * nothing (record `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
@@ -21,22 +20,18 @@
  * `2026-08-31-generative-sequencing-transport-and-pitch` §4 — this is not the
  * world seed).
  */
-import type { ArpeggiatorConfig } from '../sequencing/arpeggiator';
 import type { ChordSequencerConfig } from '../sequencing/chordSequencer';
 import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
 import type { ScaleName } from '../sequencing/scaleSampler';
-import type { StepSequencerConfig } from '../sequencing/stepSequencer';
 
 /** A driver config as the arrangement stores it: the player injects the seed. */
 export type EuclideanDriver = Omit<EuclideanConfig, 'seed' | 'generatorIndex'>;
-export type ArpDriver = Omit<ArpeggiatorConfig, 'seed' | 'generatorIndex'>;
-export type StepDriver = Omit<StepSequencerConfig, 'seed' | 'generatorIndex'>;
 export type GridDriver = Omit<GridSequencerConfig, 'seed' | 'generatorIndex'>;
 export type ChordDriver = Omit<ChordSequencerConfig, 'seed' | 'generatorIndex'>;
 
 /** What may drive a part (#597). `none` is inert: allowed anywhere, skipped by every sequencing path. */
-export const SEQUENCER_KINDS = ['none', 'euclidean', 'arp', 'step', 'grid', 'chord'] as const;
+export const SEQUENCER_KINDS = ['none', 'euclidean', 'grid', 'chord'] as const;
 export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
 
 export interface NoSequencer {
@@ -51,16 +46,12 @@ export type EuclideanSpec = {
   /** Seconds a hit is held before its release phase. */
   readonly hold: number;
 } & EuclideanDriver;
-/** The arpeggiator: pool + walk over the shared scale. */
-export type ArpSpec = { readonly kind: 'arp' } & ArpDriver;
-/** The step sequencer: slow, with gate 1 it is the drone — repeated notes tie. */
-export type StepSpec = { readonly kind: 'step' } & StepDriver;
 /** The grid (#602): a written 1–32 step line of scale degrees with accent, slide, tie and rest. */
 export type GridSpec = { readonly kind: 'grid' } & GridDriver;
 /** The chord progression (#606): 0–32 written steps of diatonic chords by degree, one voicing per part. */
 export type ChordSpec = { readonly kind: 'chord' } & ChordDriver;
 
-export type SequencerSpec = NoSequencer | EuclideanSpec | ArpSpec | StepSpec | GridSpec | ChordSpec;
+export type SequencerSpec = NoSequencer | EuclideanSpec | GridSpec | ChordSpec;
 
 /** One part as the player sees it; the document adds its strip (`DocumentPart`). */
 export interface MusicPart {
@@ -79,8 +70,6 @@ export interface ArrangementKey {
   /** MIDI note of the root in the reference octave. */
   readonly root: number;
   readonly scale: ScaleName | readonly number[];
-  /** Relative weight per degree, same length as the scale. */
-  readonly weights: readonly number[];
 }
 
 export interface Arrangement {
@@ -102,8 +91,8 @@ export function driverOf(spec: SequencerSpec): Record<string, unknown> {
 }
 
 /**
- * A recursive partial, for `AudioSystem.apply()`. Arrays (weights, an
- * explicit scale) are replaced wholesale, never merged. The `NonNullable`
+ * A recursive partial, for `AudioSystem.apply()`. Arrays (an explicit
+ * scale, a step list) are replaced wholesale, never merged. The `NonNullable`
  * unwrap is what lets a partial reach inside optional fields.
  */
 export type DeepPartial<T> = {
@@ -141,7 +130,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function mergeValue(current: unknown, partial: unknown, path: string, ignored: string[]): unknown {
   if (isPlainObject(current) && isPlainObject(partial)) {
     // A tagged union changing kind is replaced wholesale: merging a walk onto
-    // an LFO — or an arp onto a Euclidean — would leave the old kind's fields
+    // an LFO — or a grid onto a Euclidean — would leave the old kind's fields
     // lying around in the data.
     if ('kind' in current && 'kind' in partial && current.kind !== partial.kind) return partial;
     const merged: Record<string, unknown> = { ...current };

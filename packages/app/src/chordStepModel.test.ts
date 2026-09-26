@@ -22,9 +22,9 @@ import {
   turnDial,
 } from './chordStepModel';
 
-const C_MINOR: ArrangementKey = { root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] };
-const D_MINOR: ArrangementKey = { root: 50, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] };
-const PENTA: ArrangementKey = { root: 60, scale: 'pentatonicMajor', weights: [1, 1, 1, 1, 1] };
+const C_MINOR: ArrangementKey = { root: 48, scale: 'naturalMinor' };
+const D_MINOR: ArrangementKey = { root: 50, scale: 'naturalMinor' };
+const PENTA: ArrangementKey = { root: 60, scale: 'pentatonicMajor' };
 
 const FOUR: ChordStep[] = [
   chordStep(0),

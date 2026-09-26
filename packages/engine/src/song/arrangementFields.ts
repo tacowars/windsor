@@ -12,7 +12,6 @@
  * `ArrangementNormaliser` (`arrangementNormalise.ts`) builds the document
  * sections on top of this vocabulary.
  */
-import { MIDI_NOTE_MAX } from '../audioConstants';
 import { isBarDivisor, TICKS_PER_BAR } from '../sequencing/scheduler';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -132,32 +131,4 @@ export class FieldNormaliser {
     }
     return out;
   }
-
-  /**
-   * A captured pitched bar (issue #70, record §6): a MIDI note or `null` (a
-   * rest) per step, looped by the generator. `null` for the whole field is
-   * generative.
-   */
-  notePattern(raw: unknown, path: string): readonly (number | null)[] | null {
-    if (raw === undefined || raw === null) return null;
-    if (!Array.isArray(raw) || raw.length === 0) {
-      this.correction(`${path}: ${show(raw)} is not a captured bar — staying generative`);
-      return null;
-    }
-    const capped = raw.length > MAX_PATTERN_STEPS ? raw.slice(0, MAX_PATTERN_STEPS) : raw;
-    if (capped.length !== raw.length) {
-      this.correction(`${path}: ${raw.length} steps capped to ${MAX_PATTERN_STEPS}`);
-    }
-    return capped.map((v: unknown, i) => {
-      if (v === null) return null;
-      if (typeof v === 'number' && Number.isFinite(v)) {
-        return this.int(v, 0, 0, MIDI_NOTE_MAX, `${path}[${i}]`);
-      }
-      this.correction(`${path}[${i}]: ${show(v)} is not a note — using a rest`);
-      return null;
-    });
-  }
 }
-
-/** A pitched bar is at most 96 steps (divisor 1); anything longer is junk. */
-const MAX_PATTERN_STEPS = 96;

@@ -46,31 +46,31 @@ const song = (parts: unknown[], rest: Record<string, unknown> = {}): Record<stri
 const KICK = { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } };
 
 describe('the part list (#597)', () => {
-  it('normalises any kind on any slot: four arpeggiators', () => {
-    const arps = [0, 1, 2, 3].map((slot) => ({
+  it('normalises any kind on any slot: four grid lines', () => {
+    const grids = [0, 1, 2, 3].map((slot) => ({
       slot,
-      name: `arp ${slot}`,
+      name: `grid ${slot}`,
       preset: 'saw-arp',
-      sequencer: { kind: 'arp' },
+      sequencer: { kind: 'grid' },
     }));
-    const result = makeArrangement(song(arps));
+    const result = makeArrangement(song(grids));
     expect(result.corrections).toEqual([]);
     expect(result.document.parts.map((p) => [p.slot, p.sequencer.kind])).toEqual([
-      [0, 'arp'],
-      [1, 'arp'],
-      [2, 'arp'],
-      [3, 'arp'],
+      [0, 'grid'],
+      [1, 'grid'],
+      [2, 'grid'],
+      [3, 'grid'],
     ]);
     expect(isShippable(result)).toBe(true);
   });
 
-  it('normalises three Euclidean parts and one step part, in list order', () => {
+  it('normalises three Euclidean parts and one chord part, in list order', () => {
     const result = makeArrangement(
       song([
         { slot: 5, preset: 'kick', sequencer: { kind: 'euclidean', note: 36 } },
         { slot: 2, preset: 'hat', sequencer: { kind: 'euclidean', note: 42 } },
         { slot: 7, preset: 'hat', sequencer: { kind: 'euclidean', note: 46 } },
-        { slot: 0, preset: 'drone-sqr', sequencer: { kind: 'step' } },
+        { slot: 0, preset: 'drone-sqr', sequencer: { kind: 'chord' } },
       ]),
     );
     expect(result.corrections).toEqual([]);

@@ -112,7 +112,7 @@ knows the one below it and nothing above.
 4. **The tabs** — `partsTab.ts`, `mixerTab.ts`, `sequencersTab.ts`,
    `harmonyTab.ts`, `arrangementTab.ts` — lay out sections and hand each
    control the context. `sequencersTab.ts` is a lookup in `SEQUENCER_CARDS`.
-5. **The cards and panels** — `arpCard.ts`, `stepCard.ts`, `gridCard.ts`,
+5. **The cards and panels** — `gridCard.ts`,
    `chordCard.ts`, `euclidCard.ts`, `patchBays.ts`, `patchPanels.ts`,
    `returnsPanel.ts`, `envCanvas.ts` / `envelopeKnobs.ts`,
    `harmonicEditor.ts`, `presetBrowser.ts`, `libraryActions.ts`,
@@ -198,8 +198,7 @@ Each is the whole list; a step skipped here is what a later ticket finds.
 
 - A **scale** is an entry in `SCALES` (`audioConstants.ts`, surfaced by
   `scaleSampler.ts`'s `SCALE_NAMES` / `scaleOffsets`); `harmonyTab.ts` picks
-  it up from `SCALE_NAMES` and the degree-weight row sizes itself from
-  `scaleOffsets`, so no list is written twice. Degrees past the scale fold
+  it up from `SCALE_NAMES`, so no list is written twice. Degrees past the scale fold
   with octave carry (`foldDegree`).
 - A **chord quality, voicing or duration** is `chordTables.ts`
   (`CHORD_QUALITIES` / `QUALITY_INTERVALS` / `QUALITY_LABELS`,

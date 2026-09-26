@@ -15,11 +15,9 @@ import type {
   SequencerSpec,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
-  DEFAULT_ARPEGGIATOR_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_GRID_CONFIG,
-  DEFAULT_STEP_SEQUENCER_CONFIG,
   EUCLID_STEPS_MAX,
   GATE_MIN,
   GRID_STEPS_MAX,
@@ -29,8 +27,6 @@ import {
   LFO_BARS_MIN,
   LFO_HZ_DEFAULT,
   MIDI_MIDDLE_C,
-  POOL_SIZE_MAX,
-  REFRESH_BARS_MAX,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
 } from '../../../packages/client/src/audio/index-for-editor';
@@ -74,50 +70,6 @@ export const VELOCITY_KNOB: SectionKnobEntry = {
   label: 'Vel',
   o: { min: 0, max: 1, def: VELOCITY_DEFAULT, fmt: fmt2 },
 };
-
-export const ARP_KNOBS: readonly SequencerKnobEntry[] = [
-  VELOCITY_KNOB,
-  {
-    kind: 'driver',
-    f: 'poolSize',
-    label: 'Pool',
-    o: { min: 1, max: POOL_SIZE_MAX, def: DEFAULT_ARPEGGIATOR_CONFIG.poolSize, step: 1, fmt: fmt0 },
-  },
-  {
-    kind: 'driver',
-    f: 'refreshBars',
-    label: 'Refresh',
-    o: {
-      min: 1,
-      max: REFRESH_BARS_MAX,
-      def: DEFAULT_ARPEGGIATOR_CONFIG.refreshBars,
-      step: 1,
-      fmt: fmt0,
-    },
-  },
-  {
-    kind: 'driver',
-    f: 'skipChance',
-    label: 'Skip',
-    o: { min: 0, max: 1, def: DEFAULT_ARPEGGIATOR_CONFIG.skipChance, fmt: fmt2 },
-  },
-  {
-    kind: 'driver',
-    f: 'gate',
-    label: 'Gate',
-    o: { min: GATE_MIN, max: 1, def: DEFAULT_ARPEGGIATOR_CONFIG.gate, fmt: fmt2 },
-  },
-];
-
-export const STEP_KNOBS: readonly SequencerKnobEntry[] = [
-  VELOCITY_KNOB,
-  {
-    kind: 'driver',
-    f: 'gate',
-    label: 'Gate',
-    o: { min: GATE_MIN, max: 1, def: DEFAULT_STEP_SEQUENCER_CONFIG.gate, fmt: fmt2 },
-  },
-];
 
 /** The Euclidean card's note range: two octaves under middle C to three above. */
 export const EUCLID_NOTE_MIN = 24;

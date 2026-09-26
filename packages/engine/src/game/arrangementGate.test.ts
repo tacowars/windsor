@@ -103,7 +103,7 @@ describe('fixture documents: valid JSON, still rejected', () => {
 
   it('rejects a dangling preset name', () => {
     const r = makeArrangement(danglingPreset);
-    // The step part still plays — but the document must not ship.
+    // The chord part still plays — but the document must not ship.
     expect(r.usable).toBe(true);
     expect(r.dangling).toEqual(['parts[0].preset: no preset "kick-2" is defined']);
     expect(isShippable(r)).toBe(false);

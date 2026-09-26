@@ -1,8 +1,8 @@
 /**
  * The grid sequencer (#602, record `2026-09-17-602-grid-sequencer-degrees-accent-slide`):
  * a written line of 1–32 steps, the classic programmable step sequencer
- * beside the generative `step` drone. Nothing here is drawn from the scale's
- * weights; the only random draw is `skipChance`.
+ * of the key. Nothing here is drawn from the scale; the only random draw is
+ * `skipChance`.
  *
  * A step is a rest, a tie, or a note `{ degree, octave, accent, slide }`:
  *

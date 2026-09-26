@@ -29,11 +29,6 @@ import { SECONDS_PER_MINUTE } from '../audioConstants';
 const { kick, hat, arp, drone } = FULL_SLOT;
 
 /** One sounding degree, one octave: every step-sequencer draw is the same MIDI note. */
-const TIED: Arrangement = {
-  ...FULL_ARRANGEMENT,
-  key: { root: 48, scale: [0], weights: [1] },
-};
-
 describe('bindings', () => {
   it('takes the transport tempo from the arrangement', () => {
     const { transport } = rig();
@@ -61,29 +56,33 @@ describe('bindings', () => {
     }
   });
 
-  it('pairs every arp noteOn with a noteOffByNote scheduled later', () => {
+  it('pairs every grid noteOn with a noteOffByNote scheduled later', () => {
     const { parts, run } = rig();
     run(8);
     const ons = kinds(parts.arp, 'noteOn');
     const offs = kinds(parts.arp, 'noteOffByNote');
     expect(ons.length).toBeGreaterThan(0);
-    expect(offs.length).toBe(ons.length);
-    ons.forEach((on, i) => {
-      const off = offs[i];
-      expect(off?.note).toBe(on.note);
-      expect(off?.time ?? 0).toBeGreaterThan(on.time ?? 0);
+    // The last note may still be sounding when the run stops; every other one is released.
+    expect(offs.length).toBeGreaterThanOrEqual(ons.length - 1);
+    expect(offs.length).toBeLessThanOrEqual(ons.length);
+    offs.forEach((off, i) => {
+      const on = ons[i];
+      expect(off.note).toBe(on?.note);
+      expect(off.time ?? 0).toBeGreaterThan(on?.time ?? 0);
     });
   });
 
-  it('ties the step part: one noteOn across bars, no retrigger, released on demand', () => {
-    const { parts, player, run } = rig(TIED);
-    run(4);
-    expect(kinds(parts.drone, 'noteOn')).toHaveLength(1);
+  it('holds the chord part across its step and releases it on demand', () => {
+    const { parts, player, run } = rig();
+    // Half of the first chord's bar: every tone is on, none is off yet.
+    run(0.5);
+    const ons = kinds(parts.drone, 'noteOn');
+    expect(ons.length).toBeGreaterThan(0);
     expect(kinds(parts.drone, 'noteOffByNote')).toHaveLength(0);
     player.releaseAll(1.25);
     const offs = kinds(parts.drone, 'noteOffByNote');
-    expect(offs).toHaveLength(1);
-    expect(offs[0]?.time).toBe(1.25);
+    expect(offs).toHaveLength(ons.length);
+    expect(offs.every((off) => off.time === 1.25)).toBe(true);
     expect(kinds(parts.drone, 'allNotesOff').length).toBeGreaterThan(0);
   });
 
@@ -111,7 +110,7 @@ describe('bindings', () => {
 });
 
 describe('any sequencer on any slot (#597)', () => {
-  /** Four arpeggiators, one per slot: each draws its own stream. */
+  /** Four grid lines, one per slot: each skips on its own stream. */
   const FOUR_ARPS: Arrangement = {
     ...FULL_ARRANGEMENT,
     parts: [kick, hat, arp, drone].map((slot): MusicPart => ({
@@ -121,19 +120,19 @@ describe('any sequencer on any slot (#597)', () => {
     })),
   };
 
-  it('plays four arpeggiators, each on its own slot’s stream', () => {
+  it('plays four grid lines, each on its own slot’s stream', () => {
     const { parts, run } = rig(FOUR_ARPS);
     run(4);
     const streams = Object.values(parts).map((p) => JSON.stringify(kinds(p, 'noteOn')));
     for (const stream of streams) expect(stream).not.toBe('[]');
     expect(new Set(streams).size).toBe(4);
-    // Slot 2's arpeggiator is bed-01's arp exactly: the slot is the stream.
+    // Slot 2's line is the fixture's exactly: the slot is the stream.
     const bed = rig();
     bed.run(4);
     expect(kinds(parts.arp, 'noteOn')).toEqual(kinds(bed.parts.arp, 'noteOn'));
   });
 
-  it('plays three Euclidean parts and one step part', () => {
+  it('plays three Euclidean parts and one chord part', () => {
     const mixed: Arrangement = {
       ...FULL_ARRANGEMENT,
       parts: [
@@ -262,10 +261,10 @@ describe('the preset table (#435)', () => {
 });
 
 describe('grid parts (#602)', () => {
-  /** bed-01's drone slot driven by a written line: root, accented seventh, tie, rest, slid third. */
+  /** The fixture's drone slot driven by a written line: root, accented seventh, tie, rest, slid third. */
   const LINE: Arrangement = {
     ...FULL_ARRANGEMENT,
-    key: { root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] },
+    key: { root: 48, scale: 'naturalMinor' },
     parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
       part.slot === drone
         ? {
@@ -336,9 +335,7 @@ describe('grid parts (#602)', () => {
         .slice(0, 2),
     ).toEqual([48, 58]);
     const before = parts.drone.calls.length;
-    expect(
-      player.apply({ key: { scale: 'pentatonicMinor', weights: [1, 1, 1, 1, 1] } }, {}).ok,
-    ).toBe(true);
+    expect(player.apply({ key: { scale: 'pentatonicMinor' } }, {}).ok).toBe(true);
     run(1);
     // The six-step line runs four steps to a bar, so bar 2 opens on steps 4
     // and 5 (degrees 2 and 4: 53, 58 in five degrees) before wrapping to the

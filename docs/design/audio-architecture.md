@@ -128,10 +128,13 @@ packages/client/src/audio/          # folders mirror the music-engine skill's fi
                           #   sequencerNormalise.ts, deskNormalise.ts; arrangementValidate.ts (PatchResolver,
                           #   #562); arrangementPlayer.ts (binds each part's sequencer to its engine part, by
                           #   slot); documentParts.ts; fallbackArrangement.ts (the diagnostic click)
-  arrangements/           # the committed song documents, one <name>.json each
-  sequencing/             # scheduler.ts (look-ahead note scheduling) and the generators: step, grid, chord,
-                          #   euclidean, arp, over scaleSampler.ts, euclid.ts, noteEvent.ts, generatorSeed.ts;
-                          #   capturedPattern.ts; generatorBoundary.test.ts keeps them off the audio graph
+  arrangements/           # the committed song documents, one <name>.json each (since #704 only a placeholder
+                          #   bed-01; Pat's own song replaces it after the harmony v2 epic, #703)
+  sequencing/             # scheduler.ts (look-ahead note scheduling) and the generators: grid, chord,
+                          #   euclidean, over scaleSampler.ts (the key's degree → note mapping, no weights),
+                          #   euclid.ts, noteEvent.ts, generatorSeed.ts; generatorBoundary.test.ts keeps them
+                          #   off the audio graph. The arp and step generators, the degree weights and pitched
+                          #   capture were deleted in #704; their replacements are epic #703's
   harmony/                # chordTheory.ts, chordNames.ts, chordVoicing.ts, chordTables.ts, chordNormalise.ts
   cost/                   # audioCost.ts (the overlay and bench readout), audioLoad.ts (audio-thread load),
                           #   schedCost.ts (main-thread scheduler cost), playbackStats.ts (underruns)
