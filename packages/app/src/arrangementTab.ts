@@ -1,6 +1,5 @@
 /**
- * Arrangement tab (#70, record §2; #435): transport, bpm and bars, and the
- * document itself — export downloads a file, import reads one back (record:
+ * Arrangement tab (#70, record §2; #435): the document itself — export downloads a file, import reads one back (record:
  * the console is a local tool, so a page-initiated download simply works).
  * New song starts over from one Init part with no sequencer (#598), asking
  * first when the document has changed since it was opened.
@@ -8,87 +7,15 @@
  * part's strip, sequencers, harmony, all of it; saved under
  * `packages/client/src/audio/arrangements/<name>.json` the game bundles it
  * at build time (record §3) and `?music=<name>` plays it, `bed-01` being the
- * default.
+ * default. The transport, bpm and bars moved to the strip above every tab
+ * (#708, `transportStrip.ts`); Mute became ‖ and Restart is gone — Import is
+ * the rebuild left (#629).
  */
-import {
-  BARS_MAX,
-  BARS_MIN,
-  BPM_MAX,
-  BPM_MIN,
-} from '../../../packages/client/src/audio/index-for-editor';
 import { EXPORT_URL_TTL_MS, READOUT_DEFER_MS, READOUT_POLL_MS } from './arrangementConstants';
-import { CARRIER_COLOR } from './consoleColors';
-import { fmt0 } from './consoleFormat';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
-import { makeKnob, type KnobSpec } from './knob';
 import { openConfirm } from './metadataModal';
-import { NEW_SONG_BARS, NEW_SONG_BPM } from './songConstants';
 import { newSong } from './songParts';
-
-const COLOR = CARRIER_COLOR;
-
-/** The tempo knob: the engine's range, and what a new song starts at (#617). */
-export const BPM_KNOB: Pick<KnobSpec, 'label' | 'min' | 'max' | 'def' | 'step' | 'fmt'> = {
-  label: 'BPM',
-  min: BPM_MIN,
-  max: BPM_MAX,
-  def: NEW_SONG_BPM,
-  step: 1,
-  fmt: fmt0,
-};
-
-/** The song's length in bars (#705, decision 5): the engine's range, and what a new song starts at. */
-export const BARS_KNOB: Pick<KnobSpec, 'label' | 'min' | 'max' | 'def' | 'step' | 'fmt'> = {
-  label: 'Bars',
-  min: BARS_MIN,
-  max: BARS_MAX,
-  def: NEW_SONG_BARS,
-  step: 1,
-  fmt: fmt0,
-};
-
-function transportSection(ctx: AppCtx): HTMLElement {
-  const { root, body } = section('Transport');
-  const row = el('div', 'bar-row');
-  const mute = el('button', 'btn', 'Mute') as HTMLButtonElement;
-  mute.type = 'button';
-  mute.onclick = (): void => {
-    const system = ctx.host.system;
-    if (!system) return ctx.status('enable audio first');
-    mute.setAttribute('aria-pressed', String(system.toggleMute()));
-  };
-  row.appendChild(mute);
-  const restart = el('button', 'btn', 'Restart') as HTMLButtonElement;
-  restart.type = 'button';
-  restart.title = 'Rebuild from the document and play from tick 0';
-  restart.onclick = (): void => ctx.restructure(() => {});
-  row.appendChild(restart);
-  row.appendChild(
-    makeKnob({
-      ...BPM_KNOB,
-      color: COLOR,
-      get: () => ctx.model.doc.transport.bpm,
-      set: (v) => void ctx.change({ transport: { bpm: v } }),
-    }),
-  );
-  // A shorter song clamps every region and event into it (the normaliser's
-  // rule, which the player applies to its live copy too), so the tabs that
-  // draw them are out of date — but this knob is mid-gesture, so they render
-  // when shown rather than under the pointer.
-  row.appendChild(
-    makeKnob({
-      ...BARS_KNOB,
-      color: COLOR,
-      get: () => ctx.model.doc.transport.bars,
-      set: (v) => {
-        if (ctx.change({ transport: { bars: v } }).ok) ctx.invalidate();
-      },
-    }),
-  );
-  body.appendChild(row);
-  return root;
-}
 
 /** Start over on a new song, asking first when this one has changed since it was opened (#598). */
 function newSongButton(ctx: AppCtx): HTMLElement {
@@ -215,7 +142,6 @@ function readoutSection(ctx: AppCtx): HTMLElement {
 
 export function renderArrangementTab(body: HTMLElement, ctx: AppCtx): void {
   body.innerHTML = '';
-  body.appendChild(transportSection(ctx));
   body.appendChild(documentSection(ctx));
   body.appendChild(reportSection(ctx));
   body.appendChild(readoutSection(ctx));
