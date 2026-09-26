@@ -18,7 +18,7 @@ const OLD_SONG = {
   version: 2,
   seed: 204,
   bpm: 96,
-  key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+  key: { root: 50, scale: 'dorian' },
   parts: [
     {
       slot: 0,
@@ -27,7 +27,7 @@ const OLD_SONG = {
       velocity: 1,
       sequencer: { kind: 'euclidean', note: 36, hold: 0.2 },
     },
-    { slot: 2, name: 'arp', preset: 'saw-arp', velocity: 0.7, sequencer: { kind: 'arp' } },
+    { slot: 2, name: 'arp', preset: 'saw-arp', velocity: 0.7, sequencer: { kind: 'grid' } },
   ],
 };
 
@@ -108,7 +108,7 @@ describe('a slot-addressed merge (#597)', () => {
           name: 'drone',
           preset: 'drone-sqr',
           strip: { level: 0.5 },
-          sequencer: { kind: 'step' },
+          sequencer: { kind: 'chord' },
         },
         { slot: 4, name: 'blank', preset: 'kick', sequencer: { kind: 'none' } },
       ],

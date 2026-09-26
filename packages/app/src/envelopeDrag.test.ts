@@ -152,7 +152,7 @@ describe('the envelope drag', () => {
 const SONG = {
   seed: 204,
   bpm: 96,
-  key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+  key: { root: 50, scale: 'dorian' },
   drone: { part: 'drone', preset: 'drone-sqr', velocity: 0.8 },
 };
 

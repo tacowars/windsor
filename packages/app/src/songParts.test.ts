@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type { PlayablePart } from '../../../packages/client/src/audio/index-for-editor';
 import {
   ArrangementPlayer,
+  DEFAULT_EUCLIDEAN_CONFIG,
   TICKS_PER_BAR,
   TickTransport,
   isShippable,
@@ -106,21 +107,23 @@ describe('sequencer kind', () => {
     const model = new DocumentModel(newSong());
     model.merge({ parts: { 0: { name: 'Lead', velocity: 0.5, strip: { pan: 0.25 } } } });
     const before = partAt(model.doc, 0)!;
-    restructure(model, setSequencerKind(model.doc, 0, 'arp'));
+    restructure(model, setSequencerKind(model.doc, 0, 'grid'));
     const after = partAt(model.doc, 0)!;
     expect(model.corrections).toEqual([]);
-    expect(after.sequencer.kind).toBe('arp');
-    expect(after.sequencer.kind === 'arp' && after.sequencer.poolSize).toBeGreaterThan(0);
+    expect(after.sequencer.kind).toBe('grid');
+    expect(after.sequencer.kind === 'grid' && after.sequencer.steps.length).toBeGreaterThan(0);
     expect({ ...after, sequencer: null }).toEqual({ ...before, sequencer: null });
   });
 
   it('discards a captured pattern when the kind changes', () => {
     const model = new DocumentModel(newSong());
-    restructure(model, setSequencerKind(model.doc, 0, 'step'));
-    model.merge({ parts: { 0: { sequencer: { pattern: [48] } } } });
-    restructure(model, setSequencerKind(model.doc, 0, 'arp'));
+    restructure(model, setSequencerKind(model.doc, 0, 'euclidean'));
+    const steps = DEFAULT_EUCLIDEAN_CONFIG.steps;
+    model.merge({ parts: { 0: { sequencer: { pattern: new Array<boolean>(steps).fill(true) } } } });
+    restructure(model, setSequencerKind(model.doc, 0, 'grid'));
+    restructure(model, setSequencerKind(model.doc, 0, 'euclidean'));
     const sequencer = partAt(model.doc, 0)!.sequencer;
-    expect(sequencer.kind === 'arp' && sequencer.pattern).toBeNull();
+    expect(sequencer.kind === 'euclidean' && sequencer.pattern).toBeNull();
   });
 
   it('is a no-op for the kind the part already has', () => {
@@ -128,7 +131,7 @@ describe('sequencer kind', () => {
     expect(setSequencerKind(model.doc, 0, 'none')).toBe(model.doc);
   });
 
-  it('plays: an arp on Part 1 sounds notes after the rebuild, four arps and 3 Euclidean + 1 step both build', () => {
+  it('plays: a grid on Part 1 sounds notes after the rebuild, four grids and 3 Euclidean + 1 chord both build', () => {
     const silent = (count: { n: number }): PlayablePart => ({
       noteOn: () => ++count.n,
       noteOffByNote: () => {},
@@ -147,7 +150,7 @@ describe('sequencer kind', () => {
     };
     const model = new DocumentModel(newSong());
     expect(play(model.doc)).toBe(0);
-    restructure(model, setSequencerKind(model.doc, 0, 'arp'));
+    restructure(model, setSequencerKind(model.doc, 0, 'grid'));
     expect(play(model.doc)).toBeGreaterThan(0);
 
     const arps = new DocumentModel(newSong());
@@ -157,15 +160,15 @@ describe('sequencer kind', () => {
       restructure(mixed, addPart(mixed.doc)!.doc);
     }
     for (const slot of [0, 1, 2, 3]) {
-      restructure(arps, setSequencerKind(arps.doc, slot, 'arp'));
-      restructure(mixed, setSequencerKind(mixed.doc, slot, slot === 3 ? 'step' : 'euclidean'));
+      restructure(arps, setSequencerKind(arps.doc, slot, 'grid'));
+      restructure(mixed, setSequencerKind(mixed.doc, slot, slot === 3 ? 'chord' : 'euclidean'));
     }
-    expect(arps.doc.parts.every((p) => p.sequencer.kind === 'arp')).toBe(true);
+    expect(arps.doc.parts.every((p) => p.sequencer.kind === 'grid')).toBe(true);
     expect(mixed.doc.parts.map((p) => p.sequencer.kind)).toEqual([
       'euclidean',
       'euclidean',
       'euclidean',
-      'step',
+      'chord',
     ]);
     expect(play(arps.doc)).toBeGreaterThan(0);
     expect(play(mixed.doc)).toBeGreaterThan(0);
@@ -186,7 +189,7 @@ describe('the song round trip', () => {
   it('exports and imports a 7-part mixed-kind song equal to the model', () => {
     const model = new DocumentModel(newSong());
     for (let i = 1; i < 7; i++) restructure(model, addPart(model.doc)!.doc);
-    const kinds = ['arp', 'euclidean', 'step', 'none', 'euclidean', 'arp', 'step'] as const;
+    const kinds = ['grid', 'euclidean', 'chord', 'none', 'euclidean', 'grid', 'chord'] as const;
     kinds.forEach((kind, slot) => restructure(model, setSequencerKind(model.doc, slot, kind)));
     model.merge({ parts: { 4: { name: 'Hat', strip: { level: 0.5, sends: { echo: 0.3 } } } } });
     restructure(model, removePart(model.doc, 2));

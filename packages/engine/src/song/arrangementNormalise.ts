@@ -23,14 +23,13 @@ import {
   MUSIC_SLOT_MAX,
   SCALE_OFFSET_MAX,
   VELOCITY_DEFAULT,
-  WEIGHT_MAX,
 } from '../audioConstants';
 import { normaliseStrip } from './deskNormalise';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
 import { normalisePatches } from '../patch/patchNormalise';
 import { PatchResolver, type ResolveOptions } from './arrangementValidate';
-import { SCALES, scaleOffsets, type ScaleName } from '../sequencing/scaleSampler';
+import { SCALES, type ScaleName } from '../sequencing/scaleSampler';
 import { normaliseSequencer } from './sequencerNormalise';
 
 export class ArrangementNormaliser extends FieldNormaliser {
@@ -76,12 +75,10 @@ export class ArrangementNormaliser extends FieldNormaliser {
 
   key(raw: unknown): ArrangementKey {
     const o = this.section(raw, 'key');
-    this.dropUnknown(o, ['root', 'scale', 'weights'], 'key');
-    const scale = this.scale(o.scale);
+    this.dropUnknown(o, ['root', 'scale'], 'key');
     return {
       root: this.int(o.root, MIDI_MIDDLE_C, 0, MIDI_NOTE_MAX, 'key.root'),
-      scale,
-      weights: this.weights(o.weights, scaleOffsets(scale).length),
+      scale: this.scale(o.scale),
     };
   }
 
@@ -97,28 +94,6 @@ export class ArrangementNormaliser extends FieldNormaliser {
       this.correction(`key.scale: ${show(raw)} names no scale — using the root alone`);
     }
     return [0];
-  }
-
-  private weights(raw: unknown, degrees: number): readonly number[] {
-    const uniform = (): number[] => new Array<number>(degrees).fill(1);
-    if (!Array.isArray(raw)) {
-      if (raw !== undefined) {
-        this.correction('key.weights: not an array — weighting every degree equally');
-      }
-      return uniform();
-    }
-    const out: number[] = [];
-    for (let i = 0; i < degrees; i++) {
-      out.push(this.num(raw[i], 1, 0, WEIGHT_MAX, `key.weights[${i}]`));
-    }
-    if (raw.length !== degrees) {
-      this.correction(`key.weights: ${raw.length} weights for ${degrees} degrees — resized`);
-    }
-    if (!out.some((w) => w > 0)) {
-      this.correction('key.weights: all zero — weighting every degree equally');
-      return uniform();
-    }
-    return out;
   }
 
   /** One part of the list (#597): identity, patch, strip and sequencer. Null drops it, reported. */
