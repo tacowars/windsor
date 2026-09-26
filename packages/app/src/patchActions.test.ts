@@ -67,7 +67,7 @@ function fakeFolder(ids: string[]): PatchFolder & { files: Map<string, string> }
 }
 
 function context(): AppCtx {
-  const model = new DocumentModel({ version: 2, ...FULL_ARRANGEMENT });
+  const model = new DocumentModel({ version: 3, ...FULL_ARRANGEMENT });
   const ctx = {
     model,
     change: (partial: DocumentPartial) => {

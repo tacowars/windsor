@@ -20,11 +20,11 @@ describe('mergeArrangement', () => {
   it('changes only the named fields and leaves the input untouched', () => {
     const before = JSON.stringify(FULL_ARRANGEMENT);
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, {
-      bpm: 90,
+      transport: { bpm: 90 },
       parts: { [arp]: { velocity: 0.5 } },
     });
     expect(ignored).toEqual([]);
-    expect(merged.bpm).toBe(90);
+    expect(merged.transport).toEqual({ ...FULL_ARRANGEMENT.transport, bpm: 90 });
     expect(merged.parts[arp]?.velocity).toBe(0.5);
     expect(merged.parts[arp]?.sequencer).toEqual(FULL_PARTS.arp.sequencer);
     expect(merged.parts[kick]).toEqual(FULL_PARTS.kick);
@@ -52,10 +52,10 @@ describe('mergeArrangement', () => {
   });
 
   it('ignores and reports an object arriving where a leaf lives', () => {
-    const partial = { bpm: { oops: 1 } } as unknown as ArrangementPartial;
+    const partial = { transport: { bpm: { oops: 1 } } } as unknown as ArrangementPartial;
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, partial);
-    expect(ignored).toEqual(['bpm']);
-    expect(merged.bpm).toBe(FULL_ARRANGEMENT.bpm);
+    expect(ignored).toEqual(['transport.bpm']);
+    expect(merged.transport.bpm).toBe(FULL_ARRANGEMENT.transport.bpm);
   });
 
   it('ignores and reports a fragment naming an absent slot', () => {
@@ -132,10 +132,24 @@ describe('mergeArrangement', () => {
 
   it('replaces arrays and the scale wholesale', () => {
     const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, {
-      key: { scale: [0, 3, 7] },
+      harmony: { scale: [0, 3, 7] },
     });
     expect(ignored).toEqual([]);
-    expect(merged.key.scale).toEqual([0, 3, 7]);
-    expect(merged.key.root).toBe(FULL_ARRANGEMENT.key.root);
+    expect(merged.harmony.scale).toEqual([0, 3, 7]);
+    expect(merged.harmony.root).toBe(FULL_ARRANGEMENT.harmony.root);
+    expect(merged.harmony.events).toEqual(FULL_ARRANGEMENT.harmony.events);
+  });
+
+  it('replaces the harmony events and a part’s regions wholesale (#705)', () => {
+    const events = [{ start: 0, duration: 384, degree: 4, size: 4 as const }];
+    const regions = [{ start: 96, duration: 96 }];
+    const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, {
+      harmony: { events },
+      parts: { [arp]: { regions } },
+    });
+    expect(ignored).toEqual([]);
+    expect(merged.harmony.events).toEqual(events);
+    expect(merged.parts[arp]?.regions).toEqual(regions);
+    expect(merged.parts[kick]?.regions).toEqual(FULL_PARTS.kick.regions);
   });
 });

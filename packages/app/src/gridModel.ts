@@ -6,7 +6,7 @@
  * arrays replace wholesale.
  */
 import type {
-  ArrangementKey,
+  Harmony,
   GridNoteStep,
   GridStep,
   GridStepKind,
@@ -106,7 +106,10 @@ export function randomSteps(count: number, degreeCount: number, draw: Draw): Gri
 }
 
 /** What the card watches to know its labels are stale: the root and the scale. */
-export function keySignature(key: ArrangementKey): string {
+/** Root and scale only: the events are the timeline's, and relabelling a degree needs neither. */
+export type Key = Pick<Harmony, 'root' | 'scale'>;
+
+export function keySignature(key: Key): string {
   const scale = typeof key.scale === 'string' ? key.scale : key.scale.join(',');
   return `${key.root}|${scale}`;
 }
@@ -118,14 +121,14 @@ export interface FoldedDegree {
   folded: boolean;
 }
 
-export function foldedView(degree: number, key: ArrangementKey): FoldedDegree {
+export function foldedView(degree: number, key: Key): FoldedDegree {
   const count = scaleOffsets(key.scale).length;
   const { degree: shown, carry } = foldDegree(degree, count);
   return { degree: shown, carry, folded: carry > 0 };
 }
 
 /** The degree picker's choices: every degree of the current scale, named from the root. */
-export function degreeOptions(key: ArrangementKey): { value: string; label: string }[] {
+export function degreeOptions(key: Key): { value: string; label: string }[] {
   return scaleOffsets(key.scale).map((offset, i) => ({
     value: String(i),
     label: `${i + 1} ${pitchClassName(key.root, offset)}`,
@@ -133,7 +136,7 @@ export function degreeOptions(key: ArrangementKey): { value: string; label: stri
 }
 
 /** What a step's top cell reads: a rest, a tie, or the note name with its fold and octave. */
-export function stepLabel(step: GridStep, key: ArrangementKey): string {
+export function stepLabel(step: GridStep, key: Key): string {
   if (step.kind === 'rest') return '·';
   if (step.kind === 'tie') return '—';
   const offsets = scaleOffsets(key.scale);

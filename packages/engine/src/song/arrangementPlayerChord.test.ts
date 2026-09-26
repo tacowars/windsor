@@ -1,6 +1,7 @@
 /**
- * The binding layer for a chord part (#606): every voiced note reaches the
- * part at the event time with the part velocity, a key change re-voices the
+ * The binding layer for a chord part (#606, #705): every voiced note reaches the
+ * part at the event time with the part velocity, the chord is the harmony
+ * timeline's at the hit's tick, a key change re-voices the
  * progression live, edits reconfigure without an all-notes-off, a bad edit is
  * refused whole, a stop releases the held chord, and capture does not apply.
  */
@@ -15,16 +16,27 @@ import {
 import { recordingPart, type RecordingPart } from '../__fixtures__/recordingPart';
 import type { Arrangement, MusicPart } from './arrangement';
 import { ArrangementPlayer } from './arrangementPlayer';
-import { DEFAULT_CHORD_CONFIG, chordStep, restStep } from '../sequencing/chordSequencer';
+import { DEFAULT_CHORD_CONFIG, hitStep, restStep } from '../sequencing/chordSequencer';
 import { PRESETS } from '../patch/presets';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 
-const { drone } = FULL_SLOT;
+const { arp, drone } = FULL_SLOT;
 
-/** The fixture's drone slot driven by a progression in C minor: i, a rest, then VI twice at half a bar. */
+/**
+ * The fixture's drone slot driven by a rhythm in C minor over i for two bars
+ * and VI for two (#705: the chord is the harmony's): a hit, a rest, then two
+ * half-bar hits — i, a rest, then VI twice.
+ */
 const PROGRESSION: Arrangement = {
   ...FULL_ARRANGEMENT,
-  key: { root: 48, scale: 'naturalMinor' },
+  harmony: {
+    root: 0,
+    scale: 'naturalMinor',
+    events: [
+      { start: 0, duration: 2 * TICKS_PER_BAR, degree: 0, size: 3 },
+      { start: 2 * TICKS_PER_BAR, duration: 2 * TICKS_PER_BAR, degree: 5, size: 3 },
+    ],
+  },
   parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
     part.slot === drone
       ? {
@@ -35,8 +47,9 @@ const PROGRESSION: Arrangement = {
             divisor: DIVISORS.bar,
             gate: 1,
             voicing: 'close',
-            register: { octave: 0 },
-            steps: [chordStep(0), restStep(), chordStep(5, { duration: 0.5, repeat: 2 })],
+            // C3 = 48.
+            register: { octave: 3 },
+            steps: [hitStep(), restStep(), hitStep({ duration: 0.5, repeat: 2 })],
           },
         }
       : part,
@@ -84,7 +97,7 @@ describe('chord parts (#606)', () => {
     const { parts, player, run } = rig(PROGRESSION);
     run(1);
     const before = parts.drone.calls.length;
-    expect(player.apply({ key: { root: 50, scale: 'major' } }, {}).ok).toBe(true);
+    expect(player.apply({ harmony: { root: 2, scale: 'major' } }, {}).ok).toBe(true);
     run(2);
     const since = parts.drone.calls.slice(before);
     expect(since.filter((c) => c.kind === 'allNotesOff')).toEqual([]);
@@ -108,7 +121,10 @@ describe('chord parts (#606)', () => {
     expect(
       player.apply({ parts: { [drone]: { sequencer: { divisor: DIVISORS.half } } } }, {}).ok,
     ).toBe(true);
-    const steps = [chordStep(3, { size: 4 })];
+    // #705: the chord is the harmony's, so the seventh on iv is a harmony edit — live, no rebuild.
+    const events = [{ start: 0, duration: 4 * TICKS_PER_BAR, degree: 3, size: 4 as const }];
+    expect(player.apply({ harmony: { events } }, {}).ok).toBe(true);
+    const steps = [hitStep()];
     expect(player.apply({ parts: { [drone]: { sequencer: { steps } } } }, {}).ok).toBe(true);
     expect(parts.drone.calls.slice(before).filter((c) => c.kind === 'allNotesOff')).toEqual([]);
     run(1);
@@ -128,19 +144,25 @@ describe('chord parts (#606)', () => {
     run(1);
     const before = parts.drone.calls.length;
     const result = player.apply(
-      { bpm: 140, parts: { [drone]: { sequencer: { steps: [chordStep(0, { repeat: 9 })] } } } },
+      {
+        transport: { bpm: 140 },
+        parts: { [drone]: { sequencer: { steps: [hitStep({ repeat: 9 })] } } },
+      },
       {},
     );
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/repeat/);
-    expect(player.readout().bpm).toBe(PROGRESSION.bpm);
+    expect(player.readout().bpm).toBe(PROGRESSION.transport.bpm);
     const junk = player.apply(
-      { bpm: 140, parts: { [drone]: { sequencer: { register: { octave: Number.NaN } } } } },
+      {
+        transport: { bpm: 140 },
+        parts: { [drone]: { sequencer: { register: { octave: Number.NaN } } } },
+      },
       {},
     );
     expect(junk.ok).toBe(false);
     expect(junk.error).toMatch(/register/);
-    expect(player.readout().bpm).toBe(PROGRESSION.bpm);
+    expect(player.readout().bpm).toBe(PROGRESSION.transport.bpm);
     run(2);
     expect(noteOns(parts.drone).slice(3, 6)).toEqual([56, 60, 63]);
     expect(parts.drone.calls.slice(before).filter((c) => c.kind === 'allNotesOff')).toEqual([]);
@@ -161,19 +183,21 @@ describe('chord parts (#606)', () => {
   });
 
   it('a kind change to chord builds a silent part until a step is written', () => {
+    // The fixture's grid slot (its drone is already a Chord Player since #705).
     const { parts, player, run } = rig(FULL_ARRANGEMENT);
     // A kind change replaces the spec wholesale, so it arrives complete (the console rebuilds for it).
-    const blank = { ...DEFAULT_CHORD_CONFIG, seed: undefined, generatorIndex: undefined };
+    const blank = { ...DEFAULT_CHORD_CONFIG };
     expect(
-      player.apply({ parts: { [drone]: { sequencer: { kind: 'chord', ...blank } } } }, {}).ok,
+      player.apply({ parts: { [arp]: { sequencer: { kind: 'chord', ...blank } } } }, {}).ok,
     ).toBe(true);
-    const before = parts.drone.calls.length;
+    const before = parts.arp.calls.length;
     run(2);
-    expect(parts.drone.calls.slice(before)).toEqual([]);
-    expect(
-      player.apply({ parts: { [drone]: { sequencer: { steps: [chordStep(0)] } } } }, {}).ok,
-    ).toBe(true);
+    expect(parts.arp.calls.slice(before)).toEqual([]);
+    expect(player.apply({ parts: { [arp]: { sequencer: { steps: [hitStep()] } } } }, {}).ok).toBe(
+      true,
+    );
     run(1);
-    expect(noteOns(parts.drone).slice(-3)).toEqual([50, 53, 57]);
+    // Bar 3 of the fixture is iv in D dorian (G B D), voiced above D3 = 50 at the default register.
+    expect(noteOns(parts.arp).slice(-3)).toEqual([50 + 5, 50 + 9, 50 + 12]);
   });
 });

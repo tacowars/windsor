@@ -9,7 +9,7 @@ import {
 import { PRESETS, clonePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
 
 function context(): AppCtx {
-  const model = new DocumentModel({ version: 2, ...FULL_ARRANGEMENT });
+  const model = new DocumentModel({ version: 3, ...FULL_ARRANGEMENT });
   return {
     model,
     change: (partial) => {

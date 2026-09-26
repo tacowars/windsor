@@ -19,20 +19,16 @@
  * guarantees the fallback — and a document full of holes — is never what
  * ships (record §5).
  */
-import {
-  ARRANGEMENT_VERSION,
-  BPM_MAX,
-  BPM_MIN,
-  DEFAULT_BPM,
-  MUSIC_PARTS_MAX,
-} from '../audioConstants';
+import { ARRANGEMENT_VERSION, MUSIC_PARTS_MAX } from '../audioConstants';
 import type {
   Arrangement,
-  ArrangementKey,
+  Harmony,
   MusicPart,
   PartsPartial,
   DeepPartial,
+  Transport,
 } from './arrangement';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { normaliseSongSidechains } from './sidechainNormalise';
 import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
@@ -61,7 +57,7 @@ export interface DocumentPart extends MusicPart {
  * applied at `initMusic` and live through `AudioSystem.apply`.
  */
 export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
-  /** The document format (#597). Anything else — the retired four-slot shape included — is unusable. */
+  /** The document format (#705: 3). Anything else — v2 and the retired four-slot shape included — is unusable. */
   readonly version: typeof ARRANGEMENT_VERSION;
   readonly parts: readonly DocumentPart[];
   /**
@@ -147,17 +143,18 @@ export function isShippable(result: MakeArrangementResult): boolean {
   );
 }
 
-const DOCUMENT_KEYS = ['version', 'seed', 'bpm', 'key', 'patches', 'parts', 'returns', 'master'];
+const DOCUMENT_KEYS = ['version', 'transport', 'harmony', 'patches', 'parts', 'returns', 'master'];
 
 /** The top-level keys of the retired four-slot format, named in its correction. */
 const RETIRED_SLOT_KEYS = ['kick', 'hat', 'arp', 'drone', 'mix'];
+/** The version whose songs #705 retired without a migration (epic #703 decisions 3 and 4). */
+const RETIRED_VERSION = 2;
 
 /** Assembled field by field because the desk sections are optional. */
 interface MutableDocument {
   version: typeof ARRANGEMENT_VERSION;
-  seed: number;
-  bpm: number;
-  key: ArrangementKey;
+  transport: Transport;
+  harmony: Harmony;
   parts: DocumentPart[];
   patches?: Record<string, Patch>;
   returns?: Record<string, ReturnSpec>;
@@ -171,26 +168,23 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   }
   const o = raw as Record<string, unknown>;
   if (o.version !== ARRANGEMENT_VERSION) {
-    const retired = RETIRED_SLOT_KEYS.some((key) => Object.hasOwn(o, key));
-    n.correction(
-      `version: ${show(o.version)} is not ${ARRANGEMENT_VERSION}` +
-        (retired ? ' — this is the retired four-slot format (#597), which is no longer read' : ''),
-    );
+    n.correction(`version: ${show(o.version)} is not ${ARRANGEMENT_VERSION}${versionReason(o)}`);
     return null;
   }
   n.dropUnknown(o, DOCUMENT_KEYS, '');
-  // The patches come first: the parts' preset names resolve against them.
+  // The patches come first: the parts' preset names resolve against them;
+  // the transport next, because the regions and events clamp to its length.
   const embedded = n.patches(o.patches);
-  const parts = normaliseParts(o.parts, n);
+  const transport = n.transport(o.transport);
+  const parts = normaliseParts(o.parts, n, transport);
   // No part left: an absent part must not be invented (record §4), so this
   // document has nothing to play and the caller falls back.
   if (parts.length === 0) return null;
 
   const document: MutableDocument = {
     version: ARRANGEMENT_VERSION,
-    seed: n.int(o.seed, 0, Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER, 'seed'),
-    bpm: n.num(o.bpm, DEFAULT_BPM, BPM_MIN, BPM_MAX, 'bpm'),
-    key: n.key(o.key),
+    transport,
+    harmony: n.harmony(o.harmony, transport.bars * TICKS_PER_BAR),
     parts,
   };
   // A library fill is embedded here and nowhere else (#562): from this point
@@ -204,13 +198,26 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   return normaliseSongSidechains(document, n);
 }
 
+/** Why a non-3 version is refused, when the shape says which retired format it is. */
+function versionReason(o: Record<string, unknown>): string {
+  if (o.version === RETIRED_VERSION) return ' — version 2 is not supported since #705';
+  if (RETIRED_SLOT_KEYS.some((key) => Object.hasOwn(o, key))) {
+    return ' — this is the retired four-slot format (#597), which is no longer read';
+  }
+  return '';
+}
+
 /**
  * The part list: at most eight, each on a unique slot. Two parts on one slot
  * would fight over one engine part and one generator stream — the later
  * creation replaces the earlier, leaving the first uncontrollable and
  * undisposed — so the later part drops, reported.
  */
-function normaliseParts(raw: unknown, n: ArrangementNormaliser): DocumentPart[] {
+function normaliseParts(
+  raw: unknown,
+  n: ArrangementNormaliser,
+  transport: Transport,
+): DocumentPart[] {
   if (!Array.isArray(raw)) {
     n.correction(`parts: ${show(raw)} is not a list of parts`);
     return [];
@@ -221,7 +228,7 @@ function normaliseParts(raw: unknown, n: ArrangementNormaliser): DocumentPart[] 
   const out: DocumentPart[] = [];
   const used = new Set<number>();
   raw.slice(0, MUSIC_PARTS_MAX).forEach((entry, i) => {
-    const part = n.part(entry, `parts[${i}]`);
+    const part = n.part(entry, `parts[${i}]`, transport);
     if (!part) return;
     if (used.has(part.slot)) {
       n.correction(`parts[${i}]: slot ${part.slot} is already used — part dropped`);

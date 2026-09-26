@@ -48,7 +48,11 @@ describe('live post-FX routing', () => {
     system.apply(route(1, 0));
     const bpm = system.scheduler.bpm;
     const level = strip(system, 0).part.gain.value;
-    const bad = system.apply({ ...route(0, 1), bpm: bpm + 10, master: { level: 0.2 } });
+    const bad = system.apply({
+      ...route(0, 1),
+      transport: { bpm: bpm + 10 },
+      master: { level: 0.2 },
+    });
     expect(bad.ok).toBe(false);
     expect(bad.error).toMatch(/cycle/);
     expect(system.scheduler.bpm).toBe(bpm);

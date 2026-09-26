@@ -161,16 +161,16 @@ function tempoSeconds(bpm: number, beats: number): number {
 function tempoRow(ctx: AppCtx, name: string): HTMLElement {
   const row = el('div', 'bar-row');
   row.style.marginTop = '6px';
-  row.appendChild(el('span', 'field-label', `Sync to ${ctx.model.doc.bpm} bpm`));
+  row.appendChild(el('span', 'field-label', `Sync to ${ctx.model.doc.transport.bpm} bpm`));
   const current = (): number => {
     const spec = returnValue(ctx, name);
     return spec.kind === 'delay' ? spec.delayTime : NaN;
   };
   for (const division of TEMPO_DIVISIONS) {
-    const seconds = tempoSeconds(ctx.model.doc.bpm, division.beats);
+    const seconds = tempoSeconds(ctx.model.doc.transport.bpm, division.beats);
     const button = el('button', 'btn', division.label) as HTMLButtonElement;
     button.type = 'button';
-    button.title = `${division.title} at ${ctx.model.doc.bpm} bpm = ${fmtMs(seconds)}`;
+    button.title = `${division.title} at ${ctx.model.doc.transport.bpm} bpm = ${fmtMs(seconds)}`;
     button.setAttribute(
       'aria-pressed',
       String(Math.abs(current() - seconds) < TEMPO_MATCH_TOLERANCE),
@@ -179,7 +179,7 @@ function tempoRow(ctx: AppCtx, name: string): HTMLElement {
       const result = ctx.change({ returns: { [name]: { delayTime: seconds } } });
       if (!result.ok) return;
       ctx.status(
-        `return "${name}" time → ${division.title} (${fmtMs(seconds)} at ${ctx.model.doc.bpm} bpm)`,
+        `return "${name}" time → ${division.title} (${fmtMs(seconds)} at ${ctx.model.doc.transport.bpm} bpm)`,
       );
       ctx.render();
     };

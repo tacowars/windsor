@@ -15,7 +15,6 @@ import type {
 } from '../../../packages/client/src/audio/index-for-editor';
 import { partAt } from '../../../packages/client/src/audio/index-for-editor';
 import type { AppCtx } from './context';
-import { partChange } from './context';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import { PartsSession } from './partsSession';
@@ -89,6 +88,11 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     if (tab.dirty) this.renderTab(tab);
   }
 
+  /** Every tab but the active one is out of date: a control that must survive its own gesture calls this, not `render`. */
+  invalidate(): void {
+    for (const [id, tab] of this.tabs) if (id !== this.active) tab.dirty = true;
+  }
+
   /** Every tab is out of date; the active one catches up now, the others when shown. */
   render(): void {
     for (const tab of this.tabs.values()) tab.dirty = true;
@@ -124,27 +128,6 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // applies the editor's library fill to a pre-#562 song.
     this.model.open(raw);
     this.rebuild();
-  }
-
-  capture(slot: number): boolean {
-    const pattern = this.host.capturePattern(slot);
-    if (!pattern) return false;
-    const result = this.change(partChange(slot, { sequencer: { pattern } }));
-    if (result.ok) {
-      this.status(
-        `part ${slot}: captured — the sounding bar is now a literal array in the document`,
-      );
-      this.render();
-    }
-    return result.ok;
-  }
-
-  release(slot: number): void {
-    const result = this.change(partChange(slot, { sequencer: { pattern: null } }));
-    if (result.ok) {
-      this.status(`part ${slot}: released back to generative`);
-      this.render();
-    }
   }
 
   /** The working patch into the document under the selected part's preset name (a built-in forks). */

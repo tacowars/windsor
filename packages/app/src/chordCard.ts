@@ -1,23 +1,35 @@
 /**
- * The Sequencers tab's chord card (#607): the picker above, the progression
- * below as one column per step — the chord's name over its numeral, then the
- * Oct, Inv, Semi, Dur and Rep dials (click up, shift-click down) — an append
- * column that takes a drop or a click, a delete-last-step button, the part
- * velocity, gate and base-step controls, and a playhead on the audible tick.
+ * The Sequencers tab's chord card (#607, #705): the Hit and Rest tiles above,
+ * the rhythm below as one column per step — Hit or Rest, then the Oct, Inv,
+ * Dur and Rep dials (click up, shift-click down) — an append column that
+ * takes a drop or a click, a delete-last-step button, the part velocity, gate
+ * and base-step controls, and a playhead on the audible tick. A hit's chord
+ * is the harmony timeline's (epic #703 decision 15): the Hit tile names and
+ * auditions the chord under the playhead, and a step's tile does the same
+ * with its own inversion and octave.
  * Every edit goes through `ctx.change` as a whole `steps` list (arrays
  * replace wholesale in the merge); the step operations are
  * `chordStepModel.ts`. The strip's cells, columns, lighting and
  * playhead loop are `stepStrip.ts` (#619), shared with the grid (#603) and
  * Euclidean (#610) cards.
  */
-import type { ChordSpec, ChordStep } from '../../../packages/client/src/audio/index-for-editor';
-import { CHORD_DIVISORS, partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type {
+  ChordSpec,
+  ChordStep,
+  HarmonyChord,
+} from '../../../packages/client/src/audio/index-for-editor';
+import {
+  CHORD_DIVISORS,
+  partAt,
+  songTicksOf,
+} from '../../../packages/client/src/audio/index-for-editor';
 import { CHORD_AUDITION_VELOCITY } from './chordConstants';
 import { chordPicker, type Picker } from './chordPicker';
 import {
   CHORD_STEPS_MAX,
   type StepDial,
   appendStep,
+  currentChord,
   dialLabel,
   dropOn,
   removeLast,
@@ -29,13 +41,14 @@ import {
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { PITCH_COLOR } from './consoleColors';
-import { el, escapeHtml, select } from './dom';
+import { el, select } from './dom';
 import { keySignature } from './gridModel';
 import { knobRow } from './seqFields';
 import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { CHORD_KNOBS } from './sequencerKnobTables';
 import {
   type Strip,
+  audibleTick,
   commitSteps,
   markStep,
   paintStrip,
@@ -47,15 +60,15 @@ import {
 } from './stepStrip';
 
 const HINT =
-  'Press a chip to hear it through this part; drag it, or Rest, onto a step or the + column. ' +
-  'Press a step to hear it as written. Dials: click up, shift-click down — Oct and Semi shift the ' +
-  'chord, Inv inverts it, Dur is a multiple of the base step, Rep plays the step that many times. ' +
-  'Voicing applies to the whole progression.';
+  'Press Hit to hear the chord under the playhead through this part; drag it, or Rest, onto a ' +
+  'step or the + column. Press a step to hear it as written. Dials: click up, shift-click down — ' +
+  'Oct shifts the hit, Inv inverts it, Dur is a multiple of the base step, Rep plays the step ' +
+  'that many times. The chords themselves are the Harmony tab’s timeline; Voicing applies to ' +
+  'the whole part.';
 
 const DIALS: ReadonlyArray<{ dial: StepDial; title: string }> = [
   { dial: 'octave', title: 'octave: click up, shift-click down' },
   { dial: 'inversion', title: 'inversion: click to cycle, shift-click back' },
-  { dial: 'semitone', title: 'semitone shift: click up, shift-click down' },
   { dial: 'duration', title: 'duration × base step: click longer, shift-click shorter' },
   { dial: 'repeat', title: 'repeat: click more, shift-click fewer' },
 ];
@@ -65,6 +78,12 @@ type ChordStrip = Strip<ChordSpec> & { picker: Picker | null };
 
 const commit = (strip: ChordStrip, edit: (spec: ChordSpec) => readonly ChordStep[]): void =>
   commitSteps(strip, edit);
+
+/** The chord the timeline holds at the audible tick — the engine's rule, read for a tile press. */
+function chordNow(ctx: AppCtx): HarmonyChord | null {
+  const { doc } = ctx.model;
+  return currentChord(doc.harmony, songTicksOf(doc), audibleTick(ctx));
+}
 
 /**
  * Pressing a step's tile sounds the step as the sequencer would play it, until
@@ -85,7 +104,7 @@ function bindTileAudition(strip: ChordStrip, node: HTMLElement, step: ChordStep)
     const spec = strip.spec();
     if (!part || !spec) return;
     node.setPointerCapture(e.pointerId);
-    const notes = stepNotes(strip.ctx.model.doc.key, step, spec.voicing, spec.register.octave);
+    const notes = stepNotes(strip.ctx.model.doc.harmony, chordNow(strip.ctx), step, spec);
     sounding = { part, ids: notes.map((n) => part.noteOn(n, CHORD_AUDITION_VELOCITY)) };
   });
   node.addEventListener('pointerup', stop);
@@ -95,10 +114,8 @@ function bindTileAudition(strip: ChordStrip, node: HTMLElement, step: ChordStep)
 function tileCell(strip: ChordStrip, index: number, spec: ChordSpec): HTMLElement {
   const step = spec.steps[index];
   if (!step) return stripCell('', 'blank');
-  const label = stepLabel(step, strip.ctx.model.doc.key);
-  const node = stripCell('', step.kind === 'chord' ? 'chord' : 'rest');
-  node.innerHTML = `${escapeHtml(label.name)}<small>${escapeHtml(label.numeral)}</small>`;
-  node.title = step.kind === 'chord' ? `degree ${step.degree + 1}: press to hear` : 'rest';
+  const node = stripCell(stepLabel(step), step.kind === 'hit' ? 'chord' : 'rest');
+  node.title = step.kind === 'hit' ? 'hit: press to hear the current chord as written' : 'rest';
   bindTileAudition(strip, node, step);
   return node;
 }
@@ -149,24 +166,32 @@ function repaint(strip: ChordStrip): void {
   strip.picker?.repaint();
 }
 
+/** Root, scale and the chord under the playhead: what the Hit tile's label depends on. */
+function tileSignature(strip: ChordStrip): string {
+  const { doc } = strip.ctx.model;
+  const chord = chordNow(strip.ctx);
+  return `${keySignature(doc.harmony)}|${chord ? chord.index : -1}|${JSON.stringify(doc.harmony.events)}`;
+}
+
 /**
  * Per frame while the card is on screen: the playhead (the engine's own step
- * for the audible tick, durations and repeats included), and a repaint when
- * the Harmony tab's root or scale has changed since the labels were drawn — a
- * root knob goes through `ctx.change` alone, which re-renders nothing.
+ * for the audible tick, durations and repeats included), and a repaint of the
+ * Hit tile when the key, the timeline or the chord under the playhead has
+ * changed since it was drawn — a root edit goes through `ctx.change` alone,
+ * which re-renders nothing, and the playhead crosses chord boundaries on its own.
  */
 function watch(strip: ChordStrip): void {
-  let keySig = keySignature(strip.ctx.model.doc.key);
+  let tileSig = tileSignature(strip);
   watchPlayhead({
     attached: () => strip.root.isConnected,
     shown: () => strip.root.closest('[hidden]') === null,
     playheadAt: () => playheadAt(strip.ctx, strip.slot),
     mark: markStep(strip),
     repaintIf: () => {
-      const sig = keySignature(strip.ctx.model.doc.key);
-      if (sig === keySig) return;
-      keySig = sig;
-      strip.repaint();
+      const sig = tileSignature(strip);
+      if (sig === tileSig) return;
+      tileSig = sig;
+      strip.picker?.repaint();
     },
   });
 }
@@ -220,7 +245,8 @@ export function chordCard(ctx: AppCtx, slot: number): HTMLElement {
     repaint: () => repaint(strip),
   };
   strip.picker = chordPicker({
-    key: () => ctx.model.doc.key,
+    harmony: () => ctx.model.doc.harmony,
+    currentChord: () => chordNow(ctx),
     spec: () => strip.spec(),
     part: () => ctx.host.part(slot),
     setVoicing: (voicing) => {
@@ -238,7 +264,7 @@ export function chordCard(ctx: AppCtx, slot: number): HTMLElement {
     el(
       'p',
       'hint',
-      `${HINT} Chips sound through ${partAt(ctx.model.doc, slot)?.name ?? 'this part'}.`,
+      `${HINT} Tiles sound through ${partAt(ctx.model.doc, slot)?.name ?? 'this part'}.`,
     ),
   );
   repaint(strip);

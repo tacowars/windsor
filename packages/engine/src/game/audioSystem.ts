@@ -312,7 +312,7 @@ export class AudioSystem {
     // every patch it plays, so the library is not a runtime import and a
     // name it does not embed is a load error, never a silent fallback.
     const resolver = new PatchResolver(patches ?? {});
-    this.insertTempo.setTempo(arrangement.bpm);
+    this.insertTempo.setTempo(arrangement.transport.bpm);
     for (const part of arrangement.parts) {
       this.addMusicPart(
         part,
