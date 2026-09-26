@@ -63,7 +63,7 @@ describe('RegionGate', () => {
     const { log } = drive([{ start: BAR, duration: BAR }], 12, 2 * SONG);
     expect(log.hooks).toEqual(['enter 0 @96', 'leave @192', 'enter 0 @480', 'leave @576']);
     const first = log.seen.filter((e) => e.time < SONG * e.secondsPerTick);
-    expect(first.map((e) => e.tick)).toEqual([0, 12, 24, 36, 48, 60, 72, 84]);
+    expect(first.map((e) => e.tick)).toEqual(Array.from({ length: BAR / 12 }, (_, i) => i * 12));
     expect(first[0]).toMatchObject({ tick: 0, step: 0, bar: 0, tickInBar: 0, regionIndex: 0 });
     // The local tick is since the entry; the chord is the song's at the transport tick.
     expect(first.every((e) => e.chord?.event.degree === 0)).toBe(true);

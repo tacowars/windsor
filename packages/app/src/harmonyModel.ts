@@ -69,17 +69,19 @@ export function setDuration(
   );
 }
 
-/** The event removed; its span goes to the one before it (the one after, for the first); the only event stays. */
+/** The event removed; its span goes to the one before it (the one after, for the first), so nothing later moves; the only event stays. */
 export function removeEvent(
   events: readonly HarmonyEvent[],
   index: number,
   songTicks: number,
 ): HarmonyEvent[] {
-  if (events.length <= 1 || index < 0 || index >= events.length) return [...events];
-  return relay(
-    events.filter((_, i) => i !== index),
-    songTicks,
-  );
+  const removed = events[index];
+  if (events.length <= 1 || !removed) return [...events];
+  const rest = events.filter((_, i) => i !== index);
+  const absorb = Math.max(0, index - 1);
+  const neighbour = rest[absorb] as HarmonyEvent;
+  rest[absorb] = { ...neighbour, duration: neighbour.duration + removed.duration };
+  return relay(rest, songTicks);
 }
 
 /**

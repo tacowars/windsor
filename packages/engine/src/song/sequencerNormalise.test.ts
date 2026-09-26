@@ -199,7 +199,9 @@ describe('a sequencer seed (#705)', () => {
     expect(low.n.corrections).toEqual([
       `${PATH}.register.octave: clamped -4 to ${REGISTER_OCTAVE_MIN}`,
     ]);
-    expect(grid({}).spec).toMatchObject({ register: { octave: 2 } });
+    expect(grid({}).spec).toMatchObject({
+      register: { octave: DEFAULT_GRID_CONFIG.register.octave },
+    });
   });
 });
 

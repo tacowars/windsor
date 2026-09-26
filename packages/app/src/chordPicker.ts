@@ -166,15 +166,21 @@ export function chordPicker(host: PickerHost): Picker {
   });
   bindKeys();
 
+  // The two tiles are built once and the Hit tile's label updated in place:
+  // a repaint lands while a tile may hold pointer capture (the playhead
+  // crossing a chord boundary mid-drag), and replacing the node would
+  // release the capture and lose the drop (Codex, #705).
   const chipRow = el('div', 'chord-picker');
+  const hit = chipButton(hitChip(host.harmony(), host.currentChord()));
+  bindChip(hit, { kind: 'hit' }, drag);
+  chipRow.appendChild(hit);
+  const rest = chipButton(REST_CHIP);
+  bindChip(rest, REST_CHIP.payload, drag);
+  chipRow.appendChild(rest);
   const repaint = (): void => {
-    const chips: Chip[] = [hitChip(host.harmony(), host.currentChord()), REST_CHIP];
-    chipRow.innerHTML = '';
-    for (const chip of chips) {
-      const node = chipButton(chip);
-      bindChip(node, chip.payload, drag);
-      chipRow.appendChild(node);
-    }
+    const chip: Chip = hitChip(host.harmony(), host.currentChord());
+    const numeral = hit.querySelector('.chip-num');
+    if (numeral) numeral.textContent = chip.numeral;
   };
 
   const controls = el('div', 'chord-picker-controls');

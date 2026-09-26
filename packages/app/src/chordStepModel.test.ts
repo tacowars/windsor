@@ -7,6 +7,9 @@ import type {
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
   CHORD_DURATIONS,
+  CHORD_INVERSION_MAX,
+  CHORD_REPEAT_MAX,
+  CHORD_STEP_OCTAVE_MAX,
   ScaleSampler,
   TICKS_PER_BAR,
   chordAt,
@@ -99,23 +102,42 @@ describe('chordStepModel', () => {
   it('turns each dial within its bounds; a rest keeps only its timing dials', () => {
     const step = hitStep();
     expect(turnDial(step, 'octave', 1)).toMatchObject({ octave: 1 });
-    expect(turnDial(hitStep({ octave: 2 }), 'octave', 1)).toMatchObject({ octave: 2 });
-    expect(turnDial(hitStep({ octave: -2 }), 'octave', -1)).toMatchObject({ octave: -2 });
-    expect(turnDial(hitStep({ inversion: 3 }), 'inversion', 1)).toMatchObject({ inversion: 0 });
-    expect(turnDial(step, 'inversion', -1)).toMatchObject({ inversion: 3 });
-    expect(turnDial(step, 'duration', 1)).toMatchObject({ duration: 1.5 });
-    expect(turnDial(step, 'duration', -1)).toMatchObject({ duration: 0.75 });
-    expect(turnDial(hitStep({ duration: 8 }), 'duration', 1)).toMatchObject({ duration: 8 });
-    expect(turnDial(hitStep({ duration: 0.25 }), 'duration', -1)).toMatchObject({ duration: 0.25 });
+    const octaveMax = CHORD_STEP_OCTAVE_MAX;
+    const invMax = CHORD_INVERSION_MAX;
+    const at = CHORD_DURATIONS.indexOf(step.duration);
+    const longer = CHORD_DURATIONS[at + 1]!;
+    const shorter = CHORD_DURATIONS[at - 1]!;
+    const longest = CHORD_DURATIONS[CHORD_DURATIONS.length - 1]!;
+    const shortest = CHORD_DURATIONS[0]!;
+    expect(turnDial(hitStep({ octave: octaveMax }), 'octave', 1)).toMatchObject({
+      octave: octaveMax,
+    });
+    expect(turnDial(hitStep({ octave: -octaveMax }), 'octave', -1)).toMatchObject({
+      octave: -octaveMax,
+    });
+    expect(turnDial(hitStep({ inversion: invMax }), 'inversion', 1)).toMatchObject({
+      inversion: 0,
+    });
+    expect(turnDial(step, 'inversion', -1)).toMatchObject({ inversion: invMax });
+    expect(turnDial(step, 'duration', 1)).toMatchObject({ duration: longer });
+    expect(turnDial(step, 'duration', -1)).toMatchObject({ duration: shorter });
+    expect(turnDial(hitStep({ duration: longest }), 'duration', 1)).toMatchObject({
+      duration: longest,
+    });
+    expect(turnDial(hitStep({ duration: shortest }), 'duration', -1)).toMatchObject({
+      duration: shortest,
+    });
     expect(turnDial(step, 'repeat', 1)).toMatchObject({ repeat: 2 });
     expect(turnDial(step, 'repeat', -1)).toMatchObject({ repeat: 1 });
-    expect(turnDial(hitStep({ repeat: 8 }), 'repeat', 1)).toMatchObject({ repeat: 8 });
+    expect(turnDial(hitStep({ repeat: CHORD_REPEAT_MAX }), 'repeat', 1)).toMatchObject({
+      repeat: CHORD_REPEAT_MAX,
+    });
     const rest = restStep();
     expect(turnDial(rest, 'octave', 1)).toBe(rest);
     expect(turnDial(rest, 'inversion', 1)).toBe(rest);
-    expect(turnDial(rest, 'duration', 1)).toEqual(restStep({ duration: 1.5 }));
+    expect(turnDial(rest, 'duration', 1)).toEqual(restStep({ duration: longer }));
     expect(turnDial(rest, 'repeat', 1)).toEqual(restStep({ repeat: 2 }));
-    expect(CHORD_DURATIONS.indexOf(1)).toBeGreaterThan(0);
+    expect(at).toBeGreaterThan(0);
   });
 
   it('reads each dial', () => {

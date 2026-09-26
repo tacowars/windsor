@@ -73,14 +73,16 @@ function transportSection(ctx: AppCtx): HTMLElement {
     }),
   );
   // A shorter song clamps every region and event into it (the normaliser's
-  // rule), so the tabs that draw them re-render after the change.
+  // rule, which the player applies to its live copy too), so the tabs that
+  // draw them are out of date — but this knob is mid-gesture, so they render
+  // when shown rather than under the pointer.
   row.appendChild(
     makeKnob({
       ...BARS_KNOB,
       color: COLOR,
       get: () => ctx.model.doc.transport.bars,
       set: (v) => {
-        if (ctx.change({ transport: { bars: v } }).ok) ctx.render();
+        if (ctx.change({ transport: { bars: v } }).ok) ctx.invalidate();
       },
     }),
   );
