@@ -9,11 +9,14 @@
  * - Each step sounds with probability `density`, drawn from the part's own
  *   stream (`streamRng(seed, regionIndex)`, restarted on a region entry and
  *   never by a chord change); a skipped step is a rest.
- * - The tie rule carries over from the retired `step` sequencer: when a note
- *   lasts its whole step (gate 1) a step repeating the held note emits
- *   nothing and the note continues; a different note releases and
- *   retriggers. Below that every step retriggers, its note-off deferred by
- *   `round(gate × divisor)` ticks.
+ * - The tie rule carries over from the retired `step` sequencer: at gate 1 a
+ *   step repeating the held note emits nothing and the note continues; a
+ *   different note releases and retriggers. Below gate 1 every step
+ *   retriggers — even where `round(gate × divisor)` fills the step — and the
+ *   note-off lands `round(gate × divisor)` ticks after the on.
+ * - It subscribes at every tick, like the Chord Player, so a gated note is
+ *   released on its own tick rather than scheduled ahead: whatever sounds is
+ *   `held` until then, and a region end's `release` cuts it on that tick.
  *
  * So a bass is a short gate and repeated triggers, and a drone a slow rate
  * at gate 1 and density 1. Pure: no audio graph, no clock of its own.
@@ -115,8 +118,10 @@ export class BassSequencer {
   private current: BassSequencerConfig;
   private sampler: ScaleSampler;
   private rng: Rng;
-  /** A note whose gate reached the step boundary and is still sounding. */
+  /** The note sounding now, whatever its gate. */
   private held: number | null = null;
+  /** The local tick its gate ends on; null at gate 1, where only a rest or a new note ends it. */
+  private offTick: number | null = null;
 
   constructor(sampler: ScaleSampler, config: BassSequencerConfig) {
     assertBassConfig(config);
@@ -133,7 +138,7 @@ export class BassSequencer {
     return this.held;
   }
 
-  /** Ticks a note sounds for; the whole step at gate 1, never less than one tick. */
+  /** Ticks a gated note sounds for, never less than one; at gate 1 it ties instead. */
   get durationTicks(): number {
     return Math.max(1, Math.round(this.current.gate * this.current.divisor));
   }
@@ -160,44 +165,46 @@ export class BassSequencer {
   }
 
   attach(source: PartTickSource): Unsubscribe {
-    return source.subscribe(this.current.divisor, (event) => this.handleTick(event));
+    return source.subscribe(1, (event) => this.handleTick(event));
   }
 
-  /** One step. Returns the events it emitted; an empty array is a tie or a silent rest. */
+  /** One local tick: a gate ending, then a step onset. Returns what it emitted. */
   handleTick(event: PartTickEvent): NoteEvent[] {
-    if (!(this.rng() < this.current.density)) return this.release(event.tick, event.time);
-    const pitch = this.pitch(event.chord);
-    const duration = this.durationTicks;
-    const holds = duration >= this.current.divisor;
-    if (holds && this.held === pitch.note) return [];
-
     const events: NoteEvent[] = [];
-    if (this.held !== null) {
-      events.push({ kind: 'noteOff', tick: event.tick, time: event.time, note: this.held });
-      this.held = null;
+    if (this.offTick !== null && event.tick >= this.offTick) {
+      events.push(...this.drop(event.tick, event.time));
     }
-    events.push({ kind: 'noteOn', tick: event.tick, time: event.time, ...pitch });
-    if (holds) {
-      this.held = pitch.note;
-    } else {
-      events.push({
-        kind: 'noteOff',
-        tick: event.tick + duration,
-        time: event.time + duration * event.secondsPerTick,
-        note: pitch.note,
-      });
-    }
+    if (event.tick % this.current.divisor === 0) events.push(...this.onset(event));
     for (const e of events) this.onNote?.(e);
     return events;
   }
 
-  /** Release the held note at the given tick: a rest, a region end, a transport stop. */
+  /** Release the held note at the given tick: a region end, a transport stop. */
   release(tick: number, time: number): NoteEvent[] {
-    if (this.held === null) return [];
-    const event: NoteEvent = { kind: 'noteOff', tick, time, note: this.held };
+    const events = this.drop(tick, time);
+    for (const e of events) this.onNote?.(e);
+    return events;
+  }
+
+  /** A step: a rest releases, a repeat at gate 1 ties, anything else (re)triggers. */
+  private onset(event: PartTickEvent): NoteEvent[] {
+    if (!(this.rng() < this.current.density)) return this.drop(event.tick, event.time);
+    const pitch = this.pitch(event.chord);
+    const ties = this.current.gate >= 1;
+    if (ties && this.held === pitch.note) return [];
+    const events = this.drop(event.tick, event.time);
+    events.push({ kind: 'noteOn', tick: event.tick, time: event.time, ...pitch });
+    this.held = pitch.note;
+    this.offTick = ties ? null : event.tick + this.durationTicks;
+    return events;
+  }
+
+  /** The held note's off at `tick`, emitted by the caller; nothing when nothing sounds. */
+  private drop(tick: number, time: number): NoteEvent[] {
+    const note = this.held;
     this.held = null;
-    this.onNote?.(event);
-    return [event];
+    this.offTick = null;
+    return note === null ? [] : [{ kind: 'noteOff', tick, time, note }];
   }
 
   /** The step's note under the current chord; no timeline events reads as the tonic triad. */

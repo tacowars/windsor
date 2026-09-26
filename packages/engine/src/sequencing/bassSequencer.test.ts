@@ -49,15 +49,17 @@ const bass = (over: Partial<BassSequencerConfig> = {}): BassSequencer =>
 const songTicksOf = (harmony: Harmony): number =>
   harmony.events.reduce((end, e) => Math.max(end, e.start + e.duration), 0);
 
-/** Steps `count` onsets from local tick `from`, handing each the chord the gate would. */
+/**
+ * Every local tick of `count` steps from `from`, as the gate hands them to a
+ * generator subscribed at 1, each with the chord the timeline holds there.
+ */
 function drive(seq: BassSequencer, harmony: Harmony, count: number, from = 0): NoteEvent[] {
   const { divisor } = seq.config;
   const events: NoteEvent[] = [];
-  for (let step = 0; step < count; step++) {
-    const tick = from + step * divisor;
+  for (let tick = from; tick < from + count * divisor; tick++) {
     const event: PartTickEvent = {
       tick,
-      step: tick / divisor,
+      step: tick,
       bar: Math.floor(tick / BAR),
       tickInBar: tick % BAR,
       seconds: tick * SECONDS_PER_TICK,
@@ -70,6 +72,19 @@ function drive(seq: BassSequencer, harmony: Harmony, count: number, from = 0): N
   }
   return events;
 }
+
+/** One local tick at the start of the fixture, over `i`. */
+const tickAt = (tick: number): PartTickEvent => ({
+  tick,
+  step: tick,
+  bar: 0,
+  tickInBar: tick,
+  seconds: 0,
+  secondsPerTick: SECONDS_PER_TICK,
+  time: 0,
+  chord: chordAt(I_VI, songTicksOf(I_VI), tick),
+  regionIndex: 0,
+});
 
 const ons = (events: NoteEvent[]): NoteOnEvent[] =>
   events.filter((e): e is NoteOnEvent => e.kind === 'noteOn');
@@ -219,6 +234,31 @@ describe('the tie rule', () => {
     expect(offs(events).map((e) => e.tick)).toEqual(
       on.map((e) => e.tick + Math.round(gate * divisor)),
     );
+  });
+
+  it('below gate 1 every step retriggers, even where the rounded gate fills the step', () => {
+    const divisor = DIVISORS.thirtySecond;
+    const gate = 0.9;
+    expect(Math.round(gate * divisor)).toBe(divisor);
+    const steps = BAR / divisor;
+    const events = drive(bass({ gate, divisor }), harmonyOf(0), steps);
+    expect(ons(events)).toHaveLength(steps);
+    const shown = events.slice(0, 3).map((e) => [e.kind, e.tick]);
+    expect(shown).toEqual([
+      ['noteOn', 0],
+      ['noteOff', divisor],
+      ['noteOn', divisor],
+    ]);
+  });
+
+  it('a release before a gated note ends cuts it on that tick, and nothing follows', () => {
+    const seq = bass({ gate: 0.5 });
+    const cut = QUARTER / 4;
+    expect(seq.handleTick(tickAt(0))).toEqual([
+      { kind: 'noteOn', tick: 0, time: 0, note: C2, degree: 0 },
+    ]);
+    expect(seq.release(cut, 0)).toEqual([{ kind: 'noteOff', tick: cut, time: 0, note: C2 }]);
+    expect(seq.handleTick(tickAt(QUARTER / 2))).toEqual([]);
   });
 });
 
