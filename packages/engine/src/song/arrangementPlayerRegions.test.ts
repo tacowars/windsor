@@ -144,4 +144,44 @@ describe('the determinism rule (■ then ▶ is a fresh player at tick 0)', () =
     expect(kinds(first.parts.arp, 'noteOn').length).toBeLessThan(written);
     expect(kinds(first.parts.arp, 'noteOn').length).toBeGreaterThan(0);
   });
+
+  it('reset() after releaseAll replays the same notes from tick 0 on the same player (#708)', () => {
+    const arrangement = grid({ skipChance: 0.5, seed: 11 });
+    const r = rig(arrangement);
+    const trace = (part: RecordingPart, from: number) =>
+      part.calls
+        .slice(from)
+        .filter((c) => c.kind === 'noteOn')
+        .map((c) => `${c.note ?? ''} @${tickOf(c.time ?? 0, arrangement)}`);
+    // Stop mid-song, off a bar line, so the streams have moved on.
+    r.run(1);
+    for (let i = 0; i < BAR / 2; i++) r.transport.advance(r.transport.transportSeconds);
+    const firstRun = { arp: trace(r.parts.arp, 0), drone: trace(r.parts.drone, 0) };
+    r.player.releaseAll();
+    const marks = { arp: r.parts.arp.calls.length, drone: r.parts.drone.calls.length };
+    r.transport.reset(0);
+    r.player.reset();
+    r.run(1);
+    for (let i = 0; i < BAR / 2; i++) r.transport.advance(r.transport.transportSeconds);
+    expect(trace(r.parts.arp, marks.arp)).toEqual(firstRun.arp);
+    expect(trace(r.parts.drone, marks.drone)).toEqual(firstRun.drone);
+    expect(firstRun.arp.length).toBeGreaterThan(0);
+  });
+
+  it('without reset() the same player does not replay: the stream carries on', () => {
+    const arrangement = grid({ skipChance: 0.5, seed: 11 });
+    const r = rig(arrangement);
+    const ons = (from: number) =>
+      r.parts.arp.calls
+        .slice(from)
+        .filter((c) => c.kind === 'noteOn')
+        .map((c) => `${c.note ?? ''} @${tickOf(c.time ?? 0, arrangement)}`);
+    r.run(2);
+    const firstRun = ons(0);
+    r.player.releaseAll();
+    const mark = r.parts.arp.calls.length;
+    r.transport.reset(0);
+    r.run(2);
+    expect(ons(mark)).not.toEqual(firstRun);
+  });
 });

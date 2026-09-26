@@ -164,18 +164,19 @@ export function watchPlayhead(watch: PlayheadWatch): void {
 }
 
 /**
- * The step the part on `slot` is sounding, or -1 while nothing runs: the
- * audible tick put through the engine's own `stepAt` (#619 decision 2). The
- * console reads the scheduler here and nowhere else.
+ * The transport's audible tick, or 0 before audio is enabled — what the chord
+ * card's Hit tile auditions at (#705) and the strip's position reads (#708).
+ * `ctx.transport.position()` is the one scheduler reading (`host.ts`).
  */
-/** The transport's audible tick, or 0 before audio is enabled — what the chord card's Hit tile auditions at (#705). */
 export function audibleTick(ctx: AppCtx): number {
-  const system = ctx.host.system;
-  return system ? system.scheduler.audibleTick(system.engine.context.currentTime) : 0;
+  return ctx.transport.position();
 }
 
+/**
+ * The step the part on `slot` is sounding, or -1 while nothing runs: the
+ * audible tick put through the engine's own `stepAt` (#619 decision 2).
+ */
 export function playheadAt(ctx: AppCtx, slot: number): number {
-  const system = ctx.host.system;
-  if (!system || !system.scheduler.isRunning) return -1;
-  return ctx.host.stepAt(slot, system.scheduler.audibleTick(system.engine.context.currentTime));
+  if (!ctx.transport.running) return -1;
+  return ctx.host.stepAt(slot, audibleTick(ctx));
 }

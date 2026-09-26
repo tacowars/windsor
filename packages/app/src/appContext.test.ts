@@ -28,6 +28,7 @@ import { dropInit } from './patchActions';
 import { addPartLive, removePartLive, setSequencerKindLive } from './partEdits';
 import { renamePatch, revertPatch } from './patchLibrary';
 import { newSong } from './songParts';
+import { barsChange, bpmChange, keyChange, scaleChange } from './transportModel';
 
 const TAB_IDS = ['parts', 'mixer', 'sequencers', 'harmony', 'arrangement'] as const;
 
@@ -311,5 +312,45 @@ describe('a change landing while the system is being built (#629 review)', () =>
     expect(c.ctx.change({ transport: { bpm: 100 } } as DocumentPartial).ok).toBe(true);
     expect(c.model.doc.transport.bpm).toBe(100);
     expect(c.builds).toBe(0);
+  });
+});
+
+describe('the transport strip (#708)', () => {
+  it('writes BPM, Bars, Key and Scale as live partials, never a rebuild', () => {
+    const c = openConsole();
+    c.ctx.render();
+    for (const partial of [bpmChange(133), barsChange(8), keyChange(9), scaleChange('dorian')]) {
+      if (!partial) throw new Error('a named scale must make a partial');
+      expect(c.ctx.change(partial).ok).toBe(true);
+    }
+    expect(c.applied).toEqual([
+      { transport: { bpm: 133 } },
+      { transport: { bars: 8 } },
+      { harmony: { root: 9 } },
+      { harmony: { scale: 'dorian' } },
+    ]);
+    const { transport, harmony } = c.model.doc;
+    expect([transport.bpm, transport.bars, harmony.root, harmony.scale]).toEqual([
+      133,
+      8,
+      9,
+      'dorian',
+    ]);
+    expect(c.builds).toBe(0);
+  });
+
+  it('renders the chrome on every render, whichever tab is active, and never on invalidate', () => {
+    const c = openConsole();
+    let strips = 0;
+    c.ctx.addChrome(() => strips++);
+    c.ctx.render();
+    c.ctx.activate('mixer');
+    c.ctx.render();
+    c.ctx.activate('arrangement');
+    expect(strips).toBe(2);
+    c.ctx.invalidate();
+    expect(strips).toBe(2);
+    c.ctx.importDoc(newSong());
+    expect(strips).toBe(3);
   });
 });

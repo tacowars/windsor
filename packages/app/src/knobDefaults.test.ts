@@ -35,7 +35,7 @@ import {
   makeArrangement,
   makePatch,
 } from '../../../packages/client/src/audio/index-for-editor';
-import { BPM_KNOB } from './arrangementTab';
+import { BARS_KNOB, BPM_KNOB } from './transportTables';
 import { REGISTER_OCTAVE_DEFAULTS, ROOT_DEFAULT, ROOT_OPTIONS, octaveKnob } from './harmonyTables';
 import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
@@ -52,7 +52,7 @@ import {
   euclidPulseKnob,
   type SequencerKnobEntry,
 } from './sequencerKnobTables';
-import { NEW_SONG_BPM } from './songConstants';
+import { NEW_SONG_BARS, NEW_SONG_BPM } from './songConstants';
 
 describe('patch knobs', () => {
   it('cover every path the Parts tab builds, and each is a number the engine defines', () => {
@@ -170,5 +170,6 @@ describe('harmony, mixer and arrangement knobs', () => {
 
   it('BPM resets to what a new song starts at', () => {
     expect(BPM_KNOB.def).toBe(NEW_SONG_BPM);
+    expect(BARS_KNOB.def).toBe(NEW_SONG_BARS);
   });
 });

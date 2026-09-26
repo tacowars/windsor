@@ -12,12 +12,33 @@ import type {
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import type { PartsSession } from './partsSession';
+import type { TransportState } from './transportModel';
+
+/**
+ * ▶ ■ ‖ and the position (#708, epic #703 decision 8) — the strip's, and the
+ * Song view's (#709). `host.ts`'s `HostTransport` implements it.
+ */
+export interface ConsoleTransport {
+  readonly state: TransportState;
+  /** The transport is issuing ticks (▶ pressed on a live system). */
+  readonly running: boolean;
+  /** Run from the current tick; false when audio is not enabled. */
+  play(): boolean;
+  /** Stop and release, keeping the tick (the game's mute). */
+  pause(): void;
+  /** Stop, release, and rewind to tick 0 with every part's region state cleared. */
+  stop(): void;
+  /** The audible transport tick; 0 before audio is enabled. */
+  position(): number;
+}
 
 export interface AppCtx {
   host: EngineHost;
   model: DocumentModel;
   /** The Parts tab's selection and working patch (#620 decision 3). */
   parts: PartsSession;
+  /** ▶ ■ ‖ and the audible position (#708). */
+  transport: ConsoleTransport;
   /**
    * A live change: applied to the live system (when audio is enabled) and
    * merged into the document. Refused by the engine → nothing changes.
@@ -26,7 +47,7 @@ export interface AppCtx {
    * removes it (#629) — `partEdits.ts` builds those.
    */
   change(partial: DocumentPartial): ApplyResult;
-  /** A whole-document change — Import's and Restart's path (#629): edit a draft, renormalise, rebuild from tick 0, re-render. */
+  /** A whole-document change — Import's shape (#629; Restart's button went with #708): edit a draft, renormalise, rebuild from tick 0, re-render. */
   restructure(edit: (draft: Record<string, unknown>) => void): void;
   /** Adopt a freshly imported raw document: normalise, rebuild, re-render. */
   importDoc(raw: unknown): void;

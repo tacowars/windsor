@@ -73,6 +73,11 @@ export class RegionGate implements PartTickSource {
     this.config = config;
   }
 
+  /** Forget the region the last tick was in (#708's ■): the next live tick is an entry, so the stream restarts. */
+  reset(): void {
+    this.entryTick = null;
+  }
+
   /** The part's state at a transport tick — what `ArrangementPlayer.stepAt` folds a playhead through. */
   stateAt(tick: number): RegionState {
     return regionState(this.config.regions, this.config.songTicks, tick);

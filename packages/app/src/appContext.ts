@@ -14,7 +14,7 @@ import type {
   Patch,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { partAt } from '../../../packages/client/src/audio/index-for-editor';
-import type { AppCtx } from './context';
+import type { AppCtx, ConsoleTransport } from './context';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import { PartsSession } from './partsSession';
@@ -46,15 +46,19 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   readonly host: EngineHost;
   readonly model: DocumentModel;
   readonly parts: PartsSession;
+  readonly transport: ConsoleTransport;
   readonly status: (message: string) => void;
 
   private readonly tabs = new Map<string, Tab<P>>();
   private active: string | null = null;
+  /** Persistent chrome above every tab (the transport strip, #708): rendered on every `render()`. */
+  private readonly chrome: Array<() => void> = [];
 
   constructor(deps: AppContextDeps) {
     this.host = deps.host;
     this.model = deps.model;
     this.status = deps.status;
+    this.transport = deps.host.transport;
     this.parts = new PartsSession((patch) => this.commitPatch(patch));
   }
 
@@ -63,6 +67,15 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     this.active ??= id;
     panel.hidden = id !== this.active;
     this.tabs.set(id, { panel, render, dirty: true });
+  }
+
+  /**
+   * Register chrome that sits above every tab panel (#708): it re-renders on
+   * every `render()` — an import, a key change on the Harmony tab — and never
+   * on `invalidate()`, so a knob in it survives its own drag.
+   */
+  addChrome(render: () => void): void {
+    this.chrome.push(render);
   }
 
   get activeTab(): string | null {
@@ -96,6 +109,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   /** Every tab is out of date; the active one catches up now, the others when shown. */
   render(): void {
     for (const tab of this.tabs.values()) tab.dirty = true;
+    for (const renderChrome of this.chrome) renderChrome();
     const active = this.active === null ? undefined : this.tabs.get(this.active);
     if (active) this.renderTab(active);
   }

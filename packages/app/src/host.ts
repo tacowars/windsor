@@ -25,10 +25,76 @@ import {
   musicPartName,
 } from '../../../packages/client/src/audio/index-for-editor';
 
+import type { ConsoleTransport } from './context';
+import { nextTransportState, type TransportState } from './transportModel';
+
 export type HostLog = (message: string) => void;
+
+/** The slice of the system ▶ ■ ‖ drive; a test fakes this much. */
+export type TransportSystem = Pick<
+  AudioSystem,
+  'startMusic' | 'stopMusic' | 'setMuted' | 'musicRunning' | 'scheduler' | 'engine'
+>;
+
+/**
+ * The console's transport (#708, epic #703 decision 8) over whatever system
+ * is live: ▶ unmutes and starts from the current tick; ‖ is the game's mute
+ * (stop + release, the tick kept); ■ is `stopMusic` (stop + release + rewind
+ * to tick 0 with the region state cleared). The state outlives a rebuild:
+ * a system built while playing starts at once, otherwise it waits idle at
+ * tick 0 for ▶ — the power button included.
+ */
+export class HostTransport implements ConsoleTransport {
+  private current: TransportState = 'idle';
+
+  constructor(private readonly live: () => TransportSystem | null) {}
+
+  get state(): TransportState {
+    return this.current;
+  }
+
+  get running(): boolean {
+    return this.live()?.musicRunning ?? false;
+  }
+
+  play(): boolean {
+    const system = this.live();
+    if (!system) return false;
+    system.setMuted(false);
+    system.startMusic();
+    this.current = nextTransportState(this.current, 'play');
+    return true;
+  }
+
+  pause(): void {
+    const system = this.live();
+    if (!system || this.current !== 'playing') return;
+    system.setMuted(true);
+    this.current = nextTransportState(this.current, 'pause');
+  }
+
+  stop(): void {
+    this.live()?.stopMusic();
+    this.current = nextTransportState(this.current, 'stop');
+  }
+
+  /** The audible transport tick, 0 before audio: the console's one reading of position (#619, #705). */
+  position(): number {
+    const system = this.live();
+    return system ? system.scheduler.audibleTick(system.engine.context.currentTime) : 0;
+  }
+
+  /** A freshly built system sits at tick 0: start it if ▶ is pressed, else the transport is idle. */
+  adopt(system: TransportSystem): void {
+    if (this.current === 'playing') system.startMusic();
+    else this.current = 'idle';
+  }
+}
 
 export class EngineHost {
   system: AudioSystem | null = null;
+  /** ▶ ■ ‖ over the live system; `ctx.transport` (#708). */
+  readonly transport = new HostTransport(() => this.system);
   /** Scope tap on the engine master. Visualisation only; routes nothing. */
   analyser: AnalyserNode | null = null;
 
@@ -143,8 +209,8 @@ export class EngineHost {
   }
 
   /**
-   * (Re)build the whole system from a document — from tick 0, on the same
-   * context. Rebuilds are serialised and coalesced: overlapping calls (rapid
+   * (Re)build the whole system from a document — at tick 0, on the same
+   * context, playing only if ▶ is pressed (#708). Rebuilds are serialised and coalesced: overlapping calls (rapid
    * slot toggles, an import landing mid-build) queue behind the running one
    * and only the latest document wins, so the live graph cannot end up
    * behind the model (cross-model self-review finding).
@@ -176,7 +242,7 @@ export class EngineHost {
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
     await this.system.unlock();
-    this.system.startMusic();
+    this.transport.adopt(this.system);
   }
 
   /** Live tuning over the document model; null while audio is not enabled. */
