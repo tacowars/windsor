@@ -41,6 +41,8 @@ import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from '
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
 import { getPath } from './patchPath';
 import {
+  BASS_KNOBS,
+  BASS_ROOT_BIAS_KNOB,
   CHORD_KNOBS,
   DENSITY_DEFAULTS,
   DENSITY_KNOBS,
@@ -95,6 +97,7 @@ describe('sequencer knobs', () => {
     ['euclidean', EUCLID_KNOBS, DEFAULT_EUCLIDEAN_CONFIG],
     ['grid', GRID_KNOBS, DEFAULT_GRID_CONFIG],
     ['chord', CHORD_KNOBS, DEFAULT_CHORD_CONFIG],
+    ['bass', [...BASS_KNOBS, BASS_ROOT_BIAS_KNOB], DEFAULT_BASS_CONFIG],
   ];
 
   it.each(tables)(

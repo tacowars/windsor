@@ -66,8 +66,8 @@ export function buildGenerator(part: MusicPart, sampler: ScaleSampler): Generato
       return new ChordSequencer(sampler, driver as ChordDriver);
     case 'arp':
       return new Arpeggiator(sampler, driver as ArpDriver);
-    case 'bass': // #707: the bass's generator replaces the stub
-      return new BassSequencer(driver as BassDriver);
+    case 'bass':
+      return new BassSequencer(sampler, driver as BassDriver);
     default:
       return null;
   }
@@ -109,7 +109,7 @@ export function liveReconfiguration(
   if (spec.kind === 'bass' && generator instanceof BassSequencer) {
     const config = driver as BassDriver;
     assertBassConfig(config);
-    return () => generator.reconfigure(config);
+    return () => generator.reconfigure(config, sampler);
   }
   return null;
 }

@@ -22,6 +22,7 @@ import {
   CHORD_VOICINGS,
   CHORD_VOICING_IDS,
   DEFAULT_ARP_CONFIG,
+  DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_GRID_CONFIG,
@@ -226,6 +227,30 @@ export const ARP_VOICING_OPTIONS: readonly { value: string; label: string }[] =
 
 /** Reseed draws from the 32-bit stream-seed space `hashSeed` folds every seed into. */
 export const ARP_RESEED_SPAN = 2 ** 32;
+
+/** The bass card (#707): Root bias is live for Follow Chord only; Reg is `octaveKnob('bass')`. */
+export const BASS_ROOT_BIAS_KNOB: DriverKnobEntry = {
+  kind: 'driver',
+  f: 'rootBias',
+  label: 'Root bias',
+  o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.rootBias, fmt: fmt2 },
+};
+
+export const BASS_KNOBS: readonly SequencerKnobEntry[] = [
+  {
+    kind: 'driver',
+    f: 'gate',
+    label: 'Gate',
+    o: { min: GATE_MIN, max: 1, def: DEFAULT_BASS_CONFIG.gate, fmt: fmt2 },
+  },
+  {
+    kind: 'driver',
+    f: 'density',
+    label: 'Density',
+    o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.density, fmt: fmt2 },
+  },
+  VELOCITY_KNOB,
+];
 
 /** The density modulator's knob ranges: the console shows less than the engine accepts. */
 export const DENSITY_BARS_MAX = 64;
