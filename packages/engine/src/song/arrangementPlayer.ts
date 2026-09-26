@@ -297,6 +297,16 @@ export class ArrangementPlayer {
     for (const { slot } of this.current.parts) this.parts.get(slot)?.allNotesOff();
   }
 
+  /**
+   * Forget every part's region state (#708, epic #703 decision 8's ■): with
+   * the transport rewound to tick 0, the next tick is an entry for every live
+   * part, so each generator re-mints its stream exactly as a fresh player
+   * would. Call after `releaseAll`, which clears what the generators hold.
+   */
+  reset(): void {
+    for (const bound of this.built.bound.values()) bound?.gate.reset();
+  }
+
   dispose(): void {
     for (const unsubscribe of this.subs.values()) unsubscribe();
     this.subs.clear();

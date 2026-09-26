@@ -207,8 +207,20 @@ export class Scheduler implements TickSource {
     this.nextTime = this.clock.currentTime + SCHEDULER_START_DELAY_SECONDS;
   }
 
+  /** Halt the queue, keeping the tick: `start(transport.currentTick)` resumes there (the mute path). */
   stop(): void {
     this.running = false;
+  }
+
+  /**
+   * Halt and rewind to tick 0 (#708, epic #703 decision 8's ■): `audibleTick`
+   * reads 0 and the next `start` issues tick 0 first. What the region state
+   * and held notes need is the player's (`ArrangementPlayer.reset`).
+   */
+  reset(): void {
+    this.stop();
+    this.transport.reset(0);
+    this.nextTime = 0;
   }
 
   /**

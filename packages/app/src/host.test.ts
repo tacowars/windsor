@@ -15,7 +15,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
-import { EngineHost } from './host';
+import { EngineHost, HostTransport, type TransportSystem } from './host';
 
 const param = (): { value: number } => ({ value: 0 });
 const node = (): Record<string, unknown> => ({
@@ -127,5 +127,106 @@ describe('EngineHost.enable when the DSP will not load', () => {
     await expect(first).rejects.toThrow();
     await expect(second).resolves.toBeUndefined();
     expect(contexts).toBe(2);
+  });
+});
+
+describe('the console transport (#708): ▶ ■ ‖ over the live system', () => {
+  interface FakeSystem {
+    calls: string[];
+    muted: boolean;
+    running: boolean;
+    tick: number;
+  }
+  const fakeSystem = (): FakeSystem & TransportSystem => {
+    const sys = {
+      calls: [] as string[],
+      muted: false,
+      running: false,
+      tick: 0,
+      startMusic(): void {
+        sys.calls.push('start');
+        if (!sys.muted) sys.running = true;
+      },
+      stopMusic(): void {
+        sys.calls.push('stop');
+        sys.running = false;
+        sys.tick = 0;
+      },
+      setMuted(muted: boolean): void {
+        sys.calls.push(muted ? 'mute' : 'unmute');
+        sys.muted = muted;
+        if (muted) sys.running = false;
+      },
+      get musicRunning(): boolean {
+        return sys.running;
+      },
+      scheduler: { audibleTick: (): number => sys.tick },
+      engine: { context: { currentTime: 0 } },
+    };
+    return sys as unknown as FakeSystem & TransportSystem;
+  };
+
+  it('does nothing before audio, and reads position 0', () => {
+    const transport = new HostTransport(() => null);
+    expect(transport.play()).toBe(false);
+    transport.pause();
+    transport.stop();
+    expect(transport.state).toBe('idle');
+    expect(transport.position()).toBe(0);
+    expect(transport.running).toBe(false);
+  });
+
+  it('▶ unmutes and starts, ‖ is the mute, ■ is stopMusic', () => {
+    const system = fakeSystem();
+    const transport = new HostTransport(() => system);
+    expect(transport.play()).toBe(true);
+    expect(transport.state).toBe('playing');
+    expect(transport.running).toBe(true);
+    system.tick = 200;
+    transport.pause();
+    expect(transport.state).toBe('paused');
+    expect(transport.position()).toBe(200);
+    transport.play();
+    expect(transport.state).toBe('playing');
+    transport.stop();
+    expect(transport.state).toBe('idle');
+    expect(transport.position()).toBe(0);
+    expect(system.calls).toEqual(['unmute', 'start', 'mute', 'unmute', 'start', 'stop']);
+  });
+
+  it('‖ on an idle transport neither mutes nor changes state', () => {
+    const system = fakeSystem();
+    const transport = new HostTransport(() => system);
+    transport.pause();
+    expect(transport.state).toBe('idle');
+    expect(system.calls).toEqual([]);
+  });
+
+  it('a rebuilt system starts only while ▶ is pressed; otherwise the transport is idle', () => {
+    const system = fakeSystem();
+    const transport = new HostTransport(() => system);
+    transport.adopt(system);
+    expect(system.calls).toEqual([]);
+    transport.play();
+    const rebuilt = fakeSystem();
+    transport.adopt(rebuilt);
+    expect(rebuilt.calls).toEqual(['start']);
+    transport.pause();
+    transport.adopt(fakeSystem());
+    expect(transport.state).toBe('idle');
+  });
+
+  it('a ‖ pressed mid-rebuild, with no system yet, keeps the rebuilt system from starting', () => {
+    let live: TransportSystem | null = fakeSystem();
+    const transport = new HostTransport(() => live);
+    transport.play();
+    live = null;
+    transport.pause();
+    expect(transport.state).toBe('paused');
+    const rebuilt = fakeSystem();
+    live = rebuilt;
+    transport.adopt(rebuilt);
+    expect(rebuilt.calls).toEqual([]);
+    expect(transport.state).toBe('idle');
   });
 });

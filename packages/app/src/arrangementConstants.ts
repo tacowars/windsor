@@ -1,4 +1,4 @@
-/** The Arrangement tab's tunables (#618). The tempo range and its default are the engine's and the song's. */
+/** The Arrangement tab's tunables (#618). The tempo and bars knobs moved to `transportTables.ts` (#708). */
 
 /** How long an export's object URL outlives the click, in ms. */
 export const EXPORT_URL_TTL_MS = 5000;

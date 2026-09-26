@@ -38,7 +38,8 @@ and its extension checklists, so neither states the other's content twice.
     no `def` field at all, and `knobDefaults.test.ts` walks every table (#618);
   - a playhead's position is `ArrangementPlayer.stepAt` through
     `AudioSystem.stepAt` → `host.stepAt`, read once in `stepStrip.ts`'s
-    `playheadAt` (#619);
+    `playheadAt` (#619); the audible tick itself is read once, in
+    `HostTransport.position()` (#708);
   - the envelope display draws the engine's `segmentLevel`, pinned
     sample-for-sample against the FM worklet (`worklet/fm/`) by
     `envelopeCurve.test.ts` (#620);
@@ -55,8 +56,8 @@ and its extension checklists, so neither states the other's content twice.
   engine adds or disposes that one part on the running transport; a refused
   partial changes nothing and never falls back to a rebuild.
   `ctx.restructure(draft => …)` — mutate, renormalise, rebuild the live system
-  from tick 0, re-render — is the Restart button's and nothing else's; an
-  import is `ctx.importDoc(raw)`, the other rebuild; a patch knob is
+  from tick 0, re-render — has no button since #708 removed Restart; an
+  import is `ctx.importDoc(raw)`, the one rebuild the UI offers; a patch knob is
   `PartsSession.push()`, which writes the working patch into the document's
   `patches` section under the part's preset name. Live-only state is lost on
   export and is a bug.
@@ -108,7 +109,15 @@ knows the one below it and nothing above.
      controller must follow an enable or a rebuild while the Parts tab is
      hidden and its render deferred.
 3. **`tabShell.ts`** builds the buttons and panels and registers each tab with
-   the context; `powerButton.ts` is the first user gesture that creates the
+   the context; **`transportStrip.ts`** (#708) is the one piece of chrome
+   above every tab — BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth`
+   position and ▶ ■ ‖ — registered through `ctx.addChrome`, so it renders on
+   every `render()` and never on `invalidate()` or `refreshTabs()` (the Bars knob's, which re-renders the active tab under the strip). The buttons are
+   `ctx.transport` (`host.ts`'s `HostTransport`: ▶ unmute + start, ‖ the
+   game's mute, ■ `AudioSystem.stopMusic` — stop, release, rewind to tick 0
+   with every region gate cleared); the rules are `transportModel.ts`, the
+   ranges `transportTables.ts`. Power-on leaves the transport idle at 1.1.1;
+   the position reads `ctx.transport.position()` on `watchPlayhead`; `powerButton.ts` is the first user gesture that creates the
    audio context and builds the live system.
 4. **The tabs** — `partsTab.ts`, `mixerTab.ts`, `sequencersTab.ts`,
    `harmonyTab.ts`, `arrangementTab.ts` — lay out sections and hand each

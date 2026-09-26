@@ -28,6 +28,7 @@ import { wirePowerButton } from './powerButton';
 import { renderSequencersTab } from './sequencersTab';
 import { newSong } from './songParts';
 import { mountTabShell } from './tabShell';
+import { mountTransportStrip } from './transportStrip';
 
 const status = (message: string): void => {
   $('status').textContent = message;
@@ -42,6 +43,7 @@ const keyboard = new Keyboard(() => ctx.livePart());
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
 
+mountTransportStrip(ctx, $('transportStrip'));
 mountTabShell(
   ctx,
   [
