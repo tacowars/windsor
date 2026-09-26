@@ -40,6 +40,8 @@ const PURE_FILES = [
   'gridSequencer.ts',
   'chordSequencer.ts',
   'arpSequencer.ts',
+  // The arpeggiator (#706): the chord the gate hands it, voiced and walked.
+  'arpeggiator.ts',
   'bassSequencer.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',

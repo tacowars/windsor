@@ -11,6 +11,7 @@
  * has nothing to draw, so its entry is the sentence that says so.
  */
 import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
+import { arpCard } from './arpCard';
 import { chordCard } from './chordCard';
 import type { AppCtx } from './context';
 import { el } from './dom';
@@ -40,6 +41,6 @@ export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   euclidean: euclidCard,
   grid: gridCard,
   chord: chordCard,
-  arp: stubCard('Arp', '#706'),
+  arp: arpCard,
   bass: stubCard('Bass', '#707'),
 };

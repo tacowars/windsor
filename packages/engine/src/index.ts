@@ -191,12 +191,8 @@ export type {
 } from './sequencing/regionGate';
 export { chordAt, eventBounds } from './harmony/harmonyTimeline';
 export type { EventBounds, Harmony, HarmonyChord, HarmonyEvent } from './harmony/harmonyTimeline';
-export {
-  ARP_STYLES,
-  ArpSequencer,
-  DEFAULT_ARP_CONFIG,
-  assertArpConfig,
-} from './sequencing/arpSequencer';
+export { ARP_STYLES, DEFAULT_ARP_CONFIG, assertArpConfig } from './sequencing/arpSequencer';
+export { Arpeggiator, arpNoteList } from './sequencing/arpeggiator';
 export type { ArpSequencerConfig, ArpStyle } from './sequencing/arpSequencer';
 export {
   BASS_PITCH_MODES,
