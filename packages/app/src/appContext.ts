@@ -18,6 +18,7 @@ import type { AppCtx, ConsoleTransport } from './context';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import { PartsSession } from './partsSession';
+import { followSongLength } from './regionModel';
 
 /** The part of the engine host the context drives; a test's fake implements this much. */
 export type ContextHost = Pick<
@@ -119,13 +120,18 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     if (active) this.renderTab(active);
   }
 
-  change(partial: DocumentPartial): ApplyResult {
+  change(edit: DocumentPartial): ApplyResult {
+    // A Bars edit carries every whole-song region and the timeline's tail
+    // with it (#709 decision 4), so the strip's knob and the document agree
+    // on what ∞ means; any other partial passes through unchanged.
+    const { partial, report } = followSongLength(this.model.doc, edit);
     const live = this.host.apply(partial);
     if (live && !live.ok) {
       this.status(`refused: ${live.error ?? 'invalid'}`);
       return live;
     }
     this.model.merge(partial);
+    if (report.length > 0) this.status(`song length: ${report.join(', ')} refitted`);
     if (live && live.ignored.length > 0) this.status(`ignored: ${live.ignored.join(', ')}`);
     // No system to apply to because one is being built (the first enable, an
     // Import, a Restart): that build captured an older document, so queue the
@@ -134,12 +140,6 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // passes 1 and 2). With audio never enabled there is nothing to queue.
     if (live === null && this.host.isBuilding) this.rebuild();
     return live ?? { ok: true, ignored: [] };
-  }
-
-  /** Restart's path, and the shape Import shares (#629): every other edit is `change`, live. */
-  restructure(edit: (draft: Record<string, unknown>) => void): void {
-    this.model.mutate(edit);
-    this.rebuild();
   }
 
   importDoc(raw: unknown): void {
