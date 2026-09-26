@@ -11,13 +11,11 @@
  * has nothing to draw, so its entry is the sentence that says so.
  */
 import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
-import { arpCard } from './arpCard';
 import { chordCard } from './chordCard';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { euclidCard } from './euclidCard';
 import { gridCard } from './gridCard';
-import { stepCard } from './stepCard';
 
 /** What every card is: the body of one part's section, built from the document. */
 export type SequencerCard = (ctx: AppCtx, slot: number) => HTMLElement;
@@ -30,8 +28,6 @@ const noneCard: SequencerCard = () =>
 export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   none: noneCard,
   euclidean: euclidCard,
-  arp: arpCard,
-  step: stepCard,
   grid: gridCard,
   chord: chordCard,
 };

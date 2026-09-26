@@ -14,8 +14,8 @@ import { ScaleSampler } from './scaleSampler';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from './scheduler';
 
 /** C minor from C3: degree 0 is 48, degree 2 is 51, degree 6 is 58. */
-const minor = new ScaleSampler({ root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] });
-const penta = new ScaleSampler({ root: 48, scale: 'pentatonicMinor', weights: [1, 1, 1, 1, 1] });
+const minor = new ScaleSampler({ root: 48, scale: 'naturalMinor' });
+const penta = new ScaleSampler({ root: 48, scale: 'pentatonicMinor' });
 
 const REST: GridStep = { kind: 'rest' };
 const TIE: GridStep = { kind: 'tie' };

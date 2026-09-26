@@ -21,10 +21,10 @@ import { DIVISORS, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler'
 
 const { drone } = FULL_SLOT;
 
-/** bed-01's drone slot driven by a progression in C minor: i, a rest, then VI twice at half a bar. */
+/** The fixture's drone slot driven by a progression in C minor: i, a rest, then VI twice at half a bar. */
 const PROGRESSION: Arrangement = {
   ...FULL_ARRANGEMENT,
-  key: { root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] },
+  key: { root: 48, scale: 'naturalMinor' },
   parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
     part.slot === drone
       ? {
@@ -84,9 +84,7 @@ describe('chord parts (#606)', () => {
     const { parts, player, run } = rig(PROGRESSION);
     run(1);
     const before = parts.drone.calls.length;
-    expect(
-      player.apply({ key: { root: 50, scale: 'major', weights: [1, 1, 1, 1, 1, 1, 1] } }, {}).ok,
-    ).toBe(true);
+    expect(player.apply({ key: { root: 50, scale: 'major' } }, {}).ok).toBe(true);
     run(2);
     const since = parts.drone.calls.slice(before);
     expect(since.filter((c) => c.kind === 'allNotesOff')).toEqual([]);

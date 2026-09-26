@@ -4,12 +4,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { Arpeggiator, DEFAULT_ARPEGGIATOR_CONFIG } from './arpeggiator';
 import { DEFAULT_EUCLIDEAN_CONFIG, EuclideanSequencer } from './euclideanSequencer';
 import { GENERATOR_SEED_STRIDE, generatorRng, generatorSeed } from './generatorSeed';
-import { ScaleSampler, uniformWeights } from './scaleSampler';
+import { DEFAULT_GRID_CONFIG, GridSequencer } from './gridSequencer';
+import { ScaleSampler } from './scaleSampler';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
-import { DEFAULT_STEP_SEQUENCER_CONFIG, StepSequencer } from './stepSequencer';
 
 interface Seeds {
   kick: number;
@@ -20,11 +19,7 @@ interface Seeds {
 
 /** The four parts of the record's §7, driven together for `bars`, as JSON per part. */
 function arrangement(seeds: Seeds, bars = 16): Record<keyof Seeds, string> {
-  const sampler = new ScaleSampler({
-    root: 48,
-    scale: 'dorian',
-    weights: uniformWeights('dorian'),
-  });
+  const sampler = new ScaleSampler({ root: 48, scale: 'dorian' });
   const transport = new TickTransport(96);
   const out = {
     kick: [] as unknown[],
@@ -48,13 +43,18 @@ function arrangement(seeds: Seeds, bars = 16): Record<keyof Seeds, string> {
     pulses: { min: 8, max: 24, start: 12 },
     density: { kind: 'walk', stepChance: 0.9 },
   });
-  const arp = new Arpeggiator(sampler, {
-    ...DEFAULT_ARPEGGIATOR_CONFIG,
+  // The two pitched parts are grids whose only draw is the seeded skip (#704:
+  // the arpeggiator and step sequencer that held these slots are gone).
+  const arp = new GridSequencer(sampler, {
+    ...DEFAULT_GRID_CONFIG,
+    skipChance: 0.5,
     seed: seeds.arp,
     generatorIndex: 2,
   });
-  const drone = new StepSequencer(sampler, {
-    ...DEFAULT_STEP_SEQUENCER_CONFIG,
+  const drone = new GridSequencer(sampler, {
+    ...DEFAULT_GRID_CONFIG,
+    divisor: 24,
+    skipChance: 0.5,
     seed: seeds.drone,
     generatorIndex: 3,
   });

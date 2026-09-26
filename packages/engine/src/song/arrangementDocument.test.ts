@@ -15,6 +15,7 @@ import type { PresetTable } from './arrangementValidate';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { DEFAULT_STRIP } from '../mixer/mix';
 import { PRESETS } from '../patch/presets';
+import { DEFAULT_GRID_CONFIG } from '../sequencing/gridSequencer';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 
 const silentPart = (): PlayablePart => ({
@@ -119,17 +120,17 @@ describe('corrections are reported', () => {
   });
 
   it('drops a field another kind owns, by path', () => {
-    const result = makeArrangement(song([{ ...KICK, sequencer: { kind: 'arp', note: 40 } }]));
+    const result = makeArrangement(song([{ ...KICK, sequencer: { kind: 'grid', note: 40 } }]));
     expect(result.corrections).toContain('parts[0].sequencer.note: unknown key dropped');
   });
 
   it('replaces a divisor that does not divide the bar', () => {
     const result = makeArrangement(
-      song([{ slot: 3, preset: 'drone-sqr', sequencer: { kind: 'step', divisor: 7 } }]),
+      song([{ slot: 3, preset: 'drone-sqr', sequencer: { kind: 'grid', divisor: 7 } }]),
     );
     expect(result.corrections.join('\n')).toMatch(/divisor: 7 does not divide the 96-tick bar/);
     const sequencer = result.document.parts[0]?.sequencer;
-    expect(sequencer?.kind === 'step' && sequencer.divisor).toBe(96);
+    expect(sequencer?.kind === 'grid' && sequencer.divisor).toBe(DEFAULT_GRID_CONFIG.divisor);
   });
 
   it('takes defaults for absent optional fields silently', () => {
@@ -153,6 +154,28 @@ describe('corrections are reported', () => {
     );
     expect(junk.document.parts[0]?.sequencer).toEqual({ kind: 'none' });
     expect(junk.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.kind/);
+  });
+
+  it('reads a deleted arp or step part as none, reported (#704)', () => {
+    for (const kind of ['arp', 'step']) {
+      const result = makeArrangement(song([{ slot: 2, preset: 'saw-arp', sequencer: { kind } }]));
+      expect(result.document.parts[0]?.sequencer).toEqual({ kind: 'none' });
+      expect(result.corrections.join('\n')).toMatch(/parts\[0\]\.sequencer\.kind/);
+    }
+  });
+
+  it('reports key.weights as an unknown key and changes nothing else (#704)', () => {
+    const key = { root: 50, scale: 'dorian' };
+    const plain = makeArrangement(song([KICK], { key }));
+    const weighted = makeArrangement(
+      song([KICK], { key: { ...key, weights: [4, 1, 2, 2, 3, 1, 2] } }),
+    );
+    expect(weighted.corrections).toEqual([
+      ...plain.corrections,
+      'key.weights: unknown key dropped',
+    ]);
+    expect(weighted.document).toEqual(plain.document);
+    expect(weighted.document.key).toEqual(key);
   });
 });
 
@@ -201,10 +224,10 @@ describe('round-trip: normalise → serialise → normalise', () => {
     const messy = song(
       [
         { ...KICK, velocity: 3, strip: { level: 9 }, sequencer: { kind: 'euclidean', divisor: 5 } },
-        { slot: 2, preset: 'saw-arp', sequencer: { kind: 'arp', gate: 2, walk: 'sideways' } },
+        { slot: 2, preset: 'saw-arp', sequencer: { kind: 'grid', skipChance: 2, length: 99 } },
         { slot: 1, preset: 'hat', strip: { sends: { echo: 2 } } },
       ],
-      { seed: 204.4, bpm: 500, key: { root: 50, scale: 'dorian', weights: [4, 1] } },
+      { seed: 204.4, bpm: 500, key: { root: 50, scale: 'dorian' } },
     );
     const first = makeArrangement(messy);
     expect(first.usable).toBe(true);
@@ -243,10 +266,10 @@ describe('a song resolves only its own patches (#562)', () => {
     version: 2,
     seed: 204,
     bpm: 96,
-    key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+    key: { root: 50, scale: 'dorian' },
     parts: [
       { slot: 0, name: 'kick', preset: 'kick', sequencer: { kind: 'euclidean' } },
-      { slot: 3, name: 'drone', preset: 'drone-sqr', sequencer: { kind: 'step' } },
+      { slot: 3, name: 'drone', preset: 'drone-sqr', sequencer: { kind: 'chord' } },
     ],
   };
 

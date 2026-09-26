@@ -1,28 +1,32 @@
 /**
- * The #69b arrangement, as a TypeScript literal in the version-2 shape
- * (#597) — the data `arrangements/bed-01.json` holds.
+ * A known-good, fully-populated arrangement in the version-2 shape (#597)
+ * for the player, apply and render tests: four parts on slots 0–3 — two
+ * Euclidean, a grid line and a chord progression — with `FULL_SLOT` naming
+ * them so tests need no lookups.
  *
- * Two jobs:
- *
- * - a known-good, fully-populated arrangement for the player, apply and
- *   render tests: four parts on slots 0–3, one of each pitched kind and two
- *   Euclidean, with `FULL_SLOT` naming them so tests need no lookups;
- * - the pin for `arrangementEquality.test.ts`, which asserts the committed
- *   JSON still normalises to exactly this — the "sounds identical to what the
- *   maintainer approved by ear" guarantee.
- *
- * When the committed arrangement is deliberately re-authored (the #70
- * console), update this copy in the same PR: the diff is the review.
+ * It began as the #69b song, whose committed-JSON twin
+ * (`arrangementEquality.test.ts`) retired with the shipped songs in #704; the
+ * slot names are that song's retired four-slot ids, kept so the tests read
+ * the same. Its pitched parts were an arpeggiator and a step drone until
+ * those kinds were deleted (#704, epic #703 decision 3).
  */
-import type { Arrangement, ArpSpec, EuclideanSpec, MusicPart, StepSpec } from '../song/arrangement';
+import type {
+  Arrangement,
+  ChordSpec,
+  EuclideanSpec,
+  GridSpec,
+  MusicPart,
+} from '../song/arrangement';
 import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
 import type { ChannelStrip } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
+import { chordStep } from '../sequencing/chordSequencer';
+import { gridNote } from '../sequencing/gridSequencer';
 
-/** The slots bed-01's parts sit on — the retired four-slot ids' generator indices. */
+/** The fixture's slots, named by the retired four-slot ids that were their generator indices. */
 export const FULL_SLOT = { kick: 0, hat: 1, arp: 2, drone: 3 } as const;
 export type FullPartId = keyof typeof FULL_SLOT;
 export const FULL_PART_IDS = Object.keys(FULL_SLOT) as FullPartId[];
@@ -63,35 +67,37 @@ const HAT: MusicPart & { sequencer: EuclideanSpec } = {
   },
 };
 
-const ARP: MusicPart & { sequencer: ArpSpec } = {
+/** The retired `arp` slot, now a written line (#704): eight eighths over the key. */
+const ARP: MusicPart & { sequencer: GridSpec } = {
   slot: FULL_SLOT.arp,
   name: 'arp',
   preset: 'saw-arp',
   velocity: 0.7,
   sequencer: {
-    kind: 'arp',
-    divisor: 6,
-    poolSize: 4,
-    refreshBars: 4,
-    walk: 'updown',
+    kind: 'grid',
+    divisor: 12,
+    steps: [0, 2, 4, 2, 5, 4, 2, 1].map((degree) => gridNote(degree)),
+    length: 8,
     skipChance: 0.3,
-    register: { octave: 1, span: 2 },
-    gate: 0.6,
-    pattern: null,
+    accentVelocity: 0.2,
+    accentMod: 0.5,
+    register: { octave: 1 },
   },
 };
 
-const DRONE: MusicPart & { sequencer: StepSpec } = {
+/** The retired `drone` slot, now a chord progression (#704): i then iv, a bar each, held. */
+const DRONE: MusicPart & { sequencer: ChordSpec } = {
   slot: FULL_SLOT.drone,
   name: 'drone',
   preset: 'drone-sqr',
   velocity: 0.8,
   sequencer: {
-    kind: 'step',
+    kind: 'chord',
     divisor: 96,
     gate: 1,
-    register: { octave: -1, span: 1 },
-    pattern: null,
+    voicing: 'close',
+    register: { octave: -1 },
+    steps: [chordStep(0), chordStep(3)],
   },
 };
 
@@ -101,11 +107,11 @@ export const FULL_PARTS = { kick: KICK, hat: HAT, arp: ARP, drone: DRONE } as co
 export const FULL_ARRANGEMENT: Arrangement = {
   seed: 204,
   bpm: 96,
-  key: { root: 50, scale: 'dorian', weights: [4, 1, 2, 2, 3, 1, 2] },
+  key: { root: 50, scale: 'dorian' },
   parts: [KICK, HAT, ARP, DRONE],
 };
 
-/** The strips bed-01's parts carry — the `MIX` entries they had before #597. */
+/** The fixture parts' strips — the `MIX` entries the #69b parts had before #597. */
 export const FULL_STRIPS: Readonly<Record<FullPartId, ChannelStrip>> = {
   kick: { level: 0.9, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {}, inserts: [] },
   hat: { level: 0.6, pan: 0.2, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.2 }, inserts: [] },
@@ -115,15 +121,11 @@ export const FULL_STRIPS: Readonly<Record<FullPartId, ChannelStrip>> = {
 
 /**
  * The same arrangement as a self-contained *document* (#562, #597): each part
- * with its strip, and the four patches its parts play, embedded, exactly as
- * `arrangements/bed-01.json` carries them.
+ * with its strip, and the four patches its parts play, embedded, the way a
+ * shipped song under `arrangements/` carries them.
  *
  * The snapshot is read from the library rather than spelled out, so this
- * fixture has no hand-copied patch numbers to drift. A ticket that
- * deliberately re-tunes one of these four library patches makes the equality
- * test fail, which is the intended alarm — it is the moment someone decides
- * whether bed-01 re-embeds the new patch or keeps the one tacowars approved by ear
- * (#564 decision 2). Any other library patch may be tuned freely.
+ * fixture has no hand-copied patch numbers to drift.
  */
 export const FULL_DOCUMENT: ArrangementDocument & {
   readonly parts: readonly DocumentPart[];
@@ -145,7 +147,7 @@ export function slotMap<P>(parts: Readonly<Record<FullPartId, P>>): Map<number, 
   return new Map(FULL_PART_IDS.map((id) => [FULL_SLOT[id], parts[id]]));
 }
 
-/** The arrangement with only the named parts kept, in bed-01 order. */
+/** The arrangement with only the named parts kept, in fixture order. */
 export function onlyParts(arrangement: Arrangement, ...ids: FullPartId[]): Arrangement {
   const slots = new Set<number>(ids.map((id) => FULL_SLOT[id]));
   return { ...arrangement, parts: arrangement.parts.filter((part) => slots.has(part.slot)) };

@@ -112,7 +112,7 @@ describe('grid sequencer normalisation (#602)', () => {
       version: ARRANGEMENT_VERSION,
       seed: 3,
       bpm: 120,
-      key: { root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] },
+      key: { root: 48, scale: 'naturalMinor' },
       patches: { acid: makePatch({ name: 'acid' }) },
       parts: [
         {

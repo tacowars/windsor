@@ -17,7 +17,6 @@ import type {
   ArrangementDocument,
   AudioPart,
   DocumentPartial,
-  NotePattern,
   WorkletUrls,
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
@@ -185,7 +184,7 @@ export class EngineHost {
     return this.system ? this.system.apply(partial) : null;
   }
 
-  capturePattern(slot: number): readonly boolean[] | NotePattern | null {
+  capturePattern(slot: number): readonly boolean[] | null {
     return this.system?.capturePattern(slot) ?? null;
   }
 

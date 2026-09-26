@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- the binding layer in one file: #629 adds the live roster (a slot added or removed) to the same plan/commit transaction the rebuilds and reconfigures run through; 373 of 350, inside the #225 decision 4 margin, and a split would put half the transaction in a second file */
 /**
  * The binding layer (issue #69): generators emit onsets and note events on the
  * tick grid; this maps them onto parts. It is the seam of record
@@ -6,8 +5,8 @@
  * know nothing about audio, and everything that does know lives here.
  *
  *   transport ─▶ EuclideanSequencer ─ onset ─▶ part.trigger
- *            ─▶ Arpeggiator        ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
- *            ─▶ StepSequencer      ─ ties: no event, the held note continues
+ *            ─▶ GridSequencer      ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
+ *            ─▶ ChordSequencer     ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
  *
  * Since #597 any part carries any of those, or none: a part is found by its
  * slot, a `none` part builds no generator and is never touched here beyond
@@ -26,9 +25,7 @@
  * one part cannot reset another's stream. A merged arrangement that fails
  * validation changes nothing and is reported, never half-applied.
  */
-import { Arpeggiator } from '../sequencing/arpeggiator';
 import type {
-  ArpDriver,
   Arrangement,
   ArrangementPartial,
   ChordDriver,
@@ -36,10 +33,8 @@ import type {
   GridDriver,
   MusicPart,
   SequencerSpec,
-  StepDriver,
 } from './arrangement';
 import { driverOf, mergeArrangement } from './arrangement';
-import { BarRecorder, type NotePattern } from '../sequencing/capturedPattern';
 import {
   EuclideanSequencer,
   assertEuclideanConfig,
@@ -58,7 +53,6 @@ import type { Patch } from '../patch/patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from '../patch/patch';
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import type { TickSource, Unsubscribe } from '../sequencing/scheduler';
-import { StepSequencer } from '../sequencing/stepSequencer';
 import { GridSequencer, assertGridConfig } from '../sequencing/gridSequencer';
 import { ChordSequencer, assertChordConfig } from '../sequencing/chordSequencer';
 import type { NoteExtras } from '../synth/audioPart';
@@ -111,7 +105,7 @@ export interface ArrangementReadout {
   counters: Record<string, number>;
 }
 
-type Generator = EuclideanSequencer | Arpeggiator | StepSequencer | GridSequencer | ChordSequencer;
+type Generator = EuclideanSequencer | GridSequencer | ChordSequencer;
 
 interface Built {
   sampler: ScaleSampler;
@@ -168,20 +162,16 @@ function stagePatches(
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
 /**
- * What builds a part's generator: its kind and driver, never its note, hold or
- * velocity. A grid (#603) or a Euclidean part (#610) rebuilds only on its kind
- * or divisor and a chord progression only on its kind (#606, it subscribes at
+ * What builds a part's generator: its kind, never its note, hold or velocity.
+ * A grid (#603) or a Euclidean part (#610) rebuilds only on its kind or
+ * divisor and a chord progression only on its kind (#606, it subscribes at
  * every tick): every other field reconfigures the live generator, so an edit
  * never cuts the held note or restarts the stream.
  */
 const generatorSig = (spec: SequencerSpec): string => {
   if (spec.kind === 'grid' || spec.kind === 'euclidean') return sig([spec.kind, spec.divisor]);
-  if (spec.kind === 'chord') return sig([spec.kind]);
-  return sig([spec.kind, driverOf(spec)]);
+  return sig([spec.kind]);
 };
-
-/** Draws from the shared sampler on a rebuild; a key change rebuilds these two. */
-const isPitched = (spec: SequencerSpec): boolean => spec.kind === 'arp' || spec.kind === 'step';
 
 /** Kept live across edits (#603, #606, #610): reconfigured after a commit, never rebuilt for one. */
 const isLive = (spec: SequencerSpec): boolean =>
@@ -226,8 +216,6 @@ export class ArrangementPlayer {
   private current: Arrangement;
   private bySlot = new Map<number, MusicPart>();
   private built: Built;
-  /** What each pitched part actually sounded, for capture (issue #70), by slot. */
-  private readonly recorders = new Map<number, BarRecorder | null>();
   private readonly subs = new Map<number, Unsubscribe>();
   private readonly counters = new Map<number, number>();
   private readonly announced = new Set<number>();
@@ -271,21 +259,15 @@ export class ArrangementPlayer {
   }
 
   /**
-   * The sounding pattern of a part as a literal array (issue #70, record §6):
-   * a Euclidean part's figure now playing, or the last bar a pitched part
-   * completed — `null` before one exists, and always for a `none` part or an
-   * absent slot. What the console freezes into the sequencer's `pattern`.
+   * A Euclidean part's sounding figure as a literal array (issue #70, record
+   * §6) — what the console's click-to-toggle freezes into the sequencer's
+   * `pattern`. `null` for any other kind or an absent slot: pitched capture
+   * went with the arpeggiator and step sequencer (#704).
    */
-  capturePattern(slot: number): readonly boolean[] | NotePattern | null {
-    const kind = this.bySlot.get(slot)?.sequencer.kind;
+  capturePattern(slot: number): readonly boolean[] | null {
     const generator = this.built.generators.get(slot) ?? null;
-    if (kind === 'euclidean' && generator instanceof EuclideanSequencer) {
-      return [...generator.currentPattern];
-    }
-    const recorder = this.recorders.get(slot);
-    if (!recorder || !kind || kind === 'none') return null;
-    const step = kind === 'step' && generator instanceof StepSequencer ? generator : null;
-    return recorder.capture(step !== null, step?.heldNote ?? null);
+    if (this.bySlot.get(slot)?.sequencer.kind !== 'euclidean') return null;
+    return generator instanceof EuclideanSequencer ? [...generator.currentPattern] : null;
   }
 
   /**
@@ -339,14 +321,10 @@ export class ArrangementPlayer {
     return { ok: true, ignored };
   }
 
-  /** Release everything sounding — step parts' held notes included. Mute and teardown call this. */
+  /** Release everything sounding — grid and chord parts' held notes included. Mute and teardown call this. */
   releaseAll(time = 0): void {
     for (const generator of this.built.generators.values()) {
-      if (
-        generator instanceof StepSequencer ||
-        generator instanceof GridSequencer ||
-        generator instanceof ChordSequencer
-      ) {
+      if (generator instanceof GridSequencer || generator instanceof ChordSequencer) {
         generator.release(0, time);
       }
     }
@@ -366,16 +344,11 @@ export class ArrangementPlayer {
    */
   private detach(slot: number): void {
     const generator = this.built.generators.get(slot);
-    if (
-      generator instanceof StepSequencer ||
-      generator instanceof GridSequencer ||
-      generator instanceof ChordSequencer
-    ) {
+    if (generator instanceof GridSequencer || generator instanceof ChordSequencer) {
       generator.release(0, 0);
     }
     this.subs.get(slot)?.();
     this.subs.delete(slot);
-    this.recorders.delete(slot);
     this.counters.delete(slot);
     this.announced.delete(slot);
     this.parts.get(slot)?.allNotesOff();
@@ -402,10 +375,6 @@ export class ArrangementPlayer {
     switch (part.sequencer.kind) {
       case 'euclidean':
         return new EuclideanSequencer({ ...(driver as EuclideanDriver), ...stream });
-      case 'arp':
-        return new Arpeggiator(sampler, { ...(driver as ArpDriver), ...stream });
-      case 'step':
-        return new StepSequencer(sampler, { ...(driver as StepDriver), ...stream });
       case 'grid':
         return new GridSequencer(sampler, { ...(driver as GridDriver), ...stream });
       case 'chord':
@@ -443,11 +412,9 @@ export class ArrangementPlayer {
       }
       const changed = generatorSig(next.sequencer) !== generatorSig(before.sequencer);
       // An inert part only rebuilds when its kind leaves or enters `none`;
-      // a seed or key change has no stream of its to reset.
-      // A grid or chord part takes a new sampler live (`reconfigure`), so a key change does not rebuild it.
-      const reseeded =
-        next.sequencer.kind !== 'none' &&
-        (seedChanged || (isPitched(next.sequencer) && keyChanged));
+      // a seed change has no stream of its to reset. A grid or chord part
+      // takes a new sampler live (`reconfigure`), so a key change rebuilds nothing.
+      const reseeded = next.sequencer.kind !== 'none' && seedChanged;
       if (changed || reseeded) rebuilt.add(next.slot);
     }
 
@@ -488,16 +455,12 @@ export class ArrangementPlayer {
         generator.onNote = (e): void => this.pitched(slot, e);
       }
     }
-    for (const { slot, sequencer } of this.current.parts) {
+    for (const { slot } of this.current.parts) {
       if (!slots.has(slot)) continue;
       this.subs.get(slot)?.();
       this.subs.delete(slot);
       const generator = this.built.generators.get(slot);
       if (generator) this.subs.set(slot, generator.attach(this.transport));
-      // A rebuilt pitched part gets a fresh recorder: its divisor may have
-      // changed, and the bars recorded under the old generator are history.
-      const pitched = sequencer.kind === 'arp' || sequencer.kind === 'step';
-      this.recorders.set(slot, pitched ? new BarRecorder(sequencer.divisor) : null);
     }
   }
 
@@ -520,7 +483,6 @@ export class ArrangementPlayer {
       const extras: NoteExtras | undefined =
         accent || event.slide ? { mod: accent?.mod ?? 0, slide: event.slide === true } : undefined;
       part.noteOn(event.note, velocity, event.time, extras);
-      this.recorders.get(slot)?.record(event.tick, event.note);
       this.count(config, event.tick);
     } else {
       part.noteOffByNote(event.note, event.time);

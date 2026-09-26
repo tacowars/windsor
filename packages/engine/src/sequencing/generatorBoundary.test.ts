@@ -35,11 +35,6 @@ const PURE_FILES = [
   'noteEvent.ts',
   'scaleSampler.ts',
   'euclideanSequencer.ts',
-  'arpeggiator.ts',
-  'stepSequencer.ts',
-  // The captured-pattern contract and bar recorder (issue #70): data in, data
-  // out — the player records into it, but it never touches a part.
-  'capturedPattern.ts',
 ];
 
 /** The pure set by absolute path, so a specifier is judged by what it resolves to, not how it is spelled. */

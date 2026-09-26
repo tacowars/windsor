@@ -30,7 +30,7 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
   patches: { [GAMEPLAY_PATCH_IDS.pickupBlip]: GAMEPLAY_PATCHES[GAMEPLAY_PATCH_IDS.pickupBlip] },
   // No pitched part exists to draw from this; it is here because a key is
   // structurally required, and it is a single root on purpose — nothing musical.
-  key: { root: 60, scale: [0], weights: [1] },
+  key: { root: 60, scale: [0] },
   parts: [
     {
       slot: 0,

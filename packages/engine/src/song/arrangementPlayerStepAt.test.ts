@@ -17,7 +17,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT, FULL_PARTS, FULL_SLOT } from '../__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_PARTS, FULL_SLOT, withPart } from '../__fixtures__/fullArrangement';
 import { rig } from '../__fixtures__/playerRig';
 import type { Arrangement, EuclideanDriver, MusicPart } from './arrangement';
 import { driverOf } from './arrangement';
@@ -43,10 +43,10 @@ const tickOf = (time: number | undefined): number => Math.round((time ?? 0) / se
 const LADDER_ROOT = 48;
 const LADDER_DEGREES = [0, 1, 2, 3, 4, 5, 6, 7];
 
-/** bed-01's drone slot as a grid part: eight eighths, one distinct degree each. */
+/** The fixture's drone slot as a grid part: eight eighths, one distinct degree each. */
 const LADDER: Arrangement = {
   ...FULL_ARRANGEMENT,
-  key: { root: LADDER_ROOT, scale: LADDER_DEGREES, weights: LADDER_DEGREES.map(() => 1) },
+  key: { root: LADDER_ROOT, scale: LADDER_DEGREES },
   parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
     part.slot === drone
       ? {
@@ -81,7 +81,7 @@ const CHORD_DRIVER = {
 
 const PROGRESSION: Arrangement = {
   ...FULL_ARRANGEMENT,
-  key: { root: 48, scale: 'naturalMinor', weights: [1, 1, 1, 1, 1, 1, 1] },
+  key: { root: 48, scale: 'naturalMinor' },
   parts: FULL_ARRANGEMENT.parts.map((part): MusicPart =>
     part.slot === drone ? { ...part, sequencer: { kind: 'chord', ...CHORD_DRIVER } } : part,
   ),
@@ -156,8 +156,8 @@ describe('ArrangementPlayer.stepAt (#619)', () => {
     expect(player.stepAt(drone, length * BARS + third)).toBe(2);
   });
 
-  it('has no step for a kind with no strip to light, or for an absent slot', () => {
-    const { player } = rig();
+  it('has no step for a none part, or for an absent slot', () => {
+    const { player } = rig(withPart(FULL_ARRANGEMENT, 'arp', { sequencer: { kind: 'none' } }));
     expect(player.stepAt(arp, TICKS_PER_BAR)).toBe(-1);
     expect(player.stepAt(FULL_ARRANGEMENT.parts.length, 0)).toBe(-1);
   });

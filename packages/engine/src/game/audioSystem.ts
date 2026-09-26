@@ -56,7 +56,6 @@ import { asPlaybackStatsHost, snapshotPlaybackStats } from '../cost/playbackStat
 import { SchedCostMeter } from '../cost/schedCost';
 import type { AudioBus } from '../mixer/audioBus';
 import type { AudioPart } from '../synth/audioPart';
-import type { NotePattern } from '../sequencing/capturedPattern';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { RouteOptions } from '../mixer/channelStrip';
 import { routePart } from '../mixer/channelStrip';
@@ -466,8 +465,8 @@ export class AudioSystem {
     };
   }
 
-  /** The sounding pattern of the part on `slot` (issue #70 capture); null before one exists. */
-  capturePattern(slot: number): readonly boolean[] | NotePattern | null {
+  /** A Euclidean part's sounding figure on `slot` (issue #70 capture); null for any other part. */
+  capturePattern(slot: number): readonly boolean[] | null {
     return this.player?.capturePattern(slot) ?? null;
   }
 

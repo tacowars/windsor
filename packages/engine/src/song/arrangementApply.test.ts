@@ -100,16 +100,16 @@ describe('apply', () => {
     expect(kinds(a.parts.hat, 'trigger').at(-1)?.note).toBe(44);
   });
 
-  it('applies a driver change live: skipChance 0 plays every arp step', () => {
+  it('applies a driver change live: skipChance 0 plays every grid step', () => {
     const { player, parts, run } = rig();
     run(1);
     expect(
-      player.apply({ parts: { [arp]: { sequencer: { kind: 'arp', skipChance: 0 } } } }).ok,
+      player.apply({ parts: { [arp]: { sequencer: { kind: 'grid', skipChance: 0 } } } }).ok,
     ).toBe(true);
     const before = kinds(parts.arp, 'noteOn').length;
     run(4);
     const after = kinds(parts.arp, 'noteOn').length;
-    // 96 / divisor 6 = 16 steps per bar, none skipped.
+    // Every step of the line is a note and none is skipped: one note-on per step.
     expect(after - before).toBe(4 * (TICKS_PER_BAR / FULL_PARTS.arp.sequencer.divisor));
   });
 
@@ -120,11 +120,11 @@ describe('apply', () => {
     b.run(2);
     const arpAsDriver = { ...FULL_PARTS.arp.sequencer };
     expect(a.player.apply({ parts: { [kick]: { sequencer: arpAsDriver } } }).ok).toBe(true);
-    expect(a.player.arrangement.parts[kick]?.sequencer.kind).toBe('arp');
+    expect(a.player.arrangement.parts[kick]?.sequencer.kind).toBe('grid');
     const triggersBefore = kinds(a.parts.kick, 'trigger').length;
     a.run(2);
     b.run(2);
-    // The kick part now plays arpeggio notes and no more percussion triggers.
+    // The kick part now plays the grid's notes and no more percussion triggers.
     expect(kinds(a.parts.kick, 'trigger')).toHaveLength(triggersBefore);
     expect(kinds(a.parts.kick, 'noteOn').length).toBeGreaterThan(0);
     expect(kinds(a.parts.kick, 'allNotesOff')).toHaveLength(1);
@@ -135,7 +135,7 @@ describe('apply', () => {
 
   it('refuses a kind change whose sequencer is incomplete, and changes nothing', () => {
     const { player } = rig();
-    const result = player.apply({ parts: { [kick]: { sequencer: { kind: 'step' } } } });
+    const result = player.apply({ parts: { [kick]: { sequencer: { kind: 'grid' } } } });
     expect(result.ok).toBe(false);
     expect(player.arrangement.parts[kick]?.sequencer).toEqual(FULL_PARTS.kick.sequencer);
   });
@@ -176,18 +176,18 @@ describe('apply', () => {
 
   it('refuses an invalid key and keeps playing on the old one', () => {
     const { player, parts, run } = rig();
-    const result = player.apply({ key: { weights: [0, 0, 0, 0, 0, 0, 0] } });
+    const result = player.apply({ key: { scale: [] } });
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/zero/);
+    expect(result.error).toMatch(/no degrees/);
     expect(player.arrangement.key).toEqual(FULL_ARRANGEMENT.key);
     run(2);
     expect(kinds(parts.arp, 'noteOn').length).toBeGreaterThan(0);
   });
 
-  it('rebuilds the pitched parts when the key changes', () => {
+  it('re-pitches the grid line live when the key changes', () => {
     const { player, parts, run } = rig();
     // One degree pinned to the root: every note after the change is known.
-    expect(player.apply({ key: { root: 48, scale: [0], weights: [1] } }).ok).toBe(true);
+    expect(player.apply({ key: { root: 48, scale: [0] } }).ok).toBe(true);
     parts.arp.calls.length = 0;
     run(4);
     const notes = new Set(kinds(parts.arp, 'noteOn').map((c) => c.note));
