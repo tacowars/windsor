@@ -169,7 +169,12 @@ function registerRow(ctx: AppCtx, slot: number, name: string): HTMLElement {
       ...octaveKnob(kind),
       color: COLOR,
       get: octave,
-      set: (v) => void ctx.change(partChange(slot, { sequencer: { register: { octave: v } } })),
+      // The Arp card shows this field as its Reg knob (#706): the hidden tab re-reads it when shown.
+      set: (v) => {
+        if (ctx.change(partChange(slot, { sequencer: { register: { octave: v } } })).ok) {
+          ctx.invalidate();
+        }
+      },
     }),
   );
   row.appendChild(knobs);
