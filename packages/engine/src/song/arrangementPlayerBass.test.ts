@@ -101,4 +101,14 @@ describe('the bass through the player', () => {
     expect(trace(r.parts.drone, 'noteOn', song)).toEqual([[0, C2]]);
     expect(trace(r.parts.drone, 'noteOffByNote', song)).toEqual([[BAR, C2]]);
   });
+
+  it('a region ending inside a gated note cuts it on the region end, not at its gate', () => {
+    const divisor = DIVISORS.quarter;
+    const regionEnd = divisor / 4;
+    const song = bassSong({ gate: 0.5 }, [{ start: 0, duration: regionEnd }]);
+    const r = rig(song);
+    r.run(1);
+    expect(trace(r.parts.drone, 'noteOn', song)).toEqual([[0, C2]]);
+    expect(trace(r.parts.drone, 'noteOffByNote', song)).toEqual([[regionEnd, C2]]);
+  });
 });
