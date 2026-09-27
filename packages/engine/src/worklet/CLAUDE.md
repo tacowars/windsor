@@ -84,7 +84,7 @@ build output. The map of `fm/` (#644):
 | `patchDefaults.ts` | every default a patch may omit, the `tone` and feedback clamp bounds and `OPERATOR_COUNT`, import-free but for the two id modules: `normalisePatch` and the main thread's `makePatch()` both fill from it, and `audioConstants.ts` re-exports `OPERATOR_COUNT` (#670) |
 | `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one, from `patchDefaults.ts` |
 | `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
-| `tsconfig.json` | the folder's own `tsc -p` project (#654): the client's settings with `noUncheckedIndexedAccess` and `useDefineForClassFields` off, and why |
+| `tsconfig.json` | the folder's own `tsc -p` project (#654): the engine's settings with `noUncheckedIndexedAccess` and `useDefineForClassFields` off, and why |
 | `*.test.ts` | direct tests of the leaf modules (#654): a module that warms the wave cache at load needs `sampleRate` on `globalThis` before a dynamic import |
 
 Each module opens with a header saying what it owns, the invariant it keeps and
@@ -97,10 +97,11 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
-   does `scripts/lib/workletBundle.test.mjs`. Three consumers read the
-   generated file and nothing else: Vite (`workletMessages.ts`, `new URL`),
-   the console (`packages/app/build-editor.mjs` inlines it behind a blob
-   URL, which cannot resolve an import) and the harness
+   does `scripts/lib/workletBundle.test.mjs`. Two consumers read the
+   generated file and nothing else: the browser, through Vite
+   (`workletMessages.ts`'s `new URL(…, import.meta.url)`, emitted by the
+   app's build as a separate asset and loaded by `audioWorklet.addModule`,
+   which is why the file must be one self-contained script) and the harness
    (`__fixtures__/workletHarness.ts`, `readFileSync` then `new Function`; the
    plate's is `__fixtures__/reverbHarness.ts`, which reads `MAX_SIZE`,
    `TANK_DELAYS`, `MAX_PRE_DELAY` and the sleep floors the same way).
@@ -144,12 +145,13 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
    from them, and the console draws envelopes with `segmentLevel`, so there
    is one table and one curve, and no pin test. The six are listed in the
-   client project's `files` and compile under its stricter flags as well:
+   engine project's `files` (`packages/engine/tsconfig.json`) and compile
+   under its stricter flags as well:
    an indexed read in one of them takes a `!`, and none of them may touch
    the worklet scope (`sampleRate`) or the wave cache at load. The PRNG stays
-   a copy of the shared package's `mulberry32`, pinned by `prng.test.ts`,
-   because the worklet bundle cannot import `@aotearoa/shared` without
-   carrying the whole package.
+   a copy of the main thread's `sequencing/mulberry32.ts`, pinned line for
+   line by `prng.test.ts`, so the worklet bundle imports nothing it would
+   have to carry.
 6. **Module shape** (#644, #645, #654): one concern per file, named after
    it, 100–350 lines, TypeScript, each opening with a header that says what it
    owns, the invariant it keeps and the test that pins it. A new concern is a
@@ -178,7 +180,8 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    the types cost nothing; the bench is the proof that the emit did not
    change shape.
 
-Verify with the client's command, `npx tsc -p packages/engine/src/worklet/fm/tsconfig.json`
-(and `reverb/tsconfig.json`; both in `npm run typecheck`), then `node scripts/build-worklets.mjs --check`
-and `node packages/app/build-editor.mjs` (the console page bundles the
-generated file, so its bytes change with it).
+Verify with `npx tsc -p packages/engine/src/worklet/fm/tsconfig.json` (and
+each other folder's `tsconfig.json`; all are in `npm run typecheck`), then
+`node scripts/build-worklets.mjs --check`, the tests, and `npm run build`
+(the app emits each generated file as its own asset); `npm run verify` runs
+them all.

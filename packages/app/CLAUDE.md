@@ -1,22 +1,24 @@
-# packages/app — the arrangement console
+# packages/app — Windsor's app (the arrangement console)
 
-## What this tool is
+## What this package is
 
-The standalone console tacowars designs sounds and songs in (#70, decision record
+`@windsor/app`: the browser UI tacowars designs sounds and songs in — Windsor's
+arrangement console, forked from Aotearoa204's `tools/patch-editor/` on
+2026-09-27 (#70, decision record
 `2026-08-31-arrangement-console-and-runtime-arrangements`): four tabs — Parts,
 Mixer, Song, Arrangement — over the **real** audio engine, plus
 an audition keyboard and a MIDI path. It boots on a new song (one part, the
 Init patch, no sequencer — #598) and opens a committed song through Import;
-Export writes the normalised document, patches and returns included, which is
-what `packages/engine/src/arrangements/<name>.json` holds and `?music=`
-plays.
+Export writes the normalised document, patches and returns included — one
+file is the whole piece, and Import reads it back.
 
-It is a **local tool, not a published page**: `patch-editor.html` at this
-directory's root is one generated file with no imports and no dev server, run
-from `file://` or any static server. Nothing here is bundled into the game.
+It is a **Vite app deployed as static files**: `index.html` (markup only),
+`src/console.css` (the whole stylesheet, imported by `src/main.ts`) and
+`src/main.ts` as a module script. `npm run dev` serves it with HMR on :5173;
+`npm run build` writes `packages/app/dist/`, which any static host serves.
 
-Two `CLAUDE.md` files sit above this one: the root's invariants, and
-`packages/client/CLAUDE.md` for the engine the console drives. The
+The root `CLAUDE.md` holds the invariants and the repo layout, and
+`packages/engine/src/worklet/CLAUDE.md` the DSP the engine loads. The
 `music-engine` skill holds the per-file map, the sound-design guidance and the
 audio verification recipes; this file holds the console's structure, its rules
 and its extension checklists, so neither states the other's content twice.
@@ -24,11 +26,12 @@ and its extension checklists, so neither states the other's content twice.
 ## Seams and non-negotiables
 
 - **The console drives the real `AudioSystem`; it builds no audio graph of its
-  own.** Its one import surface is
-  `packages/engine/src/index-for-editor.ts` (everything `index.ts` has
-  except `babylonBridge.ts`). `build-editor.mjs` asserts both boundaries and
-  fails the build: the bundle contains no Babylon, and no console source —
-  template or `src/*.ts` — names `createGain(`, `createDelay(`,
+  own.** Its one import surface is `@windsor/engine`
+  (`packages/engine/src/index.ts`); ESLint's `no-restricted-imports` refuses
+  a deep `@windsor/engine/<path>` or relative `../engine/` import from
+  `src/` (tests may reach fixtures that way), and the engine never imports
+  the app. `consoleBoundary.test.ts` fails when any console source —
+  `index.html` or `src/*.ts` — names `createGain(`, `createDelay(`,
   `audioWorklet.addModule` or the rest of `FORBIDDEN_IN_CONSOLE_CODE`. A
   missing feature is an engine change plus a control here, never a local node.
 - **Never restate an engine rule.** Where the engine already decides, the
@@ -66,26 +69,28 @@ and its extension checklists, so neither states the other's content twice.
   touches no strip, patch, capture or note stream.
 - **Tunables live in one `<area>Constants.ts` / `<area>Tables.ts` beside the
   logic** (root CLAUDE.md "Code structure"; `no-magic-numbers` reaches
-  `tools/*/src/**/*.ts` since #618, with `*Constants.ts` / `*Table*.ts` /
+  `packages/*/src/**/*.ts` — the app since #618 — with `*Constants.ts` / `*Table*.ts` /
   `*.test.ts` as the only ignores). `main.ts` is composition and has no table
   of its own — the number it configures lives in the area's table
   (`hostConstants.ts`'s `HOST_PUMP_INTERVAL_MS`).
 - **One palette, one set of formatters, one DOM builder set**:
-  `consoleColors.ts` (pinned to the template's CSS custom properties by
+  `consoleColors.ts` (pinned to `console.css`'s custom properties by
   `consoleColors.test.ts`), `consoleFormat.ts`, `dom.ts`. `el(tag, class,
   text)` sets `textContent`; `html()` is the explicit markup opt-in, and
   anything user-supplied goes through `escapeHtml`.
 - **One step strip and one playhead loop** (`stepStrip.ts`, #619), **one card
-  per sequencer kind through `SEQUENCER_CARDS`** (`sequencerCards.ts`), the
-  way `FRAME_SYSTEMS` and `SIM_SYSTEMS` order the game's loops (ADR
-  `2026-09-05-system-registries-folder-ownership-and-data-separate-from-logic`).
+  per sequencer kind through `SEQUENCER_CARDS`** (`sequencerCards.ts`) — a
+  registry, the way Aotearoa204's ADR
+  `2026-09-05-system-registries-folder-ownership-and-data-separate-from-logic`
+  ordered that game's loops.
   A tab never branches on a kind — the Song view's per-kind lookups are
   tables (`songViewTables.ts`'s `LANE_TONE`, `REGION_SUMMARY`,
   `CYCLE_TICKS`). Since #709 every `watchPlayhead` without a frame source of
   its own joins one `requestAnimationFrame` (`createFrameDriver`), so the
   ruler line and the card in the pane are one request, not two.
-- **`patch-editor.html` is generated and checked, not authored** (#620
-  decision 6) — see "The tracked page" below.
+- **Nothing in the page is generated.** Aotearoa204's single-file
+  `patch-editor.html` (#620 decision 6) is gone with its generator; Vite
+  builds `dist/` from the sources — see "The build" below.
 
 ## The layers
 
@@ -120,8 +125,8 @@ knows the one below it and nothing above.
    above every tab — BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth`
    position and ▶ ■ ‖ — registered through `ctx.addChrome`, so it renders on
    every `render()` and never on `invalidate()` or `refreshTabs()` (the Bars knob's, which re-renders the active tab under the strip). The buttons are
-   `ctx.transport` (`host.ts`'s `HostTransport`: ▶ unmute + start, ‖ the
-   game's mute, ■ `AudioSystem.stopMusic` — stop, release, rewind to tick 0
+   `ctx.transport` (`host.ts`'s `HostTransport`: ▶ unmute + start, ‖
+   `AudioSystem.setMuted(true)`, ■ `AudioSystem.stopMusic` — stop, release, rewind to tick 0
    with every region gate cleared); the rules are `transportModel.ts`, the
    ranges `transportTables.ts`. Power-on leaves the transport idle at 1.1.1;
    the position reads `ctx.transport.position()` on `watchPlayhead`; `powerButton.ts` is the first user gesture that creates the
@@ -147,8 +152,10 @@ knows the one below it and nothing above.
    Node with no DOM**, so a rule worth testing belongs in a model, a table or
    a write function, not in a click handler (`patchPanels.test.ts` tests
    `writeToggle`, not the button).
-7. **The engine**, through `index-for-editor.ts` only. `host.ts` owns the one
-   `AudioContext` for the life of the page and the blob-URL worklets;
+7. **The engine**, through `@windsor/engine` only. `host.ts` owns the one
+   `AudioContext` for the life of the page and calls `FmEngine.init({})`, so
+   the worklets load from the engine's own `new URL(…, import.meta.url)`
+   URLs;
    `documentModel.ts` keeps the document *normalised* at all times, so the
    export/import round trip is equality by construction.
 
@@ -218,7 +225,7 @@ Each is the whole list; a step skipped here is what a later ticket finds.
    lane in `songViewTables.ts` — `LANE_TONE`, `REGION_SUMMARY`,
    `CYCLE_TICKS` (`songViewTables.test.ts` fails without all three); any
    tunable of its own in a `<kind>Constants.ts`.
-3. A row in the `music-engine` skill's console table, and a rebuilt page.
+3. A row in the `music-engine` skill's console table.
 
 **Add a lane kind** (#709) — a new row of the Song view beside the harmony
 lane and the part lanes
@@ -233,7 +240,7 @@ lane and the part lanes
 3. Its input in `laneSignature` (`songTab.ts`), so a change from anywhere
    repaints it; its pane content (if it has one) as a new `SongSelection`
    kind in `songDetailPane.ts`.
-4. Its CSS in the template's "the Song view" block; a rebuilt page.
+4. Its CSS in `console.css`'s "the Song view" block.
 
 **Add a return or FX kind**
 
@@ -263,8 +270,7 @@ lane and the part lanes
    `insertKnobTables.ts` reading `DEFAULT_<KIND>`, its label in
    `INSERT_LABELS`, and an entry in `INSERT_CARDS` (`insertCards.test.ts`
    fails without one).
-3. A render test of its sound and its bounds beside the kind, and a rebuilt
-   page.
+3. A render test of its sound and its bounds beside the kind.
 4. Presets, if the kind has them: a `<kind>PresetTables.ts` of
    `InsertPreset` entries, each citing its source, and a `<kind>Presets.ts`
    over `inserts/insertPresets.ts`; the card is then a `presetInsertCard`
@@ -305,62 +311,63 @@ lane and the part lanes
 
 1. The rule goes in `patchActions.ts`, pure, over `libraryModel.ts` and the
    open document, with a test; metadata rules in `patchMetadata.ts`.
-2. The button goes in `libraryActions.ts`'s row; a modal is the template's
-   `<dialog>` through `metadataModal.ts` (never `window.confirm`), focus
+2. The button goes in `libraryActions.ts`'s row; a modal is an
+   `index.html` `<dialog>` through `metadataModal.ts` (never `window.confirm`), focus
    trapped by `focusTrap.ts`.
 3. A write goes through `patchFileWriter.ts` (the folder grant in
    `libraryFolder.ts`, otherwise a download for `import-patches.mjs`), and the
    row shows `AFTER_WRITE_COMMANDS` (`libraryConstants.ts`) — pinned equal to
    the scripts' copy in `lib/afterWriteCommands.mjs` by its test.
 
-## The tracked page
+## The build
 
-`patch-editor.html` is generated by `build-editor.mjs`: the template, the eight
-worklet sources inlined verbatim as strings the page turns into blob URLs, and
-the console app bundled with the engine through `index-for-editor.ts` (one
-esbuild call, `lib/audioBundle.mjs`). It is marked `linguist-generated=true`
-and is **checked, not trusted** — `node packages/app/build-editor.mjs
---check` builds to memory and exits 1 when the tracked file differs, and
-`npm run verify` runs it after `build`.
+Vite (`vite.config.ts`) builds the page, the hashed app bundle and each DSP
+worklet the engine names with `new URL('../worklet/generated/*.js',
+import.meta.url)` as its own asset — `assetsInlineLimit` refuses to inline a
+`.js` file as a data URL, so every worklet loads through
+`audioWorklet.addModule` from a real file. `base` is relative (`./`,
+overridable with `WINDSOR_BASE`), so `dist/` serves from any path.
+`loudnessCheck.checkLoudness(patch)` renders against the engine's default
+worklet URL the same way.
 
-A conflict on it is git's to resolve: `scripts/git-merge-regenerate-console-page.sh`,
-the merge driver `.gitattributes` names and `scripts/dev-bootstrap.sh` registers
-(#628), keeps a clean text merge and regenerates the page from this tree's
-sources when the text conflicts — `--check`, never the driver, is what says the
-page matches its sources.
+Nothing here is tracked output. Two generated files sit upstream in the
+engine, each with a `--check` that `npm run verify` runs:
+`worklet/generated/*.js` (`scripts/build-worklets.mjs`) and `patches/index.ts`
+(`scripts/patch-library-index.mjs`). The app bakes the whole patch library —
+`documentModel.ts` imports `PRESETS`, which `presets.ts` builds from
+`patches/index.ts` — so a patch file added or edited needs the index
+regenerated, not the page.
 
-**The page bakes the whole patch library.** `documentModel.ts` imports
-`PRESETS`, which `presets.ts` builds from the generated `patches/index.ts`
-over every `packages/engine/src/patches/<id>.json`. So a patch file
-added, edited or merged by anyone changes this page's bytes, and `--check`
-fails until it is rebuilt — that is the intended signal, not a surprise. The
-same holds for a schema, DSP, engine or console-source change. Rebuild with
-`node packages/app/build-editor.mjs` and commit the page in the same PR.
+Retired with the fork: `build-editor.mjs`, `editor-template.html`, the
+tracked `patch-editor.html` and its `--check`, `src/dsp.d.ts` /
+`window.__A204_DSP__`, blob-URL worklet loading and the page's merge driver
+(records `2026-09-18-patch-editor-page-is-checked-not-trusted`,
+`2026-09-18-console-page-merge-driver` stay as history).
 
 ## Commands
 
 ```bash
-node packages/app/build-editor.mjs          # rebuild the tracked page
-node packages/app/build-editor.mjs --check  # what verify runs: stale page → exit 1
-npx vitest run packages/app                 # the console's tests (Node, no DOM)
-npm run typecheck                                 # includes packages/app/tsconfig.json, the type gate
-                                                  # (esbuild strips types without checking them; the
-                                                  # standalone `tsc -p` needs packages/shared built first)
-npx eslint packages/app                     # includes no-magic-numbers over src/
-node packages/app/sweep-headroom.mjs --stale        # after a patch file is written
-node scripts/patch-library-index.mjs --write              # regenerate patches/index.ts
-node packages/app/import-patches.mjs                # move downloaded <id>.json into patches/
-npm run verify                                            # the PR gate
+npm run dev                                    # Vite dev server with HMR on :5173
+npm run build                                  # static build → packages/app/dist/
+npm run preview                                # serve the built dist/
+npx vitest run packages/app                    # the console's tests (Node, no DOM)
+npm run typecheck                              # includes packages/app/tsconfig.json, the type gate
+                                               # (Vite strips types without checking them)
+npx eslint packages/app                        # no-magic-numbers and the import fence over src/
+node packages/app/sweep-headroom.mjs --stale   # after a patch file is written
+node scripts/patch-library-index.mjs --write   # regenerate patches/index.ts
+node packages/app/import-patches.mjs           # move downloaded <id>.json into patches/
+npm run verify                                 # the gate
 ```
 
-Open the console by loading `packages/app/patch-editor.html` in Chrome
-and pressing the power button; audio starts on that gesture. A MIDI
-controller is offered once the browser grants access (#523).
+Open the console at the dev server's URL (or a served `dist/`) in Chrome and
+press the power button; audio starts on that gesture. A MIDI controller is
+offered once the browser grants access (#523).
 
 ## Hard-won constraints
 
 - **A rebuild reuses the same `AudioContext`.** Worklet module maps are per
-  context and keyed by URL, so re-`init` with the same blob URLs resolves from
+  context and keyed by URL, so re-`init` with the same URLs resolves from
   cache instead of re-registering the processors. `enable()` gates on the
   system and joins an in-flight build; a failed attempt tears the context down
   so the next press starts clean (#617).
@@ -391,8 +398,6 @@ controller is offered once the browser grants access (#523).
 - **The keyboard's held map is keyed on `e.code`, and Panic reaches every part
   that sounded** (#617): a layout-dependent `e.key` stuck notes on, and a
   latched note on a part the selection has since left is still sounding.
-- **The template's stylesheet is brace-checked by the build** (#610): a rule
-  that loses its closing brace silently nests every later rule, and the
-  console renders unstyled with the build and every test green.
-- **`dsp.d.ts` types the eight inlined worklet sources** (`window.__A204_DSP__`);
-  it exists because the page, not the module graph, supplies them.
+- **`console.css` is brace-checked by `consoleBoundary.test.ts`** (#610): a
+  rule that loses its closing brace silently nests every later rule, and the
+  console renders unstyled with the build and every other test green.
