@@ -157,14 +157,17 @@ logic inlined in `runRenderLoop`.
 
 **A song is a list of parts, each with any sequencer** (#597, record
 `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`). An
-`arrangements/<name>.json` is `version: 2` with 1–8 `parts`; each part sits on a unique
-`slot` 0–7, carries its own `strip` (level, pan, low cut, sends, inserts) and a `sequencer` whose `kind` is
-`euclidean` (a fixed-note trigger), `arp`, `step` (slow with gate 1, the drone), `grid` (a
-written 1–32 step line of scale degrees, #602), `chord` (a written progression of diatonic
-chords by degree with one voicing per part, #606) or `none` (inert: built and playable from
-the keyboard, never sequenced). The slot is the part's
-identity — its engine part is `music-<slot>`, its generator stream is seeded by the slot —
-so removing, reordering or renaming a part never moves another part's notes; the name is a
+`arrangements/<name>.json` has 1–8 `parts` (the document is `version: 3`, #705 — its
+timeline, harmony and regions are the Song view paragraph below); each part sits on a
+unique `slot` 0–7, carries its own `strip` (level, pan, low cut, sends, inserts) and a
+`sequencer` whose `kind` is `euclidean` (a fixed-note trigger), `grid` (a written 1–32
+step line of scale degrees, #602), `chord` (the Chord Player: written hits that voice the
+harmony timeline's chord, one voicing per part, #606, #705), `arp` (the Arpeggiator over
+the active chord, #706), `bass` (the Bass / Drone: root, chord or a fixed-degree pedal,
+#707) or `none` (inert: built and playable from the keyboard, never sequenced). The slot
+is the part's identity — its engine part is `music-<slot>`, and its generator stream is
+its own sequencer's `seed`, hashed per region entry (`generatorSeed.ts`, #705) — so
+removing, reordering or renaming a part never moves another part's notes; the name is a
 label. Live partials address parts by slot (`{ parts: { 2: { velocity: 0.5 } } }`); adding
 or removing a part rebuilds. The earlier four fixed slots (`kick`, `hat`, `arp`, `drone`)
 and the top-level `mix` overlay are no longer read.
