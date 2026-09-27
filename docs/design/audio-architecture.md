@@ -1,12 +1,24 @@
 # Audio Architecture — Synthesised Runtime Audio
 
 **Status:** Accepted (2026-08-31). Implemented by #33.
-**Purpose:** Record how runtime audio works. The functional requirements it serves are in
-[game-design-document.md](game-design-document.md) §5.3 and §5.4.
+**Purpose:** Record how runtime audio works.
+
+> **Windsor fork, 2026-09-27.** This document was forked from the Aotearoa204 game
+> repository and now describes Windsor's engine (`packages/engine/`, `@windsor/engine`)
+> and the app that drives it (`packages/app/`, `@windsor/app`). `#NNN` numbers are
+> Aotearoa204 issues, kept as provenance. The game's integration — the Babylon bridge,
+> the render loop, the gameplay SFX path, `?music=` song selection, the committed
+> `bed-01` song, the settings sliders and the frame bench — was removed in the fork;
+> where a section below describes it, it says so. §1 and §2 are the game's history and
+> are kept as written; the design documents, ADRs and records they cite are
+> Aotearoa204's and are not in this repository unless they appear under `docs/`.
 
 ---
 
 ## 1. Standing
+
+*Aotearoa204 history: the invariants named here are the game's. Windsor has no asset
+pipeline and no such invariant.*
 
 `CLAUDE.md` invariant 4 originally read *"No time goes into art, animation, or audio
 during the tech demo"*, following design doc §1. **Audio is now excepted from it**, by
@@ -23,6 +35,9 @@ What is *not* in scope: wiring audio to gameplay events. #33 landed the engine a
 it works. Making the game make noise is separate work, constrained in advance by §4.
 
 ## 2. Why synthesis rather than sampled audio
+
+*Aotearoa204 history: the GDD sections, invariants and Havok isolation cited here are
+the game's.*
 
 Settled history, kept short. Three GDD requirements make samples the wrong default:
 §5.3's DRG-style telegraph (ambient drop-out → rumble → horn, and *"the AI goes quiet
@@ -67,7 +82,7 @@ which is what makes saw and square usable as FM operators at all.
 
 **FM, plate reverb and the compressor insert use our worklets; other effects use native Web Audio nodes**, which execute in the
 browser's own audio thread and cost nothing from the JS main-thread budget that
-[tech-demo-proposal.md](tech-demo-proposal.md) §1 identifies as the project's primary
+Aotearoa204's `tech-demo-proposal.md` §1 identified as the project's primary
 risk. This section first said "only the FM runs in the AudioWorklet";
 `docs/log/2026-08-31-dattorro-reverb-not-plateau.md` decision 4 removed the `ConvolverNode`
 path outright — `generateImpulseResponse` and the convolver are gone — and put the reverb
@@ -80,7 +95,7 @@ in a second worklet of its own:
 | Advanced Drive (#701) | AudioWorklet: `worklet/advancedDrive/`; 2x oversampled shapers, five routes, per-stage filtering and modulation; Classic Drive stays native |
 | Glue-inspired part compressor (#660) | AudioWorklet: `worklet/compressor/`, bundled into `generated/compressor-processor.js`; feedback behavioral approximation, detector input reserved for future routing |
 | Bus tone shaping, delay, distortion, master safety compression | `BiquadFilterNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
-| 3D positioning | Babylon's spatial audio, over `PannerNode` |
+| 3D positioning | *Removed in the fork* — it was Babylon's spatial audio, over `PannerNode` (§5) |
 
 **One worklet node per timbral *part*, never per voice.** Each node carries fixed
 overhead; 8–16 internally-polyphonic parts is the shape, each with its own native effect
@@ -89,24 +104,27 @@ chain.
 **One-shot world SFX are baked, not synthesised live.** A dozen turrets each needing an
 independent 3D position do not need a dozen worklets: render the patch once through an
 `OfflineAudioContext` at load, then play ordinary spatialised buffer sources. Live
-synthesis is for music, ambience, and anything whose parameters move.
+synthesis is for music, ambience, and anything whose parameters move. *In Windsor* the
+game's SFX path is gone; the bake survives as `render/offlineRender.ts`
+(`renderPatchToBuffer`), which the console's loudness check uses.
 
 ---
 
 ## 4. Placement in this repo
 
-Audio is **client-only**. `CLAUDE.md` invariant 1 requires `packages/shared` to be
-deterministic and free of Babylon, DOM and Node APIs; Web Audio is a DOM API and audio
-output is not part of the simulation. Nothing audio-related may enter `shared`.
+The engine is **UI-free and browser-only**: `packages/engine/src/` imports Web Audio and
+nothing of the app, and the app imports it through `@windsor/engine` (`index.ts`) only —
+an ESLint `no-restricted-imports` rule in both directions. (In Aotearoa204 audio was
+client-only and kept out of the deterministic `packages/shared`; the engine was
+`packages/client/src/audio/`.)
 
 ```
 packages/engine/src/          # folders mirror the music-engine skill's file map (#655)
-  index.ts                # the public surface the game imports
-  index-for-editor.ts     # the same minus babylonBridge, for the console
-  audioConstants.ts       # the area's tables (re-exports the worklet's data modules, #656)
-  game/                   # audioSystem.ts (the system: update(dt), owned by the render loop),
-                          #   arrangementLibrary.ts (?music= selection), musicOptions.ts,
-                          #   musicControls.ts, babylonBridge.ts (the Babylon Audio Engine v2 seam)
+  index.ts                # the one public surface, @windsor/engine
+  audioConstants.ts       # the area's tables (re-exports the worklet's data modules, #656; MS_PER_SECOND)
+  system/                 # audioSystem.ts (the system: update() is the look-ahead pump, which the app
+                          #   calls on a timer); its SFX bus and API are game leftovers, a known follow-up
+  render/                 # offlineRender.ts (renderPatchToBuffer: a patch baked to an AudioBuffer)
   synth/                  # fmEngine.ts (context, worklet modules, parts, buses), audioPart.ts (one
                           #   timbral part == one worklet node), workletMessages.ts (main-thread <-> worklet
                           #   contract and the worklet URLs), the fmProcessor*.test.ts behavioural tests
@@ -114,50 +132,50 @@ packages/engine/src/          # folders mirror the music-engine skill's file map
                           #   (dry buses with inserts), channelStrip.ts (one part through its strip: fader,
                           #   stages, rotation and sends off the tail), lowCutStage.ts (#640), insertChain.ts
                           #   + stripTap.ts (#639, #652), stereoRotate.ts (the pan matrix), returnBus.ts
-                          #   (the plate and the delay, 100% wet), reverbSpace.ts, deskApply.ts, mixLevels.ts,
-                          #   tanhCurve.ts (the inserts' shared clip curve)
-  inserts/                # strip insert kinds: the registry, drive (#641), chorus (#642), compressor (#660)
+                          #   (the plate and the delay, 100% wet), reverbSpace.ts, deskApply.ts,
+                          #   tanhCurve.ts (the inserts' shared clip curve), the sidechain and master modules
+  inserts/                # strip insert kinds: the registry, drive (#641), chorus (#642), compressor (#660),
+                          #   retro reverb (#682), phaser (#687), ensemble (#695), delay (#698), Advanced Drive (#701)
   patch/                  # patch.ts (schema, enums; the algorithm table re-exported from the worklet),
                           #   patchNormalise.ts, patchLibrary.ts (the patches/*.json contract, #561),
-                          #   presets.ts (the whole-bank table — editor/test only, #562), gameplayPatches.ts
-                          #   (the patches game code plays, by id), presetCatalog.ts, patchFileSerialise.ts
+                          #   presets.ts (the whole-bank table, #562), gameplayPatches.ts (weapon-zap and
+                          #   pickup-blip, by id: a game leftover), presetCatalog.ts, patchFileSerialise.ts
   patches/                # the patch library: one <id>.json per patch, plus a generated index.ts
   song/                   # arrangement.ts (the part list: slot, name, preset, sequencer kind, #597),
-                          #   arrangementDocument.ts (makeArrangement: the never-throws version-2
-                          #   normaliser) over arrangementNormalise.ts, arrangementFields.ts,
-                          #   sequencerNormalise.ts, deskNormalise.ts; arrangementValidate.ts (PatchResolver,
+                          #   arrangementDocument.ts (makeArrangement: the never-throws normaliser) over
+                          #   arrangementNormalise.ts, arrangementFields.ts, sequencerNormalise.ts,
+                          #   deskNormalise.ts, timelineNormalise.ts; arrangementValidate.ts (PatchResolver,
                           #   #562); arrangementPlayer.ts (binds each part's sequencer to its engine part, by
                           #   slot); documentParts.ts; fallbackArrangement.ts (the diagnostic click)
-  arrangements/           # the committed song documents, one <name>.json each (since #704 only a placeholder
-                          #   bed-01; Pat's own song replaces it after the harmony v2 epic, #703)
   sequencing/             # scheduler.ts (look-ahead note scheduling) and the generators: grid, chord,
-                          #   euclidean, over scaleSampler.ts (the key's degree → note mapping, no weights),
-                          #   euclid.ts, noteEvent.ts, generatorSeed.ts; generatorBoundary.test.ts keeps them
-                          #   off the audio graph. The arp and step generators, the degree weights and pitched
-                          #   capture were deleted in #704; their replacements are epic #703's
-  harmony/                # chordTheory.ts, chordNames.ts, chordVoicing.ts, chordTables.ts, chordNormalise.ts
-  cost/                   # audioCost.ts (the overlay and bench readout), audioLoad.ts (audio-thread load),
+                          #   euclidean, arp, bass, over scaleSampler.ts (the key's degree → note mapping),
+                          #   euclid.ts, noteEvent.ts, regionClock.ts, regionGate.ts, generatorSeed.ts over
+                          #   mulberry32.ts (the main-thread PRNG); generatorBoundary.test.ts keeps them
+                          #   off the audio graph
+  harmony/                # harmonyTimeline.ts, chordTheory.ts, chordNames.ts, chordVoicing.ts, chordTables.ts,
+                          #   chordNormalise.ts
+  cost/                   # audioCost.ts (the combined readout), audioLoad.ts (audio-thread load),
                           #   schedCost.ts (main-thread scheduler cost), playbackStats.ts (underruns)
-  sfx/                    # the gameplay SFX path (Babylon AudioV2, not the music engine's): gameplaySfx.ts,
-                          #   actionSfx.ts, spatialSfx.ts, sfxSelection.ts, sfxBuffers.ts, createGameplaySfx.ts,
-                          #   sfxConstants.ts, footstepCadence.ts; offlineRender.ts bakes a patch to an AudioBuffer
-  worklet/                # the DSP (§6.1): generated/ holds the bundles (#643)
+  worklet/                # the DSP (§6.1): generated/ holds the bundles (#643); worklet/CLAUDE.md the rules
     fm/                   # the FM source, TypeScript in its own project (#644, #645, #654): fmProcessor.ts (entry), voice,
                           #   voiceControl, voiceRender, voiceKernel, fmConstants, waveTables,
                           #   algorithms, envelope, lfo, svf, prng, patchNormalise
     compressor/           # the compressor insert's processor (#660)
     reverb/               # the plate's source (#671): reverbProcessor.ts (entry), delayLines, tank, reverbConstants
+    meter/ retro/ phaser/ delay/ advancedDrive/   # the other worklet inserts and the peak meter
   __fixtures__/           # headless worklet harness and the fake audio graph, Node-only; shared by every folder
-packages/app/     # authoring tool, outside the client bundle
+packages/app/             # the arrangement console: a Vite app over @windsor/engine (§9)
 ```
 
-This follows the `area:*` mirroring rule in `CLAUDE.md` — an `area:audio` ticket points at
-one directory — and the systems rule: an explicit `update(dt)` owned by the loop, never
-logic inlined in `runRenderLoop`.
+Removed in the fork, as game-only: `game/` (`babylonBridge.ts`, `arrangementLibrary.ts`
+and `?music=` selection, `musicOptions.ts`, `musicControls.ts`), `mixer/mixLevels.ts`
+(the settings sliders' levels), `sfx/` bar `offlineRender.ts`, `audioManifest.d.ts`,
+`arrangements/` (the committed songs, `bed-01` among them) and the game-facing
+`index.ts` (the app's former `index-for-editor.ts` is now the one `index.ts`).
 
 **A song is a list of parts, each with any sequencer** (#597, record
-`2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`). An
-`arrangements/<name>.json` has 1–8 `parts` (the document is `version: 3`, #705 — its
+`2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`). A song
+document has 1–8 `parts` (the document is `version: 3`, #705 — its
 timeline, harmony and regions are the Song view paragraph below); each part sits on a
 unique `slot` 0–7, carries its own `strip` (level, pan, low cut, sends, inserts) and a
 `sequencer` whose `kind` is `euclidean` (a fixed-note trigger), `grid` (a written 1–32
@@ -172,18 +190,19 @@ label. Live partials address parts by slot (`{ parts: { 2: { velocity: 0.5 } } }
 or removing a part rebuilds. The earlier four fixed slots (`kick`, `hat`, `arp`, `drone`)
 and the top-level `mix` overlay are no longer read.
 
-**A song document is self-contained, and the game resolves patches from it alone**
-(#562, epic #564 decision 2). An `arrangements/<name>.json` carries a snapshot of every
+**A song document is self-contained, and playback resolves patches from it alone**
+(#562, epic #564 decision 2). A song document carries a snapshot of every
 patch its parts play in its `patches` section; `PatchResolver` (`arrangementValidate.ts`)
-is the one resolver, and on the game path it is handed the document's patches and nothing
-else — a name it cannot resolve is a load error naming the part and the id, never a fall
-back to the library. So improving a `patches/<id>.json` cannot change what a shipped song
-sounds like, and no game path imports the whole-bank table: the bundler drops the library
-(#562 cut the client chunk by 245 KB). Two deliberate exceptions, both by id and both
-bundled: `gameplayPatches.ts` for the game's own sounds, which are not songs, and the
-metronome fallback, which carries its one patch the same way every other document does.
+is the one resolver, and on the plain playback path it is handed the document's patches
+and nothing else — a name it cannot resolve is a load error naming the part and the id,
+never a fall back to the library. So improving a `patches/<id>.json` cannot change what a
+saved song sounds like. (In Aotearoa204 the game path also never imported the whole-bank
+table, so its bundler dropped the library; Windsor's app bakes the whole library.) Two
+deliberate exceptions, both by id: `gameplayPatches.ts` (the game's own sounds, still
+present as the fallback click's and the SFX route's), and the metronome fallback, which
+carries its one patch the same way every other document does.
 
-The editor is the only caller that relaxes the rule, through `makeArrangement`'s one
+The console is the only caller that relaxes the rule, through `makeArrangement`'s one
 `libraryFill` option: a document written before #562 resolves its names from the library
 once on open, the resolved patches are embedded into the document there and then, and the
 Arrangement tab says which ids were filled. The next export is self-contained.
@@ -202,40 +221,19 @@ playhead — so what the lanes show is what the region gate plays, and every edi
 live partial over the console's pure `regionModel.ts` / `harmonyLaneModel.ts`, never a
 rebuild. The console's layers are `packages/app/CLAUDE.md` "The Song view".
 
-**Audio observes; it never decides.** Simulation events flow one way — the authoritative
-server and the client sim emit events, the audio system subscribes and makes noise. No
-audio state may feed back into simulation state, and nothing in the audio path may
-influence anything the server also computes. A dropped or late sound must be inaudible to
-the simulation, or invariant 1's determinism guarantee is worthless.
+**Audio observes; it never decides** was the game's rule: simulation events flowed one
+way, from the authoritative server and client sim to the audio system, and no audio state
+fed back. Windsor has no simulation; the rule survives only as `AudioSystem`'s header
+wording, a known follow-up.
 
 ---
 
-## 5. Babylon.js integration
+## 5. Babylon.js integration — removed
 
-Babylon's Audio Engine v2 accepts an externally-created `AudioContext` and can wrap an
-arbitrary `AudioNode` as a spatialised sound source. That is the whole seam: the synth
-owns the DSP, Babylon owns positioning and bus routing, and there is exactly one
-`AudioContext` in the process.
-
-**The seam is built: `packages/engine/src/game/babylonBridge.ts`.** Read it rather than a
-sample here — it carries the working code, and its header carries the typings verification
-this section used to table (every symbol read from the installed
-`node_modules/@babylonjs/core` at 9.23.0, `CLAUDE.md` source of truth 1, cross-checked
-against the `BabylonJS/Babylon.js` repository at tag `9.23.0`).
-
-One trap worth recording, because it is not visible from the call site: on the WebAudio
-engine *class*, `createSoundSourceAsync` is tagged `@internal` — but so is
-`createSoundAsync`, which is unambiguously public API. The public surface is the abstract
-declaration on `AudioEngineV2` and the free `CreateSoundSourceAsync` function; the tag is
-on the implementation override, not the contract.
-
-Two notes the vendored `babylonjs` skill makes that apply directly:
-
-- Write v2 only. The v1 `Sound` / `AudioEngine` classes are legacy and are one of the
-  deprecated idioms the skill warns creeps in from third-party posts.
-- Audio engines hold GPU/OS resources and are not garbage-collected — dispose them.
-
-Deep-import per invariant 5: `@babylonjs/core/AudioV2/webAudio`, never the barrel.
+Aotearoa204 routed the engine's one `AudioContext` into Babylon's Audio Engine v2 through
+`game/babylonBridge.ts`, the only Babylon-touching module, which the console's
+`index-for-editor.ts` left out. Windsor has no Babylon: the bridge was deleted in the fork
+and the engine's output goes straight to `AudioContext.destination` through the master.
 
 ---
 
@@ -283,37 +281,46 @@ a bespoke build step.
 `audioConstants.ts` re-export the wave ids and the algorithm table from the
 worklet's own modules, and the console draws envelopes with the worklet's
 `segmentLevel`; the PRNG copy stays, pinned by `prng.test.ts`, because the
-worklet bundle cannot import the shared package without carrying it whole.
+worklet bundle cannot import the shared package without carrying it whole. *In
+Windsor* the main-thread copy is the engine's own `sequencing/mulberry32.ts`, and
+`worklet/fm/prng.ts` is pinned to it.
 
 The cost was duplication: the waveform enums and the algorithm routing table existed both in
 the worklet and in `patch.ts`. `patch.test.ts` asserts the copies are identical, so they
 cannot drift silently. The seeded PRNG the DSP tests use (#78) is the same story: it is
-`mulberry32` copied out of `packages/shared/src/terrain/heightmap.ts`, because the worklet
-cannot import it. The game path is unchanged — absent `processorOptions.seed` the
+`mulberry32` copied out of Aotearoa204's `packages/shared/src/terrain/heightmap.ts`, because
+the worklet cannot import it. The unseeded path is unchanged — absent `processorOptions.seed` the
 processor draws free-running operator phase, per-voice noise seeds and pan jitter from
 `Math.random` exactly as before, and a part whose every note started from the same phase
 would sound mechanical. Reasoning, and the headroom measurement the seed made possible:
 `docs/log/2026-09-02-bass-digital-clip-headroom.md`.
 
-### 6.2 Cross-origin isolation is already on
+### 6.2 Cross-origin isolation is off
 
-`packages/client/vite.config.ts` sets COOP/COEP for Havok. Consequences for audio:
+Aotearoa204's client set COOP/COEP for Havok; Windsor's `packages/app/vite.config.ts`
+does not, and a static host may not let it. Consequences for audio:
 
-- `SharedArrayBuffer` is available, so the Worker + SAB audio pattern is on the table.
-  It is almost certainly unnecessary at these costs and adds real complexity; noted so
-  the option is known, not recommended.
-- `require-corp` blocks cross-origin subresources that do not opt in. Generated audio
-  sidesteps this; any future sampled layer must be same-origin or CORP-enabled.
+- `SharedArrayBuffer` is unavailable, so the Worker + SAB audio pattern needs those
+  headers first. It is almost certainly unnecessary at these costs and adds real
+  complexity; noted so the option is known, not recommended.
+- Generated audio needs no cross-origin subresource; a future sampled layer should be
+  same-origin so that turning isolation on later does not block it.
 
 ### 6.3 Numbers must be measured
 
-`CLAUDE.md` invariant 3: pass/fail numbers are measured on the target machine, and a
-claim without a machine and backend named is not a result. §7 applies this to the one
-figure this design currently has.
+A performance claim is measured, never estimated, and names the machine and browser it
+was read on; a number without both is not a result. §7 applies this to the figures this
+design has. (In Aotearoa204 this was invariant 3, with a named target machine.)
 
 ---
 
 ## 7. Performance: what is known, and what is not
+
+*Windsor fork:* the frame overlay, the frame bench (`?bench=1&audio=1`,
+`scripts/run-bench.mjs`), the `__a204` console handle, `docs/reference/` and the target
+box below were the game's and are not in this repository. What remains is the counters
+in `packages/engine/src/cost/`, read through `AudioSystem.readout()`; the text below is
+kept as the record of how they were built and calibrated.
 
 **Not a qualifying measurement.** The prototype renders 32 voices of its heaviest preset
 in about 10% of one core. That was measured headless in Node 22 on an Apple Silicon Mac,
@@ -369,7 +376,7 @@ rather than estimated. Both halves come from
 `packages/engine/src/cost/audioCost.ts`'s `AudioCostReadout`, which is what
 `stats.audioReadout` hands the overlay and the bench collector:
 
-- **Underruns: `AudioContext.playbackStats`** (`audio/playbackStats.ts`), the
+- **Underruns: `AudioContext.playbackStats`** (`cost/playbackStats.ts`), the
   source of truth for the criterion. Present by default in Chrome 152 on the
   target box, feature-detected everywhere, and reported as `n/a` / `null`
   where it is absent — never replaced by an estimate. The units matter and are
@@ -386,7 +393,7 @@ rather than estimated. Both halves come from
   the quantum budget the box read about the same ~90 events/s, so the number
   says whether and for how long audio broke, never by how much. The record is
   `docs/research/2026-09-14-275-playbackstats-probe/`.
-- **Scheduling cost: `audio.schedMs`** (`audio/schedCost.ts`), the p95 half of
+- **Scheduling cost: `audio.schedMs`** (`cost/schedCost.ts`), the p95 half of
   the criterion. `AudioSystem.update()` times its own scheduler pump — the
   system's whole per-frame main-thread cost — over a rolling one-second
   window for the overlay, and per frame for the bench, whose `audio.schedMs`
@@ -417,9 +424,8 @@ ADR candidates in the sense of `docs/adr/README.md` — each would constrain wor
 more than one ticket. None is urgent; record them when the work that needs them is
 scheduled.
 
-1. **Whether audio is ever authoritative for anything.** The position here is no (§4).
-   Worth an explicit record, because "the horn plays when the wave spawns" invites a
-   shortcut where the sound *is* the event.
+1. ~~**Whether audio is ever authoritative for anything.**~~ Moot in Windsor, which has
+   no simulation; it was the game's question (§4).
 2. **Whether a sampled layer is ever added** (§2), and if so where it sits relative to
    this one.
 
@@ -429,7 +435,8 @@ against invariant 4 (§1, `2026-08-31-audio-enters-tech-demo-scope`), and **musi
 structure** — a sequenced arrangement driven by the scheduler, decided across
 `2026-08-31-generative-sequencing-transport-and-pitch` (the 24 PPQ transport and its
 fan-out), `2026-08-31-arrangement-document-schema-and-optional-parts` (the arrangement
-document, `arrangementDocument.ts` and `arrangements/bed-01.json`),
+document, `arrangementDocument.ts` and `arrangements/bed-01.json`, the latter not in
+Windsor),
 `2026-08-31-arrangement-console-and-runtime-arrangements` and
 `2026-08-31-music-mute-and-suppression-semantics` (mute defined against the transport's
 tick).
@@ -441,12 +448,15 @@ prototype survives as a standalone git snapshot in the sibling `Aotearoa204/` ch
 under `audio/`; it is not a dependency of anything here, and the repository copy is the
 one that is maintained.
 
-The patch editor in `packages/app/` is generated, not hand-maintained. It inlines
-the real worklet and the real patch schema, so it cannot drift from what the game runs.
-After changing the DSP or the schema:
+The console in `packages/app/` imports the real engine through `@windsor/engine`, so it
+cannot drift from what plays. It is a Vite app: `npm run dev` serves it with HMR on :5173
+and `npm run build` writes static files to `packages/app/dist/`, each DSP worklet emitted
+as its own asset from the engine's `new URL(…, import.meta.url)`. (Aotearoa204 generated
+it as one tracked page, `patch-editor.html`, with `build-editor.mjs`; both are gone.)
+After changing the DSP, rebuild the bundles:
 
 ```sh
-node packages/app/build-editor.mjs
+node scripts/build-worklets.mjs
 ```
 
 All of it is original code; no emulator source was copied. Reference material and its
@@ -467,34 +477,22 @@ Ableton Operator informed the feature set — the waveform range, per-operator e
 the filter section, and an 11-algorithm set rather than the DX7's 32. No code is involved.
 
 
-## 10. Hybrid gameplay SFX (#489)
+## 10. Hybrid gameplay SFX (#489) — removed
 
-The sampled layer anticipated in §2 is adopted by Pat's 2026-09-12 decision:
-[hybrid gameplay sound](../log/2026-09-12-hybrid-gameplay-sound.md).
-`tools/sfx/README.md` describes ElevenLabs authoring, provenance, spend and
-auditioning. This supersedes §8's open question about adopting samples.
-
-`createGameplaySfx.ts` shares the music context, loads sampled footsteps and
-impacts, and bakes `weapon-zap` through `offlineRender.ts`. `SpatialSfx` owns
-independent spatial playback slots and bounded voices; `GameplaySfx` observes
-movement and confirmed hits through the frame registry. The `sfx` console
-command controls its volume independently of music. Credentials are authoring
-only. The listener uses character position and camera orientation.
-
-First-delivery limitations: one earth/grass step bank for all surfaces, metal
-impact candidates, distance-derived contact timing and hit-confirmed gunfire.
-Misses lack a replicated event. Further surface banks, shot events, occlusion,
-reverb zones and priority voice stealing remain separate work. No target-machine
-performance claim or listening verdict is implied by unit tests.
+Aotearoa204 adopted a sampled layer for gameplay sounds (footsteps, impacts, a baked
+`weapon-zap`) played through Babylon's spatial audio. That path (`sfx/`) was removed in
+the fork; `render/offlineRender.ts`, `patch/gameplayPatches.ts` and `AudioSystem`'s SFX
+bus remain, the last two as known follow-ups.
 
 ### Song master (#666)
 
 Music dry paths retain their existing bus highpass; its output and both
-returns sum before the song master inserts and output level. The game Music
-volume follows this master, while gameplay SFX remain separate. An optional
+returns sum before the song master inserts and output level. The music bus
+output (the game's Music volume in Aotearoa204) follows this master, while the SFX
+bus remains separate. An optional
 `master: { level, inserts }` document section stores the settings; absent means
 unity/no inserts. The console reuses insert cards for this Master strip and
-displays independent L/R sample peaks before game volume/safety compression.
+displays independent L/R sample peaks before the bus output and safety compression.
 Its view-owned meter worklet runs only while visible. Ownership and compatibility
 are recorded in `docs/log/2026-09-23-666-song-master-and-stereo-meter.md`.
 
