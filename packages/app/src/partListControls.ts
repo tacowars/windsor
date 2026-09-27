@@ -6,12 +6,8 @@
  * parts play on; a rename is a live label change. Everything addresses the
  * part by slot — the name is only what the buttons show.
  */
-import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  MUSIC_PARTS_MAX,
-  SEQUENCER_KINDS,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { SequencerKind } from '@windsor/engine';
+import { MUSIC_PARTS_MAX, SEQUENCER_KINDS, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el, seg } from './dom';
 import { KIND_LABELS } from './sequencerConstants';

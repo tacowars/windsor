@@ -1,0 +1,37 @@
+# Every pull request and every push to main runs the same gate as
+# `npm run verify` locally. PR jobs never hold a write-capable token.
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '.claude/**', '**/*.md']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**', '.claude/**', '**/*.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Never-track guard
+        run: |
+          if git ls-files | grep -Eq '(^|/)(\.env|.*\.kubeconfig)$'; then
+            echo "tracked file matching the never-track pattern" >&2
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --fund=false
+      - run: npm run verify

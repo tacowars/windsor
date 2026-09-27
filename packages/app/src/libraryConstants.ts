@@ -40,7 +40,7 @@ export const isInitPreset = (id: string): boolean => id.startsWith(INIT_PRESET_P
 export const INIT_PATCH_NAME = 'Init';
 
 /** The repo folder the grant is asked on, shown in the picker's hint and the mode line. */
-export const LIBRARY_FOLDER_PATH = 'packages/client/src/audio/patches';
+export const LIBRARY_FOLDER_PATH = 'packages/engine/src/patches';
 
 /** IndexedDB home of the remembered directory handle. */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;
@@ -50,9 +50,9 @@ export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'pa
  * print the same list from `lib/afterWriteCommands.mjs`; its test pins the two.
  */
 export const AFTER_WRITE_COMMANDS = [
-  'node tools/patch-editor/sweep-headroom.mjs --stale',
+  'node packages/app/sweep-headroom.mjs --stale',
   'node scripts/patch-library-index.mjs --write',
-  'npx prettier --write packages/client/src/audio/patches',
+  'npx prettier --write packages/engine/src/patches',
 ] as const;
 
 /** The metadata modal (#563, #620 decision 7): its category sentinel, focus-trap query and readout precision. */

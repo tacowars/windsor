@@ -5,8 +5,8 @@ import {
   COMPRESSOR_RATIOS,
   COMPRESSOR_BOUNDS,
   DEFAULT_COMPRESSOR,
-} from '../../../packages/client/src/audio/index-for-editor';
-import type { CompressorSpec } from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
+import type { CompressorSpec } from '@windsor/engine';
 import { fmt2, fmtDb, fmtHz } from './consoleFormat';
 import type { InsertKnobEntry } from './insertKnobTables';
 

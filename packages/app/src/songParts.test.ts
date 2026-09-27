@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { PlayablePart } from '../../../packages/client/src/audio/index-for-editor';
+import type { PlayablePart } from '@windsor/engine';
 import {
   ArrangementPlayer,
   DEFAULT_EUCLIDEAN_CONFIG,
@@ -16,7 +16,7 @@ import {
   makeArrangement,
   partAt,
   removePart,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import { INIT_PATCH_NAME, initPresetId } from './libraryConstants';
 import { addPart, newSong, nextFreeSlot, replaceDraft, setSequencerKind } from './songParts';

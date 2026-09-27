@@ -6,7 +6,7 @@
  * so a schema-default change in `patch.ts` moves double-click reset with it.
  * `knobDefaults.test.ts` walks `allPatchKnobs()`.
  */
-import { OP_NAMES, makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import { OP_NAMES, makePatch } from '@windsor/engine';
 import { fmt2, fmtHz, fmtMs, fmtSigned } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type {
-  ChordStep,
-  Harmony,
-  HarmonyChord,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ChordStep, Harmony, HarmonyChord } from '@windsor/engine';
 import {
   CHORD_DURATIONS,
   CHORD_INVERSION_MAX,
@@ -15,7 +11,7 @@ import {
   chordAt,
   hitStep,
   restStep,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import {
   REST_CHIP,
   appendStep,

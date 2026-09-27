@@ -4,7 +4,7 @@ import {
   PHASER_PRESETS,
   applyPhaserPreset,
   matchingPhaserPreset,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { PHASER_KNOBS } from './phaserTables';
 import { insertChange } from './insertTarget';
 import { el } from './dom';

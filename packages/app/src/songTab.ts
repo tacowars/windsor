@@ -15,8 +15,8 @@
  * the ruler watch's signature check, and the one playhead loop is
  * `stepStrip.ts`'s (decision 5).
  */
-import type { DocumentPartial } from '../../../packages/client/src/audio/index-for-editor';
-import { songTicksOf } from '../../../packages/client/src/audio/index-for-editor';
+import type { DocumentPartial } from '@windsor/engine';
+import { songTicksOf } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { paintDetailPane } from './songDetailPane';

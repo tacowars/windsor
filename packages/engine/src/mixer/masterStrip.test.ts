@@ -14,7 +14,7 @@ import { makeArrangement } from '../song/arrangementDocument';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import { FmEngine } from '../synth/fmEngine';
-import { AudioSystem } from '../game/audioSystem';
+import { AudioSystem } from '../system/audioSystem';
 import { makePatch } from '../patch/patch';
 import { DEFAULT_STRIP } from './mix';
 import { DEFAULT_MASTER, normaliseMaster } from './masterSpec';

@@ -11,6 +11,6 @@ import { AFTER_WRITE_COMMANDS } from './afterWriteCommands.mjs';
 describe('AFTER_WRITE_COMMANDS', () => {
   it('is the same list the console shows', () => {
     expect([...CONSOLE_COMMANDS]).toEqual(AFTER_WRITE_COMMANDS);
-    expect(AFTER_WRITE_COMMANDS[0]).toMatch(/^node tools\/patch-editor\/sweep-headroom\.mjs/);
+    expect(AFTER_WRITE_COMMANDS[0]).toMatch(/^node packages\/app\/sweep-headroom\.mjs/);
   });
 });

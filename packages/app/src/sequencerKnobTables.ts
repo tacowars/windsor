@@ -14,7 +14,7 @@ import type {
   DensityModKind,
   MusicPart,
   SequencerSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import {
   ARP_OCTAVES_MAX,
   ARP_OCTAVES_MIN,
@@ -37,7 +37,7 @@ import {
   MIDI_MIDDLE_C,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { fmt0, fmt2, fmtMs, noteName } from './consoleFormat';
 import type { PulseField } from './euclidModel';
 import { GRID_ROTATE_MAX } from './gridConstants';

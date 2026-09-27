@@ -8,14 +8,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { Harmony, HarmonyEvent } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  CHORD_SIZE_SEVENTH,
-  CHORD_SIZE_TRIAD,
-  PPQ,
-  TICKS_PER_BAR,
-  chordAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { Harmony, HarmonyEvent } from '@windsor/engine';
+import { CHORD_SIZE_SEVENTH, CHORD_SIZE_TRIAD, PPQ, TICKS_PER_BAR, chordAt } from '@windsor/engine';
 import {
   appendEvent,
   degreeChips,

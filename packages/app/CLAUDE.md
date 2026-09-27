@@ -1,4 +1,4 @@
-# tools/patch-editor — the arrangement console
+# packages/app — the arrangement console
 
 ## What this tool is
 
@@ -8,7 +8,7 @@ Mixer, Song, Arrangement — over the **real** audio engine, plus
 an audition keyboard and a MIDI path. It boots on a new song (one part, the
 Init patch, no sequencer — #598) and opens a committed song through Import;
 Export writes the normalised document, patches and returns included, which is
-what `packages/client/src/audio/arrangements/<name>.json` holds and `?music=`
+what `packages/engine/src/arrangements/<name>.json` holds and `?music=`
 plays.
 
 It is a **local tool, not a published page**: `patch-editor.html` at this
@@ -25,7 +25,7 @@ and its extension checklists, so neither states the other's content twice.
 
 - **The console drives the real `AudioSystem`; it builds no audio graph of its
   own.** Its one import surface is
-  `packages/client/src/audio/index-for-editor.ts` (everything `index.ts` has
+  `packages/engine/src/index-for-editor.ts` (everything `index.ts` has
   except `babylonBridge.ts`). `build-editor.mjs` asserts both boundaries and
   fails the build: the bundle contains no Babylon, and no console source —
   template or `src/*.ts` — names `createGain(`, `createDelay(`,
@@ -319,7 +319,7 @@ lane and the part lanes
 worklet sources inlined verbatim as strings the page turns into blob URLs, and
 the console app bundled with the engine through `index-for-editor.ts` (one
 esbuild call, `lib/audioBundle.mjs`). It is marked `linguist-generated=true`
-and is **checked, not trusted** — `node tools/patch-editor/build-editor.mjs
+and is **checked, not trusted** — `node packages/app/build-editor.mjs
 --check` builds to memory and exits 1 when the tracked file differs, and
 `npm run verify` runs it after `build`.
 
@@ -331,29 +331,29 @@ page matches its sources.
 
 **The page bakes the whole patch library.** `documentModel.ts` imports
 `PRESETS`, which `presets.ts` builds from the generated `patches/index.ts`
-over every `packages/client/src/audio/patches/<id>.json`. So a patch file
+over every `packages/engine/src/patches/<id>.json`. So a patch file
 added, edited or merged by anyone changes this page's bytes, and `--check`
 fails until it is rebuilt — that is the intended signal, not a surprise. The
 same holds for a schema, DSP, engine or console-source change. Rebuild with
-`node tools/patch-editor/build-editor.mjs` and commit the page in the same PR.
+`node packages/app/build-editor.mjs` and commit the page in the same PR.
 
 ## Commands
 
 ```bash
-node tools/patch-editor/build-editor.mjs          # rebuild the tracked page
-node tools/patch-editor/build-editor.mjs --check  # what verify runs: stale page → exit 1
-npx vitest run tools/patch-editor                 # the console's tests (Node, no DOM)
-npm run typecheck                                 # includes tools/patch-editor/tsconfig.json, the type gate
+node packages/app/build-editor.mjs          # rebuild the tracked page
+node packages/app/build-editor.mjs --check  # what verify runs: stale page → exit 1
+npx vitest run packages/app                 # the console's tests (Node, no DOM)
+npm run typecheck                                 # includes packages/app/tsconfig.json, the type gate
                                                   # (esbuild strips types without checking them; the
                                                   # standalone `tsc -p` needs packages/shared built first)
-npx eslint tools/patch-editor                     # includes no-magic-numbers over src/
-node tools/patch-editor/sweep-headroom.mjs --stale        # after a patch file is written
+npx eslint packages/app                     # includes no-magic-numbers over src/
+node packages/app/sweep-headroom.mjs --stale        # after a patch file is written
 node scripts/patch-library-index.mjs --write              # regenerate patches/index.ts
-node tools/patch-editor/import-patches.mjs                # move downloaded <id>.json into patches/
+node packages/app/import-patches.mjs                # move downloaded <id>.json into patches/
 npm run verify                                            # the PR gate
 ```
 
-Open the console by loading `tools/patch-editor/patch-editor.html` in Chrome
+Open the console by loading `packages/app/patch-editor.html` in Chrome
 and pressing the power button; audio starts on that gesture. A MIDI
 controller is offered once the browser grants access (#523).
 

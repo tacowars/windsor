@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* global process, console */
 /**
- * The generated worklet files under `packages/client/src/audio/worklet/generated/`,
+ * The generated worklet files under `packages/engine/src/worklet/generated/`,
  * each bundled by esbuild from its source folder beside it (#643). Default
  * mode writes every file whose bundle changed; `--check` (the `npm run verify`
  * mode) writes nothing and fails on a generated file that differs from a fresh
@@ -38,7 +38,7 @@ for (const worklet of WORKLETS) {
   } else if (check) {
     console.error(
       `build-worklets: worklet/${worklet.output} differs from a fresh bundle of worklet/${worklet.entry}. ` +
-        `It is generated: edit the source under packages/client/src/audio/worklet/${sourceDirOf(worklet)}/ ` +
+        `It is generated: edit the source under packages/engine/src/worklet/${sourceDirOf(worklet)}/ ` +
         `and run \`${REBUILD_COMMAND}\`, then commit the result.`,
     );
     stale++;

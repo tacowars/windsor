@@ -1,11 +1,6 @@
 /** Base transfer and magnitude response use engine functions; modulation is labelled separately. */
-import {
-  driveShape,
-  DriveFilter,
-  DRIVE_SHAPERS,
-  DRIVE_DSP,
-} from '../../../packages/client/src/audio/index-for-editor';
-import type { DriveStageSpec } from '../../../packages/client/src/audio/index-for-editor';
+import { driveShape, DriveFilter, DRIVE_SHAPERS, DRIVE_DSP } from '@windsor/engine';
+import type { DriveStageSpec } from '@windsor/engine';
 import { DRIVE_PLOT as P } from './advancedDriveTables';
 import { STRIP_COLOR } from './consoleColors';
 import { el } from './dom';

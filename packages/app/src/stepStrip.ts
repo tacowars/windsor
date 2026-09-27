@@ -12,11 +12,8 @@
  * `host.stepAt` (decision 2). `playheadAt` is the console's only reading of
  * the audible tick.
  */
-import type {
-  SequencerKind,
-  SequencerSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type { SequencerKind, SequencerSpec } from '@windsor/engine';
+import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el } from './dom';

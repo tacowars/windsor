@@ -1,6 +1,6 @@
 /** Independent L/R sample-peak bars; the shared frame loop owns the visible tap (#666). */
-import { PEAK_METER } from '../../../packages/client/src/audio/index-for-editor';
-import type { PeakMeter } from '../../../packages/client/src/audio/index-for-editor';
+import { PEAK_METER } from '@windsor/engine';
+import type { PeakMeter } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { watchPlayhead } from './stepStrip';

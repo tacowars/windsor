@@ -9,7 +9,7 @@ import {
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
   partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { arpSeedChange, freshSeed, parseSeed } from './arpModel';
 import { DocumentModel } from './documentModel';
 import { octaveKnob } from './harmonyTables';

@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { choosePreset } from './presetBrowser';
 import { DocumentModel } from './documentModel';
 import type { AppCtx } from './context';
-import {
-  FULL_ARRANGEMENT,
-  FULL_SLOT,
-} from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
-import { PRESETS, clonePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
+import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { PRESETS, clonePatch, partAt } from '@windsor/engine';
 
 function context(): AppCtx {
   const model = new DocumentModel({ version: 3, ...FULL_ARRANGEMENT });

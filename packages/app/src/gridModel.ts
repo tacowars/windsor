@@ -5,12 +5,7 @@
  * function returns a new list; the card writes it through `ctx.change`, where
  * arrays replace wholesale.
  */
-import type {
-  Harmony,
-  GridNoteStep,
-  GridStep,
-  GridStepKind,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { Harmony, GridNoteStep, GridStep, GridStepKind } from '@windsor/engine';
 import {
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
@@ -18,7 +13,7 @@ import {
   gridNote,
   pitchClassName,
   scaleOffsets,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
 
 export { GRID_STEPS_MAX, GRID_STEP_OCTAVE_MAX };

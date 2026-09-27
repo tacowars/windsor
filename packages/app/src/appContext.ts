@@ -7,13 +7,8 @@
  * this context's document write. It knows no DOM beyond a panel's `hidden`
  * flag, so `appContext.test.ts` drives it with fakes.
  */
-import type {
-  ApplyResult,
-  AudioPart,
-  DocumentPartial,
-  Patch,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type { ApplyResult, AudioPart, DocumentPartial, Patch } from '@windsor/engine';
+import { partAt } from '@windsor/engine';
 import type { AppCtx, ConsoleTransport } from './context';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';

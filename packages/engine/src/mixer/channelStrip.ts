@@ -21,7 +21,7 @@
  * to the master as well would sum it twice.
  */
 import type { AudioPart } from '../synth/audioPart';
-import { MS_PER_SECOND } from '../../timeConstants';
+import { MS_PER_SECOND } from '../audioConstants';
 import { createInsertChain, createInsertUpdater } from './insertChain';
 import type { InsertRegistry, InsertSpec, InsertStage } from '../inserts/insertRegistry';
 import { INSERT_KINDS } from '../inserts/insertRegistry';

@@ -3,7 +3,7 @@
  * The card draws; these return the partial, so the rule is tested in Node
  * without a DOM.
  */
-import type { DocumentPartial } from '../../../packages/client/src/audio/index-for-editor';
+import type { DocumentPartial } from '@windsor/engine';
 import { partChange } from './context';
 import { ARP_RESEED_SPAN } from './sequencerKnobTables';
 

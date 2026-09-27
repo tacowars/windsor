@@ -1,5 +1,5 @@
 /** The compressor's controls commit the complete insert list into the song. */
-import { DEFAULT_COMPRESSOR } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_COMPRESSOR } from '@windsor/engine';
 import { sidechainSelector } from './sidechainSelector';
 import { compressorMeter } from './compressorMeter';
 import { COMPRESSOR_KNOBS, COMPRESSOR_SELECTS } from './compressorTables';

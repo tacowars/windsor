@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GridStep, Harmony } from '../../../packages/client/src/audio/index-for-editor';
+import type { GridStep, Harmony } from '@windsor/engine';
 
 type Key = Pick<Harmony, 'root' | 'scale'>;
-import { gridNote } from '../../../packages/client/src/audio/index-for-editor';
+import { gridNote } from '@windsor/engine';
 import {
   cycleKind,
   cycleOctave,

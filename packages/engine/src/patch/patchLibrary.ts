@@ -17,7 +17,7 @@
  * - `headroom` is the offline clip sweep's record: the seed that produced the
  *   worst peak, that peak, how many seeds were swept, and a hash of `patch` so
  *   an edited patch cannot ride on a stale sweep. `fmProcessorHeadroom.test.ts`
- *   renders the recorded seed; `tools/patch-editor/sweep-headroom.mjs` writes
+ *   renders the recorded seed; `packages/app/sweep-headroom.mjs` writes
  *   the record. Decision record: `docs/log/2026-09-15-561-patch-library-file-shape.md`.
  *
  * Browser-safe: no Node, no DOM. `presets.ts` builds the whole-bank table from
@@ -30,7 +30,7 @@ import { makePatch } from './patch';
 export const PATCH_FILE_FORMAT = 1;
 
 /** The offline sweep that writes a file's `headroom` record; error messages quote it. */
-export const SWEEP_COMMAND = 'node tools/patch-editor/sweep-headroom.mjs';
+export const SWEEP_COMMAND = 'node packages/app/sweep-headroom.mjs';
 
 /** A filename slug: lower-case words of letters and digits joined by single hyphens. */
 export const PATCH_ID_RULE = /^[a-z0-9]+(-[a-z0-9]+)*$/;

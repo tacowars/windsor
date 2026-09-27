@@ -9,8 +9,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '@windsor/engine';
+import { makePatch } from '@windsor/engine';
 import { FILTER_KNOBS, LFO_KNOBS, patchKnobOpts } from './patchKnobTables';
 import { GLOBAL_TOGGLES, toggleIndex, writeToggle } from './patchPanels';
 import type { PatchEditor } from './partsSession';

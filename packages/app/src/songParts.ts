@@ -6,17 +6,8 @@
  * a default the engine owns. Removing a part is the engine's `removePart`
  * (`documentParts.ts`), which prunes a patch only no other part plays.
  */
-import type {
-  ArrangementDocument,
-  DocumentPart,
-  SequencerKind,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  ARRANGEMENT_VERSION,
-  MUSIC_PARTS_MAX,
-  SEEDED_KINDS,
-  TICKS_PER_BAR,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ArrangementDocument, DocumentPart, SequencerKind } from '@windsor/engine';
+import { ARRANGEMENT_VERSION, MUSIC_PARTS_MAX, SEEDED_KINDS, TICKS_PER_BAR } from '@windsor/engine';
 import { initPresetId } from './libraryConstants';
 import { initPatchDefaults } from './patchActions';
 import { NEW_SONG_BARS, NEW_SONG_BPM, NEW_SONG_HARMONY, partLabelFor } from './songConstants';

@@ -14,7 +14,7 @@ import {
   SEQUENCER_KINDS,
   TICKS_PER_BAR,
   hitStep,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import {
   CYCLE_TICKS,
   LANE_TONE,

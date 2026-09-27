@@ -32,7 +32,7 @@ import {
   VELOCITY_DEFAULT,
   WALK_CHANCE,
   makePatch,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { BARS_KNOB, BPM_KNOB } from './transportTables';
 import { REGISTER_OCTAVE_DEFAULTS, octaveKnob } from './harmonyTables';
 import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';

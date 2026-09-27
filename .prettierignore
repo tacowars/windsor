@@ -1,0 +1,11 @@
+# Prettier owns source code only. Prose and workflow files are hand-formatted.
+dist/
+node_modules/
+package-lock.json
+docs/
+.claude/
+.github/
+*.md
+# The DSP worklet bundles (#643), written by scripts/build-worklets.mjs from
+# the source folders beside them and refused by --check when they differ.
+packages/engine/src/worklet/generated/

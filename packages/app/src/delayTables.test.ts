@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { DEFAULT_DELAY, DELAY_BOUNDS } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_DELAY, DELAY_BOUNDS } from '@windsor/engine';
 import { DELAY_KNOBS } from './delayTables';
 it('uses engine ranges and reset values for every delay knob', () => {
   expect(DELAY_KNOBS.map((entry) => entry.f).sort()).toEqual(Object.keys(DELAY_BOUNDS).sort());

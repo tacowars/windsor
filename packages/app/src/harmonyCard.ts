@@ -6,13 +6,8 @@
  * through the view; the dial writes the lanes only, so it survives its own
  * drag, and reads its value back from the document.
  */
-import type { ChordSize } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  CHORD_SIZE_SEVENTH,
-  CHORD_SIZE_TRIAD,
-  PPQ,
-  TICKS_PER_BAR,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ChordSize } from '@windsor/engine';
+import { CHORD_SIZE_SEVENTH, CHORD_SIZE_TRIAD, PPQ, TICKS_PER_BAR } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el, seg } from './dom';
 import {

@@ -1,10 +1,10 @@
-/* eslint-disable no-magic-numbers -- DSP: the mulberry32 and xorshift constants are the algorithms, pinned to the shared copy; the tunables are fmConstants.ts (#654) */
+/* eslint-disable no-magic-numbers -- DSP: the mulberry32 and xorshift constants are the algorithms, pinned to sequencing/mulberry32.ts; the tunables are fmConstants.ts (#654) */
 /**
  * The worklet's one random source (#78, #644): `Math.random` unless a seed is
  * supplied, then mulberry32; and the non-zero 32-bit seed each voice's noise
  * and sample-and-hold LFO draw from it. Invariant: allocation free, and the
  * same algorithm line for line as `mulberry32` in
- * `packages/shared/src/terrain/heightmap.ts`. `fmProcessor.test.ts` pins the
+ * `sequencing/mulberry32.ts`. `fmProcessor.test.ts` pins the
  * zero exclusion; every seeded harness render depends on this stream.
  */
 
@@ -26,7 +26,7 @@
 /**
  * `Math.random`, unless a seed is supplied; then a reproducible mulberry32 --
  * the same algorithm, line for line, as `mulberry32` in
- * `packages/shared/src/terrain/heightmap.ts`, so the repo has one seeded
+ * `sequencing/mulberry32.ts`, so the engine has one seeded
  * generator rather than two. It is copied rather than imported for the reason
  * at the top of this file: the worklet must stay import-free.
  */

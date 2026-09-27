@@ -14,7 +14,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
+import { makeArrangement } from '@windsor/engine';
 import { EngineHost, HostTransport, type TransportSystem } from './host';
 
 const param = (): { value: number } => ({ value: 0 });
@@ -37,8 +37,8 @@ class FakeAudioContext {
   state = 'suspended';
   destination = node();
   audioWorklet = {
-    addModule: (url: string): Promise<void> => {
-      loaded.push(url.slice(0, url.indexOf(':') + 1));
+    addModule: (url: string | URL): Promise<void> => {
+      loaded.push(String(url).split('/').pop() ?? '');
       return Promise.reject(new Error('worklet modules are refused on this origin'));
     },
   };
@@ -59,18 +59,10 @@ class FakeAudioContext {
 }
 
 const globals = globalThis as unknown as Record<string, unknown>;
-const saved = {
-  window: globals['window'],
-  AudioContext: globals['AudioContext'],
-  createObjectURL: URL.createObjectURL,
-};
-globals['window'] = { __A204_DSP__: { fm: '// fm', reverb: '// reverb' } };
+const saved = { AudioContext: globals['AudioContext'] };
 globals['AudioContext'] = FakeAudioContext;
-URL.createObjectURL = (): string => 'blob:fake-dsp';
 afterAll(() => {
-  globals['window'] = saved.window;
   globals['AudioContext'] = saved.AudioContext;
-  URL.createObjectURL = saved.createObjectURL;
 });
 
 describe('EngineHost.enable when the DSP will not load', () => {
@@ -86,10 +78,10 @@ describe('EngineHost.enable when the DSP will not load', () => {
     host = new EngineHost((line) => void log.push(line));
   });
 
-  it('tries the blob URLs, then the data URLs, and reports the failure', async () => {
+  it("loads the engine's own worklet URL and reports the failure", async () => {
     await expect(host.enable(song)).rejects.toThrow('refused');
-    // One module attempt per context: the blob attempt and the data-URL retry.
-    expect(loaded).toEqual(['blob:', 'data:']);
+    // One attempt, on one context, at the FM module the engine names.
+    expect(loaded).toEqual(['fm-processor.js']);
     expect(log).toHaveLength(1);
     expect(log[0]).toContain('audio could not be enabled');
     expect(log[0]).toContain('retry');
@@ -104,9 +96,9 @@ describe('EngineHost.enable when the DSP will not load', () => {
     expect(host.capturePattern(0)).toBeNull();
     expect(host.part(0)).toBeNull();
     expect(() => host.update()).not.toThrow();
-    // Both contexts it opened are closed again.
-    expect(contexts).toBe(2);
-    expect(closed).toBe(2);
+    // The context it opened is closed again.
+    expect(contexts).toBe(1);
+    expect(closed).toBe(1);
   });
 
   it('retries on the next click instead of returning early for ever', async () => {
@@ -117,8 +109,8 @@ describe('EngineHost.enable when the DSP will not load', () => {
     // The second click on the power button. Before #617 this resolved
     // silently against the context the failed run had left behind.
     await expect(host.enable(song)).rejects.toThrow('refused');
-    expect(loaded).toEqual(['blob:', 'data:']);
-    expect(contexts).toBe(2);
+    expect(loaded).toEqual(['fm-processor.js']);
+    expect(contexts).toBe(1);
   });
 
   it('keeps one enable in flight rather than opening a context per click', async () => {
@@ -126,7 +118,7 @@ describe('EngineHost.enable when the DSP will not load', () => {
     const second = host.enable(song);
     await expect(first).rejects.toThrow();
     await expect(second).resolves.toBeUndefined();
-    expect(contexts).toBe(2);
+    expect(contexts).toBe(1);
   });
 });
 

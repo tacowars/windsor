@@ -1,5 +1,5 @@
 /** The whole song's inserts and output level, shared with the game (#666). */
-import { DEFAULT_MASTER } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_MASTER } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { section } from './dom';
 import { makeKnob } from './knob';

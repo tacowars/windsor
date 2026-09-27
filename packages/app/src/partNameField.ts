@@ -4,7 +4,7 @@
  * partial on the part's slot; the name is never a key, so a rename touches no
  * strip, patch, capture or note stream.
  */
-import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 

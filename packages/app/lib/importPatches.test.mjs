@@ -14,11 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import {
-  PATCH_LIBRARY,
-  loadUnsweptPatchFile,
-  serialisePatchFile,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { PATCH_LIBRARY, loadUnsweptPatchFile, serialisePatchFile } from '../../engine/src/index';
 import {
   importExitCode,
   importIdFromName,

@@ -8,8 +8,8 @@
  * plays it; revert puts the library's version back under the same id. Both
  * are live edits (#629): nothing here rebuilds the system.
  */
-import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { PRESETS, clonePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '@windsor/engine';
+import { PRESETS, clonePatch, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { LibraryModel } from './libraryModel';

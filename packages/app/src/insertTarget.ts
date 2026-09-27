@@ -1,10 +1,6 @@
 /** The two song-owned insert locations; cards share one document/live target (#666). */
-import type {
-  DocumentPartial,
-  InsertSpec,
-  InsertStage,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { partAt, musicPartName } from '../../../packages/client/src/audio/index-for-editor';
+import type { DocumentPartial, InsertSpec, InsertStage } from '@windsor/engine';
+import { partAt, musicPartName } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 export type InsertTarget = number | 'master';

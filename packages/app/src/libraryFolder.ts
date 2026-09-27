@@ -1,6 +1,6 @@
 /**
  * The library folder (#563, epic #564 decision 5): a File System Access grant
- * on `packages/client/src/audio/patches/`, remembered in IndexedDB and
+ * on `packages/engine/src/patches/`, remembered in IndexedDB and
  * re-requested when the browser has dropped it. The folder is read through
  * the unswept loader — a file the editor just wrote has a stale or missing
  * record by construction — so the preset browser reflects a save without a
@@ -10,8 +10,8 @@
  * tests drive it with an in-memory fake and only `wrapDirectoryHandle` touches
  * the Chrome API.
  */
-import type { UnsweptLibraryEntry } from '../../../packages/client/src/audio/index-for-editor';
-import { loadUnsweptPatchFile } from '../../../packages/client/src/audio/index-for-editor';
+import type { UnsweptLibraryEntry } from '@windsor/engine';
+import { loadUnsweptPatchFile } from '@windsor/engine';
 import { HANDLE_DB } from './libraryConstants';
 import type { LibraryEntries } from './patchMetadata';
 

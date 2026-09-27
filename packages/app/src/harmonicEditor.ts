@@ -4,7 +4,7 @@
  * stroke step writes `ops[i].userPartials` in the working patch and pushes it,
  * so the document and the live part hear the drawing as it happens.
  */
-import { OP_NAMES, WAVE } from '../../../packages/client/src/audio/index-for-editor';
+import { OP_NAMES, WAVE } from '@windsor/engine';
 import { el, seg } from './dom';
 import { CYCLE_PAD_PX } from './harmonicConstants';
 import {
@@ -19,7 +19,7 @@ import {
   waveCycle,
 } from './harmonicModel';
 import type { BarPoint, HarmonicCount } from './harmonicModel';
-import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '@windsor/engine';
 import type { PatchEditor } from './partsSession';
 
 const BAR_GAP_PX = 1;

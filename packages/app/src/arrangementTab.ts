@@ -4,10 +4,8 @@
  * New song starts over from one Init part with no sequencer (#598), asking
  * first when the document has changed since it was opened.
  * The exported file is the normalised document — patches, returns, each
- * part's strip, sequencers, harmony, all of it; saved under
- * `packages/client/src/audio/arrangements/<name>.json` the game bundles it
- * at build time (record §3) and `?music=<name>` plays it, `bed-01` being the
- * default. The transport, bpm and bars moved to the strip above every tab
+ * part's strip, sequencers, harmony, all of it — self-contained (#562), so
+ * Import on any machine plays it as exported. The transport, bpm and bars moved to the strip above every tab
  * (#708, `transportStrip.ts`); Mute became ‖ and Restart is gone — Import is
  * the rebuild left (#629).
  */
@@ -43,10 +41,8 @@ function documentSection(ctx: AppCtx): HTMLElement {
   const { root, body } = section(
     'Document',
     'Export downloads the whole piece — a snapshot of every patch any part plays, plus ' +
-      "returns, every part's strip, sequencers and harmony — as one normalised document. Save it as " +
-      'packages/client/src/audio/arrangements/<name>.json: the game bundles every file there, ' +
-      'resolves patches from the document alone (#562), ?music=<name> plays it (bed-01 is the ' +
-      'default), and npm run verify gates each one.',
+      "returns, every part's strip, sequencers and harmony — as one normalised, self-contained " +
+      'document. Import reads one back and plays it exactly as exported.',
   );
   const row = el('div', 'bar-row');
   row.appendChild(newSongButton(ctx));

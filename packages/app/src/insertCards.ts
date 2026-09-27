@@ -6,7 +6,7 @@
  * `insertCards.test.ts` fails the moment a kind arrives without one.
  */
 import type { InsertTarget } from './insertTarget';
-import type { InsertKindName } from '../../../packages/client/src/audio/index-for-editor';
+import type { InsertKindName } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { compressorCard } from './compressorCard';
 import { chorusCard } from './chorusCard';

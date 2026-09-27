@@ -9,15 +9,8 @@
  * by `songViewTables.test.ts`. A zoom control is a follow-up (decision 8):
  * `pxPerBar` is a table value, not a state.
  */
-import type {
-  SequencerKind,
-  SequencerSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  BEATS_PER_BAR,
-  PPQ,
-  TICKS_PER_BAR,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { SequencerKind, SequencerSpec } from '@windsor/engine';
+import { BEATS_PER_BAR, PPQ, TICKS_PER_BAR } from '@windsor/engine';
 import { BASS_MODE_OPTIONS } from './bassModel';
 import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { ARP_STYLE_LABELS } from './sequencerKnobTables';

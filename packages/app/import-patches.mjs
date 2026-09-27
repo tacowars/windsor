@@ -3,9 +3,9 @@
  * Moves patch files the editor downloaded into the library (#563, epic #564
  * decision 5): without a folder grant, Save and Copy to new download
  * `<id>.json`, and this validates each with the library loader and copies it
- * into `packages/client/src/audio/patches/`. Run from the repo root:
+ * into `packages/engine/src/patches/`. Run from the repo root:
  *
- *     node tools/patch-editor/import-patches.mjs [dir]
+ *     node packages/app/import-patches.mjs [dir]
  *
  * `dir` defaults to `~/Downloads`. A downloaded file has no current headroom
  * record, so the loader used is the unswept one; the sweep then writes the
@@ -25,7 +25,7 @@ const PATCHES = join(AUDIO_DIR, 'patches');
 
 const [dirArg] = process.argv.slice(2);
 if (dirArg === '--help' || dirArg === '-h') {
-  console.log('usage: node tools/patch-editor/import-patches.mjs [dir]   (default ~/Downloads)');
+  console.log('usage: node packages/app/import-patches.mjs [dir]   (default ~/Downloads)');
   process.exit(2);
 }
 const sourceDir = resolve(dirArg ?? join(homedir(), 'Downloads'));

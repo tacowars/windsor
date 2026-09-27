@@ -10,7 +10,7 @@
  * The one card that is not its own file is `none`: a part with no sequencer
  * has nothing to draw, so its entry is the sentence that says so.
  */
-import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
+import type { SequencerKind } from '@windsor/engine';
 import { arpCard } from './arpCard';
 import { bassCard } from './bassCard';
 import { chordCard } from './chordCard';

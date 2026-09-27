@@ -3,13 +3,12 @@
  * `2026-08-31-arrangement-console-and-runtime-arrangements` §1).
  *
  * It owns a single `AudioContext` for the life of the page and drives the
- * *real* `AudioSystem` — no graph of its own. The worklet sources are inlined
- * into the page; they become blob URLs handed to `FmEngine.init`, whose
- * default `import.meta.url` path is meaningless in a standalone file.
+ * *real* `AudioSystem` — no graph of its own. The worklet modules load from
+ * the engine's default URLs, resolved by Vite from `import.meta.url`.
  *
  * Structural changes (a part slot added or removed, an imported document)
  * rebuild the system on the same context: worklet module maps are per
- * context and keyed by URL, so re-`init` with the same blob URLs resolves
+ * context and keyed by URL, so re-`init` with the same URLs resolves
  * from cache instead of re-registering the processors.
  */
 import type {
@@ -18,12 +17,8 @@ import type {
   AudioPart,
   DocumentPartial,
   WorkletUrls,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  AudioSystem,
-  FmEngine,
-  musicPartName,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
+import { AudioSystem, FmEngine, musicPartName } from '@windsor/engine';
 
 import type { ConsoleTransport } from './context';
 import { nextTransportState, type TransportState } from './transportModel';
@@ -121,9 +116,8 @@ export class EngineHost {
 
   /**
    * First user gesture: create the context, load the DSP, build the system.
-   * Blob URLs first; a `file://` origin refuses blob worklet modules
-   * (observed in the #70 browser verification), so on failure retry once
-   * with data URLs on a fresh context — nothing registered on the failed one.
+   * The worklet modules load from the engine's own URLs (`workletMessages.ts`),
+   * which Vite serves in development and emits as hashed assets in `dist/`.
    *
    * The early return is on the *system*, not the context (#617). `start` sets
    * the context before it builds, so a run where both attempts threw left a
@@ -141,42 +135,12 @@ export class EngineHost {
     // and the moment `rebuild` swaps it — so a click landing in that window
     // joins the build in flight instead of opening a second context over it.
     if (this.context) return this.joinBuild();
-    const dsp = window.__A204_DSP__;
-    const blob = (source: string): string =>
-      URL.createObjectURL(new Blob([source], { type: 'application/javascript' }));
-    const data = (source: string): string =>
-      `data:application/javascript;charset=utf-8,${encodeURIComponent(source)}`;
     try {
-      await this.start(document, {
-        fmUrl: blob(dsp.fm),
-        reverbUrl: blob(dsp.reverb),
-        compressorUrl: blob(dsp.compressor),
-        meterUrl: blob(dsp.meter),
-        retroReverbUrl: blob(dsp.retroReverb),
-        phaserUrl: blob(dsp.phaser),
-        advancedDriveUrl: blob(dsp.advancedDrive),
-        delayUrl: blob(dsp.delay),
-      });
-    } catch {
-      try {
-        // The latest document, not the captured one: an import or slot toggle
-        // may have queued a newer document while the blob attempt was failing,
-        // and the retry must not reinstall the older state over it.
-        await this.start(this.latest ?? document, {
-          fmUrl: data(dsp.fm),
-          reverbUrl: data(dsp.reverb),
-          compressorUrl: data(dsp.compressor),
-          meterUrl: data(dsp.meter),
-          retroReverbUrl: data(dsp.retroReverb),
-          phaserUrl: data(dsp.phaser),
-          advancedDriveUrl: data(dsp.advancedDrive),
-          delayUrl: data(dsp.delay),
-        });
-      } catch (error) {
-        this.discard();
-        this.log(`audio could not be enabled: ${String(error)} — click the power button to retry`);
-        throw error;
-      }
+      await this.start(document, {});
+    } catch (error) {
+      this.discard();
+      this.log(`audio could not be enabled: ${String(error)} — click the power button to retry`);
+      throw error;
     }
   }
 

@@ -45,7 +45,7 @@ const SWEEP_SEEDS = 64;
 /**
  * The seed that produced each patch's worst peak in its offline sweep,
  * rendered alongside the sample above. Since #561 it is each library file's
- * `headroom.worstSeed`, written by `tools/patch-editor/sweep-headroom.mjs`
+ * `headroom.worstSeed`, written by `packages/app/sweep-headroom.mjs`
  * and pinned to the patch by `headroom.contentHash`; `seedsSwept` says how
  * wide that sweep was (16,384 for the original bank, #78; 4,096 for `saw-arp`
  * and `drone-sqr`; 256 for the scoring bank, #475).

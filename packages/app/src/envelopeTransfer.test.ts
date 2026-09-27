@@ -10,8 +10,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { Envelope, Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { LOOP_MODE_NAMES, makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Envelope, Patch } from '@windsor/engine';
+import { LOOP_MODE_NAMES, makePatch } from '@windsor/engine';
 import {
   ENVELOPE_SLOTS,
   type EnvelopeSlot,

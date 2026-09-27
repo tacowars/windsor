@@ -26,7 +26,7 @@ import {
   refreshLibrary,
 } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
-import { checkLoudness, workletDataUrl } from './loudnessCheck';
+import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
 import type { PatchScope } from './patchActions';
 import {
@@ -123,8 +123,7 @@ async function forgetFolder(ctx: AppCtx): Promise<void> {
   ctx.render();
 }
 
-const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> =>
-  checkLoudness(ctx.parts.patch, workletDataUrl(window.__A204_DSP__.fm));
+const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> => checkLoudness(ctx.parts.patch);
 
 async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {
   const scope = scopeFor(ctx);

@@ -2,7 +2,7 @@
  * It owns its edges, preserves the existing insert updater, and exposes an
  * opt-in sample meter. masterStrip.test.ts pins routing, edits and disposal.
  */
-import { MS_PER_SECOND } from '../../timeConstants';
+import { MS_PER_SECOND } from '../audioConstants';
 import { INSERT_KINDS } from '../inserts/insertRegistry';
 import type { InsertSpec, InsertStage } from '../inserts/insertRegistry';
 import { FieldNormaliser, isRecord } from '../song/arrangementFields';

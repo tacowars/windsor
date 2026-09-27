@@ -16,12 +16,8 @@ import type {
   HarmonyEvent,
   Region,
   SequencerSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  PPQ,
-  TICKS_PER_BAR,
-  isInfiniteRegion,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
+import { PPQ, TICKS_PER_BAR, isInfiniteRegion } from '@windsor/engine';
 import { fitEvents } from './harmonyLaneModel';
 
 /** The kinds whose modifier snap is their own step; the rest snap to the beat. */

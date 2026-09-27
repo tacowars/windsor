@@ -4,13 +4,8 @@
  * patch (`partsSession`) and pushes it to the live part. The knob specs are
  * `patchKnobTables.ts`; the thumbnail geometry `patchPanelConstants.ts`.
  */
-import type { Algorithm } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  ALGORITHMS,
-  FILTER_MODE_NAMES,
-  LFO_SHAPE_NAMES,
-  OP_NAMES,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { Algorithm } from '@windsor/engine';
+import { ALGORITHMS, FILTER_MODE_NAMES, LFO_SHAPE_NAMES, OP_NAMES } from '@windsor/engine';
 import { ALG_LINK_COLOR, CARRIER_COLOR, INK_ON_ACCENT, MOD_COLOR } from './consoleColors';
 import { $, el, seg } from './dom';
 import { drawEnv } from './envCanvas';
@@ -25,7 +20,7 @@ import {
   patchKnobOpts,
 } from './patchKnobTables';
 import { ALG_THUMB } from './patchPanelConstants';
-import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '@windsor/engine';
 import type { PatchEditor } from './partsSession';
 import { getPath, pathKnob, setPath } from './patchPath';
 

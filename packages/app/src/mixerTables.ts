@@ -3,11 +3,7 @@
  * returns' own ranges and tempo divisions. The plate's ranges are the
  * worklet's (`REVERB_SPACE_RANGES`); the delay's are here.
  */
-import {
-  DEFAULT_STRIP,
-  LOW_CUT_MAX_HZ,
-  LOW_CUT_MIN_HZ,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_STRIP, LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '@windsor/engine';
 import { fmt2, fmtHz, fmtSigned } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
 

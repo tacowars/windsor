@@ -7,7 +7,7 @@ import {
   DEFAULT_CHORUS,
   applyChorusPreset,
   matchingChorusPreset,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import type { InsertCard } from './insertCards';
 import { CHORUS_KNOBS } from './insertKnobTables';
 import { presetInsertCard } from './presetInsertCard';

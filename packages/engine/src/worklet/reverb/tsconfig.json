@@ -1,7 +1,7 @@
 {
   // The plate's audio-thread project (#671), following fm/ (#654). Reuse its scope
   // declarations; keep indexed sample reads and class-field emission unchanged.
-  "extends": "../../../../../../tsconfig.base.json",
+  "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
     "composite": false,
     "declaration": false,

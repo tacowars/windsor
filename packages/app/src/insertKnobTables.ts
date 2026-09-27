@@ -3,12 +3,7 @@
  * (`inserts/insertConstants.ts`) and each default is the kind's own
  * (`DEFAULT_DRIVE`, `DEFAULT_CHORUS`), so the console states neither again.
  */
-import type {
-  ChorusSpec,
-  DriveSpec,
-  EnsembleSpec,
-  InsertKindName,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ChorusSpec, DriveSpec, EnsembleSpec, InsertKindName } from '@windsor/engine';
 import {
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
@@ -22,7 +17,7 @@ import {
   DRIVE_TONE_MAX_HZ,
   DRIVE_TONE_MIN_HZ,
   ENSEMBLE_BOUNDS,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { fmt2, fmtDb, fmtHz } from './consoleFormat';
 import type { SeqKnobOpts } from './sequencerKnobTables';
 

@@ -30,7 +30,7 @@ function stripIsChrome(html: string): boolean {
 }
 
 describe('the transport strip in the page', () => {
-  const template = read('../editor-template.html');
+  const template = read('../index.html');
 
   it('sits under the header, inside the sticky chrome and outside every tab panel', () => {
     expect(stripIsChrome(template)).toBe(true);

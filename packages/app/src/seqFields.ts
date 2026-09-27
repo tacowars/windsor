@@ -12,13 +12,8 @@ import type {
   DensityMod,
   DensityModKind,
   SequencerSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  DEFAULT_EUCLIDEAN_CONFIG,
-  DENSITY_MOD_KINDS,
-  LFO_SHAPES,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
+import { DEFAULT_EUCLIDEAN_CONFIG, DENSITY_MOD_KINDS, LFO_SHAPES, partAt } from '@windsor/engine';
 import { PERC_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { partChange } from './context';

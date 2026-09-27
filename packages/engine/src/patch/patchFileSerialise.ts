@@ -2,7 +2,7 @@
  * The one serialisation of a `patches/<id>.json` file (#563): the exact bytes
  * the #561 migration wrote — keys in the order `format, name, category, tags,
  * description, patch, headroom`, two-space `JSON.stringify`, a trailing
- * newline. The offline sweep (`tools/patch-editor/sweep-headroom.mjs`) and the
+ * newline. The offline sweep (`packages/app/sweep-headroom.mjs`) and the
  * editor's Save path both write through this, so a file the editor produces is
  * byte-identical to a migrated one for the same data; `prettier --write` then
  * reshapes it the same way for every writer.

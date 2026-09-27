@@ -1,6 +1,6 @@
 /** Track names are labels only: the song stores stable slots. */
-import { canSidechain } from '../../../packages/client/src/audio/index-for-editor';
-import type { SidechainSource } from '../../../packages/client/src/audio/index-for-editor';
+import { canSidechain } from '@windsor/engine';
+import type { SidechainSource } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { insertChange, insertsOf, type InsertTarget } from './insertTarget';

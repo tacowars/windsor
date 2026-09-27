@@ -7,8 +7,8 @@
  * card has no register knob (`PANE_OCTAVE_KINDS`), the Octave knob. A
  * selected chord shows `harmonyCard.ts`. One selection at a time.
  */
-import type { MusicPart } from '../../../packages/client/src/audio/index-for-editor';
-import { TICKS_PER_BAR, partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type { MusicPart } from '@windsor/engine';
+import { TICKS_PER_BAR, partAt } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { partChange } from './context';
 import { el } from './dom';

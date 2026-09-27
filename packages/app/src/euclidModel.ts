@@ -7,13 +7,8 @@
  * no player holds one. Every function returns data; the card writes it
  * through `ctx.change`, where a `pattern` array replaces wholesale.
  */
-import type { EuclideanSpec } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  EUCLID_STEPS_MAX,
-  PPQ,
-  euclid,
-  patternToString,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { EuclideanSpec } from '@windsor/engine';
+import { EUCLID_STEPS_MAX, PPQ, euclid, patternToString } from '@windsor/engine';
 
 export { EUCLID_STEPS_MAX };
 

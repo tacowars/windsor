@@ -9,10 +9,10 @@
  * region 1 is not the stream seed `s + 1` gives region 0 — a plain
  * `seed + index` would make neighbouring seeds share a region.
  *
- * `mulberry32` is the repo's one PRNG (`@aotearoa/shared`); nothing here adds
- * another.
+ * `mulberry32` is the engine's one main-thread PRNG (`mulberry32.ts`); nothing
+ * here adds another.
  */
-import { mulberry32 } from '@aotearoa/shared';
+import { mulberry32 } from './mulberry32';
 
 export const GENERATOR_SEED_STRIDE = 0x9e3779b9;
 

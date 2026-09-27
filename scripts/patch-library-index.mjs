@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* global process, console, URL */
 /**
- * `packages/client/src/audio/patches/index.ts`, generated from the files
+ * `packages/engine/src/patches/index.ts`, generated from the files
  * beside it so the library's static-import table cannot drift (#561).
  * `--check` (the `npm run verify` mode) fails on a stale index or a file
  * that is not a patch; `--write` regenerates it. Pure half and its tests:
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { patchIdsIn, renderIndex } from './lib/patchLibraryIndex.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const DIR = join(root, 'packages/client/src/audio/patches');
+const DIR = join(root, 'packages/engine/src/patches');
 const INDEX = join(DIR, 'index.ts');
 
 function fail(message) {

@@ -5,11 +5,8 @@
  * chain: the same kinds in the same order are param writes, anything else
  * rebuilds that one strip's inserts.
  */
-import type {
-  InsertKindName,
-  InsertSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { INSERT_KINDS, MAX_INSERTS } from '../../../packages/client/src/audio/index-for-editor';
+import type { InsertKindName, InsertSpec } from '@windsor/engine';
+import { INSERT_KINDS, MAX_INSERTS } from '@windsor/engine';
 
 /** Whether a strip holding `list` has room for another insert. */
 export const canAddInsert = (list: readonly InsertSpec[]): boolean => list.length < MAX_INSERTS;

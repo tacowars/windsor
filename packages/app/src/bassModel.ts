@@ -4,14 +4,14 @@
  * the seed a typed field or a Reseed press writes. Every function returns
  * data; the card writes it through `ctx.change`.
  */
-import type { BassPitchMode } from '../../../packages/client/src/audio/index-for-editor';
+import type { BassPitchMode } from '@windsor/engine';
 import {
   BASS_PITCH_MODES,
   foldDegree,
   pitchClassName,
   scaleOffsets,
   toRoman,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { BASS_RESEED_SPAN } from './bassConstants';
 import type { Key } from './gridModel';
 

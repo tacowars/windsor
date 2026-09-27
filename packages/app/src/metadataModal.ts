@@ -2,7 +2,7 @@
  * The metadata modal and the confirm modal (#563, epic #564 decision 9): the
  * page's own `<dialog>`s, never `window.confirm`. The rules — required and
  * unique name, the id from the name, categories and tags from the library —
- * are `patchMetadata.ts`; this is the markup in `editor-template.html`
+ * are `patchMetadata.ts`; this is the markup in `index.html`
  * driven. Focus is trapped while a modal is up and returns to the patch
  * controls on close (`focusTrap.ts`), so QWERTY plays straight away.
  */

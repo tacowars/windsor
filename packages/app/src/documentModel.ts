@@ -11,11 +11,8 @@
  * very next export carries every patch the song plays. `filled` is what the
  * Arrangement tab tells the user was filled that way.
  */
-import type {
-  ArrangementDocument,
-  MakeArrangementResult,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { PRESETS, makeArrangement } from '../../../packages/client/src/audio/index-for-editor';
+import type { ArrangementDocument, MakeArrangementResult } from '@windsor/engine';
+import { PRESETS, makeArrangement } from '@windsor/engine';
 
 /**
  * Merge for the local copy: objects recurse, arrays and `null` assign

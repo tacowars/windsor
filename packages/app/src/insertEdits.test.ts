@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_DRIVE, MAX_INSERTS } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_DRIVE, MAX_INSERTS } from '@windsor/engine';
 import { addInsert, canAddInsert, moveInsert, removeInsert, setInsertField } from './insertEdits';
 
 describe('insert edits', () => {

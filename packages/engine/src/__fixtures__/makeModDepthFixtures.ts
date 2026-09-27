@@ -2,8 +2,8 @@
  * Regenerates the two #543 reference fixtures — the state of `PRESETS` and of
  * the engine *before* modulation depth was rescaled.
  *
- *     npx tsx packages/client/src/audio/__fixtures__/makeModDepthFixtures.ts
- *     npx prettier --write packages/client/src/audio/__fixtures__/modDepth*.json
+ *     npx tsx packages/engine/src/__fixtures__/makeModDepthFixtures.ts
+ *     npx prettier --write packages/engine/src/__fixtures__/modDepth*.json
  *
  * Both outputs are a snapshot of main at the commit named in
  * `modDepthLevels.json`, taken before the migration landed, and

@@ -4,7 +4,7 @@
  * song stores values, never a preset id, and any knob turn that leaves every
  * preset's values reads Custom.
  */
-import type { InsertSpec } from '../../../packages/client/src/audio/index-for-editor';
+import type { InsertSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { InsertKnobEntry } from './insertKnobTables';

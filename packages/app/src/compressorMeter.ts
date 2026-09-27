@@ -4,8 +4,8 @@
  * the live insert each time so a chain replacement cannot leave a stale meter.
  */
 import type { InsertTarget } from './insertTarget';
-import { COMPRESSOR_DSP } from '../../../packages/client/src/audio/index-for-editor';
-import type { InsertSpec, InsertStage } from '../../../packages/client/src/audio/index-for-editor';
+import { COMPRESSOR_DSP } from '@windsor/engine';
+import type { InsertSpec, InsertStage } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { liveInsert } from './insertTarget';

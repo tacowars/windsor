@@ -10,8 +10,8 @@
  * scaling with the shape, because a curve without them is not the sound the
  * user heard.
  */
-import type { Envelope, Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { OP_NAMES } from '../../../packages/client/src/audio/index-for-editor';
+import type { Envelope, Patch } from '@windsor/engine';
+import { OP_NAMES } from '@windsor/engine';
 import { getPath, setPath } from './patchPath';
 
 /** Every envelope in a patch, as a path into it. */

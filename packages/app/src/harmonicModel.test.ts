@@ -7,8 +7,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT } from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
-import { WAVE, makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import { FULL_ARRANGEMENT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { WAVE, makePatch } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import {
   PREVIEW_POINTS,

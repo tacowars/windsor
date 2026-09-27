@@ -8,7 +8,7 @@ import {
   ENSEMBLE_PRESETS,
   applyEnsemblePreset,
   matchingEnsemblePreset,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import type { InsertCard } from './insertCards';
 import { ENSEMBLE_KNOBS } from './insertKnobTables';
 import { presetInsertCard } from './presetInsertCard';

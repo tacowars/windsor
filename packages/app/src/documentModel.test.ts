@@ -6,11 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  PRESETS,
-  makeArrangement,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { PRESETS, makeArrangement, partAt } from '@windsor/engine';
 import { DocumentModel, deepMerge, mergeDocument } from './documentModel';
 
 /** Live for the whole four-bar song: what every fixture part carries (#705). */

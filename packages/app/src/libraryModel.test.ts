@@ -6,12 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { FULL_ARRANGEMENT } from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
-import {
-  PATCH_LIBRARY,
-  makePatch,
-  serialisePatchFile,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { FULL_ARRANGEMENT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { PATCH_LIBRARY, makePatch, serialisePatchFile } from '@windsor/engine';
 import type { PatchFolder } from './libraryFolder';
 import {
   connectLibrary,

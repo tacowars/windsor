@@ -7,8 +7,8 @@
  * restarts its stream at once — record
  * `2026-09-26-harmony-v2-document-v3-timeline-and-regions`).
  */
-import type { ArpSpec } from '../../../packages/client/src/audio/index-for-editor';
-import { DEFAULT_ARP_CONFIG } from '../../../packages/client/src/audio/index-for-editor';
+import type { ArpSpec } from '@windsor/engine';
+import { DEFAULT_ARP_CONFIG } from '@windsor/engine';
 import { arpSeedChange, freshSeed, parseSeed } from './arpModel';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';

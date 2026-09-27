@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { identifierFor, patchIdsIn, renderIndex } from './patchLibraryIndex.mjs';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const PATCHES = join(root, 'packages/client/src/audio/patches');
-const FIXTURES = join(root, 'packages/client/src/audio/__fixtures__');
+const PATCHES = join(root, 'packages/engine/src/patches');
+const FIXTURES = join(root, 'packages/engine/src/__fixtures__');
 
 describe('the patch library index', () => {
   it('is current for the committed patches/ directory', () => {

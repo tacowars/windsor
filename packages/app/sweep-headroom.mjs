@@ -4,8 +4,8 @@
  * the seed that produced the worst peak, that peak, the seed count, and a hash
  * of the patch so an edit cannot ride on a stale sweep. Run from the repo root:
  *
- *     node tools/patch-editor/sweep-headroom.mjs <id…> [--seeds <n>]
- *     node tools/patch-editor/sweep-headroom.mjs --stale [--seeds <n>]
+ *     node packages/app/sweep-headroom.mjs <id…> [--seeds <n>]
+ *     node packages/app/sweep-headroom.mjs --stale [--seeds <n>]
  *
  * `--stale` sweeps every file whose record is missing or whose `contentHash`
  * no longer matches its patch. The default is 16,384 seeds — the sweep that
@@ -32,7 +32,7 @@ if (!Number.isSafeInteger(seeds) || seeds < 1)
 const stale = args.includes('--stale');
 const named = args.filter((arg, i) => !arg.startsWith('--') && args[i - 1] !== '--seeds');
 if (!stale && named.length === 0) {
-  console.error('usage: node tools/patch-editor/sweep-headroom.mjs <id…|--stale> [--seeds <n>]');
+  console.error('usage: node packages/app/sweep-headroom.mjs <id…|--stale> [--seeds <n>]');
   process.exit(2);
 }
 
@@ -69,5 +69,5 @@ for (const id of ids) {
   );
 }
 console.log(
-  `sweep-headroom: wrote ${ids.length} record${ids.length === 1 ? '' : 's'}; run \`npx prettier --write packages/client/src/audio/patches\``,
+  `sweep-headroom: wrote ${ids.length} record${ids.length === 1 ? '' : 's'}; run \`npx prettier --write packages/engine/src/patches\``,
 );

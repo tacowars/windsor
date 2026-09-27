@@ -1,8 +1,5 @@
 import { expect, it } from 'vitest';
-import {
-  DEFAULT_RETRO_REVERB,
-  RETRO_REVERB_BOUNDS,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_RETRO_REVERB, RETRO_REVERB_BOUNDS } from '@windsor/engine';
 import { RETRO_REVERB_KNOBS } from './retroReverbTables';
 
 it('exposes every numerical engine field with the engine range and default', () => {

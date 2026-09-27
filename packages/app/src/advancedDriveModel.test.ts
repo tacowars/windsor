@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { DEFAULT_ADVANCED_DRIVE } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_ADVANCED_DRIVE } from '@windsor/engine';
 import { editDriveStage } from './advancedDriveModel';
 import { addInsert } from './insertEdits';
 import { insertChange } from './insertTarget';

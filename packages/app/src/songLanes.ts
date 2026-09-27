@@ -10,7 +10,7 @@
  * drag works on touch; a drag previews on the lane and commits once on
  * release, as one `ctx.change`.
  */
-import type { MusicPart, Region } from '../../../packages/client/src/audio/index-for-editor';
+import type { MusicPart, Region } from '@windsor/engine';
 import { el } from './dom';
 import {
   addRegion,

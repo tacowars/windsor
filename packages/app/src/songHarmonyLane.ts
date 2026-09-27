@@ -7,8 +7,8 @@
  * shifts every event after it (the pure `harmonyLaneModel.ts`). Chords
  * only: a rest is a gap in a part's regions (epic #703 decision 6).
  */
-import type { ArrangementDocument } from '../../../packages/client/src/audio/index-for-editor';
-import { chordAt, eventBounds } from '../../../packages/client/src/audio/index-for-editor';
+import type { ArrangementDocument } from '@windsor/engine';
+import { chordAt, eventBounds } from '@windsor/engine';
 import { el } from './dom';
 import { appendEvent, eventLabel, setEventDuration } from './harmonyLaneModel';
 import { pointerDrag } from './songLanes';

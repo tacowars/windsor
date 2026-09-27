@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { TICKS_PER_BAR } from '../../../packages/client/src/audio/index-for-editor';
+import { TICKS_PER_BAR } from '@windsor/engine';
 import {
   barsChange,
   bpmChange,
