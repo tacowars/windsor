@@ -62,7 +62,6 @@ export class FmEngine {
   /** What every part created from now on is told (#629); the worklet's own default is off. */
   private liveRetune = false;
   private moduleLoaded = false;
-  private maxVoicesSeen = 0;
 
   constructor(context?: AudioContext) {
     this.context = context ?? new AudioContext({ latencyHint: 'interactive' });
@@ -85,16 +84,6 @@ export class FmEngine {
 
   get isReady(): boolean {
     return this.moduleLoaded;
-  }
-
-  /** Parts alive on this engine (#445: Aotearoa204's bench header recorded it). */
-  get partCount(): number {
-    return this.parts.size;
-  }
-
-  /** The largest voice limit any live part was built with (#445); 0 before the first. */
-  get maxVoices(): number {
-    return this.maxVoicesSeen;
   }
 
   /** Load the DSP modules. Must be awaited before `createPart` or a reverb return. */
@@ -127,7 +116,6 @@ export class FmEngine {
 
     const patch = resolvePatch(options);
     const maxVoices = options.maxVoices ?? PART_MAX_VOICES_DEFAULT;
-    if (maxVoices > this.maxVoicesSeen) this.maxVoicesSeen = maxVoices;
     const processorOptions: ProcessorOptions = {
       maxVoices,
       patch: structuredClone(patch),

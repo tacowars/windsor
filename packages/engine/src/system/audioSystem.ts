@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 356 lines: routing and partial splitting now have their own modules; the system retains their transport/graph transaction boundary (#225 decision 4). */
 /**
  * The audio system: the standing graph a page plays through. The console
  * (`packages/app/src/host.ts`) constructs it and pumps `update()` from its
@@ -47,11 +46,8 @@ import type {
 import { ArrangementPlayer } from '../song/arrangementPlayer';
 import { PatchResolver } from '../song/arrangementValidate';
 import { AUDIO_LOAD_REPORT_SECONDS, MUSIC_PART_MAX_VOICES } from '../audioConstants';
-import type { AudioCostReadout } from '../cost/audioCost';
 import type { AudioLoadReadout } from '../cost/audioLoad';
 import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
-import { asPlaybackStatsHost, snapshotPlaybackStats } from '../cost/playbackStats';
-import { SchedCostMeter } from '../cost/schedCost';
 import type { AudioBus } from '../mixer/audioBus';
 import type { AudioPart } from '../synth/audioPart';
 import type { PartStrip } from '../mixer/channelStrip';
@@ -75,11 +71,6 @@ export interface AudioSystemOptions {
   mix?: Readonly<Record<string, ChannelStrip>>;
   /** The returns to build. Defaults to `RETURNS`. */
   returns?: Readonly<Record<string, ReturnSpec>>;
-  /**
-   * The main-thread clock `update()` times itself with (#275 decision 7).
-   * Injected so a test can assert the scheduling cost without a real one.
-   */
-  now?: () => number;
   /**
    * How a strip waits out the fade around a structural insert edit (#652).
    * Defaults to `setTimeout`; a test hands in something immediate.
@@ -117,9 +108,6 @@ export class AudioSystem {
   /** The music parts by slot — the player's roster, grown and shrunk live through `apply` (#629). */
   private readonly musicParts = new Map<number, AudioPart>();
   private readonly loadMeter = new AudioLoadMeter();
-  /** What `update()` costs on the main thread, over the rolling window (#275). */
-  private readonly schedMeter: SchedCostMeter;
-  private readonly now: () => number;
   /** Passed to every strip: how it waits out an insert fade (#652). */
   private readonly routeOptions: RouteOptions;
   private readonly sidechains = new SidechainDesk(
@@ -136,21 +124,18 @@ export class AudioSystem {
   private player: ArrangementPlayer | null = null;
   private readonly insertTempo: ReturnType<typeof tempoInsertRegistry>;
   private muted = false;
-  private suppressed = false;
 
   constructor(engine?: FmEngine, options: AudioSystemOptions = {}) {
     this.engine = engine ?? new FmEngine();
     this.scheduler = new Scheduler(this.engine.context, { bpm: 96 });
     this.mix = options.mix ?? MIX;
     this.returnSpecs = options.returns ?? RETURNS;
-    this.now = options.now ?? ((): number => performance.now());
     this.insertTempo = tempoInsertRegistry(this.scheduler.bpm);
     this.routeOptions = {
       registry: meteredInsertRegistry(this.loadMeter, this.insertTempo.registry),
       changed: () => this.sidechains.changed(),
       ...(options.defer ? { defer: options.defer } : {}),
     };
-    this.schedMeter = new SchedCostMeter({ now: this.now });
   }
 
   /** The song master, distinct from the engine-wide safety output and the channel faders. */
@@ -195,44 +180,6 @@ export class AudioSystem {
   /** Call from a click or key handler. */
   async unlock(): Promise<void> {
     await this.engine.unlock();
-  }
-
-  /**
-   * Unlock and start the transport with no gesture behind it — for an
-   * automated run (#445: Aotearoa204's audio bench), where the page has no
-   * input and Chrome is launched with
-   * `--autoplay-policy=no-user-gesture-required`. The same two steps a page
-   * binds to its first pointer or key; here they run directly, and the
-   * resulting context state is returned. A page that stays `suspended` is a
-   * harness failure, not a silent control, so the state is not swallowed.
-   */
-  async startWithoutGesture(): Promise<AudioContextState> {
-    const state = await this.engine.unlock();
-    this.startMusic();
-    return state;
-  }
-
-  /** What the DSP costs on the audio thread right now (#445). */
-  loadReadout(): AudioLoadReadout {
-    return this.loadMeter.readout();
-  }
-
-  /**
-   * What audio costs this page, in one call (#275): the DSP's estimated load,
-   * the main thread's measured scheduling cost, and the context's lifetime
-   * playback counters where the browser has them.
-   *
-   * The hook a load display or a benchmark reads (Aotearoa204's overlay and
-   * bench collector did).
-   * `playback` is snapshotted on every call — the API hands back one live
-   * object whose fields mutate, so a held reference is not a reading.
-   */
-  costReadout(): AudioCostReadout {
-    return {
-      load: this.loadMeter.readout(),
-      sched: this.schedMeter.readout(),
-      playback: snapshotPlaybackStats(asPlaybackStatsHost(this.engine.context)),
-    };
   }
 
   /** Processors this system has turned load reporting on in (#445) — parts plus worklet returns. */
@@ -291,9 +238,8 @@ export class AudioSystem {
    * Build a music part per part the document lists and bind the generators
    * to the transport (issues #69, #75, #597). Each part lands on its own
    * strip and is registered under its slot (`musicPartName`), never its
-   * label; a `none` part is built and playable but nothing sequences it. Idempotent. Nothing sounds until `startMusic()`; after
-   * `suppressMusic()` the whole graph exists but the transport never starts
-   * (refinement decision 2).
+   * label; a `none` part is built and playable but nothing sequences it.
+   * Idempotent. Nothing sounds until `startMusic()`.
    *
    * Throws, naming the part and the id, when the document does not carry a
    * patch a part names (#562). That is deliberate: a song is self-contained,
@@ -365,19 +311,9 @@ export class AudioSystem {
     this.musicParts.delete(slot);
   }
 
-  /**
-   * Refinement decision 2 (Aotearoa204's `?music=0`): keep the whole graph but
-   * never start the transport — not at unlock, and not through an unmute.
-   * Enforced here so no caller can bypass the suppression.
-   */
-  suppressMusic(): void {
-    this.suppressed = true;
-    this.scheduler.stop();
-  }
-
-  /** Start (or resume) the transport. Called at the unlock gesture; a no-op while muted or suppressed. */
+  /** Start (or resume) the transport. A no-op while muted or before `initMusic`. */
   startMusic(): void {
-    if (!this.player || this.muted || this.suppressed) return;
+    if (!this.player || this.muted) return;
     this.scheduler.start(this.scheduler.transport.currentTick);
   }
 
@@ -416,12 +352,6 @@ export class AudioSystem {
     this.player?.releaseAll(this.engine.context.currentTime);
     this.scheduler.reset();
     this.player?.reset();
-  }
-
-  /** Flip the mute (#69: Aotearoa204's scripted toggle); the console uses `setMuted`. Returns the new muted state. */
-  toggleMute(): boolean {
-    this.setMuted(!this.muted);
-    return this.muted;
   }
 
   /**
@@ -507,12 +437,7 @@ export class AudioSystem {
    */
   update(_dt: number): void {
     if (!this.started) return;
-    // Timed here rather than around the whole system because this call *is*
-    // the system's per-frame main-thread work: everything else audio does
-    // happens on the audio thread or on an event (#275 decision 7).
-    const before = this.now();
     this.scheduler.update();
-    this.schedMeter.sample(this.now() - before);
   }
 
   dispose(): void {
@@ -520,7 +445,6 @@ export class AudioSystem {
     this.player?.dispose();
     this.player = null;
     this.muted = false;
-    this.suppressed = false;
     this.sidechains.dispose();
     for (const strip of this.strips.values()) strip.dispose();
     this.strips.clear();
@@ -533,7 +457,6 @@ export class AudioSystem {
     this.musicBus?.output.disconnect();
     this.auxLevel?.disconnect();
     this.loadMeter.dispose();
-    this.schedMeter.reset();
     this.engine.dispose();
     this.musicBus = null;
     this.returns = null;

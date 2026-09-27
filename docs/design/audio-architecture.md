@@ -154,8 +154,7 @@ packages/engine/src/          # folders mirror the music-engine skill's file map
                           #   off the audio graph
   harmony/                # harmonyTimeline.ts, chordTheory.ts, chordNames.ts, chordVoicing.ts, chordTables.ts,
                           #   chordNormalise.ts
-  cost/                   # audioCost.ts (the combined readout), audioLoad.ts (audio-thread load),
-                          #   schedCost.ts (main-thread scheduler cost), playbackStats.ts (underruns)
+  cost/                   # audioLoad.ts (the audio-thread load, #445)
   worklet/                # the DSP (§6.1): generated/ holds the bundles (#643); worklet/CLAUDE.md the rules
     fm/                   # the FM source, TypeScript in its own project (#644, #645, #654): fmProcessor.ts (entry), voice,
                           #   voiceControl, voiceRender, voiceKernel, fmConstants, waveTables,
@@ -317,95 +316,34 @@ design has. (In Aotearoa204 this was invariant 3, with a named target machine.)
 
 ## 7. Performance: what is known, and what is not
 
-*Windsor fork:* the frame overlay, the frame bench (`?bench=1&audio=1`,
-`scripts/run-bench.mjs`), the `__a204` console handle, `docs/reference/` and the target
-box below were the game's and are not in this repository. What remains is the counters
-in `packages/engine/src/cost/`, read through `AudioSystem.readout()`; the text below is
-kept as the record of how they were built and calibrated.
+*Windsor fork:* Aotearoa204 measured audio inside its frame overlay and frame bench, and
+added main-thread scheduling cost (#275) and `AudioContext.playbackStats` underruns
+(#275) beside the audio-thread load. Those readouts served the game's bench and are
+removed (`docs/log/2026-09-27-game-only-audio-hooks-removed.md`). Windsor keeps the one
+the console shows: the audio-thread load.
 
 **Not a qualifying measurement.** The prototype renders 32 voices of its heaviest preset
 in about 10% of one core. That was measured headless in Node 22 on an Apple Silicon Mac,
-against wall-clock audio time — not in a browser, not with a render loop competing for
-the main thread, and not on the target machine (Ryzen 5 5600G / Vega 7 / Chrome /
-Ubuntu). Under invariant 3 it is an indication that the approach is not obviously
-infeasible, and nothing more.
+against wall-clock audio time, not in a browser. Under invariant 5 it is an indication
+that the approach is not obviously infeasible, and nothing more.
 
-What would qualify, when audio is built:
+**What matters.** Audio runs on the browser's audio thread, so the number that matters
+is **dropout**, not frame rate: buffer underruns over a fixed window, read on a named
+machine, browser and backend.
 
-- Audio runs in the browser's audio thread, so the number that matters is not frame rate
-  but **dropout**: `AudioContext.baseLatency`, and a count of buffer underruns over a
-  fixed window, taken on the target machine with a backend named.
-- The main-thread cost of audio is the *scheduling* work, which belongs in `src/stats.ts`
-  alongside the existing counters so it appears in the same overlay every other milestone
-  reading comes from. It is now there: `stats/lines/audio.ts` draws it and
-  `bench/summary.ts`'s `AudioMetrics.schedMs` records it (#275).
-- Suggested criterion, to be argued when the ticket is written: **zero underruns over a
-  60 s M3-equivalent horde window, with audio scheduling under 0.5 ms of main-thread time
-  per frame at p95.**
+**What exists (#445).** `packages/engine/src/cost/audioLoad.ts` owns
+`AudioLoadReadout { loadPct, peakPct, underruns, processors }`, exposed on
+`AudioSystem.readout().load` and shown by the console's Arrangement tab. Every worklet
+accumulates it inside `process()` and posts it once per interval, so the "no allocation
+in `process()`" rule of §6.1 still holds.
 
-**What exists now (#445).** Both halves are instrumented, and neither is a
-gate yet:
-
-- **In the frame.** `?bench=1&audio=1` builds the `AudioSystem` and plays the
-  `?music=<name>` document through the standard window, against the same rung
-  in silence: `node scripts/run-bench.mjs --audio[=<name>]`. That is the arm
-  the milestone cadence can take a music reading with; the verdict is the
-  three standing frame gates, and no audio field votes.
-  `docs/reference/client-measurement-seams.md` is the seam.
-- **On the audio thread.** `packages/engine/src/cost/audioLoad.ts` owns
-  `AudioLoadReadout { loadPct, peakPct, underruns, processors }`, exposed on
-  `AudioSystem.readout().load` and `__a204.audio.readout()`, drawn as one
-  overlay line and carried into the bench JSON's `audio` block. Both worklets
-  accumulate it inside `process()` and post once per interval, so the
-  "no allocation in `process()`" rule of §6.1 still holds.
-- **What the probe found.** The two measurements this section assumes are not
-  available in Chrome 152: there is no `AudioContext.renderCapacity` (flagged
-  builds included) and no `performance.now()` in `AudioWorkletGlobalScope`, so
-  a processor cannot time its own call. The readout is therefore a
-  **duty-cycle sampler** built on `Date.now()`, whose resolution (1 ms) is a
-  third of a render quantum (2.9 ms at 44.1 kHz): it reads 0 at rest and
-  tracks the true load monotonically while over-reading it by roughly 2–3×.
-  The record and its calibration are
-  `docs/research/2026-09-11-445-audio-bench-arm/`. `underruns` — quanta whose
-  measured span reached the whole budget — is the one hard number, which is
-  why the suggested criterion above is still expressed in underruns and why
-  it is argued at the first target reading rather than asserted here.
-**What exists now (#275).** The section's own criterion — "zero underruns over
-a 60 s M3-equivalent horde window, with audio scheduling under 0.5 ms of
-main-thread time per frame at p95" — is now readable off the instrumentation
-rather than estimated. Both halves come from
-`packages/engine/src/cost/audioCost.ts`'s `AudioCostReadout`, which is what
-`stats.audioReadout` hands the overlay and the bench collector:
-
-- **Underruns: `AudioContext.playbackStats`** (`cost/playbackStats.ts`), the
-  source of truth for the criterion. Present by default in Chrome 152 on the
-  target box, feature-detected everywhere, and reported as `n/a` / `null`
-  where it is absent — never replaced by an estimate. The units matter and are
-  not the obvious ones: **one `underrunEvents` is one output-device callback
-  delivered short**, which on the box is 512 frames at 48 kHz = 10.667 ms =
-  exactly `baseLatency`, *not* one 128-frame render quantum;
-  `underrunDuration` is in seconds of output, and `totalDuration` is output
-  time (it holds while the context is suspended), so
-  `underrunDuration / totalDuration` is the glitch fraction of what was
-  actually played. The counters are cumulative for the context's life and lag
-  their own load by up to three seconds, so the overlay shows lifetime totals
-  and the bench reports a **delta** across the window taken after
-  `AUDIO_STATS_SETTLE_MS`. They also **saturate**: at 150 % and at 300 % of
-  the quantum budget the box read about the same ~90 events/s, so the number
-  says whether and for how long audio broke, never by how much. The record is
-  `docs/research/2026-09-14-275-playbackstats-probe/`.
-- **Scheduling cost: `audio.schedMs`** (`cost/schedCost.ts`), the p95 half of
-  the criterion. `AudioSystem.update()` times its own scheduler pump — the
-  system's whole per-frame main-thread cost — over a rolling one-second
-  window for the overlay, and per frame for the bench, whose `audio.schedMs`
-  distribution is what a milestone reading quotes.
-- The sampler's own `underruns` stays beside them, **labelled `est`**: it
-  counts something else (a render quantum that provably overran) and is the
-  conservative lower bound described above, not a second opinion on the same
-  number.
-- **Still missing:** a target-box reading. The #445 audio pair is the first
-  one to carry these fields (#275 decision 8); until it is taken, no number
-  here is a result (invariant 3).
+The probe (`docs/research/2026-09-11-445-audio-bench-arm/`) found that Chrome 152 has no
+`AudioContext.renderCapacity` and no `performance.now()` in `AudioWorkletGlobalScope`, so
+a processor cannot time its own call. The readout is therefore a **duty-cycle sampler**
+built on `Date.now()`, whose 1 ms resolution is a third of a render quantum (2.9 ms at
+44.1 kHz). It reads 0 at rest and tracks the true load monotonically, while over-reading
+it by roughly 2–3×. `underruns` counts quanta whose measured span reached the whole
+budget, a conservative lower bound on deadline misses. It is the one hard number.
 
 Two known costs, recorded so they are not surprises:
 
