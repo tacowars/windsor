@@ -50,17 +50,19 @@ const harmonic = (x: number[], hz: number, rate = 48000): number => {
   });
   return (2 * Math.hypot(real, imaginary)) / x.length;
 };
-it.each([44100, 48000, 96000])(
-  'reconstructs three flat bands and phase-matches every dry/wet mix at %i Hz',
-  (rate) => {
-    for (const hz of [50, 200, 700, 2000, 7000]) {
-      const dry = render({ route: 'multiband', mix: 0 }, { hz, rate }).l;
-      for (const mix of [0.25, 0.5, 1]) {
-        const wet = render({ route: 'multiband', mix }, { hz, rate }).l;
-        expect(difference(late(wet), late(dry))).toBeLessThan(1e-6);
-      }
-      expect(rms(dry.slice(-rate / 10))).toBeCloseTo(0.1 / Math.SQRT2, 3);
+// One case per rate and tone, so no case renders the whole sweep.
+const BAND_CASES = [44100, 48000, 96000].flatMap((rate) =>
+  [50, 200, 700, 2000, 7000].map((hz) => [rate, hz] as const),
+);
+it.each(BAND_CASES)(
+  'reconstructs three flat bands and phase-matches every dry/wet mix at %i Hz, %i Hz tone',
+  (rate, hz) => {
+    const dry = render({ route: 'multiband', mix: 0 }, { hz, rate }).l;
+    for (const mix of [0.25, 0.5, 1]) {
+      const wet = render({ route: 'multiband', mix }, { hz, rate }).l;
+      expect(difference(late(wet), late(dry))).toBeLessThan(1e-6);
     }
+    expect(rms(dry.slice(-rate / 10))).toBeCloseTo(0.1 / Math.SQRT2, 3);
   },
   20000,
 );

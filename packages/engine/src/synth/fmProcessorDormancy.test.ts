@@ -125,22 +125,25 @@ describe('the factory bank', () => {
     return { samples, peak: Math.max(held.peak, tail.peak), wentDormant };
   };
 
-  it('renders every preset identically with and without dormancy, to -120 dB', () => {
-    let dormantPresets = 0;
-    for (const name of PRESET_NAMES) {
-      const patch = PRESETS[name] as Patch;
-      const before = heldAndReleased(patch, false);
-      const after = heldAndReleased(patch, true);
-      if (after.wentDormant) dormantPresets++;
+  // One case per preset, so the case's time does not grow with the bank.
+  const dormantPresets = new Set<string>();
+  it.each(PRESET_NAMES)('%s renders identically with and without dormancy, to -120 dB', (name) => {
+    const patch = PRESETS[name] as Patch;
+    const before = heldAndReleased(patch, false);
+    const after = heldAndReleased(patch, true);
+    if (after.wentDormant) dormantPresets.add(name);
 
-      let residual = 0;
-      for (let i = 0; i < before.samples.length; i++) {
-        residual = Math.max(residual, Math.abs((before.samples[i] ?? 0) - (after.samples[i] ?? 0)));
-      }
-      expect(residual, name).toBeLessThanOrEqual(before.peak * RESIDUAL_RATIO);
+    let residual = 0;
+    for (let i = 0; i < before.samples.length; i++) {
+      residual = Math.max(residual, Math.abs((before.samples[i] ?? 0) - (after.samples[i] ?? 0)));
     }
-    // Otherwise the comparison above proves nothing about the dormant path.
-    expect(dormantPresets).toBeGreaterThan(0);
+    expect(residual).toBeLessThanOrEqual(before.peak * RESIDUAL_RATIO);
+  });
+
+  // Cases run in order within the file, so this reads every case's result.
+  it('exercises the dormant path on at least one preset', () => {
+    // Otherwise the comparisons above prove nothing about the dormant path.
+    expect(dormantPresets.size).toBeGreaterThan(0);
   });
 });
 
