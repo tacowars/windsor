@@ -119,7 +119,7 @@ client-only and kept out of the deterministic `packages/shared`; the engine was
 `packages/client/src/audio/`.)
 
 ```
-packages/engine/src/          # folders mirror the music-engine skill's file map (#655)
+packages/engine/src/          # folders mirror the windsor-engine skill's file map (#655)
   index.ts                # the one public surface, @windsor/engine
   audioConstants.ts       # the area's tables (re-exports the worklet's data modules, #656; MS_PER_SECOND)
   system/                 # audioSystem.ts (the system: update() is the look-ahead pump, which the app
