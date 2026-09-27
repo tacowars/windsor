@@ -519,6 +519,307 @@
         margin: 2px 0 6px;
       }
 
+      /* ---------- the Song view (#709): ruler, lanes, regions, the pane ---------- */
+
+      .lanes-scroll {
+        overflow-x: auto;
+        padding: 12px 14px 16px;
+        scrollbar-width: thin;
+      }
+      .lanes {
+        position: relative;
+        display: grid;
+        grid-template-columns: var(--names) calc(var(--bars) * var(--bar));
+        gap: 4px var(--gap);
+        align-items: stretch;
+        width: max-content;
+      }
+      .lane-name {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 6px;
+        border-radius: var(--r);
+        border: 1px solid transparent;
+        font-family: var(--f-panel);
+        cursor: pointer;
+      }
+      .lane-name b {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .lane-name small {
+        font-family: var(--f-num);
+        font-size: 9px;
+        color: var(--ink-faint);
+        letter-spacing: 0.04em;
+      }
+      .lane-name .tri {
+        flex: none;
+        width: 9px;
+        font-size: 9px;
+        line-height: 1;
+        color: var(--ink-faint);
+      }
+      .lane-name .nm {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        line-height: 1.15;
+      }
+      .lane-name.selected {
+        border-color: var(--carrier);
+        background: var(--panel-hi);
+      }
+      .lane-name.selected .tri {
+        color: var(--carrier);
+      }
+      .lane-name.ruler-name {
+        justify-content: flex-end;
+        cursor: default;
+      }
+      .ruler {
+        display: flex;
+        border-bottom: 1px solid var(--line-bright);
+        height: 22px;
+      }
+      .ruler-bar {
+        position: relative;
+        flex: none;
+        border-left: 1px solid var(--line-bright);
+        font-family: var(--f-num);
+        font-size: 10px;
+        color: var(--ink-dim);
+      }
+      .ruler-bar span {
+        position: absolute;
+        left: 4px;
+        top: 2px;
+      }
+      .ruler-bar i {
+        position: absolute;
+        bottom: 0;
+        width: 1px;
+        height: 6px;
+        background: var(--line-bright);
+      }
+      .lane {
+        position: relative;
+        height: 34px;
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        background-image: repeating-linear-gradient(
+          90deg,
+          var(--line) 0 1px,
+          transparent 1px var(--bar)
+        );
+        background-position: -1px 0;
+        touch-action: none;
+        user-select: none;
+      }
+      .lane.selected {
+        border-color: var(--carrier);
+      }
+      .lane.lane-harm {
+        height: 40px;
+      }
+      .hblk {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        background: var(--panel-hi);
+        border: 1px solid var(--line-bright);
+        border-top: 3px solid var(--modulator);
+        border-radius: var(--r);
+        padding: 2px 6px;
+        font-family: var(--f-panel);
+        display: flex;
+        flex-direction: column;
+        line-height: 1.15;
+        overflow: hidden;
+        cursor: pointer;
+      }
+      .hblk b {
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .hblk small {
+        font-family: var(--f-num);
+        font-size: 8.5px;
+        color: var(--ink-faint);
+        white-space: nowrap;
+      }
+      .hblk.playing {
+        border-color: var(--carrier);
+        border-top-color: var(--modulator);
+      }
+      .hblk.selected {
+        border-color: var(--carrier);
+        box-shadow: 0 0 0 1px var(--carrier);
+      }
+      .hadd {
+        position: absolute;
+        top: 6px;
+        left: calc(100% + 6px);
+      }
+      .reg {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0 6px;
+        border-radius: var(--r);
+        border: 1px solid var(--modulator);
+        background-color: rgba(95, 168, 160, 0.2);
+        color: var(--ink);
+        font-family: var(--f-panel);
+        font-size: 10px;
+        font-variant: small-caps;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+        overflow: hidden;
+        cursor: grab;
+      }
+      .reg.perc {
+        border-color: var(--carrier);
+        background-color: rgba(224, 164, 78, 0.17);
+      }
+      .reg.cyc {
+        background-image: repeating-linear-gradient(
+          90deg,
+          rgba(220, 227, 227, 0.22) 0 1px,
+          transparent 1px var(--cyc)
+        );
+      }
+      .reg.selected {
+        box-shadow: 0 0 0 1px var(--carrier);
+        border-color: var(--carrier);
+      }
+      .reg .gl {
+        flex: none;
+        font-family: var(--f-ui);
+        font-size: 11px;
+        line-height: 1;
+        color: var(--carrier);
+        font-variant: normal;
+      }
+      .reg .lb {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .ph-line {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--carrier);
+        box-shadow: 0 0 6px var(--carrier);
+        pointer-events: none;
+        z-index: 2;
+      }
+      .ph-line i {
+        position: absolute;
+        top: -2px;
+        left: 4px;
+        font-style: normal;
+        font-family: var(--f-num);
+        font-size: 9px;
+        color: var(--carrier);
+        white-space: nowrap;
+      }
+      .detail-pane {
+        position: sticky;
+        bottom: 0;
+        z-index: 4;
+        border-top: 2px solid var(--line-bright);
+        background: var(--panel);
+        padding: 10px 14px 14px;
+        max-height: 60vh;
+        overflow-y: auto;
+      }
+      .detail-pane.empty {
+        padding-bottom: 10px;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-family: var(--f-panel);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-dim);
+      }
+      .card-head small {
+        font-family: var(--f-num);
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        text-transform: none;
+        color: var(--ink-faint);
+        margin-left: 8px;
+      }
+      .pane-row {
+        margin: 0 0 10px;
+        align-items: center;
+      }
+      .pane-note {
+        margin: 0;
+      }
+      .degrees {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 2px;
+        max-width: 480px;
+      }
+      .dchip {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
+        min-width: 0;
+        padding: 4px 0 3px;
+        background: var(--inset);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        color: var(--ink-dim);
+        font-family: var(--f-panel);
+        cursor: pointer;
+      }
+      .dchip b {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+      .dchip small {
+        font-family: var(--f-num);
+        font-size: 8.5px;
+        color: var(--ink-faint);
+      }
+      .dchip:hover {
+        background: var(--panel-hi);
+        color: var(--ink);
+      }
+      .dchip[aria-pressed='true'] {
+        background: var(--modulator);
+        border-color: var(--modulator);
+        color: #111416;
+      }
+      .dchip[aria-pressed='true'] small {
+        color: #111416;
+      }
+      .harmony-card .bar-row {
+        align-items: center;
+      }
+
       /* ---------- parts grid ---------- */
 
       .parts-grid {

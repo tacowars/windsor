@@ -3,8 +3,8 @@
 ## What this tool is
 
 The standalone console tacowars designs sounds and songs in (#70, decision record
-`2026-08-31-arrangement-console-and-runtime-arrangements`): five tabs — Parts,
-Mixer, Sequencers, Harmony, Arrangement — over the **real** audio engine, plus
+`2026-08-31-arrangement-console-and-runtime-arrangements`): four tabs — Parts,
+Mixer, Song, Arrangement — over the **real** audio engine, plus
 an audition keyboard and a MIDI path. It boots on a new song (one part, the
 Init patch, no sequencer — #598) and opens a committed song through Import;
 Export writes the normalised document, patches and returns included, which is
@@ -55,9 +55,9 @@ and its extension checklists, so neither states the other's content twice.
   the kind's whole default spec (`partEdits.ts`, `removePartChange`), and the
   engine adds or disposes that one part on the running transport; a refused
   partial changes nothing and never falls back to a rebuild.
-  `ctx.restructure(draft => …)` — mutate, renormalise, rebuild the live system
-  from tick 0, re-render — has no button since #708 removed Restart; an
-  import is `ctx.importDoc(raw)`, the one rebuild the UI offers; a patch knob is
+  an import is `ctx.importDoc(raw)`, the one rebuild the UI offers (Restart
+  went with #708 and `ctx.restructure` with #709, when nothing but a test
+  still called it); a patch knob is
   `PartsSession.push()`, which writes the working patch into the document's
   `patches` section under the part's preset name. Live-only state is lost on
   export and is a bug.
@@ -79,7 +79,11 @@ and its extension checklists, so neither states the other's content twice.
   per sequencer kind through `SEQUENCER_CARDS`** (`sequencerCards.ts`), the
   way `FRAME_SYSTEMS` and `SIM_SYSTEMS` order the game's loops (ADR
   `2026-09-05-system-registries-folder-ownership-and-data-separate-from-logic`).
-  A tab never branches on a kind.
+  A tab never branches on a kind — the Song view's per-kind lookups are
+  tables (`songViewTables.ts`'s `LANE_TONE`, `REGION_SUMMARY`,
+  `CYCLE_TICKS`). Since #709 every `watchPlayhead` without a frame source of
+  its own joins one `requestAnimationFrame` (`createFrameDriver`), so the
+  ruler line and the card in the pane are one request, not two.
 - **`patch-editor.html` is generated and checked, not authored** (#620
   decision 6) — see "The tracked page" below.
 
@@ -90,14 +94,17 @@ knows the one below it and nothing above.
 
 1. **`main.ts` is composition only** (57 lines): it constructs the
    `DocumentModel`, the `EngineHost`, the `AppContext`, the `Keyboard` and the
-   `MidiAccessor`, hands `mountTabShell` the five tabs, wires the power button
+   `MidiAccessor`, hands `mountTabShell` the four tabs, wires the power button
    and starts the look-ahead pump. No behaviour lives here.
 2. **`appContext.ts` is the `AppCtx` implementation** (#620): it owns the tab
    registry, the `PartsSession` (whose `commit` is this context's document
    write, a constructor parameter rather than a module hook), and the
-   operations every control calls — `change`, `restructure`, `importDoc`,
-   `livePart()` (the Euclidean capture and release went with #705: the card
-   commits `host.capturePattern` through `ctx.change` itself). `context.ts` is the interface the tabs
+   operations every control calls — `change`, `importDoc`, `livePart()` (the
+   Euclidean capture and release went with #705: the card commits
+   `host.capturePattern` through `ctx.change` itself). `change` carries a
+   `transport.bars` edit through every whole-song region and the timeline's
+   tail (`regionModel.ts`'s `followSongLength`, #709 decision 4), so the
+   strip's Bars knob needs no knowledge of regions. `context.ts` is the interface the tabs
    import, so a card needs no import cycle back to the implementation. It
    knows no DOM beyond a panel's `hidden` flag, which is why
    `appContext.test.ts` drives it with fakes.
@@ -119,18 +126,21 @@ knows the one below it and nothing above.
    ranges `transportTables.ts`. Power-on leaves the transport idle at 1.1.1;
    the position reads `ctx.transport.position()` on `watchPlayhead`; `powerButton.ts` is the first user gesture that creates the
    audio context and builds the live system.
-4. **The tabs** — `partsTab.ts`, `mixerTab.ts`, `sequencersTab.ts`,
-   `harmonyTab.ts`, `arrangementTab.ts` — lay out sections and hand each
-   control the context. `sequencersTab.ts` is a lookup in `SEQUENCER_CARDS`.
-5. **The cards and panels** — `gridCard.ts`,
-   `chordCard.ts`, `euclidCard.ts`, `patchBays.ts`, `patchPanels.ts`,
+4. **The tabs** — `partsTab.ts`, `mixerTab.ts`, `songTab.ts`,
+   `arrangementTab.ts` — lay out sections and hand each control the context.
+   `songTab.ts` is the Song view's composition (#709): its one piece of state
+   (the selection), the lanes and the pane — see "The Song view" below.
+5. **The cards and panels** — `gridCard.ts`, `chordCard.ts`, `euclidCard.ts`,
+   `arpCard.ts`, `bassCard.ts`, `harmonyCard.ts`, `songDetailPane.ts`,
+   `songRuler.ts`, `songHarmonyLane.ts`, `songLanes.ts`, `patchBays.ts`, `patchPanels.ts`,
    `returnsPanel.ts`, `envCanvas.ts` / `envelopeKnobs.ts`,
    `harmonicEditor.ts`, `presetBrowser.ts`, `libraryActions.ts`,
    `metadataModal.ts`, `midiPanel.ts` — draw DOM and call the context. The
    shared machinery they draw on is `stepStrip.ts`, `knob.ts`,
    `patchPath.ts`, `seqFields.ts` and `dom.ts`.
 6. **The pure models** — `gridModel.ts`, `chordStepModel.ts`,
-   `euclidModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
+   `euclidModel.ts`, `arpModel.ts`, `bassModel.ts`, `regionModel.ts`,
+   `harmonyLaneModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
    `patchMetadata.ts`, `libraryModel.ts`, `ratioSplit.ts`,
    `envelopeTransfer.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
    `loudnessCheck.ts` — take values and return values. **The tests run in
@@ -144,6 +154,45 @@ knows the one below it and nothing above.
 
 The per-file map — which file owns what, for all of `src/` — is the
 `music-engine` skill's console table.
+
+## The Song view (#709)
+
+Layout B of epic #703 (decision 1; mockups on the ticket): a bar ruler, the
+harmony lane, one lane of regions per part by slot, one playhead line, and a
+detail pane at the bottom. Its layers, top down:
+
+1. **`songTab.ts`** — composition and the selection (`SongSelection`: a part
+   and optionally one of its regions, a chord event, or nothing). Every edit
+   ends in `view.commit(partial)`: one `ctx.change` live partial, then
+   `ctx.invalidate()` and a repaint of the lanes (and the pane when asked).
+   The lanes also repaint when their signature — bars, harmony, each part's
+   regions, kind, summary and cycle — changes under a card's knob, checked
+   by the one watch below. Never a rebuild.
+2. **`songRuler.ts`** — the ruler (`rulerLabels`, beat ticks) and the **one
+   playhead loop** of the view: `watchSongPlayhead` is a `watchPlayhead`
+   over `ctx.transport.position()` that places the line, lights the playing
+   chord block and runs the lanes' repaint check. The card in the pane keeps
+   its own `watchPlayhead` for its cells; both are one frame request.
+3. **`songHarmonyLane.ts`** — blocks from the engine's `eventBounds`, named
+   by `harmonyLaneModel.ts` (`eventLabel` over `chordOf` / `chordName` /
+   `romanNumeral`), a right-edge drag that resizes the event and shifts the
+   rest, the `+` tile that appends a bar of the last degree.
+4. **`songLanes.ts`** — `.reg` blocks per region (tone, summary and cycle
+   ticks from `songViewTables.ts`; ⟲ or ∞ from `regionMark`), and the
+   pointer gestures over `regionModel.ts`: click a gap to add, drag an edge
+   to resize, the body to move, alt-click to split, Shift for the modifier
+   snap (the part's `divisor`, else the beat). A drag previews on the lane
+   and commits once on release. `pointerDrag` is the shared press-or-drag
+   helper (capture, threshold), the way `chordDrag.ts` does it.
+5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
+   and close ×; for a part, a row with Split / Delete for the selected
+   region and the Octave knob for `PANE_OCTAVE_KINDS` (the kinds whose card
+   has no Reg), then the part's card from `SEQUENCER_CARDS` **as is**; for
+   a chord, `harmonyCard.ts` — seven degree chips, Triad | Seventh, the
+   Duration dial (bars; beats under Shift), Delete.
+6. **The pure models** — `regionModel.ts`, `harmonyLaneModel.ts`,
+   `songViewTables.ts` (the px maths and the per-kind tables). The tests are
+   theirs; the DOM files hold no rule worth testing.
 
 ## Extension checklists
 
@@ -164,9 +213,27 @@ Each is the whole list; a step skipped here is what a later ticket finds.
    (`sequencerCards.test.ts` fails without it); a label in `KIND_LABELS`
    (`sequencerConstants.ts`); knob specs in `sequencerKnobTables.ts` reading
    the kind's `DEFAULT_*_CONFIG`; a register default in
-   `harmonyTables.ts`'s `REGISTER_OCTAVE_DEFAULTS` if the kind is pitched;
-   any tunable of its own in a `<kind>Constants.ts`.
+   `harmonyTables.ts`'s `REGISTER_OCTAVE_DEFAULTS` if the kind is pitched,
+   and the kind in `PANE_OCTAVE_KINDS` if its card draws no Reg knob; its
+   lane in `songViewTables.ts` — `LANE_TONE`, `REGION_SUMMARY`,
+   `CYCLE_TICKS` (`songViewTables.test.ts` fails without all three); any
+   tunable of its own in a `<kind>Constants.ts`.
 3. A row in the `music-engine` skill's console table, and a rebuilt page.
+
+**Add a lane kind** (#709) — a new row of the Song view beside the harmony
+lane and the part lanes
+
+1. A pure model beside it, with a test on the ticket's fixtures: what a
+   click, a drag and a delete do to the document's list, every function
+   returning a new list for `ctx.change` (arrays replace wholesale).
+2. A `song<Kind>Lane.ts` returning `[nameCell, lane]` the way
+   `harmonyLaneRow` and `partLaneRow` do, drawn from the document at the
+   table's px-per-bar (`tickToPx`), gestures through `pointerDrag`, edits
+   through `view.commit`; appended to `paintLanes` in `songTab.ts`.
+3. Its input in `laneSignature` (`songTab.ts`), so a change from anywhere
+   repaints it; its pane content (if it has one) as a new `SongSelection`
+   kind in `songDetailPane.ts`.
+4. Its CSS in the template's "the Song view" block; a rebuilt page.
 
 **Add a return or FX kind**
 
@@ -207,17 +274,19 @@ Each is the whole list; a step skipped here is what a later ticket finds.
 **Add a harmony mode**
 
 - A **scale** is an entry in `SCALES` (`audioConstants.ts`, surfaced by
-  `scaleSampler.ts`'s `SCALE_NAMES` / `scaleOffsets`); `harmonyTab.ts` picks
-  it up from `SCALE_NAMES`, so no list is written twice. Degrees past the scale fold
-  with octave carry (`foldDegree`).
+  `scaleSampler.ts`'s `SCALE_NAMES` / `scaleOffsets`); the transport strip
+  picks it up from `SCALE_NAMES` (#708), so no list is written twice. Degrees
+  past the scale fold with octave carry (`foldDegree`).
 - A **chord quality, voicing or duration** is `chordTables.ts`
   (`CHORD_QUALITIES` / `QUALITY_INTERVALS` / `QUALITY_LABELS`,
   `CHORD_VOICINGS`, `CHORD_DURATIONS`) plus the stacking rule in
   `chordTheory.ts` and, if it changes what notes sound, `chordVoicing.ts`;
-  the console surfaces it in `chordPicker.ts` / `chordStepModel.ts` and, for a
-  per-part register, `harmonyTables.ts`.
-- Pitch only belongs in Harmony. The density LFOs are the Sequencers tab's
-  (`seqFields.ts`'s `densityControls`).
+  the console surfaces it in `chordPicker.ts` / `chordStepModel.ts`, the
+  harmony lane's labels and chips come from `harmonyLaneModel.ts` over the
+  engine's `chordOf` / `chordName` / `romanNumeral` / `diatonicChords`, and a
+  per-part register is `harmonyTables.ts`.
+- Pitch belongs to the harmony lane and the register knobs. The density LFOs
+  are the Euclidean card's (`seqFields.ts`'s `densityControls`).
 
 **Add a knob**
 
