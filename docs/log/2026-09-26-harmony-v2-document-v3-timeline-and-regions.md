@@ -105,7 +105,8 @@ transcript and the mockups), as the code now states them:
 - The overlap rule: the epic's "each end clamped to the next start" (the
   earlier region yields) is implemented; the ticket's acceptance line reads
   as the later region's start moving, which is the other resolution of the
-  same overlap — flagged in the PR for tacowars to confirm.
+  same overlap — flagged in the PR for tacowars to confirm. Confirmed (tacowars,
+  2026-09-27): the implemented rule stands.
 - `transport.bars` shrinking live: the document is renormalised (regions and
   events clamped) while the running player keeps its merged regions; the
   audible result is the same because `regionState` treats a region past the
