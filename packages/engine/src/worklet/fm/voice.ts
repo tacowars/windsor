@@ -130,7 +130,7 @@ class Voice {
     this.order = ALG_ORDER[0];
 
     // The fixed-index kernel and per-note constants (#548). `specialise` is the
-    // part's switch, on in the game and the console; `kernel` is whether the
+    // part's switch, always on in live playback; `kernel` is whether the
     // bound patch can take the kernel exactly (see `ALG_EDGES`).
     this.specialise = true;
     this.kernel = false;
@@ -235,8 +235,8 @@ class Voice {
    * amplitude ramps and envelope stages carry on; only the parameter blocks
    * they read change, so a ratio, level or filter knob is heard on the next
    * control block instead of the next note. A wave or algorithm switch steps
-   * audibly -- acceptable while designing a sound, which is why the game never
-   * sends `liveRetune` and keeps the click-free note-on binding.
+   * audibly -- acceptable while designing a sound, which is why `liveRetune`
+   * is off by default and a part keeps the click-free note-on binding.
    */
   rebind(patch: WorkletPatch, waveSets: (Float32Array[] | null)[]): void {
     this.patch = patch;

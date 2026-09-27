@@ -7,7 +7,7 @@
  * property load); the objects are built from them, so each number is written
  * once. Import-free on purpose, like `waveIds.ts`: the main thread reads this
  * module too, so nothing here may touch the worklet scope or the wave cache.
- * Listed in the client project's `files` and compiled by both projects.
+ * Listed in the engine project's `files` and compiled by both projects.
  * `modeIds.test.ts` pins `patch.ts`'s re-exports to these objects.
  */
 

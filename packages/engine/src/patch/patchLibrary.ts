@@ -1,8 +1,8 @@
 /**
  * The patch library's file contract (#561, epic #564): one
- * `patches/<id>.json` per patch, read by the game, the standalone editor and
- * the tests through the same validator, so a file the editor writes is exactly
- * a file the game plays.
+ * `patches/<id>.json` per patch, read by the console and the tests through
+ * the same validator, so a file the editor writes is exactly a file a song
+ * plays.
  *
  * A file is
  *
@@ -247,7 +247,7 @@ export type UnsweptLibraryEntry = Omit<LibraryEntry, 'headroom'> & { headroom?: 
 /**
  * The editor's re-read after a write (#563): every check `loadPatchFile`
  * makes except the sweep's currency — a missing record is accepted, a stale
- * one is carried as written, a malformed one is still refused. The game and
+ * one is carried as written, a malformed one is still refused. Playback and
  * the tests never use this; `npm run verify` stays the gate that demands the
  * sweep.
  */

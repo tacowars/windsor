@@ -4,8 +4,8 @@
  * The frame collector cannot see the audio rendering thread at all, so the DSP
  * reports its own cost: each worklet processor accumulates counters inside
  * `process()` and posts them once per report interval, and this module sums
- * the live ones into one `AudioLoadReadout` for the overlay, the bench sampler
- * and `__a204.audio.readout()`.
+ * the live ones into one `AudioLoadReadout` for `AudioSystem.loadReadout()`,
+ * `costReadout()` and `readout()`.
  *
  * ## What the numbers are worth
  *
@@ -43,8 +43,8 @@
  * of truth for dropout: `playbackStats.ts` reads
  * `AudioContext.playbackStats.underrunEvents`, which counts a different thing
  * — one short **output-device callback**, not one render quantum — and #275
- * decision 3 makes that the figure the overlay and the bench lead with, this
- * one beside it labelled `est`. Neither is the other's check: this one is a
+ * decision 3 makes that the figure a load display leads with, this one
+ * beside it labelled `est`. Neither is the other's check: this one is a
  * lower bound on deadline misses inside the DSP, that one is what the device
  * actually failed to play. N boundary crossings prove the
  * render took **more than N − 1 ms** — nothing about N itself — so a 2.2 ms
@@ -69,7 +69,7 @@ const MS_PER_SECOND = 1000;
 const CLOCK_RESOLUTION_MS = 1;
 
 /**
- * The audio thread's cost, as the overlay, the bench and `__a204` read it.
+ * The audio thread's cost, as `AudioSystem.loadReadout()` reports it.
  * All four fields are zero on a page with no audio, and on one whose
  * processors have not reported yet.
  */

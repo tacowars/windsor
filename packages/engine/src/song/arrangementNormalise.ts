@@ -62,7 +62,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
   /**
    * Library patches the parts resolved through the fill, by id — what the
    * editor's open path embeds into the document so the next export carries
-   * them. Empty on the game path, where there is no fill.
+   * them. Empty on the playback path, where there is no fill.
    */
   filledPatches(): Record<string, Patch> {
     const out: Record<string, Patch> = {};

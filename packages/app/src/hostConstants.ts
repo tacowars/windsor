@@ -4,5 +4,5 @@
  * file configures lives, per CLAUDE.md "Code structure".
  */
 
-/** The look-ahead pump the game's render loop provides; in the console, a timer. */
+/** How often the console's timer pumps the scheduler's look-ahead queue (`AudioSystem.update`). */
 export const HOST_PUMP_INTERVAL_MS = 25;

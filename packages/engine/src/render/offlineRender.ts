@@ -1,10 +1,7 @@
 /**
- * Renders a patch to an `AudioBuffer` once, so one-shot world SFX can be played
- * as ordinary spatialised buffer sources.
- *
- * A dozen turrets each needing an independent 3D position do not need a dozen
- * worklets. Live synthesis is for music, ambience, and anything whose parameters
- * move; everything else is baked at load.
+ * Renders a patch to an `AudioBuffer` offline, through the same FM worklet
+ * live playback uses: the console's loudness check (`loudnessCheck.ts`) reads
+ * a patch this way. (Aotearoa204 baked one-shot SFX with it.)
  */
 import type { Patch } from '../patch/patch';
 import type { ProcessorOptions } from '../synth/workletMessages';
@@ -24,8 +21,8 @@ export interface BakeOptions {
   seed?: number;
   /**
    * Where the worklet module is loaded from. The default resolves beside this
-   * module, which a standalone page (the patch editor, one file on `file://`)
-   * cannot serve, so it hands a blob or data URL of the inlined source instead.
+   * module; a page that cannot serve that file (in Aotearoa204, the one-file
+   * patch editor on `file://`) hands a blob or data URL of the source instead.
    */
   workletUrl?: string | URL;
 }

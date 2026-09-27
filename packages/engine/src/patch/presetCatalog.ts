@@ -16,7 +16,7 @@ export interface PresetListing extends PresetMetadata {
   source: 'document' | 'built-in';
 }
 
-/** The four legacy gameplay sounds keep this category; the browser hides it unless asked. */
+/** The four sounds kept from Aotearoa204's game keep this category; the browser hides it unless asked. */
 export const HIDDEN_CATEGORY = 'Legacy game FX';
 
 export interface PresetFilter {

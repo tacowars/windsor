@@ -6,8 +6,8 @@
  * only runs inside an `AudioWorkletGlobalScope`. This shims that scope so the
  * processor can be driven a block at a time and its output inspected.
  *
- * Node-only, by design: excluded from the client's tsc build (see
- * packages/client/tsconfig.json) so browser code cannot reach it.
+ * Node-only, by design: excluded from the engine's tsc build (see
+ * packages/engine/tsconfig.json) so browser code cannot reach it.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -57,7 +57,7 @@ export interface AlgorithmTable {
  * The seed every `create()` uses unless one is passed.
  *
  * The processor draws free-running operator phase, per-voice noise seeds and
- * pan jitter from `Math.random` in the game. Left alone, that makes every
+ * pan jitter from `Math.random` in live playback. Left alone, that makes every
  * render here a different signal, and a test that asserts a level is then a
  * coin toss on the tail of the distribution — which is exactly how the
  * `bass-digital` clip assertion failed once and passed on re-run (#78). Every
@@ -67,7 +67,7 @@ export interface AlgorithmTable {
  */
 export const DEFAULT_SEED = 0xa204;
 
-/** Construction switches the game never sets; a test flips one to build its "before" render. */
+/** Construction switches live playback never sets; a test flips one to build its "before" render. */
 export interface CreateOptions {
   /** `false` renders silent held voices in full, as the part did before #547. */
   dormancy?: boolean;
@@ -90,7 +90,7 @@ export interface EnvelopeLike {
 }
 
 export interface LoadedProcessor {
-  /** `seed: null` restores the game's `Math.random`; omitted means DEFAULT_SEED. */
+  /** `seed: null` restores live playback's `Math.random`; omitted means DEFAULT_SEED. */
   create(
     patch: unknown,
     maxVoices?: number,
@@ -193,7 +193,7 @@ export function loadProcessor(): LoadedProcessor {
           maxVoices,
           patch: structuredClone(patch),
           // `null` is the deliberate opt-out; the worklet reads `== null` as
-          // "no seed" and falls back to Math.random, the game's path.
+          // "no seed" and falls back to Math.random, live playback's path.
           seed: seed ?? undefined,
           ...options,
         },

@@ -1127,8 +1127,8 @@ var Voice = class {
    * amplitude ramps and envelope stages carry on; only the parameter blocks
    * they read change, so a ratio, level or filter knob is heard on the next
    * control block instead of the next note. A wave or algorithm switch steps
-   * audibly -- acceptable while designing a sound, which is why the game never
-   * sends `liveRetune` and keeps the click-free note-on binding.
+   * audibly -- acceptable while designing a sound, which is why `liveRetune`
+   * is off by default and a part keeps the click-free note-on binding.
    */
   rebind(patch, waveSets) {
     this.patch = patch;

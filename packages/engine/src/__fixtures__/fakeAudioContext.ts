@@ -10,7 +10,7 @@
  * assigns, multiplied by its `gain` param the way the worklet's fader is, so
  * post-fader taps behave as they do live.
  *
- * Node-only, by design: excluded from the client's tsc build.
+ * Node-only, by design: excluded from the engine's tsc build.
  */
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import type { FakeHost } from './fakeAudioNodes';

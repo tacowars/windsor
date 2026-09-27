@@ -21,7 +21,7 @@ export interface ConsoleTransport {
   readonly running: boolean;
   /** Run from the current tick; false when audio is not enabled. */
   play(): boolean;
-  /** Stop and release, keeping the tick (the game's mute). */
+  /** Stop and release, keeping the tick (`AudioSystem.setMuted`). */
   pause(): void;
   /** Stop, release, and rewind to tick 0 with every part's region state cleared. */
   stop(): void;

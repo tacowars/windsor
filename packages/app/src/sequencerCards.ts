@@ -1,6 +1,6 @@
 /**
  * The Sequencers tab's card registry (#619 decision 3): one entry per
- * `SequencerKind`, the way `FRAME_SYSTEMS` and `SIM_SYSTEMS` order the loops
+ * `SequencerKind`, the registry pattern Aotearoa204's game loops used
  * (ADR `2026-09-05-system-registries-folder-ownership-and-data-separate-from-logic`).
  * `sequencersTab.ts` looks a part's card up here instead of branching on its
  * kind, so a new kind is a new card file and an appended entry — and

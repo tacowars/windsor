@@ -66,6 +66,6 @@ bootLibrary()
   })
   .catch((error: unknown) => status(`library folder: ${String(error)}`));
 wirePowerButton($('power'), ctx);
-// The look-ahead pump the game's render loop provides; here, a timer.
+// The scheduler's look-ahead pump: a timer, since the console has no frame loop to drive it.
 setInterval(() => host.update(), HOST_PUMP_INTERVAL_MS);
 status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');

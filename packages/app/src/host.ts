@@ -33,7 +33,7 @@ export type TransportSystem = Pick<
 
 /**
  * The console's transport (#708, epic #703 decision 8) over whatever system
- * is live: ▶ unmutes and starts from the current tick; ‖ is the game's mute
+ * is live: ▶ unmutes and starts from the current tick; ‖ is `setMuted(true)`
  * (stop + release, the tick kept); ■ is `stopMusic` (stop + release + rewind
  * to tick 0 with the region state cleared). The state outlives a rebuild:
  * a system built while playing starts at once, otherwise it waits idle at
@@ -202,7 +202,7 @@ export class EngineHost {
     this.system.initMusic(document, (part, tick) =>
       this.log(`${part.name} sounded (slot ${part.slot}, tick ${tick})`),
     );
-    // The console's knobs retune the voices already ringing; the game does not.
+    // The console's knobs retune the voices already ringing (off by default in the engine).
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
     await this.system.unlock();

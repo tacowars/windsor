@@ -4,7 +4,7 @@
  * `2026-08-31-generative-sequencing-transport-and-pitch` §3).
  *
  * It emits onsets and knows nothing about audio; a binding maps an onset to a
- * part and a velocity, and a horde can read the same onsets for its footfalls.
+ * part and a velocity, and any other listener can read the same onsets.
  *
  * The pattern regenerates only on a bar line, whichever modulator drives `k`,
  * so a density change never re-cuts a figure mid-flight. A hand edit is

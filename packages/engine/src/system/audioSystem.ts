@@ -153,7 +153,7 @@ export class AudioSystem {
     this.schedMeter = new SchedCostMeter({ now: this.now });
   }
 
-  /** The song master, distinct from the engine-wide safety output and settings gains. */
+  /** The song master, distinct from the engine-wide safety output and the channel faders. */
   get masterStrip(): MasterStrip | null {
     return this.masterStripValue;
   }
@@ -198,13 +198,13 @@ export class AudioSystem {
   }
 
   /**
-   * Unlock and start the transport with no gesture behind it — bench mode
-   * (`?bench=1&audio=1`, #445), where the page has no input and Chrome is
-   * launched with `--autoplay-policy=no-user-gesture-required`. The same two
-   * steps `musicControls.ts` binds to the first pointer or key; here they run
-   * directly, and the resulting context state is what the bench header
-   * records. A page that stays `suspended` is a recorder failure, not a
-   * silent control, so the state is returned rather than swallowed.
+   * Unlock and start the transport with no gesture behind it — for an
+   * automated run (#445: Aotearoa204's audio bench), where the page has no
+   * input and Chrome is launched with
+   * `--autoplay-policy=no-user-gesture-required`. The same two steps a page
+   * binds to its first pointer or key; here they run directly, and the
+   * resulting context state is returned. A page that stays `suspended` is a
+   * harness failure, not a silent control, so the state is not swallowed.
    */
   async startWithoutGesture(): Promise<AudioContextState> {
     const state = await this.engine.unlock();
@@ -222,7 +222,8 @@ export class AudioSystem {
    * the main thread's measured scheduling cost, and the context's lifetime
    * playback counters where the browser has them.
    *
-   * This is the overlay's and the bench collector's hook (`stats.audioReadout`).
+   * The hook a load display or a benchmark reads (Aotearoa204's overlay and
+   * bench collector did).
    * `playback` is snapshotted on every call — the API hands back one live
    * object whose fields mutate, so a held reference is not a reading.
    */
@@ -290,9 +291,9 @@ export class AudioSystem {
    * Build a music part per part the document lists and bind the generators
    * to the transport (issues #69, #75, #597). Each part lands on its own
    * strip and is registered under its slot (`musicPartName`), never its
-   * label; a `none` part is built and playable but nothing sequences it. Idempotent. Nothing sounds until `startMusic()`; under
-   * `?music=0` main.ts builds this but never starts the transport, so the
-   * whole graph exists on a silent page (refinement decision 2).
+   * label; a `none` part is built and playable but nothing sequences it. Idempotent. Nothing sounds until `startMusic()`; after
+   * `suppressMusic()` the whole graph exists but the transport never starts
+   * (refinement decision 2).
    *
    * Throws, naming the part and the id, when the document does not carry a
    * patch a part names (#562). That is deliberate: a song is self-contained,
@@ -365,9 +366,9 @@ export class AudioSystem {
   }
 
   /**
-   * `?music=0` (decision 2): keep the whole graph but never start the
-   * transport — not at unlock, and not through an unmute, the debug shim's
-   * included. Enforced here so no caller can bypass the suppression.
+   * Refinement decision 2 (Aotearoa204's `?music=0`): keep the whole graph but
+   * never start the transport — not at unlock, and not through an unmute.
+   * Enforced here so no caller can bypass the suppression.
    */
   suppressMusic(): void {
     this.suppressed = true;
@@ -408,7 +409,7 @@ export class AudioSystem {
    * ■ (#708, epic #703 decision 8): stop the transport, release everything
    * held, then rewind to tick 0 with every part's region state cleared — the
    * next `startMusic` plays the document from bar 1 exactly as a fresh
-   * system would. The mute flag is untouched; the game never calls this.
+   * system would. The mute flag is untouched.
    */
   stopMusic(): void {
     this.scheduler.stop();
@@ -417,7 +418,7 @@ export class AudioSystem {
     this.player?.reset();
   }
 
-  /** Scriptable toggle for `__a204.audio.toggleMute` (#69); the `M` key and `music on|off` use `setMuted`. Returns the new muted state. */
+  /** Flip the mute (#69: Aotearoa204's scripted toggle); the console uses `setMuted`. Returns the new muted state. */
   toggleMute(): boolean {
     this.setMuted(!this.muted);
     return this.muted;
@@ -500,9 +501,9 @@ export class AudioSystem {
   }
 
   /**
-   * Driven by the render loop. Only pumps the look-ahead queue -- the times it
-   * emits come from the audio clock, so a long frame delays the check, never
-   * the note.
+   * Driven by the host's timer (the console's `HOST_PUMP_INTERVAL_MS`). Only
+   * pumps the look-ahead queue -- the times it emits come from the audio
+   * clock, so a late call delays the check, never the note.
    */
   update(_dt: number): void {
     if (!this.started) return;

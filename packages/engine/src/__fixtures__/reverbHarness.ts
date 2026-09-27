@@ -7,8 +7,8 @@
  * `AudioWorkletGlobalScope`. This shims that scope so the reverb can be driven a
  * block at a time and its tail inspected.
  *
- * Node-only, by design: excluded from the client's tsc build (see
- * packages/client/tsconfig.json) so browser code cannot reach it.
+ * Node-only, by design: excluded from the engine's tsc build (see
+ * packages/engine/tsconfig.json) so browser code cannot reach it.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -38,7 +38,7 @@ export interface ReverbProcessorLike {
   ): boolean;
 }
 
-/** Construction switches the game never sets; a test flips one to build its "before" render (#547). */
+/** Construction switches live playback never sets; a test flips one to build its "before" render (#547). */
 export interface ReverbCreateOptions {
   /** `false` keeps the tank rendering through any length of silence. */
   sleep?: boolean;

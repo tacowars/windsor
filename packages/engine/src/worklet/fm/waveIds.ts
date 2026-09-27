@@ -3,7 +3,7 @@
  * thread's `patch.ts` re-exports, so a patch, a preset, the console's picker
  * and the operator all name a wave the same way. Import-free on purpose: the
  * main thread reads this module too, so nothing here may touch the worklet
- * scope or the wave cache (`waveTables.ts`). Listed in the client project's
+ * scope or the wave cache (`waveTables.ts`). Listed in the engine project's
  * `files` and compiled by both projects. `waveTables.test.ts` pins the ids
  * against `patch.ts`'s re-export.
  */
