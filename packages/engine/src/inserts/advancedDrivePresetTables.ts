@@ -1,9 +1,9 @@
-/** Original recipes inspired by tacowars's examples, not measured Ableton presets or circuit models. */
+/** Original recipes, not measurements of any unit or circuit, so they cite no source. */
 import { DEFAULT_ADVANCED_DRIVE, DEFAULT_DRIVE_STAGE } from './advancedDriveSpec';
 import type { AdvancedDriveSpec, DriveStageSpec } from './advancedDriveSpec';
 import type { InsertPreset } from './insertPresets';
 const source = {
-  urls: ['https://www.ableton.com/en/live-manual/12/live-audio-effect-reference/#roar'],
+  urls: [],
   measured: false,
 };
 const stage = (values: Partial<DriveStageSpec>): DriveStageSpec => ({

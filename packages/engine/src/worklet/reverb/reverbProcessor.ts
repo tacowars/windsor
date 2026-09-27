@@ -21,8 +21,7 @@
  *
  * Derived from khoin/DattorroReverbNode (public domain), rewritten here for
  * four additions the original does not have, each taken from the paper or from
- * ordinary one-pole filter design -- see docs/log for why they are not ported
- * from Valley's Plateau, which is GPL-3:
+ * ordinary one-pole filter design:
  *
  *   1. SIZE. Every tank delay and output tap is scaled by a continuous factor,
  *      so one instance covers a tight plate through to a cathedral. Buffers are

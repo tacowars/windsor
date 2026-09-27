@@ -93,7 +93,7 @@ in a second worklet of its own:
 | FM voices, per-voice filter, envelopes, LFO | AudioWorklet (ours): `worklet/fm/`, bundled to `worklet/generated/fm-processor.js` (#643) |
 | Reverb | AudioWorklet (ours): `worklet/reverb/`, bundled to `worklet/generated/reverb-processor.js` (#671), a Dattorro plate. **No `ConvolverNode`** — it was removed, not left beside it |
 | Advanced Drive (#701) | AudioWorklet: `worklet/advancedDrive/`; 2x oversampled shapers, five routes, per-stage filtering and modulation; Classic Drive stays native |
-| Glue-inspired part compressor (#660) | AudioWorklet: `worklet/compressor/`, bundled into `generated/compressor-processor.js`; feedback behavioral approximation, detector input reserved for future routing |
+| Feedback part compressor (#660) | AudioWorklet: `worklet/compressor/`, bundled into `generated/compressor-processor.js`; feedback behavioral approximation, detector input reserved for future routing |
 | Bus tone shaping, delay, distortion, master safety compression | `BiquadFilterNode`, `DelayNode`, `WaveShaperNode`, `DynamicsCompressorNode` |
 | 3D positioning | *Removed in the fork* — it was Babylon's spatial audio, over `PannerNode` (§5) |
 
@@ -460,22 +460,17 @@ After changing the DSP, rebuild the bundles:
 node scripts/build-worklets.mjs
 ```
 
-All of it is original code; no emulator source was copied. Reference material and its
-licence standing:
+The engine is original code except where the table below says otherwise. Each entry
+also cites its source in the file that uses it (root invariant 7). Any code taken from
+elsewhere in future gets a row here.
 
-| Project | Licence | Standing |
+| Code | Source | Licence |
 |---|---|---|
-| [ymfm](https://github.com/aaronsgiles/ymfm) | BSD-3-Clause | The only cleanly permissive OPL/OPM/OPN core. Relevant only if `.VGM` playback is ever wanted |
-| [msfa](https://github.com/google/music-synthesizer-for-android) | Apache 2.0 | Best open DX7 engine; correctness reference for envelopes and operator feedback |
-| [dx7-synth-js](https://github.com/mmontag/dx7-synth-js) | MIT | Clearest readable JS FM voice; useful for envelope curve shapes |
-| [DaisySP](https://github.com/electro-smith/DaisySP) | MIT | Effects, filters, reverb |
-| [Airwindows](https://github.com/airwindows/airwindows) | MIT | Effects |
-| [Dexed](https://github.com/asb2m10/dexed) | **GPLv3** | Do not read into this codebase |
-| [Cardinal](https://github.com/DISTRHO/Cardinal) | **GPLv3+** | Fine to design by ear against; do not port code from it |
+| The plate reverb (`worklet/reverb/`) | Derived from khoin/DattorroReverbNode, rewritten; the topology and tables are Jon Dattorro, "Effect Design Part 1", JAES 1997 | Public domain |
+| Cubic delay-line interpolation (`worklet/reverb/delayLines.ts`) | O. Niemitalo's cubic interpolator, musicdsp.org | Published as a free snippet |
 
-The two GPL entries are listed precisely because they are the most tempting references.
-Ableton Operator informed the feature set — the waveform range, per-operator envelopes,
-the filter section, and an 11-algorithm set rather than the DX7's 32. No code is involved.
+Preset tables that reproduce measured values name their source in the table's
+`source.urls` (`inserts/insertPresets.ts`).
 
 
 ## 10. Hybrid gameplay SFX (#489) — removed

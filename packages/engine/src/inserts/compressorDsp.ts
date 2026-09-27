@@ -3,7 +3,7 @@
  * A soft-knee detector sees the signal AFTER the controlled gain, BEFORE makeup
  * and dry/wet. We solve that feedback implicitly with an analytic soft-knee solution,
  * avoiding a one-sample feedback instability at 0.01 ms / 10:1. This is a
- * behavioral model, not Cytomic's diode circuit solver. Range caps the control
+ * behavioral model, not a circuit simulation. Range caps the control
  * voltage; Auto adds a slowly charging/releasing baseline to fast recovery.
  * No objects are allocated by configure(), tick(), or feedbackStep().
  */

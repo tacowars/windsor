@@ -8,7 +8,7 @@
 
 /** Where a preset's numbers come from: a public source, and whether it states them. */
 export interface PresetSource {
-  /** The public pages the values were read from. */
+  /** The public pages the values were read from; empty for an original recipe. */
   readonly urls: readonly string[];
   /** True when the source states the values; false when they are an approximation of it. */
   readonly measured: boolean;
