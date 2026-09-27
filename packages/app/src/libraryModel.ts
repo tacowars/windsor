@@ -6,7 +6,8 @@
  * actions, so a save shows up everywhere without a rebuild.
  */
 import type { Patch, PresetListing } from '@windsor/engine';
-import { PATCH_LIBRARY, loadUnsweptPatchFile } from '@windsor/engine';
+import { loadUnsweptPatchFile } from '@windsor/engine';
+import { builtInEntries, loadBuiltIns } from './builtInLibrary';
 import type { PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
 import { LIBRARY_FOLDER_PATH, isInitPreset } from './libraryConstants';
@@ -27,11 +28,17 @@ export interface LibraryModel {
 export const library: LibraryModel = pageLibrary();
 
 export function pageLibrary(): LibraryModel {
-  return { mode: 'page', entries: PATCH_LIBRARY, folder: null, problems: [] };
+  return { mode: 'page', entries: builtInEntries(), folder: null, problems: [] };
 }
 
 export const libraryPatch = (model: LibraryModel, id: string): Patch | undefined =>
   Object.hasOwn(model.entries, id) ? model.entries[id]?.patch : undefined;
+
+/** Load the built-ins, and show them if the model is still on the page library. */
+export async function loadPageLibrary(model: LibraryModel): Promise<void> {
+  await loadBuiltIns();
+  if (model.mode === 'page') model.entries = builtInEntries();
+}
 
 /** Point the model at a folder and read it. */
 export async function connectLibrary(model: LibraryModel, folder: PatchFolder): Promise<void> {

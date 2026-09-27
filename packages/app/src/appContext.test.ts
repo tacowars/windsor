@@ -8,10 +8,11 @@
  * part's preset.
  */
 /* eslint-disable max-lines -- one fixture (the fake console) over every context rule; #709 added the Song view's three cases and the file sits 3 % over */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { ApplyResult, AudioPart, DocumentPartial } from '@windsor/engine';
-import { PRESETS, TICKS_PER_BAR, clonePatch, makePatch, partAt } from '@windsor/engine';
+import { TICKS_PER_BAR, clonePatch, makePatch, partAt } from '@windsor/engine';
+import { PRESETS } from '@windsor/engine/patch/presets';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
@@ -23,6 +24,11 @@ import { addPartLive, removePartLive, setSequencerKindLive } from './partEdits';
 import { renamePatch, revertPatch } from './patchLibrary';
 import { newSong } from './songParts';
 import { barsChange, bpmChange, keyChange, scaleChange } from './transportModel';
+import { library, loadPageLibrary } from './libraryModel';
+
+// The built-in library loads on demand in the page; these tests read it
+// through the console's shared model, as the page does after boot.
+beforeAll(() => loadPageLibrary(library));
 
 const TAB_IDS = ['parts', 'mixer', 'song', 'arrangement'] as const;
 

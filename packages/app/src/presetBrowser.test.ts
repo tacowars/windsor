@@ -1,9 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { choosePreset } from './presetBrowser';
 import { DocumentModel } from './documentModel';
 import type { AppCtx } from './context';
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { PRESETS, clonePatch, partAt } from '@windsor/engine';
+import { clonePatch, partAt } from '@windsor/engine';
+import { PRESETS } from '@windsor/engine/patch/presets';
+import { library, loadPageLibrary } from './libraryModel';
+
+// The built-in library loads on demand in the page; these tests read it
+// through the console's shared model, as the page does after boot.
+beforeAll(() => loadPageLibrary(library));
 
 function context(): AppCtx {
   const model = new DocumentModel({ version: 3, ...FULL_ARRANGEMENT });

@@ -6,7 +6,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PATCH_LIBRARY, serialisePatchFile } from '@windsor/engine';
+import { serialisePatchFile } from '@windsor/engine';
+import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { ChromeDirectoryHandle } from './libraryFolder';
 import { readFolderLibrary, wrapDirectoryHandle } from './libraryFolder';
 

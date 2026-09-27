@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterPresets, PRESET_CATALOG, type PresetListing } from './presetCatalog';
+import { filterPresets, type PresetListing } from './presetCatalog';
 import { clonePatch } from './patch';
 import { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './presets';
 import { makeArrangement } from '../song/arrangementDocument';
@@ -20,7 +20,7 @@ const listed = (): PresetListing[] =>
 describe('patch library catalogue', () => {
   it('lists every library file with complete metadata', () => {
     expect(LIBRARY.length).toBeGreaterThan(0);
-    expect(Object.keys(PRESET_CATALOG).sort()).toEqual([...PRESET_NAMES].sort());
+    expect(LIBRARY.map((entry) => entry.id).sort()).toEqual([...PRESET_NAMES].sort());
     expect(new Set(LIBRARY.map((entry) => entry.category))).toEqual(
       new Set(['Strings', 'Pads', 'Plucks', 'Basses', 'Soundtrack FX', 'Drums', 'Legacy game FX']),
     );
@@ -28,11 +28,6 @@ describe('patch library catalogue', () => {
       expect(entry.tags.length, entry.id).toBeGreaterThan(0);
       expect(entry.description.length, entry.id).toBeGreaterThan(0);
       expect(PRESETS[entry.id]).toBe(entry.patch);
-      expect(PRESET_CATALOG[entry.id]).toEqual({
-        category: entry.category,
-        tags: entry.tags,
-        description: entry.description,
-      });
     }
   });
   it('has distinct synthesis settings, not just distinct names', () => {

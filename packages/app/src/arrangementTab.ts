@@ -9,6 +9,7 @@
  * (#708, `transportStrip.ts`); Mute became ‖ and Restart is gone — Import is
  * the rebuild left (#629).
  */
+import { loadBuiltIns } from './builtInLibrary';
 import { EXPORT_URL_TTL_MS, READOUT_DEFER_MS, READOUT_POLL_MS } from './arrangementConstants';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
@@ -73,9 +74,10 @@ function documentSection(ctx: AppCtx): HTMLElement {
   file.onchange = (): void => {
     const chosen = file.files?.[0];
     if (!chosen) return;
-    chosen
-      .text()
-      .then((text) => {
+    // An older song's names resolve against the built-ins (#562), so they
+    // must have arrived before the document is normalised.
+    Promise.all([chosen.text(), loadBuiltIns()])
+      .then(([text]) => {
         ctx.importDoc(JSON.parse(text) as unknown);
         ctx.status(`imported ${chosen.name}`);
       })

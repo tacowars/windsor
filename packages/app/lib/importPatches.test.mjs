@@ -14,7 +14,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { PATCH_LIBRARY, loadUnsweptPatchFile, serialisePatchFile } from '../../engine/src/index';
+import { loadUnsweptPatchFile, serialisePatchFile } from '../../engine/src/index';
+import { PATCH_LIBRARY } from '../../engine/src/patch/presets';
 import {
   importExitCode,
   importIdFromName,

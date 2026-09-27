@@ -21,6 +21,7 @@ import {
 import {
   connectLibrary,
   disconnectLibrary,
+  loadPageLibrary,
   library,
   libraryModeText,
   refreshLibrary,
@@ -61,8 +62,9 @@ export function syncLibraryMode(): void {
   line.title = library.problems.join('\n');
 }
 
-/** At boot: reconnect a remembered folder whose grant still stands. */
+/** At boot: load the built-ins, then reconnect a remembered folder whose grant still stands. */
 export async function bootLibrary(): Promise<void> {
+  await loadPageLibrary(library);
   if (!folderApiAvailable()) return;
   const handle = await recallHandle();
   if (!handle) return;

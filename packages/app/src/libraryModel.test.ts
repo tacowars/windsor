@@ -4,10 +4,11 @@
  * replaces the entries, and page mode's writes are downloads the model still
  * reflects.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { PATCH_LIBRARY, makePatch, serialisePatchFile } from '@windsor/engine';
+import { makePatch, serialisePatchFile } from '@windsor/engine';
+import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { PatchFolder } from './libraryFolder';
 import {
   connectLibrary,
@@ -19,6 +20,10 @@ import {
   removeLibraryFile,
   writeLibraryFile,
 } from './libraryModel';
+import { loadBuiltIns } from './builtInLibrary';
+
+// The built-in library loads on demand in the page; these tests read it.
+beforeAll(() => loadBuiltIns());
 
 /** The entry minus its headroom record: what a file looks like before its sweep. */
 const withoutHeadroom = <T extends { headroom?: unknown }>(entry: T): Omit<T, 'headroom'> =>

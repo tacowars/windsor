@@ -4,10 +4,15 @@
  * fills what the document omits, the model says which ids it filled, and the
  * export is self-contained from then on.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
-import { PRESETS, makeArrangement, partAt } from '@windsor/engine';
+import { makeArrangement, partAt } from '@windsor/engine';
+import { PRESETS } from '@windsor/engine/patch/presets';
 import { DocumentModel, deepMerge, mergeDocument } from './documentModel';
+import { loadBuiltIns } from './builtInLibrary';
+
+// The built-in library loads on demand in the page; these tests read it.
+beforeAll(() => loadBuiltIns());
 
 /** Live for the whole four-bar song: what every fixture part carries (#705). */
 const WHOLE = [{ start: 0, duration: 4 * 96 }];

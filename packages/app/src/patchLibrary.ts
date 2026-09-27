@@ -9,7 +9,8 @@
  * are live edits (#629): nothing here rebuilds the system.
  */
 import type { Patch } from '@windsor/engine';
-import { PRESETS, clonePatch, partAt } from '@windsor/engine';
+import { clonePatch, partAt } from '@windsor/engine';
+import { builtInPresets } from './builtInLibrary';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { LibraryModel } from './libraryModel';
@@ -72,7 +73,7 @@ export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = lib
   if (!ctx.change({ patches: { [name]: clonePatch(entry) } }).ok) return;
   ctx.render();
   ctx.status(
-    Object.hasOwn(PRESETS, name)
+    Object.hasOwn(builtInPresets(), name)
       ? `document patch "${name}" reset to the built-in`
       : `document patch "${name}" reset to the library file`,
   );

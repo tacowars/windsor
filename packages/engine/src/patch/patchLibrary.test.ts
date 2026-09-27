@@ -24,7 +24,6 @@ import {
 } from './patchLibrary';
 import type { PatchFile } from './patchLibrary';
 import { PATCH_FILES } from '../patches/index';
-import { PRESET_CATALOG } from './presetCatalog';
 import { PATCH_LIBRARY, PRESETS } from './presets';
 
 const PATCHES = join(dirname(fileURLToPath(import.meta.url)), '../patches');
@@ -215,7 +214,10 @@ describe('a new patch file', () => {
         tags: ['probe'],
         description: fresh.description,
       });
-      for (const id of onDisk) expect(listing[id]).toEqual(PRESET_CATALOG[id]);
+      for (const id of onDisk) {
+        const { category, tags, description } = PATCH_LIBRARY[id]!;
+        expect(listing[id]).toEqual({ category, tags, description });
+      }
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -197,7 +197,8 @@ is the one resolver, and on the plain playback path it is handed the document's 
 and nothing else — a name it cannot resolve is a load error naming the part and the id,
 never a fall back to the library. So improving a `patches/<id>.json` cannot change what a
 saved song sounds like. (In Aotearoa204 the game path also never imported the whole-bank
-table, so its bundler dropped the library; Windsor's app bakes the whole library.) One
+table, so its bundler dropped the library. Windsor's console loads the whole library as its
+own chunk through `loadBuiltInLibrary`: `docs/log/2026-09-27-the-built-in-library-loads-as-its-own-chunk.md`.) One
 deliberate exception, by id: `fallbackPatch.ts`, the fallback click's patch, which the
 fallback document carries the same way every other document does. `AudioSystem`'s aux
 parts take a `Patch` from their caller and resolve no name at all.

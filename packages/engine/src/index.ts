@@ -237,7 +237,8 @@ export {
 export type { ReverbSpace, SpaceName } from './mixer/reverbSpace';
 export { renderPatchToBuffer } from './render/offlineRender';
 export type { BakeOptions } from './render/offlineRender';
-export { PATCH_LIBRARY, PRESETS, PRESET_NAMES } from './patch/presets';
+export { loadBuiltInLibrary } from './patch/builtInLibrary';
+export type { BuiltInLibrary } from './patch/builtInLibrary';
 export {
   PATCH_FILE_FORMAT,
   PATCH_ID_RULE,
@@ -328,7 +329,7 @@ export type {
   OnsetHandler,
 } from './sequencing/euclideanSequencer';
 
-export { HIDDEN_CATEGORY, PRESET_CATALOG, filterPresets } from './patch/presetCatalog';
+export { HIDDEN_CATEGORY, filterPresets } from './patch/presetCatalog';
 // The envelope curve the worklet shapes segments with (#620 decision 4): the
 // console's display draws with it, and the harness pins it to the DSP.
 export { curveShape, segmentLevel } from './worklet/fm/envelope';
