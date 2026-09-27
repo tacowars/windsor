@@ -217,7 +217,7 @@ export interface PlaybackStatsWindowOptions {
  * One measured window's worth of playback stats: snapshot at open, wait out
  * the counters' tail, snapshot at close, difference (#275 decision 6).
  *
- * `open()` is synchronous and cheap — it is called on the frame the bench
+ * `open()` is synchronous and cheap — it is called on the frame a measured
  * window opens. `close()` is where the settle wait is taken, so a caller that
  * wants the window's real tail must await it before it reports.
  */

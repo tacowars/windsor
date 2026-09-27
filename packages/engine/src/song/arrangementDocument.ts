@@ -2,10 +2,10 @@
  * The arrangement document layer (issue #75; record
  * `2026-08-31-arrangement-console-and-runtime-arrangements` §3–§5).
  *
- * An arrangement is a JSON document committed under `arrangements/`, imported
- * at build time — never fetched, so a malformed file fails `npm run build`
- * and cannot reach a running game — and handed to `makeArrangement`, the
- * never-throws normaliser between the document and the engine. It clamps
+ * An arrangement is a JSON document — a song the console opens, imports or
+ * builds (in Aotearoa204, a file committed under `arrangements/` and imported
+ * at build time) — handed to `makeArrangement`, the never-throws normaliser
+ * between the document and the engine. It clamps
  * every number into range, defaults absent fields, drops unknown keys, and
  * reports everything it corrected, distinguishing a document it repaired from
  * one with nothing usable in it, which yields the metronome
@@ -90,7 +90,7 @@ export interface MakeArrangementResult {
   /**
    * Patch ids a `libraryFill` supplied because the document did not embed
    * them (#562) — now embedded in `document.patches`, so the next export
-   * carries them. Always empty on the game path, which hands no fill.
+   * carries them. Always empty on the playback path, which hands no fill.
    */
   filled: string[];
   /** False when nothing usable survived; `document` is then `FALLBACK_ARRANGEMENT`. */
@@ -102,7 +102,7 @@ export interface MakeArrangementResult {
  * result satisfies the generator constructors' asserted ranges, so building
  * an `ArrangementPlayer` from it cannot throw either.
  *
- * With no options this is the game rule (#562): a part's `preset` resolves
+ * With no options this is the playback rule (#562): a part's `preset` resolves
  * against the document's own `patches` and nothing else. The editor passes
  * `{ libraryFill: PRESETS }` so a document written before #562 still opens —
  * every name it resolves that way is embedded into the returned document and
@@ -188,7 +188,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
     parts,
   };
   // A library fill is embedded here and nowhere else (#562): from this point
-  // the document is self-contained, so the export and the game path are the
+  // the document is self-contained, so the export and the playback path are the
   // same document.
   const patches = { ...embedded, ...n.filledPatches() };
   if (Object.keys(patches).length > 0) document.patches = patches;

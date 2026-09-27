@@ -1,13 +1,9 @@
 /**
- * The console-safe surface of the audio package (issue #70): everything
- * `index.ts` exports except `babylonBridge.ts` — the sole module importing
- * Babylon. The engine below it touches nothing but Web Audio, so the
- * standalone arrangement console can drive the real `AudioSystem` rather
- * than a copy of it.
- *
- * `build-editor.mjs` bundles the console from this entry and asserts the
- * output contains no Babylon; a Babylon import creeping in here fails that
- * build, not the game's.
+ * The engine's public surface (issue #70): the one entry `@windsor/app`
+ * imports. The engine touches nothing but Web Audio, so the console drives
+ * the real `AudioSystem` rather than a copy of it; ESLint keeps the app from
+ * reaching past this file, and `consoleBoundary.test.ts` keeps it from
+ * building a graph of its own.
  */
 /* eslint-disable max-lines -- one export list, one entry per engine name the console may reach; a split would be two halves of the same surface */
 export { AudioSystem } from './system/audioSystem';

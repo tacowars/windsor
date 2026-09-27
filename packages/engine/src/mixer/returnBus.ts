@@ -23,7 +23,7 @@
  * The plate cost about 1% of one core per instance rendering 60 s of audio
  * under Node 24 on an Apple M4 Pro -- a development machine, not the target,
  * so an order-of-magnitude sanity check and not a milestone result under
- * CLAUDE.md invariant 3. See docs/research/2026-08-31-52-dattorro-reverb/.
+ * CLAUDE.md invariant 5. See docs/research/2026-08-31-52-dattorro-reverb/.
  */
 import {
   DELAY_CLIP_CEILING,

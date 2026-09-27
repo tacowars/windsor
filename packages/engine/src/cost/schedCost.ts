@@ -1,18 +1,18 @@
 /**
  * What the audio scheduler costs on the **main** thread (#275 decision 7).
  *
- * `systems.ts` runs `audio.update(dt)` in `FRAME_SYSTEMS` every frame, so the
- * look-ahead pump's cost has been inside every milestone reading taken so far,
- * unattributed (the 2026-09-05 audit's finding C13). This meter attributes it:
- * the audio system times its own `update()` and pushes the millisecond figure
- * here, and the overlay and the bench read it back.
+ * The host calls `AudioSystem.update()` on a timer (in Aotearoa204, every
+ * frame), so the look-ahead pump's cost lands on the main thread unattributed
+ * (the 2026-09-05 audit's finding C13). This meter attributes it: the audio
+ * system times its own `update()` and pushes the millisecond figure here, and
+ * `costReadout()` reads it back.
  *
  * It is a **rolling window**, not a lifetime mean: `AUDIO_SCHED_WINDOW_SECONDS`
  * of samples, the same second the worklets report their DSP load over, so the
- * overlay's two audio numbers describe the same slice of wall time. The bench
- * does not read the mean at all — it samples `lastMs` per frame and takes its
- * own distribution over the measured window, which is the honest way to get a
- * p95 over 60 s rather than a p95 of rolling p95s.
+ * readout's two audio numbers describe the same slice of wall time. A
+ * benchmark should not read the mean at all — it samples `lastMs` per call and
+ * takes its own distribution over the measured window, which is the honest way
+ * to get a p95 over 60 s rather than a p95 of rolling p95s.
  *
  * `docs/design/audio-architecture.md` §7 wants "audio scheduling under 0.5 ms
  * of main-thread time per frame at p95". This is the number that criterion
@@ -41,7 +41,7 @@ const MS_PER_SECOND = 1000;
 
 /** The main-thread scheduling cost over the rolling window. */
 export interface SchedCostReadout {
-  /** The most recent frame's cost, ms — what the bench samples per frame. */
+  /** The most recent `update()`'s cost, ms — what a benchmark samples per call. */
   lastMs: number;
   /** Mean cost per frame over the window, ms. */
   meanMs: number;
@@ -106,10 +106,10 @@ export class SchedCostMeter {
   }
 
   /**
-   * Mean and nearest-rank p95 over the window. The percentile method is the
-   * bench's (`bench/summary.ts`'s `percentile`), and `schedCost.test.ts` pins
-   * the two to agree so the overlay's p95 and a bench line's p95 cannot drift
-   * apart.
+   * Mean and nearest-rank p95 over the window. The percentile method is
+   * Aotearoa204's bench's (`bench/summary.ts`'s `percentile` there), and
+   * `schedCost.test.ts` pins the method, so a p95 read here means what it
+   * meant there.
    */
   readout(): SchedCostReadout {
     const frames = this.ms.length;

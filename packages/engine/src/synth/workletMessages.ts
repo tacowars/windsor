@@ -48,7 +48,7 @@ export interface ControlMessage {
 
 /**
  * Whether a `patch` message also re-points the voices already sounding. Off by
- * default: the game swaps presets rarely and a ringing voice keeping its old
+ * default: a song swaps presets rarely, and a ringing voice keeping its old
  * patch is what stops the swap clicking. The arrangement console turns it on
  * so a knob is heard while it is being turned, not on the next note.
  */
@@ -132,7 +132,7 @@ export interface ProcessorOptions {
   /**
    * Pins the processor's one random source — free-running operator phase, the
    * per-voice noise seed and `panRandom` jitter — so a render is reproducible.
-   * Omitted in the game, which gets `Math.random`: a part whose every note
+   * Omitted in live playback, which gets `Math.random`: a part whose every note
    * started from the same phase would sound mechanical. The DSP tests (#78)
    * supply it; an offline bake that wants byte-identical output may too.
    */

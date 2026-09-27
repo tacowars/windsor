@@ -27,7 +27,7 @@ export interface ResolveOptions {
   /**
    * The editor's open path (#562): a part naming a library id the document
    * does not embed resolves here once, and the fill is recorded so the caller
-   * can embed it and tell the user. Absent on the game path — there, a name
+   * can embed it and tell the user. Absent on the playback path — there, a name
    * the document does not define is an error, never the library's business.
    */
   readonly libraryFill?: PresetTable;
@@ -37,13 +37,13 @@ export interface ResolveOptions {
  * How a song document's part presets resolve (#562, epic #564 decision 2).
  *
  * A song is self-contained: its `patches` section is the table, and the
- * game path hands no `libraryFill`, so improving `patches/<id>.json` cannot
+ * playback path hands no `libraryFill`, so improving `patches/<id>.json` cannot
  * silently change what a shipped song plays. The editor hands the library in,
  * which is how a document written before #562 still opens — resolved once,
  * recorded in `filled`, and embedded by the normaliser so the next export
  * carries it.
  *
- * One resolver, one option: the game rule and the editor rule differ by this
+ * One resolver, one option: the playback rule and the editor rule differ by this
  * object and nothing else.
  */
 export class PatchResolver {
@@ -65,7 +65,7 @@ export class PatchResolver {
     return filled;
   }
 
-  /** The game's load error: names the part and the id, and never falls back. */
+  /** The playback path's load error: names the part and the id, and never falls back. */
   require(id: string, name: string): Patch {
     const patch = this.lookup(name);
     if (!patch) {
@@ -76,7 +76,7 @@ export class PatchResolver {
     return patch;
   }
 
-  /** Ids that came from the library fill, in first-use order; empty on the game path. */
+  /** Ids that came from the library fill, in first-use order; empty on the playback path. */
   get filled(): readonly string[] {
     return [...this.filledIds];
   }

@@ -4,8 +4,8 @@
  * controls write. No DOM, no engine — `transportModel.test.ts` pins them.
  *
  * Epic #703 decision 8: ▶ runs from the current position; ■ halts, releases
- * every voice and rewinds to tick 0; ‖ pauses keeping the position (the
- * game's mute). The pressed state is ▶ or ‖; ■ is momentary.
+ * every voice and rewinds to tick 0; ‖ pauses keeping the position
+ * (`AudioSystem.setMuted`). The pressed state is ▶ or ‖; ■ is momentary.
  */
 import type { DocumentPartial, ScaleName } from '@windsor/engine';
 import { SCALE_NAMES } from '@windsor/engine';

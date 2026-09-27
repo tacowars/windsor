@@ -13,7 +13,7 @@
  *
  * Data only, like `modeIds.ts`: it imports the two import-free id modules and
  * nothing else, never touches the worklet scope or the wave cache, is listed
- * in the client project's `files` and is on the generators' pure side
+ * in the engine project's `files` and is on the generators' pure side
  * because `audioConstants.ts` re-exports `OPERATOR_COUNT` from here. A
  * change to a value here is a render change: `fmProcessorGolden.test.ts`.
  */

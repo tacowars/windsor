@@ -1,5 +1,5 @@
 /**
- * Patch normalisation (#644): the editor and the game send partial patches,
+ * Patch normalisation (#644): the console and its songs send partial patches,
  * and every field is filled here so the audio loop never tests for undefined.
  * Invariant: every default and clamp bound is read from `patchDefaults.ts`,
  * the table `makePatch()` in `patch/patch.ts` fills from too, so the engine
@@ -40,7 +40,7 @@ export interface WorkletPatch extends Patch {
 /* ------------------------------------------------------------------ *
  * Patch normalisation
  *
- * The editor and the game send partial patches; fill in every field here so
+ * The console and its songs send partial patches; fill in every field here so
  * the audio loop never has to test for undefined.
  * ------------------------------------------------------------------ */
 

@@ -12,7 +12,7 @@
  * that test assert nothing: only run it to move the reference point on
  * purpose, and say so in the ticket that does.
  *
- * Node-only, like everything in `__fixtures__/`: outside the client's tsc
+ * Node-only, like everything in `__fixtures__/`: outside the engine's tsc
  * build so browser code cannot reach it.
  */
 import { writeFileSync } from 'node:fs';

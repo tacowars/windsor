@@ -21,7 +21,7 @@ export const silentPart = (): PlayablePart => ({
   allNotesOff: () => {},
 });
 
-/** The document's own patches — the only table the game resolves against (#562). */
+/** The document's own patches — the only table playback resolves against (#562). */
 export const patchesOf = (arrangement: Arrangement): PresetTable =>
   (arrangement as ArrangementDocument).patches ?? {};
 

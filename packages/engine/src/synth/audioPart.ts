@@ -144,7 +144,7 @@ export class AudioPart {
     this.noteByHandle.clear();
   }
 
-  /** Hard stop with no release tails. Clicks; for scene teardown, not gameplay. */
+  /** Hard stop with no release tails. Clicks; for teardown, not playback. */
   panic(): void {
     this.post({ type: 'panic' });
     this.heldByNote.clear();
@@ -162,7 +162,7 @@ export class AudioPart {
 
   /**
    * Make later `setPatch` calls reach the voices already sounding too. The
-   * console's knobs want this; the game leaves it off (`LiveRetuneMessage`).
+   * console's knobs want this; song playback leaves it off (`LiveRetuneMessage`).
    */
   setLiveRetune(enabled: boolean): void {
     this.post({ type: 'liveRetune', enabled });

@@ -1,6 +1,7 @@
 /**
- * What audio costs this page, as the overlay, the bench collector and
- * `__a204` read it in one call (#275).
+ * What audio costs this page, in one call (#275): `AudioSystem.costReadout()`,
+ * for a load display or a benchmark. (In Aotearoa204 its readers were the
+ * game's debug overlay and bench; Windsor's console does not read it yet.)
  *
  * Three measurements of three different things, deliberately not merged into
  * one number:
@@ -15,10 +16,9 @@
  *              `playbackStats.ts`) — `null` on a browser without the API,
  *              never a substituted estimate (decision 5).
  *
- * The overlay shows `playback` as the **context-lifetime totals**, which is
- * what a player experiences; the bench reports deltas over its measured
- * window (decision 6) and takes them from `PlaybackStatsWindow`, not from
- * here.
+ * `playback` here is the **context-lifetime totals**, which is what a
+ * listener experiences; a benchmark wants deltas over its measured window
+ * (decision 6) and takes them from `PlaybackStatsWindow`, not from here.
  */
 import type { AudioLoadReadout } from './audioLoad';
 import { ZERO_AUDIO_LOAD } from './audioLoad';

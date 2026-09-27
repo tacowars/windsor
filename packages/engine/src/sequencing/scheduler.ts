@@ -11,7 +11,7 @@
  * - `Scheduler` drives it with the look-ahead pattern. A coarse timer wakes
  *   periodically and queues ticks far enough ahead that the audio thread
  *   always has work stamped against its own clock. Notes are never triggered
- *   from the render loop directly: `requestAnimationFrame` jitters with frame
+ *   from a frame callback directly: `requestAnimationFrame` jitters with frame
  *   time, and audio timing that jitters with frame rate is audible.
  *
  * Nothing here imports the audio graph. The clock the `Scheduler` reads is a
@@ -224,8 +224,8 @@ export class Scheduler implements TickSource {
   }
 
   /**
-   * Advance the queue. Driven by the render loop, but what it emits is timed
-   * against the audio clock, so frame-rate variation cannot shift a note.
+   * Advance the queue. Driven by the host's timer, but what it emits is timed
+   * against the audio clock, so a late wake-up cannot shift a note.
    */
   update(): void {
     if (!this.running) return;

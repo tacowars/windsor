@@ -85,7 +85,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.maxVoices = maxVoices;
 
     // One random source for the whole part. Absent `seed` this is Math.random,
-    // which is what the game gets; see "Randomness" near the top of the file.
+    // which is what live playback gets; see "Randomness" in `prng.ts`.
     this.random = makeRandom(opts.seed);
 
     // Four reserve slots above the sounding limit so a stolen voice can fade
@@ -102,16 +102,16 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.noteMap = new Map(); // noteId -> array of voice indices
     this.lastNote = null; // for legato glide
     this.running = true;
-    // Off in the game; the console turns it on so a knob retunes ringing voices.
+    // Off by default; the console turns it on so a knob retunes ringing voices.
     this.liveRetune = false;
     // Seconds a slid note glides when the patch's `glide` is 0 (#602).
     this.slideSeconds = num(opts.slideSeconds, 0);
-    // Skipping silent held voices (#547). Always on in the game and the console;
+    // Skipping silent held voices (#547). Always on in live playback;
     // `dormancy: false` exists so a test can render the same part without it and
     // prove the two renders agree.
     this.dormancy = opts.dormancy !== false;
-    // The fixed-index voice kernel and per-note constants (#548), on in the game
-    // and the console; `specialise: false` renders every voice through the
+    // The fixed-index voice kernel and per-note constants (#548), always on in
+    // live playback; `specialise: false` renders every voice through the
     // generic loop, so a test can prove the two agree bit for bit.
     const specialise = opts.specialise !== false;
     for (let i = 0; i < poolSize; i++) this.voices[i].specialise = specialise;

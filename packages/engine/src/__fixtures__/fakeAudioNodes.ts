@@ -17,8 +17,8 @@
  * Pull-based: a node renders once per block on first request and caches; a
  * `DelayNode` renders from its ring without pulling upstream, which is what
  * lets a feedback loop evaluate, and is then `commit()`ed once the block's
- * consumers have read it. Node-only, by design: excluded from the client's tsc
- * build (see packages/client/tsconfig.json).
+ * consumers have read it. Node-only, by design: excluded from the engine's tsc
+ * build (see packages/engine/tsconfig.json).
  */
 
 export const BLOCK = 128;

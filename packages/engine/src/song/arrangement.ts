@@ -19,8 +19,8 @@
  * the song has an explicit length (`transport.bars`), a harmony timeline
  * of chord events, and each part a list of `regions` saying where it is
  * live; every generative sequencer carries its own `seed`, and its stream
- * per region is `hashSeed(seed, regionIndex)` — none of this is the world
- * seed.
+ * per region is `hashSeed(seed, regionIndex)`, independent of any other
+ * seed on the page.
  */
 import type { ArpSequencerConfig } from '../sequencing/arpSequencer';
 import type { BassSequencerConfig } from '../sequencing/bassSequencer';

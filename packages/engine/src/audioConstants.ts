@@ -7,8 +7,6 @@
  * what a tuning ticket edits; the files that import it are what a behaviour
  * ticket edits. The generator presets stay in `presets*.ts` — those are
  * authored patches, not tunables.
- *
- * Nothing here feeds simulation state (root invariant 4): audio observes.
  */
 
 /* ---------------------------- tempo and time ---------------------------- */
@@ -263,15 +261,14 @@ export const RENDER_QUANTUM_FRAMES = 128;
  * audio time (#445). The processor counts quanta, so the main thread converts
  * with the live sample rate. A whole second is long enough for the duty-cycle
  * sampler in `audioLoad.ts` to hold a useful number of samples, and short
- * enough that the overlay and the bench's per-frame column track the music
- * rather than the whole run.
+ * enough that a readout tracks the music rather than the whole run.
  */
 export const AUDIO_LOAD_REPORT_SECONDS = 1;
 
 /**
  * A processor whose last report is older than this has stopped reporting —
  * disposed, or an audio thread that has stalled outright — and drops out of
- * the readout rather than freezing its last number on the overlay. Three
+ * the readout rather than freezing its last number on screen. Three
  * report intervals: one missed post is jitter, three in a row is gone.
  */
 export const AUDIO_LOAD_STALE_MS = 3 * AUDIO_LOAD_REPORT_SECONDS * 1000;
@@ -293,8 +290,8 @@ export const AUDIO_STATS_SETTLE_MS = 3000;
 /**
  * The rolling window the main-thread audio scheduling cost reports its mean
  * and p95 over (#275 decision 7), in seconds. The same second the worklets
- * report their load over, so the overlay's two audio numbers describe the
- * same slice of wall time rather than two different ones.
+ * report their load over, so `costReadout()`'s two audio numbers describe
+ * the same slice of wall time rather than two different ones.
  */
 export const AUDIO_SCHED_WINDOW_SECONDS = AUDIO_LOAD_REPORT_SECONDS;
 
@@ -309,9 +306,9 @@ export const AUDIO_SCHED_MAX_SAMPLES = 1024;
 /**
  * The quantile the scheduling cost is reported at, as a fraction — the p95
  * `docs/design/audio-architecture.md` §7 states its criterion in. The same
- * value as the bench's `QUANTILES.p95` (`bench/benchConstants.ts`), and
- * `schedCost.test.ts` pins the two equal rather than importing the bench's
- * table into the audio graph.
+ * value as Aotearoa204's bench used (`QUANTILES.p95` there), and
+ * `schedCost.test.ts` computes it the same way, so a p95 read here means what
+ * it meant there.
  */
 export const AUDIO_SCHED_QUANTILE = 0.95;
 

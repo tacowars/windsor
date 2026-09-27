@@ -1,8 +1,9 @@
 /**
  * Owns the `AudioContext`, the worklet module, and the parts built on it.
  *
- * There is exactly one `AudioContext` in the client. Babylon's audio engine is
- * handed this one rather than creating its own -- see `babylonBridge.ts`.
+ * The context is the caller's or the engine's own; every part, bus and
+ * return built on the engine shares its clock. The console hands in one
+ * context and rebuilds engines on it (`packages/app/src/host.ts`).
  */
 import { PART_MAX_VOICES_DEFAULT, SLIDE_SECONDS_DEFAULT } from '../audioConstants';
 import type { AudioBus, BusOptions } from '../mixer/audioBus';
@@ -86,7 +87,7 @@ export class FmEngine {
     return this.moduleLoaded;
   }
 
-  /** Parts alive on this engine — the bench header's `parts` (#445). */
+  /** Parts alive on this engine (#445: Aotearoa204's bench header recorded it). */
   get partCount(): number {
     return this.parts.size;
   }

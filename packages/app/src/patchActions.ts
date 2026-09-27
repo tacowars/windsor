@@ -173,7 +173,7 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   return id;
 }
 
-/** Remove a library file; refused for an id game code plays. Songs keep their copies. */
+/** Remove a library file; refused for the engine's fallback patch. Songs keep their copies. */
 export async function deletePatch(library: LibraryModel, id: string): Promise<void> {
   const refusal = deleteRefusal(id);
   if (refusal) throw new Error(refusal);
