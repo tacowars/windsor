@@ -1,5 +1,5 @@
 /**
- * The operator ratio as Ableton Operator shows it (#587): a whole-number
+ * The operator ratio as the console shows it (#587): a whole-number
  * **Coarse** and a fractional **Fine** over the one stored `ops.<i>.ratio`
  * field. Coarse is the multiple of the played note — the harmonic series is
  * where the usable FM sounds are — and Fine is the inharmonic offset within

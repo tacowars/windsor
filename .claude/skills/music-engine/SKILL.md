@@ -19,8 +19,9 @@ stay as provenance.
 
 Start with [the audio architecture](../../../docs/design/audio-architecture.md)
 and inspect the relevant implementation. This is a four-operator instrument
-with FM, harmonic waveforms and subtractive filtering, not a DX/OPL or Ableton
-Operator emulator. Do not infer parameter semantics from those instruments.
+with FM, harmonic waveforms and subtractive filtering, and not an emulation of
+any other synthesizer. Read parameter semantics from the code, never from
+another instrument.
 
 Within `packages/engine/src/` the folders are the map (#655): one per row
 below, the directory listing names the rest. At the root stay only
