@@ -2,7 +2,7 @@
  * The Arp card's seed rules (#706): Reseed writes a new safe integer into the
  * document, and the Seed field accepts only what the normaliser keeps.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_ARP_CONFIG,
@@ -14,6 +14,10 @@ import { arpSeedChange, freshSeed, parseSeed } from './arpModel';
 import { DocumentModel } from './documentModel';
 import { octaveKnob } from './harmonyTables';
 import { ARP_KNOBS, ARP_RESEED_SPAN } from './sequencerKnobTables';
+import { loadBuiltIns } from './builtInLibrary';
+
+// The built-in library loads on demand in the page; these tests read it.
+beforeAll(() => loadBuiltIns());
 
 const arpSong = (): DocumentModel =>
   new DocumentModel({

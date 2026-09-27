@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 
 import { HEADROOM_RENDER, peakAt } from '../../engine/src/__fixtures__/headroomSweep';
 import { loadProcessor } from '../../engine/src/__fixtures__/workletHarness';
-import { PATCH_LIBRARY, clonePatch } from '../../engine/src/index';
+import { clonePatch } from '../../engine/src/index';
+import { PATCH_LIBRARY } from '../../engine/src/patch/presets';
 import { LOUDNESS_RENDER, LOUDNESS_SEEDS } from '../src/libraryConstants';
 import { loudnessVerdict } from '../src/loudnessCheck';
 

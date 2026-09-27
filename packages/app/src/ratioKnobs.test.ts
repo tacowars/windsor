@@ -11,7 +11,8 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PATCH_LIBRARY, clonePatch, makeArrangement } from '@windsor/engine';
+import { clonePatch, makeArrangement } from '@windsor/engine';
+import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { DocumentModel } from './documentModel';
 import { keyTarget } from './knob';
 import type { PatchEditor } from './partsSession';

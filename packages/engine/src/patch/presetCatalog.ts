@@ -5,8 +5,6 @@
  * The listing itself is the console's `libraryModel.listLibrary` over
  * whichever library it has open (#620 retired the duplicate here).
  */
-import { PATCH_LIBRARY } from './presets';
-
 export interface PresetMetadata {
   category: string;
   tags: readonly string[];
@@ -20,13 +18,6 @@ export interface PresetListing extends PresetMetadata {
 
 /** The four legacy gameplay sounds keep this category; the browser hides it unless asked. */
 export const HIDDEN_CATEGORY = 'Legacy game FX';
-
-export const PRESET_CATALOG: Record<string, PresetMetadata> = Object.fromEntries(
-  Object.values(PATCH_LIBRARY).map(({ id, category, tags, description }) => [
-    id,
-    { category, tags, description },
-  ]),
-);
 
 export interface PresetFilter {
   query: string;

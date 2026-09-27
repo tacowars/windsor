@@ -12,7 +12,8 @@
  * Arrangement tab tells the user was filled that way.
  */
 import type { ArrangementDocument, MakeArrangementResult } from '@windsor/engine';
-import { PRESETS, makeArrangement } from '@windsor/engine';
+import { makeArrangement } from '@windsor/engine';
+import { builtInPresets } from './builtInLibrary';
 
 /**
  * Merge for the local copy: objects recurse, arrays and `null` assign
@@ -107,7 +108,7 @@ export class DocumentModel {
 
   /** The editor's normalisation: the library fills what an older document omits. */
   private normalise(raw: unknown): MakeArrangementResult {
-    return makeArrangement(raw, { libraryFill: PRESETS });
+    return makeArrangement(raw, { libraryFill: builtInPresets() });
   }
 
   /**

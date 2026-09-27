@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PATCH_LIBRARY } from '@windsor/engine';
+import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import { SUGGESTED_HEADROOM } from './libraryConstants';
 import {
   categoriesOf,

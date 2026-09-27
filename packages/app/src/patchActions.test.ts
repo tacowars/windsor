@@ -3,18 +3,18 @@
  * Init, Save, Copy to new, Delete and the unsaved-changes guard, with the
  * open song's copy following a save.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import {
   FALLBACK_PATCH_ID,
-  PATCH_LIBRARY,
   clonePatch,
   loadPatchFile,
   loadUnsweptPatchFile,
   makePatch,
   partAt,
 } from '@windsor/engine';
+import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { DocumentPartial } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
@@ -42,6 +42,10 @@ import {
 } from './patchActions';
 import { revertPatch } from './patchLibrary';
 import { serialisePatchFile } from '@windsor/engine';
+import { loadBuiltIns } from './builtInLibrary';
+
+// The built-in library loads on demand in the page; these tests read it.
+beforeAll(() => loadBuiltIns());
 
 /** An in-memory folder seeded with a few real library files. */
 function fakeFolder(ids: string[]): PatchFolder & { files: Map<string, string> } {

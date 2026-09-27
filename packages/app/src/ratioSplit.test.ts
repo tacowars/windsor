@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PATCH_LIBRARY } from '@windsor/engine';
+import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import {
   COARSE_MAX,
   COARSE_MIN,
