@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import {
-  GAMEPLAY_PATCH_IDS,
+  FALLBACK_PATCH_ID,
   PATCH_LIBRARY,
   clonePatch,
   loadPatchFile,
@@ -245,13 +245,13 @@ describe('Copy to new', () => {
 });
 
 describe('Delete', () => {
-  it('is refused for every gameplay id and allowed otherwise', async () => {
-    const scope = await folderScope(['kick', 'weapon-zap', 'pickup-blip']);
-    for (const id of Object.values(GAMEPLAY_PATCH_IDS)) {
-      expect(deleteRefusal(id)).toContain('GAMEPLAY_PATCH_IDS');
-      await expect(deletePatch(scope.library, id)).rejects.toThrow('cannot be deleted');
-      expect(scope.folder.files.has(`${id}.json`)).toBe(true);
-    }
+  it('is refused for the fallback patch and allowed otherwise', async () => {
+    const scope = await folderScope(['kick', FALLBACK_PATCH_ID]);
+    expect(deleteRefusal(FALLBACK_PATCH_ID)).toContain('FALLBACK_PATCH_ID');
+    await expect(deletePatch(scope.library, FALLBACK_PATCH_ID)).rejects.toThrow(
+      'cannot be deleted',
+    );
+    expect(scope.folder.files.has(`${FALLBACK_PATCH_ID}.json`)).toBe(true);
     expect(deleteRefusal('kick')).toBeNull();
     await deletePatch(scope.library, 'kick');
     expect(scope.folder.files.has('kick.json')).toBe(false);

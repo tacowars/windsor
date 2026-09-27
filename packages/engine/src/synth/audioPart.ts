@@ -130,7 +130,7 @@ export class AudioPart {
     if (ids.length === 0) this.heldByNote.delete(note);
   }
 
-  /** Fire and forget: a note of fixed length. The shape most game SFX want. */
+  /** Fire and forget: a note of fixed length. The shape an audition or a one-shot wants. */
   trigger(note: number, velocity = 1, duration = 0.25, time?: number): number {
     const start = time ?? this.context.currentTime;
     const id = this.noteOn(note, velocity, start);

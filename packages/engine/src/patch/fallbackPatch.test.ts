@@ -1,30 +1,30 @@
 /**
- * Gameplay sounds reference the library by stable id (epic #564 decision 3):
- * every id in `GAMEPLAY_PATCH_IDS` has a file, and game code spells no preset
- * id outside that table, so the editor's Delete guard (#563) can trust it.
+ * The engine names one library patch by id, the fallback click's (epic #564
+ * decision 3): that id has a file, and engine code spells no preset id
+ * anywhere else, so the console's Delete guard (#563) can trust it.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './gameplayPatches';
+import { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './fallbackPatch';
 import { patchLeafDifferences } from './patchLibrary';
 import { PATCH_LIBRARY, PRESETS } from './presets';
 
 const AUDIO = join(dirname(fileURLToPath(import.meta.url)), '..');
-const IDS = Object.values(GAMEPLAY_PATCH_IDS);
 
-describe('GAMEPLAY_PATCH_IDS', () => {
-  it.each(IDS)('%s has a library file and resolves to the same patch', (id) => {
+describe('FALLBACK_PATCH_ID', () => {
+  it('has a library file and resolves to the same patch', () => {
+    const id = FALLBACK_PATCH_ID;
     expect(existsSync(join(AUDIO, 'patches', `${id}.json`))).toBe(true);
     expect(PATCH_LIBRARY[id]).toBeDefined();
-    expect(patchLeafDifferences(GAMEPLAY_PATCHES[id], PRESETS[id], id)).toEqual([]);
+    expect(patchLeafDifferences(FALLBACK_PATCH, PRESETS[id], id)).toEqual([]);
   });
 });
 
 /**
- * A preset id spelled where game code names a patch: `preset: '<id>'` or
+ * A preset id spelled where engine code names a patch: `preset: '<id>'` or
  * `PRESETS['<id>']`. A bare word is not a preset literal (`'kick'` is also a
  * part slot), so the position is what classifies it.
  */
@@ -37,14 +37,14 @@ function presetLiterals(source: string): string[] {
     .filter((id) => Object.hasOwn(PATCH_LIBRARY, id));
 }
 
-/** Non-test engine source, minus fixtures, the generated index and the table itself. */
-function gameSources(dir: string): string[] {
+/** Non-test engine source, minus fixtures, the generated index and `fallbackPatch.ts` itself. */
+function engineSources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory())
-      return entry.name === '__fixtures__' || entry.name === 'patches' ? [] : gameSources(path);
+      return entry.name === '__fixtures__' || entry.name === 'patches' ? [] : engineSources(path);
     if (!entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) return [];
-    if (entry.name.endsWith('.d.ts') || path === join(AUDIO, 'patch/gameplayPatches.ts')) return [];
+    if (entry.name.endsWith('.d.ts') || path === join(AUDIO, 'patch/fallbackPatch.ts')) return [];
     return [path];
   });
 }
@@ -60,8 +60,8 @@ describe('preset literals in engine code', () => {
     expect(presetLiterals("const parts = ['kick', 'hat']; part: 'kick'")).toEqual([]);
   });
 
-  it('are spelled nowhere outside GAMEPLAY_PATCH_IDS', () => {
-    const offenders = gameSources(AUDIO).flatMap((path) => {
+  it('are spelled nowhere outside fallbackPatch.ts', () => {
+    const offenders = engineSources(AUDIO).flatMap((path) => {
       const ids = presetLiterals(readFileSync(path, 'utf8'));
       return ids.length ? [`${relative(AUDIO, path)}: ${ids.join(', ')}`] : [];
     });

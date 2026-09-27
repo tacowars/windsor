@@ -57,14 +57,14 @@ it('reuses live effects on reorder, keeps output level independent, and cancels 
   expect(targets(master.input)).toEqual([]);
   expect(targets(master.output)).toEqual([]);
 });
-async function render(level: number, inserts = false, sfx = false) {
+async function render(level: number, inserts = false, aux = false) {
   const context = new FakeContext();
   const engine = new FmEngine(context.asAudioContext());
   const system = new AudioSystem(engine, { defer: (run) => run() });
   await system.init();
   system.masterStrip!.apply({ level, inserts: inserts ? [DEFAULT_DRIVE] : [] });
-  const part = sfx
-    ? system.createSfxPart('ui', 'pickup-blip')
+  const part = aux
+    ? system.createAuxPart('ui', makePatch())
     : system.createMusicPart('m', makePatch(), 1, { ...DEFAULT_STRIP, sends: { room: 0.4 } });
   sourceOf(part).feed = tones(440, 660, 0.2);
   const [out, room] = renderGraph(context, 0.2, [
@@ -74,16 +74,16 @@ async function render(level: number, inserts = false, sfx = false) {
   const result = { out: out!, room: room!, context, system };
   return result;
 }
-it('scales the complete music sum, after distortion, without changing return input or dry SFX', async () => {
+it('scales the complete music sum, after distortion, without changing return input or a dry aux part', async () => {
   const full = await render(1, true);
   const half = await render(0.5, true);
   expect(rms(full.out.left)).toBeGreaterThan(0.01);
   expect(rms(half.out.left) / rms(full.out.left)).toBeCloseTo(0.5, 6);
   expect(maxAbsDiff(full.room.left, half.room.left)).toBe(0);
-  const sfx = await render(1, false, true);
+  const aux = await render(1, false, true);
   const mutedMaster = await render(0, false, true);
-  expect(maxAbsDiff(sfx.out.left, mutedMaster.out.left)).toBe(0);
-  for (const item of [full, half, sfx, mutedMaster]) item.system.dispose();
+  expect(maxAbsDiff(aux.out.left, mutedMaster.out.left)).toBe(0);
+  for (const item of [full, half, aux, mutedMaster]) item.system.dispose();
 });
 it('lands document and live master changes on the running system without restarting parts', async () => {
   const context = new FakeContext();

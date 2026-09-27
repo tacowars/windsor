@@ -224,7 +224,7 @@ describe('returns', () => {
     expect(plates(context)).toBe(1);
     system.createMusicPart('drone', PRESETS['pad-drift']!);
     system.createMusicPart('arp', PRESETS['lead-bell']!);
-    system.createSfxPart('ui', 'pickup-blip');
+    system.createAuxPart('ui', PRESETS['pickup-blip']!);
     expect(plates(context)).toBe(1);
     expect(system.returnBus('room')?.spec).toBe(RETURNS.room);
   });
@@ -269,17 +269,17 @@ describe('returns', () => {
   });
 });
 
-describe('SFX parts', () => {
+describe('aux parts', () => {
   it('reach the master through a strip, with level and pan applied and no bus inserts', async () => {
     const level = 0.5;
     const { system, engine, context } = await rig({ mix: { ui: strip({}, -1, level) } });
-    const part = system.createSfxPart('ui', 'pickup-blip');
+    const part = system.createAuxPart('ui', PRESETS['pickup-blip']!);
     const live = system.strip('ui');
     if (!live) throw new Error('no strip');
     sourceOf(part).feed = MONO;
 
     expect(part.gain.value).toBe(level);
-    // One node stands between the strip and the master, and it is the SFX
+    // One node stands between the strip and the master, and it is the aux
     // fader at unity (#518): still no bus insert, and the rendered level
     // below is unchanged because multiplying by exactly 1 is exact.
     const dryPath = nodesBetween(fake(live.rotation.output), fake(engine.master));
@@ -296,7 +296,7 @@ describe('SFX parts', () => {
 
   it('can have a touch of room, the same way a music part does', async () => {
     const { system, context } = await rig({ mix: { blip: strip({ room: 0.3 }) } });
-    sourceOf(system.createSfxPart('blip', 'pickup-blip')).feed = BURST;
+    sourceOf(system.createAuxPart('blip', PRESETS['pickup-blip']!)).feed = BURST;
     const [room] = renderGraph(context, 1, [returnOutput(system, 'room')]);
     expect(rms(room?.left ?? new Float32Array(1))).toBeGreaterThan(1e-3);
   });

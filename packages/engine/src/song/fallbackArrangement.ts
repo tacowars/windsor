@@ -11,7 +11,7 @@
 import type { ArrangementDocument, DocumentPart } from './arrangementDocument';
 import type { EuclideanSpec } from './arrangement';
 import { ARRANGEMENT_VERSION, CHORD_SIZE_TRIAD } from '../audioConstants';
-import { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from '../patch/gameplayPatches';
+import { FALLBACK_PATCH, FALLBACK_PATCH_ID } from '../patch/fallbackPatch';
 import { DEFAULT_STRIP } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
 import { DIVISORS, TICKS_PER_BAR } from '../sequencing/scheduler';
@@ -24,9 +24,9 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
   version: ARRANGEMENT_VERSION,
   transport: { bpm: 120, bars: 1 },
   // Self-contained like every other document (#562): the click carries the
-  // one patch it plays, from the gameplay table the game bundles by id, so
-  // the fallback needs no library either.
-  patches: { [GAMEPLAY_PATCH_IDS.pickupBlip]: GAMEPLAY_PATCHES[GAMEPLAY_PATCH_IDS.pickupBlip] },
+  // one patch it plays, imported by id on its own, so the fallback needs no
+  // library either.
+  patches: { [FALLBACK_PATCH_ID]: FALLBACK_PATCH },
   // No pitched part exists to draw from this; it is here because a harmony is
   // structurally required, and it is a single root on purpose — nothing musical.
   harmony: {
@@ -38,7 +38,7 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
     {
       slot: 0,
       name: 'click',
-      preset: GAMEPLAY_PATCH_IDS.pickupBlip,
+      preset: FALLBACK_PATCH_ID,
       velocity: 1,
       // Unity, centred, and with no sends — whatever a song's strips say.
       strip: DEFAULT_STRIP,

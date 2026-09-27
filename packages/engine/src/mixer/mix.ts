@@ -67,7 +67,7 @@ export type ReturnName = keyof typeof RETURNS;
 export const RETURN_NAMES = Object.keys(RETURNS) as ReturnName[];
 
 /**
- * One strip shape for every part, SFX included (record §8). `R` is the set of
+ * One strip shape for every part, aux parts included (record §8). `R` is the set of
  * return names a strip may send to; the shipped `MIX` is checked against
  * `RETURNS` at compile time, while the routing code accepts any string.
  */
@@ -104,12 +104,12 @@ export const DEFAULT_STRIP: ChannelStrip = {
 };
 
 /**
- * Where each SFX part sits, keyed by strip name — the strips `createSfxPart`
+ * Where each aux part sits, keyed by strip name — the strips `createAuxPart`
  * reaches for. Music parts are not here: since #597 each music part carries
  * its own strip in the song document, so a song's mix travels with the song.
  */
 export const MIX = {
-  place: { level: 0.9, pan: 0.3, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.08 }, inserts: [] },
+  audition: { level: 0.9, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.08 }, inserts: [] },
   ui: { level: 0.7, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {}, inserts: [] },
 } satisfies Record<string, ChannelStrip<ReturnName>>;
 

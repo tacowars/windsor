@@ -256,8 +256,7 @@ export type {
 } from './patch/patchLibrary';
 export { serialisePatchFile } from './patch/patchFileSerialise';
 export type { UnsweptPatchFile } from './patch/patchFileSerialise';
-export { GAMEPLAY_PATCHES, GAMEPLAY_PATCH_IDS } from './patch/gameplayPatches';
-export type { GameplayPatchId } from './patch/gameplayPatches';
+export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
 export {
   BEATS_PER_BAR,

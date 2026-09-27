@@ -138,8 +138,8 @@ packages/engine/src/          # folders mirror the music-engine skill's file map
                           #   retro reverb (#682), phaser (#687), ensemble (#695), delay (#698), Advanced Drive (#701)
   patch/                  # patch.ts (schema, enums; the algorithm table re-exported from the worklet),
                           #   patchNormalise.ts, patchLibrary.ts (the patches/*.json contract, #561),
-                          #   presets.ts (the whole-bank table, #562), gameplayPatches.ts (weapon-zap and
-                          #   pickup-blip, by id: a game leftover), presetCatalog.ts, patchFileSerialise.ts
+                          #   presets.ts (the whole-bank table, #562), fallbackPatch.ts (the fallback
+                          #   click's one patch, by id), presetCatalog.ts, patchFileSerialise.ts
   patches/                # the patch library: one <id>.json per patch, plus a generated index.ts
   song/                   # arrangement.ts (the part list: slot, name, preset, sequencer kind, #597),
                           #   arrangementDocument.ts (makeArrangement: the never-throws normaliser) over
@@ -197,10 +197,10 @@ is the one resolver, and on the plain playback path it is handed the document's 
 and nothing else — a name it cannot resolve is a load error naming the part and the id,
 never a fall back to the library. So improving a `patches/<id>.json` cannot change what a
 saved song sounds like. (In Aotearoa204 the game path also never imported the whole-bank
-table, so its bundler dropped the library; Windsor's app bakes the whole library.) Two
-deliberate exceptions, both by id: `gameplayPatches.ts` (the game's own sounds, still
-present as the fallback click's and the SFX route's), and the metronome fallback, which
-carries its one patch the same way every other document does.
+table, so its bundler dropped the library; Windsor's app bakes the whole library.) One
+deliberate exception, by id: `fallbackPatch.ts`, the fallback click's patch, which the
+fallback document carries the same way every other document does. `AudioSystem`'s aux
+parts take a `Patch` from their caller and resolve no name at all.
 
 The console is the only caller that relaxes the rule, through `makeArrangement`'s one
 `libraryFill` option: a document written before #562 resolves its names from the library
@@ -481,14 +481,15 @@ the filter section, and an 11-algorithm set rather than the DX7's 32. No code is
 
 Aotearoa204 adopted a sampled layer for gameplay sounds (footsteps, impacts, a baked
 `weapon-zap`) played through Babylon's spatial audio. That path (`sfx/`) was removed in
-the fork; `render/offlineRender.ts`, `patch/gameplayPatches.ts` and `AudioSystem`'s SFX
-bus remain, the last two as known follow-ups.
+the fork. `render/offlineRender.ts` remains as a general patch-to-buffer render. The
+gameplay patch table became `patch/fallbackPatch.ts` and the SFX bus became the aux bus
+(`createAuxPart`, `setAuxGain`): `docs/log/2026-09-27-aux-bus-replaces-the-game-sfx-route.md`.
 
 ### Song master (#666)
 
 Music dry paths retain their existing bus highpass; its output and both
 returns sum before the song master inserts and output level. The music bus
-output (the game's Music volume in Aotearoa204) follows this master, while the SFX
+output (the game's Music volume in Aotearoa204) follows this master, while the aux
 bus remains separate. An optional
 `master: { level, inserts }` document section stores the settings; absent means
 unity/no inserts. The console reuses insert cards for this Master strip and

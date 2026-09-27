@@ -14,8 +14,8 @@ const strips = Object.entries(MIX);
 const returns = Object.entries(RETURNS);
 
 describe('MIX', () => {
-  it('names the SFX strips only: music parts carry their own strip in the song (#597)', () => {
-    expect(Object.keys(MIX).sort()).toEqual(['place', 'ui']);
+  it('names the aux strips only: music parts carry their own strip in the song (#597)', () => {
+    expect(Object.keys(MIX).sort()).toEqual(['audition', 'ui']);
   });
 
   it('keeps every fader inside the worklet gain range, 0..4', () => {
