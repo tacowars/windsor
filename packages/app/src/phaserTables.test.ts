@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { DEFAULT_PHASER, PHASER_BOUNDS } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_PHASER, PHASER_BOUNDS } from '@windsor/engine';
 import { PHASER_KNOBS } from './phaserTables';
 
 it('exposes every numerical engine field with the engine range and default', () => {

@@ -13,7 +13,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import type { AudioPart } from '../../../packages/client/src/audio/index-for-editor';
+import type { AudioPart } from '@windsor/engine';
 import { Keyboard } from './keyboard';
 
 /** Only what `keyboard.ts` touches: `#keys`, `#octLabel`, and Panic's sweep. */

@@ -32,6 +32,7 @@ const PURE_FILES = [
   'scheduler.ts',
   'euclid.ts',
   'generatorSeed.ts',
+  'mulberry32.ts',
   'noteEvent.ts',
   'scaleSampler.ts',
   'euclideanSequencer.ts',
@@ -88,12 +89,10 @@ const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s[^;]*?\sfrom\s+['"]([^'"]+)['"]
 describe.each(PURE_FILES)('%s stays on the pure side of the boundary', (file) => {
   const source = readFileSync(join(HERE, file), 'utf8');
 
-  it('imports only the shared package and the other pure modules', () => {
+  it('imports only the other pure modules', () => {
     const specifiers = [...source.matchAll(IMPORT_RE)].map((m) => m[1]!);
     for (const spec of specifiers) {
-      const allowed =
-        spec === '@aotearoa/shared' ||
-        PURE_PATHS.has(`${join(dirname(join(HERE, file)), spec)}.ts`);
+      const allowed = PURE_PATHS.has(`${join(dirname(join(HERE, file)), spec)}.ts`);
       expect(allowed, `${file} imports ${spec}`).toBe(true);
     }
   });

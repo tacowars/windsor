@@ -3,10 +3,7 @@
  * One set for every tab — a value formatted two ways in two panels is how the
  * returns' delay time came to read `1500m` beside a glide that read `1.50s`.
  */
-import {
-  CHORD_NOTE_NAMES,
-  SEMITONES_PER_OCTAVE,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { CHORD_NOTE_NAMES, SEMITONES_PER_OCTAVE } from '@windsor/engine';
 
 const MS_PER_SECOND = 1000;
 const HZ_PER_KILOHERTZ = 1000;

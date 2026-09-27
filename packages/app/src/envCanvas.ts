@@ -4,8 +4,8 @@
  * `fm-processor.js`, so the drawing and the DSP cannot disagree. The knob
  * groups beside it are `envelopeKnobs.ts`.
  */
-import type { Envelope } from '../../../packages/client/src/audio/index-for-editor';
-import { segmentLevel } from '../../../packages/client/src/audio/index-for-editor';
+import type { Envelope } from '@windsor/engine';
+import { segmentLevel } from '@windsor/engine';
 import { LINE_BRIGHT_COLOR, LINE_COLOR } from './consoleColors';
 import {
   ENV_GUIDE_DASH,

@@ -13,7 +13,6 @@ import { patchLeafDifferences } from './patchLibrary';
 import { PATCH_LIBRARY, PRESETS } from './presets';
 
 const AUDIO = join(dirname(fileURLToPath(import.meta.url)), '..');
-const CLIENT_SRC = join(AUDIO, '..');
 const IDS = Object.values(GAMEPLAY_PATCH_IDS);
 
 describe('GAMEPLAY_PATCH_IDS', () => {
@@ -38,7 +37,7 @@ function presetLiterals(source: string): string[] {
     .filter((id) => Object.hasOwn(PATCH_LIBRARY, id));
 }
 
-/** Non-test client source, minus fixtures, the generated index and the table itself. */
+/** Non-test engine source, minus fixtures, the generated index and the table itself. */
 function gameSources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -50,24 +49,21 @@ function gameSources(dir: string): string[] {
   });
 }
 
-describe('preset literals in game code', () => {
+describe('preset literals in engine code', () => {
   it('flags a real file that spells one and passes a real file that does not', () => {
     // The full-arrangement fixture names its parts' presets by string; it is a
     // fixture, so the guard below never scans it, which is what makes it a
     // safe positive input for the classifier itself.
     const fixture = readFileSync(join(AUDIO, '__fixtures__/fullArrangement.ts'), 'utf8');
     expect(presetLiterals(fixture)).toContain('kick');
-    // sfxBuffers bakes two gameplay patches and names both through the table.
-    const sfx = readFileSync(join(AUDIO, 'sfx/sfxBuffers.ts'), 'utf8');
-    expect(presetLiterals(sfx)).toEqual([]);
     // A part slot named 'kick' is not a preset literal.
     expect(presetLiterals("const parts = ['kick', 'hat']; part: 'kick'")).toEqual([]);
   });
 
   it('are spelled nowhere outside GAMEPLAY_PATCH_IDS', () => {
-    const offenders = gameSources(CLIENT_SRC).flatMap((path) => {
+    const offenders = gameSources(AUDIO).flatMap((path) => {
       const ids = presetLiterals(readFileSync(path, 'utf8'));
-      return ids.length ? [`${relative(CLIENT_SRC, path)}: ${ids.join(', ')}`] : [];
+      return ids.length ? [`${relative(AUDIO, path)}: ${ids.join(', ')}`] : [];
     });
     expect(offenders).toEqual([]);
   });

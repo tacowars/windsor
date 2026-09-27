@@ -6,7 +6,7 @@
  * octave range `REGISTER_OCTAVE_MIN..MAX` (decision 11); the key root moved
  * to the transport strip with #708 (`transportTables.ts`'s `KEY_OPTIONS`).
  */
-import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
+import type { SequencerKind } from '@windsor/engine';
 import {
   DEFAULT_ARP_CONFIG,
   DEFAULT_BASS_CONFIG,
@@ -14,7 +14,7 @@ import {
   DEFAULT_GRID_CONFIG,
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { fmt0 } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
 

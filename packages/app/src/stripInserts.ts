@@ -7,14 +7,8 @@
  * transport and every other part keep playing.
  */
 import type { InsertTarget } from './insertTarget';
-import type {
-  InsertKindName,
-  InsertSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  INSERT_KIND_NAMES,
-  MAX_INSERTS,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { InsertKindName, InsertSpec } from '@windsor/engine';
+import { INSERT_KIND_NAMES, MAX_INSERTS } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { insertChange } from './insertTarget';
 import { el } from './dom';

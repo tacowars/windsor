@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  BASS_PITCH_MODES,
-  DEFAULT_BASS_CONFIG,
-  SCALES,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { BASS_PITCH_MODES, DEFAULT_BASS_CONFIG, SCALES, partAt } from '@windsor/engine';
 import { BASS_RESEED_SPAN } from './bassConstants';
 import {
   BASS_MODE_OPTIONS,

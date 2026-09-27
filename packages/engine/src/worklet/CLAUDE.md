@@ -99,7 +99,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
    does `scripts/lib/workletBundle.test.mjs`. Three consumers read the
    generated file and nothing else: Vite (`workletMessages.ts`, `new URL`),
-   the console (`tools/patch-editor/build-editor.mjs` inlines it behind a blob
+   the console (`packages/app/build-editor.mjs` inlines it behind a blob
    URL, which cannot resolve an import) and the harness
    (`__fixtures__/workletHarness.ts`, `readFileSync` then `new Function`; the
    plate's is `__fixtures__/reverbHarness.ts`, which reads `MAX_SIZE`,
@@ -126,13 +126,13 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    factory preset's render in all three paths against
    `__fixtures__/fmGolden.json`. A refactor never refreshes it. A DSP change
    that is intended refreshes it with
-   `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/client/src/audio/synth/fmProcessorGolden.test.ts`
+   `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts`
    and says so in the PR; the patch files' `headroom` records may then need
-   `tools/patch-editor/sweep-headroom.mjs` too. The plate's gate is
+   `packages/app/sweep-headroom.mjs` too. The plate's gate is
    `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
    fifteen scenarios in the default, `sleep: false` and `settledSkip: false`
    paths, refreshed only with
-   `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/client/src/audio/mixer/reverbGolden.test.ts`.
+   `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change.
@@ -178,7 +178,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    the types cost nothing; the bench is the proof that the emit did not
    change shape.
 
-Verify with the client's command, `npx tsc -p packages/client/src/audio/worklet/fm/tsconfig.json`
+Verify with the client's command, `npx tsc -p packages/engine/src/worklet/fm/tsconfig.json`
 (and `reverb/tsconfig.json`; both in `npm run typecheck`), then `node scripts/build-worklets.mjs --check`
-and `node tools/patch-editor/build-editor.mjs` (the console page bundles the
+and `node packages/app/build-editor.mjs` (the console page bundles the
 generated file, so its bytes change with it).

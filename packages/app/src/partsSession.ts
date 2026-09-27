@@ -10,8 +10,8 @@
  * it. `commit` is a constructor parameter — the context's document write —
  * never a module hook reassigned by whichever tab rendered last.
  */
-import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '@windsor/engine';
+import { makePatch } from '@windsor/engine';
 
 export class PartsSession {
   /** The selected part's slot (#597). */

@@ -3,8 +3,8 @@
  * display names, category and tag lists drawn from the library, tag
  * normalisation and suggestions, and the loudness warning's volume advice.
  */
-import type { UnsweptLibraryEntry } from '../../../packages/client/src/audio/index-for-editor';
-import { PATCH_ID_RULE } from '../../../packages/client/src/audio/index-for-editor';
+import type { UnsweptLibraryEntry } from '@windsor/engine';
+import { PATCH_ID_RULE } from '@windsor/engine';
 import { SUGGESTED_HEADROOM } from './libraryConstants';
 
 export type LibraryEntries = Readonly<Record<string, UnsweptLibraryEntry>>;

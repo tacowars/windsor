@@ -11,11 +11,7 @@
  * `chordOf` / `chordName` / `romanNumeral`, never a second spelling.
  * `harmonyLaneModel.test.ts` pins the fixtures the ticket names.
  */
-import type {
-  ChordSize,
-  Harmony,
-  HarmonyEvent,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ChordSize, Harmony, HarmonyEvent } from '@windsor/engine';
 import {
   CHORD_SIZE_SEVENTH,
   PPQ,
@@ -26,7 +22,7 @@ import {
   pitchClassName,
   romanNumeral,
   scaleOffsets,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 
 /** A duration as the card reads it: whole bars and the beats left over. */
 export function barsBeats(ticks: number): { bars: number; beats: number } {

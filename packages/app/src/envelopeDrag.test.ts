@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import { makePatch } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import {
   type DragPaint,

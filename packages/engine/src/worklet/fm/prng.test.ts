@@ -1,10 +1,10 @@
-import { mulberry32 } from '@aotearoa/shared';
+import { mulberry32 } from '../../sequencing/mulberry32';
 import { describe, expect, it } from 'vitest';
 
 import { makeRandom, randomSeed32 } from './prng';
 
 describe('the worklet PRNG', () => {
-  it('is mulberry32, line for line with the shared one', () => {
+  it('is mulberry32, line for line with the main-thread copy', () => {
     const ours = makeRandom(0xa204);
     const theirs = mulberry32(0xa204);
     for (let i = 0; i < 1000; i++) expect(ours()).toBe(theirs());

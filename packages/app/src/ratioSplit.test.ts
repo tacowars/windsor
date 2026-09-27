@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PATCH_LIBRARY } from '../../../packages/client/src/audio/index-for-editor';
+import { PATCH_LIBRARY } from '@windsor/engine';
 import {
   COARSE_MAX,
   COARSE_MIN,

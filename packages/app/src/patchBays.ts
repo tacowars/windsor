@@ -1,10 +1,5 @@
 /** The four operator bays of the Parts tab (#70, ported); the knob specs are `patchKnobTables.ts`. */
-import {
-  ALGORITHMS,
-  LOOP_MODE_NAMES,
-  OP_NAMES,
-  WAVE_NAMES,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { ALGORITHMS, LOOP_MODE_NAMES, OP_NAMES, WAVE_NAMES } from '@windsor/engine';
 import { CARRIER_COLOR, MOD_COLOR } from './consoleColors';
 import { $, el, html, seg } from './dom';
 import { drawEnv } from './envCanvas';

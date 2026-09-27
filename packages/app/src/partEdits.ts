@@ -8,12 +8,8 @@
  * kind's defaults through `DocumentModel.preview`, so nothing here restates
  * a default the engine owns. `ctx.restructure` is Import's and Restart's.
  */
-import type {
-  ArrangementDocument,
-  DocumentPartial,
-  SequencerKind,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { partAt, removePartChange } from '../../../packages/client/src/audio/index-for-editor';
+import type { ArrangementDocument, DocumentPartial, SequencerKind } from '@windsor/engine';
+import { partAt, removePartChange } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { addPart, setSequencerKind } from './songParts';

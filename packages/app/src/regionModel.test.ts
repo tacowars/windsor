@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { Region } from '../../../packages/client/src/audio/index-for-editor';
+import type { Region } from '@windsor/engine';
 import {
   DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
@@ -15,7 +15,7 @@ import {
   PPQ,
   TICKS_PER_BAR,
   partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import {
   addRegion,

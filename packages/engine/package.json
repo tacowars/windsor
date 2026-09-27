@@ -1,0 +1,12 @@
+{
+  "name": "@windsor/engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Windsor's audio engine: the four-operator FM synth, sequencers, harmony, mixer and inserts over Web Audio",
+  "license": "AGPL-3.0-only",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  }
+}

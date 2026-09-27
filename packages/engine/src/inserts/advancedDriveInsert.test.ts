@@ -6,7 +6,7 @@ import { ADVANCED_DRIVE_NAME } from './advancedDriveConstants';
 import { DEFAULT_ADVANCED_DRIVE } from './advancedDriveSpec';
 import { ADVANCED_DRIVE_INSERT } from './advancedDriveInsert';
 import { FmEngine } from '../synth/fmEngine';
-import { AudioSystem } from '../game/audioSystem';
+import { AudioSystem } from '../system/audioSystem';
 import { makePatch } from '../patch/patch';
 
 class AdvancedDriveNode extends FakeNode {

@@ -1,9 +1,6 @@
 /** Retro reverb controls use the engine's bounds and initial values. */
-import {
-  DEFAULT_RETRO_REVERB,
-  RETRO_REVERB_BOUNDS,
-} from '../../../packages/client/src/audio/index-for-editor';
-import type { RetroReverbSpec } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_RETRO_REVERB, RETRO_REVERB_BOUNDS } from '@windsor/engine';
+import type { RetroReverbSpec } from '@windsor/engine';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { fmt2, fmtHz, fmtMs } from './consoleFormat';
 

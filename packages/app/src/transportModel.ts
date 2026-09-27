@@ -7,11 +7,8 @@
  * every voice and rewinds to tick 0; ‖ pauses keeping the position (the
  * game's mute). The pressed state is ▶ or ‖; ■ is momentary.
  */
-import type {
-  DocumentPartial,
-  ScaleName,
-} from '../../../packages/client/src/audio/index-for-editor';
-import { SCALE_NAMES } from '../../../packages/client/src/audio/index-for-editor';
+import type { DocumentPartial, ScaleName } from '@windsor/engine';
+import { SCALE_NAMES } from '@windsor/engine';
 import { POSITION_GRID, type PositionGrid } from './transportTables';
 
 export type TransportState = 'idle' | 'playing' | 'paused';

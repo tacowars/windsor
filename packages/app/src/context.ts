@@ -5,10 +5,7 @@
  * no import cycle. The names are the surface the cards and panels call, and
  * they stay put when the implementation moves (#620).
  */
-import type {
-  ApplyResult,
-  DocumentPartial,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ApplyResult, DocumentPartial } from '@windsor/engine';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import type { PartsSession } from './partsSession';

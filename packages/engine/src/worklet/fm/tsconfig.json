@@ -12,7 +12,7 @@
   // there too, under its stricter flags. `npm run typecheck` runs
   // it as its own `tsc -p`; esbuild bundles from it; ESLint's `.ts` rules
   // apply as everywhere.
-  "extends": "../../../../../../tsconfig.base.json",
+  "extends": "../../../../../tsconfig.base.json",
   "compilerOptions": {
     "composite": false,
     "declaration": false,

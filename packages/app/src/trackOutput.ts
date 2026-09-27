@@ -1,5 +1,5 @@
 /** Audible output switches live without touching the post-FX detector signal. */
-import { partAt } from '../../../packages/client/src/audio/index-for-editor';
+import { partAt } from '@windsor/engine';
 import { type AppCtx, partChange } from './context';
 import { el } from './dom';
 export function trackOutput(ctx: AppCtx, slot: number): HTMLElement {

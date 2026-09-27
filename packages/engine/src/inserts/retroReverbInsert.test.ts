@@ -6,7 +6,7 @@ import { RETRO_REVERB_NAME } from './retroReverbConstants';
 import { DEFAULT_RETRO_REVERB } from './retroReverbSpec';
 import { RETRO_REVERB_INSERT } from './retroReverbInsert';
 import { FmEngine } from '../synth/fmEngine';
-import { AudioSystem } from '../game/audioSystem';
+import { AudioSystem } from '../system/audioSystem';
 import { makePatch } from '../patch/patch';
 
 class RetroNode extends FakeNode {

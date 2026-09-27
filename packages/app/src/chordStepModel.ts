@@ -10,13 +10,7 @@
  * wholesale. Which step the transport is on is the engine's answer, not a
  * copy here: the card's playhead reads `host.stepAt` (#619 decision 2).
  */
-import type {
-  ChordHitStep,
-  ChordSpec,
-  ChordStep,
-  Harmony,
-  HarmonyChord,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ChordHitStep, ChordSpec, ChordStep, Harmony, HarmonyChord } from '@windsor/engine';
 import {
   CHORD_DURATIONS,
   CHORD_INVERSION_MAX,
@@ -32,7 +26,7 @@ import {
   romanNumeral,
   scaleOffsets,
   voiceHit,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 
 export { CHORD_STEPS_MAX };
 

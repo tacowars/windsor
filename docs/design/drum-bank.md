@@ -1,6 +1,6 @@
 # Drum bank: TR-808, TR-909 and Elektron-style FM
 
-Thirty-seven percussion patches in `packages/client/src/audio/patches/`
+Thirty-seven percussion patches in `packages/engine/src/patches/`
 under the **Drums** category: fifteen `tr808-*`, eleven `tr909-*` and eleven
 `efm-*` (the Machinedrum's "Enhanced FM" drum family, the Elektron shape).
 Each file's `description` is its audition note. This page records how the
@@ -106,7 +106,7 @@ an open one.
 ## Verification and what it cannot say
 
 Each file carries a 16,384-seed headroom record from
-`tools/patch-editor/sweep-headroom.mjs`; the render is a quarter-second note
+`packages/app/sweep-headroom.mjs`; the render is a quarter-second note
 at velocity 0.9. The lab used to author the bank measured, per patch, the
 peak, the time to −20 / −40 / −60 dB, spectral centroid over the first,
 mid and late windows, the strongest partials and a 1 ms amplitude view of

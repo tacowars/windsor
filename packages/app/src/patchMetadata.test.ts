@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PATCH_LIBRARY } from '../../../packages/client/src/audio/index-for-editor';
+import { PATCH_LIBRARY } from '@windsor/engine';
 import { SUGGESTED_HEADROOM } from './libraryConstants';
 import {
   categoriesOf,

@@ -6,8 +6,8 @@
  * peak and a suggested volume; it never blocks the write, because
  * `npm run verify` and the 16,384-seed sweep are the hard gate.
  */
-import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
-import { renderPatchToBuffer } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '@windsor/engine';
+import { renderPatchToBuffer } from '@windsor/engine';
 import { LOUDNESS_RENDER, LOUDNESS_SEEDS } from './libraryConstants';
 import { suggestedVolume } from './patchMetadata';
 
@@ -52,14 +52,10 @@ export function loudnessVerdict(
   };
 }
 
-/** A data URL for the inlined worklet: the one module form every origin, `file://` included, loads. */
-export const workletDataUrl = (source: string): string =>
-  `data:application/javascript;charset=utf-8,${encodeURIComponent(source)}`;
-
 /** Render the check's seeds through the engine and judge them. */
 export async function checkLoudness(
   patch: Patch,
-  workletUrl: string,
+  workletUrl?: string | URL,
   seeds: number = LOUDNESS_SEEDS,
 ): Promise<LoudnessResult> {
   const { sampleRate, noteOffFrame, blocks, blockFrames } = LOUDNESS_RENDER;
@@ -73,7 +69,7 @@ export async function checkLoudness(
       sampleRate,
       maxVoices: LOUDNESS_RENDER.voices,
       seed,
-      workletUrl,
+      ...(workletUrl === undefined ? {} : { workletUrl }),
     });
     peaks.push({ seed, peak: peakOf(buffer) });
   }

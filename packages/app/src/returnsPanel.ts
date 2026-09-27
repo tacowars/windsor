@@ -7,7 +7,7 @@
  * delay time to a note value at the document's bpm; the time is what is
  * stored, so a later bpm change needs the button pressed again.
  */
-import type { ReturnSpec, ReverbSpace } from '../../../packages/client/src/audio/index-for-editor';
+import type { ReturnSpec, ReverbSpace } from '@windsor/engine';
 import {
   DELAY_FEEDBACK_MAX,
   DELAY_MAX_SECONDS,
@@ -19,7 +19,7 @@ import {
   SECONDS_PER_MINUTE,
   SPACES,
   SPACE_NAMES,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { RETURN_COLOR } from './consoleColors';
 import { fmt2, fmtDb, fmtHz, fmtMs } from './consoleFormat';
 import type { AppCtx } from './context';
@@ -211,7 +211,7 @@ export function renderReturnsSection(ctx: AppCtx): HTMLElement {
     'The plate (every parameter), the delay (time, regeneration, damping) and both levels land in ' +
       'the document (returns section) and on the live buses; the tempo buttons set the delay time to a ' +
       'note value at the document bpm. ' +
-      'Which returns exist is code-owned (packages/client/src/audio/mixer/mix.ts).',
+      'Which returns exist is code-owned (packages/engine/src/mixer/mix.ts).',
   );
   for (const name of RETURN_NAMES) returns.body.appendChild(returnRow(ctx, name));
   return returns.root;

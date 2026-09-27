@@ -11,11 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  PATCH_LIBRARY,
-  clonePatch,
-  makeArrangement,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { PATCH_LIBRARY, clonePatch, makeArrangement } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import { keyTarget } from './knob';
 import type { PatchEditor } from './partsSession';

@@ -1,6 +1,6 @@
 /**
- * The one esbuild prelude the console's Node scripts share (#620 decision 5):
- * bundle a handful of exports from `packages/client/src/audio` — TypeScript
+ * The one esbuild prelude the library's Node scripts share (#620 decision 5):
+ * bundle a handful of exports from `packages/engine/src` — TypeScript
  * the scripts cannot import directly — into a cache file and import that.
  * `import-patches.mjs`, `sweep-headroom.mjs` and `migrate-patches-586.mjs`
  * each used to carry their own copy of this.
@@ -15,8 +15,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** `packages/client/src/audio`, the directory every bundled export resolves from. */
-export const AUDIO_DIR = resolve(HERE, '../../../packages/client/src/audio');
+/** `packages/engine/src`, the directory every bundled export resolves from. */
+export const AUDIO_DIR = resolve(HERE, '../../engine/src');
 
 /** A cache name is one slug: the file lands in `node_modules/` of the cwd (the repo root). */
 export const CACHE_NAME_RULE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -49,27 +49,4 @@ export async function loadAudioExports(exportsSource, cacheName) {
   const options = audioBundleOptions(exportsSource, cacheName);
   await build(options);
   return import(pathToFileURL(options.outfile).href);
-}
-
-/**
- * The console page's own bundle (`build-editor.mjs`): `src/main.ts` with the
- * engine behind `index-for-editor.ts`, as one browser IIFE, returned as text.
- * `workletMessages.ts` builds its default URLs from `import.meta.url`, which
- * an IIFE lacks; the host always passes blob-URL overrides, so the defaults
- * only need to *construct* without throwing.
- */
-export async function bundleConsoleApp(entryPoint) {
-  const bundle = await build({
-    entryPoints: [entryPoint],
-    bundle: true,
-    write: false,
-    format: 'iife',
-    target: 'es2022',
-    platform: 'browser',
-    legalComments: 'none',
-    define: { 'import.meta.url': 'self.location.href' },
-  });
-  const [output] = bundle.outputFiles;
-  if (!output) throw new Error('the console bundle produced no output');
-  return output.text;
 }

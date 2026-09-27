@@ -5,7 +5,7 @@ import {
   RETRO_REVERB_MODES,
   applyRetroPreset,
   matchingRetroPreset,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { RETRO_REVERB_KNOBS } from './retroReverbTables';
 import { insertChange } from './insertTarget';
 import { el } from './dom';

@@ -7,12 +7,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  HEADROOM_RENDER,
-  peakAt,
-} from '../../../packages/client/src/audio/__fixtures__/headroomSweep';
-import { loadProcessor } from '../../../packages/client/src/audio/__fixtures__/workletHarness';
-import { PATCH_LIBRARY, clonePatch } from '../../../packages/client/src/audio/index-for-editor';
+import { HEADROOM_RENDER, peakAt } from '../../engine/src/__fixtures__/headroomSweep';
+import { loadProcessor } from '../../engine/src/__fixtures__/workletHarness';
+import { PATCH_LIBRARY, clonePatch } from '../../engine/src/index';
 import { LOUDNESS_RENDER, LOUDNESS_SEEDS } from '../src/libraryConstants';
 import { loudnessVerdict } from '../src/loudnessCheck';
 

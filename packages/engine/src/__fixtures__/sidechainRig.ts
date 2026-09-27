@@ -3,7 +3,7 @@ import { FakeContext, FakeWorkletNode } from './fakeAudioContext';
 import { BLOCK, FakeNode, FakeParam } from './fakeAudioNodes';
 import { compressorParams, loadCompressor } from './compressorHarness';
 import { COMPRESSOR_NAME } from '../inserts/compressorConstants';
-import { AudioSystem } from '../game/audioSystem';
+import { AudioSystem } from '../system/audioSystem';
 import { FmEngine } from '../synth/fmEngine';
 import { FULL_DOCUMENT } from './fullArrangement';
 import type { ArrangementDocument } from '../song/arrangementDocument';

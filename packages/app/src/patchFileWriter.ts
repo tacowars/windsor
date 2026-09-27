@@ -4,16 +4,8 @@
  * package's one serialiser so the bytes match the #561 migration's, and — when
  * no folder is connected — handed to the browser as a download.
  */
-import type {
-  HeadroomRecord,
-  Patch,
-  UnsweptPatchFile,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  PATCH_FILE_FORMAT,
-  makePatch,
-  serialisePatchFile,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { HeadroomRecord, Patch, UnsweptPatchFile } from '@windsor/engine';
+import { PATCH_FILE_FORMAT, makePatch, serialisePatchFile } from '@windsor/engine';
 import type { PatchMetadata } from './patchMetadata';
 
 /**

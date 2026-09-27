@@ -41,7 +41,7 @@ describe('the esbuild options', () => {
     const banner = bannerFor(fm);
     expect(options.banner.js).toBe(banner);
     expect(banner).toContain('GENERATED');
-    expect(banner).toContain('packages/client/src/audio/worklet/fm/');
+    expect(banner).toContain('packages/engine/src/worklet/fm/');
     expect(banner).toContain(REBUILD_COMMAND);
     expect(banner).toContain('--check');
   });

@@ -5,10 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  FULL_ARRANGEMENT,
-  FULL_SLOT,
-} from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
+import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import {
   GAMEPLAY_PATCH_IDS,
   PATCH_LIBRARY,
@@ -17,8 +14,8 @@ import {
   loadUnsweptPatchFile,
   makePatch,
   partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
-import type { DocumentPartial } from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
+import type { DocumentPartial } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
@@ -44,7 +41,7 @@ import {
   unsavedQuestion,
 } from './patchActions';
 import { revertPatch } from './patchLibrary';
-import { serialisePatchFile } from '../../../packages/client/src/audio/index-for-editor';
+import { serialisePatchFile } from '@windsor/engine';
 
 /** An in-memory folder seeded with a few real library files. */
 function fakeFolder(ids: string[]): PatchFolder & { files: Map<string, string> } {

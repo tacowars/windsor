@@ -8,8 +8,8 @@
  * decision 3); every control here is handed a `PatchEditor` over it, built
  * once per render, whose push also keeps the rail's picker and marker honest.
  */
-import type { PartialPatch } from '../../../packages/client/src/audio/index-for-editor';
-import { clonePatch, makePatch, partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type { PartialPatch } from '@windsor/engine';
+import { clonePatch, makePatch, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { $, el, seg } from './dom';
 import type { Keyboard } from './keyboard';

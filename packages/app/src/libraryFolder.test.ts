@@ -6,10 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  PATCH_LIBRARY,
-  serialisePatchFile,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { PATCH_LIBRARY, serialisePatchFile } from '@windsor/engine';
 import type { ChromeDirectoryHandle } from './libraryFolder';
 import { readFolderLibrary, wrapDirectoryHandle } from './libraryFolder';
 

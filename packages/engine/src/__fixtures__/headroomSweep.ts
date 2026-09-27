@@ -1,6 +1,6 @@
 /**
  * Node-only real-DSP clip sweep shared by `fmProcessorHeadroom.test.ts` and
- * the offline record writer (`tools/patch-editor/sweep-headroom.mjs`, which
+ * the offline record writer (`packages/app/sweep-headroom.mjs`, which
  * bundles this file with esbuild). One definition of the render every headroom
  * number in the library was measured with, so a `worstSeed` recorded by the
  * tool is the seed the test renders.

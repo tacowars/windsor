@@ -1,13 +1,6 @@
 /** Native keyboard-accessible browsing; filtering never changes the song. */
-import {
-  clonePatch,
-  filterPresets,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
-import type {
-  PresetFilter,
-  PresetListing,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { clonePatch, filterPresets, partAt } from '@windsor/engine';
+import type { PresetFilter, PresetListing } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, select } from './dom';

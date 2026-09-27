@@ -5,11 +5,8 @@
  * baked into the page. One model, read by the browser, the badge and the
  * actions, so a save shows up everywhere without a rebuild.
  */
-import type { Patch, PresetListing } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  PATCH_LIBRARY,
-  loadUnsweptPatchFile,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch, PresetListing } from '@windsor/engine';
+import { PATCH_LIBRARY, loadUnsweptPatchFile } from '@windsor/engine';
 import type { PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
 import { LIBRARY_FOLDER_PATH, isInitPreset } from './libraryConstants';

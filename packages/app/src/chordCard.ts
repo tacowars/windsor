@@ -13,16 +13,8 @@
  * playhead loop are `stepStrip.ts` (#619), shared with the grid (#603) and
  * Euclidean (#610) cards.
  */
-import type {
-  ChordSpec,
-  ChordStep,
-  HarmonyChord,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  CHORD_DIVISORS,
-  partAt,
-  songTicksOf,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ChordSpec, ChordStep, HarmonyChord } from '@windsor/engine';
+import { CHORD_DIVISORS, partAt, songTicksOf } from '@windsor/engine';
 import { CHORD_AUDITION_VELOCITY } from './chordConstants';
 import { chordPicker, type Picker } from './chordPicker';
 import {

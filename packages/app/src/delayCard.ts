@@ -6,8 +6,8 @@ import {
   DELAY_PRESETS,
   applyDelayPreset,
   matchingDelayPreset,
-} from '../../../packages/client/src/audio/index-for-editor';
-import type { DelaySpec } from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
+import type { DelaySpec } from '@windsor/engine';
 import { DELAY_KNOBS, DELAY_MODE_LABELS } from './delayTables';
 import { insertChange } from './insertTarget';
 import { el } from './dom';

@@ -3,8 +3,8 @@
  * divisors and the note names. Data, not logic — `sequencerKnobTables.ts`
  * holds the knob specs.
  */
-import type { SequencerKind } from '../../../packages/client/src/audio/index-for-editor';
-import { CHORD_NOTE_NAMES } from '../../../packages/client/src/audio/index-for-editor';
+import type { SequencerKind } from '@windsor/engine';
+import { CHORD_NOTE_NAMES } from '@windsor/engine';
 
 /** One spelling per kind, in the part list's picker and on each card's header. */
 export const KIND_LABELS: Readonly<Record<SequencerKind, string>> = {

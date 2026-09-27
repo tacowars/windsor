@@ -10,18 +10,8 @@
 /* eslint-disable max-lines -- one fixture (the fake console) over every context rule; #709 added the Song view's three cases and the file sits 3 % over */
 import { describe, expect, it } from 'vitest';
 
-import type {
-  ApplyResult,
-  AudioPart,
-  DocumentPartial,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  PRESETS,
-  TICKS_PER_BAR,
-  clonePatch,
-  makePatch,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ApplyResult, AudioPart, DocumentPartial } from '@windsor/engine';
+import { PRESETS, TICKS_PER_BAR, clonePatch, makePatch, partAt } from '@windsor/engine';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';

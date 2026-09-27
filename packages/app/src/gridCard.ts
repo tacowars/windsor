@@ -11,8 +11,8 @@
  * and where the playhead is — is `stepStrip.ts` (#619), shared with the chord
  * (#607) and Euclidean (#610) cards.
  */
-import type { GridSpec } from '../../../packages/client/src/audio/index-for-editor';
-import { scaleOffsets } from '../../../packages/client/src/audio/index-for-editor';
+import type { GridSpec } from '@windsor/engine';
+import { scaleOffsets } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { PITCH_COLOR } from './consoleColors';

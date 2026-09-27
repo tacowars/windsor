@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EuclideanSpec } from '../../../packages/client/src/audio/index-for-editor';
+import type { EuclideanSpec } from '@windsor/engine';
 import {
   DEFAULT_EUCLIDEAN_CONFIG,
   DIVISORS,
   PPQ,
   euclid,
   patternFromString,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { pulseDefault } from './sequencerKnobTables';
 import {
   EUCLID_STEPS_MAX,

@@ -3,12 +3,10 @@
  *
  * Two things are pinned here beyond the arithmetic: that the window really
  * rolls (a cost from two seconds ago must not still be in the p95 a listening
- * session reads), and that the percentile method is the bench's, so the
- * overlay's p95 and a bench line's p95 cannot mean two different things.
+ * session reads), and that the percentile method is nearest-rank, the one
+ * Aotearoa204's bench used, so a p95 read here means what it meant there.
  */
 import { describe, expect, it } from 'vitest';
-import { QUANTILES } from '../../bench/benchConstants.js';
-import { percentile } from '../../bench/summary.js';
 import { AUDIO_SCHED_QUANTILE } from '../audioConstants';
 import { SchedCostMeter, ZERO_SCHED_COST } from './schedCost';
 
@@ -74,19 +72,23 @@ describe('SchedCostMeter', () => {
   });
 });
 
-describe('the percentile is the bench’s (one definition, #147 item 7)', () => {
-  it('reports the quantile the bench reports', () => {
-    expect(AUDIO_SCHED_QUANTILE).toBe(QUANTILES.p95);
+/** Nearest-rank percentile, as Aotearoa204's bench computed it (`bench/summary.ts` there). */
+const nearestRank = (sorted: readonly number[], q: number): number =>
+  sorted[Math.min(sorted.length, Math.max(1, Math.ceil(q * sorted.length))) - 1] ?? 0;
+
+describe('the percentile is nearest-rank (#147 item 7)', () => {
+  it('reports the p95', () => {
+    expect(AUDIO_SCHED_QUANTILE).toBe(0.95);
   });
 
-  it('agrees with bench/summary.ts percentile on the same samples', () => {
-    // Nearest-rank, both sides. A run of 20 costs makes the rank land off a
-    // round boundary, which is where two methods would disagree.
+  it('agrees with a nearest-rank percentile on the same samples', () => {
+    // A run of 15 costs makes the rank land off a round boundary, which is
+    // where two methods would disagree.
     const costs = [0.9, 0.1, 0.4, 0.2, 0.8, 0.3, 0.7, 0.5, 0.6, 1.0, 0.15, 0.25, 0.35, 0.45, 0.55];
     const clock = { t: 0 };
     const meter = meterAt(clock);
     for (const ms of costs) meter.sample(ms);
     const sorted = [...costs].sort((a, b) => a - b);
-    expect(meter.readout().p95Ms).toBe(percentile(sorted, QUANTILES.p95));
+    expect(meter.readout().p95Ms).toBe(nearestRank(sorted, AUDIO_SCHED_QUANTILE));
   });
 });

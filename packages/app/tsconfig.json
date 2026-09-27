@@ -1,10 +1,8 @@
 {
-  // The arrangement console's modules (#70). Bundled by build-editor.mjs
-  // (esbuild strips types without checking them), so this config is the type
-  // gate: `npx tsc -p tools/patch-editor/tsconfig.json`, run by the root
-  // `npm run typecheck`. The imports reach straight into
-  // packages/client/src/audio, which is the point — the console is typed
-  // against the real engine's API, not a copy of it.
+  // The app's modules and tests. Vite strips types without checking them, so
+  // this config is the type gate (`npm run typecheck`). The app reaches the
+  // engine through `@windsor/engine` only; its tests may also import the
+  // engine's fixtures by subpath (`@windsor/engine/__fixtures__/…`).
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
@@ -13,7 +11,7 @@
     "declarationMap": false,
     "sourceMap": false,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": []
+    "types": ["vite/client"]
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }

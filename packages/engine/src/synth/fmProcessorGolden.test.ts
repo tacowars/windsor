@@ -26,7 +26,7 @@ import type { CreateOptions, ScheduledEvent } from '../__fixtures__/workletHarne
 import { PRESET_NAMES, PRESETS } from '../patch/presets';
 
 const REFRESH =
-  'A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/client/src/audio/synth/fmProcessorGolden.test.ts';
+  'A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts';
 const refreshing = process.env['A204_REFRESH_FM_GOLDEN'] === '1';
 const TABLE = fileURLToPath(new URL('../__fixtures__/fmGolden.json', import.meta.url));
 

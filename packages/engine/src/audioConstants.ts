@@ -11,11 +11,6 @@
  * Nothing here feeds simulation state (root invariant 4): audio observes.
  */
 
-/* ------------------------------ the music ------------------------------- */
-
-/** The committed `arrangements/<name>.json` the game plays unless `?music=<name>` says otherwise. */
-export const DEFAULT_ARRANGEMENT_NAME = 'bed-01';
-
 /* ---------------------------- tempo and time ---------------------------- */
 
 /** The transport's tempo when a document or a scheduler does not name one. */
@@ -25,6 +20,8 @@ export const BPM_MIN = 20;
 export const BPM_MAX = 300;
 
 export const SECONDS_PER_MINUTE = 60;
+/** Milliseconds per second: the ramp and smoothing times are written in ms. */
+export const MS_PER_SECOND = 1000;
 
 /** Notes of each value in one bar — the denominators of `DIVISORS`. */
 export const NOTES_PER_BAR = {

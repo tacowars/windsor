@@ -6,7 +6,7 @@ import { DELAY_NAME } from './delayConstants';
 import { DEFAULT_DELAY } from './delaySpec';
 import { DELAY_INSERT } from './delayInsert';
 import { FmEngine } from '../synth/fmEngine';
-import { AudioSystem } from '../game/audioSystem';
+import { AudioSystem } from '../system/audioSystem';
 import { FULL_DOCUMENT } from '../__fixtures__/fullArrangement';
 import { makePatch } from '../patch/patch';
 

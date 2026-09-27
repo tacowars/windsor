@@ -22,7 +22,7 @@ import {
   ENSEMBLE_BOUNDS,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { INSERT_CARDS } from './insertCards';
 import { CHORUS_KNOBS, DRIVE_KNOBS, ENSEMBLE_KNOBS, INSERT_LABELS } from './insertKnobTables';
 

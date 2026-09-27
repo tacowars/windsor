@@ -1,6 +1,6 @@
 /**
  * The pure half of `scripts/patch-library-index.mjs` (#561): which files in
- * `packages/client/src/audio/patches/` are patches, and the text of the
+ * `packages/engine/src/patches/` are patches, and the text of the
  * `index.ts` that imports every one of them statically. Static imports are the
  * one mechanism Vite (the game), esbuild (the standalone editor) and Vitest
  * share — `import.meta.glob` is Vite-only — so the index is generated and

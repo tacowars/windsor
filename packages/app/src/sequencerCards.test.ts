@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { SEQUENCER_KINDS } from '../../../packages/client/src/audio/index-for-editor';
+import { SEQUENCER_KINDS } from '@windsor/engine';
 import { SEQUENCER_CARDS } from './sequencerCards';
 import { KIND_LABELS } from './sequencerConstants';
 

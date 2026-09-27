@@ -1,0 +1,39 @@
+{
+  "name": "windsor",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Windsor: a browser-based FM sequencer and DAW",
+  "license": "AGPL-3.0-only",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "npm run dev -w packages/app --",
+    "build": "npm run build -w packages/app",
+    "preview": "npm run preview -w packages/app --",
+    "typecheck": "tsc -p packages/engine/tsconfig.json && tsc -p packages/engine/tsconfig.test.json && tsc -p packages/app/tsconfig.json && tsc -p packages/engine/src/worklet/fm/tsconfig.json && tsc -p packages/engine/src/worklet/compressor/tsconfig.json && tsc -p packages/engine/src/worklet/meter/tsconfig.json && tsc -p packages/engine/src/worklet/reverb/tsconfig.json && tsc -p packages/engine/src/worklet/retro/tsconfig.json && tsc -p packages/engine/src/worklet/advancedDrive/tsconfig.json && tsc -p packages/engine/src/worklet/phaser/tsconfig.json && tsc -p packages/engine/src/worklet/delay/tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "worklets": "node scripts/build-worklets.mjs --check",
+    "patch-index": "node scripts/patch-library-index.mjs --check",
+    "verify:quick": "npm run typecheck && npm run lint && npm run format:check && npm run test",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run worklets && npm run patch-index && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@types/node": "^26.4.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
+  }
+}

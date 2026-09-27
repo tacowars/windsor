@@ -5,11 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  PATCH_LIBRARY,
-  loadPatchFile,
-  loadUnsweptPatchFile,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { PATCH_LIBRARY, loadPatchFile, loadUnsweptPatchFile } from '@windsor/engine';
 import { buildPatchFile, patchFileBlob, patchFileName, patchFileText } from './patchFileWriter';
 
 const entry = PATCH_LIBRARY['lead-bell']!;

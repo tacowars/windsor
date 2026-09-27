@@ -53,7 +53,7 @@ describe('serialisePatchFile', () => {
     const text = serialisePatchFile(entry);
     expect(loadPatchFile(entry.id, JSON.parse(text))).toEqual(entry);
     // The sweep's own reader is a plain `JSON.parse` of the file (`readFile`).
-    const sweep = readFileSync('tools/patch-editor/sweep-headroom.mjs', 'utf8');
+    const sweep = readFileSync('packages/app/sweep-headroom.mjs', 'utf8');
     expect(sweep).toContain('serialisePatchFile(file)');
     expect(sweep).not.toContain("JSON.stringify(file, null, 2) + '\\n'");
   });

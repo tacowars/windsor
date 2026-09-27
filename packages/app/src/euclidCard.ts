@@ -11,7 +11,7 @@
  * The operations are `euclidModel.ts`; the playhead loop and its lighting are
  * `stepStrip.ts` (#619), shared with the grid (#603) and chord (#607) cards.
  */
-import type { EuclideanSpec } from '../../../packages/client/src/audio/index-for-editor';
+import type { EuclideanSpec } from '@windsor/engine';
 import { PERC_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { partChange } from './context';

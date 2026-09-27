@@ -1,6 +1,6 @@
 /** Engine-owned limits/defaults; times are milliseconds and divisions are quarter-note beats. */
-import { DEFAULT_DELAY, DELAY_BOUNDS } from '../../../packages/client/src/audio/index-for-editor';
-import type { DelaySpec } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_DELAY, DELAY_BOUNDS } from '@windsor/engine';
+import type { DelaySpec } from '@windsor/engine';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { fmt2, fmtDb, fmtHz } from './consoleFormat';
 const fields = [

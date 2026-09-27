@@ -5,7 +5,7 @@
  * `afterWriteCommands.test.mjs` pins the two equal (#620 decision 7).
  */
 export const AFTER_WRITE_COMMANDS = [
-  'node tools/patch-editor/sweep-headroom.mjs --stale',
+  'node packages/app/sweep-headroom.mjs --stale',
   'node scripts/patch-library-index.mjs --write',
-  'npx prettier --write packages/client/src/audio/patches',
+  'npx prettier --write packages/engine/src/patches',
 ];

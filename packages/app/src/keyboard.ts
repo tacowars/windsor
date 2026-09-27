@@ -2,8 +2,8 @@
  * The audition keyboard (#70): plays the Parts tab's selected part through
  * the real engine — `part.noteOn`/`noteOff`, nothing local.
  */
-import type { AudioPart } from '../../../packages/client/src/audio/index-for-editor';
-import { SEMITONES_PER_OCTAVE } from '../../../packages/client/src/audio/index-for-editor';
+import type { AudioPart } from '@windsor/engine';
+import { SEMITONES_PER_OCTAVE } from '@windsor/engine';
 import { $, el } from './dom';
 import {
   BLACK_KEYS,

@@ -4,12 +4,8 @@
  * `strip` in the document and the live system; the returns — space, level, the delay line — go through the
  * document's `returns` section the same way (`returnsPanel.ts`).
  */
-import type { ChannelStrip } from '../../../packages/client/src/audio/index-for-editor';
-import {
-  DEFAULT_STRIP,
-  RETURN_NAMES,
-  partAt,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { ChannelStrip } from '@windsor/engine';
+import { DEFAULT_STRIP, RETURN_NAMES, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { RETURN_COLOR, STRIP_COLOR } from './consoleColors';

@@ -12,11 +12,8 @@ import {
   ADVANCED_DRIVE_PRESETS,
   applyAdvancedDrivePreset,
   matchingAdvancedDrivePreset,
-} from '../../../packages/client/src/audio/index-for-editor';
-import type {
-  AdvancedDriveSpec,
-  DriveStageSpec,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
+import type { AdvancedDriveSpec, DriveStageSpec } from '@windsor/engine';
 import type { InsertCard } from './insertCards';
 import { insertChange, insertsOf } from './insertTarget';
 import { el } from './dom';

@@ -1,17 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_COMPRESSOR } from '../../../packages/client/src/audio/inserts/compressorSpec';
-import { FULL_DOCUMENT } from '../../../packages/client/src/audio/__fixtures__/fullArrangement';
-import { makeArrangement } from '../../../packages/client/src/audio/song/arrangementDocument';
-import {
-  removePart,
-  removePartChange,
-} from '../../../packages/client/src/audio/song/documentParts';
+import { DEFAULT_COMPRESSOR } from '@windsor/engine/inserts/compressorSpec';
+import { FULL_DOCUMENT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { makeArrangement } from '@windsor/engine/song/arrangementDocument';
+import { removePart, removePartChange } from '@windsor/engine/song/documentParts';
 import {
   documentSidechains,
   invalidSidechains,
   canSidechain,
-} from '../../../packages/client/src/audio/mixer/sidechainGraph';
-import { planSidechains } from '../../../packages/client/src/audio/mixer/sidechainPlan';
+} from '@windsor/engine/mixer/sidechainGraph';
+import { planSidechains } from '@windsor/engine/mixer/sidechainPlan';
 import { DocumentModel } from './documentModel';
 const comp = (track: number | null) => ({ ...DEFAULT_COMPRESSOR, sidechain: { track } });
 const document = () => ({

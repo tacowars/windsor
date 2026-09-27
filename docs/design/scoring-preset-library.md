@@ -5,7 +5,7 @@ techno: 16 strings, 24 pads, 20 plucks, 16 basses and 24 soundtrack FX.
 The original 14 IDs remain valid. Four gameplay sounds are available under
 **Legacy game FX**, outside the default **All musical sounds** view.
 
-Open `tools/patch-editor/patch-editor.html`, enable audio, select a part and
+Open `packages/app/patch-editor.html`, enable audio, select a part and
 use the Parts rail's search, category, tag and source filters. Search words
 match across names, IDs, tags and playing notes; all words must match.
 Filters intersect. Arrow keys browse the native result list; **Enter**,
@@ -187,7 +187,7 @@ an arbitrary arrangement, mixer gain or feedback setting will not overload.
 ## Extending the bank
 
 Since #561 every scoring patch is one file,
-`packages/client/src/audio/patches/score-<slug>.json`, holding the full
+`packages/engine/src/patches/score-<slug>.json`, holding the full
 normalised patch with its category, tags, audition note (`description`)
 and headroom record; the recipe rows and the voicing module that expanded
 them were retired once the expanded patches were frozen as data
@@ -204,10 +204,10 @@ After changing a sound, rewrite its headroom record and run the real-DSP
 checks (from the repo root):
 
 ```sh
-node tools/patch-editor/sweep-headroom.mjs <id…|--stale> [--seeds <n>]
-npx prettier --write packages/client/src/audio/patches
-npx vitest run packages/client/src/audio/patch/presetCatalog.test.ts packages/client/src/audio/patch/patchLibraryEnvelope.test.ts packages/client/src/audio/synth/fmProcessorHeadroom.test.ts tools/patch-editor/src/presetBrowser.test.ts
-node tools/patch-editor/build-editor.mjs
+node packages/app/sweep-headroom.mjs <id…|--stale> [--seeds <n>]
+npx prettier --write packages/engine/src/patches
+npx vitest run packages/engine/src/patch/presetCatalog.test.ts packages/engine/src/patch/patchLibraryEnvelope.test.ts packages/engine/src/synth/fmProcessorHeadroom.test.ts packages/app/src/presetBrowser.test.ts
+node packages/app/build-editor.mjs
 ```
 
 The sweep's default is 16,384 seeds (about 6 s per patch on a dev machine);

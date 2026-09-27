@@ -6,17 +6,8 @@
  * tile, carries a ghost onto a step of the card's strip. The press-and-drag
  * behaviour is `chordDrag.ts`'s state machine; this file is its DOM.
  */
-import type {
-  AudioPart,
-  ChordSpec,
-  ChordVoicingId,
-  Harmony,
-  HarmonyChord,
-} from '../../../packages/client/src/audio/index-for-editor';
-import {
-  CHORD_VOICINGS,
-  CHORD_VOICING_IDS,
-} from '../../../packages/client/src/audio/index-for-editor';
+import type { AudioPart, ChordSpec, ChordVoicingId, Harmony, HarmonyChord } from '@windsor/engine';
+import { CHORD_VOICINGS, CHORD_VOICING_IDS } from '@windsor/engine';
 import { CHORD_AUDITION_VELOCITY, CHORD_GHOST_OFFSET } from './chordConstants';
 import {
   type ChordDragController,

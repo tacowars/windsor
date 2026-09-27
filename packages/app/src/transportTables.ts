@@ -13,7 +13,7 @@ import {
   PPQ,
   SCALE_NAMES,
   TICKS_PER_BAR,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import { fmt0 } from './consoleFormat';
 import type { KnobSpec } from './knob';
 import { NEW_SONG_BARS, NEW_SONG_BPM } from './songConstants';

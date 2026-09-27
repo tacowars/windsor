@@ -7,9 +7,9 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { makePatch } from '../../../packages/client/src/audio/index-for-editor';
+import { makePatch } from '@windsor/engine';
 import { LOUDNESS_SEEDS, SUGGESTED_HEADROOM } from './libraryConstants';
-import { loudnessVerdict, peakOf, workletDataUrl } from './loudnessCheck';
+import { loudnessVerdict, peakOf } from './loudnessCheck';
 
 describe('the verdict', () => {
   it('reads a buffer peak across channels', () => {
@@ -42,11 +42,5 @@ describe('the verdict', () => {
     const verdict = loudnessVerdict(makePatch(), [{ seed: 0, peak: 0.7 }]);
     expect(verdict.clips).toBe(false);
     expect(verdict.suggestedVolume).toBeNull();
-  });
-
-  it('builds a data URL a file:// page can load the worklet from', () => {
-    expect(workletDataUrl('class X {}')).toBe(
-      'data:application/javascript;charset=utf-8,class%20X%20%7B%7D',
-    );
   });
 });

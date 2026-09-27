@@ -6,12 +6,12 @@
  * first schema change since the library became files. `filter.modWheelDepth`
  * (octaves the mod wheel adds to `envAmount`) joined `FilterSettings`, and the
  * loader refuses a file missing a field, so every
- * `packages/client/src/audio/patches/<id>.json` gains `"modWheelDepth": 0` in
+ * `packages/engine/src/patches/<id>.json` gains `"modWheelDepth": 0` in
  * its `filter` — written through the shared serialiser, in `makePatch()`'s key
  * order — and its `headroom.contentHash` is recomputed in place.
  *
- *     node tools/patch-editor/migrate-patches-586.mjs [--spot-check=3]
- *     npx prettier --write packages/client/src/audio/patches
+ *     node packages/app/migrate-patches-586.mjs [--spot-check=3]
+ *     npx prettier --write packages/engine/src/patches
  *     node scripts/patch-library-index.mjs --write
  *
  * No re-sweep: a field at its default cannot change a render (the worklet's

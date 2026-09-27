@@ -5,14 +5,14 @@
  * Delete over the library model and the open document. The modal collects
  * the metadata; this writes the file and keeps the song in step.
  */
-import type { Patch } from '../../../packages/client/src/audio/index-for-editor';
+import type { Patch } from '@windsor/engine';
 import {
   GAMEPLAY_PATCH_IDS,
   clonePatch,
   makePatch,
   partAt,
   patchLeafDifferences,
-} from '../../../packages/client/src/audio/index-for-editor';
+} from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { INIT_PATCH_NAME, initPresetId, isInitPreset } from './libraryConstants';

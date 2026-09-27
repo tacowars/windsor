@@ -27,6 +27,7 @@ import { newSong } from './songParts';
 import { songTab } from './songTab';
 import { mountTabShell } from './tabShell';
 import { mountTransportStrip } from './transportStrip';
+import './console.css';
 
 const status = (message: string): void => {
   $('status').textContent = message;

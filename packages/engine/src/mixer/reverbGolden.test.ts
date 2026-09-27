@@ -40,7 +40,7 @@ import {
 } from '../__fixtures__/reverbHarness';
 
 const REFRESH =
-  'A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/client/src/audio/mixer/reverbGolden.test.ts';
+  'A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts';
 const refreshing = process.env['A204_REFRESH_REVERB_GOLDEN'] === '1';
 const TABLE = fileURLToPath(new URL('../__fixtures__/reverbGolden.json', import.meta.url));
 

@@ -6,8 +6,8 @@
  * is no written line to show. Every control writes the document through
  * `ctx.change`; the pure rules are `bassModel.ts`.
  */
-import type { BassPitchMode, BassSpec } from '../../../packages/client/src/audio/index-for-editor';
-import { DEFAULT_BASS_CONFIG, partAt } from '../../../packages/client/src/audio/index-for-editor';
+import type { BassPitchMode, BassSpec } from '@windsor/engine';
+import { DEFAULT_BASS_CONFIG, partAt } from '@windsor/engine';
 import { BASS_DISABLED_OPACITY } from './bassConstants';
 import {
   BASS_MODE_OPTIONS,

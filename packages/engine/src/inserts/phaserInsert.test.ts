@@ -6,7 +6,7 @@ import { PHASER_NAME } from './phaserConstants';
 import { DEFAULT_PHASER } from './phaserSpec';
 import { PHASER_INSERT } from './phaserInsert';
 import { FmEngine } from '../synth/fmEngine';
-import { AudioSystem } from '../game/audioSystem';
+import { AudioSystem } from '../system/audioSystem';
 import { makePatch } from '../patch/patch';
 
 class PhaserNode extends FakeNode {

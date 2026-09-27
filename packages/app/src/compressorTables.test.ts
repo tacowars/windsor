@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_COMPRESSOR,
-  INSERT_KINDS,
-  makeArrangement,
-} from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_COMPRESSOR, INSERT_KINDS, makeArrangement } from '@windsor/engine';
 import { COMPRESSOR_KNOBS, COMPRESSOR_SELECTS } from './compressorTables';
 import { setInsertField } from './insertEdits';
 import { DocumentModel } from './documentModel';

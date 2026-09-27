@@ -1,6 +1,6 @@
 /** Phaser ranges and reset values come from the engine's song contract. */
-import { DEFAULT_PHASER, PHASER_BOUNDS } from '../../../packages/client/src/audio/index-for-editor';
-import type { PhaserSpec } from '../../../packages/client/src/audio/index-for-editor';
+import { DEFAULT_PHASER, PHASER_BOUNDS } from '@windsor/engine';
+import type { PhaserSpec } from '@windsor/engine';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { fmt2, fmtHz } from './consoleFormat';
 

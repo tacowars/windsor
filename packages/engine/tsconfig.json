@@ -1,0 +1,38 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  // Six worklet modules are read by the main thread too (#656): the algorithm
+  // table, the wave ids, the envelope curve, the mode ids, the patch defaults
+  // and the constants they use. They sit under `worklet/fm/`, which is
+  // excluded below and checked by its own project, so they are listed here by
+  // name and compiled by both — under this project's stricter flags as well.
+  "files": [
+    "src/worklet/fm/algorithms.ts",
+    "src/worklet/fm/waveIds.ts",
+    "src/worklet/fm/envelope.ts",
+    "src/worklet/fm/fmConstants.ts",
+    "src/worklet/fm/modeIds.ts",
+    "src/worklet/fm/patchDefaults.ts"
+  ],
+  "include": ["src", "src/**/*.json"],
+  "exclude": [
+    "src/worklet/advancedDrive/**",
+    "src/worklet/retro/**",
+    "src/worklet/phaser/**",
+    "src/worklet/delay/**",
+    "src/**/*.test.ts",
+    "src/**/__fixtures__/**",
+    "src/worklet/fm/**",
+    "src/worklet/compressor/**",
+    "src/worklet/meter/**",
+    "src/worklet/reverb/**"
+  ]
+}
