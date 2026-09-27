@@ -1,9 +1,9 @@
 # The user's patches and songs live in IndexedDB
 
 - **Date:** 2026-09-27
-- **Status:** proposed. tacowars chose IndexedDB over OPFS; the shape below is
-  awaiting review before any code.
-- **Supersedes, when accepted:** the user-state known follow-up in
+- **Status:** accepted. tacowars chose IndexedDB over OPFS and settled the open
+  questions on 2026-09-27; not built yet.
+- **Supersedes:** the user-state known follow-up in
   `2026-09-27-windsor-forked-from-aotearoa204.md`
 
 ## Context
@@ -29,7 +29,7 @@ One IndexedDB database, `windsor`, version 1, with two object stores:
 | Store | Key | Value |
 |---|---|---|
 | `patches` | patch id | the patch file's text, exactly what `serialisePatchFile` writes and a download would contain |
-| `songs` | song id | `{ id, name, updated, document }`, where `document` is the exported JSON text |
+| `songs` | `current` (the only key for now) | `{ updated, document }`, where `document` is the exported JSON text |
 
 Storing each record as the same text as its file keeps the format single:
 one loader (`loadUnsweptPatchFile`, `makeArrangement`) reads a download, a
@@ -66,26 +66,33 @@ plugs into the existing actions without new write paths:
 
 ### Songs
 
-- **Autosave.** The open document is saved to a fixed `current` record,
-  debounced a few seconds after each change. On boot the console reopens it
-  instead of a new song, so a reload loses nothing. New song replaces it
-  after the existing "discard changes?" guard.
-- **Named songs.** "Save song" / "Open song" on the Song tab store and list
-  named records. Export and Import stay as they are: one file is the whole
-  piece (invariant 3).
+- **Autosave.** The open document is saved to the `current` record,
+  debounced a few seconds after each change. New song replaces it after the
+  existing "discard changes?" guard.
+- **Restore asks first.** On boot, when a `current` record exists, the
+  console starts on a new song as it does today and asks whether to restore
+  the last session (showing when it was saved). Restoring opens it the way
+  Import does, including waiting for the built-in library. Declining keeps
+  the record until the first change overwrites it, so a mis-click can be
+  undone by reloading.
+- **Autosave only.** There is no "Save song" / "Open song" yet. Export and
+  Import stay as they are: one file is the whole piece (invariant 3). Named
+  songs can be added later as more keys in the same store.
 - **Self-contained.** Stored songs are unaffected by library edits: a stored
   song is the exported document with its `patches` snapshot.
 
 ### Out of scope for the first cut
 
+- Named songs (a song list on the Song tab).
 - Sync across devices, and sharing.
 - Import and export of the whole library as one bundle. It is a natural
   follow-up: a zip, or one JSON of records.
 - OPFS. Revisit only if audio samples ever need storing, since those are
   the large binary case where OPFS earns its keep.
 
-## Questions for tacowars
+## Decisions (tacowars, 2026-09-27)
 
-1. Should autosave-and-reopen be the boot behaviour, or should the console
-   offer "restore last session?"
-2. Named songs in the first cut, or autosave only?
+1. On a reload, the console asks before restoring the last session.
+2. Autosave only for the first cut; no named songs.
+3. Saving over a built-in patch creates a new id; built-ins are never
+   shadowed.
