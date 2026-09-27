@@ -1,0 +1,26 @@
+{
+  "resolution": "1280 x 900",
+  "hardwareScalingLevel": 1,
+  "engine": "WebGPU1",
+  "driver": "",
+  "capabilities": {
+    "stdDerivatives": true,
+    "compressedTextures": false,
+    "hardwareInstances": true,
+    "textureFloat": true,
+    "textureHalfFloat": true,
+    "renderToTextureFloat": true,
+    "renderToTextureHalfFloat": true,
+    "indices32Bit": true,
+    "fragmentDepth": true,
+    "highPrecisionShaders": true,
+    "drawBuffers": true,
+    "vertexArrayObject": false,
+    "timerQuery": true,
+    "stencil": false,
+    "parallelShaderCompilation": false,
+    "maxTexturesUnits": 16,
+    "maxTexturesSize": 8192,
+    "maxAnisotropy": 16
+  }
+}

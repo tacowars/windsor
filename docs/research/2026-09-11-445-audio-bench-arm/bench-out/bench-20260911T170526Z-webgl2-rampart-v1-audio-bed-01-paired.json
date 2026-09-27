@@ -1,0 +1,247 @@
+{
+  "kind": "a204-bench-paired",
+  "schema": 3,
+  "runId": "20260911T170526Z",
+  "backend": "webgl2",
+  "retrieval": "log",
+  "route": "rampart-v1",
+  "build": 5000,
+  "horde": 400,
+  "vat": null,
+  "audio": "bed-01",
+  "gitCommit": "65a96033",
+  "served": {
+    "expected": "65a96033",
+    "preflight": {
+      "commit": "65a96033",
+      "source": "/@vite/env"
+    },
+    "server": {
+      "built": true,
+      "entry": "/Volumes/Sendai/code/Aotearoa204-wt-445/packages/server/dist/index.js",
+      "ms": 289
+    },
+    "prewarm": {
+      "skipped": false,
+      "cdpPort": 9353,
+      "build": 5000,
+      "horde": 400,
+      "pages": [
+        {
+          "url": "http://localhost:5218/?bench=1&backend=webgl2&route=rampart-v1&server=63697",
+          "readyMs": 4515,
+          "reloads": 0,
+          "attempts": 1
+        }
+      ]
+    }
+  },
+  "control": {
+    "runs": [
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-silent-1",
+        "build": 5000,
+        "horde": 400,
+        "ok": true,
+        "validity": {
+          "ok": true,
+          "fps": 60
+        },
+        "renderer": "capsule",
+        "p50": 16.699999809265137,
+        "p95": 17.199999809265137,
+        "drawCalls": 358.5852777777778,
+        "visibleP5": 347,
+        "pass": true,
+        "server": {
+          "port": 63734,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 215
+        }
+      },
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-silent-2",
+        "build": 5000,
+        "horde": 400,
+        "ok": true,
+        "validity": {
+          "ok": true,
+          "fps": 60
+        },
+        "renderer": "capsule",
+        "p50": 16.699999809265137,
+        "p95": 17.5,
+        "drawCalls": 358.59483476812,
+        "visibleP5": 348,
+        "pass": true,
+        "server": {
+          "port": 63888,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 215
+        }
+      }
+    ],
+    "reproducibility": {
+      "checked": true,
+      "p50s": [
+        16.699999809265137,
+        16.699999809265137
+      ],
+      "spreadPct": 0,
+      "within5pct": true
+    },
+    "allPass": true
+  },
+  "arm": {
+    "kind": "audio",
+    "build": 5000,
+    "horde": 400,
+    "vat": null,
+    "audio": "bed-01",
+    "runs": [
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-1",
+        "build": 5000,
+        "horde": 400,
+        "ok": true,
+        "validity": {
+          "ok": true,
+          "fps": 60
+        },
+        "renderer": "capsule",
+        "p50": 16.699999809265137,
+        "p95": 17.5,
+        "drawCalls": 358.5936111111111,
+        "visibleP5": 347,
+        "pass": true,
+        "server": {
+          "port": 64056,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 215
+        }
+      },
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-2",
+        "build": 5000,
+        "horde": 400,
+        "ok": true,
+        "validity": {
+          "ok": true,
+          "fps": 60
+        },
+        "renderer": "capsule",
+        "p50": 16.699999809265137,
+        "p95": 17.100000381469727,
+        "drawCalls": 358.60083333333336,
+        "visibleP5": 346,
+        "pass": true,
+        "server": {
+          "port": 64259,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 215
+        }
+      }
+    ],
+    "reproducibility": {
+      "checked": true,
+      "p50s": [
+        16.699999809265137,
+        16.699999809265137
+      ],
+      "spreadPct": 0,
+      "within5pct": true
+    },
+    "allPass": true
+  },
+  "pairs": [
+    {
+      "run": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-1",
+      "control": "webgl2-rampart-v1-build5000-horde400-silent-1",
+      "comparison": {
+        "arm": "audio",
+        "gateOnScreen": false,
+        "intervalDeltaPct": {
+          "p50": 0,
+          "p95": 1.7441871747769553,
+          "p99": 0.5681840040960313
+        },
+        "drawCalls": {
+          "run": 358.5936111111111,
+          "control": 358.5852777777778,
+          "delta": 0.008333333333325754,
+          "allowance": 0.5
+        },
+        "bandPct": 5,
+        "within5pct": true,
+        "bandGates": false,
+        "drawCallsOk": true,
+        "thresholdsOk": true,
+        "horde": null,
+        "controlThresholdsOk": true,
+        "pass": true
+      },
+      "pass": true
+    },
+    {
+      "run": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-2",
+      "control": "webgl2-rampart-v1-build5000-horde400-silent-2",
+      "comparison": {
+        "arm": "audio",
+        "gateOnScreen": false,
+        "intervalDeltaPct": {
+          "p50": 0,
+          "p95": -2.285712105887277,
+          "p99": -0.5649739126967728
+        },
+        "drawCalls": {
+          "run": 358.60083333333336,
+          "control": 358.59483476812,
+          "delta": 0.005998565213360507,
+          "allowance": 0.5
+        },
+        "bandPct": 5,
+        "within5pct": true,
+        "bandGates": false,
+        "drawCallsOk": true,
+        "thresholdsOk": true,
+        "horde": null,
+        "controlThresholdsOk": true,
+        "pass": true
+      },
+      "pass": true
+    }
+  ],
+  "allPass": true
+}

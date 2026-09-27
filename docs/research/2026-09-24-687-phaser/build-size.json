@@ -1,0 +1,14 @@
+{
+  "baseline": "949f405edc8a3a7b417cfe990e2263267a4fc4d6",
+  "baselineEntry": "index-DcvaA2lk.js",
+  "baselineBytes": 729524,
+  "phaserEntry": "index-D-bwx4x2.js",
+  "phaserBytes": 730811,
+  "entryDeltaBytes": 1287,
+  "separatePhaserWorkletBytes": 6866,
+  "commands": [
+    "vite build --outDir /tmp/687-clean-baseline-dist (clean detached baseline packages/client)",
+    "npm run build -w packages/client (#687 worktree)"
+  ],
+  "note": "Both builds use tracked source only, Node 24 on Apple M1. Main checkout untracked acid.json excluded by clean baseline. Separate worklet counted separately."
+}

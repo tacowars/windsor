@@ -1,0 +1,54 @@
+{
+  "version": 3,
+  "transport": {
+    "bpm": 96,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 2,
+    "scale": "dorian"
+  },
+  "patches": {
+    "hat": {}
+  },
+  "parts": [
+    {
+      "slot": 1,
+      "name": "hat",
+      "preset": "hat",
+      "velocity": 0.6,
+      "strip": {
+        "level": 0.6,
+        "pan": 0.2,
+        "sends": {
+          "cave": 0.4
+        }
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "euclidean",
+        "seed": 0,
+        "note": 42,
+        "hold": 0.08,
+        "steps": 16,
+        "divisor": 6,
+        "pulses": {
+          "min": 5,
+          "max": 12,
+          "start": 8
+        },
+        "rotate": 2,
+        "density": {
+          "kind": "lfoBars",
+          "bars": 3,
+          "shape": "sine"
+        }
+      }
+    }
+  ]
+}

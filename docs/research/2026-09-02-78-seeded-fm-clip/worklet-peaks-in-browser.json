@@ -1,0 +1,75 @@
+{
+  "what": "Presets rendered through the real AudioWorklet in Chrome (OfflineAudioContext, 48 kHz, 51,200 frames, note 60 @ velocity 0.9, noteOff at frame 12,000) — the same signal the Node harness in fmProcessorHeadroom.test.ts renders, so the two can be compared sample-peak to sample-peak.",
+  "how": "chrome-devtools MCP evaluate_script on the ?debug=1 page: import('/src/audio/presets.ts'), OfflineAudioContext.audioWorklet.addModule('/src/audio/worklet/fm-processor.js'), new AudioWorkletNode(ctx, 'fm-part', { processorOptions: { maxVoices: 16, patch, events, seed? } }).",
+  "servedBuild": "a993c67",
+  "nodeReference": {
+    "bass-digital defaultSeed 0xa204": 0.5915,
+    "bass-digital worstPhases": 0.9393,
+    "bass-digital seed 12428": 0.8638,
+    "weapon-zap seed 1261": 0.9356,
+    "ai-voice seed 11629": 0.9372,
+    "horde-horn seed 14891": 0.9342,
+    "comment": "vitest fmProcessorHeadroom, and the offline 16,384-seed sweep reported on the PR"
+  },
+  "webgpuPage": {
+    "url": "http://localhost:5251/?debug=1&server=8158",
+    "music": {
+      "bpm": 96,
+      "root": 50,
+      "scale": "dorian",
+      "counters": { "kick": 24, "hat": 59, "arp": 80, "drone": 6 },
+      "muted": false,
+      "running": true
+    },
+    "bassDigital": {
+      "volume": 0.14,
+      "defaultSeed_0xa204": 0.5915170311927795,
+      "seed7_a": 0.6700881719589233,
+      "seed7_b": 0.6700881719589233,
+      "seed8": 0.6084981560707092,
+      "unseeded_a": 0.5750990509986877,
+      "unseeded_b": 0.6405273675918579,
+      "worstPhases": 0.9393107891082764
+    },
+    "atWorstKnownSeed": {
+      "bass-digital": { "volume": 0.14, "seed": 12428, "peak": 0.8638485670089722 },
+      "weapon-zap": { "volume": 0.45, "seed": 1261, "peak": 0.935571551322937 },
+      "ai-voice": { "volume": 0.62, "seed": 11629, "peak": 0.9371675848960876 },
+      "horde-horn": { "volume": 0.23, "seed": 14891, "peak": 0.9342034459114075 }
+    }
+  },
+  "webgl2Page": {
+    "url": "http://localhost:5251/?debug=1&server=8158&backend=webgl2",
+    "music": {
+      "bpm": 96,
+      "root": 50,
+      "scale": "dorian",
+      "counters": { "kick": 23, "hat": 58, "arp": 79, "drone": 6 },
+      "muted": false,
+      "running": true
+    },
+    "bassDigital": {
+      "volume": 0.14,
+      "defaultSeed_0xa204": 0.5915170311927795,
+      "seed7_a": 0.6700881719589233,
+      "seed7_b": 0.6700881719589233,
+      "unseeded_a": 0.5970083475112915,
+      "unseeded_b": 0.6264051795005798,
+      "worstPhases": 0.9393107891082764
+    },
+    "atWorstKnownSeed": {
+      "bass-digital": { "volume": 0.14, "seed": 12428, "peak": 0.8638485670089722 },
+      "weapon-zap": { "volume": 0.45, "seed": 1261, "peak": 0.935571551322937 },
+      "ai-voice": { "volume": 0.62, "seed": 11629, "peak": 0.9371675848960876 },
+      "horde-horn": { "volume": 0.23, "seed": 14891, "peak": 0.9342034459114075 }
+    }
+  },
+  "reads": [
+    "seed7_a === seed7_b on both pages: the same seed is the same audio in a real AudioWorklet, not only under the Node shim.",
+    "seed8 differs from seed7: the seed is actually driving the draws.",
+    "unseeded_a !== unseeded_b on both pages: with no seed the processor still free-runs from Math.random, which is the game path and is unchanged.",
+    "Every atWorstKnownSeed peak matches the offline sweep to seven decimals, so the four trimmed volumes clear 1.0 by 6.1-6.6% in the browser and not merely in Node.",
+    "bass-digital's worstPhases value (0.9393108) is the bound the phase-space search produced; the browser agrees with the harness to four decimals.",
+    "The two rendering backends produce identical audio figures, as they must: the AudioWorklet runs on the audio thread and does not touch the GPU. The counters differ only because the two pages started a few seconds apart."
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "pageSha256": "8246e29e6f48e332a1c8a3f7bd98d97987aac9d910db418c21052d2f7dd4fa82",
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "darwin 25.5.0",
+    "browser": "153.0.8010.53",
+    "backend": "headless Chrome AudioWorklet / OfflineAudioContext; no graphics rendering"
+  },
+  "meterDb": [
+    -8.419251306891088,
+    -7.989255148668956
+  ],
+  "characterReset": {
+    "before": 0.65,
+    "after": 0.65
+  },
+  "savedTrackEffect": {
+    "kind": "retro-reverb",
+    "mode": "reverse",
+    "decay": 1.4,
+    "size": 1,
+    "tone": 4200,
+    "diffusion": 0.85,
+    "preDelay": 0,
+    "character": 0.65,
+    "mix": 0.23,
+    "enabled": true,
+    "duration": 0.3789473684210526
+  },
+  "savedMasterEffect": {
+    "kind": "retro-reverb",
+    "mode": "gated",
+    "decay": 1.4,
+    "size": 1,
+    "tone": 4200,
+    "diffusion": 0.85,
+    "preDelay": 0,
+    "character": 0.65,
+    "mix": 0.15,
+    "enabled": true,
+    "duration": 0.1
+  },
+  "exportReimport": true,
+  "offline": [
+    {
+      "mode": 0,
+      "energy": 0.019146679206406447,
+      "late": 0.0006189955145271778,
+      "peak": 0.011323210783302784
+    },
+    {
+      "mode": 1,
+      "energy": 0.019177722940448883,
+      "late": 0,
+      "peak": 0.008591343648731709
+    },
+    {
+      "mode": 2,
+      "energy": 0.014549985002083739,
+      "late": 0,
+      "peak": 0.012725471518933773
+    }
+  ]
+}

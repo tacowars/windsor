@@ -1,0 +1,17 @@
+{
+  "baselineCommit": "8b1fa82a",
+  "node": "24.20.0",
+  "method": "Vite production build; index gzip via Python gzip; asset totals exclude source maps",
+  "baseline": {
+    "index": "index-BCrcGJ4O.js",
+    "indexBytes": 717879,
+    "gzipBytes": 206468,
+    "totalAssetBytes": 21615136
+  },
+  "master": {
+    "index": "index-Cbx6R3dW.js",
+    "indexBytes": 723285,
+    "gzipBytes": 208785,
+    "totalAssetBytes": 21620542
+  }
+}

@@ -1,0 +1,19 @@
+{
+  // The arrangement console's modules (#70). Bundled by build-editor.mjs
+  // (esbuild strips types without checking them), so this config is the type
+  // gate: `npx tsc -p tools/patch-editor/tsconfig.json`, run by the root
+  // `npm run typecheck`. The imports reach straight into
+  // packages/client/src/audio, which is the point — the console is typed
+  // against the real engine's API, not a copy of it.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src"]
+}

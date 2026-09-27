@@ -1,0 +1,73 @@
+{
+  "version": 3,
+  "transport": {
+    "bpm": 96,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 2,
+    "scale": "dorian"
+  },
+  "patches": {
+    "drone-sqr": {}
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "kick",
+      "preset": "kick-2",
+      "velocity": 1,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "euclidean",
+        "seed": 0,
+        "note": 36,
+        "hold": 0.2,
+        "steps": 16,
+        "divisor": 6,
+        "pulses": {
+          "min": 2,
+          "max": 5,
+          "start": 4
+        },
+        "rotate": 0,
+        "density": {
+          "kind": "lfoBars",
+          "bars": 8,
+          "shape": "tri"
+        }
+      }
+    },
+    {
+      "slot": 3,
+      "name": "drone",
+      "preset": "drone-sqr",
+      "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 2
+        },
+        "steps": [
+          {
+            "kind": "hit"
+          }
+        ]
+      }
+    }
+  ]
+}

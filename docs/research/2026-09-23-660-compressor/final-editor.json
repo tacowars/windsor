@@ -1,0 +1,41 @@
+{
+  "sourceSha256": "39e0eeb26f4e0e39ff1fddf7742569f7032cee0e186a5f53533d996b60ad0171",
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "darwin 25.5.0",
+    "browser": "153.0.8010.53",
+    "backend": "Chrome AudioWorklet, headless",
+    "commit": "5cc65bad5e09ae7498968ceb9b3ae511b5974ecb"
+  },
+  "active": {
+    "value": 22.184285302799335,
+    "label": "GR 22.2 dB",
+    "params": {
+      "makeup": 0,
+      "enabled": 1,
+      "range": 60,
+      "external": 0,
+      "highpass": 0,
+      "ratio": 10,
+      "mix": 1,
+      "threshold": -30,
+      "attack": 0.30000001192092896,
+      "release": 0.4000000059604645
+    },
+    "context": "running",
+    "sampleRate": 48000
+  },
+  "exported": {
+    "kind": "compressor",
+    "threshold": -30,
+    "makeup": 0,
+    "attack": 0.3,
+    "ratio": 10,
+    "release": 0.4,
+    "highpass": 0,
+    "range": 60,
+    "mix": 1,
+    "enabled": false
+  },
+  "measurements": []
+}

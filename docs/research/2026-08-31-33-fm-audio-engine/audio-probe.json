@@ -1,0 +1,18 @@
+{
+  "note": "Audio-specific probe. The standard bridge command set has no audio coverage, and audio is this ticket's subject. Run in the WebGPU session (3) against the Vite dev server.",
+  "devServer": {
+    "workletUrl": "/src/audio/worklet/fm-processor.js",
+    "status": 200,
+    "bytes": 233045,
+    "bytesNote": "Vite's dev transform inflates the 38 KB source with an inline source map; the production build emits it raw at 38,598 B.",
+    "registersFmPart": true,
+    "offlineRender": { "frames": 24000, "peak": 0.5429, "nonFinite": 0 },
+    "liveAudioContext": { "state": "running", "baseLatencyMs": 5.33 }
+  },
+  "productionBuild": {
+    "workletAsset": "assets/fm-processor-D0Mo2pDI.js",
+    "bytes": 38598,
+    "referencedByEntryChunk": true,
+    "note": "Verified by `npm run build -w packages/client`: the entry chunk contains the hashed asset name, which is what proves new URL(..., import.meta.url) resolves the worklet in a real build."
+  }
+}
