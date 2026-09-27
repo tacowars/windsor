@@ -19,7 +19,7 @@ It is a **Vite app deployed as static files**: `index.html` (markup only),
 
 The root `CLAUDE.md` holds the invariants and the repo layout, and
 `packages/engine/src/worklet/CLAUDE.md` the DSP the engine loads. The
-`music-engine` skill holds the per-file map, the sound-design guidance and the
+`windsor-engine` skill holds the per-file map, the sound-design guidance and the
 audio verification recipes; this file holds the console's structure, its rules
 and its extension checklists, so neither states the other's content twice.
 
@@ -160,7 +160,7 @@ knows the one below it and nothing above.
    export/import round trip is equality by construction.
 
 The per-file map — which file owns what, for all of `src/` — is the
-`music-engine` skill's console table.
+`windsor-engine` skill's console table.
 
 ## The Song view (#709)
 
@@ -225,7 +225,7 @@ Each is the whole list; a step skipped here is what a later ticket finds.
    lane in `songViewTables.ts` — `LANE_TONE`, `REGION_SUMMARY`,
    `CYCLE_TICKS` (`songViewTables.test.ts` fails without all three); any
    tunable of its own in a `<kind>Constants.ts`.
-3. A row in the `music-engine` skill's console table.
+3. A row in the `windsor-engine` skill's console table.
 
 **Add a lane kind** (#709) — a new row of the Song view beside the harmony
 lane and the part lanes

@@ -14,21 +14,23 @@ own issues are referenced as `windsor#<n>`.
 Stack: TypeScript end to end, npm workspaces, Vite, Vitest, Web Audio and
 AudioWorklets. The app is a static site. There is no server: `vite build`
 writes `packages/app/dist/` for GitHub Pages, Cloudflare Pages or
-S3 + CloudFront. User state belongs in the browser (IndexedDB/OPFS, the File
-System Access folder grant, import/export).
+S3 + CloudFront. User state belongs in the browser: IndexedDB for the user's
+patches and the autosaved song (`docs/log/2026-09-27-user-library-in-indexeddb.md`),
+the File System Access folder grant, and import/export.
 
 ## Layout
 
 | Working on… | Go to | Verify with |
 |---|---|---|
-| The engine: FM synthesis, worklets, patches, songs, sequencers, harmony, mixer, inserts | `packages/engine/src/` (`@windsor/engine`). Read `.claude/skills/music-engine/SKILL.md` first, and `packages/engine/src/worklet/CLAUDE.md` before touching DSP | `npm run verify` |
+| The engine: FM synthesis, worklets, patches, songs, sequencers, harmony, mixer, inserts | `packages/engine/src/` (`@windsor/engine`). Read `.claude/skills/windsor-engine/SKILL.md` first, and `packages/engine/src/worklet/CLAUDE.md` before touching DSP | `npm run verify` |
 | The UI: tabs, cards, knobs, the library browser, audition input | `packages/app/` (`@windsor/app`). Read `packages/app/CLAUDE.md` first | `npm run verify`, plus `npm run dev` in the browser |
 | Generated files: the worklet bundles and the patch index | `scripts/build-worklets.mjs`, `scripts/patch-library-index.mjs` | `npm run worklets`, `npm run patch-index` |
 | Design, decisions, research | `docs/design/`, `docs/log/`, `docs/research/` | — |
 
 **The engine/app boundary.** The engine never imports the app. The app
 reaches the engine through `@windsor/engine`, its `index.ts`, and nothing
-else; its tests may also import `@windsor/engine/<path>` for fixtures. ESLint
+else; its tests may also import `@windsor/engine/<path>` for fixtures and for
+`patch/presets` (the built-in library, which the index loads on demand). ESLint
 enforces both directions. When the app needs something new, extend the
 engine's index. Don't build a second synth, graph or sequencer in the app:
 `packages/app/src/consoleBoundary.test.ts` fails on a Web Audio node built

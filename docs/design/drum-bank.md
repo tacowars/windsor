@@ -39,7 +39,7 @@ threads rather than measured in a paper.
 
 The engine is four operators with per-operator envelopes, one global
 filter, one global pitch envelope and one LFO per voice
-(`.claude/skills/music-engine/references/synth-behavior.md`). The bank
+(`.claude/skills/windsor-engine/references/synth-behavior.md`). The bank
 leans on five of its features:
 
 - **Trigger-mode envelopes.** Every drum envelope runs in `loopMode` 2

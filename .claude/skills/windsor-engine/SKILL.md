@@ -1,9 +1,9 @@
 ---
-name: music-engine
+name: windsor-engine
 description: Design patches and compositions or develop Windsor's FM music engine (@windsor/engine), song documents, mixer and the browser app (@windsor/app). Use for synth behavior, presets, sequencing, harmony, returns, inserts, the console UI and audio verification.
 ---
 
-# Music engine
+# Windsor engine
 
 Work on Windsor's instrument: the engine (`@windsor/engine`) and the app
 that drives it (`@windsor/app`, the arrangement console). Repository paths
@@ -106,7 +106,7 @@ stated there once. The table below is the file map — what owns what, today; pa
 
 | Console task | Read/edit |
 |---|---|
-| Composition, the shared context, the document, the engine connection | `src/main.ts` (construction and wiring only), `src/appContext.ts` (the `AppContext`: the tab registry — the active tab renders, the rest catch up when shown — `change` / `restructure` / `importDoc` / `capture` / `release`, and `livePart()` resolved per call), `src/context.ts` (the `AppCtx` interface the tabs import, and `partChange`), `src/tabShell.ts` (the bar and the panels), `src/powerButton.ts` (the first gesture, which builds the live system), `src/documentModel.ts` (the always-normalised document and the editor-only library fill), `src/host.ts` + `src/hostConstants.ts` (one `AudioContext` for the page, `FmEngine.init({})` so the worklets load from the engine's own URLs, the look-ahead pump), `src/partsSession.ts` (the working patch and its commit), `src/patchPath.ts` (dotted paths into it) |
+| Composition, the shared context, the document, the engine connection | `src/main.ts` (construction and wiring only), `src/appContext.ts` (the `AppContext`: the tab registry — the active tab renders, the rest catch up when shown — `change` / `importDoc`, and `livePart()` resolved per call; the Euclidean card commits `host.capturePattern` through `change` itself, #705), `src/context.ts` (the `AppCtx` interface the tabs import, and `partChange`), `src/tabShell.ts` (the bar and the panels), `src/powerButton.ts` (the first gesture, which builds the live system), `src/documentModel.ts` (the always-normalised document and the editor-only library fill), `src/host.ts` + `src/hostConstants.ts` (one `AudioContext` for the page, `FmEngine.init({})` so the worklets load from the engine's own URLs, the look-ahead pump), `src/partsSession.ts` (the working patch and its commit), `src/patchPath.ts` (dotted paths into it) |
 | The vocabulary every tab shares | `src/dom.ts` (builders only; `el()` writes text, `html()` is the markup opt-in), `src/consoleColors.ts` (the one palette, pinned to `src/console.css`'s custom properties), `src/consoleFormat.ts` (the one set of readout formatters), `src/knob.ts` + `src/knobConstants.ts` (the console's one control), `src/scope.ts` + `src/scopeConstants.ts` (the master analyser trace), `src/focusTrap.ts`, `src/sequencerConstants.ts` (`KIND_LABELS`, `DIVISOR_OPTIONS`, `NOTE_NAMES`) |
 | The four tabs | `src/partsTab.ts` (the patch editor over the selected slot), `src/mixerTab.ts` + `src/mixerTables.ts` (strips and sends; `src/trackOutput.ts` selects Master/Sidechain only and `src/sidechainSelector.ts` selects a compressor detector by stable slot, #667; each strip's inserts through `src/stripInserts.ts`, the `INSERT_CARDS` registry in `src/insertCards.ts`, `src/driveCard.ts` and `src/chorusCard.ts` over `src/insertKnobs.ts` + `src/insertKnobTables.ts`, `src/ensembleCard.ts` (#695; it and the chorus card put a preset picker and an on switch above their knobs through `src/presetInsertCard.ts`), `src/retroReverbCard.ts` + `src/retroReverbTables.ts` (#682), and the pure `src/insertEdits.ts` — #641; the compressor's `src/compressorCard.ts` + `src/compressorTables.ts` (ranges and defaults from the engine) with `src/compressorMeter.ts` (one gain-reduction line over the engine's real detector, on the console's frame loop), #660; the song master's `src/masterStrip.ts` (the song's inserts and output level) + `src/masterTables.ts` with `src/masterMeter.ts` (independent L/R sample-peak bars), and `src/insertTarget.ts` (the two song-owned insert locations the cards share), #666) with `src/returnsPanel.ts` (the plate and the delay, in the document's `returns`), the Song view (#709, below) with `src/seqFields.ts` (the field knobs, the divisor picker, the density controls) + `src/sequencerKnobTables.ts` + `src/harmonyTables.ts` (the register octave knob the arp and bass cards and the pane draw), `src/arrangementTab.ts` + `src/arrangementConstants.ts` (export/import, new song, the report and live readout); above every tab, `src/transportStrip.ts` + `src/transportTables.ts` + `src/transportModel.ts` (BPM, Bars, 4/4, key, scale, the bar.beat.sixteenth position and ▶ ■ ‖ over `host.ts`'s `HostTransport`, #708) |
 | Operator bays, knobs, the User-wave harmonic editor | `src/patchBays.ts`, `src/patchPanels.ts` + `src/patchPanelConstants.ts` (algorithm picker, globals, filter, LFO, pitch envelope), `src/patchKnobTables.ts` (every patch knob as data, with no `def` — `patchKnobOpts` reads `makePatch()` at the path), `src/harmonicEditor.ts` + `src/harmonicModel.ts` (pure) + `src/harmonicConstants.ts` |
@@ -196,7 +196,7 @@ through Import. Test documents are fixtures under
 
 ## Verify the change that was made
 
-- **Patch/DSP:** use `engine/__fixtures__/workletHarness.ts` and relevant
+- **Patch/DSP:** use `packages/engine/src/__fixtures__/workletHarness.ts` and relevant
   `fmProcessor*.test.ts` / `patch.test.ts`. Measure seeded output, finite
   samples, audibility, peaks and release completion. Cover intended registers,
   velocities, gates and chords; include retrigger/steal behavior if changed.
