@@ -273,45 +273,6 @@ export const AUDIO_LOAD_REPORT_SECONDS = 1;
  */
 export const AUDIO_LOAD_STALE_MS = 3 * AUDIO_LOAD_REPORT_SECONDS * 1000;
 
-/**
- * How long a consumer waits after a measured window closes before reading
- * `AudioContext.playbackStats` for the closing snapshot (#275 decision 6).
- *
- * The counters are not live: probed on the target box they refreshed about
- * once a second, and after a burst of overload they kept rising for a further
- * second — the `overload` probe gained 80 events in the second *after* the
- * load stopped, and had settled by +3 s
- * (`docs/research/2026-09-14-275-playbackstats-probe/`). A window read at the
- * instant it closes therefore under-counts its own tail. Three seconds is the
- * box's settled figure; the floor the decision sets is 1000 ms.
- */
-export const AUDIO_STATS_SETTLE_MS = 3000;
-
-/**
- * The rolling window the main-thread audio scheduling cost reports its mean
- * and p95 over (#275 decision 7), in seconds. The same second the worklets
- * report their load over, so `costReadout()`'s two audio numbers describe
- * the same slice of wall time rather than two different ones.
- */
-export const AUDIO_SCHED_WINDOW_SECONDS = AUDIO_LOAD_REPORT_SECONDS;
-
-/**
- * Hard cap on per-frame scheduling samples held for that window. One second
- * at 60 fps is 60 samples and at 240 fps is 240; the cap only bites if frames
- * arrive faster than that or the clock stops advancing, and it is what keeps
- * a wedged page from growing the buffer without bound.
- */
-export const AUDIO_SCHED_MAX_SAMPLES = 1024;
-
-/**
- * The quantile the scheduling cost is reported at, as a fraction — the p95
- * `docs/design/audio-architecture.md` §7 states its criterion in. The same
- * value as Aotearoa204's bench used (`QUANTILES.p95` there), and
- * `schedCost.test.ts` computes it the same way, so a p95 read here means what
- * it meant there.
- */
-export const AUDIO_SCHED_QUANTILE = 0.95;
-
 /* --------------------------- FM algorithms ------------------------------ */
 
 /**

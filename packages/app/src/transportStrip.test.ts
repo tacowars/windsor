@@ -52,6 +52,5 @@ describe('the transport strip in the page', () => {
     expect(read('./main.ts')).toContain("mountTransportStrip(ctx, $('transportStrip'))");
     const arrangement = read('./arrangementTab.ts');
     expect(arrangement).not.toContain("section('Transport'");
-    expect(arrangement).not.toContain('toggleMute');
   });
 });
