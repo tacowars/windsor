@@ -22,7 +22,7 @@ describe('patch library catalogue', () => {
     expect(LIBRARY.length).toBeGreaterThan(0);
     expect(LIBRARY.map((entry) => entry.id).sort()).toEqual([...PRESET_NAMES].sort());
     expect(new Set(LIBRARY.map((entry) => entry.category))).toEqual(
-      new Set(['Strings', 'Pads', 'Plucks', 'Basses', 'Soundtrack FX', 'Drums', 'Legacy game FX']),
+      new Set(['Strings', 'Pads', 'Plucks', 'Basses', 'Soundtrack FX', 'Drums', 'Legacy FX']),
     );
     for (const entry of LIBRARY) {
       expect(entry.tags.length, entry.id).toBeGreaterThan(0);
@@ -46,10 +46,10 @@ describe('patch library catalogue', () => {
     expect(filterPresets(entries, { ...empty, query: 'zzzzzz' })).toEqual([]);
     expect(filterPresets(entries, { ...empty, query: 'concrete', tag: 'airy' })).toEqual([]);
   });
-  it('hides legacy gameplay sounds by default but retains explicit access', () => {
+  it('hides the legacy sounds by default but retains explicit access', () => {
     expect(filterPresets(listed(), empty).some((entry) => entry.id === 'weapon-zap')).toBe(false);
     expect(
-      filterPresets(listed(), { ...empty, category: 'Legacy game FX' }).map((entry) => entry.id),
+      filterPresets(listed(), { ...empty, category: 'Legacy FX' }).map((entry) => entry.id),
     ).toContain('weapon-zap');
   });
   it('normalises and round trips every library patch, including user harmonics', () => {

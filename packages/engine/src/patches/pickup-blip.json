@@ -1,9 +1,9 @@
 {
   "format": 1,
   "name": "Pickup Blip",
-  "category": "Legacy game FX",
-  "tags": ["legacy", "game-fx"],
-  "description": "Retained for existing documents. Legacy gameplay sound.",
+  "category": "Legacy FX",
+  "tags": ["legacy", "fx"],
+  "description": "A short sine blip with a rising pitch envelope. The engine's fallback click plays it, so it cannot be deleted.",
   "patch": {
     "name": "Pickup Blip",
     "algorithm": 0,
