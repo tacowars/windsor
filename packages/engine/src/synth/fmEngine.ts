@@ -24,8 +24,8 @@ import { PROCESSOR_NAME, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessag
 export interface PartOptions {
   /**
    * The patch this part plays. The engine resolves no names (#562): a song's
-   * patch comes from its document and a gameplay patch from
-   * `gameplayPatches.ts`, so the whole-bank table is not a runtime import.
+   * patch comes from its document and any other from its caller, so the
+   * whole-bank table is not a runtime import.
    */
   patch?: Patch;
   /** Sounding voice limit. The pool holds a few more, for steal fade-outs. */

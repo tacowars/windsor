@@ -7,7 +7,7 @@
  */
 import type { Patch } from '@windsor/engine';
 import {
-  GAMEPLAY_PATCH_IDS,
+  FALLBACK_PATCH_ID,
   clonePatch,
   makePatch,
   partAt,
@@ -67,9 +67,8 @@ export const canDelete = (origin: PatchOrigin, library: LibraryModel): boolean =
 
 /** Why an id cannot be deleted, or null. */
 export function deleteRefusal(id: string): string | null {
-  const gameplay = Object.values(GAMEPLAY_PATCH_IDS) as string[];
-  return gameplay.includes(id)
-    ? `"${id}" is played by game code (GAMEPLAY_PATCH_IDS) and cannot be deleted.`
+  return id === FALLBACK_PATCH_ID
+    ? `"${id}" is the engine's fallback click (FALLBACK_PATCH_ID) and cannot be deleted.`
     : null;
 }
 

@@ -1,11 +1,8 @@
 /* eslint-disable max-lines -- 356 lines: routing and partial splitting now have their own modules; the system retains their transport/graph transaction boundary (#225 decision 4). */
 /**
- * The audio system: constructed by `main.ts`, updated by the render loop.
- *
- * Audio observes; it never decides. Simulation events flow one way -- the sim
- * emits, this subscribes and makes noise. Nothing here may feed back into
- * simulation state, or the determinism guarantee in CLAUDE.md invariant 1 stops
- * meaning anything: a dropped or late sound must be invisible to the server.
+ * The audio system: the standing graph a page plays through. The console
+ * (`packages/app/src/host.ts`) constructs it and pumps `update()` from its
+ * frame loop.
  *
  * The standing graph, per docs/log/2026-08-31-mixer-sends-returns-and-channel-strips.md:
  *
@@ -15,15 +12,16 @@
  *                                                                                          ▼
  *                                                          song master inserts/level → musicBus.output (the Music fader)
  *                                                                                          │
- *   sfx part.output ─▶ [stages…] ─▶ tail ─── [rotate θ] ─▶ sfxLevel ─▶ master ◀────────────┘
+ *   aux part.output ─▶ [stages…] ─▶ tail ─── [rotate θ] ─▶ auxLevel ─▶ master ◀────────────┘
  *                                                                      └─▶ limiter ─▶ out
  *
  * Each strip's stages sit between the part and its tail, and the rotation and
  * the sends both tap the tail (#639). The first stage is always the strip's
- * low cut (#640), so a room hears the cut signal too. SFX parts get the same strip with the SFX fader as
- * their dry destination, so they skip the music bus's inserts but still have a real pan and a send.
- * `musicBus.output` and `sfxLevel` are the settings panel's two channel
- * faders (#518 decision 1): the music one is the bus's existing output gain,
+ * low cut (#640), so a room hears the cut signal too. Aux parts — an
+ * audition, a metronome, anything outside the song — get the same strip with
+ * the aux fader as their dry destination, so they skip the song master but
+ * still have a real pan and a send. `musicBus.output` and `auxLevel` are the
+ * two channel faders (#518 decision 1): the music one is the bus's existing output gain,
  * so the dry path gains no node, and the returns are summed into it so the
  * room follows the music down. The engine's master is not a fader and never
  * becomes one.
@@ -66,7 +64,6 @@ import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { MIX, RETURNS, stripFor } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
-import { GAMEPLAY_PATCHES, type GameplayPatchId } from '../patch/gameplayPatches';
 import type { ReturnBus } from '../mixer/returnBus';
 import { createReturns } from '../mixer/returnBus';
 import { Scheduler } from '../sequencing/scheduler';
@@ -90,7 +87,7 @@ export interface AudioSystemOptions {
   defer?: RouteOptions['defer'];
 }
 
-/** `__a204.audio.readout()` (issue #69): the arrangement's state plus the system's. */
+/** `AudioSystem.readout()` (issue #69): the arrangement's state plus the system's. */
 export interface MusicReadout extends ArrangementReadout {
   muted: boolean;
   running: boolean;
@@ -112,10 +109,10 @@ export class AudioSystem {
   private musicBus: AudioBus | null = null;
   private masterStripValue: MasterStrip | null = null;
   private returns: Readonly<Record<string, ReturnBus>> | null = null;
-  /** The SFX strips' dry summing gain — the SFX fader (#518); built by `init()`. */
-  private sfxLevel: GainNode | null = null;
+  /** The aux strips' dry summing gain — the aux fader (#518); built by `init()`. */
+  private auxLevel: GainNode | null = null;
   private musicGainValue = 1;
-  private sfxGainValue = 1;
+  private auxGainValue = 1;
   private readonly strips = new Map<string, PartStrip>();
   /** The music parts by slot — the player's roster, grown and shrunk live through `apply` (#629). */
   private readonly musicParts = new Map<number, AudioPart>();
@@ -180,12 +177,12 @@ export class AudioSystem {
     this.musicBus.filter!.connect(master.input);
     master.output.connect(this.musicBus.output);
     this.returns = createReturns(this.engine.context, this.returnSpecs, master.input);
-    this.sfxLevel = this.engine.context.createGain();
-    this.sfxLevel.connect(this.engine.master);
-    // A level set before `init()` (the settings read at boot) lands on the
+    this.auxLevel = this.engine.context.createGain();
+    this.auxLevel.connect(this.engine.master);
+    // A level set before `init()` (a saved setting read at boot) lands on the
     // nodes the moment they exist, so no sound is ever made at the wrong one.
     this.musicBus.output.gain.value = this.musicGainValue;
-    this.sfxLevel.gain.value = this.sfxGainValue;
+    this.auxLevel.gain.value = this.auxGainValue;
     // The plate is a standing processor on the audio thread, so it reports too
     // (#445): a load figure that counted only the parts would understate the
     // music by the whole reverb.
@@ -254,15 +251,15 @@ export class AudioSystem {
   }
 
   /**
-   * Create a part on its strip, dry into the SFX fader, for UI and close-up
-   * SFX. The fader is one `GainNode` at unity until the settings move it
+   * Create a part on its strip, dry into the aux fader: a sound outside the
+   * song, such as an audition or a metronome, that must not pass the song
+   * master. The fader is one `GainNode` at unity until `setAuxGain` moves it
    * (#518), so a part's path to the master is otherwise what it always was.
+   * The patch is the caller's, as for a music part (#562).
    */
-  createSfxPart(name: string, id: GameplayPatchId, maxVoices = 8): AudioPart {
+  createAuxPart(name: string, patch: Patch, maxVoices = 8): AudioPart {
     this.standing();
-    // Gameplay sounds are not songs: they still resolve by library id (#562),
-    // through the two-entry table the game bundles.
-    return this.route(name, clonePatch(GAMEPLAY_PATCHES[id]), maxVoices, this.sfxNode());
+    return this.route(name, patch, maxVoices, this.auxNode());
   }
 
   /**
@@ -275,18 +272,18 @@ export class AudioSystem {
     if (this.musicBus) this.musicBus.output.gain.value = gain;
   }
 
-  /** The SFX strips' fader; the spatial engine's half is `mixLevels.ts`. */
-  setSfxGain(gain: number): void {
-    this.sfxGainValue = gain;
-    if (this.sfxLevel) this.sfxLevel.gain.value = gain;
+  /** The aux strips' fader. Safe before `init()`, like the music fader. */
+  setAuxGain(gain: number): void {
+    this.auxGainValue = gain;
+    if (this.auxLevel) this.auxLevel.gain.value = gain;
   }
 
   get musicGain(): number {
     return this.musicGainValue;
   }
 
-  get sfxGain(): number {
-    return this.sfxGainValue;
+  get auxGain(): number {
+    return this.auxGainValue;
   }
 
   /**
@@ -533,13 +530,13 @@ export class AudioSystem {
     this.musicBus?.input.disconnect();
     this.musicBus?.filter?.disconnect();
     this.musicBus?.output.disconnect();
-    this.sfxLevel?.disconnect();
+    this.auxLevel?.disconnect();
     this.loadMeter.dispose();
     this.schedMeter.reset();
     this.engine.dispose();
     this.musicBus = null;
     this.returns = null;
-    this.sfxLevel = null;
+    this.auxLevel = null;
     this.started = false;
   }
 
@@ -550,9 +547,9 @@ export class AudioSystem {
     return { musicBus: this.musicBus, returns: this.returns };
   }
 
-  private sfxNode(): GainNode {
-    if (!this.sfxLevel) throw new Error('AudioSystem.init() must be awaited first');
-    return this.sfxLevel;
+  private auxNode(): GainNode {
+    if (!this.auxLevel) throw new Error('AudioSystem.init() must be awaited first');
+    return this.auxLevel;
   }
 
   private route(

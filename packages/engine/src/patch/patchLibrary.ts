@@ -21,8 +21,8 @@
  *   the record. Decision record: `docs/log/2026-09-15-561-patch-library-file-shape.md`.
  *
  * Browser-safe: no Node, no DOM. `presets.ts` builds the whole-bank table from
- * the generated `patches/index.ts`; `gameplayPatches.ts` reads single files by
- * id so a bundler can drop the rest once #562 removes the runtime fallback.
+ * the generated `patches/index.ts`; `fallbackPatch.ts` reads its single file
+ * by id, so the playback path needs none of the rest.
  */
 import type { Patch } from './patch';
 import { makePatch } from './patch';
