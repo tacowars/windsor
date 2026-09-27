@@ -1,0 +1,48 @@
+{
+  "pageSha256": "7f1ed0cddb55699432c8e713243e48d09ff43d2a07ac1a8d5d369d5a1b0e87bd",
+  "parentCommit": "1f43e9f3c95e0b67f06952d8dec3f5f80e316fc8",
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "darwin 25.5.0",
+    "browser": "153.0.8010.53",
+    "backend": "Chrome AudioWorklet and native Web Audio, headless"
+  },
+  "limit": 8,
+  "counts": [
+    {
+      "target": 0,
+      "count": 8,
+      "disabledAtCap": true,
+      "order": [
+        "1 · Bus compressor",
+        "2 · Chorus",
+        "3 · Drive",
+        "4 · Drive",
+        "5 · Drive",
+        "6 · Drive",
+        "7 · Drive",
+        "8 · Drive"
+      ]
+    },
+    {
+      "target": "master",
+      "count": 8,
+      "disabledAtCap": true,
+      "order": [
+        "1 · Bus compressor",
+        "2 · Chorus",
+        "3 · Drive",
+        "4 · Drive",
+        "5 · Drive",
+        "6 · Drive",
+        "7 · Drive",
+        "8 · Drive"
+      ]
+    }
+  ],
+  "meterDb": [
+    -12.113314324308902,
+    -12.08565970733874
+  ],
+  "exportReimport": true
+}

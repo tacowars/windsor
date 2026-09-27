@@ -1,0 +1,20 @@
+chrome-devtools list_console_messages - http://127.0.0.1:5173/?debug=1&backend=webgl2 (WebGL2),
+bridge session 5, after the scripted a204-motor move and the take-screenshot.
+Zero errors, zero warnings.
+
+msgid=8 is the second Babylon banner: Babylon's DumpTools PNG encoder at the
+first take-screenshot, not a stray engine (browser-testing.md §5).
+
+The absence of `[a204] audio unavailable` is the positive evidence for this
+ticket: main.ts wraps audio startup in a guard that logs that warning and
+continues silent, so a clean console means AudioSystem.init() succeeded on a
+normal startup.
+
+msgid=1 [debug] [vite] connecting... (1 args)
+msgid=2 [debug] [vite] connected. (1 args)
+msgid=3 [log] BJS - [09:42:08]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)
+msgid=4 [info] [a204] {"event":"engine","backend":"WebGL2","gpu":"ANGLE (Apple, ANGLE Metal Renderer: Apple M1, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))"} (2 args)
+msgid=5 [info] [a204] {"event":"debug","shim":true,"bridge":true} (2 args)
+msgid=6 [info] [a204] {"event":"chunks","built":1788,"disposed":0,"queued":0,"ms":466} (2 args)
+msgid=7 [info] [a204] {"event":"bridge","name":"Aotearoa204 WebGL2","port":4400,"connected":true} (2 args)
+msgid=8 [log] BJS - [09:42:37]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)

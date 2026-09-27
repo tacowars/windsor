@@ -1,0 +1,83 @@
+{
+  "pageSha256": "929b31eed896056615554f922e0625f6301fcfdf654bcea67c3261a4c5770331",
+  "parentCommit": "8b1fa82aeff53602869824c5c0b94af74849ff17",
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "darwin 25.5.0",
+    "browser": "153.0.8010.53",
+    "backend": "Chrome AudioWorklet, headless"
+  },
+  "active": {
+    "levels": [
+      -11.641602208413671,
+      -11.641602208413671
+    ],
+    "reduction": 24,
+    "meter": {
+      "type": "peaks",
+      "left": 0.26177000999450684,
+      "right": 0.26177000999450684,
+      "holdLeft": 0.26177000999450684,
+      "holdRight": 0.26177000999450684,
+      "overload": false
+    },
+    "compressor": {
+      "makeup": 0,
+      "enabled": 1,
+      "range": 60,
+      "external": 0,
+      "highpass": 0,
+      "ratio": 10,
+      "mix": 1,
+      "threshold": -40,
+      "attack": 10,
+      "release": 0
+    }
+  },
+  "saved": {
+    "level": 1,
+    "inserts": [
+      {
+        "kind": "compressor",
+        "threshold": -40,
+        "makeup": 0,
+        "attack": 10,
+        "ratio": 10,
+        "release": 0,
+        "highpass": 0,
+        "range": 60,
+        "mix": 1,
+        "enabled": true
+      }
+    ]
+  },
+  "nodeCounts": [
+    {
+      "name": "dattorro-reverb",
+      "stopped": false,
+      "reports": 0
+    },
+    {
+      "name": "fm-part",
+      "stopped": false,
+      "reports": 0
+    },
+    {
+      "name": "a204-peak-meter",
+      "stopped": true,
+      "reports": 16
+    },
+    {
+      "name": "a204-compressor",
+      "stopped": false,
+      "reports": 0
+    },
+    {
+      "name": "a204-peak-meter",
+      "stopped": false,
+      "reports": 1
+    }
+  ],
+  "masterLevelZeroSilencesMeter": true,
+  "hiddenMeterStopped": true
+}

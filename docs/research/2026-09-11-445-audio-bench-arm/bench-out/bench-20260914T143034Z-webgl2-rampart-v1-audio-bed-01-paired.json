@@ -1,0 +1,195 @@
+{
+  "kind": "a204-bench-paired",
+  "schema": 3,
+  "runId": "20260914T143034Z",
+  "backend": "webgl2",
+  "retrieval": "log",
+  "route": "rampart-v1",
+  "build": 5000,
+  "horde": 400,
+  "vat": null,
+  "audio": "bed-01",
+  "gitCommit": "ddaf0b2e",
+  "served": {
+    "expected": "ddaf0b2e2274ae997676868e456e8770aa03d532",
+    "preflight": {
+      "commit": "ddaf0b2e",
+      "source": "/@vite/env"
+    },
+    "server": {
+      "built": true,
+      "entry": "/home/radioflash/projects/Aotearoa204-wt-445-target-pair/packages/server/dist/index.js",
+      "ms": 2941
+    },
+    "prewarm": {
+      "skipped": false,
+      "cdpPort": 9353,
+      "build": 5000,
+      "horde": 400,
+      "pages": [
+        {
+          "url": "http://localhost:5173/?bench=1&backend=webgl2&route=rampart-v1&server=43793",
+          "readyMs": 7055,
+          "reloads": 0,
+          "attempts": 1
+        }
+      ]
+    }
+  },
+  "control": {
+    "runs": [
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-silent-1",
+        "build": 5000,
+        "horde": 400,
+        "ok": false,
+        "validity": {
+          "ok": false,
+          "fps": 30.8,
+          "why": "implied fps 30.8 < 55: window was occluded or throttled"
+        },
+        "renderer": "capsule",
+        "p50": 32.5,
+        "p95": 35.60000014305115,
+        "drawCalls": 445.85451595457005,
+        "visibleP5": 349,
+        "pass": false,
+        "server": {
+          "port": 46195,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 220
+        }
+      },
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-silent-2",
+        "build": 5000,
+        "horde": 400,
+        "ok": false,
+        "validity": {
+          "ok": false,
+          "fps": 31.75,
+          "why": "implied fps 31.8 < 55: window was occluded or throttled"
+        },
+        "renderer": "capsule",
+        "p50": 31.200000047683716,
+        "p95": 34.60000014305115,
+        "drawCalls": 445.79328436516266,
+        "visibleP5": 350,
+        "pass": false,
+        "server": {
+          "port": 46429,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 220
+        }
+      }
+    ],
+    "reproducibility": {
+      "checked": false
+    },
+    "allPass": false
+  },
+  "arm": {
+    "kind": "audio",
+    "build": 5000,
+    "horde": 400,
+    "vat": null,
+    "audio": "bed-01",
+    "runs": [
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-1",
+        "build": 5000,
+        "horde": 400,
+        "ok": false,
+        "validity": {
+          "ok": false,
+          "fps": 29.94,
+          "why": "implied fps 29.9 < 55: window was occluded or throttled"
+        },
+        "renderer": "capsule",
+        "p50": 33,
+        "p95": 39.39999985694885,
+        "drawCalls": 445.7979966611018,
+        "visibleP5": 352,
+        "pass": false,
+        "server": {
+          "port": 45443,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 220
+        }
+      },
+      {
+        "label": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-2",
+        "build": 5000,
+        "horde": 400,
+        "ok": false,
+        "validity": {
+          "ok": false,
+          "fps": 28.63,
+          "why": "implied fps 28.6 < 55: window was occluded or throttled"
+        },
+        "renderer": "capsule",
+        "p50": 34.799999952316284,
+        "p95": 39.5,
+        "drawCalls": 445.88300349243303,
+        "visibleP5": 352,
+        "pass": false,
+        "server": {
+          "port": 41619,
+          "args": [
+            "--port=0",
+            "--start=now",
+            "--build=rampart-v1",
+            "--horde=400",
+            "--waves=off",
+            "--melee=off",
+            "--crowd=off"
+          ],
+          "telemetryLines": 220
+        }
+      }
+    ],
+    "reproducibility": {
+      "checked": false
+    },
+    "allPass": false
+  },
+  "pairs": [
+    {
+      "run": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-1",
+      "control": "webgl2-rampart-v1-build5000-horde400-silent-1",
+      "comparison": null,
+      "pass": false
+    },
+    {
+      "run": "webgl2-rampart-v1-build5000-horde400-audio-bed-01-2",
+      "control": "webgl2-rampart-v1-build5000-horde400-silent-2",
+      "comparison": null,
+      "pass": false
+    }
+  ],
+  "allPass": false
+}

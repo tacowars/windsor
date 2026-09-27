@@ -1,0 +1,51 @@
+/**
+ * The insert list edits (#641) return whole lists, because a list in a
+ * partial replaces the document's wholesale; the engine then decides between
+ * a param write and a rebuild by comparing kinds.
+ */
+import { describe, expect, it } from 'vitest';
+
+import { DEFAULT_DRIVE, MAX_INSERTS } from '../../../packages/client/src/audio/index-for-editor';
+import { addInsert, canAddInsert, moveInsert, removeInsert, setInsertField } from './insertEdits';
+
+describe('insert edits', () => {
+  it('adds a fresh insert of the kind, and stops at the limit', () => {
+    let list = addInsert([], 'drive');
+    expect(list).toEqual([DEFAULT_DRIVE]);
+    expect(list[0]).not.toBe(DEFAULT_DRIVE);
+    while (canAddInsert(list)) list = addInsert(list, 'drive');
+    expect(list).toHaveLength(MAX_INSERTS);
+    expect(addInsert(list, 'drive')).toHaveLength(MAX_INSERTS);
+  });
+
+  it('removes by index, leaving the others in order', () => {
+    const a = { ...DEFAULT_DRIVE, drive: 3 };
+    const b = { ...DEFAULT_DRIVE, drive: 9 };
+    expect(removeInsert([a, b], 0)).toEqual([b]);
+    expect(removeInsert([a, b], 5)).toEqual([a, b]);
+  });
+
+  it('moves an insert one place along the chain, and never off either end (#652)', () => {
+    const a = { ...DEFAULT_DRIVE, drive: 3 };
+    const b = { ...DEFAULT_DRIVE, drive: 9 };
+    const list = [a, b];
+    expect(moveInsert(list, 1, -1)).toEqual([b, a]);
+    expect(moveInsert(list, 0, 1)).toEqual([b, a]);
+    // The ends, and an index the list does not hold, leave the order alone.
+    expect(moveInsert(list, 0, -1)).toEqual(list);
+    expect(moveInsert(list, 1, 1)).toEqual(list);
+    expect(moveInsert(list, 5, -1)).toEqual(list);
+    expect(moveInsert(list, -1, 1)).toEqual(list);
+    // The input list is never touched.
+    expect(list).toEqual([a, b]);
+    expect(moveInsert(list, 0, 1)).not.toBe(list);
+  });
+
+  it('sets one field on one insert and leaves the input list alone', () => {
+    const list = [DEFAULT_DRIVE, DEFAULT_DRIVE];
+    const next = setInsertField(list, 1, 'mix', 0.4);
+    expect(next).toEqual([DEFAULT_DRIVE, { ...DEFAULT_DRIVE, mix: 0.4 }]);
+    expect(list[1]).toBe(DEFAULT_DRIVE);
+    expect(setInsertField(list, 7, 'mix', 0.4)).toEqual(list);
+  });
+});

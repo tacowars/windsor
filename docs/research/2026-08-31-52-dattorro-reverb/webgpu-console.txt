@@ -1,0 +1,6 @@
+[debug] [vite] connecting...
+[debug] [vite] connected.
+[log] BJS - [12:51:57]: Babylon.js v9.23.0 - WebGPU1 engine
+[info] [a204] {"event":"engine","backend":"WebGPU","gpu":"apple metal-3 unknown version"}
+[info] [a204] {"event":"debug","shim":true,"bridge":false}
+[info] [a204] {"event":"chunks","built":1786,"disposed":0,"queued":0,"ms":184}

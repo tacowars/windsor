@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "transport": {
+    "bpm": 120,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 2,
+    "scale": "dorian"
+  },
+  "patches": {
+    "init-0": {}
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Part 1",
+      "preset": "init-0",
+      "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "none"
+      }
+    }
+  ]
+}

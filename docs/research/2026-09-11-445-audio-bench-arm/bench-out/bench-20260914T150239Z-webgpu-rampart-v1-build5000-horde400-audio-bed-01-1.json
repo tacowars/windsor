@@ -1,0 +1,224 @@
+{
+  "bench": "a204-m1-terrain-budget",
+  "schema": 12,
+  "header": {
+    "terrain": {
+      "seed": 1,
+      "scale": 96,
+      "octaves": 5,
+      "amplitude": 40,
+      "base": 0.52,
+      "detail": 0.12,
+      "roll": 0.15,
+      "upland": 0.22,
+      "basin": 0.3,
+      "gully": 0.15,
+      "coreRadius": 50,
+      "coreFade": 150,
+      "coreRelief": 0.45,
+      "mountain": 200
+    },
+    "routeId": "rampart-v1",
+    "gateOnScreen": true,
+    "gitCommit": "ddaf0b2e",
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "babylon": "9.23.0",
+    "backend": "WebGPU",
+    "gpu": "amd gcn-5 unknown version",
+    "motor": {
+      "dtSeconds": 0.05,
+      "maxStepsPerFrame": 4
+    },
+    "window": {
+      "innerWidth": 1896,
+      "innerHeight": 968,
+      "devicePixelRatio": 1.25,
+      "renderWidth": 1920,
+      "renderHeight": 1080
+    },
+    "camera": {
+      "fovRadians": 0.9,
+      "fovMode": "vertical",
+      "radius": 6,
+      "beta": 1.4,
+      "alpha": -1.5707963267948966
+    },
+    "lodRings": [
+      {
+        "ring": 0,
+        "maxDistance": 256,
+        "spacing": 2
+      },
+      {
+        "ring": 1,
+        "maxDistance": 768,
+        "spacing": 8
+      },
+      {
+        "ring": 2,
+        "maxDistance": 1536,
+        "spacing": 32
+      }
+    ],
+    "fog": {
+      "start": 1200,
+      "end": 4096
+    },
+    "terrainOptions": {
+      "superChunks": true,
+      "horizon": true
+    },
+    "meshBudgetMs": 4,
+    "warmup": {
+      "laps": 1,
+      "seconds": 151.5642999999523
+    },
+    "windowSeconds": 60,
+    "webgpuAdapter": "amd gcn-5 (timestamp-query)",
+    "building": {
+      "requested": 5000,
+      "layoutId": "fort-ring-v1",
+      "pieces": 5001,
+      "kinds": {
+        "wall": 2889,
+        "floor": 1689,
+        "ramp": 422,
+        "core": 1
+      },
+      "fortMs": 3.299999952316284
+    },
+    "horde": {
+      "requested": 400,
+      "seed": 1,
+      "spawnRadius": 200,
+      "renderer": "capsule",
+      "vat": null
+    },
+    "audio": {
+      "document": "bed-01",
+      "contextState": "running",
+      "sampleRate": 48000,
+      "baseLatency": 0.010666666666666666,
+      "parts": 4,
+      "maxVoices": 12,
+      "processors": 5,
+      "averageLatency": 0.036996,
+      "minimumLatency": 0,
+      "maximumLatency": 0.04224
+    }
+  },
+  "route": {
+    "id": "rampart-v1",
+    "laps": 1,
+    "distanceM": 101.3624759103021,
+    "crossings": 0,
+    "minY": 23.290138244628906,
+    "maxY": 23.62045669555664
+  },
+  "heap": {
+    "beforeMB": 204.5946502685547,
+    "afterMB": 207.68657779693604
+  },
+  "frames": {
+    "count": 1925,
+    "windowMs": 60034.799999952316,
+    "meanFps": 32.06473578660259,
+    "intervalMs": {
+      "p50": 28.90000009536743,
+      "p95": 49.90000009536743,
+      "p99": 96.10000014305115,
+      "max": 129.89999985694885,
+      "mean": 31.18690909088432
+    },
+    "over33Ms": 355,
+    "over100Ms": 15
+  },
+  "cpu": {
+    "sceneMs": {
+      "p50": 11.199999809265137,
+      "p95": 17.90000009536743,
+      "p99": 19.5,
+      "max": 23,
+      "mean": 12.355324675696236
+    },
+    "renderMs": {
+      "p50": 5.5,
+      "p95": 8.5,
+      "p99": 9.900000095367432,
+      "max": 13.5,
+      "mean": 5.978545451350026
+    }
+  },
+  "gpu": {
+    "samples": 0,
+    "frameMs": null
+  },
+  "scene": {
+    "drawCalls": {
+      "mean": 445.8197402597403,
+      "min": 442,
+      "max": 448
+    },
+    "activeMeshes": {
+      "mean": 363.6155844155844,
+      "min": 360,
+      "max": 366
+    },
+    "triangles": {
+      "mean": 4068683.577142857,
+      "min": 3946516,
+      "max": 4142354
+    }
+  },
+  "terrain": {
+    "builds": 0,
+    "disposes": 0,
+    "buildMsTotal": 0,
+    "buildMsMax": 0
+  },
+  "horde": {
+    "visible": {
+      "min": 314,
+      "p5": 345,
+      "mean": 384.4067532467532
+    },
+    "stepMs": {
+      "p50": 0.5999999046325684,
+      "p95": 1.2000000476837158,
+      "p99": 2.1000001430511475,
+      "max": 4.8999998569488525,
+      "mean": 0.5688311675926307
+    }
+  },
+  "audio": {
+    "loadPct": {
+      "p50": 8.673978065802594,
+      "p95": 11.864406779661017,
+      "p99": 13.373253493013973,
+      "max": 13.373253493013973,
+      "mean": 8.871245089014796
+    },
+    "peakPct": 112.5,
+    "underruns": 2,
+    "schedMs": {
+      "p50": 0,
+      "p95": 0.10000014305114746,
+      "p99": 0.20000004768371582,
+      "max": 3.299999952316284,
+      "mean": 0.022597402721256404
+    },
+    "underrunEvents": 0,
+    "underrunDuration": 0,
+    "totalDuration": 62.14979200000002
+  },
+  "verdict": {
+    "p95Ok": false,
+    "p99Ok": false,
+    "worstOk": false,
+    "horde": {
+      "visibleP5Ok": true,
+      "visibleMeanOk": true
+    },
+    "pass": false
+  }
+}

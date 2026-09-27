@@ -1,0 +1,13 @@
+{
+  "totalMeshes": 1796,
+  "activeMeshes": 95,
+  "activeIndices": 115524,
+  "activeFaces": 38508,
+  "activeBones": 0,
+  "activeParticles": 0,
+  "drawCalls": 95,
+  "totalLights": 1,
+  "totalVertices": 93239,
+  "totalMaterials": 8,
+  "totalTextures": 0
+}

@@ -1,0 +1,40 @@
+chrome-devtools MCP `list_console_messages` — WebGPU page
+http://localhost:5251/?debug=1&server=8158   (served build a993c67)
+
+Captured after page load, after the keypress that unlocked audio, after the
+in-page OfflineAudioContext measurement, and after the whole bridge run
+(get-system-stats, query-a204-state x2, a204-motor, take-screenshot).
+Unfiltered: every message the page produced.
+
+## Console messages
+Showing 1-14 of 14 (Page 1 of 1).
+msgid=1 [debug] [vite] connecting... (1 args)
+msgid=2 [debug] [vite] connected. (1 args)
+msgid=3 [info] [a204] {"event":"net","connected":true,"server":"ws://localhost:8158","playerId":1,"seed":1,"tickRate":20,"tick":277,"revision":0,"baselinePieces":0,"latencyMs":0,"jitterMs":0} (2 args)
+msgid=4 [log] BJS - [01:32:17]: Babylon.js v9.23.0 - WebGPU1 engine (1 args)
+msgid=5 [info] [a204] {"event":"engine","backend":"WebGPU","gpu":"apple metal-3 unknown version"} (2 args)
+msgid=6 [info] [a204] {"event":"debug","shim":true,"bridge":true} (2 args)
+msgid=7 [info] [a204] {"event":"chunks","built":1786,"disposed":0,"queued":0,"ms":182} (2 args)
+msgid=8 [info] [a204] {"event":"bridge","name":"Aotearoa204 WebGPU","port":4400,"connected":true} (2 args)
+msgid=9 [info] [a204] {"event":"music","state":"started","bpm":96,"root":50,"scale":"dorian"} (2 args)
+msgid=10 [info] [a204] {"event":"music","state":"note","part":"kick","tick":0} (2 args)
+msgid=11 [info] [a204] {"event":"music","state":"note","part":"hat","tick":0} (2 args)
+msgid=12 [info] [a204] {"event":"music","state":"note","part":"arp","tick":0} (2 args)
+msgid=13 [info] [a204] {"event":"music","state":"note","part":"drone","tick":0} (2 args)
+msgid=14 [log] BJS - [01:32:55]: Babylon.js v9.23.0 - WebGL2 - Parallel shader compilation (1 args)
+
+Zero [error], zero [warn], zero [issue].
+
+msgid=14 is the one known non-fault: the second Babylon banner logged at the
+first `take-screenshot` is the `DumpTools` PNG encoder, not a second engine
+for the scene (docs/reference/browser-testing.md 5). The scene's engine is
+msgid=4 / msgid=5, and get-system-stats-webgpu.json is the evidence for it.
+
+## performance.getEntriesByType('resource') — same page, same moment
+{"total":250,"failures":[]}
+
+(No status >= 400. Paired with the listing per browser-testing.md 7: a warm
+browser can cache a failed request per origin and hide it from the console.
+`fm-processor.js` itself is fetched by the AudioWorklet thread and so does
+not appear in main-thread resource timing; that it loaded is proved by the
+`music` events above and by worklet-peaks-in-browser.json.)

@@ -1,0 +1,26 @@
+{
+  "resolution": "1280 x 900",
+  "hardwareScalingLevel": 1,
+  "engine": "WebGL2 - Parallel shader compilation",
+  "driver": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version)",
+  "capabilities": {
+    "stdDerivatives": true,
+    "compressedTextures": true,
+    "hardwareInstances": true,
+    "textureFloat": true,
+    "textureHalfFloat": true,
+    "renderToTextureFloat": true,
+    "renderToTextureHalfFloat": true,
+    "indices32Bit": true,
+    "fragmentDepth": true,
+    "highPrecisionShaders": true,
+    "drawBuffers": true,
+    "vertexArrayObject": true,
+    "timerQuery": true,
+    "stencil": false,
+    "parallelShaderCompilation": true,
+    "maxTexturesUnits": 16,
+    "maxTexturesSize": 16384,
+    "maxAnisotropy": 16
+  }
+}

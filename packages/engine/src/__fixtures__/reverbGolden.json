@@ -1,0 +1,81 @@
+{
+  "about": "sha256 of each plate scenario's interleaved Float32 render through mixer/reverbGolden.test.ts, in the default path and with the sleep (#547) and the settled-SIZE skip (#547) switched off. Written only by that test under A204_REFRESH_REVERB_GOLDEN=1, and only when a render change is intended (#671).",
+  "sampleRate": 48000,
+  "hashes": {
+    "decay-long": {
+      "default": "fd194d77c395c0f8c55556166f4309d2bf9bbe8a4fa5396b7951be7348b38c88",
+      "noSleep": "fd194d77c395c0f8c55556166f4309d2bf9bbe8a4fa5396b7951be7348b38c88",
+      "noSettledSkip": "fd194d77c395c0f8c55556166f4309d2bf9bbe8a4fa5396b7951be7348b38c88"
+    },
+    "decay-short": {
+      "default": "3a6e051059a3417b2f05b84279ab231859da1b8e526f081b72e5501333771d32",
+      "noSleep": "3a6e051059a3417b2f05b84279ab231859da1b8e526f081b72e5501333771d32",
+      "noSettledSkip": "3a6e051059a3417b2f05b84279ab231859da1b8e526f081b72e5501333771d32"
+    },
+    "dry-only": {
+      "default": "bf473185d05676e7898737dbfcab0c2c67ccb9f65a9659945eeb50bfb4108fd3",
+      "noSleep": "bf473185d05676e7898737dbfcab0c2c67ccb9f65a9659945eeb50bfb4108fd3",
+      "noSettledSkip": "bf473185d05676e7898737dbfcab0c2c67ccb9f65a9659945eeb50bfb4108fd3"
+    },
+    "filters-and-modulation": {
+      "default": "997c9eff457303bfea7e3cc20f05a1bf03356ba279abb59b4cace91db3677c9c",
+      "noSleep": "997c9eff457303bfea7e3cc20f05a1bf03356ba279abb59b4cace91db3677c9c",
+      "noSettledSkip": "997c9eff457303bfea7e3cc20f05a1bf03356ba279abb59b4cace91db3677c9c"
+    },
+    "hold": {
+      "default": "842f928eb5329a09c00b3e3fd0b4b30576b5f18e29c9c933c3dae1df664ddcee",
+      "noSleep": "842f928eb5329a09c00b3e3fd0b4b30576b5f18e29c9c933c3dae1df664ddcee",
+      "noSettledSkip": "842f928eb5329a09c00b3e3fd0b4b30576b5f18e29c9c933c3dae1df664ddcee"
+    },
+    "hold-released": {
+      "default": "5fd711d11dd000047dee7036cf8519709d6df48725ba7b8e6cf347f2bb591a25",
+      "noSleep": "5fd711d11dd000047dee7036cf8519709d6df48725ba7b8e6cf347f2bb591a25",
+      "noSettledSkip": "5fd711d11dd000047dee7036cf8519709d6df48725ba7b8e6cf347f2bb591a25"
+    },
+    "impulse": {
+      "default": "011f6e2f57508ae82712c8124569dff7463ac6ab76e3c869ae4d394d4f8f7473",
+      "noSleep": "011f6e2f57508ae82712c8124569dff7463ac6ab76e3c869ae4d394d4f8f7473",
+      "noSettledSkip": "011f6e2f57508ae82712c8124569dff7463ac6ab76e3c869ae4d394d4f8f7473"
+    },
+    "max-diffusion": {
+      "default": "5bfc81c6c2ceb7b299a79ce9cd2406b037e40883ee6c2aced773cbd828f34943",
+      "noSleep": "5bfc81c6c2ceb7b299a79ce9cd2406b037e40883ee6c2aced773cbd828f34943",
+      "noSettledSkip": "5bfc81c6c2ceb7b299a79ce9cd2406b037e40883ee6c2aced773cbd828f34943"
+    },
+    "size-and-decay": {
+      "default": "3c876ed37c3fded99dc0c9b036e63416ff2625b809b76c57d2f16bfbf43384da",
+      "noSleep": "3c876ed37c3fded99dc0c9b036e63416ff2625b809b76c57d2f16bfbf43384da",
+      "noSettledSkip": "3c876ed37c3fded99dc0c9b036e63416ff2625b809b76c57d2f16bfbf43384da"
+    },
+    "size-box": {
+      "default": "b501dbfcbf62ce52f6d8d7b554ca9e84b7dbe4662dd090aff0fc9d501f65d8a4",
+      "noSleep": "b501dbfcbf62ce52f6d8d7b554ca9e84b7dbe4662dd090aff0fc9d501f65d8a4",
+      "noSettledSkip": "b501dbfcbf62ce52f6d8d7b554ca9e84b7dbe4662dd090aff0fc9d501f65d8a4"
+    },
+    "size-cathedral": {
+      "default": "75547d445363706cbea419ffd028c658038fc61a3589f2a3abd2f277c9e2859e",
+      "noSleep": "75547d445363706cbea419ffd028c658038fc61a3589f2a3abd2f277c9e2859e",
+      "noSettledSkip": "75547d445363706cbea419ffd028c658038fc61a3589f2a3abd2f277c9e2859e"
+    },
+    "size-glide": {
+      "default": "40eb374eecbc3d96d53c4af4ce211992a55dcb090c50735a0eda3b54aaf13e52",
+      "noSleep": "40eb374eecbc3d96d53c4af4ce211992a55dcb090c50735a0eda3b54aaf13e52",
+      "noSettledSkip": "40eb374eecbc3d96d53c4af4ce211992a55dcb090c50735a0eda3b54aaf13e52"
+    },
+    "sleep": {
+      "default": "1e19cb327073ecb522f6680cd113f8616653c0cc8c8a607b39b83d11e9ea7ff8",
+      "noSleep": "7db2d7cefceb64650d858086b456b978e5a065c7fb83e9f4fec0309f423032ee",
+      "noSettledSkip": "1e19cb327073ecb522f6680cd113f8616653c0cc8c8a607b39b83d11e9ea7ff8"
+    },
+    "sleep-and-wake": {
+      "default": "cd63ea3a0f1f7da08bf1fc79268acdf6428ae037e4397988ba3d9ddf0fbb06c2",
+      "noSleep": "c2184c4c630c5c4a1418a55da3488f6eb89458df7d1f33e94d0e1f0163f7c5c2",
+      "noSettledSkip": "cd63ea3a0f1f7da08bf1fc79268acdf6428ae037e4397988ba3d9ddf0fbb06c2"
+    },
+    "wet-late": {
+      "default": "061da0f7edf06ee5bee4e1813a9233d3b98629864ad22a5e190c81da035442cd",
+      "noSleep": "061da0f7edf06ee5bee4e1813a9233d3b98629864ad22a5e190c81da035442cd",
+      "noSettledSkip": "061da0f7edf06ee5bee4e1813a9233d3b98629864ad22a5e190c81da035442cd"
+    }
+  }
+}

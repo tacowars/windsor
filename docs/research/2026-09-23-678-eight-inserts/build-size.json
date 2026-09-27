@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "commit": "1f43e9f3c95e0b67f06952d8dec3f5f80e316fc8",
+    "entryBytes": 727989,
+    "entryGzipBytes": 210629,
+    "distBytesExcludingMaps": 29751275
+  },
+  "implementation": {
+    "entryBytes": 728001,
+    "entryGzipBytes": 210637,
+    "distBytesExcludingMaps": 29751287
+  },
+  "delta": {
+    "entryBytes": 12,
+    "entryGzipBytes": 8,
+    "distBytesExcludingMaps": 12
+  },
+  "machine": {
+    "system": "macOS-26.5.1-arm64-arm-64bit-Mach-O",
+    "backend": "Vite production build via npm workspace, Node 24"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "machine": {
+    "cpu": "Apple M1",
+    "os": "Darwin 25.5.0",
+    "arch": "arm64"
+  },
+  "backend": "Node v24.20.0 / V8 13.6.233.17-node.53; no graphics backend",
+  "baseline": "949f405edc8a3a7b417cfe990e2263267a4fc4d6",
+  "sampleRate": 48000,
+  "blockFrames": 128,
+  "warmupSeconds": 1,
+  "scenarios": [
+    {
+      "mode": "classic",
+      "instances": 1,
+      "msPerAudioSecond": [
+        24.755625000000002,
+        17.377083,
+        18.213250000000002
+      ],
+      "checksum": -0.9016191959381104
+    },
+    {
+      "mode": "classic",
+      "instances": 8,
+      "msPerAudioSecond": [
+        139.34825,
+        139.15387500000003,
+        146.16695800000002
+      ],
+      "checksum": -0.9016191959381104
+    },
+    {
+      "mode": "classic",
+      "instances": 16,
+      "msPerAudioSecond": [
+        287.48750000000007,
+        278.5693329999999,
+        296.7269580000002
+      ],
+      "checksum": -0.9016191959381104
+    },
+    {
+      "mode": "acid",
+      "instances": 1,
+      "msPerAudioSecond": [
+        18.610542000000123,
+        17.378458000000137,
+        16.516374999999925
+      ],
+      "checksum": -0.7845902931876481
+    },
+    {
+      "mode": "acid",
+      "instances": 8,
+      "msPerAudioSecond": [
+        144.12820799999986,
+        151.49391700000024,
+        140.0597499999999
+      ],
+      "checksum": -0.7845902931876481
+    },
+    {
+      "mode": "acid",
+      "instances": 16,
+      "msPerAudioSecond": [
+        276.58716700000014,
+        273.03804200000013,
+        296.4609580000001
+      ],
+      "checksum": -0.7845902931876481
+    },
+    {
+      "mode": "space",
+      "instances": 1,
+      "msPerAudioSecond": [
+        17.853749999999764,
+        17.71349999999984,
+        21.633124999999836
+      ],
+      "checksum": -0.96480593085289
+    },
+    {
+      "mode": "space",
+      "instances": 8,
+      "msPerAudioSecond": [
+        153.40875000000005,
+        150.59620799999993,
+        140.9159579999996
+      ],
+      "checksum": -0.96480593085289
+    },
+    {
+      "mode": "space",
+      "instances": 16,
+      "msPerAudioSecond": [
+        298.47499999999945,
+        293.34954199999993,
+        293.4577499999996
+      ],
+      "checksum": -0.96480593085289
+    }
+  ],
+  "limitations": "Sequential offline callbacks, warm JIT, no other game work. Includes stereo lattice filters, per-sample modulation and smoothing. No real-time scheduling, browser copy overhead, underrun verdict or target-machine claim."
+}

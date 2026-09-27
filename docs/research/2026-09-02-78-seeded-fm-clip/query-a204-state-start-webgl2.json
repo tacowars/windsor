@@ -1,0 +1,101 @@
+{
+  "backend": "WebGL2",
+  "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4 Pro, Unspecified Version) (Google Inc. (Apple); WebGL 2.0 (OpenGL ES 3.0 Chromium))",
+  "gitCommit": "a993c67",
+  "seed": 1,
+  "player": {
+    "x": 35,
+    "y": 20.73061180114746,
+    "z": 32,
+    "support": "supported",
+    "groundError": 8.036367873387462e-7,
+    "fallthroughs": 0,
+    "blocked": false,
+    "motor": "kinematic"
+  },
+  "camera": {
+    "x": 35,
+    "y": 22.350414658548907,
+    "z": 26.08730162006924,
+    "yaw": -1.5707963267948966,
+    "pitch": 1.4,
+    "fovRadians": 0.9
+  },
+  "chunks": {
+    "byRing": [
+      46,
+      394,
+      1354
+    ],
+    "queueLength": 0,
+    "lastBuildMs": 0,
+    "budgetMs": 4
+  },
+  "colliders": {
+    "bodies": 46,
+    "swaps": 0
+  },
+  "building": {
+    "pieces": 0,
+    "wall": 0,
+    "floor": 0,
+    "ramp": 0,
+    "target": "wall -> no target"
+  },
+  "horde": null,
+  "net": {
+    "playerId": 2,
+    "rtt": 85.55781816004615,
+    "serverTick": 1815,
+    "bytesInPerSec": 1240,
+    "revision": 0,
+    "snapshots": 685,
+    "lead": 2,
+    "bufferDepth": 2,
+    "arrivalMargin": 85.39486258747502,
+    "late": 4,
+    "underruns": 4,
+    "leadAdjustments": 4
+  },
+  "pred": {
+    "residual": {
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0
+    },
+    "samples": 684,
+    "blends": 0,
+    "snaps": 0,
+    "blendsUnexpected": 0,
+    "snapsUnexpected": 0,
+    "lastCause": "none"
+  },
+  "world": {
+    "revision": 0
+  },
+  "build": {
+    "samples": 0,
+    "latencyMs": {
+      "p50": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "pending": 0,
+    "rejected": 0,
+    "lastReject": null
+  },
+  "remotePlayers": 1,
+  "render": {
+    "width": 1200,
+    "height": 1943,
+    "pinned": false
+  },
+  "script": {
+    "active": false
+  },
+  "frames": {
+    "status": "idle",
+    "count": 0
+  }
+}
