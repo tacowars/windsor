@@ -1,9 +1,9 @@
 {
   "format": 1,
   "name": "Weapon Zap",
-  "category": "Legacy game FX",
-  "tags": ["legacy", "game-fx"],
-  "description": "Retained for existing documents. Legacy gameplay sound.",
+  "category": "Legacy FX",
+  "tags": ["legacy", "fx"],
+  "description": "Retained for older songs that play it.",
   "patch": {
     "name": "Weapon Zap",
     "algorithm": 1,

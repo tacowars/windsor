@@ -2,10 +2,10 @@
 
 Issue #475 adds 100 starting points for moody atmospheres and minimal dub
 techno: 16 strings, 24 pads, 20 plucks, 16 basses and 24 soundtrack FX.
-The original 14 IDs remain valid. Four gameplay sounds are available under
-**Legacy game FX**, outside the default **All musical sounds** view.
+The original 14 IDs remain valid. Four sounds kept from Aotearoa204's game are available under
+**Legacy FX**, outside the default **All musical sounds** view.
 
-Open `packages/app/patch-editor.html`, enable audio, select a part and
+Run the console (`npm run dev`), enable audio, select a part and
 use the Parts rail's search, category, tag and source filters. Search words
 match across names, IDs, tags and playing notes; all words must match.
 Filters intersect. Arrow keys browse the native result list; **Enter**,
