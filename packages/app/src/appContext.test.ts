@@ -7,6 +7,7 @@
  * and the session's commit landing in the document under the selected
  * part's preset.
  */
+/* eslint-disable max-lines -- one fixture (the fake console) over every context rule; #709 added the Song view's three cases and the file sits 3 % over */
 import { describe, expect, it } from 'vitest';
 
 import type {
@@ -16,12 +17,15 @@ import type {
 } from '../../../packages/client/src/audio/index-for-editor';
 import {
   PRESETS,
+  TICKS_PER_BAR,
   clonePatch,
   makePatch,
   partAt,
 } from '../../../packages/client/src/audio/index-for-editor';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
+import { partChange } from './context';
 import { DocumentModel } from './documentModel';
+import { appendEvent } from './harmonyLaneModel';
 import type { EngineHost } from './host';
 import { initPresetId } from './libraryConstants';
 import { dropInit } from './patchActions';
@@ -30,7 +34,7 @@ import { renamePatch, revertPatch } from './patchLibrary';
 import { newSong } from './songParts';
 import { barsChange, bpmChange, keyChange, scaleChange } from './transportModel';
 
-const TAB_IDS = ['parts', 'mixer', 'sequencers', 'harmony', 'arrangement'] as const;
+const TAB_IDS = ['parts', 'mixer', 'song', 'arrangement'] as const;
 
 interface Console {
   ctx: AppContext<TabPanel>;
@@ -100,24 +104,24 @@ describe('AppContext rendering', () => {
     expect(c.ctx.activeTab).toBe('parts');
     expect(Object.values(c.renders).every((n) => n === 0)).toBe(true);
     c.ctx.render();
-    expect(c.renders).toEqual({ parts: 1, mixer: 0, sequencers: 0, harmony: 0, arrangement: 0 });
+    expect(c.renders).toEqual({ parts: 1, mixer: 0, song: 0, arrangement: 0 });
     expect(c.panels['parts']?.hidden).toBe(false);
     expect(TAB_IDS.filter((id) => id !== 'parts').every((id) => c.panels[id]?.hidden)).toBe(true);
   });
 
-  it('renders only the active tab on a change after a restructure', async () => {
+  it('renders only the active tab on a change after an import', async () => {
     const c = openConsole();
     c.ctx.render();
-    c.ctx.restructure(() => undefined);
+    c.ctx.importDoc(newSong());
     await flush();
-    // Once for the draft, once when the live rebuild landed — the active tab only.
+    // Once for the adopted document, once when the live rebuild landed — the active tab only.
     expect(c.builds).toBe(1);
-    expect(c.renders).toEqual({ parts: 3, mixer: 0, sequencers: 0, harmony: 0, arrangement: 0 });
+    expect(c.renders).toEqual({ parts: 3, mixer: 0, song: 0, arrangement: 0 });
     const result = c.ctx.change({ transport: { bpm: 120 } } as DocumentPartial);
     c.ctx.render();
     expect(result.ok).toBe(true);
     expect(c.applied).toHaveLength(1);
-    expect(c.renders).toEqual({ parts: 4, mixer: 0, sequencers: 0, harmony: 0, arrangement: 0 });
+    expect(c.renders).toEqual({ parts: 4, mixer: 0, song: 0, arrangement: 0 });
   });
 
   it('renders a dirty tab once when switched to, and a clean one not at all', () => {
@@ -141,17 +145,17 @@ describe('AppContext rendering', () => {
   it('invalidates every tab on an import', async () => {
     const c = openConsole();
     for (const id of TAB_IDS) c.ctx.activate(id);
-    c.ctx.activate('harmony');
+    c.ctx.activate('song');
     const before = { ...c.renders };
     c.ctx.importDoc(newSong());
     await flush();
-    expect(c.renders['harmony']).toBe((before['harmony'] ?? 0) + 2);
+    expect(c.renders['song']).toBe((before['song'] ?? 0) + 2);
     for (const id of TAB_IDS) {
-      if (id !== 'harmony') expect(c.renders[id], id).toBe(before[id]);
+      if (id !== 'song') expect(c.renders[id], id).toBe(before[id]);
     }
     for (const id of TAB_IDS) c.ctx.activate(id);
     for (const id of TAB_IDS) {
-      if (id !== 'harmony') expect(c.renders[id], id).toBe((before[id] ?? 0) + 1);
+      if (id !== 'song') expect(c.renders[id], id).toBe((before[id] ?? 0) + 1);
     }
   });
 });
@@ -284,12 +288,11 @@ describe('structural edits stay live (#629)', () => {
     expect(c.builds).toBe(0);
   });
 
-  it('Import and Restart still rebuild from the document', async () => {
+  it('Import still rebuilds from the document — the one rebuild left since #709', async () => {
     const c = openConsole();
-    c.ctx.restructure(() => undefined);
     c.ctx.importDoc(newSong());
     await flush();
-    expect(c.builds).toBe(2);
+    expect(c.builds).toBe(1);
     expect(c.applied).toHaveLength(0);
   });
 });
@@ -323,9 +326,10 @@ describe('the transport strip (#708)', () => {
       if (!partial) throw new Error('a named scale must make a partial');
       expect(c.ctx.change(partial).ok).toBe(true);
     }
+    // The Bars edit carries the ∞ region and the timeline's tail with it (#709 decision 4).
     expect(c.applied).toEqual([
       { transport: { bpm: 133 } },
-      { transport: { bars: 8 } },
+      expect.objectContaining({ transport: { bars: 8 } }),
       { harmony: { root: 9 } },
       { harmony: { scale: 'dorian' } },
     ]);
@@ -359,12 +363,72 @@ describe('the transport strip (#708)', () => {
     let strips = 0;
     c.ctx.addChrome(() => strips++);
     c.ctx.render();
-    c.ctx.activate('harmony');
-    const before = c.renders['harmony'] ?? 0;
+    c.ctx.activate('song');
+    const before = c.renders['song'] ?? 0;
     c.ctx.refreshTabs();
-    expect(c.renders['harmony']).toBe(before + 1);
+    expect(c.renders['song']).toBe(before + 1);
     expect(strips).toBe(1);
     c.ctx.activate('mixer');
     expect(c.renders['mixer']).toBe(1);
+  });
+});
+
+describe('the Song view (#709)', () => {
+  const BAR = TICKS_PER_BAR;
+
+  it('writes a region edit as a live partial on the part, never a rebuild', () => {
+    const c = openConsole();
+    c.ctx.render();
+    const regions = [
+      { start: 0, duration: BAR },
+      { start: 2 * BAR, duration: BAR },
+    ];
+    expect(c.ctx.change(partChange(0, { regions })).ok).toBe(true);
+    expect(c.applied).toEqual([{ parts: { 0: { regions } } }]);
+    expect(partAt(c.model.doc, 0)?.regions).toEqual(regions);
+    expect(c.builds).toBe(0);
+    expect(c.renders).toEqual({ parts: 1, mixer: 0, song: 0, arrangement: 0 });
+  });
+
+  it('writes a harmony edit as a live partial, the timeline kept contiguous by the normaliser', () => {
+    const c = openConsole();
+    c.ctx.render();
+    const songTicks = c.model.doc.transport.bars * BAR;
+    const events = appendEvent(c.model.doc.harmony.events, songTicks);
+    expect(events.length).toBe(c.model.doc.harmony.events.length + 1);
+    expect(c.ctx.change({ harmony: { events } }).ok).toBe(true);
+    expect(c.applied).toEqual([{ harmony: { events } }]);
+    expect(c.model.doc.harmony.events).toEqual(events);
+    expect(c.builds).toBe(0);
+  });
+
+  it('round-trips a song edited only through the view: export, import, export byte-equal', () => {
+    const c = openConsole();
+    const songTicks = c.model.doc.transport.bars * BAR;
+    c.ctx.change({ harmony: { events: appendEvent(c.model.doc.harmony.events, songTicks) } });
+    c.ctx.change(
+      partChange(0, {
+        regions: [
+          { start: 0, duration: BAR },
+          { start: 2 * BAR, duration: 2 * BAR },
+        ],
+      }),
+    );
+    const exported = c.model.toJson();
+    c.ctx.importDoc(JSON.parse(exported));
+    expect(c.model.toJson()).toBe(exported);
+    expect(c.model.corrections).toEqual([]);
+  });
+
+  it('carries a Bars edit through the whole-song region and the last event, and says so', () => {
+    const c = openConsole();
+    const grown = c.model.doc.transport.bars + 2;
+    expect(c.ctx.change(barsChange(grown)).ok).toBe(true);
+    expect(partAt(c.model.doc, 0)?.regions).toEqual([{ start: 0, duration: grown * BAR }]);
+    const last = c.model.doc.harmony.events.at(-1);
+    expect(last && last.start + last.duration).toBe(grown * BAR);
+    expect(c.applied[0]?.parts?.[0]).toEqual({ regions: [{ start: 0, duration: grown * BAR }] });
+    expect(c.status.at(-1)).toMatch(/^song length: .*refitted$/);
+    expect(c.builds).toBe(0);
   });
 });

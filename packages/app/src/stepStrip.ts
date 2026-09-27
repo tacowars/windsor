@@ -116,6 +116,35 @@ export function paintStrip<S>(strip: Strip<S>, columns: (spec: S) => readonly HT
 /** Where the loop gets its frames; a test drives it with its own. */
 export type FrameSource = (run: () => void) => void;
 
+/**
+ * One frame request shared by every watch (#709 decision 5): the callbacks
+ * queued since the last frame run together on the next one, so the Song
+ * view's ruler line and the card in its pane — and every card on any tab —
+ * cost one `requestAnimationFrame` between them, not one each. A callback
+ * that re-queues itself while the batch runs lands in the next frame.
+ */
+export function createFrameDriver(frame: FrameSource): FrameSource {
+  let pending: Array<() => void> = [];
+  let queued = false;
+  const flush = (): void => {
+    queued = false;
+    const due = pending;
+    pending = [];
+    for (const run of due) run();
+  };
+  return (run) => {
+    pending.push(run);
+    if (queued) return;
+    queued = true;
+    frame(flush);
+  };
+}
+
+/** The console's one animation-frame request; a watch without a `frame` of its own joins it. */
+const SHARED_FRAMES: FrameSource = createFrameDriver(
+  (run: () => void): void => void requestAnimationFrame(run),
+);
+
 /** What one card asks the playhead loop to do each frame. */
 export interface PlayheadWatch {
   /** True while the card is in the document; the first frame it is not, the loop ends. */
@@ -131,7 +160,7 @@ export interface PlayheadWatch {
    * it is false costs the frame and nothing else — no repaint, no playhead.
    */
   shown?(): boolean;
-  /** Defaults to `requestAnimationFrame`. */
+  /** Defaults to the console's shared frame driver over `requestAnimationFrame`. */
   frame?: FrameSource;
 }
 
@@ -146,9 +175,13 @@ export interface PlayheadWatch {
  * is still queued, so showing the tab again needs no lifecycle event, but the
  * frame does no work. The step lit when the tab went away stays lit, and the
  * first shown frame moves it if the transport moved meanwhile.
+ *
+ * Every watch without a frame source of its own shares one request
+ * (`createFrameDriver`, #709 decision 5): the view has one loop however many
+ * strips and lines it lights.
  */
 export function watchPlayhead(watch: PlayheadWatch): void {
-  const frame = watch.frame ?? ((run: () => void): void => void requestAnimationFrame(run));
+  const frame = watch.frame ?? SHARED_FRAMES;
   let playing = -1;
   const tick = (): void => {
     if (!watch.attached()) return;

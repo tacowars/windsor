@@ -185,6 +185,20 @@ The editor is the only caller that relaxes the rule, through `makeArrangement`'s
 once on open, the resolved patches are embedded into the document there and then, and the
 Arrangement tab says which ids were filled. The next export is self-contained.
 
+**The Song view (#709)** is where a version-3 song is authored (epic #703; record
+`2026-09-26-harmony-v2-document-v3-timeline-and-regions`): a bar ruler of
+`transport.bars`, the harmony lane — one block per `harmony.events` entry, contiguous
+from tick 0, the last holding to the song end — one lane of `regions` per part by
+slot, one playhead line placed from the transport's audible tick, and a detail pane
+under the lanes hosting the selected part's sequencer card or the selected chord's
+harmony card. A region is where a part's one pattern is live; a gap is a rest; the
+pattern restarts on entry to a region and free-runs in the one whole-song region (∞).
+The view draws from the engine's own rules — `sequencing/regionClock.ts` for the
+position, `harmony/harmonyTimeline.ts` for the block bounds and the chord under the
+playhead — so what the lanes show is what the region gate plays, and every edit is a
+live partial over the console's pure `regionModel.ts` / `harmonyLaneModel.ts`, never a
+rebuild. The console's layers are `tools/patch-editor/CLAUDE.md` "The Song view".
+
 **Audio observes; it never decides.** Simulation events flow one way — the authoritative
 server and the client sim emit events, the audio system subscribes and makes noise. No
 audio state may feed back into simulation state, and nothing in the audio path may
