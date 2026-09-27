@@ -50,9 +50,11 @@ plugs into the existing actions without new write paths:
 - **Sources.** The preset browser's `source` filter gains `library` (the
   user's patches in IndexedDB) beside `built-in` and `document`. The page
   model lists built-ins and user patches together.
-- **Save.** Writing a built-in id into the user library shadows the
-  built-in. The file keeps its id, as a document copy does today. Deleting
-  the user copy brings the built-in back.
+- **Save.** Saving over a built-in never shadows it. The edit gets a new
+  id in the user library (the existing Copy-to-new naming, `kick-2` and so
+  on), and the part switches to it. Built-in ids stay read-only, so a
+  built-in always sounds the same. Saving a user patch writes over its own
+  id. (Decided by tacowars, 2026-09-27.)
 - **Copy to new.** A new id goes to the user library.
 - **Delete.** The action applies to user patches only. Built-ins stay
   read-only, and the `FALLBACK_PATCH_ID` guard remains.
@@ -86,6 +88,4 @@ plugs into the existing actions without new write paths:
 
 1. Should autosave-and-reopen be the boot behaviour, or should the console
    offer "restore last session?"
-2. Should saving over a built-in id shadow it (proposed), or always fork to
-   a new id?
-3. Named songs in the first cut, or autosave only?
+2. Named songs in the first cut, or autosave only?
