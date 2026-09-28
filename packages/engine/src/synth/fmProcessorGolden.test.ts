@@ -14,9 +14,15 @@
  * A failure means the render changed. When that is intended (a DSP ticket),
  * refresh the table with the command in `REFRESH` and say so in the PR; a
  * refactor never refreshes it.
+ *
+ * The table is pinned to `.nvmrc`'s Node major (windsor#6): V8's `Math.pow`
+ * moved by an ulp between Node 22 and 24, enough to flip a few float32
+ * samples in nine long pad and score presets. Under another major the suite
+ * fails once, before rendering, and names the fix rather than failing nine
+ * presets that did not change.
  */
 import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -29,6 +35,18 @@ const REFRESH =
   'A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts';
 const refreshing = process.env['A204_REFRESH_FM_GOLDEN'] === '1';
 const TABLE = fileURLToPath(new URL('../__fixtures__/fmGolden.json', import.meta.url));
+
+/** The Node major the table was written under, read from the repo's `.nvmrc`. */
+const EXPECTED_MAJOR = readFileSync(new URL('../../../../.nvmrc', import.meta.url), 'utf8')
+  .trim()
+  .replace(/^v/, '')
+  .split('.')[0];
+const RUNNING_MAJOR = process.versions.node.split('.')[0];
+const WRONG_NODE =
+  `fmGolden.json is pinned to Node ${EXPECTED_MAJOR} (.nvmrc) but this is Node ` +
+  `${process.versions.node}: V8's Math differs by an ulp between majors, so the hashes ` +
+  `cannot match. Run under Node ${EXPECTED_MAJOR} (\`brew link --overwrite node@${EXPECTED_MAJOR}\`, ` +
+  `or \`nvm use\` / \`fnm use\` on .nvmrc).`;
 
 const loaded = loadProcessor();
 const BLOCK_FRAMES = 128;
@@ -78,6 +96,13 @@ const table: Record<string, Record<string, string>> = golden.hashes;
 const fresh: Record<string, Record<string, string>> = {};
 
 describe('the factory bank renders the same bits as the golden table', () => {
+  if (RUNNING_MAJOR !== EXPECTED_MAJOR) {
+    it('runs under the Node major the table was written on', () => {
+      throw new Error(WRONG_NODE);
+    });
+    return;
+  }
+
   it('has a row for every preset and no preset that is gone', () => {
     expect(Object.keys(table).sort(), `presets and the table differ — ${REFRESH}`).toEqual(
       [...PRESET_NAMES].sort(),
@@ -102,7 +127,8 @@ describe('the factory bank renders the same bits as the golden table', () => {
 });
 
 afterAll(() => {
-  if (!refreshing) return;
+  // Never write a table from the wrong Node: `fresh` would be empty.
+  if (!refreshing || RUNNING_MAJOR !== EXPECTED_MAJOR) return;
   const sorted = Object.fromEntries(
     Object.keys(fresh)
       .sort()
