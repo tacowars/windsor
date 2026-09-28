@@ -9,3 +9,6 @@ dist/
 coverage/
 # Pat's working songs, kept out of the repo for now (approved 2026-09-28).
 songs/
+
+# Claude Code agent worktrees (one checkout per worker)
+.claude/worktrees/
