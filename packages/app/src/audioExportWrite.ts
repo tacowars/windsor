@@ -2,8 +2,10 @@
  * Writing an encoded WAV to a picked file so that Cancel still counts
  * (windsor#40). The bytes go in chunks, with the signal checked before each
  * chunk and before the close. A writable stream replaces the file's contents
- * only on `close()`, so aborting it on a cancel or a failure leaves the file
- * as it was.
+ * only on `close()`, so aborting it on a cancel or a failure before then
+ * leaves the file as it was. The close is the commit point (windsor#51
+ * decision 2): once it is called, a Cancel no longer changes the outcome,
+ * which is the close's own — saved, or its error.
  */
 import { WAV_WRITE_CHUNK_BYTES } from './audioExportConstants';
 
@@ -30,6 +32,9 @@ export async function writeInChunks(
       if (signal.aborted) throw abortError();
       await writable.write(bytes.subarray(at, at + chunkBytes));
     }
+    // `close()` is the commit point (windsor#51 decision 2): the last look at
+    // the signal is here, and a Cancel once the close is called changes
+    // nothing, since an abort cannot undo a close in flight.
     if (signal.aborted) throw abortError();
     await writable.close();
   } catch (error) {

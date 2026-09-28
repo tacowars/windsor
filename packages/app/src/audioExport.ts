@@ -14,7 +14,7 @@ import {
   RENDER_SAMPLE_RATES,
   RENDER_TAIL_SECONDS,
   WAV_BIT_DEPTHS,
-  encodeWav,
+  encodeWavAsync,
   renderRefusal,
   renderSong,
 } from '@windsor/engine';
@@ -158,7 +158,7 @@ async function startExport(
       repaint();
     },
     render: renderSong,
-    encode: encodeWav,
+    encode: encodeWavAsync,
   });
   job = null;
   repaint();

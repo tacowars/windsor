@@ -89,6 +89,13 @@ export interface AudioSystemOptions {
    * — live playback — every note is posted as it is scheduled.
    */
   partEvents?: (name: string) => ScheduledMessage[] | undefined;
+  /**
+   * Whether the parts, returns and worklet inserts sample their own timing
+   * for the load readout (#445). Defaults to true, as live playback does; the
+   * offline song render passes false, since no processor's timing means
+   * anything while an export runs (windsor#51).
+   */
+  meterLoad?: boolean;
 }
 
 /** `AudioSystem.readout()` (issue #69): the arrangement's state plus the system's. */
@@ -125,6 +132,7 @@ export class AudioSystem {
   private readonly routeOptions: RouteOptions;
   private readonly partSeed: ((name: string) => number) | undefined;
   private readonly partEvents: AudioSystemOptions['partEvents'];
+  private readonly metered: boolean;
   private readonly sidechains = new SidechainDesk(
     () =>
       new Map(
@@ -147,9 +155,12 @@ export class AudioSystem {
     this.returnSpecs = options.returns ?? RETURNS;
     this.partSeed = options.partSeed;
     this.partEvents = options.partEvents;
+    this.metered = options.meterLoad ?? true;
     this.insertTempo = tempoInsertRegistry(this.scheduler.bpm);
     this.routeOptions = {
-      registry: meteredInsertRegistry(this.loadMeter, this.insertTempo.registry),
+      registry: this.metered
+        ? meteredInsertRegistry(this.loadMeter, this.insertTempo.registry)
+        : this.insertTempo.registry,
       changed: () => this.sidechains.changed(),
       ...(options.defer ? { defer: options.defer } : {}),
     };
@@ -520,6 +531,7 @@ export class AudioSystem {
 
   /** Turn the audio-load sampler on in one node's processor (#445); `audioLoad.ts` owns the rules. */
   private meterLoad(id: string, node: AudioNode): void {
+    if (!this.metered) return;
     meterNode(this.loadMeter, id, node, this.engine.context.sampleRate, AUDIO_LOAD_REPORT_SECONDS);
   }
 }

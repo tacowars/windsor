@@ -70,6 +70,47 @@ describe('writeInChunks', () => {
     expect(writable.log).toEqual(['write 3', 'abort']);
   });
 
+  /** A writable whose close waits for the test to settle it, and a promise that the close began. */
+  function pendingClose(): {
+    writable: FakeWritable;
+    closeStarted: Promise<void>;
+    settle: (error?: Error) => void;
+  } {
+    const writable = fakeWritable();
+    let started!: () => void;
+    const closeStarted = new Promise<void>((resolve) => (started = resolve));
+    let settle!: (error?: Error) => void;
+    writable.close = () => {
+      writable.log.push('close');
+      started();
+      return new Promise<void>((resolve, reject) => {
+        settle = (error) => (error ? reject(error) : resolve());
+      });
+    };
+    return { writable, closeStarted, settle: (error) => settle(error) };
+  }
+
+  it('a cancel once the close is called changes nothing: the close commits', async () => {
+    const controller = new AbortController();
+    const { writable, closeStarted, settle } = pendingClose();
+    const done = writeInChunks(writable, new Uint8Array(3), controller.signal, 4);
+    await closeStarted;
+    controller.abort();
+    settle();
+    await expect(done).resolves.toBeUndefined();
+    expect(writable.log).toEqual(['write 3', 'close']);
+  });
+
+  it("a cancel once the close is called reports the close's own error", async () => {
+    const controller = new AbortController();
+    const { writable, closeStarted, settle } = pendingClose();
+    const done = writeInChunks(writable, new Uint8Array(3), controller.signal, 4);
+    await closeStarted;
+    controller.abort();
+    settle(new Error('quota exceeded'));
+    await expect(done).rejects.toThrow('quota exceeded');
+  });
+
   it('writes nothing when already cancelled', async () => {
     const controller = new AbortController();
     controller.abort();

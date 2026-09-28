@@ -55,6 +55,8 @@ export async function buildSystem(
     partSeed: (name) => seeds.get(name) ?? seed,
     ...(opening ? { partEvents: (name: string) => opening.get(name) } : {}),
     defer: (run) => run(),
+    // No processor samples its own timing during an export (windsor#51).
+    meterLoad: false,
   });
   await system.init();
   // A song with no parts renders the standing graph: silence of the song's length.

@@ -1,11 +1,12 @@
 /**
  * The WAV writer (windsor#40 decision 6): byte-exact headers for every rate
  * and depth the console offers, samples that round-trip, clip counting, and
- * a 16-bit dither that is TPDF (±1 LSB) and reproducible.
+ * a 16-bit dither that is TPDF (±1 LSB) and reproducible; and the chunked
+ * async encoder, byte-identical and cancellable between chunks (windsor#51).
  */
 import { describe, expect, it } from 'vitest';
 
-import { encodeWav, wavHeader } from './wavEncoder';
+import { encodeWav, encodeWavAsync, wavHeader } from './wavEncoder';
 
 /** Little-endian bytes of `value` in `width` bytes. */
 const le = (value: number, width: number): number[] =>
@@ -147,5 +148,68 @@ describe('encodeWav', () => {
   it('writes the two extremes as the symmetric full-scale words', () => {
     const { bytes } = encodeWav([Float32Array.from([1, -1])], 48000, 24);
     expect([...bytes.subarray(44)]).toEqual([0xff, 0xff, 0x7f, 0x01, 0x00, 0x80]);
+  });
+});
+
+describe('encodeWavAsync', () => {
+  /** A noisy stereo pair with some clipped samples, so dither and clipping both run. */
+  const noisy = (frames: number): Float32Array[] =>
+    [0.3, 0.7].map((phase) =>
+      Float32Array.from({ length: frames }, (_, i) => 1.2 * Math.sin(i * phase)),
+    );
+
+  it("writes the synchronous encoder's bytes exactly, at both depths and any chunk size", async () => {
+    const channels = noisy(1001);
+    for (const bits of [16, 24] as const) {
+      const sync = encodeWav(channels, 44100, bits);
+      for (const chunkFrames of [1, 7, 1000, 1001, 1 << 16]) {
+        const chunked = await encodeWavAsync(channels, 44100, bits, {
+          chunkFrames,
+          yieldToLoop: () => Promise.resolve(),
+        });
+        expect(chunked.clipped).toBe(sync.clipped);
+        expect(chunked.bytes).toEqual(sync.bytes);
+      }
+    }
+  });
+
+  it('yields to the event loop between chunks by default', async () => {
+    let ticked = false;
+    setTimeout(() => {
+      ticked = true;
+    }, 0);
+    await encodeWavAsync(noisy(100), 48000, 24, { chunkFrames: 30 });
+    expect(ticked).toBe(true);
+  });
+
+  it('rejects with an AbortError when aborted between chunks, and encodes no further', async () => {
+    const controller = new AbortController();
+    let yields = 0;
+    const encode = encodeWavAsync(noisy(100), 48000, 16, {
+      chunkFrames: 10,
+      signal: controller.signal,
+      yieldToLoop: () => {
+        if (++yields === 2) controller.abort();
+        return Promise.resolve();
+      },
+    });
+    await expect(encode).rejects.toMatchObject({ name: 'AbortError' });
+    expect(yields).toBe(2);
+  });
+
+  it('refuses a chunk size that is not a positive integer', async () => {
+    for (const chunkFrames of [0, -1, NaN, 2.5]) {
+      await expect(encodeWavAsync(noisy(10), 48000, 24, { chunkFrames })).rejects.toThrow(
+        new RangeError(`chunkFrames must be a positive integer, got ${chunkFrames}`),
+      );
+    }
+  });
+
+  it('refuses at once when already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      encodeWavAsync(noisy(10), 48000, 24, { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
   });
 });
