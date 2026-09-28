@@ -8,9 +8,10 @@ on:
   push:
     branches: [main]
     paths-ignore: ['docs/**', '.claude/**', '**/*.md']
+  # Every PR runs the workflow so the required `verify` check always
+  # reports; a docs-only PR skips the heavy steps and passes in seconds.
   pull_request:
     branches: [main]
-    paths-ignore: ['docs/**', '.claude/**', '**/*.md']
   workflow_dispatch:
 
 permissions:
@@ -31,12 +32,30 @@ jobs:
             echo "tracked file matching the never-track pattern" >&2
             exit 1
           fi
-      - uses: actions/setup-node@v4
+      - name: Does the diff touch code?
+        id: changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            git fetch --no-tags --depth=1 origin "$base"
+            if git diff --name-only "$base" HEAD | grep -Evq '^(docs/|\.claude/|.*\.md$)'; then
+              echo "code=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "code=false" >> "$GITHUB_OUTPUT"
+              echo "docs-only diff: skipping the gate"
+            fi
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci --no-audit --fund=false
-      - run: npm run verify
+      - if: steps.changes.outputs.code == 'true'
+        run: npm ci --no-audit --fund=false
+      - if: steps.changes.outputs.code == 'true'
+        run: npm run verify
       # verify ends with `vite build`; its relative base serves from the
       # project-site path (/windsor/) without a rebuild.
       - if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
