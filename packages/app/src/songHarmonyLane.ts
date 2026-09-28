@@ -13,7 +13,7 @@ import { el } from './dom';
 import { appendEvent, eventLabel, setEventDuration } from './harmonyLaneModel';
 import { pointerDrag } from './songLanes';
 import type { SongView } from './songTab';
-import { BLOCK_GAP_PX, REGION_EDGE_PX, pxToTick, tickToPx } from './songViewTables';
+import { blockBox, blockHitAt, isNarrowBlock, pxToTick } from './songViewTables';
 
 /** The `.hblk` for one drawn event block. */
 function block(view: SongView, index: number, start: number, end: number): HTMLElement {
@@ -21,8 +21,10 @@ function block(view: SongView, index: number, start: number, end: number): HTMLE
   const event = doc.harmony.events[index];
   const node = el('div', 'hblk');
   node.dataset['event'] = String(index);
-  node.style.left = `${tickToPx(start)}px`;
-  node.style.width = `${tickToPx(end - start) - BLOCK_GAP_PX}px`;
+  const box = blockBox(start, end - start, view.state.pxPerBar);
+  node.style.left = `${box.leftPx}px`;
+  node.style.width = `${box.widthPx}px`;
+  node.classList.toggle('narrow', isNarrowBlock(box.widthPx));
   if (event) {
     const label = eventLabel(doc.harmony, event);
     node.appendChild(el('b', '', label.name));
@@ -33,17 +35,25 @@ function block(view: SongView, index: number, start: number, end: number): HTMLE
   return node;
 }
 
+/** One drawn event's index and tick span, as `eventBounds` yields it. */
+interface EventSpan {
+  readonly index: number;
+  readonly start: number;
+  readonly end: number;
+}
+
 /** A press on a block selects it; its right edge drags the event's end — a preview while dragging, one commit on release. */
-function wireEdgeDrag(view: SongView, node: HTMLElement, index: number, start: number): void {
+function wireEdgeDrag(view: SongView, node: HTMLElement, bounds: EventSpan): void {
+  const { index, start, end } = bounds;
   const laneLeft = (): number => (node.parentElement ?? node).getBoundingClientRect().left;
-  const tickAt = (e: PointerEvent): number => pxToTick(e.clientX - laneLeft());
-  const edgeTicks = pxToTick(REGION_EDGE_PX);
-  // A press anywhere on the block selects it on release; only a press on the right edge resizes.
+  const px = view.state.pxPerBar;
+  const pxAt = (e: PointerEvent): number => e.clientX - laneLeft();
+  const tickAt = (e: PointerEvent): number => pxToTick(pxAt(e), px);
+  // A press anywhere on the block selects it on release; only a press on the right edge band resizes.
   let onEdge = false;
   pointerDrag(node, {
     accept: (e) => {
-      const width = node.offsetWidth > 0 ? pxToTick(node.offsetWidth) : 0;
-      onEdge = tickAt(e) >= start + width - edgeTicks;
+      onEdge = blockHitAt(blockBox(start, end - start, px), pxAt(e)) === 'end';
       return true;
     },
     move: (e) => {
@@ -51,7 +61,10 @@ function wireEdgeDrag(view: SongView, node: HTMLElement, index: number, start: n
       const events = view.ctx.model.doc.harmony.events;
       const preview = setEventDuration(events, index, tickAt(e) - start, view.songTicks());
       const next = preview[index];
-      if (next) node.style.width = `${tickToPx(next.duration) - BLOCK_GAP_PX}px`;
+      if (!next) return;
+      const width = blockBox(start, next.duration, px).widthPx;
+      node.style.width = `${width}px`;
+      node.classList.toggle('narrow', isNarrowBlock(width));
     },
     end: (e, moved) => {
       if (!moved || !onEdge) return void view.select({ kind: 'event', index });
@@ -78,7 +91,7 @@ export function harmonyLaneRow(view: SongView): [HTMLElement, HTMLElement] {
   const songTicks = view.songTicks();
   for (const bounds of eventBounds(doc.harmony, songTicks)) {
     const node = block(view, bounds.index, bounds.start, bounds.end);
-    wireEdgeDrag(view, node, bounds.index, bounds.start);
+    wireEdgeDrag(view, node, bounds);
     lane.appendChild(node);
   }
   const add = el('button', 'btn nudge hadd', '+') as HTMLButtonElement;

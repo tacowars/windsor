@@ -574,6 +574,9 @@ body.chord-dragging {
   display: flex;
   border-bottom: 1px solid var(--line-bright);
   height: 22px;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
 }
 .ruler-bar {
   position: relative;
@@ -647,6 +650,9 @@ body.chord-dragging {
   border-color: var(--carrier);
   box-shadow: 0 0 0 1px var(--carrier);
 }
+.hblk.narrow {
+  padding: 0;
+}
 .hadd {
   position: absolute;
   top: 6px;
@@ -671,6 +677,9 @@ body.chord-dragging {
   white-space: nowrap;
   overflow: hidden;
   cursor: grab;
+}
+.reg.narrow {
+  padding: 0;
 }
 .reg.perc {
   border-color: var(--carrier);
