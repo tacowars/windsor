@@ -17,23 +17,21 @@ import { opEnvelopeSlot } from './envelopeTransfer';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import type { KnobElement } from './knob';
 import { FIXED_HZ_KNOB, OP_KNOBS, patchKnobOpts } from './patchKnobTables';
-import { BAY_SILENT_LEVEL } from './patchPanelConstants';
+import { BAY_SILENT_LEVEL, PULSE_START_WIDTH } from './patchPanelConstants';
 import type { PatchEditor } from './partsSession';
 import { pathKnob } from './patchPath';
 import { ratioControls, showPitchControls } from './ratioKnobs';
-
-/** The duty a Pulse starts at: a square. At the default width 1 the two saws cancel to silence. */
-const PULSE_START_WIDTH = 0.5;
 
 /**
  * Seed a Pulse operator's duty, the way `ensureUserPartials` seeds a User
  * wave: an operator switched to Pulse at full width gets a square, and one
  * whose width was already moved keeps it. Switching away leaves width alone.
+ * `startWidth` is the seeded duty, `PULSE_START_WIDTH` unless a caller says otherwise.
  */
-export function ensurePulseWidth(patch: Patch, i: number): void {
+export function ensurePulseWidth(patch: Patch, i: number, startWidth = PULSE_START_WIDTH): void {
   const target = patch.ops[i];
   if (target?.wave === WAVE.PULSE && target.width >= WIDTH_RANGE.max) {
-    target.width = PULSE_START_WIDTH;
+    target.width = startWidth;
   }
 }
 

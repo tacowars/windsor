@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { Operator } from '@windsor/engine';
 import { WAVE, makePatch } from '@windsor/engine';
 import { ensurePulseWidth } from './patchBays';
+import { PULSE_START_WIDTH } from './patchPanelConstants';
 
 function opOf(ops: Operator[], i: number): Operator {
   const target = ops[i];
@@ -16,12 +17,20 @@ function opOf(ops: Operator[], i: number): Operator {
 }
 
 describe('ensurePulseWidth', () => {
-  it('seeds 0.5 on an operator switched to Pulse at width 1', () => {
+  it('seeds PULSE_START_WIDTH, a square, on an operator switched to Pulse at width 1', () => {
     const patch = makePatch();
     const target = opOf(patch.ops, 1);
     target.wave = WAVE.PULSE;
     ensurePulseWidth(patch, 1);
-    expect(target.width).toBe(0.5);
+    expect(target.width).toBe(PULSE_START_WIDTH);
+  });
+
+  it('seeds the width it is handed in place of the shipped one', () => {
+    const patch = makePatch();
+    const target = opOf(patch.ops, 2);
+    target.wave = WAVE.PULSE;
+    ensurePulseWidth(patch, 2, 0.25);
+    expect(target.width).toBe(0.25);
   });
 
   it('keeps a width already moved', () => {
@@ -43,6 +52,6 @@ describe('ensurePulseWidth', () => {
     ensurePulseWidth(patch, 0);
     target.wave = WAVE.SINE;
     ensurePulseWidth(patch, 0);
-    expect(target.width).toBe(0.5);
+    expect(target.width).toBe(PULSE_START_WIDTH);
   });
 });
