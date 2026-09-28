@@ -39,6 +39,7 @@ export function crc32(bytes: Uint8Array, crc = 0): number {
 export interface Crc32AsyncOptions {
   /** Aborting rejects with an `AbortError` between chunks. */
   signal?: AbortSignal;
+  /** Bytes read between yields, a positive integer; the shipped `CRC32_CHUNK_BYTES` when absent. */
   chunkBytes?: number;
   yieldToLoop?: () => Promise<void>;
 }
@@ -49,6 +50,9 @@ export async function crc32Async(
   options: Crc32AsyncOptions = {},
 ): Promise<number> {
   const { signal, chunkBytes = CRC32_CHUNK_BYTES, yieldToLoop = nextTask } = options;
+  if (!Number.isInteger(chunkBytes) || chunkBytes <= 0) {
+    throw new RangeError(`chunkBytes must be a positive integer, got ${chunkBytes}`);
+  }
   let crc = 0;
   for (let at = 0; ; at += chunkBytes) {
     if (signal?.aborted) throw new DOMException('the checksum was cancelled', 'AbortError');

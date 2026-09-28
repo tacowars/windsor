@@ -292,6 +292,39 @@ describe('renderStems', () => {
     expect(handed).toEqual(['master', 'part 0', 'part 1']);
   });
 
+  it('cancels during the lineup check: AbortError, and none of that pass is handed on', async () => {
+    const controller = new AbortController();
+    const handed: string[] = [];
+    let yields = 0;
+    let passesDone = 0;
+    const run = renderStems(
+      SONG,
+      {
+        sampleRate: RATE,
+        tailSeconds: 0,
+        signal: controller.signal,
+        passLimits: { maxChannels: 6, maxSamples: 1e12 },
+        // Pass 1 is never compared, so every yield is pass 2's comparison.
+        lineup: {
+          chunkFrames: RENDER_QUANTUM_FRAMES,
+          yieldToLoop: async () => {
+            if (++yields === 3) controller.abort();
+          },
+        },
+        createContext: (init) => new FakeOfflineContext(init),
+        onProgress: (fraction) => {
+          if (fraction === 1 / 3 || fraction === 2 / 3) passesDone++;
+        },
+      },
+      async ({ stem }) => void handed.push(label(stem)),
+    );
+    await expect(run).rejects.toMatchObject({ name: 'AbortError' });
+    // The abort came in mid-comparison, after pass 2 rendered, and was heard at the next chunk.
+    expect(passesDone).toBe(2);
+    expect(yields).toBe(3);
+    expect(handed).toEqual(['master', 'part 0', 'part 1']);
+  });
+
   it('reports progress across the passes, rising to 1', async () => {
     const seen: number[] = [];
     await collect(SONG, {

@@ -23,12 +23,15 @@ import type { RenderSongOptions } from './renderSong';
 import { planFor, renderRefusal, wholeSong } from './renderSong';
 import type { Stem, StemChoice, StemPassLimits, StemSource } from './stemPlan';
 import { STEM_PASS_LIMITS, passChannels, planStemPasses, stemSources } from './stemPlan';
+import type { LineupOptions } from './stemLineup';
 import { linesUp } from './stemLineup';
 import { attachStems } from './stemTaps';
 
 export interface RenderStemsOptions extends RenderSongOptions, StemChoice {
   /** How wide a pass may be; the shipped limits when absent (a test narrows them). */
   passLimits?: StemPassLimits;
+  /** The lineup check's chunking (a test seam); `options.signal` cancels it. */
+  lineup?: Omit<LineupOptions, 'signal'>;
 }
 
 /** One file's audio: which stem, and its two channels from bar 1 through the tail. */
@@ -86,7 +89,12 @@ export async function renderStems(
       // is held beside the pass, not counted in its budget.
       if (passes.length > 1) reference = master.map((channel) => channel.slice());
       await handOn({ kind: 'master' }, master);
-    } else if (!linesUp(reference!, master)) {
+    } else if (
+      !(await linesUp(reference!, master, {
+        ...options.lineup,
+        ...(options.signal ? { signal: options.signal } : {}),
+      }))
+    ) {
       throw new Error(`stem pass ${index + 1} did not line up with the first; nothing was written`);
     }
     for (const [k, stem] of group.entries()) await handOn(stem, pair(RENDER_CHANNELS * (k + 1)));

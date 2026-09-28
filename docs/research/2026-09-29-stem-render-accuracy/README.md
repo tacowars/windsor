@@ -75,6 +75,8 @@ keeps a copy of the first pass's master and compares each later pass's
 master with it frame by frame (`stemLineup.ts`). The largest absolute
 difference at any one frame must be at most 1e-5
 (`RENDER_STEM_LINEUP_TOLERANCE`), ten times the 1.0e-6 measured here.
+The comparison runs in chunks of 65,536 frames. Between chunks it yields to
+the event loop and checks for Cancel, as the WAV encoder does.
 
 A pass that drifted, even by a single frame, moves real audio against
 itself, and the difference is of the order of the audio. An earlier version

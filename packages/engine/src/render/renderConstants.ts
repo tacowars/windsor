@@ -93,3 +93,11 @@ export const WAV_ENCODE_CHUNK_FRAMES = 1 << 16;
  * so run-to-run rounding passes with margin.
  */
 export const RENDER_STEM_LINEUP_TOLERANCE = 1e-5;
+
+/**
+ * Frames the stem lineup check compares between yields to the event loop
+ * (`stemLineup.ts`): 65 536 frames, about 1.49 s of song at 44.1 kHz and
+ * 1.37 s at 48 kHz, both channels. The signal is checked once per chunk, as
+ * the WAV encoder's `WAV_ENCODE_CHUNK_FRAMES`.
+ */
+export const RENDER_STEM_LINEUP_CHUNK_FRAMES = 1 << 16;

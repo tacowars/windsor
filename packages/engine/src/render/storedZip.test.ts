@@ -57,6 +57,14 @@ describe('crc32', () => {
     await expect(run).rejects.toMatchObject({ name: 'AbortError' });
     expect(chunks).toBe(2);
   });
+
+  it('refuses a chunk that is not a positive integer', async () => {
+    for (const chunkBytes of [0, -1, NaN, 2.5]) {
+      await expect(crc32Async(text('123456789'), { chunkBytes })).rejects.toThrow(
+        new RangeError(`chunkBytes must be a positive integer, got ${chunkBytes}`),
+      );
+    }
+  });
 });
 
 describe('StoredZipWriter', () => {
