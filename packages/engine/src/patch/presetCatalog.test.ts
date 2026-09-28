@@ -22,7 +22,16 @@ describe('patch library catalogue', () => {
     expect(LIBRARY.length).toBeGreaterThan(0);
     expect(LIBRARY.map((entry) => entry.id).sort()).toEqual([...PRESET_NAMES].sort());
     expect(new Set(LIBRARY.map((entry) => entry.category))).toEqual(
-      new Set(['Strings', 'Pads', 'Plucks', 'Basses', 'Soundtrack FX', 'Drums', 'Legacy FX']),
+      new Set([
+        'Strings',
+        'Pads',
+        'Plucks',
+        'Leads',
+        'Basses',
+        'Soundtrack FX',
+        'Drums',
+        'Legacy FX',
+      ]),
     );
     for (const entry of LIBRARY) {
       expect(entry.tags.length, entry.id).toBeGreaterThan(0);
