@@ -7,3 +7,5 @@ dist/
 .claude/settings.local.json
 .vite/
 coverage/
+# Pat's working songs, kept out of the repo for now (approved 2026-09-28).
+songs/

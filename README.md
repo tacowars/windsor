@@ -10,7 +10,8 @@ A browser-based sequencer and DAW built on a custom four-operator FM engine:
   classic and advanced drive, chorus, ensemble, phaser, dub delay, retro
   reverb), a plate and delay return, and a song master.
 
-Everything runs in the browser, and the app deploys as static files.
+Everything runs in the browser, and the app deploys as static files. Try it
+at <https://tacowars.github.io/windsor/>. Chrome is the tested browser.
 
 Windsor began as the music engine and arrangement console of the game
 Aotearoa204 and was forked on 2026-09-27. `#<n>` references in the code and
@@ -39,6 +40,10 @@ one file per DSP worklet. Serve it from any static host over http(s); worklets
 don't load from `file://`. The build uses a relative base, so it works under a
 sub-path such as a GitHub Pages project site. Set `WINDSOR_BASE` to override
 it.
+
+CI (`.github/workflows/ci.yml`) runs `npm run verify` on every pull request
+and every push to `main`. A push to `main` that passes also publishes the
+build to GitHub Pages.
 
 ## Repository layout
 
