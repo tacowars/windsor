@@ -238,7 +238,7 @@ export type { BakeOptions } from './render/offlineRender';
 // The song render and the WAV writer (windsor#40).
 export { renderRefusal, renderSong, songSeconds } from './render/renderSong';
 export type { RenderSongOptions, RenderedSong } from './render/renderSong';
-export { encodeWav } from './render/wavEncoder';
+export { encodeWav, encodeWavAsync } from './render/wavEncoder';
 export type { EncodedWav } from './render/wavEncoder';
 export {
   RENDER_SAMPLE_RATES,
