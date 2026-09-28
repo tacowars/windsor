@@ -20,6 +20,7 @@ import patch_hat from './hat.json';
 import patch_horde_horn from './horde-horn.json';
 import patch_kick from './kick.json';
 import patch_lead_bell from './lead-bell.json';
+import patch_lead_width_sweep from './lead-width-sweep.json';
 import patch_pad_drift from './pad-drift.json';
 import patch_pickup_blip from './pickup-blip.json';
 import patch_saw_arp from './saw-arp.json';
@@ -182,6 +183,7 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'horde-horn': patch_horde_horn,
   kick: patch_kick,
   'lead-bell': patch_lead_bell,
+  'lead-width-sweep': patch_lead_width_sweep,
   'pad-drift': patch_pad_drift,
   'pickup-blip': patch_pickup_blip,
   'saw-arp': patch_saw_arp,

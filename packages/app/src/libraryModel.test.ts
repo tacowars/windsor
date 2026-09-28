@@ -82,7 +82,7 @@ describe('the model', () => {
     const model = pageLibrary();
     expect(model.mode).toBe('page');
     expect(libraryPatch(model, 'kick')).toBe(PATCH_LIBRARY['kick']?.patch);
-    expect(Object.keys(model.entries)).toHaveLength(159);
+    expect(Object.keys(model.entries)).toHaveLength(Object.keys(PATCH_LIBRARY).length);
     const files = new Map([['hat.json', serialisePatchFile(PATCH_LIBRARY['hat']!)]]);
     await connectLibrary(model, memoryFolder(files));
     expect(model.mode).toBe('folder');
