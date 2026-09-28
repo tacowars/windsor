@@ -1,8 +1,8 @@
 # The user's patches and songs live in IndexedDB
 
 - **Date:** 2026-09-27
-- **Status:** accepted. Pat chose IndexedDB over OPFS and settled the open
-  questions on 2026-09-27; not built yet.
+- **Status:** accepted and built. Pat chose IndexedDB over OPFS and settled
+  the open questions on 2026-09-27; built on 2026-09-28 (see "As built").
 - **Supersedes:** the user-state known follow-up in
   `2026-09-27-windsor-forked-from-aotearoa204.md`
 
@@ -96,3 +96,29 @@ plugs into the existing actions without new write paths:
 2. Autosave only for the first cut; no named songs.
 3. Saving over a built-in patch creates a new id; built-ins are never
    shadowed.
+
+## As built (2026-09-28)
+
+The design above holds. Details settled while building it:
+
+- **Files.** `app/src/userLibraryStore.ts` is the IndexedDB adapter (the
+  only code that touches the API); `userSession.ts` boots it;
+  `songAutosave.ts`, `songRestore.ts` and `storagePersistence.ts` are the
+  tested rules. `LibraryModel` gains `user` (the store) and `userIds` (the
+  writable ids); `isWritable` and `saveForks` are the read-only rule.
+- **The engine's listing type.** `PresetListing.source` in
+  `patch/presetCatalog.ts` gains `'library'`. That is a type change only;
+  no engine behaviour changes.
+- **A stored id that matches a built-in** (a future built-in taking an id a
+  user already saved) stays hidden behind the built-in and is named in the
+  status line's refused list. The user's record is kept, not deleted.
+- **No IndexedDB** (some private modes): the library is the built-ins alone,
+  Save forks and downloads `<id>.json` as before, and nothing autosaves.
+- **The autosave also flushes when the page is hidden**, so an edit made
+  just before closing the tab is kept. It skips a write whose text equals
+  the last one it wrote.
+- **The persistence request is not awaited.** It runs before the first
+  write, and a browser that prompts for it never holds up a save.
+- **Save over a built-in** opens the Copy-to-new modal, titled "Save your
+  own …" and prefilled `<name> copy`. The id comes from the name, as for
+  Copy to new, because display names must stay unique.
