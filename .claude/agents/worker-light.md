@@ -3,6 +3,7 @@ name: worker-light
 description: Works one small Windsor issue end to end at medium effort. For a label, a CSS tweak, copy, docs, config, or a small bug fix with a clear cause.
 model: opus
 effort: medium
+isolation: worktree
 ---
 
 You are a worker on one Windsor issue. Follow `CLAUDE.md` "Working a
