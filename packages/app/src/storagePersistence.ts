@@ -2,7 +2,9 @@
  * Ask the browser to keep the user's library and autosaved song under storage
  * pressure (`navigator.storage.persist()`), once per page, on the first
  * write. A refusal is reported, never fatal: the data is still stored, only
- * evictable (`2026-09-27-user-library-in-indexeddb`).
+ * evictable (`2026-09-27-user-library-in-indexeddb`). Chrome declines for
+ * most sites a visitor has not bookmarked or used much, so the refusal is
+ * the common case: it marks the library line, and never the status line.
  */
 
 /** Resolves true when storage is (now) persistent. */
@@ -15,24 +17,22 @@ export function browserPersist(): PersistRequest | null {
   return () => navigator.storage.persist();
 }
 
-export const PERSIST_REFUSED =
-  'this browser may clear your saved patches and song under storage pressure — export to keep a copy';
-
 /**
  * A hook to call before every write: the first call makes the request and
- * reports a refusal or a failure; every later call shares that first one.
+ * calls `refused` on a refusal or a failure; every later call shares that
+ * first one.
  */
 export function persistOnce(
   persist: PersistRequest | null,
-  report: (message: string) => void,
+  refused: () => void,
 ): () => Promise<void> {
   let asked: Promise<void> | null = null;
   return () => {
     asked ??= (async (): Promise<void> => {
       try {
-        if (!persist || !(await persist())) report(PERSIST_REFUSED);
+        if (!persist || !(await persist())) refused();
       } catch {
-        report(PERSIST_REFUSED);
+        refused();
       }
     })();
     return asked;

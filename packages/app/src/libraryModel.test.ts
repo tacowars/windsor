@@ -163,6 +163,8 @@ describe("the user's library", () => {
     expect(libraryModeText(model)).toBe(
       'Library: 159 built-in patches and 1 of yours, kept in this browser',
     );
+    model.evictable = true;
+    expect(libraryModeText(model)).toContain('may clear them');
   });
 
   it('writes and removes its own ids, and refuses a built-in either way', async () => {
@@ -196,7 +198,9 @@ describe("the user's library", () => {
     await connectUserLibrary(model, memoryFolder(files));
     await connectLibrary(model, memoryFolder(new Map()));
     expect(model.entries['my-kick']).toBeUndefined();
+    model.evictable = true;
     await disconnectLibrary(model);
+    expect(model.evictable).toBe(true);
     expect(model.entries['my-kick']?.name).toBe('My Kick');
     expect(model.userIds.has('my-kick')).toBe(true);
   });
