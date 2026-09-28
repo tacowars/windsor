@@ -732,7 +732,8 @@ function updateOperatorWidth(voice, i, freq, lfoVal, lfo2Val, n) {
   const width = raw < WIDTH_RANGE.min ? WIDTH_RANGE.min : raw > WIDTH_RANGE.max ? WIDTH_RANGE.max : raw;
   const kind = voice.kind[i];
   if (kind === KIND_TABLE && voice.mips[i]) {
-    voice.tables[i] = voice.mips[i][mipIndex(freq / width)];
+    const scale = Math.max(voice.width[i], 1 / width);
+    voice.tables[i] = voice.mips[i][mipIndex(freq * scale)];
   } else if (kind === KIND_PULSE && voice.mips[i]) {
     voice.tables[i] = voice.mips[i][mipIndex(freq)];
   }

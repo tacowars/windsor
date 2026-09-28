@@ -56,10 +56,11 @@ function restingWidth(kind: number, width: number): number {
  * Operator `i`'s width for this block (#55): its effective width, both LFOs
  * added and clamped to WIDTH_RANGE, sets a per-sample ramp to the value the
  * loops read (`restingWidth`), and the mip table: a squeezed wave's segment
- * plays at `freq / width`, a PULSE reads its saw tables at `freq`. A ramp
+ * plays at `freq / width`, so the table is picked for the narrower of the
+ * ramp's two ends, and a PULSE reads its saw tables at `freq`. A ramp
  * that has all but arrived lands on its target (WIDTH_SNAP), so a width back
  * at 1 takes the plain wave's path again. Width 1 with no LFO depth reads
- * `freq / 1` and ramps by 0: the old block exactly. Allocates nothing.
+ * `freq * 1` and ramps by 0: the old block exactly. Allocates nothing.
  */
 // eslint-disable-next-line max-params -- one operator's control-rate inputs, called four times per block; an options object would allocate on the audio thread
 function updateOperatorWidth(
@@ -76,7 +77,11 @@ function updateOperatorWidth(
     raw < WIDTH_RANGE.min ? WIDTH_RANGE.min : raw > WIDTH_RANGE.max ? WIDTH_RANGE.max : raw;
   const kind = voice.kind[i];
   if (kind === KIND_TABLE && voice.mips[i]) {
-    voice.tables[i] = voice.mips[i]![mipIndex(freq / width)];
+    // The narrower of the ramp's two ends, so the table is safe for the whole
+    // block either way: `voice.width` holds 1 / width now, so the larger
+    // phase scale is freq / min(width now, width target).
+    const scale = Math.max(voice.width[i], 1 / width);
+    voice.tables[i] = voice.mips[i]![mipIndex(freq * scale)];
   } else if (kind === KIND_PULSE && voice.mips[i]) {
     voice.tables[i] = voice.mips[i]![mipIndex(freq)];
   }

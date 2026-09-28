@@ -115,6 +115,46 @@ describe('width on a noise operator', () => {
   });
 });
 
+/** The voice fields the mip test reads and drives; the worklet is untyped JS. */
+interface WidthVoice {
+  active: boolean;
+  tables: (Float32Array | null)[];
+  updateControl(n: number, bend: number, wheel: number, cutoffMod: number): void;
+  render(outL: Float32Array, outR: Float32Array, off: number, n: number): void;
+}
+
+/** The part's one sounding voice, after a held A4 has run a few blocks. */
+function heldVoice(
+  partial: PartialPatch,
+  live = false,
+): { processor: ProcessorLike; voice: WidthVoice } {
+  const processor = loaded.create(makePatch(partial), 1);
+  if (live) processor.inbox({ type: 'liveRetune', enabled: true } as unknown as ScheduledEvent);
+  const on: ScheduledEvent[] = [{ type: 'noteOn', id: 1, note: NOTE, velocity: 1, frame: 0 }];
+  render(loaded, processor, 4, on);
+  const voice = (processor.voices as unknown as WidthVoice[]).find((v) => v.active)!;
+  return { processor, voice };
+}
+
+describe('the mip table while width ramps', () => {
+  it('holds the narrow end’s table through a block that opens 0.05 to 1, then the wide one', () => {
+    const narrowTable = heldVoice(lone({ width: 0.05 })).voice.tables[0];
+    const wideTable = heldVoice(lone({ width: 1 })).voice.tables[0];
+    expect(narrowTable).not.toBe(wideTable);
+
+    const { processor, voice } = heldVoice(lone({ width: 0.05 }), true);
+    processor.inbox({ type: 'patch', patch: makePatch(lone({ width: 1 })) } as never);
+    const block = loaded.ctrlInterval;
+    const outL = new Float32Array(block);
+    const outR = new Float32Array(block);
+    voice.updateControl(block, 0, 0, 0);
+    expect(voice.tables[0]).toBe(narrowTable);
+    voice.render(outL, outR, 0, block);
+    voice.updateControl(block, 0, 0, 0);
+    expect(voice.tables[0]).toBe(wideTable);
+  });
+});
+
 describe('a width stepped mid-note', () => {
   it('ramps from 1 to 0.3 with no jump beyond the wave’s own swing', () => {
     const processor: ProcessorLike = loaded.create(makePatch(lone({})), 1);
