@@ -197,6 +197,14 @@ describe('encodeWavAsync', () => {
     expect(yields).toBe(2);
   });
 
+  it('refuses a chunk size that is not a positive integer', async () => {
+    for (const chunkFrames of [0, -1, NaN, 2.5]) {
+      await expect(encodeWavAsync(noisy(10), 48000, 24, { chunkFrames })).rejects.toThrow(
+        new RangeError(`chunkFrames must be a positive integer, got ${chunkFrames}`),
+      );
+    }
+  });
+
   it('refuses at once when already aborted', async () => {
     const controller = new AbortController();
     controller.abort();

@@ -61,7 +61,8 @@ export const WAV_DITHER_SEED = 0x0d_17_4e_12;
 
 /**
  * Frames the async WAV encoder writes between yields to the event loop
- * (windsor#51): about 1.4 s of song at 48 kHz, small enough that a Cancel
- * click is answered promptly, large enough that yielding costs nothing.
+ * (windsor#51): 65 536 frames, about 1.49 s of song at 44.1 kHz and 1.37 s at
+ * 48 kHz. The signal is checked once per chunk, so a smaller chunk hears a
+ * Cancel after less encoding, at the cost of more yields.
  */
 export const WAV_ENCODE_CHUNK_FRAMES = 1 << 16;

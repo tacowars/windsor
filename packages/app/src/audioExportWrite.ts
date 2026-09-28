@@ -39,9 +39,9 @@ export async function writeInChunks(
 }
 
 /**
- * `close()` raced against `signal` (windsor#51 decision 2): a large file's
- * close can take a while, and a Cancel while it is pending rejects at once so
- * the caller aborts the stream. The close left behind still settles; its
+ * `close()` raced against `signal` (windsor#51 decision 2): a Cancel while
+ * the close is pending rejects without waiting for it, so the caller aborts
+ * the stream. The close left behind still settles; its
  * rejection is swallowed.
  */
 function closeUnlessAborted(writable: ChunkWritable, signal: AbortSignal): Promise<void> {

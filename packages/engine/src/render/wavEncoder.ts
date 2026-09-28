@@ -103,6 +103,9 @@ export async function encodeWavAsync(
   options: AsyncWavOptions = {},
 ): Promise<EncodedWav> {
   const { signal, chunkFrames = WAV_ENCODE_CHUNK_FRAMES, yieldToLoop = nextTask } = options;
+  if (!Number.isInteger(chunkFrames) || chunkFrames <= 0) {
+    throw new RangeError(`chunkFrames must be a positive integer, got ${chunkFrames}`);
+  }
   const writer = new WavWriter(channels, sampleRate, bitDepth, options);
   for (;;) {
     if (signal?.aborted) throw new DOMException('the encode was cancelled', 'AbortError');
