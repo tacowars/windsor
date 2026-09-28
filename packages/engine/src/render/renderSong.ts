@@ -27,7 +27,7 @@
  * the part's slot, decision 7), and the sequencers draw from the document's
  * own seeds, so two renders of the same song are bit-identical.
  */
-import { SCHEDULER_START_DELAY_SECONDS } from '../audioConstants';
+import { SCHEDULER_START_DELAY_SECONDS, SECONDS_PER_MINUTE } from '../audioConstants';
 import { hashSeed } from '../sequencing/generatorSeed';
 import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import { playableSwing } from '../sequencing/swing';
@@ -42,6 +42,7 @@ import { planRender } from './renderPlan';
 import {
   RENDER_CHANNELS,
   RENDER_LOOK_AHEAD_SECONDS,
+  RENDER_MAX_FRAMES,
   RENDER_SAMPLE_RATE_DEFAULT,
   RENDER_SEED_DEFAULT,
   RENDER_STEP_SECONDS,
@@ -81,7 +82,10 @@ export interface RenderSongOptions {
 }
 
 export interface RenderedSong {
-  /** One array per channel, left then right: the song from bar 1, then the tail. */
+  /**
+   * One array per channel, left then right: the song from bar 1, then the
+   * tail. Views into the rendered buffer, not copies.
+   */
   channels: Float32Array[];
   sampleRate: number;
   /** The song's own length, before the tail. */
@@ -95,21 +99,56 @@ export function songSeconds(document: ArrangementDocument): number {
   return clock.swungTicks(bars * TICKS_PER_BAR) * clock.secondsPerTick;
 }
 
-export async function renderSong(
+/** The frame plan a render of `document` with `options` would take; allocates nothing. */
+function planFor(
   document: ArrangementDocument,
-  options: RenderSongOptions = {},
-): Promise<RenderedSong> {
+  options: Pick<RenderSongOptions, 'sampleRate' | 'tailSeconds'>,
+): RenderPlan {
   const sampleRate = options.sampleRate ?? RENDER_SAMPLE_RATE_DEFAULT;
   const tail = Math.min(
     RENDER_TAIL_SECONDS.max,
     Math.max(RENDER_TAIL_SECONDS.min, options.tailSeconds ?? RENDER_TAIL_SECONDS.default),
   );
-  const plan = planRender({
+  return planRender({
     sampleRate,
     leadSeconds: SCHEDULER_START_DELAY_SECONDS,
     songSeconds: songSeconds(document),
     tailSeconds: tail,
   });
+}
+
+/**
+ * Why a render of `document` would be refused, or null. A render holds the
+ * whole song as float PCM in the offline context and then the encoded file,
+ * so past `RENDER_MAX_FRAMES` the tab could run out of memory. The check
+ * allocates nothing: the console calls it before opening a save picker, and
+ * `renderSong` before it builds a context.
+ */
+export function renderRefusal(
+  document: ArrangementDocument,
+  options: Pick<RenderSongOptions, 'sampleRate' | 'tailSeconds'> = {},
+  maxFrames: number = RENDER_MAX_FRAMES,
+): string | null {
+  const plan = planFor(document, options);
+  if (plan.totalFrames <= maxFrames) return null;
+  const rate = options.sampleRate ?? RENDER_SAMPLE_RATE_DEFAULT;
+  const minutes = (frames: number, at: number): string =>
+    (frames / at / SECONDS_PER_MINUTE).toFixed(1);
+  return (
+    `the song and its tail run ${minutes(plan.totalFrames, rate)} minutes, longer than the ` +
+    `${minutes(maxFrames, rate)} minutes a render can hold at this sample rate — choose a ` +
+    'lower sample rate, a shorter tail, fewer bars or a faster tempo'
+  );
+}
+
+export async function renderSong(
+  document: ArrangementDocument,
+  options: RenderSongOptions = {},
+): Promise<RenderedSong> {
+  const sampleRate = options.sampleRate ?? RENDER_SAMPLE_RATE_DEFAULT;
+  const refusal = renderRefusal(document, options);
+  if (refusal) throw new RangeError(refusal);
+  const plan = planFor(document, options);
   throwIfAborted(options.signal);
   const create = options.createContext ?? ((init) => new OfflineAudioContext(init));
   const context = create({
@@ -122,7 +161,8 @@ export async function renderSong(
     const buffer = await drive(context, system, plan, options);
     return {
       channels: Array.from({ length: RENDER_CHANNELS }, (_, c) =>
-        buffer.getChannelData(c).slice(plan.leadFrames),
+        // A view past the lead-in, not a copy: the song is held once.
+        buffer.getChannelData(c).subarray(plan.leadFrames),
       ),
       sampleRate,
       songSeconds: plan.songFrames / sampleRate,

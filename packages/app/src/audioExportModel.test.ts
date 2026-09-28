@@ -158,7 +158,7 @@ describe('runAudioExport', () => {
     const sink = fakeSink();
     const render = (): Promise<RenderedSong> => Promise.reject(new Error('worklet failed'));
     const outcome = await runAudioExport(run({ sink, render }));
-    expect(outcome).toEqual({ kind: 'failed', error: 'Error: worklet failed' });
+    expect(outcome).toEqual({ kind: 'failed', error: 'worklet failed' });
     expect(sink.written).toHaveLength(0);
     expect(sink.discarded).toBe(1);
   });

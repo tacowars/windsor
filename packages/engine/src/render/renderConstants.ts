@@ -17,6 +17,14 @@ export const WAV_BIT_DEPTH_DEFAULT: WavBitDepth = 24;
 /** Seconds rendered after the song's last bar so releases and returns ring out (decision 3). */
 export const RENDER_TAIL_SECONDS = { min: 0, max: 10, default: 2 } as const;
 
+/**
+ * The longest render, in frames: 15 minutes at 48 kHz. A render holds the
+ * whole song as 32-bit float stereo in the offline context (about 346 MB at
+ * this limit) and then the encoded file (about 259 MB at 24-bit), so a longer
+ * one risks the tab. 256 bars at 20 BPM (51 minutes) is refused.
+ */
+export const RENDER_MAX_FRAMES = 48000 * 60 * 15;
+
 /** A render is stereo, like the live master. */
 export const RENDER_CHANNELS = 2;
 

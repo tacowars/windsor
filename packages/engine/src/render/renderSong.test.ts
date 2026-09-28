@@ -21,7 +21,7 @@ import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
 import { FULL_DOCUMENT, FULL_PART_IDS, FULL_SLOT } from '../__fixtures__/fullArrangement';
 import { noteToneFeed } from '../__fixtures__/noteFeeds';
-import { SCHEDULER_START_DELAY_SECONDS } from '../audioConstants';
+import { BARS_MAX, BPM_MIN, SCHEDULER_START_DELAY_SECONDS } from '../audioConstants';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import { musicPartName } from '../song/documentParts';
 import { FmEngine } from '../synth/fmEngine';
@@ -29,7 +29,8 @@ import type { ProcessorOptions } from '../synth/workletMessages';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 import { AudioSystem } from '../system/audioSystem';
 import type { RenderSongOptions } from './renderSong';
-import { renderSong, songSeconds } from './renderSong';
+import { RENDER_MAX_FRAMES } from './renderConstants';
+import { renderRefusal, renderSong, songSeconds } from './renderSong';
 
 /** Every `fm-part` built, with the options it was built with. */
 const built: { node: FakeWorkletNode; options: ProcessorOptions }[] = [];
@@ -228,6 +229,43 @@ describe('renderSong', () => {
     const { render, contexts } = offline(FULL_DOCUMENT, { signal: controller.signal });
     await expect(render).rejects.toMatchObject({ name: 'AbortError' });
     expect(contexts).toHaveLength(0);
+  });
+});
+
+describe('the frame budget', () => {
+  const longest: ArrangementDocument = {
+    ...FULL_DOCUMENT,
+    transport: { ...FULL_DOCUMENT.transport, bpm: BPM_MIN, bars: BARS_MAX },
+  };
+
+  it('refuses the engine limits (256 bars at 20 BPM) before any context is built', async () => {
+    expect(songSeconds(longest)).toBeCloseTo(BARS_MAX * 4 * (60 / BPM_MIN), 6);
+    const reason = renderRefusal(longest, { sampleRate: 48000, tailSeconds: 10 });
+    expect(reason).toMatch(/lower sample rate/);
+    const { render, contexts } = offline(longest, { sampleRate: 48000 });
+    await expect(render).rejects.toThrow(RangeError);
+    await expect(render).rejects.toThrow(/lower sample rate/);
+    expect(contexts).toHaveLength(0);
+    expect(built).toHaveLength(0);
+  });
+
+  it('refuses at any offered rate, and lets through what fits', () => {
+    expect(renderRefusal(longest, { sampleRate: 44100, tailSeconds: 0 })).not.toBeNull();
+    expect(renderRefusal(FULL_DOCUMENT, { sampleRate: 48000, tailSeconds: 10 })).toBeNull();
+    // The boundary is the frame count, song plus lead-in plus tail.
+    const frames = Math.round((SCHEDULER_START_DELAY_SECONDS + songSeconds(FULL_DOCUMENT)) * 48000);
+    const fits = { sampleRate: 48000, tailSeconds: 0 };
+    expect(renderRefusal(FULL_DOCUMENT, fits, frames)).toBeNull();
+    expect(renderRefusal(FULL_DOCUMENT, fits, frames - 1)).not.toBeNull();
+    expect(RENDER_MAX_FRAMES).toBe(48000 * 60 * 15);
+  });
+
+  it('hands back views into the rendered buffer, not copies', async () => {
+    const rendered = await offline(FULL_DOCUMENT, { sampleRate: 8000, tailSeconds: 0 }).render;
+    const [left, right] = rendered.channels;
+    expect(left!.byteOffset).toBeGreaterThan(0);
+    expect(left!.buffer.byteLength).toBeGreaterThan(left!.byteLength);
+    expect(right!.buffer).not.toBe(left!.buffer);
   });
 });
 

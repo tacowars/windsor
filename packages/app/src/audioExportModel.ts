@@ -103,7 +103,7 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
     if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
       return { kind: 'cancelled' };
     }
-    return { kind: 'failed', error: String(error) };
+    return { kind: 'failed', error: error instanceof Error ? error.message : String(error) };
   }
 }
 

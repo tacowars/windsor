@@ -15,6 +15,7 @@ import {
   RENDER_TAIL_SECONDS,
   WAV_BIT_DEPTHS,
   encodeWav,
+  renderRefusal,
   renderSong,
 } from '@windsor/engine';
 import type { RenderSampleRate, WavBitDepth } from '@windsor/engine';
@@ -127,6 +128,12 @@ async function startExport(
   fileName: string,
 ): Promise<void> {
   if (job) return;
+  // A song too long to hold is refused before a picker opens or a byte is allocated.
+  const refusal = renderRefusal(ctx.model.doc, settings);
+  if (refusal) {
+    ctx.notify(`audio export refused: ${refusal}`, 'error');
+    return;
+  }
   let sink: WavSink | null;
   try {
     // The picker opens first, inside the click's user activation.

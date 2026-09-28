@@ -236,7 +236,7 @@ export type { ReverbSpace, SpaceName } from './mixer/reverbSpace';
 export { renderPatchToBuffer } from './render/offlineRender';
 export type { BakeOptions } from './render/offlineRender';
 // The song render and the WAV writer (windsor#40).
-export { renderSong, songSeconds } from './render/renderSong';
+export { renderRefusal, renderSong, songSeconds } from './render/renderSong';
 export type { RenderSongOptions, RenderedSong } from './render/renderSong';
 export { encodeWav } from './render/wavEncoder';
 export type { EncodedWav } from './render/wavEncoder';
