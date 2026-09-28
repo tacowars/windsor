@@ -79,7 +79,14 @@ the workspace, so each seeds an empty one.
   (`head.repo.full_name == github.repository`). A fork PR runs `verify`
   alone and gets no write token.
 - **A docs-only PR gets no preview.** The `changes` step reports
-  `code=false`, no artifact is built, and `preview` is skipped.
+  `code=false`, no artifact is built, and `preview` is skipped. If an
+  earlier push had code and left a preview, `preview-remove` deletes it in
+  the same per-PR group, so no stale build stays linked.
+- **Removal is quiet when there is nothing to remove.** `preview-remove`
+  first asks the contents API whether `pr-preview/pr-<N>/` exists on
+  `gh-pages`, using the job's token and no checkout. If it doesn't, the job
+  pushes nothing and posts no "removed" comment. This covers closing a
+  docs-only PR and every docs-only push.
 
 ## Why not Cloudflare Pages
 

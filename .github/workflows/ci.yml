@@ -164,12 +164,18 @@ jobs:
           umbrella-dir: pr-preview
           qr-code: 'false'
 
-  # Closing or merging the PR deletes its preview folder.
+  # Deletes the PR's preview folder when the PR is closed or merged, or when
+  # a push leaves it docs-only (verify says code=false), so no stale build
+  # stays linked. On `closed`, verify is skipped, hence `!cancelled()`
+  # rather than the implicit success() gate. It does nothing, and posts no
+  # comment, when the folder doesn't exist.
   preview-remove:
     if: >-
+      !cancelled() &&
       github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action == 'closed' || needs.verify.outputs.code == 'false')
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -178,11 +184,26 @@ jobs:
       group: gh-pages-pr-${{ github.event.pull_request.number }}
       cancel-in-progress: false
     steps:
-      - name: Seed an empty repository
+      - name: Is there a preview to remove?
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if gh api "repos/$REPO/contents/pr-preview/pr-$PR?ref=gh-pages" --silent 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "no preview folder for PR $PR: nothing to remove"
+          fi
+      - if: steps.existing.outputs.exists == 'true'
+        name: Seed an empty repository
         run: |
           git init -q
           git -c user.name=ci -c user.email=ci@localhost commit -q --allow-empty -m seed
-      - uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1.8.1
+      - if: steps.existing.outputs.exists == 'true'
+        uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1.8.1
         with:
           action: remove
           preview-branch: gh-pages
