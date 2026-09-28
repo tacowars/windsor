@@ -160,6 +160,14 @@ session sets the class in the issue when it writes it. The worker keeps it
 unless the diff crosses into a `reviewed` area, and then says so in the
 PR. The main session checks the class against the diff.
 
+A `reviewed` PR merges without Pat when all four hold: nothing Pat
+can click or hear changes (an engine-only or internal change a preview
+would not show); the issue's decisions agreed the design; the worker
+raised no deviation and no `needs-human` (a necessary edit outside the
+owned files, declared in the PR, is not one); and CI is green with no open
+P0 or P1 in Codex's latest review. The main session checks all four.
+Anything audible still waits for Pat's listen, and UI for Pat's look.
+
 **The main session** dispatches and merges. Before launching a worker it
 runs `bash scripts/overlap.sh <owned paths>` against open PRs and local
 worktrees; an overlap means sequence, and a hotspot (the engine index,

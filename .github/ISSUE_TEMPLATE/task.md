@@ -69,3 +69,11 @@ new or moved control, a new gesture, a restyle).
 else, including user-visible text the issue spells out word for word (a
 rename, a label, a hint), a bug fix that restores intended behaviour
 without changing how a control works, tests, docs and refactors.
+
+A `reviewed` PR merges without Pat when all four hold: nothing Pat
+can click or hear changes (an engine-only or internal change a preview
+would not show); the issue's decisions agreed the design; the worker
+raised no deviation and no `needs-human` (a necessary edit outside the
+owned files, declared in the PR, is not one); and CI is green with no open
+P0 or P1 in Codex's latest review. The main session checks all four.
+Anything audible still waits for Pat's listen, and UI for Pat's look.
