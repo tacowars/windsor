@@ -163,6 +163,27 @@ export function libraryProblemsText(model: LibraryModel): string | null {
   return `library: ${problems.length} patch file(s) refused — ${problems.join('; ')}`;
 }
 
+/** Raises an `error` toast; the one `ctx.notify` call a problem report needs. */
+export type ProblemNotify = (message: string, tone: 'error') => void;
+
+/** Reports the model's refusals; `force` says them again even when unchanged. */
+export type ProblemReporter = (model: LibraryModel, notify: ProblemNotify, force?: boolean) => void;
+
+/**
+ * The refusal report, holding what it last said. Refusals leave patches
+ * missing, so they are an `error` toast, which stays until dismissed. The
+ * same set is said once across re-renders, and again only when it changes or
+ * on `force` (an explicit "Re-read folder" that finds it still there).
+ */
+export function createProblemReporter(): ProblemReporter {
+  let reported: string | null = null;
+  return (model, notify, force = false) => {
+    const text = libraryProblemsText(model);
+    if (text !== null && (force || text !== reported)) notify(text, 'error');
+    reported = text;
+  };
+}
+
 function sourceOf(
   id: string,
   inDocument: boolean,

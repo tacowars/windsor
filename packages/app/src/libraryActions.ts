@@ -23,10 +23,10 @@ import {
 } from './libraryFolder';
 import {
   connectLibrary,
+  createProblemReporter,
   disconnectLibrary,
   loadPageLibrary,
   library,
-  libraryProblemsText,
   refreshLibrary,
 } from './libraryModel';
 import type { LibraryModel } from './libraryModel';
@@ -59,13 +59,11 @@ let remembered: ChromeDirectoryHandle | null = null;
 const scopeFor = (ctx: AppCtx): PatchScope => ({ ctx, library, slot: ctx.parts.selected });
 
 /** The refusals last reported, so a re-render does not repeat the same toast. */
-let reportedProblems: string | null = null;
+const reportProblems = createProblemReporter();
 
-/** Tells the user, once per distinct set, which patch files the last library read refused. */
-export function reportLibraryProblems(ctx: AppCtx): void {
-  const text = libraryProblemsText(library);
-  if (text !== null && text !== reportedProblems) ctx.notify(text, 'warning');
-  reportedProblems = text;
+/** Tells the user which patch files the last library read refused (`createProblemReporter`). */
+export function reportLibraryProblems(ctx: AppCtx, force = false): void {
+  reportProblems(library, (message, tone) => ctx.notify(message, tone), force);
 }
 
 /**
@@ -312,7 +310,11 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
       const reread = button('Re-read folder', 'Read the folder again', true);
       reread.onclick = (): void => {
         refreshLibrary(library)
-          .then(() => ctx.render())
+          .then(() => {
+            // An explicit re-read says a refusal again, even one dismissed and unchanged.
+            reportLibraryProblems(ctx, true);
+            ctx.render();
+          })
           .catch((error: unknown) => ctx.notify(String(error), 'error'));
       };
       folderRow.append(reread, forget);

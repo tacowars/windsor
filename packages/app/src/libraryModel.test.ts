@@ -13,12 +13,14 @@ import type { PatchFolder } from './libraryFolder';
 import {
   connectLibrary,
   connectUserLibrary,
+  createProblemReporter,
   disconnectLibrary,
   isWritable,
   libraryProblemsText,
   libraryPatch,
   listLibrary,
   pageLibrary,
+  refreshLibrary,
   removeLibraryFile,
   writeLibraryFile,
 } from './libraryModel';
@@ -139,6 +141,43 @@ describe('the model', () => {
 
   it('has no problem toast for a clean read', () => {
     expect(libraryProblemsText(pageLibrary())).toBeNull();
+  });
+});
+
+describe('reportLibraryProblems (createProblemReporter)', () => {
+  const broken = (): Map<string, string> =>
+    new Map([['broken.json', '{"format": 1, "name": "broken"}']]);
+
+  it('reports refusals with the persistent error tone, once across re-renders', async () => {
+    const model = pageLibrary();
+    await connectLibrary(model, memoryFolder(broken()));
+    const said: [string, string][] = [];
+    const report = createProblemReporter();
+    report(model, (message, tone) => said.push([message, tone]));
+    report(model, (message, tone) => said.push([message, tone]));
+    expect(said).toHaveLength(1);
+    expect(said[0]?.[1]).toBe('error');
+    expect(said[0]?.[0]).toContain('broken');
+  });
+
+  it('says an unchanged refusal again on an explicit re-read', async () => {
+    const model = pageLibrary();
+    await connectLibrary(model, memoryFolder(broken()));
+    const said: string[] = [];
+    const report = createProblemReporter();
+    report(model, (message) => said.push(message));
+    await refreshLibrary(model);
+    report(model, (message) => said.push(message));
+    expect(said).toHaveLength(1);
+    report(model, (message) => said.push(message), true);
+    expect(said).toHaveLength(2);
+    expect(said[1]).toBe(said[0]);
+  });
+
+  it('stays quiet on a clean library, even when forced', () => {
+    const said: string[] = [];
+    createProblemReporter()(pageLibrary(), (message) => said.push(message), true);
+    expect(said).toEqual([]);
   });
 });
 
