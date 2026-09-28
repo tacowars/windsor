@@ -152,7 +152,7 @@ was cut before. The table was refreshed on Node 24. `fmProcessorHeadroom`,
 `fmProcessorDormancy`, `fmProcessorSlide` and the other `fmProcessor*` tests
 pass unchanged.
 
-### Accented steps: the patch's filter sweep (needs Pat)
+### Accented steps: the patch's filter sweep (resolved in the patch)
 
 On `clippy.json` the largest step at an accented note-on is 0.17–0.23 (five
 seeds), against 0.039 later in the same notes. Round 1's clicks were in the
@@ -174,21 +174,29 @@ about ten octaves (from 55 Hz to the Nyquist clamp) over its 2 ms attack. The
 engine's 32-sample control-rate staircase accounts for only about a fifth of
 it: updating every sample leaves 0.11–0.15. A slower filter attack or a smaller
 accent depth removes it. Under issue decision 5 this is a patch setting
-behaving as designed, so the engine is not changed to hide it. What to do is
-Pat's call:
+behaving as designed, so the engine is not changed to hide it. It was
+resolved in the patch. Engine smoothing of the sweep was rejected, because it
+removed only about a fifth of the click (see the decision record).
 
-- **In the patch:** a filter attack of about 10 ms, or a smaller
-  `filter.modWheelDepth` (the accent's filter depth). Either keeps the accent
-  bright without the tick.
-- **In the engine (a new ticket):** per-sample cutoff interpolation inside
-  the render loops would smooth the staircase. It costs a coefficient
-  recompute per sample in the hot loop, and it removes only the smaller part
-  of this click.
+### A held End level (Codex review, round 1)
+
+Round 2's `finished` check waited for the amplitude to reach 0. A carrier
+envelope whose End level is above 0 holds that level for good, so a released
+voice with one rang and held its slot forever. (On `main` it was freed at the
+end of the release, which cut the held level to 0.) Now, once every
+carrier's envelope has ended and one ended above 0, the part runs the 4 ms
+steal fade (after the filter) and kills the voice at the fade's end.
+`fmProcessorDormancy`'s End 0.5 case is extended past the release. It fails
+on round 2's build (the voice is still active) and passes now, with no step
+above 0.05. No factory preset has a carrier End above 0, so the golden does
+not change.
+
+## Decision record
+
+`docs/log/2026-09-28-voices-end-at-silence.md`.
 
 ## Listening
 
-Pending: Pat's verdict. Round 1: open `songs/clicks.json`, play it, and
-listen for a tick on each step, loudest on the two accented steps. Round 2:
-open `clippy.json`, play it, press ■ and ‖ mid-note, and listen for a tick
-as the last note's ring ends. The accented-step tick in `clippy.json` is
-expected to remain until the patch question above is decided.
+On the round-1 build Pat heard clearly fewer clicks than main; the accent
+click was resolved in the patch (1 ms filter attack; Pat rejected 10 ms as
+an audible ramp); the round-2 stop/pause fix awaits Pat's listen.

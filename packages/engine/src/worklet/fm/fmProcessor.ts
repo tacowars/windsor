@@ -489,7 +489,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
           done += chunk;
         }
 
-        if (!v.gate && !v.fading && v.finished) v.active = false;
+        v.settle();
       }
 
       cursor += seg;

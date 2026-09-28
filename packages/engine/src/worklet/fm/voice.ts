@@ -346,6 +346,17 @@ class Voice {
     return !f.slope24 || Svf.quiet(this.svfB);
   }
 
+  /**
+   * After a render: a released voice ends once nothing is left to hear
+   * (`finished`), and one whose envelopes ended at a held End level fades out
+   * with `steal` instead (windsor#7). A gated or fading voice is left alone.
+   */
+  settle(): void {
+    if (this.gate || this.fadeInc !== 0) return;
+    if (this.finished) this.active = false;
+    else if (this.holdsEndLevel) this.steal();
+  }
+
   /** A voice that is fading out is no longer available, but still sounding. */
   get fading(): boolean {
     return this.fadeInc !== 0;
@@ -366,6 +377,23 @@ class Voice {
       if (Math.abs(this.amp[c]) > DORMANT_AMP) return false;
     }
     return this.filterQuiet;
+  }
+
+  /**
+   * Every carrier's envelope has ended, and at least one ended above 0 (an
+   * End level): the voice holds that level for good and never goes quiet, so
+   * the part fades it out with `steal` rather than waiting on it or cutting
+   * it (windsor#7). Reads the envelopes, not the amplitude ramps.
+   */
+  get holdsEndLevel(): boolean {
+    const carriers = this.alg.carriers;
+    let holds = false;
+    for (let i = 0; i < carriers.length; i++) {
+      const env = this.ampEnv[carriers[i]];
+      if (!env.finished) return false;
+      if (Math.abs(env.value) > DORMANT_AMP) holds = true;
+    }
+    return holds;
   }
 
   /** Control-rate update, `voiceControl.js`: envelopes, LFO, glide, ramps, filter coefficients. */
