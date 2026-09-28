@@ -1,7 +1,8 @@
 /**
  * The transport strip (#708, epic #703 decision 1), which sits in the header
  * row since windsor#11 beside the brand, the power button and the tabs — Tap,
- * BPM, Bars, swing and its grid (windsor#29), 4/4, key, scale, the `bar.beat.sixteenth` position, and ▶ ■ ‖.
+ * BPM, Bars, swing and its grid (windsor#29), 4/4, key, scale, the `bar.beat.sixteenth` position, ▶ ■ ‖
+ * and the loop button (windsor#30).
  * Tempo and bars are number boxes that type and drag (`numberDrag.ts`,
  * windsor#12), laid out as Ableton Live's control bar: Tap, BPM, Bars. Every edit is a live `ctx.change`, never a rebuild;
  * the buttons are `ctx.transport` (`host.ts`'s `HostTransport`), and the
@@ -17,7 +18,7 @@
 import type { Swing } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
-import { el, select } from './dom';
+import { el, html, select } from './dom';
 import { makeNumberBox } from './numberDrag';
 import { audibleTick, watchPlayhead } from './stepStrip';
 import {
@@ -30,6 +31,8 @@ import {
   formatPosition,
   isStraight,
   keyChange,
+  loopIsOn,
+  loopToggle,
   parseBars,
   parseBpm,
   parseSwing,
@@ -168,6 +171,37 @@ function button(label: string, title: string): HTMLButtonElement {
   return node;
 }
 
+/** A loop arrow: two strokes, each ending in its arrowhead, round one another. */
+const LOOP_ICON =
+  '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" ' +
+  'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M2.5 9V7.5A2.5 2.5 0 0 1 5 5h8M11 3l2 2-2 2"/>' +
+  '<path d="M13.5 7v1.5A2.5 2.5 0 0 1 11 11H3M5 9l-2 2 2 2"/></svg>';
+
+/**
+ * The loop button (windsor#30 decision 1, Ableton Live's loop switch): lit
+ * while the song loops. A press flips `transport.loop.on`, and on a song
+ * with no loop yet creates one over bars 1–4 (`loopToggle`). The light
+ * follows the document on the console's one frame loop, so a loop an import
+ * brought, or a Bars edit dropped, shows without a render of the strip.
+ */
+function loopButton(ctx: AppCtx): HTMLElement {
+  const loop = button('', 'Loop: repeat the bars under the loop brace on the Song tab');
+  loop.classList.add('transport-loop');
+  loop.appendChild(html('span', 'loop-icon', LOOP_ICON));
+  const sync = (on: boolean): void => loop.setAttribute('aria-pressed', String(on));
+  loop.onclick = (): void => {
+    if (ctx.change(loopToggle(ctx.model.doc.transport)).ok) sync(loopIsOn(ctx.model.doc.transport));
+  };
+  sync(loopIsOn(ctx.model.doc.transport));
+  watchPlayhead({
+    attached: () => loop.isConnected,
+    playheadAt: () => Number(loopIsOn(ctx.model.doc.transport)),
+    mark: (on) => sync(on === 1),
+  });
+  return loop;
+}
+
 /** ▶ ■ ‖ and the position they move. */
 function transportControls(ctx: AppCtx): HTMLElement[] {
   const position = el(
@@ -206,7 +240,7 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
       position.textContent = formatPosition(tick, songTicks(ctx));
     },
   });
-  return [position, play, stop, pause];
+  return [position, play, stop, pause, loopButton(ctx)];
 }
 
 /** One group the header wraps as a unit (windsor#11 decision 2). */

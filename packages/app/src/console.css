@@ -134,6 +134,14 @@ input {
 .transport-tap {
   font-size: 11px;
 }
+/* The loop button (windsor#30): a loop arrow beside ▶ ■ ‖, lit with the
+   accent fill of any pressed .btn while the song loops. */
+.transport-loop .loop-icon {
+  display: inline-flex;
+}
+.transport-loop svg {
+  display: block;
+}
 .transport-box {
   display: inline-flex;
   align-items: center;
@@ -695,6 +703,57 @@ body.chord-dragging {
   width: 1px;
   height: 6px;
   background: var(--line-bright);
+}
+/* The loop brace (windsor#30): a strip under the ruler's bar numbers, its
+   own element so the ruler's zoom never sees its presses. The brace is a
+   grey bar with an inward-pointing triangle handle at each end, dimmed while
+   the loop is off; while it is on, a line at each end runs down every lane,
+   on the bar line at every zoom (placed from the lanes' --bar). */
+.loop-strip {
+  position: relative;
+  height: 12px;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+.loop-brace {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: var(--ink-faint);
+  border-radius: 1px;
+  opacity: 0.45;
+  cursor: grab;
+}
+.loop-brace.on {
+  background: var(--ink-dim);
+  opacity: 1;
+}
+.loop-handle {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  cursor: ew-resize;
+}
+.loop-handle.start {
+  left: 0;
+  border-left: 6px solid var(--ink);
+}
+.loop-handle.end {
+  right: 0;
+  border-right: 6px solid var(--ink);
+}
+.loop-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--ink-dim);
+  pointer-events: none;
+  z-index: 1;
 }
 .lane {
   position: relative;
