@@ -49,6 +49,15 @@ full `verify`; the worker does not.
 
 ## PR class
 
-`routine` or `reviewed` (see CLAUDE.md "Working a ticket"). Sound design,
-UI/UX, the song document schema, persistence and any deviation are
-`reviewed`.
+`routine` or `reviewed` (see CLAUDE.md "Working a ticket"), set here when
+the issue is written.
+
+`reviewed` waits for Pat: sound design (`patches/`, the worklets, a
+golden change), the song document schema, persistence, a deviation from
+the issue's decisions, or a UI/UX change to layout, interaction or look (a
+new or moved control, a new gesture, a restyle).
+
+`routine` merges on a green check plus no P0 or P1 from Codex: everything
+else, including user-visible text the issue spells out word for word (a
+rename, a label, a hint), a bug fix that restores intended behaviour
+without changing how a control works, tests, docs and refactors.
