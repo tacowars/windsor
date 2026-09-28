@@ -22,8 +22,8 @@ the File System Access folder grant, and import/export.
 
 | Working on… | Go to | Verify with |
 |---|---|---|
-| The engine: FM synthesis, worklets, patches, songs, sequencers, harmony, mixer, inserts | `packages/engine/src/` (`@windsor/engine`). Read `.claude/skills/windsor-engine/SKILL.md` first, and `packages/engine/src/worklet/CLAUDE.md` before touching DSP | `npm run verify` |
-| The UI: tabs, cards, knobs, the library browser, audition input | `packages/app/` (`@windsor/app`). Read `packages/app/CLAUDE.md` first | `npm run verify`, plus `npm run dev` in the browser |
+| The engine: FM synthesis, worklets, patches, songs, sequencers, harmony, mixer, inserts | `packages/engine/src/` (`@windsor/engine`). Read `.claude/skills/windsor-engine/SKILL.md` first, and `packages/engine/src/worklet/CLAUDE.md` before touching DSP | The tests beside what you touched (`npx vitest run <paths>`, the goldens for DSP), then `npm run typecheck && npm run lint`. CI runs `verify` |
+| The UI: tabs, cards, knobs, the library browser, audition input | `packages/app/` (`@windsor/app`). Read `packages/app/CLAUDE.md` first | The tests beside what you touched, `npm run typecheck && npm run lint`, and `npm run dev` in the browser. CI runs `verify` |
 | Generated files: the worklet bundles and the patch index | `scripts/build-worklets.mjs`, `scripts/patch-library-index.mjs` | `npm run worklets`, `npm run patch-index` |
 | Design, decisions, research | `docs/design/`, `docs/log/`, `docs/research/` | — |
 
@@ -101,6 +101,7 @@ npm run preview            # serve the built dist/ (e.g. -- --port 4199)
 npm run verify             # the PR gate: typecheck, lint, format, test, worklets, patch index, build
 npm run verify:quick       # typecheck, lint, format, test
 npm run format             # prettier --write (code only; prose is hand-formatted)
+bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (main session, before a launch)
 ```
 
 ## Conventions
@@ -114,4 +115,43 @@ npm run format             # prettier --write (code only; prose is hand-formatte
 - **Commit style:** a sentence-case imperative subject, with a body that
   explains why.
 - **Branching:** work on a branch and open a PR against `main`. CI runs
-  `npm run verify`.
+  `npm run verify`, and a ruleset on `main` requires that check and a PR.
+
+## Working a ticket
+
+The issue is the whole brief (`.github/ISSUE_TEMPLATE/task.md`) and the PR
+is the only report (`.github/pull_request_template.md`). The rationale is
+in `docs/log/2026-09-28-parallel-workflow-without-an-orchestrator.md`.
+
+**A worker**, whether a sub-agent in a worktree or a session of its own:
+
+1. Reads the issue, then only the docs and skill references it names.
+2. Branches as `<feature|fix|docs|tech-debt>/<N>-<slug>` from `origin/main`
+   and edits only the folders the issue owns.
+3. Runs the checks the issue's "Verify locally" names, never the full
+   `verify` and never the whole suite. CI runs the gate; a hook enforces it.
+4. Commits, pushes, opens the PR from the template with `Fixes #N` and its
+   class, and ends its turn. Its final message is the PR URL and one line.
+5. Never merges, never watches CI, never writes the board. A question only
+   Pat can answer gets the `needs-human` label and a comment, then the turn
+   ends.
+
+**PR classes.** `routine` merges on a green check plus no P0 or P1 from
+Codex. `reviewed` waits for Pat: sound design (`patches/`, the worklets, a
+golden change), UI/UX, the song document schema, persistence, or a
+deviation from the issue's decisions. The worker declares the class; the
+main session checks it against the diff's paths.
+
+**The main session** dispatches and merges. Before launching a worker it
+runs `bash scripts/overlap.sh <owned paths>` against open PRs and local
+worktrees; an overlap means sequence, and a hotspot (the engine index,
+`partGenerators.ts`, the insert registry, the patch index, `main.ts`,
+`package.json`) means a `seam` ticket lands first. At most two Claude
+workers at once, one heavy test run at a time, and no new launch while two
+PRs wait for Pat. It merges with `gh pr merge <N> --squash --auto` and lets
+GitHub wait for the check. A Codex finding at P0 or P1 goes to a fresh
+round on the same branch, at most twice, then to Pat.
+
+**Backlog.** Issues. No label is backlog, `ready` is the queue, an open PR
+is in progress, closed is done. Project #6 is a view that GitHub's own
+workflows move; nothing else writes to it.
