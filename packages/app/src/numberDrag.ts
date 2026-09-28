@@ -91,17 +91,21 @@ function attachDrag(
 }
 
 /**
- * Enter and blur commit a typed entry; Escape reverts it. Text left as the
- * box showed it commits nothing (`typedEntry`), so a focus and blur never
- * rewrites a value the box displays rounded.
+ * Enter and blur commit a typed entry; Escape reverts it. Only an edit since
+ * focus commits (`typedEntry`), so a focus and blur never rewrites a value the
+ * box displays rounded, while retyping the same text still does.
  */
 function attachTyping(input: HTMLInputElement, spec: NumberBoxSpec, show: () => void): void {
-  let shown = input.value;
+  let edited = false;
   input.addEventListener('focus', () => {
-    shown = input.value;
+    edited = false;
+  });
+  input.addEventListener('input', () => {
+    edited = true;
   });
   const commit = (): void => {
-    const value = typedEntry(input.value, shown, spec.parse);
+    const value = typedEntry(input.value, edited, spec.parse);
+    edited = false;
     if (value !== null && value !== spec.get()) spec.set(value);
     show();
   };
@@ -111,6 +115,7 @@ function attachTyping(input: HTMLInputElement, spec: NumberBoxSpec, show: () => 
       input.blur();
       e.preventDefault();
     } else if (e.key === 'Escape') {
+      edited = false;
       show();
       input.blur();
       e.preventDefault();

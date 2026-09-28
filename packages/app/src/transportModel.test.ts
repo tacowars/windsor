@@ -342,21 +342,20 @@ describe('the swing box and its grid (windsor#29)', () => {
 
 describe('a number box commits only what was typed', () => {
   it('leaves a fractional swing alone on a focus and blur without typing', () => {
-    const song = { amount: 66.7, grid: 8 } as const;
-    const shown = SWING_KNOB.fmt?.(song.amount) ?? String(song.amount);
+    const shown = SWING_KNOB.fmt?.(66.7) ?? '';
     expect(shown).toBe('67');
-    expect(typedEntry(shown, shown, parseSwing)).toBeNull();
+    expect(typedEntry(shown, false, parseSwing)).toBeNull();
+    expect(typedEntry('133.50', false, parseBpm)).toBeNull();
+    expect(typedEntry('8', false, parseBars)).toBeNull();
   });
 
-  it('leaves a BPM and Bars alone on a focus and blur without typing', () => {
-    expect(typedEntry('133.50', '133.50', parseBpm)).toBeNull();
-    expect(typedEntry('8', '8', parseBars)).toBeNull();
+  it('commits a retyped same text, so 66.7 shown as 67 and retyped becomes 67', () => {
+    expect(typedEntry('67', true, parseSwing)).toBe(67);
   });
 
   it('commits a typed edit, and reverts typed text', () => {
-    expect(typedEntry('60', '67', parseSwing)).toBe(60);
-    expect(typedEntry('67 ', '67', parseSwing)).toBe(67);
-    expect(typedEntry('120', '133.50', parseBpm)).toBe(120);
-    expect(typedEntry('loose', '67', parseSwing)).toBeNull();
+    expect(typedEntry('60', true, parseSwing)).toBe(60);
+    expect(typedEntry('120', true, parseBpm)).toBe(120);
+    expect(typedEntry('loose', true, parseSwing)).toBeNull();
   });
 });

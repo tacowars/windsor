@@ -135,17 +135,17 @@ export function parseBoxEntry(text: string, range: BoxRange): number | null {
 }
 
 /**
- * What Enter or blur on a number box commits: nothing when the text is still
- * what the box showed (a focus and blur without typing), so a value the box
- * displays rounded — a song's swing of 66.7 shown as 67 — is never rewritten
- * by looking at it; otherwise the parsed entry, or null to revert.
+ * What Enter or blur on a number box commits: nothing when the text was not
+ * edited since focus, so a value the box displays rounded — a song's swing of
+ * 66.7 shown as 67 — is never rewritten by looking at it; after any edit, even
+ * one that retypes the same text, the parsed entry, or null to revert.
  */
 export function typedEntry(
   text: string,
-  shown: string,
+  edited: boolean,
   parse: (text: string) => number | null,
 ): number | null {
-  return text === shown ? null : parse(text);
+  return edited ? parse(text) : null;
 }
 
 export const parseBpm = (text: string): number | null => parseBoxEntry(text, BPM_KNOB);
