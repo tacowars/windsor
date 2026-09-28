@@ -208,10 +208,9 @@ function returnRow(ctx: AppCtx, name: string): HTMLElement {
 export function renderReturnsSection(ctx: AppCtx): HTMLElement {
   const returns = section(
     'Returns',
-    'The plate (every parameter), the delay (time, regeneration, damping) and both levels land in ' +
-      'the document (returns section) and on the live buses; the tempo buttons set the delay time to a ' +
-      'note value at the document bpm. ' +
-      'Which returns exist is code-owned (packages/engine/src/mixer/mix.ts).',
+    'The plate and the delay are shared by every part through its strip’s sends. Their settings ' +
+      'and levels are saved with the song, and the tempo buttons set the delay time to a note value ' +
+      'at the song’s tempo.',
   );
   for (const name of RETURN_NAMES) returns.body.appendChild(returnRow(ctx, name));
   return returns.root;

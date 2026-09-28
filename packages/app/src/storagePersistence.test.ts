@@ -1,23 +1,23 @@
 /** The persistence request: once per page, on the first write, a refusal reported and never fatal. */
 import { describe, expect, it } from 'vitest';
 
-import { PERSIST_REFUSED, persistOnce } from './storagePersistence';
+import { persistOnce } from './storagePersistence';
 
 describe('persistOnce', () => {
   it('asks once however many writes follow, and is quiet when granted', async () => {
     let asked = 0;
-    const reports: string[] = [];
+    let refusals = 0;
     const ensure = persistOnce(
       () => {
         asked++;
         return Promise.resolve(true);
       },
-      (m) => reports.push(m),
+      () => refusals++,
     );
     await Promise.all([ensure(), ensure()]);
     await ensure();
     expect(asked).toBe(1);
-    expect(reports).toEqual([]);
+    expect(refusals).toBe(0);
   });
 
   it('reports a refusal, a failure, or a browser without the request, once each', async () => {
@@ -26,11 +26,11 @@ describe('persistOnce', () => {
       () => Promise.reject(new Error('no')),
       null,
     ]) {
-      const reports: string[] = [];
-      const ensure = persistOnce(persist, (m) => reports.push(m));
+      let refusals = 0;
+      const ensure = persistOnce(persist, () => refusals++);
       await ensure();
       await ensure();
-      expect(reports).toEqual([PERSIST_REFUSED]);
+      expect(refusals).toBe(1);
     }
   });
 });
