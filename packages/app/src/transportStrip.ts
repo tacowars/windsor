@@ -102,7 +102,7 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
     pause.setAttribute('aria-pressed', String(pressed.pause));
   };
   play.onclick = (): void => {
-    if (!ctx.transport.play()) ctx.status('enable audio first');
+    if (!ctx.transport.play()) ctx.notify('enable audio first', 'warning');
     sync();
   };
   pause.onclick = (): void => {

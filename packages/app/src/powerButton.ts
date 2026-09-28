@@ -13,9 +13,10 @@ export function wirePowerButton(button: HTMLElement, ctx: AppCtx): void {
       .then(() => {
         button.textContent = 'Audio on';
         button.classList.remove('primary');
-        ctx.status('audio on — press ▶ to play the document');
+        ctx.notify('audio on — press ▶ to play the document');
         ctx.render();
       })
-      .catch((error: unknown) => ctx.status(`audio failed: ${String(error)}`));
+      // The host has already said why, and that the button retries (`EngineHost.enable`).
+      .catch(() => undefined);
   };
 }

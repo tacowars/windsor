@@ -24,6 +24,7 @@ import {
   transferMessage,
 } from './envelopeTransfer';
 import type { PatchEditor } from './partsSession';
+import { notify } from './toast';
 
 export type TransferKind = 'copy' | 'swap';
 
@@ -176,13 +177,6 @@ function paintGhost(state: DragPaint): void {
   if (swapping && state.over) drawSlotInto(ghostTo, state.over);
 }
 
-function showStatus(message: string): void {
-  // The console's one status line. It is absent in a DOM-free test, and a
-  // missing status line must never swallow an edit that already landed.
-  const line = typeof document === 'undefined' ? null : document.getElementById('status');
-  if (line) line.textContent = message;
-}
-
 /**
  * The drop itself: the model's copy or swap, one push into the document and
  * the live part, then the whole patch UI so the target's knobs, loop-mode
@@ -199,7 +193,8 @@ export function applyEnvelopeTransfer(
   if (!changed) return false;
   editor.push();
   editor.refresh();
-  showStatus(transferMessage(kind, from, to));
+  // A no-op in a DOM-free test: a notice never swallows an edit that already landed.
+  notify(transferMessage(kind, from, to));
   return true;
 }
 

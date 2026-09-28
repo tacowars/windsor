@@ -76,9 +76,14 @@ and its extension checklists, so neither states the other's content twice.
   `*.test.ts` as the only ignores). `main.ts` is composition and has no table
   of its own — the number it configures lives in the area's table
   (`hostConstants.ts`'s `HOST_PUMP_INTERVAL_MS`).
-- **One palette, one set of formatters, one DOM builder set**:
+- **One palette, one set of formatters, one DOM builder set, one way to
+  tell the user something**:
   `consoleColors.ts` (pinned to `console.css`'s custom properties by
-  `consoleColors.test.ts`), `consoleFormat.ts`, `dom.ts`. `el(tag, class,
+  `consoleColors.test.ts`), `consoleFormat.ts`, `dom.ts`, and
+  `ctx.notify(message, tone)` — a toast (`toast.ts` over `toastModel.ts`,
+  record `2026-09-28-notices-are-toasts`). Pick the tone: `info`,
+  `success`, `warning`, or `error` for something the user must act on,
+  which stays until dismissed. Nothing writes status text into the header. `el(tag, class,
   text)` sets `textContent`; `html()` is the explicit markup opt-in, and
   anything user-supplied goes through `escapeHtml`.
 - **One step strip and one playhead loop** (`stepStrip.ts`, #619), **one card
@@ -153,7 +158,7 @@ knows the one below it and nothing above.
    `patchMetadata.ts`, `libraryModel.ts`, `ratioSplit.ts`,
    `envelopeTransfer.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
    `loudnessCheck.ts`, `songAutosave.ts`, `songRestore.ts`,
-   `storagePersistence.ts` — take values and return values. **The tests run in
+   `storagePersistence.ts`, `toastModel.ts` — take values and return values. **The tests run in
    Node with no DOM**, so a rule worth testing belongs in a model, a table or
    a write function, not in a click handler (`patchPanels.test.ts` tests
    `writeToggle`, not the button).
@@ -325,7 +330,7 @@ lane and the part lanes
    (`libraryFolder.ts`) is connected, or — in a browser with no IndexedDB —
    a download. Built-ins are read-only: a write over one is refused, and Save
    forks it (`saveForks`). Both stores are a `PatchFolder`, so a test fakes
-   either in memory. In folder mode the status line names the sweep, and
+   either in memory. In folder mode the save's notice names the sweep, and
    `AFTER_WRITE_COMMANDS` (`libraryConstants.ts`) is pinned equal to the
    scripts' copy in `lib/afterWriteCommands.mjs` by its test.
 

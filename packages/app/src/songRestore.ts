@@ -35,7 +35,7 @@ export async function restoreSong(ctx: AppCtx, stored: StoredSong): Promise<void
   await loadBuiltIns();
   ctx.parts.selected = 0;
   ctx.importDoc(JSON.parse(stored.document) as unknown);
-  ctx.status(`restored the song saved ${savedWhen(stored)}`);
+  ctx.notify(`restored the song saved ${savedWhen(stored)}`, 'success');
 }
 
 /** Ask, and restore on yes; a record that fails to open is reported and left in place. */
@@ -49,7 +49,10 @@ export async function offerRestore(
     await restoreSong(ctx, stored);
     return true;
   } catch (error) {
-    ctx.status(`restore failed: ${error instanceof Error ? error.message : String(error)}`);
+    ctx.notify(
+      `restore failed: ${error instanceof Error ? error.message : String(error)}`,
+      'error',
+    );
     return false;
   }
 }

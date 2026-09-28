@@ -199,9 +199,7 @@ export class EngineHost {
     await engine.init(this.urls);
     this.system = new AudioSystem(engine);
     await this.system.init();
-    this.system.initMusic(document, (part, tick) =>
-      this.log(`${part.name} sounded (slot ${part.slot}, tick ${tick})`),
-    );
+    this.system.initMusic(document);
     // The console's knobs retune the voices already ringing (off by default in the engine).
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);

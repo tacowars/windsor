@@ -164,7 +164,7 @@ describe('swapEnvelopes', () => {
 });
 
 describe('transferMessage', () => {
-  it('words the status line as the operation the user just did', () => {
+  it('words the notice as the operation the user just did', () => {
     expect(transferMessage('copy', 'ops.0.env', 'ops.2.env')).toBe("Copied A's envelope to C");
     expect(transferMessage('swap', 'ops.1.env', 'filter.env')).toBe(
       'Swapped B and Filter envelopes',
