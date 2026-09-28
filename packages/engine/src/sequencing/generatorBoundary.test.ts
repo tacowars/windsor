@@ -30,6 +30,9 @@ const PURE_FILES = [
   '../worklet/fm/modeIds.ts',
   '../worklet/fm/waveIds.ts',
   'scheduler.ts',
+  // Swing (windsor#14): the clock's time warp and its table.
+  'swing.ts',
+  'swingTables.ts',
   'euclid.ts',
   'generatorSeed.ts',
   'mulberry32.ts',

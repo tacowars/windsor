@@ -45,6 +45,8 @@ export type {
   PartsPartial,
   SequencerKind,
   SequencerSpec,
+  Swing,
+  SwingGrid,
 } from './song/arrangement';
 export { ArrangementPlayer } from './song/arrangementPlayer';
 export {
@@ -272,6 +274,17 @@ export type {
   TickSource,
   Unsubscribe,
 } from './sequencing/scheduler';
+/**
+ * Song swing (windsor#14): the bounds and grids of `transport.swing`. A live
+ * edit is `ctx.change({ transport: { swing: { amount, grid } } })`, either
+ * field alone allowed.
+ */
+export {
+  STRAIGHT_SWING,
+  SWING_AMOUNT_MAX,
+  SWING_AMOUNT_MIN,
+  SWING_GRIDS,
+} from './sequencing/swingTables';
 export { euclid, patternFromString, patternToString, rotatePattern } from './sequencing/euclid';
 export type { Pattern } from './sequencing/euclid';
 export { GENERATOR_SEED_STRIDE, hashSeed, streamRng } from './sequencing/generatorSeed';

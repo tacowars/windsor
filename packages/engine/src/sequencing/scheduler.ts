@@ -14,6 +14,12 @@
  *   from a frame callback directly: `requestAnimationFrame` jitters with frame
  *   time, and audio timing that jitters with frame rate is audible.
  *
+ * Swing (windsor#14) lives here too, in the one clock, so it reaches every
+ * part: each tick interval lasts `swingSlope` straight ticks (`swing.ts`),
+ * which moves the off-beat of each pair and leaves the pair boundaries on the
+ * grid. Straight, every slope is exactly 1 and the clock is bit for bit the
+ * pre-swing one.
+ *
  * Nothing here imports the audio graph. The clock the `Scheduler` reads is a
  * structural `{ currentTime }`, which an audio context satisfies and a test
  * fakes with a plain object.
@@ -27,6 +33,8 @@ import {
   SECONDS_PER_MINUTE,
   TICK_STAMP_EPSILON,
 } from '../audioConstants';
+import { swingSlope, swingTicks, unswingTicks } from './swing';
+import { STRAIGHT_SWING, SWING_TABLE, type Swing, type SwingTable } from './swingTables';
 
 /** Pulses per quarter note -- the MIDI-clock grid. */
 export const PPQ = 24;
@@ -61,9 +69,9 @@ export interface TickEvent {
   bar: number;
   /** Position inside the bar; 0 is the bar line. */
   tickInBar: number;
-  /** Transport time in seconds since tick 0, accumulated at the running tempo. */
+  /** Transport time in seconds since tick 0, accumulated at the running tempo and swing. */
   seconds: number;
-  /** Seconds per tick at the tempo this tick was issued under. */
+  /** Seconds per straight tick at the tempo this tick was issued under. */
   secondsPerTick: number;
   /** Clock time the tick should sound at (audio-context time under the `Scheduler`). */
   time: number;
@@ -85,16 +93,38 @@ interface Subscriber {
 /** The pure tick counter and fan-out. No clock of its own; `advance` is called per tick. */
 export class TickTransport implements TickSource {
   bpm: number;
+  /** The song's swing (windsor#14): read per tick, so a live edit lands on the next one. */
+  swing: Swing;
   private tick = 0;
   private seconds = 0;
   private subscribers: Subscriber[] = [];
 
-  constructor(bpm = DEFAULT_BPM) {
+  constructor(
+    bpm = DEFAULT_BPM,
+    swing: Swing = STRAIGHT_SWING,
+    private readonly swingTable: SwingTable = SWING_TABLE,
+  ) {
     this.bpm = bpm;
+    this.swing = swing;
   }
 
   get secondsPerTick(): number {
     return SECONDS_PER_MINUTE / this.bpm / PPQ;
+  }
+
+  /** Seconds from `tick` to `tick + 1` at the running tempo and swing. */
+  intervalSeconds(tick: number): number {
+    return this.secondsPerTick * swingSlope(tick, this.swing, this.swingTable);
+  }
+
+  /** Where tick position `tick` sounds, in straight ticks from 0 (`swing.ts`). */
+  swungTicks(tick: number): number {
+    return swingTicks(tick, this.swing, this.swingTable);
+  }
+
+  /** The inverse of `swungTicks`. */
+  unswungTicks(warped: number): number {
+    return unswingTicks(warped, this.swing, this.swingTable);
   }
 
   /** The tick `advance()` will issue next. */
@@ -119,7 +149,7 @@ export class TickTransport implements TickSource {
 
   reset(atTick = 0): void {
     this.tick = atTick;
-    this.seconds = atTick * this.secondsPerTick;
+    this.seconds = this.swungTicks(atTick) * this.secondsPerTick;
   }
 
   /** Issue the current tick to every subscriber it falls on, then move to the next. */
@@ -139,7 +169,7 @@ export class TickTransport implements TickSource {
       if (tick % divisor === 0) handler({ ...base, step: tick / divisor });
     }
     this.tick = tick + 1;
-    this.seconds += secondsPerTick;
+    this.seconds += this.intervalSeconds(tick);
   }
 }
 
@@ -152,6 +182,10 @@ export interface SchedulerOptions {
   /** Seconds of audio to keep queued ahead of now. */
   lookAhead?: number;
   bpm?: number;
+  /** The song's swing (windsor#14); straight when absent. */
+  swing?: Swing;
+  /** The warp's table; the shipped one when absent. */
+  swingTable?: SwingTable;
 }
 
 /** Look-ahead driver for a `TickTransport` against a real clock. */
@@ -166,7 +200,11 @@ export class Scheduler implements TickSource {
   constructor(clock: AudioClock, options: SchedulerOptions = {}) {
     this.clock = clock;
     this.lookAhead = options.lookAhead ?? SCHEDULER_LOOK_AHEAD_SECONDS;
-    this.transport = new TickTransport(options.bpm ?? DEFAULT_BPM);
+    this.transport = new TickTransport(
+      options.bpm ?? DEFAULT_BPM,
+      options.swing ?? STRAIGHT_SWING,
+      options.swingTable ?? SWING_TABLE,
+    );
   }
 
   get bpm(): number {
@@ -175,6 +213,14 @@ export class Scheduler implements TickSource {
 
   set bpm(value: number) {
     this.transport.bpm = value;
+  }
+
+  get swing(): Swing {
+    return this.transport.swing;
+  }
+
+  set swing(value: Swing) {
+    this.transport.swing = value;
   }
 
   get isRunning(): boolean {
@@ -192,12 +238,15 @@ export class Scheduler implements TickSource {
    * stamped `nextTime - (currentTick - k) * secondsPerTick`, and the audible
    * one is the last whose stamp is at or before `now`. 0 until the first tick
    * sounds; the last issued tick once the queue has run ahead and stopped.
+   * Under swing (windsor#14) the stamps are warped, so the count back runs in
+   * swung ticks and is unwarped: the playhead stays on the tick that sounds.
    */
   audibleTick(now: number): number {
     const issued = this.transport.currentTick;
     const ahead = (this.nextTime - now) / this.transport.secondsPerTick;
+    const tick = this.transport.unswungTicks(this.transport.swungTicks(issued) - ahead);
     // Never past the last issued tick: a stopped queue does not keep counting.
-    return Math.max(0, Math.min(issued - 1, Math.floor(issued - ahead + TICK_STAMP_EPSILON)));
+    return Math.max(0, Math.min(issued - 1, Math.floor(tick + TICK_STAMP_EPSILON)));
   }
 
   start(atTick = 0): void {
@@ -231,8 +280,9 @@ export class Scheduler implements TickSource {
     if (!this.running) return;
     const horizon = this.clock.currentTime + this.lookAhead;
     while (this.nextTime < horizon) {
+      const tick = this.transport.currentTick;
       this.transport.advance(this.nextTime);
-      this.nextTime += this.transport.secondsPerTick;
+      this.nextTime += this.transport.intervalSeconds(tick);
     }
   }
 }

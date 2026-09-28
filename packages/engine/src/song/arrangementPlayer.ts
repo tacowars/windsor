@@ -51,6 +51,8 @@ import { clonePatch, makePatch, mergePatch, type PartialPatch } from '../patch/p
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import type { TickSource, Unsubscribe } from '../sequencing/scheduler';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { STRAIGHT_SWING, type Swing } from '../sequencing/swingTables';
+import { playableSwing } from '../sequencing/swing';
 import { RegionGate, type RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
 import { fitTimelines } from './timelineNormalise';
@@ -90,6 +92,8 @@ export interface PartHost {
 /** What the player needs from the transport. `Scheduler` and `TickTransport` both satisfy it. */
 export interface MusicTransport extends TickSource {
   bpm: number;
+  /** The song's swing (windsor#14). Optional: a transport without it plays straight. */
+  swing?: Swing;
 }
 
 /** Fired once per part, on its first note — the "it is audible" console evidence. */
@@ -167,6 +171,16 @@ function stagePatches(
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
+/**
+ * The arrangement with its swing written out (windsor#14): a document may
+ * leave it absent (straight), but the live copy carries it so a partial like
+ * `{ transport: { swing: { amount: 60 } } }` has a field to merge into.
+ */
+const withSwing = (arrangement: Arrangement): Arrangement =>
+  arrangement.transport.swing
+    ? arrangement
+    : { ...arrangement, transport: { ...arrangement.transport, swing: STRAIGHT_SWING } };
+
 /** The song's length in ticks, from its explicit `transport.bars` (decision 5). */
 export const songTicksOf = (arrangement: Arrangement): number =>
   arrangement.transport.bars * TICKS_PER_BAR;
@@ -201,11 +215,12 @@ export class ArrangementPlayer {
     private readonly onEvent?: MusicEventHandler,
   ) {
     this.presets = { ...presets };
-    this.current = structuredClone(arrangement);
+    this.current = withSwing(structuredClone(arrangement));
     validateArrangement(this.current, this.presets);
     this.index();
     this.built = this.buildAll(this.current);
     this.transport.bpm = this.current.transport.bpm;
+    this.transport.swing = playableSwing(this.current.transport.swing);
     this.attach(new Set(this.current.parts.map((part) => part.slot)));
   }
 
@@ -271,6 +286,7 @@ export class ArrangementPlayer {
       return { ok: false, ignored, error: error instanceof Error ? error.message : String(error) };
     }
     this.transport.bpm = merged.transport.bpm;
+    this.transport.swing = playableSwing(merged.transport.swing);
     this.presets = plan.presets;
     for (const [slot, patch] of plan.patchChanges) this.parts.get(slot)?.setPatch(patch);
     for (const slot of plan.removed) this.detach(slot);
