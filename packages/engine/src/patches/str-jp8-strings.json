@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Jupiter-8 Strings",
   "category": "Strings",
   "tags": ["strings", "trance", "edm", "jupiter-8", "ensemble", "bright"],
@@ -20,7 +20,6 @@
       {
         "wave": 1,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -52,7 +51,6 @@
           1, 0.309, 0.206, 0.25, 0, 0.167, 0.088, 0.077, 0.111, 0, 0.091, 0.052, 0.048, 0.071, 0,
           0.062, 0.036, 0.034, 0.053, 0, 0.048, 0.028, 0.027, 0.042
         ],
-        "userKey": "686-pulse-40",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -81,7 +79,6 @@
       {
         "wave": 1,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -110,7 +107,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -186,11 +182,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 6661,
-    "peak": 0.18575884401798248,
-    "seedsSwept": 16384,
-    "contentHash": "14f95fa4"
   }
 }

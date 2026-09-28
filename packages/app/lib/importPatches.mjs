@@ -2,7 +2,7 @@
  * The pure half of `import-patches.mjs` (#563): which downloaded files are
  * patch files, which of them the loader accepts, and the copy into
  * `patches/`. The loader is injected — the CLI bundles the audio package's
- * `loadUnsweptPatchFile` with esbuild, the test imports it straight from the
+ * `loadPatchFile` with esbuild, the test imports it straight from the
  * TypeScript source — so this file needs no bundler of its own.
  */
 import { copyFileSync, readdirSync, readFileSync, statSync } from 'node:fs';

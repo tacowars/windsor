@@ -10,18 +10,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { seedRange, sweepHeadroom } from '../__fixtures__/headroomSweep';
-import { loadProcessor } from '../__fixtures__/workletHarness';
 import { makePatch } from './patch';
 import type { Patch } from './patch';
-import {
-  PATCH_FILE_FORMAT,
-  PATCH_ID_RULE,
-  SWEEP_COMMAND,
-  loadPatchFile,
-  loadPatchLibrary,
-  patchContentHash,
-} from './patchLibrary';
+import { PATCH_FILE_FORMAT, PATCH_ID_RULE, loadPatchFile, loadPatchLibrary } from './patchLibrary';
 import type { PatchFile } from './patchLibrary';
 import { PatchFormatError } from './patchMigrations';
 import { PATCH_FILES } from '../patches/index';
@@ -44,19 +35,15 @@ function without<T extends object>(object: T, key: keyof T): Omit<T, typeof key>
 const fileOf = (id: string): Record<string, unknown> =>
   JSON.parse(readFileSync(join(PATCHES, `${id}.json`), 'utf8')) as Record<string, unknown>;
 
-/** A fresh, valid file for a patch that is not in the library, with a tiny in-test sweep. */
-function freshFile(patch: Patch, seeds = 8): PatchFile {
-  const { worstSeed, peak } = sweepHeadroom(patch, seedRange(seeds), loadProcessor());
-  return {
-    format: PATCH_FILE_FORMAT,
-    name: patch.name,
-    category: 'Pads',
-    tags: ['probe'],
-    description: 'A temporary patch that exists only inside this test.',
-    patch,
-    headroom: { worstSeed, peak, seedsSwept: seeds, contentHash: patchContentHash(patch) },
-  };
-}
+/** A fresh, valid file for a patch that is not in the library. */
+const freshFile = (patch: Patch): PatchFile => ({
+  format: PATCH_FILE_FORMAT,
+  name: patch.name,
+  category: 'Pads',
+  tags: ['probe'],
+  description: 'A temporary patch that exists only inside this test.',
+  patch,
+});
 
 describe('the real library files', () => {
   it('are every file on disk, and the generated index names each one', () => {
@@ -74,6 +61,23 @@ describe('the real library files', () => {
     expect(PRESETS[id]).toBe(PATCH_LIBRARY[id]?.patch);
   });
 
+  it.each(onDisk)('%s is format 2, complete, with no retired key', (id) => {
+    const raw = fileOf(id);
+    expect(raw['format']).toBe(2);
+    expect(Object.keys(raw)).toEqual([
+      'format',
+      'name',
+      'category',
+      'tags',
+      'description',
+      'patch',
+    ]);
+    const patch = raw['patch'] as Patch;
+    for (const op of patch.ops) expect(Object.keys(op)).not.toContain('userKey');
+    // Written complete, so the file on disk is the patch it plays.
+    expect(patch).toEqual(makePatch(patch));
+  });
+
   it('carries the id rule the index generator applies', () => {
     // One definition: scripts/lib/patchLibraryIndex.mjs holds the same regex.
     expect(PATCH_ID_RULE.test('score-drowned-cellos')).toBe(true);
@@ -84,11 +88,46 @@ describe('the real library files', () => {
   });
 });
 
+describe('the loader fills', () => {
+  const real = fileOf('lead-bell');
+  const patch = real['patch'] as Patch;
+  const expected = loadPatchFile('lead-bell', real);
+
+  it('a missing patch section with its defaults, returning the completed patch', () => {
+    const entry = loadPatchFile('lead-bell', { ...real, patch: without(patch, 'lfo') });
+    expect(entry.patch.lfo).toEqual(makePatch().lfo);
+    expect(entry.patch).toEqual(makePatch(without(patch, 'lfo')));
+    expect(entry.patch.ops).toEqual(expected.patch.ops);
+  });
+
+  it("one operator's missing field, and nothing else", () => {
+    const ops = patch.ops.map((op, i) => (i === 2 ? without(op, 'velSens') : op));
+    const entry = loadPatchFile('lead-bell', { ...real, patch: { ...patch, ops } });
+    const filled = structuredClone(expected);
+    filled.patch.ops[2]!.velSens = makePatch().ops[2]!.velSens;
+    expect(entry).toEqual(filled);
+  });
+
+  it('a missing envelope field, and a missing envelope', () => {
+    const filter = { ...patch.filter, env: without(patch.filter.env, 'keyScale') };
+    const entry = loadPatchFile('lead-bell', {
+      ...real,
+      patch: { ...without(patch, 'pitchEnv'), filter },
+    });
+    expect(entry.patch.filter.env.keyScale).toBe(makePatch().filter.env.keyScale);
+    expect(entry.patch.pitchEnv).toEqual(makePatch().pitchEnv);
+  });
+
+  it('nothing for a missing format: the file is format 1 and upgrades', () => {
+    expect(loadPatchFile('lead-bell', without(real, 'format'))).toEqual(expected);
+  });
+});
+
 describe('the loader rejects', () => {
   const real = fileOf('lead-bell');
   const patch = real['patch'] as Patch;
 
-  it('an unknown field at the top level, in the patch and in the headroom record', () => {
+  it('an unknown field at the top level, in the patch and in an operator', () => {
     expect(() => loadPatchFile('lead-bell', { ...real, author: 'Pat' })).toThrow(
       /unknown field author/,
     );
@@ -104,21 +143,41 @@ describe('the loader rejects', () => {
     expect(() =>
       loadPatchFile('lead-bell', {
         ...real,
-        headroom: { ...(real['headroom'] as object), note: 60 },
+        patch: { ...patch, filter: { ...patch.filter, env: { ...patch.filter.env, hold: 1 } } },
       }),
-    ).toThrow(/headroom: unknown field note/);
+    ).toThrow(/patch\.filter\.env: unknown field hold/);
   });
 
-  it('a missing patch field and a leaf of the wrong type', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, patch: without(patch, 'lfo') })).toThrow(
-      /patch: missing field lfo/,
+  it('a key format 2 retired, when the file says it is format 2', () => {
+    expect(() =>
+      loadPatchFile('lead-bell', { ...real, headroom: { worstSeed: 0, peak: 0.5 } }),
+    ).toThrow(/unknown field headroom/);
+    const ops = patch.ops.map((op) => ({ ...op, userKey: '' }));
+    expect(() => loadPatchFile('lead-bell', { ...real, patch: { ...patch, ops } })).toThrow(
+      /patch\.ops\[0\]: unknown field userKey/,
     );
+  });
+
+  it('a leaf of the wrong type, and an array of the wrong length', () => {
     expect(() =>
       loadPatchFile('lead-bell', { ...real, patch: { ...patch, volume: '0.5' } }),
     ).toThrow(/patch\.volume: expected a number/);
     expect(() =>
       loadPatchFile('lead-bell', { ...real, patch: { ...patch, volume: Infinity } }),
     ).toThrow(/patch\.volume: expected a finite number/);
+    expect(() => loadPatchFile('lead-bell', { ...real, patch: { ...patch, lfo: 'slow' } })).toThrow(
+      /patch\.lfo: expected an object/,
+    );
+    expect(() =>
+      loadPatchFile('lead-bell', { ...real, patch: { ...patch, ops: patch.ops.slice(0, 3) } }),
+    ).toThrow(/patch\.ops: length 3, expected 4/);
+  });
+
+  it('a missing file field: only the patch is filled', () => {
+    expect(() => loadPatchFile('lead-bell', without(real, 'category'))).toThrow(
+      /missing field category/,
+    );
+    expect(() => loadPatchFile('lead-bell', without(real, 'patch'))).toThrow(/missing field patch/);
   });
 
   it('a name that is not the patch name, and an empty one', () => {
@@ -137,71 +196,20 @@ describe('the loader rejects', () => {
   });
 
   it('a format it does not know, as a PatchFormatError naming both formats', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 2 })).toThrow(PatchFormatError);
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 2 })).toThrow(
-      'patches/lead-bell.json: saved with patch format 2, this build reads 1',
+    expect(() => loadPatchFile('lead-bell', { ...real, format: 3 })).toThrow(PatchFormatError);
+    expect(() => loadPatchFile('lead-bell', { ...real, format: 3 })).toThrow(
+      'patches/lead-bell.json: saved with patch format 3, this build reads 2',
     );
-    expect(() => loadPatchFile('lead-bell', { ...real, format: '1' })).toThrow(
-      /format: expected 1, got 1/,
+    expect(() => loadPatchFile('lead-bell', { ...real, format: '2' })).toThrow(
+      /format: expected 2, got 2/,
     );
-  });
-
-  it('nothing for a missing format: the file is format 1', () => {
-    expect(loadPatchFile('lead-bell', without(real, 'format'))).toEqual(
-      loadPatchFile('lead-bell', real),
-    );
-  });
-
-  it('a missing headroom record, naming the sweep command', () => {
-    expect(() => loadPatchFile('lead-bell', without(real, 'headroom'))).toThrow(
-      `missing headroom record — run \`${SWEEP_COMMAND} lead-bell\``,
-    );
-  });
-
-  it('a stale headroom hash after an edit, naming the sweep command', () => {
-    const edited = structuredClone(patch);
-    edited.ops[1]!.level += Number.EPSILON;
-    expect(() => loadPatchFile('lead-bell', { ...real, patch: edited })).toThrow(
-      `stale headroom record: the patch changed since its sweep — run \`${SWEEP_COMMAND} lead-bell\``,
-    );
-    expect(() =>
-      loadPatchFile('lead-bell', {
-        ...real,
-        headroom: { ...(real['headroom'] as object), contentHash: 'deadbeef' },
-      }),
-    ).toThrow(/stale headroom record/);
-  });
-
-  it('a malformed headroom record', () => {
-    const headroom = real['headroom'] as Record<string, unknown>;
-    expect(() =>
-      loadPatchFile('lead-bell', { ...real, headroom: { ...headroom, peak: '0.7' } }),
-    ).toThrow(/headroom\.peak: expected a finite number/);
-    expect(() =>
-      loadPatchFile('lead-bell', { ...real, headroom: without(headroom, 'seedsSwept') }),
-    ).toThrow(/headroom: missing field seedsSwept/);
-  });
-});
-
-describe('the content hash', () => {
-  it('is the same for the same patch in any key order, and differs for one ulp', () => {
-    const patch = PRESETS['lead-bell']!;
-    const reordered = JSON.parse(
-      JSON.stringify(Object.fromEntries(Object.entries(patch).reverse())),
-    ) as Patch;
-    expect(patchContentHash(reordered)).toBe(patchContentHash(patch));
-    expect(patchContentHash(reordered)).toBe(PATCH_LIBRARY['lead-bell']?.headroom.contentHash);
-    const drifted = structuredClone(patch);
-    drifted.ops[1]!.level += Number.EPSILON;
-    expect(patchContentHash(drifted)).not.toBe(patchContentHash(patch));
-    expect(patchContentHash(patch)).toMatch(/^[0-9a-f]{8}$/);
   });
 });
 
 describe('a new patch file', () => {
   it('joins the library, its catalogue and its checks without touching any old test', () => {
     // Written to disk and read back so the temporary file takes the same
-    // path a committed one does: JSON on disk, parsed, validated by id.
+    // path a committed one does: JSON on disk, parsed, loaded by id.
     const dir = mkdtempSync(join(tmpdir(), '561-patch-'));
     try {
       const fresh = freshFile(makePatch({ name: 'Probe 561', ops: [{ level: 0.5 }] }));
@@ -210,7 +218,6 @@ describe('a new patch file', () => {
       const library = loadPatchLibrary({ ...PATCH_FILES, 'probe-561': raw });
       expect(Object.keys(library)).toHaveLength(Object.keys(PATCH_FILES).length + 1);
       expect(library['probe-561']?.patch).toEqual(fresh.patch);
-      expect(library['probe-561']?.headroom.seedsSwept).toBe(8);
       // Every committed entry is untouched by the newcomer.
       for (const id of onDisk) expect(library[id]).toEqual(PATCH_LIBRARY[id]);
       // The catalogue derives from the entries, so the newcomer lists like any other.

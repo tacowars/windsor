@@ -107,7 +107,7 @@ describe("a song's patch snapshot", () => {
   });
 
   it('takes an embedded patch that declares the current format, dropping the key', () => {
-    const result = makeArrangement(withPatch({ format: 1, volume: 0.5 }));
+    const result = makeArrangement(withPatch({ format: 2, volume: 0.5 }));
     expect(result.corrections).toEqual([]);
     expect(result.document.patches?.['kick']).not.toHaveProperty('format');
   });
@@ -119,9 +119,9 @@ describe("a song's patch snapshot", () => {
     expect(refused).toEqual({
       format: 'patch',
       found: 99,
-      reads: 1,
+      reads: 2,
       patch: 'kick',
-      message: 'saved with patch format 99 in patch "kick", this build reads 1',
+      message: 'saved with patch format 99 in patch "kick", this build reads 2',
     });
     const result = makeArrangement(raw);
     expect(result.usable).toBe(false);
@@ -132,9 +132,9 @@ describe("a song's patch snapshot", () => {
 
   it('upgrades an embedded patch through the patch table', () => {
     const upgrade = (patch: Doc): Doc => ({ ...patch, volume: 0.25 });
-    const { document } = upgradeSong(withPatch({ format: 0, volume: 0.5 }), {
+    const { document } = upgradeSong(withPatch({ format: 1, volume: 0.5 }), {
       songs: {},
-      patches: { 0: upgrade },
+      patches: { 1: upgrade },
     });
     expect((document as { patches: Record<string, Doc> }).patches['kick']).toEqual({
       volume: 0.25,

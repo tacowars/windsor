@@ -330,9 +330,8 @@ lane and the part lanes
    (`libraryFolder.ts`) is connected, or — in a browser with no IndexedDB —
    a download. Built-ins are read-only: a write over one is refused, and Save
    forks it (`saveForks`). Both stores are a `PatchFolder`, so a test fakes
-   either in memory. In folder mode the save's notice names the sweep, and
-   `AFTER_WRITE_COMMANDS` (`libraryConstants.ts`) is pinned equal to the
-   scripts' copy in `lib/afterWriteCommands.mjs` by its test.
+   either in memory, and both read through the engine's one `loadPatchFile`,
+   which upgrades an old format and fills a missing field.
 
 ## The build
 
@@ -369,9 +368,9 @@ npx vitest run packages/app                    # the console's tests (Node, no D
 npm run typecheck                              # includes packages/app/tsconfig.json, the type gate
                                                # (Vite strips types without checking them)
 npx eslint packages/app                        # no-magic-numbers and the import fence over src/
-node packages/app/sweep-headroom.mjs --stale   # after a patch file is written
-node scripts/patch-library-index.mjs --write   # regenerate patches/index.ts
+node scripts/patch-library-index.mjs --write   # after a patch file is written: regenerate patches/index.ts
 node packages/app/import-patches.mjs           # move downloaded <id>.json into patches/
+node packages/app/rewrite-patches.mjs          # after a patch format bump: rewrite the bank at the new format
 npm run verify                                 # the gate
 ```
 

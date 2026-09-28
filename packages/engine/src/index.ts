@@ -253,21 +253,12 @@ export type { BuiltInLibrary } from './patch/builtInLibrary';
 export {
   PATCH_FILE_FORMAT,
   PATCH_ID_RULE,
-  SWEEP_COMMAND,
   loadPatchFile,
   loadPatchLibrary,
-  loadUnsweptPatchFile,
-  patchContentHash,
   patchLeafDifferences,
 } from './patch/patchLibrary';
-export type {
-  HeadroomRecord,
-  LibraryEntry,
-  PatchFile,
-  UnsweptLibraryEntry,
-} from './patch/patchLibrary';
+export type { LibraryEntry, PatchFile } from './patch/patchLibrary';
 export { serialisePatchFile } from './patch/patchFileSerialise';
-export type { UnsweptPatchFile } from './patch/patchFileSerialise';
 export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
 export {
@@ -417,6 +408,7 @@ export * from './inserts/advancedDrivePresets';
 export { SONG_MIGRATIONS, upgradeSong } from './song/songMigrations';
 export type { FormatMigrations, SongUpgrade } from './song/songMigrations';
 export {
+  PATCH_FILE_MIGRATIONS,
   PATCH_FORMAT_ABSENT,
   PATCH_MIGRATIONS,
   PatchFormatError,

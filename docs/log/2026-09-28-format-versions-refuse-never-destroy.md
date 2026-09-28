@@ -24,6 +24,8 @@ was, and nothing offered the saved text back.
    files load wrong or fail: a rename, a re-scale, a removed field or a
    changed meaning. An additive field whose default reproduces the old
    behaviour bumps nothing, because the tolerant normalisers already handle it.
+   The library loader fills an additive field's default too
+   (`2026-09-28-retire-the-headroom-record`).
 2. **Upgrades run first, and are never required.** `SONG_MIGRATIONS[n]`
    (`song/songMigrations.ts`) and `PATCH_MIGRATIONS[n]`
    (`patch/patchMigrations.ts`) upgrade version `n` to `n + 1`. They run

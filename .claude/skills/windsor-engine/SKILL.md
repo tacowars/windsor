@@ -120,9 +120,9 @@ stated there once. The table below is the file map — what owns what, today; pa
 | The Song view (#709, epic #703 decision 1): the bar ruler, the harmony lane, one lane of regions per part, one playhead line, the detail pane hosting the selected part's card or the harmony card | `src/songTab.ts` (composition and the selection; every edit one `ctx.change` live partial, then a repaint of the lanes), `src/songRuler.ts` (the ruler and the view's one `watchPlayhead` over `ctx.transport.position()`: the line, the lit chord block, the lanes' repaint check), `src/songHarmonyLane.ts` (chord blocks from the engine's `eventBounds`, the right-edge resize, the `+` tile), `src/songLanes.ts` (region blocks — tone, summary, cycle ticks, ⟲ / ∞ — and the gestures: click a gap to add, drag an edge or the body, alt-click to split, Shift for the step snap; `pointerDrag` is the shared press-or-drag helper), `src/songDetailPane.ts` (header, close, Split / Delete for the selected region, the Octave knob for `PANE_OCTAVE_KINDS`, then the card as is), `src/harmonyCard.ts` (seven degree chips, Triad / Seventh, the Duration dial, Delete); pure: `src/regionModel.ts` (add / resize / move / split / delete / `regionMark` / `snapGrain`, and `followSongLength`, which `AppContext.change` applies so a Bars edit carries every whole-song region and the timeline's tail), `src/harmonyLaneModel.ts` (resize shifts the rest and the last absorbs, delete merges into the previous, append takes a bar of the last degree, `eventLabel` / `degreeChips` over the engine's chord names), `src/songViewTables.ts` (px per bar, the name column, `tickToPx`, `LANE_TONE`, `REGION_SUMMARY`, `CYCLE_TICKS`, `PANE_OCTAVE_KINDS`) |
 | The arp card: style, Rate, Gate, Octaves, Voicing, Retrigger, Reg, Vel, Seed + Reseed; no strip, no playhead (#706) | `src/arpCard.ts`, `src/arpModel.ts` (pure: the style and voicing options from the engine's enums, the seed field and Reseed) |
 | The bass card: pitch mode, Root bias / Fixed degree enabled per mode, Rate, Gate, Density, Reg, Vel, Seed + Reseed; no strip, no playhead (#707) | `src/bassCard.ts`, `src/bassModel.ts` (pure: the mode's live controls, the degree names from the key, the seed field and Reseed), `src/bassConstants.ts` |
-| The patch library: browsing, selection, writes (#563) | `src/patchLibrary.ts` (which patch the selected part plays, and the fork-on-edit rule), `src/presetBrowser.ts` (exported as `presetPicker` by `patchLibrary.ts`), `src/libraryActions.ts` (the row: Init, Save, Copy to new, Delete, the folder grant, the unsaved marker) over `src/patchActions.ts` (pure), `src/libraryModel.ts` (the built-ins plus the user's library, or the folder while connected — the listing `patch/presetCatalog.ts` no longer duplicates; `isWritable`: built-ins never are), `src/libraryFolder.ts` (the developer's File System Access grant, its remembered handle, `PatchFolder` fake-able), `src/userLibraryStore.ts` (the `windsor` IndexedDB database: the user's patches as a `PatchFolder`, the autosaved song as a `SongStore`), `src/userSession.ts` (boot: the user library, the restore question, the autosave), `src/songAutosave.ts` + `src/songAutosaveConstants.ts` (debounced write of the open song to `songs/current`), `src/songRestore.ts` (ask, then open the record like Import), `src/storagePersistence.ts` (`navigator.storage.persist()` once, on the first write), `src/libraryConstants.ts` (including `AFTER_WRITE_COMMANDS`), `src/patchFileWriter.ts` (the bytes via `patch/patchFileSerialise.ts`), `src/patchMetadata.ts` (ids, names, tags; pure), `src/metadataModal.ts` (`index.html`'s `<dialog>`s, never `window.confirm`), `src/loudnessCheck.ts` (the browser-side clip check through `render/offlineRender.ts` at the engine's default worklet URL) |
+| The patch library: browsing, selection, writes (#563) | `src/patchLibrary.ts` (which patch the selected part plays, and the fork-on-edit rule), `src/presetBrowser.ts` (exported as `presetPicker` by `patchLibrary.ts`), `src/libraryActions.ts` (the row: Init, Save, Copy to new, Delete, the folder grant, the unsaved marker) over `src/patchActions.ts` (pure), `src/libraryModel.ts` (the built-ins plus the user's library, or the folder while connected — the listing `patch/presetCatalog.ts` no longer duplicates; `isWritable`: built-ins never are), `src/libraryFolder.ts` (the developer's File System Access grant, its remembered handle, `PatchFolder` fake-able), `src/userLibraryStore.ts` (the `windsor` IndexedDB database: the user's patches as a `PatchFolder`, the autosaved song as a `SongStore`), `src/userSession.ts` (boot: the user library, the restore question, the autosave), `src/songAutosave.ts` + `src/songAutosaveConstants.ts` (debounced write of the open song to `songs/current`), `src/songRestore.ts` (ask, then open the record like Import), `src/storagePersistence.ts` (`navigator.storage.persist()` once, on the first write), `src/libraryConstants.ts`, `src/patchFileWriter.ts` (the bytes via `patch/patchFileSerialise.ts`), `src/patchMetadata.ts` (ids, names, tags; pure), `src/metadataModal.ts` (`index.html`'s `<dialog>`s, never `window.confirm`), `src/loudnessCheck.ts` (the browser-side clip check through `render/offlineRender.ts` at the engine's default worklet URL) |
 | Audition input: QWERTY, on-screen keys, MIDI | `src/keyboard.ts` + `src/keyboardConstants.ts` (the one note path, Hold, Panic, bend/wheel; held keys are filed under `e.code` and Panic reaches every part this keyboard has sounded — #617); MIDI in `src/midiMessage.ts`, `src/midiPerformer.ts`, `src/midiInputs.ts` (pure), `src/midiConstants.ts`, and `src/midiAccess.ts`, `src/midiPanel.ts` (Web MIDI, device selector) |
-| The page itself and the scripts around it | `index.html` (markup only), `src/console.css` (the whole stylesheet, imported by `src/main.ts`), `vite.config.ts` (relative `base`, worklets never inlined), `src/consoleBoundary.test.ts` (no local audio nodes; the stylesheet's braces balance — #610), `lib/audioBundle.mjs` (the esbuild call the Node-side scripts load engine exports through), `lib/afterWriteCommands.mjs` (the scripts' copy of the console's list, pinned equal by its test), `import-patches.mjs` + `lib/importPatches.mjs`, `sweep-headroom.mjs`, `migrate-patches-586.mjs` (a kept schema migration) |
+| The page itself and the scripts around it | `index.html` (markup only), `src/console.css` (the whole stylesheet, imported by `src/main.ts`), `vite.config.ts` (relative `base`, worklets never inlined), `src/consoleBoundary.test.ts` (no local audio nodes; the stylesheet's braces balance — #610), `lib/audioBundle.mjs` (the esbuild call the Node-side scripts load engine exports through), `import-patches.mjs` + `lib/importPatches.mjs`, `rewrite-patches.mjs` (the bank rewritten at a new patch format through the loader and the serialiser) |
 
 ## Design a sound or composition
 
@@ -152,14 +152,17 @@ mechanisms, their sources and the engine tricks the `tr808-*`, `tr909-*` and
 `efm-*` patches use (trigger envelopes, the LFO burst gate, negative-feedback
 diode rounding). Since
 #561 every patch, scoring or original, is one `engine/patches/<id>.json`
-carrying its own category, tags, description and headroom record (decision
+carrying its own category, tags and description (decision
 record `2026-09-15-561-patch-library-file-shape`); the recipe tables are
 gone. `patch/presetCatalog.ts` carries the browser metadata and its filter; the
 listing itself is the console's `libraryModel.listLibrary` over whichever library
 it has open, browsed in `app/src/presetBrowser.ts`. Reuse tags, retain IDs and keep
 document overrides visible when extending the browser. A new or edited file
-needs `node packages/app/sweep-headroom.mjs <id>` (or `--stale`) and
-`node scripts/patch-library-index.mjs --write`; `npm run verify` checks both.
+needs `node scripts/patch-library-index.mjs --write`, which `npm run verify`
+checks. The loader (`loadPatchFile`) upgrades an old `format` through
+`patch/patchMigrations.ts` and fills a missing field from `makePatch`, but
+refuses an unknown key or a wrong type; a format bump rewrites the bank with
+`node packages/app/rewrite-patches.mjs`.
 The console writes files itself (#563): a Chrome folder grant on `patches/`
 (the developer mode) makes Save and Copy to new write there. Without it they
 write to the user's library in the browser's IndexedDB, where a built-in is
@@ -203,12 +206,11 @@ through Import. Test documents are fixtures under
   samples, audibility, peaks and release completion. Cover intended registers,
   velocities, gates and chords; include retrigger/steal behavior if changed.
   A short seed sweep cannot establish slow-envelope audibility or a universal
-  clipping bound. Each patch file's `headroom` record is the retained worst
-  seed, peak and seed count, written only by `packages/app/sweep-headroom.mjs`;
-  the record's `contentHash` covers the patch, so an edited file fails
-  `fmProcessorHeadroom.test.ts` until it is re-swept, and a schema change that
-  adds a defaulted field refreshes every file's hash without a re-sweep through
-  a kept migration script (#586's record). For a bit-identity comparison the
+  clipping bound. A patch file carries no level record: a hot patch shows on
+  the strip and master meters, and the editor's loudness check warns before a
+  save (record `2026-09-28-retire-the-headroom-record`). A schema field added
+  with a default needs no rewrite of the bank, since the loader fills it. For
+  a bit-identity comparison the
   harness can render with `specialise: false` (the generic voice loop, #548) or
   `dormancy: false` (#547); both must agree with the default path sample for
   sample. A migration proof against a captured fixture is a one-time test:

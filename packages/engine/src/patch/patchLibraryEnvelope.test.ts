@@ -1,6 +1,5 @@
 /**
- * Long-note checks complement the short seeded headroom sweep: every library
- * patch in a sustained category is finite and audible through its whole
+ * Long-note checks: every library patch in a sustained category is finite and audible through its whole
  * envelope and releases; the chord families keep headroom for four notes.
  * Driven by the files' own categories, so a patch saved from the editor is
  * held to the same bar as the bank it joins. Real worklet, dry output.

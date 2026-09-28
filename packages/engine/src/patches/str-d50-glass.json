@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "D-50 Glass Strings",
   "category": "Strings",
   "tags": ["strings", "ambient", "trance", "d50", "la-synthesis", "glass"],
@@ -23,7 +23,6 @@
           1, 0.435, 0.268, 0.189, 0.145, 0.116, 0.097, 0.082, 0.072, 0.063, 0.056, 0.051, 0.046,
           0.042, 0.039, 0.036, 0.033, 0.031, 0.029, 0.027, 0.026, 0.024, 0.023, 0.022
         ],
-        "userKey": "686-tilt-saw-12",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -52,7 +51,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2,
         "fixed": false,
         "fixedHz": 100,
@@ -81,7 +79,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3,
         "fixed": false,
         "fixedHz": 100,
@@ -110,7 +107,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3.5,
         "fixed": false,
         "fixedHz": 100,
@@ -186,11 +182,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 15038,
-    "peak": 0.21413832902908325,
-    "seedsSwept": 16384,
-    "contentHash": "bd05c278"
   }
 }

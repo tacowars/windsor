@@ -45,7 +45,6 @@ const env = (over: Partial<Envelope> = {}): Envelope => ({
 const op = (level: number, feedback: number, attackTime: number): Patch['ops'][number] => ({
   wave: 0,
   userPartials: null,
-  userKey: '',
   ratio: 1,
   fixed: false,
   fixedHz: 100,

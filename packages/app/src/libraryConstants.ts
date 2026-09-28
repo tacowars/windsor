@@ -5,10 +5,9 @@
  */
 
 /**
- * The browser-side clip check's render — `fmProcessorHeadroom.test.ts`'s
- * render, with fewer seeds. `loudnessCheck.test.ts` pins it to the fixture's
- * `HEADROOM_RENDER`, which the browser bundle cannot import (it reads the
- * worklet from disk).
+ * The browser-side clip check's render: note 60 held a quarter second at
+ * velocity 0.9, 400 blocks of 128 frames, sixteen voices, 48 kHz.
+ * `lib/loudnessRender.test.mjs` renders it through the real worklet in Node.
  */
 export const LOUDNESS_RENDER = {
   voices: 16,
@@ -20,7 +19,7 @@ export const LOUDNESS_RENDER = {
   sampleRate: 48000,
 } as const;
 
-/** Seeds the quick check renders; the offline sweep's 16,384 is the real reading. */
+/** Seeds the quick check renders: a warning, not a proof over every seed. */
 export const LOUDNESS_SEEDS = 16;
 
 /** The suggested volume aims this far under the clip line: `volume × 0.98 / peak`. */
@@ -61,16 +60,6 @@ export const EVICTABLE_WARNING =
 
 /** IndexedDB home of the remembered directory handle (the developer's folder grant). */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;
-
-/**
- * What to run after a write before `npm run verify` passes. The Node scripts
- * print the same list from `lib/afterWriteCommands.mjs`; its test pins the two.
- */
-export const AFTER_WRITE_COMMANDS = [
-  'node packages/app/sweep-headroom.mjs --stale',
-  'node scripts/patch-library-index.mjs --write',
-  'npx prettier --write packages/engine/src/patches',
-] as const;
 
 /** The metadata modal (#563, #620 decision 7): its category sentinel, focus-trap query and readout precision. */
 export const NEW_CATEGORY = '__new__';

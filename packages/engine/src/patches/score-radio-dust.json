@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Radio Dust",
   "category": "Soundtrack FX",
   "tags": ["noise", "static", "thin"],
@@ -34,7 +34,6 @@
       {
         "wave": 4,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -63,7 +62,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3,
         "fixed": false,
         "fixedHz": 100,
@@ -92,7 +90,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 4.251,
         "fixed": false,
         "fixedHz": 100,
@@ -121,7 +118,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.5,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
         "keyScale": 0
       }
     }
-  },
-  "headroom": {
-    "worstSeed": 226,
-    "peak": 0.18280187249183655,
-    "seedsSwept": 256,
-    "contentHash": "9b21459c"
   }
 }

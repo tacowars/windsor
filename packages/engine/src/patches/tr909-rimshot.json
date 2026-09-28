@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "909 Rimshot",
   "category": "Drums",
   "tags": ["909", "perc", "analog", "short", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 3,
         "userPartials": null,
-        "userKey": "",
         "ratio": 5.7333838890383815,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 3,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.7582377259717703,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 4,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 6856,
-    "peak": 0.41494953632354736,
-    "seedsSwept": 16384,
-    "contentHash": "78cc4209"
   }
 }

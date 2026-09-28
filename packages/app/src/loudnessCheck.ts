@@ -1,10 +1,11 @@
 /**
  * The quick clip check Save and Copy to new run in the browser (#563, epic
- * #564 decision 11): the headroom test's render — note 60 held a quarter
- * second at velocity 0.9, 400 blocks, sixteen voices — over a handful of
- * seeds, through the audio package's own offline render. It warns with the
- * peak and a suggested volume; it never blocks the write, because
- * `npm run verify` and the 16,384-seed sweep are the hard gate.
+ * #564 decision 11): note 60 held a quarter second at velocity 0.9, 400
+ * blocks, sixteen voices (`LOUDNESS_RENDER`), over a handful of seeds,
+ * through the audio package's own offline render. It warns with the peak and
+ * a suggested volume; it never blocks the write, because a hot patch is the
+ * user's to fix and the strip and master meters show it (record
+ * `2026-09-28-retire-the-headroom-record`).
  */
 import type { Patch } from '@windsor/engine';
 import { renderPatchToBuffer } from '@windsor/engine';

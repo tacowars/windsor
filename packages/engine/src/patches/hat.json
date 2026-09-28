@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "FM Hat",
   "category": "Drums",
   "tags": ["hat", "noise", "original"],
@@ -20,7 +20,6 @@
       {
         "wave": 4,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 6,
         "userPartials": null,
-        "userKey": "",
         "ratio": 11.3,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 6,
         "userPartials": null,
-        "userKey": "",
         "ratio": 17.1,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 6945,
-    "peak": 0.4534999430179596,
-    "seedsSwept": 16384,
-    "contentHash": "497756c0"
   }
 }

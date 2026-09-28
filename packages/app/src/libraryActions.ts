@@ -139,7 +139,7 @@ const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> => checkLoudness(ctx.
 
 /** The save toast, naming where the write went. */
 function writtenText(model: LibraryModel, id: string): string {
-  if (model.folder) return `wrote ${id}.json to the folder — run the sweep before committing`;
+  if (model.folder) return `wrote ${id}.json to the folder`;
   if (model.user) return `saved ${id} to your library`;
   return `downloaded ${id}.json`;
 }
@@ -180,7 +180,6 @@ async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
       id: origin.id,
       ownId: origin.id,
       loudness: loudnessFor(ctx),
-      repoWrite: library.folder !== null,
       opener,
     },
     ctx.parts.patch.volume,
@@ -206,7 +205,6 @@ async function runCopy(
       entries: library.entries,
       id: (name) => uniqueId(slugify(name), taken),
       loudness: loudnessFor(ctx),
-      repoWrite: library.folder !== null,
       opener,
     },
     ctx.parts.patch.volume,

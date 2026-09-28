@@ -2,16 +2,16 @@
  * The library folder (#563, epic #564 decision 5): a File System Access grant
  * on `packages/engine/src/patches/`, remembered in IndexedDB and
  * re-requested when the browser has dropped it. The folder is read through
- * the unswept loader — a file the editor just wrote has a stale or missing
- * record by construction — so the preset browser reflects a save without a
+ * the library's one loader, the same the built-ins and the user's IndexedDB
+ * library load through, so the preset browser reflects a save without a
  * rebuild.
  *
  * `PatchFolder` is the whole of what the workflow needs from the handle; the
  * tests drive it with an in-memory fake and only `wrapDirectoryHandle` touches
  * the Chrome API.
  */
-import type { FormatRefusal, UnsweptLibraryEntry } from '@windsor/engine';
-import { PatchFormatError, loadUnsweptPatchFile } from '@windsor/engine';
+import type { FormatRefusal, LibraryEntry } from '@windsor/engine';
+import { PatchFormatError, loadPatchFile } from '@windsor/engine';
 import { HANDLE_DB } from './libraryConstants';
 import type { LibraryEntries } from './patchMetadata';
 
@@ -53,9 +53,9 @@ function oldName(raw: unknown, id: string): string {
 
 const JSON_SUFFIX = '.json';
 
-/** Every `<id>.json` in the folder through the unswept loader; a bad file is reported, an old one kept, neither fatal. */
+/** Every `<id>.json` in the folder through the library loader; a bad file is reported, an old one kept, neither fatal. */
 export async function readFolderLibrary(folder: PatchFolder): Promise<FolderLibrary> {
-  const entries: Record<string, UnsweptLibraryEntry> = {};
+  const entries: Record<string, LibraryEntry> = {};
   const problems: string[] = [];
   const oldFormat: OldFormatPatch[] = [];
   const names = (await folder.list()).filter((name) => name.endsWith(JSON_SUFFIX)).sort();
@@ -66,7 +66,7 @@ export async function readFolderLibrary(folder: PatchFolder): Promise<FolderLibr
     try {
       text = await folder.read(name);
       raw = JSON.parse(text);
-      entries[id] = loadUnsweptPatchFile(id, raw);
+      entries[id] = loadPatchFile(id, raw);
     } catch (error) {
       if (error instanceof PatchFormatError) {
         oldFormat.push({ id, name: oldName(raw, id), text, refusal: error.refusal });

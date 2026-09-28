@@ -144,7 +144,6 @@ var FILTER_ENV_DEFAULTS = { ...ENVELOPE_DEFAULTS, sustainLevel: 0 };
 var OPERATOR_DEFAULTS = {
   wave: WAVE.SINE,
   userPartials: null,
-  userKey: "",
   ratio: 1,
   fixed: false,
   fixedHz: 100,
@@ -224,7 +223,6 @@ function opDefaults(o, index) {
   return {
     wave: num(o.wave, d.wave) | 0,
     userPartials: o.userPartials || d.userPartials,
-    userKey: o.userKey || d.userKey,
     ratio: num(o.ratio, d.ratio),
     fixed: !!o.fixed,
     fixedHz: num(o.fixedHz, d.fixedHz),

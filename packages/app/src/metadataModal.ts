@@ -8,7 +8,7 @@
  */
 import { $, el } from './dom';
 import { FocusReturn, tabWrapTarget } from './focusTrap';
-import { AFTER_WRITE_COMMANDS, FOCUSABLE, NEW_CATEGORY, VOLUME_DIGITS } from './libraryConstants';
+import { FOCUSABLE, NEW_CATEGORY, VOLUME_DIGITS } from './libraryConstants';
 import type { LoudnessResult } from './loudnessCheck';
 import type { LibraryEntries, PatchMetadata } from './patchMetadata';
 import { categoriesOf, nameProblem, normaliseTags, suggestTags } from './patchMetadata';
@@ -93,12 +93,6 @@ export interface MetadataRequest {
   /** The entry being saved over, exempt from the name-uniqueness rule. */
   ownId?: string;
   loudness: Promise<LoudnessResult> | null;
-  /**
-   * The write lands in a repo checkout (the developer's folder grant): show
-   * the sweep and index commands the file needs before `npm run verify`
-   * passes. A visitor saving to their own library never sees them.
-   */
-  repoWrite: boolean;
   opener?: HTMLElement | null;
 }
 
@@ -156,19 +150,13 @@ function tagInput(entries: LibraryEntries, tags: string[]): { render: () => void
   return { render };
 }
 
-function loudnessLine(result: LoudnessResult, volume: number, repoWrite: boolean): string {
+function loudnessLine(result: LoudnessResult, volume: number): string {
   const peak = result.peak.toFixed(VOLUME_DIGITS);
   if (!result.clips)
     return `Loudness: peak ${peak} over ${result.seeds} seeds of a 1 s note — under the line.`;
   const suggested = (result.suggestedVolume ?? 0).toFixed(VOLUME_DIGITS);
-  const gate = repoWrite
-    ? 'The write is still allowed; the offline sweep is the hard gate.'
-    : 'You can still save it.';
-  return `Loudness: peak ${peak} at seed ${result.worstSeed} over ${result.seeds} seeds of a 1 s note — CLIPS. Suggested volume ${suggested} (now ${volume.toFixed(VOLUME_DIGITS)}). ${gate}`;
+  return `Loudness: peak ${peak} at seed ${result.worstSeed} over ${result.seeds} seeds of a 1 s note — CLIPS. Suggested volume ${suggested} (now ${volume.toFixed(VOLUME_DIGITS)}). You can still save it.`;
 }
-
-const afterWriteText = (): string =>
-  `The written file carries a stale or missing headroom record, so npm run verify fails until you run: ${AFTER_WRITE_COMMANDS.join('; then ')}. The sweep costs about 6 s per patch at 16,384 seeds (--seeds <n> lowers it).`;
 
 let openGeneration = 0;
 
@@ -214,9 +202,6 @@ export async function openMetadataModal(
   newCategory.value = '';
   description.value = request.initial.description;
   problem.textContent = '';
-  const after = $('metaAfter');
-  after.textContent = request.repoWrite ? afterWriteText() : '';
-  after.hidden = !request.repoWrite;
   const chips = tagInput(request.entries, tags);
   chips.render();
 
@@ -236,7 +221,7 @@ export async function openMetadataModal(
   loudness.textContent = request.loudness ? 'Checking loudness…' : '';
   const showLoudness = claimLoudnessLine((line) => (loudness.textContent = line));
   request.loudness
-    ?.then((result) => showLoudness(loudnessLine(result, volume, request.repoWrite)))
+    ?.then((result) => showLoudness(loudnessLine(result, volume)))
     .catch((error: unknown) => showLoudness(`Loudness check unavailable: ${String(error)}`));
 
   let answer: PatchMetadata | null = null;
