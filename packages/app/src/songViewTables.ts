@@ -6,8 +6,10 @@
  * cycle length for the faint ticks inside a block, and which kinds the
  * detail pane gives an Octave knob because their card carries none. Data
  * beside the logic (root CLAUDE.md "Code structure"); the px maths is pinned
- * by `songViewTables.test.ts`. A zoom control is a follow-up (decision 8):
- * `pxPerBar` is a table value, not a state.
+ * by `songViewTables.test.ts`. The zoom (windsor#8) makes `pxPerBar` view
+ * state in `songTab.ts`: `SONG_VIEW.pxPerBar` is where it starts, and
+ * `minPxPerBar` / `maxPxPerBar` / `dragPxPerDoubling` bound the ruler drag
+ * that changes it (`songZoomModel.ts`).
  */
 import type { SequencerKind, SequencerSpec } from '@windsor/engine';
 import { BEATS_PER_BAR, PPQ, TICKS_PER_BAR } from '@windsor/engine';
@@ -16,15 +18,31 @@ import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { ARP_STYLE_LABELS } from './sequencerKnobTables';
 
 export interface SongViewScale {
-  /** Px one bar of `TICKS_PER_BAR` ticks spans on the ruler and in every lane. */
+  /** Px one bar of `TICKS_PER_BAR` ticks spans on the ruler and in every lane, before any zoom. */
   readonly pxPerBar: number;
+  /** The zoom's floor: a `BARS_MAX` song still fits a wide screen at this scale. */
+  readonly minPxPerBar: number;
+  /** The zoom's ceiling: a sixteenth is still a comfortable drag target at this scale. */
+  readonly maxPxPerBar: number;
+  /** Px of vertical ruler drag that doubles (up) or halves (down) the scale. */
+  readonly dragPxPerDoubling: number;
+  /** The narrowest a ruler label's stretch may be; below it the labels thin to every 2nd, 4th… bar. */
+  readonly minLabelPx: number;
   /** The lane-name column to the left of the ruler and the lanes. */
   readonly laneNameWidthPx: number;
   /** The grid gap between the name column and a lane. */
   readonly laneGapPx: number;
 }
 
-export const SONG_VIEW: SongViewScale = { pxPerBar: 96, laneNameWidthPx: 120, laneGapPx: 8 };
+export const SONG_VIEW: SongViewScale = {
+  pxPerBar: 96,
+  minPxPerBar: 8,
+  maxPxPerBar: 768,
+  dragPxPerDoubling: 60,
+  minLabelPx: 28,
+  laneNameWidthPx: 120,
+  laneGapPx: 8,
+};
 
 /** A pointer moved this far is a resize or a move; under it, a click. */
 export const SONG_DRAG_THRESHOLD_PX = 4;
@@ -34,19 +52,29 @@ export const REGION_EDGE_PX = 8;
 export const BLOCK_GAP_PX = 2;
 
 /** Px from the song start for a tick — the playhead line's, a block's left edge. */
-export const tickToPx = (tick: number, pxPerBar: number = SONG_VIEW.pxPerBar): number =>
+export const tickToPx = (tick: number, pxPerBar: number): number =>
   (tick / TICKS_PER_BAR) * pxPerBar;
 
 /** The tick under a px offset from the song start (unsnapped; `regionModel.ts` snaps). */
-export const pxToTick = (px: number, pxPerBar: number = SONG_VIEW.pxPerBar): number =>
-  (px / pxPerBar) * TICKS_PER_BAR;
+export const pxToTick = (px: number, pxPerBar: number): number => (px / pxPerBar) * TICKS_PER_BAR;
 
 /** The ruler's bar labels: `1..bars`. */
 export const rulerLabels = (bars: number): string[] =>
   Array.from({ length: Math.max(0, Math.trunc(bars)) }, (_, i) => String(i + 1));
 
+/** Label every n-th bar, n a power of two, so no label's stretch is narrower than `minLabelPx`. */
+export function rulerLabelEvery(
+  pxPerBar: number,
+  minLabelPx: number = SONG_VIEW.minLabelPx,
+): number {
+  let every = 1;
+  if (!(pxPerBar > 0)) return every;
+  while (every * pxPerBar < minLabelPx) every *= 2;
+  return every;
+}
+
 /** The px offsets of the beat ticks inside one bar (the first beat is the bar line itself). */
-export const beatTickPx = (pxPerBar: number = SONG_VIEW.pxPerBar): number[] =>
+export const beatTickPx = (pxPerBar: number): number[] =>
   Array.from({ length: BEATS_PER_BAR - 1 }, (_, i) => tickToPx((i + 1) * PPQ, pxPerBar));
 
 export type LaneTone = 'pitch' | 'perc' | 'none';

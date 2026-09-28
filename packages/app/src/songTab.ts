@@ -22,7 +22,7 @@ import { el } from './dom';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
-import { playheadLine, rulerRow, watchSongPlayhead } from './songRuler';
+import { playheadLine, rulerRow, watchSongPlayhead, wireRulerZoom } from './songRuler';
 import { CYCLE_TICKS, REGION_SUMMARY, SONG_VIEW, forKind } from './songViewTables';
 
 /** What the pane shows: a part (and, when a block was clicked, which of its regions), a chord event, or nothing. */
@@ -33,6 +33,14 @@ export type SongSelection =
 
 export interface SongViewState {
   selection: SongSelection;
+  /**
+   * The zoom (windsor#8): px one bar spans, set by the ruler drag within
+   * `SONG_VIEW`'s bounds. View state, like the scroll below: kept across
+   * renders of the tab, never written to the document or the autosave.
+   */
+  pxPerBar: number;
+  /** The lanes' horizontal scroll, restored after a render. */
+  scrollPx: number;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
@@ -87,7 +95,6 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
   state.selection = validSelection(ctx, state.selection);
   const scroll = el('div', 'lanes-scroll');
   const lanes = el('div', 'lanes');
-  lanes.style.setProperty('--bar', `${SONG_VIEW.pxPerBar}px`);
   lanes.style.setProperty('--names', `${SONG_VIEW.laneNameWidthPx}px`);
   lanes.style.setProperty('--gap', `${SONG_VIEW.laneGapPx}px`);
   const line = playheadLine();
@@ -95,6 +102,9 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
   scroll.appendChild(lanes);
   body.appendChild(scroll);
   body.appendChild(pane);
+  scroll.addEventListener('scroll', () => {
+    state.scrollPx = scroll.scrollLeft;
+  });
 
   const view: SongView = {
     ctx,
@@ -117,8 +127,9 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
     paintLanes() {
       const { doc } = ctx.model;
       lanes.style.setProperty('--bars', String(doc.transport.bars));
+      lanes.style.setProperty('--bar', `${state.pxPerBar}px`);
       const rows: HTMLElement[] = [
-        ...rulerRow(doc.transport.bars),
+        ...rulerRow(doc.transport.bars, state.pxPerBar),
         ...harmonyLaneRow(view),
         ...doc.parts.flatMap((part) => partLaneRow(view, part)),
       ];
@@ -131,6 +142,14 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
   let signature = laneSignature(ctx);
   view.paintLanes();
   view.paintPane();
+  scroll.scrollLeft = state.scrollPx;
+  wireRulerZoom({
+    scroll,
+    lanes,
+    state,
+    bars: () => ctx.model.doc.transport.bars,
+    repaint: () => view.paintLanes(),
+  });
   watchSongPlayhead({
     ctx,
     lanes,
@@ -149,6 +168,6 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
 
 /** The tab's renderer, keeping its selection across renders — what `main.ts` registers as Song. */
 export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
-  const state: SongViewState = { selection: null };
+  const state: SongViewState = { selection: null, pxPerBar: SONG_VIEW.pxPerBar, scrollPx: 0 };
   return (body) => renderSongView(body, ctx, state);
 }

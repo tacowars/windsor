@@ -79,9 +79,10 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   const tone = LANE_TONE[part.sequencer.kind];
   const cycle = forKind(CYCLE_TICKS, part.sequencer);
   const node = el('div', `reg${tone === 'perc' ? ' perc' : ''}${cycle ? ' cyc' : ''}`);
-  node.style.left = `${tickToPx(region.start)}px`;
-  node.style.width = `${tickToPx(region.duration) - BLOCK_GAP_PX}px`;
-  if (cycle) node.style.setProperty('--cyc', `${tickToPx(cycle)}px`);
+  const px = view.state.pxPerBar;
+  node.style.left = `${tickToPx(region.start, px)}px`;
+  node.style.width = `${Math.max(0, tickToPx(region.duration, px) - BLOCK_GAP_PX)}px`;
+  if (cycle) node.style.setProperty('--cyc', `${tickToPx(cycle, px)}px`);
   const mark = regionMark(part.regions, view.songTicks());
   const glyph = el('span', 'gl', mark);
   glyph.title = mark === '∞' ? 'whole song: free-running' : 'restarts on entry';
@@ -99,11 +100,11 @@ type Gesture =
   { kind: 'add' } | { kind: 'move' | 'resizeStart' | 'resizeEnd'; index: number; grab: number };
 
 /** What a press at `tick` on the lane starts: a new region in a gap, or an edge or body drag of the region under it. */
-function gestureAt(regions: readonly Region[], tick: number): Gesture {
+function gestureAt(regions: readonly Region[], tick: number, pxPerBar: number): Gesture {
   const index = regionAt(regions, tick);
   const region = regions[index];
   if (!region) return { kind: 'add' };
-  const edge = pxToTick(REGION_EDGE_PX);
+  const edge = pxToTick(REGION_EDGE_PX, pxPerBar);
   const grab = tick - region.start;
   if (grab < edge) return { kind: 'resizeStart', index, grab };
   if (tick > region.start + region.duration - edge) return { kind: 'resizeEnd', index, grab };
@@ -142,7 +143,7 @@ function paintRegions(
 
 function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   const tickAt = (e: PointerEvent): number =>
-    pxToTick(e.clientX - lane.getBoundingClientRect().left);
+    pxToTick(e.clientX - lane.getBoundingClientRect().left, view.state.pxPerBar);
   const current = (): MusicPart =>
     view.ctx.model.doc.parts.find((p) => p.slot === part.slot) ?? part;
   let gesture: Gesture = { kind: 'add' };
@@ -164,7 +165,7 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   pointerDrag(lane, {
     accept: (e) => {
       if (e.altKey) return false;
-      gesture = gestureAt(current().regions, tickAt(e));
+      gesture = gestureAt(current().regions, tickAt(e), view.state.pxPerBar);
       draft = null;
       return true;
     },

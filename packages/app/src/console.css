@@ -574,6 +574,9 @@ body.chord-dragging {
   display: flex;
   border-bottom: 1px solid var(--line-bright);
   height: 22px;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
 }
 .ruler-bar {
   position: relative;

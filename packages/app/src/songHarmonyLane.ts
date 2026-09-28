@@ -21,8 +21,9 @@ function block(view: SongView, index: number, start: number, end: number): HTMLE
   const event = doc.harmony.events[index];
   const node = el('div', 'hblk');
   node.dataset['event'] = String(index);
-  node.style.left = `${tickToPx(start)}px`;
-  node.style.width = `${tickToPx(end - start) - BLOCK_GAP_PX}px`;
+  const px = view.state.pxPerBar;
+  node.style.left = `${tickToPx(start, px)}px`;
+  node.style.width = `${Math.max(0, tickToPx(end - start, px) - BLOCK_GAP_PX)}px`;
   if (event) {
     const label = eventLabel(doc.harmony, event);
     node.appendChild(el('b', '', label.name));
@@ -36,13 +37,14 @@ function block(view: SongView, index: number, start: number, end: number): HTMLE
 /** A press on a block selects it; its right edge drags the event's end — a preview while dragging, one commit on release. */
 function wireEdgeDrag(view: SongView, node: HTMLElement, index: number, start: number): void {
   const laneLeft = (): number => (node.parentElement ?? node).getBoundingClientRect().left;
-  const tickAt = (e: PointerEvent): number => pxToTick(e.clientX - laneLeft());
-  const edgeTicks = pxToTick(REGION_EDGE_PX);
+  const px = view.state.pxPerBar;
+  const tickAt = (e: PointerEvent): number => pxToTick(e.clientX - laneLeft(), px);
+  const edgeTicks = pxToTick(REGION_EDGE_PX, px);
   // A press anywhere on the block selects it on release; only a press on the right edge resizes.
   let onEdge = false;
   pointerDrag(node, {
     accept: (e) => {
-      const width = node.offsetWidth > 0 ? pxToTick(node.offsetWidth) : 0;
+      const width = node.offsetWidth > 0 ? pxToTick(node.offsetWidth, px) : 0;
       onEdge = tickAt(e) >= start + width - edgeTicks;
       return true;
     },
@@ -51,7 +53,7 @@ function wireEdgeDrag(view: SongView, node: HTMLElement, index: number, start: n
       const events = view.ctx.model.doc.harmony.events;
       const preview = setEventDuration(events, index, tickAt(e) - start, view.songTicks());
       const next = preview[index];
-      if (next) node.style.width = `${tickToPx(next.duration) - BLOCK_GAP_PX}px`;
+      if (next) node.style.width = `${Math.max(0, tickToPx(next.duration, px) - BLOCK_GAP_PX)}px`;
     },
     end: (e, moved) => {
       if (!moved || !onEdge) return void view.select({ kind: 'event', index });

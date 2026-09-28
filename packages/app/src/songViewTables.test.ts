@@ -23,6 +23,7 @@ import {
   beatTickPx,
   forKind,
   pxToTick,
+  rulerLabelEvery,
   rulerLabels,
   tickToPx,
 } from './songViewTables';
@@ -33,13 +34,31 @@ describe('the ruler scale', () => {
     expect(tickToPx(0, PX)).toBe(0);
     expect(tickToPx(TICKS_PER_BAR, PX)).toBe(PX);
     expect(tickToPx(2.25 * TICKS_PER_BAR, PX)).toBe(2.25 * PX);
-    expect(pxToTick(tickToPx(TICKS_PER_BAR + PPQ))).toBe(TICKS_PER_BAR + PPQ);
+    expect(pxToTick(tickToPx(TICKS_PER_BAR + PPQ, PX), PX)).toBe(TICKS_PER_BAR + PPQ);
   });
 
   it('labels the bars 1..n and ticks the beats inside a bar', () => {
     expect(rulerLabels(4)).toEqual(['1', '2', '3', '4']);
     expect(rulerLabels(0)).toEqual([]);
-    expect(beatTickPx(SONG_VIEW.pxPerBar)).toEqual([1, 2, 3].map((b) => tickToPx(b * PPQ)));
+    expect(beatTickPx(SONG_VIEW.pxPerBar)).toEqual(
+      [1, 2, 3].map((b) => tickToPx(b * PPQ, SONG_VIEW.pxPerBar)),
+    );
+  });
+
+  it('keeps a tick and its px paired at every zoom', () => {
+    for (const px of [SONG_VIEW.minPxPerBar, SONG_VIEW.pxPerBar, SONG_VIEW.maxPxPerBar]) {
+      expect(tickToPx(TICKS_PER_BAR, px)).toBe(px);
+      expect(pxToTick(tickToPx(TICKS_PER_BAR + PPQ, px), px)).toBeCloseTo(TICKS_PER_BAR + PPQ);
+    }
+  });
+
+  it('thins the bar labels by powers of two as the zoom narrows the bars', () => {
+    expect(rulerLabelEvery(SONG_VIEW.pxPerBar)).toBe(1);
+    expect(rulerLabelEvery(SONG_VIEW.maxPxPerBar)).toBe(1);
+    const every = rulerLabelEvery(SONG_VIEW.minPxPerBar);
+    expect(every * SONG_VIEW.minPxPerBar).toBeGreaterThanOrEqual(SONG_VIEW.minLabelPx);
+    expect((every / 2) * SONG_VIEW.minPxPerBar).toBeLessThan(SONG_VIEW.minLabelPx);
+    expect(rulerLabelEvery(0)).toBe(1);
   });
 });
 
