@@ -136,7 +136,8 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `A204_REFRESH_REVERB_GOLDEN=1 npx vitest run packages/engine/src/mixer/reverbGolden.test.ts`.
    The table is pinned to Node 24's V8 (`.nvmrc`; the laptop and CI agree):
    under Node 22, nine pad and score presets hash differently because `Math`
-   differs between V8 versions. A run on the wrong Node is not a render change.
+   differs between V8 versions. A run on the wrong Node is not a render change,
+   and the test's guard says so in one failure before it renders (windsor#6).
 5. **Six modules are read by the main thread too** (#656): `algorithms.ts`,
    `waveIds.ts`, `envelope.ts`, `fmConstants.ts`, `modeIds.ts` (#669:
    `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`) and
