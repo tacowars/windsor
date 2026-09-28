@@ -1,7 +1,7 @@
 /**
  * The arrangement console (#70, record
  * `2026-08-31-arrangement-console-and-runtime-arrangements`): four tabs over
- * the real engine — Parts, Mixer, Song (#709), Arrangement. It boots on a new song — one part, the Init patch, no
+ * the real engine — Parts, Mixer, Song (#709) and the Settings gear (windsor#39). It boots on a new song — one part, the Init patch, no
  * sequencer (#598) — and a committed song opens through Import. It drives one
  * `AudioSystem`, and every change flows through `change` (live apply +
  * document merge) on the `AppContext`; Import is the one rebuild. Export writes the normalised document —
@@ -24,7 +24,7 @@ import { renderPartsTab } from './partsTab';
 import { wirePowerButton } from './powerButton';
 import { newSong } from './songParts';
 import { songTab } from './songTab';
-import { mountTabShell } from './tabShell';
+import { GEAR_ICON, mountTabShell } from './tabShell';
 import { mountToasts, notify } from './toast';
 import { mountTransportStrip } from './transportStrip';
 import { bootUserState } from './userSession';
@@ -47,7 +47,13 @@ mountTabShell(
     { id: 'parts', label: 'Parts', render: (body) => renderPartsTab(body, ctx, keyboard, midi) },
     { id: 'mixer', label: 'Mixer', render: (body) => renderMixerTab(body, ctx) },
     { id: 'song', label: 'Song', render: songTab(ctx) },
-    { id: 'arrangement', label: 'Arrangement', render: (body) => renderArrangementTab(body, ctx) },
+    {
+      id: 'arrangement',
+      label: 'Settings',
+      icon: GEAR_ICON,
+      ariaLabel: 'Settings',
+      render: (body) => renderArrangementTab(body, ctx),
+    },
   ],
   $('tabBar'),
   $('tabRoot'),
