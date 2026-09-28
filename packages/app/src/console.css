@@ -123,6 +123,14 @@ input {
   align-items: center;
   justify-content: center;
 }
+/* Key and scale without their visible labels (Pat's request on windsor#12):
+   one select each, at the same height as the boxes and the tab bar. */
+.transport-picker select.field {
+  width: auto;
+  height: var(--head-control-h);
+  padding-top: 0;
+  padding-bottom: 0;
+}
 .transport-tap {
   font-size: 11px;
 }

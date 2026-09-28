@@ -166,6 +166,15 @@ export function tapTempo(
   return { taps: next, bpm: interval > 0 ? clampToStep(MS_PER_MINUTE / interval, BPM_KNOB) : null };
 }
 
+/**
+ * Whether a press on a number box starts its gesture: a primary press
+ * anywhere in the box, the number or its unit, except on the number while it
+ * is being typed in, where the press places the text cursor instead.
+ */
+export function startsPress(button: number, onInput: boolean, typing: boolean): boolean {
+  return button === 0 && !(onInput && typing);
+}
+
 /** What a pointer move does to a press on a number box. */
 export type PressMove = 'end' | 'wait' | 'drag';
 

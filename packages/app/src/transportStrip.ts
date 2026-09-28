@@ -103,7 +103,20 @@ function keyPickers(ctx: AppCtx): HTMLElement[] {
     const partial = scaleChange(name);
     if (partial && ctx.change(partial).ok) ctx.render();
   });
-  return [key, scalePick];
+  return [headPicker(key, 'Key'), headPicker(scalePick, 'Scale')];
+}
+
+/**
+ * A header picker without its visible label (Pat's request on windsor#12),
+ * so the row stays one control high; the select keeps its `aria-label` from
+ * `select()` and names itself in a tooltip.
+ */
+function headPicker(wrap: HTMLElement, label: string): HTMLElement {
+  wrap.querySelector('.field-label')?.remove();
+  wrap.classList.add('transport-picker');
+  const sel = wrap.querySelector('select');
+  if (sel) sel.title = label;
+  return wrap;
 }
 
 function button(label: string, title: string): HTMLButtonElement {

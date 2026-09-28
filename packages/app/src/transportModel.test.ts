@@ -21,6 +21,7 @@ import {
   parseBpm,
   pressMove,
   pressedButtons,
+  startsPress,
   scaleChange,
   tapTempo,
   type TransportAction,
@@ -208,6 +209,26 @@ describe('tap tempo (decision 4)', () => {
 describe('a press on a number box', () => {
   const PAST = NUMBER_DRAG_THRESHOLD_PX + 1;
   const HELD = 1;
+
+  it('starts anywhere in the box, the unit included, but not on a number being typed', () => {
+    const PRIMARY = 0;
+    // On the unit (not the input): starts, whether or not the number has focus.
+    expect(startsPress(PRIMARY, false, false)).toBe(true);
+    expect(startsPress(PRIMARY, false, true)).toBe(true);
+    // On the number: starts unless it is being typed in (the press moves the caret).
+    expect(startsPress(PRIMARY, true, false)).toBe(true);
+    expect(startsPress(PRIMARY, true, true)).toBe(false);
+    expect(startsPress(2, false, false)).toBe(false);
+  });
+
+  it('a drag from the unit changes the value; a still press is a click that types', () => {
+    // A press on the unit starts, a move past the threshold drags and moves bars.
+    expect(startsPress(0, false, false)).toBe(true);
+    expect(pressMove(false, PAST, HELD)).toBe('drag');
+    expect(dragBars(6, NUMBER_DRAG.rangePx, false)).not.toBe(6);
+    // A still press never leaves 'wait', so the release focuses the number.
+    expect(pressMove(false, 0, HELD)).toBe('wait');
+  });
 
   it('waits inside the threshold, then drags', () => {
     expect(pressMove(false, NUMBER_DRAG_THRESHOLD_PX - 1, HELD)).toBe('wait');

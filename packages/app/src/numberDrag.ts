@@ -7,7 +7,7 @@
  * functions (`transportModel.ts`); this file only wires pointer and keys.
  */
 import { el } from './dom';
-import { pressMove } from './transportModel';
+import { pressMove, startsPress } from './transportModel';
 
 export interface NumberBoxSpec {
   /** The accessible name and tooltip's subject. */
@@ -42,16 +42,26 @@ function boxInput(spec: NumberBoxSpec): HTMLInputElement {
   return input;
 }
 
-/** Press, drag past the threshold to sweep; release without a drag to type. */
-function attachDrag(input: HTMLInputElement, spec: NumberBoxSpec, show: () => void): void {
+/**
+ * Press anywhere in the box (the number or its unit), drag past the threshold
+ * to sweep; release without a drag to type. The gesture lives on the whole
+ * box, the surface that shows the ns-resize cursor and refuses touch panning.
+ */
+function attachDrag(
+  box: HTMLElement,
+  input: HTMLInputElement,
+  spec: NumberBoxSpec,
+  show: () => void,
+): void {
   let press: { y: number; start: number; moved: boolean } | null = null;
-  input.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0 || document.activeElement === input) return;
+  box.addEventListener('pointerdown', (e) => {
+    const typing = document.activeElement === input;
+    if (!startsPress(e.button, e.target === input, typing)) return;
     press = { y: e.clientY, start: spec.get(), moved: false };
-    input.setPointerCapture(e.pointerId);
+    box.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
-  input.addEventListener('pointermove', (e) => {
+  box.addEventListener('pointermove', (e) => {
     if (!press) return;
     const upPx = press.y - e.clientY;
     const move = pressMove(press.moved, upPx, e.buttons);
@@ -69,15 +79,15 @@ function attachDrag(input: HTMLInputElement, spec: NumberBoxSpec, show: () => vo
     if (!press) return;
     const clicked = !press.moved;
     press = null;
-    if (input.hasPointerCapture(e.pointerId)) input.releasePointerCapture(e.pointerId);
+    if (box.hasPointerCapture(e.pointerId)) box.releasePointerCapture(e.pointerId);
     if (typing && clicked) {
       input.focus();
       input.select();
     }
   };
-  input.addEventListener('pointerup', (e) => release(e, true));
-  input.addEventListener('pointercancel', (e) => release(e, false));
-  input.addEventListener('lostpointercapture', (e) => release(e, false));
+  box.addEventListener('pointerup', (e) => release(e, true));
+  box.addEventListener('pointercancel', (e) => release(e, false));
+  box.addEventListener('lostpointercapture', (e) => release(e, false));
 }
 
 /** Enter and blur commit a typed entry; Escape reverts it. */
@@ -102,14 +112,14 @@ function attachTyping(input: HTMLInputElement, spec: NumberBoxSpec, show: () => 
 
 /** Build one box: the number and its unit, the same height as the tab bar. */
 export function makeNumberBox(spec: NumberBoxSpec): NumberBoxElement {
-  const node = el('label', 'transport-box') as NumberBoxElement;
+  const node = el('div', 'transport-box') as NumberBoxElement;
   const input = boxInput(spec);
   node.appendChild(input);
   node.appendChild(el('span', 'transport-unit', spec.unit));
   const show = (): void => {
     input.value = spec.format(spec.get());
   };
-  attachDrag(input, spec, show);
+  attachDrag(node, input, spec, show);
   attachTyping(input, spec, show);
   node.refresh = show;
   show();
