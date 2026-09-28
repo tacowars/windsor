@@ -22,6 +22,7 @@ import { audibleTick, watchPlayhead } from './stepStrip';
 import {
   barsChange,
   bpmChange,
+  countsAsTap,
   dragBars,
   dragBpm,
   formatPosition,
@@ -76,19 +77,17 @@ function tempoBoxes(ctx: AppCtx): HTMLElement[] {
   const tap = button('Tap', 'Tap tempo: tap on the beat; a 2 s pause starts again');
   tap.classList.add('transport-tap');
   let taps: readonly number[] = [];
-  const onTap = (): void => {
+  // A mouse or touch taps on the press, not the release, so the beat lands
+  // where the finger does; a keyboard, assistive technology or voice control
+  // activates through a `click` with no press before it (`countsAsTap`).
+  const onTap = (e: MouseEvent): void => {
+    if (!countsAsTap(e)) return;
     const result = tapTempo(taps, performance.now());
     taps = result.taps;
     if (result.bpm !== null && ctx.change(bpmChange(result.bpm)).ok) bpm.refresh();
   };
-  // On the press, not the release, so the beat lands where the finger does.
-  tap.addEventListener('pointerdown', (e) => {
-    if (e.button === 0) onTap();
-  });
-  tap.addEventListener('keydown', (e) => {
-    if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) onTap();
-    if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
-  });
+  tap.addEventListener('pointerdown', onTap);
+  tap.addEventListener('click', onTap);
   return [tap, bpm, bars];
 }
 

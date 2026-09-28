@@ -11,6 +11,7 @@ import { BARS_MAX, BPM_MAX, BPM_MIN, TICKS_PER_BAR } from '@windsor/engine';
 import {
   barsChange,
   bpmChange,
+  countsAsTap,
   dragBars,
   dragBpm,
   formatPosition,
@@ -18,6 +19,7 @@ import {
   nextTransportState,
   parseBars,
   parseBpm,
+  pressMove,
   pressedButtons,
   scaleChange,
   tapTempo,
@@ -27,6 +29,7 @@ import {
 import {
   KEY_OPTIONS,
   NUMBER_DRAG,
+  NUMBER_DRAG_THRESHOLD_PX,
   POSITION_GRID,
   SCALE_OPTIONS,
   TAP_TEMPO,
@@ -199,5 +202,35 @@ describe('tap tempo (decision 4)', () => {
   it('clamps and rounds to the tempo step', () => {
     expect(tapAll([0, 100]).at(-1)).toBe(BPM_MAX);
     expect(tapAll([0, 700]).at(-1)).toBe(85.71);
+  });
+});
+
+describe('a press on a number box', () => {
+  const PAST = NUMBER_DRAG_THRESHOLD_PX + 1;
+  const HELD = 1;
+
+  it('waits inside the threshold, then drags', () => {
+    expect(pressMove(false, NUMBER_DRAG_THRESHOLD_PX - 1, HELD)).toBe('wait');
+    expect(pressMove(false, -PAST, HELD)).toBe('drag');
+    expect(pressMove(true, 0, HELD)).toBe('drag');
+  });
+
+  it('ends, changing nothing, on a move with the primary button no longer held', () => {
+    expect(pressMove(true, PAST * 10, 0)).toBe('end');
+    expect(pressMove(false, PAST, 0)).toBe('end');
+    // Only the secondary button held is a release of the primary one.
+    expect(pressMove(true, PAST, 2)).toBe('end');
+  });
+});
+
+describe('what counts as one tap on Tap', () => {
+  it('counts a primary press, not the click that follows it', () => {
+    expect(countsAsTap({ type: 'pointerdown', button: 0, detail: 0 })).toBe(true);
+    expect(countsAsTap({ type: 'pointerdown', button: 2, detail: 0 })).toBe(false);
+    expect(countsAsTap({ type: 'click', button: 0, detail: 1 })).toBe(false);
+  });
+
+  it('counts a keyboard or assistive click, which has no press before it', () => {
+    expect(countsAsTap({ type: 'click', button: 0, detail: 0 })).toBe(true);
   });
 });

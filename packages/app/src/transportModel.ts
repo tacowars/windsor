@@ -20,6 +20,7 @@ import {
   type KnobRange,
   MS_PER_MINUTE,
   NUMBER_DRAG,
+  NUMBER_DRAG_THRESHOLD_PX,
   POSITION_GRID,
   type PositionGrid,
   TAP_TEMPO,
@@ -163,4 +164,41 @@ export function tapTempo(
   if (next.length < 2) return { taps: next, bpm: null };
   const interval = (now - (next[0] ?? now)) / (next.length - 1);
   return { taps: next, bpm: interval > 0 ? clampToStep(MS_PER_MINUTE / interval, BPM_KNOB) : null };
+}
+
+/** What a pointer move does to a press on a number box. */
+export type PressMove = 'end' | 'wait' | 'drag';
+
+/**
+ * A move during a press on a number box: `end` once the primary button is no
+ * longer held (a release outside the window, or a focus loss that never sent
+ * `pointerup`, as `knob.ts` guards), `wait` while an unmoved press stays
+ * inside the threshold (a click to type), `drag` otherwise.
+ */
+export function pressMove(
+  moved: boolean,
+  upPx: number,
+  buttons: number,
+  thresholdPx = NUMBER_DRAG_THRESHOLD_PX,
+): PressMove {
+  if ((buttons & 1) === 0) return 'end';
+  return !moved && Math.abs(upPx) < thresholdPx ? 'wait' : 'drag';
+}
+
+/** The fields of a Tap event that decide whether it counts. */
+export interface TapEvent {
+  readonly type: string;
+  readonly button: number;
+  readonly detail: number;
+}
+
+/**
+ * Whether an event on Tap counts as one tap. A mouse or touch counts on the
+ * primary `pointerdown`, where the beat lands; a `click` counts only when its
+ * `detail` is 0 (a keyboard, assistive technology or voice activation with
+ * no press before it), so one physical tap never counts twice.
+ */
+export function countsAsTap(e: TapEvent): boolean {
+  if (e.type === 'pointerdown') return e.button === 0;
+  return e.type === 'click' && e.detail === 0;
 }

@@ -136,6 +136,8 @@ input {
   border-radius: var(--r);
   background: var(--inset);
   cursor: ns-resize;
+  /* As .knob: a touch drag moves the number, never scrolls the page. */
+  touch-action: none;
 }
 .transport-box:hover {
   border-color: var(--line-bright);

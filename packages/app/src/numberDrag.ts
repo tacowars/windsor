@@ -7,7 +7,7 @@
  * functions (`transportModel.ts`); this file only wires pointer and keys.
  */
 import { el } from './dom';
-import { NUMBER_DRAG_THRESHOLD_PX } from './transportTables';
+import { pressMove } from './transportModel';
 
 export interface NumberBoxSpec {
   /** The accessible name and tooltip's subject. */
@@ -54,7 +54,12 @@ function attachDrag(input: HTMLInputElement, spec: NumberBoxSpec, show: () => vo
   input.addEventListener('pointermove', (e) => {
     if (!press) return;
     const upPx = press.y - e.clientY;
-    if (!press.moved && Math.abs(upPx) < NUMBER_DRAG_THRESHOLD_PX) return;
+    const move = pressMove(press.moved, upPx, e.buttons);
+    if (move === 'end') {
+      release(e, false);
+      return;
+    }
+    if (move === 'wait') return;
     press.moved = true;
     const value = spec.drag(press.start, upPx, e.shiftKey);
     if (value !== spec.get()) spec.set(value);
