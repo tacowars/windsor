@@ -57,7 +57,10 @@ it touches against the invariants in `CLAUDE.md`.
   TypeScript.
 - Song documents: a save or load that does not carry `patches`, `returns`,
   strips, harmony, sequencers and captured patterns through a round trip; a
-  library edit that reaches into a saved song.
+  library edit that reaches into a saved song; a change to the song or patch
+  shape that makes an old file load wrong or fail without bumping
+  `ARRANGEMENT_VERSION` or `PATCH_FILE_FORMAT`
+  (`docs/log/2026-09-28-format-versions-refuse-never-destroy.md`).
 - The engine/app boundary: the engine importing the app; the app importing
   anything but `@windsor/engine`; a Web Audio node built in the app.
 - Tables: a tunable inlined where `no-magic-numbers` would not see it (a

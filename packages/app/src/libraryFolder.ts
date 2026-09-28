@@ -10,8 +10,8 @@
  * tests drive it with an in-memory fake and only `wrapDirectoryHandle` touches
  * the Chrome API.
  */
-import type { UnsweptLibraryEntry } from '@windsor/engine';
-import { loadUnsweptPatchFile } from '@windsor/engine';
+import type { FormatRefusal, UnsweptLibraryEntry } from '@windsor/engine';
+import { PatchFormatError, loadUnsweptPatchFile } from '@windsor/engine';
 import { HANDLE_DB } from './libraryConstants';
 import type { LibraryEntries } from './patchMetadata';
 
@@ -24,28 +24,56 @@ export interface PatchFolder {
   remove(name: string): Promise<void>;
 }
 
+/**
+ * A stored patch in a format this build cannot read
+ * (`2026-09-28-format-versions-refuse-never-destroy`): kept, listed as old,
+ * never playable, with its text exactly as stored for Export.
+ */
+export interface OldFormatPatch {
+  id: string;
+  /** The file's own `name` when it has one, else the id. */
+  name: string;
+  text: string;
+  refusal: FormatRefusal;
+}
+
 export interface FolderLibrary {
   entries: LibraryEntries;
   /** Files that did not load, each with the loader's message; shown, never fatal. */
   problems: string[];
+  /** Files in a format this build cannot read, kept apart from `problems`. */
+  oldFormat: OldFormatPatch[];
+}
+
+/** The display name an old file gives itself, without trusting its shape. */
+function oldName(raw: unknown, id: string): string {
+  const name = (raw as { name?: unknown } | null)?.name;
+  return typeof name === 'string' && name.trim() ? name : id;
 }
 
 const JSON_SUFFIX = '.json';
 
-/** Every `<id>.json` in the folder through the unswept loader; a bad file is reported, not fatal. */
+/** Every `<id>.json` in the folder through the unswept loader; a bad file is reported, an old one kept, neither fatal. */
 export async function readFolderLibrary(folder: PatchFolder): Promise<FolderLibrary> {
   const entries: Record<string, UnsweptLibraryEntry> = {};
   const problems: string[] = [];
+  const oldFormat: OldFormatPatch[] = [];
   const names = (await folder.list()).filter((name) => name.endsWith(JSON_SUFFIX)).sort();
   for (const name of names) {
     const id = name.slice(0, -JSON_SUFFIX.length);
+    let text = '';
+    let raw: unknown;
     try {
-      entries[id] = loadUnsweptPatchFile(id, JSON.parse(await folder.read(name)));
+      text = await folder.read(name);
+      raw = JSON.parse(text);
+      entries[id] = loadUnsweptPatchFile(id, raw);
     } catch (error) {
-      problems.push(error instanceof Error ? error.message : String(error));
+      if (error instanceof PatchFormatError) {
+        oldFormat.push({ id, name: oldName(raw, id), text, refusal: error.refusal });
+      } else problems.push(error instanceof Error ? error.message : String(error));
     }
   }
-  return { entries, problems };
+  return { entries, problems, oldFormat };
 }
 
 // --- The Chrome side: the handle, its permission and its IndexedDB home ---
