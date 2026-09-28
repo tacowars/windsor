@@ -70,6 +70,24 @@ describe('writeInChunks', () => {
     expect(writable.log).toEqual(['write 3', 'abort']);
   });
 
+  it('a cancel while the close is pending aborts the stream at once', async () => {
+    const controller = new AbortController();
+    const writable = fakeWritable();
+    let closing!: () => void;
+    const closeStarted = new Promise<void>((resolve) => (closing = resolve));
+    writable.close = () => {
+      writable.log.push('close');
+      closing();
+      // A close that never finishes on its own: only the abort ends the wait.
+      return new Promise<void>(() => {});
+    };
+    const done = writeInChunks(writable, new Uint8Array(3), controller.signal, 4);
+    await closeStarted;
+    controller.abort();
+    await expect(done).rejects.toMatchObject({ name: 'AbortError' });
+    expect(writable.log).toEqual(['write 3', 'close', 'abort']);
+  });
+
   it('writes nothing when already cancelled', async () => {
     const controller = new AbortController();
     controller.abort();

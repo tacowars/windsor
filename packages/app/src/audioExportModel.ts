@@ -81,7 +81,17 @@ export interface AudioExportRun {
   signal: AbortSignal;
   onProgress: (fraction: number) => void;
   render: (document: ArrangementDocument, options: RenderSongOptions) => Promise<RenderedSong>;
-  encode: (channels: Float32Array[], sampleRate: number, bitDepth: WavBitDepth) => EncodedWav;
+  /**
+   * The engine's chunked encoder (`encodeWavAsync`): it yields between chunks
+   * and rejects with an `AbortError` once `signal` fires, so a Cancel during
+   * a long song's encode lands before the file reaches the sink (windsor#51).
+   */
+  encode: (
+    channels: Float32Array[],
+    sampleRate: number,
+    bitDepth: WavBitDepth,
+    options: { signal: AbortSignal },
+  ) => Promise<EncodedWav>;
 }
 
 export type AudioExportOutcome =
@@ -99,10 +109,11 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
       onProgress: run.onProgress,
     });
     if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
-    const { bytes, clipped } = run.encode(
+    const { bytes, clipped } = await run.encode(
       rendered.channels,
       rendered.sampleRate,
       settings.bitDepth,
+      { signal },
     );
     if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
     await sink.write(bytes, signal);

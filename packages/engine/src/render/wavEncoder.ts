@@ -8,6 +8,9 @@
  * seeded PRNG, so two encodes of the same render are byte-identical; 24-bit
  * output is rounded without dither, its LSB already far below the synth's
  * noise floor.
+ *
+ * `encodeWavAsync` writes the same bytes in chunks, yielding between them, so
+ * a long song's encode can be cancelled (windsor#51).
  */
 import { mulberry32 } from '../sequencing/mulberry32';
 import type { WavBitDepth } from './renderConstants';
@@ -16,6 +19,7 @@ import {
   BYTE_MASK,
   WAV_DITHERED_BIT_DEPTH,
   WAV_DITHER_SEED,
+  WAV_ENCODE_CHUNK_FRAMES,
   WAV_FMT_CHUNK_BYTES,
   WAV_FORMAT_PCM,
   WAV_HEADER_BYTES,
@@ -71,32 +75,110 @@ export function encodeWav(
   bitDepth: WavBitDepth,
   options: WavOptions = {},
 ): EncodedWav {
-  const frames = channels[0]?.length ?? 0;
-  const bytesPerSample = bitDepth / BITS_PER_BYTE;
-  const bytes = new Uint8Array(WAV_HEADER_BYTES + frames * channels.length * bytesPerSample);
-  bytes.set(wavHeader(channels.length, sampleRate, bitDepth, frames));
-  const fullScale = 2 ** (bitDepth - 1) - 1;
-  const random =
-    bitDepth === WAV_DITHERED_BIT_DEPTH ? mulberry32(options.ditherSeed ?? WAV_DITHER_SEED) : null;
-  let clipped = 0;
-  let at = WAV_HEADER_BYTES;
-  for (let frame = 0; frame < frames; frame++) {
-    for (const channel of channels) {
-      let sample = channel[frame] ?? 0;
-      if (sample > 1 || sample < -1) {
-        clipped++;
-        sample = sample > 1 ? 1 : -1;
-      }
-      const dither = random ? random() - random() : 0;
-      const word = Math.max(
-        -fullScale - 1,
-        Math.min(fullScale, Math.round(sample * fullScale + dither)),
-      );
-      writeWord(bytes, at, word, bytesPerSample);
-      at += bytesPerSample;
-    }
+  const writer = new WavWriter(channels, sampleRate, bitDepth, options);
+  writer.advance(writer.frames);
+  return writer.result();
+}
+
+export interface AsyncWavOptions extends WavOptions {
+  /** Aborting rejects the encode with an `AbortError` between chunks (windsor#51). */
+  signal?: AbortSignal;
+  /** Frames encoded between yields; the shipped `WAV_ENCODE_CHUNK_FRAMES` when absent. */
+  chunkFrames?: number;
+  /** How the encoder hands the event loop back between chunks; a macrotask when absent. */
+  yieldToLoop?: () => Promise<void>;
+}
+
+/**
+ * `encodeWav` in chunks, yielding to the event loop between them and
+ * checking `signal` after each yield (windsor#51 decision 1), so a Cancel
+ * click during a long song's encode lands before the file is handed on. The
+ * bytes are the synchronous encoder's exactly: one writer, one dither PRNG,
+ * advanced chunk by chunk.
+ */
+export async function encodeWavAsync(
+  channels: readonly Float32Array[],
+  sampleRate: number,
+  bitDepth: WavBitDepth,
+  options: AsyncWavOptions = {},
+): Promise<EncodedWav> {
+  const { signal, chunkFrames = WAV_ENCODE_CHUNK_FRAMES, yieldToLoop = nextTask } = options;
+  const writer = new WavWriter(channels, sampleRate, bitDepth, options);
+  for (;;) {
+    if (signal?.aborted) throw new DOMException('the encode was cancelled', 'AbortError');
+    if (writer.done) return writer.result();
+    writer.advance(chunkFrames);
+    await yieldToLoop();
   }
-  return { bytes, clipped };
+}
+
+function nextTask(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** One encode in progress: the file being filled, the dither PRNG, and the next frame. */
+class WavWriter {
+  readonly frames: number;
+  private readonly bytes: Uint8Array;
+  private readonly bytesPerSample: number;
+  private readonly fullScale: number;
+  private readonly random: (() => number) | null;
+  private clipped = 0;
+  private frame = 0;
+  private at = WAV_HEADER_BYTES;
+
+  constructor(
+    private readonly channels: readonly Float32Array[],
+    sampleRate: number,
+    bitDepth: WavBitDepth,
+    options: WavOptions,
+  ) {
+    this.frames = channels[0]?.length ?? 0;
+    this.bytesPerSample = bitDepth / BITS_PER_BYTE;
+    this.bytes = new Uint8Array(
+      WAV_HEADER_BYTES + this.frames * channels.length * this.bytesPerSample,
+    );
+    this.bytes.set(wavHeader(channels.length, sampleRate, bitDepth, this.frames));
+    this.fullScale = 2 ** (bitDepth - 1) - 1;
+    this.random =
+      bitDepth === WAV_DITHERED_BIT_DEPTH
+        ? mulberry32(options.ditherSeed ?? WAV_DITHER_SEED)
+        : null;
+  }
+
+  get done(): boolean {
+    return this.frame >= this.frames;
+  }
+
+  /** Encode up to `count` more frames, in order. */
+  advance(count: number): void {
+    const { bytes, bytesPerSample, fullScale, random, channels } = this;
+    const end = Math.min(this.frames, this.frame + count);
+    let { at, clipped } = this;
+    for (let frame = this.frame; frame < end; frame++) {
+      for (const channel of channels) {
+        let sample = channel[frame] ?? 0;
+        if (sample > 1 || sample < -1) {
+          clipped++;
+          sample = sample > 1 ? 1 : -1;
+        }
+        const dither = random ? random() - random() : 0;
+        const word = Math.max(
+          -fullScale - 1,
+          Math.min(fullScale, Math.round(sample * fullScale + dither)),
+        );
+        writeWord(bytes, at, word, bytesPerSample);
+        at += bytesPerSample;
+      }
+    }
+    this.frame = end;
+    this.at = at;
+    this.clipped = clipped;
+  }
+
+  result(): EncodedWav {
+    return { bytes: this.bytes, clipped: this.clipped };
+  }
 }
 
 /** Little-endian fields written in order. */

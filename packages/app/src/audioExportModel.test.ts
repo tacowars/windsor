@@ -6,7 +6,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { RenderSongOptions, RenderedSong } from '@windsor/engine';
-import { RENDER_SAMPLE_RATE_DEFAULT, RENDER_TAIL_SECONDS, encodeWav } from '@windsor/engine';
+import {
+  RENDER_SAMPLE_RATE_DEFAULT,
+  RENDER_TAIL_SECONDS,
+  encodeWav,
+  encodeWavAsync,
+} from '@windsor/engine';
 import { FULL_DOCUMENT } from '@windsor/engine/__fixtures__/fullArrangement';
 
 import type { AudioExportRun, WavSink } from './audioExportModel';
@@ -69,7 +74,7 @@ function run(overrides: Partial<AudioExportRun> = {}): AudioExportRun {
     signal: new AbortController().signal,
     onProgress: () => {},
     render: fakeRender(100).render,
-    encode: encodeWav,
+    encode: encodeWavAsync,
     ...overrides,
   };
 }
@@ -184,11 +189,31 @@ describe('runAudioExport', () => {
     const controller = new AbortController();
     const encode: AudioExportRun['encode'] = (channels, rate, depth) => {
       controller.abort();
-      return encodeWav(channels, rate, depth);
+      return Promise.resolve(encodeWav(channels, rate, depth));
     };
     const outcome = await runAudioExport(run({ sink, signal: controller.signal, encode }));
     expect(outcome).toEqual({ kind: 'cancelled' });
     expect(sink.written).toHaveLength(0);
+  });
+
+  it('a cancel between encoder chunks stops the encode and never calls the sink', async () => {
+    const sink = fakeSink();
+    const controller = new AbortController();
+    let chunks = 0;
+    const encode: AudioExportRun['encode'] = (channels, rate, depth, { signal }) =>
+      encodeWavAsync(channels, rate, depth, {
+        signal,
+        chunkFrames: 10,
+        yieldToLoop: () => {
+          if (++chunks === 3) controller.abort();
+          return Promise.resolve();
+        },
+      });
+    const outcome = await runAudioExport(run({ sink, signal: controller.signal, encode }));
+    expect(outcome).toEqual({ kind: 'cancelled' });
+    expect(chunks).toBe(3);
+    expect(sink.written).toHaveLength(0);
+    expect(sink.discarded).toBe(1);
   });
 
   it('a failed render writes nothing and says why', async () => {

@@ -58,3 +58,10 @@ export const WAV_DITHERED_BIT_DEPTH: WavBitDepth = 16;
 
 /** The PRNG seed for the 16-bit TPDF dither, so an encode is reproducible. */
 export const WAV_DITHER_SEED = 0x0d_17_4e_12;
+
+/**
+ * Frames the async WAV encoder writes between yields to the event loop
+ * (windsor#51): about 1.4 s of song at 48 kHz, small enough that a Cancel
+ * click is answered promptly, large enough that yielding costs nothing.
+ */
+export const WAV_ENCODE_CHUNK_FRAMES = 1 << 16;

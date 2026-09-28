@@ -201,6 +201,12 @@ export function wholeSong(document: ArrangementDocument): ArrangementDocument {
 /**
  * Render with a stop every step: issue the ticks due before the next stop,
  * release everything at the song's end, report progress, honour an abort.
+ *
+ * An abort is heard for the whole of `startRendering()`, after the last stop
+ * too, and rejects at once (windsor#51 decisions 3 and 5). An offline context
+ * can't be stopped, so a stop reached after an abort schedules no other and
+ * resumes: the render runs on to its end over the graph `renderSong` has
+ * disposed by then, settles, and lets go of its buffer.
  */
 async function drive(
   context: OfflineContextLike,
@@ -209,36 +215,54 @@ async function drive(
   options: RenderSongOptions,
 ): Promise<AudioBuffer> {
   const { signal, onProgress } = options;
+  throwIfAborted(signal);
   let ended = false;
-  let rejectAbort: (reason: unknown) => void = () => {};
-  const aborted = new Promise<never>((_, reject) => {
-    rejectAbort = reject;
-  });
-  const pump = (): void => {
-    if (!ended) pumpAhead(system, context.currentTime, plan);
-  };
   const stopAt = (time: number): void => {
     void context.suspend(time).then(async () => {
-      if (signal?.aborted) return rejectAbort(abortError());
-      pump();
-      if (!ended && context.currentTime >= plan.endSeconds) {
-        ended = true;
-        system.stopMusic();
+      if (!signal?.aborted) {
+        if (!ended) pumpAhead(system, context.currentTime, plan);
+        if (!ended && context.currentTime >= plan.endSeconds) {
+          ended = true;
+          system.stopMusic();
+        }
+        onProgress?.(context.currentTime / plan.totalSeconds);
+        const next = plan.nextStop(context.currentTime, RENDER_STEP_SECONDS);
+        if (next !== null) stopAt(next);
+        // Let the note messages reach the audio thread before it renders on.
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
-      onProgress?.(context.currentTime / plan.totalSeconds);
-      const next = plan.nextStop(context.currentTime, RENDER_STEP_SECONDS);
-      if (next !== null) stopAt(next);
-      // Let the note messages reach the audio thread before it renders on.
-      await new Promise((resolve) => setTimeout(resolve, 0));
       await context.resume();
     });
   };
   // The opening is already in the processors (`playOpening`).
   const first = plan.nextStop(0, RENDER_STEP_SECONDS);
   if (first !== null) stopAt(first);
-  const buffer = await Promise.race([context.startRendering(), aborted]);
+  const buffer = await untilAborted(context.startRendering(), signal);
   onProgress?.(1);
   return buffer;
+}
+
+/**
+ * `work`, or an `AbortError` the moment `signal` fires: one listener for the
+ * whole wait, removed when `work` settles. A `work` left behind by an abort
+ * still settles later, and a rejection it settles with is swallowed here.
+ */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) return work;
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(abortError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    work.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
