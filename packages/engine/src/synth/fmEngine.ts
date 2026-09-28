@@ -33,6 +33,12 @@ export interface PartOptions {
   maxVoices?: number;
   /** Defaults to the engine master. Pass `null` to leave the part unrouted. */
   destination?: AudioNode | null;
+  /**
+   * Pins the processor's random source (`ProcessorOptions.seed`). Live parts
+   * omit it; an offline song render (`render/renderSong.ts`) passes one per
+   * part so two renders are bit-identical (windsor#40).
+   */
+  seed?: number;
 }
 
 /**
@@ -121,6 +127,7 @@ export class FmEngine {
       patch: structuredClone(patch),
       slideSeconds: SLIDE_SECONDS_DEFAULT,
     };
+    if (options.seed !== undefined) processorOptions.seed = options.seed;
 
     const node = new AudioWorkletNode(this.context, PROCESSOR_NAME, {
       numberOfInputs: 0,
