@@ -25,4 +25,14 @@ describe('TickStamps', () => {
     stamps.clear(20);
     expect(stamps.soundingAt(100, 0)).toBe(-1);
   });
+
+  it('reads the tick each stamp was issued with when a loop jumps it back (windsor#15)', () => {
+    const stamps = new TickStamps(8);
+    stamps.clear(94);
+    [94, 95, 48, 49].forEach((tick, i) => stamps.record(tick, i));
+    expect(stamps.oldest).toBe(94);
+    expect(stamps.soundingAt(1.5, 0)).toBe(95);
+    expect(stamps.soundingAt(2, 0)).toBe(48);
+    expect(stamps.soundingAt(9, 0)).toBe(49);
+  });
 });

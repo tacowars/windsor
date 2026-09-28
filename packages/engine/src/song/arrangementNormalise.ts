@@ -38,6 +38,7 @@ import {
   type SwingGrid,
 } from '../sequencing/swingTables';
 import { normaliseHarmonyEvents, normaliseRegions } from './timelineNormalise';
+import { normaliseLoop } from './songLoop';
 import { normaliseStrip } from './deskNormalise';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
@@ -87,17 +88,20 @@ export class ArrangementNormaliser extends FieldNormaliser {
     return this.resolver.filled;
   }
 
-  /** The clock (#705): tempo, the song's explicit length in bars (decision 5) and its swing. */
+  /** The clock (#705): tempo, the song's explicit length in bars (decision 5), its swing and loop. */
   transport(raw: unknown): Transport {
     const o = this.section(raw, 'transport');
-    this.dropUnknown(o, ['bpm', 'bars', 'swing'], 'transport');
+    this.dropUnknown(o, ['bpm', 'bars', 'swing', 'loop'], 'transport');
     const transport = {
       bpm: this.num(o.bpm, DEFAULT_BPM, BPM_MIN, BPM_MAX, 'transport.bpm'),
       bars: this.int(o.bars, DEFAULT_BARS, BARS_MIN, BARS_MAX, 'transport.bars'),
     };
-    // Absent stays absent: a song from before swing plays straight and
-    // exports byte for byte as it came (record `2026-09-28-song-swing-in-the-transport`).
-    return o.swing === undefined ? transport : { ...transport, swing: this.swing(o.swing) };
+    // Absent stays absent: a song from before swing or the loop plays as it
+    // did and exports byte for byte as it came (records
+    // `2026-09-28-song-swing-in-the-transport`, `2026-09-28-song-loop-in-the-transport`).
+    const swung = o.swing === undefined ? transport : { ...transport, swing: this.swing(o.swing) };
+    const loop = normaliseLoop(o.loop, transport.bars * TICKS_PER_BAR, this);
+    return loop === undefined ? swung : { ...swung, loop };
   }
 
   /**

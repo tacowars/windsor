@@ -5,36 +5,51 @@
  * the ticks queued after it, and the playhead never runs backward while
  * the old queue drains.
  *
+ * Stamps are held in issue order, each with its tick, because the tick is
+ * not monotonic: a loop (windsor#15) jumps it back from the loop end to the
+ * loop start. The times always are.
+ *
  * One preallocated ring, written once per tick: no allocation per tick.
  */
 import { TICK_STAMP_RING } from './schedulerConstants';
 
 export class TickStamps {
   private readonly times: Float64Array;
-  /** The first tick of the current run: stamps before it are stale. */
+  private readonly ticks: Float64Array;
+  /** The first tick of the current run: what `oldest` reads before anything is recorded. */
   private from = 0;
-  /** One past the last tick recorded. */
-  private end = 0;
+  /** Stamps recorded since the last `clear`; the next one lands at `count % size`. */
+  private count = 0;
 
   constructor(size = TICK_STAMP_RING) {
     this.times = new Float64Array(size);
+    this.ticks = new Float64Array(size);
   }
 
   /** Forget every stamp: the next run starts at `tick`. */
   clear(tick: number): void {
     this.from = tick;
-    this.end = tick;
+    this.count = 0;
   }
 
-  /** Record that `tick` was stamped `time`. Ticks arrive in order. */
+  /** Record that `tick` was stamped `time`. Times arrive in order; ticks may jump back. */
   record(tick: number, time: number): void {
-    this.times[tick % this.times.length] = time;
-    this.end = tick + 1;
+    const slot = this.count % this.times.length;
+    this.times[slot] = time;
+    this.ticks[slot] = tick;
+    this.count++;
   }
 
-  /** The oldest tick whose stamp is still held. */
+  /** The tick of the oldest stamp still held; the run's first tick when none is. */
   get oldest(): number {
-    return Math.max(this.from, this.end - this.times.length);
+    if (this.count === 0) return this.from;
+    return this.ticks[this.first() % this.ticks.length]!;
+  }
+
+  /** When the oldest held stamp sounds; null when none is held. */
+  get oldestTime(): number | null {
+    if (this.count === 0) return null;
+    return this.times[this.first() % this.times.length]!;
   }
 
   /**
@@ -43,9 +58,15 @@ export class TickStamps {
    */
   soundingAt(now: number, tolerance: number): number {
     const limit = now + tolerance;
-    for (let tick = this.end - 1; tick >= this.oldest; tick--) {
-      if (this.times[tick % this.times.length]! <= limit) return tick;
+    for (let i = this.count - 1; i >= this.first(); i--) {
+      const slot = i % this.times.length;
+      if (this.times[slot]! <= limit) return this.ticks[slot]!;
     }
     return -1;
+  }
+
+  /** The issue index of the oldest stamp still held. */
+  private first(): number {
+    return Math.max(0, this.count - this.times.length);
   }
 }
