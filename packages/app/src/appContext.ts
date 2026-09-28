@@ -14,6 +14,7 @@ import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import { PartsSession } from './partsSession';
 import { followSongLength } from './regionModel';
+import type { ToastTone } from './toastModel';
 
 /** The part of the engine host the context drives; a test's fake implements this much. */
 export type ContextHost = Pick<
@@ -35,7 +36,7 @@ interface Tab<P extends TabPanel> {
 export interface AppContextDeps {
   host: EngineHost;
   model: DocumentModel;
-  status: (message: string) => void;
+  notify: (message: string, tone?: ToastTone) => void;
 }
 
 export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
@@ -43,7 +44,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   readonly model: DocumentModel;
   readonly parts: PartsSession;
   readonly transport: ConsoleTransport;
-  readonly status: (message: string) => void;
+  readonly notify: (message: string, tone?: ToastTone) => void;
 
   private readonly tabs = new Map<string, Tab<P>>();
   private active: string | null = null;
@@ -53,7 +54,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   constructor(deps: AppContextDeps) {
     this.host = deps.host;
     this.model = deps.model;
-    this.status = deps.status;
+    this.notify = deps.notify;
     this.transport = deps.host.transport;
     this.parts = new PartsSession((patch) => this.commitPatch(patch));
   }
@@ -122,12 +123,13 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     const { partial, report } = followSongLength(this.model.doc, edit);
     const live = this.host.apply(partial);
     if (live && !live.ok) {
-      this.status(`refused: ${live.error ?? 'invalid'}`);
+      this.notify(`refused: ${live.error ?? 'invalid'}`, 'error');
       return live;
     }
     this.model.merge(partial);
-    if (report.length > 0) this.status(`song length: ${report.join(', ')} refitted`);
-    if (live && live.ignored.length > 0) this.status(`ignored: ${live.ignored.join(', ')}`);
+    if (report.length > 0) this.notify(`song length: ${report.join(', ')} refitted`);
+    if (live && live.ignored.length > 0)
+      this.notify(`ignored: ${live.ignored.join(', ')}`, 'warning');
     // No system to apply to because one is being built (the first enable, an
     // Import, a Restart): that build captured an older document, so queue the
     // current one behind it — coalesced, latest wins — or a part added or
@@ -155,7 +157,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   private rebuild(): void {
     void this.host.build(this.model.doc).then(
       () => this.render(),
-      (error: unknown) => this.status(String(error)),
+      (error: unknown) => this.notify(String(error), 'error'),
     );
     this.render();
   }

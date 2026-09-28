@@ -46,7 +46,8 @@ export function badgeText(ctx: AppCtx, slot: number): string {
  */
 export function renamePatch(ctx: AppCtx, from: string, to: string): void {
   if (to === '' || to === from) return;
-  if (ctx.model.doc.patches?.[to]) return ctx.status(`a document patch "${to}" already exists`);
+  if (ctx.model.doc.patches?.[to])
+    return ctx.notify(`a document patch "${to}" already exists`, 'warning');
   const patch = ctx.model.doc.patches?.[from];
   if (!patch) return;
   const parts: Record<number, { preset: string }> = {};
@@ -56,7 +57,7 @@ export function renamePatch(ctx: AppCtx, from: string, to: string): void {
   const result = ctx.change({ patches: { [from]: null, [to]: renamed }, parts });
   if (!result.ok) return;
   ctx.render();
-  ctx.status(`renamed document patch "${from}" to "${to}"`);
+  ctx.notify(`renamed document patch "${from}" to "${to}"`, 'success');
 }
 
 /**
@@ -72,10 +73,11 @@ export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = lib
   if (!entry) return;
   if (!ctx.change({ patches: { [name]: clonePatch(entry) } }).ok) return;
   ctx.render();
-  ctx.status(
+  ctx.notify(
     Object.hasOwn(builtInPresets(), name)
       ? `document patch "${name}" reset to the built-in`
       : `document patch "${name}" reset to the library copy`,
+    'success',
   );
 }
 

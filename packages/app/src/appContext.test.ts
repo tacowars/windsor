@@ -80,7 +80,7 @@ function openConsole(refuse = false): Console {
   console.ctx = new AppContext<TabPanel>({
     host: host as EngineHost,
     model: console.model,
-    status: (message) => status.push(message),
+    notify: (message) => status.push(message),
   });
   for (const id of TAB_IDS) {
     console.renders[id] = 0;

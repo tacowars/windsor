@@ -25,17 +25,15 @@ import { wirePowerButton } from './powerButton';
 import { newSong } from './songParts';
 import { songTab } from './songTab';
 import { mountTabShell } from './tabShell';
+import { mountToasts, notify } from './toast';
 import { mountTransportStrip } from './transportStrip';
 import { bootUserState } from './userSession';
 import './console.css';
 
-const status = (message: string): void => {
-  $('status').textContent = message;
-};
-
+mountToasts($('toasts'));
 const model = new DocumentModel(newSong());
-const host = new EngineHost(status);
-const ctx = new AppContext<HTMLElement>({ host, model, status });
+const host = new EngineHost((message) => notify(message, 'error'));
+const ctx = new AppContext<HTMLElement>({ host, model, notify });
 // The keyboard plays the Parts tab's selected part, once audio is enabled.
 const keyboard = new Keyboard(() => ctx.livePart());
 // A MIDI controller plays through the same keyboard (#523).
@@ -60,8 +58,6 @@ void midi.resume();
 wirePowerButton($('power'), ctx);
 // The user's patches and autosaved song (IndexedDB), and a remembered library
 // folder whose grant still stands; the row's button re-grants a dropped one.
-// The boot status goes first, so the session's own messages land after it.
-status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
-bootUserState(ctx).catch((error: unknown) => status(`your library: ${String(error)}`));
+bootUserState(ctx).catch((error: unknown) => notify(`your library: ${String(error)}`, 'error'));
 // The scheduler's look-ahead pump: a timer, since the console has no frame loop to drive it.
 setInterval(() => host.update(), HOST_PUMP_INTERVAL_MS);

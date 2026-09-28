@@ -1261,6 +1261,75 @@ body.env-dragging .env-canvas {
   color: var(--hot);
 }
 
+/* ---------- toasts (toast.ts): notices at the bottom right, never in the header ---------- */
+
+.toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  background: var(--panel-hi);
+  border: 1px solid var(--line-bright);
+  border-left: 3px solid var(--ink-faint);
+  border-radius: var(--r);
+  padding: 9px 8px 9px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: toast-in 160ms ease-out;
+}
+.toast-success {
+  border-left-color: var(--modulator);
+}
+.toast-warning {
+  border-left-color: var(--carrier);
+}
+.toast-error {
+  border-left-color: var(--hot);
+}
+.toast-text {
+  flex: 1;
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.toast-close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: -2px 0;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.toast-close:hover {
+  background: var(--inset);
+  color: var(--ink);
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 dialog {
   background: var(--panel);
   color: var(--ink);

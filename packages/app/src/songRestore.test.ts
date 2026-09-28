@@ -24,7 +24,7 @@ function context(): AppCtx & { messages: string[] } {
     messages,
     parts: { selected: 2 },
     importDoc: (raw: unknown) => model.open(raw),
-    status: (message: string) => messages.push(message),
+    notify: (message: string) => messages.push(message),
   } as unknown as AppCtx & { messages: string[] };
 }
 

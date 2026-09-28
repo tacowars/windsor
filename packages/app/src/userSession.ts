@@ -4,11 +4,12 @@
  * built-ins, offer to restore the autosaved song, and from then on autosave
  * the open song after each change and whenever the page is hidden. Where the
  * browser has no IndexedDB, the library is the built-ins alone and Save
- * downloads, as before.
+ * downloads, as before. It also says the console's first word: the new-song
+ * hint, or what became of the last session.
  */
 import type { AppCtx } from './context';
 import { bootLibrary, syncLibraryMode } from './libraryActions';
-import { library } from './libraryModel';
+import { EVICTABLE_WARNING } from './libraryConstants';
 import { openConfirm } from './metadataModal';
 import { SongAutosave } from './songAutosave';
 import { offerRestore } from './songRestore';
@@ -16,10 +17,9 @@ import { browserPersist, persistOnce } from './storagePersistence';
 import { openUserStores } from './userLibraryStore';
 
 export async function bootUserState(ctx: AppCtx): Promise<void> {
-  const ensurePersisted = persistOnce(browserPersist(), () => {
-    library.evictable = true;
-    syncLibraryMode();
-  });
+  const ensurePersisted = persistOnce(browserPersist(), () =>
+    ctx.notify(EVICTABLE_WARNING, 'warning'),
+  );
   const stores = await openUserStores(() => void ensurePersisted());
   const stored = stores ? await stores.songs.load().catch(() => null) : null;
   // The question and the library load run together; a restore waits for the built-ins itself.
@@ -30,12 +30,14 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
     }),
     offerRestore(ctx, stored, openConfirm),
   ]);
-  if (!restored && stored) ctx.status('new song — your last session is kept until your first edit');
+  if (!stored)
+    ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
+  else if (!restored) ctx.notify('new song — your last session is kept until your first edit');
   if (!stores) return;
   const autosave = new SongAutosave({
     store: stores.songs,
     read: () => ctx.model.toJson(),
-    report: ctx.status,
+    report: (message) => ctx.notify(message, 'error'),
   });
   ctx.model.onChange(() => autosave.schedule());
   document.addEventListener('visibilitychange', () => {

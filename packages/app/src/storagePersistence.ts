@@ -4,7 +4,7 @@
  * write. A refusal is reported, never fatal: the data is still stored, only
  * evictable (`2026-09-27-user-library-in-indexeddb`). Chrome declines for
  * most sites a visitor has not bookmarked or used much, so the refusal is
- * the common case: it marks the library line, and never the status line.
+ * the common case: one warning toast, beside the save's own.
  */
 
 /** Resolves true when storage is (now) persistent. */
