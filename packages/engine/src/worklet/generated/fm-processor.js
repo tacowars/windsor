@@ -870,17 +870,17 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
     if (carC) sig += oC * aC;
     if (carD) sig += oD * aD;
     sig *= gain;
+    if (mode !== FILT_OFF) {
+      if (drive !== 1) sig = softClip(sig * drive);
+      sig = voice.svfA.process(sig, mode);
+      if (slope24) sig = voice.svfB.process(sig, mode);
+    }
     if (fadeInc !== 0) {
       fade += fadeInc;
       if (fade <= 0) {
         fade = 0;
       }
       sig *= fade;
-    }
-    if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
-      sig = voice.svfA.process(sig, mode);
-      if (slope24) sig = voice.svfB.process(sig, mode);
     }
     const k = off + s;
     outL[k] += sig * panL;
@@ -983,17 +983,17 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       sig += out[i] * amp[i];
     }
     sig *= gain;
+    if (mode !== FILT_OFF) {
+      if (drive !== 1) sig = softClip(sig * drive);
+      sig = voice.svfA.process(sig, mode);
+      if (slope24) sig = voice.svfB.process(sig, mode);
+    }
     if (fadeInc !== 0) {
       fade += fadeInc;
       if (fade <= 0) {
         fade = 0;
       }
       sig *= fade;
-    }
-    if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
-      sig = voice.svfA.process(sig, mode);
-      if (slope24) sig = voice.svfB.process(sig, mode);
     }
     const k = off + s;
     outL[k] += sig * voice.panL;
@@ -1560,6 +1560,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         if (!v.active) continue;
         let done = 0;
         while (done < seg) {
+          if (!v.active) break;
           if (v.ctrlCount === 0 && dormancy && v.dormant) {
             v.age += seg - done;
             break;
