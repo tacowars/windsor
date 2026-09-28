@@ -4,9 +4,11 @@
  * render, encode, write — with its cancel, and the notice that says where the
  * file went.
  *
- * A cancel during the write counts too: the sink gets the signal and aborts
- * its write, so the destination keeps what it had and the run reports
- * `cancelled`, never `saved`.
+ * A cancel during the write counts until the sink's commit point: the sink
+ * gets the signal and aborts its write, so the destination keeps what it had
+ * and the run reports `cancelled`, never `saved`. Past that point (a Save as
+ * whose `close()` is called, windsor#51 decision 2) a Cancel changes nothing:
+ * the run reports what the write did, `saved` or its own error.
  *
  * A render cancelled or failed writes nothing: the sink is written only once
  * the whole file is encoded, and a sink opened ahead of the render (the save
@@ -66,7 +68,8 @@ export interface WavSink {
   readonly where: string;
   /**
    * Write the whole file, or reject with an `AbortError` and leave the
-   * destination as it was once `signal` fires. Resolves only once written.
+   * destination as it was once `signal` fires before the commit point.
+   * Resolves only once written; past the commit point `signal` is ignored.
    */
   write(bytes: Uint8Array, signal: AbortSignal): Promise<void>;
   /** The run will not write; release anything held. Never deletes a file the user picked. */
@@ -101,6 +104,7 @@ export type AudioExportOutcome =
 
 export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOutcome> {
   const { settings, sink, signal } = run;
+  let writing = false;
   try {
     const rendered = await run.render(run.document, {
       sampleRate: settings.sampleRate,
@@ -116,11 +120,15 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
       { signal },
     );
     if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
+    // From here the sink decides: past its commit point a Cancel changes
+    // nothing, and the write resolves (saved) or fails with its own error.
+    writing = true;
     await sink.write(bytes, signal);
     return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped };
   } catch (error) {
     await sink.discard().catch(() => undefined);
-    if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+    const abortError = error instanceof DOMException && error.name === 'AbortError';
+    if (abortError || (signal.aborted && !writing)) {
       return { kind: 'cancelled' };
     }
     return { kind: 'failed', error: error instanceof Error ? error.message : String(error) };

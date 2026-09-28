@@ -184,6 +184,25 @@ describe('runAudioExport', () => {
     expect(aborted).toBe(true);
   });
 
+  it("a cancel past the sink's commit point reports what the write did", async () => {
+    for (const [result, expected] of [
+      [undefined, { kind: 'saved', fileName: 'song.wav', where: 'x', clipped: 0 }],
+      [new Error('quota exceeded'), { kind: 'failed', error: 'quota exceeded' }],
+    ] as const) {
+      const controller = new AbortController();
+      const sink: WavSink = {
+        where: 'x',
+        // A sink that has committed (a Save as whose close is called): it ignores the cancel.
+        write: () => {
+          controller.abort();
+          return result ? Promise.reject(result) : Promise.resolve();
+        },
+        discard: () => Promise.resolve(),
+      };
+      expect(await runAudioExport(run({ sink, signal: controller.signal }))).toEqual(expected);
+    }
+  });
+
   it('a cancel that lands between encode and write never calls the sink', async () => {
     const sink = fakeSink();
     const controller = new AbortController();
