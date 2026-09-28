@@ -107,6 +107,14 @@ describe('operator width on a sine', () => {
   });
 });
 
+describe('width on a noise operator', () => {
+  it('is ignored: a noise draw has no phase to squeeze', () => {
+    expect(
+      sameBits(hold(lone({ wave: WAVE.NOISE, width: 0.25 })), hold(lone({ wave: WAVE.NOISE }))),
+    ).toBe(true);
+  });
+});
+
 describe('a width stepped mid-note', () => {
   it('ramps from 1 to 0.3 with no jump beyond the wave’s own swing', () => {
     const processor: ProcessorLike = loaded.create(makePatch(lone({})), 1);
