@@ -1,9 +1,9 @@
 /**
  * The FM worklet's tunables (#644): table size, mip count, the control-rate
- * interval, the dormancy floors, the modulation and feedback depths and the
- * shortest envelope segment. Data, not logic: every other module under `fm/`
- * imports what it needs from here, and none of these is read by the main
- * thread. A change here changes every render; `fmProcessorGolden.test.ts`
+ * interval, the dormancy floors, the modulation and feedback depths, the
+ * shortest envelope segment and the width ramp's snap. Data, not logic: every
+ * other module under `fm/` imports what it needs from here, and none of these
+ * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
  * says so, and `fmProcessorKernel.test.ts` pins `MOD_INDEX_SCALE` against the
  * bank it was authored at (#543).
  */
@@ -57,6 +57,14 @@ const MIN_SEG_TIME = 0.0005; // shortest envelope segment, seconds
  * is linear, positive bows the segment down, negative bows it up.
  */
 const ENVELOPE_CURVE_STEEPNESS = 3;
+/*
+ * Operator width's ramp (#55) lands exactly on its target once the two are
+ * this close, so a width that returns to 1 takes the plain wave's path again
+ * rather than creeping at a float32 ulp for the rest of the note. The value
+ * the loops ramp is at most 1 / WIDTH_RANGE.min = 20, where a float32 ulp is
+ * about 2e-6; a step of 1e-5 in it moves the read phase by 1e-5 of a cycle.
+ */
+const WIDTH_SNAP = 1e-5;
 
 export {
   TABLE_SIZE,
@@ -71,4 +79,5 @@ export {
   FEEDBACK_SQUARE_CYCLES,
   MIN_SEG_TIME,
   ENVELOPE_CURVE_STEEPNESS,
+  WIDTH_SNAP,
 };
