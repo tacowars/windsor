@@ -73,6 +73,17 @@ export type {
   GridStep,
   GridStepKind,
 } from './sequencing/gridSequencer';
+// Per-step parameter modulation (windsor#17): the lanes and the table behind them.
+export { isStepModParam, stepModAt } from './sequencing/stepModLanes';
+export type { StepModLane } from './sequencing/stepModLanes';
+export {
+  STEP_MOD_LANES_MAX,
+  STEP_MOD_PARAMS,
+  STEP_MOD_SLOT_COUNT,
+  STEP_MOD_TABLE,
+} from './worklet/fm/stepModTables';
+export type { StepModCurve, StepModParam, StepModRow } from './worklet/fm/stepModTables';
+export { stepModValue } from './worklet/fm/stepModValue';
 export {
   CHORD_STEP_KINDS,
   ChordSequencer,

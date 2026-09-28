@@ -106,6 +106,20 @@ describe('AudioPart note extras (#602)', () => {
   });
 });
 
+describe('AudioPart step offsets (windsor#17)', () => {
+  it('posts a step’s offsets beside its mod, and nothing for a note without', () => {
+    const { part, sent } = makePart();
+    const stepMod = [0, 0.5, -0.25];
+    part.noteOn(60, 0.9, undefined, { mod: 1, slide: false, stepMod });
+    part.noteOn(62, 0.9, undefined, { mod: 1 });
+    const ons = sent.filter((m) => m.type === 'noteOn') as Array<
+      Sent & { stepMod?: readonly number[] }
+    >;
+    expect(ons[0]).toMatchObject({ note: 60, mod: 1, stepMod });
+    expect(ons[1]).not.toHaveProperty('stepMod');
+  });
+});
+
 describe('AudioPart held notes (windsor#40)', () => {
   it('keeps note messages back while held, hands them over in order, then posts again', () => {
     const { part, sent } = makePart();

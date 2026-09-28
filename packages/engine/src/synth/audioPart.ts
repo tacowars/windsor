@@ -16,6 +16,8 @@ export interface NoteExtras {
   mod?: number;
   /** Take over the held voice legato (mono patches); otherwise an ordinary note-on. */
   slide?: boolean;
+  /** A step's parameter offsets, one slot per `STEP_MOD_TABLE` row (windsor#17); absent for none. */
+  stepMod?: readonly number[];
 }
 
 export class AudioPart {
@@ -89,7 +91,8 @@ export class AudioPart {
    * Start a note. Omit `time` for "as soon as possible"; pass a context time to
    * place it exactly, which is what the scheduler does.
    *
-   * `extras` carries a grid step's accent mod and slide flag (#602).
+   * `extras` carries a grid step's accent mod and slide flag (#602) and its
+   * parameter offsets (windsor#17).
    *
    * @returns a handle for `noteOff`.
    */
@@ -104,6 +107,7 @@ export class AudioPart {
     };
     if (extras?.mod !== undefined && extras.mod !== 0) message.mod = extras.mod;
     if (extras?.slide) message.slide = true;
+    if (extras?.stepMod) message.stepMod = extras.stepMod;
     this.schedule(message);
     const ids = this.heldByNote.get(note);
     if (ids) ids.push(id);

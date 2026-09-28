@@ -68,7 +68,7 @@ function renderVoiceGeneric(
     tables = voice.tables;
   const width = voice.width,
     widthInc = voice.widthInc;
-  const fbAmt = patch.feedbackScratch; // Float32Array(4), refreshed by the part
+  const fbAmt = voice.opFeedback; // Float32Array(4): the patch's, or the step's (windsor#17)
 
   // Width (#55), one bit per operator, hoisted: `ramping` advances its width
   // each sample, `squeezed` reads its wave compressed. Neither is set for a

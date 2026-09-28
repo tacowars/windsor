@@ -27,6 +27,12 @@ export interface NoteOnEvent {
    * starting a new one. Emitted before the held note's off at the same tick.
    */
   slide?: boolean;
+  /**
+   * Step modulation (windsor#17): the step's parameter offsets, one slot per
+   * `STEP_MOD_TABLE` row, held for the note's life. Absent when every lane
+   * reads 0 on the step, or the generator has none.
+   */
+  stepMod?: readonly number[];
 }
 
 export interface NoteOffEvent {

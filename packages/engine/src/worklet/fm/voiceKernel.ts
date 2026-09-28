@@ -78,7 +78,7 @@ function renderVoiceKernel(
     ampInc = voice.ampInc;
   const kind = voice.kind,
     tables = voice.tables;
-  const fbAmt = patch.feedbackScratch;
+  const fbAmt = voice.opFeedback;
   const edges = voice.edges,
     carriers = voice.carrierBits;
 

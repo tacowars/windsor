@@ -26,6 +26,11 @@
  * restarts when the playhead enters a region and the skip stream is minted
  * there from `hashSeed(seed, regionIndex)` (`enter`); a single ∞ region
  * free-runs. A skipped step (one draw per note step) is a rest.
+ *
+ * Step modulation lanes (windsor#17, `stepModLanes.ts`): a note step's
+ * note-on carries the lanes' offsets at that step, held for the note's life;
+ * a slide hands them to the retargeted voice. No lanes, or lanes at 0 on a
+ * step, send nothing, and the note-on is what it was.
  */
 import {
   ACCENT_MOD_DEFAULT,
@@ -38,6 +43,7 @@ import {
 import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import type { ScaleSampler } from './scaleSampler';
+import { assertStepModLanes, stepModAt, type StepModLane } from './stepModLanes';
 import {
   DIVISORS,
   isBarDivisor,
@@ -82,6 +88,11 @@ export interface GridSequencerConfig {
   register: { octave: number };
   /** The part's own seed (decision 16); the stream per region is `hashSeed(seed, regionIndex)`. */
   seed: number;
+  /**
+   * Step modulation (windsor#17): at most `STEP_MOD_LANES_MAX` lanes, each
+   * one value per step; the normaliser keeps them as long as `steps`.
+   */
+  lanes: readonly StepModLane[];
 }
 
 /** A plain note step on the root at the register octave. */
@@ -103,6 +114,7 @@ export const DEFAULT_GRID_CONFIG: GridSequencerConfig = {
   accentMod: ACCENT_MOD_DEFAULT,
   register: { octave: GRID_REGISTER_OCTAVE_DEFAULT },
   seed: 0,
+  lanes: [],
 };
 
 function assertStep(step: GridStep, index: number): void {
@@ -145,6 +157,7 @@ export function assertGridConfig(config: GridSequencerConfig): void {
     throw new RangeError(`accentMod must be in [0, 1], got ${config.accentMod}`);
   }
   if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
+  assertStepModLanes(config.lanes);
 }
 
 export class GridSequencer {
@@ -214,7 +227,8 @@ export class GridSequencer {
 
   /** One step. Returns the events it emitted; an empty array is a tie. */
   handleTick(event: TickEvent): NoteEvent[] {
-    const step = this.current.steps[this.stepAt(event.step)];
+    const index = this.stepAt(event.step);
+    const step = this.current.steps[index];
     if (!step || step.kind === 'tie') return [];
     if (step.kind === 'rest') return this.restStep(event);
     // One draw per note step, whatever the rest of the line does, so an edit
@@ -222,10 +236,10 @@ export class GridSequencer {
     if (this.current.skipChance > 0 && this.rng() < this.current.skipChance) {
       return this.restStep(event);
     }
-    return this.noteStep(event, step);
+    return this.noteStep(event, step, index);
   }
 
-  private noteStep(event: TickEvent, step: GridNoteStep): NoteEvent[] {
+  private noteStep(event: TickEvent, step: GridNoteStep, index: number): NoteEvent[] {
     const note = this.sampler.noteForFolded(
       step.degree,
       this.current.register.octave + step.octave,
@@ -244,6 +258,8 @@ export class GridSequencer {
       on.accent = { velocity: this.current.accentVelocity, mod: this.current.accentMod };
     }
     if (slide) on.slide = true;
+    const stepMod = stepModAt(this.current.lanes, index);
+    if (stepMod) on.stepMod = stepMod;
 
     const events: NoteEvent[] = [];
     const off: NoteEvent | null =

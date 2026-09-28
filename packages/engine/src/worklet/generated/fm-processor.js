@@ -321,8 +321,6 @@ function normalisePatch(raw) {
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS)
     }
   };
-  p.feedbackScratch = new Float32Array(OPERATOR_COUNT);
-  for (let i = 0; i < OPERATOR_COUNT; i++) p.feedbackScratch[i] = ops[i].feedback;
   return p;
 }
 
@@ -364,10 +362,14 @@ var Envelope = class {
     this.p = null;
     this.sr = 48e3;
     this.timeScale = 1;
+    this.decayTime = 0;
+    this.decayCurve = 0;
   }
   configure(params, sampleRate2) {
     this.p = params;
     this.sr = sampleRate2;
+    this.decayTime = params.decayTime;
+    this.decayCurve = params.decayCurve;
   }
   noteOn() {
     const p = this.p;
@@ -403,9 +405,9 @@ var Envelope = class {
         curve = p.attackCurve;
         break;
       case ST_DECAY:
-        time = p.decayTime;
+        time = this.decayTime;
         target = p.sustainLevel;
-        curve = p.decayCurve;
+        curve = this.decayCurve;
         break;
       default:
         time = p.releaseTime;
@@ -651,6 +653,66 @@ function secondLfoSeed(seed) {
   return x || 1;
 }
 
+// packages/engine/src/worklet/fm/stepModTables.ts
+var STEP_MOD_FILTER_ROWS = [
+  { param: "filter.envAmount", curve: "linear", span: 6, min: -6, max: 6, slideKeeps: false },
+  { param: "filter.cutoff", curve: "octaves", span: 4.5, min: 30, max: 18e3, slideKeeps: false },
+  { param: "filter.resonance", curve: "linear", span: 6, min: 0.5, max: 12, slideKeeps: false },
+  {
+    param: "filter.env.decayTime",
+    curve: "log",
+    span: 0.5,
+    min: 1e-3,
+    max: 20,
+    slideKeeps: false
+  }
+];
+var STEP_MOD_OPERATOR_ROWS = [
+  { field: "level", curve: "linear", span: 0.5, min: 0, max: 1, slideKeeps: false },
+  { field: "env.decayTime", curve: "log", span: 0.5, min: 1e-3, max: 20, slideKeeps: false },
+  { field: "env.decayCurve", curve: "linear", span: 1, min: -1, max: 1, slideKeeps: true },
+  {
+    field: "feedback",
+    curve: "linear",
+    span: 1,
+    min: FEEDBACK_RANGE.min,
+    max: FEEDBACK_RANGE.max,
+    slideKeeps: true
+  },
+  {
+    field: "width",
+    curve: "linear",
+    span: 0.5,
+    min: WIDTH_RANGE.min,
+    max: WIDTH_RANGE.max,
+    slideKeeps: false
+  }
+];
+var STEP_MOD_TABLE = [
+  ...STEP_MOD_FILTER_ROWS,
+  ...Array.from(
+    { length: OPERATOR_COUNT },
+    (_, i) => STEP_MOD_OPERATOR_ROWS.map(({ field, ...row }) => ({
+      param: `ops.${i}.${field}`,
+      ...row
+    }))
+  ).flat()
+];
+var STEP_MOD_PARAMS = STEP_MOD_TABLE.map((row) => row.param);
+var STEP_MOD_SLOT_COUNT = STEP_MOD_TABLE.length;
+var STEP_MOD_LANES_MAX = 4;
+var STEP_SLOT_ENV_AMOUNT = 0;
+var STEP_SLOT_CUTOFF = 1;
+var STEP_SLOT_RESONANCE = 2;
+var STEP_SLOT_FILTER_DECAY = 3;
+var STEP_SLOT_OP_BASE = STEP_MOD_FILTER_ROWS.length;
+var STEP_SLOT_OP_STRIDE = STEP_MOD_OPERATOR_ROWS.length;
+var STEP_OP_LEVEL = 0;
+var STEP_OP_DECAY = 1;
+var STEP_OP_DECAY_CURVE = 2;
+var STEP_OP_FEEDBACK = 3;
+var STEP_OP_WIDTH = 4;
+
 // packages/engine/src/worklet/fm/svf.ts
 var Svf = class {
   constructor() {
@@ -728,7 +790,7 @@ function restingWidth(kind, width) {
 }
 function updateOperatorWidth(voice, i, freq, lfoVal, lfo2Val, n) {
   const patch = voice.patch;
-  const raw = patch.ops[i].width + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
+  const raw = voice.opWidth[i] + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
   const width = raw < WIDTH_RANGE.min ? WIDTH_RANGE.min : raw > WIDTH_RANGE.max ? WIDTH_RANGE.max : raw;
   const kind = voice.kind[i];
   if (kind === KIND_TABLE && voice.mips[i]) {
@@ -776,16 +838,17 @@ function updateVoiceControl(voice, n, bend, wheel, cutoffMod) {
     const velAmp = 1 - op.velSens + op.velSens * velCurve;
     const keyAmp = specialise ? voice.levelKeyAmp[i] : Math.pow(2, -op.levelKeyScale * keyOffset);
     const lfoAmp = 1 + lfoVal * lfoP.toOp[i] + lfo2Val * lfo2P.toOp[i];
-    const target = env * op.level * op.level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
+    const level = voice.opLevel[i];
+    const target = env * level * level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
     voice.ampInc[i] = (target - voice.amp[i]) / n;
   }
   const f = patch.filter;
   if (f.mode !== FILT_OFF) {
     const fenv = voice.filtEnv.advance(n);
-    const octaves = fenv * (f.envAmount + modWheel * f.modWheelDepth) + lfoVal * f.lfoAmount + f.keyTrack * keyOffset + cutoffMod + lfo2Val * f.lfo2Amount;
-    const cutoff = f.cutoff * Math.pow(2, octaves);
-    voice.svfA.setCoeffs(cutoff, f.resonance, voice.sr);
-    if (f.slope24) voice.svfB.setCoeffs(cutoff, f.resonance, voice.sr);
+    const octaves = fenv * (voice.envAmount + modWheel * f.modWheelDepth) + lfoVal * f.lfoAmount + f.keyTrack * keyOffset + cutoffMod + lfo2Val * f.lfo2Amount;
+    const cutoff = voice.cutoff * Math.pow(2, octaves);
+    voice.svfA.setCoeffs(cutoff, voice.resonance, voice.sr);
+    if (f.slope24) voice.svfB.setCoeffs(cutoff, voice.resonance, voice.sr);
   }
   voice.age += n;
 }
@@ -806,7 +869,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const phase = voice.phase, phaseInc = voice.phaseInc, out = voice.out;
   const fb1 = voice.fb1, fb2 = voice.fb2, amp = voice.amp, ampInc = voice.ampInc;
   const kind = voice.kind, tables = voice.tables;
-  const fbAmt = patch.feedbackScratch;
+  const fbAmt = voice.opFeedback;
   const edges = voice.edges, carriers = voice.carrierBits;
   const kA = kind[A], kB = kind[B], kC = kind[C], kD = kind[D];
   const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0;
@@ -1107,7 +1170,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const fb1 = voice.fb1, fb2 = voice.fb2, amp = voice.amp, ampInc = voice.ampInc;
   const kind = voice.kind, tables = voice.tables;
   const width = voice.width, widthInc = voice.widthInc;
-  const fbAmt = patch.feedbackScratch;
+  const fbAmt = voice.opFeedback;
   let ramping = 0, squeezed = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
@@ -1222,6 +1285,56 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   }
 }
 
+// packages/engine/src/worklet/fm/stepModValue.ts
+function stepModValue(row, base, v) {
+  if (v === 0) return base;
+  let x;
+  if (row.curve === "octaves") x = base * Math.pow(2, v * row.span);
+  else if (row.curve === "log") x = base * Math.pow(row.max / row.min, v * row.span);
+  else x = base + v * row.span;
+  return x < row.min ? row.min : x > row.max ? row.max : x;
+}
+
+// packages/engine/src/worklet/fm/voiceStepMod.ts
+function loadStepOffsets(voice, src, slide) {
+  const dst = voice.stepOffsets;
+  const n = src ? src.length : 0;
+  for (let s = 0; s < STEP_MOD_SLOT_COUNT; s++) {
+    if (slide && STEP_MOD_TABLE[s].slideKeeps) continue;
+    const raw = s < n ? src[s] : 0;
+    const v = typeof raw === "number" && raw === raw ? raw : 0;
+    dst[s] = v < -1 ? -1 : v > 1 ? 1 : v;
+  }
+}
+function bindStepMod(voice, patch) {
+  const o = voice.stepOffsets;
+  const t = STEP_MOD_TABLE;
+  const f = patch.filter;
+  voice.envAmount = stepModValue(t[STEP_SLOT_ENV_AMOUNT], f.envAmount, o[STEP_SLOT_ENV_AMOUNT]);
+  voice.cutoff = stepModValue(t[STEP_SLOT_CUTOFF], f.cutoff, o[STEP_SLOT_CUTOFF]);
+  voice.resonance = stepModValue(t[STEP_SLOT_RESONANCE], f.resonance, o[STEP_SLOT_RESONANCE]);
+  const fd = STEP_SLOT_FILTER_DECAY;
+  voice.filtEnv.decayTime = stepModValue(t[fd], f.env.decayTime, o[fd]);
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const op = patch.ops[i];
+    const env = voice.ampEnv[i];
+    const b = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
+    const lv = b + STEP_OP_LEVEL, dc = b + STEP_OP_DECAY, cv = b + STEP_OP_DECAY_CURVE, fb = b + STEP_OP_FEEDBACK, wd = b + STEP_OP_WIDTH;
+    voice.opLevel[i] = stepModValue(t[lv], op.level, o[lv]);
+    env.decayTime = stepModValue(t[dc], op.env.decayTime, o[dc]);
+    env.decayCurve = stepModValue(t[cv], op.env.decayCurve, o[cv]);
+    voice.opFeedback[i] = stepModValue(t[fb], op.feedback, o[fb]);
+    voice.opWidth[i] = stepModValue(t[wd], op.width, o[wd]);
+  }
+}
+function startStepMod(voice, patch, stepMod) {
+  loadStepOffsets(voice, stepMod, false);
+  bindStepMod(voice, patch);
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    voice.width[i] = restingWidth(voice.kind[i], voice.opWidth[i]);
+  }
+}
+
 // packages/engine/src/worklet/fm/voice.ts
 var Voice = class {
   constructor(sampleRate2, random) {
@@ -1272,6 +1385,13 @@ var Voice = class {
     this.carrierBits = 0;
     this.detuneMul = new Float64Array(4);
     this.levelKeyAmp = new Float64Array(4);
+    this.stepOffsets = new Float64Array(STEP_MOD_SLOT_COUNT);
+    this.envAmount = 0;
+    this.cutoff = 0;
+    this.resonance = 0;
+    this.opLevel = new Float64Array(4);
+    this.opFeedback = new Float32Array(4);
+    this.opWidth = new Float64Array(4).fill(1);
   }
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */
   bindConstants(patch) {
@@ -1287,13 +1407,13 @@ var Voice = class {
     this.noiseSeed = x;
     return x / 2147483647 - 1;
   }
-  /** Bind a patch and its prebuilt wavetables. Called on note-on. */
+  /** Bind a patch, its prebuilt wavetables and the step's offsets (windsor#17). Called on note-on. */
   // Gathering these into an options object would allocate one per note-on, and
   // this class exists to keep the audio thread allocation-free. They are also
-  // all primitives written straight into preallocated fields, so there is no
-  // cohesive sub-object to extract.
-  // eslint-disable-next-line max-params -- allocation-free note-on, see above
-  start(patch, waveSets, note, velocity, detune, pan, glideFrom, voiceId) {
+  // all primitives (or the message's own offset array) written straight into
+  // preallocated fields, so there is no cohesive sub-object to extract.
+  // eslint-disable-next-line max-params, max-lines-per-function -- allocation-free note-on, see above; one note's setup read top to bottom, 61 of 60 since the step offsets (windsor#17)
+  start(patch, waveSets, note, velocity, detune, pan, glideFrom, voiceId, stepMod) {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
@@ -1325,7 +1445,6 @@ var Voice = class {
       this.amp[i] = 0;
       this.ampInc[i] = 0;
       this.kind[i] = waveKind(op.wave);
-      this.width[i] = restingWidth(this.kind[i], op.width);
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
       this.ampEnv[i].configure(op.env, this.sr);
@@ -1343,6 +1462,7 @@ var Voice = class {
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
     this.svfA.reset();
     this.svfB.reset();
+    startStepMod(this, patch, stepMod);
   }
   /**
    * Re-point a sounding voice at a new patch (the console's live knobs). Phase,
@@ -1357,14 +1477,12 @@ var Voice = class {
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
     const keyOffset = (this.note - 60) / 12;
+    let switched = 0;
     for (let i = 0; i < 4; i++) {
       const op = patch.ops[i];
       const wasPulse = this.kind[i] === KIND_PULSE;
       this.kind[i] = waveKind(op.wave);
-      if (wasPulse !== (this.kind[i] === KIND_PULSE)) {
-        this.width[i] = restingWidth(this.kind[i], op.width);
-        this.widthInc[i] = 0;
-      }
+      if (wasPulse !== (this.kind[i] === KIND_PULSE)) switched |= 1 << i;
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
       this.ampEnv[i].configure(op.env, this.sr);
@@ -1374,14 +1492,23 @@ var Voice = class {
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
+    bindStepMod(this, patch);
+    for (let i = 0; i < 4; i++) {
+      if ((switched & 1 << i) === 0) continue;
+      this.width[i] = restingWidth(this.kind[i], this.opWidth[i]);
+      this.widthInc[i] = 0;
+    }
   }
   /**
    * Legato slide (#602): re-point a sounding voice at a new note. The pitch
    * glides from wherever it is over `glideSeconds`; envelopes, LFO, phase and
    * filter state carry on, so nothing retriggers. The constants that depend on
-   * the key offset are recomputed for the new note, as `rebind` does.
+   * the key offset are recomputed for the new note, as `rebind` does. The new
+   * step's offsets apply from here, except the rows a sounding voice cannot
+   * change without a click (`slideKeeps`: decay curve, feedback), which keep
+   * the old step's (windsor#17).
    */
-  retarget(note, velocity, mod, glideSeconds) {
+  retarget(note, velocity, mod, glideSeconds, stepMod) {
     const patch = this.patch;
     this.note = note;
     this.pitchTarget = note;
@@ -1394,6 +1521,8 @@ var Voice = class {
     }
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.bindConstants(patch);
+    loadStepOffsets(this, stepMod, true);
+    bindStepMod(this, patch);
   }
   release() {
     if (!this.active) return;
@@ -1719,7 +1848,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     const mod = num(msg.mod, 0);
     const count = p.spread > 0 ? 2 : 1;
     const glideFrom = p.glide > 0 && this.lastNote != null ? this.lastNote : null;
-    if (msg.slide && p.mono && this.slideTo(id, msg.note, vel, mod)) return;
+    if (msg.slide && p.mono && this.slideTo(id, msg, vel, mod)) return;
     if (p.mono) this.cutSounding();
     let list = this.noteMap.get(id);
     if (list) this.noteOffId(id);
@@ -1730,7 +1859,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
       const detune = count === 1 ? 0 : sign * p.spread / 100;
       let pan = p.pan + p.panKey * ((msg.note - 60) / 48) + p.panRandom * (this.random() * 2 - 1);
       if (count > 1) pan += sign * 0.35 * Math.min(1, p.spread / 50);
-      v.start(p, this.waveSets, msg.note, vel, detune, pan, glideFrom, id);
+      v.start(p, this.waveSets, msg.note, vel, detune, pan, glideFrom, id, msg.stepMod);
       v.mod = mod;
       list.push(v);
     }
@@ -1738,12 +1867,14 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.lastNote = msg.note;
   }
   /**
-   * Retarget the held note's voices to `note` under handle `id` (#602). In
-   * mono at most one handle is gated, so the first gated voice names it.
-   * False when nothing is sounding: the caller starts a fresh voice instead.
-   * Allocates nothing beyond the map's own bookkeeping, as `noteOn` does.
+   * Retarget the held note's voices to the message's note and step offsets
+   * (windsor#17) under handle `id` (#602). In mono at most one handle is
+   * gated, so the first gated voice names it. False when nothing is
+   * sounding: the caller starts a fresh voice instead. Allocates nothing
+   * beyond the map's own bookkeeping, as `noteOn` does.
    */
-  slideTo(id, note, velocity, mod) {
+  slideTo(id, msg, velocity, mod) {
+    const note = msg.note;
     const vs = this.voices;
     let heldId = null;
     for (let i = 0; i < vs.length; i++) {
@@ -1761,7 +1892,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     for (let i = 0; i < list.length; i++) {
       const v = list[i];
       if (v.voiceId !== heldId) continue;
-      v.retarget(note, velocity, mod, glide);
+      v.retarget(note, velocity, mod, glide, msg.stepMod);
       v.voiceId = id;
     }
     this.noteMap.delete(heldId);

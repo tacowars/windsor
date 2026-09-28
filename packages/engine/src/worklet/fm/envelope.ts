@@ -5,6 +5,9 @@
  * console draws with — `envelopeCurve.ts` mirrors them and
  * `envelopeCurve.test.ts` pins the two sample for sample (#620) until #656
  * shares the function. `patchLibraryEnvelope.test.ts` pins release completion.
+ * The decay's time and curve are the envelope's own copies, which `configure`
+ * takes from the parameter block and a step's offsets may then replace for
+ * one note (windsor#17, `voiceStepMod.ts`).
  */
 
 import type { Envelope as EnvelopeParams } from '../../patch/patch';
@@ -55,6 +58,8 @@ class Envelope {
   p: EnvelopeParams | null;
   sr: number;
   timeScale: number;
+  decayTime: number;
+  decayCurve: number;
 
   constructor() {
     this.state = ST_IDLE;
@@ -64,11 +69,16 @@ class Envelope {
     this.p = null; // parameter block, owned by the voice's patch
     this.sr = 48000;
     this.timeScale = 1; // key tracking: >1 slower, <1 faster
+    // The decay segment's, from `configure`; a step's offsets replace them per note (windsor#17).
+    this.decayTime = 0;
+    this.decayCurve = 0;
   }
 
   configure(params: EnvelopeParams, sampleRate: number): void {
     this.p = params;
     this.sr = sampleRate;
+    this.decayTime = params.decayTime;
+    this.decayCurve = params.decayCurve;
   }
 
   noteOn(): void {
@@ -109,9 +119,9 @@ class Envelope {
         curve = p.attackCurve;
         break;
       case ST_DECAY:
-        time = p.decayTime;
+        time = this.decayTime;
         target = p.sustainLevel;
-        curve = p.decayCurve;
+        curve = this.decayCurve;
         break;
       default:
         time = p.releaseTime;

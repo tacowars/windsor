@@ -337,7 +337,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // starts fresh. `spread` still runs its detuned pair for the one note, and
     // `glide` still slides from `lastNote`.
     // A slide in mono (#602): the sounding voice takes the new note legato.
-    if (msg.slide && p.mono && this.slideTo(id, msg.note, vel, mod)) return;
+    if (msg.slide && p.mono && this.slideTo(id, msg, vel, mod)) return;
     if (p.mono) this.cutSounding();
 
     let list: Voice[] | undefined = this.noteMap.get(id);
@@ -350,7 +350,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
       const detune = count === 1 ? 0 : (sign * p.spread) / 100;
       let pan = p.pan + p.panKey * ((msg.note - 60) / 48) + p.panRandom * (this.random() * 2 - 1);
       if (count > 1) pan += sign * 0.35 * Math.min(1, p.spread / 50);
-      v.start(p, this.waveSets, msg.note, vel, detune, pan, glideFrom, id);
+      v.start(p, this.waveSets, msg.note, vel, detune, pan, glideFrom, id, msg.stepMod);
       v.mod = mod;
       list.push(v);
     }
@@ -359,12 +359,14 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Retarget the held note's voices to `note` under handle `id` (#602). In
-   * mono at most one handle is gated, so the first gated voice names it.
-   * False when nothing is sounding: the caller starts a fresh voice instead.
-   * Allocates nothing beyond the map's own bookkeeping, as `noteOn` does.
+   * Retarget the held note's voices to the message's note and step offsets
+   * (windsor#17) under handle `id` (#602). In mono at most one handle is
+   * gated, so the first gated voice names it. False when nothing is
+   * sounding: the caller starts a fresh voice instead. Allocates nothing
+   * beyond the map's own bookkeeping, as `noteOn` does.
    */
-  slideTo(id: number, note: number, velocity: number, mod: number): boolean {
+  slideTo(id: number, msg: NoteOnMessage, velocity: number, mod: number): boolean {
+    const note = msg.note;
     const vs = this.voices;
     let heldId: number | null = null;
     for (let i = 0; i < vs.length; i++) {
@@ -382,7 +384,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < list.length; i++) {
       const v = list[i];
       if (v.voiceId !== heldId) continue;
-      v.retarget(note, velocity, mod, glide);
+      v.retarget(note, velocity, mod, glide, msg.stepMod);
       v.voiceId = id;
     }
     this.noteMap.delete(heldId);

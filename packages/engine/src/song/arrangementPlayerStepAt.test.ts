@@ -68,6 +68,7 @@ const LADDER: Arrangement = {
             accentMod: 1,
             register: { octave: 3 },
             seed: 0,
+            lanes: [],
           },
         }
       : part,
