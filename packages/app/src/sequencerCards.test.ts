@@ -26,4 +26,11 @@ describe('SEQUENCER_CARDS', () => {
   it('draws every kind the tab can label, so no section can be headed and left blank', () => {
     expect(Object.keys(SEQUENCER_CARDS).sort()).toEqual(Object.keys(KIND_LABELS).sort());
   });
+
+  it('names the bass kind Basslead and the euclidean kind Euclid, keeping the persisted ids', () => {
+    expect(SEQUENCER_KINDS).toContain('bass');
+    expect(SEQUENCER_KINDS).toContain('euclidean');
+    expect(KIND_LABELS.bass).toBe('Basslead');
+    expect(KIND_LABELS.euclidean).toBe('Euclid');
+  });
 });
