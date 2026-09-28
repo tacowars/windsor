@@ -167,10 +167,14 @@ async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
     const name = library.entries[origin.id]?.name ?? origin.id;
     return runCopy(ctx, opener, refresh, forkWording(name));
   }
+  // Folder mode names the file it overwrites; a visitor's patch is a record, named as they know it.
+  const name = library.entries[origin.id]?.name ?? origin.id;
   const meta = await openMetadataModal(
     {
-      title: `Save over ${origin.id}.json`,
-      hint: 'Writes the working patch over its library id; the open song copy follows.',
+      title: library.folder ? `Save over ${origin.id}.json` : `Save over "${name}"`,
+      hint: library.folder
+        ? 'Writes the working patch over its library id; the open song copy follows.'
+        : "Saves your edits over this patch in your library. The song's copy updates too.",
       initial: currentMetadata(scope, ctx.parts.patch),
       entries: library.entries,
       id: origin.id,
