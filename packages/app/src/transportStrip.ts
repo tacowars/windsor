@@ -1,30 +1,36 @@
 /**
  * The transport strip (#708, epic #703 decision 1), which sits in the header
- * row since windsor#11 beside the brand, the power button and the tabs — BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth`
- * position, and ▶ ■ ‖. Every edit is a live `ctx.change`, never a rebuild;
+ * row since windsor#11 beside the brand, the power button and the tabs — Tap,
+ * BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth` position, and ▶ ■ ‖.
+ * Tempo and bars are number boxes that type and drag (`numberDrag.ts`,
+ * windsor#12), laid out as Ableton Live's control bar: Tap, BPM, Bars. Every edit is a live `ctx.change`, never a rebuild;
  * the buttons are `ctx.transport` (`host.ts`'s `HostTransport`), and the
  * rules they follow are `transportModel.ts`'s.
  *
  * It is chrome, not a tab: `mountTransportStrip` registers it with the
  * context, which re-renders it on every `render()` (an import, a key change
- * on the Harmony tab) and never on `invalidate()`, so a knob here survives
+ * on the Harmony tab) and never on `invalidate()`, so a box here survives
  * its own drag. The position follows the transport on `stepStrip.ts`'s
  * `watchPlayhead` — the console's one frame loop — and the loop idles while
  * the transport is not running (issue decision 4).
  */
 import type { AppContext } from './appContext';
-import { CARRIER_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el, select } from './dom';
-import { makeKnob } from './knob';
+import { makeNumberBox } from './numberDrag';
 import { audibleTick, watchPlayhead } from './stepStrip';
 import {
   barsChange,
   bpmChange,
+  dragBars,
+  dragBpm,
   formatPosition,
   keyChange,
+  parseBars,
+  parseBpm,
   pressedButtons,
   scaleChange,
+  tapTempo,
 } from './transportModel';
 import {
   BARS_KNOB,
@@ -36,30 +42,54 @@ import {
   SCALE_OPTIONS,
 } from './transportTables';
 
-const COLOR = CARRIER_COLOR;
-
 const songTicks = (ctx: AppCtx): number => ctx.model.doc.transport.bars * POSITION_GRID.bar;
 
-function tempoKnobs(ctx: AppCtx): HTMLElement[] {
-  const bpm = makeKnob({
-    ...BPM_KNOB,
-    color: COLOR,
+/**
+ * Tap, BPM, Bars (windsor#12). The song's length reshapes what every tab
+ * draws (regions and events are clamped into it, a timeline appends at its
+ * end), so a Bars edit re-renders the tabs — the active one included — while
+ * the strip, whose box may be mid-drag, is left alone.
+ */
+function tempoBoxes(ctx: AppCtx): HTMLElement[] {
+  const bpm = makeNumberBox({
+    label: BPM_KNOB.label,
+    unit: BPM_KNOB.label,
+    inputMode: 'decimal',
     get: () => ctx.model.doc.transport.bpm,
     set: (v) => void ctx.change(bpmChange(v)),
+    format: BPM_KNOB.fmt ?? String,
+    parse: parseBpm,
+    drag: (start, upPx, fine) => dragBpm(start, upPx, fine),
   });
-  // The song's length reshapes what every tab draws (regions and events are
-  // clamped into it, a timeline appends at its end), so the tabs re-render —
-  // the active one included — while the strip, whose knob is mid-gesture,
-  // is left alone.
-  const bars = makeKnob({
-    ...BARS_KNOB,
-    color: COLOR,
+  const bars = makeNumberBox({
+    label: BARS_KNOB.label,
+    unit: BARS_KNOB.label,
+    inputMode: 'numeric',
     get: () => ctx.model.doc.transport.bars,
     set: (v) => {
       if (ctx.change(barsChange(v)).ok) ctx.refreshTabs();
     },
+    format: BARS_KNOB.fmt ?? String,
+    parse: parseBars,
+    drag: (start, upPx, fine) => dragBars(start, upPx, fine),
   });
-  return [bpm, bars];
+  const tap = button('Tap', 'Tap tempo: tap on the beat; a 2 s pause starts again');
+  tap.classList.add('transport-tap');
+  let taps: readonly number[] = [];
+  const onTap = (): void => {
+    const result = tapTempo(taps, performance.now());
+    taps = result.taps;
+    if (result.bpm !== null && ctx.change(bpmChange(result.bpm)).ok) bpm.refresh();
+  };
+  // On the press, not the release, so the beat lands where the finger does.
+  tap.addEventListener('pointerdown', (e) => {
+    if (e.button === 0) onTap();
+  });
+  tap.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) onTap();
+    if (e.key === 'Enter' || e.key === ' ') e.preventDefault();
+  });
+  return [tap, bpm, bars];
 }
 
 function keyPickers(ctx: AppCtx): HTMLElement[] {
@@ -141,7 +171,7 @@ function group(nodes: readonly HTMLElement[]): HTMLElement {
 export function renderTransportStrip(root: HTMLElement, ctx: AppCtx): void {
   root.innerHTML = '';
   const row = el('div', 'transport-row');
-  row.appendChild(group([...tempoKnobs(ctx), el('span', 'transport-meter', METER_LABEL)]));
+  row.appendChild(group([...tempoBoxes(ctx), el('span', 'transport-meter', METER_LABEL)]));
   row.appendChild(group(keyPickers(ctx)));
   row.appendChild(group(transportControls(ctx)));
   root.appendChild(row);
