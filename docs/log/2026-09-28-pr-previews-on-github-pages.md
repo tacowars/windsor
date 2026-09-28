@@ -84,9 +84,12 @@ the workspace, so each seeds an empty one.
   the same per-PR group, so no stale build stays linked.
 - **Removal is quiet when there is nothing to remove.** `preview-remove`
   first asks the contents API whether `pr-preview/pr-<N>/` exists on
-  `gh-pages`, using the job's token and no checkout. If it doesn't, the job
-  pushes nothing and posts no "removed" comment. This covers closing a
-  docs-only PR and every docs-only push.
+  `gh-pages`, using the job's token and no checkout. Only an HTTP 404 counts
+  as absent: then the job succeeds quietly, pushing nothing and posting no
+  "removed" comment. This covers closing a docs-only PR and every docs-only
+  push. Any other failure of the lookup (a 5xx, a rate limit, an auth
+  error) fails the job, so it shows red and can be re-run instead of
+  leaving a preview in place.
 
 ## Why not Cloudflare Pages
 

@@ -190,12 +190,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
+        # Only a 404 means "absent". Any other failure (5xx, rate limit,
+        # auth) fails the job so it shows red and can be re-run, rather than
+        # passing with the preview left in place.
         run: |
-          if gh api "repos/$REPO/contents/pr-preview/pr-$PR?ref=gh-pages" --silent 2>/dev/null; then
+          if out=$(gh api "repos/$REPO/contents/pr-preview/pr-$PR?ref=gh-pages" --silent 2>&1); then
             echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
+          elif grep -q 'HTTP 404' <<<"$out"; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "no preview folder for PR $PR: nothing to remove"
+          else
+            echo "$out" >&2
+            echo "::error::could not check for the preview folder of PR $PR"
+            exit 1
           fi
       - if: steps.existing.outputs.exists == 'true'
         name: Seed an empty repository
