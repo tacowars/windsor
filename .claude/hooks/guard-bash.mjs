@@ -12,9 +12,42 @@ const input = JSON.parse(readFileSync(0, 'utf8'));
 const command = String(input.tool_input?.command ?? '');
 const inWorker = Boolean(input.agent_id);
 
+// CI polling is matched against the commands actually run: heredoc bodies
+// and quoted text are dropped, the rest is split on pipes, `;`, `&&`, `||`,
+// `$(`, backticks and newlines, and a pattern must match at the start of a
+// segment. A heredoc or an issue body that merely mentions a polling
+// command passes.
+const pollMessage =
+  'Do not poll CI. Wait for the Codex review, then merge with `gh pr merge <N> --squash` (see CLAUDE.md, the main session).';
+const polling = [/^gh\s+run\s+watch\b/, /^gh\s+pr\s+checks\b.*--watch\b/];
+
+function stripHeredocBodies(text) {
+  const kept = [];
+  let terminator = null;
+  for (const line of text.split('\n')) {
+    if (terminator !== null) {
+      if (line.trim() === terminator) terminator = null;
+      continue;
+    }
+    kept.push(line);
+    const opener = /<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/.exec(line);
+    if (opener) terminator = opener[2];
+  }
+  return kept.join('\n');
+}
+
+function commandSegments(text) {
+  return stripHeredocBodies(text)
+    .replace(/'[^']*'/g, "''")
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .split(/\n|;|&&|\|\||\||\$\(|`/)
+    .map((segment) => segment.trim().replace(/^[({]\s*/, ''));
+}
+
+const segments = commandSegments(command);
+const polls = polling.some((pattern) => segments.some((segment) => pattern.test(segment)));
+
 const everywhere = [
-  [/\bgh\s+run\s+watch\b/, 'Do not poll CI. Merge with `gh pr merge --squash --auto` and let GitHub wait.'],
-  [/\bgh\s+pr\s+checks\b[^\n|;&]*--watch/, 'Do not poll CI. Read `gh pr checks` once, or use auto-merge.'],
   [/\bgh\s+project\s+item-(add|edit|delete|archive)\b/, 'Nobody writes the board. GitHub moves items from issue and PR events.'],
 ];
 
@@ -28,15 +61,15 @@ const workerOnly = [
 ];
 
 const rules = inWorker ? [...everywhere, ...workerOnly] : everywhere;
-const hit = rules.find(([pattern]) => pattern.test(command));
+const reason = polls ? pollMessage : rules.find(([pattern]) => pattern.test(command))?.[1];
 
-if (hit) {
+if (reason) {
   process.stdout.write(
     JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
-        permissionDecisionReason: hit[1],
+        permissionDecisionReason: reason,
       },
     }),
   );
