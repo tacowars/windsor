@@ -13,12 +13,14 @@ import type { PatchFolder } from './libraryFolder';
 import {
   connectLibrary,
   connectUserLibrary,
+  createProblemReporter,
   disconnectLibrary,
   isWritable,
-  libraryModeText,
+  libraryProblemsText,
   libraryPatch,
   listLibrary,
   pageLibrary,
+  refreshLibrary,
   removeLibraryFile,
   writeLibraryFile,
 } from './libraryModel';
@@ -85,14 +87,12 @@ describe('the model', () => {
     const model = pageLibrary();
     expect(model.mode).toBe('page');
     expect(libraryPatch(model, 'kick')).toBe(PATCH_LIBRARY['kick']?.patch);
-    expect(libraryModeText(model)).toContain('159 built-in patches');
-    expect(libraryModeText(model)).not.toContain('packages/engine');
+    expect(Object.keys(model.entries)).toHaveLength(159);
     const files = new Map([['hat.json', serialisePatchFile(PATCH_LIBRARY['hat']!)]]);
     await connectLibrary(model, memoryFolder(files));
     expect(model.mode).toBe('folder');
     expect(Object.keys(model.entries)).toEqual(['hat']);
     expect(libraryPatch(model, 'kick')).toBeUndefined();
-    expect(libraryModeText(model)).toContain('folder "patches" (1 patches)');
     await disconnectLibrary(model);
     expect(model.mode).toBe('page');
     expect(libraryPatch(model, 'kick')).toBeDefined();
@@ -129,11 +129,55 @@ describe('the model', () => {
     const half = '{"format": 1, "name": "half"}';
     await writeLibraryFile(model, 'half-written', half, (id, body) => downloads.push([id, body]));
     // The file still reaches the disk — it is the user's own Save — but it is
-    // not an entry, and the row says so, exactly as the folder read does.
+    // not an entry, and a toast says so, exactly as the folder read does.
     expect(downloads).toEqual([['half-written', half]]);
     expect(model.entries['half-written']).toBeUndefined();
     expect(model.problems).toHaveLength(1);
     expect(model.problems[0]).toContain('half-written');
+    expect(libraryProblemsText(model)).toMatch(
+      /^library: 1 patch file\(s\) refused — .*half-written/,
+    );
+  });
+
+  it('has no problem toast for a clean read', () => {
+    expect(libraryProblemsText(pageLibrary())).toBeNull();
+  });
+});
+
+describe('reportLibraryProblems (createProblemReporter)', () => {
+  const broken = (): Map<string, string> =>
+    new Map([['broken.json', '{"format": 1, "name": "broken"}']]);
+
+  it('reports refusals with the persistent error tone, once across re-renders', async () => {
+    const model = pageLibrary();
+    await connectLibrary(model, memoryFolder(broken()));
+    const said: [string, string][] = [];
+    const report = createProblemReporter();
+    report(model, (message, tone) => said.push([message, tone]));
+    report(model, (message, tone) => said.push([message, tone]));
+    expect(said).toHaveLength(1);
+    expect(said[0]?.[1]).toBe('error');
+    expect(said[0]?.[0]).toContain('broken');
+  });
+
+  it('says an unchanged refusal again on an explicit re-read', async () => {
+    const model = pageLibrary();
+    await connectLibrary(model, memoryFolder(broken()));
+    const said: string[] = [];
+    const report = createProblemReporter();
+    report(model, (message) => said.push(message));
+    await refreshLibrary(model);
+    report(model, (message) => said.push(message));
+    expect(said).toHaveLength(1);
+    report(model, (message) => said.push(message), true);
+    expect(said).toHaveLength(2);
+    expect(said[1]).toBe(said[0]);
+  });
+
+  it('stays quiet on a clean library, even when forced', () => {
+    const said: string[] = [];
+    createProblemReporter()(pageLibrary(), (message) => said.push(message), true);
+    expect(said).toEqual([]);
   });
 });
 
@@ -160,9 +204,6 @@ describe("the user's library", () => {
     const listing = listLibrary(model.entries, {}, model.userIds);
     expect(listing.find((entry) => entry.id === 'my-kick')?.source).toBe('library');
     expect(listing.find((entry) => entry.id === 'kick')?.source).toBe('built-in');
-    expect(libraryModeText(model)).toBe(
-      'Library: 159 built-in patches and 1 of yours, kept in this browser',
-    );
   });
 
   it('writes and removes its own ids, and refuses a built-in either way', async () => {
@@ -188,6 +229,9 @@ describe("the user's library", () => {
     expect(model.entries['kick']).toBe(PATCH_LIBRARY['kick']);
     expect(model.userIds.has('kick')).toBe(false);
     expect(model.problems).toEqual(['your patch "kick" is hidden by the built-in of the same id']);
+    expect(libraryProblemsText(model)).toBe(
+      'library: 1 patch file(s) refused — your patch "kick" is hidden by the built-in of the same id',
+    );
   });
 
   it('gives way to a connected folder, and comes back when it is forgotten', async () => {

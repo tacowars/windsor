@@ -4,8 +4,8 @@
  * `patchActions.ts` and the modals. Writes go to the user's library in this
  * browser (`2026-09-27-user-library-in-indexeddb`), or to the folder while
  * one is connected.
- * The actions are pure and tested; this wires them to buttons and keeps the
- * header's library-mode line current.
+ * The actions are pure and tested; this wires them to buttons and reports
+ * the patch files a library read refused as a warning toast.
  */
 import type { AppCtx } from './context';
 import { el } from './dom';
@@ -23,10 +23,10 @@ import {
 } from './libraryFolder';
 import {
   connectLibrary,
+  createProblemReporter,
   disconnectLibrary,
   loadPageLibrary,
   library,
-  libraryModeText,
   refreshLibrary,
 } from './libraryModel';
 import type { LibraryModel } from './libraryModel';
@@ -58,13 +58,12 @@ let remembered: ChromeDirectoryHandle | null = null;
 
 const scopeFor = (ctx: AppCtx): PatchScope => ({ ctx, library, slot: ctx.parts.selected });
 
-/** The library row's account of where patches come from and go, and the folder read's problems if any. */
-export function syncLibraryMode(): void {
-  const line = document.getElementById('libraryMode');
-  if (!line) return;
-  const problems = library.problems.length ? ` · ${library.problems.length} file(s) refused` : '';
-  line.textContent = libraryModeText(library) + problems;
-  line.title = library.problems.join('\n');
+/** The refusals last reported, so a re-render does not repeat the same toast. */
+const reportProblems = createProblemReporter();
+
+/** Tells the user which patch files the last library read refused (`createProblemReporter`). */
+export function reportLibraryProblems(ctx: AppCtx, force = false): void {
+  reportProblems(library, (message, tone) => ctx.notify(message, tone), force);
 }
 
 /**
@@ -137,11 +136,11 @@ async function forgetFolder(ctx: AppCtx): Promise<void> {
 
 const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> => checkLoudness(ctx.parts.patch);
 
-/** What the status line says after a write, by where it went. */
-function writtenText(model: LibraryModel, id: string, verb: string): string {
-  if (model.folder) return `${verb} ${id}.json — run the sweep before committing`;
-  if (model.user) return `${verb} "${id}" in your library`;
-  return `downloaded ${id}.json — this browser cannot keep it`;
+/** The save toast, naming where the write went. */
+function writtenText(model: LibraryModel, id: string): string {
+  if (model.folder) return `wrote ${id}.json to the folder — run the sweep before committing`;
+  if (model.user) return `saved ${id} to your library`;
+  return `downloaded ${id}.json`;
 }
 
 interface CopyWording {
@@ -187,7 +186,7 @@ async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
   );
   if (!meta) return;
   const id = await savePatch({ ...scope, working: ctx.parts.patch, meta });
-  ctx.notify(writtenText(library, id, 'saved'), 'success');
+  ctx.notify(writtenText(library, id), 'success');
   refresh();
 }
 
@@ -213,7 +212,7 @@ async function runCopy(
   );
   if (!meta) return;
   const id = await copyToNew({ ...scope, working: ctx.parts.patch, meta });
-  ctx.notify(`${writtenText(library, id, 'saved')} — this part now plays it`, 'success');
+  ctx.notify(`${writtenText(library, id)} — this part now plays it`, 'success');
   refresh();
 }
 
@@ -311,7 +310,11 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
       const reread = button('Re-read folder', 'Read the folder again', true);
       reread.onclick = (): void => {
         refreshLibrary(library)
-          .then(() => ctx.render())
+          .then(() => {
+            // An explicit re-read says a refusal again, even one dismissed and unchanged.
+            reportLibraryProblems(ctx, true);
+            ctx.render();
+          })
           .catch((error: unknown) => ctx.notify(String(error), 'error'));
       };
       folderRow.append(reread, forget);
@@ -322,12 +325,9 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     );
   }
   box.appendChild(folderRow);
-  const mode = el('p', 'hint');
-  mode.id = 'libraryMode';
-  box.appendChild(mode);
   queueMicrotask(() => {
     syncModifiedMarker(ctx);
-    syncLibraryMode();
+    reportLibraryProblems(ctx);
   });
   return box;
 }

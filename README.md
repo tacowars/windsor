@@ -42,8 +42,13 @@ sub-path such as a GitHub Pages project site. Set `WINDSOR_BASE` to override
 it.
 
 CI (`.github/workflows/ci.yml`) runs `npm run verify` on every pull request
-and every push to `main`. A push to `main` that passes also publishes the
-build to GitHub Pages.
+and every push to `main`. GitHub Pages serves the `gh-pages` branch:
+
+- **Live:** a push to `main` that passes publishes the build to the branch
+  root, <https://tacowars.github.io/windsor/>.
+- **Previews:** a pull request from this repo that touches code publishes
+  its build to `https://tacowars.github.io/windsor/pr-preview/pr-<N>/` and
+  comments the link on the PR. Closing or merging removes it.
 
 ## Repository layout
 
