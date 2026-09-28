@@ -119,8 +119,10 @@ var WAVE = {
   // unbandlimited, aliases by design
   SINE_4BIT: 7,
   SINE_8BIT: 8,
-  USER: 9
+  USER: 9,
   // partials supplied by the patch
+  PULSE: 10
+  // two saws, duty from the operator's width
 };
 
 // packages/engine/src/worklet/fm/patchDefaults.ts
@@ -150,6 +152,8 @@ var OPERATOR_DEFAULTS = {
   detune: 0,
   level: 0,
   feedback: 0,
+  /** The fraction of the period the wave is squeezed into; for PULSE, the duty. */
+  width: 1,
   velSens: 0.4,
   levelKeyScale: 0,
   phase: 0,
@@ -175,10 +179,16 @@ var LFO_DEFAULTS = {
   amount: 0,
   delay: 0,
   retrigger: false,
+  /** The phase runs once from note-on and holds its end value. */
+  oneShot: false,
+  /** 0..1 instead of -1..1. */
+  unipolar: false,
   toPitch: 0,
   modWheelDepth: 1
 };
+var LFO2_DEFAULTS = { ...LFO_DEFAULTS, modWheelDepth: 0 };
 var LFO_TO_OP_DEFAULT = 0;
+var LFO_TO_WIDTH_DEFAULT = 0;
 var FILTER_DEFAULTS = {
   mode: FILT_OFF,
   cutoff: 8e3,
@@ -188,10 +198,12 @@ var FILTER_DEFAULTS = {
   envAmount: 0,
   modWheelDepth: 0,
   lfoAmount: 0,
+  lfo2Amount: 0,
   keyTrack: 0
 };
 var TONE_RANGE = { min: 0.02, max: 1 };
 var FEEDBACK_RANGE = { min: -1, max: 1 };
+var WIDTH_RANGE = { min: 0.05, max: 1 };
 
 // packages/engine/src/worklet/fm/patchNormalise.ts
 function envDefaults(o, d = ENVELOPE_DEFAULTS) {
@@ -231,6 +243,8 @@ function opDefaults(o, index) {
     level: num(o.level, index === 0 ? LEAD_OPERATOR_LEVEL : d.level),
     feedback: clamp(num(o.feedback, d.feedback), FEEDBACK_RANGE),
     // bipolar (#529)
+    width: clamp(num(o.width, d.width), WIDTH_RANGE),
+    // the duty for PULSE
     velSens: num(o.velSens, d.velSens),
     levelKeyScale: num(o.levelKeyScale, d.levelKeyScale),
     phase: num(o.phase, d.phase),
@@ -239,16 +253,36 @@ function opDefaults(o, index) {
     env: envDefaults(o.env)
   };
 }
+function perOperator(raw, d) {
+  const out = [];
+  for (let i = 0; i < OPERATOR_COUNT; i++) out.push(num(raw && raw[i], d));
+  return out;
+}
+function lfoDefaults(raw, ld) {
+  raw = raw || {};
+  return {
+    shape: num(raw.shape, ld.shape) | 0,
+    rate: num(raw.rate, ld.rate),
+    amount: num(raw.amount, ld.amount),
+    delay: num(raw.delay, ld.delay),
+    retrigger: !!raw.retrigger,
+    oneShot: !!raw.oneShot,
+    // runs once from note-on and holds
+    unipolar: !!raw.unipolar,
+    // 0..1 instead of -1..1
+    toPitch: num(raw.toPitch, ld.toPitch),
+    // semitones
+    modWheelDepth: num(raw.modWheelDepth, ld.modWheelDepth),
+    toOp: perOperator(raw.toOp, LFO_TO_OP_DEFAULT),
+    toWidth: perOperator(raw.toWidth, LFO_TO_WIDTH_DEFAULT)
+  };
+}
 function normalisePatch(raw) {
   raw = raw || {};
   const ops = [];
   for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
-  const lfoRaw = raw.lfo || {};
   const filtRaw = raw.filter || {};
-  const toOp = [];
-  for (let i = 0; i < OPERATOR_COUNT; i++)
-    toOp.push(num(lfoRaw.toOp && lfoRaw.toOp[i], LFO_TO_OP_DEFAULT));
-  const pd = PATCH_DEFAULTS, ld = LFO_DEFAULTS, fd = FILTER_DEFAULTS;
+  const pd = PATCH_DEFAULTS, fd = FILTER_DEFAULTS;
   const p = {
     name: raw.name || pd.name,
     algorithm: Math.max(0, Math.min(ALGORITHMS.length - 1, num(raw.algorithm, pd.algorithm) | 0)),
@@ -266,17 +300,8 @@ function normalisePatch(raw) {
     mono: !!raw.mono,
     // one note at a time, with retrigger (#453)
     ops,
-    lfo: {
-      shape: num(lfoRaw.shape, ld.shape) | 0,
-      rate: num(lfoRaw.rate, ld.rate),
-      amount: num(lfoRaw.amount, ld.amount),
-      delay: num(lfoRaw.delay, ld.delay),
-      retrigger: !!lfoRaw.retrigger,
-      toPitch: num(lfoRaw.toPitch, ld.toPitch),
-      // semitones
-      modWheelDepth: num(lfoRaw.modWheelDepth, ld.modWheelDepth),
-      toOp
-    },
+    lfo: lfoDefaults(raw.lfo, LFO_DEFAULTS),
+    lfo2: lfoDefaults(raw.lfo2, LFO2_DEFAULTS),
     filter: {
       mode: num(filtRaw.mode, fd.mode) | 0,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
@@ -289,6 +314,8 @@ function normalisePatch(raw) {
       // octaves the wheel adds to envAmount (#586)
       lfoAmount: num(filtRaw.lfoAmount, fd.lfoAmount),
       // octaves
+      lfo2Amount: num(filtRaw.lfo2Amount, fd.lfo2Amount),
+      // octaves, from LFO 2
       keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS)
     }

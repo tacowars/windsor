@@ -61,7 +61,7 @@ describe('the real library files', () => {
     expect(PRESETS[id]).toBe(PATCH_LIBRARY[id]?.patch);
   });
 
-  it.each(onDisk)('%s is format 2, complete, with no retired key', (id) => {
+  it.each(onDisk)('%s is format 2, with no retired key', (id) => {
     const raw = fileOf(id);
     expect(raw['format']).toBe(2);
     expect(Object.keys(raw)).toEqual([
@@ -74,8 +74,10 @@ describe('the real library files', () => {
     ]);
     const patch = raw['patch'] as Patch;
     for (const op of patch.ops) expect(Object.keys(op)).not.toContain('userKey');
-    // Written complete, so the file on disk is the patch it plays.
-    expect(patch).toEqual(makePatch(patch));
+    // The file on disk is the patch it plays wherever it speaks. A field added
+    // after it was written is filled by the loader, not written into the bank
+    // (record `2026-09-28-retire-the-headroom-record`, "Consequences").
+    expect(makePatch(patch)).toMatchObject(patch);
   });
 
   it('carries the id rule the index generator applies', () => {

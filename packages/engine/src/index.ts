@@ -261,6 +261,8 @@ export type { LibraryEntry, PatchFile } from './patch/patchLibrary';
 export { serialisePatchFile } from './patch/patchFileSerialise';
 export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
+// The operator width's bounds and the second LFO's defaults (windsor#54).
+export { LFO2_DEFAULTS, WIDTH_RANGE } from './worklet/fm/patchDefaults';
 export {
   BEATS_PER_BAR,
   DIVISORS,

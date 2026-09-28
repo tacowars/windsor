@@ -19,6 +19,7 @@ const WAVE = {
   SINE_4BIT: 7,
   SINE_8BIT: 8,
   USER: 9, // partials supplied by the patch
+  PULSE: 10, // two saws, duty from the operator's width
 } as const;
 
 export { WAVE };

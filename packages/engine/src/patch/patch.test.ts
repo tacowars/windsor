@@ -6,12 +6,70 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { readFileSync } from 'node:fs';
+
+import { LFO2_DEFAULTS, LFO_DEFAULTS } from '../worklet/fm/patchDefaults';
 import { ALGORITHMS, WAVE, WAVE_NAMES, makePatch } from './patch';
+import type { Patch } from './patch';
+import { serialisePatchFile } from './patchFileSerialise';
+import { loadPatchFile } from './patchLibrary';
 import { PRESETS, PRESET_NAMES } from './presets';
 
 describe('waveform ids', () => {
   it('names every waveform id', () => {
     expect(WAVE_NAMES.length).toBe(Object.keys(WAVE).length);
+  });
+
+  it('names PULSE at its id (windsor#54)', () => {
+    expect(WAVE.PULSE).toBe(10);
+    expect(WAVE_NAMES[WAVE.PULSE]).toBe('Pulse');
+  });
+});
+
+describe('operator width, the LFO fields and LFO 2 (windsor#54)', () => {
+  const zeros = [0, 0, 0, 0];
+
+  it('default to values that reproduce the old sound', () => {
+    const patch = makePatch();
+    for (const op of patch.ops) expect(op.width).toBe(1);
+    expect(patch.lfo).toMatchObject({ oneShot: false, unipolar: false, toWidth: zeros });
+    expect(patch.lfo2).toEqual({ ...LFO2_DEFAULTS, toOp: zeros, toWidth: zeros });
+    expect(patch.lfo2.modWheelDepth).toBe(0);
+    expect(patch.filter.lfo2Amount).toBe(0);
+  });
+
+  it('keep LFO 2 its own: a partial LFO 2 is completed from LFO2_DEFAULTS, not from lfo', () => {
+    const patch = makePatch({ lfo: { rate: 2 }, lfo2: { amount: 0.5, oneShot: true } });
+    expect(patch.lfo2).toEqual({
+      ...LFO2_DEFAULTS,
+      amount: 0.5,
+      oneShot: true,
+      toOp: zeros,
+      toWidth: zeros,
+    });
+    expect(patch.lfo).toEqual({ ...LFO_DEFAULTS, rate: 2, toOp: zeros, toWidth: zeros });
+    expect(patch.lfo2.toWidth).not.toBe(patch.lfo.toWidth);
+  });
+});
+
+describe('a patch file written before windsor#54', () => {
+  const url = new URL('../patches/lead-bell.json', import.meta.url);
+  const raw = JSON.parse(readFileSync(url, 'utf8')) as Record<string, unknown>;
+  const before = raw['patch'] as Record<string, unknown>;
+
+  it('carries none of the new fields', () => {
+    expect(before).not.toHaveProperty('lfo2');
+    expect(before['filter']).not.toHaveProperty('lfo2Amount');
+  });
+
+  it('loads with the defaults, and round-trips unchanged apart from the new fields', () => {
+    const entry = loadPatchFile('lead-bell', raw);
+    const fresh = makePatch();
+    expect(entry.patch.lfo2).toEqual(fresh.lfo2);
+    expect(entry.patch.ops.map((op) => op.width)).toEqual([1, 1, 1, 1]);
+    const written = JSON.parse(serialisePatchFile(entry)) as { patch: Patch };
+    expect(written.patch).toMatchObject(before);
+    expect(written.patch).toEqual(entry.patch);
   });
 });
 

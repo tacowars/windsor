@@ -20,8 +20,10 @@ import {
   FILTER_DEFAULTS,
   FILTER_ENV_DEFAULTS,
   LEAD_OPERATOR_LEVEL,
+  LFO2_DEFAULTS,
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
+  LFO_TO_WIDTH_DEFAULT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
@@ -38,6 +40,7 @@ export const WAVE_NAMES = [
   'Sine 4bit',
   'Sine 8bit',
   'User',
+  'Pulse',
 ] as const;
 
 /** The mode ids live with the worklet that switches on them (`worklet/fm/modeIds.ts`, #669). */
@@ -100,6 +103,13 @@ export interface Operator {
   level: number;
   /** Self-feedback, -1..1 (#529): positive towards a sawtooth, negative towards a square, 0 off. */
   feedback: number;
+  /**
+   * The fraction of the period the wave is squeezed into, `WIDTH_RANGE`; the
+   * rest of the period holds at zero, and 1 is the plain wave. For PULSE it is
+   * the duty, and 0.5 is a square
+   * (record `2026-09-28-operator-width-pulse-and-a-second-lfo`).
+   */
+  width: number;
   velSens: number;
   levelKeyScale: number;
   phase: number;
@@ -113,11 +123,17 @@ export interface LfoSettings {
   amount: number;
   delay: number;
   retrigger: boolean;
+  /** The phase runs once from note-on (a reset is implied) and holds its end value. */
+  oneShot: boolean;
+  /** 0..1 instead of -1..1: `(v + 1) / 2` after the shape, before the fade-in. */
+  unipolar: boolean;
   /** Semitones. */
   toPitch: number;
   modWheelDepth: number;
   /** Per-operator level modulation depth. */
   toOp: number[];
+  /** Per-operator width modulation depth, added to `Operator.width` before the clamp. */
+  toWidth: number[];
 }
 
 export interface FilterSettings {
@@ -132,6 +148,8 @@ export interface FilterSettings {
   modWheelDepth: number;
   /** Octaves. */
   lfoAmount: number;
+  /** Octaves, from the second LFO. */
+  lfo2Amount: number;
   keyTrack: number;
   env: Envelope;
 }
@@ -160,6 +178,8 @@ export interface Patch {
   ops: Operator[];
   pitchEnv: Envelope;
   lfo: LfoSettings;
+  /** A second LFO, symmetric with the first; `LFO2_DEFAULTS` leaves it inert. */
+  lfo2: LfoSettings;
   filter: FilterSettings;
 }
 
@@ -190,6 +210,16 @@ export function makeOperator(o: PartialOperator = {}): Operator {
   };
 }
 
+/** An LFO over its defaults, its per-operator depths filled when the partial names none. */
+function makeLfo(defaults: typeof LFO_DEFAULTS, o: Partial<LfoSettings> = {}): LfoSettings {
+  return {
+    ...defaults,
+    toOp: new Array<number>(OPERATOR_COUNT).fill(LFO_TO_OP_DEFAULT),
+    toWidth: new Array<number>(OPERATOR_COUNT).fill(LFO_TO_WIDTH_DEFAULT),
+    ...o,
+  };
+}
+
 export function makePatch(o: PartialPatch = {}): Patch {
   const ops: Operator[] = [];
   for (let i = 0; i < OPERATOR_COUNT; i++) {
@@ -201,11 +231,8 @@ export function makePatch(o: PartialPatch = {}): Patch {
     ...o,
     ops,
     pitchEnv: makeEnvelope(o.pitchEnv ?? {}, PITCH_ENV_DEFAULTS),
-    lfo: {
-      ...LFO_DEFAULTS,
-      toOp: new Array<number>(OPERATOR_COUNT).fill(LFO_TO_OP_DEFAULT),
-      ...(o.lfo ?? {}),
-    },
+    lfo: makeLfo(LFO_DEFAULTS, o.lfo),
+    lfo2: makeLfo(LFO2_DEFAULTS, o.lfo2),
     filter: {
       ...FILTER_DEFAULTS,
       ...(o.filter ?? {}),
@@ -232,7 +259,7 @@ function mergeInto(current: unknown, partial: unknown): unknown {
 
 /**
  * A partial patch over a complete one, then completed again: objects recurse,
- * arrays (`ops`, `toOp`, `userPartials`) are replaced wholesale. The live
+ * arrays (`ops`, `toOp`, `toWidth`, `userPartials`) are replaced wholesale. The live
  * `patches` path of `AudioSystem.apply` merges a document's patch edit over
  * the part's current patch with this, so a partial names only what changes.
  */

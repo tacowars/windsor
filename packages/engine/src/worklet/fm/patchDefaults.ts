@@ -1,8 +1,8 @@
 /**
  * The patch defaults (#670): every value a patch may omit, and the bounds the
- * worklet clamps three fields to. Two readers fill a patch from this one
- * table — `patchNormalise.ts` for the audio loop when a `patch` message
- * arrives, and `makePatch()` in the main thread's `patch/patch.ts` for the
+ * worklet clamps the tone, the feedback and the width to. Two readers fill a
+ * patch from this one table — `patchNormalise.ts` for the audio loop when a
+ * `patch` message arrives, and `makePatch()` in the main thread's `patch/patch.ts` for the
  * editor, the tests and the console's knob defaults — so a knob cannot show
  * one default while the engine plays another. `patchDefaults.test.ts` pins
  * the two fills equal leaf for leaf for an empty partial.
@@ -21,7 +21,7 @@
 import { FILT_OFF, LFO_SINE, LOOP_NONE } from './modeIds';
 import { WAVE } from './waveIds';
 
-/** Operators per voice — the length of `ops`, `lfo.toOp` and `OP_NAMES`. */
+/** Operators per voice — the length of `ops`, `lfo.toOp`, `lfo.toWidth` and `OP_NAMES`. */
 const OPERATOR_COUNT = 4;
 
 /** The envelope every operator gets; the pitch and filter envelopes override a few fields below. */
@@ -56,6 +56,8 @@ const OPERATOR_DEFAULTS = {
   detune: 0,
   level: 0,
   feedback: 0,
+  /** The fraction of the period the wave is squeezed into; for PULSE, the duty. */
+  width: 1,
   velSens: 0.4,
   levelKeyScale: 0,
   phase: 0,
@@ -80,19 +82,35 @@ const PATCH_DEFAULTS = {
   mono: false,
 };
 
-/** The LFO, its per-operator depths aside (`LFO_TO_OP_DEFAULT`, one per operator). */
+/**
+ * The LFO, its per-operator depths aside (`LFO_TO_OP_DEFAULT` and
+ * `LFO_TO_WIDTH_DEFAULT`, one per operator).
+ */
 const LFO_DEFAULTS = {
   shape: LFO_SINE,
   rate: 5,
   amount: 0,
   delay: 0,
   retrigger: false,
+  /** The phase runs once from note-on and holds its end value. */
+  oneShot: false,
+  /** 0..1 instead of -1..1. */
+  unipolar: false,
   toPitch: 0,
   modWheelDepth: 1,
 };
 
+/**
+ * The second LFO: the first's defaults, but deaf to the mod wheel, so a fresh
+ * LFO 2 is inert (record `2026-09-28-operator-width-pulse-and-a-second-lfo`).
+ */
+const LFO2_DEFAULTS = { ...LFO_DEFAULTS, modWheelDepth: 0 };
+
 /** Each operator's LFO level-modulation depth. */
 const LFO_TO_OP_DEFAULT = 0;
+
+/** Each operator's LFO width-modulation depth. */
+const LFO_TO_WIDTH_DEFAULT = 0;
 
 /** The filter, its envelope aside (`FILTER_ENV_DEFAULTS`). */
 const FILTER_DEFAULTS = {
@@ -104,6 +122,7 @@ const FILTER_DEFAULTS = {
   envAmount: 0,
   modWheelDepth: 0,
   lfoAmount: 0,
+  lfo2Amount: 0,
   keyTrack: 0,
 };
 
@@ -113,17 +132,23 @@ const TONE_RANGE = { min: 0.02, max: 1 };
 /** Operator self-feedback is bipolar (#529) and clamped here by the worklet. */
 const FEEDBACK_RANGE = { min: -1, max: 1 };
 
+/** Operator width is clamped here by the worklet: 1 is the plain wave, the floor keeps a sliver of it. */
+const WIDTH_RANGE = { min: 0.05, max: 1 };
+
 export {
   ENVELOPE_DEFAULTS,
   FEEDBACK_RANGE,
   FILTER_DEFAULTS,
   FILTER_ENV_DEFAULTS,
   LEAD_OPERATOR_LEVEL,
+  LFO2_DEFAULTS,
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
+  LFO_TO_WIDTH_DEFAULT,
   OPERATOR_COUNT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
   TONE_RANGE,
+  WIDTH_RANGE,
 };
