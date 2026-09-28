@@ -972,6 +972,22 @@ body.chord-dragging {
   align-items: center;
 }
 
+/* Export Audio (Settings): formats, the tail knob, then the actions below. */
+.export-formats {
+  align-items: center;
+  gap: 14px;
+}
+.export-formats .seg {
+  flex: none;
+}
+.export-formats .seg button {
+  white-space: nowrap;
+  padding: 6px 10px;
+}
+.export-actions {
+  margin-top: 12px;
+}
+
 /* ---------- parts grid ---------- */
 
 .parts-grid {

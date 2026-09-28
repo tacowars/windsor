@@ -19,7 +19,7 @@ import {
 import { AudioPart } from './audioPart';
 import type { Patch } from '../patch/patch';
 import { makePatch } from '../patch/patch';
-import type { ProcessorOptions } from './workletMessages';
+import type { ProcessorOptions, ScheduledMessage } from './workletMessages';
 import { PROCESSOR_NAME, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessages';
 
 export interface PartOptions {
@@ -33,6 +33,19 @@ export interface PartOptions {
   maxVoices?: number;
   /** Defaults to the engine master. Pass `null` to leave the part unrouted. */
   destination?: AudioNode | null;
+  /**
+   * Pins the processor's random source (`ProcessorOptions.seed`). Live parts
+   * omit it; an offline song render (`render/renderSong.ts`) passes one per
+   * part so two renders are bit-identical (windsor#40).
+   */
+  seed?: number;
+  /**
+   * Notes the processor is built holding (`ProcessorOptions.events`). An
+   * offline song render hands in its opening this way, because a port
+   * message would reach the processor after rendering had begun
+   * (windsor#40). Live parts omit it.
+   */
+  events?: ScheduledMessage[];
 }
 
 /**
@@ -121,6 +134,8 @@ export class FmEngine {
       patch: structuredClone(patch),
       slideSeconds: SLIDE_SECONDS_DEFAULT,
     };
+    if (options.seed !== undefined) processorOptions.seed = options.seed;
+    if (options.events?.length) processorOptions.events = options.events;
 
     const node = new AudioWorkletNode(this.context, PROCESSOR_NAME, {
       numberOfInputs: 0,

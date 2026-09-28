@@ -17,11 +17,14 @@ interface Interval {
   off: number;
 }
 
-/** Sounding intervals in absolute frames, from the node's posted messages so far. */
+/**
+ * Sounding intervals in absolute frames, from the notes the node was built
+ * holding and the messages posted to it so far.
+ */
 function intervals(node: FakeWorkletNode): Interval[] {
   const ons = new Map<number, number>();
   const offs = new Map<number, number>();
-  for (const message of node.posted) {
+  for (const message of [...node.events, ...node.posted]) {
     const m = message as { type?: string; id?: number; frame?: number };
     if (m.id === undefined || m.frame === undefined) continue;
     if (m.type === 'noteOn') ons.set(m.id, m.frame);

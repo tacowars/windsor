@@ -105,3 +105,22 @@ describe('AudioPart note extras (#602)', () => {
     expect(ons[2]).not.toHaveProperty('slide');
   });
 });
+
+describe('AudioPart held notes (windsor#40)', () => {
+  it('keeps note messages back while held, hands them over in order, then posts again', () => {
+    const { part, sent } = makePart();
+    part.holdNotes();
+    const id = part.trigger(60, 1, 0.25, 0);
+    part.allNotesOff();
+    const held = part.takeHeldNotes();
+    // Only the notes are held: a control message is not a frame-stamped note.
+    expect(sent.map((m) => m.type)).toEqual(['allNotesOff']);
+    expect(held.map((m) => [m.type, m.id, m.frame])).toEqual([
+      ['noteOn', id, 0],
+      ['noteOff', id, 12000],
+    ]);
+    part.noteOn(62);
+    expect(sent.map((m) => m.type)).toEqual(['allNotesOff', 'noteOn']);
+    expect(part.takeHeldNotes()).toEqual([]);
+  });
+});
