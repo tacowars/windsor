@@ -184,14 +184,22 @@ export abstract class FakeNode {
     return this.cached[output] ?? [];
   }
 
-  /** Everything connected to `input`, summed; stereo when any source is. */
+  /**
+   * Everything connected to `input`, summed; stereo when any source is. A
+   * source wider than stereo (a merger of more than two inputs, windsor#41)
+   * makes the sum that wide, channel by channel, as the spec's discrete
+   * up-mix has it: a stereo source fills channels 0–1 and the rest stay 0.
+   */
   protected gather(block: number, input = 0): Float32Array[] {
+    const sources = this.inbound
+      .filter((connection) => connection.input === input)
+      .map((connection) => connection.from.pull(block, connection.output));
+    const width = Math.max(0, ...sources.map((channels) => channels.length));
+    if (width > 2) return gatherWide(sources, width);
     const left = new Float32Array(BLOCK);
     const right = new Float32Array(BLOCK);
     let stereo = false;
-    for (const connection of this.inbound) {
-      if (connection.input !== input) continue;
-      const channels = connection.from.pull(block, connection.output);
+    for (const channels of sources) {
       const l = channels[0];
       if (!l) continue;
       const r = channels[1] ?? l;
@@ -205,6 +213,18 @@ export abstract class FakeNode {
   }
 
   protected abstract render(block: number): Float32Array[][];
+}
+
+/** `width` fresh channels, each the sum of the sources' same channel (a discrete up-mix). */
+function gatherWide(sources: readonly Float32Array[][], width: number): Float32Array[] {
+  const out = Array.from({ length: width }, () => new Float32Array(BLOCK));
+  for (const channels of sources) {
+    channels.forEach((channel, c) => {
+      const target = out[c]!;
+      for (let i = 0; i < BLOCK; i++) target[i] = (target[i] ?? 0) + (channel[i] ?? 0);
+    });
+  }
+  return out;
 }
 
 export class FakeGain extends FakeNode {

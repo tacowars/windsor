@@ -48,7 +48,7 @@ import { PatchResolver } from '../song/arrangementValidate';
 import { AUDIO_LOAD_REPORT_SECONDS, MUSIC_PART_MAX_VOICES } from '../audioConstants';
 import type { AudioLoadReadout } from '../cost/audioLoad';
 import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
-import type { AudioBus } from '../mixer/audioBus';
+import { type AudioBus, MUSIC_BUS_OPTIONS } from '../mixer/audioBus';
 import type { AudioPart } from '../synth/audioPart';
 import type { ScheduledMessage } from '../synth/workletMessages';
 import type { PartStrip } from '../mixer/channelStrip';
@@ -182,7 +182,7 @@ export class AudioSystem {
   async init(): Promise<void> {
     if (this.started) return;
     await this.engine.init();
-    this.musicBus = this.engine.createBus({ filter: { type: 'highpass', frequency: 30 } });
+    this.musicBus = this.engine.createBus(MUSIC_BUS_OPTIONS);
     // Keep the dry-only highpass. Returns join after it, before song inserts.
     const master = createMasterStrip(this.engine.context, this.routeOptions);
     this.masterStripValue = master;

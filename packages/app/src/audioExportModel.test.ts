@@ -24,7 +24,7 @@ import {
 } from './audioExportModel';
 
 interface FakeSink extends WavSink {
-  written: Uint8Array[];
+  written: Blob[];
   discarded: number;
 }
 
@@ -33,8 +33,8 @@ function fakeSink(): FakeSink {
     where: 'your downloads',
     written: [],
     discarded: 0,
-    write: (bytes) => {
-      sink.written.push(bytes);
+    write: (file) => {
+      sink.written.push(file);
       return Promise.resolve();
     },
     discard: () => {
@@ -68,7 +68,13 @@ function fakeRender(frames: number, value = 0.25) {
 function run(overrides: Partial<AudioExportRun> = {}): AudioExportRun {
   return {
     document: FULL_DOCUMENT,
-    settings: { sampleRate: 44100, bitDepth: 16, tailSeconds: 0 },
+    settings: {
+      sampleRate: 44100,
+      bitDepth: 16,
+      tailSeconds: 0,
+      stems: false,
+      includeMuted: false,
+    },
     fileName: 'song.wav',
     sink: fakeSink(),
     signal: new AbortController().signal,
@@ -104,6 +110,8 @@ describe('defaultExportSettings', () => {
   it("starts from the engine's defaults", () => {
     const settings = defaultExportSettings();
     expect(settings.sampleRate).toBe(RENDER_SAMPLE_RATE_DEFAULT);
+    // The mix alone; stems, and the muted parts in them, are asked for (windsor#41).
+    expect(settings).toMatchObject({ stems: false, includeMuted: false });
     expect(settings.tailSeconds).toBe(RENDER_TAIL_SECONDS.default);
     expect(RENDER_TAIL_SECONDS).toMatchObject({ min: 0, max: 10, default: 2 });
   });
@@ -118,7 +126,13 @@ describe('runAudioExport', () => {
       run({
         sink,
         render,
-        settings: { sampleRate: 44100, bitDepth: 24, tailSeconds: 3 },
+        settings: {
+          sampleRate: 44100,
+          bitDepth: 24,
+          tailSeconds: 3,
+          stems: false,
+          includeMuted: false,
+        },
         onProgress: (f) => progress.push(f),
       }),
     );
@@ -126,7 +140,11 @@ describe('runAudioExport', () => {
     expect(progress).toEqual([0.25, 0.5, 0.75]);
     expect(sink.written).toHaveLength(1);
     const channel = new Float32Array(100).fill(0.25);
-    expect(sink.written[0]).toEqual(encodeWav([channel, channel], 44100, 24).bytes);
+    const written = sink.written[0]!;
+    expect(written.type).toBe('audio/wav');
+    expect(new Uint8Array(await written.arrayBuffer())).toEqual(
+      encodeWav([channel, channel], 44100, 24).bytes,
+    );
     expect(sink.discarded).toBe(0);
     expect(outcome).toEqual({
       kind: 'saved',

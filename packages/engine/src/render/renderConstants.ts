@@ -29,6 +29,20 @@ export const RENDER_MAX_FRAMES = 48000 * 60 * 15;
 export const RENDER_CHANNELS = 2;
 
 /**
+ * The widest stem pass (windsor#41 decision 2): 32 channels, the most an
+ * `OfflineAudioContext` is required to support. Channels 0–1 of every pass
+ * are the master, so one pass carries up to 15 stereo stems.
+ */
+export const RENDER_STEM_CHANNELS_MAX = 32;
+
+/**
+ * The float samples (frames × channels) one stem pass may hold: twice what
+ * the longest song render holds (about 691 MB). A long song with many stems
+ * renders in narrower passes instead of one context too large for the tab.
+ */
+export const RENDER_STEM_PASS_MAX_SAMPLES = 2 * RENDER_MAX_FRAMES * RENDER_CHANNELS;
+
+/**
  * How far apart the render stops to feed the scheduler, in seconds of song.
  * Each stop issues the ticks up to `RENDER_LOOK_AHEAD_SECONDS` ahead, which
  * must reach past the next stop so no tick is ever issued late.
@@ -66,3 +80,11 @@ export const WAV_DITHER_SEED = 0x0d_17_4e_12;
  * Cancel after less encoding, at the cost of more yields.
  */
 export const WAV_ENCODE_CHUNK_FRAMES = 1 << 16;
+
+/**
+ * How far a later stem pass's master may stray from the first's, per sample
+ * and averaged over a render quantum, before the passes count as not lined
+ * up (`stemLineup.ts`): 1e-5, about −100 dBFS, ten times the largest
+ * difference measured between two renders of one song in Chrome (1.0e-6).
+ */
+export const RENDER_STEM_LINEUP_TOLERANCE = 1e-5;
