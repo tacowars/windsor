@@ -47,6 +47,14 @@ full `verify`; the worker does not.
 - `npx vitest run <paths>`
 - `npm run typecheck && npm run lint`
 
+## Worker
+
+`worker` or `worker-light` (the profiles in `.claude/agents/`), set by the
+main session with the PR class. `worker` (effort high) for the engine and
+DSP, the song or patch format, persistence and multi-file features;
+`worker-light` (effort medium) for a label, a CSS tweak, copy, docs,
+config, or a small bug fix with a clear cause.
+
 ## PR class
 
 `routine` or `reviewed` (see CLAUDE.md "Working a ticket"), set here when
