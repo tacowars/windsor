@@ -9,11 +9,11 @@ import { CHORD_NOTE_NAMES } from '@windsor/engine';
 /** One spelling per kind, in the part list's picker and on each card's header. */
 export const KIND_LABELS: Readonly<Record<SequencerKind, string>> = {
   none: 'None',
-  euclidean: 'Euclidean',
+  euclidean: 'Euclid',
   grid: 'Grid',
   chord: 'Chord',
   arp: 'Arp',
-  bass: 'Bass',
+  bass: 'Basslead',
 };
 
 /** The twelve pitch classes, sharps: the engine's own list, not a copy. */
