@@ -187,36 +187,36 @@ an arbitrary arrangement, mixer gain or feedback setting will not overload.
 ## Extending the bank
 
 Since #561 every scoring patch is one file,
-`packages/engine/src/patches/score-<slug>.json`, holding the full
-normalised patch with its category, tags, audition note (`description`)
-and headroom record; the recipe rows and the voicing module that expanded
-them were retired once the expanded patches were frozen as data
-(decision record `2026-09-15-561-patch-library-file-shape`). The `score-…`
-IDs are the filename slugs and stable song references: the display `name`
-may change, the id never does.
+`packages/engine/src/patches/score-<slug>.json`, holding the patch with its
+category, tags and audition note (`description`), at patch format 2; the
+recipe rows and the voicing module that expanded them were retired once the
+expanded patches were frozen as data (decision record
+`2026-09-15-561-patch-library-file-shape`). The `score-…` IDs are the
+filename slugs and stable song references: the display `name` may change,
+the id never does. A file carries no headroom record and no `userKey`
+(record `2026-09-28-retire-the-headroom-record`): the loader fills any patch
+field a file omits from `makePatch`'s defaults, so a field added to the
+schema later needs no rewrite of the bank.
 
 `presetCatalog.ts` only lists and filters; metadata is the file's own and is
 not part of the DSP patch or arrangement schema. Reuse existing tags where
-they fit. For a new USER spectrum, supply a unique nonempty `userKey`: the
-worklet cache keys on it, not on the partial array's contents.
+they fit. A USER spectrum needs only its `userPartials`: the worklet caches
+a User wave by its partials.
 
-After changing a sound, rewrite its headroom record and run the real-DSP
+After adding or changing a sound, regenerate the index and run the real-DSP
 checks (from the repo root):
 
 ```sh
-node packages/app/sweep-headroom.mjs <id…|--stale> [--seeds <n>]
+node scripts/patch-library-index.mjs --write
 npx prettier --write packages/engine/src/patches
-npx vitest run packages/engine/src/patch/presetCatalog.test.ts packages/engine/src/patch/patchLibraryEnvelope.test.ts packages/engine/src/synth/fmProcessorHeadroom.test.ts packages/app/src/presetBrowser.test.ts
-node packages/app/build-editor.mjs
+npx vitest run packages/engine/src/patch/presetCatalog.test.ts packages/engine/src/patch/patchLibraryEnvelope.test.ts packages/app/src/presetBrowser.test.ts
 ```
 
-The sweep's default is 16,384 seeds (about 6 s per patch on a dev machine);
-`--seeds` lowers it and the count is written to the file as `seedsSwept`, so
-a lighter sweep is a visible fact. It records the worst **sampled** seed and
-is not an exhaustive bound. The bank's records carry the seeds they were
-measured with: 16,384 for the original bank (4,096 for `saw-arp` and
-`drone-sqr`) and 256 for the scoring bank. Long-note tests complement the short window: full attacks, decays and
-release tails at low/middle/high notes, plus four-note chords. The intended
+There is no sweep and no level record. A hot patch shows on the strip and
+master meters, and the editor's loudness check warns before a save. The
+long-note checks (`patchLibraryEnvelope.test.ts`) hold every patch in a
+sustained category to finite, audible output through its whole envelope and
+release, and the chord families to four-note headroom. The intended
 listening verdict still belongs to Pat; mechanical checks cannot establish
 whether a sound fits the score.
 
