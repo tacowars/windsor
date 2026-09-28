@@ -33,6 +33,13 @@
  * rebuilds nothing, and a key change re-pitches through the sampler. A
  * merged arrangement that fails validation changes nothing and is reported,
  * never half-applied.
+ *
+ * The loop (windsor#15) is the clock's: the player hands it the song's
+ * `TickLoop` at build and on every partial, and the counter jumps back from
+ * the loop's end to its start. The player follows the tick, and on any jump
+ * treats the new tick as every part's entry, just as the song's end is for a
+ * region: held notes are released on that tick and each gate restarts its
+ * stream. A loop over the whole song jumps nothing and is today's wrap.
  */
 import type { Arrangement, ArrangementPartial, MusicPart } from './arrangement';
 import { mergeArrangement } from './arrangement';
@@ -49,13 +56,14 @@ import {
 import type { Patch } from '../patch/patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from '../patch/patch';
 import { ScaleSampler } from '../sequencing/scaleSampler';
-import type { TickSource, Unsubscribe } from '../sequencing/scheduler';
-import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import type { TickEvent, TickLoop, TickSource, Unsubscribe } from '../sequencing/scheduler';
+import { TICKS_PER_BAR, isLoopJump } from '../sequencing/scheduler';
 import { STRAIGHT_SWING, type Swing } from '../sequencing/swingTables';
 import { playableSwing } from '../sequencing/swing';
 import { RegionGate, type RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
 import { fitTimelines } from './timelineNormalise';
+import { tickLoopOf, withFittedLoop } from './songLoop';
 import {
   buildGenerator,
   generatorSig,
@@ -94,6 +102,8 @@ export interface MusicTransport extends TickSource {
   bpm: number;
   /** The song's swing (windsor#14). Optional: a transport without it plays straight. */
   swing?: Swing;
+  /** The loop the clock wraps (windsor#15). Optional: a transport without it plays through. */
+  loop?: TickLoop | null;
 }
 
 /** Fired once per part, on its first note — the "it is audible" console evidence. */
@@ -201,6 +211,9 @@ export class ArrangementPlayer {
   private readonly subs = new Map<number, Unsubscribe>();
   private readonly counters = new Map<number, number>();
   private readonly announced = new Set<number>();
+  /** The last transport tick seen, to spot the loop's jump back; null after a rewind. */
+  private lastTick: number | null = null;
+  private readonly unfollow: Unsubscribe;
   /**
    * The table preset names resolve against — the document's own patches
    * (#562), never the library; a `patches` partial edits it live.
@@ -215,12 +228,15 @@ export class ArrangementPlayer {
     private readonly onEvent?: MusicEventHandler,
   ) {
     this.presets = { ...presets };
-    this.current = withSwing(structuredClone(arrangement));
+    this.current = withFittedLoop(withSwing(structuredClone(arrangement)));
     validateArrangement(this.current, this.presets);
     this.index();
     this.built = this.buildAll(this.current);
     this.transport.bpm = this.current.transport.bpm;
     this.transport.swing = playableSwing(this.current.transport.swing);
+    this.transport.loop = tickLoopOf(this.current.transport);
+    // Subscribed before any gate, so a jump is seen before a part hears the tick.
+    this.unfollow = this.transport.subscribe(1, (event) => this.follow(event));
     this.attach(new Set(this.current.parts.map((part) => part.slot)));
   }
 
@@ -273,10 +289,10 @@ export class ArrangementPlayer {
    * neither the table nor the arrangement changes.
    */
   apply(partial: ArrangementPartial, patches: Readonly<Record<string, unknown>> = {}): ApplyResult {
-    // The merged timelines are re-fitted to the merged length, so a live
-    // `transport.bars` edit plays what its normalised document will.
+    // The merged timelines and loop are re-fitted to the merged length, so a
+    // live `transport.bars` edit plays what its normalised document will.
     const { merged: raw, ignored } = mergeArrangement(this.current, partial);
-    const merged = fitTimelines(raw);
+    const merged = withFittedLoop(fitTimelines(raw));
     const staged = stagePatches(this.presets, patches, ignored);
     let plan: Plan;
     try {
@@ -287,6 +303,7 @@ export class ArrangementPlayer {
     }
     this.transport.bpm = merged.transport.bpm;
     this.transport.swing = playableSwing(merged.transport.swing);
+    this.transport.loop = tickLoopOf(merged.transport);
     this.presets = plan.presets;
     for (const [slot, patch] of plan.patchChanges) this.parts.get(slot)?.setPatch(patch);
     for (const slot of plan.removed) this.detach(slot);
@@ -320,13 +337,33 @@ export class ArrangementPlayer {
    * would. Call after `releaseAll`, which clears what the generators hold.
    */
   reset(): void {
+    this.lastTick = null;
     for (const bound of this.built.bound.values()) bound?.gate.reset();
   }
 
   dispose(): void {
+    this.unfollow();
     for (const unsubscribe of this.subs.values()) unsubscribe();
     this.subs.clear();
     this.releaseAll();
+  }
+
+  /**
+   * Every tick, before any gate: a tick that is the loop's jump back from the
+   * last one (windsor#15). Any other discontinuity, a restart at another
+   * tick, is the caller's to handle, as it was before the loop. Each pitched part releases what it
+   * holds on the new tick and each gate forgets its region, so the tick is an
+   * entry for every live part and the pass replays from its stream's start,
+   * exactly as a region is re-entered on the song's wrap.
+   */
+  private follow(event: TickEvent): void {
+    const last = this.lastTick;
+    this.lastTick = event.tick;
+    if (last === null || !isLoopJump(last, event.tick, this.transport.loop ?? null)) return;
+    for (const bound of this.built.bound.values()) {
+      if (bound && isPitched(bound.generator)) bound.generator.release(event.tick, event.time);
+      bound?.gate.reset();
+    }
   }
 
   /**

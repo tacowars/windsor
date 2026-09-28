@@ -98,7 +98,16 @@ export interface MusicPart {
   readonly sequencer: SequencerSpec;
 }
 
-/** The song's clock: its tempo, its explicit length (decision 5) and its swing. */
+/** A song's loop (windsor#15): a tick range `[start, end)` and whether playback wraps it. */
+export interface SongLoop {
+  /** The loop's first tick, on a beat, in `[0, songTicks)`. */
+  readonly start: number;
+  /** One past its last tick, on a beat, in `(start, songTicks]`. */
+  readonly end: number;
+  readonly on: boolean;
+}
+
+/** The song's clock: its tempo, its explicit length (decision 5), its swing and its loop. */
 export interface Transport {
   readonly bpm: number;
   /** 1–`BARS_MAX` bars of `TICKS_PER_BAR` ticks; every region and event sits inside. */
@@ -110,6 +119,13 @@ export interface Transport {
    * written before swing carries none, and its export stays without one.
    */
   readonly swing?: Swing;
+  /**
+   * The bar range playback wraps while `on` (windsor#15, record
+   * `2026-09-28-song-loop-in-the-transport`), in ticks on the beat grid,
+   * inside the song. Absent is off: a song written before the loop carries
+   * none, and its export stays without one.
+   */
+  readonly loop?: SongLoop;
 }
 
 export interface Arrangement {
