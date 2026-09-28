@@ -160,15 +160,27 @@ session sets the class in the issue when it writes it. The worker keeps it
 unless the diff crosses into a `reviewed` area, and then says so in the
 PR. The main session checks the class against the diff.
 
+A `reviewed` PR merges without Pat when all four hold: nothing Pat
+can click or hear changes (an engine-only or internal change a preview
+would not show); the issue's decisions agreed the design; the worker
+raised no deviation and no `needs-human` (a necessary edit outside the
+owned files, declared in the PR, is not one); and CI is green with no open
+P0 or P1 in Codex's latest review. The main session checks all four.
+Anything audible still waits for Pat's listen, and UI for Pat's look.
+
 **The main session** dispatches and merges. Before launching a worker it
 runs `bash scripts/overlap.sh <owned paths>` against open PRs and local
 worktrees; an overlap means sequence, and a hotspot (the engine index,
 `partGenerators.ts`, the insert registry, the patch index, `main.ts`,
 `package.json`) means a `seam` ticket lands first. At most two Claude
 workers at once, one heavy test run at a time, and no new launch while two
-PRs wait for Pat. It merges with `gh pr merge <N> --squash --auto` and lets
-GitHub wait for the check. A Codex finding at P0 or P1 goes to a fresh
-round on the same branch, at most twice, then to Pat.
+PRs wait for Pat. It launches each worker with the profile the issue's
+"Worker" section names (`worker` or `worker-light`, in `.claude/agents/`).
+It merges with `gh pr merge <N> --squash`. `--auto` waits only for
+`verify`, not for Codex, so a routine PR merges only after Codex's 👍, and
+without `--auto` when the check is already green. It adds labels through
+the REST API, as `.claude/worker-rules.md` shows. A Codex finding at P0 or
+P1 goes to a fresh round on the same branch, at most twice, then to Pat.
 
 **Backlog.** Issues. No label is backlog, `ready` is the queue, an open PR
 is in progress, closed is done. Project #6 is a view that GitHub's own

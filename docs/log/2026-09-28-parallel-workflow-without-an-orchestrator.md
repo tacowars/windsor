@@ -26,6 +26,7 @@ lives one hour, which makes an idle hub re-read its context cold.
    criteria with boundaries, the local verify slice, and the PR class. No
    role file; the standing rules are the "Working a ticket" section of
    `CLAUDE.md`.
+   Refined by `2026-09-28-thin-worker-profiles`.
 2. **The PR is the only report.** `.github/pull_request_template.md`. A
    worker's final message is the PR URL and one line.
 3. **CI is the gate.** A worker runs the tests beside its change, typecheck
@@ -55,6 +56,7 @@ lives one hour, which makes an idle hub re-read its context cold.
 9. **Model and effort.** Opus at `high` for the main session and
    implementers (`.claude/settings.json`). Explore and verifier sub-agents
    run on Sonnet at `low`.
+   Refined by `2026-09-28-thin-worker-profiles`.
 10. **Measure each wave** with the transcript script in the research
     folder plus ready-to-merge time and Pat's intervention minutes per PR,
     and compare one worker against two before raising the cap.
