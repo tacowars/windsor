@@ -5,25 +5,42 @@
  * decision 7), not a tunable, and the injected-grid case shows the format
  * follows whatever grid it is handed.
  */
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
-import { BARS_MAX, BPM_MAX, BPM_MIN, TICKS_PER_BAR } from '@windsor/engine';
+import {
+  BARS_MAX,
+  BPM_MAX,
+  BPM_MIN,
+  STRAIGHT_SWING,
+  SWING_AMOUNT_MAX,
+  SWING_AMOUNT_MIN,
+  TICKS_PER_BAR,
+} from '@windsor/engine';
+import { loadBuiltIns } from './builtInLibrary';
+import { DocumentModel } from './documentModel';
 import {
   barsChange,
   bpmChange,
   countsAsTap,
   dragBars,
   dragBpm,
+  dragSwing,
   formatPosition,
+  isStraight,
   keyChange,
   nextTransportState,
   parseBars,
   parseBpm,
+  parseSwing,
   pressMove,
   pressedButtons,
   startsPress,
   scaleChange,
+  swingChange,
+  swingGridChange,
+  swingOf,
   tapTempo,
+  typedEntry,
   type TransportAction,
   type TransportState,
 } from './transportModel';
@@ -33,6 +50,8 @@ import {
   NUMBER_DRAG_THRESHOLD_PX,
   POSITION_GRID,
   SCALE_OPTIONS,
+  SWING_GRID_OPTIONS,
+  SWING_KNOB,
   TAP_TEMPO,
 } from './transportTables';
 
@@ -253,5 +272,90 @@ describe('what counts as one tap on Tap', () => {
 
   it('counts a keyboard or assistive click, which has no press before it', () => {
     expect(countsAsTap({ type: 'click', button: 0, detail: 0 })).toBe(true);
+  });
+});
+
+describe('the swing box and its grid (windsor#29)', () => {
+  // The document round trip reads the built-in library, which loads on demand.
+  beforeAll(() => loadBuiltIns());
+
+  it('spans the engine range, starting straight', () => {
+    expect([SWING_KNOB.min, SWING_KNOB.max]).toEqual([SWING_AMOUNT_MIN, SWING_AMOUNT_MAX]);
+    expect(SWING_KNOB.def).toBe(STRAIGHT_SWING.amount);
+    expect(isStraight(SWING_AMOUNT_MIN)).toBe(true);
+    expect(isStraight(SWING_AMOUNT_MIN + 1)).toBe(false);
+  });
+
+  it('types 66, clamps 80 to 75, reads a trailing %, and reverts text', () => {
+    expect(parseSwing('66')).toBe(66);
+    expect(parseSwing('66%')).toBe(66);
+    expect(parseSwing('80')).toBe(SWING_AMOUNT_MAX);
+    expect(parseSwing('40')).toBe(SWING_AMOUNT_MIN);
+    expect(parseSwing('66.4')).toBe(66);
+    expect(parseSwing('loose')).toBeNull();
+    expect(parseSwing('')).toBeNull();
+  });
+
+  it('drags from 50 to 75 over the knob travel, clamped at both ends', () => {
+    expect(dragSwing(SWING_AMOUNT_MIN, NUMBER_DRAG.rangePx, false)).toBe(SWING_AMOUNT_MAX);
+    expect(dragSwing(SWING_AMOUNT_MIN, NUMBER_DRAG.rangePx * 2, false)).toBe(SWING_AMOUNT_MAX);
+    expect(dragSwing(SWING_AMOUNT_MIN, -NUMBER_DRAG.rangePx, false)).toBe(SWING_AMOUNT_MIN);
+    const fine = dragSwing(SWING_AMOUNT_MIN, NUMBER_DRAG.rangePx, true);
+    expect(fine).toBeGreaterThan(SWING_AMOUNT_MIN);
+    expect(fine).toBeLessThan(SWING_AMOUNT_MAX);
+    expect(Number.isInteger(dragSwing(SWING_AMOUNT_MIN, 37, false))).toBe(true);
+  });
+
+  it('reads straight when the song carries no swing', () => {
+    expect(swingOf({})).toEqual(STRAIGHT_SWING);
+    expect(swingOf({ swing: { amount: 60, grid: 8 } })).toEqual({ amount: 60, grid: 8 });
+  });
+
+  it('writes the whole swing, the edit over the current one', () => {
+    const current = { amount: 60, grid: 8 } as const;
+    expect(swingChange(current, { amount: 66 })).toEqual({
+      transport: { swing: { amount: 66, grid: 8 } },
+    });
+    expect(swingGridChange(current, '16')).toEqual({
+      transport: { swing: { amount: 60, grid: 16 } },
+    });
+    expect(swingGridChange(current, '4')).toBeNull();
+  });
+
+  it('offers 1/16 then 1/8, each a grid the engine plays', () => {
+    expect(SWING_GRID_OPTIONS.map((o) => o.label)).toEqual(['1/16', '1/8']);
+    for (const option of SWING_GRID_OPTIONS) {
+      expect(swingGridChange(STRAIGHT_SWING, option.value)).not.toBeNull();
+    }
+  });
+
+  it('survives an export and a re-import', () => {
+    const model = new DocumentModel({ version: 3 });
+    model.merge(swingChange(swingOf(model.doc.transport), { amount: 66 }));
+    const grid = swingGridChange(swingOf(model.doc.transport), '8');
+    expect(grid).not.toBeNull();
+    model.merge(grid);
+    const reopened = new DocumentModel(JSON.parse(model.toJson()));
+    expect(reopened.doc.transport.swing).toEqual({ amount: 66, grid: 8 });
+  });
+});
+
+describe('a number box commits only what was typed', () => {
+  it('leaves a fractional swing alone on a focus and blur without typing', () => {
+    const shown = SWING_KNOB.fmt?.(66.7) ?? '';
+    expect(shown).toBe('67');
+    expect(typedEntry(shown, false, parseSwing)).toBeNull();
+    expect(typedEntry('133.50', false, parseBpm)).toBeNull();
+    expect(typedEntry('8', false, parseBars)).toBeNull();
+  });
+
+  it('commits a retyped same text, so 66.7 shown as 67 and retyped becomes 67', () => {
+    expect(typedEntry('67', true, parseSwing)).toBe(67);
+  });
+
+  it('commits a typed edit, and reverts typed text', () => {
+    expect(typedEntry('60', true, parseSwing)).toBe(60);
+    expect(typedEntry('120', true, parseBpm)).toBe(120);
+    expect(typedEntry('loose', true, parseSwing)).toBeNull();
   });
 });
