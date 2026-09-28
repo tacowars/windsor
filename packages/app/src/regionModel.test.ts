@@ -20,6 +20,7 @@ import { DocumentModel } from './documentModel';
 import {
   addRegion,
   deleteRegion,
+  dragRegion,
   fitRegions,
   followSongLength,
   moveRegion,
@@ -162,5 +163,37 @@ describe('a song-length change', () => {
     expect(followSongLength(model.doc, same)).toEqual({ partial: same, report: [] });
     const bpm = { transport: { bpm: 100 } };
     expect(followSongLength(model.doc, bpm)).toEqual({ partial: bpm, report: [] });
+  });
+});
+
+describe("a drag by the pointer's travel (windsor#21)", () => {
+  const beat = [region(0, BAR), region(2 * BAR, PPQ)];
+
+  it("changes a widened block's length by the travel, not by where its drawn end sits", () => {
+    // The drawn end of a one-beat block widened at the floor sits past its span: a still press there changes nothing.
+    expect(dragRegion(beat, { kind: 'resizeEnd', index: 1, deltaTicks: 0 }, SONG, PPQ)).toEqual(
+      beat,
+    );
+    const longer = dragRegion(beat, { kind: 'resizeEnd', index: 1, deltaTicks: PPQ }, SONG, PPQ);
+    expect(longer[1]).toEqual(region(2 * BAR, 2 * PPQ));
+    const snapped = dragRegion(
+      beat,
+      { kind: 'resizeEnd', index: 1, deltaTicks: 0.6 * PPQ },
+      SONG,
+      PPQ,
+    );
+    expect(snapped[1]).toEqual(region(2 * BAR, 2 * PPQ));
+  });
+
+  it('moves the start and the body by the travel too, within the neighbours', () => {
+    const regions = [region(0, BAR), region(2 * BAR, BAR)];
+    const start = dragRegion(regions, { kind: 'resizeStart', index: 1, deltaTicks: -BAR }, SONG);
+    expect(start[1]).toEqual(region(BAR, 2 * BAR));
+    const moved = dragRegion(regions, { kind: 'move', index: 1, deltaTicks: 0.4 * BAR }, SONG);
+    expect(moved).toEqual(regions);
+    expect(dragRegion(regions, { kind: 'move', index: 1, deltaTicks: 5 * BAR }, SONG)[1]).toEqual(
+      region(3 * BAR, BAR),
+    );
+    expect(dragRegion(regions, { kind: 'move', index: 7, deltaTicks: BAR }, SONG)).toEqual(regions);
   });
 });

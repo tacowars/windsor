@@ -19,6 +19,7 @@ import {
   fitEvents,
   maxEventDuration,
   removeEvent,
+  resizeEventBy,
   setEventDuration,
 } from './harmonyLaneModel';
 
@@ -150,5 +151,21 @@ describe('labels', () => {
     expect(durationLabel(2 * BAR + PPQ)).toBe('2 bars · 1 beat');
     expect(durationLabel(BAR)).toBe('1 bar');
     expect(durationLabel(3 * PPQ)).toBe('3 beats');
+  });
+});
+
+describe("an edge drag by the pointer's travel (windsor#21)", () => {
+  it("changes the duration by the travel from the event's own length", () => {
+    expect(resizeEventBy(FOUR, 1, BAR, SONG)).toEqual(setEventDuration(FOUR, 1, 2 * BAR, SONG));
+    expect(resizeEventBy(FOUR, 1, 0, SONG)).toEqual(FOUR);
+  });
+
+  it('lengthens a one-beat event by a beat, not to where its widened edge was drawn', () => {
+    const events = [ev(0, PPQ, 0), ev(PPQ, SONG - PPQ, 4)];
+    expect(spans(resizeEventBy(events, 0, PPQ, SONG))).toEqual([
+      [0, 2 * PPQ],
+      [2 * PPQ, SONG - 2 * PPQ],
+    ]);
+    expect(resizeEventBy(events, 5, PPQ, SONG)).toEqual(events);
   });
 });

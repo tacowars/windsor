@@ -17,6 +17,7 @@ import {
   TICKS_PER_BAR,
   hitStep,
 } from '@windsor/engine';
+import { snapTick, splitRegion } from './regionModel';
 import {
   CYCLE_TICKS,
   LANE_TONE,
@@ -28,6 +29,7 @@ import {
   beatTickPx,
   blockBox,
   blockHitAt,
+  boxTick,
   edgeBandPx,
   forKind,
   hitBlocks,
@@ -177,5 +179,51 @@ describe('the per-kind tables', () => {
         hold: 1,
       }),
     ).toMatch(/^euclid \d+\/\d+ · /);
+  });
+});
+
+describe('the tick under a drawn block (windsor#21)', () => {
+  const MIN = SONG_VIEW.minPxPerBar;
+
+  it('is the plain conversion on a block no wider than its span', () => {
+    const px = SONG_VIEW.pxPerBar;
+    const span = { startTick: TICKS_PER_BAR, durationTicks: 2 * TICKS_PER_BAR };
+    const box = blockBox(span.startTick, span.durationTicks, px);
+    for (const at of [box.leftPx, box.leftPx + 30, box.leftPx + box.widthPx]) {
+      expect(boxTick(box, at, span, px)).toBeCloseTo(pxToTick(at, px));
+    }
+  });
+
+  it('keeps every px of a widened block inside its own span', () => {
+    const span = { startTick: 3 * TICKS_PER_BAR, durationTicks: PPQ };
+    const box = blockBox(span.startTick, span.durationTicks, MIN);
+    expect(box.widthPx).toBeGreaterThan(tickToPx(PPQ, MIN));
+    expect(boxTick(box, box.leftPx, span, MIN)).toBe(span.startTick);
+    expect(boxTick(box, box.leftPx + box.widthPx / 2, span, MIN)).toBe(span.startTick + PPQ / 2);
+    expect(boxTick(box, box.leftPx + box.widthPx, span, MIN)).toBe(span.startTick + PPQ);
+    expect(boxTick(box, box.leftPx + 99, span, MIN)).toBe(span.startTick + PPQ);
+  });
+
+  it('lets an alt-click anywhere on a widened region split that region', () => {
+    const regions = [
+      { start: 0, duration: TICKS_PER_BAR },
+      { start: 2 * TICKS_PER_BAR, duration: PPQ },
+    ];
+    const boxes = regions.map((r) => blockBox(r.start, r.duration, MIN));
+    const box = boxes[1];
+    const grain = PPQ / 4;
+    expect(box).toBeDefined();
+    if (!box) return;
+    // Off the region's own span (past `tickToPx(PPQ)`) but on its drawn box.
+    const px = box.leftPx + box.widthPx * 0.6;
+    expect(px - box.leftPx).toBeGreaterThan(tickToPx(PPQ, MIN) * 0.5);
+    const found = hitBlocks(boxes, px);
+    expect(found?.index).toBe(1);
+    const span = { startTick: 2 * TICKS_PER_BAR, durationTicks: PPQ };
+    const cut = snapTick(boxTick(box, px, span, MIN), grain);
+    const split = splitRegion(regions, 1, cut, grain);
+    expect(split).toHaveLength(3);
+    expect(split[1]?.start).toBe(2 * TICKS_PER_BAR);
+    expect((split[2]?.start ?? 0) + (split[2]?.duration ?? 0)).toBe(2 * TICKS_PER_BAR + PPQ);
   });
 });

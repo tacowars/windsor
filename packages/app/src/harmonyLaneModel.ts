@@ -115,6 +115,23 @@ export function setEventDuration(
   );
 }
 
+/**
+ * A drag of event `index`'s right edge by `deltaTicks` (windsor#21): its
+ * duration grows or shrinks by the pointer's travel, never jumps to the
+ * pointer's absolute tick, so a block widened past its span resizes by what
+ * the pointer moved.
+ */
+export function resizeEventBy(
+  events: readonly HarmonyEvent[],
+  index: number,
+  deltaTicks: number,
+  songTicks: number,
+): HarmonyEvent[] {
+  const event = events[index];
+  if (!event) return [...events];
+  return setEventDuration(events, index, event.duration + deltaTicks, songTicks);
+}
+
 /** The event removed; its span goes to the one before it (the one after, for the first), so nothing later moves; the only event stays. */
 export function removeEvent(
   events: readonly HarmonyEvent[],

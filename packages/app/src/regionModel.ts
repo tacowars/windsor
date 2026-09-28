@@ -125,6 +125,39 @@ export function moveRegion(
   return regions.map((r, i) => (i === index ? { start, duration: r.duration } : r));
 }
 
+export type RegionDrag = 'move' | 'resizeStart' | 'resizeEnd';
+
+/**
+ * A drag of region `index`'s body or one of its edges by `deltaTicks` from
+ * where it was pressed (windsor#21): the edge or the start moves by the
+ * pointer's travel from the region's own tick, never to the pointer's
+ * absolute tick — so a block `MIN_BLOCK_PX` drew wider than its span
+ * changes by what the pointer moved, not by the widened offset.
+ */
+export function dragRegion(
+  regions: readonly Region[],
+  drag: { readonly kind: RegionDrag; readonly index: number; readonly deltaTicks: number },
+  songTicks: number,
+  grain: number = TICKS_PER_BAR,
+): Region[] {
+  const region = regions[drag.index];
+  if (!region) return [...regions];
+  switch (drag.kind) {
+    case 'resizeStart':
+      return resizeRegionStart(regions, drag.index, region.start + drag.deltaTicks, grain);
+    case 'resizeEnd':
+      return resizeRegionEnd(
+        regions,
+        drag.index,
+        endOf(region) + drag.deltaTicks,
+        songTicks,
+        grain,
+      );
+    case 'move':
+      return moveRegion(regions, drag.index, region.start + drag.deltaTicks, songTicks, grain);
+  }
+}
+
 /** The region cut in two at the snapped tick; unchanged when the cut lands on or outside its edges. */
 export function splitRegion(
   regions: readonly Region[],
