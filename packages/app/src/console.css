@@ -55,7 +55,9 @@ input {
   min-height: 100vh;
 }
 
-/* The header and the transport strip (#708): one sticky block above every tab. */
+/* The header (#708, windsor#11): one sticky row above every tab holding the
+   brand, the power button, the transport and the tabs. It wraps on a narrow
+   display, a transport group at a time, and never scrolls sideways. */
 .chrome {
   position: sticky;
   top: 0;
@@ -66,20 +68,25 @@ input {
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 10px 16px;
+  gap: 8px 16px;
+  padding: 6px 16px;
   flex-wrap: wrap;
 }
 .transport-strip {
-  background: var(--inset);
-  border-bottom: 1px solid var(--line);
-  padding: 6px 16px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .transport-row {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
+  align-items: center;
+  gap: 8px 16px;
   flex-wrap: wrap;
+}
+.transport-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: none;
 }
 .transport-meter,
 .transport-position {
@@ -89,7 +96,7 @@ input {
   padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: var(--r);
-  background: var(--panel);
+  background: var(--inset);
 }
 .transport-position {
   min-width: 7ch;
