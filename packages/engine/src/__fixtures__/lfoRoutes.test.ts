@@ -1,5 +1,3 @@
-// The FM project carries no Node types (`types: []`); the harness reads the bundle with `node:fs`.
-/// <reference types="node" />
 /**
  * The LFO's per-operator routes (windsor#10): the "To A / To B / To C / To D"
  * knobs, `lfo.toOp[0..3]`. `voiceControl.ts` scales each operator's target
@@ -15,10 +13,10 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { LoadedProcessor } from '../../__fixtures__/workletHarness';
-import { goertzel, loadProcessor, render } from '../../__fixtures__/workletHarness';
-import type { Patch } from '../../patch/patch';
-import { LFO_SHAPE, makeEnvelope, makePatch } from '../../patch/patch';
+import type { Patch } from '../patch/patch';
+import { LFO_SHAPE, makeEnvelope, makePatch } from '../patch/patch';
+import type { LoadedProcessor } from './workletHarness';
+import { goertzel, loadProcessor, render } from './workletHarness';
 
 const loaded: LoadedProcessor = loadProcessor();
 
