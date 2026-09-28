@@ -32,9 +32,11 @@ sub-agents, board writes, `gh` calls and handoff notes are cheap: 14% of tool
 calls and a few minutes per ticket. Three things are expensive:
 
 1. **The verify gate run inside the sub-agent, repeatedly.** The finish phase
-   (from the first `ticket-finish.sh` call to the end) is 20% of an
-   implementer's calls but 68% of its wall clock. The gate ran 2.3 times per
-   ticket, median 214 s each, 3 h 29 min in total across 26 tickets. Under
+   (from the first `ticket-finish.sh` call to the end of the transcript) is
+   20% of an implementer's calls but 68% of its wall clock. That phase also
+   holds the fix-ups, the Codex pass and the CI registration, so not all of
+   it is verification. The gate script itself ran 2.3 times per ticket,
+   median 214 s per call, 3 h 29 min in total across 26 tickets. Under
    sibling load it goes red on Vitest timeouts alone (6 of 13 runs in the
    #703 epic), which forces reruns and fix-up rounds.
 2. **Context per turn.** Every ticket-implementer starts at 43 to 45 k tokens
@@ -69,7 +71,8 @@ main. Section 5 maps that onto Windsor.
 |---|---|---|
 | tool calls per sub-agent | 31 | 101 |
 | assistant turns | 26 | 80 |
-| wall clock | 12 m 18 s | 46 m 17 s |
+| wall clock, all 35 | 12 m 18 s | 46 m 17 s |
+| wall clock, the 26 implementers | 21 m 11 s | |
 | input tokens incl. cache reads | 2.43 M | 12.7 M |
 | starting context (ticket-implementer) | 43.1 to 44.8 k, all 26 | |
 | context per turn | 95 k | 176 k |
@@ -102,9 +105,16 @@ their first finish call. `gh` calls in sub-agents: 37 calls, 8 minutes.
 calls and 11% of time. Finish is 20% of calls and 68% of time.
 
 **Cost:** the harness cost records put all 31 Aotearoa204 sessions, sub-agents
-included, at USD 803 and 5.9 M output tokens. The six orchestrator sessions
-and their sub-agents are USD 290 of that. Most of the spend was in ordinary
-interactive sessions, not in the orchestrated flow.
+included, at USD 733 at list price and 4.3 M output tokens. The six
+orchestrator sessions and their sub-agents are USD 290 of that, 40%. The
+other 60% was ordinary interactive sessions. (An earlier draft of this memo
+said USD 803 and 5.9 M; the figures in `transcript-overhead-report.md` are
+the ones the script wrote.) Pat is on a Max subscription, so these dollars
+are a proxy for allowance drawn, not a bill; see section 9.
+
+Some implementer runs are follow-up rounds on the same ticket, so a
+per-run figure is not a per-ticket delivery time. Durations include
+permission prompts and human absence.
 
 ## 3. Measured: the orchestrator (6 sessions, 32 launches)
 
@@ -125,12 +135,15 @@ state.
 Aotearoa204 measured itself and cut hard, and the cuts worked on tokens but
 not on minutes:
 
-- MVP post-mortem (`docs/research/2026-09-02-mvp-protocol-post-mortem.md`):
-  2,227 active agent-minutes and 2.48 G cache-read tokens for 49 tickets.
-  Time split: model thinking 46.7%, Codex review 16.7%, CI polling 12.0%.
-  After the #134 cuts, per 1,000 source lines: turns 126 to 49, cache-read
-  25.6 M to 11.7 M, active minutes 40.9 to 43.5. Its verdict: "the cuts
-  bought turns and tokens, not wall-clock minutes."
+- MVP post-mortem (`docs/research/2026-09-02-mvp-protocol-post-mortem.md`),
+  using its own section 6 corrections (the first pass double-counted
+  streamed records): 2,227 active agent-minutes and 1.19 G cache-read
+  tokens for 49 tickets, median 93 turns and 17.4 M cache-read per ticket,
+  about 180 k tokens of context per turn. Time split: model thinking 44%,
+  Codex review 17%, CI polling 12%. After the #134 cuts, per 1,000 source
+  lines: turns 126 to 49, cache-read 25.6 M to 11.7 M, active minutes 40.9
+  to 43.5. Its verdict: "the cuts bought turns and tokens, not wall-clock
+  minutes."
 - One run (#324) spent 335 of 470 Bash calls polling CI, 157 M cache-read
   tokens. Polling is now hook-denied.
 - Startup reading was cut from 35.4 k to 8.3 k tokens on 2026-09-02; the
@@ -275,14 +288,163 @@ the gate out of the model.
    transcript folder after each wave and record process share, starting
    context, per-turn context, and time inside `verify`. The Windsor baseline
    today: five process-free sub-agents at 3% process share, median 5 min,
-   starting context 12 to 28 k. That is what the floor looks like; a wave
-   should be judged against it.
+   starting context 12 to 28 k. Those were research and measurement runs,
+   not implementation, so they show the floor a sub-agent starts from, not
+   a target for shipping a feature. Section 8 adds the delivery measures
+   that transcripts alone cannot give.
 
 What this gives up: the orchestrator's live relay to Pat (replaced by PR
-notifications and the idle notification of a background session), the
-cross-model Codex pass on every PR (keep it on demand for engine DSP and
-schema changes), and the per-ticket metrics commit (replaced by the script
-run per wave).
+notifications and the idle notification of a background session), and the
+per-ticket metrics commit (replaced by the script run per wave). The Codex
+pass stays, for the reason in section 9.
+
+## 8. Review of the refined memo
+
+Pat asked a second model for advice and a separate session wrote
+`../2026-09-28-agent-orchestration-refined/README.md` with a source audit.
+This section records what that memo adds to the recommendation above, what
+it corrects, and where it does not fit the goal.
+
+**Adopted, because it is right and section 7 was missing it:**
+
+- **Backpressure across the whole delivery process.** A worker finishing a
+  PR is not free capacity: the PR still needs review and integration. Count
+  unmerged PRs and scarce resources, not running agents. Rule for Windsor:
+  pause dispatch when two PRs are waiting for Pat.
+- **Eligibility is three checks, not one label.** Prerequisites landed,
+  likely shared edits do not collide with active work, needed resources
+  free. A `ready` label plus self-assignment does not stop two workers
+  starting the same issue; with one human dispatcher that is fine, with an
+  automated dispatcher it needs one writer or an atomic claim.
+- **Name the shared append sites up front.** In Windsor those are the
+  engine index exports, `partGenerators.ts`, the insert registry, the
+  generated patch index and `main.ts`. Reserve them, pre-register entries in
+  the seam ticket, or fold the work into one change. A dependency graph does
+  not capture two independent tickets appending to one registry.
+- **"Verify once" is a shape, not a count.** Run the fast, relevant checks
+  while implementing (the DSP goldens for DSP, round trips for document
+  changes, headroom and index regeneration for patches), and let CI own the
+  comprehensive gate. Do not suppress a check a new fix legitimately needs.
+  Adopting a reduced local gate means editing CLAUDE.md's "Verify with"
+  column, not just doing it.
+- **Repair policy.** Distinguish code failures from infrastructure
+  failures, allow at most two automatic repair attempts, give one worker
+  the branch during repair, and bind every result to the PR head so a stale
+  failure does not trigger edits and a stale success does not close work.
+- **Runtime isolation is about the browser and the machine here.** One
+  port and disposable browser state per active preview (IndexedDB is
+  origin-scoped, so ports separate app data too), scratch outputs kept
+  apart, browser automation and audio benchmarks serialised. No database
+  or container per ticket for a static site.
+- **Measure delivery, not just tokens.** Time from ready to accepted
+  merge, Pat's intervention minutes, CI and review waiting, infrastructure
+  retries, integration rework, defects found after merge. The transcript
+  script gives context and tool-call diagnostics; PR and review timestamps
+  give the rest. Compare one worker against two on similar tasks before
+  going higher.
+- **Keep review where defects are costly.** The #703 epic's independent
+  review caught arpeggiator boundary defects the implementation tests
+  missed. Put known boundaries (register extremes, empty note pools) in the
+  brief so review finds new problems rather than omitted criteria.
+- **Keep a planning conversation; give execution a smaller owner.** A
+  long-lived session for deciding what Windsor becomes is worth its
+  context. It should not poll CI, reread the board or receive worker
+  messages.
+- **Hooks are not all free.** Command hooks run outside the model; prompt
+  and agent hooks invoke one.
+
+**Corrections accepted:** the cost totals and the post-mortem figures above
+are now the corrected ones. GitHub's agent-activity status is for
+integrated agent sessions, not local CLI workers, so a board for local
+workers needs an Actions projection from PR events, or no board.
+
+**Pushed back on, because of the goal:**
+
+- **`/autofix-pr` is the wrong default under a capped allowance.** It is
+  available on Max and needs no usage credits: the cloud docs say cloud
+  sessions "share rate limits with all other Claude and Claude Code usage
+  within your account" and there is "no separate compute charge". But it is
+  an always-on watcher that spends a full-context cloud turn on every CI
+  failure and review comment, cannot react to merge conflicts, and needs
+  the Claude GitHub App. Under a rolling five-hour window that is the wrong
+  shape. A human-triggered fix round, bounded to two attempts, is the
+  default. Try auto-fix on one PR to measure it, nothing more.
+- **Do not drop the Codex pass.** The refined memo keeps review in general;
+  section 7's first draft made Codex on-demand. Under two subscriptions the
+  Codex pass is the one lever that adds review without drawing on the
+  Claude allowance at all. Section 9.
+- **The memo's HN survey does not change the plan.** It confirms people
+  build these factories and that two or three concurrent substantial tasks
+  is the common human limit. It adds no controlled evidence either way, and
+  the memo says so.
+
+## 9. The subscription constraint
+
+Pat runs on a Claude Max subscription with usage credits off, plus a
+ChatGPT Pro subscription for Codex. There is no API budget. That changes
+what "token efficient" means: the unit is the rolling allowance window, not
+dollars, and there are two independent pools.
+
+**What the Claude Code docs say counts against the Max allowance** (costs
+page and cloud page, read 2026-09-28):
+
+- Every sub-agent, every agent a workflow or `/batch` spawns, every agent
+  teammate, every cloud session and every scheduled task sends its own
+  requests against the same plan limits. The `/usage` attribution
+  breakdown shows the sub-agent share; the session dollar figure "isn't
+  relevant for billing" on Max.
+- Cache reads count. A one-line message in a long session "still draws
+  usage for the whole conversation" at the cached rate. Per-turn context
+  is therefore the quantity to keep small, exactly as measured in section 2.
+- The prompt cache lives one hour on a subscription (five minutes on
+  usage credits). A session that wakes after a longer idle re-reads its
+  whole context cold. The Aotearoa204 orchestrator sessions ran 9 to 36
+  hours of wall clock for one to three hours of API time, so most of their
+  wakeups were cold misses on 100 to 200 k tokens. A long-lived hub is
+  costly on Max for that reason alone.
+- Cross-session messages, goal check-ins and scheduled tasks each start a
+  new turn that sends the full context. A planning session that receives
+  worker messages pays for each one; set `crossSessionInbound` to `hold`
+  or do not wire workers to it.
+- Limits are per window and partly per model family: after "You've hit
+  your Opus limit", switching to another family keeps working. Aotearoa204
+  tripped the account limit twice with two Fable agents at once.
+- Keep usage credits off by signing in with the Max credentials only and
+  leaving the toggle off in Settings, Usage. Nothing in this plan needs
+  them.
+
+**What the Codex pricing page says** (learn.chatgpt.com/docs/pricing, read
+2026-09-28): Codex CLI, IDE extension, cloud tasks and code review are
+included on Pro; usage is metered by tokens in five-hour windows with a
+weekly cap; local and cloud draw from one allowance; GitHub-triggered
+reviews count; extra credits are optional and off unless bought.
+
+**What follows for the plan:**
+
+1. **Two pools, so split the work by pool.** Claude does planning, DSP,
+   UI and anything that needs the browser. Codex does the adversarial
+   review pass on every engine, schema and persistence PR (Aotearoa204
+   measured 120 to 340 s per pass, about 65 findings over 35 passes, one in
+   six wrong) and can implement bounded, well-specified tickets that need
+   no browser (Aotearoa204 measured 391 to 720 s and 66 to 133 k tokens per
+   round; its failure mode was ending in `NEEDS HOST` when verify needed the
+   host, so give it tickets whose checks run headless). That review costs
+   the Claude allowance nothing.
+2. **Concurrency is set by the window, not the machine.** Two Claude
+   workers plus Pat's own session is the starting cap, matching both the
+   Vitest contention measurement and the usage-limit trips. Read `/usage`
+   attribution after each wave.
+3. **Spread models across families.** Implementers on Opus 5.5 at
+   `medium`; Explore, verifier and look sub-agents on Sonnet 5 at `low`.
+   That keeps the Opus bucket for the work that needs it and matches the
+   docs' own advice for sub-agents.
+4. **No long-lived hub.** Dispatch from Pat's session or a script, let
+   workers end their turn on the PR, and read PR state. Every idle hour of a
+   waiting hub is a cold re-read on wakeup.
+5. **Prefer local over cloud for repair.** Cloud sessions are allowed and
+   uncharged for compute, but they are the same allowance and they are
+   event-driven. Use them for a task that should outlive the laptop, not as
+   a watcher per PR.
 
 ## Sources
 
@@ -297,7 +459,10 @@ Anthropic, fetched 2026-09-28:
   `prompting-claude-fable-5-1`)
 - Claude Code docs: `agents`, `sub-agents`, `agent-teams`, `workflows`,
   `worktrees`, `agent-view`, `claude-projects`, `hooks`, `costs`,
-  `best-practices` under <https://code.claude.com/docs/en/>
+  `commands`, `claude-code-on-the-web`, `best-practices` under
+  <https://code.claude.com/docs/en/>
+- Codex pricing and plan inclusion: <https://learn.chatgpt.com/docs/pricing>
+- The refined memo and its audit: `../2026-09-28-agent-orchestration-refined/`
 - Introducing dynamic workflows in Claude Code (2026-05-28):
   <https://claude.com/blog/introducing-dynamic-workflows-in-claude-code>
 - Building a C compiler with a team of parallel Claudes (2026-02-05):
