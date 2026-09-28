@@ -29,6 +29,23 @@ export const RENDER_MAX_FRAMES = 48000 * 60 * 15;
 export const RENDER_CHANNELS = 2;
 
 /**
+ * The widest stem pass (windsor#41 decision 2): 32 channels, the most an
+ * `OfflineAudioContext` is required to support. Channels 0–1 of every pass
+ * are the master, so one pass carries up to 15 stereo stems.
+ */
+export const RENDER_STEM_CHANNELS_MAX = 32;
+
+/**
+ * The float samples (frames × channels) one stem pass may hold: twice what
+ * the longest song render holds (about 691 MB). A long song with many stems
+ * renders in narrower passes instead of one context too large for the tab.
+ * A render of more than one pass also holds a copy of the first pass's
+ * master for the lineup check: two channels of the song, at most what one
+ * song render holds (about 346 MB).
+ */
+export const RENDER_STEM_PASS_MAX_SAMPLES = 2 * RENDER_MAX_FRAMES * RENDER_CHANNELS;
+
+/**
  * How far apart the render stops to feed the scheduler, in seconds of song.
  * Each stop issues the ticks up to `RENDER_LOOK_AHEAD_SECONDS` ahead, which
  * must reach past the next stop so no tick is ever issued late.
@@ -66,3 +83,21 @@ export const WAV_DITHER_SEED = 0x0d_17_4e_12;
  * Cancel after less encoding, at the cost of more yields.
  */
 export const WAV_ENCODE_CHUNK_FRAMES = 1 << 16;
+
+/**
+ * How far a later stem pass's master may stray from the first's at any one
+ * frame before the passes count as not lined up (`stemLineup.ts`): 1e-5,
+ * about −100 dBFS. That is ten times the largest difference measured between
+ * two renders of one song in headless Chrome 153 on an Apple M1 (1.0e-6,
+ * float rounding in the master's sum; docs/research/2026-09-29-stem-render-accuracy),
+ * so run-to-run rounding passes with margin.
+ */
+export const RENDER_STEM_LINEUP_TOLERANCE = 1e-5;
+
+/**
+ * Frames the stem lineup check compares between yields to the event loop
+ * (`stemLineup.ts`): 65 536 frames, about 1.49 s of song at 44.1 kHz and
+ * 1.37 s at 48 kHz, both channels. The signal is checked once per chunk, as
+ * the WAV encoder's `WAV_ENCODE_CHUNK_FRAMES`.
+ */
+export const RENDER_STEM_LINEUP_CHUNK_FRAMES = 1 << 16;
