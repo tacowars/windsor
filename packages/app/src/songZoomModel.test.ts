@@ -6,7 +6,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { BARS_MAX } from '@windsor/engine';
-import { clampScroll, clampZoom, dragZoom, maxScroll, zoomForDrag } from './songZoomModel';
+import {
+  clampScroll,
+  clampZoom,
+  dragZoom,
+  fitPxPerBar,
+  fittedScale,
+  followFit,
+  maxScroll,
+  zoomForDrag,
+  zoomToFit,
+} from './songZoomModel';
 import type { ZoomBounds, ZoomDragStart } from './songZoomModel';
 import { SONG_VIEW } from './songViewTables';
 
@@ -95,5 +105,57 @@ describe('the scroll', () => {
     const deep = dragZoom(start, { dx: -1e9, dy: -1e4 }, b);
     expect(deep.pxPerBar).toBe(SONG_VIEW.maxPxPerBar);
     expect(deep.scrollPx).toBe(CHROME + BARS_MAX * SONG_VIEW.maxPxPerBar - VIEWPORT);
+  });
+});
+
+describe('the fit (windsor#21)', () => {
+  const lanesPx = VIEWPORT - CHROME;
+
+  it('fits a 1-bar, a 4-bar and a BARS_MAX song, the floor winning under it', () => {
+    for (const bars of [1, 4, BARS_MAX]) {
+      const b = bounds(bars);
+      const fit = fitPxPerBar(b);
+      expect(fit).toBeCloseTo(lanesPx / bars);
+      const scale = fittedScale(b);
+      expect(scale.minPxPerBar).toBe(Math.max(SONG_VIEW.minPxPerBar, lanesPx / bars));
+      expect(scale.maxPxPerBar).toBeGreaterThanOrEqual(scale.minPxPerBar);
+      // At the floor the last bar ends at the right edge, or the view scrolls when the table's floor won.
+      const atFloor = maxScroll(b, scale.minPxPerBar);
+      if (scale.minPxPerBar === lanesPx / bars) expect(atFloor).toBeCloseTo(0);
+      else expect(atFloor).toBeGreaterThan(0);
+    }
+    expect(fittedScale(bounds(BARS_MAX)).minPxPerBar).toBe(SONG_VIEW.minPxPerBar);
+    // A 1-bar song fills a window wider than the ceiling: the ceiling rises with it.
+    expect(fittedScale(bounds(1)).maxPxPerBar).toBe(Math.max(SONG_VIEW.maxPxPerBar, lanesPx));
+  });
+
+  it('stops a drag down at the fit', () => {
+    const b = bounds(4);
+    const start: ZoomDragStart = { pxPerBar: 400, scrollPx: 300, pointerPx: 500 };
+    const out = dragZoom(start, { dx: 0, dy: 1e4 }, b, fittedScale(b));
+    expect(out.pxPerBar).toBeCloseTo(lanesPx / 4);
+    expect(out.scrollPx).toBe(0);
+  });
+
+  it('has no fit before the view has a width', () => {
+    expect(fitPxPerBar({ bars: 4, viewportPx: 0, chromePx: CHROME })).toBeNull();
+    expect(fittedScale({ bars: 4, viewportPx: 0, chromePx: CHROME })).toBe(SONG_VIEW);
+  });
+
+  it('double-click returns to the fit at bar 1', () => {
+    expect(zoomToFit(bounds(4))).toEqual({ pxPerBar: lanesPx / 4, scrollPx: 0 });
+    expect(zoomToFit(bounds(BARS_MAX))).toEqual({ pxPerBar: SONG_VIEW.minPxPerBar, scrollPx: 0 });
+  });
+
+  it('follows the fit when a view at it narrows or widens, and clamps any other view up', () => {
+    const wide = fittedScale({ bars: 8, viewportPx: 1600, chromePx: CHROME });
+    const narrow = fittedScale({ bars: 8, viewportPx: 800, chromePx: CHROME });
+    expect(followFit(wide.minPxPerBar, wide.minPxPerBar, narrow)).toBe(narrow.minPxPerBar);
+    expect(followFit(narrow.minPxPerBar, narrow.minPxPerBar, wide)).toBe(wide.minPxPerBar);
+    // Zoomed in: a narrower window keeps the zoom, a wider fit above it pulls it up.
+    expect(followFit(400, wide.minPxPerBar, narrow)).toBe(400);
+    expect(followFit(100, narrow.minPxPerBar, wide)).toBe(wide.minPxPerBar);
+    // First measure: no previous floor, so a short song's fit pulls the default zoom up.
+    expect(followFit(SONG_VIEW.pxPerBar, null, fittedScale(bounds(2)))).toBe(lanesPx / 2);
   });
 });

@@ -9,7 +9,9 @@
  * by `songViewTables.test.ts`. The zoom (windsor#8) makes `pxPerBar` view
  * state in `songTab.ts`: `SONG_VIEW.pxPerBar` is where it starts, and
  * `minPxPerBar` / `maxPxPerBar` / `dragPxPerDoubling` bound the ruler drag
- * that changes it (`songZoomModel.ts`).
+ * that changes it (`songZoomModel.ts`). Since windsor#21 the zoom's real
+ * floor is the scale that fits the whole song in the window;
+ * `minPxPerBar` is only the absolute floor under it.
  */
 import type { SequencerKind, SequencerSpec } from '@windsor/engine';
 import { BEATS_PER_BAR, PPQ, TICKS_PER_BAR } from '@windsor/engine';
@@ -20,7 +22,7 @@ import { ARP_STYLE_LABELS } from './sequencerKnobTables';
 export interface SongViewScale {
   /** Px one bar of `TICKS_PER_BAR` ticks spans on the ruler and in every lane, before any zoom. */
   readonly pxPerBar: number;
-  /** The zoom's floor: a `BARS_MAX` song still fits a wide screen at this scale. */
+  /** The zoom's absolute floor, under the fit (windsor#21): below it a long song in a narrow window scrolls. */
   readonly minPxPerBar: number;
   /** The zoom's ceiling: a sixteenth is still a comfortable drag target at this scale. */
   readonly maxPxPerBar: number;
@@ -43,6 +45,12 @@ export const SONG_VIEW: SongViewScale = {
   laneNameWidthPx: 120,
   laneGapPx: 8,
 };
+
+/**
+ * How near the fit a zoom may be and still count as fitted (windsor#21): a
+ * view at the fit follows it when the window or the song length changes it.
+ */
+export const FIT_TOLERANCE_PX = 0.5;
 
 /** A pointer moved this far is a resize or a move; under it, a click. */
 export const SONG_DRAG_THRESHOLD_PX = 4;
@@ -114,6 +122,24 @@ export const isNarrowBlock = (widthPx: number): boolean => widthPx < NARROW_BLOC
 /** The band at each end of a drawn block that drags that edge: `REGION_EDGE_PX`, capped at a share of the width. */
 export const edgeBandPx = (widthPx: number): number =>
   Math.min(REGION_EDGE_PX, widthPx * EDGE_BAND_FRACTION);
+
+/**
+ * The tick under a press `px` from the song start on the drawn `box` of a
+ * block spanning `durationTicks` from `startTick` (windsor#21): the plain
+ * conversion while the box is no wider than its span, and the press's share
+ * of the box mapped onto the span once `MIN_BLOCK_PX` has widened it — so
+ * every px of a widened block lands inside its own span, never past it.
+ */
+export function boxTick(
+  box: BlockBox,
+  px: number,
+  span: { readonly startTick: number; readonly durationTicks: number },
+  pxPerBar: number,
+): number {
+  const spanPx = tickToPx(span.durationTicks, pxPerBar);
+  const share = Math.min(1, Math.max(0, (px - box.leftPx) / Math.max(box.widthPx, spanPx)));
+  return span.startTick + share * span.durationTicks;
+}
 
 export type BlockHit = 'start' | 'end' | 'body';
 

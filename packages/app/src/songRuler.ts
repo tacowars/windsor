@@ -11,7 +11,9 @@
  * and drag, up to zoom in and down to zoom out around the pressed bar, left
  * and right to drag the arrangement — the maths is `songZoomModel.ts`. A
  * press released without moving changes nothing, so the ruler's click stays
- * free for loop selection (windsor#15).
+ * free for loop selection (windsor#15). The zoom stops at the fit, the
+ * scale at which the whole song fills the window (windsor#21), and a
+ * double-click returns to it at bar 1; a resize or a Bars change refits.
  */
 import { TICKS_PER_BAR } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -20,7 +22,7 @@ import { watchPlayhead } from './stepStrip';
 import { formatPosition } from './transportModel';
 import { SONG_DRAG_THRESHOLD_PX, beatTickPx, rulerLabelEvery, rulerLabels } from './songViewTables';
 import type { SongZoom, ZoomBounds, ZoomDragStart } from './songZoomModel';
-import { dragZoom } from './songZoomModel';
+import { clampScroll, dragZoom, fittedScale, followFit, zoomToFit } from './songZoomModel';
 
 /**
  * The name-column cell and the ruler for `bars` bars at `pxPerBar`: one
@@ -31,7 +33,7 @@ export function rulerRow(bars: number, pxPerBar: number): [HTMLElement, HTMLElem
   const name = el('div', 'lane-name ruler-name');
   name.appendChild(el('small', '', 'bar · beat'));
   const ruler = el('div', 'ruler');
-  ruler.title = 'drag up or down to zoom, left or right to scroll';
+  ruler.title = 'drag up or down to zoom, left or right to scroll · double-click to fit the song';
   const every = rulerLabelEvery(pxPerBar);
   const beats = every === 1 ? beatTickPx(pxPerBar) : [];
   rulerLabels(bars).forEach((label, i) => {
@@ -72,8 +74,11 @@ export interface RulerZoom {
   scroll: HTMLElement;
   /** The lanes grid: it outlives a repaint, so it holds the pointer capture while the ruler is redrawn. */
   lanes: HTMLElement;
-  /** The view's current zoom and scroll, which the drag rewrites. */
-  state: { pxPerBar: number; scrollPx: number };
+  /**
+   * The view's current zoom and scroll, which the drag rewrites, and the
+   * fit last measured — the zoom's floor, which a view sitting on it follows.
+   */
+  state: { pxPerBar: number; scrollPx: number; floorPxPerBar: number | null };
   bars(): number;
   /** Redraw the lanes at `state.pxPerBar`. */
   repaint(): void;
@@ -91,8 +96,45 @@ function measureBounds(zoom: RulerZoom, pxPerBar: number): ZoomBounds {
   };
 }
 
-/** Wire the ruler drag: vertical zooms around the pressed bar, horizontal scrolls, both in one drag. */
-export function wireRulerZoom(zoom: RulerZoom): void {
+/** Set the view's zoom and scroll, repainting the lanes only when the scale changed. */
+function applyZoom(zoom: RulerZoom, view: SongZoom): void {
+  const { scroll, state } = zoom;
+  if (view.pxPerBar !== state.pxPerBar) {
+    state.pxPerBar = view.pxPerBar;
+    zoom.repaint();
+  }
+  scroll.scrollLeft = view.scrollPx;
+  state.scrollPx = scroll.scrollLeft;
+}
+
+/**
+ * Re-measure the fit and keep the zoom on it (windsor#21): a view at the old
+ * fit follows the new one, any other is clamped up to it. Nothing while the
+ * view has no width (its tab hidden).
+ */
+function refit(zoom: RulerZoom): void {
+  const { state } = zoom;
+  const bounds = measureBounds(zoom, state.pxPerBar);
+  if (!(bounds.viewportPx > 0)) return;
+  const scale = fittedScale(bounds);
+  const pxPerBar = followFit(state.pxPerBar, state.floorPxPerBar, scale);
+  state.floorPxPerBar = scale.minPxPerBar;
+  applyZoom(zoom, { pxPerBar, scrollPx: clampScroll(zoom.scroll.scrollLeft, bounds, pxPerBar) });
+}
+
+/** The view's zoom handle: `refit` after anything that may move the fit besides a resize, which it follows itself. */
+export interface RulerZoomHandle {
+  refit(): void;
+}
+
+/**
+ * Wire the ruler: a drag zooms (vertical, around the pressed bar, down to the
+ * fit) and scrolls (horizontal) in one gesture; a double-click fits; a
+ * resize of the scroll container refits. The drag holds the pointer on the
+ * lanes, which retargets the clicks there too, so the double-click is
+ * placed by where it lands, not by its target.
+ */
+export function wireRulerZoom(zoom: RulerZoom): RulerZoomHandle {
   const { lanes, scroll, state } = zoom;
   lanes.addEventListener('pointerdown', (down) => {
     const ruler = down.target instanceof Element ? down.target.closest('.ruler') : null;
@@ -104,26 +146,19 @@ export function wireRulerZoom(zoom: RulerZoom): void {
       pointerPx: down.clientX - ruler.getBoundingClientRect().left,
     };
     const bounds = measureBounds(zoom, start.pxPerBar);
+    const scale = fittedScale(bounds);
     let moved = false;
     try {
       lanes.setPointerCapture(down.pointerId);
     } catch {
       // A pointer the browser does not track: the drag still runs on the lanes' own events.
     }
-    const apply = (view: SongZoom): void => {
-      if (view.pxPerBar !== state.pxPerBar) {
-        state.pxPerBar = view.pxPerBar;
-        zoom.repaint();
-      }
-      scroll.scrollLeft = view.scrollPx;
-      state.scrollPx = scroll.scrollLeft;
-    };
     const onMove = (e: PointerEvent): void => {
       const dx = e.clientX - down.clientX;
       const dy = e.clientY - down.clientY;
       if (!moved && Math.max(Math.abs(dx), Math.abs(dy)) < SONG_DRAG_THRESHOLD_PX) return;
       moved = true;
-      apply(dragZoom(start, { dx, dy }, bounds));
+      applyZoom(zoom, dragZoom(start, { dx, dy }, bounds, scale));
     };
     const onUp = (): void => {
       lanes.removeEventListener('pointermove', onMove);
@@ -134,6 +169,24 @@ export function wireRulerZoom(zoom: RulerZoom): void {
     lanes.addEventListener('pointerup', onUp);
     lanes.addEventListener('pointercancel', onUp);
   });
+  lanes.addEventListener('dblclick', (e) => {
+    if (!onRuler(lanes, e)) return;
+    applyZoom(zoom, zoomToFit(measureBounds(zoom, state.pxPerBar)));
+  });
+  const observer = new ResizeObserver(() => {
+    if (scroll.isConnected) refit(zoom);
+    else observer.disconnect();
+  });
+  observer.observe(scroll);
+  return { refit: () => refit(zoom) };
+}
+
+/** Whether a click landed on the ruler, by position: the drag's capture makes the lanes its target. */
+function onRuler(lanes: HTMLElement, e: MouseEvent): boolean {
+  const rect = lanes.querySelector('.ruler')?.getBoundingClientRect();
+  if (!rect) return false;
+  const { clientX: x, clientY: y } = e;
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
 export interface SongPlayheadWatch {

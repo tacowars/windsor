@@ -8,9 +8,14 @@
  * The scale clamps to `SONG_VIEW`'s bounds and the scroll to the content,
  * the first bar at the left edge and the last at the right. View state only:
  * none of it reaches the document.
+ *
+ * The fit (windsor#21) is the zoom's real floor: `fittedScale` raises the
+ * table's `minPxPerBar` to the scale at which every bar fills the visible
+ * lanes width, and a view at the fit follows it when the window or the
+ * song's length moves it (`followFit`).
  */
 import type { SongViewScale } from './songViewTables';
-import { SONG_VIEW } from './songViewTables';
+import { FIT_TOLERANCE_PX, SONG_VIEW } from './songViewTables';
 
 /** Where a ruler drag started. */
 export interface ZoomDragStart {
@@ -76,4 +81,43 @@ export function dragZoom(
   const anchorShift = start.pointerPx * (pxPerBar / start.pxPerBar - 1);
   const scrollPx = clampScroll(start.scrollPx + anchorShift - move.dx, bounds, pxPerBar);
   return { pxPerBar, scrollPx };
+}
+
+/** The scale at which all `bars` fill the viewport besides the chrome: the last bar ends at the right edge. Null before the view has a width. */
+export function fitPxPerBar(bounds: ZoomBounds): number | null {
+  const lanesPx = bounds.viewportPx - bounds.chromePx;
+  if (!(bounds.bars > 0) || !(lanesPx > 0)) return null;
+  return lanesPx / bounds.bars;
+}
+
+/**
+ * The table with its floor raised to the fit: `minPxPerBar` stays the
+ * absolute floor under a fit smaller than it (the view scrolls), and the
+ * ceiling rises with a fit above it (a short song in a wide window fills it).
+ */
+export function fittedScale(bounds: ZoomBounds, scale: SongViewScale = SONG_VIEW): SongViewScale {
+  const fit = fitPxPerBar(bounds);
+  if (fit === null) return scale;
+  const minPxPerBar = Math.max(scale.minPxPerBar, fit);
+  return { ...scale, minPxPerBar, maxPxPerBar: Math.max(scale.maxPxPerBar, minPxPerBar) };
+}
+
+/**
+ * The zoom after the fit moved from `previousFloor` to `next`'s floor (a
+ * resize, a Bars change): a view that sat at the old floor stays at the
+ * new one, narrowing or widening, and any other view is clamped into
+ * `next`, so a fit that rose past it pulls it up.
+ */
+export function followFit(
+  pxPerBar: number,
+  previousFloor: number | null,
+  next: SongViewScale,
+): number {
+  const atFloor = previousFloor !== null && Math.abs(pxPerBar - previousFloor) <= FIT_TOLERANCE_PX;
+  return atFloor ? next.minPxPerBar : clampZoom(pxPerBar, next);
+}
+
+/** A double-click on the ruler: the fit, from bar 1. */
+export function zoomToFit(bounds: ZoomBounds, scale: SongViewScale = SONG_VIEW): SongZoom {
+  return { pxPerBar: fittedScale(bounds, scale).minPxPerBar, scrollPx: 0 };
 }

@@ -41,6 +41,12 @@ export interface SongViewState {
   pxPerBar: number;
   /** The lanes' horizontal scroll, restored after a render. */
   scrollPx: number;
+  /**
+   * The zoom's floor as last measured: the fit, the scale at which the whole
+   * song fills the window (windsor#21), or `SONG_VIEW.minPxPerBar` under it.
+   * Null until the view first has a width. A zoom sitting on it follows it.
+   */
+  floorPxPerBar: number | null;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
@@ -145,7 +151,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
   view.paintLanes();
   view.paintPane();
   scroll.scrollLeft = state.scrollPx;
-  wireRulerZoom({
+  const zoom = wireRulerZoom({
     scroll,
     lanes,
     state,
@@ -164,12 +170,18 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
       signature = now;
       state.selection = validSelection(ctx, state.selection);
       view.paintLanes();
+      zoom.refit();
     },
   });
 }
 
 /** The tab's renderer, keeping its selection across renders — what `main.ts` registers as Song. */
 export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
-  const state: SongViewState = { selection: null, pxPerBar: SONG_VIEW.pxPerBar, scrollPx: 0 };
+  const state: SongViewState = {
+    selection: null,
+    pxPerBar: SONG_VIEW.pxPerBar,
+    scrollPx: 0,
+    floorPxPerBar: null,
+  };
   return (body) => renderSongView(body, ctx, state);
 }
