@@ -136,11 +136,17 @@ in `docs/log/2026-09-28-parallel-workflow-without-an-orchestrator.md`.
    Pat can answer gets the `needs-human` label and a comment, then the turn
    ends.
 
-**PR classes.** `routine` merges on a green check plus no P0 or P1 from
-Codex. `reviewed` waits for Pat: sound design (`patches/`, the worklets, a
-golden change), UI/UX, the song document schema, persistence, or a
-deviation from the issue's decisions. The worker declares the class; the
-main session checks it against the diff's paths.
+**PR classes.** `reviewed` waits for Pat: sound design (`patches/`, the
+worklets, a golden change), the song document schema, persistence, a
+deviation from the issue's decisions, or a UI/UX change to layout,
+interaction or look (a new or moved control, a new gesture, a restyle).
+`routine` merges on a green check plus no P0 or P1 from Codex: everything
+else, including user-visible text the issue spells out word for word (a
+rename, a label, a hint), a bug fix that restores intended behaviour
+without changing how a control works, tests, docs and refactors. The main
+session sets the class in the issue when it writes it. The worker keeps it
+unless the diff crosses into a `reviewed` area, and then says so in the
+PR. The main session checks the class against the diff.
 
 **The main session** dispatches and merges. Before launching a worker it
 runs `bash scripts/overlap.sh <owned paths>` against open PRs and local

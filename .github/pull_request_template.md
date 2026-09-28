@@ -2,9 +2,18 @@ Fixes #
 
 ## Class
 
-`routine` or `reviewed`. Reviewed means sound design, UI/UX, the song
-document schema, persistence, a golden test change, or a deviation from
-the issue's decisions; add the `reviewed` label and Pat merges.
+`routine` or `reviewed`, as the issue sets it. If the diff crosses into a
+`reviewed` area, say so here, add the `reviewed` label, and Pat merges.
+
+`reviewed` waits for Pat: sound design (`patches/`, the worklets, a
+golden change), the song document schema, persistence, a deviation from
+the issue's decisions, or a UI/UX change to layout, interaction or look (a
+new or moved control, a new gesture, a restyle).
+
+`routine` merges on a green check plus no P0 or P1 from Codex: everything
+else, including user-visible text the issue spells out word for word (a
+rename, a label, a hint), a bug fix that restores intended behaviour
+without changing how a control works, tests, docs and refactors.
 
 ## What changed
 
