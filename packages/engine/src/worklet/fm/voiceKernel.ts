@@ -1,4 +1,5 @@
 /* eslint-disable no-magic-numbers -- DSP: the kernel's feedback average, interpolation and mip arithmetic, bit for bit the generic loop's; the tunables are fmConstants.ts (#654) */
+/* eslint-disable max-lines -- one hot loop written out per operator (#548); #55's width and PULSE reads took it past 350, and slicing it would reload the locals it exists to keep */
 /**
  * The fixed-index voice kernel (#548, #645): `renderVoiceGeneric`'s
  * arithmetic in its order, with the four operators written out, their state
@@ -8,7 +9,10 @@
  * operations in the same order. What breaks it: a reordered sum, a
  * `Math.fround` lost to a helper's return (a Float32Array store rounds; a
  * local does not, so every store-back is explicit), a local hoisted onto the
- * voice, a term dropped that is not exactly ±0. This function is not sliced
+ * voice, a term dropped that is not exactly ±0. Width (#55) follows the
+ * generic loop's reads: a flag per operator, hoisted, keeps width 1 on the old
+ * read, and the width ramp runs beside the phase, live or not, as the generic
+ * loop's does. This function is not sliced
  * finer, whatever `max-lines-per-function` says: a helper per operator would
  * reload the state through the voice and give the saving back
  * (docs/research/2026-09-15-548-fm-voice-loop-specialisation).
@@ -26,7 +30,7 @@ import {
 } from './fmConstants';
 import { FILT_OFF } from './modeIds';
 import { softClip } from './svf';
-import { KIND_NOISE, KIND_SAW_D, KIND_TABLE } from './waveTables';
+import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
 
 /**
  * `render`, with fixed operator indices (#548): see `ALG_EDGES` for why the
@@ -133,6 +137,28 @@ function renderVoiceKernel(
     f2B = fb2[B],
     f2C = fb2[C],
     f2D = fb2[D];
+  // Width (#55), as the generic loop reads it: `ramp` advances the width each
+  // sample, a Float32Array store's rounding made explicit; `sq` reads the wave
+  // squeezed. Both are false for a width of exactly 1 that is not ramping, so
+  // every patch before #55 takes the old read below, untouched.
+  const width = voice.width,
+    widthInc = voice.widthInc;
+  const wiA = widthInc[A],
+    wiB = widthInc[B],
+    wiC = widthInc[C],
+    wiD = widthInc[D];
+  let wA = width[A],
+    wB = width[B],
+    wC = width[C],
+    wD = width[D];
+  const rampA = wiA !== 0,
+    rampB = wiB !== 0,
+    rampC = wiC !== 0,
+    rampD = wiD !== 0;
+  const sqA = kA !== KIND_NOISE && kA !== KIND_PULSE && (wA !== 1 || rampA);
+  const sqB = kB !== KIND_NOISE && kB !== KIND_PULSE && (wB !== 1 || rampB);
+  const sqC = kC !== KIND_NOISE && kC !== KIND_PULSE && (wC !== 1 || rampC);
+  const sqD = kD !== KIND_NOISE && kD !== KIND_PULSE && (wD !== 1 || rampD);
 
   for (let s = 0; s < n; s++) {
     if (liveD) {
@@ -146,14 +172,35 @@ function renderVoiceKernel(
       let ph = phD + mod;
       ph -= Math.floor(ph);
       let v: number;
-      if (kD === KIND_TABLE) {
+      if (sqD) {
+        const pw = ph * wD;
+        if (pw >= 1) v = 0;
+        else if (kD === KIND_TABLE) {
+          const fi = pw * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tD[i0];
+          v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
+        } else if (kD === KIND_SAW_D) v = pw * 2 - 1;
+        else v = pw < 0.5 ? 1 : -1;
+      } else if (kD === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
         const s0 = tD[i0];
         v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
       } else if (kD === KIND_NOISE) v = voice.noise();
       else if (kD === KIND_SAW_D) v = ph * 2 - 1;
-      else v = ph < 0.5 ? 1 : -1;
+      else if (kD === KIND_PULSE) {
+        let pd = ph + wD;
+        pd -= Math.floor(pd);
+        const fi = ph * TABLE_SIZE;
+        const i0 = fi | 0;
+        const s0 = tD[i0];
+        const up = s0 + (tD[i0 + 1] - s0) * (fi - i0);
+        const fd = pd * TABLE_SIZE;
+        const d0 = fd | 0;
+        const sd = tD[d0];
+        v = up - (sd + (tD[d0 + 1] - sd) * (fd - d0));
+      } else v = ph < 0.5 ? 1 : -1;
       f2D = f1D;
       f1D = Math.fround(v * a);
       oD = Math.fround(v);
@@ -161,6 +208,7 @@ function renderVoiceKernel(
     }
     phD += incD;
     if (phD >= 1) phD -= Math.floor(phD);
+    if (rampD) wD = Math.fround(wD + wiD);
 
     if (liveC) {
       const a = aC;
@@ -174,14 +222,35 @@ function renderVoiceKernel(
       let ph = phC + mod;
       ph -= Math.floor(ph);
       let v: number;
-      if (kC === KIND_TABLE) {
+      if (sqC) {
+        const pw = ph * wC;
+        if (pw >= 1) v = 0;
+        else if (kC === KIND_TABLE) {
+          const fi = pw * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tC[i0];
+          v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
+        } else if (kC === KIND_SAW_D) v = pw * 2 - 1;
+        else v = pw < 0.5 ? 1 : -1;
+      } else if (kC === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
         const s0 = tC[i0];
         v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
       } else if (kC === KIND_NOISE) v = voice.noise();
       else if (kC === KIND_SAW_D) v = ph * 2 - 1;
-      else v = ph < 0.5 ? 1 : -1;
+      else if (kC === KIND_PULSE) {
+        let pd = ph + wC;
+        pd -= Math.floor(pd);
+        const fi = ph * TABLE_SIZE;
+        const i0 = fi | 0;
+        const s0 = tC[i0];
+        const up = s0 + (tC[i0 + 1] - s0) * (fi - i0);
+        const fd = pd * TABLE_SIZE;
+        const d0 = fd | 0;
+        const sd = tC[d0];
+        v = up - (sd + (tC[d0 + 1] - sd) * (fd - d0));
+      } else v = ph < 0.5 ? 1 : -1;
       f2C = f1C;
       f1C = Math.fround(v * a);
       oC = Math.fround(v);
@@ -189,6 +258,7 @@ function renderVoiceKernel(
     }
     phC += incC;
     if (phC >= 1) phC -= Math.floor(phC);
+    if (rampC) wC = Math.fround(wC + wiC);
 
     if (liveB) {
       const a = aB;
@@ -203,14 +273,35 @@ function renderVoiceKernel(
       let ph = phB + mod;
       ph -= Math.floor(ph);
       let v: number;
-      if (kB === KIND_TABLE) {
+      if (sqB) {
+        const pw = ph * wB;
+        if (pw >= 1) v = 0;
+        else if (kB === KIND_TABLE) {
+          const fi = pw * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tB[i0];
+          v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
+        } else if (kB === KIND_SAW_D) v = pw * 2 - 1;
+        else v = pw < 0.5 ? 1 : -1;
+      } else if (kB === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
         const s0 = tB[i0];
         v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
       } else if (kB === KIND_NOISE) v = voice.noise();
       else if (kB === KIND_SAW_D) v = ph * 2 - 1;
-      else v = ph < 0.5 ? 1 : -1;
+      else if (kB === KIND_PULSE) {
+        let pd = ph + wB;
+        pd -= Math.floor(pd);
+        const fi = ph * TABLE_SIZE;
+        const i0 = fi | 0;
+        const s0 = tB[i0];
+        const up = s0 + (tB[i0 + 1] - s0) * (fi - i0);
+        const fd = pd * TABLE_SIZE;
+        const d0 = fd | 0;
+        const sd = tB[d0];
+        v = up - (sd + (tB[d0 + 1] - sd) * (fd - d0));
+      } else v = ph < 0.5 ? 1 : -1;
       f2B = f1B;
       f1B = Math.fround(v * a);
       oB = Math.fround(v);
@@ -218,6 +309,7 @@ function renderVoiceKernel(
     }
     phB += incB;
     if (phB >= 1) phB -= Math.floor(phB);
+    if (rampB) wB = Math.fround(wB + wiB);
 
     if (liveA) {
       const a = aA;
@@ -233,14 +325,35 @@ function renderVoiceKernel(
       let ph = phA + mod;
       ph -= Math.floor(ph);
       let v: number;
-      if (kA === KIND_TABLE) {
+      if (sqA) {
+        const pw = ph * wA;
+        if (pw >= 1) v = 0;
+        else if (kA === KIND_TABLE) {
+          const fi = pw * TABLE_SIZE;
+          const i0 = fi | 0;
+          const s0 = tA[i0];
+          v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
+        } else if (kA === KIND_SAW_D) v = pw * 2 - 1;
+        else v = pw < 0.5 ? 1 : -1;
+      } else if (kA === KIND_TABLE) {
         const fi = ph * TABLE_SIZE;
         const i0 = fi | 0;
         const s0 = tA[i0];
         v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
       } else if (kA === KIND_NOISE) v = voice.noise();
       else if (kA === KIND_SAW_D) v = ph * 2 - 1;
-      else v = ph < 0.5 ? 1 : -1;
+      else if (kA === KIND_PULSE) {
+        let pd = ph + wA;
+        pd -= Math.floor(pd);
+        const fi = ph * TABLE_SIZE;
+        const i0 = fi | 0;
+        const s0 = tA[i0];
+        const up = s0 + (tA[i0 + 1] - s0) * (fi - i0);
+        const fd = pd * TABLE_SIZE;
+        const d0 = fd | 0;
+        const sd = tA[d0];
+        v = up - (sd + (tA[d0 + 1] - sd) * (fd - d0));
+      } else v = ph < 0.5 ? 1 : -1;
       f2A = f1A;
       f1A = Math.fround(v * a);
       oA = Math.fround(v);
@@ -248,6 +361,7 @@ function renderVoiceKernel(
     }
     phA += incA;
     if (phA >= 1) phA -= Math.floor(phA);
+    if (rampA) wA = Math.fround(wA + wiA);
 
     let sig = 0;
     if (carA) sig += oA * aA;
@@ -282,6 +396,10 @@ function renderVoiceKernel(
   phase[B] = phB;
   phase[C] = phC;
   phase[D] = phD;
+  width[A] = wA;
+  width[B] = wB;
+  width[C] = wC;
+  width[D] = wD;
   storeOperator(voice, A, liveA, n, aA, oA, f1A, f2A);
   storeOperator(voice, B, liveB, n, aB, oB, f1B, f2B);
   storeOperator(voice, C, liveC, n, aC, oC, f1C, f2C);

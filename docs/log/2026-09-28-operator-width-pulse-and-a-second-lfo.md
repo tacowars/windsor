@@ -62,7 +62,8 @@ one schema.
    - **Effective width.** Per operator `i`, per sample:
      `clamp(op.width + lfo1 × lfo.toWidth[i] + lfo2 × lfo2.toWidth[i], WIDTH_RANGE)`,
      where `lfo1` and `lfo2` are each LFO's output value.
-   - **Width's meaning.** Phase compression for every wave except PULSE. On
+   - **Width's meaning.** Phase compression for every wave except PULSE and
+     noise; a noise operator has no phase to squeeze and ignores width. On
      PULSE it is the duty.
    - **One-shot** runs the LFO's phase once and holds its end value. It
      implies a reset at note-on, whatever `retrigger` says, so a one-shot LFO

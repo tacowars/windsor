@@ -7,8 +7,11 @@
  * with `specialise: false`. Invariant: one sample loop, read top to bottom,
  * allocation free, no per-sample call beyond `voice.noise()` and the filter;
  * a helper per operator would reload the locals through the voice and cost
- * more than it saves. `fmProcessorKernel.test.ts` compares it with the kernel
- * on every preset; the golden test pins it.
+ * more than it saves. Width (#55): an operator whose width is exactly 1 and
+ * still takes the old read, untouched; one squeezed reads its wave at
+ * `phase / width` and holds 0 once that passes 1; a PULSE reads its saw
+ * table twice. `fmProcessorKernel.test.ts` compares it with the kernel on
+ * every preset; the golden test pins it.
  */
 
 import type { Voice } from './voice';
@@ -20,7 +23,7 @@ import {
 } from './fmConstants';
 import { FILT_OFF } from './modeIds';
 import { softClip } from './svf';
-import { KIND_NOISE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
+import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
 
 /**
  * Render `n` samples into the part's stereo accumulators starting at `off`.
@@ -63,7 +66,23 @@ function renderVoiceGeneric(
     ampInc = voice.ampInc;
   const kind = voice.kind,
     tables = voice.tables;
+  const width = voice.width,
+    widthInc = voice.widthInc;
   const fbAmt = patch.feedbackScratch; // Float32Array(4), refreshed by the part
+
+  // Width (#55), one bit per operator, hoisted: `ramping` advances its width
+  // each sample, `squeezed` reads its wave compressed. Neither is set for a
+  // width of exactly 1 that is not ramping, which is every patch before #55.
+  let ramping = 0,
+    squeezed = 0;
+  for (let i = 0; i < 4; i++) {
+    const bit = 1 << i;
+    if (widthInc[i] !== 0) ramping |= bit;
+    const k = kind[i];
+    if (k !== KIND_NOISE && k !== KIND_PULSE && (width[i] !== 1 || widthInc[i] !== 0)) {
+      squeezed |= bit;
+    }
+  }
 
   for (let s = 0; s < n; s++) {
     for (let oi = 0; oi < 4; oi++) {
@@ -89,24 +108,59 @@ function renderVoiceGeneric(
       ph -= Math.floor(ph);
 
       let v: number;
-      switch (kind[i]) {
-        case KIND_NOISE:
-          v = voice.noise();
-          break;
-        case KIND_SAW_D:
-          v = ph * 2 - 1;
-          break;
-        case KIND_SQUARE_D:
-          v = ph < 0.5 ? 1 : -1;
-          break;
-        default: {
+      if ((squeezed & (1 << i)) !== 0) {
+        // The wave runs at 1 / width through the first `width` of the period,
+        // then holds 0. Reading at exactly 1 would interpolate past the guard
+        // sample, so the hold is its own branch.
+        const pw = ph * width[i];
+        const k = kind[i];
+        if (pw >= 1) v = 0;
+        else if (k === KIND_SAW_D) v = pw * 2 - 1;
+        else if (k === KIND_SQUARE_D) v = pw < 0.5 ? 1 : -1;
+        else {
           const t = tables[i]!;
-          const fi = ph * TABLE_SIZE;
+          const fi = pw * TABLE_SIZE;
           const i0 = fi | 0;
-          const frac = fi - i0;
           const s0 = t[i0];
-          v = s0 + (t[i0 + 1] - s0) * frac;
-          break;
+          v = s0 + (t[i0 + 1] - s0) * (fi - i0);
+        }
+      } else {
+        switch (kind[i]) {
+          case KIND_NOISE:
+            v = voice.noise();
+            break;
+          case KIND_SAW_D:
+            v = ph * 2 - 1;
+            break;
+          case KIND_SQUARE_D:
+            v = ph < 0.5 ? 1 : -1;
+            break;
+          case KIND_PULSE: {
+            // Two reads of the saw, the second a duty later: a band-limited
+            // pulse, zero-mean at any duty.
+            const t = tables[i]!;
+            let pd = ph + width[i];
+            pd -= Math.floor(pd);
+            const fi = ph * TABLE_SIZE;
+            const i0 = fi | 0;
+            const s0 = t[i0];
+            const up = s0 + (t[i0 + 1] - s0) * (fi - i0);
+            const fd = pd * TABLE_SIZE;
+            const d0 = fd | 0;
+            const sd = t[d0];
+            const down = sd + (t[d0 + 1] - sd) * (fd - d0);
+            v = up - down;
+            break;
+          }
+          default: {
+            const t = tables[i]!;
+            const fi = ph * TABLE_SIZE;
+            const i0 = fi | 0;
+            const frac = fi - i0;
+            const s0 = t[i0];
+            v = s0 + (t[i0 + 1] - s0) * frac;
+            break;
+          }
         }
       }
 
@@ -116,6 +170,7 @@ function renderVoiceGeneric(
 
       phase[i] += phaseInc[i];
       if (phase[i] >= 1) phase[i] -= Math.floor(phase[i]);
+      if ((ramping & (1 << i)) !== 0) width[i] += widthInc[i];
       amp[i] = a + ampInc[i];
     }
 

@@ -6,7 +6,7 @@ import { WAVE } from './waveIds';
 
 // The module warms the wave cache at load and reads the scope's sample rate.
 Object.assign(globalThis, { sampleRate: 48000 });
-const { getMips, KIND_NOISE, KIND_SAW_D, KIND_TABLE, mipIndex, SIN_TAB, waveKind } =
+const { getMips, KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE, mipIndex, SIN_TAB, waveKind } =
   await import('./waveTables');
 
 describe('the wave tables', () => {
@@ -48,5 +48,11 @@ describe('the wave tables', () => {
     expect(waveKind(WAVE.SAW_D)).toBe(KIND_SAW_D);
     expect(waveKind(WAVE.SINE)).toBe(KIND_TABLE);
     expect(waveKind(WAVE.USER)).toBe(KIND_TABLE);
+    expect(waveKind(WAVE.PULSE)).toBe(KIND_PULSE);
+  });
+
+  it('give PULSE the saw’s own tables, one copy in the cache (#55)', () => {
+    expect(getMips(WAVE.PULSE, 48000, 1, null)).toBe(getMips(WAVE.SAW, 48000, 1, null));
+    expect(getMips(WAVE.PULSE, 48000, 0.5, null)).toBe(getMips(WAVE.SAW, 48000, 0.5, null));
   });
 });
