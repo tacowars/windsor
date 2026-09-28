@@ -33,6 +33,7 @@ import {
   blockBox,
   forKind,
   hitBlocks,
+  isNarrowBlock,
   pxToTick,
   tickToPx,
 } from './songViewTables';
@@ -83,6 +84,7 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   const box = blockBox(region.start, region.duration, px);
   node.style.left = `${box.leftPx}px`;
   node.style.width = `${box.widthPx}px`;
+  node.classList.toggle('narrow', isNarrowBlock(box.widthPx));
   if (cycle) node.style.setProperty('--cyc', `${tickToPx(cycle, px)}px`);
   const mark = regionMark(part.regions, view.songTicks());
   const glyph = el('span', 'gl', mark);

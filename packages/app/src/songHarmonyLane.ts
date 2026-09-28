@@ -13,7 +13,7 @@ import { el } from './dom';
 import { appendEvent, eventLabel, setEventDuration } from './harmonyLaneModel';
 import { pointerDrag } from './songLanes';
 import type { SongView } from './songTab';
-import { blockBox, blockHitAt, pxToTick } from './songViewTables';
+import { blockBox, blockHitAt, isNarrowBlock, pxToTick } from './songViewTables';
 
 /** The `.hblk` for one drawn event block. */
 function block(view: SongView, index: number, start: number, end: number): HTMLElement {
@@ -24,6 +24,7 @@ function block(view: SongView, index: number, start: number, end: number): HTMLE
   const box = blockBox(start, end - start, view.state.pxPerBar);
   node.style.left = `${box.leftPx}px`;
   node.style.width = `${box.widthPx}px`;
+  node.classList.toggle('narrow', isNarrowBlock(box.widthPx));
   if (event) {
     const label = eventLabel(doc.harmony, event);
     node.appendChild(el('b', '', label.name));
@@ -60,7 +61,10 @@ function wireEdgeDrag(view: SongView, node: HTMLElement, bounds: EventSpan): voi
       const events = view.ctx.model.doc.harmony.events;
       const preview = setEventDuration(events, index, tickAt(e) - start, view.songTicks());
       const next = preview[index];
-      if (next) node.style.width = `${blockBox(start, next.duration, px).widthPx}px`;
+      if (!next) return;
+      const width = blockBox(start, next.duration, px).widthPx;
+      node.style.width = `${width}px`;
+      node.classList.toggle('narrow', isNarrowBlock(width));
     },
     end: (e, moved) => {
       if (!moved || !onEdge) return void view.select({ kind: 'event', index });

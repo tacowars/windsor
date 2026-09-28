@@ -134,6 +134,8 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
         ...doc.parts.flatMap((part) => partLaneRow(view, part)),
       ];
       lanes.replaceChildren(...rows, line);
+      // The new blocks start unlit, and the loop marks only a moved tick: light the playing chord now, paused or not.
+      markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
     },
     paintPane() {
       paintDetailPane(pane, view);

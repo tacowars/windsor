@@ -3,6 +3,8 @@
  * px at the table's scale, the ruler's labels, and one tone, summary and
  * cycle length per kind the engine declares.
  */
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -20,6 +22,7 @@ import {
   LANE_TONE,
   REGION_SUMMARY,
   MIN_BLOCK_PX,
+  NARROW_BLOCK_PX,
   REGION_EDGE_PX,
   SONG_VIEW,
   beatTickPx,
@@ -28,6 +31,7 @@ import {
   edgeBandPx,
   forKind,
   hitBlocks,
+  isNarrowBlock,
   pxToTick,
   rulerLabelEvery,
   rulerLabels,
@@ -98,6 +102,37 @@ describe('a block at the widest zoom-out (minPxPerBar)', () => {
     expect(hitBlocks(boxes, (second?.leftPx ?? 0) + 1)?.index).toBe(1);
     expect(hitBlocks(boxes, 0.5)?.index).toBe(0);
     expect(hitBlocks(boxes, 100)).toBeNull();
+  });
+
+  it('hits a one-beat region and a one-beat harmony block at their drawn right edge, for resize', () => {
+    // Both lanes draw through blockBox; a narrow block drops its padding, so it is drawn exactly this wide.
+    const region = blockBox(2 * TICKS_PER_BAR, PPQ, MIN);
+    const chord = blockBox(5 * TICKS_PER_BAR + PPQ, PPQ, MIN);
+    for (const box of [region, chord]) {
+      expect(isNarrowBlock(box.widthPx)).toBe(true);
+      const right = box.leftPx + box.widthPx;
+      expect(blockHitAt(box, right)).toBe('end');
+      expect(blockHitAt(box, right - 0.5)).toBe('end');
+      expect(hitBlocks([box], right)).toEqual({ index: 0, hit: 'end' });
+    }
+  });
+
+  it('draws a narrow block without the padding the CSS gives a full one', () => {
+    const css = readFileSync(new URL('./console.css', import.meta.url), 'utf8');
+    const rule = (selector: string): string =>
+      new RegExp(`\\n${selector.replace(/\./g, '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+    const values = (body: string, prop: string): string[] =>
+      (new RegExp(`\\n\\s*${prop}: ([^;]*);`).exec(body)?.[1] ?? '').split(/\s+/);
+    for (const block of ['.reg', '.hblk']) {
+      const full = rule(block);
+      // `padding: <vertical> <horizontal>`, `border: <width> solid <colour>`.
+      const padding = parseFloat(values(full, 'padding')[1] ?? '');
+      const border = parseFloat(values(full, 'border')[0] ?? '');
+      expect(2 * padding + 2 * border, block).toBe(NARROW_BLOCK_PX);
+      expect(rule(`${block}.narrow`), block).toMatch(/padding: 0;/);
+    }
+    expect(MIN_BLOCK_PX).toBeLessThan(NARROW_BLOCK_PX);
+    expect(isNarrowBlock(blockBox(0, TICKS_PER_BAR, SONG_VIEW.pxPerBar).widthPx)).toBe(false);
   });
 
   it('keeps the full edge band on a wide block at the default zoom', () => {

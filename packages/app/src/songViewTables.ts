@@ -52,6 +52,14 @@ export const REGION_EDGE_PX = 8;
 export const BLOCK_GAP_PX = 2;
 /** The narrowest a block renders, whatever the zoom: a one-beat event at `minPxPerBar` stays visible and grabbable. */
 export const MIN_BLOCK_PX = 6;
+/**
+ * The horizontal padding plus side borders a `.reg` or `.hblk` draws at full
+ * size (`console.css`: 6 px padding and a 1 px border each side, pinned by
+ * `songViewTables.test.ts`). A block narrower than this is drawn `.narrow`,
+ * without padding, so its drawn width is exactly `blockBox`'s and the hit
+ * test and the eye agree.
+ */
+export const NARROW_BLOCK_PX = 14;
 /** The largest share of a block's width each edge band may take, so the body always keeps a movable middle. */
 export const EDGE_BAND_FRACTION = 0.25;
 
@@ -99,6 +107,9 @@ export function blockBox(startTick: number, durationTicks: number, pxPerBar: num
     widthPx: Math.max(MIN_BLOCK_PX, tickToPx(durationTicks, pxPerBar) - BLOCK_GAP_PX),
   };
 }
+
+/** A block too narrow for its padding: drawn `.narrow`, so the CSS cannot widen it past its hit box. */
+export const isNarrowBlock = (widthPx: number): boolean => widthPx < NARROW_BLOCK_PX;
 
 /** The band at each end of a drawn block that drags that edge: `REGION_EDGE_PX`, capped at a share of the width. */
 export const edgeBandPx = (widthPx: number): number =>
