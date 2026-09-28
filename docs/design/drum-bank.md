@@ -105,9 +105,10 @@ an open one.
 
 ## Verification and what it cannot say
 
-Each file carries a 16,384-seed headroom record from
-`packages/app/sweep-headroom.mjs`; the render is a quarter-second note
-at velocity 0.9. The lab used to author the bank measured, per patch, the
+Each file is one `packages/engine/src/patches/<id>.json` at patch format 2,
+with no headroom record (record `2026-09-28-retire-the-headroom-record`); a
+new or edited file needs `node scripts/patch-library-index.mjs --write`, and
+no sweep. The lab used to author the bank measured, per patch, the
 peak, the time to −20 / −40 / −60 dB, spectral centroid over the first,
 mid and late windows, the strongest partials and a 1 ms amplitude view of
 the clap bursts, so the numbers in the descriptions are what the engine

@@ -137,8 +137,9 @@ musical choices that remain material and unresolved.
 - Start with an existing sound or `makePatch`; use `clonePatch` for an editable
   copy. Preserve factory IDs and unrelated song settings. A sound that should
   outlive the session is a library file, `engine/patches/<id>.json`, saved from
-  the console (Init, Save, Copy to new) or written and swept; sound data never
-  goes back into TypeScript.
+  the console (Init, Save, Copy to new) or written by hand followed by
+  `node scripts/patch-library-index.mjs --write`; sound data never goes back
+  into TypeScript.
 - Choose carrier/modulator envelopes for the intended articulation, then
   tune filter and modulation. Document useful register/hold time and any
   recommended mixer sends. Delay/plate belong to the song, not `Patch`.

@@ -15,9 +15,12 @@ const settings = (o: Partial<LfoSettings> = {}): LfoSettings => ({
   amount: 1,
   delay: 0,
   retrigger: true,
+  oneShot: false,
+  unipolar: false,
   toPitch: 0,
   modWheelDepth: 1,
   toOp: [0, 0, 0, 0],
+  toWidth: [0, 0, 0, 0],
   ...o,
 });
 

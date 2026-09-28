@@ -23,13 +23,16 @@ import {
   FILTER_DEFAULTS,
   FILTER_ENV_DEFAULTS,
   LEAD_OPERATOR_LEVEL,
+  LFO2_DEFAULTS,
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
+  LFO_TO_WIDTH_DEFAULT,
   OPERATOR_COUNT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
   TONE_RANGE,
+  WIDTH_RANGE,
 } from './patchDefaults';
 
 /** The patch the voice reads: every field filled, plus the per-operator feedback scratch. */
@@ -85,6 +88,7 @@ function opDefaults(o: PartialOperator | null | undefined, index: number): Opera
     detune: num(o.detune, d.detune), // cents
     level: num(o.level, index === 0 ? LEAD_OPERATOR_LEVEL : d.level),
     feedback: clamp(num(o.feedback, d.feedback), FEEDBACK_RANGE), // bipolar (#529)
+    width: clamp(num(o.width, d.width), WIDTH_RANGE), // the duty for PULSE
     velSens: num(o.velSens, d.velSens),
     levelKeyScale: num(o.levelKeyScale, d.levelKeyScale),
     phase: num(o.phase, d.phase),
@@ -93,18 +97,41 @@ function opDefaults(o: PartialOperator | null | undefined, index: number): Opera
   };
 }
 
+/** One per-operator depth array, filled index by index. */
+function perOperator(raw: unknown[] | null | undefined, d: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < OPERATOR_COUNT; i++) out.push(num(raw && raw[i], d));
+  return out;
+}
+
+/** Either LFO: the first and the second share a shape and differ only in their defaults. */
+function lfoDefaults(
+  raw: Partial<LfoSettings> | null | undefined,
+  ld: typeof LFO_DEFAULTS,
+): LfoSettings {
+  raw = raw || {};
+  return {
+    shape: num(raw.shape, ld.shape) | 0,
+    rate: num(raw.rate, ld.rate),
+    amount: num(raw.amount, ld.amount),
+    delay: num(raw.delay, ld.delay),
+    retrigger: !!raw.retrigger,
+    oneShot: !!raw.oneShot, // runs once from note-on and holds
+    unipolar: !!raw.unipolar, // 0..1 instead of -1..1
+    toPitch: num(raw.toPitch, ld.toPitch), // semitones
+    modWheelDepth: num(raw.modWheelDepth, ld.modWheelDepth),
+    toOp: perOperator(raw.toOp, LFO_TO_OP_DEFAULT),
+    toWidth: perOperator(raw.toWidth, LFO_TO_WIDTH_DEFAULT),
+  };
+}
+
 function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
   raw = raw || {};
   const ops: Operator[] = [];
   for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
 
-  const lfoRaw: Partial<LfoSettings> = raw.lfo || {};
   const filtRaw = raw.filter || {};
-  const toOp: number[] = [];
-  for (let i = 0; i < OPERATOR_COUNT; i++)
-    toOp.push(num(lfoRaw.toOp && lfoRaw.toOp[i], LFO_TO_OP_DEFAULT));
   const pd = PATCH_DEFAULTS,
-    ld = LFO_DEFAULTS,
     fd = FILTER_DEFAULTS;
 
   const p = {
@@ -121,16 +148,8 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
     spread: num(raw.spread, pd.spread), // cents; >0 doubles voices
     mono: !!raw.mono, // one note at a time, with retrigger (#453)
     ops,
-    lfo: {
-      shape: num(lfoRaw.shape, ld.shape) | 0,
-      rate: num(lfoRaw.rate, ld.rate),
-      amount: num(lfoRaw.amount, ld.amount),
-      delay: num(lfoRaw.delay, ld.delay),
-      retrigger: !!lfoRaw.retrigger,
-      toPitch: num(lfoRaw.toPitch, ld.toPitch), // semitones
-      modWheelDepth: num(lfoRaw.modWheelDepth, ld.modWheelDepth),
-      toOp,
-    },
+    lfo: lfoDefaults(raw.lfo, LFO_DEFAULTS),
+    lfo2: lfoDefaults(raw.lfo2, LFO2_DEFAULTS),
     filter: {
       mode: num(filtRaw.mode, fd.mode) | 0,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
@@ -140,6 +159,7 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
       envAmount: num(filtRaw.envAmount, fd.envAmount), // octaves
       modWheelDepth: num(filtRaw.modWheelDepth, fd.modWheelDepth), // octaves the wheel adds to envAmount (#586)
       lfoAmount: num(filtRaw.lfoAmount, fd.lfoAmount), // octaves
+      lfo2Amount: num(filtRaw.lfo2Amount, fd.lfo2Amount), // octaves, from LFO 2
       keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS),
     },

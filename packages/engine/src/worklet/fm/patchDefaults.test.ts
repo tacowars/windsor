@@ -5,6 +5,7 @@ import type { PartialPatch, Patch } from '../../patch/patch';
 import { patchLeafDifferences } from '../../patch/patchLibrary';
 import type { WorkletPatch } from './patchNormalise';
 import { TONE_RANGE } from './patchDefaults';
+import { WAVE } from './waveIds';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
 Object.assign(globalThis, { sampleRate: 48000 });
@@ -31,6 +32,14 @@ describe('the patch defaults (#670)', () => {
     ],
     // makePatch() takes an array wholesale where the worklet fills per index, so a full one.
     ['the LFO', { lfo: { rate: 2, toOp: [0.5, 0, 0, 0] } }],
+    // windsor#54: the operator width inside its range, the LFO fields and LFO 2.
+    ['an operator width', { ops: [{ width: 0.5 }, { wave: WAVE.PULSE, width: 0.25 }] }],
+    [
+      "the LFO's one-shot, unipolar and width depths",
+      { lfo: { oneShot: true, unipolar: true, toWidth: [0, 0.4, 0, 0] } },
+    ],
+    ['LFO 2', { lfo2: { rate: 0.5, amount: 1, toOp: [0, 0, 0.2, 0], toWidth: [0.3, 0, 0, 0] } }],
+    ["the filter's LFO 2 depth", { filter: { lfo2Amount: 2 } } as PartialPatch],
   ])('fills the rest of a partial naming %s identically', (_what, partial) => {
     expect(patchLeafDifferences(workletFill(partial), makePatch(partial), 'partial')).toEqual([]);
   });
