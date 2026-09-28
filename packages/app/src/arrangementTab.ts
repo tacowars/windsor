@@ -25,7 +25,7 @@ function newSongButton(ctx: AppCtx): HTMLElement {
     const start = (): void => {
       ctx.parts.selected = 0;
       ctx.importDoc(newSong());
-      ctx.status('new song — pick a sequencer for Part 1 in the Parts tab');
+      ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab');
     };
     if (!ctx.model.changed) return start();
     void openConfirm({
@@ -62,7 +62,7 @@ function documentSection(ctx: AppCtx): HTMLElement {
     a.download = name.value || 'arrangement.json';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), EXPORT_URL_TTL_MS);
-    ctx.status(`exported ${a.download}`);
+    ctx.notify(`exported ${a.download}`, 'success');
   };
   row.appendChild(exportBtn);
   const file = document.createElement('input');
@@ -79,9 +79,9 @@ function documentSection(ctx: AppCtx): HTMLElement {
     Promise.all([chosen.text(), loadBuiltIns()])
       .then(([text]) => {
         ctx.importDoc(JSON.parse(text) as unknown);
-        ctx.status(`imported ${chosen.name}`);
+        ctx.notify(`imported ${chosen.name}`, 'success');
       })
-      .catch((error: unknown) => ctx.status(`import failed: ${String(error)}`));
+      .catch((error: unknown) => ctx.notify(`import failed: ${String(error)}`, 'error'));
   };
   row.appendChild(file);
   body.appendChild(row);

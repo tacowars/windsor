@@ -55,9 +55,9 @@ export const USER_DB = {
   currentSong: 'current',
 } as const;
 
-/** The library line's note when the browser declined persistent storage. */
-export const EVICTABLE_NOTE =
-  '(the browser may clear them and your autosaved song if it runs short of space; export a song to keep it)';
+/** The warning shown once when the browser declines persistent storage (`storagePersistence.ts`). */
+export const EVICTABLE_WARNING =
+  'Your patches and autosaved song are kept in this browser, which may clear them if it runs short of space. Export a song to keep a copy.';
 
 /** IndexedDB home of the remembered directory handle (the developer's folder grant). */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;

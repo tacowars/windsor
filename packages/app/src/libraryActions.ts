@@ -58,7 +58,7 @@ let remembered: ChromeDirectoryHandle | null = null;
 
 const scopeFor = (ctx: AppCtx): PatchScope => ({ ctx, library, slot: ctx.parts.selected });
 
-/** The header's account of the mode, and the folder read's problems if any. */
+/** The library row's account of where patches come from and go, and the folder read's problems if any. */
 export function syncLibraryMode(): void {
   const line = document.getElementById('libraryMode');
   if (!line) return;
@@ -123,7 +123,7 @@ async function connectFolder(ctx: AppCtx): Promise<void> {
   }
   remembered = null;
   await connectLibrary(library, wrapDirectoryHandle(handle));
-  ctx.status(`library folder "${handle.name}" connected — Save writes to it`);
+  ctx.notify(`library folder "${handle.name}" connected — Save writes to it`, 'success');
   ctx.render();
 }
 
@@ -131,7 +131,7 @@ async function forgetFolder(ctx: AppCtx): Promise<void> {
   await forgetHandle();
   await disconnectLibrary(library);
   remembered = null;
-  ctx.status('library folder forgotten — Save writes to your library in this browser again');
+  ctx.notify('library folder forgotten — Save writes to your library in this browser again');
   ctx.render();
 }
 
@@ -183,7 +183,7 @@ async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
   );
   if (!meta) return;
   const id = await savePatch({ ...scope, working: ctx.parts.patch, meta });
-  ctx.status(writtenText(library, id, 'saved'));
+  ctx.notify(writtenText(library, id, 'saved'), 'success');
   refresh();
 }
 
@@ -209,7 +209,7 @@ async function runCopy(
   );
   if (!meta) return;
   const id = await copyToNew({ ...scope, working: ctx.parts.patch, meta });
-  ctx.status(`${writtenText(library, id, 'saved')} — this part now plays it`);
+  ctx.notify(`${writtenText(library, id, 'saved')} — this part now plays it`, 'success');
   refresh();
 }
 
@@ -217,7 +217,7 @@ async function runDelete(ctx: AppCtx, opener: HTMLElement, refresh: () => void):
   const origin = patchOrigin(scopeFor(ctx));
   if (origin.kind !== 'library') return;
   const refusal = deleteRefusal(origin.id);
-  if (refusal) return ctx.status(`delete refused: ${refusal}`);
+  if (refusal) return ctx.notify(`delete refused: ${refusal}`, 'warning');
   const name = library.entries[origin.id]?.name ?? origin.id;
   const ok = await openConfirm({
     title: `Delete "${name}"?`,
@@ -227,8 +227,9 @@ async function runDelete(ctx: AppCtx, opener: HTMLElement, refresh: () => void):
   });
   if (!ok) return;
   await deletePatch(library, origin.id);
-  ctx.status(
+  ctx.notify(
     library.folder ? `deleted ${origin.id}.json` : `deleted "${origin.id}" from your library`,
+    'success',
   );
   refresh();
 }
@@ -236,7 +237,7 @@ async function runDelete(ctx: AppCtx, opener: HTMLElement, refresh: () => void):
 async function runInit(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {
   if (!(await confirmUnsaved(ctx, opener))) return;
   initPatch(scopeFor(ctx));
-  ctx.status('Init loaded — Copy to new keeps it; loading another patch discards it');
+  ctx.notify('Init loaded — Copy to new keeps it; loading another patch discards it');
   refresh();
 }
 
@@ -258,7 +259,7 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     action: (ctx: AppCtx, opener: HTMLElement, refresh: () => void) => Promise<void>,
     opener: HTMLElement,
   ): void => {
-    action(ctx, opener, refresh).catch((error: unknown) => ctx.status(String(error)));
+    action(ctx, opener, refresh).catch((error: unknown) => ctx.notify(String(error), 'error'));
   };
   const init = button('Init', 'makePatch() defaults; not in the library until Copy to new', true);
   init.onclick = (): void => run(runInit, init);
@@ -295,19 +296,19 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
       true,
     );
     connect.onclick = (): void => {
-      connectFolder(ctx).catch((error: unknown) => ctx.status(String(error)));
+      connectFolder(ctx).catch((error: unknown) => ctx.notify(String(error), 'error'));
     };
     folderRow.appendChild(connect);
     if (library.folder) {
       const forget = button('Forget folder', 'Back to your library in this browser', true);
       forget.onclick = (): void => {
-        forgetFolder(ctx).catch((error: unknown) => ctx.status(String(error)));
+        forgetFolder(ctx).catch((error: unknown) => ctx.notify(String(error), 'error'));
       };
       const reread = button('Re-read folder', 'Read the folder again', true);
       reread.onclick = (): void => {
         refreshLibrary(library)
           .then(() => ctx.render())
-          .catch((error: unknown) => ctx.status(String(error)));
+          .catch((error: unknown) => ctx.notify(String(error), 'error'));
       };
       folderRow.append(reread, forget);
     }
@@ -317,6 +318,9 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     );
   }
   box.appendChild(folderRow);
+  const mode = el('p', 'hint');
+  mode.id = 'libraryMode';
+  box.appendChild(mode);
   queueMicrotask(() => {
     syncModifiedMarker(ctx);
     syncLibraryMode();

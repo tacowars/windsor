@@ -177,7 +177,7 @@ function syncPresetAndBadge(ctx: AppCtx, editor: PatchEditor): void {
       (proceed) => {
         confirmUnsaved(ctx).then(
           (ok) => ok && proceed(),
-          (error: unknown) => ctx.status(String(error)),
+          (error: unknown) => ctx.notify(String(error), 'error'),
         );
       },
     ),

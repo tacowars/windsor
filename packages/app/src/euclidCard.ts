@@ -83,7 +83,7 @@ function commitPattern(card: Card, pattern: Figure | null): void {
   const result = card.ctx.change(partChange(card.slot, { sequencer: { pattern } }));
   if (!result.ok) return;
   card.captureButton.textContent = pattern ? 'Release' : 'Capture';
-  card.ctx.status(
+  card.ctx.notify(
     pattern
       ? `part ${card.slot}: captured — the figure is a literal array in the document`
       : `part ${card.slot}: released back to the modulator`,
