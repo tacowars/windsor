@@ -10,8 +10,9 @@
  * The ruler is also the view's zoom and scroll handle (windsor#8): press
  * and drag, up to zoom in and down to zoom out around the pressed bar, left
  * and right to drag the arrangement — the maths is `songZoomModel.ts`. A
- * press released without moving changes nothing, so the ruler's click stays
- * free for loop selection (windsor#15). The zoom stops at the fit, the
+ * press released without moving changes nothing. The loop has its own
+ * strip under the ruler (`loopBrace.ts`, windsor#30), so no press on the
+ * ruler ever edits it. The zoom stops at the fit, the
  * scale at which the whole song fills the window (windsor#21), and a
  * double-click returns to it at bar 1; a resize or a Bars change refits.
  */
