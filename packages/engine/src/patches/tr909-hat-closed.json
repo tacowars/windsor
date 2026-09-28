@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "909 Closed Hat",
   "category": "Drums",
   "tags": ["909", "hat", "metal", "short", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 3100,
@@ -49,7 +48,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 4700,
@@ -78,7 +76,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 6900,
@@ -107,7 +104,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 1789,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 1207,
-    "peak": 0.6829350590705872,
-    "seedsSwept": 16384,
-    "contentHash": "9198d40c"
   }
 }

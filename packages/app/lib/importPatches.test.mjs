@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { loadUnsweptPatchFile, serialisePatchFile } from '../../engine/src/index';
+import { loadPatchFile, serialisePatchFile } from '../../engine/src/index';
 import { PATCH_LIBRARY } from '../../engine/src/patch/presets';
 import {
   importExitCode,
@@ -33,11 +33,8 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-/** The entry minus its headroom record: what a downloaded file looks like before its sweep. */
-const kickUnswept = Object.fromEntries(
-  Object.entries(PATCH_LIBRARY['kick']).filter(([key]) => key !== 'headroom'),
-);
-const validText = serialisePatchFile(kickUnswept);
+/** What Save downloads for the kick. */
+const validText = serialisePatchFile(PATCH_LIBRARY['kick']);
 
 describe('importIdFromName', () => {
   it('reads the id and drops a download suffix, and ignores other files', () => {
@@ -62,7 +59,7 @@ describe('importPatches', () => {
     const result = importPatches({
       sourceDir: source,
       patchesDir: patches,
-      loadFile: loadUnsweptPatchFile,
+      loadFile: loadPatchFile,
     });
     expect(result.copied).toEqual([{ id: 'kick', file: 'kick.json' }]);
     expect(readFileSync(join(patches, 'kick.json'), 'utf8')).toBe(validText);
@@ -88,7 +85,7 @@ describe('importPatches', () => {
     const result = importPatches({
       sourceDir: source,
       patchesDir: patches,
-      loadFile: loadUnsweptPatchFile,
+      loadFile: loadPatchFile,
     });
     expect(result.copied).toEqual([{ id: 'kick', file: 'kick (1).json' }]);
     expect(result.skipped).toEqual([{ file: 'kick.json', reason: 'older than kick (1).json' }]);
@@ -107,7 +104,7 @@ describe('importPatches', () => {
     const result = importPatches({
       sourceDir: source,
       patchesDir: patches,
-      loadFile: loadUnsweptPatchFile,
+      loadFile: loadPatchFile,
     });
     expect(result.copied).toEqual([{ id: 'kick', file: 'kick.json' }]);
     expect(result.rejected).toEqual([]);
@@ -128,7 +125,7 @@ describe('importPatches', () => {
     const result = importPatches({
       sourceDir: source,
       patchesDir: patches,
-      loadFile: loadUnsweptPatchFile,
+      loadFile: loadPatchFile,
     });
     expect(result.copied).toEqual([{ id: 'kick', file: 'kick.json' }]);
     expect(result.rejected.map((r) => r.file)).toEqual(['half-written.json']);

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Salt Violins",
   "category": "Strings",
   "tags": ["airy", "bowed", "ensemble"],
@@ -20,7 +20,6 @@
       {
         "wave": 1,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 1,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.5,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 236,
-    "peak": 0.15674389898777008,
-    "seedsSwept": 256,
-    "contentHash": "6d43ba07"
   }
 }

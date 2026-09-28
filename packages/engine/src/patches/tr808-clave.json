@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "808 Clave",
   "category": "Drums",
   "tags": ["808", "perc", "analog", "short", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 9.55563981506397,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 9.55563981506397,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 3446,
-    "peak": 0.6057541966438293,
-    "seedsSwept": 16384,
-    "contentHash": "1d984a6f"
   }
 }

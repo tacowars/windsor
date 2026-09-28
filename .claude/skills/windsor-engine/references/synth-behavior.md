@@ -143,8 +143,8 @@ the worklet sums them into a peak-normalised table and bandlimits it per
 octave, with **Tone** trimming upper harmonics as for the other waves. `null`
 plays a sine and `[]` plays silence. The wavetable cache is keyed by waveform,
 quantized tone and the partial values themselves (#511), so equal spectra
-share a table and any edit is heard; `userKey` is ignored by the worklet and
-kept only so existing patches and documents load. The console draws partials
+share a table and any edit is heard; the old per-patch cache key retired
+with patch format 2. The console draws partials
 in each operator bay while its wave is User (16 / 32 / 64 bars, values 0–1);
 a hand-written array may be longer or negative, and is played as written.
 

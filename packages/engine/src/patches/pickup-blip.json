@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Pickup Blip",
   "category": "Legacy FX",
   "tags": ["legacy", "fx"],
@@ -34,7 +34,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -63,7 +62,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 4,
         "fixed": false,
         "fixedHz": 100,
@@ -92,7 +90,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -121,7 +118,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
         "keyScale": 0
       }
     }
-  },
-  "headroom": {
-    "worstSeed": 1566,
-    "peak": 0.6788219809532166,
-    "seedsSwept": 16384,
-    "contentHash": "4658b341"
   }
 }

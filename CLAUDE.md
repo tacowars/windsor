@@ -43,10 +43,9 @@ there.
    `node scripts/build-worklets.mjs`, and commit both. `--check` fails on a
    stale or hand-edited bundle.
 2. **The patch library is files.** Every patch is one
-   `packages/engine/src/patches/<id>.json` carrying its own headroom record.
-   A new or edited file needs `node packages/app/sweep-headroom.mjs <id>` and
-   `node scripts/patch-library-index.mjs --write`, and `verify` checks both.
-   Sound data never goes back into TypeScript.
+   `packages/engine/src/patches/<id>.json`. A new or edited file needs
+   `node scripts/patch-library-index.mjs --write`, and `verify` checks the
+   index. Sound data never goes back into TypeScript.
 3. **A song document is self-contained.** It carries a snapshot of every
    patch it plays, and a library edit never changes a saved song until that
    song is re-exported. Preserve `patches`, `returns`, strips, harmony,

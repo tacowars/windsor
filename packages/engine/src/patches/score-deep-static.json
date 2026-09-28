@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Deep Static",
   "category": "Soundtrack FX",
   "tags": ["noise", "static", "dark"],
@@ -34,7 +34,6 @@
       {
         "wave": 4,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -63,7 +62,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.5,
         "fixed": false,
         "fixedHz": 100,
@@ -92,7 +90,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.7085,
         "fixed": false,
         "fixedHz": 100,
@@ -121,7 +118,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.5,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
         "keyScale": 0
       }
     }
-  },
-  "headroom": {
-    "worstSeed": 60,
-    "peak": 0.04416625574231148,
-    "seedsSwept": 256,
-    "contentHash": "df46cdbd"
   }
 }

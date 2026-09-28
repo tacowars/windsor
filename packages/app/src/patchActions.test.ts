@@ -6,14 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import {
-  FALLBACK_PATCH_ID,
-  clonePatch,
-  loadPatchFile,
-  loadUnsweptPatchFile,
-  makePatch,
-  partAt,
-} from '@windsor/engine';
+import { FALLBACK_PATCH_ID, clonePatch, loadPatchFile, makePatch, partAt } from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { DocumentPartial } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -181,13 +174,20 @@ describe('Save', () => {
     });
     expect(id).toBe('kick');
     const written = JSON.parse(scope.folder.files.get('kick.json')!);
-    // The record carried over is now stale — the sweep's job — but the file is otherwise valid.
-    expect(() => loadPatchFile('kick', written)).toThrow('stale headroom record');
-    const entry = loadUnsweptPatchFile('kick', written);
+    // A plain library file: format 2, the patch, nothing a later step must fill in.
+    expect(Object.keys(written)).toEqual([
+      'format',
+      'name',
+      'category',
+      'tags',
+      'description',
+      'patch',
+    ]);
+    const entry = loadPatchFile('kick', written);
+    expect(entry.format).toBe(2);
     expect(entry.name).toBe('Kick Two');
     expect(entry.patch.name).toBe('Kick Two');
     expect(entry.patch.volume).toBe(0.5);
-    expect(entry.headroom).toEqual(PATCH_LIBRARY['kick']!.headroom);
     // The folder was re-read, so the library and the song both carry the save.
     expect(scope.library.entries['kick']?.patch.volume).toBe(0.5);
     expect(scope.ctx.model.doc.patches?.['kick']?.name).toBe('Kick Two');
@@ -261,8 +261,8 @@ describe('Copy to new', () => {
     expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('fm-kick-2');
     expect(scope.ctx.model.doc.patches?.['fm-kick-2']?.name).toBe('FM Kick');
     const written = JSON.parse(scope.folder.files.get('fm-kick-2.json')!);
-    expect(written.headroom).toBeUndefined();
-    expect(loadUnsweptPatchFile('fm-kick-2', written).name).toBe('FM Kick');
+    expect(written.format).toBe(2);
+    expect(loadPatchFile('fm-kick-2', written).name).toBe('FM Kick');
     expect(scope.library.entries['fm-kick-2']?.id).toBe('fm-kick-2');
   });
 

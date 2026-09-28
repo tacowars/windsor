@@ -29,6 +29,18 @@ describe('patch normalisation', () => {
     expect(Array.from(p.feedbackScratch)).toEqual([1, -1, 0, 0]);
   });
 
+  it("ignores a stray retired key, as a song's format-1 snapshot still carries userKey", () => {
+    // The normaliser reads known fields only, so a key format 2 retired
+    // (record `2026-09-28-retire-the-headroom-record`) is never copied.
+    const stray = { ops: [{ ratio: 2, userKey: 'bell' }] } as unknown as Parameters<
+      typeof normalisePatch
+    >[0];
+    const p = normalisePatch(stray);
+    expect(p.ops[0].ratio).toBe(2);
+    expect(Object.keys(p.ops[0])).not.toContain('userKey');
+    expect(p.ops[0]).toEqual(normalisePatch({ ops: [{ ratio: 2 }] }).ops[0]);
+  });
+
   it('keeps a finite number and replaces anything else', () => {
     expect(num(3, 1)).toBe(3);
     expect(num('3', 1)).toBe(1);

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "EFM Crash",
   "category": "Drums",
   "tags": ["efm", "cymbal", "digital", "metal", "long", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 1900,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 2683,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 5130,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 7311,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 2203,
-    "peak": 0.6764625310897827,
-    "seedsSwept": 16384,
-    "contentHash": "3740449c"
   }
 }

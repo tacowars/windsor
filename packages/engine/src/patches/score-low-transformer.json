@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Low Transformer",
   "category": "Basses",
   "tags": ["mechanical", "reedy", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 1,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2.01,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2.01,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 18,
-    "peak": 0.22918163239955902,
-    "seedsSwept": 256,
-    "contentHash": "248b5bc8"
   }
 }

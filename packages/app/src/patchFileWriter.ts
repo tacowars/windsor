@@ -1,25 +1,19 @@
 /**
  * What Save and Copy to new write (#563): a `patches/<id>.json` built from
  * the working patch and the modal's metadata, serialised by the audio
- * package's one serialiser so the bytes match the #561 migration's, and — when
- * no folder is connected — handed to the browser as a download.
+ * package's one serialiser so the bytes match every other writer's, and —
+ * when no folder is connected — handed to the browser as a download.
  */
-import type { HeadroomRecord, Patch, UnsweptPatchFile } from '@windsor/engine';
+import type { Patch, PatchFile } from '@windsor/engine';
 import { PATCH_FILE_FORMAT, makePatch, serialisePatchFile } from '@windsor/engine';
 import type { PatchMetadata } from './patchMetadata';
 
 /**
  * The file for a patch under new metadata. The patch is renormalised with the
- * display name as its `name` (the loader demands the two agree), and the
- * record is carried as it was: stale once the patch changed, absent for a
- * new patch — the sweep rewrites it either way.
+ * display name as its `name` (the loader demands the two agree).
  */
-export function buildPatchFile(
-  meta: PatchMetadata,
-  patch: Patch,
-  headroom?: HeadroomRecord,
-): UnsweptPatchFile {
-  const file: UnsweptPatchFile = {
+export function buildPatchFile(meta: PatchMetadata, patch: Patch): PatchFile {
+  return {
     format: PATCH_FILE_FORMAT,
     name: meta.name,
     category: meta.category,
@@ -27,11 +21,9 @@ export function buildPatchFile(
     description: meta.description,
     patch: makePatch({ ...structuredClone(patch), name: meta.name }),
   };
-  if (headroom) file.headroom = structuredClone(headroom);
-  return file;
 }
 
-export const patchFileText = (file: UnsweptPatchFile): string => serialisePatchFile(file);
+export const patchFileText = (file: PatchFile): string => serialisePatchFile(file);
 
 /** The download's body: the file bytes as JSON. */
 export function patchFileBlob(text: string): Blob {

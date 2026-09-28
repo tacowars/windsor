@@ -41,8 +41,8 @@ it touches against the invariants in `CLAUDE.md`.
   the goldens without a decision record, a secret in the tree, a licence
   breach.
 - P1: wrong behaviour a user can hit, an invariant in `CLAUDE.md` broken, a
-  hot path that allocates per block, a patch file without its headroom
-  record or index entry, a round trip that drops a field.
+  hot path that allocates per block, a patch file without its index entry,
+  a round trip that drops a field.
 - P2: worth fixing, not blocking.
 - Anything `npm run verify` catches on its own (types, lint, format, a
   failing test, a stale bundle or index) is P3 and not worth a comment.
@@ -53,8 +53,7 @@ it touches against the invariants in `CLAUDE.md`.
   DSP path, a change that would move the golden tests, a hand edit to a
   generated bundle.
 - Patches: a new or edited `packages/engine/src/patches/<id>.json` without a
-  regenerated headroom record and index; sound data moved back into
-  TypeScript.
+  regenerated index; sound data moved back into TypeScript.
 - Song documents: a save or load that does not carry `patches`, `returns`,
   strips, harmony, sequencers and captured patterns through a round trip; a
   library edit that reaches into a saved song; a change to the song or patch

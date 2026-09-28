@@ -3,11 +3,11 @@
  * display names, category and tag lists drawn from the library, tag
  * normalisation and suggestions, and the loudness warning's volume advice.
  */
-import type { UnsweptLibraryEntry } from '@windsor/engine';
+import type { LibraryEntry } from '@windsor/engine';
 import { PATCH_ID_RULE } from '@windsor/engine';
 import { SUGGESTED_HEADROOM } from './libraryConstants';
 
-export type LibraryEntries = Readonly<Record<string, UnsweptLibraryEntry>>;
+export type LibraryEntries = Readonly<Record<string, LibraryEntry>>;
 
 /** What the modal collects; the id is derived, never typed. */
 export interface PatchMetadata {

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "EFM Rim",
   "category": "Drums",
   "tags": ["efm", "perc", "digital", "short", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 4.586707111230705,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 16.053474889307466,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.9111279630127938,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3.8222559260255875,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 9173,
-    "peak": 0.5985177159309387,
-    "seedsSwept": 16384,
-    "contentHash": "8f13e1f5"
   }
 }

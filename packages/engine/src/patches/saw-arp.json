@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Saw Arp",
   "category": "Plucks",
   "tags": ["arp", "authored"],
@@ -20,7 +20,6 @@
       {
         "wave": 1,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100.00000000000004,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.87,
         "fixed": false,
         "fixedHz": 8000,
@@ -78,7 +76,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 4,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 3684,
-    "peak": 0.5170947313308716,
-    "seedsSwept": 4096,
-    "contentHash": "4f8cee98"
   }
 }

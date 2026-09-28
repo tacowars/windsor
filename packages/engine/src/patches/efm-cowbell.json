@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "EFM Cowbell",
   "category": "Drums",
   "tags": ["efm", "perc", "digital", "metal", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2.140463318574329,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3.2106949778614937,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3.2298062574916213,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 4.844709386237432,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 9122,
-    "peak": 0.46795031428337097,
-    "seedsSwept": 16384,
-    "contentHash": "708d98a9"
   }
 }

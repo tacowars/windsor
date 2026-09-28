@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "909 Snare",
   "category": "Drums",
   "tags": ["909", "snare", "analog", "noise", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 3,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.6880060666846057,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 3,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.2613444555884439,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 4,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 6587,
-    "peak": 0.4577358663082123,
-    "seedsSwept": 16384,
-    "contentHash": "9897ca7f"
   }
 }

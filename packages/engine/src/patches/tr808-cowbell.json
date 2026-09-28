@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "808 Cowbell",
   "category": "Drums",
   "tags": ["808", "perc", "analog", "metal", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2.24366422857702,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3.2298062574916213,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2.24366422857702,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3.2298062574916213,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 15413,
-    "peak": 0.45248010754585266,
-    "seedsSwept": 16384,
-    "contentHash": "83d0867f"
   }
 }

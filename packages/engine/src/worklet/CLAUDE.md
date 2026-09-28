@@ -128,8 +128,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `__fixtures__/fmGolden.json`. A refactor never refreshes it. A DSP change
    that is intended refreshes it with
    `A204_REFRESH_FM_GOLDEN=1 npx vitest run packages/engine/src/synth/fmProcessorGolden.test.ts`
-   and says so in the PR; the patch files' `headroom` records may then need
-   `packages/app/sweep-headroom.mjs` too. The plate's gate is
+   and says so in the PR. The plate's gate is
    `mixer/reverbGolden.test.ts` against `__fixtures__/reverbGolden.json` (#671):
    fifteen scenarios in the default, `sleep: false` and `settledSkip: false`
    paths, refreshed only with

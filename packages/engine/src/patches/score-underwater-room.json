@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Underwater Room",
   "category": "Pads",
   "tags": ["dark", "dub", "submerged"],
@@ -20,7 +20,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0.28, 0.12, 0.06, 0.03],
-        "userKey": "a204-scoring-v1-silk",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0.28, 0.12, 0.06, 0.03],
-        "userKey": "a204-scoring-v1-silk",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 46,
-    "peak": 0.03706682473421097,
-    "seedsSwept": 256,
-    "contentHash": "7911ca97"
   }
 }

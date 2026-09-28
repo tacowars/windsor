@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "909 High Tom",
   "category": "Drums",
   "tags": ["909", "tom", "analog", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.611560948164094,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 4,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.611560948164094,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.223121896328188,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 2901,
-    "peak": 0.5542904138565063,
-    "seedsSwept": 16384,
-    "contentHash": "43443929"
   }
 }

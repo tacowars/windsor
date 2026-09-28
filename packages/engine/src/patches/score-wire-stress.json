@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Wire Stress",
   "category": "Soundtrack FX",
   "tags": ["atonal", "thin", "tension"],
@@ -34,7 +34,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -63,7 +62,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 5.17,
         "fixed": false,
         "fixedHz": 100,
@@ -92,7 +90,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 7.32589,
         "fixed": false,
         "fixedHz": 100,
@@ -121,7 +118,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.5,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
         "keyScale": 0
       }
     }
-  },
-  "headroom": {
-    "worstSeed": 224,
-    "peak": 0.18030790984630585,
-    "seedsSwept": 256,
-    "contentHash": "0c1cf702"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Night Choir",
   "category": "Pads",
   "tags": ["vocal", "dark", "slow"],
@@ -20,7 +20,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0.04, 0.36, 0.08, 0.22, 0.03, 0.09],
-        "userKey": "a204-scoring-v1-choir",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.5,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0.04, 0.36, 0.08, 0.22, 0.03, 0.09],
-        "userKey": "a204-scoring-v1-choir",
         "ratio": 2,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.75,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 182,
-    "peak": 0.010192250832915306,
-    "seedsSwept": 256,
-    "contentHash": "a738f530"
   }
 }

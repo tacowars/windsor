@@ -164,7 +164,7 @@ export async function savePatch(request: WriteRequest): Promise<string> {
   if (origin.kind !== 'library') throw new Error('Save needs a library patch; use Copy to new.');
   if (saveForks(request)) return copyToNew(request);
   const { ctx, library, meta, working } = request;
-  const file = buildPatchFile(meta, working, library.entries[origin.id]?.headroom);
+  const file = buildPatchFile(meta, working);
   await writeLibraryFile(library, origin.id, patchFileText(file), request.download);
   if (ctx.model.doc.patches && Object.hasOwn(ctx.model.doc.patches, origin.id)) {
     ctx.change({ patches: { [origin.id]: file.patch } });
