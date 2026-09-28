@@ -105,7 +105,7 @@ function spacePicker(ctx: AppCtx, name: string): HTMLElement {
     const space = SPACES[key as keyof typeof SPACES];
     const result = ctx.change({ returns: { [name]: { space: { ...space } } } });
     if (result.ok) {
-      ctx.status(`return "${name}" space → ${key}, in the document`);
+      ctx.notify(`return "${name}" space → ${key}, in the document`);
       ctx.render();
     }
   });
@@ -178,7 +178,7 @@ function tempoRow(ctx: AppCtx, name: string): HTMLElement {
     button.onclick = (): void => {
       const result = ctx.change({ returns: { [name]: { delayTime: seconds } } });
       if (!result.ok) return;
-      ctx.status(
+      ctx.notify(
         `return "${name}" time → ${division.title} (${fmtMs(seconds)} at ${ctx.model.doc.transport.bpm} bpm)`,
       );
       ctx.render();

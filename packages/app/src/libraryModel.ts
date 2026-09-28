@@ -13,7 +13,7 @@ import { loadUnsweptPatchFile } from '@windsor/engine';
 import { builtInEntries, loadBuiltIns } from './builtInLibrary';
 import type { PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
-import { EVICTABLE_NOTE, isInitPreset } from './libraryConstants';
+import { isInitPreset } from './libraryConstants';
 import { downloadPatchFile, patchFileName } from './patchFileWriter';
 import type { LibraryEntries } from './patchMetadata';
 
@@ -27,13 +27,6 @@ export interface LibraryModel {
   user: PatchFolder | null;
   /** The ids in `entries` that are the user's own, writable in page mode; built-ins never are. */
   userIds: ReadonlySet<string>;
-  /**
-   * The browser declined persistent storage, so it may evict the user's
-   * library and autosaved song under storage pressure. Shown on the library
-   * line rather than the status line, where it would replace the save's own
-   * message (`storagePersistence.ts`).
-   */
-  evictable: boolean;
   /** The last folder read's load failures, for the status line. */
   problems: string[];
 }
@@ -41,14 +34,13 @@ export interface LibraryModel {
 /** The one instance the console shares; tests build their own with `pageLibrary()`. */
 export const library: LibraryModel = pageLibrary();
 
-export function pageLibrary(user: PatchFolder | null = null, evictable = false): LibraryModel {
+export function pageLibrary(user: PatchFolder | null = null): LibraryModel {
   return {
     mode: 'page',
     entries: builtInEntries(),
     folder: null,
     user,
     userIds: new Set(),
-    evictable,
     problems: [],
   };
 }
@@ -85,7 +77,7 @@ export async function connectLibrary(model: LibraryModel, folder: PatchFolder): 
 
 /** Back to the built-ins and the user's library. */
 export async function disconnectLibrary(model: LibraryModel): Promise<void> {
-  Object.assign(model, pageLibrary(model.user, model.evictable));
+  Object.assign(model, pageLibrary(model.user));
   await refreshLibrary(model);
 }
 
@@ -170,10 +162,8 @@ export function libraryModeText(model: LibraryModel): string {
   if (model.folder)
     return `Library: folder "${model.folder.name}" (${count} patches) — Save writes to it`;
   const built = count - model.userIds.size;
-  if (model.user) {
-    const kept = `Library: ${built} built-in patches and ${model.userIds.size} of yours, kept in this browser`;
-    return model.evictable ? `${kept} ${EVICTABLE_NOTE}` : kept;
-  }
+  if (model.user)
+    return `Library: ${built} built-in patches and ${model.userIds.size} of yours, kept in this browser`;
   return `Library: ${built} built-in patches — this browser cannot store your own, so Save downloads <id>.json`;
 }
 

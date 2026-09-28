@@ -9,6 +9,7 @@ import type { ApplyResult, DocumentPartial } from '@windsor/engine';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import type { PartsSession } from './partsSession';
+import type { ToastTone } from './toastModel';
 import type { TransportState } from './transportModel';
 
 /**
@@ -56,7 +57,8 @@ export interface AppCtx {
   refreshTabs(): void;
   /** The other tabs are out of date and render when shown; the active tab keeps its controls (a knob mid-drag). */
   invalidate(): void;
-  status(message: string): void;
+  /** Tell the user something, as a toast (`toast.ts`); the tone defaults to info. */
+  notify(message: string, tone?: ToastTone): void;
 }
 
 /** A partial touching one part, by slot. */

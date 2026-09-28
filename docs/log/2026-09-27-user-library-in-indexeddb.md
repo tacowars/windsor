@@ -111,7 +111,8 @@ The design above holds. Details settled while building it:
   no engine behaviour changes.
 - **A stored id that matches a built-in** (a future built-in taking an id a
   user already saved) stays hidden behind the built-in and is named in the
-  status line's refused list. The user's record is kept, not deleted.
+  library line's refused list (in the Parts tab's library row since
+  `2026-09-28-notices-are-toasts`). The user's record is kept, not deleted.
 - **No IndexedDB** (some private modes): the library is the built-ins alone,
   Save forks and downloads `<id>.json` as before, and nothing autosaves.
 - **The autosave also flushes when the page is hidden**, so an edit made
@@ -120,8 +121,9 @@ The design above holds. Details settled while building it:
 - **The persistence request is not awaited.** It runs before the first
   write, and a browser that prompts for it never holds up a save. Chrome
   declines it for most sites a visitor hasn't bookmarked or used much, so a
-  refusal is the common case. It shows as a note on the library line, not
-  in the status line, where it replaced the save's own message.
+  refusal is the common case. It is a one-time warning toast
+  (`2026-09-28-notices-are-toasts`), shown beside the save's own notice
+  rather than in place of it.
 - **After Save on a built-in, the song keeps its edited copy of the
   built-in** even though no part plays it any more. tacowars wants this: you
   sometimes come back to that patch later (2026-09-28).
