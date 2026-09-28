@@ -235,6 +235,19 @@ export {
 export type { ReverbSpace, SpaceName } from './mixer/reverbSpace';
 export { renderPatchToBuffer } from './render/offlineRender';
 export type { BakeOptions } from './render/offlineRender';
+// The song render and the WAV writer (windsor#40).
+export { renderRefusal, renderSong, songSeconds } from './render/renderSong';
+export type { RenderSongOptions, RenderedSong } from './render/renderSong';
+export { encodeWav } from './render/wavEncoder';
+export type { EncodedWav } from './render/wavEncoder';
+export {
+  RENDER_SAMPLE_RATES,
+  RENDER_SAMPLE_RATE_DEFAULT,
+  RENDER_TAIL_SECONDS,
+  WAV_BIT_DEPTHS,
+  WAV_BIT_DEPTH_DEFAULT,
+} from './render/renderConstants';
+export type { RenderSampleRate, WavBitDepth } from './render/renderConstants';
 export { loadBuiltInLibrary } from './patch/builtInLibrary';
 export type { BuiltInLibrary } from './patch/builtInLibrary';
 export {

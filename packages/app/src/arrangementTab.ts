@@ -9,6 +9,7 @@
  * (#708, `transportStrip.ts`); Mute became ‖ and Restart is gone — Import is
  * the rebuild left (#629).
  */
+import { audioExportSection } from './audioExport';
 import { loadBuiltIns } from './builtInLibrary';
 import { EXPORT_URL_TTL_MS, READOUT_DEFER_MS, READOUT_POLL_MS } from './arrangementConstants';
 import type { AppCtx } from './context';
@@ -146,6 +147,12 @@ function readoutSection(ctx: AppCtx): HTMLElement {
 export function renderArrangementTab(body: HTMLElement, ctx: AppCtx): void {
   body.innerHTML = '';
   body.appendChild(documentSection(ctx));
+  body.appendChild(
+    audioExportSection(
+      ctx,
+      () => body.querySelector<HTMLInputElement>('input[name="export-name"]')?.value ?? '',
+    ),
+  );
   body.appendChild(reportSection(ctx));
   body.appendChild(readoutSection(ctx));
 }

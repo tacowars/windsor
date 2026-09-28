@@ -142,6 +142,8 @@ export class FakeWorkletNode extends FakeNode {
   readonly name: string;
   readonly parameters = new Map<string, FakeParam>();
   readonly posted: unknown[] = [];
+  /** An `fm-part`'s `processorOptions.events`: the notes it was built holding. */
+  readonly events: unknown[];
   readonly port = {
     postMessage: (message: unknown): void => {
       this.posted.push(message);
@@ -156,6 +158,7 @@ export class FakeWorkletNode extends FakeNode {
   constructor(context: FakeContext, name: string, options: WorkletOptions = {}) {
     super(context, options.numberOfInputs ?? 1, options.numberOfOutputs ?? 1);
     this.name = name;
+    this.events = [...((options.processorOptions as { events?: unknown[] })?.events ?? [])];
     if (!context.isRegistered(name)) {
       throw new Error(`AudioWorkletNode: processor "${name}" not registered (addModule first)`);
     }

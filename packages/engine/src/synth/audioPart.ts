@@ -35,6 +35,8 @@ export class AudioPart {
   /** note -> live handles, oldest first. Both maps are kept in step by forget(). */
   private readonly heldByNote = new Map<number, number[]>();
   private readonly noteByHandle = new Map<number, number>();
+  /** Note messages kept back instead of posted while held (`holdNotes`); null when not. */
+  private held: ScheduledMessage[] | null = null;
 
   constructor(name: string, node: AudioWorkletNode, patch: Patch) {
     this.name = name;
@@ -61,7 +63,26 @@ export class AudioPart {
   }
 
   private schedule(message: ScheduledMessage): void {
-    this.post(message);
+    if (this.held) this.held.push(message);
+    else this.post(message);
+  }
+
+  /**
+   * Keep every note message from now on instead of posting it, until
+   * `takeHeldNotes`. An offline render plays its opening this way
+   * (windsor#40): a port message is asynchronous and loses the race against
+   * `OfflineAudioContext.startRendering()`, so the opening's notes go to the
+   * processor at construction instead (`PartOptions.events`).
+   */
+  holdNotes(): void {
+    this.held ??= [];
+  }
+
+  /** Stop holding and hand back the note messages held, oldest first. */
+  takeHeldNotes(): ScheduledMessage[] {
+    const held = this.held ?? [];
+    this.held = null;
+    return held;
   }
 
   /**

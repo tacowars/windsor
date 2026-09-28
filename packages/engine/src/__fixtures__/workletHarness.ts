@@ -76,6 +76,8 @@ export interface CreateOptions {
   specialise?: boolean;
   /** Seconds a slid note glides when the patch's `glide` is 0 (#602); the engine passes its default. */
   slideSeconds?: number;
+  /** Notes present before the first block (`ProcessorOptions.events`), as an offline render builds a part. */
+  events?: ScheduledEvent[];
 }
 
 /** The worklet's own `Envelope`, for pinning a model of it (#620): the console's curve. */

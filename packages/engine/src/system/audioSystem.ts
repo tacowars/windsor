@@ -50,6 +50,7 @@ import type { AudioLoadReadout } from '../cost/audioLoad';
 import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
 import type { AudioBus } from '../mixer/audioBus';
 import type { AudioPart } from '../synth/audioPart';
+import type { ScheduledMessage } from '../synth/workletMessages';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { RouteOptions } from '../mixer/channelStrip';
 import { routePart } from '../mixer/channelStrip';
@@ -76,6 +77,18 @@ export interface AudioSystemOptions {
    * Defaults to `setTimeout`; a test hands in something immediate.
    */
   defer?: RouteOptions['defer'];
+  /**
+   * The random seed each part's processor is built with, by engine part name
+   * (windsor#40). Absent — live playback — every part draws from
+   * `Math.random`; the offline song render pins one per part.
+   */
+  partSeed?: (name: string) => number;
+  /**
+   * The notes each part's processor is built holding, by engine part name
+   * (`PartOptions.events`): the offline render's opening (windsor#40). Absent
+   * — live playback — every note is posted as it is scheduled.
+   */
+  partEvents?: (name: string) => ScheduledMessage[] | undefined;
 }
 
 /** `AudioSystem.readout()` (issue #69): the arrangement's state plus the system's. */
@@ -110,6 +123,8 @@ export class AudioSystem {
   private readonly loadMeter = new AudioLoadMeter();
   /** Passed to every strip: how it waits out an insert fade (#652). */
   private readonly routeOptions: RouteOptions;
+  private readonly partSeed: ((name: string) => number) | undefined;
+  private readonly partEvents: AudioSystemOptions['partEvents'];
   private readonly sidechains = new SidechainDesk(
     () =>
       new Map(
@@ -130,6 +145,8 @@ export class AudioSystem {
     this.scheduler = new Scheduler(this.engine.context, { bpm: 96 });
     this.mix = options.mix ?? MIX;
     this.returnSpecs = options.returns ?? RETURNS;
+    this.partSeed = options.partSeed;
+    this.partEvents = options.partEvents;
     this.insertTempo = tempoInsertRegistry(this.scheduler.bpm);
     this.routeOptions = {
       registry: meteredInsertRegistry(this.loadMeter, this.insertTempo.registry),
@@ -484,7 +501,15 @@ export class AudioSystem {
     strip?: ChannelStrip,
   ): AudioPart {
     const { returns } = this.standing();
-    const part = this.engine.createPart(name, { patch, maxVoices, destination: null });
+    const seed = this.partSeed?.(name);
+    const events = this.partEvents?.(name);
+    const part = this.engine.createPart(name, {
+      patch,
+      maxVoices,
+      destination: null,
+      ...(seed === undefined ? {} : { seed }),
+      ...(events === undefined ? {} : { events }),
+    });
     this.meterLoad(`part:${name}`, part.node);
     this.strips.set(
       name,
