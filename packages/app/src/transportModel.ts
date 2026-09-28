@@ -8,10 +8,11 @@
  * (`AudioSystem.setMuted`). The pressed state is ▶ or ‖; ■ is momentary.
  *
  * windsor#12: the tempo and bars boxes' typed entry, their drag, and tap
- * tempo are rules here too, so the DOM file only wires them.
+ * tempo are rules here too, so the DOM file only wires them. windsor#29 adds
+ * the swing box and its grid picker.
  */
-import type { DocumentPartial, ScaleName } from '@windsor/engine';
-import { SCALE_NAMES } from '@windsor/engine';
+import type { DocumentPartial, ScaleName, Swing } from '@windsor/engine';
+import { SCALE_NAMES, STRAIGHT_SWING, SWING_GRIDS } from '@windsor/engine';
 import {
   BARS_DRAG_STEP,
   BARS_KNOB,
@@ -23,6 +24,7 @@ import {
   NUMBER_DRAG_THRESHOLD_PX,
   POSITION_GRID,
   type PositionGrid,
+  SWING_KNOB,
   TAP_TEMPO,
   type TapTempo,
 } from './transportTables';
@@ -79,6 +81,31 @@ export function scaleChange(name: string): DocumentPartial | null {
   return picked ? { harmony: { scale: picked } } : null;
 }
 
+/**
+ * The swing a transport plays: its own, or straight when the song has none
+ * (a song from before windsor#14 keeps no `swing` field and plays straight).
+ */
+export const swingOf = (transport: { readonly swing?: Swing }): Swing =>
+  transport.swing ?? STRAIGHT_SWING;
+
+/**
+ * A swing edit as a live partial (windsor#29 decision 3): the whole swing,
+ * the current one with `edit` over it, so the field the song lacked is
+ * written out and an export carries both.
+ */
+export const swingChange = (current: Swing, edit: Partial<Swing>): DocumentPartial => ({
+  transport: { swing: { ...current, ...edit } },
+});
+
+/** A grid pick as a partial, or null for a value that names no grid the engine plays. */
+export function swingGridChange(current: Swing, value: string): DocumentPartial | null {
+  const grid = SWING_GRIDS.find((known) => String(known) === value);
+  return grid === undefined ? null : swingChange(current, { grid });
+}
+
+/** At the bottom of its range the swing is straight, and the box reads dimmed. */
+export const isStraight = (amount: number): boolean => amount <= SWING_KNOB.min;
+
 type BoxRange = Pick<KnobRange, 'min' | 'max' | 'step'>;
 
 /** Decimal places a step carries: 0.01 → 2, 1 → 0. */
@@ -109,6 +136,8 @@ export function parseBoxEntry(text: string, range: BoxRange): number | null {
 
 export const parseBpm = (text: string): number | null => parseBoxEntry(text, BPM_KNOB);
 export const parseBars = (text: string): number | null => parseBoxEntry(text, BARS_KNOB);
+export const parseSwing = (text: string): number | null =>
+  parseBoxEntry(text.replace('%', ''), SWING_KNOB);
 
 /** A vertical drag, in pixels (up positive), as a share of the range, the way a knob reads it. */
 function dragDelta(upPx: number, fine: boolean, range: BoxRange, feel: DragFeel): number {
@@ -122,6 +151,11 @@ function dragDelta(upPx: number, fine: boolean, range: BoxRange, feel: DragFeel)
  */
 export function dragBpm(start: number, upPx: number, fine: boolean, feel = NUMBER_DRAG): number {
   return clampToStep(start + dragDelta(upPx, fine, BPM_KNOB, feel), BPM_KNOB);
+}
+
+/** The swing a drag reaches: the knob's share of 50–75 per pixel, in whole percent. */
+export function dragSwing(start: number, upPx: number, fine: boolean, feel = NUMBER_DRAG): number {
+  return clampToStep(start + dragDelta(upPx, fine, SWING_KNOB, feel), SWING_KNOB);
 }
 
 /**

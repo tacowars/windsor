@@ -166,8 +166,14 @@ input {
   cursor: ns-resize;
   user-select: none;
 }
-.transport-box-input[name='bars'] {
+.transport-box-input[name='bars'],
+.transport-box-input[name='swing'] {
   width: 3ch;
+}
+/* Swing at 50% is straight (windsor#29 decision 1): the number dims, and
+   lights again as soon as the box swings. */
+.transport-box-straight .transport-box-input {
+  color: var(--ink-dim);
 }
 .transport-box-input:focus {
   outline: none;
