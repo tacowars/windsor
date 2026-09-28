@@ -229,6 +229,16 @@ input {
   background: var(--carrier);
   color: #111416;
 }
+/* An icon tab (windsor#39, the Settings gear): the 14px glyph fills the text
+   tabs' line box, so the button keeps the tab bar's height. */
+.tab-btn-icon {
+  display: flex;
+  align-items: center;
+  padding: 7px 11px;
+}
+.tab-icon {
+  display: block;
+}
 
 .tab-root {
   flex: 1;
