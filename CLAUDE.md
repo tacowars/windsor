@@ -136,6 +136,11 @@ in `docs/log/2026-09-28-parallel-workflow-without-an-orchestrator.md`.
    tacowars can answer gets the `needs-human` label and a comment, then the turn
    ends.
 
+A code PR from this repo gets a live preview at
+`https://tacowars.github.io/windsor/pr-preview/pr-<N>/`, linked in a PR
+comment. A UI PR's reviewer opens it from there
+(`docs/log/2026-09-28-pr-previews-on-github-pages.md`).
+
 **PR classes.** `reviewed` waits for tacowars: sound design (`patches/`, the
 worklets, a golden change), the song document schema, persistence, a
 deviation from the issue's decisions, or a UI/UX change to layout,
