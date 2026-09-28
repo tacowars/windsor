@@ -55,6 +55,10 @@ export const USER_DB = {
   currentSong: 'current',
 } as const;
 
+/** The library line's note when the browser declined persistent storage. */
+export const EVICTABLE_NOTE =
+  '(the browser may clear them and your autosaved song if it runs short of space; export a song to keep it)';
+
 /** IndexedDB home of the remembered directory handle (the developer's folder grant). */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;
 
