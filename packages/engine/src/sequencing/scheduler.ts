@@ -20,6 +20,12 @@
  * grid. Straight, every slope is exactly 1 and the clock is bit for bit the
  * pre-swing one.
  *
+ * The loop (windsor#15) lives here for the same reason: with a `TickLoop`
+ * set, the tick after the loop's last one is its first, so the counter jumps
+ * back from `end` to `start` exactly where the song's end would have folded
+ * it to 0. The transport's seconds keep running across the jump, and the
+ * points sit on beats, so every swing pair keeps its phase.
+ *
  * Nothing here imports the audio graph. The clock the `Scheduler` reads is a
  * structural `{ currentTime }`, which an audio context satisfies and a test
  * fakes with a plain object.
@@ -62,8 +68,42 @@ export function isBarDivisor(divisor: number): boolean {
   return Number.isInteger(divisor) && divisor > 0 && TICKS_PER_BAR % divisor === 0;
 }
 
+/**
+ * The span the clock wraps (windsor#15): the tick after the one before `end`
+ * is `start`. Both are song ticks in `[0, songTicks]`, positions mod
+ * `songTicks`, since the counter itself never folds at the song's end.
+ */
+export interface TickLoop {
+  readonly start: number;
+  readonly end: number;
+  readonly songTicks: number;
+}
+
+/**
+ * The tick `advance` issues after `tick`: one on, or the loop's start in
+ * place of its end. A loop covering the whole song is the song's own wrap
+ * and jumps nothing; an empty or inverted one is ignored.
+ */
+export function followingTick(tick: number, loop: TickLoop | null): number {
+  const next = tick + 1;
+  if (!loop) return next;
+  const { start, end, songTicks } = loop;
+  const span = end - start;
+  if (!(span > 0) || span >= songTicks) return next;
+  return (next - end) % songTicks === 0 ? next - span : next;
+}
+
+/** True when `tick` following `last` is the loop's jump back, not a step or a restart elsewhere. */
+export function isLoopJump(last: number, tick: number, loop: TickLoop | null): boolean {
+  return tick !== last + 1 && tick === followingTick(last, loop);
+}
+
 export interface TickEvent {
-  /** Absolute tick since the transport was (re)started at tick 0. */
+  /**
+   * Transport tick since the transport was (re)started. It counts on past
+   * the song's end (positions are `tick mod songTicks`) and jumps back only
+   * at a loop's end (windsor#15).
+   */
   tick: number;
   /** `tick / divisor` for the subscriber receiving this event. */
   step: number;
@@ -94,6 +134,8 @@ interface Subscriber {
 /** The pure tick counter and fan-out. No clock of its own; `advance` is called per tick. */
 export class TickTransport implements TickSource {
   bpm: number;
+  /** The loop the counter wraps (windsor#15); null plays through, today's rule. */
+  loop: TickLoop | null = null;
   private playing: Swing;
   private tick = 0;
   private seconds = 0;
@@ -181,7 +223,7 @@ export class TickTransport implements TickSource {
     for (const { divisor, handler } of this.subscribers.slice()) {
       if (tick % divisor === 0) handler({ ...base, step: tick / divisor });
     }
-    this.tick = tick + 1;
+    this.tick = followingTick(tick, this.loop);
     this.seconds += this.intervalSeconds(tick);
   }
 }
@@ -208,7 +250,11 @@ export class Scheduler implements TickSource {
 
   private readonly clock: AudioClock;
   private running = false;
+  /** Rewound (constructed, or `reset`) and not started since: where ▶ begins follows the loop. */
+  private atRest = true;
   private nextTime = 0;
+  /** The tick the last rewind put the transport on: 0, or a loop's start (windsor#15). */
+  private restTick = 0;
   /** What each recent tick was actually stamped: `audibleTick` reads these. */
   private readonly stamps = new TickStamps();
 
@@ -238,6 +284,23 @@ export class Scheduler implements TickSource {
     this.transport.swing = value;
   }
 
+  get loop(): TickLoop | null {
+    return this.transport.loop;
+  }
+
+  /**
+   * The song's loop (windsor#15), live: the next tick past its end wraps. At
+   * rest the rewound position follows it, so ▶ starts at the loop's start
+   * while it is on and at 0 while it is off; a paused or running transport
+   * keeps its tick, and one already past the end plays on to the song's end,
+   * folds to 0, and wraps from the loop's end after that.
+   */
+  set loop(value: TickLoop | null) {
+    this.transport.loop = value;
+    const rest = value?.start ?? 0;
+    if (this.atRest && this.transport.currentTick !== rest) this.rewind(rest);
+  }
+
   get isRunning(): boolean {
     return this.running;
   }
@@ -261,13 +324,17 @@ export class Scheduler implements TickSource {
     const sounding = this.stamps.soundingAt(now, TICK_STAMP_EPSILON * secondsPerTick);
     if (sounding >= 0) return sounding;
     // No held stamp has sounded yet (before the run's first tick, or older
-    // than the ring): count back from the queue's head at the running tempo
-    // and swing, never reaching a held tick. 0 before anything sounds.
-    const issued = this.transport.currentTick;
-    const ahead = (this.nextTime - now) / secondsPerTick;
-    const tick = this.transport.unswungTicks(this.transport.swungTicks(issued) - ahead);
-    const newest = Math.min(issued, this.stamps.oldest) - 1;
-    return Math.max(0, Math.min(newest, Math.floor(tick + TICK_STAMP_EPSILON)));
+    // than the ring): count back at the running tempo and swing from the
+    // oldest held stamp, or the queue's head when none is held, never
+    // reaching that tick. Counting from the oldest stamp keeps a loop's jump
+    // (windsor#15) queued after it out of the count. The rewound tick (0, or
+    // the loop's start) before anything sounds.
+    const oldestTime = this.stamps.oldestTime;
+    const anchor = oldestTime === null ? this.transport.currentTick : this.stamps.oldest;
+    const ahead = ((oldestTime ?? this.nextTime) - now) / secondsPerTick;
+    const tick = this.transport.unswungTicks(this.transport.swungTicks(anchor) - ahead);
+    const floor = Math.min(this.restTick, anchor);
+    return Math.max(floor, Math.min(anchor - 1, Math.floor(tick + TICK_STAMP_EPSILON)));
   }
 
   /**
@@ -279,6 +346,7 @@ export class Scheduler implements TickSource {
   start(atTick = 0): void {
     if (this.running) return;
     this.running = true;
+    this.atRest = false;
     if (atTick !== this.transport.currentTick) this.transport.reset(atTick);
     this.stamps.clear(atTick);
     this.nextTime = this.clock.currentTime + SCHEDULER_START_DELAY_SECONDS;
@@ -290,14 +358,21 @@ export class Scheduler implements TickSource {
   }
 
   /**
-   * Halt and rewind to tick 0 (#708, epic #703 decision 8's ■): `audibleTick`
-   * reads 0 and the next `start` issues tick 0 first. What the region state
-   * and held notes need is the player's (`ArrangementPlayer.reset`).
+   * Halt and rewind (#708, epic #703 decision 8's ■): to tick 0, or to the
+   * loop's start while a loop is on (windsor#15). `audibleTick` reads that
+   * tick and the next `start` issues it first. What the region state and
+   * held notes need is the player's (`ArrangementPlayer.reset`).
    */
-  reset(): void {
+  reset(atTick = this.transport.loop?.start ?? 0): void {
     this.stop();
-    this.transport.reset(0);
-    this.stamps.clear(0);
+    this.atRest = true;
+    this.rewind(atTick);
+  }
+
+  private rewind(atTick: number): void {
+    this.restTick = atTick;
+    this.transport.reset(atTick);
+    this.stamps.clear(atTick);
     this.nextTime = 0;
   }
 
