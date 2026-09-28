@@ -39,6 +39,30 @@ main's.
 - **`.nojekyll` at the root.** Pages runs Jekyll over a branch source, which
   drops files whose names start with `_`. main's deploy writes the marker.
 
+### Three writers on one branch
+
+`deploy`, `preview` and `preview-remove` all push to `gh-pages`. One shared
+concurrency group would serialise them, but a group holds only one pending
+run, and a newer one cancels it even with `cancel-in-progress: false`. A
+burst of PR pushes could then drop main's deploy, or another PR's preview.
+So the design scopes the groups and relies on a retrying push:
+
+- **Groups scoped to content.** main's deploy is in `gh-pages-main`, and a
+  PR's preview and removal are in `gh-pages-pr-<N>`. A pending run is
+  superseded only by a newer run for the same content: a newer main build,
+  or a newer event on the same PR. main is linear, so the newer build
+  already holds whatever the superseded one would have published.
+- **A retrying push across groups.** Writers in different groups can push
+  at once. Every writer uses the deploy action with `force: false`. Its
+  documented behaviour in both pinned versions, and in the code of v4.9.0
+  (ours) and v4.7.4 (inside pr-preview-action v1.8.1), is the same. A push
+  the remote rejects is followed by a fetch of the branch, a rebase onto
+  it, and another push, up to `attempt-limit` times: 3 by default, 5 for
+  main's deploy. Past the limit the job fails and is not silently dropped.
+- **The rebase cannot conflict.** main writes the root with
+  `clean-exclude: pr-preview/`, and a preview writes only
+  `pr-preview/pr-<N>/`, so no two writers touch the same file.
+
 ### The security boundary
 
 `verify` is the only job that checks out and runs the PR's code, and its
