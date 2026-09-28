@@ -156,7 +156,7 @@ export async function renderSong(
     length: plan.totalFrames,
     sampleRate,
   });
-  const system = await buildSystem(context, document, options);
+  const system = await buildSystem(context, wholeSong(document), options);
   try {
     const buffer = await drive(context, system, plan, options);
     return {
@@ -170,6 +170,17 @@ export async function renderSong(
   } finally {
     system.dispose();
   }
+}
+
+/**
+ * The document a whole-song render plays: the same song with its loop
+ * switched off. A loop that is on wraps the transport, which would repeat the
+ * loop and drop every bar outside it. A copy, so the open song keeps its loop.
+ */
+export function wholeSong(document: ArrangementDocument): ArrangementDocument {
+  const { loop } = document.transport;
+  if (!loop?.on) return document;
+  return { ...document, transport: { ...document.transport, loop: { ...loop, on: false } } };
 }
 
 /** The live system on the offline context, the song loaded, every part's processor seeded. */

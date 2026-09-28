@@ -24,6 +24,9 @@ export const TAIL_KNOB_STEP = 0.5;
 /** How long a download's object URL outlives the click, ms. */
 export const WAV_URL_TTL_MS = 60_000;
 
+/** A Save as write goes in chunks of this many bytes, so a Cancel lands between them. */
+export const WAV_WRITE_CHUNK_BYTES = 1 << 20;
+
 /** The sample-rate choices read in kHz. */
 export const HZ_PER_KHZ = 1000;
 

@@ -232,6 +232,43 @@ describe('renderSong', () => {
   });
 });
 
+describe('a song with its loop on', () => {
+  it('exports the whole song once, not the loop repeated', async () => {
+    const rate = 8000;
+    const barTicks = 96;
+    const looped: ArrangementDocument = {
+      ...FULL_DOCUMENT,
+      transport: {
+        ...FULL_DOCUMENT.transport,
+        loop: { start: barTicks, end: 2 * barTicks, on: true },
+      },
+    };
+    const cheap = { sampleRate: rate, tailSeconds: 0 };
+    const noteOnFrames = (): number[][] =>
+      built.map((b) =>
+        b.node.posted
+          .filter((m) => (m as { type?: string }).type === 'noteOn')
+          .map((m) => (m as { frame: number }).frame),
+      );
+    const plain = await offline(FULL_DOCUMENT, cheap).render;
+    const plainFrames = noteOnFrames();
+    const rendered = await offline(looped, cheap).render;
+    const frames = noteOnFrames();
+    // Identical to the song with no loop at all: every bar, once.
+    expect(rendered.channels[0]).toEqual(plain.channels[0]);
+    expect(rendered.channels[1]).toEqual(plain.channels[1]);
+    const lead = Math.round(SCHEDULER_START_DELAY_SECONDS * rate);
+    const bar = songSeconds(FULL_DOCUMENT) / 4;
+    const all = frames.flat();
+    expect(all.some((f) => f < lead + bar * rate)).toBe(true);
+    expect(all.some((f) => f >= lead + 2 * bar * rate)).toBe(true);
+    expect(all.some((f) => f >= lead + 3 * bar * rate)).toBe(true);
+    expect(frames).toEqual(plainFrames);
+    // The open song keeps its loop.
+    expect(looped.transport.loop?.on).toBe(true);
+  });
+});
+
 describe('the frame budget', () => {
   const longest: ArrangementDocument = {
     ...FULL_DOCUMENT,

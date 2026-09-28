@@ -154,6 +154,43 @@ describe('runAudioExport', () => {
     expect(sink.written).toHaveLength(0);
   });
 
+  it('a cancel while the write is pending aborts it and reports cancelled, not saved', async () => {
+    const controller = new AbortController();
+    let aborted = false;
+    let started!: () => void;
+    const writing = new Promise<void>((resolve) => (started = resolve));
+    const sink: WavSink = {
+      where: 'x',
+      // A slow write that honours the signal the way the save-picker sink does.
+      write: (_bytes, signal) =>
+        new Promise<void>((_, reject) => {
+          started();
+          signal.addEventListener('abort', () => {
+            aborted = true;
+            reject(new DOMException('cancelled', 'AbortError'));
+          });
+        }),
+      discard: () => Promise.resolve(),
+    };
+    const outcome = runAudioExport(run({ sink, signal: controller.signal }));
+    await writing;
+    controller.abort();
+    expect(await outcome).toEqual({ kind: 'cancelled' });
+    expect(aborted).toBe(true);
+  });
+
+  it('a cancel that lands between encode and write never calls the sink', async () => {
+    const sink = fakeSink();
+    const controller = new AbortController();
+    const encode: AudioExportRun['encode'] = (channels, rate, depth) => {
+      controller.abort();
+      return encodeWav(channels, rate, depth);
+    };
+    const outcome = await runAudioExport(run({ sink, signal: controller.signal, encode }));
+    expect(outcome).toEqual({ kind: 'cancelled' });
+    expect(sink.written).toHaveLength(0);
+  });
+
   it('a failed render writes nothing and says why', async () => {
     const sink = fakeSink();
     const render = (): Promise<RenderedSong> => Promise.reject(new Error('worklet failed'));

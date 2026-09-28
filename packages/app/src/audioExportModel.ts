@@ -4,6 +4,10 @@
  * render, encode, write — with its cancel, and the notice that says where the
  * file went.
  *
+ * A cancel during the write counts too: the sink gets the signal and aborts
+ * its write, so the destination keeps what it had and the run reports
+ * `cancelled`, never `saved`.
+ *
  * A render cancelled or failed writes nothing: the sink is written only once
  * the whole file is encoded, and a sink opened ahead of the render (the save
  * picker must open inside the click's user activation, long before the render
@@ -60,7 +64,11 @@ export function wavFileName(exportName: string): string {
 export interface WavSink {
   /** How the notice names the destination ("your downloads", "the file you chose"). */
   readonly where: string;
-  write(bytes: Uint8Array): Promise<void>;
+  /**
+   * Write the whole file, or reject with an `AbortError` and leave the
+   * destination as it was once `signal` fires. Resolves only once written.
+   */
+  write(bytes: Uint8Array, signal: AbortSignal): Promise<void>;
   /** The run will not write; release anything held. Never deletes a file the user picked. */
   discard(): Promise<void>;
 }
@@ -96,7 +104,8 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
       rendered.sampleRate,
       settings.bitDepth,
     );
-    await sink.write(bytes);
+    if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
+    await sink.write(bytes, signal);
     return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped };
   } catch (error) {
     await sink.discard().catch(() => undefined);

@@ -11,6 +11,7 @@ import {
   WAV_URL_TTL_MS,
 } from './audioExportConstants';
 import type { WavSink } from './audioExportModel';
+import { abortError, writeInChunks } from './audioExportWrite';
 
 interface SaveFilePickerOptions {
   id?: string;
@@ -31,7 +32,8 @@ export const savePickerAvailable = (): boolean =>
 export function downloadSink(fileName: string): WavSink {
   return {
     where: 'your downloads',
-    write: (bytes) => {
+    write: (bytes, signal) => {
+      if (signal.aborted) return Promise.reject(abortError());
       const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: WAV_MIME });
       const anchor = document.createElement('a');
       anchor.href = URL.createObjectURL(blob);
@@ -51,8 +53,9 @@ export function downloadSink(fileName: string): WavSink {
  * The picked file is never removed: it may be one the user already had, and
  * nothing proves it new. The file is opened for writing only once the whole
  * WAV is encoded, and a writable stream keeps the old contents until it
- * closes, so a failed write is aborted and the file is left as it was. A
- * cancel before that point never touches the file (a browser that creates an
+ * closes, so a failed or cancelled write (`writeInChunks`) is aborted and
+ * the file is left as it was. A cancel before that point never touches the
+ * file (a browser that creates an
  * empty file on picking a new name leaves that empty file).
  */
 export async function pickSaveSink(fileName: string): Promise<WavSink | null> {
@@ -69,15 +72,18 @@ export async function pickSaveSink(fileName: string): Promise<WavSink | null> {
   }
   return {
     where: `${handle.name}, where you chose`,
-    write: async (bytes) => {
+    write: async (bytes, signal) => {
+      if (signal.aborted) throw abortError();
       const writable = await handle.createWritable();
-      try {
-        await writable.write(bytes as Uint8Array<ArrayBuffer>);
-        await writable.close();
-      } catch (error) {
-        await writable.abort().catch(() => undefined);
-        throw error;
-      }
+      await writeInChunks(
+        {
+          write: (chunk) => writable.write(chunk as Uint8Array<ArrayBuffer>),
+          close: () => writable.close(),
+          abort: () => writable.abort(),
+        },
+        bytes,
+        signal,
+      );
     },
     discard: () => Promise.resolve(),
   };
