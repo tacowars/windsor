@@ -135,9 +135,9 @@ export async function writeLibraryFile(
   download(id, text);
   // Through the loader the folder path reads with (#617), not a bare spread:
   // page mode kept the entry in memory unchecked, so a file the folder would
-  // have refused — and counted under `problems` for the row to show — became
+  // have refused — and counted under `problems` for a toast to report — became
   // a valid-looking entry in the browser and in every action that reads one.
-  // Refused the same way here: no entry, and the reason on the row.
+  // Refused the same way here: no entry, and the reason in a toast.
   try {
     model.entries = { ...model.entries, [id]: loadUnsweptPatchFile(id, JSON.parse(text)) };
     model.userIds = new Set([...model.userIds, id]);
@@ -156,15 +156,11 @@ export async function removeLibraryFile(model: LibraryModel, id: string): Promis
   await refreshLibrary(model);
 }
 
-/** The status line's account of the mode. */
-export function libraryModeText(model: LibraryModel): string {
-  const count = Object.keys(model.entries).length;
-  if (model.folder)
-    return `Library: folder "${model.folder.name}" (${count} patches) — Save writes to it`;
-  const built = count - model.userIds.size;
-  if (model.user)
-    return `Library: ${built} built-in patches and ${model.userIds.size} of yours, kept in this browser`;
-  return `Library: ${built} built-in patches — this browser cannot store your own, so Save downloads <id>.json`;
+/** The warning toast for the patch files the last library read refused, or null when it refused none. */
+export function libraryProblemsText(model: LibraryModel): string | null {
+  const { problems } = model;
+  if (!problems.length) return null;
+  return `library: ${problems.length} patch file(s) refused — ${problems.join('; ')}`;
 }
 
 function sourceOf(

@@ -8,7 +8,7 @@
  * hint, or what became of the last session.
  */
 import type { AppCtx } from './context';
-import { bootLibrary, syncLibraryMode } from './libraryActions';
+import { bootLibrary, reportLibraryProblems } from './libraryActions';
 import { EVICTABLE_WARNING } from './libraryConstants';
 import { openConfirm } from './metadataModal';
 import { SongAutosave } from './songAutosave';
@@ -25,7 +25,7 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
   // The question and the library load run together; a restore waits for the built-ins itself.
   const [, restored] = await Promise.all([
     bootLibrary(stores?.patches ?? null).then(() => {
-      syncLibraryMode();
+      reportLibraryProblems(ctx);
       ctx.render();
     }),
     offerRestore(ctx, stored, openConfirm),
