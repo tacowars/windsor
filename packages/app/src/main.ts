@@ -18,7 +18,6 @@ import { DocumentModel } from './documentModel';
 import { EngineHost } from './host';
 import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { Keyboard } from './keyboard';
-import { bootLibrary, syncLibraryMode } from './libraryActions';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
 import { renderPartsTab } from './partsTab';
@@ -27,6 +26,7 @@ import { newSong } from './songParts';
 import { songTab } from './songTab';
 import { mountTabShell } from './tabShell';
 import { mountTransportStrip } from './transportStrip';
+import { bootUserState } from './userSession';
 import './console.css';
 
 const status = (message: string): void => {
@@ -57,15 +57,11 @@ mountTabShell(
 ctx.render();
 keyboard.attachGlobalKeys();
 void midi.resume();
-// A remembered library folder whose grant still stands is read before the
-// first render that could show it; the row's button re-grants a dropped one.
-bootLibrary()
-  .then(() => {
-    syncLibraryMode();
-    ctx.render();
-  })
-  .catch((error: unknown) => status(`library folder: ${String(error)}`));
 wirePowerButton($('power'), ctx);
+// The user's patches and autosaved song (IndexedDB), and a remembered library
+// folder whose grant still stands; the row's button re-grants a dropped one.
+// The boot status goes first, so the session's own messages land after it.
+status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
+bootUserState(ctx).catch((error: unknown) => status(`your library: ${String(error)}`));
 // The scheduler's look-ahead pump: a timer, since the console has no frame loop to drive it.
 setInterval(() => host.update(), HOST_PUMP_INTERVAL_MS);
-status('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');

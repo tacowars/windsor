@@ -69,7 +69,7 @@ export function presetBrowser(
   guard: PickGuard = (proceed) => proceed(),
 ): HTMLElement {
   const box = el('div', 'preset-browser');
-  const entries = listLibrary(library.entries, ctx.model.doc.patches);
+  const entries = listLibrary(library.entries, ctx.model.doc.patches, library.userIds);
   const selected = partAt(ctx.model.doc, slot)?.preset ?? '';
   const current = el('p', 'hint');
   current.textContent = `Current: ${entries.find((entry) => entry.id === selected)?.name ?? selected}`;

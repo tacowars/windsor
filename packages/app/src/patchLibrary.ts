@@ -75,7 +75,7 @@ export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = lib
   ctx.status(
     Object.hasOwn(builtInPresets(), name)
       ? `document patch "${name}" reset to the built-in`
-      : `document patch "${name}" reset to the library file`,
+      : `document patch "${name}" reset to the library copy`,
   );
 }
 
