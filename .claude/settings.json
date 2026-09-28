@@ -19,6 +19,9 @@
       "Bash(npm run lint:*)",
       "Bash(npx prettier --check:*)",
       "Bash(bash scripts/overlap.sh:*)"
+    ],
+    "deny": [
+      "mcp__chrome-devtools__get_network_request"
     ]
   },
   "hooks": {
