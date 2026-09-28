@@ -45,9 +45,14 @@ Pat set the musical decisions on the issue:
    `1`, and `swingTicks`/`unswingTicks` short-circuit to the identity. The
    stamps, `event.seconds` and `audibleTick` are therefore the same numbers
    as before. The goldens and player tests are unchanged.
-4. **`audibleTick` unwarps.** It counts back from the next stamp in swung
-   ticks and inverts the warp, so the playhead reads the tick that is
-   sounding.
+4. **`audibleTick` reads the stamps that were actually issued.** The
+   scheduler records each tick's time in a preallocated ring
+   (`sequencing/tickStamps.ts`, sized in `schedulerConstants.ts`). The
+   playhead is the last recorded tick whose stamp has passed. A live swing
+   or tempo change therefore moves only the ticks queued after it, and the
+   playhead never runs backward while the old queue drains. Before a run's
+   first tick sounds, it falls back to counting back from the queue's head
+   through the inverse warp.
 5. **In the document, absent stays absent.** `transport.swing` is optional
    in the `Transport` type. The normaliser writes it only when the document
    has one. A song from before swing therefore imports and exports byte for

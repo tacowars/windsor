@@ -33,6 +33,9 @@ const PURE_FILES = [
   // Swing (windsor#14): the clock's time warp and its table.
   'swing.ts',
   'swingTables.ts',
+  // The issued stamps `audibleTick` reads, and the ring's size.
+  'tickStamps.ts',
+  'schedulerConstants.ts',
   'euclid.ts',
   'generatorSeed.ts',
   'mulberry32.ts',

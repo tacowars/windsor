@@ -121,4 +121,31 @@ describe('the swung clock (windsor#14)', () => {
       12,
     );
   });
+
+  it('keeps the playhead on the sounding tick, never backward, through a live swing change', () => {
+    for (const [from, to] of [
+      [STRAIGHT_SWING, HARD],
+      [HARD, STRAIGHT_SWING],
+      [HARD, { amount: 60, grid: 8 } as Swing],
+    ] as const) {
+      const clock = { currentTime: 0 };
+      const scheduler = new Scheduler(clock, { bpm: 120, swing: from, lookAhead: 0.12 });
+      const times: number[] = [];
+      scheduler.subscribe(1, (e) => times.push(e.time));
+      scheduler.start();
+      let last = 0;
+      for (let step = 0; step < 400; step++) {
+        clock.currentTime += 0.003;
+        // The change lands while straight (or old-swing) stamps are still queued ahead.
+        if (step === 66) scheduler.swing = to;
+        scheduler.update();
+        const now = clock.currentTime;
+        const heard = scheduler.audibleTick(now);
+        const sounding = times.filter((time) => time <= now).length - 1;
+        expect(heard).toBe(Math.max(0, sounding));
+        expect(heard).toBeGreaterThanOrEqual(last);
+        last = heard;
+      }
+    }
+  });
 });

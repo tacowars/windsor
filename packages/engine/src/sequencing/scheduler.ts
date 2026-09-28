@@ -34,6 +34,7 @@ import {
   TICK_STAMP_EPSILON,
 } from '../audioConstants';
 import { swingSlope, swingTicks, unswingTicks } from './swing';
+import { TickStamps } from './tickStamps';
 import { STRAIGHT_SWING, SWING_TABLE, type Swing, type SwingTable } from './swingTables';
 
 /** Pulses per quarter note -- the MIDI-clock grid. */
@@ -196,6 +197,8 @@ export class Scheduler implements TickSource {
   private readonly clock: AudioClock;
   private running = false;
   private nextTime = 0;
+  /** What each recent tick was actually stamped: `audibleTick` reads these. */
+  private readonly stamps = new TickStamps();
 
   constructor(clock: AudioClock, options: SchedulerOptions = {}) {
     this.clock = clock;
@@ -234,25 +237,32 @@ export class Scheduler implements TickSource {
   /**
    * The tick sounding at clock time `now` (#603, the console's playhead). The
    * queue runs `lookAhead` ahead of the clock, so `transport.currentTick` is
-   * where the *next issued* tick lands, not what is audible: tick `k` was
-   * stamped `nextTime - (currentTick - k) * secondsPerTick`, and the audible
-   * one is the last whose stamp is at or before `now`. 0 until the first tick
-   * sounds; the last issued tick once the queue has run ahead and stopped.
-   * Under swing (windsor#14) the stamps are warped, so the count back runs in
-   * swung ticks and is unwarped: the playhead stays on the tick that sounds.
+   * where the *next issued* tick lands, not what is audible: the audible one
+   * is the last whose stamp is at or before `now`. The stamps read are the
+   * ones actually issued (windsor#14), so a live swing or tempo change moves
+   * only the ticks queued after it and the playhead never runs backward
+   * while the old queue drains. The last issued tick once the queue has run
+   * ahead and stopped.
    */
   audibleTick(now: number): number {
+    const secondsPerTick = this.transport.secondsPerTick;
+    const sounding = this.stamps.soundingAt(now, TICK_STAMP_EPSILON * secondsPerTick);
+    if (sounding >= 0) return sounding;
+    // No held stamp has sounded yet (before the run's first tick, or older
+    // than the ring): count back from the queue's head at the running tempo
+    // and swing, never reaching a held tick. 0 before anything sounds.
     const issued = this.transport.currentTick;
-    const ahead = (this.nextTime - now) / this.transport.secondsPerTick;
+    const ahead = (this.nextTime - now) / secondsPerTick;
     const tick = this.transport.unswungTicks(this.transport.swungTicks(issued) - ahead);
-    // Never past the last issued tick: a stopped queue does not keep counting.
-    return Math.max(0, Math.min(issued - 1, Math.floor(tick + TICK_STAMP_EPSILON)));
+    const newest = Math.min(issued, this.stamps.oldest) - 1;
+    return Math.max(0, Math.min(newest, Math.floor(tick + TICK_STAMP_EPSILON)));
   }
 
   start(atTick = 0): void {
     if (this.running) return;
     this.running = true;
     this.transport.reset(atTick);
+    this.stamps.clear(atTick);
     this.nextTime = this.clock.currentTime + SCHEDULER_START_DELAY_SECONDS;
   }
 
@@ -269,6 +279,7 @@ export class Scheduler implements TickSource {
   reset(): void {
     this.stop();
     this.transport.reset(0);
+    this.stamps.clear(0);
     this.nextTime = 0;
   }
 
@@ -281,6 +292,7 @@ export class Scheduler implements TickSource {
     const horizon = this.clock.currentTime + this.lookAhead;
     while (this.nextTime < horizon) {
       const tick = this.transport.currentTick;
+      this.stamps.record(tick, this.nextTime);
       this.transport.advance(this.nextTime);
       this.nextTime += this.transport.intervalSeconds(tick);
     }
