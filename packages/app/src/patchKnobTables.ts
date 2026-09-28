@@ -6,7 +6,7 @@
  * so a schema-default change in `patch.ts` moves double-click reset with it.
  * `knobDefaults.test.ts` walks `allPatchKnobs()`.
  */
-import { OP_NAMES, makePatch } from '@windsor/engine';
+import { OP_NAMES, WIDTH_RANGE, makePatch } from '@windsor/engine';
 import { fmt2, fmtHz, fmtMs, fmtSigned } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';
@@ -42,6 +42,8 @@ const fmtCents = (v: number): string => `${v.toFixed(0)}c`;
 const fmtHzRate = (v: number): string => `${v.toFixed(2)}H`;
 const fmtSemitones = (v: number): string => `${v.toFixed(2)}st`;
 const fmtSignedSemitones = (v: number): string => `${fmtSigned(v)}st`;
+const PERCENT = 100;
+const fmtPercent = (v: number): string => `${(v * PERCENT).toFixed(0)}%`;
 
 export const GLOBAL_KNOBS: PatchKnobTable = [
   { f: 'volume', label: 'Volume', o: { min: 0, max: 1.5, fmt: fmt2 } },
@@ -59,23 +61,38 @@ export const FILTER_KNOBS: PatchKnobTable = [
   { f: 'filter.envAmount', label: 'Env Amt', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.modWheelDepth', label: 'Wheel', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.lfoAmount', label: 'LFO Amt', o: { min: -4, max: 4, fmt: fmtSigned } },
+  { f: 'filter.lfo2Amount', label: 'LFO 2 Amt', o: { min: -4, max: 4, fmt: fmtSigned } },
   { f: 'filter.keyTrack', label: 'Key Trk', o: { min: -1, max: 2, fmt: fmtSigned } },
 ];
 
-export const LFO_KNOBS: PatchKnobTable = [
-  { f: 'lfo.rate', label: 'Rate', o: { min: 0.02, max: 40, curve: 'log', fmt: fmtHzRate } },
-  { f: 'lfo.amount', label: 'Amount', o: { min: 0, max: 1, fmt: fmt2 } },
-  { f: 'lfo.modWheelDepth', label: 'Wheel', o: { min: 0, max: 1, fmt: fmt2 } },
-  { f: 'lfo.delay', label: 'Fade In', o: { min: 0, max: 6, curve: 'log', fmt: fmtMs } },
-  { f: 'lfo.toPitch', label: 'To Pitch', o: { min: 0, max: 12, fmt: fmtSemitones } },
+/** The patch's two LFOs (#54): one settings shape, so one set of tables per key. */
+export type LfoKey = 'lfo' | 'lfo2';
+export const LFO_KEYS: readonly LfoKey[] = ['lfo', 'lfo2'];
+
+/** An LFO's own knobs: rate, depth, the wheel, the fade-in and the pitch depth. */
+export const lfoKnobs = (key: LfoKey): PatchKnobTable => [
+  { f: `${key}.rate`, label: 'Rate', o: { min: 0.02, max: 40, curve: 'log', fmt: fmtHzRate } },
+  { f: `${key}.amount`, label: 'Amount', o: { min: 0, max: 1, fmt: fmt2 } },
+  { f: `${key}.modWheelDepth`, label: 'Wheel', o: { min: 0, max: 1, fmt: fmt2 } },
+  { f: `${key}.delay`, label: 'Fade In', o: { min: 0, max: 6, curve: 'log', fmt: fmtMs } },
+  { f: `${key}.toPitch`, label: 'To Pitch', o: { min: 0, max: 12, fmt: fmtSemitones } },
 ];
 
-/** The LFO's per-operator depth, one knob per operator letter. */
-export const LFO_TO_OP_KNOBS: PatchKnobTable = OP_NAMES.map((name, i) => ({
-  f: `lfo.toOp.${i}`,
-  label: `To ${name}`,
-  o: { min: -1, max: 1, fmt: fmtSigned },
-}));
+/** An LFO's per-operator level depth, one knob per operator letter. */
+export const lfoToOpKnobs = (key: LfoKey): PatchKnobTable =>
+  OP_NAMES.map((name, i) => ({
+    f: `${key}.toOp.${i}`,
+    label: `To ${name}`,
+    o: { min: -1, max: 1, fmt: fmtSigned },
+  }));
+
+/** An LFO's per-operator width depth, added to the operator's Width before the clamp. */
+export const lfoToWidthKnobs = (key: LfoKey): PatchKnobTable =>
+  OP_NAMES.map((name, i) => ({
+    f: `${key}.toWidth.${i}`,
+    label: `Width ${name}`,
+    o: { min: -1, max: 1, fmt: fmtSigned },
+  }));
 
 export const PITCH_ENV_AMOUNT_KNOB: PatchKnobEntry = {
   f: 'pitchEnvAmount',
@@ -99,6 +116,11 @@ export const OP_KNOBS: PatchKnobTable = [
   { f: 'detune', label: 'Detune', o: { min: -100, max: 100, step: 1, fmt: fmtCents } },
   { f: 'level', label: 'Level', o: { min: 0, max: 1, fmt: fmt2 } },
   { f: 'feedback', label: 'Fdbk', o: { min: -1, max: 1, fmt: fmtSigned } },
+  {
+    f: 'width',
+    label: 'Width',
+    o: { min: WIDTH_RANGE.min, max: WIDTH_RANGE.max, fmt: fmtPercent },
+  },
   { f: 'velSens', label: 'Vel', o: { min: 0, max: 1, fmt: fmt2 } },
 ];
 
@@ -138,8 +160,11 @@ export function allPatchKnobs(): PatchKnob[] {
   };
   own(GLOBAL_KNOBS);
   own(FILTER_KNOBS);
-  own(LFO_KNOBS);
-  own(LFO_TO_OP_KNOBS);
+  for (const key of LFO_KEYS) {
+    own(lfoKnobs(key));
+    own(lfoToOpKnobs(key));
+    own(lfoToWidthKnobs(key));
+  }
   own([PITCH_ENV_AMOUNT_KNOB]);
   OP_NAMES.forEach((_, i) => under(`ops.${i}`, [FIXED_HZ_KNOB, ...OP_KNOBS]));
   for (const slot of ENVELOPE_SLOTS) under(slot, [...ENVELOPE_KNOBS, ...ENVELOPE_ADV_KNOBS]);

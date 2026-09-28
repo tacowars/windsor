@@ -11,8 +11,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
 import { makePatch } from '@windsor/engine';
-import { FILTER_KNOBS, LFO_KNOBS, patchKnobOpts } from './patchKnobTables';
-import { GLOBAL_TOGGLES, toggleIndex, writeToggle } from './patchPanels';
+import { FILTER_KNOBS, lfoKnobs, patchKnobOpts } from './patchKnobTables';
+import {
+  GLOBAL_TOGGLES,
+  LFO_PHASE_NAMES,
+  LFO_RANGE_NAMES,
+  lfoPhaseIndex,
+  toggleIndex,
+  writeLfoPhase,
+  writeToggle,
+} from './patchPanels';
 import type { PatchEditor } from './partsSession';
 import { getPath, setPath } from './patchPath';
 
@@ -54,7 +62,7 @@ describe('the global row toggles', () => {
 describe('the Wheel knobs (#586)', () => {
   const wheelKnobs = () => ({
     filter: FILTER_KNOBS.find((k) => k.f === 'filter.modWheelDepth'),
-    lfo: LFO_KNOBS.find((k) => k.f === 'lfo.modWheelDepth'),
+    lfo: lfoKnobs('lfo').find((k) => k.f === 'lfo.modWheelDepth'),
   });
 
   it('sit beside the amounts they add to, over fields the patch really has', () => {
@@ -65,7 +73,7 @@ describe('the Wheel knobs (#586)', () => {
     expect([filter?.o?.min, filter?.o?.max]).toEqual([-6, 6]);
     expect([lfo?.o?.min, lfo?.o?.max]).toEqual([0, 1]);
     const fresh = makePatch();
-    for (const k of [...FILTER_KNOBS, ...LFO_KNOBS]) {
+    for (const k of [...FILTER_KNOBS, ...lfoKnobs('lfo'), ...lfoKnobs('lfo2')]) {
       expect(typeof getPath(fresh, k.f), k.f).toBe('number');
     }
     // The knob's centre is the schema's default, so a fresh patch reads as untouched.
@@ -81,5 +89,51 @@ describe('the Wheel knobs (#586)', () => {
     expect(imported.filter.modWheelDepth).toBe(3);
     expect(imported.lfo.modWheelDepth).toBe(0);
     expect(imported).toEqual(edited);
+  });
+});
+
+describe('the LFO Phase segment (windsor#56)', () => {
+  it('offers Free, Retrigger and One-shot', () => {
+    expect(LFO_PHASE_NAMES).toEqual(['Free', 'Retrigger', 'One-shot']);
+  });
+
+  it('round-trips all three states on either LFO', () => {
+    const patch = makePatch();
+    for (const lfo of [patch.lfo, patch.lfo2]) {
+      LFO_PHASE_NAMES.forEach((_, i) => {
+        writeLfoPhase(lfo, i);
+        expect(lfoPhaseIndex(lfo)).toBe(i);
+      });
+    }
+  });
+
+  it('sets both flags on One-shot, clears both on Free, clears oneShot only on Retrigger', () => {
+    const { lfo2: lfo } = makePatch();
+    writeLfoPhase(lfo, LFO_PHASE_NAMES.indexOf('One-shot'));
+    expect([lfo.oneShot, lfo.retrigger]).toEqual([true, true]);
+    writeLfoPhase(lfo, LFO_PHASE_NAMES.indexOf('Retrigger'));
+    expect([lfo.oneShot, lfo.retrigger]).toEqual([false, true]);
+    writeLfoPhase(lfo, LFO_PHASE_NAMES.indexOf('One-shot'));
+    writeLfoPhase(lfo, LFO_PHASE_NAMES.indexOf('Free'));
+    expect([lfo.oneShot, lfo.retrigger]).toEqual([false, false]);
+  });
+
+  it('shows One-shot whenever oneShot is set, whatever retrigger says', () => {
+    const { lfo } = makePatch();
+    lfo.oneShot = true;
+    lfo.retrigger = false;
+    expect(lfoPhaseIndex(lfo)).toBe(LFO_PHASE_NAMES.indexOf('One-shot'));
+  });
+});
+
+describe('the LFO Range segment (windsor#56)', () => {
+  it('writes unipolar on its own LFO only', () => {
+    expect(LFO_RANGE_NAMES).toEqual(['Bipolar', 'Unipolar']);
+    const patch = makePatch();
+    expect(toggleIndex(patch, 'lfo2.unipolar')).toBe(0);
+    writeToggle(patch, 'lfo2.unipolar', 1);
+    expect(patch.lfo2.unipolar).toBe(true);
+    expect(patch.lfo.unipolar).toBe(false);
+    expect(toggleIndex(patch, 'lfo2.unipolar')).toBe(1);
   });
 });
