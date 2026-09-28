@@ -80,6 +80,27 @@ export const NARROW_BLOCK_PX = 14;
 /** The largest share of a block's width each edge band may take, so the body always keeps a movable middle. */
 export const EDGE_BAND_FRACTION = 0.25;
 
+/**
+ * The loop brace (windsor#30): the bars the loop button creates when the
+ * song has no loop yet (clamped to the song), and the grab zone of each
+ * inward-pointing handle — its width inside the brace, capped at a share of
+ * a narrow brace so the body keeps a movable middle, and a little reach
+ * outside it so a handle stays grabbable at the widest zoom-out.
+ */
+export interface LoopBraceTable {
+  readonly newLoopBars: number;
+  readonly handlePx: number;
+  readonly handleOutsidePx: number;
+  readonly handleFraction: number;
+}
+
+export const LOOP_BRACE: LoopBraceTable = {
+  newLoopBars: 4,
+  handlePx: 8,
+  handleOutsidePx: 4,
+  handleFraction: 0.25,
+};
+
 /** Px from the song start for a tick — the playhead line's, a block's left edge. */
 export const tickToPx = (tick: number, pxPerBar: number): number =>
   (tick / TICKS_PER_BAR) * pxPerBar;

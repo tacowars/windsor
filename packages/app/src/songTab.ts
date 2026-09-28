@@ -7,7 +7,8 @@
  *
  * This file is the view's composition and its one piece of state — the
  * selection — plus the two repaints every edit ends in. The lanes are
- * `songRuler.ts`, `songHarmonyLane.ts` and `songLanes.ts`; the pane is
+ * `songRuler.ts`, the loop brace under it (`loopBrace.ts`, windsor#30),
+ * `songHarmonyLane.ts` and `songLanes.ts`; the pane is
  * `songDetailPane.ts`; the edits themselves are the pure `regionModel.ts` and
  * `harmonyLaneModel.ts`. Every edit is one `ctx.change` live partial, never
  * a rebuild; the lanes repaint from the document, so a card's knob in the
@@ -19,6 +20,7 @@ import type { DocumentPartial } from '@windsor/engine';
 import { songTicksOf } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import { loopBraceRow } from './loopBrace';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
@@ -70,6 +72,7 @@ function laneSignature(ctx: AppCtx): string {
   const { doc } = ctx.model;
   return JSON.stringify([
     doc.transport.bars,
+    doc.transport.loop ?? null,
     doc.harmony,
     doc.parts.map((part) => [
       part.slot,
@@ -134,12 +137,14 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
       const { doc } = ctx.model;
       lanes.style.setProperty('--bars', String(doc.transport.bars));
       lanes.style.setProperty('--bar', `${state.pxPerBar}px`);
+      const brace = loopBraceRow(view);
       const rows: HTMLElement[] = [
         ...rulerRow(doc.transport.bars, state.pxPerBar),
+        ...brace.row,
         ...harmonyLaneRow(view),
         ...doc.parts.flatMap((part) => partLaneRow(view, part)),
       ];
-      lanes.replaceChildren(...rows, line);
+      lanes.replaceChildren(...rows, ...brace.lines, line);
       // The new blocks start unlit, and the loop marks only a moved tick: light the playing chord now, paused or not.
       markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
     },

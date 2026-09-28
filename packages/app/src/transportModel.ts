@@ -9,10 +9,11 @@
  *
  * windsor#12: the tempo and bars boxes' typed entry, their drag, and tap
  * tempo are rules here too, so the DOM file only wires them. windsor#29 adds
- * the swing box and its grid picker.
+ * the swing box and its grid picker, windsor#30 the loop button.
  */
-import type { DocumentPartial, ScaleName, Swing } from '@windsor/engine';
-import { SCALE_NAMES, STRAIGHT_SWING, SWING_GRIDS } from '@windsor/engine';
+import type { DocumentPartial, ScaleName, Swing, Transport } from '@windsor/engine';
+import { SCALE_NAMES, STRAIGHT_SWING, SWING_GRIDS, TICKS_PER_BAR } from '@windsor/engine';
+import { loopChange, newLoopRange } from './loopBraceModel';
 import {
   BARS_DRAG_STEP,
   BARS_KNOB,
@@ -101,6 +102,21 @@ export const swingChange = (current: Swing, edit: Partial<Swing>): DocumentParti
 export function swingGridChange(current: Swing, value: string): DocumentPartial | null {
   const grid = SWING_GRIDS.find((known) => String(known) === value);
   return grid === undefined ? null : swingChange(current, { grid });
+}
+
+/** Whether the song loops (windsor#30): its loop is on. A song with no loop does not. */
+export const loopIsOn = (transport: Pick<Transport, 'loop'>): boolean =>
+  transport.loop?.on === true;
+
+/**
+ * The loop button (windsor#30 decision 1) as a live partial: it flips the
+ * loop's `on` and keeps its range, and on a song with no loop yet it
+ * creates one over bars 1–4 (clamped to the song), switched on.
+ */
+export function loopToggle(transport: Pick<Transport, 'bars' | 'loop'>): DocumentPartial {
+  const { loop } = transport;
+  if (loop) return loopChange(loop, !loop.on);
+  return loopChange(newLoopRange(transport.bars * TICKS_PER_BAR), true);
 }
 
 /** At the bottom of its range the swing is straight, and the box reads dimmed. */
