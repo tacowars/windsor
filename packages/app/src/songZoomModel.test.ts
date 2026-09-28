@@ -14,11 +14,12 @@ import {
   fittedScale,
   followFit,
   maxScroll,
+  stepRulerDrag,
   zoomForDrag,
   zoomToFit,
 } from './songZoomModel';
-import type { ZoomBounds, ZoomDragStart } from './songZoomModel';
-import { SONG_VIEW } from './songViewTables';
+import type { RulerDrag, RulerDragEvent, ZoomBounds, ZoomDragStart } from './songZoomModel';
+import { SONG_DRAG_THRESHOLD_PX, SONG_VIEW } from './songViewTables';
 
 const CHROME = 156;
 const VIEWPORT = 1000;
@@ -157,5 +158,63 @@ describe('the fit (windsor#21)', () => {
     expect(followFit(100, narrow.minPxPerBar, wide)).toBe(wide.minPxPerBar);
     // First measure: no previous floor, so a short song's fit pulls the default zoom up.
     expect(followFit(SONG_VIEW.pxPerBar, null, fittedScale(bounds(2)))).toBe(lanesPx / 2);
+  });
+});
+
+describe('the ruler drag (a missed release never leaves a hover zooming)', () => {
+  const b = bounds(64);
+  const pressed: RulerDrag = {
+    pointerId: 1,
+    originX: 500,
+    originY: 40,
+    start: { pxPerBar: 96, scrollPx: 2000, pointerPx: 24.5 * 96 },
+    bounds: b,
+    scale: SONG_VIEW,
+    moved: false,
+  };
+  const move = (dx: number, dy: number, buttons = 1, pointerId = 1): RulerDragEvent => ({
+    type: 'move',
+    pointerId,
+    buttons,
+    clientX: pressed.originX + dx,
+    clientY: pressed.originY + dy,
+  });
+  const dragging = stepRulerDrag(pressed, move(0, -60)).drag as RulerDrag;
+
+  it('zooms only while the pressing pointer holds the primary button past the threshold', () => {
+    expect(stepRulerDrag(pressed, move(1, 1))).toEqual({ drag: pressed, view: null });
+    const step = stepRulerDrag(pressed, move(0, -60));
+    expect(step.drag?.moved).toBe(true);
+    expect(step.view).toEqual(dragZoom(pressed.start, { dx: 0, dy: -60 }, b));
+    expect(stepRulerDrag(dragging, move(-80, 0, 1, 2))).toEqual({ drag: dragging, view: null });
+  });
+
+  it('ends on a move with the button up, a release, a cancel, a lost capture or a blur, with no view change', () => {
+    const endings: RulerDragEvent[] = [
+      move(-300, 200, 0),
+      move(-300, 200, 2),
+      { type: 'up', pointerId: 1 },
+      { type: 'cancel', pointerId: 1 },
+      { type: 'lost', pointerId: 1 },
+      { type: 'blur' },
+    ];
+    for (const event of endings) {
+      for (const drag of [pressed, dragging]) {
+        expect(stepRulerDrag(drag, event)).toEqual({ drag: null, view: null });
+      }
+    }
+  });
+
+  it('never changes the view on a hover with no drag live, button held or not', () => {
+    for (const event of [move(0, -600), move(400, 0, 0), move(SONG_DRAG_THRESHOLD_PX * 10, 0)]) {
+      expect(stepRulerDrag(null, event)).toEqual({ drag: null, view: null });
+    }
+    // The double-click after two still presses: each release ended its press, so nothing is left live.
+    let drag: RulerDrag | null = pressed;
+    for (const event of [move(1, 0), { type: 'up', pointerId: 1 } as const]) {
+      drag = stepRulerDrag(drag, event).drag;
+    }
+    expect(drag).toBeNull();
+    expect(stepRulerDrag(drag, move(0, 300)).view).toBeNull();
   });
 });

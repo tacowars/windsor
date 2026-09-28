@@ -13,9 +13,14 @@
  * table's `minPxPerBar` to the scale at which every bar fills the visible
  * lanes width, and a view at the fit follows it when the window or the
  * song's length moves it (`followFit`).
+ *
+ * The drag itself is a small state machine (`stepRulerDrag`): only a move of
+ * the pressing pointer with the primary button still down changes the view;
+ * a release, a cancel, a lost capture, a window blur or a move with the
+ * button up ends it, so a missed release can never leave a hover zooming.
  */
 import type { SongViewScale } from './songViewTables';
-import { FIT_TOLERANCE_PX, SONG_VIEW } from './songViewTables';
+import { FIT_TOLERANCE_PX, SONG_DRAG_THRESHOLD_PX, SONG_VIEW, primaryHeld } from './songViewTables';
 
 /** Where a ruler drag started. */
 export interface ZoomDragStart {
@@ -115,6 +120,62 @@ export function followFit(
 ): number {
   const atFloor = previousFloor !== null && Math.abs(pxPerBar - previousFloor) <= FIT_TOLERANCE_PX;
   return atFloor ? next.minPxPerBar : clampZoom(pxPerBar, next);
+}
+
+/** A live ruler drag: the pressing pointer, where it pressed, and what the view clamps to. */
+export interface RulerDrag {
+  readonly pointerId: number;
+  readonly originX: number;
+  readonly originY: number;
+  readonly start: ZoomDragStart;
+  readonly bounds: ZoomBounds;
+  readonly scale: SongViewScale;
+  /** Past the threshold: a press that never gets here changes nothing. */
+  readonly moved: boolean;
+}
+
+/** What reaches the drag: a pointer move, or one of the events that end it. */
+export type RulerDragEvent =
+  | {
+      readonly type: 'move';
+      readonly pointerId: number;
+      readonly buttons: number;
+      readonly clientX: number;
+      readonly clientY: number;
+    }
+  | { readonly type: 'up' | 'cancel' | 'lost'; readonly pointerId: number }
+  | { readonly type: 'blur' };
+
+/** The drag after an event (null once it ended) and the view to apply, if the event moved it. */
+export interface RulerDragStep {
+  readonly drag: RulerDrag | null;
+  readonly view: SongZoom | null;
+}
+
+/**
+ * One event of the ruler drag. With no drag live nothing changes — a hover
+ * never zooms or scrolls. Another pointer's events are ignored. A move
+ * without the primary button, a release, a cancel, a lost capture or a
+ * window blur ends the drag and leaves the view where the last move put it.
+ * A move under the threshold waits; past it every move is a new view.
+ */
+export function stepRulerDrag(
+  drag: RulerDrag | null,
+  event: RulerDragEvent,
+  thresholdPx: number = SONG_DRAG_THRESHOLD_PX,
+): RulerDragStep {
+  if (!drag || event.type === 'blur') return { drag: null, view: null };
+  if (event.pointerId !== drag.pointerId) return { drag, view: null };
+  if (event.type !== 'move' || !primaryHeld(event.buttons)) return { drag: null, view: null };
+  const dx = event.clientX - drag.originX;
+  const dy = event.clientY - drag.originY;
+  if (!drag.moved && Math.max(Math.abs(dx), Math.abs(dy)) < thresholdPx) {
+    return { drag, view: null };
+  }
+  return {
+    drag: drag.moved ? drag : { ...drag, moved: true },
+    view: dragZoom(drag.start, { dx, dy }, drag.bounds, drag.scale),
+  };
 }
 
 /** A double-click on the ruler: the fit, from bar 1. */

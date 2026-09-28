@@ -54,6 +54,15 @@ export const FIT_TOLERANCE_PX = 0.5;
 
 /** A pointer moved this far is a resize or a move; under it, a click. */
 export const SONG_DRAG_THRESHOLD_PX = 4;
+/** The primary (left) button's bit in `PointerEvent.buttons`. */
+export const PRIMARY_BUTTON_BIT = 1;
+
+/**
+ * Whether a move still has the primary button down. A drag that sees a move
+ * without it missed its release (a window blur, a release the browser never
+ * reported) and must end there, or it would follow a plain hover.
+ */
+export const primaryHeld = (buttons: number): boolean => (buttons & PRIMARY_BUTTON_BIT) !== 0;
 /** The band at each end of a region block that drags its edge instead of moving it. */
 export const REGION_EDGE_PX = 8;
 /** The gap a block leaves before the next one's left edge, so adjoining regions read as two. */

@@ -26,6 +26,7 @@ import {
   forKind,
   hitBlocks,
   isNarrowBlock,
+  primaryHeld,
   pxToTick,
   tickToPx,
 } from './songViewTables';
@@ -38,34 +39,56 @@ export interface DragHandlers {
   move(e: PointerEvent): void;
   /** The release; `moved` says whether the press became a drag. */
   end(e: PointerEvent, moved: boolean): void;
+  /** A drag that ended without a release (cancel, lost capture, blur, a move with the button up): drop its preview. */
+  abort(moved: boolean): void;
 }
 
-/** A press-and-drag with pointer capture: under the threshold it is a click, past it a drag. */
+/**
+ * A press-and-drag with pointer capture: under the threshold it is a click,
+ * past it a drag. Only the pressing pointer's release commits (`end`); a
+ * cancel, a lost capture, a window blur or a move with the primary button
+ * up — a release it never saw — aborts, so a later hover never drags.
+ */
 export function pointerDrag(node: HTMLElement, handlers: DragHandlers): void {
+  let live: { pointerId: number; x: number; moved: boolean } | null = null;
+  const finish = (release: PointerEvent | null): void => {
+    if (!live) return;
+    const { pointerId, moved } = live;
+    live = null;
+    window.removeEventListener('blur', onBlur);
+    if (node.hasPointerCapture(pointerId)) node.releasePointerCapture(pointerId);
+    if (release) handlers.end(release, moved);
+    else handlers.abort(moved);
+  };
+  const onBlur = (): void => finish(null);
+  const mine = (e: PointerEvent): boolean => live !== null && e.pointerId === live.pointerId;
   node.addEventListener('pointerdown', (down) => {
     if (down.button !== 0 || (handlers.accept && !handlers.accept(down))) return;
     down.stopPropagation();
-    let moved = false;
+    finish(null);
+    live = { pointerId: down.pointerId, x: down.clientX, moved: false };
     try {
       node.setPointerCapture(down.pointerId);
     } catch {
       // A pointer the browser does not track (a synthetic event, a capture-less input): the drag still runs on the node's own events.
     }
-    const onMove = (e: PointerEvent): void => {
-      if (!moved && Math.abs(e.clientX - down.clientX) < SONG_DRAG_THRESHOLD_PX) return;
-      moved = true;
-      handlers.move(e);
-    };
-    const onUp = (e: PointerEvent): void => {
-      node.removeEventListener('pointermove', onMove);
-      node.removeEventListener('pointerup', onUp);
-      node.removeEventListener('pointercancel', onUp);
-      handlers.end(e, moved);
-    };
-    node.addEventListener('pointermove', onMove);
-    node.addEventListener('pointerup', onUp);
-    node.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onBlur);
   });
+  node.addEventListener('pointermove', (e) => {
+    if (!live || !mine(e)) return;
+    if (!primaryHeld(e.buttons)) return void finish(null);
+    if (!live.moved && Math.abs(e.clientX - live.x) < SONG_DRAG_THRESHOLD_PX) return;
+    live.moved = true;
+    handlers.move(e);
+  });
+  node.addEventListener('pointerup', (e) => {
+    if (mine(e)) finish(e);
+  });
+  for (const type of ['pointercancel', 'lostpointercapture'] as const) {
+    node.addEventListener(type, (e) => {
+      if (mine(e)) finish(null);
+    });
+  }
 }
 
 /** One `.reg` block for a region of `part`. */
@@ -179,6 +202,12 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
       const drag = { kind: gesture.kind, index: gesture.index, deltaTicks };
       draft = dragRegion(live.regions, drag, view.songTicks(), grain);
       paintRegions(view, lane, live, draft);
+    },
+    abort: () => {
+      if (!draft) return;
+      draft = null;
+      const live = current();
+      paintRegions(view, lane, live, live.regions);
     },
     end: (e, moved) => {
       const live = current();

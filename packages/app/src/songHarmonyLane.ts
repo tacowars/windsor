@@ -81,6 +81,9 @@ function wireEdgeDrag(view: SongView, node: HTMLElement, bounds: EventSpan): voi
       if (!moved || !onEdge) return void view.select({ kind: 'event', index });
       view.commit({ harmony: { events: resized(e) } }, true);
     },
+    abort: (moved) => {
+      if (moved && onEdge) view.paintLanes();
+    },
   });
 }
 

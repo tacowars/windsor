@@ -20,9 +20,15 @@ import type { AppCtx } from './context';
 import { el } from './dom';
 import { watchPlayhead } from './stepStrip';
 import { formatPosition } from './transportModel';
-import { SONG_DRAG_THRESHOLD_PX, beatTickPx, rulerLabelEvery, rulerLabels } from './songViewTables';
-import type { SongZoom, ZoomBounds, ZoomDragStart } from './songZoomModel';
-import { clampScroll, dragZoom, fittedScale, followFit, zoomToFit } from './songZoomModel';
+import { beatTickPx, rulerLabelEvery, rulerLabels } from './songViewTables';
+import type {
+  RulerDrag,
+  RulerDragEvent,
+  SongZoom,
+  ZoomBounds,
+  ZoomDragStart,
+} from './songZoomModel';
+import { clampScroll, fittedScale, followFit, stepRulerDrag, zoomToFit } from './songZoomModel';
 
 /**
  * The name-column cell and the ruler for `bars` bars at `pxPerBar`: one
@@ -130,47 +136,61 @@ export interface RulerZoomHandle {
 /**
  * Wire the ruler: a drag zooms (vertical, around the pressed bar, down to the
  * fit) and scrolls (horizontal) in one gesture; a double-click fits; a
- * resize of the scroll container refits. The drag holds the pointer on the
- * lanes, which retargets the clicks there too, so the double-click is
- * placed by where it lands, not by its target.
+ * resize of the scroll container refits. The drag is `stepRulerDrag`'s state
+ * machine over one set of listeners: the lanes (which outlive the ruler's
+ * repaint) capture the pointer at the press, and a release, a cancel, a lost
+ * capture, a window blur or a move with the button up ends it, so no hover
+ * after a missed release zooms. The capture retargets the clicks to the
+ * lanes, so the double-click is placed by where it lands, not by its target.
  */
 export function wireRulerZoom(zoom: RulerZoom): RulerZoomHandle {
   const { lanes, scroll, state } = zoom;
+  let drag: RulerDrag | null = null;
+  const onBlur = (): void => step({ type: 'blur' });
+  const release = (pointerId: number): void => {
+    window.removeEventListener('blur', onBlur);
+    if (lanes.hasPointerCapture(pointerId)) lanes.releasePointerCapture(pointerId);
+  };
+  const step = (event: RulerDragEvent): void => {
+    const was = drag;
+    const next = stepRulerDrag(drag, event);
+    drag = next.drag;
+    if (next.view) applyZoom(zoom, next.view);
+    if (was && !drag) release(was.pointerId);
+  };
   lanes.addEventListener('pointerdown', (down) => {
     const ruler = down.target instanceof Element ? down.target.closest('.ruler') : null;
     if (down.button !== 0 || !(ruler instanceof HTMLElement)) return;
     down.preventDefault();
+    if (drag) step({ type: 'cancel', pointerId: drag.pointerId });
     const start: ZoomDragStart = {
       pxPerBar: state.pxPerBar,
       scrollPx: scroll.scrollLeft,
       pointerPx: down.clientX - ruler.getBoundingClientRect().left,
     };
     const bounds = measureBounds(zoom, start.pxPerBar);
-    const scale = fittedScale(bounds);
-    let moved = false;
+    const { pointerId, clientX: originX, clientY: originY } = down;
+    drag = { pointerId, originX, originY, start, bounds, scale: fittedScale(bounds), moved: false };
     try {
-      lanes.setPointerCapture(down.pointerId);
+      lanes.setPointerCapture(pointerId);
     } catch {
       // A pointer the browser does not track: the drag still runs on the lanes' own events.
     }
-    const onMove = (e: PointerEvent): void => {
-      const dx = e.clientX - down.clientX;
-      const dy = e.clientY - down.clientY;
-      if (!moved && Math.max(Math.abs(dx), Math.abs(dy)) < SONG_DRAG_THRESHOLD_PX) return;
-      moved = true;
-      applyZoom(zoom, dragZoom(start, { dx, dy }, bounds, scale));
-    };
-    const onUp = (): void => {
-      lanes.removeEventListener('pointermove', onMove);
-      lanes.removeEventListener('pointerup', onUp);
-      lanes.removeEventListener('pointercancel', onUp);
-    };
-    lanes.addEventListener('pointermove', onMove);
-    lanes.addEventListener('pointerup', onUp);
-    lanes.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onBlur);
   });
+  lanes.addEventListener('pointermove', (e) => {
+    const { pointerId, buttons, clientX, clientY } = e;
+    step({ type: 'move', pointerId, buttons, clientX, clientY });
+  });
+  lanes.addEventListener('pointerup', (e) => step({ type: 'up', pointerId: e.pointerId }));
+  lanes.addEventListener('pointercancel', (e) => step({ type: 'cancel', pointerId: e.pointerId }));
+  lanes.addEventListener('lostpointercapture', (e) =>
+    step({ type: 'lost', pointerId: e.pointerId }),
+  );
   lanes.addEventListener('dblclick', (e) => {
     if (!onRuler(lanes, e)) return;
+    // Both presses have released by now; end anything a lost event left live before fitting.
+    step({ type: 'blur' });
     applyZoom(zoom, zoomToFit(measureBounds(zoom, state.pxPerBar)));
   });
   const observer = new ResizeObserver(() => {
