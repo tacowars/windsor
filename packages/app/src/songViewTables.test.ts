@@ -3,6 +3,8 @@
  * px at the table's scale, the ruler's labels, and one tone, summary and
  * cycle length per kind the engine declares.
  */
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -19,10 +21,19 @@ import {
   CYCLE_TICKS,
   LANE_TONE,
   REGION_SUMMARY,
+  MIN_BLOCK_PX,
+  NARROW_BLOCK_PX,
+  REGION_EDGE_PX,
   SONG_VIEW,
   beatTickPx,
+  blockBox,
+  blockHitAt,
+  edgeBandPx,
   forKind,
+  hitBlocks,
+  isNarrowBlock,
   pxToTick,
+  rulerLabelEvery,
   rulerLabels,
   tickToPx,
 } from './songViewTables';
@@ -33,13 +44,102 @@ describe('the ruler scale', () => {
     expect(tickToPx(0, PX)).toBe(0);
     expect(tickToPx(TICKS_PER_BAR, PX)).toBe(PX);
     expect(tickToPx(2.25 * TICKS_PER_BAR, PX)).toBe(2.25 * PX);
-    expect(pxToTick(tickToPx(TICKS_PER_BAR + PPQ))).toBe(TICKS_PER_BAR + PPQ);
+    expect(pxToTick(tickToPx(TICKS_PER_BAR + PPQ, PX), PX)).toBe(TICKS_PER_BAR + PPQ);
   });
 
   it('labels the bars 1..n and ticks the beats inside a bar', () => {
     expect(rulerLabels(4)).toEqual(['1', '2', '3', '4']);
     expect(rulerLabels(0)).toEqual([]);
-    expect(beatTickPx(SONG_VIEW.pxPerBar)).toEqual([1, 2, 3].map((b) => tickToPx(b * PPQ)));
+    expect(beatTickPx(SONG_VIEW.pxPerBar)).toEqual(
+      [1, 2, 3].map((b) => tickToPx(b * PPQ, SONG_VIEW.pxPerBar)),
+    );
+  });
+
+  it('keeps a tick and its px paired at every zoom', () => {
+    for (const px of [SONG_VIEW.minPxPerBar, SONG_VIEW.pxPerBar, SONG_VIEW.maxPxPerBar]) {
+      expect(tickToPx(TICKS_PER_BAR, px)).toBe(px);
+      expect(pxToTick(tickToPx(TICKS_PER_BAR + PPQ, px), px)).toBeCloseTo(TICKS_PER_BAR + PPQ);
+    }
+  });
+
+  it('thins the bar labels by powers of two as the zoom narrows the bars', () => {
+    expect(rulerLabelEvery(SONG_VIEW.pxPerBar)).toBe(1);
+    expect(rulerLabelEvery(SONG_VIEW.maxPxPerBar)).toBe(1);
+    const every = rulerLabelEvery(SONG_VIEW.minPxPerBar);
+    expect(every * SONG_VIEW.minPxPerBar).toBeGreaterThanOrEqual(SONG_VIEW.minLabelPx);
+    expect((every / 2) * SONG_VIEW.minPxPerBar).toBeLessThan(SONG_VIEW.minLabelPx);
+    expect(rulerLabelEvery(0)).toBe(1);
+  });
+});
+
+describe('a block at the widest zoom-out (minPxPerBar)', () => {
+  const MIN = SONG_VIEW.minPxPerBar;
+
+  it('keeps a one-beat event visible and hittable', () => {
+    const beat = blockBox(3 * TICKS_PER_BAR, PPQ, MIN);
+    expect(beat.widthPx).toBe(MIN_BLOCK_PX);
+    expect(beat.leftPx).toBe(3 * MIN);
+    expect(blockHitAt(beat, beat.leftPx + beat.widthPx / 2)).toBe('body');
+    expect(blockHitAt(beat, beat.leftPx)).toBe('start');
+    expect(blockHitAt(beat, beat.leftPx + beat.widthPx)).toBe('end');
+  });
+
+  it('gives a one-bar region a movable centre between its two edge bands', () => {
+    const bar = blockBox(TICKS_PER_BAR, TICKS_PER_BAR, MIN);
+    const { leftPx, widthPx } = bar;
+    expect(edgeBandPx(widthPx)).toBeLessThan(widthPx / 2);
+    expect(blockHitAt(bar, leftPx)).toBe('start');
+    expect(blockHitAt(bar, leftPx + widthPx / 2)).toBe('body');
+    expect(blockHitAt(bar, leftPx + widthPx)).toBe('end');
+    expect(blockHitAt(bar, leftPx - 1)).toBeNull();
+    expect(blockHitAt(bar, leftPx + widthPx + 1)).toBeNull();
+  });
+
+  it('picks the block drawn on top where a widened block overlaps the next', () => {
+    const boxes = [blockBox(0, PPQ, MIN), blockBox(PPQ, PPQ, MIN)];
+    const second = boxes[1];
+    expect(second).toBeDefined();
+    expect(hitBlocks(boxes, (second?.leftPx ?? 0) + 1)?.index).toBe(1);
+    expect(hitBlocks(boxes, 0.5)?.index).toBe(0);
+    expect(hitBlocks(boxes, 100)).toBeNull();
+  });
+
+  it('hits a one-beat region and a one-beat harmony block at their drawn right edge, for resize', () => {
+    // Both lanes draw through blockBox; a narrow block drops its padding, so it is drawn exactly this wide.
+    const region = blockBox(2 * TICKS_PER_BAR, PPQ, MIN);
+    const chord = blockBox(5 * TICKS_PER_BAR + PPQ, PPQ, MIN);
+    for (const box of [region, chord]) {
+      expect(isNarrowBlock(box.widthPx)).toBe(true);
+      const right = box.leftPx + box.widthPx;
+      expect(blockHitAt(box, right)).toBe('end');
+      expect(blockHitAt(box, right - 0.5)).toBe('end');
+      expect(hitBlocks([box], right)).toEqual({ index: 0, hit: 'end' });
+    }
+  });
+
+  it('draws a narrow block without the padding the CSS gives a full one', () => {
+    const css = readFileSync(new URL('./console.css', import.meta.url), 'utf8');
+    const rule = (selector: string): string =>
+      new RegExp(`\\n${selector.replace(/\./g, '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+    const values = (body: string, prop: string): string[] =>
+      (new RegExp(`\\n\\s*${prop}: ([^;]*);`).exec(body)?.[1] ?? '').split(/\s+/);
+    for (const block of ['.reg', '.hblk']) {
+      const full = rule(block);
+      // `padding: <vertical> <horizontal>`, `border: <width> solid <colour>`.
+      const padding = parseFloat(values(full, 'padding')[1] ?? '');
+      const border = parseFloat(values(full, 'border')[0] ?? '');
+      expect(2 * padding + 2 * border, block).toBe(NARROW_BLOCK_PX);
+      expect(rule(`${block}.narrow`), block).toMatch(/padding: 0;/);
+    }
+    expect(MIN_BLOCK_PX).toBeLessThan(NARROW_BLOCK_PX);
+    expect(isNarrowBlock(blockBox(0, TICKS_PER_BAR, SONG_VIEW.pxPerBar).widthPx)).toBe(false);
+  });
+
+  it('keeps the full edge band on a wide block at the default zoom', () => {
+    const bar = blockBox(0, TICKS_PER_BAR, SONG_VIEW.pxPerBar);
+    expect(edgeBandPx(bar.widthPx)).toBe(REGION_EDGE_PX);
+    expect(blockHitAt(bar, REGION_EDGE_PX - 1)).toBe('start');
+    expect(blockHitAt(bar, REGION_EDGE_PX + 1)).toBe('body');
   });
 });
 

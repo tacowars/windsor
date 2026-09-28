@@ -26,13 +26,14 @@ import {
 import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
 import {
-  BLOCK_GAP_PX,
   CYCLE_TICKS,
   LANE_TONE,
-  REGION_EDGE_PX,
   REGION_SUMMARY,
   SONG_DRAG_THRESHOLD_PX,
+  blockBox,
   forKind,
+  hitBlocks,
+  isNarrowBlock,
   pxToTick,
   tickToPx,
 } from './songViewTables';
@@ -79,9 +80,12 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   const tone = LANE_TONE[part.sequencer.kind];
   const cycle = forKind(CYCLE_TICKS, part.sequencer);
   const node = el('div', `reg${tone === 'perc' ? ' perc' : ''}${cycle ? ' cyc' : ''}`);
-  node.style.left = `${tickToPx(region.start)}px`;
-  node.style.width = `${tickToPx(region.duration) - BLOCK_GAP_PX}px`;
-  if (cycle) node.style.setProperty('--cyc', `${tickToPx(cycle)}px`);
+  const px = view.state.pxPerBar;
+  const box = blockBox(region.start, region.duration, px);
+  node.style.left = `${box.leftPx}px`;
+  node.style.width = `${box.widthPx}px`;
+  node.classList.toggle('narrow', isNarrowBlock(box.widthPx));
+  if (cycle) node.style.setProperty('--cyc', `${tickToPx(cycle, px)}px`);
   const mark = regionMark(part.regions, view.songTicks());
   const glyph = el('span', 'gl', mark);
   glyph.title = mark === '∞' ? 'whole song: free-running' : 'restarts on entry';
@@ -98,16 +102,22 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
 type Gesture =
   { kind: 'add' } | { kind: 'move' | 'resizeStart' | 'resizeEnd'; index: number; grab: number };
 
-/** What a press at `tick` on the lane starts: a new region in a gap, or an edge or body drag of the region under it. */
-function gestureAt(regions: readonly Region[], tick: number): Gesture {
-  const index = regionAt(regions, tick);
-  const region = regions[index];
-  if (!region) return { kind: 'add' };
-  const edge = pxToTick(REGION_EDGE_PX);
-  const grab = tick - region.start;
-  if (grab < edge) return { kind: 'resizeStart', index, grab };
-  if (tick > region.start + region.duration - edge) return { kind: 'resizeEnd', index, grab };
-  return { kind: 'move', index, grab };
+const HIT_GESTURE = { start: 'resizeStart', end: 'resizeEnd', body: 'move' } as const;
+
+/**
+ * What a press `px` into the lane starts: a new region in a gap, or an edge
+ * or body drag of the drawn block under it — classified on the drawn boxes
+ * (`hitBlocks`), so a block widened to its minimum is hit where it shows.
+ */
+function gestureAt(regions: readonly Region[], px: number, pxPerBar: number): Gesture {
+  const found = hitBlocks(
+    regions.map((r) => blockBox(r.start, r.duration, pxPerBar)),
+    px,
+  );
+  const region = found ? regions[found.index] : undefined;
+  if (!found || !region) return { kind: 'add' };
+  const grab = pxToTick(px, pxPerBar) - region.start;
+  return { kind: HIT_GESTURE[found.hit], index: found.index, grab };
 }
 
 /** The regions a drag of `gesture` to `tick` previews or commits. */
@@ -141,8 +151,8 @@ function paintRegions(
 }
 
 function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
-  const tickAt = (e: PointerEvent): number =>
-    pxToTick(e.clientX - lane.getBoundingClientRect().left);
+  const pxAt = (e: PointerEvent): number => e.clientX - lane.getBoundingClientRect().left;
+  const tickAt = (e: PointerEvent): number => pxToTick(pxAt(e), view.state.pxPerBar);
   const current = (): MusicPart =>
     view.ctx.model.doc.parts.find((p) => p.slot === part.slot) ?? part;
   let gesture: Gesture = { kind: 'add' };
@@ -164,7 +174,7 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   pointerDrag(lane, {
     accept: (e) => {
       if (e.altKey) return false;
-      gesture = gestureAt(current().regions, tickAt(e));
+      gesture = gestureAt(current().regions, pxAt(e), view.state.pxPerBar);
       draft = null;
       return true;
     },
