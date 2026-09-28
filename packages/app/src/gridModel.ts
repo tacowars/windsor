@@ -5,7 +5,7 @@
  * function returns a new list; the card writes it through `ctx.change`, where
  * arrays replace wholesale.
  */
-import type { Harmony, GridNoteStep, GridStep, GridStepKind } from '@windsor/engine';
+import type { Harmony, GridNoteStep, GridStep, GridStepKind, StepModLane } from '@windsor/engine';
 import {
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
@@ -71,13 +71,25 @@ export function stepsForLength(steps: readonly GridStep[], length: number): Grid
  * are. The card's Rotate knob applies the difference since its last value, so
  * the document holds the rotated list and no offset.
  */
-export function rotateSteps(steps: readonly GridStep[], by: number, length: number): GridStep[] {
+export function rotateSteps<T>(steps: readonly T[], by: number, length: number): T[] {
   const n = Math.max(1, Math.min(Math.trunc(length), steps.length));
   const shift = ((Math.trunc(by) % n) + n) % n;
   if (shift === 0) return [...steps];
   const loop = steps.slice(0, n);
   const rotated = loop.map((_, i) => loop[(i - shift + n) % n] ?? loop[0]!);
   return [...rotated, ...steps.slice(n)];
+}
+
+/**
+ * The modulation lanes turned with the steps (windsor#31): a lane value
+ * belongs to its step, like a parameter lock, so Rotate carries it along.
+ */
+export function rotateLanes(
+  lanes: readonly StepModLane[],
+  by: number,
+  length: number,
+): StepModLane[] {
+  return lanes.map((lane) => ({ ...lane, values: rotateSteps(lane.values, by, length) }));
 }
 
 /** A uniform draw in [0, 1); the card passes `Math.random`, a test passes its own. */

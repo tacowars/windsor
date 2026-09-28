@@ -11,6 +11,7 @@ import {
   foldedView,
   keySignature,
   randomSteps,
+  rotateLanes,
   rotateSteps,
   setDegree,
   stepLabel,
@@ -119,5 +120,15 @@ describe('grid step operations (#603)', () => {
     // Degree 6 in five degrees: degree 1 (D#) one octave up.
     expect(stepLabel(gridNote(6), PENTA)).toBe('D#+1');
     expect(stepLabel(gridNote(6, { octave: -1 }), PENTA)).toBe('D#');
+  });
+});
+
+describe('lanes turn with the steps (windsor#31)', () => {
+  it('rotates each lane over the loop and leaves the values past it in place', () => {
+    const lanes = [{ param: 'filter.cutoff' as const, values: [0.1, 0.2, 0.3, 0.4, 0.9] }];
+    expect(rotateLanes(lanes, 1, 4)).toEqual([
+      { param: 'filter.cutoff', values: [0.4, 0.1, 0.2, 0.3, 0.9] },
+    ]);
+    expect(rotateLanes(lanes, -1, 4)[0]!.values).toEqual([0.2, 0.3, 0.4, 0.1, 0.9]);
   });
 });
