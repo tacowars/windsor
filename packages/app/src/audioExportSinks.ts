@@ -18,9 +18,6 @@ interface SaveFilePickerOptions {
   types?: { description: string; accept: Record<string, string[]> }[];
 }
 
-/** Chrome's handle can delete itself; the spec's cannot yet. */
-type RemovableFileHandle = FileSystemFileHandle & { remove?: () => Promise<void> };
-
 declare global {
   interface Window {
     showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<FileSystemFileHandle>;
@@ -49,11 +46,17 @@ export function downloadSink(fileName: string): WavSink {
 
 /**
  * Ask where to save, inside the click (the picker needs its user activation,
- * and a render can outlast it). Null when the user closes the picker. A
- * cancelled render removes the file the picker may already have created.
+ * and a render can outlast it). Null when the user closes the picker.
+ *
+ * The picked file is never removed: it may be one the user already had, and
+ * nothing proves it new. The file is opened for writing only once the whole
+ * WAV is encoded, and a writable stream keeps the old contents until it
+ * closes, so a failed write is aborted and the file is left as it was. A
+ * cancel before that point never touches the file (a browser that creates an
+ * empty file on picking a new name leaves that empty file).
  */
 export async function pickSaveSink(fileName: string): Promise<WavSink | null> {
-  let handle: RemovableFileHandle;
+  let handle: FileSystemFileHandle;
   try {
     handle = await window.showSaveFilePicker!({
       id: WAV_SAVE_PICKER_ID,
@@ -68,11 +71,14 @@ export async function pickSaveSink(fileName: string): Promise<WavSink | null> {
     where: `${handle.name}, where you chose`,
     write: async (bytes) => {
       const writable = await handle.createWritable();
-      await writable.write(bytes as Uint8Array<ArrayBuffer>);
-      await writable.close();
+      try {
+        await writable.write(bytes as Uint8Array<ArrayBuffer>);
+        await writable.close();
+      } catch (error) {
+        await writable.abort().catch(() => undefined);
+        throw error;
+      }
     },
-    discard: async () => {
-      await handle.remove?.();
-    },
+    discard: () => Promise.resolve(),
   };
 }

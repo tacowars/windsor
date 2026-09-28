@@ -23,6 +23,14 @@ export class FakeOfflineContext extends FakeContext {
   readonly length: number;
   /** Every suspend frame asked for, in order: what the render's stops were. */
   readonly suspendFrames: number[] = [];
+  /**
+   * The order things happened in: `module` per `addModule`, `start` when
+   * rendering begins, and whatever a test's worklet stand-in pushes for the
+   * messages it is posted. A real context delivers a port message
+   * asynchronously; this one reads `posted` at once, so a test asserts the
+   * order the render relies on instead.
+   */
+  readonly timeline: string[] = [];
   onNode: ((node: FakeNode) => void) | null = null;
   private readonly pending = new Map<number, () => void>();
   private release: (() => void) | null = null;
@@ -33,6 +41,11 @@ export class FakeOfflineContext extends FakeContext {
     // overrides it on this instance.
     Object.defineProperty(this, 'sampleRate', { value: init.sampleRate });
     this.length = init.length;
+    const addModule = this.audioWorklet.addModule;
+    this.audioWorklet.addModule = (url: string | URL): Promise<void> => {
+      this.timeline.push('module');
+      return addModule(url);
+    };
   }
 
   override register(node: FakeNode): void {
@@ -63,6 +76,7 @@ export class FakeOfflineContext extends FakeContext {
     const left = new Float32Array(blocks * BLOCK);
     const right = new Float32Array(blocks * BLOCK);
     this.state = 'running';
+    this.timeline.push('start');
     for (let b = 0; b < blocks; b++) {
       this.currentTime = (b * BLOCK) / this.sampleRate;
       await this.pauseAt(b * BLOCK);

@@ -12,6 +12,13 @@
  * the transport and releases every held note, then renders the tail so
  * releases and returns ring out.
  *
+ * Notes reach the processors by `postMessage`, which is asynchronous. The
+ * look-ahead is twice the step, so a note posted at a stop sounds at least a
+ * step later, and the context is suspended while the message travels. The
+ * opening window has no such lead: its notes are posted before rendering
+ * starts, so the render waits for a round trip through the audio thread
+ * (`drainPostedMessages`) before it calls `startRendering()`.
+ *
  * The scheduler places tick 0 `SCHEDULER_START_DELAY_SECONDS` after the start
  * of the context; that lead-in is rendered and trimmed, so bar 1 is the file's
  * first sample and every note lands on the frame it lands on live.
@@ -45,6 +52,7 @@ import {
 export interface OfflineContextLike {
   readonly sampleRate: number;
   readonly currentTime: number;
+  readonly audioWorklet: { addModule(url: string): Promise<void> };
   suspend(suspendTime: number): Promise<void>;
   resume(): Promise<void>;
   startRendering(): Promise<AudioBuffer>;
@@ -190,12 +198,29 @@ async function drive(
     });
   };
   pump();
+  // The opening window's notes are posted before rendering starts, and an
+  // offline context outruns an asynchronous postMessage
+  // (`ProcessorOptions.events`): wait until the audio thread has taken them.
+  await drainPostedMessages(context);
   const first = plan.nextStop(0, RENDER_STEP_SECONDS);
   if (first !== null) stopAt(first);
   const buffer = await Promise.race([context.startRendering(), aborted]);
   onProgress?.(1);
   return buffer;
 }
+
+/**
+ * A round trip through the audio thread: an empty module, evaluated as a task
+ * on the worklet thread queued behind every port message already posted to
+ * it. Its URL is new each time, because a module map caches by URL.
+ */
+async function drainPostedMessages(context: OfflineContextLike): Promise<void> {
+  barrierCount += 1;
+  await context.audioWorklet.addModule(
+    `data:text/javascript,${encodeURIComponent(`// windsor render barrier ${barrierCount}`)}`,
+  );
+}
+let barrierCount = 0;
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw abortError();

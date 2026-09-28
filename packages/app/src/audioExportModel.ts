@@ -7,7 +7,8 @@
  * A render cancelled or failed writes nothing: the sink is written only once
  * the whole file is encoded, and a sink opened ahead of the render (the save
  * picker must open inside the click's user activation, long before the render
- * ends) is discarded instead.
+ * ends) is told to discard instead. Discarding releases what the sink holds
+ * and never deletes a file: a picked file may be one the user already had.
  */
 import type {
   ArrangementDocument,
@@ -60,6 +61,7 @@ export interface WavSink {
   /** How the notice names the destination ("your downloads", "the file you chose"). */
   readonly where: string;
   write(bytes: Uint8Array): Promise<void>;
+  /** The run will not write; release anything held. Never deletes a file the user picked. */
   discard(): Promise<void>;
 }
 

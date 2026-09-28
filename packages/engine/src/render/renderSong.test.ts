@@ -42,6 +42,12 @@ class RecordingWorkletNode extends FakeWorkletNode {
       // A tone per engine part, the same for the live and the offline graph.
       const index = built.length;
       this.feed = noteToneFeed(this, 200 + 173 * (index % 8));
+      const post = this.port.postMessage;
+      this.port.postMessage = (message: unknown): void => {
+        const timeline = (context as Partial<FakeOfflineContext>).timeline;
+        timeline?.push(`post:${String((message as { type?: string }).type)}`);
+        post(message);
+      };
     }
   }
 }
@@ -53,7 +59,8 @@ beforeAll(() => {
 });
 afterAll(() => restore());
 
-const RATE = 48000;
+/** Low enough to keep the headless renders cheap on CI; the tail test covers the shipped rates. */
+const RATE = 16000;
 
 function offline(
   document: ArrangementDocument,
@@ -77,6 +84,7 @@ function offline(
 async function liveRender(document: ArrangementDocument, seconds: number): Promise<Float32Array> {
   built.length = 0;
   const context = new FakeContext();
+  Object.defineProperty(context, 'sampleRate', { value: RATE });
   const system = new AudioSystem(new FmEngine(context.asAudioContext()));
   await system.init();
   system.initMusic(document);
@@ -108,10 +116,12 @@ describe('renderSong', () => {
   });
 
   it('renders the same song twice bit-identically, each part on its own fixed seed', async () => {
-    const first = offline(FULL_DOCUMENT, { tailSeconds: 1 });
+    // A low rate keeps the two renders cheap; what is compared is the same.
+    const cheap = { sampleRate: 8000, tailSeconds: 0.5 };
+    const first = offline(FULL_DOCUMENT, cheap);
     const a = await first.render;
     const seedsA = built.map((b) => b.options.seed);
-    const second = offline(FULL_DOCUMENT, { tailSeconds: 1 });
+    const second = offline(FULL_DOCUMENT, cheap);
     const b = await second.render;
     const seedsB = built.map((entry) => entry.options.seed);
     expect(a.channels[0]).toEqual(b.channels[0]);
@@ -122,6 +132,26 @@ describe('renderSong', () => {
     expect(seedsB).toEqual(seedsA);
     // The stops are identical too: the render is driven, not timed.
     expect(second.contexts[0]!.suspendFrames).toEqual(first.contexts[0]!.suspendFrames);
+  });
+
+  it('delivers the opening notes before rendering starts, so bar 1 beat 1 sounds', async () => {
+    const { render, contexts } = offline(FULL_DOCUMENT, { sampleRate: 8000, tailSeconds: 0 });
+    const rendered = await render;
+    const timeline = contexts[0]!.timeline;
+    const start = timeline.indexOf('start');
+    const opening = timeline.slice(0, start);
+    // Tick 0's notes are posted before rendering, then one round trip
+    // through the audio thread (an empty module) drains them.
+    expect(opening).toContain('post:noteOn');
+    expect(opening.at(-1)).toBe('module');
+    expect(opening.lastIndexOf('post:noteOn')).toBeLessThan(opening.lastIndexOf('module'));
+    const lead = Math.round(SCHEDULER_START_DELAY_SECONDS * 8000);
+    const tickZero = built.flatMap((b) =>
+      b.node.posted.filter((m) => (m as { type?: string; frame?: number }).frame === lead),
+    );
+    expect(tickZero.length).toBeGreaterThan(0);
+    // The kick is on the downbeat: the file's first block already sounds.
+    expect(rendered.channels[0]!.subarray(0, 128).some((sample) => sample !== 0)).toBe(true);
   });
 
   it('leaves live parts unseeded', async () => {

@@ -51,8 +51,8 @@ const DESTINATION_LABELS: Record<ExportDestination, string> = {
 export function audioExportSection(ctx: AppCtx, songName: () => string): HTMLElement {
   const { root, body } = section(
     'Export Audio',
-    'Renders the whole song offline, faster than real time, through the same engine as ' +
-      'playback, then writes a stereo WAV. The tail keeps rendering after the last bar so ' +
+    'Renders the whole song offline through the same engine as playback, then writes a ' +
+      'stereo WAV. The tail keeps rendering after the last bar so ' +
       'releases and returns ring out; a tail of 0 gives a loop-ready file.',
   );
   const formats = el('div', 'bar-row');
