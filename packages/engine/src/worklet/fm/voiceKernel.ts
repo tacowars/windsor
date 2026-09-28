@@ -256,18 +256,21 @@ function renderVoiceKernel(
     if (carD) sig += oD * aD;
     sig *= gain;
 
+    if (mode !== FILT_OFF) {
+      if (drive !== 1) sig = softClip(sig * drive);
+      sig = voice.svfA.process(sig, mode);
+      if (slope24) sig = voice.svfB.process(sig, mode);
+    }
+
+    // The steal fade comes after the filter, so the voice reaches 0 at the
+    // filter's output: a fade before it left a low cutoff ringing, and the
+    // kill at the fade's end cut that tail to 0 in one sample (windsor#7).
     if (fadeInc !== 0) {
       fade += fadeInc;
       if (fade <= 0) {
         fade = 0;
       }
       sig *= fade;
-    }
-
-    if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
-      sig = voice.svfA.process(sig, mode);
-      if (slope24) sig = voice.svfB.process(sig, mode);
     }
 
     const k = off + s;

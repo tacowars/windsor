@@ -335,10 +335,26 @@ class Voice {
       if (env.p!.endLevel !== 0) return false;
       if (Math.abs(this.amp[i]) > DORMANT_AMP) return false;
     }
+    return this.filterQuiet;
+  }
+
+  /** The filter is off, or has stopped ringing: both stages under the dormancy floor (#547). */
+  get filterQuiet(): boolean {
     const f = this.patch!.filter;
     if (f.mode === FILT_OFF) return true;
     if (!Svf.quiet(this.svfA)) return false;
     return !f.slope24 || Svf.quiet(this.svfB);
+  }
+
+  /**
+   * After a render: a released voice ends once nothing is left to hear
+   * (`finished`), and one whose envelopes ended at a held End level fades out
+   * with `steal` instead (windsor#7). A gated or fading voice is left alone.
+   */
+  settle(): void {
+    if (this.gate || this.fadeInc !== 0) return;
+    if (this.finished) this.active = false;
+    else if (this.holdsEndLevel) this.steal();
   }
 
   /** A voice that is fading out is no longer available, but still sounding. */
@@ -346,12 +362,38 @@ class Voice {
     return this.fadeInc !== 0;
   }
 
+  /**
+   * Nothing left to hear: every carrier's envelope has ended, its amplitude
+   * ramp has reached ~0 and the filter has stopped ringing. Ending a voice on
+   * the envelopes alone skipped the last ramp and cut a resonant filter's
+   * ring to 0 in one sample, the click at the end of a stop's release
+   * (windsor#7).
+   */
   get finished(): boolean {
     const carriers = this.alg.carriers;
     for (let i = 0; i < carriers.length; i++) {
-      if (!this.ampEnv[carriers[i]].finished) return false;
+      const c = carriers[i];
+      if (!this.ampEnv[c].finished) return false;
+      if (Math.abs(this.amp[c]) > DORMANT_AMP) return false;
     }
-    return true;
+    return this.filterQuiet;
+  }
+
+  /**
+   * Every carrier's envelope has ended, and at least one ended above 0 (an
+   * End level): the voice holds that level for good and never goes quiet, so
+   * the part fades it out with `steal` rather than waiting on it or cutting
+   * it (windsor#7). Reads the envelopes, not the amplitude ramps.
+   */
+  get holdsEndLevel(): boolean {
+    const carriers = this.alg.carriers;
+    let holds = false;
+    for (let i = 0; i < carriers.length; i++) {
+      const env = this.ampEnv[carriers[i]];
+      if (!env.finished) return false;
+      if (Math.abs(env.value) > DORMANT_AMP) holds = true;
+    }
+    return holds;
   }
 
   /** Control-rate update, `voiceControl.js`: envelopes, LFO, glide, ramps, filter coefficients. */

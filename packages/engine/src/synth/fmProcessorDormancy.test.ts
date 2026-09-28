@@ -28,6 +28,10 @@ const DECAY_S = 0.05;
 /** Well past DECAY_S, so the carrier has settled in sustain at 0. */
 const SETTLE_S = 0.4;
 const HOLD_S = 1;
+/** Past any release this file's patches use, so a held end level has had its chance to end. */
+const END_LEVEL_TAIL_S = 2;
+/** The click threshold of `__fixtures__/voiceClicks.test.ts` (windsor#7). */
+const CLICK_THRESHOLD = 0.05;
 const TAIL_S = 1.5;
 
 interface VoiceState {
@@ -242,6 +246,30 @@ describe('allocation and note-off', () => {
     expect(after.wasDormant).toBe(false);
     expect(after.off.peak).toBeGreaterThan(0);
     expect(after.off.samples).toEqual(before.off.samples);
+  });
+
+  it('fades out a voice whose release ends at a held end level, then frees it (windsor#7)', () => {
+    // The release settles at 0.5 and would hold it for good: past the release
+    // the part fades the voice with the 4 ms steal instead of holding a slot
+    // forever or cutting it to 0 in one sample.
+    const patch = pluck({
+      ops: [{ level: 1, env: { decayTime: DECAY_S, sustainLevel: 0, endLevel: 0.5 } }],
+      pitchEnv: { initLevel: 1, attackTime: 2, peakLevel: 0, sustainLevel: 0 },
+      pitchEnvAmount: 1,
+    });
+    const processor = loaded.create(patch, 8);
+    render(loaded, processor, blocksFor(SETTLE_S), [noteOn(1)]);
+    const off = render(loaded, processor, blocksFor(END_LEVEL_TAIL_S), [
+      { type: 'noteOff', id: 1, frame: 0 },
+    ]);
+    expect(off.peak).toBeGreaterThan(0);
+    expect(activeVoices(processor)).toHaveLength(0);
+    let largest = 0;
+    for (let i = 1; i < off.samples.length / 2; i++) {
+      const step = Math.abs((off.samples[i * 2] ?? 0) - (off.samples[(i - 1) * 2] ?? 0));
+      if (step > largest) largest = step;
+    }
+    expect(largest).toBeLessThan(CLICK_THRESHOLD);
   });
 
   it('wakes on a live retune that raises the sustain, ramping up without a step', () => {
