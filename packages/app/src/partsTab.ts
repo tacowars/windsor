@@ -59,6 +59,11 @@ const GRID_HTML = `
         <div class="knob-row" id="lfoKnobs"></div>
       </div>
       <div class="section">
+        <div class="section-title"><span>LFO 2</span></div>
+        <div class="seg-slot" id="lfo2Shape" style="margin-bottom: 8px"></div>
+        <div class="knob-row" id="lfo2Knobs"></div>
+      </div>
+      <div class="section">
         <div class="section-title"><span>Pitch Env</span></div>
         <canvas class="env-canvas" id="pitchEnvCanvas" width="500" height="92"></canvas>
         <div class="knob-row" id="pitchKnobs" style="margin-top: 6px"></div>
@@ -115,7 +120,8 @@ function refreshPatchUi(editor: PatchEditor): void {
   buildGlobal(editor);
   buildBays(editor);
   buildFilter(editor);
-  buildLfo(editor);
+  buildLfo(editor, 'lfo');
+  buildLfo(editor, 'lfo2');
   buildPitch(editor);
 }
 

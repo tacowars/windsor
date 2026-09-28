@@ -1,5 +1,13 @@
 /** The four operator bays of the Parts tab (#70, ported); the knob specs are `patchKnobTables.ts`. */
-import { ALGORITHMS, LOOP_MODE_NAMES, OP_NAMES, WAVE_NAMES } from '@windsor/engine';
+import type { Patch } from '@windsor/engine';
+import {
+  ALGORITHMS,
+  LOOP_MODE_NAMES,
+  OP_NAMES,
+  WAVE,
+  WAVE_NAMES,
+  WIDTH_RANGE,
+} from '@windsor/engine';
 import { CARRIER_COLOR, MOD_COLOR } from './consoleColors';
 import { $, el, html, seg } from './dom';
 import { drawEnv } from './envCanvas';
@@ -7,11 +15,27 @@ import { attachEnvelopeDrag } from './envelopeDrag';
 import { envAdvKnobs, envKnobs } from './envelopeKnobs';
 import { opEnvelopeSlot } from './envelopeTransfer';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
+import type { KnobElement } from './knob';
 import { FIXED_HZ_KNOB, OP_KNOBS, patchKnobOpts } from './patchKnobTables';
 import { BAY_SILENT_LEVEL } from './patchPanelConstants';
 import type { PatchEditor } from './partsSession';
 import { pathKnob } from './patchPath';
 import { ratioControls, showPitchControls } from './ratioKnobs';
+
+/** The duty a Pulse starts at: a square. At the default width 1 the two saws cancel to silence. */
+const PULSE_START_WIDTH = 0.5;
+
+/**
+ * Seed a Pulse operator's duty, the way `ensureUserPartials` seeds a User
+ * wave: an operator switched to Pulse at full width gets a square, and one
+ * whose width was already moved keeps it. Switching away leaves width alone.
+ */
+export function ensurePulseWidth(patch: Patch, i: number): void {
+  const target = patch.ops[i];
+  if (target?.wave === WAVE.PULSE && target.width >= WIDTH_RANGE.max) {
+    target.width = PULSE_START_WIDTH;
+  }
+}
 
 function op(editor: PatchEditor, i: number): { level: number; wave: number; fixed: boolean } {
   return editor.patch.ops[i] ?? { level: 0, wave: 0, fixed: false };
@@ -55,6 +79,7 @@ function waveAndPitchLine(
     const target = editor.patch.ops[i];
     if (target) target.wave = Number(waveSel.value);
     ensureUserPartials(editor.patch, i);
+    ensurePulseWidth(editor.patch, i);
     editor.push();
     onWave();
   };
@@ -112,7 +137,7 @@ function mainKnobRow(
   i: number,
   color: string,
   syncActive: () => void,
-): { root: HTMLElement; syncPitch: () => void } {
+): { root: HTMLElement; syncPitch: () => void; syncKnobs: () => void } {
   const row = el('div', 'knob-row');
   const ratioNodes = ratioControls(editor, i, color);
   for (const node of ratioNodes) row.appendChild(node);
@@ -129,7 +154,11 @@ function mainKnobRow(
   }
   const syncPitch = (): void => showPitchControls(op(editor, i).fixed, ratioNodes, fixedNode);
   syncPitch();
-  return { root: row, syncPitch };
+  // A wave switch can seed Width (`ensurePulseWidth`), so the row re-reads the patch.
+  const syncKnobs = (): void => {
+    for (const knob of row.querySelectorAll<KnobElement>('.knob')) knob.refresh();
+  };
+  return { root: row, syncPitch, syncKnobs };
 }
 
 /** The bay's body and its Adv row, which the head's button toggles. */
@@ -142,7 +171,11 @@ function bayBody(
   const body = el('div', 'bay-body');
   const harmonics = harmonicEditor(editor, i, color);
   const knobs = mainKnobRow(editor, i, color, syncActive);
-  body.appendChild(waveAndPitchLine(editor, i, harmonics.sync, knobs.syncPitch));
+  const onWave = (): void => {
+    harmonics.sync();
+    knobs.syncKnobs();
+  };
+  body.appendChild(waveAndPitchLine(editor, i, onWave, knobs.syncPitch));
   body.appendChild(harmonics.root);
   body.appendChild(knobs.root);
 
