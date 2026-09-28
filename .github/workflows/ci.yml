@@ -1,7 +1,13 @@
 # Every pull request and every push to main runs the same gate as
-# `npm run verify` locally. A push to main that passes also publishes the
-# built console to GitHub Pages. PR jobs never hold a write-capable token:
-# only the deploy job, which runs on main alone, is granted Pages writes.
+# `npm run verify` locally. The site is served by GitHub Pages from the
+# `gh-pages` branch: a push to main that passes publishes the build to the
+# branch root, and a code PR from this repo publishes its build to
+# `pr-preview/pr-<N>/` (docs/log/2026-09-28-pr-previews-on-github-pages.md).
+#
+# The security boundary: `verify` checks out and runs the PR's code with a
+# read-only token and hands the build over as a workflow artifact. The jobs
+# that hold a write token (`deploy`, `preview`, `preview-remove`) never check
+# out or run the PR's code: they download that artifact and push files.
 name: build
 
 on:
@@ -10,8 +16,10 @@ on:
     paths-ignore: ['docs/**', '.claude/**', '**/*.md']
   # Every PR runs the workflow so the required `verify` check always
   # reports; a docs-only PR skips the heavy steps and passes in seconds.
+  # `closed` only removes the PR's preview.
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, closed]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +31,10 @@ concurrency:
 
 jobs:
   verify:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
     steps:
       - uses: actions/checkout@v4
       - name: Never-track guard
@@ -56,26 +67,96 @@ jobs:
         run: npm ci --no-audit --fund=false
       - if: steps.changes.outputs.code == 'true'
         run: npm run verify
-      # verify ends with `vite build`; its relative base serves from the
-      # project-site path (/windsor/) without a rebuild.
-      - if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: actions/upload-pages-artifact@v4
+      # verify ends with `vite build`; its relative base serves the same
+      # dist/ from the site root and from any pr-preview/pr-<N>/ folder.
+      - if: steps.changes.outputs.code == 'true'
+        uses: actions/upload-artifact@v4
         with:
+          name: site
           path: packages/app/dist
+          retention-days: 7
 
+  # main's build goes to the root of `gh-pages`, keeping every open PR's
+  # preview under pr-preview/.
   deploy:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
+      contents: write
     concurrency:
-      group: pages
+      group: gh-pages-main
       cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+      # Pages would otherwise run Jekyll over the branch, which drops any
+      # file whose name starts with `_`.
+      - run: touch site/.nojekyll
+      # The deploy action needs a git repository in the workspace to build
+      # its worktree in; an empty one keeps any source out of this job.
+      - name: Seed an empty repository
+        run: |
+          git init -q
+          git -c user.name=ci -c user.email=ci@localhost commit -q --allow-empty -m seed
+      - uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445 # v4.9.0
+        with:
+          branch: gh-pages
+          folder: site
+          clean: true
+          clean-exclude: pr-preview/
+          # Rebase onto a concurrent preview push instead of overwriting it.
+          force: false
+
+  # A code PR from this repo gets its build at pr-preview/pr-<N>/ and a
+  # sticky comment with the URL. Forks and docs-only PRs get neither.
+  preview:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.verify.outputs.code == 'true'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+      - name: Seed an empty repository
+        run: |
+          git init -q
+          git -c user.name=ci -c user.email=ci@localhost commit -q --allow-empty -m seed
+      - uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1.8.1
+        with:
+          action: deploy
+          source-dir: site
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          qr-code: 'false'
+
+  # Closing or merging the PR deletes its preview folder.
+  preview-remove:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Seed an empty repository
+        run: |
+          git init -q
+          git -c user.name=ci -c user.email=ci@localhost commit -q --allow-empty -m seed
+      - uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1.8.1
+        with:
+          action: remove
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          qr-code: 'false'
