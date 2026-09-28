@@ -148,4 +148,51 @@ describe('the swung clock (windsor#14)', () => {
       }
     }
   });
+
+  it('keeps the accumulated seconds through a swing edit mid-pair, a pause and a resume', () => {
+    const clock = { currentTime: 0 };
+    const scheduler = new Scheduler(clock, { bpm: 120, lookAhead: 0 });
+    const seconds: number[] = [];
+    scheduler.subscribe(1, (e) => seconds.push(e.seconds));
+    scheduler.start();
+    const spt = scheduler.transport.secondsPerTick;
+    const runTo = (ticks: number): void => {
+      while (seconds.length < ticks) {
+        clock.currentTime += 0.001;
+        scheduler.update();
+      }
+    };
+    runTo(7); // ticks 0–6 straight
+    scheduler.swing = HARD; // mid-pair: ticks 7–11 at 75%
+    runTo(12);
+    const resumeAt = scheduler.transport.currentTick;
+    const accumulated = scheduler.transport.transportSeconds;
+    scheduler.stop();
+    clock.currentTime += 1;
+    scheduler.start(resumeAt);
+    runTo(seconds.length + 1);
+    const next = seconds[resumeAt]!;
+    expect(next).toBe(accumulated);
+    // Ticks 0–6 straight and the rest of their pair at 75%, not 75% from tick 0.
+    const expected = 7 + 5 * 0.5;
+    expect(seconds[12]! / spt).toBeCloseTo(expected + (resumeAt - 12) * 1.5, 9);
+    // A start at another tick is a seek: recomputed under the current swing.
+    scheduler.stop();
+    scheduler.start(30);
+    expect(scheduler.transport.transportSeconds).toBeCloseTo(33 * spt, 12);
+  });
+
+  it('clamps an out-of-range swing at the scheduler, in the options and the setter', () => {
+    const over = new Scheduler({ currentTime: 0 }, { swing: { amount: 100, grid: 16 } });
+    expect(over.swing).toEqual({ amount: 75, grid: 16 });
+    over.swing = { amount: 140, grid: 8 };
+    expect(over.swing).toEqual({ amount: 75, grid: 8 });
+    over.swing = { amount: 49, grid: 16 };
+    expect(over.swing).toEqual({ amount: 50, grid: 16 });
+    const under = new Scheduler({ currentTime: 0 }, { swing: { amount: -20, grid: 8 } });
+    expect(under.swing).toEqual({ amount: 50, grid: 8 });
+    // At the hardest playable amount every tick still moves forward.
+    over.swing = { amount: 100, grid: 16 };
+    for (let t = 0; t < 24; t++) expect(over.transport.intervalSeconds(t)).toBeGreaterThan(0);
+  });
 });

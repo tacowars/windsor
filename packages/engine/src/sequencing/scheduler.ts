@@ -33,7 +33,7 @@ import {
   SECONDS_PER_MINUTE,
   TICK_STAMP_EPSILON,
 } from '../audioConstants';
-import { swingSlope, swingTicks, unswingTicks } from './swing';
+import { playableSwing, swingSlope, swingTicks, unswingTicks } from './swing';
 import { TickStamps } from './tickStamps';
 import { STRAIGHT_SWING, SWING_TABLE, type Swing, type SwingTable } from './swingTables';
 
@@ -94,8 +94,7 @@ interface Subscriber {
 /** The pure tick counter and fan-out. No clock of its own; `advance` is called per tick. */
 export class TickTransport implements TickSource {
   bpm: number;
-  /** The song's swing (windsor#14): read per tick, so a live edit lands on the next one. */
-  swing: Swing;
+  private playing: Swing;
   private tick = 0;
   private seconds = 0;
   private subscribers: Subscriber[] = [];
@@ -106,7 +105,20 @@ export class TickTransport implements TickSource {
     private readonly swingTable: SwingTable = SWING_TABLE,
   ) {
     this.bpm = bpm;
-    this.swing = swing;
+    this.playing = playableSwing(swing, swingTable);
+  }
+
+  /**
+   * The song's swing (windsor#14): read per tick, so a live edit lands on the
+   * next one. Clamped through `playableSwing` on the way in, so no caller can
+   * hand the clock an amount that collapses or reverses a tick.
+   */
+  get swing(): Swing {
+    return this.playing;
+  }
+
+  set swing(value: Swing) {
+    this.playing = playableSwing(value, this.swingTable);
   }
 
   get secondsPerTick(): number {
@@ -258,10 +270,16 @@ export class Scheduler implements TickSource {
     return Math.max(0, Math.min(newest, Math.floor(tick + TICK_STAMP_EPSILON)));
   }
 
+  /**
+   * Run from `atTick`. Resuming where the queue stopped keeps the transport's
+   * accumulated seconds: they carry every swing and tempo the song has played
+   * (windsor#14), which a recompute from tick 0 under the current ones would
+   * lose. Only a start at another tick recomputes them.
+   */
   start(atTick = 0): void {
     if (this.running) return;
     this.running = true;
-    this.transport.reset(atTick);
+    if (atTick !== this.transport.currentTick) this.transport.reset(atTick);
     this.stamps.clear(atTick);
     this.nextTime = this.clock.currentTime + SCHEDULER_START_DELAY_SECONDS;
   }

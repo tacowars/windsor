@@ -53,20 +53,27 @@ Pat set the musical decisions on the issue:
    playhead never runs backward while the old queue drains. Before a run's
    first tick sounds, it falls back to counting back from the queue's head
    through the inverse warp.
-5. **In the document, absent stays absent.** `transport.swing` is optional
+5. **A resume keeps the accumulated song time.** `Scheduler.start` at the
+   tick where the queue stopped leaves the transport's seconds alone. Those
+   seconds carry every swing and tempo already played, and the Euclidean
+   LFO reads them. Only a start at another tick (a seek or a stop) recomputes
+   them, under the current swing. `TickTransport` clamps every swing handed
+   to it through `playableSwing`, whether through the constructor, the
+   `Scheduler` options or the setter.
+6. **In the document, absent stays absent.** `transport.swing` is optional
    in the `Transport` type. The normaliser writes it only when the document
    has one. A song from before swing therefore imports and exports byte for
    byte as it came, and plays straight. A present swing has its amount
    clamped to 50–75 and its grid checked against 8|16, and each repair is
    reported as a correction.
-6. **The player always carries a swing.** `ArrangementPlayer` writes
+7. **The player always carries a swing.** `ArrangementPlayer` writes
    straight into its live copy when the document has none, so a live
    partial such as `{ transport: { swing: { amount: 62 } } }` has a field to
    merge into, either field alone. It hands the clock
    `playableSwing(merged.transport.swing)`, which clamps whatever the clock
    could not play. A partial that bypassed the normaliser therefore cannot
    make an interval zero or negative.
-7. **What the app gets.** `@windsor/engine` exports the `Swing` and
+8. **What the app gets.** `@windsor/engine` exports the `Swing` and
    `SwingGrid` types, `STRAIGHT_SWING`, `SWING_AMOUNT_MIN` and
    `SWING_AMOUNT_MAX`, and `SWING_GRIDS`. A live edit is
    `ctx.change({ transport: { swing: { amount, grid } } })`. A reader of a
