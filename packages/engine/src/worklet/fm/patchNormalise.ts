@@ -35,10 +35,11 @@ import {
   WIDTH_RANGE,
 } from './patchDefaults';
 
-/** The patch the voice reads: every field filled, plus the per-operator feedback scratch. */
-export interface WorkletPatch extends Patch {
-  feedbackScratch: Float32Array;
-}
+/**
+ * The patch the voice reads: every field filled. The per-operator feedback
+ * the loops read is the voice's own since windsor#17 (`Voice.opFeedback`).
+ */
+export type WorkletPatch = Patch;
 
 /* ------------------------------------------------------------------ *
  * Patch normalisation
@@ -163,10 +164,7 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
       keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS),
     },
-  } satisfies Patch as WorkletPatch;
-
-  p.feedbackScratch = new Float32Array(OPERATOR_COUNT);
-  for (let i = 0; i < OPERATOR_COUNT; i++) p.feedbackScratch[i] = ops[i].feedback;
+  } satisfies Patch;
   return p;
 }
 

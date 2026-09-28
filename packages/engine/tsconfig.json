@@ -9,9 +9,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": []
   },
-  // Six worklet modules are read by the main thread too (#656): the algorithm
-  // table, the wave ids, the envelope curve, the mode ids, the patch defaults
-  // and the constants they use. They sit under `worklet/fm/`, which is
+  // Eight worklet modules are read by the main thread too (#656): the algorithm
+  // table, the wave ids, the envelope curve, the mode ids, the patch defaults,
+  // the constants they use, and the step modulation table and curve
+  // (windsor#17). They sit under `worklet/fm/`, which is
   // excluded below and checked by its own project, so they are listed here by
   // name and compiled by both — under this project's stricter flags as well.
   "files": [
@@ -20,7 +21,9 @@
     "src/worklet/fm/envelope.ts",
     "src/worklet/fm/fmConstants.ts",
     "src/worklet/fm/modeIds.ts",
-    "src/worklet/fm/patchDefaults.ts"
+    "src/worklet/fm/patchDefaults.ts",
+    "src/worklet/fm/stepModTables.ts",
+    "src/worklet/fm/stepModValue.ts"
   ],
   "include": ["src", "src/**/*.json"],
   "exclude": [

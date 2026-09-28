@@ -15,18 +15,15 @@ describe('patch normalisation', () => {
     expect(p.volume).toBe(0.8);
     expect(p.filter.cutoff).toBe(8000);
     expect(p.lfo.rate).toBe(5);
-    expect(p.feedbackScratch).toBeInstanceOf(Float32Array);
-    expect(p.feedbackScratch).toHaveLength(4);
     expect(normalisePatch(undefined).ops[3].env.sustainLevel).toBe(0.7);
   });
 
-  it('clamps the algorithm, the tone and the feedback, and mirrors feedback into the scratch', () => {
+  it('clamps the algorithm, the tone and the feedback', () => {
     const p = normalisePatch({ algorithm: 99, tone: 0, ops: [{ feedback: 2 }, { feedback: -3 }] });
     expect(p.algorithm).toBe(10);
     expect(p.tone).toBe(0.02);
     expect(p.ops[0].feedback).toBe(1);
     expect(p.ops[1].feedback).toBe(-1);
-    expect(Array.from(p.feedbackScratch)).toEqual([1, -1, 0, 0]);
   });
 
   it("ignores a stray retired key, as a song's format-1 snapshot still carries userKey", () => {

@@ -53,7 +53,8 @@ function restingWidth(kind: number, width: number): number {
 }
 
 /**
- * Operator `i`'s width for this block (#55): its effective width, both LFOs
+ * Operator `i`'s width for this block (#55): its effective width (the
+ * patch's, or the step's — windsor#17), both LFOs
  * added and clamped to WIDTH_RANGE, sets a per-sample ramp to the value the
  * loops read (`restingWidth`), and the mip table: a squeezed wave's segment
  * plays at `freq / width`, so the table is picked for the narrower of the
@@ -72,7 +73,7 @@ function updateOperatorWidth(
   n: number,
 ): void {
   const patch = voice.patch!;
-  const raw = patch.ops[i].width + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
+  const raw = voice.opWidth[i] + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
   const width =
     raw < WIDTH_RANGE.min ? WIDTH_RANGE.min : raw > WIDTH_RANGE.max ? WIDTH_RANGE.max : raw;
   const kind = voice.kind[i];
@@ -150,7 +151,8 @@ function updateVoiceControl(
     const velAmp = 1 - op.velSens + op.velSens * velCurve;
     const keyAmp = specialise ? voice.levelKeyAmp[i] : Math.pow(2, -op.levelKeyScale * keyOffset);
     const lfoAmp = 1 + lfoVal * lfoP.toOp[i] + lfo2Val * lfo2P.toOp[i];
-    const target = env * op.level * op.level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
+    const level = voice.opLevel[i]; // the patch's, or the step's (windsor#17)
+    const target = env * level * level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
 
     voice.ampInc[i] = (target - voice.amp[i]) / n;
   }
@@ -160,16 +162,17 @@ function updateVoiceControl(
   if (f.mode !== FILT_OFF) {
     const fenv = voice.filtEnv.advance(n);
     // The wheel adds to the envelope amount the way it adds to the LFO's
-    // (#586): depth 0 leaves the term exactly as it was.
+    // (#586): depth 0 leaves the term exactly as it was. The amount, cutoff
+    // and resonance are the voice's: the patch's, or the step's (windsor#17).
     const octaves =
-      fenv * (f.envAmount + modWheel * f.modWheelDepth) +
+      fenv * (voice.envAmount + modWheel * f.modWheelDepth) +
       lfoVal * f.lfoAmount +
       f.keyTrack * keyOffset +
       cutoffMod +
       lfo2Val * f.lfo2Amount;
-    const cutoff = f.cutoff * Math.pow(2, octaves);
-    voice.svfA.setCoeffs(cutoff, f.resonance, voice.sr);
-    if (f.slope24) voice.svfB.setCoeffs(cutoff, f.resonance, voice.sr);
+    const cutoff = voice.cutoff * Math.pow(2, octaves);
+    voice.svfA.setCoeffs(cutoff, voice.resonance, voice.sr);
+    if (f.slope24) voice.svfB.setCoeffs(cutoff, voice.resonance, voice.sr);
   }
 
   voice.age += n;
