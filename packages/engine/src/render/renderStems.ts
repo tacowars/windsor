@@ -5,8 +5,8 @@
  *
  * Each pass renders the master on channels 0–1 and its stems on the pairs
  * after (decision 2); the plan is `stemPlan.ts`. The first pass's master is
- * handed on with its stems; every later pass's master must match it
- * (`stemLineup.ts`), or the passes did not line up and the export fails
+ * handed on with its stems; every later pass's master must match it frame
+ * by frame (`stemLineup.ts`), or the passes did not line up and the export fails
  * rather than write stems that drift. That holds because every pass is built
  * from the same document, seeds and stops (windsor#40 decision 7).
  *
@@ -23,7 +23,7 @@ import type { RenderSongOptions } from './renderSong';
 import { planFor, renderRefusal, wholeSong } from './renderSong';
 import type { Stem, StemChoice, StemPassLimits, StemSource } from './stemPlan';
 import { STEM_PASS_LIMITS, passChannels, planStemPasses, stemSources } from './stemPlan';
-import { blockEnvelope, envelopesMatch } from './stemLineup';
+import { linesUp } from './stemLineup';
 import { attachStems } from './stemTaps';
 
 export interface RenderStemsOptions extends RenderSongOptions, StemChoice {
@@ -64,7 +64,7 @@ export async function renderStems(
     options.passLimits ?? STEM_PASS_LIMITS,
   );
   const handed: Stem[] = [];
-  let first: Float64Array | null = null;
+  let reference: Float32Array[] | null = null;
   for (const [index, indices] of passes.entries()) {
     const group = indices.map((i) => sources[i]!);
     const buffer = await renderPass(
@@ -80,12 +80,13 @@ export async function renderStems(
     const pair = (first: number): Float32Array[] =>
       [first, first + 1].map((c) => buffer.getChannelData(c).subarray(plan.leadFrames));
     const master = pair(0);
-    // One pass needs no check; with more, every master must match the first's.
-    const envelope = passes.length > 1 ? blockEnvelope(master) : null;
     if (index === 0) {
-      first = envelope;
+      // One pass needs no check; with more, every later master must match a
+      // copy of this one frame by frame. The copy (two channels of the song)
+      // is held beside the pass, not counted in its budget.
+      if (passes.length > 1) reference = master.map((channel) => channel.slice());
       await handOn({ kind: 'master' }, master);
-    } else if (!envelopesMatch(envelope!, first!)) {
+    } else if (!linesUp(reference!, master)) {
       throw new Error(`stem pass ${index + 1} did not line up with the first; nothing was written`);
     }
     for (const [k, stem] of group.entries()) await handOn(stem, pair(RENDER_CHANNELS * (k + 1)));

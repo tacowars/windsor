@@ -164,7 +164,13 @@ describe('renderStems', () => {
     narrow.stems.forEach((stem, i) => expect(stem.channels).toEqual(one.stems[i]!.channels));
   });
 
-  it('fails, writing nothing more, when a later pass does not line up', async () => {
+  /**
+   * A three-pass render whose song contexts' buffers `edit` changes after
+   * rendering, by pass (1-based), and the stems handed on before it ended.
+   */
+  async function drifted(
+    edit: (pass: number, buffer: AudioBuffer) => void,
+  ): Promise<{ run: Promise<unknown>; handed: string[] }> {
     let songContexts = 0;
     const handed: string[] = [];
     const run = renderStems(
@@ -175,22 +181,51 @@ describe('renderStems', () => {
         passLimits: { maxChannels: 6, maxSamples: 1e12 },
         createContext: (init) => {
           const context = new FakeOfflineContext(init);
-          // The second pass's master comes out a block late, as a drifted pass would.
-          if (init.length !== RENDER_QUANTUM_FRAMES && ++songContexts === 2) {
-            const start = context.startRendering.bind(context);
-            context.startRendering = async () => {
-              const buffer = await start();
-              buffer.getChannelData(0).copyWithin(RENDER_QUANTUM_FRAMES, 0);
-              return buffer;
-            };
-          }
+          if (init.length === RENDER_QUANTUM_FRAMES) return context;
+          const pass = ++songContexts;
+          const start = context.startRendering.bind(context);
+          context.startRendering = async () => {
+            const buffer = await start();
+            edit(pass, buffer);
+            return buffer;
+          };
           return context;
         },
       },
       async ({ stem }) => void handed.push(label(stem)),
     );
-    await expect(run).rejects.toThrow(/did not line up/);
+    return { run, handed };
+  }
+
+  it('fails, writing nothing more, when a later pass drifts by a whole quantum', async () => {
+    const { run, handed } = await drifted((pass, buffer) => {
+      if (pass === 2) buffer.getChannelData(0).copyWithin(RENDER_QUANTUM_FRAMES, 0);
+    });
+    await expect(run).rejects.toThrow(/stem pass 2 did not line up/);
     expect(handed).toEqual(['master', 'part 0', 'part 1']);
+  });
+
+  it('fails when an isolated transient moves within one quantum in a later pass', async () => {
+    // Every pass's master gets one click in the same block of the song: at the
+    // block's first frame in pass 1, at its last in every pass after. The
+    // passes are the same length, and the click's block is unchanged.
+    const block = 40 * RENDER_QUANTUM_FRAMES;
+    const { run, handed } = await drifted((pass, buffer) => {
+      const lead = buffer.length - Math.round(songSeconds(SONG) * RATE);
+      const at = lead + block + (pass === 1 ? 0 : RENDER_QUANTUM_FRAMES - 1);
+      for (const c of [0, 1]) buffer.getChannelData(c)[at]! += 0.5;
+    });
+    await expect(run).rejects.toThrow(/stem pass 2 did not line up/);
+    expect(handed).toEqual(['master', 'part 0', 'part 1']);
+  });
+
+  it('passes when every pass carries the same click at the same frame', async () => {
+    const { run, handed } = await drifted((_, buffer) => {
+      const lead = buffer.length - Math.round(songSeconds(SONG) * RATE);
+      for (const c of [0, 1]) buffer.getChannelData(c)[lead + 40 * RENDER_QUANTUM_FRAMES]! += 0.5;
+    });
+    await expect(run).resolves.toMatchObject({ passes: 3 });
+    expect(handed).toHaveLength(7);
   });
 
   it('leaves a "Sidechain only" part out, or renders it as if routed to the master', async () => {

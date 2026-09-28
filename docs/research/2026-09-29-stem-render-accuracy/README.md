@@ -71,9 +71,16 @@ decision 7) holds on the headless graph, where its test runs. In Chrome it
 holds to about −120 dBFS: a few 24-bit steps.
 
 For this reason the stem render does not check its passes bit for bit. It
-compares each later pass's master with the first's, block by block
-(`stemLineup.ts`), with 1e-5 per sample allowed. That is ten times the 1.0e-6
-measured.
+keeps a copy of the first pass's master and compares each later pass's
+master with it frame by frame (`stemLineup.ts`). The largest absolute
+difference at any one frame must be at most 1e-5
+(`RENDER_STEM_LINEUP_TOLERANCE`), ten times the 1.0e-6 measured here.
+
+A pass that drifted, even by a single frame, moves real audio against
+itself, and the difference is of the order of the audio. An earlier version
+compared per-quantum envelopes instead. Code review caught that a transient
+moving within its 128-frame block leaves the envelope unchanged, so that
+check would have let a sub-quantum drift through.
 
 ## Finding: the limiter delays and lifts the master
 

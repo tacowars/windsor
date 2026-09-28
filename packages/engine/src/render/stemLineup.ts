@@ -1,41 +1,42 @@
 /**
  * Whether two stem passes line up (windsor#41): every pass renders the
  * master on channels 0–1, so a later pass's master is compared with the
- * first's.
+ * first's, sample by sample.
  *
  * Not bit for bit. The stems themselves come out bit-identical from pass to
  * pass in Chrome, but the master does not: Chrome sums a node's inputs in an
  * order it does not fix, and the master's input sums three or more sources
  * (the dry bus and each return), so float rounding differs from render to
- * render — by up to 1.0e-6 between two renders of the same song, measured in
- * headless Chrome 153 on an Apple M1. What a pass that drifted would show is
- * a note in another place: whole blocks of the envelope changed. So the
- * check keeps each channel's summed magnitude per render quantum — a few
- * kilobytes, not a second copy of the master — and allows each block
- * `RENDER_STEM_LINEUP_TOLERANCE` per sample.
+ * render — by up to 1.0e-6 between two renders of the same song
+ * (docs/research/2026-09-29-stem-render-accuracy). So the check is the
+ * largest absolute difference at any one frame, against
+ * `RENDER_STEM_LINEUP_TOLERANCE`. A pass that drifted, by a whole quantum or
+ * a single frame, moves real audio against itself, and the difference at the
+ * moved samples is of the order of the audio, not of rounding.
  */
-import { RENDER_QUANTUM_FRAMES, RENDER_STEM_LINEUP_TOLERANCE } from './renderConstants';
+import { RENDER_STEM_LINEUP_TOLERANCE } from './renderConstants';
 
-/** Per channel, the sum of |sample| over each render quantum, in order. */
-export function blockEnvelope(channels: readonly Float32Array[]): Float64Array {
-  const frames = channels[0]?.length ?? 0;
-  const blocks = Math.ceil(frames / RENDER_QUANTUM_FRAMES);
-  const envelope = new Float64Array(blocks * channels.length);
-  channels.forEach((channel, c) => {
-    for (let i = 0; i < channel.length; i++) {
-      envelope[c * blocks + Math.floor(i / RENDER_QUANTUM_FRAMES)]! += Math.abs(channel[i]!);
-    }
-  });
-  return envelope;
+/**
+ * The largest |a − b| over every frame of every channel; `Infinity` when the
+ * two differ in channel count or length, which no lined-up pass can.
+ */
+export function masterDrift(a: readonly Float32Array[], b: readonly Float32Array[]): number {
+  if (a.length !== b.length) return Infinity;
+  let drift = 0;
+  for (let c = 0; c < a.length; c++) {
+    const x = a[c]!;
+    const y = b[c]!;
+    if (x.length !== y.length) return Infinity;
+    for (let i = 0; i < x.length; i++) drift = Math.max(drift, Math.abs(x[i]! - y[i]!));
+  }
+  return drift;
 }
 
-/** Whether two envelopes agree block for block, within `tolerance` per sample. */
-export function envelopesMatch(
-  a: Float64Array,
-  b: Float64Array,
+/** Whether `master` is `reference` to within `tolerance` at every frame. */
+export function linesUp(
+  reference: readonly Float32Array[],
+  master: readonly Float32Array[],
   tolerance: number = RENDER_STEM_LINEUP_TOLERANCE,
 ): boolean {
-  if (a.length !== b.length) return false;
-  const allowed = tolerance * RENDER_QUANTUM_FRAMES;
-  return a.every((value, i) => Math.abs(value - b[i]!) <= allowed);
+  return masterDrift(reference, master) <= tolerance;
 }

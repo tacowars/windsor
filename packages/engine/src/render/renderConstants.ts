@@ -39,6 +39,9 @@ export const RENDER_STEM_CHANNELS_MAX = 32;
  * The float samples (frames × channels) one stem pass may hold: twice what
  * the longest song render holds (about 691 MB). A long song with many stems
  * renders in narrower passes instead of one context too large for the tab.
+ * A render of more than one pass also holds a copy of the first pass's
+ * master for the lineup check: two channels of the song, at most what one
+ * song render holds (about 346 MB).
  */
 export const RENDER_STEM_PASS_MAX_SAMPLES = 2 * RENDER_MAX_FRAMES * RENDER_CHANNELS;
 
@@ -82,9 +85,11 @@ export const WAV_DITHER_SEED = 0x0d_17_4e_12;
 export const WAV_ENCODE_CHUNK_FRAMES = 1 << 16;
 
 /**
- * How far a later stem pass's master may stray from the first's, per sample
- * and averaged over a render quantum, before the passes count as not lined
- * up (`stemLineup.ts`): 1e-5, about −100 dBFS, ten times the largest
- * difference measured between two renders of one song in Chrome (1.0e-6).
+ * How far a later stem pass's master may stray from the first's at any one
+ * frame before the passes count as not lined up (`stemLineup.ts`): 1e-5,
+ * about −100 dBFS. That is ten times the largest difference measured between
+ * two renders of one song in headless Chrome 153 on an Apple M1 (1.0e-6,
+ * float rounding in the master's sum; docs/research/2026-09-29-stem-render-accuracy),
+ * so run-to-run rounding passes with margin.
  */
 export const RENDER_STEM_LINEUP_TOLERANCE = 1e-5;
