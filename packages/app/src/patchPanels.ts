@@ -14,13 +14,15 @@ import { envAdvKnobs, envKnobs } from './envelopeKnobs';
 import {
   FILTER_KNOBS,
   GLOBAL_KNOBS,
-  LFO_KNOBS,
-  LFO_TO_OP_KNOBS,
   PITCH_ENV_AMOUNT_KNOB,
+  lfoKnobs,
+  lfoToOpKnobs,
+  lfoToWidthKnobs,
   patchKnobOpts,
+  type LfoKey,
 } from './patchKnobTables';
 import { ALG_THUMB } from './patchPanelConstants';
-import type { Patch } from '@windsor/engine';
+import type { LfoSettings, Patch } from '@windsor/engine';
 import type { PatchEditor } from './partsSession';
 import { getPath, pathKnob, setPath } from './patchPath';
 
@@ -43,6 +45,26 @@ export const toggleIndex = (patch: Patch, field: string): number =>
 /** What pressing one of a toggle's two buttons writes. The editor's push commits it. */
 export const writeToggle = (patch: Patch, field: string, index: number): void =>
   setPath(patch, field, index === 1);
+
+/** The LFO's Phase segment: a free-running phase, a reset at note-on, or one pass that holds. */
+export const LFO_PHASE_NAMES = ['Free', 'Retrigger', 'One-shot'] as const;
+const PHASE_RETRIGGER = 1;
+const PHASE_ONE_SHOT = 2;
+
+/** The Phase segment index an LFO shows: One-shot wins, since it implies the reset. */
+export const lfoPhaseIndex = (lfo: LfoSettings): number => {
+  if (lfo.oneShot) return PHASE_ONE_SHOT;
+  return lfo.retrigger ? PHASE_RETRIGGER : 0;
+};
+
+/** What one Phase button writes: One-shot sets both flags, Free clears both, Retrigger clears `oneShot`. */
+export function writeLfoPhase(lfo: LfoSettings, index: number): void {
+  lfo.oneShot = index === PHASE_ONE_SHOT;
+  lfo.retrigger = index !== 0;
+}
+
+/** The LFO's Range segment, over `unipolar`. */
+export const LFO_RANGE_NAMES = ['Bipolar', 'Unipolar'] as const;
 
 function algDepths(alg: Algorithm): number[] {
   const depth = OP_NAMES.map(() => -1);
@@ -208,10 +230,11 @@ export function buildFilter(editor: PatchEditor): void {
   requestAnimationFrame(redraw);
 }
 
-export function buildLfo(editor: PatchEditor): void {
-  const segBox = $('lfoShape');
+/** One LFO panel, `lfo` or `lfo2`: its shape, its knobs and the Phase and Range segments. */
+export function buildLfo(editor: PatchEditor, key: LfoKey): void {
+  const segBox = $(`${key}Shape`);
   segBox.innerHTML = '';
-  const lfo = (): { shape: number; retrigger: boolean } => editor.patch.lfo;
+  const lfo = (): LfoSettings => editor.patch[key];
   segBox.appendChild(
     indexSeg(
       editor,
@@ -222,20 +245,25 @@ export function buildLfo(editor: PatchEditor): void {
       },
     ),
   );
-  const row = $('lfoKnobs');
+  const row = $(`${key}Knobs`);
   row.innerHTML = '';
-  for (const k of [...LFO_KNOBS, ...LFO_TO_OP_KNOBS]) {
+  for (const k of [...lfoKnobs(key), ...lfoToOpKnobs(key), ...lfoToWidthKnobs(key)]) {
     row.appendChild(pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
   }
-  const retrigSeg = indexSeg(
+  const phaseSeg = indexSeg(
     editor,
-    ['Free', 'Retrigger'],
-    () => (lfo().retrigger ? 1 : 0),
-    (i) => {
-      lfo().retrigger = i === 1;
-    },
+    LFO_PHASE_NAMES,
+    () => lfoPhaseIndex(lfo()),
+    (i) => writeLfoPhase(lfo(), i),
   );
-  row.appendChild(labelledSeg('Phase', retrigSeg));
+  row.appendChild(labelledSeg('Phase', phaseSeg));
+  const rangeSeg = indexSeg(
+    editor,
+    LFO_RANGE_NAMES,
+    () => toggleIndex(editor.patch, `${key}.unipolar`),
+    (i) => writeToggle(editor.patch, `${key}.unipolar`, i),
+  );
+  row.appendChild(labelledSeg('Range', rangeSeg));
 }
 
 export function buildPitch(editor: PatchEditor): void {
