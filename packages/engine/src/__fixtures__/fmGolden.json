@@ -98,6 +98,11 @@
       "generic": "744a3f9c50d2290135deb3fbbd1e5cb5967abcde5597a877c169e65222052815",
       "noDormancy": "744a3f9c50d2290135deb3fbbd1e5cb5967abcde5597a877c169e65222052815"
     },
+    "lead-width-sweep": {
+      "default": "7a114c22705f1952a44b4e027a371c15147357a652a76e4f0b57439f0d83534c",
+      "generic": "7a114c22705f1952a44b4e027a371c15147357a652a76e4f0b57439f0d83534c",
+      "noDormancy": "7a114c22705f1952a44b4e027a371c15147357a652a76e4f0b57439f0d83534c"
+    },
     "pad-drift": {
       "default": "7912ac29e8ad7c83a0cca1aa76926909be4bb5dbe24d112296bc8c60664cb832",
       "generic": "7912ac29e8ad7c83a0cca1aa76926909be4bb5dbe24d112296bc8c60664cb832",
@@ -639,9 +644,9 @@
       "noDormancy": "e8f4c0609b21d2a8aead77755f7d11c34d5bc681519b2980df9c299e4e2e2438"
     },
     "str-juno-strings": {
-      "default": "66e94b213bf0b61d56542889975231d8cfea5c926550c6d1bcec473bffd0f33c",
-      "generic": "66e94b213bf0b61d56542889975231d8cfea5c926550c6d1bcec473bffd0f33c",
-      "noDormancy": "66e94b213bf0b61d56542889975231d8cfea5c926550c6d1bcec473bffd0f33c"
+      "default": "bdeb222f2da29db0227c04b4b65217d05c06cfde4433a67798042b3723eeeacf",
+      "generic": "bdeb222f2da29db0227c04b4b65217d05c06cfde4433a67798042b3723eeeacf",
+      "noDormancy": "bdeb222f2da29db0227c04b4b65217d05c06cfde4433a67798042b3723eeeacf"
     },
     "str-ob-strings": {
       "default": "83739612679a43fb836dae5ccaf4546b1a272b5dacd8877743ae8742b79a4cc7",
