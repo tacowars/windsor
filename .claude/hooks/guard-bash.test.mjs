@@ -45,6 +45,14 @@ const denied = [
   ["printf '%s\\n' 'example <<EOF'\ngh run watch 123", POLL],
   ["cat > f <<'EOF'\nhello\nEOF\ngh run watch 1", POLL],
   ['cat > f <<-EOF\n\thello\n\tEOF\ngh run watch 1', POLL],
+  ['>/tmp/watch.log gh run watch 123', POLL],
+  ['gh -R owner/repo run watch 123', POLL],
+  ['gh pr -R owner/repo checks 5 --watch', POLL],
+  ['gh pr checks 5 --watch=true', POLL],
+  ['echo "$(printf \')\' ; gh run watch 1)"', POLL],
+  ['echo "`printf \'`\' ; gh run watch 1`"', POLL],
+  // Unquoted words in order are treated as a run, even after `echo`.
+  ['echo gh run watch', POLL],
   ['gh project item-add 6 --url x', BOARD],
 ];
 
@@ -69,7 +77,9 @@ const allowed = [
   "cat > f <<'EOF'\nthen gh run watch 123\nEOF",
   'cat > f <<EOF\ngh pr checks 5 --watch\nEOF\necho done',
   'echo hi # gh run watch 1',
-  'echo gh run watch',
+  'echo "gh run watch"',
+  'echo "$(printf \'gh run watch\')"',
+  'gh run list --limit 5',
   'ls 2>&1 | grep watch',
 ];
 

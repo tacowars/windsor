@@ -11,16 +11,15 @@ import process from 'node:process';
 // CI polling is matched against the commands actually run, not against text
 // that merely mentions them. A small shell-word lexer (not a shell grammar)
 // splits the command line into simple commands and each command into words
-// with the quotes removed. Heredoc bodies and comments are skipped. Leading
-// assignments and shell keywords are dropped, and the rest is matched word
-// by word, so a heredoc, a `--body-file` or a quoted `--body` that mentions
-// a polling command passes while `gh run 'watch'` does not.
+// with the quotes removed. Heredoc bodies and comments are skipped. A
+// command polls when its words hold `gh`, `run`, `watch` in that order (or
+// `gh`, `pr`, `checks` and then `--watch`), so a heredoc, a `--body-file`
+// or a quoted `--body` that mentions a polling command passes while
+// `gh run 'watch'` does not. This is a best-effort nudge against an agent's
+// habit of polling CI, not a security boundary.
 
 const SEPARATORS = new Set([';', '&', '|', '\n', '(', ')', '`']);
 const DOUBLE_QUOTE_ESCAPES = new Set(['$', '`', '"', '\\', '\n']);
-const PREFIX_WORDS = new Set([
-  'if', 'then', 'else', 'elif', 'do', 'while', 'until', 'time', '!', '{', '(', 'command', 'exec', 'env',
-]);
 
 function createLexer(text) {
   const state = { i: 0, word: null, words: [], commands: [], heredocs: [] };
@@ -49,23 +48,37 @@ function readSingleQuoted(lexer) {
   state.i = end + 1;
 }
 
+// The index of the character that closes a substitution whose body starts
+// at `from`: the matching `)` or the next backtick, whichever `close` is.
+// Quotes and backslashes are tracked as the word lexer tracks them, so a
+// quoted `)` or backtick is data.
+function substitutionEnd(text, from, close) {
+  let depth = 1;
+  let quote = null;
+  let i = from;
+  for (; i < text.length; i += 1) {
+    const c = text[i];
+    if (quote === "'") {
+      if (c === "'") quote = null;
+    } else if (c === '\\') i += 1;
+    else if (quote === '"') {
+      if (c === '"') quote = null;
+    } else if (c === "'" || c === '"') quote = c;
+    else if (close === ')' && c === '(') depth += 1;
+    else if (c === close && (depth -= 1) === 0) return i;
+  }
+  return i;
+}
+
 // A `$( … )` or backtick substitution inside double quotes still runs, so
 // its text is lexed as commands of its own. Returns the index after it.
 function readQuotedSubstitution(lexer, start) {
   const { text, state } = lexer;
   const backtick = text[start] === '`';
-  let end = start + (backtick ? 1 : 2);
-  let depth = 1;
-  while (end < text.length && depth > 0) {
-    if (text[end] === '\\') end += 1;
-    else if (backtick && text[end] === '`') depth = 0;
-    else if (!backtick && text[end] === '(') depth += 1;
-    else if (!backtick && text[end] === ')') depth -= 1;
-    end += 1;
-  }
-  const inner = text.slice(start + (backtick ? 1 : 2), depth === 0 ? end - 1 : end);
-  state.commands.push(...simpleCommands(inner));
-  return end;
+  const from = start + (backtick ? 1 : 2);
+  const end = substitutionEnd(text, from, backtick ? '`' : ')');
+  state.commands.push(...simpleCommands(text.slice(from, end)));
+  return end + 1;
 }
 
 function readDoubleQuoted(lexer) {
@@ -161,20 +174,23 @@ function simpleCommands(text) {
   return lexer.state.commands;
 }
 
-function commandWords(words) {
-  let start = 0;
-  while (start < words.length && (PREFIX_WORDS.has(words[start]) || /^[A-Za-z_]\w*=/.test(words[start]))) {
-    start += 1;
+// The index after `sequence` found in order (not necessarily adjacent) in
+// `words`, or -1. Order rather than position means prefixes, redirections,
+// assignments, keywords and `-R owner/repo` flags cannot hide the command.
+function indexAfterInOrder(words, sequence) {
+  let found = 0;
+  for (let i = 0; i < words.length; i += 1) {
+    if (words[i] === sequence[found]) found += 1;
+    if (found === sequence.length) return i + 1;
   }
-  return words.slice(start);
+  return -1;
 }
 
 function pollsCi(text) {
   return simpleCommands(text).some((words) => {
-    const [tool, group, action, ...rest] = commandWords(words);
-    if (tool !== 'gh') return false;
-    if (group === 'run' && action === 'watch') return true;
-    return group === 'pr' && action === 'checks' && rest.some((w) => w === '--watch' || w.startsWith('--watch='));
+    if (indexAfterInOrder(words, ['gh', 'run', 'watch']) !== -1) return true;
+    const afterChecks = indexAfterInOrder(words, ['gh', 'pr', 'checks']);
+    return afterChecks !== -1 && words.slice(afterChecks).some((w) => w === '--watch' || w.startsWith('--watch='));
   });
 }
 
