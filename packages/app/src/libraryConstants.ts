@@ -42,7 +42,20 @@ export const INIT_PATCH_NAME = 'Init';
 /** The repo folder the grant is asked on, shown in the picker's hint and the mode line. */
 export const LIBRARY_FOLDER_PATH = 'packages/engine/src/patches';
 
-/** IndexedDB home of the remembered directory handle. */
+/**
+ * The user's own state (`2026-09-27-user-library-in-indexeddb`): one
+ * database, two stores. `patches` holds each patch file's text by id;
+ * `songs` holds the autosaved open song under `current`.
+ */
+export const USER_DB = {
+  name: 'windsor',
+  version: 1,
+  patches: 'patches',
+  songs: 'songs',
+  currentSong: 'current',
+} as const;
+
+/** IndexedDB home of the remembered directory handle (the developer's folder grant). */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;
 
 /**

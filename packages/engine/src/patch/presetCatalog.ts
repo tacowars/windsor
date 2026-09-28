@@ -13,7 +13,8 @@ export interface PresetMetadata {
 export interface PresetListing extends PresetMetadata {
   id: string;
   name: string;
-  source: 'document' | 'built-in';
+  /** Where the listed patch lives: the open song, the user's own library, or the built-ins. */
+  source: 'document' | 'library' | 'built-in';
 }
 
 /** The four sounds kept from Aotearoa204's game keep this category; the browser hides it unless asked. */

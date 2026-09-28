@@ -95,6 +95,8 @@ export class DocumentModel {
   usable = true;
   /** The export as it stood when this document was opened, for "changed since opened". */
   private opened = '';
+  /** Called after every open, merge and mutate: the song autosave listens here. */
+  private readonly listeners = new Set<() => void>();
 
   constructor(raw: unknown) {
     this.adopt(this.normalise(raw));
@@ -104,6 +106,12 @@ export class DocumentModel {
   /** True once any edit has moved the document away from what was opened (#598's New song guard). */
   get changed(): boolean {
     return this.toJson() !== this.opened;
+  }
+
+  /** Listen for every change to the document; returns the unsubscribe. */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** The editor's normalisation: the library fills what an older document omits. */
@@ -119,6 +127,7 @@ export class DocumentModel {
   open(raw: unknown): void {
     this.adopt(this.normalise(raw));
     this.opened = this.toJson();
+    this.notify();
   }
 
   private adopt(result: MakeArrangementResult): void {
@@ -132,6 +141,7 @@ export class DocumentModel {
   /** A live change — a field, a whole part, a removal (#629): merge, renormalise, keep the report. */
   merge(partial: unknown): void {
     this.adopt(this.normalise(mergeDocument(this.doc, partial)));
+    this.notify();
   }
 
   /**
@@ -149,6 +159,11 @@ export class DocumentModel {
     const draft = JSON.parse(JSON.stringify(this.doc)) as Record<string, unknown>;
     edit(draft);
     this.adopt(this.normalise(draft));
+    this.notify();
+  }
+
+  private notify(): void {
+    for (const listener of this.listeners) listener();
   }
 
   /** The export payload: the normalised document, pretty-printed. */
