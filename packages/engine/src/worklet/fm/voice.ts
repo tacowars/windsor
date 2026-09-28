@@ -1,10 +1,10 @@
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
- * history and amplitude ramps, six envelopes, an LFO, two filter stages, the
- * steal fade — and its lifecycle: `start`, `rebind`, `retarget`, `release`,
- * `kill`, `steal`, and the `dormant` / `fading` / `finished` reads the part
- * polls. The hot paths are functions over the voice in `voiceControl.js`,
+ * history, amplitude and width ramps, six envelopes, two LFOs, two filter
+ * stages, the steal fade — and its lifecycle: `start`, `rebind`, `retarget`,
+ * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
+ * the part polls. The hot paths are functions over the voice in `voiceControl.js`,
  * `voiceRender.js` and `voiceKernel.js`; `render` and `updateControl` stay
  * methods because the part and the tests call them on the voice. Invariant:
  * every buffer is allocated here, once; nothing after construction allocates.
@@ -17,14 +17,14 @@ import type { WorkletPatch } from './patchNormalise';
 import { ALGORITHMS, ALG_ORDER } from './algorithms';
 import { Envelope, ST_IDLE, ST_SUSTAIN } from './envelope';
 import { DORMANT_AMP } from './fmConstants';
-import { Lfo } from './lfo';
+import { Lfo, secondLfoSeed } from './lfo';
 import { randomSeed32 } from './prng';
 import { FILT_OFF } from './modeIds';
 import { Svf } from './svf';
-import { bindVoiceConstants, updateVoiceControl } from './voiceControl';
+import { bindVoiceConstants, restingWidth, updateVoiceControl } from './voiceControl';
 import { renderVoiceKernel } from './voiceKernel';
 import { renderVoiceGeneric } from './voiceRender';
-import { waveKind } from './waveTables';
+import { KIND_PULSE, waveKind } from './waveTables';
 
 /* ------------------------------------------------------------------ *
  * Voice — four operators, a filter, and the modulation that feeds them.
@@ -43,6 +43,8 @@ class Voice {
   fb2: Float32Array;
   amp: Float32Array;
   ampInc: Float32Array;
+  width: Float32Array;
+  widthInc: Float32Array;
   kind: Int32Array;
   tables: (Float32Array | null)[];
   mips: (Float32Array[] | null)[];
@@ -50,6 +52,7 @@ class Voice {
   filtEnv: Envelope;
   pitchEnv: Envelope;
   lfo: Lfo;
+  lfo2: Lfo;
   svfA: Svf;
   svfB: Svf;
   noiseSeed: number;
@@ -91,6 +94,11 @@ class Voice {
     this.fb2 = new Float32Array(4); // one before that
     this.amp = new Float32Array(4); // interpolated amplitude
     this.ampInc = new Float32Array(4);
+    // Width (#55), as the loops read it: the duty for PULSE, and for every
+    // other wave the phase scale 1 / width, so the squeeze is a multiply.
+    // Ramped per sample like `amp`; exactly 1 and still is the plain wave.
+    this.width = new Float32Array(4).fill(1);
+    this.widthInc = new Float32Array(4);
     this.kind = new Int32Array(4);
     this.tables = [null, null, null, null]; // active mip for each operator
     this.mips = [null, null, null, null]; // full mip set for each operator
@@ -98,7 +106,9 @@ class Voice {
     this.ampEnv = [new Envelope(), new Envelope(), new Envelope(), new Envelope()];
     this.filtEnv = new Envelope();
     this.pitchEnv = new Envelope();
-    this.lfo = new Lfo(random);
+    this.lfo = new Lfo(randomSeed32(random));
+    // Seeded from LFO 1, not drawn: the part's random stream stays where it was (#55).
+    this.lfo2 = new Lfo(secondLfoSeed(this.lfo.seed));
     this.svfA = new Svf();
     this.svfB = new Svf();
 
@@ -208,6 +218,8 @@ class Voice {
       this.ampInc[i] = 0;
 
       this.kind[i] = waveKind(op.wave);
+      // The ramp starts from the patch's width; the first control block sets its step.
+      this.width[i] = restingWidth(this.kind[i], op.width);
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
 
@@ -225,7 +237,9 @@ class Voice {
     this.pitchEnv.timeScale = 1;
     this.pitchEnv.noteOn();
 
-    this.lfo.reset(patch.lfo.retrigger);
+    // A one-shot LFO always starts from the top of its run (#55).
+    this.lfo.reset(patch.lfo.retrigger || patch.lfo.oneShot);
+    this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
     this.svfA.reset();
     this.svfB.reset();
   }
@@ -245,7 +259,14 @@ class Voice {
     const keyOffset = (this.note - 60) / 12;
     for (let i = 0; i < 4; i++) {
       const op = patch.ops[i];
+      const wasPulse = this.kind[i] === KIND_PULSE;
       this.kind[i] = waveKind(op.wave);
+      // Width means a duty on PULSE and a phase scale elsewhere: a switch
+      // between the two restarts the ramp from the new meaning's value.
+      if (wasPulse !== (this.kind[i] === KIND_PULSE)) {
+        this.width[i] = restingWidth(this.kind[i], op.width);
+        this.widthInc[i] = 0;
+      }
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
       // configure() swaps the parameter block and leaves the stage and value alone.
@@ -396,7 +417,7 @@ class Voice {
     return holds;
   }
 
-  /** Control-rate update, `voiceControl.js`: envelopes, LFO, glide, ramps, filter coefficients. */
+  /** Control-rate update, `voiceControl.js`: envelopes, LFOs, glide, ramps, filter coefficients. */
   updateControl(n: number, bend: number, wheel: number, cutoffMod: number): void {
     updateVoiceControl(this, n, bend, wheel, cutoffMod);
   }

@@ -1,15 +1,18 @@
 /* eslint-disable no-magic-numbers -- DSP: the xorshift shifts and the shape arithmetic are the algorithm; the tunables are fmConstants.ts (#654) */
 /**
  * The per-voice LFO (#644): seven shapes over one phase, sample-and-hold and
- * drift from the voice's own xorshift32 stream, and a fade-in. Invariant:
- * allocation free, and the sine shape reads `SIN_TAB` so it is the operators'
- * sine to the bit. `fmProcessorModWheel.test.ts` and the golden test pin it.
+ * drift from the LFO's own xorshift32 stream, a fade-in, and (#55) one-shot
+ * and unipolar modes. A voice runs two (`lfo`, `lfo2`); the second is seeded
+ * from the first by `secondLfoSeed`, never from the part's random stream, so
+ * adding it moved no other draw. Invariant: allocation free, and the sine
+ * shape reads `SIN_TAB` so it is the operators' sine to the bit. `lfo.test.ts`,
+ * `fmProcessorModWheel.test.ts`, `__fixtures__/lfo2Routes.test.ts` and the
+ * golden test pin it.
  */
 
 import type { LfoSettings } from '../../patch/patch';
 import { TABLE_MASK, TABLE_SIZE } from './fmConstants';
 import { LFO_DRIFT, LFO_SAW_DOWN, LFO_SAW_UP, LFO_SH, LFO_SQUARE, LFO_TRI } from './modeIds';
-import { randomSeed32 } from './prng';
 import { SIN_TAB } from './waveTables';
 
 /* ------------------------------------------------------------------ *
@@ -24,13 +27,14 @@ class Lfo {
   fade: number;
   seed: number;
 
-  constructor(random: () => number) {
+  /** `seed` is a non-zero xorshift32 state: `randomSeed32`, or `secondLfoSeed` of another LFO's. */
+  constructor(seed: number) {
     this.phase = 0;
     this.value = 0;
     this.held = 0;
     this.target = 0;
     this.fade = 0;
-    this.seed = randomSeed32(random);
+    this.seed = seed;
   }
 
   rand(): number {
@@ -52,11 +56,24 @@ class Lfo {
     this.target = this.rand() * 2 - 1;
   }
 
+  /**
+   * Advance by `n` samples and return the value, faded in. A one-shot LFO's
+   * phase stops at 1 and holds there, so it never wraps and every shape holds
+   * its end value (#55); `start` resets it at note-on. Unipolar remaps the
+   * shape's -1..1 to 0..1 before the fade, so the fade-in scales up from 0.
+   */
   advance(p: LfoSettings, n: number, sampleRate: number): number {
     const prev = this.phase;
     this.phase += (p.rate * n) / sampleRate;
-    const wrapped = this.phase >= 1;
-    if (wrapped) this.phase -= Math.floor(this.phase);
+    let wrapped = false;
+    if (this.phase >= 1) {
+      if (p.oneShot) {
+        this.phase = 1;
+      } else {
+        wrapped = true;
+        this.phase -= Math.floor(this.phase);
+      }
+    }
 
     switch (p.shape) {
       case LFO_TRI:
@@ -92,8 +109,26 @@ class Lfo {
     } else {
       this.fade = 1;
     }
+    if (p.unipolar) return ((this.value + 1) / 2) * this.fade;
     return this.value * this.fade;
   }
 }
 
-export { Lfo };
+/**
+ * LFO 2's seed from LFO 1's (#55): one xorshift32 step of the seed mixed with
+ * the golden-ratio constant, so the two streams differ without a new draw
+ * from the part's random source. The draw order is what keeps every seeded
+ * render, the goldens included, where it was: a new draw would shift each
+ * later voice's phases, noise and pan. Zero, xorshift's fixed point, maps to 1.
+ */
+function secondLfoSeed(seed: number): number {
+  let x = (seed ^ 0x9e3779b9) >>> 0;
+  x ^= x << 13;
+  x >>>= 0;
+  x ^= x >> 17;
+  x ^= x << 5;
+  x >>>= 0;
+  return x || 1;
+}
+
+export { Lfo, secondLfoSeed };

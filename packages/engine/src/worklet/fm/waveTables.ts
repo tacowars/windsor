@@ -3,7 +3,8 @@
  * Waveforms (#644): the wave ids, the exact sine table, the bandlimited
  * per-octave mip tables built from harmonic partials, the cache that shares
  * them across every part in this worklet global scope, and the render kind an
- * operator's wave selects. Invariants: `SIN_TAB` and `WAVE_CACHE` are
+ * operator's wave selects. PULSE (#55) is two reads of the saw set, so its
+ * waves are the saw's and the cache holds one copy. Invariants: `SIN_TAB` and `WAVE_CACHE` are
  * single-instance module state, never duplicated; `WAVE` mirrors `patch.ts`
  * (`patch.test.ts` pins the copy until #656 shares it); the warm-up at the end
  * runs inside `addModule()`, never in a render. `fmProcessorUserWave.test.ts`
@@ -123,11 +124,13 @@ const WAVE_CACHE = new Map<string, Float32Array[]>();
 const WAVE_CACHE_LIMIT = 64;
 
 function getMips(
-  waveId: number,
+  wave: number,
   sampleRate: number,
   tone: number,
   userPartials: number[] | null,
 ): Float32Array[] {
+  // PULSE is two reads of the saw's tables (#55): one key, one copy.
+  const waveId = wave === WAVE.PULSE ? WAVE.SAW : wave;
   const toneQ = Math.max(0.02, Math.min(1, Math.round(tone * 20) / 20));
   // null plays a sine and [] plays silence: the two must never share a key.
   let content = '';
@@ -157,9 +160,13 @@ function mipIndex(freq: number): number {
 const KIND_TABLE = 0,
   KIND_NOISE = 1,
   KIND_SAW_D = 2,
-  KIND_SQUARE_D = 3;
+  KIND_SQUARE_D = 3,
+  KIND_PULSE = 4;
 
-/** The render kind an operator's wave id selects; everything not raw or noise is a table. */
+/**
+ * The render kind an operator's wave id selects; everything not raw, noise or
+ * PULSE is a table. A PULSE operator reads its saw table twice (#55).
+ */
 function waveKind(wave: number): number {
   switch (wave) {
     case WAVE.NOISE:
@@ -168,6 +175,8 @@ function waveKind(wave: number): number {
       return KIND_SAW_D;
     case WAVE.SQUARE_D:
       return KIND_SQUARE_D;
+    case WAVE.PULSE:
+      return KIND_PULSE;
     default:
       return KIND_TABLE;
   }
@@ -180,4 +189,14 @@ for (const w of [WAVE.SINE, WAVE.SAW, WAVE.SQUARE, WAVE.TRIANGLE]) {
   getMips(w, sampleRate, 1, null);
 }
 
-export { SIN_TAB, getMips, mipIndex, KIND_TABLE, KIND_NOISE, KIND_SAW_D, KIND_SQUARE_D, waveKind };
+export {
+  SIN_TAB,
+  getMips,
+  mipIndex,
+  KIND_TABLE,
+  KIND_NOISE,
+  KIND_SAW_D,
+  KIND_SQUARE_D,
+  KIND_PULSE,
+  waveKind,
+};
