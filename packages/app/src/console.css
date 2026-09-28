@@ -64,6 +64,9 @@ input {
   z-index: 5;
 }
 .head {
+  /* The tab bar's height (.tab-btn: 7px padding around an 11px line), which
+     Tap, the tempo and bars boxes and the readouts share (windsor#12). */
+  --head-control-h: 28px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -106,6 +109,78 @@ input {
 .transport-btn {
   min-width: 34px;
   font-size: 14px;
+}
+/* Tap, the tempo and bars boxes (windsor#12): flat number fields in a box,
+   as Ableton Live's control bar draws them, one row at the tab bar's height.
+   A vertical drag moves the number, so the cursor says so until it types. */
+.transport-group > .transport-btn,
+.transport-group > .transport-meter,
+.transport-group > .transport-position {
+  height: var(--head-control-h);
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Key and scale without their visible labels (tacowars's request on windsor#12):
+   one select each, at the same height as the boxes and the tab bar. */
+.transport-picker select.field {
+  width: auto;
+  height: var(--head-control-h);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.transport-tap {
+  font-size: 11px;
+}
+.transport-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--head-control-h);
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--inset);
+  cursor: ns-resize;
+  /* As .knob: a touch drag moves the number, never scrolls the page. */
+  touch-action: none;
+}
+.transport-box:hover {
+  border-color: var(--line-bright);
+}
+.transport-box:focus-within {
+  border-color: var(--carrier);
+}
+.transport-box-input {
+  width: 6ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--f-num);
+  font-size: 13px;
+  color: var(--ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  cursor: ns-resize;
+  user-select: none;
+}
+.transport-box-input[name='bars'] {
+  width: 3ch;
+}
+.transport-box-input:focus {
+  outline: none;
+  cursor: text;
+  user-select: text;
+}
+.transport-unit {
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
 .brand {

@@ -7,19 +7,34 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { TICKS_PER_BAR } from '@windsor/engine';
+import { BARS_MAX, BPM_MAX, BPM_MIN, TICKS_PER_BAR } from '@windsor/engine';
 import {
   barsChange,
   bpmChange,
+  countsAsTap,
+  dragBars,
+  dragBpm,
   formatPosition,
   keyChange,
   nextTransportState,
+  parseBars,
+  parseBpm,
+  pressMove,
   pressedButtons,
+  startsPress,
   scaleChange,
+  tapTempo,
   type TransportAction,
   type TransportState,
 } from './transportModel';
-import { KEY_OPTIONS, POSITION_GRID, SCALE_OPTIONS } from './transportTables';
+import {
+  KEY_OPTIONS,
+  NUMBER_DRAG,
+  NUMBER_DRAG_THRESHOLD_PX,
+  POSITION_GRID,
+  SCALE_OPTIONS,
+  TAP_TEMPO,
+} from './transportTables';
 
 describe('formatPosition', () => {
   const LONG = 16 * TICKS_PER_BAR;
@@ -108,5 +123,135 @@ describe("the strip's writes", () => {
       'B',
     ]);
     expect(SCALE_OPTIONS.every((o) => scaleChange(o.value) !== null)).toBe(true);
+  });
+});
+
+describe('typing into the tempo and bars boxes (windsor#12 decision 1)', () => {
+  it('sets a typed tempo to two decimals, clamps an out-of-range one, reverts on junk', () => {
+    expect(parseBpm('133.5')).toBe(133.5);
+    expect(parseBpm(' 120.257 ')).toBe(120.26);
+    expect(parseBpm('133,5')).toBe(133.5);
+    expect(parseBpm('999')).toBe(BPM_MAX);
+    expect(parseBpm('3')).toBe(BPM_MIN);
+    expect(parseBpm('abc')).toBeNull();
+    expect(parseBpm('')).toBeNull();
+    expect(parseBpm('Infinity')).toBeNull();
+  });
+
+  it('sets whole bars, clamped to 1..BARS_MAX', () => {
+    expect(parseBars('12')).toBe(12);
+    expect(parseBars('5.4')).toBe(5);
+    expect(parseBars('0')).toBe(1);
+    expect(parseBars('9999')).toBe(BARS_MAX);
+    expect(parseBars('eight')).toBeNull();
+  });
+});
+
+describe('dragging the boxes (decision 2)', () => {
+  /** Pixels of travel that move a box by `share` of its range, at the knob's feel. */
+  const px = (share: number): number => share * NUMBER_DRAG.rangePx;
+  const barsPx = (bars: number): number => px(bars / (BARS_MAX - 1));
+
+  it('sweeps tempo at the knob sensitivity, up increasing, at the box step', () => {
+    expect(dragBpm(120, 0, false)).toBe(120);
+    expect(dragBpm(120, px(0.1), false)).toBe(148);
+    expect(dragBpm(120, -px(0.1), false)).toBe(92);
+    expect(dragBpm(120, 1, true)).toBeCloseTo(
+      120 + (BPM_MAX - BPM_MIN) / NUMBER_DRAG.fineRangePx,
+      2,
+    );
+    expect(dragBpm(120, px(2), false)).toBe(BPM_MAX);
+  });
+
+  it('moves bars 6 → 8 → 12 up, 6 → 4 and 4 → 1 down, never past BARS_MAX', () => {
+    expect(dragBars(6, barsPx(3), false)).toBe(6);
+    expect(dragBars(6, barsPx(4), false)).toBe(8);
+    expect(dragBars(6, barsPx(8), false)).toBe(12);
+    expect(dragBars(6, -barsPx(4), false)).toBe(4);
+    expect(dragBars(4, -barsPx(4), false)).toBe(1);
+    expect(dragBars(1, barsPx(4), false)).toBe(4);
+    expect(dragBars(250, barsPx(40), false)).toBe(BARS_MAX);
+  });
+});
+
+describe('tap tempo (decision 4)', () => {
+  const tapAll = (times: number[]): (number | null)[] => {
+    let taps: readonly number[] = [];
+    return times.map((now) => {
+      const result = tapTempo(taps, now);
+      taps = result.taps;
+      return result.bpm;
+    });
+  };
+
+  it('gives 120 at 500 ms intervals, from the second tap on', () => {
+    expect(tapAll([0, 500, 1000, 1500, 2000])).toEqual([null, 120, 120, 120, 120]);
+  });
+
+  it('averages only the last four intervals', () => {
+    const bpm = tapAll([0, 1000, 1500, 2000, 2500, 3000]).at(-1);
+    expect(bpm).toBe(120);
+    expect(tapTempo([0, 1000], 1500).taps).toHaveLength(3);
+    expect(tapTempo([0, 1, 2, 3, 4], 5).taps).toHaveLength(TAP_TEMPO.intervals + 1);
+  });
+
+  it('starts a new average after a 2 s pause', () => {
+    const bpms = tapAll([0, 500, 1000, 1000 + TAP_TEMPO.resetMs, 1000 + TAP_TEMPO.resetMs + 400]);
+    expect(bpms).toEqual([null, 120, 120, null, 150]);
+  });
+
+  it('clamps and rounds to the tempo step', () => {
+    expect(tapAll([0, 100]).at(-1)).toBe(BPM_MAX);
+    expect(tapAll([0, 700]).at(-1)).toBe(85.71);
+  });
+});
+
+describe('a press on a number box', () => {
+  const PAST = NUMBER_DRAG_THRESHOLD_PX + 1;
+  const HELD = 1;
+
+  it('starts anywhere in the box, the unit included, but not on a number being typed', () => {
+    const PRIMARY = 0;
+    // On the unit (not the input): starts, whether or not the number has focus.
+    expect(startsPress(PRIMARY, false, false)).toBe(true);
+    expect(startsPress(PRIMARY, false, true)).toBe(true);
+    // On the number: starts unless it is being typed in (the press moves the caret).
+    expect(startsPress(PRIMARY, true, false)).toBe(true);
+    expect(startsPress(PRIMARY, true, true)).toBe(false);
+    expect(startsPress(2, false, false)).toBe(false);
+  });
+
+  it('a drag from the unit changes the value; a still press is a click that types', () => {
+    // A press on the unit starts, a move past the threshold drags and moves bars.
+    expect(startsPress(0, false, false)).toBe(true);
+    expect(pressMove(false, PAST, HELD)).toBe('drag');
+    expect(dragBars(6, NUMBER_DRAG.rangePx, false)).not.toBe(6);
+    // A still press never leaves 'wait', so the release focuses the number.
+    expect(pressMove(false, 0, HELD)).toBe('wait');
+  });
+
+  it('waits inside the threshold, then drags', () => {
+    expect(pressMove(false, NUMBER_DRAG_THRESHOLD_PX - 1, HELD)).toBe('wait');
+    expect(pressMove(false, -PAST, HELD)).toBe('drag');
+    expect(pressMove(true, 0, HELD)).toBe('drag');
+  });
+
+  it('ends, changing nothing, on a move with the primary button no longer held', () => {
+    expect(pressMove(true, PAST * 10, 0)).toBe('end');
+    expect(pressMove(false, PAST, 0)).toBe('end');
+    // Only the secondary button held is a release of the primary one.
+    expect(pressMove(true, PAST, 2)).toBe('end');
+  });
+});
+
+describe('what counts as one tap on Tap', () => {
+  it('counts a primary press, not the click that follows it', () => {
+    expect(countsAsTap({ type: 'pointerdown', button: 0, detail: 0 })).toBe(true);
+    expect(countsAsTap({ type: 'pointerdown', button: 2, detail: 0 })).toBe(false);
+    expect(countsAsTap({ type: 'click', button: 0, detail: 1 })).toBe(false);
+  });
+
+  it('counts a keyboard or assistive click, which has no press before it', () => {
+    expect(countsAsTap({ type: 'click', button: 0, detail: 0 })).toBe(true);
   });
 });
