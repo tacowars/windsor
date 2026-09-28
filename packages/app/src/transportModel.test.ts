@@ -40,6 +40,7 @@ import {
   swingGridChange,
   swingOf,
   tapTempo,
+  typedEntry,
   type TransportAction,
   type TransportState,
 } from './transportModel';
@@ -336,5 +337,26 @@ describe('the swing box and its grid (windsor#29)', () => {
     model.merge(grid);
     const reopened = new DocumentModel(JSON.parse(model.toJson()));
     expect(reopened.doc.transport.swing).toEqual({ amount: 66, grid: 8 });
+  });
+});
+
+describe('a number box commits only what was typed', () => {
+  it('leaves a fractional swing alone on a focus and blur without typing', () => {
+    const song = { amount: 66.7, grid: 8 } as const;
+    const shown = SWING_KNOB.fmt?.(song.amount) ?? String(song.amount);
+    expect(shown).toBe('67');
+    expect(typedEntry(shown, shown, parseSwing)).toBeNull();
+  });
+
+  it('leaves a BPM and Bars alone on a focus and blur without typing', () => {
+    expect(typedEntry('133.50', '133.50', parseBpm)).toBeNull();
+    expect(typedEntry('8', '8', parseBars)).toBeNull();
+  });
+
+  it('commits a typed edit, and reverts typed text', () => {
+    expect(typedEntry('60', '67', parseSwing)).toBe(60);
+    expect(typedEntry('67 ', '67', parseSwing)).toBe(67);
+    expect(typedEntry('120', '133.50', parseBpm)).toBe(120);
+    expect(typedEntry('loose', '67', parseSwing)).toBeNull();
   });
 });

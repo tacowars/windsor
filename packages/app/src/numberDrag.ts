@@ -7,7 +7,7 @@
  * functions (`transportModel.ts`); this file only wires pointer and keys.
  */
 import { el } from './dom';
-import { pressMove, startsPress } from './transportModel';
+import { pressMove, startsPress, typedEntry } from './transportModel';
 
 export interface NumberBoxSpec {
   /** The accessible name and tooltip's subject. */
@@ -90,10 +90,18 @@ function attachDrag(
   box.addEventListener('lostpointercapture', (e) => release(e, false));
 }
 
-/** Enter and blur commit a typed entry; Escape reverts it. */
+/**
+ * Enter and blur commit a typed entry; Escape reverts it. Text left as the
+ * box showed it commits nothing (`typedEntry`), so a focus and blur never
+ * rewrites a value the box displays rounded.
+ */
 function attachTyping(input: HTMLInputElement, spec: NumberBoxSpec, show: () => void): void {
+  let shown = input.value;
+  input.addEventListener('focus', () => {
+    shown = input.value;
+  });
   const commit = (): void => {
-    const value = spec.parse(input.value);
+    const value = typedEntry(input.value, shown, spec.parse);
     if (value !== null && value !== spec.get()) spec.set(value);
     show();
   };
