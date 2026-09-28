@@ -23,7 +23,7 @@ import { INIT_PATCH_NAME, initPresetId } from './libraryConstants';
 import { listLibrary } from './libraryModel';
 import type { PatchFolder } from './libraryFolder';
 import type { LibraryModel } from './libraryModel';
-import { connectLibrary, pageLibrary } from './libraryModel';
+import { connectLibrary, connectUserLibrary, pageLibrary } from './libraryModel';
 import {
   canCopy,
   canDelete,
@@ -37,6 +37,7 @@ import {
   initPatch,
   isModified,
   patchOrigin,
+  saveForks,
   savePatch,
   unsavedQuestion,
 } from './patchActions';
@@ -103,6 +104,14 @@ describe('patch origin', () => {
     expect(patchOrigin(scope)).toEqual({ kind: 'document', id: 'mine' });
   });
 });
+
+/** A page-mode library over an empty user store, and a part on the built-in kick. */
+async function userScope() {
+  const store = fakeFolder([]);
+  const library: LibraryModel = pageLibrary();
+  await connectUserLibrary(library, store);
+  return { scope: { ctx: context(), library, slot: FULL_SLOT.kick }, store };
+}
 
 const INIT_ID = initPresetId(String(FULL_SLOT.kick));
 
@@ -194,23 +203,47 @@ describe('Save', () => {
     );
   });
 
-  it('downloads instead when no folder is connected, and the browser still sees the save', async () => {
+  it('forks a built-in to a new id in the user library, and never writes over it', async () => {
+    const { scope, store } = await userScope();
+    const working = clonePatch(PATCH_LIBRARY['kick']!.patch);
+    working.volume = 0.25;
+    scope.ctx.change({ patches: { kick: working } });
+    expect(saveForks(scope)).toBe(true);
+    const meta = { ...copyPrefill(scope, working) };
+    expect(meta.name).toBe('FM Kick copy');
+    const id = await savePatch({ ...scope, working, meta });
+    expect(id).toBe('fm-kick-copy');
+    expect([...store.files.keys()]).toEqual(['fm-kick-copy.json']);
+    expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('fm-kick-copy');
+    expect(scope.library.entries['fm-kick-copy']?.patch.volume).toBe(0.25);
+    expect(scope.library.entries['kick']).toBe(PATCH_LIBRARY['kick']);
+    // The part now plays the user's patch, so the next Save overwrites it.
+    expect(saveForks(scope)).toBe(false);
+    working.volume = 0.3;
+    expect(await savePatch({ ...scope, working, meta })).toBe('fm-kick-copy');
+    expect(store.files.size).toBe(1);
+    expect(scope.library.entries['fm-kick-copy']?.patch.volume).toBe(0.3);
+    expect(scope.ctx.model.doc.patches?.['fm-kick-copy']?.volume).toBe(0.3);
+  });
+
+  it('with nowhere to store, forks a built-in and downloads the new id', async () => {
     const library = pageLibrary();
     const ctx = context();
     const scope = { ctx, library, slot: FULL_SLOT.kick };
     const downloads: string[] = [];
     const working = clonePatch(PATCH_LIBRARY['kick']!.patch);
     working.volume = 0.25;
-    await savePatch({
+    const id = await savePatch({
       ...scope,
       working,
-      meta: { name: 'FM Kick', category: 'Drums', tags: ['kick'], description: 'd' },
+      meta: { name: 'Soft Kick', category: 'Drums', tags: ['kick'], description: 'd' },
       download: (id, text) => downloads.push(`${id}:${text.length}`),
     });
+    expect(id).toBe('soft-kick');
     expect(downloads).toHaveLength(1);
-    expect(downloads[0]?.startsWith('kick:')).toBe(true);
-    expect(library.entries['kick']?.patch.volume).toBe(0.25);
-    expect(PATCH_LIBRARY['kick']?.patch.volume).not.toBe(0.25);
+    expect(downloads[0]?.startsWith('soft-kick:')).toBe(true);
+    expect(library.entries['soft-kick']?.patch.volume).toBe(0.25);
+    expect(library.entries['kick']?.patch.volume).toBe(PATCH_LIBRARY['kick']?.patch.volume);
   });
 });
 
@@ -264,8 +297,20 @@ describe('Delete', () => {
     expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('kick');
   });
 
-  it('needs the folder', async () => {
-    await expect(deletePatch(pageLibrary(), 'kick')).rejects.toThrow('folder');
+  it("applies to the user's own patches only, never a built-in", async () => {
+    const { scope, store } = await userScope();
+    await copyToNew({
+      ...scope,
+      working: clonePatch(PATCH_LIBRARY['kick']!.patch),
+      meta: { name: 'Mine', category: 'Drums', tags: [], description: '' },
+    });
+    expect(canDelete({ kind: 'library', id: 'kick' }, scope.library)).toBe(false);
+    expect(canDelete({ kind: 'library', id: 'mine' }, scope.library)).toBe(true);
+    await expect(deletePatch(scope.library, 'kick')).rejects.toThrow('read-only');
+    await deletePatch(scope.library, 'mine');
+    expect(store.files.size).toBe(0);
+    expect(scope.library.entries['kick']).toBeDefined();
+    await expect(deletePatch(pageLibrary(), 'kick')).rejects.toThrow('cannot store');
   });
 });
 

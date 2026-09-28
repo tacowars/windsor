@@ -12,7 +12,9 @@ import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { PatchFolder } from './libraryFolder';
 import {
   connectLibrary,
+  connectUserLibrary,
   disconnectLibrary,
+  isWritable,
   libraryModeText,
   libraryPatch,
   listLibrary,
@@ -21,6 +23,7 @@ import {
   writeLibraryFile,
 } from './libraryModel';
 import { loadBuiltIns } from './builtInLibrary';
+import { buildPatchFile, patchFileText } from './patchFileWriter';
 
 // The built-in library loads on demand in the page; these tests read it.
 beforeAll(() => loadBuiltIns());
@@ -82,14 +85,15 @@ describe('the model', () => {
     const model = pageLibrary();
     expect(model.mode).toBe('page');
     expect(libraryPatch(model, 'kick')).toBe(PATCH_LIBRARY['kick']?.patch);
-    expect(libraryModeText(model)).toContain('baked into the page');
+    expect(libraryModeText(model)).toContain('159 built-in patches');
+    expect(libraryModeText(model)).not.toContain('packages/engine');
     const files = new Map([['hat.json', serialisePatchFile(PATCH_LIBRARY['hat']!)]]);
     await connectLibrary(model, memoryFolder(files));
     expect(model.mode).toBe('folder');
     expect(Object.keys(model.entries)).toEqual(['hat']);
     expect(libraryPatch(model, 'kick')).toBeUndefined();
     expect(libraryModeText(model)).toContain('folder "patches" (1 patches)');
-    disconnectLibrary(model);
+    await disconnectLibrary(model);
     expect(model.mode).toBe('page');
     expect(libraryPatch(model, 'kick')).toBeDefined();
   });
@@ -116,7 +120,7 @@ describe('the model', () => {
     expect(model.entries['kick-2']?.id).toBe('kick-2');
     expect(model.problems).toEqual([]);
     expect(PATCH_LIBRARY['kick-2']).toBeUndefined();
-    await expect(removeLibraryFile(model, 'kick')).rejects.toThrow('folder');
+    await expect(removeLibraryFile(model, 'kick')).rejects.toThrow('cannot store');
   });
 
   it('refuses a page-mode write the folder path would have refused (#617)', async () => {
@@ -130,5 +134,70 @@ describe('the model', () => {
     expect(model.entries['half-written']).toBeUndefined();
     expect(model.problems).toHaveLength(1);
     expect(model.problems[0]).toContain('half-written');
+  });
+});
+
+describe("the user's library", () => {
+  /** A user patch file, as Save writes it: the kick under a new name, with no headroom record. */
+  const mine = (name: string): string =>
+    patchFileText(
+      buildPatchFile(
+        { name, category: 'Drums', tags: ['kick'], description: '' },
+        PATCH_LIBRARY['kick']!.patch,
+      ),
+    );
+
+  it('lists beside the built-ins as source "library", and only its own ids are writable', async () => {
+    const files = new Map([['my-kick.json', mine('My Kick')]]);
+    const model = pageLibrary();
+    await connectUserLibrary(model, memoryFolder(files));
+    expect(model.mode).toBe('page');
+    expect(model.entries['kick']).toBeDefined();
+    expect(model.entries['my-kick']?.name).toBe('My Kick');
+    expect([...model.userIds]).toEqual(['my-kick']);
+    expect(isWritable(model, 'my-kick')).toBe(true);
+    expect(isWritable(model, 'kick')).toBe(false);
+    const listing = listLibrary(model.entries, {}, model.userIds);
+    expect(listing.find((entry) => entry.id === 'my-kick')?.source).toBe('library');
+    expect(listing.find((entry) => entry.id === 'kick')?.source).toBe('built-in');
+    expect(libraryModeText(model)).toBe(
+      'Library: 159 built-in patches and 1 of yours, kept in this browser',
+    );
+  });
+
+  it('writes and removes its own ids, and refuses a built-in either way', async () => {
+    const files = new Map<string, string>();
+    const model = pageLibrary();
+    await connectUserLibrary(model, memoryFolder(files));
+    await writeLibraryFile(model, 'soft-kick', mine('Soft Kick'));
+    expect(files.has('soft-kick.json')).toBe(true);
+    expect(model.userIds.has('soft-kick')).toBe(true);
+    await expect(writeLibraryFile(model, 'kick', mine('FM Kick'))).rejects.toThrow('read-only');
+    await expect(removeLibraryFile(model, 'kick')).rejects.toThrow('read-only');
+    expect(files.has('kick.json')).toBe(false);
+    await removeLibraryFile(model, 'soft-kick');
+    expect(files.size).toBe(0);
+    expect(model.entries['soft-kick']).toBeUndefined();
+    expect(model.entries['kick']).toBeDefined();
+  });
+
+  it('never lets a stored id shadow a built-in, and says so', async () => {
+    const files = new Map([['kick.json', mine('Not The Kick')]]);
+    const model = pageLibrary();
+    await connectUserLibrary(model, memoryFolder(files));
+    expect(model.entries['kick']).toBe(PATCH_LIBRARY['kick']);
+    expect(model.userIds.has('kick')).toBe(false);
+    expect(model.problems).toEqual(['your patch "kick" is hidden by the built-in of the same id']);
+  });
+
+  it('gives way to a connected folder, and comes back when it is forgotten', async () => {
+    const files = new Map([['my-kick.json', mine('My Kick')]]);
+    const model = pageLibrary();
+    await connectUserLibrary(model, memoryFolder(files));
+    await connectLibrary(model, memoryFolder(new Map()));
+    expect(model.entries['my-kick']).toBeUndefined();
+    await disconnectLibrary(model);
+    expect(model.entries['my-kick']?.name).toBe('My Kick');
+    expect(model.userIds.has('my-kick')).toBe(true);
   });
 });

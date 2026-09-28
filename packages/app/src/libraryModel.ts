@@ -1,16 +1,19 @@
 /**
  * The editor's view of the patch library (#563): the entries the preset
- * browser lists and the actions write to, and where they came from — the
- * connected folder, read at start and after every write, or the library
- * baked into the page. One model, read by the browser, the badge and the
- * actions, so a save shows up everywhere without a rebuild.
+ * browser lists and the actions write to, and where they came from. In page
+ * mode that is the built-ins plus the user's own library in IndexedDB
+ * (`2026-09-27-user-library-in-indexeddb`); in folder mode, the developer's
+ * File System Access grant on the repo's patches, which replaces both while
+ * connected. Either store is read at start and after every write. One model,
+ * read by the browser, the badge and the actions, so a save shows up
+ * everywhere without a rebuild.
  */
 import type { Patch, PresetListing } from '@windsor/engine';
 import { loadUnsweptPatchFile } from '@windsor/engine';
 import { builtInEntries, loadBuiltIns } from './builtInLibrary';
 import type { PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
-import { LIBRARY_FOLDER_PATH, isInitPreset } from './libraryConstants';
+import { isInitPreset } from './libraryConstants';
 import { downloadPatchFile, patchFileName } from './patchFileWriter';
 import type { LibraryEntries } from './patchMetadata';
 
@@ -20,6 +23,10 @@ export interface LibraryModel {
   mode: LibraryMode;
   entries: LibraryEntries;
   folder: PatchFolder | null;
+  /** The user's library in IndexedDB; null until connected, or when the browser has no IndexedDB. */
+  user: PatchFolder | null;
+  /** The ids in `entries` that are the user's own, writable in page mode; built-ins never are. */
+  userIds: ReadonlySet<string>;
   /** The last folder read's load failures, for the status line. */
   problems: string[];
 }
@@ -27,17 +34,38 @@ export interface LibraryModel {
 /** The one instance the console shares; tests build their own with `pageLibrary()`. */
 export const library: LibraryModel = pageLibrary();
 
-export function pageLibrary(): LibraryModel {
-  return { mode: 'page', entries: builtInEntries(), folder: null, problems: [] };
+export function pageLibrary(user: PatchFolder | null = null): LibraryModel {
+  return {
+    mode: 'page',
+    entries: builtInEntries(),
+    folder: null,
+    user,
+    userIds: new Set(),
+    problems: [],
+  };
 }
 
 export const libraryPatch = (model: LibraryModel, id: string): Patch | undefined =>
   Object.hasOwn(model.entries, id) ? model.entries[id]?.patch : undefined;
 
-/** Load the built-ins, and show them if the model is still on the page library. */
+/**
+ * True when a write may go over `id`: any file in the connected folder, or a
+ * user patch in page mode. A built-in in page mode is read-only — Save forks
+ * it to a new id instead (decision 1 of the user-library record).
+ */
+export const isWritable = (model: LibraryModel, id: string): boolean =>
+  model.folder ? Object.hasOwn(model.entries, id) : model.userIds.has(id);
+
+/** Load the built-ins, and show them (with the user's patches) if the model is on the page library. */
 export async function loadPageLibrary(model: LibraryModel): Promise<void> {
   await loadBuiltIns();
-  if (model.mode === 'page') model.entries = builtInEntries();
+  if (model.mode === 'page') await refreshLibrary(model);
+}
+
+/** Attach the user's library store and read it in beside the built-ins. */
+export async function connectUserLibrary(model: LibraryModel, user: PatchFolder): Promise<void> {
+  model.user = user;
+  await refreshLibrary(model);
 }
 
 /** Point the model at a folder and read it. */
@@ -47,23 +75,48 @@ export async function connectLibrary(model: LibraryModel, folder: PatchFolder): 
   await refreshLibrary(model);
 }
 
-/** Back to the library baked into the page. */
-export function disconnectLibrary(model: LibraryModel): void {
-  Object.assign(model, pageLibrary());
-}
-
-/** Re-read the folder (after every write); a no-op in page mode. */
-export async function refreshLibrary(model: LibraryModel): Promise<void> {
-  if (!model.folder) return;
-  const { entries, problems } = await readFolderLibrary(model.folder);
-  model.entries = entries;
-  model.problems = problems;
+/** Back to the built-ins and the user's library. */
+export async function disconnectLibrary(model: LibraryModel): Promise<void> {
+  Object.assign(model, pageLibrary(model.user));
+  await refreshLibrary(model);
 }
 
 /**
- * Write one file: into the folder and re-read it, or — with no folder — a
- * download plus the entry kept in memory so the browser reflects it for the
- * rest of the session.
+ * Re-read the store the model is on (after every write): the folder, or the
+ * user's library over the built-ins. A user id a built-in also has stays
+ * hidden behind the built-in — built-ins are never shadowed — and is named
+ * under `problems`.
+ */
+export async function refreshLibrary(model: LibraryModel): Promise<void> {
+  if (model.folder) {
+    const { entries, problems } = await readFolderLibrary(model.folder);
+    model.entries = entries;
+    model.problems = problems;
+    return;
+  }
+  const builtIns = builtInEntries();
+  if (!model.user) {
+    model.entries = builtIns;
+    return;
+  }
+  const { entries, problems } = await readFolderLibrary(model.user);
+  const clashes = Object.keys(entries).filter((id) => Object.hasOwn(builtIns, id));
+  const own = Object.fromEntries(
+    Object.entries(entries).filter(([id]) => !Object.hasOwn(builtIns, id)),
+  );
+  model.entries = { ...builtIns, ...own };
+  model.userIds = new Set(Object.keys(own));
+  model.problems = [
+    ...problems,
+    ...clashes.map((id) => `your patch "${id}" is hidden by the built-in of the same id`),
+  ];
+}
+
+/**
+ * Write one file: into the folder or the user's library and re-read it, or —
+ * with neither (a browser without IndexedDB) — a download plus the entry kept
+ * in memory so the browser reflects it for the rest of the session. A
+ * built-in id is refused in page mode: built-ins are never shadowed.
  */
 export async function writeLibraryFile(
   model: LibraryModel,
@@ -71,8 +124,11 @@ export async function writeLibraryFile(
   text: string,
   download: (id: string, text: string) => void = downloadPatchFile,
 ): Promise<void> {
-  if (model.folder) {
-    await model.folder.write(patchFileName(id), text);
+  if (!model.folder && Object.hasOwn(builtInEntries(), id))
+    throw new Error(`"${id}" is a built-in patch and stays read-only.`);
+  const store = model.folder ?? model.user;
+  if (store) {
+    await store.write(patchFileName(id), text);
     await refreshLibrary(model);
     return;
   }
@@ -84,16 +140,19 @@ export async function writeLibraryFile(
   // Refused the same way here: no entry, and the reason on the row.
   try {
     model.entries = { ...model.entries, [id]: loadUnsweptPatchFile(id, JSON.parse(text)) };
+    model.userIds = new Set([...model.userIds, id]);
     model.problems = [];
   } catch (error) {
     model.problems = [error instanceof Error ? error.message : String(error)];
   }
 }
 
-/** Remove one file from the folder and re-read it; refused in page mode. */
+/** Remove one of the user's patches, or a folder file, and re-read; a built-in is refused. */
 export async function removeLibraryFile(model: LibraryModel, id: string): Promise<void> {
-  if (!model.folder) throw new Error('Delete needs the library folder connected.');
-  await model.folder.remove(patchFileName(id));
+  const store = model.folder ?? model.user;
+  if (!store) throw new Error('This browser cannot store patches, so there is none to delete.');
+  if (!isWritable(model, id)) throw new Error(`"${id}" is a built-in patch and stays read-only.`);
+  await store.remove(patchFileName(id));
   await refreshLibrary(model);
 }
 
@@ -102,7 +161,19 @@ export function libraryModeText(model: LibraryModel): string {
   const count = Object.keys(model.entries).length;
   if (model.folder)
     return `Library: folder "${model.folder.name}" (${count} patches) — Save writes to it`;
-  return `Library: baked into the page (${count} patches) — Save downloads <id>.json; connect ${LIBRARY_FOLDER_PATH} to write`;
+  const built = count - model.userIds.size;
+  if (model.user)
+    return `Library: ${built} built-in patches and ${model.userIds.size} of yours, kept in this browser`;
+  return `Library: ${built} built-in patches — this browser cannot store your own, so Save downloads <id>.json`;
+}
+
+function sourceOf(
+  id: string,
+  inDocument: boolean,
+  userIds: ReadonlySet<string>,
+): PresetListing['source'] {
+  if (inDocument) return 'document';
+  return userIds.has(id) ? 'library' : 'built-in';
 }
 
 /**
@@ -115,6 +186,7 @@ export function libraryModeText(model: LibraryModel): string {
 export function listLibrary(
   entries: LibraryEntries,
   documentPatches: Readonly<Record<string, Patch>> = {},
+  userIds: ReadonlySet<string> = new Set(),
 ): PresetListing[] {
   const ids = [...new Set([...Object.keys(documentPatches), ...Object.keys(entries)])].filter(
     (id) => !isInitPreset(id),
@@ -127,7 +199,7 @@ export function listLibrary(
       return {
         id,
         name: patch?.name ?? id,
-        source: documentPatch ? 'document' : 'built-in',
+        source: sourceOf(id, documentPatch !== undefined, userIds),
         category: entry?.category ?? 'Uncategorized',
         tags: entry?.tags ?? [],
         description: documentPatch

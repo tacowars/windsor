@@ -1,13 +1,16 @@
 /**
  * The Parts tab's library row (#563): Init, Save, Copy to new, Delete, the
- * folder grant and the unsaved marker, over `patchActions.ts` and the modals.
+ * folder grant (the developer mode) and the unsaved marker, over
+ * `patchActions.ts` and the modals. Writes go to the user's library in this
+ * browser (`2026-09-27-user-library-in-indexeddb`), or to the folder while
+ * one is connected.
  * The actions are pure and tested; this wires them to buttons and keeps the
  * header's library-mode line current.
  */
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { LIBRARY_FOLDER_PATH } from './libraryConstants';
-import type { ChromeDirectoryHandle } from './libraryFolder';
+import type { ChromeDirectoryHandle, PatchFolder } from './libraryFolder';
 import {
   folderApiAvailable,
   forgetHandle,
@@ -26,6 +29,7 @@ import {
   libraryModeText,
   refreshLibrary,
 } from './libraryModel';
+import type { LibraryModel } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
@@ -43,6 +47,7 @@ import {
   initPatch,
   isModified,
   patchOrigin,
+  saveForks,
   savePatch,
   unsavedQuestion,
 } from './patchActions';
@@ -62,8 +67,13 @@ export function syncLibraryMode(): void {
   line.title = library.problems.join('\n');
 }
 
-/** At boot: load the built-ins, then reconnect a remembered folder whose grant still stands. */
-export async function bootLibrary(): Promise<void> {
+/**
+ * At boot: attach the user's library (null where the browser has no
+ * IndexedDB), load the built-ins beside it, then reconnect a remembered
+ * folder whose grant still stands.
+ */
+export async function bootLibrary(user: PatchFolder | null): Promise<void> {
+  library.user = user;
   await loadPageLibrary(library);
   if (!folderApiAvailable()) return;
   const handle = await recallHandle();
@@ -119,18 +129,44 @@ async function connectFolder(ctx: AppCtx): Promise<void> {
 
 async function forgetFolder(ctx: AppCtx): Promise<void> {
   await forgetHandle();
-  disconnectLibrary(library);
+  await disconnectLibrary(library);
   remembered = null;
-  ctx.status('library folder forgotten — back on the page library; Save downloads');
+  ctx.status('library folder forgotten — Save writes to your library in this browser again');
   ctx.render();
 }
 
 const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> => checkLoudness(ctx.parts.patch);
 
+/** What the status line says after a write, by where it went. */
+function writtenText(model: LibraryModel, id: string, verb: string): string {
+  if (model.folder) return `${verb} ${id}.json — run the sweep before committing`;
+  if (model.user) return `${verb} "${id}" in your library`;
+  return `downloaded ${id}.json — this browser cannot keep it`;
+}
+
+interface CopyWording {
+  title: string;
+  hint: string;
+}
+
+const COPY_WORDING: CopyWording = {
+  title: 'Copy to new',
+  hint: 'Saves the working patch as a new patch in your library and switches this part to it.',
+};
+
+const forkWording = (name: string): CopyWording => ({
+  title: `Save your own "${name}"`,
+  hint: 'Built-in patches stay as they are: this saves your edit as a new patch in your library and switches this part to it.',
+});
+
 async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {
   const scope = scopeFor(ctx);
   const origin = patchOrigin(scope);
   if (origin.kind !== 'library') return;
+  if (saveForks(scope)) {
+    const name = library.entries[origin.id]?.name ?? origin.id;
+    return runCopy(ctx, opener, refresh, forkWording(name));
+  }
   const meta = await openMetadataModal(
     {
       title: `Save over ${origin.id}.json`,
@@ -146,17 +182,21 @@ async function runSave(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
   );
   if (!meta) return;
   const id = await savePatch({ ...scope, working: ctx.parts.patch, meta });
-  ctx.status(`saved ${id}.json — run the sweep before committing`);
+  ctx.status(writtenText(library, id, 'saved'));
   refresh();
 }
 
-async function runCopy(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {
+async function runCopy(
+  ctx: AppCtx,
+  opener: HTMLElement,
+  refresh: () => void,
+  wording: CopyWording = COPY_WORDING,
+): Promise<void> {
   const scope = scopeFor(ctx);
   const taken = [...Object.keys(library.entries), ...Object.keys(ctx.model.doc.patches ?? {})];
   const meta = await openMetadataModal(
     {
-      title: 'Copy to new',
-      hint: 'Writes the working patch as a new library file and switches this part to it.',
+      ...wording,
       initial: copyPrefill(scope, ctx.parts.patch),
       entries: library.entries,
       id: (name) => uniqueId(slugify(name), taken),
@@ -167,7 +207,7 @@ async function runCopy(ctx: AppCtx, opener: HTMLElement, refresh: () => void): P
   );
   if (!meta) return;
   const id = await copyToNew({ ...scope, working: ctx.parts.patch, meta });
-  ctx.status(`wrote ${id}.json — this part now plays it; run the sweep before committing`);
+  ctx.status(`${writtenText(library, id, 'saved')} — this part now plays it`);
   refresh();
 }
 
@@ -179,13 +219,15 @@ async function runDelete(ctx: AppCtx, opener: HTMLElement, refresh: () => void):
   const name = library.entries[origin.id]?.name ?? origin.id;
   const ok = await openConfirm({
     title: `Delete "${name}"?`,
-    body: `Removes ${origin.id}.json from the library folder. Songs keep their own copies; this part keeps playing the document's copy.`,
+    body: `Removes ${library.folder ? `${origin.id}.json from the library folder` : 'it from your library'}. Songs keep their own copies; this part keeps playing the song's copy.`,
     ok: 'Delete',
     opener,
   });
   if (!ok) return;
   await deletePatch(library, origin.id);
-  ctx.status(`deleted ${origin.id}.json`);
+  ctx.status(
+    library.folder ? `deleted ${origin.id}.json` : `deleted "${origin.id}" from your library`,
+  );
   refresh();
 }
 
@@ -218,13 +260,21 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
   };
   const init = button('Init', 'makePatch() defaults; not in the library until Copy to new', true);
   init.onclick = (): void => run(runInit, init);
-  const save = button('Save', 'Write over this library id', canSave(origin));
+  const save = button(
+    'Save',
+    saveForks(scope)
+      ? 'Save your edit as a new patch; built-ins stay read-only'
+      : 'Save over this patch',
+    canSave(origin),
+  );
   save.onclick = (): void => run(runSave, save);
-  const copy = button('Copy to new', 'Save as a new library patch', canCopy(origin));
+  const copy = button('Copy to new', 'Save as a new patch in your library', canCopy(origin));
   copy.onclick = (): void => run(runCopy, copy);
   const del = button(
     'Delete',
-    library.folder ? 'Remove the file from the library folder' : 'Connect the library folder first',
+    library.folder
+      ? 'Remove the file from the library folder'
+      : 'Remove from your library; built-ins stay',
     canDelete(origin, library),
   );
   del.onclick = (): void => run(runDelete, del);
@@ -239,7 +289,7 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     else if (remembered) label = 'Re-grant folder';
     const connect = button(
       label,
-      `Grant access to ${LIBRARY_FOLDER_PATH} so Save writes the file`,
+      `Developer mode: grant access to ${LIBRARY_FOLDER_PATH} in a Windsor checkout so Save writes the file there`,
       true,
     );
     connect.onclick = (): void => {
@@ -247,7 +297,7 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     };
     folderRow.appendChild(connect);
     if (library.folder) {
-      const forget = button('Forget folder', 'Back to the library baked into the page', true);
+      const forget = button('Forget folder', 'Back to your library in this browser', true);
       forget.onclick = (): void => {
         forgetFolder(ctx).catch((error: unknown) => ctx.status(String(error)));
       };
@@ -259,9 +309,9 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
       };
       folderRow.append(reread, forget);
     }
-  } else {
+  } else if (!library.user) {
     folderRow.appendChild(
-      el('p', 'hint', 'No File System Access API here: Save downloads <id>.json.'),
+      el('p', 'hint', 'This browser cannot store patches: Save downloads <id>.json.'),
     );
   }
   box.appendChild(folderRow);

@@ -352,3 +352,20 @@ describe('deepMerge', () => {
     expect(deepMerge({ a: [1, 2, 3] }, { a: [4] })).toEqual({ a: [4] });
   });
 });
+
+describe('change listeners (the song autosave)', () => {
+  it('hears every open, merge and mutate, until unsubscribed', () => {
+    const model = new DocumentModel({ version: 3, parts: [] });
+    let heard = 0;
+    const stop = model.onChange(() => heard++);
+    model.merge({ transport: { bpm: 100 } });
+    model.mutate((draft) => {
+      draft.transport = { bpm: 110 };
+    });
+    model.open({ version: 3, parts: [] });
+    expect(heard).toBe(3);
+    stop();
+    model.merge({ transport: { bpm: 120 } });
+    expect(heard).toBe(3);
+  });
+});

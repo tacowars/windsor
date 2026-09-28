@@ -10,7 +10,10 @@ Mixer, Song, Arrangement — over the **real** audio engine, plus
 an audition keyboard and a MIDI path. It boots on a new song (one part, the
 Init patch, no sequencer — #598) and opens a committed song through Import;
 Export writes the normalised document, patches and returns included — one
-file is the whole piece, and Import reads it back.
+file is the whole piece, and Import reads it back. The user's own patches and
+the autosaved open song live in the browser's IndexedDB
+(`2026-09-27-user-library-in-indexeddb`); on a reload the console asks before
+restoring that song.
 
 It is a **Vite app deployed as static files**: `index.html` (markup only),
 `src/console.css` (the whole stylesheet, imported by `src/main.ts`) and
@@ -97,10 +100,11 @@ and its extension checklists, so neither states the other's content twice.
 Composition → context → tabs → cards → pure models → the engine. Each layer
 knows the one below it and nothing above.
 
-1. **`main.ts` is composition only** (57 lines): it constructs the
+1. **`main.ts` is composition only** (67 lines): it constructs the
    `DocumentModel`, the `EngineHost`, the `AppContext`, the `Keyboard` and the
-   `MidiAccessor`, hands `mountTabShell` the four tabs, wires the power button
-   and starts the look-ahead pump. No behaviour lives here.
+   `MidiAccessor`, hands `mountTabShell` the four tabs, wires the power button,
+   starts `userSession.ts`'s `bootUserState` (the user library, the restore
+   question, the autosave) and the look-ahead pump. No behaviour lives here.
 2. **`appContext.ts` is the `AppCtx` implementation** (#620): it owns the tab
    registry, the `PartsSession` (whose `commit` is this context's document
    write, a constructor parameter rather than a module hook), and the
@@ -148,7 +152,8 @@ knows the one below it and nothing above.
    `harmonyLaneModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
    `patchMetadata.ts`, `libraryModel.ts`, `ratioSplit.ts`,
    `envelopeTransfer.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
-   `loudnessCheck.ts` — take values and return values. **The tests run in
+   `loudnessCheck.ts`, `songAutosave.ts`, `songRestore.ts`,
+   `storagePersistence.ts` — take values and return values. **The tests run in
    Node with no DOM**, so a rule worth testing belongs in a model, a table or
    a write function, not in a click handler (`patchPanels.test.ts` tests
    `writeToggle`, not the button).
@@ -314,10 +319,15 @@ lane and the part lanes
 2. The button goes in `libraryActions.ts`'s row; a modal is an
    `index.html` `<dialog>` through `metadataModal.ts` (never `window.confirm`), focus
    trapped by `focusTrap.ts`.
-3. A write goes through `patchFileWriter.ts` (the folder grant in
-   `libraryFolder.ts`, otherwise a download for `import-patches.mjs`), and the
-   row shows `AFTER_WRITE_COMMANDS` (`libraryConstants.ts`) — pinned equal to
-   the scripts' copy in `lib/afterWriteCommands.mjs` by its test.
+3. A write goes through `patchFileWriter.ts` and `libraryModel.ts`'s
+   `writeLibraryFile`: into the user's library in IndexedDB
+   (`userLibraryStore.ts`), into the folder while the developer's grant
+   (`libraryFolder.ts`) is connected, or — in a browser with no IndexedDB —
+   a download. Built-ins are read-only: a write over one is refused, and Save
+   forks it (`saveForks`). Both stores are a `PatchFolder`, so a test fakes
+   either in memory. In folder mode the status line names the sweep, and
+   `AFTER_WRITE_COMMANDS` (`libraryConstants.ts`) is pinned equal to the
+   scripts' copy in `lib/afterWriteCommands.mjs` by its test.
 
 ## The build
 
@@ -398,6 +408,11 @@ offered once the browser grants access (#523).
 - **The keyboard's held map is keyed on `e.code`, and Panic reaches every part
   that sounded** (#617): a layout-dependent `e.key` stuck notes on, and a
   latched note on a part the selection has since left is still sounding.
+- **IndexedDB is the one untested seam** (`2026-09-27-user-library-in-indexeddb`):
+  the tests run in Node with none, so the user library is a `PatchFolder` and
+  the autosave a `SongStore`, both faked in memory, and only
+  `userLibraryStore.ts` touches the browser API. Check a change there in the
+  browser (`npm run dev`, DevTools → Application → IndexedDB → `windsor`).
 - **`console.css` is brace-checked by `consoleBoundary.test.ts`** (#610): a
   rule that loses its closing brace silently nests every later rule, and the
   console renders unstyled with the build and every other test green.

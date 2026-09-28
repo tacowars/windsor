@@ -17,7 +17,7 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { INIT_PATCH_NAME, initPresetId, isInitPreset } from './libraryConstants';
 import type { LibraryModel } from './libraryModel';
-import { removeLibraryFile, writeLibraryFile } from './libraryModel';
+import { isWritable, removeLibraryFile, writeLibraryFile } from './libraryModel';
 import { buildPatchFile, patchFileText } from './patchFileWriter';
 import type { PatchMetadata } from './patchMetadata';
 import { copyMetadata, slugify, uniqueId } from './patchMetadata';
@@ -63,7 +63,17 @@ export function isModified(scope: PatchScope, working: Patch): boolean {
 export const canSave = (origin: PatchOrigin): boolean => origin.kind === 'library';
 export const canCopy = (origin: PatchOrigin): boolean => origin.kind !== 'none';
 export const canDelete = (origin: PatchOrigin, library: LibraryModel): boolean =>
-  origin.kind === 'library' && library.folder !== null;
+  origin.kind === 'library' && isWritable(library, origin.id);
+
+/**
+ * True when Save on this part forks rather than overwrites: its patch is a
+ * built-in, which stays read-only, so the edit goes to a new id in the
+ * user's library (decision 1 of `2026-09-27-user-library-in-indexeddb`).
+ */
+export function saveForks(scope: PatchScope): boolean {
+  const origin = patchOrigin(scope);
+  return origin.kind === 'library' && !isWritable(scope.library, origin.id);
+}
 
 /** Why an id cannot be deleted, or null. */
 export function deleteRefusal(id: string): string | null {
@@ -145,10 +155,14 @@ export interface WriteRequest extends PatchScope {
   download?: (id: string, text: string) => void;
 }
 
-/** Save over the current library id; the open song's copy follows, since the part plays it. */
+/**
+ * Save over the current library id; the open song's copy follows, since the
+ * part plays it. A built-in forks instead: Copy to new under `meta`'s name.
+ */
 export async function savePatch(request: WriteRequest): Promise<string> {
   const origin = patchOrigin(request);
   if (origin.kind !== 'library') throw new Error('Save needs a library patch; use Copy to new.');
+  if (saveForks(request)) return copyToNew(request);
   const { ctx, library, meta, working } = request;
   const file = buildPatchFile(meta, working, library.entries[origin.id]?.headroom);
   await writeLibraryFile(library, origin.id, patchFileText(file), request.download);
@@ -158,7 +172,7 @@ export async function savePatch(request: WriteRequest): Promise<string> {
   return origin.id;
 }
 
-/** Save the working patch as a new library entry, and switch the part to it. */
+/** Save the working patch as a new entry in the user's library (or the folder), and switch the part to it. */
 export async function copyToNew(request: WriteRequest): Promise<string> {
   const { ctx, library, slot, meta, working } = request;
   const wasInit = patchOrigin(request).kind === 'init';
@@ -173,7 +187,7 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   return id;
 }
 
-/** Remove a library file; refused for the engine's fallback patch. Songs keep their copies. */
+/** Remove one of the user's patches (or a folder file); refused for a built-in and the fallback. Songs keep their copies. */
 export async function deletePatch(library: LibraryModel, id: string): Promise<void> {
   const refusal = deleteRefusal(id);
   if (refusal) throw new Error(refusal);
