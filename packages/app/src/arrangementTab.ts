@@ -15,6 +15,7 @@ import type { AppCtx } from './context';
 import { el, section } from './dom';
 import { openConfirm } from './metadataModal';
 import { newSong } from './songParts';
+import { importRefusedText, songRefusal } from './songRestore';
 
 /** Start over on a new song, asking first when this one has changed since it was opened (#598). */
 function newSongButton(ctx: AppCtx): HTMLElement {
@@ -78,6 +79,10 @@ function documentSection(ctx: AppCtx): HTMLElement {
     // must have arrived before the document is normalised.
     Promise.all([chosen.text(), loadBuiltIns()])
       .then(([text]) => {
+        // A song format this build cannot read is refused before anything is
+        // replaced (`2026-09-28-format-versions-refuse-never-destroy`).
+        const refusal = songRefusal(text);
+        if (refusal) return ctx.notify(importRefusedText(chosen.name, refusal), 'error');
         ctx.importDoc(JSON.parse(text) as unknown);
         ctx.notify(`imported ${chosen.name}`, 'success');
       })

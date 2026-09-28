@@ -11,7 +11,7 @@ import type { AppCtx } from './context';
 import { DocumentModel } from './documentModel';
 import type { ConfirmRequest } from './metadataModal';
 import type { StoredSong } from './songAutosave';
-import { offerRestore, restoreRequest } from './songRestore';
+import { importRefusedText, offerRestore, restoreRequest, songRefusal } from './songRestore';
 import { newSong } from './songParts';
 
 beforeAll(() => loadBuiltIns());
@@ -71,5 +71,66 @@ describe('offerRestore', () => {
     expect(request.body).toContain('2026');
     expect(request.body).toContain('kept until your first edit');
     expect(restoreRequest({ updated: 'yesterday', document: '{}' }).body).toContain('yesterday');
+  });
+
+  describe('a song in a format this build cannot read', () => {
+    /** The exported song with its version bumped, spacing and all. */
+    const future = (): string => song().replace('"version": 3,', '"version": 99,');
+
+    it('asks to download it or start fresh, naming both formats, and never opens it', async () => {
+      const ctx = context();
+      const fresh = ctx.model.toJson();
+      const asked: ConfirmRequest[] = [];
+      const downloads: string[] = [];
+      const text = future();
+      const answer = (request: ConfirmRequest): Promise<boolean> => {
+        asked.push(request);
+        return Promise.resolve(true);
+      };
+      const restored = await offerRestore(ctx, saved(text), answer, (body) => downloads.push(body));
+      expect(restored).toBe(false);
+      expect(asked).toHaveLength(1);
+      expect(asked[0]?.ok).toBe('Download the old song');
+      expect(asked[0]?.cancel).toBe('Start fresh');
+      expect(asked[0]?.body).toContain('saved with song format 99, this build reads 3');
+      expect(asked[0]?.body).toContain('kept until your first edit');
+      expect(downloads).toEqual([text]);
+      expect(ctx.model.toJson()).toBe(fresh);
+      expect(ctx.messages).toEqual([]);
+    });
+
+    it('downloads nothing on Start fresh', async () => {
+      const ctx = context();
+      const downloads: string[] = [];
+      const restored = await offerRestore(
+        ctx,
+        saved(future()),
+        () => Promise.resolve(false),
+        (body) => downloads.push(body),
+      );
+      expect(restored).toBe(false);
+      expect(downloads).toEqual([]);
+    });
+
+    it('is refused whole when a patch in its snapshot is unreadable', () => {
+      const doc = JSON.parse(song()) as { patches: Record<string, Record<string, unknown>> };
+      const [id] = Object.keys(doc.patches);
+      doc.patches[id!] = { ...doc.patches[id!], format: 99 };
+      const refusal = songRefusal(JSON.stringify(doc));
+      expect(refusal?.patch).toBe(id);
+      expect(refusal?.message).toBe(
+        `saved with patch format 99 in patch "${id}", this build reads 1`,
+      );
+    });
+
+    it('refuses an import with the same words, and leaves the readable and the unparsable alone', () => {
+      const refusal = songRefusal(future());
+      expect(refusal).not.toBeNull();
+      expect(importRefusedText('song.json', refusal!)).toBe(
+        'import refused: song.json was saved with song format 99, this build reads 3. The file is unchanged.',
+      );
+      expect(songRefusal(song())).toBeNull();
+      expect(songRefusal('{not json')).toBeNull();
+    });
   });
 });

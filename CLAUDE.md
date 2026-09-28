@@ -111,6 +111,13 @@ bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (mai
   the PR body names it. The records imported from Aotearoa204 are history:
   they describe the engine as it was built for the game and are never
   edited.
+- **Format versions:** a PR that makes old songs or patches load wrong or
+  fail (a rename, a re-scale, a removed field, a changed meaning) bumps
+  `ARRANGEMENT_VERSION` or `PATCH_FILE_FORMAT`, says so in its body, and
+  either adds an upgrade to `songMigrations.ts` / `patchMigrations.ts` or
+  states that none is provided. An additive field whose default reproduces
+  the old behaviour bumps nothing
+  (`docs/log/2026-09-28-format-versions-refuse-never-destroy.md`).
 - **Research and measurements:** `docs/research/<date>-<slug>/`.
 - **Commit style:** a sentence-case imperative subject, with a body that
   explains why.

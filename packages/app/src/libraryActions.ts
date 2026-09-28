@@ -33,6 +33,7 @@ import type { LibraryModel } from './libraryModel';
 import type { LoudnessResult } from './loudnessCheck';
 import { checkLoudness } from './loudnessCheck';
 import { openConfirm, openMetadataModal } from './metadataModal';
+import { oldFormatList } from './oldFormatPatches';
 import type { PatchScope } from './patchActions';
 import {
   canCopy,
@@ -325,6 +326,7 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     );
   }
   box.appendChild(folderRow);
+  box.appendChild(oldFormatList(ctx, library, refresh));
   queueMicrotask(() => {
     syncModifiedMarker(ctx);
     reportLibraryProblems(ctx);

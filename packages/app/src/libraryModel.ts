@@ -11,7 +11,7 @@
 import type { Patch, PresetListing } from '@windsor/engine';
 import { loadUnsweptPatchFile } from '@windsor/engine';
 import { builtInEntries, loadBuiltIns } from './builtInLibrary';
-import type { PatchFolder } from './libraryFolder';
+import type { OldFormatPatch, PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
 import { isInitPreset } from './libraryConstants';
 import { downloadPatchFile, patchFileName } from './patchFileWriter';
@@ -29,6 +29,12 @@ export interface LibraryModel {
   userIds: ReadonlySet<string>;
   /** The last folder read's load failures, for the status line. */
   problems: string[];
+  /**
+   * Stored patches in a format this build cannot read
+   * (`2026-09-28-format-versions-refuse-never-destroy`): never in `entries`,
+   * so never playable or assignable; kept for Export and Delete.
+   */
+  oldFormat: OldFormatPatch[];
 }
 
 /** The one instance the console shares; tests build their own with `pageLibrary()`. */
@@ -42,6 +48,7 @@ export function pageLibrary(user: PatchFolder | null = null): LibraryModel {
     user,
     userIds: new Set(),
     problems: [],
+    oldFormat: [],
   };
 }
 
@@ -89,17 +96,20 @@ export async function disconnectLibrary(model: LibraryModel): Promise<void> {
  */
 export async function refreshLibrary(model: LibraryModel): Promise<void> {
   if (model.folder) {
-    const { entries, problems } = await readFolderLibrary(model.folder);
+    const { entries, problems, oldFormat } = await readFolderLibrary(model.folder);
     model.entries = entries;
     model.problems = problems;
+    model.oldFormat = oldFormat;
     return;
   }
   const builtIns = builtInEntries();
   if (!model.user) {
     model.entries = builtIns;
+    model.oldFormat = [];
     return;
   }
-  const { entries, problems } = await readFolderLibrary(model.user);
+  const { entries, problems, oldFormat } = await readFolderLibrary(model.user);
+  model.oldFormat = oldFormat;
   const clashes = Object.keys(entries).filter((id) => Object.hasOwn(builtIns, id));
   const own = Object.fromEntries(
     Object.entries(entries).filter(([id]) => !Object.hasOwn(builtIns, id)),
@@ -152,6 +162,30 @@ export async function removeLibraryFile(model: LibraryModel, id: string): Promis
   const store = model.folder ?? model.user;
   if (!store) throw new Error('This browser cannot store patches, so there is none to delete.');
   if (!isWritable(model, id)) throw new Error(`"${id}" is a built-in patch and stays read-only.`);
+  await store.remove(patchFileName(id));
+  await refreshLibrary(model);
+}
+
+/** An old-format patch by id, or undefined. */
+export const oldFormatPatch = (model: LibraryModel, id: string): OldFormatPatch | undefined =>
+  model.oldFormat.find((entry) => entry.id === id);
+
+/** Export an old-format patch: its stored text, byte for byte, as `<id>.json`. */
+export function exportOldFormat(
+  model: LibraryModel,
+  id: string,
+  download: (id: string, text: string) => void = downloadPatchFile,
+): void {
+  const entry = oldFormatPatch(model, id);
+  if (!entry) throw new Error(`"${id}" is not an old-format patch in this library.`);
+  download(id, entry.text);
+}
+
+/** Delete an old-format patch from the store it was read from, on the user's word, and re-read. */
+export async function removeOldFormat(model: LibraryModel, id: string): Promise<void> {
+  const store = model.folder ?? model.user;
+  if (!store || !oldFormatPatch(model, id))
+    throw new Error(`"${id}" is not an old-format patch in this library.`);
   await store.remove(patchFileName(id));
   await refreshLibrary(model);
 }

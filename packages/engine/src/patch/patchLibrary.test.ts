@@ -23,6 +23,7 @@ import {
   patchContentHash,
 } from './patchLibrary';
 import type { PatchFile } from './patchLibrary';
+import { PatchFormatError } from './patchMigrations';
 import { PATCH_FILES } from '../patches/index';
 import { PATCH_LIBRARY, PRESETS } from './presets';
 
@@ -135,9 +136,19 @@ describe('the loader rejects', () => {
     }
   });
 
-  it('a format it does not know', () => {
+  it('a format it does not know, as a PatchFormatError naming both formats', () => {
+    expect(() => loadPatchFile('lead-bell', { ...real, format: 2 })).toThrow(PatchFormatError);
     expect(() => loadPatchFile('lead-bell', { ...real, format: 2 })).toThrow(
-      /format: expected 1, got 2/,
+      'patches/lead-bell.json: saved with patch format 2, this build reads 1',
+    );
+    expect(() => loadPatchFile('lead-bell', { ...real, format: '1' })).toThrow(
+      /format: expected 1, got 1/,
+    );
+  });
+
+  it('nothing for a missing format: the file is format 1', () => {
+    expect(loadPatchFile('lead-bell', without(real, 'format'))).toEqual(
+      loadPatchFile('lead-bell', real),
     );
   });
 

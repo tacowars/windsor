@@ -15,6 +15,7 @@ import {
   connectUserLibrary,
   createProblemReporter,
   disconnectLibrary,
+  exportOldFormat,
   isWritable,
   libraryProblemsText,
   libraryPatch,
@@ -22,6 +23,7 @@ import {
   pageLibrary,
   refreshLibrary,
   removeLibraryFile,
+  removeOldFormat,
   writeLibraryFile,
 } from './libraryModel';
 import { loadBuiltIns } from './builtInLibrary';
@@ -243,5 +245,76 @@ describe("the user's library", () => {
     await disconnectLibrary(model);
     expect(model.entries['my-kick']?.name).toBe('My Kick');
     expect(model.userIds.has('my-kick')).toBe(true);
+  });
+
+  describe('a patch in a format this build cannot read', () => {
+    /** Save's bytes with the format bumped, spacing and all: what Export must hand back. */
+    const future = (name: string): string => mine(name).replace('"format": 1,', '"format": 99,');
+
+    it('is listed as old format, never as an entry, and nothing is refused or dropped', async () => {
+      const text = future('Future Kick');
+      const files = new Map([
+        ['future-kick.json', text],
+        ['my-kick.json', mine('My Kick')],
+      ]);
+      const model = pageLibrary();
+      await connectUserLibrary(model, memoryFolder(files));
+      expect(model.oldFormat).toEqual([
+        {
+          id: 'future-kick',
+          name: 'Future Kick',
+          text,
+          refusal: {
+            format: 'patch',
+            found: 99,
+            reads: 1,
+            message: 'saved with patch format 99, this build reads 1',
+          },
+        },
+      ]);
+      expect(model.entries['future-kick']).toBeUndefined();
+      expect(libraryPatch(model, 'future-kick')).toBeUndefined();
+      expect(isWritable(model, 'future-kick')).toBe(false);
+      expect(listLibrary(model.entries, {}, model.userIds).map((e) => e.id)).not.toContain(
+        'future-kick',
+      );
+      expect(model.problems).toEqual([]);
+      expect(model.entries['my-kick']?.name).toBe('My Kick');
+      expect(files.get('future-kick.json')).toBe(text);
+    });
+
+    it('exports its stored text byte for byte', async () => {
+      const text = future('Future Kick');
+      const model = pageLibrary();
+      await connectUserLibrary(model, memoryFolder(new Map([['future-kick.json', text]])));
+      const downloads: Array<[string, string]> = [];
+      exportOldFormat(model, 'future-kick', (id, body) => downloads.push([id, body]));
+      expect(downloads).toEqual([['future-kick', text]]);
+      expect(() => exportOldFormat(model, 'kick', () => undefined)).toThrow('not an old-format');
+    });
+
+    it('is deleted only when asked, and only as old format', async () => {
+      const files = new Map([['future-kick.json', future('Future Kick')]]);
+      const model = pageLibrary();
+      await connectUserLibrary(model, memoryFolder(files));
+      await expect(removeOldFormat(model, 'kick')).rejects.toThrow('not an old-format');
+      await removeOldFormat(model, 'future-kick');
+      expect(files.size).toBe(0);
+      expect(model.oldFormat).toEqual([]);
+    });
+
+    it('is listed from a connected folder too, and a file with no format loads as today', async () => {
+      const unversioned = JSON.parse(mine('Plain Kick')) as Record<string, unknown>;
+      delete unversioned['format'];
+      const files = new Map([
+        ['future-kick.json', future('Future Kick')],
+        ['plain-kick.json', JSON.stringify(unversioned)],
+      ]);
+      const model = pageLibrary();
+      await connectLibrary(model, memoryFolder(files));
+      expect(model.oldFormat.map((entry) => entry.id)).toEqual(['future-kick']);
+      expect(model.entries['plain-kick']?.format).toBe(1);
+      expect(model.problems).toEqual([]);
+    });
   });
 });

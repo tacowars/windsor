@@ -57,6 +57,8 @@ export interface ConfirmRequest {
   title: string;
   body: string;
   ok: string;
+  /** The other button's label; "Cancel" when absent. */
+  cancel?: string;
   opener?: HTMLElement | null;
 }
 
@@ -72,7 +74,9 @@ export async function openConfirm(request: ConfirmRequest): Promise<boolean> {
     answer = true;
     dialog.close();
   };
-  $('confirmCancel').onclick = (): void => dialog.close();
+  const cancel = $('confirmCancel');
+  cancel.textContent = request.cancel ?? 'Cancel';
+  cancel.onclick = (): void => dialog.close();
   const shown = showTrapped(dialog, request.opener ?? null);
   ok.focus();
   await shown;

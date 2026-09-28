@@ -387,3 +387,15 @@ export * from './inserts/advancedDriveConstants';
 export { driveShape } from './inserts/advancedDriveCurves';
 export { DriveFilter } from './inserts/advancedDriveFilter';
 export * from './inserts/advancedDrivePresets';
+
+// Format versions (record `2026-09-28-format-versions-refuse-never-destroy`).
+export { SONG_MIGRATIONS, upgradeSong } from './song/songMigrations';
+export type { FormatMigrations, SongUpgrade } from './song/songMigrations';
+export {
+  PATCH_FORMAT_ABSENT,
+  PATCH_MIGRATIONS,
+  PatchFormatError,
+  upgradePatch,
+  upgradePatchFile,
+} from './patch/patchMigrations';
+export type { FormatRefusal, Migration, MigrationTable } from './song/formatUpgrade';
