@@ -41,6 +41,7 @@ lives one hour, which makes an idle hub re-read its context cold.
 5. **Two PR classes.** `routine` merges on green plus no P0 or P1 from
    Codex. `reviewed` (sound design, UI/UX, song document schema,
    persistence, golden changes, deviations) waits for tacowars.
+   Refined by `2026-09-28-pr-class-covers-ui-changes-not-ui-copy`.
 6. **Codex reviews every PR from GitHub.** The framing lives in
    `AGENTS.md` under "Code Review Rules" and spends the Codex allowance, not
    the Claude window. The main session triages findings; a fix is a fresh
