@@ -50,6 +50,10 @@ export const SONG_DRAG_THRESHOLD_PX = 4;
 export const REGION_EDGE_PX = 8;
 /** The gap a block leaves before the next one's left edge, so adjoining regions read as two. */
 export const BLOCK_GAP_PX = 2;
+/** The narrowest a block renders, whatever the zoom: a one-beat event at `minPxPerBar` stays visible and grabbable. */
+export const MIN_BLOCK_PX = 6;
+/** The largest share of a block's width each edge band may take, so the body always keeps a movable middle. */
+export const EDGE_BAND_FRACTION = 0.25;
 
 /** Px from the song start for a tick — the playhead line's, a block's left edge. */
 export const tickToPx = (tick: number, pxPerBar: number): number =>
@@ -76,6 +80,54 @@ export function rulerLabelEvery(
 /** The px offsets of the beat ticks inside one bar (the first beat is the bar line itself). */
 export const beatTickPx = (pxPerBar: number): number[] =>
   Array.from({ length: BEATS_PER_BAR - 1 }, (_, i) => tickToPx((i + 1) * PPQ, pxPerBar));
+
+/** Where a block draws on its lane, in px from the song start. */
+export interface BlockBox {
+  readonly leftPx: number;
+  readonly widthPx: number;
+}
+
+/**
+ * The drawn box of a block spanning `durationTicks` from `startTick`: its
+ * span less the gap to the next block, never narrower than `MIN_BLOCK_PX`
+ * (windsor#8: at the widest zoom-out a one-beat block would otherwise be
+ * 0 px wide and unselectable).
+ */
+export function blockBox(startTick: number, durationTicks: number, pxPerBar: number): BlockBox {
+  return {
+    leftPx: tickToPx(startTick, pxPerBar),
+    widthPx: Math.max(MIN_BLOCK_PX, tickToPx(durationTicks, pxPerBar) - BLOCK_GAP_PX),
+  };
+}
+
+/** The band at each end of a drawn block that drags that edge: `REGION_EDGE_PX`, capped at a share of the width. */
+export const edgeBandPx = (widthPx: number): number =>
+  Math.min(REGION_EDGE_PX, widthPx * EDGE_BAND_FRACTION);
+
+export type BlockHit = 'start' | 'end' | 'body';
+
+/** What a press `px` from the song start hits on `box`: an edge band, the body between them, or nothing. */
+export function blockHitAt(box: BlockBox, px: number): BlockHit | null {
+  const offset = px - box.leftPx;
+  if (offset < 0 || offset > box.widthPx) return null;
+  const band = edgeBandPx(box.widthPx);
+  if (offset < band) return 'start';
+  if (offset > box.widthPx - band) return 'end';
+  return 'body';
+}
+
+/** The topmost drawn box under `px` (the last, as later blocks draw over earlier ones) and what it hits there; null in a gap. */
+export function hitBlocks(
+  boxes: readonly BlockBox[],
+  px: number,
+): { index: number; hit: BlockHit } | null {
+  for (let index = boxes.length - 1; index >= 0; index--) {
+    const box = boxes[index];
+    const hit = box ? blockHitAt(box, px) : null;
+    if (hit) return { index, hit };
+  }
+  return null;
+}
 
 export type LaneTone = 'pitch' | 'perc' | 'none';
 

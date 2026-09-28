@@ -19,9 +19,15 @@ import {
   CYCLE_TICKS,
   LANE_TONE,
   REGION_SUMMARY,
+  MIN_BLOCK_PX,
+  REGION_EDGE_PX,
   SONG_VIEW,
   beatTickPx,
+  blockBox,
+  blockHitAt,
+  edgeBandPx,
   forKind,
+  hitBlocks,
   pxToTick,
   rulerLabelEvery,
   rulerLabels,
@@ -59,6 +65,46 @@ describe('the ruler scale', () => {
     expect(every * SONG_VIEW.minPxPerBar).toBeGreaterThanOrEqual(SONG_VIEW.minLabelPx);
     expect((every / 2) * SONG_VIEW.minPxPerBar).toBeLessThan(SONG_VIEW.minLabelPx);
     expect(rulerLabelEvery(0)).toBe(1);
+  });
+});
+
+describe('a block at the widest zoom-out (minPxPerBar)', () => {
+  const MIN = SONG_VIEW.minPxPerBar;
+
+  it('keeps a one-beat event visible and hittable', () => {
+    const beat = blockBox(3 * TICKS_PER_BAR, PPQ, MIN);
+    expect(beat.widthPx).toBe(MIN_BLOCK_PX);
+    expect(beat.leftPx).toBe(3 * MIN);
+    expect(blockHitAt(beat, beat.leftPx + beat.widthPx / 2)).toBe('body');
+    expect(blockHitAt(beat, beat.leftPx)).toBe('start');
+    expect(blockHitAt(beat, beat.leftPx + beat.widthPx)).toBe('end');
+  });
+
+  it('gives a one-bar region a movable centre between its two edge bands', () => {
+    const bar = blockBox(TICKS_PER_BAR, TICKS_PER_BAR, MIN);
+    const { leftPx, widthPx } = bar;
+    expect(edgeBandPx(widthPx)).toBeLessThan(widthPx / 2);
+    expect(blockHitAt(bar, leftPx)).toBe('start');
+    expect(blockHitAt(bar, leftPx + widthPx / 2)).toBe('body');
+    expect(blockHitAt(bar, leftPx + widthPx)).toBe('end');
+    expect(blockHitAt(bar, leftPx - 1)).toBeNull();
+    expect(blockHitAt(bar, leftPx + widthPx + 1)).toBeNull();
+  });
+
+  it('picks the block drawn on top where a widened block overlaps the next', () => {
+    const boxes = [blockBox(0, PPQ, MIN), blockBox(PPQ, PPQ, MIN)];
+    const second = boxes[1];
+    expect(second).toBeDefined();
+    expect(hitBlocks(boxes, (second?.leftPx ?? 0) + 1)?.index).toBe(1);
+    expect(hitBlocks(boxes, 0.5)?.index).toBe(0);
+    expect(hitBlocks(boxes, 100)).toBeNull();
+  });
+
+  it('keeps the full edge band on a wide block at the default zoom', () => {
+    const bar = blockBox(0, TICKS_PER_BAR, SONG_VIEW.pxPerBar);
+    expect(edgeBandPx(bar.widthPx)).toBe(REGION_EDGE_PX);
+    expect(blockHitAt(bar, REGION_EDGE_PX - 1)).toBe('start');
+    expect(blockHitAt(bar, REGION_EDGE_PX + 1)).toBe('body');
   });
 });
 
