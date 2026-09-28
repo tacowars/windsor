@@ -29,9 +29,11 @@ import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import type { Region } from '../sequencing/regionClock';
+import type { Swing } from '../sequencing/swingTables';
 
 export type { Harmony, HarmonyEvent } from '../harmony/harmonyTimeline';
 export type { Region } from '../sequencing/regionClock';
+export type { Swing, SwingGrid } from '../sequencing/swingTables';
 
 /**
  * A driver config as the arrangement stores it: since #705 the whole
@@ -96,11 +98,18 @@ export interface MusicPart {
   readonly sequencer: SequencerSpec;
 }
 
-/** The song's clock: its tempo and its explicit length (decision 5). */
+/** The song's clock: its tempo, its explicit length (decision 5) and its swing. */
 export interface Transport {
   readonly bpm: number;
   /** 1–`BARS_MAX` bars of `TICKS_PER_BAR` ticks; every region and event sits inside. */
   readonly bars: number;
+  /**
+   * One swing for every part (windsor#14, record
+   * `2026-09-28-song-swing-in-the-transport`): the off-beat 8th or 16th of each
+   * pair lands at `amount`%. Absent is straight (`STRAIGHT_SWING`): a song
+   * written before swing carries none, and its export stays without one.
+   */
+  readonly swing?: Swing;
 }
 
 export interface Arrangement {
