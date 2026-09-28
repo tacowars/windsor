@@ -10,6 +10,10 @@
  *       "patch": { …full normalised Patch… },
  *       "headroom": { "worstSeed", "peak", "seedsSwept", "contentHash" } }
  *
+ * - `format` is the file format (`patchMigrations.ts`): a file with none is
+ *   format 1, one an upgrade reaches is upgraded on load, and any other is
+ *   refused with a `PatchFormatError` (record
+ *   `2026-09-28-format-versions-refuse-never-destroy`).
  * - `id` is the filename slug, immutable; `name` is the editable display name
  *   and equals `patch.name` (epic decision 4).
  * - `patch` is a complete `Patch` exactly as `makePatch` would return it —
@@ -26,8 +30,9 @@
  */
 import type { Patch } from './patch';
 import { makePatch } from './patch';
+import { PATCH_FILE_FORMAT, PatchFormatError, upgradePatchFile } from './patchMigrations';
 
-export const PATCH_FILE_FORMAT = 1;
+export { PATCH_FILE_FORMAT };
 
 /** The offline sweep that writes a file's `headroom` record; error messages quote it. */
 export const SWEEP_COMMAND = 'node packages/app/sweep-headroom.mjs';
@@ -232,7 +237,8 @@ function refuse(id: string, problems: string[]): never {
 
 /**
  * Validates one file against the contract above and returns it typed, or
- * throws one error naming the file and every problem found.
+ * throws one error naming the file and every problem found — a
+ * `PatchFormatError` when the file's format is one this build cannot read.
  */
 export function loadPatchFile(id: string, raw: unknown): LibraryEntry {
   const entry = validatePatchFile(id, raw);
@@ -268,6 +274,17 @@ function validatePatchFile(id: string, raw: unknown): UnsweptLibraryEntry {
   if (!PATCH_ID_RULE.test(id))
     fail([`id "${id}" is not a slug (lower-case letters, digits and single hyphens)`]);
   if (!isRecord(raw)) return fail(['expected a JSON object']);
+  // The format first (record `2026-09-28-format-versions-refuse-never-destroy`):
+  // upgraded when the chain reaches this build's, refused as its own error
+  // otherwise, so the console can keep the file and list it as old.
+  const upgraded = upgradePatchFile(raw);
+  if ('refused' in upgraded) throw new PatchFormatError(id, upgraded.refused);
+  return validateCurrentFile(id, upgraded.value as Record<string, unknown>);
+}
+
+/** A file at this build's format against the contract. */
+function validateCurrentFile(id: string, raw: Record<string, unknown>): UnsweptLibraryEntry {
+  const fail = (problems: string[]): never => refuse(id, problems);
   const keys = keyDifference(raw, FILE_KEYS, REQUIRED_KEYS);
   if (keys) fail([keys]);
   const problems = [...metadataProblems(raw), ...patchProblems(raw['patch'])];

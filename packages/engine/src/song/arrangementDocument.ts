@@ -39,6 +39,8 @@ import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
 import type { ResolveOptions } from './arrangementValidate';
+import type { FormatRefusal } from './formatUpgrade';
+import { upgradeSong } from './songMigrations';
 
 export { FALLBACK_ARRANGEMENT };
 
@@ -95,6 +97,13 @@ export interface MakeArrangementResult {
   filled: string[];
   /** False when nothing usable survived; `document` is then `FALLBACK_ARRANGEMENT`. */
   usable: boolean;
+  /**
+   * Set when the song, or a patch in its snapshot, is a format this build
+   * cannot read and no upgrade reaches (record
+   * `2026-09-28-format-versions-refuse-never-destroy`): `usable` is false, and
+   * a caller holding the saved text keeps it rather than the fallback.
+   */
+  refused?: FormatRefusal;
 }
 
 /**
@@ -110,7 +119,12 @@ export interface MakeArrangementResult {
  */
 export function makeArrangement(raw: unknown, options: ResolveOptions = {}): MakeArrangementResult {
   const n = new ArrangementNormaliser(options);
-  const document = normalise(raw, n);
+  // The upgrades run before the version check; a song refused for its own
+  // version meets the check's correction below, one refused for a patch
+  // in its snapshot is refused whole (a song is self-contained, #562).
+  const { document: upgraded, refused } = upgradeSong(raw);
+  if (refused?.patch !== undefined) n.correction(`patches.${refused.patch}: ${refused.message}`);
+  const document = refused?.patch === undefined ? normalise(upgraded, n) : null;
   if (!document) {
     n.correction('nothing usable survives normalisation — falling back to the metronome');
     return {
@@ -119,6 +133,7 @@ export function makeArrangement(raw: unknown, options: ResolveOptions = {}): Mak
       dangling: n.dangling,
       filled: [...n.filled],
       usable: false,
+      ...(refused && { refused }),
     };
   }
   return {

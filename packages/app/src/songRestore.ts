@@ -5,11 +5,21 @@
  * opens the record the way Import opens a file, after the built-ins have
  * arrived; declining keeps the record until the first edit replaces it, so a
  * mis-click is undone by reloading.
+ *
+ * A record in a song format this build cannot read is never opened and never
+ * deleted (`2026-09-28-format-versions-refuse-never-destroy`): the question
+ * says which format it is and offers the stored text as a download, as-is.
+ * Import refuses such a file with the same words.
  */
+import type { FormatRefusal } from '@windsor/engine';
+import { upgradeSong } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
 import type { ConfirmRequest } from './metadataModal';
 import type { StoredSong } from './songAutosave';
+
+/** The file name the refused record downloads as. */
+export const OLD_SONG_FILE = 'old-song.json';
 
 /** When the record was written, in the reader's locale; the raw text if it is not a date. */
 export function savedWhen(stored: StoredSong): string {
@@ -30,6 +40,34 @@ export function restoreRequest(stored: StoredSong): ConfirmRequest {
   };
 }
 
+/** Why a song's text cannot be opened by this build, or null when it can (or is not JSON — the open reports that). */
+export function songRefusal(text: string): FormatRefusal | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  return upgradeSong(raw).refused ?? null;
+}
+
+/** The question for a record this build cannot read: download it as-is, or start fresh. */
+export function refusedRequest(stored: StoredSong, refusal: FormatRefusal): ConfirmRequest {
+  return {
+    title: "Your last song can't be opened",
+    body:
+      `Your last song, saved in this browser on ${savedWhen(stored)}, was ${refusal.message}. ` +
+      'Download the old song to keep it as a file, or start fresh. ' +
+      'The saved song is kept until your first edit replaces it.',
+    ok: 'Download the old song',
+    cancel: 'Start fresh',
+  };
+}
+
+/** The error toast for an imported file this build cannot read; the file itself is untouched. */
+export const importRefusedText = (fileName: string, refusal: FormatRefusal): string =>
+  `import refused: ${fileName} was ${refusal.message}. The file is unchanged.`;
+
 /** Open the stored song the way Import opens a file: after the built-ins, for an older song's library fill (#562). */
 export async function restoreSong(ctx: AppCtx, stored: StoredSong): Promise<void> {
   await loadBuiltIns();
@@ -38,13 +76,36 @@ export async function restoreSong(ctx: AppCtx, stored: StoredSong): Promise<void
   ctx.notify(`restored the song saved ${savedWhen(stored)}`, 'success');
 }
 
-/** Ask, and restore on yes; a record that fails to open is reported and left in place. */
+/** Hand the stored text to the browser's download path, byte for byte. */
+export function downloadSongText(text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = OLD_SONG_FILE;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Ask, and restore on yes; a record that fails to open is reported and left
+ * in place. A record this build cannot read is offered as a download instead
+ * and is never opened: the answer is always false, since nothing was restored.
+ */
 export async function offerRestore(
   ctx: AppCtx,
   stored: StoredSong | null,
   confirm: (request: ConfirmRequest) => Promise<boolean>,
+  download: (text: string) => void = downloadSongText,
 ): Promise<boolean> {
-  if (!stored || !(await confirm(restoreRequest(stored)))) return false;
+  if (!stored) return false;
+  const refusal = songRefusal(stored.document);
+  if (refusal) {
+    if (await confirm(refusedRequest(stored, refusal))) download(stored.document);
+    return false;
+  }
+  if (!(await confirm(restoreRequest(stored)))) return false;
   try {
     await restoreSong(ctx, stored);
     return true;
