@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CLICKS_LINE,
   CLICKS_PATCH,
+  CLIPPY_PATCH,
   FIRST_FRAME,
   SLIDE_SECONDS,
   STEP_FRAMES,
@@ -33,6 +34,11 @@ const CLICK_THRESHOLD = 0.05;
 /** Twice through the line, so step 0's slide has a held note to slide from. */
 const LOOPS = 2;
 const STEPS = CLICKS_LINE.length * LOOPS;
+const BLOCK = 128;
+/** A stop lands mid-step, with the note held in sustain. */
+const STOP_INTO_STEP = 3000;
+/** Long enough for the 0.4 s release and the filter's ring after it. */
+const TAIL_SECONDS = 3;
 
 function renderLine(patch: unknown, maxVoices = 16): Float32Array {
   const processor = loaded.create(patch, maxVoices, undefined, { slideSeconds: SLIDE_SECONDS });
@@ -65,6 +71,24 @@ describe('voice clicks (windsor#7)', () => {
         if (at < STEPS) expect(stepWindow(mono, at)).toBeLessThan(CLICK_THRESHOLD);
       }
     });
+  });
+
+  // Stop and pause both reach the worklet as the held note's off and an
+  // `allNotesOff` (`AudioSystem.stopMusic` / `setMuted`, through
+  // `ArrangementPlayer.releaseAll`): every voice releases. On `main` the
+  // voice ended when its carrier envelopes did, cutting the resonant
+  // filter's ring (0.07–0.12) to 0 in one sample at the end of the release.
+  it.each([7, 15])('rings out after a stop at step %i and ends in silence', (step) => {
+    const stopAt = FIRST_FRAME + step * STEP_FRAMES + STOP_INTO_STEP;
+    const events = lineEvents(CLICKS_LINE, 1).filter((e) => e.frame < stopAt);
+    events.push({ type: 'noteOff', id: step + 1, frame: stopAt });
+    events.push({ type: 'allNotesOff', id: 0, frame: stopAt }); // the worklet reads no id on it
+    const processor = loaded.create(CLIPPY_PATCH, 16, undefined, { slideSeconds: SLIDE_SECONDS });
+    const blocks = Math.ceil((stopAt + TAIL_SECONDS * loaded.sampleRate) / BLOCK);
+    const { samples, nonFinite } = render(loaded, processor, blocks, events);
+    expect(nonFinite).toBe(0);
+    expect(maxStep(samples, stopAt)).toBeLessThan(CLICK_THRESHOLD);
+    expect(processor.voices.filter((v) => v.active)).toHaveLength(0);
   });
 
   it('retriggers the same note on a poly patch without a click, stealing or not', () => {

@@ -1216,6 +1216,10 @@ var Voice = class {
       if (env.p.endLevel !== 0) return false;
       if (Math.abs(this.amp[i]) > DORMANT_AMP) return false;
     }
+    return this.filterQuiet;
+  }
+  /** The filter is off, or has stopped ringing: both stages under the dormancy floor (#547). */
+  get filterQuiet() {
     const f = this.patch.filter;
     if (f.mode === FILT_OFF) return true;
     if (!Svf.quiet(this.svfA)) return false;
@@ -1225,12 +1229,21 @@ var Voice = class {
   get fading() {
     return this.fadeInc !== 0;
   }
+  /**
+   * Nothing left to hear: every carrier's envelope has ended, its amplitude
+   * ramp has reached ~0 and the filter has stopped ringing. Ending a voice on
+   * the envelopes alone skipped the last ramp and cut a resonant filter's
+   * ring to 0 in one sample, the click at the end of a stop's release
+   * (windsor#7).
+   */
   get finished() {
     const carriers = this.alg.carriers;
     for (let i = 0; i < carriers.length; i++) {
-      if (!this.ampEnv[carriers[i]].finished) return false;
+      const c = carriers[i];
+      if (!this.ampEnv[c].finished) return false;
+      if (Math.abs(this.amp[c]) > DORMANT_AMP) return false;
     }
-    return true;
+    return this.filterQuiet;
   }
   /** Control-rate update, `voiceControl.js`: envelopes, LFO, glide, ramps, filter coefficients. */
   updateControl(n, bend, wheel, cutoffMod) {

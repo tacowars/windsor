@@ -103,6 +103,37 @@ export const CLICKS_PATCH: Patch = {
   },
 };
 
+/**
+ * Pat's second demo, `clippy.json` (windsor#7, round 2): the same line and
+ * carrier, with sustain 1 and a 0.4 s release, under a resonant low-pass
+ * (Q 4.76) at 55 Hz. The filter envelope opens it 4.2 octaves, plus 6 more
+ * on an accent (`modWheelDepth` 6 at mod 1). The LFO does not reach the
+ * filter.
+ */
+export const CLIPPY_PATCH: Patch = {
+  ...CLICKS_PATCH,
+  ops: [
+    {
+      ...CLICKS_PATCH.ops[0]!,
+      env: env({
+        attackTime: 0.0005000000000000001,
+        decayTime: 0.5448667761520452,
+        sustainLevel: 1,
+        releaseTime: 0.4008216221420844,
+      }),
+    },
+    ...CLICKS_PATCH.ops.slice(1),
+  ],
+  filter: {
+    ...CLICKS_PATCH.filter,
+    cutoff: 55.444153861358735,
+    resonance: 4.757779147585374,
+    envAmount: 4.164473684210526,
+    modWheelDepth: 6,
+    lfoAmount: 0,
+  },
+};
+
 export interface LineStep {
   note: number;
   accent?: boolean;
