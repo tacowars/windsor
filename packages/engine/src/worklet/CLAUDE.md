@@ -83,6 +83,9 @@ build output. The map of `fm/` (#644):
 | `prng.ts` | `makeRandom`, `randomSeed32` |
 | `patchDefaults.ts` | every default a patch may omit, the `tone` and feedback clamp bounds and `OPERATOR_COUNT`, import-free but for the two id modules: `normalisePatch` and the main thread's `makePatch()` both fill from it, and `audioConstants.ts` re-exports `OPERATOR_COUNT` (#670) |
 | `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one, from `patchDefaults.ts` |
+| `stepModTables.ts` | `STEP_MOD_TABLE` (windsor#17): one row per `StepModParam` (bounds, span, curve, `slideKeeps`) and `STEP_MOD_LANES_MAX`; the main thread's sequencer, song normaliser and index read it |
+| `stepModValue.ts` | `stepModValue`: the one step modulation curve, a row and a lane value over the patch's own; 0 returns the base untouched. The voice binds with it and the index re-exports it |
+| `voiceStepMod.ts` | `loadStepOffsets` and `bindStepMod`: a note-on's offsets into the voice's preallocated slots, and the per-voice values the control update, envelopes and render loops read in place of the patch's |
 | `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
 | `tsconfig.json` | the folder's own `tsc -p` project (#654): the engine's settings with `noUncheckedIndexedAccess` and `useDefineForClassFields` off, and why |
 | `*.test.ts` | direct tests of the leaf modules (#654): a module that warms the wave cache at load needs `sampleRate` on `globalThis` before a dynamic import |
@@ -137,14 +140,17 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change,
    and the test's guard says so in one failure before it renders (windsor#6).
-5. **Six modules are read by the main thread too** (#656): `algorithms.ts`,
+5. **Eight modules are read by the main thread too** (#656): `algorithms.ts`,
    `waveIds.ts`, `envelope.ts`, `fmConstants.ts`, `modeIds.ts` (#669:
-   `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`) and
+   `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`),
    `patchDefaults.ts` (#670: `makePatch()` fills from it, and
-   `patchDefaults.test.ts` pins its fill equal to `normalisePatch`'s). `audioConstants.ts` and
+   `patchDefaults.test.ts` pins its fill equal to `normalisePatch`'s), and
+   `stepModTables.ts` and `stepModValue.ts` (windsor#17: the sequencer and
+   the song normaliser read the table, and the index exports both, so a
+   console and the voice compute a step's value with one curve). `audioConstants.ts` and
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
    from them, and the console draws envelopes with `segmentLevel`, so there
-   is one table and one curve, and no pin test. The six are listed in the
+   is one table and one curve, and no pin test. The eight are listed in the
    engine project's `files` (`packages/engine/tsconfig.json`) and compile
    under its stricter flags as well:
    an indexed read in one of them takes a `!`, and none of them may touch
