@@ -3,6 +3,7 @@
 - **Date:** 2026-09-28
 - **Decided by:** tacowars
 - **Refines:** decision 5 of `2026-09-28-parallel-workflow-without-an-orchestrator`
+- **Refined by:** `2026-09-28-agreed-engine-prs-merge-without-the-owner`
 
 ## Context
 
