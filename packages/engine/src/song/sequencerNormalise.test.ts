@@ -82,6 +82,7 @@ describe('grid sequencer normalisation (#602)', () => {
       accentMod: 0.4,
       register: { octave: 5 },
       seed: 77,
+      lanes: [],
     });
   });
 

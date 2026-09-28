@@ -27,6 +27,8 @@ export interface ScheduledEvent {
   /** Per-note mod and the legato slide flag (#602). */
   mod?: number;
   slide?: boolean;
+  /** A step's parameter offsets, one slot per `STEP_MOD_TABLE` row (windsor#17). */
+  stepMod?: readonly number[];
 }
 
 export interface VoiceLike {

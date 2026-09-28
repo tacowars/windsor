@@ -2,7 +2,8 @@
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history, amplitude and width ramps, six envelopes, two LFOs, two filter
- * stages, the steal fade — and its lifecycle: `start`, `rebind`, `retarget`,
+ * stages, the steal fade, a step's parameter offsets and the per-voice values
+ * they make (windsor#17) — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
  * the part polls. The hot paths are functions over the voice in `voiceControl.js`,
  * `voiceRender.js` and `voiceKernel.js`; `render` and `updateControl` stay
@@ -20,10 +21,12 @@ import { DORMANT_AMP } from './fmConstants';
 import { Lfo, secondLfoSeed } from './lfo';
 import { randomSeed32 } from './prng';
 import { FILT_OFF } from './modeIds';
+import { STEP_MOD_SLOT_COUNT } from './stepModTables';
 import { Svf } from './svf';
 import { bindVoiceConstants, restingWidth, updateVoiceControl } from './voiceControl';
 import { renderVoiceKernel } from './voiceKernel';
 import { renderVoiceGeneric } from './voiceRender';
+import { bindStepMod, loadStepOffsets, startStepMod } from './voiceStepMod';
 import { KIND_PULSE, waveKind } from './waveTables';
 
 /* ------------------------------------------------------------------ *
@@ -81,6 +84,13 @@ class Voice {
   carrierBits: number;
   detuneMul: Float64Array;
   levelKeyAmp: Float64Array;
+  stepOffsets: Float64Array;
+  envAmount: number;
+  cutoff: number;
+  resonance: number;
+  opLevel: Float64Array;
+  opFeedback: Float32Array;
+  opWidth: Float64Array;
 
   constructor(sampleRate: number, random: () => number) {
     this.sr = sampleRate;
@@ -148,6 +158,18 @@ class Voice {
     this.carrierBits = 0;
     this.detuneMul = new Float64Array(4); // Math.pow(2, detune / 1200)
     this.levelKeyAmp = new Float64Array(4); // Math.pow(2, -levelKeyScale * keyOffset)
+
+    // A step's parameter offsets (windsor#17), one slot per `stepModTables.ts`
+    // row, and the values they make, read in place of the patch's: the
+    // filter's, then each operator's level, feedback (a Float32Array, as the
+    // loops have always read it) and width. `bindStepMod` writes them.
+    this.stepOffsets = new Float64Array(STEP_MOD_SLOT_COUNT);
+    this.envAmount = 0;
+    this.cutoff = 0;
+    this.resonance = 0;
+    this.opLevel = new Float64Array(4);
+    this.opFeedback = new Float32Array(4);
+    this.opWidth = new Float64Array(4).fill(1);
   }
 
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */
@@ -166,12 +188,12 @@ class Voice {
     return x / 0x7fffffff - 1;
   }
 
-  /** Bind a patch and its prebuilt wavetables. Called on note-on. */
+  /** Bind a patch, its prebuilt wavetables and the step's offsets (windsor#17). Called on note-on. */
   // Gathering these into an options object would allocate one per note-on, and
   // this class exists to keep the audio thread allocation-free. They are also
-  // all primitives written straight into preallocated fields, so there is no
-  // cohesive sub-object to extract.
-  // eslint-disable-next-line max-params -- allocation-free note-on, see above
+  // all primitives (or the message's own offset array) written straight into
+  // preallocated fields, so there is no cohesive sub-object to extract.
+  // eslint-disable-next-line max-params, max-lines-per-function -- allocation-free note-on, see above; one note's setup read top to bottom, 61 of 60 since the step offsets (windsor#17)
   start(
     patch: WorkletPatch,
     waveSets: (Float32Array[] | null)[],
@@ -181,6 +203,7 @@ class Voice {
     pan: number,
     glideFrom: number | null,
     voiceId: number,
+    stepMod: ArrayLike<number> | null | undefined,
   ): void {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
@@ -218,8 +241,6 @@ class Voice {
       this.ampInc[i] = 0;
 
       this.kind[i] = waveKind(op.wave);
-      // The ramp starts from the patch's width; the first control block sets its step.
-      this.width[i] = restingWidth(this.kind[i], op.width);
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
 
@@ -242,6 +263,10 @@ class Voice {
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
     this.svfA.reset();
     this.svfB.reset();
+
+    // The step's offsets (windsor#17), and the width ramps from the note's
+    // width; the first control block sets their step.
+    startStepMod(this, patch, stepMod);
   }
 
   /**
@@ -257,16 +282,12 @@ class Voice {
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
     const keyOffset = (this.note - 60) / 12;
+    let switched = 0;
     for (let i = 0; i < 4; i++) {
       const op = patch.ops[i];
       const wasPulse = this.kind[i] === KIND_PULSE;
       this.kind[i] = waveKind(op.wave);
-      // Width means a duty on PULSE and a phase scale elsewhere: a switch
-      // between the two restarts the ramp from the new meaning's value.
-      if (wasPulse !== (this.kind[i] === KIND_PULSE)) {
-        this.width[i] = restingWidth(this.kind[i], op.width);
-        this.widthInc[i] = 0;
-      }
+      if (wasPulse !== (this.kind[i] === KIND_PULSE)) switched |= 1 << i;
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i]![0] : null;
       // configure() swaps the parameter block and leaves the stage and value alone.
@@ -277,15 +298,33 @@ class Voice {
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
+    // The note keeps its step's offsets over the new patch's values (windsor#17).
+    bindStepMod(this, patch);
+    // Width means a duty on PULSE and a phase scale elsewhere: a switch
+    // between the two restarts the ramp from the new meaning's value.
+    for (let i = 0; i < 4; i++) {
+      if ((switched & (1 << i)) === 0) continue;
+      this.width[i] = restingWidth(this.kind[i], this.opWidth[i]);
+      this.widthInc[i] = 0;
+    }
   }
 
   /**
    * Legato slide (#602): re-point a sounding voice at a new note. The pitch
    * glides from wherever it is over `glideSeconds`; envelopes, LFO, phase and
    * filter state carry on, so nothing retriggers. The constants that depend on
-   * the key offset are recomputed for the new note, as `rebind` does.
+   * the key offset are recomputed for the new note, as `rebind` does. The new
+   * step's offsets apply from here, except the rows a sounding voice cannot
+   * change without a click (`slideKeeps`: decay curve, feedback), which keep
+   * the old step's (windsor#17).
    */
-  retarget(note: number, velocity: number, mod: number, glideSeconds: number): void {
+  retarget(
+    note: number,
+    velocity: number,
+    mod: number,
+    glideSeconds: number,
+    stepMod: ArrayLike<number> | null | undefined,
+  ): void {
     const patch = this.patch!;
     this.note = note;
     this.pitchTarget = note;
@@ -298,6 +337,8 @@ class Voice {
     }
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.bindConstants(patch);
+    loadStepOffsets(this, stepMod, true);
+    bindStepMod(this, patch);
   }
 
   release(): void {

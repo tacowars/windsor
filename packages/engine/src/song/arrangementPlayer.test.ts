@@ -301,6 +301,7 @@ describe('grid parts (#602)', () => {
               register: { octave: 3 },
               // The skip-edit case below turns skipChance to 0.01: this seed's stream skips nothing in bar 2.
               seed: 204,
+              lanes: [],
             },
           }
         : part,

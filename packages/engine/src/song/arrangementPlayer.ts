@@ -62,6 +62,7 @@ import { STRAIGHT_SWING, type Swing } from '../sequencing/swingTables';
 import { playableSwing } from '../sequencing/swing';
 import { RegionGate, type RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
+import { partNoteOn } from './partNoteOn';
 import { fitTimelines } from './timelineNormalise';
 import { tickLoopOf, withFittedLoop } from './songLoop';
 import {
@@ -506,11 +507,8 @@ export class ArrangementPlayer {
     const part = this.parts.get(slot);
     if (!config || !part) return;
     if (event.kind === 'noteOn') {
-      // A grid accent (#602) bumps the part's velocity and rides in as per-note mod.
-      const accent = event.accent;
-      const velocity = accent ? Math.min(1, config.velocity + accent.velocity) : config.velocity;
-      const extras: NoteExtras | undefined =
-        accent || event.slide ? { mod: accent?.mod ?? 0, slide: event.slide === true } : undefined;
+      // A grid accent, slide (#602) or step's offsets (windsor#17) ride in as extras.
+      const { velocity, extras } = partNoteOn(event, config.velocity);
       part.noteOn(event.note, velocity, event.time, extras);
       this.count(config, event.tick);
     } else {

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { makePatch } from '../../patch/patch';
 import type { PartialPatch, Patch } from '../../patch/patch';
 import { patchLeafDifferences } from '../../patch/patchLibrary';
-import type { WorkletPatch } from './patchNormalise';
 import { TONE_RANGE } from './patchDefaults';
 import { WAVE } from './waveIds';
 
@@ -11,11 +10,9 @@ import { WAVE } from './waveIds';
 Object.assign(globalThis, { sampleRate: 48000 });
 const { normalisePatch } = await import('./patchNormalise');
 
-/** The worklet's fill, less the audio loop's scratch, which is not a patch field. */
+/** The worklet's fill. */
 function workletFill(partial: PartialPatch): Patch {
-  const patch: Partial<Pick<WorkletPatch, 'feedbackScratch'>> & Patch = normalisePatch(partial);
-  delete patch.feedbackScratch;
-  return patch;
+  return normalisePatch(partial);
 }
 
 describe('the patch defaults (#670)', () => {

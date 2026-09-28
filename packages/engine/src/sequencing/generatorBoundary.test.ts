@@ -29,6 +29,10 @@ const PURE_FILES = [
   '../worklet/fm/patchDefaults.ts',
   '../worklet/fm/modeIds.ts',
   '../worklet/fm/waveIds.ts',
+  // Step modulation (windsor#17): the table the worklet shares, and the lanes
+  // a sequencer carries over it.
+  '../worklet/fm/stepModTables.ts',
+  'stepModLanes.ts',
   'scheduler.ts',
   // Swing (windsor#14): the clock's time warp and its table.
   'swing.ts',

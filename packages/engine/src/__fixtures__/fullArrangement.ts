@@ -97,6 +97,7 @@ const ARP: MusicPart & { sequencer: GridSpec } = {
     accentMod: 0.5,
     // D4 = 62: the same notes the fixture sounded when the register was root-relative.
     register: { octave: 4 },
+    lanes: [],
   },
 };
 

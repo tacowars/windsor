@@ -42,6 +42,8 @@ import {
   gridNote,
   type GridStep,
 } from '../sequencing/gridSequencer';
+import { isStepModParam, type StepModLane } from '../sequencing/stepModLanes';
+import { STEP_MOD_LANES_MAX, type StepModParam } from '../worklet/fm/stepModTables';
 
 /** The tagged sequencer; an absent or unknown kind is `none`, which is inert. */
 export function normaliseSequencer(raw: unknown, path: string, n: FieldNormaliser): SequencerSpec {
@@ -151,6 +153,7 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
     'accentMod',
     'register',
     'seed',
+    'lanes',
   ];
   n.dropUnknown(o, known, path);
   const steps = gridSteps(o.steps, `${path}.steps`, n);
@@ -164,7 +167,55 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
     accentMod: n.num(o.accentMod, d.accentMod, 0, 1, `${path}.accentMod`),
     register: registerOctave(o.register, d.register.octave, `${path}.register`, n),
     seed: seed(o.seed, `${path}.seed`, n),
+    lanes: stepModLanes(o.lanes, steps.length, `${path}.lanes`, n),
   };
+}
+
+/**
+ * Step modulation lanes (windsor#17): absent is none, today's behaviour. A
+ * lane naming an unknown or repeated parameter is dropped, lanes past
+ * `STEP_MOD_LANES_MAX` are dropped, each value is clamped to -1..1, and a
+ * lane is padded with 0 or trimmed to the step count, each reported.
+ */
+function stepModLanes(
+  raw: unknown,
+  steps: number,
+  path: string,
+  n: FieldNormaliser,
+): StepModLane[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a list of lanes — no lanes`);
+    return [];
+  }
+  const lanes: StepModLane[] = [];
+  const seen = new Set<StepModParam>();
+  raw.forEach((item, i) => {
+    const at = `${path}[${i}]`;
+    const o = n.section(item, at);
+    n.dropUnknown(o, ['param', 'values'], at);
+    const drop = (why: string): void => n.correction(`${at}: ${why} — lane dropped`);
+    const param = o.param;
+    if (!isStepModParam(param))
+      return drop(`${show(param)} is not a parameter a lane can modulate`);
+    if (seen.has(param)) return drop(`${param} already has a lane`);
+    if (lanes.length >= STEP_MOD_LANES_MAX) return drop(`more than ${STEP_MOD_LANES_MAX} lanes`);
+    seen.add(param);
+    lanes.push({ param, values: laneValues(o.values, steps, `${at}.values`, n) });
+  });
+  return lanes;
+}
+
+/** One value per step in -1..1: junk is 0, a short list padded with 0, a long one trimmed. */
+function laneValues(raw: unknown, steps: number, path: string, n: FieldNormaliser): number[] {
+  const list: unknown[] = Array.isArray(raw) ? raw : [];
+  if (!Array.isArray(raw)) n.correction(`${path}: ${show(raw)} is not a list of values — all 0`);
+  else if (raw.length !== steps) {
+    n.correction(`${path}: ${raw.length} values for ${steps} steps — resized`);
+  }
+  return Array.from({ length: steps }, (_, i) =>
+    i < list.length ? n.num(list[i], 0, -1, 1, `${path}[${i}]`) : 0,
+  );
 }
 
 /** 1–32 steps. An absent or junk list is the default bar; an over-long one is capped, reported. */
