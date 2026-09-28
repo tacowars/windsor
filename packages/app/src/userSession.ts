@@ -8,6 +8,7 @@
  */
 import type { AppCtx } from './context';
 import { bootLibrary, syncLibraryMode } from './libraryActions';
+import { library } from './libraryModel';
 import { openConfirm } from './metadataModal';
 import { SongAutosave } from './songAutosave';
 import { offerRestore } from './songRestore';
@@ -15,7 +16,10 @@ import { browserPersist, persistOnce } from './storagePersistence';
 import { openUserStores } from './userLibraryStore';
 
 export async function bootUserState(ctx: AppCtx): Promise<void> {
-  const ensurePersisted = persistOnce(browserPersist(), ctx.status);
+  const ensurePersisted = persistOnce(browserPersist(), () => {
+    library.evictable = true;
+    syncLibraryMode();
+  });
   const stores = await openUserStores(() => void ensurePersisted());
   const stored = stores ? await stores.songs.load().catch(() => null) : null;
   // The question and the library load run together; a restore waits for the built-ins itself.

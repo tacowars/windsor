@@ -118,7 +118,13 @@ The design above holds. Details settled while building it:
   just before closing the tab is kept. It skips a write whose text equals
   the last one it wrote.
 - **The persistence request is not awaited.** It runs before the first
-  write, and a browser that prompts for it never holds up a save.
+  write, and a browser that prompts for it never holds up a save. Chrome
+  declines it for most sites a visitor hasn't bookmarked or used much, so a
+  refusal is the common case. It shows as a note on the library line, not
+  in the status line, where it replaced the save's own message.
+- **After Save on a built-in, the song keeps its edited copy of the
+  built-in** even though no part plays it any more. Pat wants this: you
+  sometimes come back to that patch later (2026-09-28).
 - **Save over a built-in** opens the Copy-to-new modal, titled "Save your
   own …" and prefilled `<name> copy`. The id comes from the name, as for
   Copy to new, because display names must stay unique.
