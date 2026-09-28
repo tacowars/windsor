@@ -8,6 +8,9 @@ import { describe, expect, it } from 'vitest';
 import type { ChunkWritable } from './audioExportWrite';
 import { writeInChunks } from './audioExportWrite';
 
+/** A file of `n` zero bytes. */
+const bytes = (n: number): Blob => new Blob([new Uint8Array(n)]);
+
 interface FakeWritable extends ChunkWritable {
   log: string[];
 }
@@ -20,7 +23,7 @@ function fakeWritable(
   return {
     log,
     write: (chunk) => {
-      log.push(`write ${chunk.length}`);
+      log.push(`write ${chunk.size}`);
       return onWrite(index++);
     },
     close: () => {
@@ -37,7 +40,7 @@ function fakeWritable(
 describe('writeInChunks', () => {
   it('writes every byte in chunks, then closes', async () => {
     const writable = fakeWritable();
-    await writeInChunks(writable, new Uint8Array(10), new AbortController().signal, 4);
+    await writeInChunks(writable, bytes(10), new AbortController().signal, 4);
     expect(writable.log).toEqual(['write 4', 'write 4', 'write 2', 'close']);
   });
 
@@ -47,7 +50,7 @@ describe('writeInChunks', () => {
     const writable = fakeWritable((index) =>
       index === 1 ? new Promise<void>((resolve) => (release = resolve)) : Promise.resolve(),
     );
-    const done = writeInChunks(writable, new Uint8Array(12), controller.signal, 4);
+    const done = writeInChunks(writable, bytes(12), controller.signal, 4);
     await Promise.resolve();
     await Promise.resolve();
     controller.abort();
@@ -62,9 +65,7 @@ describe('writeInChunks', () => {
       controller.abort();
       return Promise.resolve();
     });
-    await expect(
-      writeInChunks(writable, new Uint8Array(3), controller.signal, 4),
-    ).rejects.toMatchObject({
+    await expect(writeInChunks(writable, bytes(3), controller.signal, 4)).rejects.toMatchObject({
       name: 'AbortError',
     });
     expect(writable.log).toEqual(['write 3', 'abort']);
@@ -93,7 +94,7 @@ describe('writeInChunks', () => {
   it('a cancel once the close is called changes nothing: the close commits', async () => {
     const controller = new AbortController();
     const { writable, closeStarted, settle } = pendingClose();
-    const done = writeInChunks(writable, new Uint8Array(3), controller.signal, 4);
+    const done = writeInChunks(writable, bytes(3), controller.signal, 4);
     await closeStarted;
     controller.abort();
     settle();
@@ -104,7 +105,7 @@ describe('writeInChunks', () => {
   it("a cancel once the close is called reports the close's own error", async () => {
     const controller = new AbortController();
     const { writable, closeStarted, settle } = pendingClose();
-    const done = writeInChunks(writable, new Uint8Array(3), controller.signal, 4);
+    const done = writeInChunks(writable, bytes(3), controller.signal, 4);
     await closeStarted;
     controller.abort();
     settle(new Error('quota exceeded'));
@@ -115,9 +116,7 @@ describe('writeInChunks', () => {
     const controller = new AbortController();
     controller.abort();
     const writable = fakeWritable();
-    await expect(
-      writeInChunks(writable, new Uint8Array(3), controller.signal),
-    ).rejects.toMatchObject({
+    await expect(writeInChunks(writable, bytes(3), controller.signal)).rejects.toMatchObject({
       name: 'AbortError',
     });
     expect(writable.log).toEqual(['abort']);
@@ -125,9 +124,9 @@ describe('writeInChunks', () => {
 
   it('a failed write aborts and rethrows', async () => {
     const writable = fakeWritable(() => Promise.reject(new Error('disk full')));
-    await expect(
-      writeInChunks(writable, new Uint8Array(3), new AbortController().signal),
-    ).rejects.toThrow('disk full');
+    await expect(writeInChunks(writable, bytes(3), new AbortController().signal)).rejects.toThrow(
+      'disk full',
+    );
     expect(writable.log).toEqual(['write 3', 'abort']);
   });
 });

@@ -259,6 +259,13 @@ export {
   WAV_BIT_DEPTH_DEFAULT,
 } from './render/renderConstants';
 export type { RenderSampleRate, WavBitDepth } from './render/renderConstants';
+// Stems: one WAV per part and per return beside the master, and the zip they download as (windsor#41).
+export { renderStems } from './render/renderStems';
+export type { RenderStemsOptions, RenderedStem, RenderedStems } from './render/renderStems';
+export { stemSources } from './render/stemPlan';
+export type { PartStem, ReturnStem, Stem, StemSource } from './render/stemPlan';
+export { StoredZipWriter } from './render/storedZip';
+export { crc32, crc32Async } from './render/crc32';
 export { loadBuiltInLibrary } from './patch/builtInLibrary';
 export type { BuiltInLibrary } from './patch/builtInLibrary';
 export {
