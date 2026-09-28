@@ -23,7 +23,7 @@ the File System Access folder grant, and import/export.
 | Working on… | Go to | Verify with |
 |---|---|---|
 | The engine: FM synthesis, worklets, patches, songs, sequencers, harmony, mixer, inserts | `packages/engine/src/` (`@windsor/engine`). Read `.claude/skills/windsor-engine/SKILL.md` first, and `packages/engine/src/worklet/CLAUDE.md` before touching DSP | The tests beside what you touched (`npx vitest run <paths>`, the goldens for DSP), then `npm run typecheck && npm run lint`. CI runs `verify` |
-| The UI: tabs, cards, knobs, the library browser, audition input | `packages/app/` (`@windsor/app`). Read `packages/app/CLAUDE.md` first | The tests beside what you touched, `npm run typecheck && npm run lint`, and `npm run dev` in the browser. CI runs `verify` |
+| The UI: tabs, cards, knobs, the library browser, audition input | `packages/app/` (`@windsor/app`). Read `packages/app/CLAUDE.md` first | The tests beside what you touched, `npm run typecheck && npm run lint`, and a look at `npm run dev` in the project's headless Chrome (`.mcp.json`, `.claude/worker-rules.md`). CI runs `verify` |
 | Generated files: the worklet bundles and the patch index | `scripts/build-worklets.mjs`, `scripts/patch-library-index.mjs` | `npm run worklets`, `npm run patch-index` |
 | Design, decisions, research | `docs/design/`, `docs/log/`, `docs/research/` | — |
 
@@ -137,6 +137,8 @@ in `docs/log/2026-09-28-parallel-workflow-without-an-orchestrator.md`.
    and edits only the folders the issue owns.
 3. Runs the checks the issue's "Verify locally" names, never the full
    `verify` and never the whole suite. CI runs the gate; a hook enforces it.
+   A UI change also gets a look in the project's headless Chrome
+   (`docs/log/2026-09-28-agents-check-ui-in-a-local-headless-chrome.md`).
 4. Commits, pushes, opens the PR from the template with `Fixes #N` and its
    class, and ends its turn. Its final message is the PR URL and one line.
 5. Never merges, never watches CI, never writes the board. A question only
