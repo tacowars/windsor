@@ -9,7 +9,7 @@
  * everywhere without a rebuild.
  */
 import type { Patch, PresetListing } from '@windsor/engine';
-import { loadUnsweptPatchFile } from '@windsor/engine';
+import { loadPatchFile } from '@windsor/engine';
 import { builtInEntries, loadBuiltIns } from './builtInLibrary';
 import type { OldFormatPatch, PatchFolder } from './libraryFolder';
 import { readFolderLibrary } from './libraryFolder';
@@ -149,7 +149,7 @@ export async function writeLibraryFile(
   // a valid-looking entry in the browser and in every action that reads one.
   // Refused the same way here: no entry, and the reason in a toast.
   try {
-    model.entries = { ...model.entries, [id]: loadUnsweptPatchFile(id, JSON.parse(text)) };
+    model.entries = { ...model.entries, [id]: loadPatchFile(id, JSON.parse(text)) };
     model.userIds = new Set([...model.userIds, id]);
     model.problems = [];
   } catch (error) {

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "EFM Open Hat",
   "category": "Drums",
   "tags": ["efm", "hat", "digital", "metal", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 420,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 4746,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 6700,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "loopMode": 2,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 13543,
-    "peak": 0.6492608785629272,
-    "seedsSwept": 16384,
-    "contentHash": "ad24221e"
   }
 }

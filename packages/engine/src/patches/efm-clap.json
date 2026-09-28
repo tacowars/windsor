@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "EFM Clap",
   "category": "Drums",
   "tags": ["efm", "clap", "digital", "noise", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 1720,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 1900,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 2425,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 3313,
@@ -183,11 +179,5 @@
       "loopMode": 2,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 14861,
-    "peak": 0.7383834719657898,
-    "seedsSwept": 16384,
-    "contentHash": "685b254f"
   }
 }

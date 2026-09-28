@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "909 Crash",
   "category": "Drums",
   "tags": ["909", "cymbal", "metal", "long", "mono"],
@@ -20,7 +20,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 2360,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 3840,
@@ -78,7 +76,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 5410,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": true,
         "fixedHz": 1673,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 7624,
-    "peak": 0.5366431474685669,
-    "seedsSwept": 16384,
-    "contentHash": "a6448fbf"
   }
 }

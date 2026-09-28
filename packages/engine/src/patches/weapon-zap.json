@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Weapon Zap",
   "category": "Legacy FX",
   "tags": ["legacy", "fx"],
@@ -34,7 +34,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -63,7 +62,6 @@
       {
         "wave": 1,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2.4,
         "fixed": false,
         "fixedHz": 100,
@@ -92,7 +90,6 @@
       {
         "wave": 4,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -121,7 +118,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 1261,
-    "peak": 0.935571551322937,
-    "seedsSwept": 16384,
-    "contentHash": "f2e3acdd"
   }
 }

@@ -50,7 +50,6 @@ const FILTER_ENV_DEFAULTS = { ...ENVELOPE_DEFAULTS, sustainLevel: 0 };
 const OPERATOR_DEFAULTS = {
   wave: WAVE.SINE,
   userPartials: null,
-  userKey: '',
   ratio: 1,
   fixed: false,
   fixedHz: 100,

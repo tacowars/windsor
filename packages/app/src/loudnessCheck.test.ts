@@ -1,9 +1,9 @@
 /**
  * The quick clip check's pure parts (#563): the buffer peak, the verdict from
- * measured peaks and the worklet data URL. The real-render assertions — the
- * render equals the headroom test's, a clipping patch's suggested volume
- * brings it under the line — are `lib/loudnessRender.test.mjs`, which can
- * load the Node-side fixture this DOM-typed tree cannot.
+ * measured peaks and the worklet data URL. The real-render assertions — a
+ * clipping patch warns, and its suggested volume brings it under the line —
+ * are `lib/loudnessRender.test.mjs`, which can load the Node-side worklet
+ * harness this DOM-typed tree cannot.
  */
 import { describe, expect, it } from 'vitest';
 

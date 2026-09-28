@@ -1,14 +1,13 @@
 /**
  * The patch library's file contract (#561, epic #564): one
  * `patches/<id>.json` per patch, read by the console and the tests through
- * the same validator, so a file the editor writes is exactly a file a song
+ * the same loader, so a file the editor writes is exactly a file a song
  * plays.
  *
  * A file is
  *
- *     { "format": 1, "name", "category", "tags": [], "description",
- *       "patch": { …full normalised Patch… },
- *       "headroom": { "worstSeed", "peak", "seedsSwept", "contentHash" } }
+ *     { "format": 2, "name", "category", "tags": [], "description",
+ *       "patch": { …normalised Patch… } }
  *
  * - `format` is the file format (`patchMigrations.ts`): a file with none is
  *   format 1, one an upgrade reaches is upgraded on load, and any other is
@@ -16,36 +15,24 @@
  *   `2026-09-28-format-versions-refuse-never-destroy`).
  * - `id` is the filename slug, immutable; `name` is the editable display name
  *   and equals `patch.name` (epic decision 4).
- * - `patch` is a complete `Patch` exactly as `makePatch` would return it —
- *   every field present, nothing extra, numbers at full double precision.
- * - `headroom` is the offline clip sweep's record: the seed that produced the
- *   worst peak, that peak, how many seeds were swept, and a hash of `patch` so
- *   an edited patch cannot ride on a stale sweep. `fmProcessorHeadroom.test.ts`
- *   renders the recorded seed; `packages/app/sweep-headroom.mjs` writes
- *   the record. Decision record: `docs/log/2026-09-15-561-patch-library-file-shape.md`.
+ * - `patch` is a `Patch` as `makePatch` returns it, numbers at full double
+ *   precision. A key `makePatch` fills may be missing, and the loader returns
+ *   the patch completed, so a field added with a default costs no rewrite of
+ *   the bank. A key it does not know, at any level, and a leaf of the wrong
+ *   type are refused (record `2026-09-28-retire-the-headroom-record`).
  *
  * Browser-safe: no Node, no DOM. `presets.ts` builds the whole-bank table from
  * the generated `patches/index.ts`; `fallbackPatch.ts` reads its single file
  * by id, so the playback path needs none of the rest.
  */
-import type { Patch } from './patch';
+import type { PartialPatch, Patch } from './patch';
 import { makePatch } from './patch';
 import { PATCH_FILE_FORMAT, PatchFormatError, upgradePatchFile } from './patchMigrations';
 
 export { PATCH_FILE_FORMAT };
 
-/** The offline sweep that writes a file's `headroom` record; error messages quote it. */
-export const SWEEP_COMMAND = 'node packages/app/sweep-headroom.mjs';
-
 /** A filename slug: lower-case words of letters and digits joined by single hyphens. */
 export const PATCH_ID_RULE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-
-export interface HeadroomRecord {
-  worstSeed: number;
-  peak: number;
-  seedsSwept: number;
-  contentHash: string;
-}
 
 export interface PatchFile {
   format: number;
@@ -54,18 +41,14 @@ export interface PatchFile {
   tags: string[];
   description: string;
   patch: Patch;
-  headroom: HeadroomRecord;
 }
 
-/** A validated file plus the id its filename gave it. */
+/** A loaded file, its patch completed, plus the id its filename gave it. */
 export interface LibraryEntry extends PatchFile {
   id: string;
 }
 
-const FILE_KEYS = ['format', 'name', 'category', 'tags', 'description', 'patch', 'headroom'];
-/** A missing `headroom` is reported by `headroomProblems`, with the command that writes it. */
-const REQUIRED_KEYS = FILE_KEYS.filter((key) => key !== 'headroom');
-const HEADROOM_KEYS = ['worstSeed', 'peak', 'seedsSwept', 'contentHash'];
+const FILE_KEYS = ['format', 'name', 'category', 'tags', 'description', 'patch'];
 
 /** `String(-0)` is `'0'`; the one value `Object.is` distinguishes gets its own spelling. */
 const show = (value: unknown): string => (Object.is(value, -0) ? '-0' : String(value));
@@ -100,41 +83,6 @@ export function patchLeafDifferences(actual: unknown, expected: unknown, path = 
   return Object.is(actual, expected) ? [] : [`${path}: ${show(actual)} ≠ ${show(expected)}`];
 }
 
-const FNV_OFFSET = 0x811c9dc5;
-const FNV_PRIME = 0x01000193;
-const HEX = 16;
-const HASH_DIGITS = 8;
-
-/** JSON with every object's keys sorted, so key order never changes a hash. */
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    const body = Object.keys(record)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key])}`);
-    return `{${body.join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-
-/**
- * 32-bit FNV-1a of the normalised patch's key-sorted JSON, as eight hex
- * digits. A staleness detector for the headroom record, not a security hash:
- * it has to run synchronously in the browser at load and in Node in the
- * sweep, and both must agree. Normalising and sorting first means the same
- * patch hashes the same whichever writer produced the file.
- */
-export function patchContentHash(patch: Patch): string {
-  const text = canonicalJson(makePatch(patch));
-  let hash = FNV_OFFSET;
-  for (let i = 0; i < text.length; i++) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-  }
-  return hash.toString(HEX).padStart(HASH_DIGITS, '0');
-}
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -154,33 +102,30 @@ function keyDifference(
 }
 
 /**
- * The patch section against `makePatch`: same keys at every level, same leaf
- * types, and the normalised copy identical to the file — so a file that was
- * not written by the normaliser (an extra field, a string for a number, a
- * missing envelope) is refused rather than half-read.
+ * The patch section against the default patch: no key it does not know at
+ * any level, each present leaf of the template's type, and each array the
+ * template's length (four operators, four LFO depths). A missing key is not
+ * a problem: `makePatch` fills it. Never checked against `makePatch(raw)`,
+ * which would carry an unknown field straight through.
  */
 function patchProblems(raw: unknown): string[] {
   if (!isRecord(raw)) return ['patch: expected an object'];
-  // Keys and types against the default patch (never against makePatch(raw),
-  // which would carry an unknown field straight through), then values
-  // against the normalised copy.
-  const shape = shapeDifferences(raw, makePatch(), 'patch');
-  if (shape.length) return shape;
-  const normalised = makePatch(raw as unknown as Patch);
-  return patchLeafDifferences(raw, normalised, 'patch').map((line) => `${line} after makePatch`);
+  return shapeDifferences(raw, makePatch(), 'patch');
 }
 
-/** Keys and leaf types of `actual` against the normalised `template`, by path. */
+/** Keys and leaf types of `actual` against the normalised `template`, by path; absent keys pass. */
 function shapeDifferences(actual: unknown, template: unknown, path: string): string[] {
   if (Array.isArray(template)) {
     if (!Array.isArray(actual)) return [`${path}: expected an array`];
+    if (actual.length !== template.length)
+      return [`${path}: length ${actual.length}, expected ${template.length}`];
     return template.flatMap((item, i) => shapeDifferences(actual[i], item, `${path}[${i}]`));
   }
   if (isRecord(template)) {
     if (!isRecord(actual)) return [`${path}: expected an object`];
-    const keys = keyDifference(actual, Object.keys(template));
+    const keys = keyDifference(actual, Object.keys(template), []);
     if (keys) return [`${path}: ${keys}`];
-    return Object.keys(template).flatMap((key) =>
+    return Object.keys(actual).flatMap((key) =>
       shapeDifferences(actual[key], template[key], `${path}.${key}`),
     );
   }
@@ -193,25 +138,6 @@ function shapeDifferences(actual: unknown, template: unknown, path: string): str
     return [`${path}: expected a ${typeof template}, got ${show(actual)}`];
   if (typeof actual === 'number' && !Number.isFinite(actual))
     return [`${path}: expected a finite number, got ${show(actual)}`];
-  return [];
-}
-
-function headroomProblems(raw: unknown, patch: Patch, id: string): string[] {
-  const fix = `run \`${SWEEP_COMMAND} ${id}\``;
-  if (raw === undefined) return [`missing headroom record — ${fix}`];
-  if (!isRecord(raw)) return ['headroom: expected an object'];
-  const keys = keyDifference(raw, HEADROOM_KEYS);
-  if (keys) return [`headroom: ${keys}`];
-  const problems: string[] = [];
-  for (const key of ['worstSeed', 'peak', 'seedsSwept']) {
-    if (typeof raw[key] !== 'number' || !Number.isFinite(raw[key]))
-      problems.push(`headroom.${key}: expected a finite number`);
-  }
-  if (typeof raw['contentHash'] !== 'string')
-    problems.push('headroom.contentHash: expected a string');
-  if (problems.length) return problems;
-  if (raw['contentHash'] !== patchContentHash(patch))
-    return [`stale headroom record: the patch changed since its sweep — ${fix}`];
   return [];
 }
 
@@ -236,40 +162,13 @@ function refuse(id: string, problems: string[]): never {
 }
 
 /**
- * Validates one file against the contract above and returns it typed, or
- * throws one error naming the file and every problem found — a
- * `PatchFormatError` when the file's format is one this build cannot read.
+ * Loads one file against the contract above: upgraded to this build's
+ * format, checked, and returned with its patch completed. Throws one error
+ * naming the file and every problem found, or a `PatchFormatError` when the
+ * file's format is one this build cannot read. Playback, the tests, the
+ * console's folder and its IndexedDB library all read through this.
  */
 export function loadPatchFile(id: string, raw: unknown): LibraryEntry {
-  const entry = validatePatchFile(id, raw);
-  const headroom = headroomProblems(entry.headroom, entry.patch, id);
-  if (headroom.length) refuse(id, headroom);
-  return entry as LibraryEntry;
-}
-
-/** A validated file whose sweep has not run yet: the record is absent or stale. */
-export type UnsweptLibraryEntry = Omit<LibraryEntry, 'headroom'> & { headroom?: HeadroomRecord };
-
-/**
- * The editor's re-read after a write (#563): every check `loadPatchFile`
- * makes except the sweep's currency — a missing record is accepted, a stale
- * one is carried as written, a malformed one is still refused. Playback and
- * the tests never use this; `npm run verify` stays the gate that demands the
- * sweep.
- */
-export function loadUnsweptPatchFile(id: string, raw: unknown): UnsweptLibraryEntry {
-  const entry = validatePatchFile(id, raw);
-  if (entry.headroom !== undefined) {
-    const problems = headroomProblems(entry.headroom, entry.patch, id).filter(
-      (problem) => !problem.startsWith('stale headroom record'),
-    );
-    if (problems.length) refuse(id, problems);
-  }
-  return entry;
-}
-
-/** Everything but the headroom record's currency; the record itself is returned as found. */
-function validatePatchFile(id: string, raw: unknown): UnsweptLibraryEntry {
   const fail = (problems: string[]): never => refuse(id, problems);
   if (!PATCH_ID_RULE.test(id))
     fail([`id "${id}" is not a slug (lower-case letters, digits and single hyphens)`]);
@@ -279,23 +178,23 @@ function validatePatchFile(id: string, raw: unknown): UnsweptLibraryEntry {
   // otherwise, so the console can keep the file and list it as old.
   const upgraded = upgradePatchFile(raw);
   if ('refused' in upgraded) throw new PatchFormatError(id, upgraded.refused);
-  return validateCurrentFile(id, upgraded.value as Record<string, unknown>);
+  return loadCurrentFile(id, upgraded.value as Record<string, unknown>);
 }
 
-/** A file at this build's format against the contract. */
-function validateCurrentFile(id: string, raw: Record<string, unknown>): UnsweptLibraryEntry {
+/** A file at this build's format against the contract, its patch completed. */
+function loadCurrentFile(id: string, raw: Record<string, unknown>): LibraryEntry {
   const fail = (problems: string[]): never => refuse(id, problems);
-  const keys = keyDifference(raw, FILE_KEYS, REQUIRED_KEYS);
+  const keys = keyDifference(raw, FILE_KEYS);
   if (keys) fail([keys]);
   const problems = [...metadataProblems(raw), ...patchProblems(raw['patch'])];
   if (problems.length) fail(problems);
-  const patch = raw['patch'] as Patch;
+  const patch = makePatch(raw['patch'] as PartialPatch);
   if (raw['name'] !== patch.name)
     fail([`name "${show(raw['name'])}" ≠ patch.name "${patch.name}"`]);
-  return { id, ...(raw as unknown as Omit<UnsweptLibraryEntry, 'id'>) };
+  return { id, ...(raw as unknown as PatchFile), patch };
 }
 
-/** Every file of a `{ id: raw }` map, validated, keyed by id. */
+/** Every file of a `{ id: raw }` map, loaded, keyed by id. */
 export function loadPatchLibrary(
   files: Readonly<Record<string, unknown>>,
 ): Record<string, LibraryEntry> {

@@ -1,12 +1,12 @@
 /**
- * The whole-bank table: every `patches/<id>.json`, validated, as `PRESETS` /
- * `PRESET_NAMES` and as `PATCH_LIBRARY` with each file's metadata and headroom
- * record. This is the console's and the tests' surface (#561 "two surfaces").
+ * The whole-bank table: every `patches/<id>.json`, loaded, as `PRESETS` /
+ * `PRESET_NAMES` and as `PATCH_LIBRARY` with each file's metadata. This is
+ * the console's and the tests' surface (#561 "two surfaces").
  * The playback path never imports it: a song carries its own patches (#562)
  * and the fallback click imports its one file through `fallbackPatch.ts`.
  *
- * Loading validates every file (`patchLibrary.ts`), so a stale headroom record
- * or a malformed file fails at import — `npm run verify` is the gate.
+ * Loading checks every file (`patchLibrary.ts`), so a malformed file fails
+ * at import — `npm run verify` is the gate.
  */
 import type { Patch } from './patch';
 import { loadPatchLibrary } from './patchLibrary';

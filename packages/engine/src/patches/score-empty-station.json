@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Empty Station",
   "category": "Pads",
   "tags": ["hollow", "distant", "cinematic"],
@@ -20,7 +20,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0.04, 0.36, 0.08, 0.22, 0.03, 0.09],
-        "userKey": "a204-scoring-v1-choir",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0.04, 0.36, 0.08, 0.22, 0.03, 0.09],
-        "userKey": "a204-scoring-v1-choir",
         "ratio": 2,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 62,
-    "peak": 0.014786391519010067,
-    "seedsSwept": 256,
-    "contentHash": "7b3fdf3c"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Drone SQR",
   "category": "Pads",
   "tags": ["drone", "authored"],
@@ -20,7 +20,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.5,
         "fixed": false,
         "fixedHz": 100.00000000000004,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.0050000000000001,
         "fixed": false,
         "fixedHz": 6620.94029304625,
@@ -78,7 +76,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 2,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 2,
         "userPartials": null,
-        "userKey": "",
         "ratio": 4,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
     }
-  },
-  "headroom": {
-    "worstSeed": 1367,
-    "peak": 0.6353955864906311,
-    "seedsSwept": 4096,
-    "contentHash": "f97900aa"
   }
 }

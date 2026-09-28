@@ -2,7 +2,7 @@
  * `renderPatchToBuffer`'s option plumbing (#563): the editor's loudness check
  * renders through this with a seed, sixteen voices and an inlined worklet
  * URL. Web Audio is stubbed — what is under test is what reaches the
- * processor, not the DSP (that is `fmProcessorHeadroom.test.ts`).
+ * processor, not the DSP (that is `packages/app/lib/loudnessRender.test.mjs`).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

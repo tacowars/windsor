@@ -79,7 +79,6 @@ function opDefaults(o: PartialOperator | null | undefined, index: number): Opera
   return {
     wave: num(o.wave, d.wave) | 0,
     userPartials: o.userPartials || d.userPartials,
-    userKey: o.userKey || d.userKey,
     ratio: num(o.ratio, d.ratio),
     fixed: !!o.fixed,
     fixedHz: num(o.fixedHz, d.fixedHz),

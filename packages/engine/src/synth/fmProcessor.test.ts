@@ -12,9 +12,10 @@
  * unseeded assertion about a level is a fresh coin toss every run -- which is
  * how the `bass-digital` clip assertion failed once and passed on re-run
  * (#78). Seeding alone would trade that rare true failure for a permanent
- * false pass, so coverage of the random space is a deliberate sweep: it lives
- * in fmProcessorHeadroom.test.ts, which is where the preset levels are on
- * trial.
+ * false pass, so no test here puts a preset's level on trial. The bank's
+ * seeded clip sweep retired with its headroom record (record
+ * `2026-09-28-retire-the-headroom-record`): a hot patch shows on the strip
+ * and master meters, and the editor's loudness check warns before a save.
  */
 import { describe, expect, it, vi } from 'vitest';
 

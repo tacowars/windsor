@@ -1,7 +1,8 @@
 /**
  * The folder reader and the handle wrapper (#563) against a fake directory
  * handle: only `<id>.json` files are read, a bad file is reported rather than
- * fatal, the unswept loader admits a fresh write, and the wrapper drives the
+ * fatal, the library loader admits a fresh write and upgrades an old one, and
+ * the wrapper drives the
  * Chrome handle's file, writable and remove calls.
  */
 import { describe, expect, it } from 'vitest';
@@ -54,31 +55,35 @@ function fakeHandle(files: Map<string, string>): ChromeDirectoryHandle & { log: 
 
 const kick = PATCH_LIBRARY['kick']!;
 
-/** The entry minus its headroom record: what a file looks like before its sweep. */
-const withoutHeadroom = <T extends { headroom?: unknown }>(entry: T): Omit<T, 'headroom'> =>
-  Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'headroom')) as Omit<
-    T,
-    'headroom'
-  >;
+/** The kick as format 1 stored it: a headroom record, and `userKey` in every operator. */
+const formatOne = (): string => {
+  const file = JSON.parse(serialisePatchFile(kick)) as Record<string, unknown>;
+  const patch = file['patch'] as { ops: Record<string, unknown>[] };
+  patch.ops = patch.ops.map((op) => ({ ...op, userKey: '' }));
+  const headroom = { worstSeed: 1, peak: 0.5, seedsSwept: 16, contentHash: '0badf00d' };
+  return `${JSON.stringify({ ...file, format: 1, headroom }, null, 2)}\n`;
+};
 
 describe('readFolderLibrary', () => {
-  it('reads every <id>.json through the unswept loader and reports the rest', async () => {
-    const unswept = withoutHeadroom(kick);
+  it('reads every <id>.json through the library loader and reports the rest', async () => {
     const files = new Map([
       ['kick.json', serialisePatchFile(kick)],
       [
         'fresh.json',
-        serialisePatchFile({ ...unswept, name: 'Fresh', patch: { ...kick.patch, name: 'Fresh' } }),
+        serialisePatchFile({ ...kick, name: 'Fresh', patch: { ...kick.patch, name: 'Fresh' } }),
       ],
+      ['old-kick.json', formatOne()],
       ['broken.json', '{"format": 1}'],
       ['notes.txt', 'not a patch'],
       ['Bad Name.json', serialisePatchFile(kick)],
     ]);
     const folder = wrapDirectoryHandle(fakeHandle(files));
     const { entries, problems } = await readFolderLibrary(folder);
-    expect(Object.keys(entries).sort()).toEqual(['fresh', 'kick']);
+    expect(Object.keys(entries).sort()).toEqual(['fresh', 'kick', 'old-kick']);
     expect(entries['kick']).toEqual(kick);
-    expect(entries['fresh']?.headroom).toBeUndefined();
+    expect(entries['fresh']?.name).toBe('Fresh');
+    // A format-1 file upgrades on the read: the same entry, the retired keys gone.
+    expect(entries['old-kick']).toEqual({ ...kick, id: 'old-kick' });
     expect(problems).toHaveLength(2);
     expect(problems.find((p) => p.includes('broken'))).toContain('missing field');
     expect(problems.find((p) => p.includes('Bad Name'))).toContain('not a slug');

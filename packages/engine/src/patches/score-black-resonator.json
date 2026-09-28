@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Black Resonator",
   "category": "Soundtrack FX",
   "tags": ["atonal", "dark", "vast"],
@@ -34,7 +34,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -63,7 +62,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.707,
         "fixed": false,
         "fixedHz": 100,
@@ -92,7 +90,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.001819,
         "fixed": false,
         "fixedHz": 100,
@@ -121,7 +118,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 0.5,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
         "keyScale": 0
       }
     }
-  },
-  "headroom": {
-    "worstSeed": 12,
-    "peak": 0.023195631802082062,
-    "seedsSwept": 256,
-    "contentHash": "cf5adebc"
   }
 }

@@ -10,7 +10,7 @@ import { AUDIO_DIR, audioBundleOptions } from './audioBundle.mjs';
 
 describe('audioBundleOptions', () => {
   it('resolves the exports from the real audio directory and defines import.meta.url inside its fixtures', () => {
-    const source = `export { loadUnsweptPatchFile } from './patch/patchLibrary';`;
+    const source = `export { loadPatchFile } from './patch/patchLibrary';`;
     const options = audioBundleOptions(source, 'test-import-patches');
     expect(options.stdin).toEqual({ contents: source, resolveDir: AUDIO_DIR, loader: 'ts' });
     expect(existsSync(join(AUDIO_DIR, 'patch/patchLibrary.ts'))).toBe(true);

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "name": "Pale Monolith",
   "category": "Pads",
   "tags": ["cold", "atonal", "vast"],
@@ -20,7 +20,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0, 0.09, 0, 0.2, 0, 0.07, 0, 0.02],
-        "userKey": "a204-scoring-v1-glass",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -49,7 +48,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 3.141,
         "fixed": false,
         "fixedHz": 100,
@@ -78,7 +76,6 @@
       {
         "wave": 9,
         "userPartials": [1, 0, 0.09, 0, 0.2, 0, 0.07, 0, 0.02],
-        "userKey": "a204-scoring-v1-glass",
         "ratio": 1,
         "fixed": false,
         "fixedHz": 100,
@@ -107,7 +104,6 @@
       {
         "wave": 0,
         "userPartials": null,
-        "userKey": "",
         "ratio": 1.5705,
         "fixed": false,
         "fixedHz": 100,
@@ -183,11 +179,5 @@
       "loopMode": 0,
       "keyScale": 0
     }
-  },
-  "headroom": {
-    "worstSeed": 12,
-    "peak": 0.014832613989710808,
-    "seedsSwept": 256,
-    "contentHash": "7a8286f8"
   }
 }

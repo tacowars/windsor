@@ -33,7 +33,7 @@ const ODD = [1, 0, 0.5];
 const EVEN = [1, 0.8, 0];
 
 const userPatch = (partials: number[] | null): Patch =>
-  makePatch({ ops: [{ wave: WAVE.USER, userPartials: partials, userKey: '' }] });
+  makePatch({ ops: [{ wave: WAVE.USER, userPartials: partials }] });
 
 const on: ScheduledEvent = { type: 'noteOn', id: 1, note: NOTE, velocity: 0.9, frame: 0 };
 
@@ -68,9 +68,9 @@ describe('the User wave', () => {
     expect(odd.third).toBeGreaterThan(odd.second * PRESENT_OVER_ABSENT);
   });
 
-  it('builds a separate table for different partials, even with the same userKey', () => {
+  it('builds a separate table for different partials', () => {
     // Order matters: the odd table is cached first, which is what the
-    // userKey-keyed cache then handed to the even patch as well.
+    // old key-by-name cache then handed to the even patch as well.
     held(userPatch(ODD));
     const even = held(userPatch(EVEN));
     expect(even.nonFinite).toBe(0);

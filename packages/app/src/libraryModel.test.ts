@@ -32,13 +32,6 @@ import { buildPatchFile, patchFileText } from './patchFileWriter';
 // The built-in library loads on demand in the page; these tests read it.
 beforeAll(() => loadBuiltIns());
 
-/** The entry minus its headroom record: what a file looks like before its sweep. */
-const withoutHeadroom = <T extends { headroom?: unknown }>(entry: T): Omit<T, 'headroom'> =>
-  Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'headroom')) as Omit<
-    T,
-    'headroom'
-  >;
-
 function memoryFolder(files: Map<string, string>): PatchFolder {
   return {
     name: 'patches',
@@ -104,10 +97,9 @@ describe('the model', () => {
     const model = pageLibrary();
     const files = new Map<string, string>();
     await connectLibrary(model, memoryFolder(files));
-    const unswept = withoutHeadroom(PATCH_LIBRARY['kick']!);
-    await writeLibraryFile(model, 'kick', serialisePatchFile(unswept));
+    await writeLibraryFile(model, 'kick', serialisePatchFile(PATCH_LIBRARY['kick']!));
     expect(files.has('kick.json')).toBe(true);
-    expect(model.entries['kick']?.headroom).toBeUndefined();
+    expect(model.entries['kick']).toEqual(PATCH_LIBRARY['kick']);
     await removeLibraryFile(model, 'kick');
     expect(files.size).toBe(0);
     expect(model.entries['kick']).toBeUndefined();
@@ -184,7 +176,7 @@ describe('reportLibraryProblems (createProblemReporter)', () => {
 });
 
 describe("the user's library", () => {
-  /** A user patch file, as Save writes it: the kick under a new name, with no headroom record. */
+  /** A user patch file, as Save writes it: the kick under a new name. */
   const mine = (name: string): string =>
     patchFileText(
       buildPatchFile(
@@ -249,7 +241,7 @@ describe("the user's library", () => {
 
   describe('a patch in a format this build cannot read', () => {
     /** Save's bytes with the format bumped, spacing and all: what Export must hand back. */
-    const future = (name: string): string => mine(name).replace('"format": 1,', '"format": 99,');
+    const future = (name: string): string => mine(name).replace('"format": 2,', '"format": 99,');
 
     it('is listed as old format, never as an entry, and nothing is refused or dropped', async () => {
       const text = future('Future Kick');
@@ -267,8 +259,8 @@ describe("the user's library", () => {
           refusal: {
             format: 'patch',
             found: 99,
-            reads: 1,
-            message: 'saved with patch format 99, this build reads 1',
+            reads: 2,
+            message: 'saved with patch format 99, this build reads 2',
           },
         },
       ]);
@@ -313,7 +305,8 @@ describe("the user's library", () => {
       const model = pageLibrary();
       await connectLibrary(model, memoryFolder(files));
       expect(model.oldFormat.map((entry) => entry.id)).toEqual(['future-kick']);
-      expect(model.entries['plain-kick']?.format).toBe(1);
+      // Read as format 1 and upgraded on the way in.
+      expect(model.entries['plain-kick']?.format).toBe(2);
       expect(model.problems).toEqual([]);
     });
   });

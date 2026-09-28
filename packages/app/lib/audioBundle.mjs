@@ -2,8 +2,7 @@
  * The one esbuild prelude the library's Node scripts share (#620 decision 5):
  * bundle a handful of exports from `packages/engine/src` — TypeScript
  * the scripts cannot import directly — into a cache file and import that.
- * `import-patches.mjs`, `sweep-headroom.mjs` and `migrate-patches-586.mjs`
- * each used to carry their own copy of this.
+ * The library's scripts each used to carry their own copy of this.
  *
  * `import.meta.url` is defined as a file under `__fixtures__/` so the worklet
  * harness (which reads `../worklet/generated/fm-processor.js` relative to itself)
