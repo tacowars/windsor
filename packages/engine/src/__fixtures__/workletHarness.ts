@@ -18,7 +18,8 @@ const SAMPLE_RATE = 48000;
 const BLOCK = 128;
 
 export interface ScheduledEvent {
-  type: 'noteOn' | 'noteOff';
+  /** `allNotesOff` is what a transport stop or pause sends (windsor#7). */
+  type: 'noteOn' | 'noteOff' | 'allNotesOff';
   id: number;
   note?: number;
   velocity?: number;

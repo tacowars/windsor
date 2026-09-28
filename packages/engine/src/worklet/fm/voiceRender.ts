@@ -1,7 +1,7 @@
 /* eslint-disable no-magic-numbers -- DSP: the generic loop's feedback average, interpolation and mip arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * The generic render loop (#645): four operators walked in the algorithm's
- * topological order, the carrier sum, the steal fade and the filter, over
+ * topological order, the carrier sum, the filter and the steal fade, over
  * locals hoisted out of the loop. It is the reference the fixed-index kernel
  * (`voiceKernel.js`) must match to the bit, and the path every voice takes
  * with `specialise: false`. Invariant: one sample loop, read top to bottom,
@@ -126,18 +126,21 @@ function renderVoiceGeneric(
     }
     sig *= gain;
 
+    if (mode !== FILT_OFF) {
+      if (drive !== 1) sig = softClip(sig * drive);
+      sig = voice.svfA.process(sig, mode);
+      if (slope24) sig = voice.svfB.process(sig, mode);
+    }
+
+    // The steal fade comes after the filter, so the voice reaches 0 at the
+    // filter's output: a fade before it left a low cutoff ringing, and the
+    // kill at the fade's end cut that tail to 0 in one sample (windsor#7).
     if (fadeInc !== 0) {
       fade += fadeInc;
       if (fade <= 0) {
         fade = 0;
       }
       sig *= fade;
-    }
-
-    if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
-      sig = voice.svfA.process(sig, mode);
-      if (slope24) sig = voice.svfB.process(sig, mode);
     }
 
     const k = off + s;

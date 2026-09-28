@@ -468,6 +468,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
 
         let done = 0;
         while (done < seg) {
+          // A steal fade that ends inside the segment kills the voice (and
+          // `kill` resets `fade` to 1): rendering on would bring the filter's
+          // ring back at full level, then cut it at the segment end (windsor#7).
+          if (!v.active) break;
           // A dormant voice is skipped to the end of the segment and re-read at
           // the next one (#547); `ctrlCount` stays 0 so that check is a control
           // boundary. Age still runs, so stealing order holds.
@@ -485,7 +489,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
           done += chunk;
         }
 
-        if (!v.gate && !v.fading && v.finished) v.active = false;
+        v.settle();
       }
 
       cursor += seg;
