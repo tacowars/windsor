@@ -1094,6 +1094,66 @@ input.field {
   color: #111416;
 }
 
+/* The power button as the CPU meter (windsor#13): a bar of the DSP load, a
+   tick at the interval's peak and the load as NN%. `cpuMeter.ts` sets
+   --cpu-fill and --cpu-peak (0..1); .over is a load past the budget, and
+   .overrun the second of red after the underrun count rose. A fixed width,
+   so a changing label never shifts the header. */
+.btn.cpu-meter {
+  --cpu-fill: 0;
+  --cpu-peak: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 116px;
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.cpu-meter-bar {
+  position: relative;
+  flex: 1 1 auto;
+  height: 6px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.cpu-meter-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--modulator);
+  transform: scaleX(var(--cpu-fill));
+  transform-origin: left center;
+  transition: transform 0.2s linear;
+}
+.cpu-meter-peak {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--cpu-peak) * 100% - 1px);
+  width: 2px;
+  background: var(--carrier);
+}
+.cpu-meter-label {
+  flex: none;
+  min-width: 5ch;
+  text-align: right;
+}
+.btn.cpu-meter.over .cpu-meter-fill {
+  background: var(--hot);
+}
+.btn.cpu-meter.overrun {
+  background: var(--hot);
+  border-color: var(--hot);
+  color: #111416;
+}
+.btn.cpu-meter.overrun .cpu-meter-fill {
+  background: #111416;
+}
+
 .field-label {
   font-family: var(--f-panel);
   font-size: 9px;
