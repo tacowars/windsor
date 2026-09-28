@@ -1,7 +1,7 @@
 /**
  * The transport strip (#708, epic #703 decision 1), which sits in the header
  * row since windsor#11 beside the brand, the power button and the tabs — Tap,
- * BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth` position, and ▶ ■ ‖.
+ * BPM, Bars, swing and its grid (windsor#29), 4/4, key, scale, the `bar.beat.sixteenth` position, and ▶ ■ ‖.
  * Tempo and bars are number boxes that type and drag (`numberDrag.ts`,
  * windsor#12), laid out as Ableton Live's control bar: Tap, BPM, Bars. Every edit is a live `ctx.change`, never a rebuild;
  * the buttons are `ctx.transport` (`host.ts`'s `HostTransport`), and the
@@ -14,6 +14,7 @@
  * `watchPlayhead` — the console's one frame loop — and the loop idles while
  * the transport is not running (issue decision 4).
  */
+import type { Swing } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
 import { el, select } from './dom';
@@ -25,12 +26,18 @@ import {
   countsAsTap,
   dragBars,
   dragBpm,
+  dragSwing,
   formatPosition,
+  isStraight,
   keyChange,
   parseBars,
   parseBpm,
+  parseSwing,
   pressedButtons,
   scaleChange,
+  swingChange,
+  swingGridChange,
+  swingOf,
   tapTempo,
 } from './transportModel';
 import {
@@ -41,6 +48,10 @@ import {
   METER_LABEL,
   POSITION_GRID,
   SCALE_OPTIONS,
+  SWING_GRID_LABEL,
+  SWING_GRID_OPTIONS,
+  SWING_KNOB,
+  SWING_UNIT,
 } from './transportTables';
 
 const songTicks = (ctx: AppCtx): number => ctx.model.doc.transport.bars * POSITION_GRID.bar;
@@ -89,6 +100,36 @@ function tempoBoxes(ctx: AppCtx): HTMLElement[] {
   tap.addEventListener('pointerdown', onTap);
   tap.addEventListener('click', onTap);
   return [tap, bpm, bars];
+}
+
+/**
+ * Swing and its grid (windsor#29): a number box in percent, dimmed while it
+ * is straight, and a label-less 1/16 | 1/8 picker. Both write the song's whole
+ * `transport.swing` through `ctx.change`.
+ */
+function swingControls(ctx: AppCtx): HTMLElement[] {
+  const swing = (): Swing => swingOf(ctx.model.doc.transport);
+  const amount = makeNumberBox({
+    label: SWING_KNOB.label,
+    unit: SWING_UNIT,
+    inputMode: 'numeric',
+    get: () => swing().amount,
+    set: (v) => {
+      if (ctx.change(swingChange(swing(), { amount: v })).ok) dim();
+    },
+    format: SWING_KNOB.fmt ?? String,
+    parse: parseSwing,
+    drag: (start, upPx, fine) => dragSwing(start, upPx, fine),
+  });
+  const dim = (): void => {
+    amount.classList.toggle('transport-box-straight', isStraight(swing().amount));
+  };
+  dim();
+  const grid = select(SWING_GRID_LABEL, SWING_GRID_OPTIONS, String(swing().grid), (value) => {
+    const partial = swingGridChange(swing(), value);
+    if (partial) ctx.change(partial);
+  });
+  return [amount, headPicker(grid, SWING_GRID_LABEL)];
 }
 
 function keyPickers(ctx: AppCtx): HTMLElement[] {
@@ -176,14 +217,15 @@ function group(nodes: readonly HTMLElement[]): HTMLElement {
 }
 
 /**
- * Draw the strip into `root` from the current document and transport: three
- * groups — tempo and bars, key and scale, position and buttons — so a narrow
- * header wraps between them, never inside one.
+ * Draw the strip into `root` from the current document and transport: four
+ * groups — tempo and bars, swing and the meter, key and scale, position and
+ * buttons — so a narrow header wraps between them, never inside one.
  */
 export function renderTransportStrip(root: HTMLElement, ctx: AppCtx): void {
   root.innerHTML = '';
   const row = el('div', 'transport-row');
-  row.appendChild(group([...tempoBoxes(ctx), el('span', 'transport-meter', METER_LABEL)]));
+  row.appendChild(group(tempoBoxes(ctx)));
+  row.appendChild(group([...swingControls(ctx), el('span', 'transport-meter', METER_LABEL)]));
   row.appendChild(group(keyPickers(ctx)));
   row.appendChild(group(transportControls(ctx)));
   root.appendChild(row);

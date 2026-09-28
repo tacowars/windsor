@@ -1,7 +1,8 @@
 /**
  * The transport strip's tables (#708, epic #703 decision 1): the tempo and
- * bars boxes' ranges and drag feel (windsor#12), tap tempo, the key and scale
- * options, and the position readout's grid. Every range is the engine's or
+ * bars boxes' ranges and drag feel (windsor#12), tap tempo, the swing box and
+ * its grid picker (windsor#29), the key and scale options, and the position
+ * readout's grid. Every range is the engine's or
  * the new song's; nothing is restated.
  */
 import {
@@ -13,6 +14,10 @@ import {
   PITCH_CLASS_MAX,
   PPQ,
   SCALE_NAMES,
+  STRAIGHT_SWING,
+  SWING_AMOUNT_MAX,
+  SWING_AMOUNT_MIN,
+  type SwingGrid,
   TICKS_PER_BAR,
 } from '@windsor/engine';
 import { fmt0, fmt2 } from './consoleFormat';
@@ -46,6 +51,31 @@ export const BARS_KNOB: KnobRange = {
   step: 1,
   fmt: fmt0,
 };
+
+/**
+ * The swing box (windsor#29 decision 1): the engine's amount range, in whole
+ * percent, starting straight. 50 reads as straight, 66 near a triplet, 75 hard.
+ */
+export const SWING_KNOB: KnobRange = {
+  label: 'Swing',
+  min: SWING_AMOUNT_MIN,
+  max: SWING_AMOUNT_MAX,
+  def: STRAIGHT_SWING.amount,
+  step: 1,
+  fmt: fmt0,
+};
+export const SWING_UNIT = '%';
+
+/**
+ * The swing grid picker (windsor#29 decision 2), 16ths first: the engine's
+ * grids, each named as the note it swings.
+ */
+export const SWING_GRID_LABEL = 'Swing grid';
+const SWING_GRID_ORDER: readonly SwingGrid[] = [16, 8];
+const SWING_GRID_NAMES: Readonly<Record<SwingGrid, string>> = { 16: '1/16', 8: '1/8' };
+export const SWING_GRID_OPTIONS: readonly { value: string; label: string }[] = SWING_GRID_ORDER.map(
+  (grid) => ({ value: String(grid), label: SWING_GRID_NAMES[grid] }),
+);
 
 /**
  * How a vertical drag on a number box moves it (windsor#12 decision 2): the
