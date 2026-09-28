@@ -1,6 +1,6 @@
 /**
- * The transport strip (#708, epic #703 decision 1): the fixed row under the
- * header on every tab — BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth`
+ * The transport strip (#708, epic #703 decision 1), which sits in the header
+ * row since windsor#11 beside the brand, the power button and the tabs — BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth`
  * position, and ▶ ■ ‖. Every edit is a live `ctx.change`, never a rebuild;
  * the buttons are `ctx.transport` (`host.ts`'s `HostTransport`), and the
  * rules they follow are `transportModel.ts`'s.
@@ -126,14 +126,24 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
   return [position, play, stop, pause];
 }
 
-/** Draw the strip into `root` from the current document and transport. */
+/** One group the header wraps as a unit (windsor#11 decision 2). */
+function group(nodes: readonly HTMLElement[]): HTMLElement {
+  const node = el('div', 'transport-group');
+  for (const child of nodes) node.appendChild(child);
+  return node;
+}
+
+/**
+ * Draw the strip into `root` from the current document and transport: three
+ * groups — tempo and bars, key and scale, position and buttons — so a narrow
+ * header wraps between them, never inside one.
+ */
 export function renderTransportStrip(root: HTMLElement, ctx: AppCtx): void {
   root.innerHTML = '';
   const row = el('div', 'transport-row');
-  for (const node of tempoKnobs(ctx)) row.appendChild(node);
-  row.appendChild(el('span', 'transport-meter', METER_LABEL));
-  for (const node of keyPickers(ctx)) row.appendChild(node);
-  for (const node of transportControls(ctx)) row.appendChild(node);
+  row.appendChild(group([...tempoKnobs(ctx), el('span', 'transport-meter', METER_LABEL)]));
+  row.appendChild(group(keyPickers(ctx)));
+  row.appendChild(group(transportControls(ctx)));
   root.appendChild(row);
 }
 
