@@ -14,7 +14,7 @@
  * exactly the invisible musical stand-in the record's §4 rejects). An absent
  * sequencer, by contrast, is `none` — inert, never a musical guess (#597).
  */
-import type { Harmony, Transport } from './arrangement';
+import type { Harmony, Swing, Transport } from './arrangement';
 import type { DocumentPart } from './arrangementDocument';
 import { FieldNormaliser, show } from './arrangementFields';
 import {
@@ -30,6 +30,13 @@ import {
   VELOCITY_DEFAULT,
 } from '../audioConstants';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import {
+  STRAIGHT_SWING,
+  SWING_AMOUNT_MAX,
+  SWING_AMOUNT_MIN,
+  SWING_GRIDS,
+  type SwingGrid,
+} from '../sequencing/swingTables';
 import { normaliseHarmonyEvents, normaliseRegions } from './timelineNormalise';
 import { normaliseStrip } from './deskNormalise';
 import type { Patch } from '../patch/patch';
@@ -80,14 +87,45 @@ export class ArrangementNormaliser extends FieldNormaliser {
     return this.resolver.filled;
   }
 
-  /** The clock (#705): tempo and the song's explicit length in bars (decision 5). */
+  /** The clock (#705): tempo, the song's explicit length in bars (decision 5) and its swing. */
   transport(raw: unknown): Transport {
     const o = this.section(raw, 'transport');
-    this.dropUnknown(o, ['bpm', 'bars'], 'transport');
-    return {
+    this.dropUnknown(o, ['bpm', 'bars', 'swing'], 'transport');
+    const transport = {
       bpm: this.num(o.bpm, DEFAULT_BPM, BPM_MIN, BPM_MAX, 'transport.bpm'),
       bars: this.int(o.bars, DEFAULT_BARS, BARS_MIN, BARS_MAX, 'transport.bars'),
     };
+    // Absent stays absent: a song from before swing plays straight and
+    // exports byte for byte as it came (record `2026-09-28-song-swing-in-the-transport`).
+    return o.swing === undefined ? transport : { ...transport, swing: this.swing(o.swing) };
+  }
+
+  /**
+   * The song's swing (windsor#14): an amount clamped to 50–75 and a grid of 8
+   * or 16, each defaulting to straight 16ths; junk is straight, reported.
+   */
+  private swing(raw: unknown): Swing {
+    const path = 'transport.swing';
+    const o = this.section(raw, path);
+    this.dropUnknown(o, ['amount', 'grid'], path);
+    const amount = this.num(
+      o.amount,
+      STRAIGHT_SWING.amount,
+      SWING_AMOUNT_MIN,
+      SWING_AMOUNT_MAX,
+      `${path}.amount`,
+    );
+    return { amount, grid: this.swingGrid(o.grid, `${path}.grid`) };
+  }
+
+  private swingGrid(raw: unknown, path: string): SwingGrid {
+    if ((SWING_GRIDS as readonly unknown[]).includes(raw)) return raw as SwingGrid;
+    if (raw !== undefined) {
+      this.correction(
+        `${path}: ${show(raw)} is not one of ${SWING_GRIDS.join('|')} — using ${STRAIGHT_SWING.grid}`,
+      );
+    }
+    return STRAIGHT_SWING.grid;
   }
 
   /** The key — a pitch-class root (decision 11) and a scale — and the chord timeline over it. */
