@@ -29,16 +29,24 @@ import type { ProcessorOptions } from '../synth/workletMessages';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 import { AudioSystem } from '../system/audioSystem';
 import type { RenderSongOptions } from './renderSong';
-import { RENDER_MAX_FRAMES } from './renderConstants';
+import {
+  RENDER_LOOK_AHEAD_SECONDS,
+  RENDER_MAX_FRAMES,
+  RENDER_QUANTUM_FRAMES,
+} from './renderConstants';
 import { renderRefusal, renderSong, songSeconds } from './renderSong';
 
-/** Every `fm-part` built, with the options it was built with. */
+/** Every `fm-part` built, with the options it was built with; not the opening's probe. */
 const built: { node: FakeWorkletNode; options: ProcessorOptions }[] = [];
+
+/** The probe `renderSong` plays the opening on: one quantum long, never rendered. */
+const isProbe = (context: FakeContext): boolean =>
+  (context as Partial<FakeOfflineContext>).length === RENDER_QUANTUM_FRAMES;
 
 class RecordingWorkletNode extends FakeWorkletNode {
   constructor(context: FakeContext, name: string, options: { processorOptions?: unknown } = {}) {
     super(context, name, options);
-    if (name === PROCESSOR_NAME) {
+    if (name === PROCESSOR_NAME && !isProbe(context)) {
       built.push({ node: this, options: options.processorOptions as ProcessorOptions });
       // A tone per engine part, the same for the live and the offline graph.
       const index = built.length;
@@ -132,27 +140,33 @@ describe('renderSong', () => {
     expect(new Set(seedsA).size).toBe(seedsA.length);
     expect(seedsB).toEqual(seedsA);
     // The stops are identical too: the render is driven, not timed.
-    expect(second.contexts[0]!.suspendFrames).toEqual(first.contexts[0]!.suspendFrames);
+    expect(second.contexts.at(-1)!.suspendFrames).toEqual(first.contexts.at(-1)!.suspendFrames);
   });
 
-  it('delivers the opening notes before rendering starts, so bar 1 beat 1 sounds', async () => {
-    const { render, contexts } = offline(FULL_DOCUMENT, { sampleRate: 8000, tailSeconds: 0 });
+  it('builds each processor holding the opening notes, so bar 1 beat 1 sounds', async () => {
+    const rate = 8000;
+    const { render, contexts } = offline(FULL_DOCUMENT, { sampleRate: rate, tailSeconds: 0 });
     const rendered = await render;
-    const timeline = contexts[0]!.timeline;
-    const start = timeline.indexOf('start');
-    const opening = timeline.slice(0, start);
-    // Tick 0's notes are posted before rendering, then one round trip
-    // through the audio thread (an empty module) drains them.
-    expect(opening).toContain('post:noteOn');
-    expect(opening.at(-1)).toBe('module');
-    expect(opening.lastIndexOf('post:noteOn')).toBeLessThan(opening.lastIndexOf('module'));
-    const lead = Math.round(SCHEDULER_START_DELAY_SECONDS * 8000);
-    const tickZero = built.flatMap((b) =>
-      b.node.posted.filter((m) => (m as { type?: string; frame?: number }).frame === lead),
-    );
-    expect(tickZero.length).toBeGreaterThan(0);
-    // The kick is on the downbeat: the file's first block already sounds.
-    expect(rendered.channels[0]!.subarray(0, 128).some((sample) => sample !== 0)).toBe(true);
+    // The opening is played first on a probe that never renders, then the render.
+    expect(contexts).toHaveLength(2);
+    expect(contexts[0]!.length).toBe(RENDER_QUANTUM_FRAMES);
+    expect(contexts[0]!.timeline).not.toContain('start');
+    const lead = Math.round(SCHEDULER_START_DELAY_SECONDS * rate);
+    const held = built.flatMap((b) => b.options.events ?? []);
+    expect(held.some((m) => m.type === 'noteOn' && m.frame === lead)).toBe(true);
+    expect(held.every((m) => m.frame < RENDER_LOOK_AHEAD_SECONDS * rate)).toBe(true);
+    // None of it is posted as well: a note reaches a processor once.
+    const timeline = contexts[1]!.timeline;
+    expect(timeline.slice(0, timeline.indexOf('start'))).not.toContain('post:noteOn');
+    for (const { node, options } of built) {
+      const heldIds = new Set((options.events ?? []).map((m) => m.id));
+      const posted = node.posted as { type?: string; id?: number }[];
+      expect(posted.filter((m) => m.type === 'noteOn' && heldIds.has(m.id!))).toEqual([]);
+    }
+    // The kick is on the downbeat: the file's first block already sounds —
+    // well above the plate's anti-denormal offset (~1e-20).
+    const first = rendered.channels[0]!.subarray(0, RENDER_QUANTUM_FRAMES);
+    expect(Math.max(...first.map(Math.abs))).toBeGreaterThan(1e-3);
   });
 
   it('leaves live parts unseeded', async () => {
@@ -246,7 +260,7 @@ describe('a song with its loop on', () => {
     const cheap = { sampleRate: rate, tailSeconds: 0 };
     const noteOnFrames = (): number[][] =>
       built.map((b) =>
-        b.node.posted
+        [...(b.options.events ?? []), ...b.node.posted]
           .filter((m) => (m as { type?: string }).type === 'noteOn')
           .map((m) => (m as { frame: number }).frame),
       );

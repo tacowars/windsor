@@ -15,9 +15,10 @@
  * Notes reach the processors by `postMessage`, which is asynchronous. The
  * look-ahead is twice the step, so a note posted at a stop sounds at least a
  * step later, and the context is suspended while the message travels. The
- * opening window has no such lead: its notes are posted before rendering
- * starts, so the render waits for a round trip through the audio thread
- * (`drainPostedMessages`) before it calls `startRendering()`.
+ * opening window has no such lead: its notes would be posted before rendering
+ * starts. So they are never posted: each processor is built holding them
+ * (`ProcessorOptions.events`), captured by playing the opening once on a
+ * throwaway system first (`renderSystem.ts`).
  *
  * The scheduler places tick 0 `SCHEDULER_START_DELAY_SECONDS` after the start
  * of the context; that lead-in is rendered and trimmed, so bar 1 is the file's
@@ -28,26 +29,24 @@
  * own seeds, so two renders of the same song are bit-identical.
  */
 import { SCHEDULER_START_DELAY_SECONDS, SECONDS_PER_MINUTE } from '../audioConstants';
-import { hashSeed } from '../sequencing/generatorSeed';
 import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import { playableSwing } from '../sequencing/swing';
 import { STRAIGHT_SWING } from '../sequencing/swingTables';
 import type { ArrangementDocument } from '../song/arrangementDocument';
-import { musicPartName } from '../song/documentParts';
 import type { WorkletUrls } from '../synth/fmEngine';
-import { FmEngine } from '../synth/fmEngine';
-import { AudioSystem } from '../system/audioSystem';
+import type { AudioSystem } from '../system/audioSystem';
 import type { RenderPlan } from './renderPlan';
 import { planRender } from './renderPlan';
 import {
   RENDER_CHANNELS,
-  RENDER_LOOK_AHEAD_SECONDS,
   RENDER_MAX_FRAMES,
+  RENDER_QUANTUM_FRAMES,
   RENDER_SAMPLE_RATE_DEFAULT,
-  RENDER_SEED_DEFAULT,
   RENDER_STEP_SECONDS,
   RENDER_TAIL_SECONDS,
 } from './renderConstants';
+import type { OpeningNotes } from './renderSystem';
+import { buildSystem, captureOpening, playOpening, pumpAhead, sameOpening } from './renderSystem';
 
 /** What the render needs of an offline context; `OfflineAudioContext` is one, a test fakes it. */
 export interface OfflineContextLike {
@@ -149,15 +148,31 @@ export async function renderSong(
   const refusal = renderRefusal(document, options);
   if (refusal) throw new RangeError(refusal);
   const plan = planFor(document, options);
-  throwIfAborted(options.signal);
   const create = options.createContext ?? ((init) => new OfflineAudioContext(init));
+  const song = wholeSong(document);
+  throwIfAborted(options.signal);
+  const opening: OpeningNotes =
+    song.parts.length > 0
+      ? await captureOpening(
+          create({ numberOfChannels: RENDER_CHANNELS, length: RENDER_QUANTUM_FRAMES, sampleRate }),
+          song,
+          options,
+          plan,
+        )
+      : new Map();
+  throwIfAborted(options.signal);
   const context = create({
     numberOfChannels: RENDER_CHANNELS,
     length: plan.totalFrames,
     sampleRate,
   });
-  const system = await buildSystem(context, wholeSong(document), options);
+  const system = await buildSystem(context, song, options, opening);
   try {
+    // The processors already hold what this play issues: drop it, once it
+    // is known to be the same notes.
+    if (!sameOpening(playOpening(system, song, plan), opening)) {
+      throw new Error('the render opening differed between its two plays; nothing was rendered');
+    }
     const buffer = await drive(context, system, plan, options);
     return {
       channels: Array.from({ length: RENDER_CHANNELS }, (_, c) =>
@@ -183,31 +198,6 @@ export function wholeSong(document: ArrangementDocument): ArrangementDocument {
   return { ...document, transport: { ...document.transport, loop: { ...loop, on: false } } };
 }
 
-/** The live system on the offline context, the song loaded, every part's processor seeded. */
-async function buildSystem(
-  context: OfflineContextLike,
-  document: ArrangementDocument,
-  options: RenderSongOptions,
-): Promise<AudioSystem> {
-  const seed = options.seed ?? RENDER_SEED_DEFAULT;
-  const seeds = new Map(document.parts.map((p) => [musicPartName(p.slot), hashSeed(seed, p.slot)]));
-  // The engine reads only the `BaseAudioContext` surface an offline context
-  // shares; `unlock()` — the one `AudioContext`-only call — is never made.
-  const engine = new FmEngine(context as unknown as AudioContext);
-  await engine.init(options.workletUrls);
-  const system = new AudioSystem(engine, {
-    partSeed: (name) => seeds.get(name) ?? seed,
-    defer: (run) => run(),
-  });
-  await system.init();
-  // A song with no parts renders the standing graph: silence of the song's length.
-  if (document.parts.length > 0) {
-    system.initMusic(document);
-    system.startMusic();
-  }
-  return system;
-}
-
 /**
  * Render with a stop every step: issue the ticks due before the next stop,
  * release everything at the song's end, report progress, honour an abort.
@@ -225,12 +215,7 @@ async function drive(
     rejectAbort = reject;
   });
   const pump = (): void => {
-    const now = context.currentTime;
-    const ahead = Math.min(RENDER_LOOK_AHEAD_SECONDS, plan.endSeconds - now);
-    if (!ended && ahead > 0) {
-      system.scheduler.lookAhead = ahead;
-      system.update(0);
-    }
+    if (!ended) pumpAhead(system, context.currentTime, plan);
   };
   const stopAt = (time: number): void => {
     void context.suspend(time).then(async () => {
@@ -248,30 +233,13 @@ async function drive(
       await context.resume();
     });
   };
-  pump();
-  // The opening window's notes are posted before rendering starts, and an
-  // offline context outruns an asynchronous postMessage
-  // (`ProcessorOptions.events`): wait until the audio thread has taken them.
-  await drainPostedMessages(context);
+  // The opening is already in the processors (`playOpening`).
   const first = plan.nextStop(0, RENDER_STEP_SECONDS);
   if (first !== null) stopAt(first);
   const buffer = await Promise.race([context.startRendering(), aborted]);
   onProgress?.(1);
   return buffer;
 }
-
-/**
- * A round trip through the audio thread: an empty module, evaluated as a task
- * on the worklet thread queued behind every port message already posted to
- * it. Its URL is new each time, because a module map caches by URL.
- */
-async function drainPostedMessages(context: OfflineContextLike): Promise<void> {
-  barrierCount += 1;
-  await context.audioWorklet.addModule(
-    `data:text/javascript,${encodeURIComponent(`// windsor render barrier ${barrierCount}`)}`,
-  );
-}
-let barrierCount = 0;
 
 function throwIfAborted(signal: AbortSignal | undefined): void {
   if (signal?.aborted) throw abortError();
