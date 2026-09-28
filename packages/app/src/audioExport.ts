@@ -56,7 +56,7 @@ export function audioExportSection(ctx: AppCtx, songName: () => string): HTMLEle
       'stereo WAV. The tail keeps rendering after the last bar so ' +
       'releases and returns ring out; a tail of 0 gives a loop-ready file.',
   );
-  const formats = el('div', 'bar-row');
+  const formats = el('div', 'bar-row export-formats');
   formats.appendChild(
     seg(
       RENDER_SAMPLE_RATES.map((rate) => ({
@@ -87,7 +87,7 @@ export function audioExportSection(ctx: AppCtx, songName: () => string): HTMLEle
     }),
   );
   body.appendChild(formats);
-  const actions = el('div', 'bar-row');
+  const actions = el('div', 'bar-row export-actions');
   body.appendChild(actions);
   repaint = (): void => paintActions(actions, ctx, songName);
   repaint();
