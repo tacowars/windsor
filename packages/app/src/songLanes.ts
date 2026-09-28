@@ -12,17 +12,8 @@
  */
 import type { MusicPart, Region } from '@windsor/engine';
 import { el } from './dom';
-import {
-  addRegion,
-  moveRegion,
-  regionAt,
-  regionMark,
-  resizeRegionEnd,
-  resizeRegionStart,
-  snapGrain,
-  snapTick,
-  splitRegion,
-} from './regionModel';
+import type { RegionDrag } from './regionModel';
+import { addRegion, dragRegion, regionMark, snapGrain, snapTick, splitRegion } from './regionModel';
 import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
 import {
@@ -31,12 +22,15 @@ import {
   REGION_SUMMARY,
   SONG_DRAG_THRESHOLD_PX,
   blockBox,
+  boxTick,
   forKind,
   hitBlocks,
   isNarrowBlock,
+  primaryHeld,
   pxToTick,
   tickToPx,
 } from './songViewTables';
+import type { BlockBox } from './songViewTables';
 
 export interface DragHandlers {
   /** False refuses the press (the pointer is not on the handle). */
@@ -45,34 +39,56 @@ export interface DragHandlers {
   move(e: PointerEvent): void;
   /** The release; `moved` says whether the press became a drag. */
   end(e: PointerEvent, moved: boolean): void;
+  /** A drag that ended without a release (cancel, lost capture, blur, a move with the button up): drop its preview. */
+  abort(moved: boolean): void;
 }
 
-/** A press-and-drag with pointer capture: under the threshold it is a click, past it a drag. */
+/**
+ * A press-and-drag with pointer capture: under the threshold it is a click,
+ * past it a drag. Only the pressing pointer's release commits (`end`); a
+ * cancel, a lost capture, a window blur or a move with the primary button
+ * up — a release it never saw — aborts, so a later hover never drags.
+ */
 export function pointerDrag(node: HTMLElement, handlers: DragHandlers): void {
+  let live: { pointerId: number; x: number; moved: boolean } | null = null;
+  const finish = (release: PointerEvent | null): void => {
+    if (!live) return;
+    const { pointerId, moved } = live;
+    live = null;
+    window.removeEventListener('blur', onBlur);
+    if (node.hasPointerCapture(pointerId)) node.releasePointerCapture(pointerId);
+    if (release) handlers.end(release, moved);
+    else handlers.abort(moved);
+  };
+  const onBlur = (): void => finish(null);
+  const mine = (e: PointerEvent): boolean => live !== null && e.pointerId === live.pointerId;
   node.addEventListener('pointerdown', (down) => {
     if (down.button !== 0 || (handlers.accept && !handlers.accept(down))) return;
     down.stopPropagation();
-    let moved = false;
+    finish(null);
+    live = { pointerId: down.pointerId, x: down.clientX, moved: false };
     try {
       node.setPointerCapture(down.pointerId);
     } catch {
       // A pointer the browser does not track (a synthetic event, a capture-less input): the drag still runs on the node's own events.
     }
-    const onMove = (e: PointerEvent): void => {
-      if (!moved && Math.abs(e.clientX - down.clientX) < SONG_DRAG_THRESHOLD_PX) return;
-      moved = true;
-      handlers.move(e);
-    };
-    const onUp = (e: PointerEvent): void => {
-      node.removeEventListener('pointermove', onMove);
-      node.removeEventListener('pointerup', onUp);
-      node.removeEventListener('pointercancel', onUp);
-      handlers.end(e, moved);
-    };
-    node.addEventListener('pointermove', onMove);
-    node.addEventListener('pointerup', onUp);
-    node.addEventListener('pointercancel', onUp);
+    window.addEventListener('blur', onBlur);
   });
+  node.addEventListener('pointermove', (e) => {
+    if (!live || !mine(e)) return;
+    if (!primaryHeld(e.buttons)) return void finish(null);
+    if (!live.moved && Math.abs(e.clientX - live.x) < SONG_DRAG_THRESHOLD_PX) return;
+    live.moved = true;
+    handlers.move(e);
+  });
+  node.addEventListener('pointerup', (e) => {
+    if (mine(e)) finish(e);
+  });
+  for (const type of ['pointercancel', 'lostpointercapture'] as const) {
+    node.addEventListener(type, (e) => {
+      if (mine(e)) finish(null);
+    });
+  }
 }
 
 /** One `.reg` block for a region of `part`. */
@@ -99,10 +115,13 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   return node;
 }
 
-type Gesture =
-  { kind: 'add' } | { kind: 'move' | 'resizeStart' | 'resizeEnd'; index: number; grab: number };
+/** A press in a gap adds; on a block it drags that block by the pointer's travel from `pressTick`. */
+type Gesture = { kind: 'add' } | { kind: RegionDrag; index: number; pressTick: number };
 
 const HIT_GESTURE = { start: 'resizeStart', end: 'resizeEnd', body: 'move' } as const;
+
+const boxesOf = (regions: readonly Region[], pxPerBar: number): BlockBox[] =>
+  regions.map((r) => blockBox(r.start, r.duration, pxPerBar));
 
 /**
  * What a press `px` into the lane starts: a new region in a gap, or an edge
@@ -110,32 +129,32 @@ const HIT_GESTURE = { start: 'resizeStart', end: 'resizeEnd', body: 'move' } as 
  * (`hitBlocks`), so a block widened to its minimum is hit where it shows.
  */
 function gestureAt(regions: readonly Region[], px: number, pxPerBar: number): Gesture {
-  const found = hitBlocks(
-    regions.map((r) => blockBox(r.start, r.duration, pxPerBar)),
-    px,
-  );
-  const region = found ? regions[found.index] : undefined;
-  if (!found || !region) return { kind: 'add' };
-  const grab = pxToTick(px, pxPerBar) - region.start;
-  return { kind: HIT_GESTURE[found.hit], index: found.index, grab };
+  const found = hitBlocks(boxesOf(regions, pxPerBar), px);
+  if (!found || !regions[found.index]) return { kind: 'add' };
+  return { kind: HIT_GESTURE[found.hit], index: found.index, pressTick: pxToTick(px, pxPerBar) };
 }
 
-/** The regions a drag of `gesture` to `tick` previews or commits. */
-function dragged(
+/**
+ * Alt-click: the region whose drawn box is under `px` (windsor#21 — never a
+ * raw tick lookup, which misses the widened part of a `MIN_BLOCK_PX` block)
+ * cut at the snapped tick the press maps to inside its span; null when
+ * there is no block there or the cut lands on an edge.
+ */
+function splitAt(
   regions: readonly Region[],
-  gesture: Exclude<Gesture, { kind: 'add' }>,
-  tick: number,
-  songTicks: number,
+  px: number,
+  pxPerBar: number,
   grain: number,
-): Region[] {
-  switch (gesture.kind) {
-    case 'resizeStart':
-      return resizeRegionStart(regions, gesture.index, tick, grain);
-    case 'resizeEnd':
-      return resizeRegionEnd(regions, gesture.index, tick, songTicks, grain);
-    case 'move':
-      return moveRegion(regions, gesture.index, tick - gesture.grab, songTicks, grain);
-  }
+): { regions: Region[]; index: number } | null {
+  const boxes = boxesOf(regions, pxPerBar);
+  const found = hitBlocks(boxes, px);
+  const region = found ? regions[found.index] : undefined;
+  const box = found ? boxes[found.index] : undefined;
+  if (!found || !region || !box) return null;
+  const span = { startTick: region.start, durationTicks: region.duration };
+  const tick = snapTick(boxTick(box, px, span, pxPerBar), grain);
+  const next = splitRegion(regions, found.index, tick, grain);
+  return next.length === regions.length ? null : { regions: next, index: found.index };
 }
 
 /** Redraw the lane's blocks from `regions` — the drag preview and the paint after a commit share it. */
@@ -160,15 +179,12 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   lane.addEventListener('pointerdown', (down) => {
     if (down.button !== 0 || !down.altKey) return;
     const live = current();
-    const tick = tickAt(down);
-    const index = regionAt(live.regions, tick);
-    if (index < 0) return;
     const grain = snapGrain(live.sequencer, down.shiftKey);
-    const regions = splitRegion(live.regions, index, snapTick(tick, grain), grain);
-    if (regions.length === live.regions.length) return;
+    const split = splitAt(live.regions, pxAt(down), view.state.pxPerBar, grain);
+    if (!split) return;
     down.stopPropagation();
-    if (view.commit({ parts: { [part.slot]: { regions } } })) {
-      view.select({ kind: 'part', slot: part.slot, region: index + 1 });
+    if (view.commit({ parts: { [part.slot]: { regions: split.regions } } })) {
+      view.select({ kind: 'part', slot: part.slot, region: split.index + 1 });
     }
   });
   pointerDrag(lane, {
@@ -182,8 +198,16 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
       if (gesture.kind === 'add') return;
       const live = current();
       const grain = snapGrain(live.sequencer, e.shiftKey);
-      draft = dragged(live.regions, gesture, tickAt(e), view.songTicks(), grain);
+      const deltaTicks = tickAt(e) - gesture.pressTick;
+      const drag = { kind: gesture.kind, index: gesture.index, deltaTicks };
+      draft = dragRegion(live.regions, drag, view.songTicks(), grain);
       paintRegions(view, lane, live, draft);
+    },
+    abort: () => {
+      if (!draft) return;
+      draft = null;
+      const live = current();
+      paintRegions(view, lane, live, live.regions);
     },
     end: (e, moved) => {
       const live = current();
