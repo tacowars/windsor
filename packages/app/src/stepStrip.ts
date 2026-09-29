@@ -12,19 +12,23 @@
  * `host.stepAt` (decision 2). `playheadAt` is the console's only reading of
  * the audible tick.
  */
-import type { SequencerKind, SequencerSpec } from '@windsor/engine';
-import { partAt } from '@windsor/engine';
+import { partAt, type SequencerKind, type SequencerSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
-import { partChange } from './context';
 import { el } from './dom';
+import { changePattern, patternOf } from './partEdits';
+import { regionAt } from './regionModel';
 
-/** The sequencer spec of the part on `slot` when it is of `kind`, else null. */
+/**
+ * The spec the part on `slot` plays in region `region` (windsor#75) — or,
+ * with no region named, its sequencer — when it is of `kind`, else null.
+ */
 export function specOf<K extends SequencerKind>(
   ctx: AppCtx,
   slot: number,
   kind: K,
+  region?: number,
 ): Extract<SequencerSpec, { kind: K }> | null {
-  const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
+  const sequencer = patternOf(ctx.model.doc, slot, region);
   // The union is discriminated by `kind`; TypeScript cannot narrow through a
   // generic comparison, so the check above is the narrowing and this is its cast.
   return sequencer?.kind === kind ? (sequencer as Extract<SequencerSpec, { kind: K }>) : null;
@@ -42,17 +46,18 @@ export interface PlayheadStrip {
 export interface Strip<S> extends PlayheadStrip {
   ctx: AppCtx;
   slot: number;
+  /** The region whose pattern the strip edits (windsor#75); absent, the part's sequencer. */
+  region?: number | undefined;
   /** This card's spec, or null when the part is gone or re-kinded. */
   spec(): S | null;
   repaint(): void;
 }
 
-/** Write an edited step list through `ctx.change`, and redraw if it took. */
+/** Write an edited step list into the strip's region (`changePattern`), and redraw if it took. */
 export function commitSteps<S, T>(strip: Strip<S>, edit: (spec: S) => T): void {
   const spec = strip.spec();
   if (!spec) return;
-  const result = strip.ctx.change(partChange(strip.slot, { sequencer: { steps: edit(spec) } }));
-  if (result.ok) strip.repaint();
+  if (changePattern(strip.ctx, strip.slot, strip.region, { steps: edit(spec) })) strip.repaint();
 }
 
 /** One `.gcell` button; `blank` keeps a column's height where a rest or tie has no field. */
@@ -205,8 +210,16 @@ export function audibleTick(ctx: AppCtx): number {
 /**
  * The step the part on `slot` is sounding, or -1 while nothing runs: the
  * audible tick put through the engine's own `stepAt` (#619 decision 2).
+ * A region card names its `region`: `stepAt` resolves the generator of the
+ * region under the audible tick, so the ring lights only while the transport
+ * is inside that region, and stays dark while another one plays (windsor#75).
  */
-export function playheadAt(ctx: AppCtx, slot: number): number {
+export function playheadAt(ctx: AppCtx, slot: number, region?: number): number {
   if (!ctx.transport.running) return -1;
-  return ctx.host.stepAt(slot, audibleTick(ctx));
+  const tick = audibleTick(ctx);
+  if (region !== undefined) {
+    const part = partAt(ctx.model.doc, slot);
+    if (part === undefined || regionAt(part.regions, tick) !== region) return -1;
+  }
+  return ctx.host.stepAt(slot, tick);
 }

@@ -6,20 +6,22 @@
  * player's figure changes, so a modulator moving `k` on a bar line is seen
  * the bar it happens and a Steps turn resizes the strip at once. Clicking a
  * cell flips that step and freezes the figure (the capture path); Release
- * lets the modulator back in. Every edit goes through `ctx.change` and, since
+ * lets the modulator back in. Every edit goes through `ctx.change` into the
+ * pane's selected region's pattern (windsor#75, `changePattern`) and, since
  * the engine reconfigures a Euclidean part live, none restarts the sequencer.
+ * The strip shows the player's live figure for that region (asked for by its
+ * index) while the transport is inside it; elsewhere the region's own
+ * preview (`euclidFigure.ts`), so Capture freezes the selected region's figure.
  * The operations are `euclidModel.ts`; the playhead loop and its lighting are
  * `stepStrip.ts` (#619), shared with the grid (#603) and chord (#607) cards.
  */
 import type { EuclideanSpec } from '@windsor/engine';
 import { PERC_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
-import { partChange } from './context';
 import { el } from './dom';
 import {
   countOnsets,
   figureKey,
-  previewFigure,
   pulsesChange,
   rotateChange,
   stepsChange,
@@ -28,7 +30,9 @@ import {
   type Figure,
   type PulseField,
 } from './euclidModel';
+import { regionFigure } from './euclidFigure';
 import { makeKnob, type KnobElement } from './knob';
+import { changePattern } from './partEdits';
 import { densityControls, divisorPicker, knobRow as tableKnobRow } from './seqFields';
 import {
   EUCLID_KNOBS,
@@ -61,6 +65,8 @@ const PULSE_FIELDS: readonly PulseField[] = ['min', 'max', 'start'];
 interface Card extends PlayheadStrip {
   ctx: AppCtx;
   slot: number;
+  /** The region whose pattern the card edits (windsor#75); absent, the part's sequencer. */
+  region: number | undefined;
   /** This card's spec, or null when the part is gone or re-kinded. */
   spec(): EuclideanSpec | null;
   readout: HTMLElement;
@@ -71,17 +77,23 @@ interface Card extends PlayheadStrip {
   dependents: KnobElement[];
 }
 
-/** The figure the player holds, or the document's preview while nothing plays. */
+/** The figure the player holds for this card's region while it plays it, else the region's preview (`regionFigure`). */
 function figureOf(card: Card): Figure {
-  const live = card.ctx.host.capturePattern(card.slot);
-  if (Array.isArray(live) && typeof live[0] === 'boolean') return live as Figure;
-  const spec = card.spec();
-  return spec ? previewFigure(spec) : [];
+  const { ctx } = card;
+  const source = {
+    doc: ctx.model.doc,
+    capturePattern: (slot: number, region?: number) => ctx.host.capturePattern(slot, region),
+    position: () => ctx.transport.position(),
+  };
+  return regionFigure(source, card.slot, card.region);
 }
 
+/** Write fields of the card's region's pattern; false when nothing took. */
+const write = (card: Card, fields: Record<string, unknown>): boolean =>
+  changePattern(card.ctx, card.slot, card.region, fields);
+
 function commitPattern(card: Card, pattern: Figure | null): void {
-  const result = card.ctx.change(partChange(card.slot, { sequencer: { pattern } }));
-  if (!result.ok) return;
+  if (!write(card, { pattern })) return;
   card.captureButton.textContent = pattern ? 'Release' : 'Capture';
   card.ctx.notify(
     pattern
@@ -130,7 +142,7 @@ function watch(card: Card): void {
   watchPlayhead({
     attached: () => card.root.isConnected,
     shown: () => card.root.closest('[hidden]') === null,
-    playheadAt: () => playheadAt(card.ctx, card.slot),
+    playheadAt: () => playheadAt(card.ctx, card.slot, card.region),
     mark: markStep(card),
     repaintIf: () => {
       const figure = figureOf(card);
@@ -149,7 +161,7 @@ function stepsKnob(card: Card): HTMLElement {
     set: (v) => {
       const spec = card.spec();
       if (!spec) return;
-      if (card.ctx.change(partChange(card.slot, { sequencer: stepsChange(spec, v) })).ok) {
+      if (write(card, stepsChange(spec, v))) {
         card.dependents.forEach((knob) => knob.refresh());
       }
     },
@@ -164,7 +176,7 @@ function rotateKnob(card: Card): HTMLElement {
     set: (v) => {
       const spec = card.spec();
       if (!spec) return;
-      card.ctx.change(partChange(card.slot, { sequencer: { rotate: rotateChange(spec, v) } }));
+      write(card, { rotate: rotateChange(spec, v) });
     },
   });
   card.dependents.push(knob);
@@ -185,7 +197,7 @@ function pulsesRow(card: Card): HTMLElement {
         const spec = card.spec();
         if (!spec) return;
         const pulses = pulsesChange(spec, field, v);
-        if (card.ctx.change(partChange(card.slot, { sequencer: { pulses } })).ok) {
+        if (write(card, { pulses })) {
           knobs.forEach((k) => k.refresh());
         }
       },
@@ -197,7 +209,7 @@ function pulsesRow(card: Card): HTMLElement {
 }
 
 function knobRow(card: Card): HTMLElement {
-  const row = tableKnobRow(card.ctx, card.slot, EUCLID_KNOBS, PERC_COLOR);
+  const row = tableKnobRow(card.ctx, card.slot, EUCLID_KNOBS, PERC_COLOR, card.region);
   row.appendChild(stepsKnob(card));
   row.appendChild(rotateKnob(card));
   return row;
@@ -214,24 +226,25 @@ function captureRow(card: Card): HTMLElement {
     const fixed = card.spec()?.pattern != null;
     commitPattern(card, fixed ? null : figureOf(card));
   };
-  wrap.appendChild(divisorPicker(card.ctx, card.slot));
+  wrap.appendChild(divisorPicker(card.ctx, card.slot, card.region));
   wrap.appendChild(card.captureButton);
   return wrap;
 }
 
-/** The card body for a Euclidean part: knobs, the k bounds, the strip and readout, the modulator, the hint. */
-export function euclidCard(ctx: AppCtx, slot: number): HTMLElement {
+/** The card body for a Euclidean part's region `region`: knobs, the k bounds, the strip and readout, the modulator, the hint. */
+export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
   const body = el('div');
   const card: Card = {
     ctx,
     slot,
+    region,
     root: el('div', 'euclid-strip'),
     readout: el('div', 'euclid-readout'),
     captureButton: document.createElement('button'),
     key: '',
     playing: -1,
     dependents: [],
-    spec: () => specOf(ctx, slot, 'euclidean'),
+    spec: () => specOf(ctx, slot, 'euclidean', region),
   };
   card.root.setAttribute('role', 'group');
   card.root.setAttribute('aria-label', 'figure');
@@ -240,7 +253,7 @@ export function euclidCard(ctx: AppCtx, slot: number): HTMLElement {
   body.appendChild(card.root);
   body.appendChild(card.readout);
   body.appendChild(captureRow(card));
-  body.appendChild(densityControls(ctx, slot));
+  body.appendChild(densityControls(ctx, slot, region));
   body.appendChild(el('p', 'hint', HINT));
   const figure = figureOf(card);
   paintFigure(card, figure);

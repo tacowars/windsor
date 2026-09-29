@@ -77,8 +77,9 @@ export function freshSequencer(kind: SequencerKind): RawDocument {
 /**
  * The song with the part on `slot` driven by a sequencer of `kind`, at that
  * kind's defaults — preset, name, velocity, strip and regions stay; a
- * captured pattern goes with the old sequencer. Unchanged when the kind
- * already matches.
+ * captured pattern goes with the old sequencer, and so does every region's
+ * own pattern (windsor#75 decision 6). Unchanged when the kind already
+ * matches.
  */
 export function setSequencerKind(
   doc: ArrangementDocument,
@@ -87,7 +88,11 @@ export function setSequencerKind(
 ): ArrangementDocument | RawDocument {
   const parts = doc.parts.map((part): DocumentPart | RawDocument =>
     part.slot === slot && part.sequencer.kind !== kind
-      ? { ...part, sequencer: freshSequencer(kind) }
+      ? {
+          ...part,
+          regions: part.regions.map(({ start, duration }) => ({ start, duration })),
+          sequencer: freshSequencer(kind),
+        }
       : part,
   );
   return parts.every((part, i) => part === doc.parts[i]) ? doc : { ...doc, parts };
