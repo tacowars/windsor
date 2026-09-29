@@ -285,7 +285,8 @@ the gate out of the model.
    Code default), Explore and verifier sub-agents at `low`. Try the
    elapsed-time line via a hook on one wave and measure.
 8. **Measure every wave.** Rerun `measure-overhead.py` on the Windsor
-   transcript folder after each wave and record process share, starting
+   transcript folder after each wave (words listed in `REPORT_HIDE_WORDS`
+   in the untracked `.env` are left out of the report) and record process share, starting
    context, per-turn context, and time inside `verify`. The Windsor baseline
    today: five process-free sub-agents at 3% process share, median 5 min,
    starting context 12 to 28 k. Those were research and measurement runs,

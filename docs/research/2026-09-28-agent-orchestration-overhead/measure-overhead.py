@@ -62,30 +62,55 @@ SECRET_RE = re.compile(
 )
 DOTENV_RE = re.compile(r"(^|[\s/])\.env(\b|$)")
 
-# The repo is public, so the report names the owner only by handle. Prompts
-# and session titles copied from transcripts pass through redact_owner_name.
-# The name is assembled from parts so this file stays clear of a repo grep
-# for it. Every pattern ignores case and matches whole words only, so
-# patch, pattern and path are never touched, but the ordinary English word
-# of the same spelling is redacted too; that is accepted. Order matters:
-# slugs (after a hyphen) go first, then the longer prose forms.
-OWNER_HANDLE = "tacowars"
-_OWNER_NAME = "P" + "at"
-_I = re.IGNORECASE
-OWNER_NAME_REDACTIONS = (
-    (re.compile(r"(?<=-)" + _OWNER_NAME + r"s(?=-)", _I), "the-owners"),
-    (re.compile(r"(?<=-)" + _OWNER_NAME + r"\b", _I), "the-owner"),
-    (re.compile(r"\b" + _OWNER_NAME + r"rick\b", _I), OWNER_HANDLE),
-    (re.compile(r"\b" + _OWNER_NAME + r"(?:'s|s)\b", _I), OWNER_HANDLE + "'s"),
-    (re.compile(r"\b" + _OWNER_NAME + r"\b", _I), OWNER_HANDLE),
-)
+# Words kept out of the report: REPORT_HIDE_WORDS (comma-separated) in the
+# repo's untracked .env, or in the environment. Each is matched as a whole
+# word in any case (letters and digits join a word; "_", "-", "." and the
+# like separate one), with an optional "'s" or "s", and becomes
+# REPORT_HIDE_WITH (default "[hidden]") in prompts and session titles.
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+HIDE_DEFAULT = "[hidden]"
 
 
-def redact_owner_name(text, table=OWNER_NAME_REDACTIONS):
-    """Replace the owner's first name, in any form the transcripts use, with the handle."""
-    for pattern, replacement in table:
-        text = pattern.sub(replacement, text)
+def read_dotenv(path):
+    """KEY=VALUE pairs from a .env file; blank lines, comments and a missing file are fine."""
+    pairs = {}
+    if not os.path.exists(path):
+        return pairs
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            pairs[key.strip()] = value.strip().strip("'\"")
+    return pairs
+
+
+def hide_table(settings):
+    """The (pattern, replacement) pairs for REPORT_HIDE_WORDS and REPORT_HIDE_WITH in `settings`."""
+    words = [w.strip() for w in settings.get("REPORT_HIDE_WORDS", "").split(",") if w.strip()]
+    with_ = settings.get("REPORT_HIDE_WITH") or HIDE_DEFAULT
+    # Longer words first, so one that contains another is replaced whole.
+    return [
+        (re.compile(r"(?<![^\W_])" + re.escape(w) + r"('s|s)?(?![^\W_])", re.IGNORECASE), with_)
+        for w in sorted(words, key=len, reverse=True)
+    ]
+
+
+def hide_words(text, table):
+    """`text` with every word in `table` replaced; a possessive or plural keeps its "'s"."""
+    for pattern, with_ in table:
+        text = pattern.sub(lambda m: with_ + ("'s" if m.group(1) else ""), text)
     return text
+
+
+HIDE_TABLE = hide_table({**read_dotenv(os.path.join(REPO_ROOT, ".env")), **os.environ})
+
+
+def require_hide_table(table):
+    """Stop before writing anything when no words are set: the report is never written unfiltered."""
+    if not table:
+        raise SystemExit("REPORT_HIDE_WORDS is not set (repo .env or environment); not writing the report.")
 
 # --------------------------------------------------------------------------
 # Bash command classification
@@ -350,7 +375,7 @@ def load_transcript(path):
             t["bad_json"] += 1
             continue
         if typ == "custom-title":
-            t["custom_title"] = redact_owner_name(r.get("customTitle") or "") or None
+            t["custom_title"] = hide_words(r.get("customTitle") or "", HIDE_TABLE) or None
         if typ == "cost-state":
             t["cost_state"] = r
         ts = parse_ts(r.get("timestamp", "")) if r.get("timestamp") else None
@@ -372,7 +397,7 @@ def load_transcript(path):
                 if SECRET_RE.search(txt):
                     t["secretish_records"] += 1
                     txt = "[redacted: secret-like content]"
-                t["first_prompt"] = redact_owner_name(re.sub(r"\s+", " ", txt))[:120]
+                t["first_prompt"] = hide_words(re.sub(r"\s+", " ", txt), HIDE_TABLE)[:120]
                 t["first_prompt_ts"] = ts
         if typ == "assistant":
             mid = m.get("id") or r.get("requestId") or r.get("uuid")
@@ -946,7 +971,7 @@ def report_project(name, sessions, subagents, out):
     if oth:
         W("- Unclassified command heads (top 12): " + ", ".join(f"`{k}` {v}" for k, v in oth.most_common(12)))
     W(f"- Records/commands with secret-like strings (redacted, never printed): {sum(s['secretish_records'] for s in sessions + subagents)}; "
-      f"Bash commands mentioning `.env`: {sum(s['dotenv_cmds'] for s in sessions + subagents)} (contents never read by this script)")
+      f"Bash commands mentioning `.env`: {sum(s['dotenv_cmds'] for s in sessions + subagents)} (this script reads only REPORT_HIDE_WORDS and REPORT_HIDE_WITH from the repo's .env and prints neither)")
     W("- `output_tokens` on assistant records is the count at the moment the record was persisted (mid-stream), e.g. 7 tokens on a record whose tool_use input is 9 kB; "
       "only end-of-turn records carry the final count. Per-transcript output tokens are therefore NOT measurable from these files; the report gives measured output "
       "characters instead, and the harness `cost-state` totals per main session (which include sub-agents) for real output-token counts.")
@@ -959,7 +984,17 @@ def report_project(name, sessions, subagents, out):
         W("- Session 35dbdc79 is the session that ran this measurement; its sub-agent transcripts (including the measuring agent's own) were still being written when read.")
 
 
+def write_report(text, table, path):
+    """Write the report with every hidden word replaced, whatever field it came from; return what was written."""
+    require_hide_table(table)
+    text = hide_words(text, table)
+    with open(path, "w") as fh:
+        fh.write(text)
+    return text
+
+
 def main():
+    require_hide_table(HIDE_TABLE)
     out = []
     out.append("# Sub-agent tool-call and token overhead, measured from Claude Code transcripts")
     out.append(f"\nGenerated {datetime.now().isoformat(timespec='seconds')} by measure-overhead.py from `{BASE}`. "
@@ -986,56 +1021,38 @@ def main():
         out.append(f"- {len(sessions)} session(s), {len(subagents)} sub-agent transcripts, {sum(sum(s['tools'].values()) for s in sessions)} tool calls, "
                    f"date range {min(ts for s in sessions for ts in s['ts']).date() if any(s['ts'] for s in sessions) else '-'}; "
                    f"output tokens {fmt_k(sum(t['output'] for t in tk))}. Not included in the Aotearoa204 totals above.")
-    text = "\n".join(out) + "\n"
+    text = write_report("\n".join(out) + "\n", HIDE_TABLE, os.path.join(HERE, "transcript-overhead-report.md"))
     sys.stdout.write(text)
-    with open(os.path.join(HERE, "transcript-overhead-report.md"), "w") as fh:
-        fh.write(text)
-
-
-def _report_text_for(prompt, title):
-    """Run a one-prompt transcript through load_transcript; return the prompt and title it reports."""
-    import tempfile
-
-    records = [
-        {"type": "custom-title", "customTitle": title},
-        {"type": "user", "timestamp": "2026-09-29T10:00:00Z", "message": {"role": "user", "content": prompt}},
-    ]
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
-        fh.write("\n".join(json.dumps(r) for r in records) + "\n")
-        path = fh.name
-    try:
-        t = load_transcript(path)
-    finally:
-        os.remove(path)
-    return t["first_prompt"] + " | " + t["custom_title"]
 
 
 def self_test():
-    """Check that transcripts naming the owner, in any case, reach the report with the handle only."""
-    name, lo, up = _OWNER_NAME, _OWNER_NAME.lower(), _OWNER_NAME.upper()
-    leak = re.compile(r"\b" + name + r"(?:'s|s|rick)?\b", re.IGNORECASE)
-    # The report keeps the first 120 characters of a prompt, so each case
-    # sits inside them: slugs, then mixed, lower and upper case prose forms,
-    # one transcript each.
-    cases = [
-        (f"Keep the pattern and patches. bed-01-is-{lo}s-song, merge-without-{lo}: {name}'s song.",
-         f"{name}'s session",
-         ("bed-01-is-the-owners-song", "merge-without-the-owner", "tacowars's song", "tacowars's session")),
-        (f"Keep the pattern and patches. {name} asked; {name}s note; {name}rick agreed.",
-         f"{name} and {name}s session",
-         ("tacowars asked", "tacowars's note", "tacowars agreed", "tacowars and tacowars's session")),
-        (f"Keep the pattern and patches. {lo} said; {lo}'s mix; {lo}s idea.",
-         f"{lo}'s, {lo}s and {lo} session",
-         ("tacowars said", "tacowars's mix", "tacowars's idea", "tacowars's, tacowars's and tacowars session")),
-        (f"Keep the pattern and patches. {up} SAID; {up}'S MIX; {up}S IDEA.",
-         f"{up}'S, {up}S and {up} session",
-         ("tacowars SAID", "tacowars's MIX", "tacowars's IDEA", "tacowars's, tacowars's and tacowars session")),
-    ]
-    for prompt, title, wants in cases:
-        got = _report_text_for(prompt, title)
-        assert not leak.search(got), f"name leaked: {got}"
-        for want in wants + ("Keep the pattern and patches.",):
-            assert want in got, f"missing {want!r}: {got}"
+    """Check hide_words on a made-up word: every case and form goes, longer words stay."""
+    table = hide_table({"REPORT_HIDE_WORDS": "Zorbl, Qux", "REPORT_HIDE_WITH": "someone"})
+    got = hide_words("Zorbl said; zorbl's mix; ZORBLS idea; run-zorbl-now; Zorblax and quxes stay.", table)
+    want = "someone said; someone's mix; someone's idea; run-someone-now; Zorblax and quxes stay."
+    assert got == want, f"got {got!r}"
+    assert hide_table({}) == [], "no words means nothing hidden"
+    try:
+        require_hide_table(hide_table({}))
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("an empty word list must stop the report")
+    require_hide_table(table)
+    assert hide_words("unchanged", []) == "unchanged"
+    got = hide_words("python3 scripts/Zorbl_tool.py; tool_zorbl.sh; zorbl2 and Zorblax stay", table)
+    assert got == "python3 scripts/someone_tool.py; tool_someone.sh; zorbl2 and Zorblax stay", f"got {got!r}"
+    import tempfile
+
+    report = "| session | scripts |\n| a1 | `python3 Zorbl.py`, run-zorbl.sh |\nPrompt: zorbl's idea\n"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "report.md")
+        written = write_report(report, table, path)
+        with open(path) as fh:
+            on_disk = fh.read()
+    assert on_disk == written, "the report on disk is the filtered one"
+    assert "zorbl" not in on_disk.lower(), f"hidden word in the report: {on_disk!r}"
+    assert "`python3 someone.py`, run-someone.sh" in on_disk, on_disk
     print("self-test passed")
 
 
