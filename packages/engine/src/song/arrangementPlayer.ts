@@ -69,7 +69,9 @@ import type { NoteExtras } from '../synth/audioPart';
 import { partNoteOn } from './partNoteOn';
 import { fitTimelines } from './timelineNormalise';
 import { tickLoopOf, withFittedLoop } from './songLoop';
-import { PartBinding, type BindingChange } from './partBinding';
+import { PartBinding, type BindingChange, type RegionStep } from './partBinding';
+
+export type { RegionStep } from './partBinding';
 
 /** What a binding needs from a part. `AudioPart` satisfies it structurally. */
 export interface PlayablePart {
@@ -273,6 +275,17 @@ export class ArrangementPlayer {
    */
   stepAt(slot: number, tick: number): number {
     return this.built.bindings.get(slot)?.stepAt(tick) ?? -1;
+  }
+
+  /**
+   * Where region `region` of the part on `slot` is at transport tick `tick`
+   * (windsor#97), whether the playhead is in it or not: its own generator's
+   * step at the region's phase, counted from the region's last start on the
+   * song's cycle, and whether that tick is inside it. Null for an absent
+   * slot, a `none` part or an index naming no region.
+   */
+  regionStepAt(slot: number, region: number, tick: number): RegionStep | null {
+    return this.built.bindings.get(slot)?.regionStepAt(region, tick) ?? null;
   }
 
   /**

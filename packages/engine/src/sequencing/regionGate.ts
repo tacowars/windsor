@@ -31,7 +31,7 @@
  * graph, no clock of its own.
  */
 import { chordAt, type Harmony, type HarmonyChord } from '../harmony/harmonyTimeline';
-import { regionState, type Region, type RegionState } from './regionClock';
+import { regionPhase, regionState, type Region, type RegionState } from './regionClock';
 import { TICKS_PER_BAR, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
 
 /** A transport tick as a part's generator sees it: local position plus the current chord. */
@@ -101,6 +101,11 @@ export class RegionGate implements PartTickSource {
   /** The part's state at a transport tick — what `ArrangementPlayer.stepAt` folds a playhead through. */
   stateAt(tick: number): RegionState {
     return regionState(this.config.regions, this.config.songTicks, tick);
+  }
+
+  /** Region `index`'s own local tick at a transport tick, live or not (`regionPhase`, windsor#97). */
+  phaseAt(index: number, tick: number): number | null {
+    return regionPhase(this.config.regions, this.config.songTicks, index, tick);
   }
 
   /** The chord at a transport tick, for a caller auditioning the current harmony. */
