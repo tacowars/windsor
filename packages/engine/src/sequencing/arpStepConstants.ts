@@ -17,3 +17,13 @@ export const ARP_STEPS_MAX = 32;
  * notes their cycle is `2L − 2` cells. Every other style's cycle is `L`.
  */
 export const ARP_BOUNCE_STYLES: readonly ArpStyle[] = ['upDown', 'downUp', 'conDiverge'];
+
+/**
+ * The salt that sets the skip-chance stream apart from the walk's
+ * (windsor#129, `arpCellPlay.ts`): the walk's stream seed is XORed with it
+ * and put through one mulberry32 draw, and that draw seeds the skip stream.
+ */
+export const ARP_SKIP_STREAM_SALT = 0x5bd1e995;
+
+/** The span of a 32-bit seed: a draw in [0, 1) times this is a whole 32-bit seed. */
+export const UINT32_SPAN = 2 ** 32;
