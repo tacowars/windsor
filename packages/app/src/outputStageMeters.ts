@@ -5,9 +5,11 @@
  * light. The rules are `outputStageModel.ts`; this file draws them.
  *
  * It rides the console's one frame loop the way `compressorMeter.ts` does,
- * keyed on the stage's report `revision`. While the transport is stopped it
- * draws idle once and waits. The clip light reads the stage's watch
- * (`outputStageWatch.ts`), which keeps the latch across a re-render.
+ * keyed on the stage's report `revision` (`meterRevision`) whatever the
+ * transport is doing: the meters follow the audio, so a silent report is
+ * what reads idle. The loop idles while the section is hidden. The clip
+ * light reads the stage's watch (`outputStageWatch.ts`), which keeps the
+ * latch across a re-render.
  */
 import { masterOutput } from '@windsor/engine';
 import type { OutputStage, OutputStageMode, OutputStageReport } from '@windsor/engine';
@@ -27,12 +29,12 @@ import {
   OUTPUT_PEAK_SCALE,
   OUTPUT_READOUT_HOLD_MS,
 } from './outputStageTables';
-import { watchOutputStage } from './outputStageWatch';
+import { meterRevision, watchOutputStage } from './outputStageWatch';
 import { watchPlayhead } from './stepStrip';
 
 export interface OutputStageMeters {
   readonly root: HTMLElement;
-  /** Redraw at once, for a mode change while the transport is stopped. */
+  /** Redraw at once, for a mode change before the next report lands. */
   refresh(): void;
   /** Clear the clip light (Reset peaks). */
   resetClip(): void;
@@ -129,12 +131,7 @@ export function outputStageMeters(ctx: AppCtx): OutputStageMeters {
   watchPlayhead({
     attached: () => block.root.isConnected,
     shown: () => block.root.closest('[hidden]') === null,
-    playheadAt: () => {
-      const live = stage();
-      if (!live) return -1;
-      watchOutputStage(live);
-      return ctx.transport.running ? live.revision : -1;
-    },
+    playheadAt: () => meterRevision(stage()),
     mark: (revision) => paint(revision >= 0 ? (stage()?.read() ?? null) : null),
   });
   paint(null);

@@ -18,6 +18,9 @@ import { reportActed } from './outputStageModel';
  */
 export type WatchedStage = Pick<OutputStage, 'subscribe'>;
 
+/** The slice the meters' frame loop reads: the watch's, plus the latest report. */
+export type MeteredStage = WatchedStage & Pick<OutputStage, 'revision' | 'read'>;
+
 export interface OutputStageWatch {
   /** Set when the stage acts; cleared only by `resetLatch` (Reset peaks). */
   readonly latched: boolean;
@@ -55,4 +58,18 @@ export function watchOutputStage(
   };
   watches.set(stage, watch);
   return watch;
+}
+
+/**
+ * The meters' frame key (windsor#94): the stage's report revision, or `-1`
+ * with no live stage. The meters follow the audio, not the transport: the
+ * audition keyboard, the metronome and the tails after Pause or Stop all
+ * pass through the stage while the transport is stopped, so a new report is
+ * drawn whatever the transport is doing, and idle is a silent report.
+ * Asking also starts the stage's watch, so the clip light never misses one.
+ */
+export function meterRevision(stage: MeteredStage | null): number {
+  if (!stage) return -1;
+  watchOutputStage(stage);
+  return stage.revision;
 }
