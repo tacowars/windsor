@@ -271,7 +271,9 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // current one behind it — coalesced, latest wins — or a part added or
     // removed in that window would exist in the document only (#629 review,
     // passes 1 and 2). With audio never enabled there is nothing to queue.
-    if (result === null && this.host.isBuilding) this.rebuild();
+    // It keeps the pending build's resume (windsor#141): an undo's bar
+    // survives a knob turned before its system stands.
+    if (result === null && this.host.isBuilding) this.rebuild({ keepPendingResume: true });
     return result ?? { ok: true, ignored: [] };
   }
 
@@ -339,8 +341,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   }
 
   /** The one path a structural change takes: the live system rebuilt, every tab invalidated. */
-  private rebuild(): void {
-    this.buildLive();
+  private rebuild(options: BuildOptions = {}): void {
+    this.buildLive(options);
     this.render();
   }
 
