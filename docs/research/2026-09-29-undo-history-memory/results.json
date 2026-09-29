@@ -1,0 +1,71 @@
+{
+  "node": "v24.21.0",
+  "platform": "darwin arm64",
+  "steps": 100,
+  "rows": [
+    {
+      "song": "FULL_DOCUMENT (4 parts)",
+      "knob": "strip level",
+      "documentJsonBytes": 25305,
+      "heldBytesMedian": 2037320,
+      "heldBytesPerStep": 20373,
+      "runs": [
+        2070280,
+        2037320,
+        2037504,
+        2019040,
+        2037320,
+        2036360,
+        2037016
+      ]
+    },
+    {
+      "song": "FULL_DOCUMENT (4 parts)",
+      "knob": "patch volume",
+      "documentJsonBytes": 25305,
+      "heldBytesMedian": 2038136,
+      "heldBytesPerStep": 20381,
+      "runs": [
+        2037720,
+        2029768,
+        2038136,
+        2036408,
+        2038552,
+        2038136,
+        2038136
+      ]
+    },
+    {
+      "song": "eight parts",
+      "knob": "strip level",
+      "documentJsonBytes": 46729,
+      "heldBytesMedian": 3843784,
+      "heldBytesPerStep": 38438,
+      "runs": [
+        3843784,
+        3841072,
+        3842584,
+        3843784,
+        3843784,
+        3856304,
+        3843784
+      ]
+    },
+    {
+      "song": "eight parts",
+      "knob": "patch volume",
+      "documentJsonBytes": 46729,
+      "heldBytesMedian": 3891824,
+      "heldBytesPerStep": 38918,
+      "runs": [
+        3844016,
+        3891824,
+        3891824,
+        3891992,
+        3891824,
+        3891824,
+        3890152
+      ]
+    }
+  ]
+}

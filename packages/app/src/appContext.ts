@@ -6,16 +6,29 @@
  * one path (`rebuild`) — and the Parts tab's `PartsSession`, whose commit is
  * this context's document write. It knows no DOM beyond a panel's `hidden`
  * flag, so `appContext.test.ts` drives it with fakes.
+ *
+ * It also keeps the song's undo history (windsor#124; epic windsor#112;
+ * record `2026-09-29-undo-history`): every song edit comes through `change`
+ * (decision 1), which records one step, or one for a whole gesture, and an
+ * undo or a redo applies the difference back through the same path.
  */
-import type { ApplyResult, AudioPart, DocumentPartial, Patch } from '@windsor/engine';
+import type {
+  ApplyResult,
+  ArrangementDocument,
+  AudioPart,
+  DocumentPartial,
+  Patch,
+} from '@windsor/engine';
 import { partAt } from '@windsor/engine';
 import type { AppCtx, ConsoleTransport } from './context';
+import { documentDiff, documentDiffLive } from './documentDiff';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import { loadRenames } from './partAutoName';
 import { PartsSession } from './partsSession';
 import { followSongLength } from './regionModel';
 import type { ToastTone } from './toastModel';
+import { UndoHistory, stepLabel } from './undoHistory';
 
 /** The part of the engine host the context drives; a test's fake implements this much. */
 export type ContextHost = Pick<
@@ -34,6 +47,16 @@ interface Tab<P extends TabPanel> {
   dirty: boolean;
 }
 
+/** An open gesture (`beginGesture`): its name, its depth, and the document before its first change. */
+interface Gesture {
+  readonly label: string;
+  depth: number;
+  before: ArrangementDocument | null;
+  tab: string | null;
+}
+
+const isEmpty = (partial: object): boolean => Object.keys(partial).length === 0;
+
 export interface AppContextDeps {
   host: EngineHost;
   model: DocumentModel;
@@ -51,6 +74,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   private active: string | null = null;
   /** Persistent chrome above every tab (the transport strip, #708): rendered on every `render()`. */
   private readonly chrome: Array<() => void> = [];
+  private readonly history = new UndoHistory<ArrangementDocument>();
+  private gesture: Gesture | null = null;
 
   constructor(deps: AppContextDeps) {
     this.host = deps.host;
@@ -94,8 +119,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   activate(id: string): void {
     const tab = this.tabs.get(id);
     if (!tab) return;
-    this.active = id;
-    for (const [tabId, other] of this.tabs) other.panel.hidden = tabId !== id;
+    this.reveal(id);
     if (tab.dirty) this.renderTab(tab);
   }
 
@@ -117,27 +141,93 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     if (active) this.renderTab(active);
   }
 
-  change(edit: DocumentPartial): ApplyResult {
+  /**
+   * A song edit: applied live, merged into the document, and recorded as one
+   * undo step named `label` (by default its sections, `stepLabel`), or, inside
+   * a gesture, folded into the gesture's step. A refused edit, or one that
+   * leaves the document as it was, records nothing.
+   */
+  change(edit: DocumentPartial, label?: string): ApplyResult {
+    const before = this.model.doc;
+    const tab = this.active;
     // A Bars edit carries every whole-song region and the timeline's tail
     // with it (#709 decision 4), so the strip's knob and the document agree
-    // on what ∞ means; any other partial passes through unchanged.
-    const { partial, report } = followSongLength(this.model.doc, edit);
-    const live = this.host.apply(partial);
-    if (live && !live.ok) {
-      this.notify(`refused: ${live.error ?? 'invalid'}`, 'error');
-      return live;
+    // on what ∞ means; any other partial passes through unchanged. The refit
+    // folds into this edit's step (epic windsor#112 decision 7).
+    const { partial, report } = followSongLength(before, edit);
+    const result = this.commit(partial, partial, report);
+    if (result.ok) this.remember(before, label ?? stepLabel(edit), tab);
+    return result;
+  }
+
+  /**
+   * Open a gesture (a knob drag, a lane paint): every `change` until the
+   * matching `endGesture` makes one step, named `label`. Nested begins count,
+   * and only the outermost end records.
+   */
+  beginGesture(label: string): void {
+    if (this.gesture) this.gesture.depth++;
+    else this.gesture = { label, depth: 1, before: null, tab: null };
+  }
+
+  /** Close a gesture; the outermost end records its step, if the document changed. */
+  endGesture(): void {
+    const gesture = this.gesture;
+    if (!gesture) return;
+    gesture.depth--;
+    if (gesture.depth > 0) return;
+    this.gesture = null;
+    const { before, label, tab } = gesture;
+    if (before && !isEmpty(documentDiff(before, this.model.doc))) {
+      this.history.record({ before, label, tab });
     }
-    this.model.merge(partial);
-    if (report.length > 0) this.notify(`song length: ${report.join(', ')} refitted`);
-    if (live && live.ignored.length > 0)
-      this.notify(`ignored: ${live.ignored.join(', ')}`, 'warning');
-    // No system to apply to because one is being built (the first enable, an
-    // Import, a Restart): that build captured an older document, so queue the
-    // current one behind it — coalesced, latest wins — or a part added or
-    // removed in that window would exist in the document only (#629 review,
-    // passes 1 and 2). With audio never enabled there is nothing to queue.
-    if (live === null && this.host.isBuilding) this.rebuild();
-    return live ?? { ok: true, ignored: [] };
+  }
+
+  get canUndo(): boolean {
+    return this.history.canUndo;
+  }
+
+  get canRedo(): boolean {
+    return this.history.canRedo;
+  }
+
+  /** The name of the step an undo takes back ("Cutoff"), or null. */
+  get undoLabel(): string | null {
+    return this.history.undoLabel;
+  }
+
+  /** The name of the step a redo makes again, or null. */
+  get redoLabel(): string | null {
+    return this.history.redoLabel;
+  }
+
+  /** Listen for every change to the history (ticket 3's buttons); returns the unsubscribe. */
+  onHistoryChange(listener: () => void): () => void {
+    return this.history.onChange(listener);
+  }
+
+  /**
+   * Step back: the document, live and in the model, as it was before the last
+   * step, and the step's tab shown. False when nothing moved: an empty
+   * history, a gesture still open, or the engine refusing.
+   */
+  undo(): boolean {
+    const step = this.gesture ? null : this.history.nextUndo;
+    const left = step && this.restore(step.before);
+    if (!step || !left) return false;
+    this.history.undone(left);
+    this.show(step.tab);
+    return true;
+  }
+
+  /** Step forward again through the last undone step; false when nothing moved, as for `undo`. */
+  redo(): boolean {
+    const step = this.gesture ? null : this.history.nextRedo;
+    const left = step && this.restore(step.before);
+    if (!step || !left) return false;
+    this.history.redone(left);
+    this.show(step.tab);
+    return true;
   }
 
   importDoc(raw: unknown): void {
@@ -150,6 +240,10 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // only when the report is clean (`startAutosave`); an import autosaves
     // on open as it always has, and its file is left untouched.
     this.model.open(raw, loadRenames);
+    // A new document starts a new history (decision 4). A gesture open
+    // across it records nothing: its "before" belongs to the other song.
+    this.history.clear();
+    if (this.gesture) this.gesture.before = null;
     this.rebuild();
   }
 
@@ -158,6 +252,74 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     const part = partAt(this.model.doc, this.parts.selected);
     if (!part) return false;
     return this.change({ patches: { [part.preset]: patch } }).ok;
+  }
+
+  /**
+   * The one path every edit takes: `live` to the live system, then `merged`
+   * into the document; a refusal is reported and changes nothing. They are
+   * the same partial except in an undo or a redo that removes an optional
+   * section, which the engine is sent as its defaults (`documentDiffLive`).
+   */
+  private commit(
+    live: DocumentPartial,
+    merged: DocumentPartial,
+    report: readonly string[] = [],
+  ): ApplyResult {
+    const result = this.host.apply(live);
+    if (result && !result.ok) {
+      this.notify(`refused: ${result.error ?? 'invalid'}`, 'error');
+      return result;
+    }
+    this.model.merge(merged);
+    if (report.length > 0) this.notify(`song length: ${report.join(', ')} refitted`);
+    if (result && result.ignored.length > 0)
+      this.notify(`ignored: ${result.ignored.join(', ')}`, 'warning');
+    // No system to apply to because one is being built (the first enable, an
+    // Import, a Restart): that build captured an older document, so queue the
+    // current one behind it — coalesced, latest wins — or a part added or
+    // removed in that window would exist in the document only (#629 review,
+    // passes 1 and 2). With audio never enabled there is nothing to queue.
+    if (result === null && this.host.isBuilding) this.rebuild();
+    return result ?? { ok: true, ignored: [] };
+  }
+
+  /**
+   * An accepted edit's step: into the open gesture (only its first change
+   * snapshots), or onto the history. `before` is the old document itself:
+   * `merge` adopts a fresh one on every change, so nothing writes into it.
+   */
+  private remember(before: ArrangementDocument, label: string, tab: string | null): void {
+    if (this.gesture) {
+      if (this.gesture.before === null) {
+        this.gesture.before = before;
+        this.gesture.tab = tab;
+      }
+      return;
+    }
+    if (isEmpty(documentDiff(before, this.model.doc))) return;
+    this.history.record({ before, label, tab });
+  }
+
+  /**
+   * Turn the document into `target` through `commit`, live first. Returns the
+   * document it replaced, for the step's other stack, or null when refused.
+   */
+  private restore(target: ArrangementDocument): ArrangementDocument | null {
+    const current = this.model.doc;
+    const { partial, live } = documentDiffLive(current, target, (raw) => this.model.preview(raw));
+    return this.commit(live, partial).ok ? current : null;
+  }
+
+  /** Show the tab a step was made on (epic decision 4) and draw what came back. */
+  private show(tab: string | null): void {
+    if (tab !== null && this.tabs.has(tab)) this.reveal(tab);
+    this.render();
+  }
+
+  /** Make `id` the active tab and hide the rest, rendering nothing. */
+  private reveal(id: string): void {
+    this.active = id;
+    for (const [tabId, other] of this.tabs) other.panel.hidden = tabId !== id;
   }
 
   /** The one path a structural change takes: the live system rebuilt, every tab invalidated. */
