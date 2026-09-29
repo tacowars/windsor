@@ -14,6 +14,7 @@
 import type { ArrangementDocument, MakeArrangementResult } from '@windsor/engine';
 import { makeArrangement } from '@windsor/engine';
 import { builtInPresets } from './builtInLibrary';
+import { reportFinalPartNames } from './partAutoName';
 
 /**
  * Merge for the local copy: objects recurse, arrays and `null` assign
@@ -127,13 +128,18 @@ export class DocumentModel {
    * `amend` is an edit the opening itself makes (windsor#103's load-time
    * rename): applied after "opened" is taken, so it counts as a change, while
    * the report stays the one the raw document produced — the
-   * import's corrections, dangling names and fills are what the user is told.
+   * import's corrections, dangling names and fills are what the user is told —
+   * except that a malformed name's line names what the rename made of it
+   * (windsor#114), so the report never contradicts the document.
    */
   open(raw: unknown, amend?: (doc: ArrangementDocument) => unknown): void {
     this.adopt(this.normalise(raw));
     this.opened = this.toJson();
     const partial = amend?.(this.doc);
-    if (partial) this.doc = this.normalise(mergeDocument(this.doc, partial)).document;
+    if (partial) {
+      this.doc = this.normalise(mergeDocument(this.doc, partial)).document;
+      this.corrections = reportFinalPartNames(this.corrections, this.doc);
+    }
     this.notify();
   }
 
