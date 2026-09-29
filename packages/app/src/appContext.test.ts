@@ -17,7 +17,7 @@ import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
 import { appendEvent } from './harmonyLaneModel';
-import type { EngineHost } from './host';
+import type { BuildOptions, EngineHost } from './host';
 import { initPresetId } from './libraryConstants';
 import { dropInit } from './patchActions';
 import { addPartLive, removePartLive, setSequencerKindLive } from './partEdits';
@@ -40,6 +40,8 @@ interface Console {
   status: string[];
   applied: DocumentPartial[];
   builds: number;
+  /** The options each build was handed, in order. */
+  buildOptions: BuildOptions[];
   /** The live parts the fake host hands out by slot, once "enabled". */
   liveParts: Map<number, AudioPart>;
   /** The fake host's state: `null` from `apply` while unenabled or building; `building` says which. */
@@ -58,6 +60,7 @@ function openConsole(refuse = false): Console {
     status,
     applied,
     builds: 0,
+    buildOptions: [],
     liveParts: new Map(),
     host: { enabled: true, building: false },
   };
@@ -67,8 +70,9 @@ function openConsole(refuse = false): Console {
       applied.push(partial);
       return refuse ? { ok: false, ignored: [], error: 'nope' } : { ok: true, ignored: [] };
     },
-    build: () => {
+    build: (_document, options = {}) => {
       console.builds++;
+      console.buildOptions.push(options);
       return Promise.resolve();
     },
     get isBuilding(): boolean {
@@ -303,6 +307,19 @@ describe('a change landing while the system is being built (#629 review)', () =>
     expect(c.model.doc.parts.map((p) => p.slot)).toEqual([0, 1]);
     await flush();
     expect(c.builds).toBe(1);
+  });
+
+  it("keeps the pending build's resume, where an import starts from the top (windsor#141)", () => {
+    const c = openConsole();
+    c.host.enabled = false;
+    c.host.building = true;
+    // A knob turned while an undo's rebuild is in flight re-syncs the edit
+    // and asks the host to carry that rebuild's bar forward.
+    expect(c.ctx.change({ transport: { bpm: 100 } } as DocumentPartial).ok).toBe(true);
+    expect(c.buildOptions).toEqual([{ keepPendingResume: true }]);
+    // A fresh document replaces the pending resume with none.
+    c.ctx.importDoc(newSong());
+    expect(c.buildOptions.at(-1)).toEqual({});
   });
 
   it('queues nothing while audio has never been enabled', () => {
