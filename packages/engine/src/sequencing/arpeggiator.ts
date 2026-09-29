@@ -24,9 +24,21 @@
  * with `retrigger` on, and never the stream (decisions 5, 6). With it off the
  * index carries on modulo the new list's length.
  *
- * **Rhythm.** Every step sounds while a chord is active — density is the
- * bass's, not the arp's — and a note lasts `gate` of its step; at gate 1 it
- * runs to the next onset, which releases and restrikes it (no tie rule).
+ * **The step grid** (windsor#129, epic windsor#126): each onset is shaped by
+ * cell `(step − base) mod arpCycleLength(style, L)`, the traversal index over
+ * the current list's cycle, so the cell restarts wherever the walk does and
+ * with `retrigger` off carries on modulo the new cycle. What a cell does —
+ * octave, accent, slide, tie, rest, the lanes, the gate's look-ahead and
+ * skip chance — is `arpCellPlay.ts`. The walk advances and a random style
+ * draws at every onset whatever its cell plays, so a rest, a tie or a skip
+ * never moves the pitches of the cells after it; skip chance draws from its
+ * own stream, minted beside the walk's at region entry.
+ *
+ * **Rhythm.** Every step is an onset while a chord is active — density is
+ * the bass's, not the arp's. A note lasts `gate` of the last step it covers;
+ * at gate 1 it runs to the next onset, which releases and restrikes it. A
+ * new arp's cells are all plain notes, so it plays exactly as it did before
+ * the grid.
  *
  * Pure: it reads the chord and local tick the gate forwards, never the
  * transport, and emits note events on the tick grid.
@@ -35,7 +47,9 @@ import { MIDI_NOTE_MAX } from '../audioConstants';
 import { chordTones } from '../harmony/chordTheory';
 import { voiceChord } from '../harmony/chordVoicing';
 import type { HarmonyChord } from '../harmony/harmonyTimeline';
+import { arpCellIndex, arpSkipRng, holdsToNext, playArpCell, skipCell } from './arpCellPlay';
 import { assertArpConfig, type ArpSequencerConfig, type ArpStyle } from './arpSequencer';
+import { arpCycleLength, arpNote } from './arpSteps';
 import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
@@ -133,6 +147,8 @@ export function otherIndex(list: readonly number[], previous: number | null, rng
   return draw >= skip ? draw + 1 : draw;
 }
 
+const PLAIN_CELL = arpNote();
+
 /** What identifies "the chord changed" for a retrigger: its degree and size, not its event. */
 const chordKey = (chord: HarmonyChord): string => `${chord.event.degree}:${chord.event.size}`;
 
@@ -154,12 +170,17 @@ export class Arpeggiator {
   private held: number | null = null;
   /** The local tick a gated note's off goes out on; null while it runs to the next onset. */
   private releaseTick: number | null = null;
+  /** Skip chance's own stream (`arpSkipRng`), minted with the walk's and never drawn by it. */
+  private skipRng: Rng;
+  /** The length of the list the last onset walked: 0 since entry, with no chord, or over an empty list. */
+  private listLength = 0;
 
   constructor(pitch: ArpPitchSource, config: ArpSequencerConfig) {
     assertArpConfig(config);
     this.pitch = pitch;
     this.current = config;
     this.rng = streamRng(config.seed, 0);
+    this.skipRng = arpSkipRng(config.seed, 0);
   }
 
   get config(): ArpSequencerConfig {
@@ -184,16 +205,22 @@ export class Arpeggiator {
   /** The region gate entered a region: the walk restarts and the stream is minted afresh. */
   enter(regionIndex: number): void {
     this.rng = streamRng(this.current.seed, regionIndex);
+    this.skipRng = arpSkipRng(this.current.seed, regionIndex);
     this.base = 0;
+    this.listLength = 0;
     this.lastChord = null;
     this.lastList = null;
     this.shuffle = null;
     this.previous = null;
   }
 
-  /** No playhead: the card draws no strip (the issue's decision 7). */
-  stepAt(_localStep: number): number {
-    return -1;
+  /**
+   * The cell a local step plays over the current list's cycle — the card's
+   * playhead — or −1 while no chord is active or the list is empty.
+   */
+  stepAt(localStep: number): number {
+    if (this.listLength === 0) return -1;
+    return arpCellIndex(localStep - this.base, arpCycleLength(this.current.style, this.listLength));
   }
 
   attach(source: PartTickSource): Unsubscribe {
@@ -203,13 +230,9 @@ export class Arpeggiator {
   /** One local tick. Returns the events it emitted; most ticks emit none. */
   handleTick(event: PartTickEvent): NoteEvent[] {
     const { divisor } = this.current;
-    const onsetTick = event.tick % divisor === 0;
     const gateEnded = this.releaseTick !== null && event.tick >= this.releaseTick;
-    const events = onsetTick || gateEnded ? this.releaseHeld(event.tick, event.time) : [];
-    if (onsetTick && event.chord) {
-      const on = this.onset(event, event.tick / divisor, event.chord);
-      if (on) events.push(on);
-    }
+    const events = gateEnded ? this.releaseHeld(event.tick, event.time) : [];
+    if (event.tick % divisor === 0) events.push(...this.onset(event, event.tick / divisor));
     for (const e of events) this.onNote?.(e);
     return events;
   }
@@ -221,17 +244,39 @@ export class Arpeggiator {
     return events;
   }
 
-  private onset(event: PartTickEvent, step: number, chord: HarmonyChord): NoteEvent | null {
-    const list = arpNoteList(this.pitch, this.current, chord);
+  /** One onset: walk the list, then play the cell for this step over what is held. */
+  private onset(event: PartTickEvent, step: number): NoteEvent[] {
+    const { chord } = event;
+    const list = chord ? arpNoteList(this.pitch, this.current, chord) : [];
     // Track before the empty-pool return: a chord clipped to nothing is still a chord change (#714 review).
-    this.track(step, chord, list);
-    if (list.length === 0) return null;
-    const note = list[this.pick(step - this.base, list)] as number;
-    const gateTicks = Math.max(1, Math.round(this.current.gate * this.current.divisor));
-    this.held = note;
-    this.previous = note;
-    this.releaseTick = gateTicks >= this.current.divisor ? null : event.tick + gateTicks;
-    return { kind: 'noteOn', tick: event.tick, time: event.time, note, degree: chord.event.degree };
+    if (chord) this.track(step, chord, list);
+    this.listLength = list.length;
+    if (!chord || list.length === 0) return this.releaseHeld(event.tick, event.time);
+    const i = step - this.base;
+    // The walk draws whatever the cell plays, so a rest never moves a later pitch.
+    const pitch = list[this.pick(i, list)] as number;
+    this.previous = pitch;
+    const { steps, skipChance } = this.current;
+    const cycle = arpCycleLength(this.current.style, list.length);
+    const index = arpCellIndex(i, cycle);
+    // Every cycle fits the stored cells (`ARP_STEPS_MAX`); a plain note stands in for safety.
+    const written = steps[index] ?? PLAIN_CELL;
+    const outcome = playArpCell(
+      {
+        tick: event.tick,
+        time: event.time,
+        degree: chord.event.degree,
+        cell: skipCell(written, skipChance, this.skipRng),
+        index,
+        pitch,
+        held: this.held,
+        holdsOn: holdsToNext(steps, i, cycle),
+      },
+      this.current,
+    );
+    this.held = outcome.held;
+    this.releaseTick = outcome.releaseTick;
+    return outcome.events;
   }
 
   /** Apply decision 5: a chord change retriggers when asked; a new list or a retrigger reshuffles. */
