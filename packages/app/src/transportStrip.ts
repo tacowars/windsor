@@ -100,12 +100,12 @@ function tempoBoxes(ctx: AppCtx): HTMLElement[] {
   return [tap, bpm, bars];
 }
 
-/** Whether an input continues a tap sequence's step: another press on Tap, or its Enter or Space. */
+/** Whether an input continues a tap sequence's step: another press or click on Tap, or its Enter or Space. */
 function continuesTaps(e: Event, tap: EventTarget): boolean {
   if (isModifierKey(e)) return true;
   if (e.target !== tap) return false;
   const key = (e as KeyboardEvent).key;
-  return e.type === 'pointerdown' || key === 'Enter' || key === ' ';
+  return e.type === 'pointerdown' || e.type === 'click' || key === 'Enter' || key === ' ';
 }
 
 /**

@@ -166,6 +166,15 @@ describe('mergedGesture', () => {
     expect(undoAll(ctx)).toBe(2);
   });
 
+  it('closes on a click with no press before it (assistive technology, voice)', () => {
+    const ctx = openGestureConsole();
+    const keys = merge();
+    press(ctx, keys, 0.3, 0);
+    fire(win, 'click', { detail: 0 });
+    ctx.change(level(0.4));
+    expect(undoAll(ctx)).toBe(2);
+  });
+
   it('closes on close(), on a window blur, and when another gesture opens', () => {
     const ctx = openGestureConsole();
     const keys = merge();

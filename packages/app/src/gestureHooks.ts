@@ -15,7 +15,8 @@
  *   `pointerup`, `pointercancel` or `blur` (decision 3);
  * - `mergedGesture`: presses a short time apart (arrow keys on a knob, tap
  *   tempo), closed by its timer, by `close()`, or by the first input anywhere
- *   that does not continue it (decision 4).
+ *   that does not continue it (decision 4): a press, a key, or a click, which
+ *   is all an assistive technology or voice activation sends.
  *
  * A merge waiting on its timer is "lingering": any other bracket opening
  * closes it first, so the next edit is never folded into it, and
@@ -104,7 +105,7 @@ export function isModifierKey(e: Event): boolean {
 
 export interface MergeOptions {
   label: string;
-  /** Whether an input anywhere (a `pointerdown` or `keydown`, seen first) continues the step rather than ending it. */
+  /** Whether an input anywhere (a `pointerdown`, `keydown` or `click`, seen first) continues the step rather than ending it. */
   continues: (e: Event) => boolean;
   /** How long after the last press the step closes. */
   ms?: number;
@@ -120,10 +121,17 @@ export interface MergedGesture {
 }
 
 /**
+ * The inputs a merge's window listener sees: a click as well as a press, since
+ * a keyboard, assistive technology or voice activation clicks a button with
+ * no press before it (`detail === 0`).
+ */
+const INPUTS = ['pointerdown', 'keydown', 'click'] as const;
+
+/**
  * Presses less than `ms` apart are one step. While it is open, a window
- * capture listener sees every press and key before any control does, so an
- * input that does not continue the merge (a click elsewhere, Cmd+Z) closes it
- * before its own edit, and a window blur closes it too.
+ * capture listener sees every press, key and click before any control does,
+ * so an input that does not continue the merge (a click elsewhere, Cmd+Z)
+ * closes it before its own edit, and a window blur closes it too.
  */
 export function mergedGesture(options: MergeOptions): MergedGesture {
   const { label, continues, ms = UNDO_MERGE_MS, win = window } = options;
@@ -137,13 +145,11 @@ export function mergedGesture(options: MergeOptions): MergedGesture {
     const opened = bracket(label, () => {
       clearTimeout(timer);
       lingering.delete(opened);
-      win.removeEventListener('pointerdown', input, true);
-      win.removeEventListener('keydown', input, true);
+      for (const type of INPUTS) win.removeEventListener(type, input, true);
       win.removeEventListener('blur', close);
     });
     lingering.add(opened);
-    win.addEventListener('pointerdown', input, true);
-    win.addEventListener('keydown', input, true);
+    for (const type of INPUTS) win.addEventListener(type, input, true);
     win.addEventListener('blur', close);
     return opened;
   };
