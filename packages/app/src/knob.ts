@@ -27,6 +27,8 @@ export interface KnobElement extends HTMLElement {
   refresh: () => void;
 }
 
+import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestureHooks';
+import type { OpenGesture } from './gestureHooks';
 import {
   ARC_END,
   ARC_MIN_DEGREES,
@@ -78,7 +80,7 @@ function knobDom(spec: KnobSpec): HTMLElement {
   return node;
 }
 
-interface Scale {
+export interface Scale {
   toNorm: (v: number) => number;
   fromNorm: (n: number) => number;
 }
@@ -163,28 +165,53 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   return node;
 }
 
-function attachKnobInput(
+/** The arrow keys a knob steps on, and which way; any other key ends its merged step. */
+const ARROW_KEYS: Readonly<Record<string, 1 | -1>> = {
+  ArrowUp: 1,
+  ArrowRight: 1,
+  ArrowDown: -1,
+  ArrowLeft: -1,
+};
+
+/** Whether an input continues a knob's arrow-key step: another arrow on the knob, or a modifier alone. */
+export function continuesKeySteps(e: Event, node: EventTarget): boolean {
+  if (isModifierKey(e)) return true;
+  return (
+    e.type === 'keydown' && e.target === node && Object.hasOwn(ARROW_KEYS, (e as KeyboardEvent).key)
+  );
+}
+
+/**
+ * The knob's pointer and keys, each gesture one undo step named after the
+ * knob (windsor#130 decisions 2 and 4): a drag from press to release, arrow
+ * presses less than `UNDO_MERGE_MS` apart, a double-click's reset. Exported
+ * for its test, which drives it over a stand-in element.
+ */
+export function attachKnobInput(
   node: HTMLElement,
   spec: KnobSpec,
   scale: Scale,
   commit: (v: number) => void,
 ): void {
-  let dragging = false;
+  let drag: OpenGesture | null = null;
   let startY = 0;
   let startN = 0;
   node.addEventListener('pointerdown', (e) => {
-    dragging = true;
+    drag?.close();
+    drag = dragGesture(spec.label);
     startY = e.clientY;
     startN = scale.toNorm(spec.get());
     node.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
   const stop = (e: PointerEvent): void => {
-    dragging = false;
+    drag?.close();
+    drag = null;
     if (node.hasPointerCapture(e.pointerId)) node.releasePointerCapture(e.pointerId);
   };
   node.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    // A drag the window ended (a release outside the browser, a blur) moves nothing more.
+    if (!drag?.open) return;
     // A release the knob never saw (capture lost to a window blur, a release
     // outside the browser, a re-render) would otherwise leave the drag live,
     // and the knob would follow the cursor whenever it hovers back.
@@ -198,17 +225,19 @@ function attachKnobInput(
   node.addEventListener('pointerup', stop);
   node.addEventListener('pointercancel', stop);
   node.addEventListener('lostpointercapture', stop);
-  node.addEventListener('dblclick', () => commit(spec.def));
-  const nudge = (dir: 1 | -1, fine: boolean): void =>
-    commit(keyTarget(spec, spec.get(), dir, fine));
+  // Each click's release has already closed its own (empty) drag step, so the
+  // reset opens a step of its own under the knob's label.
+  node.addEventListener('dblclick', () => withGesture(spec.label, () => commit(spec.def)));
+  const keys = mergedGesture({
+    label: spec.label,
+    continues: (e) => continuesKeySteps(e, node),
+  });
+  node.addEventListener('blur', () => keys.close());
   node.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-      nudge(1, e.shiftKey);
-      e.preventDefault();
-    }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
-      nudge(-1, e.shiftKey);
-      e.preventDefault();
-    }
+    const dir = Object.hasOwn(ARROW_KEYS, e.key) ? ARROW_KEYS[e.key] : undefined;
+    if (dir === undefined) return;
+    keys.touch();
+    commit(keyTarget(spec, spec.get(), dir, e.shiftKey));
+    e.preventDefault();
   });
 }

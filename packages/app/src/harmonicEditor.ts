@@ -6,6 +6,8 @@
  */
 import { OP_NAMES, WAVE } from '@windsor/engine';
 import { el, seg } from './dom';
+import { dragGesture } from './gestureHooks';
+import type { OpenGesture } from './gestureHooks';
 import { CYCLE_PAD_PX } from './harmonicConstants';
 import {
   HARMONIC_COUNTS,
@@ -77,14 +79,21 @@ function drawCycle(canvas: HTMLCanvasElement, partials: readonly number[], color
   g.stroke();
 }
 
-function attachStroke(
+/**
+ * A paint across the bars, from press to release, is one undo step
+ * (windsor#130 decision 6): the step opens through the gesture hook before
+ * the first push, and closes at the stroke's end or, when the canvas never
+ * hears one, by the window. Exported for its test, which drives it over a
+ * stand-in canvas.
+ */
+export function attachStroke(
   editor: PatchEditor,
   canvas: HTMLCanvasElement,
   i: number,
   redraw: () => void,
 ): void {
   let last: BarPoint | null = null;
-  let drawing = false;
+  let stroke: OpenGesture | null = null;
   const step = (e: PointerEvent): void => {
     const op = editor.patch.ops[i];
     if (!op) return;
@@ -105,18 +114,22 @@ function attachStroke(
     redraw();
   };
   const stop = (e: PointerEvent): void => {
-    drawing = false;
+    stroke?.close();
+    stroke = null;
     last = null;
     if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
   };
   canvas.addEventListener('pointerdown', (e) => {
-    drawing = true;
+    stroke?.close();
+    stroke = dragGesture('Harmonics');
+    last = null;
     canvas.setPointerCapture(e.pointerId);
     e.preventDefault();
     step(e);
   });
   canvas.addEventListener('pointermove', (e) => {
-    if (!drawing) return;
+    // A stroke the window ended (a release outside the browser, a blur) paints nothing more.
+    if (!stroke?.open) return;
     // Same guard as the knobs: a release lost with capture must not leave the pen down.
     if ((e.buttons & 1) === 0) return stop(e);
     step(e);

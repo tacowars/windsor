@@ -7,7 +7,13 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { FakeElement, fakeEvent, openGestureConsole } from './__fixtures__/gestureConsole';
+import { settleGestures } from './gestureHooks';
+import { tapHandler } from './transportStrip';
+import { partChange } from './context';
+import { TAP_TEMPO } from './transportTables';
 
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -57,5 +63,109 @@ describe('the transport strip in the page', () => {
     expect(read('./main.ts')).toContain("mountTransportStrip(ctx, $('transportStrip'))");
     const arrangement = read('./arrangementTab.ts');
     expect(arrangement).not.toContain("section('Transport'");
+  });
+});
+
+describe('tap tempo as an undo step (windsor#130)', () => {
+  let clock = 0;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', new EventTarget());
+    clock = 0;
+  });
+  afterEach(() => {
+    settleGestures();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** A tap on the press, then `gapMs` of quiet on the fake clock. */
+  function tapThen(onTap: (e: MouseEvent) => void, gapMs: number): void {
+    onTap(fakeEvent('pointerdown') as MouseEvent);
+    clock += gapMs;
+    vi.advanceTimersByTime(gapMs);
+  }
+
+  it('makes a sequence of taps one step, and a sequence after the tap window another', () => {
+    const ctx = openGestureConsole();
+    const start = ctx.model.doc.transport.bpm;
+    const onTap = tapHandler(
+      ctx,
+      new FakeElement(),
+      () => {},
+      () => clock,
+    );
+    for (let i = 0; i < 5; i++) tapThen(onTap, 600);
+    expect(ctx.model.doc.transport.bpm).toBe(100);
+    tapThen(onTap, TAP_TEMPO.resetMs);
+    for (let i = 0; i < 4; i++) tapThen(onTap, 400);
+    tapThen(onTap, TAP_TEMPO.resetMs);
+    expect(ctx.model.doc.transport.bpm).toBe(150);
+    expect(ctx.undoLabel).toBe('Tap tempo');
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.model.doc.transport.bpm).toBe(100);
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.model.doc.transport.bpm).toBe(start);
+    expect(ctx.canUndo).toBe(false);
+  });
+
+  /**
+   * A click with `detail === 0` on `el` (a keyboard, assistive technology or
+   * voice activation), as the page delivers it: the window's capture
+   * listeners first, seeing `el` as the target, then `el`'s own.
+   */
+  function clickOn(el: EventTarget): void {
+    const captured = fakeEvent('click', { detail: 0 });
+    Object.defineProperty(captured, 'target', { value: el });
+    window.dispatchEvent(captured);
+    el.dispatchEvent(fakeEvent('click', { detail: 0 }));
+  }
+
+  /** A Tap button wired as the strip wires it, on the fake clock. */
+  function tapButton(ctx: ReturnType<typeof openGestureConsole>): FakeElement {
+    const tap = new FakeElement();
+    const onTap = tapHandler(
+      ctx,
+      tap,
+      () => {},
+      () => clock,
+    );
+    tap.addEventListener('click', (e) => onTap(e as MouseEvent));
+    return tap;
+  }
+
+  it('closes on a detail-zero click on another button, so its edit is its own step', () => {
+    const ctx = openGestureConsole();
+    const tap = tapButton(ctx);
+    const randomize = new FakeElement();
+    randomize.addEventListener('click', () => ctx.change(partChange(0, { strip: { level: 0.3 } })));
+    clickOn(tap);
+    clock += 400;
+    vi.advanceTimersByTime(400);
+    clickOn(tap);
+    expect(ctx.model.doc.transport.bpm).toBe(150);
+    clickOn(randomize);
+    expect(ctx.undoLabel).not.toBe('Tap tempo');
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.undoLabel).toBe('Tap tempo');
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.canUndo).toBe(false);
+  });
+
+  it('keeps detail-zero clicks on Tap itself one step', () => {
+    const ctx = openGestureConsole();
+    const start = ctx.model.doc.transport.bpm;
+    const tap = tapButton(ctx);
+    for (let i = 0; i < 3; i++) {
+      clickOn(tap);
+      clock += 400;
+      vi.advanceTimersByTime(400);
+    }
+    expect(ctx.model.doc.transport.bpm).toBe(150);
+    settleGestures();
+    expect(ctx.undoLabel).toBe('Tap tempo');
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.model.doc.transport.bpm).toBe(start);
+    expect(ctx.canUndo).toBe(false);
   });
 });
