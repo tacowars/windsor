@@ -116,6 +116,34 @@ describe('playheadAt', () => {
     expect(asked).toEqual([]);
   });
 
+  describe('with a region named', () => {
+    const regionCtx = (): ReturnType<typeof fakeCtx> => {
+      const fake = fakeCtx((tick) => tick % 4);
+      const part = {
+        slot: 0,
+        regions: [
+          { start: 0, duration: 100 },
+          { start: 100, duration: 100 },
+        ],
+      };
+      (fake.ctx as unknown as { model: unknown }).model = { doc: { parts: [part] } };
+      return fake;
+    };
+
+    it('lights nothing while the audible tick is inside another region', () => {
+      const { ctx, transport, asked } = regionCtx();
+      transport.audible = 42;
+      expect(playheadAt(ctx, 0, 1)).toBe(-1);
+      expect(asked).toEqual([]);
+    });
+
+    it('lights the step while the selected region plays', () => {
+      const { ctx, transport } = regionCtx();
+      transport.audible = 102;
+      expect(playheadAt(ctx, 0, 1)).toBe(102 % 4);
+    });
+  });
+
   it('is -1 before audio is enabled, when there is no system to ask', () => {
     const ctx = {
       host: { system: null },

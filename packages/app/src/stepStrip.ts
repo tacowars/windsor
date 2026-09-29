@@ -12,10 +12,11 @@
  * `host.stepAt` (decision 2). `playheadAt` is the console's only reading of
  * the audible tick.
  */
-import type { SequencerKind, SequencerSpec } from '@windsor/engine';
+import { partAt, type SequencerKind, type SequencerSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { changePattern, patternOf } from './partEdits';
+import { regionAt } from './regionModel';
 
 /**
  * The spec the part on `slot` plays in region `region` (windsor#75) — or,
@@ -209,8 +210,16 @@ export function audibleTick(ctx: AppCtx): number {
 /**
  * The step the part on `slot` is sounding, or -1 while nothing runs: the
  * audible tick put through the engine's own `stepAt` (#619 decision 2).
+ * A region card names its `region`: `stepAt` resolves the generator of the
+ * region under the audible tick, so the ring lights only while the transport
+ * is inside that region, and stays dark while another one plays (windsor#75).
  */
-export function playheadAt(ctx: AppCtx, slot: number): number {
+export function playheadAt(ctx: AppCtx, slot: number, region?: number): number {
   if (!ctx.transport.running) return -1;
-  return ctx.host.stepAt(slot, audibleTick(ctx));
+  const tick = audibleTick(ctx);
+  if (region !== undefined) {
+    const part = partAt(ctx.model.doc, slot);
+    if (part === undefined || regionAt(part.regions, tick) !== region) return -1;
+  }
+  return ctx.host.stepAt(slot, tick);
 }

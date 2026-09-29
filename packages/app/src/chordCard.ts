@@ -178,7 +178,7 @@ function watch(strip: ChordStrip): void {
   watchPlayhead({
     attached: () => strip.root.isConnected,
     shown: () => strip.root.closest('[hidden]') === null,
-    playheadAt: () => playheadAt(strip.ctx, strip.slot),
+    playheadAt: () => playheadAt(strip.ctx, strip.slot, strip.region),
     mark: markStep(strip),
     repaintIf: () => {
       const sig = tileSignature(strip);

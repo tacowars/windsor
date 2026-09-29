@@ -142,7 +142,7 @@ function watch(card: Card): void {
   watchPlayhead({
     attached: () => card.root.isConnected,
     shown: () => card.root.closest('[hidden]') === null,
-    playheadAt: () => playheadAt(card.ctx, card.slot),
+    playheadAt: () => playheadAt(card.ctx, card.slot, card.region),
     mark: markStep(card),
     repaintIf: () => {
       const figure = figureOf(card);
