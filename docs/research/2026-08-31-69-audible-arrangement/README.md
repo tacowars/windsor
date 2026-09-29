@@ -5,7 +5,7 @@ backends, the music starts at the unlock gesture, `__a204.audio.apply` tunes
 the transport live, `M` mutes and unmutes, and `?music=0` yields a silent
 client with the whole graph still built. Captured twice: first at the
 original defaults, then re-captured in full at `9b55846` after tacowars's first
-listen swapped the arp and drone to his authored patches (`saw-arp`,
+listen swapped the arp and drone to the authored patches (`saw-arp`,
 `drone-sqr` — `presetsAuthored.ts`); the files below are the re-capture. The
 audible acceptance criteria — per-return energy attribution (hall from arp
 and drone, delay from hat only, kick dry), tie behaviour, apply semantics —

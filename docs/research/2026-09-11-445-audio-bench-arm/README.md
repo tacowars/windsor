@@ -271,7 +271,7 @@ it (the settle wait).
 
 \* The first line predates the RDP column. The connection was found
 established after the line closed at 14:45Z, and the maintainer confirmed
-it was his. It is taken as attached throughout; the record cannot show when it
+it was theirs. It is taken as attached throughout; the record cannot show when it
 was opened.
 
 ### Per run, per arm
