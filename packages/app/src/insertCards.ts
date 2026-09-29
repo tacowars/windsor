@@ -14,6 +14,7 @@ import { advancedDriveCard } from './advancedDriveCard';
 import { driveCard } from './driveCard';
 import { delayCard } from './delayCard';
 import { ensembleCard } from './ensembleCard';
+import { tapeCard } from './tapeCard';
 import { phaserCard } from './phaserCard';
 import { retroReverbCard } from './retroReverbCard';
 
@@ -27,6 +28,7 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   compressor: compressorCard,
   'retro-reverb': retroReverbCard,
   phaser: phaserCard,
+  tape: tapeCard,
   delay: delayCard,
   ensemble: ensembleCard,
 };

@@ -30,6 +30,7 @@
     "src/worklet/advancedDrive/**",
     "src/worklet/retro/**",
     "src/worklet/phaser/**",
+    "src/worklet/tape/**",
     "src/worklet/delay/**",
     "src/**/*.test.ts",
     "src/**/__fixtures__/**",

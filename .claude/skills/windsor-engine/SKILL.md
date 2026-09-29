@@ -52,6 +52,13 @@ signed feedback, feedback cut, stereo offset, envelope sweep, bass keep and
 mix are song-owned; presets preserve Mix/enabled. Tests include the shipped
 processor and real synth bass/pad input.
 
+Tape (REELS Lite adaptation) is `inserts/tapeSpec.ts`, `tapeConstants.ts`,
+`tapeInsert.ts` and `tapeRandomise.ts`, with preallocated DSP under
+`worklet/tape/`. The console uses `app/src/tapeCard.ts` / `tapeTables.ts`.
+Three tape models, Drive, Bias, Wear, Hiss, Trim, Mix and the random seed are
+song-owned. CC0 source provenance and deliberate Max differences are in
+`docs/log/2026-09-30-reels-inspired-tape-insert.md`.
+
 Advanced Drive (#701) is `inserts/advancedDriveSpec.ts`,
 `advancedDriveConstants.ts`, `advancedDriveInsert.ts`, its preset tables and
 shared shaper/filter functions; DSP is `worklet/advancedDrive/`. It adds
