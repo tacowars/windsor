@@ -12,6 +12,8 @@ import type { StepModLane, StepModParam, StepModRow } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX, STEP_MOD_PARAMS, STEP_MOD_TABLE, stepModValue } from '@windsor/engine';
 import { fmtSigned } from './consoleFormat';
 import {
+  LANE_CLICK_SLOP_PX,
+  LANE_DOUBLE_CLICK_MS,
   LANE_OCTAVE_DIGITS,
   LANE_PAINT,
   STEP_MOD_LANE_LABELS,
@@ -152,39 +154,147 @@ export function offsetLabel(row: StepModRow, value: number): string {
 }
 
 /**
- * How a step's note-on meets the voice (windsor#31): `none`, a plain
- * note-on (or no note at all); `retarget`, a Slide onto a new pitch, which
- * hands the sounding voice over and keeps the old step's offsets on every
- * `slideKeeps` row; `same`, a Slide onto the pitch already held, which sends
- * no note-on, so none of the step's values reach the voice. The card reads
- * it from its own steps (the grid's `slideAt`).
+ * How a step's note-on meets the voice (windsor#31). `kind`: `none`, a
+ * plain note-on (or no note at all); `retarget`, a Slide onto a new pitch,
+ * which hands the sounding voice over and keeps the old step's offsets on
+ * every `slideKeeps` row; `same`, a Slide onto the pitch already held,
+ * which sends no note-on, so none of the step's values reach the voice.
+ * `when`: `always`, or a hold the run decides: `wrap`, held only once the
+ * loop has wrapped (a region's entry holds nothing), and `skip`, held unless
+ * Skip drops the note before it. The card reads it from its own steps (the
+ * grid's `slideAt`).
  */
-export type StepSlide = 'none' | 'retarget' | 'same';
-
-/** Whether a slide holds `param` at the previous step's offset, so this step's own value does not play. */
-export function heldBySlide(slide: StepSlide, param: StepModParam): boolean {
-  if (slide === 'same') return true;
-  return slide === 'retarget' && rowOf(param)?.slideKeeps === true;
+export interface StepSlide {
+  readonly kind: 'none' | 'retarget' | 'same';
+  readonly when: 'always' | 'wrap' | 'skip';
 }
+
+/** A plain step: what a card without slides reports. */
+export const NO_SLIDE: StepSlide = { kind: 'none', when: 'always' };
+
+/** Whether a step's own value reaches the voice: it `plays`, a slide keeps the old one (`held`), or the run decides (`depends`). */
+export type LaneHold = 'plays' | 'held' | 'depends';
+
+export function heldBySlide(slide: StepSlide, param: StepModParam): LaneHold {
+  const holds =
+    slide.kind === 'same' || (slide.kind === 'retarget' && rowOf(param)?.slideKeeps === true);
+  if (!holds) return 'plays';
+  return slide.when === 'always' ? 'held' : 'depends';
+}
+
+/** What a readout adds after the offset when a slide holds the row, or may. */
+const HOLD_NOTE: Record<StepSlide['when'], string> = {
+  always: 'held by slide',
+  wrap: 'held by slide once looping',
+  skip: 'held by slide unless skipped',
+};
 
 /**
  * What a cell's readout says: the offset, and what the step plays through
- * the engine's curve when the patch's own value is known — or, when a slide
- * holds the row, that the value is set but does not play.
+ * the engine's curve when the patch's own value is known; or, when a slide
+ * holds the row or may, that instead.
  */
 export function laneReadout(
   param: StepModParam,
   value: number,
   base: number | undefined,
-  slide: StepSlide = 'none',
+  slide: StepSlide = NO_SLIDE,
 ): string {
   const row = rowOf(param);
   if (!row) return fmtSigned(value);
   const offset = offsetLabel(row, value);
-  if (heldBySlide(slide, param)) return `${offset} · held by slide`;
+  if (heldBySlide(slide, param) !== 'plays') return `${offset} · ${HOLD_NOTE[slide.when]}`;
   if (base === undefined) return offset;
   return `${offset} → ${STEP_MOD_LANE_LABELS[param].fmt(stepModValue(row, base, value))}`;
 }
 
 /** The name a lane and the picker show. */
 export const laneLabel = (param: StepModParam): string => STEP_MOD_LANE_LABELS[param].label;
+
+/** Whether a press has travelled far enough from where it went down to be a drag. */
+export function isDrag(dx: number, dy: number, slop = LANE_CLICK_SLOP_PX): boolean {
+  return Math.abs(dx) > slop || Math.abs(dy) > slop;
+}
+
+/** The time and the timer a click gate runs on; a test passes a fake. */
+export interface LaneClock {
+  now(): number;
+  /** Run `fn` after `ms`; the returned function cancels it. */
+  after(ms: number, fn: () => void): () => void;
+}
+
+/** Where a lane edit lands: one lane's whole value list. */
+export type LaneWrite = (lane: number, values: readonly number[]) => void;
+
+/** What a press does: start painting, or reset the cell (the second press of a double-click). */
+export type PressKind = 'paint' | 'reset';
+
+interface PendingClick {
+  readonly lane: number;
+  readonly index: number;
+  readonly values: readonly number[];
+  readonly at: number;
+  readonly cancel: () => void;
+}
+
+/**
+ * The lane cells' press, release and double-click rules, without the DOM.
+ * A drag writes on release. A click (no travel past the slop) shows at once
+ * but is written only when the double-click window closes; a second press
+ * on the same cell inside the window drops that write and writes the cell's
+ * reset to 0 instead, so a double-click writes one list, with 0 at the
+ * cell. A press anywhere else writes a waiting click first. The browser's
+ * `dblclick` is not used: by the time it fires, both presses are over.
+ */
+export class LaneClickGate {
+  private pending: PendingClick | null = null;
+  private resetting = false;
+
+  constructor(
+    private readonly write: LaneWrite,
+    private readonly clock: LaneClock,
+    private readonly windowMs = LANE_DOUBLE_CLICK_MS,
+  ) {}
+
+  /** A press on `lane`'s cell `index`. On `reset` the gate has written the 0; the card only redraws. */
+  press(lane: number, index: number): PressKind {
+    const waiting = this.pending;
+    if (
+      waiting?.lane === lane &&
+      waiting.index === index &&
+      this.clock.now() - waiting.at <= this.windowMs
+    ) {
+      this.drop();
+      this.resetting = true;
+      this.write(lane, resetCell(waiting.values, index));
+      return 'reset';
+    }
+    this.flush();
+    this.resetting = false;
+    return 'paint';
+  }
+
+  /** A release: a drag writes now, a click waits out the window, the release of a reset does nothing. */
+  release(lane: number, index: number, values: readonly number[], dragged: boolean): void {
+    if (this.resetting) {
+      this.resetting = false;
+      return;
+    }
+    if (dragged) return this.write(lane, values);
+    const cancel = this.clock.after(this.windowMs, () => this.flush());
+    this.pending = { lane, index, values: [...values], at: this.clock.now(), cancel };
+  }
+
+  /** Write a waiting click now. */
+  flush(): void {
+    const waiting = this.pending;
+    if (!waiting) return;
+    this.drop();
+    this.write(waiting.lane, waiting.values);
+  }
+
+  private drop(): void {
+    this.pending?.cancel();
+    this.pending = null;
+  }
+}

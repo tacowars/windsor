@@ -6,13 +6,17 @@
  * a positive value and down for a negative one; a press or a vertical drag
  * sets it, a drag across cells paints each cell it crosses, a double-click
  * resets it to 0, and a hover reads the step's offset and what it plays.
+ * A slide that holds a row draws its cell dashed; one whose hold the run
+ * decides (the loop's wrap, a Skip) draws it dotted.
  *
  * Generic over the card: a card hands a `LaneHost` (its lanes, the write
  * through `ctx.change`, its repaint), so the grid carries lanes first and
  * another step kind can reuse this file as is. The rules are
  * `stepModLaneModel.ts`; this file only reads pointers and draws.
  *
- * A drag previews on the cells and commits once on release. It keeps the
+ * A drag previews on the cells and commits once on release; a click shows
+ * at once and commits when the double-click window closes, and a second
+ * press inside it writes the reset alone (`LaneClickGate`). A drag keeps the
  * pointer captured on the pressed cell, and a cancel, a lost capture, a
  * window blur or a move with the primary button up — a release it never saw —
  * drops the preview (as PR windsor#27's drags do).
@@ -26,16 +30,18 @@ import { primaryHeld } from './songViewTables';
 import {
   type PaintPoint,
   type StepSlide,
+  LaneClickGate,
+  NO_SLIDE,
   addLane,
   canAddLane,
   cellAtX,
   freeParams,
   heldBySlide,
+  isDrag,
   laneLabel,
   laneReadout,
   paintSpan,
   removeLane,
-  resetCell,
   valueAtY,
   withLaneValues,
 } from './stepModLaneModel';
@@ -54,7 +60,7 @@ export interface LaneHost {
   repaint(): void;
   /** The number of written steps: a new lane's length. */
   stepCount(): number;
-  /** How step `index`'s note meets the voice; a card without slides leaves it out (`none`). */
+  /** How step `index`'s note meets the voice; a card without slides leaves it out (`NO_SLIDE`). */
   slide?(index: number): StepSlide;
 }
 
@@ -64,6 +70,30 @@ export function patchBase(ctx: AppCtx, slot: number, param: StepModParam): numbe
   const part = partAt(doc, slot);
   const value = part ? getPath(doc.patches?.[part.preset], param) : undefined;
   return typeof value === 'number' ? value : undefined;
+}
+
+/** One click gate per card: its writes go through the host, its timer is the page's. */
+const gates = new WeakMap<LaneHost, LaneClickGate>();
+
+function gateOf(host: LaneHost): LaneClickGate {
+  let gate = gates.get(host);
+  if (!gate) {
+    gate = new LaneClickGate(
+      (lane, values) => {
+        const lanes = host.lanes();
+        if (!lanes || !host.write(withLaneValues(lanes, lane, values))) host.repaint();
+      },
+      {
+        now: () => performance.now(),
+        after: (ms, fn) => {
+          const id = setTimeout(fn, ms);
+          return () => clearTimeout(id);
+        },
+      },
+    );
+    gates.set(host, gate);
+  }
+  return gate;
 }
 
 const cellsOf = (scope: HTMLElement, lane: number): HTMLElement[] =>
@@ -79,22 +109,39 @@ function showReadout(host: LaneHost, lane: number, step: number, value: number |
   const line = host.scope.querySelector<HTMLElement>(`.mod-readout[data-lane="${lane}"]`);
   const param = host.lanes()?.[lane]?.param;
   if (!line || !param) return;
-  const slide = host.slide?.(step) ?? 'none';
+  const slide = host.slide?.(step) ?? NO_SLIDE;
   line.textContent =
     value === null ? '' : `${step + 1}: ${laneReadout(param, value, host.base(param), slide)}`;
 }
 
-/** A press on lane `lane`'s cell: paint from it until the release, or drop the preview. */
-function paintFrom(host: LaneHost, lane: number, cell: HTMLElement, down: PointerEvent): void {
-  const start = host.lanes()?.[lane];
-  if (down.button !== 0 || !start) return;
+/**
+ * A press on lane `lane`'s cell `index`: the second press of a double-click
+ * resets it, any other paints from it until the release, or drops the
+ * preview if the release never comes.
+ */
+function pressCell(host: LaneHost, lane: number, index: number, down: PointerEvent): void {
+  const cell = down.currentTarget as HTMLElement;
+  if (down.button !== 0 || !host.lanes()?.[lane]) return;
   down.preventDefault();
+  const gate = gateOf(host);
+  if (gate.press(lane, index) === 'paint') return paintFrom(host, lane, index, down);
+  drawCell(cell, 0);
+  showReadout(host, lane, index, 0);
+  cell.addEventListener('pointerup', () => gate.release(lane, index, [], false), { once: true });
+}
+
+function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEvent): void {
+  const cell = down.currentTarget as HTMLElement;
+  const start = host.lanes()?.[lane];
+  if (!start) return;
   const cells = cellsOf(host.scope, lane);
   const spans = cells.map((c) => c.getBoundingClientRect());
   const { top, height } = cell.getBoundingClientRect();
   let values = [...start.values];
   let last: PaintPoint | null = null;
+  let dragged = false;
   const paint = (e: PointerEvent): void => {
+    dragged ||= isDrag(e.clientX - down.clientX, e.clientY - down.clientY);
     const to = { index: cellAtX(e.clientX, spans), value: valueAtY(e.clientY, { top, height }) };
     values = paintSpan(values, last, to);
     last = to;
@@ -106,8 +153,8 @@ function paintFrom(host: LaneHost, lane: number, cell: HTMLElement, down: Pointe
     if (stop.signal.aborted) return;
     stop.abort();
     if (cell.hasPointerCapture(down.pointerId)) cell.releasePointerCapture(down.pointerId);
-    const lanes = host.lanes();
-    if (!commit || !lanes || !host.write(withLaneValues(lanes, lane, values))) host.repaint();
+    if (commit) gateOf(host).release(lane, index, values, dragged);
+    else host.repaint();
   };
   const mine = (e: PointerEvent): boolean => e.pointerId === down.pointerId;
   const on = { signal: stop.signal };
@@ -136,30 +183,26 @@ function paintFrom(host: LaneHost, lane: number, cell: HTMLElement, down: Pointe
 /**
  * Step `index`'s cells, one per lane in lane order, for the card to append
  * to that step's column. `sounds` false dims a step no note plays on; a
- * cell a slide holds (`heldBySlide`) draws its bar in the rule colour, since
- * its value is kept for when the slide goes but does not play.
+ * cell a slide holds (`heldBySlide`) draws dashed with its bar in the rule
+ * colour, since its value is kept for when the slide goes but does not
+ * play, and one the run decides draws dotted.
  */
 export function laneCells(host: LaneHost, index: number, sounds = true): HTMLElement[] {
   return (host.lanes() ?? []).map((lane, k) => {
     const cell = el('div', k === 0 ? 'mod-cell first' : 'mod-cell');
     cell.dataset.lane = String(k);
     cell.classList.toggle('mute', !sounds);
-    cell.classList.toggle('held', heldBySlide(host.slide?.(index) ?? 'none', lane.param));
+    const hold = heldBySlide(host.slide?.(index) ?? NO_SLIDE, lane.param);
+    cell.classList.toggle('held', hold === 'held');
+    cell.classList.toggle('depends', hold === 'depends');
     cell.setAttribute('aria-label', `${laneLabel(lane.param)} step ${index + 1}`);
     cell.appendChild(el('div', 'mod-bar'));
     drawCell(cell, lane.values[index] ?? 0);
-    cell.addEventListener('pointerdown', (e) => paintFrom(host, k, cell, e));
+    cell.addEventListener('pointerdown', (e) => pressCell(host, k, index, e));
     cell.addEventListener('pointermove', (e) => {
       if (e.buttons === 0) showReadout(host, k, index, host.lanes()?.[k]?.values[index] ?? 0);
     });
     cell.addEventListener('pointerleave', () => showReadout(host, k, index, null));
-    cell.addEventListener('dblclick', () => {
-      const lanes = host.lanes();
-      const values = lanes?.[k] && resetCell(lanes[k].values, index);
-      if (!lanes || !values || !host.write(withLaneValues(lanes, k, values))) return host.repaint();
-      drawCell(cell, 0);
-      showReadout(host, k, index, 0);
-    });
     return cell;
   });
 }

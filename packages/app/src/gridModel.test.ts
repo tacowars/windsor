@@ -136,31 +136,49 @@ describe('lanes turn with the steps (windsor#31)', () => {
 
 describe('how a step meets the note before it (windsor#31)', () => {
   const slide = (degree: number, octave = 0): GridStep => gridNote(degree, { octave, slide: true });
+  const at = (
+    steps: GridStep[],
+    index: number,
+    length = steps.length,
+    skipChance = 0,
+    key = MINOR,
+  ) => slideAt({ steps, length, skipChance }, index, key);
 
   it('reads a slide onto a new pitch as a retarget, and onto the held pitch as nothing new', () => {
     const steps = [gridNote(0), slide(2), slide(2), gridNote(4)];
-    expect(slideAt(steps, 4, 1, MINOR)).toBe('retarget');
-    expect(slideAt(steps, 4, 2, MINOR)).toBe('same');
-    expect(slideAt(steps, 4, 3, MINOR)).toBe('none');
-    expect(slideAt(steps, 4, 0, MINOR)).toBe('none');
+    expect(at(steps, 1)).toEqual({ kind: 'retarget', when: 'always' });
+    expect(at(steps, 2)).toEqual({ kind: 'same', when: 'always' });
+    expect(at(steps, 3).kind).toBe('none');
+    expect(at(steps, 0).kind).toBe('none');
   });
 
   it('holds across ties, and a rest holds nothing', () => {
-    expect(slideAt([gridNote(3), TIE, TIE, slide(3)], 4, 3, MINOR)).toBe('same');
-    expect(slideAt([gridNote(3), REST, TIE, slide(3)], 4, 3, MINOR)).toBe('none');
+    expect(at([gridNote(3), TIE, TIE, slide(3)], 3)).toEqual({ kind: 'same', when: 'always' });
+    expect(at([gridNote(3), REST, TIE, slide(3)], 3).kind).toBe('none');
   });
 
-  it('wraps round the loop, and ignores the steps past it', () => {
+  it('leaves a slide whose held note wraps round the loop to the run: a region entry holds nothing', () => {
     const steps = [slide(0), gridNote(1), gridNote(0), REST];
-    expect(slideAt(steps, 2, 0, MINOR)).toBe('retarget');
-    expect(slideAt(steps, 3, 0, MINOR)).toBe('same');
-    expect(slideAt([slide(5), TIE], 2, 0, MINOR)).toBe('same');
-    expect(slideAt([gridNote(0), slide(1)], 1, 1, MINOR)).toBe('none');
+    expect(at(steps, 0, 2)).toEqual({ kind: 'retarget', when: 'wrap' });
+    expect(at(steps, 0, 3)).toEqual({ kind: 'same', when: 'wrap' });
+    expect(at([slide(5), TIE], 0)).toEqual({ kind: 'same', when: 'wrap' });
+    expect(at([TIE, slide(1), gridNote(0)], 1)).toEqual({ kind: 'retarget', when: 'wrap' });
+    expect(at([slide(0), REST], 0).kind).toBe('none');
+  });
+
+  it('leaves a slide after a note Skip may drop to the run', () => {
+    const steps = [gridNote(0), TIE, slide(2)];
+    expect(at(steps, 2, 3, 0.25)).toEqual({ kind: 'retarget', when: 'skip' });
+    expect(at(steps, 2, 3, 0)).toEqual({ kind: 'retarget', when: 'always' });
+  });
+
+  it('ignores the steps past the loop', () => {
+    expect(at([gridNote(0), slide(1)], 1, 1).kind).toBe('none');
   });
 
   it('compares pitches as the engine plays them, a folded degree meeting its octave', () => {
     // Degree 5 in the five-degree pentatonic is the root an octave up.
-    expect(slideAt([gridNote(0, { octave: 1 }), slide(5)], 2, 1, PENTA)).toBe('same');
-    expect(slideAt([gridNote(0), slide(0, 1)], 2, 1, PENTA)).toBe('retarget');
+    expect(at([gridNote(0, { octave: 1 }), slide(5)], 1, 2, 0, PENTA).kind).toBe('same');
+    expect(at([gridNote(0), slide(0, 1)], 1, 2, 0, PENTA).kind).toBe('retarget');
   });
 });

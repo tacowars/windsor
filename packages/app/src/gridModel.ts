@@ -5,7 +5,14 @@
  * function returns a new list; the card writes it through `ctx.change`, where
  * arrays replace wholesale.
  */
-import type { Harmony, GridNoteStep, GridStep, GridStepKind, StepModLane } from '@windsor/engine';
+import type {
+  GridNoteStep,
+  GridSpec,
+  GridStep,
+  GridStepKind,
+  Harmony,
+  StepModLane,
+} from '@windsor/engine';
 import {
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
@@ -164,29 +171,36 @@ function relativePitch(step: GridNoteStep, key: Key): number {
 
 /**
  * How a step's note-on meets the note before it (windsor#31, `StepSlide`),
- * read the way `GridSequencer.noteStep` decides it: `none` for a rest, a
- * tie, a note without Slide or a Slide with nothing held; `retarget` for a
- * Slide onto a different pitch; `same` for a Slide onto the pitch already
- * held. What is
- * held is the latest note before the step, walking back over ties and
- * wrapping round the loop (a rest holds nothing), as the line plays once
- * it is looping. A skipped step is a draw the console cannot know, so it is
- * read as played.
+ * read the way `GridSequencer.noteStep` decides it. `kind` is what a Slide
+ * does once a note is held: `none` for a rest, a tie, a note without Slide
+ * or a Slide after a rest; `retarget` onto a different pitch; `same` onto
+ * the pitch already held. The held note is the latest note before the
+ * step, walking back over ties (a rest holds nothing).
+ *
+ * `when` says whether the run can change that. The engine holds nothing on
+ * a region's entry, so a Slide whose held note comes from wrapping round
+ * the loop (step 1 among them) plays its own values on entry and is held
+ * only once the loop wraps: `wrap`. Skip drops a note step as a rest, which
+ * releases the held note, so with Skip above 0 a Slide after a note may
+ * play too: `skip`. Otherwise the line decides it alone: `always`.
  */
 export function slideAt(
-  steps: readonly GridStep[],
-  length: number,
+  spec: Pick<GridSpec, 'steps' | 'length' | 'skipChance'>,
   index: number,
   key: Key,
 ): StepSlide {
-  const n = Math.max(1, Math.min(Math.trunc(length), steps.length));
+  const { steps } = spec;
+  const n = Math.max(1, Math.min(Math.trunc(spec.length), steps.length));
   const step = steps[index];
-  if (!step || step.kind !== 'note' || !step.slide || index >= n) return 'none';
+  const none: StepSlide = { kind: 'none', when: 'always' };
+  if (!step || step.kind !== 'note' || !step.slide || index >= n) return none;
   for (let back = 1; back <= n; back++) {
     const prev = steps[(((index - back) % n) + n) % n];
-    if (!prev || prev.kind === 'rest') return 'none';
+    if (!prev || prev.kind === 'rest') return none;
     if (prev.kind === 'tie') continue;
-    return relativePitch(prev, key) === relativePitch(step, key) ? 'same' : 'retarget';
+    const kind = relativePitch(prev, key) === relativePitch(step, key) ? 'same' : 'retarget';
+    const when = back > index ? 'wrap' : spec.skipChance > 0 ? 'skip' : 'always';
+    return { kind, when };
   }
-  return 'none';
+  return none;
 }

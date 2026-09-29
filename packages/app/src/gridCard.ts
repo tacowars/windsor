@@ -31,7 +31,7 @@ import {
   paintLaneNames,
   patchBase,
 } from './stepModLane';
-import { lanesForSteps } from './stepModLaneModel';
+import { NO_SLIDE, lanesForSteps } from './stepModLaneModel';
 import {
   cycleKind,
   cycleOctave,
@@ -69,7 +69,8 @@ const HINT =
   'A accent, S slide. Steps past Length stay written, greyed. Randomize rewrites every step; ' +
   'Rotate turns the loop. + Lane adds a modulation lane: drag a bar up or down, across steps ' +
   'to paint; double-click resets a step to the patch value. A dashed cell is held by a slide: ' +
-  'set, but the step plays the previous offset.';
+  'set, but the step plays the previous offset. A dotted one is held only when the loop wraps ' +
+  'into it, or unless Skip drops the note before it.';
 
 /** This card's strip: one column per written step of a `grid` spec, and its lanes. */
 interface GridStrip extends Strip<GridSpec> {
@@ -174,17 +175,20 @@ function repaint(strip: GridStrip): void {
  * Per frame while the card is on screen: the playhead (the engine's own step
  * for the audible tick), and a repaint when the Harmony tab's root or scale
  * has changed since the labels were drawn — a root knob goes through
- * `ctx.change` alone, which re-renders nothing.
+ * `ctx.change` alone, which re-renders nothing — or Skip has moved to or
+ * from 0, which decides whether a slide's hold on a lane is certain.
  */
 function watch(strip: GridStrip): void {
-  let keySig = keySignature(strip.ctx.model.doc.harmony);
+  const signature = (): string =>
+    `${keySignature(strip.ctx.model.doc.harmony)}|${(strip.spec()?.skipChance ?? 0) > 0}`;
+  let keySig = signature();
   watchPlayhead({
     attached: () => strip.root.isConnected,
     shown: () => strip.root.closest('[hidden]') === null,
     playheadAt: () => playheadAt(strip.ctx, strip.slot),
     mark: markStep(strip),
     repaintIf: () => {
-      const sig = keySignature(strip.ctx.model.doc.harmony);
+      const sig = signature();
       if (sig === keySig) return;
       keySig = sig;
       strip.repaint();
@@ -271,7 +275,7 @@ function laneHost(ctx: AppCtx, slot: number, scope: HTMLElement, repaint: () => 
     stepCount: () => spec()?.steps.length ?? 0,
     slide: (index) => {
       const s = spec();
-      return s ? slideAt(s.steps, s.length, index, ctx.model.doc.harmony) : 'none';
+      return s ? slideAt(s, index, ctx.model.doc.harmony) : NO_SLIDE;
     },
   };
 }

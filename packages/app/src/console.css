@@ -539,8 +539,10 @@ input {
   font-family: var(--f-num);
   font-size: 9px;
   color: var(--modulator);
-  white-space: nowrap;
+  line-height: 11px;
   min-height: 11px;
+  max-height: 22px;
+  overflow: hidden;
 }
 .mod-cell {
   position: relative;
@@ -594,6 +596,12 @@ input {
 }
 .mod-cell.held .mod-bar {
   background: var(--line-bright);
+}
+/* A slide the run decides (the loop's wrap, a Skip): the bar may play, so
+   it keeps its colour, and the border is dotted in the rule colour. */
+.mod-cell.depends {
+  border-style: dotted;
+  border-color: var(--line-bright);
 }
 .grid-col.playing .mod-cell {
   border-color: var(--carrier);

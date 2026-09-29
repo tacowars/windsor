@@ -6,7 +6,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { GridSpec, StepModLane } from '@windsor/engine';
+import type { GridSpec, GridStep, StepModLane, StepModParam } from '@windsor/engine';
 import {
   ARRANGEMENT_VERSION,
   gridNote,
@@ -23,6 +23,10 @@ import {
   cellAtX,
   freeParams,
   heldBySlide,
+  isDrag,
+  LaneClickGate,
+  type LaneClock,
+  type LaneHold,
   laneReadout,
   lanesForSteps,
   offsetLabel,
@@ -216,35 +220,133 @@ describe('a lane in the document', () => {
 
 describe('a slide holds what the voice keeps (windsor#31)', () => {
   const KEY = { root: 0, scale: 'naturalMinor' } as const;
-  const line = [
-    gridNote(0),
-    gridNote(2, { slide: true }),
-    gridNote(2, { slide: true }),
-    gridNote(4),
-  ];
-  const held = (index: number, param: StepModLane['param']): boolean =>
-    heldBySlide(slideAt(line, line.length, index, KEY), param);
+  const slide = (degree: number): GridStep => gridNote(degree, { slide: true });
+  const line = [gridNote(0), slide(2), slide(2), gridNote(4)];
+  const hold = (steps: GridStep[], index: number, param: StepModParam, skipChance = 0): LaneHold =>
+    heldBySlide(slideAt({ steps, length: steps.length, skipChance }, index, KEY), param);
 
   it('holds feedback on a slide to a new pitch, but not the cutoff on the same step', () => {
-    expect(held(1, 'ops.0.feedback')).toBe(true);
-    expect(held(1, 'ops.2.env.decayCurve')).toBe(true);
-    expect(held(1, 'filter.cutoff')).toBe(false);
-    expect(held(1, 'ops.1.level')).toBe(false);
+    expect(hold(line, 1, 'ops.0.feedback')).toBe('held');
+    expect(hold(line, 1, 'ops.2.env.decayCurve')).toBe('held');
+    expect(hold(line, 1, 'filter.cutoff')).toBe('plays');
+    expect(hold(line, 1, 'ops.1.level')).toBe('plays');
   });
 
   it('holds every lane on a slide to the held pitch, which sends no note-on', () => {
-    for (const param of STEP_MOD_PARAMS) expect(held(2, param), param).toBe(true);
+    for (const param of STEP_MOD_PARAMS) expect(hold(line, 2, param), param).toBe('held');
   });
 
   it('never holds a step without a slide', () => {
     for (const index of [0, 3]) {
-      for (const param of STEP_MOD_PARAMS) expect(held(index, param), param).toBe(false);
+      for (const param of STEP_MOD_PARAMS) expect(hold(line, index, param), param).toBe('plays');
     }
   });
 
+  it("leaves a slide on the loop's first step to the run: held once looping, played on entry", () => {
+    const steps = [slide(0), gridNote(0)];
+    expect(hold(steps, 0, 'filter.cutoff')).toBe('depends');
+    expect(hold([slide(0), gridNote(3)], 0, 'ops.0.feedback')).toBe('depends');
+    expect(hold([slide(0), gridNote(3)], 0, 'filter.cutoff')).toBe('plays');
+  });
+
+  it('leaves a slide after a note Skip can drop to the run', () => {
+    expect(hold(line, 2, 'filter.cutoff', 0.1)).toBe('depends');
+    expect(hold(line, 1, 'ops.0.feedback', 0.1)).toBe('depends');
+    expect(hold(line, 3, 'ops.0.feedback', 0.1)).toBe('plays');
+  });
+
   it('says so in the readout instead of a played value', () => {
-    expect(laneReadout('ops.0.feedback', 0.35, 0, 'retarget')).toBe('+0.35 · held by slide');
-    expect(laneReadout('filter.cutoff', 0.5, 1000, 'retarget')).toBe('+2.3 oct → 4.76k');
-    expect(laneReadout('filter.cutoff', 0.5, 1000, 'same')).toBe('+2.3 oct · held by slide');
+    const always = { kind: 'retarget', when: 'always' } as const;
+    expect(laneReadout('ops.0.feedback', 0.35, 0, always)).toBe('+0.35 · held by slide');
+    expect(laneReadout('filter.cutoff', 0.5, 1000, always)).toBe('+2.3 oct → 4.76k');
+    expect(laneReadout('filter.cutoff', 0.5, 1000, { kind: 'same', when: 'always' })).toBe(
+      '+2.3 oct · held by slide',
+    );
+    expect(laneReadout('ops.0.feedback', 0.35, 0, { kind: 'retarget', when: 'wrap' })).toBe(
+      '+0.35 · held by slide once looping',
+    );
+    expect(laneReadout('ops.0.feedback', 0.35, 0, { kind: 'same', when: 'skip' })).toBe(
+      '+0.35 · held by slide unless skipped',
+    );
+  });
+});
+
+describe('clicks, drags and the double-click', () => {
+  /** A clock the test moves by hand, firing due timers as it goes. */
+  function fakeClock(): LaneClock & { advance(ms: number): void } {
+    let t = 0;
+    let timers: { due: number; fn: () => void; live: boolean }[] = [];
+    return {
+      now: () => t,
+      after: (ms, fn) => {
+        const timer = { due: t + ms, fn, live: true };
+        timers.push(timer);
+        return () => void (timer.live = false);
+      },
+      advance(ms) {
+        t += ms;
+        const due = timers.filter((x) => x.live && x.due <= t);
+        timers = timers.filter((x) => !due.includes(x));
+        for (const x of due) x.fn();
+      },
+    };
+  }
+  const setup = () => {
+    const writes: [number, number[]][] = [];
+    const clock = fakeClock();
+    const gate = new LaneClickGate((lane, values) => writes.push([lane, [...values]]), clock, 250);
+    return { writes, clock, gate };
+  };
+
+  it('writes a double-click (down, up, down, up, dblclick) once, as the reset', () => {
+    const { writes, clock, gate } = setup();
+    expect(gate.press(0, 1)).toBe('paint');
+    gate.release(0, 1, [0, 0.6, 0.2], false);
+    clock.advance(120);
+    expect(gate.press(0, 1)).toBe('reset');
+    gate.release(0, 1, [], false);
+    // The browser's dblclick lands here; the gate has nothing left to do.
+    clock.advance(1000);
+    expect(writes).toEqual([[0, [0, 0, 0.2]]]);
+  });
+
+  it('writes a single click once, when the window closes', () => {
+    const { writes, clock, gate } = setup();
+    gate.press(1, 2);
+    gate.release(1, 2, [0, 0, 0.5], false);
+    clock.advance(249);
+    expect(writes).toEqual([]);
+    clock.advance(1);
+    expect(writes).toEqual([[1, [0, 0, 0.5]]]);
+    clock.advance(1000);
+    expect(writes).toHaveLength(1);
+  });
+
+  it('writes a drag at once', () => {
+    const { writes, gate } = setup();
+    gate.press(0, 0);
+    gate.release(0, 0, [0.4, 0.8], true);
+    expect(writes).toEqual([[0, [0.4, 0.8]]]);
+  });
+
+  it('writes a waiting click before a press elsewhere, and a late second press is a new click', () => {
+    const { writes, clock, gate } = setup();
+    gate.press(0, 0);
+    gate.release(0, 0, [0.3, 0], false);
+    expect(gate.press(0, 1)).toBe('paint');
+    expect(writes).toEqual([[0, [0.3, 0]]]);
+    gate.release(0, 1, [0.3, 0.7], false);
+    clock.advance(300);
+    expect(gate.press(0, 1)).toBe('paint');
+    expect(writes).toEqual([
+      [0, [0.3, 0]],
+      [0, [0.3, 0.7]],
+    ]);
+  });
+
+  it('tells a click from a drag by the travel past the slop', () => {
+    expect(isDrag(2, -3)).toBe(false);
+    expect(isDrag(0, 4)).toBe(true);
+    expect(isDrag(-4, 0)).toBe(true);
   });
 });
