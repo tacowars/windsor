@@ -75,6 +75,33 @@ input {
   padding: 6px 16px;
   flex-wrap: wrap;
 }
+/* Undo and Redo (windsor#131): a pair of icon buttons tucked against the
+   power button (the negative margin halves the header's 16px gap), dimmed
+   with nothing to take back or make again. */
+.undo-controls {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  margin-left: -8px;
+}
+.undo-controls .btn {
+  height: var(--head-control-h);
+  width: var(--head-control-h);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.undo-icon {
+  display: block;
+}
+.undo-controls .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: var(--inset);
+  color: var(--ink-dim);
+  border-color: var(--line);
+}
 .transport-strip {
   flex: 1 1 auto;
   min-width: 0;
