@@ -19,8 +19,13 @@ import { el } from './dom';
 import { euclidCard } from './euclidCard';
 import { gridCard } from './gridCard';
 
-/** What every card is: the body of one part's section, built from the document. */
-export type SequencerCard = (ctx: AppCtx, slot: number) => HTMLElement;
+/**
+ * What every card is: the body of one part's section, built from the
+ * document. `region` names the region whose pattern the card edits
+ * (windsor#75); the grid card ignores it until windsor#76 and edits the
+ * part's sequencer.
+ */
+export type SequencerCard = (ctx: AppCtx, slot: number, region?: number) => HTMLElement;
 
 /** A part with no sequencer: keyboard and MIDI only, so there is nothing to lay out. */
 const noneCard: SequencerCard = () =>

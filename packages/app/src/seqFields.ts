@@ -6,6 +6,12 @@
  * its part by slot (#597) and a field by name the spec union knows (#618
  * decision 8), so a typo fails typecheck instead of writing a key the
  * normaliser drops. The specs are `sequencerKnobTables.ts`.
+ *
+ * A sequencer field is read from and written to one region's pattern
+ * (windsor#75): the optional `region` names it, and `partEdits.ts`'s
+ * `patternOf` / `changePattern` do the read and the full-copy write. With no
+ * region named, the field is the part's `sequencer`, as the grid card uses it
+ * until windsor#76.
  */
 import type {
   ArrangementDocument,
@@ -19,35 +25,39 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, seg, select } from './dom';
 import { makeKnob } from './knob';
+import { changePattern, patternOf } from './partEdits';
 import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { DENSITY_DEFAULTS, DENSITY_KNOBS } from './sequencerKnobTables';
 import type { SequencerField, SequencerKnobEntry } from './sequencerKnobTables';
 
-/** The sequencer spec of the part on `slot`, if the part exists. */
-export const driverOf = (doc: ArrangementDocument, slot: number): SequencerSpec | undefined =>
-  partAt(doc, slot)?.sequencer;
+/**
+ * The spec the part on `slot` plays in region `region`, or its sequencer when
+ * no region is named; undefined when the part is gone.
+ */
+export const driverOf = (
+  doc: ArrangementDocument,
+  slot: number,
+  region?: number,
+): SequencerSpec | undefined => patternOf(doc, slot, region);
 
 /** One field of a spec by name, whatever the kind; a field the kind lacks reads `undefined`. */
 const fieldOf = (spec: SequencerSpec | undefined, field: SequencerField): unknown =>
   spec === undefined ? undefined : Reflect.get(spec, field);
 
-/** A sequencer-field partial for the part on `slot`. */
-const sequencerChange = (slot: number, fields: Record<string, unknown>) =>
-  partChange(slot, { sequencer: fields });
-
-/** A knob writing one sequencer field (note, hold, gate …). */
+/** A knob writing one sequencer field (note, hold, gate …) of region `region`'s pattern. */
 export function driverKnob(
   ctx: AppCtx,
   slot: number,
   entry: Extract<SequencerKnobEntry, { kind: 'driver' }>,
   color: string,
+  region?: number,
 ): HTMLElement {
   return makeKnob({
     ...entry.o,
     label: entry.label,
     color,
-    get: () => Number(fieldOf(driverOf(ctx.model.doc, slot), entry.f) ?? entry.o.def),
-    set: (v) => void ctx.change(sequencerChange(slot, { [entry.f]: v })),
+    get: () => Number(fieldOf(driverOf(ctx.model.doc, slot, region), entry.f) ?? entry.o.def),
+    set: (v) => void changePattern(ctx, slot, region, { [entry.f]: v }),
   });
 }
 
@@ -67,73 +77,85 @@ export function sectionKnob(
   });
 }
 
-/** One table entry as a knob, bound to its part or sequencer field. */
+/** One table entry as a knob, bound to its part field or to region `region`'s sequencer field. */
 export const tableKnob = (
   ctx: AppCtx,
   slot: number,
   entry: SequencerKnobEntry,
   color: string,
+  region?: number,
 ): HTMLElement =>
   entry.kind === 'section'
     ? sectionKnob(ctx, slot, entry, color)
-    : driverKnob(ctx, slot, entry, color);
+    : driverKnob(ctx, slot, entry, color, region);
 
-/** One card's row of table knobs. */
+/** One card's row of table knobs, its sequencer fields in region `region`'s pattern. */
 export function knobRow(
   ctx: AppCtx,
   slot: number,
   table: readonly SequencerKnobEntry[],
   color: string,
+  region?: number,
 ): HTMLElement {
   const row = el('div', 'knob-row');
-  for (const entry of table) row.appendChild(tableKnob(ctx, slot, entry, color));
+  for (const entry of table) row.appendChild(tableKnob(ctx, slot, entry, color, region));
   return row;
 }
 
-export function divisorPicker(ctx: AppCtx, slot: number): HTMLElement {
-  const spec = driverOf(ctx.model.doc, slot);
+export function divisorPicker(ctx: AppCtx, slot: number, region?: number): HTMLElement {
+  const spec = driverOf(ctx.model.doc, slot, region);
   const divisor = spec && spec.kind !== 'none' ? spec.divisor : DEFAULT_EUCLIDEAN_CONFIG.divisor;
   return select('Step', DIVISOR_OPTIONS, String(divisor), (v) => {
-    const result = ctx.change(sequencerChange(slot, { divisor: Number(v) }));
-    if (result.ok) ctx.render();
+    if (changePattern(ctx, slot, region, { divisor: Number(v) })) ctx.render();
   });
 }
 
-/** The Euclidean part's density modulator, or the engine's default one when the part has none. */
-function densityOf(ctx: AppCtx, slot: number): DensityMod {
-  const spec = driverOf(ctx.model.doc, slot);
+/** The pattern the density controls edit: the part on `slot`, in region `region` when one is named. */
+interface DensityTarget {
+  readonly ctx: AppCtx;
+  readonly slot: number;
+  readonly region: number | undefined;
+}
+
+/** The Euclidean pattern's density modulator, or the engine's default one when there is none. */
+function densityOf({ ctx, slot, region }: DensityTarget): DensityMod {
+  const spec = driverOf(ctx.model.doc, slot, region);
   return spec?.kind === 'euclidean' ? spec.density : DENSITY_DEFAULTS.lfoBars;
 }
 
-function densityKnob(ctx: AppCtx, slot: number, kind: DensityModKind): HTMLElement {
+const writeDensity = (target: DensityTarget, density: Record<string, unknown>): boolean =>
+  changePattern(target.ctx, target.slot, target.region, { density });
+
+function densityKnob(target: DensityTarget, kind: DensityModKind): HTMLElement {
   const k = DENSITY_KNOBS[kind];
   return makeKnob({
     ...k.o,
     label: k.label,
     color: PERC_COLOR,
-    get: () => Number(Reflect.get(densityOf(ctx, slot), k.f) ?? k.o.def),
-    set: (v) => void ctx.change(sequencerChange(slot, { density: { kind, [k.f]: v } })),
+    get: () => Number(Reflect.get(densityOf(target), k.f) ?? k.o.def),
+    set: (v) => void writeDensity(target, { kind, [k.f]: v }),
   });
 }
 
-function shapeSeg(ctx: AppCtx, slot: number, kind: DensityModKind): HTMLElement {
+function shapeSeg(target: DensityTarget, kind: DensityModKind): HTMLElement {
   return seg(
     LFO_SHAPES.map((s) => ({ value: s, label: s })),
     () => {
-      const density = densityOf(ctx, slot);
+      const density = densityOf(target);
       return density.kind === 'walk' ? LFO_SHAPES[0] : density.shape;
     },
-    (s) => void ctx.change(sequencerChange(slot, { density: { kind, shape: s } })),
+    (s) => void writeDensity(target, { kind, shape: s }),
     PERC_COLOR,
   );
 }
 
-/** The density modulator of a Euclidean part: kind picker plus the kind's own controls. */
-export function densityControls(ctx: AppCtx, slot: number): HTMLElement {
+/** The density modulator of a Euclidean pattern (region `region`'s): kind picker plus the kind's own controls. */
+export function densityControls(ctx: AppCtx, slot: number, region?: number): HTMLElement {
+  const target: DensityTarget = { ctx, slot, region };
   const wrap = el('div');
   wrap.style.marginTop = '8px';
   wrap.appendChild(el('span', 'field-label', 'Density modulator'));
-  const kind = densityOf(ctx, slot).kind;
+  const kind = densityOf(target).kind;
   wrap.appendChild(
     seg(
       DENSITY_MOD_KINDS.map((k) => ({ value: k, label: k })),
@@ -141,15 +163,14 @@ export function densityControls(ctx: AppCtx, slot: number): HTMLElement {
       (k) => {
         const picked = DENSITY_MOD_KINDS.find((known) => known === k);
         if (!picked) return;
-        const result = ctx.change(sequencerChange(slot, { density: DENSITY_DEFAULTS[picked] }));
-        if (result.ok) ctx.render();
+        if (writeDensity(target, { ...DENSITY_DEFAULTS[picked] })) ctx.render();
       },
       PERC_COLOR,
     ),
   );
   const row = el('div', 'knob-row');
-  row.appendChild(densityKnob(ctx, slot, kind));
+  row.appendChild(densityKnob(target, kind));
   wrap.appendChild(row);
-  if (kind !== 'walk') wrap.appendChild(shapeSeg(ctx, slot, kind));
+  if (kind !== 'walk') wrap.appendChild(shapeSeg(target, kind));
   return wrap;
 }

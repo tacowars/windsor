@@ -6,17 +6,28 @@
  * a row for the selected region — Split, Delete — and, for the kinds whose
  * card has no register knob (`PANE_OCTAVE_KINDS`), the Octave knob. A
  * selected chord shows `harmonyCard.ts`. One selection at a time.
+ *
+ * The card and the Octave knob edit the selected region's pattern
+ * (windsor#75): a part selected without a region edits its first, and a
+ * part with no regions shows a hint in place of the card. The grid card
+ * edits the part's sequencer until windsor#76.
  */
 import type { MusicPart } from '@windsor/engine';
-import { TICKS_PER_BAR, partAt } from '@windsor/engine';
+import { TICKS_PER_BAR, partAt, regionPattern } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
-import { partChange } from './context';
 import { el } from './dom';
 import { harmonyCard } from './harmonyCard';
 import { eventBar } from './harmonyLaneModel';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
-import { deleteRegion, snapTick, splitRegion } from './regionModel';
+import {
+  changePattern,
+  editedRegion,
+  keepsRegionPatterns,
+  patternOf,
+  splitPartRegion,
+} from './partEdits';
+import { deleteRegion } from './regionModel';
 import { SEQUENCER_CARDS } from './sequencerCards';
 import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
@@ -36,25 +47,29 @@ function head(view: SongView, title: string, note: string): HTMLElement {
   return row;
 }
 
-/** The Octave knob for a card without one: the part's absolute register (epic #703 decision 11). */
-function paneOctaveKnob(
-  view: SongView,
-  slot: number,
-  kind: MusicPart['sequencer']['kind'],
-): HTMLElement {
+/**
+ * The region the pane's card and Octave knob edit: the selected one, else the
+ * first (windsor#75 decision 2) — none for a kind whose card edits the part's
+ * sequencer (the grid until windsor#76), and null when the part has no region.
+ */
+function editTarget(part: MusicPart, region: number | null): number | null | undefined {
+  return keepsRegionPatterns(part) ? editedRegion(part, region) : undefined;
+}
+
+/** The Octave knob for a card without one: the edited pattern's absolute register (epic #703 decision 11). */
+function paneOctaveKnob(view: SongView, part: MusicPart, edited: number | undefined): HTMLElement {
   const { ctx } = view;
+  const { slot } = part;
   const octave = (): number => {
-    const sequencer = partAt(ctx.model.doc, slot)?.sequencer;
+    const sequencer = patternOf(ctx.model.doc, slot, edited);
     return sequencer && 'register' in sequencer ? sequencer.register.octave : 0;
   };
   return makeKnob({
-    ...octaveKnob(kind),
+    ...octaveKnob(part.sequencer.kind),
     color: PITCH_COLOR,
     get: octave,
     set: (v) => {
-      if (ctx.change(partChange(slot, { sequencer: { register: { octave: v } } })).ok) {
-        ctx.invalidate();
-      }
+      if (changePattern(ctx, slot, edited, { register: { octave: v } })) ctx.invalidate();
     },
   });
 }
@@ -62,8 +77,9 @@ function paneOctaveKnob(
 /** Split and Delete for the selected region, and the Octave knob where the card lacks one. */
 function partRow(view: SongView, part: MusicPart, region: number | null): HTMLElement {
   const row = el('div', 'bar-row pane-row');
-  if (PANE_OCTAVE_KINDS.includes(part.sequencer.kind)) {
-    row.appendChild(paneOctaveKnob(view, part.slot, part.sequencer.kind));
+  const edited = editTarget(part, region);
+  if (PANE_OCTAVE_KINDS.includes(part.sequencer.kind) && edited !== null) {
+    row.appendChild(paneOctaveKnob(view, part, edited));
   }
   const write = (regions: readonly MusicPart['regions'][number][], select: number | null): void => {
     if (view.commit({ parts: { [part.slot]: { regions: [...regions] } } })) {
@@ -78,8 +94,9 @@ function partRow(view: SongView, part: MusicPart, region: number | null): HTMLEl
   split.disabled = !target || target.duration < 2 * TICKS_PER_BAR;
   split.onclick = (): void => {
     if (region === null || !target) return;
-    const at = snapTick(target.start + target.duration / 2, TICKS_PER_BAR);
-    write(splitRegion(part.regions, region, at), region + 1);
+    // At its middle bar: the modifier-free grain is a bar, whatever the region's own step.
+    const split = splitPartRegion(part, region, target.start + target.duration / 2, false);
+    if (split) write(split, region + 1);
   };
   row.appendChild(split);
   const remove = el('button', 'btn', 'Delete region') as HTMLButtonElement;
@@ -103,15 +120,27 @@ function paintPart(pane: HTMLElement, view: SongView, slot: number, region: numb
   if (!part) return;
   const { kind } = part.sequencer;
   const count = part.regions.length;
+  const edited = editTarget(part, region);
+  const shown = typeof edited === 'number' ? regionPattern(part, edited) : part.sequencer;
   pane.appendChild(
     head(
       view,
       `${part.name} — ${KIND_LABELS[kind]}`,
-      `${forKind(REGION_SUMMARY, part.sequencer)} · ${count} region${count === 1 ? '' : 's'}`,
+      `${forKind(REGION_SUMMARY, shown)} · ${count} region${count === 1 ? '' : 's'}`,
     ),
   );
   pane.appendChild(partRow(view, part, region));
-  pane.appendChild(SEQUENCER_CARDS[kind](view.ctx, slot));
+  if (edited === null) {
+    pane.appendChild(
+      el(
+        'p',
+        'hint',
+        'No regions: click an empty stretch of the lane to draw one, then edit it here.',
+      ),
+    );
+    return;
+  }
+  pane.appendChild(SEQUENCER_CARDS[kind](view.ctx, slot, edited));
 }
 
 function paintEvent(pane: HTMLElement, view: SongView, index: number): void {

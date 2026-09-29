@@ -434,9 +434,13 @@ export class AudioSystem {
     };
   }
 
-  /** A Euclidean part's sounding figure on `slot` (issue #70 capture); null for any other part. */
-  capturePattern(slot: number): readonly boolean[] | null {
-    return this.player?.capturePattern(slot) ?? null;
+  /**
+   * A Euclidean part's sounding figure on `slot` (issue #70 capture): region
+   * `regionIndex`'s (windsor#74, windsor#75), or with no index the one
+   * `part.sequencer` plays; null for any other part.
+   */
+  capturePattern(slot: number, regionIndex?: number): readonly boolean[] | null {
+    return this.player?.capturePattern(slot, regionIndex) ?? null;
   }
 
   /**

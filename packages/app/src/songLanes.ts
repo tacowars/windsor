@@ -9,11 +9,18 @@
  * beat). Pointer events with capture, the way `chordDrag.ts` does it, so a
  * drag works on touch; a drag previews on the lane and commits once on
  * release, as one `ctx.change`.
+ *
+ * Each region carries its own pattern (windsor#75): a block's summary and
+ * cycle ticks are that region's (`regionPattern`), a move or a resize keeps
+ * the pattern, a split gives both halves a copy, and a drawn region copies
+ * its neighbour's (`partEdits.ts`'s `drawRegionChange`).
  */
-import type { MusicPart, Region } from '@windsor/engine';
+import type { MusicPart, PartRegion, Region } from '@windsor/engine';
+import { regionPattern } from '@windsor/engine';
 import { el } from './dom';
+import { drawRegionChange, regionGrain, splitPartRegion } from './partEdits';
 import type { RegionDrag } from './regionModel';
-import { addRegion, dragRegion, regionMark, snapGrain, snapTick, splitRegion } from './regionModel';
+import { dragRegion, regionMark } from './regionModel';
 import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
 import {
@@ -91,10 +98,11 @@ export function pointerDrag(node: HTMLElement, handlers: DragHandlers): void {
   }
 }
 
-/** One `.reg` block for a region of `part`. */
+/** One `.reg` block for a region of `part`, labelled with that region's own pattern. */
 function regionBlock(view: SongView, part: MusicPart, index: number, region: Region): HTMLElement {
   const tone = LANE_TONE[part.sequencer.kind];
-  const cycle = forKind(CYCLE_TICKS, part.sequencer);
+  const pattern = regionPattern(part, index);
+  const cycle = forKind(CYCLE_TICKS, pattern);
   const node = el('div', `reg${tone === 'perc' ? ' perc' : ''}${cycle ? ' cyc' : ''}`);
   const px = view.state.pxPerBar;
   const box = blockBox(region.start, region.duration, px);
@@ -106,7 +114,7 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   const glyph = el('span', 'gl', mark);
   glyph.title = mark === '∞' ? 'whole song: free-running' : 'restarts on entry';
   node.appendChild(glyph);
-  node.appendChild(el('span', 'lb', forKind(REGION_SUMMARY, part.sequencer)));
+  node.appendChild(el('span', 'lb', forKind(REGION_SUMMARY, pattern)));
   const selected = view.state.selection;
   node.classList.toggle(
     'selected',
@@ -137,24 +145,24 @@ function gestureAt(regions: readonly Region[], px: number, pxPerBar: number): Ge
 /**
  * Alt-click: the region whose drawn box is under `px` (windsor#21 — never a
  * raw tick lookup, which misses the widened part of a `MIN_BLOCK_PX` block)
- * cut at the snapped tick the press maps to inside its span; null when
- * there is no block there or the cut lands on an edge.
+ * cut at the tick the press maps to inside its span, snapped to that
+ * region's own grain (`splitPartRegion`), both halves holding a copy of its
+ * pattern; null when there is no block there or the cut lands on an edge.
  */
 function splitAt(
-  regions: readonly Region[],
+  part: MusicPart,
   px: number,
   pxPerBar: number,
-  grain: number,
-): { regions: Region[]; index: number } | null {
-  const boxes = boxesOf(regions, pxPerBar);
+  modifier: boolean,
+): { regions: PartRegion[]; index: number } | null {
+  const boxes = boxesOf(part.regions, pxPerBar);
   const found = hitBlocks(boxes, px);
-  const region = found ? regions[found.index] : undefined;
+  const region = found ? part.regions[found.index] : undefined;
   const box = found ? boxes[found.index] : undefined;
   if (!found || !region || !box) return null;
   const span = { startTick: region.start, durationTicks: region.duration };
-  const tick = snapTick(boxTick(box, px, span, pxPerBar), grain);
-  const next = splitRegion(regions, found.index, tick, grain);
-  return next.length === regions.length ? null : { regions: next, index: found.index };
+  const next = splitPartRegion(part, found.index, boxTick(box, px, span, pxPerBar), modifier);
+  return next ? { regions: next, index: found.index } : null;
 }
 
 /** Redraw the lane's blocks from `regions` — the drag preview and the paint after a commit share it. */
@@ -162,7 +170,7 @@ function paintRegions(
   view: SongView,
   lane: HTMLElement,
   part: MusicPart,
-  regions: readonly Region[],
+  regions: readonly PartRegion[],
 ): void {
   lane.replaceChildren(
     ...regions.map((region, index) => regionBlock(view, { ...part, regions }, index, region)),
@@ -175,12 +183,10 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   const current = (): MusicPart =>
     view.ctx.model.doc.parts.find((p) => p.slot === part.slot) ?? part;
   let gesture: Gesture = { kind: 'add' };
-  let draft: Region[] | null = null;
+  let draft: PartRegion[] | null = null;
   lane.addEventListener('pointerdown', (down) => {
     if (down.button !== 0 || !down.altKey) return;
-    const live = current();
-    const grain = snapGrain(live.sequencer, down.shiftKey);
-    const split = splitAt(live.regions, pxAt(down), view.state.pxPerBar, grain);
+    const split = splitAt(current(), pxAt(down), view.state.pxPerBar, down.shiftKey);
     if (!split) return;
     down.stopPropagation();
     if (view.commit({ parts: { [part.slot]: { regions: split.regions } } })) {
@@ -197,7 +203,7 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
     move: (e) => {
       if (gesture.kind === 'add') return;
       const live = current();
-      const grain = snapGrain(live.sequencer, e.shiftKey);
+      const grain = regionGrain(live, gesture.index, e.shiftKey);
       const deltaTicks = tickAt(e) - gesture.pressTick;
       const drag = { kind: gesture.kind, index: gesture.index, deltaTicks };
       draft = dragRegion(live.regions, drag, view.songTicks(), grain);
@@ -210,14 +216,15 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
       paintRegions(view, lane, live, live.regions);
     },
     end: (e, moved) => {
-      const live = current();
+      const { ctx } = view;
       if (gesture.kind === 'add') {
         if (moved) return;
-        const regions = addRegion(live.regions, tickAt(e), view.songTicks());
-        if (!regions) return void view.select({ kind: 'part', slot: part.slot, region: null });
-        const added = regions.findIndex((r) => !live.regions.includes(r));
-        if (view.commit({ parts: { [part.slot]: { regions } } })) {
-          view.select({ kind: 'part', slot: part.slot, region: added });
+        const drawn = drawRegionChange(ctx.model.doc, part.slot, tickAt(e), (raw) =>
+          ctx.model.preview(raw),
+        );
+        if (!drawn) return void view.select({ kind: 'part', slot: part.slot, region: null });
+        if (view.commit({ parts: { [part.slot]: { regions: drawn.regions } } })) {
+          view.select({ kind: 'part', slot: part.slot, region: drawn.index });
         }
         return;
       }
