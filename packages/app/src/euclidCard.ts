@@ -2,7 +2,9 @@
  * The Sequencers tab's Euclidean card (#610): the knobs the old card had —
  * Note, Vel, Hold, Steps, Rotate, the `k` bounds, the divisor, the density
  * modulator — and the figure strip: one cell per step, the onsets lit, the
- * playhead on the audible tick, a `k / n` readout, repainted the frame the
+ * region's playhead ring (`regionPlayhead.ts`, windsor#101: bright while the
+ * song is inside the region, a dimmer ghost ring on the step the region
+ * would be on elsewhere), a `k / n` readout, repainted the frame the
  * player's figure changes, so a modulator moving `k` on a bar line is seen
  * the bar it happens and a Steps turn resizes the strip at once. Clicking a
  * cell flips that step and freezes the figure (the capture path); Release
@@ -33,6 +35,7 @@ import {
 import { regionFigure } from './euclidFigure';
 import { makeKnob, type KnobElement } from './knob';
 import { changePattern } from './partEdits';
+import { lightPlayhead, regionPlayheadAt } from './regionPlayhead';
 import { densityControls, divisorPicker, knobRow as tableKnobRow } from './seqFields';
 import {
   EUCLID_KNOBS,
@@ -40,14 +43,7 @@ import {
   EUCLID_STEPS_KNOB,
   euclidPulseKnob,
 } from './sequencerKnobTables';
-import {
-  type PlayheadStrip,
-  markPlaying,
-  markStep,
-  playheadAt,
-  specOf,
-  watchPlayhead,
-} from './stepStrip';
+import { type PlayheadStrip, markStep, specOf, watchPlayhead } from './stepStrip';
 
 const HINT =
   'Lit cells are the onsets of the figure the player holds; the ring is the playhead. ' +
@@ -83,6 +79,8 @@ function figureOf(card: Card): Figure {
   const source = {
     doc: ctx.model.doc,
     capturePattern: (slot: number, region?: number) => ctx.host.capturePattern(slot, region),
+    regionStepAt: (slot: number, region: number, tick: number) =>
+      ctx.host.regionStepAt(slot, region, tick),
     position: () => ctx.transport.position(),
   };
   return regionFigure(source, card.slot, card.region);
@@ -124,7 +122,7 @@ function paintFigure(card: Card, figure: Figure): void {
     node.setAttribute('aria-pressed', String(figure[i] === true));
   });
   card.key = figureKey(figure);
-  markPlaying(card.root, card.playing);
+  lightPlayhead(card.root, card.playing);
 }
 
 function readoutText(card: Card, figure: Figure): string {
@@ -136,13 +134,13 @@ function readoutText(card: Card, figure: Figure): string {
  * Per frame while the card is on screen: the figure (repainted only when it
  * changed — a modulator moving `k`, a knob turn, a capture), the readout, and
  * the playhead (the engine's own step for the audible tick, so the ring is on
- * the cell the player is reading).
+ * the cell the player is reading, or its ghost while another region plays).
  */
 function watch(card: Card): void {
   watchPlayhead({
     attached: () => card.root.isConnected,
     shown: () => card.root.closest('[hidden]') === null,
-    playheadAt: () => playheadAt(card.ctx, card.slot, card.region),
+    playheadAt: () => regionPlayheadAt(card.ctx, card.slot, card.region),
     mark: markStep(card),
     repaintIf: () => {
       const figure = figureOf(card);

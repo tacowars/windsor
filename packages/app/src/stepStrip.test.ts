@@ -2,7 +2,7 @@
  * The one step strip and playhead loop (#619 decision 1), driven without a
  * DOM: a fake frame source in place of `requestAnimationFrame`, a fake
  * scheduler in place of the transport, and cells that are nothing but their
- * class lists — which is all `markPlaying` reads.
+ * class lists — which is all the lighting reads.
  *
  * What is pinned here is the loop's contract: it asks the engine where the
  * playhead is (never deriving it), lights a step only when it moved, runs the
@@ -14,7 +14,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { AppCtx } from './context';
 import { HostTransport, type TransportSystem } from './host';
-import { createFrameDriver, markPlaying, playheadAt, watchPlayhead } from './stepStrip';
+import { DARK, ghostOf, regionPlayheadAt } from './regionPlayhead';
+import { createFrameDriver, markStep, watchPlayhead } from './stepStrip';
 
 /** A cell: its class list and a way to read what was toggled onto it. */
 function fakeCell(): { classList: { toggle(token: string, on: boolean): void }; on: Set<string> } {
@@ -80,68 +81,45 @@ function fakeCtx(step: (tick: number) => number): {
   return { ctx, transport, asked };
 }
 
-describe('markPlaying', () => {
-  it('lights only the playhead’s cell, and none for -1', () => {
+describe('markStep', () => {
+  it('remembers the playhead for the next repaint and lights it, bright, ghost or dark', () => {
     const children = fakeStrip(4);
-    markPlaying({ children }, 2);
+    const strip = { root: { children } as unknown as HTMLElement, playing: DARK };
+    const mark = markStep(strip);
+    mark(2);
     expect(lit(children)).toEqual([2]);
-    markPlaying({ children }, 0);
-    expect(lit(children)).toEqual([0]);
-    markPlaying({ children }, -1);
+    expect(strip.playing).toBe(2);
+    mark(ghostOf(1));
     expect(lit(children)).toEqual([]);
+    expect(children[1]?.on.has('ghost')).toBe(true);
+    expect(strip.playing).toBe(ghostOf(1));
+    mark(DARK);
+    expect(children.every((cell) => cell.on.size === 0)).toBe(true);
   });
 
-  it('lights nothing for a step past the strip, leaving the cells as they were', () => {
+  it('lights nothing for a step past the strip', () => {
     const children = fakeStrip(3);
-    markPlaying({ children }, children.length);
+    markStep({ root: { children } as unknown as HTMLElement, playing: DARK })(children.length);
     expect(lit(children)).toEqual([]);
   });
 });
 
-describe('playheadAt', () => {
+describe('regionPlayheadAt with no region named: the part’s own step', () => {
   const SLOT = 3;
 
   it('hands the audible tick to the engine’s stepAt and returns what it says', () => {
     const { ctx, transport, asked } = fakeCtx((tick) => tick % 4);
     transport.now = 1.5;
     transport.audible = 42;
-    expect(playheadAt(ctx, SLOT)).toBe(42 % 4);
+    expect(regionPlayheadAt(ctx, SLOT)).toBe(42 % 4);
     expect(asked).toEqual([{ slot: SLOT, tick: 42 }]);
   });
 
   it('asks nothing while the transport is stopped', () => {
     const { ctx, transport, asked } = fakeCtx(() => 0);
     transport.running = false;
-    expect(playheadAt(ctx, SLOT)).toBe(-1);
+    expect(regionPlayheadAt(ctx, SLOT)).toBe(-1);
     expect(asked).toEqual([]);
-  });
-
-  describe('with a region named', () => {
-    const regionCtx = (): ReturnType<typeof fakeCtx> => {
-      const fake = fakeCtx((tick) => tick % 4);
-      const part = {
-        slot: 0,
-        regions: [
-          { start: 0, duration: 100 },
-          { start: 100, duration: 100 },
-        ],
-      };
-      (fake.ctx as unknown as { model: unknown }).model = { doc: { parts: [part] } };
-      return fake;
-    };
-
-    it('lights nothing while the audible tick is inside another region', () => {
-      const { ctx, transport, asked } = regionCtx();
-      transport.audible = 42;
-      expect(playheadAt(ctx, 0, 1)).toBe(-1);
-      expect(asked).toEqual([]);
-    });
-
-    it('lights the step while the selected region plays', () => {
-      const { ctx, transport } = regionCtx();
-      transport.audible = 102;
-      expect(playheadAt(ctx, 0, 1)).toBe(102 % 4);
-    });
   });
 
   it('is -1 before audio is enabled, when there is no system to ask', () => {
@@ -149,7 +127,7 @@ describe('playheadAt', () => {
       host: { system: null },
       transport: new HostTransport(() => null),
     } as unknown as AppCtx;
-    expect(playheadAt(ctx, SLOT)).toBe(-1);
+    expect(regionPlayheadAt(ctx, SLOT)).toBe(-1);
   });
 });
 
@@ -183,7 +161,7 @@ describe('watchPlayhead', () => {
     let queued: (() => void) | null = null;
     watchPlayhead({
       attached: () => attached.value,
-      playheadAt: () => playheadAt(ctx, SLOT),
+      playheadAt: () => regionPlayheadAt(ctx, SLOT),
       mark: (step) => void marks.push(step),
       repaintIf: () => void state.checks++,
       ...(options.tracksShown === true ? { shown: () => shown.value } : {}),
@@ -377,7 +355,7 @@ describe('createFrameDriver (#709 decision 5)', () => {
     for (const i of [0, 1]) {
       watchPlayhead({
         attached: () => true,
-        playheadAt: () => playheadAt(ctx, i),
+        playheadAt: () => regionPlayheadAt(ctx, i),
         mark: (step) => void marks[i]?.push(step),
         frame: d.frame,
       });

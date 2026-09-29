@@ -3,7 +3,9 @@
  * the rhythm below as one column per step — Hit or Rest, then the Oct, Inv,
  * Dur and Rep dials (click up, shift-click down) — an append column that
  * takes a drop or a click, a delete-last-step button, the part velocity, gate
- * and base-step controls, and a playhead on the audible tick. A hit's chord
+ * and base-step controls, and the region's playhead (`regionPlayhead.ts`,
+ * windsor#101): bright on the step sounding while the song is inside the
+ * region, a ghost on the step it would be on elsewhere. A hit's chord
  * is the harmony timeline's (epic #703 decision 15): the Hit tile names and
  * auditions the selected region's chord — the one under the playhead while
  * the song is inside the region, else the one at its start (windsor#100) —
@@ -37,6 +39,7 @@ import { PITCH_COLOR } from './consoleColors';
 import { el, select } from './dom';
 import { keySignature } from './gridModel';
 import { changePattern } from './partEdits';
+import { regionPlayheadAt } from './regionPlayhead';
 import { knobRow } from './seqFields';
 import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { CHORD_KNOBS } from './sequencerKnobTables';
@@ -45,7 +48,6 @@ import {
   commitSteps,
   markStep,
   paintStrip,
-  playheadAt,
   specOf,
   stripCell,
   stripColumn,
@@ -166,7 +168,8 @@ function tileSignature(strip: ChordStrip): string {
 
 /**
  * Per frame while the card is on screen: the playhead (the engine's own step
- * for the audible tick, durations and repeats included), and a repaint of the
+ * for the audible tick, durations and repeats included, bright in the region
+ * and a ghost outside it), and a repaint of the
  * Hit tile when the key, the timeline or the region's chord has changed since
  * it was drawn — a root edit goes through `ctx.change` alone, which
  * re-renders nothing, a region edit moves its start, and the playhead crosses
@@ -177,7 +180,7 @@ function watch(strip: ChordStrip): void {
   watchPlayhead({
     attached: () => strip.root.isConnected,
     shown: () => strip.root.closest('[hidden]') === null,
-    playheadAt: () => playheadAt(strip.ctx, strip.slot, strip.region),
+    playheadAt: () => regionPlayheadAt(strip.ctx, strip.slot, strip.region),
     mark: markStep(strip),
     repaintIf: () => {
       const sig = tileSignature(strip);

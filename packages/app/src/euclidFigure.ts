@@ -4,27 +4,28 @@
  * that region, the player's live figure for that region — asked for by its
  * index (`capturePattern(slot, region)`, windsor#74), so a capture in the
  * second region never freezes the first region's or the part's figure —
- * and elsewhere the region's own preview. Pure over the three things it
- * reads, so a test drives it with the engine's player rig.
+ * and elsewhere the region's own preview. Inside-or-not is the engine's
+ * `regionStepAt` (windsor#101), which wraps the audible tick the way the
+ * gate does, so the live figure comes back after the song's wrap to bar 1
+ * and after every loop-brace wrap. Pure over the things it reads, so a test
+ * drives it with the engine's player rig.
  */
-import type { ArrangementDocument } from '@windsor/engine';
-import { partAt } from '@windsor/engine';
+import type { ArrangementDocument, RegionStep } from '@windsor/engine';
 import { previewFigure, type Figure } from './euclidModel';
 import { patternOf } from './partEdits';
-import { regionAt } from './regionModel';
 
-/** What the figure reads: the document, the player's capture and the audible tick. */
+/** What the figure reads: the document, the player's capture and position, and the audible tick. */
 export interface FigureSource {
   readonly doc: ArrangementDocument;
   capturePattern(slot: number, region?: number): readonly boolean[] | null;
+  regionStepAt(slot: number, region: number, tick: number): RegionStep | null;
   position(): number;
 }
 
 /** True while the transport is inside region `region` of the part on `slot` (always, with no region named). */
 function playing(source: FigureSource, slot: number, region: number | undefined): boolean {
   if (region === undefined) return true;
-  const part = partAt(source.doc, slot);
-  return part !== undefined && regionAt(part.regions, source.position()) === region;
+  return source.regionStepAt(slot, region, source.position())?.live === true;
 }
 
 /**

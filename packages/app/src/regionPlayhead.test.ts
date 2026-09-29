@@ -1,17 +1,18 @@
 /**
- * The grid card's playhead (windsor#97), driven without a DOM: a fake
- * transport and a fake engine answering `regionStepAt`, and cells that are
- * nothing but their class lists.
+ * The sequencer cards' region playhead (windsor#97, windsor#101), driven
+ * without a DOM: a fake transport and a fake engine answering
+ * `regionStepAt`, and cells that are nothing but their class lists.
  *
  * Pinned here: the playhead is the engine's answer (bright in the region, a
  * ghost outside it), dark only while the transport is not running, and the
- * lighting puts one of the two classes on one column and clears the rest.
+ * lighting puts one of the two classes on one column or cell and clears the
+ * rest. `regionPlayheadCards.test.ts` drives it through the real player.
  */
 import { describe, expect, it } from 'vitest';
 
 import type { RegionStep } from '@windsor/engine';
 import type { AppCtx } from './context';
-import { DARK, ghostOf, gridPlayheadAt, lightGrid, readPlayhead } from './gridPlayhead';
+import { DARK, ghostOf, lightPlayhead, readPlayhead, regionPlayheadAt } from './regionPlayhead';
 
 function fakeCtx(answer: (tick: number) => RegionStep | null): {
   ctx: AppCtx;
@@ -70,54 +71,54 @@ describe('the playhead number', () => {
   });
 });
 
-describe('gridPlayheadAt', () => {
+describe('regionPlayheadAt', () => {
   it('hands the audible tick to the engine and lights its step bright inside the region', () => {
     const { ctx, transport, asked } = fakeCtx(() => ({ step: 2, live: true }));
     transport.tick = 42;
-    expect(gridPlayheadAt(ctx, 1, 0)).toBe(2);
+    expect(regionPlayheadAt(ctx, 1, 0)).toBe(2);
     expect(asked).toEqual([{ slot: 1, region: 0, tick: 42 }]);
   });
 
   it('is the ghost of the engine’s step while the region does not play', () => {
     const { ctx } = fakeCtx(() => ({ step: 5, live: false }));
-    expect(readPlayhead(gridPlayheadAt(ctx, 1, 0))).toEqual({ step: 5, ghost: true });
+    expect(readPlayhead(regionPlayheadAt(ctx, 1, 0))).toEqual({ step: 5, ghost: true });
   });
 
   it('is dark while the transport is paused or stopped, asking nothing', () => {
     const { ctx, transport, asked } = fakeCtx(() => ({ step: 1, live: true }));
     transport.running = false;
-    expect(gridPlayheadAt(ctx, 1, 0)).toBe(DARK);
+    expect(regionPlayheadAt(ctx, 1, 0)).toBe(DARK);
     expect(asked).toEqual([]);
   });
 
   it('is dark when the engine has no position for the region', () => {
-    expect(gridPlayheadAt(fakeCtx(() => null).ctx, 1, 0)).toBe(DARK);
-    expect(gridPlayheadAt(fakeCtx(() => ({ step: -1, live: false })).ctx, 1, 0)).toBe(DARK);
+    expect(regionPlayheadAt(fakeCtx(() => null).ctx, 1, 0)).toBe(DARK);
+    expect(regionPlayheadAt(fakeCtx(() => ({ step: -1, live: false })).ctx, 1, 0)).toBe(DARK);
   });
 
   it('with no region named, is the part’s own step', () => {
     const { ctx, transport } = fakeCtx(() => null);
     transport.tick = 7;
-    expect(gridPlayheadAt(ctx, 1)).toBe(7 % 4);
+    expect(regionPlayheadAt(ctx, 1)).toBe(7 % 4);
   });
 });
 
-describe('lightGrid', () => {
+describe('lightPlayhead', () => {
   it('lights one column bright or ghost, clears the rest, and nothing for dark', () => {
     const children = Array.from({ length: 4 }, fakeCell);
-    lightGrid({ children }, 2);
+    lightPlayhead({ children }, 2);
     expect(classes(children)).toEqual(['', '', 'playing', '']);
-    lightGrid({ children }, ghostOf(1));
+    lightPlayhead({ children }, ghostOf(1));
     expect(classes(children)).toEqual(['', 'ghost', '', '']);
-    lightGrid({ children }, 1);
+    lightPlayhead({ children }, 1);
     expect(classes(children)).toEqual(['', 'playing', '', '']);
-    lightGrid({ children }, DARK);
+    lightPlayhead({ children }, DARK);
     expect(classes(children)).toEqual(['', '', '', '']);
   });
 
   it('lights nothing for a step past the strip', () => {
     const children = Array.from({ length: 2 }, fakeCell);
-    lightGrid({ children }, ghostOf(2));
+    lightPlayhead({ children }, ghostOf(2));
     expect(classes(children)).toEqual(['', '']);
   });
 });
