@@ -205,6 +205,35 @@ export const ARP_KNOBS: readonly SequencerKnobEntry[] = [
   },
 ];
 
+/**
+ * The Arp card's step-grid knobs (windsor#137): Skip, Acc vel and Acc mod,
+ * the grid's ranges and readouts over the arp's own defaults. They follow
+ * Reg in the card's row.
+ */
+export const ARP_GRID_KNOBS: readonly SequencerKnobEntry[] = [
+  {
+    kind: 'driver',
+    f: 'skipChance',
+    label: 'Skip',
+    o: { min: 0, max: 1, def: DEFAULT_ARP_CONFIG.skipChance, fmt: fmt2 },
+  },
+  {
+    kind: 'driver',
+    f: 'accentVelocity',
+    label: 'Acc vel',
+    o: { min: 0, max: 1, def: DEFAULT_ARP_CONFIG.accentVelocity, fmt: fmt2 },
+  },
+  {
+    kind: 'driver',
+    f: 'accentMod',
+    label: 'Acc mod',
+    o: { min: 0, max: 1, def: DEFAULT_ARP_CONFIG.accentMod, fmt: fmt2 },
+  },
+];
+
+/** The Arp card's Rotate: the grid's, ±`GRID_ROTATE_MAX` cells, and like it never stored. */
+export const ARP_ROTATE_KNOB: CardKnobSpec = GRID_ROTATE_KNOB;
+
 /** The ten traversals as the Style select names them, in the engine's order. */
 export const ARP_STYLE_LABELS: Readonly<Record<ArpStyle, string>> = {
   up: 'Up',

@@ -171,14 +171,18 @@ export function offsetLabel(row: StepModRow, value: number): string {
  * plain note-on (or no note at all); `retarget`, a Slide onto a new pitch,
  * which hands the sounding voice over and keeps the old step's offsets on
  * every `slideKeeps` row; `same`, a Slide onto the pitch already held,
- * which sends no note-on, so none of the step's values reach the voice.
+ * which sends no note-on, so none of the step's values reach the voice;
+ * `either`, a Slide whose pitch the run draws (a random arp style,
+ * windsor#137), which is a `retarget` when it moves and a `same` when it
+ * lands on the held pitch, so its `slideKeeps` rows are held as a
+ * `retarget`'s and every other row plays only if the pitch moves.
  * `when`: `always`, or a hold the run decides: `wrap`, held only once the
  * loop has wrapped (a region's entry holds nothing), and `skip`, held unless
  * Skip drops the note before it. The card reads it from its own steps (the
  * grid's `slideAt`).
  */
 export interface StepSlide {
-  readonly kind: 'none' | 'retarget' | 'same';
+  readonly kind: 'none' | 'retarget' | 'same' | 'either';
   readonly when: 'always' | 'wrap' | 'skip';
 }
 
@@ -189,11 +193,16 @@ export const NO_SLIDE: StepSlide = { kind: 'none', when: 'always' };
 export type LaneHold = 'plays' | 'held' | 'depends';
 
 export function heldBySlide(slide: StepSlide, param: StepModParam): LaneHold {
-  const holds =
-    slide.kind === 'same' || (slide.kind === 'retarget' && rowOf(param)?.slideKeeps === true);
-  if (!holds) return 'plays';
+  if (slide.kind === 'none') return 'plays';
+  if (slide.kind !== 'same' && rowOf(param)?.slideKeeps !== true) {
+    return slide.kind === 'either' ? 'depends' : 'plays';
+  }
   return slide.when === 'always' ? 'held' : 'depends';
 }
+
+/** Whether `param` on a step with `slide` plays only if the slide moves pitch (`either`, not a `slideKeeps` row). */
+const playsIfMoves = (slide: StepSlide, param: StepModParam): boolean =>
+  slide.kind === 'either' && rowOf(param)?.slideKeeps !== true;
 
 /** What a readout adds after the offset when a slide holds the row, or may. */
 const HOLD_NOTE: Record<StepSlide['when'], string> = {
@@ -201,6 +210,9 @@ const HOLD_NOTE: Record<StepSlide['when'], string> = {
   wrap: 'held by slide once looping',
   skip: 'held by slide unless skipped',
 };
+
+/** What a readout adds on a row that plays only if a drawn slide moves pitch. */
+const MOVES_NOTE = 'plays if the slide moves pitch';
 
 /**
  * What a cell's readout says: the offset, and what the step plays through
@@ -216,6 +228,7 @@ export function laneReadout(
   const row = rowOf(param);
   if (!row) return fmtSigned(value);
   const offset = offsetLabel(row, value);
+  if (playsIfMoves(slide, param)) return `${offset} · ${MOVES_NOTE}`;
   if (heldBySlide(slide, param) !== 'plays') return `${offset} · ${HOLD_NOTE[slide.when]}`;
   if (base === undefined) return offset;
   return `${offset} → ${STEP_MOD_LANE_LABELS[param].fmt(stepModValue(row, base, value))}`;
