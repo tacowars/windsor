@@ -6,6 +6,11 @@
  * Stops land on the render quantum, the grid `OfflineAudioContext.suspend`
  * uses, and the song's end is its own stop, rounded up to that grid, so the
  * release lands at or just after the last bar and never before it.
+ *
+ * The output stage may delay the master (windsor#93 decision 9): the render
+ * runs `latencyFrames` longer, and the master is read that many frames later
+ * than the stems (`masterStart` against `leadFrames`), so both start on bar 1
+ * and run the song and its tail.
  */
 import { RENDER_QUANTUM_FRAMES } from './renderConstants';
 
@@ -15,12 +20,20 @@ export interface RenderPlanInput {
   leadSeconds: number;
   songSeconds: number;
   tailSeconds: number;
+  /** Frames the output stage delays the master by; 0 when absent. */
+  latencyFrames?: number;
 }
 
 export interface RenderPlan {
   leadFrames: number;
   songFrames: number;
   tailFrames: number;
+  /** Frames the output stage delays the master by (decision 9). */
+  latencyFrames: number;
+  /** Where the master's bar 1 is in the render: past the lead-in and the stage's latency. */
+  masterStart: number;
+  /** Frames every file holds: the song and its tail. */
+  outputFrames: number;
   totalFrames: number;
   totalSeconds: number;
   /** Context time of the song's last bar line: no tick is issued at or after it. */
@@ -34,7 +47,8 @@ export function planRender(input: RenderPlanInput): RenderPlan {
   const leadFrames = Math.round(input.leadSeconds * sampleRate);
   const songFrames = Math.round(input.songSeconds * sampleRate);
   const tailFrames = Math.round(input.tailSeconds * sampleRate);
-  const totalFrames = leadFrames + songFrames + tailFrames;
+  const latencyFrames = input.latencyFrames ?? 0;
+  const totalFrames = leadFrames + songFrames + tailFrames + latencyFrames;
   const endSeconds = input.leadSeconds + input.songSeconds;
   const quantumUp = (frame: number): number =>
     Math.ceil(frame / RENDER_QUANTUM_FRAMES) * RENDER_QUANTUM_FRAMES;
@@ -43,6 +57,9 @@ export function planRender(input: RenderPlanInput): RenderPlan {
     leadFrames,
     songFrames,
     tailFrames,
+    latencyFrames,
+    masterStart: leadFrames + latencyFrames,
+    outputFrames: songFrames + tailFrames,
     totalFrames,
     totalSeconds: totalFrames / sampleRate,
     endSeconds,

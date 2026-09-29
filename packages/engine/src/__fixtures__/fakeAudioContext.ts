@@ -8,11 +8,16 @@
  * plate (`worklet/reverb/`, bundled to `worklet/generated/reverb-processor.js`)
  * through `reverbHarness.ts`; an `fm-part` node plays whatever `Feed` the test
  * assigns, multiplied by its `gain` param the way the worklet's fader is, so
- * post-fader taps behave as they do live.
+ * post-fader taps behave as they do live. The engine's output stage runs the
+ * real generated processor too (`outputStageHarness.ts`, windsor#93), at the
+ * context's rate, and its reports reach the node's `port.onmessage` as they
+ * are posted.
  *
  * Node-only, by design: excluded from the engine's tsc build.
  */
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
+import { OUTPUT_STAGE_NAME } from '../mixer/outputStageConstants';
+import { loadOutputStage } from './outputStageHarness';
 import type { FakeHost } from './fakeAudioNodes';
 import { FakeConstantSource, FakeOscillator, FakePeriodicWave } from './fakeOscillator';
 import { FakeWaveShaper } from './fakeWaveShaper';
@@ -53,6 +58,7 @@ export class FakeContext implements FakeHost {
       this.modules.push(text);
       if (text.includes('fm-processor')) this.registered.add(PROCESSOR_NAME);
       if (text.includes('reverb-processor')) this.registered.add(REVERB_PROCESSOR_NAME);
+      if (text.includes('output-stage-processor')) this.registered.add(OUTPUT_STAGE_NAME);
     },
   };
 
@@ -135,6 +141,7 @@ interface WorkletOptions {
   numberOfInputs?: number;
   numberOfOutputs?: number;
   processorOptions?: unknown;
+  parameterData?: Record<string, number>;
 }
 
 export class FakeWorkletNode extends FakeNode {
@@ -144,11 +151,18 @@ export class FakeWorkletNode extends FakeNode {
   readonly posted: unknown[] = [];
   /** An `fm-part`'s `processorOptions.events`: the notes it was built holding. */
   readonly events: unknown[];
-  readonly port = {
+  readonly port: {
+    postMessage(message: unknown): void;
+    onmessage: ((event: { data: unknown }) => void) | null;
+    close(): void;
+  } = {
     postMessage: (message: unknown): void => {
       this.posted.push(message);
+      // Only the output stage hears its port here; the plate's load sampler stays off, as before.
+      if (this.name === OUTPUT_STAGE_NAME) this.processor?.inbox(message);
     },
     onmessage: null,
+    close: (): void => {},
   };
   /** For an `fm-part` node: what it plays. Silence until a test assigns one. */
   feed: Feed | null = null;
@@ -168,6 +182,14 @@ export class FakeWorkletNode extends FakeNode {
       for (const d of reverbModule.descriptors) {
         this.parameters.set(d.name, new FakeParam(d.defaultValue, d.minValue, d.maxValue));
         this.values[d.name] = new Float32Array([d.defaultValue]);
+      }
+    } else if (name === OUTPUT_STAGE_NAME) {
+      const stage = loadOutputStage(context.sampleRate);
+      this.processor = stage.create((report) => this.port.onmessage?.({ data: report }));
+      for (const d of stage.descriptors) {
+        const value = options.parameterData?.[d.name] ?? d.defaultValue;
+        this.parameters.set(d.name, new FakeParam(value, d.minValue, d.maxValue));
+        this.values[d.name] = new Float32Array([value]);
       }
     } else if (name === PROCESSOR_NAME) {
       this.parameters.set('pitchBend', new FakeParam(0, -24, 24));

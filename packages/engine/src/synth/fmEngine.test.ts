@@ -1,11 +1,16 @@
 /**
- * `FmEngine.init()` loads the two worklet modules from the URLs Vite resolves
+ * `FmEngine.init()` loads the worklet modules from the URLs Vite resolves
  * for the client, or from URLs a standalone page hands in (#70). The default
- * path must not move when the override lands.
+ * path must not move when the override lands. The last module is the output
+ * stage's, which `init` builds between the master and the destination
+ * (windsor#93).
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { FakeContext, installFakeAudioWorklet } from '../__fixtures__/fakeAudioContext';
+import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
+import { OUTPUT_STAGE_WORKLET_URL } from '../mixer/outputStage';
+import { OUTPUT_STAGE_NAME } from '../mixer/outputStageConstants';
 import { FmEngine } from './fmEngine';
 import {
   PEAK_METER_WORKLET_URL,
@@ -39,6 +44,7 @@ describe('FmEngine.init', () => {
       String(PHASER_WORKLET_URL),
       String(ADVANCED_DRIVE_WORKLET_URL),
       String(DELAY_WORKLET_URL),
+      String(OUTPUT_STAGE_WORKLET_URL),
     ]);
   });
 
@@ -47,7 +53,7 @@ describe('FmEngine.init', () => {
     const engine = new FmEngine(context.asAudioContext());
     await engine.init();
     await engine.init();
-    expect(context.modules).toHaveLength(8);
+    expect(context.modules).toHaveLength(9);
   });
 
   it('takes override URLs, together or one at a time', async () => {
@@ -61,6 +67,7 @@ describe('FmEngine.init', () => {
       phaserUrl: 'blob:phaser',
       advancedDriveUrl: 'blob:advanced-drive',
       delayUrl: 'blob:delay',
+      outputStageUrl: 'blob:output-stage-processor',
     });
     expect(both.modules).toEqual([
       'blob:fm',
@@ -71,6 +78,7 @@ describe('FmEngine.init', () => {
       'blob:phaser',
       'blob:advanced-drive',
       'blob:delay',
+      'blob:output-stage-processor',
     ]);
 
     const one = new FakeContext();
@@ -84,6 +92,7 @@ describe('FmEngine.init', () => {
       String(PHASER_WORKLET_URL),
       String(ADVANCED_DRIVE_WORKLET_URL),
       String(DELAY_WORKLET_URL),
+      String(OUTPUT_STAGE_WORKLET_URL),
     ]);
   });
 
@@ -93,6 +102,36 @@ describe('FmEngine.init', () => {
     expect(() => engine.createPart('early')).toThrow(/init\(\)/);
     const bus = engine.createBus({ filter: { type: 'highpass', frequency: 30 } });
     expect(bus.filter?.type).toBe('highpass');
+  });
+});
+
+describe('the output stage (windsor#93)', () => {
+  const targets = (node: unknown): FakeNode[] => (node as FakeNode).outbound.map((c) => c.to);
+
+  it('sits between the master and the destination from init on, with no browser compressor', async () => {
+    const context = new FakeContext();
+    const engine = new FmEngine(context.asAudioContext());
+    expect(engine.outputStage).toBeNull();
+    expect(targets(engine.master)).toEqual([]);
+    await engine.init();
+    const stage = engine.outputStage!;
+    expect((stage.node as unknown as { name: string }).name).toBe(OUTPUT_STAGE_NAME);
+    expect(targets(engine.master)).toEqual([stage.node]);
+    expect(targets(stage.node)).toEqual([context.destination]);
+    expect(context.nodes.some((node) => node.kind === 'compressor')).toBe(false);
+    expect(stage.settings).toEqual({ mode: 'limiter', ceilingDb: -1, lookahead: false });
+  });
+
+  it('is disconnected and stopped on dispose', async () => {
+    const context = new FakeContext();
+    const engine = new FmEngine(context.asAudioContext());
+    await engine.init();
+    const node = engine.outputStage!.node as unknown as FakeNode & { posted: unknown[] };
+    engine.dispose();
+    expect(engine.outputStage).toBeNull();
+    expect(targets(engine.master)).toEqual([]);
+    expect(targets(node)).toEqual([]);
+    expect(node.posted).toContainEqual({ type: 'stop' });
   });
 });
 

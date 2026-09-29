@@ -1,8 +1,9 @@
 /**
  * `renderStems` (windsor#41) over the headless graph: the acceptance
- * criteria. The stems summed are the master with its inserts and limiter
- * bypassed (the fake limiter is a pass-through, and the song here has no
- * master insert), within a stated tolerance; every stem has the master's
+ * criteria. The stems summed are the master with its inserts and output
+ * stage bypassed (the song here has no master insert, and is quiet enough
+ * that the stage, the real one since windsor#93, passes it at unity), within
+ * a stated tolerance; every stem has the master's
  * length and start; a render split into passes lines up exactly with one
  * that is not.
  *

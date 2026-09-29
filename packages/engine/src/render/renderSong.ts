@@ -17,7 +17,10 @@
  *
  * The scheduler places tick 0 `SCHEDULER_START_DELAY_SECONDS` after the start
  * of the context; that lead-in is rendered and trimmed, so bar 1 is the file's
- * first sample and every note lands on the frame it lands on live.
+ * first sample and every note lands on the frame it lands on live. The master
+ * goes through the engine's output stage as set (windsor#93), and whatever
+ * that stage delays it by is rendered on the end and trimmed off the head
+ * too, so a master WAV starts on bar 1 in every mode.
  *
  * Every FM processor is built with a fixed seed (the render seed hashed with
  * the part's slot, decision 7), and the sequencers draw from the document's
@@ -29,6 +32,8 @@ import { playableSwing } from '../sequencing/swing';
 import { STRAIGHT_SWING } from '../sequencing/swingTables';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import type { WorkletUrls } from '../synth/fmEngine';
+import { masterOutput } from '../mixer/masterSpec';
+import { outputStageLatency } from '../mixer/outputStageDsp';
 import type { RenderPlan } from './renderPlan';
 import { planRender } from './renderPlan';
 import {
@@ -104,6 +109,7 @@ export function planFor(
     leadSeconds: SCHEDULER_START_DELAY_SECONDS,
     songSeconds: songSeconds(document),
     tailSeconds: tail,
+    latencyFrames: outputStageLatency(masterOutput(document.master), sampleRate),
   });
 }
 
@@ -147,8 +153,8 @@ export async function renderSong(
   );
   return {
     channels: Array.from({ length: RENDER_CHANNELS }, (_, c) =>
-      // A view past the lead-in, not a copy: the song is held once.
-      buffer.getChannelData(c).subarray(plan.leadFrames),
+      // A view past the lead-in and the stage's latency, not a copy: the song is held once.
+      buffer.getChannelData(c).subarray(plan.masterStart, plan.masterStart + plan.outputFrames),
     ),
     sampleRate,
     songSeconds: plan.songFrames / sampleRate,

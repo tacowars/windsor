@@ -12,7 +12,7 @@
  *                                                          song master inserts/level → musicBus.output (the Music fader)
  *                                                                                          │
  *   aux part.output ─▶ [stages…] ─▶ tail ─── [rotate θ] ─▶ auxLevel ─▶ master ◀────────────┘
- *                                                                      └─▶ limiter ─▶ out
+ *                                                                      └─▶ output stage ─▶ out
  *
  * Each strip's stages sit between the part and its tail, and the rotation and
  * the sends both tap the tail (#639). The first stage is always the strip's
@@ -23,7 +23,9 @@
  * two channel faders (#518 decision 1): the music one is the bus's existing output gain,
  * so the dry path gains no node, and the returns are summed into it so the
  * room follows the music down. The engine's master is not a fader and never
- * becomes one.
+ * becomes one. The output stage (windsor#93) is the engine's, after its
+ * master, so the aux path goes through it too; its mode, ceiling and
+ * lookahead are the song's `master.output`, set here in place.
  *
  * Music comes in as an `ArrangementDocument` (issue #75): the committed JSON,
  * normalised by `makeArrangement`. `initMusic` builds a part per entry in the
@@ -51,8 +53,7 @@ import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
 import { type AudioBus, MUSIC_BUS_OPTIONS } from '../mixer/audioBus';
 import type { AudioPart } from '../synth/audioPart';
 import type { ScheduledMessage } from '../synth/workletMessages';
-import type { PartStrip } from '../mixer/channelStrip';
-import type { RouteOptions } from '../mixer/channelStrip';
+import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
 import { routePart } from '../mixer/channelStrip';
 import { applyReturnsLive, applyStripLive } from '../mixer/deskApply';
 import { musicPartName } from '../song/documentParts';
@@ -107,6 +108,7 @@ export interface MusicReadout extends ArrangementReadout {
 }
 
 import { createMasterStrip } from '../mixer/masterStrip';
+import { applyMasterLive } from '../mixer/outputStageMaster';
 import type { MasterStrip } from '../mixer/masterStrip';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import { meteredInsertRegistry } from '../inserts/meteredInsertRegistry';
@@ -166,7 +168,7 @@ export class AudioSystem {
     };
   }
 
-  /** The song master, distinct from the engine-wide safety output and the channel faders. */
+  /** The song master, distinct from the engine-wide output stage and the channel faders. */
   get masterStrip(): MasterStrip | null {
     return this.masterStripValue;
   }
@@ -292,7 +294,7 @@ export class AudioSystem {
         part.strip,
       );
     }
-    if (master) this.masterStrip!.apply(master);
+    applyMasterLive(this.masterStrip!, this.engine.outputStage, master);
     this.sidechains.commit(routing);
     if (returns) applyReturnsLive(this.standing().returns, returns);
     // The roster the player reads and — for a live add or removal — grows and
@@ -408,7 +410,7 @@ export class AudioSystem {
     }
     this.insertTempo.setTempo(this.scheduler.bpm);
     const ignored = [...result.ignored];
-    if (master !== undefined) ignored.push(...this.masterStrip!.apply(master));
+    ignored.push(...applyMasterLive(this.masterStrip!, this.engine.outputStage, master));
     for (const [slot, strip] of strips) {
       const live = this.strips.get(musicPartName(Number(slot)));
       // An absent slot was already reported by the player's merge.

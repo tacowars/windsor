@@ -1,0 +1,15 @@
+{
+  "about": "sha256 of each output stage scenario rendered through mixer/outputStageGolden.test.ts: the interleaved Float32 output of the generated processor on its fixture signal. Written only by that test under WINDSOR_REFRESH_OUTPUT_STAGE_GOLDEN=1, and only when a render change is intended (windsor#93).",
+  "sampleRate": 48000,
+  "hashes": {
+    "limiter": "29712eb08ac6e562c99cbce28f825f8036b74d2988e23d545ed6488f63382010",
+    "limiter-lookahead": "24575370a6f1eb3b63ca4a76628a75cb318fba5863f7535cb71f4963d9119c62",
+    "soft": "f50f1d2cafe14794da82a80d1a3a43fccf8c9133dbb04522817ec6efc734bfa2",
+    "soft-lookahead": "f50f1d2cafe14794da82a80d1a3a43fccf8c9133dbb04522817ec6efc734bfa2",
+    "hard": "d884cd80e81ec04de11f0d0327cff58fbd49a03f0f02303741515e48027385ff",
+    "hard-lookahead": "d884cd80e81ec04de11f0d0327cff58fbd49a03f0f02303741515e48027385ff",
+    "off": "e8a98df7610c4d6d9443b879228b5a86693644b5564111a934daadcf9be7d9e2",
+    "off-lookahead": "e8a98df7610c4d6d9443b879228b5a86693644b5564111a934daadcf9be7d9e2",
+    "live-changes": "31824dabda3474141337bab32e6ae36c018ed95033f6f6cdc633d90b7e5fe7ab"
+  }
+}
