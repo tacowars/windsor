@@ -42,9 +42,13 @@ and its extension checklists, so neither states the other's content twice.
   - a knob's default is `makePatch()` at its path, the kind's
     `DEFAULT_*_CONFIG`, or the normaliser's constant — a `PatchKnobEntry` has
     no `def` field at all, and `knobDefaults.test.ts` walks every table (#618);
-  - a playhead's position is `ArrangementPlayer.stepAt` through
-    `AudioSystem.stepAt` → `host.stepAt`, read once in `stepStrip.ts`'s
-    `playheadAt` (#619); the audible tick itself is read once, in
+  - a card's playhead is the engine's `ArrangementPlayer.regionStepAt`
+    through `AudioSystem.regionStepAt` → `host.regionStepAt`, read once in
+    `regionPlayhead.ts`'s `regionPlayheadAt` (#619 decision 2, windsor#97,
+    windsor#101): the step sounding while the song is in the card's region,
+    a ghost on the step its pattern would be on while it is not, dark while
+    the transport is halted. Nothing in the console folds a tick into a
+    region or a step. The audible tick itself is read once, in
     `HostTransport.position()` (#708);
   - the envelope display draws the engine's `segmentLevel`, pinned
     sample-for-sample against the FM worklet (`worklet/fm/`) by
@@ -86,7 +90,8 @@ and its extension checklists, so neither states the other's content twice.
   which stays until dismissed. Nothing writes status text into the header. `el(tag, class,
   text)` sets `textContent`; `html()` is the explicit markup opt-in, and
   anything user-supplied goes through `escapeHtml`.
-- **One step strip and one playhead loop** (`stepStrip.ts`, #619), **one card
+- **One step strip and one playhead loop** (`stepStrip.ts`'s
+  `watchPlayhead`, #619; `regionPlayhead.ts` says where and lights it), **one card
   per sequencer kind through `SEQUENCER_CARDS`** (`sequencerCards.ts`) — a
   registry, the way Aotearoa204's ADR
   `2026-09-05-system-registries-folder-ownership-and-data-separate-from-logic`
@@ -150,11 +155,11 @@ knows the one below it and nothing above.
    `returnsPanel.ts`, `envCanvas.ts` / `envelopeKnobs.ts`,
    `harmonicEditor.ts`, `presetBrowser.ts`, `libraryActions.ts`,
    `metadataModal.ts`, `midiPanel.ts` — draw DOM and call the context. The
-   shared machinery they draw on is `stepStrip.ts`, `knob.ts`,
+   shared machinery they draw on is `stepStrip.ts`, `regionPlayhead.ts`, `knob.ts`,
    `patchPath.ts`, `seqFields.ts` and `dom.ts`.
 6. **The pure models** — `gridModel.ts`, `chordStepModel.ts`,
    `euclidModel.ts`, `arpModel.ts`, `bassModel.ts`, `regionModel.ts`,
-   `harmonyLaneModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
+   `playheadDrag.ts`, `harmonyLaneModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
    `patchMetadata.ts`, `libraryModel.ts`, `ratioSplit.ts`,
    `envelopeTransfer.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
    `loudnessCheck.ts`, `songAutosave.ts`, `songRestore.ts`,
@@ -190,6 +195,14 @@ detail pane at the bottom. Its layers, top down:
    over `ctx.transport.position()` that places the line, lights the playing
    chord block and runs the lanes' repaint check. The card in the pane keeps
    its own `watchPlayhead` for its cells; both are one frame request.
+   While the transport is stopped or paused with audio on, the line's
+   `bar.beat.sixteenth` label is a handle (`wirePlayheadDrag`, windsor#102):
+   a drag previews the line on the nearest bar line, bar 1 to the last bar,
+   and the release seeks there through `ctx.transport.seek` →
+   `AudioSystem.seekMusic`. A cancel, a lost capture or a blur puts the line
+   back. While it plays the label takes no press, so the ruler's zoom and
+   scroll work under it. The rules are the pure **`playheadDrag.ts`**
+   (`canDragPlayhead`, `snapBar`, `stepPlayheadDrag`).
 3. **`songHarmonyLane.ts`** — blocks from the engine's `eventBounds`, named
    by `harmonyLaneModel.ts` (`eventLabel` over `chordOf` / `chordName` /
    `romanNumeral`), a right-edge drag that resizes the event and shifts the
