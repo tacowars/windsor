@@ -509,7 +509,7 @@ I think we're down to a much smaller set now. None needs to block the overall ar
 
 3. **Gaps in Harmony.** I recommend **no gaps**. Extending/moving one event should always leave an active chord. The previous harmony event effectively holds until the next one. It avoids an awkward meaning for "no chord" in arp/bass generators. We can deliberately add `N.C.` maybe. but I need the ability to mute/silence a sequencer on a chord step because dub chords echo for a long time sometimes. a rest mechanism that can stop feeding notes to a specific sequencer is needed. 
 
-4. **Fixed Bass representation.** Pats note: ChatGPT recommended an actual MIDI note such as `C2`, not merely scale degree `0` saying "Fixed" should mean genuinely fixed. If we later transpose the whole song, we can decide whether a separate transpose operation moves pedal notes too. But I'm not sure I understood the motive for this and it seems to complicate matters. if fixed bass is difficult we can save it for later.
+4. **Fixed Bass representation.** tacowars's note: ChatGPT recommended an actual MIDI note such as `C2`, not merely scale degree `0` saying "Fixed" should mean genuinely fixed. If we later transpose the whole song, we can decide whether a separate transpose operation moves pedal notes too. But I'm not sure I understood the motive for this and it seems to complicate matters. if fixed bass is difficult we can save it for later.
 
 5. **Arp voicing semantics.** I recommend using the same underlying voicing vocabulary as the Chord Player where sensible, but letting the arp additionally specify octave span. That keeps "Close / Spread / Drop..." consistent across instruments without coupling the two performers.
 
