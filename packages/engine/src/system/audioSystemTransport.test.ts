@@ -12,6 +12,7 @@ import { FakeContext, installFakeAudioWorklet, sourceOf } from '../__fixtures__/
 import { FULL_DOCUMENT, FULL_PART_IDS, FULL_SLOT } from '../__fixtures__/fullArrangement';
 import { AudioSystem } from './audioSystem';
 import { musicPartName } from '../song/documentParts';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { FmEngine } from '../synth/fmEngine';
 
 const restore = installFakeAudioWorklet();
@@ -113,6 +114,38 @@ describe('stopMusic (■)', () => {
     expect(system.scheduler.transport.currentTick).toBe(halted);
     system.stopMusic();
     expect(system.scheduler.transport.currentTick).toBe(0);
+  });
+
+  it('seekMusic (windsor#102) moves a halted transport, and ▶ plays the parts from there', async () => {
+    const { context, system, posted } = await musicRig();
+    const bar = 2 * TICKS_PER_BAR;
+    const issued: number[] = [];
+    system.scheduler.subscribe(1, (e) => issued.push(e.tick));
+    expect(system.seekMusic(bar)).toBe(true);
+    expect(system.scheduler.audibleTick(context.currentTime)).toBe(bar);
+    const marks = FULL_PART_IDS.map((id) => posted(id).length);
+    system.startMusic();
+    context.currentTime = 2;
+    system.update(0);
+    expect(issued[0]).toBe(bar);
+    expect(FULL_PART_IDS.some((id, i) => notesFrom(posted(id), marks[i] ?? 0).length > 0)).toBe(
+      true,
+    );
+
+    // Playing: refused, and the transport runs on where it was.
+    const running = system.scheduler.transport.currentTick;
+    expect(system.seekMusic(0)).toBe(false);
+    expect(system.scheduler.transport.currentTick).toBe(running);
+    expect(system.musicRunning).toBe(true);
+
+    // Paused: moved, and the resume starts from the new tick.
+    system.setMuted(true);
+    issued.length = 0;
+    expect(system.seekMusic(TICKS_PER_BAR)).toBe(true);
+    system.setMuted(false);
+    context.currentTime += 1;
+    system.update(0);
+    expect(issued[0]).toBe(TICKS_PER_BAR);
   });
 
   it("the strip's live partials reach the engine without a rebuild (#708)", async () => {

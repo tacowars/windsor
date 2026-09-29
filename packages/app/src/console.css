@@ -1047,6 +1047,32 @@ body.chord-dragging {
   color: var(--carrier);
   white-space: nowrap;
 }
+/* The playhead drag (windsor#102): while the transport is stopped or paused
+   (`.seekable`, set per frame) the label is the line's handle. Its box
+   reaches back over the line and down the ruler's height, so the press lands
+   on the line's top, not only the digits, and the text stays where it was.
+   Hovering it brightens the whole line; a drag keeps it bright with the
+   grabbing cursor, which the pointer capture carries off the handle. While
+   the transport plays the label takes no press and the ruler under it zooms
+   as before. */
+.ph-line.seekable i {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  left: -6px;
+  padding: 0 4px 12px 10px;
+}
+.ph-line.seekable:hover,
+.ph-line.dragging {
+  filter: brightness(1.35);
+  box-shadow:
+    0 0 4px var(--carrier),
+    0 0 12px var(--carrier);
+}
+.ph-line.dragging i {
+  cursor: grabbing;
+}
 .detail-pane {
   position: sticky;
   bottom: 0;

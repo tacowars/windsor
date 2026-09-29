@@ -1,10 +1,10 @@
 /**
  * How the song plays: the arrangement player `AudioSystem.initMusic` built,
- * bound to the transport, and the rules for starting, stopping and muting it
- * (#708, epic #703 decision 8), plus where it is — the position queries the
- * console's playheads read (#619 decision 2, windsor#97). Before a player is
- * loaded, `start` does nothing and the queries answer "nothing"; stop and
- * mute still act on the transport.
+ * bound to the transport, and the rules for starting, stopping, muting
+ * (#708, epic #703 decision 8) and seeking it (windsor#102), plus where it is
+ * — the position queries the console's playheads read (#619 decision 2,
+ * windsor#97). Before a player is loaded, `start` and `seek` do nothing and
+ * the queries answer "nothing"; stop and mute still act on the transport.
  */
 import type { ArrangementPlayer, ArrangementReadout, RegionStep } from '../song/arrangementPlayer';
 import type { Scheduler } from '../sequencing/scheduler';
@@ -76,6 +76,21 @@ export class MusicPlayback {
     this.playerValue?.releaseAll(this.context.currentTime);
     this.scheduler.reset();
     this.playerValue?.reset();
+  }
+
+  /**
+   * Move a stopped or paused transport to `tick` (windsor#102): the
+   * scheduler's `seek`, then release everything held and clear every part's
+   * region state, as ■ does, so the next `start` enters whatever region holds
+   * `tick` fresh. The mute flag is untouched, so ▶ after a pause resumes from
+   * here. Refused (false, nothing changed) while running, before a player is
+   * loaded, or for a tick the scheduler refuses.
+   */
+  seek(tick: number): boolean {
+    if (!this.playerValue || !this.scheduler.seek(tick)) return false;
+    this.playerValue.releaseAll(this.context.currentTime);
+    this.playerValue.reset();
+    return true;
   }
 
   /** The player's readout, or the transport's tempo and no key before one is loaded. */
