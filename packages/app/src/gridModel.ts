@@ -5,16 +5,25 @@
  * function returns a new list; the card writes it through `ctx.change`, where
  * arrays replace wholesale.
  */
-import type { Harmony, GridNoteStep, GridStep, GridStepKind } from '@windsor/engine';
+import type {
+  GridNoteStep,
+  GridSpec,
+  GridStep,
+  GridStepKind,
+  Harmony,
+  StepModLane,
+} from '@windsor/engine';
 import {
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
+  SEMITONES_PER_OCTAVE,
   foldDegree,
   gridNote,
   pitchClassName,
   scaleOffsets,
 } from '@windsor/engine';
 import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
+import type { StepSlide } from './stepModLaneModel';
 
 export { GRID_STEPS_MAX, GRID_STEP_OCTAVE_MAX };
 
@@ -71,13 +80,25 @@ export function stepsForLength(steps: readonly GridStep[], length: number): Grid
  * are. The card's Rotate knob applies the difference since its last value, so
  * the document holds the rotated list and no offset.
  */
-export function rotateSteps(steps: readonly GridStep[], by: number, length: number): GridStep[] {
+export function rotateSteps<T>(steps: readonly T[], by: number, length: number): T[] {
   const n = Math.max(1, Math.min(Math.trunc(length), steps.length));
   const shift = ((Math.trunc(by) % n) + n) % n;
   if (shift === 0) return [...steps];
   const loop = steps.slice(0, n);
   const rotated = loop.map((_, i) => loop[(i - shift + n) % n] ?? loop[0]!);
   return [...rotated, ...steps.slice(n)];
+}
+
+/**
+ * The modulation lanes turned with the steps (windsor#31): a lane value
+ * belongs to its step, like a parameter lock, so Rotate carries it along.
+ */
+export function rotateLanes(
+  lanes: readonly StepModLane[],
+  by: number,
+  length: number,
+): StepModLane[] {
+  return lanes.map((lane) => ({ ...lane, values: rotateSteps(lane.values, by, length) }));
 }
 
 /** A uniform draw in [0, 1); the card passes `Math.random`, a test passes its own. */
@@ -139,4 +160,47 @@ export function stepLabel(step: GridStep, key: Key): string {
   const name = pitchClassName(key.root, offsets[view.degree] ?? 0);
   const octave = step.octave + view.carry;
   return octave === 0 ? name : `${name}${octave > 0 ? '+' : ''}${octave}`;
+}
+
+/** A note step's pitch relative to the part's register root: equal exactly when the engine's MIDI notes are. */
+function relativePitch(step: GridNoteStep, key: Key): number {
+  const offsets = scaleOffsets(key.scale);
+  const { degree, carry } = foldDegree(step.degree, offsets.length);
+  return (step.octave + carry) * SEMITONES_PER_OCTAVE + (offsets[degree] ?? 0);
+}
+
+/**
+ * How a step's note-on meets the note before it (windsor#31, `StepSlide`),
+ * read the way `GridSequencer.noteStep` decides it. `kind` is what a Slide
+ * does once a note is held: `none` for a rest, a tie, a note without Slide
+ * or a Slide after a rest; `retarget` onto a different pitch; `same` onto
+ * the pitch already held. The held note is the latest note before the
+ * step, walking back over ties (a rest holds nothing).
+ *
+ * `when` says whether the run can change that. The engine holds nothing on
+ * a region's entry, so a Slide whose held note comes from wrapping round
+ * the loop (step 1 among them) plays its own values on entry and is held
+ * only once the loop wraps: `wrap`. Skip drops a note step as a rest, which
+ * releases the held note, so with Skip above 0 a Slide after a note may
+ * play too: `skip`. Otherwise the line decides it alone: `always`.
+ */
+export function slideAt(
+  spec: Pick<GridSpec, 'steps' | 'length' | 'skipChance'>,
+  index: number,
+  key: Key,
+): StepSlide {
+  const { steps } = spec;
+  const n = Math.max(1, Math.min(Math.trunc(spec.length), steps.length));
+  const step = steps[index];
+  const none: StepSlide = { kind: 'none', when: 'always' };
+  if (!step || step.kind !== 'note' || !step.slide || index >= n) return none;
+  for (let back = 1; back <= n; back++) {
+    const prev = steps[(((index - back) % n) + n) % n];
+    if (!prev || prev.kind === 'rest') return none;
+    if (prev.kind === 'tie') continue;
+    const kind = relativePitch(prev, key) === relativePitch(step, key) ? 'same' : 'retarget';
+    const when = back > index ? 'wrap' : spec.skipChance > 0 ? 'skip' : 'always';
+    return { kind, when };
+  }
+  return none;
 }
