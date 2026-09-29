@@ -62,12 +62,28 @@ describe('watchOutputStage', () => {
     expect(watch.lastActedMs).toBe(250);
   });
 
-  it('judges each report by the mode in force: Off latches above 0 dBFS', () => {
+  it('latches in Off on an output above 0 dBFS', () => {
     const stage = fakeStage({ ...DEFAULT_OUTPUT_STAGE, mode: 'off' });
     const watch = watchOutputStage(stage, () => 0);
     stage.post({ outputLeft: 0.99 });
     expect(watch.latched).toBe(false);
     stage.post({ outputLeft: 1.2 });
+    expect(watch.latched).toBe(true);
+  });
+
+  it('latches on a limiter report delivered after a switch to Off', () => {
+    const stage = fakeStage({ ...DEFAULT_OUTPUT_STAGE, mode: 'limiter' });
+    const watch = watchOutputStage(stage, () => 0);
+    stage.settings = { ...stage.settings, mode: 'off' };
+    stage.post({ inputLeft: 2, outputLeft: 0.89, reductionDb: 7, active: true });
+    expect(watch.latched).toBe(true);
+  });
+
+  it('latches on an Off report above 0 dBFS delivered after a switch to Limiter', () => {
+    const stage = fakeStage({ ...DEFAULT_OUTPUT_STAGE, mode: 'off' });
+    const watch = watchOutputStage(stage, () => 0);
+    stage.settings = { ...stage.settings, mode: 'limiter' };
+    stage.post({ inputLeft: 1.3, outputLeft: 1.3 });
     expect(watch.latched).toBe(true);
   });
 });

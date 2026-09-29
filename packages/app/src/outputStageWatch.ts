@@ -11,8 +11,12 @@
 import type { OutputStage } from '@windsor/engine';
 import { reportActed } from './outputStageModel';
 
-/** The slice of a stage the watch reads; a test fakes this much. */
-export type WatchedStage = Pick<OutputStage, 'settings' | 'subscribe'>;
+/**
+ * The slice of a stage the watch reads; a test fakes this much. Not its
+ * settings: a report is judged by itself, since it may arrive after a mode
+ * switch (`reportActed`).
+ */
+export type WatchedStage = Pick<OutputStage, 'subscribe'>;
 
 export interface OutputStageWatch {
   /** Set when the stage acts; cleared only by `resetLatch` (Reset peaks). */
@@ -34,7 +38,7 @@ export function watchOutputStage(
   let latched = false;
   let lastActedMs: number | null = null;
   stage.subscribe((report) => {
-    if (!reportActed(report, stage.settings.mode)) return;
+    if (!reportActed(report)) return;
     latched = true;
     lastActedMs = now();
   });

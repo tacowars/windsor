@@ -113,7 +113,7 @@ describe('the meter scale', () => {
     expect(view.peaks[0]).toBe(view.peaks[2]);
     expect(view.peaks[1]).toBe(view.peaks[3]);
     expect(view.gaugeDb).toBe(0);
-    expect(reportActed(quiet, 'limiter')).toBe(false);
+    expect(reportActed(quiet)).toBe(false);
   });
 
   it('draws idle as the floor and an empty gauge', () => {
@@ -136,15 +136,13 @@ describe('the meter scale', () => {
 
 describe('the clip light', () => {
   it('latches when the stage changed a sample', () => {
-    expect(reportActed(report({ active: true }), 'limiter')).toBe(true);
-    expect(reportActed(report({ active: true }), 'hard')).toBe(true);
-    expect(reportActed(report({ inputLeft: 0.9, outputLeft: 0.9 }), 'soft')).toBe(false);
+    expect(reportActed(report({ active: true }))).toBe(true);
+    expect(reportActed(report({ inputLeft: 0.9, outputLeft: 0.9 }))).toBe(false);
   });
 
-  it('latches in Off on a sample above 0 dBFS', () => {
-    expect(reportActed(report({ outputRight: 1.01 }), 'off')).toBe(true);
-    expect(reportActed(report({ outputLeft: 1 }), 'off')).toBe(false);
-    expect(reportActed(report({ outputLeft: 0.5, active: true }), 'off')).toBe(false);
+  it('latches on an output sample above 0 dBFS, which only Off lets through', () => {
+    expect(reportActed(report({ outputRight: 1.01 }))).toBe(true);
+    expect(reportActed(report({ outputLeft: 1 }))).toBe(false);
   });
 });
 

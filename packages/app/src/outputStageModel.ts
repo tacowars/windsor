@@ -56,9 +56,16 @@ export function gaugeDb(db: number, max = OUTPUT_GAUGE_MAX_DB): number {
 /**
  * Whether the stage acted in a report's interval: it changed a sample, or, in
  * Off mode where it never does, a sample went above 0 dBFS (decision 3).
+ *
+ * Judged from the report alone, never from the mode in force now: a report
+ * reaches the console after a mode switch the stage applied at once, so the
+ * current mode need not be the one that made it. `active` was computed on
+ * the audio thread by the modes that ran in the interval, and every mode but
+ * Off holds the output at a ceiling of 0 dBFS or below, so an output peak
+ * above 0 dBFS can only come from Off.
  */
-export function reportActed(report: Readonly<OutputStageReport>, mode: OutputStageMode): boolean {
-  if (mode !== 'off') return report.active;
+export function reportActed(report: Readonly<OutputStageReport>): boolean {
+  if (report.active) return true;
   return Math.max(report.outputLeft, report.outputRight) > OUTPUT_OFF_CLIP_LEVEL;
 }
 
