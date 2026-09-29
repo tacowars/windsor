@@ -426,6 +426,10 @@ export { DEFAULT_PHASER } from './inserts/phaserSpec';
 export type { PhaserSpec } from './inserts/phaserSpec';
 export { PHASER_BOUNDS } from './inserts/phaserConstants';
 export { PHASER_PRESETS, applyPhaserPreset, matchingPhaserPreset } from './inserts/phaserPresets';
+export { DEFAULT_TAPE } from './inserts/tapeSpec';
+export type { TapeSpec } from './inserts/tapeSpec';
+export { TAPE_BOUNDS, TAPE_TYPES, TAPE_LABELS } from './inserts/tapeConstants';
+export { randomiseTape } from './inserts/tapeRandomise';
 
 export { DEFAULT_DELAY } from './inserts/delaySpec';
 export type { DelaySpec } from './inserts/delaySpec';
