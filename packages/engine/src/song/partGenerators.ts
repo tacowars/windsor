@@ -17,7 +17,6 @@ import type {
   ChordDriver,
   EuclideanDriver,
   GridDriver,
-  MusicPart,
   SequencerSpec,
 } from './arrangement';
 import { driverOf } from './arrangement';
@@ -47,17 +46,23 @@ const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
  * A Chord Player subscribes at every tick and draws nothing, so only its
  * kind rebuilds it. Every other field reconfigures the live generator, so
  * an edit never cuts the held note or restarts the stream; `regions` and the
- * harmony are the gate's and rebuild nothing.
+ * harmony are the gate's and rebuild nothing. Since windsor#74 the rule
+ * holds per region: each region's pattern has its own generator, and the
+ * sig of that pattern (with the part's seed) says whether an edit to it
+ * rebuilds that generator or reconfigures it (`partBinding.ts`).
  */
 export function generatorSig(spec: SequencerSpec): string {
   if (spec.kind === 'none' || spec.kind === 'chord') return sig([spec.kind]);
   return sig([spec.kind, spec.divisor, spec.seed]);
 }
 
-/** The part's generator, or null for a `none` part. */
-export function buildGenerator(part: MusicPart, sampler: ScaleSampler): Generator | null {
-  const driver: unknown = driverOf(part.sequencer);
-  switch (part.sequencer.kind) {
+/**
+ * The generator a spec builds — a part's `sequencer`, or one region's
+ * pattern (`regionPattern`, windsor#74) — or null for `none`.
+ */
+export function buildGenerator(spec: SequencerSpec, sampler: ScaleSampler): Generator | null {
+  const driver: unknown = driverOf(spec);
+  switch (spec.kind) {
     case 'euclidean':
       return new EuclideanSequencer(driver as EuclideanDriver);
     case 'grid':

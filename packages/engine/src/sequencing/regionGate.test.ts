@@ -115,6 +115,85 @@ describe('RegionGate', () => {
     expect(gate.stateAt(SONG + 5)).toEqual({ live: true, index: 0, entryTick: SONG, localTick: 5 });
   });
 
+  it('routes each tick to the subscriptions that accept its region, after the hooks (windsor#74)', () => {
+    const transport = new TickTransport(120);
+    const order: string[] = [];
+    const gate = new RegionGate(
+      transport,
+      {
+        regions: [
+          { start: 0, duration: 2 * BAR },
+          { start: 2 * BAR, duration: 2 * BAR },
+        ],
+        songTicks: SONG,
+        harmony: HARMONY,
+      },
+      {
+        onEnter: (index) => order.push(`enter ${index}`),
+        onLeave: (tick) => order.push(`leave @${tick}`),
+      },
+    );
+    const first: PartTickEvent[] = [];
+    const second: PartTickEvent[] = [];
+    gate.subscribe(
+      12,
+      (e) => {
+        first.push(e);
+        order.push(`first ${e.tick}`);
+      },
+      (index) => index === 0,
+    );
+    gate.subscribe(
+      6,
+      (e) => {
+        second.push(e);
+        order.push(`second ${e.tick}`);
+      },
+      (index) => index === 1,
+    );
+    for (let i = 0; i <= SONG; i++) transport.advance(transport.transportSeconds);
+    expect(first.every((e) => e.regionIndex === 0)).toBe(true);
+    expect(first).toHaveLength((2 * BAR) / 12 + 1);
+    expect(second.every((e) => e.regionIndex === 1)).toBe(true);
+    expect(second).toHaveLength((2 * BAR) / 6);
+    expect(second[1]).toMatchObject({ tick: 6, step: 1 });
+    // The boundary: the hooks once, then only the entered region's subscriber.
+    const boundary = order.indexOf('leave @192');
+    expect(order.slice(boundary, boundary + 3)).toEqual(['leave @192', 'enter 1', 'second 0']);
+    expect(order.filter((o) => o.startsWith('enter'))).toEqual(['enter 0', 'enter 1', 'enter 0']);
+  });
+
+  it('holds one transport subscription however many it serves, and drops it with the last', () => {
+    let subscriptions = 0;
+    const transport = new TickTransport(120);
+    const counted = {
+      subscribe: (divisor: number, handler: Parameters<TickTransport['subscribe']>[1]) => {
+        subscriptions++;
+        const unsubscribe = transport.subscribe(divisor, handler);
+        return () => {
+          subscriptions--;
+          unsubscribe();
+        };
+      },
+    };
+    const gate = new RegionGate(counted, {
+      regions: [{ start: 0, duration: SONG }],
+      songTicks: SONG,
+      harmony: HARMONY,
+    });
+    const a = gate.subscribe(1, () => {});
+    const b = gate.subscribe(
+      6,
+      () => {},
+      () => true,
+    );
+    expect(subscriptions).toBe(1);
+    a();
+    expect(subscriptions).toBe(1);
+    b();
+    expect(subscriptions).toBe(0);
+  });
+
   it('refuses a divisor that is not a positive integer', () => {
     const gate = new RegionGate(new TickTransport(120), {
       regions: [],
