@@ -42,6 +42,22 @@ bundled to `generated/peak-meter-processor.js` and checked by its own
 `mixer/peakMeterProcessor.test.ts` runs the generated processor and
 `mixer/peakMeter.test.ts` checks its main-thread lifetime.
 
+`outputStage/outputStageProcessor.ts` is the output stage's worklet adapter
+(windsor#93), bundled to `generated/output-stage-processor.js`: the last node
+before the destination, which the engine builds in `synth/fmEngine.ts`. It
+owns the k-rate parameters (mode, ceiling, lookahead), the port and the
+reused telemetry and load reports. The DSP is shared source in
+`mixer/outputStageDsp.ts` over `outputStageLimiter.ts` and
+`outputStageClipper.ts`: it also compiles in the main-thread project, but the
+processor calls `OutputStageDsp.process` on every render quantum, so it is
+audio-thread code and stays allocation-free. The node is in
+`mixer/outputStage.ts`. Unlike the
+other folders it has no `tsconfig.json` of its own: it compiles in the
+engine's project under its stricter flags, declares the worklet-scope names
+it reads, and `declare`s its class fields. `mixer/outputStageProcessor.test.ts`
+runs the generated bundle through `__fixtures__/outputStageHarness.ts`, and
+`mixer/outputStageGolden.test.ts` pins its render.
+
 `compressor/compressorProcessor.ts` wraps the typed, tested compressor DSP in
 `inserts/compressorDsp.ts`; it also bundles through the table below (#660).
 
@@ -97,7 +113,8 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`),
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`,
+   `outputStage/`, or the `mixer/outputStage*` modules its processor imports),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so
    does `scripts/lib/workletBundle.test.mjs`. Two consumers read the
