@@ -80,6 +80,27 @@ export type BassSpec = { readonly kind: 'bass' } & BassDriver;
 
 export type SequencerSpec = NoSequencer | EuclideanSpec | GridSpec | ChordSpec | ArpSpec | BassSpec;
 
+/** `Omit` applied to each member of a union, so the kind still discriminates. */
+type WithoutSeed<S> = S extends unknown ? Omit<S, 'seed'> : never;
+
+/**
+ * A region's own pattern (windsor#73, epic windsor#70; record
+ * `2026-09-29-each-region-plays-its-own-pattern`): the part's
+ * `SequencerSpec` without `seed` — the kind plus the kind's whole config,
+ * `note` and `hold` included for a Euclidean part. The seed stays on the
+ * part, and a region's stream stays `hashSeed(seed, regionIndex)`. Read it
+ * through `regionPattern` (`regionPattern.ts`), never directly.
+ */
+export type RegionPattern = WithoutSeed<SequencerSpec>;
+
+/**
+ * A region as a part holds it: the window (`Region`, all the clocks and the
+ * gate read) plus, optionally, the pattern it plays. A region without one
+ * plays `part.sequencer`, so a song written before region patterns plays
+ * exactly as it did.
+ */
+export type PartRegion = Region & { readonly pattern?: RegionPattern };
+
 /** One part as the player sees it; the document adds its strip (`DocumentPart`). */
 export interface MusicPart {
   /** 0–7, unique in the song: the part's identity. */
@@ -91,10 +112,11 @@ export interface MusicPart {
   readonly velocity: number;
   /**
    * Where in the song the part is live (#705, decisions 2 and 17): sorted,
-   * non-overlapping, in ticks; the one pattern cycles inside each; none is
+   * non-overlapping, in ticks; a region's pattern (its own, or the part's
+   * `sequencer` when it has none — windsor#73) cycles inside it; none is
    * silent; one whole-song region free-runs.
    */
-  readonly regions: readonly Region[];
+  readonly regions: readonly PartRegion[];
   readonly sequencer: SequencerSpec;
 }
 

@@ -42,13 +42,16 @@ export type {
   GridDriver,
   GridSpec,
   NoSequencer,
+  PartRegion,
   PartsPartial,
+  RegionPattern,
   SequencerKind,
   SequencerSpec,
   Swing,
   SwingGrid,
 } from './song/arrangement';
 export { ArrangementPlayer } from './song/arrangementPlayer';
+export { regionPattern } from './song/regionPattern';
 export {
   lookupPreset,
   partLabel,
