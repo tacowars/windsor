@@ -4,6 +4,12 @@
  * The context is the caller's or the engine's own; every part, bus and
  * return built on the engine shares its clock. The console hands in one
  * context and rebuilds engines on it (`packages/app/src/host.ts`).
+ *
+ * The last node before the destination is the output stage (windsor#93,
+ * `mixer/outputStage.ts`): Windsor's own limiter / soft clip / hard clip /
+ * off worklet, which replaced the browser's `DynamicsCompressorNode` with its
+ * 6 ms delay and makeup gain. It is a worklet, so it exists from `init()` on;
+ * before then the master reaches nothing.
  */
 import { PART_MAX_VOICES_DEFAULT, SLIDE_SECONDS_DEFAULT } from '../audioConstants';
 import type { AudioBus, BusOptions } from '../mixer/audioBus';
@@ -17,6 +23,8 @@ import {
   DELAY_WORKLET_URL,
 } from './workletMessages';
 import { AudioPart } from './audioPart';
+import type { OutputStage } from '../mixer/outputStage';
+import { OUTPUT_STAGE_WORKLET_URL, createOutputStage } from '../mixer/outputStage';
 import type { Patch } from '../patch/patch';
 import { makePatch } from '../patch/patch';
 import type { ProcessorOptions, ScheduledMessage } from './workletMessages';
@@ -62,6 +70,7 @@ export interface WorkletUrls {
   phaserUrl?: string | URL;
   advancedDriveUrl?: string | URL;
   delayUrl?: string | URL;
+  outputStageUrl?: string | URL;
 }
 
 export class FmEngine {
@@ -70,7 +79,7 @@ export class FmEngine {
   /** Everything routes through here, so one fader ducks the whole synth. */
   readonly master: GainNode;
 
-  private readonly limiter: DynamicsCompressorNode;
+  private stage: OutputStage | null = null;
   private readonly parts = new Map<string, AudioPart>();
   /** What every part created from now on is told (#629); the worklet's own default is off. */
   private liveRetune = false;
@@ -81,18 +90,6 @@ export class FmEngine {
 
     this.master = this.context.createGain();
     this.master.gain.value = 0.9;
-
-    // Catches the sum of many parts peaking together; individual presets are
-    // already level-matched so this should rarely engage.
-    this.limiter = this.context.createDynamicsCompressor();
-    this.limiter.threshold.value = -6;
-    this.limiter.knee.value = 0;
-    this.limiter.ratio.value = 20;
-    this.limiter.attack.value = 0.003;
-    this.limiter.release.value = 0.15;
-
-    this.master.connect(this.limiter);
-    this.limiter.connect(this.context.destination);
   }
 
   get isReady(): boolean {
@@ -110,7 +107,18 @@ export class FmEngine {
     await this.context.audioWorklet.addModule(urls.phaserUrl ?? PHASER_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.advancedDriveUrl ?? ADVANCED_DRIVE_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.delayUrl ?? DELAY_WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.outputStageUrl ?? OUTPUT_STAGE_WORKLET_URL);
+    // Catches the sum of many parts peaking together. It starts on the
+    // default settings; a song's own reach it through `AudioSystem`.
+    this.stage = createOutputStage(this.context);
+    this.master.connect(this.stage.node);
+    this.stage.node.connect(this.context.destination);
     this.moduleLoaded = true;
+  }
+
+  /** The safety output between the master and the destination; null until `init()`. */
+  get outputStage(): OutputStage | null {
+    return this.stage;
   }
 
   /** Browsers start contexts suspended; call from a click or key handler. */
@@ -190,7 +198,8 @@ export class FmEngine {
     for (const part of this.parts.values()) part.dispose();
     this.parts.clear();
     this.master.disconnect();
-    this.limiter.disconnect();
+    this.stage?.dispose();
+    this.stage = null;
   }
 }
 

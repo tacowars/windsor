@@ -1,8 +1,8 @@
 /**
  * The `meterLoad` option (windsor#51 decision 6): the live system turns the
- * load sampler on in every part, return and worklet insert (#445); the
- * offline render's system turns it on nowhere, so no processor samples its
- * own timing during an export.
+ * load sampler on in every part, return and worklet insert, and in the output
+ * stage (#445, windsor#93); the offline render's system turns it on nowhere,
+ * so no processor samples its own timing during an export.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,10 +10,13 @@ import {
   FakeContext,
   FakeWorkletNode,
   installFakeAudioWorklet,
+  renderGraph,
 } from '../__fixtures__/fakeAudioContext';
+import { AUDIO_LOAD_REPORT_SECONDS } from '../audioConstants';
 import { FakeNode, FakeParam } from '../__fixtures__/fakeAudioNodes';
 import { compressorParams } from '../__fixtures__/compressorHarness';
 import { COMPRESSOR_NAME } from '../inserts/compressorConstants';
+import { OUTPUT_STAGE_NAME } from '../mixer/outputStageConstants';
 import { DEFAULT_COMPRESSOR } from '../inserts/compressorSpec';
 import { PRESETS } from '../patch/presets';
 import { FmEngine } from '../synth/fmEngine';
@@ -53,7 +56,7 @@ afterEach(() => {
 /** A system with one part carrying a compressor, and how many of its nodes were asked to report load. */
 async function meteredRig(
   options: AudioSystemOptions,
-): Promise<{ system: AudioSystem; reporting: number }> {
+): Promise<{ system: AudioSystem; reporting: number; context: FakeContext }> {
   restore = installFakeAudioWorklet();
   vi.stubGlobal(
     'AudioWorkletNode',
@@ -76,7 +79,7 @@ async function meteredRig(
       (message) => (message as { type?: string }).type === 'reportLoad',
     ),
   ).length;
-  return { system, reporting };
+  return { system, reporting, context };
 }
 
 describe('load metering', () => {
@@ -85,6 +88,19 @@ describe('load metering', () => {
     // The part, the plate return and the compressor, at least.
     expect(system.meteredProcessors).toBeGreaterThanOrEqual(3);
     expect(reporting).toBe(system.meteredProcessors);
+  });
+
+  it('counts the always-running output stage in the load sum', async () => {
+    const { system, context } = await meteredRig({});
+    const stage = context.nodes.find(
+      (node) => (node as Partial<FakeWorkletNode>).name === OUTPUT_STAGE_NAME,
+    ) as FakeWorkletNode;
+    expect(stage.posted).toContainEqual({ type: 'reportLoad', quanta: expect.any(Number) });
+    // Only the stage's processor runs its sampler in the headless graph, so a
+    // readout with one processor in it is the stage's.
+    expect(system.readout().load.processors).toBe(0);
+    renderGraph(context, AUDIO_LOAD_REPORT_SECONDS * 2);
+    expect(system.readout().load.processors).toBe(1);
   });
 
   it('attaches no load meter anywhere with meterLoad: false', async () => {

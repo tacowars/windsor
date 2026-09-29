@@ -393,10 +393,26 @@ export {
   COMPRESSOR_DSP,
 } from './inserts/compressorConstants';
 
-export { DEFAULT_MASTER, normaliseMaster } from './mixer/masterSpec';
+export { DEFAULT_MASTER, masterOutput, normaliseMaster } from './mixer/masterSpec';
 export type { MasterSpec } from './mixer/masterSpec';
 export { PEAK_METER } from './mixer/peakMeterConstants';
 export type { PeakMeter } from './mixer/peakMeter';
+
+// The engine's output stage (windsor#93): `FmEngine.outputStage` is the live
+// one; the song's settings are `master.output`.
+export type { OutputStage } from './mixer/outputStage';
+export {
+  OUTPUT_CEILING_DB,
+  OUTPUT_LIMITER,
+  OUTPUT_SOFT_CLIP,
+  OUTPUT_STAGE_DEFAULTS,
+  OUTPUT_STAGE_MODES,
+  OUTPUT_STAGE_REPORT_HZ,
+} from './mixer/outputStageConstants';
+export type { OutputStageMode, OutputStageReport } from './mixer/outputStageConstants';
+export { outputStageLatency } from './mixer/outputStageDsp';
+export { DEFAULT_OUTPUT_STAGE, normaliseOutputStage } from './mixer/outputStageSpec';
+export type { OutputStageSettings } from './mixer/outputStageSpec';
 
 export { canSidechain } from './mixer/sidechainGraph';
 export type { SidechainSource } from './inserts/sidechainSource';

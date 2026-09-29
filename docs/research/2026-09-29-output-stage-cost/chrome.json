@@ -1,0 +1,212 @@
+{
+  "machine": "Apple M1 (8 cores), macOS 26.5.1",
+  "browser": "HeadlessChrome/154.0.0.0 (chrome-devtools-mcp 1.10.1, --headless)",
+  "backend": "OfflineAudioContext, 48 kHz stereo, 128-frame quanta; worklet served by the Vite dev server",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "hardwareConcurrency": 8,
+  "sampleRate": 48000,
+  "seconds": 30,
+  "runs": 7,
+  "results": {
+    "quiet (-12 dBFS)": {
+      "direct": {
+        "medianMs": 8.9,
+        "msPerAudioSecondOverDirect": 0,
+        "runsMs": [
+          9.3,
+          8.1,
+          8.9,
+          8,
+          8.2,
+          9,
+          9.2
+        ],
+        "outputPeak": 0.2487
+      },
+      "compressor": {
+        "medianMs": 61.9,
+        "msPerAudioSecondOverDirect": 1.767,
+        "runsMs": [
+          62.1,
+          62.1,
+          61.3,
+          61.9,
+          61.3,
+          61.9,
+          61.1
+        ],
+        "outputPeak": 0.3687
+      },
+      "off": {
+        "medianMs": 43.9,
+        "msPerAudioSecondOverDirect": 1.167,
+        "runsMs": [
+          45.2,
+          44.4,
+          43.9,
+          44.5,
+          43.7,
+          43.3,
+          43.6
+        ],
+        "outputPeak": 0.2487
+      },
+      "limiter": {
+        "medianMs": 52.5,
+        "msPerAudioSecondOverDirect": 1.453,
+        "runsMs": [
+          49.8,
+          52.8,
+          52.4,
+          53.3,
+          52.5,
+          52.3,
+          52.6
+        ],
+        "outputPeak": 0.2487
+      },
+      "limiter+lookahead": {
+        "medianMs": 67.4,
+        "msPerAudioSecondOverDirect": 1.95,
+        "runsMs": [
+          64.7,
+          67.4,
+          67.1,
+          66.9,
+          67.6,
+          67.6,
+          68
+        ],
+        "outputPeak": 0.2487
+      },
+      "soft": {
+        "medianMs": 100.7,
+        "msPerAudioSecondOverDirect": 3.06,
+        "runsMs": [
+          98.5,
+          101.2,
+          100.6,
+          101.2,
+          100.6,
+          100.7,
+          101.4
+        ],
+        "outputPeak": 0.2487
+      },
+      "hard": {
+        "medianMs": 99.5,
+        "msPerAudioSecondOverDirect": 3.02,
+        "runsMs": [
+          99.2,
+          99.8,
+          99.8,
+          99.5,
+          99.5,
+          99.5,
+          101
+        ],
+        "outputPeak": 0.2487
+      }
+    },
+    "hot (+6 dBFS)": {
+      "direct": {
+        "medianMs": 8.7,
+        "msPerAudioSecondOverDirect": 0,
+        "runsMs": [
+          8.7,
+          9.5,
+          8.2,
+          8.2,
+          9.7,
+          8.7,
+          8.3
+        ],
+        "outputPeak": 1.9895
+      },
+      "compressor": {
+        "medianMs": 70.6,
+        "msPerAudioSecondOverDirect": 2.063,
+        "runsMs": [
+          70.7,
+          71.8,
+          68.4,
+          68.4,
+          68.1,
+          70.6,
+          70.9
+        ],
+        "outputPeak": 0.8947
+      },
+      "off": {
+        "medianMs": 44.1,
+        "msPerAudioSecondOverDirect": 1.18,
+        "runsMs": [
+          45.5,
+          45.3,
+          44.1,
+          43.9,
+          43.9,
+          44.4,
+          44
+        ],
+        "outputPeak": 1.9895
+      },
+      "limiter": {
+        "medianMs": 54.5,
+        "msPerAudioSecondOverDirect": 1.527,
+        "runsMs": [
+          54.3,
+          55.5,
+          57,
+          55.3,
+          53.3,
+          54.5,
+          53.9
+        ],
+        "outputPeak": 0.8913
+      },
+      "limiter+lookahead": {
+        "medianMs": 74,
+        "msPerAudioSecondOverDirect": 2.177,
+        "runsMs": [
+          76.2,
+          73.9,
+          72.2,
+          74.2,
+          72.9,
+          74,
+          74.8
+        ],
+        "outputPeak": 0.8913
+      },
+      "soft": {
+        "medianMs": 140.8,
+        "msPerAudioSecondOverDirect": 4.403,
+        "runsMs": [
+          139.2,
+          138.8,
+          140.8,
+          139.2,
+          143.3,
+          141.3,
+          141.3
+        ],
+        "outputPeak": 0.7919
+      },
+      "hard": {
+        "medianMs": 126.1,
+        "msPerAudioSecondOverDirect": 3.913,
+        "runsMs": [
+          126.1,
+          125.3,
+          126.1,
+          126.1,
+          128.1,
+          125.5,
+          125.6
+        ],
+        "outputPeak": 0.8913
+      }
+    }
+  }
+}

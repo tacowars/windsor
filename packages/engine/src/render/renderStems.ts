@@ -11,7 +11,9 @@
  * from the same document, seeds and stops (windsor#40 decision 7).
  *
  * Every stem, like the master, starts at bar 1 on its first sample and runs
- * the song and its tail: the same frames of the same pass buffer.
+ * the song and its tail. The stems are read from the pass buffer past the
+ * lead-in; the master, which the output stage may delay (windsor#93), past
+ * the lead-in and that latency too, so the two line up at offset 0.
  *
  * Stems arrive one at a time through `onStem`, and each pass's buffer is let
  * go once its stems are handed on, so a render holds one pass at a time.
@@ -80,9 +82,11 @@ export async function renderStems(
       },
       { channels: passChannels(group.length), attach: (system) => attachStems(system, group) },
     );
-    const pair = (first: number): Float32Array[] =>
-      [first, first + 1].map((c) => buffer.getChannelData(c).subarray(plan.leadFrames));
-    const master = pair(0);
+    const pair = (first: number, start = plan.leadFrames): Float32Array[] =>
+      [first, first + 1].map((c) =>
+        buffer.getChannelData(c).subarray(start, start + plan.outputFrames),
+      );
+    const master = pair(0, plan.masterStart);
     if (index === 0) {
       // One pass needs no check; with more, every later master must match a
       // copy of this one frame by frame. The copy (two channels of the song)

@@ -2,8 +2,8 @@
  * The stem taps of one render pass (windsor#41): extra edges off the live
  * system's graph into the offline context's wider destination, added after
  * the system is built and before it plays. Nothing in the system changes;
- * the master still reaches channels 0–1 through the limiter, as in the song
- * render.
+ * the master still reaches channels 0–1 through the output stage
+ * (windsor#93), as in the song render.
  *
  *   strip rotation.output ─▶ highpass (the music bus's) ─┐
  *   return.output ───────────────────────────────────────┤ splitter ─▶ merger pair 2k, 2k+1
@@ -17,7 +17,8 @@
  * taken as it is. The one gain after the merger is the scalar gains the
  * master applies after its inserts — its level, the music fader, the engine's
  * output gain — so the stems summed are the master with its inserts and the
- * safety limiter bypassed, and nothing else.
+ * output stage bypassed, and nothing else. The stage may delay the master;
+ * `renderStems.ts` reads the master that much later, so they line up.
  *
  * A part routed "Sidechain only" has its dry path gated to silence; asked
  * for, its stem is taken before the gate (the strip's `head`) through a
@@ -62,7 +63,7 @@ export function attachStems(system: AudioSystem, stems: readonly StemSource[]): 
   };
 }
 
-/** The scalar gains between the master's inserts and its limiter, multiplied. */
+/** The scalar gains between the master's inserts and the output stage, multiplied. */
 export function masterScalarGain(system: AudioSystem): number {
   const level = system.masterStrip?.output.gain.value ?? 1;
   return level * system.musicGain * system.engine.master.gain.value;
