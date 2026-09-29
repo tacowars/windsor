@@ -1,11 +1,15 @@
-/** Independent L/R sample-peak bars; the shared frame loop owns the visible tap (#666). */
+/**
+ * Independent L/R sample-peak bars; the shared frame loop owns the visible tap
+ * (#666). They read before the output stage; Reset peaks also runs `onReset`,
+ * which clears the output stage's clip light (windsor#94).
+ */
 import { PEAK_METER } from '@windsor/engine';
 import type { PeakMeter } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { watchPlayhead } from './stepStrip';
 import { amplitudeDb } from './masterTables';
-export function masterMeter(ctx: AppCtx): HTMLElement {
+export function masterMeter(ctx: AppCtx, onReset?: () => void): HTMLElement {
   const root = el('div', 'master-meter');
   const channels = ['L', 'R'].map((name) => {
     const row = el('label', 'master-meter-channel', name);
@@ -27,7 +31,10 @@ export function masterMeter(ctx: AppCtx): HTMLElement {
     active?.setActive(false);
     active = undefined;
   };
-  overload.onclick = (): void => active?.reset();
+  overload.onclick = (): void => {
+    active?.reset();
+    onReset?.();
+  };
   watchPlayhead({
     attached: () => {
       if (root.isConnected) return true;

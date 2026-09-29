@@ -66,7 +66,7 @@ export function audioExportSection(ctx: AppCtx, songName: () => string): HTMLEle
       'stereo WAV. The tail keeps rendering after the last bar so ' +
       'releases and returns ring out; a tail of 0 gives a loop-ready file. Stems adds one ' +
       'WAV per part (after its fader, without its sends) and one per return, beside the ' +
-      "master, in one zip; they skip the master's inserts and limiter, so summed they are " +
+      "master, in one zip; they skip the master's inserts and output stage, so summed they are " +
       'the master before its dynamics.',
   );
   body.appendChild(formatControls());
