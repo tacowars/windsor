@@ -46,9 +46,12 @@ bundled to `generated/peak-meter-processor.js` and checked by its own
 (windsor#93), bundled to `generated/output-stage-processor.js`: the last node
 before the destination, which the engine builds in `synth/fmEngine.ts`. It
 owns the k-rate parameters (mode, ceiling, lookahead), the port and the
-reused telemetry and load reports. The DSP lives on the main-thread side, in
+reused telemetry and load reports. The DSP is shared source in
 `mixer/outputStageDsp.ts` over `outputStageLimiter.ts` and
-`outputStageClipper.ts`, with the node in `mixer/outputStage.ts`. Unlike the
+`outputStageClipper.ts`: it also compiles in the main-thread project, but the
+processor calls `OutputStageDsp.process` on every render quantum, so it is
+audio-thread code and stays allocation-free. The node is in
+`mixer/outputStage.ts`. Unlike the
 other folders it has no `tsconfig.json` of its own: it compiles in the
 engine's project under its stricter flags, declares the worklet-scope names
 it reads, and `declare`s its class fields. `mixer/outputStageProcessor.test.ts`
