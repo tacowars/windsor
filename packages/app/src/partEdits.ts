@@ -28,7 +28,7 @@ import { partAt, regionPattern, removePartChange, songTicksOf } from '@windsor/e
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { deepMerge } from './documentModel';
-import { addRegion, neighbourIndex } from './regionModel';
+import { addRegion, neighbourIndex, snapGrain, splitRegion } from './regionModel';
 import { addPart, freshSequencer, setSequencerKind } from './songParts';
 
 /** A raw document normalised without being adopted — `DocumentModel.preview`. */
@@ -139,6 +139,35 @@ export const patternCopy = (
  */
 export const splitFill = (part: Pick<MusicPart, 'sequencer'>): RegionPattern | undefined =>
   keepsRegionPatterns(part) ? withoutSeed(part.sequencer) : undefined;
+
+/**
+ * The snap grain of a gesture on region `index` of `part` — a split, an
+ * alt-click split, an edge or body drag: a bar, or with the modifier that
+ * region's own step (`regionPattern`'s divisor), never the part's sequencer,
+ * which a card edit no longer touches.
+ */
+export const regionGrain = (
+  part: Pick<MusicPart, 'regions' | 'sequencer'>,
+  index: number,
+  modifier: boolean,
+): number => snapGrain(regionPattern(part, index), modifier);
+
+/**
+ * Region `index` of `part` cut at `tick`, snapped to that region's own grain
+ * (`regionGrain`), both halves holding a copy of its pattern (decision 3);
+ * null when there is no such region or the cut lands on one of its edges.
+ */
+export function splitPartRegion(
+  part: Pick<MusicPart, 'regions' | 'sequencer'>,
+  index: number,
+  tick: number,
+  modifier: boolean,
+): PartRegion[] | null {
+  if (!part.regions[index]) return null;
+  const grain = regionGrain(part, index, modifier);
+  const next = splitRegion(part.regions, index, tick, grain, splitFill(part));
+  return next.length === part.regions.length ? null : next;
+}
 
 /**
  * The region a card on `part` edits (decision 2): the selected one, else the

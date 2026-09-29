@@ -25,9 +25,9 @@ import {
   editedRegion,
   keepsRegionPatterns,
   patternOf,
-  splitFill,
+  splitPartRegion,
 } from './partEdits';
-import { deleteRegion, snapTick, splitRegion } from './regionModel';
+import { deleteRegion } from './regionModel';
 import { SEQUENCER_CARDS } from './sequencerCards';
 import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
@@ -94,8 +94,9 @@ function partRow(view: SongView, part: MusicPart, region: number | null): HTMLEl
   split.disabled = !target || target.duration < 2 * TICKS_PER_BAR;
   split.onclick = (): void => {
     if (region === null || !target) return;
-    const at = snapTick(target.start + target.duration / 2, TICKS_PER_BAR);
-    write(splitRegion(part.regions, region, at, TICKS_PER_BAR, splitFill(part)), region + 1);
+    // At its middle bar: the modifier-free grain is a bar, whatever the region's own step.
+    const split = splitPartRegion(part, region, target.start + target.duration / 2, false);
+    if (split) write(split, region + 1);
   };
   row.appendChild(split);
   const remove = el('button', 'btn', 'Delete region') as HTMLButtonElement;

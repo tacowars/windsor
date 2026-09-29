@@ -17,9 +17,11 @@ import {
   drawRegionChange,
   editedRegion,
   patternOf,
+  regionGrain,
   regionPatternChange,
   sequencerKindChange,
   splitFill,
+  splitPartRegion,
 } from './partEdits';
 import { moveRegion, resizeRegionEnd, splitRegion } from './regionModel';
 import { newSong } from './songParts';
@@ -248,5 +250,55 @@ describe('a split, a draw, a move and a kind change', () => {
     const part = part0(model.doc);
     expect(part.sequencer.kind).toBe('arp');
     expect(part.regions).toEqual(TWO_REGIONS);
+  });
+});
+
+describe('a gesture snaps to the grain of the region it acts on (fix round 1)', () => {
+  /** Two chord regions: the first at the part's one-bar step, the second edited to eighths. */
+  function twoSteps(): DocumentModel {
+    const model = songWith('chord', TWO_REGIONS);
+    edit(model, 1, { divisor: DIVISORS.eighth, steps: [hit(0, 0)] });
+    return model;
+  }
+
+  it("reads each region's own divisor under the modifier, a bar without it", () => {
+    const part = part0(twoSteps().doc);
+    expect(part.sequencer).toMatchObject({ divisor: DIVISORS.bar });
+    expect(regionGrain(part, 0, true)).toBe(DIVISORS.bar);
+    expect(regionGrain(part, 1, true)).toBe(DIVISORS.eighth);
+    expect(regionGrain(part, 1, false)).toBe(BAR);
+  });
+
+  it("cuts a Shift+Alt split in the second region on its own eighth, not on the part's bar", () => {
+    const part = part0(twoSteps().doc);
+    const eighth = DIVISORS.eighth;
+    const at = 2 * BAR + 3 * eighth;
+    const split = splitPartRegion(part, 1, at + eighth / 4, true);
+    expect(split?.map(({ start, duration }) => [start, duration])).toEqual([
+      [0, 2 * BAR],
+      [2 * BAR, 3 * eighth],
+      [at, 4 * BAR - at],
+    ]);
+    // Both halves hold the second region's pattern, not the first's or the part's.
+    expect(split?.[1]?.pattern).toMatchObject({ divisor: eighth, steps: [hit(0, 0)] });
+    expect(split?.[2]?.pattern).toEqual(split?.[1]?.pattern);
+    // At the part's one-bar step the same press snaps onto the region's start and is refused.
+    expect(splitPartRegion(part, 1, at + eighth / 4, false)).toBeNull();
+  });
+
+  it("splits at the pane's Split button: the region's middle bar, both halves its own pattern", () => {
+    const part = part0(twoSteps().doc);
+    const target = part.regions[1];
+    if (!target) throw new Error('no second region');
+    const split = splitPartRegion(part, 1, target.start + target.duration / 2, false);
+    expect(split?.map(({ start, duration }) => [start, duration])).toEqual([
+      [0, 2 * BAR],
+      [2 * BAR, BAR],
+      [3 * BAR, BAR],
+    ]);
+    expect(split?.[1]?.pattern).toMatchObject({ divisor: DIVISORS.eighth });
+    expect(split?.[2]?.pattern).toMatchObject({ divisor: DIVISORS.eighth });
+    expect(split?.[0]?.pattern).toBeUndefined();
+    expect(splitPartRegion(part, 5, BAR, false)).toBeNull();
   });
 });

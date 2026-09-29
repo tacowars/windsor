@@ -18,9 +18,9 @@
 import type { MusicPart, PartRegion, Region } from '@windsor/engine';
 import { regionPattern } from '@windsor/engine';
 import { el } from './dom';
-import { drawRegionChange, splitFill } from './partEdits';
+import { drawRegionChange, regionGrain, splitPartRegion } from './partEdits';
 import type { RegionDrag } from './regionModel';
-import { dragRegion, regionMark, snapGrain, snapTick, splitRegion } from './regionModel';
+import { dragRegion, regionMark } from './regionModel';
 import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
 import {
@@ -145,26 +145,24 @@ function gestureAt(regions: readonly Region[], px: number, pxPerBar: number): Ge
 /**
  * Alt-click: the region whose drawn box is under `px` (windsor#21 — never a
  * raw tick lookup, which misses the widened part of a `MIN_BLOCK_PX` block)
- * cut at the snapped tick the press maps to inside its span, both halves
- * holding a copy of its pattern; null when there is no block there or the
- * cut lands on an edge.
+ * cut at the tick the press maps to inside its span, snapped to that
+ * region's own grain (`splitPartRegion`), both halves holding a copy of its
+ * pattern; null when there is no block there or the cut lands on an edge.
  */
 function splitAt(
   part: MusicPart,
   px: number,
   pxPerBar: number,
-  grain: number,
+  modifier: boolean,
 ): { regions: PartRegion[]; index: number } | null {
-  const { regions } = part;
-  const boxes = boxesOf(regions, pxPerBar);
+  const boxes = boxesOf(part.regions, pxPerBar);
   const found = hitBlocks(boxes, px);
-  const region = found ? regions[found.index] : undefined;
+  const region = found ? part.regions[found.index] : undefined;
   const box = found ? boxes[found.index] : undefined;
   if (!found || !region || !box) return null;
   const span = { startTick: region.start, durationTicks: region.duration };
-  const tick = snapTick(boxTick(box, px, span, pxPerBar), grain);
-  const next = splitRegion(regions, found.index, tick, grain, splitFill(part));
-  return next.length === regions.length ? null : { regions: next, index: found.index };
+  const next = splitPartRegion(part, found.index, boxTick(box, px, span, pxPerBar), modifier);
+  return next ? { regions: next, index: found.index } : null;
 }
 
 /** Redraw the lane's blocks from `regions` — the drag preview and the paint after a commit share it. */
@@ -188,9 +186,7 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   let draft: PartRegion[] | null = null;
   lane.addEventListener('pointerdown', (down) => {
     if (down.button !== 0 || !down.altKey) return;
-    const live = current();
-    const grain = snapGrain(live.sequencer, down.shiftKey);
-    const split = splitAt(live, pxAt(down), view.state.pxPerBar, grain);
+    const split = splitAt(current(), pxAt(down), view.state.pxPerBar, down.shiftKey);
     if (!split) return;
     down.stopPropagation();
     if (view.commit({ parts: { [part.slot]: { regions: split.regions } } })) {
@@ -207,8 +203,7 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
     move: (e) => {
       if (gesture.kind === 'add') return;
       const live = current();
-      // The modifier snaps to the dragged region's own step.
-      const grain = snapGrain(regionPattern(live, gesture.index), e.shiftKey);
+      const grain = regionGrain(live, gesture.index, e.shiftKey);
       const deltaTicks = tickAt(e) - gesture.pressTick;
       const drag = { kind: gesture.kind, index: gesture.index, deltaTicks };
       draft = dragRegion(live.regions, drag, view.songTicks(), grain);
