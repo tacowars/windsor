@@ -7,7 +7,7 @@
 
 A PR was reviewed from its diff and a local `npm run dev`. A UI change
 needs to be seen and played, and tacowars reviews from a desk and a phone.
-tacowars wanted a live URL on every PR, one click from the PR page.
+They wanted a live URL on every PR, one click from the PR page.
 
 The site was deployed with GitHub's Actions Pages flow
 (`upload-pages-artifact` then `deploy-pages`). That flow publishes one

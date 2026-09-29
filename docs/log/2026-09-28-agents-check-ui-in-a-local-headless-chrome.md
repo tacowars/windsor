@@ -52,8 +52,8 @@ not a dependency of the app, and nothing from it ships in `dist/`.
 ## Consequences
 
 - The first session after this merges asks to enable the project's MCP
-  server. `enableAllProjectMcpServers` is off in tacowars's user settings, so tacowars
-  approves it once, or lists it in `.claude/settings.local.json` under
+  server. `enableAllProjectMcpServers` is off in tacowars's user settings, so they
+  approve it once, or lists it in `.claude/settings.local.json` under
   `enabledMcpjsonServers` as HOOP and Aotearoa204 do.
 - The server needs Google Chrome installed on the machine running Claude
   Code.

@@ -9,9 +9,9 @@
 
 ## Decision
 
-tacowars replaced `arrangements/bed-01.json` with a new song of tacowars's own on
-2026-09-17 and, asked whether to restore the old file and ship it as
-bed-04, chose to keep it as bed-01 (tacowars, 2026-09-17). So:
+tacowars replaced `arrangements/bed-01.json` with a new song of their own on
+2026-09-17 and, asked whether to restore the old file and ship theirs as
+bed-04, chose to keep theirs as bed-01 (tacowars, 2026-09-17). So:
 
 - **`bed-01.json` is a song like any other in `arrangements/`**: the game's
   default (`DEFAULT_ARRANGEMENT_NAME`), edited in the console, and held to
@@ -36,7 +36,7 @@ fixture's four parts. The fixture keeps the codec proof; the song is free.
 ## Punted / alternatives
 
 - **Restore the old bed-01 and ship tacowars's song as bed-04.** The smaller
-  change; rejected by tacowars, who wants that song as the default.
+  change; rejected by tacowars, who wants their song as the default.
 - **A pre-push format check.** The commit also went to main unformatted
   (the first half of #613). The pre-push hook checks secrets and
   `.gitignore` only; adding `format:check` to it is worth a ticket, not
