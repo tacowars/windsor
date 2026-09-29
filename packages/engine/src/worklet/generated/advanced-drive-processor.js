@@ -547,6 +547,8 @@ var AdvancedDriveDsp = class {
     for (const p of ADVANCED_DRIVE_PARAMETERS)
       this.controls[p.name] = params[p.name]?.[0] ?? p.defaultValue;
     Object.assign(this.targets, this.controls);
+    this.activeKeys = CONTINUOUS.slice();
+    this.activeCount = 0;
     this.graph = new DriveRouting(rate * DRIVE_DSP.oversample);
     this.up = [new DriveFir(), new DriveFir()];
     this.down = [new DriveFir(), new DriveFir()];
@@ -557,12 +559,17 @@ var AdvancedDriveDsp = class {
   }
   configure(params, _frames) {
     for (const key of KEYS) this.targets[key] = params[key][0];
+    this.activeCount = 0;
+    for (const key of CONTINUOUS)
+      if (!Object.is(this.targets[key], this.controls[key]))
+        this.activeKeys[this.activeCount++] = key;
     this.pending = false;
     for (const key of DISCRETE) if (this.targets[key] !== this.controls[key]) this.pending = true;
   }
   update(left, right) {
     const s = this.controls, t = this.targets;
-    for (const key of CONTINUOUS) {
+    for (let i = 0; i < this.activeCount; i++) {
+      const key = this.activeKeys[i];
       s[key] += this.smooth * (t[key] - s[key]);
       if (Math.abs(s[key] - t[key]) < DRIVE_DSP.silence) s[key] = t[key];
     }
