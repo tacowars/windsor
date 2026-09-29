@@ -9,8 +9,7 @@
  *
  * The card and the Octave knob edit the selected region's pattern
  * (windsor#75): a part selected without a region edits its first, and a
- * part with no regions shows a hint in place of the card. The grid card
- * edits the part's sequencer until windsor#76.
+ * part with no regions shows a hint in place of the card.
  */
 import type { MusicPart } from '@windsor/engine';
 import { TICKS_PER_BAR, partAt, regionPattern } from '@windsor/engine';
@@ -50,7 +49,7 @@ function head(view: SongView, title: string, note: string): HTMLElement {
 /**
  * The region the pane's card and Octave knob edit: the selected one, else the
  * first (windsor#75 decision 2) — none for a kind whose card edits the part's
- * sequencer (the grid until windsor#76), and null when the part has no region.
+ * sequencer, and null when the part has no region.
  */
 function editTarget(part: MusicPart, region: number | null): number | null | undefined {
   return keepsRegionPatterns(part) ? editedRegion(part, region) : undefined;

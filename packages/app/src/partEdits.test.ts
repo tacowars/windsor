@@ -61,6 +61,10 @@ function edit(model: DocumentModel, region: number | undefined, fields: Record<s
   model.merge(partial);
 }
 
+/** One lane value per step of the default grid, `first` on step 1 and 0 elsewhere. */
+const stepValues = (first: number): number[] =>
+  Array.from({ length: 16 }, (_, i) => (i === 0 ? first : 0));
+
 const TWO_REGIONS = [
   { start: 0, duration: 2 * BAR },
   { start: 2 * BAR, duration: 2 * BAR },
@@ -189,11 +193,23 @@ describe('a split, a draw, a move and a kind change', () => {
     expect(patternOf(model.doc, 0, 1)).toMatchObject({ steps: [hit(1, 1)] });
   });
 
-  it("gives a grid split no copy: the grid card edits the part's sequencer until windsor#76", () => {
+  it('splits a grid region into two copies, lanes included, that then edit on their own (windsor#76)', () => {
     const model = songWith('grid', [{ start: 0, duration: 4 * BAR }]);
+    const cutoff = [{ param: 'filter.cutoff', values: stepValues(0.5) }];
+    edit(model, 0, { lanes: cutoff });
     const part = part0(model.doc);
-    const split = splitRegion(part.regions, 0, 2 * BAR, BAR, splitFill(part));
-    expect(split.map((r) => r.pattern)).toEqual([undefined, undefined]);
+    model.merge({
+      parts: { 0: { regions: splitRegion(part.regions, 0, 2 * BAR, BAR, splitFill(part)) } },
+    });
+    expect(patternOf(model.doc, 0, 1)).toMatchObject({ lanes: cutoff });
+    expect(part0(model.doc).regions[1]?.pattern).toEqual(part0(model.doc).regions[0]?.pattern);
+    const rest = { kind: 'rest' };
+    edit(model, 1, { steps: [rest], length: 1, lanes: [] });
+    expect(patternOf(model.doc, 0, 0)).toMatchObject({ length: 16, lanes: cutoff });
+    expect(patternOf(model.doc, 0, 1)).toMatchObject({ steps: [rest], lanes: [] });
+    const reopened = new DocumentModel(JSON.parse(model.toJson()));
+    expect(patternOf(reopened.doc, 0, 0)).toMatchObject({ lanes: cutoff });
+    expect(patternOf(reopened.doc, 0, 1)).toMatchObject({ steps: [rest], lanes: [] });
   });
 
   it("copies the left neighbour's pattern into a drawn region, else the right's", () => {
@@ -222,10 +238,13 @@ describe('a split, a draw, a move and a kind change', () => {
     expect(drawn?.regions[0]?.pattern).toEqual(part0(songWith('chord', []).doc).sequencer);
   });
 
-  it('draws a bare region on a grid lane', () => {
+  it("copies a grid neighbour's steps and lanes into a drawn region (windsor#76)", () => {
     const model = songWith('grid', [{ start: 0, duration: BAR }]);
+    const cutoff = [{ param: 'filter.cutoff', values: stepValues(-0.25) }];
+    edit(model, 0, { length: 3, lanes: cutoff });
     const drawn = drawRegionChange(model.doc, 0, 2 * BAR, (raw) => model.preview(raw));
-    expect(drawn?.regions[1]).toEqual({ start: 2 * BAR, duration: BAR });
+    expect(drawn?.regions[1]?.pattern).toMatchObject({ length: 3, lanes: cutoff });
+    expect(drawn?.regions[1]?.pattern).toEqual(part0(model.doc).regions[0]?.pattern);
   });
 
   it('keeps a pattern through a move, and a delete leaves the others as they were', () => {
