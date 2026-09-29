@@ -207,14 +207,6 @@ input {
   align-items: baseline;
   gap: 9px;
 }
-.brand small {
-  font-family: var(--f-num);
-  font-size: 10px;
-  font-weight: 400;
-  letter-spacing: 0.16em;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-}
 
 .tabs {
   display: flex;
