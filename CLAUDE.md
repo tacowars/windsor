@@ -183,6 +183,23 @@ without `--auto` when the check is already green. It adds labels through
 the REST API, as `.claude/worker-rules.md` shows. A Codex finding at P0 or
 P1 goes to a fresh round on the same branch, at most twice, then to tacowars.
 
+The main session also keeps itself small
+(`docs/log/2026-09-29-the-main-session-stays-small.md`):
+
+- **Context.** Past about 150k tokens it writes its handoff and a fresh
+  session takes over, or it compacts.
+- **Waiting.** It wakes once per PR decision: when `verify` has finished
+  and Codex has reviewed the head (matched on `original_commit_id`), not
+  on each event.
+- **Fix rounds.** A round goes to a fresh worker, usually `worker-light`,
+  whose brief is the findings with file and line and the rule to follow.
+  It is not sent to the worker that wrote the PR.
+- **Size.** Work whose states interact (cancel, timing, selection, live
+  edits) and that is expected past about 800 changed lines is split
+  before launch, a seam first, with the interactions listed as boundary
+  cases.
+- **Browser.** Its own UI checks go to a sub-agent on Sonnet at `low`.
+
 **Backlog.** Issues. No label is backlog, `ready` is the queue, an open PR
 is in progress, closed is done. Project #6 is a view that GitHub's own
 workflows move; nothing else writes to it.
