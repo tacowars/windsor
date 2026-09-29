@@ -63,6 +63,8 @@ export type TransportSystem = Pick<
  */
 export class HostTransport implements ConsoleTransport {
   private current: TransportState = 'idle';
+  /** Where the build in flight will start (windsor#132): what `position()` reads while no system is live. */
+  private pending = 0;
 
   constructor(private readonly live: () => TransportSystem | null) {}
 
@@ -105,10 +107,20 @@ export class HostTransport implements ConsoleTransport {
     return this.live()?.seekMusic(tick) ?? false;
   }
 
-  /** The audible transport tick, 0 before audio: the console's one reading of position (#619, #705). */
+  /**
+   * The audible transport tick: the console's one reading of position (#619,
+   * #705). While no system is live it is the tick the pending build will
+   * start from (windsor#132), so a second undo landing mid-rebuild carries the
+   * first one's bar forward instead of 0; before audio that is 0.
+   */
   position(): number {
     const system = this.live();
-    return system ? system.scheduler.audibleTick(system.engine.context.currentTime) : 0;
+    return system ? system.scheduler.audibleTick(system.engine.context.currentTime) : this.pending;
+  }
+
+  /** A build was queued that will start the song at `tick` (windsor#132). */
+  buildPending(tick: number): void {
+    this.pending = tick;
   }
 
   /**
@@ -219,18 +231,21 @@ export class EngineHost {
    * and only the latest document wins, so the live graph cannot end up
    * behind the model (cross-model self-review finding). The latest call's
    * options win with its document, so an import queued behind an undo
-   * starts from the top.
+   * starts from the top, and the transport reads the latest call's start
+   * tick until the system stands.
    */
   build(document: ArrangementDocument, options: BuildOptions = {}): Promise<void> {
     this.latest = document;
     const generation = ++this.generation;
+    const from = resumeTick(options.resumeAt, songTicksOf(document));
+    this.transport.buildPending(from);
     this.building = this.building
       .catch(() => undefined)
-      .then(() => (generation === this.generation ? this.rebuild(document, options) : undefined));
+      .then(() => (generation === this.generation ? this.rebuild(document, from) : undefined));
     return this.building;
   }
 
-  private async rebuild(document: ArrangementDocument, options: BuildOptions): Promise<void> {
+  private async rebuild(document: ArrangementDocument, from: number): Promise<void> {
     if (!this.context || !this.urls) return;
     // Dropped as it is disposed (#617): `init` below can throw — a worklet
     // module that will not load on this origin — and `apply`, `capturePattern`
@@ -246,7 +261,7 @@ export class EngineHost {
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
     await this.system.unlock();
-    this.transport.adopt(this.system, resumeTick(options.resumeAt, songTicksOf(document)));
+    this.transport.adopt(this.system, from);
   }
 
   /** Live tuning over the document model; null while audio is not enabled. */

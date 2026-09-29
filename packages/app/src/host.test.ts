@@ -14,7 +14,7 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { TICKS_PER_BAR, makeArrangement } from '@windsor/engine';
+import { TICKS_PER_BAR, makeArrangement, songTicksOf } from '@windsor/engine';
 import { EngineHost, HostTransport, resumeTick, type TransportSystem } from './host';
 
 const param = (): { value: number } => ({ value: 0 });
@@ -32,6 +32,9 @@ const node = (): Record<string, unknown> => ({
 const loaded: string[] = [];
 let contexts = 0;
 let closed = 0;
+/** Set to hold each module load until the test calls `refusals`. */
+let deferModules = false;
+const refusals: (() => void)[] = [];
 
 class FakeAudioContext {
   state = 'suspended';
@@ -39,7 +42,10 @@ class FakeAudioContext {
   audioWorklet = {
     addModule: (url: string | URL): Promise<void> => {
       loaded.push(String(url).split('/').pop() ?? '');
-      return Promise.reject(new Error('worklet modules are refused on this origin'));
+      const refusal = new Error('worklet modules are refused on this origin');
+      if (!deferModules) return Promise.reject(refusal);
+      // A build held mid-initialisation until the test refuses it.
+      return new Promise<void>((_resolve, reject) => void refusals.push(() => reject(refusal)));
     },
   };
   constructor() {
@@ -289,5 +295,44 @@ describe('resumeTick (windsor#132): where a rebuilt system starts', () => {
     expect(resumeTick(SONG, SONG)).toBe(0);
     expect(resumeTick(10 * BAR + 5, SONG)).toBe(0);
     expect(resumeTick(Number.NaN, SONG)).toBe(0);
+  });
+});
+
+describe('an undo landing while a rebuild initialises (windsor#132)', () => {
+  const BAR = TICKS_PER_BAR;
+  const empty = makeArrangement({}).document;
+  const song = { ...empty, transport: { ...empty.transport, bars: 8 } };
+
+  afterAll(() => {
+    deferModules = false;
+  });
+
+  /** Let the queued build reach its first held module load. */
+  const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('reads the bar the pending build resumes from, until a non-undo build takes over', async () => {
+    deferModules = true;
+    const host = new EngineHost(() => undefined);
+    // A build is in flight, held in initialisation: no system is live.
+    const enabling = host.enable(song);
+    await settle();
+    expect(refusals).toHaveLength(1);
+    expect(host.isBuilding).toBe(true);
+    expect(host.transport.position()).toBe(0);
+    // The first undo, read mid-bar 5, queues a build resuming from bar 5.
+    const undos = [host.build(song, { resumeAt: 4 * BAR + BAR / 2 })];
+    expect(host.transport.position()).toBe(4 * BAR);
+    // A second undo before initialisation resolves reads that bar, not 0,
+    // so the build that wins still resumes there.
+    undos.push(host.build(song, { resumeAt: host.transport.position() % songTicksOf(song) }));
+    expect(host.transport.position()).toBe(4 * BAR);
+    // An import or New song queued behind them starts from the top.
+    undos.push(host.build(song));
+    expect(host.transport.position()).toBe(0);
+    refusals.splice(0).forEach((refuse) => refuse());
+    await expect(enabling).rejects.toThrow('refused');
+    await settle();
+    refusals.splice(0).forEach((refuse) => refuse());
+    await Promise.allSettled(undos);
   });
 });
