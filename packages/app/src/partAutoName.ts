@@ -79,3 +79,29 @@ export function loadRenames(
   }
   return Object.keys(parts).length > 0 ? ({ parts } as DocumentPartial) : null;
 }
+
+/**
+ * The import report as the song ends up (windsor#114): a malformed name is
+ * reported as falling back to `Part <slot + 1>`, and when the load-time rename
+ * then names that part after its patch, the line says so instead of claiming
+ * the fallback. Every other line, and a clean generic import's report, is
+ * returned as it came.
+ */
+export function reportFinalPartNames(
+  corrections: readonly string[],
+  doc: Pick<ArrangementDocument, 'parts'>,
+): string[] {
+  const renamed = new Map<string, string>();
+  for (const part of doc.parts) {
+    const fallback = partLabelFor(part.slot);
+    if (part.name !== fallback) renamed.set(`is not a name — using "${fallback}"`, part.name);
+  }
+  return corrections.map((line) => {
+    for (const [ending, name] of renamed) {
+      if (line.endsWith(ending)) {
+        return `${line.slice(0, -ending.length)}is not a name — named after its patch: "${name}"`;
+      }
+    }
+    return line;
+  });
+}

@@ -18,6 +18,7 @@ import {
   autoPartName,
   isGenericPartName,
   loadRenames,
+  reportFinalPartNames,
 } from './partAutoName';
 import { choosePreset } from './presetBrowser';
 import { addPart, newSong } from './songParts';
@@ -147,6 +148,38 @@ describe('opening a song', () => {
     expect(partAt(model.doc, 2)).toBeUndefined();
     expect(model.dangling).toEqual(['parts[2].preset: no preset "nope" is defined']);
     expect(model.changed).toBe(true);
+  });
+  it('reports a malformed name as the name the part ends up with (windsor#114)', () => {
+    const doc = context().model.doc;
+    const patches = { ...doc.patches, 'saw-arp': clonePatch(PRESETS['saw-arp']!) };
+    const parts = doc.parts.map((part) =>
+      part.slot === 1 ? { ...part, name: 7, preset: 'saw-arp' } : part,
+    );
+    const model = new DocumentModel(newSong());
+    model.open({ ...doc, parts, patches }, loadRenames);
+    expect(partAt(model.doc, 1)?.name).toBe('Saw Ar');
+    expect(model.corrections).toEqual([
+      'parts[1].name: 7 is not a name — named after its patch: "Saw Ar"',
+    ]);
+    expect(model.corrections.join('\n')).not.toContain('Part 2');
+  });
+  it('reports a clean generic import as it did before the rename', () => {
+    const doc = context().model.doc;
+    const patches = { ...doc.patches, 'saw-arp': clonePatch(PRESETS['saw-arp']!) };
+    const parts = doc.parts.map((part) =>
+      part.slot === 1 ? { ...part, preset: 'saw-arp' } : part,
+    );
+    const plain = new DocumentModel(newSong());
+    plain.open({ ...doc, parts, patches });
+    const model = new DocumentModel(newSong());
+    model.open({ ...doc, parts, patches }, loadRenames);
+    expect(partAt(model.doc, 1)?.name).toBe('Saw Ar');
+    expect(model.corrections).toEqual(plain.corrections);
+  });
+  it('leaves a malformed name that no rename touched reported as its fallback', () => {
+    const line = 'parts[1].name: 7 is not a name — using "Part 2"';
+    const parts = [{ slot: 1, name: 'Part 2' }] as never;
+    expect(reportFinalPartNames([line, 'other'], { parts })).toEqual([line, 'other']);
   });
   it('leaves a song of Init parts and typed names alone', () => {
     expect(loadRenames(context().model.doc)).toBeNull();
