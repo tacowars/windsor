@@ -34,6 +34,23 @@
  * never moves the pitches of the cells after it; skip chance draws from its
  * own stream, minted beside the walk's at region entry.
  *
+ * **The gate's look-ahead across a chord change.** The gate is decided at
+ * the onset, and it reads the next cell in the current list's cycle
+ * (`holdsToNext(steps, i, cycle)`). The arp can't see the chord at its next
+ * onset: the region gate hands it the chord at the current tick only. So
+ * when the next onset changes the chord, the look-ahead can name a cell
+ * other than the one that onset plays. With `retrigger` on, that onset plays
+ * cell 0. With it off, it plays the next index modulo the new cycle. Nothing
+ * is held into it unless the old cycle's next cell was a tie or a slide. So
+ * a tie there plays nothing, and a slide there plays a plain note (epic
+ * decision 4, "with nothing held"). The other way round, a tie or slide in
+ * the old cycle holds the note to the change, and the cell played there
+ * releases it or carries it on as its own kind says. At a boundary that
+ * falls on the cycle's end, the two cells are the same. Reading the next
+ * chord would need the gate to hand over a look-ahead, or the arp to read
+ * the harmony timeline. Either one couples the arp to the transport, so
+ * this stays an open design point for tacowars (windsor#129).
+ *
  * **Rhythm.** Every step is an onset while a chord is active — density is
  * the bass's, not the arp's. A note lasts `gate` of the last step it covers;
  * at gate 1 it runs to the next onset, which releases and restrikes it. A

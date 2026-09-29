@@ -279,3 +279,39 @@ describe('the cycle across a chord change, and the playhead', () => {
     expect(arp.stepAt(1)).toBe(-1);
   });
 });
+
+describe('the gate look-ahead at a retrigger that is not cycle-aligned', () => {
+  /** i for two quarter steps, then iv (both triads): with retrigger on, step 2 restarts at cell 0 mid-cycle. */
+  const I_IV: Harmony = {
+    ...MINOR,
+    events: [
+      { start: 0, duration: 2 * QUARTER, degree: 0, size: 3 },
+      { start: 2 * QUARTER, duration: SONG - 2 * QUARTER, degree: 3, size: 3 },
+    ],
+  };
+  const play = (written: Record<number, ArpStep>): NoteEvent[] =>
+    run({ style: 'upDown', retrigger: true, steps: cells(written) }, 4, I_IV);
+  const offTicks = (events: readonly NoteEvent[]): number[] =>
+    events.filter((e) => e.kind === 'noteOff').map((e) => e.tick);
+
+  it('reads the current cycle: a tie on cell 0 at the change has nothing held, and plays nothing', () => {
+    const events = play({ 0: TIE });
+    // Step 1 is cell 1; the cycle's next cell is 2, a note, so its gate stands.
+    expect(offTicks(events)[0]).toBe(QUARTER + QUARTER / 2);
+    expect(onSteps(events)).toEqual([1, 3]);
+  });
+
+  it('a slide on cell 0 at the change has nothing held, and plays as a plain note', () => {
+    const events = play({ 0: arpNote({ slide: true }) });
+    expect(offTicks(events).slice(0, 2)).toEqual([QUARTER / 2, QUARTER + QUARTER / 2]);
+    const atChange = onsOf(events).find((e) => e.tick === 2 * QUARTER);
+    expect(atChange).toBeDefined();
+    expect(atChange!.slide).toBeUndefined();
+  });
+
+  it('a tie on the cycle’s next cell holds the note to the change, where cell 0 releases and restrikes', () => {
+    const events = play({ 2: TIE });
+    expect(offTicks(events)).toContain(2 * QUARTER);
+    expect(onSteps(events)).toEqual([0, 1, 2, 3]);
+  });
+});

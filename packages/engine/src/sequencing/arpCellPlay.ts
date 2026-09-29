@@ -20,7 +20,9 @@
  *   step, unless the next cell in the cycle is a tie or a slide
  *   (`holdsToNext`); then it runs to that onset. The look-ahead reads the
  *   next cell's kind only, so a skip drawn there later is a rest that
- *   releases the note at its own onset.
+ *   releases the note at its own onset. It reads the current cycle, so at a
+ *   chord change the next onset may play another cell (`arpeggiator.ts`,
+ *   "The gate's look-ahead across a chord change").
  * - **Skip chance:** a note cell becomes a rest with probability
  *   `skipChance`, drawn from a stream of its own (`arpSkipRng`), never the
  *   walk's, and nothing is drawn at 0 (`skipCell`).
