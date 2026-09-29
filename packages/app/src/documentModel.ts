@@ -125,8 +125,8 @@ export class DocumentModel {
    * bypass the library fill (#562 review pass 1/2, P2).
    *
    * `amend` is an edit the opening itself makes (windsor#103's load-time
-   * rename): applied after "opened" is taken, so it counts as a change and
-   * autosaves, while the report stays the one the raw document produced — the
+   * rename): applied after "opened" is taken, so it counts as a change, while
+   * the report stays the one the raw document produced — the
    * import's corrections, dangling names and fills are what the user is told.
    */
   open(raw: unknown, amend?: (doc: ArrangementDocument) => unknown): void {
