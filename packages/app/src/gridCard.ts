@@ -15,7 +15,9 @@
  * in one `stepModLane.ts` cell per lane, so a lane lines up with the steps at
  * any step count, and the lanes' names stand in a sticky column at the left
  * of the same scroller. Length pads the lanes with the steps, and Rotate
- * turns them with the steps.
+ * turns them with the steps. Every edit here to the steps or lanes writes a
+ * lane click still waiting out its double-click window first, so the click's
+ * snapshot cannot land afterwards and undo the edit.
  */
 import type { GridSpec } from '@windsor/engine';
 import { scaleOffsets } from '@windsor/engine';
@@ -26,6 +28,7 @@ import { el } from './dom';
 import {
   type LaneHost,
   fillLanePicker,
+  flushLaneClicks,
   laneCells,
   lanePicker,
   paintLaneNames,
@@ -83,8 +86,11 @@ interface GridStrip extends Strip<GridSpec> {
 
 const cell = stripCell;
 
-const commit = (strip: GridStrip, edit: (spec: GridSpec) => GridSpec['steps']): void =>
+/** A step edit; like Length, Rotate and + Lane, it first writes a held lane click (`flushLaneClicks`). */
+const commit = (strip: GridStrip, edit: (spec: GridSpec) => GridSpec['steps']): void => {
+  flushLaneClicks(strip.lanes);
   commitSteps(strip, edit);
+};
 
 function kindCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   const step = spec.steps[index];
@@ -202,6 +208,7 @@ function lengthKnob(strip: GridStrip): HTMLElement {
     color: PITCH_COLOR,
     get: () => strip.spec()?.length ?? 1,
     set: (v) => {
+      flushLaneClicks(strip.lanes);
       const spec = strip.spec();
       if (!spec) return;
       const length = Math.round(v);
@@ -225,6 +232,7 @@ function rotateKnob(strip: GridStrip): HTMLElement {
       const by = target - turned;
       if (by === 0) return;
       turned = target;
+      flushLaneClicks(strip.lanes);
       const spec = strip.spec();
       if (!spec) return;
       const steps = rotateSteps(spec.steps, by, spec.length);

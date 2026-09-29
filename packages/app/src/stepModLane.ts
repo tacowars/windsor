@@ -15,11 +15,14 @@
  * `stepModLaneModel.ts`; this file only reads pointers and draws.
  *
  * A drag previews on the cells and commits once on release; a click shows
- * at once and commits when the double-click window closes, and a second
- * press inside it writes the reset alone (`LaneClickGate`). A drag keeps the
- * pointer captured on the pressed cell, and a cancel, a lost capture, a
- * window blur or a move with the primary button up — a release it never saw —
- * drops the preview (as PR windsor#27's drags do).
+ * at once and commits when the double-click window closes; a second press on
+ * the same cell inside it paints like any press, and its release writes the
+ * reset (still) or its drag (moved) in place of the click (`LaneClickGate`).
+ * Every other edit the card makes to its steps or lanes calls
+ * `flushLaneClicks` first. A drag keeps the pointer captured on the pressed
+ * cell, and a cancel, a lost capture, a window blur or a move with the
+ * primary button up — a release it never saw — drops the preview (as PR
+ * windsor#27's drags do) and writes any held click.
  */
 import type { StepModLane, StepModParam } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX, partAt } from '@windsor/engine';
@@ -97,6 +100,15 @@ function gateOf(host: LaneHost): LaneClickGate {
   return gate;
 }
 
+/**
+ * Write a click the card's gate still holds. The card calls this before any
+ * other edit to its steps or lanes (and before reading them for it), so the
+ * held snapshot lands first and cannot later undo that edit.
+ */
+export function flushLaneClicks(host: LaneHost): void {
+  gates.get(host)?.flush();
+}
+
 const cellsOf = (scope: HTMLElement, lane: number): HTMLElement[] =>
   Array.from(scope.querySelectorAll<HTMLElement>(`.mod-cell[data-lane="${lane}"]`));
 
@@ -116,20 +128,16 @@ function showReadout(host: LaneHost, lane: number, step: number, value: number |
 }
 
 /**
- * A press on lane `lane`'s cell `index`: the second press of a double-click
- * resets it, any other paints from it until the release, or drops the
+ * A press on lane `lane`'s cell `index`: it paints from the cell until the
+ * release (where the gate tells a double-click from a drag), or drops the
  * preview if the release never comes.
  */
 function pressCell(host: LaneHost, lane: number, index: number, down: PointerEvent): void {
-  const cell = down.currentTarget as HTMLElement;
   const param = host.lanes()?.[lane]?.param;
   if (down.button !== 0 || !param) return;
   down.preventDefault();
-  const gate = gateOf(host);
-  if (gate.press(param, index) === 'paint') return paintFrom(host, lane, index, down);
-  drawCell(cell, 0);
-  showReadout(host, lane, index, 0);
-  cell.addEventListener('pointerup', () => gate.release(param, index, [], false), { once: true });
+  gateOf(host).press(param, index);
+  paintFrom(host, lane, index, down);
 }
 
 function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEvent): void {
@@ -155,8 +163,15 @@ function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEve
     if (stop.signal.aborted) return;
     stop.abort();
     if (cell.hasPointerCapture(down.pointerId)) cell.releasePointerCapture(down.pointerId);
-    if (commit) gateOf(host).release(start.param, index, values, dragged);
-    else host.repaint();
+    if (!commit) {
+      // The second press of a pair cancelled: its first click still stands.
+      gateOf(host).flush();
+      return host.repaint();
+    }
+    if (gateOf(host).release(start.param, index, values, dragged) === 'reset') {
+      cells.forEach((c, i) => drawCell(c, i === index ? 0 : (values[i] ?? 0)));
+      showReadout(host, lane, index, 0);
+    }
   };
   const mine = (e: PointerEvent): boolean => e.pointerId === down.pointerId;
   const on = { signal: stop.signal };
@@ -241,6 +256,7 @@ export function lanePicker(host: LaneHost): HTMLSelectElement {
   select.className = 'field mod-add';
   select.setAttribute('aria-label', 'add a modulation lane');
   select.onchange = (): void => {
+    flushLaneClicks(host);
     const lanes = host.lanes();
     const param = select.value as StepModParam;
     const next = lanes && addLane(lanes, param, host.stepCount());
