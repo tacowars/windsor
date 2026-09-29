@@ -134,6 +134,20 @@ describe('opening a song', () => {
     expect(partAt(model.doc, 0)?.name).toBe('Part 1');
     expect(loadRenames(model.doc)).toBeNull();
   });
+  it('keeps the import report of the song as opened through the rename', () => {
+    const doc = context().model.doc;
+    const patches = { ...doc.patches, 'saw-arp': clonePatch(PRESETS['saw-arp']!) };
+    const renamed = doc.parts.map((part) =>
+      part.slot === 1 ? { ...part, preset: 'saw-arp' } : part,
+    );
+    const lost = { ...renamed[0]!, slot: 2, preset: 'nope' };
+    const model = new DocumentModel(newSong());
+    model.open({ ...doc, parts: [...renamed, lost], patches }, loadRenames);
+    expect(partAt(model.doc, 1)?.name).toBe('Saw Ar');
+    expect(partAt(model.doc, 2)).toBeUndefined();
+    expect(model.dangling).toEqual(['parts[2].preset: no preset "nope" is defined']);
+    expect(model.changed).toBe(true);
+  });
   it('leaves a song of Init parts and typed names alone', () => {
     expect(loadRenames(context().model.doc)).toBeNull();
   });
