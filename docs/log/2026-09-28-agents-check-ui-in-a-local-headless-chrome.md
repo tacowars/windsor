@@ -13,7 +13,7 @@ look at the preview.
 The sandbox was not the cause. A dev server started from an agent's shell
 listens on this machine's `127.0.0.1` and answers `curl`, and tacowars's own
 Chrome here opens it. The Claude in Chrome extension connected to tacowars's
-account runs on his other Mac, so its `localhost` is that machine. Public
+account runs on the other Mac, so its `localhost` is that machine. Public
 URLs, such as the PR previews, worked, which hid the cause.
 
 HOOP and Aotearoa204 never met this. Both register the Chrome DevTools MCP
@@ -52,8 +52,8 @@ not a dependency of the app, and nothing from it ships in `dist/`.
 ## Consequences
 
 - The first session after this merges asks to enable the project's MCP
-  server. `enableAllProjectMcpServers` is off in tacowars's user settings, so he
-  approves it once, or lists it in `.claude/settings.local.json` under
+  server. `enableAllProjectMcpServers` is off in tacowars's user settings, so they
+  approve it once, or lists it in `.claude/settings.local.json` under
   `enabledMcpjsonServers` as HOOP and Aotearoa204 do.
 - The server needs Google Chrome installed on the machine running Claude
   Code.
