@@ -103,12 +103,11 @@ export function setSequencerKindLive(ctx: AppCtx, slot: number, kind: SequencerK
 }
 
 /**
- * The kinds whose card edits the selected region's pattern (windsor#75). The
- * grid joins with windsor#76; until then its card edits `part.sequencer`, and
- * a split or a drawn region of a grid part carries no pattern, so the card's
- * edits stay what every grid region plays.
+ * The kinds whose card edits the selected region's pattern (windsor#75; the
+ * grid, lanes included, since windsor#76).
  */
 export const REGION_PATTERN_KINDS: ReadonlySet<SequencerKind> = new Set<SequencerKind>([
+  'grid',
   'chord',
   'arp',
   'bass',
@@ -184,7 +183,7 @@ export function editedRegion(
 /**
  * What a card reads: region `region`'s pattern through the engine's
  * `regionPattern` (the part's seed included), or the part's sequencer when no
- * region is named — the grid card until windsor#76.
+ * region is named.
  */
 export function patternOf(
   doc: ArrangementDocument,
@@ -205,7 +204,7 @@ export function patternOf(
  * whole into that region's `pattern`. Every other region is left as it is.
  * The `seed` is the part's, so a seed in `fields` goes to `part.sequencer`.
  * With no region named the edit goes to `part.sequencer`, as before region
- * patterns (the grid card until windsor#76). Null when the part or the
+ * patterns. Null when the part or the
  * region is gone.
  */
 export function regionPatternChange(
