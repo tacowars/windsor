@@ -13,9 +13,11 @@
  * the part's local step minus the step the traversal last restarted on:
  * `up` / `down` cycle; `upDown` / `downUp` bounce without repeating the ends
  * (for L ≤ 2 they are `up` / `down`); `converge` is outside-in, `diverge` its
- * reverse; `random` is a uniform draw, `randomOther` a uniform draw over the
- * notes other than the previous one, `randomOnce` one shuffle repeated until
- * the list changes or a retrigger.
+ * reverse; `conDiverge` is the `upDown` bounce run through converge's order,
+ * outside-in then back out, the centre and the edge not repeated (for L ≤ 2
+ * it is `converge`, windsor#121); `random` is a uniform draw, `randomOther` a
+ * uniform draw over the notes other than the previous one, `randomOnce` one
+ * shuffle repeated until the list changes or a retrigger.
  *
  * **Restarts.** Region entry (`enter`) restarts the walk and mints the stream
  * from `hashSeed(seed, regionIndex)`; a chord change restarts the walk only
@@ -107,6 +109,8 @@ export function orderedIndex(style: OrderedArpStyle, i: number, length: number):
       return convergeAt(cycle, length);
     case 'diverge':
       return convergeAt(last - cycle, length);
+    case 'conDiverge':
+      return length <= 2 ? convergeAt(cycle, length) : convergeAt(bounceAt(i, length), length);
   }
 }
 
