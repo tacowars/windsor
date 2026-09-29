@@ -162,7 +162,10 @@ describe('renderStems', () => {
     expect(rendered.map((c) => c.numberOfChannels)).toEqual([6, 6, 6]);
     expect(narrow.stems.map((s) => s.stem)).toEqual(one.stems.map((s) => s.stem));
     narrow.stems.forEach((stem, i) => expect(stem.channels).toEqual(one.stems[i]!.channels));
-  });
+    // Four renders of the song in one test (one pass, then three) run past
+    // vitest's 5 s default on the CI runner (windsor#80); the budget is for
+    // the runner, not a claim about the render's speed.
+  }, 30_000);
 
   /**
    * A three-pass render whose song contexts' buffers `edit` changes after
