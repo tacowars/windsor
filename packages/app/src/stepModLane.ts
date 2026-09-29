@@ -14,15 +14,13 @@
  * another step kind can reuse this file as is. The rules are
  * `stepModLaneModel.ts`; this file only reads pointers and draws.
  *
- * A drag previews on the cells and commits once on release; a click shows
- * at once and commits when the double-click window closes; a second press on
- * the same cell inside it paints like any press, and its release writes the
- * reset (still) or its drag (moved) in place of the click (`LaneClickGate`).
- * Every other edit the card makes to its steps or lanes calls
- * `flushLaneClicks` first. A drag keeps the pointer captured on the pressed
- * cell, and a cancel, a lost capture, a window blur or a move with the
- * primary button up — a release it never saw — drops the preview (as PR
- * windsor#27's drags do) and writes any held click.
+ * A press previews on the cells and writes once, at its release, whether
+ * it was a click or a drag; a still second press on the same cell inside the
+ * double-click window writes the cell's reset instead (`LaneClickGate`).
+ * Nothing waits for a later write. A press keeps the pointer captured on the
+ * pressed cell, and a cancel, a lost capture, a window blur or a move with
+ * the primary button up — a release it never saw — drops the preview (as PR
+ * windsor#27's drags do) and writes nothing.
  */
 import type { StepModLane, StepModParam } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX, partAt } from '@windsor/engine';
@@ -74,7 +72,7 @@ export function patchBase(ctx: AppCtx, slot: number, param: StepModParam): numbe
   return typeof value === 'number' ? value : undefined;
 }
 
-/** One click gate per card: its writes go through the host, its timer is the page's. */
+/** One click gate per card: its writes go through the host, its clock is the page's. */
 const gates = new WeakMap<LaneHost, LaneClickGate>();
 
 function gateOf(host: LaneHost): LaneClickGate {
@@ -83,30 +81,15 @@ function gateOf(host: LaneHost): LaneClickGate {
     gate = new LaneClickGate(
       (param, values) => {
         const lanes = host.lanes();
-        // The lane is named by its parameter: gone (removed in the window) means no write.
+        // The lane is named by its parameter: gone means no write.
         const next = lanes && withParamValues(lanes, param, values);
         if (next && !host.write(next)) host.repaint();
       },
-      {
-        now: () => performance.now(),
-        after: (ms, fn) => {
-          const id = setTimeout(fn, ms);
-          return () => clearTimeout(id);
-        },
-      },
+      { now: () => performance.now() },
     );
     gates.set(host, gate);
   }
   return gate;
-}
-
-/**
- * Write a click the card's gate still holds. The card calls this before any
- * other edit to its steps or lanes (and before reading them for it), so the
- * held snapshot lands first and cannot later undo that edit.
- */
-export function flushLaneClicks(host: LaneHost): void {
-  gates.get(host)?.flush();
 }
 
 const cellsOf = (scope: HTMLElement, lane: number): HTMLElement[] =>
@@ -163,11 +146,7 @@ function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEve
     if (stop.signal.aborted) return;
     stop.abort();
     if (cell.hasPointerCapture(down.pointerId)) cell.releasePointerCapture(down.pointerId);
-    if (!commit) {
-      // The second press of a pair cancelled: its first click still stands.
-      gateOf(host).flush();
-      return host.repaint();
-    }
+    if (!commit) return host.repaint();
     if (gateOf(host).release(start.param, index, values, dragged) === 'reset') {
       cells.forEach((c, i) => drawCell(c, i === index ? 0 : (values[i] ?? 0)));
       showReadout(host, lane, index, 0);
@@ -238,7 +217,6 @@ export function paintLaneNames(names: HTMLElement, host: LaneHost): void {
     remove.title = `Remove the ${laneLabel(lane.param)} lane`;
     remove.onclick = (): void => {
       const now = host.lanes();
-      gateOf(host).cancel(lane.param);
       if (now && host.write(removeLane(now, k))) host.repaint();
     };
     head.appendChild(remove);
@@ -256,7 +234,6 @@ export function lanePicker(host: LaneHost): HTMLSelectElement {
   select.className = 'field mod-add';
   select.setAttribute('aria-label', 'add a modulation lane');
   select.onchange = (): void => {
-    flushLaneClicks(host);
     const lanes = host.lanes();
     const param = select.value as StepModParam;
     const next = lanes && addLane(lanes, param, host.stepCount());

@@ -57,9 +57,8 @@ export const LANE_PAINT: LanePaintTable = { snapBand: 0.05, divisions: 100 };
 export const LANE_OCTAVE_DIGITS = 1;
 
 /**
- * A lane cell's double-click window, ms: a press and release that doesn't
- * move shows its value at once but is written only when this runs out, so a
- * second press on the cell inside it resets to 0 with nothing else written.
+ * A lane cell's double-click window, ms: a still second press on a cell that
+ * starts within this of the last click's release resets the cell to 0.
  * A UI timing near the usual desktop double-click interval, not a
  * measurement.
  */

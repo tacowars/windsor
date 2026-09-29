@@ -1,9 +1,9 @@
 /**
- * The lane cells' press, release and double-click timing (windsor#31),
- * without the DOM: when a lane edit is written, on a clock the card injects
- * (`performance.now` and `setTimeout` in the page, a fake in the tests).
- * The values themselves are `stepModLaneModel.ts`'s; `stepModLane.ts` feeds
- * this its pointer events.
+ * The lane cells' press, release and double-click rules (windsor#31),
+ * without the DOM: what a release writes, on a clock the card injects
+ * (`performance.now` in the page, a fake in the tests). The values
+ * themselves are `stepModLaneModel.ts`'s; `stepModLane.ts` feeds this its
+ * pointer events.
  */
 import type { StepModParam } from '@windsor/engine';
 import { resetCell } from './stepModLaneModel';
@@ -14,11 +14,9 @@ export function isDrag(dx: number, dy: number, slop = LANE_CLICK_SLOP_PX): boole
   return Math.abs(dx) > slop || Math.abs(dy) > slop;
 }
 
-/** The time and the timer a click gate runs on; a test passes a fake. */
+/** The time a click gate reads; a test passes a fake. */
 export interface LaneClock {
   now(): number;
-  /** Run `fn` after `ms`; the returned function cancels it. */
-  after(ms: number, fn: () => void): () => void;
 }
 
 /** Where a lane edit lands: one lane's whole value list, the lane named by its parameter. */
@@ -27,33 +25,35 @@ export type LaneWrite = (lane: StepModParam, values: readonly number[]) => void;
 /** What a release wrote: a double-click's reset to 0, which the card redraws, or anything else. */
 export type ReleaseKind = 'reset' | 'values';
 
-interface HeldClick {
+interface LastClick {
   readonly lane: StepModParam;
   readonly index: number;
-  readonly values: readonly number[];
+  /** When the click was released. */
   readonly at: number;
-  readonly cancel: () => void;
 }
 
 /**
  * The lane cells' press, release and double-click rules, without the DOM.
- * A drag writes on release. A click (no travel past the slop) shows at once
- * but is held, and written when the double-click window closes. A second
- * press on the same cell inside the window paints like any press and is
- * decided at its release: still, it is a double-click, and the held click
- * gives way to the cell's reset to 0; dragged, it gives way to the dragged
- * values. Either way the pair writes one list. A press anywhere else writes
- * a held click first, and so must every other edit the card makes to its
- * steps or lanes (`flush`), or the held snapshot would later undo that edit.
- * A lane is named by its parameter, never its place in the list, and
- * removing a lane drops its held click (`cancel`). The browser's `dblclick`
- * is not used: by the time it fires, both presses are over.
+ * Every release writes at once: a drag its values, a click (no travel past
+ * the slop) its value. A second press on the same cell of the same lane
+ * that starts within the window of the last click's release, and releases
+ * without dragging, is a double-click: it writes the cell's reset to 0. If
+ * it drags, it is an ordinary drag. A double-click forgets the click before
+ * it, so a third click is a plain click.
+ *
+ * A double-click therefore writes twice, the click and then the reset.
+ * That is fine: Windsor has no undo stack for the pair to clutter, and
+ * during playback the click's value can sound for at most the window.
+ * Nothing is ever held, so nothing can land after another edit or a
+ * re-render. A lane is named by its parameter, never its place in the list.
+ * The browser's `dblclick` is not used: by the time it fires, both presses
+ * are over.
  */
 export class LaneClickGate {
-  /** A click waiting out the window. */
-  private held: HeldClick | null = null;
-  /** A held click whose cell has been pressed again: that press's release decides. */
-  private second: HeldClick | null = null;
+  /** The last plain click, the one a second press would pair with. */
+  private last: LastClick | null = null;
+  /** Whether the press in progress is the second of a pair. */
+  private second = false;
 
   constructor(
     private readonly write: LaneWrite,
@@ -63,23 +63,14 @@ export class LaneClickGate {
 
   /** A press on `lane`'s cell `index`; the card paints from it, whatever it turns out to be. */
   press(lane: StepModParam, index: number): void {
-    const held = this.held;
-    if (
-      held?.lane === lane &&
-      held.index === index &&
-      this.clock.now() - held.at <= this.windowMs
-    ) {
-      this.drop();
-      this.second = held;
-      return;
-    }
-    this.flush();
+    const last = this.last;
+    this.second =
+      last?.lane === lane && last.index === index && this.clock.now() - last.at <= this.windowMs;
   }
 
   /**
-   * A release. The second press of a pair writes the cell's reset (still) or
-   * its values (dragged), in place of the held click; any other drag writes
-   * now, and any other click is held.
+   * A release, written now: a still second press writes the cell's reset,
+   * anything else its values.
    */
   release(
     lane: StepModParam,
@@ -88,41 +79,18 @@ export class LaneClickGate {
     dragged: boolean,
   ): ReleaseKind {
     const second = this.second;
-    this.second = null;
-    if (second && !dragged) {
-      this.write(lane, resetCell(second.values, index));
-      return 'reset';
-    }
-    if (second || dragged) {
+    this.second = false;
+    this.last = null;
+    if (dragged) {
       this.write(lane, values);
       return 'values';
     }
-    const cancel = this.clock.after(this.windowMs, () => this.flush());
-    this.held = { lane, index, values: [...values], at: this.clock.now(), cancel };
+    if (second) {
+      this.write(lane, resetCell(values, index));
+      return 'reset';
+    }
+    this.write(lane, values);
+    this.last = { lane, index, at: this.clock.now() };
     return 'values';
-  }
-
-  /** Drop a held click on `lane` unwritten: the lane is being removed. */
-  cancel(lane: StepModParam): void {
-    if (this.held?.lane === lane) this.drop();
-    if (this.second?.lane === lane) this.second = null;
-  }
-
-  /**
-   * Write a held click now: its window closed, another cell was pressed, the
-   * second press was cancelled before its release, or the card is about to
-   * edit the steps or lanes.
-   */
-  flush(): void {
-    const waiting = this.held ?? this.second;
-    if (!waiting) return;
-    this.drop();
-    this.second = null;
-    this.write(waiting.lane, waiting.values);
-  }
-
-  private drop(): void {
-    this.held?.cancel();
-    this.held = null;
   }
 }

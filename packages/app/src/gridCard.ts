@@ -15,9 +15,8 @@
  * in one `stepModLane.ts` cell per lane, so a lane lines up with the steps at
  * any step count, and the lanes' names stand in a sticky column at the left
  * of the same scroller. Length pads the lanes with the steps, and Rotate
- * turns them with the steps. Every edit here to the steps or lanes writes a
- * lane click still waiting out its double-click window first, so the click's
- * snapshot cannot land afterwards and undo the edit.
+ * turns them with the steps. A lane click writes on its release, so every
+ * edit here reads lanes the document already holds.
  */
 import type { GridSpec } from '@windsor/engine';
 import { scaleOffsets } from '@windsor/engine';
@@ -28,7 +27,6 @@ import { el } from './dom';
 import {
   type LaneHost,
   fillLanePicker,
-  flushLaneClicks,
   laneCells,
   lanePicker,
   paintLaneNames,
@@ -86,12 +84,6 @@ interface GridStrip extends Strip<GridSpec> {
 
 const cell = stripCell;
 
-/** A step edit; like Length, Rotate and + Lane, it first writes a held lane click (`flushLaneClicks`). */
-const commit = (strip: GridStrip, edit: (spec: GridSpec) => GridSpec['steps']): void => {
-  flushLaneClicks(strip.lanes);
-  commitSteps(strip, edit);
-};
-
 function kindCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
   const step = spec.steps[index];
   if (!step) return cell('', 'blank');
@@ -101,7 +93,7 @@ function kindCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement 
   if (folded) node.classList.add('folded');
   node.title = step.kind === 'note' ? `degree ${step.degree + 1}` : step.kind;
   node.onclick = (): void =>
-    commit(strip, (s) => withStep(s.steps, index, cycleKind(s.steps[index] ?? step)));
+    commitSteps(strip, (s) => withStep(s.steps, index, cycleKind(s.steps[index] ?? step)));
   return node;
 }
 
@@ -122,7 +114,7 @@ function degreeSelect(strip: GridStrip, index: number, spec: GridSpec): HTMLElem
   }
   sel.value = String(step.degree);
   sel.onchange = (): void =>
-    commit(strip, (s) =>
+    commitSteps(strip, (s) =>
       withStep(s.steps, index, setDegree(s.steps[index] ?? step, Number(sel.value))),
     );
   return sel;
@@ -135,7 +127,7 @@ function octaveCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElemen
   const node = cell(label);
   node.title = 'octave: click up, shift-click down';
   node.onclick = (event: MouseEvent): void =>
-    commit(strip, (s) =>
+    commitSteps(strip, (s) =>
       withStep(s.steps, index, cycleOctave(s.steps[index] ?? step, event.shiftKey ? -1 : 1)),
     );
   return node;
@@ -153,7 +145,7 @@ function flagCell(
   node.title = flag;
   node.setAttribute('aria-pressed', String(step[flag]));
   node.onclick = (): void =>
-    commit(strip, (s) => withStep(s.steps, index, toggleFlag(s.steps[index] ?? step, flag)));
+    commitSteps(strip, (s) => withStep(s.steps, index, toggleFlag(s.steps[index] ?? step, flag)));
   return node;
 }
 
@@ -208,7 +200,6 @@ function lengthKnob(strip: GridStrip): HTMLElement {
     color: PITCH_COLOR,
     get: () => strip.spec()?.length ?? 1,
     set: (v) => {
-      flushLaneClicks(strip.lanes);
       const spec = strip.spec();
       if (!spec) return;
       const length = Math.round(v);
@@ -232,7 +223,6 @@ function rotateKnob(strip: GridStrip): HTMLElement {
       const by = target - turned;
       if (by === 0) return;
       turned = target;
-      flushLaneClicks(strip.lanes);
       const spec = strip.spec();
       if (!spec) return;
       const steps = rotateSteps(spec.steps, by, spec.length);
@@ -249,7 +239,7 @@ function randomizeButton(strip: GridStrip): HTMLElement {
   button.style.borderColor = PITCH_COLOR;
   button.title = 'Every step: a random degree from the key, octave, accent and slide';
   button.onclick = (): void =>
-    commit(strip, (spec) =>
+    commitSteps(strip, (spec) =>
       randomSteps(
         spec.steps.length,
         scaleOffsets(strip.ctx.model.doc.harmony.scale).length,
