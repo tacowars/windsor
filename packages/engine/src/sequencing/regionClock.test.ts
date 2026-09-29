@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { NOT_LIVE, isInfiniteRegion, regionState, type Region } from './regionClock';
+import { NOT_LIVE, isInfiniteRegion, regionPhase, regionState, type Region } from './regionClock';
 import { TICKS_PER_BAR } from './scheduler';
 
 const BAR = TICKS_PER_BAR;
@@ -79,5 +79,39 @@ describe('regionState', () => {
       expect(regionState(beyond, SONG, tick), String(tick)).toEqual(NOT_LIVE);
     }
     expect(regionState([{ start: 0, duration: 1 }], 0, 0)).toEqual(NOT_LIVE);
+  });
+});
+
+describe('regionPhase (windsor#97)', () => {
+  const two: Region[] = [
+    { start: BAR, duration: BAR },
+    { start: 2 * BAR, duration: BAR },
+  ];
+
+  it('inside a region it is regionState’s localTick, on every song iteration', () => {
+    for (const tick of [BAR, BAR + 5, 2 * BAR - 1, SONG + BAR + 7, 3 * SONG + 2 * BAR + 11]) {
+      const state = regionState(two, SONG, tick);
+      if (!state.live) throw new Error(`tick ${tick} should be live`);
+      expect(regionPhase(two, SONG, state.index, tick), String(tick)).toBe(state.localTick);
+    }
+  });
+
+  it('outside it, the ticks since its last start on the song’s cycle, back to 0 on its start', () => {
+    expect(regionPhase(two, SONG, 0, 2 * BAR)).toBe(BAR);
+    expect(regionPhase(two, SONG, 0, SONG - 1)).toBe(SONG - BAR - 1);
+    expect(regionPhase(two, SONG, 0, SONG)).toBe(SONG - BAR);
+    expect(regionPhase(two, SONG, 0, SONG + BAR - 1)).toBe(SONG - 1);
+    expect(regionPhase(two, SONG, 0, SONG + BAR)).toBe(0);
+    expect(regionPhase(two, SONG, 1, 0)).toBe(2 * BAR);
+  });
+
+  it('the ∞ region is the transport tick, as regionState has it', () => {
+    const inf: Region[] = [{ start: 0, duration: SONG }];
+    expect(regionPhase(inf, SONG, 0, SONG + 5)).toBe(SONG + 5);
+  });
+
+  it('is null for an index naming no region, or a song of no length', () => {
+    expect(regionPhase(two, SONG, 2, 0)).toBeNull();
+    expect(regionPhase(two, 0, 0, 0)).toBeNull();
   });
 });

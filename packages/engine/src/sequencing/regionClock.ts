@@ -65,3 +65,27 @@ export function regionState(
   }
   return NOT_LIVE;
 }
+
+/**
+ * Region `index`'s own position at `tick`, whether or not the playhead is in
+ * it (windsor#97): the ticks since the region last started, counted on the
+ * song's cycle, `(songTick - start) mod songTicks`. Inside the region it is
+ * `regionState`'s `localTick`, so the two never disagree there; outside, it
+ * carries on from the last start as if the region were still sounding, and
+ * falls back to 0 on the tick the region starts again, which is the entry
+ * the performer restarts on. The ∞ region is the transport tick, as in
+ * `regionState`. A loop's jump moves the transport tick, and this follows
+ * it the way the gate does. Null for an index naming no region, or a song
+ * of no length.
+ */
+export function regionPhase(
+  regions: readonly Region[],
+  songTicks: number,
+  index: number,
+  tick: number,
+): number | null {
+  const region = regions[index];
+  if (region === undefined || !(songTicks > 0)) return null;
+  if (isInfiniteRegion(regions, songTicks)) return tick;
+  return (((tick - region.start) % songTicks) + songTicks) % songTicks;
+}

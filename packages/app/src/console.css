@@ -606,6 +606,32 @@ input {
 .grid-col.playing .mod-cell {
   border-color: var(--carrier);
 }
+/* The grid card's playhead (windsor#97): one column highlight in two
+   strengths, `--head`. Bright (`.playing`) while the song is in the card's
+   region; the ghost (`.ghost`) steps through the region's pattern while it
+   is not. It tints the column and outlines every cell in it, the step grid's
+   rows and the lanes' alike, so it shows with no lanes added. Scoped to the
+   grid card's scroller: the chord card's strip keeps its own look. */
+.grid-scroll .grid-col.playing {
+  --head: var(--carrier);
+  --head-tint: color-mix(in srgb, var(--carrier) 22%, transparent);
+}
+.grid-scroll .grid-col.ghost {
+  --head: color-mix(in srgb, var(--carrier) 45%, var(--line));
+  --head-tint: color-mix(in srgb, var(--carrier) 12%, transparent);
+}
+.grid-scroll .grid-col:is(.playing, .ghost) {
+  background: var(--head-tint);
+  border-radius: var(--r);
+  box-shadow: 0 0 0 2px var(--head-tint);
+}
+.grid-scroll .grid-col:is(.playing, .ghost) :is(.gcell, select.gsel, .mod-cell) {
+  border-color: var(--head);
+}
+.grid-scroll .grid-col:is(.playing, .ghost) .grid-idx {
+  background: var(--head);
+  color: #111416;
+}
 
 /* ---------- the chord card (#607) ---------- */
 

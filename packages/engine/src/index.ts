@@ -181,6 +181,7 @@ export type {
   MusicTransport,
   PartHost,
   PlayablePart,
+  RegionStep,
 } from './song/arrangementPlayer';
 export { FmEngine } from './synth/fmEngine';
 export type { PartOptions, WorkletUrls } from './synth/fmEngine';

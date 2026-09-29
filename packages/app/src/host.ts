@@ -16,6 +16,7 @@ import type {
   ArrangementDocument,
   AudioPart,
   DocumentPartial,
+  RegionStep,
   WorkletUrls,
 } from '@windsor/engine';
 import { AudioSystem, FmEngine, musicPartName } from '@windsor/engine';
@@ -224,6 +225,15 @@ export class EngineHost {
    */
   stepAt(slot: number, tick: number): number {
     return this.system?.stepAt(slot, tick) ?? -1;
+  }
+
+  /**
+   * Where region `region` of the part on `slot` is at transport tick `tick`,
+   * sounding or not, or null — the engine's rule, which the grid card's
+   * bright and ghost playhead read (windsor#97).
+   */
+  regionStepAt(slot: number, region: number, tick: number): RegionStep | null {
+    return this.system?.regionStepAt(slot, region, tick) ?? null;
   }
 
   /** The engine part on a slot, for the Parts tab and keyboard (#597: never by label). */
