@@ -15,6 +15,15 @@ export const WAV_FALLBACK_NAME = 'song';
 export const WAV_EXTENSION = '.wav';
 export const WAV_MIME = 'audio/wav';
 
+/** The stems' archive (windsor#41): `<song>-stems.zip`, stored, not compressed. */
+export const ZIP_EXTENSION = '.zip';
+export const ZIP_MIME = 'application/zip';
+export const STEMS_ZIP_SUFFIX = '-stems';
+/** A part's stem is numbered by its slot + 1, to two digits: `<song>-01-<part>.wav`. */
+export const STEM_NUMBER_DIGITS = 2;
+/** A return's stem: `<song>-return-<name>.wav`. */
+export const STEM_RETURN_WORD = 'return';
+
 /** Characters no file system on the three desktop platforms accepts in a name. */
 export const FILE_NAME_FORBIDDEN = /[\\/:*?"<>|]+/g;
 

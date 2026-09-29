@@ -45,7 +45,7 @@ import { clonePatch } from '../patch/patch';
 import { normalisePatches } from '../patch/patchNormalise';
 import { PatchResolver, type ResolveOptions } from './arrangementValidate';
 import { SCALES, type ScaleName } from '../sequencing/scaleSampler';
-import { normaliseSequencer } from './sequencerNormalise';
+import { normaliseSequencer, sequencerKindOf } from './sequencerNormalise';
 
 export class ArrangementNormaliser extends FieldNormaliser {
   /**
@@ -179,7 +179,12 @@ export class ArrangementNormaliser extends FieldNormaliser {
       preset,
       velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, `${path}.velocity`),
       strip: normaliseStrip(o.strip, `${path}.strip`, this),
-      regions: normaliseRegions(o.regions, transport.bars * TICKS_PER_BAR, `${path}.regions`, this),
+      regions: normaliseRegions(o.regions, {
+        songTicks: transport.bars * TICKS_PER_BAR,
+        kind: sequencerKindOf(o.sequencer),
+        path: `${path}.regions`,
+        n: this,
+      }),
       sequencer: normaliseSequencer(o.sequencer, `${path}.sequencer`, this),
     };
   }

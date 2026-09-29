@@ -29,20 +29,31 @@ import {
   RENDER_TAIL_SECONDS,
   WAV_BIT_DEPTH_DEFAULT,
 } from '@windsor/engine';
-import { FILE_NAME_FORBIDDEN, WAV_EXTENSION, WAV_FALLBACK_NAME } from './audioExportConstants';
+import {
+  FILE_NAME_FORBIDDEN,
+  WAV_EXTENSION,
+  WAV_FALLBACK_NAME,
+  WAV_MIME,
+} from './audioExportConstants';
 import type { ToastTone } from './toastModel';
 
 export interface AudioExportSettings {
   sampleRate: RenderSampleRate;
   bitDepth: WavBitDepth;
   tailSeconds: number;
+  /** One WAV per part and return beside the master, as one zip (windsor#41). */
+  stems: boolean;
+  /** Stems only: export the parts routed "Sidechain only" too (windsor#41 decision 4). */
+  includeMuted: boolean;
 }
 
-/** What a fresh page offers: the engine's defaults. */
+/** What a fresh page offers: the engine's defaults, the mix alone. */
 export const defaultExportSettings = (): AudioExportSettings => ({
   sampleRate: RENDER_SAMPLE_RATE_DEFAULT,
   bitDepth: WAV_BIT_DEPTH_DEFAULT,
   tailSeconds: RENDER_TAIL_SECONDS.default,
+  stems: false,
+  includeMuted: false,
 });
 
 export type ExportDestination = 'download' | 'saveAs';
@@ -52,17 +63,21 @@ export function exportDestinations(hasSavePicker: boolean): ExportDestination[] 
   return hasSavePicker ? ['download', 'saveAs'] : ['download'];
 }
 
-/** `<song name>.wav`, the song's name being the Export field's, less its `.json`. */
-export function wavFileName(exportName: string): string {
+/** The song's name for its files: the Export field's, less its `.json`, safe on any file system. */
+export function songFileStem(exportName: string): string {
   const stem = exportName
     .trim()
     .replace(/\.json$/i, '')
     .replace(FILE_NAME_FORBIDDEN, '-')
     .trim();
-  return `${stem || WAV_FALLBACK_NAME}${WAV_EXTENSION}`;
+  return stem || WAV_FALLBACK_NAME;
 }
 
-/** Where an encoded file goes: written once, or discarded when the run does not finish. */
+/** `<song name>.wav`. */
+export const wavFileName = (exportName: string): string =>
+  `${songFileStem(exportName)}${WAV_EXTENSION}`;
+
+/** Where a finished file — a WAV, or the stems' zip — goes: written once, or discarded. */
 export interface WavSink {
   /** How the notice names the destination ("your downloads", "the file you chose"). */
   readonly where: string;
@@ -71,7 +86,7 @@ export interface WavSink {
    * destination as it was once `signal` fires before the commit point.
    * Resolves only once written; past the commit point `signal` is ignored.
    */
-  write(bytes: Uint8Array, signal: AbortSignal): Promise<void>;
+  write(file: Blob, signal: AbortSignal): Promise<void>;
   /** The run will not write; release anything held. Never deletes a file the user picked. */
   discard(): Promise<void>;
 }
@@ -103,9 +118,8 @@ export type AudioExportOutcome =
   | { kind: 'failed'; error: string };
 
 export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOutcome> {
-  const { settings, sink, signal } = run;
-  let writing = false;
-  try {
+  const { settings, signal } = run;
+  return runToSink(run, async () => {
     const rendered = await run.render(run.document, {
       sampleRate: settings.sampleRate,
       tailSeconds: settings.tailSeconds,
@@ -119,11 +133,34 @@ export async function runAudioExport(run: AudioExportRun): Promise<AudioExportOu
       settings.bitDepth,
       { signal },
     );
+    return { file: new Blob([bytes as Uint8Array<ArrayBuffer>], { type: WAV_MIME }), clipped };
+  });
+}
+
+/** What a run makes before it writes: the whole file, and the samples clipped making it. */
+export interface MadeFile {
+  file: Blob;
+  clipped: number;
+}
+
+/**
+ * Make the file, then write it to the sink: the cancel rules every export
+ * shares, the WAV's and the stems' (windsor#41). Nothing reaches the sink
+ * until the file is whole; a cancel or a failure before then discards.
+ */
+export async function runToSink(
+  run: Pick<AudioExportRun, 'sink' | 'signal' | 'fileName'>,
+  make: () => Promise<MadeFile>,
+): Promise<AudioExportOutcome> {
+  const { sink, signal } = run;
+  let writing = false;
+  try {
+    const { file, clipped } = await make();
     if (signal.aborted) throw new DOMException('cancelled', 'AbortError');
     // From here the sink decides: past its commit point a Cancel changes
     // nothing, and the write resolves (saved) or fails with its own error.
     writing = true;
-    await sink.write(bytes, signal);
+    await sink.write(file, signal);
     return { kind: 'saved', fileName: run.fileName, where: sink.where, clipped };
   } catch (error) {
     await sink.discard().catch(() => undefined);

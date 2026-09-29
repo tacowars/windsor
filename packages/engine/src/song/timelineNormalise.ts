@@ -6,7 +6,9 @@
  *
  * Regions (epic #703 decision 17): each end is clamped to the next region's
  * start and to the song end, so the list never overlaps; a region left with
- * no length is dropped, reported. No regions is a silent part.
+ * no length is dropped, reported. No regions is a silent part. A region may
+ * carry its own `pattern` (windsor#73), which travels with it and is
+ * normalised by `normaliseRegionPattern` against the part's kind.
  *
  * Events (decisions 5, 6, 10): contiguous — an event's duration *is* the
  * gap to the next start (the song end for the last), so the document holds
@@ -17,10 +19,10 @@
 import { CHORD_SIZE_TRIAD, HARMONY_DEGREE_MAX } from '../audioConstants';
 import type { HarmonyEvent } from '../harmony/harmonyTimeline';
 import { isChordSize, type ChordSize } from '../harmony/chordTheory';
-import type { Region } from '../sequencing/regionClock';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
-import type { Arrangement } from './arrangement';
-import { FieldNormaliser, show } from './arrangementFields';
+import type { Arrangement, PartRegion, SequencerKind } from './arrangement';
+import { FieldNormaliser, isRecord, show } from './arrangementFields';
+import { normaliseRegionPattern, sequencerKindOf } from './sequencerNormalise';
 
 /**
  * The arrangement with its regions and events re-fitted to its own
@@ -40,7 +42,13 @@ export function fitTimelines(arrangement: Arrangement): Arrangement {
     },
     parts: arrangement.parts.map((part) => ({
       ...part,
-      regions: normaliseRegions(part.regions, songTicks, `parts.${part.slot}.regions`, n),
+      regions: normaliseRegions(part.regions, {
+        songTicks,
+        // Read tolerantly: the player fits a merged partial before it validates it.
+        kind: sequencerKindOf(part.sequencer),
+        path: `parts.${part.slot}.regions`,
+        n,
+      }),
     })),
   };
 }
@@ -61,19 +69,42 @@ function span(raw: unknown, songTicks: number, path: string, n: FieldNormaliser)
   };
 }
 
-function sortedSpans(raw: unknown[], songTicks: number, path: string, n: FieldNormaliser): Span[] {
-  return raw
-    .map((entry, i) => span(entry, songTicks, `${path}[${i}]`, n))
-    .sort((a, b) => a.start - b.start);
+/** A region's span and its written `pattern`, which travels with it through the sort. */
+interface RegionSpan extends Span {
+  pattern: unknown;
 }
 
-/** A part's regions: sorted, each end clamped to the next start and the song end, empty ones dropped. */
-export function normaliseRegions(
-  raw: unknown,
+function sortedSpans(
+  raw: unknown[],
   songTicks: number,
   path: string,
   n: FieldNormaliser,
-): Region[] {
+): RegionSpan[] {
+  return raw
+    .map((entry, i) => ({
+      ...span(entry, songTicks, `${path}[${i}]`, n),
+      pattern: isRecord(entry) ? entry.pattern : undefined,
+    }))
+    .sort((a, b) => a.start - b.start);
+}
+
+/** What a part's regions are normalised against. */
+export interface RegionsContext {
+  /** The song's length: every region ends inside it. */
+  readonly songTicks: number;
+  /** The part's sequencer kind, which a region's own pattern must share (windsor#73). */
+  readonly kind: SequencerKind;
+  readonly path: string;
+  readonly n: FieldNormaliser;
+}
+
+/**
+ * A part's regions: sorted, each end clamped to the next start and the song
+ * end, empty ones dropped. A surviving region keeps its own `pattern`,
+ * normalised against the part's kind (windsor#73); one without stays without.
+ */
+export function normaliseRegions(raw: unknown, context: RegionsContext): PartRegion[] {
+  const { songTicks, kind, path, n } = context;
   if (raw === undefined) {
     n.correction(`${path}: missing — the part has no regions and is silent`);
     return [];
@@ -83,7 +114,7 @@ export function normaliseRegions(
     return [];
   }
   const spans = sortedSpans(raw, songTicks, path, n);
-  const out: Region[] = [];
+  const out: PartRegion[] = [];
   spans.forEach((s, i) => {
     const next = spans[i + 1];
     const end = Math.min(s.start + s.duration, next ? next.start : songTicks, songTicks);
@@ -95,7 +126,10 @@ export function normaliseRegions(
     if (duration !== s.duration) {
       n.correction(`${s.path}.duration: clamped ${s.duration} to ${duration}`);
     }
-    out.push({ start: s.start, duration });
+    const pattern = normaliseRegionPattern(s.pattern, kind, `${s.path}.pattern`, n);
+    out.push(
+      pattern === undefined ? { start: s.start, duration } : { start: s.start, duration, pattern },
+    );
   });
   return out;
 }

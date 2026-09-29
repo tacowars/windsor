@@ -69,3 +69,52 @@ export const KICK = {
   regions: ALL,
   sequencer: { kind: 'euclidean', seed: 0 },
 };
+
+/**
+ * Two chord performances (windsor#73), each complete and correction-free as
+ * written: a close whole-bar pad, and a spread, half-gated eighth-note
+ * figure an octave up with an inversion. `REGION_PATTERN_CHORD` plays one
+ * per region.
+ */
+export const CHORD_PATTERN_A = {
+  kind: 'chord',
+  divisor: TICKS_PER_BAR,
+  gate: 1,
+  voicing: 'close',
+  register: { octave: 3 },
+  steps: [{ kind: 'hit', duration: 1, repeat: 1, inversion: 0, octave: 0 }],
+};
+export const CHORD_PATTERN_B = {
+  kind: 'chord',
+  divisor: TICKS_PER_BAR / 8,
+  gate: 0.5,
+  voicing: 'spread',
+  register: { octave: 4 },
+  steps: [
+    { kind: 'hit', duration: 1, repeat: 2, inversion: 1, octave: 0 },
+    { kind: 'rest', duration: 2, repeat: 1 },
+  ],
+};
+
+/**
+ * A chord part whose two regions each carry their own pattern (windsor#73):
+ * bars 1–2 play `CHORD_PATTERN_A`, bars 3–4 `CHORD_PATTERN_B`, and the
+ * part's own `sequencer` (a blank chord part) is what neither region plays.
+ */
+export const REGION_PATTERN_CHORD = {
+  slot: 1,
+  name: 'chords',
+  preset: 'drone-sqr',
+  regions: [
+    { start: 0, duration: 2 * TICKS_PER_BAR, pattern: CHORD_PATTERN_A },
+    { start: 2 * TICKS_PER_BAR, duration: 2 * TICKS_PER_BAR, pattern: CHORD_PATTERN_B },
+  ],
+  sequencer: {
+    kind: 'chord',
+    divisor: TICKS_PER_BAR,
+    gate: 1,
+    voicing: 'close',
+    register: { octave: 3 },
+    steps: [],
+  },
+};

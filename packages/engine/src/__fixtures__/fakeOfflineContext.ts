@@ -21,6 +21,7 @@ export interface FakeOfflineInit {
 
 export class FakeOfflineContext extends FakeContext {
   readonly length: number;
+  readonly numberOfChannels: number;
   /** Every suspend frame asked for, in order: what the render's stops were. */
   readonly suspendFrames: number[] = [];
   /**
@@ -41,6 +42,7 @@ export class FakeOfflineContext extends FakeContext {
     // overrides it on this instance.
     Object.defineProperty(this, 'sampleRate', { value: init.sampleRate });
     this.length = init.length;
+    this.numberOfChannels = init.numberOfChannels;
     const addModule = this.audioWorklet.addModule;
     this.audioWorklet.addModule = (url: string | URL): Promise<void> => {
       this.timeline.push('module');
@@ -71,10 +73,15 @@ export class FakeOfflineContext extends FakeContext {
     release?.();
   }
 
+  /**
+   * Every channel the context was made with: a mono destination fills the
+   * right from the left, as before; a wider one (a stem pass, windsor#41)
+   * keeps each channel, silence where nothing reaches it.
+   */
   async startRendering(): Promise<AudioBuffer> {
     const blocks = Math.ceil(this.length / BLOCK);
-    const left = new Float32Array(blocks * BLOCK);
-    const right = new Float32Array(blocks * BLOCK);
+    const width = Math.max(2, this.numberOfChannels);
+    const data = Array.from({ length: width }, () => new Float32Array(blocks * BLOCK));
     this.state = 'running';
     this.timeline.push('start');
     for (let b = 0; b < blocks; b++) {
@@ -82,11 +89,13 @@ export class FakeOfflineContext extends FakeContext {
       await this.pauseAt(b * BLOCK);
       for (const delay of this.delays) delay.pull(b);
       const channels = this.destination.pull(b);
-      left.set(channels[0] ?? new Float32Array(BLOCK), b * BLOCK);
-      right.set(channels[1] ?? channels[0] ?? new Float32Array(BLOCK), b * BLOCK);
+      data.forEach((target, c) => {
+        const source = channels[c] ?? (c === 1 ? channels[0] : undefined);
+        target.set(source ?? new Float32Array(BLOCK), b * BLOCK);
+      });
       for (const delay of this.delays) delay.commit(b);
     }
-    const out = [left.subarray(0, this.length), right.subarray(0, this.length)];
+    const out = data.map((channel) => channel.subarray(0, this.length));
     return {
       length: this.length,
       numberOfChannels: out.length,

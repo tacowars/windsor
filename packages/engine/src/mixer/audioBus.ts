@@ -37,6 +37,14 @@ export interface AudioBus {
   readonly filter?: BiquadFilterNode;
 }
 
+/**
+ * The music bus (`AudioSystem`): the dry parts' sum through a highpass,
+ * before the song master. The stem render (windsor#41) runs each part's stem
+ * through a bus built from the same options, so the stems sum to what the
+ * master receives.
+ */
+export const MUSIC_BUS_OPTIONS: BusOptions = { filter: { type: 'highpass', frequency: 30 } };
+
 /** Wire a bus. Connect parts to `input`; route `output` onward. */
 export function createBus(context: BaseAudioContext, options: BusOptions = {}): AudioBus {
   const input = context.createGain();
