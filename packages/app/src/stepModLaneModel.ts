@@ -12,8 +12,6 @@ import type { StepModLane, StepModParam, StepModRow } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX, STEP_MOD_PARAMS, STEP_MOD_TABLE, stepModValue } from '@windsor/engine';
 import { fmtSigned } from './consoleFormat';
 import {
-  LANE_CLICK_SLOP_PX,
-  LANE_DOUBLE_CLICK_MS,
   LANE_OCTAVE_DIGITS,
   LANE_PAINT,
   STEP_MOD_LANE_LABELS,
@@ -55,6 +53,21 @@ export function withLaneValues(
   values: readonly number[],
 ): StepModLane[] {
   return lanes.map((lane, i) => (i === index ? { ...lane, values: [...values] } : lane));
+}
+
+/**
+ * The list with the lane for `param` given `values`, or null when no lane
+ * names `param` any more: what a write that waited (a click's double-click
+ * window) lands on, so a lane removed or moved meanwhile never takes
+ * another lane's values.
+ */
+export function withParamValues(
+  lanes: readonly StepModLane[],
+  param: StepModParam,
+  values: readonly number[],
+): StepModLane[] | null {
+  const index = lanes.findIndex((lane) => lane.param === param);
+  return index < 0 ? null : withLaneValues(lanes, index, values);
 }
 
 /** One step back to the patch's own value: a double-click. */
@@ -210,91 +223,3 @@ export function laneReadout(
 
 /** The name a lane and the picker show. */
 export const laneLabel = (param: StepModParam): string => STEP_MOD_LANE_LABELS[param].label;
-
-/** Whether a press has travelled far enough from where it went down to be a drag. */
-export function isDrag(dx: number, dy: number, slop = LANE_CLICK_SLOP_PX): boolean {
-  return Math.abs(dx) > slop || Math.abs(dy) > slop;
-}
-
-/** The time and the timer a click gate runs on; a test passes a fake. */
-export interface LaneClock {
-  now(): number;
-  /** Run `fn` after `ms`; the returned function cancels it. */
-  after(ms: number, fn: () => void): () => void;
-}
-
-/** Where a lane edit lands: one lane's whole value list. */
-export type LaneWrite = (lane: number, values: readonly number[]) => void;
-
-/** What a press does: start painting, or reset the cell (the second press of a double-click). */
-export type PressKind = 'paint' | 'reset';
-
-interface PendingClick {
-  readonly lane: number;
-  readonly index: number;
-  readonly values: readonly number[];
-  readonly at: number;
-  readonly cancel: () => void;
-}
-
-/**
- * The lane cells' press, release and double-click rules, without the DOM.
- * A drag writes on release. A click (no travel past the slop) shows at once
- * but is written only when the double-click window closes; a second press
- * on the same cell inside the window drops that write and writes the cell's
- * reset to 0 instead, so a double-click writes one list, with 0 at the
- * cell. A press anywhere else writes a waiting click first. The browser's
- * `dblclick` is not used: by the time it fires, both presses are over.
- */
-export class LaneClickGate {
-  private pending: PendingClick | null = null;
-  private resetting = false;
-
-  constructor(
-    private readonly write: LaneWrite,
-    private readonly clock: LaneClock,
-    private readonly windowMs = LANE_DOUBLE_CLICK_MS,
-  ) {}
-
-  /** A press on `lane`'s cell `index`. On `reset` the gate has written the 0; the card only redraws. */
-  press(lane: number, index: number): PressKind {
-    const waiting = this.pending;
-    if (
-      waiting?.lane === lane &&
-      waiting.index === index &&
-      this.clock.now() - waiting.at <= this.windowMs
-    ) {
-      this.drop();
-      this.resetting = true;
-      this.write(lane, resetCell(waiting.values, index));
-      return 'reset';
-    }
-    this.flush();
-    this.resetting = false;
-    return 'paint';
-  }
-
-  /** A release: a drag writes now, a click waits out the window, the release of a reset does nothing. */
-  release(lane: number, index: number, values: readonly number[], dragged: boolean): void {
-    if (this.resetting) {
-      this.resetting = false;
-      return;
-    }
-    if (dragged) return this.write(lane, values);
-    const cancel = this.clock.after(this.windowMs, () => this.flush());
-    this.pending = { lane, index, values: [...values], at: this.clock.now(), cancel };
-  }
-
-  /** Write a waiting click now. */
-  flush(): void {
-    const waiting = this.pending;
-    if (!waiting) return;
-    this.drop();
-    this.write(waiting.lane, waiting.values);
-  }
-
-  private drop(): void {
-    this.pending?.cancel();
-    this.pending = null;
-  }
-}

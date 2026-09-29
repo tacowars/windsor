@@ -23,9 +23,6 @@ import {
   cellAtX,
   freeParams,
   heldBySlide,
-  isDrag,
-  LaneClickGate,
-  type LaneClock,
   type LaneHold,
   laneReadout,
   lanesForSteps,
@@ -268,85 +265,5 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
     expect(laneReadout('ops.0.feedback', 0.35, 0, { kind: 'same', when: 'skip' })).toBe(
       '+0.35 · held by slide unless skipped',
     );
-  });
-});
-
-describe('clicks, drags and the double-click', () => {
-  /** A clock the test moves by hand, firing due timers as it goes. */
-  function fakeClock(): LaneClock & { advance(ms: number): void } {
-    let t = 0;
-    let timers: { due: number; fn: () => void; live: boolean }[] = [];
-    return {
-      now: () => t,
-      after: (ms, fn) => {
-        const timer = { due: t + ms, fn, live: true };
-        timers.push(timer);
-        return () => void (timer.live = false);
-      },
-      advance(ms) {
-        t += ms;
-        const due = timers.filter((x) => x.live && x.due <= t);
-        timers = timers.filter((x) => !due.includes(x));
-        for (const x of due) x.fn();
-      },
-    };
-  }
-  const setup = () => {
-    const writes: [number, number[]][] = [];
-    const clock = fakeClock();
-    const gate = new LaneClickGate((lane, values) => writes.push([lane, [...values]]), clock, 250);
-    return { writes, clock, gate };
-  };
-
-  it('writes a double-click (down, up, down, up, dblclick) once, as the reset', () => {
-    const { writes, clock, gate } = setup();
-    expect(gate.press(0, 1)).toBe('paint');
-    gate.release(0, 1, [0, 0.6, 0.2], false);
-    clock.advance(120);
-    expect(gate.press(0, 1)).toBe('reset');
-    gate.release(0, 1, [], false);
-    // The browser's dblclick lands here; the gate has nothing left to do.
-    clock.advance(1000);
-    expect(writes).toEqual([[0, [0, 0, 0.2]]]);
-  });
-
-  it('writes a single click once, when the window closes', () => {
-    const { writes, clock, gate } = setup();
-    gate.press(1, 2);
-    gate.release(1, 2, [0, 0, 0.5], false);
-    clock.advance(249);
-    expect(writes).toEqual([]);
-    clock.advance(1);
-    expect(writes).toEqual([[1, [0, 0, 0.5]]]);
-    clock.advance(1000);
-    expect(writes).toHaveLength(1);
-  });
-
-  it('writes a drag at once', () => {
-    const { writes, gate } = setup();
-    gate.press(0, 0);
-    gate.release(0, 0, [0.4, 0.8], true);
-    expect(writes).toEqual([[0, [0.4, 0.8]]]);
-  });
-
-  it('writes a waiting click before a press elsewhere, and a late second press is a new click', () => {
-    const { writes, clock, gate } = setup();
-    gate.press(0, 0);
-    gate.release(0, 0, [0.3, 0], false);
-    expect(gate.press(0, 1)).toBe('paint');
-    expect(writes).toEqual([[0, [0.3, 0]]]);
-    gate.release(0, 1, [0.3, 0.7], false);
-    clock.advance(300);
-    expect(gate.press(0, 1)).toBe('paint');
-    expect(writes).toEqual([
-      [0, [0.3, 0]],
-      [0, [0.3, 0.7]],
-    ]);
-  });
-
-  it('tells a click from a drag by the travel past the slop', () => {
-    expect(isDrag(2, -3)).toBe(false);
-    expect(isDrag(0, 4)).toBe(true);
-    expect(isDrag(-4, 0)).toBe(true);
   });
 });

@@ -30,21 +30,20 @@ import { primaryHeld } from './songViewTables';
 import {
   type PaintPoint,
   type StepSlide,
-  LaneClickGate,
   NO_SLIDE,
   addLane,
   canAddLane,
   cellAtX,
   freeParams,
   heldBySlide,
-  isDrag,
   laneLabel,
   laneReadout,
   paintSpan,
   removeLane,
   valueAtY,
-  withLaneValues,
+  withParamValues,
 } from './stepModLaneModel';
+import { LaneClickGate, isDrag } from './stepModLaneClicks';
 
 /** What a lane needs of the card it sits on. */
 export interface LaneHost {
@@ -79,9 +78,11 @@ function gateOf(host: LaneHost): LaneClickGate {
   let gate = gates.get(host);
   if (!gate) {
     gate = new LaneClickGate(
-      (lane, values) => {
+      (param, values) => {
         const lanes = host.lanes();
-        if (!lanes || !host.write(withLaneValues(lanes, lane, values))) host.repaint();
+        // The lane is named by its parameter: gone (removed in the window) means no write.
+        const next = lanes && withParamValues(lanes, param, values);
+        if (next && !host.write(next)) host.repaint();
       },
       {
         now: () => performance.now(),
@@ -121,13 +122,14 @@ function showReadout(host: LaneHost, lane: number, step: number, value: number |
  */
 function pressCell(host: LaneHost, lane: number, index: number, down: PointerEvent): void {
   const cell = down.currentTarget as HTMLElement;
-  if (down.button !== 0 || !host.lanes()?.[lane]) return;
+  const param = host.lanes()?.[lane]?.param;
+  if (down.button !== 0 || !param) return;
   down.preventDefault();
   const gate = gateOf(host);
-  if (gate.press(lane, index) === 'paint') return paintFrom(host, lane, index, down);
+  if (gate.press(param, index) === 'paint') return paintFrom(host, lane, index, down);
   drawCell(cell, 0);
   showReadout(host, lane, index, 0);
-  cell.addEventListener('pointerup', () => gate.release(lane, index, [], false), { once: true });
+  cell.addEventListener('pointerup', () => gate.release(param, index, [], false), { once: true });
 }
 
 function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEvent): void {
@@ -153,7 +155,7 @@ function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEve
     if (stop.signal.aborted) return;
     stop.abort();
     if (cell.hasPointerCapture(down.pointerId)) cell.releasePointerCapture(down.pointerId);
-    if (commit) gateOf(host).release(lane, index, values, dragged);
+    if (commit) gateOf(host).release(start.param, index, values, dragged);
     else host.repaint();
   };
   const mine = (e: PointerEvent): boolean => e.pointerId === down.pointerId;
@@ -221,6 +223,7 @@ export function paintLaneNames(names: HTMLElement, host: LaneHost): void {
     remove.title = `Remove the ${laneLabel(lane.param)} lane`;
     remove.onclick = (): void => {
       const now = host.lanes();
+      gateOf(host).cancel(lane.param);
       if (now && host.write(removeLane(now, k))) host.repaint();
     };
     head.appendChild(remove);
