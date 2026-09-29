@@ -19,6 +19,8 @@ import {
 } from '../audioConstants';
 import { CHORD_VOICING_DEFAULT, CHORD_VOICING_IDS } from '../harmony/chordTables';
 import { ARP_STYLES, DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
+import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
+import { defaultArpSteps } from '../sequencing/arpSteps';
 import { BASS_PITCH_MODES, DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
 import { DEFAULT_GRID_CONFIG, gridNote } from '../sequencing/gridSequencer';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
@@ -220,6 +222,11 @@ describe('arp sequencer normalisation (#705)', () => {
       voicing: 'drop2',
       retrigger: true,
       register: { octave: 5 },
+      steps: [{ kind: 'tie' }, ...defaultArpSteps(ARP_STEPS_MAX - 1)],
+      lanes: [{ param: 'filter.cutoff', values: new Array<number>(ARP_STEPS_MAX).fill(0.5) }],
+      accentVelocity: 0.4,
+      accentMod: 0.6,
+      skipChance: 0.2,
       seed: 9,
     };
     const full = sequencer(written);

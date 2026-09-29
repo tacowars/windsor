@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
+import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
+import { defaultArpSteps } from '../sequencing/arpSteps';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { ALL, KICK, PATCHES, play, song } from '../__fixtures__/documentCases';
 
@@ -58,6 +60,11 @@ describe('the version-3 document (#705)', () => {
       voicing: 'spread',
       retrigger: true,
       register: { octave: 5 },
+      steps: [{ kind: 'rest' }, ...defaultArpSteps(ARP_STEPS_MAX - 1)],
+      lanes: [],
+      accentVelocity: 0.3,
+      accentMod: 0.9,
+      skipChance: 0.1,
       seed: 31,
     };
     const bass = {
