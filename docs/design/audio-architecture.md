@@ -224,7 +224,7 @@ The view draws from the engine's own rules — `sequencing/regionClock.ts` for t
 position, `harmony/harmonyTimeline.ts` for the block bounds and the chord under the
 playhead — so what the lanes show is what the region gate plays, and every edit is a
 live partial over the console's pure `regionModel.ts` / `harmonyLaneModel.ts`, never a
-rebuild. While the transport is stopped or paused the playhead line is a handle: a drag
+rebuild. While the transport is stopped or paused with audio on, the playhead line is a handle: a drag
 snaps it to a bar line and the drop seeks the engine's transport there
 (`AudioSystem.seekMusic`, windsor#102). The console's layers are `packages/app/CLAUDE.md`
 "The Song view".
