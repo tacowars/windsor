@@ -7,11 +7,17 @@
  * throw. `ArrangementNormaliser` (`arrangementNormalise.ts`) calls it per part.
  */
 import { chordDriver } from '../harmony/chordNormalise';
-import type { EuclideanDriver, GridDriver, SequencerSpec } from './arrangement';
+import type {
+  EuclideanDriver,
+  GridDriver,
+  RegionPattern,
+  SequencerKind,
+  SequencerSpec,
+} from './arrangement';
 import { arpDriver, bassDriver } from './performerNormalise';
 import { registerOctave, seed } from './sequencerFields';
-import { SEQUENCER_KINDS } from './arrangement';
-import { show, type FieldNormaliser } from './arrangementFields';
+import { SEEDED_KINDS, SEQUENCER_KINDS } from './arrangement';
+import { isRecord, show, type FieldNormaliser } from './arrangementFields';
 import {
   EUCLID_STEPS_MAX,
   GRID_DEGREE_MAX,
@@ -75,6 +81,49 @@ export function normaliseSequencer(raw: unknown, path: string, n: FieldNormalise
       n.dropUnknown(driver, [], path);
       return { kind: 'none' };
   }
+}
+
+/**
+ * The kind `normaliseSequencer` settles on for `raw`, read without a report:
+ * what a part's regions normalise their patterns against before the
+ * sequencer itself is normalised (and reported) in its usual place.
+ */
+export function sequencerKindOf(raw: unknown): SequencerKind {
+  const kind = isRecord(raw) ? raw.kind : undefined;
+  return (SEQUENCER_KINDS as readonly unknown[]).includes(kind) ? (kind as SequencerKind) : 'none';
+}
+
+/**
+ * A region's own pattern (windsor#73): absent stays absent, so a region
+ * without one plays the part's `sequencer` and nothing is ever copied in.
+ * One of another kind than the part's is dropped, reported; a `seed` inside
+ * one is dropped silently (the seed is the part's). Everything else gets
+ * exactly the rules `part.sequencer` gets for that kind.
+ */
+export function normaliseRegionPattern(
+  raw: unknown,
+  kind: SequencerKind,
+  path: string,
+  n: FieldNormaliser,
+): RegionPattern | undefined {
+  if (raw === undefined) return undefined;
+  if (!isRecord(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a pattern — dropped, the region plays the part's`);
+    return undefined;
+  }
+  if (raw.kind !== kind) {
+    n.correction(
+      `${path}.kind: ${show(raw.kind)} is not the part's kind ${kind} — pattern dropped, the region plays the part's`,
+    );
+    return undefined;
+  }
+  // A stand-in seed for a seeded kind keeps `seed()` from reporting it missing.
+  const written: Record<string, unknown> = { ...raw };
+  delete written.seed;
+  if (SEEDED_KINDS.includes(kind)) written.seed = 0;
+  const spec: Record<string, unknown> = { ...normaliseSequencer(written, path, n) };
+  delete spec.seed;
+  return spec as RegionPattern;
 }
 
 function euclideanDriver(raw: unknown, path: string, n: FieldNormaliser): EuclideanDriver {
