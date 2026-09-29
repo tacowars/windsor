@@ -983,6 +983,15 @@ def report_project(name, sessions, subagents, out):
         W("- Session 35dbdc79 is the session that ran this measurement; its sub-agent transcripts (including the measuring agent's own) were still being written when read.")
 
 
+def write_report(text, table, path):
+    """Write the report with every hidden word replaced, whatever field it came from; return what was written."""
+    require_hide_table(table)
+    text = hide_words(text, table)
+    with open(path, "w") as fh:
+        fh.write(text)
+    return text
+
+
 def main():
     require_hide_table(HIDE_TABLE)
     out = []
@@ -1011,10 +1020,8 @@ def main():
         out.append(f"- {len(sessions)} session(s), {len(subagents)} sub-agent transcripts, {sum(sum(s['tools'].values()) for s in sessions)} tool calls, "
                    f"date range {min(ts for s in sessions for ts in s['ts']).date() if any(s['ts'] for s in sessions) else '-'}; "
                    f"output tokens {fmt_k(sum(t['output'] for t in tk))}. Not included in the Aotearoa204 totals above.")
-    text = "\n".join(out) + "\n"
+    text = write_report("\n".join(out) + "\n", HIDE_TABLE, os.path.join(HERE, "transcript-overhead-report.md"))
     sys.stdout.write(text)
-    with open(os.path.join(HERE, "transcript-overhead-report.md"), "w") as fh:
-        fh.write(text)
 
 
 def self_test():
@@ -1032,6 +1039,17 @@ def self_test():
         raise AssertionError("an empty word list must stop the report")
     require_hide_table(table)
     assert hide_words("unchanged", []) == "unchanged"
+    import tempfile
+
+    report = "| session | scripts |\n| a1 | `python3 Zorbl.py`, run-zorbl.sh |\nPrompt: zorbl's idea\n"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "report.md")
+        written = write_report(report, table, path)
+        with open(path) as fh:
+            on_disk = fh.read()
+    assert on_disk == written, "the report on disk is the filtered one"
+    assert "zorbl" not in on_disk.lower(), f"hidden word in the report: {on_disk!r}"
+    assert "`python3 someone.py`, run-someone.sh" in on_disk, on_disk
     print("self-test passed")
 
 
