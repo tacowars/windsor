@@ -7,6 +7,7 @@
  * The actions are pure and tested; this wires them to buttons and reports
  * the patch files a library read refused as a warning toast.
  */
+import { partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { LIBRARY_FOLDER_PATH } from './libraryConstants';
@@ -210,9 +211,12 @@ async function runCopy(
     ctx.parts.patch.volume,
   );
   if (!meta) return;
+  const named = partAt(ctx.model.doc, scope.slot)?.name;
   const id = await copyToNew({ ...scope, working: ctx.parts.patch, meta });
   ctx.notify(`${writtenText(library, id)} — this part now plays it`, 'success');
   refresh();
+  // A generic part just took its patch's name (windsor#103): the part picker shows it too.
+  if (partAt(ctx.model.doc, scope.slot)?.name !== named) ctx.render();
 }
 
 async function runDelete(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {

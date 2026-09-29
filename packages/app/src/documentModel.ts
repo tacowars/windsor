@@ -123,10 +123,17 @@ export class DocumentModel {
    * Open a raw document — the import path. Private `adopt` on purpose: an
    * outside caller normalising for itself is how the file-import path came to
    * bypass the library fill (#562 review pass 1/2, P2).
+   *
+   * `amend` is an edit the opening itself makes (windsor#103's load-time
+   * rename): applied after "opened" is taken, so it counts as a change, while
+   * the report stays the one the raw document produced — the
+   * import's corrections, dangling names and fills are what the user is told.
    */
-  open(raw: unknown): void {
+  open(raw: unknown, amend?: (doc: ArrangementDocument) => unknown): void {
     this.adopt(this.normalise(raw));
     this.opened = this.toJson();
+    const partial = amend?.(this.doc);
+    if (partial) this.doc = this.normalise(mergeDocument(this.doc, partial)).document;
     this.notify();
   }
 

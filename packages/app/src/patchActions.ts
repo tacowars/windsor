@@ -18,6 +18,7 @@ import { partChange } from './context';
 import { INIT_PATCH_NAME, initPresetId, isInitPreset } from './libraryConstants';
 import type { LibraryModel } from './libraryModel';
 import { isWritable, removeLibraryFile, writeLibraryFile } from './libraryModel';
+import { assignPatchFields } from './partAutoName';
 import { buildPatchFile, patchFileText } from './patchFileWriter';
 import type { PatchMetadata } from './patchMetadata';
 import { copyMetadata, slugify, uniqueId } from './patchMetadata';
@@ -182,7 +183,8 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   ]);
   const file = buildPatchFile(meta, working);
   await writeLibraryFile(library, id, patchFileText(file), request.download);
-  ctx.change({ ...partChange(slot, { preset: id }), patches: { [id]: file.patch } });
+  const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
+  ctx.change({ ...partChange(slot, fields), patches: { [id]: file.patch } });
   if (wasInit) dropInit(ctx);
   return id;
 }
