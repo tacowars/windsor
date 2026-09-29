@@ -1,6 +1,8 @@
 /**
- * The playhead every sequencer card shows for its region (windsor#97 for the
- * grid, windsor#101 for the chord and Euclidean cards): bright on the step
+ * The playhead the grid, chord and Euclidean cards show for their region
+ * (windsor#97 for the grid, windsor#101 for the chord and Euclidean cards).
+ * The arp and bass cards show none by design: their generators are
+ * generative and have no step position. The playhead is bright on the step
  * the engine is sounding while the song is inside the card's region, and a
  * dimmer ghost on the step the region's pattern would be on while it is not
  * — another region of the part playing, or none. Dark only while the

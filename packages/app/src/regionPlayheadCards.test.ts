@@ -99,9 +99,10 @@ const REGIONS: Record<number, PartRegion[]> = {
 /** The fixture song with the chord and Euclidean parts only, in `regions` (the ones above by default). */
 function player(regions: Record<number, PartRegion[]> = REGIONS): ReturnType<typeof rig> {
   const base = onlyParts(FULL_ARRANGEMENT, 'kick', 'drone');
-  const parts = base.parts.map(
-    (part): MusicPart => ({ ...part, regions: regions[part.slot] ?? part.regions }),
-  );
+  const parts = base.parts.map((part): MusicPart => ({
+    ...part,
+    regions: regions[part.slot] ?? part.regions,
+  }));
   return rig({ ...base, parts });
 }
 
