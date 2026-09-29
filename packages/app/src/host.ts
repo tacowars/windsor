@@ -34,6 +34,13 @@ export interface BuildOptions {
    * undo and redo rebuild passes it; every other build starts from the top.
    */
   resumeAt?: number;
+  /**
+   * The build only re-syncs an edit made while another build was in flight
+   * (windsor#141): it resumes where that pending build would have, or from
+   * the top with none pending, and `resumeAt` is not read. A fresh document
+   * (Import, New song, the restore on reload) never passes it.
+   */
+  keepPendingResume?: boolean;
 }
 
 /**
@@ -132,6 +139,11 @@ export class HostTransport implements ConsoleTransport {
    */
   buildPending(tick: number | undefined): void {
     this.pending = tick ?? null;
+  }
+
+  /** The tick the build in flight resumes from, or undefined with none pending (windsor#141). */
+  get pendingResume(): number | undefined {
+    return this.pending ?? undefined;
   }
 
   /** The latest build failed or had nothing to build: no resume is pending any more. */
@@ -251,12 +263,15 @@ export class EngineHost {
    * behind the model (cross-model self-review finding). The latest call's
    * options win with its document, so an import queued behind an undo
    * starts from the top, and the transport reads the latest call's resume
-   * tick until the system that call built is adopted.
+   * tick until the system that call built is adopted. A call that only
+   * re-syncs an edit (`keepPendingResume`, windsor#141) carries the pending
+   * resume forward instead, so an undo's bar survives a knob turned mid-build.
    */
   build(document: ArrangementDocument, options: BuildOptions = {}): Promise<void> {
     this.latest = document;
     const generation = ++this.generation;
-    const from = resumeTick(options.resumeAt, songTicksOf(document));
+    const at = options.keepPendingResume ? this.transport.pendingResume : options.resumeAt;
+    const from = resumeTick(at, songTicksOf(document));
     this.transport.buildPending(from);
     this.building = this.building
       .catch(() => undefined)
