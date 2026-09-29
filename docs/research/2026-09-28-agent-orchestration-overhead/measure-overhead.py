@@ -105,6 +105,12 @@ def hide_words(text, table):
 
 HIDE_TABLE = hide_table({**read_dotenv(os.path.join(REPO_ROOT, ".env")), **os.environ})
 
+
+def require_hide_table(table):
+    """Stop before writing anything when no words are set: the report is never written unfiltered."""
+    if not table:
+        raise SystemExit("REPORT_HIDE_WORDS is not set (repo .env or environment); not writing the report.")
+
 # --------------------------------------------------------------------------
 # Bash command classification
 # --------------------------------------------------------------------------
@@ -978,6 +984,7 @@ def report_project(name, sessions, subagents, out):
 
 
 def main():
+    require_hide_table(HIDE_TABLE)
     out = []
     out.append("# Sub-agent tool-call and token overhead, measured from Claude Code transcripts")
     out.append(f"\nGenerated {datetime.now().isoformat(timespec='seconds')} by measure-overhead.py from `{BASE}`. "
@@ -1017,6 +1024,13 @@ def self_test():
     want = "someone said; someone's mix; someone's idea; run-someone-now; Zorblax and quxes stay."
     assert got == want, f"got {got!r}"
     assert hide_table({}) == [], "no words means nothing hidden"
+    try:
+        require_hide_table(hide_table({}))
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError("an empty word list must stop the report")
+    require_hide_table(table)
     assert hide_words("unchanged", []) == "unchanged"
     print("self-test passed")
 
