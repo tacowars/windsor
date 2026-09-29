@@ -39,6 +39,7 @@ lives one hour, which makes an idle hub re-read its context cold.
    Claude workers, lands a `seam` ticket first when a wave shares a hotspot,
    and merges routine PRs with `gh pr merge --squash --auto` so GitHub does
    the waiting. A ruleset on `main` requires the `verify` check and a PR.
+   Refined by `2026-09-29-the-main-session-stays-small`.
 5. **Two PR classes.** `routine` merges on green plus no P0 or P1 from
    Codex. `reviewed` (sound design, UI/UX, song document schema,
    persistence, golden changes, deviations) waits for tacowars.
