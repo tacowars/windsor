@@ -212,8 +212,9 @@ export class EngineHost {
     return this.system ? this.system.apply(partial) : null;
   }
 
-  capturePattern(slot: number): readonly boolean[] | null {
-    return this.system?.capturePattern(slot) ?? null;
+  /** A Euclidean part's live figure: region `region`'s (windsor#75), or with none the part's own. */
+  capturePattern(slot: number, region?: number): readonly boolean[] | null {
+    return this.system?.capturePattern(slot, region) ?? null;
   }
 
   /**

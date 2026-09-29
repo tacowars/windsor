@@ -9,20 +9,19 @@
  * lets the modulator back in. Every edit goes through `ctx.change` into the
  * pane's selected region's pattern (windsor#75, `changePattern`) and, since
  * the engine reconfigures a Euclidean part live, none restarts the sequencer.
- * The strip shows the player's live figure only while the transport is inside
- * that region; elsewhere it shows the region's own figure.
+ * The strip shows the player's live figure for that region (asked for by its
+ * index) while the transport is inside it; elsewhere the region's own
+ * preview (`euclidFigure.ts`), so Capture freezes the selected region's figure.
  * The operations are `euclidModel.ts`; the playhead loop and its lighting are
  * `stepStrip.ts` (#619), shared with the grid (#603) and chord (#607) cards.
  */
 import type { EuclideanSpec } from '@windsor/engine';
-import { partAt } from '@windsor/engine';
 import { PERC_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import {
   countOnsets,
   figureKey,
-  previewFigure,
   pulsesChange,
   rotateChange,
   stepsChange,
@@ -31,9 +30,9 @@ import {
   type Figure,
   type PulseField,
 } from './euclidModel';
+import { regionFigure } from './euclidFigure';
 import { makeKnob, type KnobElement } from './knob';
 import { changePattern } from './partEdits';
-import { regionAt } from './regionModel';
 import { densityControls, divisorPicker, knobRow as tableKnobRow } from './seqFields';
 import {
   EUCLID_KNOBS,
@@ -78,21 +77,15 @@ interface Card extends PlayheadStrip {
   dependents: KnobElement[];
 }
 
-/** True while the transport is inside the card's region (always, with no region named). */
-function inRegion(card: Card): boolean {
-  if (card.region === undefined) return true;
-  const part = partAt(card.ctx.model.doc, card.slot);
-  return (
-    part !== undefined && regionAt(part.regions, card.ctx.transport.position()) === card.region
-  );
-}
-
-/** The figure the player holds while it plays this card's region, else the document's preview. */
+/** The figure the player holds for this card's region while it plays it, else the region's preview (`regionFigure`). */
 function figureOf(card: Card): Figure {
-  const live = inRegion(card) ? card.ctx.host.capturePattern(card.slot) : null;
-  if (Array.isArray(live) && typeof live[0] === 'boolean') return live as Figure;
-  const spec = card.spec();
-  return spec ? previewFigure(spec) : [];
+  const { ctx } = card;
+  const source = {
+    doc: ctx.model.doc,
+    capturePattern: (slot: number, region?: number) => ctx.host.capturePattern(slot, region),
+    position: () => ctx.transport.position(),
+  };
+  return regionFigure(source, card.slot, card.region);
 }
 
 /** Write fields of the card's region's pattern; false when nothing took. */
