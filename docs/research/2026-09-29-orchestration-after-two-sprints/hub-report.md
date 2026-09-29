@@ -40,9 +40,10 @@ Each API call is attributed to the last message that started a turn: a message f
 | trigger | turns started | API calls | tokens | share |
 |---|---|---|---|---|
 | tacowars | 125 | 823 | 161.0M | 56% |
-| Monitor / background wait (CI, Codex) | 63 | 273 | 62.6M | 22% |
+| Monitor / background wait (CI, Codex) | 62 | 270 | 61.8M | 21% |
 | worker hand-back | 72 | 250 | 61.4M | 21% |
 | agent finished | 11 | 25 | 3.4M | 1% |
+| other background task | 1 | 3 | 0.8M | 0% |
 
 ### Main-session tokens by the tool each call made
 

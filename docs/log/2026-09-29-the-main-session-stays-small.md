@@ -13,8 +13,8 @@ changes worked: the gate left the worker (57 minutes of vitest, typecheck
 and lint across 38 workers) and workers start at 29 to 30k tokens. The
 cost moved to the main session, which used 40% of the tokens of the
 sessions that dispatched work. It ran to 370 to 415k context per call and
-never compacted: 36% of its tokens were context above 150k. It woke 63
-times for a CI or Codex verdict (22% of its tokens) and 72 times for a
+never compacted: 36% of its tokens were context above 150k. It woke 62
+times for a CI or Codex verdict (21% of its tokens) and 72 times for a
 worker's hand-back (21%). Fix rounds continued in the original worker were
 36% of worker tokens, at a median 171k per call, while a fresh worker
 starts at 30k. The three PRs that went past the two-round cap were

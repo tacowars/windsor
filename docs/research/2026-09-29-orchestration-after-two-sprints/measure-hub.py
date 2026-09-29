@@ -109,6 +109,9 @@ def k(n):
     return f"{n / 1e3:.0f}k"
 
 
+REVIEW_WAIT = re.compile(r"verify|codex|\bCI\b|\bchecks?\b|#\d+|\bPR\b", re.IGNORECASE)
+
+
 def trigger(r):
     """What started the main-session turn that follows this record, or None."""
     c = r["message"]["content"]
@@ -122,7 +125,11 @@ def trigger(r):
         summ = summ.group(1) if summ else ""
         if summ.startswith("Agent"):
             return "agent finished"
-        return "Monitor / background wait (CI, Codex)"
+        # Only a wait on a PR's verdict counts as a review wake; a dev server
+        # or any other background task reporting back is counted apart.
+        if REVIEW_WAIT.search(summ):
+            return "Monitor / background wait (CI, Codex)"
+        return "other background task"
     if r.get("isMeta") or s.startswith("<system-reminder>"):
         return None
     return "tacowars"

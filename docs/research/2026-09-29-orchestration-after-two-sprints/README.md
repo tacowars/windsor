@@ -58,9 +58,10 @@ tokens. The rest came without anyone typing:
 
 | trigger | turns started | tokens | share |
 |---|---|---|---|
-| Monitor or background wait on CI and Codex | 63 | 62.6M | 22% |
+| Monitor or background wait on CI and Codex | 62 | 61.8M | 21% |
 | a worker's hand-back | 72 | 61.4M | 21% |
 | an agent finished | 11 | 3.4M | 1% |
+| another background task (not a PR verdict) | 1 | 0.8M | 0% |
 
 A Codex or CI wake cost about 1M tokens: about four calls at a quarter of
 a million each, to read a verdict and act on it. Codex itself answers in a
