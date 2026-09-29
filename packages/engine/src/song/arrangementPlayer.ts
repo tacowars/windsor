@@ -16,6 +16,10 @@
  * the tick a region ends, releases what the part holds through
  * `release()`. The player never reads a tick itself; `stepAt` folds the
  * console's playhead through the same gate (#619's one position rule).
+ * Since windsor#74 each region plays its own pattern (`regionPattern`): a
+ * part's `PartBinding` (`partBinding.ts`) holds one generator per region
+ * with a pattern of its own, plus the one `part.sequencer` builds for the
+ * rest, all behind the part's gate, and the region entered is the one heard.
  *
  * Since #597 any part carries any kind, or none: a part is found by its
  * slot, a `none` part builds no generator and is never touched here beyond
@@ -28,11 +32,11 @@
  * `apply()` is the live tuning path (refinement decision 3): a deep partial is
  * merged over the current arrangement, validated, and committed — bpm straight
  * to the transport, a preset change via `setPatch`, and only the generators
- * whose kind, divisor or seed changed are rebuilt (`generatorSig`); a
- * `regions`, `transport.bars` or harmony edit reaches every gate live and
- * rebuilds nothing, and a key change re-pitches through the sampler. A
- * merged arrangement that fails validation changes nothing and is reported,
- * never half-applied.
+ * whose kind, divisor or seed changed are rebuilt (`generatorSig`), region
+ * by region (`PartBinding.plan`); a `regions`, `transport.bars` or harmony
+ * edit reaches every gate live, and a key change re-pitches through the
+ * sampler. A merged arrangement that fails validation changes nothing and
+ * is reported, never half-applied.
  *
  * The loop (windsor#15) is the clock's: the player hands it the song's
  * `TickLoop` at build and on every partial, and the counter jumps back from
@@ -41,9 +45,9 @@
  * region: held notes are released on that tick and each gate restarts its
  * stream. A loop over the whole song jumps nothing and is today's wrap.
  */
-import type { Arrangement, ArrangementPartial, MusicPart } from './arrangement';
+import type { Arrangement, ArrangementPartial, MusicPart, SequencerSpec } from './arrangement';
 import { mergeArrangement } from './arrangement';
-import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
+import type { OnsetEvent } from '../sequencing/euclideanSequencer';
 import type { NoteEvent } from '../sequencing/noteEvent';
 import type { PresetTable } from './arrangementValidate';
 import {
@@ -60,19 +64,12 @@ import type { TickEvent, TickLoop, TickSource, Unsubscribe } from '../sequencing
 import { TICKS_PER_BAR, isLoopJump } from '../sequencing/scheduler';
 import { STRAIGHT_SWING, type Swing } from '../sequencing/swingTables';
 import { playableSwing } from '../sequencing/swing';
-import { RegionGate, type RegionGateConfig } from '../sequencing/regionGate';
+import type { RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
 import { partNoteOn } from './partNoteOn';
 import { fitTimelines } from './timelineNormalise';
 import { tickLoopOf, withFittedLoop } from './songLoop';
-import {
-  buildGenerator,
-  generatorSig,
-  generatorStepAt,
-  isPitched,
-  liveReconfiguration,
-  type Generator,
-} from './partGenerators';
+import { PartBinding, type BindingChange } from './partBinding';
 
 /** What a binding needs from a part. `AudioPart` satisfies it structurally. */
 export interface PlayablePart {
@@ -126,23 +123,22 @@ export interface ArrangementReadout {
   counters: Record<string, number>;
 }
 
-/** A part's generator behind its region gate. */
-interface Bound {
-  generator: Generator;
-  gate: RegionGate;
-}
-
 interface Built {
   sampler: ScaleSampler;
   /** By slot; `null` for a `none` part. */
-  bound: ReadonlyMap<number, Bound | null>;
+  bindings: ReadonlyMap<number, PartBinding | null>;
 }
 
 interface Plan {
   built: Built;
-  rebuilt: ReadonlySet<number>;
-  /** Parts kept live: each entry applies the validated config to its generator after the commit. */
-  reconfigured: ReadonlyArray<() => void>;
+  /** Bindings built whole (a part added, or its kind changed): attached after the commit. */
+  fresh: readonly PartBinding[];
+  /** The bindings those replaced: disposed. */
+  retired: readonly PartBinding[];
+  /** Parts kept: each change reconfigures or rebuilds its region generators after the commit. */
+  changes: readonly BindingChange[];
+  /** Parts already sounding that restart: cut before anything is attached. */
+  cut: ReadonlySet<number>;
   patchChanges: ReadonlyArray<readonly [number, Patch]>;
   /** Parts on slots the arrangement did not hold (#629), with the patch each starts on. */
   added: ReadonlyArray<readonly [MusicPart, Patch]>;
@@ -209,7 +205,6 @@ export class ArrangementPlayer {
   private current: Arrangement;
   private bySlot = new Map<number, MusicPart>();
   private built: Built;
-  private readonly subs = new Map<number, Unsubscribe>();
   private readonly counters = new Map<number, number>();
   private readonly announced = new Set<number>();
   /** The last transport tick seen, to spot the loop's jump back; null after a rewind. */
@@ -238,7 +233,7 @@ export class ArrangementPlayer {
     this.transport.loop = tickLoopOf(this.current.transport);
     // Subscribed before any gate, so a jump is seen before a part hears the tick.
     this.unfollow = this.transport.subscribe(1, (event) => this.follow(event));
-    this.attach(new Set(this.current.parts.map((part) => part.slot)));
+    for (const binding of this.built.bindings.values()) binding?.attach();
   }
 
   /** The live arrangement, as data — what `readout` and #70's console read. */
@@ -261,11 +256,11 @@ export class ArrangementPlayer {
   /**
    * A Euclidean part's sounding figure as a literal array (issue #70, record
    * §6) — what the console's click-to-toggle freezes into the sequencer's
-   * `pattern`. `null` for any other kind or an absent slot.
+   * `pattern`: region `regionIndex`'s (windsor#74), or with no index the
+   * one `part.sequencer` plays. `null` for any other kind or an absent slot.
    */
-  capturePattern(slot: number): readonly boolean[] | null {
-    const generator = this.built.bound.get(slot)?.generator ?? null;
-    return generator instanceof EuclideanSequencer ? [...generator.currentPattern] : null;
+  capturePattern(slot: number, regionIndex?: number): readonly boolean[] | null {
+    return this.built.bindings.get(slot)?.capture(regionIndex) ?? null;
   }
 
   /**
@@ -273,13 +268,11 @@ export class ArrangementPlayer {
    * when the part has no position to show — an absent slot, a `none` or
    * unbuilt part, a tick outside the part's regions, an empty Chord Player
    * (#619 decision 2). The tick goes through the part's gate first, so the
-   * playhead and the performer agree on the local position (#705).
+   * playhead and the performer agree on the local position (#705), and the
+   * region it falls in answers with its own pattern's step (windsor#74).
    */
   stepAt(slot: number, tick: number): number {
-    const bound = this.built.bound.get(slot);
-    if (!bound) return -1;
-    const state = bound.gate.stateAt(tick);
-    return state.live ? generatorStepAt(bound.generator, state.localTick) : -1;
+    return this.built.bindings.get(slot)?.stepAt(tick) ?? -1;
   }
 
   /**
@@ -309,25 +302,24 @@ export class ArrangementPlayer {
     for (const [slot, patch] of plan.patchChanges) this.parts.get(slot)?.setPatch(patch);
     for (const slot of plan.removed) this.detach(slot);
     // Only a part that was already sounding is cut; a part just added has nothing to cut.
-    for (const slot of plan.rebuilt) if (this.bySlot.has(slot)) this.parts.get(slot)?.allNotesOff();
+    for (const slot of plan.cut) this.parts.get(slot)?.allNotesOff();
+    for (const binding of plan.retired) binding.dispose();
     for (const [part, patch] of plan.added) this.parts.add?.(part, patch);
     this.built = plan.built;
     this.current = merged;
     this.index();
-    this.attach(plan.rebuilt);
-    for (const reconfigure of plan.reconfigured) reconfigure();
+    for (const binding of plan.fresh) binding.attach();
+    for (const change of plan.changes) change.commit();
     // Regions, song length and harmony are live on every gate (#705): the next tick reads them.
     for (const part of merged.parts) {
-      this.built.bound.get(part.slot)?.gate.reconfigure(gateConfig(merged, part));
+      this.built.bindings.get(part.slot)?.reconfigureGate(gateConfig(merged, part));
     }
     return { ok: true, ignored };
   }
 
   /** Release everything sounding — every pitched part's held notes included. Mute and teardown call this. */
   releaseAll(time = 0): void {
-    for (const bound of this.built.bound.values()) {
-      if (bound && isPitched(bound.generator)) bound.generator.release(0, time);
-    }
+    for (const binding of this.built.bindings.values()) binding?.release(0, time);
     for (const { slot } of this.current.parts) this.parts.get(slot)?.allNotesOff();
   }
 
@@ -339,13 +331,12 @@ export class ArrangementPlayer {
    */
   reset(): void {
     this.lastTick = null;
-    for (const bound of this.built.bound.values()) bound?.gate.reset();
+    for (const binding of this.built.bindings.values()) binding?.reset();
   }
 
   dispose(): void {
     this.unfollow();
-    for (const unsubscribe of this.subs.values()) unsubscribe();
-    this.subs.clear();
+    for (const binding of this.built.bindings.values()) binding?.dispose();
     this.releaseAll();
   }
 
@@ -361,10 +352,7 @@ export class ArrangementPlayer {
     const last = this.lastTick;
     this.lastTick = event.tick;
     if (last === null || !isLoopJump(last, event.tick, this.transport.loop ?? null)) return;
-    for (const bound of this.built.bound.values()) {
-      if (bound && isPitched(bound.generator)) bound.generator.release(event.tick, event.time);
-      bound?.gate.reset();
-    }
+    for (const binding of this.built.bindings.values()) binding?.jump(event.tick, event.time);
   }
 
   /**
@@ -373,10 +361,9 @@ export class ArrangementPlayer {
    * part handed back to the host to dispose. Nothing else is touched.
    */
   private detach(slot: number): void {
-    const generator = this.built.bound.get(slot)?.generator ?? null;
-    if (isPitched(generator)) generator.release(0, 0);
-    this.subs.get(slot)?.();
-    this.subs.delete(slot);
+    const binding = this.built.bindings.get(slot);
+    binding?.release(0, 0);
+    binding?.dispose();
     this.counters.delete(slot);
     this.announced.delete(slot);
     this.parts.get(slot)?.allNotesOff();
@@ -389,27 +376,24 @@ export class ArrangementPlayer {
 
   private buildAll(arrangement: Arrangement): Built {
     const sampler = new ScaleSampler(arrangement.harmony);
-    const bound = new Map<number, Bound | null>();
-    for (const part of arrangement.parts)
-      bound.set(part.slot, this.build(arrangement, part, sampler));
-    return { sampler, bound };
+    const bindings = new Map<number, PartBinding | null>();
+    for (const part of arrangement.parts) {
+      bindings.set(part.slot, this.bind(arrangement, part, sampler));
+    }
+    return { sampler, bindings };
   }
 
-  /**
-   * The part's generator behind its gate: the gate restarts the generator's
-   * stream on a region entry and releases its held notes on a region end —
-   * the note-offs go out through the same `pitched` binding as any other.
-   */
-  private build(arrangement: Arrangement, part: MusicPart, sampler: ScaleSampler): Bound | null {
-    const generator = buildGenerator(part, sampler);
-    if (!generator) return null;
-    const gate = new RegionGate(this.transport, gateConfig(arrangement, part), {
-      onEnter: (regionIndex) => generator.enter(regionIndex),
-      onLeave: (tick, time) => {
-        if (isPitched(generator)) generator.release(tick, time);
-      },
+  /** The part's generators behind its gate, their events pointed at the part on its slot. */
+  private bind(
+    arrangement: Arrangement,
+    part: MusicPart,
+    sampler: ScaleSampler,
+  ): PartBinding | null {
+    const { slot } = part;
+    return PartBinding.create(this.transport, part, gateConfig(arrangement, part), sampler, {
+      note: (event) => this.pitched(slot, event),
+      onset: (event, spec) => this.percussion(slot, spec, event),
     });
-    return { generator, gate };
   }
 
   /** Everything `apply` will change, validated and constructed before anything is touched. */
@@ -418,87 +402,73 @@ export class ArrangementPlayer {
     const keyChanged =
       sig([merged.harmony.root, merged.harmony.scale]) !==
       sig([this.current.harmony.root, this.current.harmony.scale]);
+    const sampler = keyChanged ? new ScaleSampler(merged.harmony) : this.built.sampler;
 
-    // A part on a slot the arrangement lacked is built like a rebuilt one
-    // (#629): its stream is the one a rebuild would have made. It needs a
-    // host that can create parts.
-    const added: Array<readonly [MusicPart, Patch]> = [];
     const removed = new Set<number>();
     for (const { slot } of this.current.parts) {
       if (!merged.parts.some((part) => part.slot === slot)) removed.add(slot);
     }
-    const rebuilt = new Set<number>();
+    const bindings = new Map<number, PartBinding | null>();
+    const fresh: PartBinding[] = [];
+    const retired: PartBinding[] = [];
+    const changes: BindingChange[] = [];
+    const cut = new Set<number>();
+    const added: Array<readonly [MusicPart, Patch]> = [];
     for (const next of merged.parts) {
       const before = this.bySlot.get(next.slot);
-      if (!before) {
+      const current = this.built.bindings.get(next.slot) ?? null;
+      if (before && before.sequencer.kind === next.sequencer.kind) {
+        // The kind holds: the binding keeps what it can, region by region.
+        bindings.set(next.slot, current);
+        const change = current?.plan(next, sampler);
+        if (change) changes.push(change);
+        if (change?.restart) cut.add(next.slot);
+        continue;
+      }
+      if (before) {
+        cut.add(next.slot);
+        if (current) retired.push(current);
+      } else {
+        // A part on a slot the arrangement lacked (#629) is built like a
+        // rebuilt one; it needs a host that can create parts.
         if (!this.parts.add) {
           throw new Error(`${partLabel(next)}: this host builds parts only at init`);
         }
         added.push([next, clonePatch(presetFor(presets, partLabel(next), next.preset))]);
-        rebuilt.add(next.slot);
-        continue;
       }
-      if (generatorSig(next.sequencer) !== generatorSig(before.sequencer)) rebuilt.add(next.slot);
+      const binding = this.bind(merged, next, sampler);
+      bindings.set(next.slot, binding);
+      if (binding) fresh.push(binding);
     }
+    const built: Built = { sampler, bindings };
+    const patchChanges = this.patchChanges(merged, presets);
+    return { built, fresh, retired, changes, cut, patchChanges, added, removed, presets };
+  }
 
-    const fresh = rebuilt.size > 0 || keyChanged ? this.buildAll(merged) : this.built;
-    const bound = new Map<number, Bound | null>();
-    for (const { slot } of merged.parts) {
-      const source = rebuilt.has(slot) ? fresh : this.built;
-      bound.set(slot, source.bound.get(slot) ?? null);
-    }
-    const built: Built = { sampler: keyChanged ? fresh.sampler : this.built.sampler, bound };
-
-    const reconfigured: Array<() => void> = [];
-    for (const part of merged.parts) {
-      if (rebuilt.has(part.slot)) continue;
-      const generator = built.bound.get(part.slot)?.generator ?? null;
-      const live = liveReconfiguration(generator, part.sequencer, built.sampler);
-      if (live) reconfigured.push(live);
-    }
-
-    // A part takes a fresh patch when its preset switched, or when the patch
-    // it plays was edited in this partial.
-    const patchChanges: Array<readonly [number, Patch]> = [];
+  /** A part takes a fresh patch when its preset switched, or when the patch it plays was edited in this partial. */
+  private patchChanges(
+    merged: Arrangement,
+    presets: Record<string, Patch>,
+  ): Array<readonly [number, Patch]> {
+    const changes: Array<readonly [number, Patch]> = [];
     for (const next of merged.parts) {
       const before = this.bySlot.get(next.slot);
       if (!before) continue;
       const switched = next.preset !== before.preset;
       const edited = lookupPreset(presets, next.preset) !== lookupPreset(this.presets, next.preset);
       if (switched || edited) {
-        patchChanges.push([
-          next.slot,
-          clonePatch(presetFor(presets, partLabel(next), next.preset)),
-        ]);
+        changes.push([next.slot, clonePatch(presetFor(presets, partLabel(next), next.preset))]);
       }
     }
-    return { built, rebuilt, reconfigured, patchChanges, added, removed, presets };
+    return changes;
   }
 
-  /** (Re)subscribe the named slots' generators to their gates and point their events at the parts. */
-  private attach(slots: ReadonlySet<number>): void {
-    for (const [slot, bound] of this.built.bound) {
-      if (!bound) continue;
-      if (bound.generator instanceof EuclideanSequencer) {
-        bound.generator.onOnset = (e): void => this.percussion(slot, e);
-      } else {
-        bound.generator.onNote = (e): void => this.pitched(slot, e);
-      }
-    }
-    for (const { slot } of this.current.parts) {
-      if (!slots.has(slot)) continue;
-      this.subs.get(slot)?.();
-      this.subs.delete(slot);
-      const bound = this.built.bound.get(slot);
-      if (bound) this.subs.set(slot, bound.generator.attach(bound.gate));
-    }
-  }
-
-  private percussion(slot: number, event: OnsetEvent): void {
+  /** A Euclidean onset, at the note and hold of the spec that played it: its region's (windsor#74). */
+  private percussion(slot: number, spec: SequencerSpec, event: OnsetEvent): void {
     const config = this.bySlot.get(slot);
     const part = this.parts.get(slot);
-    if (!config || !part || config.sequencer.kind !== 'euclidean') return;
-    part.trigger(config.sequencer.note, config.velocity, config.sequencer.hold, event.time);
+    if (!config || !part || spec.kind !== 'euclidean') return;
+    part.trigger(spec.note, config.velocity, spec.hold, event.time);
     this.count(config, event.tick);
   }
 
