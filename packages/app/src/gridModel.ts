@@ -27,20 +27,41 @@ import type { StepSlide } from './stepModLaneModel';
 
 export { GRID_STEPS_MAX, GRID_STEP_OCTAVE_MAX };
 
-/** The top cell's cycle: a note becomes a tie, a tie a rest, a rest a note on the root. */
-const NEXT_KIND: Record<GridStepKind, GridStepKind> = { note: 'tie', tie: 'rest', rest: 'note' };
-
-export function cycleKind(step: GridStep): GridStep {
-  const kind = NEXT_KIND[step.kind];
-  return kind === 'note' ? gridNote() : { kind };
+/**
+ * What the cell operations below need of a note: its octave and its two
+ * flags. A grid step has them, and so does an arp cell, which has no degree
+ * (windsor#137), so the two cards share one set of operations.
+ */
+export interface NoteCell {
+  readonly kind: 'note';
+  readonly octave: number;
+  readonly accent: boolean;
+  readonly slide: boolean;
 }
 
-export function withStep(steps: readonly GridStep[], index: number, step: GridStep): GridStep[] {
+/** A rest, a tie or a note: a `GridStep` when `N` is the grid's note, an `ArpStep` when the arp's. */
+export type Cell<N extends NoteCell> = { readonly kind: 'rest' } | { readonly kind: 'tie' } | N;
+
+/** The top cell's cycle: a note becomes a tie, a tie a rest, a rest a fresh note. */
+const NEXT_KIND: Record<GridStepKind, GridStepKind> = { note: 'tie', tie: 'rest', rest: 'note' };
+
+/** The next kind. A rest becomes `note()`: the grid's root note, or the note a card names. */
+export function cycleKind(step: GridStep): GridStep;
+export function cycleKind<N extends NoteCell>(step: Cell<N>, note: () => N): Cell<N>;
+export function cycleKind(step: Cell<NoteCell>, note: () => NoteCell = gridNote): Cell<NoteCell> {
+  const kind = NEXT_KIND[step.kind];
+  return kind === 'note' ? note() : { kind };
+}
+
+/** The list with step `index` replaced: a grid step list, or any other card's cells. */
+export function withStep(steps: readonly GridStep[], index: number, step: GridStep): GridStep[];
+export function withStep<T>(steps: readonly T[], index: number, step: T): T[];
+export function withStep<T>(steps: readonly T[], index: number, step: T): T[] {
   return steps.map((s, i) => (i === index ? step : s));
 }
 
 /** A note step edit; a rest or tie is returned unchanged. */
-function editNote(step: GridStep, edit: (note: GridNoteStep) => GridNoteStep): GridStep {
+function editNote<N extends NoteCell>(step: Cell<N>, edit: (note: N) => N): Cell<N> {
   return step.kind === 'note' ? edit(step) : step;
 }
 
@@ -49,7 +70,7 @@ export function setDegree(step: GridStep, degree: number): GridStep {
 }
 
 /** Octave up or down by one, held within ±`GRID_STEP_OCTAVE_MAX`. */
-export function cycleOctave(step: GridStep, direction: 1 | -1): GridStep {
+export function cycleOctave<N extends NoteCell>(step: Cell<N>, direction: 1 | -1): Cell<N> {
   return editNote(step, (note) => ({
     ...note,
     octave: Math.max(
@@ -59,7 +80,7 @@ export function cycleOctave(step: GridStep, direction: 1 | -1): GridStep {
   }));
 }
 
-export function toggleFlag(step: GridStep, flag: 'accent' | 'slide'): GridStep {
+export function toggleFlag<N extends NoteCell>(step: Cell<N>, flag: 'accent' | 'slide'): Cell<N> {
   return editNote(step, (note) => ({ ...note, [flag]: !note[flag] }));
 }
 

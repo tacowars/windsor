@@ -76,6 +76,7 @@ import {
   arpSkipRng,
   holdsToNext,
   playArpCell,
+  shiftOctave,
   skipCell,
   strikeCell,
 } from './arpCellPlay';
@@ -157,6 +158,27 @@ export function orderedIndex(style: OrderedArpStyle, i: number, length: number):
     case 'conDiverge':
       return length <= 2 ? convergeAt(cycle, length) : convergeAt(bounceAt(i, length), length);
   }
+}
+
+/**
+ * The pitch cell `k` of the cycle plays over `list`, its `octave` shift
+ * applied (`shiftOctave`), when the walk alone decides it: an ordered style,
+ * whose traversal repeats with the cycle, or any style over a one-note list.
+ * Null for a random style over more notes, whose pitch the run draws. The
+ * Arp card reads it to tell a slide onto a new pitch from one onto the
+ * pitch already held (windsor#137).
+ */
+export function arpCellPitch(
+  style: ArpStyle,
+  k: number,
+  list: readonly number[],
+  octave: number,
+): number | null {
+  if (list.length === 0) return null;
+  const ordered = style !== 'random' && style !== 'randomOther' && style !== 'randomOnce';
+  if (!ordered && list.length > 1) return null;
+  const at = ordered ? orderedIndex(style, k, list.length) : 0;
+  return shiftOctave(list[at] as number, octave);
 }
 
 /** A Fisher–Yates shuffle of `0..length−1` from the stream: `length − 1` draws. */
@@ -252,6 +274,22 @@ export class Arpeggiator {
   stepAt(localStep: number): number {
     if (this.listLength === 0) return -1;
     return arpCellIndex(localStep - this.base, arpCycleLength(this.current.style, this.listLength));
+  }
+
+  /**
+   * The cell local step `localStep` lands on counted from an entry into
+   * `chord`, with no onset needed: the walk restarts at entry, so it is the
+   * step itself over the cycle of the list `chord` voices now. A region
+   * that isn't sounding shows this as its ghost (windsor#137), since
+   * `stepAt` reads the last onset's list, which another region or an
+   * earlier visit left, or none before the first. −1 with no chord or an
+   * empty list.
+   */
+  entryStepAt(localStep: number, chord: HarmonyChord | null): number {
+    if (!chord) return -1;
+    const length = arpNoteList(this.pitch, this.current, chord).length;
+    if (length === 0) return -1;
+    return arpCellIndex(localStep, arpCycleLength(this.current.style, length));
   }
 
   attach(source: PartTickSource): Unsubscribe {
