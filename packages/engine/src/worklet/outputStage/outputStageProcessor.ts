@@ -18,7 +18,6 @@ import {
   OUTPUT_STAGE_DEFAULTS,
   OUTPUT_STAGE_MODES,
   OUTPUT_STAGE_NAME,
-  OUTPUT_STAGE_QUANTUM,
   OUTPUT_STAGE_REPORT_HZ,
   silentReport,
 } from '../../mixer/outputStageConstants';
@@ -45,7 +44,6 @@ class OutputStageProcessor extends AudioWorkletProcessor {
   declare running: boolean;
   declare frames: number;
   declare report: OutputStageReport;
-  declare silence: Float32Array;
 
   static get parameterDescriptors(): ParamDescriptor[] {
     return [
@@ -79,7 +77,6 @@ class OutputStageProcessor extends AudioWorkletProcessor {
     this.running = true;
     this.frames = 0;
     this.report = silentReport();
-    this.silence = new Float32Array(OUTPUT_STAGE_QUANTUM);
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' }>) => {
       if (data.type === 'stop') this.running = false;
     };
@@ -92,10 +89,17 @@ class OutputStageProcessor extends AudioWorkletProcessor {
     if (!out || !outL) return true;
     const outR = out[1] ?? outL;
     const frames = outL.length;
-    // Grown once if a platform ever renders a longer quantum; never per block.
-    if (this.silence.length < frames) this.silence = new Float32Array(frames);
-    const inL = inputs[0]?.[0] ?? this.silence;
-    const inR = inputs[0]?.[1] ?? inL;
+    let inL = inputs[0]?.[0];
+    let inR = inputs[0]?.[1] ?? inL;
+    if (!inL || !inR) {
+      // A missing input is silence, processed in place in the output, so a
+      // quantum of any length needs no buffer (the DSP reads each sample
+      // before it writes it). The output is always stereo (`outputStage.ts`).
+      outL.fill(0);
+      outR.fill(0);
+      inL = outL;
+      inR = outR;
+    }
     const mode = Math.round(params['mode']![0]!);
     this.dsp.configure(mode, params['ceilingDb']![0]!, params['lookahead']![0]! >= 1 / 2);
     this.dsp.process(inL, inR, outL, outR, frames);

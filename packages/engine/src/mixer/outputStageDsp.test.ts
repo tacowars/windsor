@@ -269,6 +269,31 @@ describe('settings on a running stage', () => {
     block(3);
     expect(maxAbs(outL)).toBeLessThanOrEqual(Math.fround(dbToGain(-6)));
   });
+
+  it('reports the interval it processed when retuned just before the report', () => {
+    const dsp = new OutputStageDsp(RATE);
+    const [l, r] = tones(dbToGain(-1 + 9), BLOCK * 8);
+    const outL = new Float32Array(BLOCK);
+    const outR = new Float32Array(BLOCK);
+    const block = (b: number): void =>
+      dsp.process(l.subarray(b * BLOCK), r.subarray(b * BLOCK), outL, outR, BLOCK);
+    dsp.configure(OUTPUT_STAGE_MODES.indexOf('limiter'), -1, true);
+    for (let b = 0; b < 8; b++) block(b);
+    dsp.configure(OUTPUT_STAGE_MODES.indexOf('off'), -1, false);
+    const limited = silentReport();
+    dsp.takeReport(limited);
+    expect(limited.reductionDb).toBeGreaterThan(6);
+    expect(limited.active).toBe(true);
+
+    dsp.configure(OUTPUT_STAGE_MODES.indexOf('hard'), -3, false);
+    for (let b = 0; b < 4; b++) block(b);
+    dsp.configure(OUTPUT_STAGE_MODES.indexOf('limiter'), 0, false);
+    const clipped = silentReport();
+    dsp.takeReport(clipped);
+    expect(clipped.overDb).toBeCloseTo(8 + 3, 1);
+    expect(clipped.reductionDb).toBe(0);
+    expect(clipped.active).toBe(true);
+  });
 });
 
 describe('the half-band filter', () => {

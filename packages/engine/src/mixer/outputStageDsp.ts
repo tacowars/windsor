@@ -30,7 +30,6 @@ import { OutputLimiter, lookaheadFrames } from './outputStageLimiter';
 const LIMITER = OUTPUT_STAGE_MODES.indexOf('limiter');
 const SOFT = OUTPUT_STAGE_MODES.indexOf('soft');
 const HARD = OUTPUT_STAGE_MODES.indexOf('hard');
-const OFF = OUTPUT_STAGE_MODES.indexOf('off');
 
 export const dbToGain = (db: number): number => Math.pow(DECADE, db / DB_PER_DECADE);
 export const gainToDb = (gain: number): number => DB_PER_DECADE * Math.log10(gain);
@@ -80,6 +79,8 @@ export class OutputStageDsp {
   private inR = 0;
   private outL = 0;
   private outR = 0;
+  /** The loudest input over the ceiling it met, while a clipper ran: 1 when under. */
+  private over = 1;
 
   constructor(sampleRate: number, tables: OutputStageTables = OUTPUT_STAGE_TABLES) {
     this.limiter = new OutputLimiter(sampleRate, tables.limiter);
@@ -124,11 +125,17 @@ export class OutputStageDsp {
     outR: Float32Array,
     frames: number,
   ): void {
-    this.inL = peak(inL, frames, this.inL);
-    this.inR = peak(inR, frames, this.inR);
+    const peakL = peak(inL, frames, 0);
+    const peakR = peak(inR, frames, 0);
+    if (peakL > this.inL) this.inL = peakL;
+    if (peakR > this.inR) this.inR = peakR;
     if (this.mode === LIMITER) {
       this.limiter.process(inL, inR, outL, outR, frames, this.limited);
     } else if (this.mode === SOFT || this.mode === HARD) {
+      // Measured against the ceiling this block met, so a later retune of the
+      // mode or the ceiling does not rewrite what the interval did.
+      const over = (peakL > peakR ? peakL : peakR) / this.ceiling;
+      if (over > this.over) this.over = over;
       this.clipper.process(this.left, inL, outL, frames, this.clipped);
       this.clipper.process(this.right, inR, outR, frames, this.clipped);
     } else {
@@ -141,23 +148,23 @@ export class OutputStageDsp {
     this.outR = peak(outR, frames, this.outR);
   }
 
-  /** Fill `report` with what happened since the last call, and start the next interval. */
+  /**
+   * Fill `report` with what happened since the last call, and start the next
+   * interval. Each figure was gathered by the mode that ran when it happened
+   * (the limiter's gain only moves while it limits, the overs only while a
+   * clipper runs), so a retune inside the interval does not erase it.
+   */
   takeReport(report: OutputStageReport): void {
     report.inputLeft = this.inL;
     report.inputRight = this.inR;
     report.outputLeft = this.outL;
     report.outputRight = this.outR;
-    const limiting = this.mode === LIMITER;
-    const clipping = this.mode === SOFT || this.mode === HARD;
     const minGain = this.limited.minGain;
-    report.reductionDb = limiting && minGain < 1 ? -gainToDb(minGain) : 0;
-    const loudest = Math.max(this.inL, this.inR);
-    report.overDb = clipping && loudest > this.ceiling ? gainToDb(loudest / this.ceiling) : 0;
-    report.active =
-      this.mode !== OFF &&
-      ((limiting && (minGain < 1 || this.limited.overshoot > 1)) ||
-        (clipping && this.clipped.acted));
+    report.reductionDb = minGain < 1 ? -gainToDb(minGain) : 0;
+    report.overDb = this.over > 1 ? gainToDb(this.over) : 0;
+    report.active = minGain < 1 || this.limited.overshoot > 1 || this.clipped.acted;
     this.inL = this.inR = this.outL = this.outR = 0;
+    this.over = 1;
     this.limited.minGain = 1;
     this.limited.overshoot = 1;
     this.clipped.acted = false;

@@ -72,9 +72,6 @@ export const MS_PER_SECOND = 1000;
 export const DB_PER_DECADE = 20;
 export const DECADE = 10;
 
-/** Web Audio's render quantum: the size the processor's silent input is allocated at. */
-export const OUTPUT_STAGE_QUANTUM = 128;
-
 /**
  * One report (decision 10), posted at `OUTPUT_STAGE_REPORT_HZ` whenever the
  * context runs. Every field covers the frames since the last report.

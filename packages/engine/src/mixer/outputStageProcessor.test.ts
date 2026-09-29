@@ -125,4 +125,39 @@ describe('the output stage processor', () => {
     processor.inbox({ type: 'stop' });
     expect(processor.process([[]], [out], stageParams({ mode: 'hard' }))).toBe(false);
   });
+
+  it('renders a missing input over a 256-frame quantum as silence, allocating nothing', () => {
+    const processor = loadOutputStage(RATE).create();
+    const [hotL, hotR] = sine(4, (BLOCK * 4) / RATE);
+    const params = stageParams({ mode: 'limiter', lookahead: true });
+    processor.process(
+      [[hotL, hotR]],
+      [[new Float32Array(BLOCK * 4), new Float32Array(BLOCK * 4)]],
+      params,
+    );
+    const quantum = 2 * BLOCK;
+    const out = [new Float32Array(quantum).fill(9), new Float32Array(quantum).fill(9)];
+    const Real = globalThis.Float32Array;
+    let built = 0;
+    globalThis.Float32Array = new Proxy(Real, {
+      construct(target, args: unknown[]) {
+        built++;
+        return Reflect.construct(target, args) as object;
+      },
+    });
+    try {
+      for (let b = 0; b < 4; b++) {
+        expect(processor.process([[]], [out], params)).toBe(true);
+        for (const channel of out) {
+          expect(channel.every((v) => Math.abs(v) <= Math.fround(dbToGain(-1)))).toBe(true);
+        }
+      }
+    } finally {
+      globalThis.Float32Array = Real;
+    }
+    expect(built).toBe(0);
+    // The lookahead's tail has drained: the silence comes out as silence.
+    expect(out[0]!.every((v) => v === 0)).toBe(true);
+    expect(out[1]!.every((v) => v === 0)).toBe(true);
+  });
 });
