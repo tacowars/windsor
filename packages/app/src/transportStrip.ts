@@ -12,8 +12,9 @@
  * context, which re-renders it on every `render()` (an import, a key change
  * on the Harmony tab) and never on `invalidate()`, so a box here survives
  * its own drag. The position follows the transport on `stepStrip.ts`'s
- * `watchPlayhead` — the console's one frame loop — and the loop idles while
- * the transport is not running (issue decision 4).
+ * `watchPlayhead` — the console's one frame loop. It reads the position
+ * halted too, not only while running as #708 decision 4 had it, so a seek
+ * from the Song view's playhead (windsor#102) shows here at once.
  */
 import type { Swing } from '@windsor/engine';
 import type { AppContext } from './appContext';
@@ -234,7 +235,6 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
   sync();
   watchPlayhead({
     attached: () => position.isConnected,
-    shown: () => ctx.transport.running,
     playheadAt: () => audibleTick(ctx),
     mark: (tick) => {
       position.textContent = formatPosition(tick, songTicks(ctx));

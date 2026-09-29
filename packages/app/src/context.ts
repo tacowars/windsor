@@ -26,6 +26,8 @@ export interface ConsoleTransport {
   pause(): void;
   /** Stop, release, and rewind to tick 0 with every part's region state cleared. */
   stop(): void;
+  /** Move a stopped or paused transport to `tick` (windsor#102); false while playing or before audio. */
+  seek(tick: number): boolean;
   /** The audible transport tick; 0 before audio is enabled. */
   position(): number;
 }
