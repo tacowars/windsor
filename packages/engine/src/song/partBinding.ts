@@ -23,6 +23,13 @@
  * it and the gate re-enters, as a rebuild always did. A generator that is not
  * live is replaced silently: the gate enters it before it plays, and `enter`
  * mints its stream afresh.
+ *
+ * The active generator is released by whatever ends its region, never by
+ * the edit that drops it: an edit that removes or moves the sounding region
+ * without a restart unsubscribes its generator but keeps it active, so the
+ * next tick's leave releases it on that tick, as a region end does, and
+ * every other release (a loop's jump back, a stop, a removal) reaches it
+ * too until one of them has let it go.
  */
 import type { MusicPart, SequencerSpec } from './arrangement';
 import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
@@ -66,9 +73,15 @@ interface Bound {
   unsubscribe: Unsubscribe | null;
 }
 
-/** True when region `index` has a pattern of its own: `regionPattern` falls back to the very `sequencer` otherwise. */
+/**
+ * True when region `index` plays a pattern of its own: it holds one of the
+ * part's kind, the rule `regionPattern` falls back on. Read from the
+ * region, never by comparing what `regionPattern` returns with
+ * `part.sequencer`: a chord pattern (no seed) comes back as itself, and a
+ * document may hold the very object the sequencer is.
+ */
 const ownsPattern = (part: MusicPart, index: number): boolean =>
-  regionPattern(part, index) !== part.sequencer;
+  part.regions[index]?.pattern?.kind === part.sequencer.kind;
 
 export class PartBinding {
   private readonly gate: RegionGate;
@@ -132,9 +145,15 @@ export class PartBinding {
     this.gate.reconfigure(config);
   }
 
-  /** Release what every pitched generator holds: a stop, a teardown, a removal. */
+  /**
+   * Release what every pitched generator holds: a stop, a teardown, a
+   * removal, a loop's jump. The active generator is among them even when an
+   * edit has dropped it, so its notes never outlive their region.
+   */
   release(tick: number, time: number): void {
-    for (const { generator } of this.bounds()) {
+    const holders = this.bounds();
+    if (this.active) holders.add(this.active);
+    for (const { generator } of holders) {
       if (isPitched(generator)) generator.release(tick, time);
     }
   }
@@ -225,6 +244,8 @@ export class PartBinding {
         bound.unsubscribe = null;
       }
       for (const reconfigure of kept) reconfigure();
+      // A restart is cut by the player. Otherwise a dropped active generator
+      // stays active, unsubscribed, until a leave or a release lets it go.
       if (restart) this.reset();
       else this.activeIndex = live;
     };
