@@ -19,12 +19,33 @@ import type {
   RegionStep,
   WorkletUrls,
 } from '@windsor/engine';
-import { AudioSystem, FmEngine, musicPartName } from '@windsor/engine';
+import { AudioSystem, FmEngine, TICKS_PER_BAR, musicPartName, songTicksOf } from '@windsor/engine';
 
 import type { ConsoleTransport } from './context';
 import { nextTransportState, type TransportState } from './transportModel';
 
 export type HostLog = (message: string) => void;
+
+/** What a rebuild may carry beyond its document. */
+export interface BuildOptions {
+  /**
+   * The song tick the transport was at (windsor#132): a system built while
+   * ▶ is pressed starts from the top of that bar instead of tick 0. Only the
+   * undo and redo rebuild passes it; every other build starts from the top.
+   */
+  resumeAt?: number;
+}
+
+/**
+ * Where a rebuilt system starts (windsor#132 decisions 2 and 3): the start of
+ * the bar holding `resumeAt`, or the top of the song when there is none or
+ * that bar is past the end of the song being built.
+ */
+export function resumeTick(resumeAt: number | undefined, songTicks: number): number {
+  if (resumeAt === undefined || !(resumeAt > 0)) return 0;
+  const bar = Math.floor(resumeAt / TICKS_PER_BAR) * TICKS_PER_BAR;
+  return bar < songTicks ? bar : 0;
+}
 
 /** The slice of the system ▶ ■ ‖ drive; a test fakes this much. */
 export type TransportSystem = Pick<
@@ -90,10 +111,17 @@ export class HostTransport implements ConsoleTransport {
     return system ? system.scheduler.audibleTick(system.engine.context.currentTime) : 0;
   }
 
-  /** A freshly built system sits at tick 0: start it if ▶ is pressed, else the transport is idle. */
-  adopt(system: TransportSystem): void {
-    if (this.current === 'playing') system.startMusic();
-    else this.current = 'idle';
+  /**
+   * A freshly built system sits at tick 0: start it if ▶ is pressed, from
+   * `from` through the engine's seek (windsor#132), else the transport is idle.
+   */
+  adopt(system: TransportSystem, from = 0): void {
+    if (this.current !== 'playing') {
+      this.current = 'idle';
+      return;
+    }
+    if (from > 0) system.seekMusic(from);
+    system.startMusic();
   }
 }
 
@@ -184,22 +212,25 @@ export class EngineHost {
   }
 
   /**
-   * (Re)build the whole system from a document — at tick 0, on the same
-   * context, playing only if ▶ is pressed (#708). Rebuilds are serialised and coalesced: overlapping calls (rapid
+   * (Re)build the whole system from a document — at tick 0, or at the bar
+   * `options.resumeAt` names (windsor#132), on the same context, playing
+   * only if ▶ is pressed (#708). Rebuilds are serialised and coalesced: overlapping calls (rapid
    * slot toggles, an import landing mid-build) queue behind the running one
    * and only the latest document wins, so the live graph cannot end up
-   * behind the model (cross-model self-review finding).
+   * behind the model (cross-model self-review finding). The latest call's
+   * options win with its document, so an import queued behind an undo
+   * starts from the top.
    */
-  build(document: ArrangementDocument): Promise<void> {
+  build(document: ArrangementDocument, options: BuildOptions = {}): Promise<void> {
     this.latest = document;
     const generation = ++this.generation;
     this.building = this.building
       .catch(() => undefined)
-      .then(() => (generation === this.generation ? this.rebuild(document) : undefined));
+      .then(() => (generation === this.generation ? this.rebuild(document, options) : undefined));
     return this.building;
   }
 
-  private async rebuild(document: ArrangementDocument): Promise<void> {
+  private async rebuild(document: ArrangementDocument, options: BuildOptions): Promise<void> {
     if (!this.context || !this.urls) return;
     // Dropped as it is disposed (#617): `init` below can throw — a worklet
     // module that will not load on this origin — and `apply`, `capturePattern`
@@ -215,7 +246,7 @@ export class EngineHost {
     engine.setLiveRetune(true);
     if (this.analyser) engine.master.connect(this.analyser);
     await this.system.unlock();
-    this.transport.adopt(this.system);
+    this.transport.adopt(this.system, resumeTick(options.resumeAt, songTicksOf(document)));
   }
 
   /** Live tuning over the document model; null while audio is not enabled. */

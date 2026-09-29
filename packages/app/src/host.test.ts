@@ -14,8 +14,8 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { makeArrangement } from '@windsor/engine';
-import { EngineHost, HostTransport, type TransportSystem } from './host';
+import { TICKS_PER_BAR, makeArrangement } from '@windsor/engine';
+import { EngineHost, HostTransport, resumeTick, type TransportSystem } from './host';
 
 const param = (): { value: number } => ({ value: 0 });
 const node = (): Record<string, unknown> => ({
@@ -242,5 +242,52 @@ describe('the console transport (#708): ▶ ■ ‖ over the live system', () =>
     transport.adopt(rebuilt);
     expect(rebuilt.calls).toEqual([]);
     expect(transport.state).toBe('idle');
+  });
+
+  it('an undo rebuild while ▶ is pressed seeks the new system to the bar, then starts it (windsor#132)', () => {
+    let live: TransportSystem | null = fakeSystem();
+    const transport = new HostTransport(() => live);
+    transport.play();
+    const rebuilt = fakeSystem();
+    live = rebuilt;
+    transport.adopt(rebuilt, 4 * TICKS_PER_BAR);
+    expect(rebuilt.calls).toEqual([`seek ${4 * TICKS_PER_BAR}`, 'start']);
+    expect(transport.state).toBe('playing');
+    expect(transport.position()).toBe(4 * TICKS_PER_BAR);
+  });
+
+  it('a paused or stopped transport adopts a resuming rebuild idle, without a seek', () => {
+    let live: TransportSystem | null = fakeSystem();
+    const transport = new HostTransport(() => live);
+    transport.play();
+    transport.pause();
+    const paused = fakeSystem();
+    live = paused;
+    transport.adopt(paused, 4 * TICKS_PER_BAR);
+    expect(paused.calls).toEqual([]);
+    expect(transport.state).toBe('idle');
+    transport.stop();
+    const stopped = fakeSystem();
+    transport.adopt(stopped, 4 * TICKS_PER_BAR);
+    expect(stopped.calls).toEqual([]);
+    expect(transport.state).toBe('idle');
+  });
+});
+
+describe('resumeTick (windsor#132): where a rebuilt system starts', () => {
+  const BAR = TICKS_PER_BAR;
+  const SONG = 8 * BAR;
+
+  it('is the start of the bar the tick is in', () => {
+    expect(resumeTick(4 * BAR + BAR / 2, SONG)).toBe(4 * BAR);
+    expect(resumeTick(4 * BAR, SONG)).toBe(4 * BAR);
+    expect(resumeTick(BAR - 1, SONG)).toBe(0);
+  });
+
+  it('is the top of the song with no tick, or a bar past the end of the song being built', () => {
+    expect(resumeTick(undefined, SONG)).toBe(0);
+    expect(resumeTick(SONG, SONG)).toBe(0);
+    expect(resumeTick(10 * BAR + 5, SONG)).toBe(0);
+    expect(resumeTick(Number.NaN, SONG)).toBe(0);
   });
 });
