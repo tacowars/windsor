@@ -21,6 +21,7 @@ import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
 import { el, html, select } from './dom';
 import { makeNumberBox } from './numberDrag';
+import { keyFacts, spaceAction } from './transportKeys';
 import { audibleTick, watchPlayhead } from './stepStrip';
 import {
   barsChange,
@@ -203,6 +204,14 @@ function loopButton(ctx: AppCtx): HTMLElement {
   return loop;
 }
 
+/** ▶, as the button and the space bar (windsor#111) press it. */
+function playTransport(ctx: AppCtx): void {
+  if (!ctx.transport.play()) ctx.notify('enable audio first', 'warning');
+}
+
+/** The transport states, numbered for `watchPlayhead`, which marks a changed number. */
+const STATE_ORDER = ['idle', 'playing', 'paused'] as const;
+
 /** ▶ ■ ‖ and the position they move. */
 function transportControls(ctx: AppCtx): HTMLElement[] {
   const position = el(
@@ -220,7 +229,7 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
     pause.setAttribute('aria-pressed', String(pressed.pause));
   };
   play.onclick = (): void => {
-    if (!ctx.transport.play()) ctx.notify('enable audio first', 'warning');
+    playTransport(ctx);
     sync();
   };
   pause.onclick = (): void => {
@@ -233,6 +242,12 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
     sync();
   };
   sync();
+  // The lights follow the transport, so a Space toggle (windsor#111) shows too.
+  watchPlayhead({
+    attached: () => play.isConnected,
+    playheadAt: () => STATE_ORDER.indexOf(ctx.transport.state),
+    mark: sync,
+  });
   watchPlayhead({
     attached: () => position.isConnected,
     playheadAt: () => audibleTick(ctx),
@@ -265,7 +280,26 @@ export function renderTransportStrip(root: HTMLElement, ctx: AppCtx): void {
   root.appendChild(row);
 }
 
-/** Register the strip as the context's chrome: it renders with every `render()`. */
+/**
+ * The space bar toggles the transport (windsor#111): ▶ from stopped or
+ * paused, ‖ while playing. The key is swallowed when it acts, so a focused
+ * button isn't clicked as well and the page doesn't scroll.
+ */
+function attachSpaceBar(ctx: AppCtx): void {
+  addEventListener('keydown', (e) => {
+    const action = spaceAction(keyFacts(e), ctx.transport.state);
+    if (action === null) return;
+    e.preventDefault();
+    if (action === 'play') playTransport(ctx);
+    else if (action === 'pause') ctx.transport.pause();
+  });
+}
+
+/**
+ * Register the strip as the context's chrome: it renders with every
+ * `render()`. The space bar's listener is attached here, once.
+ */
 export function mountTransportStrip(ctx: AppContext<HTMLElement>, root: HTMLElement): void {
   ctx.addChrome(() => renderTransportStrip(root, ctx));
+  attachSpaceBar(ctx);
 }
