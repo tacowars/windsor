@@ -25,6 +25,7 @@ export const ARP_STYLES = [
   'downUp',
   'converge',
   'diverge',
+  'conDiverge',
   'random',
   'randomOther',
   'randomOnce',

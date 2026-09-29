@@ -171,14 +171,30 @@ describe('the ordered styles over L = 6, first 12 steps', () => {
     downUp: [5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 4],
     converge: [0, 5, 1, 4, 2, 3, 0, 5, 1, 4, 2, 3],
     diverge: [3, 2, 4, 1, 5, 0, 3, 2, 4, 1, 5, 0],
+    conDiverge: [0, 5, 1, 4, 2, 3, 2, 4, 1, 5, 0, 5],
   };
   it.each(Object.entries(expected))('%s', (style, indices) => {
     expect(line({ style: style as ArpStyle })).toEqual(indices.map((i) => LIST[i]));
   });
 });
 
+describe('conDiverge over L = 4', () => {
+  it('turns at the centre and the edge without repeating either', () => {
+    const cycle = [0, 1, 2, 3, 4, 5, 6].map((i) => orderedIndex('conDiverge', i, 4));
+    expect(cycle).toEqual([0, 3, 1, 2, 1, 3, 0]);
+  });
+});
+
 describe('the degenerate lists', () => {
-  const ordered: OrderedArpStyle[] = ['up', 'down', 'upDown', 'downUp', 'converge', 'diverge'];
+  const ordered: OrderedArpStyle[] = [
+    'up',
+    'down',
+    'upDown',
+    'downUp',
+    'converge',
+    'diverge',
+    'conDiverge',
+  ];
   const walk = (style: OrderedArpStyle, length: number): number[] =>
     [0, 1, 2, 3].map((i) => orderedIndex(style, i, length));
 
@@ -192,6 +208,11 @@ describe('the degenerate lists', () => {
     expect(walk('downUp', 2)).toEqual(walk('down', 2));
     expect(walk('converge', 2)).toEqual([0, 1, 0, 1]);
     expect(walk('diverge', 2)).toEqual([1, 0, 1, 0]);
+  });
+
+  it('L = 2: conDiverge is converge', () => {
+    expect(walk('conDiverge', 2)).toEqual(walk('converge', 2));
+    expect(walk('conDiverge', 2)).toEqual([0, 1, 0, 1]);
   });
 
   it('L = 2: randomOther alternates', () => {
