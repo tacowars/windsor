@@ -1,32 +1,21 @@
-/* eslint-disable max-lines -- the one system the console drives, at 350 before windsor#97's region query (beside stepAt, where the ticket puts it) took it 4 lines over; splitting the class for 4 lines would scatter one surface */
 /**
- * The audio system: the standing graph a page plays through. The console
+ * The audio system: the one surface the console drives. The console
  * (`packages/app/src/host.ts`) constructs it and pumps `update()` from its
  * frame loop.
  *
- * The standing graph, per docs/log/2026-08-31-mixer-sends-returns-and-channel-strips.md:
+ * It composes collaborators that each own their state
+ * (docs/log/2026-09-29-audio-system-split.md):
  *
- *   music part.output ─▶ [stages…] ─▶ tail ─┬─ [rotate θ] ─▶ musicBus.input ─▶ [highpass] ─┐
- *                                           ├─ send ─▶ return "room" (plate, 100% wet) ────┤
- *                                           └─ send ─▶ return "echo" (delay) ──────────────┤
- *                                                                                          ▼
- *                                                          song master inserts/level → musicBus.output (the Music fader)
- *                                                                                          │
- *   aux part.output ─▶ [stages…] ─▶ tail ─── [rotate θ] ─▶ auxLevel ─▶ master ◀────────────┘
- *                                                                      └─▶ output stage ─▶ out
+ * - `StandingGraph`: the music bus, the song master, the returns and the aux
+ *   fader. Its header draws the signal chain.
+ * - `PartStrips`: every part created here, on its strip, by engine name.
+ * - `MusicRoster`: the music parts by slot, the player's `PartHost`.
+ * - `MusicPlayback`: the player on the transport (start, stop, mute) and the
+ *   position queries.
+ * - `SystemLoadMeter`: which processors report their load, and the sum.
  *
- * Each strip's stages sit between the part and its tail, and the rotation and
- * the sends both tap the tail (#639). The first stage is always the strip's
- * low cut (#640), so a room hears the cut signal too. Aux parts — an
- * audition, a metronome, anything outside the song — get the same strip with
- * the aux fader as their dry destination, so they skip the song master but
- * still have a real pan and a send. `musicBus.output` and `auxLevel` are the
- * two channel faders (#518 decision 1): the music one is the bus's existing output gain,
- * so the dry path gains no node, and the returns are summed into it so the
- * room follows the music down. The engine's master is not a fader and never
- * becomes one. The output stage (windsor#93) is the engine's, after its
- * master, so the aux path goes through it too; its mode, ceiling and
- * lookahead are the song's `master.output`, set here in place.
+ * What stays here is construction, the lifecycle (`init`, `update`,
+ * `dispose`) and the two document transactions, which span them all.
  *
  * Music comes in as an `ArrangementDocument` (issue #75): the committed JSON,
  * normalised by `makeArrangement`. `initMusic` builds a part per entry in the
@@ -36,37 +25,35 @@
  * arrangement fields through the player, `patches` onto the parts, each
  * part's `strip` and the `returns` onto the live desk (`deskApply.ts`).
  */
-import { splitStrips } from '../mixer/deskPartial';
-import { SidechainDesk } from '../mixer/sidechainDesk';
-import type { ArrangementPartial, MusicPart } from '../song/arrangement';
-import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDocument';
-import type {
-  ApplyResult,
-  ArrangementReadout,
-  MusicEventHandler,
-  PartHost,
-  RegionStep,
-} from '../song/arrangementPlayer';
-import { ArrangementPlayer } from '../song/arrangementPlayer';
-import { PatchResolver } from '../song/arrangementValidate';
-import { AUDIO_LOAD_REPORT_SECONDS, MUSIC_PART_MAX_VOICES } from '../audioConstants';
+import { MUSIC_PART_MAX_VOICES } from '../audioConstants';
 import type { AudioLoadReadout } from '../cost/audioLoad';
-import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
-import { type AudioBus, MUSIC_BUS_OPTIONS } from '../mixer/audioBus';
-import type { AudioPart } from '../synth/audioPart';
-import type { ScheduledMessage } from '../synth/workletMessages';
+import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
-import { routePart } from '../mixer/channelStrip';
 import { applyReturnsLive, applyStripLive } from '../mixer/deskApply';
-import { musicPartName } from '../song/documentParts';
-import { FmEngine } from '../synth/fmEngine';
+import { splitStrips } from '../mixer/deskPartial';
+import type { MasterStrip } from '../mixer/masterStrip';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
-import { MIX, RETURNS, stripFor } from '../mixer/mix';
+import { MIX, RETURNS } from '../mixer/mix';
+import { applyMasterLive } from '../mixer/outputStageMaster';
+import type { ReturnBus } from '../mixer/returnBus';
+import { SidechainDesk } from '../mixer/sidechainDesk';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
-import type { ReturnBus } from '../mixer/returnBus';
-import { createReturns } from '../mixer/returnBus';
 import { Scheduler } from '../sequencing/scheduler';
+import type { ArrangementPartial } from '../song/arrangement';
+import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDocument';
+import type { ApplyResult, MusicEventHandler, RegionStep } from '../song/arrangementPlayer';
+import { ArrangementPlayer } from '../song/arrangementPlayer';
+import { PatchResolver } from '../song/arrangementValidate';
+import type { AudioPart } from '../synth/audioPart';
+import { FmEngine } from '../synth/fmEngine';
+import type { ScheduledMessage } from '../synth/workletMessages';
+import type { PlaybackReadout } from './musicPlayback';
+import { MusicPlayback } from './musicPlayback';
+import { MusicRoster } from './musicRoster';
+import { PartStrips } from './partStrips';
+import { StandingGraph } from './standingGraph';
+import { SystemLoadMeter } from './systemLoadMeter';
 
 export interface AudioSystemOptions {
   /** Start suspended and wait for a gesture. Always true in a real page. */
@@ -102,80 +89,60 @@ export interface AudioSystemOptions {
 }
 
 /** `AudioSystem.readout()` (issue #69): the arrangement's state plus the system's. */
-export interface MusicReadout extends ArrangementReadout {
-  muted: boolean;
-  running: boolean;
+export interface MusicReadout extends PlaybackReadout {
   /** What the DSP costs on the audio thread (#445); all zeros until it reports. */
   load: AudioLoadReadout;
 }
-
-import { createMasterStrip } from '../mixer/masterStrip';
-import { applyMasterLive } from '../mixer/outputStageMaster';
-import type { MasterStrip } from '../mixer/masterStrip';
-import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
-import { meteredInsertRegistry } from '../inserts/meteredInsertRegistry';
-
-/** What a call before the standing graph exists throws. */
-const NOT_INITIALISED = 'AudioSystem.init() must be awaited first';
 
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
 
-  private readonly mix: Readonly<Record<string, ChannelStrip>>;
-  private readonly returnSpecs: Readonly<Record<string, ReturnSpec>>;
-  private musicBus: AudioBus | null = null;
-  private masterStripValue: MasterStrip | null = null;
-  private returns: Readonly<Record<string, ReturnBus>> | null = null;
-  /** The aux strips' dry summing gain — the aux fader (#518); built by `init()`. */
-  private auxLevel: GainNode | null = null;
-  private musicGainValue = 1;
-  private auxGainValue = 1;
-  private readonly strips = new Map<string, PartStrip>();
-  /** The music parts by slot — the player's roster, grown and shrunk live through `apply` (#629). */
-  private readonly musicParts = new Map<number, AudioPart>();
-  private readonly loadMeter = new AudioLoadMeter();
-  /** Passed to every strip: how it waits out an insert fade (#652). */
-  private readonly routeOptions: RouteOptions;
-  private readonly partSeed: ((name: string) => number) | undefined;
-  private readonly partEvents: AudioSystemOptions['partEvents'];
-  private readonly metered: boolean;
-  private readonly sidechains = new SidechainDesk(
-    () =>
-      new Map(
-        [...this.musicParts.keys()].flatMap((slot) => {
-          const strip = this.strips.get(musicPartName(slot));
-          return strip ? [[slot, strip] as const] : [];
-        }),
-      ),
-    () => this.masterStrip,
-  );
-  private started = false;
-  private player: ArrangementPlayer | null = null;
+  private readonly meter: SystemLoadMeter;
   private readonly insertTempo: ReturnType<typeof tempoInsertRegistry>;
-  private muted = false;
+  private readonly graph: StandingGraph;
+  private readonly parts: PartStrips;
+  private readonly roster: MusicRoster;
+  private readonly sidechains: SidechainDesk;
+  private readonly playback: MusicPlayback;
+  private started = false;
 
   constructor(engine?: FmEngine, options: AudioSystemOptions = {}) {
     this.engine = engine ?? new FmEngine();
     this.scheduler = new Scheduler(this.engine.context, { bpm: 96 });
-    this.mix = options.mix ?? MIX;
-    this.returnSpecs = options.returns ?? RETURNS;
-    this.partSeed = options.partSeed;
-    this.partEvents = options.partEvents;
-    this.metered = options.meterLoad ?? true;
+    this.meter = new SystemLoadMeter(this.engine.context, options.meterLoad ?? true);
     this.insertTempo = tempoInsertRegistry(this.scheduler.bpm);
-    this.routeOptions = {
-      registry: this.metered
-        ? meteredInsertRegistry(this.loadMeter, this.insertTempo.registry)
-        : this.insertTempo.registry,
+    // Passed to every strip and the song master: how it builds an insert, whom
+    // it tells when its chain changes, and how it waits out a fade (#652).
+    const routeOptions: RouteOptions = {
+      registry: this.meter.registry(this.insertTempo.registry),
       changed: () => this.sidechains.changed(),
       ...(options.defer ? { defer: options.defer } : {}),
     };
+    const graph = new StandingGraph(this.engine, options.returns ?? RETURNS, routeOptions);
+    const parts = new PartStrips({
+      engine: this.engine,
+      graph,
+      meter: this.meter,
+      mix: options.mix ?? MIX,
+      routeOptions,
+      partSeed: options.partSeed,
+      partEvents: options.partEvents,
+    });
+    const roster = new MusicRoster(parts);
+    this.graph = graph;
+    this.parts = parts;
+    this.roster = roster;
+    this.sidechains = new SidechainDesk(
+      () => roster.tracks(),
+      () => graph.masterStrip,
+    );
+    this.playback = new MusicPlayback(this.scheduler, this.engine.context);
   }
 
   /** The song master, distinct from the engine-wide output stage and the channel faders. */
   get masterStrip(): MasterStrip | null {
-    return this.masterStripValue;
+    return this.graph.masterStrip;
   }
 
   get isStarted(): boolean {
@@ -189,28 +156,15 @@ export class AudioSystem {
   async init(): Promise<void> {
     if (this.started) return;
     await this.engine.init();
-    this.musicBus = this.engine.createBus(MUSIC_BUS_OPTIONS);
-    // Keep the dry-only highpass. Returns join after it, before song inserts.
-    const master = createMasterStrip(this.engine.context, this.routeOptions);
-    this.masterStripValue = master;
-    this.musicBus.filter!.disconnect(this.musicBus.output);
-    this.musicBus.filter!.connect(master.input);
-    master.output.connect(this.musicBus.output);
-    this.returns = createReturns(this.engine.context, this.returnSpecs, master.input);
-    this.auxLevel = this.engine.context.createGain();
-    this.auxLevel.connect(this.engine.master);
-    // A level set before `init()` (a saved setting read at boot) lands on the
-    // nodes the moment they exist, so no sound is ever made at the wrong one.
-    this.musicBus.output.gain.value = this.musicGainValue;
-    this.auxLevel.gain.value = this.auxGainValue;
+    this.graph.build();
     // The plate is a standing processor on the audio thread, so it reports too
     // (#445): a load figure that counted only the parts would understate the
     // music by the whole reverb.
-    for (const [name, bus] of Object.entries(this.returns)) {
-      this.meterLoad(`return:${name}`, bus.effect);
+    for (const [name, bus] of Object.entries(this.graph.standing().returns)) {
+      this.meter.attach(`return:${name}`, bus.effect);
     }
     // So is the output stage (windsor#93): it runs on every block, song or no song.
-    this.meterLoad('outputStage', this.engine.outputStage?.node);
+    this.meter.attach('outputStage', this.engine.outputStage?.node);
     this.started = true;
   }
 
@@ -221,7 +175,7 @@ export class AudioSystem {
 
   /** Processors this system has turned load reporting on in (#445): parts, worklet returns and inserts, and the output stage. */
   get meteredProcessors(): number {
-    return this.loadMeter.processorCount;
+    return this.meter.processorCount;
   }
 
   /** Create a part on its strip, dry into the music bus. The patch is the caller's — no name is resolved here (#562). */
@@ -231,8 +185,7 @@ export class AudioSystem {
     maxVoices = MUSIC_PART_MAX_VOICES,
     strip?: ChannelStrip,
   ): AudioPart {
-    const { musicBus } = this.standing();
-    return this.route(name, patch, maxVoices, musicBus.input, strip);
+    return this.parts.createMusic(name, patch, maxVoices, strip);
   }
 
   /**
@@ -243,8 +196,7 @@ export class AudioSystem {
    * The patch is the caller's, as for a music part (#562).
    */
   createAuxPart(name: string, patch: Patch, maxVoices = 8): AudioPart {
-    this.standing();
-    return this.route(name, patch, maxVoices, this.auxNode());
+    return this.parts.createAux(name, patch, maxVoices);
   }
 
   /**
@@ -253,22 +205,20 @@ export class AudioSystem {
    * the value is held and applied when the graph is built.
    */
   setMusicGain(gain: number): void {
-    this.musicGainValue = gain;
-    if (this.musicBus) this.musicBus.output.gain.value = gain;
+    this.graph.setMusicGain(gain);
   }
 
   /** The aux strips' fader. Safe before `init()`, like the music fader. */
   setAuxGain(gain: number): void {
-    this.auxGainValue = gain;
-    if (this.auxLevel) this.auxLevel.gain.value = gain;
+    this.graph.setAuxGain(gain);
   }
 
   get musicGain(): number {
-    return this.musicGainValue;
+    return this.graph.musicGain;
   }
 
   get auxGain(): number {
-    return this.auxGainValue;
+    return this.graph.auxGain;
   }
 
   /**
@@ -285,7 +235,7 @@ export class AudioSystem {
    * before a committed document could reach here.
    */
   initMusic(document: ArrangementDocument, onEvent?: MusicEventHandler): void {
-    if (this.player) return;
+    if (this.playback.player) return;
     const routing = this.sidechains.check(document);
     this.sidechains.begin();
     const { returns, patches, master, ...arrangement } = document;
@@ -295,7 +245,7 @@ export class AudioSystem {
     const resolver = new PatchResolver(patches ?? {});
     this.insertTempo.setTempo(arrangement.transport.bpm);
     for (const part of arrangement.parts) {
-      this.addMusicPart(
+      this.roster.add(
         part,
         clonePatch(resolver.require(`part ${part.slot}`, part.preset)),
         part.strip,
@@ -303,92 +253,46 @@ export class AudioSystem {
     }
     applyMasterLive(this.masterStrip!, this.engine.outputStage, master);
     this.sidechains.commit(routing);
-    if (returns) applyReturnsLive(this.standing().returns, returns);
-    // The roster the player reads and — for a live add or removal — grows and
-    // shrinks through (#629); the player calls these only after its plan has
-    // validated the whole partial, so a refused edit creates and disposes nothing.
-    const host: PartHost = {
-      get: (slot) => this.musicParts.get(slot),
-      add: (part, patch) => this.addMusicPart(part, patch),
-      remove: (slot) => this.removeMusicPart(slot),
-    };
-    this.player = new ArrangementPlayer(
-      this.scheduler,
-      host,
-      arrangement,
-      resolver.table(),
-      onEvent,
+    if (returns) applyReturnsLive(this.graph.standing().returns, returns);
+    this.playback.load(
+      new ArrangementPlayer(
+        this.scheduler,
+        this.roster.host(),
+        arrangement,
+        resolver.table(),
+        onEvent,
+      ),
     );
-  }
-
-  /**
-   * The `music-<slot>` engine part on its strip (#629 decision 1). At init the
-   * document's strip is handed in; a part added live starts on the desk's
-   * default strip and `apply` then lands the partial's `strip` fields on it,
-   * the way it does for every other slot.
-   */
-  private addMusicPart(part: MusicPart, patch: Patch, strip?: ChannelStrip): AudioPart {
-    const audio = this.createMusicPart(
-      musicPartName(part.slot),
-      patch,
-      MUSIC_PART_MAX_VOICES,
-      strip,
-    );
-    this.musicParts.set(part.slot, audio);
-    return audio;
-  }
-
-  /** Dispose the `music-<slot>` part, its strip and its load meter entry, and nothing else (#629 decision 1). */
-  private removeMusicPart(slot: number): void {
-    const name = musicPartName(slot);
-    this.strips.get(name)?.dispose();
-    this.strips.delete(name);
-    this.loadMeter.detach(`part:${name}`);
-    this.engine.disposePart(name);
-    this.musicParts.delete(slot);
   }
 
   /** Start (or resume) the transport. A no-op while muted or before `initMusic`. */
   startMusic(): void {
-    if (!this.player || this.muted) return;
-    this.scheduler.start(this.scheduler.transport.currentTick);
+    this.playback.start();
   }
 
   get musicRunning(): boolean {
-    return this.scheduler.isRunning;
+    return this.playback.running;
   }
 
   get isMuted(): boolean {
-    return this.muted;
+    return this.playback.isMuted;
   }
 
   /**
    * Mute stops the transport and releases everything held, so tails ring out
-   * rather than cutting; unmute resumes at the tick the transport stopped on,
-   * which keeps the bar phase every regeneration hangs off.
+   * rather than cutting; unmute resumes at the tick the transport stopped on
+   * (`MusicPlayback.setMuted`).
    */
   setMuted(muted: boolean): void {
-    if (this.muted === muted) return;
-    this.muted = muted;
-    if (muted) {
-      this.scheduler.stop();
-      this.player?.releaseAll(this.engine.context.currentTime);
-    } else {
-      this.startMusic();
-    }
+    this.playback.setMuted(muted);
   }
 
   /**
-   * ■ (#708, epic #703 decision 8): stop the transport, release everything
-   * held, then rewind to tick 0 with every part's region state cleared — the
-   * next `startMusic` plays the document from bar 1 exactly as a fresh
-   * system would. The mute flag is untouched.
+   * ■ (#708, epic #703 decision 8): stop, release, and rewind to tick 0 with
+   * the region state cleared (`MusicPlayback.stop`). The mute flag is untouched.
    */
   stopMusic(): void {
-    this.scheduler.stop();
-    this.player?.releaseAll(this.engine.context.currentTime);
-    this.scheduler.reset();
-    this.player?.reset();
+    this.playback.stop();
   }
 
   /**
@@ -399,13 +303,14 @@ export class AudioSystem {
    * the partial names, with unknown names reported in `ignored` (#597).
    */
   apply(partial: DocumentPartial): ApplyResult {
-    if (!this.player) return { ok: false, ignored: [], error: 'music is not initialised' };
+    const { player } = this.playback;
+    if (!player) return { ok: false, ignored: [], error: 'music is not initialised' };
     const routing = this.sidechains.plan(partial);
     if (routing.error) return { ok: false, ignored: [], error: routing.error };
     const { returns, patches, parts, master, ...rest } = partial;
     const { arrangementParts, strips } = splitStrips(parts);
     this.sidechains.begin();
-    const result = this.player.apply(
+    const result = player.apply(
       arrangementParts === undefined
         ? rest
         : { ...rest, parts: arrangementParts as NonNullable<ArrangementPartial['parts']> },
@@ -419,28 +324,19 @@ export class AudioSystem {
     const ignored = [...result.ignored];
     ignored.push(...applyMasterLive(this.masterStrip!, this.engine.outputStage, master));
     for (const [slot, strip] of strips) {
-      const live = this.strips.get(musicPartName(Number(slot)));
+      const live = this.roster.strip(Number(slot));
       // An absent slot was already reported by the player's merge.
       if (live) ignored.push(...applyStripLive(live, strip, `parts.${slot}.strip`));
     }
-    if (returns !== undefined) ignored.push(...applyReturnsLive(this.standing().returns, returns));
+    if (returns !== undefined) {
+      ignored.push(...applyReturnsLive(this.graph.standing().returns, returns));
+    }
     this.sidechains.commit(routing.graph);
     return { ok: true, ignored };
   }
 
   readout(): MusicReadout {
-    const base: ArrangementReadout = this.player?.readout() ?? {
-      bpm: this.scheduler.bpm,
-      root: NaN,
-      scale: [],
-      counters: {},
-    };
-    return {
-      ...base,
-      muted: this.muted,
-      running: this.scheduler.isRunning,
-      load: this.loadMeter.readout(),
-    };
+    return { ...this.playback.readout(), load: this.meter.readout() };
   }
 
   /**
@@ -449,7 +345,7 @@ export class AudioSystem {
    * `part.sequencer` plays; null for any other part.
    */
   capturePattern(slot: number, regionIndex?: number): readonly boolean[] | null {
-    return this.player?.capturePattern(slot, regionIndex) ?? null;
+    return this.playback.capturePattern(slot, regionIndex);
   }
 
   /**
@@ -458,7 +354,7 @@ export class AudioSystem {
    * engine's own position rule instead of re-deriving one.
    */
   stepAt(slot: number, tick: number): number {
-    return this.player?.stepAt(slot, tick) ?? -1;
+    return this.playback.stepAt(slot, tick);
   }
 
   /**
@@ -467,17 +363,17 @@ export class AudioSystem {
    * card's playhead outside its region is still the engine's position rule.
    */
   regionStepAt(slot: number, region: number, tick: number): RegionStep | null {
-    return this.player?.regionStepAt(slot, region, tick) ?? null;
+    return this.playback.regionStepAt(slot, region, tick);
   }
 
   /** The live strip of a part this system created. */
   strip(name: string): PartStrip | undefined {
-    return this.strips.get(name);
+    return this.parts.get(name);
   }
 
   /** A return by name, once `init()` has built them. */
   returnBus(name: string): ReturnBus | undefined {
-    return this.returns?.[name];
+    return this.graph.returnBus(name);
   }
 
   /**
@@ -491,67 +387,13 @@ export class AudioSystem {
   }
 
   dispose(): void {
-    this.scheduler.stop();
-    this.player?.dispose();
-    this.player = null;
-    this.muted = false;
+    this.playback.dispose();
     this.sidechains.dispose();
-    for (const strip of this.strips.values()) strip.dispose();
-    this.strips.clear();
-    this.musicParts.clear();
-    if (this.returns) for (const bus of Object.values(this.returns)) bus.dispose();
-    this.masterStrip?.dispose();
-    this.masterStripValue = null;
-    this.musicBus?.input.disconnect();
-    this.musicBus?.filter?.disconnect();
-    this.musicBus?.output.disconnect();
-    this.auxLevel?.disconnect();
-    this.loadMeter.dispose();
+    this.parts.dispose();
+    this.roster.clear();
+    this.graph.dispose();
+    this.meter.dispose();
     this.engine.dispose();
-    this.musicBus = null;
-    this.returns = null;
-    this.auxLevel = null;
     this.started = false;
-  }
-
-  private standing(): { musicBus: AudioBus; returns: Readonly<Record<string, ReturnBus>> } {
-    if (!this.musicBus || !this.returns) throw new Error(NOT_INITIALISED);
-    return { musicBus: this.musicBus, returns: this.returns };
-  }
-
-  private auxNode(): GainNode {
-    if (!this.auxLevel) throw new Error(NOT_INITIALISED);
-    return this.auxLevel;
-  }
-
-  private route(
-    name: string,
-    patch: Patch,
-    maxVoices: number,
-    dry: AudioNode,
-    strip?: ChannelStrip,
-  ): AudioPart {
-    const { returns } = this.standing();
-    const seed = this.partSeed?.(name);
-    const events = this.partEvents?.(name);
-    const part = this.engine.createPart(name, {
-      patch,
-      maxVoices,
-      destination: null,
-      ...(seed === undefined ? {} : { seed }),
-      ...(events === undefined ? {} : { events }),
-    });
-    this.meterLoad(`part:${name}`, part.node);
-    this.strips.set(
-      name,
-      routePart(part, strip ?? stripFor(this.mix, name), returns, dry, this.routeOptions),
-    );
-    return part;
-  }
-
-  /** Turn the audio-load sampler on in one node's processor (#445); `audioLoad.ts` owns the rules. */
-  private meterLoad(id: string, node: AudioNode | undefined): void {
-    if (!this.metered || !node) return;
-    meterNode(this.loadMeter, id, node, this.engine.context.sampleRate, AUDIO_LOAD_REPORT_SECONDS);
   }
 }
