@@ -21,6 +21,11 @@ What workers have tripped on. The protocol itself is `CLAUDE.md`
   - Open your own page with `new_page` and pass its `pageId` to every
     call. Never act on a page you didn't open; the browser is shared with
     the main session and the other worker.
+  - To set up a song, import JSON rather than clicking it together: on
+    the Settings tab (`[data-tab="arrangement"]`), put a `File` in
+    `input[name="import-file"]` through a `DataTransfer` and dispatch
+    `change`. A part's cards show in the Song tab's pane once one of its
+    regions is selected. After a reload, accept the "Restore" prompt.
   - Check what the issue's acceptance criteria describe: one
     `evaluate_script` per step, returning the few values you need, and a
     screenshot for layout, which DOM text can't show.
