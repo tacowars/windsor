@@ -56,8 +56,6 @@ import { StandingGraph } from './standingGraph';
 import { SystemLoadMeter } from './systemLoadMeter';
 
 export interface AudioSystemOptions {
-  /** Start suspended and wait for a gesture. Always true in a real page. */
-  autoUnlock?: boolean;
   /** The desk. Defaults to `MIX`; a test or the console (#70) may hand in its own. */
   mix?: Readonly<Record<string, ChannelStrip>>;
   /** The returns to build. Defaults to `RETURNS`. */
