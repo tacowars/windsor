@@ -17,7 +17,7 @@
  * `stepStrip.ts`'s (decision 5).
  */
 import type { DocumentPartial } from '@windsor/engine';
-import { songTicksOf } from '@windsor/engine';
+import { regionPattern, songTicksOf } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { loopBraceRow } from './loopBrace';
@@ -79,13 +79,21 @@ function laneSignature(ctx: AppCtx): string {
       part.name,
       part.regions,
       part.sequencer.kind,
-      forKind(REGION_SUMMARY, part.sequencer),
-      forKind(CYCLE_TICKS, part.sequencer),
+      // Each region's own pattern (windsor#75): a region without one shows the part's sequencer.
+      part.regions.map((_, i) => {
+        const pattern = regionPattern(part, i);
+        return [forKind(REGION_SUMMARY, pattern), forKind(CYCLE_TICKS, pattern)];
+      }),
     ]),
   ]);
 }
 
-/** The selection still names something in the document; else nothing is selected. */
+/**
+ * The selection still names something in the document; else nothing is
+ * selected. A part selected without a region, or with one that is gone,
+ * selects its first region (windsor#75 decision 2), so the pane says which
+ * region its card edits.
+ */
 function validSelection(ctx: AppCtx, selection: SongSelection): SongSelection {
   if (!selection) return null;
   const { doc } = ctx.model;
@@ -95,7 +103,8 @@ function validSelection(ctx: AppCtx, selection: SongSelection): SongSelection {
   const part = doc.parts.find((p) => p.slot === selection.slot);
   if (!part) return null;
   const region = selection.region !== null && selection.region < part.regions.length;
-  return region ? selection : { kind: 'part', slot: selection.slot, region: null };
+  if (region) return selection;
+  return { kind: 'part', slot: selection.slot, region: part.regions.length > 0 ? 0 : null };
 }
 
 // eslint-disable-next-line max-lines-per-function -- the view's one composition: the lanes, the pane, the watch and the SongView the lanes call back into read as one sequence

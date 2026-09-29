@@ -8,7 +8,8 @@
  * auditions the chord under the playhead, and a step's tile does the same
  * with its own inversion and octave.
  * Every edit goes through `ctx.change` as a whole `steps` list (arrays
- * replace wholesale in the merge); the step operations are
+ * replace wholesale in the merge), into the pane's selected region's
+ * pattern (windsor#75, `partEdits.ts`'s `changePattern`); the step operations are
  * `chordStepModel.ts`. The strip's cells, columns, lighting and
  * playhead loop are `stepStrip.ts` (#619), shared with the grid (#603) and
  * Euclidean (#610) cards.
@@ -31,10 +32,10 @@ import {
   withStep,
 } from './chordStepModel';
 import type { AppCtx } from './context';
-import { partChange } from './context';
 import { PITCH_COLOR } from './consoleColors';
 import { el, select } from './dom';
 import { keySignature } from './gridModel';
+import { changePattern } from './partEdits';
 import { knobRow } from './seqFields';
 import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { CHORD_KNOBS } from './sequencerKnobTables';
@@ -191,16 +192,20 @@ function watch(strip: ChordStrip): void {
 const BASE_STEP_OPTIONS = DIVISOR_OPTIONS.filter((o) => CHORD_DIVISORS.includes(Number(o.value)));
 
 function controls(strip: ChordStrip): HTMLElement {
-  return knobRow(strip.ctx, strip.slot, CHORD_KNOBS, PITCH_COLOR);
+  return knobRow(strip.ctx, strip.slot, CHORD_KNOBS, PITCH_COLOR, strip.region);
+}
+
+/** Write one field of the strip's region's pattern, and redraw if it took. */
+function writeField(strip: ChordStrip, fields: Record<string, unknown>): void {
+  if (changePattern(strip.ctx, strip.slot, strip.region, fields)) strip.repaint();
 }
 
 function tools(strip: ChordStrip): HTMLElement {
-  const { ctx, slot } = strip;
   const row = el('div', 'capture-row');
   row.appendChild(
-    select('Base step', BASE_STEP_OPTIONS, String(strip.spec()?.divisor ?? ''), (v) => {
-      if (ctx.change(partChange(slot, { sequencer: { divisor: Number(v) } })).ok) strip.repaint();
-    }),
+    select('Base step', BASE_STEP_OPTIONS, String(strip.spec()?.divisor ?? ''), (v) =>
+      writeField(strip, { divisor: Number(v) }),
+    ),
   );
   const minus = el('button', 'btn', 'Delete last step') as HTMLButtonElement;
   minus.type = 'button';
@@ -224,16 +229,17 @@ function highlight(strip: ChordStrip, index: number | null): void {
   [...strip.root.children].forEach((col, i) => col.classList.toggle('drop-target', i === index));
 }
 
-/** The card body for a `chord` part: controls, the picker, the step strip, the hint. */
-export function chordCard(ctx: AppCtx, slot: number): HTMLElement {
+/** The card body for a `chord` part's region `region`: controls, the picker, the step strip, the hint. */
+export function chordCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
   const body = el('div');
   const strip: ChordStrip = {
     ctx,
     slot,
+    region,
     root: el('div', 'grid-strip chord-strip'),
     picker: null,
     playing: -1,
-    spec: () => specOf(ctx, slot, 'chord'),
+    spec: () => specOf(ctx, slot, 'chord', region),
     repaint: () => repaint(strip),
   };
   strip.picker = chordPicker({
@@ -241,9 +247,7 @@ export function chordCard(ctx: AppCtx, slot: number): HTMLElement {
     currentChord: () => chordNow(ctx),
     spec: () => strip.spec(),
     part: () => ctx.host.part(slot),
-    setVoicing: (voicing) => {
-      if (ctx.change(partChange(slot, { sequencer: { voicing } })).ok) strip.repaint();
-    },
+    setVoicing: (voicing) => writeField(strip, { voicing }),
     targetAt: (x, y) => targetAt(strip, x, y),
     highlight: (index) => highlight(strip, index),
     drop: (payload, index) => commit(strip, (s) => dropOn(s.steps, index, payload)),

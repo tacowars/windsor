@@ -126,6 +126,20 @@ describe('sequencer kind', () => {
     expect(sequencer.kind === 'euclidean' && sequencer.pattern).toBeNull();
   });
 
+  it("clears every region's own pattern, reporting nothing (windsor#75 decision 6)", () => {
+    const model = new DocumentModel(newSong());
+    restructure(model, setSequencerKind(model.doc, 0, 'chord'));
+    const whole = partAt(model.doc, 0)!.regions[0]!;
+    const pattern = { ...partAt(model.doc, 0)!.sequencer, gate: 0.5 };
+    model.merge({ parts: { 0: { regions: [{ ...whole, pattern }] } } });
+    expect(partAt(model.doc, 0)!.regions[0]?.pattern).toMatchObject({ gate: 0.5 });
+    restructure(model, setSequencerKind(model.doc, 0, 'arp'));
+    expect(model.corrections).toEqual([]);
+    expect(partAt(model.doc, 0)!.regions).toEqual([
+      { start: whole.start, duration: whole.duration },
+    ]);
+  });
+
   it('is a no-op for the kind the part already has', () => {
     const model = new DocumentModel(newSong());
     expect(setSequencerKind(model.doc, 0, 'none')).toBe(model.doc);

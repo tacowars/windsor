@@ -1,18 +1,35 @@
 /**
- * The console's structural edits as live partials (#629): a part added on
- * the lowest free slot, the selected part removed, a part's sequencer kind
+ * The console's part edits as live partials. Structural (#629): a part added
+ * on the lowest free slot, the selected part removed, a part's sequencer kind
  * changed — each one `ctx.change`, so the transport and every other part
  * keep playing where they are. The shape is the engine's: a whole part at a
  * free slot, `null` at a slot that leaves, `null` at a patch id that goes
  * with it (`removePartChange`). The normaliser fills the new part and the
  * kind's defaults through `DocumentModel.preview`, so nothing here restates
  * a default the engine owns. `ctx.restructure` is Import's and Restart's.
+ *
+ * And the pattern a card edits (windsor#75, epic windsor#70; record
+ * `2026-09-29-each-region-plays-its-own-pattern`): a card reads the selected
+ * region's pattern (`patternOf`) and writes a full copy of it back into that
+ * region (`regionPatternChange`), never into `part.sequencer`; a drawn region
+ * copies its neighbour (`drawRegionChange`); a kind change clears every
+ * region's pattern.
  */
-import type { ArrangementDocument, DocumentPartial, SequencerKind } from '@windsor/engine';
-import { partAt, removePartChange } from '@windsor/engine';
+import type {
+  ArrangementDocument,
+  DocumentPartial,
+  MusicPart,
+  PartRegion,
+  RegionPattern,
+  SequencerKind,
+  SequencerSpec,
+} from '@windsor/engine';
+import { partAt, regionPattern, removePartChange, songTicksOf } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
-import { addPart, setSequencerKind } from './songParts';
+import { deepMerge } from './documentModel';
+import { addRegion, neighbourIndex } from './regionModel';
+import { addPart, freshSequencer, setSequencerKind } from './songParts';
 
 /** A raw document normalised without being adopted — `DocumentModel.preview`. */
 export type Preview = (raw: unknown) => ArrangementDocument;
@@ -34,7 +51,7 @@ export function addPartChange(
   };
 }
 
-/** The partial driving the part on `slot` with a `kind` sequencer at the kind's defaults; null when unchanged. */
+/** The partial driving the part on `slot` with a `kind` sequencer at the kind's defaults, every region's pattern cleared; null when unchanged. */
 export function sequencerKindChange(
   doc: ArrangementDocument,
   slot: number,
@@ -44,7 +61,11 @@ export function sequencerKindChange(
   const next = setSequencerKind(doc, slot, kind);
   if (next === doc) return null;
   const part = partAt(preview(next), slot);
-  return part ? partChange(slot, { sequencer: part.sequencer }) : null;
+  if (!part) return null;
+  // `setSequencerKind` cleared the regions' patterns (windsor#75 decision 6): send them when there were any.
+  const patterned = partAt(doc, slot)?.regions.some((r) => r.pattern !== undefined) ?? false;
+  const regions = patterned ? { regions: part.regions } : {};
+  return partChange(slot, { sequencer: part.sequencer, ...regions });
 }
 
 /** Add a part live and select it; the slot it took, or null when the song is full or the engine refused. */
@@ -79,4 +100,150 @@ export function setSequencerKindLive(ctx: AppCtx, slot: number, kind: SequencerK
   if (!partial || !ctx.change(partial).ok) return false;
   ctx.render();
   return true;
+}
+
+/**
+ * The kinds whose card edits the selected region's pattern (windsor#75). The
+ * grid joins with windsor#76; until then its card edits `part.sequencer`, and
+ * a split or a drawn region of a grid part carries no pattern, so the card's
+ * edits stay what every grid region plays.
+ */
+export const REGION_PATTERN_KINDS: ReadonlySet<SequencerKind> = new Set<SequencerKind>([
+  'chord',
+  'arp',
+  'bass',
+  'euclidean',
+]);
+
+/** True when `part`'s regions each carry their own pattern. */
+export const keepsRegionPatterns = (part: Pick<MusicPart, 'sequencer'>): boolean =>
+  REGION_PATTERN_KINDS.has(part.sequencer.kind);
+
+/** A spec without its seed: what a region's pattern holds (the seed is the part's). */
+function withoutSeed(spec: SequencerSpec): RegionPattern {
+  const copy: Record<string, unknown> = { ...spec };
+  delete copy.seed;
+  // The kind's spec less its seed is exactly `RegionPattern`'s member for that kind.
+  return copy as RegionPattern;
+}
+
+/** A full copy of what region `index` of `part` plays, less the seed: what a draw and a first edit write. */
+export const patternCopy = (
+  part: Pick<MusicPart, 'regions' | 'sequencer'>,
+  index: number,
+): RegionPattern => withoutSeed(regionPattern(part, index));
+
+/**
+ * What a split gives a region with no pattern of its own (decision 3): a copy
+ * of the part's sequencer for a kind whose regions carry patterns, else none.
+ */
+export const splitFill = (part: Pick<MusicPart, 'sequencer'>): RegionPattern | undefined =>
+  keepsRegionPatterns(part) ? withoutSeed(part.sequencer) : undefined;
+
+/**
+ * The region a card on `part` edits (decision 2): the selected one, else the
+ * first; null when the part has none.
+ */
+export function editedRegion(
+  part: Pick<MusicPart, 'regions'>,
+  selected: number | null,
+): number | null {
+  if (part.regions.length === 0) return null;
+  return selected !== null && selected >= 0 && selected < part.regions.length ? selected : 0;
+}
+
+/**
+ * What a card reads: region `region`'s pattern through the engine's
+ * `regionPattern` (the part's seed included), or the part's sequencer when no
+ * region is named — the grid card until windsor#76.
+ */
+export function patternOf(
+  doc: ArrangementDocument,
+  slot: number,
+  region?: number,
+): SequencerSpec | undefined {
+  const part = partAt(doc, slot);
+  if (!part) return undefined;
+  return region === undefined ? part.sequencer : regionPattern(part, region);
+}
+
+/**
+ * The one write of a card's sequencer edit (decision 1): `fields` — a
+ * sequencer partial as the cards send it, `{ steps }`, `{ register: {
+ * octave } }` — merged into a full copy of what region `region` plays now
+ * (its own pattern, or on the first edit the part's sequencer), objects
+ * recursing and arrays replacing as the document's merge does, and written
+ * whole into that region's `pattern`. Every other region is left as it is.
+ * The `seed` is the part's, so a seed in `fields` goes to `part.sequencer`.
+ * With no region named the edit goes to `part.sequencer`, as before region
+ * patterns (the grid card until windsor#76). Null when the part or the
+ * region is gone.
+ */
+export function regionPatternChange(
+  doc: ArrangementDocument,
+  slot: number,
+  region: number | undefined,
+  fields: Readonly<Record<string, unknown>>,
+): DocumentPartial | null {
+  const part = partAt(doc, slot);
+  if (!part) return null;
+  if (region === undefined) return partChange(slot, { sequencer: fields });
+  if (!part.regions[region]) return null;
+  const { seed, ...rest } = fields;
+  const change: Record<string, unknown> = seed === undefined ? {} : { sequencer: { seed } };
+  if (Object.keys(rest).length > 0) {
+    // Merged over a normalised pattern of the same kind; the document renormalises the result.
+    const pattern = deepMerge(patternCopy(part, region), rest) as RegionPattern;
+    change.regions = part.regions.map((r, i) => (i === region ? { ...r, pattern } : r));
+  }
+  return partChange(slot, change);
+}
+
+/** Write a card's sequencer edit live through `regionPatternChange`; false when nothing took. */
+export function changePattern(
+  ctx: AppCtx,
+  slot: number,
+  region: number | undefined,
+  fields: Readonly<Record<string, unknown>>,
+): boolean {
+  const partial = regionPatternChange(ctx.model.doc, slot, region, fields);
+  return partial !== null && ctx.change(partial).ok;
+}
+
+/** The kind's default pattern for the part on `slot`, as the normaliser fills it. */
+function defaultPattern(
+  doc: ArrangementDocument,
+  slot: number,
+  preview: Preview,
+): RegionPattern | undefined {
+  const parts = doc.parts.map((p) =>
+    p.slot === slot ? { ...p, regions: [], sequencer: freshSequencer(p.sequencer.kind) } : p,
+  );
+  const sequencer = partAt(preview({ ...doc, parts }), slot)?.sequencer;
+  return sequencer && withoutSeed(sequencer);
+}
+
+/**
+ * A region drawn on the lane of the part on `slot` at `tick`, and its index
+ * (decision 4): it copies the pattern of the nearest region that starts
+ * before it, else of the nearest after it, and the first region of a part
+ * with none starts from the kind's default pattern. A kind whose regions
+ * carry no pattern draws a bare region. Null when there is no room.
+ */
+export function drawRegionChange(
+  doc: ArrangementDocument,
+  slot: number,
+  tick: number,
+  preview: Preview,
+): { regions: PartRegion[]; index: number } | null {
+  const part = partAt(doc, slot);
+  const regions = part && addRegion(part.regions, tick, songTicksOf(doc));
+  if (!part || !regions) return null;
+  const index = regions.findIndex((r) => !part.regions.includes(r));
+  const added = regions[index];
+  if (!added || !keepsRegionPatterns(part)) return { regions, index };
+  const from = neighbourIndex(part.regions, added.start);
+  const pattern = from >= 0 ? patternCopy(part, from) : defaultPattern(doc, slot, preview);
+  if (!pattern) return { regions, index };
+  return { regions: regions.map((r, i) => (i === index ? { ...r, pattern } : r)), index };
 }

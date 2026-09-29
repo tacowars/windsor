@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { Region } from '@windsor/engine';
+import type { PartRegion, Region, RegionPattern } from '@windsor/engine';
 import {
   DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
@@ -24,6 +24,7 @@ import {
   fitRegions,
   followSongLength,
   moveRegion,
+  neighbourIndex,
   regionMark,
   resizeRegionEnd,
   resizeRegionStart,
@@ -195,5 +196,66 @@ describe("a drag by the pointer's travel (windsor#21)", () => {
       region(3 * BAR, BAR),
     );
     expect(dragRegion(regions, { kind: 'move', index: 7, deltaTicks: BAR }, SONG)).toEqual(regions);
+  });
+});
+
+describe('a region carries its pattern through every edit (windsor#75)', () => {
+  const chord = (octave: number): RegionPattern => ({
+    ...DEFAULT_CHORD_CONFIG,
+    kind: 'chord',
+    register: { octave },
+  });
+  const held = (start: number, duration: number, octave: number): PartRegion => ({
+    start,
+    duration,
+    pattern: chord(octave),
+  });
+
+  it('keeps it through a move, a resize at either edge and a drag', () => {
+    const lane = [held(0, BAR, 2), held(2 * BAR, BAR, 5)];
+    expect(moveRegion(lane, 1, 3 * BAR, SONG)[1]).toEqual(held(3 * BAR, BAR, 5));
+    expect(resizeRegionEnd(lane, 0, 2 * BAR, SONG)[0]).toEqual(held(0, 2 * BAR, 2));
+    expect(resizeRegionStart(lane, 1, BAR)[1]).toEqual(held(BAR, 2 * BAR, 5));
+    const drag = { kind: 'move', index: 0, deltaTicks: BAR } as const;
+    expect(dragRegion(lane, drag, SONG)[0]).toEqual(held(BAR, BAR, 2));
+  });
+
+  it("gives both halves of a split the region's own pattern, or the fill when it had none", () => {
+    expect(splitRegion([held(0, SONG, 4)], 0, 2 * BAR)).toEqual([
+      held(0, 2 * BAR, 4),
+      held(2 * BAR, 2 * BAR, 4),
+    ]);
+    expect(splitRegion([region(0, SONG)], 0, 2 * BAR, BAR, chord(1))).toEqual([
+      held(0, 2 * BAR, 1),
+      held(2 * BAR, 2 * BAR, 1),
+    ]);
+    expect(splitRegion([region(0, SONG)], 0, 2 * BAR)).toEqual([
+      region(0, 2 * BAR),
+      region(2 * BAR, 2 * BAR),
+    ]);
+  });
+
+  it('takes the pattern away with a deleted region and keeps it through a song-length change', () => {
+    expect(deleteRegion([held(0, BAR, 1), held(2 * BAR, BAR, 2)], 0)).toEqual([
+      held(2 * BAR, BAR, 2),
+    ]);
+    expect(fitRegions([held(0, SONG, 3)], 6 * BAR, SONG).regions).toEqual([held(0, 6 * BAR, 3)]);
+    expect(fitRegions([held(BAR, 3 * BAR, 3)], 2 * BAR, SONG).regions).toEqual([held(BAR, BAR, 3)]);
+  });
+
+  it("keeps the other regions' patterns when one is added", () => {
+    expect(addRegion([held(0, BAR, 2)], 2 * BAR, SONG)).toEqual([
+      held(0, BAR, 2),
+      region(2 * BAR, BAR),
+    ]);
+  });
+
+  it('names the region a drawn one copies: the nearest before it, else the nearest after', () => {
+    const lane = [region(BAR, BAR), region(4 * BAR, BAR), region(6 * BAR, BAR)];
+    expect(neighbourIndex(lane, 5 * BAR)).toBe(1);
+    expect(neighbourIndex(lane, 3 * BAR)).toBe(0);
+    expect(neighbourIndex(lane, 0)).toBe(0);
+    expect(neighbourIndex(lane.slice(1), 0)).toBe(0);
+    expect(neighbourIndex([], 0)).toBe(-1);
   });
 });

@@ -9,12 +9,19 @@
  * snap grain is bars by default; the modifier snaps to the part's own step
  * (`divisor`) for grid / chord / euclidean and to the beat otherwise.
  * `regionModel.test.ts` pins the fixtures the ticket names.
+ *
+ * A region may carry its own `pattern` (windsor#75, epic windsor#70; record
+ * `2026-09-29-each-region-plays-its-own-pattern`), so every edit is generic
+ * over the region and keeps what it holds: a move or a resize keeps the
+ * pattern, a split gives both halves a copy, a delete takes it along.
  */
 import type {
   ArrangementDocument,
   DocumentPartial,
   HarmonyEvent,
+  PartRegion,
   Region,
+  RegionPattern,
   SequencerSpec,
 } from '@windsor/engine';
 import { PPQ, TICKS_PER_BAR, isInfiniteRegion } from '@windsor/engine';
@@ -37,7 +44,7 @@ export const snapDown = (tick: number, grain: number): number => Math.floor(tick
 
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
 const endOf = (region: Region): number => region.start + region.duration;
-const sorted = (regions: readonly Region[]): Region[] =>
+const sorted = <R extends Region>(regions: readonly R[]): R[] =>
   [...regions].sort((a, b) => a.start - b.start);
 
 /** The index of the region holding `tick`, or -1 in a gap. */
@@ -62,67 +69,82 @@ function bounds(
  * inside a region, past the song, or the gap has no room.
  */
 export function addRegion(
-  regions: readonly Region[],
+  regions: readonly PartRegion[],
   tick: number,
   songTicks: number,
   grain: number = TICKS_PER_BAR,
-): Region[] | null {
+): PartRegion[] | null {
   const start = Math.max(0, snapDown(tick, grain));
   if (start >= songTicks || regionAt(regions, start) >= 0) return null;
   const next = regions.find((r) => r.start > start);
   const end = Math.min(start + TICKS_PER_BAR, next ? next.start : songTicks, songTicks);
   if (end <= start) return null;
-  return sorted([...regions, { start, duration: end - start }]);
+  return sorted<PartRegion>([...regions, { start, duration: end - start }]);
+}
+
+/**
+ * The region a new one drawn at `start` copies (windsor#75 decision 4): the
+ * nearest region that starts before it, else the nearest after it; -1 when
+ * the lane has none. The lane is sorted, so the last one before is the nearest.
+ */
+export function neighbourIndex(regions: readonly Region[], start: number): number {
+  let before = -1;
+  let after = -1;
+  regions.forEach((r, i) => {
+    if (r.start < start) before = i;
+    else if (r.start > start && after < 0) after = i;
+  });
+  return before >= 0 ? before : after;
 }
 
 /** The region's end dragged to `tick`, snapped, kept at least a grain long and short of the next region and the song end. */
-export function resizeRegionEnd(
-  regions: readonly Region[],
+export function resizeRegionEnd<R extends Region>(
+  regions: readonly R[],
   index: number,
   tick: number,
   songTicks: number,
   grain: number = TICKS_PER_BAR,
-): Region[] {
+): R[] {
   const region = regions[index];
   if (!region) return [...regions];
   const { hi } = bounds(regions, index, songTicks);
   const lo = region.start + grain;
   if (lo > hi) return [...regions];
   const end = clamp(snapTick(tick, grain), lo, hi);
-  return regions.map((r, i) => (i === index ? { start: r.start, duration: end - r.start } : r));
+  return regions.map((r, i) => (i === index ? { ...r, duration: end - r.start } : r));
 }
 
 /** The region's start dragged to `tick`, snapped, kept after the previous region and at least a grain before its end. */
-export function resizeRegionStart(
-  regions: readonly Region[],
+export function resizeRegionStart<R extends Region>(
+  regions: readonly R[],
   index: number,
   tick: number,
   grain: number = TICKS_PER_BAR,
-): Region[] {
+): R[] {
   const region = regions[index];
   if (!region) return [...regions];
   const { lo } = bounds(regions, index, Number.POSITIVE_INFINITY);
   const hi = endOf(region) - grain;
   if (lo > hi) return [...regions];
   const start = clamp(snapTick(tick, grain), lo, hi);
-  return regions.map((r, i) => (i === index ? { start, duration: endOf(r) - start } : r));
+  return regions.map((r, i) => (i === index ? { ...r, start, duration: endOf(r) - start } : r));
 }
 
 /** The region moved so it starts at `tick`, snapped, keeping its duration and its neighbours. */
-export function moveRegion(
-  regions: readonly Region[],
+export function moveRegion<R extends Region>(
+  regions: readonly R[],
   index: number,
   tick: number,
   songTicks: number,
   grain: number = TICKS_PER_BAR,
-): Region[] {
+): R[] {
   const region = regions[index];
   if (!region) return [...regions];
   const { lo, hi } = bounds(regions, index, songTicks);
   const last = hi - region.duration;
   if (lo > last) return [...regions];
   const start = clamp(snapTick(tick, grain), lo, last);
-  return regions.map((r, i) => (i === index ? { start, duration: r.duration } : r));
+  return regions.map((r, i) => (i === index ? { ...r, start } : r));
 }
 
 export type RegionDrag = 'move' | 'resizeStart' | 'resizeEnd';
@@ -134,12 +156,12 @@ export type RegionDrag = 'move' | 'resizeStart' | 'resizeEnd';
  * absolute tick — so a block `MIN_BLOCK_PX` drew wider than its span
  * changes by what the pointer moved, not by the widened offset.
  */
-export function dragRegion(
-  regions: readonly Region[],
+export function dragRegion<R extends Region>(
+  regions: readonly R[],
   drag: { readonly kind: RegionDrag; readonly index: number; readonly deltaTicks: number },
   songTicks: number,
   grain: number = TICKS_PER_BAR,
-): Region[] {
+): R[] {
   const region = regions[drag.index];
   if (!region) return [...regions];
   switch (drag.kind) {
@@ -158,29 +180,38 @@ export function dragRegion(
   }
 }
 
-/** The region cut in two at the snapped tick; unchanged when the cut lands on or outside its edges. */
+/**
+ * The region cut in two at the snapped tick; unchanged when the cut lands on
+ * or outside its edges. Both halves hold the region's pattern (windsor#75
+ * decision 3): its own, or `fill` — the part's sequencer, for a region that
+ * had none — so each half then edits on its own. Without either, neither
+ * half carries one.
+ */
 export function splitRegion(
-  regions: readonly Region[],
+  regions: readonly PartRegion[],
   index: number,
   tick: number,
   grain: number = TICKS_PER_BAR,
-): Region[] {
+  fill?: RegionPattern,
+): PartRegion[] {
   const region = regions[index];
   if (!region) return [...regions];
   const at = snapTick(tick, grain);
   if (at <= region.start || at >= endOf(region)) return [...regions];
+  const pattern = region.pattern ?? fill;
+  const held = pattern ? { pattern } : {};
   return regions.flatMap((r, i) =>
     i === index
       ? [
-          { start: r.start, duration: at - r.start },
-          { start: at, duration: endOf(r) - at },
+          { start: r.start, duration: at - r.start, ...held },
+          { start: at, duration: endOf(r) - at, ...held },
         ]
       : [r],
   );
 }
 
-/** The region removed, leaving a gap: a rest. */
-export function deleteRegion(regions: readonly Region[], index: number): Region[] {
+/** The region removed with its pattern, leaving a gap: a rest. */
+export function deleteRegion<R extends Region>(regions: readonly R[], index: number): R[] {
   return regions.filter((_, i) => i !== index);
 }
 
@@ -197,20 +228,21 @@ export const regionMark = (regions: readonly Region[], songTicks: number): Regio
  * what the normaliser would do to the tail, done here so the live partial
  * and the document agree, plus the growth the normaliser cannot know about.
  */
-export function fitRegions(
-  regions: readonly Region[],
+export function fitRegions<R extends Region>(
+  regions: readonly R[],
   songTicks: number,
   previousSongTicks: number,
-): { regions: Region[]; changed: boolean } {
-  if (isInfiniteRegion(regions, previousSongTicks)) {
+): { regions: R[]; changed: boolean } {
+  const whole = regions[0];
+  if (whole && isInfiniteRegion(regions, previousSongTicks)) {
     return {
-      regions: [{ start: 0, duration: songTicks }],
+      regions: [{ ...whole, start: 0, duration: songTicks }],
       changed: songTicks !== previousSongTicks,
     };
   }
   const fitted = regions
     .filter((r) => r.start < songTicks)
-    .map((r) => (endOf(r) > songTicks ? { start: r.start, duration: songTicks - r.start } : r));
+    .map((r) => (endOf(r) > songTicks ? { ...r, duration: songTicks - r.start } : r));
   const changed =
     fitted.length !== regions.length ||
     fitted.some((r, i) => r.start !== regions[i]?.start || r.duration !== regions[i]?.duration);
@@ -238,7 +270,7 @@ export function followSongLength(
   const songTicks = bars * TICKS_PER_BAR;
   const previous = doc.transport.bars * TICKS_PER_BAR;
   const report: string[] = [];
-  const parts: Record<number, { regions: Region[] }> = {};
+  const parts: Record<number, { regions: PartRegion[] }> = {};
   for (const part of doc.parts) {
     const fitted = fitRegions(part.regions, songTicks, previous);
     if (!fitted.changed) continue;
