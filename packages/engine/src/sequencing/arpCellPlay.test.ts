@@ -15,6 +15,7 @@ import {
   playArpCell,
   shiftOctave,
   skipCell,
+  strikeCell,
   type ArpCellConfig,
   type ArpOnset,
 } from './arpCellPlay';
@@ -111,6 +112,21 @@ describe('skip chance', () => {
       expect(Array.from({ length: 8 }, arpSkipRng(seed, region))).toEqual(skipDraws);
     }
     expect(arpSkipSeed(7, 1)).not.toBe(arpSkipSeed(7, 0));
+  });
+});
+
+describe('strikeCell, a cell at a retrigger reset', () => {
+  it('turns a tie into a plain note and drops a slide, keeping octave and accent', () => {
+    expect(strikeCell({ kind: 'tie' })).toStrictEqual(arpNote());
+    expect(strikeCell(arpNote({ slide: true, octave: -1, accent: true }))).toStrictEqual(
+      arpNote({ octave: -1, accent: true }),
+    );
+  });
+
+  it('leaves a note and a rest as written', () => {
+    const note = arpNote({ octave: 1 });
+    expect(strikeCell(note)).toBe(note);
+    expect(strikeCell({ kind: 'rest' })).toStrictEqual({ kind: 'rest' });
   });
 });
 

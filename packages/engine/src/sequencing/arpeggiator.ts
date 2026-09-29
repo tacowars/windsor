@@ -41,15 +41,22 @@
  * when the next onset changes the chord, the look-ahead can name a cell
  * other than the one that onset plays. With `retrigger` on, that onset plays
  * cell 0. With it off, it plays the next index modulo the new cycle. Nothing
- * is held into it unless the old cycle's next cell was a tie or a slide. So
- * a tie there plays nothing, and a slide there plays a plain note (epic
- * decision 4, "with nothing held"). The other way round, a tie or slide in
- * the old cycle holds the note to the change, and the cell played there
- * releases it or carries it on as its own kind says. At a boundary that
- * falls on the cycle's end, the two cells are the same. Reading the next
- * chord would need the gate to hand over a look-ahead, or the arp to read
- * the harmony timeline. Either one couples the arp to the transport, so
- * this stays an open design point for tacowars (windsor#129).
+ * is held into it unless the old cycle's next cell was a tie or a slide.
+ * The other way round, a tie or slide in the old cycle holds the note to
+ * the change, and the cell played there releases it or carries it on as its
+ * own kind says. At a boundary that falls on the cycle's end, the two cells
+ * are the same.
+ *
+ * **Cell 0 at a retrigger reset** (decided by tacowars, windsor#129). When a
+ * chord change with `retrigger` on restarts the walk at cell 0, and cell 0
+ * is a tie or a slide, it plays as a plain note: the walked pitch with the
+ * cell's octave shift, its accent and its lanes, but no tie and no slide
+ * (`strikeCell`). So every chord change starts on a sounding note, whatever
+ * was held into it. This applies only at a retrigger reset: a tie or slide
+ * on cell 0 when the cycle wraps with no chord change plays as written, and
+ * with `retrigger` off a tie or slide at the change plays as written too
+ * (with nothing held, a tie plays nothing and a slide a plain note, epic
+ * decision 4).
  *
  * **Rhythm.** Every step is an onset while a chord is active — density is
  * the bass's, not the arp's. A note lasts `gate` of the last step it covers;
@@ -64,7 +71,14 @@ import { MIDI_NOTE_MAX } from '../audioConstants';
 import { chordTones } from '../harmony/chordTheory';
 import { voiceChord } from '../harmony/chordVoicing';
 import type { HarmonyChord } from '../harmony/harmonyTimeline';
-import { arpCellIndex, arpSkipRng, holdsToNext, playArpCell, skipCell } from './arpCellPlay';
+import {
+  arpCellIndex,
+  arpSkipRng,
+  holdsToNext,
+  playArpCell,
+  skipCell,
+  strikeCell,
+} from './arpCellPlay';
 import { assertArpConfig, type ArpSequencerConfig, type ArpStyle } from './arpSequencer';
 import { arpCycleLength, arpNote } from './arpSteps';
 import { streamRng, type Rng } from './generatorSeed';
@@ -266,7 +280,7 @@ export class Arpeggiator {
     const { chord } = event;
     const list = chord ? arpNoteList(this.pitch, this.current, chord) : [];
     // Track before the empty-pool return: a chord clipped to nothing is still a chord change (#714 review).
-    if (chord) this.track(step, chord, list);
+    const reset = chord ? this.track(step, chord, list) : false;
     this.listLength = list.length;
     if (!chord || list.length === 0) return this.releaseHeld(event.tick, event.time);
     const i = step - this.base;
@@ -278,12 +292,14 @@ export class Arpeggiator {
     const index = arpCellIndex(i, cycle);
     // Every cycle fits the stored cells (`ARP_STEPS_MAX`); a plain note stands in for safety.
     const written = steps[index] ?? PLAIN_CELL;
+    const played = skipCell(written, skipChance, this.skipRng);
     const outcome = playArpCell(
       {
         tick: event.tick,
         time: event.time,
         degree: chord.event.degree,
-        cell: skipCell(written, skipChance, this.skipRng),
+        // A retrigger reset starts on a sounding note: a tie or slide on cell 0 strikes plain.
+        cell: reset ? strikeCell(played) : played,
         index,
         pitch,
         held: this.held,
@@ -296,17 +312,22 @@ export class Arpeggiator {
     return outcome.events;
   }
 
-  /** Apply decision 5: a chord change retriggers when asked; a new list or a retrigger reshuffles. */
-  private track(step: number, chord: HarmonyChord, list: readonly number[]): void {
+  /**
+   * Apply decision 5: a chord change retriggers when asked; a new list or a
+   * retrigger reshuffles. Returns whether this onset reset the walk.
+   */
+  private track(step: number, chord: HarmonyChord, list: readonly number[]): boolean {
     const key = chordKey(chord);
     const listKey = list.join(',');
-    if (this.lastChord !== null && key !== this.lastChord && this.current.retrigger) {
+    const reset = this.lastChord !== null && key !== this.lastChord && this.current.retrigger;
+    if (reset) {
       this.base = step;
       this.shuffle = null;
     }
     if (listKey !== this.lastList) this.shuffle = null;
     this.lastChord = key;
     this.lastList = listKey;
+    return reset;
   }
 
   private pick(i: number, list: readonly number[]): number {

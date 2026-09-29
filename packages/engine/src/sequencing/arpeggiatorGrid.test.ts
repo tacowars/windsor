@@ -294,19 +294,49 @@ describe('the gate look-ahead at a retrigger that is not cycle-aligned', () => {
   const offTicks = (events: readonly NoteEvent[]): number[] =>
     events.filter((e) => e.kind === 'noteOff').map((e) => e.tick);
 
-  it('reads the current cycle: a tie on cell 0 at the change has nothing held, and plays nothing', () => {
+  it('a tie on cell 0 at the change plays as a plain note, so the chord change sounds', () => {
     const events = play({ 0: TIE });
-    // Step 1 is cell 1; the cycle's next cell is 2, a note, so its gate stands.
-    expect(offTicks(events)[0]).toBe(QUARTER + QUARTER / 2);
-    expect(onSteps(events)).toEqual([1, 3]);
+    // Step 0 is cell 0 at entry, not a reset: a tie with nothing held plays nothing.
+    expect(onSteps(events)).toEqual([1, 2, 3]);
+    const atChange = onsOf(events).find((e) => e.tick === 2 * QUARTER);
+    expect(atChange!.slide).toBeUndefined();
+    // Cell 1 follows it, a note, so its gate stands.
+    expect(offTicks(events)).toContain(2 * QUARTER + QUARTER / 2);
   });
 
-  it('a slide on cell 0 at the change has nothing held, and plays as a plain note', () => {
-    const events = play({ 0: arpNote({ slide: true }) });
-    expect(offTicks(events).slice(0, 2)).toEqual([QUARTER / 2, QUARTER + QUARTER / 2]);
-    const atChange = onsOf(events).find((e) => e.tick === 2 * QUARTER);
-    expect(atChange).toBeDefined();
-    expect(atChange!.slide).toBeUndefined();
+  it('a tie on cell 0 with a note held into the change releases it and strikes', () => {
+    const events = play({ 0: TIE, 2: TIE });
+    expect(offTicks(events)).toContain(2 * QUARTER);
+    expect(onSteps(events)).toEqual([1, 2, 3]);
+  });
+
+  it('a slide on cell 0 at the change plays as a plain note, held into or not', () => {
+    for (const written of [
+      { 0: arpNote({ slide: true }) },
+      { 0: arpNote({ slide: true }), 2: TIE },
+    ]) {
+      const events = play(written);
+      const atChange = events.filter((e) => e.tick === 2 * QUARTER);
+      const on = onsOf(atChange)[0];
+      expect(on).toBeDefined();
+      expect(on!.slide).toBeUndefined();
+      // Not legato: any held note's off goes out before the strike.
+      expect(atChange.at(-1)!.kind).toBe('noteOn');
+    }
+  });
+
+  it('keeps an accent and an octave on a slide cell 0 at the change', () => {
+    const plain = play({});
+    const events = play({ 0: arpNote({ slide: true, accent: true, octave: 1 }) });
+    const atChange = onsOf(events).find((e) => e.tick === 2 * QUARTER)!;
+    const unshifted = onsOf(plain).find((e) => e.tick === 2 * QUARTER)!;
+    expect(atChange.note).toBe(unshifted.note + SEMITONES_PER_OCTAVE);
+    expect(atChange.accent).toBeDefined();
+  });
+
+  it('a tie on cell 0 when the cycle wraps with no chord change still ties, retrigger on', () => {
+    const events = run({ style: 'upDown', retrigger: true, steps: cells({ 0: TIE }) }, 8);
+    expect(onSteps(events)).toEqual([1, 2, 3, 5, 6, 7]);
   });
 
   it('a tie on the cycle’s next cell holds the note to the change, where cell 0 releases and restrikes', () => {

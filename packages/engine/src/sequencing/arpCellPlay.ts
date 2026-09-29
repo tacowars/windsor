@@ -23,6 +23,13 @@
  *   releases the note at its own onset. It reads the current cycle, so at a
  *   chord change the next onset may play another cell (`arpeggiator.ts`,
  *   "The gate's look-ahead across a chord change").
+ * - **A retrigger reset** (decided by tacowars, windsor#129): when a chord
+ *   change with `retrigger` on restarts the walk at cell 0 and that cell is
+ *   a tie or a slide, it plays as a plain note — the walked pitch with the
+ *   cell's octave shift, its accent and its lanes, but no tie and no slide
+ *   (`strikeCell`). So every chord change starts on a sounding note. A tie
+ *   or slide on cell 0 when the cycle wraps with no chord change plays as
+ *   written.
  * - **Skip chance:** a note cell becomes a rest with probability
  *   `skipChance`, drawn from a stream of its own (`arpSkipRng`), never the
  *   walk's, and nothing is drawn at 0 (`skipCell`).
@@ -32,7 +39,7 @@
 import { MIDI_NOTE_MAX } from '../audioConstants';
 import type { ArpSequencerConfig } from './arpSequencer';
 import { ARP_SKIP_STREAM_SALT, UINT32_SPAN } from './arpStepConstants';
-import type { ArpStep } from './arpSteps';
+import { arpNote, type ArpStep } from './arpSteps';
 import { hashSeed, streamRng, type Rng } from './generatorSeed';
 import { mulberry32 } from './mulberry32';
 import type { NoteEvent, NoteOnEvent } from './noteEvent';
@@ -82,6 +89,13 @@ export function arpSkipRng(seed: number, regionIndex: number): Rng {
 export function skipCell(cell: ArpStep, skipChance: number, rng: Rng): ArpStep {
   if (cell.kind !== 'note' || skipChance <= 0) return cell;
   return rng() < skipChance ? REST : cell;
+}
+
+/** A cell as it plays at a retrigger reset: a tie or a slide becomes a plain note, keeping a note's octave and accent. */
+export function strikeCell(cell: ArpStep): ArpStep {
+  if (cell.kind === 'tie') return arpNote();
+  if (cell.kind === 'note' && cell.slide) return { ...cell, slide: false };
+  return cell;
 }
 
 /** One onset as the arpeggiator hands it over, the walk and the skip already resolved. */
