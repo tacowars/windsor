@@ -152,13 +152,36 @@ export function offsetLabel(row: StepModRow, value: number): string {
 }
 
 /**
- * What a cell's readout says: the offset, and — when the patch's own value
- * is known — what the step plays, through the engine's curve.
+ * How a step's note-on meets the voice (windsor#31): `none`, a plain
+ * note-on (or no note at all); `retarget`, a Slide onto a new pitch, which
+ * hands the sounding voice over and keeps the old step's offsets on every
+ * `slideKeeps` row; `same`, a Slide onto the pitch already held, which sends
+ * no note-on, so none of the step's values reach the voice. The card reads
+ * it from its own steps (the grid's `slideAt`).
  */
-export function laneReadout(param: StepModParam, value: number, base: number | undefined): string {
+export type StepSlide = 'none' | 'retarget' | 'same';
+
+/** Whether a slide holds `param` at the previous step's offset, so this step's own value does not play. */
+export function heldBySlide(slide: StepSlide, param: StepModParam): boolean {
+  if (slide === 'same') return true;
+  return slide === 'retarget' && rowOf(param)?.slideKeeps === true;
+}
+
+/**
+ * What a cell's readout says: the offset, and what the step plays through
+ * the engine's curve when the patch's own value is known — or, when a slide
+ * holds the row, that the value is set but does not play.
+ */
+export function laneReadout(
+  param: StepModParam,
+  value: number,
+  base: number | undefined,
+  slide: StepSlide = 'none',
+): string {
   const row = rowOf(param);
   if (!row) return fmtSigned(value);
   const offset = offsetLabel(row, value);
+  if (heldBySlide(slide, param)) return `${offset} · held by slide`;
   if (base === undefined) return offset;
   return `${offset} → ${STEP_MOD_LANE_LABELS[param].fmt(stepModValue(row, base, value))}`;
 }

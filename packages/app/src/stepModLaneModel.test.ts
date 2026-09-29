@@ -7,15 +7,22 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { GridSpec, StepModLane } from '@windsor/engine';
-import { ARRANGEMENT_VERSION, STEP_MOD_LANES_MAX, STEP_MOD_PARAMS, partAt } from '@windsor/engine';
+import {
+  ARRANGEMENT_VERSION,
+  gridNote,
+  STEP_MOD_LANES_MAX,
+  STEP_MOD_PARAMS,
+  partAt,
+} from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
 import { DocumentModel } from './documentModel';
-import { stepsForLength } from './gridModel';
+import { slideAt, stepsForLength } from './gridModel';
 import {
   addLane,
   canAddLane,
   cellAtX,
   freeParams,
+  heldBySlide,
   laneReadout,
   lanesForSteps,
   offsetLabel,
@@ -204,5 +211,40 @@ describe('a lane in the document', () => {
     const lanes = [lane('filter.cutoff', [0.5, 0.25])];
     expect(lanesForSteps(lanes, 4)).toEqual([lane('filter.cutoff', [0.5, 0.25, 0, 0])]);
     expect(lanesForSteps(lanes, 1)).toEqual([lane('filter.cutoff', [0.5])]);
+  });
+});
+
+describe('a slide holds what the voice keeps (windsor#31)', () => {
+  const KEY = { root: 0, scale: 'naturalMinor' } as const;
+  const line = [
+    gridNote(0),
+    gridNote(2, { slide: true }),
+    gridNote(2, { slide: true }),
+    gridNote(4),
+  ];
+  const held = (index: number, param: StepModLane['param']): boolean =>
+    heldBySlide(slideAt(line, line.length, index, KEY), param);
+
+  it('holds feedback on a slide to a new pitch, but not the cutoff on the same step', () => {
+    expect(held(1, 'ops.0.feedback')).toBe(true);
+    expect(held(1, 'ops.2.env.decayCurve')).toBe(true);
+    expect(held(1, 'filter.cutoff')).toBe(false);
+    expect(held(1, 'ops.1.level')).toBe(false);
+  });
+
+  it('holds every lane on a slide to the held pitch, which sends no note-on', () => {
+    for (const param of STEP_MOD_PARAMS) expect(held(2, param), param).toBe(true);
+  });
+
+  it('never holds a step without a slide', () => {
+    for (const index of [0, 3]) {
+      for (const param of STEP_MOD_PARAMS) expect(held(index, param), param).toBe(false);
+    }
+  });
+
+  it('says so in the readout instead of a played value', () => {
+    expect(laneReadout('ops.0.feedback', 0.35, 0, 'retarget')).toBe('+0.35 · held by slide');
+    expect(laneReadout('filter.cutoff', 0.5, 1000, 'retarget')).toBe('+2.3 oct → 4.76k');
+    expect(laneReadout('filter.cutoff', 0.5, 1000, 'same')).toBe('+2.3 oct · held by slide');
   });
 });

@@ -42,6 +42,7 @@ import {
   rotateLanes,
   rotateSteps,
   setDegree,
+  slideAt,
   stepLabel,
   stepsForLength,
   toggleFlag,
@@ -67,7 +68,8 @@ const HINT =
   'written degree folded into the current scale. Oct: click up, shift-click down. ' +
   'A accent, S slide. Steps past Length stay written, greyed. Randomize rewrites every step; ' +
   'Rotate turns the loop. + Lane adds a modulation lane: drag a bar up or down, across steps ' +
-  'to paint; double-click resets a step to the patch value.';
+  'to paint; double-click resets a step to the patch value. A dashed cell is held by a slide: ' +
+  'set, but the step plays the previous offset.';
 
 /** This card's strip: one column per written step of a `grid` spec, and its lanes. */
 interface GridStrip extends Strip<GridSpec> {
@@ -267,6 +269,10 @@ function laneHost(ctx: AppCtx, slot: number, scope: HTMLElement, repaint: () => 
     write: (lanes) => ctx.change(partChange(slot, { sequencer: { lanes } })).ok,
     repaint,
     stepCount: () => spec()?.steps.length ?? 0,
+    slide: (index) => {
+      const s = spec();
+      return s ? slideAt(s.steps, s.length, index, ctx.model.doc.harmony) : 'none';
+    },
   };
 }
 

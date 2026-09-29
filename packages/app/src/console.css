@@ -491,7 +491,7 @@ input {
   justify-content: flex-end;
   gap: 2px;
   flex: none;
-  width: 112px;
+  width: 132px;
   padding-right: 4px;
   background: var(--panel);
 }
@@ -586,6 +586,14 @@ input {
 }
 .mod-cell.zero .mod-bar {
   display: none;
+}
+/* A slide holds this row at the previous step's offset: the value is kept
+   but does not play, so its bar takes the rule colour. */
+.mod-cell.held {
+  border-style: dashed;
+}
+.mod-cell.held .mod-bar {
+  background: var(--line-bright);
 }
 .grid-col.playing .mod-cell {
   border-color: var(--carrier);

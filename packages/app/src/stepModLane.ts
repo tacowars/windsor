@@ -25,10 +25,12 @@ import { getPath } from './patchPath';
 import { primaryHeld } from './songViewTables';
 import {
   type PaintPoint,
+  type StepSlide,
   addLane,
   canAddLane,
   cellAtX,
   freeParams,
+  heldBySlide,
   laneLabel,
   laneReadout,
   paintSpan,
@@ -52,6 +54,8 @@ export interface LaneHost {
   repaint(): void;
   /** The number of written steps: a new lane's length. */
   stepCount(): number;
+  /** How step `index`'s note meets the voice; a card without slides leaves it out (`none`). */
+  slide?(index: number): StepSlide;
 }
 
 /** The patch value of `param` for the part on `slot`: what a readout's played value starts from. */
@@ -75,8 +79,9 @@ function showReadout(host: LaneHost, lane: number, step: number, value: number |
   const line = host.scope.querySelector<HTMLElement>(`.mod-readout[data-lane="${lane}"]`);
   const param = host.lanes()?.[lane]?.param;
   if (!line || !param) return;
+  const slide = host.slide?.(step) ?? 'none';
   line.textContent =
-    value === null ? '' : `${step + 1}: ${laneReadout(param, value, host.base(param))}`;
+    value === null ? '' : `${step + 1}: ${laneReadout(param, value, host.base(param), slide)}`;
 }
 
 /** A press on lane `lane`'s cell: paint from it until the release, or drop the preview. */
@@ -130,13 +135,16 @@ function paintFrom(host: LaneHost, lane: number, cell: HTMLElement, down: Pointe
 
 /**
  * Step `index`'s cells, one per lane in lane order, for the card to append
- * to that step's column. `sounds` false dims a step no note plays on.
+ * to that step's column. `sounds` false dims a step no note plays on; a
+ * cell a slide holds (`heldBySlide`) draws its bar in the rule colour, since
+ * its value is kept for when the slide goes but does not play.
  */
 export function laneCells(host: LaneHost, index: number, sounds = true): HTMLElement[] {
   return (host.lanes() ?? []).map((lane, k) => {
     const cell = el('div', k === 0 ? 'mod-cell first' : 'mod-cell');
     cell.dataset.lane = String(k);
     cell.classList.toggle('mute', !sounds);
+    cell.classList.toggle('held', heldBySlide(host.slide?.(index) ?? 'none', lane.param));
     cell.setAttribute('aria-label', `${laneLabel(lane.param)} step ${index + 1}`);
     cell.appendChild(el('div', 'mod-bar'));
     drawCell(cell, lane.values[index] ?? 0);

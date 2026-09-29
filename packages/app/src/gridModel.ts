@@ -9,12 +9,14 @@ import type { Harmony, GridNoteStep, GridStep, GridStepKind, StepModLane } from 
 import {
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
+  SEMITONES_PER_OCTAVE,
   foldDegree,
   gridNote,
   pitchClassName,
   scaleOffsets,
 } from '@windsor/engine';
 import { GRID_RANDOM_FLAG_CHANCE, GRID_RANDOM_OCTAVE_SPAN } from './gridConstants';
+import type { StepSlide } from './stepModLaneModel';
 
 export { GRID_STEPS_MAX, GRID_STEP_OCTAVE_MAX };
 
@@ -151,4 +153,40 @@ export function stepLabel(step: GridStep, key: Key): string {
   const name = pitchClassName(key.root, offsets[view.degree] ?? 0);
   const octave = step.octave + view.carry;
   return octave === 0 ? name : `${name}${octave > 0 ? '+' : ''}${octave}`;
+}
+
+/** A note step's pitch relative to the part's register root: equal exactly when the engine's MIDI notes are. */
+function relativePitch(step: GridNoteStep, key: Key): number {
+  const offsets = scaleOffsets(key.scale);
+  const { degree, carry } = foldDegree(step.degree, offsets.length);
+  return (step.octave + carry) * SEMITONES_PER_OCTAVE + (offsets[degree] ?? 0);
+}
+
+/**
+ * How a step's note-on meets the note before it (windsor#31, `StepSlide`),
+ * read the way `GridSequencer.noteStep` decides it: `none` for a rest, a
+ * tie, a note without Slide or a Slide with nothing held; `retarget` for a
+ * Slide onto a different pitch; `same` for a Slide onto the pitch already
+ * held. What is
+ * held is the latest note before the step, walking back over ties and
+ * wrapping round the loop (a rest holds nothing), as the line plays once
+ * it is looping. A skipped step is a draw the console cannot know, so it is
+ * read as played.
+ */
+export function slideAt(
+  steps: readonly GridStep[],
+  length: number,
+  index: number,
+  key: Key,
+): StepSlide {
+  const n = Math.max(1, Math.min(Math.trunc(length), steps.length));
+  const step = steps[index];
+  if (!step || step.kind !== 'note' || !step.slide || index >= n) return 'none';
+  for (let back = 1; back <= n; back++) {
+    const prev = steps[(((index - back) % n) + n) % n];
+    if (!prev || prev.kind === 'rest') return 'none';
+    if (prev.kind === 'tie') continue;
+    return relativePitch(prev, key) === relativePitch(step, key) ? 'same' : 'retarget';
+  }
+  return 'none';
 }
