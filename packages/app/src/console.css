@@ -1858,6 +1858,107 @@ dialog select.field {
 .master-meter .overload {
   color: var(--hot);
 }
+/* The master strip's output stage (windsor#94): the mode, Ceiling and
+   Lookahead, then peaks in and out of the stage, the gain-reduction or
+   over-ceiling gauge, and the clip light, which latches until Reset peaks. */
+.section.output-stage {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding: 12px 0 0;
+  max-width: 500px;
+}
+.output-stage-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.output-stage-controls .seg {
+  flex: 1 1 260px;
+}
+.output-lookahead:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.output-meters {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.output-meter-row {
+  display: grid;
+  grid-template-columns: 3.5em 1fr 9em;
+  align-items: center;
+  gap: 8px;
+}
+.output-meter-row[hidden],
+.output-off-note[hidden] {
+  display: none;
+}
+.output-meter-name {
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.output-meters meter {
+  width: 100%;
+  height: 12px;
+}
+.output-off-note {
+  margin: 0;
+}
+.output-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.output-clip-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--inset);
+  border: 1px solid var(--line-bright);
+}
+.output-clip.latched {
+  color: var(--hot);
+}
+.output-clip.latched .output-clip-dot {
+  background: var(--hot);
+  border-color: var(--hot);
+  box-shadow: 0 0 6px var(--hot);
+}
+
+/* The top-bar output light (windsor#94 decision 4), beside the CPU meter:
+   lit while the stage acted in the last second, outlined in Off mode. */
+.output-light {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-left: -8px;
+  border-radius: 50%;
+  background: var(--line-bright);
+  border: 1px solid var(--line-bright);
+}
+.output-light.lit {
+  background: var(--carrier);
+  border-color: var(--carrier);
+  box-shadow: 0 0 6px var(--carrier);
+}
+.output-light.off {
+  background: transparent;
+  border-color: var(--ink-faint);
+}
 .compressor-meter {
   display: flex;
   align-items: center;
