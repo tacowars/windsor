@@ -262,6 +262,62 @@ describe('the console transport (#708): ▶ ■ ‖ over the live system', () =>
     expect(transport.position()).toBe(4 * TICKS_PER_BAR);
   });
 
+  it('reads the pending resume tick while a rebuilt system is live but not yet adopted (init, unlock)', () => {
+    const BAR = TICKS_PER_BAR;
+    let live: TransportSystem | null = fakeSystem();
+    const transport = new HostTransport(() => live);
+    transport.play();
+    // The first undo, mid-bar 5, requests a build resuming from bar 5.
+    transport.buildPending(4 * BAR);
+    // `rebuild` assigns the new system before its `init` and `unlock`
+    // resolve: it is live, at rest at tick 0, and not adopted.
+    const rebuilt = fakeSystem();
+    live = rebuilt;
+    expect(transport.position()).toBe(4 * BAR);
+    // A second undo in that window reads bar 5, not the rest position.
+    transport.buildPending(transport.position());
+    expect(transport.position()).toBe(4 * BAR);
+    transport.adopt(rebuilt, 4 * BAR);
+    expect(rebuilt.calls).toEqual([`seek ${4 * BAR}`, 'start']);
+    // Adopted, the transport reads the system again.
+    rebuilt.tick = 4 * BAR + 7;
+    expect(transport.position()).toBe(4 * BAR + 7);
+  });
+
+  it('a pending resume ends with the build abandoned, and a build with none reads the live system', () => {
+    const system = fakeSystem();
+    system.tick = 96;
+    const transport = new HostTransport(() => system);
+    transport.buildPending(TICKS_PER_BAR);
+    expect(transport.position()).toBe(TICKS_PER_BAR);
+    transport.buildAbandoned();
+    expect(transport.position()).toBe(96);
+    transport.buildPending(TICKS_PER_BAR);
+    transport.buildPending(undefined);
+    expect(transport.position()).toBe(96);
+  });
+
+  it('a resume at 0 seeks a rebuilt system resting at a later loop start; no resume leaves it there', () => {
+    const LOOP_START = 4 * TICKS_PER_BAR;
+    let live: TransportSystem | null = fakeSystem();
+    const transport = new HostTransport(() => live);
+    transport.play();
+    // `initMusic` rewound the fresh system to the active bars 5–9 loop.
+    const resumed = fakeSystem();
+    resumed.tick = LOOP_START;
+    live = resumed;
+    transport.adopt(resumed, 0);
+    expect(resumed.calls).toEqual(['seek 0', 'start']);
+    expect(transport.position()).toBe(0);
+    // An import or New song (no resume) starts where the system rests.
+    const imported = fakeSystem();
+    imported.tick = LOOP_START;
+    live = imported;
+    transport.adopt(imported);
+    expect(imported.calls).toEqual(['start']);
+    expect(transport.position()).toBe(LOOP_START);
+  });
+
   it('a paused or stopped transport adopts a resuming rebuild idle, without a seek', () => {
     let live: TransportSystem | null = fakeSystem();
     const transport = new HostTransport(() => live);
@@ -290,8 +346,12 @@ describe('resumeTick (windsor#132): where a rebuilt system starts', () => {
     expect(resumeTick(BAR - 1, SONG)).toBe(0);
   });
 
-  it('is the top of the song with no tick, or a bar past the end of the song being built', () => {
-    expect(resumeTick(undefined, SONG)).toBe(0);
+  it('is no resume at all with no tick, told apart from a resume at the top', () => {
+    expect(resumeTick(undefined, SONG)).toBeUndefined();
+    expect(resumeTick(0, SONG)).toBe(0);
+  });
+
+  it('is the top of the song for a bar past the end of the song being built', () => {
     expect(resumeTick(SONG, SONG)).toBe(0);
     expect(resumeTick(10 * BAR + 5, SONG)).toBe(0);
     expect(resumeTick(Number.NaN, SONG)).toBe(0);
@@ -334,5 +394,26 @@ describe('an undo landing while a rebuild initialises (windsor#132)', () => {
     await settle();
     refusals.splice(0).forEach((refuse) => refuse());
     await Promise.allSettled(undos);
+  });
+
+  it('drops the pending bar when the resuming build fails, or has no audio to build', async () => {
+    deferModules = false;
+    const host = new EngineHost(() => undefined);
+    // Before audio there is nothing to build: the resume ends with the build.
+    const before = host.build(song, { resumeAt: 4 * BAR });
+    expect(host.transport.position()).toBe(4 * BAR);
+    await before;
+    expect(host.transport.position()).toBe(0);
+    // An undo queued behind an enable whose DSP will not load: the failed
+    // enable takes the context down, and the undo leaves no bar behind it.
+    deferModules = true;
+    const enabling = host.enable(song);
+    await settle();
+    const undo = host.build(song, { resumeAt: 4 * BAR });
+    expect(host.transport.position()).toBe(4 * BAR);
+    refusals.splice(0).forEach((refuse) => refuse());
+    await expect(enabling).rejects.toThrow('refused');
+    await undo;
+    expect(host.transport.position()).toBe(0);
   });
 });
