@@ -20,12 +20,12 @@ import type {
   DocumentPartial,
   Patch,
 } from '@windsor/engine';
-import { partAt } from '@windsor/engine';
+import { partAt, songTicksOf } from '@windsor/engine';
 import type { AppCtx, ConsoleTransport } from './context';
 import { deepEqual, documentDiffLive } from './documentDiff';
 import type { DocumentModel } from './documentModel';
 import { setGestureHook } from './gestureHooks';
-import type { EngineHost } from './host';
+import type { BuildOptions, EngineHost } from './host';
 import { loadRenames } from './partAutoName';
 import { PartsSession } from './partsSession';
 import { followSongLength } from './regionModel';
@@ -303,8 +303,9 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
    * difference, an ordinary live partial, and is rebuilt from the snapshot
    * instead where no partial reaches it exactly: a part restored anywhere
    * but last, or a partial the engine ignored some of (epic decision 9
-   * accepts the click). Returns the document it replaced, for the step's
-   * other stack, or null when the engine refused.
+   * accepts the click); a transport playing across that rebuild plays on
+   * from the bar it was in (windsor#132). Returns the document it replaced,
+   * for the step's other stack, or null when the engine refused.
    */
   private restore(target: ArrangementDocument): ArrangementDocument | null {
     const current = this.model.doc;
@@ -318,7 +319,10 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // With no system to apply to, a build in flight took an older document
     // and must be followed, as in `commit`; with audio never enabled there is
     // nothing to build.
-    if (rebuild || (result ? result.ignored.length > 0 : this.host.isBuilding)) this.buildLive();
+    if (rebuild || (result ? result.ignored.length > 0 : this.host.isBuilding)) {
+      // The song tick of the system still standing, in the song it was playing.
+      this.buildLive({ resumeAt: this.transport.position() % songTicksOf(current) });
+    }
     return current;
   }
 
@@ -343,10 +347,11 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   /**
    * The live system rebuilt from the document, and every tab drawn again once
    * it stands. `EngineHost.build` rebuilds at tick 0: a transport playing
-   * across it plays on from the top of the song (`HostTransport.adopt`).
+   * across it plays on from the top of the song (`HostTransport.adopt`), or,
+   * for an undo or redo, from the bar `options.resumeAt` names.
    */
-  private buildLive(): void {
-    void this.host.build(this.model.doc).then(
+  private buildLive(options: BuildOptions = {}): void {
+    void this.host.build(this.model.doc, options).then(
       () => this.render(),
       (error: unknown) => this.notify(String(error), 'error'),
     );
