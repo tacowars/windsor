@@ -266,4 +266,15 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
       '+0.35 · held by slide unless skipped',
     );
   });
+
+  it('on a slide whose pitch the run draws, holds what a retarget holds and leaves the rest to the run', () => {
+    const either = { kind: 'either', when: 'always' } as const;
+    expect(heldBySlide(either, 'ops.0.feedback')).toBe('held');
+    expect(heldBySlide(either, 'filter.cutoff')).toBe('depends');
+    expect(heldBySlide({ kind: 'either', when: 'wrap' }, 'ops.0.feedback')).toBe('depends');
+    expect(laneReadout('filter.cutoff', 0.5, 1000, either)).toBe(
+      '+2.3 oct · plays if the slide moves pitch',
+    );
+    expect(laneReadout('ops.0.feedback', 0.35, 0, either)).toBe('+0.35 · held by slide');
+  });
 });

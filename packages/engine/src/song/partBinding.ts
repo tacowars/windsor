@@ -32,6 +32,7 @@
  * too until one of them has let it go.
  */
 import type { MusicPart, SequencerSpec } from './arrangement';
+import { Arpeggiator } from '../sequencing/arpeggiator';
 import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
 import type { NoteEvent } from '../sequencing/noteEvent';
 import { RegionGate, type PartTickSource, type RegionGateConfig } from '../sequencing/regionGate';
@@ -207,7 +208,24 @@ export class PartBinding {
     if (!bound || local === null) return null;
     const state = this.gate.stateAt(tick);
     const live = state.live && state.index === index;
-    return { step: generatorStepAt(bound.generator, local), live };
+    const step = live
+      ? generatorStepAt(bound.generator, local)
+      : this.ghostStepAt(bound.generator, index, local);
+    return { step, live };
+  }
+
+  /**
+   * Region `index`'s step at its phase `local` while it isn't sounding. An
+   * arp's `stepAt` reads the list its last onset walked, which is none
+   * before the region first plays and otherwise what another region or an
+   * earlier visit left, so its ghost counts afresh from an entry into the
+   * region's first chord (windsor#137), the chord the Arp card's strip
+   * shows there. Every other generator's step needs no onset.
+   */
+  private ghostStepAt(generator: Generator, index: number, local: number): number {
+    if (!(generator instanceof Arpeggiator)) return generatorStepAt(generator, local);
+    const chord = this.gate.chordAt(this.starts[index] ?? 0);
+    return generator.entryStepAt(Math.floor(local / generator.config.divisor), chord);
   }
 
   /**

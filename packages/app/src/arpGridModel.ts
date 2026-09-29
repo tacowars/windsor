@@ -13,11 +13,25 @@
  * as the grid keeps steps past its length, and every edit here leaves them
  * alone.
  */
-import type { ArpSpec, ArpStep, Harmony, HarmonyChord, StepModLane } from '@windsor/engine';
-import { ARP_STEPS_MAX, ScaleSampler, arpCycleLength, arpNote, arpNoteList } from '@windsor/engine';
+import type {
+  ArpSpec,
+  ArpStep,
+  ArpStyle,
+  Harmony,
+  HarmonyChord,
+  StepModLane,
+} from '@windsor/engine';
+import {
+  ARP_STEPS_MAX,
+  ScaleSampler,
+  arpCellPitch,
+  arpCycleLength,
+  arpNote,
+  arpNoteList,
+} from '@windsor/engine';
 import { ARP_RANDOM, type ArpRandomTable } from './arpGridConstants';
 import { type Draw, cycleKind, rotateLanes, rotateSteps } from './gridModel';
-import type { StepSlide } from './stepModLaneModel';
+import { NO_SLIDE, type StepSlide } from './stepModLaneModel';
 
 /** What the shown count reads of the arp: the fields `arpNoteList` and the cycle rule take. */
 export type ArpCycleFields = Pick<ArpSpec, 'style' | 'voicing' | 'octaves' | 'register'>;
@@ -25,19 +39,31 @@ export type ArpCycleFields = Pick<ArpSpec, 'style' | 'voicing' | 'octaves' | 're
 /** The key a note list is voiced in. */
 export type ArpKey = Pick<Harmony, 'root' | 'scale'>;
 
+/** The note list the arp walks over `chord` (`arpNoteList`): empty with no chord. */
+export function arpShownList(
+  spec: ArpCycleFields,
+  key: ArpKey,
+  chord: HarmonyChord | null,
+): number[] {
+  return chord ? arpNoteList(new ScaleSampler(key), spec, chord) : [];
+}
+
 /**
- * The cells the strip shows for `chord`: one cycle of the style over the
- * arp's note list (epic decisions 2 and 3), at most `ARP_STEPS_MAX`; 0 with
- * no chord or an empty list, when the arp plays nothing.
+ * The cells the strip shows over `list`: one cycle of the style (epic
+ * decisions 2 and 3), at most `ARP_STEPS_MAX`; 0 over an empty list, when
+ * the arp plays nothing.
  */
+export function arpListCount(style: ArpStyle, list: readonly number[]): number {
+  return Math.min(ARP_STEPS_MAX, arpCycleLength(style, list.length));
+}
+
+/** The cells the strip shows for `chord`: `arpListCount` over its note list; 0 with no chord. */
 export function arpCellCount(
   spec: ArpCycleFields,
   key: ArpKey,
   chord: HarmonyChord | null,
 ): number {
-  if (!chord) return 0;
-  const list = arpNoteList(new ScaleSampler(key), spec, chord);
-  return Math.min(ARP_STEPS_MAX, arpCycleLength(spec.style, list.length));
+  return arpListCount(spec.style, arpShownList(spec, key, chord));
 }
 
 /** The top cell's cycle: note → tie → rest → a plain note. */
@@ -100,10 +126,18 @@ export function randomArpCells(
 
 /**
  * How cell `index`'s note meets the note before it, for the lanes' held
- * cells and readouts (windsor#31, `StepSlide`), read over the shown cycle
- * the way `arpCellPlay.ts` plays it. A slide after a note (walking back
- * over ties) hands the voice over: `retarget`, since the arp walks to a
- * new pitch at each onset. A rest before it holds nothing: `none`.
+ * cells and readouts (windsor#31, `StepSlide`), read over one cycle of the
+ * style over `list` (the shown chord's notes) the way `arpCellPlay.ts`
+ * plays it. The note before it is the latest note cell, walking back over
+ * ties; a rest before it holds nothing: `none`.
+ *
+ * `kind`: the engine sends a slide onto the pitch already held no note-on
+ * at all, so it compares the two cells' pitches (`arpCellPitch`, the walk
+ * with each cell's octave shift). An ordered style's pitches are known over
+ * the shown chord: `retarget` when they differ, `same` when they meet, as
+ * a two-octave list can make two cells land an octave apart and a shift
+ * close the gap. A random style draws its pitch in the run, so a slide
+ * there is `either`, which the lanes show as playing only if it moves.
  *
  * `when`: a slide whose held note comes from wrapping round the cycle
  * (cell 1 among them) is held only once the cycle wraps, as a region's
@@ -111,21 +145,24 @@ export function randomArpCells(
  * the note before it may rest: `skip`. Otherwise `always`.
  */
 export function arpSlideAt(
-  spec: Pick<ArpSpec, 'steps' | 'skipChance'>,
+  spec: Pick<ArpSpec, 'steps' | 'skipChance' | 'style'>,
   index: number,
-  count: number,
+  list: readonly number[],
 ): StepSlide {
-  const { steps } = spec;
-  const none: StepSlide = { kind: 'none', when: 'always' };
-  const n = Math.min(Math.trunc(count), steps.length);
+  const { steps, style } = spec;
+  const n = Math.min(arpListCount(style, list), steps.length);
   const step = steps[index];
-  if (!step || step.kind !== 'note' || !step.slide || index >= n) return none;
+  if (!step || step.kind !== 'note' || !step.slide || index >= n) return NO_SLIDE;
   for (let back = 1; back <= n; back++) {
-    const prev = steps[(((index - back) % n) + n) % n];
-    if (!prev || prev.kind === 'rest') return none;
+    const at = (((index - back) % n) + n) % n;
+    const prev = steps[at];
+    if (!prev || prev.kind === 'rest') return NO_SLIDE;
     if (prev.kind === 'tie') continue;
+    const held = arpCellPitch(style, at, list, prev.octave);
+    const next = arpCellPitch(style, index, list, step.octave);
+    const kind = held === null || next === null ? 'either' : held === next ? 'same' : 'retarget';
     const when = back > index ? 'wrap' : spec.skipChance > 0 ? 'skip' : 'always';
-    return { kind: 'retarget', when };
+    return { kind, when };
   }
-  return none;
+  return NO_SLIDE;
 }

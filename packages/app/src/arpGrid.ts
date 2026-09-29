@@ -21,9 +21,10 @@
 import type { ArpSpec, ArpStep } from '@windsor/engine';
 import { ARP_STEPS_MAX } from '@windsor/engine';
 import {
-  arpCellCount,
   arpKindLabel,
+  arpListCount,
   arpOctaveLabel,
+  arpShownList,
   arpSlideAt,
   nextArpKind,
   randomArpCells,
@@ -58,12 +59,13 @@ import {
   watchPlayhead,
 } from './stepStrip';
 
-/** The arp's strip: its scroller, lane names and picker, and the cell count it last drew. */
+/** The arp's strip: its scroller, lane names and picker, and the note list and cell count it last drew. */
 interface ArpStrip extends Strip<ArpSpec> {
   scroll: HTMLElement;
   names: HTMLElement;
   picker: HTMLSelectElement | null;
   lanes: LaneHost;
+  list: readonly number[];
   count: number;
 }
 
@@ -76,12 +78,18 @@ export interface ArpGridParts {
 
 const cell = stripCell;
 
+/** The notes the arp walks over the chord the card reads now; empty with no spec or chord. */
+function listOf(strip: Strip<ArpSpec>): number[] {
+  const spec = strip.spec();
+  if (!spec) return [];
+  const chord = regionChord(strip.ctx, strip.slot, strip.region);
+  return arpShownList(spec, strip.ctx.model.doc.harmony, chord);
+}
+
 /** The cells the strip shows now: one cycle over the chord the card reads. */
 function countOf(strip: Strip<ArpSpec>): number {
   const spec = strip.spec();
-  if (!spec) return 0;
-  const chord = regionChord(strip.ctx, strip.slot, strip.region);
-  return arpCellCount(spec, strip.ctx.model.doc.harmony, chord);
+  return spec ? arpListCount(spec.style, listOf(strip)) : 0;
 }
 
 /** Write one cell, edited from what the document holds now. */
@@ -135,7 +143,9 @@ function column(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
 /** Redraw the shown cells, the lane names and the picker from the document, keeping the scroll. */
 function repaint(strip: ArpStrip): void {
   const scrollLeft = strip.scroll.scrollLeft;
-  strip.count = countOf(strip);
+  const spec = strip.spec();
+  strip.list = listOf(strip);
+  strip.count = spec ? arpListCount(spec.style, strip.list) : 0;
   paintLaneNames(strip.names, strip.lanes);
   paintStrip(strip, (spec) =>
     spec.steps.slice(0, strip.count).map((step, index) => column(strip, index, step)),
@@ -145,13 +155,17 @@ function repaint(strip: ArpStrip): void {
 }
 
 /**
- * Per frame while the card is on screen: a repaint when the shown count
- * has moved (a Style, Octaves, Voicing or Reg edit, or the playhead in a
- * chord of another size) or Skip has moved to or from 0, which decides
+ * Per frame while the card is on screen: a repaint when the style or the
+ * notes it walks have moved (a Style, Octaves, Voicing or Reg edit, or the
+ * playhead in another chord), which move the shown count and which slides
+ * land on the held pitch, or Skip has moved to or from 0, which decides
  * whether a slide's hold on a lane is certain; then the playhead.
  */
 function watch(strip: ArpStrip): void {
-  const signature = (): string => `${countOf(strip)}|${(strip.spec()?.skipChance ?? 0) > 0}`;
+  const signature = (): string => {
+    const spec = strip.spec();
+    return `${spec?.style}|${listOf(strip).join(',')}|${(spec?.skipChance ?? 0) > 0}`;
+  };
   let drawn = signature();
   watchPlayhead({
     attached: () => strip.root.isConnected,
@@ -200,10 +214,15 @@ function randomizeButton(strip: ArpStrip): HTMLElement {
 /**
  * What the lanes need of this card, as `gridCard.ts`'s `laneHost()`: the
  * region's lanes, their write into its pattern, the patch they push, and
- * the region's cells for the slide readout. A new lane holds a value for
- * every stored cell (`ARP_STEPS_MAX`), and a paint reaches only the shown.
+ * the region's cells over the shown notes for the slide readout. A new
+ * lane holds a value for every stored cell (`ARP_STEPS_MAX`), and a paint
+ * reaches only the shown.
  */
-function laneHost(strip: Strip<ArpSpec>, scope: HTMLElement, shown: () => number): LaneHost {
+function laneHost(
+  strip: Strip<ArpSpec>,
+  scope: HTMLElement,
+  shown: () => readonly number[],
+): LaneHost {
   const { ctx, slot, region } = strip;
   const spec = (): ArpSpec | null => strip.spec();
   return {
@@ -237,8 +256,9 @@ export function arpGrid(ctx: AppCtx, slot: number, region: number | undefined): 
     scroll,
     names: el('div', 'mod-names'),
     picker: null,
+    list: [],
     count: 0,
-    lanes: laneHost(base, scroll, () => strip.count),
+    lanes: laneHost(base, scroll, () => strip.list),
   };
   const tools = el('div', 'capture-row');
   tools.appendChild(randomizeButton(strip));
