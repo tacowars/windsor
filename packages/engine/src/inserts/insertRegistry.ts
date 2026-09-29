@@ -18,6 +18,8 @@ import { MAX_INSERTS } from './insertConstants';
 import { RETRO_REVERB_INSERT } from './retroReverbInsert';
 import { DELAY_INSERT } from './delayInsert';
 import type { DelaySpec } from './delaySpec';
+import { TAPE_INSERT } from './tapeInsert';
+import type { TapeSpec } from './tapeSpec';
 import { PHASER_INSERT } from './phaserInsert';
 import type { PhaserSpec } from './phaserSpec';
 import { ENSEMBLE_INSERT } from './ensembleInsert';
@@ -32,6 +34,7 @@ export type InsertSpec =
   | ChorusSpec
   | CompressorSpec
   | RetroReverbSpec
+  | TapeSpec
   | PhaserSpec
   | DelaySpec
   | EnsembleSpec;
@@ -49,6 +52,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   phaser: PHASER_INSERT,
   delay: DELAY_INSERT,
   ensemble: ENSEMBLE_INSERT,
+  tape: TAPE_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];

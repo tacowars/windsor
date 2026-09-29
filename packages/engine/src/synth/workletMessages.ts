@@ -200,3 +200,5 @@ export const ADVANCED_DRIVE_WORKLET_URL = new URL(
   '../worklet/generated/advanced-drive-processor.js',
   import.meta.url,
 );
+
+export const TAPE_WORKLET_URL = new URL('../worklet/generated/tape-processor.js', import.meta.url);

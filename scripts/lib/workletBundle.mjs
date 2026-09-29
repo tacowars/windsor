@@ -65,6 +65,7 @@ export const WORKLETS = [
     entry: 'outputStage/outputStageProcessor.ts',
     output: 'generated/output-stage-processor.js',
   },
+  { name: 'tape', entry: 'tape/tapeProcessor.ts', output: 'generated/tape-processor.js' },
 ];
 
 /** The directory an agent edits instead of the generated file, relative to `WORKLET_DIR`. */

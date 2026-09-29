@@ -29,6 +29,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   compressor: 'Bus compressor',
   'retro-reverb': 'Retro reverb',
   phaser: 'Phaser',
+  tape: 'Tape',
   delay: 'Dub delay',
   ensemble: 'Ensemble',
 };
