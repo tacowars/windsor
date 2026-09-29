@@ -205,7 +205,7 @@ export const ARP_KNOBS: readonly SequencerKnobEntry[] = [
   },
 ];
 
-/** The nine traversals as the Style select names them, in the engine's order. */
+/** The ten traversals as the Style select names them, in the engine's order. */
 export const ARP_STYLE_LABELS: Readonly<Record<ArpStyle, string>> = {
   up: 'Up',
   down: 'Down',
@@ -213,6 +213,7 @@ export const ARP_STYLE_LABELS: Readonly<Record<ArpStyle, string>> = {
   downUp: 'Down-up',
   converge: 'Converge',
   diverge: 'Diverge',
+  conDiverge: 'Con & Diverge',
   random: 'Random',
   randomOther: 'Random, no repeat',
   randomOnce: 'Random once',
