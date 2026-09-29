@@ -65,15 +65,19 @@ DOTENV_RE = re.compile(r"(^|[\s/])\.env(\b|$)")
 # The repo is public, so the report names the owner only by handle. Prompts
 # and session titles copied from transcripts pass through redact_owner_name.
 # The name is assembled from parts so this file stays clear of a repo grep
-# for it. Order matters: the longer forms go first.
+# for it. Every pattern ignores case and matches whole words only, so
+# patch, pattern and path are never touched, but the ordinary English word
+# of the same spelling is redacted too; that is accepted. Order matters:
+# slugs (after a hyphen) go first, then the longer prose forms.
 OWNER_HANDLE = "tacowars"
 _OWNER_NAME = "P" + "at"
+_I = re.IGNORECASE
 OWNER_NAME_REDACTIONS = (
-    (re.compile(r"\b" + _OWNER_NAME + r"rick\b"), OWNER_HANDLE),
-    (re.compile(r"\b" + _OWNER_NAME + r"(?:'s|s)\b"), OWNER_HANDLE + "'s"),
-    (re.compile(r"\b" + _OWNER_NAME + r"\b"), OWNER_HANDLE),
-    (re.compile(r"(?<=-)" + _OWNER_NAME.lower() + r"s(?=-)"), "the-owners"),
-    (re.compile(r"(?<=-)" + _OWNER_NAME.lower() + r"\b"), "the-owner"),
+    (re.compile(r"(?<=-)" + _OWNER_NAME + r"s(?=-)", _I), "the-owners"),
+    (re.compile(r"(?<=-)" + _OWNER_NAME + r"\b", _I), "the-owner"),
+    (re.compile(r"\b" + _OWNER_NAME + r"rick\b", _I), OWNER_HANDLE),
+    (re.compile(r"\b" + _OWNER_NAME + r"(?:'s|s)\b", _I), OWNER_HANDLE + "'s"),
+    (re.compile(r"\b" + _OWNER_NAME + r"\b", _I), OWNER_HANDLE),
 )
 
 
@@ -988,16 +992,12 @@ def main():
         fh.write(text)
 
 
-def self_test():
-    """Check that a transcript naming the owner reaches the report with the handle only."""
+def _report_text_for(prompt, title):
+    """Run a one-prompt transcript through load_transcript; return the prompt and title it reports."""
     import tempfile
 
-    name = _OWNER_NAME
-    # The report keeps the first 120 characters, so every case sits inside them.
-    prompt = (f"bed-01-is-{name.lower()}s-song, merge-without-{name.lower()}: {name}'s song. "
-              f"{name} asked; {name}s note; {name}rick agreed. Keep the pattern and patches.")
     records = [
-        {"type": "custom-title", "customTitle": f"{name}'s session"},
+        {"type": "custom-title", "customTitle": title},
         {"type": "user", "timestamp": "2026-09-29T10:00:00Z", "message": {"role": "user", "content": prompt}},
     ]
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
@@ -1007,14 +1007,35 @@ def self_test():
         t = load_transcript(path)
     finally:
         os.remove(path)
-    got = t["first_prompt"] + " | " + t["custom_title"]
-    leak = re.compile(r"\b" + name + r"|-" + name.lower() + r"s?\b")
-    assert not leak.search(got), f"name leaked: {got}"
-    for want in ("tacowars's song", "tacowars asked", "tacowars's note", "tacowars agreed",
-                 "bed-01-is-the-owners-song", "merge-without-the-owner", "tacowars's session"):
-        assert want in got, f"missing {want!r}: {got}"
-    redacted = redact_owner_name(prompt)
-    assert "the pattern and patches" in redacted, redacted
+    return t["first_prompt"] + " | " + t["custom_title"]
+
+
+def self_test():
+    """Check that transcripts naming the owner, in any case, reach the report with the handle only."""
+    name, lo, up = _OWNER_NAME, _OWNER_NAME.lower(), _OWNER_NAME.upper()
+    leak = re.compile(r"\b" + name + r"(?:'s|s|rick)?\b", re.IGNORECASE)
+    # The report keeps the first 120 characters of a prompt, so each case
+    # sits inside them: slugs, then mixed, lower and upper case prose forms,
+    # one transcript each.
+    cases = [
+        (f"Keep the pattern and patches. bed-01-is-{lo}s-song, merge-without-{lo}: {name}'s song.",
+         f"{name}'s session",
+         ("bed-01-is-the-owners-song", "merge-without-the-owner", "tacowars's song", "tacowars's session")),
+        (f"Keep the pattern and patches. {name} asked; {name}s note; {name}rick agreed.",
+         f"{name} and {name}s session",
+         ("tacowars asked", "tacowars's note", "tacowars agreed", "tacowars and tacowars's session")),
+        (f"Keep the pattern and patches. {lo} said; {lo}'s mix; {lo}s idea.",
+         f"{lo}'s, {lo}s and {lo} session",
+         ("tacowars said", "tacowars's mix", "tacowars's idea", "tacowars's, tacowars's and tacowars session")),
+        (f"Keep the pattern and patches. {up} SAID; {up}'S MIX; {up}S IDEA.",
+         f"{up}'S, {up}S and {up} session",
+         ("tacowars SAID", "tacowars's MIX", "tacowars's IDEA", "tacowars's, tacowars's and tacowars session")),
+    ]
+    for prompt, title, wants in cases:
+        got = _report_text_for(prompt, title)
+        assert not leak.search(got), f"name leaked: {got}"
+        for want in wants + ("Keep the pattern and patches.",):
+            assert want in got, f"missing {want!r}: {got}"
     print("self-test passed")
 
 
