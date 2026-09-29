@@ -12,7 +12,7 @@
  *                                                          song master inserts/level → musicBus.output (the Music fader)
  *                                                                                          │
  *   aux part.output ─▶ [stages…] ─▶ tail ─── [rotate θ] ─▶ auxLevel ─▶ master ◀────────────┘
- *                                                                      └─▶ limiter ─▶ out
+ *                                                                      └─▶ output stage ─▶ out
  *
  * Each strip's stages sit between the part and its tail, and the rotation and
  * the sends both tap the tail (#639). The first stage is always the strip's
@@ -23,7 +23,9 @@
  * two channel faders (#518 decision 1): the music one is the bus's existing output gain,
  * so the dry path gains no node, and the returns are summed into it so the
  * room follows the music down. The engine's master is not a fader and never
- * becomes one.
+ * becomes one. The output stage (windsor#93) is the engine's, after its
+ * master, so the aux path goes through it too; its mode, ceiling and
+ * lookahead are the song's `master.output`, set here in place.
  *
  * Music comes in as an `ArrangementDocument` (issue #75): the committed JSON,
  * normalised by `makeArrangement`. `initMusic` builds a part per entry in the
@@ -51,8 +53,7 @@ import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
 import { type AudioBus, MUSIC_BUS_OPTIONS } from '../mixer/audioBus';
 import type { AudioPart } from '../synth/audioPart';
 import type { ScheduledMessage } from '../synth/workletMessages';
-import type { PartStrip } from '../mixer/channelStrip';
-import type { RouteOptions } from '../mixer/channelStrip';
+import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
 import { routePart } from '../mixer/channelStrip';
 import { applyReturnsLive, applyStripLive } from '../mixer/deskApply';
 import { musicPartName } from '../song/documentParts';
@@ -107,9 +108,13 @@ export interface MusicReadout extends ArrangementReadout {
 }
 
 import { createMasterStrip } from '../mixer/masterStrip';
+import { applyMasterLive } from '../mixer/outputStageMaster';
 import type { MasterStrip } from '../mixer/masterStrip';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import { meteredInsertRegistry } from '../inserts/meteredInsertRegistry';
+
+/** What a call before the standing graph exists throws. */
+const NOT_INITIALISED = 'AudioSystem.init() must be awaited first';
 
 export class AudioSystem {
   readonly engine: FmEngine;
@@ -166,7 +171,7 @@ export class AudioSystem {
     };
   }
 
-  /** The song master, distinct from the engine-wide safety output and the channel faders. */
+  /** The song master, distinct from the engine-wide output stage and the channel faders. */
   get masterStrip(): MasterStrip | null {
     return this.masterStripValue;
   }
@@ -202,6 +207,8 @@ export class AudioSystem {
     for (const [name, bus] of Object.entries(this.returns)) {
       this.meterLoad(`return:${name}`, bus.effect);
     }
+    // So is the output stage (windsor#93): it runs on every block, song or no song.
+    this.meterLoad('outputStage', this.engine.outputStage?.node);
     this.started = true;
   }
 
@@ -210,7 +217,7 @@ export class AudioSystem {
     await this.engine.unlock();
   }
 
-  /** Processors this system has turned load reporting on in (#445) — parts plus worklet returns. */
+  /** Processors this system has turned load reporting on in (#445): parts, worklet returns and inserts, and the output stage. */
   get meteredProcessors(): number {
     return this.loadMeter.processorCount;
   }
@@ -292,7 +299,7 @@ export class AudioSystem {
         part.strip,
       );
     }
-    if (master) this.masterStrip!.apply(master);
+    applyMasterLive(this.masterStrip!, this.engine.outputStage, master);
     this.sidechains.commit(routing);
     if (returns) applyReturnsLive(this.standing().returns, returns);
     // The roster the player reads and — for a live add or removal — grows and
@@ -408,7 +415,7 @@ export class AudioSystem {
     }
     this.insertTempo.setTempo(this.scheduler.bpm);
     const ignored = [...result.ignored];
-    if (master !== undefined) ignored.push(...this.masterStrip!.apply(master));
+    ignored.push(...applyMasterLive(this.masterStrip!, this.engine.outputStage, master));
     for (const [slot, strip] of strips) {
       const live = this.strips.get(musicPartName(Number(slot)));
       // An absent slot was already reported by the player's merge.
@@ -497,14 +504,12 @@ export class AudioSystem {
   }
 
   private standing(): { musicBus: AudioBus; returns: Readonly<Record<string, ReturnBus>> } {
-    if (!this.musicBus || !this.returns) {
-      throw new Error('AudioSystem.init() must be awaited first');
-    }
+    if (!this.musicBus || !this.returns) throw new Error(NOT_INITIALISED);
     return { musicBus: this.musicBus, returns: this.returns };
   }
 
   private auxNode(): GainNode {
-    if (!this.auxLevel) throw new Error('AudioSystem.init() must be awaited first');
+    if (!this.auxLevel) throw new Error(NOT_INITIALISED);
     return this.auxLevel;
   }
 
@@ -534,8 +539,8 @@ export class AudioSystem {
   }
 
   /** Turn the audio-load sampler on in one node's processor (#445); `audioLoad.ts` owns the rules. */
-  private meterLoad(id: string, node: AudioNode): void {
-    if (!this.metered) return;
+  private meterLoad(id: string, node: AudioNode | undefined): void {
+    if (!this.metered || !node) return;
     meterNode(this.loadMeter, id, node, this.engine.context.sampleRate, AUDIO_LOAD_REPORT_SECONDS);
   }
 }
