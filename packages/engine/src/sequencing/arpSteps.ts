@@ -10,8 +10,8 @@
  * the playhead reads the first `arpCycleLength(style, L)` of them, and the
  * cells past it wait, as the grid keeps steps past its length.
  *
- * Nothing plays the cells yet (the epic's part 2 does), so a new arp, every
- * cell a plain note, sounds as it did before the grid.
+ * The arpeggiator plays the cells (windsor#129, `arpCellPlay.ts`); a new
+ * arp, every cell a plain note, sounds as it did before the grid.
  */
 import { GRID_STEP_OCTAVE_MAX } from '../audioConstants';
 import { ARP_BOUNCE_STYLES, ARP_STEPS_MAX } from './arpStepConstants';
