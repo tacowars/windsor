@@ -463,6 +463,150 @@ input {
   border-color: var(--hot);
 }
 
+/* The grid card's modulation lanes (windsor#31): the names stand in a sticky
+   column at the left of the scroller, and each step's column ends in one
+   bipolar cell per lane, so a lane lines up with the step, accent and slide
+   cells. `--mag` (0..1) is a cell's value off the centre line; `.neg` draws
+   it downward. Both the name rows and the cells sit at the bottom of their
+   columns (`justify-content: flex-end`, `margin-top: auto`), so they meet
+   whatever the rows above them measure. */
+.grid-scroll {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 8px 0 6px;
+  scrollbar-width: thin;
+}
+.grid-scroll > .grid-strip {
+  flex: none;
+  overflow: visible;
+  padding: 0;
+}
+.mod-names {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+  flex: none;
+  width: 132px;
+  padding-right: 4px;
+  background: var(--panel);
+}
+.mod-names[hidden] {
+  display: none;
+}
+.mod-name {
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 2px 0 6px;
+  border-left: 2px solid var(--modulator);
+}
+.mod-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.mod-title {
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mod-x {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.mod-x:hover {
+  color: var(--hot);
+}
+.mod-readout {
+  font-family: var(--f-num);
+  font-size: 9px;
+  color: var(--modulator);
+  line-height: 11px;
+  min-height: 11px;
+  max-height: 22px;
+  overflow: hidden;
+}
+.mod-cell {
+  position: relative;
+  height: 44px;
+  flex: none;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: ns-resize;
+  touch-action: none;
+  --mag: 0;
+}
+.mod-cell.first {
+  margin-top: auto;
+}
+.mod-cell::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 1px;
+  background: var(--line-bright);
+}
+.mod-cell:hover {
+  border-color: var(--line-bright);
+}
+.mod-cell.mute {
+  opacity: 0.45;
+}
+.mod-bar {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 50%;
+  height: calc(var(--mag) * (50% - 2px));
+  background: var(--modulator);
+  border-radius: 1px;
+}
+.mod-cell.neg .mod-bar {
+  bottom: auto;
+  top: 50%;
+}
+.mod-cell.zero .mod-bar {
+  display: none;
+}
+/* A slide holds this row at the previous step's offset: the value is kept
+   but does not play, so its bar takes the rule colour. */
+.mod-cell.held {
+  border-style: dashed;
+}
+.mod-cell.held .mod-bar {
+  background: var(--line-bright);
+}
+/* A slide the run decides (the loop's wrap, a Skip): the bar may play, so
+   it keeps its colour, and the border is dotted in the rule colour. */
+.mod-cell.depends {
+  border-style: dotted;
+  border-color: var(--line-bright);
+}
+.grid-col.playing .mod-cell {
+  border-color: var(--carrier);
+}
+
 /* ---------- the chord card (#607) ---------- */
 
 .chord-picker-controls {
