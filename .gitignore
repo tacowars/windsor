@@ -10,5 +10,8 @@ coverage/
 # tacowars's working songs, kept out of the repo for now (approved 2026-09-28).
 songs/
 
+# Claude session handoffs: local notes between sessions, never published.
+.claude/handoffs/
+
 # Claude Code agent worktrees (one checkout per worker)
 .claude/worktrees/
