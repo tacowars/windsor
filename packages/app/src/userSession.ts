@@ -11,10 +11,10 @@ import type { AppCtx } from './context';
 import { bootLibrary, reportLibraryProblems } from './libraryActions';
 import { EVICTABLE_WARNING } from './libraryConstants';
 import { openConfirm } from './metadataModal';
-import { SongAutosave } from './songAutosave';
 import { offerRestore } from './songRestore';
 import { browserPersist, persistOnce } from './storagePersistence';
 import { openUserStores } from './userLibraryStore';
+import { startAutosave } from './userSessionAutosave';
 
 export async function bootUserState(ctx: AppCtx): Promise<void> {
   const ensurePersisted = persistOnce(browserPersist(), () =>
@@ -34,12 +34,12 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
     ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
   else if (!restored) ctx.notify('new song — your last session is kept until your first edit');
   if (!stores) return;
-  const autosave = new SongAutosave({
-    store: stores.songs,
-    read: () => ctx.model.toJson(),
-    report: (message) => ctx.notify(message, 'error'),
-  });
-  ctx.model.onChange(() => autosave.schedule());
+  // A clean restore's load-time rename (windsor#103) saves now; a repaired one waits for an edit.
+  const autosave = startAutosave(
+    ctx.model,
+    { store: stores.songs, report: (message) => ctx.notify(message, 'error') },
+    restored,
+  );
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void autosave.flush();
   });

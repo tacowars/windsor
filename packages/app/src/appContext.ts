@@ -12,6 +12,7 @@ import { partAt } from '@windsor/engine';
 import type { AppCtx, ConsoleTransport } from './context';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
+import { loadRenames } from './partAutoName';
 import { PartsSession } from './partsSession';
 import { followSongLength } from './regionModel';
 import type { ToastTone } from './toastModel';
@@ -142,7 +143,13 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   importDoc(raw: unknown): void {
     // Through the model, never `makeArrangement` here: the model is what
     // applies the editor's library fill to a pre-#562 song.
-    this.model.open(raw);
+    // A generic part already playing a patch takes its name now (windsor#103
+    // decision 4): a document edit like a typed rename, so it exports, made
+    // inside `open` so the import report stays the raw document's; the
+    // rebuild below builds from the renamed document. A restore autosaves it
+    // only when the report is clean (`startAutosave`); an import autosaves
+    // on open as it always has, and its file is left untouched.
+    this.model.open(raw, loadRenames);
     this.rebuild();
   }
 

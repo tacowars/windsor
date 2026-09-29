@@ -5,6 +5,7 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, select } from './dom';
 import { library, libraryPatch, listLibrary } from './libraryModel';
+import { assignPatchFields } from './partAutoName';
 
 // Retain filters when a patch selection rebuilds the Parts rail, or when changing parts.
 const filter: PresetFilter = { query: '', category: '', tag: '', source: '' };
@@ -16,7 +17,7 @@ export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
   const patch = documentPatch ?? libraryPatch(library, name);
   if (!patch) return false;
   return ctx.change({
-    ...partChange(slot, { preset: name }),
+    ...partChange(slot, assignPatchFields(ctx.model.doc, slot, name, patch.name)),
     patches: { [name]: clonePatch(patch) },
   }).ok;
 }
@@ -108,8 +109,11 @@ export function presetBrowser(
   // where the QWERTY keys play the new sound (they are ignored inside a select).
   const apply = (focusLabel: string): void => {
     guard(() => {
+      const named = partAt(ctx.model.doc, slot)?.name;
       if (choosePreset(ctx, slot, results.value)) {
         onPick();
+        // A generic part just took its patch's name (windsor#103): the part picker shows it too.
+        if (partAt(ctx.model.doc, slot)?.name !== named) ctx.render();
         document.querySelector<HTMLElement>(`[aria-label="${focusLabel}"]`)?.focus();
       }
     });
