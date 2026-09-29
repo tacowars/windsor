@@ -27,6 +27,7 @@ import { songTab } from './songTab';
 import { GEAR_ICON, mountTabShell } from './tabShell';
 import { mountToasts, notify } from './toast';
 import { mountTransportStrip } from './transportStrip';
+import { mountUndoControls } from './undoControls';
 import { bootUserState } from './userSession';
 import './console.css';
 
@@ -40,6 +41,7 @@ const keyboard = new Keyboard(() => ctx.livePart());
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
 
+mountUndoControls(ctx, $('undoControls'));
 mountTransportStrip(ctx, $('transportStrip'));
 mountTabShell(
   ctx,
