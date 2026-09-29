@@ -36,7 +36,6 @@ var OUTPUT_STAGE_REPORT_HZ = PEAK_METER.reportHz;
 var MS_PER_SECOND = 1e3;
 var DB_PER_DECADE = 20;
 var DECADE = 10;
-var OUTPUT_STAGE_QUANTUM = 128;
 function silentReport() {
   return {
     type: "outputStage",
@@ -328,7 +327,6 @@ var OutputLimiter = class {
 var LIMITER = OUTPUT_STAGE_MODES.indexOf("limiter");
 var SOFT = OUTPUT_STAGE_MODES.indexOf("soft");
 var HARD = OUTPUT_STAGE_MODES.indexOf("hard");
-var OFF = OUTPUT_STAGE_MODES.indexOf("off");
 var dbToGain = (db) => Math.pow(DECADE, db / DB_PER_DECADE);
 var gainToDb = (gain) => DB_PER_DECADE * Math.log10(gain);
 var OUTPUT_STAGE_TABLES = {
@@ -358,6 +356,8 @@ var OutputStageDsp = class {
   inR = 0;
   outL = 0;
   outR = 0;
+  /** The loudest input over the ceiling it met, while a clipper ran: 1 when under. */
+  over = 1;
   constructor(sampleRate2, tables = OUTPUT_STAGE_TABLES) {
     this.limiter = new OutputLimiter(sampleRate2, tables.limiter);
     this.clipper = new OversampledClipper(tables.oversample);
@@ -391,11 +391,15 @@ var OutputStageDsp = class {
     this.clipper.configure(mode === SOFT, this.ceiling, this.ceiling * this.kneeGain);
   }
   process(inL, inR, outL, outR, frames) {
-    this.inL = peak(inL, frames, this.inL);
-    this.inR = peak(inR, frames, this.inR);
+    const peakL = peak(inL, frames, 0);
+    const peakR = peak(inR, frames, 0);
+    if (peakL > this.inL) this.inL = peakL;
+    if (peakR > this.inR) this.inR = peakR;
     if (this.mode === LIMITER) {
       this.limiter.process(inL, inR, outL, outR, frames, this.limited);
     } else if (this.mode === SOFT || this.mode === HARD) {
+      const over = (peakL > peakR ? peakL : peakR) / this.ceiling;
+      if (over > this.over) this.over = over;
       this.clipper.process(this.left, inL, outL, frames, this.clipped);
       this.clipper.process(this.right, inR, outR, frames, this.clipped);
     } else {
@@ -407,20 +411,23 @@ var OutputStageDsp = class {
     this.outL = peak(outL, frames, this.outL);
     this.outR = peak(outR, frames, this.outR);
   }
-  /** Fill `report` with what happened since the last call, and start the next interval. */
+  /**
+   * Fill `report` with what happened since the last call, and start the next
+   * interval. Each figure was gathered by the mode that ran when it happened
+   * (the limiter's gain only moves while it limits, the overs only while a
+   * clipper runs), so a retune inside the interval does not erase it.
+   */
   takeReport(report) {
     report.inputLeft = this.inL;
     report.inputRight = this.inR;
     report.outputLeft = this.outL;
     report.outputRight = this.outR;
-    const limiting = this.mode === LIMITER;
-    const clipping = this.mode === SOFT || this.mode === HARD;
     const minGain = this.limited.minGain;
-    report.reductionDb = limiting && minGain < 1 ? -gainToDb(minGain) : 0;
-    const loudest = Math.max(this.inL, this.inR);
-    report.overDb = clipping && loudest > this.ceiling ? gainToDb(loudest / this.ceiling) : 0;
-    report.active = this.mode !== OFF && (limiting && (minGain < 1 || this.limited.overshoot > 1) || clipping && this.clipped.acted);
+    report.reductionDb = minGain < 1 ? -gainToDb(minGain) : 0;
+    report.overDb = this.over > 1 ? gainToDb(this.over) : 0;
+    report.active = minGain < 1 || this.limited.overshoot > 1 || this.clipped.acted;
     this.inL = this.inR = this.outL = this.outR = 0;
+    this.over = 1;
     this.limited.minGain = 1;
     this.limited.overshoot = 1;
     this.clipped.acted = false;
@@ -468,7 +475,6 @@ var OutputStageProcessor = class extends AudioWorkletProcessor {
     this.running = true;
     this.frames = 0;
     this.report = silentReport();
-    this.silence = new Float32Array(OUTPUT_STAGE_QUANTUM);
     this.port.onmessage = ({ data }) => {
       if (data.type === "stop") this.running = false;
     };
@@ -480,9 +486,14 @@ var OutputStageProcessor = class extends AudioWorkletProcessor {
     if (!out || !outL) return true;
     const outR = out[1] ?? outL;
     const frames = outL.length;
-    if (this.silence.length < frames) this.silence = new Float32Array(frames);
-    const inL = inputs[0]?.[0] ?? this.silence;
-    const inR = inputs[0]?.[1] ?? inL;
+    let inL = inputs[0]?.[0];
+    let inR = inputs[0]?.[1] ?? inL;
+    if (!inL || !inR) {
+      outL.fill(0);
+      outR.fill(0);
+      inL = outL;
+      inR = outR;
+    }
     const mode = Math.round(params["mode"][0]);
     this.dsp.configure(mode, params["ceilingDb"][0], params["lookahead"][0] >= 1 / 2);
     this.dsp.process(inL, inR, outL, outR, frames);
