@@ -80,28 +80,38 @@ export function loadRenames(
   return Object.keys(parts).length > 0 ? ({ parts } as DocumentPartial) : null;
 }
 
+const PART_DROPPED = /^parts\[(\d+)\](?:\.slot)?: .* — part dropped$/;
+const NAME_FALLBACK = /^(parts\[(\d+)\]\.name: .* is not a name — )using "(.*)"$/;
+
+/** The raw indices the report says were dropped whole (bad slot, no preset, a duplicate slot). */
+function droppedIndices(corrections: readonly string[]): number[] {
+  return corrections.flatMap((line) => {
+    const match = PART_DROPPED.exec(line);
+    return match ? [Number(match[1])] : [];
+  });
+}
+
 /**
  * The import report as the song ends up (windsor#114): a malformed name is
  * reported as falling back to `Part <slot + 1>`, and when the load-time rename
  * then names that part after its patch, the line says so instead of claiming
- * the fallback. Every other line, and a clean generic import's report, is
- * returned as it came.
+ * the fallback. The line's `parts[i]` path names the raw part: a part the
+ * report drops keeps its line as it came, and a surviving one is the part at
+ * its place among the survivors, which the rename never reorders. Every other
+ * line, and a clean generic import's report, is returned as it came.
  */
 export function reportFinalPartNames(
   corrections: readonly string[],
   doc: Pick<ArrangementDocument, 'parts'>,
 ): string[] {
-  const renamed = new Map<string, string>();
-  for (const part of doc.parts) {
-    const fallback = partLabelFor(part.slot);
-    if (part.name !== fallback) renamed.set(`is not a name — using "${fallback}"`, part.name);
-  }
+  const dropped = droppedIndices(corrections);
   return corrections.map((line) => {
-    for (const [ending, name] of renamed) {
-      if (line.endsWith(ending)) {
-        return `${line.slice(0, -ending.length)}is not a name — named after its patch: "${name}"`;
-      }
-    }
-    return line;
+    const match = NAME_FALLBACK.exec(line);
+    if (!match) return line;
+    const index = Number(match[2]);
+    if (dropped.includes(index)) return line;
+    const part = doc.parts[index - dropped.filter((d) => d < index).length];
+    if (!part || partLabelFor(part.slot) !== match[3] || part.name === match[3]) return line;
+    return `${match[1]}named after its patch: "${part.name}"`;
   });
 }

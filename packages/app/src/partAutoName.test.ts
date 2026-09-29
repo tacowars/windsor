@@ -163,6 +163,28 @@ describe('opening a song', () => {
     ]);
     expect(model.corrections.join('\n')).not.toContain('Part 2');
   });
+  it("leaves a dropped duplicate's malformed name reported as its fallback (windsor#114)", () => {
+    const doc = context().model.doc;
+    const patches = { ...doc.patches, 'saw-arp': clonePatch(PRESETS['saw-arp']!) };
+    const parts = doc.parts.flatMap((part): { name: unknown; preset: string }[] =>
+      part.slot === 1
+        ? [
+            { ...part, name: 7, preset: 'saw-arp' },
+            { ...part, name: 8, preset: 'saw-arp' },
+          ]
+        : [part],
+    );
+    const survivor = parts.findIndex((part) => part.name === 7);
+    const duplicate = survivor + 1;
+    const model = new DocumentModel(newSong());
+    model.open({ ...doc, parts, patches }, loadRenames);
+    expect(partAt(model.doc, 1)?.name).toBe('Saw Ar');
+    expect(model.corrections).toEqual([
+      `parts[${survivor}].name: 7 is not a name — named after its patch: "Saw Ar"`,
+      `parts[${duplicate}].name: 8 is not a name — using "Part 2"`,
+      `parts[${duplicate}]: slot 1 is already used — part dropped`,
+    ]);
+  });
   it('reports a clean generic import as it did before the rename', () => {
     const doc = context().model.doc;
     const patches = { ...doc.patches, 'saw-arp': clonePatch(PRESETS['saw-arp']!) };
