@@ -64,7 +64,8 @@ DOTENV_RE = re.compile(r"(^|[\s/])\.env(\b|$)")
 
 # Words kept out of the report: REPORT_HIDE_WORDS (comma-separated) in the
 # repo's untracked .env, or in the environment. Each is matched as a whole
-# word in any case, with an optional "'s" or "s", and becomes
+# word in any case (letters and digits join a word; "_", "-", "." and the
+# like separate one), with an optional "'s" or "s", and becomes
 # REPORT_HIDE_WITH (default "[hidden]") in prompts and session titles.
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
 HIDE_DEFAULT = "[hidden]"
@@ -91,7 +92,7 @@ def hide_table(settings):
     with_ = settings.get("REPORT_HIDE_WITH") or HIDE_DEFAULT
     # Longer words first, so one that contains another is replaced whole.
     return [
-        (re.compile(r"\b" + re.escape(w) + r"('s|s)?\b", re.IGNORECASE), with_)
+        (re.compile(r"(?<![^\W_])" + re.escape(w) + r"('s|s)?(?![^\W_])", re.IGNORECASE), with_)
         for w in sorted(words, key=len, reverse=True)
     ]
 
@@ -970,7 +971,7 @@ def report_project(name, sessions, subagents, out):
     if oth:
         W("- Unclassified command heads (top 12): " + ", ".join(f"`{k}` {v}" for k, v in oth.most_common(12)))
     W(f"- Records/commands with secret-like strings (redacted, never printed): {sum(s['secretish_records'] for s in sessions + subagents)}; "
-      f"Bash commands mentioning `.env`: {sum(s['dotenv_cmds'] for s in sessions + subagents)} (contents never read by this script)")
+      f"Bash commands mentioning `.env`: {sum(s['dotenv_cmds'] for s in sessions + subagents)} (this script reads only REPORT_HIDE_WORDS and REPORT_HIDE_WITH from the repo's .env and prints neither)")
     W("- `output_tokens` on assistant records is the count at the moment the record was persisted (mid-stream), e.g. 7 tokens on a record whose tool_use input is 9 kB; "
       "only end-of-turn records carry the final count. Per-transcript output tokens are therefore NOT measurable from these files; the report gives measured output "
       "characters instead, and the harness `cost-state` totals per main session (which include sub-agents) for real output-token counts.")
@@ -1039,6 +1040,8 @@ def self_test():
         raise AssertionError("an empty word list must stop the report")
     require_hide_table(table)
     assert hide_words("unchanged", []) == "unchanged"
+    got = hide_words("python3 scripts/Zorbl_tool.py; tool_zorbl.sh; zorbl2 and Zorblax stay", table)
+    assert got == "python3 scripts/someone_tool.py; tool_someone.sh; zorbl2 and Zorblax stay", f"got {got!r}"
     import tempfile
 
     report = "| session | scripts |\n| a1 | `python3 Zorbl.py`, run-zorbl.sh |\nPrompt: zorbl's idea\n"
