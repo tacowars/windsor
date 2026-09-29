@@ -3,7 +3,7 @@
  * its parameters, its report on a hot fixture and a quiet one, a live change
  * of settings, and its shutdown.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   BLOCK,
@@ -124,6 +124,31 @@ describe('the output stage processor', () => {
     expect(out[0]!.every((v) => v === 0)).toBe(true);
     processor.inbox({ type: 'stop' });
     expect(processor.process([[]], [out], stageParams({ mode: 'hard' }))).toBe(false);
+  });
+
+  it('times itself once asked, and posts its load beside its report on the one port', () => {
+    const processor = loadOutputStage(RATE).create();
+    const params = stageParams({ mode: 'limiter' });
+    const block = (): Float32Array[] => [new Float32Array(BLOCK), new Float32Array(BLOCK)];
+    const loads = (): unknown[] =>
+      processor.outbox().filter((m) => (m as { type: string }).type === 'load');
+    processor.process([block()], [block()], params);
+    expect(loads()).toEqual([]);
+    let clock = 1000;
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => (clock += 2));
+    try {
+      processor.inbox({ type: 'reportLoad', quanta: 3 });
+      for (let b = 0; b < 3; b++) processor.process([block()], [block()], params);
+    } finally {
+      now.mockRestore();
+    }
+    // Each call spans 2 ms of the stubbed clock; the interval, 3 calls and the start.
+    expect(loads()).toEqual([
+      { type: 'load', busyMs: 6, wallMs: 12, quanta: 3, peakMs: 2, underruns: 0 },
+    ]);
+    const perReport = Math.ceil(RATE / OUTPUT_STAGE_REPORT_HZ / BLOCK);
+    for (let b = 0; b < perReport; b++) processor.process([block()], [block()], params);
+    expect(processor.outbox().some((m) => m.type === 'outputStage')).toBe(true);
   });
 
   it('renders a missing input over a 256-frame quantum as silence, allocating nothing', () => {

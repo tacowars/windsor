@@ -55,12 +55,17 @@ export function createOutputStage(
   let report: OutputStageReport = silentReport();
   let revision = 0;
   const listeners = new Set<(report: Readonly<OutputStageReport>) => void>();
-  node.port.onmessage = ({ data }: MessageEvent<OutputStageReport>): void => {
+  // A listener, not `onmessage`: the load meter (`cost/audioLoad.ts`) takes
+  // `onmessage` on this port for the stage's `load` reports, as it does on
+  // the compressor's, and the two must not replace each other.
+  const receive = ({ data }: MessageEvent<OutputStageReport>): void => {
     if (data?.type !== 'outputStage') return;
     report = data;
     revision++;
     for (const listener of listeners) listener(report);
   };
+  node.port.addEventListener('message', receive);
+  node.port.start();
   const param = (name: string): AudioParam | undefined => node.parameters.get(name);
   return {
     node,
@@ -88,7 +93,7 @@ export function createOutputStage(
     dispose(): void {
       listeners.clear();
       node.port.postMessage({ type: 'stop' });
-      node.port.onmessage = null;
+      node.port.removeEventListener('message', receive);
       node.port.close();
       node.disconnect();
     },

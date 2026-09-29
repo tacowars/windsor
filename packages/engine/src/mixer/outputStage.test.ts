@@ -5,6 +5,8 @@
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
+import { AudioLoadMeter, meterNode } from '../cost/audioLoad';
+
 import type { FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import {
   FakeContext,
@@ -81,6 +83,18 @@ describe('createOutputStage', () => {
     out.dispose();
     expect(node.posted).toContainEqual({ type: 'stop' });
     expect(node.outbound).toEqual([]);
-    expect(node.port.onmessage).toBeNull();
+    const before = out.revision;
+    node.port.dispatchEvent(new MessageEvent('message', { data: { type: 'outputStage' } }));
+    expect(out.revision).toBe(before);
+  });
+
+  it('keeps its reports when the load meter takes the port, and sends the meter its load', async () => {
+    const { context, out, node } = await stage();
+    const meter = new AudioLoadMeter(() => 0);
+    meterNode(meter, 'outputStage', out.node, context.sampleRate, 0.01);
+    expect(node.posted).toContainEqual({ type: 'reportLoad', quanta: expect.any(Number) });
+    renderGraph(context, 0.2);
+    expect(out.revision).toBeGreaterThanOrEqual(5);
+    expect(meter.readout().processors).toBe(1);
   });
 });

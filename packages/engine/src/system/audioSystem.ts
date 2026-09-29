@@ -113,6 +113,9 @@ import type { MasterStrip } from '../mixer/masterStrip';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import { meteredInsertRegistry } from '../inserts/meteredInsertRegistry';
 
+/** What a call before the standing graph exists throws. */
+const NOT_INITIALISED = 'AudioSystem.init() must be awaited first';
+
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
@@ -204,6 +207,8 @@ export class AudioSystem {
     for (const [name, bus] of Object.entries(this.returns)) {
       this.meterLoad(`return:${name}`, bus.effect);
     }
+    // So is the output stage (windsor#93): it runs on every block, song or no song.
+    this.meterLoad('outputStage', this.engine.outputStage?.node);
     this.started = true;
   }
 
@@ -212,7 +217,7 @@ export class AudioSystem {
     await this.engine.unlock();
   }
 
-  /** Processors this system has turned load reporting on in (#445) — parts plus worklet returns. */
+  /** Processors this system has turned load reporting on in (#445): parts, worklet returns and inserts, and the output stage. */
   get meteredProcessors(): number {
     return this.loadMeter.processorCount;
   }
@@ -499,14 +504,12 @@ export class AudioSystem {
   }
 
   private standing(): { musicBus: AudioBus; returns: Readonly<Record<string, ReturnBus>> } {
-    if (!this.musicBus || !this.returns) {
-      throw new Error('AudioSystem.init() must be awaited first');
-    }
+    if (!this.musicBus || !this.returns) throw new Error(NOT_INITIALISED);
     return { musicBus: this.musicBus, returns: this.returns };
   }
 
   private auxNode(): GainNode {
-    if (!this.auxLevel) throw new Error('AudioSystem.init() must be awaited first');
+    if (!this.auxLevel) throw new Error(NOT_INITIALISED);
     return this.auxLevel;
   }
 
@@ -536,8 +539,8 @@ export class AudioSystem {
   }
 
   /** Turn the audio-load sampler on in one node's processor (#445); `audioLoad.ts` owns the rules. */
-  private meterLoad(id: string, node: AudioNode): void {
-    if (!this.metered) return;
+  private meterLoad(id: string, node: AudioNode | undefined): void {
+    if (!this.metered || !node) return;
     meterNode(this.loadMeter, id, node, this.engine.context.sampleRate, AUDIO_LOAD_REPORT_SECONDS);
   }
 }

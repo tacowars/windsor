@@ -151,19 +151,26 @@ export class FakeWorkletNode extends FakeNode {
   readonly posted: unknown[] = [];
   /** An `fm-part`'s `processorOptions.events`: the notes it was built holding. */
   readonly events: unknown[];
-  readonly port: {
+  /**
+   * A port that, like a real one, hands what the processor posts both to
+   * `onmessage` and to every `message` listener (the output stage listens,
+   * the load meter takes `onmessage`).
+   */
+  readonly port: EventTarget & {
     postMessage(message: unknown): void;
     onmessage: ((event: { data: unknown }) => void) | null;
+    start(): void;
     close(): void;
-  } = {
+  } = Object.assign(new EventTarget(), {
     postMessage: (message: unknown): void => {
       this.posted.push(message);
       // Only the output stage hears its port here; the plate's load sampler stays off, as before.
       if (this.name === OUTPUT_STAGE_NAME) this.processor?.inbox(message);
     },
     onmessage: null,
+    start: (): void => {},
     close: (): void => {},
-  };
+  });
   /** For an `fm-part` node: what it plays. Silence until a test assigns one. */
   feed: Feed | null = null;
   private readonly processor: ReverbProcessorLike | null = null;
@@ -185,7 +192,10 @@ export class FakeWorkletNode extends FakeNode {
       }
     } else if (name === OUTPUT_STAGE_NAME) {
       const stage = loadOutputStage(context.sampleRate);
-      this.processor = stage.create((report) => this.port.onmessage?.({ data: report }));
+      this.processor = stage.create((report) => {
+        this.port.onmessage?.({ data: report });
+        this.port.dispatchEvent(new MessageEvent('message', { data: report }));
+      });
       for (const d of stage.descriptors) {
         const value = options.parameterData?.[d.name] ?? d.defaultValue;
         this.parameters.set(d.name, new FakeParam(value, d.minValue, d.maxValue));

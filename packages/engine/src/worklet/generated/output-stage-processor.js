@@ -475,12 +475,21 @@ var OutputStageProcessor = class extends AudioWorkletProcessor {
     this.running = true;
     this.frames = 0;
     this.report = silentReport();
+    this.loadQuanta = 0;
+    this.load = { type: "load", busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
+    this.wallStart = 0;
     this.port.onmessage = ({ data }) => {
       if (data.type === "stop") this.running = false;
+      if (data.type === "reportLoad") {
+        this.loadQuanta = Math.max(0, data.quanta | 0);
+        this.load.busyMs = this.load.quanta = this.load.peakMs = 0;
+        this.wallStart = Date.now();
+      }
     };
   }
   process(inputs, outputs, params) {
     if (!this.running) return false;
+    const start = this.loadQuanta ? Date.now() : 0;
     const out = outputs[0];
     const outL = out?.[0];
     if (!out || !outL) return true;
@@ -503,7 +512,26 @@ var OutputStageProcessor = class extends AudioWorkletProcessor {
       this.port.postMessage(this.report);
       this.frames = 0;
     }
+    if (this.loadQuanta) this.sampleLoad(frames, start);
     return true;
+  }
+  /**
+   * The load sampler (#445), as the compressor's: the `Date.now()` span of
+   * this call, summed, and posted every `loadQuanta` calls in the one reused
+   * object. `cost/audioLoad.ts` says what the numbers are worth.
+   */
+  sampleLoad(frames, start) {
+    const now = Date.now();
+    const elapsed = now - start;
+    const load = this.load;
+    load.busyMs += elapsed;
+    load.peakMs = Math.max(load.peakMs, elapsed);
+    if (elapsed - 1 >= frames / sampleRate * MS_PER_SECOND) load.underruns++;
+    if (++load.quanta < this.loadQuanta) return;
+    load.wallMs = now - this.wallStart;
+    this.port.postMessage(load);
+    load.busyMs = load.quanta = load.peakMs = 0;
+    this.wallStart = now;
   }
 };
 registerProcessor(OUTPUT_STAGE_NAME, OutputStageProcessor);
