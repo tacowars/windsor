@@ -64,8 +64,10 @@ tokens. The rest came without anyone typing:
 
 A Codex or CI wake cost about 1M tokens: about four calls at a quarter of
 a million each, to read a verdict and act on it. Codex itself answers in a
-median 3.4 minutes after a push (`pr-report.md`), so the waiting is short
-and the cost is the context each wake reloads.
+median 3.4 minutes after the head's newest commit (`pr-report.md`). That
+counts from the commit, not the push, so it is an upper bound on the wait
+after a push: the waiting is short, and the cost is the context each wake
+reloads.
 
 **What it did with the calls.** `gh` 25% of main-session tokens, a reply
 with no tool 21%, shell reads and edits 16%, the browser 13%, `git` 8%.
@@ -125,8 +127,10 @@ Recorded in `docs/log/2026-09-29-the-main-session-stays-small.md` and in
    shortest one here, `3d9b9710`, ran at 41 to 49k per call); the measured
    cost of not rotating is 102.8M over two days.
 2. **One wake per PR decision.** Watch a PR until `verify` has finished
-   and Codex has reviewed its head (matched on `original_commit_id`), and
-   wake once, not on each event.
+   and Codex has reviewed its head, and wake once, not on each event.
+   Codex's summary comment names the commit each completed review covered;
+   its findings are the inline comments with that `original_commit_id`,
+   and none means clean (a 👍 reaction names no commit).
 3. **A fix round goes to a fresh worker.** The brief is the findings, with
    file and line, and the rule to follow; the profile is usually
    `worker-light`. Trial it for a wave and compare with section 3.
@@ -166,7 +170,9 @@ Recorded in `docs/log/2026-09-29-the-main-session-stays-small.md` and in
   hand-back may be the main session merging, which it would do anyway.
 - The 24% in-tool share comes from `../2026-09-28-agent-orchestration-overhead/measure-overhead.py`,
   whose `windsor` section reads the same folder. That script rewrites its
-  own report file, so run a copy.
+  own report file, so run a copy, with `REPORT_HIDE_WORDS` set in the
+  environment: a copy outside the repo can't see the repo's `.env`, and
+  the script refuses to write without its word list.
 
 ## Reproduce
 

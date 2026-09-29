@@ -10,7 +10,11 @@ comment text.
   usually one commit, but a rebase or a second commit in one round also
   counts.
 - Codex latency: from the PR's newest commit before a Codex review (or a
-  Codex issue comment, which is how its 👍 arrives) to that review.
+  Codex issue comment: its summary or its no-findings note) to that
+  review. Commit time, not push time: a push after the commit makes this
+  longer than the wait after the push, so it is an upper bound on that.
+- Every Codex event after --until is left out, like every PR merged after
+  it, so a rerun reproduces the report.
 - P0/P1: Codex inline comments whose badge names P0 or P1.
 
     python3 pr-rounds.py [--until 2026-09-29T09:22:00Z] > pr-report.md
@@ -61,9 +65,12 @@ def main():
     for p in prs:
         n = p["number"]
         commits = sorted(ts(c["commit"]["committer"]["date"]) for c in api(f"repos/{REPO}/pulls/{n}/commits"))
-        reviews = [r for r in api(f"repos/{REPO}/pulls/{n}/reviews") if is_codex(r["user"])]
-        inline = [c for c in api(f"repos/{REPO}/pulls/{n}/comments") if is_codex(c["user"])]
-        notes = [c for c in api(f"repos/{REPO}/issues/{n}/comments") if is_codex(c["user"])]
+        reviews = [r for r in api(f"repos/{REPO}/pulls/{n}/reviews")
+                   if is_codex(r["user"]) and r.get("submitted_at") and ts(r["submitted_at"]) <= until]
+        inline = [c for c in api(f"repos/{REPO}/pulls/{n}/comments")
+                  if is_codex(c["user"]) and ts(c["created_at"]) <= until]
+        notes = [c for c in api(f"repos/{REPO}/issues/{n}/comments")
+                 if is_codex(c["user"]) and ts(c["created_at"]) <= until]
         for at in sorted([ts(r["submitted_at"]) for r in reviews] + [ts(c["created_at"]) for c in notes]):
             before = [c for c in commits if c < at]
             if before:
@@ -86,7 +93,7 @@ def main():
         dist[min(r["extra"], 3)] = dist.get(min(r["extra"], 3), 0) + 1
     out.append("- Extra rounds (3 means 3 or more): " + ", ".join(f"{k}: {v}" for k, v in sorted(dist.items())) + ".")
     lat = sorted(latency)
-    out.append(f"- Codex latency after a push: median {median(lat):.1f} min, p90 {lat[int(len(lat) * 0.9)]:.1f} min, "
+    out.append(f"- Codex latency after the newest commit (an upper bound on the wait after a push): median {median(lat):.1f} min, p90 {lat[int(len(lat) * 0.9)]:.1f} min, "
                f"n = {len(lat)}.")
     for lo, hi in SIZE_BANDS:
         band = [r for r in rows if r["lines"] >= lo and (hi is None or r["lines"] < hi)]

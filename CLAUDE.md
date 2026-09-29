@@ -189,8 +189,11 @@ The main session also keeps itself small
 - **Context.** Past about 150k tokens it writes its handoff and a fresh
   session takes over, or it compacts.
 - **Waiting.** It wakes once per PR decision: when `verify` has finished
-  and Codex has reviewed the head (matched on `original_commit_id`), not
-  on each event.
+  and Codex has reviewed the head, not on each event. Codex's summary
+  comment names the commit each completed review covered. That review's
+  findings are its inline comments whose `original_commit_id` is that
+  commit; none means clean. Its 👍 reaction carries no commit, so it
+  never confirms a head on its own.
 - **Fix rounds.** A round goes to a fresh worker, usually `worker-light`,
   whose brief is the findings with file and line and the rule to follow.
   It is not sent to the worker that wrote the PR.

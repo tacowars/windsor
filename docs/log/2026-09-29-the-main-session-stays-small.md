@@ -25,8 +25,12 @@ features with many interacting states, not simply large ones.
 1. **Rotate at about 150k context.** The main session writes its handoff
    in `.claude/handoffs/` and a fresh session takes over, or it compacts.
 2. **One wake per PR decision.** The main session watches a PR until
-   `verify` has finished and Codex has reviewed its head (matched on
-   `original_commit_id`), and wakes once for the pair, not once per event.
+   `verify` has finished and Codex has reviewed its head, and wakes once
+   for the pair, not once per event. Codex's summary comment names the
+   commit each completed review covered; that review's findings are the
+   inline comments whose `original_commit_id` is that commit, and none
+   means clean. A clean review often leaves only a 👍 reaction, which
+   names no commit, so the summary is what ties it to the head.
 3. **A fix round goes to a fresh worker.** The brief is the findings with
    file and line and the rule to follow, and the profile is usually
    `worker-light`. The main session does not send the round to the worker
