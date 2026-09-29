@@ -122,13 +122,18 @@ client-only and kept out of the deterministic `packages/shared`; the engine was
 packages/engine/src/          # folders mirror the windsor-engine skill's file map (#655)
   index.ts                # the one public surface, @windsor/engine
   audioConstants.ts       # the area's tables (re-exports the worklet's data modules, #656; MS_PER_SECOND)
-  system/                 # audioSystem.ts (the system: update() is the look-ahead pump, which the app
-                          #   calls on a timer); its SFX bus and API are game leftovers, a known follow-up
+  system/                 # audioSystem.ts (the system, a facade: update() is the look-ahead pump, which
+                          #   the app calls on a timer) over five collaborators, each owning its state
+                          #   (docs/log/2026-09-29-audio-system-split.md): standingGraph.ts (music bus,
+                          #   song master, returns, aux fader), partStrips.ts (every part on its strip),
+                          #   musicRoster.ts (the song's parts by slot), musicPlayback.ts (the player on
+                          #   the transport: start, stop, seek, mute, the position queries),
+                          #   systemLoadMeter.ts (which processors report their load)
   render/                 # offlineRender.ts (renderPatchToBuffer: a patch baked to an AudioBuffer)
   synth/                  # fmEngine.ts (context, worklet modules, parts, buses), audioPart.ts (one
                           #   timbral part == one worklet node), workletMessages.ts (main-thread <-> worklet
                           #   contract and the worklet URLs), the fmProcessor*.test.ts behavioural tests
-  mixer/                  # mix.ts (the desk: RETURNS and the SFX strips, typed plain data), audioBus.ts
+  mixer/                  # mix.ts (the desk: RETURNS and the audition and UI strips, typed plain data), audioBus.ts
                           #   (dry buses with inserts), channelStrip.ts (one part through its strip: fader,
                           #   stages, rotation and sends off the tail), lowCutStage.ts (#640), insertChain.ts
                           #   + stripTap.ts (#639, #652), stereoRotate.ts (the pan matrix), returnBus.ts
@@ -219,12 +224,15 @@ The view draws from the engine's own rules — `sequencing/regionClock.ts` for t
 position, `harmony/harmonyTimeline.ts` for the block bounds and the chord under the
 playhead — so what the lanes show is what the region gate plays, and every edit is a
 live partial over the console's pure `regionModel.ts` / `harmonyLaneModel.ts`, never a
-rebuild. The console's layers are `packages/app/CLAUDE.md` "The Song view".
+rebuild. While the transport is stopped or paused the playhead line is a handle: a drag
+snaps it to a bar line and the drop seeks the engine's transport there
+(`AudioSystem.seekMusic`, windsor#102). The console's layers are `packages/app/CLAUDE.md`
+"The Song view".
 
 **Audio observes; it never decides** was the game's rule: simulation events flowed one
 way, from the authoritative server and client sim to the audio system, and no audio state
-fed back. Windsor has no simulation; the rule survives only as `AudioSystem`'s header
-wording, a known follow-up.
+fed back. Windsor has no simulation, and `AudioSystem`'s header no longer carries the
+game's wording.
 
 ---
 
