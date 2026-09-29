@@ -10,8 +10,7 @@
  * A sequencer field is read from and written to one region's pattern
  * (windsor#75): the optional `region` names it, and `partEdits.ts`'s
  * `patternOf` / `changePattern` do the read and the full-copy write. With no
- * region named, the field is the part's `sequencer`, as the grid card uses it
- * until windsor#76.
+ * region named, the field is the part's `sequencer`.
  */
 import type {
   ArrangementDocument,

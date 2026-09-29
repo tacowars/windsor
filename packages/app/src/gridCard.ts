@@ -4,8 +4,10 @@
  * from a picker holding only the current scale, Oct cycles the step octave,
  * A and S toggle accent and slide — plus the loop length, the divisor, skip
  * and the two accent knobs, and a playhead that follows the audible tick.
- * Every edit goes through `ctx.change` as a whole `steps` list (arrays
- * replace wholesale in the merge); the step operations are `gridModel.ts`.
+ * Every edit writes a full copy of the selected region's pattern
+ * (windsor#76, `changePattern`), never `part.sequencer`, so two regions of
+ * one part keep their own steps and lanes; the step operations are
+ * `gridModel.ts`.
  *
  * The strip itself — its cells and columns, the lighting, the playhead loop
  * and where the playhead is — is `stepStrip.ts` (#619), shared with the chord
@@ -21,7 +23,6 @@
 import type { GridSpec } from '@windsor/engine';
 import { scaleOffsets } from '@windsor/engine';
 import type { AppCtx } from './context';
-import { partChange } from './context';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import {
@@ -50,6 +51,7 @@ import {
   withStep,
 } from './gridModel';
 import { makeKnob } from './knob';
+import { changePattern } from './partEdits';
 import { divisorPicker, tableKnob } from './seqFields';
 import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
 import {
@@ -183,7 +185,7 @@ function watch(strip: GridStrip): void {
   watchPlayhead({
     attached: () => strip.root.isConnected,
     shown: () => strip.root.closest('[hidden]') === null,
-    playheadAt: () => playheadAt(strip.ctx, strip.slot),
+    playheadAt: () => playheadAt(strip.ctx, strip.slot, strip.region),
     mark: markStep(strip),
     repaintIf: () => {
       const sig = signature();
@@ -205,8 +207,8 @@ function lengthKnob(strip: GridStrip): HTMLElement {
       const length = Math.round(v);
       const steps = stepsForLength(spec.steps, length);
       const lanes = lanesForSteps(spec.lanes, steps.length);
-      const change = { sequencer: { length, steps, lanes } };
-      if (strip.ctx.change(partChange(strip.slot, change)).ok) strip.repaint();
+      if (changePattern(strip.ctx, strip.slot, strip.region, { length, steps, lanes }))
+        strip.repaint();
     },
   });
 }
@@ -227,8 +229,7 @@ function rotateKnob(strip: GridStrip): HTMLElement {
       if (!spec) return;
       const steps = rotateSteps(spec.steps, by, spec.length);
       const lanes = rotateLanes(spec.lanes, by, spec.length);
-      if (strip.ctx.change(partChange(strip.slot, { sequencer: { steps, lanes } })).ok)
-        strip.repaint();
+      if (changePattern(strip.ctx, strip.slot, strip.region, { steps, lanes })) strip.repaint();
     },
   });
 }
@@ -251,25 +252,30 @@ function randomizeButton(strip: GridStrip): HTMLElement {
 
 /** Vel first, Length second, then the rest of the table, then Rotate: the row order the card had. */
 function controls(strip: GridStrip): HTMLElement {
-  const { ctx, slot } = strip;
+  const { ctx, slot, region } = strip;
   const [velocity, ...rest] = GRID_KNOBS;
   const row = el('div', 'knob-row');
-  if (velocity) row.appendChild(tableKnob(ctx, slot, velocity, PITCH_COLOR));
+  if (velocity) row.appendChild(tableKnob(ctx, slot, velocity, PITCH_COLOR, region));
   row.appendChild(lengthKnob(strip));
-  for (const entry of rest) row.appendChild(tableKnob(ctx, slot, entry, PITCH_COLOR));
+  for (const entry of rest) row.appendChild(tableKnob(ctx, slot, entry, PITCH_COLOR, region));
   row.appendChild(rotateKnob(strip));
   return row;
 }
 
-/** What the lanes need of this card: its spec's lanes, their write, the patch they push. */
-function laneHost(ctx: AppCtx, slot: number, scope: HTMLElement, repaint: () => void): LaneHost {
-  const spec = (): GridSpec | null => specOf(ctx, slot, 'grid');
+/**
+ * What the lanes need of this card: its region's lanes, their write into that
+ * region's pattern (windsor#76), the patch they push, and the region's own
+ * steps for the slide readout and the held-cell dimming.
+ */
+function laneHost(strip: Strip<GridSpec>, scope: HTMLElement): LaneHost {
+  const { ctx, slot, region } = strip;
+  const spec = (): GridSpec | null => strip.spec();
   return {
     scope,
     lanes: () => spec()?.lanes ?? null,
     base: (param) => patchBase(ctx, slot, param),
-    write: (lanes) => ctx.change(partChange(slot, { sequencer: { lanes } })).ok,
-    repaint,
+    write: (lanes) => changePattern(ctx, slot, region, { lanes }),
+    repaint: () => strip.repaint(),
     stepCount: () => spec()?.steps.length ?? 0,
     slide: (index) => {
       const s = spec();
@@ -278,25 +284,33 @@ function laneHost(ctx: AppCtx, slot: number, scope: HTMLElement, repaint: () => 
   };
 }
 
-/** The card body for a `grid` part: controls, the step strip with its lanes, the hint. */
-export function gridCard(ctx: AppCtx, slot: number): HTMLElement {
+/**
+ * The card body for a `grid` part's region `region` (windsor#76): controls,
+ * the step strip with its lanes, the hint. With no region named it edits the
+ * part's sequencer.
+ */
+export function gridCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
   const body = el('div');
   const scroll = el('div', 'grid-scroll');
-  const strip: GridStrip = {
+  const base: Strip<GridSpec> = {
     ctx,
     slot,
+    region,
     root: el('div', 'grid-strip'),
+    playing: -1,
+    spec: () => specOf(ctx, slot, 'grid', region),
+    repaint: () => repaint(strip),
+  };
+  const strip: GridStrip = {
+    ...base,
     scroll,
     names: el('div', 'mod-names'),
     picker: null,
-    playing: -1,
-    spec: () => specOf(ctx, slot, 'grid'),
-    repaint: () => repaint(strip),
-    lanes: laneHost(ctx, slot, scroll, () => repaint(strip)),
+    lanes: laneHost(base, scroll),
   };
   body.appendChild(controls(strip));
   const tools = el('div', 'capture-row');
-  tools.appendChild(divisorPicker(ctx, slot));
+  tools.appendChild(divisorPicker(ctx, slot, region));
   tools.appendChild(randomizeButton(strip));
   strip.picker = lanePicker(strip.lanes);
   const lanes = el('div');
