@@ -9,12 +9,12 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { ApplyResult, ArrangementDocument, DocumentPartial } from '@windsor/engine';
-import { RETURNS, makePatch, partAt, removePartChange } from '@windsor/engine';
+import { RETURNS, TICKS_PER_BAR, makePatch, partAt, removePartChange } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
-import type { EngineHost } from './host';
+import type { BuildOptions, EngineHost } from './host';
 import { library, loadPageLibrary } from './libraryModel';
 import { addPartLive } from './partEdits';
 import { newSong } from './songParts';
@@ -31,6 +31,10 @@ interface Console {
   applied: DocumentPartial[];
   status: string[];
   builds: number;
+  /** The options each build was handed, in order. */
+  buildOptions: BuildOptions[];
+  /** The tick the fake transport reads. */
+  position: number;
   /** Set to make the host refuse every live partial from then on. */
   refusing: boolean;
   /** Set to make the host report a path it ignored in every live partial from then on. */
@@ -45,6 +49,8 @@ function openConsole(): Console {
     applied: [],
     status: [],
     builds: 0,
+    buildOptions: [],
+    position: 0,
     refusing: false,
     ignoring: false,
     panels: {},
@@ -55,8 +61,9 @@ function openConsole(): Console {
       c.applied.push(partial);
       return { ok: true, ignored: c.ignoring ? ['somewhere'] : [] };
     },
-    build: () => {
+    build: (_document, options = {}) => {
       c.builds++;
+      c.buildOptions.push(options);
       return Promise.resolve();
     },
     isBuilding: false,
@@ -64,7 +71,7 @@ function openConsole(): Console {
     part: () => null,
   };
   c.ctx = new AppContext<TabPanel>({
-    host: host as EngineHost,
+    host: { ...host, transport: { position: () => c.position } } as unknown as EngineHost,
     model: c.model,
     notify: (message) => c.status.push(message),
   });
@@ -365,5 +372,29 @@ describe('an undo restores the document exactly', () => {
     expect(c.ctx.undo()).toBe(true);
     expect(c.builds).toBe(1);
     expect(c.status).toEqual([]);
+  });
+});
+
+describe('an undo rebuild resumes from the bar (windsor#132)', () => {
+  const BAR = TICKS_PER_BAR;
+  const MID_BAR_3 = 2 * BAR + BAR / 2;
+
+  it('hands an undo or redo rebuild the song tick the transport was at, looped or not', () => {
+    const c = openConsole();
+    c.ctx.importDoc(FULL_DOCUMENT);
+    expect(c.buildOptions).toEqual([{}]);
+    expect(c.ctx.change(removePartChange(c.model.doc, FULL_SLOT.hat)!).ok).toBe(true);
+    c.position = MID_BAR_3;
+    expect(c.ctx.undo()).toBe(true);
+    expect(c.buildOptions.at(-1)).toEqual({ resumeAt: MID_BAR_3 });
+    // A redo rebuilds only where the engine ignores some of it; the tick is
+    // read in the song that was playing, however often it has looped.
+    c.ignoring = true;
+    c.position = 2 * c.model.doc.transport.bars * BAR + MID_BAR_3;
+    expect(c.ctx.redo()).toBe(true);
+    expect(c.buildOptions.at(-1)).toEqual({ resumeAt: MID_BAR_3 });
+    // New song, like Import and the restore on reload, builds from the top.
+    c.ctx.importDoc(newSong());
+    expect(c.buildOptions.at(-1)).toEqual({});
   });
 });
