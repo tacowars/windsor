@@ -24,6 +24,20 @@
       "mcp__chrome-devtools__get_network_request"
     ]
   },
+  "skillOverrides": {
+    "claude-api": "off",
+    "claude-in-chrome": "off",
+    "init": "off",
+    "keybindings-help": "off",
+    "dataviz": "name-only",
+    "schedule": "name-only",
+    "anthropic-skills:docx": "off",
+    "anthropic-skills:pptx": "off",
+    "anthropic-skills:xlsx": "off",
+    "anthropic-skills:pdf": "off",
+    "anthropic-skills:morning": "off",
+    "anthropic-skills:import-memory": "off"
+  },
   "hooks": {
     "PreToolUse": [
       {
