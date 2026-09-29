@@ -1,23 +1,23 @@
 # The reviewed PR class covers UI changes, not UI copy
 
 - **Date:** 2026-09-28
-- **Decided by:** Pat
+- **Decided by:** tacowars
 - **Refines:** decision 5 of `2026-09-28-parallel-workflow-without-an-orchestrator`
-- **Refined by:** `2026-09-28-agreed-engine-prs-merge-without-pat`
+- **Refined by:** `2026-09-28-agreed-engine-prs-merge-without-the-owner`
 
 ## Context
 
 Decision 5 of `2026-09-28-parallel-workflow-without-an-orchestrator` sent
-every "UI/UX" PR to Pat. In practice that caught small, fully specified
-edits too: the label rename in windsor#9 (PR #19) waited for Pat although
+every "UI/UX" PR to tacowars. In practice that caught small, fully specified
+edits too: the label rename in windsor#9 (PR #19) waited for tacowars although
 the issue spelled out the new words and there was nothing left to judge.
-Pat said it should have merged on its own on a green check and a clean
-Codex review. What needs Pat's eye is a change to how the console looks or
+tacowars said it should have merged on its own on a green check and a clean
+Codex review. What needs tacowars's eye is a change to how the console looks or
 behaves, not text the issue already fixed word for word.
 
 ## Decisions
 
-1. **`reviewed`** (Pat merges): sound design (`patches/`, the worklets, a
+1. **`reviewed`** (tacowars merges): sound design (`patches/`, the worklets, a
    golden change), the song document schema, persistence, any deviation
    from the issue's decisions, and a **UI/UX change to layout, interaction
    or look**: a new or moved control, a new gesture, or a restyle.

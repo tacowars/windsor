@@ -6,13 +6,13 @@
 
 ## Context
 
-Pat asked for one global swing that reaches every part and is saved with
+tacowars asked for one global swing that reaches every part and is saved with
 the song. Windsor has a single clock: `sequencing/scheduler.ts`'s
 `TickTransport` counts 24 PPQ ticks, and the `Scheduler` stamps each one
 with an audio-clock time. Every generator reads that clock through its
 region gate. So swing can live in one place.
 
-Pat set the musical decisions on the issue:
+tacowars set the musical decisions on the issue:
 
 - The grid is selectable, 8ths or 16ths. Swing delays the second of each
   pair.

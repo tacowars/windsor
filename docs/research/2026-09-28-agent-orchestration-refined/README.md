@@ -1,6 +1,6 @@
 # A smaller software factory for Windsor
 
-2026-09-28. A refined answer to Pat's question about GitHub Projects,
+2026-09-28. A refined answer to tacowars's question about GitHub Projects,
 tickets, worktrees and Claude Code orchestration, incorporating Aotearoa204
 and HOOP rather than treating the pattern as a new proposal.
 

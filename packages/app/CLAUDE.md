@@ -2,7 +2,7 @@
 
 ## What this package is
 
-`@windsor/app`: the browser UI Pat designs sounds and songs in — Windsor's
+`@windsor/app`: the browser UI tacowars designs sounds and songs in — Windsor's
 arrangement console, forked from Aotearoa204's `tools/patch-editor/` on
 2026-09-27 (#70, decision record
 `2026-08-31-arrangement-console-and-runtime-arrangements`): four tabs — Parts,

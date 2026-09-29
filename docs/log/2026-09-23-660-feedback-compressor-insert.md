@@ -1,6 +1,6 @@
 # A feedback compressor insert with a separate detector input
 
-Ticket: #660. Pat requested implementation after a feasibility investigation,
+Ticket: #660. tacowars requested implementation after a feasibility investigation,
 with the final sonic verdict reserved for an audition against Cytomic The Glue.
 
 1. `compressor` is a normal, song-owned part insert. Its fixed graph wraps a
@@ -13,7 +13,7 @@ with the final sonic verdict reserved for an audition against Cytomic The Glue.
    fast/slow states for Auto release. It is not Cytomic's nonlinear dual-diode
    circuit model. Stereo uses the maximum rectified channel, not a signed sum.
    Range bounds control gain reduction, without modelling Cytomic's detector-rail
-   saturation. No exact sonic equivalence is claimed before Pat's verdict.
+   saturation. No exact sonic equivalence is claimed before tacowars's verdict.
 3. Controls are threshold, makeup, stepped attack/ratio/release (zero means Auto),
    detector-only highpass, Range, linear dry/wet and smoothed bypass. Detector HP
    zero is off. No lookahead or oversampling is introduced, so dry and wet samples

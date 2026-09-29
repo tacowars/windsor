@@ -1,7 +1,7 @@
 # Parallel work runs without an orchestrator, a board script or a role file
 
 - **Date:** 2026-09-28
-- **Decided by:** Pat
+- **Decided by:** tacowars
 - **Research:** `docs/research/2026-09-28-agent-orchestration-overhead/`
   and `docs/research/2026-09-28-agent-orchestration-refined/`
 
@@ -14,7 +14,7 @@ reporting back. Measured over 35 sub-agent transcripts, the cost sat in
 three places: the gate run inside the worker (68% of an implementer's wall
 clock), a 43 to 45 k token starting context from the role file, and the
 orchestrator as a poller (39% process calls, a median of 6 calls between
-launches). Board writes and handoff notes were cheap. Pat runs on a Claude
+launches). Board writes and handoff notes were cheap. tacowars runs on a Claude
 Max subscription with usage credits off plus a Codex Pro subscription, so
 the unit of cost is the rolling allowance window, and the prompt cache
 lives one hour, which makes an idle hub re-read its context cold.
@@ -41,7 +41,7 @@ lives one hour, which makes an idle hub re-read its context cold.
    the waiting. A ruleset on `main` requires the `verify` check and a PR.
 5. **Two PR classes.** `routine` merges on green plus no P0 or P1 from
    Codex. `reviewed` (sound design, UI/UX, song document schema,
-   persistence, golden changes, deviations) waits for Pat.
+   persistence, golden changes, deviations) waits for tacowars.
    Refined by `2026-09-28-pr-class-covers-ui-changes-not-ui-copy`.
 6. **Codex reviews every PR from GitHub.** The framing lives in
    `AGENTS.md` under "Code Review Rules" and spends the Codex allowance, not
@@ -58,7 +58,7 @@ lives one hour, which makes an idle hub re-read its context cold.
    run on Sonnet at `low`.
    Refined by `2026-09-28-thin-worker-profiles`.
 10. **Measure each wave** with the transcript script in the research
-    folder plus ready-to-merge time and Pat's intervention minutes per PR,
+    folder plus ready-to-merge time and tacowars's intervention minutes per PR,
     and compare one worker against two before raising the cap.
 
 ## Not adopted

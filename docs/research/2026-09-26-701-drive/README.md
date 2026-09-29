@@ -2,7 +2,7 @@
 
 Original DSP inspired by Roar's stage/routing workflow, not an emulation.
 The [research brief](../2026-09-26-drive-roar.md) records the references and
-Pat's three scope decisions. Existing `kind: drive` songs keep the original
+tacowars's three scope decisions. Existing `kind: drive` songs keep the original
 native implementation; the editor calls it Classic Drive. The new kind is
 `advanced-drive`, available on parts and master.
 
@@ -88,7 +88,7 @@ audio, load a patch in Parts, then add **Advanced Drive** in Mixer.
    processing. Change song tempo or disable Sync to compare free movement.
 
 Export/import the song to preserve every stage, including hidden ones.
-Pat's listening verdict remains pending; render tests are not that verdict.
+tacowars's listening verdict remains pending; render tests are not that verdict.
 
 ## Evidence
 

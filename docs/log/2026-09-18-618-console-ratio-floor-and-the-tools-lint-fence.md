@@ -26,7 +26,7 @@
    fenced out by name in the same block: a throwaway measurement harness by
    its own README, nothing in `packages/` imports it, and its 40 bare numbers
    are measured tables and report column widths.
-2. **`RATIO_MIN` is 0.0625 in the console** (Pat, 2026-09-18): four octaves
+2. **`RATIO_MIN` is 0.0625 in the console** (tacowars, 2026-09-18): four octaves
    under the note, two under the drum bodies the bank pinned at 0.25. The
    engine and `patchNormalise.ts` stay unclamped; `ratioSplit.test.ts` checks
    split / join at the floor and at a value between 0.0625 and 0.25, and the

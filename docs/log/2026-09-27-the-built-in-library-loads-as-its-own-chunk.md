@@ -17,7 +17,7 @@ library to start, because a new song plays only the Init patch (#598).
 
 ## Decision
 
-Lazy-load the library. Pat chose this over raising the warning limit or
+Lazy-load the library. tacowars chose this over raising the warning limit or
 splitting the drum and scoring banks.
 
 1. **The engine exports a loader, not the table.** The index drops

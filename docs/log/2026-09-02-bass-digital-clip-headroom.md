@@ -28,7 +28,7 @@
    0.52 → 0.45, `ai-voice` 0.66 → 0.62, `horde-horn` 0.24 → 0.23. This goes
    past the letter of #78, which named one preset; it is here because the
    sweep the ticket asked for found them, and because decision 2 makes the
-   suite fail on them rather than look away. Each is a one-line revert if Pat
+   suite fail on them rather than look away. Each is a one-line revert if tacowars
    would rather re-level them by ear.
 
 ## Why
@@ -86,7 +86,7 @@ random input the processor has, and the numbers in decision 5 come from it.
 operator ratios, levels, filter drive and resonance are the sound. −1.68 dB
 on one part is recoverable anywhere downstream (the channel strip's fader,
 `mix.ts`) and audibly nothing; a resonance or drive change to lower the crest
-factor would alter a preset Pat authored, to buy the same headroom. The
+factor would alter a preset tacowars authored, to buy the same headroom. The
 ticket prescribed the volume trim and it is also the smaller claim on someone
 else's judgement.
 

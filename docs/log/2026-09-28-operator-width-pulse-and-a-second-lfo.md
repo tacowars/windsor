@@ -1,7 +1,7 @@
 # Operator width, a PULSE wave and a second LFO
 
 - **Date:** 2026-09-28
-- **Status:** accepted (Pat, 2026-09-28, epic windsor#53 "Design")
+- **Status:** accepted (tacowars, 2026-09-28, epic windsor#53 "Design")
 - **Tickets:** windsor#54 (this schema seam), windsor#55 (the DSP),
   windsor#56 (the console), windsor#57 (the patches)
 - **Closes, when the epic lands:** Aotearoa204 #692 (PWM) and engine

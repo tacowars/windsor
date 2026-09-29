@@ -27,7 +27,7 @@ What workers have tripped on. The protocol itself is `CLAUDE.md`
   - Don't call `get_network_request` (it can hang the shared browser). If
     a call gets no response, don't retry it; report what you checked.
   - When done, `close_page` your page and stop your server with TaskStop.
-  - List what you checked in the PR. Pat still looks at the preview.
+  - List what you checked in the PR. tacowars still looks at the preview.
 - **CI and the final message.** As `CLAUDE.md` steps 4 and 5 say; the hook
   denies CI polling, so don't retry it.
 - **Fix round.** Fix on the same branch, push, update the PR body, and

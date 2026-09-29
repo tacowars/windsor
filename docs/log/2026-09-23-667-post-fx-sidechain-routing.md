@@ -1,6 +1,6 @@
 # Post-FX sidechains and silent trigger tracks
 
-Ticket: #667. Builds on #666 / PR #668. Pat chose post-FX only after
+Ticket: #667. Builds on #666 / PR #668. tacowars chose post-FX only after
 confirming a Sidechain only output; there is no Pre-Level tap.
 
 - Compressor `sidechain` defaults to Internal; `{ track: slot }` selects a
@@ -28,5 +28,5 @@ confirming a Sidechain only output; there is no Pre-Level tap.
   No CPU/frame-time claim follows from this structural description.
 
 Evidence: `docs/research/2026-09-23-667-post-fx-sidechains/` and the real-DSP
-routing tests. Listening remains available to Pat in the standalone editor;
+routing tests. Listening remains available to tacowars in the standalone editor;
 this change makes no new Glue-equivalence claim.

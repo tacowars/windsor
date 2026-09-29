@@ -75,7 +75,7 @@ the skill's map rows, scheduled when no audio PR is open.
 
 ## Why
 
-Pat, 2026-09-23: "This code is entirely built and maintained by AI agents
+tacowars, 2026-09-23: "This code is entirely built and maintained by AI agents
 though so I want to make sure that any review or refactor we do takes that
 into account. We want the music engine to be organized so its easiest for AI
 coding agents to work on it. I am not concerned with human coders needing it

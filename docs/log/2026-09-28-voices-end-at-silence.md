@@ -3,12 +3,12 @@
 - **Date:** 2026-09-28
 - **Status:** accepted and built (windsor#7, PR windsor#20). The fixes for
   the steal and for a held End level are measured. The stop/pause fix awaits
-  Pat's listen.
+  tacowars's listen.
 - **Measurements:** `docs/research/2026-09-28-voice-clicks/README.md`
 
 ## Context
 
-Pat heard clicks in two demo songs, `clicks.json` and `clippy.json`. They
+tacowars heard clicks in two demo songs, `clicks.json` and `clippy.json`. They
 sounded like an envelope or a voice cutting in or out. Each click was
 traced to a way the FM part ended a voice with its per-voice filter still
 ringing.
@@ -88,8 +88,8 @@ a carrier End level above 0.
 - **Hard-cutting a voice that holds an End level.** A cut is the click this
   record exists to remove, and waiting on its amplitude never ends.
 
-## Pat's verdict
+## tacowars's verdict
 
-On the round-1 build Pat heard clearly fewer clicks than main; the accent
-click was resolved in the patch (1 ms filter attack; Pat rejected 10 ms as
-an audible ramp); the round-2 stop/pause fix awaits Pat's listen.
+On the round-1 build tacowars heard clearly fewer clicks than main; the accent
+click was resolved in the patch (1 ms filter attack; tacowars rejected 10 ms as
+an audible ramp); the round-2 stop/pause fix awaits tacowars's listen.

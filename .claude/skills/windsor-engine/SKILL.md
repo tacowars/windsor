@@ -131,7 +131,7 @@ routing, envelopes, fixed frequencies or custom harmonics. Infer the sound's
 role, register, gate length and mixer context from the request; ask only for
 musical choices that remain material and unresolved.
 
-- Pat's established scoring direction is moody atmosphere and minimal dub
+- tacowars's established scoring direction is moody atmosphere and minimal dub
   techno. Use it when applicable; a new brief can choose a different palette.
   Soundtrack FX include sweeps, noise, pulses, glitches and tension textures.
 - Start with an existing sound or `makePatch`; use `clonePatch` for an editable
@@ -145,7 +145,7 @@ musical choices that remain material and unresolved.
   recommended mixer sends. Delay/plate belong to the song, not `Patch`.
 - Audition both dry and in the intended arrangement. Test slow sounds with
   a long enough note gate; a short sequencer gate can interrupt a valid swell.
-  Describe sonic intent separately from measured output and Pat's verdict.
+  Describe sonic intent separately from measured output and tacowars's verdict.
 
 **Scoring bank:** `docs/design/scoring-preset-library.md` is its guide.
 **Drum bank:** `docs/design/drum-bank.md` records the 808 / 909 / EFM
@@ -242,8 +242,8 @@ through Import. Test documents are fixtures under
   discipline; heap snapshots alone cannot prove it.
 
 Run the narrow checks while developing, then `npm run verify`. Report a listening verdict as pending when it is
-Pat's remaining criterion; hand back exact sounds/steps rather than waiting
-or equating passing DSP tests with musical approval. Pat auditions in the
+tacowars's remaining criterion; hand back exact sounds/steps rather than waiting
+or equating passing DSP tests with musical approval. tacowars auditions in the
 console with a MIDI controller as well as QWERTY, so a handback can name
 velocity, pitch bend, mod wheel (which scales LFO amount through
 `lfo.modWheelDepth` and adds to the filter envelope amount through

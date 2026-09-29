@@ -61,7 +61,7 @@ ticket moved the file whole; #644 and #645 split it.
 
 ## Why
 
-Pat, 2026-09-23: the code is maintained by AI agents, so the refactor is
+tacowars, 2026-09-23: the code is maintained by AI agents, so the refactor is
 optimised for them (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 Every item above is that plan applied to this step. The single-file record's
 reasoning was sound and is kept: the shipped artefact is still one

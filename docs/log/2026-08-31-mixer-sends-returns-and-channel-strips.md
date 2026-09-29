@@ -9,7 +9,7 @@
 - Amended by `2026-09-22-639-sends-tap-the-strip-tail` (#639): §7's sends and
   the rotation tap the strip's tail, after any strip stages, not `part.output`
 
-A design conversation with Pat, recorded before any code exists. No
+A design conversation with tacowars, recorded before any code exists. No
 implementation was written; this record is the brief a later ticket works from.
 
 PR #59 settled *that* a reverb space is shared rather than owned by a `Patch`.
@@ -184,7 +184,7 @@ state** (CLAUDE.md invariant 1 — "audio observes; it never decides"), and
 
 ## Punted / alternatives
 
-Each was put to Pat as an option and declined:
+Each was put to tacowars as an option and declined:
 
 | Rejected | Why not |
 |---|---|

@@ -1,6 +1,6 @@
 # Voice clicks in a retriggered mono line (windsor#7)
 
-Pat heard clicks in `songs/clicks.json`, like an envelope or a voice cutting in
+tacowars heard clicks in `songs/clicks.json`, like an envelope or a voice cutting in
 or out. This note records where they come from, what was measured, and the fix.
 
 ## The reproduction
@@ -113,9 +113,9 @@ cut. Every poly preset's render is bit-identical. The table was refreshed on
 Node 24 (`.nvmrc`). `fmProcessorHeadroom`, `fmProcessor`, `fmProcessorSlide`
 and `fmProcessorDormancy` pass unchanged.
 
-## Round 2: Pat's verdict and `clippy.json`
+## Round 2: tacowars's verdict and `clippy.json`
 
-Pat listened to round 1. It was much better than `main`, which clicked on
+tacowars listened to round 1. It was much better than `main`, which clicked on
 nearly every step, but two clicks remained, heard in a second demo,
 `clippy.json`. That demo has the same line and carrier with sustain 1 and a
 0.4 s release. It sits under a resonant low-pass (Q 4.76) at 55 Hz, which its
@@ -197,6 +197,6 @@ not change.
 
 ## Listening
 
-On the round-1 build Pat heard clearly fewer clicks than main; the accent
-click was resolved in the patch (1 ms filter attack; Pat rejected 10 ms as
-an audible ramp); the round-2 stop/pause fix awaits Pat's listen.
+On the round-1 build tacowars heard clearly fewer clicks than main; the accent
+click was resolved in the patch (1 ms filter attack; tacowars rejected 10 ms as
+an audible ramp); the round-2 stop/pause fix awaits tacowars's listen.

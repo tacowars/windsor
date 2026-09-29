@@ -22,7 +22,7 @@ master's inserts or be moved by its fader.
 
 ## Decision
 
-Generalise the route. Pat chose this over removing it.
+Generalise the route. tacowars chose this over removing it.
 
 1. **The aux bus.** `createSfxPart` becomes `createAuxPart(name, patch,
    maxVoices)`, and `setSfxGain` / `sfxGain` become `setAuxGain` / `auxGain`.

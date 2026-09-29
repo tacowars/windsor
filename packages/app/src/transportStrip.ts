@@ -151,7 +151,7 @@ function keyPickers(ctx: AppCtx): HTMLElement[] {
 }
 
 /**
- * A header picker without its visible label (Pat's request on windsor#12),
+ * A header picker without its visible label (tacowars's request on windsor#12),
  * so the row stays one control high; the select keeps its `aria-label` from
  * `select()` and names itself in a tooltip.
  */

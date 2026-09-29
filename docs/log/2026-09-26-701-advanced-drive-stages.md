@@ -1,6 +1,6 @@
 # Advanced Drive preserves Classic Drive and adds five stage routes
 
-2026-09-26 · #701 · Pat's Roar-inspired drive request and explicit scope answers.
+2026-09-26 · #701 · tacowars's Roar-inspired drive request and explicit scope answers.
 
 1. Ship a separate `advanced-drive` insert; keep `drive`'s native graph and
    existing settings unchanged. Label the latter Classic Drive in the editor.

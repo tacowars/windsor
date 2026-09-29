@@ -5,7 +5,7 @@
  * its own test rig — plays the part's pattern in the untouched region and
  * the edited copy in the other. Each window is compared against the same
  * song with that pattern on the whole part, so nothing here restates how a
- * chord is voiced or a figure is timed; the tick checks are what Pat hears.
+ * chord is voiced or a figure is timed; the tick checks are what tacowars hears.
  */
 import { describe, expect, it } from 'vitest';
 

@@ -26,7 +26,7 @@ Mix controls only dry/wet; Output follows the blend. Preset selection keeps
 Mix, Output and bypass. A manual change shows Custom. Export on Arrangement
 saves all values, including each lane's inactive free-time/sync setting.
 
-Pat's listening verdict is pending. Mechanical results do not establish an
+tacowars's listening verdict is pending. Mechanical results do not establish an
 Ableton sound match or musical approval.
 
 ## Mechanical evidence

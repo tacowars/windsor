@@ -8,11 +8,11 @@
 
 ## Decision
 
-From Pat's brief of 2026-09-17: a Euclidean part must be playable live — no
+From tacowars's brief of 2026-09-17: a Euclidean part must be playable live — no
 parameter turn restarts it — and the console must show its figure as the
 modulator moves it and as the knobs turn, Drambo's Euclidean module being the
-reference. Points 1 and 4 are Pat's; 2, 3 and 5 are the implementer's reading
-and stand unless Pat objects at review.
+reference. Points 1 and 4 are tacowars's; 2, 3 and 5 are the implementer's reading
+and stand unless tacowars objects at review.
 
 1. **Every Euclidean field but the divisor reconfigures the live generator.**
    `EuclideanSequencer.reconfigure(config)` keeps the stream and the current
@@ -75,4 +75,4 @@ only on capture.
 - The arpeggiator and the step sequencer still rebuild on any driver change.
   Their configs are mostly stream-shaping (pool, refresh, register), where a
   restart is arguably the point; a live path for them is a separate ticket
-  if Pat wants it.
+  if tacowars wants it.

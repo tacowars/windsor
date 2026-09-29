@@ -18,7 +18,7 @@ Stop, then returns and checks exactly one active meter delivers reports.
 `browser.json` records the page SHA-256, parent commit (dirty checkout), live
 AudioParams, actual sample-meter report, exported master, and node lifetime.
 `console.json` has zero warnings/errors; `network.json` retains all completed
-and failed request events. The screenshot is for Pat; the assertions and
+and failed request events. The screenshot is for tacowars; the assertions and
 processor data establish behavior. No game-world collector is relevant to
 this standalone console scenario (decision 6 in the ticket's record).
 

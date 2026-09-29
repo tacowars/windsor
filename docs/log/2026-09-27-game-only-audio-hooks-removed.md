@@ -20,7 +20,7 @@ those callers, and nothing in Windsor's console calls them:
 
 ## Decision
 
-Remove them. Pat agreed on 2026-09-27. The load readout the console shows
+Remove them. tacowars agreed on 2026-09-27. The load readout the console shows
 stays: `cost/audioLoad.ts`, reported by every worklet and read through
 `AudioSystem.readout().load`, and the tests' `meteredProcessors` hook with
 it. `update()` now just pumps the scheduler.

@@ -1,5 +1,5 @@
 /**
- * Which MIDI inputs the console listens to (#523), without Web MIDI: Pat often
+ * Which MIDI inputs the console listens to (#523), without Web MIDI: tacowars often
  * has two or three class-compliant devices connected and plays one. The
  * selection is a device name (ids are not promised stable across sessions) or
  * `ALL_INPUTS`; a remembered device that is not connected stays selected and

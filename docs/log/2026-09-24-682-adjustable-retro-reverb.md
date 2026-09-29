@@ -1,9 +1,9 @@
 # An adjustable ROM-free retro reverb insert
 
-For #682, Pat chose a freely adjustable MIDIVerb-inspired reverb rather than
+For #682, tacowars chose a freely adjustable MIDIVerb-inspired reverb rather than
 BarrVerb or hardware equivalence, with ordinary, gated and reverse-style
 presets approximating the original range. Factory ROM redistribution permission
-is unknown; Pat authorized local inspection of the supplied U51/U54 firmware
+is unknown; tacowars authorized local inspection of the supplied U51/U54 firmware
 to understand it, while keeping firmware out of shipped assets.
 
 Implement an original TypeScript AudioWorklet and expose it through the shared
@@ -16,7 +16,7 @@ Keep preset selection as a write of sound parameters, preserving Mix and bypass.
 Songs store the resulting values and need no external preset bank to reproduce
 their settings. There are 63 approximation entries; bypass covers Defeat.
 Do not label them measured matches: initial values follow public program
-descriptions, and Pat's listening verdict remains pending.
+descriptions, and tacowars's listening verdict remains pending.
 
 CPU claims must name the measured backend and machine. Retain the development
 measurements, implementation options, firmware identification, validation and

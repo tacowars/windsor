@@ -4,7 +4,7 @@
  * into the selected region's pattern and nowhere else, the seed stays the
  * part's, a drawn region copies its neighbour, a split gives both halves a
  * copy, a kind change clears every region, and each region's performance
- * survives export → import. Pat's report is the fixture: one chord part, two
+ * survives export → import. tacowars's report is the fixture: one chord part, two
  * regions, one hit at octave 3 in the first and four hits at inversion 2 in
  * the second.
  */
@@ -79,7 +79,7 @@ describe('a card edit writes the selected region only', () => {
     expect(part.regions[1]?.pattern).toEqual({ ...before, steps: [hit(2, 0)] });
   });
 
-  it("keeps Pat's two performances apart through selecting back and forth and export → import", () => {
+  it("keeps tacowars's two performances apart through selecting back and forth and export → import", () => {
     const model = songWith('chord', TWO_REGIONS);
     edit(model, 0, { steps: [hit(0, 0)] });
     edit(model, 0, { register: { octave: 5 } });

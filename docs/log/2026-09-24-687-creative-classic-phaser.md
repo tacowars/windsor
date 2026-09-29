@@ -1,6 +1,6 @@
 # Creative classic phaser insert
 
-Ticket: #687. Pat supplied Stone Phaser as the reference and requested a
+Ticket: #687. tacowars supplied Stone Phaser as the reference and requested a
 more open effect for acid basslines and spacey pads, retaining classic phasing.
 
 1. Ship an original four-stage stereo phaser, named **Phaser**, through the
@@ -28,5 +28,5 @@ more open effect for acid basslines and spacey pads, retaining classic phasing.
    branding is copied. Research/provenance and development-machine evidence
    are in `docs/research/2026-09-24-687-phaser/`.
 
-Pat's listening verdict is required before merge. Passing DSP tests does not
+tacowars's listening verdict is required before merge. Passing DSP tests does not
 establish musical preference or hardware equivalence.

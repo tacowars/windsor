@@ -1,7 +1,7 @@
 # Retire the headroom record, the content hash and userKey
 
 - **Date:** 2026-09-28
-- **Status:** accepted (Pat, 2026-09-28, windsor#60)
+- **Status:** accepted (tacowars, 2026-09-28, windsor#60)
 - **Supersedes:** the headroom record of `2026-09-15-561-patch-library-file-shape`,
   the hash refresh #586 added for a schema change, and the bank-wide clip
   test of `2026-09-02-bass-digital-clip-headroom`. Those records are

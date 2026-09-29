@@ -8,11 +8,11 @@
   `2026-08-31-arrangement-console-and-runtime-arrangements` §3 (build-time
   import, no runtime fetch) and §4–§5 (the loud fallback, the verify gate)
 
-Pat asked for one file: the synth and the reverb predate the mixer, sequencer
+tacowars asked for one file: the synth and the reverb predate the mixer, sequencer
 and arrangement work, so a patch edited on the console's Parts tab was
 live-only and left the page as a separate patch JSON that had to be
 hand-landed in `presetsAuthored.ts`, and the return level, delay time and
-reverb space on the Mixer tab had no export at all. Pat wants to program
+reverb space on the Mixer tab had no export at all. tacowars wants to program
 every patch and every musical and mix element in the console, export one
 JSON, and swap that file in the game to audition it.
 
@@ -83,7 +83,7 @@ makes the export the piece, and makes the normaliser, the gate and the live
 
 The runtime-fetch alternative for swapping music was rejected in the console
 record on an argument that still holds (a failed load is inaudible when the
-content is generative). A build-time glob gives the swap Pat asked for
+content is generative). A build-time glob gives the swap tacowars asked for
 without reopening it: a new file is one more bundled module, a typo in the
 name is a click and a log line, and Vite's dev server picks up a dropped-in
 file on reload.

@@ -176,7 +176,7 @@ PR
  ↓
 CI fails
  ↓
-Pat notices failure
+tacowars notices failure
  ↓
 restart agent
  ↓

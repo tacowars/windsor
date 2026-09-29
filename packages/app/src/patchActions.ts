@@ -123,7 +123,7 @@ const playedPresets = (ctx: AppCtx): Set<string> =>
  * Drop every Init sentinel no part plays any more: an unsaved Init is
  * discarded, never exported. A live removal — `null` at each id (#629): this
  * runs right after a part's first patch pick, and as a restructure it was the
- * restart Pat heard on every sequencer.
+ * restart tacowars heard on every sequencer.
  */
 export function dropInit(ctx: AppCtx): void {
   const patches = ctx.model.doc.patches;

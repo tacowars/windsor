@@ -1,7 +1,7 @@
 # The user's patches and songs live in IndexedDB
 
 - **Date:** 2026-09-27
-- **Status:** accepted and built. Pat chose IndexedDB over OPFS and settled
+- **Status:** accepted and built. tacowars chose IndexedDB over OPFS and settled
   the open questions on 2026-09-27; built on 2026-09-28 (see "As built").
 - **Supersedes:** the user-state known follow-up in
   `2026-09-27-windsor-forked-from-aotearoa204.md`
@@ -54,7 +54,7 @@ plugs into the existing actions without new write paths:
   id in the user library (the existing Copy-to-new naming, `kick-2` and so
   on), and the part switches to it. Built-in ids stay read-only, so a
   built-in always sounds the same. Saving a user patch writes over its own
-  id. (Decided by Pat, 2026-09-27.)
+  id. (Decided by tacowars, 2026-09-27.)
 - **Copy to new.** A new id goes to the user library.
 - **Delete.** The action applies to user patches only. Built-ins stay
   read-only, and the `FALLBACK_PATCH_ID` guard remains.
@@ -90,7 +90,7 @@ plugs into the existing actions without new write paths:
 - OPFS. Revisit only if audio samples ever need storing, since those are
   the large binary case where OPFS earns its keep.
 
-## Decisions (Pat, 2026-09-27)
+## Decisions (tacowars, 2026-09-27)
 
 1. On a reload, the console asks before restoring the last session.
 2. Autosave only for the first cut; no named songs.
@@ -125,7 +125,7 @@ The design above holds. Details settled while building it:
   (`2026-09-28-notices-are-toasts`), shown beside the save's own notice
   rather than in place of it.
 - **After Save on a built-in, the song keeps its edited copy of the
-  built-in** even though no part plays it any more. Pat wants this: you
+  built-in** even though no part plays it any more. tacowars wants this: you
   sometimes come back to that patch later (2026-09-28).
 - **Save over a built-in** opens the Copy-to-new modal, titled "Save your
   own …" and prefilled `<name> copy`. The id comes from the name, as for

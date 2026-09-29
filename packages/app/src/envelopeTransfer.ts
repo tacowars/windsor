@@ -5,7 +5,7 @@
  * `Envelope` type (`audio/patch.ts`), so a shape that works on one operator is
  * the same twelve fields on any other. This is the pure half of the drag —
  * which slots exist, what the status line calls them, and the copy and the
- * swap themselves. Pat, 2026-09-16, decided both calls the model encodes: a
+ * swap themselves. tacowars, 2026-09-16, decided both calls the model encodes: a
  * shift-drag swaps rather than copies, and a copy carries loop mode and key
  * scaling with the shape, because a curve without them is not the sound the
  * user heard.

@@ -1,7 +1,7 @@
 # Format versions: refuse, never destroy
 
 - **Date:** 2026-09-28
-- **Status:** accepted (Pat, 2026-09-28, windsor#43)
+- **Status:** accepted (tacowars, 2026-09-28, windsor#43)
 - **Refines:** `2026-09-26-harmony-v2-document-v3-timeline-and-regions`
   decision 1 (the #705 retirement of song version 2), which stands
 

@@ -86,7 +86,7 @@ fork/storage records, package scripts and CI configuration:
 - [HOOP browser contention](/Users/arrakis/code/HOOP/.claude/handoffs/2026-09-19-2055-email-sender-live-impacto-nine-merges.md): five simultaneous browser checks stalled; subsequent checks were serialised.
 - [HOOP board-query improvement](/Users/arrakis/code/HOOP/.claude/handoffs/2026-09-20-0120-session-close-eight-merges-ai-read-records.md): expensive list queries, cheaper item operations and contract-first parallel work.
 
-These absolute links refer to sibling checkouts on Pat's machine. The
+These absolute links refer to sibling checkouts on tacowars's machine. The
 committed Windsor report remains the portable summary of those projects.
 
 **Documentation distinctions that change the recommendation.**

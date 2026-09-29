@@ -246,7 +246,7 @@ describe('structural edits stay live (#629)', () => {
     expect(c.status.at(-1)).toBe('refused: nope');
   });
 
-  it('drops a stale Init live after the first patch pick — the restart Pat heard', () => {
+  it('drops a stale Init live after the first patch pick — the restart tacowars heard', () => {
     const c = openConsole();
     addPartLive(c.ctx);
     const init = initPresetId('1');
