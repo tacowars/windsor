@@ -29,7 +29,7 @@ export type HostLog = (message: string) => void;
 /** The slice of the system ▶ ■ ‖ drive; a test fakes this much. */
 export type TransportSystem = Pick<
   AudioSystem,
-  'startMusic' | 'stopMusic' | 'setMuted' | 'musicRunning' | 'scheduler' | 'engine'
+  'startMusic' | 'stopMusic' | 'seekMusic' | 'setMuted' | 'musicRunning' | 'scheduler' | 'engine'
 >;
 
 /**
@@ -72,6 +72,16 @@ export class HostTransport implements ConsoleTransport {
   stop(): void {
     this.live()?.stopMusic();
     this.current = nextTransportState(this.current, 'stop');
+  }
+
+  /**
+   * Move the stopped or paused transport to `tick` (windsor#102, the Song
+   * view's playhead drag): the engine's seek, so ▶ plays from there and
+   * `position()` reads it at once. The state is kept, so a paused transport
+   * stays paused. False, changing nothing, while playing or before audio.
+   */
+  seek(tick: number): boolean {
+    return this.live()?.seekMusic(tick) ?? false;
   }
 
   /** The audible transport tick, 0 before audio: the console's one reading of position (#619, #705). */

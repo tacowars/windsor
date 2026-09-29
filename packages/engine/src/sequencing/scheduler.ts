@@ -369,6 +369,22 @@ export class Scheduler implements TickSource {
     this.rewind(atTick);
   }
 
+  /**
+   * Move a halted transport to `tick` (windsor#102, the Song view's playhead
+   * drag): `audibleTick` reads it and the next `start` issues it first,
+   * whether the transport was stopped or paused. The position is now the
+   * user's, so a later loop edit leaves it where it is, as it leaves a paused
+   * one. With a loop on, a tick before the loop plays on into it and wraps
+   * there as usual. Refused (false, nothing changed) while running, or for a
+   * tick that is not a non-negative integer.
+   */
+  seek(tick: number): boolean {
+    if (this.running || !Number.isInteger(tick) || tick < 0) return false;
+    this.atRest = false;
+    this.rewind(tick);
+    return true;
+  }
+
   private rewind(atTick: number): void {
     this.restTick = atTick;
     this.transport.reset(atTick);

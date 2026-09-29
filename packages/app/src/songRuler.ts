@@ -15,10 +15,19 @@
  * ruler ever edits it. The zoom stops at the fit, the
  * scale at which the whole song fills the window (windsor#21), and a
  * double-click returns to it at bar 1; a resize or a Bars change refits.
+ *
+ * While the transport is stopped or paused the line itself is a handle
+ * (windsor#102): its `bar.beat.sixteenth` label takes the press, brightens
+ * the line on hover, and a drag moves the line to the nearest bar line and
+ * seeks the transport there on release (`playheadDrag.ts` holds the rules).
+ * While it plays the label takes no press, so the ruler under it zooms as
+ * before.
  */
 import { TICKS_PER_BAR } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import type { PlayheadDrag, PlayheadDragEvent } from './playheadDrag';
+import { barTick, canDragPlayhead, pressStartsDrag, stepPlayheadDrag } from './playheadDrag';
 import { watchPlayhead } from './stepStrip';
 import { formatPosition } from './transportModel';
 import { beatTickPx, rulerLabelEvery, rulerLabels } from './songViewTables';
@@ -189,7 +198,9 @@ export function wireRulerZoom(zoom: RulerZoom): RulerZoomHandle {
     step({ type: 'lost', pointerId: e.pointerId }),
   );
   lanes.addEventListener('dblclick', (e) => {
-    if (!onRuler(lanes, e)) return;
+    // The playhead's handle sits over the ruler: a double-click on it is two presses on the line, not a fit.
+    const onLine = e.target instanceof Element && e.target.closest('.ph-line') !== null;
+    if (onLine || !onRuler(lanes, e)) return;
     // Both presses have released by now; end anything a lost event left live before fitting.
     step({ type: 'blur' });
     applyZoom(zoom, zoomToFit(measureBounds(zoom, state.pxPerBar)));
@@ -210,6 +221,99 @@ function onRuler(lanes: HTMLElement, e: MouseEvent): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
+export interface PlayheadDragWire {
+  ctx: AppCtx;
+  /** The lanes grid, which holds the ruler the pointer is measured against. */
+  lanes: HTMLElement;
+  /** The line from `playheadLine`; its label is the handle. */
+  line: HTMLElement;
+  /** The view's zoom, read at every move. */
+  pxPerBar(): number;
+  bars(): number;
+  songTicks(): number;
+  /** Called with the transport's position once a drag ends: the harmony lane lights its block. */
+  onTick(tick: number): void;
+}
+
+/** The drag as the view's playhead loop sees it. */
+export interface PlayheadDragHandle {
+  /** A drag is in progress: the loop leaves the line where the pointer put it. */
+  readonly dragging: boolean;
+  /** Per frame: show the grab affordance while the transport is halted, and end a drag it outran. */
+  sync(): void;
+}
+
+/** The pointer's px from bar 1's line: the ruler's left edge, measured at every move so a scroll is followed. */
+function rulerPx(lanes: HTMLElement, clientX: number): number {
+  const ruler = lanes.querySelector('.ruler');
+  return ruler ? clientX - ruler.getBoundingClientRect().left : Number.NaN;
+}
+
+/**
+ * Wire the playhead's handle (windsor#102): a press on the label while the
+ * transport is halted captures the pointer, every move previews the line on
+ * the snapped bar, and the release seeks there through `ctx.transport.seek`,
+ * the engine's. A cancel, a lost capture, a window blur or the transport
+ * starting mid-drag puts the line back on the transport's position. The
+ * `.seekable` class, set per frame by `sync`, is what lets the label take a
+ * press at all, so a playing line never shadows the ruler.
+ */
+export function wirePlayheadDrag(wire: PlayheadDragWire): PlayheadDragHandle {
+  const { ctx, lanes, line } = wire;
+  const handle = line.firstElementChild;
+  if (!(handle instanceof HTMLElement)) throw new Error('the playhead line has no label');
+  let drag: PlayheadDrag | null = null;
+  const grabState = () => ({ enabled: ctx.host.enabled, running: ctx.transport.running });
+  const settle = (): void => {
+    line.classList.remove('dragging');
+    const tick = ctx.transport.position();
+    placePlayhead(line, tick, wire.songTicks());
+    wire.onTick(tick);
+  };
+  const onBlur = (): void => step({ type: 'cancel' });
+  const step = (event: PlayheadDragEvent): void => {
+    const was = drag;
+    const next = stepPlayheadDrag(drag, event, { pxPerBar: wire.pxPerBar(), bars: wire.bars() });
+    drag = next.drag;
+    if (next.preview !== null) placePlayhead(line, barTick(next.preview), wire.songTicks());
+    if (!was || drag) return;
+    window.removeEventListener('blur', onBlur);
+    if (handle.hasPointerCapture(was.pointerId)) handle.releasePointerCapture(was.pointerId);
+    if (next.drop !== null) ctx.transport.seek(barTick(next.drop));
+    settle();
+  };
+  handle.addEventListener('pointerdown', (down) => {
+    if (!pressStartsDrag(down.button, grabState())) return;
+    down.preventDefault();
+    if (drag) step({ type: 'cancel' });
+    drag = { pointerId: down.pointerId, originX: down.clientX, bar: null };
+    line.classList.add('dragging');
+    try {
+      handle.setPointerCapture(down.pointerId);
+    } catch {
+      // A pointer the browser does not track: the drag still runs on the handle's own events.
+    }
+    window.addEventListener('blur', onBlur);
+  });
+  handle.addEventListener('pointermove', (e) => {
+    const { pointerId, buttons, clientX } = e;
+    step({ type: 'move', pointerId, buttons, clientX, px: rulerPx(lanes, clientX) });
+  });
+  handle.addEventListener('pointerup', (e) => step({ type: 'up', pointerId: e.pointerId }));
+  handle.addEventListener('pointercancel', () => step({ type: 'cancel' }));
+  handle.addEventListener('lostpointercapture', () => step({ type: 'cancel' }));
+  return {
+    get dragging() {
+      return drag !== null;
+    },
+    sync() {
+      const grabbable = canDragPlayhead(grabState());
+      if (drag && !grabbable) step({ type: 'cancel' });
+      line.classList.toggle('seekable', grabbable);
+    },
+  };
+}
+
 export interface SongPlayheadWatch {
   ctx: AppCtx;
   /** The lanes grid; the loop ends when it leaves the document and idles while its tab is hidden. */
@@ -220,6 +324,8 @@ export interface SongPlayheadWatch {
   onTick(tick: number): void;
   /** The lanes' own repaint check, run every shown frame before the playhead. */
   repaintIf(): void;
+  /** The line's drag (windsor#102): synced every shown frame, and the line left alone while it runs. */
+  drag: PlayheadDragHandle;
 }
 
 /** The view's one loop: the ruler line, the playing chord block, and the lanes' repaint check. */
@@ -229,9 +335,12 @@ export function watchSongPlayhead(watch: SongPlayheadWatch): void {
     shown: () => watch.lanes.closest('[hidden]') === null,
     playheadAt: () => watch.ctx.transport.position(),
     mark: (tick) => {
-      placePlayhead(watch.line, tick, watch.songTicks());
+      if (!watch.drag.dragging) placePlayhead(watch.line, tick, watch.songTicks());
       watch.onTick(tick);
     },
-    repaintIf: watch.repaintIf,
+    repaintIf: () => {
+      watch.repaintIf();
+      watch.drag.sync();
+    },
   });
 }

@@ -24,7 +24,13 @@ import { loopBraceRow } from './loopBrace';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
-import { playheadLine, rulerRow, watchSongPlayhead, wireRulerZoom } from './songRuler';
+import {
+  playheadLine,
+  rulerRow,
+  watchSongPlayhead,
+  wirePlayheadDrag,
+  wireRulerZoom,
+} from './songRuler';
 import { CYCLE_TICKS, REGION_SUMMARY, SONG_VIEW, forKind } from './songViewTables';
 
 /** What the pane shows: a part (and, when a block was clicked, which of its regions), a chord event, or nothing. */
@@ -172,12 +178,24 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
     bars: () => ctx.model.doc.transport.bars,
     repaint: () => view.paintLanes(),
   });
+  const onTick = (tick: number): void =>
+    markPlayingBlock(lanes, ctx.model.doc, view.songTicks(), tick);
+  const drag = wirePlayheadDrag({
+    ctx,
+    lanes,
+    line,
+    pxPerBar: () => state.pxPerBar,
+    bars: () => ctx.model.doc.transport.bars,
+    songTicks: view.songTicks,
+    onTick,
+  });
   watchSongPlayhead({
     ctx,
     lanes,
     line,
     songTicks: view.songTicks,
-    onTick: (tick) => markPlayingBlock(lanes, ctx.model.doc, view.songTicks(), tick),
+    onTick,
+    drag,
     repaintIf: () => {
       const now = laneSignature(ctx);
       if (now === signature) return;

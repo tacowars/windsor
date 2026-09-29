@@ -296,6 +296,15 @@ export class AudioSystem {
   }
 
   /**
+   * Move the stopped or paused transport to `tick` (windsor#102): release,
+   * clear the region state, and start from there next (`MusicPlayback.seek`).
+   * False, changing nothing, while running or before `initMusic`.
+   */
+  seekMusic(tick: number): boolean {
+    return this.playback.seek(tick);
+  }
+
+  /**
    * Live tuning over the document model (refinement decision 3; issue #75):
    * merge a partial document over the current state. Arrangement fields go
    * through the player — a merged arrangement that fails validation changes

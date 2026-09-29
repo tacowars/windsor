@@ -144,6 +144,12 @@ describe('the console transport (#708): ▶ ■ ‖ over the live system', () =>
         sys.running = false;
         sys.tick = 0;
       },
+      seekMusic(tick: number): boolean {
+        sys.calls.push(`seek ${tick}`);
+        if (sys.running) return false;
+        sys.tick = tick;
+        return true;
+      },
       setMuted(muted: boolean): void {
         sys.calls.push(muted ? 'mute' : 'unmute');
         sys.muted = muted;
@@ -184,6 +190,22 @@ describe('the console transport (#708): ▶ ■ ‖ over the live system', () =>
     expect(transport.state).toBe('idle');
     expect(transport.position()).toBe(0);
     expect(system.calls).toEqual(['unmute', 'start', 'mute', 'unmute', 'start', 'stop']);
+  });
+
+  it('seek (windsor#102) is the engine seek, keeping the state; refused while playing or before audio', () => {
+    expect(new HostTransport(() => null).seek(96)).toBe(false);
+    const system = fakeSystem();
+    const transport = new HostTransport(() => system);
+    expect(transport.seek(192)).toBe(true);
+    expect(transport.position()).toBe(192);
+    expect(transport.state).toBe('idle');
+    transport.play();
+    expect(transport.seek(96)).toBe(false);
+    transport.pause();
+    expect(transport.seek(96)).toBe(true);
+    expect(transport.state).toBe('paused');
+    expect(transport.position()).toBe(96);
+    expect(system.calls).toEqual(['seek 192', 'unmute', 'start', 'seek 96', 'mute', 'seek 96']);
   });
 
   it('‖ on an idle transport neither mutes nor changes state', () => {

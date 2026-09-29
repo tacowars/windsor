@@ -1,7 +1,8 @@
 /**
  * `MusicPlayback` on its own: a real `Scheduler` on the fake context and a
  * recording stand-in for the player. Start is a no-op before a player or while
- * muted; mute keeps the tick and stop rewinds it (#708); the queries forward
+ * muted; mute keeps the tick and stop rewinds it (#708); seek moves a halted
+ * transport and refuses a running one (windsor#102); the queries forward
  * to the player and answer "nothing" without one.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -100,6 +101,58 @@ describe('MusicPlayback transport', () => {
     expect(player.releaseAll).toHaveBeenCalledTimes(2);
     expect(player.reset).toHaveBeenCalledTimes(1);
     expect(playback.isMuted).toBe(true);
+  });
+});
+
+describe('MusicPlayback.seek (windsor#102)', () => {
+  const BAR = 96;
+
+  it('refuses before a player is loaded', () => {
+    const { playback, scheduler } = rig();
+    expect(playback.seek(4 * BAR)).toBe(false);
+    expect(scheduler.transport.currentTick).toBe(0);
+  });
+
+  it('moves a stopped transport, releasing and clearing the region state', () => {
+    const { context, scheduler, playback, player, load } = rig();
+    load();
+    expect(playback.seek(4 * BAR)).toBe(true);
+    expect(scheduler.transport.currentTick).toBe(4 * BAR);
+    expect(scheduler.audibleTick(context.currentTime)).toBe(4 * BAR);
+    expect(player.releaseAll).toHaveBeenCalledWith(context.currentTime);
+    expect(player.reset).toHaveBeenCalledTimes(1);
+    playback.start();
+    expect(playback.running).toBe(true);
+    expect(scheduler.transport.currentTick).toBe(4 * BAR);
+  });
+
+  it('moves a paused transport, and unmuting resumes from the new tick', () => {
+    const { scheduler, playback, player, load, advance } = rig();
+    load();
+    playback.start();
+    advance(2);
+    playback.setMuted(true);
+    const paused = scheduler.transport.currentTick;
+    expect(playback.seek(BAR)).toBe(true);
+    expect(playback.isMuted).toBe(true);
+    expect(player.reset).toHaveBeenCalledTimes(1);
+    playback.setMuted(false);
+    expect(playback.running).toBe(true);
+    expect(scheduler.transport.currentTick).toBe(BAR);
+    expect(scheduler.transport.currentTick).not.toBe(paused);
+  });
+
+  it('refuses while playing, changing nothing', () => {
+    const { scheduler, playback, player, load, advance } = rig();
+    load();
+    playback.start();
+    advance(1);
+    const tick = scheduler.transport.currentTick;
+    expect(playback.seek(4 * BAR)).toBe(false);
+    expect(scheduler.transport.currentTick).toBe(tick);
+    expect(playback.running).toBe(true);
+    expect(player.releaseAll).not.toHaveBeenCalled();
+    expect(player.reset).not.toHaveBeenCalled();
   });
 });
 
