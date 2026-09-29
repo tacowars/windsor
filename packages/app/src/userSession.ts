@@ -40,6 +40,8 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
     report: (message) => ctx.notify(message, 'error'),
   });
   ctx.model.onChange(() => autosave.schedule());
+  // A restore that renamed its generic parts on load (windsor#103) saves that now.
+  if (restored && ctx.model.changed) autosave.schedule();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void autosave.flush();
   });

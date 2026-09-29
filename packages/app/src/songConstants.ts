@@ -20,3 +20,9 @@ export const NEW_SONG_HARMONY = { root: 0, scale: 'naturalMinor' } as const;
 
 /** A part's default label: `Part 1` for slot 0. */
 export const partLabelFor = (slot: number): string => `Part ${slot + 1}`;
+
+/**
+ * How many user-visible characters (graphemes) of a patch's name a generic
+ * part takes when it is first given that patch (windsor#103).
+ */
+export const PART_AUTO_NAME_LENGTH = 6;
