@@ -4,6 +4,7 @@ import type { PresetFilter, PresetListing } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { el, select } from './dom';
+import { withGesture } from './gestureHooks';
 import { library, libraryPatch, listLibrary } from './libraryModel';
 import { assignPatchFields } from './partAutoName';
 
@@ -20,6 +21,19 @@ export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
     ...partChange(slot, assignPatchFields(ctx.model.doc, slot, name, patch.name)),
     patches: { [name]: clonePatch(patch) },
   }).ok;
+}
+
+/**
+ * Choosing a preset, and what the pick sets off (`onPick`: the rail reload and
+ * the Init discard, `dropInit`), as one undo step (windsor#130 decision 7).
+ * True when the preset loaded.
+ */
+export function pickPreset(ctx: AppCtx, slot: number, name: string, onPick: () => void): boolean {
+  return withGesture('Choose preset', () => {
+    if (!choosePreset(ctx, slot, name)) return false;
+    onPick();
+    return true;
+  });
 }
 
 function filterControls(entries: PresetListing[], refresh: () => void): HTMLElement {
@@ -110,8 +124,7 @@ export function presetBrowser(
   const apply = (focusLabel: string): void => {
     guard(() => {
       const named = partAt(ctx.model.doc, slot)?.name;
-      if (choosePreset(ctx, slot, results.value)) {
-        onPick();
+      if (pickPreset(ctx, slot, results.value, onPick)) {
         // A generic part just took its patch's name (windsor#103): the part picker shows it too.
         if (partAt(ctx.model.doc, slot)?.name !== named) ctx.render();
         document.querySelector<HTMLElement>(`[aria-label="${focusLabel}"]`)?.focus();

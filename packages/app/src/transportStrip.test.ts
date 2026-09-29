@@ -7,7 +7,12 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { FakeElement, fakeEvent, openGestureConsole } from './__fixtures__/gestureConsole';
+import { settleGestures } from './gestureHooks';
+import { tapHandler } from './transportStrip';
+import { TAP_TEMPO } from './transportTables';
 
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -57,5 +62,49 @@ describe('the transport strip in the page', () => {
     expect(read('./main.ts')).toContain("mountTransportStrip(ctx, $('transportStrip'))");
     const arrangement = read('./arrangementTab.ts');
     expect(arrangement).not.toContain("section('Transport'");
+  });
+});
+
+describe('tap tempo as an undo step (windsor#130)', () => {
+  let clock = 0;
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', new EventTarget());
+    clock = 0;
+  });
+  afterEach(() => {
+    settleGestures();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** A tap on the press, then `gapMs` of quiet on the fake clock. */
+  function tapThen(onTap: (e: MouseEvent) => void, gapMs: number): void {
+    onTap(fakeEvent('pointerdown') as MouseEvent);
+    clock += gapMs;
+    vi.advanceTimersByTime(gapMs);
+  }
+
+  it('makes a sequence of taps one step, and a sequence after the tap window another', () => {
+    const ctx = openGestureConsole();
+    const start = ctx.model.doc.transport.bpm;
+    const onTap = tapHandler(
+      ctx,
+      new FakeElement(),
+      () => {},
+      () => clock,
+    );
+    for (let i = 0; i < 5; i++) tapThen(onTap, 600);
+    expect(ctx.model.doc.transport.bpm).toBe(100);
+    tapThen(onTap, TAP_TEMPO.resetMs);
+    for (let i = 0; i < 4; i++) tapThen(onTap, 400);
+    tapThen(onTap, TAP_TEMPO.resetMs);
+    expect(ctx.model.doc.transport.bpm).toBe(150);
+    expect(ctx.undoLabel).toBe('Tap tempo');
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.model.doc.transport.bpm).toBe(100);
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.model.doc.transport.bpm).toBe(start);
+    expect(ctx.canUndo).toBe(false);
   });
 });

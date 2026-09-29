@@ -7,6 +7,8 @@
  * functions (`transportModel.ts`); this file only wires pointer and keys.
  */
 import { el } from './dom';
+import { dragGesture } from './gestureHooks';
+import type { OpenGesture } from './gestureHooks';
 import { pressMove, startsPress, typedEntry } from './transportModel';
 
 export interface NumberBoxSpec {
@@ -46,22 +48,28 @@ function boxInput(spec: NumberBoxSpec): HTMLInputElement {
  * Press anywhere in the box (the number or its unit), drag past the threshold
  * to sweep; release without a drag to type. The gesture lives on the whole
  * box, the surface that shows the ns-resize cursor and refuses touch panning.
+ * A press is one undo step named after the box (windsor#130 decision 5),
+ * closed on release or, when the box never hears one, by the window. Exported
+ * for its test, which drives it over stand-in elements.
  */
-function attachDrag(
+export function attachDrag(
   box: HTMLElement,
   input: HTMLInputElement,
   spec: NumberBoxSpec,
   show: () => void,
 ): void {
-  let press: { y: number; start: number; moved: boolean } | null = null;
+  let press: { y: number; start: number; moved: boolean; step: OpenGesture } | null = null;
   box.addEventListener('pointerdown', (e) => {
     const typing = document.activeElement === input;
     if (!startsPress(e.button, e.target === input, typing)) return;
-    press = { y: e.clientY, start: spec.get(), moved: false };
+    press?.step.close();
+    press = { y: e.clientY, start: spec.get(), moved: false, step: dragGesture(spec.label) };
     box.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
   box.addEventListener('pointermove', (e) => {
+    // A press the window ended (a release outside the browser, a blur) moves nothing more.
+    if (press && !press.step.open) press = null;
     if (!press) return;
     const upPx = press.y - e.clientY;
     const move = pressMove(press.moved, upPx, e.buttons);
@@ -78,6 +86,7 @@ function attachDrag(
   const release = (e: PointerEvent, typing: boolean): void => {
     if (!press) return;
     const clicked = !press.moved;
+    press.step.close();
     press = null;
     if (box.hasPointerCapture(e.pointerId)) box.releasePointerCapture(e.pointerId);
     if (typing && clicked) {

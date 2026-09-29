@@ -15,6 +15,7 @@ import {
 } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
+import { withGesture } from './gestureHooks';
 import { INIT_PATCH_NAME, initPresetId, isInitPreset } from './libraryConstants';
 import type { LibraryModel } from './libraryModel';
 import { isWritable, removeLibraryFile, writeLibraryFile } from './libraryModel';
@@ -183,9 +184,12 @@ export async function copyToNew(request: WriteRequest): Promise<string> {
   ]);
   const file = buildPatchFile(meta, working);
   await writeLibraryFile(library, id, patchFileText(file), request.download);
-  const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
-  ctx.change({ ...partChange(slot, fields), patches: { [id]: file.patch } });
-  if (wasInit) dropInit(ctx);
+  // The switch and the Init discard it sets off are one undo step (windsor#130 decision 7).
+  withGesture('Copy to new', () => {
+    const fields = assignPatchFields(ctx.model.doc, slot, id, file.patch.name);
+    ctx.change({ ...partChange(slot, fields), patches: { [id]: file.patch } });
+    if (wasInit) dropInit(ctx);
+  });
   return id;
 }
 
