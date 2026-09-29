@@ -1,0 +1,26 @@
+{
+  "environment": {
+    "cpu": "Apple M1",
+    "arch": "arm64",
+    "os": "25.5.0",
+    "node": "v22.22.3",
+    "v8": "12.4.254.21-node.56",
+    "browser": "none",
+    "backend": "source-bundled DSP in Node; no audio device"
+  },
+  "parity": {
+    "smooth": {
+      "identicalDoubleSamples": 1689600
+    },
+    "cache": {
+      "identicalDoubleSamples": 1689600
+    },
+    "decimate": {
+      "identicalDoubleSamples": 1689600
+    },
+    "combined": {
+      "identicalDoubleSamples": 1689600
+    }
+  },
+  "benchmarks": []
+}
