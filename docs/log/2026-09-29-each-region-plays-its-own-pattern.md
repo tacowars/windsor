@@ -1,8 +1,8 @@
 # Each region plays its own pattern
 
 - **Date:** 2026-09-29
-- **Status:** accepted (Pat, 2026-09-29, epic windsor#70 "Design";
-  decision 7 by the main session while Pat was away)
+- **Status:** accepted (tacowars, 2026-09-29, epic windsor#70 "Design";
+  decision 7 by the main session while tacowars was away)
 - **Links:** epic windsor#70 · windsor#73 (this seam) · windsor#74 (the
   player) · windsor#75, windsor#76 (the console)
 - **Closes:** the deferred line of
@@ -15,7 +15,7 @@
 Since #705 a part has one `sequencer` and a list of `regions`, and a region
 is only a window, `{ start, duration }`, where that one pattern is live.
 Changing a chord step's inversion, the steps, the octave or the base step
-in one region changes every region of the part. Pat wants regions to work
+in one region changes every region of the part. tacowars wants regions to work
 like clips in Ableton: two regions of one chord part, one under each of two
 harmony events, can voice and rhythm their chords differently. The same
 holds for every sequencer kind: chord, grid (with its step modulation
@@ -41,7 +41,7 @@ lanes), arp, bass and euclid.
    fields.
 4. **The pattern is optional on the region.** A region without `pattern`
    plays `part.sequencer`. The console gives a region its own full copy
-   the first time the region is edited, split or drawn, so what Pat sees
+   the first time the region is edited, split or drawn, so what tacowars sees
    is clip-style throughout, and `part.sequencer` is never edited again
    except by a kind change. A drawn region copies its left neighbour (the
    nearest region that starts before it); a split gives both halves a
@@ -72,7 +72,7 @@ lanes), arp, bass and euclid.
   field (does a region's `steps` replace the part's or merge with it? what
   does a region inherit when the part's gate changes?). A whole pattern per
   region has none: what a region plays is what it holds. It is also what
-  Pat asked for: two regions of one part, each set on its own and each
+  tacowars asked for: two regions of one part, each set on its own and each
   heard on its own.
 - **Optional on the region.** A required pattern would have to be written
   into every region of every song at once, by a migration and a format
@@ -80,7 +80,7 @@ lanes), arp, bass and euclid.
   would have to land together to keep the app building and playing. With
   the pattern optional, each lands alone: after this seam nothing plays
   differently, after the player a region with a pattern is heard, and
-  after the console Pat can make one.
+  after the console tacowars can make one.
 - **The seed on the part.** The stream per region is already the part's
   seed hashed with the region's index, so every region already plays its
   own stream; a seed per region would add a second way to say the same
@@ -99,5 +99,5 @@ lanes), arp, bass and euclid.
   editing regions one by one gets tedious (epic windsor#70, out of scope).
 - A required `pattern` with a version-4 upgrade that copies
   `part.sequencer` into every region. It is the cleaner end state, and it
-  may follow once the chain has landed; it is not needed for Pat to hear
+  may follow once the chain has landed; it is not needed for tacowars to hear
   and edit regions separately.

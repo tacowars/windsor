@@ -9,8 +9,8 @@
 
 ## Decision
 
-Refined with Pat on 2026-09-17 from a brief modelled on Scaler 2; points 1,
-3, 4, 7 and 12 are the refiner's reading of that brief, the rest Pat's own
+Refined with tacowars on 2026-09-17 from a brief modelled on Scaler 2; points 1,
+3, 4, 7 and 12 are the refiner's reading of that brief, the rest tacowars's own
 calls at refinement.
 
 1. **A new kind, `chord`**, beside `grid` and `step`: a written progression
@@ -35,7 +35,7 @@ calls at refinement.
 5. **Roman numerals follow the quality**: upper case for major and
    augmented, lower for minor and diminished, `°`, `+`, `7`, `maj7`, `ø7`,
    `°7` suffixes, so C natural minor reads `i ii° III iv v VI VII`.
-6. **Inversion is per step; voicing is per part** (Pat): Scaler applies a
+6. **Inversion is per step; voicing is per part** (tacowars): Scaler applies a
    voicing to the whole chord set. Inversion rotates the close stack with
    octave carry (inversion 3 of a triad is root position an octave up; the
    written value is kept). The part's `voicing` — `close`, `drop2`, `drop3`,
@@ -49,14 +49,14 @@ calls at refinement.
    segment starts. A part-level `gate` in (0, 1] sets a chord's length as a
    fraction of its step; at 1 the offs land on the next onset's tick, before
    that onset's ons. Repeats retrigger; there are no ties.
-8. **A chip auditions through the chord part the card belongs to** (Pat),
+8. **A chip auditions through the chord part the card belongs to** (tacowars),
    the synth the progression will play, never the Parts tab's selection.
    Dragging a chip or the Rest tile onto a step replaces the step's chord and
    keeps its timing. Pointer-capture drag, as `envelopeDrag.ts`.
 9. **Capture does not apply**; no recorder, no Capture button.
-10. **A chord part opens blank** (Pat): no steps, silent until a chord is
+10. **A chord part opens blank** (tacowars): no steps, silent until a chord is
     dropped in; `steps` may be empty and an empty list is never defaulted.
-11. **Note names are spelled with sharps** (Pat), as `noteName` already does.
+11. **Note names are spelled with sharps** (tacowars), as `noteName` already does.
 12. **A voicing yields at most six notes**; a mono patch hears the top one.
     `MUSIC_PART_MAX_VOICES` is not raised.
 13. **Every edit but the kind reconfigures live** (#603's rule): the
@@ -71,7 +71,7 @@ calls at refinement.
 
 ## Why
 
-Pat wants to program chord progressions that match the key and scale chosen
+tacowars wants to program chord progressions that match the key and scale chosen
 on the Harmony tab, the way Scaler does it: pick from the key's own chords,
 see the analysis, hear a chord before placing it, and shape each step's
 timing, repeat, octave, inversion and shift.
@@ -89,9 +89,9 @@ out in ticks and subscribes at the tick rather than at a divisor.
 - **Chords as a grid step field.** Rejected (decision 1).
 - **A fixed chord table per named scale.** Rejected: custom scales would have
   no chords.
-- **Voicing per step.** Rejected by Pat for Scaler's per-set voicing.
+- **Voicing per step.** Rejected by tacowars for Scaler's per-set voicing.
 - **Auditioning through the Parts tab's selected part**, as the brief first
-  read. Rejected by Pat: the chord part is what the step will sound like.
+  read. Rejected by tacowars: the chord part is what the step will sound like.
 - **Flat spelling for flat keys.** Sharps only for now; a spelling-by-key
   pass can come later without touching the document.
 - **Per-step velocity, ties across repeats, strums, ninths.** Not asked for;

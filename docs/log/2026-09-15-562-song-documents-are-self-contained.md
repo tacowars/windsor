@@ -50,7 +50,7 @@ path that section is the **only** table a part's `preset` resolves against.
 
 The library is going to keep improving (#563 makes it editable from the
 browser), and until this ticket improving it silently re-authored the game's
-music: `bed-01` named `kick` and got whatever `kick` had become. Pat's decision
+music: `bed-01` named `kick` and got whatever `kick` had become. tacowars's decision
 2 on the epic is that a song plays exactly the patches it was exported with,
 which only holds if the document is the whole record and the resolver has no
 other table to reach for.
@@ -70,7 +70,7 @@ the seeded worklet and asserts the Float32 buffer is sample-identical, by
 `patchLeafDifferences` on the values, and a sensitivity case proving one
 changed operator ratio does move the samples. That is the computed proof that
 embedding changed no sound, and its "before" case is built in the test rather
-than pinned as a literal or a hash, per Pat's rule on tunables.
+than pinned as a literal or a hash, per tacowars's rule on tunables.
 
 (`arrangementEquality.test.ts` proves the *arrangement* is unchanged — which
 part fires on which tick, through which strip — and deliberately cannot see a
@@ -80,7 +80,7 @@ passes caught an earlier draft of this PR claiming otherwise.)
 It does couple that test to four of the library's 114 patches: deliberately
 re-tuning `kick`, `hat`, `saw-arp` or `drone-sqr` fails it. That failure is the
 intended alarm, not churn — it is the moment someone decides whether `bed-01`
-re-embeds the new patch or keeps the one Pat approved by ear on PR #81, which
+re-embeds the new patch or keeps the one tacowars approved by ear on PR #81, which
 is exactly the decision this ticket exists to make visible. Every other library
 patch is free to move: no song references it.
 
@@ -113,6 +113,6 @@ patch is free to move: no song references it.
 library's and called a later mismatch "the intended alarm" for deciding
 whether `bed-01` re-embeds. Decision 2 already decides that: a song keeps its
 snapshot until it is re-exported, so the library drifting from the song is the
-designed state, not an alarm. Pat's first library save (`kick`) failed the test
+designed state, not an alarm. tacowars's first library save (`kick`) failed the test
 on main. #583 deletes it; the proof is PR #573's history. `arrangementEquality.test.ts`
 stays, since it proves the arrangement rather than the timbre.

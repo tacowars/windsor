@@ -7,7 +7,7 @@ dist/
 .claude/settings.local.json
 .vite/
 coverage/
-# Pat's working songs, kept out of the repo for now (approved 2026-09-28).
+# tacowars's working songs, kept out of the repo for now (approved 2026-09-28).
 songs/
 
 # Claude session handoffs: local notes between sessions, never published.

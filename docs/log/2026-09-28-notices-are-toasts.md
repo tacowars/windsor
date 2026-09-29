@@ -1,7 +1,7 @@
 # Notices are toasts, not a header status line
 
 - **Date:** 2026-09-28
-- **Status:** accepted (Pat asked for it on 2026-09-28)
+- **Status:** accepted (tacowars asked for it on 2026-09-28)
 
 ## Context
 

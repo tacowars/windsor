@@ -6,8 +6,8 @@
   scope exception on the terms of
   `docs/log/2026-08-31-audio-enters-tech-demo-scope.md`
 
-The reference point Pat gave was **Plateau** (Valley Audio, VCV Rack), and the
-implementation Pat linked was **`khoin/DattorroReverbNode`**. Those are not the
+The reference point tacowars gave was **Plateau** (Valley Audio, VCV Rack), and the
+implementation tacowars linked was **`khoin/DattorroReverbNode`**. Those are not the
 same thing, and they carry different licences. This record pins which one the
 code descends from, why the difference matters legally, and the structural
 choices that fell out — because "it's the Dattorro reverb" is the sentence a

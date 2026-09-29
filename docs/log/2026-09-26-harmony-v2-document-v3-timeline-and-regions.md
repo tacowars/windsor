@@ -6,7 +6,7 @@
 
 ## Decision
 
-Epic #703's decisions 2, 3, 5–11 and 15–17 (Pat, 2026-09-26, from the
+Epic #703's decisions 2, 3, 5–11 and 15–17 (tacowars, 2026-09-26, from the
 transcript and the mockups), as the code now states them:
 
 1. **Document version 3, a clean break** (decisions 3, 4). `version: 3` is
@@ -14,7 +14,7 @@ transcript and the mockups), as the code now states them:
    refused with "version 2 is not supported since #705" and, like every
    other unusable document, falls back to the metronome. No migration; no
    song ports — the placeholder `arrangements/bed-01.json` is rewritten by
-   hand and Pat composes fresh songs in the tool.
+   hand and tacowars composes fresh songs in the tool.
 2. **The song has an explicit length** (decision 5): `transport: { bpm,
    bars }`, `songTicks = bars × TICKS_PER_BAR`. The transport's absolute
    tick never wraps; every timeline lookup is `tick mod songTicks`. 4/4 stays
@@ -105,7 +105,7 @@ transcript and the mockups), as the code now states them:
 - The overlap rule: the epic's "each end clamped to the next start" (the
   earlier region yields) is implemented; the ticket's acceptance line reads
   as the later region's start moving, which is the other resolution of the
-  same overlap — flagged in the PR for Pat to confirm. Confirmed (Pat,
+  same overlap — flagged in the PR for tacowars to confirm. Confirmed (tacowars,
   2026-09-27): the implemented rule stands.
 - `transport.bars` shrinking live: the document is renormalised (regions and
   events clamped) while the running player keeps its merged regions; the

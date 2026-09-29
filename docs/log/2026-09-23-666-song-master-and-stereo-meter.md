@@ -1,7 +1,7 @@
 # A song master before the game Music volume
 
 Ticket #666, following the folder move in #655 and compressor in #660.
-Pat approved the master as the whole song, including returns. Post-FX
+tacowars approved the master as the whole song, including returns. Post-FX
 sidechains and silent triggers follow in #667; no Pre-Level synth output.
 
 1. The existing dry-only 30 Hz highpass stays before the sum. Its output and

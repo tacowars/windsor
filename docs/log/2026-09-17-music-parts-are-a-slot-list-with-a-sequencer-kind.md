@@ -29,19 +29,19 @@ longer read.
   why bed-01 is sample-identical.
 - **`sequencer.kind` is `euclidean | arp | step | none`.** Each kind carries its
   generator's driver fields. `euclidean` also carries `note` and `hold` (it
-  stays a fixed-note trigger wherever it sits, per Pat), and a note or hold
+  stays a fixed-note trigger wherever it sits, per tacowars), and a note or hold
   change does not rebuild its stream. A kind change replaces the sequencer
   wholesale and rebuilds only that part. An absent sequencer normalises to
   `none`, silently.
-- **`none` is inert (Pat, 2026-09-17).** A `none` part builds its engine part
+- **`none` is inert (tacowars, 2026-09-17).** A `none` part builds its engine part
   and strip, so the keyboard and MIDI can play it, and every sequencing path
   skips it, reseeds included. It is allowed anywhere, including a committed
   song. `isShippable` still requires at least one sequenced part, so a song made
   only of `none` parts fails the verify gate the way an empty song always has.
-- **Each part owns its strip** (Pat's choice over a name-keyed `mix` section).
+- **Each part owns its strip** (tacowars's choice over a name-keyed `mix` section).
   A strip normalises over `DEFAULT_STRIP`; a send to an undefined return is
   dangling. `MIX` keeps only the SFX strips.
-- **Old files are converted once, not read (Pat's choice).** The four-slot
+- **Old files are converted once, not read (tacowars's choice).** The four-slot
   shape normalises to unusable with a correction naming the retired format.
   `bed-01.json` was converted by a one-time script and proved sample-identical
   against a baseline captured on the four-slot code: master, plate and delay
@@ -54,7 +54,7 @@ longer read.
 
 ## Why
 
-Pat wants any arrangement of sequencers, such as four arpeggiators, or three
+tacowars wants any arrangement of sequencers, such as four arpeggiators, or three
 Euclidean parts and a drone, and a part count that follows the piece rather
 than the code. Keying parts by a slot number, not a name, keeps the two
 guarantees the four-slot design had: a stable per-part random stream, and a

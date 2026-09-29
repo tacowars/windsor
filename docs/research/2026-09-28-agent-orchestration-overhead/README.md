@@ -21,7 +21,7 @@
   3. Surveyed: Anthropic's current docs (Claude Code agents, subagents, agent
      teams, workflows, worktrees, projects; the Opus 5.5, Fable 5 and 5.1
      prompting guides) and community sources from 2026. Sources at the end.
-- **Machine:** transcripts read on Pat's Mac (Darwin 25.5), Claude Code
+- **Machine:** transcripts read on tacowars's Mac (Darwin 25.5), Claude Code
   2.1.26x to 2.1.28x. Durations are elapsed time and include permission
   prompts and any human absence.
 
@@ -109,7 +109,7 @@ included, at USD 733 at list price and 4.3 M output tokens. The six
 orchestrator sessions and their sub-agents are USD 290 of that, 40%. The
 other 60% was ordinary interactive sessions. (An earlier draft of this memo
 said USD 803 and 5.9 M; the figures in `transcript-overhead-report.md` are
-the ones the script wrote.) Pat is on a Max subscription, so these dollars
+the ones the script wrote.) tacowars is on a Max subscription, so these dollars
 are a proxy for allowance drawn, not a bill; see section 9.
 
 Some implementer runs are follow-up rounds on the same ticket, so a
@@ -278,7 +278,7 @@ the gate out of the model.
    outside the owned folders, and the decision record if one was made. A
    sub-agent's final message is a few lines with the PR number. Keep
    `.claude/handoffs/` for the human's own long sessions, not per ticket.
-6. **One writer to main.** Pat merges, in dependency order, smallest blast
+6. **One writer to main.** tacowars merges, in dependency order, smallest blast
    radius first, squash, rebase only on a real conflict. Batch review PRs.
    Retry an agent at most twice on a red check, then hand to a human.
 7. **Effort and time.** Implementers at `medium` on Opus 5.5 (or the Claude
@@ -293,14 +293,14 @@ the gate out of the model.
    a target for shipping a feature. Section 8 adds the delivery measures
    that transcripts alone cannot give.
 
-What this gives up: the orchestrator's live relay to Pat (replaced by PR
+What this gives up: the orchestrator's live relay to tacowars (replaced by PR
 notifications and the idle notification of a background session), and the
 per-ticket metrics commit (replaced by the script run per wave). The Codex
 pass stays, for the reason in section 9.
 
 ## 8. Review of the refined memo
 
-Pat asked a second model for advice and a separate session wrote
+tacowars asked a second model for advice and a separate session wrote
 `../2026-09-28-agent-orchestration-refined/README.md` with a source audit.
 This section records what that memo adds to the recommendation above, what
 it corrects, and where it does not fit the goal.
@@ -310,7 +310,7 @@ it corrects, and where it does not fit the goal.
 - **Backpressure across the whole delivery process.** A worker finishing a
   PR is not free capacity: the PR still needs review and integration. Count
   unmerged PRs and scarce resources, not running agents. Rule for Windsor:
-  pause dispatch when two PRs are waiting for Pat.
+  pause dispatch when two PRs are waiting for tacowars.
 - **Eligibility is three checks, not one label.** Prerequisites landed,
   likely shared edits do not collide with active work, needed resources
   free. A `ready` label plus self-assignment does not stop two workers
@@ -337,7 +337,7 @@ it corrects, and where it does not fit the goal.
   apart, browser automation and audio benchmarks serialised. No database
   or container per ticket for a static site.
 - **Measure delivery, not just tokens.** Time from ready to accepted
-  merge, Pat's intervention minutes, CI and review waiting, infrastructure
+  merge, tacowars's intervention minutes, CI and review waiting, infrastructure
   retries, integration rework, defects found after merge. The transcript
   script gives context and tool-call diagnostics; PR and review timestamps
   give the rest. Compare one worker against two on similar tasks before
@@ -380,7 +380,7 @@ workers needs an Actions projection from PR events, or no board.
 
 ## 9. The subscription constraint
 
-Pat runs on a Claude Max subscription with usage credits off, plus a
+tacowars runs on a Claude Max subscription with usage credits off, plus a
 ChatGPT Pro subscription for Codex. There is no API budget. That changes
 what "token efficient" means: the unit is the rolling allowance window, not
 dollars, and there are two independent pools.
@@ -431,14 +431,14 @@ reviews count; extra credits are optional and off unless bought.
    host, so give it tickets whose checks run headless). That review costs
    the Claude allowance nothing.
 2. **Concurrency is set by the window, not the machine.** Two Claude
-   workers plus Pat's own session is the starting cap, matching both the
+   workers plus tacowars's own session is the starting cap, matching both the
    Vitest contention measurement and the usage-limit trips. Read `/usage`
    attribution after each wave.
 3. **Spread models across families.** Implementers on Opus 5.5 at
    `medium`; Explore, verifier and look sub-agents on Sonnet 5 at `low`.
    That keeps the Opus bucket for the work that needs it and matches the
    docs' own advice for sub-agents.
-4. **No long-lived hub.** Dispatch from Pat's session or a script, let
+4. **No long-lived hub.** Dispatch from tacowars's session or a script, let
    workers end their turn on the PR, and read PR state. Every idle hour of a
    waiting hub is a cold re-read on wakeup.
 5. **Prefer local over cloud for repair.** Cloud sessions are allowed and

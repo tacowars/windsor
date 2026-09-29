@@ -1,4 +1,4 @@
-# bed-01 is Pat's song; the reference twin of the TypeScript arrangement is a fixture
+# bed-01 is tacowars's song; the reference twin of the TypeScript arrangement is a fixture
 
 - Date: 2026-09-17
 - Area: audio
@@ -9,9 +9,9 @@
 
 ## Decision
 
-Pat replaced `arrangements/bed-01.json` with a new song of his own on
+tacowars replaced `arrangements/bed-01.json` with a new song of his own on
 2026-09-17 and, asked whether to restore the old file and ship his as
-bed-04, chose to keep his as bed-01 (Pat, 2026-09-17). So:
+bed-04, chose to keep his as bed-01 (tacowars, 2026-09-17). So:
 
 - **`bed-01.json` is a song like any other in `arrangements/`**: the game's
   default (`DEFAULT_ARRANGEMENT_NAME`), edited in the console, and held to
@@ -35,8 +35,8 @@ fixture's four parts. The fixture keeps the codec proof; the song is free.
 
 ## Punted / alternatives
 
-- **Restore the old bed-01 and ship Pat's song as bed-04.** The smaller
-  change; rejected by Pat, who wants his song as the default.
+- **Restore the old bed-01 and ship tacowars's song as bed-04.** The smaller
+  change; rejected by tacowars, who wants his song as the default.
 - **A pre-push format check.** The commit also went to main unformatted
   (the first half of #613). The pre-push hook checks secrets and
   `.gitignore` only; adding `format:check` to it is worth a ticket, not

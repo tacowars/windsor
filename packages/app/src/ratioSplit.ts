@@ -27,7 +27,7 @@
  * The stored field's range. The floor is the console's alone — the engine and
  * `patchNormalise` accept any positive ratio — and sits four octaves under the
  * note, two under the drum bodies that `drum-bank-ratio-floor` pinned at 0.25
- * (Pat, 2026-09-18; `2026-09-18-618-console-ratio-floor-and-the-tools-lint-fence`).
+ * (tacowars, 2026-09-18; `2026-09-18-618-console-ratio-floor-and-the-tools-lint-fence`).
  */
 export const RATIO_MIN = 0.0625;
 export const RATIO_MAX = 24;

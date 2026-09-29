@@ -29,7 +29,7 @@ import {
   RATIO_MIN,
 } from './ratioSplit';
 
-/** A song whose arp slot plays the library's `lead-bell` — Pat's own check. */
+/** A song whose arp slot plays the library's `lead-bell` — tacowars's own check. */
 const SONG = {
   seed: 204,
   bpm: 96,

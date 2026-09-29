@@ -217,7 +217,7 @@ master meters, and the editor's loudness check warns before a save. The
 long-note checks (`patchLibraryEnvelope.test.ts`) hold every patch in a
 sustained category to finite, audible output through its whole envelope and
 release, and the chord families to four-note headroom. The intended
-listening verdict still belongs to Pat; mechanical checks cannot establish
+listening verdict still belongs to tacowars; mechanical checks cannot establish
 whether a sound fits the score.
 
 The classic string-machine bank (`str-*`: Solina, Oberheim, Juno, D-50,

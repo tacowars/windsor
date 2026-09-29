@@ -60,7 +60,7 @@ the low cut and before the tap, so the sends hear them.
 
 ## Why
 
-Pat asked for per-channel distortion and chorus. The registry keeps the rule
+tacowars asked for per-channel distortion and chorus. The registry keeps the rule
 that no DSP runs unless a table declares it, while letting a song choose its
 effects. The whole-list partial reuses the one array rule the document
 already has, instead of inventing index-keyed partials. The same-kinds check

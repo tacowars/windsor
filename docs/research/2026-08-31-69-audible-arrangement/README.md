@@ -4,7 +4,7 @@ Evidence that the client is audible: the four generative parts build on both
 backends, the music starts at the unlock gesture, `__a204.audio.apply` tunes
 the transport live, `M` mutes and unmutes, and `?music=0` yields a silent
 client with the whole graph still built. Captured twice: first at the
-original defaults, then re-captured in full at `9b55846` after Pat's first
+original defaults, then re-captured in full at `9b55846` after tacowars's first
 listen swapped the arp and drone to his authored patches (`saw-arp`,
 `drone-sqr` — `presetsAuthored.ts`); the files below are the re-capture. The
 audible acceptance criteria — per-return energy attribution (hall from arp
@@ -16,7 +16,7 @@ are asserted by the vitest suite on the headless graph stand-in
 **Indicative only** — development machine, not the target box. No frame or
 audio-cost number is claimed: audio CPU on the target (Ryzen 5600G / Vega 7)
 is unmeasured and outside every milestone reading (bench mode builds no
-audio). Whether the defaults are *musical* is the listening gate — Pat's
+audio). Whether the defaults are *musical* is the listening gate — tacowars's
 ear, not this record.
 
 ## Machine and browser

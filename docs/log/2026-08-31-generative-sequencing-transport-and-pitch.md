@@ -8,7 +8,7 @@
   scope exception on the terms of
   `docs/log/2026-08-31-audio-enters-tech-demo-scope.md`
 
-A design conversation with Pat, recorded before any code exists. No
+A design conversation with tacowars, recorded before any code exists. No
 implementation was written; this record is the brief the sequencing ticket
 works from.
 
@@ -17,12 +17,12 @@ sound: no code calls `createMusicPart` or `createSfxPart`, so the client has
 always been silent. This record specifies the first four parts and the
 machinery that plays them.
 
-Pat's brief, verbatim in substance: a dry kick and a hi-hat with a little
+tacowars's brief, verbatim in substance: a dry kick and a hi-hat with a little
 delay, both driven by Euclidean sequencers whose density is modulated to create
 movement over time; a short synth arpeggiator into a medium hall, up/down or
 random with random misses; and a fourth part on a step sequencer with a
 selectable step length from a whole bar down to 1/32, so that at slow settings
-it plays long drones with the pad. Pat notes the Euclidean sequencers are
+it plays long drones with the pad. tacowars notes the Euclidean sequencers are
 wanted for gameplay rhythm regardless, so they are built as reusable
 generators, not as music-only fixtures.
 
@@ -36,7 +36,7 @@ one listener. Four sequencers at four rates need many subscribers, each holding
 its own divisor **in ticks**.
 
 The grid is 24 pulses per quarter note — the MIDI-clock standard — so every
-step length Pat asked for is an exact integer:
+step length tacowars asked for is an exact integer:
 
 | Step | Ticks | | Step | Ticks |
 |---|---|---|---|---|
@@ -65,7 +65,7 @@ tested headlessly against tick counts rather than against sound.
 ### 3. Euclidean density takes one of three modulator kinds
 
 Each percussion sequencer holds `E(k, n)` with `n` fixed and `k` modulated
-between bounds. The modulator is a tagged union, chosen per sequencer — Pat
+between bounds. The modulator is a tagged union, chosen per sequencer — tacowars
 asked for all three rather than one scheme:
 
 ```ts
@@ -109,7 +109,7 @@ randomness cannot shift another's, and any pattern is reproducible in a test.
 
 ### 5. The arpeggiator holds a pool, then walks it
 
-Pat asked for both generative pitch and "up/down with random misses". These
+tacowars asked for both generative pitch and "up/down with random misses". These
 reconcile if the arp does not hold a written figure but a **pool**: it samples
 a few weighted degrees from the scale, refreshes the pool every few bars, and
 walks that pool in `up | down | updown | random` with a per-step skip
@@ -155,7 +155,7 @@ divisors, and it keeps them phase-locked for free.
 **One pitch source, many rates.** The same argument again, applied to notes.
 The arp and the drone differ in draw rate and register, nothing else.
 
-Both leave the seam in the right place for the gameplay use Pat flagged: a
+Both leave the seam in the right place for the gameplay use tacowars flagged: a
 generator that emits onsets against a tick grid is as useful to a horde's
 rhythm as to a hat, precisely because it knows nothing about audio.
 
@@ -170,7 +170,7 @@ here.
 | Rejected | Why not |
 |---|---|
 | 1/32 base grid (`stepsPerBeat` 8) | Covers the six scales and nothing else — no triplets or swing without redoing the clock |
-| 1/16 classic drum-machine grid | Puts the 1/32 hat Pat asked for out of reach |
+| 1/16 classic drum-machine grid | Puts the 1/32 hat tacowars asked for out of reach |
 | A `Scheduler` per part | Free-running clocks drift audibly within a bar |
 | Modulated rotation drift alongside density | Offered and declined; static `rotate` remains, unmodulated |
 | A written key + chord progression module | Declined in favour of emergent harmony |
@@ -181,5 +181,5 @@ here.
 
 Key, scale, degree weights, register split and the LFO periods are all
 deliberately left unset here. They are tuning by ear, not decisions by
-interview; they land as defaults in the arrangement module and move when Pat
+interview; they land as defaults in the arrangement module and move when tacowars
 listens.

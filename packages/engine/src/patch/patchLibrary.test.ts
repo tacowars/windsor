@@ -130,7 +130,7 @@ describe('the loader rejects', () => {
   const patch = real['patch'] as Patch;
 
   it('an unknown field at the top level, in the patch and in an operator', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, author: 'Pat' })).toThrow(
+    expect(() => loadPatchFile('lead-bell', { ...real, author: 'tacowars' })).toThrow(
       /unknown field author/,
     );
     expect(() => loadPatchFile('lead-bell', { ...real, patch: { ...patch, sparkle: 1 } })).toThrow(

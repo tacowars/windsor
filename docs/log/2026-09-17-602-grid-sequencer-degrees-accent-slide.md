@@ -9,7 +9,7 @@
 
 ## Decision
 
-Refined with Pat on 2026-09-17; every point below was Pat's call.
+Refined with tacowars on 2026-09-17; every point below was tacowars's call.
 
 1. **A new kind, `grid`, beside `step`.** The generative `step` sequencer
    stays the drone. The grid is a written line of 1–32 steps, looped on its
@@ -52,7 +52,7 @@ Refined with Pat on 2026-09-17; every point below was Pat's call.
 
 ## Why
 
-Pat wants a classic programmable step sequencer with 303-style slide,
+tacowars wants a classic programmable step sequencer with 303-style slide,
 accent, tie, rest and per-step octave, where an accent can be programmed
 into a patch as an acid line (gain and filter envelope together) or
 something stranger, and where every note comes from the key on the Harmony
@@ -83,9 +83,9 @@ a live retune.
 - **Clamping an out-of-scale degree to the top degree.** Flattens the line
   and collapses distinct steps to one pitch; wrap keeps the contour.
 - **A skipped step holding the previous note** rather than resting. Rest
-  is what a 303 does when a step is off; Pat chose rest.
+  is what a 303 does when a step is off; tacowars chose rest.
 - **Fixed accent amounts** (velocity 1, mod 1) with the patch doing all the
-  shaping. Pat wanted the two knobs.
+  shaping. tacowars wanted the two knobs.
 - **Patterns longer than a bar through a bar counter.** Unnecessary: the
   absolute step count already gives any length, and polymetric lines for
   free.

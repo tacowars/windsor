@@ -1,18 +1,18 @@
 # Agents check their UI in a local headless Chrome
 
 - **Date:** 2026-09-28
-- **Status:** accepted (Pat, windsor#58)
+- **Status:** accepted (tacowars, windsor#58)
 
 ## Context
 
 No agent could look at the app it had changed. The first parallel wave put
 that down to the sandbox: a dev server started by an agent never loaded in
-Claude in Chrome, so worker PRs listed manual checks and waited for Pat's
+Claude in Chrome, so worker PRs listed manual checks and waited for tacowars's
 look at the preview.
 
 The sandbox was not the cause. A dev server started from an agent's shell
-listens on this machine's `127.0.0.1` and answers `curl`, and Pat's own
-Chrome here opens it. The Claude in Chrome extension connected to Pat's
+listens on this machine's `127.0.0.1` and answers `curl`, and tacowars's own
+Chrome here opens it. The Claude in Chrome extension connected to tacowars's
 account runs on his other Mac, so its `localhost` is that machine. Public
 URLs, such as the PR previews, worked, which hid the cause.
 
@@ -25,7 +25,7 @@ the machine it runs on.
 **Register `chrome-devtools-mcp` in `.mcp.json`, headless and isolated.**
 
 - **Headless and isolated.** The Chrome opens no window and starts from a
-  temporary profile, so an agent never sees Pat's own browser data, and
+  temporary profile, so an agent never sees tacowars's own browser data, and
   each server start begins with empty IndexedDB.
 - **Pinned.** The version is pinned (1.10.1) rather than `@latest`, so a
   new release can't change what agents run without a PR.
@@ -39,8 +39,8 @@ the machine it runs on.
   worker rules carry both: `get_network_request` can hang on a response
   body that never completes and block every other call, and one agent can
   close another's page. The rules are in `.claude/worker-rules.md`.
-- **The preview stays Pat's look.** A worker's own check catches layout
-  and wiring before review; it doesn't replace Pat's look at a UI PR.
+- **The preview stays tacowars's look.** A worker's own check catches layout
+  and wiring before review; it doesn't replace tacowars's look at a UI PR.
 
 ## Provenance
 
@@ -52,7 +52,7 @@ not a dependency of the app, and nothing from it ships in `dist/`.
 ## Consequences
 
 - The first session after this merges asks to enable the project's MCP
-  server. `enableAllProjectMcpServers` is off in Pat's user settings, so he
+  server. `enableAllProjectMcpServers` is off in tacowars's user settings, so he
   approves it once, or lists it in `.claude/settings.local.json` under
   `enabledMcpjsonServers` as HOOP and Aotearoa204 do.
 - The server needs Google Chrome installed on the machine running Claude

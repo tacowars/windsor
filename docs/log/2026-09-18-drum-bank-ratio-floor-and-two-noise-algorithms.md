@@ -30,7 +30,7 @@ two engine and console facts rather than around them:
 
 Both constraints are the console's and the engine's promises, not the
 bank's: a ratio the knobs cannot show would export as 0.25 the first time
-Pat touched it, and a patch that silently took the generic loop would be the
+tacowars touched it, and a patch that silently took the generic loop would be the
 one factory sound the kernel test does not cover. Naming the note that gives
 the machine's pitch costs nothing musically — a drum part plays whatever
 note its grid says — and keeps the library's invariants intact.

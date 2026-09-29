@@ -141,7 +141,7 @@ in `docs/log/2026-09-28-parallel-workflow-without-an-orchestrator.md`.
 4. Commits, pushes, opens the PR from the template with `Fixes #N` and its
    class, and ends its turn. Its final message is the PR URL and one line.
 5. Never merges, never watches CI, never writes the board. A question only
-   Pat can answer gets the `needs-human` label and a comment, then the turn
+   tacowars can answer gets the `needs-human` label and a comment, then the turn
    ends.
 
 A code PR from this repo gets a live preview at
@@ -149,7 +149,7 @@ A code PR from this repo gets a live preview at
 comment. A UI PR's reviewer opens it from there
 (`docs/log/2026-09-28-pr-previews-on-github-pages.md`).
 
-**PR classes.** `reviewed` waits for Pat: sound design (`patches/`, the
+**PR classes.** `reviewed` waits for tacowars: sound design (`patches/`, the
 worklets, a golden change), the song document schema, persistence, a
 deviation from the issue's decisions, or a UI/UX change to layout,
 interaction or look (a new or moved control, a new gesture, a restyle).
@@ -161,13 +161,13 @@ session sets the class in the issue when it writes it. The worker keeps it
 unless the diff crosses into a `reviewed` area, and then says so in the
 PR. The main session checks the class against the diff.
 
-A `reviewed` PR merges without Pat when all four hold: nothing Pat
+A `reviewed` PR merges without tacowars when all four hold: nothing tacowars
 can click or hear changes (an engine-only or internal change a preview
 would not show); the issue's decisions agreed the design; the worker
 raised no deviation and no `needs-human` (a necessary edit outside the
 owned files, declared in the PR, is not one); and CI is green with no open
 P0 or P1 in Codex's latest review. The main session checks all four.
-Anything audible still waits for Pat's listen, and UI for Pat's look.
+Anything audible still waits for tacowars's listen, and UI for tacowars's look.
 
 **The main session** dispatches and merges. Before launching a worker it
 runs `bash scripts/overlap.sh <owned paths>` against open PRs and local
@@ -175,13 +175,13 @@ worktrees; an overlap means sequence, and a hotspot (the engine index,
 `partGenerators.ts`, the insert registry, the patch index, `main.ts`,
 `package.json`) means a `seam` ticket lands first. At most two Claude
 workers at once, one heavy test run at a time, and no new launch while two
-PRs wait for Pat. It launches each worker with the profile the issue's
+PRs wait for tacowars. It launches each worker with the profile the issue's
 "Worker" section names (`worker` or `worker-light`, in `.claude/agents/`).
 It merges with `gh pr merge <N> --squash`. `--auto` waits only for
 `verify`, not for Codex, so a routine PR merges only after Codex's 👍, and
 without `--auto` when the check is already green. It adds labels through
 the REST API, as `.claude/worker-rules.md` shows. A Codex finding at P0 or
-P1 goes to a fresh round on the same branch, at most twice, then to Pat.
+P1 goes to a fresh round on the same branch, at most twice, then to tacowars.
 
 **Backlog.** Issues. No label is backlog, `ready` is the queue, an open PR
 is in progress, closed is done. Project #6 is a view that GitHub's own

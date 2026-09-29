@@ -1,5 +1,5 @@
 /**
- * MIDI input tunables and wire numbers (#523). Pat's defaults, 2026-09-13:
+ * MIDI input tunables and wire numbers (#523). tacowars's defaults, 2026-09-13:
  * a ±2 semitone bend, every channel, linear velocity, aftertouch unmapped.
  */
 

@@ -1,6 +1,6 @@
 # Advanced drive: Roar reference and implementation brief
 
-Status: scope settled with Pat on 2026-09-26; implementation ticket #701.
+Status: scope settled with tacowars on 2026-09-26; implementation ticket #701.
 Five core routes, envelope follower plus one LFO, and the core palette are
 selected. Feedback/delay and experimental additions are deferred.
 The shipped semantics and audition steps are in
@@ -8,7 +8,7 @@ The shipped semantics and audition steps are in
 
 ## Reference and intent
 
-Pat supplied six Roar screenshots, including Acid Distortion, Drum Break
+tacowars supplied six Roar screenshots, including Acid Distortion, Drum Break
 Duster and Diode Treatment, and requested a more capable drive insert with
 shapers, filters and configurable signal paths. This is an original effect
 inspired by that workflow; no claim of matching Ableton's DSP or presets.
@@ -78,10 +78,10 @@ current seams.
 ## Scope decisions
 
 1. **Resolved:** implement Single, Serial, Parallel, three-band and Mid/Side;
-   defer internal feedback/delay routes. Pat selected this scope in the
+   defer internal feedback/delay routes. tacowars selected this scope in the
    design conversation. A separate delay after the drive is useful but
    cannot substitute for selected shapers inside a feedback loop.
-2. **Resolved:** include an input envelope follower and one LFO. Pat selected
+2. **Resolved:** include an input envelope follower and one LFO. tacowars selected
    this scope in the design conversation. Provide bipolar amounts to each
    stage's shaper amount, bias and cutoff, envelope attack/release and
    sensitivity, and a free or tempo-synced LFO.
@@ -152,5 +152,5 @@ tempo is not saved independently in the insert.
   and bounded internal state under worst-case gain/filter settings.
 - Rebuild worklets and the tracked console; run the repository finish gate.
   Inspect the console controls and retain evidence for any visual criteria.
-- Hand Pat exact recipe/audition steps. Automated checks cannot supply the
+- Hand tacowars exact recipe/audition steps. Automated checks cannot supply the
   listening verdict. No performance figure is claimed in this brief.

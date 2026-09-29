@@ -9,10 +9,10 @@
   scope exception on the terms of
   `docs/log/2026-08-31-audio-enters-tech-demo-scope.md`
 
-A design conversation with Pat, recorded before any code exists. No
+A design conversation with tacowars, recorded before any code exists. No
 implementation was written.
 
-Pat asked for one UI covering the mixer, the sequencers, the harmonic
+tacowars asked for one UI covering the mixer, the sequencers, the harmonic
 parameters and the synth patches in tabs — enough to compose the whole
 arrangement without editing source. That is a direct revisit of the mixer
 record's §9, on the trigger that record itself named: *revisit when several
@@ -48,7 +48,7 @@ Web Audio graph and loads the worklets from inlined strings via blob URLs
 patch format.
 
 The console instead runs the actual `AudioSystem`, `Scheduler`, sequencers and
-mixer. What Pat composes is then literally what the game plays, rather than
+mixer. What tacowars composes is then literally what the game plays, rather than
 what a second implementation of it sounds like.
 
 Two things make that possible, and both are small **if designed in while #68
@@ -77,7 +77,7 @@ real classes. That is the bulk of the engine-side work in #70.
 | Harmony | key, scale, degree weights, register split per part |
 | Arrangement | transport and bpm, document export/import |
 
-Pat listed LFO periods alongside the harmonic parameters; they live in
+tacowars listed LFO periods alongside the harmonic parameters; they live in
 **Sequencers**, because they modulate Euclidean density rather than pitch. The
 LFO inside a `Patch` is a different thing again and stays in Parts.
 
@@ -94,7 +94,7 @@ const arrangement = makeArrangement(raw);
 `tsconfig.base.json` needs `resolveJsonModule`; `moduleResolution` is already
 `bundler`, and Vite bundles JSON natively.
 
-This was originally specified as a runtime `fetch`, and Pat rejected that on an
+This was originally specified as a runtime `fetch`, and tacowars rejected that on an
 argument that holds: with generative audio, a document that fails to load and
 falls back to defaults is **undetectable by ear**, because sounding different
 from last time is the expected output. A runtime load needs a failure signal,
@@ -119,7 +119,7 @@ Three things fall out, all of them simplifications:
 
 ### 4. The fallback is a diagnostic click, not a musical default
 
-Pat's objection applies to fallbacks in general, not just to loading: a
+tacowars's objection applies to fallbacks in general, not just to loading: a
 hardwired musical default standing in for the real arrangement is invisible
 precisely because the real arrangement is generative.
 
@@ -219,7 +219,7 @@ is a milestone measurement (invariant 3).
 | Runtime `fetch` that falls silent on failure | Unmissable in principle, but silence has already gone undetected for this entire project and cannot distinguish a failed load from a suspended context |
 | Runtime `fetch` that throws with an on-screen banner | Better than silence, but still a signal someone has to notice; build-time import removes the failure instead |
 | Deleting the code-side arrangement entirely | Unambiguous, but #68 and #69 could then make no sound at all before #70 lands |
-| Keeping unnamed musical defaults | Exactly the invisibility Pat objected to |
+| Keeping unnamed musical defaults | Exactly the invisibility tacowars objected to |
 | Copy out and paste back in | Round-trips, but still hand-carried, and needs the same validation as a document without the benefits |
 | A hosted console persisting arrangements itself | Nothing to paste, but state lives outside the repo and the game and console can silently disagree |
 | Purely parametric, no capture | Smallest UI; when a phrase is almost right you can only re-roll, never keep it |
@@ -230,7 +230,7 @@ is a milestone measurement (invariant 3).
 
 ### The console is a local tool, not a published Artifact
 
-Decided by Pat while this record was being written. The editor had previously
+Decided by tacowars while this record was being written. The editor had previously
 been published to claude.ai as "Seedship FM Console"; the console is not, and
 nothing in this design targets that.
 
@@ -238,7 +238,7 @@ Two constraints lift as a result, and #70 should take both:
 
 - **Export can simply download a file.** A page-initiated download is blocked
   in the Artifact viewer sandbox but works normally from a local file or a
-  static server, which is how Pat runs the editor.
+  static server, which is how tacowars runs the editor.
 - **`build-editor.mjs`'s document guard can go.** It currently throws if the
   generated HTML contains `<!doctype>`, `<html>`, `<head>` or `<body>`, purely
   because the Artifact host supplied its own skeleton. Without that host the

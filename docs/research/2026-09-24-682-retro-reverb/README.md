@@ -1,9 +1,9 @@
 # Adjustable vintage reverb insert (#682)
 
-Pat chose a freely adjustable MIDIVerb-inspired effect, ordinary/gated/reverse
+tacowars chose a freely adjustable MIDIVerb-inspired effect, ordinary/gated/reverse
 presets approximating the original range, and no factory ROM in shipped assets.
 The result is **original DSP, not an emulator or a verified factory match**.
-Listening approval and further preset tuning remain Pat's verdict.
+Listening approval and further preset tuning remain tacowars's verdict.
 
 ## Source findings
 
@@ -23,13 +23,13 @@ Listening approval and further preset tuning remain Pat's verdict.
   The emulator includes one's-complement/sign-carry behavior and different
   converter scaling/input handling. The compiler removes instruction dispatch;
   compiling factory microcode is still use of the factory program data.
-- Pat's U51 file is the **DSP program ROM**, 16,384 bytes. Its MD5 is
+- tacowars's U51 file is the **DSP program ROM**, 16,384 bytes. Its MD5 is
   `11a460c8e64d3325411bba0c11a2ae49`, the MIDIVerb dump identified in the
   [independent emulator's supported-ROM list](https://github.com/thement/midiverb_emulator#supported-roms).
   SHA-256: `dcf2ff65fa0fe72eb811ef7e6713e06472809e892df47aa1639766c22ab4c362`.
   Depipelining using Brombaugh's `mk_mvucode.c` indexing matches BarrVerb's
   **all 63 effect programs exactly**. Slot 64 differs at instruction zero.
-- Pat's U54 file is 8,192 bytes; SHA-256
+- tacowars's U54 file is 8,192 bytes; SHA-256
   `f70ce8e315126a3c74f0268b027bc6af1278dea18c03b4050cb17e7e9c600b05`.
   Sheet 1 of the [reverse-engineered schematic](https://github.com/emeb/MIDIVerb_RE/blob/main/schematics/MIDIVerb_Schematic.pdf)
   labels U51 DSP code and connects U54 to the 8031 controller. U54 is relevant
@@ -109,7 +109,7 @@ The JavaScript integer loop took a median 13.68 ms/audio second for one instance
 on the same M1/Node backend, excluding converters, resampling and integration.
 This was feasibility evidence for a port, not proof of hardware fidelity or
 a comparison with WASM. The local probe is retained at
-`/tmp/a204-midiverb-research/probe.mjs`; it reads Pat's BarrVerb checkout and
+`/tmp/a204-midiverb-research/probe.mjs`; it reads tacowars's BarrVerb checkout and
 generates native reference files only in that temporary directory.
 
 `collect.mjs` drives the rebuilt file:// editor in Chrome. `browser.json`
@@ -146,6 +146,6 @@ the picker becomes Custom, and the values survive export/import. Time applies
 to gated/reverse; Decay and Size apply to ordinary reverb. The bypass checkbox
 covers the original Defeat role; the bank contains 63 effect approximations.
 
-Tests and Chrome checks establish signal, state and timing behavior. Pat still
+Tests and Chrome checks establish signal, state and timing behavior. tacowars still
 needs to judge density, metallic coloration, long-tail usefulness and resemblance
 to the original musical roles, especially under dense chords and repeated drums.

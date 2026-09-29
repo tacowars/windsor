@@ -1,7 +1,7 @@
 # Workers load a thin profile: worker or worker-light, one shared rules file
 
 - **Date:** 2026-09-28
-- **Decided by:** Pat
+- **Decided by:** tacowars
 - **Refines:** decisions 1 ("No role file") and 9 (model and effort) of
   `2026-09-28-parallel-workflow-without-an-orchestrator`
 - **Research:** `docs/research/2026-09-28-agent-orchestration-overhead/`
@@ -12,7 +12,7 @@ The first waves of workers kept tripping on the same few things: a
 worktree resolving `@windsor/*` to the main checkout, an older default
 Node, `gh pr edit` failing to add labels, trying to reach a dev server
 from the sandbox. The fixes lived in one session's memory or were repeated
-in every launch prompt, so they did not travel to Pat's other machine.
+in every launch prompt, so they did not travel to tacowars's other machine.
 The research rejected a 24 kB role file, which pushed a worker's starting
 context to 43 to 45 k tokens. The size was the problem, not a profile as
 such.

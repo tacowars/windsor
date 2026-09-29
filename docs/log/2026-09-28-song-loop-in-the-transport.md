@@ -6,8 +6,8 @@
 
 ## Context
 
-Pat asked for a loop over a bar range that is saved with the song. While
-the loop is on, playback wraps from the loop's end back to its start. Pat
+tacowars asked for a loop over a bar range that is saved with the song. While
+the loop is on, playback wraps from the loop's end back to its start. tacowars
 set the musical decisions on the issue:
 
 - It is saved as `transport.loop = { start, end, on }` in ticks. The range is

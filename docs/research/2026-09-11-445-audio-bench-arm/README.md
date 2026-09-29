@@ -371,7 +371,7 @@ here: silent-2 had no CI job but did have RDP and a decaying load of 6.4→3.3.
    reads 0 in all six arm windows on the target box: WebGL2 clean ×2,
    WebGL2 under RDP + CI ×2, WebGPU ×2 (one under CI). The window is ~63 s,
    not 60 s, and the frame budget was already blown. The argument is for the
-   orchestrator and Pat; two facts bear on it:
+   orchestrator and tacowars; two facts bear on it:
    - a `playbackStats` underrun is a whole 512-frame output callback, and
      under sustained overload the counter saturates (#275 probe findings 3
      and 5);

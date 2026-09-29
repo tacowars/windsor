@@ -113,4 +113,4 @@ peak, the time to −20 / −40 / −60 dB, spectral centroid over the first,
 mid and late windows, the strongest partials and a 1 ms amplitude view of
 the clap bursts, so the numbers in the descriptions are what the engine
 renders, not what the knobs suggest. None of that is a listening verdict;
-that is Pat's, in the console with velocity and the keyboard.
+that is tacowars's, in the console with velocity and the keyboard.

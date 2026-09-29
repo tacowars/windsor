@@ -13,7 +13,7 @@ synth, no plate and no delay running. The only cost figures that existed were
 two Node sanity checks: the plate at "~1 % of one core, not measured here"
 (`docs/research/2026-08-31-52-dattorro-reverb/`) and 32 voices at ~10 % in
 `docs/design/audio-architecture.md` §7, which labels itself "not a qualifying
-measurement". Since #435 the music is a whole document Pat swaps with
+measurement". Since #435 the music is a whole document tacowars swaps with
 `?music=<name>`, so a document can be arbitrarily heavier than `bed-01` and
 nothing says what it costs.
 

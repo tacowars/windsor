@@ -47,7 +47,7 @@ signal order.
 
 ## Why
 
-Pat, 2026-09-22: "lets say I add chorus and then I want distortion, it adds it
+tacowars, 2026-09-22: "lets say I add chorus and then I want distortion, it adds it
 in that order, but usually I would prefer distortion to come before chorus",
 and "if we can avoid nasty clicks or pops when doing so that would be good
 too". Remove-and-re-add loses the settings, so the arrows are the least

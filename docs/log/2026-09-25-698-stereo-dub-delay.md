@@ -1,6 +1,6 @@
 # Stereo and dub delay insert
 
-Ticket: #698. Pat requested an Echo-inspired delay workflow for trance and
+Ticket: #698. tacowars requested an Echo-inspired delay workflow for trance and
 dub: independent synced delays, stereo/ping-pong/mid-side routing, HP/LP
 filtering, dry/wet and output gain. Reverb is explicitly out of scope.
 

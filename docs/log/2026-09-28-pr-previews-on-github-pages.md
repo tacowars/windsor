@@ -1,12 +1,12 @@
 # Every PR gets a preview on GitHub Pages
 
 - **Date:** 2026-09-28
-- **Status:** accepted (Pat's decisions in windsor#37)
+- **Status:** accepted (tacowars's decisions in windsor#37)
 
 ## Context
 
 A PR was reviewed from its diff and a local `npm run dev`. A UI change
-needs to be seen and played, and Pat reviews from his desk and his phone.
+needs to be seen and played, and tacowars reviews from his desk and his phone.
 He wanted a live URL on every PR, one click from the PR page.
 
 The site was deployed with GitHub's Actions Pages flow

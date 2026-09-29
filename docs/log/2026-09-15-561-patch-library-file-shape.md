@@ -109,7 +109,7 @@ audibility and release.
 
 `patchLibraryIdentity.test.ts` pinned every id and every `Patch` field to the
 pre-migration fixture. That was the migration's proof, and it stopped being a
-gate the moment the library became data the editor saves over: Pat's first
+gate the moment the library became data the editor saves over: tacowars's first
 save (`kick`, "updated kick - shorter") failed it even after the headroom
 sweep, and its id check would have failed on the 115th file. #583 deletes the
 test, the way #561 retired #543's `modDepth.test.ts`. The fixture and its

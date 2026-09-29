@@ -6,7 +6,7 @@
  *     octaves = filtEnv × (envAmount + modWheel × filter.modWheelDepth) + …
  *
  * so depth 0 is exactly today's term, and the two depths together give the
- * toggle Pat asked for without a switch: wheel to the LFO, to the filter,
+ * toggle tacowars asked for without a switch: wheel to the LFO, to the filter,
  * both, or neither.
  *
  * The cutoff is read back from the SVF's coefficients rather than inferred

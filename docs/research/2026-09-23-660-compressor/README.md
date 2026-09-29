@@ -25,7 +25,7 @@ proposed soundtrack. `console.json` contains the complete console/pageerror
 transcript: zero warnings/errors. `network.json` contains all completed and
 failed page request events: no failed requests.
 
-The screenshot is for Pat; the processor values and document assertions are
+The screenshot is for tacowars; the processor values and document assertions are
 the evidence. A game-world movement/screenshot collector cannot express this
 standalone UI scenario (decision record, item 7).
 
@@ -81,7 +81,7 @@ and given a regression test; `browser.json` is the refreshed reading.
 
 ## Listening
 
-Pat's verdict is pending. Open the ticket worktree's editor, enable audio,
+tacowars's verdict is pending. Open the ticket worktree's editor, enable audio,
 import a familiar song, Mixer → Add insert → Bus compressor. Begin with 2:1
 or 4:1, 10 ms, Auto and 2–4 dB reduction, level-match with Makeup, and compare
 transients/recovery/bypass with The Glue. Try short manual releases and heavy

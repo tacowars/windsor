@@ -6,7 +6,7 @@
  * notice later: that the copy is structural (turning the target's knobs must
  * not move the source's curve) and that it carries loop mode and key scaling,
  * the two fields that are not part of the drawn shape and so are the ones a
- * shape-only copy would silently drop (Pat, 2026-09-16).
+ * shape-only copy would silently drop (tacowars, 2026-09-16).
  */
 import { describe, expect, it } from 'vitest';
 

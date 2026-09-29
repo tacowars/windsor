@@ -1,8 +1,8 @@
 /**
- * The reproduction for windsor#7: the patch and the note line of Pat's
+ * The reproduction for windsor#7: the patch and the note line of tacowars's
  * `clicks.json` demo, as the grid sequencer sends them to the worklet, and
  * the one measurement the tests make — the largest sample-to-sample step, the
- * zipper check `reverbHarness.ts` uses. The song itself is Pat's file and
+ * zipper check `reverbHarness.ts` uses. The song itself is tacowars's file and
  * stays out of the repo; this is its one part, copied by value.
  *
  * The patch is a mono sine carrier with feedback (a saw-like op 1, attack
@@ -121,7 +121,7 @@ export const CLICKS_PATCH: Patch = {
 };
 
 /**
- * Pat's second demo, `clippy.json` (windsor#7, round 2): the same line and
+ * tacowars's second demo, `clippy.json` (windsor#7, round 2): the same line and
  * carrier, with sustain 1 and a 0.4 s release, under a resonant low-pass
  * (Q 4.76) at 55 Hz. The filter envelope opens it 4.2 octaves, plus 6 more
  * on an accent (`modWheelDepth` 6 at mod 1). The LFO does not reach the

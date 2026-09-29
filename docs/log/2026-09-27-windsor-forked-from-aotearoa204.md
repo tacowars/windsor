@@ -1,7 +1,7 @@
 # Windsor is a hard fork of Aotearoa204's music engine
 
 - **Date:** 2026-09-27
-- **Decided by:** Pat
+- **Decided by:** tacowars
 - **Source:** `tacowars/Aotearoa204` `main` at `153294a6`
 
 ## Context
@@ -9,7 +9,7 @@
 Aotearoa204's music engine had outgrown its role as a game soundtrack. It
 had four-operator FM synthesis, five sequencer kinds over a harmony
 timeline, a mixer with eight insert kinds and a standalone arrangement
-console. Pat wants to keep developing it as a web-based sequencer/DAW,
+console. tacowars wants to keep developing it as a web-based sequencer/DAW,
 without the game's constraints, under the name Windsor.
 
 ## Decisions
@@ -57,7 +57,7 @@ without the game's constraints, under the name Windsor.
    Aotearoa204's board, orchestrator and handoff machinery did not come
    across and can be added if parallel agent work needs it.
 6. **Licence: AGPL-3.0.** Windsor is meant to be hosted as a web app, and
-   the AGPL keeps a modified hosted copy open where the GPL would not. Pat
+   the AGPL keeps a modified hosted copy open where the GPL would not. tacowars
    wrote the imported code, so the game's rights to its own copy are
    unaffected.
 
