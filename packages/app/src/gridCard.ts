@@ -50,14 +50,15 @@ import {
   toggleFlag,
   withStep,
 } from './gridModel';
-import { gridPlayheadAt, lightGrid } from './gridPlayhead';
 import { makeKnob } from './knob';
 import { changePattern } from './partEdits';
+import { regionPlayheadAt } from './regionPlayhead';
 import { divisorPicker, tableKnob } from './seqFields';
 import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
 import {
   type Strip,
   commitSteps,
+  markStep,
   paintStrip,
   specOf,
   stripCell,
@@ -76,8 +77,8 @@ const HINT =
 
 /**
  * This card's strip: one column per written step of a `grid` spec, and its
- * lanes. Its `playing` is a `gridPlayhead.ts` number: a bright step, a ghost
- * step or dark, which `lightGrid` reads after every repaint.
+ * lanes. Its `playing` is a `regionPlayhead.ts` number: a bright step, a
+ * ghost step or dark, which `paintStrip` relights after every repaint.
  */
 interface GridStrip extends Strip<GridSpec> {
   /** The scroller holding the lane names and the strip. */
@@ -170,7 +171,6 @@ function repaint(strip: GridStrip): void {
   const scrollLeft = strip.scroll.scrollLeft;
   paintLaneNames(strip.names, strip.lanes);
   paintStrip(strip, (spec) => spec.steps.map((_, index) => column(strip, index, spec)));
-  lightGrid(strip.root, strip.playing);
   if (strip.picker) fillLanePicker(strip.picker, strip.lanes);
   strip.scroll.scrollLeft = scrollLeft;
 }
@@ -178,7 +178,7 @@ function repaint(strip: GridStrip): void {
 /**
  * Per frame while the card is on screen: the playhead (the engine's own step
  * for the audible tick, bright in the region and a ghost outside it —
- * `gridPlayhead.ts`, windsor#97), and a repaint when the Harmony tab's root or scale
+ * `regionPlayhead.ts`, windsor#97), and a repaint when the Harmony tab's root or scale
  * has changed since the labels were drawn — a root knob goes through
  * `ctx.change` alone, which re-renders nothing — or Skip has moved to or
  * from 0, which decides whether a slide's hold on a lane is certain.
@@ -190,11 +190,8 @@ function watch(strip: GridStrip): void {
   watchPlayhead({
     attached: () => strip.root.isConnected,
     shown: () => strip.root.closest('[hidden]') === null,
-    playheadAt: () => gridPlayheadAt(strip.ctx, strip.slot, strip.region),
-    mark: (playhead) => {
-      strip.playing = playhead;
-      lightGrid(strip.root, playhead);
-    },
+    playheadAt: () => regionPlayheadAt(strip.ctx, strip.slot, strip.region),
+    mark: markStep(strip),
     repaintIf: () => {
       const sig = signature();
       if (sig === keySig) return;

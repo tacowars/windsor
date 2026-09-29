@@ -13,6 +13,7 @@ import {
   FULL_DOCUMENT,
   FULL_PARTS,
   FULL_SLOT,
+  FULL_SONG_TICKS,
   withDocumentPart,
 } from '@windsor/engine/__fixtures__/fullArrangement';
 import { rig } from '@windsor/engine/__fixtures__/playerRig';
@@ -31,8 +32,15 @@ const withK = (k: number): RegionPattern => ({
   pulses: { min: k, max: k, start: k },
 });
 
-/** Two Euclid regions, 4 onsets in bars 1–2 and 11 in bars 3–4, played up to `tick`. */
-function playedTo(tick: number): { model: DocumentModel; source: FigureSource } {
+/**
+ * Two Euclid regions, 4 onsets in bars 1–2 and 11 in bars 3–4, played up to
+ * `tick`; `asked` records the regions the figure asked the player for.
+ */
+function playedTo(tick: number): {
+  model: DocumentModel;
+  source: FigureSource;
+  asked: Array<number | undefined>;
+} {
   const model = new DocumentModel(
     withDocumentPart(FULL_DOCUMENT, 'kick', {
       regions: halves(withK(4), withK(11)),
@@ -41,12 +49,17 @@ function playedTo(tick: number): { model: DocumentModel; source: FigureSource } 
   );
   const r = rig(model.doc);
   r.run(tick / BAR);
+  const asked: Array<number | undefined> = [];
   const source: FigureSource = {
     doc: model.doc,
-    capturePattern: (s, region) => r.player.capturePattern(s, region),
+    capturePattern: (s, region) => {
+      asked.push(region);
+      return r.player.capturePattern(s, region);
+    },
+    regionStepAt: (s, region, at) => r.player.regionStepAt(s, region, at),
     position: () => tick,
   };
-  return { model, source };
+  return { model, source, asked };
 }
 
 describe("the Euclid card's figure for a region", () => {
@@ -70,5 +83,15 @@ describe("the Euclid card's figure for a region", () => {
     expect(countOnsets(regionFigure(source, slot, 0))).toBe(4);
     // Region 2 is not playing: its figure is its pattern's preview.
     expect(countOnsets(regionFigure(source, slot, 1))).toBe(11);
+  });
+
+  it('shows the live figure again after the song wraps to bar 1 (windsor#101)', () => {
+    // The transport's tick never wraps: two passes on, it is past every region's start.
+    const { source, asked } = playedTo(2 * FULL_SONG_TICKS + HALF + BAR);
+    expect(countOnsets(regionFigure(source, slot, 1))).toBe(11);
+    expect(asked).toEqual([1]);
+    // Region 1 is not playing there: its preview, and the player is not asked.
+    expect(countOnsets(regionFigure(source, slot, 0))).toBe(4);
+    expect(asked).toEqual([1]);
   });
 });

@@ -9,14 +9,14 @@
  * that fills in its columns, and a registry entry (`sequencerCards.ts`).
  *
  * Nothing here decides *where* the playhead is: that is the engine's, through
- * `host.stepAt` (decision 2). `playheadAt` is the console's only reading of
- * the audible tick.
+ * `host.regionStepAt` (decision 2), and `regionPlayhead.ts` reads it and
+ * lights it, bright or ghost (windsor#97, windsor#101).
  */
-import { partAt, type SequencerKind, type SequencerSpec } from '@windsor/engine';
+import type { SequencerKind, SequencerSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { changePattern, patternOf } from './partEdits';
-import { regionAt } from './regionModel';
+import { lightPlayhead } from './regionPlayhead';
 
 /**
  * The spec the part on `slot` plays in region `region` (windsor#75) — or,
@@ -38,7 +38,7 @@ export function specOf<K extends SequencerKind>(
 export interface PlayheadStrip {
   /** The element holding one child per step. */
   root: HTMLElement;
-  /** The column or cell the playhead sits on, or -1; reapplied after every repaint. */
+  /** The playhead as `regionPlayhead.ts` numbers it (a step, a ghost, or dark); reapplied after every repaint. */
   playing: number;
 }
 
@@ -79,29 +79,12 @@ export function stripColumn(
   return col;
 }
 
-/**
- * What lighting the playhead reads of a strip — its children's class lists.
- * Structural on purpose: a real element satisfies it, and so does a test's
- * stand-in, so the loop and its lighting are driven without a DOM.
- */
-export interface LitStrip {
-  readonly children: ArrayLike<{
-    readonly classList: { toggle(token: string, on: boolean): void };
-  }>;
-}
-
-/** Light the playhead's child of a strip, or none for -1. */
-export function markPlaying(strip: LitStrip, playing: number): void {
-  const { children } = strip;
-  for (let i = 0; i < children.length; i++) children[i]?.classList.toggle('playing', i === playing);
-}
-
-/** Remember the step the card is on and light it: what a card hands the loop as `mark`. */
+/** Remember the playhead the card is on and light it: what a card hands the loop as `mark`. */
 export const markStep =
   (strip: PlayheadStrip) =>
-  (step: number): void => {
-    strip.playing = step;
-    markPlaying(strip.root, step);
+  (playhead: number): void => {
+    strip.playing = playhead;
+    lightPlayhead(strip.root, playhead);
   };
 
 /** Redraw every column from the document, keeping the horizontal scroll where it was. */
@@ -112,7 +95,7 @@ export function paintStrip<S>(strip: Strip<S>, columns: (spec: S) => readonly HT
   if (!spec) return;
   for (const col of columns(spec)) strip.root.appendChild(col);
   strip.root.scrollLeft = scrollLeft;
-  markPlaying(strip.root, strip.playing);
+  lightPlayhead(strip.root, strip.playing);
 }
 
 /** Where the loop gets its frames; a test drives it with its own. */
@@ -151,7 +134,7 @@ const SHARED_FRAMES: FrameSource = createFrameDriver(
 export interface PlayheadWatch {
   /** True while the card is in the document; the first frame it is not, the loop ends. */
   attached(): boolean;
-  /** The step the transport is on, or -1 — `playheadAt` for every card that sounds. */
+  /** Where the playhead is, as a number; the step strips' is `regionPlayheadAt`. */
   playheadAt(): number;
   /** Light a step. Called only when it changed. */
   mark(step: number): void;
@@ -205,21 +188,4 @@ export function watchPlayhead(watch: PlayheadWatch): void {
  */
 export function audibleTick(ctx: AppCtx): number {
   return ctx.transport.position();
-}
-
-/**
- * The step the part on `slot` is sounding, or -1 while nothing runs: the
- * audible tick put through the engine's own `stepAt` (#619 decision 2).
- * A region card names its `region`: `stepAt` resolves the generator of the
- * region under the audible tick, so the ring lights only while the transport
- * is inside that region, and stays dark while another one plays (windsor#75).
- */
-export function playheadAt(ctx: AppCtx, slot: number, region?: number): number {
-  if (!ctx.transport.running) return -1;
-  const tick = audibleTick(ctx);
-  if (region !== undefined) {
-    const part = partAt(ctx.model.doc, slot);
-    if (part === undefined || regionAt(part.regions, tick) !== region) return -1;
-  }
-  return ctx.host.stepAt(slot, tick);
 }
