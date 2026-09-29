@@ -4,23 +4,44 @@
  * v3 document carries either kind today; #706 and #707 add the generator
  * and the card, not a field. Everything returned satisfies `assertArpConfig`
  * / `assertBassConfig` by construction.
+ *
+ * The arp's step grid (windsor#127) takes the grid's rules: a cell as a grid
+ * step without its degree, the grid's lanes, accent and skip ranges. Its
+ * cells are always exactly `ARP_STEPS_MAX`: an absent list is every cell a
+ * plain note, silently; a short, long or junk one is padded with plain notes
+ * or trimmed, reported.
  */
 import { ARP_OCTAVES_MAX, ARP_OCTAVES_MIN, GATE_MIN, HARMONY_DEGREE_MAX } from '../audioConstants';
 import { CHORD_VOICING_DEFAULT, CHORD_VOICING_IDS } from '../harmony/chordTables';
 import { ARP_STYLES, DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
+import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
+import { arpNote, defaultArpSteps, type ArpStep } from '../sequencing/arpSteps';
 import { BASS_PITCH_MODES, DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
 import type { ArpDriver, BassDriver } from './arrangement';
-import type { FieldNormaliser } from './arrangementFields';
-import { registerOctave, seed } from './sequencerFields';
+import { GRID_STEP_KINDS } from '../sequencing/gridSequencer';
+import { show, type FieldNormaliser } from './arrangementFields';
+import { registerOctave, seed, stepModLanes, stepNoteFields } from './sequencerFields';
+
+const ARP_KEYS = [
+  'style',
+  'divisor',
+  'gate',
+  'octaves',
+  'voicing',
+  'retrigger',
+  'register',
+  'steps',
+  'lanes',
+  'accentVelocity',
+  'accentMod',
+  'skipChance',
+  'seed',
+];
 
 export function arpDriver(raw: unknown, path: string, n: FieldNormaliser): ArpDriver {
   const d = DEFAULT_ARP_CONFIG;
   const o = n.section(raw, path);
-  n.dropUnknown(
-    o,
-    ['style', 'divisor', 'gate', 'octaves', 'voicing', 'retrigger', 'register', 'seed'],
-    path,
-  );
+  n.dropUnknown(o, ARP_KEYS, path);
   return {
     style: n.pick(o.style, ARP_STYLES, d.style, `${path}.style`),
     divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
@@ -29,8 +50,40 @@ export function arpDriver(raw: unknown, path: string, n: FieldNormaliser): ArpDr
     voicing: n.pick(o.voicing, CHORD_VOICING_IDS, CHORD_VOICING_DEFAULT, `${path}.voicing`),
     retrigger: n.bool(o.retrigger, d.retrigger, `${path}.retrigger`),
     register: registerOctave(o.register, d.register.octave, `${path}.register`, n),
+    steps: arpSteps(o.steps, `${path}.steps`, n),
+    lanes: stepModLanes(o.lanes, ARP_STEPS_MAX, `${path}.lanes`, n),
+    accentVelocity: n.num(o.accentVelocity, d.accentVelocity, 0, 1, `${path}.accentVelocity`),
+    accentMod: n.num(o.accentMod, d.accentMod, 0, 1, `${path}.accentMod`),
+    skipChance: n.num(o.skipChance, d.skipChance, 0, 1, `${path}.skipChance`),
     seed: seed(o.seed, `${path}.seed`, n),
   };
+}
+
+/** Exactly `ARP_STEPS_MAX` cells: absent is every cell a plain note; otherwise padded or trimmed, reported. */
+function arpSteps(raw: unknown, path: string, n: FieldNormaliser): ArpStep[] {
+  if (raw === undefined) return defaultArpSteps();
+  if (!Array.isArray(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a list of steps — every step a plain note`);
+    return defaultArpSteps();
+  }
+  if (raw.length !== ARP_STEPS_MAX) {
+    n.correction(`${path}: ${raw.length} steps for ${ARP_STEPS_MAX} — resized with plain notes`);
+  }
+  return Array.from({ length: ARP_STEPS_MAX }, (_, i) =>
+    i < raw.length ? arpStep(raw[i], `${path}[${i}]`, n) : arpNote(),
+  );
+}
+
+/** A grid step without its degree: a rest, a tie, or a note with octave, accent and slide. */
+function arpStep(raw: unknown, path: string, n: FieldNormaliser): ArpStep {
+  const o = n.section(raw, path);
+  const kind = n.pick(o.kind, GRID_STEP_KINDS, 'note', `${path}.kind`);
+  if (kind !== 'note') {
+    n.dropUnknown(o, ['kind'], path);
+    return { kind };
+  }
+  n.dropUnknown(o, ['kind', 'octave', 'accent', 'slide'], path);
+  return arpNote(stepNoteFields(o, path, n));
 }
 
 export function bassDriver(raw: unknown, path: string, n: FieldNormaliser): BassDriver {

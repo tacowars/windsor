@@ -51,6 +51,9 @@ const PURE_FILES = [
   'gridSequencer.ts',
   'chordSequencer.ts',
   'arpSequencer.ts',
+  // The arp's step grid (windsor#127): its cells, cycle rule and constants.
+  'arpSteps.ts',
+  'arpStepConstants.ts',
   // The arpeggiator (#706): the chord the gate hands it, voiced and walked.
   'arpeggiator.ts',
   'bassSequencer.ts',

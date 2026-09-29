@@ -15,14 +15,13 @@ import type {
   SequencerSpec,
 } from './arrangement';
 import { arpDriver, bassDriver } from './performerNormalise';
-import { registerOctave, seed } from './sequencerFields';
+import { registerOctave, seed, stepModLanes, stepNoteFields } from './sequencerFields';
 import { SEEDED_KINDS, SEQUENCER_KINDS } from './arrangement';
 import { isRecord, show, type FieldNormaliser } from './arrangementFields';
 import {
   EUCLID_STEPS_MAX,
   GRID_DEGREE_MAX,
   GRID_STEPS_MAX,
-  GRID_STEP_OCTAVE_MAX,
   HOLD_DEFAULT,
   HOLD_MAX,
   HOLD_MIN,
@@ -48,8 +47,6 @@ import {
   gridNote,
   type GridStep,
 } from '../sequencing/gridSequencer';
-import { isStepModParam, type StepModLane } from '../sequencing/stepModLanes';
-import { STEP_MOD_LANES_MAX, type StepModParam } from '../worklet/fm/stepModTables';
 
 /** The tagged sequencer; an absent or unknown kind is `none`, which is inert. */
 export function normaliseSequencer(raw: unknown, path: string, n: FieldNormaliser): SequencerSpec {
@@ -220,53 +217,6 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
   };
 }
 
-/**
- * Step modulation lanes (windsor#17): absent is none, today's behaviour. A
- * lane naming an unknown or repeated parameter is dropped, lanes past
- * `STEP_MOD_LANES_MAX` are dropped, each value is clamped to -1..1, and a
- * lane is padded with 0 or trimmed to the step count, each reported.
- */
-function stepModLanes(
-  raw: unknown,
-  steps: number,
-  path: string,
-  n: FieldNormaliser,
-): StepModLane[] {
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw)) {
-    n.correction(`${path}: ${show(raw)} is not a list of lanes — no lanes`);
-    return [];
-  }
-  const lanes: StepModLane[] = [];
-  const seen = new Set<StepModParam>();
-  raw.forEach((item, i) => {
-    const at = `${path}[${i}]`;
-    const o = n.section(item, at);
-    n.dropUnknown(o, ['param', 'values'], at);
-    const drop = (why: string): void => n.correction(`${at}: ${why} — lane dropped`);
-    const param = o.param;
-    if (!isStepModParam(param))
-      return drop(`${show(param)} is not a parameter a lane can modulate`);
-    if (seen.has(param)) return drop(`${param} already has a lane`);
-    if (lanes.length >= STEP_MOD_LANES_MAX) return drop(`more than ${STEP_MOD_LANES_MAX} lanes`);
-    seen.add(param);
-    lanes.push({ param, values: laneValues(o.values, steps, `${at}.values`, n) });
-  });
-  return lanes;
-}
-
-/** One value per step in -1..1: junk is 0, a short list padded with 0, a long one trimmed. */
-function laneValues(raw: unknown, steps: number, path: string, n: FieldNormaliser): number[] {
-  const list: unknown[] = Array.isArray(raw) ? raw : [];
-  if (!Array.isArray(raw)) n.correction(`${path}: ${show(raw)} is not a list of values — all 0`);
-  else if (raw.length !== steps) {
-    n.correction(`${path}: ${raw.length} values for ${steps} steps — resized`);
-  }
-  return Array.from({ length: steps }, (_, i) =>
-    i < list.length ? n.num(list[i], 0, -1, 1, `${path}[${i}]`) : 0,
-  );
-}
-
 /** 1–32 steps. An absent or junk list is the default bar; an over-long one is capped, reported. */
 function gridSteps(raw: unknown, path: string, n: FieldNormaliser): GridStep[] {
   if (raw === undefined) return defaultGridSteps();
@@ -289,9 +239,8 @@ function gridStep(raw: unknown, path: string, n: FieldNormaliser): GridStep {
     return { kind };
   }
   n.dropUnknown(o, ['kind', 'degree', 'octave', 'accent', 'slide'], path);
-  return gridNote(n.int(o.degree, 0, 0, GRID_DEGREE_MAX, `${path}.degree`), {
-    octave: n.int(o.octave, 0, -GRID_STEP_OCTAVE_MAX, GRID_STEP_OCTAVE_MAX, `${path}.octave`),
-    accent: n.bool(o.accent, false, `${path}.accent`),
-    slide: n.bool(o.slide, false, `${path}.slide`),
-  });
+  return gridNote(
+    n.int(o.degree, 0, 0, GRID_DEGREE_MAX, `${path}.degree`),
+    stepNoteFields(o, path, n),
+  );
 }
