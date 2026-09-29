@@ -181,48 +181,28 @@ describe('documentDiff round trips every kind of edit', () => {
     const partial = documentDiff(b, FULL) as { parts: Record<number, { sequencer: unknown }> };
     expect(partial.parts[HAT]?.sequencer).toEqual(partAt(FULL, HAT)?.sequencer);
   });
-
-  it('restores a removed middle part with the same parts, the restored one last', () => {
-    // The merge appends a part at a slot it lacks (`mergePartList`, and the
-    // engine's `mergeParts` alike), so the list order is the one thing a
-    // restore cannot say. Record `2026-09-29-undo-history` names the gap.
-    const b = removedPart(FULL, HAT);
-    const restored = merged(b, documentDiff(b, FULL));
-    const bySlot = (doc: ArrangementDocument): unknown[] =>
-      [...doc.parts].sort((x, y) => x.slot - y.slot);
-    expect(bySlot(restored)).toStrictEqual(bySlot(FULL));
-    expect(restored.parts.at(-1)?.slot).toBe(HAT);
-    expect({ ...restored, parts: [] }).toStrictEqual({ ...FULL, parts: [] });
-  });
-
-  it('leaves one return removed beside another as its defaults', () => {
-    // `returns` is not a keyed section in the merge: an `undefined` return
-    // reads as the code's defaults, so the sound comes back and the document
-    // carries them. Record `2026-09-29-undo-history` names the gap.
-    const a = after(FULL, { returns: { room: { level: 0.4 } } });
-    const b = after(a, { returns: { echo: { feedback: 0.6 } } });
-    const back = merged(b, documentDiff(b, a));
-    expect(back.returns?.room).toStrictEqual(a.returns?.room);
-    expect(back.returns?.echo).toStrictEqual(RETURNS.echo);
-  });
 });
 
 describe('documentDiffLive spells out a removed section for the engine', () => {
-  it('sends the same partial when nothing optional is removed', () => {
+  it('sends the difference itself when nothing optional is removed', () => {
     const b = after(FULL, partChange(HAT, { strip: { level: 0.33 } }));
-    const { partial, live } = documentDiffLive(b, FULL, normalise);
-    expect(live).toBe(partial);
+    expect(documentDiffLive(b, FULL, normalise)).toStrictEqual({
+      live: documentDiff(b, FULL),
+      rebuild: false,
+    });
   });
 
-  it("sends each removed section as the normaliser's defaults, and the model its absence", () => {
+  it("sends each removed section as the normaliser's defaults", () => {
     const b = after(FULL, {
       returns: { room: { level: 0.4 } },
       master: { level: 0.5, inserts: [DEFAULT_DRIVE], output: {} },
       transport: { swing: { amount: 62, grid: 16 } },
       parts: { [HAT]: { strip: { output: 'sidechain' } } },
     });
-    const { partial, live } = documentDiffLive(b, FULL, normalise);
+    const { live, rebuild } = documentDiffLive(b, FULL, normalise);
+    const partial = documentDiff(b, FULL);
     expect(merged(b, partial)).toStrictEqual(FULL);
+    expect(rebuild).toBe(false);
     const defaults = after(FULL, {
       returns: { room: {} },
       master: { output: {} },
@@ -243,6 +223,34 @@ describe('documentDiffLive spells out a removed section for the engine', () => {
     expect(live).toStrictEqual({
       transport: { loop: { start: 0, end: FULL.transport.bars * TICKS_PER_BAR, on: false } },
     });
+  });
+
+  it('sends one return removed beside another as the defaults a system built without it plays', () => {
+    const a = after(FULL, { returns: { room: { level: 0.4 } } });
+    const b = after(a, { returns: { echo: { feedback: 0.6 } } });
+    expect(documentDiffLive(b, a, normalise)).toStrictEqual({
+      live: { returns: { echo: RETURNS.echo } },
+      rebuild: false,
+    });
+  });
+});
+
+describe('documentDiffLive asks for a rebuild where the slot merge would reorder the parts', () => {
+  const partOrder = (doc: ArrangementDocument): number[] => doc.parts.map((part) => part.slot);
+
+  it('rebuilds to restore a removed middle part, which the merge would append', () => {
+    const b = removedPart(FULL, HAT);
+    expect(partOrder(FULL).indexOf(HAT)).toBeLessThan(FULL.parts.length - 1);
+    expect(documentDiffLive(b, FULL, normalise).rebuild).toBe(true);
+    // Removing it again is an ordinary live partial.
+    expect(documentDiffLive(FULL, b, normalise).rebuild).toBe(false);
+  });
+
+  it('restores the last part removed live, where appending it is its place', () => {
+    const b = removedPart(FULL, DRONE);
+    expect(partOrder(FULL).at(-1)).toBe(DRONE);
+    expect(documentDiffLive(b, FULL, normalise).rebuild).toBe(false);
+    expect(documentDiffLive(FULL, addedPart(FULL), normalise).rebuild).toBe(false);
   });
 });
 

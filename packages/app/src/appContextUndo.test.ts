@@ -9,7 +9,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { ApplyResult, ArrangementDocument, DocumentPartial } from '@windsor/engine';
-import { makePatch, partAt } from '@windsor/engine';
+import { RETURNS, makePatch, partAt, removePartChange } from '@windsor/engine';
+import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
@@ -32,6 +33,8 @@ interface Console {
   builds: number;
   /** Set to make the host refuse every live partial from then on. */
   refusing: boolean;
+  /** Set to make the host report a path it ignored in every live partial from then on. */
+  ignoring: boolean;
   panels: Record<string, TabPanel>;
 }
 
@@ -43,13 +46,14 @@ function openConsole(): Console {
     status: [],
     builds: 0,
     refusing: false,
+    ignoring: false,
     panels: {},
   };
   const host: ContextHost = {
     apply: (partial): ApplyResult => {
       if (c.refusing) return { ok: false, ignored: [], error: 'nope' };
       c.applied.push(partial);
-      return { ok: true, ignored: [] };
+      return { ok: true, ignored: c.ignoring ? ['somewhere'] : [] };
     },
     build: () => {
       c.builds++;
@@ -313,5 +317,53 @@ describe('an undo is an ordinary live edit', () => {
     expect(live.returns.room.level).toBe(
       c.model.preview({ ...newSong(), returns: { room: {} } }).returns?.room?.level,
     );
+  });
+});
+
+describe('an undo restores the document exactly', () => {
+  it('brings a removed middle part back in its place, rebuilding the live system', () => {
+    const c = openConsole();
+    c.ctx.importDoc(FULL_DOCUMENT);
+    const start = c.model.doc;
+    const slots = start.parts.map((part) => part.slot);
+    expect(slots.indexOf(FULL_SLOT.hat)).toBeLessThan(slots.length - 1);
+    expect(c.ctx.change(removePartChange(start, FULL_SLOT.hat)!).ok).toBe(true);
+    const removed = c.model.doc;
+    const [applied, builds] = [c.applied.length, c.builds];
+    expect(c.ctx.undo()).toBe(true);
+    expect(c.model.doc).toStrictEqual(start);
+    expect(c.model.doc.parts.map((part) => part.slot)).toEqual(slots);
+    // The slot merge would append the part, so the live system is rebuilt
+    // from the snapshot instead of being sent a partial.
+    expect([c.applied.length, c.builds]).toEqual([applied, builds + 1]);
+    // Removing it again is an ordinary live partial.
+    expect(c.ctx.redo()).toBe(true);
+    expect(c.model.doc).toStrictEqual(removed);
+    expect([c.applied.length, c.builds]).toEqual([applied + 1, builds + 1]);
+  });
+
+  it('takes a second return added beside another out of the document again', () => {
+    const c = openConsole();
+    c.ctx.change({ returns: { room: { level: 0.2 } } });
+    const one = c.model.doc;
+    expect(Object.keys(one.returns ?? {})).toEqual(['room']);
+    c.ctx.change({ returns: { echo: { feedback: 0.6 } } });
+    const two = c.model.doc;
+    expect(c.ctx.undo()).toBe(true);
+    expect(c.model.doc).toStrictEqual(one);
+    // The engine has no absent return: it is sent the one a system built without it plays.
+    expect(c.applied.at(-1)).toEqual({ returns: { echo: RETURNS.echo } });
+    expect(c.ctx.redo()).toBe(true);
+    expect(c.model.doc).toStrictEqual(two);
+    expect(c.builds).toBe(0);
+  });
+
+  it('rebuilds the live system from the snapshot when the engine ignores part of an undo', () => {
+    const c = openConsole();
+    c.ctx.change(level(0.4));
+    c.ignoring = true;
+    expect(c.ctx.undo()).toBe(true);
+    expect(c.builds).toBe(1);
+    expect(c.status).toEqual([]);
   });
 });

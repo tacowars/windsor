@@ -1,9 +1,10 @@
 /**
  * The difference between two normalised song documents (windsor#124; epic
  * windsor#112 decision 2; record `2026-09-29-undo-history`): the partial
- * that turns `current` into `target` when `mergeDocument` merges it and the
- * normaliser runs, so an undo or a redo reaches the model as an ordinary
- * edit and no kind of edit needs a hand-written inverse.
+ * that turns `current` into `target` when a merge applies it, so an undo or
+ * a redo reaches the live system as an ordinary edit and no kind of edit
+ * needs a hand-written inverse. The model's side of an undo does not merge
+ * it: it adopts the snapshot itself (`DocumentModel.replace`).
  *
  * - **The keyed sections** (`parts` by slot, `patches` by id): an entry only
  *   `current` holds becomes `null`, which the merge reads as removal; one only
@@ -11,18 +12,20 @@
  * - **Below them**, records recurse over the keys either side holds. An
  *   array, a leaf or a record whose `kind` changed is sent whole, as
  *   `deepMerge` assigns it. A key only `current` holds is sent as
- *   `undefined`: the merge assigns it, and the normaliser reads an
- *   `undefined` optional section (`master`, `returns`, `master.output`, a
- *   strip's `output`, the transport's `swing` and `loop`) as absent.
+ *   `undefined`.
  * - **Unchanged sections are left out**, so two equal documents diff to `{}`.
  *
- * The engine has no "absent" for those optional sections: its live apply
- * skips an `undefined` one and keeps what it holds. `documentDiffLive` also
- * returns the partial the engine is sent, with each removed section spelled
- * out as the values the normaliser gives it when it is absent, so the sound
- * follows the document back.
+ * The engine has no "absent" for the optional sections (`master`, a return,
+ * `master.output`, a strip's `output`, the transport's `swing` and `loop`):
+ * its live apply skips an `undefined` one and keeps what it holds.
+ * `documentDiffLive` returns the partial the engine is sent, with each
+ * removed section spelled out as the values the normaliser gives it when it
+ * is absent, which are the values a system built without it plays. It also
+ * says when no partial can reach `target` live: a restored part that the
+ * slot merge would put in another place in the list.
  */
 import type { ArrangementDocument, DocumentPartial } from '@windsor/engine';
+import { mergeDocument } from './documentModel';
 
 type Rec = Record<string, unknown>;
 /** A key path in the partial's own terms: `parts` addressed by slot. */
@@ -153,15 +156,32 @@ const junk = (value: unknown): unknown =>
     ? Object.fromEntries(Object.entries(value).map(([key, v]) => [key, junk(v)]))
     : null;
 
-export interface DocumentDiffs {
-  /** What `model.merge` takes: `documentDiff(current, target)`. */
-  readonly partial: DocumentPartial;
-  /** What `host.apply` takes: the same, with every removed optional section's defaults spelled out. */
+export interface LiveDiff {
+  /** What `host.apply` takes: the difference, with every removed optional section's defaults spelled out. */
   readonly live: DocumentPartial;
+  /**
+   * True when `live` cannot bring the live system to `target`: the slot
+   * merge (`mergePartList`, and the engine's `mergeParts` alike) appends a
+   * part at a slot it lacks, so a part restored anywhere but last would
+   * play and show in another place. The live system is rebuilt from
+   * `target` instead.
+   */
+  readonly rebuild: boolean;
+}
+
+const slotsOf = (parts: unknown): string =>
+  (Array.isArray(parts) ? parts : [])
+    .map((part: unknown) => (isRecord(part) ? String(part.slot) : ''))
+    .join();
+
+/** Whether the slot merge of `partial`'s parts into `current` lists them in `target`'s order. */
+function keepsPartOrder(current: Rec, target: Rec, partial: Rec): boolean {
+  const merged = mergeDocument({ parts: current.parts }, { parts: partial.parts ?? {} }) as Rec;
+  return slotsOf(merged.parts) === slotsOf(target.parts);
 }
 
 /**
- * Both sides of an undo or a redo. `normalise` is the model's own
+ * The live side of an undo or a redo. `normalise` is the model's own
  * (`DocumentModel.preview`): it reads a probe of `target` with each removed
  * section filled with junk, and what it substitutes is what that section
  * is when absent.
@@ -170,14 +190,17 @@ export function documentDiffLive(
   current: ArrangementDocument,
   target: ArrangementDocument,
   normalise: (raw: unknown) => ArrangementDocument,
-): DocumentDiffs {
+): LiveDiff {
   const removed: Path[] = [];
-  const partial = diffDocument(current as unknown as Rec, target as unknown as Rec, removed);
-  if (removed.length === 0) return { partial, live: partial } as DocumentDiffs;
-  const probe = structuredClone(target) as unknown as Rec;
+  const from = current as unknown as Rec;
+  const to = target as unknown as Rec;
+  const partial = diffDocument(from, to, removed);
+  const rebuild = !keepsPartOrder(from, to, partial);
+  if (removed.length === 0) return { live: partial as DocumentPartial, rebuild };
+  const probe = structuredClone(to);
   for (const path of removed) setAt(probe, path, junk(getAt(current, path)));
   const defaults = normalise(probe);
   const live = structuredClone(partial);
   for (const path of removed) setAt(live, path, getAt(defaults, path));
-  return { partial, live } as DocumentDiffs;
+  return { live: live as DocumentPartial, rebuild };
 }

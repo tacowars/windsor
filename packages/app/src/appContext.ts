@@ -9,8 +9,9 @@
  *
  * It also keeps the song's undo history (windsor#124; epic windsor#112;
  * record `2026-09-29-undo-history`): every song edit comes through `change`
- * (decision 1), which records one step, or one for a whole gesture, and an
- * undo or a redo applies the difference back through the same path.
+ * (decision 1), which records one step, or one for a whole gesture. An undo
+ * or a redo sends the live system the difference back, as an edit does, and
+ * the model adopts the step's snapshot itself.
  */
 import type {
   ApplyResult,
@@ -21,7 +22,7 @@ import type {
 } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
 import type { AppCtx, ConsoleTransport } from './context';
-import { documentDiff, documentDiffLive } from './documentDiff';
+import { deepEqual, documentDiffLive } from './documentDiff';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import { loadRenames } from './partAutoName';
@@ -54,8 +55,6 @@ interface Gesture {
   before: ArrangementDocument | null;
   tab: string | null;
 }
-
-const isEmpty = (partial: object): boolean => Object.keys(partial).length === 0;
 
 export interface AppContextDeps {
   host: EngineHost;
@@ -155,7 +154,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // on what ∞ means; any other partial passes through unchanged. The refit
     // folds into this edit's step (epic windsor#112 decision 7).
     const { partial, report } = followSongLength(before, edit);
-    const result = this.commit(partial, partial, report);
+    const result = this.commit(partial, report);
     if (result.ok) this.remember(before, label ?? stepLabel(edit), tab);
     return result;
   }
@@ -178,7 +177,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     if (gesture.depth > 0) return;
     this.gesture = null;
     const { before, label, tab } = gesture;
-    if (before && !isEmpty(documentDiff(before, this.model.doc))) {
+    if (before && !deepEqual(before, this.model.doc)) {
       this.history.record({ before, label, tab });
     }
   }
@@ -254,23 +253,14 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     return this.change({ patches: { [part.preset]: patch } }).ok;
   }
 
-  /**
-   * The one path every edit takes: `live` to the live system, then `merged`
-   * into the document; a refusal is reported and changes nothing. They are
-   * the same partial except in an undo or a redo that removes an optional
-   * section, which the engine is sent as its defaults (`documentDiffLive`).
-   */
-  private commit(
-    live: DocumentPartial,
-    merged: DocumentPartial,
-    report: readonly string[] = [],
-  ): ApplyResult {
-    const result = this.host.apply(live);
+  /** The one path every edit takes: the live system first, then the document; a refusal is reported and changes nothing. */
+  private commit(partial: DocumentPartial, report: readonly string[]): ApplyResult {
+    const result = this.host.apply(partial);
     if (result && !result.ok) {
-      this.notify(`refused: ${result.error ?? 'invalid'}`, 'error');
+      this.refused(result);
       return result;
     }
-    this.model.merge(merged);
+    this.model.merge(partial);
     if (report.length > 0) this.notify(`song length: ${report.join(', ')} refitted`);
     if (result && result.ignored.length > 0)
       this.notify(`ignored: ${result.ignored.join(', ')}`, 'warning');
@@ -296,18 +286,38 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
       }
       return;
     }
-    if (isEmpty(documentDiff(before, this.model.doc))) return;
+    if (deepEqual(before, this.model.doc)) return;
     this.history.record({ before, label, tab });
   }
 
+  private refused(result: ApplyResult): void {
+    this.notify(`refused: ${result.error ?? 'invalid'}`, 'error');
+  }
+
   /**
-   * Turn the document into `target` through `commit`, live first. Returns the
-   * document it replaced, for the step's other stack, or null when refused.
+   * Turn the document into `target`, a step's snapshot, live first. The
+   * model adopts the snapshot itself (`DocumentModel.replace`), so the
+   * document is equal to it by construction. The live system is sent the
+   * difference, an ordinary live partial, and is rebuilt from the snapshot
+   * instead where no partial reaches it exactly: a part restored anywhere
+   * but last, or a partial the engine ignored some of (epic decision 9
+   * accepts the click). Returns the document it replaced, for the step's
+   * other stack, or null when the engine refused.
    */
   private restore(target: ArrangementDocument): ArrangementDocument | null {
     const current = this.model.doc;
-    const { partial, live } = documentDiffLive(current, target, (raw) => this.model.preview(raw));
-    return this.commit(live, partial).ok ? current : null;
+    const { live, rebuild } = documentDiffLive(current, target, (raw) => this.model.preview(raw));
+    const result = rebuild ? null : this.host.apply(live);
+    if (result && !result.ok) {
+      this.refused(result);
+      return null;
+    }
+    this.model.replace(target);
+    // With no system to apply to, a build in flight took an older document
+    // and must be followed, as in `commit`; with audio never enabled there is
+    // nothing to build.
+    if (rebuild || (result ? result.ignored.length > 0 : this.host.isBuilding)) this.buildLive();
+    return current;
   }
 
   /** Show the tab a step was made on (epic decision 4) and draw what came back. */
@@ -324,11 +334,20 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
 
   /** The one path a structural change takes: the live system rebuilt, every tab invalidated. */
   private rebuild(): void {
+    this.buildLive();
+    this.render();
+  }
+
+  /**
+   * The live system rebuilt from the document, and every tab drawn again once
+   * it stands. `EngineHost.build` rebuilds at tick 0: a transport playing
+   * across it plays on from the top of the song (`HostTransport.adopt`).
+   */
+  private buildLive(): void {
     void this.host.build(this.model.doc).then(
       () => this.render(),
       (error: unknown) => this.notify(String(error), 'error'),
     );
-    this.render();
   }
 
   private renderTab(tab: Tab<P>): void {
