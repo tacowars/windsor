@@ -368,4 +368,15 @@ describe('change listeners (the song autosave)', () => {
     model.merge({ transport: { bpm: 120 } });
     expect(heard).toBe(3);
   });
+
+  it('hears a replace, which adopts the document it is given itself (an undo)', () => {
+    const model = new DocumentModel({ version: 3, parts: [] });
+    const before = model.doc;
+    model.merge({ transport: { bpm: 100 } });
+    let heard = 0;
+    model.onChange(() => heard++);
+    model.replace(before);
+    expect([model.doc, model.corrections, heard]).toEqual([before, [], 1]);
+    expect(model.doc).toBe(before);
+  });
 });

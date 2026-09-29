@@ -158,6 +158,19 @@ export class DocumentModel {
   }
 
   /**
+   * Adopt a document this model already held, as it is: an undo's or a
+   * redo's snapshot (windsor#124, record `2026-09-29-undo-history`). A merge
+   * could not say everything a snapshot holds (a part's place in the list,
+   * a return that was absent), so the snapshot itself becomes the document
+   * and is equal to it by construction. The report is the one normalising it
+   * gives, as after a `merge`, and the listeners hear it as they hear a merge.
+   */
+  replace(doc: ArrangementDocument): void {
+    this.adopt({ ...this.normalise(doc), document: doc });
+    this.notify();
+  }
+
+  /**
    * A raw document normalised the way `open` would, without adopting it
    * (#629): what a live add or kind change sends the engine is the part the
    * normaliser fills — its strip, velocity and the kind's defaults — so the
