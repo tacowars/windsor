@@ -5,8 +5,9 @@
  * takes a drop or a click, a delete-last-step button, the part velocity, gate
  * and base-step controls, and a playhead on the audible tick. A hit's chord
  * is the harmony timeline's (epic #703 decision 15): the Hit tile names and
- * auditions the chord under the playhead, and a step's tile does the same
- * with its own inversion and octave.
+ * auditions the selected region's chord — the one under the playhead while
+ * the song is inside the region, else the one at its start (windsor#100) —
+ * and a step's tile does the same with its own inversion and octave.
  * Every edit goes through `ctx.change` as a whole `steps` list (arrays
  * replace wholesale in the merge), into the pane's selected region's
  * pattern (windsor#75, `partEdits.ts`'s `changePattern`); the step operations are
@@ -15,14 +16,14 @@
  * Euclidean (#610) cards.
  */
 import type { ChordSpec, ChordStep, HarmonyChord } from '@windsor/engine';
-import { CHORD_DIVISORS, partAt, songTicksOf } from '@windsor/engine';
+import { CHORD_DIVISORS, partAt } from '@windsor/engine';
 import { CHORD_AUDITION_VELOCITY } from './chordConstants';
 import { chordPicker, type Picker } from './chordPicker';
+import { regionChord } from './chordRegionChord';
 import {
   CHORD_STEPS_MAX,
   type StepDial,
   appendStep,
-  currentChord,
   dialLabel,
   dropOn,
   removeLast,
@@ -41,7 +42,6 @@ import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { CHORD_KNOBS } from './sequencerKnobTables';
 import {
   type Strip,
-  audibleTick,
   commitSteps,
   markStep,
   paintStrip,
@@ -53,7 +53,7 @@ import {
 } from './stepStrip';
 
 const HINT =
-  'Press Hit to hear the chord under the playhead through this part; drag it, or Rest, onto a ' +
+  'Press Hit to hear this region’s chord through this part; drag it, or Rest, onto a ' +
   'step or the + column. Press a step to hear it as written. Dials: click up, shift-click down — ' +
   'Oct shifts the hit, Inv inverts it, Dur is a multiple of the base step, Rep plays the step ' +
   'that many times. The chords themselves are the Harmony tab’s timeline; Voicing applies to ' +
@@ -72,11 +72,9 @@ type ChordStrip = Strip<ChordSpec> & { picker: Picker | null };
 const commit = (strip: ChordStrip, edit: (spec: ChordSpec) => readonly ChordStep[]): void =>
   commitSteps(strip, edit);
 
-/** The chord the timeline holds at the audible tick — the engine's rule, read for a tile press. */
-function chordNow(ctx: AppCtx): HarmonyChord | null {
-  const { doc } = ctx.model;
-  return currentChord(doc.harmony, songTicksOf(doc), audibleTick(ctx));
-}
+/** The chord the card's tiles name and sound: its region's (`chordRegionChord.ts`, windsor#100). */
+const chordNow = (strip: ChordStrip): HarmonyChord | null =>
+  regionChord(strip.ctx, strip.slot, strip.region);
 
 /**
  * Pressing a step's tile sounds the step as the sequencer would play it, until
@@ -97,7 +95,7 @@ function bindTileAudition(strip: ChordStrip, node: HTMLElement, step: ChordStep)
     const spec = strip.spec();
     if (!part || !spec) return;
     node.setPointerCapture(e.pointerId);
-    const notes = stepNotes(strip.ctx.model.doc.harmony, chordNow(strip.ctx), step, spec);
+    const notes = stepNotes(strip.ctx.model.doc.harmony, chordNow(strip), step, spec);
     sounding = { part, ids: notes.map((n) => part.noteOn(n, CHORD_AUDITION_VELOCITY)) };
   });
   node.addEventListener('pointerup', stop);
@@ -159,19 +157,20 @@ function repaint(strip: ChordStrip): void {
   strip.picker?.repaint();
 }
 
-/** Root, scale and the chord under the playhead: what the Hit tile's label depends on. */
+/** Root, scale and the region's chord: what the Hit tile's label depends on. */
 function tileSignature(strip: ChordStrip): string {
   const { doc } = strip.ctx.model;
-  const chord = chordNow(strip.ctx);
+  const chord = chordNow(strip);
   return `${keySignature(doc.harmony)}|${chord ? chord.index : -1}|${JSON.stringify(doc.harmony.events)}`;
 }
 
 /**
  * Per frame while the card is on screen: the playhead (the engine's own step
  * for the audible tick, durations and repeats included), and a repaint of the
- * Hit tile when the key, the timeline or the chord under the playhead has
- * changed since it was drawn — a root edit goes through `ctx.change` alone,
- * which re-renders nothing, and the playhead crosses chord boundaries on its own.
+ * Hit tile when the key, the timeline or the region's chord has changed since
+ * it was drawn — a root edit goes through `ctx.change` alone, which
+ * re-renders nothing, a region edit moves its start, and the playhead crosses
+ * chord boundaries and enters or leaves the region on its own.
  */
 function watch(strip: ChordStrip): void {
   let tileSig = tileSignature(strip);
@@ -244,7 +243,7 @@ export function chordCard(ctx: AppCtx, slot: number, region?: number): HTMLEleme
   };
   strip.picker = chordPicker({
     harmony: () => ctx.model.doc.harmony,
-    currentChord: () => chordNow(ctx),
+    currentChord: () => chordNow(strip),
     spec: () => strip.spec(),
     part: () => ctx.host.part(slot),
     setVoicing: (voicing) => writeField(strip, { voicing }),

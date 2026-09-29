@@ -1,7 +1,7 @@
 /**
- * The chord picker (#607, #705): one Hit tile — named for the chord the
- * harmony timeline holds under the playhead — one Rest tile, and the part's
- * voicing. Pressing the Hit tile sounds the current chord through the chord
+ * The chord picker (#607, #705): one Hit tile — named for the chord its host
+ * hands it, the card's region's (windsor#100) — one Rest tile, and the part's
+ * voicing. Pressing the Hit tile sounds that chord through the chord
  * part the card belongs to (epic #605 decision 8); dragging it, or the Rest
  * tile, carries a ghost onto a step of the card's strip. The press-and-drag
  * behaviour is `chordDrag.ts`'s state machine; this file is its DOM.
@@ -20,7 +20,7 @@ import { el, escapeHtml, html, select } from './dom';
 
 export interface PickerHost {
   harmony(): Harmony;
-  /** The chord under the playhead now: what the Hit tile names and sounds. */
+  /** The chord the Hit tile names and sounds now: the card's region's (`chordRegionChord.ts`). */
   currentChord(): HarmonyChord | null;
   spec(): ChordSpec | null;
   /** The engine part the chips sound through: the chord part itself. */
