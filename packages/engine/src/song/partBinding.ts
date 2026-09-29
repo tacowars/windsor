@@ -55,6 +55,18 @@ export interface PartOutput {
   onset(event: OnsetEvent, spec: SequencerSpec): void;
 }
 
+/**
+ * Where one region's pattern is at a transport tick (windsor#97): the step
+ * its generator plays there, and whether the playhead is in that region.
+ * Out of it, `step` is the step the pattern would be on had it run on from
+ * the region's last start (`regionPhase`).
+ */
+export interface RegionStep {
+  readonly step: number;
+  /** True while the tick is inside the region: `step` is then what `stepAt` answers. */
+  readonly live: boolean;
+}
+
 /** What `PartBinding.plan` hands the player: validated and built, committed later. */
 export interface BindingChange {
   /**
@@ -181,6 +193,21 @@ export class PartBinding {
     if (!state.live) return -1;
     const bound = this.byRegion[state.index] ?? this.base;
     return generatorStepAt(bound.generator, state.localTick);
+  }
+
+  /**
+   * Region `index`'s step at transport tick `tick`, sounding or not: its
+   * own generator at the region's phase (`RegionGate.phaseAt`), at its own
+   * divisor. Inside the region this is `stepAt`'s answer; null for an index
+   * naming no region.
+   */
+  regionStepAt(index: number, tick: number): RegionStep | null {
+    const bound = this.byRegion[index];
+    const local = this.gate.phaseAt(index, tick);
+    if (!bound || local === null) return null;
+    const state = this.gate.stateAt(tick);
+    const live = state.live && state.index === index;
+    return { step: generatorStepAt(bound.generator, local), live };
   }
 
   /**

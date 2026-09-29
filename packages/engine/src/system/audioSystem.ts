@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the one system the console drives, at 350 before windsor#97's region query (beside stepAt, where the ticket puts it) took it 4 lines over; splitting the class for 4 lines would scatter one surface */
 /**
  * The audio system: the standing graph a page plays through. The console
  * (`packages/app/src/host.ts`) constructs it and pumps `update()` from its
@@ -44,6 +45,7 @@ import type {
   ArrangementReadout,
   MusicEventHandler,
   PartHost,
+  RegionStep,
 } from '../song/arrangementPlayer';
 import { ArrangementPlayer } from '../song/arrangementPlayer';
 import { PatchResolver } from '../song/arrangementValidate';
@@ -457,6 +459,15 @@ export class AudioSystem {
    */
   stepAt(slot: number, tick: number): number {
     return this.player?.stepAt(slot, tick) ?? -1;
+  }
+
+  /**
+   * Where region `region` of the part on `slot` is at transport tick `tick`,
+   * sounding or not (windsor#97): `ArrangementPlayer.regionStepAt`, so a
+   * card's playhead outside its region is still the engine's position rule.
+   */
+  regionStepAt(slot: number, region: number, tick: number): RegionStep | null {
+    return this.player?.regionStepAt(slot, region, tick) ?? null;
   }
 
   /** The live strip of a part this system created. */
