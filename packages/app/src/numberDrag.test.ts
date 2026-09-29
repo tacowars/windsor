@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ArrangementDocument } from '@windsor/engine';
 import { FakeElement, fire, openGestureConsole } from './__fixtures__/gestureConsole';
 import type { NumberBoxSpec } from './numberDrag';
-import { attachDrag } from './numberDrag';
+import { attachDrag, attachTyping } from './numberDrag';
 import {
   barsChange,
   bpmChange,
@@ -122,5 +122,31 @@ describe('a number box drag', () => {
     fire(node, 'pointerdown', { clientY: 300 });
     fire(node, 'pointerup', { clientY: 300 });
     expect(ctx.canUndo).toBe(false);
+  });
+});
+
+describe('a typed entry', () => {
+  it.each(BOXES)('commits as one step named $label', (which) => {
+    const ctx = openGestureConsole();
+    const before = which.get(ctx.model.doc);
+    const input = Object.assign(new FakeElement(), { value: '', blur: () => {} });
+    const spec: NumberBoxSpec = {
+      label: which.label,
+      unit: '',
+      inputMode: 'numeric',
+      get: () => which.get(ctx.model.doc),
+      set: (v) => which.set(ctx, v),
+      format: String,
+      parse: () => before + 1,
+      drag: which.drag,
+    };
+    attachTyping(input as unknown as HTMLInputElement, spec, () => {});
+    fire(input, 'focus');
+    fire(input, 'input');
+    fire(input, 'blur');
+    expect(which.get(ctx.model.doc)).not.toBe(before);
+    expect(ctx.undoLabel).toBe(which.label);
+    expect(ctx.undo()).toBe(true);
+    expect(which.get(ctx.model.doc)).toBe(before);
   });
 });

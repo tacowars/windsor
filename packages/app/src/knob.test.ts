@@ -102,6 +102,24 @@ describe('a knob drag', () => {
   });
 });
 
+describe('a knob double-click', () => {
+  it('resets as one step named after the knob, after the clicks’ own empty drags', () => {
+    const ctx = openGestureConsole();
+    const node = levelKnob(ctx);
+    ctx.change(level(0.9));
+    const before = levelOf(ctx);
+    for (let i = 0; i < 2; i++) {
+      fire(node, 'pointerdown', { clientY: 100 });
+      fire(node, 'pointerup', { clientY: 100 });
+    }
+    fire(node, 'dblclick');
+    expect(levelOf(ctx)).toBe(0.5);
+    expect(ctx.undoLabel).toBe('Level');
+    expect(ctx.undo()).toBe(true);
+    expect(levelOf(ctx)).toBe(before);
+  });
+});
+
 describe('arrow keys on a knob', () => {
   const arrow = (node: FakeElement, key = 'ArrowDown'): void => fire(node, 'keydown', { key });
 

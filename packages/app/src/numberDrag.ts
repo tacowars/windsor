@@ -7,7 +7,7 @@
  * functions (`transportModel.ts`); this file only wires pointer and keys.
  */
 import { el } from './dom';
-import { dragGesture } from './gestureHooks';
+import { dragGesture, withGesture } from './gestureHooks';
 import type { OpenGesture } from './gestureHooks';
 import { pressMove, startsPress, typedEntry } from './transportModel';
 
@@ -102,9 +102,11 @@ export function attachDrag(
 /**
  * Enter and blur commit a typed entry; Escape reverts it. Only an edit since
  * focus commits (`typedEntry`), so a focus and blur never rewrites a value the
- * box displays rounded, while retyping the same text still does.
+ * box displays rounded, while retyping the same text still does. A typed
+ * commit is one undo step named after the box, like its drag. Exported for
+ * its test.
  */
-function attachTyping(input: HTMLInputElement, spec: NumberBoxSpec, show: () => void): void {
+export function attachTyping(input: HTMLInputElement, spec: NumberBoxSpec, show: () => void): void {
   let edited = false;
   input.addEventListener('focus', () => {
     edited = false;
@@ -115,7 +117,7 @@ function attachTyping(input: HTMLInputElement, spec: NumberBoxSpec, show: () => 
   const commit = (): void => {
     const value = typedEntry(input.value, edited, spec.parse);
     edited = false;
-    if (value !== null && value !== spec.get()) spec.set(value);
+    if (value !== null && value !== spec.get()) withGesture(spec.label, () => spec.set(value));
     show();
   };
   input.addEventListener('blur', commit);

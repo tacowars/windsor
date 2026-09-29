@@ -27,7 +27,7 @@ export interface KnobElement extends HTMLElement {
   refresh: () => void;
 }
 
-import { dragGesture, isModifierKey, mergedGesture } from './gestureHooks';
+import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestureHooks';
 import type { OpenGesture } from './gestureHooks';
 import {
   ARC_END,
@@ -225,7 +225,9 @@ export function attachKnobInput(
   node.addEventListener('pointerup', stop);
   node.addEventListener('pointercancel', stop);
   node.addEventListener('lostpointercapture', stop);
-  node.addEventListener('dblclick', () => commit(spec.def));
+  // Each click's release has already closed its own (empty) drag step, so the
+  // reset opens a step of its own under the knob's label.
+  node.addEventListener('dblclick', () => withGesture(spec.label, () => commit(spec.def)));
   const keys = mergedGesture({
     label: spec.label,
     continues: (e) => continuesKeySteps(e, node),
