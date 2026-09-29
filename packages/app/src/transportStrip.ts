@@ -20,6 +20,7 @@ import type { Swing } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
 import { el, html, select } from './dom';
+import { isModifierKey, mergedGesture } from './gestureHooks';
 import { makeNumberBox } from './numberDrag';
 import { keyFacts, spaceAction } from './transportKeys';
 import { audibleTick, watchPlayhead } from './stepStrip';
@@ -57,6 +58,7 @@ import {
   SWING_GRID_OPTIONS,
   SWING_KNOB,
   SWING_UNIT,
+  TAP_TEMPO,
 } from './transportTables';
 
 const songTicks = (ctx: AppCtx): number => ctx.model.doc.transport.bars * POSITION_GRID.bar;
@@ -92,19 +94,47 @@ function tempoBoxes(ctx: AppCtx): HTMLElement[] {
   });
   const tap = button('Tap', 'Tap tempo: tap on the beat; a 2 s pause starts again');
   tap.classList.add('transport-tap');
-  let taps: readonly number[] = [];
-  // A mouse or touch taps on the press, not the release, so the beat lands
-  // where the finger does; a keyboard, assistive technology or voice control
-  // activates through a `click` with no press before it (`countsAsTap`).
-  const onTap = (e: MouseEvent): void => {
-    if (!countsAsTap(e)) return;
-    const result = tapTempo(taps, performance.now());
-    taps = result.taps;
-    if (result.bpm !== null && ctx.change(bpmChange(result.bpm)).ok) bpm.refresh();
-  };
+  const onTap = tapHandler(ctx, tap, () => bpm.refresh());
   tap.addEventListener('pointerdown', onTap);
   tap.addEventListener('click', onTap);
   return [tap, bpm, bars];
+}
+
+/** Whether an input continues a tap sequence's step: another press or click on Tap, or its Enter or Space. */
+function continuesTaps(e: Event, tap: EventTarget): boolean {
+  if (isModifierKey(e)) return true;
+  if (e.target !== tap) return false;
+  const key = (e as KeyboardEvent).key;
+  return e.type === 'pointerdown' || e.type === 'click' || key === 'Enter' || key === ' ';
+}
+
+/**
+ * Tap tempo's handler. A mouse or touch taps on the press, not the release,
+ * so the beat lands where the finger does; a keyboard, assistive technology
+ * or voice control activates through a `click` with no press before it
+ * (`countsAsTap`). The taps of one sequence, each less than the tap window
+ * after the last, are one undo step (windsor#130 decision 7). Exported for
+ * its test, which drives it with a fake clock.
+ */
+export function tapHandler(
+  ctx: AppCtx,
+  tap: EventTarget,
+  onTempo: () => void,
+  now: () => number = () => performance.now(),
+): (e: MouseEvent) => void {
+  let taps: readonly number[] = [];
+  const sequence = mergedGesture({
+    label: 'Tap tempo',
+    ms: TAP_TEMPO.resetMs,
+    continues: (e) => continuesTaps(e, tap),
+  });
+  return (e) => {
+    if (!countsAsTap(e)) return;
+    const result = tapTempo(taps, now());
+    taps = result.taps;
+    sequence.touch();
+    if (result.bpm !== null && ctx.change(bpmChange(result.bpm)).ok) onTempo();
+  };
 }
 
 /**

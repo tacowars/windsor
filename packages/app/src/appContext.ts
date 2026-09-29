@@ -24,6 +24,7 @@ import { partAt } from '@windsor/engine';
 import type { AppCtx, ConsoleTransport } from './context';
 import { deepEqual, documentDiffLive } from './documentDiff';
 import type { DocumentModel } from './documentModel';
+import { setGestureHook } from './gestureHooks';
 import type { EngineHost } from './host';
 import { loadRenames } from './partAutoName';
 import { PartsSession } from './partsSession';
@@ -82,6 +83,7 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     this.notify = deps.notify;
     this.transport = deps.host.transport;
     this.parts = new PartsSession((patch) => this.commitPatch(patch));
+    setGestureHook({ begin: (label) => this.beginGesture(label), end: () => this.endGesture() });
   }
 
   /** Register a tab; the first registered is the active one. Nothing renders until `render()`. */

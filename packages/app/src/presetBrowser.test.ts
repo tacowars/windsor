@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { choosePreset } from './presetBrowser';
+import { choosePreset, pickPreset } from './presetBrowser';
+import { openGestureConsole } from './__fixtures__/gestureConsole';
+import { dropInit } from './patchActions';
 import { DocumentModel } from './documentModel';
 import type { AppCtx } from './context';
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
@@ -49,5 +51,28 @@ describe('browser selection', () => {
     expect(choosePreset(ctx, FULL_SLOT.arp, 'not-a-patch')).toBe(false);
     expect(choosePreset(ctx, FULL_SLOT.arp, 'constructor')).toBe(false);
     expect(ctx.model.toJson()).toBe(before);
+  });
+});
+
+describe('choosing a preset as an undo step (windsor#130)', () => {
+  it('is one step, the Init discard it sets off included', () => {
+    const ctx = openGestureConsole();
+    const before = ctx.model.doc;
+    const init = partAt(before, 0)?.preset ?? '';
+    const id = 'score-concrete-chord';
+    expect(pickPreset(ctx, 0, id, () => dropInit(ctx))).toBe(true);
+    // Two edits: the part switched to the preset, and the Init no part plays dropped.
+    expect(partAt(ctx.model.doc, 0)?.preset).toBe(id);
+    expect(ctx.model.doc.patches?.[init]).toBeUndefined();
+    expect(ctx.undoLabel).toBe('Choose preset');
+    expect(ctx.undo()).toBe(true);
+    expect(ctx.model.doc).toEqual(before);
+    expect(ctx.canUndo).toBe(false);
+  });
+
+  it('records nothing for a preset that does not load', () => {
+    const ctx = openGestureConsole();
+    expect(pickPreset(ctx, 0, 'not-a-patch', () => dropInit(ctx))).toBe(false);
+    expect(ctx.canUndo).toBe(false);
   });
 });
