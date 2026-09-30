@@ -16,11 +16,13 @@ const {
   kernel,
   NORM,
   normalization,
+  boundaryTrial,
   EXPERIMENT: E,
   REFERENCE: R,
   FILTERED: F,
 } = await loadSource(`
 export * from './docs/research/2026-09-30-tape-filtered-reference/filteredConstants.ts';
+export * from './docs/research/2026-09-30-tape-filtered-reference/boundary.ts';
 export * from './docs/research/2026-09-30-tape-filtered-reference/reconstruction.ts';
 export * from './docs/research/2026-09-30-tape-filtered-reference/filteredReference.ts';
 export * from './docs/research/2026-09-30-tape-reference/reference.ts';
@@ -39,9 +41,9 @@ const report = {
     backend: 'Node Float64 source DSP',
   },
   settings: {
-    ...E,
-    ...R,
-    ...F,
+    experiment: E,
+    reference: R,
+    filtered: F,
     normalization: NORM,
     normalizationHalfPanels: normalization(F.normalizationPanels / 2),
   },
@@ -206,42 +208,8 @@ for (const factor of [...E.factors, ...F.levels]) {
 }
 for (const rate of E.rates)
   for (const solver of E.solvers)
-    for (const sign of R.histories)
-      for (const level of E.stressLevels) {
-        const factor = R.diagnosticFactor;
-        const input = (n) => (n < E.blockSize ? 0 : n < 2 * E.blockSize ? level : 0);
-        const field = {
-          grid: 2 * factor,
-          bins: [0],
-          at: (i, derivative = false) => reconstruct(i / (2 * factor), input)[derivative ? 1 : 0],
-        };
-        const r = render({
-          rate,
-          factor,
-          solver,
-          field,
-          frames: F.boundaryFrames,
-          signal: { bins: [0], amplitude: 1, sign },
-        });
-        report.boundaries.push({
-          rate,
-          solver,
-          sign,
-          level,
-          finite: r.finite,
-          failure: r.failure,
-          resets: r.resets,
-          clips: r.clips,
-          final: r.final,
-          fieldPeak: r.fieldPeak,
-          points: F.boundaryTimes.map((t) => ({
-            t,
-            field: reconstruct(t, input).map((x) => sign * x),
-            raw: Number.isFinite(r.raw[t]) ? r.raw[t] : null,
-            output: Number.isFinite(r.output[t]) ? r.output[t] : null,
-          })),
-        });
-      }
+    for (const level of F.boundaryLevels)
+      report.boundaries.push(boundaryTrial({ rate, solver, level }));
 writeReport(new URL('./measurement.json', import.meta.url), report);
 console.log(
   'Wrote report; normal reference failures:',

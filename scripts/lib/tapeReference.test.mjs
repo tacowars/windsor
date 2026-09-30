@@ -75,7 +75,7 @@ describe('Tape reference refinement and state', () => {
     const continuous = analytic({ ...options, factor: R.refinements.at(-1) });
     expect(errorDb(window(candidate.output), window(references[2].output))).toBeLessThan(-65);
     expect(errorDb(window(references[2].output), window(continuous.output))).toBeGreaterThan(-50);
-  });
+  }, 30_000); // Full CI exceeded the default 5 s; numerical gates above are unchanged.
   it('preserves opposite remanent histories, tiny forcing, DC and block endpoints', () => {
     const states = R.histories.map((sign) => {
       const core = new FrozenCore(rate * R.diagnosticFactor);

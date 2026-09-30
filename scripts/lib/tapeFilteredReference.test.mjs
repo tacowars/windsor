@@ -1,5 +1,8 @@
 /** Independent reconstruction, timestamps and qualification checks for Windsor #150. */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { URL } from 'node:url';
+import { boundaryTrial } from '../../docs/research/2026-09-30-tape-filtered-reference/boundary.ts';
 import {
   kernel,
   normalization,
@@ -251,5 +254,62 @@ describe('Honest reference and residual gates', () => {
     ).toBeGreaterThan(-30);
     expect(() => window(reference, false, E.frames + 1)).toThrow();
     expect(errorDb(window(reference), window(reference))).toBe(-300);
+  });
+});
+
+describe('Reproducible report domains', () => {
+  const report = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../docs/research/2026-09-30-tape-filtered-reference/measurement.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  it('preserves stimulus amplitudes and refinement factors in separate settings', () => {
+    expect(report.settings.experiment).toEqual(E);
+    expect(report.settings.reference).toEqual(R);
+    expect(report.settings.filtered).toEqual(F);
+    expect(report.settings.experiment.levels).toEqual([0.01, 0.25, 1, 4]);
+    expect(report.settings.filtered.levels).toEqual([16, 32, 64]);
+    expect(report.settings).not.toHaveProperty('levels');
+  });
+  it('records each signed pulse exactly once per rate/solver with the actual plateau polarity', () => {
+    const expected = E.rates.flatMap((rate) =>
+      E.solvers.flatMap((solver) => F.boundaryLevels.map((level) => [rate, solver, level].join())),
+    );
+    const keys = report.boundaries.map(({ rate, solver, level }) => [rate, solver, level].join());
+    expect(new Set(F.boundaryLevels).size).toBe(9);
+    expect(keys).toHaveLength(54);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toEqual(expected);
+    for (const row of report.boundaries) {
+      expect(row).not.toHaveProperty('sign');
+      const plateau = row.points.find(({ t }) => t === 160).field[0];
+      expect(Math.sign(plateau)).toBe(Math.sign(row.level));
+      if (row.level !== 0) expect(plateau / row.level).toBeCloseTo(1, 5);
+    }
+    expect(report.boundaries.filter((row) => row.failure)).toHaveLength(24);
+    expect(report.boundaries.filter((row) => row.finite)).toHaveLength(30);
+  });
+  it('renders the signed level without a second polarity multiplier', () => {
+    const rows = [-1, 1].map((level) =>
+      boundaryTrial({ rate: E.benchmarkRate, solver: 'rk4', level }),
+    );
+    for (const row of rows) {
+      expect(row.failure).toBeNull();
+      expect(row.finite).toBe(true);
+      const plateau = row.points.find(({ t }) => t === 160);
+      expect(Math.sign(plateau.field[0])).toBe(row.level);
+      expect(Math.sign(plateau.raw)).toBe(row.level);
+      expect(Math.sign(plateau.output)).toBe(row.level);
+      expect(row).toEqual(
+        report.boundaries.find(
+          (r) => r.rate === row.rate && r.solver === row.solver && r.level === row.level,
+        ),
+      );
+    }
+    expect(rows[0].final).toBeCloseTo(-rows[1].final, 12);
   });
 });

@@ -10,6 +10,8 @@ export const FILTERED = {
   kernelSeriesRadius: 1e-4,
   identityTolerance: 1e-7,
   boundaryFrames: 512,
+  // Independent signed pulses, each starting at zero; polarity is applied once.
+  boundaryLevels: [0, 1e-12, -1e-12, 1, -1, 8, -8, 100, -100],
   candidateMarginDb: 10,
   boundaryTimes: [0, 127, 128, 129, 159, 160, 255, 256],
   testTimeoutMs: 30000,

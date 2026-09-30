@@ -65,6 +65,19 @@ high/two-tone cases. No product setting is selected from these numbers.
 
 The periodic amplitude-4 references converge, but both solvers fail at
 1× on the high-tone overload. Reconstructed ±8/±100 step pulses exceed
-the unclipped input domain and abort. The next boundary is explicit
+the unclipped input domain and abort: 24 of 54 unique boundary trials;
+the 30 zero/tiny/unit trials remain finite. Each rate/solver tests nine
+signed pulse levels with polarity applied once. This corrects the initial
+120-row report's duplicated sign/level combinations and repeated zero.
+Settings now retain experiment amplitudes and filtered refinement factors
+in separate namespaces rather than merging their colliding `levels` keys.
+Neither correction changes the normal-domain numerical results or gates.
+
+The older frozen-history test receives a targeted 30-second timeout after
+full CI exceeded its default 5 seconds; its numerical assertions and
+historical research sources/reports are unchanged. This is the sole narrow
+edit outside #150's ownership, necessary to complete CI verification.
+
+The next boundary is explicit
 input/control conditioning and stability, followed by resampling response
 and realistic browser cost. Qualification here does not erase those tasks.

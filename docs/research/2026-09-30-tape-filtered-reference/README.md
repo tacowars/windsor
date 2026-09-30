@@ -51,15 +51,15 @@ the new filtered 1× path. Its measured DC gain ranges from 0.99999669 at
 All 24 periodic amplitude-4 reference probes pass in all three families.
 Nevertheless, both consistent solvers fail at 1× for the amplitude-4 high
 tone at every rate/polarity (12 invalid trials); the alpha baseline also
-resets in those 12 trials. All invalid residuals are null. Of 120 signed
-step-pulse trials, 48 abort when reconstructed ±8/±100 exceeds the declared
-unclipped input domain; the 72 zero/tiny/unit probes remain finite. These
+resets in those 12 trials. All invalid residuals are null. Of 54 unique signed
+step-pulse trials, 24 abort when reconstructed ±8/±100 exceeds the declared
+unclipped input domain; the 30 zero/tiny/unit probes remain finite. These
 are recorded failures, not overload recovery or production safety.
 
 Measured on Apple M1 arm64, Darwin 25.5.0, Node 24.21.0 /
 V8 13.6.233.17-node.53, Float64 source DSP, no browser/audio device.
 The report has 288 new reference groups, 1536 candidate trials,
-96 decomposition rows, seven filter checks, 120 boundary trials and
+96 decomposition rows, seven filter checks, 54 boundary trials and
 96 explicitly historical full-alpha reference gates. These are numerical
 results, not timing or CPU measurements.
 
@@ -153,6 +153,20 @@ zero history; default internal Drive/Width/Saturation 0.5. Two-tone peak
 amplitude is split equally between its tones. Twenty-four amplitude-4
 cases are separate probes. No control corners or automation are covered.
 
+Boundary probes use nine unique signed host-sample levels: 0, ±1e-12,
+±1, ±8 and ±100, each once per rate and solver (3 × 2 × 9 = 54).
+Every pulse starts from zero history, has its plateau at samples 128–255,
+and returns to zero at 256. `level` carries the polarity exactly once;
+there is no independent sign multiplier. This replaces the initial report's
+120 rows, which duplicated opposite sign/level combinations and zero.
+
+Report settings are namespaced as `settings.experiment`, `settings.reference`
+and `settings.filtered`. Stimulus amplitudes are `experiment.levels`
+(0.01/0.25/1/4), integration refinements are `filtered.levels` (16/32/64),
+and this pulse matrix is `filtered.boundaryLevels`. The preserved
+`experiment.stressLevels` describes #145's sequential stress input, not
+this experiment's independent pulse matrix.
+
 Each claim requires both successive unfitted RMS refinement residuals
 below -70 dB low/mid or -60 dB high/two-tone, finite nonzero output and no
 reset/clip/failure. Settling compares periods one/two, except quiet low
@@ -189,9 +203,9 @@ npx vitest run scripts/lib/tapeFilteredReference.test.mjs scripts/lib/tapeRefere
 npm run typecheck
 npx tsc --noEmit --target esnext --module esnext --moduleResolution bundler --strict --skipLibCheck docs/research/2026-09-30-tape-filtered-reference/*.ts
 npm run lint -- --ignore-pattern '.claude/worktrees/**'
-npx prettier --check --ignore-path /dev/null 'docs/research/2026-09-30-tape-filtered-reference/*.{ts,mjs}' scripts/lib/tapeFilteredReference.test.mjs
+npx prettier --check --ignore-path /dev/null 'docs/research/2026-09-30-tape-filtered-reference/*.{ts,mjs}' scripts/lib/tapeFilteredReference.test.mjs scripts/lib/tapeReference.test.mjs
 git diff --check
-git diff origin/main --exit-code -- packages/engine packages/app docs/research/2026-09-30-tape-phase-3 docs/research/2026-09-30-tape-reference scripts/lib/tapePrototype.test.mjs scripts/lib/tapeReference.test.mjs
+git diff origin/main --exit-code -- packages/engine packages/app docs/research/2026-09-30-tape-phase-3 docs/research/2026-09-30-tape-reference scripts/lib/tapePrototype.test.mjs
 ```
 
 The one sequential reproduction writes only this directory's report. It
@@ -201,6 +215,13 @@ again. Run numerical jobs sequentially. This is offline, intentionally
 allocating research; no browser, audio device or local upstream checkout
 is used. CI discovers the three focused test files without configuration
 changes. CI owns the full `verify` gate.
+
+The fix round changes only the older `tapeReference.test.mjs` frozen-history
+test's timeout from the 5-second default to 30 seconds: full CI timed out
+while the focused slice passed. Its numerical assertions are unchanged;
+this narrow ownership exception does not modify #145/#148 sources or
+reports. The three new report checks pin both settings domains, unique
+signed pulse coverage and label agreement with the rendered plateau.
 
 ## Independence and limits
 
