@@ -70,31 +70,47 @@ export const DELAY_LINE_KNOBS: readonly DelayLineKnob[] = [
   },
 ];
 
-/** The named starting point whose numbers `space` holds exactly, if any. */
+/** The named starting point whose numbers `space` holds exactly, field by field, if any. */
 export function matchingSpace(space: ReverbSpace | undefined): SpaceName | undefined {
   if (!space) return undefined;
-  return SPACE_NAMES.find((key) => JSON.stringify(SPACES[key]) === JSON.stringify(space));
+  return SPACE_NAMES.find((key) => {
+    const named = SPACES[key];
+    return (Object.keys(named) as (keyof ReverbSpace)[]).every((f) => named[f] === space[f]);
+  });
+}
+
+/** A control that re-reads the document when a knob beside it edits what it shows. */
+export interface RefreshingControl {
+  readonly root: HTMLElement;
+  refresh(): void;
 }
 
 /**
- * The Starting point picker: the named spaces, and "custom" when `current`
- * matches none. Picking one hands its name to `onPick`, which writes its
- * numbers into the document.
+ * The Starting point picker: the named spaces, and "custom" when the space
+ * `read` returns matches none. Picking one hands its name to `onPick`, which
+ * writes its numbers into the document. `refresh` re-evaluates the match, so
+ * a knob turn that leaves every space reads "custom", and picking the space
+ * it left is a one-step reset.
  */
 export function spacePicker(
-  current: ReverbSpace | undefined,
+  read: () => ReverbSpace | undefined,
   onPick: (name: SpaceName) => void,
-): HTMLElement {
-  const match = matchingSpace(current);
-  const options: { value: string; label: string }[] = SPACE_NAMES.map((key) => ({
-    value: key,
-    label: key,
-  }));
-  if (!match) options.unshift({ value: '', label: 'custom' });
-  return select('Starting point', options, match ?? '', (key) => {
+): RefreshingControl {
+  const options = SPACE_NAMES.map((key) => ({ value: key, label: key }));
+  const root = select('Starting point', options, '', (key) => {
     if (key === '') return;
     onPick(key as SpaceName);
   });
+  const sel = root.querySelector('select') as HTMLSelectElement;
+  const custom = new Option('custom', '');
+  const refresh = (): void => {
+    const match = matchingSpace(read());
+    if (match) custom.remove();
+    else if (custom.parentElement !== sel) sel.add(custom, 0);
+    sel.value = match ?? '';
+  };
+  refresh();
+  return { root, refresh };
 }
 
 /** Seconds of `beats` at `bpm`, inside the delay line's range. */
@@ -105,30 +121,40 @@ export function tempoSeconds(bpm: number, beats: number): number {
 
 export type TempoDivision = (typeof TEMPO_DIVISIONS)[number];
 
+/** Whether a delay time of `seconds` is `division` at `bpm`. */
+export function tempoMatches(bpm: number, seconds: number, division: TempoDivision): boolean {
+  return Math.abs(seconds - tempoSeconds(bpm, division.beats)) < TEMPO_MATCH_TOLERANCE;
+}
+
 /**
- * One button per note value at `bpm`, pressed when `current` (seconds) is
- * that value. A press hands `onPick` the seconds to store: the time is what
- * is saved, so a later bpm change needs the button pressed again.
+ * One button per note value at `bpm`, pressed when the time `read` returns
+ * (seconds) is that value. A press hands `onPick` the seconds to store: the
+ * time is what is saved, so a later bpm change needs the button pressed
+ * again. `refresh` re-reads the time, so a Time knob turn releases a button.
  */
 export function tempoRow(
   bpm: number,
-  current: number,
+  read: () => number,
   onPick: (seconds: number, division: TempoDivision) => void,
-): HTMLElement {
-  const row = el('div', 'bar-row');
-  row.style.marginTop = '6px';
-  row.appendChild(el('span', 'field-label', `Sync to ${bpm} bpm`));
-  for (const division of TEMPO_DIVISIONS) {
+): RefreshingControl {
+  const root = el('div', 'bar-row');
+  root.style.marginTop = '6px';
+  root.appendChild(el('span', 'field-label', `Sync to ${bpm} bpm`));
+  const buttons = TEMPO_DIVISIONS.map((division) => {
     const seconds = tempoSeconds(bpm, division.beats);
     const button = el('button', 'btn', division.label) as HTMLButtonElement;
     button.type = 'button';
     button.title = `${division.title} at ${bpm} bpm = ${fmtMs(seconds)}`;
-    button.setAttribute(
-      'aria-pressed',
-      String(Math.abs(current - seconds) < TEMPO_MATCH_TOLERANCE),
-    );
     button.onclick = (): void => onPick(seconds, division);
-    row.appendChild(button);
-  }
-  return row;
+    root.appendChild(button);
+    return { button, division };
+  });
+  const refresh = (): void => {
+    const current = read();
+    for (const { button, division } of buttons) {
+      button.setAttribute('aria-pressed', String(tempoMatches(bpm, current, division)));
+    }
+  };
+  refresh();
+  return { root, refresh };
 }

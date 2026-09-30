@@ -32,12 +32,11 @@ export const echoCard: InsertCard = (ctx, slot, index) => {
       commit({ ...current(), enabled: value === 'on' }),
     ),
   );
-  root.append(
-    row,
-    insertKnobs(ctx, slot, index, ECHO_KNOBS),
-    tempoRow(ctx.model.doc.transport.bpm, s.delayTime, (seconds) =>
-      commit({ ...current(), delayTime: seconds }),
-    ),
+  const tempo = tempoRow(
+    ctx.model.doc.transport.bpm,
+    () => current().delayTime,
+    (seconds) => commit({ ...current(), delayTime: seconds }),
   );
+  root.append(row, insertKnobs(ctx, slot, index, ECHO_KNOBS, tempo.refresh), tempo.root);
   return root;
 };

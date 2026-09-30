@@ -26,12 +26,16 @@ export const plateReverbCard: InsertCard = (ctx, slot, index) => {
   };
   const s = current();
   const row = el('div', 'knob-row');
+  const picker = spacePicker(
+    () => plateSpace(current()),
+    (name) => commit({ ...current(), ...SPACES[name] }),
+  );
   row.append(
-    spacePicker(plateSpace(s), (name) => commit({ ...current(), ...SPACES[name] })),
+    picker.root,
     select(INSERT_LABELS.plate, INSERT_SWITCH_OPTIONS, s.enabled ? 'on' : 'off', (value) =>
       commit({ ...current(), enabled: value === 'on' }),
     ),
   );
-  root.append(row, insertKnobs(ctx, slot, index, PLATE_REVERB_KNOBS));
+  root.append(row, insertKnobs(ctx, slot, index, PLATE_REVERB_KNOBS, picker.refresh));
   return root;
 };

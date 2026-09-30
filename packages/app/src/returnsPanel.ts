@@ -7,14 +7,14 @@
  * delay time to a note value at the document's bpm; the time is what is
  * stored, so a later bpm change needs the button pressed again.
  */
-import type { ReturnSpec } from '@windsor/engine';
+import type { ReturnSpec, ReverbSpace } from '@windsor/engine';
 import { RETURNS, RETURN_NAMES, REVERB_SPACE_RANGES, SPACES } from '@windsor/engine';
 import { RETURN_COLOR } from './consoleColors';
 import { fmt2, fmtMs } from './consoleFormat';
 import type { AppCtx } from './context';
 import { el, html, section } from './dom';
 import { makeKnob } from './knob';
-import type { SpaceKnob } from './returnControls';
+import type { RefreshingControl, SpaceKnob } from './returnControls';
 import { DELAY_LINE_KNOBS, SPACE_KNOBS, spacePicker, tempoRow } from './returnControls';
 
 /** The return as the document has it, else as the code ships it. */
@@ -35,7 +35,7 @@ function levelKnob(ctx: AppCtx, name: string): HTMLElement {
   });
 }
 
-function spaceKnob(ctx: AppCtx, name: string, spec: SpaceKnob): HTMLElement {
+function spaceKnob(ctx: AppCtx, name: string, spec: SpaceKnob, onChange: () => void): HTMLElement {
   const [min, max] = REVERB_SPACE_RANGES[spec.f];
   const base = RETURNS.room.space[spec.f];
   return makeKnob({
@@ -49,14 +49,19 @@ function spaceKnob(ctx: AppCtx, name: string, spec: SpaceKnob): HTMLElement {
       const spec2 = returnValue(ctx, name);
       return spec2.kind === 'reverb' ? spec2.space[spec.f] : base;
     },
-    set: (v) => void ctx.change({ returns: { [name]: { space: { [spec.f]: v } } } }),
+    set: (v) => {
+      if (ctx.change({ returns: { [name]: { space: { [spec.f]: v } } } }).ok) onChange();
+    },
   });
 }
 
 /** Write a named starting point's numbers into the document, then re-render the knobs. */
-function returnSpacePicker(ctx: AppCtx, name: string): HTMLElement {
-  const current = returnValue(ctx, name);
-  return spacePicker(current.kind === 'reverb' ? current.space : undefined, (key) => {
+function returnSpacePicker(ctx: AppCtx, name: string): RefreshingControl {
+  const read = (): ReverbSpace | undefined => {
+    const current = returnValue(ctx, name);
+    return current.kind === 'reverb' ? current.space : undefined;
+  };
+  return spacePicker(read, (key) => {
     const result = ctx.change({ returns: { [name]: { space: { ...SPACES[key] } } } });
     if (result.ok) {
       ctx.notify(`return "${name}" space → ${key}, in the document`);
@@ -65,7 +70,7 @@ function returnSpacePicker(ctx: AppCtx, name: string): HTMLElement {
   });
 }
 
-function delayKnobs(ctx: AppCtx, name: string): HTMLElement[] {
+function delayKnobs(ctx: AppCtx, name: string, onChange: () => void): HTMLElement[] {
   const base = RETURNS.echo;
   const value = (): { delayTime: number; feedback: number; damp: number; resonance: number } => {
     const spec = returnValue(ctx, name);
@@ -78,16 +83,21 @@ function delayKnobs(ctx: AppCtx, name: string): HTMLElement[] {
       color: RETURN_COLOR,
       ...o,
       get: () => value()[f],
-      set: (v) => void ctx.change({ returns: { [name]: { [f]: v } } }),
+      set: (v) => {
+        if (ctx.change({ returns: { [name]: { [f]: v } } }).ok) onChange();
+      },
     }),
   );
 }
 
 /** The tempo buttons: each sets the delay time to a note value at the document's bpm. */
-function returnTempoRow(ctx: AppCtx, name: string): HTMLElement {
+function returnTempoRow(ctx: AppCtx, name: string): RefreshingControl {
   const bpm = ctx.model.doc.transport.bpm;
-  const spec = returnValue(ctx, name);
-  return tempoRow(bpm, spec.kind === 'delay' ? spec.delayTime : NaN, (seconds, division) => {
+  const read = (): number => {
+    const spec = returnValue(ctx, name);
+    return spec.kind === 'delay' ? spec.delayTime : NaN;
+  };
+  return tempoRow(bpm, read, (seconds, division) => {
     const result = ctx.change({ returns: { [name]: { delayTime: seconds } } });
     if (!result.ok) return;
     ctx.notify(
@@ -104,11 +114,15 @@ function returnRow(ctx: AppCtx, name: string): HTMLElement {
   const knobs = el('div', 'knob-row');
   knobs.appendChild(levelKnob(ctx, name));
   if (spec.kind === 'delay') {
-    for (const knob of delayKnobs(ctx, name)) knobs.appendChild(knob);
-    row.appendChild(returnTempoRow(ctx, name));
+    const tempo = returnTempoRow(ctx, name);
+    for (const knob of delayKnobs(ctx, name, tempo.refresh)) knobs.appendChild(knob);
+    row.appendChild(tempo.root);
   } else {
-    row.appendChild(returnSpacePicker(ctx, name));
-    for (const spec2 of SPACE_KNOBS) knobs.appendChild(spaceKnob(ctx, name, spec2));
+    const picker = returnSpacePicker(ctx, name);
+    row.appendChild(picker.root);
+    for (const spec2 of SPACE_KNOBS) {
+      knobs.appendChild(spaceKnob(ctx, name, spec2, picker.refresh));
+    }
   }
   row.appendChild(knobs);
   return row;
