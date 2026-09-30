@@ -76,15 +76,16 @@ export interface ChannelStrip<R extends string = string> {
   readonly output?: 'master' | 'sidechain';
   /**
    * Silences the part's dry signal and its sends, post-fader (windsor#154).
-   * Missing means off; a document stores it only while it is on. The
-   * sidechain key is tapped before it, so a muted kick still ducks.
+   * Missing means off; a present `false` is kept, as `output` keeps an
+   * explicit Master. The sidechain key is tapped before it, so a muted kick
+   * still ducks.
    */
   readonly mute?: boolean;
   /**
    * While any music part has it, every music part without it is silent, dry
    * and sends; the returns keep playing the soloed parts' sends (windsor#154).
-   * Additive, missing means off, stored only while on, and never applied to
-   * the aux strips.
+   * Additive and missing means off; a present `false` is kept, as for
+   * `mute`. Never applied to the aux strips.
    */
   readonly solo?: boolean;
   /** The mix fader, 0..4: sets the part's k-rate `gain` param (record §3). */
