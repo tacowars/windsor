@@ -42,11 +42,15 @@ since the integration, and this only gives it a control.
    be cleaner, if anywhere.
 4. Ignore the click at the moment of switching; judge the steady sound on
    either side of it.
-5. Keep in mind the cost: on the recorded M1 in Chrome 154, only 2× keeps
-   four Tape instances under the 1.33 ms mean target; 4× measured
-   1.48–1.69 ms, above the four-track budget
-   (the [integration design](2026-09-30-tape-magnetic-integration-design.md)'s
-   context).
+5. Keep in mind the cost, with a caveat: the only browser numbers so far
+   are for the research candidates, not the shipped Tape path. On the
+   recorded M1 in Chrome 154 they put the 2× candidate under the 1.33 ms
+   four-instance mean target and the 4× candidate above it
+   ([browser cost](../research/2026-09-30-tape-browser-cost/README.md)).
+   The shipped bundle adds the retained EQ, transport, hiss and dropouts
+   and the kernel-derivative filter, and is measured separately by
+   windsor#250; until that lands, treat the ratio between 2× and 4× as
+   the meaningful part, not the absolute fit to the budget.
 
 The result of the audition, and the PR that deletes the losing factor and
 the picker with its `ARRANGEMENT_VERSION` bump (design decision 1), come
