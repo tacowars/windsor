@@ -340,6 +340,55 @@ function randomSeed32(random) {
   return random() * 4294967295 >>> 0 || 1;
 }
 
+// packages/engine/src/worklet/loadSampler.ts
+var LOAD_MS_PER_SECOND = 1e3;
+var LoadSampler = class {
+  constructor(rate, port) {
+    this.quanta = 0;
+    this.startMs = NaN;
+    this.wallStartMs = NaN;
+    this.rate = rate;
+    this.port = port;
+    this.report = { type: "load", busyMs: NaN, wallMs: NaN, quanta: 0, peakMs: NaN, underruns: 0 };
+  }
+  /**
+   * A `reportLoad` message: start (or restart) at `quanta` renders a report,
+   * or stop at 0. The cumulative underrun count survives a restart; the
+   * interval's counters do not.
+   */
+  start(quanta) {
+    const report = this.report;
+    this.quanta = Math.max(0, quanta | 0);
+    report.busyMs = report.quanta = report.peakMs = 0;
+    this.wallStartMs = Date.now();
+  }
+  /** Before the render. */
+  begin() {
+    if (this.quanta !== 0) this.startMs = Date.now();
+  }
+  /**
+   * After a render of `frames`: the span's millisecond crossings, and the post
+   * once the interval is full. The span is not a duration: N crossings prove
+   * only that the render took more than N − 1 ms (a 2.2 ms quantum from
+   * 1000.9 to 1003.1 crosses three), so only `span − 1` may count a missed
+   * deadline (#445 review, passes 1 and 2).
+   */
+  end(frames) {
+    if (this.quanta === 0) return;
+    const now = Date.now();
+    const elapsed = now - this.startMs;
+    const report = this.report;
+    report.busyMs += elapsed;
+    report.peakMs = Math.max(report.peakMs, elapsed);
+    if (elapsed - 1 >= frames / this.rate * LOAD_MS_PER_SECOND) report.underruns++;
+    if (++report.quanta < this.quanta) return;
+    report.wallMs = now - this.wallStartMs;
+    this.port.postMessage(report);
+    report.busyMs = report.quanta = report.peakMs = 0;
+    this.wallStartMs = now;
+  }
+};
+
 // packages/engine/src/worklet/fm/envelope.ts
 var ST_IDLE = 0, ST_ATTACK = 1, ST_DECAY = 2, ST_SUSTAIN = 3, ST_RELEASE = 4, ST_DONE = 5;
 function curveShape(p, k) {
@@ -1674,13 +1723,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.dormancy = opts.dormancy !== false;
     const specialise = opts.specialise !== false;
     for (let i = 0; i < poolSize; i++) this.voices[i].specialise = specialise;
-    this.loadQuanta = 0;
-    this.loadCount = 0;
-    this.loadBusyMs = 0;
-    this.loadPeakMs = 0;
-    this.loadUnderruns = 0;
-    this.loadWallStart = 0;
-    this.loadBudgetMs = 128 / sampleRate * 1e3;
+    this.load = new LoadSampler(sampleRate, this.port);
     if (Array.isArray(opts.events)) {
       for (const ev of opts.events) this.schedule(ev, ev.frame);
     }
@@ -1730,38 +1773,9 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.running = false;
         break;
       case "reportLoad":
-        this.loadQuanta = Math.max(0, msg.quanta | 0);
-        this.loadCount = 0;
-        this.loadBusyMs = 0;
-        this.loadPeakMs = 0;
-        this.loadWallStart = Date.now();
+        this.load.start(msg.quanta);
         break;
     }
-  }
-  /**
-   * One quantum's duty-cycle sample, and the once-per-interval post (#445).
-   * `t1 - t0` is not a duration: it is the number of integer-millisecond
-   * boundaries that fell inside the render, which is what makes this a
-   * sampler rather than a timer. Allocates only at the post.
-   */
-  sampleLoad(t0, t1) {
-    const spanMs = t1 - t0;
-    this.loadBusyMs += spanMs;
-    if (spanMs > this.loadPeakMs) this.loadPeakMs = spanMs;
-    if (spanMs - 1 >= this.loadBudgetMs) this.loadUnderruns++;
-    if (++this.loadCount < this.loadQuanta) return;
-    this.port.postMessage({
-      type: "load",
-      busyMs: this.loadBusyMs,
-      wallMs: t1 - this.loadWallStart,
-      quanta: this.loadCount,
-      peakMs: this.loadPeakMs,
-      underruns: this.loadUnderruns
-    });
-    this.loadCount = 0;
-    this.loadBusyMs = 0;
-    this.loadPeakMs = 0;
-    this.loadWallStart = t1;
   }
   schedule(ev, frame) {
     const queued = ev;
@@ -1919,10 +1933,11 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
    * and a page that never turns the sampler on pays one branch per quantum.
    */
   process(inputs, outputs, params) {
-    if (this.loadQuanta === 0) return this.renderBlock(inputs, outputs, params);
-    const t0 = Date.now();
+    const load = this.load;
+    if (load.quanta === 0) return this.renderBlock(inputs, outputs, params);
+    load.begin();
     const running = this.renderBlock(inputs, outputs, params);
-    this.sampleLoad(t0, Date.now());
+    load.end(128);
     return running;
   }
   renderBlock(inputs, outputs, params) {

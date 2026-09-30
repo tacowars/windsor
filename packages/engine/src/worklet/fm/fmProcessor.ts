@@ -31,6 +31,7 @@ import type { WorkletPatch } from './patchNormalise';
 import { CTRL_INTERVAL } from './fmConstants';
 import { normalisePatch, num } from './patchNormalise';
 import { makeRandom } from './prng';
+import { LoadSampler } from '../loadSampler';
 import { Voice } from './voice';
 import { WAVE } from './waveIds';
 import { getMips } from './waveTables';
@@ -61,13 +62,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
   liveRetune: boolean;
   slideSeconds: number;
   dormancy: boolean;
-  loadQuanta: number;
-  loadCount: number;
-  loadBusyMs: number;
-  loadPeakMs: number;
-  loadUnderruns: number;
-  loadWallStart: number;
-  loadBudgetMs: number;
+  load: LoadSampler;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
@@ -116,18 +111,11 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const specialise = opts.specialise !== false;
     for (let i = 0; i < poolSize; i++) this.voices[i].specialise = specialise;
 
-    // Audio-load sampler (#445), off until a `reportLoad` message turns it on,
-    // so an offline render and the Node harness time nothing and post nothing.
-    // See workletMessages.ts for why this counts millisecond boundaries rather
-    // than timing the call: AudioWorkletGlobalScope has no performance.now(),
-    // and Date.now() cannot resolve a 2.9 ms quantum on its own.
-    this.loadQuanta = 0; // report cadence in quanta; 0 = not reporting
-    this.loadCount = 0; // quanta since the last report
-    this.loadBusyMs = 0;
-    this.loadPeakMs = 0;
-    this.loadUnderruns = 0; // cumulative, never reset
-    this.loadWallStart = 0;
-    this.loadBudgetMs = (128 / sampleRate) * 1000;
+    // Audio-load sampler (#445, `../loadSampler.ts`), off until a `reportLoad`
+    // message turns it on, so an offline render and the Node harness time
+    // nothing and post nothing. See workletMessages.ts for why this counts
+    // millisecond boundaries rather than timing the call.
+    this.load = new LoadSampler(sampleRate, this.port);
 
     // Events supplied at construction. port.postMessage() is delivered
     // asynchronously and can lose the race against OfflineAudioContext's
@@ -190,46 +178,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
         this.running = false;
         break;
       case 'reportLoad':
-        // #445: start (or restart) the duty-cycle sampler. The cumulative
-        // underrun count survives a restart; the interval accumulators do not.
-        this.loadQuanta = Math.max(0, msg.quanta | 0);
-        this.loadCount = 0;
-        this.loadBusyMs = 0;
-        this.loadPeakMs = 0;
-        this.loadWallStart = Date.now();
+        // #445: start (or restart) the duty-cycle sampler.
+        this.load.start(msg.quanta);
         break;
     }
-  }
-
-  /**
-   * One quantum's duty-cycle sample, and the once-per-interval post (#445).
-   * `t1 - t0` is not a duration: it is the number of integer-millisecond
-   * boundaries that fell inside the render, which is what makes this a
-   * sampler rather than a timer. Allocates only at the post.
-   */
-  sampleLoad(t0: number, t1: number): void {
-    const spanMs = t1 - t0;
-    this.loadBusyMs += spanMs;
-    if (spanMs > this.loadPeakMs) this.loadPeakMs = spanMs;
-    // N boundary crossings prove only that the render took MORE THAN N-1 ms:
-    // a 2.2 ms quantum from 1000.9 to 1003.1 crosses three and would count as
-    // an overrun of a 2.902 ms budget if the count were read as a duration.
-    // So the provable lower bound is `spanMs - 1`, and only that may accuse a
-    // quantum of missing its deadline (#445 review, pass 1 and 2).
-    if (spanMs - 1 >= this.loadBudgetMs) this.loadUnderruns++;
-    if (++this.loadCount < this.loadQuanta) return;
-    this.port.postMessage({
-      type: 'load',
-      busyMs: this.loadBusyMs,
-      wallMs: t1 - this.loadWallStart,
-      quanta: this.loadCount,
-      peakMs: this.loadPeakMs,
-      underruns: this.loadUnderruns,
-    });
-    this.loadCount = 0;
-    this.loadBusyMs = 0;
-    this.loadPeakMs = 0;
-    this.loadWallStart = t1;
   }
 
   schedule(ev: ScheduledMessage, frame: number | undefined): void {
@@ -418,10 +370,11 @@ class FmPartProcessor extends AudioWorkletProcessor {
     outputs: Float32Array[][],
     params: Record<string, Float32Array>,
   ): boolean {
-    if (this.loadQuanta === 0) return this.renderBlock(inputs, outputs, params);
-    const t0 = Date.now();
+    const load = this.load;
+    if (load.quanta === 0) return this.renderBlock(inputs, outputs, params);
+    load.begin();
     const running = this.renderBlock(inputs, outputs, params);
-    this.sampleLoad(t0, Date.now());
+    load.end(128);
     return running;
   }
 

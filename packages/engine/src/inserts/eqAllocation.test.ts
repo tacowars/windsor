@@ -6,7 +6,7 @@
  *
  * Method. A heap reading inside Vitest is not repeatable (the runner shares
  * the heap), so the test spawns a Node of its own that runs the shipped bundle
- * (`__fixtures__/eqAllocationProbe.ts`) with `--expose-gc`, a 64 MB young
+ * (`__fixtures__/workletAllocationProbe.ts`, driven by `eqToggleScenario.ts`) with `--expose-gc`, a 64 MB young
  * generation (nothing it allocates is collected before it is counted) and
  * `--trace-generalization`, and reads its result from a JSON file the child
  * writes into a temporary directory. Stdout carries the trace alone: on Linux
@@ -47,21 +47,18 @@
  * What this does not cover: the first changes after a long steady run still
  * run code V8 has not optimised yet, which boxes (see the research README).
  */
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { PROBE_SCRIPT_NAME } from '../__fixtures__/eqAllocationProbe';
-import type { ProbeConfig } from '../__fixtures__/eqAllocationProbe';
-import { representationChanges } from '../__fixtures__/generalizationTrace';
+import {
+  probeScenario,
+  runAllocationProbe,
+  workletBundle,
+} from '../__fixtures__/workletAllocation';
+import type { ProbeRun } from '../__fixtures__/workletAllocation';
+import type { EqToggleConfig } from '../__fixtures__/eqToggleScenario';
 import { EQ_BAND_COUNT, EQ_BAND_TYPES, EQ_SLOPES } from './eqConstants';
 import { EQ_BAND_PARAMS, eqParamName, eqParameterValues } from './eqParameters';
 import type { EqSpec } from './eqSpec';
 
-const PROBE = fileURLToPath(new URL('../__fixtures__/eqAllocationProbe.ts', import.meta.url));
-const BUNDLE = fileURLToPath(new URL('../worklet/generated/eq-processor.js', import.meta.url));
 const TOLERANCE_BYTES = 16 * 1024;
 
 /** Every band audible (a bell or shelf at a gain), each at its own frequency. */
@@ -80,56 +77,31 @@ const SPEC: EqSpec = {
   })),
 };
 
-interface ProbeRun {
-  bytes: number;
-  /** The growth in each tenth of the measured run. */
-  windows: number[];
-  gcs: number;
-  /** Each generalisation the bundle caused that changed a field's representation. */
-  changes: string[];
-}
-
 function probe(): ProbeRun {
-  const config: ProbeConfig = {
-    bundle: BUNDLE,
-    rate: 48000,
-    params: eqParameterValues(SPEC),
+  const scenarioConfig: EqToggleConfig = {
     names: Object.fromEntries(
       EQ_BAND_PARAMS.map((field) => [
         field,
         Array.from({ length: EQ_BAND_COUNT }, (_, b) => eqParamName(b, field)),
       ]),
-    ) as ProbeConfig['names'],
+    ) as EqToggleConfig['names'],
     typeCount: EQ_BAND_TYPES.length,
     slopeCount: EQ_SLOPES.length,
-    warmup: 48000,
-    measure: 40000,
     period: 8,
   };
-  const dir = mkdtempSync(join(tmpdir(), 'eq-allocation-'));
-  try {
-    const resultFile = join(dir, 'result.json');
-    const child = spawnSync(
-      process.execPath,
-      [
-        '--expose-gc',
-        '--min-semi-space-size=64',
-        '--max-semi-space-size=64',
-        '--trace-generalization',
-        '--no-warnings',
-        PROBE,
-        JSON.stringify(config),
-        resultFile,
-      ],
-      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-    );
-    expect(child.status, child.stderr).toBe(0);
-    const result = JSON.parse(readFileSync(resultFile, 'utf8')) as Omit<ProbeRun, 'changes'>;
-    const changes = representationChanges(child.stdout, PROBE_SCRIPT_NAME);
-    return { ...result, changes };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  return runAllocationProbe({
+    bundle: workletBundle('eq-processor.js'),
+    rate: 48000,
+    params: eqParameterValues(SPEC),
+    options: {},
+    messages: [],
+    inputChannels: 2,
+    loadQuanta: 0,
+    warmup: 48000,
+    measure: 40000,
+    scenario: probeScenario('eqToggleScenario.ts'),
+    scenarioConfig,
+  });
 }
 
 describe('the audio thread on V8', () => {

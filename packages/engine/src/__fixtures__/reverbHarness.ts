@@ -75,7 +75,11 @@ export function loadReverb(): LoadedReverb {
     private readonly posted: unknown[] = [];
 
     constructor() {
-      this.port = { postMessage: (m: unknown) => this.posted.push(m), onmessage: null };
+      // Cloned, as the real port clones: the load report is one reused object.
+      this.port = {
+        postMessage: (m: unknown) => this.posted.push(structuredClone(m)),
+        onmessage: null,
+      };
     }
 
     inbox(message: unknown): void {

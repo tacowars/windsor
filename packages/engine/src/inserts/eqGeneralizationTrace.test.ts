@@ -46,4 +46,33 @@ describe('representationChanges', () => {
     expect(representationChanges(split, SCRIPT)).toHaveLength(1);
     expect(representationChanges(split, SCRIPT)[0]).toMatch(/^\[generalizing\]gain:s/);
   });
+
+  it('counts a change whose pair another record cut in two', () => {
+    // Codex on windsor#208: the halves of `fade:s{…}->d{…}` land in two records.
+    const output =
+      '[generalizing]fade:s{Any;mu' +
+      '[generalizing]q:d{Any;const}->d{Any;const} (uninitialized field) [new ~EqBand+115 at eq-processor.js:446]\n' +
+      'table}->d{Any;mutable} (+5 maps) [~step+39 at eq-processor.js:559]\n';
+    const changes = representationChanges(output, SCRIPT);
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatch(/cut pairs\) heads s tails d/);
+  });
+
+  it('counts a cut pair it cannot pair up, and passes one whose halves are a birth', () => {
+    const lostTail = '[generalizing]fade:s{Any;mu[generalizing]q:d{Any;const}->d{Any;const} (x)\n';
+    expect(representationChanges(lostTail, SCRIPT)).toHaveLength(1);
+    const lostHead = '[generalizing]q:d{Any;const}->d{Any;const} (x)\ntable}->d{Any;mutable} (y)\n';
+    expect(representationChanges(lostHead, SCRIPT)).toHaveLength(1);
+    const birth =
+      '[generalizing]fade:v{None;co[generalizing]q:d{Any;const}->d{Any;const} (x)\n' +
+      'nst}->d{Any;const} (uninitialized field) [new ~EqBand+115 at eq-processor.js:446]\n';
+    expect(representationChanges(birth, SCRIPT)).toEqual([]);
+  });
+
+  it('counts two cut pairs whose sides could be joined into a change', () => {
+    const output =
+      '[generalizing]a:s{Any;co[generalizing]b:d{Any;co[generalizing]c:d{Any;const}->d{Any;const} (x)\n' +
+      'nst}->s{Any;mutable} (y)\nnst}->d{Any;mutable} (z)\n';
+    expect(representationChanges(output, SCRIPT)).toHaveLength(1);
+  });
 });

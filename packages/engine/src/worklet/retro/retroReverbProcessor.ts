@@ -3,18 +3,16 @@ import {
   RETRO_REVERB_NAME,
   RETRO_REVERB_BOUNDS,
   RETRO_REVERB_DEFAULTS,
-  RETRO_REVERB_DSP,
 } from '../../inserts/retroReverbConstants';
-import type { LoadReportMessage, ReportLoadMessage } from '../../synth/workletMessages';
+import type { ReportLoadMessage } from '../../synth/workletMessages';
+import { LoadSampler } from '../loadSampler';
 import { RetroReverbDsp } from './retroReverbDsp';
 import type { RetroParams } from './retroReverbDsp';
 
 class RetroReverbProcessor extends AudioWorkletProcessor {
   dsp: RetroReverbDsp;
   running: boolean;
-  loadQuanta: number;
-  load: LoadReportMessage;
-  wallStart: number;
+  load: LoadSampler;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
@@ -41,22 +39,16 @@ class RetroReverbProcessor extends AudioWorkletProcessor {
     }
     this.dsp = new RetroReverbDsp(sampleRate, params);
     this.running = true;
-    this.loadQuanta = 0;
-    this.load = { type: 'load', busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
-    this.wallStart = 0;
+    this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
       if (data.type === 'stop') this.running = false;
-      if (data.type === 'reportLoad') {
-        this.loadQuanta = Math.max(0, data.quanta | 0);
-        this.load.busyMs = this.load.quanta = this.load.peakMs = 0;
-        this.wallStart = Date.now();
-      }
+      if (data.type === 'reportLoad') this.load.start(data.quanta);
     };
   }
 
   process(inputs: Float32Array[][], outputs: Float32Array[][], params: RetroParams): boolean {
     if (!this.running) return false;
-    const start = this.loadQuanta ? Date.now() : 0;
+    this.load.begin();
     const out = outputs[0];
     if (!out?.[0]) return true;
     const left = inputs[0]?.[0];
@@ -68,23 +60,8 @@ class RetroReverbProcessor extends AudioWorkletProcessor {
       out[0][i] = this.dsp.left;
       if (out[1]) out[1][i] = this.dsp.right;
     }
-    if (this.loadQuanta) this.report(frames, start);
+    this.load.end(frames);
     return true;
-  }
-
-  report(frames: number, start: number): void {
-    const now = Date.now();
-    const elapsed = now - start;
-    const load = this.load;
-    load.busyMs += elapsed;
-    load.peakMs = Math.max(load.peakMs, elapsed);
-    if (elapsed - 1 >= (frames / sampleRate) * RETRO_REVERB_DSP.millisecondsPerSecond)
-      load.underruns++;
-    if (++load.quanta < this.loadQuanta) return;
-    load.wallMs = now - this.wallStart;
-    this.port.postMessage(load);
-    load.busyMs = load.quanta = load.peakMs = 0;
-    this.wallStart = now;
   }
 }
 

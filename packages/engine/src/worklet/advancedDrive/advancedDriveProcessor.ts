@@ -1,15 +1,14 @@
 /** Worklet lifecycle, parameter blocks and existing load telemetry for Advanced Drive. */
-import { ADVANCED_DRIVE_NAME, DRIVE_DSP } from '../../inserts/advancedDriveConstants';
+import { ADVANCED_DRIVE_NAME } from '../../inserts/advancedDriveConstants';
 import { ADVANCED_DRIVE_PARAMETERS } from '../../inserts/advancedDriveParameters';
-import type { LoadReportMessage, ReportLoadMessage } from '../../synth/workletMessages';
+import type { ReportLoadMessage } from '../../synth/workletMessages';
+import { LoadSampler } from '../loadSampler';
 import { AdvancedDriveDsp } from './advancedDriveDsp';
 import type { AdvancedDriveParams } from './advancedDriveDsp';
 class AdvancedDriveProcessor extends AudioWorkletProcessor {
   dsp: AdvancedDriveDsp;
   running: boolean;
-  loadQuanta: number;
-  load: LoadReportMessage;
-  wallStart: number;
+  load: LoadSampler;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return ADVANCED_DRIVE_PARAMETERS;
@@ -26,16 +25,10 @@ class AdvancedDriveProcessor extends AudioWorkletProcessor {
     }
     this.dsp = new AdvancedDriveDsp(sampleRate, params);
     this.running = true;
-    this.loadQuanta = 0;
-    this.load = { type: 'load', busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
-    this.wallStart = 0;
+    this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
       if (data.type === 'stop') this.running = false;
-      if (data.type === 'reportLoad') {
-        this.loadQuanta = Math.max(0, data.quanta | 0);
-        this.load.busyMs = this.load.quanta = this.load.peakMs = 0;
-        this.wallStart = Date.now();
-      }
+      if (data.type === 'reportLoad') this.load.start(data.quanta);
     };
   }
 
@@ -45,7 +38,7 @@ class AdvancedDriveProcessor extends AudioWorkletProcessor {
     params: AdvancedDriveParams,
   ): boolean {
     if (!this.running) return false;
-    const start = this.loadQuanta ? Date.now() : 0;
+    this.load.begin();
     const out = outputs[0];
     if (!out?.[0]) return true;
     const left = inputs[0]?.[0];
@@ -57,22 +50,8 @@ class AdvancedDriveProcessor extends AudioWorkletProcessor {
       out[0][i] = this.dsp.left;
       if (out[1]) out[1][i] = this.dsp.right;
     }
-    if (this.loadQuanta) this.report(frames, start);
+    this.load.end(frames);
     return true;
-  }
-
-  report(frames: number, start: number): void {
-    const now = Date.now();
-    const elapsed = now - start;
-    const load = this.load;
-    load.busyMs += elapsed;
-    load.peakMs = Math.max(load.peakMs, elapsed);
-    if (elapsed - 1 >= (frames / sampleRate) * DRIVE_DSP.ms) load.underruns++;
-    if (++load.quanta < this.loadQuanta) return;
-    load.wallMs = now - this.wallStart;
-    this.port.postMessage(load);
-    load.busyMs = load.quanta = load.peakMs = 0;
-    this.wallStart = now;
   }
 }
 
