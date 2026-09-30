@@ -10,7 +10,15 @@
  */
 import type { EqSpec } from '@windsor/engine';
 import type { EqDragStart, EqPlot } from './eqCurveModel';
-import { doubleClick, dragBand, hitBand, keyEdit, wheelBand, withBand } from './eqCurveModel';
+import {
+  doubleClick,
+  dragBand,
+  hitBand,
+  keyEdit,
+  wheelBand,
+  wheelContinues,
+  withBand,
+} from './eqCurveModel';
 import type { OpenGesture } from './gestureHooks';
 import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestureHooks';
 
@@ -102,9 +110,30 @@ function wireDoubleClick(host: EqCurveHost): void {
   });
 }
 
+/** The wheel's Q steps: `touch(band)` before each tick's edit. */
+export interface BandWheelGesture {
+  touch(band: number): void;
+}
+
+/**
+ * Wheel ticks a moment apart on one band are one step, as a knob's turns are;
+ * a tick on another band closes that step and opens its own (`wheelContinues`).
+ */
+export function bandWheelGesture(win: EventTarget = window): BandWheelGesture {
+  const turns = mergedGesture({ label: 'EQ band Q', continues: isModifierKey, win });
+  let last = -1;
+  return {
+    touch(band) {
+      if (!wheelContinues(last, band)) turns.close();
+      last = band;
+      turns.touch();
+    },
+  };
+}
+
 function wireWheel(host: EqCurveHost): void {
   const { canvas } = host;
-  const turns = mergedGesture({ label: 'EQ band Q', continues: isModifierKey });
+  const turns = bandWheelGesture();
   canvas.addEventListener(
     'wheel',
     (e) => {
@@ -113,7 +142,7 @@ function wireWheel(host: EqCurveHost): void {
       if (band < 0) return;
       e.preventDefault();
       if (band !== host.selected()) host.select(band);
-      turns.touch();
+      turns.touch(band);
       // Shift turns a vertical wheel sideways in some browsers, so either axis counts.
       const delta = e.deltaY || e.deltaX;
       host.edit(withBand(spec, band, wheelBand(spec.bands[band]!, delta, e.shiftKey)));

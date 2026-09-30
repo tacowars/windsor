@@ -169,6 +169,13 @@ export function wheelBand(band: EqBand, delta: number, fine: boolean): EqBand {
   };
 }
 
+/**
+ * Whether a wheel tick over band `band` continues the open Q step, whose
+ * ticks turned band `last` (-1 before any): only the same band's ticks merge,
+ * so each band's wheel edits undo on their own.
+ */
+export const wheelContinues = (last: number, band: number): boolean => last >= 0 && last === band;
+
 /** What a double-click on the curve did: which band it took, and the spec after it. */
 export type EqDoubleClick =
   | { readonly kind: 'reset' | 'add'; readonly band: number; readonly spec: EqSpec }

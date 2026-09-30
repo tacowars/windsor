@@ -20,6 +20,7 @@ import {
   pointDb,
   soloBand,
   wheelBand,
+  wheelContinues,
   withBand,
   xOfFreq,
   yOfDb,
@@ -194,6 +195,12 @@ describe('the wheel over a point', () => {
     expect(wheelBand(bell(), EQ_GESTURE.wheelPx, false).q).toBeCloseTo(1 / Math.E, 9);
     expect(wheelBand(bell(), -EQ_GESTURE.wheelFinePx, true).q).toBeCloseTo(Math.E, 9);
     expect(wheelBand(bell({ q: 17 }), -1e4, false).q).toBe(EQ_BOUNDS.q[1]);
+  });
+
+  it('continues the open Q step only on the band its ticks turned', () => {
+    expect(wheelContinues(-1, 0)).toBe(false);
+    expect(wheelContinues(2, 2)).toBe(true);
+    expect(wheelContinues(2, 3)).toBe(false);
   });
 });
 
