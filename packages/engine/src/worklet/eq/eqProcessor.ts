@@ -19,7 +19,8 @@ import {
 } from '../../inserts/eqConstants';
 import { eqBandGain } from '../../inserts/eqCoefficients';
 import { EQ_BAND_PARAMS, eqParamName, eqParameterDescriptors } from '../../inserts/eqParameters';
-import type { LoadReportMessage, ReportLoadMessage } from '../../synth/workletMessages';
+import type { ReportLoadMessage } from '../../synth/workletMessages';
+import { LoadSampler } from '../loadSampler';
 import { EqDsp } from './eqDsp';
 
 type EqParams = Record<string, Float32Array>;
@@ -47,9 +48,7 @@ class EqProcessor extends AudioWorkletProcessor {
   silence: Float32Array;
   /** `b1Freq` … `b8On`, in `EQ_BAND_PARAMS` order band by band. */
   names: string[];
-  loadQuanta: number;
-  load: LoadReportMessage;
-  wallStart: number;
+  load: LoadSampler;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return eqParameterDescriptors();
@@ -63,18 +62,10 @@ class EqProcessor extends AudioWorkletProcessor {
     this.names = [];
     for (let b = 0; b < EQ_BAND_COUNT; b++)
       for (const field of EQ_BAND_PARAMS) this.names.push(eqParamName(b, field));
-    this.loadQuanta = 0;
-    // The times are readings of Date.now() and differences of them: doubles from
-    // their first write (worklet rule 7), set by `reportLoad` or before each post.
-    this.load = { type: 'load', busyMs: NaN, wallMs: NaN, quanta: 0, peakMs: NaN, underruns: 0 };
-    this.wallStart = NaN;
+    this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
       if (data.type === 'stop') this.running = false;
-      if (data.type === 'reportLoad') {
-        this.loadQuanta = Math.max(0, data.quanta | 0);
-        this.load.busyMs = this.load.quanta = this.load.peakMs = 0;
-        this.wallStart = Date.now();
-      }
+      if (data.type === 'reportLoad') this.load.start(data.quanta);
     };
   }
 
@@ -101,7 +92,7 @@ class EqProcessor extends AudioWorkletProcessor {
 
   process(inputs: Float32Array[][], outputs: Float32Array[][], params: EqParams): boolean {
     if (!this.running) return false;
-    const start = this.loadQuanta ? Date.now() : 0;
+    this.load.begin();
     const out = outputs[0];
     if (!out || !out[0] || !out[1]) return true;
     const input = inputs[0];
@@ -109,22 +100,8 @@ class EqProcessor extends AudioWorkletProcessor {
     const right = input && input[1] ? input[1] : left;
     this.configure(params);
     this.dsp.process(left, right, out[0], out[1]);
-    if (this.loadQuanta) this.report(out[0].length, start);
+    this.load.end(out[0].length);
     return true;
-  }
-
-  report(frames: number, start: number): void {
-    const now = Date.now();
-    const elapsed = now - start;
-    const load = this.load;
-    load.busyMs += elapsed;
-    load.peakMs = Math.max(load.peakMs, elapsed);
-    if (elapsed - 1 >= (frames / sampleRate) * EQ_DSP.millisecondsPerSecond) load.underruns++;
-    if (++load.quanta < this.loadQuanta) return;
-    load.wallMs = now - this.wallStart;
-    this.port.postMessage(load);
-    load.busyMs = load.quanta = load.peakMs = 0;
-    this.wallStart = now;
   }
 }
 

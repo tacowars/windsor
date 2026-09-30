@@ -37,6 +37,7 @@
  */
 
 import type { ReportLoadMessage } from '../../synth/workletMessages';
+import { LoadSampler } from '../loadSampler';
 import { _applySize, _makeDelay, _read, _readCubic, _readTap, _write1 } from './delayLines';
 import {
   ANTI_DENORMAL,
@@ -82,13 +83,7 @@ class DattorroReverb extends AudioWorkletProcessor {
   _quiet: number;
   _asleep: boolean;
   _stepping: boolean;
-  _loadQuanta: number;
-  _loadCount: number;
-  _loadBusyMs: number;
-  _loadPeakMs: number;
-  _loadUnderruns: number;
-  _loadWallStart: number;
-  _loadBudgetMs: number;
+  _load: LoadSampler;
 
   // The delay lines and the awake render, installed on the prototype below.
   declare _makeDelay: typeof _makeDelay;
@@ -174,50 +169,16 @@ class DattorroReverb extends AudioWorkletProcessor {
     this._asleep = false;
     this._stepping = false;
 
-    // Audio-load sampler (#445): identical to fm-processor.js's, off until a
-    // `reportLoad` message turns it on. The plate is the other standing
-    // processor on the audio thread, so a load figure that omitted it would
-    // understate what the music costs.
-    this._loadQuanta = 0;
-    this._loadCount = 0;
-    this._loadBusyMs = 0;
-    this._loadPeakMs = 0;
-    this._loadUnderruns = 0;
-    this._loadWallStart = 0;
-    this._loadBudgetMs = (128 / sampleRate) * 1000;
+    // Audio-load sampler (#445, `../loadSampler.ts`), off until a `reportLoad`
+    // message turns it on. The plate is the other standing processor on the
+    // audio thread, so a load figure that omitted it would understate what
+    // the music costs.
+    this._load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = (e: MessageEvent<ReportLoadMessage | undefined>) => {
       const msg = e.data;
       if (!msg || msg.type !== 'reportLoad') return;
-      this._loadQuanta = Math.max(0, msg.quanta | 0);
-      this._loadCount = 0;
-      this._loadBusyMs = 0;
-      this._loadPeakMs = 0;
-      this._loadWallStart = Date.now();
+      this._load.start(msg.quanta);
     };
-  }
-
-  /** One quantum's duty-cycle sample and the once-per-interval post (#445). */
-  _sampleLoad(t0: number, t1: number): void {
-    const spanMs = t1 - t0;
-    this._loadBusyMs += spanMs;
-    if (spanMs > this._loadPeakMs) this._loadPeakMs = spanMs;
-    // `spanMs - 1` is the provable lower bound on the render's duration; see
-    // fm-processor.js `sampleLoad` for why the raw crossing count may not
-    // accuse a quantum of missing its deadline.
-    if (spanMs - 1 >= this._loadBudgetMs) this._loadUnderruns++;
-    if (++this._loadCount < this._loadQuanta) return;
-    this.port.postMessage({
-      type: 'load',
-      busyMs: this._loadBusyMs,
-      wallMs: t1 - this._loadWallStart,
-      quanta: this._loadCount,
-      peakMs: this._loadPeakMs,
-      underruns: this._loadUnderruns,
-    });
-    this._loadCount = 0;
-    this._loadBusyMs = 0;
-    this._loadPeakMs = 0;
-    this._loadWallStart = t1;
   }
 
   /**
@@ -241,10 +202,11 @@ class DattorroReverb extends AudioWorkletProcessor {
     outputs: Float32Array[][],
     parameters: Record<string, Float32Array>,
   ): boolean {
-    if (this._loadQuanta === 0) return this._render(inputs, outputs, parameters);
-    const t0 = Date.now();
+    const load = this._load;
+    if (load.quanta === 0) return this._render(inputs, outputs, parameters);
+    load.begin();
     const running = this._render(inputs, outputs, parameters);
-    this._sampleLoad(t0, Date.now());
+    load.end(128);
     return running;
   }
 

@@ -6,9 +6,9 @@
  * port message would not be. The report is one reused object, posted at
  * `OUTPUT_STAGE_REPORT_HZ` for as long as the context runs; `process`
  * allocates nothing. Like the other DSP processors it also times its own
- * `process()` once a `reportLoad` message turns the sampler on, and posts a
- * reused `load` report for `cost/audioLoad.ts` (#445); both reports share the
- * port, told apart by `type`. `mixer/outputStageProcessor.test.ts` runs the
+ * `process()` with `../loadSampler.ts` once a `reportLoad` message turns the
+ * sampler on, and posts a reused `load` report for `cost/audioLoad.ts` (#445);
+ * both reports share the port, told apart by `type`. `mixer/outputStageProcessor.test.ts` runs the
  * generated bundle and `mixer/outputStageGolden.test.ts` pins its render.
  *
  * Unlike the other worklet folders, this one has no `tsconfig.json` of its
@@ -22,12 +22,12 @@ import {
   OUTPUT_STAGE_MODES,
   OUTPUT_STAGE_NAME,
   OUTPUT_STAGE_REPORT_HZ,
-  MS_PER_SECOND,
   silentReport,
 } from '../../mixer/outputStageConstants';
 import type { OutputStageReport } from '../../mixer/outputStageConstants';
 import { OutputStageDsp } from '../../mixer/outputStageDsp';
-import type { LoadReportMessage, ReportLoadMessage } from '../../synth/workletMessages';
+import type { ReportLoadMessage } from '../../synth/workletMessages';
+import { LoadSampler } from '../loadSampler';
 
 type ControlMessage = { type: 'stop' } | ReportLoadMessage;
 
@@ -51,9 +51,7 @@ class OutputStageProcessor extends AudioWorkletProcessor {
   declare running: boolean;
   declare frames: number;
   declare report: OutputStageReport;
-  declare loadQuanta: number;
-  declare load: LoadReportMessage;
-  declare wallStart: number;
+  declare load: LoadSampler;
 
   static get parameterDescriptors(): ParamDescriptor[] {
     return [
@@ -87,22 +85,16 @@ class OutputStageProcessor extends AudioWorkletProcessor {
     this.running = true;
     this.frames = 0;
     this.report = silentReport();
-    this.loadQuanta = 0;
-    this.load = { type: 'load', busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
-    this.wallStart = 0;
+    this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<ControlMessage>) => {
       if (data.type === 'stop') this.running = false;
-      if (data.type === 'reportLoad') {
-        this.loadQuanta = Math.max(0, data.quanta | 0);
-        this.load.busyMs = this.load.quanta = this.load.peakMs = 0;
-        this.wallStart = Date.now();
-      }
+      if (data.type === 'reportLoad') this.load.start(data.quanta);
     };
   }
 
   process(inputs: Float32Array[][], outputs: Float32Array[][], params: Params): boolean {
     if (!this.running) return false;
-    const start = this.loadQuanta ? Date.now() : 0;
+    this.load.begin();
     const out = outputs[0];
     const outL = out?.[0];
     if (!out || !outL) return true;
@@ -128,27 +120,8 @@ class OutputStageProcessor extends AudioWorkletProcessor {
       this.port.postMessage(this.report);
       this.frames = 0;
     }
-    if (this.loadQuanta) this.sampleLoad(frames, start);
+    this.load.end(frames);
     return true;
-  }
-
-  /**
-   * The load sampler (#445), as the compressor's: the `Date.now()` span of
-   * this call, summed, and posted every `loadQuanta` calls in the one reused
-   * object. `cost/audioLoad.ts` says what the numbers are worth.
-   */
-  sampleLoad(frames: number, start: number): void {
-    const now = Date.now();
-    const elapsed = now - start;
-    const load = this.load;
-    load.busyMs += elapsed;
-    load.peakMs = Math.max(load.peakMs, elapsed);
-    if (elapsed - 1 >= (frames / sampleRate) * MS_PER_SECOND) load.underruns++;
-    if (++load.quanta < this.loadQuanta) return;
-    load.wallMs = now - this.wallStart;
-    this.port.postMessage(load);
-    load.busyMs = load.quanta = load.peakMs = 0;
-    this.wallStart = now;
   }
 }
 

@@ -3,10 +3,10 @@
  * two stereo inputs, AudioParams, shutdown and opt-in telemetry. The render
  * loop allocates nothing; report objects are reused and posts are throttled.
  */
-/* eslint-disable no-magic-numbers -- DSP adapter: binary controls, stereo indices and milliseconds per second; tunables live in compressorConstants.ts */
+/* eslint-disable no-magic-numbers -- DSP adapter: binary controls and stereo indices; tunables live in compressorConstants.ts */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate */
 import type { CompressorParams } from '../../inserts/compressorDsp';
-import type { LoadReportMessage, ReportLoadMessage } from '../../synth/workletMessages';
+import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { CompressorDsp } from '../../inserts/compressorDsp';
 import {
   COMPRESSOR_NAME,
@@ -14,6 +14,7 @@ import {
   COMPRESSOR_DEFAULTS,
   COMPRESSOR_DSP,
 } from '../../inserts/compressorConstants';
+import { LoadSampler } from '../loadSampler';
 
 type ControlMessage = { type: 'stop' } | ReportLoadMessage | { type: 'meter'; enabled: boolean };
 
@@ -24,9 +25,7 @@ class CompressorProcessor extends AudioWorkletProcessor {
   frames: number;
   peak: number;
   meterReport: { type: 'reduction'; db: number };
-  loadQuanta: number;
-  load: LoadReportMessage;
-  wallStart: number;
+  load: LoadSampler;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
     return [
@@ -54,9 +53,7 @@ class CompressorProcessor extends AudioWorkletProcessor {
     this.frames = 0;
     this.peak = 0;
     this.meterReport = { type: 'reduction', db: 0 };
-    this.loadQuanta = 0;
-    this.load = { type: 'load', busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
-    this.wallStart = 0;
+    this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<ControlMessage>) => {
       if (data.type === 'stop') this.running = false;
       if (data.type === 'meter') {
@@ -64,17 +61,13 @@ class CompressorProcessor extends AudioWorkletProcessor {
         this.frames = 0;
         this.peak = 0;
       }
-      if (data.type === 'reportLoad') {
-        this.loadQuanta = Math.max(0, data.quanta | 0);
-        this.load.busyMs = this.load.quanta = this.load.peakMs = 0;
-        this.wallStart = Date.now();
-      }
+      if (data.type === 'reportLoad') this.load.start(data.quanta);
     };
   }
 
   process(inputs: Float32Array[][], outputs: Float32Array[][], params: CompressorParams): boolean {
     if (!this.running) return false;
-    const start = this.loadQuanta ? Date.now() : 0;
+    this.load.begin();
     const out = outputs[0];
     if (!out?.[0]) return true;
     const source = inputs[0];
@@ -90,11 +83,13 @@ class CompressorProcessor extends AudioWorkletProcessor {
       if (out[1]) out[1][i] = (right?.[i] ?? 0) * gain;
       if (this.meter) this.peak = Math.max(this.peak, this.dsp.reductionDb);
     }
-    this.report(params, out[0].length, start);
+    this.report(params, out[0].length);
+    this.load.end(out[0].length);
     return true;
   }
 
-  report(params: CompressorParams, frames: number, start: number): void {
+  /** The gain-reduction meter's throttled post. */
+  report(params: CompressorParams, frames: number): void {
     if (this.meter) {
       this.frames += frames;
       if (this.frames >= sampleRate / COMPRESSOR_DSP.meterHz) {
@@ -103,18 +98,6 @@ class CompressorProcessor extends AudioWorkletProcessor {
         this.frames = this.peak = 0;
       }
     }
-    if (!this.loadQuanta) return;
-    const now = Date.now();
-    const elapsed = now - start;
-    const load = this.load;
-    load.busyMs += elapsed;
-    load.peakMs = Math.max(load.peakMs, elapsed);
-    if (elapsed - 1 >= (frames / sampleRate) * 1000) load.underruns++;
-    if (++load.quanta < this.loadQuanta) return;
-    load.wallMs = now - this.wallStart;
-    this.port.postMessage(load);
-    load.busyMs = load.quanta = load.peakMs = 0;
-    this.wallStart = now;
   }
 }
 registerProcessor(COMPRESSOR_NAME, CompressorProcessor);
