@@ -28,8 +28,19 @@
  * The EQ's doubles were first written as 0 or 1, and `fade` took its first
  * fraction at the first type, slope or on change: 42 generalisations in this
  * run before the fix, none after. The trace names each one, the field and the
- * bundle line that caused it; none may change a representation (a field's
- * first write, from `v` for none, is its birth, not a change).
+ * bundle line that caused it.
+ *
+ * The rule (`__fixtures__/generalizationTrace.ts`): a failure is a
+ * generalisation whose two sides differ in representation (`s`, `d`, `h`,
+ * `t`), from the bundle or from no named script, at any time in the run. A
+ * field's first write (from `v`, none) is its birth, and a constness or
+ * field-type change (`d{Any;const}->d{Any;mutable}`, as every `EqBand` field
+ * shows in its constructor) keeps the representation, so neither counts. The
+ * trace is read as records cut at each `[generalizing]` marker, not as lines:
+ * V8 writes a record in pieces, and Linux CI has printed two interleaved in
+ * one line. The rule does not look at when an event falls: V8's own buffered
+ * writes and the probe's are not ordered against each other, so a marker
+ * between warm-up and the measured run could not place them.
  *
  * What this does not cover: the first changes after a long steady run still
  * run code V8 has not optimised yet, which boxes (see the research README).
@@ -39,6 +50,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { PROBE_RESULT, PROBE_SCRIPT_NAME } from '../__fixtures__/eqAllocationProbe';
 import type { ProbeConfig } from '../__fixtures__/eqAllocationProbe';
+import { representationChanges } from '../__fixtures__/generalizationTrace';
 import { EQ_BAND_COUNT, EQ_BAND_TYPES, EQ_SLOPES } from './eqConstants';
 import { EQ_BAND_PARAMS, eqParamName, eqParameterValues } from './eqParameters';
 import type { EqSpec } from './eqSpec';
@@ -103,15 +115,9 @@ function probe(): ProbeRun {
     { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
   );
   expect(child.status, child.stderr).toBe(0);
-  const lines = child.stdout.split('\n');
-  const result = lines.find((line) => line.startsWith(PROBE_RESULT));
+  const result = child.stdout.split('\n').find((line) => line.startsWith(PROBE_RESULT));
   expect(result, 'the probe reports').toBeDefined();
-  // `[generalizing]fade:s{Any;mutable}->d{Any;mutable} (…) [~step+39 at eq-processor.js:559]`
-  const change = /^\[generalizing\][^:]*:([a-z])\{[^}]*\}->([a-z])\{/;
-  const changes = lines.filter((line) => {
-    const m = change.exec(line);
-    return !!m && line.includes(` at ${PROBE_SCRIPT_NAME}:`) && m[1] !== 'v' && m[1] !== m[2];
-  });
+  const changes = representationChanges(child.stdout, PROBE_SCRIPT_NAME);
   return { ...(JSON.parse(result!.slice(PROBE_RESULT.length)) as ProbeRun), changes };
 }
 
