@@ -31,6 +31,8 @@ describe('INSERT_KINDS', () => {
       'delay',
       'ensemble',
       'tape',
+      'plate',
+      'echo',
     ]);
     for (const name of INSERT_KIND_NAMES) {
       const kind = INSERT_KINDS[name];

@@ -14,17 +14,28 @@ import {
   CHORUS_RATE_MIN_HZ,
   DEFAULT_CHORUS,
   DEFAULT_DRIVE,
+  DEFAULT_ECHO,
   DEFAULT_ENSEMBLE,
+  DEFAULT_PLATE_REVERB,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
   DRIVE_TONE_MIN_HZ,
+  ECHO_BOUNDS,
   ENSEMBLE_BOUNDS,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
+  REVERB_SPACE_RANGES,
 } from '@windsor/engine';
 import { INSERT_CARDS } from './insertCards';
-import { CHORUS_KNOBS, DRIVE_KNOBS, ENSEMBLE_KNOBS, INSERT_LABELS } from './insertKnobTables';
+import {
+  CHORUS_KNOBS,
+  DRIVE_KNOBS,
+  ECHO_KNOBS,
+  ENSEMBLE_KNOBS,
+  INSERT_LABELS,
+  PLATE_REVERB_KNOBS,
+} from './insertKnobTables';
 
 describe('INSERT_CARDS', () => {
   it('has a card for every insert kind the engine declares, and no other', () => {
@@ -35,11 +46,16 @@ describe('INSERT_CARDS', () => {
   it('labels every kind it can add', () => {
     expect(Object.keys(INSERT_LABELS).sort()).toEqual([...INSERT_KIND_NAMES].sort());
   });
+
+  it('calls the return-derived kinds Plate reverb and Echo (windsor#171)', () => {
+    expect(INSERT_LABELS.plate).toBe('Plate reverb');
+    expect(INSERT_LABELS.echo).toBe('Echo');
+  });
 });
 
 describe('DRIVE_KNOBS', () => {
   it("covers every drive field but the kind, each defaulting to DEFAULT_DRIVE's", () => {
-    const fields = INSERT_KINDS.drive.fields.filter((f) => f !== 'kind');
+    const fields = INSERT_KINDS.drive.fields.filter((f) => f !== 'kind' && f !== 'enabled');
     expect(DRIVE_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
     for (const { f, o } of DRIVE_KNOBS) expect(o.def, f).toBe(DEFAULT_DRIVE[f]);
   });
@@ -84,6 +100,34 @@ describe('ENSEMBLE_KNOBS (#695)', () => {
     for (const { f, o } of ENSEMBLE_KNOBS) {
       expect(o.def, f).toBe(DEFAULT_ENSEMBLE[f]);
       expect([o.min, o.max], f).toEqual([...ENSEMBLE_BOUNDS[f as keyof typeof ENSEMBLE_BOUNDS]]);
+    }
+  });
+});
+
+describe('PLATE_REVERB_KNOBS (windsor#171)', () => {
+  it("covers every plate number, spanning the plate's ranges from DEFAULT_PLATE_REVERB", () => {
+    const fields = INSERT_KINDS.plate.fields.filter((f) => f !== 'kind' && f !== 'enabled');
+    expect(PLATE_REVERB_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
+    for (const { f, o } of PLATE_REVERB_KNOBS) {
+      expect(o.def, f).toBe(DEFAULT_PLATE_REVERB[f]);
+      const range =
+        f === 'mix' ? [0, 1] : REVERB_SPACE_RANGES[f as keyof typeof REVERB_SPACE_RANGES];
+      expect([o.min, o.max], f).toEqual([...range]);
+    }
+  });
+});
+
+describe('ECHO_KNOBS (windsor#171)', () => {
+  it('covers every echo number from DEFAULT_ECHO, inside the engine bounds', () => {
+    const fields = INSERT_KINDS.echo.fields.filter((f) => f !== 'kind' && f !== 'enabled');
+    expect(ECHO_KNOBS.map((k) => k.f).sort()).toEqual([...fields].sort());
+    for (const { f, o } of ECHO_KNOBS) {
+      expect(o.def, f).toBe(DEFAULT_ECHO[f]);
+      const [min, max] = ECHO_BOUNDS[f as keyof typeof ECHO_BOUNDS];
+      expect(o.min, f).toBeGreaterThanOrEqual(min);
+      expect(o.max, f).toBeLessThanOrEqual(max);
+      expect(o.def, f).toBeGreaterThanOrEqual(o.min);
+      expect(o.def, f).toBeLessThanOrEqual(o.max);
     }
   });
 });
