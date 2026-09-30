@@ -275,7 +275,8 @@ lane and the part lanes
 2. Console: its knobs in `returnsPanel.ts` over ranges in `mixerTables.ts`
    (the plate's ranges stay the worklet's `REVERB_SPACE_RANGES`), each edit
    through `ctx.change` into the document's `returns` section like every other
-   field, and the strip's send in `mixerTab.ts`.
+   field. A part's send needs no edit: the Song tab's expanded mixer column
+   (`songMixerCell.ts`) builds one `sendKnob` per `RETURN_NAMES` entry.
 3. The document contract holds: a song carries its returns, so the export must
    round-trip the new fields (`arrangementDocumentDesk.test.ts`).
 

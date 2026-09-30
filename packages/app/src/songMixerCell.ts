@@ -209,7 +209,6 @@ export function partMixerCell(
   const output = expanded
     ? outputSelect({
         label: `Output ${part.name}`,
-        compact: true,
         get: () => stripOutput(stripOf(ctx, slot)),
         set: (next) => {
           const ok = setStripOutput(ctx, slot, next);
