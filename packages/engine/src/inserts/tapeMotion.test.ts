@@ -1,5 +1,8 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { loadTape, tapeParams } from '../__fixtures__/tapeHarness';
+
+// The magnetic core (windsor#224) renders slower than the old saturation; CI's runner needs more than 5 s here.
+vi.setConfig({ testTimeout: 30_000 });
 
 // Inspect the shipped processor; importing worklet source would bypass its TS project boundary.
 interface TapeState {
