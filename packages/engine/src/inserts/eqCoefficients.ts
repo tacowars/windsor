@@ -118,7 +118,9 @@ export function sectionsDb(
 const BAND_STRIDE = EQ_DSP.maxSections * PER;
 const scratch = new Float64Array(EQ_BAND_COUNT * BAND_STRIDE);
 const counts = new Uint8Array(EQ_BAND_COUNT);
-const design: EqBandDesign = { type: 0, slope: 0, freq: 0, gain: 0, q: 0 };
+// Doubles first written as doubles, as the worklet's band's own (`worklet/eq/eqBand.ts`):
+// the two literals share their keys, and so V8's hidden class.
+const design: EqBandDesign = { type: 0, slope: 0, freq: NaN, gain: NaN, q: NaN };
 
 /**
  * Fill `out` with the EQ's digital response in dB at each of `frequencies`

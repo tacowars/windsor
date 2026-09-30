@@ -14,7 +14,15 @@
  * Invariants: nothing here allocates after the constructor; a band that is
  * off, or a bell or shelf settled at exactly 0 dB, reports `idle` and holds
  * zero state, so it can be skipped and later resume without a transient.
- * Pinned by `inserts/eqDsp.test.ts` through the shipped bundle.
+ * Every field keeps the representation the constructor gives it (worklet
+ * rule 7): V8 types a field by its first value, so a double first written as
+ * a small integer is a Smi field until its first fraction, and that write
+ * generalises it, deprecating the class's map and deoptimising the code that
+ * reads it, which boxes every double until V8 optimises it again (`fade` took
+ * its first fraction at the first type, slope or on change). So a double
+ * field is first written as a double (NaN until the first block snaps it). Pinned
+ * by `inserts/eqDsp.test.ts` and `eqAllocation.test.ts` through the shipped
+ * bundle.
  */
 import type { EqBandDesign } from '../../inserts/eqAnalog';
 import { designEqBand } from '../../inserts/eqCoefficients';
@@ -22,6 +30,7 @@ import {
   EQ_BOUNDS,
   EQ_DSP as D,
   EQ_FIRST_ORDER_SLOPE,
+  EQ_FLAT_Q,
   EQ_TYPE_ID as T,
 } from '../../inserts/eqConstants';
 
@@ -72,18 +81,20 @@ export class EqBand {
     this.ramp = false;
     this.state = new Float64Array(D.maxSections * ST);
     this.sections = 0;
-    this.design = { type: T.bell, slope: EQ_FIRST_ORDER_SLOPE, freq: 1, gain: 0, q: 1 };
+    // Every double is first written as a double (see the header): NaN until
+    // the first block snaps it, and a first-order cut's held Q starts flat.
+    this.design = { type: T.bell, slope: EQ_FIRST_ORDER_SLOPE, freq: NaN, gain: NaN, q: NaN };
     this.on = false;
     this.nextType = T.bell;
     this.nextSlope = EQ_FIRST_ORDER_SLOPE;
     this.nextOn = false;
-    this.nextFreq = this.nextQ = 1;
-    this.nextGain = 0;
-    this.targetFreq = this.targetQ = 1;
-    this.targetLogFreq = this.targetLogQ = 0;
-    this.logFreq = this.logQ = 0;
+    this.nextFreq = this.nextQ = this.nextGain = NaN;
+    this.targetFreq = NaN;
+    this.targetQ = EQ_FLAT_Q;
+    this.targetLogFreq = this.targetLogQ = NaN;
+    this.logFreq = this.logQ = NaN;
     this.moving = this.pending = this.dirty = false;
-    this.fade = 0;
+    this.fade = NaN;
     this.fadeDir = 0;
     this.fadeStep = 1 / (D.bandFadeSeconds * sampleRate);
     this.glideStep = 1 - Math.exp(-D.refreshFrames / (D.smoothSeconds * sampleRate));

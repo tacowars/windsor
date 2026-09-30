@@ -1,4 +1,4 @@
-# Parametric EQ: accuracy, clicks and cost
+# Parametric EQ: accuracy, clicks, cost and allocation
 
 2026-09-30 · windsor#198 · record `2026-09-30-parametric-eq-insert`
 
@@ -8,7 +8,7 @@ the worklet (`packages/engine/src/worklet/eq/`) and its tests. Nothing is
 registered yet, so nothing here can be heard in the app; the Chrome
 load-meter reading comes with windsor#199, once the kind is registered.
 
-Reproduce every number below from the repository root:
+Reproduce the accuracy and cost numbers below from the repository root:
 
 ```sh
 node docs/research/2026-09-30-parametric-eq/bench.mjs
@@ -16,7 +16,12 @@ node docs/research/2026-09-30-parametric-eq/bench.mjs
 
 It writes [bench.json](bench.json) (the environment, the throughput and the
 full accuracy grid, one row per rate, type, centre, Q and gain) and prints
-the tables.
+the tables. The allocation numbers come from `eqAllocation.test.ts` and
+
+```sh
+node --expose-gc --min-semi-space-size=64 --max-semi-space-size=64 \
+  docs/research/2026-09-30-parametric-eq/coldSwitch.mjs [bundle]
+```
 
 ## Which form each band type uses
 
@@ -145,14 +150,65 @@ reading on the load meter follows with windsor#199.
 
 ## Allocation
 
-`eqDsp.test.ts` checks worklet rule 2 on the shipped bundle: nothing
-`process` reaches builds an array, object, closure, string or spread, or
-calls a method that returns a new one. V8 also boxes a double that crosses a
-call it does not inline, which no source syntax shows, so the section forms
-pass their working values through fields instead of arguments. With Node's
-heap statistics and sampling heap profiler on the same machine, after a
-warm-up, 10 000 quanta each of flat, settled, silent, bypassed and gliding
-processing grew the heap by no more than the measuring loop alone. A type,
-slope or on switch still boxed about 100 bytes per band in V8's switch path:
-a few hundred bytes per click, not per quantum. A heap reading inside Vitest
-was not repeatable enough to be a test, so the test is the static check.
+Measured on the machine above (Apple M1, Node v24.21.0, V8
+13.6.233.17-node.53) with the shipped bundle.
+
+`eqDsp.test.ts` checks worklet rule 2 in the source: nothing `process`
+reaches builds an array, object, closure, string or spread, or calls a
+method that returns a new one. V8 also boxes a double that crosses a call it
+does not inline, which no source syntax shows, so the section forms pass
+their working values through fields instead of arguments.
+
+Rule 7 is checked with `--trace-generalization`. V8 types a field by its
+first value, so a double first written as 0 or 1 is a small-integer field
+until its first fraction, and that write generalises it: the object's map is
+deprecated and the code that reads it deoptimised, and until V8 optimises
+that code again it boxes every double. The first build first wrote its
+doubles as integers, and the run in `eqAllocation.test.ts` traced 42 such
+changes after the constructors: the band's and the DSP's doubles, the
+section forms' working values (`v`), the band's `design` and the load
+report's times. `fade` changed at the first type, slope or on change, and
+`--trace-deopt` showed it deoptimising `runSections`, `flush` and
+`configure` for a wrong map. Every double field is now first written as a
+double (NaN until the first block snaps it; a first-order cut's held Q
+starts at √½) and the trace shows none. Renders are bit for bit what they
+were: eight seeded scripts of 4 000 quanta, with type, slope, on, frequency,
+gain, Q, output and enable changes and silences, matched the first build to
+the sample.
+
+`eqAllocation.test.ts` reads the heap in a Node of its own (a reading inside
+Vitest was not repeatable). After 48 000 quanta that run every path (glides,
+toggles, the output and enable fades, silence, a load report), 40 000 quanta
+that toggle type, slope and on on all eight bands every 8 quanta grew the
+heap by 6 752 bytes, the same in every run: the eleven readings' own result
+objects. One boxed double per band switch would read about 480 KB. The first
+build reads the same 6 752 bytes here: once warm, its switch did not box per
+switch either. The earlier reading of about 100 bytes per band per switch was
+code V8 had not yet optimised.
+
+What still allocates, so rule 2 is not met in full:
+
+- **A switch's first runs.** V8 runs a function in its interpreter or
+  baseline tier until it is hot, and those tiers box every double result. A
+  change runs code that steady playing does not (the band's fade and its mix,
+  the coefficient glide, the new type's section design), and its first runs
+  also deoptimise `process`, `piece` and `band`, which have no type feedback
+  for that branch yet. `coldSwitch.mjs` measures it: a fresh EQ plays eight
+  audible bands for 20 000 quanta, then takes sixteen single changes (one
+  band's type, slope or on in turn), each followed by 1 000 quanta. Bytes per
+  change, the reading's own taken off:
+
+  | Build | 1st | 2nd | 3rd | 4th | 5th–16th |
+  | --- | ---: | ---: | ---: | ---: | --- |
+  | first build, cold | 2 798 416 | 548 024 | 347 000 | 546 688 | 2 808 – 1 275 928 |
+  | this build, cold (three runs) | 1 761 136 – 1 884 504 | 477 960 – 533 144 | 352 824 – 362 336 | 257 128 – 560 008 | 2 808 – 1 332 744 |
+  | this build, after 48 000 quanta of all-band toggles | 280 – 5 768 | 5 608 – 17 736 | 361 512 – 377 128 | 21 368 – 24 072 | 248 – 408 |
+
+  The source cannot remove this: it is how V8 runs any rarely taken path, in
+  every worklet. Only keeping the path hot would, for example by rehearsing
+  every change on a scratch EQ when the module loads; that costs audio-thread
+  time at load and is not done here.
+- **The load report.** While the load meter reads, `process` calls
+  `Date.now()` twice a quantum, and V8 returns each reading as a new heap
+  number: 32 bytes a quantum, measured. Every insert processor reports load
+  the same way.

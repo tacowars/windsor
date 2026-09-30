@@ -64,8 +64,10 @@ class EqProcessor extends AudioWorkletProcessor {
     for (let b = 0; b < EQ_BAND_COUNT; b++)
       for (const field of EQ_BAND_PARAMS) this.names.push(eqParamName(b, field));
     this.loadQuanta = 0;
-    this.load = { type: 'load', busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
-    this.wallStart = 0;
+    // The times are readings of Date.now() and differences of them: doubles from
+    // their first write (worklet rule 7), set by `reportLoad` or before each post.
+    this.load = { type: 'load', busyMs: NaN, wallMs: NaN, quanta: 0, peakMs: NaN, underruns: 0 };
+    this.wallStart = NaN;
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
       if (data.type === 'stop') this.running = false;
       if (data.type === 'reportLoad') {

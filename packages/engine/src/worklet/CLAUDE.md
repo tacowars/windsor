@@ -33,9 +33,14 @@ pieces of 16 samples while anything moves) and the enable crossfade;
 the TDF-II loops, the coefficient ramp across a gliding piece and the band
 fade. The coefficients come from `inserts/eqCoefficients.ts` /
 `eqSectionDesign.ts`, which the console's curve shares; the section forms pass
-no double across a call, since V8 boxes one it does not inline. Tests under
+no double across a call, since V8 boxes one it does not inline, and every
+double field (the band's, the DSP's, the forms' `v`) is first written as a
+double, NaN until the first block snaps it (rule 7). Tests under
 `inserts/eq*.test.ts` run the bundle through `__fixtures__/eqHarness.ts`,
-which also reaches its hot functions by name for the rule 2 check.
+which also reaches its hot functions by name for the rule 2 check;
+`inserts/eqAllocation.test.ts` runs it in a child Node
+(`__fixtures__/eqAllocationProbe.ts`) that reads the heap and V8's
+`--trace-generalization` while every band toggles.
 
 `phaser/` is the original four-stage stereo insert (#687):
 `phaserProcessor.ts` owns controls/lifecycle/load reporting and `phaserDsp.ts`

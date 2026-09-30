@@ -13,8 +13,10 @@
  * block.
  *
  * Invariants: nothing allocates after the constructor; the output of the
- * copy paths is the input's own samples. Pinned by `inserts/eqDsp.test.ts`
- * through the shipped bundle.
+ * copy paths is the input's own samples; a double field is first written as
+ * a double, so no later write changes its representation (see `eqBand.ts`).
+ * The first `retarget` snaps every value. Pinned by `inserts/eqDsp.test.ts`
+ * and `eqAllocation.test.ts` through the shipped bundle.
  */
 import { EQ_DSP as D, EQ_MATH as M } from '../../inserts/eqConstants';
 import { EqBand } from './eqBand';
@@ -57,14 +59,15 @@ export class EqDsp {
     this.dryL = new Float64Array(D.blockFrames);
     this.dryR = new Float64Array(D.blockFrames);
     this.inL = this.inR = this.outL = this.outR = new Float32Array(0);
-    this.nextOutput = 0;
+    // Doubles first written as doubles, NaN until the first block snaps them (see the header).
+    this.nextOutput = NaN;
     this.nextEnabled = true;
-    this.gain = this.gainTarget = 1;
+    this.gain = this.gainTarget = NaN;
     this.gainMoving = false;
     this.gainStep = 1 - Math.exp(-1 / (D.smoothSeconds * sampleRate));
     this.enabled = true;
     this.bypassed = false;
-    this.mix = 1;
+    this.mix = NaN;
     this.mixDir = 0;
     this.mixStep = 1 / (D.enableFadeSeconds * sampleRate);
     this.clear = true;

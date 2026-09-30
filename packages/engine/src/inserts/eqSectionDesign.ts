@@ -24,40 +24,47 @@
  * inline, and this runs on the audio thread every refresh while a band
  * glides: nothing here allocates. Every section's poles lie inside the unit
  * circle for every value in range. Pinned by `eqCoefficients.test.ts` and the
- * allocation check in `eqDsp.test.ts`.
+ * allocation checks in `eqDsp.test.ts` and `eqAllocation.test.ts`.
  */
 import { EQ_MATH as M, EQ_SECTION as X, EQ_SHELF_MIN_SEPARATION } from './eqConstants';
 
-/** The working values of the section being designed, and the section itself (a0 = 1). */
+/**
+ * The working values of the section being designed, and the section itself
+ * (a0 = 1). Each is written before it is read; it starts as NaN, a double,
+ * because V8 types a field by its first value, and a field first written as
+ * a small integer would be generalised by its first fraction, deprecating
+ * this object's map and deoptimising every form that reads it (on the audio
+ * thread, the first shelf after a run of bells, say).
+ */
 export const v = {
   /** The band's corner (radians per sample), Q and heard gain (dB). */
-  w0: 0,
-  q: 1,
-  gain: 0,
+  w0: NaN,
+  q: NaN,
+  gain: NaN,
   /** The poles' natural frequency and Q, for `matchPoles`. */
-  pw: 0,
-  pq: 1,
+  pw: NaN,
+  pq: NaN,
   /** A frequency, and cos²(w/2), sin²(w/2) and 4 cos² sin² there (Vicanek's basis). */
-  w: 0,
-  p0: 1,
-  p1: 0,
-  p2: 0,
+  w: NaN,
+  p0: NaN,
+  p1: NaN,
+  p2: NaN,
   /** A numerator's power in that basis, for `numerator`. */
-  P0: 0,
-  P1: 0,
-  P2: 0,
+  P0: NaN,
+  P1: NaN,
+  P2: NaN,
   /** A shelf's amplitude, its third fitting point, a ratio to the corner and the power there. */
-  A: 1,
-  w3: 0,
-  ratio: 1,
-  power: 1,
+  A: NaN,
+  w3: NaN,
+  ratio: NaN,
+  power: NaN,
   /** The prototype's power at a cut's corner. */
-  corner: 1,
-  b0: 1,
-  b1: 0,
-  b2: 0,
-  a1: 0,
-  a2: 0,
+  corner: NaN,
+  b0: NaN,
+  b1: NaN,
+  b2: NaN,
+  a1: NaN,
+  a2: NaN,
 };
 
 export function setPhi(): void {
