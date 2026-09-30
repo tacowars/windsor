@@ -22,6 +22,7 @@ import { regionPattern, songTicksOf } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { loopBraceRow } from './loopBrace';
+import type { DetailPane } from './songDetailPane';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
@@ -183,7 +184,7 @@ function renderSongView(
   pane.addEventListener('scroll', () => {
     state.paneScrollPx = pane.scrollTop;
   });
-  let paneStale = (): boolean => false;
+  let paneDrawn: DetailPane = { stale: () => false, refreshHead: () => undefined };
   // Set once the zoom is wired below; the arrow can only be pressed after that.
   let refit = (): void => undefined;
   const mixer = {
@@ -236,7 +237,7 @@ function renderSongView(
       markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
     },
     paintPane() {
-      paneStale = paintDetailPane(pane, view);
+      paneDrawn = paintDetailPane(pane, view);
     },
   };
   let signature = laneSignature(ctx);
@@ -272,7 +273,7 @@ function renderSongView(
     drag,
     repaintIf: () => {
       // The insert panel's chain edited on the Mixer tab, which marks this tab nothing.
-      if (paneStale()) view.paintPane();
+      if (paneDrawn.stale()) view.paintPane();
       // A strip edited on the Mixer tab: the column redraws in place, never rebuilt under a knob.
       const strips = stripSignature(ctx);
       if (strips !== stripsDrawn) {
@@ -284,6 +285,8 @@ function renderSongView(
       signature = now;
       state.selection = validSelection(ctx, state.selection);
       view.paintLanes();
+      // A card's edit never redraws the pane (the knob stays under the pointer): its header follows in place.
+      paneDrawn.refreshHead();
       zoom.refit();
     },
   });
