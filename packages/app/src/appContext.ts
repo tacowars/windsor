@@ -76,6 +76,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   private readonly chrome: Array<() => void> = [];
   private readonly history = new UndoHistory<ArrangementDocument>();
   private gesture: Gesture | null = null;
+  /** Who follows each tab's shown state (`onTabShown`), by tab id. */
+  private readonly shownListeners = new Map<string, Set<(shown: boolean) => void>>();
 
   constructor(deps: AppContextDeps) {
     this.host = deps.host;
@@ -88,9 +90,28 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
 
   /** Register a tab; the first registered is the active one. Nothing renders until `render()`. */
   addTab(id: string, panel: P, render: (panel: P) => void): void {
+    const before = this.active;
     this.active ??= id;
     panel.hidden = id !== this.active;
     this.tabs.set(id, { panel, render, dirty: true });
+    this.announceShown(before);
+  }
+
+  /**
+   * Follow whether tab `id` is shown (windsor#193 decision 4): `listener`
+   * hears the state now and then on each change, until the returned call
+   * stops it. What a view that works only while seen (the meters' loop)
+   * starts and stops on, rather than polling its panel's `hidden`.
+   */
+  onTabShown(id: string, listener: (shown: boolean) => void): () => void {
+    let listeners = this.shownListeners.get(id);
+    if (!listeners) {
+      listeners = new Set();
+      this.shownListeners.set(id, listeners);
+    }
+    listeners.add(listener);
+    listener(this.active === id);
+    return () => void listeners.delete(listener);
   }
 
   /**
@@ -336,8 +357,19 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
 
   /** Make `id` the active tab and hide the rest, rendering nothing. */
   private reveal(id: string): void {
+    const before = this.active;
     this.active = id;
     for (const [tabId, other] of this.tabs) other.panel.hidden = tabId !== id;
+    this.announceShown(before);
+  }
+
+  /** Tell the tab hidden and the tab shown, if the active tab moved from `before`. */
+  private announceShown(before: string | null): void {
+    const now = this.active;
+    if (now === before) return;
+    if (before !== null)
+      for (const listener of this.shownListeners.get(before) ?? []) listener(false);
+    if (now !== null) for (const listener of this.shownListeners.get(now) ?? []) listener(true);
   }
 
   /** The one path a structural change takes: the live system rebuilt, every tab invalidated. */

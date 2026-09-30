@@ -1,15 +1,18 @@
 /**
  * What the console remembers about one live output stage (windsor#94): the
- * clip light's latch and when the stage last acted. It listens to every
- * report through `OutputStage.subscribe`, so a frame loop slower than the
- * reports, or a Mixer tab that is hidden or re-rendered, never misses one.
+ * clip light's latch, what latched it, when the stage last acted, and each
+ * input channel's latch above 0 dBFS (windsor#193 decision 5). It listens to
+ * every report through `OutputStage.subscribe`, so a frame loop slower than
+ * the reports, or a Mixer tab that is hidden or re-rendered, never misses
+ * one.
  *
  * One watch per stage, kept in a `WeakMap`: the master strip's section and
  * the top-bar light read the same latch, and a rebuild's new stage starts a
  * fresh one while the old one goes with its stage.
  */
 import type { OutputStage } from '@windsor/engine';
-import { reportActed } from './outputStageModel';
+import { type OutputStageAction, reportAction, reportActed } from './outputStageModel';
+import { OUTPUT_OFF_CLIP_LEVEL } from './outputStageTables';
 
 /**
  * The slice of a stage the watch reads; a test fakes this much. Not its
@@ -21,11 +24,24 @@ export type WatchedStage = Pick<OutputStage, 'subscribe'>;
 /** The slice the meters' frame loop reads: the watch's, plus the latest report. */
 export type MeteredStage = WatchedStage & Pick<OutputStage, 'revision' | 'read'>;
 
+/** One side of the stage's stereo input. */
+export type InputChannel = 'left' | 'right';
+
 export interface OutputStageWatch {
   /** Set when the stage acts; cleared only by `resetLatch` (Reset peaks). */
   readonly latched: boolean;
+  /**
+   * What latched it, from the latching report alone (`reportAction`), so a
+   * mode change before the reset keeps the name; `null` while unlatched.
+   */
+  readonly latchedAction: OutputStageAction | null;
   /** When the stage last acted, in `now()` milliseconds; `null` if it never has. */
   readonly lastActedMs: number | null;
+  /** Whether `channel`'s input went above 0 dBFS since it was last cleared. */
+  inputOver(channel: InputChannel): boolean;
+  /** Clears one input channel's latch, and nothing else. */
+  clearInputOver(channel: InputChannel): void;
+  /** Clears the stage's latch, its action and both input latches. */
   resetLatch(): void;
 }
 
@@ -38,22 +54,38 @@ export function watchOutputStage(
 ): OutputStageWatch {
   const known = watches.get(stage);
   if (known) return known;
-  let latched = false;
+  let latchedAction: OutputStageAction | null = null;
   let lastActedMs: number | null = null;
+  const over = { left: false, right: false };
   stage.subscribe((report) => {
-    if (!reportActed(report)) return;
-    latched = true;
+    if (report.inputLeft > OUTPUT_OFF_CLIP_LEVEL) over.left = true;
+    if (report.inputRight > OUTPUT_OFF_CLIP_LEVEL) over.right = true;
+    // The latch keeps windsor#94's rule (`reportActed`), and any report it
+    // passes has an action; the name is the latching report's own, so a
+    // later report never renames it.
+    const action = reportActed(report) ? reportAction(report) : null;
+    if (action === null) return;
+    latchedAction ??= action;
     lastActedMs = now();
   });
   const watch: OutputStageWatch = {
     get latched() {
-      return latched;
+      return latchedAction !== null;
+    },
+    get latchedAction() {
+      return latchedAction;
     },
     get lastActedMs() {
       return lastActedMs;
     },
+    inputOver: (channel) => over[channel],
+    clearInputOver: (channel) => {
+      over[channel] = false;
+    },
     resetLatch: () => {
-      latched = false;
+      latchedAction = null;
+      over.left = false;
+      over.right = false;
     },
   };
   watches.set(stage, watch);

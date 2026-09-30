@@ -101,6 +101,59 @@ describe('watchOutputStage', () => {
   });
 });
 
+describe('the latched action and the input latches (windsor#193 decision 5)', () => {
+  it('keeps Limiting after a limiter latch and a switch to Off, until reset', () => {
+    const stage = fakeStage({ ...DEFAULT_OUTPUT_STAGE, mode: 'limiter' });
+    const watch = watchOutputStage(stage, () => 0);
+    expect(watch.latchedAction).toBeNull();
+    stage.post({ inputLeft: 2, outputLeft: 0.89, reductionDb: 7, active: true });
+    expect(watch.latchedAction).toBe('Limiting');
+    stage.settings = { ...stage.settings, mode: 'off' };
+    stage.post({ inputLeft: 1.3, outputLeft: 1.3 });
+    expect(watch.latchedAction).toBe('Limiting');
+    watch.resetLatch();
+    expect(watch.latched).toBe(false);
+    expect(watch.latchedAction).toBeNull();
+    stage.post({ inputLeft: 1.3, outputLeft: 1.3 });
+    expect(watch.latchedAction).toBe('Over 0 dB');
+  });
+
+  it('names Clipping for a clipper report, whatever the mode in force', () => {
+    const stage = fakeStage({ ...DEFAULT_OUTPUT_STAGE, mode: 'limiter' });
+    const watch = watchOutputStage(stage, () => 0);
+    stage.post({ inputLeft: 2, outputLeft: 0.89, overDb: 7, active: true });
+    expect(watch.latchedAction).toBe('Clipping');
+  });
+
+  it('latches each input channel above 0 dBFS, and clears each alone', () => {
+    const stage = fakeStage();
+    const watch = watchOutputStage(stage, () => 0);
+    stage.post({ inputLeft: 1, inputRight: 0.5 });
+    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([false, false]);
+    stage.post({ inputLeft: 1.1, outputLeft: 0.89, reductionDb: 1, active: true });
+    stage.post({ inputRight: 1.4, outputRight: 0.89, reductionDb: 3, active: true });
+    stage.post({});
+    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([true, true]);
+    watch.clearInputOver('left');
+    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([false, true]);
+    expect(watch.latched).toBe(true);
+    watch.clearInputOver('right');
+    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([false, false]);
+    expect(watch.latchedAction).toBe('Limiting');
+  });
+
+  it('clears both kinds on a reset', () => {
+    const stage = fakeStage();
+    const watch = watchOutputStage(stage, () => 0);
+    stage.post({ inputLeft: 2, inputRight: 2, outputLeft: 0.89, reductionDb: 7, active: true });
+    expect(watch.latched && watch.inputOver('left') && watch.inputOver('right')).toBe(true);
+    watch.resetLatch();
+    expect(watch.latched).toBe(false);
+    expect(watch.latchedAction).toBeNull();
+    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([false, false]);
+  });
+});
+
 describe('meterRevision (the meters follow the audio, not the transport)', () => {
   it('is -1 with no live stage', () => {
     expect(meterRevision(null)).toBe(-1);

@@ -22,6 +22,7 @@
  * the render.
  */
 import { OUTPUT_OVERSAMPLE } from './outputStageConstants';
+import { outputStageCurve } from './outputStageCurve';
 
 /** One channel's histories, at the song's rate: the input, and the even and odd residuals. */
 export interface ClipperChannel {
@@ -152,18 +153,14 @@ export class OversampledClipper {
     channel.quiet = quiet;
   }
 
-  /** The curve less the identity: 0 wherever the curve leaves the sample alone. */
+  /**
+   * The curve less the identity: 0 wherever the curve leaves the sample
+   * alone. The curve is `outputStageCurve`, the one the console plots.
+   */
   private residual(w: number): number {
     const a = w < 0 ? -w : w;
-    const c = this.ceiling;
-    if (!this.soft) {
-      if (a <= c) return 0;
-      return w > 0 ? c - w : -c - w;
-    }
-    const k = this.knee;
-    if (a <= k) return 0;
-    const u = (a - k) / (c - k);
-    const y = k + ((c - k) * u) / (1 + u);
+    const y = outputStageCurve(this.soft ? 'soft' : 'hard', this.ceiling, a, this.knee);
+    if (y === a) return 0;
     return w > 0 ? y - w : -y - w;
   }
 }
