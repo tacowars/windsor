@@ -239,7 +239,7 @@ describe('Qualification and interrupted evidence', () => {
       expect(valid(bad)).toBe(false);
     }
     const changed = structuredClone(target);
-    changed.samples.output.fill(0.1);
+    changed.samples.output[B.frames - 1] = 0.1;
     const errors = compare(target, changed).errors;
     expect(errors).toEqual({ raw: 0, output: 0.1, fixed: 0 });
     const badPairs = p.map((v) => (v.id === rows[0].id && v.to === 1024 ? { ...v, errors } : v));
@@ -294,7 +294,15 @@ describe('Saved report', () => {
     for (const p of report.pairs) {
       const a = report.trials.find((t) => t.id === p.id && t.factor === p.from);
       const b = report.trials.find((t) => t.id === p.id && t.factor === p.to);
-      expect(compare(a, b)).toEqual(p);
+      const errors = Object.fromEntries(
+        ['raw', 'output', 'fixed'].map((key) => [
+          key,
+          a.state.finite && b.state.finite
+            ? Math.max(...a.samples[key].map((x, i) => Math.abs(x - b.samples[key][i])))
+            : null,
+        ]),
+      );
+      expect({ id: b.id, from: a.factor, to: b.factor, errors }).toEqual(p);
     }
     for (const row of rows)
       expect(group(row, report.trials, report.pairs, true)).toEqual(

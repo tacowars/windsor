@@ -26,3 +26,30 @@ Prior evidence, shipping DSP/UI, schemas, presets and goldens remain intact.
 Milestone B is not complete. Any new conditioning model or numerical method
 requires its own next task and independent reference qualification, before
 full dynamic and eventual product qualification.
+
+
+## Outcome and next boundary
+
+The complete 28-trajectory/24-comparison run took 26.973 seconds on the
+recorded M1/Node Float64 backend; all shared coarse summaries and errors
+match #169 exactly. Both center signed unit pulses qualify at the finest
+256/512/1024× triple under the unchanged raw/full 1e-7 criterion. Both
+controls-1/0/0 signed ±100 pulses remain unqualified: their finest errors
+are 6.85460e-7 raw and 8.98369e-7 full, and the preserved 16× trajectories
+still fail the state guard during return. Finer finite output and final
+remanence do not conceal either failure type.
+
+Stage evidence records large conditioned derivatives near field zero,
+large coarse stage updates and magnetic branch changes. The sampled
+coarse denominator minimum remains above its guard floor. This does not
+prove a continuous stability bound or that slew is the sole cause.
+See the report for stage states, caps and numerical uncertainty.
+
+The next recommendation is one new bounded, unchanged-system reference
+comparison at 1024/2048/4096/8192× for the two remaining signed extreme
+pulses at 48 kHz, under the same gates and 900-second bound. Its cost and
+qualification are unknown. If it fails, preserve the blocker and refine
+an event-localization or derivative-consistent conditioning experiment;
+do not extend an automatic ladder or silently clip dH. No follow-up is
+implemented by this decision. Full static/dynamic domains, candidate
+corner accuracy, browser cost and eventual in-app audition remain pending.

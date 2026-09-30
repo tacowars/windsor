@@ -1,10 +1,11 @@
 # Tape signed boundary reference refinement
 
 Windsor [#178](https://github.com/tacowars/windsor/issues/178) isolates four
-unqualified static knee-policy pulses from #167/#169. It refines the unchanged
-system and observes its actual RK stages. A complete bounded blocker report
-is an allowed outcome; neither finite output nor this task's completion
-qualifies a complete input/control domain or completes milestone B.
+unqualified static knee-policy pulses from #167/#169. The fixed refinement
+qualifies both center unit pulses at 48 kHz, while both extreme pulses still
+miss the unchanged precision target. The complete report preserves their
+coarse failures. No complete input/control domain is qualified, and milestone
+B remains incomplete.
 
 The equation is Jatin Chowdhury's GPL-3.0-only adaptation at revision
 `604372e4ffd9690c3e283362e4598cb43edbb475`. The unchanged core,
@@ -119,3 +120,109 @@ The earlier qualified static tone rows remain historical anchors. In
 particular, RK4/4× misses high-bin corners at 1/0/1, and RK2/8× at 1/0/1
 and 1/1/1. Boundary-reference refinement cannot resolve these candidate
 accuracy misses or choose a product solver/control domain.
+
+## Results and remaining work
+
+All **28/28 primary trajectories and 24/24 comparisons** completed in
+**26.973 seconds**, below the 900-second limit, with no missing records or
+truncated journal. Environment: Apple M1 arm64, Darwin 25.5.0, Node 24.20.0 /
+V8 13.6.233.17-node.53, Float64 source DSP, no browser or audio device.
+The 12 shared trial summaries and eight raw/full comparison records match
+#169 exactly. Recorded source hashes match the measured code. Runtime is
+numerical reproduction time, not real-time browser cost.
+
+The following absolute errors apply equally to both independently rendered
+signs. Every earlier residual, state and bounded diagnostic is retained in
+[measurement.json](measurement.json).
+
+| Case | Pair | Raw maximum error | Full maximum error | Fixed observation error |
+|---|---|---:|---:|---:|
+| Center ±1 | 256→512× | 7.02444e-8 | 7.01021e-8 | 7.00301e-8 |
+| Center ±1 | 512→1024× | 2.95669e-8 | 2.06347e-8 | 2.06450e-8 |
+| Controls 1/0/0, ±100 | 256→512× | 7.17042e-5 | 8.96802e-5 | 2.79700e-5 |
+| Controls 1/0/0, ±100 | 512→1024× | 6.85460e-7 | 8.98369e-7 | 1.85675e-6 |
+
+The center unit pulses qualify only on the finest 256/512/1024× triple.
+The preceding 128→256× pair still misses the criterion (raw 1.40415e-7,
+full 1.42339e-7). Their final magnetizations at 1024× are
+±0.05341405966564157; DC/remanence was retained. These are finite pulses
+that needed finer precision references, not demonstrated unstable inputs.
+Qualification here covers these two zero-history cases at this rate only.
+
+Both ±100 pulses still have **no passing reference triple**. Their 16×
+trajectories fail at index 4369 (host time 273.0625), matching the earlier
+return-transient failure. The remaining 26 trajectories are finite, and all
+28 report zero resets/clips. At 1024× the extreme-pulse final magnetizations
+are ±1.6944522861437017e-5. Neither finite finer states nor this small final
+value replaces full-trajectory qualification: the largest finest raw error
+occurs at host frame 143, and full-output error at frame 288. The preserved
+16× failures are distinct from the finite finer precision shortfalls.
+
+### Observed stage behavior
+
+For the positive extreme pulse at 16×, the largest conditioned stage
+increment has magnitude **13.607657** at host time 272.09375, in the return
+transient, with conditioned H=-0.809676. The failure step retains all four
+actual stage states, including distinct midpoint M=-19.177135 and
+M=-19.972338. All four returned slopes in that step are finite; the
+weighted RK4 update exceeds the imported magnitude-20 state guard. The
+reported final M=-16.937607 is the last accepted state, not a reset or the
+rejected next state. The minimum sampled absolute irreversible denominator
+at 16× is 0.000539442, above the imported 1e-9 denominator floor; the
+reversible denominator stays at least 0.99682672 for these controls.
+These observations do not establish a continuous denominator bound.
+
+At 1024×, the positive extreme pulse's largest conditioned derivative is
+**2,877,711.977 H units/second** at time 142.93701171875, with H=0.973388,
+inside the knee's identity region. A nearby stage at time 142.9208984375
+has H=0.0240898 and a returned slope of 5,562,189.854 M units/second,
+for a stage increment of 0.113163. The sampled field-zero brackets are
+[142.92041015625,142.9208984375] at startup and
+[272.0791015625,272.07958984375] on return. The negative pulse mirrors
+these magnitudes and state polarities. Amplitude conditioning therefore
+leaves substantial slew near zero in these measured trajectories; this
+is evidence to investigate temporal resolution, not proof of the sole
+cause, a new slew limit, or a control-smoothing solution.
+
+The extreme-pulse sampled minimum absolute irreversible denominator
+increases to 0.004773614 at 1024×. Irreversible stage-call transition counts
+fall from 600 at 32× to 302 at 1024×, while field-zero and knee counts are
+30 and 26 at both grids. This does not establish exact physical crossing
+counts: the record explicitly distinguishes same-time trial-stage changes.
+For the positive extreme pulse, the irreversible detail cap truncates
+153/95/27 window records at 32/64/128×; for the negative pulse those counts
+are 152/94/26. Their total irreversible transition counts differ by one
+(positive 600→302, negative 599→301 at 32→1024×): the imported equation
+chooses positive direction at zero velocity, where the returned slope
+is zero. Numerical output and error magnitudes retain signed symmetry;
+branch diagnostics need not have identical counts. Every total/window
+count and complete failure-step snapshot is retained. All other families
+and remaining factors fit within their caps.
+
+### Bounded next recommendation
+
+The extreme-pulse raw/full discrepancies decrease from 1.06012/1.16546
+at 32→64× to 6.85460e-7/8.98369e-7 at 512→1024×, without finer state
+failures. This supports **one separately declared finer-reference task**
+for controls 1/0/0 at ±100, 48 kHz, keeping the system and gates unchanged:
+1024/2048/4096/8192×, eight primary trajectories, with the same hard
+900-second bound and two passing finest successive raw/full comparisons.
+Its higher cost is unmeasured; completion within the bound is not promised.
+If it remains blocked, retain that result and refine an event-localization
+or conditioning experiment from its measured error rather than extending
+an automatic refinement loop. No such follow-up has been run here.
+
+A bounded-slew model is not justified as an implementation change by this
+report alone. If proposed later, it is a new system with its own consistent
+derivative and independent reference qualification. The remaining input/
+control/history/rate domain, dynamic stability and earlier corner candidate
+misses are unresolved; no product domain, solver or cost choice follows.
+
+Verification passed: **33/33 focused tests**, repository typecheck and lint,
+standalone strict research typecheck, explicit source Prettier check,
+whitespace and owned-file checks. Negative controls retain raw-only/full-only
+failures, a final-frame spike, missing/nonconsecutive finest pairs,
+nonfinite/reset/clip evidence, null samples, duplicate/missing identities,
+wrong chain derivative, distinct midpoint states, capped details and
+interrupted journal tails. The saved report's numerical errors are
+recomputed with an independent absolute-difference expression.
