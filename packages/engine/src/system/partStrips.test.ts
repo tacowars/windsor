@@ -2,15 +2,18 @@
  * `PartStrips` on its own, over a built `StandingGraph` on the headless graph
  * stand-in: a music part lands dry on the music bus and an aux part on the aux
  * fader, each on its strip and on the load meter; `remove` takes one part down
- * and nothing else; `dispose` takes the strips down.
+ * and nothing else; `dispose` takes the strips down, each strip's peak meter
+ * with it (windsor#155).
  */
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import { reaches } from '../__fixtures__/audioAnalysis';
+import type { FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import { FakeContext, installFakeAudioWorklet, sourceOf } from '../__fixtures__/fakeAudioContext';
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { LOW_CUT_MIN_HZ } from '../audioConstants';
 import type { ChannelStrip } from '../mixer/mix';
+import { PEAK_METER_NAME } from '../mixer/peakMeterConstants';
 import { RETURNS } from '../mixer/mix';
 import { PRESETS } from '../patch/presets';
 import { FmEngine } from '../synth/fmEngine';
@@ -24,6 +27,10 @@ afterAll(() => restore());
 
 const fake = (node: AudioNode): FakeNode => node as unknown as FakeNode;
 const PATCH = PRESETS['pad-drift']!;
+
+/** The meter nodes built on the engine's context so far. */
+const meterNodes = (engine: FmEngine): FakeWorkletNode[] =>
+  (engine.context as unknown as FakeContext).workletNodes.filter((n) => n.name === PEAK_METER_NAME);
 
 const desk = (level: number): ChannelStrip => ({
   level,
@@ -121,5 +128,28 @@ describe('PartStrips.remove and dispose', () => {
     expect(parts.get('ui')).toBeUndefined();
     expect(fake(drone.output).outbound).toEqual([]);
     expect(engine.getPart('drone')).toBe(drone);
+  });
+
+  it('disposes a removed part’s meter, and every meter on dispose, for music and aux alike', async () => {
+    const { engine, parts } = await rig();
+    parts.createMusic('drone', PATCH, 4);
+    parts.createMusic('lead', PATCH, 4);
+    parts.createAux('ui', PATCH, 2);
+    const strips = ['drone', 'lead', 'ui'].map((name) => parts.get(name)!);
+    expect(meterNodes(engine)).toEqual([]);
+    for (const strip of strips) strip.meter.setActive(true);
+    const [drone, lead, ui] = meterNodes(engine);
+    expect(meterNodes(engine)).toHaveLength(3);
+
+    parts.remove('drone');
+    expect(drone!.inbound).toEqual([]);
+    expect(drone!.posted).toContainEqual({ type: 'stop' });
+    expect(lead!.inbound).toHaveLength(1);
+
+    parts.dispose();
+    expect(lead!.inbound).toEqual([]);
+    expect(ui!.inbound).toEqual([]);
+    for (const strip of strips) strip.meter.setActive(true);
+    expect(meterNodes(engine)).toHaveLength(3);
   });
 });

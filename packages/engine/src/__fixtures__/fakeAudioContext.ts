@@ -11,13 +11,16 @@
  * post-fader taps behave as they do live. The engine's output stage runs the
  * real generated processor too (`outputStageHarness.ts`, windsor#93), at the
  * context's rate, and its reports reach the node's `port.onmessage` as they
- * are posted.
+ * are posted. So does the peak meter (`peakMeterHarness.ts`, windsor#155),
+ * whose reports reach `onmessage` and whose port carries reset and stop.
  *
  * Node-only, by design: excluded from the engine's tsc build.
  */
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import { OUTPUT_STAGE_NAME } from '../mixer/outputStageConstants';
+import { PEAK_METER_NAME } from '../mixer/peakMeterConstants';
 import { loadOutputStage } from './outputStageHarness';
+import { loadPeakMeter } from './peakMeterHarness';
 import type { FakeHost } from './fakeAudioNodes';
 import { FakeConstantSource, FakeOscillator, FakePeriodicWave } from './fakeOscillator';
 import { FakeWaveShaper } from './fakeWaveShaper';
@@ -59,6 +62,7 @@ export class FakeContext implements FakeHost {
       if (text.includes('fm-processor')) this.registered.add(PROCESSOR_NAME);
       if (text.includes('reverb-processor')) this.registered.add(REVERB_PROCESSOR_NAME);
       if (text.includes('output-stage-processor')) this.registered.add(OUTPUT_STAGE_NAME);
+      if (text.includes('peak-meter-processor')) this.registered.add(PEAK_METER_NAME);
     },
   };
 
@@ -164,8 +168,10 @@ export class FakeWorkletNode extends FakeNode {
   } = Object.assign(new EventTarget(), {
     postMessage: (message: unknown): void => {
       this.posted.push(message);
-      // Only the output stage hears its port here; the plate's load sampler stays off, as before.
-      if (this.name === OUTPUT_STAGE_NAME) this.processor?.inbox(message);
+      // Only the output stage and the meter hear their port here; the plate's load sampler stays off, as before.
+      if (this.name === OUTPUT_STAGE_NAME || this.name === PEAK_METER_NAME) {
+        this.processor?.inbox(message);
+      }
     },
     onmessage: null,
     start: (): void => {},
@@ -201,6 +207,10 @@ export class FakeWorkletNode extends FakeNode {
         this.parameters.set(d.name, new FakeParam(value, d.minValue, d.maxValue));
         this.values[d.name] = new Float32Array([value]);
       }
+    } else if (name === PEAK_METER_NAME) {
+      this.processor = loadPeakMeter(context.sampleRate).create((report) => {
+        this.port.onmessage?.({ data: report });
+      });
     } else if (name === PROCESSOR_NAME) {
       this.parameters.set('pitchBend', new FakeParam(0, -24, 24));
       this.parameters.set('modWheel', new FakeParam(0, 0, 1));

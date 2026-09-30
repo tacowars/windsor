@@ -1,0 +1,26 @@
+{
+  "machine": "Apple M1 (8 cores), macOS 26.5.1",
+  "browser": "HeadlessChrome/154.0.0.0 (chrome-devtools-mcp 1.10.1, --headless)",
+  "backend": "OfflineAudioContext, 48 kHz stereo, 128-frame quanta; worklet served by the Vite dev server",
+  "worklet": "packages/engine/src/worklet/generated/peak-meter-processor.js at ffa1037",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+  "hardwareConcurrency": 8,
+  "sampleRate": 48000,
+  "seconds": 30,
+  "runs": 7,
+  "parts": 16,
+  "results": {
+    "none": {
+      "medianMs": 359.8,
+      "msPerAudioSecondOverNone": 0,
+      "runsMs": [370, 365.1, 366.9, 357, 359.8, 357.1, 358.9],
+      "reportsInLastRun": 0
+    },
+    "sixteenMeters": {
+      "medianMs": 968.6,
+      "msPerAudioSecondOverNone": 20.293,
+      "runsMs": [918.6, 925.6, 967.6, 989, 985.7, 968.6, 977.6],
+      "reportsInLastRun": 13840
+    }
+  }
+}
