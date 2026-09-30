@@ -26,7 +26,7 @@ export const STRIP: ChannelStrip = {
   level: 1,
   pan: 0.4,
   lowCut: LOW_CUT_MIN_HZ,
-  sends: { room: 0.5, echo: 0.25 },
+  sends: { a: 0.5, b: 0.25 },
   inserts: [],
 };
 export const STAGE_GAIN = 0.5;

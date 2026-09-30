@@ -28,7 +28,9 @@ import type { AudioSystemOptions } from './audioSystem';
 import { AudioSystem } from './audioSystem';
 import { FmEngine } from '../synth/fmEngine';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
-import { RETURNS } from '../mixer/mix';
+import { RETURNS, onSendBus } from '../mixer/mix';
+import { DEFAULT_ECHO } from '../inserts/echoInsert';
+import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
 import { SPACES } from '../mixer/reverbSpace';
 import { REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import { PRESETS } from '../patch/presets';
@@ -64,7 +66,7 @@ function returnOutput(system: AudioSystem, name: string): FakeNode {
   return fake(bus.output);
 }
 
-/** Build parts named in `mix` (all on the music bus), feed them, render the room return. */
+/** Build parts named in `mix` (all on the music bus), feed them, render Send A, the room. */
 async function roomRender(
   mix: Record<string, ChannelStrip>,
   feed: ReturnType<typeof tones>,
@@ -77,7 +79,7 @@ async function roomRender(
   const [room, master] = renderGraph(
     system.engine.context as unknown as FakeContext,
     RENDER_SECONDS,
-    [returnOutput(system, 'room'), fake(engine.master)],
+    [returnOutput(system, 'a'), fake(engine.master)],
     onBlock ? (b, t) => onBlock(system, b, t) : undefined,
   );
   if (!room || !master) throw new Error('render produced no captures');
@@ -94,8 +96,8 @@ const strip = (sends: ChannelStrip['sends'], pan = 0, level = 1): ChannelStrip =
 
 describe('sends are per part', () => {
   it('lets two parts sit in one room at different depths', async () => {
-    const shallow = await roomRender({ a: strip({ room: 0.2 }) }, BURST);
-    const deep = await roomRender({ b: strip({ room: 0.6 }) }, BURST);
+    const shallow = await roomRender({ a: strip({ a: 0.2 }) }, BURST);
+    const deep = await roomRender({ b: strip({ a: 0.6 }) }, BURST);
 
     const shallowRms = rms(shallow.room.left);
     expect(shallowRms).toBeGreaterThan(0);
@@ -104,9 +106,9 @@ describe('sends are per part', () => {
   });
 
   it('silences a part at send 0 without altering the tail of a part still sending', async () => {
-    const both = await roomRender({ a: strip({ room: 0.4 }), b: strip({ room: 0.4 }) }, BURST);
-    const aMuted = await roomRender({ a: strip({ room: 0 }), b: strip({ room: 0.4 }) }, BURST);
-    const bAlone = await roomRender({ b: strip({ room: 0.4 }) }, BURST);
+    const both = await roomRender({ a: strip({ a: 0.4 }), b: strip({ a: 0.4 }) }, BURST);
+    const aMuted = await roomRender({ a: strip({ a: 0 }), b: strip({ a: 0.4 }) }, BURST);
+    const bAlone = await roomRender({ b: strip({ a: 0.4 }) }, BURST);
 
     const tailFrom = Math.round(1.0 * SAMPLE_RATE);
     expect(rms(bAlone.room.left, tailFrom)).toBeGreaterThan(1e-4);
@@ -116,14 +118,14 @@ describe('sends are per part', () => {
   });
 
   it('turns a send down live, and what is already in the room keeps ringing', async () => {
-    const both = await roomRender({ a: strip({ room: 0.4 }), b: strip({ room: 0.4 }) }, BURST);
-    const bAlone = await roomRender({ b: strip({ room: 0.4 }) }, BURST);
+    const both = await roomRender({ a: strip({ a: 0.4 }), b: strip({ a: 0.4 }) }, BURST);
+    const bAlone = await roomRender({ b: strip({ a: 0.4 }) }, BURST);
     const cutAt = 0.4;
     const cut = await roomRender(
-      { a: strip({ room: 0.4 }), b: strip({ room: 0.4 }) },
+      { a: strip({ a: 0.4 }), b: strip({ a: 0.4 }) },
       BURST,
       (system, _block, time) => {
-        if (time >= cutAt) system.strip('a')?.setSend('room', 0);
+        if (time >= cutAt) system.strip('a')?.setSend('a', 0);
       },
     );
 
@@ -148,7 +150,7 @@ describe('sends are per part', () => {
 describe('the fader and the dry path', () => {
   it('sets the strip level on the k-rate gain param and adds no GainNode to the dry path', async () => {
     const { system, engine } = await rig();
-    const drone = strip({ room: 0.45 }, 0, 0.8);
+    const drone = strip({ a: 0.45 }, 0, 0.8);
     const part = system.createMusicPart('drone', PRESETS['pad-drift']!, undefined, drone);
     const live = system.strip('drone');
     if (!live) throw new Error('no strip');
@@ -205,8 +207,8 @@ describe('the fader and the dry path', () => {
 
 describe('sends are pre-pan', () => {
   it('leaves the room where it was when the part is panned', async () => {
-    const centred = await roomRender({ p: strip({ room: 0.4 }, 0) }, BURST);
-    const panned = await roomRender({ p: strip({ room: 0.4 }, 1) }, BURST);
+    const centred = await roomRender({ p: strip({ a: 0.4 }, 0) }, BURST);
+    const panned = await roomRender({ p: strip({ a: 0.4 }, 1) }, BURST);
 
     expect(maxAbsDiff(centred.room.left, panned.room.left)).toBe(0);
     expect(maxAbsDiff(centred.room.right, panned.room.right)).toBe(0);
@@ -226,13 +228,13 @@ describe('returns', () => {
     system.createMusicPart('arp', PRESETS['lead-bell']!);
     system.createAuxPart('ui', PRESETS['pickup-blip']!);
     expect(plates(context)).toBe(1);
-    expect(system.returnBus('room')?.spec).toBe(RETURNS.room);
+    expect(system.returnBus('a')?.spec).toEqual(RETURNS.a);
   });
 
-  it('takes a second plate as one more RETURNS entry, with no change to the types or routing', async () => {
+  it('takes a third bus as one more RETURNS entry, with no change to the types or routing', async () => {
     const returns = {
       ...RETURNS,
-      short: { kind: 'reverb', space: SPACES.plate, level: 0.5 },
+      short: { level: 0.5, inserts: [onSendBus({ ...DEFAULT_PLATE_REVERB, ...SPACES.plate })] },
     } satisfies Record<string, ReturnSpec>;
     const mix = {
       p: strip({ short: 0.5 }),
@@ -243,7 +245,7 @@ describe('returns', () => {
     sourceOf(system.createMusicPart('p', PRESETS['pad-drift']!)).feed = BURST;
     const [short, room] = renderGraph(context, 1, [
       returnOutput(system, 'short'),
-      returnOutput(system, 'room'),
+      returnOutput(system, 'a'),
     ]);
     expect(rms(short?.left ?? new Float32Array(1))).toBeGreaterThan(1e-3);
     // Nothing was sent to the hall; what remains is the plate's anti-denormal floor.
@@ -251,15 +253,15 @@ describe('returns', () => {
     expect(system.strip('p')?.sends.size).toBe(3);
   });
 
-  it('echoes through the delay return after delayTime, quieter each repeat', async () => {
-    const { system, context } = await rig({ mix: { h: strip({ echo: 0.5 }) } });
+  it('echoes through Send B after delayTime, quieter each repeat', async () => {
+    const { system, context } = await rig({ mix: { h: strip({ b: 0.5 }) } });
     sourceOf(system.createMusicPart('h', PRESETS['lead-bell']!)).feed = burst(MONO, 0.05);
-    const [echo] = renderGraph(context, 1, [returnOutput(system, 'echo')]);
+    const [echo] = renderGraph(context, 1, [returnOutput(system, 'b')]);
     if (!echo) throw new Error('render produced no captures');
 
     const at = (from: number, to: number): number =>
       rms(echo.left, Math.round(from * SAMPLE_RATE), Math.round(to * SAMPLE_RATE));
-    const { delayTime } = RETURNS.echo;
+    const { delayTime } = DEFAULT_ECHO;
     expect(at(0.1, delayTime - 0.01)).toBe(0);
     const first = at(delayTime, delayTime + 0.05);
     const second = at(2 * delayTime, 2 * delayTime + 0.05);
@@ -295,9 +297,9 @@ describe('aux parts', () => {
   });
 
   it('can have a touch of room, the same way a music part does', async () => {
-    const { system, context } = await rig({ mix: { blip: strip({ room: 0.3 }) } });
+    const { system, context } = await rig({ mix: { blip: strip({ a: 0.3 }) } });
     sourceOf(system.createAuxPart('blip', PRESETS['pickup-blip']!)).feed = BURST;
-    const [room] = renderGraph(context, 1, [returnOutput(system, 'room')]);
+    const [room] = renderGraph(context, 1, [returnOutput(system, 'a')]);
     expect(rms(room?.left ?? new Float32Array(1))).toBeGreaterThan(1e-3);
   });
 });

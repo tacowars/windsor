@@ -65,11 +65,11 @@ async function render(level: number, inserts = false, aux = false) {
   system.masterStrip!.apply({ level, inserts: inserts ? [DEFAULT_DRIVE] : [] });
   const part = aux
     ? system.createAuxPart('ui', makePatch())
-    : system.createMusicPart('m', makePatch(), 1, { ...DEFAULT_STRIP, sends: { room: 0.4 } });
+    : system.createMusicPart('m', makePatch(), 1, { ...DEFAULT_STRIP, sends: { a: 0.4 } });
   sourceOf(part).feed = tones(440, 660, 0.2);
   const [out, room] = renderGraph(context, 0.2, [
     fake(engine.master),
-    fake(system.returnBus('room')!.output),
+    fake(system.returnBus('a')!.output),
   ]);
   const result = { out: out!, room: room!, context, system };
   return result;

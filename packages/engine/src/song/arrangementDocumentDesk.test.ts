@@ -1,21 +1,20 @@
 /**
  * The three sections that make a document the whole piece of music (#435):
  * `patches` (named FM patches — since #562 the *only* place a part's preset
- * resolves), `returns` (overlays over the code's `RETURNS`) and their
- * normalisation — never throws, every junk value corrected by path, a return
- * name the code does not define dangling.
+ * resolves), `returns` (the send buses over the code's `RETURNS`,
+ * windsor#172) and their normalisation — never throws, every junk value
+ * corrected by path, a bus name the code does not define dangling.
  */
 import { describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT, withPart } from '../__fixtures__/fullArrangement';
 import { isShippable, makeArrangement } from './arrangementDocument';
-import {
-  DELAY_FEEDBACK_MAX,
-  DELAY_RESONANCE_DEFAULT_DB,
-  DELAY_RESONANCE_MAX_DB,
-  DELAY_RESONANCE_MIN_DB,
-  REVERB_SPACE_RANGES,
-} from '../audioConstants';
+import { ARRANGEMENT_VERSION, REVERB_SPACE_RANGES } from '../audioConstants';
+import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
+import { DEFAULT_DRIVE } from '../inserts/driveInsert';
+import { DEFAULT_ECHO } from '../inserts/echoInsert';
+import { MAX_INSERTS } from '../inserts/insertConstants';
+import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
 import { RETURNS } from '../mixer/mix';
 import { makePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
@@ -24,7 +23,7 @@ import { PRESETS } from '../patch/presets';
 const PARTS_PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
 
 /** The fixture as a self-contained song: since #562 a part resolves nowhere else. */
-const SONG = { version: 3, ...FULL_ARRANGEMENT, patches: PARTS_PATCHES };
+const SONG = { version: ARRANGEMENT_VERSION, ...FULL_ARRANGEMENT, patches: PARTS_PATCHES };
 
 const arpOf = (r: ReturnType<typeof makeArrangement>) =>
   r.document.parts.find((p) => p.slot === FULL_SLOT.arp);
@@ -138,94 +137,122 @@ describe('the patches section', () => {
   });
 });
 
-describe('the returns section', () => {
-  it('overlays the code return: named fields change, the rest is the base', () => {
-    const r = makeArrangement({
-      ...SONG,
-      returns: { room: { level: 0.5, space: { size: 2 } }, echo: { delayTime: 0.5 } },
-    });
+describe('the returns section: the send buses (windsor#172)', () => {
+  const plate = { ...DEFAULT_PLATE_REVERB, mix: 1 };
+  const echo = { ...DEFAULT_ECHO, mix: 1 };
+
+  it("fills a bus from the code's: a named level, and the default chain when none is given", () => {
+    const r = makeArrangement({ ...SONG, returns: { a: { level: 0.5 } } });
     expect(r.corrections).toEqual([]);
-    expect(r.document.returns?.room).toEqual({
-      kind: 'reverb',
-      level: 0.5,
-      space: { ...RETURNS.room.space, size: 2 },
-    });
-    expect(r.document.returns?.echo).toEqual({ ...RETURNS.echo, delayTime: 0.5 });
+    expect(r.document.returns).toEqual({ a: { level: 0.5, inserts: RETURNS.a.inserts } });
+    expect(RETURNS.a.inserts).toEqual([plate]);
   });
 
-  it('clamps into the worklet ranges and the delay bounds, by path', () => {
+  it('round-trips a chain of any kinds: an empty one, a full one and a mixed one', () => {
+    const full = Array.from({ length: MAX_INSERTS }, () => DEFAULT_DRIVE);
+    for (const returns of [
+      { a: { level: 0.9, inserts: [] }, b: { level: 0.6, inserts: [echo, DEFAULT_CHORUS] } },
+      { a: { level: 0.2, inserts: full }, b: { level: 0.6, inserts: [] } },
+      { b: { level: 1, inserts: [DEFAULT_CHORUS, echo, plate] } },
+    ]) {
+      const first = makeArrangement({ ...SONG, returns });
+      expect(first.corrections).toEqual([]);
+      expect(first.document.returns).toEqual(returns);
+      const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+      expect(again.corrections).toEqual([]);
+      expect(again.document).toEqual(first.document);
+    }
+  });
+
+  it('keeps an empty chain empty, where an absent or junk one is the default', () => {
+    const r = makeArrangement({ ...SONG, returns: { a: { inserts: [] }, b: { inserts: 'x' } } });
+    expect(r.document.returns?.a?.inserts).toEqual([]);
+    expect(r.document.returns?.b?.inserts).toEqual(RETURNS.b.inserts);
+    expect(r.corrections).toEqual([
+      "returns.b.inserts: not a list — using the bus's default chain",
+    ]);
+  });
+
+  it('corrects a chain as a strip is corrected: clamps, unknown kinds and the insert limit', () => {
+    const over = Array.from({ length: MAX_INSERTS + 1 }, () => ({ kind: 'drive' }));
     const r = makeArrangement({
       ...SONG,
-      returns: { room: { level: 3, space: { size: 99 } }, echo: { feedback: 1.5, damp: 1 } },
+      returns: {
+        a: { level: 3, inserts: [{ kind: 'plate', size: 99, mix: 2 }, { kind: 'wah' }] },
+        b: { inserts: over, wet: 1 },
+      },
     });
-    const room = r.document.returns?.room;
-    const echo = r.document.returns?.echo;
-    expect(room?.level).toBe(1);
-    expect(room?.kind === 'reverb' && room.space.size).toBe(REVERB_SPACE_RANGES.size[1]);
-    expect(echo?.kind === 'delay' && echo.feedback).toBe(DELAY_FEEDBACK_MAX);
+    expect(r.document.returns?.a).toEqual({
+      level: 1,
+      inserts: [{ ...DEFAULT_PLATE_REVERB, size: REVERB_SPACE_RANGES.size[1], mix: 1 }],
+    });
+    expect(r.document.returns?.b?.inserts).toHaveLength(MAX_INSERTS);
     expect(r.corrections).toEqual([
-      'returns.room.level: clamped 3 to 1',
-      'returns.room.space.size: clamped 99 to 4',
-      'returns.echo.feedback: clamped 1.5 to 0.95',
-      'returns.echo.damp: clamped 1 to 10',
+      'returns.a.level: clamped 3 to 1',
+      'returns.a.inserts[0].size: clamped 99 to 4',
+      'returns.a.inserts[0].mix: clamped 2 to 1',
+      'returns.a.inserts[1]: dropped',
+      'returns.b.wet: unknown key dropped',
+      `returns.b.inserts[${MAX_INSERTS}]: past the ${MAX_INSERTS}-insert limit — dropped`,
     ]);
+    expect(r.dangling).toEqual(['returns.a.inserts[1].kind: no insert kind "wah" is defined']);
   });
 
-  it('gives the echo a resonance: the code default when absent, clamped, and round-tripped (#647)', () => {
-    const absent = makeArrangement({ ...SONG, returns: { echo: { delayTime: 0.5 } } });
-    const echo = absent.document.returns?.echo;
-    expect(echo?.kind === 'delay' && echo.resonance).toBe(DELAY_RESONANCE_DEFAULT_DB);
-    expect(RETURNS.echo.resonance).toBe(DELAY_RESONANCE_DEFAULT_DB);
-
-    const loud = makeArrangement({ ...SONG, returns: { echo: { resonance: 40 } } });
-    const quiet = makeArrangement({ ...SONG, returns: { echo: { resonance: -40 } } });
-    const set = makeArrangement({ ...SONG, returns: { echo: { resonance: 7.5 } } });
-    const res = (r: typeof loud): number | false => {
-      const e = r.document.returns?.echo;
-      return e?.kind === 'delay' && e.resonance;
-    };
-    expect(res(loud)).toBe(DELAY_RESONANCE_MAX_DB);
-    expect(res(quiet)).toBe(DELAY_RESONANCE_MIN_DB);
-    expect(res(set)).toBe(7.5);
-    expect(loud.corrections).toEqual([
-      `returns.echo.resonance: clamped 40 to ${DELAY_RESONANCE_MAX_DB}`,
-    ]);
-
-    const again = makeArrangement(JSON.parse(JSON.stringify(set.document)));
-    expect(res(again)).toBe(7.5);
-    expect(again.corrections).toEqual([]);
-  });
-
-  it('keeps the code kind, and drops fields of the other kind as unknown', () => {
+  it('keys a compressor on a bus from its own input: an external sidechain is corrected', () => {
     const r = makeArrangement({
       ...SONG,
-      returns: { room: { kind: 'delay', delayTime: 1 } },
+      returns: { a: { inserts: [{ kind: 'compressor', sidechain: { track: 0 } }] } },
     });
-    expect(r.document.returns?.room?.kind).toBe('reverb');
+    const [comp] = r.document.returns?.a?.inserts ?? [];
+    expect(comp?.kind === 'compressor' && comp.sidechain).toBe('internal');
     expect(r.corrections).toEqual([
-      "returns.room.kind: delay is not the code's reverb — kept",
-      'returns.room.delayTime: unknown key dropped',
+      'returns.a.inserts[0].sidechain: a send bus keys from its own input — internal',
     ]);
   });
 
-  it('reports a return the code does not define as dangling, which fails the gate', () => {
-    const r = makeArrangement({ ...SONG, returns: { cave: { level: 1 } } });
+  it('drops the old return shape: a v4 bus holds no space or delay fields', () => {
+    const r = makeArrangement({
+      ...SONG,
+      returns: { a: { kind: 'reverb', space: { size: 2 } }, b: { delayTime: 1 } },
+    });
+    expect(r.document.returns).toEqual({ a: RETURNS.a, b: RETURNS.b });
+    expect(r.corrections).toEqual([
+      'returns.a.kind: unknown key dropped',
+      'returns.a.space: unknown key dropped',
+      'returns.b.delayTime: unknown key dropped',
+    ]);
+  });
+
+  it('reports a bus the code does not define as dangling, which fails the gate', () => {
+    const r = makeArrangement({ ...SONG, returns: { room: { level: 1 }, c: { level: 1 } } });
     expect(r.document.returns).toBeUndefined();
-    expect(r.dangling).toEqual(['returns.cave: no return "cave" is defined']);
+    expect(r.dangling).toEqual([
+      'returns.room: no send bus "room" is defined',
+      'returns.c: no send bus "c" is defined',
+    ]);
     expect(isShippable(r)).toBe(false);
   });
 
-  it('treats an inherited object name as no return at all (review finding 2)', () => {
+  it('treats an inherited object name as no bus at all (review finding 2)', () => {
     const r = makeArrangement({ ...SONG, returns: { constructor: { level: 0.5 } } });
     expect(r.document.returns).toBeUndefined();
-    expect(r.dangling).toEqual(['returns.constructor: no return "constructor" is defined']);
+    expect(r.dangling).toEqual(['returns.constructor: no send bus "constructor" is defined']);
+  });
+
+  it('reports a send to a bus the code does not define as dangling', () => {
+    const parts = SONG.parts.map((part) =>
+      part.slot === FULL_SLOT.arp ? { ...part, strip: { sends: { room: 0.3, a: 0.2 } } } : part,
+    );
+    const r = makeArrangement({ ...SONG, parts });
+    expect(arpOf(r)?.strip.sends).toEqual({ a: 0.2 });
+    expect(r.dangling).toEqual(['parts[2].strip.sends.room: no send bus "room" is defined']);
   });
 
   it('round-trips: the normalised document normalises to itself with no corrections', () => {
     const first = makeArrangement({
       ...SONG,
       patches: { ...PARTS_PATCHES, lead: { volume: 0.3 } },
-      returns: { room: { space: { decay: 0.5 } } },
+      returns: { a: { inserts: [{ kind: 'plate', decay: 0.5, mix: 1 }] } },
     });
     const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
     expect(again.corrections).toEqual([]);

@@ -26,7 +26,7 @@ describe('the version-3 document (#705)', () => {
     expect(result.usable).toBe(false);
     expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
     expect(result.corrections).toEqual([
-      'version: 2 is not 3 — version 2 is not supported since #705',
+      'version: 2 is not 4 — version 2 is not supported since #705',
       'nothing usable survives normalisation — falling back to the metronome',
     ]);
   });

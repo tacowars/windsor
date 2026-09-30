@@ -37,7 +37,7 @@ export interface PartStem {
   readonly muted: boolean;
 }
 
-/** A return's stem, by return name ("room", "echo"). */
+/** A send bus's stem, by bus name ("a", "b"). */
 export interface ReturnStem {
   readonly kind: 'return';
   readonly name: string;

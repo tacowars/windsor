@@ -4,7 +4,7 @@
  * A song carries `version` (`ARRANGEMENT_VERSION`). `SONG_MIGRATIONS[n]`
  * upgrades a document at version `n` to `n + 1` and runs before
  * `makeArrangement`'s check; the chain continues while it has an entry
- * (1→2→3). A version the chain cannot bring to this build's is refused:
+ * (3→4). A version the chain cannot bring to this build's is refused:
  * the document is not loaded, and the console keeps the saved text.
  *
  * A song is self-contained (#562), so its `patches` snapshot is read at the
@@ -12,15 +12,106 @@
  * its own `format` is upgraded through `PATCH_MIGRATIONS`, and one the chain
  * cannot reach refuses the whole song.
  */
-import { ARRANGEMENT_VERSION } from '../audioConstants';
+import { ARRANGEMENT_VERSION, REVERB_SPACE_RANGES } from '../audioConstants';
+import { ECHO_LINE_DEFAULTS } from '../inserts/echoConstants';
+import { SEND_BUS_WET_MIX } from '../mixer/mix';
+import { SPACES } from '../mixer/reverbSpace';
 import { PATCH_MIGRATIONS, upgradePatch } from '../patch/patchMigrations';
 import type { FormatRefusal, MigrationTable } from './formatUpgrade';
 import { declaredVersion, formatRefusal, runUpgrades } from './formatUpgrade';
 
 type RawDocument = Record<string, unknown>;
 
-/** Empty: version 2 was retired by #705 with no upgrade, and 3 is the only version read. */
-export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/** `from`'s own `keys`, where it has them: a v3 return's fields, carried as they were. */
+function pick(from: Record<string, unknown>, keys: readonly string[]): Record<string, unknown> {
+  return Object.fromEntries(
+    keys.filter((key) => Object.hasOwn(from, key)).map((k) => [k, from[k]]),
+  );
+}
+
+/**
+ * A v3 return as a v4 bus holding one insert of `kind`, at Mix 1: the
+ * return's own `level` kept, `fields` (the effect's settings, already
+ * narrowed to the ones v3 read) carried over the v3 base the return
+ * overlaid. `kind` and `mix` go last, so no carried field can override
+ * them. A return that is not a record is handed on as it is, for the
+ * normaliser to report.
+ */
+function returnAsBus(
+  raw: unknown,
+  kind: 'plate' | 'echo',
+  base: object,
+  fields: Record<string, unknown>,
+): unknown {
+  if (!isRecord(raw)) return raw;
+  const insert = { ...base, ...fields, kind, mix: SEND_BUS_WET_MIX };
+  return { ...pick(raw, ['level']), inserts: [insert] };
+}
+
+/**
+ * A strip's `sends` as v3 kept them, renamed: only `room` and `echo`, as `a`
+ * and `b`. Every other key named no return in v3 and was dropped on load,
+ * so it is dropped here too; a v3 `a` or `b` in particular never overrides
+ * a renamed value or becomes a valid send.
+ */
+function renameSends(sends: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [v3, v4] of Object.entries(V3_SEND_NAMES)) {
+    if (Object.hasOwn(sends, v3)) out[v4] = sends[v3];
+  }
+  return out;
+}
+
+/** What each v3 return became. */
+const V3_SEND_NAMES: Readonly<Record<string, string>> = { room: 'a', echo: 'b' };
+/** The fields a v3 `room.space` was read with; the v3 normaliser dropped any other key. */
+const V3_SPACE_FIELDS: readonly string[] = Object.keys(REVERB_SPACE_RANGES);
+/** The fields a v3 `echo` return's line was read with. */
+const V3_ECHO_FIELDS: readonly string[] = Object.keys(ECHO_LINE_DEFAULTS);
+
+/**
+ * 3 → 4 (windsor#172; record `2026-09-30-insert-rack-and-send-bus-chains`
+ * §7): the fixed `room` and `echo` returns become Send A and Send B, each a
+ * level and an insert chain. `room` becomes `a` holding a Plate reverb with
+ * its old space, and `echo` becomes `b` holding an Echo with its old line,
+ * both at Mix 1, so the song sounds as it did. The upgrade outputs exactly
+ * what the v3 normaliser kept, renamed: every return other than `room` and
+ * `echo`, every return field other than those v3 read, and every send other
+ * than `room` and `echo` is dropped here as v3 dropped it, never handed on
+ * (a v3 `a` or `b` would otherwise become a valid v4 name). An absent
+ * `returns` stays absent. Every part's `sends.room` and `sends.echo` become
+ * `sends.a` and `sends.b`.
+ */
+export function sendBusesFromReturns(doc: RawDocument): RawDocument {
+  const out: RawDocument = { ...doc };
+  if (isRecord(doc.returns)) {
+    // Only `room` and `echo`: v3 dropped every other return, `a` and `b` included.
+    const { room, echo } = doc.returns;
+    const returns: Record<string, unknown> = {};
+    if (room !== undefined) {
+      const space = isRecord(room) && isRecord(room.space) ? pick(room.space, V3_SPACE_FIELDS) : {};
+      returns.a = returnAsBus(room, 'plate', SPACES.hall, space);
+    }
+    if (echo !== undefined) {
+      const line = isRecord(echo) ? pick(echo, V3_ECHO_FIELDS) : {};
+      returns.b = returnAsBus(echo, 'echo', ECHO_LINE_DEFAULTS, line);
+    }
+    out.returns = returns;
+  }
+  if (Array.isArray(doc.parts)) {
+    out.parts = doc.parts.map((part: unknown) => {
+      if (!isRecord(part) || !isRecord(part.strip) || !isRecord(part.strip.sends)) return part;
+      return { ...part, strip: { ...part.strip, sends: renameSends(part.strip.sends) } };
+    });
+  }
+  return out;
+}
+
+/** Version 2 was retired by #705 with no upgrade; 3 upgrades to 4. */
+export const SONG_MIGRATIONS: MigrationTable<RawDocument> = { 3: sendBusesFromReturns };
 
 /** The tables `upgradeSong` runs; a test hands its own. */
 export interface FormatMigrations {
@@ -35,9 +126,6 @@ export interface SongUpgrade {
   readonly document: unknown;
   readonly refused?: FormatRefusal;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
  * A raw song upgraded to this build's version, or refused. A document with

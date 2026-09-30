@@ -109,17 +109,18 @@ const PAIRS: ReadonlyArray<readonly [string, ArrangementDocument, ArrangementDoc
   [
     'a return added to a song without returns',
     FULL,
-    after(FULL, { returns: { room: { level: 0.4 } } }),
+    after(FULL, { returns: { a: { level: 0.4 } } }),
   ],
-  [
-    'both returns added',
-    FULL,
-    after(FULL, { returns: { room: { level: 0.4 }, echo: { feedback: 0.6 } } }),
-  ],
+  ['both returns added', FULL, after(FULL, { returns: { a: { level: 0.4 }, b: { inserts: [] } } })],
   [
     'a return knob',
-    after(FULL, { returns: { room: { level: 0.4 } } }),
-    after(FULL, { returns: { room: { level: 0.7 } } }),
+    after(FULL, { returns: { a: { level: 0.4 } } }),
+    after(FULL, { returns: { a: { level: 0.7 } } }),
+  ],
+  [
+    'a send bus chain emptied and filled again (windsor#172)',
+    after(FULL, { returns: { a: { inserts: [] } } }),
+    after(FULL, { returns: { a: { inserts: [DEFAULT_DRIVE, DEFAULT_DRIVE] } } }),
   ],
   [
     'a strip insert added',
@@ -202,7 +203,7 @@ describe('documentDiffLive spells out a removed section for the engine', () => {
 
   it("sends each removed section as the normaliser's defaults", () => {
     const b = after(FULL, {
-      returns: { room: { level: 0.4 } },
+      returns: { a: { level: 0.4 } },
       master: { level: 0.5, inserts: [DEFAULT_DRIVE], output: {} },
       transport: { swing: { amount: 62, grid: 16 } },
       parts: { [HAT]: { strip: { output: 'sidechain' } } },
@@ -212,7 +213,7 @@ describe('documentDiffLive spells out a removed section for the engine', () => {
     expect(merged(b, partial)).toStrictEqual(FULL);
     expect(rebuild).toBe(false);
     const defaults = after(FULL, {
-      returns: { room: {} },
+      returns: { a: {} },
       master: { output: {} },
       transport: { swing: {} },
     });
@@ -253,10 +254,10 @@ describe('documentDiffLive spells out a removed section for the engine', () => {
   });
 
   it('sends one return removed beside another as the defaults a system built without it plays', () => {
-    const a = after(FULL, { returns: { room: { level: 0.4 } } });
-    const b = after(a, { returns: { echo: { feedback: 0.6 } } });
+    const a = after(FULL, { returns: { a: { level: 0.4 } } });
+    const b = after(a, { returns: { b: { level: 0.3 } } });
     expect(documentDiffLive(b, a, normalise)).toStrictEqual({
-      live: { returns: { echo: RETURNS.echo } },
+      live: { returns: { b: RETURNS.b } },
       rebuild: false,
     });
   });

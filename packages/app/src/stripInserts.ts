@@ -69,7 +69,11 @@ function addPicker(ctx: AppCtx, slot: InsertTarget): HTMLElement {
   picker.name = `add-insert-${slot}`;
   picker.setAttribute(
     'aria-label',
-    slot === 'master' ? 'Add an insert to Master' : `Add an insert to slot ${slot}`,
+    slot === 'master'
+      ? 'Add an insert to Master'
+      : typeof slot === 'string'
+        ? `Add an insert to Send ${slot.toUpperCase()}`
+        : `Add an insert to slot ${slot}`,
   );
   picker.add(new Option(ADD_PROMPT, ''));
   for (const kind of INSERT_KIND_NAMES) picker.add(new Option(INSERT_LABELS[kind], kind));
@@ -79,7 +83,7 @@ function addPicker(ctx: AppCtx, slot: InsertTarget): HTMLElement {
   picker.onchange = (): void => {
     const kind = picker.value as InsertKindName | '';
     picker.value = '';
-    if (kind !== '') commit(ctx, slot, addInsert(insertsOf(ctx, slot), kind));
+    if (kind !== '') commit(ctx, slot, addInsert(insertsOf(ctx, slot), kind, slot));
   };
   return picker;
 }

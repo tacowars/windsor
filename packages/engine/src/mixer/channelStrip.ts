@@ -2,8 +2,8 @@
  * Wiring one part through its channel strip.
  *
  *   part.output ─▶ [low cut] ─▶ [insert …] ─▶ tail ─┬─ [rotate θ] ─▶ dry destination (a bus, or the master)
- *                                                   ├─ send ─▶ return "room"
- *                                                   └─ send ─▶ return "echo"   … one send per return, at 0 unless the strip names it
+ *                                                   ├─ send ─▶ Send A
+ *                                                   └─ send ─▶ Send B   … one send per bus, at 0 unless the strip names it
  *
  * The fader is not here: `MIX.level` sets the part's k-rate `gain` param, a
  * multiply per block inside the worklet, so no `GainNode` sits in the dry path

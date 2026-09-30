@@ -6,15 +6,27 @@
  * rebuilds that one strip's inserts.
  */
 import type { InsertKindName, InsertSpec } from '@windsor/engine';
-import { INSERT_KINDS, MAX_INSERTS } from '@windsor/engine';
+import { INSERT_KINDS, MAX_INSERTS, onSendBus } from '@windsor/engine';
+import type { InsertTarget } from './insertTarget';
+import { isBusTarget } from './insertTarget';
 
 /** Whether a strip holding `list` has room for another insert. */
 export const canAddInsert = (list: readonly InsertSpec[]): boolean => list.length < MAX_INSERTS;
 
-/** `list` with a fresh insert of `kind` on the end, or `list` unchanged when it is full. */
-export function addInsert(list: readonly InsertSpec[], kind: InsertKindName): InsertSpec[] {
+/**
+ * `list` with a fresh insert of `kind` on the end, or `list` unchanged when it
+ * is full. On a send bus a Plate reverb or an Echo starts fully wet, the way
+ * the engine's own buses hold them (`onSendBus`, windsor#172); everywhere
+ * else, and every other kind, starts at the kind's defaults.
+ */
+export function addInsert(
+  list: readonly InsertSpec[],
+  kind: InsertKindName,
+  target?: InsertTarget,
+): InsertSpec[] {
   if (!canAddInsert(list)) return [...list];
-  return [...list, structuredClone(INSERT_KINDS[kind].defaults)];
+  const fresh = structuredClone(INSERT_KINDS[kind].defaults);
+  return [...list, target !== undefined && isBusTarget(target) ? onSendBus(fresh) : fresh];
 }
 
 /** `list` without the insert at `index`. */

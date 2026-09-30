@@ -7,8 +7,8 @@
  * The standing graph, per docs/log/2026-08-31-mixer-sends-returns-and-channel-strips.md:
  *
  *   music part.output ─▶ [stages…] ─▶ tail ─┬─ [rotate θ] ─▶ musicBus.input ─▶ [highpass] ─┐
- *                                           ├─ send ─▶ return "room" (plate, 100% wet) ────┤
- *                                           └─ send ─▶ return "echo" (delay) ──────────────┤
+ *                                           ├─ send ─▶ Send A [inserts…] ─▶ level ─────────┤
+ *                                           └─ send ─▶ Send B [inserts…] ─▶ level ─────────┤
  *                                                                                          ▼
  *                                                          song master inserts/level → musicBus.output (the Music fader)
  *                                                                                          │
@@ -27,6 +27,8 @@
  * becomes one. The output stage (windsor#93) is the engine's, after its
  * master, so the aux path goes through it too; its mode, ceiling and
  * lookahead are the song's `master.output`, set in place by `AudioSystem`.
+ * The send buses (windsor#172) hold insert chains built from the strips'
+ * `routeOptions`, so the song's tempo and the load meter reach them too.
  */
 import { type AudioBus, MUSIC_BUS_OPTIONS } from '../mixer/audioBus';
 import type { RouteOptions } from '../mixer/channelStrip';
@@ -80,7 +82,14 @@ export class StandingGraph {
     this.musicBus.filter!.disconnect(this.musicBus.output);
     this.musicBus.filter!.connect(master.input);
     master.output.connect(this.musicBus.output);
-    this.returns = createReturns(this.engine.context, this.returnSpecs, master.input);
+    // The buses build their chains as the strips do: the same registry, so a
+    // worklet insert on a bus is metered and a tempo-aware one follows the song.
+    this.returns = createReturns(
+      this.engine.context,
+      this.returnSpecs,
+      master.input,
+      this.routeOptions,
+    );
     this.auxLevel = this.engine.context.createGain();
     this.auxLevel.connect(this.engine.master);
     // A level set before `init()` (a saved setting read at boot) lands on the

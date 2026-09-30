@@ -114,8 +114,8 @@ describe('live post-FX routing', () => {
     const { system, context } = await sidechainRig();
     system.apply({
       parts: {
-        0: { strip: { output: 'sidechain', sends: { room: 1, echo: 1 } } },
-        1: { strip: { level: 1, inserts: [comp(0)], sends: { room: 0, echo: 0 } } },
+        0: { strip: { output: 'sidechain', sends: { a: 1, b: 1 } } },
+        1: { strip: { level: 1, inserts: [comp(0)], sends: { a: 0, b: 0 } } },
       },
     });
     sourceOf(strip(system, 0).part).feed = (b, l, r) => {
@@ -130,7 +130,7 @@ describe('live post-FX routing', () => {
       [
         fake(strip(system, 1).tail),
         fake(strip(system, 0).head),
-        fake(strip(system, 0).sends.get('room')!),
+        fake(strip(system, 0).sends.get('a')!),
       ],
       (_b, t) => {
         if (t > 0.2) strip(system, 0).setLevel(0);
@@ -158,7 +158,7 @@ describe('live post-FX routing', () => {
               inserts: filtered ? [{ ...DEFAULT_DRIVE, mix: 1, drive: 0, tone: 200 }] : [],
             },
           },
-          1: { strip: { level: 1, inserts: master ? [] : [comp(0)], sends: { room: 0, echo: 0 } } },
+          1: { strip: { level: 1, inserts: master ? [] : [comp(0)], sends: { a: 0, b: 0 } } },
         },
         master: { inserts: master ? [comp(0)] : [] },
       });
@@ -181,7 +181,7 @@ describe('live post-FX routing', () => {
   });
   it('stops new dry/send audio while the existing return tail keeps decaying', async () => {
     const { system, context } = await sidechainRig();
-    system.apply({ parts: { 0: { strip: { sends: { echo: 1 } } } } });
+    system.apply({ parts: { 0: { strip: { sends: { b: 1 } } } } });
     sourceOf(strip(system, 0).part).feed = (b, l, r) => {
       for (let i = 0; i < l.length; i++) l[i] = r[i] = 0.4 * Math.sin((b * l.length + i) * 0.1);
     };
@@ -190,8 +190,8 @@ describe('live post-FX routing', () => {
       0.5,
       [
         fake(strip(system, 0).rotation.output),
-        fake(strip(system, 0).sends.get('echo')!),
-        fake(system.returnBus('echo')!.output),
+        fake(strip(system, 0).sends.get('b')!),
+        fake(system.returnBus('b')!.output),
       ],
       (_b, t) => {
         if (t >= 0.1) strip(system, 0).setOutput('sidechain');
@@ -209,7 +209,7 @@ describe('live post-FX routing', () => {
     ]) {
       const { system, context } = await sidechainRig();
       system.apply(route(1, 0));
-      system.apply({ parts: { 0: { strip: { sends: { echo: 1 } } } } });
+      system.apply({ parts: { 0: { strip: { sends: { b: 1 } } } } });
       sourceOf(strip(system, 0).part).feed = (b, l, r) => {
         for (let i = 0; i < l.length; i++) l[i] = r[i] = 0.4 * Math.sin((b * l.length + i) * 0.1);
       };
@@ -219,7 +219,7 @@ describe('live post-FX routing', () => {
         0.3,
         [
           fake(strip(system, 0).rotation.output),
-          fake(strip(system, 0).sends.get('echo')!),
+          fake(strip(system, 0).sends.get('b')!),
           fake(detector(system, 1)),
         ],
         (_b, t) => {

@@ -1,7 +1,7 @@
 /**
  * `StandingGraph` on its own, over the headless graph stand-in: what exists
  * before `build()`, the wiring it builds (the music bus through the song
- * master, the returns into the master's input, the aux fader straight to the
+ * master, the send buses into the master's input, the aux fader straight to the
  * engine's master), the two faders held across a build, and the teardown.
  */
 import { afterAll, describe, expect, it } from 'vitest';
@@ -9,6 +9,11 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { reaches } from '../__fixtures__/audioAnalysis';
 import { FakeContext, installFakeAudioWorklet } from '../__fixtures__/fakeAudioContext';
 import type { FakeGain, FakeNode } from '../__fixtures__/fakeAudioNodes';
+import type { ChorusSpec } from '../inserts/chorusInsert';
+import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
+import type { InsertRegistry, InsertSpec } from '../inserts/insertRegistry';
+import { INSERT_KINDS } from '../inserts/insertRegistry';
+import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import { RETURNS } from '../mixer/mix';
 import { FmEngine } from '../synth/fmEngine';
 import { StandingGraph } from './standingGraph';
@@ -36,7 +41,7 @@ describe('StandingGraph before build()', () => {
   it('has no nodes, and refuses the ones a part is routed onto', async () => {
     const graph = new StandingGraph(await engineReady(), RETURNS, {});
     expect(graph.masterStrip).toBeNull();
-    expect(graph.returnBus('room')).toBeUndefined();
+    expect(graph.returnBus('a')).toBeUndefined();
     expect(() => graph.standing()).toThrow(/init\(\)/);
     expect(() => graph.auxNode()).toThrow(/init\(\)/);
   });
@@ -65,7 +70,7 @@ describe('StandingGraph.build()', () => {
     expect(filterTargets).toEqual([fake(master.input)]);
   });
 
-  it('builds one return per spec, summed into the song master', async () => {
+  it('builds one send bus per spec, summed into the song master', async () => {
     const { graph } = await built();
     const { returns } = graph.standing();
     expect(Object.keys(returns)).toEqual(Object.keys(RETURNS));
@@ -73,6 +78,31 @@ describe('StandingGraph.build()', () => {
       expect(graph.returnBus(name)).toBe(returns[name]);
       expect(reaches(fake(returns[name]!.output), fake(graph.masterStrip!.input))).toBe(true);
     }
+  });
+
+  it("builds each bus's chain from the strips' registry, so the song's tempo reaches it", async () => {
+    const heard: number[] = [];
+    const source = {
+      ...INSERT_KINDS,
+      chorus: {
+        ...INSERT_KINDS.chorus,
+        create: (context: BaseAudioContext, spec: InsertSpec) => ({
+          ...INSERT_KINDS.chorus.create(context, spec as ChorusSpec),
+          setTempo: (bpm: number) => void heard.push(bpm),
+        }),
+      },
+    } as InsertRegistry;
+    const tempo = tempoInsertRegistry(96, source);
+    const graph = new StandingGraph(await engineReady(), RETURNS, {
+      registry: tempo.registry,
+      defer: (run) => run(),
+    });
+    graph.build();
+    graph.returnBus('a')!.setInserts([DEFAULT_CHORUS]);
+    expect(graph.returnBus('a')!.inserts.map((s) => s.kind)).toEqual(['chorus']);
+    expect(graph.returnBus('b')!.inserts.map((s) => s.kind)).toEqual(['echo']);
+    tempo.setTempo(120);
+    expect(heard).toEqual([96, 120]);
   });
 
   it('wires the aux fader straight to the engine master, past the song master', async () => {
@@ -101,7 +131,7 @@ describe('StandingGraph.dispose()', () => {
     expect(fake(musicBus.output).outbound).toEqual([]);
     expect(aux.outbound).toEqual([]);
     expect(graph.masterStrip).toBeNull();
-    expect(graph.returnBus('room')).toBeUndefined();
+    expect(graph.returnBus('a')).toBeUndefined();
     expect(() => graph.standing()).toThrow(/init\(\)/);
     expect(graph.musicGain).toBe(0.6);
   });

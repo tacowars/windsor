@@ -1,15 +1,15 @@
 /**
  * `AudioSystem` over the whole-music document (#435, #597): `initMusic` plays a
  * part on the document's own patch when `patches` names its preset and lands
- * the `returns` overlay on the live buses; `apply` edits patches, strips and
- * returns live, only the fields the partial names.
+ * the `returns` section on the live send buses (windsor#172); `apply` edits
+ * patches, strips and buses live, only the fields the partial names.
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { FakeContext, installFakeAudioWorklet } from '../__fixtures__/fakeAudioContext';
 import type { FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
-import { FakeBiquad } from '../__fixtures__/fakeAudioNodes';
+import { FakeBiquad, FakeDelay } from '../__fixtures__/fakeAudioNodes';
 import {
   FULL_DOCUMENT,
   FULL_SLOT,
@@ -20,6 +20,9 @@ import type { ArrangementDocument } from '../song/arrangementDocument';
 import { AudioSystem } from './audioSystem';
 import { musicPartName } from '../song/documentParts';
 import { FmEngine } from '../synth/fmEngine';
+import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
+import type { EchoSpec } from '../inserts/echoInsert';
+import type { PlateReverbSpec } from '../inserts/plateReverbInsert';
 import { RETURNS } from '../mixer/mix';
 import { makePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
@@ -35,7 +38,7 @@ afterAll(() => restore());
 async function system(document: ArrangementDocument): Promise<AudioSystem> {
   const context = new FakeContext();
   const engine = new FmEngine(context.asAudioContext());
-  const sys = new AudioSystem(engine);
+  const sys = new AudioSystem(engine, { defer: (run) => run() });
   await sys.init();
   sys.initMusic(document);
   return sys;
@@ -43,12 +46,27 @@ async function system(document: ArrangementDocument): Promise<AudioSystem> {
 
 const stripOf = (sys: AudioSystem, id: FullPartId) => sys.strip(musicPartName(FULL_SLOT[id]));
 
+const PLATE = RETURNS.a.inserts[0] as PlateReverbSpec;
+const ECHO = RETURNS.b.inserts[0] as EchoSpec;
+
+/** The kinds on a bus's live chain, in order. */
+const kindsOf = (sys: AudioSystem, bus: string): string[] =>
+  sys.returnBus(bus)?.inserts.map((stage) => stage.kind) ?? [];
+/** The plate worklet of Send A's first insert. */
 const plateOf = (sys: AudioSystem): FakeWorkletNode =>
-  sys.returnBus('room')?.effect as unknown as FakeWorkletNode;
-const delayOf = (sys: AudioSystem): DelayNode => sys.returnBus('echo')?.effect as DelayNode;
+  sys.returnBus('a')?.inserts[0]?.processor as unknown as FakeWorkletNode;
+/** The delay line of Send B's first insert: the one delay its input reaches. */
+const delayOf = (sys: AudioSystem): FakeDelay => {
+  const stack = [sys.returnBus('b')?.inserts[0]?.input as unknown as FakeNode];
+  for (let node = stack.pop(); node; node = stack.pop()) {
+    if (node instanceof FakeDelay) return node;
+    stack.push(...node.outbound.map((c) => c.to).filter((to): to is FakeNode => 'outbound' in to));
+  }
+  throw new Error('Send B holds no delay line');
+};
 /** The echo's damping filter: the one node the delay line feeds. */
 const dampOf = (sys: AudioSystem): FakeBiquad => {
-  const next = (delayOf(sys) as unknown as FakeNode).outbound[0]?.to;
+  const next = delayOf(sys).outbound[0]?.to;
   if (!(next instanceof FakeBiquad)) throw new Error('the delay line does not feed a biquad');
   return next;
 };
@@ -71,36 +89,6 @@ describe('initMusic with patches', () => {
       patches: { ...FULL_DOCUMENT.patches, kick: { ...PRESETS.kick!, volume: 0.05 } },
     });
     expect(stripOf(sys, 'kick')?.part.patch.volume).toBe(0.05);
-  });
-});
-
-describe('initMusic with returns', () => {
-  it('lands the plate space, the return levels and the delay line on the live buses', async () => {
-    const sys = await system({
-      ...FULL_DOCUMENT,
-      returns: {
-        room: { kind: 'reverb', level: 0.4, space: { ...RETURNS.room.space, size: 2.5 } },
-        echo: {
-          kind: 'delay',
-          level: 0.2,
-          delayTime: 0.75,
-          feedback: 0.5,
-          damp: 1500,
-          resonance: 6,
-        },
-      },
-    });
-    expect(sys.returnBus('room')?.level.value).toBe(0.4);
-    expect(plateOf(sys).parameters.get('size')?.value).toBe(2.5);
-    expect(sys.returnBus('echo')?.level.value).toBe(0.2);
-    expect(delayOf(sys).delayTime.value).toBe(0.75);
-    expect(dampOf(sys).Q.value).toBe(6);
-  });
-
-  it('keeps the code returns when the document has no overlay', async () => {
-    const sys = await system(FULL_DOCUMENT);
-    expect(sys.returnBus('room')?.level.value).toBe(RETURNS.room.level);
-    expect(plateOf(sys).parameters.get('size')?.value).toBe(RETURNS.room.space.size);
   });
 });
 
@@ -147,45 +135,111 @@ describe('apply over patches and returns', () => {
     const sys = await system(FULL_DOCUMENT);
     expect(sys.apply({ patches: { lead: 3 } } as never).ignored).toEqual(['patches.lead']);
   });
+});
 
-  it('changes only the return fields the partial names, clamped', async () => {
+describe('initMusic with the send buses (windsor#172)', () => {
+  it("lands each bus's level and chain settings on the live buses", async () => {
+    const sys = await system({
+      ...FULL_DOCUMENT,
+      returns: {
+        a: { level: 0.4, inserts: [{ ...PLATE, size: 2.5 }] },
+        b: {
+          level: 0.2,
+          inserts: [{ ...ECHO, delayTime: 0.75, feedback: 0.5, damp: 1500, resonance: 6 }],
+        },
+      },
+    });
+    expect(sys.returnBus('a')?.level.value).toBe(0.4);
+    expect(plateOf(sys).parameters.get('size')?.value).toBe(2.5);
+    expect(plateOf(sys).parameters.get('wet')?.value).toBe(1);
+    expect(plateOf(sys).parameters.get('dry')?.value).toBe(0);
+    expect(sys.returnBus('b')?.level.value).toBe(0.2);
+    expect(delayOf(sys).delayTime.value).toBe(0.75);
+    expect(dampOf(sys).Q.value).toBe(6);
+  });
+
+  it('keeps the code buses when the document has none', async () => {
     const sys = await system(FULL_DOCUMENT);
+    expect(sys.returnBus('a')?.spec).toEqual(RETURNS.a);
+    expect(sys.returnBus('b')?.spec).toEqual(RETURNS.b);
+    expect(plateOf(sys).parameters.get('size')?.value).toBe(PLATE.size);
+  });
+
+  it("builds the document's own chains: an empty one and a mixed one", async () => {
+    const sys = await system({
+      ...FULL_DOCUMENT,
+      returns: {
+        a: { level: 0.9, inserts: [] },
+        b: { level: 0.6, inserts: [ECHO, DEFAULT_CHORUS] },
+      },
+    });
+    expect(kindsOf(sys, 'a')).toEqual([]);
+    expect(kindsOf(sys, 'b')).toEqual(['echo', 'chorus']);
+  });
+});
+
+describe('apply over the send buses (windsor#172)', () => {
+  it('writes a settings-only chain edit onto the live stages, and a level live', async () => {
+    const sys = await system(FULL_DOCUMENT);
+    const stage = sys.returnBus('a')?.inserts[0];
     const sizeBefore = plateOf(sys).parameters.get('size')?.value;
     expect(
-      sys.apply({ returns: { room: { space: { decay: 0.3 } }, echo: { feedback: 9 } } }),
-    ).toEqual({
-      ok: true,
-      ignored: [],
-    });
+      sys.apply({ returns: { a: { inserts: [{ ...PLATE, decay: 0.3 }] }, b: { level: 9 } } }),
+    ).toEqual({ ok: true, ignored: [] });
+    expect(sys.returnBus('a')?.inserts[0]).toBe(stage);
     expect(plateOf(sys).parameters.get('decay')?.value).toBe(0.3);
     expect(plateOf(sys).parameters.get('size')?.value).toBe(sizeBefore);
-    expect(sys.returnBus('echo')?.level.value).toBe(RETURNS.echo.level);
+    expect(sys.returnBus('a')?.level.value).toBe(RETURNS.a.level);
+    expect(sys.returnBus('b')?.level.value).toBe(1);
+  });
+
+  it("rebuilds one bus's chain and leaves the other bus and every strip as they were", async () => {
+    const sys = await system(FULL_DOCUMENT);
+    const echo = sys.returnBus('b')?.inserts[0];
+    const drone = stripOf(sys, 'drone');
+    expect(sys.apply({ returns: { a: { inserts: [ECHO, DEFAULT_CHORUS] } } }).ok).toBe(true);
+    expect(kindsOf(sys, 'a')).toEqual(['echo', 'chorus']);
+    expect(sys.returnBus('b')?.inserts[0]).toBe(echo);
+    expect(stripOf(sys, 'drone')).toBe(drone);
+    expect(sys.apply({ returns: { a: { inserts: [] } } }).ok).toBe(true);
+    expect(kindsOf(sys, 'a')).toEqual([]);
   });
 
   it('moves the echo resonance live, clamped into its range (#647)', async () => {
     const sys = await system(FULL_DOCUMENT);
+    const echoWith = (resonance: number) => ({
+      returns: { b: { inserts: [{ ...ECHO, resonance }] } },
+    });
     expect(dampOf(sys).Q.value).toBe(DELAY_RESONANCE_DEFAULT_DB);
-    expect(sys.apply({ returns: { echo: { resonance: 9 } } })).toEqual({ ok: true, ignored: [] });
+    expect(sys.apply(echoWith(9))).toEqual({ ok: true, ignored: [] });
     expect(dampOf(sys).Q.value).toBe(9);
-    sys.apply({ returns: { echo: { resonance: 99 } } });
+    sys.apply(echoWith(99));
     expect(dampOf(sys).Q.value).toBe(DELAY_RESONANCE_MAX_DB);
-    sys.apply({ returns: { echo: { resonance: -99 } } });
+    sys.apply(echoWith(-99));
     expect(dampOf(sys).Q.value).toBe(DELAY_RESONANCE_MIN_DB);
-    const wrongKind = sys.apply({ returns: { room: { resonance: 3 } } } as never);
-    expect(wrongKind.ignored).toEqual(['returns.room.resonance']);
   });
 
-  it('reports unknown returns, wrong-kind fields and junk by path', async () => {
+  it('reports unknown buses, old return fields and junk by path', async () => {
     const sys = await system(FULL_DOCUMENT);
     const result = sys.apply({
-      returns: { cave: { level: 1 }, room: { delayTime: 1, space: { wat: 1 }, level: 'x' } },
+      returns: {
+        cave: { level: 1 },
+        room: { level: 0.5 },
+        a: { space: { size: 2 }, level: 'x', inserts: [{ kind: 'wah' }] },
+        b: { inserts: 'none' },
+      },
     } as never);
     expect(result.ok).toBe(true);
     expect(result.ignored.sort()).toEqual([
+      'returns.a.inserts[0]',
+      'returns.a.level',
+      'returns.a.space',
+      'returns.b.inserts',
       'returns.cave',
-      'returns.room.delayTime',
-      'returns.room.level',
-      'returns.room.space.wat',
+      'returns.room',
     ]);
+    // The unknown kind is dropped, so Send A's chain is now empty; Send B's junk changes nothing.
+    expect(kindsOf(sys, 'a')).toEqual([]);
+    expect(kindsOf(sys, 'b')).toEqual(['echo']);
   });
 });

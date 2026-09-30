@@ -83,7 +83,7 @@ describe('the audible arrangement', () => {
     const [room, echo, master] = renderGraph(
       context,
       8 * BAR_SECONDS,
-      [tap(system, 'room'), tap(system, 'echo'), engine.master as unknown as FakeNode],
+      [tap(system, 'a'), tap(system, 'b'), engine.master as unknown as FakeNode],
       () => system.update(0),
     );
     if (!room || !echo || !master) throw new Error('render produced no captures');

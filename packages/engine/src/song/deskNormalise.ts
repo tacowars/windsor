@@ -1,36 +1,23 @@
 /**
  * The desk sections of an arrangement document — each part's `strip` (over
- * `DEFAULT_STRIP`, #597) and `returns` (overlays over the code's `RETURNS`) —
- * normalised the same way: only the fields the document names change, the
- * base supplies the rest, and the result is the complete strip or return
- * spec the graph is built from. A name the code does not define is dangling,
- * never invented: which strips and returns exist stays code-owned (one
- * plate, one delay — no unmeasured DSP runs for nothing), what they are set
- * to is the document's (record
- * `2026-09-11-music-document-carries-patches-and-returns`).
+ * `DEFAULT_STRIP`, #597) and `returns`, the send buses (over the code's
+ * `RETURNS`, windsor#172) — normalised the same way: only the fields the
+ * document names change, the base supplies the rest, and the result is the
+ * complete strip or bus spec the graph is built from. A name the code does
+ * not define is dangling, never invented: which strips and buses exist stays
+ * code-owned (Send A and Send B), what they hold and how they are set is the
+ * document's (record `2026-09-11-music-document-carries-patches-and-returns`).
  */
 import type { FieldNormaliser } from './arrangementFields';
-import {
-  DELAY_DAMP_MAX_HZ,
-  DELAY_DAMP_MIN_HZ,
-  DELAY_FEEDBACK_MAX,
-  DELAY_MAX_SECONDS,
-  DELAY_RESONANCE_MAX_DB,
-  DELAY_RESONANCE_MIN_DB,
-  LOW_CUT_MAX_HZ,
-  LOW_CUT_MIN_HZ,
-  MIX_LEVEL_MAX,
-  RETURN_LEVEL_MAX,
-  REVERB_SPACE_RANGES,
-} from '../audioConstants';
-import type { ChannelStrip, DelayReturn, ReturnSpec, ReverbReturn } from '../mixer/mix';
+import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ, MIX_LEVEL_MAX, RETURN_LEVEL_MAX } from '../audioConstants';
+import type { InsertSpec } from '../inserts/insertRegistry';
+import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { normaliseInserts } from '../inserts/insertRegistry';
-import { DEFAULT_STRIP, RETURNS } from '../mixer/mix';
-import type { ReverbSpace } from '../mixer/reverbSpace';
+import { DEFAULT_STRIP, RETURNS, isReturnName } from '../mixer/mix';
 
 /**
  * A part's own strip (#597): level, pan, low cut (#640), sends and inserts
- * (#641), over `DEFAULT_STRIP` — unity, centred, uncut, dry, no inserts. A send to a return the code
+ * (#641), over `DEFAULT_STRIP` — unity, centred, uncut, dry, no inserts. A send to a bus the code
  * does not define is dangling.
  */
 export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): ChannelStrip {
@@ -72,7 +59,7 @@ function switchedOn(
   return { [key]: n.bool(raw, false, `${path}.${key}`) };
 }
 
-/** Sends overlay the base per return — set a send to 0 to silence it — the
+/** Sends overlay the base per bus — set a send to 0 to silence it — the
  * same only-named-fields semantics `AudioSystem.apply` uses live. */
 function sends(
   raw: unknown,
@@ -87,8 +74,8 @@ function sends(
     if (amount !== undefined) out[name] = amount;
   }
   for (const [name, amount] of Object.entries(o)) {
-    if (!Object.hasOwn(RETURNS, name)) {
-      n.dangling.push(`${path}.${name}: no return "${name}" is defined`);
+    if (!isReturnName(name)) {
+      n.dangling.push(`${path}.${name}: no send bus "${name}" is defined`);
       n.correction(`${path}.${name}: dropped`);
       continue;
     }
@@ -98,8 +85,9 @@ function sends(
 }
 
 /**
- * Return overlays over `RETURNS`, by name. The kind is the code's: a
- * document cannot turn the plate into a delay, only set what the plate is.
+ * The send buses over `RETURNS`, by name (windsor#172): each one's level and
+ * its insert chain. A bus the document leaves out is the code's; a name
+ * other than `a` or `b` is dangling and dropped.
  */
 export function normaliseReturns(
   raw: unknown,
@@ -109,77 +97,46 @@ export function normaliseReturns(
   const o = n.section(raw, 'returns');
   const out: Record<string, ReturnSpec> = {};
   for (const [name, value] of Object.entries(o)) {
-    const base: ReturnSpec | undefined = Object.hasOwn(RETURNS, name)
-      ? RETURNS[name as keyof typeof RETURNS]
-      : undefined;
-    if (!base) {
-      n.dangling.push(`returns.${name}: no return "${name}" is defined`);
+    if (!isReturnName(name)) {
+      n.dangling.push(`returns.${name}: no send bus "${name}" is defined`);
       n.correction(`returns.${name}: dropped`);
       continue;
     }
+    const base = RETURNS[name];
     const path = `returns.${name}`;
     const section = n.section(value, path);
-    if (section.kind !== undefined && section.kind !== base.kind) {
-      n.correction(`${path}.kind: ${section.kind as string} is not the code's ${base.kind} — kept`);
-    }
-    out[name] =
-      base.kind === 'reverb'
-        ? reverbReturn(section, base, path, n)
-        : delayReturn(section, base, path, n);
+    n.dropUnknown(section, ['level', 'inserts'], path);
+    out[name] = {
+      level: n.num(section.level, base.level, 0, RETURN_LEVEL_MAX, `${path}.level`),
+      inserts: normaliseBusInserts(section.inserts, `${path}.inserts`, n, base.inserts),
+    };
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function reverbReturn(
-  o: Record<string, unknown>,
-  base: ReverbReturn,
-  path: string,
-  n: FieldNormaliser,
-): ReverbReturn {
-  n.dropUnknown(o, ['kind', 'level', 'space'], path);
-  return {
-    kind: 'reverb',
-    level: n.num(o.level, base.level, 0, RETURN_LEVEL_MAX, `${path}.level`),
-    space: space(o.space, base.space, `${path}.space`, n),
-  };
-}
-
-/** Every plate parameter, clamped to the worklet's declared range. */
-export function space(
+/**
+ * A bus's chain: a strip's list, read the same way, with two differences.
+ * An absent list is the code's chain `base`, and so is junk, since that is
+ * what the bus plays without one; an empty list is kept, and passes the
+ * sends through. A compressor keys from the bus's own input: an external
+ * sidechain is not offered on a bus, so one in the document is corrected
+ * to internal.
+ */
+export function normaliseBusInserts(
   raw: unknown,
-  base: ReverbSpace,
   path: string,
   n: FieldNormaliser,
-): ReverbSpace {
-  const o = n.section(raw, path);
-  n.dropUnknown(o, Object.keys(REVERB_SPACE_RANGES), path);
-  const out = { ...base };
-  for (const [field, [min, max]] of Object.entries(REVERB_SPACE_RANGES)) {
-    const key = field as keyof ReverbSpace;
-    out[key] = n.num(o[key], base[key], min, max, `${path}.${key}`);
+  base: readonly InsertSpec[],
+): InsertSpec[] {
+  if (raw === undefined) return [...base];
+  if (!Array.isArray(raw)) {
+    n.correction(`${path}: not a list — using the bus's default chain`);
+    return [...base];
   }
-  return out;
-}
-
-function delayReturn(
-  o: Record<string, unknown>,
-  base: DelayReturn,
-  path: string,
-  n: FieldNormaliser,
-): DelayReturn {
-  n.dropUnknown(o, ['kind', 'level', 'delayTime', 'feedback', 'damp', 'resonance'], path);
-  return {
-    kind: 'delay',
-    level: n.num(o.level, base.level, 0, RETURN_LEVEL_MAX, `${path}.level`),
-    delayTime: n.num(o.delayTime, base.delayTime, 0, DELAY_MAX_SECONDS, `${path}.delayTime`),
-    feedback: n.num(o.feedback, base.feedback, 0, DELAY_FEEDBACK_MAX, `${path}.feedback`),
-    damp: n.num(o.damp, base.damp, DELAY_DAMP_MIN_HZ, DELAY_DAMP_MAX_HZ, `${path}.damp`),
-    resonance: n.num(
-      o.resonance,
-      base.resonance,
-      DELAY_RESONANCE_MIN_DB,
-      DELAY_RESONANCE_MAX_DB,
-      `${path}.resonance`,
-    ),
-  };
+  return normaliseInserts(raw, path, n).map((spec, i) => {
+    if (spec.kind !== 'compressor' || spec.sidechain === undefined) return spec;
+    if (spec.sidechain === 'internal') return spec;
+    n.correction(`${path}[${i}].sidechain: a send bus keys from its own input — internal`);
+    return { ...spec, sidechain: 'internal' };
+  });
 }

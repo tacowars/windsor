@@ -4,8 +4,8 @@
  * output, mute and solo close (`audibleGate.ts`, windsor#154).
  *
  *   tail ─▶ head ─▶ audible ─┬─ [rotate θ] ─▶ dry destination
- *                           ├─ send ─▶ return "room"
- *                           └─ send ─▶ return "echo"
+ *                           ├─ send ─▶ Send A
+ *                           └─ send ─▶ Send B
  *
  * One gain at the head, so a structural insert edit can fade the strip down,
  * re-wire and fade back up without a click, and so moving the tail is one
