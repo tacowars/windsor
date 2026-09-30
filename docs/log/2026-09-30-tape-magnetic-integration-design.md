@@ -72,10 +72,13 @@ the fastest honest path to a level-matched audition in the app.
 
    The integration PR carries tests that: (a) confirm the calibration
    point; (b) push full-scale tones, impulses and steps at Bias 0 through
-   every model at every Drive from minimum to maximum and assert the guard
-   counter and the core's reset counter stay at zero; (c) push the same
-   at both Bias extremes and record the guard count per model, rate and
-   Drive, asserting the reset counter stays at zero; (d) push the
+   the model of least boost (the calibration model) at every Drive from
+   minimum to maximum and assert the guard counter and the core's reset
+   counter stay at zero; (c) push the same through every model at Bias 0
+   and at both Bias extremes, and record the guard count per model, rate
+   and Drive, asserting the reset counter stays at zero (a model whose own
+   EQ boosts, such as Ferric's low shelf, is expected to reach the guard
+   near maximum Drive, and that count is recorded, not forbidden); (d) push the
    sign-of-impulse-response sequence and an input above full scale and
    assert the guard engages and the field at the core stays within ±4;
    and (e) the **slew test**: ten seconds of sustained clipped white noise
@@ -91,7 +94,12 @@ the fastest honest path to a level-matched audition in the app.
    `span` host samples (48, one millisecond at 48 kHz). That delay applies
    whether the insert is enabled or bypassed, and the dry path of Mix is
    delayed by the same 48 samples, so with Wear, Wow and Flutter at zero,
-   toggling Enabled and moving Mix never shift timing or phase. The
+   toggling Enabled and moving Mix never shift the fixed delay. That is a
+   guarantee about delay, not about phase: the core adds frequency- and
+   level-dependent phase (the prototype record says the FIR delay is not
+   total nonlinear latency), and the retained EQ and DC blocker add phase
+   of their own, so a partial Mix blends two paths of equal fixed delay
+   and different phase, as any parallel saturation does. The
    retained transport stage adds its own variable delay, up to 25 ms, to
    the wet path only, after the core, as it does today; that delay is the
    wow and flutter effect, and a partial Mix with motion combs on purpose,
@@ -102,9 +110,12 @@ the fastest honest path to a level-matched audition in the app.
    defect. A Tape on a track is always at least 48 samples later than a
    track without one; the insert contract has no latency compensation and
    none is added now. The integration PR tests an impulse through the
-   enabled and bypassed insert at zero motion, asserting equal delay, and
-   at fixed nonzero Wear, asserting the wet path's extra delay equals the
-   transport delay reported by the motion model.
+   enabled and bypassed insert at zero motion, asserting equal fixed
+   delay; at fixed nonzero Wear, asserting the wet path's extra delay
+   equals the transport delay reported by the motion model; and reports,
+   without a gate, the wet-versus-dry phase across frequency at a low
+   level and at full scale, so the audition notes say what a partial Mix
+   does.
 5. **One more accuracy round before building.** RK4 at 2× and 4× with the
    span-32 and span-48 pairs are measured against the qualified reference
    on tones at all nine sampled control points at 48 kHz on the existing
