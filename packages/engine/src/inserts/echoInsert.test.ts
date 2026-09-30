@@ -12,11 +12,10 @@ import { FakeContext, FakeWorkletNode, renderGraph } from '../__fixtures__/fakeA
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import type { FakeWaveShaper } from '../__fixtures__/fakeWaveShaper';
 import { DELAY_FEEDBACK_MAX, DELAY_MAX_SECONDS } from '../audioConstants';
-import { RETURNS } from '../mixer/mix';
-import { createReturn } from '../mixer/returnBus';
+import { attachDelay } from '../mixer/returnEffects';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
-import { ECHO_BOUNDS } from './echoConstants';
+import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS } from './echoConstants';
 import type { EchoSpec } from './echoInsert';
 import { DEFAULT_ECHO, ECHO_INSERT } from './echoInsert';
 
@@ -48,10 +47,12 @@ describe('the Echo sound', () => {
     const { output } = await renderStage(hot);
 
     const { context: c, source } = await context();
-    const echo = { ...RETURNS.echo, feedback: DELAY_FEEDBACK_MAX, level: 1 };
-    const bus = createReturn(c.asAudioContext(), 'echo', echo, c.destination as never);
-    source.connect(fake(bus.input));
-    const [returned] = renderGraph(c, SECONDS, [fake(bus.output)]);
+    // The echo return's line, as it was built before windsor#172.
+    const ctx = c.asAudioContext();
+    const [input, out] = [ctx.createGain(), ctx.createGain()];
+    attachDelay(ctx, input, out, { ...ECHO_LINE_DEFAULTS, feedback: DELAY_FEEDBACK_MAX });
+    source.connect(fake(input));
+    const [returned] = renderGraph(c, SECONDS, [fake(out)]);
 
     const afterBurst = Math.round((BURST_SECONDS + DEFAULT_ECHO.delayTime) * c.sampleRate);
     expect(rms(output.left, afterBurst)).toBeGreaterThan(0);
@@ -110,7 +111,7 @@ describe('the Echo graph', () => {
 
 describe('ECHO_INSERT', () => {
   it("starts at the echo return's numbers, Mix 0.30, switched on", () => {
-    const { delayTime, feedback, damp, resonance } = RETURNS.echo;
+    const { delayTime, feedback, damp, resonance } = ECHO_LINE_DEFAULTS;
     expect(DEFAULT_ECHO).toEqual({
       kind: 'echo',
       delayTime,

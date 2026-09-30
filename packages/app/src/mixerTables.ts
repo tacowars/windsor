@@ -1,8 +1,10 @@
 /**
- * The Mixer tab's knob specs (#618): the strips over `DEFAULT_STRIP`, and the
- * returns' own ranges and tempo divisions. The plate's ranges are the
- * worklet's (`REVERB_SPACE_RANGES`); the delay's are here.
+ * The Mixer tab's knob specs (#618): the strips over `DEFAULT_STRIP`, the
+ * send buses' names, and the plate and delay line's own ranges and tempo
+ * divisions. The plate's ranges are the worklet's (`REVERB_SPACE_RANGES`);
+ * the delay's are here.
  */
+import type { ReturnName } from '@windsor/engine';
 import { DEFAULT_STRIP, LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '@windsor/engine';
 import { fmt2, fmtHz, fmtSigned } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
@@ -35,10 +37,13 @@ export const STRIP_LOW_CUT_KNOB: CardKnobSpec = {
   curve: 'log',
   fmt: fmtHz,
 };
+/** The send buses as the console names them (windsor#172). */
+export const BUS_LABELS: Readonly<Record<ReturnName, string>> = { a: 'Send A', b: 'Send B' };
 /** A send the strip does not name is silent. */
 export const SEND_DEFAULT = 0;
+/** A part's send to one bus, labelled with the bus's letter: `→ A`, `→ B`. */
 export const sendKnob = (ret: string): CardKnobSpec => ({
-  label: `→ ${ret}`,
+  label: `→ ${ret.toUpperCase()}`,
   min: 0,
   max: 1,
   def: DEFAULT_STRIP.sends[ret] ?? SEND_DEFAULT,

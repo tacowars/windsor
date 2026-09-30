@@ -37,7 +37,7 @@ const desk = (level: number): ChannelStrip => ({
   pan: 0,
   lowCut: LOW_CUT_MIN_HZ,
   inserts: [],
-  sends: { room: 0.2 },
+  sends: { a: 0.2 },
 });
 
 async function rig(extra: Partial<PartStripsOptions> = {}, build = true) {

@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { PlayablePart } from '@windsor/engine';
 import {
+  ARRANGEMENT_VERSION,
   ArrangementPlayer,
   DEFAULT_EUCLIDEAN_CONFIG,
   TICKS_PER_BAR,
@@ -32,7 +33,7 @@ describe('newSong', () => {
     expect(result.corrections).toEqual([]);
     expect(result.dangling).toEqual([]);
     const { document } = result;
-    expect(document.version).toBe(3);
+    expect(document.version).toBe(ARRANGEMENT_VERSION);
     expect(document.parts).toHaveLength(1);
     const [part] = document.parts;
     expect(part).toMatchObject({ slot: 0, name: 'Part 1', preset: initPresetId('0') });
@@ -205,7 +206,7 @@ describe('the song round trip', () => {
     for (let i = 1; i < 7; i++) restructure(model, addPart(model.doc)!.doc);
     const kinds = ['grid', 'euclidean', 'chord', 'none', 'euclidean', 'grid', 'chord'] as const;
     kinds.forEach((kind, slot) => restructure(model, setSequencerKind(model.doc, slot, kind)));
-    model.merge({ parts: { 4: { name: 'Hat', strip: { level: 0.5, sends: { echo: 0.3 } } } } });
+    model.merge({ parts: { 4: { name: 'Hat', strip: { level: 0.5, sends: { b: 0.3 } } } } });
     restructure(model, removePart(model.doc, 2));
     expect(model.doc.parts).toHaveLength(6);
     restructure(model, addPart(model.doc)!.doc);

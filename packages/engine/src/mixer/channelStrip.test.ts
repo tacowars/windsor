@@ -87,14 +87,14 @@ describe('routePart with no inserts', () => {
     expect(context.nodes.map((n) => [...n.outbound])).toEqual(before);
   });
 
-  it('cuts the low end of the dry path and of the room send alike', async () => {
+  it('cuts the low end of the dry path and of the send to Send A alike', async () => {
     const ratios = async (hz: number): Promise<{ dry: number; send: number }> => {
       const level = async (lowCut: number): Promise<number[]> => {
         const { context, part, dry } = await rig();
         (part.node as unknown as { feed: unknown }).feed = tones(hz, hz, AMPLITUDE);
         const returns = createReturns(context.asAudioContext(), RETURNS, dry);
         const strip = routePart(part, { ...STRIP, lowCut }, returns, dry);
-        const taps = [fake(strip.rotation.output), fake(strip.sends.get('room')!)];
+        const taps = [fake(strip.rotation.output), fake(strip.sends.get('a')!)];
         return renderGraph(context, SECONDS, taps).map((c) => settled(c, context.sampleRate));
       };
       const [openDry, openSend] = await level(LOW_CUT_MIN_HZ);
@@ -151,7 +151,7 @@ describe('routePart with inserts', () => {
     expect(strip.tail).toBe(second!.output);
   });
 
-  it('puts the insert in front of the room as well as the dry path', async () => {
+  it('puts the insert in front of Send A as well as the dry path', async () => {
     const levels = async (inserts: InsertSpec[]): Promise<number[]> => {
       const { context, part, dry } = await rig();
       (part.node as unknown as { feed: unknown }).feed = tones(440, 660, AMPLITUDE);
@@ -160,7 +160,7 @@ describe('routePart with inserts', () => {
         registry: TEST_KINDS,
         defer: NOW,
       });
-      const taps = [fake(strip.rotation.output), fake(strip.sends.get('room')!)];
+      const taps = [fake(strip.rotation.output), fake(strip.sends.get('a')!)];
       return renderGraph(context, SECONDS, taps).map((c) => settled(c, context.sampleRate));
     };
     const [plainDry, plainSend] = await levels([]);

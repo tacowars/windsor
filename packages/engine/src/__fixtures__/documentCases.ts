@@ -6,7 +6,7 @@
  * writes its own regions. Read by `arrangementDocument.test.ts` and
  * `arrangementDocumentV3.test.ts`.
  */
-import { DEFAULT_BARS } from '../audioConstants';
+import { ARRANGEMENT_VERSION, DEFAULT_BARS } from '../audioConstants';
 import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import type { Arrangement } from '../song/arrangement';
 import type { ArrangementDocument } from '../song/arrangementDocument';
@@ -51,12 +51,12 @@ export const live = (part: unknown): unknown =>
     ? { regions: ALL, ...part }
     : part;
 
-/** A version-3 document carrying `PATCHES` and the given parts, each live for the whole song. */
+/** A current-version document carrying `PATCHES` and the given parts, each live for the whole song. */
 export const song = (
   parts: unknown[],
   rest: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
-  version: 3,
+  version: ARRANGEMENT_VERSION,
   patches: PATCHES,
   parts: parts.map(live),
   ...rest,

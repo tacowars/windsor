@@ -29,7 +29,7 @@ const THREE: ArrangementDocument = {
   ...FULL_DOCUMENT,
   parts: FULL_DOCUMENT.parts
     .slice(0, 3)
-    .map((part) => ({ ...part, strip: { ...part.strip, sends: { room: 0.5, echo: 0.5 } } })),
+    .map((part) => ({ ...part, strip: { ...part.strip, sends: { a: 0.5, b: 0.5 } } })),
 };
 const SLOTS = [0, 1, 2];
 const strip = (system: AudioSystem, slot: number): PartStrip => system.strip(musicPartName(slot))!;
@@ -54,7 +54,7 @@ const peak = (channel: Float32Array): number =>
 function heard(system: AudioSystem, context: FakeContext, slots = SLOTS): string[] {
   const taps = slots.flatMap((slot) => {
     const s = strip(system, slot);
-    return [s.rotation.output, s.sends.get('room')!, s.sends.get('echo')!].map(fake);
+    return [s.rotation.output, s.sends.get('a')!, s.sends.get('b')!].map(fake);
   });
   const captures = renderGraph(context, 0.05, taps);
   return slots.map((_, k) => {
@@ -115,8 +115,8 @@ describe('solo over the music parts', () => {
 
   it("keeps the returns playing the soloed part's sends, and nobody else's", async () => {
     const { system, context } = await rig();
-    const echo = system.returnBus('echo')!;
-    const room = system.returnBus('room')!;
+    const echo = system.returnBus('b')!;
+    const room = system.returnBus('a')!;
     // The echo repeats after its delay time, so its output is read late in the render.
     const late = Math.round(0.35 * context.sampleRate);
     const returned = (): number[] => {
@@ -127,7 +127,7 @@ describe('solo over the music parts', () => {
     system.apply(set(1, { solo: true }));
     expect(returned().every((p) => p > 1e-3)).toBe(true);
     // The soloed part sends nothing now: whatever still reached a return came from the others.
-    system.apply(set(1, { sends: { room: 0, echo: 0 } }));
+    system.apply(set(1, { sends: { a: 0, b: 0 } }));
     expect(returned().slice(0, 2)).toEqual([0, 0]);
     system.dispose();
   });

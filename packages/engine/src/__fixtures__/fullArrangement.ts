@@ -23,7 +23,7 @@ import type { ChannelStrip } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
-import { LOW_CUT_MIN_HZ } from '../audioConstants';
+import { ARRANGEMENT_VERSION, LOW_CUT_MIN_HZ } from '../audioConstants';
 import { hitStep } from '../sequencing/chordSequencer';
 import { gridNote } from '../sequencing/gridSequencer';
 import type { Region } from '../sequencing/regionClock';
@@ -139,9 +139,9 @@ export const FULL_ARRANGEMENT: Arrangement = {
 /** The fixture parts' strips — the `MIX` entries the #69b parts had before #597. */
 export const FULL_STRIPS: Readonly<Record<FullPartId, ChannelStrip>> = {
   kick: { level: 0.9, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: {}, inserts: [] },
-  hat: { level: 0.6, pan: 0.2, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.2 }, inserts: [] },
-  arp: { level: 0.7, pan: -0.15, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.3 }, inserts: [] },
-  drone: { level: 0.8, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: { room: 0.45 }, inserts: [] },
+  hat: { level: 0.6, pan: 0.2, lowCut: LOW_CUT_MIN_HZ, sends: { b: 0.2 }, inserts: [] },
+  arp: { level: 0.7, pan: -0.15, lowCut: LOW_CUT_MIN_HZ, sends: { a: 0.3 }, inserts: [] },
+  drone: { level: 0.8, pan: 0, lowCut: LOW_CUT_MIN_HZ, sends: { a: 0.45 }, inserts: [] },
 };
 
 /**
@@ -156,7 +156,7 @@ export const FULL_DOCUMENT: ArrangementDocument & {
   readonly parts: readonly DocumentPart[];
   readonly patches: Readonly<Record<string, Patch>>;
 } = {
-  version: 3,
+  version: ARRANGEMENT_VERSION,
   ...FULL_ARRANGEMENT,
   parts: FULL_PART_IDS.map((id) => ({ ...FULL_PARTS[id], strip: FULL_STRIPS[id] })),
   patches: Object.fromEntries(

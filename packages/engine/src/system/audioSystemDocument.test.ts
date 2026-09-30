@@ -67,11 +67,11 @@ describe('initMusic over a document', () => {
 
   it('lands each part on its own strip', async () => {
     const doc = withDocumentPart(FULL_DOCUMENT, 'hat', {
-      strip: { level: 0.25, pan: -0.5, lowCut: LOW_CUT_MIN_HZ, sends: { echo: 0.1 }, inserts: [] },
+      strip: { level: 0.25, pan: -0.5, lowCut: LOW_CUT_MIN_HZ, sends: { b: 0.1 }, inserts: [] },
     });
     const sys = await system(doc);
     expect(stripOf(sys, 'hat')?.part.gain.value).toBe(0.25);
-    expect(stripOf(sys, 'hat')?.sends.get('echo')?.gain.value).toBe(0.1);
+    expect(stripOf(sys, 'hat')?.sends.get('b')?.gain.value).toBe(0.1);
     expect(stripOf(sys, 'kick')?.part.gain.value).toBe(FULL_STRIPS.kick.level);
   });
 
@@ -127,13 +127,13 @@ describe('apply over the document model', () => {
   it('changes only the strip fields the partial names', async () => {
     const sys = await system(FULL_DOCUMENT);
     const strip = stripOf(sys, 'hat');
-    const echoBefore = strip?.sends.get('echo')?.gain.value;
+    const echoBefore = strip?.sends.get('b')?.gain.value;
     expect(sys.apply({ parts: { [hat]: { strip: { level: 0.3 } } } })).toEqual({
       ok: true,
       ignored: [],
     });
     expect(strip?.part.gain.value).toBe(0.3);
-    expect(strip?.sends.get('echo')?.gain.value).toBe(echoBefore);
+    expect(strip?.sends.get('b')?.gain.value).toBe(echoBefore);
   });
 
   it('lands the document low cut on the strip, and moves it live, clamped (#640)', async () => {
@@ -248,17 +248,17 @@ describe('apply over the document model', () => {
 
   it('sets sends live and clamps into range', async () => {
     const sys = await system(FULL_DOCUMENT);
-    expect(sys.apply({ parts: { [hat]: { strip: { sends: { echo: 2 } } } } }).ok).toBe(true);
-    expect(stripOf(sys, 'hat')?.sends.get('echo')?.gain.value).toBe(1);
+    expect(sys.apply({ parts: { [hat]: { strip: { sends: { b: 2 } } } } }).ok).toBe(true);
+    expect(stripOf(sys, 'hat')?.sends.get('b')?.gain.value).toBe(1);
   });
 
   it('sets a send the part had no amount for yet: every strip reaches every return', async () => {
     const sys = await system(FULL_DOCUMENT);
-    expect(sys.apply({ parts: { [kick]: { strip: { sends: { room: 0.4 } } } } })).toEqual({
+    expect(sys.apply({ parts: { [kick]: { strip: { sends: { a: 0.4 } } } } })).toEqual({
       ok: true,
       ignored: [],
     });
-    expect(stripOf(sys, 'kick')?.sends.get('room')?.gain.value).toBe(0.4);
+    expect(stripOf(sys, 'kick')?.sends.get('a')?.gain.value).toBe(0.4);
   });
 
   it('reports unknown slots, returns and fields in ignored', async () => {
@@ -312,7 +312,7 @@ describe('live add and removal (#629)', () => {
     expect(sys.apply({ parts: { [drone]: DRONE } })).toEqual({ ok: true, ignored: [] });
     expect(sys.engine.getPart(musicPartName(drone))).toBeDefined();
     expect(stripOf(sys, 'drone')?.part.gain.value).toBe(FULL_STRIPS.drone.level);
-    expect(stripOf(sys, 'drone')?.sends.get('room')?.gain.value).toBe(FULL_STRIPS.drone.sends.room);
+    expect(stripOf(sys, 'drone')?.sends.get('a')?.gain.value).toBe(FULL_STRIPS.drone.sends.a);
     expect(sys.meteredProcessors).toBe(metered + 1);
     expect(sys.readout().counters).toHaveProperty(String(drone), 0);
   });

@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_DRIVE, MAX_INSERTS } from '@windsor/engine';
+import { DEFAULT_DRIVE, DEFAULT_ECHO, DEFAULT_PLATE_REVERB, MAX_INSERTS } from '@windsor/engine';
 import { addInsert, canAddInsert, moveInsert, removeInsert, setInsertField } from './insertEdits';
 
 describe('insert edits', () => {
@@ -16,6 +16,20 @@ describe('insert edits', () => {
     while (canAddInsert(list)) list = addInsert(list, 'drive');
     expect(list).toHaveLength(MAX_INSERTS);
     expect(addInsert(list, 'drive')).toHaveLength(MAX_INSERTS);
+  });
+
+  it('starts a Plate reverb or an Echo at Mix 1.00 on a send bus, and at its default elsewhere (windsor#172)', () => {
+    for (const bus of ['a', 'b'] as const) {
+      expect(addInsert([], 'plate', bus)).toEqual([{ ...DEFAULT_PLATE_REVERB, mix: 1 }]);
+      expect(addInsert([], 'echo', bus)).toEqual([{ ...DEFAULT_ECHO, mix: 1 }]);
+      expect(addInsert([], 'drive', bus)).toEqual([DEFAULT_DRIVE]);
+    }
+    for (const target of [0, 3, 'master', undefined] as const) {
+      expect(addInsert([], 'plate', target)).toEqual([DEFAULT_PLATE_REVERB]);
+      expect(addInsert([], 'echo', target)).toEqual([DEFAULT_ECHO]);
+    }
+    expect(DEFAULT_PLATE_REVERB.mix).toBe(0.3);
+    expect(DEFAULT_ECHO.mix).toBe(0.3);
   });
 
   it('removes by index, leaving the others in order', () => {

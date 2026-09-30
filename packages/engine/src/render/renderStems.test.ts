@@ -116,8 +116,8 @@ describe('renderStems', () => {
       'part 1',
       'part 2',
       'part 3',
-      'room',
-      'echo',
+      'a',
+      'b',
     ]);
     for (const { channels } of stems.slice(1)) expect(peak(channels[0]!)).toBeGreaterThan(1e-3);
   });
@@ -283,8 +283,8 @@ describe('renderStems', () => {
     const peaks = Object.fromEntries(stems.map((s) => [label(s.stem), peak(s.channels[0]!)]));
     expect(peaks['part 1']).toBeGreaterThan(1e-3);
     expect([peaks['part 0'], peaks['part 2'], peaks['part 3']]).toEqual([0, 0, 0]);
-    // The hat sends only to the echo, so the room has no stem.
-    expect(Object.keys(peaks)).toEqual(['master', 'part 0', 'part 1', 'part 2', 'part 3', 'echo']);
+    // The hat sends only to Send B, so Send A has no stem.
+    expect(Object.keys(peaks)).toEqual(['master', 'part 0', 'part 1', 'part 2', 'part 3', 'b']);
   });
 
   it('refuses a song too long to render before building anything', async () => {

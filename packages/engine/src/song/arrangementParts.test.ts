@@ -11,7 +11,12 @@ import type { ArrangementDocument } from './arrangementDocument';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
-import { DEFAULT_BARS, LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '../audioConstants';
+import {
+  ARRANGEMENT_VERSION,
+  DEFAULT_BARS,
+  LOW_CUT_MAX_HZ,
+  LOW_CUT_MIN_HZ,
+} from '../audioConstants';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 
@@ -39,9 +44,9 @@ const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
 /** The whole default-length song (#705): the one ∞ region every part here is live in. */
 const ALL = [{ start: 0, duration: DEFAULT_BARS * TICKS_PER_BAR }];
 
-/** A version-3 document; every part that is an object and names no regions lives the whole song. */
+/** A current-version document; every part that is an object and names no regions lives the whole song. */
 const song = (parts: unknown[], rest: Record<string, unknown> = {}): Record<string, unknown> => ({
-  version: 3,
+  version: ARRANGEMENT_VERSION,
   patches: PATCHES,
   parts: parts.map((part) =>
     typeof part === 'object' && part !== null && !('regions' in part)
@@ -124,13 +129,13 @@ describe('the part list (#597)', () => {
 
   it('normalises a part strip over DEFAULT_STRIP', () => {
     const result = makeArrangement(
-      song([{ ...KICK, strip: { level: 9, pan: -0.5, sends: { room: 0.4 } } }]),
+      song([{ ...KICK, strip: { level: 9, pan: -0.5, sends: { a: 0.4 } } }]),
     );
     expect(result.document.parts[0]?.strip).toEqual({
       level: 4,
       pan: -0.5,
       lowCut: LOW_CUT_MIN_HZ,
-      sends: { room: 0.4 },
+      sends: { a: 0.4 },
       inserts: [],
     });
     expect(result.corrections).toEqual(['parts[0].strip.level: clamped 9 to 4']);
@@ -215,8 +220,8 @@ describe('the part list (#597)', () => {
     ]);
   });
 
-  it('is unusable when the version is not 3', () => {
-    for (const version of [undefined, 1, 2, '3', 4]) {
+  it('is unusable when the version is not 4', () => {
+    for (const version of [undefined, 1, 2, '4', 5]) {
       const result = makeArrangement({ ...song([KICK]), version });
       expect(result.usable, String(version)).toBe(false);
       expect(result.corrections[0]).toMatch(/^version: /);

@@ -143,7 +143,7 @@ describe('the mixer column', () => {
     const drawn = stripSignature(ctx);
     ctx.change(partChange(0, { name: 'Pulse II' }));
     expect(stripSignature(ctx)).toBe(drawn);
-    const [ret = 'room'] = RETURN_NAMES;
+    const [ret = 'a'] = RETURN_NAMES;
     const edits = [
       { level: 0.3 },
       { pan: 0.5 },

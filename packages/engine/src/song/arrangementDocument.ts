@@ -55,11 +55,11 @@ export interface DocumentPart extends MusicPart {
  * parts each with their strip, plus the two sections that make it the whole
  * piece of music in one file (record
  * `2026-09-11-music-document-carries-patches-and-returns`) — the synth
- * patches its parts play, and return overlays over the code's `RETURNS`,
+ * patches its parts play, and the send buses over the code's `RETURNS`,
  * applied at `initMusic` and live through `AudioSystem.apply`.
  */
 export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
-  /** The document format (#705: 3). Anything else — v2 and the retired four-slot shape included — is unusable. */
+  /** The document format (windsor#172: 4; a 3 is upgraded). Anything else — v2 and the retired four-slot shape included — is unusable. */
   readonly version: typeof ARRANGEMENT_VERSION;
   readonly parts: readonly DocumentPart[];
   /**
@@ -68,7 +68,7 @@ export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
    * `patches/<id>.json` never changes what a shipped song sounds like.
    */
   readonly patches?: Readonly<Record<string, Patch>>;
-  /** Return settings by return name — the plate's space and level, the delay's time, feedback, damp and level. */
+  /** The send buses by name, `a` and `b` (windsor#172): each one's level and insert chain. An absent bus is the code's. */
   readonly returns?: Readonly<Record<string, ReturnSpec>>;
   readonly master?: MasterSpec;
 };
@@ -213,7 +213,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   return normaliseSongSidechains(document, n);
 }
 
-/** Why a non-3 version is refused, when the shape says which retired format it is. */
+/** Why another version is refused, when the shape says which retired format it is. */
 function versionReason(o: Record<string, unknown>): string {
   if (o.version === RETIRED_VERSION) return ' — version 2 is not supported since #705';
   if (RETIRED_SLOT_KEYS.some((key) => Object.hasOwn(o, key))) {

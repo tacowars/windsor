@@ -190,15 +190,17 @@ export { Scheduler } from './sequencing/scheduler';
 export type { SchedulerOptions } from './sequencing/scheduler';
 export { createBus } from './mixer/audioBus';
 export type { AudioBus, BusOptions } from './mixer/audioBus';
-export { DEFAULT_STRIP, MIX, RETURNS, RETURN_NAMES, stripFor } from './mixer/mix';
-export type {
-  ChannelStrip,
-  DelayReturn,
-  PartName,
-  ReturnName,
-  ReturnSpec,
-  ReverbReturn,
+export {
+  DEFAULT_STRIP,
+  MIX,
+  RETURNS,
+  RETURN_NAMES,
+  SEND_BUS_WET_MIX,
+  isReturnName,
+  onSendBus,
+  stripFor,
 } from './mixer/mix';
+export type { ChannelStrip, PartName, ReturnName, ReturnSpec } from './mixer/mix';
 export { createReturn, createReturns, createSend } from './mixer/returnBus';
 export type { ReturnBus } from './mixer/returnBus';
 export { routePart } from './mixer/channelStrip';
