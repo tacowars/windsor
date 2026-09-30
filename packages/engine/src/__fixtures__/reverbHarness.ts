@@ -138,8 +138,12 @@ export interface ReverbInternals {
   _buffers: Float32Array[];
   _write: Int32Array;
   _length: Float32Array;
-  _read(index: number, offset: number): number;
-  _readCubic(index: number, offset: number): number;
+  /** Each read leaves its sample in `_value` (windsor#227). */
+  _read(index: number, offset: number): void;
+  /** Reads `_offset` samples forward of the line's read point. */
+  _readCubic(index: number): void;
+  _value: number;
+  _offset: number;
   /** Sleep state (#547). */
   _asleep: boolean;
   _sleepSpan: number;
