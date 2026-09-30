@@ -2764,3 +2764,181 @@ dialog select.field {
   background: transparent;
   border-color: var(--ink-faint);
 }
+
+/* The master column's meter parts (windsor#193; record
+   2026-09-30-master-column-and-meters, decisions 4, 5 and 10; the mockup's
+   .bar, .scale and .hbar rules). Each bar is a fixed zone gradient (written
+   inline from meterTables.ts) under a cover moved with transform, so a
+   paint needs no layout. The segments are a repeating gradient over it.
+   The widths come from meterTables.ts as --meter-bar-w and --meter-ch-w,
+   the height from the caller as --meter-h. */
+.meter-channel {
+  width: var(--meter-ch-w, 28px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.meter-led {
+  width: 8px;
+  height: 8px;
+  margin-bottom: 2px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line-bright);
+  background: var(--inset);
+  cursor: pointer;
+}
+.meter-led.is-lit {
+  background: var(--hot);
+  border-color: var(--hot);
+  box-shadow: 0 0 5px var(--hot);
+}
+.meter-led.is-empty {
+  visibility: hidden;
+}
+.meter-readout {
+  height: 14px;
+  margin-bottom: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: 9.5px var(--f-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.meter-readout:hover {
+  color: var(--ink);
+}
+.meter-readout.is-hot {
+  color: var(--hot);
+}
+.meter-name {
+  height: 14px;
+  font: 600 8.5px var(--f-panel);
+  line-height: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.meter-bar {
+  position: relative;
+  width: var(--meter-bar-w, 10px);
+  height: var(--meter-h);
+  border-radius: 1.5px;
+  overflow: hidden;
+}
+.meter-bar::after,
+.meter-hbar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to top, transparent 0 3px, var(--inset) 3px 4px);
+  pointer-events: none;
+}
+.meter-hbar::after {
+  background: repeating-linear-gradient(to right, transparent 0 3px, var(--inset) 3px 4px);
+}
+.meter-cover {
+  position: absolute;
+  inset: 0;
+  background: var(--inset);
+  opacity: 0.86;
+  transform-origin: top;
+  transform: scaleY(1);
+  transition: transform 34ms linear;
+  will-change: transform;
+}
+.meter-hold {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--ink);
+  opacity: 0;
+  transition: transform 34ms linear;
+}
+.meter-ceiling {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 0;
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.8;
+}
+.meter-bar.is-reduction {
+  background: var(--carrier);
+}
+.meter-bar.is-reduction .meter-cover {
+  transform-origin: bottom;
+}
+.meter-bar.is-reduction .meter-hold {
+  top: 0;
+  bottom: auto;
+}
+.meter-channel.is-dim .meter-bar {
+  opacity: 0.3;
+}
+.meter-scale {
+  position: relative;
+  flex: none;
+  width: 22px;
+  height: var(--meter-h);
+  margin-top: 26px;
+}
+.meter-scale span {
+  position: absolute;
+  right: 3px;
+  transform: translateY(50%);
+  font: 8px var(--f-num);
+  line-height: 1;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.meter-scale span::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -3px;
+  width: 2px;
+  height: 1px;
+  background: var(--ink-faint);
+}
+.meter-scale span.is-zero {
+  color: var(--ink-dim);
+}
+.meter-scale.is-reduction span {
+  right: auto;
+  left: 3px;
+}
+.meter-scale.is-reduction span::after {
+  right: auto;
+  left: -3px;
+}
+.meter-hbar {
+  position: relative;
+  height: 5px;
+  border-radius: 1px;
+  overflow: hidden;
+}
+.meter-hbar .meter-cover {
+  transform-origin: right;
+  transform: scaleX(1);
+}
+.meter-hbar .meter-ceiling {
+  top: -1px;
+  bottom: -1px;
+  left: 0;
+  right: auto;
+  width: 1px;
+  height: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter-cover,
+  .meter-hold {
+    transition: none;
+  }
+}
