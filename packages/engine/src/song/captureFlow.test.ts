@@ -20,6 +20,7 @@ import { makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer, type PlayablePart } from './arrangementPlayer';
 import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import { PRESETS } from '../patch/presets';
+import { ARRANGEMENT_VERSION } from '../audioConstants';
 
 const { kick, arp, drone } = FULL_SLOT;
 
@@ -115,7 +116,7 @@ describe('player capture and release', () => {
     const pattern = r.player.capturePattern(kick);
     expect(r.player.apply({ parts: { [kick]: freeze('euclidean', pattern) } }).ok).toBe(true);
     const exported = JSON.parse(
-      JSON.stringify({ version: 3, patches: PATCHES, ...r.player.arrangement }),
+      JSON.stringify({ version: ARRANGEMENT_VERSION, patches: PATCHES, ...r.player.arrangement }),
     ) as unknown;
     const imported = makeArrangement(exported);
     expect(imported.corrections).toEqual([]);
@@ -138,9 +139,9 @@ describe('player capture and release', () => {
   });
 });
 
-/** A version-3 document (#705) of the given parts, each live for the whole default-length song. */
+/** A current-version document of the given parts, each live for the whole default-length song. */
 const doc = (...parts: Array<Record<string, unknown>>): Record<string, unknown> => ({
-  version: 3,
+  version: ARRANGEMENT_VERSION,
   transport: { bpm: FULL_ARRANGEMENT.transport.bpm, bars: FULL_ARRANGEMENT.transport.bars },
   patches: PATCHES,
   parts: parts.map((part) => ({ regions: [FULL_REGION], ...part })),

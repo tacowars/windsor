@@ -221,8 +221,9 @@ describe('the part list (#597)', () => {
     ]);
   });
 
-  it('is unusable when the version is not 4', () => {
-    for (const version of [undefined, 1, 2, '4', 5]) {
+  it("is unusable when the version is not this build's", () => {
+    const current = ARRANGEMENT_VERSION;
+    for (const version of [undefined, 1, 2, current - 1, String(current), current + 1]) {
       const result = makeArrangement({ ...song([KICK]), version });
       expect(result.usable, String(version)).toBe(false);
       expect(result.corrections[0]).toMatch(/^version: /);

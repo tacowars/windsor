@@ -6,7 +6,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { makeArrangement, partAt } from '@windsor/engine';
+import { ARRANGEMENT_VERSION, makeArrangement, partAt } from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
 import { DocumentModel, deepMerge, mergeDocument } from './documentModel';
 import { loadBuiltIns } from './builtInLibrary';
@@ -19,7 +19,7 @@ const WHOLE = [{ start: 0, duration: 4 * 96 }];
 
 /** A song naming library ids with no `patches` section. */
 const OLD_SONG = {
-  version: 3,
+  version: ARRANGEMENT_VERSION,
   transport: { bpm: 96, bars: 4 },
   harmony: { root: 2, scale: 'dorian' },
   parts: [
@@ -355,14 +355,14 @@ describe('deepMerge', () => {
 
 describe('change listeners (the song autosave)', () => {
   it('hears every open, merge and mutate, until unsubscribed', () => {
-    const model = new DocumentModel({ version: 3, parts: [] });
+    const model = new DocumentModel({ version: ARRANGEMENT_VERSION, parts: [] });
     let heard = 0;
     const stop = model.onChange(() => heard++);
     model.merge({ transport: { bpm: 100 } });
     model.mutate((draft) => {
       draft.transport = { bpm: 110 };
     });
-    model.open({ version: 3, parts: [] });
+    model.open({ version: ARRANGEMENT_VERSION, parts: [] });
     expect(heard).toBe(3);
     stop();
     model.merge({ transport: { bpm: 120 } });
@@ -370,7 +370,7 @@ describe('change listeners (the song autosave)', () => {
   });
 
   it('hears a replace, which adopts the document it is given itself (an undo)', () => {
-    const model = new DocumentModel({ version: 3, parts: [] });
+    const model = new DocumentModel({ version: ARRANGEMENT_VERSION, parts: [] });
     const before = model.doc;
     model.merge({ transport: { bpm: 100 } });
     let heard = 0;
