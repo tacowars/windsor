@@ -25,7 +25,13 @@ import { loopBraceRow } from './loopBrace';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
-import { emptyMixerCell, mixerHeaderCell, partMixerCell, refreshMixerCells } from './songMixerCell';
+import {
+  EXPANDED_KNOB_COUNT,
+  emptyMixerCell,
+  mixerHeaderCell,
+  partMixerCell,
+  refreshMixerCells,
+} from './songMixerCell';
 import { stripSignature } from './songMixerModel';
 import { guardFrozenColumns } from './songFrozenColumns';
 import {
@@ -35,7 +41,7 @@ import {
   wirePlayheadDrag,
   wireRulerZoom,
 } from './songRuler';
-import { CYCLE_TICKS, REGION_SUMMARY, SONG_VIEW, forKind } from './songViewTables';
+import { CYCLE_TICKS, REGION_SUMMARY, SONG_VIEW, forKind, mixerColumnPx } from './songViewTables';
 
 /** A row's name cell and lane with the mixer column's cell between them (windsor#157). */
 const withMixer = ([name, lane]: [HTMLElement, HTMLElement], cell: HTMLElement): HTMLElement[] => [
@@ -75,6 +81,12 @@ export interface SongViewState {
   insertsOpen: boolean;
   /** The detail pane's vertical scroll, restored after a repaint or a render (an insert added or removed). */
   paneScrollPx: number;
+  /**
+   * The mixer column's arrow (windsor#158): every strip expanded to all its
+   * controls, or collapsed to Level, M and S. Kept across renders, never
+   * written to the document; starts collapsed.
+   */
+  mixerExpanded: boolean;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
@@ -144,7 +156,13 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
   const scroll = el('div', 'lanes-scroll');
   const lanes = el('div', 'lanes');
   lanes.style.setProperty('--names', `${SONG_VIEW.laneNameWidthPx}px`);
-  lanes.style.setProperty('--mixer', `${SONG_VIEW.mixerWidthPx}px`);
+  const sizeMixer = (): void =>
+    lanes.style.setProperty(
+      '--mixer',
+      `${mixerColumnPx(state.mixerExpanded, EXPANDED_KNOB_COUNT)}px`,
+    );
+  sizeMixer();
+  lanes.style.setProperty('--mix-knobs', String(EXPANDED_KNOB_COUNT));
   lanes.style.setProperty('--gap', `${SONG_VIEW.laneGapPx}px`);
   guardFrozenColumns(lanes, SONG_VIEW.laneGapPx);
   const line = playheadLine();
@@ -159,6 +177,21 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
     state.paneScrollPx = pane.scrollTop;
   });
   let paneStale = (): boolean => false;
+  // Set once the zoom is wired below; the arrow can only be pressed after that.
+  let refit = (): void => undefined;
+  const mixer = {
+    get expanded(): boolean {
+      return state.mixerExpanded;
+    },
+    toggle(): void {
+      state.mixerExpanded = !state.mixerExpanded;
+      sizeMixer();
+      view.paintLanes();
+      // The fit reads the grid's width, so it is measured on the new cells.
+      refit();
+      lanes.querySelector<HTMLElement>('.mix-toggle')?.focus();
+    },
+  };
 
   const view: SongView = {
     ctx,
@@ -184,11 +217,11 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
       lanes.style.setProperty('--bar', `${state.pxPerBar}px`);
       const brace = loopBraceRow(view);
       const rows: HTMLElement[] = [
-        ...withMixer(rulerRow(doc.transport.bars, state.pxPerBar), mixerHeaderCell()),
+        ...withMixer(rulerRow(doc.transport.bars, state.pxPerBar), mixerHeaderCell(mixer)),
         ...withMixer(brace.row, emptyMixerCell()),
         ...withMixer(harmonyLaneRow(view), emptyMixerCell()),
         ...doc.parts.flatMap((part) =>
-          withMixer(partLaneRow(view, part), partMixerCell(ctx, part)),
+          withMixer(partLaneRow(view, part), partMixerCell(ctx, part, state.mixerExpanded)),
         ),
       ];
       lanes.replaceChildren(...rows, ...brace.lines, line);
@@ -211,6 +244,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
     bars: () => ctx.model.doc.transport.bars,
     repaint: () => view.paintLanes(),
   });
+  refit = zoom.refit;
   const onTick = (tick: number): void =>
     markPlayingBlock(lanes, ctx.model.doc, view.songTicks(), tick);
   const drag = wirePlayheadDrag({
@@ -258,6 +292,7 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     sequencerOpen: true,
     insertsOpen: true,
     paneScrollPx: 0,
+    mixerExpanded: false,
   };
   return (body) => renderSongView(body, ctx, state);
 }

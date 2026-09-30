@@ -1,17 +1,24 @@
 /**
- * The mixer column's writes (windsor#157): a Level set here lands in the
- * part's strip, where the Mixer tab reads it; M and S are one undo step a
- * press, named after the part; on a sidechain-only part only a lit switch
- * can be pressed, and only to clear it.
+ * The mixer column's writes (windsor#157, windsor#158): a Level, Pan, Low
+ * cut, send or Output set here lands in the part's strip, where the Mixer
+ * tab reads it; M and S are one undo step a press, named after the part; on
+ * a sidechain-only part only a lit switch can be pressed, and only to clear
+ * it.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { openGestureConsole } from './__fixtures__/gestureConsole';
 import { partChange } from './context';
 import { settleGestures } from './gestureHooks';
+import { RETURN_NAMES } from '@windsor/engine';
 import {
   setStripLevel,
+  setStripLowCut,
+  setStripOutput,
+  setStripPan,
+  setStripSend,
   stripOf,
+  stripOutput,
   stripSignature,
   switchEnabled,
   switchLabel,
@@ -93,12 +100,60 @@ describe('the mixer column', () => {
     },
   );
 
-  it('moves its strip signature on a Level, a switch or an output change, and on nothing else', () => {
+  it('sets Pan, Low cut and each send in the part’s strip, leaving the other sends', () => {
+    const ctx = console0();
+    const [first, second] = RETURN_NAMES;
+    if (first === undefined || second === undefined) throw new Error('two returns expected');
+    setStripPan(ctx, 0, -0.15);
+    setStripLowCut(ctx, 0, 120);
+    setStripSend(ctx, 0, first, 0.25);
+    setStripSend(ctx, 0, second, 0.08);
+    const strip = ctx.model.doc.parts[0]?.strip;
+    expect(strip?.pan).toBe(-0.15);
+    expect(strip?.lowCut).toBe(120);
+    expect(strip?.sends[first]).toBe(0.25);
+    expect(strip?.sends[second]).toBe(0.08);
+  });
+
+  it('undoes a Pan as one step', () => {
+    const ctx = console0();
+    const before = stripOf(ctx, 0).pan;
+    setStripPan(ctx, 0, 0.5);
+    expect(ctx.undo()).toBe(true);
+    expect(stripOf(ctx, 0).pan).toBe(before);
+  });
+
+  it('routes the Output, and M and S follow it', () => {
+    const ctx = console0();
+    expect(stripOutput(stripOf(ctx, 0))).toBe('master');
+    expect(toggleStripSwitch(ctx, 0, 'solo')).toBe(true);
+    expect(setStripOutput(ctx, 0, 'sidechain')).toBe(true);
+    expect(stripOutput(stripOf(ctx, 0))).toBe('sidechain');
+    expect(switchEnabled(stripOf(ctx, 0), 'mute')).toBe(false);
+    expect(switchEnabled(stripOf(ctx, 0), 'solo')).toBe(true);
+    expect(setStripOutput(ctx, 0, 'master')).toBe(true);
+    expect(switchEnabled(stripOf(ctx, 0), 'mute')).toBe(true);
+    expect(switchEnabled(stripOf(ctx, 0), 'solo')).toBe(true);
+    expect(ctx.undo()).toBe(true);
+    expect(stripOutput(stripOf(ctx, 0))).toBe('sidechain');
+  });
+
+  it('moves its strip signature on every field the expanded cell shows, and on nothing else', () => {
     const ctx = console0();
     const drawn = stripSignature(ctx);
-    ctx.change(partChange(0, { strip: { pan: 0.5 } }));
+    ctx.change(partChange(0, { name: 'Pulse II' }));
     expect(stripSignature(ctx)).toBe(drawn);
-    for (const strip of [{ level: 0.3 }, { mute: true }, { solo: true }, { output: 'sidechain' }]) {
+    const [ret = 'room'] = RETURN_NAMES;
+    const edits = [
+      { level: 0.3 },
+      { pan: 0.5 },
+      { lowCut: 200 },
+      { sends: { [ret]: 0.4 } },
+      { mute: true },
+      { solo: true },
+      { output: 'sidechain' },
+    ];
+    for (const strip of edits) {
       const before = stripSignature(ctx);
       ctx.change(partChange(0, { strip }));
       expect(stripSignature(ctx)).not.toBe(before);
