@@ -181,7 +181,7 @@ export const COMPRESSOR_WORKLET_URL = new URL(
   import.meta.url,
 );
 
-/** Opt-in song-master sample meter (#666). */
+/** The channel strips' sample-peak meter (#666, windsor#155). */
 export const PEAK_METER_WORKLET_URL = new URL(
   '../worklet/generated/peak-meter-processor.js',
   import.meta.url,
