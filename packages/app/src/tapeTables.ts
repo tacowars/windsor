@@ -65,8 +65,8 @@ export const TAPE_OVERSAMPLING_OPTIONS: readonly (readonly [value: string, text:
 
 /** The Oversampling picker's hint (windsor#246 decision 2), word for word. */
 export const TAPE_OVERSAMPLING_HINT =
-  'Audition only: 2× fits four tracks in the CPU budget; 4× is cleaner on bright, ' +
-  'hard-driven sounds. One of these will be removed after the audition.';
+  'Audition only: 2× costs less CPU; 4× is cleaner on bright, hard-driven sounds. ' +
+  'One of these will be removed after the audition.';
 
 /**
  * Tape's pages in the rack (windsor#175 decisions 1 and 3), in tab order:
