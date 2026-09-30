@@ -24,7 +24,8 @@ unresolved in that Chrome. Candidate accuracy on tones at the control
 corners is measured last, by the child issue that follows this record, and
 informs the audition without reopening what is decided here.
 
-tacowars chose the five points below from a pros-and-cons list. The aim is
+tacowars chose the first five points below from a pros-and-cons list;
+the sixth fixes what E1 needs and was added on review. The aim is
 the fastest honest path to a level-matched audition in the app.
 
 ## Decisions
@@ -43,30 +44,36 @@ the fastest honest path to a level-matched audition in the app.
    delay, hiss, dropouts and trim stay in their order. No second insert.
    The REELS saturation polynomial leaves the chain; its provenance record
    stands as history.
-3. **Field bounding: a ceiling on the gain into the core, and a guard.**
-   A full-scale input at Drive 0 and flat EQ reaches the knee (source
-   field 1). The bound is on the whole path before the core. Bias EQ and
-   tape-model EQ run before Drive with gains above unity, and a bounded
-   transient can exceed a filter's peak frequency gain, so the figure that
-   caps Drive is the **worst-case sample gain**: the largest L1 norm of the
-   retained EQ cascade's impulse response over every model, the Bias
-   extremes, the three rates and the crossfade and smoothing states between
-   them, computed from the filter tables and declared in
-   `tapeConstants.ts`. The Drive mapping is capped so that this figure times
-   the Drive gain never exceeds 4 at the control's maximum. Because
-   coefficient smoothing passes through filters not in the tables, the
-   domain is also guaranteed by construction: a **hard guard clip at ±4 at
-   the core input**, with a counter, that never engages for a full-scale
-   input inside the capped range and exists only so that an out-of-range
-   signal meets a clip rather than the unqualified state-guard path. It is
+3. **Field bounding: the guard is the guarantee, the ceiling is the
+   calibration.** A full-scale sine at Drive 0 and flat EQ reaches the knee
+   (source field 1). Bias EQ and tape-model EQ run before Drive with gains
+   above unity, and a bounded adversarial signal (the sign of a filter's
+   impulse response) can reach the cascade's L1 norm, about 7.8 at 96 kHz
+   for Studio with full Bias, which no musically useful Drive range can
+   cap without giving up saturation at Drive 0. So the two duties are
+   split. The **domain is guaranteed by construction** by a hard guard clip
+   at source field ±4 at the core input, with a counter: every input, of
+   any level, meets that clip before the core, so the unqualified
+   state-guard path is unreachable from the input. The **Drive ceiling is a
+   calibration** for musical signals: the Drive mapping is capped so that
+   the largest steady-state peak frequency gain of the retained EQ (over
+   every model, the Bias extremes and the three rates, computed from the
+   filter tables and declared in `tapeConstants.ts`) times the Drive gain
+   never exceeds 4 for a full-scale sine at the control's maximum. Within
+   that range the guard does not engage for tones, impulses or steps; it
+   does engage for an adversarial sign sequence or an input above full
+   scale, and that is a clip at four times the knee level on a signal the
+   knee already compresses toward its asymptote, not a fault. The guard is
    not a tone-shaping limiter and does not precede the EQ. The integration
-   PR carries tests that push full-scale tones and bounded impulses and
-   steps through the retained EQ at every model, both Bias extremes and all
-   three rates, during a model crossfade and a Bias sweep, at maximum Drive,
-   and asserts the guard counter stays at zero and the field stays within
-   ±4; and a test above full scale that shows the guard engaging and the
-   core's reset counter staying at zero. The Drive control's visible range
-   and label are the UI issue's to settle (`reviewed`).
+   PR carries tests that push full-scale tones, impulses and steps through
+   the retained EQ at every model, both Bias extremes and all three rates,
+   during a model crossfade and a Bias sweep, at maximum Drive, and assert
+   the guard counter stays at zero and the core's reset counter stays at
+   zero; and tests that push the sign-of-impulse-response sequence and an
+   input above full scale, and assert the guard engages, the field at the
+   core stays within ±4, and the reset counter stays at zero. The Drive
+   control's visible range and label are the UI issue's to settle
+   (`reviewed`).
 4. **Latency: the fixed delay always applies, the dry path is matched, and
    transport delay stays part of the effect.** The FIR pair delays by
    `span` host samples (48, one millisecond at 48 kHz). That delay applies
@@ -91,6 +98,20 @@ the fastest honest path to a level-matched audition in the app.
    on tones at all nine sampled control points at 48 kHz on the existing
    gates. Its result informs the audition and closes or bounds milestone
    B's accuracy question; it does not change decisions 1 to 4.
+
+6. **The core's three internal controls are fixed per tape model.** The
+   researched core has three internal controls (drive, width, saturation,
+   each in [0,1], mapped to its `a`, `c` and `Ms`), and the research
+   records say their 0.5 values are not product defaults. Windsor's Drive
+   is the source-field gain of decision 3, not the core's drive control,
+   and no new knob is added. Each tape model row in `tapeConstants.ts`
+   carries its three fixed core control values. Every model starts at the
+   research centre 0.5 / 0.5 / 0.5, a sampled point of the survival domain,
+   so identical Tape settings always give identical hysteresis, and a test
+   pins the mapping at every model. Giving models different values is sound
+   design for the audition PR (`reviewed`), constrained to the sampled
+   control points of the dynamic-survival record until a wider domain is
+   qualified.
 
 ## Consequences for E
 
