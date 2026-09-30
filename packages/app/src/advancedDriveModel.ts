@@ -1,5 +1,6 @@
 /** Immutable nested stage edits: hidden stages and other inserts remain untouched. */
 import type { AdvancedDriveSpec, DriveStageSpec } from '@windsor/engine';
+import { matchingAdvancedDrivePreset } from '@windsor/engine';
 import {
   DRIVE_MAIN_PAGE,
   DRIVE_MOD_PAGE,
@@ -17,6 +18,15 @@ export function editDriveStage<K extends keyof DriveStageSpec>(
     ...spec,
     stages: spec.stages.map((stage, i) => (i === index ? { ...stage, [key]: value } : stage)),
   };
+}
+
+/**
+ * The Starting point picker's value for `spec`: the preset it matches, or
+ * `''` for Custom. The card sets the picker from this after every commit, so
+ * any edit to a field a preset sets shows Custom.
+ */
+export function driveStartingPoint(spec: AdvancedDriveSpec): string {
+  return matchingAdvancedDrivePreset(spec) ?? '';
 }
 
 /** One of Advanced Drive's pages: Main, a stage by its 0-based index, or Mod. */

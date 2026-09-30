@@ -20,7 +20,6 @@ import {
   DRIVE_DIVISIONS,
   ADVANCED_DRIVE_PRESETS,
   applyAdvancedDrivePreset,
-  matchingAdvancedDrivePreset,
 } from '@windsor/engine';
 import type { AdvancedDriveSpec, DriveStageSpec } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -30,7 +29,7 @@ import { insertChange, insertsOf } from './insertTarget';
 import { driveSelect, driveToggle, driveKnob } from './advancedDriveControls';
 import { drivePlots } from './advancedDrivePlots';
 import type { DrivePage } from './advancedDriveModel';
-import { drivePages, editDriveStage } from './advancedDriveModel';
+import { drivePages, driveStartingPoint, editDriveStage } from './advancedDriveModel';
 import {
   DRIVE_GLOBAL_FIELDS,
   DRIVE_STAGE_FIELDS,
@@ -57,27 +56,29 @@ type StageNumber = keyof typeof DRIVE_STAGE_BOUNDS;
 
 interface DriveView {
   current(): AdvancedDriveSpec;
-  /** Send `spec`; with `render`, render the rack after (the pages may change). */
+  /**
+   * Send `spec`, then run `afterCommit`; with `render`, render the rack after
+   * (the pages may change).
+   */
   commit(spec: AdvancedDriveSpec, render?: boolean): void;
+  /** Set by the Main page: refreshes its Starting point after every commit, from any control. */
+  afterCommit?: () => void;
 }
 
 const HZ_FIELDS: ReadonlySet<string> = new Set(['pivot', 'low', 'high', 'rate', 'frequency']);
 
-/** The global knob for `key`, labelled `label`; `onKnob` runs after each turn. */
+/** The global knob for `key`, labelled `label`. */
 function globalKnob(
   view: DriveView,
   [key, label]: readonly [GlobalNumber, string],
-  o: { readonly onKnob?: () => void; readonly big?: boolean | undefined } = {},
+  o: { readonly big?: boolean | undefined } = {},
 ): HTMLElement {
   return driveKnob({
     label,
     bounds: ADVANCED_DRIVE_BOUNDS[key],
     def: DEFAULT_ADVANCED_DRIVE[key],
     get: () => view.current()[key],
-    set: (value) => {
-      view.commit({ ...view.current(), [key]: value });
-      o.onKnob?.();
-    },
+    set: (value) => view.commit({ ...view.current(), [key]: value }),
     hz: HZ_FIELDS.has(key),
     big: o.big,
   });
@@ -114,12 +115,12 @@ function mainPage(view: DriveView): HTMLElement {
   const preset = driveSelect(
     'Starting point',
     ['', ...ADVANCED_DRIVE_PRESETS.map((p) => p.id)],
-    matchingAdvancedDrivePreset(spec) ?? '',
+    driveStartingPoint(spec),
     (id) => view.commit(applyAdvancedDrivePreset(view.current(), id), true),
     ['Custom', ...ADVANCED_DRIVE_PRESETS.map((p) => p.label)],
   );
-  const showMatch = (): void => {
-    preset.querySelector('select')!.value = matchingAdvancedDrivePreset(view.current()) ?? '';
+  view.afterCommit = (): void => {
+    preset.querySelector('select')!.value = driveStartingPoint(view.current());
   };
   const routing = driveSelect(
     'Routing',
@@ -131,17 +132,14 @@ function mainPage(view: DriveView): HTMLElement {
   const compensation = driveToggle('Tone compensation', spec.compensation, (on) =>
     view.commit({ ...view.current(), compensation: on }),
   );
-  const knob = (key: GlobalNumber): HTMLElement =>
-    globalKnob(view, byKey(key), { onKnob: showMatch });
-  const routeKnobs = DRIVE_ROUTE_FIELDS[spec.route].map((field) =>
-    globalKnob(view, field, { onKnob: showMatch }),
-  );
+  const knob = (key: GlobalNumber): HTMLElement => globalKnob(view, byKey(key));
+  const routeKnobs = DRIVE_ROUTE_FIELDS[spec.route].map((field) => globalKnob(view, field));
   return insertPage(
     fitColumn(preset, routing, compensation),
     insertColumn(knob('drive'), knob('output')),
     insertColumn(knob('tone'), knob('pivot')),
     ...knobColumns(routeKnobs),
-    insertColumn(globalKnob(view, byKey('mix'), { onKnob: showMatch, big: true })),
+    insertColumn(globalKnob(view, byKey('mix'), { big: true })),
     wideColumn(insertNote(DRIVE_ROUTE_DIAGRAMS[DRIVE_ROUTES.indexOf(spec.route)]!)),
   );
 }
@@ -224,7 +222,9 @@ export const advancedDriveCard: InsertCard = (ctx: AppCtx, target: InsertTarget,
       const inserts = [...insertsOf(ctx, target)];
       if (inserts[index]?.kind !== 'advanced-drive') return;
       inserts[index] = spec;
-      if (ctx.change(insertChange(target, inserts)).ok && render) ctx.render();
+      if (!ctx.change(insertChange(target, inserts)).ok) return;
+      view.afterCommit?.();
+      if (render) ctx.render();
     },
   };
   return drivePages(view.current().route).map((page): InsertPage => ({

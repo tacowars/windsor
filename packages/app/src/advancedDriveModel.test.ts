@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_ADVANCED_DRIVE, DRIVE_ROUTES } from '@windsor/engine';
-import { drivePages, editDriveStage } from './advancedDriveModel';
+import {
+  ADVANCED_DRIVE_PRESETS,
+  DEFAULT_ADVANCED_DRIVE,
+  DRIVE_DIVISIONS,
+  DRIVE_FILTERS,
+  DRIVE_LFO_SHAPES,
+  DRIVE_ROUTES,
+  DRIVE_SHAPERS,
+  applyAdvancedDrivePreset,
+} from '@windsor/engine';
+import type { AdvancedDriveSpec } from '@windsor/engine';
+import { drivePages, driveStartingPoint, editDriveStage } from './advancedDriveModel';
 import { DRIVE_ROUTE_STAGES } from './advancedDriveTables';
 import { emptyRack, showPage, viewAt } from './insertRackModel';
 
@@ -71,4 +81,40 @@ it('stage edits round-trip through both part and master document partials', () =
         : { parts: { [slot]: { strip: { inserts: [edited] } } } },
     );
   }
+});
+
+describe('driveStartingPoint (windsor#173 fix round)', () => {
+  const other = <T>(list: readonly T[], now: T): T => list.find((v) => v !== now)!;
+  const STAGE_SWITCHES = ['enabled', 'shaping', 'filtering', 'pre'] as const;
+  const DIVISIONS = Object.keys(DRIVE_DIVISIONS) as AdvancedDriveSpec['division'][];
+  const edits = (p: AdvancedDriveSpec): [string, AdvancedDriveSpec][] => [
+    ['compensation', { ...p, compensation: !p.compensation }],
+    ['sync', { ...p, sync: !p.sync }],
+    ['route', { ...p, route: other(DRIVE_ROUTES, p.route) }],
+    ['division', { ...p, division: other(DIVISIONS, p.division) }],
+    ['wave', { ...p, wave: other(DRIVE_LFO_SHAPES, p.wave) }],
+    ...p.stages.flatMap((s, i): [string, AdvancedDriveSpec][] => [
+      ...STAGE_SWITCHES.map((key): [string, AdvancedDriveSpec] => [
+        `stage ${i} ${key}`,
+        editDriveStage(p, i, key, !s[key]),
+      ]),
+      [`stage ${i} shaper`, editDriveStage(p, i, 'shaper', other(DRIVE_SHAPERS, s.shaper))],
+      [`stage ${i} filter`, editDriveStage(p, i, 'filter', other(DRIVE_FILTERS, s.filter))],
+    ]),
+  ];
+
+  it('names each preset right after it is applied', () => {
+    for (const preset of ADVANCED_DRIVE_PRESETS) {
+      const applied = applyAdvancedDrivePreset(DEFAULT_ADVANCED_DRIVE, preset.id);
+      expect(driveStartingPoint(applied)).toBe(preset.id);
+    }
+  });
+
+  it('shows Custom after any switch or picker changes a preset', () => {
+    for (const preset of ADVANCED_DRIVE_PRESETS) {
+      const applied = applyAdvancedDrivePreset(DEFAULT_ADVANCED_DRIVE, preset.id);
+      for (const [name, edited] of edits(applied))
+        expect(driveStartingPoint(edited), `${preset.id}: ${name}`).toBe('');
+    }
+  });
 });
