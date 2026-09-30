@@ -1,16 +1,45 @@
-/** Base transfer and magnitude response use engine functions; modulation is labelled separately. */
+/**
+ * Base transfer and magnitude response use engine functions; modulation is
+ * labelled separately. In the rack (windsor#174 decision 4) the two plots
+ * stand stacked in one column and take their size from it: the SVG stretches
+ * to the box, and its line keeps its width.
+ */
 import { driveShape, DriveFilter, DRIVE_SHAPERS, DRIVE_DSP } from '@windsor/engine';
 import type { DriveStageSpec } from '@windsor/engine';
 import { DRIVE_PLOT as P } from './advancedDriveTables';
-import { STRIP_COLOR } from './consoleColors';
 import { el } from './dom';
-function plot(label: string, sample: (x: number) => number): HTMLElement {
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function line(svg: SVGSVGElement, [x1, y1, x2, y2]: readonly number[]): void {
+  const rule = document.createElementNS(SVG_NS, 'line');
+  rule.setAttribute('class', 'drive-plot-grid');
+  rule.setAttribute('x1', String(x1));
+  rule.setAttribute('y1', String(y1));
+  rule.setAttribute('x2', String(x2));
+  rule.setAttribute('y2', String(y2));
+  svg.appendChild(rule);
+}
+
+interface PlotSpec {
+  readonly label: string;
+  /** Where the grid's two rules cross, as shares of the width and of the height from the bottom. */
+  readonly origin: readonly [x: number, y: number];
+  readonly sample: (x: number) => number;
+}
+
+function plot(name: string, { label, origin, sample }: PlotSpec): HTMLElement {
   const root = el('div', 'drive-plot');
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  root.title = label;
+  const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${P.width} ${P.height}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', label);
-  const path = document.createElementNS(svg.namespaceURI, 'path');
+  const [ox, oy] = [origin[0] * P.width, (1 - origin[1]) * P.height];
+  line(svg, [0, oy, P.width, oy]);
+  line(svg, [ox, 0, ox, P.height]);
+  const path = document.createElementNS(SVG_NS, 'path');
   let d = '';
   for (let i = 0; i <= P.points; i++) {
     const x = i / P.points,
@@ -18,15 +47,14 @@ function plot(label: string, sample: (x: number) => number): HTMLElement {
     d += `${i ? 'L' : 'M'}${x * P.width},${(1 - y) * P.height} `;
   }
   path.setAttribute('d', d);
-  path.setAttribute('fill', 'none');
-  path.setAttribute('stroke', STRIP_COLOR);
-  path.setAttribute('stroke-width', '2');
+  path.setAttribute('class', 'drive-plot-line');
   svg.appendChild(path);
-  root.append(el('div', 'hint', label), svg);
+  root.append(el('span', 'drive-plot-name', name), svg);
   return root;
 }
-export function drivePlots(stage: DriveStageSpec): HTMLElement {
-  const root = el('div', 'knob-row');
+
+/** The stage's shaper and filter plots, in that order. */
+export function drivePlots(stage: DriveStageSpec): HTMLElement[] {
   const filter = new DriveFilter();
   filter.configure({
     type: stage.filter,
@@ -35,22 +63,34 @@ export function drivePlots(stage: DriveStageSpec): HTMLElement {
     gain: stage.peak,
     rate: P.rate * DRIVE_DSP.oversample,
   });
-  root.append(
-    plot('Base shaper · before modulation and DC removal', (x) => {
-      const input = 2 * x - 1;
-      const output =
-        stage.enabled && stage.shaping
-          ? driveShape(input, DRIVE_SHAPERS.indexOf(stage.shaper), stage.amount, stage.bias)
-          : input;
-      return (output + 1) / 2;
+  return [
+    plot('Shaper', {
+      label: 'Base shaper · before modulation and DC removal',
+      origin: [P.shaperOrigin, P.shaperOrigin],
+      sample: (x) => {
+        const input = 2 * x - 1;
+        const output =
+          stage.enabled && stage.shaping
+            ? driveShape(input, DRIVE_SHAPERS.indexOf(stage.shaper), stage.amount, stage.bias)
+            : input;
+        return (output + 1) / 2;
+      },
     }),
-    plot('Base filter · 48 kHz reference · −36 to +24 dB', (x) => {
-      const hz = P.minHz * (P.maxHz / P.minHz) ** x;
-      const magnitude =
-        stage.enabled && stage.filtering ? filter.magnitude(hz, P.rate * DRIVE_DSP.oversample) : 1;
-      const db = P.dbScale * Math.log10(Math.max(Number.EPSILON, magnitude));
-      return (db - P.minDb) / (P.maxDb - P.minDb);
+    plot('Filter', {
+      label: 'Base filter · 48 kHz reference · −36 to +24 dB',
+      origin: [
+        Math.log(P.gridHz / P.minHz) / Math.log(P.maxHz / P.minHz),
+        -P.minDb / (P.maxDb - P.minDb),
+      ],
+      sample: (x) => {
+        const hz = P.minHz * (P.maxHz / P.minHz) ** x;
+        const magnitude =
+          stage.enabled && stage.filtering
+            ? filter.magnitude(hz, P.rate * DRIVE_DSP.oversample)
+            : 1;
+        const db = P.dbScale * Math.log10(Math.max(Number.EPSILON, magnitude));
+        return (db - P.minDb) / (P.maxDb - P.minDb);
+      },
     }),
-  );
-  return root;
+  ];
 }

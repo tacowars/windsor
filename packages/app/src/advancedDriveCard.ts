@@ -1,4 +1,13 @@
-/** Advanced Drive edits the real song insert; local stage selection is editor-only. */
+/**
+ * Advanced Drive edits the real song insert, as pages in the rack
+ * (windsor#174, record `2026-09-30-insert-rack-and-send-bus-chains`
+ * decision 3): Main (starting point, routing, tone compensation, the route
+ * and the global knobs), one Stage page per stage the routing uses (its
+ * switches, pickers, six knobs, both plots, then its six modulation
+ * amounts), and Mod (the modulation sources). The on/off switch is the
+ * rack's rail. A routing or starting-point change renders the rack, so the
+ * Stage pages follow it; every other edit keeps the page as it is.
+ */
 import {
   DEFAULT_ADVANCED_DRIVE,
   DEFAULT_DRIVE_STAGE,
@@ -11,208 +20,216 @@ import {
   DRIVE_DIVISIONS,
   ADVANCED_DRIVE_PRESETS,
   applyAdvancedDrivePreset,
-  matchingAdvancedDrivePreset,
 } from '@windsor/engine';
 import type { AdvancedDriveSpec, DriveStageSpec } from '@windsor/engine';
-import type { InsertCard } from './insertCards';
+import type { AppCtx } from './context';
+import type { InsertCard, InsertPage } from './insertCards';
+import type { InsertTarget } from './insertTarget';
 import { insertChange, insertsOf } from './insertTarget';
-import { el } from './dom';
-import type { KnobElement } from './knob';
 import { driveSelect, driveToggle, driveKnob } from './advancedDriveControls';
 import { drivePlots } from './advancedDrivePlots';
-import { editDriveStage } from './advancedDriveModel';
+import type { DrivePage } from './advancedDriveModel';
+import { drivePages, driveStartingPoint, editDriveStage } from './advancedDriveModel';
 import {
   DRIVE_GLOBAL_FIELDS,
   DRIVE_STAGE_FIELDS,
   DRIVE_SOURCE_FIELDS,
   DRIVE_MOD_FIELDS,
+  DRIVE_ROUTE_FIELDS,
   DRIVE_ROUTE_LABELS,
   DRIVE_ROUTE_DIAGRAMS,
+  DRIVE_SOURCE_HELP,
+  DRIVE_SOURCE_NOTE,
 } from './advancedDriveTables';
+import {
+  fitColumn,
+  insertColumn,
+  insertNote,
+  insertPage,
+  insertRule,
+  knobColumns,
+  wideColumn,
+} from './insertLayout';
 
 type GlobalNumber = keyof typeof ADVANCED_DRIVE_BOUNDS;
 type StageNumber = keyof typeof DRIVE_STAGE_BOUNDS;
+
 interface DriveView {
   current(): AdvancedDriveSpec;
-  commit(spec: AdvancedDriveSpec, redraw?: boolean): void;
-  selected: number;
-  plots: HTMLElement;
-  root: HTMLElement;
-  draw(): void;
+  /**
+   * Send `spec`, then run `afterCommit`; with `render`, render the rack after
+   * (the pages may change).
+   */
+  commit(spec: AdvancedDriveSpec, render?: boolean): void;
+  /** Set by the Main page: refreshes its Starting point after every commit, from any control. */
+  afterCommit?: () => void;
 }
-function globalKnobs(
+
+const HZ_FIELDS: ReadonlySet<string> = new Set(['pivot', 'low', 'high', 'rate', 'frequency']);
+
+/** The global knob for `key`, labelled `label`. */
+function globalKnob(
   view: DriveView,
-  fields: readonly (readonly [GlobalNumber, string])[],
+  [key, label]: readonly [GlobalNumber, string],
+  o: { readonly big?: boolean | undefined } = {},
 ): HTMLElement {
-  const row = el('div', 'knob-row');
-  for (const [key, label] of fields)
-    row.append(
-      driveKnob({
-        label,
-        bounds: ADVANCED_DRIVE_BOUNDS[key],
-        def: DEFAULT_ADVANCED_DRIVE[key],
-        get: () => view.current()[key],
-        set: (value) => view.commit({ ...view.current(), [key]: value }),
-        hz: key === 'pivot' || key === 'low' || key === 'high' || key === 'rate',
-      }),
-    );
-  return row;
+  return driveKnob({
+    label,
+    bounds: ADVANCED_DRIVE_BOUNDS[key],
+    def: DEFAULT_ADVANCED_DRIVE[key],
+    get: () => view.current()[key],
+    set: (value) => view.commit({ ...view.current(), [key]: value }),
+    hz: HZ_FIELDS.has(key),
+    big: o.big,
+  });
 }
+
+/** The knobs of `fields` on the stage at `stage`, two to a column; `onKnob` runs after each turn. */
 function stageKnobs(
   view: DriveView,
+  stage: number,
   fields: readonly (readonly [StageNumber, string])[],
-): HTMLElement {
-  const row = el('div', 'knob-row');
-  for (const [key, label] of fields)
-    row.append(
-      driveKnob({
-        label,
-        bounds: DRIVE_STAGE_BOUNDS[key],
-        def: DEFAULT_DRIVE_STAGE[key],
-        get: () => view.current().stages[view.selected]![key],
-        set: (value) => {
-          view.commit(editDriveStage(view.current(), view.selected, key, value));
-          view.plots.replaceChildren(drivePlots(view.current().stages[view.selected]!));
-        },
-        hz: key === 'frequency',
-      }),
-    );
-  return row;
+  onKnob?: () => void,
+): HTMLElement[] {
+  const knobs = fields.map(([key, label]) =>
+    driveKnob({
+      label,
+      bounds: DRIVE_STAGE_BOUNDS[key],
+      def: DEFAULT_DRIVE_STAGE[key],
+      get: () => view.current().stages[stage]![key],
+      set: (value) => {
+        view.commit(editDriveStage(view.current(), stage, key, value));
+        onKnob?.();
+      },
+      hz: HZ_FIELDS.has(key),
+    }),
+  );
+  return knobColumns(knobs);
 }
-function sources(view: DriveView): HTMLElement {
-  const root = el('details', 'drive-section'),
-    spec = view.current();
-  root.append(el('summary', '', 'Modulation sources'), globalKnobs(view, DRIVE_SOURCE_FIELDS));
-  const row = el('div', 'knob-row');
-  row.append(
-    driveToggle('Sync LFO', spec.sync, (sync) => view.commit({ ...view.current(), sync }, true)),
+
+const byKey = (key: GlobalNumber): readonly [GlobalNumber, string] =>
+  [...DRIVE_GLOBAL_FIELDS, ...DRIVE_SOURCE_FIELDS].find(([k]) => k === key)!;
+
+function mainPage(view: DriveView): HTMLElement {
+  const spec = view.current();
+  const preset = driveSelect(
+    'Starting point',
+    ['', ...ADVANCED_DRIVE_PRESETS.map((p) => p.id)],
+    driveStartingPoint(spec),
+    (id) => view.commit(applyAdvancedDrivePreset(view.current(), id), true),
+    ['Custom', ...ADVANCED_DRIVE_PRESETS.map((p) => p.label)],
+  );
+  view.afterCommit = (): void => {
+    preset.querySelector('select')!.value = driveStartingPoint(view.current());
+  };
+  const routing = driveSelect(
+    'Routing',
+    DRIVE_ROUTES,
+    spec.route,
+    (route) => view.commit({ ...view.current(), route: route as AdvancedDriveSpec['route'] }, true),
+    DRIVE_ROUTE_LABELS,
+  );
+  const compensation = driveToggle('Tone compensation', spec.compensation, (on) =>
+    view.commit({ ...view.current(), compensation: on }),
+  );
+  const knob = (key: GlobalNumber): HTMLElement => globalKnob(view, byKey(key));
+  const routeKnobs = DRIVE_ROUTE_FIELDS[spec.route].map((field) => globalKnob(view, field));
+  return insertPage(
+    fitColumn(preset, routing, compensation),
+    insertColumn(knob('drive'), knob('output')),
+    insertColumn(knob('tone'), knob('pivot')),
+    ...knobColumns(routeKnobs),
+    insertColumn(globalKnob(view, byKey('mix'), { big: true })),
+    wideColumn(insertNote(DRIVE_ROUTE_DIAGRAMS[DRIVE_ROUTES.indexOf(spec.route)]!)),
+  );
+}
+
+function stagePage(view: DriveView, stage: number): HTMLElement {
+  const now = (): DriveStageSpec => view.current().stages[stage]!;
+  const plots = insertColumn();
+  plots.classList.add('drive-plots');
+  const draw = (): void => plots.replaceChildren(...drivePlots(now()));
+  const set = <K extends keyof DriveStageSpec>(key: K, value: DriveStageSpec[K]): void => {
+    view.commit(editDriveStage(view.current(), stage, key, value));
+    draw();
+  };
+  const s = now();
+  const switches = fitColumn(
+    driveToggle('Stage on', s.enabled, (v) => set('enabled', v)),
+    driveToggle('Shaper on', s.shaping, (v) => set('shaping', v)),
+    driveToggle('Filter on', s.filtering, (v) => set('filtering', v)),
+    driveToggle('Filter before shaper', s.pre, (v) => set('pre', v)),
+  );
+  const pickers = wideColumn(
+    driveSelect('Shaper', DRIVE_SHAPERS, s.shaper, (v) =>
+      set('shaper', v as DriveStageSpec['shaper']),
+    ),
+    driveSelect('Filter', DRIVE_FILTERS, s.filter, (v) =>
+      set('filter', v as DriveStageSpec['filter']),
+    ),
+  );
+  draw();
+  return insertPage(
+    switches,
+    pickers,
+    ...stageKnobs(view, stage, DRIVE_STAGE_FIELDS, draw),
+    plots,
+    insertRule(),
+    ...stageKnobs(view, stage, DRIVE_MOD_FIELDS),
+  );
+}
+
+function modPage(view: DriveView): HTMLElement {
+  const spec = view.current();
+  const rate = globalKnob(view, byKey('rate'));
+  const dimRate = (): void => {
+    rate.classList.toggle('dim', view.current().sync);
+  };
+  dimRate();
+  const sources = wideColumn(
+    driveToggle('Sync LFO', spec.sync, (sync) => {
+      view.commit({ ...view.current(), sync });
+      dimRate();
+    }),
     driveSelect('Division', Object.keys(DRIVE_DIVISIONS), spec.division, (division) =>
       view.commit({ ...view.current(), division: division as AdvancedDriveSpec['division'] }),
     ),
     driveSelect('Wave', DRIVE_LFO_SHAPES, spec.wave, (wave) =>
       view.commit({ ...view.current(), wave: wave as AdvancedDriveSpec['wave'] }),
     ),
+    insertNote(DRIVE_SOURCE_NOTE, DRIVE_SOURCE_HELP),
   );
-  root.append(
-    row,
-    el(
-      'p',
-      'hint',
-      'Envelope follows this insert’s stereo input. Cutoff modulation is in octaves. LFO Hz applies when Sync is off.',
-    ),
+  return insertPage(
+    insertColumn(globalKnob(view, byKey('attack')), globalKnob(view, byKey('release'))),
+    insertColumn(globalKnob(view, byKey('sensitivity')), rate),
+    sources,
   );
-  return root;
 }
-function stagePanel(view: DriveView): HTMLElement {
-  const spec = view.current(),
-    stage = spec.stages[view.selected]!;
-  const root = el('div', 'drive-section'),
-    tabs = el('div', 'knob-row');
-  const names =
-    spec.route === 'multiband'
-      ? ['Low', 'Mid', 'High']
-      : spec.route === 'mid-side'
-        ? ['Mid', 'Side']
-        : spec.route === 'single'
-          ? ['Stage 1']
-          : ['Stage 1', 'Stage 2'];
-  names.forEach((name, i) => {
-    const button = el('button', i === view.selected ? 'btn active' : 'btn', name);
-    button.setAttribute('aria-pressed', String(i === view.selected));
-    button.onclick = (): void => {
-      view.selected = i;
-      view.draw();
-    };
-    tabs.append(button);
-  });
-  const row = el('div', 'knob-row');
-  const set = <K extends keyof DriveStageSpec>(key: K, value: DriveStageSpec[K]): void =>
-    view.commit(editDriveStage(view.current(), view.selected, key, value), true);
-  row.append(
-    driveToggle('Stage on', stage.enabled, (v) => set('enabled', v)),
-    driveToggle('Shaper on', stage.shaping, (v) => set('shaping', v)),
-    driveSelect('Shaper', DRIVE_SHAPERS, stage.shaper, (v) =>
-      set('shaper', v as DriveStageSpec['shaper']),
-    ),
-    driveToggle('Filter on', stage.filtering, (v) => set('filtering', v)),
-    driveSelect('Filter', DRIVE_FILTERS, stage.filter, (v) =>
-      set('filter', v as DriveStageSpec['filter']),
-    ),
-    driveToggle('Filter before shaper', stage.pre, (v) => set('pre', v)),
-  );
-  view.plots = el('div');
-  view.plots.append(drivePlots(stage));
-  const mod = el('details', 'drive-section');
-  mod.append(el('summary', '', 'Stage modulation amounts'), stageKnobs(view, DRIVE_MOD_FIELDS));
-  root.append(tabs, row, stageKnobs(view, DRIVE_STAGE_FIELDS), view.plots, mod);
-  return root;
+
+function pageBody(view: DriveView, page: DrivePage): HTMLElement {
+  if (page.kind === 'main') return mainPage(view);
+  if (page.kind === 'stage') return stagePage(view, page.stage);
+  return modPage(view);
 }
-function drawDrive(view: DriveView): void {
-  const spec = view.current();
-  if (spec.route === 'single') view.selected = 0;
-  else if (spec.route !== 'multiband') view.selected = Math.min(1, view.selected);
-  const row = el('div', 'knob-row');
-  row.append(
-    driveSelect(
-      'Starting point',
-      ['', ...ADVANCED_DRIVE_PRESETS.map((p) => p.id)],
-      matchingAdvancedDrivePreset(spec) ?? '',
-      (id) => view.commit(applyAdvancedDrivePreset(view.current(), id), true),
-      ['Custom', ...ADVANCED_DRIVE_PRESETS.map((p) => p.label)],
-    ),
-    driveToggle('Advanced Drive', spec.enabled, (enabled) =>
-      view.commit({ ...view.current(), enabled }, true),
-    ),
-    driveSelect(
-      'Routing',
-      DRIVE_ROUTES,
-      spec.route,
-      (route) =>
-        view.commit({ ...view.current(), route: route as AdvancedDriveSpec['route'] }, true),
-      DRIVE_ROUTE_LABELS,
-    ),
-    driveToggle('Tone compensation', spec.compensation, (compensation) =>
-      view.commit({ ...view.current(), compensation }),
-    ),
-  );
-  const route = el('div', 'hint', DRIVE_ROUTE_DIAGRAMS[DRIVE_ROUTES.indexOf(spec.route)]);
-  view.root.replaceChildren(row, route, globalKnobs(view, DRIVE_GLOBAL_FIELDS));
-  if (spec.route === 'multiband')
-    view.root.append(
-      globalKnobs(view, [
-        ['low', 'Low crossover Hz'],
-        ['high', 'High crossover Hz'],
-      ]),
-    );
-  if (spec.route === 'serial' || spec.route === 'parallel')
-    view.root.append(globalKnobs(view, [['blend', 'Blend']]));
-  view.root.append(stagePanel(view), sources(view));
-}
-export const advancedDriveCard: InsertCard = (ctx, target, index) => {
+
+export const advancedDriveCard: InsertCard = (ctx: AppCtx, target: InsertTarget, index) => {
   const view: DriveView = {
-    root: el('div', 'advanced-drive-card'),
-    plots: el('div'),
-    selected: 0,
     current: () => {
       const spec = insertsOf(ctx, target)[index];
       return spec?.kind === 'advanced-drive' ? spec : DEFAULT_ADVANCED_DRIVE;
     },
-    commit(spec, redraw = false): void {
+    commit(spec, render = false): void {
       const inserts = [...insertsOf(ctx, target)];
       if (inserts[index]?.kind !== 'advanced-drive') return;
       inserts[index] = spec;
       if (!ctx.change(insertChange(target, inserts)).ok) return;
-      if (redraw) view.draw();
-      else {
-        for (const knob of view.root.querySelectorAll<KnobElement>('.knob')) knob.refresh();
-        const picker = view.root.querySelector<HTMLSelectElement>(
-          'select[aria-label="Starting point"]',
-        );
-        if (picker) picker.value = matchingAdvancedDrivePreset(view.current()) ?? '';
-      }
+      view.afterCommit?.();
+      if (render) ctx.render();
     },
-    draw: () => drawDrive(view),
   };
-  view.draw();
-  return view.root;
+  return drivePages(view.current().route).map((page): InsertPage => ({
+    name: page.name,
+    ...(page.kind === 'stage' ? { title: page.title } : {}),
+    build: () => pageBody(view, page),
+  }));
 };

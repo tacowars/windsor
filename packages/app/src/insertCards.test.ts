@@ -33,6 +33,7 @@ import {
   DRIVE_KNOBS,
   ECHO_KNOBS,
   ENSEMBLE_KNOBS,
+  INSERT_GROUPS,
   INSERT_LABELS,
   PLATE_REVERB_KNOBS,
 } from './insertKnobTables';
@@ -45,6 +46,22 @@ describe('INSERT_CARDS', () => {
 
   it('labels every kind it can add', () => {
     expect(Object.keys(INSERT_LABELS).sort()).toEqual([...INSERT_KIND_NAMES].sort());
+  });
+
+  it('puts every kind in exactly one Add group, and no other name (windsor#173)', () => {
+    const grouped = INSERT_GROUPS.flatMap((group) => group.kinds);
+    expect([...grouped].sort()).toEqual([...INSERT_KIND_NAMES].sort());
+    expect(new Set(grouped).size).toBe(grouped.length);
+  });
+
+  it('groups the Add slot as decided: Drive, Dynamics, Modulation, Time, Space', () => {
+    expect(INSERT_GROUPS.map((group) => group.label)).toEqual([
+      'Drive',
+      'Dynamics',
+      'Modulation',
+      'Time',
+      'Space',
+    ]);
   });
 
   it('calls the return-derived kinds Plate reverb and Echo (windsor#171)', () => {

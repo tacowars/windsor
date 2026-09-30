@@ -18,6 +18,15 @@ export const KNOB_PAD_PX = 8;
  */
 export const KNOB_COMPACT_R = 10;
 export const KNOB_COMPACT_PAD_PX = 6;
+/**
+ * The insert rack's dials (windsor#173; the mockup's `.knob` and
+ * `.knob.big`, `docs/research/2026-09-30-insert-rack/mockup.html`): a 30 px
+ * dial for two to a column at the rack's height, and a 42 px one that
+ * stands alone in its column.
+ */
+export const KNOB_RACK_R = 12;
+export const KNOB_RACK_BIG_R = 18;
+export const KNOB_RACK_PAD_PX = 6;
 /** The face sits inside the track; the pin stops short of the rim. */
 export const FACE_INSET = 3.5;
 export const PIN_INSET = 5;

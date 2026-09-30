@@ -347,37 +347,559 @@ input {
   font-family: var(--f-num);
   font-weight: 400;
 }
-.insert-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  flex-basis: 100%;
-  padding-left: 124px;
-}
-.insert-box {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 4px 8px 6px;
-}
-.insert-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 2px;
-}
 .btn.nudge {
   padding: 2px 6px;
   min-width: 22px;
   line-height: 1;
 }
+
+/* ---------- the insert rack (windsor#173) ---------- */
+/* Record `2026-09-30-insert-rack-and-send-bus-chains`; the look is the
+   mockup's side-rail layout (docs/research/2026-09-30-insert-rack/mockup.html).
+   One row that never wraps and scrolls sideways; every insert is --rack-h
+   tall and as wide as its content. The sizes are custom properties
+   stripInserts.ts sets on the row from insertRackTables.ts. */
+.insert-row {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+  flex-basis: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 6px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  scrollbar-color: var(--line-bright) var(--inset);
+}
+.insert-box {
+  flex: none;
+  height: var(--rack-h);
+  display: flex;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.insert-box.off .insert-stack {
+  opacity: 0.4;
+}
+/* The rail: the switch at the top, the vertical name, ◀ ▶ ✕ at the bottom. */
+.insert-rail {
+  width: var(--rack-rail);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 0;
+  background: var(--panel-hi);
+  border-right: 1px solid var(--line);
+}
+.insert-box.folded {
+  width: var(--rack-fold);
+  cursor: pointer;
+}
+.insert-box.folded .insert-rail {
+  width: 100%;
+  border-right: 0;
+}
+.insert-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink-faint);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.insert-icon:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line-bright);
+}
+.insert-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.insert-icon.insert-power {
+  color: var(--modulator);
+  font-size: 12px;
+}
+.insert-box.off .insert-icon.insert-power {
+  color: var(--ink-faint);
+}
 .insert-name {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding: 1px 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r);
+  color: var(--ink);
   font-family: var(--f-panel);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.insert-name:hover {
+  background: var(--panel);
+}
+.insert-num {
+  margin-inline-end: 5px;
+  color: var(--ink-faint);
+}
+.insert-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: auto;
+}
+/* ◀ ▶ ✕ a little shorter than square, so the longest name fits the rail. */
+.insert-tools .insert-icon {
+  height: 16px;
+}
+/* The body: the page tabs, when there are two or more pages, over the page. */
+.insert-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.insert-tabs {
+  flex: none;
+  height: var(--rack-tabs-h);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.insert-tabs button {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.insert-tabs button:hover {
+  color: var(--ink);
+}
+.insert-tabs button[aria-selected='true'] {
+  background: var(--kc, var(--modulator));
+  color: var(--inset);
+}
+/* Every page fits the height: nothing scrolls inside an insert. */
+.insert-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* The keyboard's focus ring on every control in the rack (the mockup's). */
+.insert-row :focus-visible {
+  outline: 2px solid var(--carrier);
+  outline-offset: 1px;
+}
+/* Inside a page (decision 5, the mockup's .col): knobs in columns of two
+   spaced evenly down the height; a picker, a switch or a note in a wide
+   column; a plot or a meter in a column of its own. */
+.insert-page {
+  height: 100%;
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px 6px;
+}
+.insert-col {
+  flex: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  gap: 2px;
+}
+.insert-col.wide {
+  width: var(--rack-wide-col);
+  align-items: stretch;
+}
+/* A column of switches whose labels run longer than a picker. */
+.insert-col.wide.fit {
+  width: auto;
+  min-width: var(--rack-wide-col);
+}
+.insert-col.wide.fit select.field {
+  width: var(--rack-wide-col);
+}
+.insert-col.wide + .insert-col.wide {
+  margin-left: 6px;
+}
+.insert-col.wide + .insert-col:not(.wide) {
+  margin-left: 6px;
+}
+.insert-col.wide > .knob {
+  align-self: center;
+}
+/* The rule between a Stage page's own controls and its modulation amounts. */
+.insert-rule {
+  flex: none;
+  width: 1px;
+  margin: 6px;
+  background: var(--line);
+}
+/* The rack's dials (knob.ts's `dial`): the mockup's 30 px .knob and 42 px .knob.big. */
+.insert-row .knob.rack {
+  width: auto;
+  min-width: 54px;
+  gap: 0;
+  padding: 2px 3px;
+}
+.insert-row .knob.rack.big {
+  min-width: 64px;
+}
+.insert-row .knob .dial-arc {
+  stroke: var(--kc, var(--modulator));
+}
+.insert-row .knob .knob-val {
+  line-height: 13px;
+}
+.insert-row .knob .knob-label {
+  line-height: 11px;
+}
+.insert-row .knob.dim .knob-val {
+  color: var(--ink-faint);
+}
+/* A picker's label above it, and a group's label (the mockup's .field .lab). */
+.insert-row .field-label,
+.insert-row .field-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 11px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+/* A picker (the mockup's .fake-select): a real <select> drawn flat, its ▾
+   an SVG in --ink-faint (#5e6b70). */
+.insert-row select.field {
+  appearance: none;
+  width: 100%;
+  max-width: none;
+  height: 22px;
+  padding: 0 16px 0 6px;
+  background: var(--inset)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E")
+    no-repeat right 6px center;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  text-transform: none;
+  cursor: pointer;
+}
+.insert-row select.field:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* A switch (the mockup's .toggle): a real checkbox drawn as a filled square. */
+.insert-switch {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-dim);
+  font-family: var(--f-ui);
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.insert-switch input[type='checkbox'] {
+  appearance: none;
+  flex: none;
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  background: var(--inset);
+  border: 1px solid var(--line-bright);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.insert-switch input[type='checkbox']:checked {
+  background: var(--kc, var(--modulator));
+  border-color: var(--kc, var(--modulator));
+}
+/* A button in a page (the mockup's .btn-s): Tape's Randomize. */
+.insert-row .insert-col .btn {
+  padding: 4px 8px;
+  background: var(--inset);
+  border: 1px solid var(--line-bright);
+  color: var(--ink-dim);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+.insert-row .insert-col .btn:hover {
+  color: var(--ink);
+}
+.insert-note {
+  max-width: var(--rack-wide-col);
+  color: var(--ink-faint);
+  font-size: 10px;
+  line-height: 1.3;
+}
+/* Advanced Drive's shaper and filter plots, stacked in one column that
+   sizes them (windsor#174 decision 4). */
+.insert-col.drive-plots {
+  width: var(--rack-plot-w);
+  align-self: stretch;
+  justify-content: stretch;
+  align-items: stretch;
+  gap: 4px;
+}
+.drive-plot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.drive-plot-name {
+  flex: none;
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 11px;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.drive-plot svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: block;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.drive-plot-line {
+  fill: none;
+  stroke: var(--kc, var(--modulator));
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+.drive-plot-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+/* The Add slots at either end, and the picker one opens in its place. */
+.insert-add {
+  flex: none;
+  height: var(--rack-h);
+  width: var(--rack-add-w);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  border: 1px dashed var(--line-bright);
+  border-radius: 5px;
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.insert-add b {
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+}
+.insert-add:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+.insert-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.insert-picker {
+  flex: none;
+  height: var(--rack-h);
+  width: var(--rack-picker-w);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: 5px;
+}
+.insert-picker-head {
+  flex: none;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 0 8px;
+  background: var(--panel-hi);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--f-panel);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.insert-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  scrollbar-color: var(--line-bright) var(--panel);
+}
+.insert-picker-label {
+  padding: 5px 10px 2px;
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.insert-picker-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 3px 10px 3px 16px;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.insert-picker-item:hover,
+.insert-picker-item:focus-visible {
+  background: var(--panel-hi);
+}
+.insert-picker-item:focus-visible {
+  outline-offset: -2px;
+}
+/* The Bus compressor's gain reduction (the mockup's .meter): a --carrier
+   fill that hangs from the top, then its reading. */
+.insert-col:has(> .compressor-meter) {
+  align-self: stretch;
+}
+.compressor-meter {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 0 0;
+}
+.gr-meter {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  max-height: 118px;
+  width: 12px;
+  overflow: hidden;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.gr-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--carrier);
+  opacity: 0.8;
+  transform-origin: top;
+}
+.compressor-meter .readout {
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+/* A send bus (windsor#172; the mockup's .rack-line and .bus-head): its head
+   (name, Level, who sends to it) beside its rack. */
+.bus-line {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+.bus-line > .insert-row {
+  flex: 1;
+}
+.bus-head {
+  flex: none;
+  width: 112px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.bus-name {
+  align-self: stretch;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--f-panel);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.bus-dot {
+  color: var(--carrier);
+}
+.bus-sub {
+  color: var(--ink-faint);
+  font-size: 10.5px;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .bar-row {
@@ -1345,11 +1867,6 @@ select.field.compact {
 .pane-inserts .card-head:last-child {
   margin-bottom: 0;
 }
-/* The Mixer strip's name-column indent has no name column to clear in the Song pane. */
-.detail-pane .insert-row {
-  padding-left: 0;
-  align-items: flex-start;
-}
 .degrees {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -1453,12 +1970,6 @@ select.field.compact {
 }
 .knob:hover {
   background: var(--panel-hi);
-}
-.retro-reverb-card .knob {
-  width: 64px;
-}
-.tape-card .knob {
-  width: 80px;
 }
 .knob svg {
   display: block;
@@ -2252,37 +2763,4 @@ dialog select.field {
 .output-light.off {
   background: transparent;
   border-color: var(--ink-faint);
-}
-.compressor-meter {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 8px 0;
-}
-.compressor-meter meter {
-  width: 180px;
-  height: 8px;
-}
-.compressor-card .field-wrap {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-.advanced-drive-card {
-  min-width: 300px;
-}
-.drive-section {
-  margin-top: 10px;
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
-}
-.drive-plot {
-  flex: 1;
-  min-width: 180px;
-}
-.drive-plot svg {
-  width: 100%;
-  max-width: 300px;
-  background: var(--panel);
-  border: 1px solid var(--line-bright);
 }
