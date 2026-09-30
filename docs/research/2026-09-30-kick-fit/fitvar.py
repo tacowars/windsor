@@ -1,7 +1,9 @@
 import json, copy, numpy as np, scipy.optimize as so, sys, os
 from fit import render; import wfit; from wfit import wscore
 mach,START,REF,OUT,secs=sys.argv[1:6]; os.environ['SECS']=secs
-p1=json.load(open(START)) if START.endswith('.json') else json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),'../../../packages/engine/src/patches',START+'.json')))['patch']
+LIB=os.path.join(os.path.dirname(os.path.abspath(__file__)),'../../../packages/engine/src/patches')
+p1=json.load(open(START if START.endswith('.json') else os.path.join(LIB,START+'.json')))
+p1=p1.get('patch',p1)  # a library file wraps its patch; a fitted one is bare
 if mach=='909':
     wfit.EDGE.update(on=True,pre=0.0015)
     t0,tp,ta=4,150,float(sys.argv[6])
