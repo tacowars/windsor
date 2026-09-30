@@ -158,3 +158,157 @@ muted output, as in phase 3.
 Before the run, a smoke plan checked the harness: two configurations, one
 repeat each, written outside the repository. It is not the measurement,
 and none of its numbers appear here.
+
+## Environment
+
+Apple M1 arm64, Darwin 25.5.0, Node 24.21.0, Google Chrome 154.0.8037.58
+(`HeadlessChrome/154.0.0.0` user agent), headless with a muted
+destination; the output device is unverified. Real-time contexts ran at
+48 kHz with `baseLatency` 5.81 ms and `outputLatency` 32 ms. Neither
+`AudioContext.renderCapacity` nor the `AudioRenderCapacity` interface
+exists in this Chrome, and `performance` is absent in the worklet scope.
+Other sessions were active on the machine: the one-minute load average was
+3.61 before and 3.17 after. The run is one `browser.mjs` invocation,
+recorded in full in [`measurement.json`](measurement.json).
+
+## Result
+
+**Run.** The 900-second bound expired at 900.3 s. The page reported the
+program's hash as the recorded `0697150c…3006717a`, with a peak of
+-6.0000005 dBFS and 960,000 frames, so Node and Chrome timed the same
+input. All **14 real-time trials** and all **14 four-instance offline
+cells** completed, the latter with five repeats each. **23 of 28 offline
+cells** are measured. Five one-instance cells are **not measured**, the
+ones the declared order put last:
+
+- `rk4/4x/48s`, edits: one repeat of five.
+- `rk2/8x/48s` and `rk4/8x/48s`, steady and edits: none.
+
+No core reset, clip or non-finite output occurred in any record.
+
+**Offline mean cost.** Median ms per quantum, with the five repeats'
+range. Duty is the median render time over 20 s, steady / edits.
+
+| Configuration | Four, steady | Four, edits | Four, duty | One, steady | One, edits |
+|---|---:|---:|---:|---:|---:|
+| `legacy` | 0.178 (0.171–0.183) | 0.203 (0.200–0.211) | 6.7% / 7.6% | 0.051 | 0.058 |
+| `identity/4x/48s` | 0.552 (0.541–0.590) | 0.549 (0.545–0.568) | 20.7% / 20.6% | 0.157 | 0.161 |
+| `rk4/2x/48s` | 0.852 (0.826–0.891) | 0.832 (0.830–0.835) | 31.9% / 31.2% | 0.223 | 0.221 |
+| `rk4/4x/32` | 1.479 (1.456–1.530) | 1.457 (1.454–1.464) | 55.4% / 54.7% | 0.387 | 0.383 |
+| `rk4/4x/48s` | 1.687 (1.660–1.726) | 1.659 (1.657–1.730) | 63.3% / 62.2% | 0.439 | not measured |
+| `rk2/8x/48s` | 2.310 (2.276–2.407) | 2.276 (2.254–2.286) | 86.6% / 85.4% | not measured | not measured |
+| `rk4/8x/48s` | 3.313 (3.288–3.390) | 3.287 (3.212–3.316) | 124.2% / 123.3% | not measured | not measured |
+
+The one-instance ranges are in the report. `rk4/8x/48s` renders offline
+slower than real time.
+
+**Real-time trials, four instances.** Boundary load is phase 3's estimate.
+Batched busy is the four nodes' summed boundary counts per 64-quantum
+batch, in ms per quantum. Batched wall is the elapsed time per quantum, at
+a resolution of 0.016 ms. Each cell gives the mean over batches, then the
+maximum. Every trial had a peak span of 1 ms and **zero provable deadline
+misses**.
+
+| Configuration | Boundary load, steady / edits | Busy, steady | Busy, edits | Wall, steady | Wall, edits |
+|---|---:|---:|---:|---:|---:|
+| `legacy` | 5.7% / 6.7% | 0.153 / 0.172 | 0.176 / 0.219 | 2.672 / 2.734 | 2.671 / 2.734 |
+| `identity/4x/48s` | 19.4% / 19.4% | 0.517 / 0.578 | 0.516 / 0.594 | 2.671 / 2.734 | 2.671 / 2.734 |
+| `rk4/2x/48s` | 26.5% / 26.9% | 0.709 / 0.828 | 0.720 / 0.766 | 2.671 / 2.734 | 2.672 / 2.734 |
+| `rk4/4x/32` | 47.5% / 45.3% | 1.277 / 1.359 | 1.210 / 1.281 | 2.671 / 2.750 | 2.672 / 2.750 |
+| `rk4/4x/48s` | 51.1% / 49.6% | 1.362 / 1.469 | 1.327 / 1.406 | 2.671 / 2.750 | 2.671 / 2.734 |
+| `rk2/8x/48s` | 64.9% / 64.6% | 1.737 / 1.812 | 1.724 / 1.781 | 2.671 / 2.750 | 2.671 / 2.750 |
+| `rk4/8x/48s` | 90.9% / 94.8% | 2.433 / 2.516 | 2.545 / 2.719 | 2.671 / 2.766 | 2.693 / 2.766 |
+
+`renderCapacity` was absent in every trial, so no trial has an
+`averageLoad`, `peakLoad` or `underrunRatio`.
+
+**A correction to the declared reading of the wall counter.** The
+declaration said one batch above 2.667 ms plus the resolution proves that
+rendering fell behind. The data refute that reading. Even legacy, at
+6.7% load, has batches of 175 ms (2.734 ms per quantum) next to short
+ones. Batch boundaries are call starts, and calls start in device-callback
+bursts whose timing jitters by a few milliseconds, so one batch's excess
+is that jitter, not a lag. Only a trial's mean carries the pacing signal.
+The one mean clearly above the period is `rk4/8x/48s` with edits, at
+2.693 ms: its 704 batched quanta took about 18 ms longer than real time.
+
+**The two methods disagree in level.** The real-time batched-busy
+estimate is 0.73 to 0.94 of the offline median, lowest for the heaviest
+paths. The offline render runs on a different thread from the real-time
+audio thread, possibly at a different priority or on a different core
+class, and the boundary estimator has its own bias
+(`packages/engine/src/cost/audioLoad.ts`). This run does not separate
+those causes. The target rule uses the offline median, as declared. The
+real-time estimate would change no verdict, though it puts `rk4/4x/48s`
+near the line (1.362 / 1.327 ms) where the offline median is 1.687 /
+1.659 ms.
+
+## Target assessment
+
+The target is four instances at or under 1.33 ms per quantum, steady and
+with edits, on the offline median.
+
+| Configuration | Role | Mean | Peak |
+|---|---|---|---|
+| `legacy` | baseline | mean within target | unresolved: `renderCapacity` absent |
+| `identity/4x/48s` | filter only | mean within target | unresolved: `renderCapacity` absent |
+| `rk4/2x/48s` | candidate | **mean within target** | unresolved: `renderCapacity` absent |
+| `rk4/4x/32` | candidate | mean outside target | unresolved: `renderCapacity` absent |
+| `rk4/4x/48s` | candidate | mean outside target | unresolved: `renderCapacity` absent |
+| `rk2/8x/48s` | candidate | mean outside target | unresolved: `renderCapacity` absent |
+| `rk4/8x/48s` | candidate | mean outside target | unresolved: `renderCapacity` absent |
+
+No candidate is certified. Peak per-quantum cost is unresolved for every
+configuration: this Chrome has no `renderCapacity`, and neither `Date.now`
+counter can time one quantum.
+
+## Comparison with phase 2
+
+Four-instance duty as a multiple of legacy's:
+
+| Configuration | Steady | Edits |
+|---|---:|---:|
+| `identity/4x/48s` | 3.11× | 2.71× |
+| `rk4/2x/48s` | 4.79× | 4.10× |
+| `rk4/4x/32` | 8.31× | 7.18× |
+| `rk4/4x/48s` | 9.49× | 8.18× |
+| `rk2/8x/48s` | 12.99× | 11.22× |
+| `rk4/8x/48s` | 18.63× | 16.20× |
+
+The FIR pair alone, `identity/4x/48s`, is **32.7%** of `rk4/4x/48s`
+steady and **33.1%** with edits. #207's Node share for the span-32 pair
+was 20–23%; span 48 costs more, and this is a different engine context.
+
+**One path or two.** One magnetic path is within target on mean:
+**`rk4/2x/48s`**, at 0.852 ms steady and 0.832 ms with edits, 64% of the
+target. Every 4× and 8× candidate is outside it on mean, including the
+phase-3 filter at 4×. So the numbers do not force an inexpensive/magnetic
+pair, but they allow a single magnetic core for all uses only at 2×
+oversampling, with its peak cost unresolved and its accuracy not measured
+here. **No product path, solver, factor, filter or default is chosen.**
+
+## Still unresolved
+
+- Candidate accuracy on the corner tones, including whether RK4 at 2× is
+  accurate enough.
+- Peak per-quantum cost. It needs `renderCapacity` or another clock that
+  can time one quantum.
+- The gap between the offline mean and the real-time estimate.
+- The five one-instance cells this run did not reach.
+- Milestone D: the product field-bounding method and the latency and
+  bypass design, including the fixed `span`-sample delay.
+- Milestone E: the original shipping implementation and its own
+  measurement.
+- The audition.
+
+## Reproduce
+
+Run from the repo root on Node 24, with nothing else heavy on the machine:
+
+```bash
+node docs/research/2026-09-30-tape-browser-cost/browser.mjs
+npx vitest run scripts/lib/tapeBrowserCost.test.mjs
+```
+
+`TAPE_CHROME` overrides the Chrome path. The tests recompute every table
+in the report from its raw records and check the program's hash in Node.
