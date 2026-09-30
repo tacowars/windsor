@@ -16,6 +16,7 @@ import {
   DEFAULT_DRIVE,
   DEFAULT_ECHO,
   DEFAULT_ENSEMBLE,
+  DEFAULT_EQ,
   DEFAULT_PLATE_REVERB,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
@@ -26,7 +27,10 @@ import {
   INSERT_KINDS,
   INSERT_KIND_NAMES,
   REVERB_SPACE_RANGES,
+  eqResponseDb,
 } from '@windsor/engine';
+import { withoutInsertIds } from '@windsor/engine/__fixtures__/insertIds';
+import { addInsert } from './insertEdits';
 import { INSERT_CARDS } from './insertCards';
 import {
   CHORUS_KNOBS,
@@ -54,14 +58,40 @@ describe('INSERT_CARDS', () => {
     expect(new Set(grouped).size).toBe(grouped.length);
   });
 
-  it('groups the Add slot as decided: Drive, Dynamics, Modulation, Time, Space', () => {
+  it('groups the Add slot as decided: EQ, Drive, Dynamics, Modulation, Time, Space', () => {
     expect(INSERT_GROUPS.map((group) => group.label)).toEqual([
+      'EQ',
       'Drive',
       'Dynamics',
       'Modulation',
       'Time',
       'Space',
     ]);
+  });
+
+  it('lists Parametric EQ first, alone under EQ (windsor#199)', () => {
+    expect(INSERT_GROUPS[0]).toEqual({ label: 'EQ', kinds: ['eq'] });
+    expect(INSERT_LABELS.eq).toBe('Parametric EQ');
+  });
+
+  it('adds a flat EQ with bands 2–7 on, on a part, the master and both send buses', () => {
+    for (const target of [0, 'master', 'a', 'b'] as const) {
+      const [added] = addInsert([], 'eq', target);
+      expect(withoutInsertIds([added!]), String(target)).toEqual([DEFAULT_EQ]);
+      if (added?.kind !== 'eq') throw new Error('not an EQ');
+      expect(added.bands.map((band) => band.on)).toEqual([
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+      ]);
+      const flat = eqResponseDb(added, [20, 100, 1000, 10000, 20000], 48000, new Float64Array(5));
+      expect([...flat]).toEqual([0, 0, 0, 0, 0]);
+    }
   });
 
   it('calls the return-derived kinds Plate reverb and Echo (windsor#171)', () => {

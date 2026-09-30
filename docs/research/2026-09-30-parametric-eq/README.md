@@ -212,3 +212,48 @@ What still allocates, so rule 2 is not met in full:
   `Date.now()` twice a quantum, and V8 returns each reading as a new heap
   number: 32 bytes a quantum, measured. Every insert processor reports load
   the same way.
+
+## Chrome load
+
+windsor#199 registered the kind, so the EQ can now be read on the console's
+load meter (the header's CPU readout, `AudioSystem.readout().load`). Read on
+2026-09-30.
+
+- **Machine:** Apple M1 (MacBookAir10,1), macOS 26.5.1. The machine was busy
+  with other work throughout: the load average was 7.7 over its 8 cores.
+- **Browser:** Chrome 154 (user agent `HeadlessChrome/154.0.0.0`), the
+  project's headless Chrome through `chrome-devtools-mcp` 1.10.1
+  (`.mcp.json`).
+- **Backend:** Web Audio with AudioWorklets on the default output device,
+  at the context's 44.1 kHz; the dev server (`npm run dev`) on this branch.
+
+**The song.** A Windsor song holds at most eight parts (`MUSIC_PARTS_MAX`),
+so 16 parts cannot play. The reading instead puts 16 EQs on the eight parts
+there can be: eight parts on the Drift Pad patch (`pad-drift`), each a Grid
+at its defaults over the whole four-bar song, looped, and two EQs on every
+part's strip, each in the mockup's "Pad clean-up" state (1 Low cut 120 Hz
+24 dB Q 0.9, 3 Bell 320 Hz −3.5 dB Q 1.4, 4 Notch 1.24 kHz Q 8, 5 Bell
+3.2 kHz +2.5 dB Q 0.9, 7 High shelf 9 kHz +1.5 dB, 8 High cut 16 kHz 48 dB;
+2 and 6 off). The baseline is the same song with no inserts.
+
+**The procedure.** Each run reloads the page, imports the song, turns the
+audio on, starts the transport with the loop on, waits 4 s, then reads the
+meter's label once a second for 20 s. The runs alternate between the two
+songs, four of each.
+
+| Run | No EQ: median (range) | 16 EQs: median (range) |
+| --- | ---: | ---: |
+| 1 | 30 % (27 – 49) | 53 % (50 – 55) |
+| 2 | 53 % (46 – 65) | 53 % (51 – 56) |
+| 3 | 37 % (30 – 48) | 51 % (47 – 55) |
+| 4 | 34 % (26 – 57) | 51 % (49 – 53) |
+
+With 16 EQs the meter read 51 – 53 % in every run and reported no underrun.
+Without them it read 30 – 53 %, most often in the 30s; its spread is the busy
+machine, and one run read as high as the EQ runs. Taking the four
+baselines' median (35.5 %) against the EQ runs' (52 %), the 16 EQs added
+about 16 points. The meter is an estimator that over-reads the true load by
+roughly 2 – 3× (`cost/audioLoad.ts`), so this is an upper bound on the
+audio-thread cost, and a quieter machine should repeat it before a number is
+quoted as the EQ's cost. The Node figure above for 16 instances with four
+active bands each, 3.66 % of a quantum, is the offline counterpart.
