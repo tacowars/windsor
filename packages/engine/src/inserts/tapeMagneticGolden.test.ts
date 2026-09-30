@@ -8,6 +8,10 @@
  * `TapeOversampler` per channel at the centre row, at 2× and at 4×. The
  * interleaved Float64 output is hashed against
  * `__fixtures__/tapeMagneticGolden.json`, with the guard and reset counts.
+ * `__fixtures__/tapeMagneticGoldenSamples.json` keeps every `STRIDE`-th
+ * frame of each render (both channels, Float64, base64): the hash stays the
+ * pin, and on a mismatch the record says where the render left it (the
+ * first differing recorded sample, the largest difference and where).
  * A failure means the render changed; when that is intended, refresh with
  * `REFRESH` and say so in the PR. A refactor never refreshes it. The table
  * is pinned to `.nvmrc`'s Node major, as the other goldens are
@@ -31,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { buildSync } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import golden from '../__fixtures__/tapeMagneticGolden.json';
+import samples from '../__fixtures__/tapeMagneticGoldenSamples.json';
 import { representationChanges } from '../__fixtures__/generalizationTrace';
 import { TapeOversampler } from '../worklet/tape/tapeOversample';
 import { TAPE_DRIVE_GAIN, TAPE_MAGNETIC, driveGain } from './tapeMagneticConstants';
@@ -39,6 +44,9 @@ const REFRESH =
   'WINDSOR_REFRESH_TAPE_MAGNETIC_GOLDEN=1 npx vitest run packages/engine/src/inserts/tapeMagneticGolden.test.ts';
 const refreshing = process.env['WINDSOR_REFRESH_TAPE_MAGNETIC_GOLDEN'] === '1';
 const TABLE = fileURLToPath(new URL('../__fixtures__/tapeMagneticGolden.json', import.meta.url));
+const SAMPLES = fileURLToPath(
+  new URL('../__fixtures__/tapeMagneticGoldenSamples.json', import.meta.url),
+);
 const EXPECTED_MAJOR = readFileSync(new URL('../../../../.nvmrc', import.meta.url), 'utf8')
   .trim()
   .replace(/^v/, '')
@@ -47,6 +55,8 @@ const RUNNING_MAJOR = process.versions.node.split('.')[0];
 
 const RATE = 48000;
 const SECONDS = 2;
+/** The per-sample record keeps every `STRIDE`-th frame: 750 frames of each render, about 16 kB each. */
+const STRIDE = 128;
 
 /** The program: tones and a signed pulse under a Drive sweep from the lower bound to the upper. */
 function program(): [Float64Array, Float64Array] {
@@ -86,8 +96,67 @@ function render(factor: number) {
       leftResets: channels[0]!.core.resets,
       rightResets: channels[1]!.core.resets,
     },
+    record: record(interleaved),
     finite: interleaved.every(Number.isFinite),
   };
+}
+
+/** Every `STRIDE`-th frame of an interleaved stereo render, both channels. */
+function record(interleaved: Float64Array): Float64Array {
+  const frames = Math.ceil(interleaved.length / 2 / STRIDE);
+  const kept = new Float64Array(2 * frames);
+  for (let f = 0; f < frames; f++) {
+    kept[2 * f] = interleaved[2 * f * STRIDE]!;
+    kept[2 * f + 1] = interleaved[2 * f * STRIDE + 1]!;
+  }
+  return kept;
+}
+
+const encode = (values: Float64Array) =>
+  Buffer.from(values.buffer, values.byteOffset, values.byteLength).toString('base64');
+
+function decode(text: string | undefined): Float64Array | undefined {
+  if (text === undefined) return undefined;
+  const bytes = Buffer.from(text, 'base64');
+  return new Float64Array(
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  );
+}
+
+/**
+ * Where a render leaves the pinned record: the first recorded sample that
+ * differs (by bits: -0 differs from 0), the largest absolute difference and
+ * where, and the guard and reset counts against the pinned ones.
+ */
+function diagnose(result: ReturnType<typeof render>, factor: number): string {
+  const name = `${factor}x`;
+  const actual = result.record;
+  const pinned = decode((samples.renders as Record<string, string | undefined>)[name]);
+  const counts = `guards L/R ${result.pinned.leftGuards}/${result.pinned.rightGuards}, resets L/R ${result.pinned.leftResets}/${result.pinned.rightResets}`;
+  const was = (golden.renders as Record<string, typeof result.pinned | undefined>)[name];
+  const pinnedCounts = was
+    ? ` (pinned ${was.leftGuards}/${was.rightGuards} and ${was.leftResets}/${was.rightResets})`
+    : '';
+  if (!pinned || pinned.length !== actual.length)
+    return `${name}: no per-sample record to compare; ${counts}${pinnedCounts}`;
+  let first = -1;
+  let largest = 0;
+  let at = -1;
+  for (let i = 0; i < actual.length; i++) {
+    if (Object.is(actual[i], pinned[i])) continue;
+    if (first < 0) first = i;
+    const difference = Math.abs(actual[i]! - pinned[i]!);
+    if (!(difference <= largest)) {
+      largest = difference;
+      at = i;
+    }
+  }
+  const where = (i: number) => `frame ${(i >> 1) * STRIDE} ${i & 1 ? 'right' : 'left'}`;
+  const found =
+    first < 0
+      ? `every recorded sample (each ${STRIDE}th frame) matches, so the change is between them`
+      : `first differing recorded sample at ${where(first)}, largest |difference| ${largest} at ${where(at)} (each ${STRIDE}th frame recorded)`;
+  return `${name}: ${found}; ${counts}${pinnedCounts}`;
 }
 
 describe('the magnetic Tape golden', () => {
@@ -106,7 +175,8 @@ describe('the magnetic Tape golden', () => {
       expect(result.finite).toBe(true);
       if (refreshing) return;
       const pinned = (golden.renders as Record<string, unknown>)[`${factor}x`];
-      expect(result.pinned, `${factor}x changed; if intended, run ${REFRESH}`).toEqual(pinned);
+      const changed = `${factor}x changed (${diagnose(result, factor)}); if intended, run ${REFRESH}`;
+      expect(result.pinned, changed).toEqual(pinned);
     });
   }
 
@@ -119,11 +189,20 @@ describe('the magnetic Tape golden', () => {
         renders: Object.fromEntries(Object.entries(renders).map(([name, r]) => [name, r.pinned])),
       };
       writeFileSync(TABLE, `${JSON.stringify(table, null, 2)}\n`);
+      const record = {
+        about: `Every ${STRIDE}th frame of each render inserts/tapeMagneticGolden.test.ts pins, interleaved left and right, as little-endian Float64 in base64. The hash in tapeMagneticGolden.json is the pin; this record only says where a mismatching render first differs and by how much. Written with it, under the same refresh (windsor#219).`,
+        stride: STRIDE,
+        renders: Object.fromEntries(
+          Object.entries(renders).map(([name, r]) => [name, encode(r.record)]),
+        ),
+      };
+      writeFileSync(SAMPLES, `${JSON.stringify(record, null, 2)}\n`);
       return;
     }
-    expect(Object.keys(golden.renders).sort()).toEqual(
-      TAPE_MAGNETIC.factors.map((f) => `${f}x`).sort(),
-    );
+    const factors = TAPE_MAGNETIC.factors.map((f) => `${f}x`).sort();
+    expect(Object.keys(golden.renders).sort()).toEqual(factors);
+    expect(Object.keys(samples.renders).sort()).toEqual(factors);
+    expect(samples.stride).toBe(STRIDE);
   });
 });
 
