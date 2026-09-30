@@ -4,13 +4,15 @@ import {
   TAPE_TYPES,
   TAPE_LABELS,
   randomiseTape,
+  TAPE_PRESETS,
+  applyTapePreset,
   type TapeSpec,
 } from '@windsor/engine';
 import type { InsertCard } from './insertCards';
 import { el } from './dom';
-import { insertKnobs, insertsOf } from './insertKnobs';
+import { insertsOf } from './insertKnobs';
 import { insertChange } from './insertTarget';
-import { TAPE_KNOBS } from './tapeTables';
+import { tapeKnobs } from './tapeKnobs';
 export const tapeCard: InsertCard = (ctx, target, index) => {
   const root = el('div', 'tape-card');
   const current = (): TapeSpec => {
@@ -41,7 +43,13 @@ export const tapeCard: InsertCard = (ctx, target, index) => {
   const random = el('button', 'btn', 'Randomize');
   random.title = 'Roll a new tape character; keep Trim, Mix and bypass';
   random.onclick = (): void => commit(randomiseTape(current()));
-  row.append(label, toggle, random);
-  root.append(row, insertKnobs(ctx, target, index, TAPE_KNOBS));
+  const preset = document.createElement('select');
+  preset.className = 'field';
+  preset.setAttribute('aria-label', 'Tape starting point');
+  preset.add(new Option('Starting point…', ''));
+  for (const entry of TAPE_PRESETS) preset.add(new Option(entry.label, entry.id));
+  preset.onchange = (): void => commit(applyTapePreset(current(), preset.value));
+  row.append(label, toggle, random, preset);
+  root.append(row, tapeKnobs(ctx, target, index));
   return root;
 };

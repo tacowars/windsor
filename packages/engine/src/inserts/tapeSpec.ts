@@ -6,7 +6,14 @@ export interface TapeSpec {
   readonly model: (typeof TAPE_TYPES)[number];
   readonly drive: number;
   readonly bias: number;
+  /** Legacy macro. split=false retains its original meaning and exact motion stream. */
   readonly wear: number;
+  readonly wow: number;
+  readonly flutter: number;
+  readonly dropouts: number;
+  readonly wowRate: number;
+  readonly flutterRate: number;
+  readonly split: boolean;
   readonly hiss: number;
   readonly trim: number;
   readonly mix: number;
@@ -30,6 +37,7 @@ export function normaliseTape(
         ? n.int(raw[name], values[name], min, max, `${path}.${name}`)
         : n.num(raw[name], values[name], min, max, `${path}.${name}`);
   }
+  values.split = n.bool(raw.split, values.split, `${path}.split`);
   values.enabled = n.bool(raw.enabled, values.enabled, `${path}.enabled`);
   return {
     kind: 'tape',

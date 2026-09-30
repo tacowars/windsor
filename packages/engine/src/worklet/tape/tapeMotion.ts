@@ -37,24 +37,43 @@ class TapeMotion {
     // eslint-disable-next-line no-magic-numbers -- mulberry32 unsigned normalization.
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
-  tick(wear: number): void {
+  wowRate = C.wowHz;
+  flutterRate = C.flutterHz;
+  previousWowRate = C.wowHz;
+  previousFlutterRate = C.flutterHz;
+  tick(wow: number, flutter = wow, dropouts = wow): void {
+    // Rescale the remaining interval so a slow cycle doesn't delay live rate edits.
+    if (this.wowRate !== this.previousWowRate) {
+      this.wowClock *= this.previousWowRate / this.wowRate;
+      this.previousWowRate = this.wowRate;
+    }
+    if (this.flutterRate !== this.previousFlutterRate) {
+      this.flutterClock *= this.previousFlutterRate / this.flutterRate;
+      this.previousFlutterRate = this.flutterRate;
+    }
     if (--this.wowClock <= 0) {
-      this.wowClock = this.rate / C.wowHz;
+      this.wowClock = this.rate / this.wowRate;
       this.wowTarget = 2 * this.random() - 1;
     }
     if (--this.flutterClock <= 0) {
       this.flutterClock =
-        this.rate / (C.flutterMinHz + this.random() * (C.flutterMaxHz - C.flutterMinHz));
+        this.rate /
+        ((C.flutterMinHz + this.random() * (C.flutterMaxHz - C.flutterMinHz)) *
+          (this.flutterRate / C.flutterHz));
       this.flutterTarget = 2 * this.random() - 1;
     }
     this.wow += this.wowSmooth * (this.wowTarget - this.wow);
     this.flutter += this.flutterSmooth * (this.flutterTarget - this.flutter);
-    this.delay =
-      Math.min(1, Math.abs(this.wow + Math.max(0, this.flutter))) *
-      wear *
-      C.maxDelaySeconds *
-      this.rate;
-    if (--this.dropoutClock <= 0) this.rollDropout(wear);
+    // Equal amounts keep the original Wear arithmetic and seeded output unchanged.
+    const amount = Math.max(wow, flutter);
+    const motion =
+      wow === flutter
+        ? this.wow + Math.max(0, this.flutter)
+        : amount > 0
+          ? (this.wow * wow + Math.max(0, this.flutter) * flutter) / amount
+          : 0;
+    this.delay = Math.min(1, Math.abs(motion)) * amount * C.maxDelaySeconds * this.rate;
+    if (--this.dropoutClock <= 0) this.rollDropout(dropouts);
     const envelope =
       this.dropoutPhase < 1 ? this.dropoutDepth * Math.sin(Math.PI * this.dropoutPhase) : 0;
     this.dropoutPhase = Math.min(1, this.dropoutPhase + 1 / this.dropoutLength);

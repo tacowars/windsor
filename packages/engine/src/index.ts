@@ -430,6 +430,10 @@ export { DEFAULT_TAPE } from './inserts/tapeSpec';
 export type { TapeSpec } from './inserts/tapeSpec';
 export { TAPE_BOUNDS, TAPE_TYPES, TAPE_LABELS } from './inserts/tapeConstants';
 export { randomiseTape } from './inserts/tapeRandomise';
+export { tapeControlValue, setTapeControl } from './inserts/tapeControls';
+export type { TapeNumber } from './inserts/tapeControls';
+export { TAPE_PRESETS } from './inserts/tapePresetTables';
+export { applyTapePreset } from './inserts/tapePresets';
 
 export { DEFAULT_DELAY } from './inserts/delaySpec';
 export type { DelaySpec } from './inserts/delaySpec';
