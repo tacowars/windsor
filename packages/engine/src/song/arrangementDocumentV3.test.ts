@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { isShippable, makeArrangement } from './arrangementDocument';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
@@ -26,7 +27,7 @@ describe('the version-3 document (#705)', () => {
     expect(result.usable).toBe(false);
     expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
     expect(result.corrections).toEqual([
-      'version: 2 is not 4 — version 2 is not supported since #705',
+      `version: 2 is not ${ARRANGEMENT_VERSION} — version 2 is not supported since #705`,
       'nothing usable survives normalisation — falling back to the metronome',
     ]);
   });

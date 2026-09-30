@@ -14,7 +14,7 @@ import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { DEFAULT_STRIP } from '../mixer/mix';
 import { PRESETS } from '../patch/presets';
 import { DEFAULT_GRID_CONFIG } from '../sequencing/gridSequencer';
-import { DEFAULT_BARS } from '../audioConstants';
+import { ARRANGEMENT_VERSION, DEFAULT_BARS } from '../audioConstants';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
 import { ArrangementPlayer } from './arrangementPlayer';
 import { ALL, KICK, PATCHES, play, silentPart, song } from '../__fixtures__/documentCases';
@@ -26,10 +26,15 @@ const JUNK: Array<[string, unknown]> = [
   ['an array', [1, 2, 3]],
   ['an empty object', {}],
   ['a version-2 document', { version: 2, seed: 1, bpm: 96, parts: [KICK], patches: PATCHES }],
-  ['a version-3 shell with nothing in it', { version: 3 }],
+  ['a current-version shell with nothing in it', { version: ARRANGEMENT_VERSION }],
   [
     'wrong types throughout',
-    { version: 3, transport: 'fast', harmony: 3, parts: [{ preset: 9, regions: 'all' }] },
+    {
+      version: ARRANGEMENT_VERSION,
+      transport: 'fast',
+      harmony: 3,
+      parts: [{ preset: 9, regions: 'all' }],
+    },
   ],
   ['a truncated document', song([{ slot: 0, preset: 'kick' }, { preset: 'hat' }])],
   [
@@ -249,7 +254,7 @@ describe('runtime inputs JSON cannot represent (self-review findings)', () => {
 
 describe('a song resolves only its own patches (#562)', () => {
   const UNEMBEDDED = {
-    version: 3,
+    version: ARRANGEMENT_VERSION,
     transport: { bpm: 96, bars: DEFAULT_BARS },
     harmony: { root: 2, scale: 'dorian' },
     parts: [
@@ -332,7 +337,7 @@ describe("a document patch's mono field (#453)", () => {
   // booleans, so the field needs no normaliser code -- which is exactly why it
   // is worth pinning: nothing else would fail if the walk stopped covering it.
   const withPatch = (patch: unknown): ReturnType<typeof makeArrangement> =>
-    makeArrangement({ version: 3, parts: [KICK], patches: { kick: patch } });
+    makeArrangement({ version: ARRANGEMENT_VERSION, parts: [KICK], patches: { kick: patch } });
 
   it('keeps true and false as given', () => {
     expect(withPatch({ mono: true }).document.patches?.kick?.mono).toBe(true);

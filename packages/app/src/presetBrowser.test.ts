@@ -5,7 +5,7 @@ import { dropInit } from './patchActions';
 import { DocumentModel } from './documentModel';
 import type { AppCtx } from './context';
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { clonePatch, partAt } from '@windsor/engine';
+import { ARRANGEMENT_VERSION, clonePatch, partAt } from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
 import { library, loadPageLibrary } from './libraryModel';
 
@@ -14,7 +14,7 @@ import { library, loadPageLibrary } from './libraryModel';
 beforeAll(() => loadPageLibrary(library));
 
 function context(): AppCtx {
-  const model = new DocumentModel({ version: 3, ...FULL_ARRANGEMENT });
+  const model = new DocumentModel({ version: ARRANGEMENT_VERSION, ...FULL_ARRANGEMENT });
   return {
     model,
     change: (partial) => {

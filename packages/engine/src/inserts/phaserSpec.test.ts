@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { makeArrangement } from '../song/arrangementDocument';
+import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { FULL_ARRANGEMENT } from '../__fixtures__/fullArrangement';
 import { PHASER_INSERT } from './phaserInsert';
 import { DEFAULT_PHASER } from './phaserSpec';
@@ -47,7 +48,7 @@ describe('phaser insert and preset song contract', () => {
       const effect = applyPhaserPreset(DEFAULT_PHASER, preset.id);
       const raw = {
         ...FULL_ARRANGEMENT,
-        version: 3,
+        version: ARRANGEMENT_VERSION,
         patches: { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} },
         parts: FULL_ARRANGEMENT.parts.map((part) => ({ ...part, strip: { inserts: [effect] } })),
         master: { inserts: [effect] },
