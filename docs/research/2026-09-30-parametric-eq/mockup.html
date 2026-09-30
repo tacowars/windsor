@@ -1,0 +1,601 @@
+<title>Windsor Parametric EQ</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a toolbar of example states, one part's insert rack with the EQ open between two folded inserts, then the behaviour, controls, sound engine and build plan for review. Deliberately single-theme: Windsor's own dark console tokens, as in the insert rack mockup. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --kc: var(--modulator);
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --rack-h: 196px;
+  --rail: 24px;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 13px/1.5 var(--f-ui); margin: 0; padding-block: 20px 56px; padding-inline: 16px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1, h2, h3 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+h1 { font-size: 17px; }
+h2 { font-size: 12.5px; color: var(--ink); }
+h3 { font-size: 10.5px; color: var(--ink-dim); letter-spacing: 0.1em; }
+p { margin: 0; max-width: 74ch; color: var(--ink-dim); }
+.lede { display: flex; flex-direction: column; gap: 6px; }
+.tag { font: 500 10px var(--f-num); color: var(--ink-faint); letter-spacing: 0; text-transform: none; }
+code, .mono { font-family: var(--f-num); font-size: 11.5px; color: var(--ink); }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.opt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.opt-label { font: 600 10px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.segs { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.segs button { background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); padding: 4px 10px; font: 500 11px var(--f-ui); cursor: pointer; }
+.segs button:last-child { border-right: 0; }
+.segs button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+button:focus-visible, select:focus-visible, canvas:focus-visible, input:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.status { font: 11px var(--f-num); color: var(--ink-faint); min-height: 16px; }
+
+/* Rack */
+.rack { display: flex; gap: 6px; align-items: stretch; overflow-x: auto; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; scrollbar-color: var(--line-bright) var(--inset); }
+.dev { flex: none; height: var(--rack-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.dev.off .body { opacity: 0.4; }
+.rail { width: var(--rail); flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; border-right: 1px solid var(--line); background: var(--panel-hi); }
+.rail .name { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 10.5px var(--f-panel); letter-spacing: 0.07em; text-transform: uppercase; white-space: nowrap; padding: 4px 0; cursor: pointer; }
+.rail .name .num { color: var(--ink-faint); margin-left: 5px; }
+.rail .spacer { flex: 1; }
+.ib { background: transparent; border: 1px solid transparent; color: var(--ink-faint); width: 18px; height: 18px; border-radius: var(--r); display: grid; place-items: center; font-size: 10px; line-height: 1; cursor: pointer; padding: 0; }
+.ib:hover { color: var(--ink); border-color: var(--line-bright); }
+.pwr { color: var(--kc); font-size: 12px; }
+.dev.off .pwr { color: var(--ink-faint); }
+.dev.folded { width: 26px; cursor: pointer; }
+.dev.folded .rail { width: 100%; border: 0; }
+.add-slot { flex: none; height: var(--rack-h); width: 88px; border: 1px dashed var(--line-bright); border-radius: 5px; background: transparent; color: var(--ink-faint); font: 600 10px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; display: grid; place-content: center; gap: 4px; text-align: center; }
+.add-slot b { font-size: 20px; font-weight: 400; display: block; }
+
+/* EQ body */
+.body { display: flex; min-width: 0; }
+.graph { display: flex; flex-direction: column; padding: 4px 6px 6px; gap: 4px; border-right: 1px solid var(--line); }
+.chips { display: flex; gap: 3px; height: 20px; flex: none; }
+.chip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px; padding: 0 3px 0 2px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font: 500 10px var(--f-num); cursor: pointer; }
+.chip:hover { border-color: var(--line-bright); color: var(--ink); }
+.chip[aria-selected="true"] { border-color: var(--carrier); color: var(--ink); }
+.chip .sq { width: 9px; height: 9px; border-radius: 2px; border: 1px solid var(--line-bright); background: var(--inset); flex: none; }
+.chip.on .sq { background: var(--kc); border-color: var(--kc); }
+.chip:not(.on) svg, .chip:not(.on) .n { opacity: 0.45; }
+.chip svg { flex: none; }
+.chip svg path { fill: none; stroke: currentColor; stroke-width: 1.3; }
+.chip .n { margin-left: auto; }
+.plot-wrap { position: relative; flex: 1; min-height: 0; }
+canvas.plot { display: block; width: 384px; height: 160px; background: var(--inset); border: 1px solid var(--line); border-radius: 2px; touch-action: none; cursor: crosshair; }
+.range { position: absolute; top: 3px; right: 3px; display: flex; gap: 1px; }
+.range button { background: transparent; border: 1px solid transparent; color: var(--ink-faint); font: 500 9px var(--f-num); padding: 0 4px; height: 15px; border-radius: 2px; cursor: pointer; }
+.range button[aria-pressed="true"] { color: var(--ink); border-color: var(--line-bright); background: var(--panel); }
+.listen-pill { position: absolute; left: 6px; top: 4px; font: 600 9px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; color: var(--inset); background: var(--carrier); border-radius: 2px; padding: 1px 5px; }
+
+.band { display: flex; padding: 4px 8px 6px; gap: 4px; }
+.cols { display: flex; gap: 2px; }
+.col { display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; }
+.col.wide { width: 104px; align-items: stretch; justify-content: flex-start; gap: 8px; padding-top: 2px; }
+.sec { font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); height: 12px; white-space: nowrap; }
+.sec b { color: var(--carrier); font-weight: 600; }
+.field-wrap { display: flex; flex-direction: column; gap: 1px; font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+select.field { background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); height: 22px; font: 11.5px var(--f-ui); padding: 0 4px; color: var(--ink); width: 100%; }
+select.field:disabled { color: var(--ink-faint); border-color: var(--line); }
+.switch { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-dim); white-space: nowrap; cursor: pointer; }
+.switch input { appearance: none; width: 11px; height: 11px; border-radius: 2px; border: 1px solid var(--line-bright); background: var(--inset); margin: 0; flex: none; cursor: pointer; }
+.switch input:checked { background: var(--kc); border-color: var(--kc); }
+.rule { width: 1px; background: var(--line); margin: 6px 4px; }
+
+/* Knob */
+.knob { width: 54px; display: flex; flex-direction: column; align-items: center; padding: 2px 0; border-radius: var(--r); cursor: ns-resize; touch-action: none; user-select: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .face { fill: var(--inset); stroke: var(--line); }
+.knob .track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .arc { stroke: var(--kc); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 13px; white-space: nowrap; }
+.knob .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); line-height: 11px; }
+.knob.dis { opacity: 0.35; pointer-events: none; }
+
+/* Plan sections */
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+ul, ol { margin: 0; padding-left: 18px; color: var(--ink-dim); display: flex; flex-direction: column; gap: 5px; }
+li b, p b { color: var(--ink); font-weight: 500; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th { text-align: left; font: 600 9px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line-bright); white-space: nowrap; }
+td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--line); color: var(--ink-dim); vertical-align: top; }
+td:first-child { color: var(--ink); white-space: nowrap; }
+td.mono { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.q { border-left: 2px solid var(--carrier); padding-left: 10px; }
+.q p + p { margin-top: 3px; }
+.rec { color: var(--carrier); font: 600 9px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; }
+kbd { font: 10.5px var(--f-num); background: var(--inset); border: 1px solid var(--line-bright); border-radius: 2px; padding: 0 4px; color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Parametric EQ <span class="tag">insert · mockup for review · 196 px rack</span></h1>
+    <p>An eight-band mixing EQ for part strips, send buses and the master. Each band is a filter you place on the curve: cut the lows, notch a ringing note, lift the presence, roll off the top. The card below works. Drag the numbered points, scroll over one to change its width, and double-click an empty spot to add a band there. It makes no sound, and the spectrum behind the curve is a stand-in for a pad part.</p>
+  </div>
+
+  <div class="toolbar" role="toolbar" aria-label="Mockup options">
+    <div class="opt"><span class="opt-label">Example</span>
+      <div class="segs" id="seg-example">
+        <button type="button" data-v="mix" aria-pressed="true">Pad clean-up</button>
+        <button type="button" data-v="new" aria-pressed="false">New insert</button>
+      </div></div>
+    <div class="opt"><span class="opt-label">Spectrum</span>
+      <div class="segs" id="seg-spec">
+        <button type="button" data-v="on" aria-pressed="true">On</button>
+        <button type="button" data-v="off" aria-pressed="false">Off</button>
+      </div></div>
+    <div class="opt"><span class="opt-label">Chain</span>
+      <div class="segs" id="seg-chain">
+        <button type="button" data-v="strip" aria-pressed="true">Part</button>
+        <button type="button" data-v="bus" aria-pressed="false">Send bus</button>
+      </div></div>
+    <div class="status" id="status" aria-live="polite"></div>
+  </div>
+
+  <div class="rack" id="rack">
+    <div class="dev folded" title="Folded insert"><div class="rail"><button class="ib pwr" type="button" aria-label="Classic Drive on">⏻</button><span class="name">Classic Drive<span class="num">1</span></span></div></div>
+    <div class="dev" id="eq">
+      <div class="rail">
+        <button class="ib pwr" type="button" id="eq-power" aria-label="EQ on or off">⏻</button>
+        <span class="name">Parametric EQ<span class="num">2</span></span>
+        <span class="spacer"></span>
+        <button class="ib" type="button" aria-label="Move earlier">◀</button>
+        <button class="ib" type="button" aria-label="Move later">▶</button>
+        <button class="ib" type="button" aria-label="Remove">✕</button>
+      </div>
+      <div class="body">
+        <div class="graph">
+          <div class="chips" id="chips" role="tablist" aria-label="Bands"></div>
+          <div class="plot-wrap">
+            <canvas class="plot" id="plot" tabindex="0" aria-label="EQ curve. Arrow keys move the selected band; Alt with up or down changes its Q; 1 to 8 select a band."></canvas>
+            <div class="range" id="range"><button type="button" data-v="12" aria-pressed="true">±12</button><button type="button" data-v="24" aria-pressed="false">±24</button></div>
+            <div class="listen-pill" id="listen-pill" hidden>Listening</div>
+          </div>
+        </div>
+        <div class="band" id="band"></div>
+      </div>
+    </div>
+    <div class="dev folded" title="Folded insert"><div class="rail"><button class="ib pwr" type="button" aria-label="Bus Compressor on">⏻</button><span class="name">Bus Compressor<span class="num">3</span></span></div></div>
+    <div class="add-slot"><span><b>+</b>Add</span></div>
+  </div>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>How you use it</h2>
+      <ul>
+        <li><b>Drag a point</b> left and right for frequency. For a bell or a shelf, up and down is gain. For a cut, up and down is resonance (Q). A notch only moves sideways.</li>
+        <li><b>Scroll over a point</b>, or hold <kbd>Alt</kbd> while dragging, to change Q. <kbd>Shift</kbd> slows any drag for fine moves.</li>
+        <li><b>Double-click an empty spot</b> to turn on the first free band as a bell at that frequency and gain. <b>Double-click a point</b> to put its gain back to 0 dB.</li>
+        <li><b>The band row</b> above the curve selects a band. Its small square turns the band on or off. The panel on the right always edits the selected band.</li>
+        <li><b>Listen on drag</b>: while you hold a point, you hear only what that band covers, as a band-pass at its frequency and Q, so you can find a ringing note before you cut it. The sound returns to normal when you let go. This is never saved.</li>
+        <li><b>Keys</b> when the curve has focus: <kbd>1</kbd>–<kbd>8</kbd> select a band, arrows move it, <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> change Q, <kbd>Shift</kbd> takes finer steps.</li>
+        <li><b>±12 / ±24</b> zooms the curve only. The spectrum, the view range and which band is selected are session view state, like a rack page, and are never saved.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Controls</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Control</th><th>Range</th><th>New band</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Type</td><td>Low cut · Low shelf · Bell · Notch · High shelf · High cut</td><td class="mono">see below</td><td>Changing type fades the band out and back in, so it never clicks.</td></tr>
+          <tr><td>Slope</td><td class="mono">6 · 12 · 24 · 48 dB/oct</td><td class="mono">12</td><td>Cuts only. 6 dB/oct has no Q.</td></tr>
+          <tr><td>Freq</td><td class="mono">10 Hz – 22 kHz</td><td class="mono">per band</td><td>Log knob. The top is held below Nyquist at 44.1 kHz.</td></tr>
+          <tr><td>Gain</td><td class="mono">−24 – +24 dB</td><td class="mono">0.0 dB</td><td>Bell and shelves only.</td></tr>
+          <tr><td>Q</td><td class="mono">0.10 – 18.0</td><td class="mono">0.71</td><td>Bandwidth for a bell or notch, the knee for a shelf, resonance for a cut.</td></tr>
+          <tr><td>On</td><td>on / off</td><td>see below</td><td>Per band, faded like a type change.</td></tr>
+          <tr><td>Scale</td><td class="mono">0 – 200 %</td><td class="mono">100 %</td><td>Multiplies every bell and shelf gain: 50 % halves the whole curve.</td></tr>
+          <tr><td>Output</td><td class="mono">−24 – +24 dB</td><td class="mono">0.0 dB</td><td>After the bands.</td></tr>
+          <tr><td>Enabled</td><td>on / off</td><td>on</td><td>The rail's switch, as every insert has.</td></tr>
+        </tbody>
+      </table></div>
+      <p>A new EQ is flat, with bands 2–7 on at 0 dB so there is a point to grab everywhere: 1 Low cut 30 Hz (off), 2 Low shelf 100 Hz, 3 Bell 250 Hz, 4 Bell 800 Hz, 5 Bell 2.5 kHz, 6 Bell 6 kHz, 7 High shelf 10 kHz, 8 High cut 18 kHz (off). A flat EQ passes the signal through untouched and costs almost nothing.</p>
+    </section>
+
+    <section class="card">
+      <h2>Sound engine</h2>
+      <p>One AudioWorklet per EQ, stereo, zero latency, no oversampling. An EQ is linear, so it creates no new frequencies and has nothing to alias. Oversampling would only fix the curve's shape near the top, and the filter design below fixes that directly.</p>
+      <ul>
+        <li><b>Accurate at the top.</b> The usual textbook biquads squeeze a bell or a cut near 20 kHz: a 12 kHz bell comes out narrower and lopsided at 48 kHz. Bells and cuts use matched second-order sections instead (Vicanek, <i>Matched Second Order Digital Filters</i>, 2016), which keep the analog shape up to Nyquist. Shelves and the notch keep the prewarped bilinear form unless the spike shows audible error. The first ticket measures both against the analog curve before either is chosen.</li>
+        <li><b>The curve you see is the filter you hear.</b> One pure coefficient module in <code>inserts/</code> serves both the worklet and the console's drawing, as Advanced Drive's filter plots already do. The console draws the digital response from the real coefficients, not an ideal.</li>
+        <li><b>Smooth under automation.</b> Frequency, gain and Q glide on a short one-pole (log for frequency and Q). Coefficients refresh every 16 samples while a value moves and not at all once it settles. Type, slope and on/off changes crossfade the band against its own input over about 10 ms.</li>
+        <li><b>Clean numbers.</b> Transposed direct form II in 64-bit state, so a 20 Hz 48 dB cut stays quiet. Tiny state values are flushed so a silent tail never goes denormal.</li>
+        <li><b>Cheap on many strips.</b> Off and flat bands are skipped. A fully flat EQ copies input to output. Silent input with settled state outputs silence without filtering. The cost of 16 EQs on 16 parts is measured on the load meter, not estimated.</li>
+        <li><b>Cuts</b>: 12 dB is one section at the band's Q. 24 and 48 dB are Butterworth cascades whose last section takes the band's resonance, so Q 0.71 is flat and higher Q adds a bump at the corner.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>How it gets built</h2>
+      <ol>
+        <li><b>Engine: the <code>eq</code> insert kind.</b> Spec, normaliser, constants, the coefficient and response module, the worklet, the registry entry and the index exports (the response function for drawing). Tests: the null test (flat = input, bit for bit), the swept response against the drawn curve, the matched-vs-bilinear error table in <code>docs/research/</code>, a click test while sweeping, and a 16-instance load reading. Class <b>reviewed</b> (DSP). Worker: <code>worker</code>.</li>
+        <li><b>Console: the EQ card.</b> This layout in the rack, the curve and its gestures, the band row and panel, the add picker's new <b>EQ</b> group listed first. The gestures' state lives in a pure model with its own tests. Class <b>reviewed</b> (UI). Needs 1.</li>
+        <li><b>Spectrum and Listen.</b> The engine gains an opt-in analyser tap on the EQ's output (read like the compressor's gain reduction, active only while the card is on screen) and a live-only listen band. Class <b>reviewed</b>. Needs 1. Can run beside 2 and join it at the end.</li>
+      </ol>
+      <p>The song format gains one kind, <code>{ kind: 'eq', enabled, scale, output, bands: [8 × { on, type, slope, freq, gain, q }] }</code>. It is additive, so <code>ARRANGEMENT_VERSION</code> stays where it is. A decision record lands with ticket 1.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Questions for tacowars</h2>
+    <div class="grid2">
+      <div class="q"><p><b>Eight bands?</b> Enough for a cut at each end plus six moves. <span class="rec">Recommend 8</span></p></div>
+      <div class="q"><p><b>Mid/side per band?</b> A per-band Stereo / Mid / Side choice would let you, say, cut side lows or lift mid presence. It costs one field and an M/S encode only when a band uses it. <span class="rec">Recommend later, as an additive field</span></p></div>
+      <div class="q"><p><b>Gain range.</b> ±24 dB leaves room for deep cuts that aren't quite a notch; ±15 dB keeps knob moves finer. <span class="rec">Recommend ±24, view at ±12</span></p></div>
+      <div class="q"><p><b>Spectrum and Listen in the first release?</b> Both help most when you're hunting a note to notch. They are ticket 3 and can ship a little after the EQ itself. <span class="rec">Recommend yes, as ticket 3</span></p></div>
+      <div class="q"><p><b>Q that tightens with gain?</b> Some EQs narrow a bell as you push it harder, like analog desks. It sounds musical, but the curve no longer follows the knob exactly. <span class="rec">Recommend leaving it out</span></p></div>
+      <div class="q"><p><b>Name.</b> "Parametric EQ" on the rail, kind <code>eq</code>, in a new "EQ" group at the top of the add picker. <span class="rec">Recommend as shown</span></p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const F_MIN = 10, F_MAX = 22000, Q_MIN = 0.1, Q_MAX = 18, G_MAX = 24, BW_Q = Math.SQRT1_2;
+  const TYPES = {
+    lowcut:    { label: 'Low cut',    gain: false, cut: true },
+    lowshelf:  { label: 'Low shelf',  gain: true },
+    bell:      { label: 'Bell',       gain: true },
+    notch:     { label: 'Notch',      gain: false },
+    highshelf: { label: 'High shelf', gain: true },
+    highcut:   { label: 'High cut',   gain: false, cut: true },
+  };
+  const GLYPH = {
+    lowcut: 'M1 9 C4 9 5 2 8 2 L15 2', highcut: 'M1 2 L8 2 C11 2 12 9 15 9',
+    lowshelf: 'M1 3 L4 3 C7 3 7 7 10 7 L15 7', highshelf: 'M1 7 L6 7 C9 7 9 3 12 3 L15 3',
+    bell: 'M1 7 L4 7 C6 7 6 2 8 2 C10 2 10 7 12 7 L15 7', notch: 'M1 3 L6 3 C7 3 7.5 9 8 9 C8.5 9 9 3 10 3 L15 3',
+  };
+  const BUTTER = { 24: [0.5412, 1.3066], 48: [0.5098, 0.6013, 0.9000, 2.5629] };
+  const band = (type, freq, gain, q, on, slope = 12) => ({ type, freq, gain, q, on, slope });
+  const EXAMPLES = {
+    new: () => ({ scale: 1, output: 0, sel: 3, bands: [
+      band('lowcut', 30, 0, BW_Q, false), band('lowshelf', 100, 0, BW_Q, true), band('bell', 250, 0, BW_Q, true), band('bell', 800, 0, BW_Q, true),
+      band('bell', 2500, 0, BW_Q, true), band('bell', 6000, 0, BW_Q, true), band('highshelf', 10000, 0, BW_Q, true), band('highcut', 18000, 0, BW_Q, false) ] }),
+    mix: () => ({ scale: 1, output: 0, sel: 3, bands: [
+      band('lowcut', 120, 0, 0.9, true, 24), band('lowshelf', 100, 0, BW_Q, false), band('bell', 320, -3.5, 1.4, true), band('notch', 1240, 0, 8, true),
+      band('bell', 3200, 2.5, 0.9, true), band('bell', 6000, 0, BW_Q, false), band('highshelf', 9000, 1.5, BW_Q, true), band('highcut', 16000, 0, BW_Q, true, 48) ] }),
+  };
+  let S = EXAMPLES.mix();
+  let view = { range: 12, spectrum: true, listen: true, dragging: -1, enabled: true };
+
+  const $ = (id) => document.getElementById(id);
+  const plot = $('plot'), ctx = plot.getContext('2d');
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888';
+  const eqEl = $('eq');
+
+  // ---- response (analog prototypes; the build draws the digital response from real coefficients)
+  const quad = (a, b, c, w) => { const re = c - a * w * w, im = b * w; return re * re + im * im; };
+  function bandPower(b, f, scale) {
+    const w = f / b.freq, q = b.q;
+    const A = Math.pow(10, (b.gain * scale) / 40), sA = Math.sqrt(A);
+    switch (b.type) {
+      case 'bell': return quad(1, A / q, 1, w) / quad(1, 1 / (A * q), 1, w);
+      case 'notch': return quad(1, 0, 1, w) / quad(1, 1 / q, 1, w);
+      case 'lowshelf': return (A * A * quad(1, sA / q, A, w)) / quad(A, sA / q, 1, w);
+      case 'highshelf': return (A * A * quad(A, sA / q, 1, w)) / quad(1, sA / q, A, w);
+      default: {
+        const hp = b.type === 'lowcut';
+        if (b.slope === 6) return hp ? (w * w) / (1 + w * w) : 1 / (1 + w * w);
+        const qs = b.slope === 12 ? [q] : BUTTER[b.slope].map((v, i, all) => (i === all.length - 1 ? v * (q / BW_Q) : v));
+        let p = 1;
+        for (const s of qs) p *= (hp ? w * w * w * w : 1) / quad(1, 1 / s, 1, w);
+        return p;
+      }
+    }
+  }
+  const bandDb = (b, f) => 10 * Math.log10(Math.max(1e-12, bandPower(b, f, S.scale)));
+  const totalDb = (f) => S.bands.reduce((db, b) => (b.on ? db + bandDb(b, f) : db), 0) + S.output;
+
+  // ---- geometry
+  let W = 384, H = 160;
+  const LOGR = Math.log(F_MAX / F_MIN);
+  const xOf = (f) => (Math.log(f / F_MIN) / LOGR) * W;
+  const fOf = (x) => F_MIN * Math.exp((x / W) * LOGR);
+  const yOf = (db) => H / 2 - (db / view.range) * (H / 2 - 8);
+  const dbOf = (y) => ((H / 2 - y) / (H / 2 - 8)) * view.range;
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  function nodeY(b) {
+    if (TYPES[b.type].gain) return yOf(b.gain * S.scale);
+    if (b.type === 'notch' || b.slope === 6) return yOf(0);
+    return yOf(bandDb(b, b.freq));
+  }
+
+  // ---- fake spectrum: a pad on A2 with a ringing partial near 1.24 kHz
+  const SPEC_N = 180;
+  const specBase = new Float64Array(SPEC_N), specNow = new Float64Array(SPEC_N);
+  for (let i = 0; i < SPEC_N; i++) {
+    const f = F_MIN * Math.exp((i / (SPEC_N - 1)) * LOGR);
+    let db = -30 - 4.5 * Math.log2(Math.max(f, 40) / 200) - (f < 55 ? (55 - f) * 0.6 : 0);
+    for (let h = 1; h <= 60; h++) { const hf = 110 * h, d = Math.log2(f / hf); db += 14 * Math.exp(-(d * d) / 0.0016) / Math.sqrt(h); }
+    const r = Math.log2(f / 1240); db += 12 * Math.exp(-(r * r) / 0.0008);
+    specBase[i] = db;
+  }
+  let lastT = 0;
+  function tickSpectrum(t) {
+    for (let i = 0; i < SPEC_N; i++) specNow[i] = specBase[i] + Math.sin(t * 0.0021 + i * 0.37) * 1.4 + Math.sin(t * 0.0053 + i * 1.7) * 0.9;
+  }
+
+  // ---- drawing
+  function sizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    W = plot.clientWidth; H = plot.clientHeight;
+    plot.width = Math.round(W * dpr); plot.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function fmtHz(f) { return f >= 1000 ? (f >= 10000 ? (f / 1000).toFixed(1) : (f / 1000).toFixed(2)) + ' kHz' : Math.round(f) + ' Hz'; }
+  function fmtDb(d) { return (d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(1) + ' dB'; }
+
+  function draw() {
+    const kc = css('--kc'), line = css('--line'), faint = css('--ink-faint'), ink = css('--ink'), carrier = css('--carrier'), inset = css('--inset'), dim = css('--ink-dim');
+    ctx.clearRect(0, 0, W, H);
+    // grid
+    ctx.lineWidth = 1; ctx.font = '9px "IBM Plex Mono", monospace'; ctx.textBaseline = 'bottom';
+    const labels = { 20: '20', 50: '50', 100: '100', 200: '200', 500: '500', 1000: '1k', 2000: '2k', 5000: '5k', 10000: '10k', 20000: '20k' };
+    for (const f of [20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 20000]) {
+      const x = Math.round(xOf(f)) + 0.5;
+      ctx.strokeStyle = line; ctx.globalAlpha = labels[f] ? 1 : 0.45;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      ctx.globalAlpha = 1;
+      if (labels[f] && x < W - 18) { ctx.fillStyle = faint; ctx.fillText(labels[f], x + 2, H - 1); }
+    }
+    const step = view.range === 12 ? 6 : 12;
+    ctx.textBaseline = 'middle';
+    for (let d = -view.range + step; d < view.range; d += step) {
+      const y = Math.round(yOf(d)) + 0.5;
+      ctx.strokeStyle = line; ctx.globalAlpha = d === 0 ? 1 : 0.6;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = faint;
+      ctx.fillText((d > 0 ? '+' : '') + d, 3, y - 6);
+    }
+    // spectrum (post-EQ)
+    if (view.spectrum) {
+      ctx.beginPath(); ctx.moveTo(0, H);
+      for (let i = 0; i < SPEC_N; i++) {
+        const f = F_MIN * Math.exp((i / (SPEC_N - 1)) * LOGR);
+        const db = view.enabled ? specNow[i] + totalDb(f) : specNow[i];
+        const y = H - clamp((db + 84) / 84, 0, 1) * H;
+        ctx.lineTo((i / (SPEC_N - 1)) * W, y);
+      }
+      ctx.lineTo(W, H); ctx.closePath();
+      ctx.fillStyle = dim; ctx.globalAlpha = 0.16; ctx.fill(); ctx.globalAlpha = 1;
+    }
+    // selected band's own curve
+    const sb = S.bands[S.sel];
+    if (sb.on) {
+      ctx.beginPath(); ctx.moveTo(0, yOf(0));
+      for (let x = 0; x <= W; x += 2) ctx.lineTo(x, clamp(yOf(bandDb(sb, fOf(x))), -2, H + 2));
+      ctx.lineTo(W, yOf(0)); ctx.closePath();
+      ctx.fillStyle = carrier; ctx.globalAlpha = 0.13; ctx.fill(); ctx.globalAlpha = 1;
+    }
+    // listen band-pass
+    if (view.listen && view.dragging >= 0) {
+      const b = S.bands[view.dragging], bp = { type: 'bell', freq: b.freq, gain: 24, q: Math.max(0.5, b.q), on: true };
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 2) { const p = bandPower(bp, fOf(x), 1); const n = (Math.sqrt(p) - 1) / (Math.pow(10, 24 / 20) - 1); ctx.lineTo(x, H - n * (H - 14)); }
+      ctx.strokeStyle = carrier; ctx.setLineDash([3, 3]); ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+    }
+    // total curve
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 1) { const y = clamp(yOf(view.enabled ? totalDb(fOf(x)) : 0), -2, H + 2); x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.strokeStyle = view.enabled ? kc : faint; ctx.lineWidth = 1.8; ctx.stroke();
+    // nodes
+    ctx.font = '600 8.5px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    S.bands.forEach((b, i) => {
+      const x = xOf(b.freq), y = clamp(nodeY(b), 7, H - 7), sel = i === S.sel;
+      ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
+      if (!b.on) { ctx.fillStyle = inset; ctx.fill(); ctx.strokeStyle = faint; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = faint; }
+      else if (sel) { ctx.fillStyle = carrier; ctx.fill(); ctx.fillStyle = inset; }
+      else { ctx.fillStyle = inset; ctx.fill(); ctx.strokeStyle = kc; ctx.lineWidth = 1.5; ctx.stroke(); ctx.fillStyle = ink; }
+      ctx.fillText(String(i + 1), x, y + 0.5);
+    });
+    ctx.textAlign = 'left';
+  }
+
+  // ---- knobs
+  const DEG = Math.PI / 180, A0 = -135 * DEG, A1 = 135 * DEG;
+  function arcPath(r, a, b) {
+    const p = (t) => [17 + r * Math.sin(t), 17 - r * Math.cos(t)];
+    const [x0, y0] = p(a), [x1, y1] = p(b);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${b - a > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+  function knob(o) {
+    const k = document.createElement('div');
+    k.className = 'knob' + (o.disabled ? ' dis' : '');
+    k.tabIndex = o.disabled ? -1 : 0;
+    k.setAttribute('role', 'slider'); k.setAttribute('aria-label', o.label);
+    const toN = (v) => (o.log ? Math.log(v / o.min) / Math.log(o.max / o.min) : (v - o.min) / (o.max - o.min));
+    const fromN = (n) => { n = clamp(n, 0, 1); return o.log ? o.min * Math.pow(o.max / o.min, n) : o.min + n * (o.max - o.min); };
+    const render = () => {
+      const v = o.get(), n = toN(v), a = A0 + n * (A1 - A0), c = o.bipolar ? 0 : A0;
+      const from = Math.min(a, c), to = Math.max(a, c);
+      const pin = [17 + 9 * Math.sin(a), 17 - 9 * Math.cos(a)];
+      k.innerHTML = `<svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><path class="track" d="${arcPath(14, A0, A1)}"/>${to - from > 0.01 ? `<path class="arc" d="${arcPath(14, from, to)}"/>` : ''}<circle class="face" cx="17" cy="17" r="10.5"/><line class="pin" x1="17" y1="17" x2="${pin[0].toFixed(2)}" y2="${pin[1].toFixed(2)}"/></svg><span class="val">${o.disabled ? '—' : o.fmt(v)}</span><span class="lab">${o.label}</span>`;
+      k.setAttribute('aria-valuetext', o.fmt(v));
+    };
+    let startY = 0, startN = 0;
+    k.addEventListener('pointerdown', (e) => { startY = e.clientY; startN = toN(o.get()); k.setPointerCapture(e.pointerId); });
+    k.addEventListener('pointermove', (e) => {
+      if (!k.hasPointerCapture(e.pointerId)) return;
+      const n = startN + (startY - e.clientY) / (e.shiftKey ? 600 : 150);
+      o.set(fromN(n)); update();
+    });
+    k.addEventListener('dblclick', () => { o.set(o.def); update(); });
+    k.addEventListener('keydown', (e) => {
+      const d = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -1 : 0;
+      if (!d) return; e.preventDefault(); o.set(fromN(toN(o.get()) + d * (e.shiftKey ? 0.005 : 0.025))); update();
+    });
+    k.render = render; render();
+    return k;
+  }
+
+  // ---- band row and panel
+  const chips = $('chips'), panel = $('band');
+  let knobs = [];
+  function buildChips() {
+    chips.textContent = '';
+    S.bands.forEach((b, i) => {
+      const c = document.createElement('button');
+      c.type = 'button'; c.setAttribute('role', 'tab');
+      c.className = 'chip' + (b.on ? ' on' : '');
+      c.setAttribute('aria-selected', String(i === S.sel));
+      c.setAttribute('aria-label', `Band ${i + 1}, ${TYPES[b.type].label}, ${b.on ? 'on' : 'off'}`);
+      c.innerHTML = `<span class="sq" data-power title="On or off"></span><svg width="16" height="11" viewBox="0 0 16 11" aria-hidden="true"><path d="${GLYPH[b.type]}"/></svg><span class="n">${i + 1}</span>`;
+      c.addEventListener('click', (e) => {
+        if (e.target.closest('[data-power]')) { b.on = !b.on; }
+        S.sel = i; buildPanel(); update();
+      });
+      chips.append(c);
+    });
+  }
+  function select(label, options, value, change, disabled) {
+    const wrap = document.createElement('label'); wrap.className = 'field-wrap'; wrap.textContent = label;
+    const s = document.createElement('select'); s.className = 'field'; s.disabled = !!disabled; s.id = 'sel-' + label.toLowerCase();
+    for (const [v, t] of options) s.add(new Option(t, v));
+    s.value = String(value); s.onchange = () => { change(s.value); buildPanel(); update(); };
+    wrap.append(s); return wrap;
+  }
+  function col(cls, ...kids) { const c = document.createElement('div'); c.className = 'col' + (cls ? ' ' + cls : ''); c.append(...kids); return c; }
+  function buildPanel() {
+    const b = S.bands[S.sel], t = TYPES[b.type];
+    panel.textContent = ''; knobs = [];
+    const head = document.createElement('div'); head.className = 'sec'; head.innerHTML = `Band <b>${S.sel + 1}</b> · ${t.label}`;
+    const typeSel = select('Type', Object.entries(TYPES).map(([k, v]) => [k, v.label]), b.type, (v) => {
+      b.type = v; if (TYPES[v].cut && ![6, 12, 24, 48].includes(b.slope)) b.slope = 12;
+      if (v === 'notch' && b.q < 2) b.q = 4;
+    });
+    const slopeSel = select('Slope', [[6, '6 dB/oct'], [12, '12 dB/oct'], [24, '24 dB/oct'], [48, '48 dB/oct']], t.cut ? b.slope : 12, (v) => { b.slope = Number(v); }, !t.cut);
+    const sw = document.createElement('label'); sw.className = 'switch';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'listen'; cb.checked = view.listen; cb.onchange = () => { view.listen = cb.checked; };
+    sw.append(cb, document.createTextNode('Listen on drag'));
+    const wide = col('wide', head, typeSel, slopeSel, sw);
+    const kf = knob({ label: 'Freq', min: F_MIN, max: F_MAX, log: true, def: 1000, get: () => b.freq, set: (v) => (b.freq = v), fmt: fmtHz });
+    const kg = knob({ label: 'Gain', min: -G_MAX, max: G_MAX, bipolar: true, def: 0, get: () => b.gain, set: (v) => (b.gain = v), fmt: fmtDb, disabled: !t.gain });
+    const kq = knob({ label: 'Q', min: Q_MIN, max: Q_MAX, log: true, def: BW_Q, get: () => b.q, set: (v) => (b.q = v), fmt: (v) => v.toFixed(2), disabled: b.slope === 6 && t.cut });
+    const ks = knob({ label: 'Scale', min: 0, max: 2, def: 1, get: () => S.scale, set: (v) => (S.scale = v), fmt: (v) => Math.round(v * 100) + ' %' });
+    const ko = knob({ label: 'Output', min: -G_MAX, max: G_MAX, bipolar: true, def: 0, get: () => S.output, set: (v) => (S.output = v), fmt: fmtDb });
+    knobs = [kf, kg, kq, ks, ko];
+    const spacer = document.createElement('div'); spacer.style.height = '52px';
+    const rule = document.createElement('div'); rule.className = 'rule';
+    const cols = document.createElement('div'); cols.className = 'cols';
+    cols.append(col('', kf, kq), col('', kg, spacer), rule, col('', ks, ko));
+    panel.append(wide, cols);
+  }
+  function update() {
+    for (const k of knobs) k.render();
+    buildChips();
+    const b = S.bands[S.sel];
+    const pill = $('listen-pill');
+    pill.hidden = !(view.listen && view.dragging >= 0);
+    if (!pill.hidden) pill.textContent = `Listening · band ${view.dragging + 1} · ${fmtHz(S.bands[view.dragging].freq)}`;
+    $('status').textContent = `Band ${S.sel + 1}: ${TYPES[b.type].label} ${fmtHz(b.freq)}${TYPES[b.type].gain ? ' ' + fmtDb(b.gain) : ''} Q ${b.q.toFixed(2)}`;
+    draw();
+  }
+
+  // ---- curve gestures
+  function hit(x, y) {
+    let best = -1, bd = 11 * 11;
+    S.bands.forEach((b, i) => { const dx = xOf(b.freq) - x, dy = clamp(nodeY(b), 7, H - 7) - y, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  const local = (e) => { const r = plot.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  let drag = null;
+  plot.addEventListener('pointerdown', (e) => {
+    const [x, y] = local(e), i = hit(x, y);
+    if (i < 0) return;
+    const b = S.bands[i];
+    S.sel = i; b.on = true; view.dragging = i;
+    drag = { i, x, y, f: b.freq, g: b.gain, q: b.q };
+    plot.setPointerCapture(e.pointerId); buildPanel(); update();
+  });
+  plot.addEventListener('pointermove', (e) => {
+    if (!drag) { const [x, y] = local(e); plot.style.cursor = hit(x, y) >= 0 ? 'grab' : 'crosshair'; return; }
+    const [x, y] = local(e), b = S.bands[drag.i], fine = e.shiftKey ? 0.2 : 1;
+    const dx = (x - drag.x) * fine, dy = (y - drag.y) * fine;
+    if (e.altKey) { b.q = clamp(drag.q * Math.exp(-dy / 40), Q_MIN, Q_MAX); }
+    else {
+      b.freq = clamp(fOf(xOf(drag.f) + dx), F_MIN, F_MAX);
+      if (TYPES[b.type].gain) b.gain = clamp(drag.g + dbOf(H / 2 + dy) / Math.max(S.scale, 0.01), -G_MAX, G_MAX);
+      else if (TYPES[b.type].cut && b.slope !== 6) b.q = clamp(drag.q * Math.exp(-dy / 40), Q_MIN, Q_MAX);
+    }
+    update();
+  });
+  const endDrag = () => { if (drag) { drag = null; view.dragging = -1; update(); } };
+  plot.addEventListener('pointerup', endDrag);
+  plot.addEventListener('pointercancel', endDrag);
+  plot.addEventListener('wheel', (e) => {
+    const [x, y] = local(e), i = hit(x, y);
+    if (i < 0) return;
+    e.preventDefault();
+    const b = S.bands[i]; S.sel = i;
+    b.q = clamp(b.q * Math.exp(-e.deltaY / (e.shiftKey ? 1200 : 300)), Q_MIN, Q_MAX);
+    buildPanel(); update();
+  }, { passive: false });
+  plot.addEventListener('dblclick', (e) => {
+    const [x, y] = local(e), i = hit(x, y);
+    if (i >= 0) { S.bands[i].gain = 0; S.sel = i; buildPanel(); update(); return; }
+    const free = S.bands.findIndex((b) => !b.on);
+    if (free < 0) { $('status').textContent = 'All eight bands are on. Turn one off to add another.'; return; }
+    Object.assign(S.bands[free], { type: 'bell', freq: clamp(fOf(x), F_MIN, F_MAX), gain: clamp(dbOf(y), -G_MAX, G_MAX), q: 1, on: true });
+    S.sel = free; buildPanel(); update();
+  });
+  plot.addEventListener('keydown', (e) => {
+    if (/^[1-8]$/.test(e.key)) { S.sel = Number(e.key) - 1; buildPanel(); update(); return; }
+    const b = S.bands[S.sel], fine = e.shiftKey ? 0.2 : 1;
+    const moves = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+    const m = moves[e.key]; if (!m) return;
+    e.preventDefault();
+    if (e.altKey) b.q = clamp(b.q * Math.exp(m[1] * 0.1 * fine), Q_MIN, Q_MAX);
+    else { b.freq = clamp(b.freq * Math.pow(2, m[0] * fine / 12), F_MIN, F_MAX); if (TYPES[b.type].gain) b.gain = clamp(b.gain + m[1] * 0.5 * fine, -G_MAX, G_MAX); }
+    update();
+  });
+
+  // ---- chrome
+  function segs(id, fn) {
+    const g = $(id);
+    g.addEventListener('click', (e) => {
+      const btn = e.target.closest('button'); if (!btn) return;
+      for (const x of g.querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === btn));
+      fn(btn.dataset.v);
+    });
+  }
+  segs('seg-example', (v) => { S = EXAMPLES[v](); buildPanel(); update(); });
+  segs('seg-spec', (v) => { view.spectrum = v === 'on'; update(); });
+  segs('seg-chain', (v) => { document.getElementById('rack').style.setProperty('--kc', v === 'bus' ? 'var(--carrier)' : 'var(--modulator)'); update(); });
+  segs('range', (v) => { view.range = Number(v); update(); });
+  $('eq-power').addEventListener('click', () => { view.enabled = !view.enabled; eqEl.classList.toggle('off', !view.enabled); update(); });
+
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function loop(t) {
+    if (view.spectrum && t - lastT > 60) { lastT = t; tickSpectrum(t); draw(); }
+    requestAnimationFrame(loop);
+  }
+  sizeCanvas(); tickSpectrum(0); buildPanel(); update();
+  if (!still) requestAnimationFrame(loop);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+})();
+</script>
