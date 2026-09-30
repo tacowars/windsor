@@ -48,6 +48,7 @@ export function songPaneCtx(ctx: AppCtx, edited: () => void): AppCtx {
     render: () => ctx.render(),
     refreshTabs: () => ctx.refreshTabs(),
     invalidate: () => ctx.invalidate(),
+    onTabShown: (id, listener) => ctx.onTabShown(id, listener),
     notify: (message, tone) => ctx.notify(message, tone),
   };
 }

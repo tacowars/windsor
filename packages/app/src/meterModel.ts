@@ -5,6 +5,9 @@
  * returns, and `meterModel.test.ts` pins it.
  */
 import {
+  AMPLITUDE_DB_PER_DECADE,
+  DECADE,
+  METER_HOLD_LINE_PX,
   MS_PER_SECOND,
   METER_BALLISTICS,
   METER_READOUT_DECIMALS,
@@ -35,6 +38,44 @@ export function meterPosition(db: number, scale: MeterScale = METER_SCALE): numb
 /** A reduction's depth on the gain-reduction bar, 0 to 1 from the top. */
 export function reductionPosition(db: number, maxDb: number = REDUCTION_SCALE.maxDb): number {
   return Number.isFinite(db) ? clamp01(db / maxDb) : 0;
+}
+
+/**
+ * How far the peak bar's hold line moves up from the bottom for a held
+ * `db`, as a `translateY` in pixels (0 or less). A full-scale hold stops a
+ * line's thickness short of the top, so it stays inside the bar.
+ */
+export function peakHoldTranslatePx(
+  db: number,
+  heightPx: number,
+  lineThicknessPx: number = METER_HOLD_LINE_PX,
+  scale: MeterScale = METER_SCALE,
+): number {
+  return -Math.min(meterPosition(db, scale) * heightPx, heightPx - lineThicknessPx);
+}
+
+/**
+ * How far the gain-reduction bar's hold line moves down from the top for a
+ * held `db`, as a `translateY` in pixels (0 or more). A full-scale hold stops
+ * a line's thickness short of the bottom, so it stays inside the bar.
+ */
+export function reductionHoldTranslatePx(
+  db: number,
+  heightPx: number,
+  lineThicknessPx: number = METER_HOLD_LINE_PX,
+  maxDb: number = REDUCTION_SCALE.maxDb,
+): number {
+  return Math.min(reductionPosition(db, maxDb) * heightPx, heightPx - lineThicknessPx);
+}
+
+/** A linear sample peak in dBFS; silence is −∞. */
+export function amplitudeToDb(linear: number): number {
+  return linear > 0 ? AMPLITUDE_DB_PER_DECADE * Math.log10(linear) : -Infinity;
+}
+
+/** A dB value as a linear gain; −∞ is 0. */
+export function dbToAmplitude(db: number): number {
+  return Math.pow(DECADE, db / AMPLITUDE_DB_PER_DECADE);
 }
 
 /**
