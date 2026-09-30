@@ -3,12 +3,33 @@
 
 // packages/engine/src/inserts/tapeConstants.ts
 var TAPE_NAME = "tape";
-var TAPE_TYPES = ["studio", "ferric", "vintage"];
-var TAPE_LABELS = ["30ips Studio", "Ferric", "Vintage"];
+var TAPE_TYPES = [
+  "studio",
+  "ferric",
+  "vintage",
+  "studio15",
+  "chrome",
+  "metal",
+  "vhs"
+];
+var TAPE_LABELS = [
+  "30ips Studio",
+  "Ferric",
+  "Vintage",
+  "15ips Studio",
+  "Chrome",
+  "Metal",
+  "VHS"
+];
 var TAPE_BOUNDS = {
   drive: [-32, 32],
   bias: [-100, 100],
   wear: [0, 100],
+  wow: [0, 100],
+  flutter: [0, 100],
+  dropouts: [0, 100],
+  wowRate: [0.05, 3],
+  flutterRate: [1, 20],
   hiss: [-70, -16],
   trim: [-24, 24],
   mix: [0, 1],
@@ -18,6 +39,12 @@ var TAPE_DEFAULTS = {
   drive: 0,
   bias: 0,
   wear: 0,
+  wow: 0,
+  flutter: 0,
+  dropouts: 0,
+  wowRate: 1,
+  flutterRate: 7,
+  split: false,
   hiss: -70,
   trim: 0,
   mix: 1,
@@ -25,6 +52,7 @@ var TAPE_DEFAULTS = {
   enabled: true
 };
 var TAPE_DSP = {
+  weightFloor: 1e-12,
   smoothSeconds: 0.01,
   toneSeconds: 0.03,
   dcHz: 10,
@@ -79,6 +107,39 @@ var TAPE_MODELS = [
       ["high", 12e3, 0.3162, 0.2],
       ["low", 100, 0.5623, 0.7],
       ["peak", 500, 1.7783, 0.7]
+    ]
+  },
+  // Original Windsor profiles: broad tape-family colors, not measured hardware emulations.
+  {
+    hissDb: -2,
+    eq: [
+      ["low", 85, 1.2589, 0.7],
+      ["high", 12e3, 0.7079, 0.5],
+      ["peak", 70, 1.4125, 0.8]
+    ]
+  },
+  {
+    hissDb: 0,
+    eq: [
+      ["low", 100, 1.122, 0.7],
+      ["high", 12500, 0.8913, 0.7],
+      ["peak", 500, 0.9441, 0.7]
+    ]
+  },
+  {
+    hissDb: -1,
+    eq: [
+      ["low", 80, 1.2589, 0.7],
+      ["high", 15e3, 1.122, 0.7],
+      ["peak", 800, 0.7943, 0.8]
+    ]
+  },
+  {
+    hissDb: 5,
+    eq: [
+      ["low", 130, 1.4125, 0.7],
+      ["high", 6500, 0.2512, 0.5],
+      ["peak", 1100, 1.1885, 0.7]
     ]
   }
 ];
@@ -138,6 +199,9 @@ var TapeFilter = class {
     this.a1 = a1 / a0;
     this.a2 = a2 / a0;
   }
+  reset() {
+    this.x1 = this.x2 = this.y1 = this.y2 = 0;
+  }
   tick(x) {
     const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
     this.x2 = this.x1;
@@ -179,6 +243,9 @@ var TapeTone = class {
       this.filters[i + 2].configure(o);
     }
   }
+  reset() {
+    for (let i = 0; i < this.filters.length; i++) this.filters[i].reset();
+  }
   tick(x) {
     for (let i = 0; i < this.filters.length; i++) x = this.filters[i].tick(x);
     return x;
@@ -201,6 +268,10 @@ var TapeMotion = class {
     this.dropoutDepth = 0;
     this.dropout = 0;
     this.delay = 0;
+    this.wowRate = TAPE_DSP.wowHz;
+    this.flutterRate = TAPE_DSP.flutterHz;
+    this.previousWowRate = TAPE_DSP.wowHz;
+    this.previousFlutterRate = TAPE_DSP.flutterHz;
     this.state = seed;
     this.wowSmooth = 1 - Math.exp(-1 / (rate * TAPE_DSP.wowSmoothSeconds));
     this.flutterSmooth = 1 - Math.exp(-1 / (rate * TAPE_DSP.flutterSmoothSeconds));
@@ -213,19 +284,29 @@ var TapeMotion = class {
     t ^= t + Math.imul(t ^ t >>> 7, t | 61);
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   }
-  tick(wear) {
+  tick(wow, flutter = wow, dropouts = wow) {
+    if (this.wowRate !== this.previousWowRate) {
+      this.wowClock *= this.previousWowRate / this.wowRate;
+      this.previousWowRate = this.wowRate;
+    }
+    if (this.flutterRate !== this.previousFlutterRate) {
+      this.flutterClock *= this.previousFlutterRate / this.flutterRate;
+      this.previousFlutterRate = this.flutterRate;
+    }
     if (--this.wowClock <= 0) {
-      this.wowClock = this.rate / TAPE_DSP.wowHz;
+      this.wowClock = this.rate / this.wowRate;
       this.wowTarget = 2 * this.random() - 1;
     }
     if (--this.flutterClock <= 0) {
-      this.flutterClock = this.rate / (TAPE_DSP.flutterMinHz + this.random() * (TAPE_DSP.flutterMaxHz - TAPE_DSP.flutterMinHz));
+      this.flutterClock = this.rate / ((TAPE_DSP.flutterMinHz + this.random() * (TAPE_DSP.flutterMaxHz - TAPE_DSP.flutterMinHz)) * (this.flutterRate / TAPE_DSP.flutterHz));
       this.flutterTarget = 2 * this.random() - 1;
     }
     this.wow += this.wowSmooth * (this.wowTarget - this.wow);
     this.flutter += this.flutterSmooth * (this.flutterTarget - this.flutter);
-    this.delay = Math.min(1, Math.abs(this.wow + Math.max(0, this.flutter))) * wear * TAPE_DSP.maxDelaySeconds * this.rate;
-    if (--this.dropoutClock <= 0) this.rollDropout(wear);
+    const amount = Math.max(wow, flutter);
+    const motion = wow === flutter ? this.wow + Math.max(0, this.flutter) : amount > 0 ? (this.wow * wow + Math.max(0, this.flutter) * flutter) / amount : 0;
+    this.delay = Math.min(1, Math.abs(motion)) * amount * TAPE_DSP.maxDelaySeconds * this.rate;
+    if (--this.dropoutClock <= 0) this.rollDropout(dropouts);
     const envelope = this.dropoutPhase < 1 ? this.dropoutDepth * Math.sin(Math.PI * this.dropoutPhase) : 0;
     this.dropoutPhase = Math.min(1, this.dropoutPhase + 1 / this.dropoutLength);
     this.dropout += this.dropoutSmooth * (envelope - this.dropout);
@@ -244,6 +325,10 @@ var KEYS = Object.keys(TAPE_DEFAULTS);
 var TapeDsp = class {
   constructor(rate, params) {
     this.rate = rate;
+    this.lastDrive = NaN;
+    this.lastTrim = NaN;
+    this.lastHiss = NaN;
+    this.hissGain = 0;
     this.dcInput = new Float64Array(2);
     this.dcOutput = new Float64Array(2);
     this.noiseLow = 0;
@@ -258,10 +343,18 @@ var TapeDsp = class {
     this.noiseGain = 0;
     this.noise = 0;
     this.mix = 1;
-    this.controls = { ...TAPE_DEFAULTS, enabled: Number(TAPE_DEFAULTS.enabled) };
+    this.controls = {
+      ...TAPE_DEFAULTS,
+      enabled: Number(TAPE_DEFAULTS.enabled),
+      split: Number(TAPE_DEFAULTS.split)
+    };
     for (const key of KEYS) this.controls[key] = params[key]?.[0] ?? this.controls[key];
     this.targets = { ...this.controls };
     this.model = Math.round(params.model?.[0] ?? 0);
+    this.noiseOffsets = Float64Array.from(
+      TAPE_MODELS,
+      (model) => TAPE_DSP.dbBase ** (model.hissDb / TAPE_DSP.dbScale)
+    );
     this.weights = new Float64Array(TAPE_MODELS.length);
     this.weights[this.model] = 1;
     this.tones = Array.from({ length: 2 * TAPE_MODELS.length }, () => new TapeTone(rate));
@@ -279,38 +372,72 @@ var TapeDsp = class {
   }
   configure(params, frames) {
     for (const key of KEYS) this.targets[key] = params[key][0];
+    if (!this.controls.split && this.targets.split) {
+      this.controls.wow = this.controls.wear;
+      this.controls.flutter = this.controls.wear;
+      this.controls.dropouts = this.controls.wear;
+    }
+    this.controls.split = this.targets.split;
     if (this.controls.seed !== this.targets.seed) {
       this.controls.seed = this.targets.seed;
       this.motion.state = this.targets.seed;
     }
-    this.model = Math.round(params.model[0]);
+    const model = Math.round(params.model[0]);
+    if (model !== this.model && this.weights[model] === 0) {
+      this.tones[model * 2].reset();
+      this.tones[model * 2 + 1].reset();
+      this.noiseTones[model].reset();
+    }
+    this.model = model;
     const k = 1 - Math.exp(-frames / (this.rate * TAPE_DSP.toneSeconds));
     this.controls.bias += k * (this.targets.bias - this.controls.bias);
     if (Math.abs(this.targets.bias - this.controls.bias) < Number.EPSILON)
       this.controls.bias = this.targets.bias;
-    for (let model = 0; model < TAPE_MODELS.length; model++) {
-      this.tones[model * 2].configure(model, this.controls.bias);
-      this.tones[model * 2 + 1].configure(model, this.controls.bias);
-      this.noiseTones[model].configure(model, 0);
+    for (let model2 = 0; model2 < TAPE_MODELS.length; model2++) {
+      this.tones[model2 * 2].configure(model2, this.controls.bias);
+      this.tones[model2 * 2 + 1].configure(model2, this.controls.bias);
+      this.noiseTones[model2].configure(model2, 0);
     }
   }
   tick(left, right) {
     const s = this.controls, t = this.targets, k = this.smooth;
     s.drive += k * (t.drive - s.drive);
     s.wear += k * (t.wear - s.wear);
+    s.wow += k * (t.wow - s.wow);
+    s.flutter += k * (t.flutter - s.flutter);
+    s.dropouts += k * (t.dropouts - s.dropouts);
+    s.wowRate += k * (t.wowRate - s.wowRate);
+    s.flutterRate += k * (t.flutterRate - s.flutterRate);
     s.hiss += k * (t.hiss - s.hiss);
     s.trim += k * (t.trim - s.trim);
     s.mix += k * (t.mix - s.mix);
     s.enabled += k * (t.enabled - s.enabled);
-    this.gain = TAPE_DSP.dbBase ** (s.drive / TAPE_DSP.dbScale);
-    this.makeup = s.drive > 0 ? this.gain ** TAPE_DSP.makeup : this.gain;
-    this.trim = TAPE_DSP.dbBase ** (s.trim / TAPE_DSP.dbScale);
+    this.updateGains();
     this.mix = s.mix * s.enabled;
-    this.motion.tick(s.wear / TAPE_DSP.percent);
+    this.motion.wowRate = s.wowRate;
+    this.motion.flutterRate = s.flutterRate;
+    if (t.split) this.motion.tick(s.wow / TAPE_DSP.percent, s.flutter / TAPE_DSP.percent, s.dropouts / TAPE_DSP.percent);
+    else this.motion.tick(s.wear / TAPE_DSP.percent);
     this.tickNoise();
     this.left = this.channel(left, 0);
     this.right = this.channel(right, 1);
     this.position = (this.position + 1) % this.buffers[0].length;
+  }
+  updateGains() {
+    const s = this.controls;
+    if (s.drive !== this.lastDrive) {
+      this.lastDrive = s.drive;
+      this.gain = TAPE_DSP.dbBase ** (s.drive / TAPE_DSP.dbScale);
+      this.makeup = s.drive > 0 ? this.gain ** TAPE_DSP.makeup : this.gain;
+    }
+    if (s.trim !== this.lastTrim) {
+      this.lastTrim = s.trim;
+      this.trim = TAPE_DSP.dbBase ** (s.trim / TAPE_DSP.dbScale);
+    }
+    if (s.hiss !== this.lastHiss) {
+      this.lastHiss = s.hiss;
+      this.hissGain = TAPE_DSP.dbBase ** (s.hiss / TAPE_DSP.dbScale);
+    }
   }
   tickNoise() {
     const white = this.motion.random() * 2 - 1;
@@ -320,16 +447,21 @@ var TapeDsp = class {
     for (let model = 0; model < TAPE_MODELS.length; model++) {
       const target = model === this.model ? 1 : 0;
       this.weights[model] += this.smooth * (target - this.weights[model]);
-      noise += this.weights[model] * this.noiseTones[model].tick(this.noiseHigh) * TAPE_DSP.dbBase ** (TAPE_MODELS[model].hissDb / TAPE_DSP.dbScale);
+      if (target === 0 && this.weights[model] < TAPE_DSP.weightFloor) this.weights[model] = 0;
+      if (target === 1 && 1 - this.weights[model] < TAPE_DSP.weightFloor) this.weights[model] = 1;
+      if (this.weights[model] === 0) continue;
+      noise += this.weights[model] * this.noiseTones[model].tick(this.noiseHigh) * this.noiseOffsets[model];
     }
-    const targetGain = this.targets.hiss <= TAPE_BOUNDS.hiss[0] ? 0 : TAPE_DSP.dbBase ** (this.controls.hiss / TAPE_DSP.dbScale);
+    const targetGain = this.targets.hiss <= TAPE_BOUNDS.hiss[0] ? 0 : this.hissGain;
     this.noiseGain += this.smooth * (targetGain - this.noiseGain);
     this.noise = noise * this.noiseGain;
   }
   channel(input, channel) {
     let tone = 0;
-    for (let model = 0; model < TAPE_MODELS.length; model++)
-      tone += this.weights[model] * this.tones[model * 2 + channel].tick(input);
+    for (let model = 0; model < TAPE_MODELS.length; model++) {
+      if (this.weights[model] !== 0)
+        tone += this.weights[model] * this.tones[model * 2 + channel].tick(input);
+    }
     const y = Math.tanh(tone * this.gain);
     const shaped = (y + TAPE_DSP.warmth * y * y + TAPE_DSP.punch * y * y * y) / this.makeup;
     const dc = shaped - this.dcInput[channel] + this.dcPole * this.dcOutput[channel];
@@ -364,6 +496,7 @@ var TapeProcessor = class _TapeProcessor extends AudioWorkletProcessor {
         defaultValue: 0,
         automationRate: "k-rate"
       },
+      { name: "split", minValue: 0, maxValue: 1, defaultValue: 0, automationRate: "k-rate" },
       { name: "enabled", minValue: 0, maxValue: 1, defaultValue: 1, automationRate: "k-rate" }
     ];
   }

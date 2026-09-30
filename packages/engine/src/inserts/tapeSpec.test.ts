@@ -12,7 +12,15 @@ it('normalizes absent and malformed fields, including model, integer seed and un
   expect(TAPE_INSERT.normalise({ kind: 'tape' }, 'fx', n)).toEqual(DEFAULT_TAPE);
   expect(n.corrections).toEqual([]);
   const fixed = TAPE_INSERT.normalise(
-    { model: 'vhs', seed: 2.5, drive: Infinity, wear: -1, bias: 500, enabled: 'false', unknown: 1 },
+    {
+      model: 'unknown-model',
+      seed: 2.5,
+      drive: Infinity,
+      wear: -1,
+      bias: 500,
+      enabled: 'false',
+      unknown: 1,
+    },
     'fx',
     n,
   );
@@ -34,6 +42,12 @@ it('round trips every tape control on tracks and master, preserving the complete
       drive: 19,
       bias: -23,
       wear: 56,
+      split: true,
+      wow: 17,
+      flutter: 29,
+      dropouts: 63,
+      wowRate: 0.25,
+      flutterRate: 12,
       hiss: -41,
       trim: -7,
       mix: 0.62,

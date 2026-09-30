@@ -7,6 +7,7 @@ import type { TapeSpec } from './tapeSpec';
 function create(context: BaseAudioContext, spec: TapeSpec): InsertStage<TapeSpec> {
   const parameterData: Record<string, number> = {
     enabled: Number(spec.enabled),
+    split: Number(spec.split),
     model: TAPE_TYPES.indexOf(spec.model),
   };
   for (const name of TAPE_NUMBERS) parameterData[name] = spec[name];
@@ -30,6 +31,7 @@ function create(context: BaseAudioContext, spec: TapeSpec): InsertStage<TapeSpec
     set(next): void {
       for (const name of TAPE_NUMBERS) processor.parameters.get(name)!.value = next[name];
       processor.parameters.get('enabled')!.value = Number(next.enabled);
+      processor.parameters.get('split')!.value = Number(next.split);
       processor.parameters.get('model')!.value = TAPE_TYPES.indexOf(next.model);
     },
     dispose(): void {

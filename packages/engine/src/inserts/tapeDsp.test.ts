@@ -36,7 +36,10 @@ describe('shipped Tape processor', () => {
           const spec = Object.fromEntries(
             Object.entries(TAPE_BOUNDS).map(([k, v]) => [k, v[edge]]),
           );
-          const samples = render({ ...spec, model, mix: 1 }, { rate, level: 4, blocks: 100 });
+          const samples = render(
+            { ...spec, model, mix: 1, split: true },
+            { rate, level: 4, blocks: 100 },
+          );
           expect(samples.every(Number.isFinite)).toBe(true);
           expect(energy(samples)).toBeGreaterThan(0);
         }

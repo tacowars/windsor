@@ -53,11 +53,31 @@ it('updates parameters without wiring changes and releases only owned edges', ()
   const stage = TAPE_INSERT.create(context.asAudioContext(), DEFAULT_TAPE);
   const node = stage.processor as unknown as TapeNode;
   const edges = context.nodes.map((n) => [...n.outbound]);
-  stage.set({ ...DEFAULT_TAPE, drive: 12, wear: 80, enabled: false });
+  stage.set({
+    ...DEFAULT_TAPE,
+    drive: 12,
+    wear: 80,
+    split: true,
+    wow: 23,
+    flutter: 34,
+    dropouts: 45,
+    wowRate: 0.5,
+    flutterRate: 11,
+    enabled: false,
+  });
   expect(context.nodes.map((n) => n.outbound)).toEqual(edges);
   expect(node.parameters.get('drive')!.value).toBe(12);
   expect(node.parameters.get('wear')!.value).toBe(80);
   expect(node.parameters.get('enabled')!.value).toBe(0);
+  for (const [key, value] of Object.entries({
+    split: 1,
+    wow: 23,
+    flutter: 34,
+    dropouts: 45,
+    wowRate: 0.5,
+    flutterRate: 11,
+  }))
+    expect(node.parameters.get(key)!.value).toBe(value);
   const output = stage.output as unknown as FakeNode;
   output.connect(context.destination);
   stage.dispose();
