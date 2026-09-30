@@ -109,8 +109,8 @@ var LoadSampler = class {
   }
 };
 
-// packages/engine/src/worklet/delay/delayDsp.ts
-var KEYS = [
+// packages/engine/src/worklet/delay/delaySlots.ts
+var DELAY_KEYS = [
   "leftMs",
   "rightMs",
   "feedback",
@@ -123,95 +123,131 @@ var KEYS = [
   "ping",
   "mid"
 ];
+var slot = (key) => DELAY_KEYS.indexOf(key);
+var DELAY_SLOT = {
+  leftMs: slot("leftMs"),
+  rightMs: slot("rightMs"),
+  feedback: slot("feedback"),
+  highpass: slot("highpass"),
+  lowpass: slot("lowpass"),
+  drive: slot("drive"),
+  mix: slot("mix"),
+  outputDb: slot("outputDb"),
+  enabled: slot("enabled"),
+  ping: slot("ping"),
+  mid: slot("mid")
+};
+
+// packages/engine/src/worklet/delay/delayDsp.ts
 var DelayDsp = class {
   constructor(rate, _params) {
+    this.rate = this.smooth = this.timeSmooth = NaN;
+    this.inputLeft = this.inputRight = this.value = this.left = this.right = NaN;
     this.rate = rate;
     const length = Math.ceil(rate * DELAY_DSP.maxSeconds) + 2;
     this.buffer = [new Float32Array(length), new Float32Array(length)];
     this.filter = new Float64Array(DELAY_DSP.filterStates);
     this.smooth = 1 - Math.exp(-1 / (rate * DELAY_DSP.smoothSeconds));
     this.timeSmooth = 1 - Math.exp(-1 / (rate * DELAY_DSP.timeSmoothSeconds));
-    this.controls = { ...DELAY_DEFAULTS, enabled: 1, ping: 0, mid: 0 };
-    this.targets = { ...this.controls };
-    this.position = this.left = this.right = 0;
+    this.controls = new Float64Array(DELAY_KEYS.length);
+    for (let k = 0; k < DELAY_KEYS.length; k++) {
+      const key = DELAY_KEYS[k];
+      this.controls[k] = key === "ping" || key === "mid" ? 0 : Number(DELAY_DEFAULTS[key]);
+    }
+    this.targets = Float64Array.from(this.controls);
+    this.position = 0;
+    this.left = this.right = 0;
     this.first = true;
   }
   configure(params, _frames) {
     const t = this.targets;
-    for (let i = 0; i < KEYS.length; i++) {
-      const key = KEYS[i];
-      if (key !== "ping" && key !== "mid") t[key] = params[key][0];
+    for (let k = 0; k < DELAY_KEYS.length; k++) {
+      if (k !== DELAY_SLOT.ping && k !== DELAY_SLOT.mid) t[k] = params[DELAY_KEYS[k]][0];
     }
-    t.ping = params.mode[0] === DELAY_MODE_IDS["ping-pong"] ? 1 : 0;
-    t.mid = params.mode[0] === DELAY_MODE_IDS["mid-side"] ? 1 : 0;
-    t.highpass = this.pole(t.highpass);
-    t.lowpass = this.pole(t.lowpass);
-    t.drive = DELAY_DSP.dbBase ** (t.drive / DELAY_DSP.dbDivisor);
-    t.outputDb = DELAY_DSP.dbBase ** (t.outputDb / DELAY_DSP.dbDivisor);
+    t[DELAY_SLOT.ping] = params.mode[0] === DELAY_MODE_IDS["ping-pong"] ? 1 : 0;
+    t[DELAY_SLOT.mid] = params.mode[0] === DELAY_MODE_IDS["mid-side"] ? 1 : 0;
+    this.pole(DELAY_SLOT.highpass);
+    this.pole(DELAY_SLOT.lowpass);
+    t[DELAY_SLOT.drive] = DELAY_DSP.dbBase ** (t[DELAY_SLOT.drive] / DELAY_DSP.dbDivisor);
+    t[DELAY_SLOT.outputDb] = DELAY_DSP.dbBase ** (t[DELAY_SLOT.outputDb] / DELAY_DSP.dbDivisor);
     if (this.first) {
-      for (let i = 0; i < KEYS.length; i++) this.controls[KEYS[i]] = t[KEYS[i]];
+      for (let k = 0; k < DELAY_KEYS.length; k++) this.controls[k] = t[k];
       this.first = false;
     }
   }
-  pole(hz) {
-    return 1 - Math.exp(-(2 * Math.PI * Math.min(hz, this.rate * DELAY_DSP.cutoffRateRatio) / this.rate));
+  /** Turns the target in `slot`, a cutoff in Hz, into its one-pole coefficient, in place. */
+  pole(slot2) {
+    const t = this.targets;
+    t[slot2] = 1 - Math.exp(-(2 * Math.PI * Math.min(t[slot2], this.rate * DELAY_DSP.cutoffRateRatio) / this.rate));
   }
-  tick(left, right) {
+  /** One host sample: `inputLeft` and `inputRight` into `left` and `right`. */
+  tick() {
+    const left = this.inputLeft;
+    const right = this.inputRight;
     const s = this.controls;
     const t = this.targets;
     const k = this.smooth;
-    s.leftMs += this.timeSmooth * (t.leftMs - s.leftMs);
-    s.rightMs += this.timeSmooth * (t.rightMs - s.rightMs);
-    s.feedback += k * (t.feedback - s.feedback);
-    s.highpass += k * (t.highpass - s.highpass);
-    s.lowpass += k * (t.lowpass - s.lowpass);
-    s.drive += k * (t.drive - s.drive);
-    s.mix += k * (t.mix - s.mix);
-    s.outputDb += k * (t.outputDb - s.outputDb);
-    s.enabled += k * (t.enabled - s.enabled);
-    s.ping += k * (t.ping - s.ping);
-    s.mid += k * (t.mid - s.mid);
-    const a = this.read(0, s.leftMs);
-    const b = this.read(1, s.rightMs);
+    s[DELAY_SLOT.leftMs] += this.timeSmooth * (t[DELAY_SLOT.leftMs] - s[DELAY_SLOT.leftMs]);
+    s[DELAY_SLOT.rightMs] += this.timeSmooth * (t[DELAY_SLOT.rightMs] - s[DELAY_SLOT.rightMs]);
+    s[DELAY_SLOT.feedback] += k * (t[DELAY_SLOT.feedback] - s[DELAY_SLOT.feedback]);
+    s[DELAY_SLOT.highpass] += k * (t[DELAY_SLOT.highpass] - s[DELAY_SLOT.highpass]);
+    s[DELAY_SLOT.lowpass] += k * (t[DELAY_SLOT.lowpass] - s[DELAY_SLOT.lowpass]);
+    s[DELAY_SLOT.drive] += k * (t[DELAY_SLOT.drive] - s[DELAY_SLOT.drive]);
+    s[DELAY_SLOT.mix] += k * (t[DELAY_SLOT.mix] - s[DELAY_SLOT.mix]);
+    s[DELAY_SLOT.outputDb] += k * (t[DELAY_SLOT.outputDb] - s[DELAY_SLOT.outputDb]);
+    s[DELAY_SLOT.enabled] += k * (t[DELAY_SLOT.enabled] - s[DELAY_SLOT.enabled]);
+    s[DELAY_SLOT.ping] += k * (t[DELAY_SLOT.ping] - s[DELAY_SLOT.ping]);
+    s[DELAY_SLOT.mid] += k * (t[DELAY_SLOT.mid] - s[DELAY_SLOT.mid]);
+    this.read(0, DELAY_SLOT.leftMs);
+    const a = this.value;
+    this.read(1, DELAY_SLOT.rightMs);
+    const b = this.value;
     const mid = (left + right) / 2;
     const side = (left - right) / 2;
-    const inputA = left + s.mid * (mid - left) + s.ping * (mid - left);
-    const inputB = right + s.mid * (side - right) - s.ping * right;
-    const feedA = a + s.ping * (b - a);
-    const feedB = b + s.ping * (a - b);
-    this.write(0, inputA * s.enabled + s.feedback * feedA);
-    this.write(1, inputB * s.enabled + s.feedback * feedB);
-    const wetL = a + s.mid * b;
-    const wetR = b + s.mid * (a - 2 * b);
-    const mix = s.mix * s.enabled;
-    const gain = 1 + s.enabled * (s.outputDb - 1);
+    const inputA = left + s[DELAY_SLOT.mid] * (mid - left) + s[DELAY_SLOT.ping] * (mid - left);
+    const inputB = right + s[DELAY_SLOT.mid] * (side - right) - s[DELAY_SLOT.ping] * right;
+    const feedA = a + s[DELAY_SLOT.ping] * (b - a);
+    const feedB = b + s[DELAY_SLOT.ping] * (a - b);
+    this.value = inputA * s[DELAY_SLOT.enabled] + s[DELAY_SLOT.feedback] * feedA;
+    this.write(0);
+    this.value = inputB * s[DELAY_SLOT.enabled] + s[DELAY_SLOT.feedback] * feedB;
+    this.write(1);
+    const wetL = a + s[DELAY_SLOT.mid] * b;
+    const wetR = b + s[DELAY_SLOT.mid] * (a - 2 * b);
+    const mix = s[DELAY_SLOT.mix] * s[DELAY_SLOT.enabled];
+    const gain = 1 + s[DELAY_SLOT.enabled] * (s[DELAY_SLOT.outputDb] - 1);
     this.left = (left + mix * (wetL - left)) * gain;
     this.right = (right + mix * (wetR - right)) * gain;
     if (++this.position === this.buffer[0].length) this.position = 0;
   }
-  read(channel, ms) {
+  /** Line `channel`, delayed by the milliseconds in control `slot` and filtered, into `value`. */
+  read(channel, slot2) {
     const buffer = this.buffer[channel];
-    const samples = Math.max(1, Math.min(buffer.length - 2, ms * this.rate / DELAY_DSP.milliseconds));
+    const s = this.controls;
+    const samples = Math.max(
+      1,
+      Math.min(buffer.length - 2, s[slot2] * this.rate / DELAY_DSP.milliseconds)
+    );
     let position = this.position - samples;
     if (position < 0) position += buffer.length;
     const index = Math.floor(position);
     const next = index + 1 === buffer.length ? 0 : index + 1;
     let value = buffer[index] + (position - index) * (buffer[next] - buffer[index]);
     const offset = channel * DELAY_DSP.polesPerChannel;
-    const s = this.controls;
     for (let i = 0; i < 2; i++) {
-      this.filter[offset + i] += s.highpass * (value - this.filter[offset + i]);
+      this.filter[offset + i] += s[DELAY_SLOT.highpass] * (value - this.filter[offset + i]);
       value -= this.filter[offset + i];
     }
     for (let i = 2; i < DELAY_DSP.polesPerChannel; i++) {
-      this.filter[offset + i] += s.lowpass * (value - this.filter[offset + i]);
+      this.filter[offset + i] += s[DELAY_SLOT.lowpass] * (value - this.filter[offset + i]);
       value = this.filter[offset + i];
     }
-    return value;
+    this.value = value;
   }
-  write(channel, value) {
-    const limit = DELAY_DSP.feedbackCeiling / this.controls.drive;
-    this.buffer[channel][this.position] = limit * Math.tanh(value / limit);
+  /** `value`, saturated, into line `channel` at the write position. */
+  write(channel) {
+    const limit = DELAY_DSP.feedbackCeiling / this.controls[DELAY_SLOT.drive];
+    this.buffer[channel][this.position] = limit * Math.tanh(this.value / limit);
   }
 };
 
@@ -259,11 +295,15 @@ var DelayProcessor = class _DelayProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
-    this.dsp.configure(params, frames);
+    const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
+    const dsp = this.dsp;
+    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
-      this.dsp.tick(left?.[i] ?? 0, right?.[i] ?? 0);
-      out[0][i] = this.dsp.left;
-      if (out[1]) out[1][i] = this.dsp.right;
+      dsp.inputLeft = i < leftFrames ? left[i] : 0;
+      dsp.inputRight = i < rightFrames ? right[i] : 0;
+      dsp.tick();
+      out[0][i] = dsp.left;
+      if (out[1]) out[1][i] = dsp.right;
     }
     this.load.end(frames);
     return true;
