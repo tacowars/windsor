@@ -1,4 +1,4 @@
-// Writes the scenario songs for windsor#222 into ./songs: one FM part and no
+// Writes the scenario songs for windsor#222 into ./scenarios: one FM part and no
 // inserts, the same part with one insert kind on the master (one song per
 // kind), and a dense song of eight parts with two or three inserts each.
 // Patches are copied from the shipped library, so each song is self-contained.
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const patchDir = join(here, '../../../packages/engine/src/patches');
-const outDir = join(here, 'songs');
+const outDir = join(here, 'scenarios');
 
 const BARS = 32;
 const TICKS_PER_BAR = 96;

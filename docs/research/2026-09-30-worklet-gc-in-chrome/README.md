@@ -55,7 +55,7 @@ thread's GC, has a yes. Its limits are under "Limits" below.
 
 ## Method
 
-**Songs** ([`songs/`](songs/), written by [`generate-songs.mjs`](generate-songs.mjs)):
+**Songs** ([`scenarios/`](scenarios/), written by [`generate-songs.mjs`](generate-songs.mjs)):
 one song per scenario, 32 bars at 120 BPM (64 s, looping), imported as JSON.
 The FM part is `pad-drift` (the Node probe's patch), a chord part hitting a
 three-note chord once a bar and holding it (gate 1), with the harmony moving
@@ -291,7 +291,8 @@ measured neither.
 
 ## Files
 
-- [`generate-songs.mjs`](generate-songs.mjs) writes [`songs/`](songs/).
+- [`generate-songs.mjs`](generate-songs.mjs) writes [`scenarios/`](scenarios/),
+  the ten songs (the repository ignores any folder named `songs/`).
 - [`analyse-trace.mjs`](analyse-trace.mjs) reduces a raw trace to a summary:
   `node --max-old-space-size=8192 analyse-trace.mjs <trace.json> <summary.json>`.
 - [`summaries/`](summaries/): one per traced run, with every collection's
