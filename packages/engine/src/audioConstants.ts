@@ -161,10 +161,11 @@ export const BASS_DENSITY_DEFAULT = 1;
 export const BASS_ROOT_BIAS_DEFAULT = 0.7;
 export const BASS_GATE_DEFAULT = 0.8;
 /**
- * A document's document-format version: 3 since #705 (transport bars, the harmony
- * timeline, regions), 4 since windsor#172 (the send buses hold insert chains).
+ * A document's document-format version: 5 since windsor#224 (Tape's Drive feeds
+ * the magnetic core, so a saved Drive changed meaning). No upgrade ships, and
+ * versions 2 to 4 are refused (record `2026-09-28-format-versions-refuse-never-destroy`).
  */
-export const ARRANGEMENT_VERSION = 4;
+export const ARRANGEMENT_VERSION = 5;
 /** How many parts a song may have, and so the highest slot (#597). */
 export const MUSIC_PARTS_MAX = 8;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;

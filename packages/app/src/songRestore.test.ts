@@ -95,7 +95,9 @@ describe('offerRestore', () => {
       expect(asked).toHaveLength(1);
       expect(asked[0]?.ok).toBe('Download the old song');
       expect(asked[0]?.cancel).toBe('Start fresh');
-      expect(asked[0]?.body).toContain('saved with song format 99, this build reads 4');
+      expect(asked[0]?.body).toContain(
+        `saved with song format 99, this build reads ${ARRANGEMENT_VERSION}`,
+      );
       expect(asked[0]?.body).toContain('kept until your first edit');
       expect(downloads).toEqual([text]);
       expect(ctx.model.toJson()).toBe(fresh);
@@ -130,7 +132,7 @@ describe('offerRestore', () => {
       const refusal = songRefusal(future());
       expect(refusal).not.toBeNull();
       expect(importRefusedText('song.json', refusal!)).toBe(
-        'import refused: song.json was saved with song format 99, this build reads 4. The file is unchanged.',
+        `import refused: song.json was saved with song format 99, this build reads ${ARRANGEMENT_VERSION}. The file is unchanged.`,
       );
       expect(songRefusal(song())).toBeNull();
       expect(songRefusal('{not json')).toBeNull();

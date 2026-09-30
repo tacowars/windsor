@@ -1,4 +1,9 @@
-/** Original finite reflection field: flat/gated or rising/reverse, with no onset detector. */
+/**
+ * Original finite reflection field: flat/gated or rising/reverse, with no onset detector.
+ * `tick` takes `input` and leaves `left`/`right`, fields rather than an argument, which V8
+ * boxes across a call it does not inline (worklet rule 2); each double field is first
+ * written as one (rule 7). Tested through retroReverbDsp.test.ts and retroReverbAllocation.test.ts.
+ */
 import {
   RETRO_REVERB_BOUNDS as B,
   RETRO_REVERB_DSP as C,
@@ -16,6 +21,8 @@ class RetroReflections {
   gainsRight: Float64Array;
   left: number;
   right: number;
+  /** The sample `tick` takes. */
+  input: number;
 
   constructor() {
     this.delay = new RetroDelay(B.duration[1] * C.rate);
@@ -25,7 +32,8 @@ class RetroReflections {
     this.fractions = new Float64Array(C.reflectionCount);
     this.gainsLeft = new Float64Array(C.reflectionCount);
     this.gainsRight = new Float64Array(C.reflectionCount);
-    this.left = this.right = 0;
+    this.left = this.right = this.input = NaN;
+    this.left = this.right = this.input = 0;
     const random = makeRandom(C.reflectionSeed);
     for (let i = 0; i < C.reflectionCount; i++) {
       this.positions[i] =
@@ -61,7 +69,7 @@ class RetroReflections {
     }
   }
 
-  tick(input: number): void {
+  tick(): void {
     let left = 0,
       right = 0;
     const buffer = this.delay.buffer;
@@ -77,7 +85,8 @@ class RetroReflections {
     }
     this.left = left;
     this.right = right;
-    this.delay.write(input);
+    this.delay.input = this.input;
+    this.delay.write();
   }
 }
 

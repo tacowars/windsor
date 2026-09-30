@@ -1,5 +1,8 @@
-/** Stereo REELS Lite adaptation. All state preallocated; seeded renders exercise the shipped processor.
- * Saturation polynomial/makeup from ELPHNT's CC0 tape_core.gendsp. Max noise/filter primitives are adapted.
+/** Stereo Tape: REELS Lite's EQ, motion and noise around Windsor's magnetic core. All state preallocated.
+ * Per channel: Bias and model EQ → × driveGain(Drive) → the magnetic core at 2× or 4× (`tapeMagneticStage.ts`)
+ * → DC block → transport delay → hiss → dropouts → trim; Mix and bypass read the dry signal delayed by the
+ * core's fixed latency (windsor#224). Max noise/filter primitives are adapted; seeded renders exercise the
+ * shipped processor (`inserts/tapeDsp.test.ts`, `tapeMagneticIntegration.test.ts`).
  */
 import {
   TAPE_BOUNDS,
@@ -7,11 +10,16 @@ import {
   TAPE_DSP as C,
   TAPE_MODELS,
 } from '../../inserts/tapeConstants';
+import { driveGain } from '../../inserts/tapeMagneticConstants';
 import { TapeTone } from './tapeFilter';
+import { assertMagneticRows } from './tapeMagneticRows';
+import { TapeMagneticStage } from './tapeMagneticStage';
 import { TapeMotion } from './tapeMotion';
 type TapeParams = Record<string, Float32Array>;
 const KEYS = Object.keys(TAPE_DEFAULTS) as Array<keyof typeof TAPE_DEFAULTS>;
 type Controls = Record<(typeof KEYS)[number], number>;
+// Refuse, when the bundle loads, a model row the core cannot normalise (design decision 6).
+assertMagneticRows();
 class TapeDsp {
   controls: Controls;
   targets: Controls;
@@ -27,6 +35,9 @@ class TapeDsp {
   dcInput = new Float64Array(2);
   dcOutput = new Float64Array(2);
   motion: TapeMotion;
+  magnetic: TapeMagneticStage;
+  /** Test-only: skip the Bias and model EQ (`bypassEq`); not a parameter, never set from a song. */
+  eqBypassed = false;
   smooth: number;
   dcPole: number;
   noiseHp: number;
@@ -38,7 +49,6 @@ class TapeDsp {
   left = 0;
   right = 0;
   gain = 1;
-  makeup = 1;
   trim = 1;
   noiseGain = 0;
   noise = 0;
@@ -68,6 +78,7 @@ class TapeDsp {
       () => new Float32Array(Math.ceil(rate * C.maxDelaySeconds) + 2),
     );
     this.motion = new TapeMotion(rate, this.controls.seed);
+    this.magnetic = new TapeMagneticStage(rate, this.controls.oversampling, this.model);
     this.smooth = 1 - Math.exp(-1 / (rate * C.smoothSeconds));
     this.dcPole = Math.exp(-(2 * Math.PI * C.dcHz) / rate);
     this.noiseHp = 1 - Math.exp(-(2 * Math.PI * C.hissHighpassHz) / rate);
@@ -95,6 +106,8 @@ class TapeDsp {
       this.noiseTones[model].reset();
     }
     this.model = model;
+    this.magnetic.select(params.oversampling[0]);
+    this.magnetic.configure(model, frames);
     const k = 1 - Math.exp(-frames / (this.rate * C.toneSeconds));
     this.controls.bias += k * (this.targets.bias - this.controls.bias);
     if (Math.abs(this.targets.bias - this.controls.bias) < Number.EPSILON)
@@ -130,13 +143,18 @@ class TapeDsp {
     this.left = this.channel(left, 0);
     this.right = this.channel(right, 1);
     this.position = (this.position + 1) % this.buffers[0].length;
+    this.magnetic.dryAt =
+      this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
+  }
+  /** Test-only: route the input straight to Drive, skipping the Bias and model EQ (design decision 3's calibration). */
+  bypassEq(bypassed: boolean): void {
+    this.eqBypassed = bypassed;
   }
   updateGains(): void {
     const s = this.controls;
     if (s.drive !== this.lastDrive) {
       this.lastDrive = s.drive;
-      this.gain = C.dbBase ** (s.drive / C.dbScale);
-      this.makeup = s.drive > 0 ? this.gain ** C.makeup : this.gain;
+      this.gain = driveGain(s.drive);
     }
     if (s.trim !== this.lastTrim) {
       this.lastTrim = s.trim;
@@ -168,13 +186,15 @@ class TapeDsp {
     this.noise = noise * this.noiseGain;
   }
   channel(input: number, channel: number): number {
-    let tone = 0;
-    for (let model = 0; model < TAPE_MODELS.length; model++) {
+    let tone = this.eqBypassed ? input : 0;
+    for (let model = 0; model < TAPE_MODELS.length && !this.eqBypassed; model++) {
       if (this.weights[model] !== 0)
         tone += this.weights[model] * this.tones[model * 2 + channel].tick(input);
     }
-    const y = Math.tanh(tone * this.gain);
-    const shaped = (y + C.warmth * y * y + C.punch * y * y * y) / this.makeup;
+    const core = this.magnetic.active[channel];
+    core.input = tone * this.gain;
+    core.advance();
+    const shaped = core.output;
     const dc = shaped - this.dcInput[channel] + this.dcPole * this.dcOutput[channel];
     this.dcInput[channel] = shaped;
     this.dcOutput[channel] = dc;
@@ -185,9 +205,14 @@ class TapeDsp {
       frac = read - index;
     const delayed = buffer[index] + frac * (buffer[(index + 1) % buffer.length] - buffer[index]);
     const wet = (delayed + this.noise) * (1 - this.motion.dropout) * this.trim;
-    // Exact initial dry/bypass, then smooth changes; snap sub-ulp residue for settled transparency.
-    if (this.mix < Number.EPSILON) return input;
-    return input + this.mix * (wet - input);
+    // The dry path is exactly as late as the core's fixed delay (design decision 4).
+    const ring = this.magnetic.dry,
+      at = channel * this.magnetic.latency + this.magnetic.dryAt;
+    const dry = ring[at];
+    ring[at] = input;
+    // Exact delayed dry/bypass, then smooth changes; snap sub-ulp residue for settled transparency.
+    if (this.mix < Number.EPSILON) return dry;
+    return dry + this.mix * (wet - dry);
   }
 }
 export { TapeDsp };

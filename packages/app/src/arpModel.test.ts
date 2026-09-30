@@ -5,6 +5,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  ARRANGEMENT_VERSION,
   DEFAULT_ARP_CONFIG,
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
@@ -21,7 +22,7 @@ beforeAll(() => loadBuiltIns());
 
 const arpSong = (): DocumentModel =>
   new DocumentModel({
-    version: 3,
+    version: ARRANGEMENT_VERSION,
     parts: [
       {
         slot: 0,
@@ -72,7 +73,7 @@ describe('the Seed field', () => {
 describe("the card's knobs", () => {
   it('default to what the normaliser writes for a bare arp part', () => {
     const bare = new DocumentModel({
-      version: 3,
+      version: ARRANGEMENT_VERSION,
       parts: [{ slot: 0, name: 'Arp', preset: 'saw-arp', sequencer: { kind: 'arp' } }],
     });
     const part = partAt(bare.doc, 0)!;

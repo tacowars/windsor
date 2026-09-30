@@ -1,5 +1,11 @@
 /** Tape adapter: block controls, stereo audio, shutdown and existing load telemetry. */
-import { TAPE_NAME, TAPE_BOUNDS, TAPE_DEFAULTS, TAPE_TYPES } from '../../inserts/tapeConstants';
+import {
+  TAPE_NAME,
+  TAPE_BOUNDS,
+  TAPE_DEFAULTS,
+  TAPE_OVERSAMPLING,
+  TAPE_TYPES,
+} from '../../inserts/tapeConstants';
 import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
 import { TapeDsp } from './tapeDsp';
@@ -28,6 +34,13 @@ class TapeProcessor extends AudioWorkletProcessor {
       },
       { name: 'split', minValue: 0, maxValue: 1, defaultValue: 0, automationRate: 'k-rate' },
       { name: 'enabled', minValue: 0, maxValue: 1, defaultValue: 1, automationRate: 'k-rate' },
+      {
+        name: 'oversampling',
+        minValue: TAPE_OVERSAMPLING[0],
+        maxValue: TAPE_OVERSAMPLING[TAPE_OVERSAMPLING.length - 1],
+        defaultValue: TAPE_DEFAULTS.oversampling,
+        automationRate: 'k-rate',
+      },
     ];
   }
 
