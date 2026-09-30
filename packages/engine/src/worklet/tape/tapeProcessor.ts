@@ -33,6 +33,7 @@ class TapeProcessor extends AudioWorkletProcessor {
         defaultValue: 0,
         automationRate: 'k-rate',
       },
+      { name: 'split', minValue: 0, maxValue: 1, defaultValue: 0, automationRate: 'k-rate' },
       { name: 'enabled', minValue: 0, maxValue: 1, defaultValue: 1, automationRate: 'k-rate' },
     ];
   }

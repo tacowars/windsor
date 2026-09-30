@@ -1,0 +1,113 @@
+/** Original Windsor starting points, not REELS or CHOW preset copies. Values live in the song. */
+import type { TapeSpec } from './tapeSpec';
+type TapeSettings = Pick<
+  TapeSpec,
+  'model' | 'drive' | 'bias' | 'wow' | 'flutter' | 'dropouts' | 'wowRate' | 'flutterRate' | 'hiss'
+>;
+export const TAPE_PRESETS: readonly { id: string; label: string; settings: TapeSettings }[] = [
+  {
+    id: 'master',
+    label: 'Studio polish',
+    settings: {
+      model: 'studio',
+      drive: 3,
+      bias: 0,
+      wow: 0,
+      flutter: 0,
+      dropouts: 0,
+      wowRate: 0.3,
+      flutterRate: 7,
+      hiss: -70,
+    },
+  },
+  {
+    id: 'reel',
+    label: 'Warm reel',
+    settings: {
+      model: 'studio15',
+      drive: 7,
+      bias: -8,
+      wow: 3,
+      flutter: 2,
+      dropouts: 0,
+      wowRate: 0.4,
+      flutterRate: 6,
+      hiss: -70,
+    },
+  },
+  {
+    id: 'chrome',
+    label: 'Chrome shimmer',
+    settings: {
+      model: 'chrome',
+      drive: 4,
+      bias: 8,
+      wow: 8,
+      flutter: 3,
+      dropouts: 0,
+      wowRate: 0.5,
+      flutterRate: 8,
+      hiss: -60,
+    },
+  },
+  {
+    id: 'metal',
+    label: 'Metal punch',
+    settings: {
+      model: 'metal',
+      drive: 10,
+      bias: 0,
+      wow: 2,
+      flutter: 1,
+      dropouts: 0,
+      wowRate: 0.3,
+      flutterRate: 7,
+      hiss: -70,
+    },
+  },
+  {
+    id: 'cassette',
+    label: 'Late-night cassette',
+    settings: {
+      model: 'ferric',
+      drive: 8,
+      bias: -15,
+      wow: 16,
+      flutter: 8,
+      dropouts: 12,
+      wowRate: 0.45,
+      flutterRate: 5,
+      hiss: -52,
+    },
+  },
+  {
+    id: 'vhs',
+    label: 'VHS memory',
+    settings: {
+      model: 'vhs',
+      drive: 6,
+      bias: -10,
+      wow: 28,
+      flutter: 14,
+      dropouts: 22,
+      wowRate: 0.6,
+      flutterRate: 9,
+      hiss: -48,
+    },
+  },
+  {
+    id: 'worn',
+    label: 'Damaged field tape',
+    settings: {
+      model: 'vintage',
+      drive: 12,
+      bias: -25,
+      wow: 40,
+      flutter: 24,
+      dropouts: 60,
+      wowRate: 1.2,
+      flutterRate: 12,
+      hiss: -45,
+    },
+  },
+];

@@ -1259,6 +1259,9 @@ body.chord-dragging {
 .retro-reverb-card .knob {
   width: 64px;
 }
+.tape-card .knob {
+  width: 80px;
+}
 .knob svg {
   display: block;
 }

@@ -54,6 +54,9 @@ class TapeFilter {
     this.a1 = a1 / a0;
     this.a2 = a2 / a0;
   }
+  reset(): void {
+    this.x1 = this.x2 = this.y1 = this.y2 = 0;
+  }
   tick(x: number): number {
     const y =
       this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
@@ -96,6 +99,9 @@ class TapeTone {
       o.q = row[3];
       this.filters[i + 2].configure(o);
     }
+  }
+  reset(): void {
+    for (let i = 0; i < this.filters.length; i++) this.filters[i].reset();
   }
   tick(x: number): number {
     for (let i = 0; i < this.filters.length; i++) x = this.filters[i].tick(x);

@@ -1,0 +1,365 @@
+{
+  "baseline": "c5e604af996d7f5c1e3713195a182da13e49c46b",
+  "environment": {
+    "cpu": "Apple M1",
+    "arch": "arm64",
+    "os": "25.5.0",
+    "node": "v24.21.0",
+    "v8": "13.6.233.17-node.53",
+    "browser": "none",
+    "backend": "source-bundled stereo DSP in Node; no audio device"
+  },
+  "rate": 48000,
+  "frames": 192000,
+  "blockSize": 128,
+  "warmupFrames": 192000,
+  "rounds": 7,
+  "parity": [
+    {
+      "values": {
+        "model": 0,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 44100,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 0,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 44100,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 1,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 44100,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 1,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 44100,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 2,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 44100,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 2,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 44100,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 0,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 48000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 0,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 48000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 1,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 48000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 1,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 48000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 2,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 48000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 2,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 48000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 0,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 96000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 0,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 96000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 1,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 96000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 1,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 96000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 2,
+        "wear": 0,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 96000,
+      "identicalFloat32Samples": 384000
+    },
+    {
+      "values": {
+        "model": 2,
+        "wear": 63,
+        "drive": 8,
+        "hiss": -45,
+        "bias": -12,
+        "seed": 123
+      },
+      "rate": 96000,
+      "identicalFloat32Samples": 384000
+    }
+  ],
+  "benchmarks": [
+    {
+      "name": "legacy-studio",
+      "values": {
+        "model": 0,
+        "drive": 8,
+        "wear": 0,
+        "hiss": -70
+      },
+      "timesMs": {
+        "baseline": [
+          85.34729199999992,
+          85.11241599999994,
+          85.28762499999993,
+          85.1528330000001,
+          85.45649999999978,
+          86.20945799999981,
+          85.2266669999999
+        ],
+        "expanded": [
+          53.518167000000176,
+          53.62754099999984,
+          53.48679100000027,
+          53.6432920000002,
+          53.817833000000064,
+          53.54804200000035,
+          54.03916699999991
+        ]
+      },
+      "medianMs": {
+        "baseline": 85.28762499999993,
+        "expanded": 53.62754099999984
+      }
+    },
+    {
+      "name": "legacy-cassette-worn",
+      "values": {
+        "model": 1,
+        "drive": 8,
+        "wear": 63,
+        "hiss": -45
+      },
+      "timesMs": {
+        "baseline": [
+          80.13929199999984,
+          80.50916600000073,
+          80.61212500000056,
+          80.18791599999986,
+          80.25595800000065,
+          80.19949999999972,
+          79.96079199999986
+        ],
+        "expanded": [
+          46.28129100000024,
+          46.97070799999983,
+          46.578583999999864,
+          46.28795900000023,
+          46.488374999999905,
+          46.98041700000067,
+          46.542459000000235
+        ]
+      },
+      "medianMs": {
+        "baseline": 80.19949999999972,
+        "expanded": 46.542459000000235
+      }
+    },
+    {
+      "name": "legacy-moving-controls",
+      "values": {
+        "model": 0,
+        "wear": 63,
+        "hiss": -45
+      },
+      "moving": true,
+      "timesMs": {
+        "baseline": [
+          77.25962499999969,
+          77.78008299999965,
+          77.5711250000004,
+          77.14329199999975,
+          77.45420800000011,
+          77.45179200000075,
+          77.4638329999998
+        ],
+        "expanded": [
+          77.77304099999947,
+          78.57395799999995,
+          78.23854200000005,
+          77.48695800000041,
+          78.59375,
+          77.89141699999982,
+          77.45279200000004
+        ]
+      },
+      "medianMs": {
+        "baseline": 77.45420800000011,
+        "expanded": 77.89141699999982
+      }
+    },
+    {
+      "name": "expanded-vhs",
+      "values": {
+        "model": 6,
+        "split": true,
+        "wow": 28,
+        "flutter": 14,
+        "dropouts": 22,
+        "wowRate": 0.6,
+        "flutterRate": 9,
+        "drive": 6,
+        "hiss": -48
+      },
+      "expandedOnly": true,
+      "timesMs": {
+        "expanded": [
+          47.45866699999988,
+          47.369792000000416,
+          47.18866699999944,
+          47.09662500000013,
+          47.49824999999964,
+          47.2789159999993,
+          48.13087499999983
+        ]
+      },
+      "medianMs": {
+        "expanded": 47.369792000000416
+      }
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import { TAPE_KNOBS } from './tapeTables';
 it('uses engine ranges/defaults for every editable tape number and displays the hiss floor as Off', () => {
   expect(TAPE_KNOBS.map((k) => k.f).sort()).toEqual(
     Object.keys(TAPE_BOUNDS)
-      .filter((k) => k !== 'seed')
+      .filter((k) => k !== 'seed' && k !== 'wear')
       .sort(),
   );
   for (const { f, o } of TAPE_KNOBS) {
