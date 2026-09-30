@@ -11,10 +11,15 @@ import {
   afterMove,
   afterRemove,
   emptyRack,
+  emptySeen,
+  recordKinds,
+  resetChain,
   showPage,
+  syncChain,
   toggleFold,
   viewAt,
 } from './insertRackModel';
+import type { RackSeen, RackView } from './insertRackModel';
 
 describe('viewAt', () => {
   it('starts every insert on page 1, open', () => {
@@ -110,5 +115,73 @@ describe('afterAdd', () => {
 
   it('adds the first insert of an empty chain open', () => {
     expect(viewAt(afterAdd(emptyRack(), 'master', 0, 0), 'master', 0, 1)).toEqual(OPEN_VIEW);
+  });
+});
+
+describe('syncChain', () => {
+  type Rack = { readonly view: RackView; readonly seen: RackSeen };
+  /** A rack that has rendered chain 1 holding `kinds` once. */
+  const rendered = (kinds: readonly string[]): Rack =>
+    syncChain({ view: emptyRack(), seen: emptySeen() }, 1, kinds);
+  /** One of the rack's own edits: the forward shift, and the new kinds recorded. */
+  const edit = (rack: Rack, view: RackView, kinds: readonly string[]): Rack => ({
+    view,
+    seen: recordKinds(rack.seen, 1, kinds),
+  });
+
+  it('resets the chain when an undo takes back an add at the front', () => {
+    let rack = rendered(['eq', 'drive']);
+    rack = { ...rack, view: toggleFold(rack.view, 1, 0) };
+    rack = edit(rack, afterAdd(rack.view, 1, 0, 2), ['comp', 'eq', 'drive']);
+    rack = syncChain(rack, 1, ['comp', 'eq', 'drive']);
+    expect(viewAt(rack.view, 1, 1, 1).folded).toBe(true);
+    const undone = syncChain(rack, 1, ['eq', 'drive']);
+    for (const at of [0, 1, 2]) expect(viewAt(undone.view, 1, at, 3)).toEqual(OPEN_VIEW);
+    expect(undone.view.size).toBe(0);
+  });
+
+  it('keeps the fold and page through a knob-only change and its undo', () => {
+    let rack = rendered(['eq', 'drive']);
+    rack = { ...rack, view: showPage(toggleFold(rack.view, 1, 0), 1, 1, 2) };
+    const again = syncChain(syncChain(rack, 1, ['eq', 'drive']), 1, ['eq', 'drive']);
+    expect(again).toBe(rack);
+    expect(viewAt(again.view, 1, 0, 3)).toEqual({ page: 0, folded: true });
+    expect(viewAt(again.view, 1, 1, 3)).toEqual({ page: 2, folded: false });
+  });
+
+  it('resets the chain when an undo takes back a move', () => {
+    let rack = rendered(['eq', 'drive']);
+    rack = { ...rack, view: toggleFold(rack.view, 1, 0) };
+    const moved = afterMove(rack.view, 1, { index: 0, delta: 1, length: 2 });
+    rack = syncChain(edit(rack, moved, ['drive', 'eq']), 1, ['drive', 'eq']);
+    expect(viewAt(rack.view, 1, 1, 1).folded).toBe(true);
+    const undone = syncChain(rack, 1, ['eq', 'drive']);
+    expect(viewAt(undone.view, 1, 0, 1)).toEqual(OPEN_VIEW);
+    expect(viewAt(undone.view, 1, 1, 1)).toEqual(OPEN_VIEW);
+  });
+
+  it('resets the chain when a redo puts back a remove', () => {
+    let rack = rendered(['eq', 'drive', 'comp']);
+    rack = { ...rack, view: toggleFold(rack.view, 1, 2) };
+    rack = syncChain(edit(rack, afterRemove(rack.view, 1, 1, 3), ['eq', 'comp']), 1, [
+      'eq',
+      'comp',
+    ]);
+    expect(viewAt(rack.view, 1, 1, 1).folded).toBe(true);
+    const undone = syncChain(rack, 1, ['eq', 'drive', 'comp']);
+    expect(undone.view.size).toBe(0);
+    const refolded = { ...undone, view: toggleFold(undone.view, 1, 0) };
+    const redone = syncChain(refolded, 1, ['eq', 'comp']);
+    expect(viewAt(redone.view, 1, 0, 1)).toEqual(OPEN_VIEW);
+    expect(viewAt(redone.view, 1, 1, 1)).toEqual(OPEN_VIEW);
+  });
+
+  it('resets only the chain whose kinds changed', () => {
+    let rack = syncChain(rendered(['eq']), 11, ['drive']);
+    rack = { ...rack, view: toggleFold(toggleFold(rack.view, 1, 0), 11, 0) };
+    const next = syncChain(rack, 1, ['comp']);
+    expect(viewAt(next.view, 1, 0, 1).folded).toBe(false);
+    expect(viewAt(next.view, 11, 0, 1).folded).toBe(true);
+    expect(viewAt(resetChain(rack.view, 11), 1, 0, 1).folded).toBe(true);
   });
 });

@@ -21,21 +21,47 @@ import type { InsertPage } from './insertCards';
 import { INSERT_CARDS } from './insertCards';
 import { moveInsert, removeInsert, setInsertField } from './insertEdits';
 import { INSERT_LABELS } from './insertKnobTables';
-import type { RackView } from './insertRackModel';
-import { afterMove, afterRemove, emptyRack, showPage, toggleFold, viewAt } from './insertRackModel';
+import type { RackSeen, RackView } from './insertRackModel';
+import {
+  afterMove,
+  afterRemove,
+  emptyRack,
+  emptySeen,
+  recordKinds,
+  showPage,
+  syncChain,
+  toggleFold,
+  viewAt,
+} from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
 import { insertChange, insertsOf } from './insertTarget';
 
 /** Every rack's view state, for this session only: never in the song. */
 let rackView: RackView = emptyRack();
+/** The kinds each chain held when `rackView` last matched it. */
+let rackSeen: RackSeen = emptySeen();
+
+const kindsOf = (inserts: readonly InsertSpec[]): string[] => inserts.map((spec) => spec.kind);
 
 /** The rack's view state now. */
 export const currentRackView = (): RackView => rackView;
 
 /**
+ * Before a render of the chain `slot`: reset its view state if the document
+ * changed its kinds some way other than the rack's own edits (an undo, a
+ * redo, an import), so no fold or page lands on another insert.
+ */
+export function syncRackView(ctx: AppCtx, slot: InsertTarget): void {
+  const next = syncChain({ view: rackView, seen: rackSeen }, slot, kindsOf(insertsOf(ctx, slot)));
+  rackView = next.view;
+  rackSeen = next.seen;
+}
+
+/**
  * Send the chain's next insert list as one edit (one undo step) and render.
  * `view` is the rack's view state to hold once the edit takes, for an edit
- * that moves inserts along the chain.
+ * that moves inserts along the chain; the chain's new kinds are recorded
+ * with it, so the render that follows keeps it.
  */
 export function commitChain(
   ctx: AppCtx,
@@ -44,7 +70,10 @@ export function commitChain(
   view?: RackView,
 ): void {
   if (!ctx.change(insertChange(slot, inserts)).ok) return;
-  if (view) rackView = view;
+  if (view) {
+    rackView = view;
+    rackSeen = recordKinds(rackSeen, slot, kindsOf(inserts));
+  }
   ctx.render();
 }
 

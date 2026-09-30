@@ -8,6 +8,13 @@
  * inserts' state with them, a remove shifts the later ones down, and an add
  * starts the new insert on page 1, open, shifting the ones after it up.
  *
+ * Those shifts follow the rack's own edits. A document that changes some
+ * other way (an undo or redo of a move, add or remove, an import, an edit on
+ * another tab) would leave the state on the wrong insert, so each chain also
+ * records the kinds it last saw (`RackSeen`). A render whose chain holds
+ * other kinds resets that chain to page 1 and open (`syncChain`), as
+ * decision 4 allows; a knob edit or its undo keeps the kinds, and the state.
+ *
  * Pure: every function returns a new state and leaves its argument alone.
  */
 
@@ -116,4 +123,41 @@ export function afterAdd(
     next = withView(next, chain, at, state.get(rackKey(chain, at - 1)) ?? OPEN_VIEW);
   }
   return withView(next, chain, index, OPEN_VIEW);
+}
+
+/** The kinds each chain held when its view state last matched it, by chain. */
+export type RackSeen = ReadonlyMap<string, string>;
+
+export const emptySeen = (): RackSeen => new Map();
+
+const kindsKey = (kinds: readonly string[]): string => kinds.join(',');
+
+/** `seen` with `chain` recorded as holding `kinds`: after one of the rack's own edits. */
+export function recordKinds(seen: RackSeen, chain: RackChain, kinds: readonly string[]): RackSeen {
+  const next = new Map(seen);
+  next.set(String(chain), kindsKey(kinds));
+  return next;
+}
+
+/** `state` with every view of `chain` gone: its inserts all on page 1, open. */
+export function resetChain(state: RackView, chain: RackChain): RackView {
+  const prefix = rackKey(chain, 0).slice(0, -1);
+  const next = new Map(state);
+  for (const key of state.keys()) if (key.startsWith(prefix)) next.delete(key);
+  return next;
+}
+
+/**
+ * The state for a render of `chain` holding `kinds`. If the chain holds
+ * other kinds than `seen` recorded, the document changed outside the rack's
+ * own edits and the views may belong to other inserts: that chain resets.
+ * Otherwise nothing changes, and the same objects come back.
+ */
+export function syncChain(
+  rack: { readonly view: RackView; readonly seen: RackSeen },
+  chain: RackChain,
+  kinds: readonly string[],
+): { readonly view: RackView; readonly seen: RackSeen } {
+  if (rack.seen.get(String(chain)) === kindsKey(kinds)) return rack;
+  return { view: resetChain(rack.view, chain), seen: recordKinds(rack.seen, chain, kinds) };
 }

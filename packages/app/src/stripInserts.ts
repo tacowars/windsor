@@ -19,7 +19,7 @@ import { addInsert, addInsertAtFront, canAddInsert } from './insertEdits';
 import { insertsOf } from './insertKnobs';
 import { afterAdd } from './insertRackModel';
 import { INSERT_RACK_PX } from './insertRackTables';
-import { commitChain, currentRackView, insertBox } from './insertShell';
+import { commitChain, currentRackView, insertBox, syncRackView } from './insertShell';
 
 /** Which end of the chain an Add slot adds at. */
 type AddSide = 'front' | 'back';
@@ -59,6 +59,7 @@ function addPicker(ctx: AppCtx, slot: InsertTarget, side: AddSide): HTMLElement 
 
 /** The chain's rack: the front Add slot, each insert, the back Add slot. */
 export function stripInserts(ctx: AppCtx, slot: InsertTarget): HTMLElement {
+  syncRackView(ctx, slot);
   const row = el('div', 'insert-row');
   for (const [name, px] of Object.entries(INSERT_RACK_PX)) row.style.setProperty(name, `${px}px`);
   row.appendChild(addPicker(ctx, slot, 'front'));
