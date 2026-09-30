@@ -188,3 +188,11 @@ describe('the compact knob (windsor#157)', () => {
     expect(compact.size).toBeLessThan(knobGeometry({}).size);
   });
 });
+
+describe("the insert rack's dials (windsor#173)", () => {
+  it("draws the mockup's 30 px dial and its 42 px big one", () => {
+    expect(knobGeometry({ dial: 'rack' }).size).toBe(30);
+    expect(knobGeometry({ dial: 'rack-big' }).size).toBe(42);
+    expect(knobGeometry({ dial: 'rack' }).r).toBeLessThan(knobGeometry({}).r);
+  });
+});

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_DRIVE, DEFAULT_ECHO, DEFAULT_PLATE_REVERB, MAX_INSERTS } from '@windsor/engine';
 import { addInsert, canAddInsert, moveInsert, removeInsert, setInsertField } from './insertEdits';
+import { addInsertAtFront } from './insertEdits';
 
 describe('insert edits', () => {
   it('adds a fresh insert of the kind, and stops at the limit', () => {
@@ -61,5 +62,41 @@ describe('insert edits', () => {
     expect(next).toEqual([DEFAULT_DRIVE, { ...DEFAULT_DRIVE, mix: 0.4 }]);
     expect(list[1]).toBe(DEFAULT_DRIVE);
     expect(setInsertField(list, 7, 'mix', 0.4)).toEqual(list);
+  });
+});
+
+describe('addInsertAtFront (windsor#173)', () => {
+  it("puts addInsert's fresh insert at index 0 and keeps the rest in order", () => {
+    const a = { ...DEFAULT_DRIVE, drive: 3 };
+    const b = { ...DEFAULT_DRIVE, drive: 9 };
+    const list = [a, b];
+    const next = addInsertAtFront(list, 'drive');
+    expect(next).toEqual([addInsert([], 'drive')[0], a, b]);
+    expect(next[0]).not.toBe(DEFAULT_DRIVE);
+    expect(list).toEqual([a, b]);
+  });
+
+  it('adds the first insert to an empty chain, as addInsert does', () => {
+    expect(addInsertAtFront([], 'drive')).toEqual(addInsert([], 'drive'));
+  });
+
+  it('starts a Plate reverb or an Echo at Mix 1.00 at the front of a send bus (windsor#172)', () => {
+    const drive = { ...DEFAULT_DRIVE, drive: 3 };
+    for (const bus of ['a', 'b'] as const) {
+      expect(addInsertAtFront([drive], 'plate', bus)).toEqual([
+        { ...DEFAULT_PLATE_REVERB, mix: 1 },
+        drive,
+      ]);
+      expect(addInsertAtFront([drive], 'echo', bus)[0]).toEqual({ ...DEFAULT_ECHO, mix: 1 });
+    }
+    for (const target of [0, 'master', undefined] as const)
+      expect(addInsertAtFront([drive], 'plate', target)[0]).toEqual(DEFAULT_PLATE_REVERB);
+  });
+
+  it('leaves a full chain as it was', () => {
+    let list = addInsert([], 'drive');
+    while (canAddInsert(list)) list = addInsert(list, 'drive');
+    const full = list.map((spec, i) => ({ ...spec, mix: i / MAX_INSERTS }));
+    expect(addInsertAtFront(full, 'chorus')).toEqual(full);
   });
 });

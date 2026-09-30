@@ -47,10 +47,20 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   echo: 'Echo',
 };
 
-/** The on/off switch every insert card shows, the way the Dub delay's reads. */
-export const INSERT_SWITCH_OPTIONS: readonly { value: 'on' | 'off'; label: string }[] = [
-  { value: 'on', label: 'Enabled' },
-  { value: 'off', label: 'Bypassed' },
+/**
+ * The Add slot's groups (windsor#173 decision 7), each an `<optgroup>` in
+ * this order. Every kind is in exactly one; `insertCards.test.ts` fails on a
+ * kind in none.
+ */
+export const INSERT_GROUPS: readonly {
+  readonly label: string;
+  readonly kinds: readonly InsertKindName[];
+}[] = [
+  { label: 'Drive', kinds: ['drive', 'advanced-drive', 'tape'] },
+  { label: 'Dynamics', kinds: ['compressor'] },
+  { label: 'Modulation', kinds: ['chorus', 'ensemble', 'phaser'] },
+  { label: 'Time', kinds: ['echo', 'delay'] },
+  { label: 'Space', kinds: ['plate', 'retro-reverb'] },
 ];
 
 export interface InsertKnobEntry<S> {

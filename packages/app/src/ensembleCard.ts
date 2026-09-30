@@ -1,7 +1,7 @@
 /**
  * The ensemble insert's card (#695): slow and fast LFO rate and depth, the
- * line centre, tone, width and mix, under a preset picker of sourced string
- * machines and an on switch.
+ * line centre, tone, width and mix, beside a preset picker of sourced string
+ * machines.
  */
 import {
   DEFAULT_ENSEMBLE,
