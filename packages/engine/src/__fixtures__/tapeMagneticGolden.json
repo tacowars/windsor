@@ -1,0 +1,20 @@
+{
+  "about": "sha256 of the magnetic Tape module rendering a two-second stereo program (tones, a signed pulse, a Drive sweep) at 48 kHz, centre row, through inserts/tapeMagneticGolden.test.ts: the interleaved Float64 output, with each channel guard and reset count. Written only by that test under WINDSOR_REFRESH_TAPE_MAGNETIC_GOLDEN=1, and only when a render change is intended (windsor#219).",
+  "sampleRate": 48000,
+  "renders": {
+    "2x": {
+      "hash": "cd56de2ee610909c0489831be061feae512f0351267077dfdf4600846227e897",
+      "leftGuards": 26,
+      "rightGuards": 0,
+      "leftResets": 0,
+      "rightResets": 0
+    },
+    "4x": {
+      "hash": "93eb417c111157148810f60044356b995d25ae45fa1e380ade176a5590883214",
+      "leftGuards": 51,
+      "rightGuards": 0,
+      "leftResets": 0,
+      "rightResets": 0
+    }
+  }
+}

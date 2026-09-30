@@ -7,6 +7,23 @@ It builds `generated/tape-processor.js` and has its own TS project.
 `inserts/tape*.test.ts` exercise the shipped bundle via `__fixtures__/tapeHarness.ts`.
 Provenance and Max differences: `docs/log/2026-09-30-reels-inspired-tape-insert.md`.
 
+`tape/tapeMagnetic.ts` and `tape/tapeOversample.ts` are the magnetic core
+(windsor#219, epic #146 E1), written from the published Jiles–Atherton model:
+the RK4 core with its field guard and knee, and the span-48 FIR pair that
+reconstructs H and its exact derivative at every RK4 stage time. Nothing
+imports them yet, so the bundle does not carry them until E2 wires them into
+`TapeDsp`. Tunables and `driveGain` are in `inserts/tapeMagneticConstants.ts`.
+Stage points travel in a `Float64Array` and results in fields, so no double
+crosses a call; `render` is the block entry. The tests import the sources
+directly, so the test project reads them under `noUncheckedIndexedAccess` and
+an indexed read takes a `!`. `inserts/tapeMagnetic.test.ts` holds the core to
+the research ruler `__fixtures__/tapeMagneticReference.json`, which
+`scripts/tape-magnetic-fixtures.mjs` writes once and which is the only file
+that touches `docs/research/`. `inserts/tapeOversample.test.ts` checks the
+pair. `inserts/tapeMagneticGolden.test.ts` pins the render (refresh only with
+`WINDSOR_REFRESH_TAPE_MAGNETIC_GOLDEN=1`) and reads the heap across `render`.
+Record: `docs/log/2026-09-30-tape-magnetic-core.md`.
+
 `advancedDrive/` is the five-route insert (#701), bundled as
 `generated/advanced-drive-processor.js`. Its processor owns lifetime and load
 reporting; `advancedDriveDsp.ts` owns smoothing, modulation and oversampling;
