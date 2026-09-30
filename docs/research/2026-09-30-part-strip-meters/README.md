@@ -51,10 +51,13 @@ The seven runs of each kind sit within about ±3 % of its median (see
   second). It is paid only while meters are active, since an inactive
   meter builds nothing (decision 3), so the cost follows how many lights
   the app has switched on.
-- The meters posted 13,840 reports in the last metered run, against the
-  14,400 that 16 meters at 30 Hz over 30 s would send; the rest were still
-  queued when the count was read, 200 ms after rendering ended. Handling
-  them is main-thread work, which this render time does not include.
+- The meters posted 13,840 reports in the last metered run, all of them.
+  The processor checks its counter once per 128-frame render quantum and
+  reports on the first quantum past 1,600 frames, so it reports every 13
+  quanta (1,664 frames, about 28.8 Hz at 48 kHz), not at exactly 30 Hz.
+  A 30 s render holds 11,250 quanta, and `floor(11250 / 13) × 16` is
+  13,840. Handling the reports is main-thread work, which this render time
+  does not include.
 
 ## Limits
 
