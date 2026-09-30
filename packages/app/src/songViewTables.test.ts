@@ -262,15 +262,17 @@ describe('the mixer column (windsor#157)', () => {
     expect(mixerColumnPx(true, 5)).toBeGreaterThan(mixerColumnPx(false, 5));
   });
 
-  it('sizes the expanded base as the CSS grid does: its fixed tracks, two gaps and the padding', () => {
+  it('sizes the expanded base as the CSS grid does: its fixed tracks, the gaps between them and the padding', () => {
     const expanded = rule('.mix-cell.expanded');
     const template = /grid-template-columns: ([^;]*);/.exec(expanded)?.[1] ?? '';
-    // The px tracks: the gutter, Output, M and S; the knobs' are fractions.
-    const fixed = [...template.matchAll(/(\d+)px/g)]
-      .map((m) => Number(m[1]))
-      .reduce((a, b) => a + b, 0);
+    // The px tracks: the gutter, Output, M, S and the lights; the knobs' are
+    // fractions, and each knob column carries its own gap (mixerKnobColumnPx),
+    // so the base holds one gap fewer than it has fixed tracks.
+    const tracks = [...template.matchAll(/(\d+)px/g)].map((m) => Number(m[1]));
+    const fixed = tracks.reduce((a, b) => a + b, 0);
+    const gaps = tracks.length - 1;
     const gap = parseFloat(/column-gap: ([^;]*);/.exec(expanded)?.[1] ?? '');
     const padX = parseFloat(/padding: 0 ([^;]*);/.exec(rule('.mix-cell'))?.[1] ?? '');
-    expect(fixed + 2 * gap + 2 * padX).toBe(SONG_VIEW.mixerExpandedBasePx);
+    expect(fixed + gaps * gap + 2 * padX).toBe(SONG_VIEW.mixerExpandedBasePx);
   });
 });

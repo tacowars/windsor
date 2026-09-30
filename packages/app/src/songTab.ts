@@ -32,6 +32,8 @@ import {
   partMixerCell,
   refreshMixerCells,
 } from './songMixerCell';
+import { songMixerLights } from './songMixerLights';
+import type { MixerLights } from './songMixerLights';
 import { stripSignature } from './songMixerModel';
 import { guardFrozenColumns } from './songFrozenColumns';
 import {
@@ -150,7 +152,12 @@ function validSelection(ctx: AppCtx, selection: SongSelection): SongSelection {
 }
 
 // eslint-disable-next-line max-lines-per-function -- the view's one composition: the lanes, the pane, the watch and the SongView the lanes call back into read as one sequence
-function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): void {
+function renderSongView(
+  body: HTMLElement,
+  ctx: AppCtx,
+  state: SongViewState,
+  lights: MixerLights,
+): void {
   body.innerHTML = '';
   state.selection = validSelection(ctx, state.selection);
   const scroll = el('div', 'lanes-scroll');
@@ -221,7 +228,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
         ...withMixer(brace.row, emptyMixerCell()),
         ...withMixer(harmonyLaneRow(view), emptyMixerCell()),
         ...doc.parts.flatMap((part) =>
-          withMixer(partLaneRow(view, part), partMixerCell(ctx, part, state.mixerExpanded)),
+          withMixer(partLaneRow(view, part), partMixerCell(ctx, part, state.mixerExpanded, lights)),
         ),
       ];
       lanes.replaceChildren(...rows, ...brace.lines, line);
@@ -294,5 +301,7 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     paneScrollPx: 0,
     mixerExpanded: false,
   };
-  return (body) => renderSongView(body, ctx, state);
+  // The mixer column's lights (windsor#159): one poller for the view, outliving each render's cells.
+  const lights = songMixerLights(ctx);
+  return (body) => renderSongView(body, ctx, state, lights);
 }
