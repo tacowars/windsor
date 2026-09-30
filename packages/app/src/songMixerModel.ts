@@ -1,16 +1,20 @@
 /**
- * The mixer column's writes (windsor#157; record
- * `2026-09-30-mixer-on-the-song-tab`): a part's Level and its M and S, each
- * through the same `ctx.change(partChange(slot, { strip }))` the Mixer tab
- * uses, then `ctx.invalidate()` so the Mixer tab redraws when opened. The
- * cell that calls them is `songMixerCell.ts`; the rules live here so a test
- * drives them without a DOM.
+ * The mixer column's writes (windsor#157, windsor#158; record
+ * `2026-09-30-mixer-on-the-song-tab`): a part's Level and its M and S, and
+ * expanded its Pan, Low cut, sends and Output, each through the same
+ * `ctx.change(partChange(slot, { strip }))` the Mixer tab uses, then
+ * `ctx.invalidate()` so the Mixer tab redraws when opened. The cell that
+ * calls them is `songMixerCell.ts`; the rules live here so a test drives
+ * them without a DOM.
  */
 import type { ChannelStrip } from '@windsor/engine';
 import { DEFAULT_STRIP, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { withGesture } from './gestureHooks';
+
+/** Where a strip plays: the master, or only its sidechain key. */
+export type StripOutput = NonNullable<ChannelStrip['output']>;
 
 /** The strip's two switches (windsor#154). */
 export type StripSwitch = 'mute' | 'solo';
@@ -44,26 +48,64 @@ export const switchOn = (strip: ChannelStrip, which: StripSwitch): boolean => st
 export const switchEnabled = (strip: ChannelStrip, which: StripSwitch): boolean =>
   switchesApply(strip) || switchOn(strip, which);
 
+/** The strip's Output; a missing field plays to the master. */
+export const stripOutput = (strip: ChannelStrip): StripOutput => strip.output ?? 'master';
+
 /**
- * What the mixer column shows of every part: its Level, M, S and whether
- * they apply. The lanes' signature leaves the strips out, so the view
- * watches this one to redraw the column in place after a Mixer tab edit.
+ * What the mixer column shows of every part, collapsed or expanded: its
+ * Level, Pan, Low cut, sends, Output, M and S. The lanes' signature leaves
+ * the strips out, so the view watches this one to redraw the column in
+ * place after a Mixer tab edit.
  */
 export function stripSignature(ctx: AppCtx): string {
   return JSON.stringify(
     ctx.model.doc.parts.map(({ slot, strip }) => [
       slot,
       strip.level,
+      strip.pan,
+      strip.lowCut,
+      strip.sends,
+      stripOutput(strip),
       switchOn(strip, 'mute'),
       switchOn(strip, 'solo'),
-      switchesApply(strip),
     ]),
   );
 }
 
-/** Set the part's Level live and into the document; the Mixer tab redraws when opened. */
+/** Write a strip field live and into the document; the Mixer tab redraws when opened. */
+function writeStrip(ctx: AppCtx, slot: number, strip: Partial<ChannelStrip>): boolean {
+  const { ok } = ctx.change(partChange(slot, { strip }));
+  if (ok) ctx.invalidate();
+  return ok;
+}
+
+/** Set the part's Level. */
 export function setStripLevel(ctx: AppCtx, slot: number, level: number): void {
-  if (ctx.change(partChange(slot, { strip: { level } })).ok) ctx.invalidate();
+  writeStrip(ctx, slot, { level });
+}
+
+/** Set the part's Pan (windsor#158). */
+export function setStripPan(ctx: AppCtx, slot: number, pan: number): void {
+  writeStrip(ctx, slot, { pan });
+}
+
+/** Set the part's Low cut, in Hz (windsor#158). */
+export function setStripLowCut(ctx: AppCtx, slot: number, lowCut: number): void {
+  writeStrip(ctx, slot, { lowCut });
+}
+
+/** Set the part's send to one return (windsor#158); the other sends stay. */
+export function setStripSend(ctx: AppCtx, slot: number, ret: string, level: number): void {
+  writeStrip(ctx, slot, { sends: { [ret]: level } });
+}
+
+/**
+ * Route the part to the master or only to its sidechain key (windsor#158).
+ * False when the engine refused it; nothing changed then. The cell re-syncs
+ * its M and S after it, since `switchEnabled` follows the Output.
+ */
+export function setStripOutput(ctx: AppCtx, slot: number, output: StripOutput): boolean {
+  return writeStrip(ctx, slot, { output });
 }
 
 /**
