@@ -1,7 +1,8 @@
 /**
  * Tape model and randomization write the same song-owned insert as its
  * knobs. In the rack (windsor#175) Tape is the pages `TAPE_PAGES` lays out:
- * Tape (the type and starting-point pickers, Randomize, and the tone knobs)
+ * Tape (the type, oversampling and starting-point pickers, Randomize, and
+ * the tone knobs)
  * and Motion (wow, flutter and dropouts). The on/off switch is the rack's
  * rail.
  */
@@ -23,7 +24,8 @@ import { insertPage, insertSelect, knobColumns, wideColumn } from './insertLayou
 import { insertChange } from './insertTarget';
 import { tapeKnobs } from './tapeKnobs';
 import type { TapeControl } from './tapeTables';
-import { TAPE_PAGES } from './tapeTables';
+import { TAPE_OVERSAMPLING_HINT, TAPE_OVERSAMPLING_OPTIONS, TAPE_PAGES } from './tapeTables';
+import { withOversampling } from './tapeCardModel';
 
 interface TapeView {
   current(): TapeSpec;
@@ -38,9 +40,26 @@ function randomButton(view: TapeView): HTMLElement {
   return random;
 }
 
+/**
+ * The audition switch (windsor#246 decision 2): the magnetic core's factor,
+ * committed like Tape type. The engine swaps to the other core on the running
+ * insert, from zero state, so a click at the switch is expected.
+ */
+function oversamplingSelect(view: TapeView): HTMLElement {
+  const select = insertSelect({
+    label: 'Oversampling',
+    options: TAPE_OVERSAMPLING_OPTIONS,
+    value: String(view.current().oversampling),
+    change: (value) => view.commit(withOversampling(view.current(), value)),
+  });
+  select.title = TAPE_OVERSAMPLING_HINT;
+  return select;
+}
+
 /** The picker or button `control` names. */
 function control(view: TapeView, name: TapeControl): HTMLElement {
   if (name === 'randomize') return randomButton(view);
+  if (name === 'oversampling') return oversamplingSelect(view);
   if (name === 'model')
     return insertSelect({
       label: 'Tape type',
