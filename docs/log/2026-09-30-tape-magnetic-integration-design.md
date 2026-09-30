@@ -53,8 +53,13 @@ the fastest honest path to a level-matched audition in the app.
    cap without giving up saturation at Drive 0. So the two duties are
    split. The **domain is guaranteed by construction** by a hard guard clip
    at source field ±4 at the core input, with a counter: every input, of
-   any level, meets that clip before the core, so the unqualified
-   state-guard path is unreachable from the input. The **Drive ceiling is a
+   any level, meets that clip before the core. The clip bounds the field's
+   amplitude, not its slew and not the integrator's state: the static
+   conditioning record keeps that distinction, and the survival evidence
+   covers reconstructed pulses and a smooth closed-form program, not
+   sustained clipped broadband input. The core's magnitude-20 state guard
+   and reset counter therefore stay, remain reachable by high-slew
+   over-level input, and are reported, never hidden. The **Drive ceiling is a
    calibration** for musical signals: the Drive mapping is capped so that
    the largest steady-state peak frequency gain of the retained EQ (over
    every model, the Bias extremes and the three rates, computed from the
@@ -69,9 +74,16 @@ the fastest honest path to a level-matched audition in the app.
    the retained EQ at every model, both Bias extremes and all three rates,
    during a model crossfade and a Bias sweep, at maximum Drive, and assert
    the guard counter stays at zero and the core's reset counter stays at
-   zero; and tests that push the sign-of-impulse-response sequence and an
-   input above full scale, and assert the guard engages, the field at the
-   core stays within ±4, and the reset counter stays at zero. The Drive
+   zero; tests that push the sign-of-impulse-response sequence and an
+   input above full scale, and assert the guard engages and the field at
+   the core stays within ±4; and a **slew test** that runs ten seconds of
+   sustained clipped white noise and of full-scale alternating-sign input
+   at +12 dB over full scale through the span-48 pair at 44.1, 48 and
+   96 kHz, at 2× and 4×, at every model row, reporting the reset count per
+   case. A reset there is a known limit of the qualified domain, recorded
+   in the PR and the audition notes, not a merge blocker; a reset on any
+   full-scale tone, impulse or step inside the calibrated range is a
+   blocker. The Drive
    control's visible range and label are the UI issue's to settle
    (`reviewed`).
 4. **Latency: the fixed delay always applies, the dry path is matched, and
@@ -111,7 +123,18 @@ the fastest honest path to a level-matched audition in the app.
    pins the mapping at every model. Giving models different values is sound
    design for the audition PR (`reviewed`), constrained to the sampled
    control points of the dynamic-survival record until a wider domain is
-   qualified.
+   qualified. **Model transitions:** the core's three controls are
+   smoothed with the same 10 ms time constant the insert already uses for
+   its continuous controls, and the magnetization state is retained; the
+   core is reconfigured from the smoothed values each block, as the
+   research core's `configure` is, with its normalisation recomputed there
+   and never on the per-sample path. While every model shares one row the
+   transition is a no-op. The PR that first assigns distinct rows adds a
+   live-switch test under a steady full-scale tone between every pair of
+   models, at 2× and 4× and all three rates, asserting zero resets and no
+   output sample outside the envelope of the two steady states; the
+   interpolation passes through control points the survival record did
+   not sample, and that test is the evidence for them.
 
 ## Consequences for E
 
