@@ -56,6 +56,13 @@ function sourceHashes() {
     '../2026-09-30-tape-filtered-reference/filteredReference.ts',
     '../2026-09-30-tape-phase-3/hysteresis.ts',
     '../2026-09-30-tape-phase-3/experimentConstants.ts',
+    '../2026-09-30-tape-phase-3/resampler.ts',
+    '../2026-09-30-tape-filtered-reference/filteredConstants.ts',
+    '../2026-09-30-tape-reference/reference.ts',
+    '../2026-09-30-tape-reference/referenceConstants.ts',
+    '../2026-09-30-tape-phase-3/load.mjs',
+    '../2026-09-30-tape-phase-3/report.mjs',
+    '../2026-09-30-tape-conditioning/journal.mjs',
   ];
   return Object.fromEntries(
     paths.map((path) => [path, sha256(readFileSync(new URL(path, import.meta.url)))]),

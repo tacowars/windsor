@@ -1,8 +1,9 @@
 /** Verification fixtures for windsor#197; not additional candidate experiments. */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { URL } from 'node:url';
+import { relative } from 'node:path';
 import {
   CANDIDATE as C,
   schedule,
@@ -27,6 +28,26 @@ const read = (path) => ({
   sha256: createHash('sha256').update(bytes(path)).digest('hex'),
   report: JSON.parse(bytes(path).toString('utf8')),
 });
+/** Every local file reachable from measure.mjs, keyed relative to this folder. */
+function importClosure() {
+  const root = new URL('../../', import.meta.url);
+  const base = new URL(dir, import.meta.url);
+  const pattern = /(?:from|import)\s*\(?\s*['"](\.[^'"]+)['"]/g;
+  const found = new Set();
+  const queue = [new URL('measure.mjs', base)];
+  while (queue.length) {
+    const url = queue.pop();
+    if (found.has(url.href)) continue;
+    found.add(url.href);
+    for (const [, spec] of readFileSync(url, 'utf8').matchAll(pattern)) {
+      const bare = new URL(spec, spec.startsWith('./docs/') ? root : url);
+      const next = existsSync(bare) ? bare : new URL(`${bare.href}.ts`);
+      if (!existsSync(next)) throw new Error(`Unresolved import ${spec} in ${url.pathname}`);
+      queue.push(next);
+    }
+  }
+  return [...found].map((href) => relative(base.pathname, new URL(href).pathname));
+}
 const rows = schedule(C);
 const accuracyRows = rows.filter((r) => r.part === 'accuracy');
 const zeros = () => Array(C.frames).fill(0);
@@ -226,6 +247,17 @@ describe('Saved report', () => {
     expect(again.run.status).toBe(saved.run.status);
     expect(V.interpret(saved, C)).toEqual(saved.outcome);
     expect(saved.trials).toHaveLength(saved.run.completedTrajectories);
+  });
+  it('hashes every source measure.mjs imports, directly or transitively', () => {
+    const listed = bytes('measure.mjs')
+      .toString('utf8')
+      .match(/const paths = \[([^\]]*)\]/)[1]
+      .match(/'[^']+'/g)
+      .map((p) => p.slice(1, -1));
+    const closure = importClosure();
+    expect(closure).toContain('../2026-09-30-tape-filtered-reference/filteredConstants.ts');
+    for (const path of closure) expect(listed).toContain(path);
+    for (const path of listed) expect(Object.keys(saved.sources)).toContain(path);
   });
   it('keeps saved outputs sign-symmetric and duplicated ruler cases identical', () => {
     const find = (t, part, level) =>

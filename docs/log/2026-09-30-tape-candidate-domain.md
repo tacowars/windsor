@@ -25,9 +25,10 @@ that and never as accuracy. The run is one sequential child under a
 ## Outcome
 
 **No candidate is accurate, and none survives ±100 at 1/0/0.** The run
-completed all 288 trajectories in 0.721 seconds on an Apple M1 with Node
-24.21.0 and the Float64 source backend. Both rulers matched their SHA-256
-and final M, and every trajectory is exactly sign-symmetric.
+completed all 288 trajectories within the declared bound; the research
+[README](../research/2026-09-30-tape-candidate-domain/README.md) records
+the measured environment. Both rulers matched their SHA-256 and final M,
+and every trajectory is exactly sign-symmetric.
 
 - **Accuracy.** No setting passes any of the four qualified cases. At the
   center ±1 all sixteen trajectories survive, and the errors fall as the
@@ -47,10 +48,11 @@ and final M, and every trajectory is exactly sign-symmetric.
   of 20 and a ±100 ruler that never exceeds 1.83, so survival says nothing
   about accuracy.
 
-The measurement child was run three times, each under a second. The first
-run's anchor check read ruler validity from the wrong level of the ruler
-rows, and the third run followed a Prettier pass. All three produced
-bit-identical trajectories, and nothing declared changed between them.
+The measurement child was run four times. The first run's anchor check
+read ruler validity from the wrong level of the ruler rows, the third
+followed a Prettier pass, and the fourth recorded the hashes of the whole
+import closure. All four produced bit-identical trajectories, and nothing
+declared changed between them.
 
 ## For milestone D
 

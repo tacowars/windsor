@@ -123,20 +123,21 @@ are read from their saved reports. The decision is
 
 ## Results
 
-**Run.** Complete: 288 of 288 scheduled trajectories in 0.721 seconds,
+**Run.** Complete: 288 of 288 scheduled trajectories in 0.701 seconds,
 exit 0, not expired, no truncated tail, nothing missing. Apple M1 arm64,
 Darwin 25.5.0, Node v24.21.0, V8 13.6.233.17-node.53, Node Float64 source
 DSP, no browser. [`measurement.json`](measurement.json) records the SHA-256
 of this folder's sources and of every imported source.
 
-The child was run three times, each under a second. The first run failed
+The child was run four times, each under a second. The first run failed
 all four anchors, so every part 1 error was null: the anchor check read
 ruler validity from the top level of a row, where those rows keep it under
 `state`. The second followed that fix, and the third followed a Prettier
-pass so that the recorded source hashes match the committed files. All
-three produced bit-identical trajectories, and the second and third
-identical errors, anchors and outcome. No setting, level, limit or case
-changed between them.
+pass so that the recorded source hashes match the committed files. A
+fourth followed review, once `measure.mjs` hashed the whole import closure
+rather than part of it. All four produced bit-identical trajectories, and
+the second to fourth identical errors, anchors and outcome. No setting,
+level, limit or case changed between them.
 
 **Anchors held.** Both ruler files match their SHA-256, and the final M
 values are exactly ±0.05341405966564157 (1024×) and ±1.694384147775507e-5
