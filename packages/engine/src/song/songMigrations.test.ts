@@ -155,18 +155,16 @@ describe('the 3 → 4 upgrade: the returns become the send buses (windsor#172)',
     expect(Object.keys(echoOnly.document.returns ?? {})).toEqual(['b']);
   });
 
-  it('hands junk and unknown names on for the normaliser to report', () => {
+  it('drops the returns and sends v3 dropped, and hands a junk room on as v3 read it', () => {
     const upgraded = upgradeSong(v3({ returns: { room: 7, cave: { level: 1 } } }, { hall: 0.5 }));
     expect(upgraded.document).toMatchObject({
       version: 4,
-      returns: { a: 7, cave: { level: 1 } },
-      parts: [{ strip: { sends: { hall: 0.5 } } }],
+      returns: { a: 7 },
+      parts: [{ strip: { sends: {} } }],
     });
     const result = makeArrangement(upgraded.document);
-    expect(result.dangling).toEqual([
-      'parts[0].strip.sends.hall: no send bus "hall" is defined',
-      'returns.cave: no send bus "cave" is defined',
-    ]);
+    expect(result.dangling).toEqual([]);
+    expect(result.document.returns).toEqual({ a: RETURNS.a });
   });
 
   it('carries only the space fields v3 read: an unknown or colliding key cannot turn Send A', () => {

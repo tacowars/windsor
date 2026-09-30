@@ -52,24 +52,21 @@ function returnAsBus(
 }
 
 /**
- * A strip's `sends` with `room` and `echo` renamed to `a` and `b`. A v3 `a`
- * or `b` named no return in v3 and was dropped on load, so it is dropped
- * here too: it never overrides a renamed value or becomes a valid send.
- * Any other key is left, for the normaliser to report.
+ * A strip's `sends` as v3 kept them, renamed: only `room` and `echo`, as `a`
+ * and `b`. Every other key named no return in v3 and was dropped on load,
+ * so it is dropped here too; a v3 `a` or `b` in particular never overrides
+ * a renamed value or becomes a valid send.
  */
 function renameSends(sends: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const [key, amount] of Object.entries(sends)) {
-    if (V4_SEND_NAMES.has(key)) continue;
-    out[V3_SEND_NAMES[key] ?? key] = amount;
+  for (const [v3, v4] of Object.entries(V3_SEND_NAMES)) {
+    if (Object.hasOwn(sends, v3)) out[v4] = sends[v3];
   }
   return out;
 }
 
 /** What each v3 return became. */
 const V3_SEND_NAMES: Readonly<Record<string, string>> = { room: 'a', echo: 'b' };
-/** The v4 names, which a v3 send could not carry. */
-const V4_SEND_NAMES: ReadonlySet<string> = new Set(Object.values(V3_SEND_NAMES));
 /** The fields a v3 `room.space` was read with; the v3 normaliser dropped any other key. */
 const V3_SPACE_FIELDS: readonly string[] = Object.keys(REVERB_SPACE_RANGES);
 /** The fields a v3 `echo` return's line was read with. */
@@ -80,17 +77,20 @@ const V3_ECHO_FIELDS: readonly string[] = Object.keys(ECHO_LINE_DEFAULTS);
  * §7): the fixed `room` and `echo` returns become Send A and Send B, each a
  * level and an insert chain. `room` becomes `a` holding a Plate reverb with
  * its old space, and `echo` becomes `b` holding an Echo with its old line,
- * both at Mix 1, so the song sounds as it did. Only what a v3 load kept is
- * carried: an unknown space or line key, and a v3 send already named `a`
- * or `b`, is dropped as v3 dropped it. An absent `returns` stays
- * absent. Every part's `sends.room` and `sends.echo` become `sends.a` and
- * `sends.b`.
+ * both at Mix 1, so the song sounds as it did. The upgrade outputs exactly
+ * what the v3 normaliser kept, renamed: every return other than `room` and
+ * `echo`, every return field other than those v3 read, and every send other
+ * than `room` and `echo` is dropped here as v3 dropped it, never handed on
+ * (a v3 `a` or `b` would otherwise become a valid v4 name). An absent
+ * `returns` stays absent. Every part's `sends.room` and `sends.echo` become
+ * `sends.a` and `sends.b`.
  */
 export function sendBusesFromReturns(doc: RawDocument): RawDocument {
   const out: RawDocument = { ...doc };
   if (isRecord(doc.returns)) {
-    const { room, echo, ...rest } = doc.returns;
-    const returns: Record<string, unknown> = { ...rest };
+    // Only `room` and `echo`: v3 dropped every other return, `a` and `b` included.
+    const { room, echo } = doc.returns;
+    const returns: Record<string, unknown> = {};
     if (room !== undefined) {
       const space = isRecord(room) && isRecord(room.space) ? pick(room.space, V3_SPACE_FIELDS) : {};
       returns.a = returnAsBus(room, 'plate', SPACES.hall, space);
