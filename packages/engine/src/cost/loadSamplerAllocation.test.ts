@@ -16,8 +16,13 @@
  *
  * - The meter costs two heap numbers a quantum, 32 bytes, and nothing more:
  *   each `Date.now()` returns a new one, which no source form avoids (the
- *   research README has V8's graph). The difference between the two runs is
- *   held to that within 8 bytes a quantum.
+ *   research README has V8's graph). Where the render allocates nothing of
+ *   its own (the EQ and the output stage), the difference between the two
+ *   runs is held to that within 8 bytes a quantum. Where the DSP still
+ *   allocates, its own bytes vary from run to run with V8's tiering (the
+ *   Retro reverb's differed by 4 KB a quantum between two runs on CI), so the
+ *   difference measures nothing there and is not asserted until that
+ *   processor's allocation ticket makes it clean (windsor#226–#233).
  * - No field the sampler writes changes its representation: no
  *   generalisation the trace places inside the bundle's `LoadSampler`.
  * - The processors whose render allocates nothing with the meter off (the EQ
@@ -102,11 +107,12 @@ describe('the load sampler on V8', () => {
       const off = probe(bundle, 0, measure);
       const on = probe(bundle, LOAD_QUANTA, measure);
       expect(off.gcs + on.gcs, 'no collection ran while the heap was read').toBe(0);
-      const perQuantum = (on.bytes - off.bytes) / measure;
       const detail = `off ${off.windows.join(' ')}; on ${on.windows.join(' ')}`;
-      expect(Math.abs(perQuantum - METER_BYTES), detail).toBeLessThanOrEqual(METER_SLACK);
       expect(within(on.changes, bundle, samplerLines(bundle))).toEqual([]);
-      if (CLEAN.has(bundle)) expect(off.bytes, detail).toBeLessThan(CLEAN_TOLERANCE_BYTES);
+      if (!CLEAN.has(bundle)) return;
+      expect(off.bytes, detail).toBeLessThan(CLEAN_TOLERANCE_BYTES);
+      const perQuantum = (on.bytes - off.bytes) / measure;
+      expect(Math.abs(perQuantum - METER_BYTES), detail).toBeLessThanOrEqual(METER_SLACK);
     },
     120_000,
   );
