@@ -1,7 +1,8 @@
 /**
  * The mixer column's writes (windsor#157): a Level set here lands in the
  * part's strip, where the Mixer tab reads it; M and S are one undo step a
- * press, named after the part; a sidechain-only part's switches do nothing.
+ * press, named after the part; on a sidechain-only part only a lit switch
+ * can be pressed, and only to clear it.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -12,6 +13,7 @@ import {
   setStripLevel,
   stripOf,
   stripSignature,
+  switchEnabled,
   switchLabel,
   switchOn,
   switchesApply,
@@ -68,6 +70,28 @@ describe('the mixer column', () => {
     expect(switchOn(stripOf(ctx, 0), 'solo')).toBe(false);
     expect(ctx.undoLabel).toBe(label);
   });
+
+  it.each([
+    ['mute', 'solo'],
+    ['solo', 'mute'],
+  ] as const)(
+    'keeps a lit %s clearable after the output moves to the sidechain, and %s disabled',
+    (lit, off) => {
+      const ctx = console0();
+      expect(toggleStripSwitch(ctx, 0, lit)).toBe(true);
+      ctx.change(partChange(0, { strip: { output: 'sidechain' } }));
+      expect(switchEnabled(stripOf(ctx, 0), lit)).toBe(true);
+      expect(switchEnabled(stripOf(ctx, 0), off)).toBe(false);
+      expect(toggleStripSwitch(ctx, 0, off)).toBe(false);
+      expect(switchOn(stripOf(ctx, 0), off)).toBe(false);
+      expect(toggleStripSwitch(ctx, 0, lit)).toBe(true);
+      expect(switchOn(stripOf(ctx, 0), lit)).toBe(false);
+      expect(ctx.undoLabel).toBe(switchLabel(lit, 'Pulse'));
+      // Cleared, it is disabled like the other: it cannot be turned back on here.
+      expect(switchEnabled(stripOf(ctx, 0), lit)).toBe(false);
+      expect(toggleStripSwitch(ctx, 0, lit)).toBe(false);
+    },
+  );
 
   it('moves its strip signature on a Level, a switch or an output change, and on nothing else', () => {
     const ctx = console0();

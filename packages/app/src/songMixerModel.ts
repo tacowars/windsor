@@ -36,6 +36,15 @@ export const switchesApply = (strip: ChannelStrip): boolean => strip.output !== 
 export const switchOn = (strip: ChannelStrip, which: StripSwitch): boolean => strip[which] === true;
 
 /**
+ * Whether the switch can be pressed. On a sidechain-only part only a lit
+ * switch can, and only to turn it off: a solo set before the part's output
+ * moved to the sidechain still silences every other part, so it must stay
+ * clearable here (windsor#157, amended on PR #168).
+ */
+export const switchEnabled = (strip: ChannelStrip, which: StripSwitch): boolean =>
+  switchesApply(strip) || switchOn(strip, which);
+
+/**
  * What the mixer column shows of every part: its Level, M, S and whether
  * they apply. The lanes' signature leaves the strips out, so the view
  * watches this one to redraw the column in place after a Mixer tab edit.
@@ -59,12 +68,12 @@ export function setStripLevel(ctx: AppCtx, slot: number, level: number): void {
 
 /**
  * Flip the part's mute or solo as one undo step named after it. False when
- * it does not apply (a sidechain-only part, no such part) or the engine
- * refused it; nothing changed then.
+ * the switch is disabled (off on a sidechain-only part), there is no such
+ * part, or the engine refused it; nothing changed then.
  */
 export function toggleStripSwitch(ctx: AppCtx, slot: number, which: StripSwitch): boolean {
   const part = partAt(ctx.model.doc, slot);
-  if (!part || !switchesApply(part.strip)) return false;
+  if (!part || !switchEnabled(part.strip, which)) return false;
   const next = !switchOn(part.strip, which);
   const { ok } = withGesture(switchLabel(which, part.name), () =>
     ctx.change(partChange(slot, { strip: { [which]: next } })),

@@ -23,9 +23,9 @@ import type { StripSwitch } from './songMixerModel';
 import {
   setStripLevel,
   stripOf,
+  switchEnabled,
   switchLabel,
   switchOn,
-  switchesApply,
   toggleStripSwitch,
 } from './songMixerModel';
 
@@ -68,10 +68,10 @@ function switchButton(
   button.setAttribute('aria-label', label);
   const sync = (): void => {
     const strip = stripOf(ctx, slot);
-    const applies = switchesApply(strip);
+    const enabled = switchEnabled(strip, which);
     button.setAttribute('aria-pressed', String(switchOn(strip, which)));
-    button.disabled = !applies;
-    button.title = applies
+    button.disabled = !enabled;
+    button.title = enabled
       ? label
       : `${part.name} only feeds a sidechain: it has no output to ${which}`;
   };
