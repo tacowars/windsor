@@ -80,6 +80,22 @@ saturating feedback, drive, mix and output gain. The console uses
 Time changes bend pitch. See `docs/research/2026-09-25-698-delay/README.md`
 for semantics and audition steps.
 
+The Parametric EQ (windsor#198, record `2026-09-30-parametric-eq-insert`) is
+`inserts/eqSpec.ts` (eight bands of on, type, slope, freq, gain and Q, plus
+scale, output and enabled), `eqConstants.ts` (the only place the ranges are
+written), `eqParameters.ts` (the flat k-rate names, `b1Freq` … `enabled`),
+`eqInsert.ts` (`EQ_INSERT`) and one coefficient module, `eqCoefficients.ts`
+over `eqSectionDesign.ts`: matched sections after Vicanek (bells, cuts, and
+the notch and shelves too, which measured audibly off in bilinear form), and
+`eqResponseDb`, the digital response of those same coefficients, which the
+console draws. `eqAnalog.ts` holds the analog prototypes the tests measure
+against. The DSP is `worklet/eq/`: stereo TDF-II in doubles, 20 ms log glides
+refreshed every 16 samples only while moving, type/slope/on crossfades, and
+bit-exact copy when flat, bypassed or silent. The processor loads with the
+others, but the kind is not in `INSERT_KINDS` until its console card
+(windsor#199). Accuracy, click and cost measurements:
+`docs/research/2026-09-30-parametric-eq/README.md`.
+
 The ensemble (#695) is `inserts/ensembleSpec.ts`, `ensembleConstants.ts`,
 `ensembleInsert.ts` and `ensemblePresets.ts` / `ensemblePresetTables.ts`:
 native nodes, no worklet. Three delay lines 120° apart, each swept by a slow
