@@ -4,6 +4,8 @@
  * decision 2). `main.ts` hands this the tab list and the two mount points.
  * A tab may show an icon in place of its label (windsor#39): its name is then
  * the button's accessible name and its tooltip.
+ * The pressed button follows the shown tab however it was shown: a click, or
+ * an undo or a redo that shows its step's tab (windsor#163).
  */
 import type { AppContext } from './appContext';
 import { el, html } from './dom';
@@ -47,6 +49,11 @@ export function tabFace(tab: Pick<TabSpec, 'label' | 'icon' | 'ariaLabel'>): Tab
   return { kind: 'icon', markup: tab.icon, name: tab.ariaLabel ?? tab.label };
 }
 
+/** Whether a tab's button reads as pressed: only the shown tab's does. */
+export function isPressed(tabId: string | undefined, activeTab: string | null): boolean {
+  return tabId !== undefined && tabId === activeTab;
+}
+
 function tabButton(tab: TabSpec): HTMLButtonElement {
   const face = tabFace(tab);
   if (face.kind === 'text') return el('button', 'tab-btn', face.text) as HTMLButtonElement;
@@ -65,7 +72,7 @@ export function mountTabShell(
   const buttons: HTMLButtonElement[] = [];
   const syncPressed = (): void => {
     for (const button of buttons) {
-      button.setAttribute('aria-pressed', String(button.dataset.tab === ctx.activeTab));
+      button.setAttribute('aria-pressed', String(isPressed(button.dataset.tab, ctx.activeTab)));
     }
   };
   for (const tab of tabs) {
@@ -82,5 +89,8 @@ export function mountTabShell(
     ctx.addTab(tab.id, panel, tab.render);
     root.appendChild(panel);
   }
+  // Undo and redo show a tab and then run every chrome render, so this runs
+  // after the switch; a click shows its tab without a render and syncs itself.
+  ctx.addChrome(syncPressed);
   syncPressed();
 }

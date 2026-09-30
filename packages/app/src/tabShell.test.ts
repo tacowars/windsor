@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GEAR_ICON, tabFace } from './tabShell';
+import { GEAR_ICON, isPressed, tabFace } from './tabShell';
 
 describe('tabFace', () => {
   it('shows a plain tab its label as text', () => {
@@ -21,5 +21,17 @@ describe('tabFace', () => {
   it('keeps the gear decorative and in the button colour', () => {
     expect(GEAR_ICON).toContain('aria-hidden="true"');
     expect(GEAR_ICON).toContain('stroke="currentColor"');
+  });
+});
+
+describe('isPressed (windsor#163)', () => {
+  it('presses only the shown tab', () => {
+    expect(isPressed('song', 'song')).toBe(true);
+    expect(isPressed('mixer', 'song')).toBe(false);
+  });
+
+  it('presses nothing before a tab is shown, or for a button without a tab', () => {
+    expect(isPressed('song', null)).toBe(false);
+    expect(isPressed(undefined, null)).toBe(false);
   });
 });
