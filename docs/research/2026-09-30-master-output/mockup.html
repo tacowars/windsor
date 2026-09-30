@@ -1,0 +1,838 @@
+<title>Windsor Master Section</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a fake top bar, the option toolbar, the Mixer tab in the chosen page order (master rack with a pinned Level + Output tail, the two send racks, or a sticky master column), then notes and the worker spec. Deliberately single-theme: Windsor's own dark console tokens, shared with the insert-rack mockup. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --well: #0c0f10;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --rack-h: 196px;
+  --rail: 24px;
+  --bar-w: 10px;
+  --ch-w: 28px;
+  --pre: 26px;   /* LED + readout above every bar */
+  --post: 14px;  /* channel name below every bar */
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 13px/1.5 var(--f-ui); margin: 0; padding-block: 0 48px; padding-inline: 16px; }
+.wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1, h2, h3 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+h1 { font-size: 17px; }
+h2 { font-size: 12px; color: var(--ink-dim); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h2 small { font-family: var(--f-num); font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ink-faint); font-weight: 400; }
+h3 { font-size: 11.5px; color: var(--ink); letter-spacing: 0.08em; }
+p, li { max-width: 74ch; color: var(--ink-dim); }
+p { margin: 0; }
+strong { color: var(--ink); font-weight: 600; }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+
+/* Fake app top bar: context for what is always on screen */
+.topbar { display: flex; align-items: center; gap: 14px; padding: 8px 12px; margin-inline: -16px; padding-inline: 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.brand { font: 600 13px var(--f-panel); letter-spacing: 0.14em; }
+.apptabs { display: flex; gap: 2px; }
+.apptabs button { background: transparent; border: 1px solid transparent; color: var(--ink-dim); font: 600 11px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: var(--r); cursor: pointer; }
+.apptabs button[aria-selected="true"] { color: var(--ink); border-color: var(--line-bright); background: var(--inset); }
+.topbar .grow { flex: 1; }
+.cpu { font: 11px var(--f-num); color: var(--ink-dim); display: flex; align-items: center; gap: 8px; }
+.olight { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--line-bright); background: var(--inset); transition: background 120ms, box-shadow 120ms; }
+.olight.lit { background: var(--carrier); border-color: var(--carrier); box-shadow: 0 0 6px var(--carrier); }
+.olight.off { background: transparent; }
+
+.lede { display: flex; flex-direction: column; gap: 6px; padding-top: 18px; }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.opt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.opt-label { font: 600 10px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.segs { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.segs button { background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); padding: 4px 10px; font: 500 11px var(--f-ui); cursor: pointer; }
+.segs button:last-child { border-right: 0; }
+.segs button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+.paints { font: 11px var(--f-num); color: var(--ink-faint); margin-left: auto; white-space: nowrap; }
+.paints b { color: var(--modulator); font-weight: 500; }
+.paints.idle b { color: var(--ink-faint); }
+
+/* Mixer body */
+.mixer { display: flex; flex-direction: column; gap: 18px; position: relative; }
+.block { display: flex; flex-direction: column; gap: 8px; }
+.rack-line { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; min-width: 0; }
+.rack { display: flex; gap: 6px; align-items: stretch; overflow-x: auto; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; min-width: 0; flex: 1 1 320px; scrollbar-color: var(--line-bright) var(--inset); }
+.tail { display: flex; gap: 6px; padding: 6px; background: var(--well); border: 1px solid var(--line-bright); border-radius: 6px; flex: none; max-width: 100%; overflow-x: auto; }
+.flow { align-self: center; color: var(--ink-faint); font: 12px var(--f-num); flex: none; }
+.add { flex: none; width: 28px; height: var(--rack-h); border: 1px dashed var(--line-bright); border-radius: 5px; display: grid; place-items: center; color: var(--ink-faint); font-size: 14px; }
+
+/* Device with a side rail (the insert rack's look) */
+.dev { flex: none; height: var(--rack-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.rail { width: var(--rail); flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 5px 0; background: var(--panel-hi); border-right: 1px solid var(--line); }
+.rail .name { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 10.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.rail .pwr { color: var(--modulator); font-size: 11px; line-height: 1; }
+.rail .fixed { color: var(--ink-faint); font-size: 9px; line-height: 1; }
+.bus .rail .pwr { color: var(--carrier); }
+.dev.folded { width: 26px; }
+.dev.folded .rail { width: 100%; border: 0; }
+.dev-body { display: flex; gap: 0; padding: 4px 6px 6px; min-width: 0; }
+.sec { display: flex; flex-direction: column; padding: 0 6px; }
+.sec + .sec { border-left: 1px solid var(--line); }
+.sec-label { height: 13px; flex: none; font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.sec-row { display: flex; align-items: flex-start; gap: 2px; flex: 1; }
+.knobs { display: grid; grid-template-columns: repeat(2, 52px); gap: 4px 2px; align-content: space-evenly; flex: 1; }
+.tail .dev { border-color: var(--line-bright); }
+
+/* Knob */
+.knob { width: 52px; display: flex; flex-direction: column; align-items: center; padding: 1px 0; border-radius: var(--r); touch-action: none; user-select: none; }
+.knob.live { cursor: ns-resize; }
+.knob.live:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .face { fill: var(--inset); stroke: var(--line); }
+.knob .track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .arc { stroke: var(--kc, var(--modulator)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 13px; white-space: nowrap; }
+.knob .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); line-height: 11px; }
+.bus .knob { --kc: var(--carrier); }
+
+/* Mode stack, lookahead and the stage lamp */
+.modes { display: flex; flex-direction: column; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; width: 78px; }
+.modes button { background: var(--inset); color: var(--ink-dim); border: 0; border-bottom: 1px solid var(--line-bright); height: 20px; font: 500 10.5px var(--f-ui); cursor: pointer; text-align: left; padding: 0 7px; }
+.modes button:last-child { border-bottom: 0; }
+.modes button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+.modes.grid2 { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+.modes.grid2 button { border-right: 1px solid var(--line-bright); text-align: center; }
+.modes.grid2 button:nth-child(2n) { border-right: 0; }
+.modes.grid2 button:nth-child(n+3) { border-bottom: 0; }
+.toggle { display: flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 0; cursor: pointer; font-size: 10.5px; color: var(--ink-dim); white-space: nowrap; }
+.toggle i { width: 11px; height: 11px; border-radius: 2px; border: 1px solid var(--line-bright); background: var(--inset); flex: none; }
+.toggle[aria-pressed="true"] i { background: var(--modulator); border-color: var(--modulator); }
+.toggle:disabled { opacity: 0.35; cursor: default; }
+.lamp { display: flex; align-items: center; gap: 6px; background: transparent; border: 0; padding: 0; cursor: pointer; font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.lamp i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--line-bright); background: var(--inset); flex: none; transition: background 100ms, box-shadow 100ms; }
+.lamp.now i { background: var(--carrier); border-color: var(--carrier); box-shadow: 0 0 5px var(--carrier); }
+.lamp.latched i { border-color: var(--hot); }
+.lamp.latched.now i, .lamp.latched:not(.now) i { background: var(--hot); border-color: var(--hot); }
+.lamp.latched:not(.now) i { box-shadow: none; opacity: 0.85; }
+.stack { display: flex; flex-direction: column; gap: 8px; justify-content: space-between; flex: 1; }
+
+/* Transfer curve */
+.curve { width: 96px; height: 96px; display: block; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); }
+.curve .grid { stroke: var(--line); stroke-width: 0.6; fill: none; }
+.curve .unity { stroke: var(--line-bright); stroke-width: 0.8; stroke-dasharray: 2 2; fill: none; }
+.curve .ceil { stroke: var(--ink-faint); stroke-width: 0.8; fill: none; }
+.curve .path { stroke: var(--modulator); stroke-width: 1.8; fill: none; stroke-linejoin: round; }
+.curve .dot { fill: var(--carrier); stroke: none; }
+.curve .ax { fill: var(--ink-faint); font: 7px var(--f-num); }
+
+/* Vertical meters: fixed gradient, a cover scaled from the top, a hold line */
+.meters { display: flex; align-items: flex-start; gap: 0; }
+.ch { width: var(--ch-w); display: flex; flex-direction: column; align-items: center; }
+.ch-led { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--line-bright); background: var(--inset); padding: 0; margin-bottom: 2px; cursor: pointer; }
+.ch-led.clip { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 5px var(--hot); }
+.ch-led.none { visibility: hidden; }
+.ch-read { height: 14px; margin-bottom: 2px; border: 0; background: transparent; padding: 0; font: 9.5px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink-dim); cursor: pointer; white-space: nowrap; }
+.ch-read:hover { color: var(--ink); }
+.ch-read.hot { color: var(--hot); }
+.ch-name { height: var(--post); font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); line-height: var(--post); }
+.bar { position: relative; width: var(--bar-w); height: var(--h); border-radius: 1.5px; overflow: hidden; background: var(--zones); }
+.bar .cover { position: absolute; inset: 0; background: var(--well); opacity: 0.86; transform-origin: top; transform: scaleY(1); transition: transform 34ms linear; will-change: transform; }
+.bar .hold { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--ink); transform: translateY(0); transition: transform 34ms linear; }
+.bar .ceil { position: absolute; left: -2px; right: -2px; bottom: 0; height: 1px; background: var(--ink); opacity: 0.8; }
+.bar.gr { background: var(--carrier); }
+.bar.gr .cover { transform-origin: bottom; }
+.bar.gr .hold { top: 0; bottom: auto; }
+.bar.gr.dim { opacity: 0.3; }
+.led .bar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(to top, transparent 0 3px, var(--well) 3px 4px); pointer-events: none; }
+.scale { position: relative; width: 22px; height: var(--h); margin-top: var(--pre); flex: none; }
+.scale span { position: absolute; right: 3px; transform: translateY(50%); font: 8px var(--f-num); color: var(--ink-faint); line-height: 1; white-space: nowrap; }
+.scale span::after { content: ''; position: absolute; right: -3px; top: 50%; width: 2px; height: 1px; background: var(--ink-faint); }
+.scale span.z { color: var(--ink-dim); }
+.scale.gr span { right: auto; left: 3px; }
+.scale.gr span::after { right: auto; left: -3px; }
+
+/* Level fader */
+.fader { width: 34px; display: flex; flex-direction: column; align-items: center; }
+.fader .ch-read { color: var(--ink); cursor: default; }
+.fader-track { position: relative; width: 26px; height: var(--h); touch-action: none; cursor: ns-resize; }
+.fader-track::before { content: ''; position: absolute; left: 11px; width: 4px; top: 0; bottom: 0; background: var(--well); border-radius: 2px; border: 1px solid var(--line); }
+.fader-cap { position: absolute; left: 0; width: 26px; height: 14px; bottom: 0; transform: translateY(50%); background: linear-gradient(var(--panel-hi), var(--line-bright)); border: 1px solid var(--line-bright); border-radius: 2px; }
+.fader-cap::after { content: ''; position: absolute; left: 3px; right: 3px; top: 6px; height: 1px; background: var(--ink); }
+
+/* Master column (option B) */
+.cols2 { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 14px; align-items: start; }
+.left { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.column { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 8px); background: var(--well); border: 1px solid var(--line-bright); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.column { --ch-w: 32px; }
+.column .meters { justify-content: center; }
+.groups { display: flex; justify-content: center; margin-top: -6px; font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.groups span { text-align: center; border-top: 1px solid var(--line-bright); padding-top: 2px; }
+.groups .fader { width: 34px; border: 0; } .groups .pair { width: calc(2 * var(--ch-w)); } .groups .scale { width: 22px; border: 0; } .groups .one { width: var(--ch-w); border: 0; }
+.column-row { display: flex; gap: 10px; align-items: flex-start; }
+.column h2 { justify-content: space-between; }
+
+/* Meter bridge: appears when the full meters scroll away */
+.bridge { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 6; display: flex; align-items: center; gap: 12px; padding: 6px 10px; background: color-mix(in srgb, var(--well) 94%, transparent); border: 1px solid var(--line-bright); border-radius: 6px; flex-wrap: wrap; }
+.bridge[hidden] { display: none; }
+.bridge .tag { font: 600 10px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.hbars { display: flex; flex-direction: column; gap: 3px; flex: 1 1 160px; max-width: 320px; }
+.hbar { position: relative; height: 5px; border-radius: 1px; overflow: hidden; background: var(--hzones); }
+.hbar .cover { position: absolute; inset: 0; background: var(--well); opacity: 0.86; transform-origin: right; transition: transform 34ms linear; }
+.hbar .ceil { position: absolute; top: -1px; bottom: -1px; width: 1px; background: var(--ink); }
+.led .hbar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(to right, transparent 0 3px, var(--well) 3px 4px); }
+.chip { font: 10.5px var(--f-num); color: var(--ink-dim); white-space: nowrap; }
+.chip b { color: var(--ink); font-weight: 500; }
+
+/* Hidden-tab stand-in */
+.away { border: 1px dashed var(--line-bright); border-radius: 6px; padding: 28px 16px; text-align: center; color: var(--ink-faint); }
+
+/* Notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.note ul, .note ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.spec { overflow-x: auto; }
+table { border-collapse: collapse; font-size: 12px; width: 100%; }
+td, th { text-align: left; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 9.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+td { color: var(--ink-dim); }
+td:first-child { color: var(--ink); white-space: nowrap; }
+code { font: 11.5px var(--f-num); color: var(--ink); }
+
+@media (max-width: 760px) {
+  .cols2 { grid-template-columns: minmax(0, 1fr); }
+  .column { position: static; order: -1; }
+  .paints { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar .cover, .bar .hold, .hbar .cover, .olight, .lamp i { transition: none; }
+}
+</style>
+
+<div class="wrap">
+  <header class="topbar">
+    <span class="brand">WINDSOR</span>
+    <div class="apptabs" role="tablist" aria-label="App tabs">
+      <button role="tab" id="tab-song" aria-selected="false">Song</button>
+      <button role="tab" aria-selected="false" disabled>Parts</button>
+      <button role="tab" id="tab-mixer" aria-selected="true">Mixer</button>
+    </div>
+    <span class="grow"></span>
+    <span class="cpu">CPU 18% <span class="olight" id="olight" title="Output stage: Limiter"></span></span>
+  </header>
+
+  <div class="lede">
+    <h1>Master section makeover</h1>
+    <p>The Mixer tab's master level, meters and output stage, redrawn in the insert rack's style. The meters move on a simulated drum loop, not real audio. Try the options, drag the Level fader and the Ceiling knob, and switch to the Song tab to watch the meters stop painting while the top-bar light keeps working.</p>
+    <p><strong>Chosen on 2026-09-30:</strong> B · Side column, segmented meters, the bridge when the column scrolls away (on narrow screens, where the column stacks on top), and one meter bridge from the output stage's own In and Out peaks with the separate master tap dropped. The ✓ marks them in the toolbar; A and C stay here for reference.</p>
+  </div>
+
+  <div class="toolbar" role="group" aria-label="Mockup options">
+    <div class="opt"><span class="opt-label">Page order</span>
+      <div class="segs" data-opt="layout">
+        <button data-v="master" aria-pressed="false">A · Master first</button>
+        <button data-v="column" aria-pressed="true">B · Side column ✓</button>
+        <button data-v="flow" aria-pressed="false">C · Sends first</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Meters</span>
+      <div class="segs" data-opt="meter">
+        <button data-v="led" aria-pressed="true">Segmented ✓</button>
+        <button data-v="smooth" aria-pressed="false">Smooth</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Bridge</span>
+      <div class="segs" data-opt="bridge">
+        <button data-v="on" aria-pressed="true">When scrolled ✓</button>
+        <button data-v="off" aria-pressed="false">Never</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Signal</span>
+      <div class="segs" data-opt="signal">
+        <button data-v="quiet" aria-pressed="false">Quiet</button>
+        <button data-v="mix" aria-pressed="true">Mix</button>
+        <button data-v="hot" aria-pressed="false">Hot</button>
+        <button data-v="stop" aria-pressed="false">Stopped</button>
+      </div>
+    </div>
+    <span class="paints" id="paints">Meter paints <b>0/s</b></span>
+  </div>
+
+  <div class="bridge led" id="bridge" hidden aria-label="Master meter bridge"></div>
+  <main class="mixer" id="mixer"></main>
+
+  <section class="notes" aria-label="Notes">
+    <div class="note">
+      <h3>What changes</h3>
+      <ul>
+        <li><strong>One meter bridge instead of two.</strong> Today the master's L/R meter and the output stage's In L/R read almost the same signal: the master output, before and after the Music fader. The mockup keeps the stage's own In and Out peaks and drops the separate master tap, so the page runs one less audio worklet while it is open.</li>
+        <li><strong>The master reads as a chain.</strong> Inserts, then Level, then Output, left to right in the same 196&nbsp;px rack as every insert. Level and Output are pinned at the end of the rack: they are never removed or reordered.</li>
+        <li><strong>Vertical meters with a real scale.</strong> dBFS ticks, colour zones (teal below −12, amber to 0, red above), a one-second peak-hold line, and a readout on each bar. Click a readout or a clip LED to reset it; the Reset peaks button goes.</li>
+        <li><strong>The ceiling is drawn.</strong> A line across the Out bars at the ceiling, and a transfer curve that shows what the mode does. A dot rides the curve at the current input peak, so you see the stage working.</li>
+        <li><strong>Level in dB.</strong> A fader reading +6.0&nbsp;dB rather than a knob reading 2.00. The stored value stays the linear gain.</li>
+        <li><strong>The stage lamp</strong> keeps today's latch rules (windsor#94 decision 3) and names what it latched on: Limiting, Clipping, or Over 0&nbsp;dB in Off. A mode change after the latch keeps that name.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>No CPU when you aren't looking</h3>
+      <ul>
+        <li><strong>The loop stops, not idles.</strong> Today each meter's frame loop keeps running every frame while the tab is hidden and checks <code>closest('[hidden]')</code> each time. The new meters start on the Mixer tab's show and stop on its hide, on <code>visibilitychange</code>, and when an IntersectionObserver says they are off screen.</li>
+        <li><strong>Paint on a report, not on a frame.</strong> The stage reports 30 times a second; the meters paint only when a new report lands, whatever the display's refresh rate.</li>
+        <li><strong>Compositor-only drawing.</strong> Each bar is a fixed gradient under a cover moved with <code>transform</code>, with a 34&nbsp;ms transition to smooth between reports. That means no layout per frame, which <code>&lt;meter&gt;</code> value changes cause.</li>
+        <li><strong>Text updates rarely.</strong> Readouts change only when the held value changes by 0.1&nbsp;dB.</li>
+        <li><strong>The transfer curve is static SVG.</strong> It redraws on a mode or ceiling edit; only the dot moves.</li>
+        <li><strong>The top-bar light stays the always-on indicator.</strong> It reads the stage's watch and repaints only when its look changes. The stage's 30&nbsp;Hz report keeps running for it and for the clip latch.</li>
+        <li>No CPU figures are claimed here. A worker measures before and after under <code>docs/research/</code>.</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h3>What tacowars chose</h3>
+      <ol>
+        <li>Page order: <strong>B · Side column</strong>. The master column is sticky on the right; the master inserts and the sends scroll on the left.</li>
+        <li>Meters: <strong>Segmented</strong>.</li>
+        <li>Bridge: <strong>when the full meters scroll away</strong>.</li>
+        <li>Master tap: <strong>dropped</strong>. The meters read the output stage's In and Out peaks, so they include the Music fader.</li>
+      </ol>
+    </div>
+    <div class="note spec">
+      <h3>Spec for workers</h3>
+      <table>
+        <thead><tr><th>Part</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Rack height</td><td>196&nbsp;px, 24&nbsp;px side rail, the insert rack's tokens</td></tr>
+          <tr><td>Meter bar</td><td>10&nbsp;px wide in a 28&nbsp;px channel; LED 8&nbsp;px and readout 14&nbsp;px above, name 14&nbsp;px below</td></tr>
+          <tr><td>Peak scale</td><td>−60 to +6&nbsp;dBFS (<code>PEAK_METER</code>), height ∝ ((dB+60)/66)<sup>1.6</sup>; ticks +6, 0, −6, −12, −18, −24, −36, −48</td></tr>
+          <tr><td>Zones</td><td>teal below −12, amber −12 to 0, red above 0</td></tr>
+          <tr><td>Ballistics</td><td>attack instant, fall 24&nbsp;dB/s, hold 1&nbsp;s (<code>PEAK_METER.holdSeconds</code>)</td></tr>
+          <tr><td>GR / Over bar</td><td>0 to 12&nbsp;dB from the top, amber; dimmed in Off</td></tr>
+          <tr><td>Transfer curve</td><td>96&nbsp;px square, −24 to +6&nbsp;dB on both axes, dot at the louder input peak. Drawn from the engine's own curves: Soft clip is linear to 6&nbsp;dB under the ceiling, then <code>outputStageClipper.ts</code>'s rational curve; Limiter and Hard clip settle at the ceiling</td></tr>
+          <tr><td>Paint rate</td><td>once per stage report (30&nbsp;Hz), never while hidden</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const S = { layout: 'column', meter: 'led', bridge: 'on', signal: 'mix', tab: 'mixer',
+    mode: 'limiter', ceil: -1, look: true, level: 1 };
+  const FLOOR = -60, TOP = 6, GR_MAX = 12, FALL = 24, HOLD_MS = 1000, HZ = 30;
+  const MODES = [['limiter', 'Limiter'], ['soft', 'Soft clip'], ['hard', 'Hard clip'], ['off', 'Off']];
+  const TICKS = [6, 0, -6, -12, -18, -24, -36, -48];
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const pos = (db) => Math.pow(clamp((db - FLOOR) / (TOP - FLOOR), 0, 1), 1.6);
+  const dbOf = (lin) => (lin > 1e-5 ? 20 * Math.log10(lin) : -Infinity);
+  const linOf = (db) => Math.pow(10, db / 20);
+  const fmtDb = (db) => (db === -Infinity || db < FLOOR ? '−∞' : (db > 0 ? '+' : db < 0 ? '−' : '') + Math.abs(db).toFixed(1));
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const svgEl = (tag, attrs) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+  // Zone gradient aligned to the scale: teal / amber at -12 / red at 0.
+  const p12 = (pos(-12) * 100).toFixed(1), p0 = (pos(0) * 100).toFixed(1);
+  const zones = (dir) => `linear-gradient(${dir}, var(--modulator) 0 ${p12}%, var(--carrier) ${p12}% ${p0}%, var(--hot) ${p0}% 100%)`;
+  const smoothZones = (dir) => `linear-gradient(${dir}, #3d7a74 0%, var(--modulator) ${p12}%, var(--carrier) ${p0 - 4}%, var(--hot) ${p0}%, var(--hot) 100%)`;
+  const applyZones = () => {
+    const led = S.meter === 'led';
+    document.documentElement.style.setProperty('--zones', led ? zones('to top') : smoothZones('to top'));
+    document.documentElement.style.setProperty('--hzones', led ? zones('to right') : smoothZones('to right'));
+  };
+
+  /* ---------- the "audio thread": a drum-loop model of the stage's reports ---------- */
+  // The lamp keeps the action it latched on, so a later mode change never renames it.
+  const ACTION = { limiter: 'Limiting', soft: 'Clipping', hard: 'Clipping', off: 'Over 0 dB' };
+  let t = 0, gain = 1, latched = false, latchedWord = '', lastActed = -1e9;
+  const clipIn = [false, false];
+  // Soft clip as outputStageClipper.ts draws it: identity up to 6 dB under the
+  // ceiling (OUTPUT_SOFT_CLIP.kneeDb), then k + (c - k)·u / (1 + u).
+  const softClip = (x, c) => { const k = c * linOf(-6); if (x <= k) return x; const u = (x - k) / (c - k); return k + ((c - k) * u) / (1 + u); };
+  const report = { in: [-Infinity, -Infinity], out: [-Infinity, -Infinity], gr: 0, over: 0, acted: false };
+  function simulate() {
+    t += 1 / HZ;
+    if (S.signal === 'stop') { report.in = [-Infinity, -Infinity]; report.out = [-Infinity, -Infinity]; report.gr = 0; report.over = 0; report.acted = false; gain = 1; return; }
+    const beat = 0.5, ph = t % beat, jitter = () => 1 + 0.08 * (Math.random() - 0.5);
+    const kick = Math.exp(-ph / 0.07), snare = Math.floor(t / beat) % 2 ? Math.exp(-ph / 0.1) : 0;
+    const hat = 0.25 * Math.exp(-(t % 0.125) / 0.02), body = 0.16 + 0.05 * Math.sin(t * 0.9);
+    const drive = { quiet: 0.27, mix: 0.6, hot: 1.3 }[S.signal] * S.level;
+    const inL = (body + 0.55 * kick + 0.4 * snare + 0.1 * hat) * jitter() * drive;
+    const inR = (body * 0.95 + 0.55 * kick + 0.32 * snare + 0.14 * hat) * jitter() * drive;
+    const c = linOf(S.ceil), peak = Math.max(inL, inR);
+    let outL = inL, outR = inR, gr = 0, over = 0, acted = false;
+    if (S.mode === 'limiter') {
+      const target = peak > c ? c / peak : 1;
+      const applied = S.look ? Math.min(gain, target) : Math.min(gain, (gain + target) / 2);
+      gain = target < gain ? (S.look ? target : applied) : gain + (1 - gain) * (1 - Math.exp(-1 / HZ / 0.15));
+      outL = inL * applied; outR = inR * applied; gr = -dbOf(applied); acted = gr > 0.05;
+    } else if (S.mode === 'soft') {
+      outL = softClip(inL, c); outR = softClip(inR, c); over = Math.max(0, dbOf(peak / c)); acted = peak > c * linOf(-6);
+    } else if (S.mode === 'hard') {
+      outL = Math.min(inL, c); outR = Math.min(inR, c); over = Math.max(0, dbOf(peak / c)); acted = peak > c;
+    } else { acted = peak > 1; }
+    report.in = [dbOf(inL), dbOf(inR)]; report.out = [dbOf(outL), dbOf(outR)];
+    report.gr = gr; report.over = over; report.acted = acted;
+    if (acted) { if (!latched) latchedWord = ACTION[S.mode]; latched = true; lastActed = performance.now(); }
+    if (inL > 1) clipIn[0] = true;
+    if (inR > 1) clipIn[1] = true;
+  }
+
+  /* ---------- meter parts ---------- */
+  let meters = [];           // everything painted per report
+  let paintCount = 0;
+  function peakChannel({ name, src, h, led = true, ceil = false }) {
+    const root = el('div', 'ch');
+    const lamp = el('button', 'ch-led' + (led ? '' : ' none'));
+    lamp.type = 'button'; lamp.title = 'Above 0 dBFS before the stage. Click to clear.';
+    const read = el('button', 'ch-read', '−∞');
+    read.type = 'button'; read.title = 'Peak over the last second. Click to reset.';
+    const bar = el('div', 'bar'); bar.style.setProperty('--h', h + 'px');
+    const cover = el('i', 'cover'), hold = el('i', 'hold');
+    bar.append(cover, hold);
+    let ceilLine = null;
+    if (ceil) { ceilLine = el('i', 'ceil'); bar.appendChild(ceilLine); }
+    root.append(lamp, read, bar, el('span', 'ch-name', name));
+    let disp = -Infinity, held = -Infinity, heldAt = 0, shown = '';
+    const reset = () => { held = -Infinity; heldAt = 0; if (led) clipIn[src.clip] = false; };
+    read.onclick = reset; lamp.onclick = reset;
+    const m = {
+      root,
+      paint(now) {
+        const v = src.get();
+        disp = Math.max(v, (disp === -Infinity ? FLOOR : disp) - FALL / HZ);
+        if (v >= held || now - heldAt > HOLD_MS) { held = v; heldAt = now; }
+        cover.style.transform = `scaleY(${(1 - pos(disp)).toFixed(4)})`;
+        hold.style.transform = `translateY(${(-pos(held) * h).toFixed(1)}px)`;
+        hold.style.opacity = held < FLOOR ? 0 : 1;
+        const text = fmtDb(held);
+        if (text !== shown) { read.textContent = shown = text; read.classList.toggle('hot', held > (ceil ? S.ceil + 0.05 : 0)); }
+        if (led) lamp.classList.toggle('clip', clipIn[src.clip]);
+        if (ceilLine) ceilLine.style.transform = `translateY(${(-pos(S.ceil) * h).toFixed(1)}px)`;
+      },
+      idle() { disp = held = -Infinity; },
+    };
+    meters.push(m);
+    return root;
+  }
+  function grChannel(h) {
+    const root = el('div', 'ch');
+    const read = el('button', 'ch-read', '0.0'); read.type = 'button';
+    const bar = el('div', 'bar gr'); bar.style.setProperty('--h', h + 'px');
+    const cover = el('i', 'cover'), hold = el('i', 'hold');
+    bar.append(cover, hold);
+    const name = el('span', 'ch-name', 'GR');
+    root.append(el('span', 'ch-led none'), read, bar, name);
+    let disp = 0, held = 0, heldAt = 0, shown = '';
+    read.onclick = () => { held = 0; };
+    meters.push({
+      root,
+      paint(now) {
+        const off = S.mode === 'off', v = S.mode === 'limiter' ? report.gr : report.over;
+        name.textContent = S.mode === 'limiter' ? 'GR' : off ? 'Off' : 'Over';
+        bar.classList.toggle('dim', off);
+        disp = Math.max(v, disp - FALL / HZ);
+        if (v >= held || now - heldAt > HOLD_MS) { held = v; heldAt = now; }
+        cover.style.transform = `scaleY(${(1 - clamp(disp / GR_MAX, 0, 1)).toFixed(4)})`;
+        hold.style.transform = `translateY(${(clamp(held / GR_MAX, 0, 1) * h).toFixed(1)}px)`;
+        hold.style.opacity = held > 0.05 ? 1 : 0;
+        const text = off ? '—' : (held > 0.05 ? '−' : '') + held.toFixed(1);
+        if (text !== shown) read.textContent = shown = text;
+      },
+      idle() { disp = held = 0; },
+    });
+    return root;
+  }
+  function peakScale(h) {
+    const s = el('div', 'scale'); s.style.setProperty('--h', h + 'px');
+    for (const db of TICKS) {
+      const span = el('span', db === 0 ? 'z' : '', db > 0 ? '+' + db : db === 0 ? '0' : '−' + -db);
+      span.style.bottom = (pos(db) * 100).toFixed(2) + '%';
+      s.appendChild(span);
+    }
+    return s;
+  }
+  function grScale(h) {
+    const s = el('div', 'scale gr'); s.style.setProperty('--h', h + 'px');
+    for (const db of [0, 3, 6, 9, 12]) {
+      const span = el('span', '', String(db)); span.style.bottom = (100 - (db / GR_MAX) * 100) + '%';
+      s.appendChild(span);
+    }
+    return s;
+  }
+
+  /* ---------- controls ---------- */
+  function arc(cx, cy, r, a0, a1) {
+    const p = (a) => [cx + r * Math.sin(a), cy - r * Math.cos(a)];
+    const [x0, y0] = p(a0), [x1, y1] = p(a1);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+  function knob({ label, frac, value, live }) {
+    const root = el('div', 'knob' + (live ? ' live' : ''));
+    const svg = svgEl('svg', { width: 40, height: 36, viewBox: '0 0 40 36', 'aria-hidden': 'true' });
+    const A = (3 * Math.PI) / 4;
+    svg.append(svgEl('circle', { class: 'face', cx: 20, cy: 20, r: 11 }), svgEl('path', { class: 'track', d: arc(20, 20, 15, -A, A) }));
+    const arcP = svgEl('path', { class: 'arc' }), pin = svgEl('line', { class: 'pin' });
+    svg.append(arcP, pin);
+    const val = el('span', 'val'), lab = el('span', 'lab', label);
+    root.append(svg, val, lab);
+    const draw = (f, text) => {
+      const a = -A + f * 2 * A;
+      arcP.setAttribute('d', f > 0.005 ? arc(20, 20, 15, -A, a) : '');
+      pin.setAttribute('x1', 20 + 4 * Math.sin(a)); pin.setAttribute('y1', 20 - 4 * Math.cos(a));
+      pin.setAttribute('x2', 20 + 10 * Math.sin(a)); pin.setAttribute('y2', 20 - 10 * Math.cos(a));
+      val.textContent = text;
+    };
+    draw(frac, value);
+    if (live) {
+      root.tabIndex = 0; root.setAttribute('role', 'slider'); root.setAttribute('aria-label', label);
+      let y0 = 0, f0 = 0;
+      root.addEventListener('pointerdown', (e) => { root.setPointerCapture(e.pointerId); y0 = e.clientY; f0 = live.get(); });
+      root.addEventListener('pointermove', (e) => { if (root.hasPointerCapture(e.pointerId)) live.set(clamp(f0 + (y0 - e.clientY) / 140, 0, 1)); });
+      root.addEventListener('keydown', (e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); live.set(clamp(live.get() + (e.key === 'ArrowUp' ? 0.01 : -0.01), 0, 1)); } });
+    }
+    return { root, draw };
+  }
+  const staticKnob = (label, frac, value) => knob({ label, frac, value }).root;
+
+  let ceilingViews = [], curveViews = [], modeViews = [], lampViews = [], faderViews = [];
+  function ceilingKnob() {
+    const k = knob({ label: 'Ceiling', frac: 0, value: '', live: {
+      get: () => (S.ceil + 12) / 12,
+      set: (f) => { S.ceil = Math.round((f * 12 - 12) * 10) / 10; syncControls(); },
+    } });
+    ceilingViews.push(k);
+    return k.root;
+  }
+  function modeStack(grid) {
+    const box = el('div', 'modes' + (grid ? ' grid2' : ''));
+    box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Output stage mode');
+    for (const [v, label] of MODES) {
+      const b = el('button', '', label); b.type = 'button'; b.dataset.v = v;
+      b.onclick = () => { S.mode = v; syncControls(); };
+      box.appendChild(b);
+    }
+    const look = el('button', 'toggle'); look.type = 'button';
+    look.append(el('i'), document.createTextNode('Lookahead'));
+    look.title = 'Limiter only: delays the output 1.5 ms so the gain is down before a peak';
+    look.onclick = () => { S.look = !S.look; syncControls(); };
+    modeViews.push({ box, look });
+    return { box, look };
+  }
+  function stageLamp() {
+    const b = el('button', 'lamp'); b.type = 'button';
+    const i = el('i'), label = el('span');
+    b.append(i, label);
+    b.onclick = () => { latched = false; latchedWord = ''; };
+    lampViews.push({ b, label });
+    return b;
+  }
+  function transferCurve() {
+    const svg = svgEl('svg', { class: 'curve', viewBox: '0 0 100 100', role: 'img' });
+    const X = (db) => ((db + 24) / 30) * 100, Y = (db) => 100 - ((db + 24) / 30) * 100;
+    for (const db of [-18, -12, -6]) {
+      svg.append(svgEl('line', { class: 'grid', x1: X(db), y1: 0, x2: X(db), y2: 100 }), svgEl('line', { class: 'grid', x1: 0, y1: Y(db), x2: 100, y2: Y(db) }));
+    }
+    svg.append(svgEl('line', { class: 'unity', x1: 0, y1: 100, x2: 100, y2: 0 }));
+    const ceil = svgEl('line', { class: 'ceil', x1: 0, x2: 100 });
+    const path = svgEl('path', { class: 'path' });
+    const dot = svgEl('circle', { class: 'dot', r: 3.2 });
+    const inAx = svgEl('text', { class: 'ax', x: 97, y: 96, 'text-anchor': 'end' }); inAx.textContent = 'in';
+    const outAx = svgEl('text', { class: 'ax', x: 4, y: 9 }); outAx.textContent = 'out';
+    svg.append(ceil, path, dot, inAx, outAx);
+    const shape = (db) => {
+      const c = S.ceil, x = linOf(db), cl = linOf(c);
+      if (S.mode === 'off') return db;
+      if (S.mode === 'hard') return Math.min(db, c);
+      if (S.mode === 'soft') return dbOf(softClip(x, cl));
+      return Math.min(db, c);   // limiter: its settled peak level; the gain moves in time, the ceiling clamp is final
+    };
+    curveViews.push({
+      svg,
+      draw() {
+        let d = '';
+        for (let db = -24; db <= 6.01; db += 0.5) d += (d ? 'L' : 'M') + X(db).toFixed(1) + ' ' + Y(clamp(shape(db), -24, 6)).toFixed(1);
+        path.setAttribute('d', d);
+        ceil.setAttribute('y1', Y(S.ceil)); ceil.setAttribute('y2', Y(S.ceil));
+        ceil.style.opacity = S.mode === 'off' ? 0 : 1;
+        svg.setAttribute('aria-label', `Transfer curve: ${S.mode}, ceiling ${S.ceil} dBFS`);
+      },
+      moveDot() {
+        const inDb = Math.max(report.in[0], report.in[1]);
+        const vis = inDb > -24;
+        dot.style.opacity = vis ? 1 : 0;
+        if (vis) { const x = clamp(inDb, -24, 6); dot.setAttribute('cx', X(x).toFixed(1)); dot.setAttribute('cy', Y(clamp(shape(x), -24, 6)).toFixed(1)); }
+      },
+    });
+    meters.push({ paint: () => curveViews.forEach((c) => c.moveDot()), idle() {} });
+    return svg;
+  }
+  function levelFader(h) {
+    const root = el('div', 'fader');
+    const read = el('span', 'ch-read');
+    const track = el('div', 'fader-track'); track.style.setProperty('--h', h + 'px');
+    track.tabIndex = 0; track.setAttribute('role', 'slider'); track.setAttribute('aria-label', 'Master level');
+    const cap = el('i', 'fader-cap'); track.appendChild(cap);
+    root.append(el('span', 'ch-led none'), read, track, el('span', 'ch-name', 'dB'));
+    const setFromY = (y) => {
+      const r = track.getBoundingClientRect(), f = clamp((r.bottom - y) / r.height, 0, 1);
+      const db = FLOOR + Math.pow(f, 1 / 1.6) * (TOP - FLOOR);
+      S.level = f < 0.01 ? 0 : Math.min(2, linOf(db)); syncControls();
+    };
+    track.addEventListener('pointerdown', (e) => { track.setPointerCapture(e.pointerId); setFromY(e.clientY); });
+    track.addEventListener('pointermove', (e) => { if (track.hasPointerCapture(e.pointerId)) setFromY(e.clientY); });
+    track.addEventListener('keydown', (e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); const db = (S.level > 0 ? dbOf(S.level) : FLOOR) + (e.key === 'ArrowUp' ? 0.5 : -0.5); S.level = clamp(linOf(db), 0, 2); syncControls(); } });
+    faderViews.push({ read, cap, h, track });
+    return root;
+  }
+
+  function syncControls() {
+    const cf = (S.ceil + 12) / 12;
+    ceilingViews.forEach((k) => k.draw(cf, fmtDb(S.ceil) + ' dBFS'));
+    curveViews.forEach((c) => { c.draw(); c.moveDot(); });
+    modeViews.forEach(({ box, look }) => {
+      box.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === S.mode)));
+      look.setAttribute('aria-pressed', String(S.look)); look.disabled = S.mode !== 'limiter';
+    });
+    const levelDb = S.level > 0 ? dbOf(S.level) : -Infinity;
+    faderViews.forEach(({ read, cap, h, track }) => {
+      read.textContent = fmtDb(levelDb);
+      cap.style.bottom = (S.level > 0 ? pos(levelDb) * h : 0) + 'px';
+      track.setAttribute('aria-valuetext', `${fmtDb(levelDb)} dB (×${S.level.toFixed(2)})`);
+      track.title = `×${S.level.toFixed(2)} linear, stored as the song's master.level`;
+    });
+    paintLamps();
+    paintBridgeStatic();
+    paintLight();
+  }
+  function paintLamps() {
+    const now = performance.now() - lastActed < HOLD_MS;
+    const word = latched ? latchedWord : ACTION[S.mode];
+    lampViews.forEach(({ b, label }) => {
+      b.classList.toggle('now', now); b.classList.toggle('latched', latched);
+      label.textContent = word;
+      b.title = latched ? `${word} happened since the last reset. Click to clear.` : `Lights while the stage is ${word.toLowerCase()}.`;
+    });
+  }
+
+  /* ---------- devices ---------- */
+  function device({ name, cls = '', body, fixed = false, folded = false }) {
+    const d = el('div', 'dev ' + cls + (folded ? ' folded' : ''));
+    const rail = el('div', 'rail');
+    rail.append(el('span', fixed ? 'fixed' : 'pwr', fixed ? '▪' : '⏻'), el('span', 'name', name));
+    d.appendChild(rail);
+    if (!folded) { const b = el('div', 'dev-body'); b.append(...body); d.appendChild(b); }
+    return d;
+  }
+  function sec(label, ...kids) { const s = el('div', 'sec'); const row = el('div', 'sec-row'); row.append(...kids); s.append(el('span', 'sec-label', label), row); return s; }
+  function knobGrid(list) { const g = el('div', 'knobs'); list.forEach(([l, f, v]) => g.appendChild(staticKnob(l, f, v))); return g; }
+  const inSrc = (i) => ({ get: () => report.in[i], clip: i });
+  const outSrc = (i) => ({ get: () => report.out[i], clip: i });
+  const METER_H = 124;
+
+  function levelDevice() {
+    const m = el('div', 'meters');
+    m.append(levelFader(METER_H), peakScale(METER_H),
+      peakChannel({ name: 'L', src: inSrc(0), h: METER_H }), peakChannel({ name: 'R', src: inSrc(1), h: METER_H }));
+    return device({ name: 'Level', fixed: true, body: [sec('Level · into the stage', m)] });
+  }
+  function outputDevice() {
+    const { box, look } = modeStack(false);
+    const modes = el('div', 'stack'); modes.append(box, look, stageLamp());
+    const shape = el('div', 'stack'); shape.style.alignItems = 'center'; shape.append(transferCurve(), ceilingKnob());
+    const gr = el('div', 'meters'); gr.append(grChannel(METER_H), grScale(METER_H));
+    const out = el('div', 'meters');
+    out.append(peakScale(METER_H), peakChannel({ name: 'L', src: outSrc(0), h: METER_H, led: false, ceil: true }), peakChannel({ name: 'R', src: outSrc(1), h: METER_H, led: false, ceil: true }));
+    return device({ name: 'Output', fixed: true, body: [sec('Mode', modes), sec('Shape', shape), sec('Reduction', gr), sec('Out', out)] });
+  }
+  function masterInserts() {
+    const rack = el('div', 'rack');
+    rack.append(
+      device({ name: '1 Compressor', body: [sec('Dynamics', knobGrid([['Thresh', 0.55, '−18.0 dB'], ['Ratio', 0.3, '3.0:1'], ['Attack', 0.2, '10 ms'], ['Makeup', 0.4, '+3.0 dB']]))] }),
+      device({ name: '2 Tape', folded: true }),
+      el('div', 'add', '+'));
+    rack.lastChild.setAttribute('aria-label', 'Add an insert');
+    return rack;
+  }
+  function sendRack(name, dev) {
+    const block = el('section', 'block');
+    const h = el('h2'); h.append(document.createTextNode(name + ' '), el('small', '', 'Level ×1.00 · the parts\' send knobs feed it'));
+    const line = el('div', 'rack-line'); const rack = el('div', 'rack bus');
+    rack.append(el('div', 'add', '+'), dev, el('div', 'add', '+'));
+    line.appendChild(rack);
+    block.append(h, line);
+    return block;
+  }
+  const sends = () => [
+    sendRack('Send A', device({ name: '1 Plate reverb', cls: 'bus', body: [sec('Plate', knobGrid([['Decay', 0.5, '2.4 s'], ['Predelay', 0.2, '20 ms'], ['Damp', 0.6, '6.0 kHz'], ['Width', 0.8, '100%']]))] })),
+    sendRack('Send B', device({ name: '1 Echo', cls: 'bus', body: [sec('Echo', knobGrid([['Time', 0.5, '3/16'], ['Feedback', 0.4, '38%'], ['Tone', 0.55, '4.2 kHz'], ['Wow', 0.1, '8%']]))] })),
+  ];
+
+  let primary = null;
+  function masterChain() {
+    const block = el('section', 'block');
+    const h = el('h2'); h.append(document.createTextNode('Master '), el('small', '', 'Parts and sends → inserts → level → output stage → speakers'));
+    const line = el('div', 'rack-line');
+    const tail = el('div', 'tail'); tail.append(levelDevice(), outputDevice());
+    line.append(masterInserts(), el('span', 'flow', '→'), tail);
+    block.append(h, line);
+    primary = tail;
+    return block;
+  }
+  function masterColumn() {
+    const col = el('aside', 'column'); col.setAttribute('aria-label', 'Master level and output');
+    const h = el('h2'); h.append(document.createTextNode('Master out'));
+    const lampSlot = stageLamp(); h.appendChild(lampSlot);
+    const H = 210, m = el('div', 'meters');
+    m.append(levelFader(H),
+      peakChannel({ name: 'L', src: inSrc(0), h: H }), peakChannel({ name: 'R', src: inSrc(1), h: H }),
+      peakScale(H),
+      peakChannel({ name: 'L', src: outSrc(0), h: H, led: false, ceil: true }), peakChannel({ name: 'R', src: outSrc(1), h: H, led: false, ceil: true }),
+      grChannel(H));
+    const { box, look } = modeStack(true);
+    const ctl = el('div', 'stack'); ctl.append(box, look);
+    const row = el('div', 'column-row'); row.append(transferCurve(), ceilingKnob());
+    const groups = el('div', 'groups');
+    [['', 'fader'], ['In', 'pair'], ['', 'scale'], ['Out', 'pair'], ['', 'one']].forEach(([t, c]) => groups.appendChild(el('span', c, t)));
+    col.append(h, m, groups, ctl, row);
+    primary = m;
+    return col;
+  }
+  function masterInsertsBlock() {
+    const block = el('section', 'block');
+    const h = el('h2'); h.append(document.createTextNode('Master inserts '), el('small', '', 'Parts and sends → inserts → the master column'));
+    const line = el('div', 'rack-line'); line.appendChild(masterInserts());
+    block.append(h, line);
+    return block;
+  }
+
+  /* ---------- meter bridge ---------- */
+  const bridge = document.getElementById('bridge');
+  let bridgeChip = null, bridgeGr = null;
+  function buildBridge() {
+    bridge.innerHTML = '';
+    const bars = el('div', 'hbars');
+    const hb = (i) => {
+      const b = el('div', 'hbar'), cover = el('i', 'cover'), ceil = el('i', 'ceil');
+      b.append(cover, ceil); bars.appendChild(b);
+      let disp = -Infinity;
+      meters.push({
+        paint() {
+          const v = report.out[i];
+          disp = Math.max(v, (disp === -Infinity ? FLOOR : disp) - FALL / HZ);
+          cover.style.transform = `scaleX(${(1 - pos(disp)).toFixed(4)})`;
+          ceil.style.left = (pos(S.ceil) * 100).toFixed(2) + '%';
+        },
+        idle() { disp = -Infinity; },
+      });
+    };
+    hb(0); hb(1);
+    bridgeGr = el('span', 'chip'); bridgeChip = el('span', 'chip');
+    bridge.append(el('span', 'tag', 'Master'), bars, bridgeGr, bridgeChip, stageLamp());
+    meters.push({ paint() { const v = S.mode === 'limiter' ? report.gr : report.over; bridgeGr.innerHTML = S.mode === 'off' ? '' : `${S.mode === 'limiter' ? 'GR' : 'Over'} <b>${v > 0.05 ? '−' + v.toFixed(1) : '0.0'}</b>`; }, idle() {} });
+  }
+  function paintBridgeStatic() { if (bridgeChip) bridgeChip.innerHTML = `<b>${MODES.find((m) => m[0] === S.mode)[1]}</b> ${S.mode === 'off' ? '' : fmtDb(S.ceil) + ' dBFS'}`; }
+
+  /* ---------- top-bar light: repaints only when its look changes ---------- */
+  const light = document.getElementById('olight');
+  let lightKey = '';
+  function paintLight() {
+    const lit = performance.now() - lastActed < HOLD_MS;
+    const key = S.mode + (S.mode === 'off' ? 'off' : lit ? 'lit' : 'unlit');
+    if (key === lightKey) return;
+    lightKey = key;
+    light.classList.toggle('lit', S.mode !== 'off' && lit);
+    light.classList.toggle('off', S.mode === 'off');
+    light.title = 'Output stage: ' + MODES.find((m) => m[0] === S.mode)[1];
+  }
+
+  /* ---------- page ---------- */
+  const mixer = document.getElementById('mixer');
+  let io = null, visible = new Set(), primaryVisible = true;
+  function render() {
+    meters = []; ceilingViews = []; curveViews = []; modeViews = []; lampViews = []; faderViews = []; primary = null;
+    mixer.innerHTML = '';
+    mixer.className = 'mixer' + (S.meter === 'led' ? ' led' : '');
+    bridge.className = 'bridge' + (S.meter === 'led' ? ' led' : '');
+    applyZones();
+    if (S.tab !== 'mixer') {
+      mixer.appendChild(el('div', 'away', 'Song tab. The Mixer\'s meters have stopped painting; the top-bar light still follows the output stage.'));
+      bridge.hidden = true; bridge.innerHTML = ''; bridgeChip = null;
+      observe(); syncControls(); return;
+    }
+    if (S.layout === 'master') { mixer.append(masterChain(), ...sends()); }
+    else if (S.layout === 'flow') { mixer.append(...sends(), masterChain()); }
+    else {
+      const grid = el('div', 'cols2'), left = el('div', 'left');
+      left.append(masterInsertsBlock(), ...sends());
+      grid.append(left, masterColumn());
+      mixer.appendChild(grid);
+    }
+    buildBridge();
+    observe(); syncControls();
+  }
+  function observe() {
+    io?.disconnect(); visible = new Set(); primaryVisible = true;
+    if (!('IntersectionObserver' in window)) return;
+    io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.target === primary) primaryVisible = e.isIntersecting;
+        e.isIntersecting ? visible.add(e.target) : visible.delete(e.target);
+      }
+      bridge.hidden = !(S.tab === 'mixer' && S.bridge === 'on' && primary && !primaryVisible);
+      if (!bridge.hidden) visible.add(bridge); else visible.delete(bridge);
+    });
+    if (primary) io.observe(primary);
+    mixer.querySelectorAll('.meters').forEach((m) => io.observe(m));
+  }
+  const live = () => S.tab === 'mixer' && !document.hidden && visible.size > 0;
+
+  let wasLive = false, perSecond = 0, lastSecond = performance.now();
+  const paints = document.getElementById('paints');
+  function tick() {
+    simulate();                     // the stage's report: always, like the worklet
+    paintLight();                   // the light: only when its look changes
+    const now = performance.now();
+    if (live()) {                   // the meters: only while someone can see them
+      meters.forEach((m) => m.paint(now));
+      paintLamps();
+      paintCount++;
+      wasLive = true;
+    } else if (wasLive) { meters.forEach((m) => m.idle()); wasLive = false; }
+    if (now - lastSecond >= 1000) {
+      perSecond = paintCount; paintCount = 0; lastSecond = now;
+      paints.innerHTML = `Meter paints <b>${perSecond}/s</b>${perSecond ? '' : ' · idle'}`;
+      paints.classList.toggle('idle', perSecond === 0);
+    }
+  }
+  setInterval(tick, 1000 / HZ);
+
+  document.querySelectorAll('.segs[data-opt]').forEach((g) => {
+    g.addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      S[g.dataset.opt] = b.dataset.v;
+      g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      if (g.dataset.opt === 'signal') { clipIn[0] = clipIn[1] = false; return; }
+      render();
+    });
+  });
+  const setTab = (tab) => {
+    S.tab = tab;
+    document.getElementById('tab-mixer').setAttribute('aria-selected', String(tab === 'mixer'));
+    document.getElementById('tab-song').setAttribute('aria-selected', String(tab === 'song'));
+    render();
+  };
+  document.getElementById('tab-mixer').onclick = () => setTab('mixer');
+  document.getElementById('tab-song').onclick = () => setTab('song');
+  render();
+})();
+</script>
