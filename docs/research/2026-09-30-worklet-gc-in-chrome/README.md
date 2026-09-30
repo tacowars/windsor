@@ -231,6 +231,15 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
 1. **Advanced Drive**: 78 070 bytes a quantum (26.9 MB/s), **+14.5
    collections a second**; alone it is 68 % of the dense song's garbage.
    Longest pause in its scenario 167 µs.
+   **After windsor#226: 0 bytes a quantum**, in every one of the 9 670
+   measured calls of a 28.6 s trace of `b-advanced-drive` with the meter off
+   (same machine and headless Chrome 154, this method, the worktree's dev
+   server; one-minute load average 4.27 before and 3.90 after the trace).
+   The thread collected 1.23 times a second, scenario a's rate: the FM
+   part's garbage alone. The drive's median call fell from 183 to 107 µs and
+   the median quantum span from 351 to 269 µs (both traced). The meter-on
+   pass after it read the drive at 5.8–8.7 % with no underrun. Summary:
+   [`summaries/b-advanced-drive-after.json`](summaries/b-advanced-drive-after.json).
 2. **Plate** (`reverb-processor.js`, as an insert): 23 061 bytes a quantum
    (7.9 MB/s), **+9.0 a second**; longest pause 210 µs. The room return runs
    the same bundle and allocates nothing only because it slept in every

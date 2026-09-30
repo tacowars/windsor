@@ -7,23 +7,26 @@ import { ADVANCED_DRIVE_PRESETS } from './advancedDrivePresetTables';
 import { DRIVE_DSP as C, DRIVE_ROUTES, DRIVE_SHAPERS } from './advancedDriveConstants';
 
 type Params = Record<string, Float32Array>;
+/** The DSP keeps each control in a Float64Array slot, in descriptor order (`driveSlots.ts`). */
+const KEYS = ADVANCED_DRIVE_PARAMETERS.map((p) => p.name);
+const slot = (key: string): number => KEYS.indexOf(key);
 interface ReferenceProcessor extends AdvancedDriveProcessorLike {
   dsp: {
     activeCount: number;
-    activeKeys: string[];
+    activeKeys: Int32Array;
     configure(params: Params, frames: number): void;
   };
 }
 function fullLoopReference(rate: number, params: Params): AdvancedDriveProcessorLike {
   const reference = loadAdvancedDrive(rate, params) as ReferenceProcessor;
   const configure = reference.dsp.configure.bind(reference.dsp);
-  const keys = ADVANCED_DRIVE_PARAMETERS.map((p) => p.name).filter(
+  const slots = KEYS.filter(
     (key) => !/^(route|wave)$|_(shaper|filter|pre|enabled|shaping|filtering)$/.test(key),
-  );
+  ).map(slot);
   reference.dsp.configure = (p, frames): void => {
     configure(p, frames);
-    for (let i = 0; i < keys.length; i++) reference.dsp.activeKeys[i] = keys[i]!;
-    reference.dsp.activeCount = keys.length;
+    for (let i = 0; i < slots.length; i++) reference.dsp.activeKeys[i] = slots[i]!;
+    reference.dsp.activeCount = slots.length;
   };
   return reference;
 }
@@ -89,17 +92,22 @@ it.each(ADVANCED_DRIVE_PRESETS)('preserves the settled $id preset sample for sam
 });
 
 interface SmoothingDsp {
-  controls: Record<string, number>;
-  targets: Record<string, number>;
-  activeKeys: string[];
+  controls: Float64Array;
+  targets: Float64Array;
+  activeKeys: Int32Array;
   activeCount: number;
   smooth: number;
   configure(params: Record<string, Float32Array>, frames: number): void;
-  update(left: number, right: number): void;
+  /** One sample's update, from the DSP's input fields (silent: the tests never tick). */
+  update(): void;
 }
 const continuous = ADVANCED_DRIVE_PARAMETERS.map((p) => p.name).filter(
   (key) => !/^(route|wave)$|_(shaper|filter|pre|enabled|shaping|filtering)$/.test(key),
 );
+const SENSITIVITY = slot('sensitivity');
+/** The names of the slots still smoothing. */
+const active = (dsp: SmoothingDsp): string[] =>
+  Array.from(dsp.activeKeys.subarray(0, dsp.activeCount), (k) => KEYS[k]!);
 function setup(rate = 48000) {
   const params = advancedDriveParams();
   const { dsp } = loadAdvancedDrive(rate, params) as unknown as { dsp: SmoothingDsp };
@@ -113,26 +121,30 @@ it('starts settled and reuses fixed-capacity storage across no-op and edited blo
   for (let block = 0; block < 4; block++) {
     dsp.configure(params, 128);
     expect(dsp.activeCount).toBe(0);
-    dsp.update(0, 0);
+    dsp.update();
   }
   for (const key of continuous) params[key]![0]! += 0.125;
   dsp.configure(params, 128);
-  expect(dsp.activeKeys.slice(0, dsp.activeCount)).toEqual(continuous);
+  expect(active(dsp)).toEqual(continuous);
   expect(dsp.activeKeys).toBe(storage);
   expect(dsp.activeKeys).toHaveLength(continuous.length);
   // Discrete stage switches and route changes never enter the smoothing list.
   params.route![0] = 3;
   params.s0_enabled![0] = 0;
   dsp.configure(params, 128);
-  expect(dsp.activeKeys.slice(0, dsp.activeCount)).toEqual(continuous);
+  expect(active(dsp)).toEqual(continuous);
 });
 
 it('does not write settled controls during a sample update', () => {
   const { dsp, params } = setup();
   dsp.configure(params, 128);
-  // A regression to the old full loop throws even though its numbers would match.
-  Object.freeze(dsp.controls);
-  expect(() => dsp.update(0, 0)).not.toThrow();
+  expect(dsp.activeCount).toBe(0);
+  // A regression to the old full loop would glide every control toward a
+  // target moved behind the active list's back; the settled update leaves them.
+  for (const key of continuous) dsp.targets[slot(key)]! += 1;
+  const before = Float64Array.from(dsp.controls);
+  dsp.update();
+  expect(dsp.controls).toEqual(before);
 });
 
 it.each([0.5, 1, 2])('preserves snap behavior at %s times the threshold', (multiple) => {
@@ -144,8 +156,8 @@ it.each([0.5, 1, 2])('preserves snap behavior at %s times the threshold', (multi
     const target = params.sensitivity![0]!;
     expected += dsp.smooth * (target - expected);
     if (Math.abs(expected - target) < C.silence) expected = target;
-    dsp.update(0, 0);
-    expect(dsp.controls.sensitivity).toBe(expected);
+    dsp.update();
+    expect(dsp.controls[SENSITIVITY]).toBe(expected);
   }
 });
 
@@ -154,27 +166,27 @@ it('keeps a mid-block settled key until the next block and reactivates it on an 
   const storage = dsp.activeKeys;
   params.sensitivity![0] = C.silence / 2;
   dsp.configure(params, 128);
-  dsp.update(0, 0);
-  expect(dsp.controls.sensitivity).toBe(params.sensitivity![0]);
+  dsp.update();
+  expect(dsp.controls[SENSITIVITY]).toBe(params.sensitivity![0]);
   expect(dsp.activeCount).toBe(1);
   dsp.configure(params, 128);
   expect(dsp.activeCount).toBe(0);
   params.sensitivity![0] = 12;
   dsp.configure(params, 128);
-  expect(dsp.activeKeys.slice(0, dsp.activeCount)).toEqual(['sensitivity']);
-  dsp.update(0, 0);
-  expect(dsp.controls.sensitivity).toBeLessThan(12);
+  expect(active(dsp)).toEqual(['sensitivity']);
+  dsp.update();
+  expect(dsp.controls[SENSITIVITY]).toBeLessThan(12);
   expect(dsp.activeKeys).toBe(storage);
 });
 
 it.each([0, -0])('preserves a target zero sign when starting from %s', (initial) => {
   const { dsp, params } = setup();
-  dsp.controls.sensitivity = initial;
+  dsp.controls[SENSITIVITY] = initial;
   params.sensitivity![0] = -initial;
   dsp.configure(params, 128);
   expect(dsp.activeCount).toBe(1);
-  dsp.update(0, 0);
-  expect(Object.is(dsp.controls.sensitivity, -initial)).toBe(true);
+  dsp.update();
+  expect(Object.is(dsp.controls[SENSITIVITY], -initial)).toBe(true);
   dsp.configure(params, 128);
   expect(dsp.activeCount).toBe(0);
 });
@@ -183,7 +195,7 @@ it.each([44100, 48000, 96000])(
   'matches the independent original recurrence through retargeting at %i Hz',
   (rate) => {
     const { dsp, params } = setup(rate);
-    const original = { ...dsp.controls };
+    const original = Float64Array.from(dsp.controls);
     for (let block = 0; block < 12; block++) {
       // Every continuous control, including the first and last, moves in both directions.
       if (block % 3 === 0)
@@ -191,11 +203,12 @@ it.each([44100, 48000, 96000])(
       dsp.configure(params, 128);
       for (let i = 0; i < 128; i++) {
         for (const key of continuous) {
-          const target = params[key]![0]!;
-          original[key]! += dsp.smooth * (target - original[key]!);
-          if (Math.abs(original[key]! - target) < C.silence) original[key] = target;
+          const target = params[key]![0]!,
+            k = slot(key);
+          original[k]! += dsp.smooth * (target - original[k]!);
+          if (Math.abs(original[k]! - target) < C.silence) original[k] = target;
         }
-        dsp.update(0, 0);
+        dsp.update();
         expect(dsp.controls).toEqual(original);
       }
     }
