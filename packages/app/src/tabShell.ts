@@ -4,8 +4,10 @@
  * decision 2). `main.ts` hands this the tab list and the two mount points.
  * A tab may show an icon in place of its label (windsor#39): its name is then
  * the button's accessible name and its tooltip.
+ * The pressed button follows the shown tab however it was shown: a click, or
+ * an undo or a redo that shows its step's tab (windsor#163).
  */
-import type { AppContext } from './appContext';
+import type { AppContext, TabPanel } from './appContext';
 import { el, html } from './dom';
 
 export interface TabSpec {
@@ -47,6 +49,33 @@ export function tabFace(tab: Pick<TabSpec, 'label' | 'icon' | 'ariaLabel'>): Tab
   return { kind: 'icon', markup: tab.icon, name: tab.ariaLabel ?? tab.label };
 }
 
+/** Whether a tab's button reads as pressed: only the shown tab's does. */
+export function isPressed(tabId: string | undefined, activeTab: string | null): boolean {
+  return tabId !== undefined && tabId === activeTab;
+}
+
+/** The part of the context the pressed state follows: the shown tab and its chrome renders. */
+export type PressedSyncContext = Pick<AppContext<TabPanel>, 'activeTab' | 'addChrome'>;
+
+/**
+ * Keeps each tab's pressed state on the shown tab (windsor#163). It registers
+ * a chrome render, because undo and redo show a tab and then run every chrome
+ * render; a click shows its tab without one and calls the returned sync
+ * itself. `setPressed` sets one tab's pressed state, which keeps this off the DOM.
+ */
+export function followShownTab(
+  ctx: PressedSyncContext,
+  tabIds: readonly string[],
+  setPressed: (tabId: string, pressed: boolean) => void,
+): () => void {
+  const sync = (): void => {
+    for (const tabId of tabIds) setPressed(tabId, isPressed(tabId, ctx.activeTab));
+  };
+  ctx.addChrome(sync);
+  sync();
+  return sync;
+}
+
 function tabButton(tab: TabSpec): HTMLButtonElement {
   const face = tabFace(tab);
   if (face.kind === 'text') return el('button', 'tab-btn', face.text) as HTMLButtonElement;
@@ -62,12 +91,8 @@ export function mountTabShell(
   bar: HTMLElement,
   root: HTMLElement,
 ): void {
-  const buttons: HTMLButtonElement[] = [];
-  const syncPressed = (): void => {
-    for (const button of buttons) {
-      button.setAttribute('aria-pressed', String(button.dataset.tab === ctx.activeTab));
-    }
-  };
+  const buttons = new Map<string, HTMLButtonElement>();
+  let syncPressed = (): void => {};
   for (const tab of tabs) {
     const button = tabButton(tab);
     button.type = 'button';
@@ -76,11 +101,13 @@ export function mountTabShell(
       ctx.activate(tab.id);
       syncPressed();
     };
-    buttons.push(button);
+    buttons.set(tab.id, button);
     bar.appendChild(button);
     const panel = el('div', 'tab-panel');
     ctx.addTab(tab.id, panel, tab.render);
     root.appendChild(panel);
   }
-  syncPressed();
+  syncPressed = followShownTab(ctx, [...buttons.keys()], (tabId, pressed) => {
+    buttons.get(tabId)?.setAttribute('aria-pressed', String(pressed));
+  });
 }
