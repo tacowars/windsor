@@ -169,6 +169,39 @@ describe('the 3 → 4 upgrade: the returns become the send buses (windsor#172)',
     ]);
   });
 
+  it('carries only the space fields v3 read: an unknown or colliding key cannot turn Send A', () => {
+    const space = { ...SPACES.cathedral, kind: 'echo', mix: 0, bogus: 1 };
+    const result = makeArrangement(v3({ returns: { room: { level: 0.5, space } } }));
+    expect(result.corrections).toEqual([]);
+    expect(result.document.returns?.['a']).toEqual({
+      level: 0.5,
+      inserts: [{ ...DEFAULT_PLATE_REVERB, ...SPACES.cathedral, mix: 1 }],
+    });
+  });
+
+  it('carries only the line fields v3 read from the echo return', () => {
+    const echo = { ...ECHO, mix: 0, bogus: 1 };
+    const result = makeArrangement(v3({ returns: { echo } }));
+    expect(result.corrections).toEqual([]);
+    expect(result.document.returns?.['b']).toEqual({
+      level: 0.4,
+      inserts: [
+        { ...DEFAULT_ECHO, delayTime: 0.375, feedback: 0.5, damp: 2400, resonance: 6, mix: 1 },
+      ],
+    });
+  });
+
+  it('lets room and echo win over a v3 send already named a or b', () => {
+    const sends = { room: 0.25, a: 1, b: 0.1, echo: 0.5 };
+    const result = makeArrangement(v3({ returns: { room: ROOM, echo: ECHO } }, sends));
+    expect(result.document.parts[0]?.strip.sends).toEqual({ a: 0.25, b: 0.5 });
+  });
+
+  it('drops a lone v3 a, which v3 never read, rather than making it a send', () => {
+    const result = makeArrangement(v3({ returns: { room: ROOM } }, { a: 1 }));
+    expect(result.document.parts[0]?.strip.sends).toEqual({});
+  });
+
   it('upgrades a v3 song once: a v4 song saved from it reads back unchanged', () => {
     const first = makeArrangement(v3({ returns: { room: ROOM, echo: ECHO } }));
     const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));

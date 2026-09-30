@@ -12,7 +12,7 @@
  * its own `format` is upgraded through `PATCH_MIGRATIONS`, and one the chain
  * cannot reach refuses the whole song.
  */
-import { ARRANGEMENT_VERSION } from '../audioConstants';
+import { ARRANGEMENT_VERSION, REVERB_SPACE_RANGES } from '../audioConstants';
 import { ECHO_LINE_DEFAULTS } from '../inserts/echoConstants';
 import { SEND_BUS_WET_MIX } from '../mixer/mix';
 import { SPACES } from '../mixer/reverbSpace';
@@ -34,9 +34,11 @@ function pick(from: Record<string, unknown>, keys: readonly string[]): Record<st
 
 /**
  * A v3 return as a v4 bus holding one insert of `kind`, at Mix 1: the
- * return's own `level` kept, `fields` (the effect's settings) carried over
- * the v3 base the return overlaid. A return that is not a record is handed
- * on as it is, for the normaliser to report.
+ * return's own `level` kept, `fields` (the effect's settings, already
+ * narrowed to the ones v3 read) carried over the v3 base the return
+ * overlaid. `kind` and `mix` go last, so no carried field can override
+ * them. A return that is not a record is handed on as it is, for the
+ * normaliser to report.
  */
 function returnAsBus(
   raw: unknown,
@@ -45,14 +47,20 @@ function returnAsBus(
   fields: Record<string, unknown>,
 ): unknown {
   if (!isRecord(raw)) return raw;
-  const insert = { kind, ...base, ...fields, mix: SEND_BUS_WET_MIX };
+  const insert = { ...base, ...fields, kind, mix: SEND_BUS_WET_MIX };
   return { ...pick(raw, ['level']), inserts: [insert] };
 }
 
-/** A strip's `sends` with `room` and `echo` renamed to `a` and `b`; any other key is left. */
+/**
+ * A strip's `sends` with `room` and `echo` renamed to `a` and `b`. A v3 `a`
+ * or `b` named no return in v3 and was dropped on load, so it is dropped
+ * here too: it never overrides a renamed value or becomes a valid send.
+ * Any other key is left, for the normaliser to report.
+ */
 function renameSends(sends: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, amount] of Object.entries(sends)) {
+    if (V4_SEND_NAMES.has(key)) continue;
     out[V3_SEND_NAMES[key] ?? key] = amount;
   }
   return out;
@@ -60,13 +68,21 @@ function renameSends(sends: Record<string, unknown>): Record<string, unknown> {
 
 /** What each v3 return became. */
 const V3_SEND_NAMES: Readonly<Record<string, string>> = { room: 'a', echo: 'b' };
+/** The v4 names, which a v3 send could not carry. */
+const V4_SEND_NAMES: ReadonlySet<string> = new Set(Object.values(V3_SEND_NAMES));
+/** The fields a v3 `room.space` was read with; the v3 normaliser dropped any other key. */
+const V3_SPACE_FIELDS: readonly string[] = Object.keys(REVERB_SPACE_RANGES);
+/** The fields a v3 `echo` return's line was read with. */
+const V3_ECHO_FIELDS: readonly string[] = Object.keys(ECHO_LINE_DEFAULTS);
 
 /**
  * 3 → 4 (windsor#172; record `2026-09-30-insert-rack-and-send-bus-chains`
  * §7): the fixed `room` and `echo` returns become Send A and Send B, each a
  * level and an insert chain. `room` becomes `a` holding a Plate reverb with
  * its old space, and `echo` becomes `b` holding an Echo with its old line,
- * both at Mix 1, so the song sounds as it did. An absent `returns` stays
+ * both at Mix 1, so the song sounds as it did. Only what a v3 load kept is
+ * carried: an unknown space or line key, and a v3 send already named `a`
+ * or `b`, is dropped as v3 dropped it. An absent `returns` stays
  * absent. Every part's `sends.room` and `sends.echo` become `sends.a` and
  * `sends.b`.
  */
@@ -76,11 +92,11 @@ export function sendBusesFromReturns(doc: RawDocument): RawDocument {
     const { room, echo, ...rest } = doc.returns;
     const returns: Record<string, unknown> = { ...rest };
     if (room !== undefined) {
-      const space = isRecord(room) && isRecord(room.space) ? room.space : {};
+      const space = isRecord(room) && isRecord(room.space) ? pick(room.space, V3_SPACE_FIELDS) : {};
       returns.a = returnAsBus(room, 'plate', SPACES.hall, space);
     }
     if (echo !== undefined) {
-      const line = isRecord(echo) ? pick(echo, Object.keys(ECHO_LINE_DEFAULTS)) : {};
+      const line = isRecord(echo) ? pick(echo, V3_ECHO_FIELDS) : {};
       returns.b = returnAsBus(echo, 'echo', ECHO_LINE_DEFAULTS, line);
     }
     out.returns = returns;
