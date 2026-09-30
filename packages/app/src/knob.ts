@@ -13,6 +13,12 @@ export interface KnobSpec {
   curve?: 'log';
   fmt?: (v: number) => string;
   color?: string;
+  /**
+   * The compact size (windsor#157): a smaller dial with its value to the
+   * right and no label under it, for a 40 px row. The label stays the
+   * knob's `title`, `aria-label` and undo step.
+   */
+  compact?: boolean;
   get: () => number;
   set: (v: number) => void;
   onChange?: () => void;
@@ -40,6 +46,8 @@ import {
   HALF_TURN_DEGREES,
   KEY_STEP,
   KEY_STEP_FINE,
+  KNOB_COMPACT_PAD_PX,
+  KNOB_COMPACT_R,
   KNOB_PAD_PX,
   KNOB_R,
   LOG_FLOOR,
@@ -59,23 +67,37 @@ function arcPath(cx: number, cy: number, r: number, a0: number, a1: number): str
   return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
 }
 
+/** A dial's radius and its SVG's side, in px. */
+export interface KnobGeometry {
+  readonly r: number;
+  readonly size: number;
+}
+
+/** The dial's geometry at the spec's size. */
+export function knobGeometry(spec: Pick<KnobSpec, 'compact'>): KnobGeometry {
+  const r = spec.compact ? KNOB_COMPACT_R : KNOB_R;
+  const pad = spec.compact ? KNOB_COMPACT_PAD_PX : KNOB_PAD_PX;
+  return { r, size: r * 2 + pad };
+}
+
 function knobDom(spec: KnobSpec): HTMLElement {
   const node = document.createElement('div');
-  node.className = 'knob';
+  node.className = spec.compact ? 'knob compact' : 'knob';
   node.tabIndex = 0;
   node.setAttribute('role', 'slider');
   node.setAttribute('aria-label', spec.label);
   if (spec.color) node.style.setProperty('--knob-color', spec.color);
-  const size = KNOB_R * 2 + KNOB_PAD_PX;
+  const { r, size } = knobGeometry(spec);
   const c = size / 2;
+  const label = spec.compact ? '' : `<span class="knob-label">${spec.label}</span>`;
   node.innerHTML =
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
-    `<circle class="dial-face" cx="${c}" cy="${c}" r="${KNOB_R - FACE_INSET}"></circle>` +
-    `<path class="dial-track" d="${arcPath(c, c, KNOB_R, ARC_START, ARC_END)}"></path>` +
+    `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE_INSET}"></circle>` +
+    `<path class="dial-track" d="${arcPath(c, c, r, ARC_START, ARC_END)}"></path>` +
     `<path class="dial-arc" d=""></path>` +
-    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - KNOB_R + PIN_INSET}"></line>` +
+    `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN_INSET}"></line>` +
     `</svg>` +
-    `<span class="knob-val"></span><span class="knob-label">${spec.label}</span>`;
+    `<span class="knob-val"></span>${label}`;
   node.title = `${spec.label} - drag, shift-drag for fine, double-click to reset`;
   return node;
 }
@@ -129,7 +151,7 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   const arc = node.querySelector('.dial-arc') as SVGPathElement;
   const pin = node.querySelector('.dial-pin') as SVGLineElement;
   const out = node.querySelector('.knob-val') as HTMLElement;
-  const size = KNOB_R * 2 + KNOB_PAD_PX;
+  const { r, size } = knobGeometry(spec);
   const c = size / 2;
   const { toNorm, fromNorm } = scaleFor(spec);
 
@@ -141,7 +163,7 @@ export function makeKnob(spec: KnobSpec): KnobElement {
     const zeroAng = ARC_START + zeroN * (ARC_END - ARC_START);
     const a0 = Math.min(zeroAng, ang);
     const a1 = Math.max(zeroAng, ang);
-    arc.setAttribute('d', Math.abs(a1 - a0) < ARC_MIN_DEGREES ? '' : arcPath(c, c, KNOB_R, a0, a1));
+    arc.setAttribute('d', Math.abs(a1 - a0) < ARC_MIN_DEGREES ? '' : arcPath(c, c, r, a0, a1));
     pin.setAttribute('transform', `rotate(${ang} ${c} ${c})`);
     out.textContent = spec.fmt ? spec.fmt(v) : v.toFixed(2);
     node.setAttribute(

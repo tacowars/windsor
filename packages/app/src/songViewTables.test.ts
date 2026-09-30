@@ -38,7 +38,9 @@ import {
   rulerLabelEvery,
   rulerLabels,
   tickToPx,
+  timelineLeftCss,
 } from './songViewTables';
+import { knobGeometry } from './knob';
 
 describe('the ruler scale', () => {
   it('puts the playhead at 0, 96 and 216 px for ticks 0, 96 and 216 at 96 px per bar', () => {
@@ -225,5 +227,28 @@ describe('the tick under a drawn block (windsor#21)', () => {
     expect(split).toHaveLength(3);
     expect(split[1]?.start).toBe(2 * TICKS_PER_BAR);
     expect((split[2]?.start ?? 0) + (split[2]?.duration ?? 0)).toBe(2 * TICKS_PER_BAR + PPQ);
+  });
+});
+
+describe('the mixer column (windsor#157)', () => {
+  const css = readFileSync(new URL('./console.css', import.meta.url), 'utf8');
+  const rule = (selector: string): string =>
+    new RegExp(`\\n${selector.replace(/\./g, '\\.')} \\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+
+  it('puts the timeline past the names, the mixer and the gap after each', () => {
+    expect(timelineLeftCss(2.5)).toBe(
+      'calc(var(--names) + var(--mixer) + 2 * var(--gap) + var(--bar) * 2.5)',
+    );
+    expect(rule('.lanes')).toMatch(
+      /grid-template-columns: var\(--names\) var\(--mixer\) calc\(var\(--bars\) \* var\(--bar\)\);/,
+    );
+  });
+
+  it('makes the part rows 40 px, leaves the Harmony lane at 40 px, and fits the compact knob', () => {
+    const height = (selector: string): number =>
+      parseFloat(/\n\s*height: ([^;]*);/.exec(rule(selector))?.[1] ?? '');
+    expect(height('.lane')).toBe(40);
+    expect(height('.lane.lane-harm')).toBe(40);
+    expect(knobGeometry({ compact: true }).size).toBeLessThan(height('.lane'));
   });
 });

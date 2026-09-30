@@ -32,7 +32,12 @@ export interface SongViewScale {
   readonly minLabelPx: number;
   /** The lane-name column to the left of the ruler and the lanes. */
   readonly laneNameWidthPx: number;
-  /** The grid gap between the name column and a lane. */
+  /**
+   * The mixer column between the names and the timeline (windsor#157): a
+   * part's Level, its value, M and S on one row. Frozen with the names.
+   */
+  readonly mixerWidthPx: number;
+  /** The grid gap between two columns: the names, the mixer and the timeline. */
   readonly laneGapPx: number;
 }
 
@@ -43,8 +48,19 @@ export const SONG_VIEW: SongViewScale = {
   dragPxPerDoubling: 60,
   minLabelPx: 28,
   laneNameWidthPx: 120,
+  mixerWidthPx: 132,
   laneGapPx: 8,
 };
+
+/**
+ * The CSS `left` of a line `bars` bars into the timeline, in the lanes
+ * grid's own variables (`--names`, `--mixer`, `--gap`, `--bar`): past the
+ * name column, the mixer column and the gap after each (windsor#157). The
+ * playhead and the loop lines both read it, so a zoom moves them with the
+ * regions and a column change moves both.
+ */
+export const timelineLeftCss = (bars: number): string =>
+  `calc(var(--names) + var(--mixer) + 2 * var(--gap) + var(--bar) * ${bars})`;
 
 /**
  * How near the fit a zoom may be and still count as fitted (windsor#21): a

@@ -10,7 +10,8 @@ import type { DocumentPartial } from '@windsor/engine';
 import { FakeElement, fire, openGestureConsole } from './__fixtures__/gestureConsole';
 import { partChange } from './context';
 import { settleGestures } from './gestureHooks';
-import { attachKnobInput, continuesKeySteps } from './knob';
+import { KNOB_PAD_PX, KNOB_R } from './knobConstants';
+import { attachKnobInput, continuesKeySteps, knobGeometry } from './knob';
 import type { KnobSpec, Scale } from './knob';
 
 const level = (value: number): DocumentPartial => partChange(0, { strip: { level: value } });
@@ -176,5 +177,14 @@ describe('arrow keys on a knob', () => {
     expect(seen(other, 'keydown', 'ArrowLeft')).toBe(false);
     expect(seen(node, 'keydown', 'z')).toBe(false);
     expect(seen(node, 'pointerdown')).toBe(false);
+  });
+});
+
+describe('the compact knob (windsor#157)', () => {
+  it('keeps the full dial as it was and draws a smaller one when compact', () => {
+    expect(knobGeometry({})).toEqual({ r: KNOB_R, size: KNOB_R * 2 + KNOB_PAD_PX });
+    const compact = knobGeometry({ compact: true });
+    expect(compact.r).toBeLessThan(KNOB_R);
+    expect(compact.size).toBeLessThan(knobGeometry({}).size);
   });
 });

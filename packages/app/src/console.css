@@ -818,17 +818,116 @@ body.chord-dragging {
 /* ---------- the Song view (#709): ruler, lanes, regions, the pane ---------- */
 
 .lanes-scroll {
+  --pad-top: 12px;
+  --pad-x: 14px;
   overflow-x: auto;
-  padding: 12px 14px 16px;
+  padding: var(--pad-top) var(--pad-x) 16px;
   scrollbar-width: thin;
 }
 .lanes {
+  --row-gap: 4px;
   position: relative;
   display: grid;
-  grid-template-columns: var(--names) calc(var(--bars) * var(--bar));
-  gap: 4px var(--gap);
+  grid-template-columns: var(--names) var(--mixer) calc(var(--bars) * var(--bar));
+  gap: var(--row-gap) var(--gap);
   align-items: stretch;
   width: max-content;
+}
+/* The frozen columns (windsor#157): the names and the mixer stay put while
+   the timeline scrolls under them, over the loop lines (z 1) and the
+   playhead (z 2) and under the detail pane (z 4). Each cell is opaque, and
+   its shadows fill the gaps beside and below it, which a line or a region
+   passing under would otherwise show through. An outer shadow never covers
+   its own cell, and the next row's cells paint over the one below them. */
+.lanes > .lane-name,
+.lanes > .mix-cell {
+  position: sticky;
+  z-index: 3;
+  background: var(--ground);
+}
+.lanes > .lane-name {
+  left: 0;
+  /* Square, selected or not: a shadow follows the corners, and a rounded one leaves a gap. */
+  border-radius: 0;
+  box-shadow:
+    calc(-1 * var(--pad-x)) 0 0 var(--ground),
+    calc(-1 * var(--pad-x)) var(--row-gap) 0 var(--ground),
+    0 var(--row-gap) 0 var(--ground);
+}
+.lanes > .mix-cell {
+  left: calc(var(--names) + var(--gap));
+  box-shadow:
+    calc(-1 * var(--gap)) 0 0 var(--ground),
+    var(--gap) 0 0 var(--ground),
+    calc(-1 * var(--gap)) var(--row-gap) 0 var(--ground),
+    0 var(--row-gap) 0 var(--ground),
+    var(--gap) var(--row-gap) 0 var(--ground);
+}
+/* Above the header row, the scroll's top padding: the playhead's label
+   reaches up into it, so the frozen columns cover it there too. */
+.lanes > .ruler-name:first-child::before,
+.lanes > .mix-head::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  height: var(--pad-top);
+  background: var(--ground);
+}
+.lanes > .ruler-name:first-child::before {
+  left: calc(-1 * var(--pad-x));
+  right: 0;
+}
+.lanes > .mix-head::before {
+  left: calc(-1 * var(--gap));
+  right: calc(-1 * var(--gap));
+}
+/* A part's collapsed strip: the compact Level knob and its value, M and S
+   on one line, sized for a 40 px row. */
+.mix-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 2px;
+}
+.mix-cell.mix-head {
+  justify-content: flex-start;
+  /* Room on the left for the expand arrow (windsor#158). */
+  padding-left: 28px;
+  font-family: var(--f-panel);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.mix-switches {
+  display: flex;
+  gap: 3px;
+}
+.btn.mix-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 10px;
+  letter-spacing: 0;
+  line-height: 1;
+}
+/* On, M and S light in the accent, as the mockup's S does. */
+.btn.mix-btn[aria-pressed='true'] {
+  background: var(--inset);
+  border-color: var(--carrier);
+  color: var(--carrier);
+  box-shadow: 0 0 5px rgba(224, 164, 78, 0.35);
+}
+.btn.mix-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.btn.mix-btn:disabled:hover {
+  background: var(--inset);
+  color: var(--ink-dim);
+  border-color: var(--line);
 }
 .lane-name {
   display: flex;
@@ -957,7 +1056,7 @@ body.chord-dragging {
 }
 .lane {
   position: relative;
-  height: 34px;
+  height: 40px;
   background: var(--inset);
   border: 1px solid var(--line);
   border-radius: var(--r);
@@ -1323,6 +1422,17 @@ body.chord-dragging {
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   pointer-events: none;
+}
+/* The compact knob (windsor#157): a smaller dial with its value to the
+   right and no label under it, for the Song tab's 40 px mixer rows. */
+.knob.compact {
+  width: auto;
+  flex-direction: row;
+  gap: 3px;
+  padding: 2px 4px 2px 2px;
+}
+.knob.compact .knob-val {
+  min-width: 4ch;
 }
 
 /* The combined ratio beside the Coarse / Fine pair (#587): a knob's

@@ -12,6 +12,12 @@ export const KNOB_R = 15;
 export const ARC_START = -135;
 export const ARC_END = 135;
 export const KNOB_PAD_PX = 8;
+/**
+ * The compact dial (windsor#157): the Song tab's mixer column, in a 40 px
+ * row, with its value beside it and no label under it.
+ */
+export const KNOB_COMPACT_R = 10;
+export const KNOB_COMPACT_PAD_PX = 6;
 /** The face sits inside the track; the pin stops short of the rim. */
 export const FACE_INSET = 3.5;
 export const PIN_INSET = 5;
