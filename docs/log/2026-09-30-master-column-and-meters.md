@@ -98,8 +98,8 @@ shows while the meters are scrolled away.
     - The meters paint only when a new stage report lands (30 Hz), whatever
       the display's refresh rate.
     - Each bar is a fixed gradient under a cover moved with `transform`,
-      with a short transition between reports. Drawing needs no layout,
-      and `<meter>` is no longer used here.
+      stepping at the report rate with no transition (see the amendment).
+      Drawing needs no layout, and `<meter>` is no longer used here.
     - A readout's text changes only when its value changes at the shown
       precision.
     - The top-bar output light stays the always-on indicator, unchanged.
@@ -119,3 +119,15 @@ shows while the meters are scrolled away.
   later.
 - No format change: no field is added, renamed or re-scaled.
 - The work is UI and interaction, so its PRs are `reviewed`.
+
+## Amendment, 2026-09-30
+
+Decision 10 first gave the bars a short transition between reports (34 ms,
+as in the mockup). windsor#194 measured it: showing the Mixer cost about
+33 ms of main-thread time a second, against 17 before the change, because a
+transition restarted at every report keeps an animation running all the
+time. Without it, the cost was about 9.5 ms a second
+(`docs/research/2026-09-30-master-output/after.md`). tacowars chose the
+cheaper build: the bars step at the report rate with no transition, since
+the difference is barely visible. The mockup keeps its transition as a
+drawing reference only.
