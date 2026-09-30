@@ -12,8 +12,8 @@
  * meter while that slot's row is attached, on screen and the tab shown, and
  * releases it otherwise, keyed by slot, never by cell.
  *
- * It runs on the shared frame driver (`watchPlayhead`), in the master
- * meter's pattern (`masterMeter.ts`): it reads a meter only when its
+ * It runs on the shared frame driver (`watchPlayhead`) and, like the
+ * Mixer's meter loop (`meterLoop.ts`), reads a meter only when its
  * revision moves, touches a light only when its step or its latch changes,
  * and releases on hide once, so a hidden Song tab never switches off a
  * meter another tab is using. The red latch lives in `ClipLatches`, which

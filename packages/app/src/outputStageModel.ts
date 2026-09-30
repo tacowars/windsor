@@ -1,7 +1,7 @@
 /**
  * The output stage's display rules (windsor#94): what an edit writes into
  * `master.output`, which gauge each mode shows, the meters' scales, when the
- * clip light latches, how a readout holds its peak, and the top-bar light.
+ * clip light latches, and the top-bar light.
  * Values in, values out; `outputStageSection.ts`, `outputStageMeters.ts` and
  * `outputStageLight.ts` only draw what this returns.
  */
@@ -116,24 +116,6 @@ export function meterView(
     gauge,
     gaugeDb: gauge === 'none' ? 0 : gaugeDb(reading),
   };
-}
-
-/** A readout's held peak: the highest value, and when it was reached. */
-export interface HeldPeak {
-  readonly value: number;
-  readonly atMs: number;
-}
-export const EMPTY_HOLD: HeldPeak = { value: 0, atMs: -Infinity };
-
-/** Keep the higher value for `holdMs`, then follow the reading again. */
-export function stepHold(hold: HeldPeak, value: number, nowMs: number, holdMs: number): HeldPeak {
-  if (value >= hold.value || nowMs - hold.atMs >= holdMs) return { value, atMs: nowMs };
-  return hold;
-}
-
-/** A peak readout: `−∞` at silence, else dBFS to a tenth. */
-export function peakLabel(linear: number): string {
-  return linear > 0 ? `${amplitudeDb(linear).toFixed(1)} dBFS` : '−∞ dBFS';
 }
 
 /** The top-bar light (decision 4): lit, unlit, or outlined in Off mode. */

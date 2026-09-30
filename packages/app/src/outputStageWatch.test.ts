@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_OUTPUT_STAGE } from '@windsor/engine';
 import type { OutputStageReport, OutputStageSettings } from '@windsor/engine';
-import { meterView, peakLabel, reportPeaks } from './outputStageModel';
+import { meterView, reportPeaks } from './outputStageModel';
 import { OUTPUT_PEAK_SCALE } from './outputStageTables';
 import { type MeteredStage, meterRevision, watchOutputStage } from './outputStageWatch';
 
@@ -175,7 +175,7 @@ describe('meterRevision (the meters follow the audio, not the transport)', () =>
     stage.post({});
     expect(meterRevision(stage)).not.toBe(loud);
     expect(meterView(stage.read(), 'limiter')).toEqual(meterView(null, 'limiter'));
-    expect(reportPeaks(stage.read()).map(peakLabel)).toEqual(Array(4).fill('−∞ dBFS'));
+    expect(reportPeaks(stage.read())).toEqual([0, 0, 0, 0]);
     expect(watchOutputStage(stage).latched).toBe(true);
   });
 });
