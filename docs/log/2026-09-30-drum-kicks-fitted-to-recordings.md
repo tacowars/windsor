@@ -51,8 +51,11 @@ off (909). The engine was not the limit: the pitch-envelope shapes, the
 - The seven files, `patches/index.ts` and the golden table
   (`fmGolden.json`, refreshed under Node 24) change; the render of every
   other patch does not.
-- The 909 kicks are about 4 dB louder than the old 909 Kick; the 808s match
-  the old 808 Kick's level within about 0.2 dB.
+- One Volume per machine (808s 1.2, 909s 0.9), so all seven peak at
+  0.59–0.67 at velocity 1. Over the first 100 ms the 808 Kick is 0.6 dB
+  below the old one and the 909 Kick 4.3 dB above the old one (level with
+  the old 808 Kick); the short and long variants differ by their decay
+  (the research note's level table).
 - Fitting a patch whose shape uses Init, curves or phase lock gives a
   sound the console can play but not fully edit: the pitch envelope's Init,
   Peak, End and curves and the operators' phase have no controls.

@@ -105,10 +105,25 @@ The patch's structure is fixed by hand; the fit finds the numbers.
 - **Every operator is phase-locked** (`phaseFree: false`).
 - **The filter stays on for its drive** (drive runs only when a filter mode
   is set), lowpass opened to 8 kHz (808) and 12 kHz (909).
-- **Levels**: the 808s at Volume 1.2 (drive saturates harder above that),
-  within about 0.2 dB of the old 808 Kick's RMS over the first 100 ms; the
-  909s stay at 0.9, about 4 dB louder than the old 909 Kick, which lost
-  4.8 dB to algorithm 6's three-carrier scaling.
+- **Levels**: one Volume per machine, as the hardware's Decay knob
+  changes length, not level: the 808s at 1.2 (drive saturates harder
+  above that), the 909s at 0.9. Rendered with `renderHit` on G#3 at
+  velocity 1, against the old 808 Kick (RMS 0.322 over the first 100 ms,
+  peak 0.65) and the old 909 Kick (RMS 0.199, peak 0.46, which lost 4.8 dB
+  to algorithm 6's three-carrier scaling):
+
+  | Patch | Peak | RMS, 0–100 ms | Against the old 808 Kick | Against the old 909 Kick |
+  |---|---|---|---|---|
+  | `tr808-kick-short` | 0.59 | 0.205 | −3.9 dB | +0.3 dB |
+  | `tr808-kick` | 0.61 | 0.301 | −0.6 dB | +3.6 dB |
+  | `tr808-kick-long` | 0.62 | 0.405 | +2.0 dB | +6.2 dB |
+  | `tr909-kick-short` | 0.67 | 0.294 | −0.8 dB | +3.4 dB |
+  | `tr909-kick` | 0.66 | 0.325 | +0.1 dB | +4.3 dB |
+  | `tr909-kick-long` | 0.66 | 0.344 | +0.6 dB | +4.8 dB |
+  | `tr909-kick-hard` | 0.67 | 0.354 | +0.8 dB | +5.0 dB |
+
+  The RMS differences within a machine are its decay: a short kick has
+  less energy in its first 100 ms at the same peak.
 
 ## Results
 
@@ -137,7 +152,7 @@ references.
 
 - **Edges sharper than 0.67 ms from an envelope.** An operator's amplitude
   ramps linearly over each 32-sample control block, so the fastest attack
-  is about 0.67 ms at 48 kHz. The 808's onset click reaches about a fifth
+  is about 0.67 ms at 48 kHz. The 808's onset click reaches about a sixth (0.02 against 0.12)
   of the recording's level above 1 kHz. A square operator at a locked phase
   places a sharp edge after the ramp instead; the 909's attack uses that.
 - **The 909's lopsided body.** The recording's positive half-cycles are
