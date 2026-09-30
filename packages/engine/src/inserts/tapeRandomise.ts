@@ -11,6 +11,8 @@ export function randomiseTape(spec: TapeSpec, random: () => number = Math.random
     wow: R.wearMax * random() ** R.wearPower,
     flutter: R.wearMax * random() ** R.wearPower,
     dropouts: R.wearMax * random() ** R.wearPower,
+    wowRate: R.wowRateMin + (R.wowRateMax - R.wowRateMin) * random(),
+    flutterRate: R.flutterRateMin + (R.flutterRateMax - R.flutterRateMin) * random(),
     hiss: R.hissMin + (R.hissMax - R.hissMin) * random() ** R.hissPower,
     seed: Math.floor(random() * (TAPE_BOUNDS.seed[1] + 1)),
   };

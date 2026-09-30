@@ -30,8 +30,13 @@ version changes. Presets and Randomize explicitly enable independent amounts.
 Seven original editable starting points cover studio polish, warm reel,
 chrome shimmer, metal punch, late-night cassette, VHS memory and damaged
 field tape. Presets preserve Trim, Mix, bypass and seed. Randomize preserves
-Trim, Mix and bypass, and rolls a new seed. All settings remain song-owned
-on both track and master inserts.
+Trim, Mix and bypass, and rolls a new seed. It also replaces customized motion
+rates with independent uniform draws: Wow Rate 0.2–1.2 Hz and Flutter Rate
+4–12 Hz. These original Windsor ranges cover the starting points' motion
+rates and favor usable creative variation; they are not physical calibration
+claims. Regression tests cover customized extremes, seeded replay, separate
+rate draws, RNG boundaries and preservation of the input and mix controls.
+All settings remain song-owned on both track and master inserts.
 
 ## Cost and audible decisions
 

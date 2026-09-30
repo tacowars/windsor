@@ -4,7 +4,7 @@ import { makeArrangement } from '../song/arrangementDocument';
 import { FULL_ARRANGEMENT } from '../__fixtures__/fullArrangement';
 import { TAPE_INSERT } from './tapeInsert';
 import { DEFAULT_TAPE } from './tapeSpec';
-import { TAPE_TYPES, TAPE_BOUNDS } from './tapeConstants';
+import { TAPE_TYPES, TAPE_BOUNDS, TAPE_RANDOM as R } from './tapeConstants';
 import { randomiseTape } from './tapeRandomise';
 import { mulberry32 } from '../sequencing/mulberry32';
 it('normalizes absent and malformed fields, including model, integer seed and unknown keys', () => {
@@ -71,13 +71,55 @@ it('round trips every tape control on tracks and master, preserving the complete
 });
 it('randomizes valid saved values while preserving Trim, Mix, bypass and the original object', () => {
   const random = mulberry32(12);
-  const spec = { ...DEFAULT_TAPE, trim: -11, mix: 0.3, enabled: false };
+  const spec = {
+    ...DEFAULT_TAPE,
+    trim: -11,
+    mix: 0.3,
+    enabled: false,
+    wowRate: TAPE_BOUNDS.wowRate[1],
+    flutterRate: TAPE_BOUNDS.flutterRate[0],
+  };
+  const original = { ...spec };
   for (let i = 0; i < 200; i++) {
     const rolled = randomiseTape(spec, random),
       n = new FieldNormaliser();
     expect(TAPE_INSERT.normalise({ ...rolled }, 'fx', n)).toEqual(rolled);
     expect(n.corrections).toEqual([]);
     expect(rolled).toMatchObject({ trim: -11, mix: 0.3, enabled: false });
-    expect(spec).toEqual({ ...DEFAULT_TAPE, trim: -11, mix: 0.3, enabled: false });
+    expect(rolled.wowRate).toBeGreaterThanOrEqual(R.wowRateMin);
+    expect(rolled.wowRate).toBeLessThanOrEqual(R.wowRateMax);
+    expect(rolled.flutterRate).toBeGreaterThanOrEqual(R.flutterRateMin);
+    expect(rolled.flutterRate).toBeLessThanOrEqual(R.flutterRateMax);
+    expect(spec).toEqual(original);
   }
+});
+it.each([
+  [0, 0.2, 4],
+  [0.5, 0.7, 8],
+  [1 - Number.EPSILON, 1.2, 12],
+])('maps RNG value %s to the intended uniform motion-rate range', (draw, wow, flutter) => {
+  const rolled = randomiseTape(DEFAULT_TAPE, () => draw!);
+  expect(rolled.wowRate).toBeCloseTo(wow!);
+  expect(rolled.flutterRate).toBeCloseTo(flutter!);
+  const n = new FieldNormaliser();
+  expect(TAPE_INSERT.normalise({ ...rolled }, 'fx', n)).toEqual(rolled);
+  expect(n.corrections).toEqual([]);
+});
+it('replays seeded randomization with separate varying draws for the two motion rates', () => {
+  const random = mulberry32(12),
+    replay = mulberry32(12);
+  const wowRates = new Set<number>(),
+    flutterRates = new Set<number>();
+  for (let i = 0; i < 20; i++) {
+    const rolled = randomiseTape(DEFAULT_TAPE, random);
+    expect(rolled).toEqual(randomiseTape(DEFAULT_TAPE, replay));
+    wowRates.add(rolled.wowRate);
+    flutterRates.add(rolled.flutterRate);
+    const wowDraw = (rolled.wowRate - R.wowRateMin) / (R.wowRateMax - R.wowRateMin);
+    const flutterDraw =
+      (rolled.flutterRate - R.flutterRateMin) / (R.flutterRateMax - R.flutterRateMin);
+    expect(wowDraw).not.toBeCloseTo(flutterDraw, 8);
+  }
+  expect(wowRates.size).toBe(20);
+  expect(flutterRates.size).toBe(20);
 });
