@@ -14,8 +14,8 @@
   the running insert switches cores without a reload. The newly selected
   core starts from zero state, so a click at the moment of switching is
   expected and is not a fault. The default is 2×. The picker's tooltip
-  reads: "Audition only: 2× fits four tracks in the CPU budget; 4× is
-  cleaner on bright, hard-driven sounds. One of these will be removed after
+  reads: "Audition only: 2× costs less CPU; 4× is cleaner on bright,
+  hard-driven sounds. One of these will be removed after
   the audition."
 - **Drive readout.** The Drive knob keeps its stored range (−32 … +32) and
   its position, but its readout is now the gain the magnetic core receives,
