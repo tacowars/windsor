@@ -71,10 +71,15 @@ the fastest honest path to a level-matched audition in the app.
    claimed.
 
    The integration PR carries tests that: (a) confirm the calibration
-   point; (b) push full-scale tones, impulses and steps at Bias 0 through
-   the model of least boost (the calibration model) at every Drive from
-   minimum to maximum and assert the guard counter and the core's reset
-   counter stay at zero; (c) push the same through every model at Bias 0
+   point; (b) push full-scale tones and impulses at Bias 0 through the model
+   of least boost (the calibration model) at every Drive from minimum to
+   maximum and assert the guard counter and the core's reset counter stay
+   at zero; push full-scale steps the same way and assert the field at the
+   core stays within ±4 and the reset counter stays at zero, recording the
+   guard count (the interpolator's overshoot reconstructs a step at
+   maximum Drive to about 4.5 before the guard, so the guard is expected
+   to catch it; that is the guard doing its job, not a calibration
+   error); (c) push the same through every model at Bias 0
    and at both Bias extremes, and record the guard count per model, rate
    and Drive, asserting the reset counter stays at zero (a model whose own
    EQ boosts, such as Ferric's low shelf, is expected to reach the guard
@@ -131,7 +136,13 @@ the fastest honest path to a level-matched audition in the app.
    carries its three fixed core control values. Every model starts at the
    research centre 0.5 / 0.5 / 0.5, a sampled point of the survival domain,
    so identical Tape settings always give identical hysteresis, and a test
-   pins the mapping at every model. Giving models different values is sound
+   pins the mapping at every model. A row is valid only if its origin
+   susceptibility, which sets the output normalisation, is above a
+   declared floor in `tapeConstants.ts`: the knee conditioning clamps the
+   reversible coefficient to zero at the internal width endpoint, where
+   the susceptibility is zero and unity normalisation is undefined, so
+   rows at that endpoint are excluded, the constants assert the floor at
+   load, and a test exercises the width endpoint and the floor. Giving models different values is sound
    design for the audition PR (`reviewed`), constrained to the sampled
    control points of the dynamic-survival record until a wider domain is
    qualified. **Model transitions:** the core's three controls are
