@@ -341,10 +341,6 @@ input {
   text-transform: uppercase;
   min-width: 110px;
 }
-.strip-name input.field {
-  max-width: 150px;
-  text-transform: none;
-}
 .strip-name small {
   color: var(--ink-faint);
   text-transform: none;
