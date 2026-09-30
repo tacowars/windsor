@@ -54,7 +54,7 @@ function cardModel(ctx: AppCtx, slot: InsertTarget, index: number): EqCardModel 
       return ctx.change(insertChange(slot, list)).ok;
     },
     sampleRate: () => ctx.host.system?.engine.context.sampleRate ?? EQ_FALLBACK_SAMPLE_RATE,
-    plot: () => eqPlot(model.view().range),
+    plot: () => eqPlot(model.view().range, model.sampleRate()),
   };
   return model;
 }

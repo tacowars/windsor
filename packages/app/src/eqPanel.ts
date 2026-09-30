@@ -142,6 +142,8 @@ function bandKnob(
   const spec = eqBandKnob(field, at);
   const knob = makeKnob({
     ...spec,
+    // A band plays no higher than the plot reaches at the running sample rate.
+    ...(field === 'freq' ? { max: model.plot().maxFreq } : {}),
     ...(o.off ? { fmt: () => EQ_KNOB_OFF_TEXT } : {}),
     color: STRIP_COLOR,
     dial: 'rack',

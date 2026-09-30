@@ -279,17 +279,17 @@ describe('the keys', () => {
   });
   const spec = specWith(3, { freq: 1000, gain: 2, q: 1 });
   const edited = (k: string, mods = {}): EqBand => {
-    const done = keyEdit(spec, 3, key(k, mods));
+    const done = keyEdit(spec, 3, key(k, mods), PLOT);
     if (!done || !('band' in done)) throw new Error(`${k} edited nothing`);
     return done.band;
   };
 
   it('select band 1 to 8 with the digits, and nothing else', () => {
     for (let n = 1; n <= 8; n++)
-      expect(keyEdit(spec, 3, key(String(n)))).toEqual({ select: n - 1 });
-    expect(keyEdit(spec, 3, key('9'))).toBeNull();
-    expect(keyEdit(spec, 3, key('0'))).toBeNull();
-    expect(keyEdit(spec, 3, key('a'))).toBeNull();
+      expect(keyEdit(spec, 3, key(String(n)), PLOT)).toEqual({ select: n - 1 });
+    expect(keyEdit(spec, 3, key('9'), PLOT)).toBeNull();
+    expect(keyEdit(spec, 3, key('0'), PLOT)).toBeNull();
+    expect(keyEdit(spec, 3, key('a'), PLOT)).toBeNull();
   });
 
   it('move frequency a semitone and gain half a dB with the arrows', () => {
@@ -302,7 +302,7 @@ describe('the keys', () => {
 
   it('leave a cut or a notch at its gain', () => {
     const cut = specWith(0, { gain: 2 });
-    const done = keyEdit(cut, 0, key('ArrowUp'));
+    const done = keyEdit(cut, 0, key('ArrowUp'), PLOT);
     expect(done && 'band' in done && done.band.gain).toBe(2);
   });
 
@@ -310,7 +310,7 @@ describe('the keys', () => {
     expect(edited('ArrowUp', { alt: true }).q).toBeCloseTo(Math.exp(EQ_GESTURE.keyQLog), 9);
     expect(edited('ArrowDown', { alt: true }).q).toBeCloseTo(Math.exp(-EQ_GESTURE.keyQLog), 9);
     expect(edited('ArrowUp', { alt: true }).gain).toBe(2);
-    expect(keyEdit(spec, 3, key('ArrowLeft', { alt: true }))).toBeNull();
+    expect(keyEdit(spec, 3, key('ArrowLeft', { alt: true }), PLOT)).toBeNull();
   });
 
   it('take a fifth of each step with Shift', () => {

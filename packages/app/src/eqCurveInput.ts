@@ -13,6 +13,7 @@ import type { EqDragStart, EqPlot } from './eqCurveModel';
 import {
   doubleClick,
   dragBand,
+  hasQ,
   hitBand,
   keyEdit,
   wheelBand,
@@ -146,6 +147,7 @@ export type EqWheelHost = Omit<EqCurveHost, 'canvas'> & { readonly canvas: Boxed
 /**
  * One wheel event over the curve: over a point it selects that band and turns
  * its Q by the event's delta in px (`wheelPixels`), whatever unit it reports.
+ * A 6 dB cut has no Q, so its wheel edits nothing and opens no step.
  */
 export function wheelCurve(host: EqWheelHost, turns: BandWheelGesture, e: EqWheel): void {
   const spec = host.spec();
@@ -154,6 +156,7 @@ export function wheelCurve(host: EqWheelHost, turns: BandWheelGesture, e: EqWhee
   if (band < 0) return;
   e.preventDefault();
   if (band !== host.selected()) host.select(band);
+  if (!hasQ(spec.bands[band]!)) return;
   turns.touch(band);
   // Shift turns a vertical wheel sideways in some browsers, so either axis counts.
   const delta = wheelPixels(e.deltaY || e.deltaX, e.deltaMode, plot.height);
@@ -177,7 +180,8 @@ function wireKeys(host: EqCurveHost): void {
   canvas.addEventListener('keydown', (e) => {
     const spec = host.spec();
     const selected = host.selected();
-    const done = keyEdit(spec, selected, { key: e.key, alt: e.altKey, shift: e.shiftKey });
+    const key = { key: e.key, alt: e.altKey, shift: e.shiftKey };
+    const done = keyEdit(spec, selected, key, host.plot());
     if (!done) return;
     e.preventDefault();
     if ('select' in done) return host.select(done.select);

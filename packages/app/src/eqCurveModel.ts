@@ -7,36 +7,55 @@
  * copy of its maths. Pinned by `eqCurveModel.test.ts`.
  */
 import type { EqBand, EqSpec } from '@windsor/engine';
-import { EQ_BOUNDS, eqResponseDb } from '@windsor/engine';
+import { EQ_BOUNDS, EQ_DSP, eqResponseDb } from '@windsor/engine';
 import type { EqRange, EqTypeRole } from './eqTables';
-import { EQ_FIRST_ORDER_SLOPE, EQ_GESTURE, EQ_PLOT, EQ_TYPE_ROLE } from './eqTables';
+import {
+  EQ_FALLBACK_SAMPLE_RATE,
+  EQ_FIRST_ORDER_SLOPE,
+  EQ_GESTURE,
+  EQ_PLOT,
+  EQ_TYPE_ROLE,
+} from './eqTables';
 
-/** The plot as the rules see it: its size in px and its ± dB range. */
+/**
+ * The plot as the rules see it: its size in px, its ± dB range, and the
+ * frequency at its right edge, the highest the engine plays at the sample rate.
+ */
 export interface EqPlot {
   readonly width: number;
   readonly height: number;
   readonly range: EqRange;
+  readonly maxFreq: number;
 }
-
-export const eqPlot = (range: EqRange): EqPlot => ({
-  width: EQ_PLOT.width,
-  height: EQ_PLOT.height,
-  range,
-});
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 const [F_MIN, F_MAX] = EQ_BOUNDS.freq;
-const LOG_SPAN = Math.log(F_MAX / F_MIN);
 
-export const clampFreq = (freq: number): number => clamp(freq, F_MIN, F_MAX);
+/**
+ * The highest frequency a band plays at `sampleRate`: the range's top, or
+ * lower where the engine's design holds a band below Nyquist (`EQ_DSP`).
+ */
+export const eqMaxFreq = (sampleRate: number): number =>
+  Math.min(F_MAX, sampleRate * EQ_DSP.maxFrequencyRatio);
+
+export const eqPlot = (range: EqRange, sampleRate: number = EQ_FALLBACK_SAMPLE_RATE): EqPlot => ({
+  width: EQ_PLOT.width,
+  height: EQ_PLOT.height,
+  range,
+  maxFreq: eqMaxFreq(sampleRate),
+});
+
+/** `freq` inside what `plot` can reach: 10 Hz up to its right edge. */
+export const clampFreq = (freq: number, plot: EqPlot): number => clamp(freq, F_MIN, plot.maxFreq);
 export const clampGain = (gain: number): number => clamp(gain, ...EQ_BOUNDS.gain);
 export const clampQ = (q: number): number => clamp(q, ...EQ_BOUNDS.q);
 
-/** x (px from the left) of `freq`: log frequency, 10 Hz at 0 and 22 kHz at the width. */
+const logSpan = (plot: EqPlot): number => Math.log(plot.maxFreq / F_MIN);
+/** x (px from the left) of `freq`: log frequency, 10 Hz at 0 and `plot.maxFreq` at the width. */
 export const xOfFreq = (freq: number, plot: EqPlot): number =>
-  (Math.log(freq / F_MIN) / LOG_SPAN) * plot.width;
+  (Math.log(freq / F_MIN) / logSpan(plot)) * plot.width;
 export const freqOfX = (x: number, plot: EqPlot): number =>
-  F_MIN * Math.exp((x / plot.width) * LOG_SPAN);
+  F_MIN * Math.exp((x / plot.width) * logSpan(plot));
 
 /** Half the plot's height less its pad: how many px the range spans either side of 0 dB. */
 const halfSpan = (plot: EqPlot): number => plot.height / 2 - EQ_PLOT.pad;
@@ -143,8 +162,9 @@ export interface EqDragMove {
 /**
  * The band a drag leaves: x is frequency (log); y is gain for a bell or a
  * shelf (the drawn gain, so divided by Scale; none at Scale 0), Q for a
- * 12/24/48 cut, and nothing for a notch or a 6 dB cut; with Alt, y is Q and
- * x nothing. A drag always turns the band on.
+ * 12/24/48 cut, and nothing for a notch or a 6 dB cut; with Alt, y is Q (none
+ * for a 6 dB cut, which has no Q) and x nothing. A drag always turns the band
+ * on. No move across leaves the stored frequency, even one past the plot.
  */
 export function dragBand(start: EqDragStart, move: EqDragMove, plot: EqPlot): EqBand {
   const f = move.fine ? EQ_GESTURE.fine : 1;
@@ -152,8 +172,8 @@ export function dragBand(start: EqDragStart, move: EqDragMove, plot: EqPlot): Eq
   const dy = (move.y - start.y) * f;
   const band: EqBand = { ...start.band, on: true };
   const qSteps = -dy / EQ_GESTURE.qDragPx;
-  if (move.alt) return { ...band, q: moveQ(band.q, qSteps) };
-  const freq = clampFreq(freqOfX(xOfFreq(band.freq, plot) + dx, plot));
+  if (move.alt) return hasQ(band) ? { ...band, q: moveQ(band.q, qSteps) } : band;
+  const freq = dx === 0 ? band.freq : clampFreq(freqOfX(xOfFreq(band.freq, plot) + dx, plot), plot);
   if (roleOf(band) === 'gain' && start.scale > 0) {
     const gain = clampGain(band.gain + dbOfY(plot.height / 2 + dy, plot) / start.scale);
     return { ...band, freq, gain };
@@ -175,8 +195,12 @@ export function wheelPixels(delta: number, deltaMode: number, pageHeight: number
   return delta;
 }
 
-/** The band after a wheel of `delta` px over its point: Q, up for a wheel away (a negative delta). */
+/**
+ * The band after a wheel of `delta` px over its point: Q, up for a wheel away
+ * (a negative delta); a 6 dB cut, which has no Q, as it was.
+ */
 export function wheelBand(band: EqBand, delta: number, fine: boolean): EqBand {
+  if (!hasQ(band)) return band;
   return {
     ...band,
     q: moveQ(band.q, -delta / (fine ? EQ_GESTURE.wheelFinePx : EQ_GESTURE.wheelPx)),
@@ -221,7 +245,7 @@ export function doubleClick(
     ...spec.bands[free]!,
     on: true,
     type: 'bell',
-    freq: clampFreq(freqOfX(point.x, plot)),
+    freq: clampFreq(freqOfX(point.x, plot), plot),
     gain,
     q: EQ_GESTURE.addedBellQ,
   };
@@ -247,10 +271,11 @@ const ARROWS: Readonly<Record<string, readonly [x: number, y: number]>> = {
 
 /**
  * `1`–`8` select that band; the arrows move the selected band's frequency a
- * semitone and a bell's or shelf's gain half a dB; Alt with ↑ or ↓ moves its
- * Q; Shift takes `EQ_GESTURE.fine` of each step.
+ * semitone (inside `plot`) and a bell's or shelf's gain half a dB; Alt with ↑
+ * or ↓ moves its Q (nothing for a 6 dB cut, which has none); Shift takes
+ * `EQ_GESTURE.fine` of each step.
  */
-export function keyEdit(spec: EqSpec, selected: number, key: EqKey): EqKeyResult {
+export function keyEdit(spec: EqSpec, selected: number, key: EqKey, plot: EqPlot): EqKeyResult {
   const digit = Number(key.key);
   if (/^[1-9]$/.test(key.key) && digit <= spec.bands.length) return { select: digit - 1 };
   const arrow = Object.hasOwn(ARROWS, key.key) ? ARROWS[key.key] : undefined;
@@ -259,9 +284,13 @@ export function keyEdit(spec: EqSpec, selected: number, key: EqKey): EqKeyResult
   const f = key.shift ? EQ_GESTURE.fine : 1;
   const [across, up] = arrow;
   if (key.alt)
-    return up ? { band: { ...band, q: moveQ(band.q, up * EQ_GESTURE.keyQLog * f) } } : null;
+    return up && hasQ(band)
+      ? { band: { ...band, q: moveQ(band.q, up * EQ_GESTURE.keyQLog * f) } }
+      : null;
   const semitones = across * EQ_GESTURE.keySemitones * f;
-  const freq = clampFreq(band.freq * 2 ** (semitones / EQ_GESTURE.semitonesPerOctave));
+  const freq = across
+    ? clampFreq(band.freq * 2 ** (semitones / EQ_GESTURE.semitonesPerOctave), plot)
+    : band.freq;
   const gain =
     roleOf(band) === 'gain' ? clampGain(band.gain + up * EQ_GESTURE.keyGainDb * f) : band.gain;
   return { band: { ...band, freq, gain } };
