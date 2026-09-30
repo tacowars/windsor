@@ -1,4 +1,12 @@
-/** Block-configured vintage reverb. Fixed internal clock; original networks; stereo dry is untouched. */
+/**
+ * Block-configured vintage reverb. Fixed internal clock; original networks; stereo dry is untouched.
+ * No double crosses a call as an argument or a result: V8 boxes one across a call it does not
+ * inline (worklet rule 2). `tick` takes `inputLeft`/`inputRight` and leaves `left`/`right`,
+ * `internal` takes `internalInput`, `convert` turns `convertInput` into `converted`, and the
+ * networks, lines and filters have fields of their own. Every double field is first written as
+ * NaN, then its start value, so none changes representation (rule 7).
+ * `inserts/retroReverbAllocation.test.ts` holds it to both on V8.
+ */
 import {
   RETRO_REVERB_DSP as C,
   RETRO_REVERB_BOUNDS as B,
@@ -39,8 +47,21 @@ class RetroReverbDsp {
   wetToneLeft: number;
   wetToneRight: number;
   wetPole: number;
+  inputLeft: number;
+  inputRight: number;
+  internalInput: number;
+  convertInput: number;
+  converted: number;
 
   constructor(rate: number, params: RetroParams) {
+    // Rule 7: each double field is born a double (NaN), before its start value.
+    this.rate = this.phase = this.previousInput = this.heldLeft = this.heldRight = NaN;
+    this.left = this.right = this.size = this.decay = this.tone = this.diffusion = NaN;
+    this.preDelay = this.character = this.mix = this.targetMix = this.duration = NaN;
+    this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
+    this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
+    this.convertInput = this.converted = NaN;
+    this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
     this.reflections = new RetroReflections();
@@ -83,48 +104,79 @@ class RetroReverbDsp {
     if (this.finite > C.silenceFloor) this.reflections.configure(this);
   }
 
-  convert(value: number): number {
-    const bounded = Math.max(-1, Math.min(1, value));
+  /** `convertInput` through the converter's clip and quantiser, into `converted`. */
+  convert(): void {
+    const bounded = Math.max(-1, Math.min(1, this.convertInput));
     const quantized = Math.trunc(bounded * C.converterSteps) / C.converterSteps;
-    return bounded + this.character * (quantized - bounded);
+    this.converted = bounded + this.character * (quantized - bounded);
   }
 
-  internal(input: number): void {
-    const delayed =
-      this.preDelay < 1 / C.rate ? this.convert(input) : this.pre.read(this.preDelay * C.rate);
-    this.pre.write(this.convert(input));
-    this.tank.tick(delayed);
+  /** One sample of the internal clock, of `internalInput`. */
+  internal(): void {
+    const input = this.internalInput;
+    let delayed: number;
+    if (this.preDelay < 1 / C.rate) {
+      this.convertInput = input;
+      this.convert();
+      delayed = this.converted;
+    } else {
+      this.pre.delay = this.preDelay * C.rate;
+      this.pre.read();
+      delayed = this.pre.output;
+    }
+    this.convertInput = input;
+    this.convert();
+    this.pre.input = this.converted;
+    this.pre.write();
+    this.tank.input = delayed;
+    this.tank.tick();
     let left = this.tank.left,
       right = this.tank.right;
     // Only finite modes pay for the dense tap field; fades retain it until inaudible.
     if (this.finite > C.silenceFloor) {
-      this.reflections.tick(delayed);
+      this.reflections.input = delayed;
+      this.reflections.tick();
       left += this.finite * (this.reflections.left - left);
       right += this.finite * (this.reflections.right - right);
     } else {
       // Keep the finite history current so changing modes never revives stale audio.
-      this.reflections.delay.write(delayed);
+      this.reflections.delay.input = delayed;
+      this.reflections.delay.write();
     }
     this.wetToneLeft += this.wetPole * (left - this.wetToneLeft);
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);
     if (Math.abs(this.wetToneLeft) < C.silenceFloor) this.wetToneLeft = 0;
     if (Math.abs(this.wetToneRight) < C.silenceFloor) this.wetToneRight = 0;
-    this.heldLeft = this.convert(this.wetToneLeft);
-    this.heldRight = this.convert(this.wetToneRight);
+    this.convertInput = this.wetToneLeft;
+    this.convert();
+    this.heldLeft = this.converted;
+    this.convertInput = this.wetToneRight;
+    this.convert();
+    this.heldRight = this.converted;
   }
 
-  tick(left: number, right: number): void {
-    const input = this.inputFilter.tick((left + right) / 2);
+  /** One host sample: `inputLeft`/`inputRight` in, `left`/`right` out. */
+  tick(): void {
+    const left = this.inputLeft,
+      right = this.inputRight;
+    this.inputFilter.input = (left + right) / 2;
+    this.inputFilter.tick();
+    const input = this.inputFilter.output;
     const step = C.rate / this.rate;
     this.phase += step;
     while (this.phase >= 1) {
       this.phase -= 1;
       const fraction = 1 - this.phase / step;
-      this.internal(this.previousInput + fraction * (input - this.previousInput));
+      this.internalInput = this.previousInput + fraction * (input - this.previousInput);
+      this.internal();
     }
     this.previousInput = input;
-    const wetL = this.leftFilter.tick(this.heldLeft);
-    const wetR = this.rightFilter.tick(this.heldRight);
+    this.leftFilter.input = this.heldLeft;
+    this.leftFilter.tick();
+    const wetL = this.leftFilter.output;
+    this.rightFilter.input = this.heldRight;
+    this.rightFilter.tick();
+    const wetR = this.rightFilter.output;
     this.mix += this.smooth * (this.targetMix - this.mix);
     if (Math.abs(this.targetMix - this.mix) < C.silenceFloor) this.mix = this.targetMix;
     this.left = left + this.mix * (wetL - left);

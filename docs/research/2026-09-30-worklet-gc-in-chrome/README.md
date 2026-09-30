@@ -274,6 +274,16 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    [`summaries/b-compressor-after.json`](summaries/b-compressor-after.json).
 5. **Retro reverb**: 6 337 bytes a quantum (2.2 MB/s), **+2.6 a second**;
    longest 209 µs.
+   **After windsor#230: 0 bytes a quantum**, in every one of the 9 832
+   measured calls of a 29.0 s trace of `b-retro-reverb` with the meter off
+   (same machine and headless Chrome 154, this method, 44.1 kHz, the
+   worktree's dev server; one-minute load average 2.98 before and 4.04
+   after the trace). The thread collected 1.24 times a second, scenario a's
+   rate: the FM part's garbage alone. The reverb's median call read 16 µs
+   (15 before) and the median quantum span 163 µs (148 before), both
+   traced. The meter-on pass after it read the CPU button at 3–9 % and
+   added no underrun (the one it showed came in the warm-up). Summary:
+   [`summaries/b-retro-reverb-after.json`](summaries/b-retro-reverb-after.json).
 6. **Phaser**: 6 186 bytes a quantum (2.1 MB/s), **+2.5 a second**; longest
    184 µs.
 7. **Delay**: 3 096 bytes a quantum (1.1 MB/s), **+1.2 a second**; longest
@@ -330,5 +340,6 @@ measured neither.
   `node --max-old-space-size=8192 analyse-trace.mjs <trace.json> <summary.json>`.
 - [`summaries/`](summaries/): one per traced run, with every collection's
   time, length and heap before and after. `b-plate-after.json` is the plate
-  scenario rerun after windsor#227.
+  scenario rerun after windsor#227, and `b-retro-reverb-after.json` the
+  Retro reverb's after windsor#230.
 - [`tables.mjs`](tables.mjs) prints this README's tables from the summaries.
