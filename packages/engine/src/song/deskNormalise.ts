@@ -54,12 +54,13 @@ export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): 
 }
 
 /**
- * `mute` or `solo` (windsor#154), stored only while on: `true` is kept and a
- * `false` is left out, as the default. A value that is not a boolean is
- * corrected to an explicit `false`, the way a junk `output` becomes
- * `'master'`: `documentDiffLive` probes a removed key with junk and sends
- * what comes back, and the engine skips an absent key, so undoing a mute must
- * read back as `false` to reach the live strip.
+ * `mute` or `solo` (windsor#154), kept exactly the way `output` is: an absent
+ * key stays absent, and a `true` or a `false` that is present is kept as it
+ * is, so normalising a normalised document changes nothing. A value that is
+ * not a boolean is corrected to an explicit `false`, the way a junk `output`
+ * becomes `'master'`: `documentDiffLive` probes a removed key with junk and
+ * sends what comes back, and the engine skips an absent key, so undoing a
+ * mute must read back as `false` to reach the live strip.
  */
 function switchedOn(
   key: 'mute' | 'solo',
@@ -67,7 +68,7 @@ function switchedOn(
   path: string,
   n: FieldNormaliser,
 ): { mute?: boolean; solo?: boolean } {
-  if (raw === undefined || raw === false) return {};
+  if (raw === undefined) return {};
   return { [key]: n.bool(raw, false, `${path}.${key}`) };
 }
 

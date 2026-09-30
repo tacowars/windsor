@@ -178,17 +178,32 @@ describe('the part list (#597)', () => {
     expect(again.corrections).toEqual([]);
   });
 
-  it('round-trips mute and solo, and stores each only while it is on (windsor#154)', () => {
+  it('round-trips mute and solo, and leaves an absent one absent (windsor#154)', () => {
     const first = makeArrangement(song([{ ...KICK, strip: { mute: true, solo: true } }]));
     expect(first.document.parts[0]?.strip).toMatchObject({ mute: true, solo: true });
     const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
     expect(again.document.parts[0]?.strip).toEqual(first.document.parts[0]?.strip);
     expect(again.corrections).toEqual([]);
 
-    const off = makeArrangement(song([{ ...KICK, strip: { mute: false, solo: false } }]));
-    expect(off.document.parts[0]?.strip).not.toHaveProperty('mute');
-    expect(off.document.parts[0]?.strip).not.toHaveProperty('solo');
-    expect(off.corrections).toEqual([]);
+    const absent = makeArrangement(song([{ ...KICK, strip: { level: 1 } }]));
+    expect(absent.document.parts[0]?.strip).not.toHaveProperty('mute');
+    expect(absent.document.parts[0]?.strip).not.toHaveProperty('solo');
+  });
+
+  it('keeps an explicit false mute and solo through export and import, as output keeps master', () => {
+    const first = makeArrangement(song([{ ...KICK, strip: { mute: false, solo: false } }]));
+    expect(first.document.parts[0]?.strip).toMatchObject({ mute: false, solo: false });
+    expect(first.corrections).toEqual([]);
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+    expect(again.document).toEqual(first.document);
+    expect(again.corrections).toEqual([]);
+  });
+
+  it('normalises a corrected mute and solo to the same document a second time', () => {
+    const first = makeArrangement(song([{ ...KICK, strip: { mute: null, solo: 'on' } }]));
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+    expect(again.document).toEqual(first.document);
+    expect(again.corrections).toEqual([]);
   });
 
   it('corrects a mute that is not a boolean to an explicit false, the default undo reads back', () => {
