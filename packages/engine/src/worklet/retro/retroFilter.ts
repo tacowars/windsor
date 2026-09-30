@@ -1,16 +1,24 @@
-/** Two cascaded Butterworth sections limit converter images; this is not an analog circuit model. */
+/**
+ * Two cascaded Butterworth sections limit converter images; this is not an analog circuit model.
+ * `tick` filters `input` into `output`: fields, not an argument and a result, which V8 boxes
+ * across a call it does not inline (worklet rule 2). Both are first written as doubles (rule 7).
+ */
 import { RETRO_REVERB_DSP as C } from '../../inserts/retroReverbConstants';
 
 class RetroFilter {
   b: Float64Array;
   a: Float64Array;
   z: Float64Array;
+  input: number;
+  output: number;
 
   constructor(rate: number) {
     const k = Math.tan((Math.PI * Math.min(C.bandwidth, rate * C.hostBandwidthRatio)) / rate);
     this.b = new Float64Array(C.filterSections);
     this.a = new Float64Array(C.filterSections * 2);
     this.z = new Float64Array(C.filterSections * 2);
+    this.input = this.output = NaN;
+    this.input = this.output = 0;
     // Fourth-order Butterworth section Qs, calculated from its pole angles.
     for (let section = 0; section < C.filterSections; section++) {
       const q = 1 / (2 * Math.cos(((2 * section + 1) * Math.PI) / C.filterPoleDivisor));
@@ -21,7 +29,8 @@ class RetroFilter {
     }
   }
 
-  tick(input: number): number {
+  tick(): void {
+    let input = this.input;
     for (let section = 0; section < C.filterSections; section++) {
       const i = section * 2;
       const output = this.b[section] * input + this.z[i];
@@ -31,7 +40,7 @@ class RetroFilter {
       this.z[i + 1] = Math.abs(z1) < C.silenceFloor ? 0 : z1;
       input = output;
     }
-    return input;
+    this.output = input;
   }
 }
 
