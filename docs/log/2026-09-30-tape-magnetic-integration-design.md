@@ -80,19 +80,22 @@ the fastest honest path to a level-matched audition in the app.
 
    The integration PR carries tests that: (a) confirm the calibration
    point exactly as stated, EQ bypassed, 1 kHz, full scale, Drive 0, and
-   report each model's 1 kHz gain at Bias 0; (b) push full-scale tones and impulses at Bias 0 through the model
-   of least boost (the calibration model) at every Drive from minimum to
-   maximum and assert the guard counter and the core's reset counter stay
-   at zero; push full-scale steps the same way and assert the field at the
-   core stays within ±4 and the reset counter stays at zero, recording the
-   guard count (the interpolator's overshoot reconstructs a step at
+   report each model's 1 kHz gain at Bias 0; (b) with the EQ bypassed, as in the calibration, push full-scale
+   tones (including 100 Hz and 1 kHz) and impulses at every Drive from
+   minimum to maximum and assert the guard counter and the core's reset
+   counter stay at zero (every model row has some gain, so no model is
+   used here; models are covered by (c)); push full-scale steps the same
+   way and assert the field at the core stays within ±4 and the reset
+   counter stays at zero, recording the guard count (the interpolator's overshoot reconstructs a step at
    maximum Drive to about 4.5 before the guard, so the guard is expected
    to catch it; that is the guard doing its job, not a calibration
    error); (c) push the same through every model at Bias 0
-   and at both Bias extremes, and record the guard count per model, rate
-   and Drive, asserting the reset counter stays at zero (a model whose own
-   EQ boosts, such as Ferric's low shelf, is expected to reach the guard
-   near maximum Drive, and that count is recorded, not forbidden); (d) push the
+   and at both Bias extremes, including a full-scale 100 Hz tone at
+   maximum Drive, and record the guard count per model, rate and Drive,
+   asserting the reset counter stays at zero (every model's EQ has gain
+   somewhere, so any model is expected to reach the guard near maximum
+   Drive on a full-scale tone in its boosted region, and that count is
+   recorded, not forbidden); (d) push the
    sign-of-impulse-response sequence and an input above full scale and
    assert the guard engages and the field at the core stays within ±4;
    and (e) the **slew test**: ten seconds of sustained clipped white noise
