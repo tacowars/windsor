@@ -235,9 +235,8 @@ describe('Saved report', () => {
     expect(saved.run.expired || saved.run.elapsedMs <= O.budgetMs).toBe(true);
     expect(saved.run.requestedTrajectories).toBe(8);
     expect(saved.run.requestedComparisons).toBe(6);
-    const done = saved.trials.filter((t) => t.factor === O.anchor.factor);
-    if (done.length === rows.length)
-      expect(anchorCheck(saved.trials, anchor)).toEqual(saved.baseline);
+    expect(anchorCheck(saved.trials, anchor)).toEqual(saved.baseline);
+    expect(saved.baseline.matches).toBe(true);
     for (const p of saved.pairs) {
       const a = saved.trials.find((t) => t.id === p.id && t.factor === p.from);
       const b = saved.trials.find((t) => t.id === p.id && t.factor === p.to);
@@ -258,6 +257,7 @@ describe('Saved report', () => {
         saved.groups.find((g) => g.id === row.id),
       );
     expect(interpret(saved)).toEqual(saved.outcome);
+    expect(saved.outcome.outcome).toBe('both qualified');
     for (const t of saved.trials)
       for (const x of Object.values(t.diagnostics.crossings)) {
         expect(x.retained.length + x.truncated).toBe(x.windowTotal);
