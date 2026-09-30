@@ -29,7 +29,8 @@ accepted it with every recommendation in its questions.
    - frequency 10 Hz – 22 kHz, held below Nyquist;
    - gain −24 – +24 dB, for the bell and the shelves only;
    - Q 0.10 – 18.0: the bandwidth of a bell or notch, the knee of a shelf,
-     the resonance of a cut. 0.71 is a new band's Q.
+     the resonance of a cut. 0.71 is every default band's Q; a bell added by
+     double-clicking the curve starts at Q 1.
 3. **Global controls:** Scale (0 – 200 %, multiplies every bell and shelf
    gain), Output (−24 – +24 dB, after the bands) and the rail's Enabled.
 4. **A new EQ is flat:** 1 Low cut 30 Hz 12 dB (off), 2 Low shelf 100 Hz,
