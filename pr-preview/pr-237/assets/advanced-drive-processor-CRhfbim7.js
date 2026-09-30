@@ -257,46 +257,85 @@ var LoadSampler = class {
 };
 
 // packages/engine/src/inserts/advancedDriveCurves.ts
-var driveGain = (db) => DRIVE_MATH.decimal ** (db / DRIVE_DSP.dbDivisor);
-var unit = (x) => Math.max(0, Math.min(1, x));
-var bipolar = (x) => Math.max(-1, Math.min(1, x));
-function curve(x, type, amount) {
-  switch (type) {
-    case "hard":
-      return bipolar(x);
-    case "diode":
-      return x / (1 + Math.abs(x) ** (2 / DRIVE_DSP.diodeKnee)) ** (DRIVE_DSP.diodeKnee / 2);
-    case "tube": {
-      const t = Math.tanh(x);
-      return t + DRIVE_DSP.tubeEven * t * t;
-    }
-    case "half-wave":
-      return Math.max(0, Math.tanh(x));
-    case "full-wave":
-      return Math.abs(Math.tanh(x));
-    case "fold":
-      return 2 / Math.PI * Math.asin(Math.sin(x * Math.PI / 2));
-    case "crush": {
-      const steps = 2 ** Math.round(DRIVE_DSP.crushBits - DRIVE_DSP.crushRange * amount);
-      return Math.round(bipolar(x) * steps) / steps;
-    }
-    default:
-      return Math.sin(bipolar(x) * Math.PI / 2);
+var DriveShaper = class {
+  constructor() {
+    this.input = this.type = this.amount = this.bias = this.output = this.point = NaN;
+    this.gain = this.root = NaN;
+    this.name = DRIVE_SHAPERS[0];
   }
-}
+  /** After a change of type or amount: what `run` reads of them. */
+  prepare() {
+    this.gain = DRIVE_MATH.decimal ** (this.amount * DRIVE_DSP.driveScale / DRIVE_DSP.dbDivisor);
+    this.name = DRIVE_SHAPERS[this.type] ?? "soft";
+    this.root = Math.sqrt(this.gain);
+  }
+  /** Amount zero is identity; bias offsets the curve but never generates output from silence. */
+  run() {
+    const x = this.input, amount = this.amount, bias = this.bias;
+    if (amount === 0) {
+      this.output = x;
+      return;
+    }
+    this.point = x * this.gain + bias;
+    this.curve();
+    const driven = this.point;
+    this.point = bias;
+    this.curve();
+    const shaped = (driven - this.point) / this.root;
+    this.output = x + amount * (shaped - x);
+  }
+  /** The curve at `point`, written back to `point`. */
+  curve() {
+    const x = this.point;
+    switch (this.name) {
+      case "hard":
+        this.point = Math.max(-1, Math.min(1, x));
+        return;
+      case "diode":
+        this.point = x / (1 + Math.abs(x) ** (2 / DRIVE_DSP.diodeKnee)) ** (DRIVE_DSP.diodeKnee / 2);
+        return;
+      case "tube": {
+        const t = Math.tanh(x);
+        this.point = t + DRIVE_DSP.tubeEven * t * t;
+        return;
+      }
+      case "half-wave":
+        this.point = Math.max(0, Math.tanh(x));
+        return;
+      case "full-wave":
+        this.point = Math.abs(Math.tanh(x));
+        return;
+      case "fold":
+        this.point = 2 / Math.PI * Math.asin(Math.sin(x * Math.PI / 2));
+        return;
+      case "crush": {
+        const steps = 2 ** Math.round(DRIVE_DSP.crushBits - DRIVE_DSP.crushRange * this.amount);
+        this.point = Math.round(Math.max(-1, Math.min(1, x)) * steps) / steps;
+        return;
+      }
+      default:
+        this.point = Math.sin(Math.max(-1, Math.min(1, x)) * Math.PI / 2);
+    }
+  }
+};
+var EDITOR_SHAPER = new DriveShaper();
 function driveShape(x, type, amount, bias) {
-  if (amount === 0) return x;
-  const gain = driveGain(amount * DRIVE_DSP.driveScale);
-  const name = DRIVE_SHAPERS[type] ?? "soft";
-  const shaped = (curve(x * gain + bias, name, amount) - curve(bias, name, amount)) / Math.sqrt(gain);
-  return x + amount * (shaped - x);
+  const shaper = EDITOR_SHAPER;
+  shaper.input = x;
+  shaper.type = type;
+  shaper.amount = amount;
+  shaper.bias = bias;
+  shaper.prepare();
+  shaper.run();
+  return shaper.output;
 }
-function driveLfo(phase, wave) {
-  if (wave === 1) return 1 - 2 * Math.abs(2 * phase - 1);
-  if (wave === 2) return phase < DRIVE_MATH.half ? 1 : -1;
-  if (wave === DRIVE_LFO_IDS.up) return 2 * phase - 1;
-  if (wave === DRIVE_LFO_IDS.down) return 1 - 2 * phase;
-  return Math.sin(2 * Math.PI * phase);
+function driveLfo(state) {
+  const phase = state.phase, wave = state.wave;
+  if (wave === 1) state.lfo = 1 - 2 * Math.abs(2 * phase - 1);
+  else if (wave === 2) state.lfo = phase < DRIVE_MATH.half ? 1 : -1;
+  else if (wave === DRIVE_LFO_IDS.up) state.lfo = 2 * phase - 1;
+  else if (wave === DRIVE_LFO_IDS.down) state.lfo = 1 - 2 * phase;
+  else state.lfo = Math.sin(2 * Math.PI * phase);
 }
 
 // packages/engine/src/worklet/advancedDrive/driveOversample.ts
@@ -319,31 +358,26 @@ var DriveFir = class {
   constructor() {
     this.buffer = new Float64Array(FIR.length);
     this.cursor = 0;
+    this.input = this.output = NaN;
   }
-  tick(x) {
-    this.buffer[this.cursor] = x;
+  /** Filters `input` into `output`. */
+  tick() {
+    this.buffer[this.cursor] = this.input;
     let y = 0, j = this.cursor;
     for (let i = 0; i < FIR.length; i++) {
       y += FIR[i] * this.buffer[j];
       if (--j < 0) j = FIR.length - 1;
     }
     if (++this.cursor === FIR.length) this.cursor = 0;
-    return y;
+    this.output = y;
   }
 };
 
 // packages/engine/src/inserts/advancedDriveFilter.ts
 var DriveFilter = class {
-  b0;
-  b1;
-  b2;
-  a1;
-  a2;
-  x1;
-  x2;
-  y1;
-  y2;
   constructor() {
+    this.x0 = this.b0 = this.b1 = this.b2 = this.a1 = this.a2 = NaN;
+    this.x1 = this.x2 = this.y1 = this.y2 = NaN;
     this.b0 = 1;
     this.b1 = this.b2 = this.a1 = this.a2 = this.x1 = this.x2 = this.y1 = this.y2 = 0;
   }
@@ -371,7 +405,7 @@ var DriveFilter = class {
       b2 = a0;
     }
     if (o.type === "peak") {
-      const a = Math.sqrt(driveGain(o.gain));
+      const a = Math.sqrt(DRIVE_MATH.decimal ** (o.gain / DRIVE_DSP.dbDivisor));
       b0 = 1 + alpha * a;
       b1 = -(2 * c);
       b2 = 1 - alpha * a;
@@ -385,13 +419,19 @@ var DriveFilter = class {
     this.a1 = a1 / a0;
     this.a2 = a2 / a0;
   }
-  tick(x) {
+  /** Filters `x0` into `y1`. */
+  tick() {
+    const x = this.x0;
     const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
     this.x2 = this.x1;
     this.x1 = x;
     this.y2 = this.y1;
     this.y1 = Number.isFinite(y) ? Math.max(-DRIVE_DSP.maxInternal, Math.min(DRIVE_DSP.maxInternal, y)) : 0;
-    return this.y1;
+  }
+  /** Filters `source`'s newest output: the next section of a chain. */
+  follow(source) {
+    this.x0 = source.y1;
+    this.tick();
   }
   reset() {
     this.x1 = this.x2 = this.y1 = this.y2 = 0;
@@ -406,34 +446,83 @@ var DriveFilter = class {
   }
 };
 
+// packages/engine/src/worklet/advancedDrive/driveSlots.ts
+var DRIVE_KEYS = ADVANCED_DRIVE_PARAMETERS.map((p) => p.name);
+function driveSlot(key) {
+  const slot = DRIVE_KEYS.indexOf(key);
+  if (slot < 0) throw new Error(`Advanced Drive has no parameter ${key}`);
+  return slot;
+}
+var DRIVE_SLOT = {
+  bpm: driveSlot("bpm"),
+  route: driveSlot("route"),
+  wave: driveSlot("wave"),
+  beats: driveSlot("beats"),
+  drive: driveSlot("drive"),
+  tone: driveSlot("tone"),
+  pivot: driveSlot("pivot"),
+  output: driveSlot("output"),
+  mix: driveSlot("mix"),
+  blend: driveSlot("blend"),
+  low: driveSlot("low"),
+  high: driveSlot("high"),
+  rate: driveSlot("rate"),
+  attack: driveSlot("attack"),
+  release: driveSlot("release"),
+  sensitivity: driveSlot("sensitivity"),
+  enabled: driveSlot("enabled"),
+  compensation: driveSlot("compensation"),
+  sync: driveSlot("sync")
+};
+function driveStageSlots(stage) {
+  const at = (key) => driveSlot(`s${stage}_${key}`);
+  return {
+    amount: at("amount"),
+    bias: at("bias"),
+    level: at("level"),
+    frequency: at("frequency"),
+    resonance: at("resonance"),
+    peak: at("peak"),
+    envAmount: at("envAmount"),
+    envBias: at("envBias"),
+    envCutoff: at("envCutoff"),
+    lfoAmount: at("lfoAmount"),
+    lfoBias: at("lfoBias"),
+    lfoCutoff: at("lfoCutoff"),
+    enabled: at("enabled"),
+    shaping: at("shaping"),
+    filtering: at("filtering"),
+    pre: at("pre"),
+    shaper: at("shaper"),
+    filter: at("filter")
+  };
+}
+
 // packages/engine/src/worklet/advancedDrive/driveStage.ts
 var DriveStage = class {
   constructor(rate, stage) {
-    this.keys = Object.fromEntries(
-      [
-        ...Object.keys(DRIVE_STAGE_DEFAULTS),
-        "enabled",
-        "shaping",
-        "filtering",
-        "pre",
-        "shaper",
-        "filter"
-      ].map((key) => [key, `s${stage}_${key}`])
-    );
+    this.slots = driveStageSlots(stage);
     this.filter = new DriveFilter();
-    this.options = { type: "lowpass", hz: 12e3, q: Math.SQRT1_2, gain: 0, rate };
+    this.options = { type: "lowpass", hz: NaN, q: NaN, gain: NaN, rate };
+    this.shaper = new DriveShaper();
     this.dcPole = 1 - Math.exp(-(2 * Math.PI * DRIVE_DSP.dcHz / rate));
-    this.amount = this.bias = this.dc = this.shaper = 0;
+    this.gain = this.dc = this.input = this.output = NaN;
+    this.shaper.amount = this.shaper.bias = this.shaper.type = this.dc = 0;
+    this.shaper.prepare();
     this.gain = 1;
     this.enabled = this.shaping = true;
     this.filtering = this.pre = false;
   }
-  configure(s, env, lfo) {
-    const p = this.keys;
-    this.amount = unit(s[p.amount] + env * s[p.envAmount] + lfo * s[p.lfoAmount]);
-    this.bias = bipolar(s[p.bias] + env * s[p.envBias] + lfo * s[p.lfoBias]);
-    this.gain = driveGain(s[p.level]);
-    this.shaper = s[p.shaper];
+  configure(s, mod) {
+    const p = this.slots, env = mod.env, lfo = mod.lfo, shaper = this.shaper;
+    shaper.amount = Math.max(
+      0,
+      Math.min(1, s[p.amount] + env * s[p.envAmount] + lfo * s[p.lfoAmount])
+    );
+    shaper.bias = Math.max(-1, Math.min(1, s[p.bias] + env * s[p.envBias] + lfo * s[p.lfoBias]));
+    this.gain = DRIVE_MATH.decimal ** (s[p.level] / DRIVE_DSP.dbDivisor);
+    shaper.type = s[p.shaper];
+    shaper.prepare();
     this.enabled = s[p.enabled] > 0;
     this.shaping = s[p.shaping] > 0;
     this.filtering = s[p.filtering] > 0;
@@ -448,16 +537,33 @@ var DriveStage = class {
     o.gain = s[p.peak];
     this.filter.configure(o);
   }
-  tick(x) {
-    if (!this.enabled) return x;
-    if (this.filtering && this.pre) x = this.filter.tick(x);
+  /** Drives `input` into `output`. */
+  tick() {
+    let x = this.input;
+    if (!this.enabled) {
+      this.output = x;
+      return;
+    }
+    const filter = this.filter;
+    if (this.filtering && this.pre) {
+      filter.x0 = x;
+      filter.tick();
+      x = filter.y1;
+    }
     if (this.shaping) {
-      const shaped = driveShape(x, this.shaper, this.amount, this.bias);
+      const shaper = this.shaper;
+      shaper.input = x;
+      shaper.run();
+      const shaped = shaper.output;
       this.dc += this.dcPole * (shaped - x - this.dc);
       x = shaped - this.dc;
     }
-    if (this.filtering && !this.pre) x = this.filter.tick(x);
-    return x * this.gain;
+    if (this.filtering && !this.pre) {
+      filter.x0 = x;
+      filter.tick();
+      x = filter.y1;
+    }
+    this.output = x * this.gain;
   }
   reset() {
     this.dc = 0;
@@ -469,48 +575,67 @@ var DriveStage = class {
 var DriveCrossover = class {
   constructor(rate) {
     this.filters = Array.from({ length: DRIVE_CROSSOVER.filters }, () => new DriveFilter());
-    this.options = { type: "lowpass", hz: 200, q: Math.SQRT1_2, gain: 0, rate };
+    this.options = { type: "lowpass", hz: NaN, q: Math.SQRT1_2, gain: NaN, rate };
+    this.lowHz = this.highHz = this.input = this.dryInput = NaN;
+    this.low = this.mid = this.high = this.dry = NaN;
     this.low = this.mid = this.high = this.dry = 0;
   }
-  configure(low, high) {
+  configure() {
     const o = this.options;
     for (let i = 0; i < this.filters.length; i++) {
-      o.hz = i < DRIVE_CROSSOVER.pair || i === DRIVE_CROSSOVER.dryLow ? low : high;
+      o.hz = i < DRIVE_CROSSOVER.pair || i === DRIVE_CROSSOVER.dryLow ? this.lowHz : this.highHz;
       o.type = i >= DRIVE_CROSSOVER.allpassStart ? "allpass" : i % DRIVE_CROSSOVER.pair < 2 ? "lowpass" : "highpass";
       this.filters[i].configure(o);
     }
   }
-  tick(x, dry) {
+  /** Splits `input` into `low`, `mid` and `high`, and phase-matches `dryInput` into `dry`. */
+  tick() {
     const f = this.filters;
-    this.low = f[8].tick(f[1].tick(f[0].tick(x)));
-    const upper = f[3].tick(f[2].tick(x));
-    this.mid = f[5].tick(f[4].tick(upper));
-    this.high = f[7].tick(f[6].tick(upper));
-    this.dry = f[10].tick(f[9].tick(dry));
+    f[0].x0 = this.input;
+    f[0].tick();
+    f[1].follow(f[0]);
+    f[8].follow(f[1]);
+    this.low = f[8].y1;
+    f[2].x0 = this.input;
+    f[2].tick();
+    f[3].follow(f[2]);
+    f[4].follow(f[3]);
+    f[5].follow(f[4]);
+    this.mid = f[5].y1;
+    f[6].follow(f[3]);
+    f[7].follow(f[6]);
+    this.high = f[7].y1;
+    f[9].x0 = this.dryInput;
+    f[9].tick();
+    f[10].follow(f[9]);
+    this.dry = f[10].y1;
   }
   reset() {
-    for (const filter of this.filters) filter.reset();
+    for (let i = 0; i < this.filters.length; i++) this.filters[i].reset();
   }
 };
 
 // packages/engine/src/worklet/advancedDrive/driveTone.ts
 var DriveTone = class {
-  constructor() {
+  constructor(rate) {
+    this.rate = rate;
+    this.db = this.hz = this.b0 = this.b1 = this.a1 = this.x0 = this.x1 = this.y1 = NaN;
     this.b0 = 1;
     this.b1 = this.a1 = this.x1 = this.y1 = 0;
   }
-  configure(db, hz, rate, inverse = false) {
-    const k = Math.tan(Math.PI * hz / rate), hi = driveGain(db / 2), lo = 1 / hi;
+  configure(inverse) {
+    const k = Math.tan(Math.PI * this.hz / this.rate), hi = DRIVE_MATH.decimal ** (this.db / 2 / DRIVE_DSP.dbDivisor), lo = 1 / hi;
     const b0 = (hi + lo * k) / (1 + k), b1 = (-hi + lo * k) / (1 + k), a1 = (k - 1) / (1 + k);
     this.b0 = inverse ? 1 / b0 : b0;
     this.b1 = inverse ? a1 / b0 : b1;
     this.a1 = inverse ? b1 / b0 : a1;
   }
-  tick(x) {
+  /** Filters `x0` into `y1`. */
+  tick() {
+    const x = this.x0;
     const y = this.b0 * x + this.b1 * this.x1 - this.a1 * this.y1;
     this.x1 = x;
     this.y1 = y;
-    return y;
   }
   reset() {
     this.x1 = this.y1 = 0;
@@ -526,142 +651,213 @@ var DriveRouting = class {
       (_, i) => new DriveStage(rate, Math.floor(i / 2))
     );
     this.cross = [new DriveCrossover(rate), new DriveCrossover(rate)];
-    this.tone = [new DriveTone(), new DriveTone()];
-    this.undo = [new DriveTone(), new DriveTone()];
+    this.tone = [new DriveTone(rate), new DriveTone(rate)];
+    this.undo = [new DriveTone(rate), new DriveTone(rate)];
+    this.env = this.lfo = this.inputLeft = this.inputRight = NaN;
+    this.channelInput = this.channelDry = this.channelOutput = NaN;
+    this.left = this.right = this.dryLeft = this.dryRight = this.route = this.blend = NaN;
+    this.drive = this.output = NaN;
     this.left = this.right = this.dryLeft = this.dryRight = this.route = this.blend = 0;
     this.drive = this.output = 1;
   }
-  configure(s, env, lfo) {
-    this.route = s.route;
-    this.blend = s.blend;
-    this.drive = driveGain(s.drive);
-    this.output = driveGain(s.output);
-    for (const stage of this.stages) stage.configure(s, env, lfo);
+  configure(s) {
+    this.route = s[DRIVE_SLOT.route];
+    this.blend = s[DRIVE_SLOT.blend];
+    this.drive = DRIVE_MATH.decimal ** (s[DRIVE_SLOT.drive] / DRIVE_DSP.dbDivisor);
+    this.output = DRIVE_MATH.decimal ** (s[DRIVE_SLOT.output] / DRIVE_DSP.dbDivisor);
+    for (let i = 0; i < this.stages.length; i++) this.stages[i].configure(s, this);
     for (let c = 0; c < 2; c++) {
-      this.cross[c].configure(s.low, s.high);
-      this.tone[c].configure(s.tone, s.pivot, this.rate);
-      this.undo[c].configure(s.tone * s.compensation, s.pivot, this.rate, true);
+      const cross = this.cross[c], tone = this.tone[c], undo = this.undo[c];
+      cross.lowHz = s[DRIVE_SLOT.low];
+      cross.highHz = s[DRIVE_SLOT.high];
+      cross.configure();
+      tone.db = s[DRIVE_SLOT.tone];
+      tone.hz = s[DRIVE_SLOT.pivot];
+      tone.configure(false);
+      undo.db = s[DRIVE_SLOT.tone] * s[DRIVE_SLOT.compensation];
+      undo.hz = s[DRIVE_SLOT.pivot];
+      undo.configure(true);
     }
   }
-  tick(left, right) {
-    let l = this.tone[0].tick(left * this.drive), r = this.tone[1].tick(right * this.drive);
+  /** Drives `inputLeft` and `inputRight` into `left` and `right`. */
+  tick() {
+    const left = this.inputLeft, right = this.inputRight, toneLeft = this.tone[0], toneRight = this.tone[1];
+    toneLeft.x0 = left * this.drive;
+    toneLeft.tick();
+    toneRight.x0 = right * this.drive;
+    toneRight.tick();
+    let l = toneLeft.y1, r = toneRight.y1;
     this.dryLeft = left;
     this.dryRight = right;
     if (this.route === DRIVE_ROUTE_IDS.midSide) {
-      const mid = this.stages[0].tick((l + r) / 2), side = this.stages[2].tick((l - r) / 2);
-      l = mid + side;
-      r = mid - side;
+      const mid = this.stages[0], side = this.stages[2];
+      mid.input = (l + r) / 2;
+      mid.tick();
+      side.input = (l - r) / 2;
+      side.tick();
+      l = mid.output + side.output;
+      r = mid.output - side.output;
     } else {
-      l = this.channel(l, left, 0);
-      r = this.channel(r, right, 1);
+      this.channelInput = l;
+      this.channelDry = left;
+      this.channel(0);
+      l = this.channelOutput;
+      this.channelInput = r;
+      this.channelDry = right;
+      this.channel(1);
+      r = this.channelOutput;
     }
-    this.left = this.undo[0].tick(l) * this.output;
-    this.right = this.undo[1].tick(r) * this.output;
+    const undoLeft = this.undo[0], undoRight = this.undo[1];
+    undoLeft.x0 = l;
+    undoLeft.tick();
+    this.left = undoLeft.y1 * this.output;
+    undoRight.x0 = r;
+    undoRight.tick();
+    this.right = undoRight.y1 * this.output;
   }
-  channel(x, dry, c) {
-    const a = this.stages[c], b = this.stages[2 + c];
+  /** Channel `c` of every route but mid/side: `channelInput` into `channelOutput`. */
+  channel(c) {
+    const x = this.channelInput, a = this.stages[c], b = this.stages[2 + c];
     if (this.route === DRIVE_ROUTE_IDS.multiband) {
-      const split = this.cross[c];
-      split.tick(x, dry);
+      const split = this.cross[c], top = this.stages[2 * 2 + c];
+      split.input = x;
+      split.dryInput = this.channelDry;
+      split.tick();
       if (c === 0) this.dryLeft = split.dry;
       else this.dryRight = split.dry;
-      return a.tick(split.low) + b.tick(split.mid) + this.stages[2 * 2 + c].tick(split.high);
+      a.input = split.low;
+      a.tick();
+      b.input = split.mid;
+      b.tick();
+      top.input = split.high;
+      top.tick();
+      this.channelOutput = a.output + b.output + top.output;
+      return;
     }
-    const first = a.tick(x);
-    if (this.route === 1) return first + this.blend * (b.tick(first) - first);
-    if (this.route === 2) return first + this.blend * (b.tick(x) - first);
-    return first;
+    a.input = x;
+    a.tick();
+    const first = a.output;
+    if (this.route === 1 || this.route === 2) {
+      b.input = this.route === 1 ? first : x;
+      b.tick();
+      this.channelOutput = first + this.blend * (b.output - first);
+      return;
+    }
+    this.channelOutput = first;
   }
+  /** Indexed loops: `reset` runs once a switch, too rarely for V8 to optimise away a `for…of`'s iterator. */
   reset() {
-    for (const stage of this.stages) stage.reset();
-    for (const cross of this.cross) cross.reset();
-    for (const tone of this.tone) tone.reset();
-    for (const undo of this.undo) undo.reset();
+    for (let i = 0; i < this.stages.length; i++) this.stages[i].reset();
+    for (let c = 0; c < 2; c++) {
+      this.cross[c].reset();
+      this.tone[c].reset();
+      this.undo[c].reset();
+    }
   }
 };
 
 // packages/engine/src/worklet/advancedDrive/advancedDriveDsp.ts
-var KEYS = ADVANCED_DRIVE_PARAMETERS.map((p) => p.name);
-var DISCRETE = KEYS.filter(
-  (k) => /^(route|wave)$|_(shaper|filter|pre|enabled|shaping|filtering)$/.test(k)
-);
-var CONTINUOUS = KEYS.filter((k) => !DISCRETE.includes(k));
+var DISCRETE_KEY = /^(route|wave)$|_(shaper|filter|pre|enabled|shaping|filtering)$/;
+var DISCRETE = DRIVE_KEYS.flatMap((k, slot) => DISCRETE_KEY.test(k) ? [slot] : []);
+var CONTINUOUS = DRIVE_KEYS.flatMap((k, slot) => DISCRETE_KEY.test(k) ? [] : [slot]);
 var AdvancedDriveDsp = class {
   constructor(rate, params) {
     this.rate = rate;
     this.smooth = 1 - Math.exp(-1 / (rate * DRIVE_DSP.smoothSeconds));
     this.step = 1 / (rate * DRIVE_DSP.transitionSeconds);
-    this.controls = {};
-    this.targets = {};
-    for (const p of ADVANCED_DRIVE_PARAMETERS)
-      this.controls[p.name] = params[p.name]?.[0] ?? p.defaultValue;
-    Object.assign(this.targets, this.controls);
-    this.activeKeys = CONTINUOUS.slice();
+    this.controls = new Float64Array(DRIVE_KEYS.length);
+    this.targets = new Float64Array(DRIVE_KEYS.length);
+    ADVANCED_DRIVE_PARAMETERS.forEach((p, slot) => {
+      this.controls[slot] = params[p.name]?.[0] ?? p.defaultValue;
+    });
+    this.targets.set(this.controls);
+    this.activeKeys = Int32Array.from(CONTINUOUS);
     this.activeCount = 0;
     this.graph = new DriveRouting(rate * DRIVE_DSP.oversample);
     this.up = [new DriveFir(), new DriveFir()];
     this.down = [new DriveFir(), new DriveFir()];
-    this.phase = this.follower = this.lfo = this.left = this.right = this.counter = 0;
+    this.inputLeft = this.inputRight = this.phase = this.wave = this.follower = this.lfo = NaN;
+    this.left = this.right = this.transition = NaN;
+    this.inputLeft = this.inputRight = this.phase = this.follower = this.lfo = 0;
+    this.left = this.right = this.counter = 0;
     this.transition = 1;
     this.pending = false;
-    this.graph.configure(this.controls, 0, 0);
+    this.graph.env = this.graph.lfo = 0;
+    this.graph.configure(this.controls);
   }
   configure(params, _frames) {
-    for (const key of KEYS) this.targets[key] = params[key][0];
-    this.activeCount = 0;
-    for (const key of CONTINUOUS)
-      if (!Object.is(this.targets[key], this.controls[key]))
-        this.activeKeys[this.activeCount++] = key;
-    this.pending = false;
-    for (const key of DISCRETE) if (this.targets[key] !== this.controls[key]) this.pending = true;
-  }
-  update(left, right) {
     const s = this.controls, t = this.targets;
+    for (let k = 0; k < DRIVE_KEYS.length; k++) t[k] = params[DRIVE_KEYS[k]][0];
+    this.activeCount = 0;
+    for (let i = 0; i < CONTINUOUS.length; i++) {
+      const k = CONTINUOUS[i];
+      if (!Object.is(t[k], s[k])) this.activeKeys[this.activeCount++] = k;
+    }
+    this.pending = false;
+    for (let i = 0; i < DISCRETE.length; i++)
+      if (t[DISCRETE[i]] !== s[DISCRETE[i]]) this.pending = true;
+  }
+  /** One host sample's smoothing, modulation and control block, from `inputLeft` and `inputRight`. */
+  update() {
+    const s = this.controls, t = this.targets, keys = this.activeKeys;
     for (let i = 0; i < this.activeCount; i++) {
-      const key = this.activeKeys[i];
-      s[key] += this.smooth * (t[key] - s[key]);
-      if (Math.abs(s[key] - t[key]) < DRIVE_DSP.silence) s[key] = t[key];
+      const k = keys[i];
+      s[k] += this.smooth * (t[k] - s[k]);
+      if (Math.abs(s[k] - t[k]) < DRIVE_DSP.silence) s[k] = t[k];
     }
     this.transition = Math.max(
       0,
       Math.min(1, this.transition + (this.pending ? -this.step : this.step))
     );
     if (this.pending && this.transition === 0) {
-      for (const key of DISCRETE) s[key] = t[key];
+      for (let i = 0; i < DISCRETE.length; i++) s[DISCRETE[i]] = t[DISCRETE[i]];
       this.pending = false;
       this.graph.reset();
       this.counter = 0;
     }
-    const level = Math.min(1, Math.max(Math.abs(left), Math.abs(right)) * driveGain(s.sensitivity));
-    const seconds = (level > this.follower ? s.attack : s.release) / DRIVE_DSP.ms;
+    const peak = Math.max(Math.abs(this.inputLeft), Math.abs(this.inputRight));
+    const level = Math.min(1, peak * DRIVE_MATH.decimal ** (s[DRIVE_SLOT.sensitivity] / DRIVE_DSP.dbDivisor));
+    const seconds = (level > this.follower ? s[DRIVE_SLOT.attack] : s[DRIVE_SLOT.release]) / DRIVE_DSP.ms;
     this.follower += (1 - Math.exp(-1 / (this.rate * seconds))) * (level - this.follower);
-    const hz = s.sync >= 1 / 2 ? s.bpm / (DRIVE_DSP.secondsPerMinute * s.beats) : s.rate;
+    const hz = s[DRIVE_SLOT.sync] >= 1 / 2 ? s[DRIVE_SLOT.bpm] / (DRIVE_DSP.secondsPerMinute * s[DRIVE_SLOT.beats]) : s[DRIVE_SLOT.rate];
     this.phase += hz / this.rate;
     this.phase -= Math.floor(this.phase);
-    this.lfo = driveLfo(this.phase, s.wave);
-    if (this.counter++ % (DRIVE_DSP.controlStride / DRIVE_DSP.oversample) === 0)
-      this.graph.configure(s, this.follower, this.lfo);
+    this.wave = s[DRIVE_SLOT.wave];
+    driveLfo(this);
+    if (this.counter++ % (DRIVE_DSP.controlStride / DRIVE_DSP.oversample) === 0) {
+      this.graph.env = this.follower;
+      this.graph.lfo = this.lfo;
+      this.graph.configure(s);
+    }
   }
-  tick(left, right) {
-    this.update(left, right);
-    const s = this.controls, graph = this.graph;
+  /** One host sample: `inputLeft` and `inputRight` into `left` and `right`. */
+  tick() {
+    this.update();
+    const left = this.inputLeft, right = this.inputRight, s = this.controls, graph = this.graph, upLeft = this.up[0], upRight = this.up[1], downLeft = this.down[0], downRight = this.down[1];
     let l = 0, r = 0;
     for (let phase = 0; phase < DRIVE_DSP.oversample; phase++) {
-      const a = this.up[0].tick(phase === 0 ? left * DRIVE_DSP.oversample : 0);
-      const b = this.up[1].tick(phase === 0 ? right * DRIVE_DSP.oversample : 0);
-      graph.tick(a, b);
+      upLeft.input = phase === 0 ? left * DRIVE_DSP.oversample : 0;
+      upLeft.tick();
+      upRight.input = phase === 0 ? right * DRIVE_DSP.oversample : 0;
+      upRight.tick();
+      const a = upLeft.output, b = upRight.output;
+      graph.inputLeft = a;
+      graph.inputRight = b;
+      graph.tick();
       const dryL = a + this.transition * (graph.dryLeft - a);
       const dryR = b + this.transition * (graph.dryRight - b);
-      const wet = this.transition * s.mix;
-      const outL = this.down[0].tick(dryL + wet * (graph.left - dryL));
-      const outR = this.down[1].tick(dryR + wet * (graph.right - dryR));
+      const wet = this.transition * s[DRIVE_SLOT.mix];
+      downLeft.input = dryL + wet * (graph.left - dryL);
+      downLeft.tick();
+      downRight.input = dryR + wet * (graph.right - dryR);
+      downRight.tick();
       if (phase === 0) {
-        l = outL;
-        r = outR;
+        l = downLeft.output;
+        r = downRight.output;
       }
     }
-    this.left = left + s.enabled * (l - left);
-    this.right = right + s.enabled * (r - right);
+    this.left = left + s[DRIVE_SLOT.enabled] * (l - left);
+    this.right = right + s[DRIVE_SLOT.enabled] * (r - right);
   }
 };
 
@@ -695,11 +891,15 @@ var AdvancedDriveProcessor = class _AdvancedDriveProcessor extends AudioWorkletP
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
-    this.dsp.configure(params, frames);
+    const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
+    const dsp = this.dsp;
+    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
-      this.dsp.tick(left?.[i] ?? 0, right?.[i] ?? 0);
-      out[0][i] = this.dsp.left;
-      if (out[1]) out[1][i] = this.dsp.right;
+      dsp.inputLeft = i < leftFrames ? left[i] : 0;
+      dsp.inputRight = i < rightFrames ? right[i] : 0;
+      dsp.tick();
+      out[0][i] = dsp.left;
+      if (out[1]) out[1][i] = dsp.right;
     }
     this.load.end(frames);
     return true;
