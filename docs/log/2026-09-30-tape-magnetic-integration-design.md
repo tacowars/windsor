@@ -44,48 +44,48 @@ the fastest honest path to a level-matched audition in the app.
    delay, hiss, dropouts and trim stay in their order. No second insert.
    The REELS saturation polynomial leaves the chain; its provenance record
    stands as history.
-3. **Field bounding: the guard is the guarantee, the ceiling is the
-   calibration.** A full-scale sine at Drive 0 and flat EQ reaches the knee
-   (source field 1). Bias EQ and tape-model EQ run before Drive with gains
-   above unity, and a bounded adversarial signal (the sign of a filter's
-   impulse response) can reach the cascade's L1 norm, about 7.8 at 96 kHz
-   for Studio with full Bias, which no musically useful Drive range can
-   cap without giving up saturation at Drive 0. So the two duties are
-   split. The **domain is guaranteed by construction** by a hard guard clip
-   at source field ±4 at the core input, with a counter: every input, of
-   any level, meets that clip before the core. The clip bounds the field's
+3. **Field bounding: the guard is the guarantee, Drive is a plain gain.**
+   The **domain is guaranteed by construction** by a hard guard clip at
+   source field ±4 at the core input, with a counter: every input, of any
+   level, meets that clip before the core. The clip bounds the field's
    amplitude, not its slew and not the integrator's state: the static
    conditioning record keeps that distinction, and the survival evidence
    covers reconstructed pulses and a smooth closed-form program, not
    sustained clipped broadband input. The core's magnitude-20 state guard
    and reset counter therefore stay, remain reachable by high-slew
-   over-level input, and are reported, never hidden. The **Drive ceiling is a
-   calibration** for musical signals: the Drive mapping is capped so that
-   the largest steady-state peak frequency gain of the retained EQ (over
-   every model, the Bias extremes and the three rates, computed from the
-   filter tables and declared in `tapeConstants.ts`) times the Drive gain
-   never exceeds 4 for a full-scale sine at the control's maximum. Within
-   that range the guard does not engage for tones, impulses or steps; it
-   does engage for an adversarial sign sequence or an input above full
-   scale, and that is a clip at four times the knee level on a signal the
-   knee already compresses toward its asymptote, not a fault. The guard is
-   not a tone-shaping limiter and does not precede the EQ. The integration
-   PR carries tests that push full-scale tones, impulses and steps through
-   the retained EQ at every model, both Bias extremes and all three rates,
-   during a model crossfade and a Bias sweep, at maximum Drive, and assert
-   the guard counter stays at zero and the core's reset counter stays at
-   zero; tests that push the sign-of-impulse-response sequence and an
-   input above full scale, and assert the guard engages and the field at
-   the core stays within ±4; and a **slew test** that runs ten seconds of
-   sustained clipped white noise and of full-scale alternating-sign input
-   at +12 dB over full scale through the span-48 pair at 44.1, 48 and
-   96 kHz, at 2× and 4×, at every model row, reporting the reset count per
-   case. A reset there is a known limit of the qualified domain, recorded
-   in the PR and the audition notes, not a merge blocker; a reset on any
-   full-scale tone, impulse or step inside the calibrated range is a
-   blocker. The Drive
-   control's visible range and label are the UI issue's to settle
-   (`reviewed`).
+   over-level input, and are reported, never hidden. The guard is not a
+   tone-shaping limiter and does not precede the EQ.
+
+   **Drive** maps to a plain gain into the core, declared in
+   `tapeConstants.ts`: unity at Drive 0, +12 dB (×4) at the control's
+   maximum, -12 dB at its minimum, linear in dB. **Calibration** is stated
+   for flat EQ only: a full-scale sine with Bias 0 through the model of
+   least boost at Drive 0 reaches source field 1, the knee. The retained
+   Bias EQ and tape-model EQ run before Drive and boost by up to about
+   14 dB at their extremes, so a full-scale tone under heavy Bias boost
+   can reach the guard even at Drive 0. That is the effect saturating as
+   hard as it can: the knee already compresses toward its asymptote of 4
+   there, and the clip at 4 adds a little flattening on top. It is
+   expected behaviour, counted, and audible only in the region the user
+   has deliberately pushed. No composite ceiling across EQ and Drive is
+   claimed.
+
+   The integration PR carries tests that: (a) confirm the calibration
+   point; (b) push full-scale tones, impulses and steps at Bias 0 through
+   every model at every Drive from minimum to maximum and assert the guard
+   counter and the core's reset counter stay at zero; (c) push the same
+   at both Bias extremes and record the guard count per model, rate and
+   Drive, asserting the reset counter stays at zero; (d) push the
+   sign-of-impulse-response sequence and an input above full scale and
+   assert the guard engages and the field at the core stays within ±4;
+   and (e) the **slew test**: ten seconds of sustained clipped white noise
+   and of full-scale alternating-sign input at +12 dB over full scale
+   through the span-48 pair at 44.1, 48 and 96 kHz, at 2× and 4×, at every
+   model row, reporting the reset count per case. A reset in (e) is a
+   known limit of the qualified domain, recorded in the PR and the
+   audition notes, not a merge blocker; a reset in (b) or (c) is a
+   blocker. The Drive control's visible range and label are the UI
+   issue's to settle (`reviewed`).
 4. **Latency: the fixed delay always applies, the dry path is matched, and
    transport delay stays part of the effect.** The FIR pair delays by
    `span` host samples (48, one millisecond at 48 kHz). That delay applies
