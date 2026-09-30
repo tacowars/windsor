@@ -5,9 +5,12 @@
  * `registerProcessor('dattorro-reverb', ...)`. The delay lines
  * (`delayLines.ts`) and the awake render (`tank.ts`) are functions over this
  * processor, installed on its prototype here, so every method body is the one
- * the hand-written `reverb-processor.js` carried, line for line. Invariants:
- * no allocation in `process` (worklet/CLAUDE.md rule 2); fields declared,
- * never initialised (rule 7). `mixer/reverbGolden.test.ts` pins the render.
+ * the hand-written `reverb-processor.js` carried, line for line, but for the
+ * samples that now cross those calls in fields (windsor#227). Invariants: no
+ * allocation in `process` (worklet/CLAUDE.md rule 2); fields declared, never
+ * initialised, and every double field first written as a double (rule 7).
+ * `mixer/reverbGolden.test.ts` pins the render and
+ * `mixer/reverbAllocation.test.ts` its allocation on V8.
  *
  * The topology is Jon Dattorro's 1997 figure 1: a pre-delay, an input
  * bandwidth filter, four cascaded all-pass diffusers, and a figure-of-eight
@@ -70,8 +73,14 @@ class DattorroReverb extends AudioWorkletProcessor {
   _tapStep: Float32Array;
   _inputLp: number;
   _inputHp: number;
-  _dampLp: number[];
-  _dampHp: number[];
+  _dampLp: Float64Array;
+  _dampHp: Float64Array;
+  /** The block's one-pole coefficients: input low-pass and high-pass, tank low-pass and high-pass. */
+  _poles: Float64Array;
+  /** The sample a read leaves and `_write1` stores (`delayLines.ts`). */
+  _value: number;
+  /** The cubic read's offset: the modulation's excursion. */
+  _offset: number;
   _excPhase: number;
   _excPhase2: number;
   _denormal: number;
@@ -122,6 +131,15 @@ class DattorroReverb extends AudioWorkletProcessor {
   constructor(options: AudioWorkletNodeOptions) {
     super(options);
 
+    // Every double field is first written as a double, NaN, before its
+    // starting value (windsor#227). V8 types a field by its first value: a 0 or
+    // 1 would make it a small-integer field, and its first fraction would
+    // generalise it, deprecating the map and deoptimising the render.
+    this._inputLp = this._inputHp = NaN;
+    this._excPhase = this._excPhase2 = NaN;
+    this._size = this._inputGain = NaN;
+    this._value = this._offset = NaN;
+
     // Pre-delay is a plain ring, always a full second, rounded up to a whole
     // number of render quanta so a block write never straddles the wrap.
     this._preDelayLength = sampleRate + (128 - (sampleRate % 128));
@@ -146,8 +164,9 @@ class DattorroReverb extends AudioWorkletProcessor {
 
     this._inputLp = 0;
     this._inputHp = 0;
-    this._dampLp = [0, 0];
-    this._dampHp = [0, 0];
+    this._dampLp = new Float64Array(2);
+    this._dampHp = new Float64Array(2);
+    this._poles = new Float64Array(4);
 
     this._excPhase = 0;
     this._excPhase2 = 0;
@@ -155,7 +174,7 @@ class DattorroReverb extends AudioWorkletProcessor {
 
     this._size = 1;
     this._inputGain = 1;
-    this._applySize(1, true);
+    this._applySize(true);
 
     // Sleep (#547): samples of continuous silence in and out, the span that has
     // to exceed, and whether the tank is asleep. `sleep: false` and
@@ -271,7 +290,7 @@ class DattorroReverb extends AudioWorkletProcessor {
     const smooth = Math.min(1, 128 / (SMOOTH_SECONDS * sampleRate));
     this._size += smooth * (parameters.size[0] - this._size);
     this._inputGain += smooth * (1 - this._inputGain);
-    this._applySize(this._size, true);
+    this._applySize(true);
     return true;
   }
 }

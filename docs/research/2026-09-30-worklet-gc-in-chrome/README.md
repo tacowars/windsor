@@ -235,6 +235,20 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    (7.9 MB/s), **+9.0 a second**; longest pause 210 µs. The room return runs
    the same bundle and allocates nothing only because it slept in every
    scenario; a song that sends to it would wake it.
+
+   **After windsor#227: 0 bytes a quantum.** The same `b-plate` scenario and
+   method (5 s warm-up, meter off, trace saved and reduced by
+   `analyse-trace.mjs` to [`summaries/b-plate-after.json`](summaries/b-plate-after.json)),
+   on the same M1, macOS 26.5.1, `HeadlessChrome/154.0.0.0`, 44.1 kHz, load
+   average 2.86 before the trace and 3.49 after, 28.3 s traced: every one of
+   the 19 121 measured `reverb-processor.js` calls grew the heap by 0 bytes,
+   the awake insert's (about 9 730 calls of 40 to 80 µs) and the sleeping
+   return's alike. The audio thread collected 1.20 times a second (34
+   scavenges, longest 160 µs), against 10.20 before and scenario a's 1.24:
+   what remains is the FM part's 2 907 bytes a quantum. The plate passed its
+   samples to and from calls V8 did not inline, which boxes each double, and
+   first wrote six double fields as 0 or 1; `mixer/reverbAllocation.test.ts`
+   now holds it to no allocation and no representation change in Node.
 3. **Tape**: 9 234 bytes a quantum (3.2 MB/s), **+3.7 a second**; longest
    152 µs.
 4. **Compressor**: 7 680 bytes a quantum (2.6 MB/s), **+3.1 a second**;
@@ -296,5 +310,6 @@ measured neither.
 - [`analyse-trace.mjs`](analyse-trace.mjs) reduces a raw trace to a summary:
   `node --max-old-space-size=8192 analyse-trace.mjs <trace.json> <summary.json>`.
 - [`summaries/`](summaries/): one per traced run, with every collection's
-  time, length and heap before and after.
+  time, length and heap before and after. `b-plate-after.json` is the plate
+  scenario rerun after windsor#227.
 - [`tables.mjs`](tables.mjs) prints this README's tables from the summaries.
