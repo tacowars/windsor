@@ -54,6 +54,7 @@ it('round trips every tape control on tracks and master, preserving the complete
       mix: 0.62,
       seed: TAPE_BOUNDS.seed[1],
       enabled: false,
+      oversampling: 4 as const,
     };
     const result = makeArrangement({
       ...FULL_ARRANGEMENT,

@@ -1,6 +1,7 @@
 /** Song-owned tape controls. Old songs acquire no insert; existing sound is unchanged. */
 import type { FieldNormaliser } from '../song/arrangementFields';
-import { TAPE_BOUNDS, TAPE_DEFAULTS, TAPE_TYPES } from './tapeConstants';
+import { TAPE_BOUNDS, TAPE_DEFAULTS, TAPE_OVERSAMPLING, TAPE_TYPES } from './tapeConstants';
+import type { TapeOversampling } from './tapeConstants';
 export interface TapeSpec {
   readonly kind: 'tape';
   readonly model: (typeof TAPE_TYPES)[number];
@@ -19,10 +20,29 @@ export interface TapeSpec {
   readonly mix: number;
   readonly seed: number;
   readonly enabled: boolean;
+  /** The magnetic core's factor, 2 or 4: E3's audition switch, never a knob (windsor#224). */
+  readonly oversampling: TapeOversampling;
 }
 export const DEFAULT_TAPE: TapeSpec = { kind: 'tape', model: 'studio', ...TAPE_DEFAULTS };
-export const TAPE_NUMBERS = Object.keys(TAPE_BOUNDS) as Array<keyof typeof TAPE_BOUNDS>;
+/** The knob numbers, each clamped into its `TAPE_BOUNDS`. */
+const KNOB_NUMBERS = Object.keys(TAPE_BOUNDS) as Array<keyof typeof TAPE_BOUNDS>;
+/** Every number the processor takes as a parameter: the knobs and the oversampling factor. */
+export const TAPE_NUMBERS: ReadonlyArray<keyof typeof TAPE_BOUNDS | 'oversampling'> = [
+  ...KNOB_NUMBERS,
+  'oversampling',
+];
 export const TAPE_FIELDS = ['kind', 'model', ...Object.keys(TAPE_DEFAULTS)];
+/** One of `TAPE_OVERSAMPLING`; the default when absent, with a correction when it is not one. */
+function oversampling(raw: unknown, path: string, n: FieldNormaliser): TapeOversampling {
+  const fallback = TAPE_DEFAULTS.oversampling;
+  if (raw === undefined) return fallback;
+  const found = TAPE_OVERSAMPLING.find((factor) => factor === raw);
+  if (found !== undefined) return found;
+  n.correction(
+    `${path}: ${String(raw)} is not one of ${TAPE_OVERSAMPLING.join('|')} — using ${fallback}`,
+  );
+  return fallback;
+}
 export function normaliseTape(
   raw: Record<string, unknown>,
   path: string,
@@ -30,7 +50,7 @@ export function normaliseTape(
 ): TapeSpec {
   n.dropUnknown(raw, TAPE_FIELDS, path);
   const values = { ...TAPE_DEFAULTS };
-  for (const name of TAPE_NUMBERS) {
+  for (const name of KNOB_NUMBERS) {
     const [min, max] = TAPE_BOUNDS[name];
     values[name] =
       name === 'seed'
@@ -39,6 +59,7 @@ export function normaliseTape(
   }
   values.split = n.bool(raw.split, values.split, `${path}.split`);
   values.enabled = n.bool(raw.enabled, values.enabled, `${path}.enabled`);
+  values.oversampling = oversampling(raw.oversampling, `${path}.oversampling`, n);
   return {
     kind: 'tape',
     model: n.pick(raw.model, TAPE_TYPES, DEFAULT_TAPE.model, `${path}.model`),

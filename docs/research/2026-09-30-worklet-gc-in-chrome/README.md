@@ -286,8 +286,40 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    [`summaries/b-retro-reverb-after.json`](summaries/b-retro-reverb-after.json).
 6. **Phaser**: 6 186 bytes a quantum (2.1 MB/s), **+2.5 a second**; longest
    184 µs.
+   **After windsor#231: 0 bytes a quantum**, in every one of the 10 266
+   measured calls of a 27.9 s trace of `b-phaser` with the meter off (same
+   machine and headless Chrome 154, this method, the worktree's dev server;
+   one-minute load average 4.50 before and 4.83 after the trace). This
+   context ran at 48 kHz, not 44.1, so `analyse-trace.mjs`'s 2 902 µs budget
+   is long by 8 %; no quantum came near either (longest 903 µs). The thread
+   collected 1.33 times a second (37 scavenges, longest 337 µs), against
+   3.71 before and scenario a's 1.24: the FM part's 2 909 bytes a quantum.
+   The phaser's median call read 36 µs (30 before) and the median quantum
+   span 215 µs (163 before), both traced; every bundle's calls read slower
+   in this trace than in the first (the FM part's median 104 µs against 77,
+   the output stage's 6 against 4), so the spans compare this run's machine,
+   not the phaser. Alone in Node 24.21 on the same M1 (stereo noise at the
+   defaults, 48 kHz, the median of nine runs of 20 000 quanta), the bundle
+   read 21.9 to 27.4 µs a quantum in five runs against 26.5 to 38.3 in
+   seven before, each new run faster than the old runs either side of it,
+   at load averages 2.8 to 4.8. The
+   meter-on pass after it read the CPU button at 1–9 % with no underrun.
+   Summary: [`summaries/b-phaser-after.json`](summaries/b-phaser-after.json).
 7. **Delay**: 3 096 bytes a quantum (1.1 MB/s), **+1.2 a second**; longest
    229 µs.
+   **After windsor#232: 0 bytes a quantum**, in every one of the 13 187
+   measured calls of a 35.7 s trace of `b-delay` with the meter off (same
+   machine and headless Chrome 154, this method, the worktree's dev server;
+   one-minute load average 4.25 before and 3.01 after the trace). This
+   run's context opened at **48 kHz**, not 44.1 (375 quanta a second, so
+   `analyse-trace.mjs`'s 2 902 µs budget is 2 667 here; no span came near
+   either). The thread collected 1.32 times a second (47 scavenges, longest
+   284 µs), against 2.48 before: the FM part's 2 907 bytes a quantum alone,
+   which at 48 kHz is scenario a's 1.24 scaled by 375/345. The delay's
+   median call read 16 µs (15 before) and the median quantum span 148 µs
+   (151 before), both traced. The meter-on pass after it read the CPU button
+   at 4–8 % with no underrun. Summary:
+   [`summaries/b-delay-after.json`](summaries/b-delay-after.json).
 8. **FM part**: 2 909 bytes a quantum for this part (1.0 MB/s), **1.24 a
    second** alone; longest 217 µs. It is last per instance, but it runs once
    per part, so a song's total grows with its part count (the dense song's
@@ -340,6 +372,7 @@ measured neither.
   `node --max-old-space-size=8192 analyse-trace.mjs <trace.json> <summary.json>`.
 - [`summaries/`](summaries/): one per traced run, with every collection's
   time, length and heap before and after. `b-plate-after.json` is the plate
-  scenario rerun after windsor#227, and `b-retro-reverb-after.json` the
-  Retro reverb's after windsor#230.
+  scenario rerun after windsor#227, `b-retro-reverb-after.json` the
+  Retro reverb's after windsor#230, and `b-phaser-after.json` the Phaser's
+  after windsor#231.
 - [`tables.mjs`](tables.mjs) prints this README's tables from the summaries.

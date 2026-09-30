@@ -1,18 +1,29 @@
 # The DSP worklets
 
-`tape/` adapts the CC0 REELS Lite saturation and controls as the `tape` insert.
-`tapeProcessor.ts` owns lifetime/telemetry, `tapeDsp.ts` the signal path,
-`tapeFilter.ts` the preallocated EQ and `tapeMotion.ts` seeded wear/noise.
+`tape/` is the `tape` insert: REELS Lite's controls, EQ, motion and noise
+(CC0, `docs/log/2026-09-30-reels-inspired-tape-insert.md`, which stands as
+history) around Windsor's magnetic core, which replaced REELS's saturation
+polynomial and makeup in windsor#224. Per channel: Bias and model EQ, ×
+`driveGain(Drive)`, the core at 2× or 4×, the DC block, the transport delay,
+hiss, dropouts, trim; Mix and bypass read the dry signal delayed by the core's
+fixed 48 samples. `tapeProcessor.ts` owns lifetime/telemetry and the
+parameters (`oversampling` is one, never a knob), `tapeDsp.ts` the signal
+path, `tapeMagneticStage.ts` the two preallocated oversampler pairs, the
+smoothed core controls and the dry ring, `tapeMagneticRows.ts` the models'
+fixed core controls and their load-time floor check, `tapeFilter.ts` the
+preallocated EQ and `tapeMotion.ts` seeded wear/noise. `TapeDsp.channel`
+drives the pair through its `input`, `advance()` and `output` fields.
 It builds `generated/tape-processor.js` and has its own TS project.
-`inserts/tape*.test.ts` exercise the shipped bundle via `__fixtures__/tapeHarness.ts`.
-Provenance and Max differences: `docs/log/2026-09-30-reels-inspired-tape-insert.md`.
+`inserts/tape*.test.ts` exercise the shipped bundle via `__fixtures__/tapeHarness.ts`;
+`__fixtures__/tapeDspProbe.ts` runs it a sample at a time for the
+`tapeMagneticIntegration*.test.ts` calibration, guard, delay and switch tests.
+Record: `docs/log/2026-09-30-tape-magnetic-integration.md`.
 
 `tape/tapeMagnetic.ts` and `tape/tapeOversample.ts` are the magnetic core
 (windsor#219, epic #146 E1), written from the published Jiles–Atherton model:
 the RK4 core with its field guard and knee, and the span-48 FIR pair that
-reconstructs H and its exact derivative at every RK4 stage time. Nothing
-imports them yet, so the bundle does not carry them until E2 wires them into
-`TapeDsp`. Tunables and `driveGain` are in `inserts/tapeMagneticConstants.ts`.
+reconstructs H and its exact derivative at every RK4 stage time.
+Tunables and `driveGain` are in `inserts/tapeMagneticConstants.ts`.
 Neither calls a transcendental `Math` function, whose results differ by an
 ulp between V8's arm64 and x64 builds: sine, cosine, tanh and 2^x come from
 `inserts/tapePortableMath.ts`, in IEEE arithmetic alone, so the render is the
@@ -51,6 +62,11 @@ Tests under `inserts/delay*.test.ts` use `__fixtures__/delayHarness.ts` to
 exercise the shipped processor. Its separate `tsconfig.json` uses the
 existing erased-field settings. Controls live in `inserts/delayConstants.ts`
 and `delaySpec.ts`; song tempo is supplied through `tempoInsertRegistry.ts`.
+The render allocates nothing (windsor#232): the controls are Float64Array
+slots (`delaySlots.ts`), a sample and a line's read or write pass through
+fields, and every double field is first written as NaN.
+`inserts/delayAllocation.test.ts` pins it on V8 through
+`__fixtures__/delayChangeScenario.ts`.
 
 `eq/` is the Parametric EQ (windsor#198), built as `generated/eq-processor.js`
 with its own `tsconfig.json`. `eqProcessor.ts` owns the flat k-rate
@@ -86,6 +102,12 @@ owns the lossless lattice stages, feedback, envelope and sweep. It ships as
 `inserts/phaser*.test.ts` exercise it through `__fixtures__/phaserHarness.ts`.
 Controls/defaults live in `inserts/phaserConstants.ts` / `phaserSpec.ts`,
 and original editable starting points in `phaserPresetTables.ts`.
+The render allocates nothing (windsor#231): samples pass through the DSP's
+`input` and `output` Float64Array slots, not as arguments or returns, the
+controls live in Float64Array slots rather than a record keyed by name, and
+every double field is first written as NaN.
+`inserts/phaserAllocation.test.ts` pins it on V8 through
+`__fixtures__/phaserChangeScenario.ts`.
 
 `retro/` is the original ROM-free vintage reverb insert (#682), built as
 `generated/retro-reverb-processor.js`. `retroReverbProcessor.ts` owns the
