@@ -418,6 +418,7 @@ export {
 } from './mixer/outputStageConstants';
 export type { OutputStageMode, OutputStageReport } from './mixer/outputStageConstants';
 export { outputStageLatency } from './mixer/outputStageDsp';
+export { outputStageCurve } from './mixer/outputStageCurve';
 export { DEFAULT_OUTPUT_STAGE, normaliseOutputStage } from './mixer/outputStageSpec';
 export type { OutputStageSettings } from './mixer/outputStageSpec';
 

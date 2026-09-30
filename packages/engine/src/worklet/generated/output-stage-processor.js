@@ -49,6 +49,16 @@ function silentReport() {
   };
 }
 
+// packages/engine/src/mixer/outputStageCurve.ts
+var SOFT_CLIP_KNEE_GAIN = Math.pow(DECADE, -OUTPUT_SOFT_CLIP.kneeDb / DB_PER_DECADE);
+function outputStageCurve(mode, ceiling, x, knee = ceiling * SOFT_CLIP_KNEE_GAIN) {
+  if (mode === "off") return x;
+  if (mode !== "soft") return x <= ceiling ? x : ceiling;
+  if (x <= knee) return x;
+  const u = (x - knee) / (ceiling - knee);
+  return knee + (ceiling - knee) * u / (1 + u);
+}
+
 // packages/engine/src/mixer/outputStageClipper.ts
 function halfBandTaps(table = OUTPUT_OVERSAMPLE) {
   const n = table.taps;
@@ -146,18 +156,14 @@ var OversampledClipper = class {
     channel.pos = pos;
     channel.quiet = quiet;
   }
-  /** The curve less the identity: 0 wherever the curve leaves the sample alone. */
+  /**
+   * The curve less the identity: 0 wherever the curve leaves the sample
+   * alone. The curve is `outputStageCurve`, the one the console plots.
+   */
   residual(w) {
     const a = w < 0 ? -w : w;
-    const c = this.ceiling;
-    if (!this.soft) {
-      if (a <= c) return 0;
-      return w > 0 ? c - w : -c - w;
-    }
-    const k = this.knee;
-    if (a <= k) return 0;
-    const u = (a - k) / (c - k);
-    const y = k + (c - k) * u / (1 + u);
+    const y = outputStageCurve(this.soft ? "soft" : "hard", this.ceiling, a, this.knee);
+    if (y === a) return 0;
     return w > 0 ? y - w : -y - w;
   }
 };

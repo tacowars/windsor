@@ -7,7 +7,7 @@
  * and the session's commit landing in the document under the selected
  * part's preset.
  */
-/* eslint-disable max-lines -- one fixture (the fake console) over every context rule; #709 added the Song view's three cases and the file sits 3 % over */
+/* eslint-disable max-lines -- one fixture (the fake console) over every context rule; #709 added the Song view's three cases and windsor#193 the tab-shown hook's, which keep it just over */
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { ApplyResult, AudioPart, DocumentPartial } from '@windsor/engine';
@@ -140,6 +140,30 @@ describe('AppContext rendering', () => {
     // An unknown tab changes nothing.
     c.ctx.activate('nowhere');
     expect(c.ctx.activeTab).toBe('parts');
+  });
+
+  it('tells a tab-shown listener the state now and on each change, until stopped (windsor#193)', () => {
+    const c = openConsole();
+    const heard: boolean[] = [];
+    const stop = c.ctx.onTabShown('mixer', (shown) => heard.push(shown));
+    c.ctx.activate('mixer');
+    c.ctx.activate('mixer');
+    c.ctx.activate('song');
+    c.ctx.activate('parts');
+    expect(heard).toEqual([false, true, false]);
+    stop();
+    c.ctx.activate('mixer');
+    expect(heard).toEqual([false, true, false]);
+    const early: boolean[] = [];
+    const fresh = new AppContext<TabPanel>({
+      host: {} as EngineHost,
+      model: c.model,
+      notify: () => undefined,
+    });
+    fresh.onTabShown('parts', (shown) => early.push(shown));
+    fresh.addTab('parts', { hidden: true }, () => undefined);
+    fresh.addTab('mixer', { hidden: true }, () => undefined);
+    expect(early).toEqual([false, true]);
   });
 
   it('invalidates every tab on an import', async () => {

@@ -17,6 +17,7 @@ import {
   outputLight,
   peakDb,
   peakLabel,
+  reportAction,
   reportActed,
   stepHold,
 } from './outputStageModel';
@@ -143,6 +144,17 @@ describe('the clip light', () => {
   it('latches on an output sample above 0 dBFS, which only Off lets through', () => {
     expect(reportActed(report({ outputRight: 1.01 }))).toBe(true);
     expect(reportActed(report({ outputLeft: 1 }))).toBe(false);
+  });
+
+  it('names the action from the report alone: Limiting, Clipping, then Over 0 dB', () => {
+    const limited = report({ inputLeft: 2, outputLeft: 0.89, reductionDb: 7, active: true });
+    expect(reportAction(limited)).toBe('Limiting');
+    expect(reportAction(report({ inputLeft: 2, outputLeft: 0.89, overDb: 7, active: true }))).toBe(
+      'Clipping',
+    );
+    expect(reportAction(report({ inputRight: 1.2, outputRight: 1.2 }))).toBe('Over 0 dB');
+    expect(reportAction(report({ inputLeft: 0.9, outputLeft: 0.9 }))).toBeNull();
+    expect(reportAction(report({ outputLeft: 1 }))).toBeNull();
   });
 });
 

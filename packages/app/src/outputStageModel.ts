@@ -69,6 +69,22 @@ export function reportActed(report: Readonly<OutputStageReport>): boolean {
   return Math.max(report.outputLeft, report.outputRight) > OUTPUT_OFF_CLIP_LEVEL;
 }
 
+/** What latched the stage lamp (record `2026-09-30-master-column-and-meters`, decision 6). */
+export type OutputStageAction = 'Limiting' | 'Clipping' | 'Over 0 dB';
+
+/**
+ * The action a report shows, or `null` where the stage did not act
+ * (windsor#193 decision 5). Like `reportActed`, judged from the report alone:
+ * a reduction is the limiter's, a changed sample otherwise a clipper's, and
+ * an output above 0 dBFS with neither can only come from Off.
+ */
+export function reportAction(report: Readonly<OutputStageReport>): OutputStageAction | null {
+  if (report.reductionDb > 0) return 'Limiting';
+  if (report.active) return 'Clipping';
+  if (Math.max(report.outputLeft, report.outputRight) > OUTPUT_OFF_CLIP_LEVEL) return 'Over 0 dB';
+  return null;
+}
+
 /** What the meters draw: four peaks (in L, in R, out L, out R) in dBFS and the gauge. */
 export interface OutputMeterView {
   readonly peaks: readonly [number, number, number, number];
