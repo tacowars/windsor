@@ -16,6 +16,10 @@
  * undo, a redo or an import renders the tab, which draws the cell again; a
  * strip edited on the Mixer tab redraws it in place (`refreshMixerCells`).
  * A press on the cell leaves the selection alone; the name cell selects.
+ *
+ * After M and S sit the part's activity and clip lights (windsor#159). The
+ * cell only places them: the column's one poller (`songMixerLights.ts`)
+ * owns their meters and the clip latch, so a redrawn cell keeps both.
  */
 import type { MusicPart } from '@windsor/engine';
 import { RETURN_NAMES } from '@windsor/engine';
@@ -45,6 +49,7 @@ import {
   switchOn,
   toggleStripSwitch,
 } from './songMixerModel';
+import type { MixerLights } from './songMixerLights';
 import { outputSelect } from './trackOutput';
 
 /** The letter each switch shows. */
@@ -184,11 +189,17 @@ function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[]
 
 /**
  * A part's strip: collapsed, Level and its value, M, S; expanded, every
- * knob, the Output select, M, S. Its redraw re-reads every control; an
+ * knob, the Output select, M, S; then the lights either way, placed here
+ * and polled by `lights`. Its redraw re-reads every control; an
  * Output change re-syncs M and S at once, since whether they apply follows
  * it (windsor#157's rule as amended on PR #168).
  */
-export function partMixerCell(ctx: AppCtx, part: MusicPart, expanded: boolean): HTMLElement {
+export function partMixerCell(
+  ctx: AppCtx,
+  part: MusicPart,
+  expanded: boolean,
+  lights: MixerLights,
+): HTMLElement {
   const { slot } = part;
   const cell = el('div', expanded ? 'mix-cell expanded' : 'mix-cell');
   const knobs = stripKnobs(ctx, slot, expanded);
@@ -213,6 +224,7 @@ export function partMixerCell(ctx: AppCtx, part: MusicPart, expanded: boolean): 
   switches.appendChild(mute.button);
   switches.appendChild(solo.button);
   cell.appendChild(switches);
+  cell.appendChild(lights.lightsFor(slot, part.name));
   REFRESH.set(cell, () => {
     for (const knob of knobs) knob.refresh();
     output?.sync();
