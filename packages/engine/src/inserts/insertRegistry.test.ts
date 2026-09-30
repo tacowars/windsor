@@ -42,6 +42,7 @@ describe('INSERT_KINDS', () => {
       'tape',
       'plate',
       'echo',
+      'eq',
     ]);
     for (const name of INSERT_KIND_NAMES) {
       const kind = INSERT_KINDS[name];

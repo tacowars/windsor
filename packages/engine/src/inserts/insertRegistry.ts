@@ -29,6 +29,8 @@ import { PLATE_REVERB_INSERT } from './plateReverbInsert';
 import type { PlateReverbSpec } from './plateReverbInsert';
 import { ECHO_INSERT } from './echoInsert';
 import type { EchoSpec } from './echoInsert';
+import { EQ_INSERT } from './eqInsert';
+import type { EqSpec } from './eqSpec';
 import type { InsertKind, InsertStage } from './insertKind';
 import type { IdClaim } from './insertIds';
 import { chainIds } from './insertIds';
@@ -55,6 +57,7 @@ export type InsertSpec = (
   | EnsembleSpec
   | PlateReverbSpec
   | EchoSpec
+  | EqSpec
 ) &
   InsertIdentity;
 export type InsertKindName = InsertSpec['kind'];
@@ -74,6 +77,7 @@ export const INSERT_KINDS: Readonly<Record<InsertKindName, InsertKind<InsertSpec
   tape: TAPE_INSERT,
   plate: PLATE_REVERB_INSERT,
   echo: ECHO_INSERT,
+  eq: EQ_INSERT,
 };
 
 export const INSERT_KIND_NAMES = Object.keys(INSERT_KINDS) as InsertKindName[];
