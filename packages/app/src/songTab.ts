@@ -8,7 +8,8 @@
  * This file is the view's composition and its one piece of state — the
  * selection — plus the two repaints every edit ends in. The lanes are
  * `songRuler.ts`, the loop brace under it (`loopBrace.ts`, windsor#30),
- * `songHarmonyLane.ts` and `songLanes.ts`; the pane is
+ * `songHarmonyLane.ts` and `songLanes.ts`, with the mixer column's cell
+ * between each row's name and lane (`songMixerCell.ts`, windsor#157); the pane is
  * `songDetailPane.ts`; the edits themselves are the pure `regionModel.ts` and
  * `harmonyLaneModel.ts`. Every edit is one `ctx.change` live partial, never
  * a rebuild; the lanes repaint from the document, so a card's knob in the
@@ -24,6 +25,9 @@ import { loopBraceRow } from './loopBrace';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
+import { emptyMixerCell, mixerHeaderCell, partMixerCell, refreshMixerCells } from './songMixerCell';
+import { stripSignature } from './songMixerModel';
+import { guardFrozenColumns } from './songFrozenColumns';
 import {
   playheadLine,
   rulerRow,
@@ -32,6 +36,13 @@ import {
   wireRulerZoom,
 } from './songRuler';
 import { CYCLE_TICKS, REGION_SUMMARY, SONG_VIEW, forKind } from './songViewTables';
+
+/** A row's name cell and lane with the mixer column's cell between them (windsor#157). */
+const withMixer = ([name, lane]: [HTMLElement, HTMLElement], cell: HTMLElement): HTMLElement[] => [
+  name,
+  cell,
+  lane,
+];
 
 /** What the pane shows: a part (and, when a block was clicked, which of its regions), a chord event, or nothing. */
 export type SongSelection =
@@ -82,7 +93,11 @@ export interface SongView {
   paintPane(): void;
 }
 
-/** The lanes' input: what a repaint must follow when it changes under a card's knob. */
+/**
+ * The lanes' input: what a repaint must follow when it changes under a card's
+ * knob. A part's strip is left out (windsor#157): the mixer column's knob
+ * edits it mid-drag, and a repaint would rebuild the knob under the pointer.
+ */
 function laneSignature(ctx: AppCtx): string {
   const { doc } = ctx.model;
   return JSON.stringify([
@@ -129,7 +144,9 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
   const scroll = el('div', 'lanes-scroll');
   const lanes = el('div', 'lanes');
   lanes.style.setProperty('--names', `${SONG_VIEW.laneNameWidthPx}px`);
+  lanes.style.setProperty('--mixer', `${SONG_VIEW.mixerWidthPx}px`);
   lanes.style.setProperty('--gap', `${SONG_VIEW.laneGapPx}px`);
+  guardFrozenColumns(lanes, SONG_VIEW.laneGapPx);
   const line = playheadLine();
   const pane = el('div', 'detail-pane');
   scroll.appendChild(lanes);
@@ -167,10 +184,12 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
       lanes.style.setProperty('--bar', `${state.pxPerBar}px`);
       const brace = loopBraceRow(view);
       const rows: HTMLElement[] = [
-        ...rulerRow(doc.transport.bars, state.pxPerBar),
-        ...brace.row,
-        ...harmonyLaneRow(view),
-        ...doc.parts.flatMap((part) => partLaneRow(view, part)),
+        ...withMixer(rulerRow(doc.transport.bars, state.pxPerBar), mixerHeaderCell()),
+        ...withMixer(brace.row, emptyMixerCell()),
+        ...withMixer(harmonyLaneRow(view), emptyMixerCell()),
+        ...doc.parts.flatMap((part) =>
+          withMixer(partLaneRow(view, part), partMixerCell(ctx, part)),
+        ),
       ];
       lanes.replaceChildren(...rows, ...brace.lines, line);
       // The new blocks start unlit, and the loop marks only a moved tick: light the playing chord now, paused or not.
@@ -181,6 +200,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
     },
   };
   let signature = laneSignature(ctx);
+  let stripsDrawn = stripSignature(ctx);
   view.paintLanes();
   view.paintPane();
   scroll.scrollLeft = state.scrollPx;
@@ -212,6 +232,12 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
     repaintIf: () => {
       // The insert panel's chain edited on the Mixer tab, which marks this tab nothing.
       if (paneStale()) view.paintPane();
+      // A strip edited on the Mixer tab: the column redraws in place, never rebuilt under a knob.
+      const strips = stripSignature(ctx);
+      if (strips !== stripsDrawn) {
+        stripsDrawn = strips;
+        refreshMixerCells(lanes);
+      }
       const now = laneSignature(ctx);
       if (now === signature) return;
       signature = now;

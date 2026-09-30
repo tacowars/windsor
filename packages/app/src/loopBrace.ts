@@ -28,7 +28,7 @@ import {
 } from './loopBraceModel';
 import { pointerDrag } from './songLanes';
 import type { SongView } from './songTab';
-import { pxToTick } from './songViewTables';
+import { pxToTick, timelineLeftCss } from './songViewTables';
 
 const STRIP_TITLE =
   'drag to draw a loop · drag a handle to move that end · drag the loop to move it · Shift snaps to beats';
@@ -47,11 +47,11 @@ function placeBrace(brace: HTMLElement, range: LoopRange, pxPerBar: number): voi
 }
 
 /**
- * Put a line on `tick`, past the name column. Its px follow the lanes'
+ * Put a line on `tick`, past the name and mixer columns. Its px follow the lanes'
  * `--bar`, as the playhead's do, so it sits on the bar line at every zoom.
  */
 function placeLine(line: HTMLElement, tick: number): void {
-  line.style.left = `calc(var(--names) + var(--gap) + var(--bar) * ${tick / TICKS_PER_BAR})`;
+  line.style.left = timelineLeftCss(tick / TICKS_PER_BAR);
 }
 
 /** Show the brace and its lines for `range`: the lines only while the loop is on. */
