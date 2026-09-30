@@ -88,6 +88,12 @@ Tests under `inserts/retroReverb*.test.ts` run the generated processor through
 `__fixtures__/retroReverbHarness.ts`. Settings and original tunables are in
 `inserts/retroReverbSpec.ts` and `retroReverbConstants.ts`; the editable
 approximation bank is `retroReverbPresets.ts` / `retroReverbPresetTables.ts`.
+The render allocates nothing (windsor#230): samples cross every call in
+fields (`inputLeft`/`inputRight`, `internalInput`, `convertInput`/`converted`,
+each network's `input`, each line's `delay`/`output`/`input`, each filter's
+`input`/`output`), never as arguments or returns, and every double field is
+first written as NaN. `inserts/retroReverbAllocation.test.ts` pins it on V8
+through `__fixtures__/retroReverbChangeScenario.ts`.
 
 `meter/peakMeterProcessor.ts` is the opt-in stereo sample meter (#666),
 bundled to `generated/peak-meter-processor.js` and checked by its own
