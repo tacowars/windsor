@@ -34,7 +34,11 @@ the fastest honest path to a level-matched audition in the app.
    core runs RK4 at a factor fixed when the DSP is constructed. Tape's
    settings expose `oversampling` (2 or 4) so tacowars can compare the two
    by ear in the app. The switch exists for that audition only; after it,
-   the losing factor and the control are deleted. Both cores and both
+   the losing factor and the control are deleted. Because a song saved
+   with the losing factor would then render differently, the PR that
+   deletes the control bumps `ARRANGEMENT_VERSION`, provides no upgrade,
+   and carries a test that loads a song saved with the losing factor and
+   asserts it is refused, never silently rendered with the winner. Both cores and both
    filter states are preallocated at construction, so the hot path stays
    allocation-free; selecting the other factor starts it from zero state,
    and a click at the switch is acceptable for the audition period.
@@ -59,8 +63,12 @@ the fastest honest path to a level-matched audition in the app.
    **Drive** maps to a plain gain into the core, declared in
    `tapeConstants.ts`: unity at Drive 0, +12 dB (×4) at the control's
    maximum, -12 dB at its minimum, linear in dB. **Calibration** is stated
-   for flat EQ only: a full-scale sine with Bias 0 through the model of
-   least boost at Drive 0 reaches source field 1, the knee. The retained
+   with the EQ out of the path, since every model row applies
+   frequency-dependent EQ and none is flat: with the Bias EQ and model EQ
+   bypassed (a test-only path the DSP exposes), a full-scale 1 kHz sine at
+   Drive 0 reaches source field 1.000, the knee, within 0.001. Through
+   any model at Bias 0 the field differs from 1 by that model's gain at
+   1 kHz, which the calibration test reports per model. The retained
    Bias EQ and tape-model EQ run before Drive and boost by up to about
    14 dB at their extremes, so a full-scale tone under heavy Bias boost
    can reach the guard even at Drive 0. That is the effect saturating as
@@ -71,7 +79,8 @@ the fastest honest path to a level-matched audition in the app.
    claimed.
 
    The integration PR carries tests that: (a) confirm the calibration
-   point; (b) push full-scale tones and impulses at Bias 0 through the model
+   point exactly as stated, EQ bypassed, 1 kHz, full scale, Drive 0, and
+   report each model's 1 kHz gain at Bias 0; (b) push full-scale tones and impulses at Bias 0 through the model
    of least boost (the calibration model) at every Drive from minimum to
    maximum and assert the guard counter and the core's reset counter stay
    at zero; push full-scale steps the same way and assert the field at the
