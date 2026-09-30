@@ -69,8 +69,13 @@ compares a render with a recording:
 
 - **per cycle**: frequency from zero crossings two apart, and peak level,
   both on a 500 Hz lowpass copy (`fit.cyc`); pitch error in semitones over
-  2–150 ms (808) or 4–150 ms (909), level error in dB out to about the
-  recording's −40 dB point, floored at −40 dB;
+  2–150 ms (808) or 4–150 ms (909), and the error in dB of the level
+  envelope's shape out to about the recording's −40 dB point, floored at
+  −40 dB. Each envelope is divided by its own body peak first, so this
+  measures how the level moves over time, not the absolute level: the
+  pack is normalised per voice, so its absolute level says nothing about
+  the machine, and the patches' levels are set against the old kicks
+  instead (below);
 - **waveform**: mean squared error over the first 30 ms, both peak
   normalised, the best of any 0–3 ms lag (`wfit.wscore`); the 909
   recordings are aligned 1.5 ms before their attack edge, since they carry
@@ -107,9 +112,11 @@ The patch's structure is fixed by hand; the fit finds the numbers.
 
 ## Results
 
-Rendered from the committed library files against their references:
+Rendered from the committed library files against their references. The
+level column is the envelope-shape error above, each side normalised to its
+own peak; it does not compare absolute gain:
 
-| Patch | Pitch RMS (st) | Level RMS (dB) | Waveform MSE, 0–30 ms |
+| Patch | Pitch RMS (st) | Level-envelope RMS (dB) | Waveform MSE, 0–30 ms |
 |---|---|---|---|
 | `tr808-kick` before | 1.54 | 1.90 | 0.806 |
 | `tr808-kick-long` before (against Decay E) | 1.34 | 10.15 | 0.978 |
