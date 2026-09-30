@@ -1,0 +1,326 @@
+{
+  "trace": "a-fm-meter-on.json",
+  "audioThread": "Realtime AudioWorklet thread",
+  "seconds": 20.195,
+  "processCalls": 20940,
+  "callsNotAttributed": 522,
+  "counterBlips": 0,
+  "messageCalls": {
+    "fm-processor.js FmPartProcessor.port.onmessage": 60
+  },
+  "processUsPerSecond": 36337.3,
+  "collections": {
+    "minor": 26,
+    "major": 0,
+    "perSecond": 1.287,
+    "longestUs": 239,
+    "totalUs": 3354,
+    "insideProcess": 0,
+    "list": [
+      {
+        "name": "MinorGC",
+        "atS": 0.32,
+        "us": 115,
+        "insideProcessOf": null,
+        "usedBefore": 3680344,
+        "usedAfter": 2903972
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.08,
+        "us": 239,
+        "insideProcessOf": null,
+        "usedBefore": 3678076,
+        "usedAfter": 2841880
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.904,
+        "us": 111,
+        "insideProcessOf": null,
+        "usedBefore": 3682960,
+        "usedAfter": 2907536
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.647,
+        "us": 180,
+        "insideProcessOf": null,
+        "usedBefore": 3684992,
+        "usedAfter": 2842832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.471,
+        "us": 107,
+        "insideProcessOf": null,
+        "usedBefore": 3682112,
+        "usedAfter": 2842832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.278,
+        "us": 120,
+        "insideProcessOf": null,
+        "usedBefore": 3686784,
+        "usedAfter": 2876456
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.074,
+        "us": 155,
+        "insideProcessOf": null,
+        "usedBefore": 3686160,
+        "usedAfter": 2843784
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.898,
+        "us": 138,
+        "insideProcessOf": null,
+        "usedBefore": 3684552,
+        "usedAfter": 2877132
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.67,
+        "us": 133,
+        "insideProcessOf": null,
+        "usedBefore": 3686472,
+        "usedAfter": 2847448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.448,
+        "us": 88,
+        "insideProcessOf": null,
+        "usedBefore": 3732844,
+        "usedAfter": 2884724
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.086,
+        "us": 101,
+        "insideProcessOf": null,
+        "usedBefore": 3708836,
+        "usedAfter": 2933452
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.76,
+        "us": 186,
+        "insideProcessOf": null,
+        "usedBefore": 3708228,
+        "usedAfter": 2869248
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.572,
+        "us": 107,
+        "insideProcessOf": null,
+        "usedBefore": 3717936,
+        "usedAfter": 2874624
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.379,
+        "us": 109,
+        "insideProcessOf": null,
+        "usedBefore": 3717556,
+        "usedAfter": 2940740
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.139,
+        "us": 133,
+        "insideProcessOf": null,
+        "usedBefore": 3714424,
+        "usedAfter": 2875576
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.952,
+        "us": 105,
+        "insideProcessOf": null,
+        "usedBefore": 3719556,
+        "usedAfter": 2944288
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.707,
+        "us": 193,
+        "insideProcessOf": null,
+        "usedBefore": 3718608,
+        "usedAfter": 2879124
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.531,
+        "us": 140,
+        "insideProcessOf": null,
+        "usedBefore": 3722396,
+        "usedAfter": 2915452
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.303,
+        "us": 114,
+        "insideProcessOf": null,
+        "usedBefore": 3722652,
+        "usedAfter": 2918028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.098,
+        "us": 151,
+        "insideProcessOf": null,
+        "usedBefore": 3726448,
+        "usedAfter": 2885356
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.922,
+        "us": 115,
+        "insideProcessOf": null,
+        "usedBefore": 3735212,
+        "usedAfter": 2918980
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.706,
+        "us": 124,
+        "insideProcessOf": null,
+        "usedBefore": 3726872,
+        "usedAfter": 2886308
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.536,
+        "us": 84,
+        "insideProcessOf": null,
+        "usedBefore": 3730364,
+        "usedAfter": 2886308
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.343,
+        "us": 104,
+        "insideProcessOf": null,
+        "usedBefore": 3729048,
+        "usedAfter": 2919932
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.138,
+        "us": 110,
+        "insideProcessOf": null,
+        "usedBefore": 3728844,
+        "usedAfter": 2887260
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.951,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 3730876,
+        "usedAfter": 2955476
+      }
+    ]
+  },
+  "quantumBudgetUs": 2902.5,
+  "quantumSpans": {
+    "quanta": 6761,
+    "medianUs": 131,
+    "p99Us": 233,
+    "maxUs": 7370,
+    "overBudget": 1
+  },
+  "quantumSpansAfterGc": {
+    "quanta": 25,
+    "medianUs": 299,
+    "p99Us": 430,
+    "maxUs": 430,
+    "overBudget": 0
+  },
+  "gcPhaseEvents": {
+    "V8.GC_TIME_TO_SAFEPOINT": 28,
+    "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED": 13,
+    "V8.GC_HEAP_EXTERNAL_PROLOGUE": 26,
+    "V8.GC_HEAP_PROLOGUE": 17,
+    "V8.GCScavenger": 26,
+    "V8.GC_SCAVENGER": 26,
+    "V8.GC_SCAVENGER_SCAVENGE": 26,
+    "V8.GC_SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_IDENTIFY": 26,
+    "V8.GC_SCAVENGER_TRACED_HANDLES_COMPUTE_WEAKNESS_PARALLEL": 21,
+    "V8.GC_SCAVENGER_SCAVENGE_COLLECT_OLD_TO_NEW_PAGES": 26,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE": 26,
+    "V8.GC_SCAVENGER_SCAVENGE_ROOTS": 26,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL": 20,
+    "V8.GC_SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_PROCESS": 26,
+    "V8.GC_SCAVENGER_TRACED_HANDLES_RESET_PARALLEL": 20,
+    "V8.GC_SCAVENGER_SCAVENGE_FINALIZE": 26,
+    "V8.GC_SCAVENGER_SCAVENGE_RESTORE_AND_QUARANTINE_PINNED": 12,
+    "V8.GC_SCAVENGER_FREE_REMEMBERED_SET": 24,
+    "V8.GC_SCAVENGER_RESIZE_NEW_SPACE": 21,
+    "V8.GC_HEAP_EPILOGUE_SAFEPOINT": 25,
+    "V8.GC_HEAP_EPILOGUE": 26,
+    "V8.GC_HEAP_EXTERNAL_EPILOGUE": 26,
+    "V8.GC_HEAP_PROLOGUE_SAFEPOINT": 10
+  },
+  "heapUsed": {
+    "first": 3334224,
+    "last": 3210316,
+    "min": 2841880,
+    "max": 4303984
+  },
+  "bundles": {
+    "fm-processor.js": {
+      "nodes": 1,
+      "bytesPerQuantum": 2933.7,
+      "calls": 6786,
+      "callsMeasured": 6776,
+      "callsExcluded": 10,
+      "bytesPerCallMedian": 2904,
+      "bytesPerCallMean": 2933.7,
+      "bytesPerCallMeanSecondHalf": 2932.8,
+      "bytesPerCallMin": 2856,
+      "bytesPerCallMax": 13372,
+      "callsAllocating": 6776,
+      "callUsMedian": 79,
+      "callUsP99": 129,
+      "callUsMax": 7210
+    },
+    "reverb-processor.js": {
+      "nodes": 1,
+      "bytesPerQuantum": 24,
+      "calls": 6786,
+      "callsMeasured": 6786,
+      "callsExcluded": 0,
+      "bytesPerCallMedian": 24,
+      "bytesPerCallMean": 24,
+      "bytesPerCallMeanSecondHalf": 24,
+      "bytesPerCallMin": 24,
+      "bytesPerCallMax": 24,
+      "callsAllocating": 6786,
+      "callUsMedian": 5,
+      "callUsP99": 14,
+      "callUsMax": 52
+    },
+    "output-stage-processor.js": {
+      "nodes": 1,
+      "bytesPerQuantum": 70.4,
+      "calls": 6786,
+      "callsMeasured": 6785,
+      "callsExcluded": 1,
+      "bytesPerCallMedian": 24,
+      "bytesPerCallMean": 70.4,
+      "bytesPerCallMeanSecondHalf": 24,
+      "bytesPerCallMin": 24,
+      "bytesPerCallMax": 26964,
+      "callsAllocating": 6785,
+      "callUsMedian": 5,
+      "callUsP99": 29,
+      "callUsMax": 854
+    }
+  }
+}
