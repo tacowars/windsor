@@ -29,6 +29,22 @@ export function addInsert(
   return [...list, target !== undefined && isBusTarget(target) ? onSendBus(fresh) : fresh];
 }
 
+/**
+ * `list` with a fresh insert of `kind` at the front (windsor#173, the rack's
+ * left Add slot): `addInsert`'s insert for the same `target`, so a send
+ * bus's Plate reverb or Echo starts fully wet here too, moved to index 0.
+ * Unchanged when full.
+ */
+export function addInsertAtFront(
+  list: readonly InsertSpec[],
+  kind: InsertKindName,
+  target?: InsertTarget,
+): InsertSpec[] {
+  const added = addInsert(list, kind, target);
+  if (added.length === list.length) return added;
+  return [added[added.length - 1]!, ...added.slice(0, -1)];
+}
+
 /** `list` without the insert at `index`. */
 export function removeInsert(list: readonly InsertSpec[], index: number): InsertSpec[] {
   return list.filter((_, i) => i !== index);

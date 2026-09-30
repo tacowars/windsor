@@ -8,12 +8,14 @@ import {
   applyTapePreset,
   type TapeSpec,
 } from '@windsor/engine';
+import type { AppCtx } from './context';
 import type { InsertCard } from './insertCards';
+import type { InsertTarget } from './insertTarget';
 import { el } from './dom';
 import { insertsOf } from './insertKnobs';
 import { insertChange } from './insertTarget';
 import { tapeKnobs } from './tapeKnobs';
-export const tapeCard: InsertCard = (ctx, target, index) => {
+function tapeBody(ctx: AppCtx, target: InsertTarget, index: number): HTMLElement {
   const root = el('div', 'tape-card');
   const current = (): TapeSpec => {
     const spec = insertsOf(ctx, target)[index];
@@ -52,4 +54,9 @@ export const tapeCard: InsertCard = (ctx, target, index) => {
   row.append(label, toggle, random, preset);
   root.append(row, tapeKnobs(ctx, target, index));
   return root;
-};
+}
+
+/** Today's controls as one page whose body scrolls inside the rack's height (windsor#173; windsor#175 pages it). */
+export const tapeCard: InsertCard = (ctx, target, index) => [
+  { name: 'Tape', build: () => tapeBody(ctx, target, index) },
+];

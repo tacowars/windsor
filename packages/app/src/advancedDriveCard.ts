@@ -14,7 +14,9 @@ import {
   matchingAdvancedDrivePreset,
 } from '@windsor/engine';
 import type { AdvancedDriveSpec, DriveStageSpec } from '@windsor/engine';
+import type { AppCtx } from './context';
 import type { InsertCard } from './insertCards';
+import type { InsertTarget } from './insertTarget';
 import { insertChange, insertsOf } from './insertTarget';
 import { el } from './dom';
 import type { KnobElement } from './knob';
@@ -188,7 +190,7 @@ function drawDrive(view: DriveView): void {
     view.root.append(globalKnobs(view, [['blend', 'Blend']]));
   view.root.append(stagePanel(view), sources(view));
 }
-export const advancedDriveCard: InsertCard = (ctx, target, index) => {
+function advancedDriveBody(ctx: AppCtx, target: InsertTarget, index: number): HTMLElement {
   const view: DriveView = {
     root: el('div', 'advanced-drive-card'),
     plots: el('div'),
@@ -215,4 +217,9 @@ export const advancedDriveCard: InsertCard = (ctx, target, index) => {
   };
   view.draw();
   return view.root;
-};
+}
+
+/** Today's controls as one page whose body scrolls inside the rack's height (windsor#173; windsor#174 pages it). */
+export const advancedDriveCard: InsertCard = (ctx, target, index) => [
+  { name: 'Advanced Drive', build: () => advancedDriveBody(ctx, target, index) },
+];

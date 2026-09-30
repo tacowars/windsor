@@ -1,4 +1,10 @@
-/** The compressor's controls commit the complete insert list into the song. */
+/**
+ * The compressor's card: its controls commit the complete insert list into
+ * the song. One page (windsor#173): the sidechain and the three stepped
+ * pickers in a wide column, the knobs in columns of two, then the
+ * gain-reduction meter in a column of its own. The on/off switch is the
+ * rack's rail.
+ */
 import { DEFAULT_COMPRESSOR } from '@windsor/engine';
 import { sidechainSelector } from './sidechainSelector';
 import { compressorMeter } from './compressorMeter';
@@ -8,39 +14,37 @@ import { el } from './dom';
 import type { InsertCard } from './insertCards';
 import { setInsertField } from './insertEdits';
 import { insertKnobs, insertsOf } from './insertKnobs';
+import { insertColumn, insertPage, wideColumn } from './insertLayout';
+import type { AppCtx } from './context';
+import type { InsertTarget } from './insertTarget';
 
-export const compressorCard: InsertCard = (ctx, slot, index) => {
-  const root = el('div', 'compressor-card');
+function steppedPickers(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement[] {
   const spec = insertsOf(ctx, slot)[index];
   const current = spec?.kind === 'compressor' ? spec : DEFAULT_COMPRESSOR;
-  const commit = (field: string, value: number | boolean): void => {
-    const inserts = setInsertField(insertsOf(ctx, slot), index, field, value);
-    void ctx.change(insertChange(slot, inserts));
-  };
-  const switches = el('div', 'knob-row');
-  for (const { field, label, values, format } of COMPRESSOR_SELECTS) {
+  return COMPRESSOR_SELECTS.map(({ field, label, values, format }) => {
     const wrap = el('label', 'field-wrap', label);
     const select = document.createElement('select');
     select.className = 'field';
     select.setAttribute('aria-label', label);
     for (const value of values) select.add(new Option(format(value), String(value)));
     select.value = String(current[field]);
-    select.onchange = (): void => commit(field, Number(select.value));
+    select.onchange = (): void => {
+      const inserts = setInsertField(insertsOf(ctx, slot), index, field, Number(select.value));
+      void ctx.change(insertChange(slot, inserts));
+    };
     wrap.appendChild(select);
-    switches.appendChild(wrap);
-  }
-  const bypass = el('label', 'field-wrap', 'Compression');
-  const enabled = document.createElement('input');
-  enabled.type = 'checkbox';
-  enabled.checked = current.enabled;
-  enabled.onchange = (): void => commit('enabled', enabled.checked);
-  bypass.appendChild(enabled);
-  switches.appendChild(bypass);
-  root.append(
-    switches,
-    sidechainSelector(ctx, slot, index),
-    insertKnobs(ctx, slot, index, COMPRESSOR_KNOBS),
-    compressorMeter(ctx, slot, index),
-  );
-  return root;
-};
+    return wrap;
+  });
+}
+
+export const compressorCard: InsertCard = (ctx, slot, index) => [
+  {
+    name: 'Comp',
+    build: () =>
+      insertPage(
+        wideColumn(sidechainSelector(ctx, slot, index), ...steppedPickers(ctx, slot, index)),
+        ...insertKnobs(ctx, slot, index, COMPRESSOR_KNOBS),
+        insertColumn(compressorMeter(ctx, slot, index)),
+      ),
+  },
+];

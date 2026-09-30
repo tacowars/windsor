@@ -1,19 +1,21 @@
 /**
  * The Plate reverb insert's card (windsor#171): the `room` return's Starting
- * point picker and 13 space knobs, then Mix, and the on/off switch. Picking a
- * space writes its numbers into the insert; the knobs edit them from there.
+ * point picker and 13 space knobs, then Mix. Picking a space writes its
+ * numbers into the insert; the knobs edit them from there. Three pages
+ * (windsor#173): Space (the picker, pre-delay, size, decay and mix),
+ * Diffusion (the four diffusion knobs and the modulation) and Tone (the four
+ * cuts). The on/off switch is the rack's rail.
  */
 import type { PlateReverbSpec } from '@windsor/engine';
 import { DEFAULT_PLATE_REVERB, SPACES, plateSpace } from '@windsor/engine';
-import { el, select } from './dom';
 import type { InsertCard } from './insertCards';
-import { INSERT_LABELS, INSERT_SWITCH_OPTIONS, PLATE_REVERB_KNOBS } from './insertKnobTables';
-import { insertKnobs, insertsOf } from './insertKnobs';
+import { PLATE_REVERB_KNOBS } from './insertKnobTables';
+import { insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
+import { insertPage, wideColumn } from './insertLayout';
 import { insertChange } from './insertTarget';
 import { spacePicker } from './returnControls';
 
 export const plateReverbCard: InsertCard = (ctx, slot, index) => {
-  const root = el('div', 'plate-card');
   const current = (): PlateReverbSpec => {
     const spec = insertsOf(ctx, slot)[index];
     return spec?.kind === 'plate' ? spec : DEFAULT_PLATE_REVERB;
@@ -24,18 +26,33 @@ export const plateReverbCard: InsertCard = (ctx, slot, index) => {
     inserts[index] = spec;
     if (ctx.change(insertChange(slot, inserts)).ok) ctx.render();
   };
-  const s = current();
-  const row = el('div', 'knob-row');
-  const picker = spacePicker(
-    () => plateSpace(current()),
-    (name) => commit({ ...current(), ...SPACES[name] }),
-  );
-  row.append(
-    picker.root,
-    select(INSERT_LABELS.plate, INSERT_SWITCH_OPTIONS, s.enabled ? 'on' : 'off', (value) =>
-      commit({ ...current(), enabled: value === 'on' }),
-    ),
-  );
-  root.append(row, insertKnobs(ctx, slot, index, PLATE_REVERB_KNOBS, picker.refresh));
-  return root;
+  const knobs = (fields: Parameters<typeof pickKnobs<PlateReverbSpec>>[1]): HTMLElement[] =>
+    insertKnobs(ctx, slot, index, pickKnobs(PLATE_REVERB_KNOBS, fields));
+  const space = (): HTMLElement => {
+    const picker = spacePicker(
+      () => plateSpace(current()),
+      (name) => commit({ ...current(), ...SPACES[name] }),
+    );
+    const fields = pickKnobs(PLATE_REVERB_KNOBS, ['preDelay', 'size', 'decay', 'mix']);
+    return insertPage(
+      wideColumn(picker.root),
+      ...insertKnobs(ctx, slot, index, fields, picker.refresh),
+    );
+  };
+  return [
+    { name: 'Space', build: space },
+    {
+      name: 'Diffusion',
+      build: () =>
+        insertPage(
+          ...knobs(['diffusionIn1', 'diffusionIn2', 'diffusionTank1', 'diffusionTank2']),
+          ...knobs(['modRate', 'modDepth']),
+        ),
+    },
+    {
+      name: 'Tone',
+      build: () =>
+        insertPage(...knobs(['inputLowCut', 'inputHighCut', 'tankLowCut', 'tankHighCut'])),
+    },
+  ];
 };
