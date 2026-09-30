@@ -5,6 +5,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
+import { ARRANGEMENT_VERSION } from '@windsor/engine';
 import { FULL_ARRANGEMENT } from '@windsor/engine/__fixtures__/fullArrangement';
 import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
@@ -29,7 +30,8 @@ function context(): AppCtx & { messages: string[] } {
 }
 
 const saved = (document: string): StoredSong => ({ updated: '2026-09-28T11:58:00.000Z', document });
-const song = (): string => new DocumentModel({ version: 3, ...FULL_ARRANGEMENT }).toJson();
+const song = (): string =>
+  new DocumentModel({ version: ARRANGEMENT_VERSION, ...FULL_ARRANGEMENT }).toJson();
 
 describe('offerRestore', () => {
   it('asks nothing when no song was saved', async () => {
@@ -75,7 +77,8 @@ describe('offerRestore', () => {
 
   describe('a song in a format this build cannot read', () => {
     /** The exported song with its version bumped, spacing and all. */
-    const future = (): string => song().replace('"version": 3,', '"version": 99,');
+    const future = (): string =>
+      song().replace(`"version": ${ARRANGEMENT_VERSION},`, '"version": 99,');
 
     it('asks to download it or start fresh, naming both formats, and never opens it', async () => {
       const ctx = context();
@@ -92,7 +95,7 @@ describe('offerRestore', () => {
       expect(asked).toHaveLength(1);
       expect(asked[0]?.ok).toBe('Download the old song');
       expect(asked[0]?.cancel).toBe('Start fresh');
-      expect(asked[0]?.body).toContain('saved with song format 99, this build reads 3');
+      expect(asked[0]?.body).toContain('saved with song format 99, this build reads 4');
       expect(asked[0]?.body).toContain('kept until your first edit');
       expect(downloads).toEqual([text]);
       expect(ctx.model.toJson()).toBe(fresh);
@@ -127,7 +130,7 @@ describe('offerRestore', () => {
       const refusal = songRefusal(future());
       expect(refusal).not.toBeNull();
       expect(importRefusedText('song.json', refusal!)).toBe(
-        'import refused: song.json was saved with song format 99, this build reads 3. The file is unchanged.',
+        'import refused: song.json was saved with song format 99, this build reads 4. The file is unchanged.',
       );
       expect(songRefusal(song())).toBeNull();
       expect(songRefusal('{not json')).toBeNull();

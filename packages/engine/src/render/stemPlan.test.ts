@@ -28,8 +28,8 @@ describe('stemSources', () => {
       { kind: 'part', slot: 1, name: 'hat', muted: false },
       { kind: 'part', slot: 2, name: 'arp', muted: false },
       { kind: 'part', slot: 3, name: 'drone', muted: false },
-      { kind: 'return', name: 'room' },
-      { kind: 'return', name: 'echo' },
+      { kind: 'return', name: 'a' },
+      { kind: 'return', name: 'b' },
     ]);
   });
 
@@ -40,39 +40,39 @@ describe('stemSources', () => {
       1,
       2,
       3,
-      'room',
-      'echo',
+      'a',
+      'b',
     ]);
   });
 
   it('skips a "Sidechain only" part unless asked, and its sends feed no return', () => {
-    // The hat is the only part sending to the echo.
+    // The hat is the only part sending to Send B.
     const song = withStrip(FULL_SLOT.hat, { output: 'sidechain' });
     const names = (choice = {}): string[] => stemSources(song, choice).map((s) => s.name);
-    expect(names()).toEqual(['kick', 'arp', 'drone', 'room']);
-    expect(names({ includeMuted: true })).toEqual(['kick', 'hat', 'arp', 'drone', 'room']);
+    expect(names()).toEqual(['kick', 'arp', 'drone', 'a']);
+    expect(names({ includeMuted: true })).toEqual(['kick', 'hat', 'arp', 'drone', 'a']);
     expect(stemSources(song, { includeMuted: true })[1]).toMatchObject({ muted: true });
   });
 
   it('lists a muted part, whose sends feed no return (windsor#154)', () => {
-    // The hat is the only part sending to the echo.
+    // The hat is the only part sending to Send B.
     const song = withStrip(FULL_SLOT.hat, { mute: true });
-    expect(stemSources(song).map((s) => s.name)).toEqual(['kick', 'hat', 'arp', 'drone', 'room']);
+    expect(stemSources(song).map((s) => s.name)).toEqual(['kick', 'hat', 'arp', 'drone', 'a']);
     expect(stemSources(song)[1]).toMatchObject({ muted: false });
   });
 
   it('keeps only the returns a soloed part sends to (windsor#154)', () => {
     const names = (slot: number): string[] =>
       stemSources(withStrip(slot, { solo: true })).map((s) => s.name);
-    // The kick sends nothing, the hat only to the echo.
+    // The kick sends nothing, the hat only to Send B.
     expect(names(FULL_SLOT.kick)).toEqual(['kick', 'hat', 'arp', 'drone']);
-    expect(names(FULL_SLOT.hat)).toEqual(['kick', 'hat', 'arp', 'drone', 'echo']);
+    expect(names(FULL_SLOT.hat)).toEqual(['kick', 'hat', 'arp', 'drone', 'b']);
   });
 
   it('leaves out a return nobody sends to', () => {
-    const song = withStrip(FULL_SLOT.hat, { sends: { echo: 0 } });
+    const song = withStrip(FULL_SLOT.hat, { sends: { b: 0 } });
     expect(stemSources(song).filter((s) => s.kind === 'return')).toEqual([
-      { kind: 'return', name: 'room' },
+      { kind: 'return', name: 'a' },
     ]);
   });
 });

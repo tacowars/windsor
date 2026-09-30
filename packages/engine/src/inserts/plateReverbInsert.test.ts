@@ -16,8 +16,7 @@ import {
 } from '../__fixtures__/fakeAudioContext';
 import type { FakeNode } from '../__fixtures__/fakeAudioNodes';
 import { REVERB_SPACE_RANGES } from '../audioConstants';
-import { RETURNS } from '../mixer/mix';
-import { createReturn } from '../mixer/returnBus';
+import { PLATE_FULLY_WET, createPlate } from '../mixer/returnEffects';
 import { SPACES } from '../mixer/reverbSpace';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
@@ -59,10 +58,10 @@ describe('the Plate reverb sound', () => {
     const { output } = await renderStage({ ...DEFAULT_PLATE_REVERB, mix: 1 });
 
     const { context: c, source } = await context();
-    const room = { ...RETURNS.room, level: 1 };
-    const bus = createReturn(c.asAudioContext(), 'room', room, c.destination as never);
-    source.connect(fake(bus.input));
-    const [returned] = renderGraph(c, SECONDS, [fake(bus.output)]);
+    // The room return's plate, as it was built before windsor#172.
+    const plate = createPlate(c.asAudioContext(), SPACES.hall, PLATE_FULLY_WET);
+    source.connect(fake(plate));
+    const [returned] = renderGraph(c, SECONDS, [fake(plate)]);
 
     expect(rms(output.left, Math.round(TAIL_FROM_SECONDS * c.sampleRate))).toBeGreaterThan(0);
     expect(output.left).toEqual(returned?.left);

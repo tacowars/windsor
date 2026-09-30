@@ -1,34 +1,22 @@
 /**
  * The live desk: a part's `strip` and the document's `returns` partials landing on the
- * running graph — the strips `routePart` built and the returns `createReturns`
+ * running graph — the strips `routePart` built and the send buses `createReturns`
  * built. Only the fields a partial names change, junk and unknown names are
  * reported by path in the returned `ignored` list, and every number is
  * clamped into the same range `deskNormalise.ts` clamps a document into, so
  * the live path and the committed path cannot disagree about a value
  * (`AudioSystem.apply`, refinement decision 3).
  */
-import {
-  DELAY_DAMP_MAX_HZ,
-  DELAY_DAMP_MIN_HZ,
-  DELAY_FEEDBACK_MAX,
-  DELAY_MAX_SECONDS,
-  DELAY_RESONANCE_MAX_DB,
-  DELAY_RESONANCE_MIN_DB,
-  LOW_CUT_MAX_HZ,
-  LOW_CUT_MIN_HZ,
-  MIX_LEVEL_MAX,
-  RETURN_LEVEL_MAX,
-  REVERB_SPACE_RANGES,
-} from '../audioConstants';
+import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ, MIX_LEVEL_MAX, RETURN_LEVEL_MAX } from '../audioConstants';
 import { FieldNormaliser } from '../song/arrangementFields';
+import { normaliseBusInserts } from '../song/deskNormalise';
 import type { PartStrip } from './channelStrip';
 import { normaliseInserts } from '../inserts/insertRegistry';
+import type { InsertSpec } from '../inserts/insertRegistry';
 import type { ReturnBus } from './returnBus';
-import type { ReverbSpace } from './reverbSpace';
 
 const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output', 'mute', 'solo'];
-const DELAY_KEYS = ['delayTime', 'feedback', 'damp', 'resonance'];
-const RETURN_KEYS = ['kind', 'level', 'space', ...DELAY_KEYS];
+const RETURN_KEYS = ['level', 'inserts'];
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -60,24 +48,32 @@ export function applyStripLive(strip: PartStrip, raw: unknown, path: string): st
   if (typeof raw.solo === 'boolean') strip.setSolo(raw.solo);
   else if (raw.solo !== undefined) ignored.push(`${path}.solo`);
   if (raw.sends !== undefined) applySends(strip, path, raw.sends, ignored);
-  if (raw.inserts !== undefined) applyInserts(strip, `${path}.inserts`, raw.inserts, ignored);
+  if (raw.inserts !== undefined) {
+    const specs = liveInserts(`${path}.inserts`, raw.inserts, ignored, normaliseInserts);
+    if (specs) strip.setInserts(specs);
+  }
   return ignored;
 }
 
 /**
- * A strip's whole `inserts` list (#641; a list replaces wholesale, like every
- * array in a partial). It goes through the document's own normaliser, so the
- * live chain and the committed one cannot disagree. A clamp is silent, as it
- * is for every live number; anything the normaliser dropped or replaced is
- * reported by its path.
+ * A whole `inserts` list (#641; a list replaces wholesale, like every array
+ * in a partial), read by the document's own normaliser `read`, so the live
+ * chain and the committed one cannot disagree. A clamp is silent, as it is
+ * for every live number; anything the normaliser dropped or replaced is
+ * reported by its path. Null when `raw` is not a list: nothing lands.
  */
-function applyInserts(strip: PartStrip, path: string, raw: unknown, ignored: string[]): void {
+function liveInserts(
+  path: string,
+  raw: unknown,
+  ignored: string[],
+  read: (raw: unknown, path: string, n: FieldNormaliser) => InsertSpec[],
+): InsertSpec[] | null {
   const n = new FieldNormaliser();
-  const specs = normaliseInserts(raw, path, n);
+  const specs = read(raw, path, n);
   for (const message of n.corrections) {
     if (!CLAMP.test(message)) ignored.push(message.slice(0, message.indexOf(': ')));
   }
-  if (Array.isArray(raw)) strip.setInserts(specs);
+  return Array.isArray(raw) ? specs : null;
 }
 
 /** A normaliser correction that only moved a number into range. */
@@ -97,7 +93,11 @@ function applySends(strip: PartStrip, path: string, sends: unknown, ignored: str
   }
 }
 
-/** `returns` partials onto the live return buses, by return name. */
+/**
+ * `returns` partials onto the live send buses, by bus name (windsor#172): a
+ * level, and a whole chain, which lands as a strip's does. The rest of the
+ * desk keeps playing while one bus's chain re-wires.
+ */
 export function applyReturnsLive(
   returns: Readonly<Record<string, ReturnBus>>,
   overlay: unknown,
@@ -115,58 +115,13 @@ export function applyReturnsLive(
     for (const key of Object.keys(raw)) {
       if (!RETURN_KEYS.includes(key)) ignored.push(`${path}.${key}`);
     }
-    if (raw.kind !== undefined && raw.kind !== bus.spec.kind) ignored.push(`${path}.kind`);
     if (isNumber(raw.level)) bus.setLevel(clamp(raw.level, 0, RETURN_LEVEL_MAX));
     else if (raw.level !== undefined) ignored.push(`${path}.level`);
-    if (bus.spec.kind === 'reverb') applySpace(bus, raw, path, ignored);
-    else applyDelay(bus, raw, path, ignored);
+    if (raw.inserts === undefined) continue;
+    const read = (list: unknown, at: string, n: FieldNormaliser): InsertSpec[] =>
+      normaliseBusInserts(list, at, n, bus.spec.inserts);
+    const specs = liveInserts(`${path}.inserts`, raw.inserts, ignored, read);
+    if (specs) bus.setInserts(specs);
   }
   return ignored;
-}
-
-function applySpace(
-  bus: ReturnBus,
-  raw: Record<string, unknown>,
-  path: string,
-  ignored: string[],
-): void {
-  for (const key of DELAY_KEYS) {
-    if (raw[key] !== undefined) ignored.push(`${path}.${key}`);
-  }
-  if (raw.space === undefined) return;
-  if (!isRecord(raw.space)) {
-    ignored.push(`${path}.space`);
-    return;
-  }
-  const space: Partial<ReverbSpace> = {};
-  for (const [field, value] of Object.entries(raw.space)) {
-    const range = REVERB_SPACE_RANGES[field as keyof ReverbSpace] as
-      readonly [number, number] | undefined;
-    if (!range || !isNumber(value)) {
-      ignored.push(`${path}.space.${field}`);
-      continue;
-    }
-    space[field as keyof ReverbSpace] = clamp(value, range[0], range[1]);
-  }
-  bus.setSpace(space);
-}
-
-function applyDelay(
-  bus: ReturnBus,
-  raw: Record<string, unknown>,
-  path: string,
-  ignored: string[],
-): void {
-  if (raw.space !== undefined) ignored.push(`${path}.space`);
-  const delay: { delayTime?: number; feedback?: number; damp?: number; resonance?: number } = {};
-  if (isNumber(raw.delayTime)) delay.delayTime = clamp(raw.delayTime, 0, DELAY_MAX_SECONDS);
-  else if (raw.delayTime !== undefined) ignored.push(`${path}.delayTime`);
-  if (isNumber(raw.feedback)) delay.feedback = clamp(raw.feedback, 0, DELAY_FEEDBACK_MAX);
-  else if (raw.feedback !== undefined) ignored.push(`${path}.feedback`);
-  if (isNumber(raw.damp)) delay.damp = clamp(raw.damp, DELAY_DAMP_MIN_HZ, DELAY_DAMP_MAX_HZ);
-  else if (raw.damp !== undefined) ignored.push(`${path}.damp`);
-  if (isNumber(raw.resonance)) {
-    delay.resonance = clamp(raw.resonance, DELAY_RESONANCE_MIN_DB, DELAY_RESONANCE_MAX_DB);
-  } else if (raw.resonance !== undefined) ignored.push(`${path}.resonance`);
-  bus.setDelay(delay);
 }

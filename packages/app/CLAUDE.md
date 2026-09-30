@@ -265,20 +265,38 @@ lane and the part lanes
    kind in `songDetailPane.ts`.
 4. Its CSS in `console.css`'s "the Song view" block.
 
-**Add a return or FX kind**
+**The send buses** (windsor#172; record
+`2026-09-30-insert-rack-and-send-bus-chains`)
 
-1. Engine: an entry in `RETURNS` (`mix.ts`) with its kind and defaults — the
-   routing takes any number of returns, and `RETURN_NAMES` follows — the
-   return's own node in `returnBus.ts`, and the sends that name it in
-   `ChannelStrip`. A document's `returns` section is normalised with the rest
-   of the song, so an old song must load unchanged.
-2. Console: its knobs in `returnsPanel.ts` over ranges in `mixerTables.ts`
-   (the plate's ranges stay the worklet's `REVERB_SPACE_RANGES`), each edit
-   through `ctx.change` into the document's `returns` section like every other
-   field. A part's send needs no edit: the Song tab's expanded mixer column
-   (`songMixerCell.ts`) builds one `sendKnob` per `RETURN_NAMES` entry.
-3. The document contract holds: a song carries its returns, so the export must
-   round-trip the new fields (`arrangementDocumentDesk.test.ts`).
+Send A and Send B are a level and an insert chain each, the song's
+`returns.a` and `returns.b`; a part reaches them through `sends.a` and
+`sends.b`. By default Send A holds a Plate reverb and Send B an Echo, both at
+Mix 1 (`RETURNS`, `mix.ts`).
+
+1. **An effect for a bus is an insert kind.** Add it as "Add a strip insert
+   kind" below says, and every bus can hold it: the chain is the strip's
+   (`insertChain.ts`), built from the same registry, so it follows the song's
+   tempo and reports its load. If the kind should start differently on a bus,
+   the way the plate and the echo start fully wet, that rule is `onSendBus`
+   (`mix.ts`), which `addInsert` (`insertEdits.ts`) applies for a bus target.
+2. **The console reaches a bus as an `InsertTarget`** (`'a'` or `'b'`,
+   `insertTarget.ts`): `insertsOf`, `insertChange` and `liveInsert` read the
+   document's chain (or the code's when the song has none), write
+   `{ returns: { a: { inserts } } }`, and find the live stage. The Mixer tab's
+   send buses (`returnsPanel.ts`) are each a name from `BUS_LABELS`, a Level
+   knob and `stripInserts(ctx, bus)`, every edit through `ctx.change` with
+   undo. A part's send needs no edit: the Song tab's expanded mixer column
+   (`songMixerCell.ts`) builds one `sendKnob` (`→ A`, `→ B`) per
+   `RETURN_NAMES` entry.
+3. **Which buses exist is the code's.** A third bus is an entry in `RETURNS`
+   (the routing takes any number, and `RETURN_NAMES`, the send knobs and the
+   stems follow), a label in `BUS_LABELS`, and a format question: a song that
+   names a bus this build lacks reports it as dangling
+   (`deskNormalise.ts`).
+4. The document contract holds: a song carries its buses' levels and chains,
+   so the export must round-trip them (`arrangementDocumentDesk.test.ts`), and
+   a change to their shape bumps `ARRANGEMENT_VERSION` with an upgrade in
+   `songMigrations.ts`, as 3 → 4 did.
 
 **Add a strip insert kind** (#641; chorus, #642, is the worked second example)
 

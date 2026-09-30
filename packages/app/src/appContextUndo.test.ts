@@ -314,16 +314,17 @@ describe('an undo is an ordinary live edit', () => {
     expect(c.builds).toBe(0);
   });
 
-  it("sends the engine a removed section's defaults, and the document loses it", () => {
+  it("undoes a send bus chain edit in one step, and a removed bus's defaults go live (windsor#172)", () => {
     const c = openConsole();
+    c.ctx.change({ returns: { a: { inserts: [] } } });
+    c.ctx.change({ returns: { a: { inserts: RETURNS.b.inserts } } });
+    expect(c.ctx.undo()).toBe(true);
+    expect(c.model.doc.returns?.a?.inserts).toEqual([]);
+    expect(c.applied.at(-1)).toEqual({ returns: { a: { inserts: [] } } });
+    expect(c.ctx.undo()).toBe(true);
+    // The document loses the bus; the engine is sent what a system built without it plays.
     expect(c.model.doc.returns).toBeUndefined();
-    c.ctx.change({ returns: { room: { level: 0.2 } } });
-    c.ctx.undo();
-    expect(c.model.doc.returns).toBeUndefined();
-    const live = c.applied.at(-1) as { returns: { room: { level: number } } };
-    expect(live.returns.room.level).toBe(
-      c.model.preview({ ...newSong(), returns: { room: {} } }).returns?.room?.level,
-    );
+    expect(c.applied.at(-1)).toEqual({ returns: { a: RETURNS.a } });
   });
 });
 
@@ -351,15 +352,15 @@ describe('an undo restores the document exactly', () => {
 
   it('takes a second return added beside another out of the document again', () => {
     const c = openConsole();
-    c.ctx.change({ returns: { room: { level: 0.2 } } });
+    c.ctx.change({ returns: { a: { level: 0.2 } } });
     const one = c.model.doc;
-    expect(Object.keys(one.returns ?? {})).toEqual(['room']);
-    c.ctx.change({ returns: { echo: { feedback: 0.6 } } });
+    expect(Object.keys(one.returns ?? {})).toEqual(['a']);
+    c.ctx.change({ returns: { b: { level: 0.3 } } });
     const two = c.model.doc;
     expect(c.ctx.undo()).toBe(true);
     expect(c.model.doc).toStrictEqual(one);
     // The engine has no absent return: it is sent the one a system built without it plays.
-    expect(c.applied.at(-1)).toEqual({ returns: { echo: RETURNS.echo } });
+    expect(c.applied.at(-1)).toEqual({ returns: { b: RETURNS.b } });
     expect(c.ctx.redo()).toBe(true);
     expect(c.model.doc).toStrictEqual(two);
     expect(c.builds).toBe(0);

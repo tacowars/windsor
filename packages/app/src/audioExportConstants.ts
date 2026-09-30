@@ -21,8 +21,8 @@ export const ZIP_MIME = 'application/zip';
 export const STEMS_ZIP_SUFFIX = '-stems';
 /** A part's stem is numbered by its slot + 1, to two digits: `<song>-01-<part>.wav`. */
 export const STEM_NUMBER_DIGITS = 2;
-/** A return's stem: `<song>-return-<name>.wav`. */
-export const STEM_RETURN_WORD = 'return';
+/** A send bus's stem: `<song>-send-<name>.wav` (windsor#172: `-send-a`, `-send-b`). */
+export const STEM_RETURN_WORD = 'send';
 
 /** Characters no file system on the three desktop platforms accepts in a name. */
 export const FILE_NAME_FORBIDDEN = /[\\/:*?"<>|]+/g;

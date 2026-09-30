@@ -1,6 +1,6 @@
 /**
- * The Echo insert (windsor#171): the `echo` return's delay line, on a strip,
- * with a Mix knob and an on/off switch. Native nodes only.
+ * The Echo insert (windsor#171): the `echo` return's delay line, on a strip
+ * or a send bus, with a Mix knob and an on/off switch. Native nodes only.
  *
  *   input ─┬─▶ send ─▶ [delay loop, soft clip] ─▶ wet (mix) ─┬─▶ output
  *          └─▶ dry (1 − mix) ───────────────────────────────┘
@@ -10,11 +10,10 @@
  * `send` and `wet` and opens `dry`: the input passes unchanged and the loop
  * empties.
  */
-import { RETURNS } from '../mixer/mix';
 import type { DelayLineSettings } from '../mixer/returnEffects';
 import { attachDelay, disconnectDelay, writeDelay } from '../mixer/returnEffects';
 import type { FieldNormaliser } from '../song/arrangementFields';
-import { ECHO_BOUNDS, ECHO_MIX_DEFAULT } from './echoConstants';
+import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstants';
 import type { InsertKind, InsertStage } from './insertKind';
 
 export interface EchoSpec extends DelayLineSettings {
@@ -26,10 +25,7 @@ export interface EchoSpec extends DelayLineSettings {
 
 export const DEFAULT_ECHO: EchoSpec = {
   kind: 'echo',
-  delayTime: RETURNS.echo.delayTime,
-  feedback: RETURNS.echo.feedback,
-  damp: RETURNS.echo.damp,
-  resonance: RETURNS.echo.resonance,
+  ...ECHO_LINE_DEFAULTS,
   mix: ECHO_MIX_DEFAULT,
   enabled: true,
 };

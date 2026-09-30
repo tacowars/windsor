@@ -7,8 +7,9 @@
  *
  * The files are `<song>.wav` (the master, as the WAV export writes it),
  * `<song>-<nn>-<part name>.wav` with `nn` the part's number (slot + 1), and
- * `<song>-return-<name>.wav` (decision 3), in `<song>-stems.zip`. Both
- * destinations get the zip: a page cannot save several downloads in a row
+ * `<song>-send-a.wav` and `<song>-send-b.wav` for the send buses (decision 3,
+ * windsor#172), in `<song>-stems.zip`. Both destinations get the zip: a
+ * page cannot save several downloads in a row
  * without the browser stopping to ask, and one Save as… picks one file.
  *
  * Each stem's bytes go into a `Blob` as soon as they are checksummed, so the

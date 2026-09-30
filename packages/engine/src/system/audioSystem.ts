@@ -154,14 +154,10 @@ export class AudioSystem {
   async init(): Promise<void> {
     if (this.started) return;
     await this.engine.init();
+    // The send buses' worklet inserts, Send A's plate among them, report their
+    // load through the insert registry, as a part's do (#445, windsor#172).
     this.graph.build();
-    // The plate is a standing processor on the audio thread, so it reports too
-    // (#445): a load figure that counted only the parts would understate the
-    // music by the whole reverb.
-    for (const [name, bus] of Object.entries(this.graph.standing().returns)) {
-      this.meter.attach(`return:${name}`, bus.effect);
-    }
-    // So is the output stage (windsor#93): it runs on every block, song or no song.
+    // So does the output stage (windsor#93): it runs on every block, song or no song.
     this.meter.attach('outputStage', this.engine.outputStage?.node);
     this.started = true;
   }

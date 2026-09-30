@@ -17,23 +17,25 @@ import { runStemExport, stemFileName, stemsZipName } from './audioExportStems';
 
 const MASTER: Stem = { kind: 'master' };
 const KICK: Stem = { kind: 'part', slot: 0, name: 'kick', muted: false };
-const ROOM: Stem = { kind: 'return', name: 'room' };
+const SEND_A: Stem = { kind: 'return', name: 'a' };
+const SEND_B: Stem = { kind: 'return', name: 'b' };
 
 describe('stem file names', () => {
-  it('names the master, each part by number and label, and each return', () => {
+  it('names the master, each part by number and label, and each send bus', () => {
     expect(stemFileName('night bus.json', MASTER)).toBe('night bus.wav');
     expect(stemFileName('night bus.json', KICK)).toBe('night bus-01-kick.wav');
     expect(stemFileName('night bus.json', { ...KICK, slot: 7, name: 'Pad' })).toBe(
       'night bus-08-Pad.wav',
     );
-    expect(stemFileName('night bus.json', ROOM)).toBe('night bus-return-room.wav');
+    expect(stemFileName('night bus.json', SEND_A)).toBe('night bus-send-a.wav');
+    expect(stemFileName('night bus.json', SEND_B)).toBe('night bus-send-b.wav');
     expect(stemsZipName('night bus.json')).toBe('night bus-stems.zip');
   });
 
   it("makes a part's label safe, and numbers a part with none", () => {
     expect(stemFileName('song', { ...KICK, name: 'a/b: c?' })).toBe('song-01-a-b- c-.wav');
     expect(stemFileName('song', { ...KICK, slot: 2, name: '  ' })).toBe('song-03.wav');
-    expect(stemFileName('', ROOM)).toBe('song-return-room.wav');
+    expect(stemFileName('', SEND_A)).toBe('song-send-a.wav');
   });
 });
 
@@ -82,7 +84,7 @@ function fakeStems(stems: { stem: Stem; value: number }[], frames = 64) {
 const THREE = [
   { stem: MASTER, value: 0.5 },
   { stem: KICK, value: 0.25 },
-  { stem: ROOM, value: 1.5 },
+  { stem: SEND_A, value: 1.5 },
 ];
 
 function run(overrides: Partial<StemExportRun> = {}): StemExportRun {
@@ -120,13 +122,13 @@ describe('runStemExport', () => {
     expect(entries.map((e) => e.name)).toEqual([
       'night bus.wav',
       'night bus-01-kick.wav',
-      'night bus-return-room.wav',
+      'night bus-send-a.wav',
     ]);
     entries.forEach((entry, i) => {
       const channel = new Float32Array(64).fill(THREE[i]!.value);
       expect(entry.data).toEqual(encodeWav([channel, channel], 44100, 16).bytes);
     });
-    // The room stem is over full scale: 64 frames × 2 channels clipped.
+    // The Send A stem is over full scale: 64 frames × 2 channels clipped.
     expect(outcome).toEqual({
       kind: 'saved',
       fileName: 'night bus-stems.zip',
