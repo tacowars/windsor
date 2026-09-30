@@ -195,9 +195,12 @@ edits commit the working patch there through `pushPatch`.
 
 Normalize through `makeArrangement`, and inspect corrections/dangling
 references. Preserve `patches`, `returns`, each part's strip, harmony,
-sequencers and captured patterns through export/import. A song is `version: 3`
-(#705: `transport.bars`, a `harmony.events` timeline, per-part `regions` and
-per-sequencer seeds) with 1–8 parts; a part is identified by its `slot` (its engine part is
+sequencers and captured patterns through export/import. A song is `version: 4`
+(windsor#172: `returns.a` / `returns.b`, each a `level` and an `inserts` chain,
+and strips' `sends.a` / `sends.b`; version 3's `room` / `echo` upgrade through
+`SONG_MIGRATIONS[3]`), and carries version 3's shape (#705: `transport.bars`,
+a `harmony.events` timeline, per-part `regions` and per-sequencer seeds), with
+1–8 parts; a part is identified by its `slot` (its engine part is
 `music-<slot>`; its stream is its own sequencer's `seed` per region), never by its name, and
 live partials address it as `{ parts: { <slot>: … } }` (#597). A partial patch edit differs from replacing
 a full patch: recursive objects merge, while patch arrays replace wholesale
