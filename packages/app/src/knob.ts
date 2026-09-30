@@ -170,6 +170,26 @@ export function keyTarget(
   return step > 0 && Math.abs(raw - current) < step ? current + dir * step : raw;
 }
 
+/** A knob's slider attributes at a value. */
+export interface KnobAria {
+  /** The raw stored value, rounded to `ARIA_VALUE_PRECISION`. */
+  readonly valuenow: string;
+  /** The visible readout, so a screen reader announces what the knob shows. */
+  readonly valuetext: string;
+}
+
+/**
+ * The knob's `aria-valuenow` and `aria-valuetext` at `v`. The text is the
+ * readout itself, so a formatted knob (Tape's Drive in dB over a stored
+ * 0..32) is announced as it reads, not as its raw value.
+ */
+export function knobAria(spec: Pick<KnobSpec, 'fmt'>, v: number): KnobAria {
+  return {
+    valuenow: String(Math.round(v * ARIA_VALUE_PRECISION) / ARIA_VALUE_PRECISION),
+    valuetext: spec.fmt ? spec.fmt(v) : v.toFixed(2),
+  };
+}
+
 /** Build one knob. The element re-renders itself after every commit. */
 export function makeKnob(spec: KnobSpec): KnobElement {
   const node = knobDom(spec) as KnobElement;
@@ -190,11 +210,10 @@ export function makeKnob(spec: KnobSpec): KnobElement {
     const a1 = Math.max(zeroAng, ang);
     arc.setAttribute('d', Math.abs(a1 - a0) < ARC_MIN_DEGREES ? '' : arcPath(c, c, r, a0, a1));
     pin.setAttribute('transform', `rotate(${ang} ${c} ${c})`);
-    out.textContent = spec.fmt ? spec.fmt(v) : v.toFixed(2);
-    node.setAttribute(
-      'aria-valuenow',
-      String(Math.round(v * ARIA_VALUE_PRECISION) / ARIA_VALUE_PRECISION),
-    );
+    const aria = knobAria(spec, v);
+    out.textContent = aria.valuetext;
+    node.setAttribute('aria-valuenow', aria.valuenow);
+    node.setAttribute('aria-valuetext', aria.valuetext);
   };
 
   const commit = (raw: number): void => {
