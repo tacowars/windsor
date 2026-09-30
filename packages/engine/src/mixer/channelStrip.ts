@@ -17,6 +17,10 @@
  * always the first stage (#640, `lowCutStage.ts`); the strip's inserts follow
  * it in list order (#641, `inserts/`).
  *
+ * The strip's peak meter (windsor#155) taps the rotation's output, the
+ * signal the dry destination hears, and only while something has made it
+ * active.
+ *
  * The part must have been created unrouted (`destination: null`); connecting it
  * to the master as well would sum it twice.
  */
@@ -28,6 +32,8 @@ import { INSERT_KINDS } from '../inserts/insertRegistry';
 import type { LowCutStage } from './lowCutStage';
 import { createLowCutStage } from './lowCutStage';
 import type { ChannelStrip } from './mix';
+import type { PeakMeter } from './peakMeter';
+import { createPeakMeter } from './peakMeter';
 import type { ReturnBus } from './returnBus';
 import { createTap } from './stripTap';
 import type { StereoRotate } from './stereoRotate';
@@ -79,6 +85,14 @@ export interface PartStrip {
   readonly head: GainNode;
   /** One send per return, by return name. */
   readonly sends: ReadonlyMap<string, GainNode>;
+  /**
+   * The strip's sample-peak meter (windsor#155), on the rotation's output:
+   * what the part puts into the mix, post-fader, post-gate and post-pan, so
+   * a muted or soloed-out part reads silence. The sends and the sidechain
+   * key are not metered. Lazy, as the master's: nothing is built until
+   * `setActive(true)`, and the strip's `dispose` disposes it.
+   */
+  readonly meter: PeakMeter;
   setLevel(level: number): void;
   setPan(pan: number): void;
   /** Hz; the caller clamps. */
@@ -110,7 +124,7 @@ const laterByTimeout = (run: () => void, seconds: number): void => {
   setTimeout(run, seconds * MS_PER_SECOND);
 };
 
-// eslint-disable-next-line max-lines-per-function -- one strip graph and its lifetime; detector metadata, output, mute and solo share the same owned tap
+// eslint-disable-next-line max-lines-per-function -- one strip graph and its lifetime; detector metadata, output, mute, solo and the meter share the same owned tap
 export function routePart(
   part: AudioPart,
   strip: ChannelStrip,
@@ -135,6 +149,7 @@ export function routePart(
   const tap = createTap(context, strip, returns, dry, inserts.tail);
   const updates = createInsertUpdater(inserts, tap, later, options.changed);
   const { rotation, sends, gate } = tap;
+  const meter = createPeakMeter(context, rotation.output);
   let solo = strip.solo === true;
 
   return {
@@ -170,6 +185,7 @@ export function routePart(
     rotation,
     head: tap.head,
     sends,
+    meter,
     setLevel(level: number): void {
       part.gain.value = level;
     },
@@ -188,6 +204,8 @@ export function routePart(
     dispose(): void {
       // Before the graph goes, so a fade still waiting cannot re-wire it (#652).
       updates.cancel();
+      // Before the tap, whose rotation output the meter's edge leaves from.
+      meter.dispose();
       tap.dispose();
       inserts.dispose();
       part.output.disconnect(lowCut.input);
