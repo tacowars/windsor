@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EqBand, EqSpec } from '@windsor/engine';
-import { DEFAULT_EQ, EQ_BOUNDS, eqResponseDb } from '@windsor/engine';
+import { DEFAULT_EQ, EQ_BOUNDS, EQ_DSP, eqResponseDb } from '@windsor/engine';
 import {
   dbOfY,
   doubleClick,
@@ -109,6 +109,21 @@ describe('where a point sits', () => {
     }
     // More Q lifts a resonant cut's point above the corner's −3 dB.
     expect(pointDb(specWith(0, { q: 4 }), 0, RATE)).toBeGreaterThan(6);
+  });
+
+  it('reads a cut stored past the plot at the edge it is drawn at and designed at', () => {
+    const rate = 32000;
+    const plot = eqPlot(12, rate);
+    const edge = rate * EQ_DSP.maxFrequencyRatio;
+    const spec = specWith(7, { on: true, slope: 24, freq: 20000, q: 4 });
+    const solo = soloBand(spec, 7);
+    const atEdge = eqResponseDb(solo, [edge], rate, new Float64Array(1))[0]!;
+    const atStored = eqResponseDb(solo, [20000], rate, new Float64Array(1))[0]!;
+    expect(atEdge).not.toBeCloseTo(atStored, 1);
+    expect(pointDb(spec, 7, rate)).toBe(atEdge);
+    const at = pointAt(spec, 7, plot, rate);
+    expect(at.x).toBe(EQ_PLOT.width - EQ_PLOT.pointRadius);
+    expect(at.y).toBe(yOfDb(atEdge, plot));
   });
 
   it('draws only that band, on, with no output gain, for its own curve', () => {

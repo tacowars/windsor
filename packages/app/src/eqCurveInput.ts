@@ -21,7 +21,7 @@ import {
   wheelPixels,
   withBand,
 } from './eqCurveModel';
-import type { OpenGesture } from './gestureHooks';
+import type { MergedGesture, OpenGesture } from './gestureHooks';
 import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestureHooks';
 
 /** What the curve's gestures read and call on their card. */
@@ -122,15 +122,19 @@ export interface BandWheelGesture {
 }
 
 /**
- * Wheel ticks a moment apart on one band are one step, as a knob's turns are;
- * a tick on another band closes that step and opens its own (`wheelContinues`).
+ * Wheel ticks a moment apart on one band are one step, as a knob's turns are,
+ * named for its band as a drag's is; a tick on another band closes that step
+ * and opens its own (`wheelContinues`).
  */
 export function bandWheelGesture(win: EventTarget = window): BandWheelGesture {
-  const turns = mergedGesture({ label: 'EQ band Q', continues: isModifierKey, win });
+  let turns: MergedGesture | null = null;
   let last = -1;
   return {
     touch(band) {
-      if (!wheelContinues(last, band)) turns.close();
+      if (!turns || !wheelContinues(last, band)) {
+        turns?.close();
+        turns = mergedGesture({ label: stepName(band), continues: isModifierKey, win });
+      }
       last = band;
       turns.touch();
     },
