@@ -202,4 +202,36 @@ describe('live post-FX routing', () => {
     expect(tail!.left.slice(15000).some((v) => Math.abs(v) > 0.01)).toBe(true);
     system.dispose();
   });
+  it('mutes or solos another part like Sidechain only, and the key still reaches its detector', async () => {
+    for (const change of [
+      (system: AudioSystem) => strip(system, 0).setMute(true),
+      (system: AudioSystem) => system.apply({ parts: { 1: { strip: { solo: true } } } }),
+    ]) {
+      const { system, context } = await sidechainRig();
+      system.apply(route(1, 0));
+      system.apply({ parts: { 0: { strip: { sends: { echo: 1 } } } } });
+      sourceOf(strip(system, 0).part).feed = (b, l, r) => {
+        for (let i = 0; i < l.length; i++) l[i] = r[i] = 0.4 * Math.sin((b * l.length + i) * 0.1);
+      };
+      let changed = false;
+      const [dry, send, key] = renderGraph(
+        context,
+        0.3,
+        [
+          fake(strip(system, 0).rotation.output),
+          fake(strip(system, 0).sends.get('echo')!),
+          fake(detector(system, 1)),
+        ],
+        (_b, t) => {
+          if (t < 0.1 || changed) return;
+          changed = true;
+          change(system);
+        },
+      );
+      expect(dry!.left.slice(6000).every((v) => v === 0)).toBe(true);
+      expect(send!.left.slice(6000).every((v) => v === 0)).toBe(true);
+      expect(key!.left.slice(6000).some((v) => Math.abs(v) > 0.1)).toBe(true);
+      system.dispose();
+    }
+  });
 });

@@ -20,6 +20,7 @@ import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
 import { FULL_DOCUMENT, FULL_SLOT } from '../__fixtures__/fullArrangement';
 import { noteToneFeed } from '../__fixtures__/noteFeeds';
 import { BARS_MAX, BPM_MIN } from '../audioConstants';
+import type { ChannelStrip } from '../mixer/mix';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
 import { RENDER_QUANTUM_FRAMES } from './renderConstants';
@@ -54,6 +55,18 @@ const TAIL = 0.5;
 
 /** No master insert, a master level off unity: the gains are what the stems must carry. */
 const SONG: ArrangementDocument = { ...FULL_DOCUMENT, master: { inserts: [], level: 0.7 } };
+
+/** `document` with one part's strip changed. */
+const withStrip = (
+  document: ArrangementDocument,
+  slot: number,
+  strip: Partial<ChannelStrip>,
+): ArrangementDocument => ({
+  ...document,
+  parts: document.parts.map((p) =>
+    p.slot === slot ? { ...p, strip: { ...p.strip, ...strip } } : p,
+  ),
+});
 
 interface Collected {
   stems: { stem: Stem; channels: Float32Array[] }[];
@@ -250,6 +263,28 @@ describe('renderStems', () => {
     expect(arp.channels).toEqual(audible.channels);
     // The master never hears it: without the muted stem, the rest still sum to it.
     expect(included.stems[0]!.channels).toEqual(skipped.stems[0]!.channels);
+  });
+
+  it('renders a muted part as a song without it, with its stem silent (windsor#154)', async () => {
+    // The drone is built last, so every other part keeps its tone without it.
+    const drone = FULL_SLOT.drone;
+    const muted = await collect(withStrip(SONG, drone, { mute: true }));
+    const without = await collect({ ...SONG, parts: SONG.parts.filter((p) => p.slot !== drone) });
+    expect(muted.stems[0]!.channels).toEqual(without.stems[0]!.channels);
+    const stem = muted.stems.find((s) => label(s.stem) === `part ${drone}`)!;
+    expect(peak(stem.channels[0]!)).toBe(0);
+  });
+
+  it('follows solo in the stems, and a soloed-out "Sidechain only" stem is silent too', async () => {
+    const song = withStrip(withStrip(SONG, FULL_SLOT.hat, { solo: true }), FULL_SLOT.arp, {
+      output: 'sidechain',
+    });
+    const { stems } = await collect(song, { includeMuted: true });
+    const peaks = Object.fromEntries(stems.map((s) => [label(s.stem), peak(s.channels[0]!)]));
+    expect(peaks['part 1']).toBeGreaterThan(1e-3);
+    expect([peaks['part 0'], peaks['part 2'], peaks['part 3']]).toEqual([0, 0, 0]);
+    // The hat sends only to the echo, so the room has no stem.
+    expect(Object.keys(peaks)).toEqual(['master', 'part 0', 'part 1', 'part 2', 'part 3', 'echo']);
   });
 
   it('refuses a song too long to render before building anything', async () => {

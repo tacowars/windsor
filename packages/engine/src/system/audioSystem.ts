@@ -249,6 +249,8 @@ export class AudioSystem {
         part.strip,
       );
     }
+    // Nothing has played on these strips yet, so solo lands with no ramp.
+    this.roster.resolveSolo(0);
     applyMasterLive(this.masterStrip!, this.engine.outputStage, master);
     this.sidechains.commit(routing);
     if (returns) applyReturnsLive(this.graph.standing().returns, returns);
@@ -335,6 +337,8 @@ export class AudioSystem {
       // An absent slot was already reported by the player's merge.
       if (live) ignored.push(...applyStripLive(live, strip, `parts.${slot}.strip`));
     }
+    // After every strip's solo flag has landed, including a part added by this partial.
+    this.roster.resolveSolo();
     if (returns !== undefined) {
       ignored.push(...applyReturnsLive(this.graph.standing().returns, returns));
     }

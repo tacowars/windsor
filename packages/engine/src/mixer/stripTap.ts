@@ -1,6 +1,7 @@
 /**
  * The tap: where a channel strip's chain meets the mix (#639, #652, #667).
- * The head also feeds external detectors, before the audible gate.
+ * The head also feeds external detectors, before the audible gate, which
+ * output, mute and solo close (`audibleGate.ts`, windsor#154).
  *
  *   tail ─▶ head ─▶ audible ─┬─ [rotate θ] ─▶ dry destination
  *                           ├─ send ─▶ return "room"
@@ -11,7 +12,8 @@
  * edge rather than one per send. It is not the fader: that is still the
  * part's k-rate `gain` inside the worklet (mixer record §3).
  */
-import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
+import type { AudibleGate } from './audibleGate';
+import { createAudibleGate } from './audibleGate';
 import type { ChannelStrip } from './mix';
 import type { ReturnBus } from './returnBus';
 import { createSend } from './returnBus';
@@ -25,7 +27,8 @@ export interface Tap {
   readonly tail: AudioNode;
   /** The fade gain every tapped path passes through (#652). */
   readonly head: GainNode;
-  setOutput(output: ChannelStrip['output']): void;
+  /** After the head: output, mute and solo open and close the dry path and the sends here. */
+  readonly gate: AudibleGate;
   move(tail: AudioNode): void;
   /** Ramp the tapped paths to `level` over `seconds`, from wherever they are now. */
   fadeTo(level: number, seconds: number): void;
@@ -47,8 +50,8 @@ export function createTap(
   const head = context.createGain();
   tail.connect(head);
   const rotation = createStereoRotate(context, strip.pan);
-  const audible = context.createGain();
-  audible.gain.value = strip.output === 'sidechain' ? 0 : 1;
+  const gate = createAudibleGate(context, strip);
+  const audible = gate.node;
   head.connect(audible);
   audible.connect(rotation.input);
   rotation.output.connect(dry);
@@ -60,15 +63,7 @@ export function createTap(
     rotation,
     sends,
     head,
-    setOutput(output): void {
-      const now = context.currentTime;
-      audible.gain.cancelScheduledValues(now);
-      audible.gain.setValueAtTime(audible.gain.value, now);
-      audible.gain.linearRampToValueAtTime(
-        output === 'sidechain' ? 0 : 1,
-        now + INSERT_FADE_SECONDS,
-      );
-    },
+    gate,
     get tail(): AudioNode {
       return tail;
     },

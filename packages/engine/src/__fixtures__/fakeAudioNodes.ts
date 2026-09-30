@@ -49,41 +49,30 @@ export class FakeParam {
   }
 
   setValueAtTime(value: number, time?: number): this {
-    this.automation.push({
-      call: 'setValueAtTime',
-      value,
-      ...(time === undefined ? {} : { time }),
-    });
-    this.value = value;
-    return this;
+    return this.record('setValueAtTime', value, time);
   }
 
   setTargetAtTime(value: number, time?: number): this {
-    this.automation.push({
-      call: 'setTargetAtTime',
-      value,
-      ...(time === undefined ? {} : { time }),
-    });
-    this.value = value;
-    return this;
+    return this.record('setTargetAtTime', value, time);
   }
 
   linearRampToValueAtTime(value: number, time?: number): this {
-    this.automation.push({
-      call: 'linearRampToValueAtTime',
-      value,
-      ...(time === undefined ? {} : { time }),
-    });
-    this.value = value;
-    return this;
+    return this.record('linearRampToValueAtTime', value, time);
   }
 
   cancelScheduledValues(time?: number): this {
-    this.automation.push({
-      call: 'cancelScheduledValues',
-      value: this.value,
-      ...(time === undefined ? {} : { time }),
-    });
+    return this.record('cancelScheduledValues', this.value, time);
+  }
+
+  /** The fake applies every ramp at once, so `value` is already the held one. */
+  cancelAndHoldAtTime(time?: number): this {
+    return this.record('cancelAndHoldAtTime', this.value, time);
+  }
+
+  /** Logs the call and leaves `value` at what it names (a cancel names the current value). */
+  private record(call: string, value: number, time?: number): this {
+    this.automation.push({ call, value, ...(time === undefined ? {} : { time }) });
+    this.value = value;
     return this;
   }
 

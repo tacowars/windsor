@@ -54,6 +54,21 @@ describe('stemSources', () => {
     expect(stemSources(song, { includeMuted: true })[1]).toMatchObject({ muted: true });
   });
 
+  it('lists a muted part, whose sends feed no return (windsor#154)', () => {
+    // The hat is the only part sending to the echo.
+    const song = withStrip(FULL_SLOT.hat, { mute: true });
+    expect(stemSources(song).map((s) => s.name)).toEqual(['kick', 'hat', 'arp', 'drone', 'room']);
+    expect(stemSources(song)[1]).toMatchObject({ muted: false });
+  });
+
+  it('keeps only the returns a soloed part sends to (windsor#154)', () => {
+    const names = (slot: number): string[] =>
+      stemSources(withStrip(slot, { solo: true })).map((s) => s.name);
+    // The kick sends nothing, the hat only to the echo.
+    expect(names(FULL_SLOT.kick)).toEqual(['kick', 'hat', 'arp', 'drone']);
+    expect(names(FULL_SLOT.hat)).toEqual(['kick', 'hat', 'arp', 'drone', 'echo']);
+  });
+
   it('leaves out a return nobody sends to', () => {
     const song = withStrip(FULL_SLOT.hat, { sends: { echo: 0 } });
     expect(stemSources(song).filter((s) => s.kind === 'return')).toEqual([

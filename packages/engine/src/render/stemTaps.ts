@@ -23,6 +23,8 @@
  * A part routed "Sidechain only" has its dry path gated to silence; asked
  * for, its stem is taken before the gate (the strip's `head`) through a
  * rotation at the strip's pan, so it sounds as it would routed to the master.
+ * A part muted or soloed out (windsor#154) is taken after the gate like any
+ * other, so its stem is silent, as playback plays it, whatever its output.
  */
 import type { AudioBus } from '../mixer/audioBus';
 import { MUSIC_BUS_OPTIONS, createBus } from '../mixer/audioBus';
@@ -80,8 +82,8 @@ function partTap(system: AudioSystem, stem: PartStem): Tap {
   if (!strip) throw new Error(`stem: part ${stem.slot} has no strip`);
   let rotation: StereoRotate | null = null;
   let source: AudioNode = strip.rotation.output;
-  if (stem.muted) {
-    // The dry path is gated after `head`: tap before the gate, and pan here.
+  if (stem.muted && !strip.mute && !strip.soloedOut) {
+    // Only the sidechain routing closed the gate after `head`: tap before it, and pan here.
     rotation = createStereoRotate(context, strip.rotation.pan);
     strip.head.connect(rotation.input);
     source = rotation.output;
