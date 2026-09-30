@@ -43,15 +43,22 @@ the fastest honest path to a level-matched audition in the app.
    delay, hiss, dropouts and trim stay in their order. No second insert.
    The REELS saturation polynomial leaves the chain; its provenance record
    stands as history.
-3. **Field bounding: a drive ceiling.** A full-scale input at Drive 0
-   reaches the knee (source field 1). The Drive control's mapping to core
-   input gain is capped so that a full-scale input never exceeds source
-   field 4 at the control's maximum (about +12 dB into the core). No
-   limiter, clipper or new conditioning precedes the core. Signals above
-   full scale can exceed the domain; the core's state guard and reset
-   counters remain, and the integration issue tests the guard path. The
-   Drive control's visible range and label are the UI issue's to settle
-   (`reviewed`); the engine mapping is declared in `tapeConstants.ts`.
+3. **Field bounding: a ceiling on the gain into the core.** A full-scale
+   input at Drive 0 and flat EQ reaches the knee (source field 1). The
+   bound is on the whole path before the core: Bias EQ and tape-model EQ
+   have peak gains above unity, so the Drive mapping is capped so that the
+   product of the largest EQ peak gain (over every model and the Bias
+   extremes, computed from the filter tables) and the Drive gain never
+   exceeds 4 for a full-scale input, at the control's maximum. The engine
+   mapping and that EQ peak figure are declared in `tapeConstants.ts`, and
+   the integration PR carries a test that drives a full-scale tone at the
+   model and Bias of largest boost and maximum Drive through the retained
+   EQ and asserts the field at the core input stays within ±4. No limiter,
+   clipper or new conditioning precedes the core. Signals above full scale
+   can still exceed the domain; the core's state guard and reset counters
+   remain, and the integration issue tests the guard path. The Drive
+   control's visible range and label are the UI issue's to settle
+   (`reviewed`).
 4. **Latency: always delayed, dry path matched.** The FIR pair delays by
    `span` host samples (48, one millisecond at 48 kHz). That delay applies
    whether the insert is enabled or bypassed, and the dry path of Mix is
