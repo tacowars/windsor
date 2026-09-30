@@ -45,7 +45,7 @@ export function stageLampView(
       lit,
       latched: true,
       label: latchedAction,
-      title: `${latchedAction} since the last clear. Click to clear the lamp and the In clip LEDs.`,
+      title: `${latchedAction} since the last clear. Click to clear the lamp.`,
     };
   }
   const label = OUTPUT_MODE_ACTIONS[mode];

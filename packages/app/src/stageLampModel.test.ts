@@ -29,7 +29,7 @@ describe('stageLampView', () => {
     const latched = { latchedAction: 'Limiting' as const, lastActedMs: 0 };
     const view = stageLampView('soft', latched, 10_000);
     expect(view).toMatchObject({ lit: false, latched: true, label: 'Limiting' });
-    expect(view.title).toContain('Click to clear');
+    expect(view.title).toBe('Limiting since the last clear. Click to clear the lamp.');
     const cleared = stageLampView('soft', { latchedAction: null, lastActedMs: 0 }, 10_000);
     expect(cleared).toMatchObject({ latched: false, label: 'Clipping' });
   });
