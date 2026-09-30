@@ -39,8 +39,9 @@ less the unmetered render's median, per second of audio.
 | 16 strips, no meters | 359.8 ms | 0 |
 | 16 strips, 16 active meters | 968.6 ms | 20.3 ms |
 
-The seven runs of each kind sit within about ±3 % of its median (see
-`chrome.json`).
+The seven unmetered runs sit within −0.8 % and +2.8 % of their median,
+and the seven metered runs within −5.2 % and +2.1 % of theirs (see
+`chrome.json`), so read the per-meter figure as about ±5 %.
 
 - **16 active meters cost about 20 ms of render-thread time per second of
   audio,** about 1.3 ms a second each: about 2 % of one core in real time
