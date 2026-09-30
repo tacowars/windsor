@@ -1,0 +1,486 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windsor Insert Rack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a toolbar of layout switches, then the part's insert rack, then the two send buses as racks of the same devices, then notes. Deliberately single-theme: Windsor's own dark console tokens. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --rack-h: 196px;
+  --head-h: 24px;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 13px/1.5 var(--f-ui);
+  padding-block: 20px 48px;
+  padding-inline: 16px;
+}
+.wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1, h2 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+h1 { font-size: 17px; }
+h2 { font-size: 12px; color: var(--ink-dim); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h2 small { font-family: var(--f-num); font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ink-faint); font-weight: 400; }
+p { margin: 0; max-width: 72ch; color: var(--ink-dim); }
+.lede { display: flex; flex-direction: column; gap: 6px; }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.opt { display: flex; align-items: center; gap: 8px; }
+.opt-label { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.segs { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.segs button { background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); padding: 4px 10px; font: 500 11px var(--f-ui); cursor: pointer; }
+.segs button:last-child { border-right: 0; }
+.segs button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+.segs button:focus-visible, .dev button:focus-visible, .add-slot:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.hint { font-size: 11px; color: var(--ink-faint); }
+
+/* A rack: one fixed-height row of devices that scrolls sideways */
+.rack-block { display: flex; flex-direction: column; gap: 8px; }
+.rack-line { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.rack { display: flex; gap: 6px; align-items: stretch; overflow-x: auto; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; min-width: 0; flex: 1; scrollbar-color: var(--line-bright) var(--inset); }
+
+/* Device */
+.dev { flex: none; height: var(--rack-h); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.dev.off .dev-body { opacity: 0.4; }
+.dev-head { height: var(--head-h); flex: none; display: flex; align-items: center; gap: 4px; padding: 0 4px 0 3px; border-bottom: 1px solid var(--line); background: var(--panel-hi); }
+.dev-name { font-family: var(--f-panel); font-size: 10.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; white-space: nowrap; padding: 0 4px; cursor: pointer; }
+.dev-name .num { color: var(--ink-faint); margin-right: 5px; }
+.spacer { flex: 1; min-width: 6px; }
+.ib { background: transparent; border: 1px solid transparent; color: var(--ink-faint); width: 18px; height: 18px; border-radius: var(--r); display: grid; place-items: center; font-size: 10px; line-height: 1; cursor: pointer; padding: 0; }
+.ib:hover { color: var(--ink); border-color: var(--line-bright); }
+.pwr { color: var(--modulator); font-size: 12px; }
+.dev.off .pwr { color: var(--ink-faint); }
+.tabs { display: flex; gap: 2px; margin-left: 4px; }
+.tabs button { background: transparent; border: 1px solid transparent; color: var(--ink-faint); font: 600 9.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--r); cursor: pointer; white-space: nowrap; }
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--inset); background: var(--modulator); }
+.dev-body { flex: 1; min-height: 0; display: flex; }
+.section { display: flex; flex-direction: column; padding: 4px 8px 6px; min-height: 0; }
+.section + .section { border-left: 1px solid var(--line); }
+.sec-label { height: 12px; flex: none; font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.cols { flex: 1; min-height: 0; display: flex; gap: 2px; }
+.col { display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; min-height: 0; }
+.col.wide { align-items: stretch; }
+.col.rule { width: 1px; background: var(--line); margin: 6px 6px; }
+
+/* Side-title variant: name on a rail, tabs as a thin row in the body */
+.side .dev { flex-direction: row; }
+.side .dev-head { width: 24px; height: auto; flex-direction: column; border-bottom: 0; border-right: 1px solid var(--line); padding: 4px 0; gap: 3px; }
+.side .dev-name { writing-mode: vertical-rl; transform: rotate(180deg); padding: 4px 0; }
+.side .dev-head .spacer { min-height: 4px; }
+.side .tabs { display: none; }
+.body-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.side-tabs { display: none; }
+.side .side-tabs { display: flex; height: 20px; flex: none; align-items: center; padding: 2px 6px 0; border-bottom: 1px solid var(--line); margin: 0; }
+
+/* Folded device */
+.dev.folded { width: 26px; cursor: pointer; }
+.dev.folded .dev-head { height: 100%; width: 100%; flex-direction: column; border: 0; padding: 4px 0; gap: 3px; }
+.dev.folded .dev-name { writing-mode: vertical-rl; transform: rotate(180deg); padding: 4px 0; }
+.dev.folded .tabs, .dev.folded .tools, .dev.folded .body-stack { display: none; }
+
+/* Controls */
+.knob { width: 54px; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 2px 0; border-radius: var(--r); }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .face { fill: var(--inset); stroke: var(--line); }
+.knob .track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .arc { stroke: var(--kc, var(--modulator)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 13px; }
+.knob .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; line-height: 11px; }
+.knob.big { width: 64px; }
+.knob.dim .val { color: var(--ink-faint); }
+.field { display: flex; flex-direction: column; gap: 1px; width: 104px; }
+.field .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.fake-select { background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); height: 22px; font-size: 11.5px; padding: 0 6px; display: flex; align-items: center; justify-content: space-between; color: var(--ink); }
+.fake-select::after { content: '▾'; color: var(--ink-faint); font-size: 10px; }
+.toggle { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-dim); white-space: nowrap; width: 100%; }
+.toggle i { width: 11px; height: 11px; border-radius: 2px; border: 1px solid var(--line-bright); background: var(--inset); flex: none; }
+.toggle.on i { background: var(--modulator); border-color: var(--modulator); }
+.btn-s { background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink-dim); font: 600 9.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 8px; text-align: center; }
+.note { font-size: 10px; color: var(--ink-faint); line-height: 1.3; max-width: 110px; }
+.plot { width: 124px; flex: 1; min-height: 60px; max-height: 118px; background: var(--inset); border: 1px solid var(--line); border-radius: 2px; }
+.plot path { fill: none; stroke: var(--modulator); stroke-width: 1.5; }
+.plot .grid { stroke: var(--line); stroke-width: 1; }
+.meter { width: 12px; flex: 1; max-height: 118px; background: var(--inset); border: 1px solid var(--line); border-radius: 2px; position: relative; overflow: hidden; }
+.meter::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 34%; background: var(--carrier); opacity: 0.8; }
+.meter-lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; color: var(--ink-faint); }
+.new-tag { font: 600 8px var(--f-panel); letter-spacing: 0.1em; color: var(--inset); background: var(--carrier); border-radius: 2px; padding: 1px 4px; margin-left: 4px; }
+
+/* Add slot, which opens into a list at the same height */
+.add-slot { flex: none; height: var(--rack-h); width: 88px; border: 1px dashed var(--line-bright); border-radius: 5px; background: transparent; color: var(--ink-faint); font: 600 10px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; display: grid; place-items: center; gap: 4px; }
+.add-slot:hover { color: var(--ink); border-color: var(--ink-faint); }
+.add-slot b { font-size: 20px; font-weight: 400; display: block; }
+.picker { flex: none; height: var(--rack-h); width: 230px; background: var(--panel); border: 1px solid var(--line-bright); border-radius: 5px; display: flex; flex-direction: column; overflow: hidden; }
+.picker-head { height: var(--head-h); flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 4px 0 8px; background: var(--panel-hi); border-bottom: 1px solid var(--line); font: 600 10.5px var(--f-panel); letter-spacing: 0.07em; text-transform: uppercase; }
+.picker-list { overflow-y: auto; padding: 4px 0; flex: 1; }
+.picker-group { font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); padding: 5px 10px 2px; }
+.picker-item { display: flex; align-items: center; width: 100%; background: transparent; border: 0; color: var(--ink); font: 12px var(--f-ui); text-align: left; padding: 3px 10px 3px 16px; cursor: pointer; }
+.picker-item:hover { background: var(--panel-hi); }
+
+/* Bus head, left of a send bus's rack */
+.bus-head { flex: none; width: 112px; height: calc(var(--rack-h) + 14px); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+.bus-name { font: 600 12px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; align-self: stretch; display: flex; justify-content: space-between; align-items: baseline; }
+.bus-name span { color: var(--carrier); }
+.bus-sub { font-size: 10.5px; color: var(--ink-faint); text-align: center; line-height: 1.35; }
+.bus .knob { --kc: var(--carrier); }
+
+/* Notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.notes > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px; color: var(--ink); }
+.notes ul { margin: 0; padding-left: 18px; color: var(--ink-dim); display: flex; flex-direction: column; gap: 5px; }
+.notes li b { color: var(--ink); font-weight: 600; }
+code { font: 11.5px var(--f-num); color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) { .dev { transition: width 0.15s; } }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Windsor insert rack</h1>
+    <p>Mockups of two ideas. Every insert is the same height and only its width varies, the way Bitwig and Live lay out their device chains. The send buses become racks of the same inserts, so the plate and the echo can be swapped out or joined by others. Switch the layout and height in the bar below. Every control is a real control of today's insert, except Mix on the plate and the echo, which is new.</p>
+  </div>
+
+  <div class="toolbar" role="group" aria-label="Mockup options">
+    <div class="opt"><span class="opt-label">Complex inserts</span>
+      <div class="segs" id="opt-mode">
+        <button type="button" data-v="pages">Pages</button>
+        <button type="button" data-v="wide">All sections, wide</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Rack height</span>
+      <div class="segs" id="opt-height">
+        <button type="button" data-v="176">176 px</button>
+        <button type="button" data-v="196">196 px</button>
+        <button type="button" data-v="228">228 px</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Name</span>
+      <div class="segs" id="opt-title">
+        <button type="button" data-v="top">Top bar</button>
+        <button type="button" data-v="side">Side rail</button>
+      </div>
+    </div>
+    <span class="hint">Click an insert's name to fold it. Click + to see the picker.</span>
+  </div>
+
+  <section class="rack-block">
+    <h2>Pad · inserts <small id="w-part"></small></h2>
+    <div class="rack-line"><div class="rack" id="rack-part"></div></div>
+  </section>
+
+  <section class="rack-block bus">
+    <h2>Send buses <small>Each bus is a strip: level, then a chain of up to 8 inserts</small></h2>
+    <div class="rack-line">
+      <div class="bus-head">
+        <div class="bus-name">Send A <span>●</span></div>
+        <div id="lvl-a"></div>
+        <div class="bus-sub">Sends from Pad, Keys, Lead</div>
+      </div>
+      <div class="rack" id="rack-a"></div>
+    </div>
+    <div class="rack-line">
+      <div class="bus-head">
+        <div class="bus-name">Send B <span>●</span></div>
+        <div id="lvl-b"></div>
+        <div class="bus-sub">Sends from Keys, Lead</div>
+      </div>
+      <div class="rack" id="rack-b"></div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <div>
+      <h3>Pages</h3>
+      <ul>
+        <li><b>Every insert fits one height.</b> A complex insert splits into tabs in its title bar, like Live's Echo (Echo, Modulation, Character).</li>
+        <li><b>Chains stay short.</b> Advanced Drive is about as wide as its widest page, not all of its pages together.</li>
+        <li><b>The cost:</b> only one page of an insert shows at a time, so a stage's filter and its modulation amounts are never on screen together.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>All sections, wide</h3>
+      <ul>
+        <li><b>Every control stays visible,</b> as in Bitwig. The sections sit side by side with a small label above each.</li>
+        <li><b>The cost:</b> Advanced Drive alone is over 1,000 px wide, so a chain of two or three complex inserts scrolls sideways. Folding an insert to its name helps.</li>
+        <li><b>A mix of the two</b> is possible: wide by default, with Advanced Drive and Tape using pages.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Open questions</h3>
+      <ul>
+        <li><b>Bus names.</b> Room and Echo stop describing a bus once its effect can be swapped. The mockup says Send A and Send B. They could also take names the user types.</li>
+        <li><b>How many buses?</b> Two, as today, or an Add bus button?</li>
+        <li><b>Mix on the plate and the echo.</b> 1.00 on a bus, as today. On a part, the default would be lower (0.30 in the mockup).</li>
+        <li><b>Advanced Drive stages.</b> Serial and parallel routings have two stages, and each stage gets its own page.</li>
+        <li><b>Tape</b> is being reworked in another session (windsor#146). Its controls here are today's.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const state = { mode: 'pages', height: 196, title: 'top', folded: new Set(), page: {}, off: new Set(['part-3']), picker: null };
+
+  // ── Controls ───────────────────────────────────────────────
+  const K = (l, v, p, o = {}) => ({ t: 'k', l, v, p, ...o });
+  const S = (l, v) => ({ t: 's', l, v });
+  const T = (l, on) => ({ t: 't', l, on });
+  const P = (kind) => ({ t: 'p', kind });
+  const B = (l) => ({ t: 'b', l });
+  const N = (text) => ({ t: 'n', text });
+  const M = (l) => ({ t: 'm', l });
+  const RULE = 'rule';
+
+  const TAU = Math.PI * 2;
+  const A0 = -0.75 * Math.PI, SPAN = 1.5 * Math.PI;
+  function arc(c, r, a0, a1) {
+    const pt = (a) => [(c + r * Math.sin(a)).toFixed(2), (c - r * Math.cos(a)).toFixed(2)];
+    const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+    return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`;
+  }
+  function knob(c) {
+    const size = c.big ? 42 : 30, mid = size / 2, r = mid - 3, face = r - 4;
+    const a = A0 + Math.max(0.001, c.p) * SPAN;
+    const px = (mid + face * Math.sin(a)).toFixed(2), py = (mid - face * Math.cos(a)).toFixed(2);
+    return `<div class="knob${c.big ? ' big' : ''}${c.dim ? ' dim' : ''}" title="${c.l}">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+        <circle class="face" cx="${mid}" cy="${mid}" r="${face}"/>
+        <path class="track" d="${arc(mid, r, A0, A0 + SPAN)}"/>
+        <path class="arc" d="${arc(mid, r, A0, a)}"/>
+        <line class="pin" x1="${mid}" y1="${mid}" x2="${px}" y2="${py}"/>
+      </svg><span class="val">${c.v}</span><span class="lab">${c.l}</span></div>`;
+  }
+  function plot(kind) {
+    const w = 124, h = 90;
+    let d;
+    if (kind === 'shaper') {
+      const pts = [];
+      for (let i = 0; i <= 40; i++) { const x = i / 40 * 2 - 1; const y = Math.tanh(x * 1.8) / Math.tanh(1.8); pts.push(`${(i / 40 * w).toFixed(1)} ${((1 - (y + 1) / 2) * (h - 8) + 4).toFixed(1)}`); }
+      d = 'M' + pts.join('L');
+    } else if (kind === 'filter') {
+      d = `M0 ${h * 0.45}L${w * 0.62} ${h * 0.45}C${w * 0.72} ${h * 0.45} ${w * 0.74} ${h * 0.38} ${w * 0.78} ${h * 0.4}S${w * 0.86} ${h * 0.9} ${w} ${h}`;
+    } else {
+      const pts = [];
+      for (let i = 0; i <= 60; i++) { const x = i / 60; pts.push(`${(x * w).toFixed(1)} ${(h / 2 - Math.sin(x * TAU * 2) * h * 0.32).toFixed(1)}`); }
+      d = 'M' + pts.join('L');
+    }
+    return `<svg class="plot" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <line class="grid" x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}"/><line class="grid" x1="${w / 2}" y1="0" x2="${w / 2}" y2="${h}"/>
+      <path d="${d}"/></svg>`;
+  }
+  function control(c) {
+    switch (c.t) {
+      case 'k': return knob(c);
+      case 's': return `<div class="field"><span class="lab">${c.l}</span><div class="fake-select">${c.v}</div></div>`;
+      case 't': return `<div class="toggle${c.on ? ' on' : ''}"><i></i>${c.l}</div>`;
+      case 'p': return plot(c.kind);
+      case 'b': return `<div class="btn-s">${c.l}</div>`;
+      case 'n': return `<div class="note">${c.text}</div>`;
+      case 'm': return `<div class="meter" title="Gain reduction"></div><span class="meter-lab">${c.l}</span>`;
+    }
+    return '';
+  }
+  function column(items) {
+    if (items === RULE) return '<div class="col rule"></div>';
+    const wide = items.some((c) => c.t === 's' || c.t === 't' || c.t === 'p' || c.t === 'n' || c.t === 'b');
+    return `<div class="col${wide ? ' wide' : ''}">${items.map(control).join('')}</div>`;
+  }
+
+  // ── Inserts: today's controls, grouped into pages ─────────
+  const classicDrive = { name: 'Classic Drive', pages: [{ name: 'Drive', cols: [[K('Drive', '+6.0dB', 0.6, { big: true })], [K('Tone', '2.50k', 0.55), K('Mix', '0.35', 0.35)]] }] };
+  const advancedDrive = { name: 'Advanced Drive', pages: [
+    { name: 'Main', cols: [
+      [S('Starting point', 'Custom'), S('Routing', 'Serial'), T('Tone comp.', true)],
+      [K('Input dB', '0.00', 0.5), K('Output dB', '0.00', 0.5)],
+      [K('Tilt dB', '0.00', 0.5), K('Tilt Hz', '500', 0.4)],
+      [K('Mix', '1.00', 1, { big: true })],
+      [N('Input → Stage 1 → Stage 2 → Output')] ] },
+    { name: 'Stage 1', cols: [
+      [T('Stage on', true), T('Shaper on', true), T('Filter on', false), T('Filter first', false)],
+      [S('Shaper', 'soft'), S('Filter', 'lowpass')],
+      [K('Amount', '0.25', 0.25), K('Bias', '0.00', 0.5)],
+      [K('Level dB', '0.00', 0.5), K('Cutoff Hz', '12.0k', 0.85)],
+      [K('Reso Q', '0.71', 0.2), K('Peak dB', '0.00', 0.5)],
+      [P('shaper')], [P('filter')] ] },
+    { name: 'Stage 2', cols: [
+      [T('Stage on', true), T('Shaper on', true), T('Filter on', true), T('Filter first', true)],
+      [S('Shaper', 'fold'), S('Filter', 'bandpass')],
+      [K('Amount', '0.60', 0.6), K('Bias', '0.10', 0.55)],
+      [K('Level dB', '−3.0', 0.4), K('Cutoff Hz', '1.80k', 0.55)],
+      [K('Reso Q', '1.40', 0.35), K('Peak dB', '0.00', 0.5)],
+      [P('shaper')], [P('filter')] ] },
+    { name: 'Mod', cols: [
+      [K('Env→Amt', '0.00', 0.5), K('LFO→Amt', '0.00', 0.5)],
+      [K('Env→Bias', '0.00', 0.5), K('LFO→Bias', '0.00', 0.5)],
+      [K('Env→Cut', '0.00', 0.5), K('LFO→Cut', '0.00', 0.5)],
+      RULE,
+      [K('Attack ms', '10.0', 0.2), K('Release ms', '180', 0.45)],
+      [K('Env gain', '0.00', 0.5), K('LFO Hz', '0.00', 0, { dim: true })],
+      [T('Sync LFO', true), S('Division', '1/4'), S('Wave', 'sine')],
+      [P('lfo')] ] } ] };
+  const dubDelay = { name: 'Dub delay', pages: [
+    { name: 'Time', cols: [
+      [S('Starting point', 'Custom'), S('Routing', 'Ping-pong')],
+      [T('Sync left', true), S('Left', '1/8 dotted')],
+      [T('Sync right', true), S('Right', '1/4')],
+      [K('Feedback', '0.45', 0.45), K('Mix', '0.30', 0.3)] ] },
+    { name: 'Tone', cols: [
+      [K('Highpass', '120', 0.2), K('Lowpass', '4.20k', 0.6)],
+      [K('Drive', '0.20', 0.2), K('Output dB', '0.00', 0.5)] ] } ] };
+  const tape = { name: 'Tape', pages: [
+    { name: 'Tape', cols: [
+      [S('Tape type', 'Studio'), S('Starting point', 'Custom'), B('Randomize')],
+      [K('Drive', '0.40', 0.4), K('Bias', '0.50', 0.5)],
+      [K('Wear', '0.20', 0.2), K('Hiss', '0.10', 0.1)],
+      [K('Trim dB', '0.00', 0.5), K('Mix', '1.00', 1)] ] },
+    { name: 'Motion', cols: [
+      [K('Wow', '0.30', 0.3), K('Wow rate', '0.50', 0.35)],
+      [K('Flutter', '0.20', 0.2), K('Flutter rate', '6.0', 0.5)],
+      [K('Dropouts', '0.05', 0.05), T('Split L/R', false)] ] } ] };
+  const compressor = { name: 'Bus compressor', pages: [{ name: 'Comp', cols: [
+    [S('Sidechain', 'This part'), K('SC HP', '80', 0.2)],
+    [K('Threshold', '−18dB', 0.45), K('Ratio', '4.0', 0.4)],
+    [K('Attack', '10ms', 0.3), K('Release', '120ms', 0.4)],
+    [K('Makeup', '+3dB', 0.4), K('Range', '12dB', 0.5)],
+    [K('Mix', '1.00', 1, { big: true })],
+    [M('GR')] ] }] };
+  const chorus = { name: 'Chorus', pages: [{ name: 'Chorus', cols: [[K('Rate', '0.80', 0.35), K('Depth', '3.0', 0.4)], [K('Spread', '0.70', 0.7), K('Mix', '0.50', 0.5)]] }] };
+  const plate = (mix) => ({ name: 'Plate reverb', isNew: true, pages: [
+    { name: 'Space', cols: [
+      [S('Starting point', 'hall'), N('Dattorro plate, the reverb the Room return runs today')],
+      [K('Pre ms', '12.0', 0.2), K('Size', '1.40', 0.7)],
+      [K('Decay', '0.78', 0.78, { big: true })],
+      [K('Mix', mix, Number(mix), { big: true })] ] },
+    { name: 'Diffusion', cols: [
+      [K('Diff 1', '0.75', 0.75), K('Diff 2', '0.62', 0.62)],
+      [K('Tank 1', '0.70', 0.7), K('Tank 2', '0.50', 0.5)],
+      [K('Mod Hz', '0.80', 0.3), K('Mod ms', '0.40', 0.25)] ] },
+    { name: 'Tone', cols: [
+      [K('In LC', '80', 0.15), K('In HC', '9.0k', 0.75)],
+      [K('Tank LC', '120', 0.2), K('Tank HC', '6.5k', 0.65)] ] } ] });
+  const echo = (mix) => ({ name: 'Echo', isNew: true, pages: [{ name: 'Echo', cols: [
+    [S('Sync to 120 bpm', '1/8 dotted'), N('The Echo return’s delay, with its soft-clipped loop')],
+    [K('Time', '280ms', 0.35), K('Regen', '0.30', 0.3)],
+    [K('Damp', '3.20k', 0.55), K('Q', '0.0dB', 0.3)],
+    [K('Mix', mix, Number(mix), { big: true })] ] }] });
+
+  const RACKS = {
+    part: [classicDrive, advancedDrive, dubDelay, tape, compressor],
+    a: [plate('1.00')],
+    b: [echo('1.00'), chorus],
+  };
+
+  const PICKER = [
+    ['Drive', ['Classic Drive', 'Advanced Drive', 'Tape']],
+    ['Dynamics', ['Bus compressor']],
+    ['Modulation', ['Chorus', 'Ensemble', 'Phaser']],
+    ['Time', ['Echo', 'Dub delay']],
+    ['Space', ['Plate reverb', 'Retro reverb']],
+  ];
+  const NEW = new Set(['Echo', 'Plate reverb']);
+
+  // ── Render ─────────────────────────────────────────────────
+  function sectionHtml(page, labelled) {
+    return `<div class="section">${labelled ? `<div class="sec-label">${page.name}</div>` : ''}<div class="cols">${page.cols.map(column).join('')}</div></div>`;
+  }
+  function tabsHtml(id, dev, current) {
+    if (state.mode !== 'pages' || dev.pages.length < 2) return '';
+    return dev.pages.map((p, i) => `<button type="button" role="tab" aria-selected="${i === current}" data-dev="${id}" data-page="${i}">${p.name}</button>`).join('');
+  }
+  function deviceHtml(rackId, dev, i) {
+    const id = `${rackId}-${i}`;
+    const folded = state.folded.has(id);
+    const current = state.page[id] ?? 0;
+    const tabs = tabsHtml(id, dev, current);
+    const body = state.mode === 'pages'
+      ? sectionHtml(dev.pages[current], false)
+      : dev.pages.map((p) => sectionHtml(p, dev.pages.length > 1)).join('');
+    const count = RACKS[rackId].length;
+    return `<div class="dev${folded ? ' folded' : ''}${state.off.has(id) ? ' off' : ''}" data-id="${id}">
+      <div class="dev-head">
+        <button type="button" class="ib pwr" data-pwr="${id}" title="On/off" aria-label="Turn ${dev.name} on or off">⏻</button>
+        <span class="dev-name" data-fold="${id}" title="Fold"><span class="num">${i + 1}</span>${dev.name}${dev.isNew ? '<span class="new-tag">NEW</span>' : ''}</span>
+        <div class="tabs" role="tablist">${tabs}</div>
+        <span class="spacer"></span>
+        <span class="tools" style="display:flex;gap:1px;flex-direction:inherit">
+          <button type="button" class="ib" title="Move earlier" aria-label="Move earlier" ${i === 0 ? 'disabled' : ''}>◀</button>
+          <button type="button" class="ib" title="Move later" aria-label="Move later" ${i === count - 1 ? 'disabled' : ''}>▶</button>
+          <button type="button" class="ib" title="Remove" aria-label="Remove">✕</button>
+        </span>
+      </div>
+      <div class="body-stack">
+        ${tabs ? `<div class="tabs side-tabs" role="tablist">${tabs}</div>` : ''}
+        <div class="dev-body">${body}</div>
+      </div>
+    </div>`;
+  }
+  function pickerHtml(rackId) {
+    if (state.picker !== rackId) return `<button type="button" class="add-slot" data-add="${rackId}" aria-label="Add an insert"><span><b>+</b>Add insert</span></button>`;
+    const groups = PICKER.map(([g, items]) => `<div class="picker-group">${g}</div>` +
+      items.map((n) => `<button type="button" class="picker-item">${n}${NEW.has(n) ? '<span class="new-tag">NEW</span>' : ''}</button>`).join('')).join('');
+    return `<div class="picker"><div class="picker-head">Add insert <button type="button" class="ib" data-close="1" aria-label="Close">✕</button></div><div class="picker-list">${groups}</div></div>`;
+  }
+  function render() {
+    document.documentElement.style.setProperty('--rack-h', state.height + 'px');
+    document.querySelector('.wrap').classList.toggle('side', state.title === 'side');
+    for (const rackId of Object.keys(RACKS)) {
+      const el = document.getElementById('rack-' + rackId);
+      el.innerHTML = RACKS[rackId].map((d, i) => deviceHtml(rackId, d, i)).join('') + pickerHtml(rackId);
+    }
+    const devs = [...document.querySelectorAll('#rack-part .dev')];
+    const total = devs.reduce((s, d) => s + d.offsetWidth, 0) + (devs.length - 1) * 6;
+    const ad = devs[1] ? devs[1].offsetWidth : 0;
+    document.getElementById('w-part').textContent = `Chain ${total.toLocaleString('en')} px wide · Advanced Drive ${ad.toLocaleString('en')} px`;
+    for (const [opt, key] of [['opt-mode', 'mode'], ['opt-height', 'height'], ['opt-title', 'title']]) {
+      for (const b of document.querySelectorAll(`#${opt} button`)) b.setAttribute('aria-pressed', String(String(state[key]) === b.dataset.v));
+    }
+  }
+
+  document.getElementById('lvl-a').innerHTML = knob({ l: 'Level', v: '0.90', p: 0.9, big: true });
+  document.getElementById('lvl-b').innerHTML = knob({ l: 'Level', v: '0.60', p: 0.6, big: true });
+
+  document.querySelector('.toolbar').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-v]');
+    if (!b) return;
+    const key = { 'opt-mode': 'mode', 'opt-height': 'height', 'opt-title': 'title' }[b.parentElement.id];
+    state[key] = key === 'height' ? Number(b.dataset.v) : b.dataset.v;
+    render();
+  });
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-page],[data-fold],[data-pwr],[data-add],[data-close],.dev.folded,.picker-item');
+    if (!t) return;
+    if (t.matches('.dev.folded')) state.folded.delete(t.dataset.id);
+    else if (t.dataset.page !== undefined) state.page[t.dataset.dev] = Number(t.dataset.page);
+    else if (t.dataset.fold) state.folded.has(t.dataset.fold) ? state.folded.delete(t.dataset.fold) : state.folded.add(t.dataset.fold);
+    else if (t.dataset.pwr) state.off.has(t.dataset.pwr) ? state.off.delete(t.dataset.pwr) : state.off.add(t.dataset.pwr);
+    else if (t.dataset.add) state.picker = t.dataset.add;
+    else state.picker = null;
+    render();
+  });
+  state.page['part-1'] = 1;
+  render();
+})();
+</script>
