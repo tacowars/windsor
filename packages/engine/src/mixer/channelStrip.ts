@@ -89,8 +89,8 @@ export interface PartStrip {
    * The strip's sample-peak meter (windsor#155), on the rotation's output:
    * what the part puts into the mix, post-fader, post-gate and post-pan, so
    * a muted or soloed-out part reads silence. The sends and the sidechain
-   * key are not metered. Lazy, as the master's: nothing is built until
-   * `setActive(true)`, and the strip's `dispose` disposes it.
+   * key are not metered. Lazy: nothing is built until `setActive(true)`,
+   * and the strip's `dispose` disposes it.
    */
   readonly meter: PeakMeter;
   setLevel(level: number): void;
