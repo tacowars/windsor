@@ -1,6 +1,6 @@
 /**
  * The drive insert (#641): a tanh saturator with a tone control and a
- * parallel dry path.
+ * parallel dry path, and an on/off switch (windsor#171).
  *
  *   input ─┬─▶ pre (drive / RANGE) ─▶ shaper (tanh) ─▶ tone (lowpass) ─▶ wet ─┬─▶ output
  *          └─▶ dry ────────────────────────────────────────────────────────┘
@@ -10,6 +10,8 @@
  * `wet` carries the output compensation, which holds a −12 dBFS sample at
  * its own level whatever the drive, so the knob changes colour more than
  * loudness. `oversample: '2x'`, because a driven saw aliases audibly without it.
+ * Off is `wet` 0 and `dry` 1, so the input passes unchanged; `enabled` is
+ * additive and a spec without it loads as on.
  *
  * The fader is the worklet's `gain`, before every stage, so a strip's Level
  * changes how hard it drives this insert; the Drive knob is the trim that
@@ -41,6 +43,7 @@ export interface DriveSpec {
   readonly tone: number;
   /** 0 dry .. 1 wet. */
   readonly mix: number;
+  readonly enabled: boolean;
 }
 
 export const DEFAULT_DRIVE: DriveSpec = {
@@ -48,9 +51,10 @@ export const DEFAULT_DRIVE: DriveSpec = {
   drive: DRIVE_GAIN_DEFAULT_DB,
   tone: DRIVE_TONE_DEFAULT_HZ,
   mix: DRIVE_MIX_DEFAULT,
+  enabled: true,
 };
 
-const FIELDS = ['kind', 'drive', 'tone', 'mix'] as const;
+const FIELDS = ['kind', 'drive', 'tone', 'mix', 'enabled'] as const;
 
 const fromDb = (db: number): number => Math.exp(db * GAIN_EXPONENT_PER_DB);
 
@@ -68,6 +72,7 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
     drive: n.num(raw.drive, base.drive, DRIVE_GAIN_MIN_DB, DRIVE_GAIN_MAX_DB, `${path}.drive`),
     tone: n.num(raw.tone, base.tone, DRIVE_TONE_MIN_HZ, DRIVE_TONE_MAX_HZ, `${path}.tone`),
     mix: n.num(raw.mix, base.mix, 0, 1, `${path}.mix`),
+    enabled: n.bool(raw.enabled, base.enabled, `${path}.enabled`),
   };
 }
 
@@ -97,8 +102,8 @@ function create(context: BaseAudioContext, spec: DriveSpec): InsertStage<DriveSp
     // The curve spans ±RANGE, so the drive gain is scaled into the shaper's [-1, 1].
     pre.gain.value = fromDb(next.drive) / DRIVE_CURVE_RANGE;
     tone.frequency.value = next.tone;
-    wet.gain.value = next.mix * driveCompensation(next.drive);
-    dry.gain.value = 1 - next.mix;
+    wet.gain.value = next.enabled ? next.mix * driveCompensation(next.drive) : 0;
+    dry.gain.value = next.enabled ? 1 - next.mix : 1;
   };
   set(spec);
 

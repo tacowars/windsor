@@ -3,7 +3,14 @@
  * (`inserts/insertConstants.ts`) and each default is the kind's own
  * (`DEFAULT_DRIVE`, `DEFAULT_CHORUS`), so the console states neither again.
  */
-import type { ChorusSpec, DriveSpec, EnsembleSpec, InsertKindName } from '@windsor/engine';
+import type {
+  ChorusSpec,
+  DriveSpec,
+  EchoSpec,
+  EnsembleSpec,
+  InsertKindName,
+  PlateReverbSpec,
+} from '@windsor/engine';
 import {
   CHORUS_DEPTH_MAX_MS,
   CHORUS_DEPTH_MIN_MS,
@@ -11,14 +18,18 @@ import {
   CHORUS_RATE_MIN_HZ,
   DEFAULT_CHORUS,
   DEFAULT_DRIVE,
+  DEFAULT_ECHO,
   DEFAULT_ENSEMBLE,
+  DEFAULT_PLATE_REVERB,
   DRIVE_GAIN_MAX_DB,
   DRIVE_GAIN_MIN_DB,
   DRIVE_TONE_MAX_HZ,
   DRIVE_TONE_MIN_HZ,
   ENSEMBLE_BOUNDS,
+  REVERB_SPACE_RANGES,
 } from '@windsor/engine';
 import { fmt2, fmtDb, fmtHz } from './consoleFormat';
+import { DELAY_LINE_KNOBS, SPACE_KNOBS } from './returnControls';
 import type { SeqKnobOpts } from './sequencerKnobTables';
 
 /** What each kind is called on its card and in the Add picker. */
@@ -32,7 +43,15 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   tape: 'Tape',
   delay: 'Dub delay',
   ensemble: 'Ensemble',
+  plate: 'Plate reverb',
+  echo: 'Echo',
 };
+
+/** The on/off switch every insert card shows, the way the Dub delay's reads. */
+export const INSERT_SWITCH_OPTIONS: readonly { value: 'on' | 'off'; label: string }[] = [
+  { value: 'on', label: 'Enabled' },
+  { value: 'off', label: 'Bypassed' },
+];
 
 export interface InsertKnobEntry<S> {
   readonly f: Exclude<keyof S, 'kind'> & string;
@@ -106,3 +125,24 @@ export const ENSEMBLE_KNOBS: readonly InsertKnobEntry<EnsembleSpec>[] = ENSEMBLE
     },
   }),
 );
+
+/** The Plate reverb's knobs (windsor#171): the return's 13 space knobs, then Mix. */
+export const PLATE_REVERB_KNOBS: readonly InsertKnobEntry<PlateReverbSpec>[] = [
+  ...SPACE_KNOBS.map(({ f, label, o }) => ({
+    f,
+    label,
+    o: {
+      ...o,
+      min: REVERB_SPACE_RANGES[f][0],
+      max: REVERB_SPACE_RANGES[f][1],
+      def: DEFAULT_PLATE_REVERB[f],
+    },
+  })),
+  { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_PLATE_REVERB.mix, fmt: fmt2 } },
+];
+
+/** The Echo's knobs (windsor#171): the return's Time, Regen, Damp and Q, then Mix. */
+export const ECHO_KNOBS: readonly InsertKnobEntry<EchoSpec>[] = [
+  ...DELAY_LINE_KNOBS.map(({ f, label, o }) => ({ f, label, o: { ...o, def: DEFAULT_ECHO[f] } })),
+  { f: 'mix', label: 'Mix', o: { min: 0, max: 1, def: DEFAULT_ECHO.mix, fmt: fmt2 } },
+];
