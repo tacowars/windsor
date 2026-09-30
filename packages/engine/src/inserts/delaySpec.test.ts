@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { makeArrangement } from '../song/arrangementDocument';
+import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { FULL_ARRANGEMENT } from '../__fixtures__/fullArrangement';
 import { DELAY_INSERT } from './delayInsert';
 import { DEFAULT_DELAY } from './delaySpec';
@@ -47,7 +48,7 @@ describe('delay insert and preset song contract', () => {
       const effect = applyDelayPreset(DEFAULT_DELAY, preset.id);
       const raw = {
         ...FULL_ARRANGEMENT,
-        version: 3,
+        version: ARRANGEMENT_VERSION,
         patches: { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} },
         parts: FULL_ARRANGEMENT.parts.map((part) => ({ ...part, strip: { inserts: [effect] } })),
         master: { inserts: [effect] },

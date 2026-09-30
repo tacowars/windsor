@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { makeArrangement } from '../song/arrangementDocument';
+import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { FULL_ARRANGEMENT } from '../__fixtures__/fullArrangement';
 import { TAPE_INSERT } from './tapeInsert';
 import { DEFAULT_TAPE } from './tapeSpec';
@@ -56,7 +57,7 @@ it('round trips every tape control on tracks and master, preserving the complete
     };
     const result = makeArrangement({
       ...FULL_ARRANGEMENT,
-      version: 3,
+      version: ARRANGEMENT_VERSION,
       patches: { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} },
       parts: FULL_ARRANGEMENT.parts.map((part) => ({ ...part, strip: { inserts: [effect] } })),
       master: { inserts: [effect] },

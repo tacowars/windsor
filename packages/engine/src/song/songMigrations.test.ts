@@ -2,23 +2,23 @@
  * Song format upgrades (record `2026-09-28-format-versions-refuse-never-destroy`):
  * a version this build cannot read is refused with both versions named, an
  * upgrade runs before the check and chains, and a song whose snapshot holds a
- * patch of an unreadable format is refused whole. The one shipped upgrade,
- * 3 → 4 (windsor#172), turns the fixed returns into the send buses.
+ * patch of an unreadable format is refused whole. No upgrade ships: versions
+ * 2 (#705) and 3 (record `2026-10-01-retire-song-version-3`) are refused.
+ * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
  */
 import { describe, expect, it } from 'vitest';
 
-import { ARRANGEMENT_VERSION, DELAY_RESONANCE_DEFAULT_DB } from '../audioConstants';
+import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { KICK, song } from '../__fixtures__/documentCases';
-import { withoutInsertIds } from '../__fixtures__/insertIds';
-import { DEFAULT_ECHO } from '../inserts/echoInsert';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
-import { RETURNS } from '../mixer/mix';
-import { SPACES } from '../mixer/reverbSpace';
 import { makeArrangement } from './arrangementDocument';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { SONG_MIGRATIONS, upgradeSong } from './songMigrations';
 
 type Doc = Record<string, unknown>;
+type Upgrade = (doc: Doc) => Doc;
+
+const NEWER = ARRANGEMENT_VERSION + 1;
+const BEHIND = ARRANGEMENT_VERSION - 1;
 
 /** A song as a version-1 file might have held it: the same parts under an older key. */
 const versionOne = (): Doc => {
@@ -26,49 +26,74 @@ const versionOne = (): Doc => {
   return { ...rest, version: 1, tracks: parts };
 };
 
-/** 1→2 renames `tracks` to `parts`; 2→3 records that it ran; 3→4 changes nothing. */
-const TABLE = {
-  1: ({ tracks, ...doc }: Doc): Doc => ({ ...doc, version: 2, parts: tracks }),
-  2: (doc: Doc): Doc => ({ ...doc, version: 3, harmony: { root: 2 } }),
-  3: (doc: Doc): Doc => doc,
-};
+/** 1 → 2 renames `tracks` to `parts`. */
+const rename: Upgrade = ({ tracks, ...doc }) => ({ ...doc, parts: tracks });
+/** The last step records that it ran. */
+const mark: Upgrade = (doc) => ({ ...doc, harmony: { root: 2 } });
+const unchanged: Upgrade = (doc) => doc;
+
+/** A chain from version 1 to this build's: rename first, mark last, and every step between changes nothing. */
+const TABLE: Record<number, Upgrade> = Object.fromEntries(
+  Array.from({ length: BEHIND }, (_, i) => i + 1).map((from) => [
+    from,
+    from === 1 ? rename : from === BEHIND ? mark : unchanged,
+  ]),
+);
 
 describe('upgradeSong', () => {
-  it('ships one upgrade, 3 → 4: version 2 was retired by #705 without one', () => {
-    expect(ARRANGEMENT_VERSION).toBe(4);
-    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['3']);
+  it('ships no upgrade: versions 2 and 3 were retired without one', () => {
+    expect(SONG_MIGRATIONS).toEqual({});
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {
-    const raw = { ...song([KICK]), version: 5 };
+    const raw = { ...song([KICK]), version: NEWER };
     const { document, refused } = upgradeSong(raw);
     expect(document).toBe(raw);
     expect(refused).toEqual({
       format: 'song',
-      found: 5,
-      reads: 4,
-      message: 'saved with song format 5, this build reads 4',
+      found: NEWER,
+      reads: ARRANGEMENT_VERSION,
+      message: `saved with song format ${NEWER}, this build reads ${ARRANGEMENT_VERSION}`,
     });
   });
 
   it('refuses a newer version through makeArrangement: unusable, the fallback, the refusal', () => {
-    const result = makeArrangement({ ...song([KICK]), version: 5 });
+    const result = makeArrangement({ ...song([KICK]), version: NEWER });
     expect(result.usable).toBe(false);
     expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
-    expect(result.refused?.message).toBe('saved with song format 5, this build reads 4');
-    expect(result.corrections[0]).toBe('version: 5 is not 4');
+    expect(result.refused?.message).toBe(
+      `saved with song format ${NEWER}, this build reads ${ARRANGEMENT_VERSION}`,
+    );
+    expect(result.corrections[0]).toBe(`version: ${NEWER} is not ${ARRANGEMENT_VERSION}`);
   });
 
   it('refuses version 2 with the reason #705 gave', () => {
     const result = makeArrangement({ ...song([KICK]), version: 2 });
-    expect(result.refused).toMatchObject({ found: 2, reads: 4 });
+    expect(result.refused).toMatchObject({ found: 2, reads: ARRANGEMENT_VERSION });
     expect(result.corrections[0]).toBe(
-      'version: 2 is not 4 — version 2 is not supported since #705',
+      `version: 2 is not ${ARRANGEMENT_VERSION} — version 2 is not supported since #705`,
     );
   });
 
+  it('refuses version 3, retired with no upgrade, with the standard message', () => {
+    const raw = { ...song([KICK]), version: 3 };
+    const { document, refused } = upgradeSong(raw);
+    expect(document).toBe(raw);
+    expect(refused).toEqual({
+      format: 'song',
+      found: 3,
+      reads: ARRANGEMENT_VERSION,
+      message: `saved with song format 3, this build reads ${ARRANGEMENT_VERSION}`,
+    });
+    const result = makeArrangement(raw);
+    expect(result.usable).toBe(false);
+    expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
+    expect(result.refused).toEqual(refused);
+    expect(result.corrections[0]).toBe(`version: 3 is not ${ARRANGEMENT_VERSION}`);
+  });
+
   it('leaves a document with no integer version to the normaliser, unrefused', () => {
-    for (const version of [undefined, '4', 1.5]) {
+    for (const version of [undefined, String(ARRANGEMENT_VERSION), 1.5]) {
       const raw = { ...song([KICK]), version };
       expect(upgradeSong(raw)).toEqual({ document: raw });
       const result = makeArrangement(raw);
@@ -78,14 +103,14 @@ describe('upgradeSong', () => {
   });
 
   it('upgrades a song one version behind, before the check', () => {
-    const two = { ...song([KICK]), version: 2 };
-    const table = { songs: { 2: TABLE[2], 3: TABLE[3] }, patches: {} };
-    const { document, refused } = upgradeSong(two, table);
+    const behind = { ...song([KICK]), version: BEHIND };
+    const table = { songs: { [BEHIND]: mark }, patches: {} };
+    const { document, refused } = upgradeSong(behind, table);
     expect(refused).toBeUndefined();
-    expect(document).toMatchObject({ version: 4, harmony: { root: 2 } });
+    expect(document).toMatchObject({ version: ARRANGEMENT_VERSION, harmony: { root: 2 } });
   });
 
-  it('chains 1→2→3→4, and the result normalises clean', () => {
+  it("chains from version 1 to this build's, and the result normalises clean", () => {
     const { document, refused } = upgradeSong(versionOne(), { songs: TABLE, patches: {} });
     expect(refused).toBeUndefined();
     expect(document).toEqual({ ...song([KICK]), harmony: { root: 2 } });
@@ -97,115 +122,11 @@ describe('upgradeSong', () => {
 
   it('refuses a version whose chain breaks part way, never half-upgraded', () => {
     const raw = versionOne();
-    const { document, refused } = upgradeSong(raw, { songs: { 1: TABLE[1] }, patches: {} });
+    const { document, refused } = upgradeSong(raw, { songs: { 1: rename }, patches: {} });
     expect(document).toBe(raw);
-    expect(refused?.message).toBe('saved with song format 1, this build reads 4');
-  });
-});
-
-describe('the 3 → 4 upgrade: the returns become the send buses (windsor#172)', () => {
-  const ROOM = { kind: 'reverb', level: 0.5, space: { ...SPACES.cathedral, size: 2 } };
-  const ECHO = {
-    kind: 'delay',
-    level: 0.4,
-    delayTime: 0.375,
-    feedback: 0.5,
-    damp: 2400,
-    resonance: 6,
-  };
-  const withSends = (sends: Doc): Doc => ({ ...KICK, strip: { level: 0.8, sends } });
-  const v3 = (rest: Doc = {}, sends: Doc = { room: 0.25, echo: 1 }): Doc => ({
-    ...song([withSends(sends)], rest),
-    version: 3,
-  });
-
-  it('turns room into Send A holding its plate, and echo into Send B holding its line, at Mix 1', () => {
-    const result = makeArrangement(v3({ returns: { room: ROOM, echo: ECHO } }));
-    expect(result.corrections).toEqual([]);
-    expect(result.document.version).toBe(4);
-    expect(withoutInsertIds(result.document.returns)).toEqual({
-      a: {
-        level: 0.5,
-        inserts: [{ ...DEFAULT_PLATE_REVERB, ...SPACES.cathedral, size: 2, mix: 1 }],
-      },
-      b: {
-        level: 0.4,
-        inserts: [
-          { ...DEFAULT_ECHO, delayTime: 0.375, feedback: 0.5, damp: 2400, resonance: 6, mix: 1 },
-        ],
-      },
-    });
-    expect(result.document.parts[0]?.strip.sends).toEqual({ a: 0.25, b: 1 });
-  });
-
-  it("fills what a v3 return left out from the v3 return's own base", () => {
-    const result = makeArrangement(v3({ returns: { room: {}, echo: { level: 0.3 } } }));
-    expect(result.corrections).toEqual([]);
-    expect(withoutInsertIds(result.document.returns)).toEqual({
-      a: RETURNS.a,
-      b: { level: 0.3, inserts: RETURNS.b.inserts },
-    });
-    const [echo] = RETURNS.b.inserts;
-    expect(echo).toMatchObject({ delayTime: 0.28, feedback: 0.3, damp: 3200 });
-    expect(echo).toMatchObject({ resonance: DELAY_RESONANCE_DEFAULT_DB });
-  });
-
-  it('leaves an absent returns absent, and a missing return to the code', () => {
-    expect(makeArrangement(v3()).document.returns).toBeUndefined();
-    const echoOnly = makeArrangement(v3({ returns: { echo: { level: 0.3 } } }));
-    expect(Object.keys(echoOnly.document.returns ?? {})).toEqual(['b']);
-  });
-
-  it('drops the returns and sends v3 dropped, and hands a junk room on as v3 read it', () => {
-    const upgraded = upgradeSong(v3({ returns: { room: 7, cave: { level: 1 } } }, { hall: 0.5 }));
-    expect(upgraded.document).toMatchObject({
-      version: 4,
-      returns: { a: 7 },
-      parts: [{ strip: { sends: {} } }],
-    });
-    const result = makeArrangement(upgraded.document);
-    expect(result.dangling).toEqual([]);
-    expect(withoutInsertIds(result.document.returns)).toEqual({ a: RETURNS.a });
-  });
-
-  it('carries only the space fields v3 read: an unknown or colliding key cannot turn Send A', () => {
-    const space = { ...SPACES.cathedral, kind: 'echo', mix: 0, bogus: 1 };
-    const result = makeArrangement(v3({ returns: { room: { level: 0.5, space } } }));
-    expect(result.corrections).toEqual([]);
-    expect(withoutInsertIds(result.document.returns?.['a'])).toEqual({
-      level: 0.5,
-      inserts: [{ ...DEFAULT_PLATE_REVERB, ...SPACES.cathedral, mix: 1 }],
-    });
-  });
-
-  it('carries only the line fields v3 read from the echo return', () => {
-    const echo = { ...ECHO, mix: 0, bogus: 1 };
-    const result = makeArrangement(v3({ returns: { echo } }));
-    expect(result.corrections).toEqual([]);
-    expect(withoutInsertIds(result.document.returns?.['b'])).toEqual({
-      level: 0.4,
-      inserts: [
-        { ...DEFAULT_ECHO, delayTime: 0.375, feedback: 0.5, damp: 2400, resonance: 6, mix: 1 },
-      ],
-    });
-  });
-
-  it('lets room and echo win over a v3 send already named a or b', () => {
-    const sends = { room: 0.25, a: 1, b: 0.1, echo: 0.5 };
-    const result = makeArrangement(v3({ returns: { room: ROOM, echo: ECHO } }, sends));
-    expect(result.document.parts[0]?.strip.sends).toEqual({ a: 0.25, b: 0.5 });
-  });
-
-  it('drops a lone v3 a, which v3 never read, rather than making it a send', () => {
-    const result = makeArrangement(v3({ returns: { room: ROOM } }, { a: 1 }));
-    expect(result.document.parts[0]?.strip.sends).toEqual({});
-  });
-
-  it('upgrades a v3 song once: a v4 song saved from it reads back unchanged', () => {
-    const first = makeArrangement(v3({ returns: { room: ROOM, echo: ECHO } }));
-    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
-    expect(again.corrections).toEqual([]);
-    expect(again.document).toEqual(first.document);
+    expect(refused?.message).toBe(
+      `saved with song format 1, this build reads ${ARRANGEMENT_VERSION}`,
+    );
   });
 });
 

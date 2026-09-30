@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { ArpSpec, ArpStep, Harmony, HarmonyChord, StepModLane } from '@windsor/engine';
 import {
   ARP_STEPS_MAX,
+  ARRANGEMENT_VERSION,
   DEFAULT_ARP_CONFIG,
   STEP_MOD_PARAMS,
   arpCellPitch,
@@ -243,7 +244,7 @@ describe("a cell's slide over the shown cycle", () => {
 describe("the grid's knobs on the Arp card", () => {
   it('default to what the normaliser writes for a bare arp part', () => {
     const bare = new DocumentModel({
-      version: 3,
+      version: ARRANGEMENT_VERSION,
       parts: [{ slot: 0, name: 'Arp', preset: 'saw-arp', sequencer: { kind: 'arp' } }],
     });
     const sequencer = partAt(bare.doc, 0)!.sequencer;
