@@ -137,6 +137,13 @@ describe('the drive sound', () => {
     const { input, output } = await render({ ...DEFAULT_DRIVE, mix: 0 }, MINUS_12_DBFS);
     expect(output.left).toEqual(input.left);
   });
+
+  it('passes the input through unchanged when switched off (windsor#171)', async () => {
+    const off = { ...DEFAULT_DRIVE, drive: DRIVEN_DB, mix: 1, enabled: false };
+    const { input, output } = await render(off, MINUS_12_DBFS);
+    expect(output.left).toEqual(input.left);
+    expect(output.right).toEqual(input.right);
+  });
 });
 
 describe('DRIVE_INSERT.normalise', () => {
@@ -149,5 +156,14 @@ describe('DRIVE_INSERT.normalise', () => {
       'x.fuzz: unknown key dropped',
       `x.drive: clamped 99 to ${DRIVE_GAIN_MAX_DB}`,
     ]);
+  });
+
+  it('loads a spec with no `enabled` as on, and keeps a switched-off one off', async () => {
+    const { FieldNormaliser } = await import('../song/arrangementFields');
+    const n = new FieldNormaliser();
+    expect(DEFAULT_DRIVE.enabled).toBe(true);
+    expect(DRIVE_INSERT.normalise({ kind: 'drive', drive: 6 }, 'x', n).enabled).toBe(true);
+    expect(DRIVE_INSERT.normalise({ kind: 'drive', enabled: false }, 'x', n).enabled).toBe(false);
+    expect(n.corrections).toEqual([]);
   });
 });

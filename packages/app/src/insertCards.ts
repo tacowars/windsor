@@ -17,6 +17,8 @@ import { ensembleCard } from './ensembleCard';
 import { tapeCard } from './tapeCard';
 import { phaserCard } from './phaserCard';
 import { retroReverbCard } from './retroReverbCard';
+import { plateReverbCard } from './plateReverbCard';
+import { echoCard } from './echoCard';
 
 /** The knobs of the insert at `index` in the part's strip. */
 export type InsertCard = (ctx: AppCtx, slot: InsertTarget, index: number) => HTMLElement;
@@ -31,4 +33,6 @@ export const INSERT_CARDS: Readonly<Record<InsertKindName, InsertCard>> = {
   tape: tapeCard,
   delay: delayCard,
   ensemble: ensembleCard,
+  plate: plateReverbCard,
+  echo: echoCard,
 };

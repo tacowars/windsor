@@ -468,3 +468,19 @@ export {
   upgradePatchFile,
 } from './patch/patchMigrations';
 export type { FormatRefusal, Migration, MigrationTable } from './song/formatUpgrade';
+
+// The Plate reverb and Echo insert kinds (windsor#171).
+export {
+  DEFAULT_PLATE_REVERB,
+  PLATE_REVERB_INSERT,
+  PLATE_SPACE_FIELDS,
+  plateSpace,
+} from './inserts/plateReverbInsert';
+export type { PlateReverbSpec } from './inserts/plateReverbInsert';
+export {
+  PLATE_REVERB_MIX_DEFAULT,
+  PLATE_REVERB_SPACE_DEFAULT,
+} from './inserts/plateReverbConstants';
+export { DEFAULT_ECHO, ECHO_INSERT } from './inserts/echoInsert';
+export type { EchoSpec } from './inserts/echoInsert';
+export { ECHO_BOUNDS, ECHO_MIX_DEFAULT } from './inserts/echoConstants';
