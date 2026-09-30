@@ -4,10 +4,12 @@
  *
  * A stem is one part's strip, post-fader and pre-master with its sends
  * excluded, or one return (decision 1). A part whose strip is routed
- * "Sidechain only" is silent in the master: Windsor has no mute or solo, so
- * that is the muted part decision 4 names, skipped unless the caller asks
- * for it. A return is exported when a part the master hears sends to it;
- * with no send it is silence, and no file.
+ * "Sidechain only" is silent in the master: it is the muted part decision 4
+ * names (written before Windsor had mute and solo), skipped unless the
+ * caller asks for it. A part muted, or soloed out by another's solo
+ * (windsor#154), is listed and renders silent, as playback plays it. A
+ * return is exported when a part the master hears sends to it; with no send
+ * it is silence, and no file.
  *
  * A pass renders the master on channels 0–1 and its stems on the pairs after
  * (decision 2): as many as the channel limit allows, and fewer when the
@@ -15,6 +17,7 @@
  * samples than `RENDER_STEM_PASS_MAX_SAMPLES`.
  */
 import { RETURN_NAMES } from '../mixer/mix';
+import { anySoloed, isHeard } from '../mixer/soloRule';
 import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
 import {
   RENDER_CHANNELS,
@@ -27,7 +30,10 @@ export interface PartStem {
   readonly kind: 'part';
   readonly slot: number;
   readonly name: string;
-  /** Routed "Sidechain only": silent in the master, exported only on request. */
+  /**
+   * Routed "Sidechain only": silent in the master, exported only on request.
+   * Not the strip's `mute` (windsor#154): a muted part's stem is listed, and silent.
+   */
   readonly muted: boolean;
 }
 
@@ -47,21 +53,22 @@ export interface StemChoice {
   includeMuted?: boolean;
 }
 
-export const isMuted = (part: DocumentPart): boolean => part.strip.output === 'sidechain';
+export const isSidechainOnly = (part: DocumentPart): boolean => part.strip.output === 'sidechain';
 
 /** The stems of `document`, parts by slot, then the returns in the desk's order. */
 export function stemSources(document: ArrangementDocument, choice: StemChoice = {}): StemSource[] {
   const parts = [...document.parts]
     .sort((a, b) => a.slot - b.slot)
-    .filter((part) => choice.includeMuted || !isMuted(part))
+    .filter((part) => choice.includeMuted || !isSidechainOnly(part))
     .map<PartStem>((part) => ({
       kind: 'part',
       slot: part.slot,
       name: part.name,
-      muted: isMuted(part),
+      muted: isSidechainOnly(part),
     }));
-  // A muted part's sends are gated with its dry path, so only an audible part feeds a return.
-  const heard = document.parts.filter((part) => !isMuted(part));
+  // Sidechain only, mute and solo gate the sends with the dry path, so only a heard part feeds a return.
+  const soloing = anySoloed(document.parts.map((part) => part.strip));
+  const heard = document.parts.filter((part) => isHeard(part.strip, soloing));
   const returns = RETURN_NAMES.filter((name) =>
     heard.some((part) => (part.strip.sends[name] ?? 0) > 0),
   ).map<ReturnStem>((name) => ({ kind: 'return', name }));

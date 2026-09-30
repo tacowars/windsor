@@ -178,6 +178,28 @@ describe('the part list (#597)', () => {
     expect(again.corrections).toEqual([]);
   });
 
+  it('round-trips mute and solo, and stores each only while it is on (windsor#154)', () => {
+    const first = makeArrangement(song([{ ...KICK, strip: { mute: true, solo: true } }]));
+    expect(first.document.parts[0]?.strip).toMatchObject({ mute: true, solo: true });
+    const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
+    expect(again.document.parts[0]?.strip).toEqual(first.document.parts[0]?.strip);
+    expect(again.corrections).toEqual([]);
+
+    const off = makeArrangement(song([{ ...KICK, strip: { mute: false, solo: false } }]));
+    expect(off.document.parts[0]?.strip).not.toHaveProperty('mute');
+    expect(off.document.parts[0]?.strip).not.toHaveProperty('solo');
+    expect(off.corrections).toEqual([]);
+  });
+
+  it('corrects a mute that is not a boolean to an explicit false, the default undo reads back', () => {
+    const result = makeArrangement(song([{ ...KICK, strip: { mute: null, solo: 'on' } }]));
+    expect(result.document.parts[0]?.strip).toMatchObject({ mute: false, solo: false });
+    expect(result.corrections).toEqual([
+      'parts[0].strip.mute: null is not a boolean — using false',
+      'parts[0].strip.solo: "on" is not a boolean — using false',
+    ]);
+  });
+
   it('is unusable when the version is not 3', () => {
     for (const version of [undefined, 1, 2, '3', 4]) {
       const result = makeArrangement({ ...song([KICK]), version });

@@ -48,6 +48,20 @@ export interface PartStrip {
   readonly part: AudioPart;
   readonly insertSpecs: readonly InsertSpec[];
   setOutput(output: ChannelStrip['output']): void;
+  /** Mute (windsor#154): the audible gate closes, cutting the dry path and every send. */
+  readonly mute: boolean;
+  setMute(mute: boolean): void;
+  /**
+   * This strip's own solo flag (windsor#154). It changes nothing here: the
+   * roster reads every music strip's flag and sets `soloedOut` on the rest
+   * (`MusicRoster.resolveSolo`).
+   */
+  readonly solo: boolean;
+  setSolo(solo: boolean): void;
+  /** Silenced by another part's solo: the audible gate closes, as for mute. */
+  readonly soloedOut: boolean;
+  /** `seconds` is the ramp, the insert fade by default; 0 sets it at once. */
+  setSoloedOut(soloedOut: boolean, seconds?: number): void;
   /** The strip's stages, in signal order: the low cut, then the inserts. */
   readonly stages: readonly StripStage[];
   /** The first stage (#640). */
@@ -96,7 +110,7 @@ const laterByTimeout = (run: () => void, seconds: number): void => {
   setTimeout(run, seconds * MS_PER_SECOND);
 };
 
-// eslint-disable-next-line max-lines-per-function -- one strip graph and its lifetime; detector metadata and output switching share the same owned tap
+// eslint-disable-next-line max-lines-per-function -- one strip graph and its lifetime; detector metadata, output, mute and solo share the same owned tap
 export function routePart(
   part: AudioPart,
   strip: ChannelStrip,
@@ -120,14 +134,29 @@ export function routePart(
   const inserts = createInsertChain(context, lowCut.output, strip.inserts, registry, part.name);
   const tap = createTap(context, strip, returns, dry, inserts.tail);
   const updates = createInsertUpdater(inserts, tap, later, options.changed);
-  const { rotation, sends } = tap;
+  const { rotation, sends, gate } = tap;
+  let solo = strip.solo === true;
 
   return {
     part,
     get insertSpecs(): readonly InsertSpec[] {
       return inserts.specs;
     },
-    setOutput: (output) => tap.setOutput(output),
+    setOutput: (output) => gate.setOutput(output),
+    get mute(): boolean {
+      return gate.mute;
+    },
+    setMute: (mute) => gate.setMute(mute),
+    get solo(): boolean {
+      return solo;
+    },
+    setSolo(next: boolean): void {
+      solo = next;
+    },
+    get soloedOut(): boolean {
+      return gate.soloedOut;
+    },
+    setSoloedOut: (soloedOut, seconds) => gate.setSoloedOut(soloedOut, seconds),
     get stages(): readonly StripStage[] {
       return [lowCut, ...inserts.stages];
     },

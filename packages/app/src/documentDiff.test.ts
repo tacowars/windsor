@@ -5,19 +5,22 @@
  * console makes them, by merging an edit's partial into a fixture and
  * normalising, so `b` is always a document the model could hold.
  */
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
-import type { ArrangementDocument, DocumentPartial } from '@windsor/engine';
+import type { ArrangementDocument, DocumentPartial, PartStrip } from '@windsor/engine';
 import {
   DEFAULT_DRIVE,
   RETURNS,
   TICKS_PER_BAR,
   clonePatch,
   makeArrangement,
+  musicPartName,
   partAt,
   removePartChange,
 } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
+import type { FakeGain, FakeNode } from '@windsor/engine/__fixtures__/fakeAudioNodes';
+import { installSidechainWorklet, sidechainRig } from '@windsor/engine/__fixtures__/sidechainRig';
 import { PRESETS } from '@windsor/engine/patch/presets';
 import { partChange } from './context';
 import { deepEqual, documentDiff, documentDiffLive } from './documentDiff';
@@ -27,6 +30,9 @@ import { addPartChange, sequencerKindChange } from './partEdits';
 import { followSongLength } from './regionModel';
 import { newSong } from './songParts';
 import { barsChange, loopToggle, swingChange } from './transportModel';
+
+const restoreWorklet = installSidechainWorklet();
+afterAll(restoreWorklet);
 
 const normalise = (raw: unknown): ArrangementDocument => makeArrangement(raw).document;
 const merged = (doc: ArrangementDocument, partial: unknown): ArrangementDocument =>
@@ -131,6 +137,8 @@ const PAIRS: ReadonlyArray<readonly [string, ArrangementDocument, ArrangementDoc
     FULL,
     after(FULL, partChange(HAT, { strip: { output: 'sidechain' } })),
   ],
+  ['a mute set', FULL, after(FULL, partChange(HAT, { strip: { mute: true } }))],
+  ['a solo set', FULL, after(FULL, partChange(HAT, { strip: { solo: true } }))],
   [
     'a harmony edit',
     FULL,
@@ -215,6 +223,25 @@ describe('documentDiffLive spells out a removed section for the engine', () => {
       parts: { [HAT]: { strip: { output: 'master' } } },
     });
     expect(deepEqual(live, partial)).toBe(false);
+  });
+
+  it('sends an undone mute and solo as an explicit false, which the live strip lands (windsor#154)', async () => {
+    const b = after(FULL, partChange(HAT, { strip: { mute: true, solo: true } }));
+    const { live, rebuild } = documentDiffLive(b, FULL, normalise);
+    expect(rebuild).toBe(false);
+    expect(live).toStrictEqual({ parts: { [HAT]: { strip: { mute: false, solo: false } } } });
+    // The live system the undo reaches: muted and soloed, then back.
+    const { system } = await sidechainRig(b);
+    const hat = system.strip(musicPartName(HAT))!;
+    const kick = system.strip(musicPartName(FULL_SLOT.kick))!;
+    // The audible gain after a strip's head, which mute and solo close.
+    const gate = (strip: PartStrip): number =>
+      ((strip.head as unknown as FakeNode).outbound[0]!.to as FakeGain).gain.value;
+    expect([hat.mute, kick.soloedOut, gate(hat), gate(kick)]).toEqual([true, true, 0, 0]);
+    expect(system.apply(live)).toEqual({ ok: true, ignored: [] });
+    expect([hat.mute, hat.solo, kick.soloedOut]).toEqual([false, false, false]);
+    expect([gate(hat), gate(kick)]).toEqual([1, 1]);
+    system.dispose();
   });
 
   it('sends a removed loop as the whole song, off', () => {
