@@ -262,6 +262,16 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    152 µs.
 4. **Compressor**: 7 680 bytes a quantum (2.6 MB/s), **+3.1 a second**;
    longest 164 µs.
+   **After windsor#229: 0 bytes a quantum**, in every one of the 10 147
+   measured calls of a 30.0 s trace of `b-compressor` with the meter off
+   (same machine and headless Chrome 154, this method, the worktree's dev
+   server; one-minute load average 3.83 before and 4.97 after the trace).
+   The thread collected 1.24 times a second, scenario a's rate: the FM
+   part's garbage alone. The compressor's median call read 13 µs (14
+   before) and the median quantum span 157 µs (154 before), both traced.
+   The meter-on pass after it read the CPU button at 3–4 % with no
+   underrun. Summary:
+   [`summaries/b-compressor-after.json`](summaries/b-compressor-after.json).
 5. **Retro reverb**: 6 337 bytes a quantum (2.2 MB/s), **+2.6 a second**;
    longest 209 µs.
 6. **Phaser**: 6 186 bytes a quantum (2.1 MB/s), **+2.5 a second**; longest
