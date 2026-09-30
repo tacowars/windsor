@@ -8,9 +8,14 @@
  * its eleven stages' order is the algorithm. Both are functions over the
  * processor, installed on its prototype by `reverbProcessor.ts`, so each body
  * is the method it was in the hand-written `reverb-processor.js`, line for
- * line. Invariant: no allocation in the render. `mixer/reverbGolden.test.ts`
- * pins every sample; `mixer/reverbProcessor.test.ts` and
- * `mixer/reverbSleep.test.ts` hold its behaviour.
+ * line, but for how a sample crosses a call (windsor#227): the reads leave
+ * theirs in `this._value`, `_write1` stores `this._value`, the cubic reads take
+ * their excursion in `this._offset`, and the block's one-pole coefficients
+ * land in `this._poles`. V8 boxes a double passed to or returned from a call
+ * it does not inline, a heap allocation each (`delayLines.ts`). Invariant: no
+ * allocation in the render. `mixer/reverbGolden.test.ts` pins every sample;
+ * `mixer/reverbProcessor.test.ts` and `mixer/reverbSleep.test.ts` hold its
+ * behaviour, and `mixer/reverbAllocation.test.ts` its allocation on V8.
  */
 
 import {
@@ -21,25 +26,38 @@ import {
   OUTPUT_TRIM,
   SLEEP_OUTPUT_FLOOR,
   SMOOTH_SECONDS,
-  TAP_LINE,
   TAP_SIGN,
   TAP_TIME,
   TAPS_PER_SIDE,
 } from './reverbConstants';
 import type { DattorroReverb } from './reverbProcessor';
 
-/** One-pole coefficient for a cutoff in Hz. */
-function poleCoefficient(hz: number): number {
-  return 1 - Math.exp((-2 * Math.PI * Math.min(hz, sampleRate * 0.49)) / sampleRate);
+/** The parameters the block's one-pole coefficients are cut from, in `_poles` order. */
+const POLE_CUTS = ['inputHighCut', 'inputLowCut', 'tankHighCut', 'tankLowCut'];
+
+/**
+ * Each one-pole coefficient for this block's cutoffs in Hz, into `poles`. One
+ * call for all four, and nothing but arrays crosses it: a coefficient
+ * returned from a call V8 does not inline is a new heap number.
+ */
+function poleCoefficients(parameters: Record<string, Float32Array>, poles: Float64Array): void {
+  for (let k = 0; k < POLE_CUTS.length; k++) {
+    const hz = parameters[POLE_CUTS[k]][0];
+    poles[k] = 1 - Math.exp((-2 * Math.PI * Math.min(hz, sampleRate * 0.49)) / sampleRate);
+  }
 }
 
-/** Mono sum of the input into the pre-delay ring, and the dry output. */
+/**
+ * Mono sum of the input into the pre-delay ring, and the dry output. It reads
+ * `dry` from the parameters itself, so no double crosses the call.
+ */
 function _writeInput(
   this: DattorroReverb,
   input: Float32Array[],
   output: Float32Array[],
-  dry: number,
+  parameters: Record<string, Float32Array>,
 ): void {
+  const dry = parameters.dry[0];
   const left = output[0];
   const right = output[1];
 
@@ -82,21 +100,23 @@ function _renderBlock(
   const inputQuiet = this._sleepEnabled && !held && this._inputQuiet(input);
   let loudest = 0;
 
-  this._writeInput(input, output, parameters.dry[0]);
+  this._writeInput(input, output, parameters);
 
   // Smoothing runs per block. A block is 2.7 ms at 48 kHz, so a SIZE sweep
   // steps its delay lengths in sub-sample increments rather than zippering.
   const smooth = Math.min(1, 128 / (SMOOTH_SECONDS * sampleRate));
   this._size += smooth * (parameters.size[0] - this._size);
   this._inputGain += smooth * ((held ? 0 : 1) - this._inputGain);
-  this._applySize(this._size, false);
+  this._applySize(false);
 
   const preDelaySamples = Math.min(
     this._preDelayLength - 128,
     Math.round(parameters.preDelay[0] * sampleRate),
   );
-  const inputLp = poleCoefficient(parameters.inputHighCut[0]);
-  const inputHp = poleCoefficient(parameters.inputLowCut[0]);
+  const poles = this._poles;
+  poleCoefficients(parameters, poles);
+  const inputLp = poles[0];
+  const inputHp = poles[1];
   // HOLD bypasses the tank filters -- an infinite decay through a damper is
   // still a decay, just a slower and duller one -- but it bypasses their
   // *output*, not their coefficients. Freezing the high-pass by zeroing its
@@ -107,8 +127,8 @@ function _renderBlock(
   // which barely charge a 20 Hz high-pass -- held steady and hid it.
   // Both states keep tracking at their real coefficients so that releasing
   // HOLD does not step either filter.
-  const dampLp = poleCoefficient(parameters.tankHighCut[0]);
-  const dampHp = poleCoefficient(parameters.tankLowCut[0]);
+  const dampLp = poles[2];
+  const dampHp = poles[3];
 
   const diffuse1 = parameters.diffusionIn1[0];
   const diffuse2 = parameters.diffusionIn2[0];
@@ -144,42 +164,92 @@ function _renderBlock(
     const shaped = this._inputLp - this._inputHp;
 
     // Pre-tank: four all-passes, the first pair at diffusion 1, second at 2.
-    let pre = this._write1(0, shaped - diffuse1 * this._read(0, 0));
-    pre = this._write1(1, diffuse1 * (pre - this._read(1, 0)) + this._read(0, 0));
-    pre = this._write1(2, diffuse1 * pre + this._read(1, 0) - diffuse2 * this._read(2, 0));
-    pre = this._write1(3, diffuse2 * (pre - this._read(3, 0)) + this._read(2, 0));
+    // Each read leaves its sample in `_value`, and `_write1` stores `_value`;
+    // every expression is the one the returning reads were summed in.
+    this._read(0, 0);
+    this._value = shaped - diffuse1 * this._value;
+    this._write1(0);
+    let pre = this._value;
+    this._read(1, 0);
+    let first = this._value;
+    this._read(0, 0);
+    this._value = diffuse1 * (pre - first) + this._value;
+    this._write1(1);
+    pre = this._value;
+    this._read(1, 0);
+    first = this._value;
+    this._read(2, 0);
+    this._value = diffuse1 * pre + first - diffuse2 * this._value;
+    this._write1(2);
+    pre = this._value;
+    this._read(3, 0);
+    first = this._value;
+    this._read(2, 0);
+    this._value = diffuse2 * (pre - first) + this._value;
+    this._write1(3);
+    pre = this._value;
 
     this._denormal = -this._denormal;
-    const split = diffuse2 * pre + this._read(3, 0) + this._denormal;
+    this._read(3, 0);
+    const split = diffuse2 * pre + this._value + this._denormal;
 
     const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
     const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
 
     // Left loop. Line 11 is the right loop's output, and vice versa: the
     // cross-feed is what makes this a figure of eight rather than two tanks.
-    let node = this._write1(4, split + decay * this._read(11, 0) + tank1 * this._readCubic(4, exc));
-    this._write1(5, this._readCubic(4, exc) - tank1 * node);
-    const rawLeft = this._read(5, 0);
+    this._read(11, 0);
+    first = this._value;
+    this._offset = exc;
+    this._readCubic(4);
+    this._value = split + decay * first + tank1 * this._value;
+    this._write1(4);
+    let node = this._value;
+    this._readCubic(4);
+    this._value = this._value - tank1 * node;
+    this._write1(5);
+    this._read(5, 0);
+    const rawLeft = this._value;
     this._dampLp[0] += dampLp * (rawLeft - this._dampLp[0]);
     this._dampHp[0] += dampHp * (this._dampLp[0] - this._dampHp[0]);
     const dampedLeft = held ? rawLeft : this._dampLp[0] - this._dampHp[0];
-    node = this._write1(6, decay * dampedLeft - tank2 * this._read(6, 0));
-    this._write1(7, this._read(6, 0) + tank2 * node);
+    this._read(6, 0);
+    this._value = decay * dampedLeft - tank2 * this._value;
+    this._write1(6);
+    node = this._value;
+    this._read(6, 0);
+    this._value = this._value + tank2 * node;
+    this._write1(7);
 
     // Right loop.
-    node = this._write1(8, split + decay * this._read(7, 0) + tank1 * this._readCubic(8, exc2));
-    this._write1(9, this._readCubic(8, exc2) - tank1 * node);
-    const rawRight = this._read(9, 0);
+    this._read(7, 0);
+    first = this._value;
+    this._offset = exc2;
+    this._readCubic(8);
+    this._value = split + decay * first + tank1 * this._value;
+    this._write1(8);
+    node = this._value;
+    this._readCubic(8);
+    this._value = this._value - tank1 * node;
+    this._write1(9);
+    this._read(9, 0);
+    const rawRight = this._value;
     this._dampLp[1] += dampLp * (rawRight - this._dampLp[1]);
     this._dampHp[1] += dampHp * (this._dampLp[1] - this._dampHp[1]);
     const dampedRight = held ? rawRight : this._dampLp[1] - this._dampHp[1];
-    node = this._write1(10, decay * dampedRight - tank2 * this._read(10, 0));
-    this._write1(11, this._read(10, 0) + tank2 * node);
+    this._read(10, 0);
+    this._value = decay * dampedRight - tank2 * this._value;
+    this._write1(10);
+    node = this._value;
+    this._read(10, 0);
+    this._value = this._value + tank2 * node;
+    this._write1(11);
 
     let left = 0;
     let right = 0;
     for (let t = 0; t < TAP_TIME.length; t++) {
-      const sample = TAP_SIGN[t] * this._readTap(TAP_LINE[t], this._tap[t]);
+      this._readTap(t);
+      const sample = TAP_SIGN[t] * this._value;
       if (t < TAPS_PER_SIDE) left += sample;
       else right += sample;
     }
@@ -220,4 +290,4 @@ function _renderBlock(
   return true;
 }
 
-export { poleCoefficient, _writeInput, _renderBlock };
+export { poleCoefficients, _writeInput, _renderBlock };

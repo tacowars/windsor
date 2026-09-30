@@ -6,10 +6,17 @@
  * write head for the output taps, cubic for the two modulated tank lines.
  * Each is a function over the processor (`this: DattorroReverb`), installed on
  * its prototype by `reverbProcessor.ts`, so its body is the method it was in
- * the hand-written `reverb-processor.js`, line for line. Invariant: no
+ * the hand-written `reverb-processor.js`, line for line, but for how a sample
+ * crosses the call (windsor#227): a read leaves its sample in `this._value`
+ * and `_write1` stores `this._value`, the cubic read's offset is
+ * `this._offset`, and a tap is named by its index. V8 boxes a double passed
+ * to or returned from a call it does not inline, and it inlined only some of
+ * the tank's forty-six reads and writes a sample, so the plate allocated
+ * about 41 KB a quantum; a double field is written in place. Invariant: no
  * allocation after construction, and the reads' operations in the order the
- * golden table was written from; `mixer/reverbGolden.test.ts` pins them and
- * `mixer/reverbProcessor.test.ts` checks the reads directly.
+ * golden table was written from; `mixer/reverbGolden.test.ts` pins them,
+ * `mixer/reverbProcessor.test.ts` checks the reads directly and
+ * `mixer/reverbAllocation.test.ts` holds the render to no allocation on V8.
  */
 
 import { FIRST_TANK_LINE, LINE_COUNT, MIN_LENGTH, TAP_LINE, TAP_TIME } from './reverbConstants';
@@ -32,7 +39,8 @@ function _makeDelay(this: DattorroReverb, seconds: number, headroom: number): vo
 }
 
 /**
- * Aim every scaled length and tap at `size`, as a per-sample ramp.
+ * Aim every scaled length and tap at `this._size`, as a per-sample ramp. The
+ * size is the field, not an argument, so no double crosses the call.
  *
  * Setting the lengths outright once a block is not enough. A two-second sweep
  * from 0.3 to 3 moves the longest line's read point by about 26 samples per
@@ -41,7 +49,8 @@ function _makeDelay(this: DattorroReverb, seconds: number, headroom: number): vo
  * audible. Ramping across the block leaves only the Doppler shift, which is
  * what sweeping a delay line is supposed to sound like.
  */
-function _applySize(this: DattorroReverb, size: number, immediate: boolean): void {
+function _applySize(this: DattorroReverb, immediate: boolean): void {
+  const size = this._size;
   for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
     this._lengthTarget[i] = Math.max(MIN_LENGTH, this._nominal[i] * size);
   }
@@ -71,14 +80,16 @@ function _applySize(this: DattorroReverb, size: number, immediate: boolean): voi
 }
 
 /**
- * Read `offset` samples forward of the line's read point, interpolating.
+ * Read `offset` samples forward of the line's read point, interpolating, into
+ * `this._value`. The tank's offsets are all 0, a small integer, which V8 passes
+ * without a box.
  *
  * Lengths are fractional because SIZE moves them: rounding to whole samples
  * made a sweep step the read point, which measured as a sample-to-sample jump
  * ten times the signal's own slew -- an audible zipper on the one knob most
  * likely to be swept while a chord rings.
  */
-function _read(this: DattorroReverb, index: number, offset: number): number {
+function _read(this: DattorroReverb, index: number, offset: number): void {
   const buffer = this._buffers[index];
   const mask = this._mask[index];
   const position = this._write[index] - this._length[index] + offset;
@@ -87,21 +98,24 @@ function _read(this: DattorroReverb, index: number, offset: number): number {
 
   const a = buffer[whole & mask];
   const b = buffer[(whole + 1) & mask];
-  return a + (b - a) * frac;
+  this._value = a + (b - a) * frac;
 }
 
-function _write1(this: DattorroReverb, index: number, value: number): number {
-  this._buffers[index][this._write[index]] = value;
-  return value;
+/** Store `this._value` at the line's write head. */
+function _write1(this: DattorroReverb, index: number): void {
+  this._buffers[index][this._write[index]] = this._value;
 }
 
 /**
- * Fractional read `delay` samples back from the write head.
+ * Output tap `t`'s fractional read, `this._tap[t]` samples back from the write
+ * head of its line, into `this._value`.
  *
  * The output taps are delays, not offsets from the oldest sample, so they do
  * not go through `_read` -- see the TAP_TIME note above.
  */
-function _readTap(this: DattorroReverb, index: number, delay: number): number {
+function _readTap(this: DattorroReverb, t: number): void {
+  const index = TAP_LINE[t];
+  const delay = this._tap[t];
   const buffer = this._buffers[index];
   const mask = this._mask[index];
   const position = this._write[index] - delay;
@@ -110,18 +124,20 @@ function _readTap(this: DattorroReverb, index: number, delay: number): number {
 
   const a = buffer[whole & mask];
   const b = buffer[(whole + 1) & mask];
-  return a + (b - a) * frac;
+  this._value = a + (b - a) * frac;
 }
 
 /**
- * Fractional read, `offset` samples forward of the line's read point.
+ * Fractional read, `this._offset` samples forward of the line's read point,
+ * into `this._value`. The offset is the modulation's excursion, a double, so
+ * it comes in a field rather than as an argument.
  *
  * Cubic rather than linear because these two reads carry the tank's delay
  * modulation: linear interpolation is a lowpass whose cutoff moves with the
  * fraction, which the ear hears as a chirp on the modulated tail.
  * O. Niemitalo, https://www.musicdsp.org/en/latest/Other/49-cubic-interpollation.html
  */
-function _readCubic(this: DattorroReverb, index: number, offset: number): number {
+function _readCubic(this: DattorroReverb, index: number): void {
   const buffer = this._buffers[index];
   const mask = this._mask[index];
   // Split the *whole* read position, exactly as _read does. Flooring
@@ -130,7 +146,7 @@ function _readCubic(this: DattorroReverb, index: number, offset: number): number
   // length across an integer the read point jumps a full sample -- which is
   // the artefact the per-sample length ramp exists to remove, reintroduced on
   // the two lines that carry the modulation.
-  const position = this._write[index] - this._length[index] + offset;
+  const position = this._write[index] - this._length[index] + this._offset;
   const whole = Math.floor(position);
   const frac = position - whole;
   let at = whole - 1;
@@ -143,7 +159,7 @@ function _readCubic(this: DattorroReverb, index: number, offset: number): number
   const a = (3 * (x1 - x2) - x0 + x3) / 2;
   const b = 2 * x2 + x0 - (5 * x1 + x3) / 2;
   const c = (x2 - x0) / 2;
-  return ((a * frac + b) * frac + c) * frac + x1;
+  this._value = ((a * frac + b) * frac + c) * frac + x1;
 }
 
 export { _makeDelay, _applySize, _read, _write1, _readTap, _readCubic };

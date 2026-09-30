@@ -257,8 +257,11 @@ describe('the delay readers', () => {
     for (const length of [64, 64.25, 64.5, 63.75, 100.1]) {
       for (const offset of [0, 0.5, 1.25, 7.75]) {
         processor._length[line] = length;
-        const linear = processor._read(line, offset);
-        const cubic = processor._readCubic(line, offset);
+        processor._read(line, offset);
+        const linear = processor._value;
+        processor._offset = offset;
+        processor._readCubic(line);
+        const cubic = processor._value;
         expect(cubic, `length ${length}, offset ${offset}`).toBeCloseTo(linear, 6);
       }
     }
