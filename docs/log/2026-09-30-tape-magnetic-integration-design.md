@@ -43,29 +43,49 @@ the fastest honest path to a level-matched audition in the app.
    delay, hiss, dropouts and trim stay in their order. No second insert.
    The REELS saturation polynomial leaves the chain; its provenance record
    stands as history.
-3. **Field bounding: a ceiling on the gain into the core.** A full-scale
-   input at Drive 0 and flat EQ reaches the knee (source field 1). The
-   bound is on the whole path before the core: Bias EQ and tape-model EQ
-   have peak gains above unity, so the Drive mapping is capped so that the
-   product of the largest EQ peak gain (over every model and the Bias
-   extremes, computed from the filter tables) and the Drive gain never
-   exceeds 4 for a full-scale input, at the control's maximum. The engine
-   mapping and that EQ peak figure are declared in `tapeConstants.ts`, and
-   the integration PR carries a test that drives a full-scale tone at the
-   model and Bias of largest boost and maximum Drive through the retained
-   EQ and asserts the field at the core input stays within ±4. No limiter,
-   clipper or new conditioning precedes the core. Signals above full scale
-   can still exceed the domain; the core's state guard and reset counters
-   remain, and the integration issue tests the guard path. The Drive
-   control's visible range and label are the UI issue's to settle
-   (`reviewed`).
-4. **Latency: always delayed, dry path matched.** The FIR pair delays by
+3. **Field bounding: a ceiling on the gain into the core, and a guard.**
+   A full-scale input at Drive 0 and flat EQ reaches the knee (source
+   field 1). The bound is on the whole path before the core. Bias EQ and
+   tape-model EQ run before Drive with gains above unity, and a bounded
+   transient can exceed a filter's peak frequency gain, so the figure that
+   caps Drive is the **worst-case sample gain**: the largest L1 norm of the
+   retained EQ cascade's impulse response over every model, the Bias
+   extremes, the three rates and the crossfade and smoothing states between
+   them, computed from the filter tables and declared in
+   `tapeConstants.ts`. The Drive mapping is capped so that this figure times
+   the Drive gain never exceeds 4 at the control's maximum. Because
+   coefficient smoothing passes through filters not in the tables, the
+   domain is also guaranteed by construction: a **hard guard clip at ±4 at
+   the core input**, with a counter, that never engages for a full-scale
+   input inside the capped range and exists only so that an out-of-range
+   signal meets a clip rather than the unqualified state-guard path. It is
+   not a tone-shaping limiter and does not precede the EQ. The integration
+   PR carries tests that push full-scale tones and bounded impulses and
+   steps through the retained EQ at every model, both Bias extremes and all
+   three rates, during a model crossfade and a Bias sweep, at maximum Drive,
+   and asserts the guard counter stays at zero and the field stays within
+   ±4; and a test above full scale that shows the guard engaging and the
+   core's reset counter staying at zero. The Drive control's visible range
+   and label are the UI issue's to settle (`reviewed`).
+4. **Latency: the fixed delay always applies, the dry path is matched, and
+   transport delay stays part of the effect.** The FIR pair delays by
    `span` host samples (48, one millisecond at 48 kHz). That delay applies
    whether the insert is enabled or bypassed, and the dry path of Mix is
-   delayed by the same amount, so toggling Enabled and moving Mix never
-   shift timing or phase. A Tape on a track is therefore always 48 samples
-   later than a track without one; the insert contract has no latency
-   compensation and none is added now.
+   delayed by the same 48 samples, so with Wear, Wow and Flutter at zero,
+   toggling Enabled and moving Mix never shift timing or phase. The
+   retained transport stage adds its own variable delay, up to 25 ms, to
+   the wet path only, after the core, as it does today; that delay is the
+   wow and flutter effect, and a partial Mix with motion combs on purpose,
+   as the REELS record already states. So at nonzero motion the wet path is
+   later than the dry path by the current transport delay, and Enabled
+   toggles between a dry path 48 samples late and a wet path 48 samples
+   plus the transport delay late. This is the declared exception, not a
+   defect. A Tape on a track is always at least 48 samples later than a
+   track without one; the insert contract has no latency compensation and
+   none is added now. The integration PR tests an impulse through the
+   enabled and bypassed insert at zero motion, asserting equal delay, and
+   at fixed nonzero Wear, asserting the wet path's extra delay equals the
+   transport delay reported by the motion model.
 5. **One more accuracy round before building.** RK4 at 2× and 4× with the
    span-32 and span-48 pairs are measured against the qualified reference
    on tones at all nine sampled control points at 48 kHz on the existing
