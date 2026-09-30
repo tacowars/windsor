@@ -55,6 +55,15 @@ export interface SongViewState {
    * Null until the view first has a width. A zoom sitting on it follows it.
    */
   floorPxPerBar: number | null;
+  /**
+   * The detail pane's arrows (windsor#156): the sequencer section and the
+   * insert panel open or folded. Shared by every part, kept across renders,
+   * never written to the document; both start open.
+   */
+  sequencerOpen: boolean;
+  insertsOpen: boolean;
+  /** The detail pane's vertical scroll, restored after a repaint or a render (an insert added or removed). */
+  paneScrollPx: number;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
@@ -129,6 +138,10 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
   scroll.addEventListener('scroll', () => {
     state.scrollPx = scroll.scrollLeft;
   });
+  pane.addEventListener('scroll', () => {
+    state.paneScrollPx = pane.scrollTop;
+  });
+  let paneStale = (): boolean => false;
 
   const view: SongView = {
     ctx,
@@ -164,7 +177,7 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
       markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
     },
     paintPane() {
-      paintDetailPane(pane, view);
+      paneStale = paintDetailPane(pane, view);
     },
   };
   let signature = laneSignature(ctx);
@@ -197,6 +210,8 @@ function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): v
     onTick,
     drag,
     repaintIf: () => {
+      // The insert panel's chain edited on the Mixer tab, which marks this tab nothing.
+      if (paneStale()) view.paintPane();
       const now = laneSignature(ctx);
       if (now === signature) return;
       signature = now;
@@ -214,6 +229,9 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     pxPerBar: SONG_VIEW.pxPerBar,
     scrollPx: 0,
     floorPxPerBar: null,
+    sequencerOpen: true,
+    insertsOpen: true,
+    paneScrollPx: 0,
   };
   return (body) => renderSongView(body, ctx, state);
 }
