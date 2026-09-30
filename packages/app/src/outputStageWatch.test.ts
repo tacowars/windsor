@@ -142,7 +142,7 @@ describe('the latched action and the input latches (windsor#193 decision 5)', ()
     expect(watch.latchedAction).toBe('Limiting');
   });
 
-  it('clears both kinds on a reset', () => {
+  it("clears only the lamp's latch on a reset, leaving the input latches", () => {
     const stage = fakeStage();
     const watch = watchOutputStage(stage, () => 0);
     stage.post({ inputLeft: 2, inputRight: 2, outputLeft: 0.89, reductionDb: 7, active: true });
@@ -150,7 +150,7 @@ describe('the latched action and the input latches (windsor#193 decision 5)', ()
     watch.resetLatch();
     expect(watch.latched).toBe(false);
     expect(watch.latchedAction).toBeNull();
-    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([false, false]);
+    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([true, true]);
   });
 });
 
