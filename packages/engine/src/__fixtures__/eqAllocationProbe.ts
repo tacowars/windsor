@@ -5,14 +5,16 @@
  * `--trace-generalization`), and reports how many bytes the heap grew while
  * type, slope and on toggled on every band, after a warm-up of every path. Node runs it directly (its types
  * are stripped), so it imports nothing but Node's own modules; the test passes
- * the parameter names and values as one JSON argument.
+ * the parameter names and values as one JSON argument, and a file path the
+ * probe writes its result to as JSON. The result has a file of its own because
+ * stdout carries V8's trace, and on Linux the trace has run into it on one line.
  *
  * The bundle is compiled as a script named `eq-processor.js`, so each line V8
  * traces from it names that file and the line in it. The parameter names come
  * keyed by their `EQ_BAND_PARAMS` field (`Freq` … `On`), so no object here
  * shares its keys, and so its hidden class, with one of the bundle's.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import v8 from 'node:v8';
 import vm from 'node:vm';
@@ -36,7 +38,6 @@ export interface ProbeConfig {
 }
 
 export const PROBE_SCRIPT_NAME = 'eq-processor.js';
-export const PROBE_RESULT = 'EQ_ALLOCATION ';
 const QUANTUM = 128;
 /** The measured run is read in this many windows, to show where any growth falls. */
 const WINDOWS = 10;
@@ -172,5 +173,5 @@ function run(config: ProbeConfig): { bytes: number; windows: number[]; gcs: numb
 // Run only as the child; the test imports this module for its types and names.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const config = JSON.parse(process.argv[2]!) as ProbeConfig;
-  process.stdout.write(`${PROBE_RESULT}${JSON.stringify(run(config))}\n`);
+  writeFileSync(process.argv[3]!, JSON.stringify(run(config)));
 }

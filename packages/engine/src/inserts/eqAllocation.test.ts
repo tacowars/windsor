@@ -8,7 +8,9 @@
  * the heap), so the test spawns a Node of its own that runs the shipped bundle
  * (`__fixtures__/eqAllocationProbe.ts`) with `--expose-gc`, a 64 MB young
  * generation (nothing it allocates is collected before it is counted) and
- * `--trace-generalization`. The child warms every path the audio thread has
+ * `--trace-generalization`, and reads its result from a JSON file the child
+ * writes into a temporary directory. Stdout carries the trace alone: on Linux
+ * CI the trace ran into a result line written there. The child warms every path the audio thread has
  * for 48 000 quanta (glides, toggles, the output and enable fades, silence, a
  * load report), forces two collections, then toggles type, slope and on in
  * turn on all eight bands every 8 quanta (a fade out and back in each time)
@@ -46,9 +48,12 @@
  * run code V8 has not optimised yet, which boxes (see the research README).
  */
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { PROBE_RESULT, PROBE_SCRIPT_NAME } from '../__fixtures__/eqAllocationProbe';
+import { PROBE_SCRIPT_NAME } from '../__fixtures__/eqAllocationProbe';
 import type { ProbeConfig } from '../__fixtures__/eqAllocationProbe';
 import { representationChanges } from '../__fixtures__/generalizationTrace';
 import { EQ_BAND_COUNT, EQ_BAND_TYPES, EQ_SLOPES } from './eqConstants';
@@ -101,24 +106,30 @@ function probe(): ProbeRun {
     measure: 40000,
     period: 8,
   };
-  const child = spawnSync(
-    process.execPath,
-    [
-      '--expose-gc',
-      '--min-semi-space-size=64',
-      '--max-semi-space-size=64',
-      '--trace-generalization',
-      '--no-warnings',
-      PROBE,
-      JSON.stringify(config),
-    ],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-  );
-  expect(child.status, child.stderr).toBe(0);
-  const result = child.stdout.split('\n').find((line) => line.startsWith(PROBE_RESULT));
-  expect(result, 'the probe reports').toBeDefined();
-  const changes = representationChanges(child.stdout, PROBE_SCRIPT_NAME);
-  return { ...(JSON.parse(result!.slice(PROBE_RESULT.length)) as ProbeRun), changes };
+  const dir = mkdtempSync(join(tmpdir(), 'eq-allocation-'));
+  try {
+    const resultFile = join(dir, 'result.json');
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--expose-gc',
+        '--min-semi-space-size=64',
+        '--max-semi-space-size=64',
+        '--trace-generalization',
+        '--no-warnings',
+        PROBE,
+        JSON.stringify(config),
+        resultFile,
+      ],
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+    );
+    expect(child.status, child.stderr).toBe(0);
+    const result = JSON.parse(readFileSync(resultFile, 'utf8')) as Omit<ProbeRun, 'changes'>;
+    const changes = representationChanges(child.stdout, PROBE_SCRIPT_NAME);
+    return { ...result, changes };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 describe('the audio thread on V8', () => {
