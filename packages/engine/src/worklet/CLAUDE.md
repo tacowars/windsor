@@ -1,18 +1,29 @@
 # The DSP worklets
 
-`tape/` adapts the CC0 REELS Lite saturation and controls as the `tape` insert.
-`tapeProcessor.ts` owns lifetime/telemetry, `tapeDsp.ts` the signal path,
-`tapeFilter.ts` the preallocated EQ and `tapeMotion.ts` seeded wear/noise.
+`tape/` is the `tape` insert: REELS Lite's controls, EQ, motion and noise
+(CC0, `docs/log/2026-09-30-reels-inspired-tape-insert.md`, which stands as
+history) around Windsor's magnetic core, which replaced REELS's saturation
+polynomial and makeup in windsor#224. Per channel: Bias and model EQ, ×
+`driveGain(Drive)`, the core at 2× or 4×, the DC block, the transport delay,
+hiss, dropouts, trim; Mix and bypass read the dry signal delayed by the core's
+fixed 48 samples. `tapeProcessor.ts` owns lifetime/telemetry and the
+parameters (`oversampling` is one, never a knob), `tapeDsp.ts` the signal
+path, `tapeMagneticStage.ts` the two preallocated oversampler pairs, the
+smoothed core controls and the dry ring, `tapeMagneticRows.ts` the models'
+fixed core controls and their load-time floor check, `tapeFilter.ts` the
+preallocated EQ and `tapeMotion.ts` seeded wear/noise. `TapeDsp.channel`
+drives the pair through its `input`, `advance()` and `output` fields.
 It builds `generated/tape-processor.js` and has its own TS project.
-`inserts/tape*.test.ts` exercise the shipped bundle via `__fixtures__/tapeHarness.ts`.
-Provenance and Max differences: `docs/log/2026-09-30-reels-inspired-tape-insert.md`.
+`inserts/tape*.test.ts` exercise the shipped bundle via `__fixtures__/tapeHarness.ts`;
+`__fixtures__/tapeDspProbe.ts` runs it a sample at a time for the
+`tapeMagneticIntegration*.test.ts` calibration, guard, delay and switch tests.
+Record: `docs/log/2026-09-30-tape-magnetic-integration.md`.
 
 `tape/tapeMagnetic.ts` and `tape/tapeOversample.ts` are the magnetic core
 (windsor#219, epic #146 E1), written from the published Jiles–Atherton model:
 the RK4 core with its field guard and knee, and the span-48 FIR pair that
-reconstructs H and its exact derivative at every RK4 stage time. Nothing
-imports them yet, so the bundle does not carry them until E2 wires them into
-`TapeDsp`. Tunables and `driveGain` are in `inserts/tapeMagneticConstants.ts`.
+reconstructs H and its exact derivative at every RK4 stage time.
+Tunables and `driveGain` are in `inserts/tapeMagneticConstants.ts`.
 Neither calls a transcendental `Math` function, whose results differ by an
 ulp between V8's arm64 and x64 builds: sine, cosine, tanh and 2^x come from
 `inserts/tapePortableMath.ts`, in IEEE arithmetic alone, so the render is the
@@ -32,10 +43,17 @@ Record: `docs/log/2026-09-30-tape-magnetic-core.md`.
 `generated/advanced-drive-processor.js`. Its processor owns lifetime and load
 reporting; `advancedDriveDsp.ts` owns smoothing, modulation and oversampling;
 `driveRouting.ts`, `driveStage.ts`, `driveCrossover.ts`, `driveTone.ts` and
-`driveOversample.ts` own the preallocated graph. Shared curves and filter
+`driveOversample.ts` own the preallocated graph; `driveSlots.ts` lays the
+controls out as Float64Array slots in descriptor order. Shared curves and filter
 coefficients live in `inserts/advancedDriveCurves.ts` and
 `advancedDriveFilter.ts` for the editor's displays. Its separate TS project
 uses erased fields. Render tests use `__fixtures__/advancedDriveHarness.ts`.
+The render allocates nothing (windsor#226): no double crosses a call as an
+argument or a return (samples and operands pass through fields, and the
+decibel gains and clamps are written in place, since the render exhausts
+V8's inlining budget and then even a tiny helper stays a call), and every
+double field is first written as one. `inserts/advancedDriveAllocation.test.ts`
+pins it on V8 through `__fixtures__/advancedDriveChangeScenario.ts`.
 
 `delay/` is the stereo/dub insert (#698), built as
 `generated/delay-processor.js`: `delayDsp.ts` owns preallocated delay/filter
@@ -44,6 +62,11 @@ Tests under `inserts/delay*.test.ts` use `__fixtures__/delayHarness.ts` to
 exercise the shipped processor. Its separate `tsconfig.json` uses the
 existing erased-field settings. Controls live in `inserts/delayConstants.ts`
 and `delaySpec.ts`; song tempo is supplied through `tempoInsertRegistry.ts`.
+The render allocates nothing (windsor#232): the controls are Float64Array
+slots (`delaySlots.ts`), a sample and a line's read or write pass through
+fields, and every double field is first written as NaN.
+`inserts/delayAllocation.test.ts` pins it on V8 through
+`__fixtures__/delayChangeScenario.ts`.
 
 `eq/` is the Parametric EQ (windsor#198), built as `generated/eq-processor.js`
 with its own `tsconfig.json`. `eqProcessor.ts` owns the flat k-rate
@@ -70,6 +93,12 @@ owns the lossless lattice stages, feedback, envelope and sweep. It ships as
 `inserts/phaser*.test.ts` exercise it through `__fixtures__/phaserHarness.ts`.
 Controls/defaults live in `inserts/phaserConstants.ts` / `phaserSpec.ts`,
 and original editable starting points in `phaserPresetTables.ts`.
+The render allocates nothing (windsor#231): samples pass through the DSP's
+`input` and `output` Float64Array slots, not as arguments or returns, the
+controls live in Float64Array slots rather than a record keyed by name, and
+every double field is first written as NaN.
+`inserts/phaserAllocation.test.ts` pins it on V8 through
+`__fixtures__/phaserChangeScenario.ts`.
 
 `retro/` is the original ROM-free vintage reverb insert (#682), built as
 `generated/retro-reverb-processor.js`. `retroReverbProcessor.ts` owns the
@@ -81,6 +110,12 @@ Tests under `inserts/retroReverb*.test.ts` run the generated processor through
 `__fixtures__/retroReverbHarness.ts`. Settings and original tunables are in
 `inserts/retroReverbSpec.ts` and `retroReverbConstants.ts`; the editable
 approximation bank is `retroReverbPresets.ts` / `retroReverbPresetTables.ts`.
+The render allocates nothing (windsor#230): samples cross every call in
+fields (`inputLeft`/`inputRight`, `internalInput`, `convertInput`/`converted`,
+each network's `input`, each line's `delay`/`output`/`input`, each filter's
+`input`/`output`), never as arguments or returns, and every double field is
+first written as NaN. `inserts/retroReverbAllocation.test.ts` pins it on V8
+through `__fixtures__/retroReverbChangeScenario.ts`.
 
 `meter/peakMeterProcessor.ts` is the opt-in stereo sample meter (#666),
 bundled to `generated/peak-meter-processor.js` and checked by its own

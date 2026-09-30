@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { makeArrangement } from '../song/arrangementDocument';
+import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { FULL_ARRANGEMENT } from '../__fixtures__/fullArrangement';
 import { RETRO_REVERB_INSERT } from './retroReverbInsert';
 import { DEFAULT_RETRO_REVERB } from './retroReverbSpec';
@@ -57,7 +58,7 @@ describe('retro insert and preset song contract', () => {
       const effect = applyRetroPreset(DEFAULT_RETRO_REVERB, preset.number);
       const raw = {
         ...FULL_ARRANGEMENT,
-        version: 3,
+        version: ARRANGEMENT_VERSION,
         patches: { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} },
         parts: FULL_ARRANGEMENT.parts.map((part) => ({ ...part, strip: { inserts: [effect] } })),
         master: { inserts: [effect] },

@@ -432,7 +432,7 @@ export { PHASER_PRESETS, applyPhaserPreset, matchingPhaserPreset } from './inser
 // The Parametric EQ (windsor#198): the kind is not in the registry until its card lands.
 export { DEFAULT_EQ } from './inserts/eqSpec';
 export type { EqSpec, EqBand } from './inserts/eqSpec';
-export { EQ_BAND_TYPES, EQ_SLOPES, EQ_BOUNDS } from './inserts/eqConstants';
+export { EQ_BAND_TYPES, EQ_SLOPES, EQ_BOUNDS, EQ_DSP } from './inserts/eqConstants';
 export type { EqBandType, EqSlope } from './inserts/eqConstants';
 export { eqResponseDb } from './inserts/eqCoefficients';
 export { EQ_INSERT } from './inserts/eqInsert';

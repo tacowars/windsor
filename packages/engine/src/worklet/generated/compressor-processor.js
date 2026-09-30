@@ -57,6 +57,16 @@ function feedbackStep(over, previous, slope, speed) {
 }
 var CompressorDsp = class {
   constructor(rate, params) {
+    this.reductionDb = this.gain = this.keyLeft = this.keyRight = NaN;
+    this.slow = this.fast = this.lowL = this.lowR = NaN;
+    this.threshold = this.makeup = this.mix = this.range = this.enabled = this.ratio = NaN;
+    this.highpass = this.attack = this.release = NaN;
+    this.attackSpeed = this.releaseSpeed = this.hpSpeed = NaN;
+    this.rate = this.smoothing = this.slowCharge = this.slowRelease = NaN;
+    this.reductionDb = 0;
+    this.gain = 1;
+    this.keyLeft = this.keyRight = 0;
+    this.slow = this.fast = this.lowL = this.lowR = 0;
     this.rate = rate;
     this.params = params;
     this.threshold = params.threshold[0];
@@ -70,30 +80,6 @@ var CompressorDsp = class {
     this.slowRelease = coeff(COMPRESSOR_DSP.autoSlowSeconds, rate);
     this.configure(params, true);
   }
-  rate;
-  reductionDb = 0;
-  /** Effective scalar applied to program audio (dry/wet and bypass included). */
-  gain = 1;
-  slow = 0;
-  fast = 0;
-  lowL = 0;
-  lowR = 0;
-  threshold = COMPRESSOR_DEFAULTS.threshold;
-  makeup = COMPRESSOR_DEFAULTS.makeup;
-  mix = COMPRESSOR_DEFAULTS.mix;
-  range = COMPRESSOR_DEFAULTS.range;
-  enabled = 1;
-  ratio = COMPRESSOR_DEFAULTS.ratio;
-  highpass = COMPRESSOR_DEFAULTS.highpass;
-  attack = COMPRESSOR_DEFAULTS.attack;
-  release = COMPRESSOR_DEFAULTS.release;
-  attackSpeed = 0;
-  releaseSpeed = 0;
-  hpSpeed = 0;
-  smoothing;
-  slowCharge;
-  slowRelease;
-  params;
   configure(params, initial = false) {
     this.params = params;
     const attack = params.attack[0];
@@ -107,15 +93,30 @@ var CompressorDsp = class {
       this.fast = this.reductionDb;
       this.slow = this.reductionDb;
       this.release = release;
-      this.releaseSpeed = coeff(release || COMPRESSOR_DSP.autoFastSeconds, this.rate);
+      this.releaseSpeed = -Math.expm1(-1 / ((release || COMPRESSOR_DSP.autoFastSeconds) * this.rate));
     }
     if (initial || highpass !== this.highpass) {
       this.highpass = highpass;
       this.hpSpeed = -Math.expm1(-(2 * Math.PI) * highpass / this.rate);
     }
   }
-  /** Rectify each channel separately: opposite-polarity stereo must not cancel. */
+  /** One sample from `left` and `right`, returning the gain: the tests' form of `advance`. */
   tick(left, right) {
+    this.keyLeft = left;
+    this.keyRight = right;
+    this.advance();
+    return this.gain;
+  }
+  /**
+   * One sample from `keyLeft` and `keyRight` into `gain` and `reductionDb`. The
+   * sample travels through fields, not arguments or a return: V8 boxes a
+   * double that crosses a call it does not inline, and this one is too long to
+   * inline into the worklet's loop. Rectify each channel separately:
+   * opposite-polarity stereo must not cancel.
+   */
+  advance() {
+    const left = this.keyLeft;
+    const right = this.keyRight;
     this.smooth();
     this.lowL += this.hpSpeed * (left - this.lowL);
     this.lowR += this.hpSpeed * (right - this.lowR);
@@ -135,7 +136,6 @@ var CompressorDsp = class {
     this.reductionDb = Math.min(this.range, next);
     const wet = Math.exp((this.makeup - this.reductionDb) * COMPRESSOR_DSP.dbToLog);
     this.gain = 1 + this.enabled * this.mix * (wet - 1);
-    return this.gain;
   }
   smooth() {
     const p = this.params;
@@ -225,8 +225,9 @@ var CompressorProcessor = class extends AudioWorkletProcessor {
     this.running = true;
     this.meter = false;
     this.frames = 0;
+    this.peak = NaN;
     this.peak = 0;
-    this.meterReport = { type: "reduction", db: 0 };
+    this.meterReport = { type: "reduction", db: NaN };
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }) => {
       if (data.type === "stop") this.running = false;
@@ -249,12 +250,18 @@ var CompressorProcessor = class extends AudioWorkletProcessor {
     const right = source?.[1] ?? left;
     const keyL = detector?.[0];
     const keyR = detector?.[1] ?? keyL;
-    this.dsp.configure(params);
+    const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
+    const keyLFrames = keyL ? keyL.length : 0, keyRFrames = keyR ? keyR.length : 0;
+    const dsp = this.dsp;
+    dsp.configure(params);
     for (let i = 0; i < out[0].length; i++) {
-      const gain = this.dsp.tick(keyL?.[i] ?? 0, keyR?.[i] ?? 0);
-      out[0][i] = (left?.[i] ?? 0) * gain;
-      if (out[1]) out[1][i] = (right?.[i] ?? 0) * gain;
-      if (this.meter) this.peak = Math.max(this.peak, this.dsp.reductionDb);
+      dsp.keyLeft = i < keyLFrames ? keyL[i] : 0;
+      dsp.keyRight = i < keyRFrames ? keyR[i] : 0;
+      dsp.advance();
+      const gain = dsp.gain;
+      out[0][i] = (i < leftFrames ? left[i] : 0) * gain;
+      if (out[1]) out[1][i] = (i < rightFrames ? right[i] : 0) * gain;
+      if (this.meter) this.peak = Math.max(this.peak, dsp.reductionDb);
     }
     this.report(params, out[0].length);
     this.load.end(out[0].length);

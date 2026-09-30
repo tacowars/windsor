@@ -6,7 +6,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { FULL_ARRANGEMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
-import { FALLBACK_PATCH_ID, clonePatch, loadPatchFile, makePatch, partAt } from '@windsor/engine';
+import {
+  ARRANGEMENT_VERSION,
+  FALLBACK_PATCH_ID,
+  clonePatch,
+  loadPatchFile,
+  makePatch,
+  partAt,
+} from '@windsor/engine';
 import { PATCH_LIBRARY } from '@windsor/engine/patch/presets';
 import type { DocumentPartial } from '@windsor/engine';
 import type { AppCtx } from './context';
@@ -62,7 +69,7 @@ function fakeFolder(ids: string[]): PatchFolder & { files: Map<string, string> }
 }
 
 function context(): AppCtx {
-  const model = new DocumentModel({ version: 3, ...FULL_ARRANGEMENT });
+  const model = new DocumentModel({ version: ARRANGEMENT_VERSION, ...FULL_ARRANGEMENT });
   const ctx = {
     model,
     change: (partial: DocumentPartial) => {

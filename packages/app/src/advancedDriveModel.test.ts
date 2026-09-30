@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ADVANCED_DRIVE_PRESETS,
+  ARRANGEMENT_VERSION,
   DEFAULT_ADVANCED_DRIVE,
   DRIVE_DIVISIONS,
   DRIVE_FILTERS,
@@ -57,7 +58,7 @@ it('edits one stage immutably and new insert defaults do not share stage objects
 });
 it('stage edits round-trip through both part and master document partials', () => {
   const model = new DocumentModel({
-    version: 2,
+    version: ARRANGEMENT_VERSION,
     parts: [{ slot: 0, name: 'Drive test', preset: 'saw-arp', sequencer: { kind: 'none' } }],
   });
   const slot = model.doc.parts[0]!.slot;

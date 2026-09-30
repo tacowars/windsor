@@ -5,9 +5,14 @@
  * avoiding a one-sample feedback instability at 0.01 ms / 10:1. This is a
  * behavioral model, not a circuit simulation. Range caps the control
  * voltage; Auto adds a slowly charging/releasing baseline to fast recovery.
- * No objects are allocated by configure(), tick(), or feedbackStep().
+ * No objects are allocated by configure(), advance(), or feedbackStep(), and no
+ * double crosses a call on the worklet's path: the sample and its gain travel
+ * through fields, and every field is `declare`d (this file also compiles in the
+ * engine's project, whose class fields would be defined as `undefined` first)
+ * and first written as a double (worklet rules 2 and 7, windsor#229). Pinned by
+ * compressorAllocation.test.ts; compressorDsp.test.ts pins the behaviour.
  */
-import { COMPRESSOR_DEFAULTS as D, COMPRESSOR_DSP as C } from './compressorConstants';
+import { COMPRESSOR_DSP as C } from './compressorConstants';
 
 export type CompressorParams = Record<string, Float32Array>;
 const coeff = (seconds: number, rate: number): number => -Math.expm1(-1 / (seconds * rate));
@@ -29,34 +34,48 @@ export function feedbackStep(over: number, previous: number, slope: number, spee
 }
 
 export class CompressorDsp {
-  reductionDb = 0;
-  /** Effective scalar applied to program audio (dry/wet and bypass included). */
-  gain = 1;
-  private slow = 0;
-  private fast = 0;
-  private lowL = 0;
-  private lowR = 0;
-  private threshold: number = D.threshold;
-  private makeup: number = D.makeup;
-  private mix: number = D.mix;
-  private range: number = D.range;
-  private enabled = 1;
-  private ratio: number = D.ratio;
-  private highpass: number = D.highpass;
-  private attack: number = D.attack;
-  private release: number = D.release;
-  private attackSpeed = 0;
-  private releaseSpeed = 0;
-  private hpSpeed = 0;
-  private readonly smoothing: number;
-  private readonly slowCharge: number;
-  private readonly slowRelease: number;
-  private params: CompressorParams;
+  declare reductionDb: number;
+  /** Effective scalar applied to program audio (dry/wet and bypass included): `advance`'s result. */
+  declare gain: number;
+  /** The detector's two channels for the next `advance`. */
+  declare keyLeft: number;
+  declare keyRight: number;
+  declare private slow: number;
+  declare private fast: number;
+  declare private lowL: number;
+  declare private lowR: number;
+  declare private threshold: number;
+  declare private makeup: number;
+  declare private mix: number;
+  declare private range: number;
+  declare private enabled: number;
+  declare private ratio: number;
+  declare private highpass: number;
+  declare private attack: number;
+  declare private release: number;
+  declare private attackSpeed: number;
+  declare private releaseSpeed: number;
+  declare private hpSpeed: number;
+  declare private readonly rate: number;
+  declare private readonly smoothing: number;
+  declare private readonly slowCharge: number;
+  declare private readonly slowRelease: number;
+  declare private params: CompressorParams;
 
-  constructor(
-    private readonly rate: number,
-    params: CompressorParams,
-  ) {
+  constructor(rate: number, params: CompressorParams) {
+    // Every double is first written as one (NaN), so V8 never has to generalise
+    // a small-integer field to a double later (worklet rule 7).
+    this.reductionDb = this.gain = this.keyLeft = this.keyRight = NaN;
+    this.slow = this.fast = this.lowL = this.lowR = NaN;
+    this.threshold = this.makeup = this.mix = this.range = this.enabled = this.ratio = NaN;
+    this.highpass = this.attack = this.release = NaN;
+    this.attackSpeed = this.releaseSpeed = this.hpSpeed = NaN;
+    this.rate = this.smoothing = this.slowCharge = this.slowRelease = NaN;
+    this.reductionDb = 0;
+    this.gain = 1;
+    this.keyLeft = this.keyRight = 0;
+    this.slow = this.fast = this.lowL = this.lowR = 0;
+    this.rate = rate;
     this.params = params;
     this.threshold = params.threshold![0]!;
     this.makeup = params.makeup![0]!;
@@ -86,7 +105,9 @@ export class CompressorDsp {
       this.fast = this.reductionDb;
       this.slow = this.reductionDb;
       this.release = release;
-      this.releaseSpeed = coeff(release || C.autoFastSeconds, this.rate);
+      // `coeff`, written in place: V8 does not inline a call on a branch this
+      // rare, and would box the double it returns.
+      this.releaseSpeed = -Math.expm1(-1 / ((release || C.autoFastSeconds) * this.rate));
     }
     if (initial || highpass !== this.highpass) {
       this.highpass = highpass;
@@ -94,8 +115,24 @@ export class CompressorDsp {
     }
   }
 
-  /** Rectify each channel separately: opposite-polarity stereo must not cancel. */
+  /** One sample from `left` and `right`, returning the gain: the tests' form of `advance`. */
   tick(left: number, right: number): number {
+    this.keyLeft = left;
+    this.keyRight = right;
+    this.advance();
+    return this.gain;
+  }
+
+  /**
+   * One sample from `keyLeft` and `keyRight` into `gain` and `reductionDb`. The
+   * sample travels through fields, not arguments or a return: V8 boxes a
+   * double that crosses a call it does not inline, and this one is too long to
+   * inline into the worklet's loop. Rectify each channel separately:
+   * opposite-polarity stereo must not cancel.
+   */
+  advance(): void {
+    const left = this.keyLeft;
+    const right = this.keyRight;
     this.smooth();
     this.lowL += this.hpSpeed * (left - this.lowL);
     this.lowR += this.hpSpeed * (right - this.lowR);
@@ -115,7 +152,6 @@ export class CompressorDsp {
     this.reductionDb = Math.min(this.range, next);
     const wet = Math.exp((this.makeup - this.reductionDb) * C.dbToLog);
     this.gain = 1 + this.enabled * this.mix * (wet - 1);
-    return this.gain;
   }
 
   private smooth(): void {

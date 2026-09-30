@@ -2,6 +2,9 @@
  * Compressor worklet adapter (#660). DSP is the tested CompressorDsp; this owns
  * two stereo inputs, AudioParams, shutdown and opt-in telemetry. The render
  * loop allocates nothing; report objects are reused and posts are throttled.
+ * Each sample reaches the DSP through its fields and each input load is
+ * bounded, so no double is boxed (worklet rule 2), and every double field is
+ * first written as one (rule 7). Pinned by inserts/compressorAllocation.test.ts.
  */
 /* eslint-disable no-magic-numbers -- DSP adapter: binary controls and stereo indices; tunables live in compressorConstants.ts */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate */
@@ -51,8 +54,9 @@ class CompressorProcessor extends AudioWorkletProcessor {
     this.running = true;
     this.meter = false;
     this.frames = 0;
+    this.peak = NaN;
     this.peak = 0;
-    this.meterReport = { type: 'reduction', db: 0 };
+    this.meterReport = { type: 'reduction', db: NaN };
     this.load = new LoadSampler(sampleRate, this.port);
     this.port.onmessage = ({ data }: MessageEvent<ControlMessage>) => {
       if (data.type === 'stop') this.running = false;
@@ -76,12 +80,23 @@ class CompressorProcessor extends AudioWorkletProcessor {
     const right = source?.[1] ?? left;
     const keyL = detector?.[0];
     const keyR = detector?.[1] ?? keyL;
-    this.dsp.configure(params);
+    // `left?.[i] ?? 0` would read the same, but its load may be undefined, so V8
+    // keeps it tagged and boxes every sample; a bounded load stays a double.
+    const leftFrames = left ? left.length : 0,
+      rightFrames = right ? right.length : 0;
+    const keyLFrames = keyL ? keyL.length : 0,
+      keyRFrames = keyR ? keyR.length : 0;
+    const dsp = this.dsp;
+    dsp.configure(params);
     for (let i = 0; i < out[0].length; i++) {
-      const gain = this.dsp.tick(keyL?.[i] ?? 0, keyR?.[i] ?? 0);
-      out[0][i] = (left?.[i] ?? 0) * gain;
-      if (out[1]) out[1][i] = (right?.[i] ?? 0) * gain;
-      if (this.meter) this.peak = Math.max(this.peak, this.dsp.reductionDb);
+      // Through fields, not arguments or a return, which V8 boxes across a call it does not inline.
+      dsp.keyLeft = i < keyLFrames ? keyL![i] : 0;
+      dsp.keyRight = i < keyRFrames ? keyR![i] : 0;
+      dsp.advance();
+      const gain = dsp.gain;
+      out[0][i] = (i < leftFrames ? left![i] : 0) * gain;
+      if (out[1]) out[1][i] = (i < rightFrames ? right![i] : 0) * gain;
+      if (this.meter) this.peak = Math.max(this.peak, dsp.reductionDb);
     }
     this.report(params, out[0].length);
     this.load.end(out[0].length);

@@ -2,8 +2,8 @@
  * Insert ids in a song (windsor#186): every insert on a part's strip, the
  * master and both send buses has one once the song is normalised. Ids
  * round-trip unchanged through export and import, a song written without
- * them (a v4 one, or a v3 one through its upgrade) fills them silently and
- * the same way every time, and a duplicate or a bad id is corrected.
+ * them fills them silently and the same way every time, and a duplicate or a
+ * bad id is corrected.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -13,10 +13,7 @@ import { insertIdsOf } from '../__fixtures__/insertIds';
 import { DEFAULT_ADVANCED_DRIVE } from '../inserts/advancedDriveSpec';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
-import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import { isInsertId } from '../inserts/insertIds';
-import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
-import { SPACES } from '../mixer/reverbSpace';
 import { makeArrangement } from './arrangementDocument';
 
 const PATCHES = { kick: {}, hat: {}, 'saw-arp': {}, 'drone-sqr': {} };
@@ -99,33 +96,6 @@ describe('insert ids in a song', () => {
         `${chain}[2].id: 42 is not an id — a new one`,
       ]).sort(),
     );
-  });
-
-  it('gives the inserts of a v3 song ids once upgraded and normalised, with no correction', () => {
-    const v3 = {
-      ...FULL_ARRANGEMENT,
-      version: 3,
-      patches: PATCHES,
-      parts: FULL_ARRANGEMENT.parts.map((part, i) =>
-        i === 0 ? { ...part, strip: { inserts: TWO_DRIVES } } : part,
-      ),
-      master: { inserts: [DEFAULT_DRIVE] },
-      returns: {
-        room: { kind: 'reverb', level: 0.5, space: SPACES.cathedral },
-        echo: { kind: 'delay', level: 0.4, delayTime: 0.375 },
-      },
-    };
-    const result = makeArrangement(v3);
-    expect(result.corrections).toEqual([]);
-    expect(result.document.version).toBe(ARRANGEMENT_VERSION);
-    const ids = Object.fromEntries(
-      Object.entries(insertIdsOf(result.document)).filter(([, chain]) => chain.length > 0),
-    );
-    expect(Object.keys(ids).sort()).toEqual([...CHAINS].sort());
-    for (const ofChain of Object.values(ids)) expect(ofChain.every(isInsertId)).toBe(true);
-    expect(result.document.returns?.a?.inserts[0]?.kind).toBe(DEFAULT_PLATE_REVERB.kind);
-    expect(result.document.returns?.b?.inserts[0]?.kind).toBe(DEFAULT_ECHO.kind);
-    expect(makeArrangement(structuredClone(v3)).document).toEqual(result.document);
   });
 
   it('gives a send bus that names only its level the default chain, with its ids', () => {

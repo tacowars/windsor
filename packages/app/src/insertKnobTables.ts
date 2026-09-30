@@ -45,6 +45,7 @@ export const INSERT_LABELS: Readonly<Record<InsertKindName, string>> = {
   ensemble: 'Ensemble',
   plate: 'Plate reverb',
   echo: 'Echo',
+  eq: 'Parametric EQ',
 };
 
 /**
@@ -56,6 +57,7 @@ export const INSERT_GROUPS: readonly {
   readonly label: string;
   readonly kinds: readonly InsertKindName[];
 }[] = [
+  { label: 'EQ', kinds: ['eq'] },
   { label: 'Drive', kinds: ['drive', 'advanced-drive', 'tape'] },
   { label: 'Dynamics', kinds: ['compressor'] },
   { label: 'Modulation', kinds: ['chorus', 'ensemble', 'phaser'] },
