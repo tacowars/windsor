@@ -19,6 +19,7 @@ import {
 } from '../audioConstants';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
+import { withoutInsertIds } from '../__fixtures__/insertIds';
 
 const silentPart = (): PlayablePart => ({
   noteOn: () => 0,
@@ -163,9 +164,9 @@ describe('the part list (#597)', () => {
       { ...DEFAULT_CHORUS, rate: 1.2, spread: 1 },
     ];
     const first = makeArrangement(song([{ ...KICK, strip: { inserts } }]));
-    expect(first.document.parts[0]?.strip.inserts).toEqual(inserts);
+    expect(withoutInsertIds(first.document.parts[0]?.strip.inserts)).toEqual(inserts);
     const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
-    expect(again.document.parts[0]?.strip.inserts).toEqual(inserts);
+    expect(again.document.parts[0]?.strip.inserts).toEqual(first.document.parts[0]?.strip.inserts);
     expect(again.corrections).toEqual([]);
 
     const unknown = makeArrangement(song([{ ...KICK, strip: { inserts: [{ kind: 'fuzz' }] } }]));

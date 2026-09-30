@@ -3,30 +3,46 @@
  * list, which is what a live partial carries, since an array in a partial
  * replaces the document's wholesale. The engine compares it with the live
  * chain: the same kinds in the same order are param writes, anything else
- * rebuilds that one strip's inserts.
+ * rebuilds that one strip's inserts. Every insert carries its id through
+ * (windsor#186), which is what the rack's view state follows.
  */
-import type { InsertKindName, InsertSpec } from '@windsor/engine';
-import { INSERT_KINDS, MAX_INSERTS, onSendBus } from '@windsor/engine';
+import type { InsertIdSource, InsertKindName, InsertSpec } from '@windsor/engine';
+import {
+  INSERT_KINDS,
+  MAX_INSERTS,
+  freshInsertId,
+  onSendBus,
+  withInsertIds,
+} from '@windsor/engine';
 import type { InsertTarget } from './insertTarget';
 import { isBusTarget } from './insertTarget';
 
 /** Whether a strip holding `list` has room for another insert. */
 export const canAddInsert = (list: readonly InsertSpec[]): boolean => list.length < MAX_INSERTS;
 
+/** Where a fresh insert's id comes from: the engine's shared source, or a seeded one in a test. */
+type IdSource = Pick<InsertIdSource, 'next'>;
+const SHARED_IDS: IdSource = { next: freshInsertId };
+
 /**
  * `list` with a fresh insert of `kind` on the end, or `list` unchanged when it
  * is full. On a send bus a Plate reverb or an Echo starts fully wet, the way
  * the engine's own buses hold them (`onSendBus`, windsor#172); everywhere
- * else, and every other kind, starts at the kind's defaults.
+ * else, and every other kind, starts at the kind's defaults. The new insert
+ * has a fresh id from `ids` (windsor#186), and the ones already there keep
+ * theirs, or take the ones normalising gives a chain the code holds.
  */
 export function addInsert(
   list: readonly InsertSpec[],
   kind: InsertKindName,
   target?: InsertTarget,
+  ids: IdSource = SHARED_IDS,
 ): InsertSpec[] {
   if (!canAddInsert(list)) return [...list];
-  const fresh = structuredClone(INSERT_KINDS[kind].defaults);
-  return [...list, target !== undefined && isBusTarget(target) ? onSendBus(fresh) : fresh];
+  const held = withInsertIds(list);
+  const defaults = structuredClone(INSERT_KINDS[kind].defaults);
+  const fresh = { ...defaults, id: ids.next(held.map((spec) => spec.id!)) };
+  return [...held, target !== undefined && isBusTarget(target) ? onSendBus(fresh) : fresh];
 }
 
 /**
@@ -39,8 +55,9 @@ export function addInsertAtFront(
   list: readonly InsertSpec[],
   kind: InsertKindName,
   target?: InsertTarget,
+  ids: IdSource = SHARED_IDS,
 ): InsertSpec[] {
-  const added = addInsert(list, kind, target);
+  const added = addInsert(list, kind, target, ids);
   if (added.length === list.length) return added;
   return [added[added.length - 1]!, ...added.slice(0, -1)];
 }

@@ -6,17 +6,26 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { withoutInsertIds } from '../__fixtures__/insertIds';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { DEFAULT_CHORUS } from './chorusInsert';
 import { DEFAULT_DRIVE } from './driveInsert';
+import { DEFAULT_ADVANCED_DRIVE } from './advancedDriveSpec';
 import { MAX_INSERTS } from './insertConstants';
+import { isInsertId } from './insertIds';
 import { INSERT_KINDS, INSERT_KIND_NAMES, insertKind, normaliseInserts } from './insertRegistry';
 
 const PATH = 'parts[0].strip.inserts';
 
-function normalise(raw: unknown): { specs: unknown[]; n: FieldNormaliser } {
+/** The list normalised, its ids apart: `specs` is each entry's settings, `ids` its id. */
+function normalise(raw: unknown): { specs: unknown[]; ids: unknown[]; n: FieldNormaliser } {
   const n = new FieldNormaliser();
-  return { specs: normaliseInserts(raw, PATH, n), n };
+  const full = normaliseInserts(raw, PATH, n);
+  return {
+    specs: withoutInsertIds(full),
+    ids: full.map((spec) => spec.id),
+    n,
+  };
 }
 
 describe('INSERT_KINDS', () => {
@@ -99,5 +108,73 @@ describe('normaliseInserts', () => {
     expect(n.corrections).toEqual([
       `${PATH}[${MAX_INSERTS}]: past the ${MAX_INSERTS}-insert limit — dropped`,
     ]);
+  });
+});
+
+describe('normaliseInserts: every insert has an id (windsor#186)', () => {
+  const STAGE = { ...DEFAULT_ADVANCED_DRIVE, drive: 3 };
+
+  it('keeps valid ids, silently, and a normalised list reads back unchanged', () => {
+    const raw = [
+      { ...STAGE, id: 'first' },
+      { ...STAGE, id: 'second' },
+    ];
+    const n = new FieldNormaliser();
+    const once = normaliseInserts(raw, PATH, n);
+    expect(once).toEqual(raw);
+    expect(n.corrections).toEqual([]);
+    expect(normaliseInserts(JSON.parse(JSON.stringify(once)), PATH, n)).toEqual(once);
+    expect(n.corrections).toEqual([]);
+  });
+
+  it('fills a missing id silently, the same way every time', () => {
+    const { ids, n } = normalise([STAGE, STAGE, { kind: 'drive' }]);
+    expect(n.corrections).toEqual([]);
+    expect(ids.every(isInsertId)).toBe(true);
+    expect(new Set(ids).size).toBe(3);
+    expect(normalise([STAGE, STAGE, { kind: 'drive' }]).ids).toEqual(ids);
+  });
+
+  it('fills around the ids the chain already holds, never taking one', () => {
+    const bare = normalise([STAGE, STAGE]).ids;
+    const { ids, n } = normalise([STAGE, { ...STAGE, id: bare[0] }]);
+    expect(n.corrections).toEqual([]);
+    expect(ids[1]).toBe(bare[0]);
+    expect(ids[0]).not.toBe(bare[0]);
+  });
+
+  it('replaces a duplicate within the chain, keeping the first, with a correction', () => {
+    const { ids, n } = normalise([
+      { ...STAGE, id: 'same' },
+      { ...STAGE, id: 'same' },
+    ]);
+    expect(ids[0]).toBe('same');
+    expect(isInsertId(ids[1]) && ids[1] !== 'same').toBe(true);
+    expect(n.corrections).toEqual([`${PATH}[1].id: "same" is already in this chain — a new one`]);
+  });
+
+  it('lets two chains hold the same id', () => {
+    const n = new FieldNormaliser();
+    expect(normaliseInserts([{ kind: 'drive', id: 'x' }], 'master.inserts', n)[0]!.id).toBe('x');
+    expect(normaliseInserts([{ kind: 'drive', id: 'x' }], PATH, n)[0]!.id).toBe('x');
+    expect(n.corrections).toEqual([]);
+  });
+
+  it('replaces anything that is not a non-empty string, with a correction', () => {
+    const junk = [null, '', 7, true, { a: 1 }, ['x']];
+    const { ids, n } = normalise(junk.map((id) => ({ kind: 'drive', id })));
+    expect(ids.every(isInsertId)).toBe(true);
+    expect(new Set(ids).size).toBe(junk.length);
+    expect(n.corrections).toEqual(
+      junk.map((id, i) => `${PATH}[${i}].id: ${JSON.stringify(id)} is not an id — a new one`),
+    );
+  });
+
+  it('reads the id beside the kind, never as one of its fields', () => {
+    for (const name of INSERT_KIND_NAMES)
+      expect(INSERT_KINDS[name].fields, name).not.toContain('id');
+    const { specs, n } = normalise([{ kind: 'drive', id: 'x', mix: 0.5 }]);
+    expect(specs).toEqual([{ ...DEFAULT_DRIVE, mix: 0.5 }]);
+    expect(n.corrections).toEqual([]);
   });
 });

@@ -64,8 +64,10 @@ describe('retro insert and preset song contract', () => {
       };
       const result = makeArrangement(raw);
       expect(result.corrections).toEqual([]);
-      expect(result.document.parts[0]!.strip!.inserts).toEqual([effect]);
-      expect(result.document.master!.inserts).toEqual([effect]);
+      expect(result.document.parts[0]!.strip!.inserts).toEqual([
+        { ...effect, id: expect.any(String) },
+      ]);
+      expect(result.document.master!.inserts).toEqual([{ ...effect, id: expect.any(String) }]);
       expect(makeArrangement(JSON.parse(JSON.stringify(result.document))).document).toEqual(
         result.document,
       );
