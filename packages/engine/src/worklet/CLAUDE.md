@@ -51,6 +51,11 @@ Tests under `inserts/delay*.test.ts` use `__fixtures__/delayHarness.ts` to
 exercise the shipped processor. Its separate `tsconfig.json` uses the
 existing erased-field settings. Controls live in `inserts/delayConstants.ts`
 and `delaySpec.ts`; song tempo is supplied through `tempoInsertRegistry.ts`.
+The render allocates nothing (windsor#232): the controls are Float64Array
+slots (`delaySlots.ts`), a sample and a line's read or write pass through
+fields, and every double field is first written as NaN.
+`inserts/delayAllocation.test.ts` pins it on V8 through
+`__fixtures__/delayChangeScenario.ts`.
 
 `eq/` is the Parametric EQ (windsor#198), built as `generated/eq-processor.js`
 with its own `tsconfig.json`. `eqProcessor.ts` owns the flat k-rate

@@ -288,6 +288,19 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    184 µs.
 7. **Delay**: 3 096 bytes a quantum (1.1 MB/s), **+1.2 a second**; longest
    229 µs.
+   **After windsor#232: 0 bytes a quantum**, in every one of the 13 187
+   measured calls of a 35.7 s trace of `b-delay` with the meter off (same
+   machine and headless Chrome 154, this method, the worktree's dev server;
+   one-minute load average 4.25 before and 3.01 after the trace). This
+   run's context opened at **48 kHz**, not 44.1 (375 quanta a second, so
+   `analyse-trace.mjs`'s 2 902 µs budget is 2 667 here; no span came near
+   either). The thread collected 1.32 times a second (47 scavenges, longest
+   284 µs), against 2.48 before: the FM part's 2 907 bytes a quantum alone,
+   which at 48 kHz is scenario a's 1.24 scaled by 375/345. The delay's
+   median call read 16 µs (15 before) and the median quantum span 148 µs
+   (151 before), both traced. The meter-on pass after it read the CPU button
+   at 4–8 % with no underrun. Summary:
+   [`summaries/b-delay-after.json`](summaries/b-delay-after.json).
 8. **FM part**: 2 909 bytes a quantum for this part (1.0 MB/s), **1.24 a
    second** alone; longest 217 µs. It is last per instance, but it runs once
    per part, so a song's total grows with its part count (the dense song's
