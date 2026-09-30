@@ -1,6 +1,7 @@
 /** Song master: summed tracks/returns → inserts → edit fade → output level (#666).
- * It owns its edges, preserves the existing insert updater, and exposes an
- * opt-in sample meter. masterStrip.test.ts pins routing, edits and disposal.
+ * It owns its edges and preserves the existing insert updater. The Mixer's
+ * master meters read the output stage's report (windsor#194), not this strip.
+ * masterStrip.test.ts pins routing, edits and disposal.
  */
 import { MS_PER_SECOND } from '../audioConstants';
 import { INSERT_KINDS } from '../inserts/insertRegistry';
@@ -10,15 +11,12 @@ import type { RouteOptions } from './channelStrip';
 import { createInsertChain, createInsertUpdater } from './insertChain';
 import { DEFAULT_MASTER, normaliseMaster } from './masterSpec';
 import type { MasterSpec } from './masterSpec';
-import { createPeakMeter } from './peakMeter';
-import type { PeakMeter } from './peakMeter';
 export interface MasterStrip {
   readonly insertSpecs: readonly InsertSpec[];
   readonly input: GainNode;
   readonly output: GainNode;
   readonly inserts: readonly InsertStage<InsertSpec>[];
   readonly spec: MasterSpec;
-  readonly meter: PeakMeter;
   apply(raw: unknown): string[];
   dispose(): void;
 }
@@ -53,7 +51,6 @@ export function createMasterStrip(
       setTimeout(run, seconds * MS_PER_SECOND);
     });
   const updates = createInsertUpdater(chain, tap, later, options.changed);
-  const meter = createPeakMeter(context, output);
   let spec = DEFAULT_MASTER;
   return {
     get insertSpecs(): readonly InsertSpec[] {
@@ -61,7 +58,6 @@ export function createMasterStrip(
     },
     input,
     output,
-    meter,
     get inserts(): readonly InsertStage<InsertSpec>[] {
       return chain.stages;
     },
@@ -79,7 +75,6 @@ export function createMasterStrip(
     },
     dispose(): void {
       updates.cancel();
-      meter.dispose();
       tail.disconnect(fade);
       chain.dispose();
       input.disconnect();
