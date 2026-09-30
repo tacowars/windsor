@@ -429,6 +429,13 @@ export { DEFAULT_PHASER } from './inserts/phaserSpec';
 export type { PhaserSpec } from './inserts/phaserSpec';
 export { PHASER_BOUNDS } from './inserts/phaserConstants';
 export { PHASER_PRESETS, applyPhaserPreset, matchingPhaserPreset } from './inserts/phaserPresets';
+// The Parametric EQ (windsor#198): the kind is not in the registry until its card lands.
+export { DEFAULT_EQ } from './inserts/eqSpec';
+export type { EqSpec, EqBand } from './inserts/eqSpec';
+export { EQ_BAND_TYPES, EQ_SLOPES, EQ_BOUNDS } from './inserts/eqConstants';
+export type { EqBandType, EqSlope } from './inserts/eqConstants';
+export { eqResponseDb } from './inserts/eqCoefficients';
+export { EQ_INSERT } from './inserts/eqInsert';
 export { DEFAULT_TAPE } from './inserts/tapeSpec';
 export type { TapeSpec } from './inserts/tapeSpec';
 export { TAPE_BOUNDS, TAPE_TYPES, TAPE_LABELS } from './inserts/tapeConstants';

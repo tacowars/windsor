@@ -24,6 +24,19 @@ exercise the shipped processor. Its separate `tsconfig.json` uses the
 existing erased-field settings. Controls live in `inserts/delayConstants.ts`
 and `delaySpec.ts`; song tempo is supplied through `tempoInsertRegistry.ts`.
 
+`eq/` is the Parametric EQ (windsor#198), built as `generated/eq-processor.js`
+with its own `tsconfig.json`. `eqProcessor.ts` owns the flat k-rate
+parameters, stop and load reports; `eqDsp.ts` the block's route (bit-exact
+copy when flat or bypassed, zeros when input and state are silent, else
+pieces of 16 samples while anything moves) and the enable crossfade;
+`eqBand.ts` one band's glides, type/slope/on fade and state; `eqSections.ts`
+the TDF-II loops, the coefficient ramp across a gliding piece and the band
+fade. The coefficients come from `inserts/eqCoefficients.ts` /
+`eqSectionDesign.ts`, which the console's curve shares; the section forms pass
+no double across a call, since V8 boxes one it does not inline. Tests under
+`inserts/eq*.test.ts` run the bundle through `__fixtures__/eqHarness.ts`,
+which also reaches its hot functions by name for the rule 2 check.
+
 `phaser/` is the original four-stage stereo insert (#687):
 `phaserProcessor.ts` owns controls/lifecycle/load reporting and `phaserDsp.ts`
 owns the lossless lattice stages, feedback, envelope and sweep. It ships as
@@ -120,7 +133,7 @@ by reference, because whoever edits this folder reads this file and does not
 reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents`).
 
 1. **`generated/` is output. Never edit it.** After any change under `fm/`
-   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`,
+   (or `reverb/`, `compressor/`, `meter/`, `retro/`, `phaser/`, `delay/`, `advancedDrive/`, `eq/`,
    `outputStage/`, `tape/`, or the `mixer/outputStage*` modules its processor imports),
    run `node scripts/build-worklets.mjs` and commit the result; `--check` in
    `npm run verify` refuses a copy that differs from a fresh bundle, and so

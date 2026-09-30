@@ -202,3 +202,6 @@ export const ADVANCED_DRIVE_WORKLET_URL = new URL(
 );
 
 export const TAPE_WORKLET_URL = new URL('../worklet/generated/tape-processor.js', import.meta.url);
+
+/** The Parametric EQ (windsor#198). */
+export const EQ_WORKLET_URL = new URL('../worklet/generated/eq-processor.js', import.meta.url);

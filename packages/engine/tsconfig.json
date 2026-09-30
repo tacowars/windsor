@@ -32,6 +32,7 @@
     "src/worklet/phaser/**",
     "src/worklet/tape/**",
     "src/worklet/delay/**",
+    "src/worklet/eq/**",
     "src/**/*.test.ts",
     "src/**/__fixtures__/**",
     "src/worklet/fm/**",

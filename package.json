@@ -15,7 +15,7 @@
     "dev": "npm run dev -w packages/app --",
     "build": "npm run build -w packages/app",
     "preview": "npm run preview -w packages/app --",
-    "typecheck": "tsc -p packages/engine/tsconfig.json && tsc -p packages/engine/tsconfig.test.json && tsc -p packages/app/tsconfig.json && tsc -p packages/engine/src/worklet/fm/tsconfig.json && tsc -p packages/engine/src/worklet/compressor/tsconfig.json && tsc -p packages/engine/src/worklet/meter/tsconfig.json && tsc -p packages/engine/src/worklet/reverb/tsconfig.json && tsc -p packages/engine/src/worklet/retro/tsconfig.json && tsc -p packages/engine/src/worklet/advancedDrive/tsconfig.json && tsc -p packages/engine/src/worklet/phaser/tsconfig.json && tsc -p packages/engine/src/worklet/delay/tsconfig.json && tsc -p packages/engine/src/worklet/tape/tsconfig.json",
+    "typecheck": "tsc -p packages/engine/tsconfig.json && tsc -p packages/engine/tsconfig.test.json && tsc -p packages/app/tsconfig.json && tsc -p packages/engine/src/worklet/fm/tsconfig.json && tsc -p packages/engine/src/worklet/compressor/tsconfig.json && tsc -p packages/engine/src/worklet/meter/tsconfig.json && tsc -p packages/engine/src/worklet/reverb/tsconfig.json && tsc -p packages/engine/src/worklet/retro/tsconfig.json && tsc -p packages/engine/src/worklet/advancedDrive/tsconfig.json && tsc -p packages/engine/src/worklet/phaser/tsconfig.json && tsc -p packages/engine/src/worklet/delay/tsconfig.json && tsc -p packages/engine/src/worklet/tape/tsconfig.json && tsc -p packages/engine/src/worklet/eq/tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
