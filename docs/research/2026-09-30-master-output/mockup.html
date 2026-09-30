@@ -282,7 +282,7 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
         <li><strong>Vertical meters with a real scale.</strong> dBFS ticks, colour zones (teal below −12, amber to 0, red above), a one-second peak-hold line, and a readout on each bar. Click a readout or a clip LED to reset it; the Reset peaks button goes.</li>
         <li><strong>The ceiling is drawn.</strong> A line across the Out bars at the ceiling, and a transfer curve that shows what the mode does. A dot rides the curve at the current input peak, so you see the stage working.</li>
         <li><strong>Level in dB.</strong> A fader reading +6.0&nbsp;dB rather than a knob reading 2.00. The stored value stays the linear gain.</li>
-        <li><strong>The stage lamp</strong> keeps today's latch rules (windsor#94 decision 3) and names what it latches: Limiting, Clipping, or Over 0&nbsp;dB in Off.</li>
+        <li><strong>The stage lamp</strong> keeps today's latch rules (windsor#94 decision 3) and names what it latched on: Limiting, Clipping, or Over 0&nbsp;dB in Off. A mode change after the latch keeps that name.</li>
       </ul>
     </div>
     <div class="note">
@@ -317,7 +317,7 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
           <tr><td>Zones</td><td>teal below −12, amber −12 to 0, red above 0</td></tr>
           <tr><td>Ballistics</td><td>attack instant, fall 24&nbsp;dB/s, hold 1&nbsp;s (<code>PEAK_METER.holdSeconds</code>)</td></tr>
           <tr><td>GR / Over bar</td><td>0 to 12&nbsp;dB from the top, amber; dimmed in Off</td></tr>
-          <tr><td>Transfer curve</td><td>96&nbsp;px square, −24 to +6&nbsp;dB on both axes, dot at the louder input peak</td></tr>
+          <tr><td>Transfer curve</td><td>96&nbsp;px square, −24 to +6&nbsp;dB on both axes, dot at the louder input peak. Drawn from the engine's own curves: Soft clip is linear to 6&nbsp;dB under the ceiling, then <code>outputStageClipper.ts</code>'s rational curve; Limiter and Hard clip settle at the ceiling</td></tr>
           <tr><td>Paint rate</td><td>once per stage report (30&nbsp;Hz), never while hidden</td></tr>
         </tbody>
       </table>
@@ -351,8 +351,13 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
   };
 
   /* ---------- the "audio thread": a drum-loop model of the stage's reports ---------- */
-  let t = 0, gain = 1, latched = false, lastActed = -1e9;
+  // The lamp keeps the action it latched on, so a later mode change never renames it.
+  const ACTION = { limiter: 'Limiting', soft: 'Clipping', hard: 'Clipping', off: 'Over 0 dB' };
+  let t = 0, gain = 1, latched = false, latchedWord = '', lastActed = -1e9;
   const clipIn = [false, false];
+  // Soft clip as outputStageClipper.ts draws it: identity up to 6 dB under the
+  // ceiling (OUTPUT_SOFT_CLIP.kneeDb), then k + (c - k)·u / (1 + u).
+  const softClip = (x, c) => { const k = c * linOf(-6); if (x <= k) return x; const u = (x - k) / (c - k); return k + ((c - k) * u) / (1 + u); };
   const report = { in: [-Infinity, -Infinity], out: [-Infinity, -Infinity], gr: 0, over: 0, acted: false };
   function simulate() {
     t += 1 / HZ;
@@ -371,13 +376,13 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
       gain = target < gain ? (S.look ? target : applied) : gain + (1 - gain) * (1 - Math.exp(-1 / HZ / 0.15));
       outL = inL * applied; outR = inR * applied; gr = -dbOf(applied); acted = gr > 0.05;
     } else if (S.mode === 'soft') {
-      outL = c * Math.tanh(inL / c); outR = c * Math.tanh(inR / c); over = Math.max(0, dbOf(peak / c)); acted = peak > 0.5 * c;
+      outL = softClip(inL, c); outR = softClip(inR, c); over = Math.max(0, dbOf(peak / c)); acted = peak > c * linOf(-6);
     } else if (S.mode === 'hard') {
       outL = Math.min(inL, c); outR = Math.min(inR, c); over = Math.max(0, dbOf(peak / c)); acted = peak > c;
     } else { acted = peak > 1; }
     report.in = [dbOf(inL), dbOf(inR)]; report.out = [dbOf(outL), dbOf(outR)];
     report.gr = gr; report.over = over; report.acted = acted;
-    if (acted) { latched = true; lastActed = performance.now(); }
+    if (acted) { if (!latched) latchedWord = ACTION[S.mode]; latched = true; lastActed = performance.now(); }
     if (inL > 1) clipIn[0] = true;
     if (inR > 1) clipIn[1] = true;
   }
@@ -527,7 +532,7 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
     const b = el('button', 'lamp'); b.type = 'button';
     const i = el('i'), label = el('span');
     b.append(i, label);
-    b.onclick = () => { latched = false; };
+    b.onclick = () => { latched = false; latchedWord = ''; };
     lampViews.push({ b, label });
     return b;
   }
@@ -548,11 +553,8 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
       const c = S.ceil, x = linOf(db), cl = linOf(c);
       if (S.mode === 'off') return db;
       if (S.mode === 'hard') return Math.min(db, c);
-      if (S.mode === 'soft') return dbOf(cl * Math.tanh(x / cl));
-      const knee = 1.5;   // limiter: a short soft knee into the ceiling
-      if (db < c - knee) return db;
-      if (db > c + knee) return c;
-      const d = db - c + knee; return db - (d * d) / (4 * knee);
+      if (S.mode === 'soft') return dbOf(softClip(x, cl));
+      return Math.min(db, c);   // limiter: its settled peak level; the gain moves in time, the ceiling clamp is final
     };
     curveViews.push({
       svg,
@@ -614,7 +616,7 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
   }
   function paintLamps() {
     const now = performance.now() - lastActed < HOLD_MS;
-    const word = { limiter: 'Limiting', soft: 'Clipping', hard: 'Clipping', off: 'Over 0 dB' }[S.mode];
+    const word = latched ? latchedWord : ACTION[S.mode];
     lampViews.forEach(({ b, label }) => {
       b.classList.toggle('now', now); b.classList.toggle('latched', latched);
       label.textContent = word;

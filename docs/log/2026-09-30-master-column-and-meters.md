@@ -65,15 +65,26 @@ shows while the meters are scrolled away.
    listen to every report, as the stage's watch does
    (`outputStageWatch.ts`), so a hidden tab never misses one.
 6. **The stage lamp keeps windsor#94's latch rules** and names what it
-   latched: Limiting, Clipping, or Over 0 dB in Off. Clicking the lamp
-   clears it.
+   latched on: Limiting, Clipping, or Over 0 dB in Off. The name belongs to
+   the report that latched it: a mode change before the lamp is cleared
+   keeps the name, since a report and a mode change may cross
+   (`outputStageWatch.test.ts`). Unlatched, it names the current mode's
+   action. Clicking the lamp clears it.
 7. **The Level control is a vertical fader reading dB.** Its dB steps
    follow the meter scale. The song still stores the linear
    `master.level` from 0 to 2, so the format doesn't change.
 8. **The transfer curve** is a 96 px square showing −24 to +6 dB on both
    axes. It draws the mode's curve and the ceiling. It is redrawn only on a
    mode or ceiling edit, and a dot at the louder input peak is the only
-   part that moves.
+   part that moves. The curve is the engine's, never an approximation:
+   - Soft clip is the identity up to `OUTPUT_SOFT_CLIP.kneeDb` below the
+     ceiling, then the clipper's rational curve (`outputStageClipper.ts`).
+     The engine exports that static curve so the plot and the DSP share it.
+   - Hard clip is the identity up to the ceiling, then flat.
+   - Limiter draws its settled peak level, the identity up to the ceiling
+     and then flat. Its gain moves in time, and the final clamp is at the
+     ceiling.
+   - Off is the identity.
 9. **A meter bridge** sticks to the top of the tab while the master
    column's meters are out of view. That happens only below the stacking
    width. It shows Out L and R as thin bars with the ceiling mark, GR or
