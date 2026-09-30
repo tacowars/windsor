@@ -39,8 +39,8 @@ export interface SongViewScale {
   readonly mixerWidthPx: number;
   /**
    * The expanded mixer column (windsor#158) besides its knobs: the arrow's
-   * gutter, the Output select, M and S, the gaps between them and the cell's
-   * padding, as `console.css`'s `.mix-cell.expanded` sizes them.
+   * gutter, the Output select, M and S, the lights track (windsor#159), the
+   * gaps between them and the cell's padding, as `console.css`'s `.mix-cell.expanded` sizes them.
    */
   readonly mixerExpandedBasePx: number;
   /** Each knob column of the expanded mixer, with the gap after it: a compact dial and a five-character value. */
@@ -57,7 +57,7 @@ export const SONG_VIEW: SongViewScale = {
   minLabelPx: 28,
   laneNameWidthPx: 120,
   mixerWidthPx: 132,
-  mixerExpandedBasePx: 165,
+  mixerExpandedBasePx: 181,
   mixerKnobColumnPx: 70,
   laneGapPx: 8,
 };

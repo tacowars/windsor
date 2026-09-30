@@ -926,7 +926,7 @@ body.chord-dragging {
    is the fixed tracks, the gaps and the padding here. */
 .mix-cell.expanded {
   display: grid;
-  grid-template-columns: 22px repeat(var(--mix-knobs), minmax(0, 1fr)) 84px 47px;
+  grid-template-columns: 22px repeat(var(--mix-knobs), minmax(0, 1fr)) 84px 47px 12px;
   column-gap: 4px;
   justify-content: stretch;
 }
@@ -974,6 +974,43 @@ select.field.compact {
   background: var(--inset);
   color: var(--ink-dim);
   border-color: var(--line);
+}
+/* A part's lights (windsor#159), after M and S: the red clip light over the
+   green activity light, stacked in the 40 px row. songMixerLights.ts sets
+   the green's colour a step at a time from songMixerLightsTables.ts; the red
+   is dark or lit in --hot, and a press on it clears the latch. */
+.mix-lights {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.mix-clip,
+.mix-activity {
+  display: block;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.mix-clip {
+  background: color-mix(in srgb, var(--hot) 16%, var(--inset));
+  cursor: default;
+}
+.mix-clip.lit {
+  background: var(--hot);
+  border-color: var(--hot);
+  box-shadow: 0 0 6px rgba(210, 100, 60, 0.7);
+  cursor: pointer;
+}
+.mix-clip:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
+}
+.mix-activity.on {
+  border-color: transparent;
 }
 .lane-name {
   display: flex;
