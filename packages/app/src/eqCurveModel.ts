@@ -88,13 +88,15 @@ const at = new Float64Array(1);
 /**
  * The dB a band's point sits at: a bell's or shelf's gain times Scale, a
  * 12/24/48 cut's response at its corner, and 0 dB for a notch or a 6 dB cut.
+ * The corner is the one the engine designs the filter at: a band stored past
+ * the plot's right edge is read at that edge (`eqMaxFreq`), where it is drawn.
  */
 export function pointDb(spec: EqSpec, index: number, sampleRate: number): number {
   const band = spec.bands[index]!;
   const role = roleOf(band);
   if (role === 'gain') return band.gain * spec.scale;
   if (!heightIsQ(band)) return 0;
-  at[0] = band.freq;
+  at[0] = Math.min(band.freq, eqMaxFreq(sampleRate));
   return eqResponseDb(soloBand(spec, index), at, sampleRate, one)[0]!;
 }
 

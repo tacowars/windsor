@@ -63,12 +63,21 @@ describe('the wheel over the curve', () => {
     tick(ctx, wheel, 1, 0.5);
     tick(ctx, wheel, 1, 0.6);
     vi.advanceTimersByTime(UNDO_MERGE_MS);
-    expect(ctx.undoLabel).toBe('EQ band Q');
+    expect(ctx.undoLabel).toBe('EQ band 2');
     expect(ctx.undo()).toBe(true);
     expect(levelOf(ctx)).toBe(0.4);
     expect(ctx.undo()).toBe(true);
     expect(levelOf(ctx)).toBe(start);
     expect(ctx.undo()).toBe(false);
+  });
+
+  it('names a wheel step on band 5 "EQ band 5", as a drag names it', () => {
+    const ctx = openGestureConsole();
+    const wheel = bandWheelGesture(new EventTarget());
+    tick(ctx, wheel, 4, 0.3);
+    tick(ctx, wheel, 4, 0.4);
+    vi.advanceTimersByTime(UNDO_MERGE_MS);
+    expect(ctx.undoLabel).toBe('EQ band 5');
   });
 
   it('makes a band wheeled again after another a new step', () => {
