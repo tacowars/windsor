@@ -304,11 +304,30 @@ describe('Reproducible report domains', () => {
       expect(Math.sign(plateau.field[0])).toBe(row.level);
       expect(Math.sign(plateau.raw)).toBe(row.level);
       expect(Math.sign(plateau.output)).toBe(row.level);
-      expect(row).toEqual(
-        report.boundaries.find(
-          (r) => r.rate === row.rate && r.solver === row.solver && r.level === row.level,
-        ),
+      const recorded = report.boundaries.find(
+        (r) => r.rate === row.rate && r.solver === row.solver && r.level === row.level,
       );
+      const { final, fieldPeak, points, ...metadata } = row;
+      const {
+        final: recordedFinal,
+        fieldPeak: recordedPeak,
+        points: recordedPoints,
+        ...recordedMetadata
+      } = recorded;
+      expect(metadata).toEqual(recordedMetadata);
+      // The Mac report and Linux CI differ in floating-point transcendental results.
+      // Keep polarity above exact; this is report agreement, not a DSP golden.
+      expect(final).toBeCloseTo(recordedFinal, 12);
+      expect(fieldPeak).toBeCloseTo(recordedPeak, 12);
+      expect(points).toHaveLength(recordedPoints.length);
+      for (const [i, point] of points.entries()) {
+        const expected = recordedPoints[i];
+        expect(point.t).toBe(expected.t);
+        expect(point.field).toHaveLength(expected.field.length);
+        point.field.forEach((value, j) => expect(value).toBeCloseTo(expected.field[j], 12));
+        expect(point.raw).toBeCloseTo(expected.raw, 12);
+        expect(point.output).toBeCloseTo(expected.output, 12);
+      }
     }
     expect(rows[0].final).toBeCloseTo(-rows[1].final, 12);
   });

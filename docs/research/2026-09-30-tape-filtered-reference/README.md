@@ -222,6 +222,10 @@ while the focused slice passed. Its numerical assertions are unchanged;
 this narrow ownership exception does not modify #145/#148 sources or
 reports. The three new report checks pin both settings domains, unique
 signed pulse coverage and label agreement with the rendered plateau.
+Report regression keeps metadata and polarity exact, but compares computed
+field/state/output values to 12 decimal places: Linux CI differed from the
+Mac report by about 6.5e-15 in the final state. This portability allowance
+does not change any reference qualification or candidate residual gate.
 
 ## Independence and limits
 
