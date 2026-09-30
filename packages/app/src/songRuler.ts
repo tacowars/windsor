@@ -30,7 +30,7 @@ import type { PlayheadDrag, PlayheadDragEvent } from './playheadDrag';
 import { barTick, canDragPlayhead, pressStartsDrag, stepPlayheadDrag } from './playheadDrag';
 import { watchPlayhead } from './stepStrip';
 import { formatPosition } from './transportModel';
-import { beatTickPx, rulerLabelEvery, rulerLabels } from './songViewTables';
+import { beatTickPx, rulerLabelEvery, rulerLabels, timelineLeftCss } from './songViewTables';
 import type {
   RulerDrag,
   RulerDragEvent,
@@ -74,13 +74,13 @@ export function playheadLine(): HTMLElement {
 }
 
 /**
- * Put the line on `tick`, past the name column. Its px follow the lanes'
+ * Put the line on `tick`, past the name and mixer columns. Its px follow the lanes'
  * `--bar`, so a zoom moves the line with the regions even while the
  * transport stands still and the loop has no new tick to mark.
  */
 export function placePlayhead(line: HTMLElement, tick: number, songTicks: number): void {
   const songTick = songTicks > 0 ? ((tick % songTicks) + songTicks) % songTicks : 0;
-  line.style.left = `calc(var(--names) + var(--gap) + var(--bar) * ${songTick / TICKS_PER_BAR})`;
+  line.style.left = timelineLeftCss(songTick / TICKS_PER_BAR);
   const label = line.firstChild;
   if (label) label.textContent = formatPosition(tick, songTicks);
 }
