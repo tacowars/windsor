@@ -10,12 +10,19 @@
  * The card and the Octave knob edit the selected region's pattern
  * (windsor#75): a part selected without a region edits its first, and a
  * part with no regions shows a hint in place of the card.
+ *
+ * Under the card, a part's insert chain (`songInsertPanel.ts`, windsor#156).
+ * The sequencer section and the insert panel each fold with an arrow
+ * (`songPaneFold.ts`): folded, the sequencer keeps its header and hides the
+ * region row and the card; the insert panel keeps only its header.
  */
 import type { MusicPart } from '@windsor/engine';
 import { TICKS_PER_BAR, partAt, regionPattern } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { harmonyCard } from './harmonyCard';
+import { insertPanel } from './songInsertPanel';
+import { foldButton } from './songPaneFold';
 import { eventBar } from './harmonyLaneModel';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
@@ -32,10 +39,12 @@ import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
 import { PANE_OCTAVE_KINDS, REGION_SUMMARY, forKind } from './songViewTables';
 
-/** The pane's header: the title, a small note, and the close ×. */
-function head(view: SongView, title: string, note: string): HTMLElement {
+/** The pane's header: a part's fold arrow, the title, a small note, and the close ×. */
+function head(view: SongView, title: string, note: string, fold?: HTMLElement): HTMLElement {
   const row = el('div', 'card-head');
-  const label = el('span', '', title);
+  const label = el('span', '');
+  if (fold) label.appendChild(fold);
+  label.appendChild(document.createTextNode(title));
   label.appendChild(el('small', '', note));
   row.appendChild(label);
   const close = el('button', 'btn nudge', '×') as HTMLButtonElement;
@@ -114,9 +123,15 @@ function partRow(view: SongView, part: MusicPart, region: number | null): HTMLEl
   return row;
 }
 
-function paintPart(pane: HTMLElement, view: SongView, slot: number, region: number | null): void {
+/** A part's sequencer section and insert panel; returns the panel's staleness check. */
+function paintPart(
+  pane: HTMLElement,
+  view: SongView,
+  slot: number,
+  region: number | null,
+): () => boolean {
   const part = partAt(view.ctx.model.doc, slot);
-  if (!part) return;
+  if (!part) return () => false;
   const { kind } = part.sequencer;
   const count = part.regions.length;
   const edited = editTarget(part, region);
@@ -126,20 +141,24 @@ function paintPart(pane: HTMLElement, view: SongView, slot: number, region: numb
       view,
       `${part.name} — ${KIND_LABELS[kind]}`,
       `${forKind(REGION_SUMMARY, shown)} · ${count} region${count === 1 ? '' : 's'}`,
+      foldButton(view, 'sequencerOpen', 'Sequencer'),
     ),
   );
-  pane.appendChild(partRow(view, part, region));
-  if (edited === null) {
+  if (view.state.sequencerOpen) {
+    pane.appendChild(partRow(view, part, region));
     pane.appendChild(
-      el(
-        'p',
-        'hint',
-        'No regions: click an empty stretch of the lane to draw one, then edit it here.',
-      ),
+      edited === null
+        ? el(
+            'p',
+            'hint',
+            'No regions: click an empty stretch of the lane to draw one, then edit it here.',
+          )
+        : SEQUENCER_CARDS[kind](view.ctx, slot, edited),
     );
-    return;
   }
-  pane.appendChild(SEQUENCER_CARDS[kind](view.ctx, slot, edited));
+  const inserts = insertPanel(view, slot);
+  pane.appendChild(inserts.element);
+  return inserts.stale;
 }
 
 function paintEvent(pane: HTMLElement, view: SongView, index: number): void {
@@ -149,12 +168,11 @@ function paintEvent(pane: HTMLElement, view: SongView, index: number): void {
   pane.appendChild(harmonyCard(view, index));
 }
 
-/** Redraw the pane for the view's selection. */
-export function paintDetailPane(pane: HTMLElement, view: SongView): void {
-  pane.innerHTML = '';
+function paintSelection(pane: HTMLElement, view: SongView): () => boolean {
   const { selection } = view.state;
-  pane.classList.toggle('empty', selection === null);
-  if (selection === null) {
+  if (selection?.kind === 'part') return paintPart(pane, view, selection.slot, selection.region);
+  if (selection) paintEvent(pane, view, selection.index);
+  else {
     pane.appendChild(
       el(
         'p',
@@ -163,8 +181,19 @@ export function paintDetailPane(pane: HTMLElement, view: SongView): void {
           'Click an empty stretch of a lane to add a region; + after the last chord appends one.',
       ),
     );
-    return;
   }
-  if (selection.kind === 'part') paintPart(pane, view, selection.slot, selection.region);
-  else paintEvent(pane, view, selection.index);
+  return () => false;
+}
+
+/**
+ * Redraw the pane for the view's selection at its kept scroll, which a
+ * repaint or a whole render would otherwise reset. Returns whether what it
+ * drew has gone stale under an edit made elsewhere (the insert panel's).
+ */
+export function paintDetailPane(pane: HTMLElement, view: SongView): () => boolean {
+  pane.innerHTML = '';
+  pane.classList.toggle('empty', view.state.selection === null);
+  const stale = paintSelection(pane, view);
+  pane.scrollTop = view.state.paneScrollPx;
+  return stale;
 }
