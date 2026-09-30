@@ -14,6 +14,7 @@
  * run them on `meterLoop.ts`.
  */
 import { el } from './dom';
+import { type GaugeMeter, regauge, restingGauge, stepGauge } from './gaugeMeter';
 import {
   elapsedSeconds,
   meterPosition,
@@ -33,7 +34,6 @@ import {
   METER_HOLD_LINE_PX,
   METER_TICKS_DB,
   METER_TRANSFORM_DECIMALS,
-  REDUCTION_BALLISTICS,
   REDUCTION_NAMES,
   REDUCTION_QUIET_DB,
   REDUCTION_SCALE,
@@ -210,37 +210,35 @@ export function createReductionBar(options: Omit<ChannelOptions, 'name'>): Reduc
   const holdShown = styleWriter(parts.hold, 'opacity');
   const text = textWriter(parts.readout);
   const name = textWriter(parts.name);
-  let off = false;
-  let state: MeterState = restingMeter(REDUCTION_BALLISTICS);
-  let lastMs: number | null = null;
+  let state: GaugeMeter = restingGauge('reduction');
 
   const draw = (): void => {
-    cover(`scaleY(${(1 - reductionPosition(state.shownDb)).toFixed(METER_TRANSFORM_DECIMALS)})`);
-    hold(`translateY(${px(reductionHoldTranslatePx(state.heldDb, options.heightPx))})`);
-    holdShown(state.heldDb > REDUCTION_QUIET_DB ? '1' : '0');
-    text(reductionReadout(state.heldDb, off));
+    const { shownDb, heldDb } = state.meter;
+    cover(`scaleY(${(1 - reductionPosition(shownDb)).toFixed(METER_TRANSFORM_DECIMALS)})`);
+    hold(`translateY(${px(reductionHoldTranslatePx(heldDb, options.heightPx))})`);
+    holdShown(heldDb > REDUCTION_QUIET_DB ? '1' : '0');
+    text(reductionReadout(heldDb, state.gauge === 'none'));
   };
   const reset = (): void => {
-    state = restingMeter(REDUCTION_BALLISTICS);
-    lastMs = null;
+    state = restingGauge(state.gauge);
     draw();
   };
   parts.readout.addEventListener('click', () => {
-    state = { ...state, heldDb: 0, heldSeconds: 0 };
+    state = { ...state, meter: { ...state.meter, heldDb: 0, heldSeconds: 0 } };
     draw();
   });
   draw();
   return {
     root: parts.root,
     update(db, nowMs) {
-      state = stepMeter(state, db, elapsedSeconds(lastMs, nowMs), REDUCTION_BALLISTICS);
-      lastMs = nowMs;
+      state = stepGauge(state, db, nowMs);
       draw();
     },
     setGauge(gauge) {
-      off = gauge === 'none';
+      // A new gauge starts from rest, never renaming the old one's hold.
+      state = regauge(state, gauge);
       name(REDUCTION_NAMES[gauge]);
-      parts.root.classList.toggle('is-dim', off);
+      parts.root.classList.toggle('is-dim', gauge === 'none');
       draw();
     },
     reset,

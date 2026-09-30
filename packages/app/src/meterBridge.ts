@@ -15,15 +15,9 @@
 import { el } from './dom';
 import { type BridgeBar, createBridgeBar } from './meterBar';
 import type { MeterLoop } from './meterLoop';
-import {
-  amplitudeToDb,
-  elapsedSeconds,
-  reductionReadout,
-  restingMeter,
-  stepMeter,
-  type MeterState,
-} from './meterModel';
-import { REDUCTION_BALLISTICS, REDUCTION_NAMES } from './meterTables';
+import { type GaugeMeter, regauge, restingGauge, stepGauge } from './gaugeMeter';
+import { amplitudeToDb, reductionReadout } from './meterModel';
+import { REDUCTION_NAMES } from './meterTables';
 import { gaugeFor, meterView } from './outputStageModel';
 import type { OutputStageLink } from './outputStageLink';
 import { OUTPUT_MODE_LABELS, formatCeilingDb } from './outputStageTables';
@@ -60,12 +54,12 @@ function gaugeChip(link: OutputStageLink): {
   reset(): void;
 } {
   const view = chip('plain-first');
-  let state: MeterState = restingMeter(REDUCTION_BALLISTICS);
-  let lastMs: number | null = null;
+  let state: GaugeMeter = restingGauge(gaugeFor(link.settings().mode));
   const draw = (): void => {
-    const gauge = gaugeFor(link.settings().mode);
-    view.root.hidden = gauge === 'none';
-    view.set(`${REDUCTION_NAMES[gauge]} `, reductionReadout(state.heldDb, false));
+    // A new gauge starts from rest, never renaming the old one's hold (`gaugeMeter.ts`).
+    state = regauge(state, gaugeFor(link.settings().mode));
+    view.root.hidden = state.gauge === 'none';
+    view.set(`${REDUCTION_NAMES[state.gauge]} `, reductionReadout(state.meter.heldDb, false));
   };
   link.onChange(draw);
   draw();
@@ -73,13 +67,11 @@ function gaugeChip(link: OutputStageLink): {
     root: view.root,
     paint(nowMs) {
       const reading = meterView(link.report(), link.settings().mode).gaugeDb;
-      state = stepMeter(state, reading, elapsedSeconds(lastMs, nowMs), REDUCTION_BALLISTICS);
-      lastMs = nowMs;
+      state = stepGauge(regauge(state, gaugeFor(link.settings().mode)), reading, nowMs);
       draw();
     },
     reset() {
-      state = restingMeter(REDUCTION_BALLISTICS);
-      lastMs = null;
+      state = restingGauge(state.gauge);
       draw();
     },
   };
