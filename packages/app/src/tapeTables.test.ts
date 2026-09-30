@@ -48,6 +48,6 @@ it('offers 2× and 4× beside Tape type with the audition hint (windsor#246)', (
   const controls = TAPE_PAGES[0]!.controls;
   expect(controls.indexOf('oversampling')).toBe(controls.indexOf('model') + 1);
   expect(TAPE_OVERSAMPLING_HINT).toBe(
-    'Audition only: 2× fits four tracks in the CPU budget; 4× is cleaner on bright, hard-driven sounds. One of these will be removed after the audition.',
+    'Audition only: 2× costs less CPU; 4× is cleaner on bright, hard-driven sounds. One of these will be removed after the audition.',
   );
 });
