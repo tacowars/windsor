@@ -217,7 +217,7 @@ is used. CI discovers the three focused test files without configuration
 changes. CI owns the full `verify` gate.
 
 The fix round changes only the older `tapeReference.test.mjs` frozen-history
-test's timeout from the 5-second default to 30 seconds: full CI timed out
+test's timeout from the 5-second default to 6 seconds: full CI timed out
 while the focused slice passed. Its numerical assertions are unchanged;
 this narrow ownership exception does not modify #145/#148 sources or
 reports. The three new report checks pin both settings domains, unique
