@@ -77,6 +77,12 @@ owns the lossless lattice stages, feedback, envelope and sweep. It ships as
 `inserts/phaser*.test.ts` exercise it through `__fixtures__/phaserHarness.ts`.
 Controls/defaults live in `inserts/phaserConstants.ts` / `phaserSpec.ts`,
 and original editable starting points in `phaserPresetTables.ts`.
+The render allocates nothing (windsor#231): samples pass through the DSP's
+`input` and `output` Float64Array slots, not as arguments or returns, the
+controls live in Float64Array slots rather than a record keyed by name, and
+every double field is first written as NaN.
+`inserts/phaserAllocation.test.ts` pins it on V8 through
+`__fixtures__/phaserChangeScenario.ts`.
 
 `retro/` is the original ROM-free vintage reverb insert (#682), built as
 `generated/retro-reverb-processor.js`. `retroReverbProcessor.ts` owns the

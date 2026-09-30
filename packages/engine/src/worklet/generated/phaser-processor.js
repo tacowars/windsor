@@ -91,8 +91,24 @@ var LoadSampler = class {
 
 // packages/engine/src/worklet/phaser/phaserDsp.ts
 var KEYS = Object.keys(PHASER_DEFAULTS);
+var SLOT = {
+  rate: KEYS.indexOf("rate"),
+  center: KEYS.indexOf("center"),
+  depth: KEYS.indexOf("depth"),
+  feedback: KEYS.indexOf("feedback"),
+  feedbackCut: KEYS.indexOf("feedbackCut"),
+  stereo: KEYS.indexOf("stereo"),
+  envelope: KEYS.indexOf("envelope"),
+  bassKeep: KEYS.indexOf("bassKeep"),
+  mix: KEYS.indexOf("mix"),
+  enabled: KEYS.indexOf("enabled")
+};
+var LEFT = 0;
+var RIGHT = 1;
 var PhaserDsp = class {
   constructor(rate, params) {
+    this.rate = this.smooth = this.attack = this.release = this.bassPole = NaN;
+    this.phase = this.follower = this.feedbackPole = this.mix = NaN;
     this.rate = rate;
     this.smooth = 1 - Math.exp(-1 / (rate * PHASER_DSP.smoothSeconds));
     this.attack = 1 - Math.exp(-1 / (rate * PHASER_DSP.attackSeconds));
@@ -102,51 +118,66 @@ var PhaserDsp = class {
     this.bass = new Float64Array(2);
     this.feedbackLow = new Float64Array(2);
     this.feedbackOut = new Float64Array(2);
-    this.controls = { ...PHASER_DEFAULTS, enabled: Number(PHASER_DEFAULTS.enabled) };
-    this.targets = { ...this.controls };
-    for (const key of KEYS) this.controls[key] = params[key]?.[0] ?? this.controls[key];
-    this.phase = this.follower = this.left = this.right = 0;
+    this.controls = new Float64Array(KEYS.length);
+    this.targets = new Float64Array(KEYS.length);
+    this.input = new Float64Array(2);
+    this.output = new Float64Array(2);
+    for (let slot = 0; slot < KEYS.length; slot++) {
+      const key = KEYS[slot];
+      this.controls[slot] = params[key]?.[0] ?? Number(PHASER_DEFAULTS[key]);
+    }
+    this.targets.set(this.controls);
+    this.phase = this.follower = 0;
     this.feedbackPole = this.mix = 0;
   }
   configure(params, _frames) {
-    for (const key of KEYS) this.targets[key] = params[key][0];
+    const t = this.targets;
+    for (let slot = 0; slot < KEYS.length; slot++) t[slot] = params[KEYS[slot]][0];
   }
-  tick(left, right) {
+  /** One stereo sample: `input` in, `output` out. */
+  tick() {
     const s = this.controls;
     const t = this.targets;
     const k = this.smooth;
-    s.rate += k * (t.rate - s.rate);
-    s.center += k * (t.center - s.center);
-    s.depth += k * (t.depth - s.depth);
-    s.feedback += k * (t.feedback - s.feedback);
-    s.feedbackCut += k * (t.feedbackCut - s.feedbackCut);
-    s.stereo += k * (t.stereo - s.stereo);
-    s.envelope += k * (t.envelope - s.envelope);
-    s.bassKeep += k * (t.bassKeep - s.bassKeep);
-    s.mix += k * (t.mix - s.mix);
-    s.enabled += k * (t.enabled - s.enabled);
+    s[SLOT.rate] += k * (t[SLOT.rate] - s[SLOT.rate]);
+    s[SLOT.center] += k * (t[SLOT.center] - s[SLOT.center]);
+    s[SLOT.depth] += k * (t[SLOT.depth] - s[SLOT.depth]);
+    s[SLOT.feedback] += k * (t[SLOT.feedback] - s[SLOT.feedback]);
+    s[SLOT.feedbackCut] += k * (t[SLOT.feedbackCut] - s[SLOT.feedbackCut]);
+    s[SLOT.stereo] += k * (t[SLOT.stereo] - s[SLOT.stereo]);
+    s[SLOT.envelope] += k * (t[SLOT.envelope] - s[SLOT.envelope]);
+    s[SLOT.bassKeep] += k * (t[SLOT.bassKeep] - s[SLOT.bassKeep]);
+    s[SLOT.mix] += k * (t[SLOT.mix] - s[SLOT.mix]);
+    s[SLOT.enabled] += k * (t[SLOT.enabled] - s[SLOT.enabled]);
+    const left = this.input[LEFT];
+    const right = this.input[RIGHT];
     const level = Math.min(1, Math.max(Math.abs(left), Math.abs(right)) * PHASER_DSP.envelopeGain);
     this.follower += (level > this.follower ? this.attack : this.release) * (level - this.follower);
-    this.feedbackPole = 1 - Math.exp(-(2 * Math.PI * s.feedbackCut) / this.rate);
-    this.mix = s.mix * s.enabled;
-    this.left = this.channel(left, 0);
-    this.right = this.channel(right, 1);
-    this.phase += s.rate / this.rate;
+    this.feedbackPole = 1 - Math.exp(-(2 * Math.PI * s[SLOT.feedbackCut]) / this.rate);
+    this.mix = s[SLOT.mix] * s[SLOT.enabled];
+    this.channel(LEFT);
+    this.channel(RIGHT);
+    this.phase += s[SLOT.rate] / this.rate;
     this.phase -= Math.floor(this.phase);
   }
-  channel(input, channel) {
+  /** One channel of the sample: `input[channel]` in, `output[channel]` out. */
+  channel(channel) {
     const s = this.controls;
-    const phase = this.phase + channel * s.stereo / PHASER_DSP.degreesPerTurn;
-    const octaves = -Math.cos(2 * Math.PI * phase) * s.depth + this.follower * s.envelope;
-    const hz = Math.max(PHASER_DSP.minHz, Math.min(this.rate * PHASER_DSP.maxRateRatio, s.center * 2 ** octaves));
+    const input = this.input[channel];
+    const phase = this.phase + channel * s[SLOT.stereo] / PHASER_DSP.degreesPerTurn;
+    const octaves = -Math.cos(2 * Math.PI * phase) * s[SLOT.depth] + this.follower * s[SLOT.envelope];
+    const hz = Math.max(
+      PHASER_DSP.minHz,
+      Math.min(this.rate * PHASER_DSP.maxRateRatio, s[SLOT.center] * 2 ** octaves)
+    );
     const tangent = Math.tan(Math.PI * hz / this.rate);
     const a = (tangent - 1) / (tangent + 1);
     const b = Math.sqrt(1 - a * a);
     this.bass[channel] += this.bassPole * (input - this.bass[channel]);
-    const dry = input - s.bassKeep * this.bass[channel];
+    const dry = input - s[SLOT.bassKeep] * this.bass[channel];
     this.feedbackLow[channel] += this.feedbackPole * (this.feedbackOut[channel] - this.feedbackLow[channel]);
     const feedback = this.feedbackOut[channel] - this.feedbackLow[channel];
-    let wet = dry + PHASER_DSP.feedbackLimit * Math.tanh(s.feedback * feedback / PHASER_DSP.feedbackLimit);
+    let wet = dry + PHASER_DSP.feedbackLimit * Math.tanh(s[SLOT.feedback] * feedback / PHASER_DSP.feedbackLimit);
     for (let stage = 0; stage < PHASER_DSP.stages; stage++) {
       const index = channel * PHASER_DSP.stages + stage;
       const output = a * wet + b * this.state[index];
@@ -154,7 +185,7 @@ var PhaserDsp = class {
       wet = output;
     }
     this.feedbackOut[channel] = wet;
-    return input + this.mix * (wet - dry);
+    this.output[channel] = input + this.mix * (wet - dry);
   }
 };
 
@@ -197,11 +228,16 @@ var PhaserProcessor = class _PhaserProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
-    this.dsp.configure(params, frames);
+    const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
+    const dsp = this.dsp;
+    const input = dsp.input, output = dsp.output;
+    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
-      this.dsp.tick(left?.[i] ?? 0, right?.[i] ?? 0);
-      out[0][i] = this.dsp.left;
-      if (out[1]) out[1][i] = this.dsp.right;
+      input[0] = i < leftFrames ? left[i] : 0;
+      input[1] = i < rightFrames ? right[i] : 0;
+      dsp.tick();
+      out[0][i] = output[0];
+      if (out[1]) out[1][i] = output[1];
     }
     this.load.end(frames);
     return true;

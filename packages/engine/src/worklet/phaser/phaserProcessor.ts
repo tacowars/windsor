@@ -1,4 +1,6 @@
-/** Phaser adapter: block controls, stereo audio, shutdown and existing load telemetry. */
+/** Phaser adapter: block controls, stereo audio, shutdown and existing load telemetry.
+ * Its render allocates nothing (windsor#231): see phaserDsp.ts.
+ */
 import { PHASER_NAME, PHASER_BOUNDS, PHASER_DEFAULTS } from '../../inserts/phaserConstants';
 import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
@@ -49,11 +51,21 @@ class PhaserProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
-    this.dsp.configure(params, frames);
+    // `left?.[i] ?? 0` would read the same, but its load may be undefined, so V8
+    // keeps it tagged and boxes every sample; a bounded load stays a double.
+    const leftFrames = left ? left.length : 0,
+      rightFrames = right ? right.length : 0;
+    const dsp = this.dsp;
+    const input = dsp.input,
+      output = dsp.output;
+    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
-      this.dsp.tick(left?.[i] ?? 0, right?.[i] ?? 0);
-      out[0][i] = this.dsp.left;
-      if (out[1]) out[1][i] = this.dsp.right;
+      // Through slots, not arguments, which V8 boxes across a call it does not inline.
+      input[0] = i < leftFrames ? left![i] : 0;
+      input[1] = i < rightFrames ? right![i] : 0;
+      dsp.tick();
+      out[0][i] = output[0];
+      if (out[1]) out[1][i] = output[1];
     }
     this.load.end(frames);
     return true;
