@@ -30,9 +30,20 @@ import type { PlateReverbSpec } from './plateReverbInsert';
 import { ECHO_INSERT } from './echoInsert';
 import type { EchoSpec } from './echoInsert';
 import type { InsertKind, InsertStage } from './insertKind';
+import type { IdClaim } from './insertIds';
+import { chainIds } from './insertIds';
 
-/** Every kind's settings, discriminated on `kind`. */
-export type InsertSpec =
+/**
+ * An insert's identity in its chain (windsor#186, `insertIds.ts`). A
+ * normalised list gives every entry one; a spec built in code may leave it
+ * out until it is normalised or added to a chain.
+ */
+export interface InsertIdentity {
+  readonly id?: string;
+}
+
+/** Every kind's settings, discriminated on `kind`, with the insert's identity. */
+export type InsertSpec = (
   | AdvancedDriveSpec
   | DriveSpec
   | ChorusSpec
@@ -43,7 +54,9 @@ export type InsertSpec =
   | DelaySpec
   | EnsembleSpec
   | PlateReverbSpec
-  | EchoSpec;
+  | EchoSpec
+) &
+  InsertIdentity;
 export type InsertKindName = InsertSpec['kind'];
 
 /** A registry of kinds by name. The strip takes one as a parameter, so a test can inject another. */
@@ -77,7 +90,8 @@ export function insertKind(
  * A strip's `inserts` list: absent is `[]`; a junk entry is dropped with a
  * correction; a kind the registry lacks is dangling and dropped; entries past
  * `MAX_INSERTS` are dropped with a correction; each kept entry is its kind's
- * normalised spec.
+ * normalised spec with its `id`. The id is read here, beside the kind's own
+ * fields rather than among them, and filled or replaced as `chainIds` says.
  */
 export function normaliseInserts(
   raw: unknown,
@@ -91,6 +105,7 @@ export function normaliseInserts(
     return [];
   }
   const out: InsertSpec[] = [];
+  const claims: IdClaim[] = [];
   raw.forEach((entry: unknown, i) => {
     const at = `${path}[${i}]`;
     if (!isRecord(entry)) {
@@ -107,9 +122,13 @@ export function normaliseInserts(
       n.correction(`${at}: past the ${MAX_INSERTS}-insert limit — dropped`);
       return;
     }
-    out.push(kind.normalise(entry, at, n));
+    const { id, ...fields } = entry;
+    const spec = kind.normalise(fields, at, n);
+    out.push(spec);
+    claims.push({ raw: id, at, kind: spec.kind });
   });
-  return out;
+  const ids = chainIds(claims, n);
+  return out.map((spec, i) => ({ ...spec, id: ids[i]! }));
 }
 
 export type { InsertKind, InsertStage };

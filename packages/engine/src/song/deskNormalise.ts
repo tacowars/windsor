@@ -12,6 +12,7 @@ import type { FieldNormaliser } from './arrangementFields';
 import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ, MIX_LEVEL_MAX, RETURN_LEVEL_MAX } from '../audioConstants';
 import type { InsertSpec } from '../inserts/insertRegistry';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
+import { withInsertIds } from '../inserts/insertIds';
 import { normaliseInserts } from '../inserts/insertRegistry';
 import { DEFAULT_STRIP, RETURNS, isReturnName } from '../mixer/mix';
 
@@ -116,7 +117,8 @@ export function normaliseReturns(
 
 /**
  * A bus's chain: a strip's list, read the same way, with two differences.
- * An absent list is the code's chain `base`, and so is junk, since that is
+ * An absent list is the code's chain `base`, with the ids normalising gives
+ * it (windsor#186), and so is junk, since that is
  * what the bus plays without one; an empty list is kept, and passes the
  * sends through. A compressor keys from the bus's own input: an external
  * sidechain is not offered on a bus, so one in the document is corrected
@@ -128,10 +130,10 @@ export function normaliseBusInserts(
   n: FieldNormaliser,
   base: readonly InsertSpec[],
 ): InsertSpec[] {
-  if (raw === undefined) return [...base];
+  if (raw === undefined) return withInsertIds(base);
   if (!Array.isArray(raw)) {
     n.correction(`${path}: not a list — using the bus's default chain`);
-    return [...base];
+    return withInsertIds(base);
   }
   return normaliseInserts(raw, path, n).map((spec, i) => {
     if (spec.kind !== 'compressor' || spec.sidechain === undefined) return spec;

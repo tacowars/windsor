@@ -11,6 +11,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { ApplyResult, ArrangementDocument, DocumentPartial } from '@windsor/engine';
 import { RETURNS, TICKS_PER_BAR, makePatch, partAt, removePartChange } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { withFilledInsertIds } from '@windsor/engine/__fixtures__/insertIds';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
@@ -324,7 +325,7 @@ describe('an undo is an ordinary live edit', () => {
     expect(c.ctx.undo()).toBe(true);
     // The document loses the bus; the engine is sent what a system built without it plays.
     expect(c.model.doc.returns).toBeUndefined();
-    expect(c.applied.at(-1)).toEqual({ returns: { a: RETURNS.a } });
+    expect(c.applied.at(-1)).toEqual(withFilledInsertIds({ returns: { a: RETURNS.a } }));
   });
 });
 
@@ -360,7 +361,7 @@ describe('an undo restores the document exactly', () => {
     expect(c.ctx.undo()).toBe(true);
     expect(c.model.doc).toStrictEqual(one);
     // The engine has no absent return: it is sent the one a system built without it plays.
-    expect(c.applied.at(-1)).toEqual({ returns: { b: RETURNS.b } });
+    expect(c.applied.at(-1)).toEqual(withFilledInsertIds({ returns: { b: RETURNS.b } }));
     expect(c.ctx.redo()).toBe(true);
     expect(c.model.doc).toStrictEqual(two);
     expect(c.builds).toBe(0);

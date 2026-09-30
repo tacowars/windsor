@@ -15,6 +15,8 @@ import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import { MAX_INSERTS } from '../inserts/insertConstants';
 import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
+import { withInsertIds } from '../inserts/insertIds';
+import { withoutInsertIds } from '../__fixtures__/insertIds';
 import { RETURNS } from '../mixer/mix';
 import { makePatch } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
@@ -144,7 +146,9 @@ describe('the returns section: the send buses (windsor#172)', () => {
   it("fills a bus from the code's: a named level, and the default chain when none is given", () => {
     const r = makeArrangement({ ...SONG, returns: { a: { level: 0.5 } } });
     expect(r.corrections).toEqual([]);
-    expect(r.document.returns).toEqual({ a: { level: 0.5, inserts: RETURNS.a.inserts } });
+    expect(r.document.returns).toEqual({
+      a: { level: 0.5, inserts: withInsertIds(RETURNS.a.inserts) },
+    });
     expect(RETURNS.a.inserts).toEqual([plate]);
   });
 
@@ -157,7 +161,7 @@ describe('the returns section: the send buses (windsor#172)', () => {
     ]) {
       const first = makeArrangement({ ...SONG, returns });
       expect(first.corrections).toEqual([]);
-      expect(first.document.returns).toEqual(returns);
+      expect(withoutInsertIds(first.document.returns)).toEqual(returns);
       const again = makeArrangement(JSON.parse(JSON.stringify(first.document)));
       expect(again.corrections).toEqual([]);
       expect(again.document).toEqual(first.document);
@@ -167,7 +171,7 @@ describe('the returns section: the send buses (windsor#172)', () => {
   it('keeps an empty chain empty, where an absent or junk one is the default', () => {
     const r = makeArrangement({ ...SONG, returns: { a: { inserts: [] }, b: { inserts: 'x' } } });
     expect(r.document.returns?.a?.inserts).toEqual([]);
-    expect(r.document.returns?.b?.inserts).toEqual(RETURNS.b.inserts);
+    expect(r.document.returns?.b?.inserts).toEqual(withInsertIds(RETURNS.b.inserts));
     expect(r.corrections).toEqual([
       "returns.b.inserts: not a list — using the bus's default chain",
     ]);
@@ -182,7 +186,7 @@ describe('the returns section: the send buses (windsor#172)', () => {
         b: { inserts: over, wet: 1 },
       },
     });
-    expect(r.document.returns?.a).toEqual({
+    expect(withoutInsertIds(r.document.returns?.a)).toEqual({
       level: 1,
       inserts: [{ ...DEFAULT_PLATE_REVERB, size: REVERB_SPACE_RANGES.size[1], mix: 1 }],
     });
@@ -215,7 +219,7 @@ describe('the returns section: the send buses (windsor#172)', () => {
       ...SONG,
       returns: { a: { kind: 'reverb', space: { size: 2 } }, b: { delayTime: 1 } },
     });
-    expect(r.document.returns).toEqual({ a: RETURNS.a, b: RETURNS.b });
+    expect(withoutInsertIds(r.document.returns)).toEqual({ a: RETURNS.a, b: RETURNS.b });
     expect(r.corrections).toEqual([
       'returns.a.kind: unknown key dropped',
       'returns.a.space: unknown key dropped',

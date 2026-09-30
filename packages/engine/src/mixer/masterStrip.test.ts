@@ -24,7 +24,10 @@ afterAll(restore);
 it('defaults old songs and round-trips master controls without dropping other desk settings', () => {
   const old = makeArrangement(FULL_DOCUMENT);
   expect(old.document.master).toBeUndefined();
-  const raw = { ...FULL_DOCUMENT, master: { level: 0.7, inserts: [DEFAULT_DRIVE] } };
+  const raw = {
+    ...FULL_DOCUMENT,
+    master: { level: 0.7, inserts: [{ ...DEFAULT_DRIVE, id: 'd' }] },
+  };
   const first = makeArrangement(raw);
   expect(first.corrections).toEqual([]);
   expect(first.document.master).toEqual(raw.master);

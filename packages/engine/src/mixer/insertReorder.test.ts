@@ -147,4 +147,43 @@ describe('routePart insert reordering', () => {
     expect(built.length).toBe(madeBefore);
     expect(targets(part.output)).toEqual([]);
   });
+
+  it('neither rebuilds nor fades for a list that only adds or changes ids (windsor#186)', async () => {
+    const { context, part, dry } = await rig();
+    const returns = createReturns(context.asAudioContext(), RETURNS, dry);
+    const waiting: (() => void)[] = [];
+    const strip = routePart(part, { ...STRIP, inserts: [scale(0.25), boost(2)] }, returns, dry, {
+      registry: TEST_KINDS,
+      defer: (run) => void waiting.push(run),
+    });
+    const live = [...strip.inserts];
+    const tail = strip.tail;
+    const madeBefore = built.length;
+    const gain = (strip.head as unknown as FakeGain).gain;
+    gain.automation.length = 0;
+    const gainOf = (i: number): number =>
+      (strip.inserts[i]!.output as unknown as FakeGain).gain.value;
+    const before = [gainOf(0), gainOf(1)];
+
+    strip.setInserts([
+      { ...scale(0.25), id: 'first' },
+      { ...boost(2), id: 'second' },
+    ]);
+    strip.setInserts([
+      { ...scale(0.25), id: 'other' },
+      { ...boost(2), id: 'second' },
+    ]);
+
+    // Param writes to the same stages: no fade waiting, no automation on the
+    // head, nothing built, re-wired or disposed, and every gain as it was.
+    expect(waiting).toHaveLength(0);
+    expect(gain.automation).toEqual([]);
+    expect(strip.inserts).toEqual(live);
+    expect(strip.tail).toBe(tail);
+    expect(built.length).toBe(madeBefore);
+    expect(live.every((stage) => (stage as unknown as (typeof built)[number]).disposed === 0)).toBe(
+      true,
+    );
+    expect([gainOf(0), gainOf(1)]).toEqual(before);
+  });
 });
