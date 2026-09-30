@@ -1,5 +1,10 @@
 # Keep the first magnetic Tape experiment outside the product
 
+**Later direction (2026-09-30):**
+[Tape greenfield direction](2026-09-30-tape-greenfield-direction.md)
+supersedes the mandatory legacy-parity/opt-in requirements below. This
+record preserves the original experiment's decisions and evidence.
+
 Phase 3 begins with a reproducible source audit and scalar prototype in
 `docs/research/2026-09-30-tape-phase-3/`. The phase-2 commit `c83564f` is the
 baseline. There is no shipped DSP, schema, preset or UI change in this increment.
