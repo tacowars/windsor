@@ -22,6 +22,7 @@ import {
   TAPE_WORKLET_URL,
   ADVANCED_DRIVE_WORKLET_URL,
   DELAY_WORKLET_URL,
+  EQ_WORKLET_URL,
 } from './workletMessages';
 import { AudioPart } from './audioPart';
 import type { OutputStage } from '../mixer/outputStage';
@@ -73,6 +74,7 @@ export interface WorkletUrls {
   advancedDriveUrl?: string | URL;
   delayUrl?: string | URL;
   outputStageUrl?: string | URL;
+  eqUrl?: string | URL;
 }
 
 export class FmEngine {
@@ -110,6 +112,7 @@ export class FmEngine {
     await this.context.audioWorklet.addModule(urls.tapeUrl ?? TAPE_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.advancedDriveUrl ?? ADVANCED_DRIVE_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.delayUrl ?? DELAY_WORKLET_URL);
+    await this.context.audioWorklet.addModule(urls.eqUrl ?? EQ_WORKLET_URL);
     await this.context.audioWorklet.addModule(urls.outputStageUrl ?? OUTPUT_STAGE_WORKLET_URL);
     // Catches the sum of many parts peaking together. It starts on the
     // default settings; a song's own reach it through `AudioSystem`.
