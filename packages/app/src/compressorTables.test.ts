@@ -32,6 +32,7 @@ describe('compressor controls and document', () => {
       range: 8,
       mix: 0.4,
       enabled: false,
+      id: 'comp',
     };
     const raw = {
       ...song,

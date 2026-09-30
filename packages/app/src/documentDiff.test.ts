@@ -19,6 +19,7 @@ import {
   removePartChange,
 } from '@windsor/engine';
 import { FULL_DOCUMENT, FULL_SLOT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { withFilledInsertIds } from '@windsor/engine/__fixtures__/insertIds';
 import type { FakeGain, FakeNode } from '@windsor/engine/__fixtures__/fakeAudioNodes';
 import { installSidechainWorklet, sidechainRig } from '@windsor/engine/__fixtures__/sidechainRig';
 import { PRESETS } from '@windsor/engine/patch/presets';
@@ -257,7 +258,7 @@ describe('documentDiffLive spells out a removed section for the engine', () => {
     const a = after(FULL, { returns: { a: { level: 0.4 } } });
     const b = after(a, { returns: { b: { level: 0.3 } } });
     expect(documentDiffLive(b, a, normalise)).toStrictEqual({
-      live: { returns: { b: RETURNS.b } },
+      live: withFilledInsertIds({ returns: { b: RETURNS.b } }),
       rebuild: false,
     });
   });

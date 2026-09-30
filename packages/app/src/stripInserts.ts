@@ -17,10 +17,9 @@ import { el } from './dom';
 import { addSlot } from './insertAddPicker';
 import { addInsert, addInsertAtFront, canAddInsert } from './insertEdits';
 import { insertsOf } from './insertKnobs';
-import { afterAdd } from './insertRackModel';
 import type { RackAccent } from './insertRackTables';
 import { INSERT_RACK_PX, RACK_ACCENTS } from './insertRackTables';
-import { commitChain, currentRackView, insertBox, syncRackView } from './insertShell';
+import { commitChain, insertBox } from './insertShell';
 
 /** Which end of the chain an Add slot adds at. */
 type AddSide = 'front' | 'back';
@@ -33,9 +32,7 @@ const SIDE_WORDS: Readonly<Record<AddSide, string>> = {
 function add(ctx: AppCtx, slot: InsertTarget, side: AddSide, kind: InsertKindName): void {
   const list = insertsOf(ctx, slot);
   const front = side === 'front';
-  const next = front ? addInsertAtFront(list, kind, slot) : addInsert(list, kind, slot);
-  const view = afterAdd(currentRackView(), slot, front ? 0 : list.length, list.length);
-  commitChain(ctx, slot, next, view);
+  commitChain(ctx, slot, front ? addInsertAtFront(list, kind, slot) : addInsert(list, kind, slot));
 }
 
 function addPicker(ctx: AppCtx, slot: InsertTarget, side: AddSide): HTMLElement {
@@ -68,7 +65,6 @@ export function stripInserts(
   slot: InsertTarget,
   accent: RackAccent = 'strip',
 ): HTMLElement {
-  syncRackView(ctx, slot);
   const row = el('div', 'insert-row');
   for (const [name, px] of Object.entries(INSERT_RACK_PX)) row.style.setProperty(name, `${px}px`);
   row.style.setProperty('--kc', RACK_ACCENTS[accent]);

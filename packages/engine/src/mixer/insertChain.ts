@@ -35,6 +35,11 @@ function unchain(head: AudioNode, stages: readonly StripStage[]): void {
   }
 }
 
+/**
+ * Whether `next` is the live kinds in the live order. Kinds only: an insert's
+ * `id` (windsor#186) is the console's, so a list that only adds or changes
+ * ids is param writes to the same stages, with no rebuild and no fade.
+ */
 const sameKinds = (
   live: readonly InsertStage<InsertSpec>[],
   next: readonly InsertSpec[],

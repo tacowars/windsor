@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ARRANGEMENT_VERSION, DELAY_RESONANCE_DEFAULT_DB } from '../audioConstants';
 import { KICK, song } from '../__fixtures__/documentCases';
+import { withoutInsertIds } from '../__fixtures__/insertIds';
 import { DEFAULT_ECHO } from '../inserts/echoInsert';
 import { DEFAULT_PLATE_REVERB } from '../inserts/plateReverbInsert';
 import { RETURNS } from '../mixer/mix';
@@ -122,7 +123,7 @@ describe('the 3 → 4 upgrade: the returns become the send buses (windsor#172)',
     const result = makeArrangement(v3({ returns: { room: ROOM, echo: ECHO } }));
     expect(result.corrections).toEqual([]);
     expect(result.document.version).toBe(4);
-    expect(result.document.returns).toEqual({
+    expect(withoutInsertIds(result.document.returns)).toEqual({
       a: {
         level: 0.5,
         inserts: [{ ...DEFAULT_PLATE_REVERB, ...SPACES.cathedral, size: 2, mix: 1 }],
@@ -140,7 +141,7 @@ describe('the 3 → 4 upgrade: the returns become the send buses (windsor#172)',
   it("fills what a v3 return left out from the v3 return's own base", () => {
     const result = makeArrangement(v3({ returns: { room: {}, echo: { level: 0.3 } } }));
     expect(result.corrections).toEqual([]);
-    expect(result.document.returns).toEqual({
+    expect(withoutInsertIds(result.document.returns)).toEqual({
       a: RETURNS.a,
       b: { level: 0.3, inserts: RETURNS.b.inserts },
     });
@@ -164,14 +165,14 @@ describe('the 3 → 4 upgrade: the returns become the send buses (windsor#172)',
     });
     const result = makeArrangement(upgraded.document);
     expect(result.dangling).toEqual([]);
-    expect(result.document.returns).toEqual({ a: RETURNS.a });
+    expect(withoutInsertIds(result.document.returns)).toEqual({ a: RETURNS.a });
   });
 
   it('carries only the space fields v3 read: an unknown or colliding key cannot turn Send A', () => {
     const space = { ...SPACES.cathedral, kind: 'echo', mix: 0, bogus: 1 };
     const result = makeArrangement(v3({ returns: { room: { level: 0.5, space } } }));
     expect(result.corrections).toEqual([]);
-    expect(result.document.returns?.['a']).toEqual({
+    expect(withoutInsertIds(result.document.returns?.['a'])).toEqual({
       level: 0.5,
       inserts: [{ ...DEFAULT_PLATE_REVERB, ...SPACES.cathedral, mix: 1 }],
     });
@@ -181,7 +182,7 @@ describe('the 3 → 4 upgrade: the returns become the send buses (windsor#172)',
     const echo = { ...ECHO, mix: 0, bogus: 1 };
     const result = makeArrangement(v3({ returns: { echo } }));
     expect(result.corrections).toEqual([]);
-    expect(result.document.returns?.['b']).toEqual({
+    expect(withoutInsertIds(result.document.returns?.['b'])).toEqual({
       level: 0.4,
       inserts: [
         { ...DEFAULT_ECHO, delayTime: 0.375, feedback: 0.5, damp: 2400, resonance: 6, mix: 1 },

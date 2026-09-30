@@ -35,10 +35,10 @@ describe('drivePages (windsor#174)', () => {
 
   it('shows Main after multiband on Stage 3 becomes single, and keeps Mod', () => {
     const multiband = names('multiband');
-    const onStage3 = showPage(emptyRack(), 0, 0, multiband, multiband.indexOf('Stage 3'));
-    expect(viewAt(onStage3, 0, 0, names('single')).page).toBe(0);
-    const onMod = showPage(emptyRack(), 0, 0, multiband, multiband.indexOf('Mod'));
-    expect(names('single')[viewAt(onMod, 0, 0, names('single')).page]).toBe('Mod');
+    const onStage3 = showPage(emptyRack(), 0, 'x', multiband, multiband.indexOf('Stage 3'));
+    expect(viewAt(onStage3, 0, 'x', names('single')).page).toBe(0);
+    const onMod = showPage(emptyRack(), 0, 'x', multiband, multiband.indexOf('Mod'));
+    expect(names('single')[viewAt(onMod, 0, 'x', names('single')).page]).toBe('Mod');
   });
 });
 import { addInsert } from './insertEdits';
@@ -61,12 +61,10 @@ it('stage edits round-trip through both part and master document partials', () =
     parts: [{ slot: 0, name: 'Drive test', preset: 'saw-arp', sequencer: { kind: 'none' } }],
   });
   const slot = model.doc.parts[0]!.slot;
-  const edited = editDriveStage(
-    { ...DEFAULT_ADVANCED_DRIVE, route: 'multiband' },
-    2,
-    'lfoBias',
-    -0.4,
-  );
+  const edited = {
+    ...editDriveStage({ ...DEFAULT_ADVANCED_DRIVE, route: 'multiband' }, 2, 'lfoBias', -0.4),
+    id: 'drive',
+  };
   for (const target of [slot, 'master'] as const) {
     const partial = insertChange(target, [edited]);
     model.merge(partial);
