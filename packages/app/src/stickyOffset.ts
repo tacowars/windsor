@@ -4,11 +4,30 @@
  * display, so its height is measured, not assumed: one `ResizeObserver` for
  * the life of the page writes it to `--chrome-h` on the document, which the
  * master column's and the bridge's `top` read. It fires only when the
- * header's size changes.
+ * header's size changes. A part that measures in pixels rather than reading
+ * the variable, like the bridge's `IntersectionObserver`, hears the same
+ * change through `onChromeResize`.
  */
 
 const CHROME_SELECTOR = '.chrome';
 let following = false;
+const listeners = new Set<(heightPx: number) => void>();
+
+/**
+ * An observer's `rootMargin` that starts `chromePx` below the viewport's top,
+ * so a part hidden under the sticky header counts as out of view. Whole
+ * pixels, and never a positive margin.
+ */
+export function belowChromeRootMargin(chromePx: number): string {
+  const px = Number.isFinite(chromePx) ? Math.max(0, Math.round(chromePx)) : 0;
+  return `${-px}px 0px 0px 0px`;
+}
+
+/** Hear the header's new height each time it changes; returns the unsubscribe. */
+export function onChromeResize(listener: (heightPx: number) => void): () => void {
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+}
 
 /** The header's height now, in CSS pixels; 0 without one. */
 export function chromeHeightPx(): number {
@@ -21,8 +40,11 @@ export function followChromeHeight(): void {
   const chrome = document.querySelector(CHROME_SELECTOR);
   if (!chrome || typeof ResizeObserver === 'undefined') return;
   following = true;
-  const write = (): void =>
-    document.documentElement.style.setProperty('--chrome-h', `${chromeHeightPx()}px`);
+  const write = (): void => {
+    const heightPx = chromeHeightPx();
+    document.documentElement.style.setProperty('--chrome-h', `${heightPx}px`);
+    for (const listener of listeners) listener(heightPx);
+  };
   new ResizeObserver(write).observe(chrome);
   write();
 }

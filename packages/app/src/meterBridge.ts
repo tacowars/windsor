@@ -8,7 +8,8 @@
  * lamp.
  *
  * An `IntersectionObserver` on the column's meters shows and hides it; it
- * reports only on a crossing, so nothing runs per frame. The bar sits in a
+ * reports only on a crossing, so nothing runs per frame. Its top margin is
+ * the sticky header's height, rebuilt when the header resizes. The bar sits in a
  * dock of no height, so showing it moves nothing under it. Its moving parts
  * paint from the tab's meter loop.
  */
@@ -22,7 +23,7 @@ import { gaugeFor, meterView } from './outputStageModel';
 import type { OutputStageLink } from './outputStageLink';
 import { OUTPUT_MODE_LABELS, formatCeilingDb } from './outputStageTables';
 import { createStageLamp } from './stageLamp';
-import { chromeHeightPx } from './stickyOffset';
+import { belowChromeRootMargin, chromeHeightPx, onChromeResize } from './stickyOffset';
 
 /** A chip's text: a plain part and a bold part, in `order`, written only when either changes. */
 function chip(order: 'bold-first' | 'plain-first'): {
@@ -75,6 +76,38 @@ function gaugeChip(link: OutputStageLink): {
       draw();
     },
   };
+}
+
+/**
+ * Show `bridge` while `watched` is out of view below the sticky header, and
+ * hide it while `watched` shows. The margin is the header's height in
+ * pixels, captured when the observer is built, so a header that wraps or
+ * unwraps builds a new one. Returns the disconnect.
+ */
+function showWhileOutOfView(bridge: HTMLElement, watched: Element): () => void {
+  const onCrossing = (entries: IntersectionObserverEntry[]): void => {
+    if (!watched.isConnected) return disconnect();
+    for (const entry of entries) {
+      // A hidden tab lays nothing out: keep the last answer until it shows.
+      if (entry.boundingClientRect.height > 0) bridge.hidden = entry.isIntersecting;
+    }
+  };
+  let margin = belowChromeRootMargin(chromeHeightPx());
+  let observer = new IntersectionObserver(onCrossing, { rootMargin: margin });
+  observer.observe(watched);
+  const stopFollowing = onChromeResize((heightPx) => {
+    const next = belowChromeRootMargin(heightPx);
+    if (next === margin) return;
+    margin = next;
+    observer.disconnect();
+    observer = new IntersectionObserver(onCrossing, { rootMargin: margin });
+    observer.observe(watched);
+  });
+  function disconnect(): void {
+    stopFollowing();
+    observer.disconnect();
+  }
+  return disconnect;
 }
 
 export interface MeterBridge {
@@ -134,16 +167,5 @@ export function renderMeterBridge(
     },
   });
   loop.add(lamp);
-  const observer = new IntersectionObserver(
-    (entries) => {
-      if (!watched.isConnected) return observer.disconnect();
-      for (const entry of entries) {
-        // A hidden tab lays nothing out: keep the last answer until it shows.
-        if (entry.boundingClientRect.height > 0) bridge.hidden = entry.isIntersecting;
-      }
-    },
-    { rootMargin: `-${Math.round(chromeHeightPx())}px 0px 0px 0px` },
-  );
-  observer.observe(watched);
-  return { root: dock, disconnect: () => observer.disconnect() };
+  return { root: dock, disconnect: showWhileOutOfView(bridge, watched) };
 }
