@@ -117,6 +117,12 @@ bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (mai
   states that none is provided. An additive field whose default reproduces
   the old behaviour bumps nothing
   (`docs/log/2026-09-28-format-versions-refuse-never-destroy.md`).
+  Tape phase 3 follows the user's greenfield direction in
+  `docs/log/2026-09-30-tape-greenfield-direction.md`: old-song audio parity,
+  old defaults/parameter meanings and compatibility shims are not required.
+  Current-format round trips and explicit format identity still apply;
+  an incompatible format need not provide an upgrade. Keep old/new Tape
+  paths only when measured CPU/product tradeoffs justify them.
 - **Research and measurements:** `docs/research/<date>-<slug>/`.
 - **Commit style:** a sentence-case imperative subject, with a body that
   explains why.

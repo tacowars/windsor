@@ -4,6 +4,11 @@ The first Tape insert landed in Windsor PR #143. The next request was a
 balance of studio usefulness and creative wear, informed by full REELS and
 the local AnalogTapeModel project.
 
+**Later direction (2026-09-30):**
+[Tape greenfield direction](2026-09-30-tape-greenfield-direction.md)
+supersedes the requirement for a future opt-in physical mode to preserve
+existing songs. The phase-2 implementation and evidence below are historical.
+
 ## Controls and compatibility
 
 Keep the original Studio, Ferric and Vintage profiles and append four original
