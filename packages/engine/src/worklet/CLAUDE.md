@@ -13,6 +13,10 @@ the RK4 core with its field guard and knee, and the span-48 FIR pair that
 reconstructs H and its exact derivative at every RK4 stage time. Nothing
 imports them yet, so the bundle does not carry them until E2 wires them into
 `TapeDsp`. Tunables and `driveGain` are in `inserts/tapeMagneticConstants.ts`.
+Neither calls a transcendental `Math` function, whose results differ by an
+ulp between V8's arm64 and x64 builds: sine, cosine, tanh and 2^x come from
+`inserts/tapePortableMath.ts`, in IEEE arithmetic alone, so the render is the
+same bits on the M1 and on CI.
 Stage points travel in a `Float64Array` and results in fields, so no double
 crosses a call; `render` is the block entry. The tests import the sources
 directly, so the test project reads them under `noUncheckedIndexedAccess` and

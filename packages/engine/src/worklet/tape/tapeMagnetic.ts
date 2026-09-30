@@ -23,7 +23,9 @@
  * per-sample path allocates nothing and passes no double across a call (the
  * stage values travel in the oversampler's `Float64Array`, the result in a
  * field); `configure` recomputes every derived coefficient and the output
- * normalisation, and is never on that path. Pinned by
+ * normalisation, and is never on that path. The step calls no
+ * transcendental `Math` function: tanh is `tanhInPlace`'s, in IEEE
+ * arithmetic, so the render is the same bits on arm64 and x64. Pinned by
  * `inserts/tapeMagnetic.test.ts` (the research ruler, the knee, both
  * guards, normalisation) and `inserts/tapeMagneticGolden.test.ts`.
  */
@@ -32,6 +34,7 @@ import {
   TAPE_MAGNETIC_DEFAULT_CONTROLS,
   type TapeMagneticControls,
 } from '../../inserts/tapeMagneticConstants';
+import { tanhInPlace } from '../../inserts/tapePortableMath';
 
 type MagneticTable = typeof TAPE_MAGNETIC;
 
@@ -115,6 +118,8 @@ class TapeMagneticCore {
   reach: Float64Array;
   weights: Float64Array;
   divisor: number;
+  /** One double for `tanhInPlace`, so no double crosses that call. */
+  scratch: Float64Array;
   table: MagneticTable;
 
   constructor(
@@ -143,6 +148,7 @@ class TapeMagneticCore {
     this.reach = Float64Array.from(table.rk4.reach);
     this.weights = Float64Array.from(table.rk4.weights);
     this.divisor = table.rk4.divisor;
+    this.scratch = new Float64Array(1);
     this.table = table;
     this.configure(rate, factor, controls);
     this.reset();
@@ -207,7 +213,10 @@ class TapeMagneticCore {
         langevin = q * (series[0]! + q2 * (series[1]! + q2 * series[2]!));
         langevinSlope = slopeSeries[0]! + q2 * (slopeSeries[1]! + q2 * slopeSeries[2]!);
       } else {
-        const coth = 1 / Math.tanh(q);
+        const scratch = this.scratch;
+        scratch[0] = q;
+        tanhInPlace(scratch, 0);
+        const coth = 1 / scratch[0]!;
         langevin = coth - 1 / q;
         langevinSlope = 1 / (q * q) - (coth * coth - 1);
       }

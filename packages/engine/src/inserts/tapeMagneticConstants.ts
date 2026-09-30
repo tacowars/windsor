@@ -19,6 +19,7 @@
  * into the Tape insert is E2's (`tapeDsp.ts`), so nothing here is audible yet.
  */
 import { TAPE_BOUNDS } from './tapeConstants';
+import { exp2 } from './tapePortableMath';
 
 export const TAPE_MAGNETIC = {
   /** FIR span in host samples: the pair's fixed delay, and each FIR's `span × factor + 1` taps (#207). */
@@ -96,18 +97,22 @@ export const TAPE_MAGNETIC_DEFAULT_CONTROLS: Readonly<TapeMagneticControls> = {
 /** Drive, in the Tape insert's existing dB bounds, to a plain gain into the core. */
 export const TAPE_DRIVE_GAIN = {
   bounds: TAPE_BOUNDS.drive,
-  /** The gain at either bound, as a ratio: ×4 at the maximum, ¼ at the minimum (±12.04 dB). */
-  boundRatio: 4,
+  /**
+   * The gain at either bound, in octaves of amplitude: 2 is ×4 at the maximum
+   * and ¼ at the minimum (±12.04 dB). Octaves, so the curve is `exp2`, exact
+   * on every platform, where `4 ** x` is not.
+   */
+  boundOctaves: 2,
 };
 
 /**
  * The source-field gain for a Drive value (design decision 3): unity at 0,
- * `boundRatio` at the upper bound, its reciprocal at the lower, linear in dB
+ * `2^boundOctaves` at the upper bound, its reciprocal at the lower, linear in dB
  * between, and clamped outside. Exact at 0 and at both bounds.
  */
 export function driveGain(drive: number, table = TAPE_DRIVE_GAIN): number {
   const [low, high] = table.bounds;
   const clamped = Math.min(high, Math.max(low, drive));
   const position = clamped >= 0 ? clamped / high : -clamped / low;
-  return table.boundRatio ** position;
+  return exp2(table.boundOctaves * position);
 }

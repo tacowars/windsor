@@ -15,7 +15,10 @@
  * A failure means the render changed; when that is intended, refresh with
  * `REFRESH` and say so in the PR. A refactor never refreshes it. The table
  * is pinned to `.nvmrc`'s Node major, as the other goldens are
- * (`worklet/CLAUDE.md` rule 4): the kernel and the core call `Math`.
+ * (`worklet/CLAUDE.md` rule 4). The program, the kernel and the core call no
+ * transcendental `Math` function (`tapePortableMath.ts`), so the render is
+ * the same bits on arm64 and x64; a hash that holds on one and not the
+ * other is a defect in the module, not a platform to pin separately.
  *
  * Allocation (worklet rule 2), by the heap-delta method: a Node of its own
  * (`--expose-gc`, a 64 MB young generation so nothing is collected before it
@@ -39,6 +42,7 @@ import samples from '../__fixtures__/tapeMagneticGoldenSamples.json';
 import { representationChanges } from '../__fixtures__/generalizationTrace';
 import { TapeOversampler } from '../worklet/tape/tapeOversample';
 import { TAPE_DRIVE_GAIN, TAPE_MAGNETIC, driveGain } from './tapeMagneticConstants';
+import { sine } from './tapePortableMath';
 
 const REFRESH =
   'WINDSOR_REFRESH_TAPE_MAGNETIC_GOLDEN=1 npx vitest run packages/engine/src/inserts/tapeMagneticGolden.test.ts';
@@ -58,7 +62,12 @@ const SECONDS = 2;
 /** The per-sample record keeps every `STRIDE`-th frame: 750 frames of each render, about 16 kB each. */
 const STRIDE = 128;
 
-/** The program: tones and a signed pulse under a Drive sweep from the lower bound to the upper. */
+/**
+ * The program: tones and a signed pulse under a Drive sweep from the lower
+ * bound to the upper. Its tones are `sine`'s, not `Math.sin`'s, which
+ * differs by an ulp between V8's arm64 and x64 builds, so the input is the
+ * same bits everywhere.
+ */
 function program(): [Float64Array, Float64Array] {
   const frames = SECONDS * RATE;
   const [low, high] = TAPE_DRIVE_GAIN.bounds;
@@ -70,12 +79,11 @@ function program(): [Float64Array, Float64Array] {
     const pulse = t >= 0.5 && t < 0.52 ? 0.8 : t >= 1.3 && t < 1.32 ? -0.8 : 0;
     left[n] =
       gain *
-      (0.6 * Math.sin(2 * Math.PI * 110 * t) +
-        0.3 * Math.sin(2 * Math.PI * 1234 * t + 0.5) +
-        0.15 * Math.sin(2 * Math.PI * 5003 * t + 1.3));
+      (0.6 * sine(2 * Math.PI * 110 * t) +
+        0.3 * sine(2 * Math.PI * 1234 * t + 0.5) +
+        0.15 * sine(2 * Math.PI * 5003 * t + 1.3));
     right[n] =
-      gain *
-      (0.3 * Math.sin(2 * Math.PI * 220 * t) + 0.2 * Math.sin(2 * Math.PI * 3100 * t) + pulse);
+      gain * (0.3 * sine(2 * Math.PI * 220 * t) + 0.2 * sine(2 * Math.PI * 3100 * t) + pulse);
   }
   return [left, right];
 }

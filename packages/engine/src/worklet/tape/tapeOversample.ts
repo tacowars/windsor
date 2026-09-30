@@ -18,7 +18,9 @@
  * oversampled rate, `span × factor + 1` of them, exactly symmetric and
  * normalised to sum to 1, and the interpolator's integer phases are exactly
  * `factor` times them: the pair is one FIR used twice. Its fixed delay is
- * exactly `span` host samples (`latency`).
+ * exactly `span` host samples (`latency`). The window and the sinc take
+ * `sine` and `cosine` from `inserts/tapePortableMath.ts`, not `Math`, so the
+ * taps are the same bits on every platform.
  *
  * Invariants: everything is allocated in the constructor; the per-sample
  * path (`advance`) allocates nothing and passes no double across a call
@@ -28,14 +30,15 @@
  * `inserts/tapeMagneticGolden.test.ts`.
  */
 import { TAPE_MAGNETIC, type TapeMagneticControls } from '../../inserts/tapeMagneticConstants';
+import { cosine, sine } from '../../inserts/tapePortableMath';
 import { TapeMagneticCore, condition, guardField, type MagneticTable } from './tapeMagnetic';
 
 /** The Blackman window over [−span/2, span/2] at |t|, and its slope there. */
 function blackman(t: number, table: MagneticTable, slope: boolean): number {
   const [a0, a1, a2] = table.blackman as [number, number, number];
   const w = (2 * Math.PI) / table.span;
-  if (slope) return -w * (a1 * Math.sin(w * t) + 2 * a2 * Math.sin(2 * w * t));
-  return a0 + a1 * Math.cos(w * t) + a2 * Math.cos(2 * w * t);
+  if (slope) return -w * (a1 * sine(w * t) + 2 * a2 * sine(2 * w * t));
+  return a0 + a1 * cosine(w * t) + a2 * cosine(2 * w * t);
 }
 
 /** The ideal low-pass sin(πβt)/(πt), β = 2 × cutoff, at t ≥ 0, and its slope there. */
@@ -43,8 +46,8 @@ function sinc(t: number, table: MagneticTable, slope: boolean): number {
   const beta = 2 * table.cutoff;
   if (t === 0) return slope ? 0 : beta;
   const x = Math.PI * beta * t;
-  if (slope) return (x * Math.cos(x) - Math.sin(x)) / (Math.PI * t * t);
-  return Math.sin(x) / (Math.PI * t);
+  if (slope) return (x * cosine(x) - sine(x)) / (Math.PI * t * t);
+  return sine(x) / (Math.PI * t);
 }
 
 /**

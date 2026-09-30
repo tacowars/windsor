@@ -102,11 +102,36 @@ Chowdhury, *Real-time physical modelling for analog tape machines*, DAFx
    - Excluding such rows from the tape models is E2's (design decision 6).
    - `configure` refuses controls outside [0, 1] and a factor other than 2
      or 4.
-6. **Drive is ×4 exactly at its maximum.** The gain is `4 ** (drive / 32)`
-   over the existing Drive bounds of ±32. It is exact at 0 and at both
-   bounds, so the maximum is +12.04 dB. The curve and `driveGain` live in
+6. **Drive is ×4 exactly at its maximum.** The gain is 2^(2 drive / 32)
+   over the existing Drive bounds of ±32, computed by `exp2` (decision 7).
+   It is exact at 0 and at both bounds, so the maximum is +12.04 dB. The curve and `driveGain` live in
    `tapeMagneticConstants.ts`, which the issue owns. The design record named
    `tapeConstants.ts`; E2 may move them when it wires Drive.
+7. **The module calls no transcendental `Math` function.** The first CI run
+   on x64 failed the golden at both factors while the M1 passed it. V8's
+   `Math.sin`, `Math.cos`, `Math.tanh` and `**` are C++ that its arm64 and
+   x64 builds round differently: on 200 000 inputs in [−20, 20], Node
+   24.20.0 arm64 and x64 (under Rosetta on the same M1) disagreed on 1148
+   sines, 1019 cosines, 10 tanhs and 283 powers of 4, by 1 to 3 ulps. The
+   kernel's taps (sin and cos), the core's Langevin function (tanh) and
+   `driveGain` (`**`) all used them, and the golden's own program built its
+   tones with `Math.sin`. The x64 render differed from the M1's on 156 000
+   of 192 000 samples at 2×, from frame 31, by at most 9.5e-13.
+   - `inserts/tapePortableMath.ts` supplies `sine`, `cosine`, `exp2` and
+     `tanhInPlace` in `+ − × ÷`, `Math.round` and `Math.abs` alone: a
+     Cody–Waite reduction by π/2 or ln 2, then a Taylor polynomial of
+     reciprocal factorials (`tapePortableMathTables.ts`). They are within 2
+     ulps (sine, cosine, exp2) and 4 ulps (tanh) of `Math`, not equal to it.
+   - `tanhInPlace` takes and returns its value in a `Float64Array`, like the
+     stage points (decision 4).
+   - After the change the arm64 and x64 renders are equal at every sample at
+     both factors, and so are the tap sets and the program.
+   - `tapePortableMath.test.ts` pins each function's output over fixed
+     integer-generated inputs by hash, so a platform that rounds them
+     differently fails there first.
+   - The golden keeps every 128th frame of each render beside its hash, and
+     a mismatch reports the first differing recorded sample and the largest
+     difference.
 
 ## The fixture
 
@@ -137,7 +162,8 @@ All figures below were read on Node 24.21.0 on the Apple M1 that the other
 Tape records name. They are accuracy figures, not cost figures.
 
 - **Equivalence.** All 36 cases match the research trajectory within
-  1.4e-12, both raw and after the normalisation is undone. There are zero
+  2.4e-12 (1.4e-12 with `Math.tanh`, before decision 7), both raw and after
+  the normalisation is undone. There are zero
   resets. Two broken cores fail it:
   - with the midpoint stages reading the step start, every case is at least
     2.9e-6 off;
@@ -162,7 +188,8 @@ The golden, `__fixtures__/tapeMagneticGolden.json`, pins a two-second stereo
 render at 2× and 4×, bit for bit, with its guard and reset counts. The
 program is tones and a signed pulse under a Drive sweep over the full
 bounds. At the sweep's top the left channel reaches the field guard: 26
-stage points at 2× and 51 at 4×, with no resets.
+stage points at 2× and 51 at 4×, with no resets. The render is the same
+bits on Node 24 arm64 and x64 (decision 7).
 
 ## What E2 and E3 still do
 
