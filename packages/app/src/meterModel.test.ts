@@ -5,16 +5,26 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  amplitudeToDb,
+  dbToAmplitude,
   elapsedSeconds,
   meterPosition,
+  peakHoldTranslatePx,
   peakReadout,
+  reductionHoldTranslatePx,
   reductionPosition,
   reductionReadout,
   restingMeter,
   stepMeter,
   zoneGradient,
 } from './meterModel';
-import { METER_BALLISTICS, METER_SCALE, REDUCTION_BALLISTICS } from './meterTables';
+import {
+  METER_BALLISTICS,
+  METER_HOLD_LINE_PX,
+  METER_SCALE,
+  REDUCTION_BALLISTICS,
+  REDUCTION_SCALE,
+} from './meterTables';
 
 const FLOOR = METER_SCALE.floorDb;
 
@@ -38,6 +48,45 @@ describe('meterPosition', () => {
     expect(reductionPosition(3)).toBe(0.25);
     expect(reductionPosition(20)).toBe(1);
     expect(reductionPosition(Number.NaN)).toBe(0);
+  });
+});
+
+describe('the hold lines', () => {
+  const HEIGHT = 210;
+
+  it('keeps a full-scale peak hold inside the top of the bar', () => {
+    // The line sits at the bottom and moves up; its top edge is at
+    // HEIGHT - thickness + translate from the bar's top.
+    const translate = peakHoldTranslatePx(METER_SCALE.ceilingDb, HEIGHT);
+    expect(translate).toBe(-(HEIGHT - METER_HOLD_LINE_PX));
+    expect(HEIGHT - METER_HOLD_LINE_PX + translate).toBe(0);
+    expect(peakHoldTranslatePx(METER_SCALE.ceilingDb + 6, HEIGHT)).toBe(translate);
+  });
+
+  it('keeps a full-scale reduction hold inside the bottom of the bar', () => {
+    // The line sits at the top and moves down; its bottom edge is at
+    // thickness + translate from the bar's top.
+    const translate = reductionHoldTranslatePx(REDUCTION_SCALE.maxDb, HEIGHT);
+    expect(translate).toBe(HEIGHT - METER_HOLD_LINE_PX);
+    expect(METER_HOLD_LINE_PX + translate).toBe(HEIGHT);
+    expect(reductionHoldTranslatePx(REDUCTION_SCALE.maxDb + 6, HEIGHT)).toBe(translate);
+  });
+
+  it('moves either line by its scale position below full scale', () => {
+    expect(peakHoldTranslatePx(-12, HEIGHT)).toBeCloseTo(-meterPosition(-12) * HEIGHT, 12);
+    expect(peakHoldTranslatePx(-Infinity, HEIGHT)).toBe(-0);
+    expect(reductionHoldTranslatePx(3, HEIGHT)).toBe(HEIGHT / 4);
+    expect(reductionHoldTranslatePx(0, HEIGHT)).toBe(0);
+  });
+});
+
+describe('amplitude and dB', () => {
+  it('reads silence as −∞ and unity as 0 dB, and back', () => {
+    expect(amplitudeToDb(0)).toBe(-Infinity);
+    expect(amplitudeToDb(1)).toBe(0);
+    expect(amplitudeToDb(0.5)).toBeCloseTo(-6.0206, 4);
+    expect(dbToAmplitude(-Infinity)).toBe(0);
+    expect(dbToAmplitude(amplitudeToDb(1.7))).toBeCloseTo(1.7, 12);
   });
 });
 

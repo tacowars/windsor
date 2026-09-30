@@ -8,7 +8,6 @@ import {
 } from '@windsor/engine';
 import type { OutputStageReport } from '@windsor/engine';
 import {
-  EMPTY_HOLD,
   gaugeDb,
   gaugeFor,
   lookaheadEnabled,
@@ -16,10 +15,8 @@ import {
   outputEdit,
   outputLight,
   peakDb,
-  peakLabel,
   reportAction,
   reportActed,
-  stepHold,
 } from './outputStageModel';
 import {
   OUTPUT_CEILING_KNOB,
@@ -127,12 +124,6 @@ describe('the meter scale', () => {
     ]);
     expect(idle.gaugeDb).toBe(0);
   });
-
-  it('labels a peak in dBFS, silence as −∞', () => {
-    expect(peakLabel(0)).toBe('−∞ dBFS');
-    expect(peakLabel(1)).toBe('0.0 dBFS');
-    expect(peakLabel(0.5)).toBe('-6.0 dBFS');
-  });
 });
 
 describe('the clip light', () => {
@@ -155,20 +146,6 @@ describe('the clip light', () => {
     expect(reportAction(report({ inputRight: 1.2, outputRight: 1.2 }))).toBe('Over 0 dB');
     expect(reportAction(report({ inputLeft: 0.9, outputLeft: 0.9 }))).toBeNull();
     expect(reportAction(report({ outputLeft: 1 }))).toBeNull();
-  });
-});
-
-describe('a held readout', () => {
-  it('keeps the highest value for the hold, then follows', () => {
-    let hold = stepHold(EMPTY_HOLD, 0.8, 0, 1000);
-    expect(hold).toEqual({ value: 0.8, atMs: 0 });
-    hold = stepHold(hold, 0.3, 500, 1000);
-    expect(hold.value).toBe(0.8);
-    hold = stepHold(hold, 0.9, 600, 1000);
-    expect(hold).toEqual({ value: 0.9, atMs: 600 });
-    hold = stepHold(hold, 0.3, 1599, 1000);
-    expect(hold.value).toBe(0.9);
-    expect(stepHold(hold, 0.3, 1600, 1000)).toEqual({ value: 0.3, atMs: 1600 });
   });
 });
 

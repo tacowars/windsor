@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_OUTPUT_STAGE } from '@windsor/engine';
 import type { OutputStageReport, OutputStageSettings } from '@windsor/engine';
-import { meterView, peakLabel, reportPeaks } from './outputStageModel';
+import { meterView, reportPeaks } from './outputStageModel';
 import { OUTPUT_PEAK_SCALE } from './outputStageTables';
 import { type MeteredStage, meterRevision, watchOutputStage } from './outputStageWatch';
 
@@ -142,7 +142,7 @@ describe('the latched action and the input latches (windsor#193 decision 5)', ()
     expect(watch.latchedAction).toBe('Limiting');
   });
 
-  it('clears both kinds on a reset', () => {
+  it("clears only the lamp's latch on a reset, leaving the input latches", () => {
     const stage = fakeStage();
     const watch = watchOutputStage(stage, () => 0);
     stage.post({ inputLeft: 2, inputRight: 2, outputLeft: 0.89, reductionDb: 7, active: true });
@@ -150,7 +150,7 @@ describe('the latched action and the input latches (windsor#193 decision 5)', ()
     watch.resetLatch();
     expect(watch.latched).toBe(false);
     expect(watch.latchedAction).toBeNull();
-    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([false, false]);
+    expect([watch.inputOver('left'), watch.inputOver('right')]).toEqual([true, true]);
   });
 });
 
@@ -175,7 +175,7 @@ describe('meterRevision (the meters follow the audio, not the transport)', () =>
     stage.post({});
     expect(meterRevision(stage)).not.toBe(loud);
     expect(meterView(stage.read(), 'limiter')).toEqual(meterView(null, 'limiter'));
-    expect(reportPeaks(stage.read()).map(peakLabel)).toEqual(Array(4).fill('−∞ dBFS'));
+    expect(reportPeaks(stage.read())).toEqual([0, 0, 0, 0]);
     expect(watchOutputStage(stage).latched).toBe(true);
   });
 });

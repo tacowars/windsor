@@ -10,14 +10,17 @@
  * `.meter-bar::after`). A readout's text is written only when it changes at
  * the shown precision. No `<meter>`. The numbers are `meterTables.ts`, the
  * rules `meterModel.ts`; this file only applies what the model returns.
- * Nothing mounts these yet: windsor#194 lays them out and runs them on
- * `meterLoop.ts`.
+ * The Mixer's master column and its bridge (windsor#194) lay them out and
+ * run them on `meterLoop.ts`.
  */
 import { el } from './dom';
+import { type GaugeMeter, regauge, restingGauge, stepGauge } from './gaugeMeter';
 import {
   elapsedSeconds,
   meterPosition,
+  peakHoldTranslatePx,
   peakReadout,
+  reductionHoldTranslatePx,
   reductionPosition,
   reductionReadout,
   restingMeter,
@@ -28,9 +31,9 @@ import {
 import {
   METER_BAR_WIDTH_PX,
   METER_CHANNEL_WIDTH_PX,
+  METER_HOLD_LINE_PX,
   METER_TICKS_DB,
   METER_TRANSFORM_DECIMALS,
-  REDUCTION_BALLISTICS,
   REDUCTION_NAMES,
   REDUCTION_QUIET_DB,
   REDUCTION_SCALE,
@@ -74,11 +77,21 @@ interface Channel {
   name: HTMLElement;
 }
 
-function channel(name: string, label: string, heightPx: number, led: boolean): Channel {
+/** What every vertical channel is built from. */
+interface ChannelOptions {
+  name: string;
+  label: string;
+  heightPx: number;
+  /** The channel's width; the shipped `METER_CHANNEL_WIDTH_PX` by default. */
+  channelPx?: number;
+}
+
+function channel(options: ChannelOptions, led: boolean): Channel {
+  const { name, label, heightPx } = options;
   const root = el('div', 'meter-channel');
   root.setAttribute('role', 'group');
   root.setAttribute('aria-label', label);
-  root.style.setProperty('--meter-ch-w', `${METER_CHANNEL_WIDTH_PX}px`);
+  root.style.setProperty('--meter-ch-w', `${options.channelPx ?? METER_CHANNEL_WIDTH_PX}px`);
   root.style.setProperty('--meter-bar-w', `${METER_BAR_WIDTH_PX}px`);
   root.style.setProperty('--meter-h', `${heightPx}px`);
   const ledNode = led ? el('button', 'meter-led') : el('span', 'meter-led is-empty');
@@ -89,18 +102,18 @@ function channel(name: string, label: string, heightPx: number, led: boolean): C
   bar.setAttribute('aria-label', `${label} level`);
   const cover = el('i', 'meter-cover');
   const hold = el('i', 'meter-hold');
+  hold.style.height = `${METER_HOLD_LINE_PX}px`;
   bar.append(cover, hold);
   const nameNode = el('span', 'meter-name', name);
   root.append(ledNode, readout, bar, nameNode);
   return { root, led: ledNode, readout, bar, cover, hold, name: nameNode };
 }
 
-export interface PeakBarOptions {
+export interface PeakBarOptions extends ChannelOptions {
   /** The name under the bar: L, R. */
   name: string;
   /** What it measures, for assistive tech: "Output stage input, left". */
   label: string;
-  heightPx: number;
   /** A clip LED above the readout; clicking it calls `onClear`. */
   clipLed?: { onClear(): void };
   /** Draw a ceiling line, placed by `setCeiling`. */
@@ -121,7 +134,7 @@ export interface PeakBar {
 
 /** A vertical peak bar with its held-peak readout, optional clip LED and ceiling line. */
 export function createPeakBar(options: PeakBarOptions): PeakBar {
-  const parts = channel(options.name, options.label, options.heightPx, Boolean(options.clipLed));
+  const parts = channel(options, Boolean(options.clipLed));
   parts.bar.style.background = zoneGradient('to top');
   parts.readout.title = 'Peak over the last second. Click to reset.';
   const cover = styleWriter(parts.cover, 'transform');
@@ -136,9 +149,8 @@ export function createPeakBar(options: PeakBarOptions): PeakBar {
 
   const draw = (): void => {
     cover(`scaleY(${(1 - meterPosition(state.shownDb)).toFixed(METER_TRANSFORM_DECIMALS)})`);
-    const held = meterPosition(state.heldDb);
-    hold(`translateY(${px(-held * options.heightPx)})`);
-    holdShown(held > 0 ? '1' : '0');
+    hold(`translateY(${px(peakHoldTranslatePx(state.heldDb, options.heightPx))})`);
+    holdShown(meterPosition(state.heldDb) > 0 ? '1' : '0');
     text(peakReadout(state.heldDb));
     parts.readout.classList.toggle('is-hot', state.heldDb > hotAboveDb);
   };
@@ -189,8 +201,8 @@ export interface ReductionBar {
 }
 
 /** A vertical gain-reduction bar that fills from the top, renamed and dimmed by its gauge. */
-export function createReductionBar(options: { label: string; heightPx: number }): ReductionBar {
-  const parts = channel(REDUCTION_NAMES.reduction, options.label, options.heightPx, false);
+export function createReductionBar(options: Omit<ChannelOptions, 'name'>): ReductionBar {
+  const parts = channel({ ...options, name: REDUCTION_NAMES.reduction }, false);
   parts.bar.classList.add('is-reduction');
   parts.readout.title = 'Deepest over the last second. Click to reset.';
   const cover = styleWriter(parts.cover, 'transform');
@@ -198,37 +210,35 @@ export function createReductionBar(options: { label: string; heightPx: number })
   const holdShown = styleWriter(parts.hold, 'opacity');
   const text = textWriter(parts.readout);
   const name = textWriter(parts.name);
-  let off = false;
-  let state: MeterState = restingMeter(REDUCTION_BALLISTICS);
-  let lastMs: number | null = null;
+  let state: GaugeMeter = restingGauge('reduction');
 
   const draw = (): void => {
-    cover(`scaleY(${(1 - reductionPosition(state.shownDb)).toFixed(METER_TRANSFORM_DECIMALS)})`);
-    hold(`translateY(${px(reductionPosition(state.heldDb) * options.heightPx)})`);
-    holdShown(state.heldDb > REDUCTION_QUIET_DB ? '1' : '0');
-    text(reductionReadout(state.heldDb, off));
+    const { shownDb, heldDb } = state.meter;
+    cover(`scaleY(${(1 - reductionPosition(shownDb)).toFixed(METER_TRANSFORM_DECIMALS)})`);
+    hold(`translateY(${px(reductionHoldTranslatePx(heldDb, options.heightPx))})`);
+    holdShown(heldDb > REDUCTION_QUIET_DB ? '1' : '0');
+    text(reductionReadout(heldDb, state.gauge === 'none'));
   };
   const reset = (): void => {
-    state = restingMeter(REDUCTION_BALLISTICS);
-    lastMs = null;
+    state = restingGauge(state.gauge);
     draw();
   };
   parts.readout.addEventListener('click', () => {
-    state = { ...state, heldDb: 0, heldSeconds: 0 };
+    state = { ...state, meter: { ...state.meter, heldDb: 0, heldSeconds: 0 } };
     draw();
   });
   draw();
   return {
     root: parts.root,
     update(db, nowMs) {
-      state = stepMeter(state, db, elapsedSeconds(lastMs, nowMs), REDUCTION_BALLISTICS);
-      lastMs = nowMs;
+      state = stepGauge(state, db, nowMs);
       draw();
     },
     setGauge(gauge) {
-      off = gauge === 'none';
+      // A new gauge starts from rest, never renaming the old one's hold.
+      state = regauge(state, gauge);
       name(REDUCTION_NAMES[gauge]);
-      parts.root.classList.toggle('is-dim', off);
+      parts.root.classList.toggle('is-dim', gauge === 'none');
       draw();
     },
     reset,

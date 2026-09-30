@@ -59,6 +59,12 @@ export interface AppCtx {
   refreshTabs(): void;
   /** The other tabs are out of date and render when shown; the active tab keeps its controls (a knob mid-drag). */
   invalidate(): void;
+  /**
+   * Follow whether tab `id` is shown (windsor#193 decision 4): `listener`
+   * hears the state now and on each change, until the returned call stops
+   * it. The Mixer's meter loop starts and stops on it.
+   */
+  onTabShown(id: string, listener: (shown: boolean) => void): () => void;
   /** Tell the user something, as a toast (`toast.ts`); the tone defaults to info. */
   notify(message: string, tone?: ToastTone): void;
 }

@@ -28,7 +28,7 @@ export type MeteredStage = WatchedStage & Pick<OutputStage, 'revision' | 'read'>
 export type InputChannel = 'left' | 'right';
 
 export interface OutputStageWatch {
-  /** Set when the stage acts; cleared only by `resetLatch` (Reset peaks). */
+  /** Set when the stage acts; cleared only by `resetLatch` (the stage lamp). */
   readonly latched: boolean;
   /**
    * What latched it, from the latching report alone (`reportAction`), so a
@@ -41,7 +41,11 @@ export interface OutputStageWatch {
   inputOver(channel: InputChannel): boolean;
   /** Clears one input channel's latch, and nothing else. */
   clearInputOver(channel: InputChannel): void;
-  /** Clears the stage's latch, its action and both input latches. */
+  /**
+   * Clears the stage's latch and its action (the lamp), and nothing else:
+   * each input latch has its own clear (record
+   * `2026-09-30-master-column-and-meters`, decision 5).
+   */
   resetLatch(): void;
 }
 
@@ -84,8 +88,6 @@ export function watchOutputStage(
     },
     resetLatch: () => {
       latchedAction = null;
-      over.left = false;
-      over.right = false;
     },
   };
   watches.set(stage, watch);

@@ -5,6 +5,8 @@
   --panel: #1f2529;
   --panel-hi: #262d32;
   --inset: #121618;
+  /* The master column's deeper ground (windsor#194), under the meters' covers. */
+  --well: #0c0f10;
   --line: #2c3439;
   --line-bright: #3d4950;
   --ink: #dce3e3;
@@ -2644,104 +2646,362 @@ dialog select.field {
 .preset-results option {
   padding: 5px 7px;
 }
-.master-meter {
+/* The Mixer tab's two columns (windsor#194; record
+   2026-09-30-master-column-and-meters, decision 1; the mockup's option B,
+   .cols2 and .column). The racks scroll on the left; the master column is
+   sticky below the header on the right. --master-col-w, --master-gap and
+   --master-sticky-gap come from masterColumnTables.ts, --chrome-h from
+   stickyOffset.ts. At MASTER_STACK_MAX_WIDTH_PX (the media query below,
+   pinned by masterColumnTables.test.ts) the column stacks above the racks
+   and stops being sticky. */
+.mixer-layout {
   display: grid;
-  gap: 6px;
-  max-width: 500px;
-  margin-top: 10px;
+  grid-template-columns: minmax(0, 1fr) var(--master-col-w);
+  column-gap: var(--master-gap);
+  row-gap: 0;
+  align-items: start;
+  padding-right: 14px;
 }
-.master-meter-channel {
-  display: grid;
-  grid-template-columns: 1em 1fr 9em;
-  align-items: center;
-  gap: 8px;
+.mixer-racks {
+  min-width: 0;
 }
-.master-meter meter {
-  width: 100%;
-  height: 12px;
+.master-column {
+  position: sticky;
+  top: calc(var(--chrome-h, 0px) + var(--master-sticky-gap));
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: var(--well);
+  border: 1px solid var(--line-bright);
+  border-radius: 6px;
 }
-.master-meter .overload {
-  color: var(--hot);
+.master-column-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
 }
-/* The master strip's output stage (windsor#94): the mode, Ceiling and
-   Lookahead, then peaks in and out of the stage, the gain-reduction or
-   over-ceiling gauge, and the clip light, which latches until Reset peaks. */
-.section.output-stage {
-  border-bottom: 0;
-  border-top: 1px solid var(--line);
-  margin-top: 14px;
-  padding: 12px 0 0;
-  max-width: 500px;
+.master-column-title {
+  margin: 0;
+  font: 600 12px var(--f-panel);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
 }
-.output-stage-controls {
+.master-meters {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.master-captions {
+  display: flex;
+  justify-content: center;
+  margin-top: -6px;
+  font: 600 8.5px var(--f-panel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.master-captions span {
+  flex: none;
+  text-align: center;
+}
+.master-captions .is-fader {
+  width: var(--fader-w);
+}
+.master-captions .is-pair {
+  width: calc(2 * var(--meter-ch-w));
+  padding-top: 2px;
+  border-top: 1px solid var(--line-bright);
+}
+.master-captions .is-scale {
+  width: 22px;
+}
+.master-captions .is-one {
+  width: var(--meter-ch-w);
+}
+.master-column.is-off .meter-ceiling,
+.meter-bridge.is-off .meter-ceiling {
+  visibility: hidden;
+}
+
+/* The stage lamp (the mockup's .lamp): amber while the stage acts, red
+   while latched, with the action's name. */
+.stage-lamp {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.output-stage-controls .seg {
-  flex: 1 1 260px;
-}
-.output-lookahead:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.output-meters {
-  display: grid;
   gap: 6px;
-  margin-top: 10px;
-}
-.output-meter-row {
-  display: grid;
-  grid-template-columns: 3.5em 1fr 9em;
-  align-items: center;
-  gap: 8px;
-}
-.output-meter-row[hidden],
-.output-off-note[hidden] {
-  display: none;
-}
-.output-meter-name {
-  font-family: var(--f-panel);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font: 600 8.5px var(--f-panel);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--ink-faint);
+  white-space: nowrap;
+  cursor: pointer;
 }
-.output-meters meter {
-  width: 100%;
-  height: 12px;
-}
-.output-off-note {
-  margin: 0;
-}
-.output-clip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: start;
-  font-family: var(--f-panel);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-}
-.output-clip-dot {
-  width: 10px;
-  height: 10px;
+.stage-lamp-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--inset);
   border: 1px solid var(--line-bright);
+  background: var(--inset);
+  transition:
+    background 100ms,
+    box-shadow 100ms;
 }
-.output-clip.latched {
+.stage-lamp.is-lit .stage-lamp-dot {
+  background: var(--carrier);
+  border-color: var(--carrier);
+  box-shadow: 0 0 5px var(--carrier);
+}
+.stage-lamp.is-latched {
   color: var(--hot);
 }
-.output-clip.latched .output-clip-dot {
+.stage-lamp.is-latched .stage-lamp-dot {
   background: var(--hot);
   border-color: var(--hot);
-  box-shadow: 0 0 6px var(--hot);
+  box-shadow: none;
+  opacity: 0.85;
+}
+.stage-lamp.is-latched.is-lit .stage-lamp-dot {
+  box-shadow: 0 0 5px var(--hot);
+  opacity: 1;
+}
+
+/* The Level fader (the mockup's .fader): a meter channel's LED slot and
+   readout above a track as tall as the bars, "dB" below. */
+.level-fader {
+  flex: none;
+  width: var(--fader-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.level-fader-readout {
+  color: var(--ink);
+  cursor: default;
+}
+.level-fader-readout:hover {
+  color: var(--ink);
+}
+.level-fader-track {
+  position: relative;
+  width: 26px;
+  height: var(--meter-h);
+  touch-action: none;
+  cursor: ns-resize;
+}
+.level-fader-track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 11px;
+  width: 4px;
+  background: var(--well);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.level-fader-cap {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 26px;
+  height: var(--fader-cap-h);
+  background: linear-gradient(var(--panel-hi), var(--line-bright));
+  border: 1px solid var(--line-bright);
+  border-radius: 2px;
+}
+.level-fader-cap::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - 0.5px);
+  left: 3px;
+  right: 3px;
+  height: 1px;
+  background: var(--ink);
+}
+
+/* The mode as two by two (the mockup's .modes.grid2) over the Lookahead
+   toggle (.toggle). */
+.stage-mode-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.seg.stage-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--line-bright);
+  border: 1px solid var(--line-bright);
+}
+.seg.stage-modes button {
+  height: 20px;
+  padding: 0 7px;
+  font: 500 10.5px var(--f-ui);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink-dim);
+}
+.seg.stage-modes button[aria-pressed='true'] {
+  background: var(--modulator);
+  color: var(--inset);
+}
+.stage-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.stage-toggle i {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  border: 1px solid var(--line-bright);
+  background: var(--inset);
+}
+.stage-toggle[aria-pressed='true'] i {
+  background: var(--modulator);
+  border-color: var(--modulator);
+}
+.stage-toggle:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The transfer curve beside the Ceiling knob (the mockup's .curve). */
+.master-shape {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.transfer-curve {
+  flex: none;
+  display: block;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.transfer-grid {
+  stroke: var(--line);
+  stroke-width: 0.6;
+  fill: none;
+}
+.transfer-unity {
+  stroke: var(--line-bright);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 2;
+  fill: none;
+}
+.transfer-ceiling {
+  stroke: var(--ink-faint);
+  stroke-width: 0.8;
+  fill: none;
+}
+.transfer-path {
+  stroke: var(--modulator);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  fill: none;
+}
+.transfer-dot {
+  fill: var(--carrier);
+}
+.transfer-axis {
+  fill: var(--ink-faint);
+  font: 7px var(--f-num);
+}
+.transfer-ceiling.is-hidden,
+.transfer-dot.is-hidden {
+  visibility: hidden;
+}
+
+/* The meter bridge (the mockup's .bridge): a dock of no height stuck below
+   the header, so the bar shows over the racks and moves nothing. */
+.meter-bridge-dock {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: var(--chrome-h, 0px);
+  z-index: 4;
+  height: 0;
+}
+.meter-bridge {
+  position: absolute;
+  top: 6px;
+  left: 14px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--well) 94%, transparent);
+  border: 1px solid var(--line-bright);
+  border-radius: 6px;
+}
+.meter-bridge[hidden] {
+  display: none;
+}
+.meter-bridge-tag {
+  font: 600 10px var(--f-panel);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.meter-bridge-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 160px;
+  max-width: 320px;
+}
+.meter-bridge-chip {
+  font: 10.5px var(--f-num);
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.meter-bridge-chip[hidden] {
+  display: none;
+}
+.meter-bridge-chip b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+@media (max-width: 760px) {
+  .mixer-layout {
+    grid-template-columns: minmax(0, 1fr);
+    padding-right: 0;
+  }
+  .master-column {
+    position: static;
+    order: -1;
+    margin: 12px 14px 0;
+  }
+  .meter-bridge-dock {
+    order: -2;
+  }
+  .meter-bridge {
+    right: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stage-lamp-dot {
+    transition: none;
+  }
 }
 
 /* The top-bar output light (windsor#94 decision 4), beside the CPU meter:
@@ -2771,7 +3031,11 @@ dialog select.field {
    inline from meterTables.ts) under a cover moved with transform, so a
    paint needs no layout. The segments are a repeating gradient over it.
    The widths come from meterTables.ts as --meter-bar-w and --meter-ch-w,
-   the height from the caller as --meter-h. */
+   the height from the caller as --meter-h, and the hold line's thickness
+   from meterTables.ts inline. The cover and the segment gaps are --well,
+   the master column's ground. The bars step at the report rate with no
+   transition: a transition restarted 30 times a second cost the main thread
+   more than it smoothed (docs/research/2026-09-30-master-output/after.md). */
 .meter-channel {
   width: var(--meter-ch-w, 28px);
   display: flex;
@@ -2834,20 +3098,19 @@ dialog select.field {
   content: '';
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(to top, transparent 0 3px, var(--inset) 3px 4px);
+  background: repeating-linear-gradient(to top, transparent 0 3px, var(--well) 3px 4px);
   pointer-events: none;
 }
 .meter-hbar::after {
-  background: repeating-linear-gradient(to right, transparent 0 3px, var(--inset) 3px 4px);
+  background: repeating-linear-gradient(to right, transparent 0 3px, var(--well) 3px 4px);
 }
 .meter-cover {
   position: absolute;
   inset: 0;
-  background: var(--inset);
+  background: var(--well);
   opacity: 0.86;
   transform-origin: top;
   transform: scaleY(1);
-  transition: transform 34ms linear;
   will-change: transform;
 }
 .meter-hold {
@@ -2855,10 +3118,8 @@ dialog select.field {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 2px;
   background: var(--ink);
   opacity: 0;
-  transition: transform 34ms linear;
 }
 .meter-ceiling {
   position: absolute;
@@ -2935,10 +3196,4 @@ dialog select.field {
   right: auto;
   width: 1px;
   height: auto;
-}
-@media (prefers-reduced-motion: reduce) {
-  .meter-cover,
-  .meter-hold {
-    transition: none;
-  }
 }
