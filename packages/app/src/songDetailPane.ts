@@ -17,51 +17,57 @@
  * region row and the card; the insert panel keeps only its header.
  */
 import type { MusicPart } from '@windsor/engine';
-import { TICKS_PER_BAR, partAt, regionPattern } from '@windsor/engine';
+import { TICKS_PER_BAR, partAt } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { harmonyCard } from './harmonyCard';
 import { insertPanel } from './songInsertPanel';
 import { foldButton } from './songPaneFold';
-import { eventBar } from './harmonyLaneModel';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
-import {
-  changePattern,
-  editedRegion,
-  keepsRegionPatterns,
-  patternOf,
-  splitPartRegion,
-} from './partEdits';
+import { changePattern, patternOf, splitPartRegion } from './partEdits';
 import { deleteRegion } from './regionModel';
 import { SEQUENCER_CARDS } from './sequencerCards';
-import { KIND_LABELS } from './sequencerConstants';
 import type { SongView } from './songTab';
-import { PANE_OCTAVE_KINDS, REGION_SUMMARY, forKind } from './songViewTables';
+import type { PaneHeadText } from './songPaneHead';
+import { editTarget, paneHeadText, partHeadText } from './songPaneHead';
+import { PANE_OCTAVE_KINDS } from './songViewTables';
+
+/** What `paintDetailPane` drew: its staleness check and its header's in-place refresh. */
+export interface DetailPane {
+  /** Whether what it drew has gone stale under an edit made elsewhere (the insert panel's). */
+  readonly stale: () => boolean;
+  /** Rewrite the header's title and note from the document, where their text moved (windsor#123). */
+  readonly refreshHead: () => void;
+}
+
+/** Writes the drawn header's title and note, each only when its text changed. */
+type HeadWriter = (text: PaneHeadText) => void;
 
 /** The pane's header: a part's fold arrow, the title, a small note, and the close ×. */
-function head(view: SongView, title: string, note: string, fold?: HTMLElement): HTMLElement {
+function head(
+  view: SongView,
+  text: PaneHeadText,
+  fold?: HTMLElement,
+): { row: HTMLElement; write: HeadWriter } {
   const row = el('div', 'card-head');
   const label = el('span', '');
   if (fold) label.appendChild(fold);
-  label.appendChild(document.createTextNode(title));
-  label.appendChild(el('small', '', note));
+  const title = document.createTextNode(text.title);
+  const note = el('small', '', text.note);
+  label.appendChild(title);
+  label.appendChild(note);
   row.appendChild(label);
   const close = el('button', 'btn nudge', '×') as HTMLButtonElement;
   close.type = 'button';
   close.setAttribute('aria-label', 'Close');
   close.onclick = (): void => view.select(null);
   row.appendChild(close);
-  return row;
-}
-
-/**
- * The region the pane's card and Octave knob edit: the selected one, else the
- * first (windsor#75 decision 2) — none for a kind whose card edits the part's
- * sequencer, and null when the part has no region.
- */
-function editTarget(part: MusicPart, region: number | null): number | null | undefined {
-  return keepsRegionPatterns(part) ? editedRegion(part, region) : undefined;
+  const write: HeadWriter = (next) => {
+    if (title.data !== next.title) title.data = next.title;
+    if (note.textContent !== next.note) note.textContent = next.note;
+  };
+  return { row, write };
 }
 
 /** The Octave knob for a card without one: the edited pattern's absolute register (epic #703 decision 11). */
@@ -123,27 +129,31 @@ function partRow(view: SongView, part: MusicPart, region: number | null): HTMLEl
   return row;
 }
 
-/** A part's sequencer section and insert panel; returns the panel's staleness check. */
+/** What a selection's painter hands back: the staleness check and the header writer. */
+interface Painted {
+  readonly stale: () => boolean;
+  readonly write: HeadWriter | null;
+}
+
+const NOTHING: Painted = { stale: () => false, write: null };
+
+/** A part's sequencer section and insert panel. */
 function paintPart(
   pane: HTMLElement,
   view: SongView,
   slot: number,
   region: number | null,
-): () => boolean {
+): Painted {
   const part = partAt(view.ctx.model.doc, slot);
-  if (!part) return () => false;
+  if (!part) return NOTHING;
   const { kind } = part.sequencer;
-  const count = part.regions.length;
   const edited = editTarget(part, region);
-  const shown = typeof edited === 'number' ? regionPattern(part, edited) : part.sequencer;
-  pane.appendChild(
-    head(
-      view,
-      `${part.name} — ${KIND_LABELS[kind]}`,
-      `${forKind(REGION_SUMMARY, shown)} · ${count} region${count === 1 ? '' : 's'}`,
-      foldButton(view, 'sequencerOpen', 'Sequencer'),
-    ),
+  const header = head(
+    view,
+    partHeadText(part, region),
+    foldButton(view, 'sequencerOpen', 'Sequencer'),
   );
+  pane.appendChild(header.row);
   if (view.state.sequencerOpen) {
     pane.appendChild(partRow(view, part, region));
     pane.appendChild(
@@ -158,42 +168,49 @@ function paintPart(
   }
   const inserts = insertPanel(view, slot);
   pane.appendChild(inserts.element);
-  return inserts.stale;
+  return { stale: inserts.stale, write: header.write };
 }
 
-function paintEvent(pane: HTMLElement, view: SongView, index: number): void {
-  const event = view.ctx.model.doc.harmony.events[index];
-  if (!event) return;
-  pane.appendChild(head(view, `Harmony — bar ${eventBar(event)}`, `chord ${index + 1}`));
+function paintEvent(pane: HTMLElement, view: SongView, index: number): Painted {
+  const text = paneHeadText(view.ctx.model.doc, { kind: 'event', index });
+  if (!text) return NOTHING;
+  const header = head(view, text);
+  pane.appendChild(header.row);
   pane.appendChild(harmonyCard(view, index));
+  return { stale: () => false, write: header.write };
 }
 
-function paintSelection(pane: HTMLElement, view: SongView): () => boolean {
+function paintSelection(pane: HTMLElement, view: SongView): Painted {
   const { selection } = view.state;
   if (selection?.kind === 'part') return paintPart(pane, view, selection.slot, selection.region);
-  if (selection) paintEvent(pane, view, selection.index);
-  else {
-    pane.appendChild(
-      el(
-        'p',
-        'hint',
-        'Select a region to edit its part, or a chord to edit the harmony. ' +
-          'Click an empty stretch of a lane to add a region; + after the last chord appends one.',
-      ),
-    );
-  }
-  return () => false;
+  if (selection) return paintEvent(pane, view, selection.index);
+  pane.appendChild(
+    el(
+      'p',
+      'hint',
+      'Select a region to edit its part, or a chord to edit the harmony. ' +
+        'Click an empty stretch of a lane to add a region; + after the last chord appends one.',
+    ),
+  );
+  return NOTHING;
 }
 
 /**
  * Redraw the pane for the view's selection at its kept scroll, which a
- * repaint or a whole render would otherwise reset. Returns whether what it
- * drew has gone stale under an edit made elsewhere (the insert panel's).
+ * repaint or a whole render would otherwise reset. Returns its staleness
+ * check and the header's in-place refresh, which a card's edit needs: the
+ * edit never redraws the pane, so the knob under the pointer survives.
  */
-export function paintDetailPane(pane: HTMLElement, view: SongView): () => boolean {
+export function paintDetailPane(pane: HTMLElement, view: SongView): DetailPane {
   pane.innerHTML = '';
   pane.classList.toggle('empty', view.state.selection === null);
-  const stale = paintSelection(pane, view);
+  const { stale, write } = paintSelection(pane, view);
   pane.scrollTop = view.state.paneScrollPx;
-  return stale;
+  return {
+    stale,
+    refreshHead: () => {
+      const text = paneHeadText(view.ctx.model.doc, view.state.selection);
+      if (write && text) write(text);
+    },
+  };
 }
