@@ -1,5 +1,8 @@
 /** Windowed-sinc interpolation/decimation: actual 2x filtering with fixed storage.
  * One round trip delays by (length-1)/2 host samples; dry uses the same two filters.
+ * A sample passes through fields (`input` in, `output` out), never as an
+ * argument or a return, which V8 boxes across a call it does not inline
+ * (worklet rule 2). Pinned by inserts/advancedDriveAllocation.test.ts.
  */
 import { DRIVE_DSP as C, DRIVE_MATH as M } from '../../inserts/advancedDriveConstants';
 function coefficients(): Float64Array {
@@ -24,12 +27,17 @@ const FIR = coefficients();
 export class DriveFir {
   readonly buffer: Float64Array;
   cursor: number;
+  input: number;
+  output: number;
   constructor() {
     this.buffer = new Float64Array(FIR.length);
     this.cursor = 0;
+    // Doubles first written as doubles (worklet rule 7), NaN until the first tick.
+    this.input = this.output = NaN;
   }
-  tick(x: number): number {
-    this.buffer[this.cursor] = x;
+  /** Filters `input` into `output`. */
+  tick(): void {
+    this.buffer[this.cursor] = this.input;
     let y = 0,
       j = this.cursor;
     for (let i = 0; i < FIR.length; i++) {
@@ -37,6 +45,6 @@ export class DriveFir {
       if (--j < 0) j = FIR.length - 1;
     }
     if (++this.cursor === FIR.length) this.cursor = 0;
-    return y;
+    this.output = y;
   }
 }

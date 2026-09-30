@@ -44,11 +44,19 @@ class AdvancedDriveProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
-    this.dsp.configure(params, frames);
+    // `left?.[i] ?? 0` would read the same, but its load may be undefined, so V8
+    // keeps it tagged and boxes every sample; a bounded load stays a double.
+    const leftFrames = left ? left.length : 0,
+      rightFrames = right ? right.length : 0;
+    const dsp = this.dsp;
+    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
-      this.dsp.tick(left?.[i] ?? 0, right?.[i] ?? 0);
-      out[0][i] = this.dsp.left;
-      if (out[1]) out[1][i] = this.dsp.right;
+      // Through fields, not arguments, which V8 boxes across a call it does not inline.
+      dsp.inputLeft = i < leftFrames ? left![i] : 0;
+      dsp.inputRight = i < rightFrames ? right![i] : 0;
+      dsp.tick();
+      out[0][i] = dsp.left;
+      if (out[1]) out[1][i] = dsp.right;
     }
     this.load.end(frames);
     return true;
