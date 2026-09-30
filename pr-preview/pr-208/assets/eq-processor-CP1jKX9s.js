@@ -107,33 +107,33 @@ var EQ_MATH = {
 // packages/engine/src/inserts/eqSectionDesign.ts
 var v = {
   /** The band's corner (radians per sample), Q and heard gain (dB). */
-  w0: 0,
-  q: 1,
-  gain: 0,
+  w0: NaN,
+  q: NaN,
+  gain: NaN,
   /** The poles' natural frequency and Q, for `matchPoles`. */
-  pw: 0,
-  pq: 1,
+  pw: NaN,
+  pq: NaN,
   /** A frequency, and cos²(w/2), sin²(w/2) and 4 cos² sin² there (Vicanek's basis). */
-  w: 0,
-  p0: 1,
-  p1: 0,
-  p2: 0,
+  w: NaN,
+  p0: NaN,
+  p1: NaN,
+  p2: NaN,
   /** A numerator's power in that basis, for `numerator`. */
-  P0: 0,
-  P1: 0,
-  P2: 0,
+  P0: NaN,
+  P1: NaN,
+  P2: NaN,
   /** A shelf's amplitude, its third fitting point, a ratio to the corner and the power there. */
-  A: 1,
-  w3: 0,
-  ratio: 1,
-  power: 1,
+  A: NaN,
+  w3: NaN,
+  ratio: NaN,
+  power: NaN,
   /** The prototype's power at a cut's corner. */
-  corner: 1,
-  b0: 1,
-  b1: 0,
-  b2: 0,
-  a1: 0,
-  a2: 0
+  corner: NaN,
+  b0: NaN,
+  b1: NaN,
+  b2: NaN,
+  a1: NaN,
+  a2: NaN
 };
 function setPhi() {
   const c = Math.cos(v.w * EQ_MATH.half);
@@ -363,7 +363,7 @@ function sectionsDb(coeffs, count, frequency, sampleRate2, offset = 0) {
 var BAND_STRIDE = EQ_DSP.maxSections * PER;
 var scratch = new Float64Array(EQ_BAND_COUNT * BAND_STRIDE);
 var counts = new Uint8Array(EQ_BAND_COUNT);
-var design = { type: 0, slope: 0, freq: 0, gain: 0, q: 0 };
+var design = { type: 0, slope: 0, freq: NaN, gain: NaN, q: NaN };
 function eqResponseDb(spec, frequencies, sampleRate2, out) {
   const bands = spec.enabled ? Math.min(spec.bands.length, EQ_BAND_COUNT) : 0;
   for (let b = 0; b < bands; b++) {
@@ -442,18 +442,18 @@ var EqBand = class {
     this.ramp = false;
     this.state = new Float64Array(EQ_DSP.maxSections * ST);
     this.sections = 0;
-    this.design = { type: EQ_TYPE_ID.bell, slope: EQ_FIRST_ORDER_SLOPE, freq: 1, gain: 0, q: 1 };
+    this.design = { type: EQ_TYPE_ID.bell, slope: EQ_FIRST_ORDER_SLOPE, freq: NaN, gain: NaN, q: NaN };
     this.on = false;
     this.nextType = EQ_TYPE_ID.bell;
     this.nextSlope = EQ_FIRST_ORDER_SLOPE;
     this.nextOn = false;
-    this.nextFreq = this.nextQ = 1;
-    this.nextGain = 0;
-    this.targetFreq = this.targetQ = 1;
-    this.targetLogFreq = this.targetLogQ = 0;
-    this.logFreq = this.logQ = 0;
+    this.nextFreq = this.nextQ = this.nextGain = NaN;
+    this.targetFreq = NaN;
+    this.targetQ = EQ_FLAT_Q;
+    this.targetLogFreq = this.targetLogQ = NaN;
+    this.logFreq = this.logQ = NaN;
     this.moving = this.pending = this.dirty = false;
-    this.fade = 0;
+    this.fade = NaN;
     this.fadeDir = 0;
     this.fadeStep = 1 / (EQ_DSP.bandFadeSeconds * sampleRate2);
     this.glideStep = 1 - Math.exp(-EQ_DSP.refreshFrames / (EQ_DSP.smoothSeconds * sampleRate2));
@@ -681,14 +681,14 @@ var EqDsp = class {
     this.dryL = new Float64Array(EQ_DSP.blockFrames);
     this.dryR = new Float64Array(EQ_DSP.blockFrames);
     this.inL = this.inR = this.outL = this.outR = new Float32Array(0);
-    this.nextOutput = 0;
+    this.nextOutput = NaN;
     this.nextEnabled = true;
-    this.gain = this.gainTarget = 1;
+    this.gain = this.gainTarget = NaN;
     this.gainMoving = false;
     this.gainStep = 1 - Math.exp(-1 / (EQ_DSP.smoothSeconds * sampleRate2));
     this.enabled = true;
     this.bypassed = false;
-    this.mix = 1;
+    this.mix = NaN;
     this.mixDir = 0;
     this.mixStep = 1 / (EQ_DSP.enableFadeSeconds * sampleRate2);
     this.clear = true;
@@ -882,8 +882,8 @@ var EqProcessor = class extends AudioWorkletProcessor {
     for (let b = 0; b < EQ_BAND_COUNT; b++)
       for (const field of EQ_BAND_PARAMS) this.names.push(eqParamName(b, field));
     this.loadQuanta = 0;
-    this.load = { type: "load", busyMs: 0, wallMs: 0, quanta: 0, peakMs: 0, underruns: 0 };
-    this.wallStart = 0;
+    this.load = { type: "load", busyMs: NaN, wallMs: NaN, quanta: 0, peakMs: NaN, underruns: 0 };
+    this.wallStart = NaN;
     this.port.onmessage = ({ data }) => {
       if (data.type === "stop") this.running = false;
       if (data.type === "reportLoad") {
