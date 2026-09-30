@@ -106,17 +106,19 @@ var RetroDelay = class {
   constructor(capacity) {
     this.buffer = new Float32Array(Math.ceil(capacity) + 2);
     this.head = 0;
+    this.delay = this.output = this.input = NaN;
+    this.delay = this.output = this.input = 0;
   }
-  read(delay) {
+  read() {
     const length = this.buffer.length;
-    let position = this.head - Math.max(1, Math.min(length - 2, delay));
+    let position = this.head - Math.max(1, Math.min(length - 2, this.delay));
     if (position < 0) position += length;
     const index = Math.floor(position);
     const next = index + 1 === length ? 0 : index + 1;
-    return this.buffer[index] + (position - index) * (this.buffer[next] - this.buffer[index]);
+    this.output = this.buffer[index] + (position - index) * (this.buffer[next] - this.buffer[index]);
   }
-  write(value) {
-    this.buffer[this.head] = value;
+  write() {
+    this.buffer[this.head] = this.input;
     if (++this.head === this.buffer.length) this.head = 0;
   }
 };
@@ -128,6 +130,8 @@ var RetroFilter = class {
     this.b = new Float64Array(RETRO_REVERB_DSP.filterSections);
     this.a = new Float64Array(RETRO_REVERB_DSP.filterSections * 2);
     this.z = new Float64Array(RETRO_REVERB_DSP.filterSections * 2);
+    this.input = this.output = NaN;
+    this.input = this.output = 0;
     for (let section = 0; section < RETRO_REVERB_DSP.filterSections; section++) {
       const q = 1 / (2 * Math.cos((2 * section + 1) * Math.PI / RETRO_REVERB_DSP.filterPoleDivisor));
       const divisor = 1 + k / q + k * k;
@@ -136,7 +140,8 @@ var RetroFilter = class {
       this.a[section * 2 + 1] = (1 - k / q + k * k) / divisor;
     }
   }
-  tick(input) {
+  tick() {
+    let input = this.input;
     for (let section = 0; section < RETRO_REVERB_DSP.filterSections; section++) {
       const i = section * 2;
       const output = this.b[section] * input + this.z[i];
@@ -146,7 +151,7 @@ var RetroFilter = class {
       this.z[i + 1] = Math.abs(z1) < RETRO_REVERB_DSP.silenceFloor ? 0 : z1;
       input = output;
     }
-    return input;
+    this.output = input;
   }
 };
 
@@ -158,8 +163,11 @@ var RetroTank = class {
     this.damping = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.gains = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
     this.values = new Float64Array(RETRO_REVERB_DSP.tankSeconds.length);
+    this.size = this.diffusion = this.pole = this.left = this.right = NaN;
+    this.input = this.lineInput = this.feedback = NaN;
     this.size = 1;
     this.diffusion = this.pole = this.left = this.right = 0;
+    this.input = this.lineInput = this.feedback = 0;
   }
   configure({
     size,
@@ -173,30 +181,46 @@ var RetroTank = class {
     for (let i = 0; i < this.lines.length; i++)
       this.gains[i] = Math.pow(RETRO_REVERB_DSP.decayTarget, RETRO_REVERB_DSP.tankSeconds[i] * size / decay);
   }
-  tick(input) {
+  tick() {
+    let input = this.input;
     for (let i = 0; i < this.diffusers.length; i++) {
       const delay = this.diffusers[i];
-      const old = delay.read(RETRO_REVERB_DSP.diffuserSeconds[i] * RETRO_REVERB_DSP.rate);
+      delay.delay = RETRO_REVERB_DSP.diffuserSeconds[i] * RETRO_REVERB_DSP.rate;
+      delay.read();
+      const old = delay.output;
       const value = input - this.diffusion * old;
-      delay.write(value);
+      delay.input = value;
+      delay.write();
       input = old + this.diffusion * value;
     }
     const y = this.values;
     for (let i = 0; i < this.lines.length; i++) {
-      const raw = this.lines[i].read(RETRO_REVERB_DSP.tankSeconds[i] * this.size * RETRO_REVERB_DSP.rate);
+      const line = this.lines[i];
+      line.delay = RETRO_REVERB_DSP.tankSeconds[i] * this.size * RETRO_REVERB_DSP.rate;
+      line.read();
+      const raw = line.output;
       const damped = this.damping[i] + this.pole * (raw - this.damping[i]);
       y[i] = this.damping[i] = Math.abs(damped) < RETRO_REVERB_DSP.silenceFloor ? 0 : damped;
     }
-    this.write(0, input, (y[0] + y[1] + y[2] + y[3]) / 2);
-    this.write(1, input, (y[0] - y[1] + y[2] - y[3]) / 2);
-    this.write(2, -input, (y[0] + y[1] - y[2] - y[3]) / 2);
-    this.write(this.lines.length - 1, -input, (y[0] - y[1] - y[2] + y[3]) / 2);
+    this.lineInput = input;
+    this.feedback = (y[0] + y[1] + y[2] + y[3]) / 2;
+    this.write(0);
+    this.feedback = (y[0] - y[1] + y[2] - y[3]) / 2;
+    this.write(1);
+    this.lineInput = -input;
+    this.feedback = (y[0] + y[1] - y[2] - y[3]) / 2;
+    this.write(2);
+    this.feedback = (y[0] - y[1] - y[2] + y[3]) / 2;
+    this.write(this.lines.length - 1);
     this.left = (y[0] + y[1] - y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
     this.right = (y[0] - y[1] + y[2] - y[3]) * RETRO_REVERB_DSP.outputTrim;
   }
-  write(i, input, feedback) {
-    const value = input * RETRO_REVERB_DSP.inputTrim + feedback * this.gains[i];
-    this.lines[i].write(Math.max(-RETRO_REVERB_DSP.stateLimit, Math.min(RETRO_REVERB_DSP.stateLimit, value)));
+  /** Line `i` takes `lineInput` and `feedback`, mixed and clamped. */
+  write(i) {
+    const value = this.lineInput * RETRO_REVERB_DSP.inputTrim + this.feedback * this.gains[i];
+    const line = this.lines[i];
+    line.input = Math.max(-RETRO_REVERB_DSP.stateLimit, Math.min(RETRO_REVERB_DSP.stateLimit, value));
+    line.write();
   }
 };
 
@@ -226,7 +250,8 @@ var RetroReflections = class {
     this.fractions = new Float64Array(RETRO_REVERB_DSP.reflectionCount);
     this.gainsLeft = new Float64Array(RETRO_REVERB_DSP.reflectionCount);
     this.gainsRight = new Float64Array(RETRO_REVERB_DSP.reflectionCount);
-    this.left = this.right = 0;
+    this.left = this.right = this.input = NaN;
+    this.left = this.right = this.input = 0;
     const random = makeRandom(RETRO_REVERB_DSP.reflectionSeed);
     for (let i = 0; i < RETRO_REVERB_DSP.reflectionCount; i++) {
       this.positions[i] = (i + RETRO_REVERB_DSP.reflectionJitterStart + RETRO_REVERB_DSP.reflectionJitterSpan * random()) / RETRO_REVERB_DSP.reflectionCount;
@@ -254,7 +279,7 @@ var RetroReflections = class {
       this.gainsRight[i] = gain * this.signs[i * 2 + 1];
     }
   }
-  tick(input) {
+  tick() {
     let left = 0, right = 0;
     const buffer = this.delay.buffer;
     const head = this.delay.head;
@@ -269,13 +294,21 @@ var RetroReflections = class {
     }
     this.left = left;
     this.right = right;
-    this.delay.write(input);
+    this.delay.input = this.input;
+    this.delay.write();
   }
 };
 
 // packages/engine/src/worklet/retro/retroReverbDsp.ts
 var RetroReverbDsp = class {
   constructor(rate, params) {
+    this.rate = this.phase = this.previousInput = this.heldLeft = this.heldRight = NaN;
+    this.left = this.right = this.size = this.decay = this.tone = this.diffusion = NaN;
+    this.preDelay = this.character = this.mix = this.targetMix = this.duration = NaN;
+    this.finite = this.reverse = this.smooth = this.wetToneLeft = this.wetToneRight = NaN;
+    this.wetPole = this.inputLeft = this.inputRight = this.internalInput = NaN;
+    this.convertInput = this.converted = NaN;
+    this.inputLeft = this.inputRight = this.internalInput = this.convertInput = this.converted = 0;
     this.rate = rate;
     this.tank = new RetroTank();
     this.reflections = new RetroReflections();
@@ -316,42 +349,73 @@ var RetroReverbDsp = class {
     this.tank.configure(this);
     if (this.finite > RETRO_REVERB_DSP.silenceFloor) this.reflections.configure(this);
   }
-  convert(value) {
-    const bounded = Math.max(-1, Math.min(1, value));
+  /** `convertInput` through the converter's clip and quantiser, into `converted`. */
+  convert() {
+    const bounded = Math.max(-1, Math.min(1, this.convertInput));
     const quantized = Math.trunc(bounded * RETRO_REVERB_DSP.converterSteps) / RETRO_REVERB_DSP.converterSteps;
-    return bounded + this.character * (quantized - bounded);
+    this.converted = bounded + this.character * (quantized - bounded);
   }
-  internal(input) {
-    const delayed = this.preDelay < 1 / RETRO_REVERB_DSP.rate ? this.convert(input) : this.pre.read(this.preDelay * RETRO_REVERB_DSP.rate);
-    this.pre.write(this.convert(input));
-    this.tank.tick(delayed);
+  /** One sample of the internal clock, of `internalInput`. */
+  internal() {
+    const input = this.internalInput;
+    let delayed;
+    if (this.preDelay < 1 / RETRO_REVERB_DSP.rate) {
+      this.convertInput = input;
+      this.convert();
+      delayed = this.converted;
+    } else {
+      this.pre.delay = this.preDelay * RETRO_REVERB_DSP.rate;
+      this.pre.read();
+      delayed = this.pre.output;
+    }
+    this.convertInput = input;
+    this.convert();
+    this.pre.input = this.converted;
+    this.pre.write();
+    this.tank.input = delayed;
+    this.tank.tick();
     let left = this.tank.left, right = this.tank.right;
     if (this.finite > RETRO_REVERB_DSP.silenceFloor) {
-      this.reflections.tick(delayed);
+      this.reflections.input = delayed;
+      this.reflections.tick();
       left += this.finite * (this.reflections.left - left);
       right += this.finite * (this.reflections.right - right);
     } else {
-      this.reflections.delay.write(delayed);
+      this.reflections.delay.input = delayed;
+      this.reflections.delay.write();
     }
     this.wetToneLeft += this.wetPole * (left - this.wetToneLeft);
     this.wetToneRight += this.wetPole * (right - this.wetToneRight);
     if (Math.abs(this.wetToneLeft) < RETRO_REVERB_DSP.silenceFloor) this.wetToneLeft = 0;
     if (Math.abs(this.wetToneRight) < RETRO_REVERB_DSP.silenceFloor) this.wetToneRight = 0;
-    this.heldLeft = this.convert(this.wetToneLeft);
-    this.heldRight = this.convert(this.wetToneRight);
+    this.convertInput = this.wetToneLeft;
+    this.convert();
+    this.heldLeft = this.converted;
+    this.convertInput = this.wetToneRight;
+    this.convert();
+    this.heldRight = this.converted;
   }
-  tick(left, right) {
-    const input = this.inputFilter.tick((left + right) / 2);
+  /** One host sample: `inputLeft`/`inputRight` in, `left`/`right` out. */
+  tick() {
+    const left = this.inputLeft, right = this.inputRight;
+    this.inputFilter.input = (left + right) / 2;
+    this.inputFilter.tick();
+    const input = this.inputFilter.output;
     const step = RETRO_REVERB_DSP.rate / this.rate;
     this.phase += step;
     while (this.phase >= 1) {
       this.phase -= 1;
       const fraction = 1 - this.phase / step;
-      this.internal(this.previousInput + fraction * (input - this.previousInput));
+      this.internalInput = this.previousInput + fraction * (input - this.previousInput);
+      this.internal();
     }
     this.previousInput = input;
-    const wetL = this.leftFilter.tick(this.heldLeft);
-    const wetR = this.rightFilter.tick(this.heldRight);
+    this.leftFilter.input = this.heldLeft;
+    this.leftFilter.tick();
+    const wetL = this.leftFilter.output;
+    this.rightFilter.input = this.heldRight;
+    this.rightFilter.tick();
+    const wetR = this.rightFilter.output;
     this.mix += this.smooth * (this.targetMix - this.mix);
     if (Math.abs(this.targetMix - this.mix) < RETRO_REVERB_DSP.silenceFloor) this.mix = this.targetMix;
     this.left = left + this.mix * (wetL - left);
@@ -399,11 +463,15 @@ var RetroReverbProcessor = class _RetroReverbProcessor extends AudioWorkletProce
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
-    this.dsp.configure(params, frames);
+    const leftFrames = left ? left.length : 0, rightFrames = right ? right.length : 0;
+    const dsp = this.dsp;
+    dsp.configure(params, frames);
     for (let i = 0; i < frames; i++) {
-      this.dsp.tick(left?.[i] ?? 0, right?.[i] ?? 0);
-      out[0][i] = this.dsp.left;
-      if (out[1]) out[1][i] = this.dsp.right;
+      dsp.inputLeft = i < leftFrames ? left[i] : 0;
+      dsp.inputRight = i < rightFrames ? right[i] : 0;
+      dsp.tick();
+      out[0][i] = dsp.left;
+      if (out[1]) out[1][i] = dsp.right;
     }
     this.load.end(frames);
     return true;
