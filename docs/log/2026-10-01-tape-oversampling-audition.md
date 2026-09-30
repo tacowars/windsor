@@ -14,9 +14,9 @@
   the running insert switches cores without a reload. The newly selected
   core starts from zero state, so a click at the moment of switching is
   expected and is not a fault. The default is 2×. The picker's tooltip
-  reads: "Audition only: 2× costs less CPU; 4× is cleaner on bright,
-  hard-driven sounds. One of these will be removed after
-  the audition."
+  reads: "2× is lighter on CPU; 4× is cleaner on bright, hard-driven
+  sounds." (It first read as an audition-only hint, until tacowars kept
+  both factors; see below.)
 - **Drive readout.** The Drive knob keeps its stored range (−32 … +32) and
   its position, but its readout is now the gain the magnetic core receives,
   `driveGain(Drive)`, in signed dB to one decimal: `-12.0 dB` at the
@@ -55,3 +55,19 @@ since the integration, and this only gives it a control.
 The result of the audition, and the PR that deletes the losing factor and
 the picker with its `ARRANGEMENT_VERSION` bump (design decision 1), come
 later.
+
+## Outcome (2026-10-01)
+
+tacowars auditioned 2× and 4× on the PR #251 preview and approved the
+PR, then asked "can't we keep 2× and 4×?" Both stay. `oversampling` is a
+per-insert product setting, 2× by default, and no factor or control is
+removed, so the further `ARRANGEMENT_VERSION` bump that the
+[integration design](2026-09-30-tape-magnetic-integration-design.md)'s
+decision 1 scheduled for the removal does not happen. The product
+reason is the measured tradeoff recorded by the
+[shipped probe](../research/2026-10-01-tape-shipped-probe/README.md):
+on the recorded M1 the shipped 2× path keeps four instances inside the
+four-track budget and the 4× path does not, while 4× is cleaner on
+bright, hard-driven material and barely resets under the clipped-noise
+stress that resets 2×. Choosing per track is the point. The tooltip now
+says only that.

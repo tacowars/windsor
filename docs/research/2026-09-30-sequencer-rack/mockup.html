@@ -1,0 +1,702 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windsor Sequencer Rack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a toolbar of switches, the Song pane with Lead selected (its sequencer over its inserts), then the other four sequencers, then notes. Single theme on purpose: Windsor's dark console tokens, the same as the insert rack mockup. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --seq-h: 220px;
+  --fx-h: 196px;
+  --step-w: 26px;
+  --beat-w: calc(var(--step-w) * 1.35);
+  --rail-w: 24px;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 13px/1.5 var(--f-ui); padding-block: 20px 48px; padding-inline: 16px; margin: 0; }
+.wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1, h2 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+h1 { font-size: 17px; }
+h2 { font-size: 12px; color: var(--ink-dim); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h2 small, .meas { font-family: var(--f-num); font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ink-faint); font-weight: 400; }
+p { margin: 0; max-width: 76ch; color: var(--ink-dim); }
+.lede { display: flex; flex-direction: column; gap: 6px; }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; position: sticky; top: 0; z-index: 5; }
+.opt { display: flex; align-items: center; gap: 8px; }
+.opt-label { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.segs { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.segs button { background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); padding: 4px 10px; font: 500 11px var(--f-ui); cursor: pointer; }
+.segs button:last-child { border-right: 0; }
+.segs button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.play-btn { background: var(--inset); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 4px 12px; font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; min-width: 74px; }
+.play-btn[aria-pressed="true"] { background: var(--carrier); color: var(--inset); border-color: var(--carrier); }
+.hint { font-size: 11px; color: var(--ink-faint); }
+
+/* The Song pane */
+.pane { display: flex; flex-direction: column; gap: 8px; }
+.pane-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pane-head .title { font: 600 12px var(--f-panel); letter-spacing: 0.07em; text-transform: uppercase; }
+.pane-head .title i { font-style: normal; color: var(--kc); }
+.pane-head .spacer { flex: 1; }
+.chip-btn { background: transparent; border: 1px solid var(--line-bright); color: var(--ink-dim); border-radius: var(--r); font: 600 9.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 8px; cursor: pointer; }
+.chip-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
+.rack { display: flex; gap: 6px; align-items: stretch; overflow-x: auto; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; min-width: 0; scrollbar-color: var(--line-bright) var(--inset); }
+.rack-label { font: 600 9px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: -4px; }
+
+/* Device, with the name on a side rail */
+.dev { flex: none; height: var(--seq-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; min-width: 0; }
+.dev.fx { height: var(--fx-h); }
+.dev.flex { flex: 0 1 auto; }
+.rail { width: var(--rail-w); flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; background: var(--panel-hi); border-right: 1px solid var(--line); }
+.dev-name { writing-mode: vertical-rl; transform: rotate(180deg); font-family: var(--f-panel); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; padding: 4px 0; cursor: pointer; }
+.dev-name .num { color: var(--ink-faint); margin-left: 5px; }
+.rail .spacer { flex: 1; }
+.ib { background: transparent; border: 1px solid transparent; color: var(--ink-faint); width: 18px; height: 18px; border-radius: var(--r); display: grid; place-items: center; font-size: 10px; line-height: 1; cursor: pointer; padding: 0; }
+.ib:hover { color: var(--ink); border-color: var(--line-bright); }
+.pwr { color: var(--modulator); font-size: 12px; }
+.kind-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kc); margin-top: 3px; }
+.dev-body { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.section { display: flex; flex-direction: column; padding: 4px 8px 6px; min-height: 0; min-width: 0; }
+.section + .section { border-left: 1px solid var(--line); }
+.section.grow { flex: 1 1 auto; }
+.sec-label { height: 14px; flex: none; font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+.sec-label em { font-style: normal; font-family: var(--f-num); letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--ink-dim); }
+.sec-body { flex: 1; min-height: 0; display: flex; gap: 2px; }
+.dev.folded { width: calc(var(--rail-w) + 2px); }
+.dev.folded .dev-body { display: none; }
+.dev.folded .rail { border-right: 0; }
+
+/* Controls (the insert rack's) */
+.col { display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; min-height: 0; }
+.col.wide { align-items: stretch; justify-content: space-evenly; }
+.knob { width: 52px; display: flex; flex-direction: column; align-items: center; padding: 1px 0; border-radius: var(--r); }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .face { fill: var(--inset); stroke: var(--line); }
+.knob .track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .arc { stroke: var(--kc, var(--modulator)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 13px; }
+.knob .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; line-height: 11px; }
+.knob.dim { opacity: 0.35; }
+.field { display: flex; flex-direction: column; gap: 1px; width: 100px; }
+.field.dim { opacity: 0.35; }
+.field .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.fake-select, .fake-input { background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); height: 22px; font-size: 11.5px; padding: 0 6px; display: flex; align-items: center; justify-content: space-between; color: var(--ink); white-space: nowrap; }
+.fake-select::after { content: '▾'; color: var(--ink-faint); font-size: 10px; margin-left: 6px; }
+.fake-input { font-family: var(--f-num); font-size: 11px; }
+.btn-s { background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink-dim); font: 600 9.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 8px; text-align: center; cursor: pointer; white-space: nowrap; }
+.btn-s:hover { color: var(--ink); border-color: var(--ink-faint); }
+.btn-s.kc { border-color: var(--kc); color: var(--ink); }
+.row2 { display: flex; gap: 4px; }
+.row2 > * { flex: 1; }
+.vseg { display: flex; flex-direction: column; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.vseg span, .hseg span { background: var(--inset); color: var(--ink-dim); font: 500 11px var(--f-ui); padding: 3px 8px; white-space: nowrap; cursor: pointer; }
+.vseg span + span { border-top: 1px solid var(--line-bright); }
+.hseg { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.hseg span { flex: 1; text-align: center; padding: 2px 6px; font-size: 10.5px; }
+.hseg span + span { border-left: 1px solid var(--line-bright); }
+.vseg span.on, .hseg span.on { background: var(--kc); color: var(--inset); }
+.new-tag { font: 600 8px var(--f-panel); letter-spacing: 0.1em; color: var(--inset); background: var(--carrier); border-radius: 2px; padding: 1px 4px; margin-left: 4px; vertical-align: 1px; }
+.dev-name .new-tag { margin: 0 0 4px; }
+
+/* The step pattern: a label column, then one column per step, rows shared */
+.pat { flex: 1; min-width: 0; min-height: 0; display: flex; gap: 4px; }
+.labs, .step { display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+.labs { flex: none; width: 64px; }
+.steps { display: flex; gap: 2px; overflow-x: auto; overflow-y: hidden; min-width: 0; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--panel); }
+.step { flex: none; width: var(--step-w); }
+.step.beat { margin-left: 4px; }
+.step.off { opacity: 0.3; }
+.slot { min-height: 0; position: relative; }
+.lab-txt { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); line-height: 12px; white-space: nowrap; }
+.idx { font: 9px/12px var(--f-num); color: var(--ink-faint); text-align: center; border-radius: 2px; }
+.idx.b { color: var(--ink-dim); }
+.play > .slot > .idx { background: var(--carrier); color: var(--inset); }
+
+.roll { position: absolute; inset: 0; background-color: var(--inset); border: 1px solid var(--line); border-radius: 2px;
+  background-image: repeating-linear-gradient(to top, transparent 0 calc(100% / var(--rows) - 1px), rgba(255,255,255,0.045) calc(100% / var(--rows) - 1px) calc(100% / var(--rows))); }
+.play .roll, .play .lane { border-color: var(--carrier); background-color: #1b2124; }
+.nb { position: absolute; left: 1px; right: 1px; bottom: calc(var(--d) * 100% / var(--rows)); height: calc(100% / var(--rows)); min-height: 6px; background: var(--kc); border-radius: 2px; font: 500 8px/1 var(--f-num); color: var(--inset); display: grid; place-items: center; overflow: hidden; cursor: ns-resize; }
+.nb.acc { box-shadow: inset 0 2px 0 var(--carrier); }
+.nb.tie { left: -4px; opacity: 0.55; border-radius: 0 2px 2px 0; cursor: pointer; }
+.nb.ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--ink-faint); opacity: 0.6; }
+.nb.fixed { cursor: pointer; }
+.rest-dot { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: var(--line-bright); }
+.keys { position: absolute; inset: 0; display: flex; flex-direction: column-reverse; }
+.keys span { flex: 1; font: 8px var(--f-num); color: var(--ink-faint); display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; min-height: 0; overflow: hidden; }
+.keys span.tonic { color: var(--kc); }
+.keys-name { position: absolute; left: 0; top: 0; }
+.chip { height: 100%; font: 9px/1 var(--f-num); color: var(--ink-faint); text-align: center; display: grid; place-items: center; border-radius: 2px; cursor: pointer; }
+.chip:hover { background: var(--panel-hi); color: var(--ink); }
+.chip.set { background: var(--panel-hi); color: var(--ink); }
+.flags { display: flex; gap: 2px; height: 100%; }
+.flag { flex: 1; border-radius: 2px; background: var(--inset); border: 1px solid var(--line); font: 600 7px/1 var(--f-panel); color: var(--ink-faint); display: grid; place-items: center; cursor: pointer; }
+.flag.a.on { background: var(--carrier); border-color: var(--carrier); color: var(--inset); }
+.flag.s.on { background: var(--kc); border-color: var(--kc); color: var(--inset); }
+.lane { position: absolute; inset: 0; background: var(--inset); border: 1px solid var(--line); border-radius: 2px; cursor: ns-resize; }
+.lane::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--line-bright); }
+.lane i { position: absolute; left: 3px; right: 3px; background: var(--kc); opacity: 0.8; border-radius: 1px; }
+.lane.mute { opacity: 0.35; }
+.lane-lab { display: flex; flex-direction: column; gap: 3px; height: 100%; justify-content: flex-start; }
+.lane-pick { display: flex; align-items: center; justify-content: space-between; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); font: 10px var(--f-ui); color: var(--ink); padding: 1px 4px; white-space: nowrap; overflow: hidden; cursor: pointer; }
+.lane-pick::after { content: '▾'; color: var(--ink-faint); font-size: 9px; margin-left: 3px; }
+.lane-sub { font: 9px var(--f-num); color: var(--ink-faint); }
+.lane-add { font: 600 8.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); cursor: pointer; }
+.lane-add:hover { color: var(--ink); }
+.lane-dots { display: flex; gap: 3px; align-items: center; }
+.lane-dots .lane-add { margin-left: auto; }
+.lane-dots b { width: 6px; height: 6px; border-radius: 50%; background: var(--line-bright); cursor: pointer; }
+.lane-dots b.on { background: var(--kc); }
+.lane-read { font: 9px var(--f-num); color: var(--ink-dim); }
+.append { flex: none; width: var(--step-w); border: 1px dashed var(--line-bright); border-radius: 2px; color: var(--ink-faint); display: grid; place-items: center; font-size: 16px; cursor: pointer; }
+.bass-prev .step { width: calc(var(--step-w) * 0.8); }
+.bass-prev .idx { text-align: left; white-space: nowrap; overflow: visible; }
+button.append { background: transparent; }
+.append:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* Chord blocks: width is time */
+.cscroll { display: flex; flex-direction: column; gap: 2px; overflow-x: auto; overflow-y: hidden; min-width: 0; scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--panel); }
+.hline { display: flex; flex: none; height: 14px; }
+.hline span { flex: none; width: calc(var(--beat-w) * 4); font: 600 9px/14px var(--f-panel); letter-spacing: 0.06em; color: var(--ink-dim); padding-left: 4px; border-left: 1px solid var(--line-bright); background: linear-gradient(to right, rgba(255,255,255,0.03), transparent); }
+.cblocks { flex: 1; min-height: 0; display: flex; }
+.cstep { flex: none; display: flex; flex-direction: column; gap: 2px; padding-right: 2px; min-height: 0; }
+.cstep .slot { flex: 0 0 13px; }
+.cstep .slot.fill { flex: 1 1 0; }
+.cblock { position: absolute; inset: 0; border-radius: 3px; background: color-mix(in srgb, var(--kc) 22%, var(--inset)); border: 1px solid color-mix(in srgb, var(--kc) 55%, transparent); display: flex; overflow: hidden; cursor: grab; }
+.cblock.rest { background: repeating-linear-gradient(135deg, var(--inset) 0 4px, #161b1e 4px 8px); border: 1px solid var(--line); cursor: default; }
+.cblock .seg { flex: 1; position: relative; }
+.cblock .seg + .seg { border-left: 1px solid color-mix(in srgb, var(--kc) 55%, transparent); }
+.cblock .seg.play { background: color-mix(in srgb, var(--carrier) 22%, transparent); }
+.cblock .cn { position: absolute; left: 4px; top: 2px; font: 600 10px var(--f-panel); letter-spacing: 0.04em; color: var(--ink); z-index: 1; }
+.cblock.rest .cn { color: var(--ink-faint); font-size: 8.5px; letter-spacing: 0.1em; }
+.cblock .vn { position: absolute; left: 3px; right: 3px; height: 2px; background: var(--kc); border-radius: 1px; }
+.cstep .chip { font-size: 8.5px; }
+.cstep.play .cblock { border-color: var(--carrier); }
+.tiles { display: flex; gap: 6px; }
+.tile { flex: 1; height: 58px; border-radius: 4px; padding: 5px 7px; display: flex; flex-direction: column; justify-content: space-between; cursor: grab; }
+.tile.hit { background: color-mix(in srgb, var(--kc) 28%, var(--inset)); border: 1px solid var(--kc); }
+.tile.rest { background: repeating-linear-gradient(135deg, var(--inset) 0 4px, #161b1e 4px 8px); border: 1px solid var(--line-bright); }
+.tile b { font: 600 15px var(--f-panel); letter-spacing: 0.04em; }
+.tile span { font: 600 8px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+
+/* Euclid circle and density plot */
+.circle { width: calc(var(--seq-h) - 32px); height: calc(var(--seq-h) - 32px); display: block; flex: none; }
+.circle .ring { fill: none; stroke: var(--line); }
+.circle .spoke { stroke: var(--line); }
+.circle .poly { fill: color-mix(in srgb, var(--kc) 10%, transparent); stroke: var(--kc); stroke-width: 1; opacity: 0.7; }
+.circle .dot { fill: var(--inset); stroke: var(--line-bright); stroke-width: 1.2; cursor: pointer; }
+.circle .dot.on { fill: var(--kc); stroke: var(--kc); }
+.circle .dot.play { stroke: var(--ink); stroke-width: 2.4; }
+.circle .dot.on.play { fill: #ffd28a; }
+.circle .big { font: 600 22px var(--f-panel); fill: var(--ink); text-anchor: middle; }
+.circle .small { font: 8.5px var(--f-num); fill: var(--ink-faint); text-anchor: middle; }
+.plot { width: 132px; flex: 1; min-height: 50px; max-height: 96px; background: var(--inset); border: 1px solid var(--line); border-radius: 2px; }
+.plot .band { fill: color-mix(in srgb, var(--kc) 10%, transparent); }
+.plot path { fill: none; stroke: var(--kc); stroke-width: 1.5; }
+.plot .gl { stroke: var(--line); }
+.plot .now { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 2 2; }
+.plot text { font: 8px var(--f-num); fill: var(--ink-faint); }
+
+/* Notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.notes > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px; color: var(--ink); }
+.notes ul { margin: 0; padding-left: 18px; color: var(--ink-dim); display: flex; flex-direction: column; gap: 5px; }
+.notes li b { color: var(--ink); font-weight: 600; }
+table.fit { border-collapse: collapse; font: 11px var(--f-num); color: var(--ink-dim); margin-top: 8px; width: 100%; }
+table.fit th, table.fit td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--line); font-weight: 400; }
+table.fit th { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+table.fit td.ok { color: var(--modulator); }
+table.fit td.tight { color: var(--carrier); }
+table.fit td.bad { color: var(--hot); }
+@media (prefers-reduced-motion: no-preference) { .dev { transition: width 0.15s; } }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Windsor sequencer rack</h1>
+    <p>Mockups of the five sequencers as rack devices: one fixed height, width set by the pattern, and the name on a side rail, the same as the insert rack. Nothing is paged. Every control shows at once, and the step hints move to the <b>?</b> on the rail. The Song pane shows the part's sequencer over its insert chain. Press Play to run the playheads. Every control is one today's cards have, except the few tagged <span class="new-tag">NEW</span>.</p>
+  </div>
+
+  <div class="toolbar" role="group" aria-label="Mockup options">
+    <div class="opt"><span class="opt-label">Sequencer height</span>
+      <div class="segs" id="opt-height">
+        <button type="button" data-v="196">196 px</button>
+        <button type="button" data-v="220">220 px</button>
+        <button type="button" data-v="244">244 px</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Step width</span>
+      <div class="segs" id="opt-stepw">
+        <button type="button" data-v="22">22</button>
+        <button type="button" data-v="26">26</button>
+        <button type="button" data-v="32">32</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Mod lanes</span>
+      <div class="segs" id="opt-lanes">
+        <button type="button" data-v="one">One at a time</button>
+        <button type="button" data-v="stack">All stacked</button>
+      </div>
+    </div>
+    <button type="button" class="play-btn" id="play" aria-pressed="false">▶ Play</button>
+    <span class="hint">Click a name to fold it. The lane dots switch lanes.</span>
+  </div>
+
+  <section class="pane" style="--kc: var(--modulator)">
+    <h2>Song pane · Lead selected <small id="w-lead"></small></h2>
+    <div class="pane-head">
+      <span class="title">Lead <i>— Grid</i></span>
+      <span class="meas">region 2 of 3 · bars 5–8</span>
+      <button type="button" class="chip-btn">Split</button>
+      <button type="button" class="chip-btn">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="ib" aria-label="Close">✕</button>
+    </div>
+    <div class="rack-label">Sequencer</div>
+    <div class="rack" id="rack-lead"></div>
+    <div class="rack-label">Inserts · 196 px</div>
+    <div class="rack" id="rack-fx"></div>
+  </section>
+
+  <section class="pane">
+    <h2>The other four <small id="w-others"></small></h2>
+    <div class="rack-label">Pad — Chord</div>
+    <div class="rack" id="rack-chord"></div>
+    <div class="rack-label">Keys — Arp</div>
+    <div class="rack" id="rack-arp"></div>
+    <div class="rack-label">Hats — Euclid</div>
+    <div class="rack" id="rack-euclid"></div>
+    <div class="rack-label">Bass — Basslead</div>
+    <div class="rack" id="rack-bass"></div>
+  </section>
+
+  <section class="notes">
+    <div>
+      <h3>Height</h3>
+      <ul>
+        <li><b>The tallest need is a step column with a mod lane:</b> step number, note, Oct, the A and S flags, and a lane you can paint. Grid and Arp both have one.</li>
+        <li><b>With one lane shown at a time, 196 px is enough.</b> The Grid's roll gets 67 px (9.6 px a degree, room for a note name) and the lane 58 px. So the sequencer can share the inserts' height and the pane stays even.</li>
+        <li><b>Stacked lanes are what break it.</b> Two lanes at 196 leave 6.4 px a degree, and four would be unusable at any of these heights. One lane at a time, with dots to switch, keeps the height fixed.</li>
+        <li><b>220 px</b> is the choice if lanes should stack two deep, or for more room to drag a note.</li>
+      </ul>
+      <table class="fit">
+        <tr><th>Height</th><th>Lanes</th><th>Roll</th><th>Per degree</th><th>A lane</th></tr>
+        <tr><td>196 px</td><td>one</td><td class="ok">67 px</td><td class="ok">9.6 px</td><td class="ok">58 px</td></tr>
+        <tr><td>220 px</td><td>one</td><td class="ok">80 px</td><td class="ok">11.4 px</td><td class="ok">69 px</td></tr>
+        <tr><td>244 px</td><td>one</td><td class="ok">93 px</td><td class="ok">13.3 px</td><td class="ok">80 px</td></tr>
+        <tr><td>196 px</td><td>2 stacked</td><td class="bad">45 px</td><td class="bad">6.4 px</td><td class="tight">39 px</td></tr>
+        <tr><td>220 px</td><td>2 stacked</td><td class="tight">54 px</td><td class="tight">7.7 px</td><td class="tight">47 px</td></tr>
+        <tr><td>244 px</td><td>2 stacked</td><td class="tight">62 px</td><td class="tight">8.9 px</td><td class="tight">54 px</td></tr>
+      </table>
+      <p class="hint" style="margin-top:6px">Measured in this mockup in headless Chrome at a 1440 px window.</p>
+    </div>
+    <div>
+      <h3>What changes</h3>
+      <ul>
+        <li><b>Grid:</b> the note cell and the degree picker become a <b>roll</b>. Drag a note up or down to change its degree, and click it to cycle note → tie → rest. A tie draws as the held note carried on. Steps shrink from 46 px to 26 px, so 32 steps fit in about 900 px.</li>
+        <li><b>Arp:</b> the same roll, but read-only in pitch. It draws the walk Style takes over the chord, so a Style or Octaves change is visible at once.</li>
+        <li><b>Chord:</b> a step is a <b>block as long as it plays</b> (Dur × Rep × base step), split at each repeat. The region's chords from the Harmony tab run above, so each hit shows the chord it will play.</li>
+        <li><b>Euclid:</b> the figure is a <b>circle</b>, with the density modulator drawn as the path <code>k</code> takes between min and max.</li>
+        <li><b>Reg on every pitched sequencer.</b> The Song pane's separate Octave knob for Grid and Chord moves into the device.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Open questions</h3>
+      <ul>
+        <li><b>Height.</b> 196 for both, with one lane shown at a time, or 220 for sequencers so two lanes can stack?</li>
+        <li><b>Grid's roll.</b> A roll changes how a degree is picked: a drag instead of a list. A folded degree (past the scale) would show as a red outline on the block.</li>
+        <li><b>Basslead preview</b> <span class="new-tag">NEW</span> needs the engine to render a region's next bars without playing them. Without it, Basslead is a narrow device with no picture.</li>
+        <li><b>Chord's harmony strip</b> <span class="new-tag">NEW</span> is read-only. Should a click on it select that chord in the Harmony lane?</li>
+        <li><b>Hints.</b> Today each card ends in a paragraph. Here the paragraph moves into the <b>?</b> on the rail.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const state = { height: 196, stepW: 26, lanes: 'one', playing: false, tick: 0, lane: { grid: 0, arp: 0 }, folded: new Set() };
+
+  // ── Controls, as the insert rack mockup draws them ──────────
+  const K = (l, v, p, o = {}) => ({ t: 'k', l, v, p, ...o });
+  const S = (l, v, o = {}) => ({ t: 's', l, v, ...o });
+  const B = (l, o = {}) => ({ t: 'b', l, ...o });
+  const I = (l, v) => ({ t: 'i', l, v });
+  const H = (l, opts, on) => ({ t: 'h', l, opts, on });
+  const V = (l, opts, on) => ({ t: 'v', l, opts, on });
+  const R = (html) => ({ t: 'raw', html });
+  const A0 = -0.75 * Math.PI, SPAN = 1.5 * Math.PI;
+  function arc(c, r, a0, a1) {
+    const pt = (a) => [(c + r * Math.sin(a)).toFixed(2), (c - r * Math.cos(a)).toFixed(2)];
+    const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+    return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`;
+  }
+  function knob(c) {
+    const size = 30, mid = size / 2, r = mid - 3, face = r - 4;
+    const a = A0 + Math.max(0.001, c.p) * SPAN;
+    const px = (mid + face * Math.sin(a)).toFixed(2), py = (mid - face * Math.cos(a)).toFixed(2);
+    return `<div class="knob${c.dim ? ' dim' : ''}" title="${c.l}">
+      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+        <circle class="face" cx="${mid}" cy="${mid}" r="${face}"/>
+        <path class="track" d="${arc(mid, r, A0, A0 + SPAN)}"/>
+        <path class="arc" d="${arc(mid, r, A0, a)}"/>
+        <line class="pin" x1="${mid}" y1="${mid}" x2="${px}" y2="${py}"/>
+      </svg><span class="val">${c.v}</span><span class="lab">${c.l}${c.isNew ? '<span class="new-tag">NEW</span>' : ''}</span></div>`;
+  }
+  const lab = (l) => (l ? `<span class="lab">${l}</span>` : '');
+  function control(c) {
+    switch (c.t) {
+      case 'k': return knob(c);
+      case 's': return `<div class="field${c.dim ? ' dim' : ''}">${lab(c.l)}<div class="fake-select">${c.v}</div></div>`;
+      case 'i': return `<div class="field">${lab(c.l)}<div class="row2"><div class="fake-input">${c.v}</div><div class="btn-s kc" style="flex:none">Reseed</div></div></div>`;
+      case 'b': return `<div class="btn-s${c.kc ? ' kc' : ''}">${c.l}</div>`;
+      case 'h': return `<div class="field">${lab(c.l)}<div class="hseg">${c.opts.map((o) => `<span class="${o === c.on ? 'on' : ''}">${o}</span>`).join('')}</div></div>`;
+      case 'v': return `<div class="field">${lab(c.l)}<div class="vseg">${c.opts.map((o) => `<span class="${o === c.on ? 'on' : ''}">${o}</span>`).join('')}</div></div>`;
+      case 'raw': return c.html;
+    }
+    return '';
+  }
+  function cols(list) {
+    return list.map((items) => {
+      const wide = items.some((c) => c.t !== 'k');
+      return `<div class="col${wide ? ' wide' : ''}">${items.map(control).join('')}</div>`;
+    }).join('');
+  }
+  const section = (label, body, cls = '') => `<div class="section ${cls}"><div class="sec-label">${label}</div><div class="sec-body">${body}</div></div>`;
+
+  function device(id, name, kc, body, o = {}) {
+    const folded = state.folded.has(id);
+    return `<div class="dev${o.fx ? ' fx' : ''}${o.flex ? ' flex' : ''}${folded ? ' folded' : ''}" data-id="${id}" style="--kc:${kc}">
+      <div class="rail">
+        ${o.fx ? '<button type="button" class="ib pwr" aria-label="On or off">⏻</button>' : '<span class="kind-dot"></span>'}
+        <span class="dev-name" data-fold="${id}" title="Fold">${name}${o.num ? `<span class="num">${o.num}</span>` : ''}</span>
+        <span class="spacer"></span>
+        ${o.fx ? '<button type="button" class="ib" aria-label="Remove">✕</button>' : `<button type="button" class="ib" title="${o.help || ''}" aria-label="How this works">?</button>`}
+      </div>
+      <div class="dev-body">${body}</div>
+    </div>`;
+  }
+
+  // ── Music: A minor, a region of four bars ───────────────────
+  const KEY = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+  const HARMONY = ['Am', 'F', 'C', 'G'];
+
+  // Pattern with a label column and one column per step. Each row: { lab, size, cell(i) }.
+  function pattern(seq, rows, count, o = {}) {
+    const size = (r) => (r.flex ? `flex:${r.flex} 1 0` : `flex:0 0 ${r.px}px`);
+    const labs = rows.map((r) => `<div class="slot" style="${size(r)}">${r.lab}</div>`).join('');
+    let steps = '';
+    for (let i = 0; i < count; i++) {
+      const beat = i > 0 && i % 4 === 0 ? ' beat' : '';
+      const off = o.length !== undefined && i >= o.length ? ' off' : '';
+      steps += `<div class="step${beat}${off}" data-seq="${seq}" data-i="${i}">${rows.map((r) => `<div class="slot" style="${size(r)}">${r.cell(i)}</div>`).join('')}</div>`;
+    }
+    if (o.append) steps += `<div class="append" title="Append a step">+</div>`;
+    return `<div class="pat"><div class="labs">${labs}</div><div class="steps">${steps}</div></div>`;
+  }
+  const idxRow = { lab: '', px: 12, cell: (i) => `<div class="idx${i % 4 === 0 ? ' b' : ''}">${i + 1}</div>` };
+  function laneBar(v) {
+    const h = Math.abs(v) * 50;
+    return v >= 0 ? `<i style="bottom:50%;height:${h}%"></i>` : `<i style="top:50%;height:${h}%"></i>`;
+  }
+  function laneRows(seq, lanes, sounds) {
+    const cell = (lane) => (i) => `<div class="lane${sounds(i) ? '' : ' mute'}">${laneBar(lane.v[i] ?? 0)}</div>`;
+    if (state.lanes === 'stack') {
+      return lanes.map((lane) => ({ flex: 1, lab: `<div class="lane-lab"><span class="lab-txt" style="text-transform:none;letter-spacing:0;font:10px var(--f-ui);color:var(--ink)">${lane.name} <span class="ib" style="display:inline-grid;width:12px;height:12px">✕</span></span></div>`, cell: cell(lane) }));
+    }
+    const k = state.lane[seq] % lanes.length;
+    const lane = lanes[k];
+    const dots = lanes.map((_, j) => `<b class="${j === k ? 'on' : ''}" data-lane="${seq}" data-k="${j}" title="${lanes[j].name}"></b>`).join('');
+    return [{
+      flex: 1,
+      lab: `<div class="lane-lab"><span class="lane-pick" title="Which lane is shown">${lane.name}</span><span class="lane-dots">${dots}<span class="lane-add" title="Add a lane">+ Lane</span></span><span class="lane-read">${lane.read}</span></div>`,
+      cell: cell(lane),
+    }];
+  }
+  function keysLab(names, tonic) {
+    return `<div class="keys">${names.map((n, i) => `<span class="${i === tonic ? 'tonic' : ''}">${n}</span>`).join('')}</div>`;
+  }
+  const octLabel = (o) => (o === 0 ? '·' : o > 0 ? `+${o}` : `−${-o}`);
+  const octRow = (get) => ({ lab: '<span class="lab-txt">Oct</span>', px: 13, cell: (i) => { const o = get(i); return o === null ? '' : `<div class="chip${o ? ' set' : ''}" title="Octave: click up, shift-click down">${octLabel(o)}</div>`; } });
+  const flagRow = (get) => ({ lab: '<span class="lab-txt" title="Accent · Slide">A · S</span>', px: 12, cell: (i) => { const s = get(i); return s ? `<div class="flags"><span class="flag a${s.a ? ' on' : ''}">A</span><span class="flag s${s.s ? ' on' : ''}">S</span></div>` : ''; } });
+
+  // ── Grid (Lead) ─────────────────────────────────────────────
+  const n = (d, o = 0, a = false, s = false) => ({ k: 'n', d, o, a, s });
+  const T = { k: 't' }, X = { k: 'r' };
+  const GRID = [n(0, 0, true), T, n(2), X, n(4, 0, false, true), n(3), T, n(2, 0, true), n(0, 1), X, n(6, -1), n(0), n(4, 0, true), T, n(3, 0, false, true), n(2)];
+  const GRID_LANES = [
+    { name: 'Cutoff', read: '5: 3.1k', v: [0.6, 0.6, 0.2, 0, 0.42, -0.2, -0.2, 0.3, 0.8, 0, -0.5, 0.1, 0.6, 0.6, -0.3, 0.2] },
+    { name: 'Op B Level', read: '', v: [0, 0.3, 0.5, 0, -0.6, -0.6, 0, 0.2, 0.4, 0, 0, 0.7, 0, 0, -0.3, 0] },
+  ];
+  function gridDegree(i) {
+    for (let j = i; j >= 0; j--) if (GRID[j].k === 'n') return GRID[j].d;
+    return 0;
+  }
+  function gridRoll(i) {
+    const s = GRID[i];
+    if (s.k === 'r') return '<div class="roll" style="--rows:7"><span class="rest-dot"></span></div>';
+    const d = s.k === 'n' ? s.d : gridDegree(i);
+    const name = s.k === 'n' ? KEY[d] : '';
+    const cls = s.k === 't' ? 'nb tie' : `nb${s.a ? ' acc' : ''}`;
+    const title = s.k === 't' ? 'Tie: click to cycle' : `Degree ${d + 1}: drag up or down; click to cycle note → tie → rest`;
+    return `<div class="roll" style="--rows:7"><div class="${cls}" style="--d:${d}" title="${title}">${name}</div></div>`;
+  }
+  function gridDevice() {
+    const controls = cols([
+      [S('Step', '1/16'), B('Randomize', { kc: true })],
+      [K('Vel', '0.80', 0.8), K('Length', '16', 0.5)],
+      [K('Skip', '0.00', 0), K('Rotate', '0', 0.5)],
+      [K('Acc vel', '0.35', 0.35), K('Acc mod', '0.50', 0.5)],
+      [K('Reg', '4', 0.55)],
+    ]);
+    const rows = [
+      idxRow,
+      { flex: 1.15, lab: keysLab(KEY, 0), cell: gridRoll },
+      octRow((i) => (GRID[i].k === 'n' ? GRID[i].o : null)),
+      flagRow((i) => (GRID[i].k === 'n' ? GRID[i] : null)),
+      ...laneRows('grid', GRID_LANES, (i) => GRID[i].k === 'n'),
+    ];
+    const body = section('Play', controls) + section('Steps <em>16 of 32</em>', pattern('grid', rows, GRID.length, { length: 16 }), 'grow');
+    return device('grid', 'Grid', 'var(--modulator)', body, { help: 'Drag a note up or down for its degree; click it to cycle note → tie → rest. Oct: click up, shift-click down. A accent, S slide. Lanes: drag a bar, across steps to paint; double-click resets.' });
+  }
+
+  // ── Arp (Keys) ──────────────────────────────────────────────
+  const ARP_PITCH = ['A3', 'C4', 'E4', 'A4', 'C5', 'E5'];
+  const ARP_WALK = [0, 1, 2, 3, 4, 5, 4, 3, 2, 1];
+  const c = (k, o = 0, a = false, s = false) => ({ k, o, a, s });
+  const ARP = [c('n'), c('n'), c('n', 0, false, true), c('n', 0, true), c('n'), c('t'), c('n', 0, true), c('r'), c('n', -1), c('n')];
+  const ARP_LANES = [{ name: 'Op A Level', read: '4: 0.84', v: [0.2, 0, -0.3, 0.3, 0.5, 0.5, 0.1, 0, -0.6, 0.2] }];
+  function arpRoll(i) {
+    const s = ARP[i];
+    const d = ARP_WALK[i];
+    if (s.k === 'r') return `<div class="roll" style="--rows:6"><div class="nb ghost fixed" style="--d:${d}" title="Rest: click to cycle"></div></div>`;
+    const cls = s.k === 't' ? 'nb tie fixed' : `nb fixed${s.a ? ' acc' : ''}`;
+    return `<div class="roll" style="--rows:6"><div class="${cls}" style="--d:${d}" title="${ARP_PITCH[d]}: click to cycle note → tie → rest"></div></div>`;
+  }
+  function arpDevice() {
+    const controls = cols([
+      [S('Style', 'Up-down'), S('Rate', '1/16'), S('Voicing', 'Close')],
+      [H('Retrigger', ['off', 'on'], 'on'), I('Seed', '48213'), B('Randomize', { kc: true })],
+      [K('Vel', '0.75', 0.75), K('Gate', '0.60', 0.6)],
+      [K('Octaves', '2', 0.33), K('Reg', '3', 0.45)],
+      [K('Skip', '0.10', 0.1), K('Rotate', '0', 0.5)],
+      [K('Acc vel', '0.30', 0.3), K('Acc mod', '0.40', 0.4)],
+    ]);
+    const rows = [
+      idxRow,
+      { flex: 1.15, lab: keysLab(ARP_PITCH, 0), cell: arpRoll },
+      octRow((i) => (ARP[i].k === 'n' ? ARP[i].o : null)),
+      flagRow((i) => (ARP[i].k === 'n' ? ARP[i] : null)),
+      ...laneRows('arp', ARP_LANES, (i) => ARP[i].k === 'n'),
+    ];
+    const body = section('Play', controls) + section('Cycle <em>10 cells · Am, Up-down, 2 oct</em>', pattern('arp', rows, ARP.length), 'grow');
+    return device('arp', 'Arp', 'var(--modulator)', body, { help: 'One note per cell from the chord under the playhead, walked by Style. The strip grows and shrinks with the chord, Octaves and Style. Click a cell to cycle note → tie → rest.' });
+  }
+
+  // ── Chord (Pad) ─────────────────────────────────────────────
+  // dur and rep in quarter notes (base step 1/4); notes are MIDI for the little voicing bars.
+  const CHORD = [
+    { k: 'hit', dur: 2, rep: 1, oct: 0, inv: 0, chord: 'Am', notes: [57, 60, 64] },
+    { k: 'hit', dur: 1, rep: 2, oct: 0, inv: 1, chord: 'Am', notes: [60, 64, 69] },
+    { k: 'rest', dur: 1, rep: 1 },
+    { k: 'hit', dur: 3, rep: 1, oct: 1, inv: 0, chord: 'F', notes: [65, 69, 72] },
+    { k: 'hit', dur: 2, rep: 1, oct: 0, inv: 0, chord: 'C', notes: [60, 64, 67] },
+    { k: 'hit', dur: 1, rep: 2, oct: 0, inv: 2, chord: 'C', notes: [55, 60, 64] },
+    { k: 'hit', dur: 4, rep: 1, oct: 0, inv: 0, chord: 'G', notes: [55, 59, 62] },
+  ];
+  const LOW = 52, HIGH = 75;
+  function chordBlock(s, i) {
+    const w = s.dur * s.rep;
+    const segs = Array.from({ length: s.rep }, (_, r) => {
+      const bars = s.k === 'hit' ? s.notes.map((m) => `<span class="vn" style="bottom:${((m - LOW) / (HIGH - LOW) * 78 + 6).toFixed(1)}%"></span>`).join('') : '';
+      return `<div class="seg" data-seg="${r}">${bars}</div>`;
+    }).join('');
+    const name = s.k === 'hit' ? s.chord : 'Rest';
+    const chip = (v, t) => `<div class="slot"><div class="chip${t ? ' set' : ''}">${v}</div></div>`;
+    const hit = s.k === 'hit';
+    return `<div class="cstep" data-seq="chord" data-i="${i}" style="width:calc(var(--beat-w) * ${w})">
+      <div class="slot fill"><div class="cblock${hit ? '' : ' rest'}" title="${hit ? 'Press to hear it; drag to move' : 'Rest'}"><span class="cn">${name}</span>${segs}</div></div>
+      ${chip(hit ? octLabel(s.oct) : '', hit && s.oct)}
+      ${chip(hit ? `inv ${s.inv}` : '', hit && s.inv)}
+      ${chip(`×${s.dur}`, s.dur !== 1)}
+      ${chip(`r${s.rep}`, s.rep !== 1)}
+    </div>`;
+  }
+  function chordDevice() {
+    const tiles = `<div class="field" style="width:132px"><span class="lab">Drag onto a step</span><div class="tiles">
+      <div class="tile hit" title="Press to hear Am; drag onto a step"><span>Hit</span><b>Am</b></div>
+      <div class="tile rest" title="Drag onto a step"><span>Rest</span><b style="color:var(--ink-faint)">—</b></div></div></div>`;
+    const controls = cols([
+      [R(tiles), S('Voicing', 'Close')],
+      [K('Vel', '0.70', 0.7), K('Gate', '0.90', 0.9)],
+      [K('Reg', '4', 0.55)],
+      [S('Base step', '1/4'), B('Delete last', { kc: true })],
+    ]);
+    const labRow = (t, px) => `<div class="slot" style="${px ? `flex:0 0 ${px}px` : 'flex:1 1 0'}"><span class="lab-txt">${t}</span></div>`;
+    const labs = `<div class="labs">${labRow('Harmony', 14)}${labRow('Steps')}${labRow('Oct', 13)}${labRow('Inv', 13)}${labRow('Dur', 13)}${labRow('Rep', 13)}</div>`;
+    const hline = `<div class="hline">${HARMONY.map((h) => `<span>${h}</span>`).join('')}</div>`;
+    const blocks = CHORD.map(chordBlock).join('') + '<div class="append" title="Append a step">+</div>';
+    const pat = `<div class="pat">${labs}<div class="cscroll">${hline}<div class="cblocks">${blocks}</div></div></div>`;
+    const body = section('Play', controls) + section('Progression <em>7 steps · 4 bars</em>', pat, 'grow');
+    return device('chord', 'Chord', 'var(--modulator)', body, { help: 'Press Hit to hear this region’s chord; drag it or Rest onto a step or the + column. Dials: click up, shift-click down. The chords are the Harmony tab’s timeline.' });
+  }
+
+  // ── Euclid (Hats) ───────────────────────────────────────────
+  const EN = 16, EK = 5;
+  const EFIG = Array.from({ length: EN }, (_, i) => (i * EK) % EN < EK);
+  function circle() {
+    const cx = 80, cy = 80, r = 62;
+    const pos = (i) => { const a = (i / EN) * Math.PI * 2; return [cx + r * Math.sin(a), cy - r * Math.cos(a)]; };
+    const on = EFIG.map((v, i) => (v ? pos(i) : null)).filter(Boolean);
+    const poly = on.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+    const dots = EFIG.map((v, i) => { const [x, y] = pos(i); return `<circle class="dot${v ? ' on' : ''}" data-seq="euclid" data-i="${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i % 4 === 0 ? 7 : 6}"><title>Step ${i + 1}: click to flip</title></circle>`; }).join('');
+    return `<svg class="circle" viewBox="0 0 160 160" aria-label="Figure">
+      <circle class="ring" cx="${cx}" cy="${cy}" r="${r}"/>
+      <polygon class="poly" points="${poly}"/>
+      ${dots}
+      <text class="big" x="${cx}" y="${cy + 4}">${EK} / ${EN}</text>
+      <text class="small" x="${cx}" y="${cy + 18}">generative</text>
+    </svg>`;
+  }
+  function densityPlot() {
+    const w = 132, h = 70, pad = 8, lo = 3, hi = 9, top = 16;
+    const y = (k) => h - pad - (k / top) * (h - 2 * pad);
+    const pts = [];
+    for (let i = 0; i <= 64; i++) { const t = i / 64 * 2; const tri = 1 - Math.abs((t % 1) * 2 - 1); pts.push(`${(i / 64 * w).toFixed(1)} ${y(lo + (hi - lo) * tri).toFixed(1)}`); }
+    return `<svg class="plot" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="k over 16 bars">
+      <rect class="band" x="0" y="${y(hi)}" width="${w}" height="${y(lo) - y(hi)}"/>
+      <line class="gl" x1="0" y1="${y(hi)}" x2="${w}" y2="${y(hi)}"/><line class="gl" x1="0" y1="${y(lo)}" x2="${w}" y2="${y(lo)}"/>
+      <path d="M${pts.join('L')}"/>
+      <line class="now" x1="${w * 0.19}" y1="0" x2="${w * 0.19}" y2="${h}"/>
+      <text x="2" y="${y(hi) - 2}">9</text><text x="2" y="${y(lo) + 9}">3</text></svg>`;
+  }
+  function euclidDevice() {
+    const controls = cols([
+      [K('Note', 'F#2', 0.45), K('Hold', '40ms', 0.3)],
+      [K('Vel', '0.65', 0.65), K('Steps n', '16', 0.25)],
+      [K('Rotate', '0', 0.5), K('k start', '5', 0.08)],
+      [K('k min', '3', 0.05), K('k max', '9', 0.14)],
+      [S('Step', '1/16'), B('Capture', { kc: true })],
+    ]);
+    const density = cols([
+      [H('', ['bars', 'Hz', 'walk'], 'bars'), R(densityPlot()), H('', ['tri', 'sine', 'saw'], 'tri')],
+      [K('Bars', '8', 0.4)],
+    ]);
+    const body = section('Figure', circle()) + section('Play', controls) + section('Density modulator', density);
+    return device('euclid', 'Euclid', 'var(--carrier)', body, { flex: true, help: 'Lit dots are the onsets; the ring is the playhead. Click a dot to flip it: the figure freezes and Capture reads Release, which lets the modulator back in.' });
+  }
+
+  // ── Basslead (Bass) ─────────────────────────────────────────
+  const BASS = [0, 0, null, 7, 0, null, 3, 0, -4, -4, null, 3, -4, null, 0, 8];
+  function bassDevice() {
+    const controls = cols([
+      [V('Pitch mode', ['Follow Root', 'Follow Chord', 'Fixed'], 'Follow Chord')],
+      [S('Fixed degree', '1 · A', { dim: true }), S('Rate', '1/8'), I('Seed', '9120')],
+      [K('Root bias', '0.60', 0.6), K('Reg', '2', 0.3)],
+      [K('Gate', '0.70', 0.7), K('Density', '0.75', 0.75)],
+      [K('Vel', '0.85', 0.85)],
+    ]);
+    const lo = -4, rows = 13;
+    const roll = (i) => {
+      const v = BASS[i];
+      return `<div class="roll" style="--rows:${rows}">${v === null ? '<span class="rest-dot"></span>' : `<div class="nb fixed" style="--d:${v - lo};min-height:4px"></div>`}</div>`;
+    };
+    const idx8 = { lab: '', px: 12, cell: (i) => `<div class="idx${i % 8 === 0 ? ' b' : ''}">${i % 8 === 0 ? `bar ${i / 8 + 1}` : ''}</div>` };
+    const rowsDef = [idx8, { flex: 1, lab: `<div class="keys"><span></span><span class="tonic">A2</span>${'<span></span>'.repeat(3)}<span>C3</span>${'<span></span>'.repeat(3)}<span>E3</span>${'<span></span>'.repeat(3)}</div>`, cell: roll }];
+    const preview = `<div class="bass-prev" style="display:flex;min-width:0;flex:1">${pattern('bass', rowsDef, BASS.length)}</div>`;
+    const body = section('Play', controls) + section('Next 2 bars <span class="new-tag">NEW</span>', preview, 'grow');
+    return device('bass', 'Basslead', 'var(--modulator)', body, { help: 'Each step draws its note from the chord under it. Root bias applies to Follow Chord only; the degree to Fixed only. A seed change restarts the part’s stream at once.' });
+  }
+
+  // ── Two inserts under the Lead's sequencer, at the insert rack's height ──
+  function fxDevices() {
+    const drive = section('', cols([[K('Drive', '+6.0dB', 0.6)], [K('Tone', '2.50k', 0.55), K('Mix', '0.35', 0.35)]]));
+    const delay = section('', cols([[S('Starting point', 'Custom'), S('Routing', 'Ping-pong')], [S('Left', '1/8 dotted'), S('Right', '1/4')], [K('Feedback', '0.45', 0.45), K('Mix', '0.30', 0.3)]]));
+    return device('fx1', 'Classic Drive', 'var(--modulator)', drive, { fx: true, num: 1 }) +
+      device('fx2', 'Dub delay', 'var(--modulator)', delay, { fx: true, num: 2 }) +
+      `<button type="button" class="append" style="width:88px;height:var(--fx-h);border-radius:5px;font:600 10px var(--f-panel);letter-spacing:0.08em;text-transform:uppercase">+ Add insert</button>`;
+  }
+
+  // ── Render ──────────────────────────────────────────────────
+  const RACKS = { lead: gridDevice, fx: fxDevices, chord: chordDevice, arp: arpDevice, euclid: euclidDevice, bass: bassDevice };
+  function widthOf(id) { const d = document.querySelector(`.dev[data-id="${id}"]`); return d ? d.offsetWidth : 0; }
+  function render() {
+    const root = document.documentElement.style;
+    root.setProperty('--seq-h', state.height + 'px');
+    root.setProperty('--step-w', state.stepW + 'px');
+    for (const [id, fn] of Object.entries(RACKS)) document.getElementById('rack-' + id).innerHTML = fn();
+    document.getElementById('w-lead').textContent = `Grid ${widthOf('grid').toLocaleString('en')} px wide at 16 steps`;
+    document.getElementById('w-others').textContent = ['chord', 'arp', 'euclid', 'bass'].map((id) => `${id[0].toUpperCase() + id.slice(1)} ${widthOf(id).toLocaleString('en')} px`).join(' · ');
+    for (const [opt, key] of [['opt-height', 'height'], ['opt-stepw', 'stepW'], ['opt-lanes', 'lanes']]) {
+      for (const b of document.querySelectorAll(`#${opt} button`)) b.setAttribute('aria-pressed', String(String(state[key]) === b.dataset.v));
+    }
+    light();
+  }
+
+  // ── Playheads: 1/16 at 120 bpm ──────────────────────────────
+  function mark(seq, index) {
+    for (const node of document.querySelectorAll(`[data-seq="${seq}"]`)) node.classList.toggle('play', Number(node.dataset.i) === index);
+  }
+  function light() {
+    const t = state.playing ? state.tick : -1;
+    mark('grid', t < 0 ? -1 : t % 16);
+    mark('arp', t < 0 ? -1 : t % ARP.length);
+    mark('euclid', t < 0 ? -1 : t % EN);
+    mark('bass', t < 0 ? -1 : Math.floor(t / 2) % BASS.length);
+    const beat = t < 0 ? -1 : Math.floor(t / 4) % 16;
+    let at = 0, step = -1, seg = -1;
+    CHORD.forEach((s, i) => { const len = s.dur * s.rep; if (beat >= at && beat < at + len) { step = i; seg = Math.floor((beat - at) / s.dur); } at += len; });
+    mark('chord', step);
+    for (const node of document.querySelectorAll('.cstep .seg')) node.classList.toggle('play', node.closest('.cstep').classList.contains('play') && Number(node.dataset.seg) === seg);
+  }
+  let timer = null;
+  document.getElementById('play').addEventListener('click', (e) => {
+    state.playing = !state.playing;
+    e.currentTarget.setAttribute('aria-pressed', String(state.playing));
+    e.currentTarget.textContent = state.playing ? '■ Stop' : '▶ Play';
+    clearInterval(timer);
+    if (state.playing) { state.tick = 0; timer = setInterval(() => { state.tick++; light(); }, 125); }
+    light();
+  });
+
+  document.querySelector('.toolbar').addEventListener('click', (e) => {
+    const b = e.target.closest('.segs button[data-v]');
+    if (!b) return;
+    const key = { 'opt-height': 'height', 'opt-stepw': 'stepW', 'opt-lanes': 'lanes' }[b.parentElement.id];
+    state[key] = key === 'lanes' ? b.dataset.v : Number(b.dataset.v);
+    render();
+  });
+  document.addEventListener('click', (e) => {
+    const f = e.target.closest('[data-fold], .dev.folded, [data-lane]');
+    if (!f) return;
+    if (f.dataset.lane) state.lane[f.dataset.lane] = Number(f.dataset.k);
+    else if (f.matches('.dev.folded')) state.folded.delete(f.dataset.id);
+    else state.folded.has(f.dataset.fold) ? state.folded.delete(f.dataset.fold) : state.folded.add(f.dataset.fold);
+    render();
+  });
+  render();
+})();
+</script>

@@ -41,7 +41,7 @@ function randomButton(view: TapeView): HTMLElement {
 }
 
 /**
- * The audition switch (windsor#246 decision 2): the magnetic core's factor,
+ * The oversampling picker (windsor#246 decision 2, kept as a product setting): the magnetic core's factor,
  * committed like Tape type. The engine swaps to the other core on the running
  * insert, from zero state, so a click at the switch is expected.
  */
