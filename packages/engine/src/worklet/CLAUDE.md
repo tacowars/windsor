@@ -32,10 +32,17 @@ Record: `docs/log/2026-09-30-tape-magnetic-core.md`.
 `generated/advanced-drive-processor.js`. Its processor owns lifetime and load
 reporting; `advancedDriveDsp.ts` owns smoothing, modulation and oversampling;
 `driveRouting.ts`, `driveStage.ts`, `driveCrossover.ts`, `driveTone.ts` and
-`driveOversample.ts` own the preallocated graph. Shared curves and filter
+`driveOversample.ts` own the preallocated graph; `driveSlots.ts` lays the
+controls out as Float64Array slots in descriptor order. Shared curves and filter
 coefficients live in `inserts/advancedDriveCurves.ts` and
 `advancedDriveFilter.ts` for the editor's displays. Its separate TS project
 uses erased fields. Render tests use `__fixtures__/advancedDriveHarness.ts`.
+The render allocates nothing (windsor#226): no double crosses a call as an
+argument or a return (samples and operands pass through fields, and the
+decibel gains and clamps are written in place, since the render exhausts
+V8's inlining budget and then even a tiny helper stays a call), and every
+double field is first written as one. `inserts/advancedDriveAllocation.test.ts`
+pins it on V8 through `__fixtures__/advancedDriveChangeScenario.ts`.
 
 `delay/` is the stereo/dub insert (#698), built as
 `generated/delay-processor.js`: `delayDsp.ts` owns preallocated delay/filter
