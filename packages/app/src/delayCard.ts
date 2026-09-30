@@ -1,9 +1,9 @@
 /**
  * The shared track/master delay card. Every control commits the whole insert
  * through ctx.change. Two pages (windsor#173): Time (starting point, routing,
- * each side's clock with its division or its ms, feedback and dry / wet) and
- * Tone (high pass, low pass, drive and output). The on/off switch is the
- * rack's rail.
+ * each side's sync switch with its division or its ms, feedback and dry /
+ * wet) and Tone (high pass, low pass, drive and output). The note on how
+ * times work is the sides' tooltip. The on/off switch is the rack's rail.
  */
 import {
   DEFAULT_DELAY,
@@ -16,33 +16,15 @@ import {
 import type { DelaySpec } from '@windsor/engine';
 import { DELAY_KNOBS, DELAY_MODE_LABELS } from './delayTables';
 import { insertChange } from './insertTarget';
-import { el } from './dom';
 import type { InsertCard } from './insertCards';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { insertKnob, insertKnobs, insertsOf, pickKnobs } from './insertKnobs';
-import { insertNote, insertPage, wideColumn } from './insertLayout';
+import { insertPage, insertSelect, insertSwitch, wideColumn } from './insertLayout';
 import type { AppCtx } from './context';
 import type { InsertTarget } from './insertTarget';
 
 const DELAY_NOTE =
   'D = dotted · T = triplet. Synced times follow song BPM (maximum 12 s). Free times: 1–8000 ms. Time changes bend pitch. Feedback above 1 sustains regeneration.';
-
-function select(
-  label: string,
-  entries: readonly (readonly [string, string])[],
-  value: string,
-  change: (value: string) => void,
-): HTMLElement {
-  const wrap = el('label', 'field-wrap', label);
-  const input = document.createElement('select');
-  input.className = 'field';
-  input.setAttribute('aria-label', label);
-  for (const [id, text] of entries) input.add(new Option(text, id));
-  input.value = value;
-  input.onchange = (): void => change(input.value);
-  wrap.append(input);
-  return wrap;
-}
 
 interface DelayView {
   readonly ctx: AppCtx;
@@ -58,48 +40,44 @@ function sided(spec: DelaySpec, entry: InsertKnobEntry<DelaySpec>): InsertKnobEn
   return { ...entry, label: entry.label.replace('Left', 'Mid').replace('Right', 'Side') };
 }
 
-/** One side's clock picker, then its division while synced or its time knob while free. */
+/** One side's sync switch, then its division while synced or its time knob while free. */
 function sideColumn(view: DelayView, side: 'left' | 'right', onKnob: () => void): HTMLElement {
   const s = view.current();
   const name =
     s.mode === 'mid-side' ? (side === 'left' ? 'Mid' : 'Side') : side === 'left' ? 'Left' : 'Right';
   const synced = s[`${side}Sync`];
-  const clock = select(
-    `${name} clock`,
-    [
-      ['sync', 'Sync'],
-      ['free', 'Free (ms)'],
-    ],
-    synced ? 'sync' : 'free',
-    (value) => view.commit({ ...view.current(), [`${side}Sync`]: value === 'sync' }),
+  const sync = insertSwitch(`Sync ${name.toLowerCase()}`, synced, (on) =>
+    view.commit({ ...view.current(), [`${side}Sync`]: on }),
   );
-  if (synced) {
-    const division = select(
-      `${name} division`,
-      Object.keys(DELAY_DIVISIONS).map((key) => [key, key]),
-      s[`${side}Division`],
-      (value) => view.commit({ ...view.current(), [`${side}Division`]: value }),
-    );
-    return wideColumn(clock, division);
-  }
   const [entry] = pickKnobs(DELAY_KNOBS, [side === 'left' ? 'leftMs' : 'rightMs']);
-  return wideColumn(clock, insertKnob(view.ctx, view.slot, view.index, sided(s, entry!), onKnob));
+  const time = synced
+    ? insertSelect({
+        label: name,
+        ariaLabel: `${name} division`,
+        options: Object.keys(DELAY_DIVISIONS).map((key) => [key, key] as const),
+        value: s[`${side}Division`],
+        change: (value) => view.commit({ ...view.current(), [`${side}Division`]: value }),
+      })
+    : insertKnob(view.ctx, view.slot, view.index, sided(s, entry!), onKnob);
+  const column = wideColumn(sync, time);
+  column.title = DELAY_NOTE;
+  return column;
 }
 
 function timePage(view: DelayView): HTMLElement {
   const s = view.current();
-  const preset = select(
-    'Starting point',
-    [['', 'Custom'], ...DELAY_PRESETS.map((p) => [p.id, p.label] as const)],
-    matchingDelayPreset(s) ?? '',
-    (id) => view.commit(applyDelayPreset(view.current(), id)),
-  );
-  const routing = select(
-    'Routing',
-    DELAY_MODES.map((mode) => [mode, DELAY_MODE_LABELS[mode]]),
-    s.mode,
-    (mode) => view.commit({ ...view.current(), mode: mode as DelaySpec['mode'] }),
-  );
+  const preset = insertSelect({
+    label: 'Starting point',
+    options: [['', 'Custom'], ...DELAY_PRESETS.map((p) => [p.id, p.label] as const)],
+    value: matchingDelayPreset(s) ?? '',
+    change: (id) => view.commit(applyDelayPreset(view.current(), id)),
+  });
+  const routing = insertSelect({
+    label: 'Routing',
+    options: DELAY_MODES.map((mode) => [mode, DELAY_MODE_LABELS[mode]] as const),
+    value: s.mode,
+    change: (mode) => view.commit({ ...view.current(), mode: mode as DelaySpec['mode'] }),
+  });
   const showMatch = (): void => {
     preset.querySelector('select')!.value = matchingDelayPreset(view.current()) ?? '';
   };
@@ -114,7 +92,6 @@ function timePage(view: DelayView): HTMLElement {
       pickKnobs(DELAY_KNOBS, ['feedback', 'mix']),
       showMatch,
     ),
-    wideColumn(insertNote(DELAY_NOTE)),
   );
 }
 

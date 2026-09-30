@@ -18,8 +18,20 @@
  * Pure: every function returns a new state and leaves its argument alone.
  */
 
-/** One insert's view: the page shown (0-based) and the fold. */
+/**
+ * One insert's view as the state keeps it: the page shown, by its tab's
+ * name ('' for the first page), and the fold. A page is kept by name so a
+ * card whose pages change (Advanced Drive's stages follow its routing,
+ * windsor#174 decision 3) stays on that page while it has it, and shows its
+ * first page once it does not.
+ */
 export interface InsertView {
+  readonly page: string;
+  readonly folded: boolean;
+}
+
+/** One insert's view as the shell draws it: the index of the page shown, and the fold. */
+export interface ShownView {
   readonly page: number;
   readonly folded: boolean;
 }
@@ -27,27 +39,33 @@ export interface InsertView {
 /** A chain: a part's slot, `'master'`, or any other name a chain takes. */
 export type RackChain = number | string;
 
-/** Every insert's view that differs from `OPEN_VIEW`, by `rackKey`. */
+/** Every insert's view that differs from `STORED_OPEN`, by `rackKey`. */
 export type RackView = ReadonlyMap<string, InsertView>;
 
-/** Page 1, open: where every insert starts. */
-export const OPEN_VIEW: InsertView = { page: 0, folded: false };
+/** The first page, open, as the state keeps it: where every insert starts. */
+const STORED_OPEN: InsertView = { page: '', folded: false };
+
+/** The first page, open, as the shell draws it. */
+export const OPEN_VIEW: ShownView = { page: 0, folded: false };
 
 export const emptyRack = (): RackView => new Map();
 
 /** The state's key for the insert at `index` of `chain`. */
 export const rackKey = (chain: RackChain, index: number): string => `${chain}#${index}`;
 
-/** The view of the insert at `index`, its page kept inside the `pageCount` pages its card has. */
+/**
+ * The view of the insert at `index`, whose card has the pages `pages` names
+ * in tab order: the page kept, or the first page when the card no longer
+ * has it.
+ */
 export function viewAt(
   state: RackView,
   chain: RackChain,
   index: number,
-  pageCount: number,
-): InsertView {
-  const view = state.get(rackKey(chain, index)) ?? OPEN_VIEW;
-  const last = Math.max(0, pageCount - 1);
-  return view.page > last ? { ...view, page: last } : view;
+  pages: readonly string[],
+): ShownView {
+  const view = state.get(rackKey(chain, index)) ?? STORED_OPEN;
+  return { page: Math.max(0, pages.indexOf(view.page)), folded: view.folded };
 }
 
 function withView(
@@ -58,20 +76,27 @@ function withView(
 ): Map<string, InsertView> {
   const next = new Map(state);
   const key = rackKey(chain, index);
-  if (view.page === OPEN_VIEW.page && view.folded === OPEN_VIEW.folded) next.delete(key);
+  if (view.page === STORED_OPEN.page && view.folded === STORED_OPEN.folded) next.delete(key);
   else next.set(key, view);
   return next;
 }
 
-/** `state` with the insert at `index` showing `page`. */
-export function showPage(state: RackView, chain: RackChain, index: number, page: number): RackView {
-  const view = state.get(rackKey(chain, index)) ?? OPEN_VIEW;
-  return withView(state, chain, index, { ...view, page: Math.max(0, page) });
+/** `state` with the insert at `index` showing the page at `at` of the pages `pages` names. */
+export function showPage(
+  state: RackView,
+  chain: RackChain,
+  index: number,
+  pages: readonly string[],
+  at: number,
+): RackView {
+  const view = state.get(rackKey(chain, index)) ?? STORED_OPEN;
+  const page = at > 0 ? (pages[at] ?? '') : '';
+  return withView(state, chain, index, { ...view, page });
 }
 
 /** `state` with the insert at `index` folded if it was open, or open if it was folded. */
 export function toggleFold(state: RackView, chain: RackChain, index: number): RackView {
-  const view = state.get(rackKey(chain, index)) ?? OPEN_VIEW;
+  const view = state.get(rackKey(chain, index)) ?? STORED_OPEN;
   return withView(state, chain, index, { ...view, folded: !view.folded });
 }
 
@@ -88,8 +113,8 @@ export function afterMove(
   const { index, delta, length } = move;
   const to = index + delta;
   if (index < 0 || index >= length || to < 0 || to >= length) return state;
-  const from = state.get(rackKey(chain, index)) ?? OPEN_VIEW;
-  const other = state.get(rackKey(chain, to)) ?? OPEN_VIEW;
+  const from = state.get(rackKey(chain, index)) ?? STORED_OPEN;
+  const other = state.get(rackKey(chain, to)) ?? STORED_OPEN;
   return withView(withView(state, chain, index, other), chain, to, from);
 }
 
@@ -102,7 +127,7 @@ export function afterRemove(
 ): RackView {
   let next: RackView = state;
   for (let at = index; at < length; at++) {
-    next = withView(next, chain, at, state.get(rackKey(chain, at + 1)) ?? OPEN_VIEW);
+    next = withView(next, chain, at, state.get(rackKey(chain, at + 1)) ?? STORED_OPEN);
   }
   return next;
 }
@@ -120,9 +145,9 @@ export function afterAdd(
 ): RackView {
   let next: RackView = state;
   for (let at = length; at > index; at--) {
-    next = withView(next, chain, at, state.get(rackKey(chain, at - 1)) ?? OPEN_VIEW);
+    next = withView(next, chain, at, state.get(rackKey(chain, at - 1)) ?? STORED_OPEN);
   }
-  return withView(next, chain, index, OPEN_VIEW);
+  return withView(next, chain, index, STORED_OPEN);
 }
 
 /** The kinds each chain held when its view state last matched it, by chain. */

@@ -25,9 +25,14 @@ import { retroReverbCard } from './retroReverbCard';
 import { plateReverbCard } from './plateReverbCard';
 import { echoCard } from './echoCard';
 
-/** One page of an insert: its tab's name, and the body built when it is shown. */
+/**
+ * One page of an insert: its tab's name, and the body built when it is
+ * shown. The rack keeps the page shown by its name, so two pages of a card
+ * never share one. `title` is the tab's tooltip, when the name needs one.
+ */
 export interface InsertPage {
   readonly name: string;
+  readonly title?: string;
   build(): HTMLElement;
 }
 

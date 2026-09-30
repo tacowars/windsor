@@ -22,4 +22,21 @@ export const INSERT_RACK_PX: Readonly<Record<string, number>> = {
   '--rack-add-w': 88,
   /** The Add picker's width, open in a slot's place. */
   '--rack-picker-w': 230,
+  /** A plot's column (Advanced Drive's shaper and filter). */
+  '--rack-plot-w': 124,
+};
+
+/** Knobs to a column at the rack's small dial. */
+export const KNOBS_PER_COLUMN = 2;
+
+/**
+ * Which chain a rack draws, and so its accent (the mockup's `--kc`): a
+ * part's chain and the master's in `--modulator`, a send bus's in
+ * `--carrier`. Its knob arcs, filled switches and page tabs read it.
+ */
+export type RackAccent = 'strip' | 'bus';
+
+export const RACK_ACCENTS: Readonly<Record<RackAccent, string>> = {
+  strip: 'var(--modulator)',
+  bus: 'var(--carrier)',
 };

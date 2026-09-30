@@ -1,6 +1,36 @@
-import { expect, it } from 'vitest';
-import { DEFAULT_ADVANCED_DRIVE } from '@windsor/engine';
-import { editDriveStage } from './advancedDriveModel';
+import { describe, expect, it } from 'vitest';
+import { DEFAULT_ADVANCED_DRIVE, DRIVE_ROUTES } from '@windsor/engine';
+import { drivePages, editDriveStage } from './advancedDriveModel';
+import { DRIVE_ROUTE_STAGES } from './advancedDriveTables';
+import { emptyRack, showPage, viewAt } from './insertRackModel';
+
+describe('drivePages (windsor#174)', () => {
+  const names = (route: (typeof DRIVE_ROUTES)[number]): string[] =>
+    drivePages(route).map((page) => page.name);
+
+  it('shows Main, one Stage page per stage the routing uses, then Mod', () => {
+    expect(names('single')).toEqual(['Main', 'Stage 1', 'Mod']);
+    for (const route of ['serial', 'parallel', 'mid-side'] as const)
+      expect(names(route), route).toEqual(['Main', 'Stage 1', 'Stage 2', 'Mod']);
+    expect(names('multiband')).toEqual(['Main', 'Stage 1', 'Stage 2', 'Stage 3', 'Mod']);
+  });
+
+  it('has a stage list for every routing, inside the stages the insert holds', () => {
+    for (const route of DRIVE_ROUTES) {
+      const stages = DRIVE_ROUTE_STAGES[route];
+      expect(stages.length, route).toBeGreaterThan(0);
+      expect(stages.length, route).toBeLessThanOrEqual(DEFAULT_ADVANCED_DRIVE.stages.length);
+    }
+  });
+
+  it('shows Main after multiband on Stage 3 becomes single, and keeps Mod', () => {
+    const multiband = names('multiband');
+    const onStage3 = showPage(emptyRack(), 0, 0, multiband, multiband.indexOf('Stage 3'));
+    expect(viewAt(onStage3, 0, 0, names('single')).page).toBe(0);
+    const onMod = showPage(emptyRack(), 0, 0, multiband, multiband.indexOf('Mod'));
+    expect(names('single')[viewAt(onMod, 0, 0, names('single')).page]).toBe('Mod');
+  });
+});
 import { addInsert } from './insertEdits';
 import { insertChange } from './insertTarget';
 import { DocumentModel } from './documentModel';

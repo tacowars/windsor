@@ -126,10 +126,8 @@ function rail({ ctx, slot, index, spec, folded, repaint }: ShellParts): HTMLElem
   };
   const name = el('button', 'insert-name') as HTMLButtonElement;
   name.type = 'button';
-  name.append(
-    el('span', 'insert-num', `${index + 1}\u2009·\u2009`),
-    document.createTextNode(label),
-  );
+  name.setAttribute('aria-label', `${index + 1} ${label}`);
+  name.append(el('span', 'insert-num', String(index + 1)), document.createTextNode(label));
   name.title = `${folded ? 'Open' : 'Fold'} ${label}`;
   name.setAttribute('aria-expanded', String(!folded));
   name.onclick = (): void => {
@@ -155,14 +153,16 @@ function rail({ ctx, slot, index, spec, folded, repaint }: ShellParts): HTMLElem
 function tabs(parts: ShellParts, pages: readonly InsertPage[], shown: number): HTMLElement {
   const row = el('div', 'insert-tabs');
   row.setAttribute('role', 'tablist');
+  const names = pages.map((page) => page.name);
   pages.forEach((page, at) => {
     const tab = el('button', '', page.name) as HTMLButtonElement;
     tab.type = 'button';
     tab.setAttribute('role', 'tab');
     tab.setAttribute('aria-selected', String(at === shown));
     tab.dataset.page = String(at);
+    if (page.title) tab.title = page.title;
     tab.onclick = (): void => {
-      rackView = showPage(rackView, parts.slot, parts.index, at);
+      rackView = showPage(rackView, parts.slot, parts.index, names, at);
       parts.repaint(`[data-page="${at}"]`);
     };
     row.appendChild(tab);
@@ -174,7 +174,12 @@ function tabs(parts: ShellParts, pages: readonly InsertPage[], shown: number): H
 export function insertBox(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
   const spec = insertsOf(ctx, slot)[index]!;
   const pages = INSERT_CARDS[spec.kind](ctx, slot, index);
-  const view = viewAt(rackView, slot, index, pages.length);
+  const view = viewAt(
+    rackView,
+    slot,
+    index,
+    pages.map((page) => page.name),
+  );
   const box = el('div', 'insert-box');
   box.classList.toggle('off', !spec.enabled);
   box.classList.toggle('folded', view.folded);

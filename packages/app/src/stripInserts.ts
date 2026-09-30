@@ -18,7 +18,8 @@ import { addSlot } from './insertAddPicker';
 import { addInsert, addInsertAtFront, canAddInsert } from './insertEdits';
 import { insertsOf } from './insertKnobs';
 import { afterAdd } from './insertRackModel';
-import { INSERT_RACK_PX } from './insertRackTables';
+import type { RackAccent } from './insertRackTables';
+import { INSERT_RACK_PX, RACK_ACCENTS } from './insertRackTables';
 import { commitChain, currentRackView, insertBox, syncRackView } from './insertShell';
 
 /** Which end of the chain an Add slot adds at. */
@@ -57,11 +58,20 @@ function addPicker(ctx: AppCtx, slot: InsertTarget, side: AddSide): HTMLElement 
   return picker;
 }
 
-/** The chain's rack: the front Add slot, each insert, the back Add slot. */
-export function stripInserts(ctx: AppCtx, slot: InsertTarget): HTMLElement {
+/**
+ * The chain's rack: the front Add slot, each insert, the back Add slot.
+ * `accent` is the rack's colour: a part's and the master's by default, a
+ * send bus's with `'bus'`.
+ */
+export function stripInserts(
+  ctx: AppCtx,
+  slot: InsertTarget,
+  accent: RackAccent = 'strip',
+): HTMLElement {
   syncRackView(ctx, slot);
   const row = el('div', 'insert-row');
   for (const [name, px] of Object.entries(INSERT_RACK_PX)) row.style.setProperty(name, `${px}px`);
+  row.style.setProperty('--kc', RACK_ACCENTS[accent]);
   row.appendChild(addPicker(ctx, slot, 'front'));
   insertsOf(ctx, slot).forEach((_, index) => row.appendChild(insertBox(ctx, slot, index)));
   row.appendChild(addPicker(ctx, slot, 'back'));

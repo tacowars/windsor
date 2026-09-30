@@ -1,21 +1,23 @@
 /**
  * The Mixer tab's send buses (windsor#172; record
  * `2026-09-30-insert-rack-and-send-bus-chains` §6): Send A and Send B, each
- * its name, its Level knob and its insert chain, the chain drawn by
- * `stripInserts` as a part's or the master's is — its cards, moves, Remove
- * and "Add insert…". Everything goes into the document's `returns` section
- * through `ctx.change`, applied live and undoable like every strip edit. The
- * plate's space and the echo's line are the Plate reverb and Echo cards'
- * own controls (windsor#171).
+ * a head (its name, its Level knob and the parts that send to it, the
+ * mockup's `.bus-head`) beside its insert chain, the chain drawn by
+ * `stripInserts` as a part's or the master's is, in the bus's `--carrier`
+ * accent. Everything goes into the document's `returns` section through
+ * `ctx.change`, applied live and undoable like every strip edit. The plate's
+ * space and the echo's line are the Plate reverb and Echo cards' own
+ * controls (windsor#171).
  */
 import type { ReturnName } from '@windsor/engine';
 import { RETURNS, RETURN_NAMES } from '@windsor/engine';
-import { RETURN_COLOR } from './consoleColors';
+import { CARRIER_COLOR } from './consoleColors';
 import { fmt2 } from './consoleFormat';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
 import { makeKnob } from './knob';
 import { BUS_LABELS } from './mixerTables';
+import { busSenders, busSendersLine } from './sendBusModel';
 import { stripInserts } from './stripInserts';
 
 function levelKnob(ctx: AppCtx, name: ReturnName): HTMLElement {
@@ -24,20 +26,31 @@ function levelKnob(ctx: AppCtx, name: ReturnName): HTMLElement {
     min: 0,
     max: 1,
     def: RETURNS[name].level,
-    color: RETURN_COLOR,
+    color: CARRIER_COLOR,
+    dial: 'rack-big',
     fmt: fmt2,
     get: () => ctx.model.doc.returns?.[name]?.level ?? RETURNS[name].level,
     set: (v) => void ctx.change({ returns: { [name]: { level: v } } }),
   });
 }
 
+function busHead(ctx: AppCtx, name: ReturnName): HTMLElement {
+  const head = el('div', 'bus-head');
+  const title = el('div', 'bus-name', BUS_LABELS[name]);
+  const dot = el('span', 'bus-dot', '●');
+  dot.setAttribute('aria-hidden', 'true');
+  title.appendChild(dot);
+  head.append(
+    title,
+    levelKnob(ctx, name),
+    el('div', 'bus-sub', busSendersLine(busSenders(ctx.model.doc, name))),
+  );
+  return head;
+}
+
 function busRow(ctx: AppCtx, name: ReturnName): HTMLElement {
-  const row = el('div', 'strip-row');
-  row.appendChild(el('div', 'strip-name', BUS_LABELS[name]));
-  const knobs = el('div', 'knob-row');
-  knobs.appendChild(levelKnob(ctx, name));
-  row.appendChild(knobs);
-  row.appendChild(stripInserts(ctx, name));
+  const row = el('div', 'bus-line');
+  row.append(busHead(ctx, name), stripInserts(ctx, name, 'bus'));
   return row;
 }
 

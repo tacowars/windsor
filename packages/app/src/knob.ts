@@ -19,6 +19,12 @@ export interface KnobSpec {
    * knob's `title`, `aria-label` and undo step.
    */
   compact?: boolean;
+  /**
+   * The insert rack's dial (windsor#173): `rack` is the smaller dial two
+   * knobs to a column share, `rack-big` the larger one that stands alone.
+   * Both keep the value and the label under the dial.
+   */
+  dial?: 'rack' | 'rack-big';
   get: () => number;
   set: (v: number) => void;
   onChange?: () => void;
@@ -50,6 +56,9 @@ import {
   KNOB_COMPACT_R,
   KNOB_PAD_PX,
   KNOB_R,
+  KNOB_RACK_BIG_R,
+  KNOB_RACK_PAD_PX,
+  KNOB_RACK_R,
   LOG_FLOOR,
   PIN_INSET,
   TWELVE_OCLOCK_DEGREES,
@@ -73,16 +82,32 @@ export interface KnobGeometry {
   readonly size: number;
 }
 
+/** The rack dials' radii, by `KnobSpec.dial`. */
+const RACK_DIAL_R: Readonly<Record<NonNullable<KnobSpec['dial']>, number>> = {
+  rack: KNOB_RACK_R,
+  'rack-big': KNOB_RACK_BIG_R,
+};
+
 /** The dial's geometry at the spec's size. */
-export function knobGeometry(spec: Pick<KnobSpec, 'compact'>): KnobGeometry {
-  const r = spec.compact ? KNOB_COMPACT_R : KNOB_R;
-  const pad = spec.compact ? KNOB_COMPACT_PAD_PX : KNOB_PAD_PX;
-  return { r, size: r * 2 + pad };
+export function knobGeometry(spec: Pick<KnobSpec, 'compact' | 'dial'>): KnobGeometry {
+  if (spec.compact) return { r: KNOB_COMPACT_R, size: KNOB_COMPACT_R * 2 + KNOB_COMPACT_PAD_PX };
+  if (spec.dial) {
+    const r = RACK_DIAL_R[spec.dial];
+    return { r, size: r * 2 + KNOB_RACK_PAD_PX };
+  }
+  return { r: KNOB_R, size: KNOB_R * 2 + KNOB_PAD_PX };
+}
+
+/** The knob's classes: `compact`, or the rack's `rack` and `big`. */
+function knobClass(spec: Pick<KnobSpec, 'compact' | 'dial'>): string {
+  if (spec.compact) return 'knob compact';
+  if (spec.dial === 'rack-big') return 'knob rack big';
+  return spec.dial === 'rack' ? 'knob rack' : 'knob';
 }
 
 function knobDom(spec: KnobSpec): HTMLElement {
   const node = document.createElement('div');
-  node.className = spec.compact ? 'knob compact' : 'knob';
+  node.className = knobClass(spec);
   node.tabIndex = 0;
   node.setAttribute('role', 'slider');
   node.setAttribute('aria-label', spec.label);

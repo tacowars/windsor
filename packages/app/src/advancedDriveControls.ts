@@ -1,5 +1,5 @@
-/** Editor widgets share the console knob, palette, and engine ranges/defaults. */
-import { el } from './dom';
+/** Editor widgets share the rack's controls, the console knob, palette, and engine ranges/defaults. */
+import { insertSelect, insertSwitch } from './insertLayout';
 import { makeKnob } from './knob';
 import { STRIP_COLOR } from './consoleColors';
 import { fmt2, fmtHz } from './consoleFormat';
@@ -10,30 +10,14 @@ export function driveSelect(
   set: (value: string) => void,
   labels = values,
 ): HTMLElement {
-  const wrap = el('label', 'field-wrap', label),
-    select = document.createElement('select');
-  select.className = 'field';
-  select.setAttribute('aria-label', label);
-  values.forEach((v, i) => select.add(new Option(labels[i], v)));
-  select.value = value;
-  select.onchange = (): void => set(select.value);
-  wrap.append(select);
-  return wrap;
+  return insertSelect({
+    label,
+    options: values.map((v, i) => [v, labels[i] ?? v] as const),
+    value,
+    change: set,
+  });
 }
-export function driveToggle(
-  label: string,
-  value: boolean,
-  set: (value: boolean) => void,
-): HTMLElement {
-  const wrap = el('label', 'field-wrap', label),
-    input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = value;
-  input.setAttribute('aria-label', label);
-  input.onchange = (): void => set(input.checked);
-  wrap.append(input);
-  return wrap;
-}
+export const driveToggle = insertSwitch;
 interface NumericControl {
   label: string;
   bounds: readonly [number, number];
@@ -41,6 +25,8 @@ interface NumericControl {
   get: () => number;
   set: (value: number) => void;
   hz?: boolean;
+  /** The rack's big dial, standing alone in its column. */
+  big?: boolean | undefined;
 }
 export function driveKnob(o: NumericControl): HTMLElement {
   return makeKnob({
@@ -51,6 +37,7 @@ export function driveKnob(o: NumericControl): HTMLElement {
     get: o.get,
     set: o.set,
     color: STRIP_COLOR,
+    dial: o.big ? 'rack-big' : 'rack',
     fmt: o.hz ? fmtHz : fmt2,
     ...(o.hz ? { curve: 'log' as const } : {}),
   });
