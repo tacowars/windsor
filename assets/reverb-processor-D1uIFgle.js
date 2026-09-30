@@ -105,7 +105,8 @@ function _makeDelay(seconds, headroom) {
   this._nominal[index] = nominal;
   this._length[index] = Math.max(1, nominal);
 }
-function _applySize(size, immediate) {
+function _applySize(immediate) {
+  const size = this._size;
   for (let i = FIRST_TANK_LINE; i < LINE_COUNT; i++) {
     this._lengthTarget[i] = Math.max(MIN_LENGTH, this._nominal[i] * size);
   }
@@ -133,13 +134,14 @@ function _read(index, offset) {
   const frac = position - whole;
   const a = buffer[whole & mask];
   const b = buffer[whole + 1 & mask];
-  return a + (b - a) * frac;
+  this._value = a + (b - a) * frac;
 }
-function _write1(index, value) {
-  this._buffers[index][this._write[index]] = value;
-  return value;
+function _write1(index) {
+  this._buffers[index][this._write[index]] = this._value;
 }
-function _readTap(index, delay) {
+function _readTap(t) {
+  const index = TAP_LINE[t];
+  const delay = this._tap[t];
   const buffer = this._buffers[index];
   const mask = this._mask[index];
   const position = this._write[index] - delay;
@@ -147,12 +149,12 @@ function _readTap(index, delay) {
   const frac = position - whole;
   const a = buffer[whole & mask];
   const b = buffer[whole + 1 & mask];
-  return a + (b - a) * frac;
+  this._value = a + (b - a) * frac;
 }
-function _readCubic(index, offset) {
+function _readCubic(index) {
   const buffer = this._buffers[index];
   const mask = this._mask[index];
-  const position = this._write[index] - this._length[index] + offset;
+  const position = this._write[index] - this._length[index] + this._offset;
   const whole = Math.floor(position);
   const frac = position - whole;
   let at = whole - 1;
@@ -163,14 +165,19 @@ function _readCubic(index, offset) {
   const a = (3 * (x1 - x2) - x0 + x3) / 2;
   const b = 2 * x2 + x0 - (5 * x1 + x3) / 2;
   const c = (x2 - x0) / 2;
-  return ((a * frac + b) * frac + c) * frac + x1;
+  this._value = ((a * frac + b) * frac + c) * frac + x1;
 }
 
 // packages/engine/src/worklet/reverb/tank.ts
-function poleCoefficient(hz) {
-  return 1 - Math.exp(-2 * Math.PI * Math.min(hz, sampleRate * 0.49) / sampleRate);
+var POLE_CUTS = ["inputHighCut", "inputLowCut", "tankHighCut", "tankLowCut"];
+function poleCoefficients(parameters, poles) {
+  for (let k = 0; k < POLE_CUTS.length; k++) {
+    const hz = parameters[POLE_CUTS[k]][0];
+    poles[k] = 1 - Math.exp(-2 * Math.PI * Math.min(hz, sampleRate * 0.49) / sampleRate);
+  }
 }
-function _writeInput(input, output, dry) {
+function _writeInput(input, output, parameters) {
+  const dry = parameters.dry[0];
   const left = output[0];
   const right = output[1];
   if (input.length >= 2) {
@@ -195,19 +202,21 @@ function _renderBlock(inputs, outputs, parameters) {
   const input = inputs[0] ?? [];
   const inputQuiet = this._sleepEnabled && !held && this._inputQuiet(input);
   let loudest = 0;
-  this._writeInput(input, output, parameters.dry[0]);
+  this._writeInput(input, output, parameters);
   const smooth = Math.min(1, 128 / (SMOOTH_SECONDS * sampleRate));
   this._size += smooth * (parameters.size[0] - this._size);
   this._inputGain += smooth * ((held ? 0 : 1) - this._inputGain);
-  this._applySize(this._size, false);
+  this._applySize(false);
   const preDelaySamples = Math.min(
     this._preDelayLength - 128,
     Math.round(parameters.preDelay[0] * sampleRate)
   );
-  const inputLp = poleCoefficient(parameters.inputHighCut[0]);
-  const inputHp = poleCoefficient(parameters.inputLowCut[0]);
-  const dampLp = poleCoefficient(parameters.tankHighCut[0]);
-  const dampHp = poleCoefficient(parameters.tankLowCut[0]);
+  const poles = this._poles;
+  poleCoefficients(parameters, poles);
+  const inputLp = poles[0];
+  const inputHp = poles[1];
+  const dampLp = poles[2];
+  const dampHp = poles[3];
   const diffuse1 = parameters.diffusionIn1[0];
   const diffuse2 = parameters.diffusionIn2[0];
   const decay = held ? HOLD_DECAY : parameters.decay[0];
@@ -230,34 +239,82 @@ function _renderBlock(inputs, outputs, parameters) {
     this._inputLp += inputLp * (delayed * this._inputGain - this._inputLp);
     this._inputHp += inputHp * (this._inputLp - this._inputHp);
     const shaped = this._inputLp - this._inputHp;
-    let pre = this._write1(0, shaped - diffuse1 * this._read(0, 0));
-    pre = this._write1(1, diffuse1 * (pre - this._read(1, 0)) + this._read(0, 0));
-    pre = this._write1(2, diffuse1 * pre + this._read(1, 0) - diffuse2 * this._read(2, 0));
-    pre = this._write1(3, diffuse2 * (pre - this._read(3, 0)) + this._read(2, 0));
+    this._read(0, 0);
+    this._value = shaped - diffuse1 * this._value;
+    this._write1(0);
+    let pre = this._value;
+    this._read(1, 0);
+    let first = this._value;
+    this._read(0, 0);
+    this._value = diffuse1 * (pre - first) + this._value;
+    this._write1(1);
+    pre = this._value;
+    this._read(1, 0);
+    first = this._value;
+    this._read(2, 0);
+    this._value = diffuse1 * pre + first - diffuse2 * this._value;
+    this._write1(2);
+    pre = this._value;
+    this._read(3, 0);
+    first = this._value;
+    this._read(2, 0);
+    this._value = diffuse2 * (pre - first) + this._value;
+    this._write1(3);
+    pre = this._value;
     this._denormal = -this._denormal;
-    const split = diffuse2 * pre + this._read(3, 0) + this._denormal;
+    this._read(3, 0);
+    const split = diffuse2 * pre + this._value + this._denormal;
     const exc = excDepth * (1 + Math.cos(this._excPhase * 2 * Math.PI));
     const exc2 = excDepth * (1 + Math.sin(this._excPhase2 * 2 * Math.PI));
-    let node = this._write1(4, split + decay * this._read(11, 0) + tank1 * this._readCubic(4, exc));
-    this._write1(5, this._readCubic(4, exc) - tank1 * node);
-    const rawLeft = this._read(5, 0);
+    this._read(11, 0);
+    first = this._value;
+    this._offset = exc;
+    this._readCubic(4);
+    this._value = split + decay * first + tank1 * this._value;
+    this._write1(4);
+    let node = this._value;
+    this._readCubic(4);
+    this._value = this._value - tank1 * node;
+    this._write1(5);
+    this._read(5, 0);
+    const rawLeft = this._value;
     this._dampLp[0] += dampLp * (rawLeft - this._dampLp[0]);
     this._dampHp[0] += dampHp * (this._dampLp[0] - this._dampHp[0]);
     const dampedLeft = held ? rawLeft : this._dampLp[0] - this._dampHp[0];
-    node = this._write1(6, decay * dampedLeft - tank2 * this._read(6, 0));
-    this._write1(7, this._read(6, 0) + tank2 * node);
-    node = this._write1(8, split + decay * this._read(7, 0) + tank1 * this._readCubic(8, exc2));
-    this._write1(9, this._readCubic(8, exc2) - tank1 * node);
-    const rawRight = this._read(9, 0);
+    this._read(6, 0);
+    this._value = decay * dampedLeft - tank2 * this._value;
+    this._write1(6);
+    node = this._value;
+    this._read(6, 0);
+    this._value = this._value + tank2 * node;
+    this._write1(7);
+    this._read(7, 0);
+    first = this._value;
+    this._offset = exc2;
+    this._readCubic(8);
+    this._value = split + decay * first + tank1 * this._value;
+    this._write1(8);
+    node = this._value;
+    this._readCubic(8);
+    this._value = this._value - tank1 * node;
+    this._write1(9);
+    this._read(9, 0);
+    const rawRight = this._value;
     this._dampLp[1] += dampLp * (rawRight - this._dampLp[1]);
     this._dampHp[1] += dampHp * (this._dampLp[1] - this._dampHp[1]);
     const dampedRight = held ? rawRight : this._dampLp[1] - this._dampHp[1];
-    node = this._write1(10, decay * dampedRight - tank2 * this._read(10, 0));
-    this._write1(11, this._read(10, 0) + tank2 * node);
+    this._read(10, 0);
+    this._value = decay * dampedRight - tank2 * this._value;
+    this._write1(10);
+    node = this._value;
+    this._read(10, 0);
+    this._value = this._value + tank2 * node;
+    this._write1(11);
     let left = 0;
     let right = 0;
     for (let t = 0; t < TAP_TIME.length; t++) {
-      const sample = TAP_SIGN[t] * this._readTap(TAP_LINE[t], this._tap[t]);
+      this._readTap(t);
+      const sample = TAP_SIGN[t] * this._value;
       if (t < TAPS_PER_SIDE) left += sample;
       else right += sample;
     }
@@ -320,6 +377,10 @@ var DattorroReverb = class extends AudioWorkletProcessor {
   }
   constructor(options) {
     super(options);
+    this._inputLp = this._inputHp = NaN;
+    this._excPhase = this._excPhase2 = NaN;
+    this._size = this._inputGain = NaN;
+    this._value = this._offset = NaN;
     this._preDelayLength = sampleRate + (128 - sampleRate % 128);
     this._preDelay = new Float32Array(this._preDelayLength);
     this._preDelayWrite = 0;
@@ -336,14 +397,15 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     this._tapStep = new Float32Array(TAP_TIME.length);
     this._inputLp = 0;
     this._inputHp = 0;
-    this._dampLp = [0, 0];
-    this._dampHp = [0, 0];
+    this._dampLp = new Float64Array(2);
+    this._dampHp = new Float64Array(2);
+    this._poles = new Float64Array(4);
     this._excPhase = 0;
     this._excPhase2 = 0;
     this._denormal = ANTI_DENORMAL;
     this._size = 1;
     this._inputGain = 1;
-    this._applySize(1, true);
+    this._applySize(true);
     const opts = options && options.processorOptions || {};
     this._sleepEnabled = opts.sleep !== false;
     this._settledSkip = opts.settledSkip !== false;
@@ -430,7 +492,7 @@ var DattorroReverb = class extends AudioWorkletProcessor {
     const smooth = Math.min(1, 128 / (SMOOTH_SECONDS * sampleRate));
     this._size += smooth * (parameters.size[0] - this._size);
     this._inputGain += smooth * (1 - this._inputGain);
-    this._applySize(this._size, true);
+    this._applySize(true);
     return true;
   }
 };
