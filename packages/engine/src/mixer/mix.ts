@@ -74,6 +74,20 @@ export const RETURN_NAMES = Object.keys(RETURNS) as ReturnName[];
 export interface ChannelStrip<R extends string = string> {
   /** Missing means Master; sidechain suppresses dry and sends, preserving the detector tap. */
   readonly output?: 'master' | 'sidechain';
+  /**
+   * Silences the part's dry signal and its sends, post-fader (windsor#154).
+   * Missing means off; a present `false` is kept, as `output` keeps an
+   * explicit Master. The sidechain key is tapped before it, so a muted kick
+   * still ducks.
+   */
+  readonly mute?: boolean;
+  /**
+   * While any music part has it, every music part without it is silent, dry
+   * and sends; the returns keep playing the soloed parts' sends (windsor#154).
+   * Additive and missing means off; a present `false` is kept, as for
+   * `mute`. Never applied to the aux strips.
+   */
+  readonly solo?: boolean;
   /** The mix fader, 0..4: sets the part's k-rate `gain` param (record §3). */
   readonly level: number;
   /** -1 (hard left) .. 1 (hard right): a rotation by pan·π/4 (record §4). */

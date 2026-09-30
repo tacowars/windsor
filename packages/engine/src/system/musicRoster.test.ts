@@ -1,8 +1,9 @@
 /**
  * `MusicRoster` on its own, over a recording stand-in for `PartStrips`: a
  * slot's part is the `music-<slot>` part at the music part voice count, the
- * sidechain desk's view holds only the song's slots, and the player's
- * `PartHost` grows and shrinks the same roster.
+ * sidechain desk's view holds only the song's slots, the player's
+ * `PartHost` grows and shrinks the same roster, and solo resolves over every
+ * slot (windsor#154).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -22,6 +23,31 @@ interface Created {
   strip: ChannelStrip | undefined;
 }
 
+/** A strip's solo state, and the ramp each change of `soloedOut` asked for. */
+function soloStrip(part: AudioPart, solo: boolean): PartStrip & { ramps: (number | undefined)[] } {
+  let soloedOut = false;
+  let own = solo;
+  const ramps: (number | undefined)[] = [];
+  return {
+    part,
+    ramps,
+    get solo(): boolean {
+      return own;
+    },
+    setSolo(next: boolean): void {
+      own = next;
+    },
+    get soloedOut(): boolean {
+      return soloedOut;
+    },
+    setSoloedOut(next: boolean, seconds?: number): void {
+      if (next === soloedOut) return;
+      soloedOut = next;
+      ramps.push(seconds);
+    },
+  } as PartStrip & { ramps: (number | undefined)[] };
+}
+
 /** Records what the roster asks of `PartStrips`, and keeps a strip per created name. */
 class RecordingStrips {
   readonly created: Created[] = [];
@@ -31,7 +57,7 @@ class RecordingStrips {
   createMusic(name: string, _patch: Patch, maxVoices: number, strip?: ChannelStrip): AudioPart {
     this.created.push({ name, maxVoices, strip });
     const part = { name } as AudioPart;
-    this.strips.set(name, { part } as PartStrip);
+    this.strips.set(name, soloStrip(part, strip?.solo === true));
     return part;
   }
 
@@ -48,6 +74,7 @@ class RecordingStrips {
 const PATCH = PRESETS['pad-drift']!;
 const part = (slot: number): MusicPart => ({ slot }) as MusicPart;
 const STRIP: ChannelStrip = { level: 0.5, pan: 0, lowCut: LOW_CUT_MIN_HZ, inserts: [], sends: {} };
+const SOLO: ChannelStrip = { ...STRIP, solo: true };
 
 function rig(): { strips: RecordingStrips; roster: MusicRoster } {
   const strips = new RecordingStrips();
@@ -107,5 +134,43 @@ describe('MusicRoster', () => {
     expect(roster.host().get(0)).toBeUndefined();
     expect(roster.tracks().size).toBe(0);
     expect(strips.removed).toEqual([]);
+  });
+
+  it('solos additively over every slot, and unsoloing brings them all back', () => {
+    const { roster } = rig();
+    for (const slot of [0, 1, 2]) roster.add(part(slot), PATCH);
+    const out = (): boolean[] => [0, 1, 2].map((slot) => roster.strip(slot)!.soloedOut);
+    roster.strip(1)!.setSolo(true);
+    roster.resolveSolo();
+    expect(out()).toEqual([true, false, true]);
+    roster.strip(2)!.setSolo(true);
+    roster.resolveSolo();
+    expect(out()).toEqual([true, false, false]);
+    roster.strip(1)!.setSolo(false);
+    roster.strip(2)!.setSolo(false);
+    roster.resolveSolo();
+    expect(out()).toEqual([false, false, false]);
+  });
+
+  it('brings a part added while another is soloed in silent, with no ramp', () => {
+    const { strips, roster } = rig();
+    roster.add(part(0), PATCH, SOLO);
+    roster.host().add!(part(1), PATCH);
+    const added = strips.get('music-1') as ReturnType<typeof soloStrip>;
+    expect(added.soloedOut).toBe(true);
+    expect(added.ramps).toEqual([0]);
+    expect(roster.strip(0)!.soloedOut).toBe(false);
+  });
+
+  it('brings every part back when the only soloed part is removed', () => {
+    const { roster } = rig();
+    roster.add(part(0), PATCH);
+    roster.add(part(1), PATCH, SOLO);
+    roster.add(part(2), PATCH);
+    roster.resolveSolo(0);
+    expect(roster.strip(0)!.soloedOut).toBe(true);
+    roster.host().remove!(1);
+    expect(roster.strip(0)!.soloedOut).toBe(false);
+    expect(roster.strip(2)!.soloedOut).toBe(false);
   });
 });

@@ -26,7 +26,7 @@ import { normaliseInserts } from '../inserts/insertRegistry';
 import type { ReturnBus } from './returnBus';
 import type { ReverbSpace } from './reverbSpace';
 
-const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output'];
+const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output', 'mute', 'solo'];
 const DELAY_KEYS = ['delayTime', 'feedback', 'damp', 'resonance'];
 const RETURN_KEYS = ['kind', 'level', 'space', ...DELAY_KEYS];
 
@@ -54,6 +54,11 @@ export function applyStripLive(strip: PartStrip, raw: unknown, path: string): st
   else if (raw.lowCut !== undefined) ignored.push(`${path}.lowCut`);
   if (raw.output === 'master' || raw.output === 'sidechain') strip.setOutput(raw.output);
   else if (raw.output !== undefined) ignored.push(`${path}.output`);
+  // Solo lands as this strip's flag; the caller re-resolves the roster (windsor#154).
+  if (typeof raw.mute === 'boolean') strip.setMute(raw.mute);
+  else if (raw.mute !== undefined) ignored.push(`${path}.mute`);
+  if (typeof raw.solo === 'boolean') strip.setSolo(raw.solo);
+  else if (raw.solo !== undefined) ignored.push(`${path}.solo`);
   if (raw.sends !== undefined) applySends(strip, path, raw.sends, ignored);
   if (raw.inserts !== undefined) applyInserts(strip, `${path}.inserts`, raw.inserts, ignored);
   return ignored;

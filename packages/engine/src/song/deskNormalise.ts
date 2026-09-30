@@ -36,19 +36,40 @@ import type { ReverbSpace } from '../mixer/reverbSpace';
 export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): ChannelStrip {
   const base = DEFAULT_STRIP;
   const o = n.section(raw, path);
-  n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output'], path);
+  n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output', 'mute', 'solo'], path);
   if (o.output !== undefined && o.output !== 'master' && o.output !== 'sidechain')
     n.correction(`${path}.output: invalid output — Master`);
   return {
     ...(o.output === undefined
       ? {}
       : { output: o.output === 'sidechain' ? ('sidechain' as const) : ('master' as const) }),
+    ...switchedOn('mute', o.mute, path, n),
+    ...switchedOn('solo', o.solo, path, n),
     level: n.num(o.level, base.level, 0, MIX_LEVEL_MAX, `${path}.level`),
     pan: n.num(o.pan, base.pan, -1, 1, `${path}.pan`),
     lowCut: n.num(o.lowCut, base.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ, `${path}.lowCut`),
     sends: sends(o.sends, base.sends, `${path}.sends`, n),
     inserts: normaliseInserts(o.inserts, `${path}.inserts`, n),
   };
+}
+
+/**
+ * `mute` or `solo` (windsor#154), kept exactly the way `output` is: an absent
+ * key stays absent, and a `true` or a `false` that is present is kept as it
+ * is, so normalising a normalised document changes nothing. A value that is
+ * not a boolean is corrected to an explicit `false`, the way a junk `output`
+ * becomes `'master'`: `documentDiffLive` probes a removed key with junk and
+ * sends what comes back, and the engine skips an absent key, so undoing a
+ * mute must read back as `false` to reach the live strip.
+ */
+function switchedOn(
+  key: 'mute' | 'solo',
+  raw: unknown,
+  path: string,
+  n: FieldNormaliser,
+): { mute?: boolean; solo?: boolean } {
+  if (raw === undefined) return {};
+  return { [key]: n.bool(raw, false, `${path}.${key}`) };
 }
 
 /** Sends overlay the base per return — set a send to 0 to silence it — the
