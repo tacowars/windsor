@@ -12,7 +12,7 @@ import {
 } from './eqParameters';
 import { DEFAULT_EQ } from './eqSpec';
 import type { EqSpec } from './eqSpec';
-import { INSERT_KIND_NAMES } from './insertRegistry';
+import { INSERT_KINDS, INSERT_KIND_NAMES } from './insertRegistry';
 
 class EqNode extends FakeNode {
   readonly kind = 'eq';
@@ -111,10 +111,11 @@ describe('the stage', () => {
     expect(context.nodes.filter((n) => n !== output && n.outbound.length)).toEqual([]);
   });
 
-  it('is a kind with the defaults and normaliser, and is not registered yet', () => {
+  it('is a kind with the defaults and normaliser, registered as eq (windsor#199)', () => {
     expect(EQ_INSERT.defaults).toBe(DEFAULT_EQ);
     expect(EQ_INSERT.fields).toEqual(['kind', 'enabled', 'scale', 'output', 'bands']);
-    expect(INSERT_KIND_NAMES).not.toContain('eq');
+    expect(INSERT_KIND_NAMES).toContain('eq');
+    expect(INSERT_KINDS.eq).toBe(EQ_INSERT);
   });
 
   it('stops processing once told to stop', () => {
