@@ -8,7 +8,10 @@
  *
  * A change ramps over `INSERT_FADE_SECONDS`, as the output switch always
  * has, so it never clicks. A caller building a system that has not played
- * yet may ask for no ramp, so a render's first block is already right.
+ * yet may ask for no ramp, so a render's first block is already right. A
+ * change that lands mid-fade reverses from where the fade has got to: the
+ * in-flight value is held before the new ramp is scheduled, never dropped
+ * back to the value the cancelled ramp started from.
  */
 import { INSERT_FADE_SECONDS } from '../inserts/insertConstants';
 import type { ChannelStrip } from './mix';
@@ -32,12 +35,12 @@ export function createAudibleGate(context: BaseAudioContext, strip: ChannelStrip
   node.gain.value = target();
   const ramp = (seconds: number): void => {
     const now = context.currentTime;
-    node.gain.cancelScheduledValues(now);
     if (seconds <= 0) {
+      node.gain.cancelScheduledValues(now);
       node.gain.setValueAtTime(target(), now);
       return;
     }
-    node.gain.setValueAtTime(node.gain.value, now);
+    holdAt(node.gain, now);
     node.gain.linearRampToValueAtTime(target(), now + seconds);
   };
   return {
@@ -65,4 +68,20 @@ export function createAudibleGate(context: BaseAudioContext, strip: ChannelStrip
       ramp(seconds);
     },
   };
+}
+
+/**
+ * Cancels what is scheduled after `now` and keeps the value the param has
+ * reached there, so a new ramp starts from it. Where a param has no
+ * `cancelAndHoldAtTime` (Firefox), the value read before cancelling is pinned.
+ */
+function holdAt(param: AudioParam, now: number): void {
+  const { cancelAndHoldAtTime } = param as Partial<Pick<AudioParam, 'cancelAndHoldAtTime'>>;
+  if (cancelAndHoldAtTime) {
+    cancelAndHoldAtTime.call(param, now);
+    return;
+  }
+  const held = param.value;
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(held, now);
 }

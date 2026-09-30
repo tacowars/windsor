@@ -34,15 +34,38 @@ describe('the audible gate', () => {
     const { gate: g, gain } = gate();
     g.setMute(true);
     expect(gain.automation).toEqual([
-      { call: 'cancelScheduledValues', value: 1, time: 1 },
-      { call: 'setValueAtTime', value: 1, time: 1 },
+      { call: 'cancelAndHoldAtTime', value: 1, time: 1 },
       { call: 'linearRampToValueAtTime', value: 0, time: 1 + INSERT_FADE_SECONDS },
     ]);
     g.setMute(true);
-    expect(gain.automation).toHaveLength(3);
+    expect(gain.automation).toHaveLength(2);
     g.setMute(false);
     expect(gain.value).toBe(1);
     expect(gain.automation.at(-1)).toMatchObject({ call: 'linearRampToValueAtTime', value: 1 });
+  });
+
+  it('holds an interrupted fade where it has got to before ramping back', () => {
+    const { gate: g, gain } = gate();
+    g.setMute(true);
+    g.setMute(false);
+    expect(gain.automation.map((a) => a.call)).toEqual([
+      'cancelAndHoldAtTime',
+      'linearRampToValueAtTime',
+      'cancelAndHoldAtTime',
+      'linearRampToValueAtTime',
+    ]);
+  });
+
+  it('pins the value read before cancelling where the param cannot cancel and hold', () => {
+    const { gate: g, gain } = gate();
+    Object.defineProperty(gain, 'cancelAndHoldAtTime', { value: undefined });
+    gain.value = 0.4; // mid-fade, as a real param reports it
+    g.setMute(true);
+    expect(gain.automation).toEqual([
+      { call: 'cancelScheduledValues', value: 0.4, time: 1 },
+      { call: 'setValueAtTime', value: 0.4, time: 1 },
+      { call: 'linearRampToValueAtTime', value: 0, time: 1 + INSERT_FADE_SECONDS },
+    ]);
   });
 
   it('stays closed while any of output, mute and solo closes it', () => {
