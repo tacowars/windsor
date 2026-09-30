@@ -78,6 +78,13 @@ export const EQ_GESTURE = {
   /** The wheel moves Q by e^(−delta / this); Shift uses the fine divisor. */
   wheelPx: 300,
   wheelFinePx: 1200,
+  /**
+   * A wheel line in px (`deltaMode` 1). A notch reports 100 px where the unit
+   * is the pixel (Chrome, Safari) and 3 lines where it is the line (Firefox),
+   * so a line is a third of 100 px and a notch turns Q alike in both. A page
+   * (`deltaMode` 2) is the plot's height.
+   */
+  wheelLinePx: 100 / 3,
   /** An arrow key's step: a semitone of frequency, half a dB of gain, a tenth (log) of Q. */
   keySemitones: 1,
   keyGainDb: 0.5,

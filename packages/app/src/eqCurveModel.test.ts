@@ -20,7 +20,9 @@ import {
   pointDb,
   soloBand,
   wheelBand,
+  WHEEL_DELTA_MODE,
   wheelContinues,
+  wheelPixels,
   withBand,
   xOfFreq,
   yOfDb,
@@ -195,6 +197,18 @@ describe('the wheel over a point', () => {
     expect(wheelBand(bell(), EQ_GESTURE.wheelPx, false).q).toBeCloseTo(1 / Math.E, 9);
     expect(wheelBand(bell(), -EQ_GESTURE.wheelFinePx, true).q).toBeCloseTo(Math.E, 9);
     expect(wheelBand(bell({ q: 17 }), -1e4, false).q).toBe(EQ_BOUNDS.q[1]);
+  });
+
+  it('reads a delta in px whatever unit the device reports', () => {
+    expect(wheelPixels(-100, WHEEL_DELTA_MODE.pixel, EQ_PLOT.height)).toBe(-100);
+    expect(wheelPixels(3, WHEEL_DELTA_MODE.line, EQ_PLOT.height)).toBeCloseTo(100, 9);
+    expect(wheelPixels(3, WHEEL_DELTA_MODE.line, EQ_PLOT.height)).toBe(3 * EQ_GESTURE.wheelLinePx);
+    expect(wheelPixels(-1, WHEEL_DELTA_MODE.page, EQ_PLOT.height)).toBe(-EQ_PLOT.height);
+  });
+
+  it('turns Q alike for a notch of 100 px and a notch of 3 lines', () => {
+    const lines = wheelPixels(-3, WHEEL_DELTA_MODE.line, EQ_PLOT.height);
+    expect(wheelBand(bell(), lines, false).q).toBeCloseTo(wheelBand(bell(), -100, false).q, 9);
   });
 
   it('continues the open Q step only on the band its ticks turned', () => {

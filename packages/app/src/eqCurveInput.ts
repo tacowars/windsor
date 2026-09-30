@@ -17,6 +17,7 @@ import {
   keyEdit,
   wheelBand,
   wheelContinues,
+  wheelPixels,
   withBand,
 } from './eqCurveModel';
 import type { OpenGesture } from './gestureHooks';
@@ -50,7 +51,11 @@ interface Drag {
   readonly gesture: OpenGesture;
 }
 
-function local(canvas: HTMLCanvasElement, e: MouseEvent): { x: number; y: number } {
+/** What `local` reads of a canvas and an event: a test passes plain objects. */
+type Boxed = Pick<HTMLCanvasElement, 'getBoundingClientRect'>;
+type Pointed = Pick<MouseEvent, 'clientX' | 'clientY'>;
+
+function local(canvas: Boxed, e: Pointed): { x: number; y: number } {
   const box = canvas.getBoundingClientRect();
   return { x: e.clientX - box.left, y: e.clientY - box.top };
 }
@@ -131,24 +136,33 @@ export function bandWheelGesture(win: EventTarget = window): BandWheelGesture {
   };
 }
 
+/** What the wheel handler reads of a `WheelEvent`: a test passes a plain object. */
+export type EqWheel = Pointed &
+  Pick<WheelEvent, 'deltaX' | 'deltaY' | 'deltaMode' | 'shiftKey' | 'preventDefault'>;
+
+/** What the wheel handler reads of its host: the canvas only for its box. */
+export type EqWheelHost = Omit<EqCurveHost, 'canvas'> & { readonly canvas: Boxed };
+
+/**
+ * One wheel event over the curve: over a point it selects that band and turns
+ * its Q by the event's delta in px (`wheelPixels`), whatever unit it reports.
+ */
+export function wheelCurve(host: EqWheelHost, turns: BandWheelGesture, e: EqWheel): void {
+  const spec = host.spec();
+  const plot = host.plot();
+  const band = hitBand(spec, local(host.canvas, e), plot, host.sampleRate());
+  if (band < 0) return;
+  e.preventDefault();
+  if (band !== host.selected()) host.select(band);
+  turns.touch(band);
+  // Shift turns a vertical wheel sideways in some browsers, so either axis counts.
+  const delta = wheelPixels(e.deltaY || e.deltaX, e.deltaMode, plot.height);
+  host.edit(withBand(spec, band, wheelBand(spec.bands[band]!, delta, e.shiftKey)));
+}
+
 function wireWheel(host: EqCurveHost): void {
-  const { canvas } = host;
   const turns = bandWheelGesture();
-  canvas.addEventListener(
-    'wheel',
-    (e) => {
-      const spec = host.spec();
-      const band = hitBand(spec, local(canvas, e), host.plot(), host.sampleRate());
-      if (band < 0) return;
-      e.preventDefault();
-      if (band !== host.selected()) host.select(band);
-      turns.touch(band);
-      // Shift turns a vertical wheel sideways in some browsers, so either axis counts.
-      const delta = e.deltaY || e.deltaX;
-      host.edit(withBand(spec, band, wheelBand(spec.bands[band]!, delta, e.shiftKey)));
-    },
-    { passive: false },
-  );
+  host.canvas.addEventListener('wheel', (e) => wheelCurve(host, turns, e), { passive: false });
 }
 
 function wireKeys(host: EqCurveHost): void {

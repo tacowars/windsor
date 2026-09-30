@@ -161,7 +161,21 @@ export function dragBand(start: EqDragStart, move: EqDragMove, plot: EqPlot): Eq
   return { ...band, freq, q: heightIsQ(band) ? moveQ(band.q, qSteps) : band.q };
 }
 
-/** The band after a wheel of `delta` over its point: Q, up for a wheel away (a negative delta). */
+/** `WheelEvent.deltaMode`'s units: pixels, lines and pages. */
+export const WHEEL_DELTA_MODE = { pixel: 0, line: 1, page: 2 } as const;
+
+/**
+ * A wheel's `delta` in px, whatever unit its `deltaMode` reports, so a notch
+ * turns Q alike on every device: a line is `EQ_GESTURE.wheelLinePx`, a page is
+ * `pageHeight` (the plot's).
+ */
+export function wheelPixels(delta: number, deltaMode: number, pageHeight: number): number {
+  if (deltaMode === WHEEL_DELTA_MODE.line) return delta * EQ_GESTURE.wheelLinePx;
+  if (deltaMode === WHEEL_DELTA_MODE.page) return delta * pageHeight;
+  return delta;
+}
+
+/** The band after a wheel of `delta` px over its point: Q, up for a wheel away (a negative delta). */
 export function wheelBand(band: EqBand, delta: number, fine: boolean): EqBand {
   return {
     ...band,
