@@ -1,8 +1,8 @@
 /**
- * Mixer tab (#70, record §2; #435): the returns and the master. Each part's
- * strip lives on the Song tab's mixer (windsor#152); the returns — space,
- * level, the delay line — go through the document's `returns` section
- * (`returnsPanel.ts`).
+ * Mixer tab (#70, record §2; #435): the send buses and the master. Each
+ * part's strip lives on the Song tab's mixer (windsor#152). Send A and Send B
+ * — each a level and an insert chain (windsor#172) — go through the
+ * document's `returns` section (`returnsPanel.ts`).
  */
 import type { AppCtx } from './context';
 import { renderReturnsSection } from './returnsPanel';
