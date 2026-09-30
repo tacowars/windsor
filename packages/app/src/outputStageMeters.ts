@@ -1,147 +1,100 @@
 /**
- * The output stage's meters on the master strip (windsor#94 decision 2):
- * input and output sample peaks for L and R, the gain-reduction gauge in
- * Limiter mode or the over-ceiling gauge in the clip modes, and the clip
- * light. The rules are `outputStageModel.ts`; this file draws them.
+ * The output stage's meters in the master column (windsor#194 decisions 2 to
+ * 4; record `2026-09-30-master-column-and-meters`, decisions 3 to 5): In L
+ * and R with their clip LEDs from the stage's input, one dBFS scale, Out L
+ * and R with the ceiling line from its output, and the GR bar, which reads
+ * Over in the clip modes and dims as Off in Off (`meterView`). They are the
+ * Mixer's one set of meters; the master strip's own tap is no longer read.
  *
- * It rides the console's one frame loop the way `compressorMeter.ts` does,
- * keyed on the stage's report `revision` (`meterRevision`) whatever the
- * transport is doing: the meters follow the audio, so a silent report is
- * what reads idle. The loop idles while the section is hidden. The clip
- * light reads the stage's watch (`outputStageWatch.ts`), which keeps the
- * latch across a re-render.
+ * Built from windsor#193's parts (`meterBar.ts`) and painted by the meter
+ * loop: `paint` reads the stage's latest report once and hands each bar its
+ * peak. A readout click resets that bar's hold, and an LED click clears that
+ * channel's input latch on the stage's watch, and nothing else. A mode or
+ * ceiling edit renames the gauge and moves the ceiling lines at once,
+ * through the link.
  */
-import { masterOutput } from '@windsor/engine';
-import type { OutputStage, OutputStageMode, OutputStageReport } from '@windsor/engine';
-import type { AppCtx } from './context';
-import { el } from './dom';
 import {
-  EMPTY_HOLD,
-  type HeldPeak,
-  type OutputMeterView,
-  meterView,
-  peakLabel,
-  reportPeaks,
-  stepHold,
-} from './outputStageModel';
-import {
-  OUTPUT_GAUGE_MAX_DB,
-  OUTPUT_PEAK_SCALE,
-  OUTPUT_READOUT_HOLD_MS,
-} from './outputStageTables';
-import { meterRevision, watchOutputStage } from './outputStageWatch';
-import { watchPlayhead } from './stepStrip';
+  type PeakBar,
+  type ReductionBar,
+  createPeakBar,
+  createPeakScale,
+  createReductionBar,
+} from './meterBar';
+import { amplitudeToDb } from './meterModel';
+import { gaugeFor, meterView, reportPeaks } from './outputStageModel';
+import type { OutputStageLink } from './outputStageLink';
+import type { InputChannel } from './outputStageWatch';
 
-export interface OutputStageMeters {
-  readonly root: HTMLElement;
-  /** Redraw at once, for a mode change before the next report lands. */
-  refresh(): void;
-  /** Clear the clip light (Reset peaks). */
-  resetClip(): void;
+export interface StageMeters {
+  readonly inputs: readonly [PeakBar, PeakBar];
+  readonly scale: HTMLElement;
+  readonly outputs: readonly [PeakBar, PeakBar];
+  readonly reduction: ReductionBar;
+  /** Draw the latest report at frame time `nowMs`. */
+  paint(nowMs: number): void;
+  /** Back to the floor, nothing held. */
+  reset(): void;
 }
 
-const PEAK_ROWS = ['In L', 'In R', 'Out L', 'Out R'] as const;
-const GAUGE_LABELS = { reduction: 'GR', over: 'Over', none: '' } as const;
+const CHANNELS: readonly InputChannel[] = ['left', 'right'];
+const NAMES = { left: 'L', right: 'R' } as const;
+const SILENCE = [0, 0, 0, 0] as const;
 
-function meterRow(
-  label: string,
-  min: number,
-  max: number,
-): { row: HTMLElement; meter: HTMLMeterElement; readout: HTMLElement } {
-  const row = el('label', 'output-meter-row');
-  const name = el('span', 'output-meter-name', label);
-  const meter = document.createElement('meter');
-  meter.min = min;
-  meter.max = max;
-  meter.value = min;
-  const readout = el('span', 'readout');
-  row.append(name, meter, readout);
-  return { row, meter, readout };
-}
-
-type MeterRow = ReturnType<typeof meterRow>;
-interface MeterBlock {
-  root: HTMLElement;
-  peaks: MeterRow[];
-  gauge: MeterRow;
-  offNote: HTMLElement;
-  clip: HTMLElement;
-}
-
-function buildMeterBlock(): MeterBlock {
-  const root = el('div', 'output-meters');
-  const peaks = PEAK_ROWS.map((name) => {
-    const row = meterRow(name, OUTPUT_PEAK_SCALE.floorDb, OUTPUT_PEAK_SCALE.ceilingDb);
-    row.meter.high = 0;
-    row.meter.setAttribute('aria-label', `Output stage ${name} sample peak`);
-    root.appendChild(row.row);
-    return row;
-  });
-  const gauge = meterRow('GR', 0, OUTPUT_GAUGE_MAX_DB);
-  const offNote = el('p', 'hint output-off-note', 'Off: nothing limits or clips the output.');
-  const clip = el('span', 'output-clip');
-  clip.append(el('span', 'output-clip-dot'), el('span', '', 'Clip'));
-  root.append(gauge.row, offNote, clip);
-  return { root, peaks, gauge, offNote, clip };
-}
-
-/** The gauge row for the mode's gauge, or the Off note in its place. */
-function paintGauge({ gauge, offNote }: MeterBlock, view: OutputMeterView): void {
-  gauge.row.hidden = view.gauge === 'none';
-  offNote.hidden = view.gauge !== 'none';
-  gauge.row.firstChild!.textContent = GAUGE_LABELS[view.gauge];
-  const name = view.gauge === 'over' ? 'Over the ceiling' : 'Gain reduction';
-  gauge.meter.setAttribute('aria-label', name);
-  gauge.meter.value = view.gaugeDb;
-  gauge.readout.textContent = `${view.gaugeDb.toFixed(1)} dB`;
-}
-
-function paintClip({ clip }: MeterBlock, latched: boolean, mode: OutputStageMode): void {
-  clip.classList.toggle('latched', latched);
-  clip.title =
-    mode === 'off'
-      ? 'Latches on a sample above 0 dBFS; Reset peaks clears it'
-      : 'Latches when the stage changes a sample; Reset peaks clears it';
-}
-
-export function outputStageMeters(ctx: AppCtx): OutputStageMeters {
-  const block = buildMeterBlock();
-  const stage = (): OutputStage | null => ctx.host.system?.engine.outputStage ?? null;
-  let holds: HeldPeak[] = PEAK_ROWS.map(() => EMPTY_HOLD);
-  let last: Readonly<OutputStageReport> | null = null;
-
-  const paint = (report: Readonly<OutputStageReport> | null): void => {
-    last = report;
-    const mode = masterOutput(ctx.model.doc.master).mode;
-    const view = meterView(report, mode);
-    const now = performance.now();
-    const linear = report ? reportPeaks(report) : null;
-    holds = holds.map((hold, i) =>
-      linear ? stepHold(hold, linear[i]!, now, OUTPUT_READOUT_HOLD_MS) : EMPTY_HOLD,
-    );
-    block.peaks.forEach(({ meter, readout }, i) => {
-      meter.value = view.peaks[i]!;
-      readout.textContent = peakLabel(holds[i]!.value);
+/** Every bar to the given height and channel width. */
+export function createStageMeters(
+  link: OutputStageLink,
+  size: { heightPx: number; channelPx: number },
+): StageMeters {
+  const input = (channel: InputChannel): PeakBar =>
+    createPeakBar({
+      ...size,
+      name: NAMES[channel],
+      label: `Output stage input, ${channel}`,
+      clipLed: { onClear: () => link.watch()?.clearInputOver(channel) },
     });
-    paintGauge(block, view);
-    const live = stage();
-    paintClip(block, live ? watchOutputStage(live).latched : false, mode);
-  };
+  const output = (channel: InputChannel): PeakBar =>
+    createPeakBar({
+      ...size,
+      name: NAMES[channel],
+      label: `Output stage output, ${channel}`,
+      ceilingLine: true,
+    });
+  const inputs = [input('left'), input('right')] as const;
+  const outputs = [output('left'), output('right')] as const;
+  const reduction = createReductionBar({ ...size, label: 'Output stage gain reduction' });
+  const scale = createPeakScale({ label: 'dBFS scale', heightPx: size.heightPx });
+  const bars = [...inputs, ...outputs];
 
-  watchPlayhead({
-    attached: () => block.root.isConnected,
-    shown: () => block.root.closest('[hidden]') === null,
-    playheadAt: () => meterRevision(stage()),
-    mark: (revision) => paint(revision >= 0 ? (stage()?.read() ?? null) : null),
-  });
-  paint(null);
+  const paintLatches = (): void => {
+    const watch = link.watch();
+    CHANNELS.forEach((channel, i) => inputs[i]!.setClip(watch?.inputOver(channel) ?? false));
+  };
+  const paintSettings = (): void => {
+    const { mode, ceilingDb } = link.settings();
+    // In Off nothing holds the output at the ceiling: the line hides (`.is-off`)
+    // and the readouts redden above 0 dBFS.
+    for (const bar of outputs) bar.setCeiling(mode === 'off' ? 0 : ceilingDb);
+    reduction.setGauge(gaugeFor(mode));
+    paintLatches();
+  };
+  link.onChange(paintSettings);
+  paintSettings();
+
   return {
-    root: block.root,
-    refresh: () => paint(last),
-    resetClip: () => {
-      const live = stage();
-      if (live) watchOutputStage(live).resetLatch();
-      paint(last);
+    inputs,
+    scale,
+    outputs,
+    reduction,
+    paint(nowMs) {
+      const report = link.report();
+      const peaks = report ? reportPeaks(report) : SILENCE;
+      bars.forEach((bar, i) => bar.update(amplitudeToDb(peaks[i]!), nowMs));
+      reduction.update(meterView(report, link.settings().mode).gaugeDb, nowMs);
+      paintLatches();
+    },
+    reset() {
+      for (const bar of bars) bar.reset();
+      reduction.reset();
     },
   };
 }

@@ -82,6 +82,16 @@ export const REDUCTION_BALLISTICS: MeterBallistics = {
   holdSeconds: METER_BALLISTICS.holdSeconds,
 };
 
+/**
+ * The hold line's thickness in CSS pixels. `meterBar.ts` sets it on the line,
+ * and `meterModel.ts` keeps a full-scale hold that far inside the bar.
+ */
+export const METER_HOLD_LINE_PX = 2;
+
+/** Amplitude to dB: 20 dB per decade. */
+export const AMPLITUDE_DB_PER_DECADE = 20;
+export const DECADE = 10;
+
 /** A cover's scale is written to this many decimals: finer than a pixel on any bar. */
 export const METER_TRANSFORM_DECIMALS = 4;
 
