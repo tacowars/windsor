@@ -37,6 +37,14 @@ export interface SongViewScale {
    * part's Level, its value, M and S on one row. Frozen with the names.
    */
   readonly mixerWidthPx: number;
+  /**
+   * The expanded mixer column (windsor#158) besides its knobs: the arrow's
+   * gutter, the Output select, M and S, the gaps between them and the cell's
+   * padding, as `console.css`'s `.mix-cell.expanded` sizes them.
+   */
+  readonly mixerExpandedBasePx: number;
+  /** Each knob column of the expanded mixer, with the gap after it: a compact dial and a five-character value. */
+  readonly mixerKnobColumnPx: number;
   /** The grid gap between two columns: the names, the mixer and the timeline. */
   readonly laneGapPx: number;
 }
@@ -49,8 +57,25 @@ export const SONG_VIEW: SongViewScale = {
   minLabelPx: 28,
   laneNameWidthPx: 120,
   mixerWidthPx: 132,
+  mixerExpandedBasePx: 165,
+  mixerKnobColumnPx: 70,
   laneGapPx: 8,
 };
+
+/**
+ * The mixer column's width (windsor#158 decision 5): the collapsed strip's,
+ * or expanded, the base plus one column a knob. The timeline starts past it,
+ * so it moves right as the column widens.
+ */
+export const mixerColumnPx = (
+  expanded: boolean,
+  knobs: number,
+  scale: Pick<
+    SongViewScale,
+    'mixerWidthPx' | 'mixerExpandedBasePx' | 'mixerKnobColumnPx'
+  > = SONG_VIEW,
+): number =>
+  expanded ? scale.mixerExpandedBasePx + knobs * scale.mixerKnobColumnPx : scale.mixerWidthPx;
 
 /**
  * The CSS `left` of a line `bars` bars into the timeline, in the lanes

@@ -34,6 +34,7 @@ import {
   forKind,
   hitBlocks,
   isNarrowBlock,
+  mixerColumnPx,
   pxToTick,
   rulerLabelEvery,
   rulerLabels,
@@ -250,5 +251,26 @@ describe('the mixer column (windsor#157)', () => {
     expect(height('.lane')).toBe(40);
     expect(height('.lane.lane-harm')).toBe(40);
     expect(knobGeometry({ compact: true }).size).toBeLessThan(height('.lane'));
+  });
+
+  it('widens the column when expanded, by one column a knob (windsor#158)', () => {
+    expect(mixerColumnPx(false, 5)).toBe(SONG_VIEW.mixerWidthPx);
+    expect(mixerColumnPx(true, 5)).toBe(
+      SONG_VIEW.mixerExpandedBasePx + 5 * SONG_VIEW.mixerKnobColumnPx,
+    );
+    expect(mixerColumnPx(true, 6) - mixerColumnPx(true, 5)).toBe(SONG_VIEW.mixerKnobColumnPx);
+    expect(mixerColumnPx(true, 5)).toBeGreaterThan(mixerColumnPx(false, 5));
+  });
+
+  it('sizes the expanded base as the CSS grid does: its fixed tracks, two gaps and the padding', () => {
+    const expanded = rule('.mix-cell.expanded');
+    const template = /grid-template-columns: ([^;]*);/.exec(expanded)?.[1] ?? '';
+    // The px tracks: the gutter, Output, M and S; the knobs' are fractions.
+    const fixed = [...template.matchAll(/(\d+)px/g)]
+      .map((m) => Number(m[1]))
+      .reduce((a, b) => a + b, 0);
+    const gap = parseFloat(/column-gap: ([^;]*);/.exec(expanded)?.[1] ?? '');
+    const padX = parseFloat(/padding: 0 ([^;]*);/.exec(rule('.mix-cell'))?.[1] ?? '');
+    expect(fixed + 2 * gap + 2 * padX).toBe(SONG_VIEW.mixerExpandedBasePx);
   });
 });
