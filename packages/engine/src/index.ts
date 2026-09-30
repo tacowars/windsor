@@ -429,10 +429,17 @@ export { DEFAULT_PHASER } from './inserts/phaserSpec';
 export type { PhaserSpec } from './inserts/phaserSpec';
 export { PHASER_BOUNDS } from './inserts/phaserConstants';
 export { PHASER_PRESETS, applyPhaserPreset, matchingPhaserPreset } from './inserts/phaserPresets';
-// The Parametric EQ (windsor#198): the kind is not in the registry until its card lands.
+// The Parametric EQ (windsor#198; registered with its card, windsor#199; spectrum and Listen, windsor#200).
 export { DEFAULT_EQ } from './inserts/eqSpec';
 export type { EqSpec, EqBand } from './inserts/eqSpec';
-export { EQ_BAND_TYPES, EQ_SLOPES, EQ_BOUNDS, EQ_DSP } from './inserts/eqConstants';
+export {
+  EQ_BAND_TYPES,
+  EQ_SLOPES,
+  EQ_BOUNDS,
+  EQ_DSP,
+  EQ_LISTEN,
+  EQ_SPECTRUM,
+} from './inserts/eqConstants';
 export type { EqBandType, EqSlope } from './inserts/eqConstants';
 export { eqResponseDb } from './inserts/eqCoefficients';
 export { EQ_INSERT } from './inserts/eqInsert';

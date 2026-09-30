@@ -81,11 +81,12 @@ export interface EqInternals extends Record<string, unknown> {
   EqProcessor: { prototype: object };
   EqDsp: { prototype: object };
   EqBand: { prototype: object };
+  EqListen: { prototype: object };
 }
 
 /** The bundle's classes and hot functions, reached by their top-level names. */
 export function eqInternals(rate = 48000): EqInternals {
-  const names = ['EqProcessor', 'EqDsp', 'EqBand', ...HOT_FUNCTIONS];
+  const names = ['EqProcessor', 'EqDsp', 'EqBand', 'EqListen', ...HOT_FUNCTIONS];
   return new Function(
     'AudioWorkletProcessor',
     'sampleRate',

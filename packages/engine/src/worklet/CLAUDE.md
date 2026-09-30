@@ -59,7 +59,13 @@ copy when flat or bypassed, zeros when input and state are silent, else
 pieces of 16 samples while anything moves) and the enable crossfade;
 `eqBand.ts` one band's glides, type/slope/on fade and state; `eqSections.ts`
 the TDF-II loops, the coefficient ramp across a gliding piece and the band
-fade. The coefficients come from `inserts/eqCoefficients.ts` /
+fade; `eqListen.ts` Listen on drag (windsor#200), a band-pass of the input
+at the held band crossfaded over the route's output, which runs only while
+a band is heard, so the render with Listen off is the route's alone
+(`inserts/eqListen.test.ts` pins it to the windsor#198 bundle's hash). Its
+start computes no double, since it runs too seldom for V8 to optimise and
+unoptimised code boxes every double; the first quantum's glide snaps
+instead. The coefficients come from `inserts/eqCoefficients.ts` /
 `eqSectionDesign.ts`, which the console's curve shares; the section forms pass
 no double across a call, since V8 boxes one it does not inline, and every
 double field (the band's, the DSP's, the forms' `v`) is first written as a
@@ -67,8 +73,11 @@ double, NaN until the first block snaps it (rule 7). Tests under
 `inserts/eq*.test.ts` run the bundle through `__fixtures__/eqHarness.ts`,
 which also reaches its hot functions by name for the rule 2 check;
 `inserts/eqAllocation.test.ts` runs it in a child Node
-(`__fixtures__/eqAllocationProbe.ts`) that reads the heap and V8's
-`--trace-generalization` while every band toggles.
+(`__fixtures__/workletAllocationProbe.ts`, launched by
+`__fixtures__/workletAllocation.ts` and driven by
+`__fixtures__/eqToggleScenario.ts`) that reads the heap and V8's
+`--trace-generalization` while every band toggles and Listen moves from
+band to band.
 
 `phaser/` is the original four-stage stereo insert (#687):
 `phaserProcessor.ts` owns controls/lifecycle/load reporting and `phaserDsp.ts`

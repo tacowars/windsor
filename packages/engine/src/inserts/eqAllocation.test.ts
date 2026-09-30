@@ -1,8 +1,9 @@
 /**
  * Worklet rules 2 and 7 for the Parametric EQ (windsor#198), measured on V8
  * rather than read off the source: once its paths have run, toggling type,
- * slope and on allocates nothing, and no field of the bundle ever changes its
- * representation.
+ * slope and on, and Listen on drag (windsor#200) starting, moving between
+ * bands and ending, allocates nothing, and no field of the bundle ever
+ * changes its representation.
  *
  * Method. A heap reading inside Vitest is not repeatable (the runner shares
  * the heap), so the test spawns a Node of its own that runs the shipped bundle
@@ -105,7 +106,7 @@ function probe(): ProbeRun {
 }
 
 describe('the audio thread on V8', () => {
-  it('toggles type, slope and on for 40 000 quanta without allocating or changing a field representation', () => {
+  it('toggles type, slope, on and Listen for 40 000 quanta without allocating or changing a field representation', () => {
     const run = probe();
     expect(run.changes).toEqual([]);
     expect(run.gcs, 'no collection ran while the heap was read').toBe(0);

@@ -10,18 +10,26 @@
  * `ctx.change`, so it is live and saved; a drag commits on every move inside
  * one undo step, as a knob does. The selected band, the ± range and the
  * Listen switch are session view state, kept here by the insert's id
- * (`insertRackModel.ts`'s `rackKey`) and never in the song. Listen is heard
- * from windsor#200; until then the switch only remembers its state.
+ * (`insertRackModel.ts`'s `rackKey`) and never in the song.
+ *
+ * Behind the curve, the EQ's output spectrum (`eqSpectrum.ts`); with the
+ * Listen switch on, holding a point plays only that band (`eqListen.ts`),
+ * with the "Listening" pill over the curve (windsor#200). Both are live
+ * only: the stage's analyser tap and `listen`, never the spec.
  */
-import { DEFAULT_EQ } from '@windsor/engine';
+import { DEFAULT_EQ, EQ_SPECTRUM } from '@windsor/engine';
+import type { InsertSpec, InsertStage } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { drawEqCurve, eqCanvasContext, eqPalette } from './eqCurve';
 import type { EqPalette } from './eqCurve';
 import { wireEqCurve } from './eqCurveInput';
 import { eqPlot } from './eqCurveModel';
+import type { EqListenControl } from './eqListen';
+import { wireEqListen } from './eqListen';
 import type { EqCardModel } from './eqPanel';
 import { eqBandRow, eqPanel, eqRangeToggle } from './eqPanel';
+import { watchEqSpectrum } from './eqSpectrum';
 import type { EqView } from './eqTables';
 import {
   EQ_CURVE_LABEL,
@@ -33,7 +41,7 @@ import type { InsertCard } from './insertCards';
 import { insertPage } from './insertLayout';
 import { insertIdAt, rackKey } from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
-import { insertChange, insertsOf } from './insertTarget';
+import { insertChange, insertsOf, liveInsert } from './insertTarget';
 
 /** Every EQ's view for this session, by `rackKey`: never in the song. */
 const views = new Map<string, EqView>();
@@ -59,14 +67,38 @@ function cardModel(ctx: AppCtx, slot: InsertTarget, index: number): EqCardModel 
   return model;
 }
 
+/** The live EQ stage at the card's slot, if audio is on. */
+function eqStage(
+  ctx: AppCtx,
+  slot: InsertTarget,
+  index: number,
+): InsertStage<InsertSpec> | undefined {
+  const stage = liveInsert(ctx, slot, index);
+  return stage?.kind === 'eq' ? stage : undefined;
+}
+
+/** The master output stage's latest input peak, linear: 0 before audio. */
+function masterPeak(ctx: AppCtx): number {
+  const report = ctx.host.system?.engine.outputStage?.read();
+  return report ? Math.max(report.inputLeft, report.inputRight) : 0;
+}
+
+interface CurveCanvas {
+  canvas: HTMLCanvasElement;
+  draw(): void;
+  /** Draw behind the curve with this spectrum (dBFS per bin), or with none. */
+  spectrum(bins: Float32Array | null): void;
+}
+
 /** The curve's canvas, and the call that draws it from the card's state now. */
-function curveCanvas(model: EqCardModel): { canvas: HTMLCanvasElement; draw(): void } {
+function curveCanvas(model: EqCardModel): CurveCanvas {
   const canvas = document.createElement('canvas');
   canvas.className = 'eq-plot';
   canvas.tabIndex = 0;
   canvas.setAttribute('aria-label', EQ_CURVE_LABEL);
   const g = eqCanvasContext(canvas);
   let palette: EqPalette | null = null;
+  let bins: Float32Array | null = null;
   const draw = (): void => {
     if (!g || !canvas.isConnected) return;
     palette ??= eqPalette(canvas);
@@ -76,14 +108,55 @@ function curveCanvas(model: EqCardModel): { canvas: HTMLCanvasElement; draw(): v
       plot: model.plot(),
       sampleRate: model.sampleRate(),
       palette,
+      spectrum: bins && { bins, binHz: model.sampleRate() / EQ_SPECTRUM.fftSize },
     });
   };
-  return { canvas, draw };
+  const spectrum = (next: Float32Array | null): void => {
+    bins = next;
+    draw();
+  };
+  return { canvas, draw, spectrum };
+}
+
+/**
+ * The curve's live extras (windsor#200): the spectrum behind it and Listen
+ * on drag with its pill. Wired after the curve's own gestures, so a press
+ * has selected its point before Listen starts on it.
+ */
+function liveExtras(
+  ctx: AppCtx,
+  slot: InsertTarget,
+  index: number,
+  model: EqCardModel,
+  curve: CurveCanvas,
+): { pill: HTMLElement; listen: EqListenControl } {
+  const stage = (): InsertStage<InsertSpec> | undefined => eqStage(ctx, slot, index);
+  const pill = el('div', 'eq-listen-pill');
+  pill.hidden = true;
+  const listen = wireEqListen({
+    canvas: curve.canvas,
+    pill,
+    enabled: () => model.view().listen,
+    spec: model.spec,
+    plot: model.plot,
+    sampleRate: model.sampleRate,
+    stage,
+    transport: () => ctx.transport.state,
+  });
+  watchEqSpectrum({
+    canvas: curve.canvas,
+    stage,
+    running: () => ctx.transport.running,
+    peak: () => masterPeak(ctx),
+    draw: curve.spectrum,
+  });
+  return { pill, listen };
 }
 
 function eqPage(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
   const model = cardModel(ctx, slot, index);
-  const { canvas, draw } = curveCanvas(model);
+  const curve = curveCanvas(model);
+  const { canvas, draw } = curve;
   const chips = el('div', 'eq-chips');
   const panel = el('div', 'eq-band');
   const paint = {
@@ -113,13 +186,16 @@ function eqPage(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
       if (!model.commit(spec)) return;
       knobs();
       repaint('band');
+      extras.listen.refresh();
     },
     full: () => ctx.notify(EQ_FULL_MESSAGE, 'info'),
   });
+  const extras = liveExtras(ctx, slot, index, model, curve);
   const wrap = el('div', 'eq-plot-wrap');
   wrap.append(
     canvas,
     eqRangeToggle(model, () => repaint('curve')),
+    extras.pill,
   );
   const graph = el('div', 'eq-graph');
   graph.append(chips, wrap);
