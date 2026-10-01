@@ -25,15 +25,16 @@
  *
  * A part routed "Sidechain only" has its dry path gated to silence; asked
  * for, its stem is taken before the gate (the strip's `head`) through a
- * rotation at the strip's pan, so it sounds as it would routed to the master.
+ * rotation that follows the strip's (`StereoRotate.follower`): its pan knob
+ * and its pan lane (windsor#344) move both, so the stem sounds as the part
+ * would routed to the master.
  * A part muted or soloed out (windsor#154) is taken after the gate like any
  * other, so its stem is silent, as playback plays it, whatever its output.
  * A muted or soloed-out group's gate is shut, so its stem is silent too.
  */
 import type { AudioBus } from '../mixer/audioBus';
 import { MUSIC_BUS_OPTIONS, createBus } from '../mixer/audioBus';
-import type { StereoRotate } from '../mixer/stereoRotate';
-import { createStereoRotate } from '../mixer/stereoRotate';
+import type { RotationFollower } from '../mixer/stereoRotate';
 import { musicPartName } from '../song/documentParts';
 import type { AudioSystem } from '../system/audioSystem';
 import { RENDER_CHANNELS } from './renderConstants';
@@ -113,8 +114,10 @@ function partTap(system: AudioSystem, stem: PartStem): Tap {
   if (!stem.muted || strip.mute || strip.soloedOut) {
     return throughMusicHighpass(context, strip.rotation.output);
   }
-  // Only the sidechain routing closed the gate after `head`: tap before it, and pan here.
-  const rotation: StereoRotate = createStereoRotate(context, strip.rotation.pan);
+  // Only the sidechain routing closed the gate after `head`: tap before it, and pan
+  // here, through a rotation the strip's pan knob and pan lane drive with its own.
+  const rotation: RotationFollower = strip.rotation.follower();
+  system.resyncAutomation(stem.slot);
   strip.head.connect(rotation.input);
   const tap = throughMusicHighpass(context, rotation.output);
   return {
