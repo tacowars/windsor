@@ -26,7 +26,6 @@ import type {
   ScheduledMessage,
   WorkletMessage,
 } from '../../synth/workletMessages';
-import type { QueuedEvent } from './eventQueue';
 import type { WorkletPatch } from './patchNormalise';
 import { EventQueue } from './eventQueue';
 import { CTRL_INTERVAL } from './fmConstants';
@@ -195,13 +194,16 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Queue `ev` at its frame, or now without one. The frame is read here, not
-   * passed in: past 2^31 it is a double, which an argument can box (rule 7).
+   * Queue `ev` at its frame, or now without one. The frame is read here and
+   * goes to the queue in its `incoming` slot, not as an argument: past 2^31
+   * it is a double, which an argument can box (rule 2), and the message is
+   * never stamped with it, since a field first written as a small integer is
+   * generalised by the first double (rule 7).
    */
   schedule(ev: ScheduledMessage): void {
-    const queued = ev as QueuedEvent;
-    queued._frame = typeof ev.frame === 'number' ? ev.frame : currentFrame;
-    this.events.insert(queued);
+    const q = this.events;
+    q.incoming[0] = typeof ev.frame === 'number' ? ev.frame : currentFrame;
+    q.insert(ev);
   }
 
   /** Drop every voice from the note map: a later note-off for any of them finds nothing. */
@@ -449,8 +451,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
     while (cursor < n) {
       // Apply every event landing on this frame.
       // The next event's frame is read in place, never returned from a call:
-      // past 2^31 it is a double, which a return can box (rule 7).
-      while (!q.empty && q.items[q.head]._frame <= blockStart + cursor) {
+      // past 2^31 it is a double, which a return can box (rule 2).
+      while (!q.empty && q.frames[q.head] <= blockStart + cursor) {
         const ev = q.take();
         if (ev.type === 'noteOn') this.noteOn(ev);
         else if (ev.type === 'noteOff') this.noteOffId(ev.id != null ? ev.id : ev.note!);
@@ -459,7 +461,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
       // Render up to the next event, the next control boundary, or block end.
       let seg = n - cursor;
       if (!q.empty) {
-        const untilEvent = q.items[q.head]._frame - (blockStart + cursor);
+        const untilEvent = q.frames[q.head] - (blockStart + cursor);
         // In (0, seg), so `| 0` is exact; it keeps `seg` a small integer when
         // the frames are doubles (past 2^31), and `voice.age` with it.
         if (untilEvent > 0 && untilEvent < seg) seg = untilEvent | 0;

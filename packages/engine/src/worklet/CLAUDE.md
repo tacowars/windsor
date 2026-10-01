@@ -165,7 +165,7 @@ build output. The map of `fm/` (#644):
 | Module | Owns |
 |---|---|
 | `fmProcessor.ts` | the entry: `FmPartProcessor` (the port, the note map as each voice's `keyed` flag, voice allocation, `renderBlock`) and `registerProcessor` |
-| `eventQueue.ts` | `EventQueue` (windsor#233): the frame-stamped note events, inserted in place and taken by an index, never `splice` or `shift` |
+| `eventQueue.ts` | `EventQueue` (windsor#233): the note events in frame order, their frames in a `Float64Array` beside them, inserted in place and taken by an index, never `splice` or `shift` |
 | `voice.ts` | `Voice`: one note's state and lifecycle (`start`, `rebind`, `retarget`, `release`, `kill`, `steal`, `dormant`); `render` and `updateControl` stay methods and delegate |
 | `voiceControl.ts` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
 | `voiceRender.ts` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
@@ -224,15 +224,18 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    the LFO levels from the voice, `Svf.setCoeffs` reads `cutoffHz` and `q`,
    and a note's velocity, detune, pan and glide go to `start` in the voice's
    fields. A frame counts: past 2^31 (about 12 hours at 48 kHz) it is a
-   double, so the render reads the next event's frame in place
-   (`q.items[q.head]._frame`, no accessor) and `schedule` reads a message's
-   frame from the message. The per-sample calls the kernel and the generic
-   loop keep (`Svf.process`, `softClip`, `noise`) are inlined first by
-   frequency. `synth/fmProcessorAllocation.test.ts` pins it through
-   `__fixtures__/fmPartChangeScenario.ts`, one run at frames past 2^31 with
-   notes posted ahead and the queue's accessors kept from inlining; what the note-on path still
-   allocates in V8's lower tiers is in
-   `docs/research/2026-09-30-worklet-gc-in-chrome/README.md`.
+   double, so the queue keeps frames in a `Float64Array` (`q.frames`), never
+   in a field of the message, the render reads the next event's frame in
+   place (`q.frames[q.head]`, no accessor), and `schedule` reads a message's
+   frame from the message and hands it to `insert` in `q.incoming`. The
+   per-sample calls the kernel and the generic loop keep (`Svf.process`,
+   `softClip`, `noise`) are inlined first by frequency.
+   `synth/fmProcessorAllocation.test.ts` pins it through
+   `__fixtures__/fmPartChangeScenario.ts`, with one run at frames past 2^31
+   with notes posted ahead and the queue's accessors kept from inlining, one
+   whose frames cross 2^31, and two that hold a note while its `age`
+   crosses 2^31; what the note-on path still allocates in V8's lower tiers
+   is in `docs/research/2026-09-30-worklet-gc-in-chrome/README.md`.
 3. **Bit-identity by construction.** The fixed-index kernel (`renderKernel`,
    #548) and the generic loop (`specialise: false`) produce the same IEEE
    operations in the same order, and `fmProcessorKernel.test.ts` compares them
@@ -290,7 +293,8 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
 7. **Types erase; they never change the emitted code.** A class field is
    declared (`ic1: number;`) and written by the constructor, a double field
    first as NaN and then its start value (windsor#233: one first written as
-   a small integer is generalised by its first fraction), never
+   a small integer is generalised by its first fraction, or by the first
+   count past 2^31, as a voice's `age` in frames is after about 12 hours), never
    initialised at the declaration: with define semantics a field would be
    emitted as `undefined` before the constructor writes a number, and V8
    then boxes every later double write to it (the #548 scenario read 336 ms

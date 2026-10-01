@@ -55,6 +55,18 @@
  * read 143 KB, a heap number a quantum; with `schedule(msg, msg.frame)`, the
  * frame passed as an argument, 21 KB with everything inlined.
  *
+ * Three more runs cross 2^31 rather than start past it, since a field first
+ * written as a small integer is generalised by the first double it holds
+ * (rule 7), on the audio thread, deoptimising the render that reads it. The
+ * fourth plays the pad from a frame its frames pass 2^31 from, three quarters
+ * of the way through the warm-up: with the frame stamped on each queued
+ * message as `_frame`, the trace read `_frame:s->d` there. The fifth and
+ * sixth hold one note through the whole run, in the kernel and dormant in
+ * the generic loop, the warm-up ending by setting its voices' `age` just
+ * below 2^31, so it crosses half way through the measured run: with `age`
+ * born a small integer, the trace read `age:s->d` and the runs read 40 MB
+ * and 1.6 MB as the render deoptimised.
+ *
  * Tolerance: 16 KiB over the 8 000 quanta; one boxed double a quantum would
  * read 128 KB. The runs read about 10 to 12 KB: the eleven readings' own
  * result objects, about 7 KB, and about one heap number a note-on. Before
@@ -80,6 +92,25 @@ const TOLERANCE_BYTES = 16 * 1024;
 const LATE_FRAME = 2 ** 32;
 /** Quanta the notes are posted ahead of where they land, about 40 ms at 48 kHz, as the scheduler's look-ahead. */
 const LOOKAHEAD_QUANTA = 16;
+
+/** The warm-up's and the measured run's quanta, which `probe` passes and the late starts below count. */
+const WARMUP_QUANTA = 96000;
+const MEASURE_QUANTA = 8000;
+const QUANTUM = 128;
+/** V8's small integers end below 2^31 (64-bit Node, no pointer compression). */
+const SMI_END = 2 ** 31;
+/**
+ * A held voice's age as the measured run starts: still a small integer, and
+ * past 2^31 half way through the run, as a drone held about 12 hours.
+ */
+const DRONE_AGE = SMI_END - (MEASURE_QUANTA / 2) * QUANTUM;
+/**
+ * A context's first frame such that its frames pass 2^31 three quarters of
+ * the way through the warm-up, so the code the crossing deoptimises in the
+ * probe and the scenario (their own frame arithmetic) is optimised again
+ * before the heap is read.
+ */
+const CROSSING_FRAME = SMI_END - ((WARMUP_QUANTA * 3) / 4) * QUANTUM;
 
 const TOGGLES: [string, number][] = [
   ['pitchBend', 2],
@@ -227,13 +258,26 @@ function probe(
       messages: [],
       inputChannels: 0,
       loadQuanta: 0,
-      warmup: 96000,
-      measure: 8000,
+      warmup: WARMUP_QUANTA,
+      measure: MEASURE_QUANTA,
       scenario: probeScenario('fmPartChangeScenario.ts'),
       scenarioConfig,
     },
     late?.v8Flags,
   );
+}
+
+/** One note held for the whole run, its voices' ages seeded at `DRONE_AGE`. */
+function drone(note: number, path: 'held' | 'dormant'): FmPartChangeConfig {
+  return {
+    events: [on(0, 0, 1, note)],
+    period: 24,
+    toggles: TOGGLES,
+    rest: 16,
+    idStride: 64,
+    paths: [path],
+    seedAge: DRONE_AGE,
+  };
 }
 
 function expectClean(run: ProbeRun): void {
@@ -288,5 +332,33 @@ describe('the FM part on V8', () => {
         { startFrame: LATE_FRAME, v8Flags: ['--allow-natives-syntax'] },
       ),
     );
+  }, 120_000);
+
+  it('plays the chord with its notes posted ahead through the frames passing 2^31, then 8 000 quanta without allocating, and changes no field representation', () => {
+    expectClean(
+      probe(
+        pad(),
+        8,
+        true,
+        {
+          events: PAD_EVENTS,
+          period: 24,
+          toggles: TOGGLES,
+          rest: 16,
+          idStride: 64,
+          paths: ['held', 'stolen', 'released', 'ended', 'silent'],
+          lookahead: LOOKAHEAD_QUANTA,
+        },
+        { startFrame: CROSSING_FRAME, v8Flags: [] },
+      ),
+    );
+  }, 120_000);
+
+  it('holds a note in the kernel while its age passes 2^31, for 8 000 quanta without allocating or changing a field representation', () => {
+    expectClean(probe(pad(), 8, true, drone(48, 'held')));
+  }, 120_000);
+
+  it('holds a dormant note in the generic loop while its age passes 2^31, for 8 000 quanta without allocating or changing a field representation', () => {
+    expectClean(probe(pluck(), 4, false, drone(60, 'dormant')));
   }, 120_000);
 });

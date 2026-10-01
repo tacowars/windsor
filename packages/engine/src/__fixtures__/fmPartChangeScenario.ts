@@ -86,6 +86,12 @@ export interface FmPartChangeConfig {
    * The child needs `--allow-natives-syntax`.
    */
   outlineQueueAccessors?: boolean;
+  /**
+   * The warm-up ends by setting every sounding voice's `age` to this, so a
+   * voice held through the measured run (a drone, dormant or not) counts
+   * its frames past 2^31, as one held for about 12 hours at 48 kHz.
+   */
+  seedAge?: number;
 }
 
 /** What the run reads of each voice: flags only, since reading a double field can box it here. */
@@ -97,6 +103,19 @@ interface VoiceState {
 }
 
 const PATHS: FmPartPath[] = ['held', 'stolen', 'released', 'dormant', 'ended', 'silent'];
+
+/** Every sounding voice's age set to `age`: a write the run makes once, before it is measured. */
+function seedAges(probe: ProbeRig, age: number): void {
+  const voices = (probe.processor as unknown as { voices: (VoiceState & { age: number })[] })
+    .voices;
+  let seeded = 0;
+  for (const voice of voices) {
+    if (!voice.active) continue;
+    voice.age = age;
+    seeded++;
+  }
+  if (seeded === 0) throw new Error('no voice was sounding to age');
+}
 
 /** The part's random source, the processor's and each voice's copy of it. */
 interface RandomSource {
@@ -128,7 +147,6 @@ interface Message {
   type: string;
   id: number;
   frame: number;
-  _frame: number;
 }
 
 /** The cycle's messages, each in its event wrapper, built once. */
@@ -146,9 +164,8 @@ function messages(events: FmPartEvent[], startFrame: number): { data: Message }[
             stepMod: stepMod ?? null,
           }
         : { type, id: key, frame: startFrame };
-    // The processor stamps `_frame` on what it queues; a reused message already has it.
-    // Both start at the run's first frame, so a frame past 2^31 is a double from the start.
-    return { data: { ...data, _frame: startFrame } as Message };
+    // `frame` starts at the run's first frame, so a frame past 2^31 is a double from the start.
+    return { data: data as Message };
   });
 }
 
@@ -274,6 +291,7 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
       probe.report(probe.config.loadQuanta);
       chunks(warmup / 2, warmup);
       seen.set(optional);
+      if (config.seedAge !== undefined) seedAges(probe, config.seedAge);
       for (let r = 0; r < WARM_READS; r++) v8.getHeapStatistics();
     },
     drive,

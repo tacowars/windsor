@@ -109,8 +109,12 @@ class Voice {
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
   constructor(sampleRate: number, random: () => number, partControls: Float64Array) {
     // Rule 7: each double field is born a double (NaN), before its start
-    // value; the noise seed is a uint32, past a small integer's range.
+    // value; the noise seed is a uint32, past a small integer's range. `age`
+    // counts frames, past 2^31 after about 12 hours held (a dormant drone
+    // too); `voiceId` is the sender's handle, which counts notes without
+    // bound; `note` is the message's number, which no contract keeps whole.
     this.noiseSeed = this.fade = this.fadeInc = this.velocity = this.detune = NaN;
+    this.age = this.voiceId = this.note = NaN;
     this.pan = this.glideFrom = NaN;
     this.panL = this.panR = this.pitchCur = this.pitchTarget = this.mod = NaN;
     this.glideSeconds = this.envAmount = this.cutoff = this.resonance = NaN;
