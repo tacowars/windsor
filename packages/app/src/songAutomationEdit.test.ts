@@ -162,14 +162,10 @@ describe('the Edit gestures', () => {
         const t = a.tick + ((tick - a.tick) * i) / 16;
         expect(shown(points, t)).toBeCloseTo(shown(original, t), 9);
       }
-      // The right half meets it at its midpoint, and stays close elsewhere.
-      expect(shown(points, (tick + b.tick) / 2)).toBeCloseTo(
-        shown(original, (tick + b.tick) / 2),
-        6,
-      );
+      // The right half is the nearest one segment can be (songAutomationSplit.test.ts).
       for (let i = 0; i <= 16; i++) {
         const t = tick + ((b.tick - tick) * i) / 16;
-        expect(Math.abs(shown(points, t) - shown(original, t))).toBeLessThan(0.02);
+        expect(Math.abs(shown(points, t) - shown(original, t))).toBeLessThan(0.005);
       }
     }
   });
@@ -269,6 +265,22 @@ describe('Draw', () => {
       grain,
     );
     expect(samples.get(BAR)).toBe(0.6);
+  });
+
+  it('a slow vertical move inside one cell stores the newest height', () => {
+    const samples = new Map<number, number>();
+    strokeTo(samples, null, { tick: BAR, display: 0.2 }, grain);
+    strokeTo(samples, { tick: BAR, display: 0.2 }, { tick: BAR, display: 0.5 }, grain);
+    strokeTo(samples, { tick: BAR, display: 0.5 }, { tick: BAR + 1, display: 0.9 }, grain);
+    expect([...samples]).toEqual([[BAR, 0.9]]);
+  });
+
+  it('a diagonal move inside one cell stores the newest height', () => {
+    const samples = new Map<number, number>();
+    // 13 and 14 both snap to 12 on a 6-tick grain.
+    strokeTo(samples, null, { tick: BAR + 13, display: 0 }, grain);
+    strokeTo(samples, { tick: BAR + 13, display: 0 }, { tick: BAR + 14, display: 1 }, grain);
+    expect([...samples]).toEqual([[BAR + 2 * SIXTEENTH, 1]]);
   });
 
   it('replaces only the range drawn, on the grain, and keeps the points outside', () => {

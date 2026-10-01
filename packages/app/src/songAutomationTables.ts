@@ -105,6 +105,22 @@ export const AUTOMATION_GESTURES: AutomationGestures = {
   drawOffGrainTicks: THIRTY_SECOND_TICKS,
 };
 
+/** How a split's right half is fitted (`songAutomationSplit.ts`). */
+export interface AutomationSplitFit {
+  /** The points along the half where the fit compares the curves. */
+  readonly samples: number;
+  /** The bends tried across −1..1 before refining. */
+  readonly gridSteps: number;
+  /** Golden-section steps around the best of them. */
+  readonly refineIterations: number;
+}
+
+export const AUTOMATION_SPLIT_FIT: AutomationSplitFit = {
+  samples: 16,
+  gridSteps: 40,
+  refineIterations: 30,
+};
+
 /** Each kind's colour (decision 3): the mixer teal, the inserts violet, the voice amber. */
 export const LANE_KIND_COLOR: Readonly<Record<AutomationTargetKind, string>> = {
   strip: 'var(--modulator)',

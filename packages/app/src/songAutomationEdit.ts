@@ -26,8 +26,9 @@ import type {
   AutomationTargetId,
   AutomationTargetRow,
 } from '@windsor/engine';
-import { bendCurve, fromDisplay, replaceRange, toDisplay, valueAt } from '@windsor/engine';
+import { fromDisplay, replaceRange, toDisplay, valueAt } from '@windsor/engine';
 import { laneY } from './songAutomationCurve';
+import { rightHalfBend } from './songAutomationSplit';
 import {
   AUTOMATION_DRAWING,
   AUTOMATION_GESTURES,
@@ -150,39 +151,11 @@ export function addPoint(
   return { points: next, index };
 }
 
-/** Half way along a segment: where a split's right half is matched to the original. */
-const MIDPOINT = 1 / 2;
-
-/**
- * The bend for the right half of bent segment `a → b` split at fraction `s`.
- * The engine's curve is `u^k` in display space: the left half is that same
- * curve with the same bend, but the right half is no power law, so it takes
- * the bend whose curve meets the original at its own midpoint, clamped to
- * −1..1.
- */
-export function rightHalfBend(
-  row: AutomationTargetRow,
-  a: AutomationPoint,
-  b: AutomationPoint,
-  s: number,
-): number {
-  const rise = toDisplay(row, b.value) - toDisplay(row, a.value);
-  const k = Math.log(bendCurve(MIDPOINT, a.bend, rise)) / Math.log(MIDPOINT);
-  if (a.bend === 0 || rise === 0 || k === 1) return a.bend;
-  const at = bendCurve(s, a.bend, rise);
-  const mid = bendCurve(s + (1 - s) * MIDPOINT, a.bend, rise);
-  const fraction = (mid - at) / (1 - at);
-  if (!(fraction > 0 && fraction < 1)) return a.bend;
-  const k2 = Math.log(fraction) / Math.log(MIDPOINT);
-  // k = BASE^(−bend · sign(rise)), so a bend scales with log k.
-  return clamp((a.bend * Math.log(k2)) / Math.log(k), -1, 1);
-}
-
 /**
  * `points` with a point on the line at `tick` ("add on the line"): the
  * line's own value there, the split segment's bend kept on the left half
- * and matched on the right (`rightHalfBend`), so the curve stays put. Null
- * when `tick` already holds two points.
+ * and fitted on the right (`rightHalfBend`), so the curve stays as near
+ * as one segment allows. Null when `tick` already holds two points.
  */
 export function addPointOnLine(
   row: AutomationTargetRow,
@@ -260,7 +233,8 @@ export interface StrokePosition {
  * Sample the stroke from `from` (the last position, or null at the press)
  * to `to` into `samples` (grain tick → display height): every grain tick
  * between them, on the straight line joining them, so a fast drag leaves no
- * gap. A tick drawn again takes the newer height.
+ * gap. A tick drawn again takes the newer height, and so does a cell both
+ * positions snap to, however slowly the pointer crossed it.
  */
 export function strokeTo(
   samples: Map<number, number>,
@@ -274,6 +248,11 @@ export function strokeTo(
     return;
   }
   const start = snapTick(from.tick, grain.ticks, grain.songTicks);
+  if (start === end) {
+    // Both samples fall in one cell: the pointer's newest height is the cell's.
+    samples.set(end, to.display);
+    return;
+  }
   const count = Math.round(Math.abs(end - start) / grain.ticks);
   const span = to.tick - from.tick;
   for (let i = 0; i <= count; i++) {
