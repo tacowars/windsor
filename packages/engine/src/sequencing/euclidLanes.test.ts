@@ -12,7 +12,7 @@ import {
   EUCLID_RATCHET_MAX,
 } from '../audioConstants';
 import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
-import { assertEuclidRows, euclidHitRead, laneStep, stepSpanSeconds } from './euclidLanes';
+import { assertEuclidRows, euclidHitRead, laneStep, rollSpanSeconds } from './euclidLanes';
 import {
   DEFAULT_EUCLIDEAN_CONFIG,
   EuclideanSequencer,
@@ -71,16 +71,16 @@ describe('laneStep', () => {
   });
 });
 
-describe('stepSpanSeconds', () => {
-  it('is the divisor’s ticks straight', () => {
-    const clock = { tick: 18, divisor: 6, secondsPerTick: 0.01, swing: STRAIGHT_SWING };
-    expect(stepSpanSeconds(clock)).toBeCloseTo(0.06, 15);
+describe('rollSpanSeconds', () => {
+  it('is its ticks straight', () => {
+    const clock = { tick: 18, ticks: 6, secondsPerTick: 0.01, swing: STRAIGHT_SWING };
+    expect(rollSpanSeconds(clock)).toBeCloseTo(0.06, 15);
   });
 
   it('follows the swing: the on-beat stretches, the off-beat shrinks, the pair sums', () => {
     const swing = { amount: 66, grid: 16 as const };
     const at = (tick: number): number =>
-      stepSpanSeconds({ tick, divisor: 6, secondsPerTick: 0.01, swing });
+      rollSpanSeconds({ tick, ticks: 6, secondsPerTick: 0.01, swing });
     expect(at(0)).toBeCloseTo((swingTicks(6, swing) - swingTicks(0, swing)) * 0.01, 15);
     expect(at(0)).toBeGreaterThan(0.06);
     expect(at(6)).toBeLessThan(0.06);

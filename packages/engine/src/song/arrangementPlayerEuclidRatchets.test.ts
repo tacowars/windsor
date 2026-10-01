@@ -12,6 +12,8 @@ import { rig } from '../__fixtures__/playerRig';
 import type { Call } from '../__fixtures__/recordingPart';
 import { euclid } from '../sequencing/euclid';
 import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { FieldNormaliser } from './arrangementFields';
+import { normaliseSequencer } from './sequencerNormalise';
 
 const DIVISOR = 6;
 const SPAN = DIVISOR * SECONDS_PER_TICK;
@@ -106,7 +108,7 @@ describe('Euclid ratchets (windsor#355)', () => {
 
 describe('live edits to the rows (windsor#355)', () => {
   it('a lane, a ratchet or an accent amount reconfigures: no cut, k, the stream and the playhead carry on', () => {
-    // Every row present at its neutral value: a part partial merges only into keys the part has.
+    // Every row present at its neutral value, so each edit replaces one rather than adding it.
     const neutral = {
       density: { kind: 'walk' as const, stepChance: 0.8 },
       ratchets: Array.from({ length: 16 }, () => 1),
@@ -145,6 +147,32 @@ describe('live edits to the rows (windsor#355)', () => {
     const since = edited.parts.kick.calls.slice(before);
     expect(since.filter((c) => c.kind === 'allNotesOff')).toEqual([]);
     expect(since.some((c) => c.extras?.mod === 0.3)).toBe(true);
+  });
+
+  it('the first lane and the first ratchets reach a part whose song has no rows', () => {
+    const { parts, player, run } = rig(kickSong({ sequencer: { pattern: ALL_ON } }));
+    const own = (): Record<string, unknown> =>
+      player.arrangement.parts[KICK_SLOT]?.sequencer as unknown as Record<string, unknown>;
+    expect(own()).not.toHaveProperty('accentLane');
+    expect(own()).not.toHaveProperty('ratchets');
+    const ratchets = Array.from({ length: 16 }, (_, i) => (i === 0 ? 2 : 1));
+    for (const sequencer of [{ accentLane: [true] }, { ratchets }]) {
+      const result = player.apply({ parts: { [KICK_SLOT]: { sequencer } } }, {});
+      expect(result, JSON.stringify(sequencer)).toEqual({ ok: true, ignored: [] });
+    }
+    expect(own()).toMatchObject({ accentLane: [true], ratchets });
+    // What was applied is what a saved song keeps: the normaliser passes it untouched.
+    const n = new FieldNormaliser();
+    expect(normaliseSequencer(own(), 'sequencer', n)).toMatchObject({
+      accentLane: [true],
+      ratchets,
+    });
+    expect(n.corrections).toEqual([]);
+    run(1);
+    const byStep = rolls(parts.kick.calls);
+    expect(byStep.get(0)).toHaveLength(2);
+    expect(byStep.get(1)).toHaveLength(1);
+    for (const hit of triggers(parts.kick.calls)) expect(hit.extras?.mod).toBe(1);
   });
 
   it('a bad row is refused whole', () => {

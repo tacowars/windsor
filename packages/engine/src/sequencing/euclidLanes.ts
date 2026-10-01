@@ -51,6 +51,19 @@ export interface EuclidRows {
   modLanes?: readonly StepModLane[];
 }
 
+/**
+ * Every row's key. Each is optional, so a normalised song may lack any of
+ * them: the normaliser keeps these and the merge lets a partial add one.
+ */
+export const EUCLID_ROW_KEYS = [
+  'ratchets',
+  'accentVelocity',
+  'accentMod',
+  'accentLane',
+  'pitchLane',
+  'modLanes',
+] as const satisfies ReadonlyArray<keyof EuclidRows>;
+
 /** What one hit's step gives it from the rows. */
 export interface EuclidHitRead {
   /** Hits in the step's roll: 1 for a plain hit. */
@@ -91,22 +104,23 @@ export function euclidHitRead(rows: EuclidRows, step: number, localStep: number)
   };
 }
 
-/** Where a roll is on the transport: the step's transport tick, its divisor, the tempo and the swing. */
+/** Where a roll is on the transport: the step's transport tick, the ticks it spans, the tempo and the swing. */
 export interface RollClock {
   /** The step's transport tick (the swing's phase), never a region's local tick. */
   readonly tick: number;
-  readonly divisor: number;
+  /** The step's divisor, or fewer where its region ends or the loop jumps first (`rollSpan.ts`). */
+  readonly ticks: number;
   readonly secondsPerTick: number;
   readonly swing: Swing;
 }
 
 /**
- * Seconds from a step's time to the next step's, both as swing leaves them:
- * the span a ratchet's roll divides evenly. Straight, it is the divisor's
- * ticks at the tempo.
+ * Seconds from a step's time to `ticks` later, both as swing leaves them:
+ * the span a ratchet's roll divides evenly. Over a whole step it ends at the
+ * next step's swung time; straight, it is the ticks at the tempo.
  */
-export function stepSpanSeconds({ tick, divisor, secondsPerTick, swing }: RollClock): number {
-  return (swingTicks(tick + divisor, swing) - swingTicks(tick, swing)) * secondsPerTick;
+export function rollSpanSeconds({ tick, ticks, secondsPerTick, swing }: RollClock): number {
+  return (swingTicks(tick + ticks, swing) - swingTicks(tick, swing)) * secondsPerTick;
 }
 
 const isLaneLength = (lane: readonly unknown[]): boolean =>

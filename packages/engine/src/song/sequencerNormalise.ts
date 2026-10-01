@@ -51,7 +51,7 @@ import {
   LFO_SHAPES,
   type DensityMod,
 } from '../sequencing/euclideanSequencer';
-import type { EuclidRows } from '../sequencing/euclidLanes';
+import { EUCLID_ROW_KEYS, type EuclidRows } from '../sequencing/euclidLanes';
 import {
   DEFAULT_GRID_CONFIG,
   GRID_STEP_KINDS,
@@ -155,15 +155,6 @@ function euclideanDriver(raw: unknown, path: string, n: FieldNormaliser): Euclid
     pattern: n.stepPattern(o.pattern, steps, `${path}.pattern`),
   };
 }
-
-const EUCLID_ROW_KEYS = [
-  'ratchets',
-  'accentVelocity',
-  'accentMod',
-  'accentLane',
-  'pitchLane',
-  'modLanes',
-] as const satisfies ReadonlyArray<keyof EuclidRows>;
 
 /**
  * The ratchet row and the drawn lanes (windsor#355): each absent stays
