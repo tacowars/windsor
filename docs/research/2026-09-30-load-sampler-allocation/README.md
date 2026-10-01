@@ -112,9 +112,29 @@ What the branch changed instead:
   time field first as NaN, as windsor#198's EQ did, and none remain.
 
 `cost/loadSamplerAllocation.test.ts` pins both: in each of the ten bundles
-the meter-on run reads 32 ± 8 bytes a quantum over the meter-off run, no
-generalisation falls on the bundle's `LoadSampler` lines, and the EQ and
-output stage allocate nothing with the meter off. A build whose sampler
+no generalisation falls on the bundle's `LoadSampler` lines, and in each
+bundle whose render allocates nothing with the meter off, the test holds
+that render under 16 KB over 2000 quanta and the meter-on run to 32 ± 8
+bytes a quantum over it. When this branch merged, only the EQ and the output
+stage allocated nothing. The allocation sweep has since made seven more
+clean, and the test pins each one (windsor#261):
+
+| Bundle | Clean since |
+|---|---|
+| EQ, output stage | this branch (windsor#221) |
+| Advanced Drive | windsor#239 |
+| Plate reverb | windsor#236 |
+| Compressor | windsor#241 |
+| Retro reverb | windsor#244 |
+| Phaser | windsor#248 |
+| Dub delay | windsor#249 |
+| FM part | windsor#257 |
+
+Tape still allocates (about 14 KB a quantum with the meter off) and is left
+out until windsor#228. The test's warm-up is 24000 quanta, not 16000: the
+probe's process allocates a one-off 3 to 17 KB about 18000 quanta in, in
+every bundle and whatever the measured length, which a 16000-quantum warm-up
+left inside the measured run. A build whose sampler
 writes `wallStartMs` first as 0 fails it
 (`wallStartMs:s{Any;const}->d{Any;mutable} … [~start+63 at tape-processor.js:182]`).
 
@@ -139,7 +159,7 @@ The table's off column is the larger finding. Eight of the ten renders
 allocate every quantum with the meter off, from their DSP, outside this
 ticket (which must not edit it): from 3.6 KB (the FM part) to 104 KB (Advanced
 Drive) a quantum, against worklet rule 2. Only the EQ and the output stage
-allocate nothing. Their traces also show representation changes outside the
+allocated nothing then; the table above lists the bundles made clean since. Their traces also show representation changes outside the
 sampler (the "after" row above): fields first written as small integers or
 heap objects and later as doubles, including `h{…}->t{…}` fields in the
 drive's `DriveFilter`, which box every later write.
