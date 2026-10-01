@@ -27,6 +27,8 @@ var DRIVE_DIODE_LINEAR_BELOW = 1 / 1048576;
 var DRIVE_DIODE_UNITY_FROM = 1048576;
 var DRIVE_TONE_MIN_HZ = 1e3;
 var DRIVE_TONE_OCTAVES = 4.25;
+var NOISE_COLOUR_CEILING = 0.45;
+var NOISE_COLOUR_DAMPING = Math.SQRT2;
 
 // packages/engine/src/worklet/fm/eventQueue.ts
 function emptySlots(capacity) {
@@ -296,7 +298,13 @@ var OPERATOR_DEFAULTS = {
   velSens: 0.4,
   levelKeyScale: 0,
   phase: 0,
-  phaseFree: true
+  phaseFree: true,
+  /**
+   * A Noise operator's own two-pole lowpass and highpass on its noise, in Hz
+   * (windsor#362, `NOISE_COLOUR_RANGE`); 0 is off. Every other wave ignores them.
+   */
+  noiseLp: 0,
+  noiseHp: 0
 };
 var LEAD_OPERATOR_LEVEL = 1;
 var PATCH_DEFAULTS = {
@@ -363,6 +371,8 @@ var DRIVE_TONE_RANGE = { min: 0, max: 1 };
 var TONE_RANGE = { min: 0.02, max: 1 };
 var FEEDBACK_RANGE = { min: -1, max: 1 };
 var WIDTH_RANGE = { min: 0.05, max: 1 };
+var NOISE_COLOUR_RANGE = { min: 0, max: 2e4 };
+var NOISE_COLOUR_FLOOR_HZ = 20;
 
 // packages/engine/src/worklet/fm/patchNormalise.ts
 function envDefaults(o, d = ENVELOPE_DEFAULTS) {
@@ -409,6 +419,9 @@ function opDefaults(o, index) {
     phase: num(o.phase, d.phase),
     phaseFree: o.phaseFree !== false,
     // free-running by default (OPERATOR_DEFAULTS.phaseFree)
+    noiseLp: clamp(num(o.noiseLp, d.noiseLp), NOISE_COLOUR_RANGE),
+    // Hz, 0 off; Noise only (windsor#362)
+    noiseHp: clamp(num(o.noiseHp, d.noiseHp), NOISE_COLOUR_RANGE),
     env: envDefaults(o.env)
   };
 }
@@ -974,6 +987,170 @@ function secondLfoSeed(seed) {
   return x || 1;
 }
 
+// packages/engine/src/inserts/tapePortableMathTables.ts
+function factorial(n) {
+  let f = 1;
+  for (let i = 2; i <= n; i++) f *= i;
+  return f;
+}
+function reciprocalFactorials(first, count, alternating) {
+  const terms = new Float64Array(count);
+  for (let i = 0; i < count; i++) {
+    const n = alternating ? first + 2 * i : first + i;
+    terms[i] = (alternating && i % 2 === 1 ? -1 : 1) / factorial(n);
+  }
+  return terms;
+}
+function split(value, residue) {
+  const scale = 4294967296;
+  const hi = Math.round(value * scale) / scale;
+  return [hi, value - hi, residue];
+}
+var POWER_REACH = 64;
+function powersOfTwo(reach) {
+  const powers = new Float64Array(2 * reach + 1);
+  powers[reach] = 1;
+  for (let k = 1; k <= reach; k++) {
+    powers[reach + k] = powers[reach + k - 1] * 2;
+    powers[reach - k] = powers[reach - k + 1] / 2;
+  }
+  return powers;
+}
+var TAPE_PORTABLE_MATH = {
+  /** π/2 as a double, and split: π/2 − Math.PI/2 = 6.123233995736766e-17. */
+  halfPi: Math.PI / 2,
+  halfPiParts: split(Math.PI / 2, 6123233995736766e-32),
+  /** k & this is the quadrant of k π/2 (two's complement, so negative k too). */
+  quadrantMask: 3,
+  /** ln 2 as a double, and split: ln 2 − Math.LN2 = 2.3190468138462996e-17. */
+  ln2: Math.LN2,
+  ln2Parts: split(Math.LN2, 23190468138462996e-33),
+  /**
+   * sin r = r Σ (−1)^i r^2i / (2i+1)! to r^19 and cos r = Σ (−1)^i r^2i / (2i)!
+   * to r^20: past them, on |r| ≤ π/4, a term is below 1e-19 of the sum.
+   */
+  sineTerms: reciprocalFactorials(1, 10, true),
+  cosineTerms: reciprocalFactorials(0, 11, true),
+  /** expm1 r = r Σ r^i / (i+1)! to r^13: past it, on |r| ≤ ln2/2, a term is below 1e-17 of r. */
+  expm1Terms: reciprocalFactorials(1, 13, false),
+  /** |x| from which tanh x is ±1 in a double: 1 − tanh 22 = 2e^-44/(1 + e^-44) < 2^-54. */
+  tanhUnity: 22,
+  powerReach: POWER_REACH,
+  powersOfTwo: powersOfTwo(POWER_REACH)
+};
+
+// packages/engine/src/worklet/fm/portableTangent.ts
+function tanInPlace(values, at) {
+  const table = TAPE_PORTABLE_MATH;
+  const x = values[at];
+  const k = Math.round(x / table.halfPi);
+  const parts = table.halfPiParts;
+  const r = x - k * parts[0] - k * parts[1] - k * parts[2];
+  const r2 = r * r;
+  const sineTerms = table.sineTerms;
+  let sinR = sineTerms[sineTerms.length - 1];
+  for (let i = sineTerms.length - 2; i >= 0; i--) sinR = sinR * r2 + sineTerms[i];
+  sinR *= r;
+  const cosineTerms = table.cosineTerms;
+  let cosR = cosineTerms[cosineTerms.length - 1];
+  for (let i = cosineTerms.length - 2; i >= 0; i--) cosR = cosR * r2 + cosineTerms[i];
+  values[at] = (k & 1) === 0 ? sinR / cosR : -cosR / sinR;
+}
+
+// packages/engine/src/worklet/fm/noiseColour.ts
+var NoiseColour = class {
+  constructor() {
+    this.lpHz = this.hpHz = this.lpA1 = this.lpA2 = this.lpA3 = NaN;
+    this.hpA1 = this.hpA2 = this.hpA3 = NaN;
+    this.lp1 = this.lp2 = this.hp1 = this.hp2 = this.point = NaN;
+    this.on = false;
+    this.lpOn = false;
+    this.hpOn = false;
+    this.lpA1 = this.hpA1 = 1;
+    this.lpA2 = this.lpA3 = this.hpA2 = this.hpA3 = 0;
+    this.lp1 = this.lp2 = this.hp1 = this.hp2 = 0;
+    this.point = 0;
+    this.slot = new Float64Array(1);
+  }
+  /** A new note: both sections start from rest. Their tuning carries over, since it is the patch's. */
+  reset() {
+    this.lp1 = 0;
+    this.lp2 = 0;
+    this.hp1 = 0;
+    this.hp2 = 0;
+  }
+  /** `point` through the lowpass, then the highpass, whichever are on; written back to `point`. */
+  process() {
+    let x = this.point;
+    if (this.lpOn) {
+      const ic1 = this.lp1;
+      const ic2 = this.lp2;
+      const v3 = x - ic2;
+      const v1 = this.lpA1 * ic1 + this.lpA2 * v3;
+      const v2 = ic2 + this.lpA2 * ic1 + this.lpA3 * v3;
+      this.lp1 = 2 * v1 - ic1;
+      this.lp2 = 2 * v2 - ic2;
+      x = v2;
+    }
+    if (this.hpOn) {
+      const ic1 = this.hp1;
+      const ic2 = this.hp2;
+      const v3 = x - ic2;
+      const v1 = this.hpA1 * ic1 + this.hpA2 * v3;
+      const v2 = ic2 + this.hpA2 * ic1 + this.hpA3 * v3;
+      this.hp1 = 2 * v1 - ic1;
+      this.hp2 = 2 * v2 - ic2;
+      x = x - NOISE_COLOUR_DAMPING * v1 - v2;
+    }
+    this.point = x;
+  }
+};
+function prewarpInPlace(slot, rate) {
+  let fc = slot[0];
+  if (fc < NOISE_COLOUR_FLOOR_HZ) fc = NOISE_COLOUR_FLOOR_HZ;
+  const top = NOISE_COLOUR_CEILING * rate;
+  if (fc > top) fc = top;
+  slot[0] = Math.PI * fc / rate;
+  tanInPlace(slot, 0);
+}
+function bindNoiseColour(voice, i) {
+  const colour = voice.noiseColour[i];
+  const op = voice.patch.ops[i];
+  const noise = voice.kind[i] === KIND_NOISE;
+  const lp = noise ? op.noiseLp : 0;
+  const hp = noise ? op.noiseHp : 0;
+  const slot = colour.slot;
+  if (lp !== colour.lpHz) {
+    const was = colour.lpOn;
+    colour.lpHz = lp;
+    colour.lpOn = lp > 0;
+    if (colour.lpOn) {
+      slot[0] = lp;
+      prewarpInPlace(slot, voice.sr);
+      const g = slot[0];
+      colour.lpA1 = 1 / (1 + g * (g + NOISE_COLOUR_DAMPING));
+      colour.lpA2 = g * colour.lpA1;
+      colour.lpA3 = g * colour.lpA2;
+      if (!was) colour.lp1 = colour.lp2 = 0;
+    }
+  }
+  if (hp !== colour.hpHz) {
+    const was = colour.hpOn;
+    colour.hpHz = hp;
+    colour.hpOn = hp > 0;
+    if (colour.hpOn) {
+      slot[0] = hp;
+      prewarpInPlace(slot, voice.sr);
+      const g = slot[0];
+      colour.hpA1 = 1 / (1 + g * (g + NOISE_COLOUR_DAMPING));
+      colour.hpA2 = g * colour.hpA1;
+      colour.hpA3 = g * colour.hpA2;
+      if (!was) colour.hp1 = colour.hp2 = 0;
+    }
+  }
+  colour.on = colour.lpOn || colour.hpOn;
+}
+
 // packages/engine/src/worklet/fm/stepModTables.ts
 var STEP_MOD_FILTER_ROWS = [
   { param: "filter.envAmount", curve: "linear", span: 6, min: -6, max: 6, slideKeeps: false },
@@ -1088,58 +1265,6 @@ var Svf = class {
         return v0;
     }
   }
-};
-
-// packages/engine/src/inserts/tapePortableMathTables.ts
-function factorial(n) {
-  let f = 1;
-  for (let i = 2; i <= n; i++) f *= i;
-  return f;
-}
-function reciprocalFactorials(first, count, alternating) {
-  const terms = new Float64Array(count);
-  for (let i = 0; i < count; i++) {
-    const n = alternating ? first + 2 * i : first + i;
-    terms[i] = (alternating && i % 2 === 1 ? -1 : 1) / factorial(n);
-  }
-  return terms;
-}
-function split(value, residue) {
-  const scale = 4294967296;
-  const hi = Math.round(value * scale) / scale;
-  return [hi, value - hi, residue];
-}
-var POWER_REACH = 64;
-function powersOfTwo(reach) {
-  const powers = new Float64Array(2 * reach + 1);
-  powers[reach] = 1;
-  for (let k = 1; k <= reach; k++) {
-    powers[reach + k] = powers[reach + k - 1] * 2;
-    powers[reach - k] = powers[reach - k + 1] / 2;
-  }
-  return powers;
-}
-var TAPE_PORTABLE_MATH = {
-  /** π/2 as a double, and split: π/2 − Math.PI/2 = 6.123233995736766e-17. */
-  halfPi: Math.PI / 2,
-  halfPiParts: split(Math.PI / 2, 6123233995736766e-32),
-  /** k & this is the quadrant of k π/2 (two's complement, so negative k too). */
-  quadrantMask: 3,
-  /** ln 2 as a double, and split: ln 2 − Math.LN2 = 2.3190468138462996e-17. */
-  ln2: Math.LN2,
-  ln2Parts: split(Math.LN2, 23190468138462996e-33),
-  /**
-   * sin r = r Σ (−1)^i r^2i / (2i+1)! to r^19 and cos r = Σ (−1)^i r^2i / (2i)!
-   * to r^20: past them, on |r| ≤ π/4, a term is below 1e-19 of the sum.
-   */
-  sineTerms: reciprocalFactorials(1, 10, true),
-  cosineTerms: reciprocalFactorials(0, 11, true),
-  /** expm1 r = r Σ r^i / (i+1)! to r^13: past it, on |r| ≤ ln2/2, a term is below 1e-17 of r. */
-  expm1Terms: reciprocalFactorials(1, 13, false),
-  /** |x| from which tanh x is ±1 in a double: 1 − tanh 22 = 2e^-44/(1 + e^-44) < 2^-54. */
-  tanhUnity: 22,
-  powerReach: POWER_REACH,
-  powersOfTwo: powersOfTwo(POWER_REACH)
 };
 
 // packages/engine/src/worklet/fm/portablePowers.ts
@@ -1390,6 +1515,7 @@ function bindVoiceConstants(voice, patch) {
     voice.detuneMul[i] = Math.pow(2, op.detune / 1200);
     voice.levelKeyAmp[i] = Math.pow(2, -op.levelKeyScale * keyOffset);
     if (voice.kind[i] === KIND_NOISE) noiseOps++;
+    bindNoiseColour(voice, i);
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
@@ -1534,6 +1660,9 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const sqB = kB !== KIND_NOISE && kB !== KIND_PULSE && (wB !== 1 || rampB);
   const sqC = kC !== KIND_NOISE && kC !== KIND_PULSE && (wC !== 1 || rampC);
   const sqD = kD !== KIND_NOISE && kD !== KIND_PULSE && (wD !== 1 || rampD);
+  const colours = voice.noiseColour;
+  const ncA = colours[A], ncB = colours[B], ncC = colours[C], ncD = colours[D];
+  const colA = ncA.on, colB = ncB.on, colC = ncC.on, colD = ncD.on;
   for (let s = 0; s < n; s++) {
     if (liveD) {
       const a = aD;
@@ -1561,8 +1690,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tD[i0];
         v = s0 + (tD[i0 + 1] - s0) * (fi - i0);
-      } else if (kD === KIND_NOISE) v = voice.noise();
-      else if (kD === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kD === KIND_NOISE) {
+        v = voice.noise();
+        if (colD) {
+          ncD.point = v;
+          ncD.process();
+          v = ncD.point;
+        }
+      } else if (kD === KIND_SAW_D) v = ph * 2 - 1;
       else if (kD === KIND_PULSE) {
         let pd = ph + wD;
         pd -= Math.floor(pd);
@@ -1616,8 +1751,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tC[i0];
         v = s0 + (tC[i0 + 1] - s0) * (fi - i0);
-      } else if (kC === KIND_NOISE) v = voice.noise();
-      else if (kC === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kC === KIND_NOISE) {
+        v = voice.noise();
+        if (colC) {
+          ncC.point = v;
+          ncC.process();
+          v = ncC.point;
+        }
+      } else if (kC === KIND_SAW_D) v = ph * 2 - 1;
       else if (kC === KIND_PULSE) {
         let pd = ph + wC;
         pd -= Math.floor(pd);
@@ -1672,8 +1813,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tB[i0];
         v = s0 + (tB[i0 + 1] - s0) * (fi - i0);
-      } else if (kB === KIND_NOISE) v = voice.noise();
-      else if (kB === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kB === KIND_NOISE) {
+        v = voice.noise();
+        if (colB) {
+          ncB.point = v;
+          ncB.process();
+          v = ncB.point;
+        }
+      } else if (kB === KIND_SAW_D) v = ph * 2 - 1;
       else if (kB === KIND_PULSE) {
         let pd = ph + wB;
         pd -= Math.floor(pd);
@@ -1729,8 +1876,14 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
         const i0 = fi | 0;
         const s0 = tA[i0];
         v = s0 + (tA[i0 + 1] - s0) * (fi - i0);
-      } else if (kA === KIND_NOISE) v = voice.noise();
-      else if (kA === KIND_SAW_D) v = ph * 2 - 1;
+      } else if (kA === KIND_NOISE) {
+        v = voice.noise();
+        if (colA) {
+          ncA.point = v;
+          ncA.process();
+          v = ncA.point;
+        }
+      } else if (kA === KIND_SAW_D) v = ph * 2 - 1;
       else if (kA === KIND_PULSE) {
         let pd = ph + wA;
         pd -= Math.floor(pd);
@@ -1918,10 +2071,12 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const kind = voice.kind, tables = voice.tables;
   const width = voice.width, widthInc = voice.widthInc;
   const fbAmt = voice.opFeedback;
-  let ramping = 0, squeezed = 0;
+  const colours = voice.noiseColour;
+  let ramping = 0, squeezed = 0, coloured = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
     if (widthInc[i] !== 0) ramping |= bit;
+    if (colours[i].on) coloured |= bit;
     const k = kind[i];
     if (k !== KIND_NOISE && k !== KIND_PULSE && (width[i] !== 1 || widthInc[i] !== 0)) {
       squeezed |= bit;
@@ -1995,6 +2150,12 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
             break;
           }
         }
+      }
+      if ((coloured & 1 << i) !== 0) {
+        const colour = colours[i];
+        colour.point = v;
+        colour.process();
+        v = colour.point;
       }
       fb2[i] = fb1[i];
       fb1[i] = v * a;
@@ -2157,6 +2318,7 @@ var Voice = class {
     this.lfo2 = new Lfo(secondLfoSeed(this.lfo.seed));
     this.svfA = new Svf();
     this.svfB = new Svf();
+    this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
     this.drive = new VoiceDrive();
     this.noiseSeed = randomSeed32(random);
     this.active = false;
@@ -2255,6 +2417,7 @@ var Voice = class {
       this.ampEnv[i].configure(op.env, this.sr);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
       this.ampEnv[i].noteOn();
+      this.noiseColour[i].reset();
     }
     this.bindConstants(patch);
     this.filtEnv.configure(patch.filter.env, this.sr);

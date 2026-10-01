@@ -6,7 +6,13 @@
  * so a schema-default change in `patch.ts` moves double-click reset with it.
  * `knobDefaults.test.ts` walks `allPatchKnobs()`.
  */
-import { OP_NAMES, WIDTH_RANGE, makePatch } from '@windsor/engine';
+import {
+  NOISE_COLOUR_FLOOR_HZ,
+  NOISE_COLOUR_RANGE,
+  OP_NAMES,
+  WIDTH_RANGE,
+  makePatch,
+} from '@windsor/engine';
 import { fmt2, fmtCycleDegrees, fmtHz, fmtMs, fmtSigned } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';
@@ -45,6 +51,7 @@ const fmtSignedSemitones = (v: number): string => `${fmtSigned(v)}st`;
 const PERCENT = 100;
 const fmtPercent = (v: number): string => `${(v * PERCENT).toFixed(0)}%`;
 const fmtTimes = (v: number): string => `×${v.toFixed(2)}`;
+const fmtHzOrOff = (v: number): string => (v > 0 ? fmtHz(v) : 'Off');
 
 export const GLOBAL_KNOBS: PatchKnobTable = [
   { f: 'volume', label: 'Volume', o: { min: 0, max: 1.5, fmt: fmt2 } },
@@ -148,6 +155,26 @@ export const OP_KNOBS: PatchKnobTable = [
 ];
 
 /**
+ * A Noise operator's own colour (windsor#362), by sub-field of `ops.<i>`: a
+ * two-pole lowpass and highpass on its noise, before its level. The bay shows
+ * them on a Noise operator only; every other wave ignores the fields. Zero-end
+ * log knobs, as the envelope times' (windsor#324): the bottom of the dial is
+ * exact 0, Off, and the log sweep runs from the engine's floor to the top of
+ * its range.
+ */
+const noiseColourRange: PatchKnobRange = {
+  min: NOISE_COLOUR_RANGE.min,
+  max: NOISE_COLOUR_RANGE.max,
+  curve: 'log',
+  logFloor: NOISE_COLOUR_FLOOR_HZ,
+  fmt: fmtHzOrOff,
+};
+export const NOISE_COLOUR_KNOBS: PatchKnobTable = [
+  { f: 'noiseLp', label: 'Noise LP', o: noiseColourRange },
+  { f: 'noiseHp', label: 'Noise HP', o: noiseColourRange },
+];
+
+/**
  * The envelope row, by sub-field of any of the six envelope slots. Since
  * windsor#316 a stage ends on its own sample, so an attack or a decay of 0
  * is a sound (a hit that opens on a step): the bottom of each sweep is exact
@@ -211,7 +238,9 @@ export function allPatchKnobs(): PatchKnob[] {
     own(lfoToWidthKnobs(key));
   }
   own([PITCH_ENV_AMOUNT_KNOB]);
-  OP_NAMES.forEach((_, i) => under(`ops.${i}`, [FIXED_HZ_KNOB, ...OP_KNOBS, OP_PHASE_KNOB]));
+  OP_NAMES.forEach((_, i) =>
+    under(`ops.${i}`, [FIXED_HZ_KNOB, ...OP_KNOBS, ...NOISE_COLOUR_KNOBS, OP_PHASE_KNOB]),
+  );
   for (const slot of ENVELOPE_SLOTS) {
     const adv = slot === 'pitchEnv' ? PITCH_ENV_ADV_KNOBS : ENVELOPE_ADV_KNOBS;
     under(slot, [...ENVELOPE_KNOBS, ...adv]);

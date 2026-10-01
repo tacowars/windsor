@@ -2,8 +2,8 @@
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history, amplitude ramps and their knots (windsor#301), width ramps, six
- * envelopes, two LFOs, the drive stage (windsor#300), two filter stages, the
- * steal fade, a step's parameter offsets and the per-voice values they make
+ * envelopes, two LFOs, each Noise operator's colour (windsor#362), the
+ * drive stage (windsor#300), two filter stages, the steal fade, a step's parameter offsets and the per-voice values they make
  * (windsor#17) — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
  * the part polls, whose logic is `voiceQuiet.ts`. The hot paths are functions over the voice in `voiceControl.js`,
@@ -23,6 +23,7 @@ import { ALGORITHMS, ALG_ORDER } from './algorithms';
 import { Envelope, ST_IDLE } from './envelope';
 import { ENVELOPE_BREAKS_MAX } from './fmConstants';
 import { Lfo, secondLfoSeed } from './lfo';
+import { NoiseColour } from './noiseColour';
 import { randomSeed32 } from './prng';
 import { STEP_MOD_SLOT_COUNT } from './stepModTables';
 import { Svf } from './svf';
@@ -68,6 +69,8 @@ class Voice {
   lfo2: Lfo;
   svfA: Svf;
   svfB: Svf;
+  /** Each operator's noise colour (windsor#362): run only for a Noise operator with a field set. */
+  noiseColour: NoiseColour[];
   drive: VoiceDrive;
   noiseSeed: number;
   active: boolean;
@@ -170,6 +173,7 @@ class Voice {
     this.lfo2 = new Lfo(secondLfoSeed(this.lfo.seed));
     this.svfA = new Svf();
     this.svfB = new Svf();
+    this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
     this.drive = new VoiceDrive();
 
     this.noiseSeed = randomSeed32(random);
@@ -299,6 +303,7 @@ class Voice {
       this.ampEnv[i].configure(op.env, this.sr);
       this.ampEnv[i].timeScale = Math.pow(2, -op.env.keyScale * keyOffset);
       this.ampEnv[i].noteOn();
+      this.noiseColour[i].reset();
     }
     this.bindConstants(patch);
 

@@ -9,7 +9,13 @@ import { envAdvKnobs, envKnobs, envLoopPicker } from './envelopeKnobs';
 import { opEnvelopeSlot } from './envelopeTransfer';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import type { KnobElement } from './knob';
-import { FIXED_HZ_KNOB, OP_KNOBS, OP_PHASE_KNOB, patchKnobOpts } from './patchKnobTables';
+import {
+  FIXED_HZ_KNOB,
+  NOISE_COLOUR_KNOBS,
+  OP_KNOBS,
+  OP_PHASE_KNOB,
+  patchKnobOpts,
+} from './patchKnobTables';
 import { OP_START_NAMES, opStartIndex, opStartLocked, writeOpStart } from './operatorStart';
 import { BAY_SILENT_LEVEL, PULSE_START_WIDTH } from './patchPanelConstants';
 import type { PatchEditor } from './partsSession';
@@ -27,6 +33,11 @@ export function ensurePulseWidth(patch: Patch, i: number, startWidth = PULSE_STA
   if (target?.wave === WAVE.PULSE && target.width >= WIDTH_RANGE.max) {
     target.width = startWidth;
   }
+}
+
+/** Whether operator `i` shows its noise colour knobs (windsor#362): only a Noise operator hears them. */
+export function showsNoiseColour(patch: Patch, i: number): boolean {
+  return patch.ops[i]?.wave === WAVE.NOISE;
 }
 
 function op(editor: PatchEditor, i: number): { level: number; wave: number; fixed: boolean } {
@@ -137,9 +148,32 @@ function startControls(editor: PatchEditor, i: number, color: string): HTMLEleme
 }
 
 /**
+ * A Noise operator's colour knobs (windsor#362), Noise LP and Noise HP: built
+ * for every operator, shown only while its wave is Noise. `sync` is what a
+ * wave switch calls.
+ */
+function noiseColourKnobs(
+  editor: PatchEditor,
+  i: number,
+  color: string,
+): { nodes: HTMLElement[]; sync: () => void } {
+  const nodes = NOISE_COLOUR_KNOBS.map((k) => {
+    const path = `ops.${i}.${k.f}`;
+    return pathKnob(editor, path, k.label, { ...patchKnobOpts(k, path), color });
+  });
+  const sync = (): void => {
+    const shown = showsNoiseColour(editor.patch, i);
+    for (const node of nodes) node.style.display = shown ? '' : 'none';
+  };
+  sync();
+  return { nodes, sync };
+}
+
+/**
  * The knob row: the pitch controls first — Coarse, Fine and their readout, or
  * the Fixed Hz knob, whichever the operator's Pitch toggle selects — then the
- * rest of `OP_KNOBS`. `syncPitch` is what the toggle calls to swap them.
+ * rest of `OP_KNOBS`, then a Noise operator's colour. `syncPitch` is what the
+ * toggle calls to swap them.
  */
 function mainKnobRow(
   editor: PatchEditor,
@@ -161,11 +195,15 @@ function mainKnobRow(
     const fade = k.f === 'level' ? { onChange: syncActive } : {};
     row.appendChild(pathKnob(editor, path, k.label, { ...patchKnobOpts(k, path), ...fade, color }));
   }
+  const colour = noiseColourKnobs(editor, i, color);
+  for (const node of colour.nodes) row.appendChild(node);
   const syncPitch = (): void => showPitchControls(op(editor, i).fixed, ratioNodes, fixedNode);
   syncPitch();
-  // A wave switch can seed Width (`ensurePulseWidth`), so the row re-reads the patch.
+  // A wave switch can seed Width (`ensurePulseWidth`), so the row re-reads the
+  // patch, and shows or hides the noise colour.
   const syncKnobs = (): void => {
     for (const knob of row.querySelectorAll<KnobElement>('.knob')) knob.refresh();
+    colour.sync();
   };
   return { root: row, syncPitch, syncKnobs };
 }
