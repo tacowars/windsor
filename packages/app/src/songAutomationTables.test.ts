@@ -37,6 +37,18 @@ describe('INACTIVE_WHY', () => {
     expect(why(DEFAULT_ADVANCED_DRIVE, 'rate')).toBe('the LFO is synced');
   });
 
+  it("blames a stage's filtering, not its filter type, for a peak lane", () => {
+    const why = INACTIVE_WHY['advanced-drive']!;
+    const at = (filtering: boolean, filter: 'peak' | 'lowpass') => ({
+      ...DEFAULT_ADVANCED_DRIVE,
+      stages: DEFAULT_ADVANCED_DRIVE.stages.map((s, i) =>
+        i === 0 ? { ...s, enabled: true, filtering, filter } : s,
+      ),
+    });
+    expect(why(at(false, 'peak'), 'stages.0.peak')).toBe('stage 1 is not filtering');
+    expect(why(at(true, 'lowpass'), 'stages.0.peak')).toBe("stage 1's filter is not a peak");
+  });
+
   it("names an EQ band's state", () => {
     const why = INACTIVE_WHY.eq!;
     const bands = DEFAULT_EQ.bands.map((b) => ({ ...b, on: false }));
