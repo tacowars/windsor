@@ -21,7 +21,10 @@
  *   and 4x (both ways, and with the insert off), every model, Drive across
  *   its range, Bias, the Wear macro and the split dials (wow, flutter and
  *   dropouts up to 100), both rates, hiss above its floor and at it, trim,
- *   a new seed, Mix down to dry and the insert switched off and on. The
+ *   a new seed, Mix down to dry and the insert switched off and on, and the
+ *   song's core controls (windsor#291) set at the knob box's corners, swept
+ *   a quantum at a time across each control's range and all three at once,
+ *   and cleared back to the model's row. The
  *   input arrives stereo, mono or with no channels (an inactive source). It
  *   warms up with the cycle twelve times, the load meter on for the first:
  *   after six, V8 compiled the block's `configure` to its top tier inside
@@ -95,22 +98,55 @@ const NAMES = [
   'mix',
   'seed',
   'enabled',
+  'core',
+  'coreDrive',
+  'coreWidth',
+  'coreSaturation',
 ];
 
-/** One step a row: its parameter values and its input. */
-const STEPS: [number[], TapeInput][] = [
-  [[2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1], 'stereo'],
-  [[4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1], 'stereo'],
-  [[4, 1, 12.5, 40, 60, 0, 0, 0, 0, 1, 7, -40, -3.5, 1, 1, 1], 'stereo'],
-  [[2, 2, -8.3, -70, 60, 1, 30, 70, 100, 0.3, 12, -20, 6, 0.6, 1, 1], 'mono'],
-  [[4, 6, 32, 15, 0, 1, 100, 10, 50, 2.5, 19, -55, 0, 0, 1, 1], 'stereo'],
-  [[2, 6, 32, 15, 0, 1, 100, 10, 50, 2.5, 19, -55, 0, 1, 1, 0], 'stereo'],
-  [[4, 3, 20, 15, 100, 0, 0, 0, 0, 0.05, 1, -30, 0, 1, 12345, 0], 'none'],
-  [[4, 3, 20, 15, 100, 0, 0, 0, 0, 0.05, 1, -30, 0, 1, 12345, 1], 'stereo'],
-  [[2, 4, -32, 100, 35, 0, 0, 0, 0, 3, 20, -16, -24, 0.3, 777, 1], 'stereo'],
-  [[2, 5, 4.4, -100, 0, 1, 5, 5, 5, 1, 7, -70, 24, 1, 777, 1], 'none'],
-  [[4, 0, 5.5, 0, 0, 1, 50, 50, 0, 0.7, 4, -65, 0, 0.9, 1, 1], 'mono'],
-  [[2, 1, 3.3, 10, 20, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1], 'stereo'],
+/** A step's sweep of the core's controls, from its row's values to these (windsor#291). */
+const SWEEP_NAMES = ['coreDrive', 'coreWidth', 'coreSaturation'];
+type Sweep = TapeChangeStep['sweep'];
+const sweepTo = (to: number[]): Sweep => ({ names: SWEEP_NAMES, to });
+
+/**
+ * One step a row: its parameter values, its input and any sweep. The last four values are the
+ * song's core (windsor#291): its flag, then drive, width and saturation in the knob box, set at
+ * its corners, swept across each control's range alone and all three at once, and cleared.
+ */
+const STEPS: [number[], TapeInput, Sweep?][] = [
+  [[2, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 0, 0.16, 0.28, 0.32], 'stereo'],
+  [[4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 1, 1, 0.05, 0], 'stereo'],
+  [
+    [4, 1, 12.5, 40, 60, 0, 0, 0, 0, 1, 7, -40, -3.5, 1, 1, 1, 1, 0, 0.62, 1],
+    'stereo',
+    sweepTo([1, 0.62, 1]),
+  ],
+  [[2, 2, -8.3, -70, 60, 1, 30, 70, 100, 0.3, 12, -20, 6, 0.6, 1, 1, 0, 0.5, 0.5, 0.5], 'mono'],
+  [
+    [4, 6, 32, 15, 0, 1, 100, 10, 50, 2.5, 19, -55, 0, 0, 1, 1, 1, 0.5, 0.05, 0.5],
+    'stereo',
+    sweepTo([0.5, 0.62, 0.5]),
+  ],
+  [[2, 6, 32, 15, 0, 1, 100, 10, 50, 2.5, 19, -55, 0, 1, 1, 0, 1, 0.5, 0.62, 0.5], 'stereo'],
+  [[4, 3, 20, 15, 100, 0, 0, 0, 0, 0.05, 1, -30, 0, 1, 12345, 0, 0, 0.5, 0.62, 0.5], 'none'],
+  [
+    [4, 3, 20, 15, 100, 0, 0, 0, 0, 0.05, 1, -30, 0, 1, 12345, 1, 1, 0.3, 0.3, 0],
+    'stereo',
+    sweepTo([0.3, 0.3, 1]),
+  ],
+  [[2, 4, -32, 100, 35, 0, 0, 0, 0, 3, 20, -16, -24, 0.3, 777, 1, 0, 0.3, 0.3, 1], 'stereo'],
+  [
+    [2, 5, 4.4, -100, 0, 1, 5, 5, 5, 1, 7, -70, 24, 1, 777, 1, 1, 1, 0.62, 1],
+    'none',
+    sweepTo([0, 0.05, 0]),
+  ],
+  [
+    [4, 0, 5.5, 0, 0, 1, 50, 50, 0, 0.7, 4, -65, 0, 0.9, 1, 1, 1, 0, 0.05, 0],
+    'mono',
+    sweepTo([1, 0.62, 1]),
+  ],
+  [[2, 1, 3.3, 10, 20, 0, 0, 0, 0, 1, 7, -70, 0, 1, 1, 1, 0, 1, 0.62, 1], 'stereo'],
 ];
 const CYCLE = STEPS.length * PERIOD;
 
@@ -150,7 +186,12 @@ function steady(oversampling: number): ProbeRun {
 }
 
 function changes(): ProbeRun {
-  const steps = STEPS.map(([values, input]): TapeChangeStep => ({ names: NAMES, values, input }));
+  const steps = STEPS.map(([values, input, sweep]): TapeChangeStep => ({
+    names: NAMES,
+    values,
+    input,
+    ...(sweep ? { sweep } : {}),
+  }));
   return run({ steps, period: PERIOD, quiet: QUIET }, 12 * CYCLE, CYCLE);
 }
 
@@ -169,7 +210,7 @@ describe('Tape on V8', () => {
     120_000,
   );
 
-  it('switches 2x and 4x, Mix, bypass and every setting and input without allocating or changing a field representation', () => {
+  it('switches 2x and 4x, Mix, bypass, every setting and input, and sweeps the core without allocating or changing a field representation', () => {
     expectClean(changes());
   }, 240_000);
 });

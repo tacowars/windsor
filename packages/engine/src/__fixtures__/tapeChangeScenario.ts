@@ -4,7 +4,8 @@
  * controls glide and settle, with a short silence at its end. The steps
  * switch the magnetic core between 2x and 4x, change the model, Bias, Drive,
  * the Wear macro and the split dials, the rates, hiss, trim and the seed, and
- * take Mix down to dry and the insert off and on. Each step also names its
+ * take Mix down to dry and the insert off and on, and set, sweep and clear the
+ * song's core controls (windsor#291). Each step also names its
  * input, as the node's input arrives in Chrome: stereo, mono (the right
  * channel follows the left) or none (an inactive source has no channels).
  * The warm-up plays the cycle whole several times, the load meter on for its
@@ -31,6 +32,11 @@ export interface TapeChangeStep {
   names: string[];
   values: number[];
   input: TapeInput;
+  /**
+   * Parameters this step then moves a quantum at a time (windsor#291's knob sweeps): from their
+   * value in `values` to `to`, index for index, linearly over the step's quanta before its silence.
+   */
+  sweep?: { names: string[]; to: number[] };
 }
 
 export interface TapeChangeConfig {
@@ -69,12 +75,29 @@ export default function tapeChangeScenario(probe: ProbeRig): ProbeScenario {
   const values = steps.map((step) => Float32Array.from(step.values));
   const feed = steps.map((step) => feeds[step.input]);
   const cycle = steps.length * period;
+  // A sweep's parameter arrays, and its start and end values, as doubles.
+  const sweepArrays = steps.map((step) => (step.sweep?.names ?? []).map((name) => params[name]!));
+  const sweepFrom = steps.map((step) =>
+    Float64Array.from(step.sweep?.names ?? [], (name) => step.values[step.names.indexOf(name)]!),
+  );
+  const sweepTo = steps.map((step) => Float64Array.from(step.sweep?.to ?? []));
+  const moving = period - config.quiet;
+  // Integer arithmetic only, and no double but a sweep's value, which goes straight to its
+  // parameter: the probe measures this code's heap along with the processor's.
   const apply = (q: number): void => {
-    if (q % period !== 0) return;
-    const step = (q / period) % steps.length;
-    const at = arrays[step]!,
-      to = values[step]!;
-    for (let i = 0; i < at.length; i++) at[i]![0] = to[i]!;
+    const k = q % period,
+      step = ((q - k) / period) % steps.length;
+    if (k === 0) {
+      const at = arrays[step]!,
+        to = values[step]!;
+      for (let i = 0; i < at.length; i++) at[i]![0] = to[i]!;
+    }
+    const sweep = sweepArrays[step]!;
+    if (sweep.length === 0 || k >= moving) return;
+    const from = sweepFrom[step]!,
+      to = sweepTo[step]!;
+    for (let i = 0; i < sweep.length; i++)
+      sweep[i]![0] = from[i]! + ((to[i]! - from[i]!) * k) / (moving - 1);
   };
   // Quanta [from, to). The warm-up and the measured run call this same function.
   const drive = (from: number, to: number): void => {

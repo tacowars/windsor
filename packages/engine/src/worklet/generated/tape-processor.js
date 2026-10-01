@@ -35,6 +35,18 @@ var TAPE_BOUNDS = {
   mix: [0, 1],
   seed: [0, 16777215]
 };
+var TAPE_CORE_BOUNDS = {
+  drive: [0, 1],
+  width: [0.05, 0.62],
+  saturation: [0, 1]
+};
+var TAPE_CORE_CONTROLS = ["drive", "width", "saturation"];
+var TAPE_CORE_PARAMS = {
+  flag: "core",
+  drive: "coreDrive",
+  width: "coreWidth",
+  saturation: "coreSaturation"
+};
 var TAPE_OVERSAMPLING = [2, 4];
 var TAPE_DEFAULTS = {
   drive: 0,
@@ -682,21 +694,32 @@ var TapeMagneticCore = class {
 };
 
 // packages/engine/src/worklet/tape/tapeMagneticRows.ts
+var ROW_LENGTH = 3;
 function magneticControls(row, into) {
   into.drive = row[0];
   into.width = row[1];
   into.saturation = row[2];
   return into;
 }
+function magneticRowInRange(row) {
+  if (!Array.isArray(row) || row.length !== ROW_LENGTH) return false;
+  for (let i = 0; i < ROW_LENGTH; i++) {
+    const value = row[i];
+    if (typeof value !== "number" || !(value >= 0 && value <= 1)) return false;
+  }
+  return true;
+}
+function magneticRowAboveFloor(row, scratch, table = TAPE_MAGNETIC) {
+  return originSusceptibility(magneticControls(row, scratch), table) > table.susceptibilityFloor;
+}
 function assertMagneticRows(rows = TAPE_MODELS, table = TAPE_MAGNETIC) {
   const controls = { drive: NaN, width: NaN, saturation: NaN };
   rows.forEach(({ magnetic }, index) => {
-    if (!magnetic.every((value) => value >= 0 && value <= 1))
+    if (!magneticRowInRange(magnetic))
       throw new RangeError(`tape model ${index}: magnetic controls must be in [0, 1]`);
-    const susceptibility = originSusceptibility(magneticControls(magnetic, controls), table);
-    if (!(susceptibility > table.susceptibilityFloor))
+    if (!magneticRowAboveFloor(magnetic, controls, table))
       throw new RangeError(
-        `tape model ${index}: origin susceptibility ${susceptibility} is not above ${table.susceptibilityFloor}`
+        `tape model ${index}: origin susceptibility ${originSusceptibility(controls, table)} is not above ${table.susceptibilityFloor}`
       );
   });
 }
@@ -852,8 +875,14 @@ var TapeOversampler = class {
 
 // packages/engine/src/worklet/tape/tapeMagneticStage.ts
 var CHANNELS = 2;
+var TapeCoreControls = class {
+  constructor() {
+    this.drive = this.width = this.saturation = NaN;
+  }
+};
 var TapeMagneticStage = class {
-  constructor(rate, factor, model) {
+  /** `override`, when given, is the song's `core`: the cores start on it rather than the row. */
+  constructor(rate, factor, model, override = null) {
     this.rate = rate;
     this.oversamplers = [];
     for (let channel = 0; channel < CHANNELS; channel++)
@@ -866,9 +895,19 @@ var TapeMagneticStage = class {
     this.snap = NaN;
     this.snap = TAPE_DSP.magneticSnap;
     this.gliding = false;
-    const row = TAPE_MODELS[model].magnetic;
-    this.target = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
-    this.controls = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
+    this.overridden = override !== null;
+    this.custom = new TapeCoreControls();
+    if (override !== null) {
+      this.custom.drive = override.drive;
+      this.custom.width = override.width;
+      this.custom.saturation = override.saturation;
+    }
+    this.target = new TapeCoreControls();
+    this.aim(model);
+    this.controls = new TapeCoreControls();
+    this.controls.drive = this.target.drive;
+    this.controls.width = this.target.width;
+    this.controls.saturation = this.target.saturation;
     for (let i = 0; i < this.oversamplers.length; i++)
       this.oversamplers[i].configure(this.controls);
     this.active = [this.oversamplers[0], this.oversamplers[TAPE_OVERSAMPLING.length]];
@@ -893,9 +932,29 @@ var TapeMagneticStage = class {
       this.active[channel] = next;
     }
   }
-  /** Once per block: `model`'s row becomes the target, and a glide starts when the controls are not on it. */
+  /**
+   * The target: `model`'s row, or while `overridden` the song's `custom`
+   * controls. Those are inside `TAPE_CORE_BOUNDS`, the box qualified for
+   * every rate and factor, twice over: the normaliser clamps a song's
+   * `core` into it, and each control's parameter has the box as its range,
+   * which the browser clamps to. No clamp here, whose constant ends are
+   * small integers V8's lower tiers would store into these double fields.
+   */
+  aim(model) {
+    const t = this.target;
+    if (!this.overridden) {
+      magneticControls(TAPE_MODELS[model].magnetic, t);
+      return;
+    }
+    const c = this.custom;
+    t.drive = c.drive;
+    t.width = c.width;
+    t.saturation = c.saturation;
+  }
+  /** Once per block: the target is aimed (`aim`), and a glide starts when the controls are not on it. */
   configure(model) {
-    const t = magneticControls(TAPE_MODELS[model].magnetic, this.target), s = this.controls;
+    this.aim(model);
+    const t = this.target, s = this.controls;
     if (s.drive !== t.drive || s.width !== t.width || s.saturation !== t.saturation)
       this.gliding = true;
   }
@@ -1079,7 +1138,17 @@ var TapeDsp = class {
       () => new Float32Array(Math.ceil(rate * TAPE_DSP.maxDelaySeconds) + 2)
     );
     this.motion = new TapeMotion(rate, this.controls.seed);
-    this.magnetic = new TapeMagneticStage(rate, this.controls.oversampling, this.model);
+    const core = params.core?.[0] === 1;
+    this.magnetic = new TapeMagneticStage(
+      rate,
+      this.controls.oversampling,
+      this.model,
+      core ? {
+        drive: params.coreDrive[0],
+        width: params.coreWidth[0],
+        saturation: params.coreSaturation[0]
+      } : null
+    );
     this.smooth = 1 - Math.exp(-1 / (rate * TAPE_DSP.smoothSeconds));
     this.dcPole = Math.exp(-(2 * Math.PI * TAPE_DSP.dcHz) / rate);
     this.noiseHp = 1 - Math.exp(-(2 * Math.PI * TAPE_DSP.hissHighpassHz) / rate);
@@ -1105,8 +1174,13 @@ var TapeDsp = class {
       this.noiseTones[model].reset();
     }
     this.model = model;
-    this.magnetic.select(params.oversampling[0]);
-    this.magnetic.configure(model);
+    const magnetic = this.magnetic;
+    magnetic.select(params.oversampling[0]);
+    magnetic.overridden = params.core[0] === 1;
+    magnetic.custom.drive = params.coreDrive[0];
+    magnetic.custom.width = params.coreWidth[0];
+    magnetic.custom.saturation = params.coreSaturation[0];
+    magnetic.configure(model);
     const k = 1 - Math.exp(-frames / (this.rate * TAPE_DSP.toneSeconds));
     this.controls.bias += k * (this.targets.bias - this.controls.bias);
     if (Math.abs(this.targets.bias - this.controls.bias) < Number.EPSILON)
@@ -1257,7 +1331,23 @@ var TapeProcessor = class _TapeProcessor extends AudioWorkletProcessor {
         maxValue: TAPE_OVERSAMPLING[TAPE_OVERSAMPLING.length - 1],
         defaultValue: TAPE_DEFAULTS.oversampling,
         automationRate: "k-rate"
-      }
+      },
+      // The song's `core` (windsor#291): 1 while set, and its controls in the qualified box, by
+      // default the first model's row, which the processor reads itself while the flag is 0.
+      {
+        name: TAPE_CORE_PARAMS.flag,
+        minValue: 0,
+        maxValue: 1,
+        defaultValue: 0,
+        automationRate: "k-rate"
+      },
+      ...TAPE_CORE_CONTROLS.map((control, i) => ({
+        name: TAPE_CORE_PARAMS[control],
+        minValue: TAPE_CORE_BOUNDS[control][0],
+        maxValue: TAPE_CORE_BOUNDS[control][1],
+        defaultValue: TAPE_MODELS[0].magnetic[i],
+        automationRate: "k-rate"
+      }))
     ];
   }
   constructor(options) {

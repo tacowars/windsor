@@ -1,8 +1,8 @@
 /**
  * Tape model and randomization write the same song-owned insert as its
  * knobs. In the rack (windsor#175) Tape is the pages `TAPE_PAGES` lays out:
- * Tape (the type, oversampling and starting-point pickers, Randomize, and
- * the tone knobs)
+ * Tape (the type, oversampling and starting-point pickers, Randomize, the
+ * tone knobs and the collapsed Advanced section, `tapeAdvanced.ts`)
  * and Motion (wow, flutter and dropouts). The on/off switch is the rack's
  * rail.
  */
@@ -25,7 +25,8 @@ import { insertChange } from './insertTarget';
 import { tapeKnobs } from './tapeKnobs';
 import type { TapeControl } from './tapeTables';
 import { TAPE_OVERSAMPLING_HINT, TAPE_OVERSAMPLING_OPTIONS, TAPE_PAGES } from './tapeTables';
-import { withOversampling } from './tapeCardModel';
+import { tapeAdvanced } from './tapeAdvanced';
+import { withModel, withOversampling } from './tapeCardModel';
 
 interface TapeView {
   current(): TapeSpec;
@@ -65,7 +66,7 @@ function control(view: TapeView, name: TapeControl): HTMLElement {
       label: 'Tape type',
       options: TAPE_TYPES.map((value, i) => [value, TAPE_LABELS[i] ?? value] as const),
       value: view.current().model,
-      change: (model) => view.commit({ ...view.current(), model: model as TapeSpec['model'] }),
+      change: (model) => view.commit(withModel(view.current(), model)),
     });
   return insertSelect({
     label: 'Starting point',
@@ -97,6 +98,7 @@ export const tapeCard: InsertCard = (ctx: AppCtx, target: InsertTarget, index) =
           ? [wideColumn(...page.controls.map((name) => control(view, name)))]
           : []),
         ...knobColumns(tapeKnobs(ctx, target, index, page.knobs)),
+        ...(page.advanced ? [tapeAdvanced(ctx, target, index)] : []),
       ),
   }));
 };

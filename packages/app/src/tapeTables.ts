@@ -2,8 +2,10 @@
 import {
   DEFAULT_TAPE,
   TAPE_BOUNDS,
+  TAPE_CORE_BOUNDS,
   TAPE_OVERSAMPLING,
   driveGain,
+  type TapeCore,
   type TapeNumber,
   type TapeSpec,
 } from '@windsor/engine';
@@ -54,6 +56,44 @@ export const TAPE_KNOBS: readonly InsertKnobEntry<TapeSpec>[] = fields.map(([f, 
 }));
 
 /**
+ * The Advanced section's knobs (windsor#291 decision 2): the magnetic core's
+ * three controls, in order, each over its `TAPE_CORE_BOUNDS`. The first is
+ * Bend, never "Drive": the card's Drive is the gain into the tape.
+ */
+export const TAPE_CORE_KNOBS: readonly {
+  readonly f: keyof TapeCore;
+  readonly label: string;
+  readonly title: string;
+}[] = [
+  { f: 'drive', label: 'Bend', title: 'How soon the tape bends into saturation' },
+  { f: 'width', label: 'Width', title: 'How wide the hysteresis loop is' },
+  { f: 'saturation', label: 'Saturation', title: 'How low the ceiling sits' },
+];
+
+/** The Advanced section's words (windsor#291 decision 2 and 3). */
+export const TAPE_ADVANCED_TEXT = {
+  header: 'Advanced',
+  custom: 'Custom',
+  useModel: 'Use model',
+  useModelTitle: "Follow the tape type's own core again",
+  openTitle: "Show the magnetic core's Bend, Width and Saturation",
+  closeTitle: 'Hide the core controls',
+} as const;
+
+/** Percent of a knob's travel. */
+const PERCENT = 100;
+
+/**
+ * A core knob's readout (windsor#291 decision 2): 0–100 % over its
+ * `TAPE_CORE_BOUNDS`, whole percent. A model row outside the box reads past
+ * 100 % (Vintage's Width, 137 %) while the insert follows its model.
+ */
+export function tapeCoreReadout(field: keyof TapeCore, v: number): string {
+  const [min, max] = TAPE_CORE_BOUNDS[field];
+  return `${Math.round((PERCENT * (v - min)) / (max - min))}%`;
+}
+
+/**
  * One of Tape's controls that is not a knob: the type, oversampling and
  * starting-point pickers, and Randomize.
  */
@@ -70,7 +110,8 @@ export const TAPE_OVERSAMPLING_HINT =
 /**
  * Tape's pages in the rack (windsor#175 decisions 1 and 3), in tab order:
  * each names its pickers and buttons, which stand first in a wide column,
- * then its knobs, two to a column. A control added to Tape is placed by
+ * then its knobs, two to a column, then the Advanced section where `advanced`
+ * is set (windsor#291). A control added to Tape is placed by
  * adding it here; `tapeTables.test.ts` fails on a knob or a control on no
  * page, or on two.
  */
@@ -78,11 +119,13 @@ export const TAPE_PAGES: readonly {
   readonly name: string;
   readonly controls: readonly TapeControl[];
   readonly knobs: readonly TapeNumber[];
+  readonly advanced?: true;
 }[] = [
   {
     name: 'Tape',
     controls: ['model', 'oversampling', 'preset', 'randomize'],
     knobs: ['drive', 'bias', 'hiss', 'trim', 'mix'],
+    advanced: true,
   },
   {
     name: 'Motion',

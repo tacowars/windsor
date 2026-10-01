@@ -224,6 +224,21 @@ the fastest honest path to a level-matched audition in the app.
    is portable: at most 1.0199, and no cycle peak below 0.9852. That is
    the tolerance this decision now allows.
 
+   **Amendment, 2026-10-01 (windsor#291).** Rows and user knobs may use
+   the qualified control domain of
+   [the control-domain records](../research/2026-10-01-tape-control-domain-2x/README.md)
+   (windsor#290 and #295): drive [0, 1], width [0.05, 0.62], saturation
+   [0, 1], every trial without a reset at 2× and 4× and 44.1, 48 and
+   96 kHz. The three controls are no longer fixed per model only: a Tape
+   insert may carry an optional `core`, set from the Tape card's Advanced
+   section (Bend, Width, Saturation), which overrides its model's row.
+   It reaches the core through the insert's parameters and the same 10 ms
+   glide, the magnetization kept, and it is clamped into the box on load
+   and by each parameter's range. Two existing rows lie outside the box,
+   Vintage's width 0.83 and VHS's 0.77, on sampled points of the
+   dynamic-survival record; they stay valid as rows, and a knob turned on
+   either model brings its width to 0.62.
+
 ## Consequences for E
 
 - **Original code.** The shipping core, its conditioning, integrator and

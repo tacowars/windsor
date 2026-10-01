@@ -2,7 +2,11 @@
 import {
   TAPE_NAME,
   TAPE_BOUNDS,
+  TAPE_CORE_BOUNDS,
+  TAPE_CORE_CONTROLS,
+  TAPE_CORE_PARAMS,
   TAPE_DEFAULTS,
+  TAPE_MODELS,
   TAPE_OVERSAMPLING,
   TAPE_TYPES,
 } from '../../inserts/tapeConstants';
@@ -41,6 +45,22 @@ class TapeProcessor extends AudioWorkletProcessor {
         defaultValue: TAPE_DEFAULTS.oversampling,
         automationRate: 'k-rate',
       },
+      // The song's `core` (windsor#291): 1 while set, and its controls in the qualified box, by
+      // default the first model's row, which the processor reads itself while the flag is 0.
+      {
+        name: TAPE_CORE_PARAMS.flag,
+        minValue: 0,
+        maxValue: 1,
+        defaultValue: 0,
+        automationRate: 'k-rate',
+      },
+      ...TAPE_CORE_CONTROLS.map((control, i) => ({
+        name: TAPE_CORE_PARAMS[control],
+        minValue: TAPE_CORE_BOUNDS[control][0],
+        maxValue: TAPE_CORE_BOUNDS[control][1],
+        defaultValue: TAPE_MODELS[0].magnetic[i],
+        automationRate: 'k-rate' as const,
+      })),
     ];
   }
 
