@@ -276,3 +276,9 @@ describe('the mixer column (windsor#157)', () => {
     expect(fixed + gaps * gap + 2 * padX).toBe(SONG_VIEW.mixerExpandedBasePx);
   });
 });
+
+describe('the automation lanes (windsor#348)', () => {
+  it('are one fixed height, 56 px (decision 2)', () => {
+    expect(SONG_VIEW.automationLanePx).toBe(56);
+  });
+});

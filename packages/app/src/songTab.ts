@@ -16,6 +16,10 @@
  * pane (a grid's Length, a Reseed) shows on its lane the next frame through
  * the ruler watch's signature check, and the one playhead loop is
  * `stepStrip.ts`'s (decision 5).
+ *
+ * A part's `▸` folds its automation lanes out beneath it (windsor#348,
+ * `songAutomationLane.ts`). Which parts are open is view state; the lanes'
+ * values follow the playhead from that same loop, without a repaint.
  */
 import type { DocumentPartial } from '@windsor/engine';
 import { regionPattern, songTicksOf } from '@windsor/engine';
@@ -33,6 +37,8 @@ import {
   partMixerCell,
   refreshMixerCells,
 } from './songMixerCell';
+import { automationRows, type Readout } from './songAutomationLane';
+import { automationSignature } from './songAutomationModel';
 import { songMixerLights } from './songMixerLights';
 import type { MixerLights } from './songMixerLights';
 import { stripSignature } from './songMixerModel';
@@ -90,6 +96,12 @@ export interface SongViewState {
    * written to the document; starts collapsed.
    */
   mixerExpanded: boolean;
+  /**
+   * The parts whose automation lanes are folded out (windsor#348 decision
+   * 1), by slot. Kept for the session, never written to the document; every
+   * part starts folded.
+   */
+  readonly openParts: Set<number>;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
@@ -113,7 +125,7 @@ export interface SongView {
  * knob. A part's strip is left out (windsor#157): the mixer column's knob
  * edits it mid-drag, and a repaint would rebuild the knob under the pointer.
  */
-function laneSignature(ctx: AppCtx): string {
+function laneSignature(ctx: AppCtx, open: ReadonlySet<number>): string {
   const { doc } = ctx.model;
   return JSON.stringify([
     doc.transport.bars,
@@ -124,6 +136,8 @@ function laneSignature(ctx: AppCtx): string {
       part.name,
       part.regions,
       part.sequencer.kind,
+      // Its lanes (windsor#348 decision 7), and what its inserts' settings let them move.
+      automationSignature(part, open.has(part.slot)),
       // Each region's own pattern (windsor#75): a region without one shows the part's sequencer.
       part.regions.map((_, i) => {
         const pattern = regionPattern(part, i);
@@ -172,6 +186,8 @@ function renderSongView(
   sizeMixer();
   lanes.style.setProperty('--mix-knobs', String(EXPANDED_KNOB_COUNT));
   lanes.style.setProperty('--gap', `${SONG_VIEW.laneGapPx}px`);
+  lanes.style.setProperty('--auto-lane-h', `${SONG_VIEW.automationLanePx}px`);
+  lanes.style.setProperty('--auto-add-h', `${SONG_VIEW.automationAddRowPx}px`);
   guardFrozenColumns(lanes, SONG_VIEW.laneGapPx);
   const line = playheadLine();
   const pane = el('div', 'detail-pane');
@@ -184,6 +200,14 @@ function renderSongView(
   pane.addEventListener('scroll', () => {
     state.paneScrollPx = pane.scrollTop;
   });
+  let signature = '';
+  // The lanes' value cells (windsor#348): set from the playhead's tick, in the song.
+  let readouts: Readout[] = [];
+  const readValues = (tick: number): void => {
+    const songTicks = view.songTicks();
+    const songTick = songTicks > 0 ? ((tick % songTicks) + songTicks) % songTicks : 0;
+    for (const read of readouts) read(songTick);
+  };
   let paneDrawn: DetailPane = { stale: () => false, refreshHead: () => undefined };
   // Set once the zoom is wired below; the arrow can only be pressed after that.
   let refit = (): void => undefined;
@@ -209,7 +233,6 @@ function renderSongView(
       if (!ctx.change(partial).ok) return false;
       ctx.invalidate();
       state.selection = validSelection(ctx, state.selection);
-      signature = laneSignature(ctx);
       view.paintLanes();
       if (paintPane) view.paintPane();
       return true;
@@ -221,18 +244,27 @@ function renderSongView(
     },
     paintLanes() {
       const { doc } = ctx.model;
+      // What is drawn, so the watch repaints only on a change from elsewhere (a fold changes it too).
+      signature = laneSignature(ctx, state.openParts);
       lanes.style.setProperty('--bars', String(doc.transport.bars));
       lanes.style.setProperty('--bar', `${state.pxPerBar}px`);
       const brace = loopBraceRow(view);
+      const fresh: Readout[] = [];
       const rows: HTMLElement[] = [
         ...withMixer(rulerRow(doc.transport.bars, state.pxPerBar), mixerHeaderCell(mixer)),
         ...withMixer(brace.row, emptyMixerCell()),
         ...withMixer(harmonyLaneRow(view), emptyMixerCell()),
-        ...doc.parts.flatMap((part) =>
-          withMixer(partLaneRow(view, part), partMixerCell(ctx, part, state.mixerExpanded, lights)),
-        ),
+        ...doc.parts.flatMap((part) => [
+          ...withMixer(
+            partLaneRow(view, part),
+            partMixerCell(ctx, part, state.mixerExpanded, lights),
+          ),
+          ...(state.openParts.has(part.slot) ? automationRows(view, part, fresh) : []),
+        ]),
       ];
+      readouts = fresh;
       lanes.replaceChildren(...rows, ...brace.lines, line);
+      readValues(ctx.transport.position());
       // The new blocks start unlit, and the loop marks only a moved tick: light the playing chord now, paused or not.
       markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
     },
@@ -240,7 +272,6 @@ function renderSongView(
       paneDrawn = paintDetailPane(pane, view);
     },
   };
-  let signature = laneSignature(ctx);
   let stripsDrawn = stripSignature(ctx);
   view.paintLanes();
   view.paintPane();
@@ -253,8 +284,10 @@ function renderSongView(
     repaint: () => view.paintLanes(),
   });
   refit = zoom.refit;
-  const onTick = (tick: number): void =>
+  const onTick = (tick: number): void => {
     markPlayingBlock(lanes, ctx.model.doc, view.songTicks(), tick);
+    readValues(tick);
+  };
   const drag = wirePlayheadDrag({
     ctx,
     lanes,
@@ -280,7 +313,7 @@ function renderSongView(
         stripsDrawn = strips;
         refreshMixerCells(lanes);
       }
-      const now = laneSignature(ctx);
+      const now = laneSignature(ctx, state.openParts);
       if (now === signature) return;
       signature = now;
       state.selection = validSelection(ctx, state.selection);
@@ -303,6 +336,7 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     insertsOpen: true,
     paneScrollPx: 0,
     mixerExpanded: false,
+    openParts: new Set(),
   };
   // The mixer column's lights (windsor#159): one poller for the view, outliving each render's cells.
   const lights = songMixerLights(ctx);
