@@ -68,7 +68,7 @@ import type { RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
 import { euclidNoteOn, partNoteOn } from './partNoteOn';
 import { euclidHitRead } from '../sequencing/euclidLanes';
-import { rollSeconds } from './rollSpan';
+import { rollHits, type RollHit, type RollShape } from './rollSpan';
 import { fitTimelines } from './timelineNormalise';
 import { tickLoopOf, withFittedLoop } from './songLoop';
 import { PartBinding, type BindingChange, type RegionStep } from './partBinding';
@@ -488,10 +488,11 @@ export class ArrangementPlayer {
   /**
    * A Euclidean onset, at the note and hold of the spec that played it: its
    * region's (windsor#74). Its lanes give it an accent, a pitch and offsets,
-   * and its step's ratchet splits it into a roll of hits evenly across the
-   * step's swung span, or as much of it as its region and the loop leave,
-   * each held at most its slice (windsor#355). A plain
-   * hit is one `trigger` at the spec's note and hold, as before.
+   * and its step's ratchet splits it into a roll of hits spaced evenly
+   * across the step's swung span, each held at most its spacing. Where its
+   * region ends or the loop jumps inside the step, the hits from there on
+   * drop and no hold crosses it (windsor#355, `rollSpan.ts`). A plain hit is
+   * one `trigger` at the spec's note and hold, as before.
    */
   private percussion(slot: number, spec: SequencerSpec, event: OnsetEvent): void {
     const config = this.bySlot.get(slot);
@@ -499,26 +500,26 @@ export class ArrangementPlayer {
     if (!config || !part || spec.kind !== 'euclidean') return;
     const read = euclidHitRead(spec, event.step, event.localStep);
     const { note, velocity, extras } = euclidNoteOn(read, spec.note, config.velocity);
+    const { divisor, hold } = spec;
     const { ratchet } = read;
-    const slice = ratchet > 1 ? this.rollSeconds(config, spec.divisor, event) / ratchet : 0;
-    const hold = ratchet > 1 ? Math.min(spec.hold, slice) : spec.hold;
-    for (let j = 0; j < ratchet; j++) {
-      part.trigger(note, velocity, hold, event.time + j * slice, extras);
+    const plain = [{ offset: 0, held: hold }];
+    const hits = ratchet > 1 ? this.rollHits(config, { divisor, hold, ratchet }, event) : plain;
+    for (const { offset, held } of hits) {
+      part.trigger(note, velocity, held, event.time + offset, extras);
       this.count(config, event.tick);
     }
   }
 
   /**
-   * Seconds from an onset's swung time to its next step's, cut short where
-   * the part's region ends or the loop jumps first (`rollSpan.ts`), so no
-   * hit of the roll lands past either. The swing's phase is the transport
+   * A roll's hits, cut where the part's region ends or the loop jumps
+   * inside the step (`rollSpan.ts`). The swing's phase is the transport
    * tick's and the gate hands a generator only its local tick, so the tick
    * read is `follow`'s, which hears every tick first.
    */
-  private rollSeconds(part: MusicPart, divisor: number, event: OnsetEvent): number {
-    return rollSeconds({
+  private rollHits(part: MusicPart, roll: RollShape, event: OnsetEvent): RollHit[] {
+    return rollHits({
+      ...roll,
       tick: this.lastTick ?? 0,
-      divisor,
       regions: part.regions,
       songTicks: songTicksOf(this.current),
       loop: this.transport.loop ?? null,
