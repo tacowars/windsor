@@ -1,8 +1,17 @@
 # The 808 hats fitted to tacowars's references
 
 - **Date:** 2026-10-01
-- **Status:** proposed (windsor#354); the listening verdict is tacowars's
-- **Amends:** the 808 hats' rows of `docs/design/drum-bank.md`
+- **Status:** accepted as the FM hats (windsor#354). At the listen
+  (2026-10-02) tacowars heard the fitted hats as too tonal for the 808:
+  "I can hear the note", where the reference is "a staccato burst of
+  noise", and the open hat "sounds like a ringing bell more than the long
+  white burst of the reference". tacowars liked them as original sounds,
+  so the fit ships as two new patches, `fm-hat-closed` (FM Closed Hat) and
+  `fm-hat-open` (FM Open Hat), and `tr808-hat-closed` / `tr808-hat-open`
+  keep their earlier patches unchanged. Where this record says "the 808
+  hats" below, it describes the fit, now the FM hats.
+- **Amends:** `docs/design/drum-bank.md` (the 808 hats' measured row and
+  the metal point)
 - **Links:** `docs/research/2026-10-01-tr808-hat-fit/` ·
   `2026-10-01-sound-match-toolkit` · `2026-10-01-voice-drive-stage`
   (windsor#300) · `2026-10-01-envelope-edges-at-sample-rate` (windsor#301)

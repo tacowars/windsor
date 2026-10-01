@@ -150,15 +150,15 @@ leans on five of its features:
   snares' snappy is white above a near-open highpass (32 and 58 Hz),
   because a highpass high enough to shape it (the 808's measures near
   1.8 kHz) would take the tones with it (`2026-10-01-tr-snares-fitted`).
-- **Metal is a pulse or square bank, or an inharmonic stack.** The 808
-  hats are four Pulse operators at the recordings' four line series
-  (819.55, 541.2, 903.4 and 636.35 Hz), driven hard together by the voice
-  drive so they intermodulate, which fills the spectrum between the lines
-  as the circuit's mix does, through a 24 dB highpass at 7 kHz (closed)
-  or 8 kHz (open); the drive's tone pole sets the level
-  (`2026-10-01-tr808-hats-fitted`). The 808 cymbal sums four of the six
-  bank frequencies as unbandlimited squares (Square D) through the
-  3440 Hz band with the 7100 Hz band envelope-opened for 100 ms. The 909's sampled hats and
+- **Metal is a square bank or an inharmonic stack.** The 808 hats and
+  cymbal sum four of the six bank frequencies as unbandlimited squares
+  (Square D) through a resonant highpass or the 3440 Hz band with the
+  7100 Hz band envelope-opened for 100 ms. A fit of the 808 hats to their
+  recordings (`2026-10-01-tr808-hats-fitted`) put four Pulse operators at
+  the recordings' four line series, driven hard together so they
+  intermodulate; at the listen they read as tonal FM hats, not the 808's
+  noise burst, so they ship as the FM Closed Hat and FM Open Hat
+  (`fm-hat-closed`, `fm-hat-open`) and the 808 hats stay as they were. The 909's sampled hats and
   cymbals are FM stand-ins: a 1.41-ratio modulator into three square
   carriers, or fed-back inharmonic sines. The EFM hats are an 11.3-ratio
   modulator with positive feedback into a low carrier.

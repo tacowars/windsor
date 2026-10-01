@@ -16,6 +16,8 @@ import patch_efm_rim from './efm-rim.json';
 import patch_efm_snare from './efm-snare.json';
 import patch_efm_tom from './efm-tom.json';
 import patch_efm_zap from './efm-zap.json';
+import patch_fm_hat_closed from './fm-hat-closed.json';
+import patch_fm_hat_open from './fm-hat-open.json';
 import patch_hat from './hat.json';
 import patch_horde_horn from './horde-horn.json';
 import patch_kick from './kick.json';
@@ -183,6 +185,8 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'efm-snare': patch_efm_snare,
   'efm-tom': patch_efm_tom,
   'efm-zap': patch_efm_zap,
+  'fm-hat-closed': patch_fm_hat_closed,
+  'fm-hat-open': patch_fm_hat_open,
   hat: patch_hat,
   'horde-horn': patch_horde_horn,
   kick: patch_kick,
