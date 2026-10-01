@@ -158,6 +158,43 @@ export function widthTable(records) {
   }));
 }
 
+/** The README's rendered-axis rows (drive, width, saturation), as it shows them at 2x. */
+export const SHOWN_ROWS = [
+  [0, 0, 0],
+  [0, 0.6, 0],
+  [0, 0.8, 0],
+  [0, 0.99, 0],
+  [0, 1, 0],
+  [1, 0, 0],
+  [1, 0.6, 0],
+  [1, 0.8, 0],
+  [1, 0.99, 0],
+  [1, 1, 0],
+  [1, 1, 1],
+];
+
+/** windsor#295: how far 4x is from 2x on each shown row, |4x - 2x| / |2x| per quantity,
+ * so the README's agreement claim is computed. The largest is `worst`. */
+export function factorAgreement(table, rows = SHOWN_ROWS) {
+  const quantities = ['peakOut', 'dcRemanence', 'spikesRemanence'];
+  const find = (point, factor) =>
+    table.find((r) => r.factor === factor && r.point.every((v, i) => v === point[i]));
+  const differences = rows.flatMap((point) => {
+    const [low, high] = [find(point, 2), find(point, 4)];
+    return quantities.map((quantity) => ({
+      point,
+      quantity,
+      relative: Math.abs(high[quantity] - low[quantity]) / Math.abs(low[quantity]),
+    }));
+  });
+  const worst = differences.reduce((a, b) => (b.relative > a.relative ? b : a));
+  const byQuantity = quantities.map((quantity) => {
+    const rowsOf = differences.filter((d) => d.quantity === quantity);
+    return rowsOf.reduce((a, b) => (b.relative > a.relative ? b : a));
+  });
+  return { rows: rows.length, worst, byQuantity };
+}
+
 /** Per box part and segment: the largest output, M and |remanence| and the guard clips. */
 export function segmentPeaks(box, table) {
   return ['static', 'sweep', 'walk'].flatMap((part) =>
@@ -220,6 +257,7 @@ export function derive(trials, grid, run, S, table = S.CONTROL) {
     extra,
     widthRule: rule,
     widthTable: widthTable(width),
+    factorAgreement: factorAgreement(widthTable(width)),
     groups,
     total: summarise(box),
     segmentPeaks: segmentPeaks(box, table),

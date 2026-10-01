@@ -14,7 +14,7 @@ import {
 } from '../../../packages/engine/src/worklet/tape/tapeMagnetic';
 import { TapeMagneticStage } from '../../../packages/engine/src/worklet/tape/tapeMagneticStage';
 import { CONTROL, type Control, type Triple } from './controlConstants';
-import { boxOf, target, walkPoints, type Trial } from './controlPaths';
+import { boxOf, target, walkPoints, type Box, type Trial } from './controlPaths';
 
 export { CONTROL } from './controlConstants';
 export * from './controlPaths';
@@ -101,10 +101,10 @@ function segmentsFor(rate: number, table: Control) {
 
 /** One trial: the program through the shipped stage, the knobs read once per block. */
 // eslint-disable-next-line max-lines-per-function -- one render loop and its counters; split, the per-sample state would cross calls
-export function runTrial(trial: Trial, wMax: number, table: Control = CONTROL) {
+export function runTrial(trial: Trial, domain: number | Box, table: Control = CONTROL) {
   const started = performance.now();
   const { rate, factor, path } = trial,
-    box = boxOf(wMax);
+    box = boxOf(domain);
   const plan = path.kind === 'walk' ? walkPoints(path, box, table) : null;
   const targets: Triple = [NaN, NaN, NaN],
     row = researchRow();

@@ -18,11 +18,16 @@ export interface Trial {
   path: Path;
 }
 
-export const boxOf = (wMax: number): Box => [
-  [0, 1],
-  [0, wMax],
-  [0, 1],
-];
+/** A width maximum is the declared box drive [0,1] x width [0, wMax] x saturation [0,1];
+ * a `Box` (windsor#295's raised width minimum) passes through unchanged. */
+export const boxOf = (domain: number | Box): Box =>
+  typeof domain === 'number'
+    ? [
+        [0, 1],
+        [0, domain],
+        [0, 1],
+      ]
+    : domain;
 const frac = (x: number) => x - Math.floor(x);
 const at = (range: [number, number], u: number) => range[0] + u * (range[1] - range[0]);
 
@@ -108,8 +113,8 @@ export function widthTrials(table: Control = CONTROL): Trial[] {
 }
 
 /** Part B in the box: every static point, every sweep and every walk, per rate and factor. */
-export function boxTrials(wMax: number, table: Control = CONTROL): Trial[] {
-  const box = boxOf(wMax),
+export function boxTrials(domain: number | Box, table: Control = CONTROL): Trial[] {
+  const box = boxOf(domain),
     points = boxPoints(box, table);
   const corners = [0, 1].flatMap((a) => [0, 1].map((b) => [a, b]));
   return table.rates.flatMap((rate) =>
