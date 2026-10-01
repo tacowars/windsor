@@ -46,24 +46,31 @@ var EventQueue = class {
     return event;
   }
   /**
-   * Hold `event` until the render admits it, reading nothing of it. The array
-   * grows only when more messages arrive between two quanta than its
-   * capacity and ever before.
+   * Hold `event` until the render admits it, reading nothing of it. When the
+   * events queued and posted would pass the room, it doubles the room here,
+   * so the render's admission never has to; a move down frees no room, it
+   * only gathers what there is at the front. It grows the room, or `posted`,
+   * only at a new most events queued and posted at once.
    */
   post(event) {
-    const posted = this.posted;
     const count = this.postedCount;
+    if (this.tail - this.head + count === this.frames.length) this.grow();
+    const posted = this.posted;
     if (count === posted.length) posted.push(event);
     else posted[count] = event;
     this.postedCount = count + 1;
   }
-  /** Queue `event` at the frame in `incoming`, after every event at or before that frame. */
+  /**
+   * Queue `event` at the frame in `incoming`, after every event at or before
+   * that frame. It never grows the queue or allocates: `event` was posted,
+   * and `post` left room for it, so at the end of the room a move down
+   * frees a slot.
+   */
   insert(event) {
-    if (this.tail === this.frames.length) this.makeRoom();
+    if (this.tail === this.frames.length) this.moveDown();
     const items = this.items;
     const frames = this.frames;
     let i = this.tail;
-    if (i === items.length) items.push(event);
     this.tail = i + 1;
     while (i > this.head && frames[i - 1] > this.incoming[0]) {
       items[i] = items[i - 1];
@@ -74,18 +81,23 @@ var EventQueue = class {
     frames[i] = this.incoming[0];
   }
   /**
-   * The queue has reached the end of its room: move it down to the front,
-   * or, when it fills the room, double the room (an allocation, only at a
-   * new most events queued at once).
+   * Double the room, `frames` and `items` alike, each event staying in its
+   * slot and the new object slots holding `undefined`. Only `post` calls it.
    */
-  makeRoom() {
+  grow() {
+    const room = this.frames.length * 2;
+    const grown = new Float64Array(room);
+    grown.set(this.frames);
+    this.frames = grown;
+    const items = this.items;
+    while (items.length < room) items.push(void 0);
+  }
+  /**
+   * The queue has reached the end of its room with room free at the front,
+   * as `post` ensures: move it down to the front.
+   */
+  moveDown() {
     const head = this.head;
-    if (head === 0) {
-      const grown = new Float64Array(this.frames.length * 2);
-      grown.set(this.frames);
-      this.frames = grown;
-      return;
-    }
     const items = this.items;
     const frames = this.frames;
     for (let i = head; i < this.tail; i++) {
