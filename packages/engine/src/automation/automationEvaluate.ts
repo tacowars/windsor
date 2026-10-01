@@ -109,33 +109,65 @@ export interface RampWindow {
 
 /**
  * The breakpoints in `[fromTick, toTick)` the player ramps linearly to, in
- * tick order and the row's units: every point there (both of a step, at
- * one tick), and inside a curved segment a cut every `grainTicks` from its
- * start. A segment that is straight in the row's units adds only its ends.
+ * tick order and the row's units. Each lies on the lane's curve.
+ *
+ * - Every point in the window, and both points of a step, at one tick.
+ * - Inside a curved segment (bent, or on a log, octave or dB row), a cut
+ *   every `grainTicks` from its start.
+ * - A segment that is straight in the row's units adds nothing inside the
+ *   window, except where it runs on to `toTick` or past: then it adds one cut, its
+ *   last grain boundary before `toTick`.
+ *
+ * So walking consecutive windows `[a,b)`, `[b,c)`, … and ramping to each
+ * breakpoint in order traces the curve, and gives no tick twice except a
+ * step's pair. The player schedules a breakpoint as its window enters the
+ * lookahead, and Web Audio jumps a param whose ramp started in the past, so
+ * every ramp must start no earlier than the previous window: the last cut
+ * keeps a long straight segment from holding flat until its far end arrives.
  */
 export function rampsBetween(
   row: AutomationTargetRow,
   points: readonly AutomationPoint[],
   window: RampWindow,
 ): AutomationRamp[] {
-  const { fromTick, toTick, grainTicks = AUTOMATION_GRAIN_TICKS } = window;
+  const { grainTicks = AUTOMATION_GRAIN_TICKS } = window;
   const out: AutomationRamp[] = [];
   if (!(grainTicks > 0)) throw new Error(`rampsBetween: grain ${grainTicks} is not positive`);
   // The segment running into the window: from the last point before it, so
   // both points of a step on its first tick are inside.
-  const first = Math.max(0, firstPointPast(points, fromTick, false) - 1);
+  const first = Math.max(0, firstPointPast(points, window.fromTick, false) - 1);
   for (let i = first; i < points.length; i++) {
     const a = points[i]!;
-    if (a.tick >= toTick) break;
-    if (a.tick >= fromTick) out.push({ tick: a.tick, value: a.value });
+    if (a.tick >= window.toTick) break;
+    if (a.tick >= window.fromTick) out.push({ tick: a.tick, value: a.value });
     const b = points[i + 1];
-    if (!b || b.tick === a.tick || straightInUnits(row, a, b)) continue;
-    const start = Math.max(1, Math.ceil((fromTick - a.tick) / grainTicks));
-    for (let k = start; ; k++) {
-      const tick = a.tick + k * grainTicks;
-      if (tick >= b.tick || tick >= toTick) break;
-      out.push({ tick, value: segmentValue(row, a, b, tick) });
-    }
+    if (!b || b.tick === a.tick || a.value === b.value) continue;
+    cutSegment(row, a, b, { ...window, grainTicks }, out);
   }
   return out;
+}
+
+/** Pushes segment `a → b`'s cuts inside the window onto `out`, as `rampsBetween` describes. */
+function cutSegment(
+  row: AutomationTargetRow,
+  a: AutomationPoint,
+  b: AutomationPoint,
+  window: Required<RampWindow>,
+  out: AutomationRamp[],
+): void {
+  const { fromTick, toTick, grainTicks } = window;
+  const lastBefore = Math.ceil((toTick - a.tick) / grainTicks) - 1;
+  if (straightInUnits(row, a, b)) {
+    const tick = a.tick + lastBefore * grainTicks;
+    if (b.tick >= toTick && lastBefore >= 1 && tick >= fromTick && tick < toTick) {
+      out.push({ tick, value: segmentValue(row, a, b, tick) });
+    }
+    return;
+  }
+  const start = Math.max(1, Math.ceil((fromTick - a.tick) / grainTicks));
+  for (let k = start; k <= lastBefore; k++) {
+    const tick = a.tick + k * grainTicks;
+    if (tick >= b.tick || tick >= toTick) break;
+    out.push({ tick, value: segmentValue(row, a, b, tick) });
+  }
 }

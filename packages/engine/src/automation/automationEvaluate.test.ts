@@ -152,16 +152,100 @@ describe('rampsBetween', () => {
     expect(rampsBetween(PAN, points, { fromTick: -50, toTick: 0 })).toEqual([]);
   });
 
-  it('gives each breakpoint to one window of a run', () => {
+  it('gives each breakpoint to one window of a run, plus the cut where a line spans an edge', () => {
     const points = [p(0, -1, 0.7), p(30, 1), p(30, -1), p(60, 0)];
     const whole = rampsBetween(PAN, points, { fromTick: 0, toTick: 100 });
     const split = [0, 13, 30, 47].flatMap((from, i, starts) =>
       rampsBetween(PAN, points, { fromTick: from, toTick: starts[i + 1] ?? 100 }),
     );
-    expect(split).toEqual(whole);
+    const cut = { tick: 46, value: valueAt(PAN, points, 46) };
+    expect(split).toEqual([...whole.slice(0, -1), cut, whole.at(-1)]);
   });
 
   it('refuses a grain that is not positive', () => {
     expect(() => rampsBetween(PAN, [p(0, 0)], { fromTick: 0, toTick: 1, grainTicks: 0 })).toThrow();
+  });
+});
+
+/** The ramps of `rampsBetween` over the consecutive windows `[edges[i], edges[i + 1])`. */
+function walk(
+  row: AutomationTargetRow,
+  points: readonly AutomationPoint[],
+  edges: readonly number[],
+): { tick: number; value: number; window: number }[] {
+  return edges.slice(0, -1).flatMap((fromTick, window) =>
+    rampsBetween(row, points, { fromTick, toTick: edges[window + 1]! }).map((r) => ({
+      ...r,
+      window,
+    })),
+  );
+}
+
+/** Window edges every `step` ticks from `from` up to `to`. */
+const edges = (from: number, to: number, step: number): number[] =>
+  Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step);
+
+/**
+ * The walk's contract: every breakpoint is on the curve, no tick comes twice
+ * but a step's pair, and no ramp starts before the previous window, unless
+ * the lane is flat across it (so nothing is held while the far end waits).
+ */
+function expectTraces(
+  row: AutomationTargetRow,
+  points: readonly AutomationPoint[],
+  windowEdges: readonly number[],
+): ReturnType<typeof walk> {
+  const ramps = walk(row, points, windowEdges);
+  ramps.forEach((r, n) => {
+    const onStep = points.some((pt) => pt.tick === r.tick && pt.value === r.value);
+    if (!onStep) expect(r.value).toBe(valueAt(row, points, r.tick));
+    if (n === 0) return;
+    const q = ramps[n - 1]!;
+    expect(r.tick).toBeGreaterThanOrEqual(q.tick);
+    if (r.tick === q.tick) expect(points.filter((pt) => pt.tick === r.tick).length).toBe(2);
+    if (r.window > 0 && q.tick < windowEdges[r.window - 1]!) expect(r.value).toBe(q.value);
+  });
+  return ramps;
+}
+
+describe('rampsBetween walked window by window', () => {
+  it('traces a long linear ramp in small windows with no hold', () => {
+    const points = [p(0, -1), p(480, 1)];
+    const ramps = expectTraces(PAN, points, edges(0, 500, 10));
+    expect(ramps.map((r) => r.tick).slice(0, 4)).toEqual([0, 9, 19, 29]);
+    expect(ramps.at(-1)).toEqual({ tick: 480, value: 1, window: 48 });
+    // Ramping straight between the breakpoints is the line at every tick.
+    for (let n = 1; n < ramps.length; n++) {
+      const [q, r] = [ramps[n - 1]!, ramps[n]!];
+      for (let tick = q.tick; tick <= r.tick; tick++) {
+        const ramped = q.value + ((r.value - q.value) * (tick - q.tick)) / (r.tick - q.tick);
+        expect(ramped).toBeCloseTo(valueAt(PAN, points, tick), 12);
+      }
+    }
+  });
+
+  it('traces a bent segment and a dB row in small windows', () => {
+    const bent = [p(0, -1, 0.6), p(200, 1, -0.4), p(400, -0.5)];
+    expect(expectTraces(PAN, bent, edges(0, 420, 7)).length).toBe(401);
+    const level = [p(0, 0.01), p(300, 2)];
+    expect(expectTraces(LEVEL, level, edges(0, 320, 9)).length).toBe(301);
+  });
+
+  it('gives a step on a window edge whole to the later window', () => {
+    const points = [p(0, -1), p(40, 0), p(40, 1), p(120, 0)];
+    const ramps = expectTraces(PAN, points, edges(0, 160, 20));
+    expect(ramps.filter((r) => r.tick === 40)).toEqual([
+      { tick: 40, value: 0, window: 2 },
+      { tick: 40, value: 1, window: 2 },
+    ]);
+    expect(ramps.find((r) => r.tick === 39)).toMatchObject({ window: 1 });
+    expect(ramps.find((r) => r.tick === 39)!.value).toBeCloseTo(-1 / 40, 12);
+  });
+
+  it('starts before the first point and ends after the last', () => {
+    const points = [p(30, 0.5), p(250, -0.5), p(250, 1), p(300, 1)];
+    const ramps = expectTraces(PAN, points, edges(-40, 360, 16));
+    expect(ramps[0]).toMatchObject({ tick: 30, value: 0.5 });
+    expect(ramps.at(-1)).toMatchObject({ tick: 300, value: 1 });
   });
 });
