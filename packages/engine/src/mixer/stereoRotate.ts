@@ -20,6 +20,8 @@
  */
 
 import { PAN_ANGLE_MAX } from '../audioConstants';
+import type { KnobHandle } from '../automation/automationHandles';
+import { knobHandle } from '../automation/automationHandles';
 
 /** Gains of the 2x2 matrix, named output·input: `lr` is R's contribution to L'. */
 export interface RotationGains {
@@ -53,10 +55,25 @@ export interface StereoRotate {
   readonly output: ChannelMergerNode;
   /** The four matrix gains, for graph assertions. */
   readonly gains: Readonly<Record<keyof RotationGains, GainNode>>;
+  /** The knob's pan: what `setPan` last recorded, whether or not a lane holds the gains. */
   readonly pan: number;
+  /** Records `pan`, and writes the gains unless the pan lane's handle is engaged. */
   setPan(pan: number): void;
+  /**
+   * The pan lane's handle (windsor#344): each value it schedules is written
+   * to all four gains as `setPan` writes them, so they always move together.
+   */
+  readonly automation: KnobHandle;
   dispose(): void;
 }
+
+/** The four gains for `pan`, in the `ll, lr, rl, rr` order of `ROTATION_ORDER`. */
+function rotationValues(pan: number): readonly number[] {
+  const g = rotationGains(pan);
+  return [g.ll, g.lr, g.rl, g.rr];
+}
+
+const ROTATION_ORDER = ['ll', 'lr', 'rl', 'rr'] as const;
 
 /** Wire a rotation set to `pan` (-1 left .. 1 right). */
 export function createStereoRotate(context: BaseAudioContext, pan = 0): StereoRotate {
@@ -88,6 +105,11 @@ export function createStereoRotate(context: BaseAudioContext, pan = 0): StereoRo
     gains.rr.gain.value = g.rr;
   };
   apply();
+  const automation = knobHandle({
+    params: ROTATION_ORDER.map((key) => gains[key].gain),
+    write: rotationValues,
+    resting: () => current,
+  });
 
   return {
     input,
@@ -98,8 +120,9 @@ export function createStereoRotate(context: BaseAudioContext, pan = 0): StereoRo
     },
     setPan(next: number): void {
       current = clampPan(next);
-      apply();
+      if (!automation.engaged) apply();
     },
+    automation,
     dispose(): void {
       input.disconnect();
       for (const gain of Object.values(gains)) gain.disconnect();

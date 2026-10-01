@@ -20,6 +20,13 @@
  * already have it. Both plays are the same seeded, clock-driven code from the
  * same start time, so they issue the same notes; the render checks that
  * (`sameOpening`).
+ *
+ * Automation needs no such detour (windsor#344): an AudioParam event is
+ * written on the main thread's timeline at once. `initMusic` holds every
+ * lane at the tick the transport rests on, `setValueAtTime(v, 0)` on the
+ * offline context, so the opening values are in place when `buildSystem`
+ * returns, before `startRendering`; from there the automation player
+ * schedules through the same pumped clock, stems included.
  */
 import { hashSeed } from '../sequencing/generatorSeed';
 import type { ArrangementDocument } from '../song/arrangementDocument';
