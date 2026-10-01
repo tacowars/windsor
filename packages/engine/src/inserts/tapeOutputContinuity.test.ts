@@ -17,21 +17,29 @@
  *   full-scale 300 Hz tone on the first for `SETTLE`, `QUIET` of silence,
  *   then the switch and `HOLD` more silence. Every sample after the switch
  *   stays within `BOUND.silence` of the tone's steady peak.
- * - **The core drive moved across [0, 1]** in the corners of the box the
- *   Advanced panel may reach (drive [0, 1], width [0.05, 0.62], saturation
- *   [0, 1]; research windsor#290 and #295), as a jump (the stage's 10 ms
- *   glide alone) and as a `SWEEP` linear sweep of the target. The panel does
- *   not exist yet, so the test writes the stage's target after each block's
- *   `configure`, as it will. The Bias and model EQ are bypassed, so the field
- *   is the input times Drive's gain: 1 at Drive 0, the knee, and 4 at +32,
- *   the guard. Drive goes from 1 to 0 under a held field at 4 (a
- *   raised-cosine onset, held through the motion, then released) and under a
- *   full-scale 300 Hz tone at 1 and at 4, and from 0 to 1 under the held
- *   field, the direction that grows M:
- *   - under a held field, every sample from the motion's start to the end of
- *     the release stays within `BOUND.fall` (drive falling) or `BOUND.rise`
- *     of the conditioned field, the measure of #290 (which read up to 242
- *     there);
+ * - **The core drive moved across its range** in the corners of the box the
+ *   Advanced panel ships (`TAPE_CORE_BOUNDS`, windsor#315: drive [0.05, 1],
+ *   width [0.05, 0.85], saturation [0, 1]), as a jump (the stage's 10 ms
+ *   glide alone) and as a `SWEEP` linear sweep. The test writes the song's
+ *   `core` into the processor's parameters before each block's `configure`,
+ *   as the panel does (windsor#291). Core drive 0 is outside the box and no
+ *   model row reaches it, so its cases moved to the box's floor
+ *   (windsor#319). The Bias and model EQ are bypassed, so the field is the
+ *   input times Drive's gain: 1 at Drive 0, the knee, and 4 at +32, the
+ *   guard. The core drive goes from the box's top to its floor under a held
+ *   field at 4 (a raised-cosine onset, held through the motion, then
+ *   released) and under a full-scale 300 Hz tone at 1 and at 4, and from the
+ *   floor to the top under the held field, the direction that grows M:
+ *   - drive falling under a held field, every sample from the motion's
+ *     start to the end of the release stays within `BOUND.fall` of the
+ *     conditioned field, the measure of #290 (which read up to 242 there);
+ *   - drive rising under a held field, the release peak stays within
+ *     `BOUND.rise` of the same corner's release with no motion
+ *     (`riseOverStill`), so the gate reads the motion and not the core's
+ *     own overshoot at wide widths (windsor#319), and every sample from the
+ *     motion's start until it settles, before the release, stays within
+ *     `BOUND.motion` of the last output before the motion, so a thump that
+ *     settles while the field is still held is caught too;
  *   - under a tone, every sample stays within `BOUND.tone` of the larger of
  *     the steady peaks before and after the motion;
  *   - |M| stays within `BOUND.m`, against the state guard of 20.
@@ -40,7 +48,13 @@ import { describe, expect, it } from 'vitest';
 import { tapeRig, type TapeRig } from '../__fixtures__/tapeDspProbe';
 import { circuit } from '../__fixtures__/tapeModelWalk';
 import { TapeMagneticCore, originSusceptibility } from '../worklet/tape/tapeMagnetic';
-import { TAPE_BOUNDS, TAPE_OVERSAMPLING, TAPE_TYPES } from './tapeConstants';
+import {
+  TAPE_BOUNDS,
+  TAPE_CORE_BOUNDS,
+  TAPE_CORE_PARAMS,
+  TAPE_OVERSAMPLING,
+  TAPE_TYPES,
+} from './tapeConstants';
 import { driveGain, TAPE_MAGNETIC } from './tapeMagneticConstants';
 import { cosine, sine } from './tapePortableMath';
 
@@ -53,18 +67,35 @@ const QUANTUM = 128;
  * before this change in brackets:
  *
  * - silence, 0.0798 (0.2402): the tone's own decaying tail, 20 ms on;
- * - held, 0.887 with drive falling (57.3) and 1.230 with it rising (2.88),
- *   both at 48 kHz. Rising, M grows to keep the output, past Ms, and the
- *   release then swings a little wider than the field; at constant drive 0
- *   the release alone reaches 1.216 of the field;
+ * - held with drive falling, 0.887 at 48 kHz (57.3), over the conditioned
+ *   field;
+ * - held with drive rising, 1.0810 (44.1 kHz, 2×, width 0.85, saturation 1,
+ *   the 50 ms sweep) over the same corner's release with no motion. Rising,
+ *   M grows to keep the output, past Ms, and the release follows the
+ *   start's. The no-motion release is the core's own overshoot, and grows
+ *   with width: with the drive held at the box's floor it peaks at 1.180 of
+ *   the conditioned field (2.5) at width 0.62 and 1.716 at 0.85, saturation
+ *   0 (0.776 and 1.017 at saturation 1), over the rates and factors. An
+ *   absolute bound would gate that overshoot, which the motion does not
+ *   cause, so this one is relative (windsor#319);
+ * - held with drive rising, the motion window, 0.99935 (96 kHz, 4×, width
+ *   0.85, saturation 0, the jump) over the last output before the motion,
+ *   and at most 0.1350 of the conditioned field. #307 keeps the output
+ *   continuous, so the window's peak is its first sample: the DC block's
+ *   decay from there only lowers it. With `retune`'s M rescale disabled it
+ *   read 9.74 at 44.1 kHz;
  * - tone, 1.0004 (1.0034);
  * - |M|, 4.97 with drive rising under the held field (1.67).
  *
- * Each ratio's gate is its measurement plus about half a point. M's, 5.5,
- * is about a tenth over its measurement and under a third of the state
- * guard.
+ * Each ratio's gate is its measurement plus about half a point, except the
+ * rise: 1.09 is its 1.0810 plus about a point, because the no-motion
+ * reference shifts with the state the trials before leave (0.92 to 1.02 of
+ * the field at one corner), and the motion window: 1.01 is its 0.99935 plus
+ * about a point, so any rise over the pre-motion output past that fails.
+ * M's, 5.5, is about a tenth over its measurement
+ * and under a third of the state guard.
  */
-const BOUND = { silence: 0.085, fall: 0.892, rise: 1.235, tone: 1.005, m: 5.5 };
+const BOUND = { silence: 0.085, fall: 0.892, rise: 1.09, motion: 1.01, tone: 1.005, m: 5.5 };
 /** Seconds: a signal before the switch or the motion, the silence before either, and the hold after. */
 const SETTLE = 0.05;
 const QUIET = 0.02;
@@ -73,13 +104,11 @@ const HOLD = 0.04;
 const SWEEP = 0.05;
 const EDGE = 0.005;
 const DRIVE_MAX = TAPE_BOUNDS.drive[1];
-/** The box's corners: [width, saturation]. */
-const CORNERS = [
-  [0.05, 0],
-  [0.05, 1],
-  [0.62, 0],
-  [0.62, 1],
-] as const;
+/** The shipped box's core drive ends, and its corners: [width, saturation]. */
+const [CORE_LOW, CORE_HIGH] = TAPE_CORE_BOUNDS.drive;
+const CORNERS = TAPE_CORE_BOUNDS.width.flatMap((width) =>
+  TAPE_CORE_BOUNDS.saturation.map((saturation) => [width, saturation] as const),
+);
 
 const resets = (rig: TapeRig): number =>
   rig.dsp.magnetic.oversamplers.reduce((sum, pair) => sum + pair.core.resets, 0);
@@ -97,14 +126,15 @@ interface Clock {
 }
 
 /**
- * One sample: `configure` at each block's start, then `controls` (which may
- * write the stage's target), then `x` on both channels. Returns the left output.
+ * One sample: at each block's start `controls` (which may write the core's
+ * parameters) and then `configure`, then `x` on both channels. Returns the
+ * left output.
  */
 function tick(rig: TapeRig, clock: Clock, x: number, controls?: () => void): number {
   const { dsp, params } = rig;
   if (clock.n % QUANTUM === 0) {
-    dsp.configure(params, QUANTUM);
     controls?.();
+    dsp.configure(params, QUANTUM);
   }
   clock.n++;
   dsp.tick(x, x);
@@ -112,15 +142,16 @@ function tick(rig: TapeRig, clock: Clock, x: number, controls?: () => void): num
 }
 
 describe("the core's retune (windsor#296)", () => {
-  const loud = { drive: 1, width: 0.05, saturation: 0 },
-    quiet = { drive: 0, width: 0.62, saturation: 1 };
+  const loud = { drive: CORE_HIGH, width: TAPE_CORE_BOUNDS.width[0], saturation: 0 },
+    quiet = { drive: CORE_LOW, width: TAPE_CORE_BOUNDS.width[1], saturation: 1 };
 
-  it('keeps M × gain, to rounding, across the whole range of the gain', () => {
+  it("keeps M × gain, to rounding, across the shipped box's range of the gain", () => {
     const core = new TapeMagneticCore(48000, 2, loud);
     core.m = 0.75;
     const out = core.m * core.gain;
     core.retune(quiet);
-    expect(core.gain * originSusceptibility(loud)).toBeGreaterThan(900);
+    // Across the shipped box the gain spans about 50 times (49.7 measured).
+    expect(core.gain * originSusceptibility(loud)).toBeGreaterThan(45);
     expect(core.m * core.gain).toBeCloseTo(out, 12);
     core.retune(loud);
     expect(core.m * core.gain).toBeCloseTo(out, 12);
@@ -191,21 +222,29 @@ interface Trial {
   to: number;
 }
 
-/** What a trial measured: the worst sample over its reference, and the largest |M| on the left core. */
+/**
+ * What a trial measured: the worst sample over its reference, the largest
+ * |M| on the left core, and for a held field the peak after its release and
+ * the motion window's peak.
+ */
 interface Excursion {
   ratio: number;
   m: number;
+  release: number;
+  /**
+   * A held field's peak from the motion's start until it settles, before
+   * the release, over the last output before the motion.
+   */
+  motion: number;
 }
 
-/** The stage's target for this block: `drive`, and the trial's width and saturation. */
+/** The song's `core` for this block, as the Advanced panel writes it: `drive`, and the trial's width and saturation. */
 function aim(rig: TapeRig, trial: Trial, drive: number): void {
-  const m = rig.dsp.magnetic,
-    t = m.target,
-    c = m.controls;
-  t.drive = drive;
-  t.width = trial.width;
-  t.saturation = trial.saturation;
-  if (c.drive !== t.drive || c.width !== t.width || c.saturation !== t.saturation) m.gliding = true;
+  const p = rig.params;
+  p[TAPE_CORE_PARAMS.flag]![0] = 1;
+  p[TAPE_CORE_PARAMS.drive]![0] = drive;
+  p[TAPE_CORE_PARAMS.width]![0] = trial.width;
+  p[TAPE_CORE_PARAMS.saturation]![0] = trial.saturation;
 }
 
 /** The trial's input at sample `i` of its signal: the tone, or the held field's onset and hold. */
@@ -233,10 +272,11 @@ function sweepDrive(rig: TapeRig, rate: number, clock: Clock, trial: Trial): Exc
   let before = 0,
     after = 0,
     worst = 0,
-    m = 0;
+    m = 0,
+    last = 0;
   for (let i = 0; i < settle; i++) {
-    const y = tick(rig, clock, input(trial, rate, i), () => aim(rig, trial, trial.from));
-    if (i >= settle - 4 * period) before = Math.max(before, Math.abs(y));
+    last = tick(rig, clock, input(trial, rate, i), () => aim(rig, trial, trial.from));
+    if (i >= settle - 4 * period) before = Math.max(before, Math.abs(last));
   }
   const startFrame = clock.n,
     span = trial.to - trial.from;
@@ -249,26 +289,45 @@ function sweepDrive(rig: TapeRig, rate: number, clock: Clock, trial: Trial): Exc
     m = Math.max(m, Math.abs(core.m));
     if (i >= settle + sweep + hold - 4 * period) after = Math.max(after, Math.abs(y));
   }
-  if (trial.signal === 'tone') return { ratio: worst / Math.max(before, after), m };
+  if (trial.signal === 'tone')
+    return { ratio: worst / Math.max(before, after), m, release: 0, motion: 0 };
+  const motion = worst / Math.abs(last);
+  let release = 0;
   for (let k = 0; k < edge + hold; k++) {
     const x = k < edge ? 0.5 + 0.5 * cosine((Math.PI * k) / edge) : 0;
-    worst = Math.max(worst, Math.abs(tick(rig, clock, x, () => aim(rig, trial, trial.to))));
+    release = Math.max(release, Math.abs(tick(rig, clock, x, () => aim(rig, trial, trial.to))));
     m = Math.max(m, Math.abs(core.m));
   }
-  return { ratio: worst / conditioned(driveGain(trial.drive)), m };
+  worst = Math.max(worst, release);
+  return { ratio: worst / conditioned(driveGain(trial.drive)), m, release, motion };
+}
+
+/**
+ * A rising trial's release peak over the same corner's release with no
+ * motion: the same field, width, saturation, factor and rate, the same
+ * timeline, and the core drive held at the trial's start. The output is
+ * continuous with that start (`retune` keeps M × gain), so that release is
+ * what the motion must not exceed.
+ */
+function riseOverStill(rig: TapeRig, rate: number, clock: Clock, trial: Trial): number {
+  const moved = sweepDrive(rig, rate, clock, trial).release;
+  return moved / sweepDrive(rig, rate, clock, { ...trial, to: trial.from }).release;
 }
 
 /** Down under a held field at the guard and under tones at the knee and the guard; up under the held field. */
 const TRIALS: Trial[] = CORNERS.flatMap(([width, saturation]) =>
-  [0, SWEEP].flatMap((sweep) => [
-    { width, saturation, sweep, signal: 'held' as const, drive: DRIVE_MAX, from: 1, to: 0 },
-    { width, saturation, sweep, signal: 'tone' as const, drive: 0, from: 1, to: 0 },
-    { width, saturation, sweep, signal: 'tone' as const, drive: DRIVE_MAX, from: 1, to: 0 },
-    { width, saturation, sweep, signal: 'held' as const, drive: DRIVE_MAX, from: 0, to: 1 },
-  ]),
+  [0, SWEEP].flatMap((sweep) => {
+    const down = { width, saturation, sweep, from: CORE_HIGH, to: CORE_LOW };
+    return [
+      { ...down, signal: 'held' as const, drive: DRIVE_MAX },
+      { ...down, signal: 'tone' as const, drive: 0 },
+      { ...down, signal: 'tone' as const, drive: DRIVE_MAX },
+      { ...down, signal: 'held' as const, drive: DRIVE_MAX, from: CORE_LOW, to: CORE_HIGH },
+    ];
+  }),
 );
 
-describe('moving the core drive across [0, 1] (windsor#296)', () => {
+describe("moving the core drive across the shipped box's range (windsor#296, windsor#319)", () => {
   it.each(RATES)(
     'at %i Hz, 2× then 4×, across the box: no reset, and held, tone and M peaks bounded',
     (rate) => {
@@ -277,11 +336,15 @@ describe('moving the core drive across [0, 1] (windsor#296)', () => {
       for (const oversampling of TAPE_OVERSAMPLING) {
         rig.params.oversampling![0] = oversampling;
         for (const trial of TRIALS) {
-          const { ratio, m } = sweepDrive(rig, rate, clock, trial);
+          const { ratio, m, motion } = sweepDrive(rig, rate, clock, trial);
           const name = `${rate} Hz ${oversampling}× ${JSON.stringify(trial)}`;
-          const gate = trial.signal === 'tone' ? 'tone' : trial.to < trial.from ? 'fall' : 'rise';
-          expect(ratio, name).toBeLessThanOrEqual(BOUND[gate]);
           expect(m, name).toBeLessThanOrEqual(BOUND.m);
+          if (trial.signal === 'held' && trial.to > trial.from) {
+            expect(motion, name).toBeLessThanOrEqual(BOUND.motion);
+            expect(riseOverStill(rig, rate, clock, trial), name).toBeLessThanOrEqual(BOUND.rise);
+            continue;
+          }
+          expect(ratio, name).toBeLessThanOrEqual(BOUND[trial.signal === 'tone' ? 'tone' : 'fall']);
         }
         expect(rig.dsp.magnetic.factor).toBe(oversampling);
       }

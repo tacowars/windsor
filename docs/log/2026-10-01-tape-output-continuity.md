@@ -201,3 +201,48 @@ a thump: the gate above holds the drive motion that reached 242 times the
 field in #290 to under the field. Width and saturation change the gain
 less, or not at all: χ₀ does not depend on Ms. Width's motion is covered
 by the same rescale, but has no gate of its own here.
+
+## Amendment, 2026-10-01: the rise gate is relative to no motion (windsor#319)
+
+The drive trials now run on the box the Advanced panel ships
+(`TAPE_CORE_BOUNDS`: drive [0.05, 1], width [0.05, 0.85], saturation
+[0, 1]) and write the song's `core` through the processor's parameters, as
+the panel does. Drive 0 is outside the box, so its cases moved to 0.05.
+
+**Why the rise gate changed.** At width 0.85 the rising trials read up to
+1.785 of the conditioned field, against the 1.235 above. Almost all of
+that is the core's own release overshoot, not the motion: with no motion
+at all, a held field at the guard (conditioned to 2.5) released at the
+box's floor drive peaks at 1.180 of the field at width 0.62 and 1.716 at
+width 0.85, saturation 0 (0.776 and 1.017 at saturation 1), the worst over
+44.1, 48 and 96 kHz at 2× and 4×. The 1.235 bound was set just above the
+first of those, so it measured the static overshoot, and gating that is
+the survival records' business, not this one's. The gate exists to catch
+excursions the motion causes (#296).
+
+**The gate now.** Each rising trial is rendered a second time at the same
+corner, field, factor and rate, on the same timeline, with the core drive
+held at the trial's start, the state `retune` keeps the output continuous
+with. The gate bounds the trial's release peak over that no-motion release
+peak.
+
+The release comparison alone would miss a thump that the motion causes
+and that settles before the field is released. A second gate covers the
+motion window itself, from the start of the drive motion until it
+settles (the 10 ms glide or the 50 ms sweep, then 40 ms of hold): every
+sample's magnitude over the last output before the motion. `retune` keeps
+the output continuous, so the window's peak is its first sample, and the
+DC block's decay from there only lowers it. Over the conditioned field
+the window peaks at 0.1350 at most. With `retune`'s M rescale disabled
+the gate read 9.74 to 9.98, and it failed at every rate.
+
+| Gate | Measured worst | Allowed |
+|---|---|---|
+| Drive 0.05 → 1 under a held field at the guard, release peak over the same corner's release with no motion | 1.0810 (44.1 kHz, 2×, width 0.85, saturation 1, 50 ms sweep) | 1.09 |
+| Drive 0.05 → 1 under a held field at the guard, motion-window peak over the last output before the motion | 0.99935 (96 kHz, 4×, width 0.85, saturation 0, jump) | 1.01 |
+
+The margin is about a point rather than half: the no-motion reference
+moves with the state the trials before it leave, from 0.92 to 1.02 of the
+field at that corner. The worst at 48 kHz is 1.0432 and at 96 kHz 1.0500.
+Every other gate and bound is unchanged, and every rate and factor still
+has zero resets. Node 24.20.0 on the Apple M1 (arm64).
