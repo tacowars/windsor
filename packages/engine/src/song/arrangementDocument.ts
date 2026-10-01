@@ -35,8 +35,9 @@ import { ArrangementNormaliser } from './arrangementNormalise';
 import { normaliseMaster } from '../mixer/masterSpec';
 import type { MasterSpec } from '../mixer/masterSpec';
 import { normaliseReturns } from './deskNormalise';
+import { normaliseGroupOutputs, normaliseGroups } from './groupNormalise';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
-import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
+import type { ChannelStrip, GroupSpec, ReturnSpec } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
 import type { ResolveOptions } from './arrangementValidate';
 import type { FormatRefusal } from './formatUpgrade';
@@ -70,17 +71,27 @@ export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
   readonly patches?: Readonly<Record<string, Patch>>;
   /** The send buses by name, `a` and `b` (windsor#172): each one's level and insert chain. An absent bus is the code's. */
   readonly returns?: Readonly<Record<string, ReturnSpec>>;
+  /**
+   * The group buses (windsor#284), in display order, at most `MAX_GROUPS`.
+   * A part's Output names one by id. Absent when the song has none.
+   */
+  readonly groups?: readonly GroupSpec[];
   readonly master?: MasterSpec;
 };
 
 /**
- * A live partial of a document: parts by slot, patches and returns by name.
- * `null` at a slot or a patch id removes that entry, and a whole part at a
- * free slot adds one (#629) — the same partial the engine's `apply` takes.
+ * A live partial of a document: parts by slot, groups by id, patches and
+ * returns by name. `null` at a slot, a group id or a patch id removes that
+ * entry, a whole part at a free slot adds one (#629), and a whole group at
+ * a free id adds one (windsor#284) — the same partial the engine's `apply`
+ * takes.
  */
-export type DocumentPartial = DeepPartial<Omit<ArrangementDocument, 'parts' | 'patches'>> & {
+export type DocumentPartial = DeepPartial<
+  Omit<ArrangementDocument, 'parts' | 'patches' | 'groups'>
+> & {
   readonly parts?: PartsPartial<DocumentPart>;
   readonly patches?: Readonly<Record<string, DeepPartial<Patch> | null>>;
+  readonly groups?: PartsPartial<GroupSpec>;
 };
 
 export interface MakeArrangementResult {
@@ -158,7 +169,16 @@ export function isShippable(result: MakeArrangementResult): boolean {
   );
 }
 
-const DOCUMENT_KEYS = ['version', 'transport', 'harmony', 'patches', 'parts', 'returns', 'master'];
+const DOCUMENT_KEYS = [
+  'version',
+  'transport',
+  'harmony',
+  'patches',
+  'parts',
+  'returns',
+  'groups',
+  'master',
+];
 
 /** The top-level keys of the retired four-slot format, named in its correction. */
 const RETIRED_SLOT_KEYS = ['kick', 'hat', 'arp', 'drone', 'mix'];
@@ -173,6 +193,7 @@ interface MutableDocument {
   parts: DocumentPart[];
   patches?: Record<string, Patch>;
   returns?: Record<string, ReturnSpec>;
+  groups?: GroupSpec[];
   master?: MasterSpec;
 }
 
@@ -209,8 +230,10 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   if (Object.keys(patches).length > 0) document.patches = patches;
   const returns = normaliseReturns(o.returns, n);
   if (returns) document.returns = returns;
+  const groups = normaliseGroups(o.groups, n);
+  if (groups) document.groups = groups;
   if (o.master !== undefined) document.master = normaliseMaster(o.master, n);
-  return normaliseSongSidechains(document, n);
+  return normaliseSongSidechains(normaliseGroupOutputs(document, n), n);
 }
 
 /** Why another version is refused, when the shape says which retired format it is. */
