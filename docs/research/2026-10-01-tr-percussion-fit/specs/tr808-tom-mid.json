@@ -1,0 +1,32 @@
+{
+  "start": "../start/tr808-tom-mid.json",
+  "params": [
+    { "path": ["ops[0].ratio", "ops[2].ratio"], "min": 0.51, "max": 0.545 },
+    { "path": ["ops[0].phase", "ops[2].phase"], "min": 0, "max": 0.5 },
+    { "path": "pitchEnvAmount", "min": 0, "max": 3 },
+    { "path": "pitchEnv.decayTime", "min": 0.005, "max": 0.3, "scale": "log" },
+    { "path": "pitchEnv.decayCurve", "min": -1, "max": 1 },
+    { "path": "ops[0].env.decayTime", "min": 0.1, "max": 2, "scale": "log" },
+    { "path": "ops[0].env.decayCurve", "min": -1, "max": 0.5 },
+    { "path": "ops[0].env.sustainLevel", "min": 0, "max": 0.6 },
+    { "path": "ops[0].env.releaseTime", "min": 0.05, "max": 2, "scale": "log" },
+    { "path": "ops[0].env.releaseCurve", "min": -1, "max": 0.5 },
+    { "path": "ops[2].level", "min": 0, "max": 1 },
+    { "path": "ops[2].env.decayTime", "min": 0.005, "max": 0.3, "scale": "log" },
+    { "path": "ops[2].env.decayCurve", "min": -1, "max": 0.5 },
+    { "path": "ops[1].level", "min": 0, "max": 0.4 },
+    { "path": "ops[1].env.decayTime", "min": 0.001, "max": 0.05, "scale": "log" },
+    { "path": "filter.cutoff", "min": 300, "max": 6000, "scale": "log" },
+    { "path": "filter.drive", "min": 1, "max": 2 }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/Tom Mid A 808 05.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "seeds": 4,
+  "optimizer": { "method": "cma", "budget": 2000, "sigma0": 0.2, "seed": 1 }
+}

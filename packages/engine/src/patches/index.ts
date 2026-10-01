@@ -163,6 +163,7 @@ import patch_tr909_rimshot from './tr909-rimshot.json';
 import patch_tr909_snare from './tr909-snare.json';
 import patch_tr909_tom_high from './tr909-tom-high.json';
 import patch_tr909_tom_low from './tr909-tom-low.json';
+import patch_tr909_tom_mid from './tr909-tom-mid.json';
 import patch_weapon_zap from './weapon-zap.json';
 
 /** Every library file, raw and unvalidated, keyed by id (`presets.ts` loads it). */
@@ -329,5 +330,6 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'tr909-snare': patch_tr909_snare,
   'tr909-tom-high': patch_tr909_tom_high,
   'tr909-tom-low': patch_tr909_tom_low,
+  'tr909-tom-mid': patch_tr909_tom_mid,
   'weapon-zap': patch_weapon_zap,
 };
