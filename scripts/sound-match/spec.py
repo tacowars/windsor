@@ -22,8 +22,9 @@ patch. A parameter's `path` is a JSON path into the bare patch; a list of
 paths ties them to one value. `scale` is "linear" (default) or "log". WAV
 paths expand `$VARS` and `~`, so a spec need not carry a machine's folders.
 A reference's other fields default to the spec's `defaults` entry.
-`seeds` is optional: left out, the seed count is decided per patch (see
-`renderer.seed_list`); 1 forces a single seed and N > 1 forces N.
+`seeds` is optional: left out, the seed count is decided from the start
+patch and the fitted paths (see `seeds.py`); 1 forces a single seed and
+N > 1 forces N.
 The structure (algorithm, waves, routing) is the start patch's; a fit only
 moves the numbers the spec names.
 """

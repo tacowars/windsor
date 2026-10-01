@@ -34,6 +34,7 @@ import comparison
 import constants as C
 import regions
 import renderer as R
+import seeds as seeds_of
 import spec as S
 from analyze import jsonable
 
@@ -157,7 +158,9 @@ def main():
     patch = R.load_patch(args.patch)
     values = S.start_values(patch, sp.params)
     with R.Renderer() as r:
-        seeds = R.seed_list(r, patch, ref.render_options, args.seeds if args.seeds is not None else sp.seeds, sp.seed_base)
+        count = args.seeds if args.seeds is not None else sp.seeds
+        fitted = [path for p in sp.params for path in p.paths]
+        seeds = seeds_of.seed_list(r, patch, ref.render_options, count, sp.seed_base, fitted)
 
         def measure(p):
             return _mean_headline(comparison.render_candidates(r, p, ref, seeds, sp.candidate_align))

@@ -161,12 +161,20 @@ python renderer.py tr909-kick --seconds 1 --count 200
   render lasts the reference's length plus 50 ms, at most 4 s.
 - **Level.** Each side is normalised to its own peak (or RMS, `--norm rms`).
   The packs are normalised per voice, so absolute level means nothing.
-- **Seeds.** A patch with a Noise operator, a `phaseFree` operator, or an
-  `lfo` or `lfo2` with a random shape (S&H or Drift) depends on its seed by
-  its structure, whatever that operator's level or that LFO's amount and
-  routing, so a fit that raises a silent noise level or an LFO's depth is
-  still scored over every seed. Any other patch is rendered with two seeds,
-  and depends on its seed if they differ by a sample. A seed-dependent patch
+- **Seeds.** The worklet's random sources are the `panRandom` jitter, a
+  free-running (`phaseFree`) start phase, the noise of a Noise operator and
+  an S&H or Drift LFO (listed, with their engine files, in `constants.py`).
+  A patch depends on its seed when its structure draws from one at its
+  current values (a Noise or `phaseFree` operator, a random `lfo` or `lfo2`
+  shape, a non-zero `panRandom`), or when a fitted parameter's path controls
+  one: `panRandom`, an operator's `wave` or `phaseFree`, anything of an
+  operator whose wave is Noise or fitted, an LFO's `shape`, and any depth of
+  an LFO whose shape is random or fitted (`filter.lfoAmount` and
+  `filter.lfo2Amount` included). The second rule holds for the whole fit,
+  whatever the start value, so a fit that raises `panRandom` from 0 or a
+  silent noise level is scored over every seed (`seeds.py`). Any other
+  patch is rendered with two seeds, and depends on its seed if they differ
+  by a sample. A seed-dependent patch
   is scored over 4 seeds (from `--seed-base` 1), any other over one. An
   optional `"seeds": N` in a fit spec, or `--seeds N` on `compare.py` and
   `sensitivity.py` (which overrides the spec's), skips that decision: `1`

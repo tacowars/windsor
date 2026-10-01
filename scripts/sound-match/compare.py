@@ -29,6 +29,7 @@ import constants as C
 import plot
 import renderer as R
 import report
+import seeds as seeds_of
 from analyze import jsonable
 
 
@@ -92,7 +93,7 @@ def candidates(args, refs):
     out = []
     with R.Renderer() as r:
         for ref in refs:
-            seeds = R.seed_list(r, patch, ref.render_options, args.seeds, args.seed_base)
+            seeds = seeds_of.seed_list(r, patch, ref.render_options, args.seeds, args.seed_base)
             out.append(comparison.render_candidates(r, patch, ref, seeds, align))
     return out, os.path.basename(source)
 

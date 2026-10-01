@@ -37,6 +37,7 @@ import scipy.optimize as so
 import comparison
 import renderer as R
 import score
+import seeds as seeds_of
 import spec as S
 from analyze import jsonable
 
@@ -46,8 +47,9 @@ class Objective:
 
     def __init__(self, sp, renderer, log):
         self.sp, self.r, self.log = sp, renderer, log
+        fitted = [path for p in sp.params for path in p.paths]
         self.seeds = [
-            R.seed_list(renderer, sp.start, ref.render_options, sp.seeds, sp.seed_base) for ref in sp.references
+            seeds_of.seed_list(renderer, sp.start, ref.render_options, sp.seeds, sp.seed_base, fitted) for ref in sp.references
         ]
         self.evals = 0
         self.best = None
