@@ -116,8 +116,9 @@ no generalisation falls on the bundle's `LoadSampler` lines, and in each
 bundle whose render allocates nothing with the meter off, the test holds
 that render under 16 KB over 2000 quanta and the meter-on run to 32 ± 8
 bytes a quantum over it. When this branch merged, only the EQ and the output
-stage allocated nothing. The allocation sweep has since made seven more
-clean, and the test pins each one (windsor#261):
+stage allocated nothing. The allocation sweep has since made the other
+eight clean, so all ten are, and the test pins each one (windsor#261,
+windsor#267):
 
 | Bundle | Clean since |
 |---|---|
@@ -129,9 +130,9 @@ clean, and the test pins each one (windsor#261):
 | Phaser | windsor#248 |
 | Dub delay | windsor#249 |
 | FM part | windsor#257 |
+| Tape | windsor#265 |
 
-Tape still allocates (about 14 KB a quantum with the meter off) and is left
-out until windsor#228. The test's warm-up is 24000 quanta, not 16000: the
+The test's warm-up is 24000 quanta, not 16000: the
 probe's process allocates a one-off 3 to 17 KB about 18000 quanta in, in
 every bundle and whatever the measured length, which a 16000-quantum warm-up
 left inside the measured run. A build whose sampler
