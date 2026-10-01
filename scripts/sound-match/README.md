@@ -107,6 +107,29 @@ For the 909 pack, which carries about 2.5 ms of near silence before the
 attack edge, align on the edge:
 `--ref-threshold-db -6 --ref-lead-ms 1.5`.
 
+**Short references.** Claves, rims and closed hats can be shorter than the
+30 ms waveform window (the 808 rim shot is 25 ms). Every plot and score
+window takes what audio there is and pads the rest with silence, for the
+reference and the candidate alike, so `--png` adds pictures without
+changing a score. To check this by hand after touching a window, synthesise
+a 10 ms and a 25 ms reference outside the repository (never commit audio),
+then run both through `compare.py --png` and a 20-evaluation fit:
+
+```bash
+python -c "
+import numpy as np, scipy.io.wavfile as w
+for ms in (10, 25):
+    t = np.arange(48 * ms) / 48000
+    x = np.sin(2 * np.pi * 1700 * t) * np.exp(-t / 0.004)
+    w.write(f'/tmp/short-{ms}ms.wav', 48000, (0.8 * x).astype(np.float32))"
+python compare.py /tmp/short-10ms.wav /tmp/short-25ms.wav tr808-rimshot --png
+python fit.py /tmp/short-spec.json --budget 20
+```
+
+where `/tmp/short-spec.json` is a spec with `"start": "tr808-rimshot"`, a
+parameter or two (say `ops[0].env.decayTime`) and the two WAVs as its
+references. Both commands should finish and write their files.
+
 ### Fit: `fit.py`
 
 ```bash
