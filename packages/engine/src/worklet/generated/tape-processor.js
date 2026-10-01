@@ -571,7 +571,9 @@ var TapeMagneticCore = class {
   }
   /**
    * Maps the three controls to Ms, a and c, and recomputes the step, the
-   * origin susceptibility and the output gain. Keeps the state. Off the
+   * origin susceptibility and the output gain. Keeps the output, as
+   * `retune` does (the first call, from the constructor, has no gain yet
+   * and leaves M to `reset`). Off the
    * per-sample path: the stage calls it at construction, and `retune` while
    * a model switch glides.
    */
@@ -590,10 +592,18 @@ var TapeMagneticCore = class {
   /**
    * `configure` without its checks or the step: Ms, a and c from `controls`,
    * and the origin susceptibility and output gain, in exactly the operations
-   * of `originSusceptibility`, so the bits are the same. Keeps the state. The
-   * stage's per-sample entry while a model switch glides the controls
-   * (design decision 6); the controls are read in place, so no double
-   * crosses the call, and every row was checked at load.
+   * of `originSusceptibility`, so the bits are the same. The stage's
+   * per-sample entry while the controls glide (design decision 6); the
+   * controls are read in place, so no double crosses the call, and every
+   * row was checked at load.
+   *
+   * Keeps the output, not the magnetization (windsor#296): M is rescaled by
+   * the old gain over the new, so `M × gain` is continuous. Without it, a
+   * field held still (or silence after remanence) freezes M, since dM/dt is
+   * proportional to dH/dt, and lowering drive raised the gain under it, up
+   * to hundreds of times the field. Rescaled, M stays in proportion to the
+   * new susceptibility, as a small signal's would. A gain step to equal bits
+   * leaves M as it was, so a retune to the same controls changes nothing.
    */
   retune(controls) {
     const t = this.table;
@@ -607,7 +617,9 @@ var TapeMagneticCore = class {
     this.irreversible = 1 - c;
     this.irreversibleK = (1 - c) * t.pinning;
     this.susceptibility = c * r / (1 - t.alpha * c * r);
-    this.gain = 1 / Math.max(this.susceptibility, t.susceptibilityFloor);
+    const gain = 1 / Math.max(this.susceptibility, t.susceptibilityFloor);
+    if (gain !== this.gain) this.m = this.m * (this.gain / gain);
+    this.gain = gain;
   }
   /** Demagnetised: the state and the output to zero. The reset counter is kept. */
   reset() {
