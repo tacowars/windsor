@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
 import { DRIVE_SHAPE, DRIVE_SHAPE_NAMES, makePatch } from '@windsor/engine';
-import { PRESETS } from '@windsor/engine/patch/presets';
 import { FILTER_KNOBS, lfoKnobs, patchKnobOpts } from './patchKnobTables';
 import {
   DRIVE_SWITCH,
@@ -166,9 +165,13 @@ describe('the Drive section switch (windsor#309)', () => {
     expect(typeof getPath(makePatch(), DRIVE_SWITCH.f)).toBe('boolean');
   });
 
-  it('shows the 808 kick On and a pad with no drive Off, the pad dimmed', () => {
-    const kick = PRESETS['tr808-kick']!;
-    const pad = PRESETS['pad-drift']!;
+  // Built here, not read from the library: a refit may move a kit's drive.
+  const driven = (): Patch =>
+    makePatch({ drive: { on: true, gain: 1.5, shape: DRIVE_SHAPE.DIODE, bias: 0.1, tone: 0.8 } });
+
+  it('shows a driven patch On and one with no drive Off, the undriven one dimmed', () => {
+    const kick = driven();
+    const pad = makePatch({ drive: { ...makePatch().drive, gain: 1, bias: 0 } });
     expect(toggleIndex(kick, DRIVE_SWITCH.f)).toBe(1);
     expect(driveInactive(kick)).toBe(false);
     expect(toggleIndex(pad, DRIVE_SWITCH.f)).toBe(0);
@@ -179,7 +182,7 @@ describe('the Drive section switch (windsor#309)', () => {
   it('switches drive.on alone, keeps the four controls, and survives the JSON round trip', () => {
     const committed: string[] = [];
     const editor: PatchEditor = {
-      patch: structuredClone(PRESETS['tr808-kick']!),
+      patch: driven(),
       push: () => committed.push(JSON.stringify(editor.patch.drive)),
       refresh: () => undefined,
     };

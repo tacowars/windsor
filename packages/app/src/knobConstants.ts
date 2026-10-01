@@ -36,6 +36,12 @@ export const ARC_MIN_DEGREES = 0.4;
 export const HALF_TURN_DEGREES = 180;
 /** SVG angles start at three o'clock; the dial's start at twelve. */
 export const TWELVE_OCLOCK_DEGREES = 90;
+/**
+ * A log knob whose `min` is 0 gives this bottom share of its dial to the run
+ * from exact 0 to its log floor (windsor#324). One arrow press, so a press up
+ * from 0 lands on the floor and a press down from the floor lands back on 0.
+ */
+export const ZERO_END_SLICE = KEY_STEP;
 /** The floor a log-scaled knob takes below its own minimum, so `log(0)` never happens. */
 export const LOG_FLOOR = 1e-6;
 /** `aria-valuenow` rounds to this many parts per unit. */

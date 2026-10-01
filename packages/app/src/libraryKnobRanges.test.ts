@@ -39,17 +39,23 @@ function outOfRange(): string[] {
 
 /**
  * Known misses, each a follow-up of its own rather than this test's to fix:
- * the claps' LFO rates sit above the Rate knob's 40 Hz. An entry that no
- * longer misses must leave this list, so it cannot hide a later one.
+ * the claps' LFO rates sit above the Rate knob's 40 Hz. Each is named by its
+ * patch and path, not its value, so a refit that moves the value without
+ * bringing it into range does not break the test (windsor#324 fix round 2).
+ * An entry that no longer misses must leave this list, so it cannot hide a
+ * later one.
  */
 const KNOWN_MISSES: readonly string[] = [
-  'efm-clap lfo.rate = 100 (0.02..40)',
-  'tr808-clap lfo.rate = 100 (0.02..40)',
-  'tr909-clap lfo.rate = 91 (0.02..40)',
+  'efm-clap lfo.rate',
+  'tr808-clap lfo.rate',
+  'tr909-clap lfo.rate',
 ];
+
+/** A miss's patch and path, without its value and range. */
+const missKey = (miss: string): string => miss.slice(0, miss.indexOf(' = '));
 
 describe('the patch library against the editor knobs', () => {
   it('keeps every knob-backed value inside its knob range, so a first touch never clamps it', () => {
-    expect(outOfRange()).toEqual([...KNOWN_MISSES]);
+    expect(outOfRange().map(missKey)).toEqual([...KNOWN_MISSES]);
   });
 });

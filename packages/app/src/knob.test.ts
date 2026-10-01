@@ -11,8 +11,9 @@ import { FakeElement, fire, openGestureConsole } from './__fixtures__/gestureCon
 import { partChange } from './context';
 import { settleGestures } from './gestureHooks';
 import { KNOB_PAD_PX, KNOB_R } from './knobConstants';
-import { attachKnobInput, continuesKeySteps, knobGeometry } from './knob';
+import { attachKnobInput, continuesKeySteps, knobGeometry, scaleFor } from './knob';
 import type { KnobSpec, Scale } from './knob';
+import { ENVELOPE_KNOBS } from './patchKnobTables';
 
 const level = (value: number): DocumentPartial => partChange(0, { strip: { level: value } });
 const LINEAR: Scale = { toNorm: (v) => v, fromNorm: (n) => Math.min(1, Math.max(0, n)) };
@@ -100,6 +101,56 @@ describe('a knob drag', () => {
     expect(ctx.undo()).toBe(true);
     expect(ctx.undo()).toBe(true);
     expect(ctx.canUndo).toBe(false);
+  });
+});
+
+/**
+ * The Attack knob over a plain value, with `makeKnob`'s clamp as its commit:
+ * a zero-end log knob (windsor#324 fix round 2), whose old minimum, 0.5 ms,
+ * many library patches ship.
+ */
+function attackKnob(start: number): { node: FakeElement; value: () => number } {
+  const o = ENVELOPE_KNOBS.find((k) => k.f === 'attackTime')!.o;
+  let value = start;
+  const spec: KnobSpec = {
+    ...o,
+    label: 'Attack',
+    def: 0.002,
+    get: () => value,
+    set: (v) => (value = v),
+  };
+  const commit = (v: number): void => spec.set(Math.min(o.max, Math.max(o.min, v)));
+  const node = new FakeElement();
+  attachKnobInput(node as unknown as HTMLElement, spec, scaleFor(o), commit);
+  return { node, value: () => value };
+}
+
+describe('a zero-distance drag on a zero-end knob (windsor#324)', () => {
+  it('commits the old minimum unchanged on a press with sideways jitter', () => {
+    const knob = attackKnob(0.0005);
+    fire(knob.node, 'pointerdown', { clientX: 50, clientY: 100 });
+    fire(knob.node, 'pointermove', { clientX: 53, clientY: 100 });
+    fire(knob.node, 'pointermove', { clientX: 47, clientY: 100 });
+    fire(knob.node, 'pointerup', { clientY: 100 });
+    expect(knob.value()).toBe(0.0005);
+  });
+
+  it('puts the value back when a drag returns to where it started', () => {
+    const knob = attackKnob(0.0005);
+    fire(knob.node, 'pointerdown', { clientY: 100 });
+    fire(knob.node, 'pointermove', { clientY: 140 });
+    expect(knob.value()).toBe(0);
+    fire(knob.node, 'pointermove', { clientY: 100 });
+    fire(knob.node, 'pointerup', { clientY: 100 });
+    expect(knob.value()).toBe(0.0005);
+  });
+
+  it('steps from 0 up to the old minimum and back down to 0, one press each', () => {
+    const knob = attackKnob(0);
+    fire(knob.node, 'keydown', { key: 'ArrowUp' });
+    expect(knob.value()).toBe(0.0005);
+    fire(knob.node, 'keydown', { key: 'ArrowDown' });
+    expect(knob.value()).toBe(0);
   });
 });
 

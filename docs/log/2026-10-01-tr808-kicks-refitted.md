@@ -66,10 +66,15 @@ three recordings from *808 From Mars* and wrote what each is for
    hard each kick is driven.
 7. **Every fitted value sits inside its editor knob** (fix round 1), so a
    first touch never clamps it and changes the sound:
-   - the envelope Attack and Decay knobs reach exact 0 at the bottom of
-     their sweep (`logFloor` in `knob.ts`; the log sweep above it starts
-     at the old minima, 0.5 ms and 1 ms), since an envelope stage of 0
-     is a sound;
+   - the envelope Attack and Decay knobs reach exact 0, since an
+     envelope stage of 0 is a sound. The bottom 2% of the dial
+     (`ZERO_END_SLICE`, one arrow press) runs straight from 0 to the old
+     minimum (`logFloor` in `knob.ts`: 0.5 ms attack, 1 ms decay), and the
+     log sweep fills the rest (fix round 2). The old minimum keeps a
+     position of its own above 0, a value under it (some fitted stages)
+     one inside the slice, so every value reads back as itself, and a
+     press that moves no distance along the dial commits the value it
+     started from;
    - the Fixed knob reaches down to 1 Hz, on its log curve, for a held
      sub-audio operator like the 808 Kick's pulse;
    - the Volume knob keeps its 1.5 maximum: the 808 Kick and the long
