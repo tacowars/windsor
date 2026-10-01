@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "Juno Strings",
   "category": "Strings",
   "tags": ["strings", "edm", "ambient", "juno", "ensemble", "pwm"],
@@ -154,7 +154,6 @@
       "mode": 1,
       "cutoff": 2000,
       "resonance": 0.6,
-      "drive": 1,
       "slope24": true,
       "envAmount": 1,
       "modWheelDepth": 1.2,
@@ -202,6 +201,12 @@
       "modWheelDepth": 0,
       "toOp": [0, 0, 0, 0],
       "toWidth": [0, 0, 0, 0.3]
+    },
+    "drive": {
+      "gain": 1,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

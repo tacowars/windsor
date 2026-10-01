@@ -124,7 +124,7 @@ describe('offerRestore', () => {
       const refusal = songRefusal(JSON.stringify(doc));
       expect(refusal?.patch).toBe(id);
       expect(refusal?.message).toBe(
-        `saved with patch format 99 in patch "${id}", this build reads 2`,
+        `saved with patch format 99 in patch "${id}", this build reads 3`,
       );
     });
 

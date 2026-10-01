@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "909 Kick",
   "category": "Drums",
   "tags": ["909", "kick", "analog", "sub", "mono"],
@@ -148,7 +148,6 @@
       "mode": 1,
       "cutoff": 12000,
       "resonance": 0.8,
-      "drive": 1.6,
       "slope24": false,
       "envAmount": 0,
       "modWheelDepth": 0,
@@ -178,6 +177,12 @@
       "toPitch": 0,
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
+    },
+    "drive": {
+      "gain": 1.6,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

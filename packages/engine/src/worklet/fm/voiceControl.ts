@@ -3,8 +3,8 @@
  * The voice's control-rate work (#645): `bindVoiceConstants`, the routing
  * flags and per-note `Math.pow` results computed once per note (#548), and
  * `updateVoiceControl`, which advances every envelope and both LFOs by
- * CTRL_INTERVAL samples, glides the pitch, refreshes the filter
- * coefficients and sets the per-sample amplitude and width ramps the render
+ * CTRL_INTERVAL samples, glides the pitch, refreshes the drive stage
+ * (windsor#300) and the filter coefficients and sets the per-sample amplitude and width ramps the render
  * loops only add. Functions over the voice, called once per control block by
  * `Voice.bindConstants` and `Voice.updateControl`. Invariant: allocation
  * free; `specialise` selects the precomputed constants or the inline
@@ -26,6 +26,7 @@ import { ALGORITHMS, ALG_CARRIER_BITS, ALG_DESCENDING, ALG_EDGES } from './algor
 import { WIDTH_SNAP } from './fmConstants';
 import { FILT_OFF } from './modeIds';
 import { WIDTH_RANGE } from './patchDefaults';
+import { updateVoiceDrive } from './voiceDrive';
 import { KIND_NOISE, KIND_PULSE, KIND_TABLE, mipIndexAt } from './waveTables';
 
 /** The frequency a squeezed wave's table is chosen for, passed to `mipIndexAt` in place of an argument. */
@@ -210,6 +211,7 @@ function updateVoiceControl(voice: Voice, n: number): void {
     voice.ampInc[i] = (target - voice.amp[i]) / n;
   }
 
+  updateVoiceDrive(voice);
   updateVoiceFilter(voice, n);
 
   voice.age += n;

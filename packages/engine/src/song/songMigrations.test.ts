@@ -2,14 +2,17 @@
  * Song format upgrades (record `2026-09-28-format-versions-refuse-never-destroy`):
  * a version this build cannot read is refused with both versions named, an
  * upgrade runs before the check and chains, and a song whose snapshot holds a
- * patch of an unreadable format is refused whole. No upgrade ships: versions
- * 2 (#705), 3 (record `2026-10-01-retire-song-version-3`) and 4 (windsor#224,
- * Tape's Drive changed meaning) are refused.
+ * patch of an unreadable format is refused whole. One upgrade ships, 5 → 6
+ * (windsor#300: the snapshot's patches to patch format 3, pinned by
+ * `songDriveUpgrade.test.ts`); versions 2 (#705), 3 (record
+ * `2026-10-01-retire-song-version-3`) and 4 (windsor#224, Tape's Drive
+ * changed meaning) are refused.
  * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
  */
 import { describe, expect, it } from 'vitest';
 
 import { ARRANGEMENT_VERSION } from '../audioConstants';
+import { PATCH_FILE_FORMAT, PATCH_MIGRATIONS } from '../patch/patchMigrations';
 import { KICK, song } from '../__fixtures__/documentCases';
 import { makeArrangement } from './arrangementDocument';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
@@ -42,8 +45,8 @@ const TABLE: Record<number, Upgrade> = Object.fromEntries(
 );
 
 describe('upgradeSong', () => {
-  it('ships no upgrade: versions 2, 3 and 4 were retired without one', () => {
-    expect(SONG_MIGRATIONS).toEqual({});
+  it('ships one upgrade, 5 → 6: versions 2, 3 and 4 were retired without one', () => {
+    expect(Object.keys(SONG_MIGRATIONS)).toEqual(['5']);
   });
 
   it('refuses a newer version, naming both, and hands the document back untouched', () => {
@@ -146,7 +149,7 @@ describe("a song's patch snapshot", () => {
   });
 
   it('takes an embedded patch that declares the current format, dropping the key', () => {
-    const result = makeArrangement(withPatch({ format: 2, volume: 0.5 }));
+    const result = makeArrangement(withPatch({ format: PATCH_FILE_FORMAT, volume: 0.5 }));
     expect(result.corrections).toEqual([]);
     expect(result.document.patches?.['kick']).not.toHaveProperty('format');
   });
@@ -158,9 +161,9 @@ describe("a song's patch snapshot", () => {
     expect(refused).toEqual({
       format: 'patch',
       found: 99,
-      reads: 2,
+      reads: PATCH_FILE_FORMAT,
       patch: 'kick',
-      message: 'saved with patch format 99 in patch "kick", this build reads 2',
+      message: `saved with patch format 99 in patch "kick", this build reads ${PATCH_FILE_FORMAT}`,
     });
     const result = makeArrangement(raw);
     expect(result.usable).toBe(false);
@@ -173,7 +176,7 @@ describe("a song's patch snapshot", () => {
     const upgrade = (patch: Doc): Doc => ({ ...patch, volume: 0.25 });
     const { document } = upgradeSong(withPatch({ format: 1, volume: 0.5 }), {
       songs: {},
-      patches: { 1: upgrade },
+      patches: { ...PATCH_MIGRATIONS, 1: upgrade },
     });
     expect((document as { patches: Record<string, Doc> }).patches['kick']).toEqual({
       volume: 0.25,

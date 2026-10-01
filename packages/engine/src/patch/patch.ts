@@ -16,6 +16,7 @@ import type { Algorithm } from '../audioConstants';
 /** The waveform ids live with the worklet that renders them (`worklet/fm/waveIds.ts`, #656). */
 export { WAVE } from '../worklet/fm/waveIds';
 import {
+  DRIVE_DEFAULTS,
   ENVELOPE_DEFAULTS,
   FILTER_DEFAULTS,
   FILTER_ENV_DEFAULTS,
@@ -44,7 +45,7 @@ export const WAVE_NAMES = [
 ] as const;
 
 /** The mode ids live with the worklet that switches on them (`worklet/fm/modeIds.ts`, #669). */
-export { FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
+export { DRIVE_SHAPE, FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
 
 export const LFO_SHAPE_NAMES = [
   'Sine',
@@ -59,6 +60,9 @@ export const LFO_SHAPE_NAMES = [
 export const FILTER_MODE_NAMES = ['Off', 'LP', 'HP', 'BP', 'Notch'] as const;
 
 export const LOOP_MODE_NAMES = ['None', 'Loop', 'Trigger'] as const;
+
+/** The voice drive's shapes, by `DRIVE_SHAPE` id (windsor#300). */
+export const DRIVE_SHAPE_NAMES = ['Soft', 'Hard', 'Diode', 'Tube', 'Fold'] as const;
 
 /** Operators are labelled A B C D, with A nearest the output. */
 export const OP_NAMES = ['A', 'B', 'C', 'D'] as const;
@@ -140,7 +144,6 @@ export interface FilterSettings {
   mode: number;
   cutoff: number;
   resonance: number;
-  drive: number;
   slope24: boolean;
   /** Octaves. */
   envAmount: number;
@@ -152,6 +155,22 @@ export interface FilterSettings {
   lfo2Amount: number;
   keyTrack: number;
   env: Envelope;
+}
+
+/**
+ * The voice's drive stage (windsor#300, record `2026-10-01-voice-drive-stage`):
+ * after the carriers and before the filter, whether the filter is on or not.
+ * `gain` 1 with `bias` 0 bypasses it.
+ */
+export interface DriveSettings {
+  /** The input gain into the shaper; 1 is unity. */
+  gain: number;
+  /** A `DRIVE_SHAPE` id. */
+  shape: number;
+  /** A DC offset added before the shaper, -1..1; silence in is still silence out. */
+  bias: number;
+  /** A one-pole lowpass after the shaper, 0..1: about 1 kHz at 0, bypassed at 1. */
+  tone: number;
 }
 
 export interface Patch {
@@ -181,6 +200,7 @@ export interface Patch {
   /** A second LFO, symmetric with the first; `LFO2_DEFAULTS` leaves it inert. */
   lfo2: LfoSettings;
   filter: FilterSettings;
+  drive: DriveSettings;
 }
 
 /** An operator with every field optional, its envelope included; `makeOperator` completes it. */
@@ -238,6 +258,7 @@ export function makePatch(o: PartialPatch = {}): Patch {
       ...(o.filter ?? {}),
       env: makeEnvelope(o.filter?.env ?? {}, FILTER_ENV_DEFAULTS),
     },
+    drive: { ...DRIVE_DEFAULTS, ...(o.drive ?? {}) },
   };
 }
 

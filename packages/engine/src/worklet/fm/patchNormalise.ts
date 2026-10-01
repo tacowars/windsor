@@ -9,6 +9,7 @@
  */
 
 import type {
+  DriveSettings,
   Envelope as EnvelopeParams,
   LfoSettings,
   Operator,
@@ -17,7 +18,12 @@ import type {
   Patch,
 } from '../../patch/patch';
 import { ALGORITHMS } from './algorithms';
+import { DRIVE_FOLD, DRIVE_SOFT } from './modeIds';
 import {
+  DRIVE_BIAS_RANGE,
+  DRIVE_DEFAULTS,
+  DRIVE_GAIN_RANGE,
+  DRIVE_TONE_RANGE,
   ENVELOPE_DEFAULTS,
   FEEDBACK_RANGE,
   FILTER_DEFAULTS,
@@ -126,6 +132,23 @@ function lfoDefaults(
   };
 }
 
+/**
+ * The drive stage (windsor#300): a shape id outside the table plays `soft`,
+ * and the gain, bias and tone are clamped to their ranges (the gain's
+ * bound keeps the shaper's operand finite, windsor#308).
+ */
+function driveDefaults(raw: Partial<DriveSettings> | null | undefined): DriveSettings {
+  raw = raw || {};
+  const d = DRIVE_DEFAULTS;
+  const shape = num(raw.shape, d.shape) | 0;
+  return {
+    gain: clamp(num(raw.gain, d.gain), DRIVE_GAIN_RANGE),
+    shape: shape < DRIVE_SOFT || shape > DRIVE_FOLD ? DRIVE_SOFT : shape,
+    bias: clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE),
+    tone: clamp(num(raw.tone, d.tone), DRIVE_TONE_RANGE),
+  };
+}
+
 function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
   raw = raw || {};
   const ops: Operator[] = [];
@@ -155,7 +178,6 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
       mode: num(filtRaw.mode, fd.mode) | 0,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
       resonance: num(filtRaw.resonance, fd.resonance),
-      drive: num(filtRaw.drive, fd.drive),
       slope24: !!filtRaw.slope24,
       envAmount: num(filtRaw.envAmount, fd.envAmount), // octaves
       modWheelDepth: num(filtRaw.modWheelDepth, fd.modWheelDepth), // octaves the wheel adds to envAmount (#586)
@@ -164,6 +186,7 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
       keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS),
     },
+    drive: driveDefaults(raw.drive),
   } satisfies Patch;
   return p;
 }

@@ -1,8 +1,8 @@
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
- * history, amplitude and width ramps, six envelopes, two LFOs, two filter
- * stages, the steal fade, a step's parameter offsets and the per-voice values
+ * history, amplitude and width ramps, six envelopes, two LFOs, the drive
+ * stage (windsor#300), two filter stages, the steal fade, a step's parameter offsets and the per-voice values
  * they make (windsor#17) — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
  * the part polls. The hot paths are functions over the voice in `voiceControl.js`,
@@ -20,12 +20,13 @@ import type { Algorithm } from './algorithms';
 import type { WorkletPatch } from './patchNormalise';
 import { ALGORITHMS, ALG_ORDER } from './algorithms';
 import { Envelope, ST_IDLE, ST_SUSTAIN } from './envelope';
-import { DORMANT_AMP } from './fmConstants';
+import { DORMANT_AMP, DORMANT_FILTER_STATE } from './fmConstants';
 import { Lfo, secondLfoSeed } from './lfo';
 import { randomSeed32 } from './prng';
 import { FILT_OFF } from './modeIds';
 import { STEP_MOD_SLOT_COUNT } from './stepModTables';
 import { Svf } from './svf';
+import { VoiceDrive } from './voiceDrive';
 import { bindVoiceConstants, restingWidth, updateVoiceControl } from './voiceControl';
 import { renderVoiceKernel } from './voiceKernel';
 import { renderVoiceGeneric } from './voiceRender';
@@ -61,6 +62,7 @@ class Voice {
   lfo2: Lfo;
   svfA: Svf;
   svfB: Svf;
+  drive: VoiceDrive;
   noiseSeed: number;
   active: boolean;
   gate: boolean;
@@ -152,6 +154,7 @@ class Voice {
     this.lfo2 = new Lfo(secondLfoSeed(this.lfo.seed));
     this.svfA = new Svf();
     this.svfB = new Svf();
+    this.drive = new VoiceDrive();
 
     this.noiseSeed = randomSeed32(random);
 
@@ -295,6 +298,7 @@ class Voice {
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
     this.svfA.reset();
     this.svfB.reset();
+    this.drive.reset();
 
     // The step's offsets (windsor#17), and the width ramps from the note's
     // width; the first control block sets their step.
@@ -432,8 +436,13 @@ class Voice {
     return this.filterQuiet;
   }
 
-  /** The filter is off, or has stopped ringing: both stages under the dormancy floor (#547). */
+  /**
+   * The filter is off, or has stopped ringing: both stages under the dormancy
+   * floor (#547), and the drive's tone pole too (windsor#300), which holds no
+   * state while it is not running.
+   */
   get filterQuiet(): boolean {
+    if (Math.abs(this.drive.toneState) > DORMANT_FILTER_STATE) return false;
     const f = this.patch!.filter;
     if (f.mode === FILT_OFF) return true;
     if (!Svf.quiet(this.svfA)) return false;
