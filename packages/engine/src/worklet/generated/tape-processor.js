@@ -164,6 +164,9 @@ var TAPE_RANDOM = {
   hissPower: 1.5
 };
 
+// packages/engine/src/inserts/tapeMagneticOverrideMessage.ts
+var TAPE_MAGNETIC_OVERRIDE = "magneticOverride";
+
 // packages/engine/src/worklet/loadSampler.ts
 var LOAD_MS_PER_SECOND = 1e3;
 var LoadSampler = class {
@@ -651,21 +654,32 @@ var TapeMagneticCore = class {
 };
 
 // packages/engine/src/worklet/tape/tapeMagneticRows.ts
+var ROW_LENGTH = 3;
 function magneticControls(row, into) {
   into.drive = row[0];
   into.width = row[1];
   into.saturation = row[2];
   return into;
 }
+function magneticRowInRange(row) {
+  if (!Array.isArray(row) || row.length !== ROW_LENGTH) return false;
+  for (let i = 0; i < ROW_LENGTH; i++) {
+    const value = row[i];
+    if (typeof value !== "number" || !(value >= 0 && value <= 1)) return false;
+  }
+  return true;
+}
+function magneticRowAboveFloor(row, scratch, table = TAPE_MAGNETIC) {
+  return originSusceptibility(magneticControls(row, scratch), table) > table.susceptibilityFloor;
+}
 function assertMagneticRows(rows = TAPE_MODELS, table = TAPE_MAGNETIC) {
   const controls = { drive: NaN, width: NaN, saturation: NaN };
   rows.forEach(({ magnetic }, index) => {
-    if (!magnetic.every((value) => value >= 0 && value <= 1))
+    if (!magneticRowInRange(magnetic))
       throw new RangeError(`tape model ${index}: magnetic controls must be in [0, 1]`);
-    const susceptibility = originSusceptibility(magneticControls(magnetic, controls), table);
-    if (!(susceptibility > table.susceptibilityFloor))
+    if (!magneticRowAboveFloor(magnetic, controls, table))
       throw new RangeError(
-        `tape model ${index}: origin susceptibility ${susceptibility} is not above ${table.susceptibilityFloor}`
+        `tape model ${index}: origin susceptibility ${originSusceptibility(controls, table)} is not above ${table.susceptibilityFloor}`
       );
   });
 }
@@ -836,6 +850,8 @@ var TapeMagneticStage = class {
     this.target = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     this.controls = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     this.configured = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
+    this.overridden = false;
+    this.candidate = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     for (let i = 0; i < this.oversamplers.length; i++)
       this.oversamplers[i].configure(this.controls);
     this.active = [this.oversamplers[0], this.oversamplers[TAPE_OVERSAMPLING.length]];
@@ -860,12 +876,29 @@ var TapeMagneticStage = class {
     }
   }
   /**
-   * Once per block: smooth the core's controls toward `model`'s row over
-   * `frames` samples with the 10 ms time constant, and reconfigure both pairs
-   * when they moved. While every row is equal this changes nothing.
+   * The developer override (windsor#276): glide to `row` in place of the
+   * model's row, or back to the model's at `null`. Returns false, and
+   * changes nothing, for anything but three numbers in [0, 1] above the floor. Not on
+   * the per-block path: the processor calls it from its port.
+   */
+  setOverride(row) {
+    if (row === null) {
+      this.overridden = false;
+      return true;
+    }
+    if (!magneticRowInRange(row) || !magneticRowAboveFloor(row, this.candidate)) return false;
+    magneticControls(row, this.target);
+    this.overridden = true;
+    return true;
+  }
+  /**
+   * Once per block: smooth the core's controls toward `model`'s row (or the
+   * override) over `frames` samples with the 10 ms time constant, and
+   * reconfigure both pairs when they moved. While every row is equal and
+   * there is no override this changes nothing.
    */
   configure(model, frames) {
-    magneticControls(TAPE_MODELS[model].magnetic, this.target);
+    if (!this.overridden) magneticControls(TAPE_MODELS[model].magnetic, this.target);
     if (frames !== this.smoothFrames) {
       this.smoothFrames = frames;
       this.smoothing = 1 - exp2(-frames / (this.rate * TAPE_DSP.smoothSeconds * TAPE_PORTABLE_MATH.ln2));
@@ -1239,9 +1272,12 @@ var TapeProcessor = class _TapeProcessor extends AudioWorkletProcessor {
     this.dsp = new TapeDsp(sampleRate, params);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
-    this.port.onmessage = ({ data }) => {
+    this.port.onmessage = ({
+      data
+    }) => {
       if (data.type === "stop") this.running = false;
       if (data.type === "reportLoad") this.load.start(data.quanta);
+      if (data.type === TAPE_MAGNETIC_OVERRIDE) this.dsp.magnetic.setOverride(data.row);
     };
   }
   process(inputs, outputs, params) {

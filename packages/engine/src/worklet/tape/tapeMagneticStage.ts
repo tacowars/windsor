@@ -14,6 +14,11 @@
  *   reconfiguration there ran in V8's lower tiers, which box every double.
  * - The dry ring: `latency` samples per channel, so Mix and bypass read a
  *   dry signal exactly as late as the pair's fixed delay (decision 4).
+ * - The developer override (windsor#276): `setOverride` sets the target to an
+ *   allowed row in place of the model's, through the same smoothing with
+ *   the magnetization kept, until a `null` row hands it back to the model.
+ *   A row out of [0, 1] or not above the susceptibility floor is refused,
+ *   never clamped. Without one, `configure` runs exactly as before.
  *
  * `TapeDsp.channel` drives the active oversampler through its `input`,
  * `advance()` and `output` fields and reads the ring in place, so no double
@@ -23,13 +28,14 @@
  * `select` and `configure` allocate nothing, and the smoothing coefficient
  * comes from `exp2`, not `Math.exp`, so the render is the same bits on
  * arm64 and x64. Pinned by `inserts/tapeMagneticIntegration.test.ts`
- * (both factors, the switch from zero state, allocation across a switch).
+ * (both factors, the switch from zero state, allocation across a switch)
+ * and `inserts/tapeMagneticOverride.test.ts` (the override).
  */
 import { TAPE_DSP as C, TAPE_MODELS, TAPE_OVERSAMPLING } from '../../inserts/tapeConstants';
 import { TAPE_MAGNETIC, type TapeMagneticControls } from '../../inserts/tapeMagneticConstants';
 import { exp2 } from '../../inserts/tapePortableMath';
 import { TAPE_PORTABLE_MATH } from '../../inserts/tapePortableMathTables';
-import { magneticControls } from './tapeMagneticRows';
+import { magneticControls, magneticRowAboveFloor, magneticRowInRange } from './tapeMagneticRows';
 import { TapeOversampler } from './tapeOversample';
 
 const CHANNELS = 2;
@@ -46,10 +52,14 @@ class TapeMagneticStage {
   /** Channel-major dry history: `latency` samples of each channel. */
   dry: Float64Array;
   dryAt: number;
-  /** The smoothed core controls, the ones last configured, and the selected model's row. */
+  /** The smoothed core controls, the ones last configured, and the selected model's row (or the override). */
   controls: TapeMagneticControls;
   configured: TapeMagneticControls;
   target: TapeMagneticControls;
+  /** Whether `target` holds the developer override rather than the model's row. */
+  overridden: boolean;
+  /** Where `setOverride` checks a row, so the check allocates nothing. */
+  candidate: TapeMagneticControls;
   /** The smoothing coefficient for a block of `smoothFrames` samples, recomputed only when that changes. */
   smoothing: number;
   smoothFrames: number;
@@ -68,6 +78,8 @@ class TapeMagneticStage {
     this.target = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     this.controls = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     this.configured = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
+    this.overridden = false;
+    this.candidate = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     for (let i = 0; i < this.oversamplers.length; i++)
       this.oversamplers[i].configure(this.controls);
     this.active = [this.oversamplers[0], this.oversamplers[TAPE_OVERSAMPLING.length]];
@@ -94,12 +106,30 @@ class TapeMagneticStage {
   }
 
   /**
-   * Once per block: smooth the core's controls toward `model`'s row over
-   * `frames` samples with the 10 ms time constant, and reconfigure both pairs
-   * when they moved. While every row is equal this changes nothing.
+   * The developer override (windsor#276): glide to `row` in place of the
+   * model's row, or back to the model's at `null`. Returns false, and
+   * changes nothing, for anything but three numbers in [0, 1] above the floor. Not on
+   * the per-block path: the processor calls it from its port.
+   */
+  setOverride(row: unknown): boolean {
+    if (row === null) {
+      this.overridden = false;
+      return true;
+    }
+    if (!magneticRowInRange(row) || !magneticRowAboveFloor(row, this.candidate)) return false;
+    magneticControls(row, this.target);
+    this.overridden = true;
+    return true;
+  }
+
+  /**
+   * Once per block: smooth the core's controls toward `model`'s row (or the
+   * override) over `frames` samples with the 10 ms time constant, and
+   * reconfigure both pairs when they moved. While every row is equal and
+   * there is no override this changes nothing.
    */
   configure(model: number, frames: number): void {
-    magneticControls(TAPE_MODELS[model].magnetic, this.target);
+    if (!this.overridden) magneticControls(TAPE_MODELS[model].magnetic, this.target);
     if (frames !== this.smoothFrames) {
       this.smoothFrames = frames;
       this.smoothing = 1 - exp2(-frames / (this.rate * C.smoothSeconds * TAPE_PORTABLE_MATH.ln2));

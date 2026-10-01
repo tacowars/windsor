@@ -27,6 +27,11 @@
  *   after six, V8 compiled the block's `configure` to its top tier inside
  *   the measured cycle, whose code read about 3.5 KB in one window.
  *
+ * - With windsor#276's developer magnetic override: the steady render at 2x
+ *   with an override set before it starts, and the cycle again with a
+ *   message on every step that sets the override to another allowed point,
+ *   or hands it back to the model's row, while the settings change.
+ *
  * Each reads `used_heap_size` in ten windows over its measured run with the
  * load meter off (each reading calls `Date.now()` twice, and V8 returns each
  * as a new heap number, 32 bytes a quantum), and counts the collections in
@@ -65,6 +70,8 @@ import {
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
 import type { ProbeConfig } from '../__fixtures__/workletAllocationProbe';
+import { TAPE_MAGNETIC_CANDIDATES } from './tapeMagneticCandidateTables';
+import { TAPE_MAGNETIC_OVERRIDE } from './tapeMagneticOverrideMessage';
 
 const TOLERANCE_BYTES = 16 * 1024;
 const PERIOD = 160;
@@ -114,22 +121,37 @@ const STEPS: [number[], TapeInput][] = [
 ];
 const CYCLE = STEPS.length * PERIOD;
 
-function base(): Omit<ProbeConfig, 'warmup' | 'measure'> {
+/** An override message: an allowed row, or the model's own row back. */
+const override = (row: readonly number[] | null): unknown => ({
+  type: TAPE_MAGNETIC_OVERRIDE,
+  row: row && [...row],
+});
+/** The cycle's messages, one a step: points across the cube, the centre, and the model's row back. */
+const OVERRIDES = [5, 4, null, 1, 7, 0, 2, null, 3, 10, 24, null].map((i) =>
+  override(i === null ? null : TAPE_MAGNETIC_CANDIDATES[i]!),
+);
+
+function base(messages: unknown[]): Omit<ProbeConfig, 'warmup' | 'measure'> {
   return {
     bundle: workletBundle('tape-processor.js'),
     rate: 48000,
     params: {},
     options: {},
-    messages: [],
+    messages,
     inputChannels: 2,
     loadQuanta: 0,
   };
 }
 
-function run(scenarioConfig: TapeChangeConfig, warmup: number, measure: number): ProbeRun {
+function run(
+  scenarioConfig: TapeChangeConfig,
+  warmup: number,
+  measure: number,
+  messages: unknown[] = [],
+): ProbeRun {
   return runAllocationProbe(
     {
-      ...base(),
+      ...base(messages),
       warmup,
       measure,
       scenario: probeScenario('tapeChangeScenario.ts'),
@@ -144,13 +166,19 @@ function run(scenarioConfig: TapeChangeConfig, warmup: number, measure: number):
  * the scenario so that the warm-up ends with its heap reads (the probe's own
  * code for them read about 7 KB in the eighth window without them).
  */
-function steady(oversampling: number): ProbeRun {
+function steady(oversampling: number, messages: unknown[] = []): ProbeRun {
   const step: TapeChangeStep = { names: ['oversampling'], values: [oversampling], input: 'stereo' };
-  return run({ steps: [step], period: PERIOD, quiet: 0 }, STEADY_WARMUP, STEADY_MEASURE);
+  return run({ steps: [step], period: PERIOD, quiet: 0 }, STEADY_WARMUP, STEADY_MEASURE, messages);
 }
 
-function changes(): ProbeRun {
-  const steps = STEPS.map(([values, input]): TapeChangeStep => ({ names: NAMES, values, input }));
+/** The cycle, each step with its override message when `overrides` is set. */
+function changes(overrides = false): ProbeRun {
+  const steps = STEPS.map(([values, input], i): TapeChangeStep => ({
+    names: NAMES,
+    values,
+    input,
+    ...(overrides ? { message: OVERRIDES[i] } : {}),
+  }));
   return run({ steps, period: PERIOD, quiet: QUIET }, 12 * CYCLE, CYCLE);
 }
 
@@ -171,5 +199,13 @@ describe('Tape on V8', () => {
 
   it('switches 2x and 4x, Mix, bypass and every setting and input without allocating or changing a field representation', () => {
     expectClean(changes());
+  }, 240_000);
+
+  it('plays at 2x with a magnetic override set without allocating or changing a field representation', () => {
+    expectClean(steady(2, [override([1, 0, 1])]));
+  }, 120_000);
+
+  it('moves the magnetic override on every step of the cycle without allocating or changing a field representation', () => {
+    expectClean(changes(true));
   }, 240_000);
 });

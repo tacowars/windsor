@@ -4,7 +4,9 @@
  * controls glide and settle, with a short silence at its end. The steps
  * switch the magnetic core between 2x and 4x, change the model, Bias, Drive,
  * the Wear macro and the split dials, the rates, hiss, trim and the seed, and
- * take Mix down to dry and the insert off and on. Each step also names its
+ * take Mix down to dry and the insert off and on. A step may also carry a
+ * port message, delivered at its first quantum after its parameters, as the
+ * browser delivers one between quanta: windsor#276's magnetic override. Each step also names its
  * input, as the node's input arrives in Chrome: stereo, mono (the right
  * channel follows the left) or none (an inactive source has no channels).
  * The warm-up plays the cycle whole several times, the load meter on for its
@@ -31,6 +33,8 @@ export interface TapeChangeStep {
   names: string[];
   values: number[];
   input: TapeInput;
+  /** A message for the processor's port at the step's first quantum, if any. */
+  message?: unknown;
 }
 
 export interface TapeChangeConfig {
@@ -68,6 +72,8 @@ export default function tapeChangeScenario(probe: ProbeRig): ProbeScenario {
   );
   const values = steps.map((step) => Float32Array.from(step.values));
   const feed = steps.map((step) => feeds[step.input]);
+  const events = steps.map((step) => (step.message === undefined ? null : { data: step.message }));
+  const port = probe.processor.port;
   const cycle = steps.length * period;
   const apply = (q: number): void => {
     if (q % period !== 0) return;
@@ -75,6 +81,8 @@ export default function tapeChangeScenario(probe: ProbeRig): ProbeScenario {
     const at = arrays[step]!,
       to = values[step]!;
     for (let i = 0; i < at.length; i++) at[i]![0] = to[i]!;
+    const event = events[step];
+    if (event) port.onmessage!(event);
   };
   // Quanta [from, to). The warm-up and the measured run call this same function.
   const drive = (from: number, to: number): void => {

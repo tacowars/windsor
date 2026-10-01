@@ -453,6 +453,10 @@ export { tapeControlValue, setTapeControl } from './inserts/tapeControls';
 export type { TapeNumber } from './inserts/tapeControls';
 export { TAPE_PRESETS } from './inserts/tapePresetTables';
 export { applyTapePreset } from './inserts/tapePresets';
+// windsor#276: the allowed magnetic points and the developer override the console's hidden picker sends.
+export { TAPE_MAGNETIC_CANDIDATES } from './inserts/tapeMagneticCandidateTables';
+export type { TapeMagneticRow } from './inserts/tapeMagneticCandidateTables';
+export { setTapeMagneticOverride } from './inserts/tapeMagneticOverride';
 
 export { DEFAULT_DELAY } from './inserts/delaySpec';
 export type { DelaySpec } from './inserts/delaySpec';

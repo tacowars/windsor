@@ -4,7 +4,8 @@
  * Tape (the type, oversampling and starting-point pickers, Randomize, and
  * the tone knobs)
  * and Motion (wow, flutter and dropouts). The on/off switch is the rack's
- * rail.
+ * rail. Under `?tapeDev` the Tape page also carries the hidden magnetic
+ * picker (windsor#276, `tapeMagneticPicker.ts`), which is never saved.
  */
 import {
   DEFAULT_TAPE,
@@ -26,6 +27,7 @@ import { tapeKnobs } from './tapeKnobs';
 import type { TapeControl } from './tapeTables';
 import { TAPE_OVERSAMPLING_HINT, TAPE_OVERSAMPLING_OPTIONS, TAPE_PAGES } from './tapeTables';
 import { withOversampling } from './tapeCardModel';
+import { magneticPicker, showsMagneticPicker } from './tapeMagneticPicker';
 
 interface TapeView {
   current(): TapeSpec;
@@ -89,14 +91,17 @@ export const tapeCard: InsertCard = (ctx: AppCtx, target: InsertTarget, index) =
       if (ctx.change(insertChange(target, inserts)).ok) ctx.render();
     },
   };
-  return TAPE_PAGES.map((page) => ({
+  // The first page's column ends with the developer picker, only under the page's flag.
+  const dev = (page: number): HTMLElement[] =>
+    page === 0 && showsMagneticPicker() ? [magneticPicker(ctx, target, index)] : [];
+  return TAPE_PAGES.map((page, i) => ({
     name: page.name,
-    build: () =>
-      insertPage(
-        ...(page.controls.length
-          ? [wideColumn(...page.controls.map((name) => control(view, name)))]
-          : []),
+    build: () => {
+      const controls = [...page.controls.map((name) => control(view, name)), ...dev(i)];
+      return insertPage(
+        ...(controls.length ? [wideColumn(...controls)] : []),
         ...knobColumns(tapeKnobs(ctx, target, index, page.knobs)),
-      ),
+      );
+    },
   }));
 };

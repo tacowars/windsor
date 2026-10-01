@@ -1,4 +1,8 @@
-/** Tape adapter: block controls, stereo audio, shutdown and existing load telemetry. */
+/**
+ * Tape adapter: block controls, stereo audio, shutdown, existing load telemetry and the developer
+ * magnetic override (windsor#276), which reaches `TapeMagneticStage.setOverride` from the port, between
+ * blocks, and never from `process`.
+ */
 import {
   TAPE_NAME,
   TAPE_BOUNDS,
@@ -6,6 +10,10 @@ import {
   TAPE_OVERSAMPLING,
   TAPE_TYPES,
 } from '../../inserts/tapeConstants';
+import {
+  TAPE_MAGNETIC_OVERRIDE,
+  type TapeMagneticOverrideMessage,
+} from '../../inserts/tapeMagneticOverrideMessage';
 import type { ReportLoadMessage } from '../../synth/workletMessages';
 import { LoadSampler } from '../loadSampler';
 import { TapeDsp } from './tapeDsp';
@@ -56,9 +64,12 @@ class TapeProcessor extends AudioWorkletProcessor {
     this.dsp = new TapeDsp(sampleRate, params);
     this.running = true;
     this.load = new LoadSampler(sampleRate, this.port);
-    this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
+    this.port.onmessage = ({
+      data,
+    }: MessageEvent<{ type: 'stop' } | ReportLoadMessage | TapeMagneticOverrideMessage>) => {
       if (data.type === 'stop') this.running = false;
       if (data.type === 'reportLoad') this.load.start(data.quanta);
+      if (data.type === TAPE_MAGNETIC_OVERRIDE) this.dsp.magnetic.setOverride(data.row);
     };
   }
 
