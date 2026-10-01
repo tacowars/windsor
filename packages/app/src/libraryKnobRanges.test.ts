@@ -54,8 +54,32 @@ const KNOWN_MISSES: readonly string[] = [
 /** A miss's patch and path, without its value and range. */
 const missKey = (miss: string): string => miss.slice(0, miss.indexOf(' = '));
 
+/** One sample at the engine's 48 kHz, in seconds. */
+const ONE_SAMPLE_S = 1 / 48_000;
+
+/**
+ * Every envelope time that is above 0 but shorter than one sample: a 0 the
+ * fitter missed (windsor#318 fix round). It renders within rounding of 0, and
+ * the knob shows it as `0m`, the same as a real 0, so it should be 0.
+ */
+function subSampleTimes(): string[] {
+  const misses: string[] = [];
+  for (const [id, patch] of Object.entries(PRESETS)) {
+    for (const { path } of allPatchKnobs()) {
+      if (!path.endsWith('Time')) continue;
+      const v = getPath(patch, path);
+      if (typeof v === 'number' && v > 0 && v < ONE_SAMPLE_S) misses.push(`${id} ${path} = ${v}`);
+    }
+  }
+  return misses;
+}
+
 describe('the patch library against the editor knobs', () => {
   it('keeps every knob-backed value inside its knob range, so a first touch never clamps it', () => {
     expect(outOfRange().map(missKey)).toEqual([...KNOWN_MISSES]);
+  });
+
+  it('ships no envelope time between 0 and one sample', () => {
+    expect(subSampleTimes()).toEqual([]);
   });
 });

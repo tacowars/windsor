@@ -65,6 +65,14 @@ tacowars put engine changes on the table for TR sound work.
     the fit's −0.46 the falling pitch sounded like a change of note at
     tacowars's listen; +0.29 sounded right. The low and mid toms keep their
     fitted curves.
+11. **The strike's attack is exactly 0 on all three 808 toms.** The fit left
+    the mid tom at 0.044 ms (two samples of ramp, so its first sample was
+    silent) and the high tom at 0.001 ms; both are now 0, as the low tom's
+    was. The 808 and 909 Kick's edge attacks (0.0007 and 0.004 ms, under
+    one sample) are snapped to 0 in the same change; they render within
+    −86 dB of the old. `libraryKnobRanges.test.ts` now fails on any
+    envelope time between 0 and one sample, a 0 the fitter missed that the
+    knob shows as `0m`.
 
 ## Consequences
 

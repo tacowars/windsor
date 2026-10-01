@@ -704,9 +704,9 @@
       "noDormancy": "d8397c4e10d2426c0367b5a0962a71b1bd5580a92e1249521bfc9b1ed2001f49"
     },
     "tr808-kick": {
-      "default": "8b3be3f30c2358f6622aeaa846d993404cc2009605e4047e2ac42334c7c9fffd",
-      "generic": "8b3be3f30c2358f6622aeaa846d993404cc2009605e4047e2ac42334c7c9fffd",
-      "noDormancy": "8b3be3f30c2358f6622aeaa846d993404cc2009605e4047e2ac42334c7c9fffd"
+      "default": "0b033cea5348c08470ddc4d2542863b5e3882db65aebfca4590bbdc21f0add28",
+      "generic": "0b033cea5348c08470ddc4d2542863b5e3882db65aebfca4590bbdc21f0add28",
+      "noDormancy": "0b033cea5348c08470ddc4d2542863b5e3882db65aebfca4590bbdc21f0add28"
     },
     "tr808-kick-long": {
       "default": "048b50120bec3e3d25fab3aa39acf4dbdfdf03f09b74c9eba61a9739af64eb8d",
@@ -734,9 +734,9 @@
       "noDormancy": "8307bf5c8e52714ab12eaa7e3b2e31536207bd18290bad66d87f0ed35e831371"
     },
     "tr808-tom-high": {
-      "default": "6fabe131f57d12c0ceb4d68fb8d28952116f9d0ae089cb5a9bc6d54cb32872e1",
-      "generic": "6fabe131f57d12c0ceb4d68fb8d28952116f9d0ae089cb5a9bc6d54cb32872e1",
-      "noDormancy": "6fabe131f57d12c0ceb4d68fb8d28952116f9d0ae089cb5a9bc6d54cb32872e1"
+      "default": "dc047c56f677c874c28a36a6e154a53dc6556fc79d0e5f2d46b6ae607749671c",
+      "generic": "dc047c56f677c874c28a36a6e154a53dc6556fc79d0e5f2d46b6ae607749671c",
+      "noDormancy": "dc047c56f677c874c28a36a6e154a53dc6556fc79d0e5f2d46b6ae607749671c"
     },
     "tr808-tom-low": {
       "default": "f7c7d17fee3b82e547dc528b6a3fb4e472f8e5774cc6068bb1ee0dbfac3ad669",
@@ -744,9 +744,9 @@
       "noDormancy": "f7c7d17fee3b82e547dc528b6a3fb4e472f8e5774cc6068bb1ee0dbfac3ad669"
     },
     "tr808-tom-mid": {
-      "default": "1c7597191c9ffd98bed24fd2d22a736d75c097fc58715efc31fe8c785649c8fc",
-      "generic": "1c7597191c9ffd98bed24fd2d22a736d75c097fc58715efc31fe8c785649c8fc",
-      "noDormancy": "1c7597191c9ffd98bed24fd2d22a736d75c097fc58715efc31fe8c785649c8fc"
+      "default": "7360d4b39d198222979d08e65951232c097f7c6d77b031fea070d781e7fab37b",
+      "generic": "7360d4b39d198222979d08e65951232c097f7c6d77b031fea070d781e7fab37b",
+      "noDormancy": "7360d4b39d198222979d08e65951232c097f7c6d77b031fea070d781e7fab37b"
     },
     "tr909-clap": {
       "default": "802b898c0ccdcadea62cb8f6316cf15b34de2fac8587f0965972234edb69e0bf",
@@ -769,9 +769,9 @@
       "noDormancy": "33c4c7730fb3d46245c36d675c93eff6f4bdeb7cb3b60be7ccd9f944c33f9722"
     },
     "tr909-kick": {
-      "default": "eba859e3b935a37ab13517399cb135494987facac95e3ec29cac5048e65f8a16",
-      "generic": "eba859e3b935a37ab13517399cb135494987facac95e3ec29cac5048e65f8a16",
-      "noDormancy": "eba859e3b935a37ab13517399cb135494987facac95e3ec29cac5048e65f8a16"
+      "default": "6a6b262069867b5b85fcb1f1230cfc4156f789c952b1ca35365052018da22f6f",
+      "generic": "6a6b262069867b5b85fcb1f1230cfc4156f789c952b1ca35365052018da22f6f",
+      "noDormancy": "6a6b262069867b5b85fcb1f1230cfc4156f789c952b1ca35365052018da22f6f"
     },
     "tr909-kick-hard": {
       "default": "6f797aff9cc108d1015f1419eab82e79ea15e71cf9d121dfbe1e84d6c933f484",
