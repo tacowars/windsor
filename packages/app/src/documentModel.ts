@@ -18,8 +18,8 @@ import { reportFinalPartNames } from './partAutoName';
 
 /**
  * Merge for the local copy: objects recurse, arrays and `null` assign
- * wholesale below the keyed sections (`mergeDocument` reads `null` at a slot
- * or a patch id as removal), and — unlike the engine-side merge, which ignores keys the
+ * wholesale below the keyed sections (`mergeDocument` reads `null` at a slot,
+ * a group id or a patch id as removal), and — unlike the engine-side merge, which ignores keys the
  * current arrangement lacks — new keys are created, because the result is
  * renormalised immediately after (`mix` may start absent, for instance).
  */
@@ -49,32 +49,42 @@ function mergeKeyed(current: unknown, partial: Record<string, unknown>): Record<
 }
 
 /**
- * The part list merged by slot (#597, #629): a fragment edits the part on its
- * slot wherever it sits in the list, `null` removes that part, and a whole
- * part (its `slot` naming a slot the list lacks) is appended — the same three
- * shapes the engine's `mergeParts` takes, so what was applied live is what
- * lands in the document. A fragment for an absent slot is left alone.
+ * A keyed list merged by its key field (#597, #629): the part list by
+ * `slot`, the group list by `id` (windsor#284). A fragment edits the entry
+ * on its key wherever it sits in the list, `null` removes that entry, and a
+ * whole entry (its key field naming a key the list lacks) is appended — the
+ * same three shapes the engine's `mergeParts` takes, so what was applied
+ * live is what lands in the document. A fragment for an absent key is left
+ * alone, and list order is kept.
  */
-function mergePartList(current: unknown[], partial: Record<string, unknown>): unknown[] {
+function mergeKeyedList(
+  current: unknown[],
+  partial: Record<string, unknown>,
+  field: 'slot' | 'id',
+): unknown[] {
   const merged: unknown[] = [];
   const held = new Set<string>();
-  for (const part of current) {
-    const slot = isRecord(part) && typeof part.slot === 'number' ? String(part.slot) : undefined;
-    const edit = slot === undefined ? undefined : partial[slot];
-    if (slot !== undefined) held.add(slot);
+  for (const entry of current) {
+    const key =
+      isRecord(entry) && typeof entry[field] === 'number' ? String(entry[field]) : undefined;
+    const edit = key === undefined ? undefined : partial[key];
+    if (key !== undefined) held.add(key);
     if (edit === null) continue;
-    merged.push(edit === undefined ? part : deepMerge(part, edit));
+    merged.push(edit === undefined ? entry : deepMerge(entry, edit));
   }
-  for (const [slot, edit] of Object.entries(partial)) {
-    if (!held.has(slot) && isRecord(edit) && edit.slot === Number(slot)) merged.push(edit);
+  for (const [key, edit] of Object.entries(partial)) {
+    if (!held.has(key) && isRecord(edit) && edit[field] === Number(key)) merged.push(edit);
   }
   return merged;
 }
 
-/** `deepMerge` over a whole document: parts by slot and patches by id, each with `null` as removal. */
+/**
+ * `deepMerge` over a whole document: parts by slot, groups by id and patches
+ * by id, each with `null` as removal. An emptied `patches` or `groups` is absent.
+ */
 export function mergeDocument(current: unknown, partial: unknown): unknown {
   if (!isRecord(current) || !isRecord(partial)) return deepMerge(current, partial);
-  const { parts, patches, ...rest } = partial;
+  const { parts, patches, groups, ...rest } = partial;
   const merged = deepMerge(current, rest) as Record<string, unknown>;
   if (isRecord(patches)) {
     const table = mergeKeyed(current.patches, patches);
@@ -82,7 +92,12 @@ export function mergeDocument(current: unknown, partial: unknown): unknown {
     else delete merged.patches;
   }
   if (isRecord(parts) && Array.isArray(current.parts)) {
-    merged.parts = mergePartList(current.parts, parts);
+    merged.parts = mergeKeyedList(current.parts, parts, 'slot');
+  }
+  if (isRecord(groups)) {
+    const list = mergeKeyedList(Array.isArray(current.groups) ? current.groups : [], groups, 'id');
+    if (list.length > 0) merged.groups = list;
+    else delete merged.groups;
   }
   return merged;
 }

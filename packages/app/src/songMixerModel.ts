@@ -13,8 +13,11 @@ import type { AppCtx } from './context';
 import { partChange } from './context';
 import { withGesture } from './gestureHooks';
 
-/** Where a strip plays: the master, or only its sidechain key. */
-export type StripOutput = NonNullable<ChannelStrip['output']>;
+/**
+ * Where a strip plays: the master, or only its sidechain key. A group
+ * Output (windsor#284) isn't offered here yet: windsor#287 adds it.
+ */
+export type StripOutput = 'master' | 'sidechain';
 
 /** The strip's two switches (windsor#154). */
 export type StripSwitch = 'mute' | 'solo';
@@ -48,8 +51,12 @@ export const switchOn = (strip: ChannelStrip, which: StripSwitch): boolean => st
 export const switchEnabled = (strip: ChannelStrip, which: StripSwitch): boolean =>
   switchesApply(strip) || switchOn(strip, which);
 
-/** The strip's Output; a missing field plays to the master. */
-export const stripOutput = (strip: ChannelStrip): StripOutput => strip.output ?? 'master';
+/**
+ * The strip's Output; a missing field plays to the master. A group Output
+ * reads as Master until windsor#287 lists the groups.
+ */
+export const stripOutput = (strip: ChannelStrip): StripOutput =>
+  strip.output === 'sidechain' ? 'sidechain' : 'master';
 
 /**
  * What the mixer column shows of every part, collapsed or expanded: its

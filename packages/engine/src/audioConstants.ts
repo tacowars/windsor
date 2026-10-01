@@ -171,6 +171,8 @@ export const MUSIC_PARTS_MAX = 8;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
 /** A mix strip's linear level: 1 is unity, 4 is +12 dB of headroom to spare. */
 export const MIX_LEVEL_MAX = 4;
+/** The most group buses a song holds (windsor#284; record `2026-10-01-group-buses` §2). */
+export const MAX_GROUPS = 8;
 /**
  * A strip's low cut, in hertz (#640). The floor is the resting value and reads
  * as off: below the music bus's own 30 Hz highpass, so nothing audible moves.

@@ -6,7 +6,7 @@
  * needs a hand-written inverse. The model's side of an undo does not merge
  * it: it adopts the snapshot itself (`DocumentModel.replace`).
  *
- * - **The keyed sections** (`parts` by slot, `patches` by id): an entry only
+ * - **The keyed sections** (`parts` by slot, `groups` and `patches` by id): an entry only
  *   `current` holds becomes `null`, which the merge reads as removal; one only
  *   `target` holds is sent whole; one both hold is diffed below.
  * - **Below them**, records recurse over the keys either side holds. An
@@ -21,14 +21,14 @@
  * `documentDiffLive` returns the partial the engine is sent, with each
  * removed section spelled out as the values the normaliser gives it when it
  * is absent, which are the values a system built without it plays. It also
- * says when no partial can reach `target` live: a restored part that the
- * slot merge would put in another place in the list.
+ * says when no partial can reach `target` live: a restored part or group
+ * that the keyed merge would put in another place in its list.
  */
 import type { ArrangementDocument, DocumentPartial } from '@windsor/engine';
 import { mergeDocument } from './documentModel';
 
 type Rec = Record<string, unknown>;
-/** A key path in the partial's own terms: `parts` addressed by slot. */
+/** A key path in the partial's own terms: `parts` addressed by slot, `groups` by id. */
 type Path = readonly string[];
 
 const isRecord = (v: unknown): v is Rec => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -98,24 +98,30 @@ function diffKeyed(a: unknown, b: unknown, path: Path, removed: Path[]): Rec | t
   return Object.keys(out).length === 0 ? UNCHANGED : out;
 }
 
-/** The part list as the partial addresses it: by slot. */
-const bySlot = (parts: unknown): Rec =>
+/** The keyed lists and the field each is addressed by: parts by slot, groups by id (windsor#284). */
+const LIST_KEYS: Readonly<Record<string, 'slot' | 'id'>> = { parts: 'slot', groups: 'id' };
+
+/** A keyed list as the partial addresses it: by `field`. */
+const byKey = (list: unknown, field: 'slot' | 'id'): Rec =>
   Object.fromEntries(
-    (Array.isArray(parts) ? parts : []).map((part: unknown) => [
-      String(isRecord(part) ? part.slot : ''),
-      part,
+    (Array.isArray(list) ? list : []).map((entry: unknown) => [
+      String(isRecord(entry) ? entry[field] : ''),
+      entry,
     ]),
   );
+
+function diffSection(current: Rec, target: Rec, key: string, removed: Path[]): unknown {
+  const field = LIST_KEYS[key];
+  if (field)
+    return diffKeyed(byKey(current[key], field), byKey(target[key], field), [key], removed);
+  if (key === 'patches') return diffKeyed(current.patches, target.patches, [key], removed);
+  return diffValue(current[key], target[key], [key], removed);
+}
 
 function diffDocument(current: Rec, target: Rec, removed: Path[]): Rec {
   const out: Rec = {};
   for (const key of keysOf(current, target)) {
-    const d =
-      key === 'parts'
-        ? diffKeyed(bySlot(current.parts), bySlot(target.parts), [key], removed)
-        : key === 'patches'
-          ? diffKeyed(current.patches, target.patches, [key], removed)
-          : diffValue(current[key], target[key], [key], removed);
+    const d = diffSection(current, target, key, removed);
     if (d !== UNCHANGED) out[key] = d;
   }
   return out;
@@ -129,15 +135,17 @@ export function documentDiff(
   return diffDocument(current as unknown as Rec, target as unknown as Rec, []) as DocumentPartial;
 }
 
-/** One step down a path: a part list by slot, a record by key. */
-function child(node: unknown, key: string): unknown {
+/** One step down a path: a keyed list by its field (`under` names the list), a record by key. */
+function child(node: unknown, key: string, under: string | undefined): unknown {
   if (Array.isArray(node)) {
-    return node.find((part: unknown) => isRecord(part) && String(part.slot) === key);
+    const field = LIST_KEYS[under ?? ''] ?? 'slot';
+    return node.find((entry: unknown) => isRecord(entry) && String(entry[field]) === key);
   }
   return isRecord(node) ? node[key] : undefined;
 }
 
-const getAt = (node: unknown, path: Path): unknown => path.reduce(child, node);
+const getAt = (node: unknown, path: Path): unknown =>
+  path.reduce((at: unknown, key, i) => child(at, key, path[i - 1]), node);
 
 function setAt(node: unknown, path: Path, value: unknown): void {
   const parent = getAt(node, path.slice(0, -1));
@@ -160,24 +168,29 @@ export interface LiveDiff {
   /** What `host.apply` takes: the difference, with every removed optional section's defaults spelled out. */
   readonly live: DocumentPartial;
   /**
-   * True when `live` cannot bring the live system to `target`: the slot
-   * merge (`mergePartList`, and the engine's `mergeParts` alike) appends a
-   * part at a slot it lacks, so a part restored anywhere but last would
-   * play and show in another place. The live system is rebuilt from
-   * `target` instead.
+   * True when `live` cannot bring the live system to `target`: the keyed
+   * merge (`mergeKeyedList`, and the engine's `mergeParts` alike) appends a
+   * part at a slot it lacks, or a group at an id it lacks, so one restored
+   * anywhere but last would play and show in another place. The live
+   * system is rebuilt from `target` instead.
    */
   readonly rebuild: boolean;
 }
 
-const slotsOf = (parts: unknown): string =>
-  (Array.isArray(parts) ? parts : [])
-    .map((part: unknown) => (isRecord(part) ? String(part.slot) : ''))
+const keysIn = (list: unknown, field: 'slot' | 'id'): string =>
+  (Array.isArray(list) ? list : [])
+    .map((entry: unknown) => (isRecord(entry) ? String(entry[field]) : ''))
     .join();
 
-/** Whether the slot merge of `partial`'s parts into `current` lists them in `target`'s order. */
-function keepsPartOrder(current: Rec, target: Rec, partial: Rec): boolean {
-  const merged = mergeDocument({ parts: current.parts }, { parts: partial.parts ?? {} }) as Rec;
-  return slotsOf(merged.parts) === slotsOf(target.parts);
+/** Whether the keyed merge of `partial` into `current` lists the parts and the groups in `target`'s order. */
+function keepsListOrder(current: Rec, target: Rec, partial: Rec): boolean {
+  const merged = mergeDocument(
+    { parts: current.parts ?? [], groups: current.groups },
+    { parts: partial.parts ?? {}, groups: partial.groups ?? {} },
+  ) as Rec;
+  return Object.entries(LIST_KEYS).every(
+    ([key, field]) => keysIn(merged[key], field) === keysIn(target[key], field),
+  );
 }
 
 /**
@@ -195,7 +208,7 @@ export function documentDiffLive(
   const from = current as unknown as Rec;
   const to = target as unknown as Rec;
   const partial = diffDocument(from, to, removed);
-  const rebuild = !keepsPartOrder(from, to, partial);
+  const rebuild = !keepsListOrder(from, to, partial);
   if (removed.length === 0) return { live: partial as DocumentPartial, rebuild };
   const probe = structuredClone(to);
   for (const path of removed) setAt(probe, path, junk(getAt(current, path)));

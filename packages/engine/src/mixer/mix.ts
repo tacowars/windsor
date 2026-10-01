@@ -63,13 +63,59 @@ export const isReturnName = (name: unknown): name is ReturnName =>
   typeof name === 'string' && Object.hasOwn(RETURNS, name);
 
 /**
+ * A group bus (windsor#284; record `2026-10-01-group-buses` §2–§3): a part
+ * whose Output names it sends its whole dry signal here instead of to the
+ * master, and the group plays to the master through its own chain.
+ *
+ *   members ─▶ input ─▶ [insert …] ─▶ pan ─▶ level ─▶ master
+ *
+ * The song owns its groups, up to `MAX_GROUPS`, in display order. The `id`
+ * is what an Output names, so a rename touches nothing else; the `name` is
+ * only a label. A group has no low cut and no sends.
+ */
+export interface GroupSpec {
+  /** Stable, non-negative and unique within the song: what `{ group: id }` names. */
+  readonly id: number;
+  readonly name: string;
+  /** The group fader, 0..`MIX_LEVEL_MAX`, as a strip's `level`. */
+  readonly level: number;
+  /** -1 (hard left) .. 1 (hard right), as a strip's `pan`. */
+  readonly pan: number;
+  /** Silences every member, dry and sends (record §6). Missing means off; a present `false` is kept. */
+  readonly mute?: boolean;
+  /** Counts as soloing every member (record §6). Missing means off; a present `false` is kept. */
+  readonly solo?: boolean;
+  /** Insert effects in signal order, at most `MAX_INSERTS`; a compressor keys from the group's input. */
+  readonly inserts: readonly InsertSpec[];
+}
+
+/** What a new group gets besides its id and name: unity, centred, no inserts, mute and solo absent. */
+export const DEFAULT_GROUP: Omit<GroupSpec, 'id' | 'name'> = { level: 1, pan: 0, inserts: [] };
+
+/** A strip's Output when it names a group bus by id (windsor#284). */
+export interface GroupOutput {
+  readonly group: number;
+}
+
+/** Whether `output` names a group: an object whose `group` is a non-negative integer. */
+export const isGroupOutput = (output: unknown): output is GroupOutput =>
+  typeof output === 'object' &&
+  output !== null &&
+  Number.isSafeInteger((output as { group?: unknown }).group) &&
+  (output as GroupOutput).group >= 0;
+
+/**
  * One strip shape for every part, aux parts included (record §8). `R` is the set of
  * bus names a strip may send to; the shipped `MIX` is checked against
  * `RETURNS` at compile time, while the routing code accepts any string.
  */
 export interface ChannelStrip<R extends string = string> {
-  /** Missing means Master; sidechain suppresses dry and sends, preserving the detector tap. */
-  readonly output?: 'master' | 'sidechain';
+  /**
+   * Missing means Master; sidechain suppresses dry and sends, preserving the
+   * detector tap; `{ group: id }` plays the dry signal into that group bus
+   * instead of the master, and keeps the part's own sends (windsor#284).
+   */
+  readonly output?: 'master' | 'sidechain' | GroupOutput;
   /**
    * Silences the part's dry signal and its sends, post-fader (windsor#154).
    * Missing means off; a present `false` is kept, as `output` keeps an
