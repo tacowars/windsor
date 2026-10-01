@@ -164,5 +164,135 @@ references.
 - **909 Kick Hard's click** stands above its body by less than the
   recording's (about 1 : 0.7 against 1 : 0.35).
 
+## Revisiting this
+
+### Setting up again
+
+- **Tools.** Node 24 (`.nvmrc`) for `kick.mjs` and `render.mjs`, which run
+  the generated `worklet/generated/fm-processor.js`. If the DSP has
+  changed, rebuild it first from the repository root
+  (`node scripts/build-worklets.mjs`). Python 3
+  with numpy and scipy for the fitting and analysis scripts; `overlay.py`
+  also needs matplotlib.
+- **The recordings.** tacowars's copy of Samples From Mars *808 From Mars*
+  and *TR-909 From Mars*, the clean digital kick folders. Keep them
+  outside the repository: they are a commercial pack, and `.gitignore` is
+  not widened for them (root `CLAUDE.md`, invariants 6 and 7). The scripts
+  take file paths; the folders as used here:
+  - `SamplesFromMars__808_kicks_digital_clean/A/BD A 808 Decay C 03.wav`
+    (folder `A` no accent, `B` accent);
+  - `SamplesFromMars_909_kicks_digital_clean/02. Medium/BD 909 Clean Medium C 03.wav`
+    (`01. Short`, `02. Medium`, `03. Long`).
+- **Working directory.** Run every command below from this folder
+  (`cd docs/research/2026-09-30-kick-fit`): the Python scripts import
+  each other, and `render.mjs` and `kick.mjs` find the engine relative to
+  themselves.
+- **Running a fit.** `python3 fitvar.py <808|909> <start patch: id or
+  .json> <recording.wav> <out.json> <render seconds> <level window ms>`,
+  for example `python3 fitvar.py 909 tr909-kick "<…>/BD 909 Clean Long C 03.wav" out.json 1.0 510`.
+  The level window is about the recording's −40 dB time (the table under
+  "The references"). The fitter writes only the patch; its renders are
+  temporary files. To check a result, render the fitted patch, then
+  overlay it on the recording:
+  - `node render.mjs out.json 56 1 out.wav 1.0` (patch, note, velocity,
+    WAV, seconds);
+  - `python3 overlay.py out.png "label|<recording>|out.wav"`, with
+    `EDGE=1` set for a 909 so the recording is aligned on its attack edge.
+- **What `fitvar.py` assumes.** Its parameter vector is written per
+  machine for the committed patches' operator layout (808: algorithm 4, C
+  the square edge; 909: algorithm 6, B the square edge). A patch with a
+  different layout needs its own `build()` there. Every fit renders G#3
+  at velocity 1, so velocity sensitivity is not fitted.
+
+### Sound work not yet done
+
+Most promising first.
+
+1. **909 Tune.** The letters A–F change the sweep's length: at 20 ms the
+   Medium kicks sit at 60 Hz (A), 80 Hz (C) and 176 Hz (F). Every patch
+   here fits C. Fitting the pitch envelope's amount and decay per letter
+   would give a Tune mapping, or tuned variants.
+2. **808 Tone.** The numbers 01–06 raise the click above 1 kHz from 0.06
+   to 0.53 of the peak at Decay C (0.09 to 0.63 at Decay A); at 06 the
+   recording opens with a flat pulse of about 1 ms at about 0.8. Every 808 patch fits 03. A bright variant
+   could fit 06 with the `Square D` edge louder and longer.
+3. **Accent and velocity.** The 808 pack has every hit with accent
+   (folder `B`). Fitting operator `velSens` so a high velocity reproduces
+   `B` and a lower one `A` would make the sequencer's accent behave like
+   the machine's. The 909 pack has no accent axis.
+4. **The 909's lopsided body.** Try a phase-locked second harmonic (a
+   sine at ratio 0.5 against the body's 0.25) to make the positive and
+   negative half-cycles unequal, 0.55 against 0.75 on the recording.
+5. **The 909's first 1.5 ms.** The recording carries about 2.5 ms of near
+   silence before its edge; our body swings positive at once. Worth one
+   try, for example a short body attack with the square edge placed at
+   its end; otherwise accept it.
+6. **909 Kick Hard's click** against its body (above).
+7. **The other TR voices.** The bank's snares, toms, congas, rims, claves,
+   cowbells, claps, maracas, hats and cymbals were built from write-ups and
+   never compared with recordings. The full *808 From Mars* pack covers
+   every 808 voice the bank has (its About file); only its kicks were used
+   here, and the 909 folders used hold only kicks. The method carries over to the tonal voices (toms, congas, rim,
+   claves, cowbell). The noise voices (snares' snappy, claps, hats,
+   cymbals) need a spectral score, band energy over time, in place of zero
+   crossings.
+
+### Engine candidates
+
+For when a patch can go no further. Ranked by how much they would likely
+help these sounds.
+
+1. **Faster amplitude edges.** An operator's amplitude ramps linearly over
+   each 32-sample control block (`CTRL_INTERVAL`, `worklet/fm/fmConstants.ts`),
+   so no envelope edge is faster than about 0.67 ms. A per-sample attack
+   segment, or a per-sample first block, would bring the 808's onset click
+   (now about a sixth of the recording's) and the claps' and rims' edges
+   closer. It adds per-sample work to the hot path and moves the goldens.
+2. **Drive without the filter.** The soft clip runs only when the filter
+   mode is not Off (`worklet/fm/voiceRender.ts`), so every kick keeps a
+   wide-open lowpass just to get drive. A drive independent of the filter
+   is a new patch field or mode, so a format question
+   (`2026-09-28-format-versions-refuse-never-destroy`).
+3. **A pitch envelope that falls in Hz.** The 909's sweep decays
+   exponentially in Hz; the engine's pitch envelope moves in semitones
+   along a curve. The fit still reached 0.6–0.7 semitones RMS, so this is
+   low priority.
+4. **A pulse source, probably not needed.** The 808's trigger pulse leaks
+   a flat, one-sided pulse of about 1 ms into the output at high Tone.
+   Two existing routes come first; neither has been tried yet:
+   - **Width squeeze on `Square D`.** For any wave but Pulse, an
+     operator's Width plays the wave in the first `width` of each cycle
+     and silence for the rest (`worklet/fm/voiceRender.ts`). A `Square D`
+     at a low fixed frequency, with a locked start phase of `width / 2`,
+     sits at −1 for `width / 2` of a cycle, then at 0. For example, at
+     10 Hz and Width 0.05 that is 2.5 ms, followed by silence the envelope
+     outlasts. The pulse is negative; flip the body's phase by 0.5 if the
+     sign matters.
+   - **The Pulse wave** (wave 10, duty from Width). It is band-limited but
+     zero-mean at any duty, so a narrow duty gives a spike with a small
+     opposite offset across the rest of the cycle, not a one-sided pulse.
+
+   An engine source is worth it only if neither shape is close enough.
+5. **Pitch at control rate.** The pitch also moves once per 32 samples, so
+   the 808's 4 ms punch steps about six times. Nothing measured here
+   showed it; listed for completeness.
+
+### Check these first when a kick sounds weak
+
+From the first, sample-free pass over the old patches:
+
+- **Level is squared.** An operator at Level 0.3 plays at 0.09 (−21 dB).
+- **Several carriers are scaled down.** The carrier sum is divided by the
+  square root of the carrier count, so algorithm 6's three carriers lose
+  4.8 dB against algorithm 0's one.
+- **The voice filter is shared.** A lowpass at a few hundred Hz removes
+  the click from every operator, and drive needs the filter on (above).
+- **The start phase.** `phaseFree` defaults to `true`, which randomises
+  the transient by about 1.2 dB from hit to hit.
+- **The master limiter.** The output stage defaults to a limiter at
+  −1 dBFS with a 0.1 ms attack and an 80 ms release
+  (`mixer/outputStageConstants.ts`). In a hot mix every kick triggers gain
+  reduction on its own front. This was not measured in a song.
+
 None of this is a listening verdict; that is tacowars's, in the console
 and the PR preview.
