@@ -61,8 +61,8 @@ const CLEAN_TOLERANCE_BYTES = 16 * 1024;
 const CHORD = [48, 55, 60, 64];
 
 /**
- * The measured quanta. With the meter off, every bundle's run now fits the
- * young generation with room to spare; Tape, the largest, reads about 28 MB.
+ * The measured quanta. With the meter off every bundle allocates nothing of
+ * its own, so each run fits the young generation with room to spare.
  */
 const MEASURE = 2000;
 const BUNDLES = [
