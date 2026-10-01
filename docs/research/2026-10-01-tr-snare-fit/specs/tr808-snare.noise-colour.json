@@ -1,0 +1,34 @@
+{
+  "start": "../start/tr808-snare.noise-colour.json",
+  "params": [
+    { "path": "ops[0].level", "min": 0.3, "max": 1 },
+    { "path": "ops[0].phase", "min": 0, "max": 1 },
+    { "path": "ops[0].env.decayTime", "min": 0.005, "max": 0.3, "scale": "log" },
+    { "path": "ops[0].env.decayCurve", "min": -1, "max": 0.5 },
+    { "path": "ops[0].env.sustainLevel", "min": 0, "max": 0.8 },
+    { "path": "ops[0].env.releaseTime", "min": 0.03, "max": 1, "scale": "log" },
+    { "path": "ops[0].env.releaseCurve", "min": -1, "max": 0.5 },
+    { "path": "ops[1].level", "min": 0, "max": 1 },
+    { "path": "ops[1].phase", "min": 0, "max": 1 },
+    { "path": "ops[1].env.decayTime", "min": 0.003, "max": 0.2, "scale": "log" },
+    { "path": "ops[1].env.decayCurve", "min": -1, "max": 0.5 },
+    { "path": "ops[2].level", "min": 0.2, "max": 1 },
+    { "path": "ops[2].noiseHp", "min": 300, "max": 6000, "scale": "log" },
+    { "path": "ops[2].noiseLp", "min": 2000, "max": 20000, "scale": "log" },
+    { "path": "ops[2].env.attackTime", "min": 0, "max": 0.005 },
+    { "path": "ops[2].env.decayTime", "min": 0.003, "max": 0.2, "scale": "log" },
+    { "path": "ops[2].env.decayCurve", "min": -1, "max": 1 },
+    { "path": "ops[2].env.sustainLevel", "min": 0, "max": 0.9 },
+    { "path": "ops[2].env.releaseTime", "min": 0.02, "max": 0.5, "scale": "log" },
+    { "path": "ops[2].env.releaseCurve", "min": -1, "max": 1 },
+    { "path": "filter.cutoff", "min": 30, "max": 1500, "scale": "log" },
+    { "path": "filter.resonance", "min": 0.5, "max": 3, "scale": "log" }
+  ],
+  "references": [
+    { "wav": "$SM_TR_REFS/SD A 808 Tone C 06.wav", "note": 60, "velocity": 1, "weight": 1 },
+    { "wav": "$SM_SNARE_HEADS/sd808-head10.wav", "note": 60, "velocity": 1, "weight": 0.5 }
+  ],
+  "weights": { "stft": 1, "band": 0.1, "wave": 4 },
+  "seeds": 4,
+  "optimizer": { "method": "cma", "budget": 2000, "sigma0": 0.15, "seed": 1 }
+}
