@@ -45,6 +45,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  allocatedBytes,
+  expectAllocationFree,
   runAllocationProbe,
   SYNCHRONOUS_TIERING,
   workletBundle,
@@ -138,8 +140,8 @@ describe('the load sampler on V8', () => {
       const detail = `off ${off.windows.join(' ')}; on ${on.windows.join(' ')}`;
       expect(within(on.changes, bundle, samplerLines(bundle))).toEqual([]);
       if (!CLEAN.has(bundle)) return;
-      expect(off.bytes, detail).toBeLessThan(CLEAN_TOLERANCE_BYTES);
-      const perQuantum = (on.bytes - off.bytes) / MEASURE;
+      expectAllocationFree(off, CLEAN_TOLERANCE_BYTES);
+      const perQuantum = (allocatedBytes(on.windows) - allocatedBytes(off.windows)) / MEASURE;
       expect(Math.abs(perQuantum - METER_BYTES), detail).toBeLessThanOrEqual(METER_SLACK);
     },
     120_000,

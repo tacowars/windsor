@@ -34,6 +34,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  expectAllocationFree,
   probeScenario,
   runAllocationProbe,
   SYNCHRONOUS_TIERING,
@@ -144,7 +145,6 @@ describe('Advanced Drive on V8', () => {
   it('plays and changes every route, shaper and filter without allocating or changing a field representation', () => {
     const run = probe();
     expect(run.changes).toEqual([]);
-    expect(run.gcs, 'no collection ran while the heap was read').toBe(0);
-    expect(run.bytes, `by tenths: ${run.windows.join(' ')}`).toBeLessThan(TOLERANCE_BYTES);
+    expectAllocationFree(run, TOLERANCE_BYTES);
   }, 120_000);
 });

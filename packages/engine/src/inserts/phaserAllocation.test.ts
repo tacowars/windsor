@@ -40,6 +40,7 @@ import type {
   PhaserInput,
 } from '../__fixtures__/phaserChangeScenario';
 import {
+  expectAllocationFree,
   probeScenario,
   runAllocationProbe,
   SYNCHRONOUS_TIERING,
@@ -111,7 +112,6 @@ describe('the Phaser on V8', () => {
   it('plays and changes every setting and input without allocating or changing a field representation', () => {
     const run = probe();
     expect(run.changes).toEqual([]);
-    expect(run.gcs, 'no collection ran while the heap was read').toBe(0);
-    expect(run.bytes, `by tenths: ${run.windows.join(' ')}`).toBeLessThan(TOLERANCE_BYTES);
+    expectAllocationFree(run, TOLERANCE_BYTES);
   }, 120_000);
 });

@@ -33,6 +33,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RetroReverbChangeConfig } from '../__fixtures__/retroReverbChangeScenario';
 import {
+  expectAllocationFree,
   probeScenario,
   runAllocationProbe,
   SYNCHRONOUS_TIERING,
@@ -74,7 +75,6 @@ describe('the Retro reverb on V8', () => {
   it('renders, changes every parameter, decays to silence and takes mono and absent input for 8 000 quanta without allocating or changing a field representation', () => {
     const run = probe();
     expect(run.changes).toEqual([]);
-    expect(run.gcs, 'no collection ran while the heap was read').toBe(0);
-    expect(run.bytes, `by tenths: ${run.windows.join(' ')}`).toBeLessThan(TOLERANCE_BYTES);
+    expectAllocationFree(run, TOLERANCE_BYTES);
   }, 120_000);
 });
