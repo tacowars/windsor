@@ -121,6 +121,14 @@ export interface Operator {
   levelKeyScale: number;
   phase: number;
   phaseFree: boolean;
+  /**
+   * A Noise operator's own colour (windsor#362, record
+   * `2026-10-02-operator-noise-colour`): a two-pole Butterworth lowpass and
+   * highpass on its noise, before its level and envelope, in Hz; 0 is off,
+   * and `NOISE_COLOUR_RANGE` bounds both. Every other wave ignores them.
+   */
+  noiseLp: number;
+  noiseHp: number;
   env: Envelope;
 }
 

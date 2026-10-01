@@ -1,13 +1,14 @@
 /**
  * Switching an operator to Pulse (windsor#56 decision 2). At the default width
  * 1 a Pulse's two saws cancel to silence, so the picker seeds a square the
- * way it seeds a User wave's partials; a width already moved is kept.
+ * way it seeds a User wave's partials; a width already moved is kept. And
+ * which operators show the noise colour knobs (windsor#362): Noise only.
  */
 import { describe, expect, it } from 'vitest';
 
 import type { Operator } from '@windsor/engine';
 import { WAVE, makePatch } from '@windsor/engine';
-import { ensurePulseWidth } from './patchBays';
+import { ensurePulseWidth, showsNoiseColour } from './patchBays';
 import { PULSE_START_WIDTH } from './patchPanelConstants';
 
 function opOf(ops: Operator[], i: number): Operator {
@@ -53,5 +54,22 @@ describe('ensurePulseWidth', () => {
     target.wave = WAVE.SINE;
     ensurePulseWidth(patch, 0);
     expect(target.width).toBe(PULSE_START_WIDTH);
+  });
+});
+
+describe('showsNoiseColour (windsor#362)', () => {
+  it('shows Noise LP and Noise HP on a Noise operator only', () => {
+    const patch = makePatch();
+    expect([0, 1, 2, 3].map((i) => showsNoiseColour(patch, i))).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    for (const [name, wave] of Object.entries(WAVE)) {
+      opOf(patch.ops, 2).wave = wave;
+      expect(showsNoiseColour(patch, 2), name).toBe(wave === WAVE.NOISE);
+    }
+    expect(showsNoiseColour(patch, 4)).toBe(false);
   });
 });
