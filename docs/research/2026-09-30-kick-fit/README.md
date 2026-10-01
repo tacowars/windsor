@@ -63,8 +63,12 @@ the part above 1 kHz, the click).
 
 `kick.mjs` renders a patch through the shipped
 `worklet/generated/fm-processor.js` under Node at 48 kHz, as the worklet
-harness does, one note-on at velocity 1 on G#3 (MIDI 56, the machines'
-52 Hz). The Python side (`ana.py`, `fit.py`, `wfit.py`; numpy and scipy)
+harness does, one note-on at velocity 1. The fit was done on G#3 (MIDI 56),
+where the patches' body ratio of 0.25 played the machines' 52 Hz. Since
+`2026-10-01-kicks-tuned-to-c4` every note-tracking ratio in the kicks is
+scaled by 2^(−4/12) (the body to 0.198425), so the same pitch, and the same
+render, now plays on C4 (MIDI 60), and `fitvar.py` renders on C4. The
+Python side (`ana.py`, `fit.py`, `wfit.py`; numpy and scipy)
 compares a render with a recording:
 
 - **per cycle**: frequency from zero crossings two apart, and peak level,
@@ -102,12 +106,17 @@ The patch's structure is fixed by hand; the fit finds the numbers.
   the Tone knob's edge. The pitch envelope starts at its peak (Init 1),
   holds 22 semitones for about 4.3 ms, drops to 8–13 semitones and releases
   to 0 over 22–27 ms.
+- **Tuning**: every kick plays 52 Hz on C4, the percussion note. Fitted
+  at body ratio 0.25 on G#3, then retuned to C4 by scaling every
+  note-tracking ratio by 2^(−4/12) (`2026-10-01-kicks-tuned-to-c4`); the
+  C4 render matches the old G#3 one within 2.2e-5.
 - **Every operator is phase-locked** (`phaseFree: false`).
 - **The filter stays on for its drive** (drive runs only when a filter mode
   is set), lowpass opened to 8 kHz (808) and 12 kHz (909).
 - **Levels**: one Volume per machine, as the hardware's Decay knob
   changes length, not level: the 808s at 1.2 (drive saturates harder
-  above that), the 909s at 0.9. Rendered with `renderHit` on G#3 at
+  above that), the 909s at 0.9. Rendered with `renderHit` on G#3 (now
+  the same render on C4) at
   velocity 1, against the old 808 Kick (RMS 0.322 over the first 100 ms,
   peak 0.65) and the old 909 Kick (RMS 0.199, peak 0.46, which lost 4.8 dB
   to algorithm 6's three-carrier scaling):
@@ -194,14 +203,15 @@ references.
   "The references"). The fitter writes only the patch; its renders are
   temporary files. To check a result, render the fitted patch, then
   overlay it on the recording:
-  - `node render.mjs out.json 56 1 out.wav 1.0` (patch, note, velocity,
+  - `node render.mjs out.json 60 1 out.wav 1.0` (patch, note, velocity,
     WAV, seconds);
   - `python3 overlay.py out.png "label|<recording>|out.wav"`, with
     `EDGE=1` set for a 909 so the recording is aligned on its attack edge.
 - **What `fitvar.py` assumes.** Its parameter vector is written per
   machine for the committed patches' operator layout (808: algorithm 4, C
   the square edge; 909: algorithm 6, B the square edge). A patch with a
-  different layout needs its own `build()` there. Every fit renders G#3
+  different layout needs its own `build()` there. Every fit renders C4
+  (`NOTE` in `fitvar.py`; the original fit used G#3 at ratio 0.25)
   at velocity 1, so velocity sensitivity is not fitted.
 
 ### Sound work not yet done
@@ -221,7 +231,7 @@ Most promising first.
    `B` and a lower one `A` would make the sequencer's accent behave like
    the machine's. The 909 pack has no accent axis.
 4. **The 909's lopsided body.** Try a phase-locked second harmonic (a
-   sine at ratio 0.5 against the body's 0.25) to make the positive and
+   sine at ratio 0.39685 against the body's 0.198425) to make the positive and
    negative half-cycles unequal, 0.55 against 0.75 on the recording.
 5. **The 909's first 1.5 ms.** The recording carries about 2.5 ms of near
    silence before its edge; our body swings positive at once. Worth one

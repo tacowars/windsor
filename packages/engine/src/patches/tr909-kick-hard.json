@@ -3,7 +3,7 @@
   "name": "909 Kick Hard",
   "category": "Drums",
   "tags": ["909", "kick", "analog", "rough", "long", "mono"],
-  "description": "Fitted to a clean recording of the machine with Attack at maximum and Decay high: the 909 Kick Long's sweep (65 Hz on C4, the 909's 52 Hz on G#3) with the attack click at its strongest, held full for 80 ms, then a 480 ms tail. The recording's click stands further above its body than this one's does.",
+  "description": "Fitted to a clean recording of the machine with Attack at maximum and Decay high: the 909 Kick Long's sweep (52 Hz on C4, the 909's pitch) with the attack click at its strongest, held full for 80 ms, then a 480 ms tail. The recording's click stands further above its body than this one's does.",
   "patch": {
     "name": "909 Kick Hard",
     "algorithm": 6,
@@ -20,7 +20,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0.001007,
@@ -76,7 +76,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0.001007,
@@ -104,7 +104,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0.001007,

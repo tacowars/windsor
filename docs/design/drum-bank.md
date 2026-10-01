@@ -68,14 +68,17 @@ leans on five of its features:
   algorithm 8, Series + Tap, whose two carriers A and B are the burst and the
   tail with C and D silent; the 909 snare folds its fixed burst into the
   snappy's 24 ms hold so it needs one Noise operator.
-- **Kick bodies sit at ratio 0.25.** By choice, not because a floor pins them
-  there: the console's Coarse / Fine pair floors the stored ratio at
-  `RATIO_MIN`, which is 0.0625 since #618 (`ratioSplit.ts`, and its test
-  round-trips every library ratio), and the engine is unclamped. The bank
-  keeps 0.25 and names the note that gives each machine's pitch: every kick
-  and the EFM kick play 65 Hz on C4, and the 808's and 909's 52 Hz is G#3
-  (the recordings the kicks were fitted to settle there), and the
-  descriptions say so.
+- **Kick bodies play the machine's pitch on C4.** The 808 and 909 kicks
+  and the EFM kick sit at body ratio 0.198425 (2^(−4/12) of the old 0.25),
+  so each plays 52 Hz on C4, the percussion note the sequencer defaults
+  to; the recordings the kicks were fitted to settle at 52 Hz. Every other
+  note-tracking ratio in those patches moved by the same factor, so the
+  patch's internal ratios are unchanged. The old 0.25 followed the
+  console's old ratio floor; the Coarse / Fine pair floors the stored ratio
+  at `RATIO_MIN`, which is 0.0625 since #618 (`ratioSplit.ts`, and its test
+  round-trips every library ratio), and the engine is unclamped
+  (`2026-10-01-kicks-tuned-to-c4`). The FM Kick (`kick`, ratio 1) is not a
+  machine voice and keeps its tuning.
 - **The 808 and 909 kicks are fitted to recordings**
   (`docs/research/2026-09-30-kick-fit/`), three Decay settings each plus
   the 909 at full Attack. The 808's punch is the pitch envelope starting at
@@ -107,8 +110,8 @@ leans on five of its features:
   modulator with positive feedback into a low carrier.
 
 Kicks, snares, toms, congas, cowbells, rims and the zap **track the key**
-with C4 (MIDI 60, the percussion note) as the reference tuning, the kicks
-excepted as above. Hats,
+with C4 (MIDI 60, the percussion note) as the reference tuning: on C4 the
+machine kicks play 52 Hz, as above. Hats,
 cymbals and claps are **fixed** or pitch-independent, as on the machines.
 Everything is `mono` with retrigger, so a closed hat on the same part chokes
 an open one.
