@@ -169,8 +169,9 @@ references.
 ### Setting up again
 
 - **Tools.** Node 24 (`.nvmrc`) for `kick.mjs` and `render.mjs`, which run
-  the generated `worklet/generated/fm-processor.js`. Rebuild it
-  (`node scripts/build-worklets.mjs`) first if the DSP has changed. Python 3
+  the generated `worklet/generated/fm-processor.js`. If the DSP has
+  changed, rebuild it first from the repository root
+  (`node scripts/build-worklets.mjs`). Python 3
   with numpy and scipy for the fitting and analysis scripts; `overlay.py`
   also needs matplotlib.
 - **The recordings.** tacowars's copy of Samples From Mars *808 From Mars*
@@ -182,6 +183,10 @@ references.
     (folder `A` no accent, `B` accent);
   - `SamplesFromMars_909_kicks_digital_clean/02. Medium/BD 909 Clean Medium C 03.wav`
     (`01. Short`, `02. Medium`, `03. Long`).
+- **Working directory.** Run every command below from this folder
+  (`cd docs/research/2026-09-30-kick-fit`): the Python scripts import
+  each other, and `render.mjs` and `kick.mjs` find the engine relative to
+  themselves.
 - **Running a fit.** `python3 fitvar.py <808|909> <start patch: id or
   .json> <recording.wav> <out.json> <render seconds> <level window ms>`,
   for example `python3 fitvar.py 909 tr909-kick "<…>/BD 909 Clean Long C 03.wav" out.json 1.0 510`.
