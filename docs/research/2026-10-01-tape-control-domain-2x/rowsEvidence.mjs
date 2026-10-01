@@ -1,9 +1,10 @@
 /* global process, console */
 /** windsor#315 evidence: the normalisation table over each candidate box (its six faces and
- * its volume), the shipped model rows, each candidate's gates, where the candidates stop and
- * the declaration, all derived from saved raw trial records and the shipped `configure`; and
- * `--check`, which re-derives them from rowsMeasurement.json, re-hashes the import closure,
- * re-renders the spot trials and tests the runner's exit gate. Run from anywhere on Node 24:
+ * its volume), the shipped model rows, each candidate's gates, the motion gate
+ * (`rowsMotion.mjs`), where the candidates stop and the declaration, all derived from saved
+ * raw trial records and the shipped `configure`; and `--check`, which re-derives them from
+ * rowsMeasurement.json, re-hashes the import closure, re-renders the spot trials and tests
+ * the runner's exit gate and the motion gate. Run from anywhere on Node 24:
  *   node docs/research/2026-10-01-tape-control-domain-2x/rowsEvidence.mjs --check
  */
 import { readFileSync } from 'node:fs';
@@ -11,6 +12,7 @@ import { URL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { summarise, segmentPeaks, loudest } from '../2026-10-01-tape-control-domain/evidence.mjs';
 import { survives, loadProgram, importClosure, closureClean, exitGateCases } from './evidence.mjs';
+import { motionResult, motionGateCases } from './rowsMotion.mjs';
 
 export const report = new URL('./rowsMeasurement.json', import.meta.url);
 const entry = 'rowsProgram.ts';
@@ -145,7 +147,8 @@ export function candidateResult(c, records, S) {
 }
 
 /** The candidates the run implies: each in order, up to the first that passed on the
- * recorded trials; the normalisation and rows tables; and the declaration. */
+ * recorded trials; the normalisation and rows tables; the motion gate over every recorded
+ * trial; and the declaration, which needs every trial to have moved as commanded. */
 export function derive(trials, run, S, table = S.ROWS) {
   const ran = [];
   for (const c of table.candidates) {
@@ -160,7 +163,8 @@ export function derive(trials, run, S, table = S.ROWS) {
     });
     if (ran.at(-1).result.passed) break;
   }
-  const expected = ran.flatMap(({ c }) => S.rowsTrials(c, table)).map((t) => t.id);
+  const scheduled = ran.flatMap(({ c }) => S.rowsTrials(c, table)),
+    expected = scheduled.map((t) => t.id);
   const done = new Set(trials.map((t) => t.id)),
     wanted = new Set(expected);
   const missing = expected.filter((id) => !done.has(id));
@@ -170,6 +174,7 @@ export function derive(trials, run, S, table = S.ROWS) {
   const declared = ran.find(({ result }) => result.passed);
   const rows = rowsTable(S, table);
   const box = declared ? declared.result.box : null;
+  const motion = motionResult(trials, scheduled, S);
   return {
     status: finished ? 'complete' : 'incomplete',
     scheduled: expected.length,
@@ -179,8 +184,9 @@ export function derive(trials, run, S, table = S.ROWS) {
     normalisation: table.candidates.map((c) => faceTable(c, S, table)),
     rows,
     boxes: ran.map(({ result }) => result),
+    motion,
     declaration: {
-      qualified: finished && Boolean(declared),
+      qualified: finished && Boolean(declared) && motion.passed,
       drive: box && box[0],
       width: box && box[1],
       saturation: box && box[2],
@@ -228,6 +234,7 @@ export async function check(path = report) {
     closureClean: closureClean(closure),
     spots: spots.every((s) => s.equal),
     exitGate: exitGateCases().every((c) => c.pass),
+    motionGate: motionGateCases(saved.trials, all, S).every((c) => c.pass),
   };
   console.log(JSON.stringify({ checks, spots }, null, 1));
   return Object.values(checks).every(Boolean);

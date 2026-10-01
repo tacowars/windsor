@@ -181,7 +181,9 @@ export function derive(trials, run, S, table = S.BOX) {
 }
 
 /** windsor#315 (Codex's P2 on PR #297): the runner's exit code. Every run fails on an unclean
- * closure, an expiry, a worker that exited nonzero or a truncated journal. A measurement also
+ * closure, an expiry, a worker that exited nonzero, a truncated journal or (where the
+ * experiment has the motion gate, #315's, after PR #317's fix round) a trial whose controls
+ * did not move as commanded, smoke runs included. A measurement also
  * fails unless every scheduled trial was recorded and a box qualified; a smoke run is partial
  * by design, so those two do not apply to it. */
 export function exitCode({ run, derived, closureOk, smoke }) {
@@ -192,7 +194,8 @@ export function exitCode({ run, derived, closureOk, smoke }) {
     run.exitCodes.every((c) => c === 0) &&
     !run.truncatedTails.length;
   const measured = derived.status === 'complete' && derived.declaration.qualified === true;
-  return closureOk && ran && (smoke || measured) ? 0 : 1;
+  const moved = derived.motion === undefined || derived.motion.passed === true;
+  return closureOk && ran && moved && (smoke || measured) ? 0 : 1;
 }
 
 /** The exit gate's cases, run by `--check`: a clean measurement passes, and each way a run
@@ -216,6 +219,13 @@ export function exitGateCases() {
       1,
     ],
     ['closure not clean', { ...base, closureOk: false }, 1],
+    ['moved', { ...base, derived: { ...derived, motion: { passed: true } } }, 0],
+    ['a trial did not move', { ...base, derived: { ...derived, motion: { passed: false } } }, 1],
+    [
+      'smoke, a trial did not move',
+      { ...base, derived: { ...partial, motion: { passed: false } }, smoke: true },
+      1,
+    ],
     ['smoke, partial', { ...base, derived: partial, smoke: true }, 0],
     [
       'smoke, worker exited nonzero',

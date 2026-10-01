@@ -1,14 +1,21 @@
-/** windsor#315: windsor#290's program, unchanged, scheduled in the candidate boxes that hold
- * every shipped model row. Every trial renders through that record's `runTrial` with its own
- * box, as windsor#295's do; only the schedule and the shipped rows' table are new here.
+/** windsor#315: windsor#290's program scheduled in the candidate boxes that hold every
+ * shipped model row. Every trial renders with its own box through `rowsTrial.ts`'s
+ * `runTrial`, which drives the stage's per-sample glide as `TapeDsp` does (the fix round on
+ * PR #317); #290's `runTrial`, which configures per block only, is not used here. The
+ * schedule, the shipped rows' table and that render are new here.
  */
-import { TAPE_LABELS, TAPE_MODELS } from '../../../packages/engine/src/inserts/tapeConstants';
+import {
+  TAPE_DSP,
+  TAPE_LABELS,
+  TAPE_MODELS,
+} from '../../../packages/engine/src/inserts/tapeConstants';
 import type { Triple } from '../2026-10-01-tape-control-domain/controlConstants';
 import { boxTrials, type Box, type BoxTrial } from './boxProgram';
 import { ROWS, type RowsTable } from './rowsConstants';
 
 export * from './boxProgram';
-export { ROWS };
+export { runTrial } from './rowsTrial';
+export { ROWS, TAPE_DSP };
 
 export type Candidate = RowsTable['candidates'][number];
 

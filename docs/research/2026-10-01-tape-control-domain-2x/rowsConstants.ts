@@ -26,6 +26,9 @@ export const ROWS = {
   faceSteps: 40,
   volumeSteps: 20,
   margin: 2,
+  /** The motion gate (`rowsMotion.mjs`, the fix round on PR #317): how far past the box's
+   * ends a glided control may read, for rounding only; a first-order glide never overshoots. */
+  motion: { epsilon: 1e-12 },
   /** Worker processes (half the machine's 8 cores) and the hard wall-clock bound, from the
    * start, over every candidate run. */
   workers: 4,
