@@ -298,6 +298,27 @@ Mix 1 (`RETURNS`, `mix.ts`).
    a change to their shape bumps `ARRANGEMENT_VERSION` with an upgrade in
    `songMigrations.ts`, as 3 → 4 did.
 
+**The groups** (windsor#287; record `2026-10-01-group-buses`)
+
+A group is the song's, not the code's: `groups` in the document, keyed by
+`id` in a partial, at most `MAX_GROUPS`. A part reaches one through its
+Output (`{ group: id }`), not a send.
+
+1. **The rules are `groupModel.ts`**, pure over the normalised document:
+   the add, rename, remove and route partials, the next name and id, and the
+   members line. Remove sends every member to Master in the same partial,
+   so one undo brings both back.
+2. **The console reaches a group's chain as an `InsertTarget`**, its key
+   `group:<id>` (`groupKey`), which no slot or bus name can collide with.
+   A group's inserts start at the part defaults (`onSendBus` is for the send
+   buses only), and its compressor keys from its own input, so the sidechain
+   selector offers no part.
+3. **The Mixer tab's Groups section** (`groupsPanel.ts`) draws each group as
+   a send bus row, with its lights from `songMixerLights` keyed on group ids
+   over `groupBus(id).meter`. The Song tab's Output select (`trackOutput.ts`)
+   lists Master, the groups by name, then Sidechain; its values are
+   `master`, `sidechain` and the group keys.
+
 **Add a strip insert kind** (#641; chorus, #642, is the worked second example)
 
 1. Engine: one `inserts/<kind>Insert.ts` exporting its spec type, its

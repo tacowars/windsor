@@ -10,10 +10,12 @@
  * transport and every other part keep playing.
  */
 import type { InsertTarget } from './insertTarget';
+import { isGroupTarget } from './insertTarget';
 import type { InsertKindName } from '@windsor/engine';
 import { MAX_INSERTS } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import { groupAt, groupIdOfKey } from './groupModel';
 import { addSlot } from './insertAddPicker';
 import { addInsert, addInsertAtFront, canAddInsert } from './insertEdits';
 import { insertsOf } from './insertKnobs';
@@ -43,22 +45,23 @@ function addPicker(ctx: AppCtx, slot: InsertTarget, side: AddSide): HTMLElement 
     pick: (kind) => add(ctx, slot, side, kind),
   });
   picker.name = `add-insert-${slot}-${side}`;
-  picker.setAttribute(
-    'aria-label',
-    slot === 'master'
-      ? 'Add an insert to Master'
-      : typeof slot === 'string'
-        ? `Add an insert to Send ${slot.toUpperCase()}`
-        : `Add an insert to slot ${slot}`,
-  );
-  picker.setAttribute('aria-label', `${picker.getAttribute('aria-label')} ${SIDE_WORDS[side]}`);
+  picker.setAttribute('aria-label', `Add an insert to ${chainName(ctx, slot)} ${SIDE_WORDS[side]}`);
   return picker;
+}
+
+/** What the Add picker's label calls the chain: Master, Send A, a group by name, or a slot. */
+function chainName(ctx: AppCtx, slot: InsertTarget): string {
+  if (slot === 'master') return 'Master';
+  if (isGroupTarget(slot)) {
+    return groupAt(ctx.model.doc, groupIdOfKey(slot) ?? -1)?.name ?? 'a group';
+  }
+  return typeof slot === 'string' ? `Send ${slot.toUpperCase()}` : `slot ${slot}`;
 }
 
 /**
  * The chain's rack: the front Add slot, each insert, the back Add slot.
  * `accent` is the rack's colour: a part's and the master's by default, a
- * send bus's with `'bus'`.
+ * send bus's (and a group's, which sets its own `--kc` after) with `'bus'`.
  */
 export function stripInserts(
   ctx: AppCtx,
