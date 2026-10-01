@@ -18,6 +18,40 @@ qualifies drive [0.05, 1] × width [0.05, 0.85] × saturation [0, 1] at both
 factors on the current core, a box that holds every shipped model row. It
 also makes `measure.mjs` exit nonzero on an incomplete or unqualified run.
 
+**Status (2026-10-01, windsor#320): #295's part is historical.** #295's
+run (`measurement.json`, `evidence.mjs`, `boxProgram.ts`,
+`boxConstants.ts`) measured the shipped core and stage as bundled at
+`510c649` (`origin/main` `c15868d` plus this folder's declaration). Its
+trials, derivations and declaration stay valid as a record of that code.
+They are not re-run and not changed. Three later commits changed files in
+its hashed import closure:
+
+- #293 (`634e717`) moved the control glide into the stage, per sample
+  (`tapeMagneticStage.ts`, `tapeMagnetic.ts`, `tapeConstants.ts`). Since
+  then, the `measure.mjs` path without `--rows`, which renders through
+  #290's per-block `runTrial`, no longer moves the controls on today's
+  stage.
+- #307 (`80b077a`) rescales M when the gain changes
+  (`tapeMagnetic.ts`, `tapeMagneticStage.ts`).
+- #314 (`6eca799`) added the Advanced controls' plumbing
+  (`tapeMagneticRows.ts`, `tapeMagneticStage.ts`, `tapeConstants.ts`).
+
+So `evidence.mjs --check` now **fails, and is expected to**: derived, clean
+closure and the exit gate pass; closure fails (those four files' hashes
+changed); and none of the three spot re-renders, each a sweep or a walk,
+is bit-equal. `evidence.mjs --historical` is the passing check for #295's
+part: it re-derives the edge table, each box's gates, the ladder and the
+declaration from the saved trials, checks that the saved closure was clean
+and that the run names its commit, and runs the exit gate's cases. It
+skips the closure re-hash and the spot re-renders.
+
+**Superseded for the shipped box** by #315's part below (the `rows*`
+files, merged as `074e599`), which ran on the core after #293 and #307
+with every trial checked to have moved as commanded. #314 landed after it
+too, so on `6eca799` its `rowsEvidence.mjs --check` also reports a changed
+closure, while its three spot re-renders, derivations, motion gate and exit
+gate still pass. This note does not change that part.
+
 ## What is measured, and what is not imported
 
 The harness is #290's, **unchanged except for the box**. The field program,
@@ -142,9 +176,15 @@ node docs/research/2026-10-01-tape-control-domain-2x/measure.mjs --rows
 node docs/research/2026-10-01-tape-control-domain-2x/rowsEvidence.mjs --check
 ```
 
-Since #307 changed the shipped core, the first two `--check`s above report
-a changed closure and moving spot trials that are no longer bit-equal (see
-"What changed under it" in #315's part).
+Since #293, #307 and #314 changed the shipped core and stage, the first two
+`--check`s above report a changed closure and moving spot trials that are
+no longer bit-equal (see the Status note at the top). Each folder's
+`--historical` is the check that passes:
+
+```sh
+node docs/research/2026-10-01-tape-control-domain-2x/evidence.mjs --historical
+node docs/research/2026-10-01-tape-control-domain/evidence.mjs --historical
+```
 
 ## Environment and run
 
