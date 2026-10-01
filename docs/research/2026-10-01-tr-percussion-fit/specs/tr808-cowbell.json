@@ -15,7 +15,7 @@
     { "path": ["ops[0].env.releaseCurve", "ops[1].env.releaseCurve"], "min": -1, "max": 0.5 },
     { "path": "filter.cutoff", "min": 400, "max": 4000, "scale": "log" },
     { "path": "filter.resonance", "min": 0.5, "max": 3 },
-    { "path": "filter.drive", "min": 1, "max": 2.5 }
+    { "path": "drive.gain", "min": 1, "max": 2.5 }
   ],
   "references": [
     {

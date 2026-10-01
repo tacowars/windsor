@@ -32,7 +32,7 @@
         "phaseFree": false,
         "env": {
           "initLevel": 0,
-          "attackTime": 7.4357e-7,
+          "attackTime": 0,
           "attackCurve": 0.721046,
           "peakLevel": 1,
           "decayTime": 0.0532163,
