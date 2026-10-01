@@ -20,7 +20,7 @@ export interface TapeSpec {
   readonly mix: number;
   readonly seed: number;
   readonly enabled: boolean;
-  /** The magnetic core's factor, 2 or 4: E3's audition switch, never a knob (windsor#224). */
+  /** The magnetic core's factor, 2 or 4: a per-insert product setting, never a knob (windsor#224, kept on 2026-10-01). */
   readonly oversampling: TapeOversampling;
 }
 export const DEFAULT_TAPE: TapeSpec = { kind: 'tape', model: 'studio', ...TAPE_DEFAULTS };

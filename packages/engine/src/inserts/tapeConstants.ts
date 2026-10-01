@@ -55,7 +55,7 @@ export const TAPE_DEFAULTS = {
   mix: 1,
   seed: 1,
   enabled: true,
-  /** The magnetic core's oversampling factor, one of `TAPE_OVERSAMPLING`: an audition switch, not a knob. */
+  /** The magnetic core's oversampling factor, one of `TAPE_OVERSAMPLING`: a product setting (2026-10-01), not a knob. */
   oversampling: 2 as TapeOversampling,
 };
 export const TAPE_DSP = {

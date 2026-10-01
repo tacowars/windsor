@@ -3,6 +3,9 @@
 - **Date:** 2026-09-30
 - **Status:** accepted (tacowars, 2026-09-30)
 - **Epic:** [#146](https://github.com/tacowars/windsor/issues/146), milestone D
+- **Amended:** decision 1's removal of the losing factor did not happen;
+  tacowars kept both, see
+  [the audition outcome](2026-10-01-tape-oversampling-audition.md#outcome-2026-10-01).
 - **Follows:** [greenfield direction](2026-09-30-tape-greenfield-direction.md),
   [static conditioning](2026-09-30-tape-static-conditioning.md),
   [candidate domain](2026-09-30-tape-candidate-domain.md),
