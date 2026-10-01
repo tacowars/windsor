@@ -79,20 +79,43 @@ def run_cma(f, u0, opt):
     if opt.get("popsize"):
         options["popsize"] = opt["popsize"]
     es = cma.CMAEvolutionStrategy(u0, opt["sigma0"], options)
+    # The start patch's evaluation counts against the budget. CMA learns only
+    # from a whole population, so a remainder smaller than one is spent on the
+    # first candidates of the next and not told: the best is still kept, and
+    # the evaluations never exceed the budget.
     while not es.stop() and f.evals < opt["budget"]:
         xs = es.ask()
+        remaining = opt["budget"] - f.evals
+        if remaining < len(xs):
+            for x in xs[:remaining]:
+                f(np.clip(x, 0, 1))
+            break
         es.tell(xs, [f(np.clip(x, 0, 1)) for x in xs])
 
 
+class BudgetSpent(Exception):
+    pass
+
+
 def run_nelder_mead(f, u0, opt):
+    """scipy checks `maxfev` only between iterations, so the budget is enforced here."""
+
+    def bounded(u):
+        if f.evals >= opt["budget"]:
+            raise BudgetSpent
+        return f(np.clip(u, 0, 1))
+
     n = len(u0)
     simplex = [u0] + [np.clip(u0 + opt["sigma0"] * np.eye(n)[i] * (1 if u0[i] < 0.5 else -1), 0, 1) for i in range(n)]
-    so.minimize(
-        lambda u: f(np.clip(u, 0, 1)),
-        u0,
-        method="Nelder-Mead",
-        options=dict(maxfev=opt["budget"], initial_simplex=np.array(simplex), adaptive=True, xatol=1e-4, fatol=1e-6),
-    )
+    try:
+        so.minimize(
+            bounded,
+            u0,
+            method="Nelder-Mead",
+            options=dict(maxfev=opt["budget"], initial_simplex=np.array(simplex), adaptive=True, xatol=1e-4, fatol=1e-6),
+        )
+    except BudgetSpent:
+        pass
 
 
 def arguments():

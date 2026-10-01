@@ -123,7 +123,9 @@ references, for example accent off at velocity 0.7 and accent on at 1.
 It writes `best.json` (a bare patch, playable with `render.mjs`),
 `log.jsonl` (every evaluation) and `summary.json` to `--out-dir` (default
 `<tmp>/sound-match/fit-<spec>/`). The start patch is scored first and kept
-unless beaten.
+unless beaten. `--budget` counts every evaluation, the start's included,
+and is never exceeded: when less than a CMA population remains, that many
+candidates are evaluated and the search stops without learning from them.
 
 ### Which control moves what: `sensitivity.py`
 
@@ -151,10 +153,12 @@ python renderer.py tr909-kick --seconds 1 --count 200
   render lasts the reference's length plus 50 ms, at most 4 s.
 - **Level.** Each side is normalised to its own peak (or RMS, `--norm rms`).
   The packs are normalised per voice, so absolute level means nothing.
-- **Seeds.** A patch is rendered with two seeds; if they differ by a
-  sample, the voice depends on its seed (a Noise operator, a free-running
-  phase, a random LFO) and is scored over `--seeds` seeds (default 4, from
-  `--seed-base` 1). The report shows the mean, and each score's standard
+- **Seeds.** A patch with a Noise operator or a `phaseFree` operator
+  depends on its seed by its structure, whatever that operator's level, so a
+  fit that raises a silent noise level is still scored over every seed.
+  Any other patch is rendered with two seeds, and depends on its seed if
+  they differ by a sample (a random LFO, say). A seed-dependent patch is
+  scored over `--seeds` seeds (default 4, from `--seed-base` 1). The report shows the mean, and each score's standard
   deviation, minimum and maximum. A fixed seed gives identical numbers on
   every run.
 
@@ -222,19 +226,8 @@ reference. Some readings and the controls they point at:
 
 ## Speed
 
-Measured on an Apple M1 (8 cores, 16 GB), macOS 26.5.1, Node 24.21.0,
-Python 3.12.9, the shipped `fm-processor.js`, 2026-10-01:
-
-- **One-shot** `node render.mjs tr909-kick --seconds 1`: 70 ms wall, nearly
-  all of it Node start-up and evaluating the bundle.
-- **Server** (`python renderer.py <patch> --seconds 1 --count 200`, after 20
-  warm-up renders): 460–615 renders/s for `tr909-kick` over three runs,
-  700 renders/s for `tr808-clap`; several hundred times real time.
-- **A fit is bound by the analysis, not the render:** the 600-evaluation
-  CMA-ES run of `specs/tr909-kick.json` (renders of 0.39 s) took 16 s and
-  27 s on two runs (22–37 evaluations a second; the machine was shared with
-  other work), with 287–537 renders/s inside the renderer. Both runs ended
-  on the same patch: a seeded CMA-ES over seeded renders is reproducible.
+How fast the renderer and a fit run, on which machine and how it was
+measured, is in `docs/research/2026-10-01-sound-match-throughput/`.
 
 ## Limits
 

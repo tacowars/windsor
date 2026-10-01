@@ -13,8 +13,8 @@ toolkit only says where a render differs and in which direction.
 1. **Python for analysis and fitting, one Node renderer.** `render.mjs` runs
    the shipped `worklet/generated/fm-processor.js`, as the worklet harness
    does. Its server mode (JSON lines in, float32 out) keeps one Node process
-   for a whole fit: about 70 ms per one-shot render against several hundred
-   renders a second through the server (README, measured on an M1).
+   for a whole fit, since Node's start-up dominates a one-shot render
+   (measured in `docs/research/2026-10-01-sound-match-throughput/`).
 2. **numpy, scipy, matplotlib and `cma`, nothing heavier.** No torch,
    librosa or auraloss: the multi-resolution STFT loss is a few lines of
    numpy. No CLAP or OpenL3 embeddings: they are large, trained on general
@@ -22,10 +22,12 @@ toolkit only says where a render differs and in which direction.
    lopsided half-cycle). All four are BSD-style and AGPL-compatible.
 3. **Noise is seeded only in the harness.** Every render passes
    `processorOptions.seed`; live playback keeps drawing from `Math.random`
-   (`worklet/fm/prng.ts`), unchanged. A render that depends on the seed,
-   found by comparing two seeds sample for sample, is scored as the mean
-   over N seeds (default 4), and the report gives the spread. A fit does not
-   chase one noise draw.
+   (`worklet/fm/prng.ts`), unchanged. A render that depends on the seed is
+   decided from the patch's structure (a Noise or `phaseFree` operator,
+   whatever its level, so a fit that raises a silent noise level stays
+   seeded) or else by comparing two seeds sample for sample. It is scored as
+   the mean over N seeds (default 4), and the report gives the spread. A
+   fit does not chase one noise draw.
 4. **Both sides are aligned by the same rule and peak-normalised.** The
    onset is the first sample above a threshold relative to the peak, less a
    lead (default −40 dB, 0.05 ms; the 909 pack wants −6 dB and 1.5 ms for
@@ -58,7 +60,9 @@ toolkit only says where a render differs and in which direction.
    names JSON paths into the patch with bounds and linear or log scale, and
    one or more references each with its note, velocity, gate and weight.
    CMA-ES is the default, Nelder–Mead the alternative. The start patch is
-   scored first and kept unless beaten.
+   scored first and kept unless beaten. The budget counts that evaluation and
+   is never exceeded: a remainder smaller than a CMA population evaluates
+   that many candidates and does not update the search.
 10. **Nothing derived from a sample enters the repository.** References are
     read in place; spec paths expand `$VARS` so a spec names no machine's
     folders. Every output defaults to `<tmp>/sound-match/`. The scripts set

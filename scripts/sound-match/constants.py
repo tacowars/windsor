@@ -109,6 +109,8 @@ WEIGHTS = {"stft": 1.0, "band": 0.1, "harm": 0.04, "pitch": 0.2, "wave": 2.0}
 # Noise: renders that depend on the seed are scored over this many seeds.
 SEEDS = 4
 SEED_BASE = 1
+# The index of 'Noise' in the engine's WAVE_NAMES (packages/engine/src/patch/patch.ts).
+NOISE_WAVE = 4
 
 # Render length when none is given: the reference's, plus this, capped.
 RENDER_MARGIN_S = 0.05

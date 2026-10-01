@@ -80,14 +80,24 @@ class Renderer:
         return self.renders / self.seconds_rendering if self.seconds_rendering else float("nan")
 
 
+def seeded_structure(patch):
+    """True when any operator has the Noise wave or a free-running start phase."""
+    return any(op.get("wave") == C.NOISE_WAVE or op.get("phaseFree") for op in patch.get("ops", []))
+
+
 def seed_list(renderer, patch, opts, count=C.SEEDS, base=C.SEED_BASE):
     """The seeds to score `patch` over: `count` of them if its render depends on the seed, else one.
 
-    Two renders with different seeds are compared sample for sample; a Noise
-    operator, a free-running start phase or a random LFO makes them differ.
+    A patch with a Noise operator or a `phaseFree` operator depends on the
+    seed by its structure, whatever that operator's level: a fit that raises
+    a silent noise level must still be scored over every seed. Otherwise two
+    renders with different seeds are compared sample for sample (a random
+    LFO, say, makes them differ).
     """
     if count <= 1:
         return [base]
+    if seeded_structure(patch):
+        return list(range(base, base + count))
     a = renderer.render(patch, seed=base, **opts)
     b = renderer.render(patch, seed=base + 1, **opts)
     return list(range(base, base + count)) if not np.array_equal(a, b) else [base]
