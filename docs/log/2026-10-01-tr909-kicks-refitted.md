@@ -43,6 +43,8 @@ goes straight to a negative edge, and, for the hard kick, Tune's long sweep
    for all four), the recordings' measured pitch (49.2–49.9 Hz by the
    toolkit's track and by an FFT peak), rather than 52 Hz. The sweep is a
    two-segment pitch envelope starting at its peak; Tune is its length.
+   tacowars kept these tunings at the listen, and the 808 kicks' own
+   recording pitches (`2026-10-01-tr808-kicks-refitted`) with them.
 4. **The opening is a step.** The edge operator (`Square D` at a fixed
    frequency) has an attack of 0 and its locked phase in the square's
    negative half; the body starts on its falling side with a fitted attack
@@ -66,7 +68,9 @@ goes straight to a negative edge, and, for the hard kick, Tune's long sweep
 - A song that played a 909 kick at 52 Hz in its key hears it about a
   semitone flat after it reloads these patches; a saved song keeps its own
   snapshot until it is re-exported. No format bump: a library edit.
-- The edge's and bodies' attacks sit below the console's Attack knob floor
-  (0.5 ms); turning that knob writes at least 0.5 ms.
+- The edge's and bodies' attacks sit below 0.5 ms, which the Attack knob
+  reaches through its zero slice since `2026-10-01-tr808-kicks-refitted`.
+- At the listen tacowars heard the four kicks as cleaner than the machine,
+  missing some grit and air, and accepted them as usable to process.
 - What remains (the click 2–7 dB hot on three, the body-average ratio, the
   short kick's post-cutoff bump) is listed, measured, in the research note.
