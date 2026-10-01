@@ -78,6 +78,16 @@
       "generic": "489491659abef798f460c26a828c217d1a9b238563bb29804d0dbfe9181c2f43",
       "noDormancy": "489491659abef798f460c26a828c217d1a9b238563bb29804d0dbfe9181c2f43"
     },
+    "fm-hat-closed": {
+      "default": "b3760cc396bd9215af20a850a8949af134a1cb296f1a39a5cf7d8ceea041ee2c",
+      "generic": "b3760cc396bd9215af20a850a8949af134a1cb296f1a39a5cf7d8ceea041ee2c",
+      "noDormancy": "b3760cc396bd9215af20a850a8949af134a1cb296f1a39a5cf7d8ceea041ee2c"
+    },
+    "fm-hat-open": {
+      "default": "87d7847d3d3225fd9190fe90762c73e224b130913cadf105b8efdd7cd05138a0",
+      "generic": "87d7847d3d3225fd9190fe90762c73e224b130913cadf105b8efdd7cd05138a0",
+      "noDormancy": "87d7847d3d3225fd9190fe90762c73e224b130913cadf105b8efdd7cd05138a0"
+    },
     "hat": {
       "default": "e5c8e54a527aa3d9465e24777ef10d2c3d5d88ad60716683fbe837d39f4748bc",
       "generic": "e5c8e54a527aa3d9465e24777ef10d2c3d5d88ad60716683fbe837d39f4748bc",

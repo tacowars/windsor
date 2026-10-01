@@ -1,0 +1,82 @@
+{
+  "start": "../start/tr808-hat-closed.shared.json",
+  "params": [
+    {
+      "path": [
+        "ops[0].env.attackTime",
+        "ops[1].env.attackTime",
+        "ops[2].env.attackTime",
+        "ops[3].env.attackTime"
+      ],
+      "min": 0,
+      "max": 0.003
+    },
+    {
+      "path": [
+        "ops[0].env.decayTime",
+        "ops[1].env.decayTime",
+        "ops[2].env.decayTime",
+        "ops[3].env.decayTime"
+      ],
+      "min": 0.001,
+      "max": 0.2,
+      "scale": "log"
+    },
+    {
+      "path": [
+        "ops[0].env.decayCurve",
+        "ops[1].env.decayCurve",
+        "ops[2].env.decayCurve",
+        "ops[3].env.decayCurve"
+      ],
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": [
+        "ops[0].env.sustainLevel",
+        "ops[1].env.sustainLevel",
+        "ops[2].env.sustainLevel",
+        "ops[3].env.sustainLevel"
+      ],
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": [
+        "ops[0].env.releaseTime",
+        "ops[1].env.releaseTime",
+        "ops[2].env.releaseTime",
+        "ops[3].env.releaseTime"
+      ],
+      "min": 0.005,
+      "max": 0.5,
+      "scale": "log"
+    },
+    {
+      "path": [
+        "ops[0].env.releaseCurve",
+        "ops[1].env.releaseCurve",
+        "ops[2].env.releaseCurve",
+        "ops[3].env.releaseCurve"
+      ],
+      "min": -1,
+      "max": 1
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/CH A 808.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "seeds": 4,
+  "optimizer": {
+    "method": "cma",
+    "budget": 600,
+    "sigma0": 0.2,
+    "seed": 1
+  }
+}
