@@ -155,7 +155,7 @@ describe('the groups section', () => {
     const r = makeArrangement(song([KICK], { groups: [{ id: 0, inserts: [compressor] }] }));
     expect(r.document.groups?.[0]?.inserts[0]).toMatchObject({ sidechain: 'internal' });
     expect(r.corrections).toEqual([
-      'groups[0].inserts[0].sidechain: a send bus keys from its own input — internal',
+      'groups[0].inserts[0].sidechain: a group keys from its own input — internal',
     ]);
   });
 });

@@ -1,11 +1,12 @@
 /**
  * Every part the system created, on its strip, by engine part name: a music
- * part dry into the music bus, an aux part dry into the aux fader, both with
+ * part dry into the music bus or the group its Output names (windsor#285),
+ * an aux part dry into the aux fader, both with
  * sends to every return (`standingGraph.ts` draws the whole graph). A part
  * lives from `createMusic` / `createAux` to `remove` or `dispose`; the
  * standing graph it lands on outlives it.
  */
-import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
+import type { DryTargets, PartStrip, RouteOptions } from '../mixer/channelStrip';
 import { routePart } from '../mixer/channelStrip';
 import type { ChannelStrip } from '../mixer/mix';
 import { stripFor } from '../mixer/mix';
@@ -31,6 +32,8 @@ export interface PartStripsOptions {
   partSeed?: ((name: string) => number) | undefined;
   /** The notes a part's processor is built holding, by engine part name (windsor#40). */
   partEvents?: ((name: string) => ScheduledMessage[] | undefined) | undefined;
+  /** A live group's input by id (windsor#285); absent, or undefined for an id, plays on Master. */
+  groupInput?: ((id: number) => AudioNode | undefined) | undefined;
 }
 
 export class PartStrips {
@@ -38,10 +41,17 @@ export class PartStrips {
 
   constructor(private readonly options: PartStripsOptions) {}
 
-  /** Create a part on its strip, dry into the music bus. The patch is the caller's (#562). */
+  /**
+   * Create a part on its strip, dry into the music bus, or into the group
+   * its Output names (windsor#285). The patch is the caller's (#562).
+   */
   createMusic(name: string, patch: Patch, maxVoices: number, strip?: ChannelStrip): AudioPart {
-    const { musicBus } = this.options.graph.standing();
-    return this.route(name, patch, maxVoices, musicBus.input, strip);
+    const { graph, groupInput } = this.options;
+    const targets: DryTargets = {
+      master: graph.standing().musicBus.input,
+      group: (id) => groupInput?.(id),
+    };
+    return this.route(name, patch, maxVoices, targets, strip);
   }
 
   /** Create a part on its strip, dry into the aux fader, so it never passes the song master. */
@@ -74,7 +84,7 @@ export class PartStrips {
     name: string,
     patch: Patch,
     maxVoices: number,
-    dry: AudioNode,
+    dry: AudioNode | DryTargets,
     strip?: ChannelStrip,
   ): AudioPart {
     const { engine, graph, meter, mix, routeOptions, partSeed, partEvents } = this.options;

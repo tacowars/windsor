@@ -69,8 +69,8 @@ describe('stemSources', () => {
     expect(names(FULL_SLOT.hat)).toEqual(['kick', 'hat', 'arp', 'drone', 'b']);
   });
 
-  it('keeps a return whose only sender is in a muted group, as playback plays it (windsor#284)', () => {
-    // Playback routes a grouped part to Master until windsor#285, so the group's mute is not heard yet.
+  it('leaves out a return whose only sender is in a muted group, as playback silences it (windsor#285)', () => {
+    // A muted group closes its members' gates, their sends included.
     const base = withStrip(FULL_SLOT.drone, { sends: { a: 0 } });
     const song: ArrangementDocument = {
       ...base,
@@ -88,7 +88,7 @@ describe('stemSources', () => {
       name: 'arp',
       muted: false,
     });
-    expect(sources).toContainEqual({ kind: 'return', name: 'a' });
+    expect(sources).not.toContainEqual({ kind: 'return', name: 'a' });
   });
 
   it('leaves out a return nobody sends to', () => {
