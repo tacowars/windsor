@@ -5,6 +5,8 @@
 var EventQueue = class {
   constructor() {
     this.items = [];
+    this.frames = new Float64Array(2);
+    this.incoming = new Float64Array(1);
     this.head = 0;
     this.tail = 0;
   }
@@ -17,23 +19,43 @@ var EventQueue = class {
     if (this.head === this.tail) this.head = this.tail = 0;
     return event;
   }
-  /** Queue `event` after every event at or before its frame. */
+  /** Queue `event` at the frame in `incoming`, after every event at or before that frame. */
   insert(event) {
+    if (this.tail === this.frames.length) this.makeRoom();
     const items = this.items;
-    if (this.tail === items.length && this.head > 0) {
-      const head = this.head;
-      for (let i2 = head; i2 < this.tail; i2++) items[i2 - head] = items[i2];
-      this.tail -= head;
-      this.head = 0;
-    }
+    const frames = this.frames;
     let i = this.tail;
     if (i === items.length) items.push(event);
     this.tail = i + 1;
-    while (i > this.head && items[i - 1]._frame > event._frame) {
+    while (i > this.head && frames[i - 1] > this.incoming[0]) {
       items[i] = items[i - 1];
+      frames[i] = frames[i - 1];
       i--;
     }
     items[i] = event;
+    frames[i] = this.incoming[0];
+  }
+  /**
+   * The queue has reached the end of its room: move it down to the front,
+   * or, when it fills the room, double the room (an allocation, only at a
+   * new most events queued at once).
+   */
+  makeRoom() {
+    const head = this.head;
+    if (head === 0) {
+      const grown = new Float64Array(this.frames.length * 2);
+      grown.set(this.frames);
+      this.frames = grown;
+      return;
+    }
+    const items = this.items;
+    const frames = this.frames;
+    for (let i = head; i < this.tail; i++) {
+      items[i - head] = items[i];
+      frames[i - head] = frames[i];
+    }
+    this.tail -= head;
+    this.head = 0;
   }
   /** Drop every queued event. */
   clear() {
@@ -1527,6 +1549,7 @@ var Voice = class {
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
   constructor(sampleRate2, random, partControls) {
     this.noiseSeed = this.fade = this.fadeInc = this.velocity = this.detune = NaN;
+    this.age = this.voiceId = this.note = NaN;
     this.pan = this.glideFrom = NaN;
     this.panL = this.panR = this.pitchCur = this.pitchTarget = this.mod = NaN;
     this.glideSeconds = this.envAmount = this.cutoff = this.resonance = NaN;
@@ -1936,13 +1959,16 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     }
   }
   /**
-   * Queue `ev` at its frame, or now without one. The frame is read here, not
-   * passed in: past 2^31 it is a double, which an argument can box (rule 7).
+   * Queue `ev` at its frame, or now without one. The frame is read here and
+   * goes to the queue in its `incoming` slot, not as an argument: past 2^31
+   * it is a double, which an argument can box (rule 2), and the message is
+   * never stamped with it, since a field first written as a small integer is
+   * generalised by the first double (rule 7).
    */
   schedule(ev) {
-    const queued = ev;
-    queued._frame = typeof ev.frame === "number" ? ev.frame : currentFrame;
-    this.events.insert(queued);
+    const q = this.events;
+    q.incoming[0] = typeof ev.frame === "number" ? ev.frame : currentFrame;
+    q.insert(ev);
   }
   /** Drop every voice from the note map: a later note-off for any of them finds nothing. */
   unkeyAll() {
@@ -2143,14 +2169,14 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     const q = this.events;
     let cursor = 0;
     while (cursor < n) {
-      while (!q.empty && q.items[q.head]._frame <= blockStart + cursor) {
+      while (!q.empty && q.frames[q.head] <= blockStart + cursor) {
         const ev = q.take();
         if (ev.type === "noteOn") this.noteOn(ev);
         else if (ev.type === "noteOff") this.noteOffId(ev.id != null ? ev.id : ev.note);
       }
       let seg = n - cursor;
       if (!q.empty) {
-        const untilEvent = q.items[q.head]._frame - (blockStart + cursor);
+        const untilEvent = q.frames[q.head] - (blockStart + cursor);
         if (untilEvent > 0 && untilEvent < seg) seg = untilEvent | 0;
       }
       for (let i = 0; i < this.voices.length; i++) {
