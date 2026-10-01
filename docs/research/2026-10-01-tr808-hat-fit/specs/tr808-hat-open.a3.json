@@ -1,0 +1,144 @@
+{
+  "start": "../start/tr808-hat-open.a3.json",
+  "params": [
+    {
+      "path": "ops[0].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[0].width",
+      "min": 0.1,
+      "max": 0.9
+    },
+    {
+      "path": "ops[1].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[1].width",
+      "min": 0.1,
+      "max": 0.9
+    },
+    {
+      "path": "ops[2].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[2].width",
+      "min": 0.1,
+      "max": 0.9
+    },
+    {
+      "path": "ops[3].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[3].width",
+      "min": 0.1,
+      "max": 0.9
+    },
+    {
+      "path": [
+        "ops[0].env.attackTime",
+        "ops[1].env.attackTime",
+        "ops[2].env.attackTime",
+        "ops[3].env.attackTime"
+      ],
+      "min": 0,
+      "max": 0.003
+    },
+    {
+      "path": [
+        "ops[0].env.decayTime",
+        "ops[1].env.decayTime",
+        "ops[2].env.decayTime",
+        "ops[3].env.decayTime"
+      ],
+      "min": 0.005,
+      "max": 0.3,
+      "scale": "log"
+    },
+    {
+      "path": [
+        "ops[0].env.decayCurve",
+        "ops[1].env.decayCurve",
+        "ops[2].env.decayCurve",
+        "ops[3].env.decayCurve"
+      ],
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": [
+        "ops[0].env.sustainLevel",
+        "ops[1].env.sustainLevel",
+        "ops[2].env.sustainLevel",
+        "ops[3].env.sustainLevel"
+      ],
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": [
+        "ops[0].env.releaseTime",
+        "ops[1].env.releaseTime",
+        "ops[2].env.releaseTime",
+        "ops[3].env.releaseTime"
+      ],
+      "min": 0.05,
+      "max": 3,
+      "scale": "log"
+    },
+    {
+      "path": [
+        "ops[0].env.releaseCurve",
+        "ops[1].env.releaseCurve",
+        "ops[2].env.releaseCurve",
+        "ops[3].env.releaseCurve"
+      ],
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "filter.cutoff",
+      "min": 3000,
+      "max": 14000,
+      "scale": "log"
+    },
+    {
+      "path": "filter.resonance",
+      "min": 0.5,
+      "max": 4
+    },
+    {
+      "path": "drive.gain",
+      "min": 1,
+      "max": 16,
+      "scale": "log"
+    },
+    {
+      "path": "drive.tone",
+      "min": 0.3,
+      "max": 1
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/OH 808 Decay 05.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "seeds": 4,
+  "optimizer": {
+    "method": "cma",
+    "budget": 800,
+    "sigma0": 0.2,
+    "seed": 1
+  }
+}
