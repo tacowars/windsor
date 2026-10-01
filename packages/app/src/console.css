@@ -14,6 +14,8 @@
   --ink-faint: #5e6b70;
   --carrier: #e0a44e;
   --modulator: #5fa8a0;
+  /* The return buses; the Euclid card's pitch lane (windsor#356). */
+  --return: #9c7bd0;
   --hot: #d2643c;
 
   --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
@@ -1558,17 +1560,311 @@ body.chord-dragging {
   color: var(--carrier);
 }
 
-/* ---------- the Euclidean card (#610) ---------- */
-
-.euclid-strip {
+/* ---------- the Euclidean card (#610; the device, windsor#356) ---------- */
+/* Record `2026-10-01-euclid-lanes-and-ratchets` decisions 9 and 10; the look
+   is the mockup's (docs/research/2026-10-01-euclid-lanes/mockup.html). The
+   rail and the tabs copy the insert rack's rules (.insert-rail,
+   .insert-tabs) under Euclid names; --kc is the part's accent. Every row's
+   cells are --ecw wide, so the rows line up step for step. */
+.euclid-card {
+  --ecw: 22px;
+  --egap: 3px;
+  --ename-w: 172px;
   display: flex;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.euclid-rail {
+  width: 24px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+  background: var(--panel-hi);
+  border-right: 1px solid var(--line);
+}
+.euclid-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: var(--kc, var(--carrier));
+}
+.euclid-name {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding: 4px 0;
+  color: var(--ink);
+  font-family: var(--f-panel);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.euclid-name-part {
+  margin-inline-start: 6px;
+  color: var(--ink-faint);
+}
+.euclid-rail-spacer {
+  flex: 1;
+}
+.euclid-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 0;
+  border-block: 1px solid var(--line);
+}
+.euclid-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink-faint);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.euclid-icon:hover {
+  color: var(--ink);
+  border-color: var(--line-bright);
+}
+.euclid-icon[aria-pressed='true'] {
+  color: var(--kc, var(--carrier));
+  border-color: var(--line-bright);
+  background: var(--inset);
+}
+.euclid-icon-svg svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.euclid-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.euclid-tabs {
+  flex: none;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.euclid-tabs button {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.euclid-tabs button:hover {
+  color: var(--ink);
+}
+.euclid-tabs button[aria-selected='true'] {
+  background: var(--kc, var(--carrier));
+  color: var(--inset);
+}
+.euclid-tab-note {
+  margin-left: auto;
+  padding-right: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 9.5px;
+}
+.euclid-page {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px 12px;
+}
+.euclid-page[hidden] {
+  display: none;
+}
+.euclid-card :focus-visible {
+  outline: 2px solid var(--carrier);
+  outline-offset: 1px;
+}
+
+/* The Density page: the modulator, the plot of k, the k bounds. */
+.euclid-density {
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 3px;
-  padding: 8px 0 4px;
+  align-items: flex-start;
+}
+.euclid-bounds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.euclid-plot svg {
+  display: block;
+  width: 200px;
+  height: 74px;
+  margin-top: 8px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+.euclid-plot .band {
+  fill: color-mix(in srgb, var(--carrier) 8%, transparent);
+}
+.euclid-plot .bound {
+  stroke: var(--line-bright);
+  stroke-dasharray: 2 3;
+}
+.euclid-plot .path {
+  fill: none;
+  stroke: var(--carrier);
+  stroke-width: 1.5;
+}
+.euclid-plot .now {
+  stroke: var(--modulator);
+  stroke-width: 1.5;
+}
+.euclid-plot text {
+  font: 8.5px var(--f-num);
+  fill: var(--ink-faint);
+}
+
+/* The rows: a sticky name column, then one --ecw cell per step. */
+.euclid-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+.euclid-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  min-width: 100%;
+}
+.euclid-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.euclid-row-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: var(--ename-w);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 4px;
+  background: var(--panel);
+}
+.euclid-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.euclid-row-text b {
+  font-family: var(--f-panel);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.euclid-row-text small {
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 9.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.euclid-stepper {
+  display: inline-flex;
+  gap: 2px;
+}
+.euclid-len,
+.euclid-x {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  padding: 0;
+  border-radius: 2px;
+  color: var(--ink-dim);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.euclid-len {
+  background: var(--panel-hi);
+  border: 1px solid var(--line-bright);
+}
+.euclid-len:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.euclid-len:hover:not(:disabled) {
+  color: var(--ink);
+}
+.euclid-x {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--ink-faint);
+}
+.euclid-x:hover {
+  color: var(--hot);
+  border-color: var(--line-bright);
+}
+.euclid-release {
+  padding: 2px 6px;
+  background: var(--inset);
+  border: 1px solid var(--carrier);
+  border-radius: var(--r);
+  color: var(--carrier);
+  font: 600 9px var(--f-panel);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.euclid-cells {
+  display: flex;
+  align-items: stretch;
+  gap: var(--egap);
 }
 .ecell {
-  width: 20px;
-  height: 20px;
+  position: relative;
+  width: var(--ecw, 20px);
+  height: var(--ecw, 20px);
   flex: none;
   padding: 0;
   background: var(--inset);
@@ -1576,7 +1872,7 @@ body.chord-dragging {
   border-radius: var(--r);
   cursor: pointer;
 }
-.ecell.beat {
+.euclid-cells > .beat {
   margin-left: 6px;
 }
 .ecell:hover {
@@ -1588,25 +1884,180 @@ body.chord-dragging {
 }
 /* The playhead ring in the column strips' two strengths (windsor#101):
    bright while the song is in the card's region, a dimmer ghost ring while
-   it is not. Only the bright ring fills an onset, the one that sounds. */
-.ecell.playing {
+   it is not. Every row draws its own ring, on its own step. Only the bright
+   ring fills an onset, the one that sounds. */
+.euclid-cells > .playing {
   --head: var(--modulator);
 }
-.ecell.ghost {
+.euclid-cells > .ghost {
   --head: color-mix(in srgb, var(--modulator) 45%, var(--line));
 }
-.ecell:is(.playing, .ghost) {
+.euclid-cells > :is(.playing, .ghost) {
   box-shadow: 0 0 0 2px var(--head);
 }
-.ecell.on.playing {
+.euclid-row-trigger .ecell.on.playing {
   background: var(--ink);
   border-color: var(--ink);
 }
+/* Under the hits: a cell over a rest is dimmed, and a notch marks where the
+   lane starts over. */
+.euclid-cells > .rest {
+  opacity: 0.32;
+}
+.euclid-cells > .wrap::after {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ink-faint);
+}
+.euclid-loop-end {
+  align-self: center;
+  padding-left: 6px;
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* The ratchet row: thin cells, a tick per hit of the roll; grey over a rest. */
+.ecell.euclid-ratchet {
+  height: 16px;
+}
+.euclid-ratchet:is(.r2, .r3, .r4) {
+  border-color: color-mix(in srgb, var(--carrier) 60%, var(--line));
+}
+.euclid-ticks {
+  position: absolute;
+  inset: 3px;
+  display: flex;
+  justify-content: space-between;
+}
+.euclid-ticks i {
+  width: 2px;
+  border-radius: 1px;
+  background: var(--carrier);
+}
+.euclid-ratchet.idle .euclid-ticks i {
+  background: var(--ink-faint);
+}
+.euclid-ratchet.r1 .euclid-ticks {
+  display: none;
+}
+
+.euclid-lanes-rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.euclid-lanes-rule span {
+  position: sticky;
+  left: 0;
+  width: var(--ename-w);
+  flex: none;
+  background: var(--panel);
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.euclid-lanes-rule hr {
+  flex: 1;
+  margin: 0;
+  border: 0;
+  border-top: 1px dashed var(--line-bright);
+}
+
+/* The accent lane: on or off per step, in --hot. */
+.ecell.euclid-accent {
+  height: 16px;
+}
+.euclid-accent.on {
+  background: var(--hot);
+  border-color: var(--hot);
+}
+/* The pitch lane: a bipolar bar in --return with its semitones. The sound
+   lanes are the grid's .mod-cell at this card's width. */
+.ecell.euclid-pitch {
+  height: 44px;
+  cursor: ns-resize;
+  touch-action: none;
+  --mag: 0;
+}
+.euclid-pitch::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 1px;
+  background: var(--line-bright);
+}
+.euclid-bar {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 50%;
+  height: calc(var(--mag) * (50% - 2px));
+  border-radius: 1px;
+  background: var(--return);
+  opacity: 0.55;
+}
+.euclid-pitch.neg .euclid-bar {
+  bottom: auto;
+  top: 50%;
+}
+.euclid-pitch.zero .euclid-bar,
+.euclid-pitch.zero .euclid-st {
+  display: none;
+}
+.euclid-st {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 1px;
+  border-radius: 2px;
+  background: var(--inset);
+  color: var(--ink);
+  font-family: var(--f-num);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  pointer-events: none;
+}
+.euclid-cells > .mod-cell {
+  width: var(--ecw);
+}
+.euclid-cells > .mod-cell.first {
+  margin-top: 0;
+}
+
+.euclid-under {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
 .euclid-readout {
+  flex: 1;
+  min-width: 0;
+  min-height: 1.5em;
+  color: var(--ink-dim);
   font-family: var(--f-num);
   font-size: 11px;
+}
+.euclid-cycle {
   color: var(--ink-dim);
-  margin: 2px 0 6px;
+  font-family: var(--f-num);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- the Song view (#709): ruler, lanes, regions, the pane ---------- */

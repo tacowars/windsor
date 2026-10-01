@@ -9,6 +9,7 @@
  */
 import type { EuclideanSpec } from '@windsor/engine';
 import { EUCLID_STEPS_MAX, PPQ, euclid, patternToString } from '@windsor/engine';
+import { ratchetsForSteps } from './euclidRatchetModel';
 
 export { EUCLID_STEPS_MAX };
 
@@ -27,7 +28,8 @@ function resize(figure: Figure, n: number): boolean[] {
 /**
  * The sequencer partial a Steps turn sends: `steps`, plus only the fields
  * the new `n` forces to move — the pulse bounds above it, a rotation past
- * it, a captured figure of the old length.
+ * it, a captured figure of the old length, a ratchet row of the old
+ * length (padded with 1 or trimmed, windsor#356).
  */
 export function stepsChange(spec: EuclideanSpec, steps: number): Record<string, unknown> {
   const n = clampInt(steps, 1, EUCLID_STEPS_MAX);
@@ -38,6 +40,9 @@ export function stepsChange(spec: EuclideanSpec, steps: number): Record<string, 
   const rotate = rotateChange({ ...spec, steps: n }, spec.rotate);
   if (rotate !== spec.rotate) partial.rotate = rotate;
   if (spec.pattern && spec.pattern.length !== n) partial.pattern = resize(spec.pattern, n);
+  if (spec.ratchets && spec.ratchets.length !== n) {
+    partial.ratchets = ratchetsForSteps(spec.ratchets, n);
+  }
   return partial;
 }
 

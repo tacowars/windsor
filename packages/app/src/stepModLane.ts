@@ -11,7 +11,11 @@
  *
  * Generic over the card: a card hands a `LaneHost` (its lanes, the write
  * through `ctx.change`, its repaint), so the grid carries lanes first and
- * another step kind can reuse this file as is. The rules are
+ * another step kind can reuse this file as is. The Euclid card (windsor#356)
+ * draws each lane as a row of its own length with `laneCell`, and may lay a
+ * lane out under its hits, so a cell can show another index of the lane
+ * (`LaneHost.valueIndex`) and the hover can go to the card's one readout
+ * (`LaneHost.say`); the grid leaves both out and draws as before. The rules are
  * `stepModLaneModel.ts`; this file only reads pointers and draws.
  *
  * A press previews on the cells and writes once, at its release, whether
@@ -39,7 +43,7 @@ import {
   heldBySlide,
   laneLabel,
   laneReadout,
-  paintSpan,
+  paintCells,
   removeLane,
   valueAtY,
   withParamValues,
@@ -62,7 +66,15 @@ export interface LaneHost {
   stepCount(): number;
   /** How step `index`'s note meets the voice; a card without slides leaves it out (`NO_SLIDE`). */
   slide?(index: number): StepSlide;
+  /** The value index lane `lane`'s cell `cell` shows; absent, the cell's own index. */
+  valueIndex?(lane: number, cell: number): number;
+  /** Where a hover's readout goes; absent, the lane's own `.mod-readout` line. Null clears it. */
+  say?(lane: number, step: number, text: string | null): void;
 }
+
+/** The value index a cell shows: the host's mapping, else the cell's own index. */
+const valueAt = (host: LaneHost, lane: number, cell: number): number =>
+  host.valueIndex?.(lane, cell) ?? cell;
 
 /** The patch value of `param` for the part on `slot`: what a readout's played value starts from. */
 export function patchBase(ctx: AppCtx, slot: number, param: StepModParam): number | undefined {
@@ -102,12 +114,13 @@ function drawCell(cell: HTMLElement, value: number): void {
 }
 
 function showReadout(host: LaneHost, lane: number, step: number, value: number | null): void {
-  const line = host.scope.querySelector<HTMLElement>(`.mod-readout[data-lane="${lane}"]`);
   const param = host.lanes()?.[lane]?.param;
-  if (!line || !param) return;
+  if (!param) return;
   const slide = host.slide?.(step) ?? NO_SLIDE;
-  line.textContent =
-    value === null ? '' : `${step + 1}: ${laneReadout(param, value, host.base(param), slide)}`;
+  const text = value === null ? null : laneReadout(param, value, host.base(param), slide);
+  if (host.say) return host.say(lane, step, text);
+  const line = host.scope.querySelector<HTMLElement>(`.mod-readout[data-lane="${lane}"]`);
+  if (line) line.textContent = text === null ? '' : `${step + 1}: ${text}`;
 }
 
 /**
@@ -119,7 +132,7 @@ function pressCell(host: LaneHost, lane: number, index: number, down: PointerEve
   const param = host.lanes()?.[lane]?.param;
   if (down.button !== 0 || !param) return;
   down.preventDefault();
-  gateOf(host).press(param, index);
+  gateOf(host).press(param, valueAt(host, lane, index));
   paintFrom(host, lane, index, down);
 }
 
@@ -128,6 +141,8 @@ function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEve
   const start = host.lanes()?.[lane];
   if (!start) return;
   const cells = cellsOf(host.scope, lane);
+  const map = cells.map((_, i) => valueAt(host, lane, i));
+  const pressed = map[index] ?? index;
   const spans = cells.map((c) => c.getBoundingClientRect());
   const { top, height } = cell.getBoundingClientRect();
   let values = [...start.values];
@@ -136,10 +151,11 @@ function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEve
   const paint = (e: PointerEvent): void => {
     dragged ||= isDrag(e.clientX - down.clientX, e.clientY - down.clientY);
     const to = { index: cellAtX(e.clientX, spans), value: valueAtY(e.clientY, { top, height }) };
-    values = paintSpan(values, last, to);
+    values = paintCells(values, map, last, to);
     last = to;
-    cells.forEach((c, i) => drawCell(c, values[i] ?? 0));
-    showReadout(host, lane, to.index, values[to.index] ?? 0);
+    cells.forEach((c, i) => drawCell(c, values[map[i] ?? i] ?? 0));
+    const at = map[to.index] ?? to.index;
+    showReadout(host, lane, at, values[at] ?? 0);
   };
   const stop = new AbortController();
   const finish = (commit: boolean): void => {
@@ -147,9 +163,12 @@ function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEve
     stop.abort();
     if (cell.hasPointerCapture(down.pointerId)) cell.releasePointerCapture(down.pointerId);
     if (!commit) return host.repaint();
-    if (gateOf(host).release(start.param, index, values, dragged) === 'reset') {
-      cells.forEach((c, i) => drawCell(c, i === index ? 0 : (values[i] ?? 0)));
-      showReadout(host, lane, index, 0);
+    if (gateOf(host).release(start.param, pressed, values, dragged) === 'reset') {
+      cells.forEach((c, i) => {
+        const at = map[i] ?? i;
+        drawCell(c, at === pressed ? 0 : (values[at] ?? 0));
+      });
+      showReadout(host, lane, pressed, 0);
     }
   };
   const mine = (e: PointerEvent): boolean => e.pointerId === down.pointerId;
@@ -184,23 +203,33 @@ function paintFrom(host: LaneHost, lane: number, index: number, down: PointerEve
  * play, and one the run decides draws dotted.
  */
 export function laneCells(host: LaneHost, index: number, sounds = true): HTMLElement[] {
-  return (host.lanes() ?? []).map((lane, k) => {
-    const cell = el('div', k === 0 ? 'mod-cell first' : 'mod-cell');
-    cell.dataset.lane = String(k);
-    cell.classList.toggle('mute', !sounds);
-    const hold = heldBySlide(host.slide?.(index) ?? NO_SLIDE, lane.param);
-    cell.classList.toggle('held', hold === 'held');
-    cell.classList.toggle('depends', hold === 'depends');
-    cell.setAttribute('aria-label', `${laneLabel(lane.param)} step ${index + 1}`);
-    cell.appendChild(el('div', 'mod-bar'));
-    drawCell(cell, lane.values[index] ?? 0);
-    cell.addEventListener('pointerdown', (e) => pressCell(host, k, index, e));
-    cell.addEventListener('pointermove', (e) => {
-      if (e.buttons === 0) showReadout(host, k, index, host.lanes()?.[k]?.values[index] ?? 0);
-    });
-    cell.addEventListener('pointerleave', () => showReadout(host, k, index, null));
-    return cell;
+  return (host.lanes() ?? []).map((_, k) => laneCell(host, k, index, sounds));
+}
+
+/**
+ * Lane `k`'s cell `index`, drawn and wired as `laneCells` draws each: what a
+ * card that lays its lanes out as rows (the Euclid card) appends per cell.
+ * The cell shows the lane's value at `valueIndex(k, index)`.
+ */
+export function laneCell(host: LaneHost, k: number, index: number, sounds = true): HTMLElement {
+  const lane = host.lanes()?.[k];
+  const cell = el('div', k === 0 ? 'mod-cell first' : 'mod-cell');
+  if (!lane) return cell;
+  const at = valueAt(host, k, index);
+  cell.dataset.lane = String(k);
+  cell.classList.toggle('mute', !sounds);
+  const hold = heldBySlide(host.slide?.(index) ?? NO_SLIDE, lane.param);
+  cell.classList.toggle('held', hold === 'held');
+  cell.classList.toggle('depends', hold === 'depends');
+  cell.setAttribute('aria-label', `${laneLabel(lane.param)} step ${at + 1}`);
+  cell.appendChild(el('div', 'mod-bar'));
+  drawCell(cell, lane.values[at] ?? 0);
+  cell.addEventListener('pointerdown', (e) => pressCell(host, k, index, e));
+  cell.addEventListener('pointermove', (e) => {
+    if (e.buttons === 0) showReadout(host, k, at, host.lanes()?.[k]?.values[at] ?? 0);
   });
+  cell.addEventListener('pointerleave', () => showReadout(host, k, at, null));
+  return cell;
 }
 
 /** Fill the name column: one row per lane, level with its cells, with its × and its readout line. */
