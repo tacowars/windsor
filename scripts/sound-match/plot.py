@@ -2,7 +2,8 @@
 
 Six panels: waveform 0–30 ms, level envelope, band envelopes, pitch,
 per-cycle shape at three points of the body, and the spectrogram difference.
-Black is the reference, red the candidate (its first seed).
+Black is the reference, red the candidate (its first seed). A sound shorter
+than a panel's window is padded with silence to it.
 """
 
 import matplotlib
@@ -12,6 +13,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 import analyze  # noqa: E402
+import audio  # noqa: E402
 import constants as C  # noqa: E402
 import spectra  # noqa: E402
 
@@ -24,9 +26,10 @@ VIEW_MS = 500
 
 
 def _waveform(ax, ref, cand):
+    # A sound shorter than the window is padded with silence, so both traces span it.
+    n = int(C.WAVE_WINDOW_MS * C.SR / 1000)
     for sig, colour, label in ((ref.signal, "k", "reference"), (cand.signal, "r", "candidate")):
-        n = int(C.WAVE_WINDOW_MS * C.SR / 1000)
-        ax.plot(np.arange(n) / C.SR * 1000, sig.x[:n], colour, lw=0.8, label=label)
+        ax.plot(np.arange(n) / C.SR * 1000, audio.fit_length(sig.x, n), colour, lw=0.8, label=label)
     ax.set_title("waveform, 0–30 ms", fontsize=9)
     ax.set_xlabel("ms")
     ax.legend(fontsize=7)
