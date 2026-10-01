@@ -1,4 +1,9 @@
-/** REELS Lite controls, adapted from ELPHNT's CC0 device; see the tape insert decision record. */
+/**
+ * Tape's controls and tables. The controls, EQ rows and motion are adapted from ELPHNT's CC0 REELS
+ * Lite (`docs/log/2026-09-30-reels-inspired-tape-insert.md`); the saturation stage is Windsor's
+ * magnetic core (`docs/log/2026-09-30-tape-magnetic-integration.md`), whose tunables are in
+ * `tapeMagneticConstants.ts`.
+ */
 export const TAPE_NAME = 'tape';
 export const TAPE_TYPES = [
   'studio',
@@ -32,6 +37,9 @@ export const TAPE_BOUNDS = {
   mix: [0, 1],
   seed: [0, 16777215],
 } as const;
+/** The oversampling factors the magnetic core is built at, lowest first (design decision 1). */
+export const TAPE_OVERSAMPLING = [2, 4] as const;
+export type TapeOversampling = (typeof TAPE_OVERSAMPLING)[number];
 export const TAPE_DEFAULTS = {
   drive: 0,
   bias: 0,
@@ -47,15 +55,14 @@ export const TAPE_DEFAULTS = {
   mix: 1,
   seed: 1,
   enabled: true,
+  /** The magnetic core's oversampling factor, one of `TAPE_OVERSAMPLING`: a product setting (2026-10-01), not a knob. */
+  oversampling: 2 as TapeOversampling,
 };
 export const TAPE_DSP = {
   weightFloor: 1e-12,
   smoothSeconds: 0.01,
   toneSeconds: 0.03,
   dcHz: 10,
-  warmth: 0.1,
-  punch: 0.8,
-  makeup: 0.7,
   dbScale: 20,
   dbBase: 10,
   percent: 100,
@@ -81,9 +88,15 @@ export const TAPE_DSP = {
   biasDb: 10,
   millisecondsPerSecond: 1000,
 };
-/** Filter rows are [kind, Hz, linear gain, Q]. First three come from CC0 coll tape_models. */
+/**
+ * Filter rows are [kind, Hz, linear gain, Q]. First three come from CC0 coll tape_models.
+ * `magnetic` is the core's fixed [drive, width, saturation], each in [0, 1] (design decision 6):
+ * every row starts at the research centre, and `worklet/tape/tapeMagneticRows.ts` refuses a row
+ * whose origin susceptibility is not above `TAPE_MAGNETIC.susceptibilityFloor` when the DSP loads.
+ */
 export const TAPE_MODELS = [
   {
+    magnetic: [0.5, 0.5, 0.5],
     hissDb: -4,
     eq: [
       ['low', 60, 0.7079, 0.7],
@@ -92,6 +105,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
+    magnetic: [0.5, 0.5, 0.5],
     hissDb: 2,
     eq: [
       ['low', 120, 1.5849, 0.7],
@@ -100,6 +114,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
+    magnetic: [0.5, 0.5, 0.5],
     hissDb: 3,
     eq: [
       ['high', 12000, 0.3162, 0.2],
@@ -109,6 +124,7 @@ export const TAPE_MODELS = [
   },
   // Original Windsor profiles: broad tape-family colors, not measured hardware emulations.
   {
+    magnetic: [0.5, 0.5, 0.5],
     hissDb: -2,
     eq: [
       ['low', 85, 1.2589, 0.7],
@@ -117,6 +133,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
+    magnetic: [0.5, 0.5, 0.5],
     hissDb: 0,
     eq: [
       ['low', 100, 1.122, 0.7],
@@ -125,6 +142,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
+    magnetic: [0.5, 0.5, 0.5],
     hissDb: -1,
     eq: [
       ['low', 80, 1.2589, 0.7],
@@ -133,6 +151,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
+    magnetic: [0.5, 0.5, 0.5],
     hissDb: 5,
     eq: [
       ['low', 130, 1.4125, 0.7],

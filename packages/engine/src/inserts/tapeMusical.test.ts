@@ -6,6 +6,12 @@ import { loadTape, tapeParams } from '../__fixtures__/tapeHarness';
 import { PRESETS } from '../patch/presets';
 import { DEFAULT_TAPE } from './tapeSpec';
 
+// windsor#224 re-pinned these ceilings from the magnetic core's render; both were 1 under the old
+// saturation. The core is normalised to unity small-signal gain and compresses above its knee
+// rather than limiting, so the pad's peaks at Drive 12 into Vintage reach about 1.13 (the arp's
+// about 0.37); each ceiling sits under a decibel above its render.
+const PEAK_CEILING = { 'saw-arp': 0.4, 'pad-drift': 1.2 } as const;
+
 it.each([
   ['saw-arp', 'ferric', [36], 2],
   ['pad-drift', 'vintage', [48, 55, 60], 6],
@@ -52,7 +58,7 @@ it.each([
       }
   }
   expect(Number.isFinite(peak)).toBe(true);
-  expect(peak).toBeLessThan(1);
+  expect(peak).toBeLessThan(PEAK_CEILING[patch]);
   expect(Math.sqrt(energy / (frames * 2))).toBeGreaterThan(dry.rms * 0.1);
   expect(Math.sqrt(difference / (frames * 2))).toBeGreaterThan(dry.rms * 0.01);
 });

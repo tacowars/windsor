@@ -3,7 +3,8 @@
  * a version this build cannot read is refused with both versions named, an
  * upgrade runs before the check and chains, and a song whose snapshot holds a
  * patch of an unreadable format is refused whole. No upgrade ships: versions
- * 2 (#705) and 3 (record `2026-10-01-retire-song-version-3`) are refused.
+ * 2 (#705), 3 (record `2026-10-01-retire-song-version-3`) and 4 (windsor#224,
+ * Tape's Drive changed meaning) are refused.
  * Every expectation reads `ARRANGEMENT_VERSION`, so a bump changes one constant.
  */
 import { describe, expect, it } from 'vitest';
@@ -41,7 +42,7 @@ const TABLE: Record<number, Upgrade> = Object.fromEntries(
 );
 
 describe('upgradeSong', () => {
-  it('ships no upgrade: versions 2 and 3 were retired without one', () => {
+  it('ships no upgrade: versions 2, 3 and 4 were retired without one', () => {
     expect(SONG_MIGRATIONS).toEqual({});
   });
 
@@ -75,22 +76,25 @@ describe('upgradeSong', () => {
     );
   });
 
-  it('refuses version 3, retired with no upgrade, with the standard message', () => {
-    const raw = { ...song([KICK]), version: 3 };
-    const { document, refused } = upgradeSong(raw);
-    expect(document).toBe(raw);
-    expect(refused).toEqual({
-      format: 'song',
-      found: 3,
-      reads: ARRANGEMENT_VERSION,
-      message: `saved with song format 3, this build reads ${ARRANGEMENT_VERSION}`,
-    });
-    const result = makeArrangement(raw);
-    expect(result.usable).toBe(false);
-    expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
-    expect(result.refused).toEqual(refused);
-    expect(result.corrections[0]).toBe(`version: 3 is not ${ARRANGEMENT_VERSION}`);
-  });
+  it.each([3, 4])(
+    'refuses version %i, retired with no upgrade, with the standard message',
+    (version) => {
+      const raw = { ...song([KICK]), version };
+      const { document, refused } = upgradeSong(raw);
+      expect(document).toBe(raw);
+      expect(refused).toEqual({
+        format: 'song',
+        found: version,
+        reads: ARRANGEMENT_VERSION,
+        message: `saved with song format ${version}, this build reads ${ARRANGEMENT_VERSION}`,
+      });
+      const result = makeArrangement(raw);
+      expect(result.usable).toBe(false);
+      expect(result.document).toEqual(FALLBACK_ARRANGEMENT);
+      expect(result.refused).toEqual(refused);
+      expect(result.corrections[0]).toBe(`version: ${version} is not ${ARRANGEMENT_VERSION}`);
+    },
+  );
 
   it('leaves a document with no integer version to the normaliser, unrefused', () => {
     for (const version of [undefined, String(ARRANGEMENT_VERSION), 1.5]) {

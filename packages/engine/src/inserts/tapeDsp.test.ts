@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { loadTape, tapeParams } from '../__fixtures__/tapeHarness';
 import { TAPE_BOUNDS, TAPE_TYPES, TAPE_DSP } from './tapeConstants';
+import { TAPE_MAGNETIC } from './tapeMagneticConstants';
 import type { TapeSpec } from './tapeSpec';
+
+// windsor#224: the magnetic core costs more per sample than the old saturation, and the longest
+// renders here take about 4 s on an M1, so they get room.
+vi.setConfig({ testTimeout: 30_000 });
 
 function render(
   spec: Partial<TapeSpec>,
@@ -45,7 +50,15 @@ describe('shipped Tape processor', () => {
         }
     },
   );
-  it('has exact stereo dry/bypass, mono duplication, and no dependence on wall clock or Math.random', () => {
+  // windsor#224: dry and bypass are now the input delayed by the magnetic core's fixed latency,
+  // exactly; before, they were the input itself.
+  it('has exact delayed stereo dry/bypass, mono duplication, and no dependence on wall clock or Math.random', () => {
+    const latency = TAPE_MAGNETIC.span;
+    const delayed = (previous: Float32Array, current: Float32Array): Float32Array =>
+      Float32Array.from({ length: 128 }, (_, i) =>
+        i < latency ? previous[128 - latency + i]! : current[i - latency]!,
+      );
+    const silence = new Float32Array(128);
     for (const spec of [{ mix: 0 }, { enabled: false }]) {
       const params = tapeParams({ ...spec, wear: 100, hiss: -16, trim: 24 });
       const processor = loadTape(48000, params);
@@ -60,10 +73,11 @@ describe('shipped Tape processor', () => {
       });
       try {
         processor.process([[l, r]], out, params);
-        expect(out[0]![0]).toEqual(l);
-        expect(out[0]![1]).toEqual(r);
+        expect(out[0]![0]).toEqual(delayed(silence, l));
+        expect(out[0]![1]).toEqual(delayed(silence, r));
         processor.process([[l]], out, params);
-        expect(out[0]![1]).toEqual(l);
+        expect(out[0]![0]).toEqual(delayed(l, l));
+        expect(out[0]![1]).toEqual(delayed(r, l));
       } finally {
         random.mockRestore();
         now.mockRestore();
@@ -109,7 +123,8 @@ describe('shipped Tape processor', () => {
       processor.process([[new Float32Array(128).fill(0.3), new Float32Array(128)]], out, params);
     expect(out[0]![1]!.every((v) => v === 0)).toBe(true);
   });
-  it('settles to exact dry after live bypass, including first and last sample of each block', () => {
+  // windsor#224: the dry path is the delayed input; on this constant input that is the input itself.
+  it('settles to exact delayed dry after live bypass, including first and last sample of each block', () => {
     const params = tapeParams({ wear: 100, hiss: -16 }),
       processor = loadTape(48000, params);
     const input = [new Float32Array(128).fill(0.1), new Float32Array(128).fill(-0.2)];
