@@ -91,12 +91,14 @@ export const TAPE_DSP = {
 /**
  * Filter rows are [kind, Hz, linear gain, Q]. First three come from CC0 coll tape_models.
  * `magnetic` is the core's fixed [drive, width, saturation], each in [0, 1] (design decision 6):
- * every row starts at the research centre, and `worklet/tape/tapeMagneticRows.ts` refuses a row
- * whose origin susceptibility is not above `TAPE_MAGNETIC.susceptibilityFloor` when the DSP loads.
+ * each row is one of the dynamic-survival record's seeded interior points, written as the double
+ * `mulberry32(204)` drew (`docs/log/2026-10-01-tape-per-model-magnetic-rows.md`, windsor#289), and
+ * `worklet/tape/tapeMagneticRows.ts` refuses a row whose origin susceptibility is not above
+ * `TAPE_MAGNETIC.susceptibilityFloor` when the DSP loads.
  */
 export const TAPE_MODELS = [
   {
-    magnetic: [0.5, 0.5, 0.5],
+    magnetic: [0.15938492002896965, 0.2784419672098011, 0.32353375502862036],
     hissDb: -4,
     eq: [
       ['low', 60, 0.7079, 0.7],
@@ -105,7 +107,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
-    magnetic: [0.5, 0.5, 0.5],
+    magnetic: [0.7231755261309445, 0.5094192686956376, 0.5937485755421221],
     hissDb: 2,
     eq: [
       ['low', 120, 1.5849, 0.7],
@@ -114,7 +116,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
-    magnetic: [0.5, 0.5, 0.5],
+    magnetic: [0.74230687180534, 0.8311155559495091, 0.5280546580906957],
     hissDb: 3,
     eq: [
       ['high', 12000, 0.3162, 0.2],
@@ -124,7 +126,7 @@ export const TAPE_MODELS = [
   },
   // Original Windsor profiles: broad tape-family colors, not measured hardware emulations.
   {
-    magnetic: [0.5, 0.5, 0.5],
+    magnetic: [0.5451831214595586, 0.5887099420651793, 0.5555956494063139],
     hissDb: -2,
     eq: [
       ['low', 85, 1.2589, 0.7],
@@ -133,7 +135,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
-    magnetic: [0.5, 0.5, 0.5],
+    magnetic: [0.3361578288022429, 0.1319972772616893, 0.5640697486232966],
     hissDb: 0,
     eq: [
       ['low', 100, 1.122, 0.7],
@@ -142,7 +144,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
-    magnetic: [0.5, 0.5, 0.5],
+    magnetic: [0.33866089140065014, 0.48996011330746114, 0.13382563437335193],
     hissDb: -1,
     eq: [
       ['low', 80, 1.2589, 0.7],
@@ -151,7 +153,7 @@ export const TAPE_MODELS = [
     ],
   },
   {
-    magnetic: [0.5, 0.5, 0.5],
+    magnetic: [0.8362328263465315, 0.7688039047643542, 0.9715575405862182],
     hissDb: 5,
     eq: [
       ['low', 130, 1.4125, 0.7],
