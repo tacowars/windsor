@@ -344,9 +344,18 @@ var DRIVE_DEFAULTS = {
   /** A DC offset added before the shaper, `DRIVE_BIAS_RANGE`. */
   bias: 0,
   /** The lowpass after the shaper, `DRIVE_TONE_RANGE`: 1 is open (bypassed). */
-  tone: 1
+  tone: 1,
+  /**
+   * The stage's switch; omitted, it is `driveOnByDefault` of the gain and
+   * bias. Last, here and in the worklet's fill (`patchNormalise.ts` says
+   * why), so the four numbers keep the object shape they had before it.
+   */
+  on: false
 };
 var DRIVE_GAIN_RANGE = { min: 0, max: 64 };
+function driveOnByDefault(gain, bias) {
+  return gain !== 1 || bias !== 0;
+}
 var DRIVE_BIAS_RANGE = { min: -1, max: 1 };
 var DRIVE_TONE_RANGE = { min: 0, max: 1 };
 var TONE_RANGE = { min: 0.02, max: 1 };
@@ -429,12 +438,16 @@ function driveDefaults(raw) {
   raw = raw || {};
   const d = DRIVE_DEFAULTS;
   const shape = num(raw.shape, d.shape) | 0;
-  return {
-    gain: clamp(num(raw.gain, d.gain), DRIVE_GAIN_RANGE),
+  const gain = clamp(num(raw.gain, d.gain), DRIVE_GAIN_RANGE);
+  const bias = clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE);
+  const drive = {
+    gain,
     shape: shape < DRIVE_SOFT || shape > DRIVE_FOLD ? DRIVE_SOFT : shape,
-    bias: clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE),
+    bias,
     tone: clamp(num(raw.tone, d.tone), DRIVE_TONE_RANGE)
   };
+  drive.on = typeof raw.on === "boolean" ? raw.on : driveOnByDefault(gain, bias);
+  return drive;
 }
 function normalisePatch(raw) {
   raw = raw || {};
@@ -1231,7 +1244,7 @@ var VoiceDrive = class {
 function updateVoiceDrive(voice) {
   const d = voice.patch.drive;
   const drive = voice.drive;
-  drive.on = d.gain !== 1 || d.bias !== 0;
+  drive.on = d.on && (d.gain !== 1 || d.bias !== 0);
   drive.toned = drive.on && d.tone < 1;
   if (!drive.toned) drive.toneState = 0;
   if (!drive.on) return;
