@@ -224,7 +224,8 @@ pump, 0.12 s ahead, on the live page. The cost is the median of three
 
 During the online case-d runs the same bent pump read 6.79 to 7.03 ms
 per second of song (headless) and 5.51 to 6.08 (headed), with the song
-playing.
+playing. Its longest pump there was 1.1 to 1.3 ms (`online-headless.json`,
+`online-headed.json`), above the table's scheduling-only 0.8 ms.
 
 ## What the numbers say
 
@@ -258,7 +259,8 @@ playing.
   The meter would still show the same load.
 - **Scheduling is affordable either way.** 128 lanes cut into ramps at
   every tick cost the main thread 5 to 7 ms per second of song, about
-  0.6 % of it. No pump exceeded 0.8 ms, inside the 25 ms pump interval.
+  0.6 % of it. No pump exceeded 0.8 ms with the scheduling alone, or
+  1.3 ms with the song playing, inside the 25 ms pump interval.
   Straight lanes written once per point cost 0.3 to 0.4 ms. A seek's
   cancel and refill cost under 1 ms. The design choice does not change
   this side: either design writes one AudioParam per lane.
