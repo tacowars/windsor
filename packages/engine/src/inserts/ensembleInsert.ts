@@ -194,10 +194,12 @@ function write(p: Params, next: EnsembleSpec, lane: (field: string) => boolean):
 
 /**
  * Each knob's lane (windsor#345): a rate on its basis's source, a depth on
- * its basis's two gains, Delay on every line, Width on every line's place and
- * the wet gain, Mix on the wet and dry gains, each at the other's live value.
+ * its basis's two gains, Delay on every line, Width on every line's place,
+ * Mix on the dry gain. The wet gain (the mix over the width's per-side sum)
+ * follows Width and Mix both, from each one's own value at every breakpoint
+ * either has.
  */
-function ensembleHandles(p: Params, spec: () => EnsembleSpec): FieldHandles {
+function ensembleHandles(p: Params, spec: () => EnsembleSpec, now: () => number): FieldHandles {
   const { lines, bases } = p;
   const [slow, fast] = bases;
   const depthOn = (b: Basis): Writes => ({
@@ -212,25 +214,23 @@ function ensembleHandles(p: Params, spec: () => EnsembleSpec): FieldHandles {
     delay: { params: lines.map((l) => l.delay.delayTime), write: (v) => lines.map(() => v / MS) },
     tone: { params: [p.tone.frequency], write: sameValue },
     width: {
-      params: [...lines.flatMap((l) => [l.toLeft.gain, l.toRight.gain]), p.wet.gain],
-      write: (v) => {
-        const { gains, perSide } = placeLines(lines.length, v);
-        return [...gains, mixGains(spec(), mix(), perSide)[0]];
-      },
+      params: lines.flatMap((l) => [l.toLeft.gain, l.toRight.gain]),
+      write: (v) => placeLines(lines.length, v).gains,
     },
-    mix: {
-      params: [p.wet.gain, p.dry.gain],
-      write: (v) => mixGains(spec(), v, placeLines(lines.length, width()).perSide),
-    },
+    mix: { params: [p.dry.gain], write: (v) => [mixGains(spec(), v, 1)[1]] },
   };
-  const knobs = fieldHandles((field) => {
-    const target = Object.hasOwn(targets, field) ? targets[field] : undefined;
+  const wet = {
+    params: [p.wet.gain],
+    fields: ['width', 'mix'] as const,
+    value: (width: number, mix: number) =>
+      mixGains(spec(), mix, placeLines(lines.length, width).perSide)[0],
+  };
+  const target = (field: string): KnobTarget | undefined => {
+    const writes = Object.hasOwn(targets, field) ? targets[field] : undefined;
     const resting = (): number => spec()[field as (typeof ENSEMBLE_NUMBERS)[number]];
-    return target && { ...target, resting };
-  });
-  const mix = (): number => knobs.live('mix', spec().mix);
-  const width = (): number => knobs.live('width', spec().width);
-  return knobs;
+    return writes && { ...writes, resting };
+  };
+  return fieldHandles(target, { params: [wet], now });
 }
 
 /** The stage's settings and lanes over its params: `set` writes what no lane holds. */
@@ -239,7 +239,11 @@ function ensembleControls(
   initial: EnsembleSpec,
 ): Required<Pick<InsertStage<EnsembleSpec>, 'set' | 'param'>> {
   let current = initial;
-  const knobs = ensembleHandles(params, () => current);
+  const knobs = ensembleHandles(
+    params,
+    () => current,
+    () => params.wet.context.currentTime,
+  );
   return {
     set(next): void {
       current = next;

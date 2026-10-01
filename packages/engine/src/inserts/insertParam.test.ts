@@ -12,68 +12,22 @@
  */
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { FakeContext } from '../__fixtures__/fakeAudioContext';
-import type { FakeParam } from '../__fixtures__/fakeAudioNodes';
-import { graphParams, installParamWorklet } from '../__fixtures__/insertParamRig';
+import { installParamWorklet } from '../__fixtures__/insertParamRig';
+import {
+  build,
+  fieldValue,
+  openSpec,
+  otherValue,
+  touched,
+  values,
+  withField,
+} from '../__fixtures__/insertStageRig';
 import { INSERT_AUTOMATION_FIELDS } from '../automation/automationInsertTables';
-import type { AutomationTargetRow } from '../automation/automationLane';
-import type { InsertKindName, InsertSpec, InsertStage } from './insertRegistry';
-import { INSERT_KINDS, INSERT_KIND_NAMES } from './insertRegistry';
+import type { InsertSpec } from './insertRegistry';
+import { INSERT_KIND_NAMES } from './insertRegistry';
 
 const undo = installParamWorklet();
 afterAll(undo);
-
-/**
- * Each kind's defaults, switched on, with both delay sides free: a synced
- * side's time comes from the tempo, so `set` would not show the field.
- */
-function openSpec(kind: InsertKindName): InsertSpec {
-  const spec = { ...INSERT_KINDS[kind].defaults, enabled: true } as InsertSpec;
-  return spec.kind === 'delay' ? { ...spec, leftSync: false, rightSync: false } : spec;
-}
-
-/** `spec` with the catalog field `field` (`bands.3.freq` included) at `value`. */
-function withField(spec: InsertSpec, field: string, value: number): InsertSpec {
-  const put = (node: unknown, path: readonly string[]): unknown => {
-    const [head, ...rest] = path;
-    const child = rest.length === 0 ? value : undefined;
-    if (Array.isArray(node)) {
-      return node.map((item, i) => (String(i) === head ? (child ?? put(item, rest)) : item));
-    }
-    const record = node as Record<string, unknown>;
-    return { ...record, [head!]: child ?? put(record[head!], rest) };
-  };
-  return put(spec, field.split('.')) as InsertSpec;
-}
-
-/** A value in `row`'s range away from `from`, and a second one away from both. */
-function otherValue(row: AutomationTargetRow, from: number, share = 0.37): number {
-  const at = (s: number): number => row.min + s * (row.max - row.min);
-  return at(share) === from ? at(share + 0.24) : at(share);
-}
-
-const fieldValue = (spec: InsertSpec, field: string): number =>
-  field
-    .split('.')
-    .reduce<unknown>((node, key) => (node as Record<string, unknown>)[key], spec) as number;
-
-interface Built {
-  readonly stage: InsertStage<InsertSpec>;
-  readonly params: ReadonlyMap<string, FakeParam>;
-}
-
-function build(spec: InsertSpec): Built {
-  const context = new FakeContext();
-  const stage = INSERT_KINDS[spec.kind].create(context.asAudioContext(), spec);
-  const params = new Map(graphParams(context).map(({ name, param }) => [name, param]));
-  for (const param of params.values()) param.automation.length = 0;
-  return { stage, params };
-}
-
-const values = (built: Built): Map<string, number> =>
-  new Map([...built.params].map(([name, param]) => [name, param.value]));
-const touched = (built: Built): string[] =>
-  [...built.params].filter(([, p]) => p.automation.length > 0).map(([name]) => name);
 
 /** `spec` with every catalog field of its kind moved to another value. */
 function everyKnobMoved(spec: InsertSpec): InsertSpec {
@@ -149,37 +103,5 @@ describe('stage.param, every kind and every catalog field', () => {
         expect(stage.param!(junk), `${kind} ${junk}`).toBeUndefined();
       }
     }
-  });
-});
-
-describe('two lanes on one param', () => {
-  /** Kinds where two fields share a param, and the two fields. */
-  const SHARED = [
-    ['drive', 'drive', 'mix'],
-    ['chorus', 'depth', 'spread'],
-    ['ensemble', 'width', 'mix'],
-  ] as const;
-
-  it.each(SHARED)('%s: %s and %s write the shared param from each other', (kind, a, b) => {
-    const spec = openSpec(kind);
-    const rows = INSERT_AUTOMATION_FIELDS[kind] as readonly AutomationTargetRow[];
-    const row = (field: string) => rows.find((r) => r.target === field)!;
-    const va = otherValue(row(a), fieldValue(spec, a));
-    const vb = otherValue(row(b), fieldValue(spec, b));
-    const lane = build(spec);
-    lane.stage.param!(a)!.hold(va, 0);
-    lane.stage.param!(b)!.hold(vb, 0);
-    const knob = build(spec);
-    knob.stage.set(withField(withField(spec, a, va), b, vb));
-    const want = values(knob);
-    for (const name of touched(lane))
-      expect(lane.params.get(name)!.value, name).toBe(want.get(name));
-    // The other lane moves on: the shared param follows from the first lane's value.
-    const vb2 = otherValue(row(b), vb, 0.9);
-    lane.stage.param!(b)!.schedule(vb2, 1, 'ramp');
-    knob.stage.set(withField(withField(spec, a, va), b, vb2));
-    const next = values(knob);
-    for (const name of touched(lane))
-      expect(lane.params.get(name)!.value, name).toBe(next.get(name));
   });
 });

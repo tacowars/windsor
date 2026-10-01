@@ -13,12 +13,15 @@
  * spec value back.
  *
  * Where one param mixes two fields (a Drive's wet gain is its mix times the
- * drive's compensation), each field's handle writes it from the other
- * field's `live` value: the other lane's latest while that one is engaged,
- * else the spec's.
+ * drive's compensation), neither field's target lists it: the stage names it
+ * in `shared`, and its schedule is written from both fields' own values at
+ * each breakpoint either has (`sharedParamSchedule.ts`).
  */
 import type { AutomationHandle, KnobHandle, KnobTarget } from '../automation/automationHandles';
 import { knobHandle, sameValue } from '../automation/automationHandles';
+import { FieldTimeline } from './fieldTimeline';
+import type { SharedParam } from './sharedParamSchedule';
+import { SharedSchedule, sharedFieldHandle } from './sharedParamSchedule';
 
 /** A stage's handles, by field, and the lock `set` reads. */
 export interface FieldHandles {
@@ -26,31 +29,50 @@ export interface FieldHandles {
   param(field: string): AutomationHandle | undefined;
   /** Whether a lane holds `field`'s params now: `set` leaves them alone. */
   automated(field: string): boolean;
-  /** `field`'s value now: its lane's latest while it holds the params, else `knob`. */
-  live(field: string, knob: number): number;
 }
 
-/** Handles over `target`, which says what one field writes, or undefined for none. */
-export function fieldHandles(target: (field: string) => KnobTarget | undefined): FieldHandles {
+/** The params two fields share, and the audio clock their schedules prune by. */
+export interface SharedParams {
+  readonly params: readonly SharedParam[];
+  readonly now: () => number;
+}
+
+/**
+ * Handles over `target`, which says what one field alone writes, or
+ * undefined for none, and over `shared`, the params two fields write
+ * together. A field in a shared pair has a target, if only an empty one.
+ */
+export function fieldHandles(
+  target: (field: string) => KnobTarget | undefined,
+  shared?: SharedParams,
+): FieldHandles {
   const handles = new Map<string, KnobHandle>();
-  const latest = new Map<string, number>();
-  const engaged = (field: string): boolean => handles.get(field)?.engaged === true;
+  const timelines = new Map<string, FieldTimeline>();
+  const timeline = (field: string): FieldTimeline => {
+    let found = timelines.get(field);
+    if (!found) {
+      found = new FieldTimeline(target(field)!.resting);
+      timelines.set(field, found);
+    }
+    return found;
+  };
+  const schedules = (shared?.params ?? []).map(
+    (p) => new SharedSchedule(p, timeline(p.fields[0]), timeline(p.fields[1])),
+  );
   return {
     param(field) {
       const found = handles.get(field);
       if (found) return found;
       const t = target(field);
       if (!t) return undefined;
-      const write = (value: number): readonly number[] => {
-        latest.set(field, value);
-        return t.write(value);
-      };
-      const handle = knobHandle({ ...t, write });
+      const own = knobHandle(t);
+      const tracked = timelines.get(field);
+      const handle =
+        tracked && shared ? sharedFieldHandle(own, tracked, schedules, shared.now) : own;
       handles.set(field, handle);
       return handle;
     },
-    automated: engaged,
-    live: (field, knob) => (engaged(field) ? (latest.get(field) ?? knob) : knob),
+    automated: (field) => handles.get(field)?.engaged === true,
   };
 }
 

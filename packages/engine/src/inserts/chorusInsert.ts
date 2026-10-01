@@ -132,34 +132,36 @@ const mixGains = (spec: ChorusSpec, mix: number, voices: number): [number, numbe
 };
 
 /**
- * Each knob's lane (windsor#345): Rate on every voice's LFO, Depth on both
- * sides' swing, Spread on the right side's, Mix on the wet and dry gains.
+ * Each knob's lane (windsor#345): Rate on every voice's LFO, Depth on the
+ * left side's swing, Mix on the wet and dry gains. The right side's swing
+ * (the depth times the spread's share) follows Depth and Spread both, from
+ * each one's own value at every breakpoint either has.
  */
-function chorusHandles(p: ChorusParams, spec: () => ChorusSpec): FieldHandles {
+function chorusHandles(p: ChorusParams, spec: () => ChorusSpec, now: () => number): FieldHandles {
   const { voices } = p;
-  const lefts = voices.map((v) => v.depthL.gain);
-  const rights = voices.map((v) => v.depthR.gain);
   const each = (value: number): number[] => voices.map(() => value);
-  const knobs: FieldHandles = fieldHandles((field): KnobTarget | undefined => {
+  const rights = {
+    params: voices.map((v) => v.depthR.gain),
+    fields: ['depth', 'spread'] as const,
+    value: rightSwing,
+  };
+  const target = (field: string): KnobTarget | undefined => {
     const resting = (): number => spec()[field as 'rate' | 'depth' | 'spread' | 'mix'];
     if (field === 'rate') {
       const write = (v: number) => voices.map((_, i) => voiceRate(v, i));
       return { params: voices.map((v) => v.lfo.frequency), write, resting };
     }
     if (field === 'depth') {
-      const write = (v: number) => [...each(swingOf(v)), ...each(rightSwing(v, spread()))];
-      return { params: [...lefts, ...rights], write, resting };
+      const write = (v: number) => each(swingOf(v));
+      return { params: voices.map((v) => v.depthL.gain), write, resting };
     }
-    if (field === 'spread') {
-      return { params: rights, write: (v) => each(rightSwing(depth(), v)), resting };
-    }
+    // Spread writes only the right side's swing, which it shares with Depth.
+    if (field === 'spread') return { params: [], write: () => [], resting };
     if (field !== 'mix') return undefined;
     const write = (v: number) => mixGains(spec(), v, voices.length);
     return { params: [p.wet, p.dry], write, resting };
-  });
-  const depth = (): number => knobs.live('depth', spec().depth);
-  const spread = (): number => knobs.live('spread', spec().spread);
-  return knobs;
+  };
+  return fieldHandles(target, { params: [rights], now });
 }
 
 function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<ChorusSpec> {
@@ -178,7 +180,11 @@ function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<Chorus
   dry.connect(output);
 
   let current = spec;
-  const knobs = chorusHandles({ voices, wet: wet.gain, dry: dry.gain }, () => current);
+  const knobs = chorusHandles(
+    { voices, wet: wet.gain, dry: dry.gain },
+    () => current,
+    () => context.currentTime,
+  );
   const set = (next: ChorusSpec): void => {
     current = next;
     const lane = (field: string): boolean => knobs.automated(field);

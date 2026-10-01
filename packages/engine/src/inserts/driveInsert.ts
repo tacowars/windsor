@@ -94,25 +94,25 @@ const wetGain = (spec: DriveSpec, mix: number, drive: number): number =>
 const dryGain = (spec: DriveSpec, mix: number): number => (spec.enabled ? 1 - mix : 1);
 
 /**
- * Each knob's lane (windsor#345): Drive moves the shaper's gain and the wet
- * gain's compensation, Mix the wet and dry gains, each at the other's live value.
+ * Each knob's lane (windsor#345): Drive moves the shaper's gain, Mix the dry
+ * gain, and the wet gain (the mix times the drive's compensation) follows
+ * both, from each one's own value at every breakpoint either has.
  */
-function driveHandles(p: DriveParams, spec: () => DriveSpec): FieldHandles {
-  const knobs: FieldHandles = fieldHandles((field): KnobTarget | undefined => {
-    const resting = (): number => spec()[field as 'drive' | 'tone' | 'mix'];
-    if (field === 'drive') {
-      const write = (v: number) => [preGain(v), wetGain(spec(), mix(), v)];
-      return { params: [p.pre, p.wet], write, resting };
-    }
-    if (field === 'mix') {
-      const write = (v: number) => [wetGain(spec(), v, drive()), dryGain(spec(), v)];
-      return { params: [p.wet, p.dry], write, resting };
-    }
-    return field === 'tone' ? { params: [p.tone], write: (v) => [v], resting } : undefined;
-  });
-  const mix = (): number => knobs.live('mix', spec().mix);
-  const drive = (): number => knobs.live('drive', spec().drive);
-  return knobs;
+function driveHandles(p: DriveParams, spec: () => DriveSpec, now: () => number): FieldHandles {
+  const wet = {
+    params: [p.wet],
+    fields: ['drive', 'mix'] as const,
+    value: (drive: number, mix: number) => wetGain(spec(), mix, drive),
+  };
+  return fieldHandles(
+    (field): KnobTarget | undefined => {
+      const resting = (): number => spec()[field as 'drive' | 'tone' | 'mix'];
+      if (field === 'drive') return { params: [p.pre], write: (v) => [preGain(v)], resting };
+      if (field === 'mix') return { params: [p.dry], write: (v) => [dryGain(spec(), v)], resting };
+      return field === 'tone' ? { params: [p.tone], write: (v) => [v], resting } : undefined;
+    },
+    { params: [wet], now },
+  );
 }
 
 function create(context: BaseAudioContext, spec: DriveSpec): InsertStage<DriveSpec> {
@@ -139,7 +139,11 @@ function create(context: BaseAudioContext, spec: DriveSpec): InsertStage<DriveSp
 
   let current = spec;
   const params = { pre: pre.gain, tone: tone.frequency, wet: wet.gain, dry: dry.gain };
-  const knobs = driveHandles(params, () => current);
+  const knobs = driveHandles(
+    params,
+    () => current,
+    () => context.currentTime,
+  );
   const set = (next: DriveSpec): void => {
     current = next;
     const lane = (field: string): boolean => knobs.automated(field);
