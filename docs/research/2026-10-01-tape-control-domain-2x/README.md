@@ -13,6 +13,11 @@ again. It also measures the failing region's edge at width 0, to test the
 pole explanation. It is **survival, not accuracy**, research only, and
 changes nothing under `packages/`.
 
+**Amended by #315.** A second part, [at the end](#windsor315-a-box-that-holds-every-shipped-model-row),
+qualifies drive [0.05, 1] × width [0.05, 0.85] × saturation [0, 1] at both
+factors on the current core, a box that holds every shipped model row. It
+also makes `measure.mjs` exit nonzero on an incomplete or unqualified run.
+
 ## What is measured, and what is not imported
 
 The harness is #290's, **unchanged except for the box**. The field program,
@@ -245,6 +250,11 @@ and 1 s knob sweeps and under 50 ms and 1 s random walks with the stage's
 - **Not decided here.** No product change, default, factor or panel
   range. The output excursions under drive motion are unchanged and remain
   the panel's design question.
+- **Amended by #315: at 2× and 4×, at 44.1, 48 and 96 kHz: drive
+  [0.05, 1], width [0.05, 0.85], saturation [0, 1]** is qualified on the
+  same criteria, on the shipped core after #307, all 1,878 trials
+  surviving (peak |M| 1.74). It holds every shipped model row, Vintage
+  and VHS included. See [#315's declaration](#declaration-315) below.
 
 **Accuracy is not qualified**, as in #290: the corner-accuracy record's
 tone-gate misses at the drive and saturation ends still apply, and were not
@@ -376,3 +386,119 @@ raw trials and the shipped `configure`. Its `--check`:
   width 0.85 and saturation 0 at 44.1 kHz 2×; a 96 kHz 4× jump walk),
   comparing their records exactly (all but wall time);
 - runs the exit gate's cases.
+
+### Environment and run (#315)
+
+Apple M1 arm64 (8 cores), Darwin 25.5.0, Node v24.20.0, V8
+13.6.233.17-node.53, Float64 in Node, no browser. The sources were bundled
+by esbuild at `cbf122f`, which is `origin/main` (`ac0fa91`, after #307)
+plus this part's declaration. Other sessions were working on the machine.
+The one-minute load average was 2.4 before the run and 8.9 after.
+
+**Run.** Complete, in **522.8 s of the 3,600-second bound**: candidate 1
+(1,878 trials), 1,878 of 1,878 scheduled. Candidate 1 passed, so the run
+stopped there and candidates 2–4 were not run. Every worker exited 0, with
+no expiry, no truncated tail and nothing missing, and `measure.mjs` exited
+0. The trials used 2,077 CPU-seconds in all. `rowsEvidence.mjs --check`
+passes all five of its checks: derived, closure, clean closure, three spot
+re-renders bit-equal, and the exit gate's 11 cases.
+
+### Results (#315)
+
+#### The normalisation over the box
+
+drive [0.05, 1] × width [0.05, 0.85] × saturation [0, 1], 41 × 41 points
+per face and 21³ through the volume, from the shipped `configure`:
+
+| Face | Lowest susceptibility | × floor | Highest gain | At (drive, width, sat.) | Highest gain / width-0 gain |
+|---|---|---|---|---|---|
+| drive = 0.05 | 3.90 × 10⁻² | 39.0 | **25.65** | 0.05, 0.85, any | 2.62 |
+| drive = 1 | 7.57 × 10⁻¹ | 756.8 | 1.32 | 1, 0.85, any | 2.63 |
+| width = 0.05 | 9.97 × 10⁻² | 99.7 | 10.03 | 0.05, 0.05, any | 1.03 |
+| width = 0.85 | 3.90 × 10⁻² | 39.0 | **25.65** | 0.05, 0.85, any | 2.63 |
+| saturation = 0 | 3.90 × 10⁻² | 39.0 | **25.65** | 0.05, 0.85, 0 | 2.63 |
+| saturation = 1 | 3.90 × 10⁻² | 39.0 | **25.65** | 0.05, 0.85, 1 | 2.63 |
+| volume (21³) | 3.90 × 10⁻² | 39.0 | 25.65 | 0.05, 0.85, 0 | 2.63 |
+
+- **The worst case is the edge drive 0.05, width 0.85**, at every
+  saturation, as the formula predicts: susceptibility 3.90 × 10⁻², **39×
+  the floor** (rule (i) asks 2×), gain **25.65**. #295's box reached 494.7
+  at drive 0, width 0.62, so the largest gain falls about 19-fold. The
+  volume's extremes equal the faces' (`extremesOnFaces`).
+- **Rule (ii) does not hold, and is reported only.** The gain over its
+  width-0 value reaches **2.63** at width 0.85 (drive-independent but for
+  the α term; #290's rule (ii) allows 2, which binds at width 0.74). The
+  shipped rows themselves exceed it: Vintage 2.47 and VHS 2.11. #290 tied
+  this ratio to the hold's excess and the remanent DC, which scale with it.
+- The other candidates, computed but not run: drive 0.1 halves the
+  largest gain to **13.03**; width 0.83 gives 24.05 at drive 0.05 and 12.22
+  at drive 0.1. Every face of every candidate is at least 39× the floor.
+
+#### The shipped rows
+
+| Model | Drive | Width | Sat. | Susceptibility | Gain | / width-0 gain | In the box |
+|---|---|---|---|---|---|---|---|
+| 30ips Studio | 0.159 | 0.278 | 0.324 | 0.271 | 3.70 | 1.18 | yes |
+| Ferric | 0.723 | 0.509 | 0.594 | 1.003 | 1.00 | 1.43 | yes |
+| Vintage | 0.742 | **0.831** | 0.528 | 0.597 | 1.67 | 2.47 | yes |
+| 15ips Studio | 0.545 | 0.589 | 0.556 | 0.691 | 1.45 | 1.57 | yes |
+| Chrome | 0.336 | 0.132 | 0.564 | 0.623 | 1.60 | 1.07 | yes |
+| Metal | 0.339 | 0.490 | 0.134 | 0.480 | 2.08 | 1.41 | yes |
+| VHS | 0.836 | 0.769 | 0.972 | 0.790 | 1.27 | 2.11 | yes |
+
+Every row is inside candidate 1 (and 2). Vintage's width, 0.8311, is
+outside candidates 3 and 4, as declared.
+
+#### The box: 1,878 of 1,878 survive
+
+| Factor | Part | Trials | Survive | Peak \|M\| | Guard margin | Peak out | Largest gain |
+|---|---|---|---|---|---|---|---|
+| 2× | static | 831 | 831 | 1.740 | 11.5× | 6.28 | 25.65 |
+| 2× | sweep | 72 | 72 | 1.740 | 11.5× | 6.28 | 25.65 |
+| 2× | walk | 36 | 36 | 1.642 | 12.2× | 3.21 | 12.31 |
+| 4× | static | 831 | 831 | 1.733 | 11.5× | 6.32 | 25.65 |
+| 4× | sweep | 72 | 72 | 1.733 | 11.5× | 6.32 | 25.65 |
+| 4× | walk | 36 | 36 | 1.643 | 12.2× | 3.21 | 12.31 |
+
+Over all three rates per factor. Per rate and factor, every group's
+figures are in `rowsMeasurement.json` under `derived.boxes[0].groups`;
+every one of the 18 groups survives whole. There are no resets, no
+nonfinite samples and no state-guard failure. Peak |M| is 1.740 (static
+corner drive 1, width 0.05, saturation 0, 44.1 kHz 2×), 11.5× under the
+guard. The largest output, 6.32, is the static worst-gain corner (drive
+0.05, width 0.85, saturation 0, 96 kHz 4×) in the `dc` hold.
+
+**Output under control motion.** In this box, no sweep or walk produces a
+larger output than the static points do: sweeps peak at 6.32, the same
+worst-gain corner's hold, and walks at 3.21. #295's box, on the core before
+#307 and with drive down to 0, reached 110 in sweeps and 241 in jump walks
+from drive moving under a frozen M. This run changes both the core (#307)
+and drive's minimum together, so it does not separate their shares; it
+only reports that the excursion is gone here. **Field guard**: all 1.87 ×
+10⁹ engagements are in the `dc` and `opposite` segments, as in #290 and
+#295.
+
+### Declaration (#315)
+
+**Qualified for survival** (zero resets, zero nonfinite samples, zero
+state-guard failures, peak |M| ≤ 1.74 against 20) on the shipped core as
+of `ac0fa91` (after #307), for field |H| ≤ 4, statically at 277 points per
+rate and factor, under 50 ms and 1 s knob sweeps and under 50 ms and 1 s
+random walks with the stage's 10 ms smoothing:
+
+- **At 2× and 4×, at 44.1, 48 and 96 kHz: drive [0.05, 1], width
+  [0.05, 0.85], saturation [0, 1].** The issue's box, candidate 1; no step
+  of decision 3 was needed.
+- **It holds every shipped model row**: drive 0.159 (30ips Studio) is
+  above 0.05 and width 0.831 (Vintage) below 0.85. A knob touched on
+  Vintage or VHS need not clamp width.
+- **Normalisation over the box**: susceptibility ≥ 3.90 × 10⁻² (39× the
+  floor) and gain ≤ 25.65, both worst on the edge drive 0.05, width 0.85.
+  The gain over its width-0 value reaches 2.63, past #290's rule (ii) at 2;
+  that rule is reported, not gated, and two shipped rows already exceed it.
+- **Drive below 0.05 is outside this box.** #295's box, drive [0, 1] ×
+  width [0.05, 0.62], was qualified on the core before #307 and was not
+  re-run on the current core here.
+- **Not decided here.** No product change, default, factor or panel range.
+
+**Accuracy is not qualified**, as in #290 and #295.
