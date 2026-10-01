@@ -23,7 +23,8 @@
  * per-sample path allocates nothing and passes no double across a call (the
  * stage values travel in the oversampler's `Float64Array`, the result in a
  * field); `configure` recomputes every derived coefficient and the output
- * normalisation, and is never on that path. The step calls no
+ * normalisation and is never on that path, and `retune`, its unchecked
+ * part, is on it only while the stage glides the controls. The step calls no
  * transcendental `Math` function: tanh is `tanhInPlace`'s, in IEEE
  * arithmetic, so the render is the same bits on arm64 and x64. Pinned by
  * `inserts/tapeMagnetic.test.ts` (the research ruler, the knee, both
@@ -157,7 +158,8 @@ class TapeMagneticCore {
   /**
    * Maps the three controls to Ms, a and c, and recomputes the step, the
    * origin susceptibility and the output gain. Keeps the state. Off the
-   * per-sample path: E2 calls it per block from smoothed controls.
+   * per-sample path: the stage calls it at construction, and `retune` while
+   * a model switch glides.
    */
   configure(rate: number, factor: number, controls: Readonly<TapeMagneticControls>): void {
     const t = this.table;
@@ -168,16 +170,30 @@ class TapeMagneticCore {
       throw new RangeError('tape core: saturation must be in [0, 1]');
     if (!t.factors.includes(factor) || !(rate > 0 && rate < Infinity))
       throw new RangeError(`tape core: no rate ${rate} at factor ${factor}`);
-    const ms = t.saturationFloor + t.saturationScale * (1 - saturation);
-    const a = ms / (t.driveFloor + t.driveScale * drive);
-    const c = Math.max(0, Math.sqrt(1 - width) - t.reversibleOffset);
+    this.dt = 1 / (rate * factor);
+    this.retune(controls);
+  }
+
+  /**
+   * `configure` without its checks or the step: Ms, a and c from `controls`,
+   * and the origin susceptibility and output gain, in exactly the operations
+   * of `originSusceptibility`, so the bits are the same. Keeps the state. The
+   * stage's per-sample entry while a model switch glides the controls
+   * (design decision 6); the controls are read in place, so no double
+   * crosses the call, and every row was checked at load.
+   */
+  retune(controls: Readonly<TapeMagneticControls>): void {
+    const t = this.table;
+    const ms = t.saturationFloor + t.saturationScale * (1 - controls.saturation);
+    const a = ms / (t.driveFloor + t.driveScale * controls.drive);
+    const c = Math.max(0, Math.sqrt(1 - controls.width) - t.reversibleOffset);
+    const r = (ms / a) * t.langevinOriginSlope;
     this.ms = ms;
     this.invA = 1 / a;
     this.reversibleGain = c * (ms / a);
     this.irreversible = 1 - c;
     this.irreversibleK = (1 - c) * t.pinning;
-    this.dt = 1 / (rate * factor);
-    this.susceptibility = originSusceptibility(controls, t);
+    this.susceptibility = (c * r) / (1 - t.alpha * c * r);
     this.gain = 1 / Math.max(this.susceptibility, t.susceptibilityFloor);
   }
 

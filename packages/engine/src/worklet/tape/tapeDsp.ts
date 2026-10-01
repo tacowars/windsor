@@ -164,7 +164,7 @@ class TapeDsp {
     }
     this.model = model;
     this.magnetic.select(params.oversampling[0]);
-    this.magnetic.configure(model, frames);
+    this.magnetic.configure(model);
     const k = 1 - Math.exp(-frames / (this.rate * C.toneSeconds));
     this.controls.bias += k * (this.targets.bias - this.controls.bias);
     if (Math.abs(this.targets.bias - this.controls.bias) < Number.EPSILON)
@@ -212,6 +212,7 @@ class TapeDsp {
     } else motion.wowAmount = motion.flutterAmount = motion.dropoutAmount = s.wear / C.percent;
     motion.advance();
     this.tickNoise();
+    if (this.magnetic.gliding) this.magnetic.glide();
     this.channel(0);
     this.left = this.sample;
     this.channel(1);
