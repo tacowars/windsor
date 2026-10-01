@@ -1,0 +1,161 @@
+/**
+ * The Song view's automation lanes, as data (windsor#348; record
+ * `2026-10-01-song-automation-lanes` decision 13): the curve's drawing
+ * tunables, the colour of each kind of target, the picker's voice groups,
+ * the readout's number rules and the reasons an insert field is inactive.
+ * The rules over them are `songAutomationModel.ts`; the DOM is
+ * `songAutomationLane.ts`. The lane's height is the Song view's
+ * (`songViewTables.ts`'s `SONG_VIEW.automationLanePx`).
+ */
+import type { AutomationTargetKind, InsertKindName, InsertSpecOf } from '@windsor/engine';
+
+/** How a lane's curve is drawn inside its row. */
+export interface AutomationDrawing {
+  /** The space above the top of the range and below its bottom, so a point at either end shows whole. */
+  readonly padPx: number;
+  /** The px between two samples of a bent segment (decision 6). */
+  readonly sampleEveryPx: number;
+  /** A point's dot. */
+  readonly dotRadiusPx: number;
+  /** The decimals a coordinate is written with in the SVG path. */
+  readonly coordDecimals: number;
+}
+
+export const AUTOMATION_DRAWING: AutomationDrawing = {
+  padPx: 6,
+  sampleEveryPx: 3,
+  dotRadiusPx: 3.2,
+  coordDecimals: 1,
+};
+
+/** Each kind's colour (decision 3): the mixer teal, the inserts violet, the voice amber. */
+export const LANE_KIND_COLOR: Readonly<Record<AutomationTargetKind, string>> = {
+  strip: 'var(--modulator)',
+  insert: 'var(--return)',
+  voice: 'var(--carrier)',
+};
+
+/** The picker's group for the strip's targets, and the kind line under a strip lane's name. */
+export const MIXER_GROUP_LABEL = 'Mixer';
+
+/** The picker's group label for an insert, from the insert's label. */
+export const insertGroupLabel = (insertLabel: string): string => `Insert · ${insertLabel}`;
+
+/**
+ * The voice's groups in the picker, in order (decision 4), each claiming the
+ * patch paths it starts with. An operator's group is named by its letter.
+ */
+export interface VoiceGroup {
+  readonly label: string;
+  readonly claims: (path: string) => boolean;
+}
+
+/** The operator index in a voice path (`ops.2.width`), or undefined. */
+export const OPERATOR_PATH = /^ops\.(\d+)\./;
+
+export const VOICE_GROUPS = (opNames: readonly string[]): readonly VoiceGroup[] => [
+  { label: 'Voice · Filter', claims: (path) => path.startsWith('filter.') },
+  ...opNames.map((name, i) => ({
+    label: `Voice · Op ${name}`,
+    claims: (path: string) => OPERATOR_PATH.exec(path)?.[1] === String(i),
+  })),
+  { label: 'Voice · LFO', claims: (path) => /^lfo2?\./.test(path) },
+  { label: 'Voice · Pitch', claims: (path) => path.startsWith('pitchEnv') },
+];
+
+/** How a readout prints a number: the thresholds where it drops a decimal. */
+export interface ReadoutNumbers {
+  /** Hz and above print in kHz. */
+  readonly kiloHz: number;
+  /** Seconds under this print in ms. */
+  readonly secondsAsMsBelow: number;
+  /** A plain number at or past this many units prints with no decimals, and past `oneDecimalFrom` with one. */
+  readonly wholeFrom: number;
+  readonly oneDecimalFrom: number;
+  /** Pan's −1..1 printed as L/R 0..100. */
+  readonly panScale: number;
+  readonly msPerSecond: number;
+  /** Decibels per decade of linear gain: a level lane's value in dB. */
+  readonly dbPerDecade: number;
+}
+
+export const READOUT_NUMBERS: ReadoutNumbers = {
+  kiloHz: 1000,
+  secondsAsMsBelow: 1,
+  wholeFrom: 100,
+  oneDecimalFrom: 10,
+  panScale: 100,
+  msPerSecond: 1000,
+  dbPerDecade: 20,
+};
+
+/**
+ * Why an insert field is inactive, as the clause after "while": one function
+ * per kind whose rows carry `available` (`automationInsertTables.ts` in the
+ * engine), over the insert's spec and the field. A kind or a field it does
+ * not answer reads "under <insert>'s current settings".
+ */
+export type InactiveWhy = {
+  readonly [K in InsertKindName]?: (spec: InsertSpecOf<K>, field: string) => string | undefined;
+};
+
+/** `stages.1.amount` → [1, 'amount']; `bands.0.q` → [0, 'q']. */
+const indexed = (field: string): readonly [number, string] | undefined => {
+  const match = /^[a-z]+\.(\d+)\.(.+)$/.exec(field);
+  return match ? [Number(match[1]), match[2] ?? ''] : undefined;
+};
+
+const SHAPER_FIELDS: ReadonlySet<string> = new Set([
+  'amount',
+  'bias',
+  'envAmount',
+  'envBias',
+  'lfoAmount',
+  'lfoBias',
+]);
+const FILTER_FIELDS: ReadonlySet<string> = new Set([
+  'frequency',
+  'resonance',
+  'envCutoff',
+  'lfoCutoff',
+]);
+
+function driveStageWhy(spec: InsertSpecOf<'advanced-drive'>, field: string): string | undefined {
+  const at = indexed(field);
+  if (!at) return undefined;
+  const [i, name] = at;
+  const stage = spec.stages[i];
+  const label = `stage ${i + 1}`;
+  if (!stage?.enabled) return `${label} is off`;
+  if (SHAPER_FIELDS.has(name) && !stage.shaping) return `${label} is not shaping`;
+  if (FILTER_FIELDS.has(name) && !stage.filtering) return `${label} is not filtering`;
+  if (name === 'peak') return `${label}'s filter is not a peak`;
+  return `the ${spec.route} route does not play ${label}`;
+}
+
+function eqBandWhy(spec: InsertSpecOf<'eq'>, field: string): string | undefined {
+  const at = indexed(field);
+  if (!at) return undefined;
+  const [i, name] = at;
+  const label = `band ${i + 1}`;
+  if (spec.bands[i]?.on !== true) return `${label} is off`;
+  if (name === 'gain') return `${label} is a cut, which has no gain`;
+  if (name === 'q') return `${label} is a 6 dB/oct cut, which has no Q`;
+  return undefined;
+}
+
+export const INACTIVE_WHY: InactiveWhy = {
+  tape: (_spec, field) =>
+    field === 'wear' ? "Tape's motion is split" : "Tape's motion is not split",
+  delay: (_spec, field) =>
+    field === 'leftMs' ? 'the left side is synced' : 'the right side is synced',
+  'retro-reverb': (_spec, field) =>
+    field === 'duration' ? 'Retro reverb is in reverb mode' : 'Retro reverb is not in reverb mode',
+  'advanced-drive': (spec, field) => {
+    if (field === 'rate') return 'the LFO is synced';
+    if (field === 'low' || field === 'high') return 'the route is not multiband';
+    if (field === 'blend') return 'the route is neither serial nor parallel';
+    return driveStageWhy(spec, field);
+  },
+  eq: eqBandWhy,
+};

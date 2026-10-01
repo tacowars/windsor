@@ -14,14 +14,19 @@
  * cycle ticks are that region's (`regionPattern`), a move or a resize keeps
  * the pattern, a split gives both halves a copy, and a drawn region copies
  * its neighbour's (`partEdits.ts`'s `drawRegionChange`).
+ *
+ * The name cell's `▸` folds the part's automation lanes out beneath it
+ * (windsor#348; `songAutomationLane.ts` draws them), and a folded part with
+ * lanes shows their count.
  */
-import type { MusicPart, PartRegion, Region } from '@windsor/engine';
+import type { DocumentPart, MusicPart, PartRegion, Region } from '@windsor/engine';
 import { regionPattern } from '@windsor/engine';
 import { el } from './dom';
 import { drawRegionChange, regionGrain, splitPartRegion } from './partEdits';
 import type { RegionDrag } from './regionModel';
 import { dragRegion, regionMark } from './regionModel';
 import { KIND_LABELS } from './sequencerConstants';
+import { laneCountLabel } from './songAutomationModel';
 import type { SongView } from './songTab';
 import {
   CYCLE_TICKS,
@@ -235,16 +240,44 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   });
 }
 
+/**
+ * The part's fold (windsor#348 decision 1): `▸` folded, `▾` with its
+ * automation lanes shown beneath it. Which parts are open is view state,
+ * kept for the session; the focus stays on the button across the repaint.
+ */
+function foldButton(view: SongView, part: DocumentPart): HTMLButtonElement {
+  const open = view.state.openParts.has(part.slot);
+  const button = el('button', 'tri', open ? '▾' : '▸') as HTMLButtonElement;
+  button.type = 'button';
+  button.dataset['focus'] = `fold:${part.slot}`;
+  button.setAttribute('aria-expanded', String(open));
+  button.setAttribute('aria-label', `${open ? 'Hide' : 'Show'} automation for ${part.name}`);
+  button.onclick = (e): void => {
+    e.stopPropagation();
+    const grid = button.closest('.lanes');
+    if (open) view.state.openParts.delete(part.slot);
+    else view.state.openParts.add(part.slot);
+    view.paintLanes();
+    grid?.querySelector<HTMLElement>(`[data-focus="fold:${part.slot}"]`)?.focus();
+  };
+  return button;
+}
+
 /** The name-column cell and the lane of regions for `part`. */
-export function partLaneRow(view: SongView, part: MusicPart): [HTMLElement, HTMLElement] {
+export function partLaneRow(view: SongView, part: DocumentPart): [HTMLElement, HTMLElement] {
   const selected = view.state.selection;
   const isSelected = selected?.kind === 'part' && selected.slot === part.slot;
   const name = el('div', `lane-name${isSelected ? ' selected' : ''}`);
-  name.appendChild(el('span', 'tri', '▸'));
+  name.appendChild(foldButton(view, part));
   const nm = el('span', 'nm');
   nm.appendChild(el('b', '', part.name));
   nm.appendChild(el('small', '', KIND_LABELS[part.sequencer.kind].toLowerCase()));
   name.appendChild(nm);
+  const lanes = part.automation?.length ?? 0;
+  if (lanes > 0 && !view.state.openParts.has(part.slot)) {
+    name.classList.add('has-badge');
+    name.appendChild(el('span', 'auto-badge', laneCountLabel(lanes)));
+  }
   name.onclick = (): void => view.select({ kind: 'part', slot: part.slot, region: null });
   const lane = el('div', `lane${isSelected ? ' selected' : ''}`);
   lane.title =

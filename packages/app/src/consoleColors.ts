@@ -1,16 +1,16 @@
 /**
  * The console's palette (#618): the one place a colour is spelled in TS. The
  * template's CSS custom properties carry the same values for the stylesheet
- * (`--carrier`, `--modulator`, `--hot`, `--line`, `--line-bright`), and
- * `consoleColors.test.ts` holds the two in step — a hue tuned in one place
- * without the other fails there, not on a screen.
+ * (`--carrier`, `--modulator`, `--return`, `--hot`, `--line`,
+ * `--line-bright`), and `consoleColors.test.ts` holds the two in step — a
+ * hue tuned in one place without the other fails there, not on a screen.
  */
 
 /** Carriers, the percussion parts, the arrangement's controls, the scope trace. */
 export const CARRIER_COLOR = '#E0A44E';
 /** Modulators, the pitched parts, the mixer strips. */
 export const MOD_COLOR = '#5FA8A0';
-/** The return buses, in the mixer and the returns panel. */
+/** The return buses, in the mixer and the returns panel; the insert targets' automation lanes. */
 export const RETURN_COLOR = '#9C7BD0';
 /** Clipping, and anything hot. */
 export const HOT_COLOR = '#D2643C';
@@ -43,6 +43,7 @@ export const groupAccent = (index: number): string =>
 export const CSS_VARIABLE_OF: Readonly<Record<string, string>> = {
   '--carrier': CARRIER_COLOR,
   '--modulator': MOD_COLOR,
+  '--return': RETURN_COLOR,
   '--hot': HOT_COLOR,
   '--line': LINE_COLOR,
   '--line-bright': LINE_BRIGHT_COLOR,
