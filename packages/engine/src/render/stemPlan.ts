@@ -17,6 +17,7 @@
  * samples than `RENDER_STEM_PASS_MAX_SAMPLES`.
  */
 import { RETURN_NAMES } from '../mixer/mix';
+import type { GroupSwitches } from '../mixer/soloRule';
 import { isHeard, isSoloing } from '../mixer/soloRule';
 import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
 import {
@@ -67,7 +68,9 @@ export function stemSources(document: ArrangementDocument, choice: StemChoice = 
       muted: isSidechainOnly(part),
     }));
   // Sidechain only, mute and solo gate the sends with the dry path, so only a heard part feeds a return.
-  const groups = document.groups ?? [];
+  // Renders play what playback plays. The live roster (`MusicRoster.resolveSolo`) does not read
+  // groups yet, so neither does this: windsor#285 passes `document.groups` when it learns them.
+  const groups: readonly GroupSwitches[] = [];
   const soloing = isSoloing(
     document.parts.map((part) => part.strip),
     groups,

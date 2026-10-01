@@ -283,6 +283,34 @@ describe('documentDiffLive asks for a rebuild where the slot merge would reorder
   });
 });
 
+describe('documentDiff keys groups by id (windsor#284)', () => {
+  const group = (id: number, name: string) => ({ id, name, level: 1, pan: 0, inserts: [] });
+  const GROUPED = after(FULL, {
+    groups: { 2: group(2, 'Drums'), 4: group(4, 'Keys'), 7: group(7, 'Pads') },
+    parts: { [HAT]: { strip: { output: { group: 2 } } } },
+  });
+
+  it('round trips a group edit, removal and addition', () => {
+    expect(GROUPED.groups?.map((g) => g.id)).toEqual([2, 4, 7]);
+    expectRoundTrip(FULL, GROUPED);
+    expectRoundTrip(GROUPED, after(GROUPED, { groups: { 2: { mute: true, level: 0.5 } } }));
+    expectRoundTrip(GROUPED, after(GROUPED, { groups: { 7: null } }));
+    expect(documentDiff(GROUPED, after(GROUPED, { groups: { 4: { solo: true } } }))).toEqual({
+      groups: { 4: { solo: true } },
+    });
+    expect(documentDiff(GROUPED, normalise(GROUPED))).toEqual({});
+  });
+
+  it('reads a removed group as null and rebuilds to restore one the merge would append', () => {
+    const b = after(GROUPED, { groups: { 4: null } });
+    expect(documentDiff(GROUPED, b)).toEqual({ groups: { 4: null } });
+    expect(documentDiff(b, GROUPED)).toEqual({ groups: { 4: group(4, 'Keys') } });
+    expect(documentDiffLive(b, GROUPED, normalise).rebuild).toBe(true);
+    const last = after(GROUPED, { groups: { 7: null } });
+    expect(documentDiffLive(last, GROUPED, normalise).rebuild).toBe(false);
+  });
+});
+
 describe('deepEqual', () => {
   it('compares JSON values structurally', () => {
     expect(deepEqual({ a: [1, { b: 2 }] }, { a: [1, { b: 2 }] })).toBe(true);
