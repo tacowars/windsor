@@ -12,7 +12,7 @@ import { PATCH_LIBRARY } from './presets';
 const contractWrites = (entry: (typeof PATCH_LIBRARY)[string]): string =>
   JSON.stringify(
     {
-      format: 2,
+      format: 3,
       name: entry.patch.name,
       category: entry.category,
       tags: [...entry.tags],
@@ -27,9 +27,9 @@ describe('serialisePatchFile', () => {
   const entry = PATCH_LIBRARY['kick'];
   if (!entry) throw new Error('kick is not in the library');
 
-  it('writes format 2 and the contract key order, and nothing else', () => {
+  it('writes format 3 and the contract key order, and nothing else', () => {
     const text = serialisePatchFile(entry);
-    expect(PATCH_FILE_FORMAT).toBe(2);
+    expect(PATCH_FILE_FORMAT).toBe(3);
     expect(text).toBe(contractWrites(entry));
     expect(Object.keys(JSON.parse(text))).toEqual([
       'format',

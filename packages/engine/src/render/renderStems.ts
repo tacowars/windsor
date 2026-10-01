@@ -1,7 +1,8 @@
 /**
- * Renders a song's stems offline (windsor#41): one stereo file per part and
- * per return, beside the master, from the same render as the song WAV
- * (`renderPass.ts`) with the stem taps attached (`stemTaps.ts`).
+ * Renders a song's stems offline (windsor#41): one stereo file per ungrouped
+ * part, per group bus (windsor#286) and per return, beside the master, from
+ * the same render as the song WAV (`renderPass.ts`) with the stem taps
+ * attached (`stemTaps.ts`).
  *
  * Each pass renders the master on channels 0–1 and its stems on the pairs
  * after (decision 2); the plan is `stemPlan.ts`. The first pass's master is

@@ -3,7 +3,8 @@
  * `2026-09-30-master-column-and-meters`): two columns. The left one scrolls
  * with the page: the master's insert rack, then Send A and Send B, each a
  * level and an insert chain (windsor#172) in the document's `returns`
- * section (`returnsPanel.ts`). The right one is the master column, sticky
+ * section (`returnsPanel.ts`), then the song's Groups (windsor#287,
+ * `groupsPanel.ts`). The right one is the master column, sticky
  * below the header (`masterColumn.ts`). At `MASTER_STACK_MAX_WIDTH_PX` and
  * below it stacks above the racks, and the meter bridge (`meterBridge.ts`)
  * stands in for its meters once they scroll away. Each part's strip lives on
@@ -25,6 +26,7 @@ import { browserMeterEnvironment, createMeterLoop } from './meterLoop';
 import { renderMeterBridge } from './meterBridge';
 import { createOutputStageLink } from './outputStageLink';
 import { renderReturnsSection } from './returnsPanel';
+import { renderGroupsSection } from './groupsPanel';
 import { followChromeHeight } from './stickyOffset';
 
 /** The last render's loop and bridge observer, ended when the tab renders again. */
@@ -48,7 +50,7 @@ export function renderMixerTab(body: HTMLElement, ctx: AppCtx): void {
   const column = renderMasterColumn(ctx, link, loop);
   const bridge = renderMeterBridge(link, loop, column.meters);
   const racks = el('div', 'mixer-racks');
-  racks.append(renderMasterInserts(ctx), renderReturnsSection(ctx));
+  racks.append(renderMasterInserts(ctx), renderReturnsSection(ctx), renderGroupsSection(ctx));
   layout.append(bridge.root, racks, column.root);
   body.appendChild(layout);
   teardown = () => {

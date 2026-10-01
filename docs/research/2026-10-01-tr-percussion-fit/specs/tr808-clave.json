@@ -1,0 +1,64 @@
+{
+  "start": "../start/tr808-clave.json",
+  "params": [
+    {
+      "path": [
+        "ops[0].ratio",
+        "ops[1].ratio"
+      ],
+      "min": 9.6,
+      "max": 10.1
+    },
+    {
+      "path": "ops[0].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.attackCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.decayTime",
+      "min": 0.01,
+      "max": 0.2,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[0].env.sustainLevel",
+      "min": 0,
+      "max": 0.5
+    },
+    {
+      "path": "ops[0].env.releaseTime",
+      "min": 0.005,
+      "max": 0.2,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.releaseCurve",
+      "min": -1,
+      "max": 0.5
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/Claves A 808.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "optimizer": {
+    "method": "cma",
+    "budget": 1200,
+    "sigma0": 0.2,
+    "seed": 1
+  }
+}

@@ -11,6 +11,8 @@ import {
   DEFAULT_DRIVE,
   DEFAULT_ECHO,
   DEFAULT_PLATE_REVERB,
+  INSERT_KINDS,
+  INSERT_KIND_NAMES,
   MAX_INSERTS,
   createInsertIdSource,
   isInsertId,
@@ -19,6 +21,7 @@ import {
 import { withoutInsertIds } from '@windsor/engine/__fixtures__/insertIds';
 import { addInsert, canAddInsert, moveInsert, removeInsert, setInsertField } from './insertEdits';
 import { addInsertAtFront } from './insertEdits';
+import { groupKey } from './groupModel';
 
 /** `list` without its ids: the settings alone. */
 const bare = (list: readonly InsertSpec[]): unknown[] => withoutInsertIds([...list]);
@@ -115,6 +118,16 @@ describe('addInsertAtFront (windsor#173)', () => {
     expect(next.slice(1)).toEqual([a, b]);
     expect(next[0]).not.toBe(DEFAULT_DRIVE);
     expect(list).toEqual([a, b]);
+  });
+
+  it('starts every kind at its part defaults on a group, so a Plate reverb starts at Mix 0.30 (windsor#287)', () => {
+    const target = groupKey(3);
+    for (const kind of INSERT_KIND_NAMES) {
+      expect(bare(addInsert([], kind, target))).toEqual([INSERT_KINDS[kind].defaults]);
+      expect(bare(addInsertAtFront([], kind, target))).toEqual([INSERT_KINDS[kind].defaults]);
+    }
+    expect(bare(addInsert([], 'plate', target))).toEqual([DEFAULT_PLATE_REVERB]);
+    expect(DEFAULT_PLATE_REVERB.mix).toBe(0.3);
   });
 
   it('adds the first insert to an empty chain, as addInsert does', () => {

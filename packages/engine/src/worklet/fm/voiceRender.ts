@@ -1,11 +1,13 @@
 /* eslint-disable no-magic-numbers -- DSP: the generic loop's feedback average, interpolation and mip arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * The generic render loop (#645): four operators walked in the algorithm's
- * topological order, the carrier sum, the filter and the steal fade, over
+ * topological order, the carrier sum, the drive stage (windsor#300), the
+ * filter and the steal fade, over
  * locals hoisted out of the loop. It is the reference the fixed-index kernel
  * (`voiceKernel.js`) must match to the bit, and the path every voice takes
  * with `specialise: false`. Invariant: one sample loop, read top to bottom,
- * allocation free, no per-sample call beyond `voice.noise()` and the filter;
+ * allocation free, no per-sample call beyond `voice.noise()`, the drive and
+ * the filter;
  * a helper per operator would reload the locals through the voice and cost
  * more than it saves. Width (#55): an operator whose width is exactly 1 and
  * still takes the old read, untouched; one squeezed reads its wave at
@@ -21,8 +23,7 @@ import {
   MOD_INDEX_SCALE,
   TABLE_SIZE,
 } from './fmConstants';
-import { FILT_OFF } from './modeIds';
-import { softClip } from './svf';
+import { DRIVE_SOFT, FILT_OFF } from './modeIds';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_SQUARE_D } from './waveTables';
 
 /**
@@ -50,7 +51,16 @@ function renderVoiceGeneric(
   const carGain = 1 / Math.sqrt(nCar);
   const f = patch.filter;
   const mode = f.mode;
-  const drive = f.drive;
+  // The drive stage (windsor#300), hoisted: `updateVoiceDrive` set it for this block.
+  const drive = voice.drive;
+  const driven = drive.on,
+    driveSoft = drive.shape === DRIVE_SOFT,
+    driveGain = drive.gain,
+    driveBias = drive.bias,
+    driveOffset = drive.offset,
+    driveToned = drive.toned,
+    driveCoef = drive.toneCoef;
+  let driveTone = drive.toneState;
   const slope24 = f.slope24;
   const gain = patch.volume * carGain;
 
@@ -181,8 +191,28 @@ function renderVoiceGeneric(
     }
     sig *= gain;
 
+    // The drive stage (windsor#300), before the filter and without it:
+    // shape(gain * x + bias) - shape(bias), then the tone pole. `soft` is
+    // written out, the filter's old soft clip operation for operation; any
+    // other shape is a call whose operand and result pass through `point`,
+    // so no double crosses it.
+    if (driven) {
+      let x = sig * driveGain + driveBias;
+      if (driveSoft) x = x > 3 ? 1 : x < -3 ? -1 : (x * (27 + x * x)) / (27 + 9 * x * x);
+      else {
+        drive.point = x;
+        drive.curve();
+        x = drive.point;
+      }
+      sig = x - driveOffset;
+      if (driveToned) {
+        const v = (sig - driveTone) * driveCoef;
+        sig = v + driveTone;
+        driveTone = sig + v;
+      }
+    }
+
     if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
       sig = voice.svfA.process(sig, mode);
       if (slope24) sig = voice.svfB.process(sig, mode);
     }
@@ -203,6 +233,7 @@ function renderVoiceGeneric(
     outR[k] += sig * voice.panR;
   }
 
+  drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();

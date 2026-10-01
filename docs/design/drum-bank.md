@@ -1,7 +1,7 @@
 # Drum bank: TR-808, TR-909 and Elektron-style FM
 
-Forty percussion patches in `packages/engine/src/patches/`
-under the **Drums** category: sixteen `tr808-*`, thirteen `tr909-*` and eleven
+Forty-one percussion patches in `packages/engine/src/patches/`
+under the **Drums** category: sixteen `tr808-*`, fourteen `tr909-*` and eleven
 `efm-*` (the Machinedrum's "Enhanced FM" drum family, the Elektron shape).
 Each file's `description` is its audition note. This page records how the
 originals make their sounds, which of those mechanisms the four-operator
@@ -24,9 +24,10 @@ threads rather than measured in a paper.
 | 808 snare | Two bridged-T resonators plus white noise through a highpass; "snappy" is the noise decay | 180 and 330 Hz (1:1.83), body ~60–120 ms, noise 100–600 ms |
 | 808 handclap | White noise → band-pass → two VCAs: one driven by a sawtooth that restarts every 10 ms while a 30 ms pulse is high, so three ramps and a fourth uninterrupted discharge; the other a smooth 100 ms "reverb" decay | band-pass ≈ 1 kHz; 3 × 10 ms + 20 ms; tail 100 ms |
 | 808 hats and cymbal | Six square oscillators summed, band-passed in two bands, then highpassed per voice | 205.3, 304.4, 369.6, 522.7, 540, 800 Hz; bands 3440 and 7100 Hz; closed 50 ms, open 90–600 ms, cymbal 350–1200 ms |
-| 808 cowbell | Two pulse oscillators through a band-pass; a loud impact then a tail | 587 and 845 Hz (1:1.44); band-pass ≈ 2.64 kHz |
-| 808 rimshot / claves | Two resonators (rimshot) or one (claves) hit by a 10 ms pulse | 1667 and 455 Hz; claves 2500 Hz |
-| 808 toms / congas | A bridged-T resonator; toms add dark lowpassed noise, congas skip it; the diodes drift the pitch down as it fades | toms 90 / 135 / 185 Hz at 200 / 130 / 100 ms; congas 185 / 280 / 400 Hz at 180 / 100 / 80 ms |
+| 808 cowbell | Two pulse oscillators through a band-pass; a loud impact then a tail | measured: 540 and 817 Hz (1:1.51), both with even harmonics; −10 dB within 10 ms, −40 dB at 360 ms (write-ups: 587 and 845 Hz, band-pass ≈ 2.64 kHz) |
+| 808 rimshot / claves | Two resonators (rimshot) or one (claves) hit by a 10 ms pulse | measured: rimshot ≈ 1820–1850 and 440 Hz, gone in 15 ms, its negative half-cycles the larger; claves a pure 2575 Hz sine that starts at its crest, −20 dB at 17 ms (write-ups: 1667 and 455 Hz; 2500 Hz) |
+| 808 toms / congas | A bridged-T resonator; toms add dark lowpassed noise, congas skip it; the diodes drift the pitch down as it fades | measured toms: 88 / 138 / 188 Hz, a near-pure sine starting at its crest, under a semitone of drift in the first 30 ms, −20 dB at 175 / 115 / 95 ms, no noise above 2 kHz after 5 ms; congas 185 / 280 / 400 Hz at 180 / 100 / 80 ms |
+| 909 toms | Two rounded triangles about 1:1.63 apart sharing one pitch envelope, plus noise | measured mid tom: 92.7 and 56.9 Hz settled, the upper starting about 4 semitones sharp and gliding down over 300 ms; −20 dB at 233 ms |
 | 808 maracas | White noise → VCA → highpass, an attack-release shape whose rise is ¾ of the length | 25–35 ms total |
 | 909 bass drum | A triangle VCO rounded towards a sine by back-to-back diodes; a pitch envelope starts high and sweeps to the base; "attack" is a click plus a short filtered-noise burst | sweep decay set by Tune, ≈ 50–100 ms in use |
 | 909 snare | Two rounded triangles, the lower with the longer decay, sharing a short pitch pulse; a fixed short noise burst plus the "snappy" noise, whose envelope holds flat 24 ms before decaying | pitch pulse 100–200 ms decay |
@@ -90,10 +91,20 @@ leans on five of its features:
   phase, whose step lands after the operator's first 0.67 ms amplitude
   ramp. Every kick operator is phase-locked (`phaseFree: false`), as the
   circuits start the same way every hit.
-- **Diode rounding is negative feedback.** The 909 toms carry `feedback`
-  −0.35 … −0.6 on the body operator, and the 909 kicks about −0.13: odd
-  harmonics that fade as the level does, which is what the diodes do to
-  the triangle.
+- **Diode rounding is negative feedback.** The 909 kicks carry `feedback`
+  about −0.13 on the body operator: odd harmonics that fade as the level
+  does, which is what the diodes do to the triangle. The fitted 909 toms
+  round their two Triangle operators with `tone` 0.07 instead, the lower
+  tone with feedback −0.79 and the upper +0.3.
+- **The tonal percussion is fitted to recordings**
+  (`docs/research/2026-10-01-tr-percussion-fit/`): the three 808 toms, the
+  rim shot, the claves and the cowbell, and the 909 mid tom, whose low and
+  high siblings are it a fourth down and up. A long, exponential-looking
+  tail is the trigger-mode breakpoint: decay to a sustain level, then the
+  release runs on to zero with no note-off. The 808 toms, rim shot and
+  claves and the 909 toms are phase-locked; the cowbell's oscillators run
+  free, as on the machine. The 909 tom is two tones about 1:1.63 apart under
+  the one pitch envelope, so they beat as the recording does.
 - **Noise colour is the global filter only.** The Noise wave is white per
   sample and ignores pitch, and a Noise operator ignores any modulator (so a
   modulator into a Noise op is wasted); an FM carrier driven by white noise

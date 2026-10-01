@@ -6,9 +6,11 @@
  * (`runToSink`).
  *
  * The files are `<song>.wav` (the master, as the WAV export writes it),
- * `<song>-<nn>-<part name>.wav` with `nn` the part's number (slot + 1), and
- * `<song>-send-a.wav` and `<song>-send-b.wav` for the send buses (decision 3,
- * windsor#172), in `<song>-stems.zip`. Both destinations get the zip: a
+ * `<song>-<nn>-<part name>.wav` with `nn` the part's number (slot + 1),
+ * `<song>-group-<n>-<group name>.wav` with `n` the group's place in the
+ * song's list, from 1 (windsor#286), and `<song>-send-a.wav` and
+ * `<song>-send-b.wav` for the send buses (decision 3, windsor#172), in
+ * `<song>-stems.zip`. Both destinations get the zip: a
  * page cannot save several downloads in a row
  * without the browser stopping to ask, and one Save as… picks one file.
  *
@@ -27,6 +29,7 @@ import { StoredZipWriter, crc32Async } from '@windsor/engine';
 import {
   FILE_NAME_FORBIDDEN,
   STEMS_ZIP_SUFFIX,
+  STEM_GROUP_WORD,
   STEM_NUMBER_DIGITS,
   STEM_RETURN_WORD,
   WAV_EXTENSION,
@@ -48,12 +51,19 @@ export function stemFileName(exportName: string, stem: Stem): string {
       return `${song}${WAV_EXTENSION}`;
     case 'part': {
       const number = String(stem.slot + 1).padStart(STEM_NUMBER_DIGITS, '0');
-      const label = stem.name.replace(FILE_NAME_FORBIDDEN, '-').trim();
-      return `${song}-${number}${label ? `-${label}` : ''}${WAV_EXTENSION}`;
+      return `${song}-${number}${labelSuffix(stem.name)}${WAV_EXTENSION}`;
     }
+    case 'group':
+      return `${song}-${STEM_GROUP_WORD}-${stem.position}${labelSuffix(stem.name)}${WAV_EXTENSION}`;
     case 'return':
       return `${song}-${STEM_RETURN_WORD}-${stem.name}${WAV_EXTENSION}`;
   }
+}
+
+/** `-<name>` with the characters no file system takes made `-`, or nothing for a blank name. */
+function labelSuffix(name: string): string {
+  const label = name.replace(FILE_NAME_FORBIDDEN, '-').trim();
+  return label ? `-${label}` : '';
 }
 
 export interface StemExportRun extends Omit<AudioExportRun, 'render'> {

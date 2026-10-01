@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "Saw Arp",
   "category": "Plucks",
   "tags": ["arp", "authored"],
@@ -134,7 +134,6 @@
       "mode": 1,
       "cutoff": 534.7160875220585,
       "resonance": 2.884816599374536,
-      "drive": 1.6,
       "slope24": false,
       "envAmount": 2.5,
       "modWheelDepth": 0,
@@ -178,6 +177,12 @@
       "toPitch": 0,
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
+    },
+    "drive": {
+      "gain": 1.6,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

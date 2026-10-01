@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "Long Dusk",
   "category": "Pads",
   "tags": ["warm", "slow", "distant"],
@@ -144,7 +144,6 @@
       "mode": 1,
       "cutoff": 1050,
       "resonance": 0.85,
-      "drive": 1,
       "slope24": true,
       "envAmount": 0.8,
       "modWheelDepth": 0,
@@ -178,6 +177,12 @@
       "endLevel": 0,
       "loopMode": 0,
       "keyScale": 0
+    },
+    "drive": {
+      "gain": 1,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

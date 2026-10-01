@@ -6,6 +6,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DRIVE_SHAPE as MAIN_DRIVE_SHAPE,
+  DRIVE_SHAPE_NAMES,
   FILTER_MODE as MAIN_FILTER_MODE,
   FILTER_MODE_NAMES,
   LFO_SHAPE as MAIN_LFO_SHAPE,
@@ -14,6 +16,9 @@ import {
   LOOP_MODE_NAMES,
 } from '../../patch/patch';
 import {
+  DRIVE_FOLD,
+  DRIVE_SHAPE,
+  DRIVE_SOFT,
   FILT_NOTCH,
   FILT_OFF,
   FILTER_MODE,
@@ -30,12 +35,14 @@ describe('mode ids', () => {
     expect(MAIN_LOOP_MODE).toBe(LOOP_MODE);
     expect(MAIN_FILTER_MODE).toBe(FILTER_MODE);
     expect(MAIN_LFO_SHAPE).toBe(LFO_SHAPE);
+    expect(MAIN_DRIVE_SHAPE).toBe(DRIVE_SHAPE);
   });
 
   it('builds each object from the scalars the DSP switches on', () => {
     expect([LOOP_MODE.NONE, LOOP_MODE.TRIGGER]).toEqual([LOOP_NONE, LOOP_TRIGGER]);
     expect([FILTER_MODE.OFF, FILTER_MODE.NOTCH]).toEqual([FILT_OFF, FILT_NOTCH]);
     expect([LFO_SHAPE.SINE, LFO_SHAPE.DRIFT]).toEqual([LFO_SINE, LFO_DRIFT]);
+    expect([DRIVE_SHAPE.SOFT, DRIVE_SHAPE.FOLD]).toEqual([DRIVE_SOFT, DRIVE_FOLD]);
   });
 
   it('numbers each set densely from zero, one console name per id', () => {
@@ -43,6 +50,7 @@ describe('mode ids', () => {
       [LOOP_MODE, LOOP_MODE_NAMES],
       [FILTER_MODE, FILTER_MODE_NAMES],
       [LFO_SHAPE, LFO_SHAPE_NAMES],
+      [DRIVE_SHAPE, DRIVE_SHAPE_NAMES],
     ];
     for (const [ids, names] of sets) {
       const values = Object.values(ids);
