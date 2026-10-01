@@ -87,6 +87,49 @@ export {
 } from './worklet/fm/stepModTables';
 export type { StepModCurve, StepModParam, StepModRow } from './worklet/fm/stepModTables';
 export { stepModValue } from './worklet/fm/stepModValue';
+// Song automation lanes (windsor#341, record `2026-10-01-song-automation-lanes`): the pure core.
+export type {
+  AutomationLane,
+  AutomationPoint,
+  AutomationScale,
+  AutomationTargetId,
+  AutomationTargetKind,
+  AutomationTargetRow,
+  InsertTargetId,
+  ParsedTarget,
+  StripTargetId,
+  VoiceTargetId,
+} from './automation/automationLane';
+export { pointsInOrder } from './automation/automationLane';
+export {
+  AUTOMATION_GRAIN_TICKS,
+  AUTOMATION_STEP_RAMP_SECONDS,
+} from './automation/automationConstants';
+export {
+  AUTOMATION_LEVEL_FLOOR_DB,
+  AUTOMATION_STRIP_LEVEL_MAX,
+  FM_LANES_MAX,
+  STRIP_AUTOMATION_ROWS,
+  VOICE_AUTOMATION_ROWS,
+} from './automation/automationTargetTables';
+export { INSERT_AUTOMATION_FIELDS } from './automation/automationInsertTables';
+export {
+  STRIP_TARGET_IDS,
+  VOICE_TARGET_IDS,
+  catalogRow,
+  formatTargetId,
+  insertTargetRow,
+  parseTargetId,
+  targetKind,
+  targetRow,
+} from './automation/automationTargets';
+export { DISPLAY_ROW, fromDisplay, toDisplay } from './automation/automationDisplay';
+export { bendCurve, rampsBetween, valueAt } from './automation/automationEvaluate';
+export type { AutomationRamp, RampWindow } from './automation/automationEvaluate';
+export { replaceRange, stampShape } from './automation/automationShapes';
+export type { AutomationShapeSpec } from './automation/automationShapes';
+export { AUTOMATION_SHAPE_KINDS } from './automation/automationShapeTables';
+export type { AutomationShapeKind } from './automation/automationShapeTables';
 export {
   CHORD_STEP_KINDS,
   ChordSequencer,
