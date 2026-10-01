@@ -3,15 +3,17 @@
  * log-frequency grid and the ± dB lines, the selected band's own curve
  * filled in `--carrier`, the whole EQ's curve in the rack's accent (`--kc`)
  * and a numbered point per band. Every line is the engine's `eqResponseDb`
- * at the running sample rate; where a point sits is `eqCurveModel.ts`'s. The
- * background stays empty until the spectrum (windsor#200).
+ * at the running sample rate; where a point sits is `eqCurveModel.ts`'s.
+ * Behind them, while the card reads it, the EQ's output spectrum as a filled
+ * area in `--ink-dim` (windsor#200; the levels are `eqSpectrum.ts`'s).
  */
 import type { EqSpec } from '@windsor/engine';
 import { eqResponseDb } from '@windsor/engine';
 import { CARRIER_COLOR, LINE_COLOR } from './consoleColors';
 import type { EqPlot } from './eqCurveModel';
 import { freqOfX, pointAt, soloBand, xOfFreq, yOfDb } from './eqCurveModel';
-import { EQ_GRID_DB, EQ_GRID_HZ, EQ_GRID_LABELS, EQ_PLOT } from './eqTables';
+import { spectrumLevels } from './eqSpectrum';
+import { EQ_GRID_DB, EQ_GRID_HZ, EQ_GRID_LABELS, EQ_PLOT, EQ_SPECTRUM_VIEW } from './eqTables';
 
 /** The colours a curve is drawn in. */
 export interface EqPalette {
@@ -22,6 +24,8 @@ export interface EqPalette {
   readonly ink: string;
   readonly faint: string;
   readonly inset: string;
+  /** The spectrum's fill. */
+  readonly dim: string;
 }
 
 /**
@@ -40,6 +44,7 @@ export function eqPalette(canvas: HTMLElement): EqPalette {
     ink: read('--ink', CARRIER_COLOR),
     faint: read('--ink-faint', LINE_COLOR),
     inset: read('--inset', LINE_COLOR),
+    dim: read('--ink-dim', LINE_COLOR),
   };
 }
 
@@ -50,11 +55,15 @@ export interface EqDrawState {
   readonly plot: EqPlot;
   readonly sampleRate: number;
   readonly palette: EqPalette;
+  /** The output spectrum in dBFS per bin, bin k at k × `binHz`; none while it is off. */
+  readonly spectrum?: { readonly bins: Float32Array; readonly binHz: number } | null;
 }
 
 /** The frequency at each x of the plot, 0 … width, and the response there. */
 const freqs = new Float64Array(EQ_PLOT.width + 1);
 const response = new Float64Array(EQ_PLOT.width + 1);
+/** The spectrum's height at each of its columns. */
+const levels = new Float64Array(Math.floor(EQ_PLOT.width / EQ_SPECTRUM_VIEW.step) + 1);
 
 /** Size `canvas` for the plot at the screen's pixel ratio and return its context, or null. */
 export function eqCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
@@ -106,6 +115,20 @@ const clampY = (y: number, plot: EqPlot): number =>
 function respond(spec: EqSpec, s: EqDrawState): void {
   for (let x = 0; x <= s.plot.width; x++) freqs[x] = freqOfX(x, s.plot);
   eqResponseDb(spec, freqs, s.sampleRate, response);
+}
+
+function spectrum(g: CanvasRenderingContext2D, s: EqDrawState): void {
+  if (!s.spectrum) return;
+  const n = spectrumLevels(s.spectrum.bins, s.spectrum.binHz, s.plot, levels);
+  g.beginPath();
+  g.moveTo(0, s.plot.height);
+  for (let i = 0; i < n; i++) g.lineTo(i * EQ_SPECTRUM_VIEW.step, levels[i]!);
+  g.lineTo(s.plot.width, s.plot.height);
+  g.closePath();
+  g.fillStyle = s.palette.dim;
+  g.globalAlpha = EQ_SPECTRUM_VIEW.fillAlpha;
+  g.fill();
+  g.globalAlpha = 1;
 }
 
 function selectedFill(g: CanvasRenderingContext2D, s: EqDrawState): void {
@@ -163,6 +186,7 @@ function points(g: CanvasRenderingContext2D, s: EqDrawState): void {
 export function drawEqCurve(g: CanvasRenderingContext2D, s: EqDrawState): void {
   g.clearRect(0, 0, s.plot.width, s.plot.height);
   grid(g, s);
+  spectrum(g, s);
   selectedFill(g, s);
   wholeCurve(g, s);
   points(g, s);

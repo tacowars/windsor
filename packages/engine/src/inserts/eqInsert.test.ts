@@ -2,7 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FakeContext, FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import { FakeNode, FakeParam } from '../__fixtures__/fakeAudioNodes';
 import { eqParams, loadEq } from '../__fixtures__/eqHarness';
-import { EQ_BAND_COUNT, EQ_NAME, EQ_SLOPES, EQ_TYPE_ID } from './eqConstants';
+import {
+  EQ_BAND_COUNT,
+  EQ_LISTEN,
+  EQ_NAME,
+  EQ_SLOPES,
+  EQ_SPECTRUM,
+  EQ_TYPE_ID,
+} from './eqConstants';
 import { EQ_INSERT } from './eqInsert';
 import {
   EQ_BAND_PARAMS,
@@ -53,6 +60,33 @@ function install(): void {
   );
 }
 afterEach(() => vi.unstubAllGlobals());
+
+/** An analyser that reads every bin at −42 dBFS. */
+class FakeAnalyser extends FakeNode {
+  readonly kind = 'analyser';
+  fftSize = 2048;
+  smoothingTimeConstant = 0.8;
+  getFloatFrequencyData(into: Float32Array): void {
+    into.fill(-42);
+  }
+  protected render(): Float32Array[][] {
+    return [[]];
+  }
+}
+
+/** A context whose `createAnalyser` builds `FakeAnalyser`s, each kept in `analysers`. */
+function analysingContext(): { context: FakeContext; analysers: FakeAnalyser[] } {
+  const context = new FakeContext();
+  const analysers: FakeAnalyser[] = [];
+  Object.assign(context, {
+    createAnalyser: (): FakeAnalyser => {
+      const analyser = new FakeAnalyser(context);
+      analysers.push(analyser);
+      return analyser;
+    },
+  });
+  return { context, analysers };
+}
 
 const PAD: EqSpec = {
   ...DEFAULT_EQ,
@@ -118,11 +152,61 @@ describe('the stage', () => {
     expect(INSERT_KINDS.eq).toBe(EQ_INSERT);
   });
 
+  it('taps its output into an analyser only while the spectrum is active', () => {
+    install();
+    const { context, analysers } = analysingContext();
+    const stage = EQ_INSERT.create(context.asAudioContext(), PAD);
+    const output = stage.output as unknown as FakeNode;
+    output.connect(context.destination);
+    const bins = new Float32Array(EQ_SPECTRUM.fftSize / 2);
+    stage.spectrum!.read(bins);
+    expect(analysers, 'nothing is built before the first activation').toEqual([]);
+    expect(bins.every((v) => v === -Infinity)).toBe(true);
+
+    stage.spectrum!.setActive(true);
+    expect(analysers).toHaveLength(1);
+    const [analyser] = analysers as [FakeAnalyser];
+    expect(analyser.fftSize).toBe(EQ_SPECTRUM.fftSize);
+    expect(analyser.smoothingTimeConstant).toBe(EQ_SPECTRUM.smoothing);
+    expect(output.outbound.map((c) => c.to)).toEqual([context.destination, analyser]);
+    expect(analyser.outbound, 'a tap, never in the program path').toEqual([]);
+    stage.spectrum!.read(bins);
+    expect(bins.every((v) => v === -42)).toBe(true);
+
+    stage.spectrum!.setActive(false);
+    stage.spectrum!.setActive(false);
+    expect(output.outbound.map((c) => c.to)).toEqual([context.destination]);
+    stage.spectrum!.read(bins);
+    expect(bins.every((v) => v === -Infinity)).toBe(true);
+
+    stage.spectrum!.setActive(true);
+    expect(analysers, 'the analyser is built once').toHaveLength(1);
+    stage.dispose();
+    expect(output.outbound.map((c) => c.to)).toEqual([context.destination]);
+  });
+
   it('stops processing once told to stop', () => {
     const processor = loadEq();
     processor.port.onmessage({ data: { type: 'stop' } });
     const out = [[new Float32Array(128), new Float32Array(128)]];
     expect(processor.process([[new Float32Array(128)]], out, eqParams())).toBe(false);
+  });
+
+  it('sends Listen to the processor, and leaves every parameter where it was', () => {
+    install();
+    const context = new FakeContext();
+    const stage = EQ_INSERT.create(context.asAudioContext(), PAD);
+    const node = stage.processor as unknown as EqNode;
+    const before = [...node.parameters].map(([name, p]) => [name, p.value]);
+    stage.listen!(3);
+    stage.listen!(EQ_LISTEN.off);
+    stage.listen!(-7);
+    expect(node.posted).toEqual([
+      { type: 'listen', band: 3 },
+      { type: 'listen', band: EQ_LISTEN.off },
+      { type: 'listen', band: EQ_LISTEN.off },
+    ]);
+    expect([...node.parameters].map(([name, p]) => [name, p.value])).toEqual(before);
   });
 
   it('reports load when asked', () => {

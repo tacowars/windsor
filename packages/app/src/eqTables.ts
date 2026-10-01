@@ -107,6 +107,33 @@ export interface EqView {
 /** Where every EQ's view starts: the mockup's (band 4, ±12 dB, Listen on). */
 export const EQ_DEFAULT_VIEW: EqView = { band: 3, range: 12, listen: true };
 
+/**
+ * The output spectrum behind the curve (windsor#200 decisions 1 and 2): what
+ * it draws, how often, and when the analyser runs at all.
+ */
+export const EQ_SPECTRUM_VIEW = {
+  /** The plot's bottom and top, in dBFS. */
+  floorDb: -84,
+  ceilingDb: 0,
+  /** Redrawn at most this often, on the console's frame loop. */
+  frameMs: 60,
+  /**
+   * Something sounds while the transport runs, or while the master output
+   * stage's input peaked above this (linear, −90 dBFS) in the last `holdMs`:
+   * the audition keyboard and the tails after Stop pass through it too.
+   */
+  heardPeak: 3.1623e-5,
+  holdMs: 500,
+  /** The filled area's opacity, in `--ink-dim`. */
+  fillAlpha: 0.16,
+  /** Its x step, px. */
+  step: 2,
+} as const;
+
+/** The pill over the curve while Listen on drag plays a band: "Listening · band 4 · 1.24kHz". */
+export const eqListenLabel = (band: number, freq: number): string =>
+  `Listening · band ${band + 1} · ${fmtHz(freq)}Hz`;
+
 /** The sample rate the curve is drawn at while the audio is off. */
 export const EQ_FALLBACK_SAMPLE_RATE = 48000;
 

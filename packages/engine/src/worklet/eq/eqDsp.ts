@@ -15,15 +15,21 @@
  * Invariants: nothing allocates after the constructor; the output of the
  * copy paths is the input's own samples; a double field is first written as
  * a double, so no later write changes its representation (see `eqBand.ts`).
- * The first `retarget` snaps every value. Pinned by `inserts/eqDsp.test.ts`
- * and `eqAllocation.test.ts` through the shipped bundle.
+ * The first `retarget` snaps every value. Listen (`eqListen.ts`,
+ * windsor#200) runs after the whole route, over its output, and only while a
+ * band is heard: with Listen off the route is untouched. Pinned by
+ * `inserts/eqDsp.test.ts`, `eqListen.test.ts` and `eqAllocation.test.ts`
+ * through the shipped bundle.
  */
 import { EQ_DSP as D, EQ_MATH as M } from '../../inserts/eqConstants';
 import { EqBand } from './eqBand';
+import { EqListen } from './eqListen';
 import { glideSections, mixFade, runSections } from './eqSections';
 
 export class EqDsp {
   bands: EqBand[];
+  /** Listen on drag: a band-pass of the input over the output while a band is held. */
+  listen: EqListen;
   /** The stereo work buffers, and a band's input kept for its fade. */
   workL: Float64Array;
   workR: Float64Array;
@@ -54,6 +60,7 @@ export class EqDsp {
   constructor(sampleRate: number, bands: number) {
     this.bands = [];
     for (let b = 0; b < bands; b++) this.bands.push(new EqBand(sampleRate));
+    this.listen = new EqListen(sampleRate);
     this.workL = new Float64Array(D.blockFrames);
     this.workR = new Float64Array(D.blockFrames);
     this.dryL = new Float64Array(D.blockFrames);
@@ -93,9 +100,17 @@ export class EqDsp {
       this.mixDir = this.enabled ? 1 : -1;
       this.bypassed = false;
     }
+    this.listen.retarget();
   }
 
+  /** One render quantum: the EQ's route, then Listen over it while a band is heard. */
   process(inL: Float32Array, inR: Float32Array, outL: Float32Array, outR: Float32Array): void {
+    this.render(inL, inR, outL, outR);
+    if (this.listen.band >= 0) this.listen.process(this.bands, inL, inR, outL, outR);
+  }
+
+  /** The EQ's route: a copy, silence, or the bands in pieces (see the header). */
+  render(inL: Float32Array, inR: Float32Array, outL: Float32Array, outR: Float32Array): void {
     const frames = outL.length;
     if (this.bypassed || (this.quiet() && this.gain === 1)) {
       for (let i = 0; i < frames; i++) {

@@ -102,6 +102,30 @@ export const EQ_DSP = {
 } as const;
 
 /**
+ * Listen on drag (windsor#200, record decision 9): while the console holds a
+ * band, the EQ plays only a band-pass at that band's frequency and Q. Live
+ * only, never in the spec or the song.
+ */
+export const EQ_LISTEN = {
+  /** `listen(off)`: the full EQ again. */
+  off: -1,
+  /** The band-pass's Q never falls below this, so a wide band still sounds like a band. */
+  minQ: 0.5,
+  /** Listening fades in, out, and from one band to the next over this long. */
+  fadeSeconds: 0.01,
+} as const;
+
+/**
+ * The output spectrum's analyser (windsor#200): on a tap after the EQ's
+ * output, never in the program path, and connected only while the card asks.
+ */
+export const EQ_SPECTRUM = {
+  fftSize: 4096,
+  /** The analyser's `smoothingTimeConstant`: how slowly a bin falls between reads. */
+  smoothing: 0.8,
+} as const;
+
+/**
  * Where a section's coefficients (b0, b1, b2, a1, a2; a0 = 1) sit in its
  * `coefficientsPerSection`, and its TDF-II state (two words per channel) in
  * its `statePerSection`.

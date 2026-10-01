@@ -1,7 +1,8 @@
 /**
  * The Parametric EQ's run for `workletAllocationProbe.ts` (windsor#198): type,
- * slope and on toggled on every band, after a warm-up of every path the audio
- * thread has. The probe imports it by path in its child Node, which runs it
+ * slope and on toggled on every band, and Listen on drag (windsor#200) taken
+ * from band to band and off, after a warm-up of every path the audio thread
+ * has. The probe imports it by path in its child Node, which runs it
  * directly (its types are stripped), so it imports nothing at run time; the
  * test passes the parameter names keyed by their `EQ_BAND_PARAMS` field
  * (`Freq` … `On`), so no object here shares its keys, and so its hidden class,
@@ -20,6 +21,22 @@ export interface EqToggleConfig {
   period: number;
 }
 
+/**
+ * Listen on drag's messages, built once (the measured run posts these and
+ * makes none): every `every` quanta the next of off, a band, the band after
+ * it, off, …, so a listen starts, moves straight to another band, and ends.
+ */
+function listenDriver(probe: ProbeRig, every: number, count: number): (q: number) => void {
+  const messages = Array.from({ length: count + 1 }, (_, i) => ({
+    data: { type: 'listen', band: i - 1 },
+  }));
+  return (q) => {
+    if (q % every !== 0) return;
+    const k = q / every;
+    probe.processor.port.onmessage!(messages[k % 3 === 0 ? 0 : 1 + (k % count)]!);
+  };
+}
+
 export default function eqToggleScenario(probe: ProbeRig): ProbeScenario {
   const config = probe.config.scenarioConfig as EqToggleConfig;
   const { params, sound, quiet } = probe;
@@ -28,6 +45,7 @@ export default function eqToggleScenario(probe: ProbeRig): ProbeScenario {
   const [types, slopes, ons] = [band('Type'), band('Slope'), band('On')];
   const [freqs, gains, qs] = [band('Freq'), band('Gain'), band('Q')];
   const count = types.length;
+  const listen = listenDriver(probe, config.period * 3, count);
   // Type, slope and on in turn, for every band at once (preallocated: nothing here allocates).
   const toggle = (q: number): void => {
     if (q % config.period !== 0) return;
@@ -61,6 +79,7 @@ export default function eqToggleScenario(probe: ProbeRig): ProbeScenario {
     for (let q = from; q < to; q++) {
       if (warm) glide(q);
       else toggle(q);
+      listen(q);
       probe.render(q, warm ? vary(q) : sound);
     }
   };

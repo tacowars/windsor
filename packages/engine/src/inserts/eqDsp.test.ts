@@ -319,6 +319,7 @@ describe('the audio thread', () => {
       ...methods(internals.EqProcessor.prototype),
       ...methods(internals.EqDsp.prototype),
       ...methods(internals.EqBand.prototype),
+      ...methods(internals.EqListen.prototype),
       ...HOT_FUNCTIONS.map((name): [string, string] => [name, String(internals[name])]),
     ];
     expect(hot.length).toBeGreaterThan(40);
@@ -347,7 +348,7 @@ describe('the audio thread', () => {
       new URL('../worklet/generated/eq-processor.js', import.meta.url),
       'utf8',
     );
-    for (const name of ['EqBand', 'EqDsp', 'EqProcessor']) {
+    for (const name of ['EqBand', 'EqDsp', 'EqListen', 'EqProcessor']) {
       const body = source.slice(source.indexOf(`class ${name} `));
       const head = body.slice(body.indexOf('{') + 1, body.indexOf('constructor('));
       expect(head.replace(/static get parameterDescriptors\(\) \{[^}]*\}/, '').trim(), name).toBe(

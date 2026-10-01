@@ -3,7 +3,8 @@
  * `generated/eq-processor.js`: the k-rate AudioParams (flat names from
  * `inserts/eqParameters.ts`), the port's stop and load reports, and one call
  * into `EqDsp` per render quantum. A mono input feeds both channels; a
- * missing input is silence.
+ * missing input is silence. A `listen` message names the band Listen on drag
+ * plays alone (windsor#200), −1 or anything but a band's index for none.
  *
  * Invariants: `process` allocates nothing (the parameter names are built
  * once, in the constructor); every value is held in its range before the DSP
@@ -14,6 +15,7 @@ import {
   EQ_BAND_TYPES,
   EQ_BOUNDS,
   EQ_DSP,
+  EQ_LISTEN,
   EQ_NAME,
   EQ_SLOPES,
 } from '../../inserts/eqConstants';
@@ -24,6 +26,7 @@ import { LoadSampler } from '../loadSampler';
 import { EqDsp } from './eqDsp';
 
 type EqParams = Record<string, Float32Array>;
+type EqMessage = { type: 'stop' } | { type: 'listen'; band: unknown } | ReportLoadMessage;
 
 const FIELDS = EQ_BAND_PARAMS.length;
 /** Each field's offset within a band's run of names. */
@@ -40,6 +43,13 @@ const SLOPE_IDS = [0, EQ_SLOPES.length - 1];
 
 function clamp(value: number, range: readonly number[]): number {
   return value < range[0] ? range[0] : value > range[1] ? range[1] : value;
+}
+
+/** A `listen` message's band: a band's index, or `EQ_LISTEN.off` for anything else. */
+function listenBand(band: unknown): number {
+  return Number.isInteger(band) && (band as number) >= 0 && (band as number) < EQ_BAND_COUNT
+    ? (band as number)
+    : EQ_LISTEN.off;
 }
 
 class EqProcessor extends AudioWorkletProcessor {
@@ -63,9 +73,10 @@ class EqProcessor extends AudioWorkletProcessor {
     for (let b = 0; b < EQ_BAND_COUNT; b++)
       for (const field of EQ_BAND_PARAMS) this.names.push(eqParamName(b, field));
     this.load = new LoadSampler(sampleRate, this.port);
-    this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' } | ReportLoadMessage>) => {
+    this.port.onmessage = ({ data }: MessageEvent<EqMessage>) => {
       if (data.type === 'stop') this.running = false;
       if (data.type === 'reportLoad') this.load.start(data.quanta);
+      if (data.type === 'listen') this.dsp.listen.nextBand = listenBand(data.band);
     };
   }
 

@@ -951,6 +951,21 @@ input {
   border-color: var(--line-bright);
   color: var(--ink);
 }
+.eq-listen-pill {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  padding: 1px 5px;
+  background: var(--carrier);
+  border-radius: 2px;
+  color: var(--inset);
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
 .eq-band {
   display: flex;
   gap: 2px;
