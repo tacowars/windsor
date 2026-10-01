@@ -8,7 +8,10 @@
  *   parameter and starts a newly selected pair from zero state.
  * - The core's three controls, smoothed per block toward the selected
  *   model's row with the insert's 10 ms time constant, the magnetization
- *   kept; the active pair is reconfigured only when they moved (decision 6).
+ *   kept; both pairs are reconfigured only when they moved (decision 6).
+ *   The idle pair is configured with the active one, so a switch only
+ *   resets the pair it selects (windsor#228): a switch is rare, and a
+ *   reconfiguration there ran in V8's lower tiers, which box every double.
  * - The dry ring: `latency` samples per channel, so Mix and bypass read a
  *   dry signal exactly as late as the pair's fixed delay (decision 4).
  *
@@ -74,9 +77,9 @@ class TapeMagneticStage {
 
   /**
    * The pair for `value`, the nearest of `TAPE_OVERSAMPLING`. A change resets
-   * the newly selected pair to zero state and configures it from the smoothed
-   * controls; the pair it leaves keeps its state until it is selected again,
-   * when it too starts from zero.
+   * the newly selected pair to zero state; it is already configured from the
+   * smoothed controls, as `configure` keeps both pairs. The pair it leaves
+   * keeps its state until it is selected again, when it too starts from zero.
    */
   select(value: number): void {
     const index = value >= (TAPE_OVERSAMPLING[0] + TAPE_OVERSAMPLING[1]) / 2 ? 1 : 0;
@@ -86,15 +89,14 @@ class TapeMagneticStage {
     for (let channel = 0; channel < CHANNELS; channel++) {
       const next = this.oversamplers[channel * TAPE_OVERSAMPLING.length + index];
       next.reset();
-      next.configure(this.controls);
       this.active[channel] = next;
     }
   }
 
   /**
    * Once per block: smooth the core's controls toward `model`'s row over
-   * `frames` samples with the 10 ms time constant, and reconfigure the active
-   * pair when they moved. While every row is equal this changes nothing.
+   * `frames` samples with the 10 ms time constant, and reconfigure both pairs
+   * when they moved. While every row is equal this changes nothing.
    */
   configure(model: number, frames: number): void {
     magneticControls(TAPE_MODELS[model].magnetic, this.target);
@@ -118,7 +120,7 @@ class TapeMagneticStage {
     last.drive = s.drive;
     last.width = s.width;
     last.saturation = s.saturation;
-    for (let channel = 0; channel < CHANNELS; channel++) this.active[channel].configure(s);
+    for (let i = 0; i < this.oversamplers.length; i++) this.oversamplers[i].configure(s);
   }
 }
 

@@ -259,7 +259,55 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    first wrote six double fields as 0 or 1; `mixer/reverbAllocation.test.ts`
    now holds it to no allocation and no representation change in Node.
 3. **Tape**: 9 234 bytes a quantum (3.2 MB/s), **+3.7 a second**; longest
-   152 µs.
+   152 µs. That figure predates the magnetic core (windsor#237, windsor#251,
+   windsor#255), which runs at 2x or 4x.
+
+   **After windsor#228: 0 bytes a quantum at either factor.** Same M1,
+   macOS 26.5.1 and `HeadlessChrome/154.0.0.0`, this method (5 s warm-up,
+   meter off, 25 to 32 s traced, reduced by `analyse-trace.mjs`), the
+   worktree's dev server serving `origin/main`'s Tape bundle for the
+   "before" runs and this branch's for the "after", each run in a freshly
+   reloaded page. `b-tape` as committed is a version 4 song, which this
+   build refuses, so it was imported with `version: 5` and, for 4x, with
+   `"oversampling": 4` on its Tape insert. The contexts opened at
+   **48 kHz** (2 667 µs a quantum; the analyser's budget column assumes
+   2 902). One-minute load average 3.9 to 5.9 across the four traces (the
+   ticket's allocation test ran ten times over during the "after" ones).
+
+   | Tape | Bytes / call, median | Calls allocating | Bytes / quantum | Minor GC / s | Tape call, median µs | Quantum span, median µs |
+   |---|---:|---:|---:|---:|---:|---:|
+   | 2x before | 10 752 | 9 254 of 9 254 | 10 757 | 4.84 | 279 | 403 |
+   | 2x after | 0 | 2 of 11 659 | 0.1 | 0 | 280 | 425 |
+   | 4x before | 10 752 | 9 254 of 9 254 | 10 830 | 4.88 | 526 | 657 |
+   | 4x after | 0 | 2 of 9 247 | 0.1 | 0 | 525 | 662 |
+
+   The fresh "before" is 10 752 bytes a call at both factors, more than the
+   9 234 measured on the old saturation stage; Node read 14 339 a quantum,
+   the same 0.75 ratio. What allocated did not depend on the factor: the
+   magnetic core already passed its stage points in a `Float64Array` and its
+   results in fields. V8's sampling heap profiler (collected objects kept,
+   Node 24) put the bytes in `channel` (43 %), `process` (28 %) and `tick`
+   (28 %): seven heap numbers a sample, from the samples passed to `tick`
+   and `channel`, `channel`'s return, and `left?.[i] ?? 0`, which is a
+   sample or undefined and so held boxed before it is passed or stored. The
+   allocation probe's trace named 49 representation changes, fields first
+   written as small integers or booleans. In each "after" trace the two
+   calls that allocated read 320 bytes each, and the sleeping plate return
+   shows the same two calls of 320 bytes, so they are not Tape's render. The
+   audio thread made no minor collection; its two collections in each trace
+   were memory-reducer mark-compacts (1 211 µs at the longest), outside any
+   render call, as windsor#233's runs saw. The change scenario
+   (`inserts/tapeAllocation.test.ts`) found three paths that allocate only
+   on a change, now removed: the controls read by a store keyed by name (a
+   boxed value a control a block), and the dropout roll and a factor
+   switch's reconfiguration, both too rare for V8 to optimise and so left
+   in its lower tiers. What remains there is V8's own: a path that first
+   runs after a long steady stretch still runs in a lower tier until V8
+   optimises it. The meter-on underrun pass was not run. Summaries:
+   [`summaries/b-tape-2x-before.json`](summaries/b-tape-2x-before.json),
+   [`b-tape-2x-after.json`](summaries/b-tape-2x-after.json),
+   [`b-tape-4x-before.json`](summaries/b-tape-4x-before.json),
+   [`b-tape-4x-after.json`](summaries/b-tape-4x-after.json).
 4. **Compressor**: 7 680 bytes a quantum (2.6 MB/s), **+3.1 a second**;
    longest 164 µs.
    **After windsor#229: 0 bytes a quantum**, in every one of the 10 147
@@ -425,6 +473,7 @@ measured neither.
   time, length and heap before and after. `b-plate-after.json` is the plate
   scenario rerun after windsor#227, `b-retro-reverb-after.json` the Retro
   reverb's after windsor#230, `b-phaser-after.json` the Phaser's after
-  windsor#231, and `a-fm-after.json` and `c-dense-after.json` the FM part's
-  after windsor#233.
+  windsor#231, `a-fm-after.json` and `c-dense-after.json` the FM part's
+  after windsor#233, and `b-tape-{2x,4x}-{before,after}.json` Tape's either
+  side of windsor#228, on the magnetic core.
 - [`tables.mjs`](tables.mjs) prints this README's tables from the summaries.

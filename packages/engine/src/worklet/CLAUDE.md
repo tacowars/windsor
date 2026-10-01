@@ -18,6 +18,16 @@ It builds `generated/tape-processor.js` and has its own TS project.
 `__fixtures__/tapeDspProbe.ts` runs it a sample at a time for the
 `tapeMagneticIntegration*.test.ts` calibration, guard, delay and switch tests.
 Record: `docs/log/2026-09-30-tape-magnetic-integration.md`.
+The render allocates nothing (windsor#228): the processor writes each frame
+to `TapeDsp.input` and calls `step` (`tick(left, right)` is the tests'
+entry), a channel leaves its sample in `sample`, a tone filters its own
+`value` in `advance`, the motion reads its amounts from fields and draws into
+`drawn`, the controls are read by name each block into a class born NaN, and
+every double field is first written as NaN. The dropout roll is written in
+`TapeMotion.advance`, not called, and both oversampler pairs stay configured,
+so a factor switch only resets: paths that rare stay in V8's lower tiers,
+which box. `inserts/tapeAllocation.test.ts` pins it on V8 through
+`__fixtures__/tapeChangeScenario.ts`.
 
 `tape/tapeMagnetic.ts` and `tape/tapeOversample.ts` are the magnetic core
 (windsor#219, epic #146 E1), written from the published Jiles–Atherton model:
