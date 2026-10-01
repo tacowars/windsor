@@ -12,12 +12,13 @@ import { DEFAULT_STRIP, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { withGesture } from './gestureHooks';
+import { routeChange } from './groupModel';
 
 /**
- * Where a strip plays: the master, or only its sidechain key. A group
- * Output (windsor#284) isn't offered here yet: windsor#287 adds it.
+ * Where a strip plays: the master, only its sidechain key, or a group bus
+ * (`{ group: id }`, windsor#284), the engine's whole Output type.
  */
-export type StripOutput = 'master' | 'sidechain';
+export type StripOutput = NonNullable<ChannelStrip['output']>;
 
 /** The strip's two switches (windsor#154). */
 export type StripSwitch = 'mute' | 'solo';
@@ -51,12 +52,8 @@ export const switchOn = (strip: ChannelStrip, which: StripSwitch): boolean => st
 export const switchEnabled = (strip: ChannelStrip, which: StripSwitch): boolean =>
   switchesApply(strip) || switchOn(strip, which);
 
-/**
- * The strip's Output; a missing field plays to the master. A group Output
- * reads as Master until windsor#287 lists the groups.
- */
-export const stripOutput = (strip: ChannelStrip): StripOutput =>
-  strip.output === 'sidechain' ? 'sidechain' : 'master';
+/** The strip's Output; a missing field plays to the master. */
+export const stripOutput = (strip: ChannelStrip): StripOutput => strip.output ?? 'master';
 
 /**
  * What the mixer column shows of every part, collapsed or expanded: its
@@ -107,12 +104,15 @@ export function setStripSend(ctx: AppCtx, slot: number, ret: string, level: numb
 }
 
 /**
- * Route the part to the master or only to its sidechain key (windsor#158).
- * False when the engine refused it; nothing changed then. The cell re-syncs
- * its M and S after it, since `switchEnabled` follows the Output.
+ * Route the part to the master, only to its sidechain key (windsor#158), or
+ * to a group (windsor#287), through `groupModel.ts`'s `routeChange`. False
+ * when the engine refused it; nothing changed then. The cell re-syncs its M
+ * and S after it, since `switchEnabled` follows the Output.
  */
 export function setStripOutput(ctx: AppCtx, slot: number, output: StripOutput): boolean {
-  return writeStrip(ctx, slot, { output });
+  const { ok } = ctx.change(routeChange(slot, output));
+  if (ok) ctx.invalidate();
+  return ok;
 }
 
 /**

@@ -71,8 +71,20 @@ function paintRow(row: LightRow, step: number, clipped: boolean): void {
   }
 }
 
+/** Where a light's meter comes from, by the number its rows are keyed on. */
+export type LightMeters = (ctx: AppCtx, key: number) => PeakMeter | undefined;
+
+/** A part strip's post-fader meter, by slot: the Song tab's lights. */
+export const partMeters: LightMeters = (ctx, slot) =>
+  ctx.host.system?.strip(musicPartName(slot))?.meter;
+
+/**
+ * The poller over `meters`. The Song tab keys its rows on part slots; the
+ * Mixer tab's Groups section (windsor#287) keys one of its own on group ids,
+ * over `groupBus(id).meter`, with the same rules and the same latch.
+ */
 // eslint-disable-next-line max-lines-per-function -- one owner's closure: its rows, its active meters, the frame poll and the release rules share the same state
-export function songMixerLights(ctx: AppCtx): MixerLights {
+export function songMixerLights(ctx: AppCtx, meters: LightMeters = partMeters): MixerLights {
   const rows = new Set<LightRow>();
   const byElement = new WeakMap<Element, LightRow>();
   const active = new Map<number, PeakMeter>();
@@ -91,8 +103,7 @@ export function songMixerLights(ctx: AppCtx): MixerLights {
           }
         });
 
-  const meterOf = (slot: number): PeakMeter | undefined =>
-    ctx.host.system?.strip(musicPartName(slot))?.meter;
+  const meterOf = (slot: number): PeakMeter | undefined => meters(ctx, slot);
 
   const release = (slot: number): void => {
     active.get(slot)?.setActive(false);

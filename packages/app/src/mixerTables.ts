@@ -1,11 +1,11 @@
 /**
  * The Mixer tab's knob specs (#618): the strips over `DEFAULT_STRIP`, the
- * send buses' names, and the plate and delay line's own ranges and tempo
+ * groups over `DEFAULT_GROUP` (windsor#287), the send buses' names, and the plate and delay line's own ranges and tempo
  * divisions. The plate's ranges are the worklet's (`REVERB_SPACE_RANGES`);
  * the delay's are here.
  */
 import type { ReturnName } from '@windsor/engine';
-import { DEFAULT_STRIP, LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '@windsor/engine';
+import { DEFAULT_GROUP, DEFAULT_STRIP, LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '@windsor/engine';
 import { fmt2, fmtHz, fmtSigned } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
 
@@ -37,6 +37,10 @@ export const STRIP_LOW_CUT_KNOB: CardKnobSpec = {
   curve: 'log',
   fmt: fmtHz,
 };
+/** A group's fader (windsor#287): a strip's range, unity by default from the engine. */
+export const GROUP_LEVEL_KNOB: CardKnobSpec = { ...STRIP_LEVEL_KNOB, def: DEFAULT_GROUP.level };
+/** A group's pan: a strip's range, centred by default from the engine. */
+export const GROUP_PAN_KNOB: CardKnobSpec = { ...STRIP_PAN_KNOB, def: DEFAULT_GROUP.pan };
 /** The send buses as the console names them (windsor#172). */
 export const BUS_LABELS: Readonly<Record<ReturnName, string>> = { a: 'Send A', b: 'Send B' };
 /** A send the strip does not name is silent. */
