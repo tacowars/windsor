@@ -10,7 +10,7 @@
 export const CARRIER_COLOR = '#E0A44E';
 /** Modulators, the pitched parts, the mixer strips. */
 export const MOD_COLOR = '#5FA8A0';
-/** The return buses, in the mixer and the returns panel; the insert targets' automation lanes. */
+/** The return buses, in the mixer and the returns panel; the insert targets' automation lanes; the Euclid card's pitch lane. */
 export const RETURN_COLOR = '#9C7BD0';
 /** Clipping, and anything hot. */
 export const HOT_COLOR = '#D2643C';

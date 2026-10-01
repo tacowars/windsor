@@ -27,6 +27,7 @@ import {
   laneReadout,
   lanesForSteps,
   offsetLabel,
+  paintCells,
   paintSpan,
   removeLane,
   resetCell,
@@ -276,5 +277,32 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
       '+2.3 oct · plays if the slide moves pitch',
     );
     expect(laneReadout('ops.0.feedback', 0.35, 0, either)).toBe('+0.35 · held by slide');
+  });
+});
+
+describe('paintCells (the Euclid lanes, windsor#356)', () => {
+  const identity = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
+
+  it('is paintSpan exactly over the identity, a press and a sweep alike', () => {
+    const values = [0, 0.5, -0.25, 0, 1, 0];
+    const press = { index: 2, value: 0.8 };
+    expect(paintCells(values, identity(6), null, press)).toEqual(paintSpan(values, null, press));
+    const from = { index: 1, value: -1 };
+    const to = { index: 5, value: 1 };
+    expect(paintCells(values, identity(6), from, to)).toEqual(paintSpan(values, from, to));
+    expect(paintCells(values, identity(6), to, from)).toEqual(paintSpan(values, to, from));
+  });
+
+  it('ignores cells past the values, as paintSpan does', () => {
+    expect(paintCells([0, 0], identity(4), null, { index: 3, value: 1 })).toEqual([0, 0]);
+  });
+
+  it('writes the value index a cell shows, the cell nearest the pointer winning a shared index', () => {
+    // A 3-step lane under 6 hits: cells show 0 1 2 0 1 2.
+    const cells = [0, 1, 2, 0, 1, 2];
+    expect(paintCells([0, 0, 0], cells, null, { index: 4, value: 0.5 })).toEqual([0, 0.5, 0]);
+    // A sweep from cell 0 (+1) to cell 4 (-1) crosses index 0 and 1 twice; the later cells win.
+    const swept = paintCells([1, 0, 0], cells, { index: 0, value: 1 }, { index: 4, value: -1 });
+    expect(swept).toEqual([-0.5, -1, 0]);
   });
 });

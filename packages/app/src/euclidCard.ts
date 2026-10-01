@@ -1,98 +1,174 @@
 /**
- * The Sequencers tab's Euclidean card (#610): the knobs the old card had —
- * Note, Vel, Hold, Steps, Rotate, the `k` bounds, the divisor, the density
- * modulator — and the figure strip: one cell per step, the onsets lit, the
- * region's playhead ring (`regionPlayhead.ts`, windsor#101: bright while the
- * song is inside the region, a dimmer ghost ring on the step the region
- * would be on elsewhere), a `k / n` readout, repainted the frame the
- * player's figure changes, so a modulator moving `k` on a bar line is seen
- * the bar it happens and a Steps turn resizes the strip at once. Clicking a
- * cell flips that step and freezes the figure (the capture path); Release
- * lets the modulator back in. Every edit goes through `ctx.change` into the
- * pane's selected region's pattern (windsor#75, `changePattern`) and, since
- * the engine reconfigures a Euclidean part live, none restarts the sequencer.
- * The strip shows the player's live figure for that region (asked for by its
- * index) while the transport is inside it; elsewhere the region's own
- * preview (`euclidFigure.ts`), so Capture freezes the selected region's figure.
- * The operations are `euclidModel.ts`; the playhead loop and its lighting are
- * `stepStrip.ts` (#619), shared with the grid (#603) and chord (#607) cards.
+ * The Euclid card (#610; the device of windsor#356, record
+ * `2026-10-01-euclid-lanes-and-ratchets` decisions 9 and 10, and its
+ * mockup): a rail (`euclidRail.ts`) and two pages under tabs
+ * (`euclidTabs.ts`). **Pattern** (`euclidPatternPage.ts`) holds the Play
+ * knobs and the stack of rows: the ratchet row over the trigger figure, and
+ * the drawn lanes below it (`euclidRows.ts`, `euclidLaneRows.ts`).
+ * **Density** (`euclidDensityPage.ts`) holds the modulator, its plot of `k`
+ * and the `k` bounds. The page and the lane view are the session's.
+ *
+ * Every edit goes through `ctx.change` into the pane's selected region's
+ * pattern (windsor#75, `changePattern`) and, since the engine reconfigures
+ * a Euclidean part live, none restarts the sequencer. The trigger row shows
+ * the player's live figure for that region while the transport is inside
+ * it, elsewhere the region's own preview (`euclidFigure.ts`), so Capture
+ * freezes the selected region's figure.
+ *
+ * One playhead loop (`stepStrip.ts`'s `watchPlayhead`): each frame reads the
+ * region's step once (the engine's `regionStepAt`, its `localStep` the
+ * lanes' clock), rebuilds the rows when what they show changed (the
+ * document, the figure, the view, or the pass under the hits), and lights
+ * every row's ring on its own step.
  */
-import type { EuclideanSpec } from '@windsor/engine';
+import type { EuclideanSpec, RegionStep } from '@windsor/engine';
+import { PPQ, TICKS_PER_BAR, partAt } from '@windsor/engine';
 import { PERC_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
-import {
-  countOnsets,
-  figureKey,
-  pulsesChange,
-  rotateChange,
-  stepsChange,
-  stepsPerBeat,
-  toggleStep,
-  type Figure,
-  type PulseField,
-} from './euclidModel';
+import { type EuclidCard, setView, viewOf, writeRows } from './euclidCardState';
+import { EUCLID_PLOT_SECONDS_DIGITS, EUCLID_READOUT_HINT } from './euclidConstants';
+import { barLineSeconds, densityNote, plotBar } from './euclidDensityModel';
+import { type DensityPage, densityPage } from './euclidDensityPage';
 import { regionFigure } from './euclidFigure';
-import { makeKnob, type KnobElement } from './knob';
-import { changePattern } from './partEdits';
-import { lightPlayhead, regionPlayheadAt } from './regionPlayhead';
-import { densityControls, divisorPicker, knobRow as tableKnobRow } from './seqFields';
-import {
-  EUCLID_KNOBS,
-  EUCLID_ROTATE_KNOB,
-  EUCLID_STEPS_KNOB,
-  euclidPulseKnob,
-} from './sequencerKnobTables';
-import { type PlayheadStrip, markStep, specOf, watchPlayhead } from './stepStrip';
+import { laneChoices, laneLength, lanesOf } from './euclidLaneModel';
+import { cycleText, fullCycle, passOf } from './euclidLaneView';
+import { type Figure, countOnsets, figureKey, stepsPerBeat } from './euclidModel';
+import { type PatternPage, fillPicker, patternPage } from './euclidPatternPage';
+import { holdWhilePressed } from './euclidPressHold';
+import { euclidRail } from './euclidRail';
+import type { RowHead } from './euclidRowParts';
+import { paintRows } from './euclidRows';
+import { euclidTabs } from './euclidTabs';
+import { lightPlayhead } from './regionPlayhead';
+import { specOf, watchPlayhead } from './stepStrip';
 
-const HINT =
-  'Lit cells are the onsets of the figure the player holds; the ring is the playhead. ' +
-  'Click a cell to flip it — the figure freezes and the row reads Release, which lets the ' +
-  'modulator back in. Steps resizes the strip at once and carries the k bounds along. ' +
-  'Nothing here restarts the sequencer; only the divisor rebuilds it.';
+const SECONDS_PER_MINUTE = 60;
 
-const PULSE_FIELDS: readonly PulseField[] = ['min', 'max', 'start'];
-
-/**
- * The figure strip and what every cell needs to write a figure and redraw. Not
- * a column `Strip`: the cells are relit in place rather than rebuilt per step,
- * so only the playhead half of `stepStrip.ts` is shared.
- */
-interface Card extends PlayheadStrip {
-  ctx: AppCtx;
-  slot: number;
-  /** The region whose pattern the card edits (windsor#75); absent, the part's sequencer. */
-  region: number | undefined;
-  /** This card's spec, or null when the part is gone or re-kinded. */
-  spec(): EuclideanSpec | null;
-  readout: HTMLElement;
-  captureButton: HTMLButtonElement;
-  /** The figure the cells show, as `x.` text; repainted when it differs. */
-  key: string;
-  /** The knobs a Steps turn can move (the `k` bounds, Rotate): re-read after it commits. */
-  dependents: KnobElement[];
+/** The card's handle plus what its loop keeps between frames. */
+interface Live {
+  readonly card: EuclidCard;
+  readonly pattern: PatternPage;
+  readonly density: DensityPage;
+  readonly note: HTMLElement;
+  /** What the rows were built from; they are rebuilt when it differs. */
+  rowsKey: string;
+  heads: RowHead[];
+  /** Each row's lit playhead, so a frame relights only what moved. */
+  lit: number[];
+  plotKey: string;
 }
 
-/** The figure the player holds for this card's region while it plays it, else the region's preview (`regionFigure`). */
-function figureOf(card: Card): Figure {
-  const { ctx } = card;
+/** The region's step at the audible tick: null while halted; the part's own step with no region named. */
+function readAt(ctx: AppCtx, slot: number, region: number | undefined): RegionStep | null {
+  if (!ctx.transport.running) return null;
+  const tick = ctx.transport.position();
+  if (region !== undefined) return ctx.host.regionStepAt(slot, region, tick);
+  const step = ctx.host.stepAt(slot, tick);
+  return step < 0 ? null : { step, live: true };
+}
+
+function figureOf(ctx: AppCtx, slot: number, region: number | undefined): Figure {
   const source = {
     doc: ctx.model.doc,
-    capturePattern: (slot: number, region?: number) => ctx.host.capturePattern(slot, region),
-    regionStepAt: (slot: number, region: number, tick: number) =>
-      ctx.host.regionStepAt(slot, region, tick),
+    capturePattern: (s: number, r?: number) => ctx.host.capturePattern(s, r),
+    regionStepAt: (s: number, r: number, tick: number) => ctx.host.regionStepAt(s, r, tick),
     position: () => ctx.transport.position(),
   };
-  return regionFigure(source, card.slot, card.region);
+  return regionFigure(source, slot, region);
 }
 
-/** Write fields of the card's region's pattern; false when nothing took. */
-const write = (card: Card, fields: Record<string, unknown>): boolean =>
-  changePattern(card.ctx, card.slot, card.region, fields);
+/** Everything the rows show, as one string: the rows rebuild when it changes. */
+function rowsKeyOf(live: Live, spec: EuclideanSpec, figure: Figure, pass: number): string {
+  const { ratchets, accentLane, pitchLane, modLanes, steps, divisor, rotate } = spec;
+  const view = viewOf(live.card.slot).lanes;
+  const shown = [ratchets, accentLane, pitchLane, modLanes, steps, divisor, rotate];
+  return JSON.stringify([shown, spec.pattern != null, figureKey(figure), view, pass]);
+}
 
-function commitPattern(card: Card, pattern: Figure | null): void {
-  if (!write(card, { pattern })) return;
-  card.captureButton.textContent = pattern ? 'Release' : 'Capture';
+function paintAll(live: Live, spec: EuclideanSpec, figure: Figure, pass: number): void {
+  const { card, pattern } = live;
+  const view = viewOf(card.slot).lanes;
+  const group = stepsPerBeat(spec.divisor);
+  live.heads = paintRows(pattern.rows, { card, spec, figure, view, pass, group });
+  live.lit = live.heads.map(() => Number.NaN);
+  fillPicker(pattern.picker, laneChoices(spec));
+  const lengths = lanesOf(spec).map((ref) => laneLength(spec, ref));
+  pattern.cycle.textContent = cycleText(fullCycle(spec.steps, lengths, spec.divisor));
+  pattern.captureButton.textContent = spec.pattern ? 'Release' : 'Capture';
+}
+
+/** Rebuild the rows if what they show changed, unless a press is held on them. */
+function repaintRows(live: Live, spec: EuclideanSpec, figure: Figure): void {
+  const view = viewOf(live.card.slot).lanes;
+  const pass = view === 'hits' ? passOf(live.card.at, spec.steps) : 0;
+  const key = rowsKeyOf(live, spec, figure, pass);
+  if (key === live.rowsKey || live.card.pressing) return;
+  live.rowsKey = key;
+  paintAll(live, spec, figure, pass);
+}
+
+function lightRows(live: Live): void {
+  live.heads.forEach((row, i) => {
+    const head = row.head(live.card.at);
+    if (head === live.lit[i]) return;
+    live.lit[i] = head;
+    lightPlayhead(row.cells, head);
+  });
+}
+
+/**
+ * The transport seconds on the audible bar's line, read from the engine's
+ * clock (`barLineSeconds`): what an Hz LFO reads there, whether or not the
+ * song is in the card's region. 0 before audio.
+ */
+function transportSeconds(ctx: AppCtx): number {
+  const system = ctx.host.system;
+  return system ? barLineSeconds(system.scheduler.transport, ctx.transport.position()) : 0;
+}
+
+/** The tab row's note and, on the Density page, the plot of `k`. */
+function paintDensity(live: Live, spec: EuclideanSpec, figure: Figure): void {
+  const k = countOnsets(figure);
+  const note = densityNote(spec, k);
+  if (live.note.textContent !== note) live.note.textContent = note;
+  if (viewOf(live.card.slot).page !== 'density') return;
+  const { ctx, at } = live.card;
+  const songBar = ctx.transport.running ? Math.floor(ctx.transport.position() / TICKS_PER_BAR) : 0;
+  const bar = plotBar(at, spec.divisor, songBar);
+  const bpm = ctx.model.doc.transport.bpm;
+  const seconds = transportSeconds(ctx);
+  const clock = { bar, seconds, secondsPerBar: (SECONDS_PER_MINUTE / bpm) * (TICKS_PER_BAR / PPQ) };
+  const shown = spec.density.kind === 'lfoHz' ? seconds.toFixed(EUCLID_PLOT_SECONDS_DIGITS) : bar;
+  const key = JSON.stringify([spec.pulses, spec.density, spec.steps, k, shown, bpm]);
+  if (key === live.plotKey) return;
+  live.plotKey = key;
+  live.density.paint(spec, k, clock);
+}
+
+/** Per frame while the card is on screen: the step, the rows, the rings, the density readouts. */
+function watch(live: Live, root: HTMLElement): void {
+  const { card } = live;
+  watchPlayhead({
+    attached: () => root.isConnected,
+    shown: () => root.closest('[hidden]') === null,
+    // Each row lights its own ring in `repaintIf`, from the one step read there.
+    playheadAt: () => 0,
+    mark: () => undefined,
+    repaintIf: () => {
+      card.at = readAt(card.ctx, card.slot, card.region);
+      const spec = card.spec();
+      if (!spec) return;
+      const figure = card.figure();
+      repaintRows(live, spec, figure);
+      lightRows(live);
+      paintDensity(live, spec, figure);
+    },
+  });
+}
+
+function capture(card: EuclidCard, pattern: Figure | null): void {
+  if (!card.write({ pattern })) return;
   card.ctx.notify(
     pattern
       ? `part ${card.slot}: captured — the figure is a literal array in the document`
@@ -100,162 +176,69 @@ function commitPattern(card: Card, pattern: Figure | null): void {
   );
 }
 
-function cell(card: Card, index: number): HTMLButtonElement {
-  const node = el('button', 'ecell') as HTMLButtonElement;
-  node.type = 'button';
-  node.title = `step ${index + 1}`;
-  node.setAttribute('aria-label', `step ${index + 1}`);
-  node.onclick = (): void => commitPattern(card, toggleStep(figureOf(card), index));
-  return node;
-}
-
-/** Rebuild the cells when the figure's length changed, else relight them; then the playhead. */
-function paintFigure(card: Card, figure: Figure): void {
-  const group = stepsPerBeat(card.spec()?.divisor ?? 0);
-  if (card.root.children.length !== figure.length) {
-    card.root.innerHTML = '';
-    figure.forEach((_, i) => card.root.appendChild(cell(card, i)));
-  }
-  [...card.root.children].forEach((node, i) => {
-    node.classList.toggle('on', figure[i] === true);
-    node.classList.toggle('beat', group > 1 && i > 0 && i % group === 0);
-    node.setAttribute('aria-pressed', String(figure[i] === true));
-  });
-  card.key = figureKey(figure);
-  lightPlayhead(card.root, card.playing);
-}
-
-function readoutText(card: Card, figure: Figure): string {
-  const fixed = card.spec()?.pattern != null;
-  return `k ${countOnsets(figure)} / n ${figure.length} · ${fixed ? 'captured' : 'generative'}`;
-}
-
-/**
- * Per frame while the card is on screen: the figure (repainted only when it
- * changed — a modulator moving `k`, a knob turn, a capture), the readout, and
- * the playhead (the engine's own step for the audible tick, so the ring is on
- * the cell the player is reading, or its ghost while another region plays).
- */
-function watch(card: Card): void {
-  watchPlayhead({
-    attached: () => card.root.isConnected,
-    shown: () => card.root.closest('[hidden]') === null,
-    playheadAt: () => regionPlayheadAt(card.ctx, card.slot, card.region),
-    mark: markStep(card),
-    repaintIf: () => {
-      const figure = figureOf(card);
-      if (figureKey(figure) !== card.key) paintFigure(card, figure);
-      const text = readoutText(card, figure);
-      if (card.readout.textContent !== text) card.readout.textContent = text;
-    },
-  });
-}
-
-function stepsKnob(card: Card): HTMLElement {
-  return makeKnob({
-    ...EUCLID_STEPS_KNOB,
-    color: PERC_COLOR,
-    get: () => card.spec()?.steps ?? EUCLID_STEPS_KNOB.def,
-    set: (v) => {
-      const spec = card.spec();
-      if (!spec) return;
-      if (write(card, stepsChange(spec, v))) {
-        card.dependents.forEach((knob) => knob.refresh());
-      }
-    },
-  });
-}
-
-function rotateKnob(card: Card): HTMLElement {
-  const knob = makeKnob({
-    ...EUCLID_ROTATE_KNOB,
-    color: PERC_COLOR,
-    get: () => card.spec()?.rotate ?? EUCLID_ROTATE_KNOB.def,
-    set: (v) => {
-      const spec = card.spec();
-      if (!spec) return;
-      write(card, { rotate: rotateChange(spec, v) });
-    },
-  });
-  card.dependents.push(knob);
-  return knob;
-}
-
-/** The three `k` knobs; a turn on one may drag another, so all three re-read after a commit. */
-function pulsesRow(card: Card): HTMLElement {
-  const row = el('div', 'knob-row');
-  const knobs = card.dependents;
-  for (const field of PULSE_FIELDS) {
-    const spec = euclidPulseKnob(field);
-    const knob = makeKnob({
-      ...spec,
-      color: PERC_COLOR,
-      get: () => card.spec()?.pulses[field] ?? spec.def,
-      set: (v) => {
-        const spec = card.spec();
-        if (!spec) return;
-        const pulses = pulsesChange(spec, field, v);
-        if (write(card, { pulses })) {
-          knobs.forEach((k) => k.refresh());
-        }
-      },
-    });
-    knobs.push(knob);
-    row.appendChild(knob);
-  }
-  return row;
-}
-
-function knobRow(card: Card): HTMLElement {
-  const row = tableKnobRow(card.ctx, card.slot, EUCLID_KNOBS, PERC_COLOR, card.region);
-  row.appendChild(stepsKnob(card));
-  row.appendChild(rotateKnob(card));
-  return row;
-}
-
-/** Capture freezes the figure the strip shows into the document; Release lets go. */
-function captureRow(card: Card): HTMLElement {
-  const wrap = el('div', 'capture-row');
-  card.captureButton.type = 'button';
-  card.captureButton.className = 'btn';
-  card.captureButton.style.borderColor = PERC_COLOR;
-  card.captureButton.textContent = card.spec()?.pattern ? 'Release' : 'Capture';
-  card.captureButton.onclick = (): void => {
-    const fixed = card.spec()?.pattern != null;
-    commitPattern(card, fixed ? null : figureOf(card));
-  };
-  wrap.appendChild(divisorPicker(card.ctx, card.slot, card.region));
-  wrap.appendChild(card.captureButton);
-  return wrap;
-}
-
-/** The card body for a Euclidean part's region `region`: knobs, the k bounds, the strip and readout, the modulator, the hint. */
-export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
-  const body = el('div');
-  const card: Card = {
+/** The card's handle; `ref.live` is filled in once its pages exist. */
+function handle(
+  ctx: AppCtx,
+  slot: number,
+  region: number | undefined,
+  ref: { live: Live | null },
+): EuclidCard {
+  const card: EuclidCard = {
     ctx,
     slot,
     region,
-    root: el('div', 'euclid-strip'),
-    readout: el('div', 'euclid-readout'),
-    captureButton: document.createElement('button'),
-    key: '',
-    playing: -1,
+    at: null,
+    pressing: false,
     dependents: [],
     spec: () => specOf(ctx, slot, 'euclidean', region),
+    figure: () => figureOf(ctx, slot, region),
+    write: (fields) => writeRows(ctx, slot, region, fields),
+    say: (text) => {
+      if (ref.live) ref.live.pattern.readout.textContent = text ?? EUCLID_READOUT_HINT;
+    },
+    capture: (pattern) => capture(card, pattern),
+    refresh: () => {
+      if (ref.live) ref.live.rowsKey = '';
+    },
   };
-  card.root.setAttribute('role', 'group');
-  card.root.setAttribute('aria-label', 'figure');
-  body.appendChild(knobRow(card));
-  body.appendChild(pulsesRow(card));
-  body.appendChild(card.root);
-  body.appendChild(card.readout);
-  body.appendChild(captureRow(card));
-  body.appendChild(densityControls(ctx, slot, region));
-  body.appendChild(el('p', 'hint', HINT));
-  const figure = figureOf(card);
-  paintFigure(card, figure);
-  card.readout.textContent = readoutText(card, figure);
-  watch(card);
-  return body;
+  return card;
+}
+
+/** The card for a Euclidean part's region `region`: the rail, the tabs, the Pattern and Density pages. */
+export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
+  const ref: { live: Live | null } = { live: null };
+  const card = handle(ctx, slot, region, ref);
+  const pattern = patternPage(card);
+  const density = densityPage(card);
+  const view = viewOf(slot);
+  const tabs = euclidTabs({ pattern: pattern.root, density: density.root }, view.page, (page) => {
+    setView(slot, { page });
+    if (ref.live) ref.live.plotKey = '';
+  });
+  const state: Live = {
+    card,
+    pattern,
+    density,
+    note: tabs.note,
+    rowsKey: '',
+    heads: [],
+    lit: [],
+    plotKey: '',
+  };
+  ref.live = state;
+  holdWhilePressed(card, pattern.rows, window);
+  const name = partAt(ctx.model.doc, slot)?.name ?? '';
+  const rail = euclidRail(name, view.lanes, (lanes) => {
+    setView(slot, { lanes });
+    card.refresh();
+  });
+  const body = el('div', 'euclid-body');
+  body.append(tabs.row, pattern.root, density.root);
+  const root = el('div', 'euclid-card');
+  root.style.setProperty('--kc', PERC_COLOR);
+  root.append(rail, body);
+  const spec = card.spec();
+  if (spec) repaintRows(state, spec, card.figure());
+  watch(state, root);
+  return root;
 }

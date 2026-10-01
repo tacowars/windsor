@@ -1,0 +1,137 @@
+/**
+ * The Euclid card's density readouts (windsor#356, decision 2 of the issue):
+ * the tab row's one-line note on the modulator, and the Density page's plot
+ * of `k`. An LFO's plot is the `k` each of the next bars gets, read the way
+ * the sequencer reads it on a bar line (`lfoValue` between the bounds,
+ * rounded): an `lfoBars` LFO by the region's own bar, an `lfoHz` one by the
+ * transport's accumulated seconds, which the region gate passes on
+ * song-wide (`RegionGate.forward`); a walk is random, so its plot is the bounds band and the
+ * current `k`. Pure: the card draws the path this returns.
+ */
+import type { DensityMod, EuclideanSpec, RegionStep, TickLoop } from '@windsor/engine';
+import { TICKS_PER_BAR, lfoValue } from '@windsor/engine';
+import { EUCLID_PLOT } from './euclidConstants';
+
+/** The modulator in a few words: `tri · 8 bars`, `sine · 0.25 Hz`, `walk · 0.5`. */
+export function densityKindText(density: DensityMod): string {
+  if (density.kind === 'lfoBars') return `${density.shape} · ${density.bars} bars`;
+  if (density.kind === 'lfoHz') return `${density.shape} · ${density.hz} Hz`;
+  return `walk · ${density.stepChance}`;
+}
+
+/** The tab row's note: `k 7 · 4–9 · tri · 8 bars`, or `captured` for a frozen figure. */
+export function densityNote(spec: EuclideanSpec, k: number): string {
+  if (spec.pattern) return 'captured';
+  const { min, max } = spec.pulses;
+  return `k ${k} · ${min}–${max} · ${densityKindText(spec.density)}`;
+}
+
+/**
+ * Where the plot reads from: the region bar it starts on (an `lfoBars` LFO's
+ * clock), the transport seconds on that bar's line and the seconds a bar
+ * lasts (an `lfoHz` LFO's).
+ */
+export interface PlotClock {
+  readonly bar: number;
+  readonly seconds: number;
+  readonly secondsPerBar: number;
+}
+
+/** The slice of the engine's transport clock (`TickTransport`) the plot reads its seconds from. */
+export interface SecondsClock {
+  /** The tick the clock issues next: the look-ahead's, at or past the audible one. */
+  readonly currentTick: number;
+  /** The seconds on `currentTick`, accumulated at every tempo and swing played so far. */
+  readonly transportSeconds: number;
+  readonly secondsPerTick: number;
+  readonly loop: TickLoop | null;
+  swungTicks(tick: number): number;
+}
+
+/**
+ * The transport seconds on the line of the bar holding `tick` (the audible
+ * tick): what the sequencer's Hz LFO read there (`TickEvent.seconds`). The
+ * clock's accumulated seconds, wound back from the tick it issues next to
+ * that line; when the look-ahead has already jumped back to a loop's start,
+ * the wind back runs through the jump.
+ */
+export function barLineSeconds(
+  clock: SecondsClock,
+  tick: number,
+  ticksPerBar = TICKS_PER_BAR,
+): number {
+  const line = tick - (tick % ticksPerBar);
+  const next = clock.currentTick;
+  const { loop } = clock;
+  const swung = (from: number, to: number): number => clock.swungTicks(to) - clock.swungTicks(from);
+  if (next >= line || !loop)
+    return clock.transportSeconds - swung(line, next) * clock.secondsPerTick;
+  // The jump back comes at the first loop end at or past the line (`followingTick`).
+  const { start, end, songTicks } = loop;
+  const jump = line + ((((end - line) % songTicks) + songTicks) % songTicks);
+  const ticks = swung(line, jump) + swung(jump - (end - start), next);
+  return clock.transportSeconds - ticks * clock.secondsPerTick;
+}
+
+/**
+ * The bar the plot starts on: the bar the sequencer is told, which the
+ * region gate rebases onto the region's own clock (`RegionGate.forward`),
+ * so a region entered on bar 3 plays its LFO from local bar 0. Read from
+ * the region's `localStep` at the part's divisor, live or, out of the
+ * region, at its phase, as the playhead's ghost is. With no local step (no
+ * region named), the song's bar `songBar`.
+ */
+export function plotBar(
+  at: RegionStep | null,
+  divisor: number,
+  songBar: number,
+  ticksPerBar = TICKS_PER_BAR,
+): number {
+  if (at?.localStep === undefined) return songBar;
+  return Math.floor((at.localStep * divisor) / ticksPerBar);
+}
+
+/** The `k` an LFO gives each of `count` bars from the clock's; empty for a walk. */
+export function lfoKs(spec: EuclideanSpec, clock: PlotClock, count: number): number[] {
+  const { density } = spec;
+  if (density.kind === 'walk') return [];
+  const { min, max } = spec.pulses;
+  return Array.from({ length: count }, (_, i) => {
+    const bar = clock.bar + i;
+    const phase =
+      density.kind === 'lfoBars'
+        ? bar / density.bars
+        : (clock.seconds + i * clock.secondsPerBar) * density.hz;
+    return min + Math.round(lfoValue(density.shape, phase) * (max - min));
+  });
+}
+
+/** The plot's vertical scale: `k` from `lo` (bottom) to `hi` (top) inside the box. */
+export interface PlotScale {
+  readonly lo: number;
+  readonly hi: number;
+}
+
+/** The scale for a figure's bounds: a little past each, within 0 and the figure's steps. */
+export function plotScale(spec: EuclideanSpec, margin = EUCLID_PLOT.margin): PlotScale {
+  const lo = Math.max(0, spec.pulses.min - margin);
+  const hi = Math.min(spec.steps, spec.pulses.max + margin);
+  return { lo, hi: Math.max(hi, lo + 1) };
+}
+
+/** The y of `k` in the plot box. */
+export function plotY(k: number, scale: PlotScale, box = EUCLID_PLOT): number {
+  const span = box.height - 2 * box.pad;
+  return box.height - box.pad - ((k - scale.lo) / (scale.hi - scale.lo)) * span;
+}
+
+/** A step path across the box, one flat run per bar: the LFO's `k` over the bars ahead. */
+export function plotPath(ks: readonly number[], scale: PlotScale, box = EUCLID_PLOT): string {
+  const w = box.width / Math.max(1, ks.length);
+  return ks
+    .map((k, i) => {
+      const y = plotY(k, scale, box).toFixed(1);
+      return `${i === 0 ? 'M' : 'L'}${(i * w).toFixed(1)} ${y}H${((i + 1) * w).toFixed(1)}`;
+    })
+    .join('');
+}
