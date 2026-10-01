@@ -1,0 +1,123 @@
+{
+  "start": "../start/tr808-rimshot.stage2.json",
+  "params": [
+    {
+      "path": "ops[0].ratio",
+      "min": 6.2,
+      "max": 7.4
+    },
+    {
+      "path": "ops[0].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[0].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.decayTime",
+      "min": 0.002,
+      "max": 0.04,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": [
+        "ops[2].ratio",
+        "ops[3].ratio"
+      ],
+      "min": 1.6,
+      "max": 2.1
+    },
+    {
+      "path": "ops[2].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[2].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[2].env.decayTime",
+      "min": 0.004,
+      "max": 0.05,
+      "scale": "log"
+    },
+    {
+      "path": "ops[2].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[3].level",
+      "min": 0,
+      "max": 0.5
+    },
+    {
+      "path": "ops[3].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[3].env.decayTime",
+      "min": 0.002,
+      "max": 0.05,
+      "scale": "log"
+    },
+    {
+      "path": "ops[1].level",
+      "min": 0,
+      "max": 0.8
+    },
+    {
+      "path": "ops[1].env.decayTime",
+      "min": 0.001,
+      "max": 0.03,
+      "scale": "log"
+    },
+    {
+      "path": "ops[1].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "filter.cutoff",
+      "min": 50,
+      "max": 2000,
+      "scale": "log"
+    },
+    {
+      "path": "filter.resonance",
+      "min": 0.5,
+      "max": 2
+    },
+    {
+      "path": "filter.drive",
+      "min": 1,
+      "max": 3
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/Rim Shot A 808.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "seeds": 4,
+  "optimizer": {
+    "method": "cma",
+    "budget": 1000,
+    "sigma0": 0.08,
+    "seed": 1
+  }
+}
