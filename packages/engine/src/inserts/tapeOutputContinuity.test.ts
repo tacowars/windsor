@@ -30,10 +30,13 @@
  *   field at 4 (a raised-cosine onset, held through the motion, then
  *   released) and under a full-scale 300 Hz tone at 1 and at 4, and from the
  *   floor to the top under the held field, the direction that grows M:
- *   - under a held field, every sample from the motion's start to the end of
- *     the release stays within `BOUND.fall` (drive falling) or `BOUND.rise`
- *     of the conditioned field, the measure of #290 (which read up to 242
- *     there);
+ *   - drive falling under a held field, every sample from the motion's
+ *     start to the end of the release stays within `BOUND.fall` of the
+ *     conditioned field, the measure of #290 (which read up to 242 there);
+ *   - drive rising under a held field, the release peak stays within
+ *     `BOUND.rise` of the same corner's release with no motion
+ *     (`riseOverStill`), so the gate reads the motion and not the core's
+ *     own overshoot at wide widths (windsor#319);
  *   - under a tone, every sample stays within `BOUND.tone` of the larger of
  *     the steady peaks before and after the motion;
  *   - |M| stays within `BOUND.m`, against the state guard of 20.
@@ -61,18 +64,27 @@ const QUANTUM = 128;
  * before this change in brackets:
  *
  * - silence, 0.0798 (0.2402): the tone's own decaying tail, 20 ms on;
- * - held, 0.887 with drive falling (57.3) and 1.230 with it rising (2.88),
- *   both at 48 kHz. Rising, M grows to keep the output, past Ms, and the
- *   release then swings a little wider than the field; at constant drive 0
- *   the release alone reaches 1.216 of the field;
+ * - held with drive falling, 0.887 at 48 kHz (57.3), over the conditioned
+ *   field;
+ * - held with drive rising, 1.0810 (44.1 kHz, 2×, width 0.85, saturation 1,
+ *   the 50 ms sweep) over the same corner's release with no motion. Rising,
+ *   M grows to keep the output, past Ms, and the release follows the
+ *   start's. The no-motion release is the core's own overshoot, and grows
+ *   with width: with the drive held at the box's floor it peaks at 1.180 of
+ *   the conditioned field (2.5) at width 0.62 and 1.716 at 0.85, saturation
+ *   0 (0.776 and 1.017 at saturation 1), over the rates and factors. An
+ *   absolute bound would gate that overshoot, which the motion does not
+ *   cause, so this one is relative (windsor#319);
  * - tone, 1.0004 (1.0034);
  * - |M|, 4.97 with drive rising under the held field (1.67).
  *
- * Each ratio's gate is its measurement plus about half a point. M's, 5.5,
- * is about a tenth over its measurement and under a third of the state
- * guard.
+ * Each ratio's gate is its measurement plus about half a point, except the
+ * rise: 1.09 is its 1.0810 plus about a point, because the no-motion
+ * reference shifts with the state the trials before leave (0.92 to 1.02 of
+ * the field at one corner). M's, 5.5, is about a tenth over its measurement
+ * and under a third of the state guard.
  */
-const BOUND = { silence: 0.085, fall: 0.892, rise: 1.235, tone: 1.005, m: 5.5 };
+const BOUND = { silence: 0.085, fall: 0.892, rise: 1.09, tone: 1.005, m: 5.5 };
 /** Seconds: a signal before the switch or the motion, the silence before either, and the hold after. */
 const SETTLE = 0.05;
 const QUIET = 0.02;
@@ -199,10 +211,14 @@ interface Trial {
   to: number;
 }
 
-/** What a trial measured: the worst sample over its reference, and the largest |M| on the left core. */
+/**
+ * What a trial measured: the worst sample over its reference, the largest
+ * |M| on the left core, and for a held field the peak after its release.
+ */
 interface Excursion {
   ratio: number;
   m: number;
+  release: number;
 }
 
 /** The song's `core` for this block, as the Advanced panel writes it: `drive`, and the trial's width and saturation. */
@@ -255,13 +271,27 @@ function sweepDrive(rig: TapeRig, rate: number, clock: Clock, trial: Trial): Exc
     m = Math.max(m, Math.abs(core.m));
     if (i >= settle + sweep + hold - 4 * period) after = Math.max(after, Math.abs(y));
   }
-  if (trial.signal === 'tone') return { ratio: worst / Math.max(before, after), m };
+  if (trial.signal === 'tone') return { ratio: worst / Math.max(before, after), m, release: 0 };
+  let release = 0;
   for (let k = 0; k < edge + hold; k++) {
     const x = k < edge ? 0.5 + 0.5 * cosine((Math.PI * k) / edge) : 0;
-    worst = Math.max(worst, Math.abs(tick(rig, clock, x, () => aim(rig, trial, trial.to))));
+    release = Math.max(release, Math.abs(tick(rig, clock, x, () => aim(rig, trial, trial.to))));
     m = Math.max(m, Math.abs(core.m));
   }
-  return { ratio: worst / conditioned(driveGain(trial.drive)), m };
+  worst = Math.max(worst, release);
+  return { ratio: worst / conditioned(driveGain(trial.drive)), m, release };
+}
+
+/**
+ * A rising trial's release peak over the same corner's release with no
+ * motion: the same field, width, saturation, factor and rate, the same
+ * timeline, and the core drive held at the trial's start. The output is
+ * continuous with that start (`retune` keeps M × gain), so that release is
+ * what the motion must not exceed.
+ */
+function riseOverStill(rig: TapeRig, rate: number, clock: Clock, trial: Trial): number {
+  const moved = sweepDrive(rig, rate, clock, trial).release;
+  return moved / sweepDrive(rig, rate, clock, { ...trial, to: trial.from }).release;
 }
 
 /** Down under a held field at the guard and under tones at the knee and the guard; up under the held field. */
@@ -288,9 +318,12 @@ describe("moving the core drive across the shipped box's range (windsor#296, win
         for (const trial of TRIALS) {
           const { ratio, m } = sweepDrive(rig, rate, clock, trial);
           const name = `${rate} Hz ${oversampling}× ${JSON.stringify(trial)}`;
-          const gate = trial.signal === 'tone' ? 'tone' : trial.to < trial.from ? 'fall' : 'rise';
-          expect(ratio, name).toBeLessThanOrEqual(BOUND[gate]);
           expect(m, name).toBeLessThanOrEqual(BOUND.m);
+          if (trial.signal === 'held' && trial.to > trial.from) {
+            expect(riseOverStill(rig, rate, clock, trial), name).toBeLessThanOrEqual(BOUND.rise);
+            continue;
+          }
+          expect(ratio, name).toBeLessThanOrEqual(BOUND[trial.signal === 'tone' ? 'tone' : 'fall']);
         }
         expect(rig.dsp.magnetic.factor).toBe(oversampling);
       }
