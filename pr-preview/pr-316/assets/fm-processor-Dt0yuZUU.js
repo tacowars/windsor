@@ -1834,15 +1834,23 @@ function settleSkipped(voice, i, live, n) {
 }
 
 // packages/engine/src/worklet/fm/voiceQuiet.ts
+var ST_IN_FLIGHT = -1;
+function heardStage(voice, i) {
+  if (voice.ampBreak[i] !== 0) return ST_IN_FLIGHT;
+  return voice.ampEnv[i].state;
+}
+function envelopeAtRest(voice, i) {
+  const stage = heardStage(voice, i);
+  return stage === ST_DONE || stage === ST_IDLE;
+}
 function voiceDormant(voice) {
   if (!voice.gate || voice.fadeInc !== 0) return false;
   const carriers = voice.alg.carriers;
   for (let c = 0; c < carriers.length; c++) {
     const i = carriers[c];
-    const env = voice.ampEnv[i];
-    if (env.state !== ST_SUSTAIN || env.p.sustainLevel !== 0) return false;
-    if (env.p.endLevel !== 0) return false;
-    if (voice.ampBreak[i] !== 0) return false;
+    const p = voice.ampEnv[i].p;
+    if (heardStage(voice, i) !== ST_SUSTAIN || p.sustainLevel !== 0) return false;
+    if (p.endLevel !== 0) return false;
     if (Math.abs(voice.amp[i]) > DORMANT_AMP) return false;
   }
   return voiceFilterQuiet(voice);
@@ -1858,8 +1866,7 @@ function voiceFinished(voice) {
   const carriers = voice.alg.carriers;
   for (let i = 0; i < carriers.length; i++) {
     const c = carriers[i];
-    if (!voice.ampEnv[c].finished) return false;
-    if (voice.ampBreak[c] !== 0) return false;
+    if (!envelopeAtRest(voice, c)) return false;
     if (Math.abs(voice.amp[c]) > DORMANT_AMP) return false;
   }
   return voiceFilterQuiet(voice);
@@ -1868,9 +1875,9 @@ function voiceHoldsEndLevel(voice) {
   const carriers = voice.alg.carriers;
   let holds = false;
   for (let i = 0; i < carriers.length; i++) {
-    const env = voice.ampEnv[carriers[i]];
-    if (!env.finished) return false;
-    if (Math.abs(env.value) > DORMANT_AMP) holds = true;
+    const c = carriers[i];
+    if (!envelopeAtRest(voice, c)) return false;
+    if (Math.abs(voice.ampEnv[c].value) > DORMANT_AMP) holds = true;
   }
   return holds;
 }
