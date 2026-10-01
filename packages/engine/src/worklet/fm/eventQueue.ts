@@ -9,10 +9,19 @@
  * posted, so the render, admitting what was posted, never grows the queue
  * or allocates. The port's `onmessage` runs on the audio thread too, but
  * between quanta, not inside `process()`.
- * An event is inserted in place, by insertion sort from the back (events
- * usually arrive in order), and taken from the front by an index; `splice`
- * returned a new array for each insert, and `shift` trimmed the array that
- * the next insert then grew again.
+ * An event is inserted in place and taken from the front by an index;
+ * `splice` returned a new array for each insert, and `shift` trimmed the
+ * array that the next insert then grew again. An event at or past the last
+ * queued frame is appended; any other finds its slot by an upper-bound
+ * search over `frames[head, tail)`, galloping back from the tail and then
+ * halving, and the later frames move up as one `copyWithin` (windsor#273).
+ * The render admits a whole burst at the start of a quantum, and notes
+ * arrive interleaved with their note-offs (a note-on at `t`, its note-off at
+ * `t + d`), so a walk back from the tail cost O(n) comparisons an event, and
+ * O(n^2) for a burst of n, before any event was due. The search reads
+ * O(log n) frames an event, and fewer for one near the tail, where most
+ * land; `eventQueue.test.ts` pins the reads for a reversed and an
+ * interleaved burst.
  *
  * The frames sit in `frames`, a Float64Array beside `items`, slot for slot,
  * never in a field: past 2^31 (about 12 hours at 48 kHz) a frame is a
@@ -126,15 +135,37 @@ class EventQueue {
     if (this.tail === this.frames.length) this.moveDown();
     const items = this.items;
     const frames = this.frames;
-    let i = this.tail;
-    this.tail = i + 1;
-    while (i > this.head && frames[i - 1] > this.incoming[0]) {
-      items[i] = items[i - 1];
-      frames[i] = frames[i - 1];
-      i--;
+    const frame = this.incoming[0];
+    const tail = this.tail;
+    this.tail = tail + 1;
+    if (tail === this.head || frames[tail - 1] <= frame) {
+      items[tail] = event;
+      frames[tail] = frame;
+      return;
     }
-    items[i] = event;
-    frames[i] = this.incoming[0];
+    // Upper bound: the first slot whose frame is past this one, so a tie
+    // goes after every event already queued at its frame (arrival order).
+    // `frames[hi]` is past it throughout; gallop back from the tail, then
+    // halve what is left.
+    const head = this.head;
+    let hi = tail - 1;
+    let lo = head;
+    for (let step = 1; hi - step >= head; step += step) {
+      if (frames[hi - step] <= frame) {
+        lo = hi - step + 1;
+        break;
+      }
+      hi -= step;
+    }
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (frames[mid] > frame) hi = mid;
+      else lo = mid + 1;
+    }
+    frames.copyWithin(lo + 1, lo, tail);
+    for (let i = tail; i > lo; i--) items[i] = items[i - 1];
+    items[lo] = event;
+    frames[lo] = frame;
   }
 
   /**
