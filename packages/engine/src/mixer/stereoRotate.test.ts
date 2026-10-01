@@ -126,3 +126,26 @@ describe('createStereoRotate in a graph', () => {
     expect(rms(after?.left ?? new Float32Array(1))).toBeGreaterThan(0.1);
   });
 });
+
+describe('a follower rotation', () => {
+  const gainsOf = (input: AudioNode): number[] =>
+    (input as unknown as FakeNode).outbound.map((c) => (c.to as unknown as GainNode).gain.value);
+  const expected = (pan: number): number[] => {
+    const g = rotationGains(pan);
+    return [g.ll, g.lr, g.rl, g.rr];
+  };
+
+  it('starts at the knob, moves with it and with the lane, and leaves the lane on dispose', () => {
+    const rotate = createStereoRotate(new FakeContext() as unknown as BaseAudioContext, 0.5);
+    const follower = rotate.follower();
+    expect(gainsOf(follower.input)).toEqual(expected(0.5));
+    rotate.setPan(-0.25);
+    expect(gainsOf(follower.input)).toEqual(expected(-0.25));
+    rotate.automation.hold(1, 0);
+    expect(gainsOf(follower.input)).toEqual(expected(1));
+    expect(gainsOf(rotate.input)).toEqual(expected(1));
+    follower.dispose();
+    rotate.automation.hold(0, 1);
+    expect(gainsOf(rotate.input)).toEqual(expected(0));
+  });
+});

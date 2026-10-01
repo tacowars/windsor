@@ -1,9 +1,10 @@
 /**
- * The live engine takes a part's `automation` and ignores it (windsor#342,
- * record `2026-10-01-song-automation-lanes`): nothing plays a lane until the
- * automation player (windsor#344). `AudioSystem.apply` takes the key out of
- * each slot's partial before the player's merge, which would otherwise report
- * it as unknown on a part that had no lanes when it was built.
+ * A part's `automation` in a live partial is the automation player's
+ * (windsor#344, `songAutomation.ts`), not the arrangement player's:
+ * `AudioSystem.apply` takes the key out of each slot's partial before the
+ * player's merge, which would otherwise report it as unknown on a part that
+ * had no lanes when it was built, and hands the whole partial to the
+ * automation once everything else has landed.
  */
 import type { DocumentPartial } from '../song/arrangementDocument';
 
