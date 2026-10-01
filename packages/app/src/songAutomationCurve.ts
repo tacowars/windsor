@@ -41,6 +41,13 @@ export interface CurveShape {
   readonly dots: readonly CurveDot[];
 }
 
+/** The px from a lane's top where a display height (0..1) draws, inside `padPx` at both ends. */
+export const laneY = (
+  display: number,
+  heightPx: number,
+  drawing: AutomationDrawing = AUTOMATION_DRAWING,
+): number => drawing.padPx + (1 - display) * (heightPx - 2 * drawing.padPx);
+
 /** The curve of `points` on `row`'s scale, inside `frame`. */
 export function curveShape(
   row: AutomationTargetRow,
@@ -51,8 +58,7 @@ export function curveShape(
   const first = points[0];
   const last = points[points.length - 1];
   if (!first || !last) return { line: '', area: '', dots: [] };
-  const span = h - 2 * drawing.padPx;
-  const yAt = (display: number): number => drawing.padPx + (1 - display) * span;
+  const yAt = (display: number): number => laneY(display, h, drawing);
   const xOf = (p: AutomationPoint): number => tickToPx(p.tick, pxPerBar);
   const yOf = (p: AutomationPoint): number => yAt(toDisplay(row, p.value));
   const n = (v: number): string => v.toFixed(drawing.coordDecimals);

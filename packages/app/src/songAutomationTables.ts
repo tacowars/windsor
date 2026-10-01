@@ -1,13 +1,15 @@
 /**
  * The Song view's automation lanes, as data (windsor#348; record
  * `2026-10-01-song-automation-lanes` decision 13): the curve's drawing
- * tunables, the colour of each kind of target, the picker's voice groups,
+ * tunables, the lane toolbar's tools and Snap choices and the gestures'
+ * px (windsor#349), the colour of each kind of target, the picker's voice groups,
  * the readout's number rules and the reasons an insert field is inactive.
  * The rules over them are `songAutomationModel.ts`; the DOM is
  * `songAutomationLane.ts`. The lane's height is the Song view's
  * (`songViewTables.ts`'s `SONG_VIEW.automationLanePx`).
  */
 import type { AutomationTargetKind, InsertKindName, InsertSpecOf } from '@windsor/engine';
+import { PPQ, TICKS_PER_BAR } from '@windsor/engine';
 
 /** How a lane's curve is drawn inside its row. */
 export interface AutomationDrawing {
@@ -26,6 +28,97 @@ export const AUTOMATION_DRAWING: AutomationDrawing = {
   sampleEveryPx: 3,
   dotRadiusPx: 3.2,
   coordDecimals: 1,
+};
+
+/** The lane toolbar's tools (windsor#349 decision 1). windsor#350 adds Shape. */
+export type AutomationTool = 'edit' | 'draw';
+
+export interface AutomationToolEntry {
+  readonly tool: AutomationTool;
+  readonly label: string;
+  /** The key that picks it while no field has focus (decision 6), as `KeyboardEvent.key`. */
+  readonly key: string;
+  /** What the tool does, under the toolbar's buttons. */
+  readonly hint: string;
+}
+
+export const AUTOMATION_TOOLS: readonly AutomationToolEntry[] = [
+  {
+    tool: 'edit',
+    label: 'Edit',
+    key: 'e',
+    hint: 'Click to add a point · drag a point to move it · drag the line to bend it · Alt-click a line to straighten it · double-click a point to delete it · Shift ignores snap',
+  },
+  {
+    tool: 'draw',
+    label: 'Draw',
+    key: 'd',
+    hint: 'Drag across a lane to draw. Points land on the snap grid; Off draws at 1/32.',
+  },
+];
+
+/** One Snap choice: its label and its grain in song ticks, 0 for Off. */
+export interface SnapChoice {
+  readonly label: string;
+  readonly ticks: number;
+}
+
+const SIXTEENTH_TICKS = PPQ / 4;
+const THIRTY_SECOND_TICKS = PPQ / 8;
+
+/** The Snap select (decision 1), coarse to fine. */
+export const SNAP_CHOICES: readonly SnapChoice[] = [
+  { label: 'Bar', ticks: TICKS_PER_BAR },
+  { label: '1/4', ticks: PPQ },
+  { label: '1/8', ticks: PPQ / 2 },
+  { label: '1/16', ticks: SIXTEENTH_TICKS },
+  { label: '1/32', ticks: THIRTY_SECOND_TICKS },
+  { label: 'Off', ticks: 0 },
+];
+
+/** Where the session starts: the Edit tool, on 1/16. */
+export const DEFAULT_AUTOMATION_TOOL: AutomationTool = 'edit';
+export const DEFAULT_SNAP_TICKS = SIXTEENTH_TICKS;
+
+/** How the Edit and Draw gestures read the pointer (decisions 2 and 3, from the mockup). */
+export interface AutomationGestures {
+  /** A press this close to a point's centre grabs the point. */
+  readonly pointHitPx: number;
+  /** A press this close to the line, above or below, is on the line. */
+  readonly lineHitPx: number;
+  /** A press that moves less than this is a click. */
+  readonly dragThresholdPx: number;
+  /** Vertical px of line drag for one full bend (−1..1 is two of them). */
+  readonly bendPxPerUnit: number;
+  /** A bend this close to 0 snaps straight. */
+  readonly straightWithin: number;
+  /** Draw's grain while Snap is Off. */
+  readonly drawOffGrainTicks: number;
+}
+
+export const AUTOMATION_GESTURES: AutomationGestures = {
+  pointHitPx: 8,
+  lineHitPx: 10,
+  dragThresholdPx: 3,
+  bendPxPerUnit: 45,
+  straightWithin: 0.07,
+  drawOffGrainTicks: THIRTY_SECOND_TICKS,
+};
+
+/** How a split's right half is fitted (`songAutomationSplit.ts`). */
+export interface AutomationSplitFit {
+  /** The points along the half where the fit compares the curves. */
+  readonly samples: number;
+  /** The bends tried across −1..1 before refining. */
+  readonly gridSteps: number;
+  /** Golden-section steps around the best of them. */
+  readonly refineIterations: number;
+}
+
+export const AUTOMATION_SPLIT_FIT: AutomationSplitFit = {
+  samples: 16,
+  gridSteps: 40,
+  refineIterations: 30,
 };
 
 /** Each kind's colour (decision 3): the mixer teal, the inserts violet, the voice amber. */

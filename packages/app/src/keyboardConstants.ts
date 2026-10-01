@@ -29,3 +29,6 @@ export const QWERTY: Readonly<Record<string, number>> = {
   l: 14,
   p: 15,
 };
+
+/** The tab whose part the QWERTY keys play: on any other tab they sound nothing (windsor#349). */
+export const AUDITION_TAB = 'parts';
