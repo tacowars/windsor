@@ -65,6 +65,20 @@ const ENVELOPE_CURVE_STEEPNESS = 3;
  * about 2e-6; a step of 1e-5 in it moves the read phase by 1e-5 of a cycle.
  */
 const WIDTH_SNAP = 1e-5;
+/*
+ * The part's event queue is sized for this many events from its constructor
+ * (windsor#270), its queued and its posted slots alike, so neither grows on
+ * the audio thread in ordinary use, a fresh part's first notes included. The
+ * figure: the scheduler keeps 0.12 s posted ahead
+ * (`SCHEDULER_LOOK_AHEAD_SECONDS`), and at 180 BPM a 32nd-note step lasts
+ * about 42 ms, so a window holds three steps; a chord on every step over all
+ * 16 voices (`PART_MAX_VOICES_DEFAULT`) is 16 note-ons and 16 note-offs a
+ * step, 96 events, which is also what one wake of the scheduler can post
+ * between two quanta. 128 leaves room above that for about 3 KB a part.
+ * Past it the queue still grows, by doubling, as the rare fallback: an
+ * allocation on the audio thread, only at a new most events at once.
+ */
+const EVENT_QUEUE_CAPACITY = 128;
 
 export {
   TABLE_SIZE,
@@ -80,4 +94,5 @@ export {
   MIN_SEG_TIME,
   ENVELOPE_CURVE_STEEPNESS,
   WIDTH_SNAP,
+  EVENT_QUEUE_CAPACITY,
 };

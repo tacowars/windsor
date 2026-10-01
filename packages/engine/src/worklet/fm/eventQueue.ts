@@ -1,7 +1,10 @@
 /**
  * The part's frame-stamped event queue (windsor#233): its note-ons and
  * note-offs in frame order, each with the frame it lands on. Invariant:
- * allocation free once it has grown to the most events ever queued at once.
+ * allocation free up to `EVENT_QUEUE_CAPACITY` events queued or posted at
+ * once, the room its constructor gives both from the start (windsor#270), so
+ * a fresh part's first notes and an ordinary burst grow nothing on the
+ * audio thread. Past that it grows, by doubling, as the rare fallback.
  * An event is inserted in place, by insertion sort from the back (events
  * usually arrive in order), and taken from the front by an index; `splice`
  * returned a new array for each insert, and `shift` trimmed the array that
@@ -41,9 +44,21 @@
  */
 
 import type { NoteOffMessage, NoteOnMessage } from '../../synth/workletMessages';
+import { EVENT_QUEUE_CAPACITY } from './fmConstants';
 
 /** A scheduled message once queued. A note-off from an older sender may carry `note` instead of `id`. */
 type QueuedEvent = NoteOnMessage | (NoteOffMessage & { note?: number });
+
+/**
+ * `capacity` slots holding `undefined`, pushed one by one so the array is
+ * PACKED_ELEMENTS from the start: `new Array(n)` would be HOLEY, and an array
+ * born empty is PACKED_SMI until its first message.
+ */
+function emptySlots(capacity: number): (QueuedEvent | undefined)[] {
+  const slots: (QueuedEvent | undefined)[] = [];
+  for (let i = 0; i < capacity; i++) slots.push(undefined);
+  return slots;
+}
 
 class EventQueue {
   /** The events in [head, tail), in frame order; the slots outside it are free and hold `undefined`. */
@@ -58,13 +73,13 @@ class EventQueue {
   posted: (QueuedEvent | undefined)[];
   postedCount: number;
 
-  constructor() {
-    this.items = [];
-    this.frames = new Float64Array(2);
+  constructor(capacity: number = EVENT_QUEUE_CAPACITY) {
+    this.items = emptySlots(capacity);
+    this.frames = new Float64Array(capacity);
     this.incoming = new Float64Array(1);
     this.head = 0;
     this.tail = 0;
-    this.posted = [];
+    this.posted = emptySlots(capacity);
     this.postedCount = 0;
   }
 
@@ -83,7 +98,8 @@ class EventQueue {
 
   /**
    * Hold `event` until the render admits it, reading nothing of it. The array
-   * grows only when more messages arrive between two quanta than ever before.
+   * grows only when more messages arrive between two quanta than its
+   * capacity and ever before.
    */
   post(event: QueuedEvent): void {
     const posted = this.posted;

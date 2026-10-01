@@ -92,6 +92,14 @@ export interface FmPartChangeConfig {
    * its frames past 2^31, as one held for about 12 hours at 48 kHz.
    */
   seedAge?: number;
+  /**
+   * The warm-up ends by giving the part a new event queue, as a fresh part
+   * has, so the measured run holds the queue's first events and its first
+   * burst while the code is warm (windsor#270). The run then throws unless
+   * the queue kept its arrays, at their length, and a burst filled its
+   * posted slots. The queue must be empty when the warm-up ends.
+   */
+  freshQueue?: boolean;
 }
 
 /** What the run reads of each voice: flags only, since reading a double field can box it here. */
@@ -115,6 +123,44 @@ function seedAges(probe: ProbeRig, age: number): void {
     seeded++;
   }
   if (seeded === 0) throw new Error('no voice was sounding to age');
+}
+
+/** What the run reads of the part's event queue: its storage and how many messages wait. */
+interface QueueStorage {
+  items: unknown[];
+  frames: Float64Array;
+  posted: unknown[];
+  postedCount: number;
+  empty: boolean;
+}
+
+/** The part's queue storage as the run reads it. */
+const queueOf = (probe: ProbeRig): QueueStorage =>
+  (probe.processor as unknown as { events: QueueStorage }).events;
+
+/**
+ * Swap a new event queue into the part, built by the queue's own class, and
+ * return a check that it has not grown since and that `peak` posted messages
+ * reached its capacity.
+ */
+function freshQueue(probe: ProbeRig): (peak: number) => void {
+  const old = queueOf(probe);
+  if (!old.empty || old.postedCount !== 0)
+    throw new Error('the event queue was not empty to replace');
+  const Queue = old.constructor as new () => QueueStorage;
+  const fresh = new Queue();
+  (probe.processor as unknown as { events: QueueStorage }).events = fresh;
+  const { items, frames, posted } = fresh;
+  const lengths = [items.length, frames.length, posted.length].join();
+  return (peak) => {
+    const now = queueOf(probe);
+    const kept = now.items === items && now.frames === frames && now.posted === posted;
+    const at = [now.items.length, now.frames.length, now.posted.length].join();
+    if (!kept || at !== lengths) {
+      throw new Error(`the event queue grew in the measured run: ${lengths} to ${at}`);
+    }
+    if (peak < posted.length) throw new Error(`the burst posted ${peak} of ${posted.length}`);
+  };
 }
 
 /** The part's random source, the processor's and each voice's copy of it. */
@@ -176,6 +222,9 @@ interface Cycle {
   /** After it renders: the paths the voices are on. */
   note(): void;
   seen: Uint8Array;
+  /** The most messages posted between two quanta since the last `restart`. */
+  peak: () => number;
+  restart: () => void;
 }
 
 // One cycle's bookkeeping, read top to bottom: the events, the play-out, the rest.
@@ -203,6 +252,7 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
   let next = 0;
   let resting = -1;
   let change = 0;
+  let peak = 0;
 
   const toggle = (): void => {
     const k = change++ % arrays.length;
@@ -223,6 +273,8 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
       port.onmessage!(event);
       next++;
     }
+    const waiting = queueOf(probe).postedCount;
+    if (waiting > peak) peak = waiting;
     if (t < last) return;
     // Played out: rest, then start the next cycle at the next quantum.
     if (resting < 0 && !anyActive()) resting = config.rest;
@@ -253,6 +305,10 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
     step,
     note,
     seen,
+    peak: () => peak,
+    restart: () => {
+      peak = 0;
+    },
   };
 }
 
@@ -260,7 +316,8 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
   const config = probe.config.scenarioConfig as FmPartChangeConfig;
   swapRandom(probe);
   if (config.outlineQueueAccessors) outlineQueueAccessors(probe);
-  const { step, note, seen } = fmCycle(probe, config);
+  const { step, note, seen, peak, restart } = fmCycle(probe, config);
+  let checkQueue: ((peak: number) => void) | undefined;
   const { warmup, measure } = probe.config;
   const none: Float32Array[][] = [];
   // Quanta [from, to). The measured run calls this same function, so it
@@ -271,10 +328,12 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
       probe.render(q, none);
       note();
     }
-    if (to === warmup + measure && seen.includes(0)) {
+    if (to !== warmup + measure) return;
+    if (seen.includes(0)) {
       const missed = PATHS.filter((_, p) => seen[p] === 0);
       throw new Error(`the measured run missed a path: ${missed.join(', ')}`);
     }
+    checkQueue?.(peak());
   };
   const chunk = config.period * 16;
   const chunks = (from: number, to: number): void => {
@@ -286,12 +345,19 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
       // The load meter on for the first half, then the measured cadence
       // (off, 0): a load report reads Date.now() twice a quantum, and V8
       // returns each as a new heap number.
+      // A first swap, so the part's `events` field is already rewritten, and
+      // the code that read it deoptimised and optimised again, by the time
+      // the swap that matters comes: V8 tracks a field written only by the
+      // constructor as constant, and the first other write deoptimises.
+      if (config.freshQueue) freshQueue(probe);
       probe.report(64);
       chunks(0, warmup / 2);
       probe.report(probe.config.loadQuanta);
       chunks(warmup / 2, warmup);
       seen.set(optional);
       if (config.seedAge !== undefined) seedAges(probe, config.seedAge);
+      if (config.freshQueue) checkQueue = freshQueue(probe);
+      restart();
       for (let r = 0; r < WARM_READS; r++) v8.getHeapStatistics();
     },
     drive,

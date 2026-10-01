@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { QueuedEvent } from './eventQueue';
 import { EventQueue } from './eventQueue';
+import { EVENT_QUEUE_CAPACITY } from './fmConstants';
 
 const event = (id: number): QueuedEvent => ({ type: 'noteOff', id, frame: 0 });
 
@@ -21,8 +22,31 @@ function takeDue(q: EventQueue, frame: number): [number, number][] {
 }
 
 describe('the FM part event queue', () => {
-  it('keeps events in frame order, a tie in arrival order, as it grows', () => {
+  it('holds its capacity of events, queued and posted, from the start without growing (windsor#270)', () => {
     const q = new EventQueue();
+    const { items, frames, posted } = q;
+    expect([items.length, frames.length, posted.length]).toEqual([
+      EVENT_QUEUE_CAPACITY,
+      EVENT_QUEUE_CAPACITY,
+      EVENT_QUEUE_CAPACITY,
+    ]);
+    for (let id = 0; id < EVENT_QUEUE_CAPACITY; id++) {
+      q.post(event(id));
+      insert(q, id, EVENT_QUEUE_CAPACITY - id);
+    }
+    expect(q.items).toBe(items);
+    expect(q.frames).toBe(frames);
+    expect(q.posted).toBe(posted);
+    expect([items.length, frames.length, posted.length]).toEqual([
+      EVENT_QUEUE_CAPACITY,
+      EVENT_QUEUE_CAPACITY,
+      EVENT_QUEUE_CAPACITY,
+    ]);
+    expect(takeDue(q, Infinity)[0]).toEqual([EVENT_QUEUE_CAPACITY - 1, 1]);
+  });
+
+  it('keeps events in frame order, a tie in arrival order, as it grows', () => {
+    const q = new EventQueue(2);
     const frames = [40, 10, 30, 10, 50, 20, 30, 0, 60, 10];
     frames.forEach((frame, id) => insert(q, id, frame));
     const expected = frames
@@ -33,7 +57,7 @@ describe('the FM part event queue', () => {
   });
 
   it('moves the queue down when it reaches the end of its room, keeping each frame with its event', () => {
-    const q = new EventQueue();
+    const q = new EventQueue(4);
     for (let id = 0; id < 4; id++) insert(q, id, id * 10);
     const room = q.frames.length;
     expect(takeDue(q, 15)).toEqual([
@@ -88,7 +112,7 @@ describe('the FM part event queue', () => {
   });
 
   it('holds posted messages in arrival order, reusing its slots, until a clear releases them', () => {
-    const q = new EventQueue();
+    const q = new EventQueue(2);
     for (let id = 0; id < 3; id++) q.post(event(id));
     expect(q.posted.slice(0, q.postedCount).map((slot) => slot?.id)).toEqual([0, 1, 2]);
     expect(q.empty).toBe(true);
@@ -101,7 +125,7 @@ describe('the FM part event queue', () => {
   });
 
   it('releases the slots a move down vacates', () => {
-    const q = new EventQueue();
+    const q = new EventQueue(4);
     for (let id = 0; id < 4; id++) insert(q, id, id * 10);
     takeDue(q, 15);
     insert(q, 4, 25);

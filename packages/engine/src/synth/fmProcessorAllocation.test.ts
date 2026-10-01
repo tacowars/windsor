@@ -82,6 +82,22 @@
  * born a small integer, the trace read `age:s->d` and the runs read 40 MB
  * and 1.6 MB as the render deoptimised.
  *
+ * A seventh run gives the part a fresh event queue as the warm-up ends, so
+ * the measured run holds a queue's first notes and its first burst with the
+ * code already warm (windsor#270): each cycle posts 64 notes, a note-on and a
+ * note-off each, in one quantum and 16 quanta ahead, the queue's whole room
+ * (`EVENT_QUEUE_CAPACITY`). A truly cold part cannot be held to the bound,
+ * since V8's lower tiers box doubles everywhere, so the run checks the
+ * growth directly as well: the scenario throws unless the queue kept its
+ * arrays at their length and the burst filled its posted slots. With the
+ * queue born empty, it grew from 0, 2 and 0 slots to 128 each and the run
+ * read 420 KB, most of it in the first tenth; with the room given by the
+ * constructor, it reads the probe's own 6 KB and the check's 1.2 KB. The
+ * warm-up swaps a queue in once at its start too: V8 tracks the part's
+ * `events` field, written only by the constructor, as constant, and the
+ * first other write deoptimises the render that read it, which read 2 MB
+ * when it fell in the measured run.
+ *
  * Tolerance: 16 KiB over the 8 000 quanta; one boxed double a quantum would
  * read 128 KB. The runs read about 6 KB, the eleven readings' own result
  * objects (616 bytes a tenth); with the note-on's message read in `noteOn`
@@ -102,8 +118,12 @@ import type { ProbeRun } from '../__fixtures__/workletAllocation';
 import type { Patch } from '../patch/patch';
 import { WAVE } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
+import { EVENT_QUEUE_CAPACITY } from '../worklet/fm/fmConstants';
 
 const TOLERANCE_BYTES = 16 * 1024;
+
+/** Notes in the burst: each a note-on and a note-off, so the burst fills the queue's room. */
+const BURST_NOTES = EVENT_QUEUE_CAPACITY / 2;
 
 /** A context about 25 hours old at 48 kHz: every frame a double in V8, whose small integers end at 2^31. */
 const LATE_FRAME = 2 ** 32;
@@ -258,6 +278,17 @@ const PLUCK_EVENTS: FmPartEvent[] = inOrder([
   ...run(200, 20, [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79], 5, 3),
 ]);
 
+/**
+ * Every note of a burst posted in one quantum, as a chord step over every
+ * voice with steps posted ahead is: the note-ons at the first half of the
+ * quantum's offsets, each note-off later in it, so the burst posts the
+ * queue's whole room at once and the queue holds it until it lands.
+ */
+const BURST_EVENTS: FmPartEvent[] = Array.from({ length: BURST_NOTES }, (_, i) => [
+  on(0, i, i + 1, 48 + (i % 24)),
+  off(0, BURST_NOTES + i, i + 1),
+]).flat();
+
 function probe(
   patch: Patch,
   maxVoices: number,
@@ -368,6 +399,21 @@ describe('the FM part on V8', () => {
         },
         { startFrame: CROSSING_FRAME, v8Flags: SYNCHRONOUS_TIERING },
       ),
+    );
+  }, 120_000);
+
+  it('gives a fresh event queue its first notes and a burst that fills its room, posted ahead, without growing it or allocating (windsor#270)', () => {
+    expectClean(
+      probe(pad(), 8, true, {
+        events: BURST_EVENTS,
+        period: 24,
+        toggles: TOGGLES,
+        rest: 16,
+        idStride: 2 * BURST_NOTES,
+        paths: ['stolen', 'released', 'ended', 'silent'],
+        lookahead: LOOKAHEAD_QUANTA,
+        freshQueue: true,
+      }),
     );
   }, 120_000);
 
