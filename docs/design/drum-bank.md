@@ -131,14 +131,22 @@ leans on five of its features:
   claves and the 909 toms are phase-locked; the cowbell's oscillators run
   free, as on the machine. The 909 tom is two tones about 1:1.63 apart under
   the one pitch envelope, so they beat as the recording does.
-- **Noise colour is the global filter only.** The Noise wave is white per
-  sample and ignores pitch, and a Noise operator ignores any modulator (so a
-  modulator into a Noise op is wasted); an FM carrier driven by white noise
-  gives a line plus a white floor, never a band. Coloured noise therefore
-  comes from the voice's one SVF, which the tonal operators share — the
-  snares' snappy is white above a near-open highpass (32 and 58 Hz),
-  because a highpass high enough to shape it (the 808's measures near
-  1.8 kHz) would take the tones with it (`2026-10-01-tr-snares-fitted`).
+- **Noise colour is the Noise operator's own, or the global filter.** The
+  Noise wave is white per sample and ignores pitch, and a Noise operator
+  ignores any modulator (so a modulator into a Noise op is wasted); an FM
+  carrier driven by white noise gives a line plus a white floor, never a
+  band. Since windsor#362 a Noise operator has its own two-pole Butterworth
+  lowpass and highpass, `noiseLp` and `noiseHp` (Hz, 0 off), on its noise
+  before its level and envelope, so a snare, clap or hat can shape its noise
+  without the voice's one SVF, which the tonal operators share, and without
+  a second operator (`2026-10-02-operator-noise-colour`). The shipped
+  snares predate the fields: their snappy is still white above a near-open
+  highpass (32 and 58 Hz), because a voice highpass high enough to shape it
+  (the 808's measures near 1.8 kHz) would take the tones with it
+  (`2026-10-01-tr-snares-fitted`), and their refit to the fields is its own
+  ticket (windsor#365). The 909 tom keeps its FM-coloured noise, which
+  windsor#361 measured closer than the operator's own filters
+  (`docs/research/2026-10-01-tom-noise-colour-prototype/`).
 - **Metal is a square bank or an inharmonic stack.** The 808 hats and
   cymbal sum four of the six bank frequencies as unbandlimited squares
   (Square D) through a resonant highpass or the 3440 Hz band with the

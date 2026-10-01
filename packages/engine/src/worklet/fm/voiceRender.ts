@@ -6,8 +6,8 @@
  * locals hoisted out of the loop. It is the reference the fixed-index kernel
  * (`voiceKernel.js`) must match to the bit, and the path every voice takes
  * with `specialise: false`. Invariant: one sample loop, read top to bottom,
- * allocation free, no per-sample call beyond `voice.noise()`, the drive and
- * the filter;
+ * allocation free, no per-sample call beyond `voice.noise()`, a Noise
+ * operator's colour (windsor#362), the drive and the filter;
  * a helper per operator would reload the locals through the voice and cost
  * more than it saves. Width (#55): an operator whose width is exactly 1 and
  * still takes the old read, untouched; one squeezed reads its wave at
@@ -87,15 +87,21 @@ function renderVoiceGeneric(
   const width = voice.width,
     widthInc = voice.widthInc;
   const fbAmt = voice.opFeedback; // Float32Array(4): the patch's, or the step's (windsor#17)
+  const colours = voice.noiseColour;
 
   // Width (#55), one bit per operator, hoisted: `ramping` advances its width
   // each sample, `squeezed` reads its wave compressed. Neither is set for a
   // width of exactly 1 that is not ramping, which is every patch before #55.
+  // A Noise operator's colour (windsor#362), one bit per operator, hoisted:
+  // `coloured` passes its noise through its own filters. Never set for an
+  // operator with neither field, or for any other wave.
   let ramping = 0,
-    squeezed = 0;
+    squeezed = 0,
+    coloured = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
     if (widthInc[i] !== 0) ramping |= bit;
+    if (colours[i].on) coloured |= bit;
     const k = kind[i];
     if (k !== KIND_NOISE && k !== KIND_PULSE && (width[i] !== 1 || widthInc[i] !== 0)) {
       squeezed |= bit;
@@ -180,6 +186,14 @@ function renderVoiceGeneric(
             break;
           }
         }
+      }
+      // A Noise operator's own colour (windsor#362): only a Noise operator
+      // sets its bit, and noise is never squeezed, so this follows its draw.
+      if ((coloured & (1 << i)) !== 0) {
+        const colour = colours[i];
+        colour.point = v;
+        colour.process();
+        v = colour.point;
       }
 
       fb2[i] = fb1[i];

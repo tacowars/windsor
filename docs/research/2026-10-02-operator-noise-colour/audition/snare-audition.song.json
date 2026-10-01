@@ -1,0 +1,1176 @@
+{
+  "version": 6,
+  "transport": {
+    "bpm": 100,
+    "bars": 8
+  },
+  "harmony": {
+    "root": 0,
+    "scale": [
+      0
+    ],
+    "events": [
+      {
+        "start": 0,
+        "duration": 768,
+        "degree": 0,
+        "size": 3
+      }
+    ]
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "808 snare",
+      "preset": "tr808-snare",
+      "velocity": 0.8,
+      "strip": {
+        "level": 1,
+        "pan": 0,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 192
+        }
+      ],
+      "sequencer": {
+        "kind": "euclidean",
+        "note": 60,
+        "hold": 0.1,
+        "steps": 16,
+        "seed": 0,
+        "divisor": 6,
+        "pulses": {
+          "min": 3,
+          "max": 9,
+          "start": 5
+        },
+        "rotate": 0,
+        "density": {
+          "kind": "lfoBars",
+          "bars": 8,
+          "shape": "tri"
+        },
+        "pattern": [
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "slot": 1,
+      "name": "808 snare, colour",
+      "preset": "tr808-snare-colour",
+      "velocity": 0.8,
+      "strip": {
+        "level": 1,
+        "pan": 0,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 192,
+          "duration": 192
+        }
+      ],
+      "sequencer": {
+        "kind": "euclidean",
+        "note": 60,
+        "hold": 0.1,
+        "steps": 16,
+        "seed": 0,
+        "divisor": 6,
+        "pulses": {
+          "min": 3,
+          "max": 9,
+          "start": 5
+        },
+        "rotate": 0,
+        "density": {
+          "kind": "lfoBars",
+          "bars": 8,
+          "shape": "tri"
+        },
+        "pattern": [
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "slot": 2,
+      "name": "909 snare",
+      "preset": "tr909-snare",
+      "velocity": 0.8,
+      "strip": {
+        "level": 1,
+        "pan": 0,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 384,
+          "duration": 192
+        }
+      ],
+      "sequencer": {
+        "kind": "euclidean",
+        "note": 60,
+        "hold": 0.1,
+        "steps": 16,
+        "seed": 0,
+        "divisor": 6,
+        "pulses": {
+          "min": 3,
+          "max": 9,
+          "start": 5
+        },
+        "rotate": 0,
+        "density": {
+          "kind": "lfoBars",
+          "bars": 8,
+          "shape": "tri"
+        },
+        "pattern": [
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "slot": 3,
+      "name": "909 snare, colour",
+      "preset": "tr909-snare-colour",
+      "velocity": 0.8,
+      "strip": {
+        "level": 1,
+        "pan": 0,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 576,
+          "duration": 192
+        }
+      ],
+      "sequencer": {
+        "kind": "euclidean",
+        "note": 60,
+        "hold": 0.1,
+        "steps": 16,
+        "seed": 0,
+        "divisor": 6,
+        "pulses": {
+          "min": 3,
+          "max": 9,
+          "start": 5
+        },
+        "rotate": 0,
+        "density": {
+          "kind": "lfoBars",
+          "bars": 8,
+          "shape": "tri"
+        },
+        "pattern": [
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false
+        ]
+      }
+    }
+  ],
+  "patches": {
+    "tr808-snare": {
+      "name": "808 Snare",
+      "algorithm": 7,
+      "volume": 0.89254,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 0,
+      "pan": 0,
+      "panRandom": 0,
+      "panKey": 0,
+      "spread": 0,
+      "mono": true,
+      "ops": [
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 0.668124,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.664438,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.767569,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.00056764,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.0100603,
+            "decayCurve": -0.935575,
+            "sustainLevel": 0.481447,
+            "releaseTime": 0.131895,
+            "releaseCurve": -0.733968,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1.3196,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.710859,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.58923,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.000554763,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.0225639,
+            "decayCurve": -0.712717,
+            "sustainLevel": 0,
+            "releaseTime": 0.005,
+            "releaseCurve": 0,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 4,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.843978,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.7,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.000416827,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.0178572,
+            "decayCurve": -0.99999,
+            "sustainLevel": 0.286046,
+            "releaseTime": 0.0763425,
+            "releaseCurve": -0.861756,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.05,
+            "decayCurve": -0.6,
+            "sustainLevel": 0,
+            "releaseTime": 0.005,
+            "releaseCurve": 0,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        }
+      ],
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0.0005,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.05,
+        "decayCurve": -0.7,
+        "sustainLevel": 0,
+        "releaseTime": 0.005,
+        "releaseCurve": 0,
+        "endLevel": 0,
+        "loopMode": 2,
+        "keyScale": 0
+      },
+      "lfo": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 1,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "lfo2": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 0,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "filter": {
+        "mode": 2,
+        "cutoff": 32.4613,
+        "resonance": 0.70125,
+        "slope24": false,
+        "envAmount": 0,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "lfo2Amount": 0,
+        "keyTrack": 0,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.0005,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.1,
+          "decayCurve": -0.7,
+          "sustainLevel": 0,
+          "releaseTime": 0.005,
+          "releaseCurve": 0,
+          "endLevel": 0,
+          "loopMode": 2,
+          "keyScale": 0
+        }
+      },
+      "drive": {
+        "gain": 1,
+        "shape": 0,
+        "bias": 0,
+        "tone": 1,
+        "on": false
+      }
+    },
+    "tr808-snare-colour": {
+      "name": "tr808-snare-colour",
+      "algorithm": 7,
+      "volume": 0.9,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 0,
+      "pan": 0,
+      "panRandom": 0,
+      "panKey": 0,
+      "spread": 0,
+      "mono": true,
+      "ops": [
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 0.6681242309008188,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.5192147821973649,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.7571379538639296,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.03462369259688413,
+            "decayCurve": -0.3500889263080308,
+            "sustainLevel": 0.31037765275086193,
+            "releaseTime": 0.11992909550192475,
+            "releaseCurve": -0.6877649790154274,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1.319598660539388,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.5887198919618023,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.5137019874583221,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.03808407802136274,
+            "decayCurve": -0.7468084831578063,
+            "sustainLevel": 0,
+            "releaseTime": 0.005,
+            "releaseCurve": 0,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 4,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.9989300824626208,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.7,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "noiseLp": 10089.029530313479,
+          "noiseHp": 2370.0400654924615,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.0006255798225637576,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.029615972707735968,
+            "decayCurve": -0.6116433156182949,
+            "sustainLevel": 0.21241548299174245,
+            "releaseTime": 0.08637087119174243,
+            "releaseCurve": -0.9475544927964289,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.05,
+            "decayCurve": -0.6,
+            "sustainLevel": 0,
+            "releaseTime": 0.005,
+            "releaseCurve": 0,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        }
+      ],
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0.0005,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.05,
+        "decayCurve": -0.7,
+        "sustainLevel": 0,
+        "releaseTime": 0.005,
+        "releaseCurve": 0,
+        "endLevel": 0,
+        "loopMode": 2,
+        "keyScale": 0
+      },
+      "lfo": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 1,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "lfo2": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 0,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "filter": {
+        "mode": 2,
+        "cutoff": 30.005338333285266,
+        "resonance": 0.5627803688364551,
+        "slope24": false,
+        "envAmount": 0,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "lfo2Amount": 0,
+        "keyTrack": 0,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.0005,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.1,
+          "decayCurve": -0.7,
+          "sustainLevel": 0,
+          "releaseTime": 0.005,
+          "releaseCurve": 0,
+          "endLevel": 0,
+          "loopMode": 2,
+          "keyScale": 0
+        }
+      },
+      "drive": {
+        "gain": 1,
+        "shape": 0,
+        "bias": 0,
+        "tone": 1,
+        "on": false
+      }
+    },
+    "tr909-snare": {
+      "name": "909 Snare",
+      "algorithm": 7,
+      "volume": 1.25029,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 11.5253,
+      "pan": 0,
+      "panRandom": 0,
+      "panKey": 0,
+      "spread": 0,
+      "mono": true,
+      "ops": [
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 0.684565,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.856427,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.344312,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.000697297,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.0223098,
+            "decayCurve": -0.735439,
+            "sustainLevel": 0.413179,
+            "releaseTime": 0.125008,
+            "releaseCurve": -0.658798,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1.09688,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.383947,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.998961,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.0000666304,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.0223098,
+            "decayCurve": -0.735439,
+            "sustainLevel": 0.413179,
+            "releaseTime": 0.125008,
+            "releaseCurve": -0.658798,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 4,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.533327,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.7,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.00210623,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.0168312,
+            "decayCurve": -0.794621,
+            "sustainLevel": 0.543126,
+            "releaseTime": 0.0754218,
+            "releaseCurve": 0.221997,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.05,
+            "decayCurve": -0.6,
+            "sustainLevel": 0,
+            "releaseTime": 0.005,
+            "releaseCurve": 0,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        }
+      ],
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.00809935,
+        "decayCurve": 0.497777,
+        "sustainLevel": 0.137647,
+        "releaseTime": 0.123375,
+        "releaseCurve": -0.480443,
+        "endLevel": 0,
+        "loopMode": 2,
+        "keyScale": 0
+      },
+      "lfo": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 1,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "lfo2": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 0,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "filter": {
+        "mode": 2,
+        "cutoff": 57.6567,
+        "resonance": 1.4344,
+        "slope24": false,
+        "envAmount": 0,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "lfo2Amount": 0,
+        "keyTrack": 0,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.0005,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.1,
+          "decayCurve": -0.7,
+          "sustainLevel": 0,
+          "releaseTime": 0.005,
+          "releaseCurve": 0,
+          "endLevel": 0,
+          "loopMode": 2,
+          "keyScale": 0
+        }
+      },
+      "drive": {
+        "gain": 1,
+        "shape": 0,
+        "bias": 0,
+        "tone": 1,
+        "on": false
+      }
+    },
+    "tr909-snare-colour": {
+      "name": "tr909-snare-colour",
+      "algorithm": 7,
+      "volume": 0.9,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 11.515343723045813,
+      "pan": 0,
+      "panRandom": 0,
+      "panKey": 0,
+      "spread": 0,
+      "mono": true,
+      "ops": [
+        {
+          "wave": 9,
+          "userPartials": [
+            1,
+            0.030016728164124862
+          ],
+          "ratio": 0.6892348649923737,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.846373345011979,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.3584944832789772,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.0010733012722281398,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.017668399599528286,
+            "decayCurve": -0.5372552116167698,
+            "sustainLevel": 0.6350159117356342,
+            "releaseTime": 0.13156734179630475,
+            "releaseCurve": -0.8533844727280714,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1.1142265228089097,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.40595628870575123,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0.9961073686078261,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.00028622666998282426,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.011338798424241204,
+            "decayCurve": -0.4060995421218757,
+            "sustainLevel": 0.7453715437581082,
+            "releaseTime": 0.07785466199265259,
+            "releaseCurve": -0.6009915668814303,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 4,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.6227467226565497,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.7,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "noiseLp": 11870.304388154958,
+          "noiseHp": 1313.4998582863989,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.0020496208636700173,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.030753626007389068,
+            "decayCurve": -0.6911533133826417,
+            "sustainLevel": 0.8732476543060086,
+            "releaseTime": 0.07236496687501115,
+            "releaseCurve": -0.3746371102520256,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0,
+          "feedback": 0,
+          "width": 1,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": false,
+          "noiseLp": 0,
+          "noiseHp": 0,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.05,
+            "decayCurve": -0.6,
+            "sustainLevel": 0,
+            "releaseTime": 0.005,
+            "releaseCurve": 0,
+            "endLevel": 0,
+            "loopMode": 2,
+            "keyScale": 0
+          }
+        }
+      ],
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.008737559281763847,
+        "decayCurve": 0.36258188326124996,
+        "sustainLevel": 0.16867019998371724,
+        "releaseTime": 0.09273222349143213,
+        "releaseCurve": -0.9679766040250025,
+        "endLevel": 0,
+        "loopMode": 2,
+        "keyScale": 0
+      },
+      "lfo": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 1,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "lfo2": {
+        "shape": 0,
+        "rate": 5,
+        "amount": 0,
+        "delay": 0,
+        "retrigger": false,
+        "oneShot": false,
+        "unipolar": false,
+        "toPitch": 0,
+        "modWheelDepth": 0,
+        "toOp": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "toWidth": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "filter": {
+        "mode": 2,
+        "cutoff": 33.01060054374024,
+        "resonance": 1.0744758895761861,
+        "slope24": false,
+        "envAmount": 0,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "lfo2Amount": 0,
+        "keyTrack": 0,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.0005,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.1,
+          "decayCurve": -0.7,
+          "sustainLevel": 0,
+          "releaseTime": 0.005,
+          "releaseCurve": 0,
+          "endLevel": 0,
+          "loopMode": 2,
+          "keyScale": 0
+        }
+      },
+      "drive": {
+        "gain": 1,
+        "shape": 0,
+        "bias": 0,
+        "tone": 1,
+        "on": false
+      }
+    }
+  }
+}

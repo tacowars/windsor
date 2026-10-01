@@ -8,10 +8,17 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
-import { OP_NAMES, WIDTH_RANGE, makePatch } from '@windsor/engine';
+import {
+  NOISE_COLOUR_FLOOR_HZ,
+  NOISE_COLOUR_RANGE,
+  OP_NAMES,
+  WIDTH_RANGE,
+  makePatch,
+} from '@windsor/engine';
 import {
   DRIVE_KNOBS,
   FILTER_KNOBS,
+  NOISE_COLOUR_KNOBS,
   OP_KNOBS,
   allPatchKnobs,
   lfoKnobs,
@@ -193,5 +200,37 @@ describe('the Drive section (windsor#309)', () => {
     expect(JSON.parse(pushed.at(-1) ?? '{}')).toEqual(written);
     const shown = JSON.parse(JSON.stringify(editor.patch, null, 2)) as Patch;
     expect(makePatch(shown).drive).toEqual(written);
+  });
+});
+
+describe('the noise colour knobs (windsor#362)', () => {
+  it('are Noise LP and Noise HP, on every operator, after Vel', () => {
+    expect(NOISE_COLOUR_KNOBS.map((k) => [k.f, k.label])).toEqual([
+      ['noiseLp', 'Noise LP'],
+      ['noiseHp', 'Noise HP'],
+    ]);
+    const paths = allPatchKnobs().map((k) => k.path);
+    OP_NAMES.forEach((_, i) => {
+      const at = paths.indexOf(`ops.${i}.noiseLp`);
+      expect(paths[at - 1], `ops.${i}`).toBe(`ops.${i}.velSens`);
+      expect(paths[at + 1], `ops.${i}`).toBe(`ops.${i}.noiseHp`);
+    });
+  });
+
+  it("are zero-end log knobs over the engine's range, starting Off", () => {
+    for (const k of NOISE_COLOUR_KNOBS) {
+      expect(k.o).toMatchObject({
+        min: 0,
+        max: NOISE_COLOUR_RANGE.max,
+        curve: 'log',
+        logFloor: NOISE_COLOUR_FLOOR_HZ,
+      });
+      expect(patchKnobOpts(k, `ops.2.${k.f}`).def).toBe(0);
+    }
+  });
+
+  it('read 0 as Off and a cutoff in Hz or kHz', () => {
+    const fmt = NOISE_COLOUR_KNOBS[0]!.o.fmt!;
+    expect([fmt(0), fmt(20), fmt(950), fmt(10089.03)]).toEqual(['Off', '20', '950', '10.09k']);
   });
 });
