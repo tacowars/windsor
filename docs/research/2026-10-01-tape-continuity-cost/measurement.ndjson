@@ -1,0 +1,4 @@
+{"factor":2,"mode":"steady","repeats":11,"beforeMs":4.501,"afterMs":5.208,"ratio":1.0302,"ratioMin":0.7014,"ratioMax":1.3109}
+{"factor":2,"mode":"switch","repeats":11,"beforeMs":3.936,"afterMs":3.715,"ratio":0.9797,"ratioMin":0.8655,"ratioMax":1.1344}
+{"factor":4,"mode":"steady","repeats":11,"beforeMs":6.478,"afterMs":6.555,"ratio":1.0111,"ratioMin":0.6917,"ratioMax":1.2019}
+{"factor":4,"mode":"switch","repeats":11,"beforeMs":5.003,"afterMs":4.995,"ratio":1.0088,"ratioMin":0.9083,"ratioMax":1.1381}

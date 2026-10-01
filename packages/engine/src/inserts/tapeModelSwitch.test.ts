@@ -29,11 +29,16 @@
  * 4×), the whole path's steady peak reached 1.014 of Metal's at four fifths
  * of the way, Ferric's EQ still lifting the level into a core already near
  * Metal's ceiling; along 30ips Studio to Vintage it dipped to 0.987 of
- * Studio's. Measured on Node 24 (arm64), this walk's worst sample was 1.0213
- * of the larger steady peak (Ferric to Metal, 4×, at 44.1 and at 48 kHz) and
- * its lowest cycle peak 0.9599 of the smaller (30ips Studio to Vintage, 4×,
- * 44.1 kHz); `MEASURED` holds both, and the test allows each half a point
- * more (`MARGIN`). With the EQ bypassed the worst sample was 1.0043. The
+ * Studio's. Measured on Node 24 (arm64), this walk's worst sample is 1.0189
+ * of the larger steady peak (Metal to Ferric, 96 kHz, at 2× and 4×) and its
+ * lowest cycle peak 0.9862 of the smaller (Vintage to 30ips Studio, 96 kHz);
+ * `MEASURED` holds both. Since windsor#296 the core keeps M × gain through a
+ * retune, so the normalisation no longer lifts or drops the magnetization
+ * the glide carries; before it, the worst was 1.0213 (Ferric to Metal, 4×,
+ * 44.1 kHz) and the lowest 0.9599 (30ips Studio to Vintage). The test allows
+ * each a tenth of a point more (`MARGIN`): the core's arithmetic is portable
+ * (`tapePortableMath.ts`), so x64 reads the same bits and the margin only
+ * absorbs a harmless change, and the gate stays under 2%. The
  * per-block reconfiguration this replaced reached 1.075 here, and 1.093 with
  * the EQ bypassed. A last test holds a finished glide to the constant render:
  * once settled, every core is tuned exactly as a DSP started on the model.
@@ -41,6 +46,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { tapeRig, type TapeRig } from '../__fixtures__/tapeDspProbe';
+import { circuit } from '../__fixtures__/tapeModelWalk';
 import { TapeMagneticCore, originSusceptibility } from '../worklet/tape/tapeMagnetic';
 import { magneticControls } from '../worklet/tape/tapeMagneticRows';
 import { TAPE_MODELS, TAPE_OVERSAMPLING, TAPE_TYPES } from './tapeConstants';
@@ -52,26 +58,11 @@ const QUANTUM = 128;
 const STEADY_SECONDS = 0.1;
 const HOLD_SECONDS = 0.06;
 /** This walk's worst excursions past the envelope, as fractions of the steady peak (see above). */
-const MEASURED = { above: 0.0213, below: 0.0401 };
+const MEASURED = { above: 0.0189, below: 0.0138 };
 /** The allowance past each measured excursion. */
-const MARGIN = 0.005;
+const MARGIN = 0.001;
 /** A finished glide's longest possible run: a whole-range step snaps within about 16 time constants. */
 const SETTLE_SECONDS = 0.2;
-
-/** A closed walk through every ordered pair of `count` nodes once (Hierholzer), from node 0. */
-function circuit(count: number): number[] {
-  const unused = Array.from({ length: count }, (_, a) =>
-    Array.from({ length: count }, (_, b) => b).filter((b) => b !== a),
-  );
-  const stack = [0];
-  const walk: number[] = [];
-  while (stack.length > 0) {
-    const next = unused[stack[stack.length - 1]!]!.pop();
-    if (next === undefined) walk.push(stack.pop()!);
-    else stack.push(next);
-  }
-  return walk.reverse();
-}
 
 /** Every field the core derives from its controls and rate. */
 const TUNING = [
