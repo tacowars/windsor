@@ -279,7 +279,9 @@ describe('groups in a live partial', () => {
     const perc = system.groupBus(PERC.id)!;
     expect(targets(strip(system, BASS).rotation.output)).toEqual([fake(perc.input)]);
     expect(
-      system.apply({ groups: { [PERC.id]: { level: 9, pan: 0.5, colour: 1 } } } as unknown as DocumentPartial),
+      system.apply({
+        groups: { [PERC.id]: { level: 9, pan: 0.5, colour: 1 } },
+      } as unknown as DocumentPartial),
     ).toEqual({ ok: true, ignored: [`groups.${PERC.id}.colour`] });
     expect(perc.spec).toMatchObject({ level: 4, pan: 0.5 });
     system.dispose();
