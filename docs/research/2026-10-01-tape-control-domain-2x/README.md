@@ -130,6 +130,17 @@ node docs/research/2026-10-01-tape-control-domain/evidence.mjs --check
 npx eslint docs/research/2026-10-01-tape-control-domain-2x/ docs/research/2026-10-01-tape-control-domain/
 ```
 
+#315's part, below, runs and re-checks with:
+
+```sh
+node docs/research/2026-10-01-tape-control-domain-2x/measure.mjs --rows
+node docs/research/2026-10-01-tape-control-domain-2x/rowsEvidence.mjs --check
+```
+
+Since #307 changed the shipped core, the first two `--check`s above report
+a changed closure and moving spot trials that are no longer bit-equal (see
+"What changed under it" in #315's part).
+
 ## Environment and run
 
 Apple M1 arm64 (8 cores), Darwin 25.5.0, Node v24.20.0, V8
@@ -238,3 +249,130 @@ and 1 s knob sweeps and under 50 ms and 1 s random walks with the stage's
 **Accuracy is not qualified**, as in #290: the corner-accuracy record's
 tone-gate misses at the drive and saturation ends still apply, and were not
 re-measured.
+
+## windsor#315: a box that holds every shipped model row
+
+Windsor [#315](https://github.com/tacowars/windsor/issues/315). The
+Advanced panel (#291, PR #314) uses the box declared above, but two shipped
+model rows sit above its width maximum of 0.62: **Vintage** (drive 0.742,
+width 0.831, saturation 0.528) and **VHS** (0.836, 0.769, 0.972). Touching
+any knob on either model would clamp width to 0.62, which is audible.
+
+That maximum is #290's rule (i), susceptibility ≥ 2 × floor, read at
+**drive 0 only**, where the origin susceptibility at width 0.62 is
+2.02 × 10⁻³ and the gain 494.7. The shipped susceptibility is
+c r / (1 − α c r) with r = (0.01 + 6 · drive) / 3 and c = √(1 − width) −
+0.01. It does not depend on saturation, rises with drive and falls with
+width. Raising drive's minimum therefore relaxes the rule, and from drive
+0.05 width 0.85 keeps the susceptibility far above it. This part qualifies
+**drive [0.05, 1] × width [0.05, 0.85] × saturation [0, 1]**, which holds
+every shipped row (lowest drive 0.159, 30ips Studio; highest width 0.831,
+Vintage) and gives up only drive's nearly linear bottom 5%.
+
+### What is measured, and what changed under it
+
+The harness is #295's, unchanged: #290's field program, static points,
+sweeps, random walks and pass criteria, every trial rendered through
+#290's `runTrial` with its own box. [`rowsProgram.ts`](rowsProgram.ts)
+schedules the candidate boxes and reads the shipped rows
+(`TAPE_MODELS`, `TAPE_LABELS`). It imports `boxProgram.ts`, #290's
+`controlConstants.ts` (for a type) and the shipped `tapeConstants.ts`,
+nothing else. `rowsEvidence.mjs` walks its import closure as
+`evidence.mjs` walks #295's, and `--check` fails unless every file is under
+`packages/engine/src/`, #290's folder or this one. **No research core** is
+reached.
+
+**The shipped core changed after #295's run.** #307 (`80b077a`) rescales
+M when the gain changes, so M × gain stays continuous under control motion.
+This part measures the core as it ships now. #290's and #295's records are
+of the core before #307 and are not changed here; their `--check` now
+reports the closure hashes as changed and their moving spot trials as not
+bit-equal (#290's static spot trial still is).
+
+### Declared experiment before measurement
+
+[`rowsConstants.ts`](rowsConstants.ts) holds every new value below. It, the
+scripts and this section were committed before the run.
+
+**The candidates**, run in order. The run stops at the first box in which
+every trial survives, and that box is declared. The first is the issue's
+box; the rest are its decision 3's steps (drive's minimum up to 0.1, width's
+maximum down to 0.83):
+
+| # | Drive | Width | Saturation |
+|---|---|---|---|
+| 1 | [0.05, 1] | [0.05, 0.85] | [0, 1] |
+| 2 | [0.1, 1] | [0.05, 0.85] | [0, 1] |
+| 3 | [0.05, 1] | [0.05, 0.83] | [0, 1] |
+| 4 | [0.1, 1] | [0.05, 0.83] | [0, 1] |
+
+Vintage's width is 0.8311, a little above 0.83, so candidates 3 and 4 would
+leave its row just outside. `derived.declaration.holdsEveryRow` reports
+whether the declared box holds every row, and either of those boxes is
+flagged if it is needed.
+
+Each candidate is #290's whole part B, as #295 ran it, per rate and factor
+(313 trials, **1,878** per candidate):
+
+- **277 static points**: the 8 corners, 12 edge midpoints, centre and the
+  same 256 R3 interior points (seed 290), mapped into the candidate box;
+- **24 sweeps**: each control end to end and back in 50 ms and in 1 s, the
+  other two at each of their four corners;
+- **12 random walks**: glide-1s, glide-50ms and jump-50ms at seeds
+  2901–2904, uniform in the candidate box;
+- at **2× and 4×**, at **44.1, 48 and 96 kHz**.
+
+**The normalisation table** (from the shipped `configure`, not rendered).
+For every candidate, on each of the box's six faces, a 41 × 41 grid; through
+its volume, a 21 × 21 × 21 grid. At each point: the origin susceptibility,
+the output gain, and the gain over its width-0 value at the same drive and
+saturation (#290's rule (ii) ratio). Reported per face and for the volume:
+the lowest susceptibility and its ratio to the floor (10⁻³), the highest
+gain, the highest ratio, and where each falls; and whether the volume's
+extremes lie on the faces. Rule (i)'s margin (2 × floor) is reported per
+face. Rule (ii) (ratio ≤ 2) is reported, not gated: the issue gates
+survival only, and the shipped rows themselves reach 2.47 (Vintage). From
+the formula above, the worst point is the edge where drive is lowest and
+width highest, at any saturation.
+
+**The shipped rows table**: each row's susceptibility, gain and ratio, and
+which candidate boxes hold it.
+
+### Pass criteria (every trial)
+
+#290's, unchanged: **zero resets** (the state guard, |M| > 20 or not
+finite, counts as a reset), **zero nonfinite** output samples and every
+input finite, and peak |M| reported against the guard at 20. The field
+guard's clips, the output's peak and its remanent DC are reported, not
+gated.
+
+### Bound and run
+
+`measure.mjs --rows` runs the candidates. Each runs in **4 worker
+processes** (half this machine's 8 cores), one journal each, dealt
+round-robin in cost order. A **hard 3,600-second wall-clock bound** runs
+from the start over every candidate. At the limit every child is killed
+and the report is assembled from the journals alone. There is no retry.
+
+**The exit code** (decision 4, Codex's P2 on PR #297). `measure.mjs`, in
+either experiment, now exits nonzero unless the closure is clean, nothing
+expired, every worker exited 0, no journal has a truncated tail, every
+scheduled trial was recorded and a box qualified. A `--smoke` run is
+partial by design, so the last two do not apply to it. The gate is
+`exitCode` in `evidence.mjs`, and both `--check`s run its 11 cases
+(expiry, a worker that exited nonzero or was killed, no worker, a truncated
+journal, missing trials, no box qualified, an unclean closure, and smoke
+runs partial and broken).
+
+[`rowsEvidence.mjs`](rowsEvidence.mjs) derives everything below from the
+raw trials and the shipped `configure`. Its `--check`:
+
+- re-derives the normalisation and rows tables, each candidate's gates,
+  where the candidates stop, completeness and the declaration from
+  `rowsMeasurement.json`;
+- re-hashes the import closure and checks it is clean;
+- re-renders three spot trials of candidate 1 (the worst-gain corner,
+  drive 0.05 and width 0.85, static at 48 kHz 2×; the 1 s drive sweep at
+  width 0.85 and saturation 0 at 44.1 kHz 2×; a 96 kHz 4× jump walk),
+  comparing their records exactly (all but wall time);
+- runs the exit gate's cases.
