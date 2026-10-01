@@ -3,7 +3,7 @@
   "name": "808 Kick",
   "category": "Drums",
   "tags": ["808", "kick", "analog", "sub", "mono"],
-  "description": "Fitted to a clean recording of the machine with Decay and Tone at mid (the Decay C sample). The punch holds 22 semitones up for 4.4 ms, so one fast cycle sounds before the body; then it falls in two steps over about 30 ms onto a sine body (65 Hz on C4, the 808's 52 Hz on G#3). Every operator starts at a locked phase, as the circuit does. Decay 560 ms; the hit runs its course whatever the gate.",
+  "description": "Fitted to a clean recording of the machine with Decay and Tone at mid (the Decay C sample). The punch holds 22 semitones up for 4.4 ms, so one fast cycle sounds before the body; then it falls in two steps over about 30 ms onto a sine body (52 Hz on C4, the 808's pitch). Every operator starts at a locked phase, as the circuit does. Decay 560 ms; the hit runs its course whatever the gate.",
   "patch": {
     "name": "808 Kick",
     "algorithm": 4,
@@ -20,7 +20,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": -0.000359,
@@ -48,7 +48,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": -0.000359,
@@ -104,7 +104,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 1,
+        "ratio": 0.793701,
         "fixed": false,
         "fixedHz": 100,
         "detune": -0.000359,

@@ -3,7 +3,7 @@
   "name": "EFM Kick",
   "category": "Drums",
   "tags": ["efm", "kick", "digital", "sub", "mono"],
-  "description": "EFM-BD: sine body (65 Hz on C4, 55 Hz on A3), a 1:1 modulator with its own feedback whose depth collapses in 25 ms (the FM knock) and a 14-semitone ramp. Velocity drives the modulator, so soft hits are pure sine.",
+  "description": "EFM-BD: sine body (52 Hz on C4, the pitch of the 808 and 909 kicks), a 1:1 modulator with its own feedback whose depth collapses in 25 ms (the FM knock) and a 14-semitone ramp. Velocity drives the modulator, so soft hits are pure sine.",
   "patch": {
     "name": "EFM Kick",
     "algorithm": 0,
@@ -20,7 +20,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0,
@@ -48,7 +48,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0,
@@ -76,7 +76,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.5,
+        "ratio": 0.39685,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0,
@@ -104,7 +104,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 1,
+        "ratio": 0.793701,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0,

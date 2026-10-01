@@ -3,7 +3,7 @@
   "name": "808 Kick Long",
   "category": "Drums",
   "tags": ["808", "kick", "analog", "sub", "long", "mono"],
-  "description": "Fitted to a clean recording of the machine with Decay high (the Decay E sample): the 808 Kick's punch and two-step fall (65 Hz on C4, the 808's 52 Hz on G#3) into a 2.4 s boom, the long tail of hip-hop and trap. The hit runs its course whatever the gate.",
+  "description": "Fitted to a clean recording of the machine with Decay high (the Decay E sample): the 808 Kick's punch and two-step fall (52 Hz on C4, the 808's pitch) into a 2.4 s boom, the long tail of hip-hop and trap. The hit runs its course whatever the gate.",
   "patch": {
     "name": "808 Kick Long",
     "algorithm": 4,
@@ -20,7 +20,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": -0.000359,
@@ -48,7 +48,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": -0.000359,
@@ -104,7 +104,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 1,
+        "ratio": 0.793701,
         "fixed": false,
         "fixedHz": 100,
         "detune": -0.000359,
