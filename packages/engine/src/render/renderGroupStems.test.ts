@@ -221,4 +221,9 @@ describe('renderStems with group buses (windsor#286)', () => {
     expect(peak(stems.get('group 1 Hiss')![0]!)).toBeGreaterThan(1e-4);
     expect(sumError(stems)).toBeLessThan(1e-6);
   });
+
+  it('renders the master alone for a song with a group and no parts', async () => {
+    const stems = await collect({ ...SONG, parts: [] });
+    expect([...stems.keys()]).toEqual(['master']);
+  });
 });

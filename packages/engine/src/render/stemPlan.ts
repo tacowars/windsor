@@ -19,8 +19,10 @@
  * insert audible from silence (Tape's hiss) reaches the master through it,
  * so its stem carries that, and is silent when the chain makes nothing. A
  * muted or soloed-out group's stem is listed, and silent, as a muted part's
- * is. A part naming a group the song lacks plays on Master, as the live
- * system plays it, and keeps its part stem.
+ * is. A song with no parts plans no group stem: its render builds no music
+ * graph (`buildSystem`), so no group bus plays, and stems play what the
+ * render plays. A part naming a group the song lacks plays on Master, as the
+ * live system plays it, and keeps its part stem.
  *
  * A pass renders the master on channels 0–1 and its stems on the pairs after
  * (decision 2): as many as the channel limit allows, and fewer when the
@@ -90,7 +92,9 @@ export function stemSources(document: ArrangementDocument, choice: StemChoice = 
       name: part.name,
       muted: isSidechainOnly(part),
     }));
-  const buses = groups.map<GroupStem>((group, i) => ({
+  // A part-less render builds no music graph, so no group bus plays to tap.
+  const playedGroups = document.parts.length > 0 ? groups : [];
+  const buses = playedGroups.map<GroupStem>((group, i) => ({
     kind: 'group',
     id: group.id,
     name: group.name,

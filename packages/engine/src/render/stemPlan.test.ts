@@ -186,6 +186,10 @@ describe('stemSources with group buses (windsor#286)', () => {
     expect(stemSources(song)).toEqual(stemSources(FULL_DOCUMENT));
   });
 
+  it('plans no group stem for a song with no parts, whose render builds no group bus', () => {
+    expect(stemSources({ ...FULL_DOCUMENT, parts: [], groups: [DRUMS] })).toEqual([]);
+  });
+
   it('plans exactly the stems of today for a song with an empty group list', () => {
     expect(stemSources({ ...FULL_DOCUMENT, groups: [] })).toEqual(stemSources(FULL_DOCUMENT));
   });
