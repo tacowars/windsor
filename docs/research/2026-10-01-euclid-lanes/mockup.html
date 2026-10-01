@@ -274,7 +274,7 @@ button:focus-visible, select:focus-visible, .cell:focus-visible { outline: 2px s
 
 <script>
 (() => {
-  const STEPS_PER_BAR = 16, BPM = 124, NOTE = 50, LEN_MAX = 32, STEPS_MAX = 32;
+  const STEPS_PER_BAR = 16, BPM = 124, NOTE = 50, LEN_MAX = 32, STEPS_MAX = 64; // the engine's EUCLID_STEPS_MAX
   const SOUND_LANES_MAX = 4, PITCH_MAX = 24, PX_PER_SEMITONE = 6, PLOT_BARS = 16;
   const FILTER_PARAMS = [['filter.cutoff', 'Cutoff', 'Filter'], ['filter.resonance', 'Resonance', 'Filter'], ['filter.envAmount', 'Env amount', 'Filter'], ['filter.env.decayTime', 'Decay', 'Filter']];
   const OP_FIELDS = [['level', 'Level'], ['env.decayTime', 'Decay'], ['env.decayCurve', 'Curve'], ['feedback', 'Feedback'], ['width', 'Width']];
@@ -591,6 +591,7 @@ button:focus-visible, select:focus-visible, .cell:focus-visible { outline: 2px s
   seg('d-shape', (v) => { S.density.shape = v; paintKnobs(); });
 
   // Audio: a stand-in tom, scheduled ahead on the audio clock. k is re-cut on each bar line, as the engine does.
+  const voices = new Set();
   let ctx = null, master = null, noise = null, timer = null, nextStep = 0, nextTime = 0, kSched = S.kStart;
   const queue = [], stepDur = () => 60 / BPM / 4;
   function valuesAt(s) {
@@ -619,6 +620,7 @@ button:focus-visible, select:focus-visible, .cell:focus-visible { outline: 2px s
     env.gain.exponentialRampToValueAtTime(0.0001, t + 0.002 + decay);
     osc.connect(body).connect(lp); src.connect(ng).connect(lp); lp.connect(env).connect(master);
     osc.start(t); src.start(t, Math.random() * 0.5); osc.stop(t + decay + 0.05); src.stop(t + decay + 0.05);
+    const voice = { osc, src }; voices.add(voice); osc.onended = () => voices.delete(voice);
   }
   function playStep(s, t) {
     if (s % STEPS_PER_BAR === 0 && !S.captured) {
@@ -649,7 +651,8 @@ button:focus-visible, select:focus-visible, .cell:focus-visible { outline: 2px s
   $('play').onclick = async () => {
     const btn = $('play');
     if (S.playing) {
-      S.playing = false; clearInterval(timer); queue.length = 0; btn.textContent = 'Play'; btn.setAttribute('aria-pressed', 'false');
+      S.playing = false; clearInterval(timer); queue.length = 0;
+      for (const v of voices) { try { v.osc.stop(); v.src.stop(); } catch { /* already stopped */ } } voices.clear(); btn.textContent = 'Play'; btn.setAttribute('aria-pressed', 'false');
       S.walkPath = []; setPos(-1, S.kStart); paintKnobs(); return;
     }
     if (!ctx) {
