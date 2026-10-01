@@ -13,15 +13,16 @@
  *      order, on every path (#548). `fmProcessorGolden.test.ts` is the gate.
  *
  * What this file owns: the parameter descriptors, the message port (patch,
- * notes, live retune, load sampling), the frame-stamped event queue, voice
- * allocation and stealing, and `renderBlock`, which walks each active voice
- * up to the next event or control boundary. Everything a voice does is
+ * notes, live retune, load sampling), the frame-stamped event queue, the
+ * note map, and `renderBlock`, which admits the notes posted since the last
+ * quantum, reads each message as it takes it (windsor#270), and walks each
+ * active voice up to the next event or control boundary. Which voice a note
+ * takes is `voiceAllocation.ts`. Everything a voice does is
  * `voice.js` and the modules beside it; the patch schema and algorithm
  * tables are mirrored in ../../patch.ts (`patch.test.ts`, until #656).
  */
 
 import type {
-  NoteOnMessage,
   ProcessorOptions,
   ScheduledMessage,
   WorkletMessage,
@@ -33,6 +34,7 @@ import { normalisePatch, num } from './patchNormalise';
 import { makeRandom } from './prng';
 import { LoadSampler } from '../loadSampler';
 import { Voice } from './voice';
+import { allocateVoice } from './voiceAllocation';
 import { PART_BEND, PART_CONTROL_COUNT, PART_CUTOFF_MOD, PART_WHEEL } from './voiceControl';
 import { WAVE } from './waveIds';
 import { getMips } from './waveTables';
@@ -42,6 +44,16 @@ interface FmProcessorOptions extends Partial<ProcessorOptions> {
   dormancy?: boolean;
   specialise?: boolean;
 }
+
+/**
+ * The note-on being started, in `noteIn`: the render copies the message's
+ * numbers here as it takes the event, so `noteOn` reads no message
+ * (windsor#270). A missing or non-number velocity or mod is NaN.
+ */
+const NOTE_IN_NOTE = 0,
+  NOTE_IN_VELOCITY = 1,
+  NOTE_IN_MOD = 2,
+  NOTE_IN_COUNT = 3;
 
 /* ------------------------------------------------------------------ *
  * The processor — one timbral part
@@ -55,6 +67,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
   waveSets: (Float32Array[] | null)[];
   events: EventQueue;
   partControls: Float64Array;
+  noteIn: Float64Array;
+  slideIn: boolean;
+  stepModIn: readonly number[] | null;
   lastNote: number;
   running: boolean;
   liveRetune: boolean;
@@ -88,6 +103,12 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // `renderBlock` writes them, and every voice's control update reads them,
     // so no double is passed to a call (windsor#233).
     this.partControls = new Float64Array(PART_CONTROL_COUNT);
+
+    // The note-on the render is starting (`NOTE_IN_*`), its slide flag and its
+    // step's offsets, copied from the message as the render takes it (windsor#270).
+    this.noteIn = new Float64Array(NOTE_IN_COUNT);
+    this.slideIn = false;
+    this.stepModIn = null;
 
     // Four reserve slots above the sounding limit so a stolen voice can fade
     // out while its replacement is already sounding.
@@ -194,88 +215,21 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Queue `ev` at its frame, or now without one. The frame is read here and
-   * goes to the queue in its `incoming` slot, not as an argument: past 2^31
-   * it is a double, which an argument can box (rule 2), and the message is
-   * never stamped with it, since a field first written as a small integer is
-   * generalised by the first double (rule 7).
+   * Queue `ev` at its frame, or, without one, at the quantum that admits it.
+   * It is posted, reading nothing of the message, and `renderBlock` admits it
+   * at the start of the next quantum (windsor#270, `eventQueue.ts`): a
+   * function run once a message is left in V8's baseline tier when the first
+   * frame past 2^31 deprecates the message's map, and there it would box
+   * the frame it read.
    */
   schedule(ev: ScheduledMessage): void {
-    const q = this.events;
-    q.incoming[0] = typeof ev.frame === 'number' ? ev.frame : currentFrame;
-    q.insert(ev);
+    this.events.post(ev);
   }
 
   /** Drop every voice from the note map: a later note-off for any of them finds nothing. */
   unkeyAll(): void {
     const vs = this.voices;
     for (let i = 0; i < vs.length; i++) vs[i].keyed = false;
-  }
-
-  /**
-   * Pick a voice.
-   *
-   * If the part is already at its sounding limit, the least valuable voice is
-   * asked to fade out (4 ms) rather than being cut dead, and the new note takes
-   * a reserve slot. Only an exhausted pool falls back to a hard kill.
-   *
-   * Priority for stealing: dormant (#547), oldest first, killed outright since
-   * it is silent and needs no fade; then already released, oldest first;
-   * otherwise oldest. A dormant voice counts as sounding, so the pool never
-   * holds more than the limit.
-   */
-  allocate(): Voice {
-    const vs = this.voices;
-    let free: Voice | null = null;
-    let sounding = 0;
-    let bestDormant: Voice | null = null,
-      bestDormantAge = -1;
-    let bestReleased: Voice | null = null,
-      bestReleasedAge = -1;
-    let bestAny: Voice | null = null,
-      bestAnyAge = -1;
-
-    for (let i = 0; i < vs.length; i++) {
-      const v = vs[i];
-      if (v.active && v.finished && !v.fading) v.active = false;
-
-      if (!v.active) {
-        if (!free) free = v;
-        continue;
-      }
-      if (v.fading) continue; // sounding but already on its way out
-
-      sounding++;
-      if (this.dormancy && v.age > bestDormantAge && v.dormant) {
-        bestDormantAge = v.age;
-        bestDormant = v;
-      }
-      if (!v.gate && v.age > bestReleasedAge) {
-        bestReleasedAge = v.age;
-        bestReleased = v;
-      }
-      if (v.age > bestAnyAge) {
-        bestAnyAge = v.age;
-        bestAny = v;
-      }
-    }
-
-    if (sounding >= this.maxVoices) {
-      if (bestDormant) {
-        bestDormant.kill();
-        return bestDormant;
-      }
-      const victim = bestReleased || bestAny;
-      if (victim) victim.steal();
-    }
-
-    if (free) return free;
-
-    // Pool exhausted (many simultaneous fades). Take the oldest outright.
-    let oldest = vs[0];
-    for (let i = 1; i < vs.length; i++) if (vs[i].age > oldest.age) oldest = vs[i];
-    oldest.kill();
-    return oldest;
   }
 
   /**
@@ -293,11 +247,20 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.unkeyAll();
   }
 
-  noteOn(msg: NoteOnMessage): void {
+  /**
+   * Start the note-on in `noteIn`, `slideIn` and `stepModIn` under handle
+   * `id`. It reads no message: the render copied it there (windsor#270).
+   */
+  noteOn(id: number): void {
     const p = this.patch;
-    const id = msg.id != null ? msg.id : msg.note;
-    const vel = num(msg.velocity, 1);
-    const mod = num(msg.mod, 0);
+    const input = this.noteIn;
+    const note = input[NOTE_IN_NOTE];
+    // `num(v, d)` with no call: `v - v` is 0 only for a finite v, and NaN
+    // stands for a missing or non-number field.
+    const velocity = input[NOTE_IN_VELOCITY];
+    const vel = velocity - velocity === 0 ? velocity : 1;
+    const modIn = input[NOTE_IN_MOD];
+    const mod = modIn - modIn === 0 ? modIn : 0;
     const count = p.spread > 0 ? 2 : 1;
     // Where a glide starts: the last note, NaN for none (`lastNote` is NaN until the first).
     const glideFrom = p.glide > 0 ? this.lastNote : NaN;
@@ -307,45 +270,46 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // starts fresh. `spread` still runs its detuned pair for the one note, and
     // `glide` still slides from `lastNote`.
     // A slide in mono (#602): the sounding voice takes the new note legato.
-    if (msg.slide && p.mono && this.slideTo(id, msg, vel, mod)) return;
+    if (this.slideIn && p.mono && this.slideTo(id, vel, mod)) return;
     if (p.mono) this.cutSounding();
 
     // A handle already held is released first, as a new note under it.
     this.noteOffId(id);
 
     for (let u = 0; u < count; u++) {
-      const v = this.allocate();
+      const v = allocateVoice(this.voices, this.maxVoices, this.dormancy);
       const sign = u === 0 ? -1 : 1;
       const detune = count === 1 ? 0 : (sign * p.spread) / 100;
-      let pan = p.pan + p.panKey * ((msg.note - 60) / 48) + p.panRandom * (this.random() * 2 - 1);
+      let pan = p.pan + p.panKey * ((note - 60) / 48) + p.panRandom * (this.random() * 2 - 1);
       if (count > 1) {
         // `Math.min(1, spread / 50)`, NaN and -0 alike, with no builtin call.
         const width = p.spread / 50;
         pan += sign * 0.35 * (width > 1 ? 1 : width);
       }
       // The note's doubles go to the voice in its fields, not as arguments (windsor#233).
+      v.note = note;
       v.velocity = vel;
       v.detune = detune;
       v.pan = pan;
       v.glideFrom = glideFrom;
-      v.start(p, this.waveSets, msg.note, id, msg.stepMod);
+      v.start(p, this.waveSets, id, this.stepModIn);
       v.mod = mod;
       v.keyed = true;
     }
-    this.lastNote = msg.note;
+    this.lastNote = note;
   }
 
   /**
-   * Retarget the held note's voices to the message's note and step offsets
-   * (windsor#17) under handle `id` (#602). In mono at most one handle is
-   * gated, so the first gated voice names it. False when nothing is
+   * Retarget the held note's voices to the note-on's note and step offsets
+   * (`noteIn`, `stepModIn`, windsor#17) under handle `id` (#602). In mono
+   * at most one handle is gated, so the first gated voice names it. False when nothing is
    * sounding: the caller starts a fresh voice instead. The slide takes the
    * handle `id` over: a voice still keyed to it leaves the note map without a
    * release, as it did when the map was a `Map` whose entry for `id` the
    * slide replaced. Allocates nothing.
    */
-  slideTo(id: number, msg: NoteOnMessage, velocity: number, mod: number): boolean {
-    const note = msg.note;
+  slideTo(id: number, velocity: number, mod: number): boolean {
+    const note = this.noteIn[NOTE_IN_NOTE];
     const vs = this.voices;
     let heldId: number | null = null;
     for (let i = 0; i < vs.length; i++) {
@@ -365,7 +329,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     for (let i = 0; i < vs.length; i++) {
       const v = vs[i];
       if (!v.keyed || v.voiceId !== heldId) continue;
-      v.retarget(note, velocity, mod, glide, msg.stepMod);
+      v.retarget(note, velocity, mod, glide, this.stepModIn);
       v.voiceId = id;
     }
     this.lastNote = note;
@@ -426,6 +390,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
     controls[PART_CUTOFF_MOD] = params.cutoffMod[0];
   }
 
+  // One quantum read top to bottom: admit, apply the events due, render each
+  // segment. The message reads stay in it because it runs every quantum
+  // (windsor#270, see the admission below).
+  // eslint-disable-next-line max-lines-per-function -- the render is the one function that reads messages, so they stay in V8's top tiers
   renderBlock(
     inputs: Float32Array[][],
     outputs: Float32Array[][],
@@ -448,14 +416,40 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const q = this.events;
     let cursor = 0;
 
+    // Admit what the port posted since the last quantum, in arrival order, at
+    // its frame or, without one, at this quantum's. This reads messages, so it
+    // is written here and not in a method called once a message: the render
+    // runs every quantum, and V8 optimises it again within a few hundred
+    // quanta of the first frame past 2^31 deprecating the message's map, where
+    // a method run per message stayed in its baseline tier, boxing (windsor#270).
+    const posted = q.posted;
+    for (let i = 0; i < q.postedCount; i++) {
+      const ev = posted[i]!;
+      posted[i] = undefined;
+      q.incoming[0] = typeof ev.frame === 'number' ? ev.frame : blockStart;
+      q.insert(ev);
+    }
+    q.postedCount = 0;
+
     while (cursor < n) {
       // Apply every event landing on this frame.
       // The next event's frame is read in place, never returned from a call:
       // past 2^31 it is a double, which a return can box (rule 2).
       while (!q.empty && q.frames[q.head] <= blockStart + cursor) {
         const ev = q.take();
-        if (ev.type === 'noteOn') this.noteOn(ev);
-        else if (ev.type === 'noteOff') this.noteOffId(ev.id != null ? ev.id : ev.note!);
+        const id = ev.id != null ? ev.id : ev.note!;
+        if (ev.type === 'noteOn') {
+          // The note-on's numbers, copied here for the same reason as the
+          // frames above: `noteOn` reads no message.
+          const input = this.noteIn;
+          input[NOTE_IN_NOTE] = ev.note;
+          input[NOTE_IN_VELOCITY] = typeof ev.velocity === 'number' ? ev.velocity : NaN;
+          input[NOTE_IN_MOD] = typeof ev.mod === 'number' ? ev.mod : NaN;
+          this.slideIn = !!ev.slide;
+          this.stepModIn = ev.stepMod || null;
+          this.noteOn(id);
+          this.stepModIn = null; // the message's array, not kept alive (windsor#262)
+        } else if (ev.type === 'noteOff') this.noteOffId(id);
       }
 
       // Render up to the next event, the next control boundary, or block end.

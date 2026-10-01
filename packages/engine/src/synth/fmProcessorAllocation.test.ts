@@ -43,7 +43,12 @@
  * calls Date.now() twice a quantum, and V8 returns each as a new heap
  * number: `docs/research/2026-09-30-load-sampler-allocation/README.md`). The
  * scenario throws, failing the child, unless the measured run took every
- * path.
+ * path. Every run compiles on the main thread (`SYNCHRONOUS_TIERING`), so the
+ * tier each function has reached when the heap is read depends on the calls
+ * the warm-up made and not on the machine's load: with the compiler on a
+ * background thread, busy CI runners read a one-off spike of 7 to 12 KB in a
+ * single tenth of an otherwise clean run, enough to pass the bound
+ * (windsor#266, as windsor#256 for the load sampler).
  *
  * A third run plays the pad as a context about 25 hours old does: every
  * frame past 2^31, a double in V8, and each note posted 16 quanta ahead of
@@ -60,17 +65,49 @@
  * (rule 7), on the audio thread, deoptimising the render that reads it. The
  * fourth plays the pad from a frame its frames pass 2^31 from, three quarters
  * of the way through the warm-up: with the frame stamped on each queued
- * message as `_frame`, the trace read `_frame:s->d` there. The fifth and
+ * message as `_frame`, the trace read `_frame:s->d` there. The crossing also
+ * changes the representation of the messages' own `frame` field, as the
+ * first message past 2^31 does for the port's in Chrome, which deprecates
+ * the message's map and throws away the optimised code of every function
+ * that read a message. With `schedule` and `noteOn` reading the messages
+ * once each, both stayed in V8's baseline tier for the rest of the run
+ * (about 80 000 quanta passed before `noteOn` was optimised again) and the
+ * run read 153 KB, about 129 KB of it in `noteOn` and 21 KB in `schedule`,
+ * the same with the crossing a quarter, half or three quarters of the way
+ * through the warm-up (windsor#270). The render, run every quantum, now reads
+ * the messages, and is optimised again within a few hundred. The fifth and
  * sixth hold one note through the whole run, in the kernel and dormant in
  * the generic loop, the warm-up ending by setting its voices' `age` just
  * below 2^31, so it crosses half way through the measured run: with `age`
  * born a small integer, the trace read `age:s->d` and the runs read 40 MB
  * and 1.6 MB as the render deoptimised.
  *
+ * A seventh run gives the part a fresh event queue as the warm-up ends, so
+ * the measured run holds a queue's first notes and its first burst with the
+ * code already warm (windsor#270): each cycle posts 65 notes, a note-on and a
+ * note-off each, in one quantum and 16 quanta ahead, two events past the
+ * queue's whole room (`EVENT_QUEUE_CAPACITY`), as 65 synchronous triggers
+ * would. A truly cold part cannot be held to the bound, since V8's lower
+ * tiers box doubles everywhere, so the run checks the growth directly as
+ * well: the scenario throws if a render replaced or lengthened any of the
+ * queue's arrays, and unless the burst passed the queue's first room and its
+ * posts grew it. The posts may grow the queue, on the message path, between
+ * quanta; the render may not. With the queue born empty, it grew from 0, 2
+ * and 0 slots to 128 each and the run read 420 KB, most of it in the first
+ * tenth; with the room given by the constructor and a burst of 64 notes, it
+ * read the probe's own 6 KB and the check's 1.2 KB. With growth in the render,
+ * the burst of 65 fails the direct check (386 slots to 516); with growth in
+ * `post`, the run reads 11.9 KB, 5 KB of it the posts' growth. The
+ * warm-up swaps a queue in once at its start too: V8 tracks the part's
+ * `events` field, written only by the constructor, as constant, and the
+ * first other write deoptimises the render that read it, which read 2 MB
+ * when it fell in the measured run.
+ *
  * Tolerance: 16 KiB over the 8 000 quanta; one boxed double a quantum would
- * read 128 KB. The runs read about 10 to 12 KB: the eleven readings' own
- * result objects, about 7 KB, and about one heap number a note-on. Before
- * this fix the part read about 3.6 KB a quantum
+ * read 128 KB. The runs read about 6 KB, the eleven readings' own result
+ * objects (616 bytes a tenth); with the note-on's message read in `noteOn`
+ * they read 10 to 12 KB, about one heap number a note-on more
+ * (windsor#270). Before windsor#233 the part read about 3.6 KB a quantum
  * (`docs/research/2026-09-30-worklet-gc-in-chrome/README.md`), and this
  * scenario 4.3 KB a quantum in the pad and 0.7 KB in the pluck.
  */
@@ -79,14 +116,19 @@ import type { FmPartChangeConfig, FmPartEvent } from '../__fixtures__/fmPartChan
 import {
   probeScenario,
   runAllocationProbe,
+  SYNCHRONOUS_TIERING,
   workletBundle,
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
 import type { Patch } from '../patch/patch';
 import { WAVE } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
+import { EVENT_QUEUE_CAPACITY } from '../worklet/fm/fmConstants';
 
 const TOLERANCE_BYTES = 16 * 1024;
+
+/** Notes in the burst: each a note-on and a note-off, so the burst passes the queue's room by two events. */
+const BURST_NOTES = EVENT_QUEUE_CAPACITY / 2 + 1;
 
 /** A context about 25 hours old at 48 kHz: every frame a double in V8, whose small integers end at 2^31. */
 const LATE_FRAME = 2 ** 32;
@@ -241,12 +283,24 @@ const PLUCK_EVENTS: FmPartEvent[] = inOrder([
   ...run(200, 20, [60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79], 5, 3),
 ]);
 
+/**
+ * Every note of a burst posted in one quantum, as a chord step over every
+ * voice with steps posted ahead is: the note-ons at the quantum's first
+ * offsets, each note-off 63 frames later, still in it (its last at 127), so
+ * the burst posts more than the queue's whole room at once and the queue
+ * holds it until it lands.
+ */
+const BURST_EVENTS: FmPartEvent[] = Array.from({ length: BURST_NOTES }, (_, i) => [
+  on(0, i, i + 1, 48 + (i % 24)),
+  off(0, i + 63, i + 1),
+]).flat();
+
 function probe(
   patch: Patch,
   maxVoices: number,
   specialise: boolean,
   scenarioConfig: FmPartChangeConfig,
-  late?: { startFrame: number; v8Flags: string[] },
+  late?: { startFrame: number; v8Flags: readonly string[] },
 ): ProbeRun {
   return runAllocationProbe(
     {
@@ -263,7 +317,7 @@ function probe(
       scenario: probeScenario('fmPartChangeScenario.ts'),
       scenarioConfig,
     },
-    late?.v8Flags,
+    late?.v8Flags ?? SYNCHRONOUS_TIERING,
   );
 }
 
@@ -329,7 +383,7 @@ describe('the FM part on V8', () => {
           lookahead: LOOKAHEAD_QUANTA,
           outlineQueueAccessors: true,
         },
-        { startFrame: LATE_FRAME, v8Flags: ['--allow-natives-syntax'] },
+        { startFrame: LATE_FRAME, v8Flags: [...SYNCHRONOUS_TIERING, '--allow-natives-syntax'] },
       ),
     );
   }, 120_000);
@@ -349,8 +403,23 @@ describe('the FM part on V8', () => {
           paths: ['held', 'stolen', 'released', 'ended', 'silent'],
           lookahead: LOOKAHEAD_QUANTA,
         },
-        { startFrame: CROSSING_FRAME, v8Flags: [] },
+        { startFrame: CROSSING_FRAME, v8Flags: SYNCHRONOUS_TIERING },
       ),
+    );
+  }, 120_000);
+
+  it('gives a fresh event queue its first notes and a burst past its room, posted ahead, growing it only as the burst is posted and never in a render (windsor#270)', () => {
+    expectClean(
+      probe(pad(), 8, true, {
+        events: BURST_EVENTS,
+        period: 24,
+        toggles: TOGGLES,
+        rest: 16,
+        idStride: 2 * BURST_NOTES,
+        paths: ['stolen', 'released', 'ended', 'silent'],
+        lookahead: LOOKAHEAD_QUANTA,
+        freshQueue: true,
+      }),
     );
   }, 120_000);
 
