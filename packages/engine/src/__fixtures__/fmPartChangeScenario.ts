@@ -95,9 +95,10 @@ export interface FmPartChangeConfig {
   /**
    * The warm-up ends by giving the part a new event queue, as a fresh part
    * has, so the measured run holds the queue's first events and its first
-   * burst while the code is warm (windsor#270). The run then throws unless
-   * the queue kept its arrays, at their length, and a burst filled its
-   * posted slots. The queue must be empty when the warm-up ends.
+   * burst while the code is warm (windsor#270). The run then throws if a
+   * render replaced or lengthened any of the queue's arrays, or unless a
+   * burst passed the room the queue was born with, so that its posts grew
+   * it. The queue must be empty when the warm-up ends.
    */
   freshQueue?: boolean;
 }
@@ -138,28 +139,58 @@ interface QueueStorage {
 const queueOf = (probe: ProbeRig): QueueStorage =>
   (probe.processor as unknown as { events: QueueStorage }).events;
 
+/** A fresh queue and its checks: around each render, and once at the end of the measured run. */
+interface QueueWatch {
+  /** Swap a new event queue into the part, built by the queue's own class. */
+  swap: () => void;
+  /** Before a render, once the quantum's messages are posted: note the queue's arrays and their lengths. */
+  mark: () => void;
+  /** After it: throw unless the render kept the arrays, at their lengths. */
+  check: () => void;
+  /** At the end: throw unless a burst of `peak` messages passed the queue's first room, so its posts grew it. */
+  finish: (peak: number) => void;
+}
+
+/** The queue's three lengths summed: none of them shrinks, so a growth in any shows in the sum. */
+const slotsOf = (q: QueueStorage): number => q.items.length + q.frames.length + q.posted.length;
+
 /**
- * Swap a new event queue into the part, built by the queue's own class, and
- * return a check that it has not grown since and that `peak` posted messages
- * reached its capacity.
+ * The checks on the part's fresh queues. A post may grow the queue, on the
+ * message path; the render, admitting what was posted, never does
+ * (windsor#270). One watch serves every swap, so the run calls the same
+ * closures it warmed, and a new one does not deoptimise the drive.
  */
-function freshQueue(probe: ProbeRig): (peak: number) => void {
-  const old = queueOf(probe);
-  if (!old.empty || old.postedCount !== 0)
-    throw new Error('the event queue was not empty to replace');
-  const Queue = old.constructor as new () => QueueStorage;
-  const fresh = new Queue();
-  (probe.processor as unknown as { events: QueueStorage }).events = fresh;
-  const { items, frames, posted } = fresh;
-  const lengths = [items.length, frames.length, posted.length].join();
-  return (peak) => {
-    const now = queueOf(probe);
-    const kept = now.items === items && now.frames === frames && now.posted === posted;
-    const at = [now.items.length, now.frames.length, now.posted.length].join();
-    if (!kept || at !== lengths) {
-      throw new Error(`the event queue grew in the measured run: ${lengths} to ${at}`);
-    }
-    if (peak < posted.length) throw new Error(`the burst posted ${peak} of ${posted.length}`);
+function watchQueue(probe: ProbeRig): QueueWatch {
+  let marked = queueOf(probe);
+  let { items, frames, posted } = marked;
+  let slots = slotsOf(marked);
+  let room = frames.length;
+  return {
+    swap: () => {
+      const old = queueOf(probe);
+      if (!old.empty || old.postedCount !== 0)
+        throw new Error('the event queue was not empty to replace');
+      const Queue = old.constructor as new () => QueueStorage;
+      const fresh = new Queue();
+      (probe.processor as unknown as { events: QueueStorage }).events = fresh;
+      room = fresh.frames.length;
+    },
+    mark: () => {
+      marked = queueOf(probe);
+      ({ items, frames, posted } = marked);
+      slots = slotsOf(marked);
+    },
+    check: () => {
+      const now = queueOf(probe);
+      const kept = now === marked && now.items === items && now.frames === frames;
+      if (!kept || now.posted !== posted || slotsOf(now) !== slots) {
+        throw new Error(`a render grew the event queue: ${slots} slots to ${slotsOf(now)}`);
+      }
+    },
+    finish: (peak) => {
+      if (peak <= room) throw new Error(`the burst posted ${peak}, within the room of ${room}`);
+      if (queueOf(probe).frames.length <= room) throw new Error('the posts never grew the queue');
+    },
   };
 }
 
@@ -317,7 +348,7 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
   swapRandom(probe);
   if (config.outlineQueueAccessors) outlineQueueAccessors(probe);
   const { step, note, seen, peak, restart } = fmCycle(probe, config);
-  let checkQueue: ((peak: number) => void) | undefined;
+  const watch = config.freshQueue ? watchQueue(probe) : undefined;
   const { warmup, measure } = probe.config;
   const none: Float32Array[][] = [];
   // Quanta [from, to). The measured run calls this same function, so it
@@ -325,7 +356,9 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
   const drive = (from: number, to: number): void => {
     for (let q = from; q < to; q++) {
       step(q);
+      watch?.mark();
       probe.render(q, none);
+      watch?.check();
       note();
     }
     if (to !== warmup + measure) return;
@@ -333,7 +366,7 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
       const missed = PATHS.filter((_, p) => seen[p] === 0);
       throw new Error(`the measured run missed a path: ${missed.join(', ')}`);
     }
-    checkQueue?.(peak());
+    watch?.finish(peak());
   };
   const chunk = config.period * 16;
   const chunks = (from: number, to: number): void => {
@@ -348,15 +381,17 @@ export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
       // A first swap, so the part's `events` field is already rewritten, and
       // the code that read it deoptimised and optimised again, by the time
       // the swap that matters comes: V8 tracks a field written only by the
-      // constructor as constant, and the first other write deoptimises.
-      if (config.freshQueue) freshQueue(probe);
+      // constructor as constant, and the first other write deoptimises. The
+      // watch checks the warm-up's renders too, which warms the checks the
+      // measured run makes.
+      watch?.swap();
       probe.report(64);
       chunks(0, warmup / 2);
       probe.report(probe.config.loadQuanta);
       chunks(warmup / 2, warmup);
       seen.set(optional);
       if (config.seedAge !== undefined) seedAges(probe, config.seedAge);
-      if (config.freshQueue) checkQueue = freshQueue(probe);
+      watch?.swap();
       restart();
       for (let r = 0; r < WARM_READS; r++) v8.getHeapStatistics();
     },

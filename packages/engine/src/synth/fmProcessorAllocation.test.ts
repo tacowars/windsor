@@ -84,15 +84,20 @@
  *
  * A seventh run gives the part a fresh event queue as the warm-up ends, so
  * the measured run holds a queue's first notes and its first burst with the
- * code already warm (windsor#270): each cycle posts 64 notes, a note-on and a
- * note-off each, in one quantum and 16 quanta ahead, the queue's whole room
- * (`EVENT_QUEUE_CAPACITY`). A truly cold part cannot be held to the bound,
- * since V8's lower tiers box doubles everywhere, so the run checks the
- * growth directly as well: the scenario throws unless the queue kept its
- * arrays at their length and the burst filled its posted slots. With the
- * queue born empty, it grew from 0, 2 and 0 slots to 128 each and the run
- * read 420 KB, most of it in the first tenth; with the room given by the
- * constructor, it reads the probe's own 6 KB and the check's 1.2 KB. The
+ * code already warm (windsor#270): each cycle posts 65 notes, a note-on and a
+ * note-off each, in one quantum and 16 quanta ahead, two events past the
+ * queue's whole room (`EVENT_QUEUE_CAPACITY`), as 65 synchronous triggers
+ * would. A truly cold part cannot be held to the bound, since V8's lower
+ * tiers box doubles everywhere, so the run checks the growth directly as
+ * well: the scenario throws if a render replaced or lengthened any of the
+ * queue's arrays, and unless the burst passed the queue's first room and its
+ * posts grew it. The posts may grow the queue, on the message path, between
+ * quanta; the render may not. With the queue born empty, it grew from 0, 2
+ * and 0 slots to 128 each and the run read 420 KB, most of it in the first
+ * tenth; with the room given by the constructor and a burst of 64 notes, it
+ * read the probe's own 6 KB and the check's 1.2 KB. With growth in the render,
+ * the burst of 65 fails the direct check (386 slots to 516); with growth in
+ * `post`, the run reads 11.9 KB, 5 KB of it the posts' growth. The
  * warm-up swaps a queue in once at its start too: V8 tracks the part's
  * `events` field, written only by the constructor, as constant, and the
  * first other write deoptimises the render that read it, which read 2 MB
@@ -122,8 +127,8 @@ import { EVENT_QUEUE_CAPACITY } from '../worklet/fm/fmConstants';
 
 const TOLERANCE_BYTES = 16 * 1024;
 
-/** Notes in the burst: each a note-on and a note-off, so the burst fills the queue's room. */
-const BURST_NOTES = EVENT_QUEUE_CAPACITY / 2;
+/** Notes in the burst: each a note-on and a note-off, so the burst passes the queue's room by two events. */
+const BURST_NOTES = EVENT_QUEUE_CAPACITY / 2 + 1;
 
 /** A context about 25 hours old at 48 kHz: every frame a double in V8, whose small integers end at 2^31. */
 const LATE_FRAME = 2 ** 32;
@@ -280,13 +285,14 @@ const PLUCK_EVENTS: FmPartEvent[] = inOrder([
 
 /**
  * Every note of a burst posted in one quantum, as a chord step over every
- * voice with steps posted ahead is: the note-ons at the first half of the
- * quantum's offsets, each note-off later in it, so the burst posts the
- * queue's whole room at once and the queue holds it until it lands.
+ * voice with steps posted ahead is: the note-ons at the quantum's first
+ * offsets, each note-off 63 frames later, still in it (its last at 127), so
+ * the burst posts more than the queue's whole room at once and the queue
+ * holds it until it lands.
  */
 const BURST_EVENTS: FmPartEvent[] = Array.from({ length: BURST_NOTES }, (_, i) => [
   on(0, i, i + 1, 48 + (i % 24)),
-  off(0, BURST_NOTES + i, i + 1),
+  off(0, i + 63, i + 1),
 ]).flat();
 
 function probe(
@@ -402,7 +408,7 @@ describe('the FM part on V8', () => {
     );
   }, 120_000);
 
-  it('gives a fresh event queue its first notes and a burst that fills its room, posted ahead, without growing it or allocating (windsor#270)', () => {
+  it('gives a fresh event queue its first notes and a burst past its room, posted ahead, growing it only as the burst is posted and never in a render (windsor#270)', () => {
     expectClean(
       probe(pad(), 8, true, {
         events: BURST_EVENTS,

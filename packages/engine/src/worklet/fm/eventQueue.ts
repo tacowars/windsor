@@ -3,8 +3,12 @@
  * note-offs in frame order, each with the frame it lands on. Invariant:
  * allocation free up to `EVENT_QUEUE_CAPACITY` events queued or posted at
  * once, the room its constructor gives both from the start (windsor#270), so
- * a fresh part's first notes and an ordinary burst grow nothing on the
- * audio thread. Past that it grows, by doubling, as the rare fallback.
+ * a fresh part's first notes and an ordinary burst grow nothing. Past that
+ * it grows, by doubling, as the rare fallback, and only in `post`, on the
+ * message path: `post` keeps the room at least the events queued and
+ * posted, so the render, admitting what was posted, never grows the queue
+ * or allocates. The port's `onmessage` runs on the audio thread too, but
+ * between quanta, not inside `process()`.
  * An event is inserted in place, by insertion sort from the back (events
  * usually arrive in order), and taken from the front by an index; `splice`
  * returned a new array for each insert, and `shift` trimmed the array that
@@ -97,25 +101,32 @@ class EventQueue {
   }
 
   /**
-   * Hold `event` until the render admits it, reading nothing of it. The array
-   * grows only when more messages arrive between two quanta than its
-   * capacity and ever before.
+   * Hold `event` until the render admits it, reading nothing of it. When the
+   * events queued and posted would pass the room, it doubles the room here,
+   * so the render's admission never has to; a move down frees no room, it
+   * only gathers what there is at the front. It grows the room, or `posted`,
+   * only at a new most events queued and posted at once.
    */
   post(event: QueuedEvent): void {
-    const posted = this.posted;
     const count = this.postedCount;
+    if (this.tail - this.head + count === this.frames.length) this.grow();
+    const posted = this.posted;
     if (count === posted.length) posted.push(event);
     else posted[count] = event;
     this.postedCount = count + 1;
   }
 
-  /** Queue `event` at the frame in `incoming`, after every event at or before that frame. */
+  /**
+   * Queue `event` at the frame in `incoming`, after every event at or before
+   * that frame. It never grows the queue or allocates: `event` was posted,
+   * and `post` left room for it, so at the end of the room a move down
+   * frees a slot.
+   */
   insert(event: QueuedEvent): void {
-    if (this.tail === this.frames.length) this.makeRoom();
+    if (this.tail === this.frames.length) this.moveDown();
     const items = this.items;
     const frames = this.frames;
     let i = this.tail;
-    if (i === items.length) items.push(event);
     this.tail = i + 1;
     while (i > this.head && frames[i - 1] > this.incoming[0]) {
       items[i] = items[i - 1];
@@ -127,18 +138,24 @@ class EventQueue {
   }
 
   /**
-   * The queue has reached the end of its room: move it down to the front,
-   * or, when it fills the room, double the room (an allocation, only at a
-   * new most events queued at once).
+   * Double the room, `frames` and `items` alike, each event staying in its
+   * slot and the new object slots holding `undefined`. Only `post` calls it.
    */
-  makeRoom(): void {
+  grow(): void {
+    const room = this.frames.length * 2;
+    const grown = new Float64Array(room);
+    grown.set(this.frames);
+    this.frames = grown;
+    const items = this.items;
+    while (items.length < room) items.push(undefined);
+  }
+
+  /**
+   * The queue has reached the end of its room with room free at the front,
+   * as `post` ensures: move it down to the front.
+   */
+  moveDown(): void {
     const head = this.head;
-    if (head === 0) {
-      const grown = new Float64Array(this.frames.length * 2);
-      grown.set(this.frames);
-      this.frames = grown;
-      return;
-    }
     const items = this.items;
     const frames = this.frames;
     for (let i = head; i < this.tail; i++) {

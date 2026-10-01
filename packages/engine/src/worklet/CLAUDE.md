@@ -242,7 +242,8 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    render reads a message (windsor#270): `schedule` posts it unread, the
    render admits what was posted at the start of the next quantum, and it
    copies a note-on's numbers into `noteIn` for `noteOn`, which takes the
-   handle alone. The first frame past 2^31 changes the representation of
+   handle alone. A burst past the queue's room grows it in `post`, between
+   quanta, and never in the render's admission. The first frame past 2^31 changes the representation of
    the message's `frame` field, deprecating its map and the optimised code
    of every function that read a message; one run per message then stayed
    in V8's baseline tier, boxing, for tens of thousands of quanta, where
