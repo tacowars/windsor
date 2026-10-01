@@ -90,3 +90,31 @@ export function runAllocationProbe(config: ProbeConfig, flags: readonly string[]
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+/**
+ * The growth over the measured run with each tenth clamped at 0 before the
+ * tenths are summed (windsor#277). A tenth can read a drop in the heap that
+ * no collection the `GCProfiler` counted explains: with a leak in the Phaser,
+ * one tenth read -605 120 bytes and the other nine about 54 KB each, and the
+ * plain total, -115 592, passed (windsor#275). Clamped, a drop cannot cancel
+ * the growth in another tenth. A clean run's tenths are byte-identical and
+ * positive, so for it this is the plain total.
+ */
+export function allocatedBytes(windows: readonly number[]): number {
+  return windows.reduce((sum, bytes) => sum + Math.max(0, bytes), 0);
+}
+
+/**
+ * Asserts the run allocated nothing: no collection ran while the heap was
+ * read, and the growth over its tenths (`allocatedBytes`) is under
+ * `toleranceBytes`. The failure names each tenth's reading.
+ */
+export function expectAllocationFree(
+  run: Pick<ProbeRun, 'gcs' | 'windows'>,
+  toleranceBytes: number,
+): void {
+  expect(run.gcs, 'no collection ran while the heap was read').toBe(0);
+  expect(allocatedBytes(run.windows), `by tenths: ${run.windows.join(' ')}`).toBeLessThan(
+    toleranceBytes,
+  );
+}
