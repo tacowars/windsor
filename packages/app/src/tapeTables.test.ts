@@ -1,12 +1,14 @@
 import { expect, it } from 'vitest';
-import { DEFAULT_TAPE, TAPE_BOUNDS } from '@windsor/engine';
+import { DEFAULT_TAPE, TAPE_BOUNDS, TAPE_CORE_BOUNDS, tapeCoreOf } from '@windsor/engine';
 import {
   TAPE_CONTROLS,
+  TAPE_CORE_KNOBS,
   TAPE_KNOBS,
   TAPE_OVERSAMPLING_HINT,
   TAPE_OVERSAMPLING_OPTIONS,
   TAPE_PAGES,
   driveReadout,
+  tapeCoreReadout,
 } from './tapeTables';
 it('uses engine ranges/defaults for every editable tape number and displays the hiss floor as Off', () => {
   expect(TAPE_KNOBS.map((k) => k.f).sort()).toEqual(
@@ -50,4 +52,25 @@ it('offers 2× and 4× beside Tape type with the audition hint (windsor#246)', (
   expect(TAPE_OVERSAMPLING_HINT).toBe(
     '2× is lighter on CPU; 4× is cleaner on bright, hard-driven sounds.',
   );
+});
+
+it('names the core knobs Bend, Width and Saturation and reads each 0–100 % over its box (windsor#291)', () => {
+  expect(TAPE_CORE_KNOBS.map((k) => [k.f, k.label])).toEqual([
+    ['drive', 'Bend'],
+    ['width', 'Width'],
+    ['saturation', 'Saturation'],
+  ]);
+  for (const { f } of TAPE_CORE_KNOBS) {
+    const [min, max] = TAPE_CORE_BOUNDS[f];
+    expect(tapeCoreReadout(f, min)).toBe('0%');
+    expect(tapeCoreReadout(f, (min + max) / 2)).toBe('50%');
+    expect(tapeCoreReadout(f, max)).toBe('100%');
+  }
+  expect(TAPE_CORE_BOUNDS).toEqual({ drive: [0.05, 1], width: [0.05, 0.85], saturation: [0, 1] });
+  // Every model row is inside the box (windsor#315): Vintage's and VHS's Width read in range.
+  expect(tapeCoreReadout('width', tapeCoreOf({ ...DEFAULT_TAPE, model: 'vintage' }).width)).toBe(
+    '98%',
+  );
+  expect(tapeCoreReadout('width', tapeCoreOf({ ...DEFAULT_TAPE, model: 'vhs' }).width)).toBe('90%');
+  expect(TAPE_PAGES.filter((page) => page.advanced).map((page) => page.name)).toEqual(['Tape']);
 });

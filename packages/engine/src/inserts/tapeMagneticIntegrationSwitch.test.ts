@@ -164,9 +164,15 @@ const source = new Float64Array(QUANTUM * 64);
 for (let i = 0; i < source.length; i++) source[i] = 3.2 * Math.sin(i * 0.031) + 1.6 * Math.sin(i * 0.29);
 const output = new Float64Array(QUANTUM);
 const stage = new api.TapeMagneticStage(48000, 2, 0);
-// One quantum as TapeDsp runs it: select and configure, then per sample the glide, each channel's pair and the dry ring.
+// One quantum as TapeDsp runs it: select, the song's core on or off (windsor#291) and configure,
+// then per sample the glide, each channel's pair and the dry ring.
 function quantum(q) {
   stage.select(q % 8 < 4 ? 2 : 4);
+  stage.overridden = q % 5 < 2;
+  // Doubles across the box, as the parameters deliver them.
+  stage.custom.drive = 0.0125 + 0.0975 * (q % 11);
+  stage.custom.width = 0.0525 + 0.0565 * (q % 11);
+  stage.custom.saturation = 0.0125 + 0.0815 * (q % 13);
   stage.configure(q % 7);
   const base = (q % 64) * QUANTUM;
   for (let i = 0; i < QUANTUM; i++) {
@@ -255,7 +261,7 @@ function probe(): { result: ProbeResult; changes: string[] } {
 }
 
 describe('the magnetic stage on V8', () => {
-  it('allocates nothing and changes no field representation across oversampling switches', () => {
+  it('allocates nothing and changes no field representation across oversampling switches and core overrides', () => {
     const { result, changes } = probe();
     expect(changes).toEqual([]);
     expect(result.gcs, 'no collection ran while the heap was read').toBe(0);

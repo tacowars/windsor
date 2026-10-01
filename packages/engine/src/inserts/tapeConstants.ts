@@ -37,6 +37,31 @@ export const TAPE_BOUNDS = {
   mix: [0, 1],
   seed: [0, 16777215],
 } as const;
+/**
+ * The magnetic core's three controls as a song may set them (windsor#291, the Tape card's Advanced
+ * section): the box qualified at 2× and 4× and 44.1, 48 and 96 kHz on the shipped core, every
+ * trial without a reset and with the controls moving (windsor#315,
+ * `docs/research/2026-10-01-tape-control-domain-2x/`, its rows declaration). A song's `core` is
+ * clamped into it on load, and it is each core parameter's range. Every model row lies inside it
+ * (`tapeCoreOverride.test.ts`), Vintage's width 0.831 and VHS's 0.769 included.
+ */
+export const TAPE_CORE_BOUNDS = {
+  drive: [0.05, 1],
+  width: [0.05, 0.85],
+  saturation: [0, 1],
+} as const;
+/** The core's controls in `TAPE_CORE_BOUNDS`' order: drive, width, saturation, as a model row. */
+export const TAPE_CORE_CONTROLS = ['drive', 'width', 'saturation'] as const;
+/**
+ * The processor's parameters for a song's `core`: `core` is 1 while one is set and 0 while the
+ * insert follows its model's row, and each control has its own k-rate parameter.
+ */
+export const TAPE_CORE_PARAMS = {
+  flag: 'core',
+  drive: 'coreDrive',
+  width: 'coreWidth',
+  saturation: 'coreSaturation',
+} as const;
 /** The oversampling factors the magnetic core is built at, lowest first (design decision 1). */
 export const TAPE_OVERSAMPLING = [2, 4] as const;
 export type TapeOversampling = (typeof TAPE_OVERSAMPLING)[number];
@@ -95,7 +120,8 @@ export const TAPE_DSP = {
 };
 /**
  * Filter rows are [kind, Hz, linear gain, Q]. First three come from CC0 coll tape_models.
- * `magnetic` is the core's fixed [drive, width, saturation], each in [0, 1] (design decision 6):
+ * `magnetic` is the core's fixed [drive, width, saturation], each in [0, 1] (design decision 6; a
+ * song's `core` overrides it per insert, windsor#291):
  * each row is one of the dynamic-survival record's seeded interior points, written as the double
  * `mulberry32(204)` drew (`docs/log/2026-10-01-tape-per-model-magnetic-rows.md`, windsor#289), and
  * `worklet/tape/tapeMagneticRows.ts` refuses a row whose origin susceptibility is not above

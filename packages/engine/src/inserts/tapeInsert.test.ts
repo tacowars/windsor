@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { FakeContext, FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import { FakeNode, FakeParam } from '../__fixtures__/fakeAudioNodes';
 import { loadTape, tapeParams } from '../__fixtures__/tapeHarness';
-import { TAPE_NAME } from './tapeConstants';
+import { TAPE_CORE_BOUNDS, TAPE_MODELS, TAPE_NAME, TAPE_TYPES } from './tapeConstants';
 import { DEFAULT_TAPE } from './tapeSpec';
 import { TAPE_INSERT } from './tapeInsert';
 import { FmEngine } from '../synth/fmEngine';
@@ -107,4 +107,24 @@ it('keeps track/master processors across edits and removes their load accounts o
   expect(stage.processor!.parameters.get('drive')!.value).toBe(15);
   system.dispose();
   expect(system.meteredProcessors).toBe(0);
+});
+
+it("carries a song's core to the processor's four parameters, and the model's row when cleared (windsor#291)", () => {
+  install();
+  const context = new FakeContext();
+  const core = { drive: 0.75, width: 0.25, saturation: 0.5 };
+  const stage = TAPE_INSERT.create(context.asAudioContext(), { ...DEFAULT_TAPE, core });
+  const node = stage.processor as unknown as TapeNode;
+  const read = (): number[] =>
+    ['core', 'coreDrive', 'coreWidth', 'coreSaturation'].map(
+      (name) => node.parameters.get(name)!.value,
+    );
+  expect(read()).toEqual([1, 0.75, 0.25, 0.5]);
+  stage.set({ ...DEFAULT_TAPE, model: 'vhs', core: { ...core, width: 0.6 } });
+  expect(read()).toEqual([1, 0.75, 0.6, 0.5]);
+  stage.set({ ...DEFAULT_TAPE, model: 'vhs' });
+  const [drive, width, saturation] = TAPE_MODELS[TAPE_TYPES.indexOf('vhs')]!.magnetic;
+  expect(width).toBeLessThanOrEqual(TAPE_CORE_BOUNDS.width[1]);
+  expect(read()).toEqual([0, drive, width, saturation]);
+  stage.dispose();
 });
