@@ -1,22 +1,16 @@
 /** The four operator bays of the Parts tab (#70, ported); the knob specs are `patchKnobTables.ts`. */
 import type { Patch } from '@windsor/engine';
-import {
-  ALGORITHMS,
-  LOOP_MODE_NAMES,
-  OP_NAMES,
-  WAVE,
-  WAVE_NAMES,
-  WIDTH_RANGE,
-} from '@windsor/engine';
+import { ALGORITHMS, OP_NAMES, WAVE, WAVE_NAMES, WIDTH_RANGE } from '@windsor/engine';
 import { CARRIER_COLOR, MOD_COLOR } from './consoleColors';
 import { $, el, html, seg } from './dom';
 import { drawEnv } from './envCanvas';
 import { attachEnvelopeDrag } from './envelopeDrag';
-import { envAdvKnobs, envKnobs } from './envelopeKnobs';
+import { envAdvKnobs, envKnobs, envLoopPicker } from './envelopeKnobs';
 import { opEnvelopeSlot } from './envelopeTransfer';
 import { ensureUserPartials, harmonicEditor } from './harmonicEditor';
 import type { KnobElement } from './knob';
-import { FIXED_HZ_KNOB, OP_KNOBS, patchKnobOpts } from './patchKnobTables';
+import { FIXED_HZ_KNOB, OP_KNOBS, OP_PHASE_KNOB, patchKnobOpts } from './patchKnobTables';
+import { OP_START_NAMES, opStartIndex, opStartLocked, writeOpStart } from './operatorStart';
 import { BAY_SILENT_LEVEL, PULSE_START_WIDTH } from './patchPanelConstants';
 import type { PatchEditor } from './partsSession';
 import { pathKnob } from './patchPath';
@@ -106,22 +100,39 @@ function waveAndPitchLine(
   return line;
 }
 
-function loopModePicker(editor: PatchEditor, i: number, color: string): HTMLElement {
-  const wrap = el('div');
-  wrap.style.cssText = 'width:100%;margin-top:5px';
-  wrap.appendChild(el('span', 'field-label', 'Envelope Loop'));
-  wrap.appendChild(
+/**
+ * The Start segment (Free | Locked) and the Phase knob it locks to, which
+ * shows only while the operator is Locked (`operatorStart.ts`).
+ */
+function startControls(editor: PatchEditor, i: number, color: string): HTMLElement {
+  const wrap = el('div', 'knob-row');
+  wrap.style.cssText = 'width:100%;margin-top:5px;align-items:flex-end';
+  const path = `ops.${i}.${OP_PHASE_KNOB.f}`;
+  const phase = pathKnob(editor, path, OP_PHASE_KNOB.label, {
+    ...patchKnobOpts(OP_PHASE_KNOB, path),
+    color,
+  });
+  const syncPhase = (): void => {
+    phase.style.display = opStartLocked(editor.patch, i) ? '' : 'none';
+  };
+  const segWrap = el('div');
+  segWrap.style.cssText = 'flex:1;min-width:0';
+  segWrap.appendChild(el('span', 'field-label', 'Start'));
+  segWrap.appendChild(
     seg(
-      LOOP_MODE_NAMES.map((label, li) => ({ value: String(li), label })),
-      () => String(editor.patch.ops[i]?.env.loopMode ?? 0),
+      OP_START_NAMES.map((label, si) => ({ value: String(si), label })),
+      () => String(opStartIndex(editor.patch, i)),
       (value) => {
-        const target = editor.patch.ops[i];
-        if (target) target.env.loopMode = Number(value);
+        writeOpStart(editor.patch, i, Number(value));
         editor.push();
+        syncPhase();
       },
       color,
     ),
   );
+  wrap.appendChild(segWrap);
+  wrap.appendChild(phase);
+  syncPhase();
   return wrap;
 }
 
@@ -191,7 +202,8 @@ function bayBody(
 
   const adv = el('div', 'knob-row adv');
   adv.appendChild(envAdvKnobs(editor, `ops.${i}.env`, color, redraw));
-  adv.appendChild(loopModePicker(editor, i, color));
+  adv.appendChild(envLoopPicker(editor, `ops.${i}.env`, color));
+  adv.appendChild(startControls(editor, i, color));
   body.appendChild(adv);
   requestAnimationFrame(redraw);
   return { body, adv };

@@ -10,10 +10,11 @@ import { ALG_LINK_COLOR, CARRIER_COLOR, INK_ON_ACCENT, MOD_COLOR } from './conso
 import { $, el, seg } from './dom';
 import { drawEnv } from './envCanvas';
 import { attachEnvelopeDrag } from './envelopeDrag';
-import { envAdvKnobs, envKnobs } from './envelopeKnobs';
+import { envAdvKnobs, envKnobs, envLoopPicker } from './envelopeKnobs';
 import {
   FILTER_KNOBS,
   GLOBAL_KNOBS,
+  PITCH_ENV_ADV_KNOBS,
   PITCH_ENV_AMOUNT_KNOB,
   lfoKnobs,
   lfoToOpKnobs,
@@ -277,5 +278,7 @@ export function buildPitch(editor: PatchEditor): void {
     pathKnob(editor, amount.f, amount.label, { ...patchKnobOpts(amount), color: CARRIER_COLOR }),
   );
   row.appendChild(envKnobs(editor, 'pitchEnv', CARRIER_COLOR, redraw));
+  row.appendChild(envAdvKnobs(editor, 'pitchEnv', CARRIER_COLOR, redraw, PITCH_ENV_ADV_KNOBS));
+  row.appendChild(envLoopPicker(editor, 'pitchEnv', CARRIER_COLOR));
   requestAnimationFrame(redraw);
 }
