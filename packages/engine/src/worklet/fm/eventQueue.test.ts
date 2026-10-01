@@ -63,4 +63,39 @@ describe('the FM part event queue', () => {
     ]);
     expect(takeDue(q, late + 1)).toEqual([[0, late + 1]]);
   });
+
+  it('releases a message once it is taken', () => {
+    const q = new EventQueue();
+    for (let id = 0; id < 3; id++) insert(q, id, id * 10);
+    expect(takeDue(q, 10)).toEqual([
+      [0, 0],
+      [1, 10],
+    ]);
+    expect(q.items[0]).toBeUndefined();
+    expect(q.items[1]).toBeUndefined();
+    expect(q.items[2]?.id).toBe(2);
+    takeDue(q, Infinity);
+    expect(q.items.every((slot) => slot === undefined)).toBe(true);
+  });
+
+  it('releases every queued message on clear', () => {
+    const q = new EventQueue();
+    for (let id = 0; id < 5; id++) insert(q, id, 100 + id);
+    takeDue(q, 100);
+    q.clear();
+    expect(q.empty).toBe(true);
+    expect(q.items.every((slot) => slot === undefined)).toBe(true);
+  });
+
+  it('releases the slots a move down vacates', () => {
+    const q = new EventQueue();
+    for (let id = 0; id < 4; id++) insert(q, id, id * 10);
+    takeDue(q, 15);
+    insert(q, 4, 25);
+    expect(q.head).toBe(0);
+    expect(q.items.slice(0, q.tail).map((slot) => slot?.id)).toEqual([2, 4, 3]);
+    expect(q.items.slice(q.tail).every((slot) => slot === undefined)).toBe(true);
+    takeDue(q, Infinity);
+    expect(q.items.every((slot) => slot === undefined)).toBe(true);
+  });
 });

@@ -17,6 +17,13 @@
  * inline is boxed (rule 2). `eventQueue.test.ts` and `fmProcessor.test.ts`
  * pin the order, `synth/fmProcessorAllocation.test.ts` the allocation and
  * the crossing.
+ *
+ * A slot drops its message once the message is taken, cleared or moved
+ * down (windsor#262), so a burst or a cancelled run of note-ons does not
+ * stay alive until a later schedule overwrites its slots. The empty value
+ * is `undefined`, written over the reference: `items` holds objects
+ * (PACKED_ELEMENTS), which holds `undefined` with no elements-kind
+ * transition, where `delete` or a shorter length would make it HOLEY.
  */
 
 import type { NoteOffMessage, NoteOnMessage } from '../../synth/workletMessages';
@@ -25,8 +32,8 @@ import type { NoteOffMessage, NoteOnMessage } from '../../synth/workletMessages'
 type QueuedEvent = NoteOnMessage | (NoteOffMessage & { note?: number });
 
 class EventQueue {
-  /** The events in [head, tail), in frame order; the slots outside it are free. */
-  items: QueuedEvent[];
+  /** The events in [head, tail), in frame order; the slots outside it are free and hold `undefined`. */
+  items: (QueuedEvent | undefined)[];
   /** Each event's frame, in the slot of `items` that holds it; its length is the queue's room. */
   frames: Float64Array;
   /** The frame of the event `insert` queues next: the part writes it here first. */
@@ -48,7 +55,9 @@ class EventQueue {
 
   /** Take the first event. The queue must not be empty. */
   take(): QueuedEvent {
-    const event = this.items[this.head++];
+    const items = this.items;
+    const event = items[this.head]!;
+    items[this.head++] = undefined;
     if (this.head === this.tail) this.head = this.tail = 0;
     return event;
   }
@@ -89,12 +98,15 @@ class EventQueue {
       items[i - head] = items[i];
       frames[i - head] = frames[i];
     }
+    for (let i = Math.max(this.tail - head, head); i < this.tail; i++) items[i] = undefined;
     this.tail -= head;
     this.head = 0;
   }
 
-  /** Drop every queued event. */
+  /** Drop every queued event, releasing the live slots only, so a clear costs what it frees. */
   clear(): void {
+    const items = this.items;
+    for (let i = this.head; i < this.tail; i++) items[i] = undefined;
     this.head = this.tail = 0;
   }
 }

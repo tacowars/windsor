@@ -15,7 +15,9 @@ var EventQueue = class {
   }
   /** Take the first event. The queue must not be empty. */
   take() {
-    const event = this.items[this.head++];
+    const items = this.items;
+    const event = items[this.head];
+    items[this.head++] = void 0;
     if (this.head === this.tail) this.head = this.tail = 0;
     return event;
   }
@@ -54,11 +56,14 @@ var EventQueue = class {
       items[i - head] = items[i];
       frames[i - head] = frames[i];
     }
+    for (let i = Math.max(this.tail - head, head); i < this.tail; i++) items[i] = void 0;
     this.tail -= head;
     this.head = 0;
   }
-  /** Drop every queued event. */
+  /** Drop every queued event, releasing the live slots only, so a clear costs what it frees. */
   clear() {
+    const items = this.items;
+    for (let i = this.head; i < this.tail; i++) items[i] = void 0;
     this.head = this.tail = 0;
   }
 };
