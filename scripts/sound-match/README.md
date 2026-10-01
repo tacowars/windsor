@@ -123,7 +123,8 @@ references, for example accent off at velocity 0.7 and accent on at 1.
 It writes `best.json` (a bare patch, playable with `render.mjs`),
 `log.jsonl` (every evaluation) and `summary.json` to `--out-dir` (default
 `<tmp>/sound-match/fit-<spec>/`). The start patch is scored first and kept
-unless beaten. `--budget` counts every evaluation, the start's included,
+unless beaten. A start value outside its bounds is clipped to them, with a
+warning, before that first score, so `best.json` always stays in bounds. `--budget` counts every evaluation, the start's included,
 and is never exceeded: when less than a CMA population remains, that many
 candidates are evaluated and the search stops without learning from them.
 
@@ -136,6 +137,8 @@ python sensitivity.py specs/tr909-kick.json tr909-kick [--step 0.05] [--ref 0]
 Moves each spec parameter by ±5 % of its range and tabulates how each
 headline measurement moves per +step: decay times, click, pitch at 10 and
 40 ms, body H2 and H3, symmetry, and centroid and band levels per region.
+A parameter at a bound gets a one-sided difference over the side that moved,
+scaled by its real change; one that cannot move at all shows "pinned".
 
 ### Render speed: `renderer.py`
 

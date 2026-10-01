@@ -10,7 +10,9 @@ that does not depend on the seed is scored once). Parameters are searched in
 
 CMA-ES (`cma`) is the default; Nelder–Mead (scipy) is available. The start
 patch is scored first and kept if nothing beats it, so a fit never ends worse
-than it began. Writes, to --out-dir (default <tmp>/sound-match/fit-<spec>):
+than it began. A start value outside its bounds is clipped to them (with a
+warning) before that first score, so the start is a point the search can
+reach and best.json stays within the bounds. Writes, to --out-dir (default <tmp>/sound-match/fit-<spec>):
 
 - best.json:   the best patch, bare;
 - log.jsonl:   every evaluation: its parameters, total and per-reference scores;
@@ -61,9 +63,10 @@ class Objective:
             weight += ref.weight
         return weighted / weight, per_ref
 
-    def __call__(self, unit, patch=None):
-        values = [p.from_unit(u) for p, u in zip(self.sp.params, unit)]
-        patch = patch or S.apply(self.sp.start, self.sp.params, values)
+    def __call__(self, unit, values=None):
+        """Score one point; `values` overrides the values `unit` maps to (the start's exact values)."""
+        values = values or [p.from_unit(u) for p, u in zip(self.sp.params, unit)]
+        patch = S.apply(self.sp.start, self.sp.params, values)
         total, per_ref = self.score_patch(patch)
         record = dict(eval=self.evals, total=total, params=dict(zip([p.name for p in self.sp.params], values)))
         record["references"] = per_ref
@@ -136,6 +139,25 @@ def _ref_lines(label, per_ref, refs):
     return lines
 
 
+def start_point(sp):
+    """The start's values, clipped to the bounds: the first evaluation is a point the search can be at.
+
+    Each clipped parameter, and each tied group whose paths start apart (the
+    fit sets them all to the first path's value), gets a warning.
+    """
+    values = []
+    for p in sp.params:
+        raw = [float(S.get_path(sp.start, path)) for path in p.paths]
+        v = float(np.clip(raw[0], p.lo, p.hi))
+        if v != raw[0]:
+            print(f"warning: start {p.name} = {raw[0]:.6g} is outside [{p.lo:.6g}, {p.hi:.6g}]; starting at {v:.6g}")
+        if any(r != raw[0] for r in raw[1:]):
+            tied = ", ".join(f"{path} = {r:.6g}" for path, r in zip(p.paths, raw))
+            print(f"warning: tied parameter starts apart ({tied}); starting all at {v:.6g}")
+        values.append(v)
+    return values
+
+
 def main():
     warnings.filterwarnings("ignore", message="Chunk")
     args = arguments()
@@ -148,8 +170,9 @@ def main():
     started = time.perf_counter()
     with R.Renderer() as r, open(os.path.join(out_dir, "log.jsonl"), "w") as log:
         f = Objective(sp, r, log)
-        u0 = np.array([p.to_unit(v) for p, v in zip(sp.params, S.start_values(sp.start, sp.params))])
-        f(u0, patch=sp.start)
+        values = start_point(sp)
+        u0 = np.array([p.to_unit(v) for p, v in zip(sp.params, values)])
+        f(u0, values=values)
         start = f.best
         (run_cma if opt["method"] == "cma" else run_nelder_mead)(f, u0, opt)
         renders, render_rate = r.renders, r.rate
