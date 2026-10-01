@@ -281,16 +281,81 @@ Vintage) and gives up only drive's nearly linear bottom 5%.
 
 ### What is measured, and what changed under it
 
-The harness is #295's, unchanged: #290's field program, static points,
-sweeps, random walks and pass criteria, every trial rendered through
-#290's `runTrial` with its own box. [`rowsProgram.ts`](rowsProgram.ts)
-schedules the candidate boxes and reads the shipped rows
-(`TAPE_MODELS`, `TAPE_LABELS`). It imports `boxProgram.ts`, #290's
-`controlConstants.ts` (for a type) and the shipped `tapeConstants.ts`,
-nothing else. `rowsEvidence.mjs` walks its import closure as
-`evidence.mjs` walks #295's, and `--check` fails unless every file is under
+The schedule is #295's: #290's field program, static points, sweeps,
+random walks and pass criteria, each trial with its own box. The render is
+not #290's `runTrial` (see the next section): every trial renders through
+[`rowsTrial.ts`](rowsTrial.ts), which drives the shipped stage exactly as
+`TapeDsp` does. [`rowsProgram.ts`](rowsProgram.ts) schedules the candidate
+boxes and reads the shipped rows (`TAPE_MODELS`, `TAPE_LABELS`). The two
+import `boxProgram.ts`, #290's `controlConstants.ts` (for types), the
+shipped `tapeConstants.ts` and the shipped `tapeMagneticStage.ts`, nothing
+else. `rowsEvidence.mjs` walks the import closure as `evidence.mjs` walks
+#295's, and `--check` fails unless every file is under
 `packages/engine/src/`, #290's folder or this one. **No research core** is
 reached.
+
+### The first run was void: the controls never moved (fix round on PR #317)
+
+**The bug.** Since #293 (`634e717`), `TapeMagneticStage.configure` only
+sets the glide's target. The controls move per sample in `glide`, which
+`TapeDsp.step` calls while `gliding`, before the channel's oversampler
+advances; each `retune` there rescales M by the old gain over the new
+(#307). #290's `runTrial`, which this part first used unchanged, calls
+`configure` once per block and never calls `glide`. The stage is built at
+the trial's starting point, so in that first run (`7ccaf94`) every sweep
+and every random walk stayed exactly where it began. For example, the 1 s
+drive sweep at width 0.85 and saturation 0, 44.1 kHz 2×, recorded
+`reached` drive [0.05, 0.05]. Its 216 dynamic trials (144 sweeps, 72
+walks) tested nothing about control motion, and its "output under control
+motion" finding was void. Codex found it on PR #317.
+
+**The fix.** [`rowsTrial.ts`](rowsTrial.ts) makes `TapeDsp`'s calls in
+`TapeDsp`'s order: per block, `select(factor)` then `configure(model)`;
+per sample, `glide()` while `gliding`, then the left channel's
+oversampler (`input`, `advance()`, `output`). The M rescale is the
+shipped `retune`'s, so it is included as shipped. Everything else is
+#290's: the field program, the research row written with the knob targets
+before each block's `configure`, and the counters. `reached`, the
+susceptibility and the gain are now read per sample, after the glide.
+#290's folder is not edited.
+
+**The motion gate** ([`rowsMotion.mjs`](rowsMotion.mjs)). Each record now
+carries the range of the targets written (`commanded`), the range of the
+glided controls (`reached`), and for a walk the controls at each hold's
+end (`holdEnds`). From the saved records, `derive` checks that:
+
+- a **static** trial held its point exactly;
+- a **sweep** held its other two controls exactly, stayed inside the box,
+  and reached both ends of its swept range within the glide's tracking
+  lag. That lag is the bound for a first-order glide (time constant
+  `TAPE_DSP.smoothSeconds`, 10 ms) behind a ramp of the sweep's slope
+  a = span / (period / 2), plus the per-sample step and the block's held
+  target: a (τ + (block + 1) / rate). It is 2.6% of the span for a 1 s
+  sweep at 44.1 kHz and 52% for a 50 ms one. A sweep that never moved
+  misses the far end by the whole span;
+- a **walk** stayed inside the box, and at every one of its holds' ends
+  (10 for the 1 s walks, 200 for the 50 ms ones) each control was at a
+  value it took at no other hold's end.
+
+A failure makes `declaration.qualified` false, and the exit gate also
+fails on it directly, smoke runs included. `--check` runs the gate on the
+first saved sweep and walk, which pass, and on the same records with their
+controls frozen at the start, which fail. Applied to the first run's
+records, the gate fails all 216 dynamic trials and passes its 1,662
+static ones.
+
+**#295's run is not affected.** Its `measurement.json` records commit
+`510c649`, which is an ancestor of `634e717` (#293); #297, which merged
+it, landed at 14:13 and #293 at 14:27 on 2026-10-01. At `510c649`,
+`TapeMagneticStage.configure(model, frames)` itself moved the controls
+once per block by the 10 ms time constant over `frames` samples, and
+reconfigured the cores when they moved. So #295's dynamic trials
+exercised the then-shipped per-block configure: all 168 of its sweeps
+moved (for example, a 1 s drive sweep at the edge reached 0.986 of the
+span and a 50 ms one 0.754), but on a core without per-sample glide and
+without #307's M rescale. #295 is not re-run here. Its own `measure.mjs` path (without
+`--rows`) still renders through #290's per-block `runTrial`, so re-run on
+today's stage, its sweeps and walks would not move either.
 
 **The shipped core changed after #295's run.** #307 (`80b077a`) rescales
 M when the gain changes, so M × gain stays continuous under control motion.
@@ -367,41 +432,51 @@ and the report is assembled from the journals alone. There is no retry.
 **The exit code** (decision 4, Codex's P2 on PR #297). `measure.mjs`, in
 either experiment, now exits nonzero unless the closure is clean, nothing
 expired, every worker exited 0, no journal has a truncated tail, every
-scheduled trial was recorded and a box qualified. A `--smoke` run is
-partial by design, so the last two do not apply to it. The gate is
-`exitCode` in `evidence.mjs`, and both `--check`s run its 11 cases
-(expiry, a worker that exited nonzero or was killed, no worker, a truncated
-journal, missing trials, no box qualified, an unclean closure, and smoke
-runs partial and broken).
+scheduled trial was recorded and a box qualified; and, in #315's
+experiment, unless every trial passed the motion gate. A `--smoke` run is
+partial by design, so completeness and qualification do not apply to it,
+but the motion gate does. The gate is `exitCode` in `evidence.mjs`, and
+both `--check`s run its 14 cases (expiry, a worker that exited nonzero or
+was killed, no worker, a truncated journal, missing trials, no box
+qualified, an unclean closure, a run that moved, a trial that did not move
+in a measurement and in a smoke run, and smoke runs partial and broken).
 
 [`rowsEvidence.mjs`](rowsEvidence.mjs) derives everything below from the
 raw trials and the shipped `configure`. Its `--check`:
 
 - re-derives the normalisation and rows tables, each candidate's gates,
-  where the candidates stop, completeness and the declaration from
-  `rowsMeasurement.json`;
+  the motion gate, where the candidates stop, completeness and the
+  declaration from `rowsMeasurement.json`;
 - re-hashes the import closure and checks it is clean;
 - re-renders three spot trials of candidate 1 (the worst-gain corner,
   drive 0.05 and width 0.85, static at 48 kHz 2×; the 1 s drive sweep at
   width 0.85 and saturation 0 at 44.1 kHz 2×; a 96 kHz 4× jump walk),
   comparing their records exactly (all but wall time);
-- runs the exit gate's cases.
+- runs the exit gate's cases and the motion gate's four (a saved sweep and
+  walk pass; the same records frozen at their start fail).
 
 ### Environment and run (#315)
 
 Apple M1 arm64 (8 cores), Darwin 25.5.0, Node v24.20.0, V8
 13.6.233.17-node.53, Float64 in Node, no browser. The sources were bundled
-by esbuild at `cbf122f`, which is `origin/main` (`ac0fa91`, after #307)
-plus this part's declaration. Other sessions were working on the machine.
-The one-minute load average was 2.4 before the run and 8.9 after.
+by esbuild at `65ab4ac`, which is `origin/main` (`ac0fa91`, after #307)
+plus this part's declaration and the fix round's harness (`rowsTrial.ts`
+and the motion gate). Other sessions were working on the machine. The
+one-minute load average was 3.1 before the run and 6.0 after.
 
-**Run.** Complete, in **522.8 s of the 3,600-second bound**: candidate 1
+This is the second run. The first (`7ccaf94`, 522.8 s) rendered through
+#290's per-block `runTrial`; its sweeps and walks never moved (see "The
+first run was void"), and its `rowsMeasurement.json` is replaced, not
+kept.
+
+**Run.** Complete, in **577.7 s of the 3,600-second bound**: candidate 1
 (1,878 trials), 1,878 of 1,878 scheduled. Candidate 1 passed, so the run
 stopped there and candidates 2–4 were not run. Every worker exited 0, with
-no expiry, no truncated tail and nothing missing, and `measure.mjs` exited
-0. The trials used 2,077 CPU-seconds in all. `rowsEvidence.mjs --check`
-passes all five of its checks: derived, closure, clean closure, three spot
-re-renders bit-equal, and the exit gate's 11 cases.
+no expiry, no truncated tail and nothing missing, every trial passed the
+motion gate, and `measure.mjs` exited 0. The trials used 2,293
+CPU-seconds in all. `rowsEvidence.mjs --check` passes all six of its
+checks: derived, closure, clean closure, three spot re-renders bit-equal,
+the exit gate's 14 cases and the motion gate's four.
 
 ### Results (#315)
 
@@ -449,42 +524,69 @@ per face and 21³ through the volume, from the shipped `configure`:
 Every row is inside candidate 1 (and 2). Vintage's width, 0.8311, is
 outside candidates 3 and 4, as declared.
 
-#### The box: 1,878 of 1,878 survive
+#### The box: 1,878 of 1,878 survive, and every trial moved
 
 | Factor | Part | Trials | Survive | Peak \|M\| | Guard margin | Peak out | Largest gain |
 |---|---|---|---|---|---|---|---|
 | 2× | static | 831 | 831 | 1.740 | 11.5× | 6.28 | 25.65 |
-| 2× | sweep | 72 | 72 | 1.740 | 11.5× | 6.28 | 25.65 |
-| 2× | walk | 36 | 36 | 1.642 | 12.2× | 3.21 | 12.31 |
+| 2× | sweep | 72 | 72 | **7.603** | **2.6×** | 6.28 | 25.65 |
+| 2× | walk | 36 | 36 | 6.438 | 3.1× | 4.99 | 17.59 |
 | 4× | static | 831 | 831 | 1.733 | 11.5× | 6.32 | 25.65 |
-| 4× | sweep | 72 | 72 | 1.733 | 11.5× | 6.32 | 25.65 |
-| 4× | walk | 36 | 36 | 1.643 | 12.2× | 3.21 | 12.31 |
+| 4× | sweep | 72 | 72 | 7.346 | 2.7× | 6.30 | 25.65 |
+| 4× | walk | 36 | 36 | 6.234 | 3.2× | 4.99 | 17.59 |
 
 Over all three rates per factor. Per rate and factor, every group's
 figures are in `rowsMeasurement.json` under `derived.boxes[0].groups`;
 every one of the 18 groups survives whole. There are no resets, no
-nonfinite samples and no state-guard failure. Peak |M| is 1.740 (static
-corner drive 1, width 0.05, saturation 0, 44.1 kHz 2×), 11.5× under the
-guard. The largest output, 6.32, is the static worst-gain corner (drive
-0.05, width 0.85, saturation 0, 96 kHz 4×) in the `dc` hold.
+nonfinite samples and no state-guard failure.
 
-**Output under control motion.** In this box, no sweep or walk produces a
-larger output than the static points do: sweeps peak at 6.32, the same
-worst-gain corner's hold, and walks at 3.21. #295's box, on the core before
-#307 and with drive down to 0, reached 110 in sweeps and 241 in jump walks
-from drive moving under a frozen M. This run changes both the core (#307)
-and drive's minimum together, so it does not separate their shares; it
-only reports that the excursion is gone here. **Field guard**: all 1.87 ×
-10⁹ engagements are in the `dc` and `opposite` segments, as in #290 and
-#295.
+**The controls moved** (`derived.motion`, all 1,878 checked, no failure).
+Every static trial held its point exactly. Every sweep held its other two
+controls and reached both ends of its swept range within the glide's
+tracking lag: the 1 s sweeps covered at least **98.6%** of the span and
+the 50 ms sweeps at least **75.4%** (a 10 ms glide cannot follow a 25 ms
+ramp further; the gate allows down to about 48%). For example, the 1 s
+drive sweep at width 0.85, saturation 0, 44.1 kHz 2×, which the first run
+recorded at drive [0.05, 0.05], now reaches [0.05, 0.987]. Every walk
+ended each of its holds at a new point on every axis; the largest distance
+from a hold's end to its target was 0.0074 for the jump walks (the glide
+settling over 50 ms), 0.0081 for the 1 s glide walks and 0.18 for the
+50 ms glide walks (the lag behind a ramp across the box in 50 ms).
+
+**Peak |M| under motion is 7.60, 2.6× under the guard at 20.** It is the
+1 s drive sweep at width 0.05 and saturation 0, 96 kHz 2×, in the
+`opposite` segment; the same sweep reaches 7.59 at 44.1 and 48 kHz, and
+the jump walks reach 6.44 (seed 2901, 48 kHz 2×, `dc` hold). Static
+points peak at 1.740 (corner drive 1, width 0.05, saturation 0, 44.1 kHz
+2×), as in the first run. This is consistent with #307's rescale: the
+shipped `retune` keeps M × gain continuous, so when drive rises the gain
+falls and M is scaled up by the same ratio, and the peaks fall in the held
+`dc` and `opposite` segments, where the field barely moves M itself. The
+first run, whose controls never moved, could not show it. The margin is
+reported; the gate is the guard itself.
+
+**Output under control motion.** No sweep or walk produces a larger
+output than the static points do. The largest output, 6.32, is the static
+worst-gain corner (drive 0.05, width 0.85, saturation 0, 96 kHz 4×) in the
+`dc` hold; sweeps peak at 6.30 (the 1 s saturation sweep at that corner's
+drive and width, 96 kHz 4×, `dc`), walks at 4.99 (jump-50ms, seed 2902,
+96 kHz 2×, `tones`). #295's box, on the per-block stage before #307 and
+with drive down to 0, reached 110 in sweeps and 241 in jump walks from
+drive moving under a frozen M. This run changes the stage (per-sample
+glide, #293), the core (#307) and drive's minimum together, so it does not
+separate their shares; it only reports that the excursion is gone here.
+**Field guard**: all 1.87 × 10⁹ engagements are in the `dc` and
+`opposite` segments, as in #290 and #295.
 
 ### Declaration (#315)
 
 **Qualified for survival** (zero resets, zero nonfinite samples, zero
-state-guard failures, peak |M| ≤ 1.74 against 20) on the shipped core as
-of `ac0fa91` (after #307), for field |H| ≤ 4, statically at 277 points per
-rate and factor, under 50 ms and 1 s knob sweeps and under 50 ms and 1 s
-random walks with the stage's 10 ms smoothing:
+state-guard failures, peak |M| ≤ 1.74 static and ≤ 7.60 under motion,
+against 20) on the shipped core and stage as of `ac0fa91` (after #293 and
+#307), for field |H| ≤ 4, statically at 277 points per rate and factor,
+under 50 ms and 1 s knob sweeps and under 50 ms and 1 s random walks,
+driven through the stage's per-sample 10 ms glide as `TapeDsp` drives it,
+with every trial checked to have moved as commanded:
 
 - **At 2× and 4×, at 44.1, 48 and 96 kHz: drive [0.05, 1], width
   [0.05, 0.85], saturation [0, 1].** The issue's box, candidate 1; no step
@@ -497,8 +599,8 @@ random walks with the stage's 10 ms smoothing:
   The gain over its width-0 value reaches 2.63, past #290's rule (ii) at 2;
   that rule is reported, not gated, and two shipped rows already exceed it.
 - **Drive below 0.05 is outside this box.** #295's box, drive [0, 1] ×
-  width [0.05, 0.62], was qualified on the core before #307 and was not
-  re-run on the current core here.
+  width [0.05, 0.62], was qualified on the per-block stage before #293 and
+  the core before #307, and was not re-run on the current stage here.
 - **Not decided here.** No product change, default, factor or panel range.
 
 **Accuracy is not qualified**, as in #290 and #295.
