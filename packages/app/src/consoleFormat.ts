@@ -7,6 +7,7 @@ import { CHORD_NOTE_NAMES, SEMITONES_PER_OCTAVE } from '@windsor/engine';
 
 const MS_PER_SECOND = 1000;
 const HZ_PER_KILOHERTZ = 1000;
+const DEGREES_PER_CYCLE = 360;
 /** MIDI octave numbering: note 60 is C4, so octave 0 begins at note 12. */
 const MIDI_OCTAVE_OFFSET = -1;
 
@@ -18,6 +19,8 @@ export const fmtMs = (v: number): string =>
 export const fmtHz = (v: number): string =>
   v >= HZ_PER_KILOHERTZ ? `${(v / HZ_PER_KILOHERTZ).toFixed(2)}k` : v.toFixed(0);
 export const fmtSigned = (v: number): string => (v >= 0 ? '+' : '') + v.toFixed(2);
+/** A phase kept in cycles (0..1), printed in whole degrees. */
+export const fmtCycleDegrees = (v: number): string => `${(v * DEGREES_PER_CYCLE).toFixed(0)}°`;
 /** A level or a biquad `Q` in dB, signed, one decimal. */
 export const fmtDb = (v: number): string => `${(v >= 0 ? '+' : '') + v.toFixed(1)}dB`;
 
