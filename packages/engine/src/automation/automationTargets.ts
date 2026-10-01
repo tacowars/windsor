@@ -6,10 +6,18 @@
  *
  * A target id is relative to the part that owns the lane:
  * - `strip.level`, `strip.pan`, `strip.send.a`, `strip.send.b`;
- * - `insert.<insertId>.<field>`, the insert's stable id (`inserts/insertIds.ts`,
- *   which holds no dot) and a field one of the kinds automates, `bands.3.freq`
- *   among them;
+ * - `insert.<insertId>.<field>`, the insert's stable id (`inserts/insertIds.ts`)
+ *   and a field one of the kinds automates, `bands.3.freq` among them;
  * - `voice.<patch path>`, one of the 29 voice rows.
+ *
+ * An insert id is any non-empty string, dots included, so an insert target is
+ * read from its end: the field is the longest field some kind automates that
+ * ends the id after a dot and leaves a non-empty insert id before it, and the
+ * insert id is everything between `insert.` and that field
+ * (`insert.echo.main.mix` is `echo.main`'s `mix`). Where that reading would
+ * give a different target, an id ending in `.stages.0` with the field `bias`,
+ * say, or where the id holds a `%`, the id is written escaped, `%` as `%25` and
+ * `.` as `%2E`, so every id round-trips; a generated id never needs it.
  *
  * Whether an insert id names an insert of a kind that has the field is the
  * part's to say: `insertTargetRow` takes the kind. `automationTargets.test.ts`
@@ -37,10 +45,21 @@ const VOICE_ROWS = byTarget(VOICE_AUTOMATION_ROWS);
 const INSERT_ROWS = new Map(
   Object.entries(INSERT_AUTOMATION_FIELDS).map(([kind, rows]) => [kind, byTarget(rows)]),
 );
-/** Every field some insert kind automates. */
-const INSERT_FIELDS: ReadonlySet<string> = new Set(
-  Object.values(INSERT_AUTOMATION_FIELDS).flatMap((rows) => rows.map((row) => row.target)),
-);
+/** Every field some insert kind automates, longest first, so `bands.3.freq` wins over a `freq`. */
+const INSERT_FIELDS_LONGEST_FIRST: readonly string[] = [
+  ...new Set(
+    Object.values(INSERT_AUTOMATION_FIELDS).flatMap((rows) => rows.map((row) => row.target)),
+  ),
+].sort((a, b) => b.length - a.length);
+const INSERT_FIELDS: ReadonlySet<string> = new Set(INSERT_FIELDS_LONGEST_FIRST);
+
+/** An escaped insert id's two escapes: `%` first, so a written `%2E` survives. */
+const ESCAPED_PERCENT = '%25';
+const ESCAPED_DOT = '%2E';
+const escapeInsertId = (insertId: string): string =>
+  insertId.replaceAll('%', ESCAPED_PERCENT).replaceAll('.', ESCAPED_DOT);
+const unescapeInsertId = (written: string): string =>
+  written.replace(/%25|%2E/g, (escape) => (escape === ESCAPED_DOT ? '.' : '%'));
 
 /** Every strip target id, in the mixer's order. */
 export const STRIP_TARGET_IDS: readonly AutomationTargetId[] = STRIP_AUTOMATION_ROWS.map(
@@ -59,8 +78,26 @@ export function targetKind(id: AutomationTargetId): AutomationTargetKind {
   return 'voice';
 }
 
-/** An insert id a target may carry: non-empty, no dot. */
-const insertIdFits = (insertId: string): boolean => insertId.length > 0 && !insertId.includes('.');
+/**
+ * `rest`, an insert target after `insert.`, as its written id and its field:
+ * the longest field that ends it after a dot with something before the dot.
+ */
+function splitInsertTarget(rest: string): readonly [string, string] | undefined {
+  for (const field of INSERT_FIELDS_LONGEST_FIRST) {
+    if (rest.length > field.length + 1 && rest.endsWith(`.${field}`)) {
+      return [rest.slice(0, rest.length - field.length - 1), field];
+    }
+  }
+  return undefined;
+}
+
+/** An insert target's id: the insert id as it is where that reads back, escaped where not. */
+function insertTargetId(insertId: string, field: string): AutomationTargetId {
+  const plain = `${insertId}.${field}`;
+  const back = insertId.includes('%') ? undefined : splitInsertTarget(plain);
+  const reads = back !== undefined && back[0] === insertId && back[1] === field;
+  return `${INSERT_PREFIX}${reads ? insertId : escapeInsertId(insertId)}.${field}`;
+}
 
 /** `id` taken apart, or undefined when the catalog has no such target. */
 export function parseTargetId(id: string): ParsedTarget | undefined {
@@ -71,12 +108,12 @@ export function parseTargetId(id: string): ParsedTarget | undefined {
     return VOICE_ROWS.has(id) ? { kind: 'voice', path: id.slice(VOICE_PREFIX.length) } : undefined;
   }
   if (!id.startsWith(INSERT_PREFIX)) return undefined;
-  const rest = id.slice(INSERT_PREFIX.length);
-  const dot = rest.indexOf('.');
-  if (dot < 0) return undefined;
-  const insertId = rest.slice(0, dot);
-  const field = rest.slice(dot + 1);
-  if (!insertIdFits(insertId) || !INSERT_FIELDS.has(field)) return undefined;
+  const split = splitInsertTarget(id.slice(INSERT_PREFIX.length));
+  if (!split) return undefined;
+  const insertId = unescapeInsertId(split[0]);
+  const field = split[1];
+  // One spelling per target: an escape where none is needed, or a stray `%`, is not one.
+  if (insertTargetId(insertId, field) !== id) return undefined;
   return { kind: 'insert', insertId, field };
 }
 
@@ -87,7 +124,9 @@ export function formatTargetId(target: ParsedTarget): AutomationTargetId {
       ? (`${STRIP_PREFIX}${target.field}` as AutomationTargetId)
       : target.kind === 'voice'
         ? `${VOICE_PREFIX}${target.path}`
-        : `${INSERT_PREFIX}${target.insertId}.${target.field}`;
+        : target.insertId.length > 0 && INSERT_FIELDS.has(target.field)
+          ? insertTargetId(target.insertId, target.field)
+          : `${INSERT_PREFIX}${target.insertId}.${target.field}`;
   const back = parseTargetId(id);
   if (!back || !sameTarget(back, target)) {
     throw new RangeError(`formatTargetId: no automation target ${JSON.stringify(target)}`);

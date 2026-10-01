@@ -113,6 +113,8 @@ export {
   VOICE_AUTOMATION_ROWS,
 } from './automation/automationTargetTables';
 export { INSERT_AUTOMATION_FIELDS } from './automation/automationInsertTables';
+export type { InsertFieldRow, InsertSpecOf } from './automation/automationInsertTables';
+export { automatableInsertFields } from './automation/automationInsertFields';
 export {
   STRIP_TARGET_IDS,
   VOICE_TARGET_IDS,

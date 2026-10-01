@@ -61,10 +61,89 @@ describe('parseTargetId and formatTargetId', () => {
     const bad: ParsedTarget[] = [
       { kind: 'strip', field: 'lowCut' },
       { kind: 'voice', path: 'volume' },
-      { kind: 'insert', insertId: 'ab.cd', field: 'mix' },
+      { kind: 'insert', insertId: '', field: 'mix' },
       { kind: 'insert', insertId: 'ab12cd34', field: 'route' },
+      { kind: 'insert', insertId: 'echo.main', field: 'bands.8.freq' },
     ];
     for (const target of bad) expect(() => formatTargetId(target)).toThrow(RangeError);
+  });
+});
+
+describe('an insert id with dots', () => {
+  const FIELDS = [
+    ...new Set(
+      INSERT_KIND_NAMES.flatMap((k) =>
+        INSERT_AUTOMATION_FIELDS[k].map((row: { target: string }) => row.target),
+      ),
+    ),
+  ];
+  const ODD_IDS = [
+    'echo.main',
+    'a.b.c',
+    'a.',
+    '.a',
+    '..',
+    'mix',
+    'a.mix',
+    'x.bands.3',
+    'bands.3',
+    'x.stages.0',
+    'stages.0',
+    'stages.0.bias',
+    'x.stages.0.level',
+    'x.bands',
+    '100%',
+    'a%2Eb',
+    'a%25b',
+    '%',
+  ];
+
+  it('reads the field from the end, longest first', () => {
+    expect(parseTargetId('insert.echo.main.mix')).toEqual({
+      kind: 'insert',
+      insertId: 'echo.main',
+      field: 'mix',
+    });
+    expect(parseTargetId('insert.eq.lead.bands.3.freq')).toEqual({
+      kind: 'insert',
+      insertId: 'eq.lead',
+      field: 'bands.3.freq',
+    });
+    expect(formatTargetId({ kind: 'insert', insertId: 'echo.main', field: 'mix' })).toBe(
+      'insert.echo.main.mix',
+    );
+  });
+
+  it('round-trips any non-empty id with every field', () => {
+    for (const insertId of ODD_IDS) {
+      for (const field of FIELDS) {
+        const target: ParsedTarget = { kind: 'insert', insertId, field };
+        const id = formatTargetId(target);
+        expect(parseTargetId(id), id).toEqual(target);
+      }
+    }
+  });
+
+  it('escapes only an id the plain reading would take apart wrongly', () => {
+    expect(formatTargetId({ kind: 'insert', insertId: 'x.stages.0', field: 'bias' })).toBe(
+      'insert.x%2Estages%2E0.bias',
+    );
+    expect(formatTargetId({ kind: 'insert', insertId: '100%', field: 'mix' })).toBe(
+      'insert.100%25.mix',
+    );
+    expect(formatTargetId({ kind: 'insert', insertId: 'x.stages.0', field: 'mix' })).toBe(
+      'insert.x.stages.0.mix',
+    );
+  });
+
+  it('holds one spelling per target', () => {
+    expect(parseTargetId('insert.echo%2Emain.mix')).toBeUndefined();
+    expect(parseTargetId('insert.a%b.mix')).toBeUndefined();
+    expect(parseTargetId('insert.x.stages.0.bias')).toEqual({
+      kind: 'insert',
+      insertId: 'x',
+      field: 'stages.0.bias',
+    });
   });
 });
 
