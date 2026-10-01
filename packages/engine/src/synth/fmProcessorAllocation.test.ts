@@ -208,7 +208,7 @@ function pad(): Patch {
   patch.ops[1]!.width = 0.3;
   patch.ops[3]!.wave = WAVE.NOISE;
   // The drive stage (windsor#300) with a bias and its tone pole running.
-  patch.drive = { gain: 1.3, shape: DRIVE_SHAPE.TUBE, bias: 0.2, tone: 0.6 };
+  patch.drive = { gain: 1.3, shape: DRIVE_SHAPE.TUBE, bias: 0.2, tone: 0.6, on: true };
   patch.filter.env.attackTime = 0.05;
   patch.filter.env.releaseTime = 0.3;
   patch.pitchEnvAmount = 0.5;
@@ -236,7 +236,7 @@ function pluck(): Patch {
   patch.ops[2]!.width = 0.6;
   patch.ops[3]!.wave = WAVE.NOISE;
   patch.filter.slope24 = true;
-  patch.drive = { gain: 1.4, shape: DRIVE_SHAPE.DIODE, bias: -0.1, tone: 0.8 };
+  patch.drive = { gain: 1.4, shape: DRIVE_SHAPE.DIODE, bias: -0.1, tone: 0.8, on: true };
   patch.lfo = { ...patch.lfo, shape: 1, amount: 0.3, toPitch: 0.2 };
   patch.lfo2 = { ...patch.lfo2, shape: 6, rate: 3, amount: 0.5, toOp: [0, 0.3, 0, 0] };
   return patch;

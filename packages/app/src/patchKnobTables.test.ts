@@ -190,8 +190,10 @@ describe('the Drive section (windsor#309)', () => {
       setPath(editor.patch, k.f, v);
       editor.push();
     }
-    expect(JSON.parse(pushed.at(-1) ?? '{}')).toEqual({ gain: 4, shape: 0, bias: -0.3, tone: 0.4 });
+    // A fresh patch's switch is Off (windsor#309), and turning a knob leaves it Off.
+    const written = { gain: 4, shape: 0, bias: -0.3, tone: 0.4, on: false };
+    expect(JSON.parse(pushed.at(-1) ?? '{}')).toEqual(written);
     const shown = JSON.parse(JSON.stringify(editor.patch, null, 2)) as Patch;
-    expect(makePatch(shown).drive).toEqual({ gain: 4, shape: 0, bias: -0.3, tone: 0.4 });
+    expect(makePatch(shown).drive).toEqual(written);
   });
 });

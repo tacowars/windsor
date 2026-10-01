@@ -50,8 +50,8 @@ describe('a version-5 song (windsor#300)', () => {
     const patches = result.document.patches!;
     expect(patches['kick']).toEqual(KICK_PATCH);
     expect(patches['kick']!.filter).not.toHaveProperty('drive');
-    // Filter Off: the old drive was silent, so the stage stays at unity.
-    expect(patches['drone-sqr']!.drive).toEqual({ gain: 1, shape: 0, bias: 0, tone: 1 });
+    // Filter Off: the old drive was silent, so the stage stays at unity, and its switch Off (windsor#309).
+    expect(patches['drone-sqr']!.drive).toEqual({ on: false, gain: 1, shape: 0, bias: 0, tone: 1 });
   });
 
   it("renders its embedded patch bit for bit as the library's", () => {

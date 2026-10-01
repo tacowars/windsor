@@ -17,7 +17,7 @@
 import type { FieldNormaliser } from '../song/arrangementFields';
 import { isRecord, show } from '../song/arrangementFields';
 import type { Patch } from './patch';
-import { makePatch } from './patch';
+import { driveOnByDefault, makePatch } from './patch';
 
 /** The `patches` section: a record of name → patch, junk entries dropped. */
 export function normalisePatches(
@@ -41,14 +41,24 @@ export function normalisePatches(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-/** One patch against the `makePatch()` template; the name defaults to the key. */
+/**
+ * One patch against the `makePatch()` template; the name defaults to the key.
+ * A drive with no boolean `on` (a song saved before the switch, windsor#309)
+ * takes `driveOnByDefault` of its own gain and bias, not the template's Off,
+ * so it plays as it did.
+ */
 export function normalisePatch(
   raw: Record<string, unknown>,
   n: FieldNormaliser,
   path: string,
 ): Patch {
   const template = makePatch({ name: path.slice(path.lastIndexOf('.') + 1) });
-  return walk(template, raw, n, path) as Patch;
+  const patch = walk(template, raw, n, path) as Patch;
+  const drive = raw['drive'];
+  if (!isRecord(drive) || typeof drive['on'] !== 'boolean') {
+    patch.drive.on = driveOnByDefault(patch.drive.gain, patch.drive.bias);
+  }
+  return patch;
 }
 
 function walk(template: unknown, raw: unknown, n: FieldNormaliser, path: string): unknown {

@@ -14,7 +14,9 @@ import { DRIVE_SHAPE, DRIVE_SHAPE_NAMES, makePatch } from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
 import { FILTER_KNOBS, lfoKnobs, patchKnobOpts } from './patchKnobTables';
 import {
+  DRIVE_SWITCH,
   GLOBAL_TOGGLES,
+  driveInactive,
   driveShapeOptions,
   LFO_PHASE_NAMES,
   LFO_RANGE_NAMES,
@@ -152,6 +154,42 @@ describe('the Drive section Shape picker (windsor#309)', () => {
     setPath(patch, 'drive.shape', DRIVE_SHAPE.TUBE);
     const imported = makePatch(JSON.parse(JSON.stringify(patch)) as Patch);
     expect(imported.drive).toEqual({ ...makePatch().drive, shape: DRIVE_SHAPE.TUBE });
+  });
+});
+
+describe('the Drive section switch (windsor#309)', () => {
+  it('reads Off | On over drive.on, a boolean the patch really has', () => {
+    expect([DRIVE_SWITCH.off, DRIVE_SWITCH.on]).toEqual(['Off', 'On']);
+    expect(typeof getPath(makePatch(), DRIVE_SWITCH.f)).toBe('boolean');
+  });
+
+  it('shows the 808 kick On and a pad with no drive Off, the pad dimmed', () => {
+    const kick = PRESETS['tr808-kick']!;
+    const pad = PRESETS['pad-drift']!;
+    expect(toggleIndex(kick, DRIVE_SWITCH.f)).toBe(1);
+    expect(driveInactive(kick)).toBe(false);
+    expect(toggleIndex(pad, DRIVE_SWITCH.f)).toBe(0);
+    expect(driveInactive(pad)).toBe(true);
+    expect(driveInactive(makePatch())).toBe(true);
+  });
+
+  it('switches drive.on alone, keeps the four controls, and survives the JSON round trip', () => {
+    const committed: string[] = [];
+    const editor: PatchEditor = {
+      patch: structuredClone(PRESETS['tr808-kick']!),
+      push: () => committed.push(JSON.stringify(editor.patch.drive)),
+      refresh: () => undefined,
+    };
+    const before = { ...editor.patch.drive };
+    writeToggle(editor.patch, DRIVE_SWITCH.f, 0);
+    editor.push();
+    expect(editor.patch.drive).toEqual({ ...before, on: false });
+    expect(driveInactive(editor.patch)).toBe(true);
+    const imported = makePatch({ drive: JSON.parse(committed.at(-1) ?? '{}') as Patch['drive'] });
+    expect(imported.drive).toEqual({ ...before, on: false });
+    writeToggle(editor.patch, DRIVE_SWITCH.f, 1);
+    editor.push();
+    expect(JSON.parse(committed.at(-1) ?? '{}')).toEqual(before);
   });
 });
 

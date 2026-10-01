@@ -24,6 +24,7 @@ import {
   DRIVE_DEFAULTS,
   DRIVE_GAIN_RANGE,
   DRIVE_TONE_RANGE,
+  driveOnByDefault,
   ENVELOPE_DEFAULTS,
   FEEDBACK_RANGE,
   FILTER_DEFAULTS,
@@ -135,18 +136,27 @@ function lfoDefaults(
 /**
  * The drive stage (windsor#300): a shape id outside the table plays `soft`,
  * and the gain, bias and tone are clamped to their ranges (the gain's
- * bound keeps the shaper's operand finite, windsor#308).
+ * bound keeps the shaper's operand finite, windsor#308). A patch with no
+ * boolean `on` takes `driveOnByDefault` of its gain and bias (windsor#309).
+ * `on` is added after the four-number literal, not written in it: a fifth
+ * literal key starts a new object shape whose numbers are born small
+ * integers (the default patch's 1 and 0) and then generalise to doubles
+ * under a driven patch, which `fmProcessorAllocation.test.ts` refuses.
  */
 function driveDefaults(raw: Partial<DriveSettings> | null | undefined): DriveSettings {
   raw = raw || {};
   const d = DRIVE_DEFAULTS;
   const shape = num(raw.shape, d.shape) | 0;
-  return {
-    gain: clamp(num(raw.gain, d.gain), DRIVE_GAIN_RANGE),
+  const gain = clamp(num(raw.gain, d.gain), DRIVE_GAIN_RANGE);
+  const bias = clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE);
+  const drive = {
+    gain,
     shape: shape < DRIVE_SOFT || shape > DRIVE_FOLD ? DRIVE_SOFT : shape,
-    bias: clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE),
+    bias,
     tone: clamp(num(raw.tone, d.tone), DRIVE_TONE_RANGE),
-  };
+  } as DriveSettings;
+  drive.on = typeof raw.on === 'boolean' ? raw.on : driveOnByDefault(gain, bias);
+  return drive;
 }
 
 function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {

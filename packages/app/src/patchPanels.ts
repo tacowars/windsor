@@ -200,6 +200,16 @@ export function buildGlobal(editor: PatchEditor): void {
   }
 }
 
+/**
+ * The Drive section's switch (windsor#309): `drive.on`, a boolean path drawn
+ * as Off | On at the section's head, the way Filter's mode starts at Off.
+ * Off, the engine runs no drive at all, and the controls stay editable.
+ */
+export const DRIVE_SWITCH = { f: 'drive.on', off: 'Off', on: 'On' } as const;
+
+/** Whether the Drive section's controls show inactive: its switch is off. */
+export const driveInactive = (patch: Patch): boolean => toggleIndex(patch, DRIVE_SWITCH.f) === 0;
+
 /** The Drive section's Shape picker: the engine's labels, each at its `DRIVE_SHAPE` id. */
 export const driveShapeOptions = (): { value: number; label: string }[] =>
   DRIVE_SHAPE_NAMES.map((label, value) => ({ value, label }));
@@ -225,9 +235,26 @@ function driveShapePicker(editor: PatchEditor): HTMLElement {
 /**
  * The voice's drive stage (windsor#300): after the carriers and before the
  * filter, heard with the filter on or off, so its section stands before
- * Filter's. Shape, then the Drive, Bias and Tone knobs.
+ * Filter's. The Off | On switch, then Shape and the Drive, Bias and Tone
+ * knobs, dimmed while the switch is off (windsor#309).
  */
 export function buildDrive(editor: PatchEditor): void {
+  const body = $('driveBody');
+  const dim = (): void => {
+    body.classList.toggle('off', driveInactive(editor.patch));
+  };
+  $('driveSwitch').replaceChildren(
+    indexSeg(
+      editor,
+      [DRIVE_SWITCH.off, DRIVE_SWITCH.on],
+      () => toggleIndex(editor.patch, DRIVE_SWITCH.f),
+      (i) => {
+        writeToggle(editor.patch, DRIVE_SWITCH.f, i);
+        dim();
+      },
+    ),
+  );
+  dim();
   $('driveShape').replaceChildren(driveShapePicker(editor));
   const row = $('driveKnobs');
   row.innerHTML = '';

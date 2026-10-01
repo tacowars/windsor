@@ -17,6 +17,7 @@ import type { Algorithm } from '../audioConstants';
 export { WAVE } from '../worklet/fm/waveIds';
 import {
   DRIVE_DEFAULTS,
+  driveOnByDefault,
   ENVELOPE_DEFAULTS,
   FILTER_DEFAULTS,
   FILTER_ENV_DEFAULTS,
@@ -46,6 +47,8 @@ export const WAVE_NAMES = [
 
 /** The mode ids live with the worklet that switches on them (`worklet/fm/modeIds.ts`, #669). */
 export { DRIVE_SHAPE, FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
+/** The drive switch a patch that omits it takes (windsor#309), from the table both fills read. */
+export { driveOnByDefault };
 
 export const LFO_SHAPE_NAMES = [
   'Sine',
@@ -160,9 +163,15 @@ export interface FilterSettings {
 /**
  * The voice's drive stage (windsor#300, record `2026-10-01-voice-drive-stage`):
  * after the carriers and before the filter, whether the filter is on or not.
- * `gain` 1 with `bias` 0 bypasses it.
+ * `on` false, or `gain` 1 with `bias` 0, bypasses it.
  */
 export interface DriveSettings {
+  /**
+   * The stage's switch (windsor#309): off, it costs nothing and the other
+   * four are kept for when it is turned back on. A patch that omits it takes
+   * `driveOnByDefault` (on when the gain is off unity or there is a bias).
+   */
+  on: boolean;
   /** The input gain into the shaper; 1 is unity. */
   gain: number;
   /** A `DRIVE_SHAPE` id. */
@@ -258,8 +267,15 @@ export function makePatch(o: PartialPatch = {}): Patch {
       ...(o.filter ?? {}),
       env: makeEnvelope(o.filter?.env ?? {}, FILTER_ENV_DEFAULTS),
     },
-    drive: { ...DRIVE_DEFAULTS, ...(o.drive ?? {}) },
+    drive: makeDrive(o.drive),
   };
+}
+
+/** The drive with its defaults; an omitted `on` is `driveOnByDefault` of the gain and bias (windsor#309). */
+function makeDrive(o: Partial<DriveSettings> | undefined): DriveSettings {
+  const drive = { ...DRIVE_DEFAULTS, ...(o ?? {}) };
+  if (typeof o?.on !== 'boolean') drive.on = driveOnByDefault(drive.gain, drive.bias);
+  return drive;
 }
 
 /** Deep copy, so an editor can mutate a preset without touching the original. */

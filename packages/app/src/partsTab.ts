@@ -54,8 +54,11 @@ const GRID_HTML = `
     <aside class="mod">
       <div class="section">
         <div class="section-title"><span>Drive</span></div>
-        <div class="bay-line" id="driveShape" style="margin-bottom: 8px"></div>
-        <div class="knob-row" id="driveKnobs"></div>
+        <div class="seg-slot" id="driveSwitch" style="margin-bottom: 8px"></div>
+        <div class="drive-body" id="driveBody">
+          <div class="bay-line" id="driveShape" style="margin-bottom: 8px"></div>
+          <div class="knob-row" id="driveKnobs"></div>
+        </div>
       </div>
       <div class="section">
         <div class="section-title"><span>Filter</span></div>
