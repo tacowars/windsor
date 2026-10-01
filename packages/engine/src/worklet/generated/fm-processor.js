@@ -70,15 +70,33 @@ var EventQueue = class {
     if (this.tail === this.frames.length) this.moveDown();
     const items = this.items;
     const frames = this.frames;
-    let i = this.tail;
-    this.tail = i + 1;
-    while (i > this.head && frames[i - 1] > this.incoming[0]) {
-      items[i] = items[i - 1];
-      frames[i] = frames[i - 1];
-      i--;
+    const frame = this.incoming[0];
+    const tail = this.tail;
+    this.tail = tail + 1;
+    if (tail === this.head || frames[tail - 1] <= frame) {
+      items[tail] = event;
+      frames[tail] = frame;
+      return;
     }
-    items[i] = event;
-    frames[i] = this.incoming[0];
+    const head = this.head;
+    let hi = tail - 1;
+    let lo = head;
+    for (let step = 1; hi - step >= head; step += step) {
+      if (frames[hi - step] <= frame) {
+        lo = hi - step + 1;
+        break;
+      }
+      hi -= step;
+    }
+    while (lo < hi) {
+      const mid = lo + hi >>> 1;
+      if (frames[mid] > frame) hi = mid;
+      else lo = mid + 1;
+    }
+    frames.copyWithin(lo + 1, lo, tail);
+    for (let i = tail; i > lo; i--) items[i] = items[i - 1];
+    items[lo] = event;
+    frames[lo] = frame;
   }
   /**
    * Double the room, `frames` and `items` alike, each event staying in its
