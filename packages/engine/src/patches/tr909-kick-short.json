@@ -3,7 +3,7 @@
   "name": "909 Kick Short",
   "category": "Drums",
   "tags": ["909", "kick", "analog", "short", "mono"],
-  "description": "Fitted to a clean recording of the machine with Decay low, Tune and Attack at mid. A 32-semitone sweep that stays high for the first 10 ms (about 220 Hz at 5 ms, 155 Hz at 10 ms) down to 65 Hz on C4 or the 909's 52 Hz on G#3; the body holds full level for 50 ms, then falls in about 110 ms. The attack edge is a square at a locked phase. The hit runs its course whatever the gate.",
+  "description": "Fitted to a clean recording of the machine with Decay low, Tune and Attack at mid. A 32-semitone sweep that stays high for the first 10 ms (about 220 Hz at 5 ms, 155 Hz at 10 ms) down to 52 Hz on C4, the 909's pitch; the body holds full level for 50 ms, then falls in about 110 ms. The attack edge is a square at a locked phase. The hit runs its course whatever the gate.",
   "patch": {
     "name": "909 Kick Short",
     "algorithm": 6,
@@ -20,7 +20,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0.001007,
@@ -76,7 +76,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0.001007,
@@ -104,7 +104,7 @@
       {
         "wave": 0,
         "userPartials": null,
-        "ratio": 0.25,
+        "ratio": 0.198425,
         "fixed": false,
         "fixedHz": 100,
         "detune": 0.001007,

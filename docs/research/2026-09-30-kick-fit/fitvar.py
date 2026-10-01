@@ -1,6 +1,7 @@
 import json, copy, numpy as np, scipy.optimize as so, sys, os
 from fit import render; import wfit; from wfit import wscore
 mach,START,REF,OUT,secs=sys.argv[1:6]; os.environ['SECS']=secs
+NOTE=60  # C4, the percussion note: the shipped kicks play the machines' 52 Hz there
 LIB=os.path.join(os.path.dirname(os.path.abspath(__file__)),'../../../packages/engine/src/patches')
 p1=json.load(open(START if START.endswith('.json') else os.path.join(LIB,START+'.json')))
 p1=p1.get('patch',p1)  # a library file wraps its patch; a fitted one is bare
@@ -33,9 +34,9 @@ else:
         return p
 x0=np.clip(np.array(x0,float),lo,hi)
 def f(v):
-    v=np.clip(v,lo,hi); return wscore(REF,render(build(v),56),t0,tp,ta)
+    v=np.clip(v,lo,hi); return wscore(REF,render(build(v),NOTE),t0,tp,ta)
 s0=f(x0)
 r=so.minimize(f,x0,method='Nelder-Mead',options=dict(maxfev=int(os.environ.get('FEV',700)),xatol=1e-4,fatol=1e-5,adaptive=True))
 v=np.clip(r.x,lo,hi)
-print(OUT,'start',round(s0,3),'best',round(r.fun,3),wscore(REF,render(build(v),56),t0,tp,ta,verbose=True))
+print(OUT,'start',round(s0,3),'best',round(r.fun,3),wscore(REF,render(build(v),NOTE),t0,tp,ta,verbose=True))
 json.dump(build(v),open(OUT,'w'),indent=1)
