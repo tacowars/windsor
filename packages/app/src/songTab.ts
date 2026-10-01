@@ -19,7 +19,10 @@
  *
  * A part's `▸` folds its automation lanes out beneath it (windsor#348,
  * `songAutomationLane.ts`). Which parts are open is view state; the lanes'
- * values follow the playhead from that same loop, without a repaint.
+ * values follow the playhead from that same loop, without a repaint. While
+ * any part is open, the lane toolbar sits above the lanes
+ * (`songAutomationToolbar.ts`, windsor#349): its tool and snap are view
+ * state too.
  */
 import type { DocumentPartial } from '@windsor/engine';
 import { regionPattern, songTicksOf } from '@windsor/engine';
@@ -39,6 +42,12 @@ import {
 } from './songMixerCell';
 import { automationRows, type Readout } from './songAutomationLane';
 import { automationSignature } from './songAutomationModel';
+import {
+  DEFAULT_AUTOMATION_TOOL,
+  DEFAULT_SNAP_TICKS,
+  type AutomationTool,
+} from './songAutomationTables';
+import { automationToolbar, syncAutomationTool, wireToolKeys } from './songAutomationToolbar';
 import { songMixerLights } from './songMixerLights';
 import type { MixerLights } from './songMixerLights';
 import { stripSignature } from './songMixerModel';
@@ -102,6 +111,9 @@ export interface SongViewState {
    * part starts folded.
    */
   readonly openParts: Set<number>;
+  /** The lane toolbar's tool and Snap grain in ticks, 0 for Off (windsor#349 decision 1). Kept for the session. */
+  automationTool: AutomationTool;
+  automationSnap: number;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
@@ -191,8 +203,12 @@ function renderSongView(
   guardFrozenColumns(lanes, SONG_VIEW.laneGapPx);
   const line = playheadLine();
   const pane = el('div', 'detail-pane');
+  // The lane toolbar (windsor#349): shown while any part is folded open.
+  const toolbar = automationToolbar(state, () => body);
   scroll.appendChild(lanes);
+  body.appendChild(toolbar);
   body.appendChild(scroll);
+  syncAutomationTool(body, state);
   body.appendChild(pane);
   scroll.addEventListener('scroll', () => {
     state.scrollPx = scroll.scrollLeft;
@@ -264,6 +280,7 @@ function renderSongView(
       ];
       readouts = fresh;
       lanes.replaceChildren(...rows, ...brace.lines, line);
+      toolbar.hidden = !doc.parts.some((part) => state.openParts.has(part.slot));
       readValues(ctx.transport.position());
       // The new blocks start unlit, and the loop marks only a moved tick: light the playing chord now, paused or not.
       markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
@@ -337,8 +354,16 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     paneScrollPx: 0,
     mixerExpanded: false,
     openParts: new Set(),
+    automationTool: DEFAULT_AUTOMATION_TOOL,
+    automationSnap: DEFAULT_SNAP_TICKS,
   };
   // The mixer column's lights (windsor#159): one poller for the view, outliving each render's cells.
   const lights = songMixerLights(ctx);
-  return (body) => renderSongView(body, ctx, state, lights);
+  // The tool keys (windsor#349): once, on the tab's body, which outlives its renders.
+  let keyed: HTMLElement | null = null;
+  return (body) => {
+    if (keyed !== body) wireToolKeys(body, state);
+    keyed = body;
+    renderSongView(body, ctx, state, lights);
+  };
 }

@@ -2344,6 +2344,18 @@ select.field.compact {
   background: rgba(220, 227, 227, 0.035);
   pointer-events: none;
 }
+/* Under the toolbar's tools (windsor#349): a drag edits, never scrolls. */
+.lanes .auto-lane {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.lanes[data-auto-tool='edit'] .auto-lane {
+  cursor: crosshair;
+}
+.lanes[data-auto-tool='draw'] .auto-lane {
+  cursor: cell;
+}
 .auto-lane svg {
   position: absolute;
   top: 0;
@@ -2389,6 +2401,51 @@ select.field.auto-picker {
 }
 .auto-add-lane {
   height: var(--auto-add-h);
+}
+/* The lane toolbar (windsor#349): the tools, Snap and the tool's hint, above
+   the lanes while a part is folded open. */
+.auto-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 14px 0;
+}
+.auto-toolbar[hidden] {
+  display: none;
+}
+.auto-tgroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.auto-tlabel {
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.seg.auto-tools {
+  flex-wrap: nowrap;
+}
+.seg.auto-tools button {
+  min-width: 52px;
+  padding: 5px 8px;
+}
+select.field.auto-snap {
+  width: auto;
+  height: 24px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+.auto-hint {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-dim);
 }
 
 /* ---------- parts grid ---------- */
