@@ -1,11 +1,12 @@
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
- * history, amplitude and width ramps, six envelopes, two LFOs, the drive
- * stage (windsor#300), two filter stages, the steal fade, a step's parameter offsets and the per-voice values
- * they make (windsor#17) — and its lifecycle: `start`, `rebind`, `retarget`,
+ * history, amplitude ramps and their knots (windsor#301), width ramps, six
+ * envelopes, two LFOs, the drive stage (windsor#300), two filter stages, the
+ * steal fade, a step's parameter offsets and the per-voice values they make
+ * (windsor#17) — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
- * the part polls. The hot paths are functions over the voice in `voiceControl.js`,
+ * the part polls, whose logic is `voiceQuiet.ts`. The hot paths are functions over the voice in `voiceControl.js`,
  * `voiceRender.js` and `voiceKernel.js`; `render` and `updateControl` stay
  * methods because the part and the tests call them on the voice. Invariant:
  * every buffer is allocated here, once; nothing after construction allocates.
@@ -19,16 +20,16 @@
 import type { Algorithm } from './algorithms';
 import type { WorkletPatch } from './patchNormalise';
 import { ALGORITHMS, ALG_ORDER } from './algorithms';
-import { Envelope, ST_IDLE, ST_SUSTAIN } from './envelope';
-import { DORMANT_AMP, DORMANT_FILTER_STATE } from './fmConstants';
+import { Envelope, ST_IDLE } from './envelope';
+import { ENVELOPE_BREAKS_MAX } from './fmConstants';
 import { Lfo, secondLfoSeed } from './lfo';
 import { randomSeed32 } from './prng';
-import { FILT_OFF } from './modeIds';
 import { STEP_MOD_SLOT_COUNT } from './stepModTables';
 import { Svf } from './svf';
 import { VoiceDrive } from './voiceDrive';
 import { bindVoiceConstants, restingWidth, updateVoiceControl } from './voiceControl';
 import { renderVoiceKernel } from './voiceKernel';
+import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
 import { bindStepMod, loadStepOffsets, startStepMod } from './voiceStepMod';
 import { KIND_PULSE, waveKind } from './waveTables';
@@ -50,6 +51,11 @@ class Voice {
   fb2: Float32Array;
   amp: Float32Array;
   ampInc: Float32Array;
+  ampBreak: Int32Array;
+  ampKnot: Int32Array;
+  knotAmp: Float32Array;
+  knotInc: Float32Array;
+  knotGap: Int32Array;
   width: Float32Array;
   widthInc: Float32Array;
   kind: Int32Array;
@@ -137,6 +143,16 @@ class Voice {
     this.fb2 = new Float32Array(4); // one before that
     this.amp = new Float32Array(4); // interpolated amplitude
     this.ampInc = new Float32Array(4);
+    // Envelope edges at their own samples (windsor#301): `ampBreak` counts
+    // the samples to an operator's next knot (0: none this block) and
+    // `ampKnot` is that knot's slot in its row of ENVELOPE_BREAKS_MAX. At the
+    // knot the ramp lands on `knotAmp`, takes `knotInc` and counts `knotGap`
+    // to the one after (0: the block's last). `updateOperatorAmp` writes them.
+    this.ampBreak = new Int32Array(4);
+    this.ampKnot = new Int32Array(4);
+    this.knotAmp = new Float32Array(4 * ENVELOPE_BREAKS_MAX);
+    this.knotInc = new Float32Array(4 * ENVELOPE_BREAKS_MAX);
+    this.knotGap = new Int32Array(4 * ENVELOPE_BREAKS_MAX);
     // Width (#55), as the loops read it: the duty for PULSE, and for every
     // other wave the phase scale 1 / width, so the squeeze is a multiply.
     // Ramped per sample like `amp`; exactly 1 and still is the plain wave.
@@ -274,6 +290,7 @@ class Voice {
       this.fb2[i] = 0;
       this.amp[i] = 0;
       this.ampInc[i] = 0;
+      this.ampBreak[i] = 0;
 
       this.kind[i] = waveKind(op.wave);
       this.mips[i] = waveSets[i];
@@ -401,6 +418,8 @@ class Voice {
       this.ampEnv[i].value = 0;
       this.amp[i] = 0;
       this.ampInc[i] = 0;
+      // A knot still pending would set the level back (windsor#301).
+      this.ampBreak[i] = 0;
     }
   }
 
@@ -411,42 +430,9 @@ class Voice {
     this.fadeInc = -1 / (0.004 * this.sr);
   }
 
-  /**
-   * Dormant (#547): gated, every carrier held in sustain at level 0 with an
-   * `endLevel` of 0, its amplitude ramp at ~0 and any filter no longer ringing.
-   * The part skips its control and render work; nothing it would have rendered
-   * is audible. Skipping freezes the pitch, filter and LFO state too, so the
-   * end-level condition matters: a release rising to a non-zero end level is
-   * sound, and would be heard from that frozen state. Excluding it means a
-   * dormant voice's note-off is silence, and the voice can simply end. Read at
-   * control boundaries, so a live retune that raises a sustain wakes the voice
-   * from its frozen state with the ordinary amplitude ramp up from ~0.
-   * Allocates nothing.
-   */
+  /** Dormant (#547): the part may skip this gated voice's work (`voiceQuiet.ts`). */
   get dormant(): boolean {
-    if (!this.gate || this.fadeInc !== 0) return false;
-    const carriers = this.alg.carriers;
-    for (let c = 0; c < carriers.length; c++) {
-      const i = carriers[c];
-      const env = this.ampEnv[i];
-      if (env.state !== ST_SUSTAIN || env.p!.sustainLevel !== 0) return false;
-      if (env.p!.endLevel !== 0) return false;
-      if (Math.abs(this.amp[i]) > DORMANT_AMP) return false;
-    }
-    return this.filterQuiet;
-  }
-
-  /**
-   * The filter is off, or has stopped ringing: both stages under the dormancy
-   * floor (#547), and the drive's tone pole too (windsor#300), which holds no
-   * state while it is not running.
-   */
-  get filterQuiet(): boolean {
-    if (Math.abs(this.drive.toneState) > DORMANT_FILTER_STATE) return false;
-    const f = this.patch!.filter;
-    if (f.mode === FILT_OFF) return true;
-    if (!Svf.quiet(this.svfA)) return false;
-    return !f.slope24 || Svf.quiet(this.svfB);
+    return voiceDormant(this);
   }
 
   /**
@@ -456,8 +442,8 @@ class Voice {
    */
   settle(): void {
     if (this.gate || this.fadeInc !== 0) return;
-    if (this.finished) this.active = false;
-    else if (this.holdsEndLevel) this.steal();
+    if (voiceFinished(this)) this.active = false;
+    else if (voiceHoldsEndLevel(this)) this.steal();
   }
 
   /** A voice that is fading out is no longer available, but still sounding. */
@@ -465,38 +451,9 @@ class Voice {
     return this.fadeInc !== 0;
   }
 
-  /**
-   * Nothing left to hear: every carrier's envelope has ended, its amplitude
-   * ramp has reached ~0 and the filter has stopped ringing. Ending a voice on
-   * the envelopes alone skipped the last ramp and cut a resonant filter's
-   * ring to 0 in one sample, the click at the end of a stop's release
-   * (windsor#7).
-   */
+  /** Nothing left to hear: carriers ended, ramps at ~0, filter quiet (`voiceQuiet.ts`, windsor#7). */
   get finished(): boolean {
-    const carriers = this.alg.carriers;
-    for (let i = 0; i < carriers.length; i++) {
-      const c = carriers[i];
-      if (!this.ampEnv[c].finished) return false;
-      if (Math.abs(this.amp[c]) > DORMANT_AMP) return false;
-    }
-    return this.filterQuiet;
-  }
-
-  /**
-   * Every carrier's envelope has ended, and at least one ended above 0 (an
-   * End level): the voice holds that level for good and never goes quiet, so
-   * the part fades it out with `steal` rather than waiting on it or cutting
-   * it (windsor#7). Reads the envelopes, not the amplitude ramps.
-   */
-  get holdsEndLevel(): boolean {
-    const carriers = this.alg.carriers;
-    let holds = false;
-    for (let i = 0; i < carriers.length; i++) {
-      const env = this.ampEnv[carriers[i]];
-      if (!env.finished) return false;
-      if (Math.abs(env.value) > DORMANT_AMP) holds = true;
-    }
-    return holds;
+    return voiceFinished(this);
   }
 
   /**

@@ -12,7 +12,9 @@
  * voice, a term dropped that is not exactly ±0. Width (#55) follows the
  * generic loop's reads: a flag per operator, hoisted, keeps width 1 on the old
  * read, and the width ramp runs beside the phase, live or not, as the generic
- * loop's does. This function is not sliced
+ * loop's does. The amplitude knots (windsor#301) too: an operator's ramp,
+ * knot counter and knot slot are locals, stepped as the generic loop steps
+ * them and stored back at the end. This function is not sliced
  * finer, whatever `max-lines-per-function` says: a helper per operator would
  * reload the state through the voice and give the saving back
  * (docs/research/2026-09-15-548-fm-voice-loop-specialisation).
@@ -36,8 +38,8 @@ import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
  * output is the same bits. Per-operator state lives in locals for the call
  * and is written back at the end; a Float32Array store is a `Math.fround`.
  *
- * An operator whose amplitude is exactly 0 and not ramping for the whole
- * call contributes ±0 to every sum it is in, so its wave is not computed.
+ * An operator whose amplitude is exactly 0, not ramping and with no knot
+ * ahead (windsor#301) for the whole call contributes ±0 to every sum it is in, so its wave is not computed.
  * Its phase still runs, and its feedback history becomes the ±0 the generic
  * loop would have stored. A noise operator is never skipped: its draws
  * advance the voice's shared noise generator.
@@ -84,6 +86,11 @@ function renderVoiceKernel(
     fb2 = voice.fb2,
     amp = voice.amp,
     ampInc = voice.ampInc;
+  const ampBreak = voice.ampBreak,
+    ampKnot = voice.ampKnot,
+    knotAmp = voice.knotAmp,
+    knotInc = voice.knotInc,
+    knotGap = voice.knotGap;
   const kind = voice.kind,
     tables = voice.tables;
   const fbAmt = voice.opFeedback;
@@ -94,10 +101,10 @@ function renderVoiceKernel(
     kB = kind[B],
     kC = kind[C],
     kD = kind[D];
-  const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0;
-  const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0;
-  const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0;
-  const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0;
+  const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0 || ampBreak[A] !== 0;
+  const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0 || ampBreak[B] !== 0;
+  const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0 || ampBreak[C] !== 0;
+  const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0 || ampBreak[D] !== 0;
   const modBA = liveA && liveB && (edges & EDGE_BA) !== 0;
   const modCA = liveA && liveC && (edges & EDGE_CA) !== 0;
   const modDA = liveA && liveD && (edges & EDGE_DA) !== 0;
@@ -121,10 +128,21 @@ function renderVoiceKernel(
     incB = phaseInc[B],
     incC = phaseInc[C],
     incD = phaseInc[D];
-  const aiA = ampInc[A],
+  // The amplitude ramps and their knots (windsor#301): at a knot an
+  // operator lands on the knot's level and takes its ramp, as the generic
+  // loop does, so `aiX` moves and goes back at the end.
+  let aiA = ampInc[A],
     aiB = ampInc[B],
     aiC = ampInc[C],
     aiD = ampInc[D];
+  let brA = ampBreak[A],
+    brB = ampBreak[B],
+    brC = ampBreak[C],
+    brD = ampBreak[D];
+  let knA = ampKnot[A],
+    knB = ampKnot[B],
+    knC = ampKnot[C],
+    knD = ampKnot[D];
   let phA = phase[A],
     phB = phase[B],
     phC = phase[C],
@@ -213,6 +231,12 @@ function renderVoiceKernel(
       f1D = Math.fround(v * a);
       oD = Math.fround(v);
       aD = Math.fround(a + aiD);
+      if (brD !== 0 && --brD === 0) {
+        aD = knotAmp[knD];
+        aiD = knotInc[knD];
+        brD = knotGap[knD];
+        knD++;
+      }
     }
     phD += incD;
     if (phD >= 1) phD -= Math.floor(phD);
@@ -263,6 +287,12 @@ function renderVoiceKernel(
       f1C = Math.fround(v * a);
       oC = Math.fround(v);
       aC = Math.fround(a + aiC);
+      if (brC !== 0 && --brC === 0) {
+        aC = knotAmp[knC];
+        aiC = knotInc[knC];
+        brC = knotGap[knC];
+        knC++;
+      }
     }
     phC += incC;
     if (phC >= 1) phC -= Math.floor(phC);
@@ -314,6 +344,12 @@ function renderVoiceKernel(
       f1B = Math.fround(v * a);
       oB = Math.fround(v);
       aB = Math.fround(a + aiB);
+      if (brB !== 0 && --brB === 0) {
+        aB = knotAmp[knB];
+        aiB = knotInc[knB];
+        brB = knotGap[knB];
+        knB++;
+      }
     }
     phB += incB;
     if (phB >= 1) phB -= Math.floor(phB);
@@ -366,6 +402,12 @@ function renderVoiceKernel(
       f1A = Math.fround(v * a);
       oA = Math.fround(v);
       aA = Math.fround(a + aiA);
+      if (brA !== 0 && --brA === 0) {
+        aA = knotAmp[knA];
+        aiA = knotInc[knA];
+        brA = knotGap[knA];
+        knA++;
+      }
     }
     phA += incA;
     if (phA >= 1) phA -= Math.floor(phA);
@@ -436,6 +478,18 @@ function renderVoiceKernel(
   amp[B] = aB;
   amp[C] = aC;
   amp[D] = aD;
+  ampInc[A] = aiA;
+  ampInc[B] = aiB;
+  ampInc[C] = aiC;
+  ampInc[D] = aiD;
+  ampBreak[A] = brA;
+  ampBreak[B] = brB;
+  ampBreak[C] = brC;
+  ampBreak[D] = brD;
+  ampKnot[A] = knA;
+  ampKnot[B] = knB;
+  ampKnot[C] = knC;
+  ampKnot[D] = knD;
   out[A] = oA;
   out[B] = oB;
   out[C] = oC;
