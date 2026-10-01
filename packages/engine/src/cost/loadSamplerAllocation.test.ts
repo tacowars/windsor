@@ -22,11 +22,9 @@
  * - The meter costs two heap numbers a quantum, 32 bytes, and nothing more:
  *   each `Date.now()` returns a new one, which no source form avoids (the
  *   research README has V8's graph). Where the render allocates nothing of
- *   its own (every bundle in `CLEAN`), the difference between the two runs is
- *   held to that within 8 bytes a quantum. Tape's DSP still allocates, and its
- *   own bytes vary from run to run with V8's tiering, so the difference
- *   measures nothing there and is not asserted until windsor#228 makes it
- *   clean.
+ *   its own (every bundle in `CLEAN`, which since windsor#265 is all ten),
+ *   the difference between the two runs is held to that within 8 bytes a
+ *   quantum.
  * - No field the sampler writes changes its representation: no
  *   generalisation the trace places inside the bundle's `LoadSampler`.
  * - Every processor whose render allocates nothing with the meter off still
@@ -39,11 +37,10 @@
  * put the drive, the Phaser and the Retro reverb over the bound, though their
  * totals were the same at 2000 and 8000 measured quanta.
  *
- * What it does not: Tape's render allocates with the meter off, from its DSP,
- * which is not the sampler's. Representation changes outside the sampler's
- * lines, and cut pairs, which a trace cannot place, are not read here; each
- * processor's own allocation test reads its whole trace, as
- * `inserts/eqAllocation.test.ts` does the EQ's.
+ * What it does not: representation changes outside the sampler's lines, and
+ * cut pairs, which a trace cannot place, are not read here; each processor's
+ * own allocation test reads its whole trace, as `inserts/eqAllocation.test.ts`
+ * does the EQ's.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
@@ -64,8 +61,8 @@ const CLEAN_TOLERANCE_BYTES = 16 * 1024;
 const CHORD = [48, 55, 60, 64];
 
 /**
- * The measured quanta. With the meter off, every bundle's run now fits the
- * young generation with room to spare; Tape, the largest, reads about 28 MB.
+ * The measured quanta. With the meter off every bundle allocates nothing of
+ * its own, so each run fits the young generation with room to spare.
  */
 const MEASURE = 2000;
 const BUNDLES = [
@@ -91,6 +88,7 @@ const CLEAN = new Set([
   'phaser-processor.js', // windsor#248
   'delay-processor.js', // windsor#249
   'fm-processor.js', // windsor#257
+  'tape-processor.js', // windsor#265
 ]);
 
 function probe(bundle: string, loadQuanta: number): ProbeRun {
