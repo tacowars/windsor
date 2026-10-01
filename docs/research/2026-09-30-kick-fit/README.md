@@ -186,9 +186,13 @@ references.
   .json> <recording.wav> <out.json> <render seconds> <level window ms>`,
   for example `python3 fitvar.py 909 tr909-kick "<…>/BD 909 Clean Long C 03.wav" out.json 1.0 510`.
   The level window is about the recording's −40 dB time (the table under
-  "The references"). Check a result with
-  `python3 overlay.py out.png "label|<recording>|<render.wav>"`, with
-  `EDGE=1` set for a 909 so the recording is aligned on its attack edge.
+  "The references"). The fitter writes only the patch; its renders are
+  temporary files. To check a result, render the fitted patch, then
+  overlay it on the recording:
+  - `node render.mjs out.json 56 1 out.wav 1.0` (patch, note, velocity,
+    WAV, seconds);
+  - `python3 overlay.py out.png "label|<recording>|out.wav"`, with
+    `EDGE=1` set for a 909 so the recording is aligned on its attack edge.
 - **What `fitvar.py` assumes.** Its parameter vector is written per
   machine for the committed patches' operator layout (808: algorithm 4, C
   the square edge; 909: algorithm 6, B the square edge). A patch with a
@@ -248,9 +252,22 @@ help these sounds.
    exponentially in Hz; the engine's pitch envelope moves in semitones
    along a curve. The fit still reached 0.6–0.7 semitones RMS, so this is
    low priority.
-4. **A pulse source.** The 808's trigger pulse leaks a flat pulse into the
-   output at high Tone. A `Square D` at a locked phase approximates it
-   today.
+4. **A pulse source, probably not needed.** The 808's trigger pulse leaks
+   a flat, one-sided pulse of about 1 ms into the output at high Tone.
+   Two existing routes come first; neither has been tried yet:
+   - **Width squeeze on `Square D`.** For any wave but Pulse, an
+     operator's Width plays the wave in the first `width` of each cycle
+     and silence for the rest (`worklet/fm/voiceRender.ts`). A `Square D`
+     at a low fixed frequency, with a locked start phase of `width / 2`,
+     sits at −1 for `width / 2` of a cycle, then at 0. For example, at
+     10 Hz and Width 0.05 that is 2.5 ms, followed by silence the envelope
+     outlasts. The pulse is negative; flip the body's phase by 0.5 if the
+     sign matters.
+   - **The Pulse wave** (wave 10, duty from Width). It is band-limited but
+     zero-mean at any duty, so a narrow duty gives a spike with a small
+     opposite offset across the rest of the cycle, not a one-sided pulse.
+
+   An engine source is worth it only if neither shape is close enough.
 5. **Pitch at control rate.** The pitch also moves once per 32 samples, so
    the 808's 4 ms punch steps about six times. Nothing measured here
    showed it; listed for completeness.
