@@ -41,7 +41,7 @@ export function newSong(): RawDocument {
   };
 }
 
-/** The lowest slot no part holds, or null when the song has all eight. */
+/** The lowest slot no part holds, or null when every slot up to `MUSIC_SLOT_MAX` is used. */
 export function nextFreeSlot(doc: Pick<ArrangementDocument, 'parts'>): number | null {
   if (doc.parts.length >= MUSIC_PARTS_MAX) return null;
   const used = new Set(doc.parts.map((part) => part.slot));

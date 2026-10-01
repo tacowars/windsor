@@ -168,8 +168,8 @@ export const BASS_GATE_DEFAULT = 0.8;
  * `2026-09-28-format-versions-refuse-never-destroy`).
  */
 export const ARRANGEMENT_VERSION = 6;
-/** How many parts a song may have, and so the highest slot (#597). */
-export const MUSIC_PARTS_MAX = 8;
+/** How many parts a song may have, and so the highest slot (#597; 16 since windsor#335). */
+export const MUSIC_PARTS_MAX = 16;
 export const MUSIC_SLOT_MAX = MUSIC_PARTS_MAX - 1;
 /** A mix strip's linear level: 1 is unity, 4 is +12 dB of headroom to spare. */
 export const MIX_LEVEL_MAX = 4;
