@@ -187,12 +187,18 @@ export interface InsertUpdater {
  * list that arrives inside that window replaces the one in flight rather than
  * starting a second fade, so a run of arrow presses is one fade and the last
  * order wins (#652).
+ *
+ * `rebuilt` hears each re-wire inside the fade, before it rises (windsor#345):
+ * a part's song lanes on its inserts re-attach to the stages as they now
+ * stand and reschedule from then. A settings-only edit lands on the same
+ * stages and does not call it.
  */
 export function createInsertUpdater(
   inserts: InsertChain,
   tap: Pick<Tap, 'move' | 'fadeTo'>,
   later: (run: () => void, seconds: number) => void,
   changed?: () => void,
+  rebuilt?: () => void,
 ): InsertUpdater {
   let pending: readonly InsertSpec[] | null = null;
   let fading = false;
@@ -218,6 +224,7 @@ export function createInsertUpdater(
       if (cancelled) return;
       inserts.set(pending ?? specs, (tail) => tap.move(tail));
       pending = null;
+      rebuilt?.();
       changed?.();
       tap.fadeTo(1, INSERT_FADE_SECONDS);
       fading = false;

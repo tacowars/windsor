@@ -119,14 +119,8 @@ export class AutomationPlayer {
    * now on are held where the playhead is and scheduled on from there.
    */
   setLanes(slot: number, lanes: readonly AutomationLane[]): void {
-    const before = this.playing.get(slot) ?? [];
     this.lanes.set(slot, lanes);
-    const next = this.resolvePart(slot);
-    const now = this.options.now();
-    for (const lane of before) {
-      if (!next.some((p) => p.target === lane.target)) lane.handle.release(now);
-    }
-    this.restart(next, now);
+    this.replay(slot, this.options.now());
   }
 
   /** The slots that hold lanes. */
@@ -152,13 +146,14 @@ export class AutomationPlayer {
 
   /**
    * Find every lane's target again and restart it from now: a tempo change,
-   * a song-length change, or a part whose inserts or patch changed. One part
-   * by slot, or every part.
+   * a song-length change, or a part whose inserts or patch changed, or
+   * whose insert chain was rebuilt (windsor#345). One part by slot, or every
+   * part.
    */
   resync(slot?: number): void {
     const now = this.options.now();
     for (const each of slot === undefined ? [...this.lanes.keys()] : [slot]) {
-      if (this.lanes.has(each)) this.restart(this.resolvePart(each), now);
+      if (this.lanes.has(each)) this.replay(each, now);
     }
   }
 
@@ -221,6 +216,21 @@ export class AutomationPlayer {
       }
       prev = ramp;
     }
+  }
+
+  /**
+   * Resolve `slot`'s lanes again and restart them from `now`. A handle no
+   * lane plays through any more gives its target back first: the lane is
+   * off or gone, or its target moved (an insert on a rebuilt or reordered
+   * stage) or went unread (windsor#345).
+   */
+  private replay(slot: number, now: number): void {
+    const before = this.playing.get(slot) ?? [];
+    const next = this.resolvePart(slot);
+    for (const lane of before) {
+      if (!next.some((p) => p.handle === lane.handle)) lane.handle.release(now);
+    }
+    this.restart(next, now);
   }
 
   /** Hold `lanes` at the playhead now, then schedule again every tick issued past now. */

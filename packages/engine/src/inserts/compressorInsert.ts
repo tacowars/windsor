@@ -3,7 +3,7 @@
  * for mixer-owned detector routing; selecting it is explicit, never inferred
  * from silence. Makeup and dry/wet live inside the zero-lookahead processor.
  */
-import { COMPRESSOR_NAME } from './compressorConstants';
+import { COMPRESSOR_BOUNDS, COMPRESSOR_NAME } from './compressorConstants';
 import {
   COMPRESSOR_FIELDS,
   COMPRESSOR_NUMBERS,
@@ -11,12 +11,22 @@ import {
   normaliseCompressor,
 } from './compressorSpec';
 import type { CompressorSpec } from './compressorSpec';
+import { ownParam, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 export { DEFAULT_COMPRESSOR } from './compressorSpec';
 export type { CompressorSpec } from './compressorSpec';
 
-// eslint-disable-next-line max-lines-per-function -- 62 lines: one compressor graph and its parameter/telemetry lifetime (#225 decision 4)
+/** Every param `set` writes, by name, for `spec`: not `external`, which the mixer's routing owns. */
+function compressorValues(spec: CompressorSpec): Record<string, number> {
+  const values: Record<string, number> = {};
+  for (const name of COMPRESSOR_NUMBERS) values[name] = spec[name];
+  values.enabled = Number(spec.enabled);
+  return values;
+}
+
+// eslint-disable-next-line max-lines-per-function -- 68 lines: one compressor graph and its parameter/telemetry lifetime (#225 decision 4)
 function create(context: BaseAudioContext, spec: CompressorSpec): InsertStage<CompressorSpec> {
+  let current = spec;
   const parameterData: Record<string, number> = {
     enabled: Number(spec.enabled),
     external: Number(spec.sidechain !== undefined && spec.sidechain !== 'internal'),
@@ -44,15 +54,21 @@ function create(context: BaseAudioContext, spec: CompressorSpec): InsertStage<Co
   };
   processor.port.addEventListener('message', receive);
   processor.port.start();
+  const params = workletFieldParams(
+    processor,
+    (name) => compressorValues(current)[name]!,
+    ownParam(COMPRESSOR_BOUNDS),
+  );
   return {
     kind: 'compressor',
     input,
     output,
     processor,
     set(next): void {
-      for (const name of COMPRESSOR_NUMBERS) processor.parameters.get(name)!.value = next[name];
-      processor.parameters.get('enabled')!.value = Number(next.enabled);
+      current = next;
+      params.write(compressorValues(next));
     },
+    param: (field) => params.param(field),
     detector: {
       input: detector,
       setExternal(external): void {

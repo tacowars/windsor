@@ -16,8 +16,11 @@
  *   transport edit (tempo, swing, loop, length) or a patch edit restarts
  *   every lane from now; a part's `automation` replaces its lanes,
  *   normalised against its live inserts as the document normaliser would; a
- *   part's insert list changing restarts its lanes, so an insert lane finds
- *   its rebuilt stage.
+ *   part's insert list changing restarts its lanes, so an insert lane plays
+ *   or goes inert as its field is read or not (windsor#345).
+ * - **Rebuild.** A structural insert edit re-wires the chain only once its
+ *   fade has landed; the strip's `insertsRebuilt` hook then restarts that
+ *   part's lanes from now, on the stages as they now stand (windsor#345).
  */
 import { AutomationPlayer } from '../automation/automationPlayer';
 import type { AutomationLane } from '../automation/automationLane';
@@ -91,6 +94,17 @@ export class SongAutomation {
   /** Restart one part's lanes from now: their targets' params changed. */
   resync(slot: number): void {
     this.playerValue?.resync(slot);
+  }
+
+  /**
+   * `strip`'s insert chain was re-wired inside its fade (windsor#345): its
+   * part's lanes find their inserts' stages again and restart from now, so
+   * a reorder, an add or a remove re-attaches the lanes that remain.
+   */
+  insertsRebuilt(strip: PartStrip): void {
+    const player = this.playerValue;
+    if (!player) return;
+    for (const slot of player.slots()) if (this.stripOf(slot) === strip) player.resync(slot);
   }
 
   /** The lanes `slot` plays now; none before `begin` or for a part without lanes. */

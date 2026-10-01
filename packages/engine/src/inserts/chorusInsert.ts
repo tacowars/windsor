@@ -37,6 +37,9 @@ import {
   CHORUS_VOICE_CENTRES_MS,
   CHORUS_VOICE_RATIOS,
 } from './insertConstants';
+import type { KnobTarget } from '../automation/automationHandles';
+import type { FieldHandles } from './insertFieldHandles';
+import { fieldHandles } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 
 export interface ChorusSpec {
@@ -111,6 +114,54 @@ function voice(
   return { lfo, depthL, depthR, delayL, delayR };
 }
 
+/** What `set` writes: each voice's params and the two mix gains. */
+interface ChorusParams {
+  readonly voices: readonly Voice[];
+  readonly wet: AudioParam;
+  readonly dry: AudioParam;
+}
+
+const voiceRate = (rate: number, i: number): number => rate * (CHORUS_VOICE_RATIOS[i] ?? 1);
+const swingOf = (depth: number): number => depth / MS_PER_SECOND;
+/** The right side's LFO gain: `1 − 2·spread` of the left's. */
+const rightSwing = (depth: number, spread: number): number => swingOf(depth) * (1 - 2 * spread);
+/** The voices sum into the merger, so each carries its share of the wet level. */
+const mixGains = (spec: ChorusSpec, mix: number, voices: number): [number, number] => {
+  const heard = spec.enabled ? mix : 0;
+  return [heard / voices, 1 - heard];
+};
+
+/**
+ * Each knob's lane (windsor#345): Rate on every voice's LFO, Depth on both
+ * sides' swing, Spread on the right side's, Mix on the wet and dry gains.
+ */
+function chorusHandles(p: ChorusParams, spec: () => ChorusSpec): FieldHandles {
+  const { voices } = p;
+  const lefts = voices.map((v) => v.depthL.gain);
+  const rights = voices.map((v) => v.depthR.gain);
+  const each = (value: number): number[] => voices.map(() => value);
+  const knobs: FieldHandles = fieldHandles((field): KnobTarget | undefined => {
+    const resting = (): number => spec()[field as 'rate' | 'depth' | 'spread' | 'mix'];
+    if (field === 'rate') {
+      const write = (v: number) => voices.map((_, i) => voiceRate(v, i));
+      return { params: voices.map((v) => v.lfo.frequency), write, resting };
+    }
+    if (field === 'depth') {
+      const write = (v: number) => [...each(swingOf(v)), ...each(rightSwing(v, spread()))];
+      return { params: [...lefts, ...rights], write, resting };
+    }
+    if (field === 'spread') {
+      return { params: rights, write: (v) => each(rightSwing(depth(), v)), resting };
+    }
+    if (field !== 'mix') return undefined;
+    const write = (v: number) => mixGains(spec(), v, voices.length);
+    return { params: [p.wet, p.dry], write, resting };
+  });
+  const depth = (): number => knobs.live('depth', spec().depth);
+  const spread = (): number => knobs.live('spread', spec().spread);
+  return knobs;
+}
+
 function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<ChorusSpec> {
   const input = context.createGain();
   const split = context.createChannelSplitter(2);
@@ -126,17 +177,20 @@ function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<Chorus
   input.connect(dry);
   dry.connect(output);
 
+  let current = spec;
+  const knobs = chorusHandles({ voices, wet: wet.gain, dry: dry.gain }, () => current);
   const set = (next: ChorusSpec): void => {
-    const swing = next.depth / MS_PER_SECOND;
+    current = next;
+    const lane = (field: string): boolean => knobs.automated(field);
     voices.forEach((v, i) => {
-      v.lfo.frequency.value = next.rate * (CHORUS_VOICE_RATIOS[i] ?? 1);
-      v.depthL.gain.value = swing;
-      v.depthR.gain.value = swing * (1 - 2 * next.spread);
+      if (!lane('rate')) v.lfo.frequency.value = voiceRate(next.rate, i);
+      if (!lane('depth')) v.depthL.gain.value = swingOf(next.depth);
+      if (!lane('depth') && !lane('spread')) {
+        v.depthR.gain.value = rightSwing(next.depth, next.spread);
+      }
     });
-    // The voices sum into the merger, so each carries its share of the wet level.
-    const mix = next.enabled ? next.mix : 0;
-    wet.gain.value = mix / voices.length;
-    dry.gain.value = 1 - mix;
+    if (lane('mix')) return;
+    [wet.gain.value, dry.gain.value] = mixGains(next, next.mix, voices.length);
   };
   set(spec);
 
@@ -145,6 +199,7 @@ function create(context: BaseAudioContext, spec: ChorusSpec): InsertStage<Chorus
     input,
     output,
     set,
+    param: (field) => knobs.param(field),
     dispose(): void {
       for (const v of voices) {
         v.lfo.stop();

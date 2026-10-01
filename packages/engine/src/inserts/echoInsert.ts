@@ -11,9 +11,17 @@
  * empties.
  */
 import type { DelayLineSettings } from '../mixer/returnEffects';
-import { attachDelay, disconnectDelay, writeDelay } from '../mixer/returnEffects';
+import {
+  attachDelay,
+  DELAY_LINE_FIELDS,
+  delayLineParam,
+  disconnectDelay,
+  writeDelay,
+} from '../mixer/returnEffects';
+import type { KnobTarget } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import { ECHO_BOUNDS, ECHO_LINE_DEFAULTS, ECHO_MIX_DEFAULT } from './echoConstants';
+import { fieldHandles } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 
 export interface EchoSpec extends DelayLineSettings {
@@ -50,6 +58,12 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
   };
 }
 
+const isLineField = (field: string): field is keyof DelayLineSettings =>
+  (DELAY_LINE_FIELDS as readonly string[]).includes(field);
+
+const wetGain = (spec: EchoSpec, mix: number): number => (spec.enabled ? mix : 0);
+const dryGain = (spec: EchoSpec, mix: number): number => (spec.enabled ? 1 - mix : 1);
+
 function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec> {
   const input = context.createGain();
   const send = context.createGain();
@@ -63,11 +77,26 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
   input.connect(dry);
   dry.connect(output);
 
+  let current = spec;
+  // Each lane (windsor#345): a loop field on its own param, Mix on the wet and dry gains.
+  const knobs = fieldHandles((field): KnobTarget | undefined => {
+    if (field === 'mix') {
+      const write = (v: number) => [wetGain(current, v), dryGain(current, v)];
+      return { params: [wet.gain, dry.gain], write, resting: () => current.mix };
+    }
+    if (!isLineField(field)) return undefined;
+    const { param, value } = delayLineParam(line, field);
+    return { params: [param], write: (v) => [value(v)], resting: () => current[field] };
+  });
   const set = (next: EchoSpec): void => {
-    writeDelay(line, next);
+    current = next;
+    const loop: Partial<Record<keyof DelayLineSettings, number>> = {};
+    for (const field of DELAY_LINE_FIELDS) if (!knobs.automated(field)) loop[field] = next[field];
+    writeDelay(line, loop);
     send.gain.value = Number(next.enabled);
-    wet.gain.value = next.enabled ? next.mix : 0;
-    dry.gain.value = next.enabled ? 1 - next.mix : 1;
+    if (knobs.automated('mix')) return;
+    wet.gain.value = wetGain(next, next.mix);
+    dry.gain.value = dryGain(next, next.mix);
   };
   set(spec);
 
@@ -76,6 +105,7 @@ function create(context: BaseAudioContext, spec: EchoSpec): InsertStage<EchoSpec
     input,
     output,
     set,
+    param: (field) => knobs.param(field),
     // The loop's own nodes too, as the return's `dispose` does; never the edge out of `output`.
     dispose(): void {
       for (const node of [input, send, wet, dry]) node.disconnect();

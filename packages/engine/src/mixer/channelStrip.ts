@@ -185,6 +185,12 @@ const NO_GROUPS = (): undefined => undefined;
 export interface RouteOptions {
   registry?: InsertRegistry;
   changed?: () => void;
+  /**
+   * A music strip's insert chain was re-wired inside its fade (windsor#345):
+   * the song's lanes on its inserts re-attach. Return, group and master buses
+   * carry no lanes and never call it.
+   */
+  insertsRebuilt?: (strip: PartStrip) => void;
   defer?: (run: () => void, seconds: number) => void;
 }
 
@@ -218,14 +224,16 @@ export function routePart(
   const first = destinationOf(targets, strip.output);
   let output = first.output;
   const tap = createTap(context, strip, returns, first.node, inserts.tail);
-  const updates = createInsertUpdater(inserts, tap, later, options.changed);
+  const updates = createInsertUpdater(inserts, tap, later, options.changed, () =>
+    options.insertsRebuilt?.(routed),
+  );
   const mover = createDryMover(tap, later);
   const { rotation, sends, gate } = tap;
   const meter = createPeakMeter(context, rotation.output);
   const knobs = stripKnobs(part, strip, tap);
   let solo = strip.solo === true;
 
-  return {
+  const routed: PartStrip = {
     part,
     get insertSpecs(): readonly InsertSpec[] {
       return inserts.specs;
@@ -301,6 +309,7 @@ export function routePart(
       lowCut.dispose();
     },
   };
+  return routed;
 }
 
 /**

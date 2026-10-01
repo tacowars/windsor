@@ -33,6 +33,10 @@
  * `dispose` stops all four oscillators and both rate sources, and disconnects what the stage built,
  * never the edge out of `output`.
  */
+import type { KnobTarget } from '../automation/automationHandles';
+import { sameValue } from '../automation/automationHandles';
+import type { FieldHandles } from './insertFieldHandles';
+import { fieldHandles } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import {
   ENSEMBLE_DSP,
@@ -41,7 +45,12 @@ import {
   ENSEMBLE_NAME,
 } from './ensembleConstants';
 import type { EnsembleSpec } from './ensembleSpec';
-import { DEFAULT_ENSEMBLE, ENSEMBLE_FIELDS, normaliseEnsemble } from './ensembleSpec';
+import {
+  DEFAULT_ENSEMBLE,
+  ENSEMBLE_FIELDS,
+  type ENSEMBLE_NUMBERS,
+  normaliseEnsemble,
+} from './ensembleSpec';
 
 const { millisecondsPerSecond: MS, degreesPerTurn, panQuarterTurn } = ENSEMBLE_DSP;
 
@@ -129,28 +138,115 @@ interface Params {
   readonly dry: GainNode;
 }
 
-/** Param writes only: one write per rate, into the source both oscillators of its pair follow. */
-function write({ lines, bases: [slow, fast], tone, wet, dry }: Params, next: EnsembleSpec): void {
-  for (const [b, rate, depth] of [
-    [slow, next.slowRate, next.slowDepth],
-    [fast, next.fastRate, next.fastDepth],
-  ] as const) {
-    b.rate.offset.value = rate;
-    b.sinDepth.gain.value = depth / MS;
-    b.cosDepth.gain.value = depth / MS;
-  }
+/** Each line's place at `width`, and the per-side sum of their gains the wet level divides by. */
+function placeLines(lineCount: number, width: number): { gains: number[]; perSide: number } {
+  const gains: number[] = [];
   let perSide = 0;
-  lines.forEach((l, i) => {
-    l.delay.delayTime.value = next.delay / MS;
-    const { left, right } = panGains(next.width * (ENSEMBLE_LINE_PANS[i] ?? 0));
-    l.toLeft.gain.value = left;
-    l.toRight.gain.value = right;
+  for (let i = 0; i < lineCount; i++) {
+    const { left, right } = panGains(width * (ENSEMBLE_LINE_PANS[i] ?? 0));
+    gains.push(left, right);
     perSide += left;
+  }
+  return { gains, perSide };
+}
+
+/** The wet and dry gains at `mix`, the wet over the lines' per-side sum. */
+const mixGains = (spec: EnsembleSpec, mix: number, perSide: number): [number, number] => {
+  const heard = spec.enabled ? mix : 0;
+  return [heard / perSide, 1 - heard];
+};
+
+/** What one field's lane writes, less the resting value. */
+type Writes = Omit<KnobTarget, 'resting'>;
+
+/** The pair of fields each rate's basis takes. */
+const BASES = [
+  ['slowRate', 'slowDepth'],
+  ['fastRate', 'fastDepth'],
+] as const;
+
+/**
+ * Param writes only: one write per rate, into the source both oscillators of
+ * its pair follow. A field a lane holds (windsor#345) is left to it; the wet
+ * gain belongs to both Width and Mix.
+ */
+function write(p: Params, next: EnsembleSpec, lane: (field: string) => boolean): void {
+  const { lines, tone, wet, dry } = p;
+  p.bases.forEach((b, i) => {
+    const [rate, depth] = BASES[i]!;
+    if (!lane(rate)) b.rate.offset.value = next[rate];
+    if (lane(depth)) return;
+    b.sinDepth.gain.value = next[depth] / MS;
+    b.cosDepth.gain.value = next[depth] / MS;
   });
-  tone.frequency.value = next.tone;
-  const mix = next.enabled ? next.mix : 0;
-  wet.gain.value = mix / perSide;
-  dry.gain.value = 1 - mix;
+  const { gains, perSide } = placeLines(lines.length, next.width);
+  lines.forEach((l, i) => {
+    if (!lane('delay')) l.delay.delayTime.value = next.delay / MS;
+    if (lane('width')) return;
+    l.toLeft.gain.value = gains[2 * i]!;
+    l.toRight.gain.value = gains[2 * i + 1]!;
+  });
+  if (!lane('tone')) tone.frequency.value = next.tone;
+  const [wetGain, dryGain] = mixGains(next, next.mix, perSide);
+  if (!lane('width') && !lane('mix')) wet.gain.value = wetGain;
+  if (!lane('mix')) dry.gain.value = dryGain;
+}
+
+/**
+ * Each knob's lane (windsor#345): a rate on its basis's source, a depth on
+ * its basis's two gains, Delay on every line, Width on every line's place and
+ * the wet gain, Mix on the wet and dry gains, each at the other's live value.
+ */
+function ensembleHandles(p: Params, spec: () => EnsembleSpec): FieldHandles {
+  const { lines, bases } = p;
+  const [slow, fast] = bases;
+  const depthOn = (b: Basis): Writes => ({
+    params: [b.sinDepth.gain, b.cosDepth.gain],
+    write: (v) => [v / MS, v / MS],
+  });
+  const targets: Readonly<Record<string, Writes>> = {
+    slowRate: { params: [slow.rate.offset], write: sameValue },
+    slowDepth: depthOn(slow),
+    fastRate: { params: [fast.rate.offset], write: sameValue },
+    fastDepth: depthOn(fast),
+    delay: { params: lines.map((l) => l.delay.delayTime), write: (v) => lines.map(() => v / MS) },
+    tone: { params: [p.tone.frequency], write: sameValue },
+    width: {
+      params: [...lines.flatMap((l) => [l.toLeft.gain, l.toRight.gain]), p.wet.gain],
+      write: (v) => {
+        const { gains, perSide } = placeLines(lines.length, v);
+        return [...gains, mixGains(spec(), mix(), perSide)[0]];
+      },
+    },
+    mix: {
+      params: [p.wet.gain, p.dry.gain],
+      write: (v) => mixGains(spec(), v, placeLines(lines.length, width()).perSide),
+    },
+  };
+  const knobs = fieldHandles((field) => {
+    const target = Object.hasOwn(targets, field) ? targets[field] : undefined;
+    const resting = (): number => spec()[field as (typeof ENSEMBLE_NUMBERS)[number]];
+    return target && { ...target, resting };
+  });
+  const mix = (): number => knobs.live('mix', spec().mix);
+  const width = (): number => knobs.live('width', spec().width);
+  return knobs;
+}
+
+/** The stage's settings and lanes over its params: `set` writes what no lane holds. */
+function ensembleControls(
+  params: Params,
+  initial: EnsembleSpec,
+): Required<Pick<InsertStage<EnsembleSpec>, 'set' | 'param'>> {
+  let current = initial;
+  const knobs = ensembleHandles(params, () => current);
+  return {
+    set(next): void {
+      current = next;
+      write(params, next, knobs.automated);
+    },
+    param: (field) => knobs.param(field),
+  };
 }
 
 function create(context: BaseAudioContext, spec: EnsembleSpec): InsertStage<EnsembleSpec> {
@@ -186,9 +282,8 @@ function create(context: BaseAudioContext, spec: EnsembleSpec): InsertStage<Ense
   const at = context.currentTime;
   for (const source of sources) source.start(at);
 
-  const set = (next: EnsembleSpec): void =>
-    write({ lines, bases: [slow, fast], tone, wet, dry }, next);
-  set(spec);
+  const controls = ensembleControls({ lines, bases: [slow, fast], tone, wet, dry }, spec);
+  controls.set(spec);
 
   const built: AudioNode[] = [
     input,
@@ -206,7 +301,8 @@ function create(context: BaseAudioContext, spec: EnsembleSpec): InsertStage<Ense
     kind: ENSEMBLE_NAME,
     input,
     output,
-    set,
+    set: controls.set,
+    param: controls.param,
     dispose(): void {
       for (const source of sources) source.stop();
       for (const node of built) node.disconnect();

@@ -33,6 +33,9 @@ import {
   DRIVE_TONE_MIN_HZ,
   GAIN_EXPONENT_PER_DB,
 } from './insertConstants';
+import type { KnobTarget } from '../automation/automationHandles';
+import type { FieldHandles } from './insertFieldHandles';
+import { fieldHandles } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 
 export interface DriveSpec {
@@ -76,6 +79,42 @@ function normalise(raw: Record<string, unknown>, path: string, n: FieldNormalise
   };
 }
 
+/** The params the drive's knobs write. */
+interface DriveParams {
+  readonly pre: AudioParam;
+  readonly tone: AudioParam;
+  readonly wet: AudioParam;
+  readonly dry: AudioParam;
+}
+
+/** The shaper's input gain for `drive` dB: the curve spans ±RANGE, scaled into [-1, 1]. */
+const preGain = (drive: number): number => fromDb(drive) / DRIVE_CURVE_RANGE;
+const wetGain = (spec: DriveSpec, mix: number, drive: number): number =>
+  spec.enabled ? mix * driveCompensation(drive) : 0;
+const dryGain = (spec: DriveSpec, mix: number): number => (spec.enabled ? 1 - mix : 1);
+
+/**
+ * Each knob's lane (windsor#345): Drive moves the shaper's gain and the wet
+ * gain's compensation, Mix the wet and dry gains, each at the other's live value.
+ */
+function driveHandles(p: DriveParams, spec: () => DriveSpec): FieldHandles {
+  const knobs: FieldHandles = fieldHandles((field): KnobTarget | undefined => {
+    const resting = (): number => spec()[field as 'drive' | 'tone' | 'mix'];
+    if (field === 'drive') {
+      const write = (v: number) => [preGain(v), wetGain(spec(), mix(), v)];
+      return { params: [p.pre, p.wet], write, resting };
+    }
+    if (field === 'mix') {
+      const write = (v: number) => [wetGain(spec(), v, drive()), dryGain(spec(), v)];
+      return { params: [p.wet, p.dry], write, resting };
+    }
+    return field === 'tone' ? { params: [p.tone], write: (v) => [v], resting } : undefined;
+  });
+  const mix = (): number => knobs.live('mix', spec().mix);
+  const drive = (): number => knobs.live('drive', spec().drive);
+  return knobs;
+}
+
 function create(context: BaseAudioContext, spec: DriveSpec): InsertStage<DriveSpec> {
   const input = context.createGain();
   const pre = context.createGain();
@@ -98,12 +137,16 @@ function create(context: BaseAudioContext, spec: DriveSpec): InsertStage<DriveSp
   input.connect(dry);
   dry.connect(output);
 
+  let current = spec;
+  const params = { pre: pre.gain, tone: tone.frequency, wet: wet.gain, dry: dry.gain };
+  const knobs = driveHandles(params, () => current);
   const set = (next: DriveSpec): void => {
-    // The curve spans ±RANGE, so the drive gain is scaled into the shaper's [-1, 1].
-    pre.gain.value = fromDb(next.drive) / DRIVE_CURVE_RANGE;
-    tone.frequency.value = next.tone;
-    wet.gain.value = next.enabled ? next.mix * driveCompensation(next.drive) : 0;
-    dry.gain.value = next.enabled ? 1 - next.mix : 1;
+    current = next;
+    const lane = (field: string): boolean => knobs.automated(field);
+    if (!lane('drive')) pre.gain.value = preGain(next.drive);
+    if (!lane('tone')) tone.frequency.value = next.tone;
+    if (!lane('drive') && !lane('mix')) wet.gain.value = wetGain(next, next.mix, next.drive);
+    if (!lane('mix')) dry.gain.value = dryGain(next, next.mix);
   };
   set(spec);
 
@@ -112,6 +155,7 @@ function create(context: BaseAudioContext, spec: DriveSpec): InsertStage<DriveSp
     input,
     output,
     set,
+    param: (field) => knobs.param(field),
     // Everything this stage wired, and nothing out of `output`: the strip owns that edge.
     dispose(): void {
       for (const node of [input, pre, shaper, tone, wet, dry]) node.disconnect();
