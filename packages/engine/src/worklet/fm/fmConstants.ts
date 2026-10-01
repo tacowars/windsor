@@ -2,7 +2,8 @@
  * The FM worklet's tunables (#644): table size, mip count, the control-rate
  * interval, the dormancy floors, the modulation and feedback depths, the
  * shortest envelope segment, the amplitude envelope's breaks per block
- * (windsor#301), the width ramp's snap, the drive stage's
+ * (windsor#301), the width ramp's snap, the feedback ramp's step
+ * (windsor#346), the drive stage's
  * shape constants and tone curve (windsor#300), and a Noise operator's
  * colour filters' ceiling and damping (windsor#362). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
@@ -23,6 +24,12 @@ const MIP_COUNT = 12; // one per octave from MIP_BASE_HZ
 const MIP_BASE_HZ = 16.352; // C0
 
 const CTRL_INTERVAL = 32; // samples between control-rate updates
+/*
+ * A song lane's feedback is ramped across each control block (windsor#346,
+ * `voiceOffsets.ts`): sample `s` of the block reads `from + (to − from) · t`
+ * with `t = s × FEEDBACK_RAMP_STEP`, exact for a power-of-two block.
+ */
+const FEEDBACK_RAMP_STEP = 1 / CTRL_INTERVAL;
 /*
  * Dormancy (#547). A held note whose carriers have all decayed to a sustain of
  * 0 renders nothing but still costs four operators, a filter and a voice slot
@@ -138,6 +145,7 @@ export {
   MIP_COUNT,
   MIP_BASE_HZ,
   CTRL_INTERVAL,
+  FEEDBACK_RAMP_STEP,
   DORMANT_AMP,
   DORMANT_FILTER_STATE,
   MOD_INDEX_SCALE,

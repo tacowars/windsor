@@ -16,6 +16,8 @@
  *
  * Node-only, by design: excluded from the engine's tsc build.
  */
+import { FM_LANES_MAX } from '../automation/automationTargetTables';
+import { voiceSlotParamName } from '../synth/audioPart';
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import { OUTPUT_STAGE_NAME } from '../mixer/outputStageConstants';
 import { PEAK_METER_NAME } from '../mixer/peakMeterConstants';
@@ -155,6 +157,8 @@ export class FakeWorkletNode extends FakeNode {
   readonly posted: unknown[] = [];
   /** An `fm-part`'s `processorOptions.events`: the notes it was built holding. */
   readonly events: unknown[];
+  /** An `fm-part`'s `processorOptions.voiceSlots`: the slot map it was built with (windsor#346). */
+  readonly voiceSlots: unknown;
   /**
    * A port that, like a real one, hands what the processor posts both to
    * `onmessage` and to every `message` listener (the output stage listens,
@@ -186,6 +190,7 @@ export class FakeWorkletNode extends FakeNode {
     super(context, options.numberOfInputs ?? 1, options.numberOfOutputs ?? 1);
     this.name = name;
     this.events = [...((options.processorOptions as { events?: unknown[] })?.events ?? [])];
+    this.voiceSlots = (options.processorOptions as { voiceSlots?: unknown })?.voiceSlots;
     if (!context.isRegistered(name)) {
       throw new Error(`AudioWorkletNode: processor "${name}" not registered (addModule first)`);
     }
@@ -216,6 +221,10 @@ export class FakeWorkletNode extends FakeNode {
       this.parameters.set('modWheel', new FakeParam(0, 0, 1));
       this.parameters.set('cutoffMod', new FakeParam(0, -1, 1));
       this.parameters.set('gain', new FakeParam(1, 0, 4));
+      // The song lanes' slots (windsor#346).
+      for (let i = 0; i < FM_LANES_MAX; i++) {
+        this.parameters.set(voiceSlotParamName(i), new FakeParam(0));
+      }
     } else {
       throw new Error(`fake AudioWorkletNode does not model processor "${name}"`);
     }

@@ -5,7 +5,8 @@
  * envelopes, two LFOs, each Noise operator's colour (windsor#362) and
  * the generic loop's noise draws (windsor#389), the
  * drive stage (windsor#300), two filter stages, the steal fade, a step's parameter offsets and the per-voice values they make
- * (windsor#17) — and its lifecycle: `start`, `rebind`, `retarget`,
+ * (windsor#17), the values a song's lanes move and the feedback ramp
+ * (windsor#346) — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
  * the part polls, whose logic is `voiceQuiet.ts`. The hot paths are functions over the voice in `voiceControl.js`,
  * `voiceRender.js` and `voiceKernel.js`; `render` and `updateControl` stay
@@ -31,6 +32,8 @@ import { Svf } from './svf';
 import { VoiceDrive } from './voiceDrive';
 import { bindVoiceConstants, restingWidth, updateVoiceControl } from './voiceControl';
 import { renderVoiceKernel } from './voiceKernel';
+import { VOICE_TARGET_COUNT } from './voiceOffsetTables';
+import { primeVoiceOffsets } from './voiceOffsets';
 import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
 import { bindStepMod, loadStepOffsets, startStepMod } from './voiceStepMod';
@@ -118,10 +121,24 @@ class Voice {
   opFreq: Float64Array;
   lfoLevel: number;
   lfo2Level: number;
+  partOffsets: Float64Array;
+  liveValues: Float64Array;
+  fbFrom: Float32Array;
+  fbTo: Float32Array;
+  fbRamp: number;
 
-  /** `partControls` is the part's one array of k-rate controls (`PART_BEND`, …), shared by every voice. */
+  /**
+   * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
+   * …), and `partOffsets` its song lanes' offsets by target code
+   * (windsor#346), both shared by every voice.
+   */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
-  constructor(sampleRate: number, random: () => number, partControls: Float64Array) {
+  constructor(
+    sampleRate: number,
+    random: () => number,
+    partControls: Float64Array,
+    partOffsets: Float64Array,
+  ) {
     // Rule 7: each double field is born a double (NaN), before its start
     // value; the noise seed is a uint32, past a small integer's range. `age`
     // counts frames, past 2^31 after about 12 hours held (a dormant drone
@@ -234,6 +251,15 @@ class Voice {
     this.opLevel = new Float64Array(4);
     this.opFeedback = new Float32Array(4);
     this.opWidth = new Float64Array(4).fill(1);
+
+    // Song automation (windsor#346, `voiceOffsets.ts`): the part's offsets,
+    // the values the voice plays with them this block, and each operator's
+    // feedback ramp across the block (`fbRamp`, a bit per ramping operator).
+    this.partOffsets = partOffsets;
+    this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
+    this.fbFrom = new Float32Array(4);
+    this.fbTo = new Float32Array(4);
+    this.fbRamp = 0;
   }
 
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */
@@ -328,8 +354,8 @@ class Voice {
     this.svfB.reset();
     this.drive.reset();
 
-    // The step's offsets (windsor#17), and the width ramps from the note's
-    // width; the first control block sets their step.
+    // The step's offsets (windsor#17) and the song's lanes (windsor#346), and
+    // the width ramps from the note's width; the first control block sets their step.
     startStepMod(this, patch, stepMod);
   }
 
@@ -364,6 +390,7 @@ class Voice {
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
     // The note keeps its step's offsets over the new patch's values (windsor#17).
     bindStepMod(this, patch);
+    primeVoiceOffsets(this);
     // Width means a duty on PULSE and a phase scale elsewhere: a switch
     // between the two restarts the ramp from the new meaning's value.
     for (let i = 0; i < 4; i++) {
