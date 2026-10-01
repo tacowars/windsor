@@ -6,13 +6,16 @@
  * (windsor#93), as in the song render.
  *
  *   strip rotation.output ─▶ highpass (the music bus's) ─┐
+ *   group output ──────────▶ highpass (the music bus's) ─┤
  *   return.output ───────────────────────────────────────┤ splitter ─▶ merger pair 2k, 2k+1
  *                                                        ▼
  *                                   merger ─▶ gain (master level × music fader × output gain) ─▶ destination
  *
  * A part's stem is the strip's dry output: post-fader, post-insert, post-pan,
- * with its sends excluded (decision 1). The music bus's highpass sits on the
- * dry sum before the master, so each part's stem runs through a copy of it
+ * with its sends excluded (decision 1). A group's stem is its bus's output
+ * (windsor#286): after its inserts, pan, level and gate, where it joins the
+ * music bus. The music bus's highpass sits on the dry sum before the master,
+ * so each part's and group's stem runs through a copy of it
  * (`MUSIC_BUS_OPTIONS`); a return joins the master after that filter and is
  * taken as it is. The one gain after the merger is the scalar gains the
  * master applies after its inserts — its level, the music fader, the engine's
@@ -25,6 +28,7 @@
  * rotation at the strip's pan, so it sounds as it would routed to the master.
  * A part muted or soloed out (windsor#154) is taken after the gate like any
  * other, so its stem is silent, as playback plays it, whatever its output.
+ * A muted or soloed-out group's gate is shut, so its stem is silent too.
  */
 import type { AudioBus } from '../mixer/audioBus';
 import { MUSIC_BUS_OPTIONS, createBus } from '../mixer/audioBus';
@@ -33,7 +37,7 @@ import { createStereoRotate } from '../mixer/stereoRotate';
 import { musicPartName } from '../song/documentParts';
 import type { AudioSystem } from '../system/audioSystem';
 import { RENDER_CHANNELS } from './renderConstants';
-import type { PartStem, StemSource } from './stemPlan';
+import type { GroupStem, PartStem, StemSource } from './stemPlan';
 import { passChannels } from './stemPlan';
 
 /** Wire `stems` onto channel pairs 2k, 2k+1 of the pass; the return undoes it. */
@@ -46,7 +50,7 @@ export function attachStems(system: AudioSystem, stems: readonly StemSource[]): 
   gain.connect(context.destination);
   const undo: (() => void)[] = [];
   stems.forEach((stem, k) => {
-    const tap = stem.kind === 'part' ? partTap(system, stem) : returnTap(system, stem.name);
+    const tap = tapFor(system, stem);
     const splitter = context.createChannelSplitter(RENDER_CHANNELS);
     tap.output.connect(splitter);
     for (let c = 0; c < RENDER_CHANNELS; c++) {
@@ -76,33 +80,57 @@ interface Tap {
   dispose(): void;
 }
 
-function partTap(system: AudioSystem, stem: PartStem): Tap {
-  const context = system.engine.context;
-  const strip = system.strip(musicPartName(stem.slot));
-  if (!strip) throw new Error(`stem: part ${stem.slot} has no strip`);
-  let rotation: StereoRotate | null = null;
-  let source: AudioNode = strip.rotation.output;
-  if (stem.muted && !strip.mute && !strip.soloedOut) {
-    // Only the sidechain routing closed the gate after `head`: tap before it, and pan here.
-    rotation = createStereoRotate(context, strip.rotation.pan);
-    strip.head.connect(rotation.input);
-    source = rotation.output;
+function tapFor(system: AudioSystem, stem: StemSource): Tap {
+  switch (stem.kind) {
+    case 'part':
+      return partTap(system, stem);
+    case 'group':
+      return groupTap(system, stem);
+    case 'return':
+      return returnTap(system, stem.name);
   }
+}
+
+/** `source` through a copy of the music bus's highpass; disposing it takes the copy away. */
+function throughMusicHighpass(context: BaseAudioContext, source: AudioNode): Tap {
   const bus: AudioBus = createBus(context, MUSIC_BUS_OPTIONS);
   source.connect(bus.input);
   return {
     output: bus.output,
     dispose(): void {
       source.disconnect(bus.input);
-      if (rotation) {
-        strip.head.disconnect(rotation.input);
-        rotation.dispose();
-      }
       bus.input.disconnect();
       bus.filter?.disconnect();
       bus.output.disconnect();
     },
   };
+}
+
+function partTap(system: AudioSystem, stem: PartStem): Tap {
+  const context = system.engine.context;
+  const strip = system.strip(musicPartName(stem.slot));
+  if (!strip) throw new Error(`stem: part ${stem.slot} has no strip`);
+  if (!stem.muted || strip.mute || strip.soloedOut) {
+    return throughMusicHighpass(context, strip.rotation.output);
+  }
+  // Only the sidechain routing closed the gate after `head`: tap before it, and pan here.
+  const rotation: StereoRotate = createStereoRotate(context, strip.rotation.pan);
+  strip.head.connect(rotation.input);
+  const tap = throughMusicHighpass(context, rotation.output);
+  return {
+    output: tap.output,
+    dispose(): void {
+      tap.dispose();
+      strip.head.disconnect(rotation.input);
+      rotation.dispose();
+    },
+  };
+}
+
+function groupTap(system: AudioSystem, stem: GroupStem): Tap {
+  const bus = system.groupBus(stem.id);
+  if (!bus) throw new Error(`stem: no group ${stem.id}`);
+  return throughMusicHighpass(system.engine.context, bus.output);
 }
 
 function returnTap(system: AudioSystem, name: string): Tap {

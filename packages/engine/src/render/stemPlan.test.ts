@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FULL_DOCUMENT, FULL_SLOT } from '../__fixtures__/fullArrangement';
+import type { GroupSpec } from '../mixer/mix';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import { RENDER_STEM_CHANNELS_MAX, RENDER_STEM_PASS_MAX_SAMPLES } from './renderConstants';
 import { passChannels, planStemPasses, stemSources } from './stemPlan';
@@ -82,12 +83,9 @@ describe('stemSources', () => {
       ),
     };
     const sources = stemSources(song);
-    expect(sources).toContainEqual({
-      kind: 'part',
-      slot: FULL_SLOT.arp,
-      name: 'arp',
-      muted: false,
-    });
+    // The arp's stem is its group's, listed though muted (windsor#286).
+    expect(sources).toContainEqual({ kind: 'group', id: 1, name: 'Group 1', position: 1 });
+    expect(sources).not.toContainEqual(expect.objectContaining({ slot: FULL_SLOT.arp }));
     expect(sources).not.toContainEqual({ kind: 'return', name: 'a' });
   });
 
@@ -96,6 +94,104 @@ describe('stemSources', () => {
     expect(stemSources(song).filter((s) => s.kind === 'return')).toEqual([
       { kind: 'return', name: 'a' },
     ]);
+  });
+});
+
+/** A group with no inserts, at unity. */
+const group = (id: number, name: string, switches: Partial<GroupSpec> = {}): GroupSpec => ({
+  id,
+  name,
+  level: 1,
+  pan: 0,
+  inserts: [],
+  ...switches,
+});
+
+/** `document` with `groups`, and each part in `members` routed to the group id it names. */
+function grouped(
+  groups: GroupSpec[],
+  members: Readonly<Record<number, number>>,
+  document: ArrangementDocument = FULL_DOCUMENT,
+): ArrangementDocument {
+  return {
+    ...document,
+    groups,
+    parts: document.parts.map((part) =>
+      members[part.slot] === undefined
+        ? part
+        : { ...part, strip: { ...part.strip, output: { group: members[part.slot]! } } },
+    ),
+  };
+}
+
+describe('stemSources with group buses (windsor#286)', () => {
+  const DRUMS = group(4, 'Drums');
+  const KEYS = group(0, 'Keys');
+
+  it('lists the ungrouped parts, then each group with a member in list order, then the returns', () => {
+    const song = grouped([DRUMS, KEYS], {
+      [FULL_SLOT.kick]: 4,
+      [FULL_SLOT.hat]: 4,
+      [FULL_SLOT.drone]: 0,
+    });
+    expect(stemSources(song)).toEqual([
+      { kind: 'part', slot: FULL_SLOT.arp, name: 'arp', muted: false },
+      { kind: 'group', id: 4, name: 'Drums', position: 1 },
+      { kind: 'group', id: 0, name: 'Keys', position: 2 },
+      { kind: 'return', name: 'a' },
+      { kind: 'return', name: 'b' },
+    ]);
+  });
+
+  it('gives a member no stem of its own, whatever includeMuted says', () => {
+    const song = grouped([DRUMS], { [FULL_SLOT.kick]: 4 });
+    for (const choice of [{}, { includeMuted: true }]) {
+      expect(stemSources(song, choice).map((s) => s.name)).toEqual([
+        'hat',
+        'arp',
+        'drone',
+        'Drums',
+        'a',
+        'b',
+      ]);
+    }
+  });
+
+  it('gives an empty group a stem in its place, as its inserts still reach the master', () => {
+    const song = grouped([group(2, 'Empty'), DRUMS], { [FULL_SLOT.kick]: 4 });
+    expect(stemSources(song).filter((s) => s.kind === 'group')).toEqual([
+      { kind: 'group', id: 2, name: 'Empty', position: 1 },
+      { kind: 'group', id: 4, name: 'Drums', position: 2 },
+    ]);
+  });
+
+  it('lists a muted or soloed-out group, which renders silent', () => {
+    const muted = grouped([group(4, 'Drums', { mute: true })], { [FULL_SLOT.kick]: 4 });
+    expect(stemSources(muted).map((s) => s.name)).toContain('Drums');
+    const soloing = withStrip(FULL_SLOT.arp, { solo: true });
+    const soloedOut = grouped([DRUMS], { [FULL_SLOT.kick]: 4 }, soloing);
+    expect(stemSources(soloedOut).map((s) => s.name)).toContain('Drums');
+  });
+
+  it('keeps the returns a soloed group sends to through its members', () => {
+    // The hat, in the soloed Drums, is the only part sending to Send B.
+    const song = grouped([group(4, 'Drums', { solo: true })], { [FULL_SLOT.hat]: 4 });
+    expect(stemSources(song).filter((s) => s.kind === 'return')).toEqual([
+      { kind: 'return', name: 'b' },
+    ]);
+  });
+
+  it('gives a part naming a group the song lacks its own stem, as it plays on Master', () => {
+    const song = grouped([], { [FULL_SLOT.kick]: 9 });
+    expect(stemSources(song)).toEqual(stemSources(FULL_DOCUMENT));
+  });
+
+  it('plans no group stem for a song with no parts, whose render builds no group bus', () => {
+    expect(stemSources({ ...FULL_DOCUMENT, parts: [], groups: [DRUMS] })).toEqual([]);
+  });
+
+  it('plans exactly the stems of today for a song with an empty group list', () => {
+    expect(stemSources({ ...FULL_DOCUMENT, groups: [] })).toEqual(stemSources(FULL_DOCUMENT));
   });
 });
 
