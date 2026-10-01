@@ -1,7 +1,7 @@
 # Drum bank: TR-808, TR-909 and Elektron-style FM
 
-Thirty-seven percussion patches in `packages/engine/src/patches/`
-under the **Drums** category: fifteen `tr808-*`, eleven `tr909-*` and eleven
+Forty percussion patches in `packages/engine/src/patches/`
+under the **Drums** category: sixteen `tr808-*`, thirteen `tr909-*` and eleven
 `efm-*` (the Machinedrum's "Enhanced FM" drum family, the Elektron shape).
 Each file's `description` is its audition note. This page records how the
 originals make their sounds, which of those mechanisms the four-operator
@@ -73,14 +73,24 @@ leans on five of its features:
   `RATIO_MIN`, which is 0.0625 since #618 (`ratioSplit.ts`, and its test
   round-trips every library ratio), and the engine is unclamped. The bank
   keeps 0.25 and names the note that gives each machine's pitch: every kick
-  and the EFM kick play 65 Hz on C4; the 808's 55 Hz is A3 and the 909's
-  52 Hz is G#3, and the descriptions say so.
-- **The 808 "sigh" is the LFO too.** A retriggered saw-down LFO at 1.7 Hz
-  with `toPitch` 0.5 semitones drops the kick a semitone across its decay.
-  The kick's punch is the global pitch envelope: +17 semitones over 5 ms.
-- **Diode rounding is negative feedback.** The 909 kick and toms carry
-  `feedback` −0.35 … −0.6 on the body operator: odd harmonics that fade as
-  the level does, which is what the diodes do to the triangle.
+  and the EFM kick play 65 Hz on C4, and the 808's and 909's 52 Hz is G#3
+  (the recordings the kicks were fitted to settle there), and the
+  descriptions say so.
+- **The 808 and 909 kicks are fitted to recordings**
+  (`docs/research/2026-09-30-kick-fit/`), three Decay settings each plus
+  the 909 at full Attack. The 808's punch is the pitch envelope starting at
+  its peak (Init 1) and holding +22 semitones for about 4.3 ms, so one fast
+  cycle sounds before the body, then a two-step fall over about 30 ms. The
+  909's is a 32-semitone sweep over 45 ms at curve −0.32, which stays high
+  for 10–20 ms; its body holds full level 50–80 ms before the tail. Each
+  attack edge is a `Square D` operator at a fixed frequency and a locked
+  phase, whose step lands after the operator's first 0.67 ms amplitude
+  ramp. Every kick operator is phase-locked (`phaseFree: false`), as the
+  circuits start the same way every hit.
+- **Diode rounding is negative feedback.** The 909 toms carry `feedback`
+  −0.35 … −0.6 on the body operator, and the 909 kicks about −0.13: odd
+  harmonics that fade as the level does, which is what the diodes do to
+  the triangle.
 - **Noise colour is the global filter only.** The Noise wave is white per
   sample and ignores pitch, and a Noise operator ignores any modulator (so a
   modulator into a Noise op is wasted); an FM carrier driven by white noise
