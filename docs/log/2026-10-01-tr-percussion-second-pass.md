@@ -61,6 +61,10 @@ tacowars put engine changes on the table for TR sound work.
    patches move it as the format's own upgrade does.
 9. **Peaks within 0.25 dB of the shipped patches** (decision 6 of the
    ticket allowed 1 dB), by `volume`.
+10. **The 909 high tom's pitch release curve is +0.29, set by ear.** At
+    the fit's −0.46 the falling pitch sounded like a change of note at
+    tacowars's listen; +0.29 sounded right. The low and mid toms keep their
+    fitted curves.
 
 ## Consequences
 

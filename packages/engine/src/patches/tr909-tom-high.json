@@ -139,7 +139,7 @@
       "decayCurve": -0.269274,
       "sustainLevel": 0.543532,
       "releaseTime": 0.328848,
-      "releaseCurve": -0.457197,
+      "releaseCurve": 0.29,
       "endLevel": 0,
       "loopMode": 2,
       "keyScale": 0
