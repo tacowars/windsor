@@ -6,8 +6,8 @@
  * session and never written to the document.
  *
  * E and D pick the tools while the Song tab shows the toolbar and no field
- * has focus. They take the key from the audition keyboard there, so a tool
- * switch never sounds a note.
+ * has focus. The audition keyboard plays on the Parts tab alone
+ * (`keyboard.ts`'s `qwertyPlaysOn`), so a tool switch never sounds a note.
  */
 import { el } from './dom';
 import {
@@ -93,23 +93,18 @@ export function automationToolbar(state: SongViewState, root: () => ParentNode):
 }
 
 /**
- * E and D on the window, ahead of the audition keyboard: they pick a tool
- * while `body` is shown with its toolbar and no field has focus. Wired once
- * per tab, since the tab's body outlives its renders.
+ * E and D on the window: they pick a tool while `body` is shown with its
+ * toolbar and no field has focus. Wired once per tab, since the tab's body
+ * outlives its renders.
  */
 export function wireToolKeys(body: HTMLElement, state: SongViewState): void {
-  window.addEventListener(
-    'keydown',
-    (e) => {
-      const tool = toolForKey(e);
-      if (!tool || isFieldFocused(e) || body.closest('[hidden]') !== null) return;
-      if (!body.querySelector('.auto-toolbar:not([hidden])')) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.repeat) return;
-      state.automationTool = tool;
-      syncAutomationTool(body, state);
-    },
-    true,
-  );
+  window.addEventListener('keydown', (e) => {
+    const tool = toolForKey(e);
+    if (!tool || isFieldFocused(e) || body.closest('[hidden]') !== null) return;
+    if (!body.querySelector('.auto-toolbar:not([hidden])')) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    state.automationTool = tool;
+    syncAutomationTool(body, state);
+  });
 }
