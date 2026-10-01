@@ -43,13 +43,12 @@
  * calls Date.now() twice a quantum, and V8 returns each as a new heap
  * number: `docs/research/2026-09-30-load-sampler-allocation/README.md`). The
  * scenario throws, failing the child, unless the measured run took every
- * path. The runs compile on the main thread (`SYNCHRONOUS_TIERING`), so the
+ * path. Every run compiles on the main thread (`SYNCHRONOUS_TIERING`), so the
  * tier each function has reached when the heap is read depends on the calls
  * the warm-up made and not on the machine's load: with the compiler on a
  * background thread, busy CI runners read a one-off spike of 7 to 12 KB in a
  * single tenth of an otherwise clean run, enough to pass the bound
- * (windsor#266, as windsor#256 for the load sampler). The run that crosses
- * 2^31 in the warm-up is the exception (`CONCURRENT_TIERING`).
+ * (windsor#266, as windsor#256 for the load sampler).
  *
  * A third run plays the pad as a context about 25 hours old does: every
  * frame past 2^31, a double in V8, and each note posted 16 quanta ahead of
@@ -66,7 +65,17 @@
  * (rule 7), on the audio thread, deoptimising the render that reads it. The
  * fourth plays the pad from a frame its frames pass 2^31 from, three quarters
  * of the way through the warm-up: with the frame stamped on each queued
- * message as `_frame`, the trace read `_frame:s->d` there. The fifth and
+ * message as `_frame`, the trace read `_frame:s->d` there. The crossing also
+ * changes the representation of the messages' own `frame` field, as the
+ * first message past 2^31 does for the port's in Chrome, which deprecates
+ * the message's map and throws away the optimised code of every function
+ * that read a message. With `schedule` and `noteOn` reading the messages
+ * once each, both stayed in V8's baseline tier for the rest of the run
+ * (about 80 000 quanta passed before `noteOn` was optimised again) and the
+ * run read 153 KB, about 129 KB of it in `noteOn` and 21 KB in `schedule`,
+ * the same with the crossing a quarter, half or three quarters of the way
+ * through the warm-up (windsor#270). The render, run every quantum, now reads
+ * the messages, and is optimised again within a few hundred. The fifth and
  * sixth hold one note through the whole run, in the kernel and dormant in
  * the generic loop, the warm-up ending by setting its voices' `age` just
  * below 2^31, so it crosses half way through the measured run: with `age`
@@ -74,9 +83,10 @@
  * and 1.6 MB as the render deoptimised.
  *
  * Tolerance: 16 KiB over the 8 000 quanta; one boxed double a quantum would
- * read 128 KB. The runs read about 10 to 12 KB: the eleven readings' own
- * result objects, about 7 KB, and about one heap number a note-on. Before
- * this fix the part read about 3.6 KB a quantum
+ * read 128 KB. The runs read about 6 KB, the eleven readings' own result
+ * objects (616 bytes a tenth); with the note-on's message read in `noteOn`
+ * they read 10 to 12 KB, about one heap number a note-on more
+ * (windsor#270). Before windsor#233 the part read about 3.6 KB a quantum
  * (`docs/research/2026-09-30-worklet-gc-in-chrome/README.md`), and this
  * scenario 4.3 KB a quantum in the pad and 0.7 KB in the pluck.
  */
@@ -118,15 +128,6 @@ const DRONE_AGE = SMI_END - (MEASURE_QUANTA / 2) * QUANTUM;
  * before the heap is read.
  */
 const CROSSING_FRAME = SMI_END - ((WARMUP_QUANTA * 3) / 4) * QUANTUM;
-/**
- * V8's default, the compiler on a background thread, for the one run that
- * crosses 2^31 in the warm-up. Under `SYNCHRONOUS_TIERING` that run reads
- * 153 KB on every run, the same with the crossing at a quarter, half or three
- * quarters of the warm-up: the bundle's `noteOn` and `schedule` allocate
- * about 129 KB and 21 KB of it. Fixing that is a change to the FM source,
- * outside windsor#266, so this run keeps the tiering it passed under.
- */
-const CONCURRENT_TIERING: readonly string[] = [];
 
 const TOGGLES: [string, number][] = [
   ['pitchBend', 2],
@@ -365,7 +366,7 @@ describe('the FM part on V8', () => {
           paths: ['held', 'stolen', 'released', 'ended', 'silent'],
           lookahead: LOOKAHEAD_QUANTA,
         },
-        { startFrame: CROSSING_FRAME, v8Flags: CONCURRENT_TIERING },
+        { startFrame: CROSSING_FRAME, v8Flags: SYNCHRONOUS_TIERING },
       ),
     );
   }, 120_000);

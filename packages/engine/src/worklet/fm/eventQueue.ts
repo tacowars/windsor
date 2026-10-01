@@ -18,9 +18,23 @@
  * pin the order, `synth/fmProcessorAllocation.test.ts` the allocation and
  * the crossing.
  *
- * A slot drops its message once the message is taken, cleared or moved
- * down (windsor#262), so a burst or a cancelled run of note-ons does not
- * stay alive until a later schedule overwrites its slots. The empty value
+ * A message the port delivers is first `post`ed: its reference goes into
+ * `posted`, in arrival order, and nothing of it is read (windsor#270). The
+ * part's render admits what was posted at the start of its next quantum,
+ * reading each frame there and inserting in the same order, so the queue
+ * holds what it held when `schedule` inserted directly. The reason is V8's
+ * tiers: past 2^31 a message's frame is a double, and the first such
+ * message changes the representation of the sender's `frame` field, which
+ * deprecates the message's map and throws away the optimised code of every
+ * function that read a message. A function called once a message (the old
+ * `schedule`, `noteOn`) then ran in V8's baseline tier for tens of thousands
+ * of quanta, where every double it read or computed was a new heap number;
+ * the render, called every quantum, is optimised again within a few hundred.
+ * `post` reads no field, so it costs nothing in any tier.
+ *
+ * A slot drops its message once the message is taken, admitted, cleared or
+ * moved down (windsor#262), so a burst or a cancelled run of note-ons does
+ * not stay alive until a later schedule overwrites its slots. The empty value
  * is `undefined`, written over the reference: `items` holds objects
  * (PACKED_ELEMENTS), which holds `undefined` with no elements-kind
  * transition, where `delete` or a shorter length would make it HOLEY.
@@ -40,6 +54,9 @@ class EventQueue {
   incoming: Float64Array;
   head: number;
   tail: number;
+  /** The messages posted since the render last admitted them, in [0, postedCount), in arrival order; the rest hold `undefined`. */
+  posted: (QueuedEvent | undefined)[];
+  postedCount: number;
 
   constructor() {
     this.items = [];
@@ -47,6 +64,8 @@ class EventQueue {
     this.incoming = new Float64Array(1);
     this.head = 0;
     this.tail = 0;
+    this.posted = [];
+    this.postedCount = 0;
   }
 
   get empty(): boolean {
@@ -60,6 +79,18 @@ class EventQueue {
     items[this.head++] = undefined;
     if (this.head === this.tail) this.head = this.tail = 0;
     return event;
+  }
+
+  /**
+   * Hold `event` until the render admits it, reading nothing of it. The array
+   * grows only when more messages arrive between two quanta than ever before.
+   */
+  post(event: QueuedEvent): void {
+    const posted = this.posted;
+    const count = this.postedCount;
+    if (count === posted.length) posted.push(event);
+    else posted[count] = event;
+    this.postedCount = count + 1;
   }
 
   /** Queue `event` at the frame in `incoming`, after every event at or before that frame. */
@@ -103,11 +134,14 @@ class EventQueue {
     this.head = 0;
   }
 
-  /** Drop every queued event, releasing the live slots only, so a clear costs what it frees. */
+  /** Drop every queued and posted event, releasing the live slots only, so a clear costs what it frees. */
   clear(): void {
     const items = this.items;
     for (let i = this.head; i < this.tail; i++) items[i] = undefined;
     this.head = this.tail = 0;
+    const posted = this.posted;
+    for (let i = 0; i < this.postedCount; i++) posted[i] = undefined;
+    this.postedCount = 0;
   }
 }
 

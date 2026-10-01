@@ -174,8 +174,9 @@ build output. The map of `fm/` (#644):
 
 | Module | Owns |
 |---|---|
-| `fmProcessor.ts` | the entry: `FmPartProcessor` (the port, the note map as each voice's `keyed` flag, voice allocation, `renderBlock`) and `registerProcessor` |
-| `eventQueue.ts` | `EventQueue` (windsor#233): the note events in frame order, their frames in a `Float64Array` beside them, inserted in place and taken by an index, never `splice` or `shift` |
+| `fmProcessor.ts` | the entry: `FmPartProcessor` (the port, the note map as each voice's `keyed` flag, `renderBlock`, which admits posted notes and reads each message) and `registerProcessor` |
+| `eventQueue.ts` | `EventQueue` (windsor#233): the note events in frame order, their frames in a `Float64Array` beside them, inserted in place and taken by an index, never `splice` or `shift`; and the messages `post`ed since the last quantum, unread until the render admits them (windsor#270) |
+| `voiceAllocation.ts` | `allocateVoice`: which voice of the pool a note takes, and the stealing order (dormant, released, oldest) |
 | `voice.ts` | `Voice`: one note's state and lifecycle (`start`, `rebind`, `retarget`, `release`, `kill`, `steal`, `dormant`); `render` and `updateControl` stay methods and delegate |
 | `voiceControl.ts` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
 | `voiceRender.ts` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
@@ -232,18 +233,26 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `value`, `Lfo.advance` in `output`, the part's bend, wheel and cutoff
    reach the voices in `partControls`, the width update reads `opFreq` and
    the LFO levels from the voice, `Svf.setCoeffs` reads `cutoffHz` and `q`,
-   and a note's velocity, detune, pan and glide go to `start` in the voice's
+   and a note's pitch, velocity, detune, pan and glide go to `start` in the voice's
    fields. A frame counts: past 2^31 (about 12 hours at 48 kHz) it is a
    double, so the queue keeps frames in a `Float64Array` (`q.frames`), never
    in a field of the message, the render reads the next event's frame in
-   place (`q.frames[q.head]`, no accessor), and `schedule` reads a message's
-   frame from the message and hands it to `insert` in `q.incoming`. The
-   per-sample calls the kernel and the generic loop keep (`Svf.process`,
+   place (`q.frames[q.head]`, no accessor), and the render reads a message's
+   frame from the message and hands it to `insert` in `q.incoming`. Only the
+   render reads a message (windsor#270): `schedule` posts it unread, the
+   render admits what was posted at the start of the next quantum, and it
+   copies a note-on's numbers into `noteIn` for `noteOn`, which takes the
+   handle alone. The first frame past 2^31 changes the representation of
+   the message's `frame` field, deprecating its map and the optimised code
+   of every function that read a message; one run per message then stayed
+   in V8's baseline tier, boxing, for tens of thousands of quanta, where
+   the render, run every quantum, is optimised again within a few hundred.
+   The per-sample calls the kernel and the generic loop keep (`Svf.process`,
    `softClip`, `noise`) are inlined first by frequency.
    `synth/fmProcessorAllocation.test.ts` pins it through
    `__fixtures__/fmPartChangeScenario.ts`, with one run at frames past 2^31
    with notes posted ahead and the queue's accessors kept from inlining, one
-   whose frames cross 2^31, and two that hold a note while its `age`
+   whose frames cross 2^31 (the messages' too), and two that hold a note while its `age`
    crosses 2^31; what the note-on path still allocates in V8's lower tiers
    is in `docs/research/2026-09-30-worklet-gc-in-chrome/README.md`.
 3. **Bit-identity by construction.** The fixed-index kernel (`renderKernel`,

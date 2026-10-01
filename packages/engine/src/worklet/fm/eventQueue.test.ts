@@ -87,6 +87,19 @@ describe('the FM part event queue', () => {
     expect(q.items.every((slot) => slot === undefined)).toBe(true);
   });
 
+  it('holds posted messages in arrival order, reusing its slots, until a clear releases them', () => {
+    const q = new EventQueue();
+    for (let id = 0; id < 3; id++) q.post(event(id));
+    expect(q.posted.slice(0, q.postedCount).map((slot) => slot?.id)).toEqual([0, 1, 2]);
+    expect(q.empty).toBe(true);
+    q.clear();
+    expect(q.postedCount).toBe(0);
+    expect(q.posted.every((slot) => slot === undefined)).toBe(true);
+    q.post(event(3));
+    expect(q.posted.length).toBe(3);
+    expect(q.posted[0]?.id).toBe(3);
+  });
+
   it('releases the slots a move down vacates', () => {
     const q = new EventQueue();
     for (let id = 0; id < 4; id++) insert(q, id, id * 10);
