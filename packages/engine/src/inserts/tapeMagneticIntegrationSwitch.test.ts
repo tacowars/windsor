@@ -13,12 +13,13 @@
  *   evaluates an esbuild bundle of `tapeMagneticStage.ts` as a script named
  *   `tape-magnetic-stage.js`, drives it as `TapeDsp` does — the pair's
  *   fields per sample, the dry ring in place, `select` and `configure` per
- *   block, the factor switched every fourth quantum and the model every
- *   quantum — and reads the heap across 1000 quanta after 6000 of warm-up.
- *   Since windsor#289 the rows differ, so every quantum reconfigures all four
- *   cores; V8 compiles that path to its top tier only after about 3000
- *   quanta here (2000 left 453 KB boxed in the window, 3000 to 7000 read
- *   600 bytes on Node 24, arm64), so the warm-up is 6000. The rest of
+ *   block and `glide` per sample while it glides, the factor switched every
+ *   fourth quantum and the model every quantum — and reads the heap across
+ *   1000 quanta after 6000 of warm-up. Since windsor#289 the rows differ, so
+ *   the controls glide throughout and the active pair is retuned every
+ *   sample. When that was per block, V8 compiled it to its top tier only
+ *   after about 3000 quanta here (2000 left 453 KB boxed in the window, 3000
+ *   to 7000 read 600 bytes on Node 24, arm64), so the warm-up is 6000. The rest of
  *   `TapeDsp` is windsor#228's (`tapeAllocation.test.ts`).
  */
 import { spawnSync } from 'node:child_process';
@@ -163,13 +164,14 @@ const source = new Float64Array(QUANTUM * 64);
 for (let i = 0; i < source.length; i++) source[i] = 3.2 * Math.sin(i * 0.031) + 1.6 * Math.sin(i * 0.29);
 const output = new Float64Array(QUANTUM);
 const stage = new api.TapeMagneticStage(48000, 2, 0);
-// One quantum as TapeDsp runs it: select and configure, then each channel's pair and dry ring per sample.
+// One quantum as TapeDsp runs it: select and configure, then per sample the glide, each channel's pair and the dry ring.
 function quantum(q) {
   stage.select(q % 8 < 4 ? 2 : 4);
-  stage.configure(q % 7, QUANTUM);
+  stage.configure(q % 7);
   const base = (q % 64) * QUANTUM;
   for (let i = 0; i < QUANTUM; i++) {
     const x = source[base + i];
+    if (stage.gliding) stage.glide();
     for (let channel = 0; channel < 2; channel++) {
       const pair = stage.active[channel];
       pair.input = x;

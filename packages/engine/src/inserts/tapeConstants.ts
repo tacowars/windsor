@@ -61,6 +61,11 @@ export const TAPE_DEFAULTS = {
 export const TAPE_DSP = {
   weightFloor: 1e-12,
   smoothSeconds: 0.01,
+  /**
+   * The magnetic controls' glide (a model switch) ends this close to the row: about 16 time
+   * constants, and a final step that moves the core's output gain by about a millionth or less.
+   */
+  magneticSnap: 1e-7,
   toneSeconds: 0.03,
   dcHz: 10,
   dbScale: 20,

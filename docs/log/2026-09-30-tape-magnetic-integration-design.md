@@ -6,6 +6,9 @@
 - **Amended:** decision 1's removal of the losing factor did not happen;
   tacowars kept both, see
   [the audition outcome](2026-10-01-tape-oversampling-audition.md#outcome-2026-10-01).
+  Decision 6's model transitions are amended on 2026-10-01 (windsor#289):
+  the glide retunes the core every sample, and the live-switch test
+  allows a measured tolerance past the envelope.
 - **Follows:** [greenfield direction](2026-09-30-tape-greenfield-direction.md),
   [static conditioning](2026-09-30-tape-static-conditioning.md),
   [candidate domain](2026-09-30-tape-candidate-domain.md),
@@ -172,6 +175,41 @@ the fastest honest path to a level-matched audition in the app.
    output sample outside the envelope of the two steady states; the
    interpolation passes through control points the survival record did
    not sample, and that test is the evidence for them.
+
+   **Amendment, 2026-10-01 (windsor#289).** Two things changed when the
+   models got distinct rows.
+
+   - **Per-sample glide.** Reconfiguring the core once per 128-sample
+     block stepped Ms, a, c and the normalisation while the magnetization
+     was kept, and a step near a crest overshot for a sample or two: up to
+     1.093 of the larger steady peak. So the stage now glides the three
+     controls per sample while they move. It retunes the active pair's
+     cores (Ms, a, c, the susceptibility and the gain, the same operations
+     as `configure`) every sample. Within 10⁻⁷ of the row it snaps to it
+     exactly, retunes all four cores and stops. A settled render is
+     therefore the constant-control render, bit for bit, and the goldens
+     do not move. The normalisation is still never recomputed on a settled
+     per-sample path.
+   - **The envelope is not exact.** A 10 ms glide passes through
+     intermediate hysteresis states. The model EQ crossfades with the same
+     time constant, so each moment of a switch is a point between the two
+     models, and some of those points have a steady output outside the
+     envelope of the two endpoints. Frozen at points along the way at
+     44.1 kHz and 4×, the whole path's steady peak reached 1.014 of Metal's
+     four fifths of the way from Ferric to Metal: Ferric's EQ still lifts
+     the level into a core already near Metal's ceiling. From 30ips Studio
+     to Vintage it dipped to 0.987 of Studio's. The core alone, at 48 kHz
+     and 4×, dips to 0.972 on that line. Under the glide itself, the live-switch test
+     (`inserts/tapeModelSwitch.test.ts`, every ordered pair, 2× and 4×,
+     44.1, 48 and 96 kHz, full-scale 300 Hz, Node 24 on arm64) measured a
+     worst sample of 1.0213 of the larger steady peak (Ferric to Metal,
+     4×, at 44.1 and 48 kHz), and a lowest cycle peak of 0.9599 of the
+     smaller (30ips Studio to Vintage, 4×, 44.1 kHz). With the model EQ
+     bypassed the worst sample was 1.0043. The test now asserts zero
+     resets and every sample within those measured excursions plus half a
+     point: at most 1.0263 of the larger steady peak and no cycle peak
+     below 0.9549 of the smaller. That is the tolerance this decision
+     allows. A change that widens it is a change to this decision.
 
 ## Consequences for E
 

@@ -110,15 +110,22 @@ when judging Vintage's level by ear.
 The test design decision 6 asked for when rows first differ is
 `inserts/tapeModelSwitch.test.ts`. It runs every ordered pair of models at
 2× and 4×, at 44.1, 48 and 96 kHz, under a full-scale tone, through the
-whole shipped path. It records no core reset. Every sample stays within 10%
-of the envelope of the pair's two steady states. The 10% covers the glide's
-block steps: the stage reconfigures the core once per 128-sample block, and
-a step near a crest overshoots for a sample or two. The test's walk measured
-up to 1.075 of the larger steady peak at 48 kHz and 1.037 at 96 kHz, where a
-block is half as long. Other alignments of the same switches reached 1.093
-(48 kHz, 4×, EQ bypassed). With per-sample
-smoothing the overshoot was 1.005, and no point along a pair's line has a
-steady peak above the larger end's.
+whole shipped path, and records no core reset.
+
+The first version of this change reconfigured the core once per 128-sample
+block, as decision 6 then said. Each block stepped the core's coefficients
+and normalisation, and a step near a crest overshot: up to 1.075 of the
+larger steady peak in the test's walk, and 1.093 with the EQ bypassed. The
+stage now glides the controls and retunes the active cores every sample
+while they move, and snaps to the row exactly when they arrive, so a settled
+render is unchanged to the bit. With that, the walk's worst sample is 1.0213
+of the larger steady peak and its lowest cycle peak 0.9599 of the smaller.
+Those excursions are the glide's intermediate states, not steps: frozen
+partway, the whole path's steady peak sits up to 1.4% above the larger end
+(Ferric to Metal) and 1.3% below the smaller (30ips Studio to Vintage). The
+test allows the measured excursions plus half a point. The design record's
+[amendment to decision 6](2026-09-30-tape-magnetic-integration-design.md)
+has the figures, and is where the tolerance is decided.
 
 ## Format
 
@@ -129,5 +136,6 @@ meaning.
 ## What follows
 
 The Advanced panel ticket lets users move the three controls themselves,
-starting from these rows. This record amends nothing in the design record,
-which already allows distinct rows.
+starting from these rows. The design record already allows distinct rows;
+this change amends its decision 6 for the per-sample glide and the
+live-switch tolerance, as above.

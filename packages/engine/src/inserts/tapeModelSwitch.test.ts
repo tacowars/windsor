@@ -19,24 +19,31 @@
  * One DSP per rate rather than per factor: in one process, the sixth bundle
  * instance ran this loop about five times slower than the first five.
  *
- * The tolerance is the glide's block steps. The stage reconfigures the core
- * once per 128-sample block (decision 6), so each block steps Ms, a, c and the
- * output normalisation with the magnetization kept, and a step near a crest
- * overshoots for a sample or two; the overshoot recurs where the block and
- * the tone's cycles realign, and decays with the glide. Measured on Node 24
- * (arm64), the worst sample of this walk reached 1.064 of the larger steady
- * peak at 44.1 kHz, 1.075 at 48 kHz and 1.037 at 96 kHz, where a block is half
- * as long (Ferric to Metal each time), and the lowest cycle peak was 0.983 of
- * the smaller (30ips Studio to Vintage, 96 kHz). Other alignments of the same
- * switches, tried while writing this, reached 1.093 (48 kHz, 4×, EQ
- * bypassed). There, with the controls smoothed every sample instead, the
- * worst was 1.005, and no point along any pair's straight line (sampled at
- * twentieths, the core alone) had a steady peak above the larger end's.
- * Runs in about 8 s.
+ * The tolerance is the glide's intermediate states, not its steps (the
+ * 2026-10-01 amendment to decision 6). The stage glides the controls and
+ * retunes the active cores every sample, so the core's coefficients and
+ * normalisation never step; it glides the model EQ's crossfade with the same
+ * 10 ms time constant. Each moment of the glide is then a point between the
+ * two models, and some of those points have a steady peak outside the
+ * envelope of the ends. Frozen at points along Ferric to Metal (44.1 kHz,
+ * 4×), the whole path's steady peak reached 1.014 of Metal's at four fifths
+ * of the way, Ferric's EQ still lifting the level into a core already near
+ * Metal's ceiling; along 30ips Studio to Vintage it dipped to 0.987 of
+ * Studio's. Measured on Node 24 (arm64), this walk's worst sample was 1.0213
+ * of the larger steady peak (Ferric to Metal, 4×, at 44.1 and at 48 kHz) and
+ * its lowest cycle peak 0.9599 of the smaller (30ips Studio to Vintage, 4×,
+ * 44.1 kHz); `MEASURED` holds both, and the test allows each half a point
+ * more (`MARGIN`). With the EQ bypassed the worst sample was 1.0043. The
+ * per-block reconfiguration this replaced reached 1.075 here, and 1.093 with
+ * the EQ bypassed. A last test holds a finished glide to the constant render:
+ * once settled, every core is tuned exactly as a DSP started on the model.
+ * Runs in about 6 s.
  */
 import { describe, expect, it } from 'vitest';
 import { tapeRig, type TapeRig } from '../__fixtures__/tapeDspProbe';
-import { TAPE_OVERSAMPLING, TAPE_TYPES } from './tapeConstants';
+import { TapeMagneticCore, originSusceptibility } from '../worklet/tape/tapeMagnetic';
+import { magneticControls } from '../worklet/tape/tapeMagneticRows';
+import { TAPE_MODELS, TAPE_OVERSAMPLING, TAPE_TYPES } from './tapeConstants';
 import { sine } from './tapePortableMath';
 
 const RATES = [44100, 48000, 96000] as const;
@@ -44,8 +51,12 @@ const HZ = 300;
 const QUANTUM = 128;
 const STEADY_SECONDS = 0.1;
 const HOLD_SECONDS = 0.06;
-/** The glide's block-step overshoot allowance, either side of the envelope (see above). */
-const GLIDE_TOLERANCE = 0.1;
+/** This walk's worst excursions past the envelope, as fractions of the steady peak (see above). */
+const MEASURED = { above: 0.0213, below: 0.0401 };
+/** The allowance past each measured excursion. */
+const MARGIN = 0.005;
+/** A finished glide's longest possible run: a whole-range step snaps within about 16 time constants. */
+const SETTLE_SECONDS = 0.2;
 
 /** A closed walk through every ordered pair of `count` nodes once (Hierholzer), from node 0. */
 function circuit(count: number): number[] {
@@ -61,6 +72,18 @@ function circuit(count: number): number[] {
   }
   return walk.reverse();
 }
+
+/** Every field the core derives from its controls and rate. */
+const TUNING = [
+  'ms',
+  'invA',
+  'reversibleGain',
+  'irreversible',
+  'irreversibleK',
+  'dt',
+  'susceptibility',
+  'gain',
+] as const;
 
 /** `frames` samples of the tone from sample `start`, both channels, each left output to `each`. */
 function play(
@@ -131,8 +154,10 @@ describe('switching tape models live (decision 6)', () => {
       });
       at.n += hold;
       const pair = `${rate} Hz ${rig.dsp.magnetic.factor}×, ${TAPE_TYPES[walk[s - 1]!]} to ${TAPE_TYPES[walk[s]!]}`;
-      expect(worst, pair).toBeLessThanOrEqual(Math.max(from, to) * (1 + GLIDE_TOLERANCE));
-      expect(lowest, pair).toBeGreaterThanOrEqual(Math.min(from, to) * (1 - GLIDE_TOLERANCE));
+      expect(worst, pair).toBeLessThanOrEqual(Math.max(from, to) * (1 + MEASURED.above + MARGIN));
+      expect(lowest, pair).toBeGreaterThanOrEqual(
+        Math.min(from, to) * (1 - MEASURED.below - MARGIN),
+      );
     }
   }
 
@@ -153,4 +178,28 @@ describe('switching tape models live (decision 6)', () => {
     },
     60_000,
   );
+
+  it("retunes every row to exactly the floor check's susceptibility", () => {
+    for (const { magnetic } of TAPE_MODELS) {
+      const controls = magneticControls(magnetic, { drive: NaN, width: NaN, saturation: NaN });
+      const core = new TapeMagneticCore(48000, 2, controls);
+      core.retune(controls);
+      expect(core.susceptibility).toBe(originSusceptibility(controls));
+    }
+  });
+
+  it('ends a glide on the row itself, every core tuned as a DSP started there', () => {
+    const rate = 48000;
+    const rig = tapeRig({ model: TAPE_TYPES[1] }, rate);
+    const fresh = tapeRig({ model: TAPE_TYPES[5] }, rate).dsp.magnetic.oversamplers;
+    expect(rig.dsp.magnetic.gliding).toBe(false);
+    rig.params.model![0] = 5;
+    let glided = 0;
+    play(rig, rate, 0, rate * SETTLE_SECONDS, () => (glided += rig.dsp.magnetic.gliding ? 1 : 0));
+    expect(glided).toBeGreaterThan(0);
+    expect(rig.dsp.magnetic.gliding).toBe(false);
+    rig.dsp.magnetic.oversamplers.forEach(({ core }, i) => {
+      for (const field of TUNING) expect(core[field], field).toBe(fresh[i]!.core[field]);
+    });
+  });
 });
