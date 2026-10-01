@@ -13,7 +13,7 @@ export interface Call {
   duration?: number | undefined;
   time?: number | undefined;
   patch?: string | undefined;
-  /** A grid note's accent mod and slide flag (#602); absent on a plain note. */
+  /** A grid note's or a Euclid hit's accent mod, slide flag and offsets (#602, windsor#355); absent on a plain note. */
   extras?: NoteExtras | undefined;
 }
 
@@ -30,8 +30,15 @@ export function recordingPart(): RecordingPart {
     noteOffByNote(note, time) {
       calls.push({ kind: 'noteOffByNote', note, time });
     },
-    trigger(note, velocity, duration, time) {
-      calls.push({ kind: 'trigger', note, velocity, duration, time });
+    trigger(note, velocity, duration, time, extras) {
+      calls.push({
+        kind: 'trigger',
+        note,
+        velocity,
+        duration,
+        time,
+        ...(extras ? { extras } : {}),
+      });
       return calls.length;
     },
     setPatch(patch: Patch) {

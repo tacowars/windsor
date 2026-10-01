@@ -46,6 +46,8 @@ const PURE_FILES = [
   'noteEvent.ts',
   'scaleSampler.ts',
   'euclideanSequencer.ts',
+  // A Euclid part's ratchet row and drawn lanes (windsor#355), read at a hit.
+  'euclidLanes.ts',
   // The written and performed kinds (#705): they read the key and the chord
   // the region gate hands them, never the graph.
   'gridSequencer.ts',

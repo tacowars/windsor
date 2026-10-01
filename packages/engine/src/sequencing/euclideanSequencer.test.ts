@@ -251,6 +251,28 @@ describe('reconfigure (#610)', () => {
     expect(JSON.stringify(live)).toBe(JSON.stringify(plain));
   });
 
+  it('an edit to the ratchets, the accent amounts or a lane keeps the figure, k and the stream (windsor#355)', () => {
+    const plain = trace(WALK, 16);
+    const rows: Partial<EuclideanConfig> = {
+      ratchets: Array.from({ length: WALK.steps }, (_, i) => (i % 3 === 0 ? 4 : 1)),
+      accentVelocity: 0.4,
+      accentMod: 0.1,
+      accentLane: [true, false, false, false, false],
+      pitchLane: [3, -3],
+      modLanes: [{ param: 'filter.cutoff', values: [0.5, 0, -0.5] }],
+    };
+    const live = traceLive(WALK, 16, 8 * TICKS_PER_BAR + 48, (seq) =>
+      seq.reconfigure({ ...WALK, ...rows }),
+    );
+    expect(JSON.stringify(live)).toBe(JSON.stringify(plain));
+  });
+
+  it('refuses a bad row live as the constructor does (windsor#355)', () => {
+    const seq = new EuclideanSequencer(WALK);
+    expect(() => seq.reconfigure({ ...WALK, ratchets: [5] })).toThrow(/ratchets/);
+    expect(() => new EuclideanSequencer({ ...WALK, pitchLane: [30] })).toThrow(/pitchLane/);
+  });
+
   it('enter(region) restarts the stream and the walk: region 0 replays the opening, region 1 draws anew (#705)', () => {
     const shape = (rows: StepTrace[]): string =>
       JSON.stringify(rows.map((r) => [r.tickInBar, r.k, r.pattern, r.onset?.step ?? null]));

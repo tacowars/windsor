@@ -26,6 +26,7 @@ import type { ArpSequencerConfig } from '../sequencing/arpSequencer';
 import type { BassSequencerConfig } from '../sequencing/bassSequencer';
 import type { ChordSequencerConfig } from '../sequencing/chordSequencer';
 import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
+import { EUCLID_ROW_KEYS } from '../sequencing/euclidLanes';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import type { Region } from '../sequencing/regionClock';
@@ -204,6 +205,19 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * A key the current object may lack and a partial still reaches: a Euclid
+ * sequencer's optional rows (windsor#355). A normalised song omits a row it
+ * does not use, so the first lane or ratchet a live edit draws arrives here
+ * with nothing to merge into; the player's validation still judges it.
+ */
+const OPTIONAL_KEYS: ReadonlyMap<unknown, ReadonlySet<string>> = new Map([
+  ['euclidean', new Set<string>(EUCLID_ROW_KEYS)],
+]);
+
+const reaches = (current: Record<string, unknown>, key: string): boolean =>
+  key in current || OPTIONAL_KEYS.get(current.kind)?.has(key) === true;
+
 function mergeValue(current: unknown, partial: unknown, path: string, ignored: string[]): unknown {
   if (isPlainObject(current) && isPlainObject(partial)) {
     // A tagged union changing kind is replaced wholesale: merging a walk onto
@@ -213,7 +227,7 @@ function mergeValue(current: unknown, partial: unknown, path: string, ignored: s
     const merged: Record<string, unknown> = { ...current };
     for (const [key, value] of Object.entries(partial)) {
       const childPath = path === '' ? key : `${path}.${key}`;
-      if (!(key in current)) {
+      if (!reaches(current, key)) {
         ignored.push(childPath);
         continue;
       }

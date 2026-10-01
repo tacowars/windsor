@@ -152,4 +152,37 @@ describe('mergeArrangement', () => {
     expect(merged.parts[arp]?.regions).toEqual(regions);
     expect(merged.parts[kick]?.regions).toEqual(FULL_PARTS.kick.regions);
   });
+
+  it('adds a Euclid row the sequencer lacks, and still ignores an unknown key (windsor#355)', () => {
+    expect(FULL_PARTS.kick.sequencer).not.toHaveProperty('accentLane');
+    const rows = {
+      ratchets: [1, 4],
+      accentVelocity: 0.3,
+      accentMod: 0.5,
+      accentLane: [true],
+      pitchLane: [0, 7],
+      modLanes: [{ param: 'filter.cutoff' as const, values: [0.5] }],
+    };
+    const partial = {
+      parts: { [kick]: { sequencer: { ...rows, bogus: 1 } } },
+    } as unknown as ArrangementPartial;
+    const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, partial);
+    expect(ignored).toEqual(['parts.0.sequencer.bogus']);
+    expect(merged.parts[kick]?.sequencer).toEqual({ ...FULL_PARTS.kick.sequencer, ...rows });
+    // Nothing else gains a row: the hat's sequencer is as it was.
+    expect(merged.parts[hat]?.sequencer).toEqual(FULL_PARTS.hat.sequencer);
+  });
+
+  it('reaches a Euclid row only on a Euclid sequencer, and only as a leaf (windsor#355)', () => {
+    const partial = {
+      parts: {
+        [arp]: { sequencer: { accentLane: [true] } },
+        [kick]: { sequencer: { ratchets: { 0: 2 } } },
+      },
+    } as unknown as ArrangementPartial;
+    const { merged, ignored } = mergeArrangement(FULL_ARRANGEMENT, partial);
+    expect(ignored.sort()).toEqual(['parts.0.sequencer.ratchets', 'parts.2.sequencer.accentLane']);
+    expect(merged.parts[arp]?.sequencer).toEqual(FULL_PARTS.arp.sequencer);
+    expect(merged.parts[kick]?.sequencer).toEqual(FULL_PARTS.kick.sequencer);
+  });
 });
