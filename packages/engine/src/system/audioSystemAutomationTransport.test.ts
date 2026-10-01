@@ -11,7 +11,12 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { lane, point } from '../__fixtures__/automationRig';
 import type { FakeContext } from '../__fixtures__/fakeAudioContext';
 import type { FakeParam } from '../__fixtures__/fakeAudioNodes';
-import { FULL_DOCUMENT, FULL_SLOT, withDocumentPart } from '../__fixtures__/fullArrangement';
+import {
+  FULL_BARS,
+  FULL_DOCUMENT,
+  FULL_SLOT,
+  withDocumentPart,
+} from '../__fixtures__/fullArrangement';
 import { installSidechainWorklet, sidechainRig } from '../__fixtures__/sidechainRig';
 import { SCHEDULER_START_DELAY_SECONDS } from '../audioConstants';
 import { AUTOMATION_STEP_RAMP_SECONDS } from '../automation/automationConstants';
@@ -19,8 +24,8 @@ import { valueAt } from '../automation/automationEvaluate';
 import type { AutomationLane } from '../automation/automationLane';
 import { catalogRow } from '../automation/automationTargets';
 import { PAN_ANGLE_MAX } from '../mixer/stereoRotate';
-import { PPQ } from '../sequencing/scheduler';
-import type { ArrangementDocument } from '../song/arrangementDocument';
+import { PPQ, TICKS_PER_BAR } from '../sequencing/scheduler';
+import { type ArrangementDocument, makeArrangement } from '../song/arrangementDocument';
 import { musicPartName } from '../song/documentParts';
 import type { AudioSystem } from './audioSystem';
 
@@ -192,6 +197,33 @@ describe('discontinuities on the live transport', () => {
         valueAt(LEVEL, edited.points, tick),
         12,
       );
+    }
+  });
+
+  it("refits the held lanes on a shortened song, so growing it again plays the document's cut", async () => {
+    const SHORT = 2;
+    const cut = SHORT * TICKS_PER_BAR;
+    const ramp = lane('strip.level', [point(0, 0.1), point(FULL_BARS * TICKS_PER_BAR, 1)]);
+    const { sys, play } = await rig([ramp]);
+    sys.startMusic();
+    play(0.5);
+    expect(sys.apply({ transport: { bars: SHORT } }).ok).toBe(true);
+    expect(sys.apply({ transport: { bars: FULL_BARS } }).ok).toBe(true);
+    // The document the console holds: shortened, normalised, lengthened, normalised again.
+    const doc = withDocumentPart(FULL_DOCUMENT, 'hat', { automation: [ramp] });
+    const shortened = makeArrangement({ ...doc, transport: { ...doc.transport, bars: SHORT } });
+    const regrown = makeArrangement({
+      ...shortened.document,
+      transport: { ...shortened.document.transport, bars: FULL_BARS },
+    }).document;
+    const expected = regrown.parts.find((p) => p.slot === hat)!.automation;
+    expect(expected![0]!.points.at(-1)!.tick).toBe(cut);
+    expect(sys.automationLanes(hat)).toEqual(expected);
+    // Past the old cut the level holds its value there: nothing of the old ramp is scheduled.
+    const end = valueAt(LEVEL, ramp.points, cut);
+    play(FIRST + (cut + 60) * TICK);
+    for (let tick = cut; tick < cut + 60; tick++) {
+      expect(levelOf(sys).valueAt(FIRST + tick * TICK)).toBeCloseTo(end, 12);
     }
   });
 });

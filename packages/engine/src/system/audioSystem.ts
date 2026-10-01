@@ -30,6 +30,7 @@
  * part's `strip` and the `returns` onto the live desk (`deskApply.ts`).
  */
 import { MUSIC_PART_MAX_VOICES } from '../audioConstants';
+import type { AutomationLane } from '../automation/automationLane';
 import type { AudioLoadReadout } from '../cost/audioLoad';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
@@ -414,6 +415,11 @@ export class AudioSystem {
    */
   resyncAutomation(slot: number): void {
     this.automation.resync(slot);
+  }
+
+  /** The lanes a part plays now: its document's, normalised and fitted. None before `initMusic`. */
+  automationLanes(slot: number): readonly AutomationLane[] {
+    return this.automation.lanesOf(slot);
   }
 
   /** A return by name, once `init()` has built them. */

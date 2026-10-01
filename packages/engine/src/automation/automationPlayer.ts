@@ -129,6 +129,16 @@ export class AutomationPlayer {
     this.restart(next, now);
   }
 
+  /** The slots that hold lanes. */
+  slots(): readonly number[] {
+    return [...this.lanes.keys()];
+  }
+
+  /** The lanes `slot` holds now; none for a slot without lanes. */
+  lanesOf(slot: number): readonly AutomationLane[] {
+    return this.lanes.get(slot) ?? [];
+  }
+
   /** A part leaving the song: its lanes are forgotten, its strip goes with it. */
   removePart(slot: number): void {
     this.lanes.delete(slot);

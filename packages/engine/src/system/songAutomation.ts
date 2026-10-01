@@ -11,8 +11,10 @@
  *   transport rests. On an offline context that is time 0, before
  *   `startRendering`: the render's opening values (`render/renderSystem.ts`).
  * - **Apply.** After a partial has landed on the strips: a part removed is
- *   forgotten; a transport edit (tempo, swing, loop, length) or a patch edit
- *   restarts every lane from now; a part's `automation` replaces its lanes,
+ *   forgotten; a length edit first refits every part's held lanes with the
+ *   document's own fit, so the engine's lanes stay the document's; a
+ *   transport edit (tempo, swing, loop, length) or a patch edit restarts
+ *   every lane from now; a part's `automation` replaces its lanes,
  *   normalised against its live inserts as the document normaliser would; a
  *   part's insert list changing restarts its lanes, so an insert lane finds
  *   its rebuilt stage.
@@ -21,8 +23,13 @@ import { AutomationPlayer } from '../automation/automationPlayer';
 import type { AutomationLane } from '../automation/automationLane';
 import { TICKS_PER_BAR, type Scheduler } from '../sequencing/scheduler';
 import { FieldNormaliser, isRecord } from '../song/arrangementFields';
-import type { ArrangementDocument, DocumentPartial } from '../song/arrangementDocument';
-import { normaliseAutomation } from '../song/automationNormalise';
+import type { MusicPart } from '../song/arrangement';
+import type {
+  ArrangementDocument,
+  DocumentPart,
+  DocumentPartial,
+} from '../song/arrangementDocument';
+import { normaliseAutomation, withFittedAutomation } from '../song/automationNormalise';
 import type { PartStrip } from '../mixer/channelStrip';
 import { automationResolver } from './automationResolver';
 
@@ -70,6 +77,7 @@ export class SongAutomation {
     if (isRecord(partial.transport) && partial.transport.bars !== undefined) {
       this.songTicks = bars() * TICKS_PER_BAR;
       player.setSongTicks(this.songTicks);
+      this.refit(player);
     }
     if (partial.transport !== undefined || partial.patches !== undefined) player.resync();
     for (const [key, part] of parts) {
@@ -85,9 +93,31 @@ export class SongAutomation {
     this.playerValue?.resync(slot);
   }
 
+  /** The lanes `slot` plays now; none before `begin` or for a part without lanes. */
+  lanesOf(slot: number): readonly AutomationLane[] {
+    return this.playerValue?.lanesOf(slot) ?? [];
+  }
+
   dispose(): void {
     this.playerValue?.dispose();
     this.playerValue = null;
+  }
+
+  /**
+   * Every part's held lanes fitted to the new length by the document's own
+   * fit (`withFittedAutomation`, as `fitTimelines` runs it), so a song
+   * shortened then lengthened plays the cut lanes its document now holds.
+   * The read is the fit's own: it takes only `automation` and `strip.inserts`.
+   */
+  private refit(player: AutomationPlayer): void {
+    for (const slot of player.slots()) {
+      const lanes = player.lanesOf(slot);
+      const inserts = this.stripOf(slot)?.insertSpecs ?? [];
+      const part = { automation: lanes, strip: { inserts } } as unknown as MusicPart;
+      const fitted = (withFittedAutomation(part, this.songTicks) as Partial<DocumentPart>)
+        .automation;
+      if (fitted !== undefined && fitted !== lanes) player.setLanes(slot, fitted);
+    }
   }
 
   /** A part's lanes from a partial, normalised against its live inserts; none for null or junk. */
