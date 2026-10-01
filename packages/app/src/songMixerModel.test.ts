@@ -138,6 +138,20 @@ describe('the mixer column', () => {
     expect(stripOutput(stripOf(ctx, 0))).toBe('sidechain');
   });
 
+  it('routes the Output to a group, keeping M and S enabled (windsor#287)', () => {
+    const ctx = console0();
+    ctx.change({ groups: { 2: { id: 2, name: 'Drums', level: 1, pan: 0, inserts: [] } } });
+    expect(setStripOutput(ctx, 0, { group: 2 })).toBe(true);
+    expect(stripOutput(stripOf(ctx, 0))).toEqual({ group: 2 });
+    expect(switchesApply(stripOf(ctx, 0))).toBe(true);
+    expect(switchEnabled(stripOf(ctx, 0), 'mute')).toBe(true);
+    expect(switchEnabled(stripOf(ctx, 0), 'solo')).toBe(true);
+    expect(setStripOutput(ctx, 0, 'sidechain')).toBe(true);
+    expect(switchEnabled(stripOf(ctx, 0), 'mute')).toBe(false);
+    expect(ctx.undo()).toBe(true);
+    expect(stripOutput(stripOf(ctx, 0))).toEqual({ group: 2 });
+  });
+
   it('moves its strip signature on every field the expanded cell shows, and on nothing else', () => {
     const ctx = console0();
     const drawn = stripSignature(ctx);
@@ -152,7 +166,9 @@ describe('the mixer column', () => {
       { mute: true },
       { solo: true },
       { output: 'sidechain' },
+      { output: { group: 2 } },
     ];
+    ctx.change({ groups: { 2: { id: 2, name: 'Drums', level: 1, pan: 0, inserts: [] } } });
     for (const strip of edits) {
       const before = stripSignature(ctx);
       ctx.change(partChange(0, { strip }));

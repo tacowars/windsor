@@ -28,6 +28,17 @@ export const PERC_COLOR = CARRIER_COLOR;
 export const PITCH_COLOR = MOD_COLOR;
 export const STRIP_COLOR = MOD_COLOR;
 
+/**
+ * The Groups section's row accents (windsor#287), one per group in list
+ * order and round again past the last: the palette's accents, the
+ * modulator first so the first group never reads as a send bus beside it.
+ */
+export const GROUP_ACCENTS: readonly string[] = [MOD_COLOR, RETURN_COLOR, CARRIER_COLOR];
+
+/** The accent of the group at `index` in the song's list. */
+export const groupAccent = (index: number): string =>
+  GROUP_ACCENTS[index % GROUP_ACCENTS.length] ?? MOD_COLOR;
+
 /** The template's custom property each TS colour mirrors, for the equality test. */
 export const CSS_VARIABLE_OF: Readonly<Record<string, string>> = {
   '--carrier': CARRIER_COLOR,

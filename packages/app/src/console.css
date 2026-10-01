@@ -1082,6 +1082,47 @@ input {
   line-height: 1.35;
   text-align: center;
 }
+/* A group (windsor#287): a send bus row whose head holds the name as a field,
+   Level and Pan, M, S and the lights, the members and Remove. groupsPanel.ts
+   sets --group-accent per row, in list order, and the rack's --kc to it. */
+.bus-head.group-head {
+  width: 132px;
+  gap: 6px;
+  border-left: 3px solid var(--group-accent, var(--modulator));
+}
+input.field.group-name {
+  align-self: stretch;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding: 3px 5px;
+  font-family: var(--f-panel);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--group-accent, var(--ink));
+}
+.group-knobs {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.group-switches {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-switches .mix-lights {
+  flex-direction: row;
+}
+.btn.group-remove {
+  padding: 2px 8px;
+  font-size: 10px;
+}
+.btn.group-add:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 
 .bar-row {
   display: flex;
