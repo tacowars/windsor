@@ -23,6 +23,7 @@ import type { EngineHost } from './host';
 import { laneY } from './songAutomationCurve';
 import {
   addPoint,
+  addPointOnLine,
   deletePoint,
   displayAtPx,
   draggedBend,
@@ -124,20 +125,78 @@ describe('where a press lands', () => {
 describe('the Edit gestures', () => {
   it('adds a point in tick order, carrying the bend of the segment it splits', () => {
     const bent = withBend(ramp, 0, 0.5);
-    const { points, index } = addPoint(bent, BAR, 0.2);
+    const { points, index } = addPoint(bent, BAR, 0.2)!;
     expect(index).toBe(1);
     expect(points).toEqual([P(0, -1, 0.5), P(BAR, 0.2, 0.5), P(2 * BAR, 1), P(3 * BAR, 1)]);
-    expect(addPoint(ramp, 4 * BAR, 0).index).toBe(3);
+    expect(addPoint(ramp, 4 * BAR, 0)!.index).toBe(3);
   });
 
   it('adds a point on the line at the line value', () => {
     const tick = snapTick(tickAtPx(96, frame), SIXTEENTH, frame.songTicks);
-    const { points } = addPoint(ramp, tick, valueAt(pan, ramp, tick));
+    const { points } = addPointOnLine(pan, ramp, tick)!;
     expect(points[1]).toEqual(P(BAR, 0));
     // The curve through it is unchanged.
     for (const t of [0, BAR / 2, BAR, 1.5 * BAR, 2 * BAR]) {
       expect(valueAt(pan, points, t)).toBeCloseTo(valueAt(pan, ramp, t), 12);
     }
+  });
+
+  it('adds a point on a bent line without moving the curve', () => {
+    const lane = AUTOMATION_PART.automation!.find((l) => l.target === 'voice.filter.cutoff')!;
+    const cutoff = catalogRow('voice.filter.cutoff')!;
+    const original = lane.points;
+    const shown = (points: readonly AutomationPoint[], t: number): number =>
+      toDisplay(cutoff, valueAt(cutoff, points, t));
+    for (const [segment, s] of [
+      [0, 0.3],
+      [1, 0.5],
+      [0, 0.7],
+    ] as const) {
+      const a = original[segment]!;
+      const b = original[segment + 1]!;
+      const tick = Math.round(a.tick + s * (b.tick - a.tick));
+      const { points, index } = addPointOnLine(cutoff, original, tick)!;
+      expect(points[index - 1]!.bend).toBe(a.bend);
+      // The left half is the same curve exactly.
+      for (let i = 0; i <= 16; i++) {
+        const t = a.tick + ((tick - a.tick) * i) / 16;
+        expect(shown(points, t)).toBeCloseTo(shown(original, t), 9);
+      }
+      // The right half meets it at its midpoint, and stays close elsewhere.
+      expect(shown(points, (tick + b.tick) / 2)).toBeCloseTo(
+        shown(original, (tick + b.tick) / 2),
+        6,
+      );
+      for (let i = 0; i <= 16; i++) {
+        const t = tick + ((b.tick - tick) * i) / 16;
+        expect(Math.abs(shown(points, t) - shown(original, t))).toBeLessThan(0.02);
+      }
+    }
+  });
+
+  it('a click off the line keeps the bend of the segment it splits', () => {
+    const bent = withBend(ramp, 0, 0.5);
+    expect(addPoint(bent, BAR, 0.9)!.points[1]!.bend).toBe(0.5);
+  });
+
+  it('adds nothing on a tick that already holds two points', () => {
+    const step = [P(0, 0), P(BAR, 0), P(BAR, 1), P(2 * BAR, 1)];
+    expect(addPoint(step, BAR, 0.5)).toBeNull();
+    expect(addPointOnLine(pan, step, BAR)).toBeNull();
+    expect(addPoint(step, 0, 0.5)!.points).toHaveLength(5);
+  });
+
+  it('moves a point onto a lone neighbour tick, but never onto a step', () => {
+    const lane = AUTOMATION_PART.automation!.find((l) => l.target === 'voice.ops.0.level')!;
+    const moved = movePoint(lane.points, 0, { tick: 2 * BAR, value: 0.5 });
+    expect(moved[0]).toEqual(P(2 * BAR - 1, 0.5));
+    const step = [P(0, 0), P(BAR, 0), P(BAR, 1), P(2 * BAR, 1), P(3 * BAR, 0)];
+    expect(movePoint(step, 3, { tick: 0, value: 1 })[3]!.tick).toBe(BAR + 1);
+    // Either side of the step moves along its own neighbour tick freely.
+    expect(movePoint(step, 2, { tick: 0, value: 1 })[2]!.tick).toBe(BAR);
+    expect(movePoint(step, 1, { tick: 3 * BAR, value: 0 })[1]!.tick).toBe(BAR);
+    // A lone neighbour tick is inclusive: the point may make a step there.
+    expect(movePoint(step, 3, { tick: 4 * BAR, value: 1 })[3]!.tick).toBe(3 * BAR);
   });
 
   it('moves a point, clamped between its neighbours', () => {
@@ -266,7 +325,7 @@ describe('one gesture, one undo step', () => {
   it('commits the whole list once, and undo restores the exact previous points', () => {
     const { ctx, model } = openConsole();
     const before = pointsIn(model)!;
-    const after = deletePoint(addPoint(before, BAR + 7, 0.123).points, 0);
+    const after = deletePoint(addPoint(before, BAR + 7, 0.123)!.points, 0);
     withGesture('Move Level point', () => {
       ctx.change(automationChange(slot, withPoints(lanesOf(AUTOMATION_PART), target, after)));
     });

@@ -26,7 +26,7 @@ import type {
   AutomationTargetId,
   AutomationTargetRow,
 } from '@windsor/engine';
-import { fromDisplay, replaceRange, toDisplay, valueAt } from '@windsor/engine';
+import { bendCurve, fromDisplay, replaceRange, toDisplay, valueAt } from '@windsor/engine';
 import { laneY } from './songAutomationCurve';
 import {
   AUTOMATION_DRAWING,
@@ -124,15 +124,24 @@ export function pressAt(
   };
 }
 
+/** How many points sit at `tick`, leaving out point `except`. */
+const pointsAtTick = (points: readonly AutomationPoint[], tick: number, except = -1): number =>
+  points.filter((p, i) => i !== except && p.tick === tick).length;
+
+/** A tick holds at most two points: the two sides of a step. */
+const STEP_POINTS = 2;
+
 /**
  * `points` with a point at `tick`, after any already there, carrying the
- * bend of the segment it splits so the curve keeps its direction.
+ * bend of the segment it splits so the curve keeps its direction; null when
+ * `tick` already holds two points (a step), which a third would break.
  */
 export function addPoint(
   points: readonly AutomationPoint[],
   tick: number,
   value: number,
-): { readonly points: AutomationPoint[]; readonly index: number } {
+): { readonly points: AutomationPoint[]; readonly index: number } | null {
+  if (pointsAtTick(points, tick) >= STEP_POINTS) return null;
   let index = points.findIndex((p) => p.tick > tick);
   if (index < 0) index = points.length;
   const bend = index > 0 ? points[index - 1]!.bend : 0;
@@ -141,7 +150,61 @@ export function addPoint(
   return { points: next, index };
 }
 
-/** `points` with point `index` at `value` and `tick`, held between its neighbours' ticks. */
+/** Half way along a segment: where a split's right half is matched to the original. */
+const MIDPOINT = 1 / 2;
+
+/**
+ * The bend for the right half of bent segment `a → b` split at fraction `s`.
+ * The engine's curve is `u^k` in display space: the left half is that same
+ * curve with the same bend, but the right half is no power law, so it takes
+ * the bend whose curve meets the original at its own midpoint, clamped to
+ * −1..1.
+ */
+export function rightHalfBend(
+  row: AutomationTargetRow,
+  a: AutomationPoint,
+  b: AutomationPoint,
+  s: number,
+): number {
+  const rise = toDisplay(row, b.value) - toDisplay(row, a.value);
+  const k = Math.log(bendCurve(MIDPOINT, a.bend, rise)) / Math.log(MIDPOINT);
+  if (a.bend === 0 || rise === 0 || k === 1) return a.bend;
+  const at = bendCurve(s, a.bend, rise);
+  const mid = bendCurve(s + (1 - s) * MIDPOINT, a.bend, rise);
+  const fraction = (mid - at) / (1 - at);
+  if (!(fraction > 0 && fraction < 1)) return a.bend;
+  const k2 = Math.log(fraction) / Math.log(MIDPOINT);
+  // k = BASE^(−bend · sign(rise)), so a bend scales with log k.
+  return clamp((a.bend * Math.log(k2)) / Math.log(k), -1, 1);
+}
+
+/**
+ * `points` with a point on the line at `tick` ("add on the line"): the
+ * line's own value there, the split segment's bend kept on the left half
+ * and matched on the right (`rightHalfBend`), so the curve stays put. Null
+ * when `tick` already holds two points.
+ */
+export function addPointOnLine(
+  row: AutomationTargetRow,
+  points: readonly AutomationPoint[],
+  tick: number,
+): { readonly points: AutomationPoint[]; readonly index: number } | null {
+  const added = addPoint(points, tick, valueAt(row, points, tick));
+  if (!added) return null;
+  const { index } = added;
+  const a = points[index - 1];
+  const b = points[index];
+  if (!a || !b || a.tick >= tick) return added;
+  const s = (tick - a.tick) / (b.tick - a.tick);
+  added.points[index] = { ...added.points[index]!, bend: rightHalfBend(row, a, b, s) };
+  return added;
+}
+
+/**
+ * `points` with point `index` at `value` and `tick`, held between its
+ * neighbours' ticks: on a neighbour's tick, unless that tick already holds
+ * two points (a step), when it stops one tick short.
+ */
 export function movePoint(
   points: readonly AutomationPoint[],
   index: number,
@@ -149,8 +212,11 @@ export function movePoint(
 ): AutomationPoint[] {
   const point = points[index];
   if (!point) return [...points];
-  const lo = points[index - 1]?.tick ?? 0;
-  const hi = points[index + 1]?.tick ?? Infinity;
+  const before = points[index - 1];
+  const after = points[index + 1];
+  const full = (tick: number): boolean => pointsAtTick(points, tick, index) >= STEP_POINTS;
+  const lo = before ? before.tick + (full(before.tick) ? 1 : 0) : 0;
+  const hi = after ? after.tick - (full(after.tick) ? 1 : 0) : Infinity;
   const next = [...points];
   next[index] = { ...point, tick: clamp(to.tick, lo, hi), value: to.value };
   return next;

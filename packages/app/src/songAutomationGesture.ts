@@ -15,9 +15,9 @@
  * The rules are `songAutomationEdit.ts`; this file only reads the pointer.
  */
 import type { AutomationPoint, AutomationTargetRow } from '@windsor/engine';
-import { valueAt } from '@windsor/engine';
 import {
   addPoint,
+  addPointOnLine,
   deletePoint,
   displayAtPx,
   draggedBend,
@@ -195,8 +195,10 @@ export function wireLaneEditing(lane: LaneEditing): void {
     if (moved) return draft ? commit(`Bend ${lane.name} line`, draft) : void stop();
     const { x, y } = at(e);
     const tick = snapped(x, e);
-    const value = drag.press.near ? valueAt(row, start, tick) : valueAtPx(row, y, frame());
-    commit(`Add ${lane.name} point`, addPoint(start, tick, value).points);
+    const added = drag.press.near
+      ? addPointOnLine(row, start, tick)
+      : addPoint(start, tick, valueAtPx(row, y, frame()));
+    return added ? commit(`Add ${lane.name} point`, added.points) : void stop();
   });
 
   for (const type of ['pointercancel', 'lostpointercapture'] as const) {
