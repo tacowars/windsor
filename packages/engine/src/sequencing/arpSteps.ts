@@ -5,7 +5,8 @@
  *
  * Cell `k` shapes the `k`-th note of the style's cycle, not a fixed pitch,
  * so a cell has no degree: it is a rest, a tie, or a note with an octave
- * shift, an accent and a slide, as a grid step is without its degree. The
+ * shift, an accent, a slide and a ratchet (windsor#366), as a grid step is
+ * without its degree. The
  * grid always stores `ARP_STEPS_MAX` cells; the cycle over the chord under
  * the playhead reads the first `arpCycleLength(style, L)` of them, and the
  * cells past it wait, as the grid keeps steps past its length.
@@ -16,7 +17,7 @@
 import { GRID_STEP_OCTAVE_MAX } from '../audioConstants';
 import { ARP_BOUNCE_STYLES, ARP_STEPS_MAX } from './arpStepConstants';
 import type { ArpStyle } from './arpSequencer';
-import { GRID_STEP_KINDS } from './gridSequencer';
+import { GRID_STEP_KINDS, assertRatchet } from './gridSequencer';
 import { assertStepModLanes, type StepModLane } from './stepModLanes';
 
 export interface ArpNoteStep {
@@ -25,6 +26,8 @@ export interface ArpNoteStep {
   readonly octave: number;
   readonly accent: boolean;
   readonly slide: boolean;
+  /** Hits the cell's roll plays, 1 to `RATCHET_MAX` (windsor#366); absent is one. */
+  readonly ratchet?: number;
 }
 
 export type ArpStep = { readonly kind: 'rest' } | { readonly kind: 'tie' } | ArpNoteStep;
@@ -72,6 +75,7 @@ function assertCell(step: ArpStep, index: number): void {
       `steps[${index}].octave must be an integer within ±${GRID_STEP_OCTAVE_MAX}`,
     );
   }
+  assertRatchet(step.ratchet, `steps[${index}]`);
 }
 
 function assertUnit(value: number, name: string): void {

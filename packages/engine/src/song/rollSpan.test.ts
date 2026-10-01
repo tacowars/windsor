@@ -115,4 +115,25 @@ describe('rollHits', () => {
       [1.5, 0.3],
     ]);
   });
+
+  it('holds each hit its gate’s share of the spacing, still bound (windsor#366)', () => {
+    // An Arp's gate 0.5 over spacing 1.5: each hit 0.75.
+    const regions = [{ start: 0, duration: 20 }];
+    const gated = { ...at, hold: Infinity, gate: 0.5 };
+    expectTicks(rollHits({ ...gated, tick: 0, regions }), [
+      [0, 0.75],
+      [1.5, 0.75],
+      [3, 0.75],
+      [4.5, 0.75],
+    ]);
+    // Spacing 3, the region's end 2 ticks in: a gate of 0.9 would hold 2.7, the bound cuts it to 2.
+    expectTicks(rollHits({ ...gated, gate: 0.9, ratchet: 2, tick: 18, regions }), [[0, 2]]);
+  });
+
+  it('is bit for bit a Euclid roll with the gate at 1', () => {
+    const regions = [{ start: 0, duration: 20 }];
+    const swing = { amount: 58, grid: 16 as const };
+    const euclid = rollHits({ ...at, hold: 0.012, tick: 12, regions, swing });
+    expect(rollHits({ ...at, hold: 0.012, tick: 12, regions, swing, gate: 1 })).toEqual(euclid);
+  });
 });
