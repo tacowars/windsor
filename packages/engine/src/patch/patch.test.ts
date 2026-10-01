@@ -6,8 +6,6 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { readFileSync } from 'node:fs';
-
 import { LFO2_DEFAULTS, LFO_DEFAULTS } from '../worklet/fm/patchDefaults';
 import { ALGORITHMS, WAVE, WAVE_NAMES, makePatch } from './patch';
 import type { Patch } from './patch';
@@ -52,9 +50,26 @@ describe('operator width, the LFO fields and LFO 2 (windsor#54)', () => {
   });
 });
 
+/**
+ * A patch file as it was saved before windsor#54: no `lfo2`, no
+ * `filter.lfo2Amount` and no operator `width`. Built here rather than read
+ * from a library file, so a refit that gives a library patch those fields
+ * (windsor#324) does not break the test.
+ */
+function fileBeforeWindsor54(): Record<string, unknown> {
+  const patch = JSON.parse(JSON.stringify(makePatch({ name: 'Old Bell', algorithm: 2 }))) as {
+    lfo2?: unknown;
+    filter: { lfo2Amount?: unknown };
+    ops: { width?: unknown }[];
+  };
+  delete patch.lfo2;
+  delete patch.filter.lfo2Amount;
+  for (const op of patch.ops) delete op.width;
+  return { format: 3, name: 'Old Bell', category: 'Leads', tags: [], description: '', patch };
+}
+
 describe('a patch file written before windsor#54', () => {
-  const url = new URL('../patches/lead-bell.json', import.meta.url);
-  const raw = JSON.parse(readFileSync(url, 'utf8')) as Record<string, unknown>;
+  const raw = fileBeforeWindsor54();
   const before = raw['patch'] as Record<string, unknown>;
 
   it('carries none of the new fields', () => {
@@ -63,7 +78,7 @@ describe('a patch file written before windsor#54', () => {
   });
 
   it('loads with the defaults, and round-trips unchanged apart from the new fields', () => {
-    const entry = loadPatchFile('lead-bell', raw);
+    const entry = loadPatchFile('old-bell', raw);
     const fresh = makePatch();
     expect(entry.patch.lfo2).toEqual(fresh.lfo2);
     expect(entry.patch.ops.map((op) => op.width)).toEqual([1, 1, 1, 1]);
