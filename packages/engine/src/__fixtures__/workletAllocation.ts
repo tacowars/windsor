@@ -28,29 +28,39 @@ export function probeScenario(file: string): string {
   return fileURLToPath(new URL(`./${file}`, import.meta.url));
 }
 
+/**
+ * V8 compiles on the main thread: a function is optimised at the call that
+ * makes it hot, not when a background thread gets to it, so the tier each
+ * function has reached when the measured run starts depends on the calls the
+ * warm-up made and never on the machine's load. With concurrent compilation
+ * a warm-up of a cheap render lasts tens of milliseconds, and on a busy
+ * runner a function can still be waiting for its optimised code when the
+ * heap is read (windsor#256).
+ */
+export const SYNCHRONOUS_TIERING = ['--no-concurrent-recompilation'] as const;
+
 export interface ProbeRun extends ProbeResult {
   /** Each generalisation the bundle caused that changed a field's representation. */
   changes: string[];
 }
 
 /**
- * Run the probe on `config`. `v8Flags` go to the child's Node before the
- * probe's own (`--no-turbo-inlining`, to measure a path as if V8 declined to
- * inline its calls, as it may in a larger render than the test's).
+ * Runs the probe. `flags` are V8 flags the child takes beside the fixed ones,
+ * such as `SYNCHRONOUS_TIERING`.
  */
-export function runAllocationProbe(config: ProbeConfig, v8Flags: string[] = []): ProbeRun {
+export function runAllocationProbe(config: ProbeConfig, flags: readonly string[] = []): ProbeRun {
   const dir = mkdtempSync(join(tmpdir(), 'worklet-allocation-'));
   try {
     const resultFile = join(dir, 'result.json');
     const child = spawnSync(
       process.execPath,
       [
-        ...v8Flags,
         '--expose-gc',
         '--min-semi-space-size=64',
         '--max-semi-space-size=64',
         '--trace-generalization',
         '--no-warnings',
+        ...flags,
         PROBE,
         JSON.stringify(config),
         resultFile,
