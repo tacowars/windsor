@@ -1,7 +1,8 @@
 /**
- * The patch's mode ids (#669): the envelope loop modes, the filter modes and
- * the LFO shapes — the numbers the worklet switches on and the main thread's
- * `patch.ts` re-exports as `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`, so a
+ * The patch's mode ids (#669): the envelope loop modes, the filter modes,
+ * the LFO shapes and the voice drive's shapes (windsor#300) — the numbers the
+ * worklet switches on and the main thread's `patch.ts` re-exports as
+ * `LOOP_MODE`, `FILTER_MODE`, `LFO_SHAPE` and `DRIVE_SHAPE`, so a
  * patch, a preset, the console and the DSP name a mode the same way. The
  * scalars are what the hot paths compare against (a module constant, never a
  * property load); the objects are built from them, so each number is written
@@ -32,6 +33,13 @@ const LFO_SINE = 0,
   LFO_SH = 5,
   LFO_DRIFT = 6;
 
+/** The voice drive's shapes (`voiceDrive.ts`, windsor#300); `soft` is the default. */
+const DRIVE_SOFT = 0,
+  DRIVE_HARD = 1,
+  DRIVE_DIODE = 2,
+  DRIVE_TUBE = 3,
+  DRIVE_FOLD = 4;
+
 const LOOP_MODE = { NONE: LOOP_NONE, LOOP: LOOP_LOOP, TRIGGER: LOOP_TRIGGER } as const;
 
 const FILTER_MODE = {
@@ -52,6 +60,14 @@ const LFO_SHAPE = {
   DRIFT: LFO_DRIFT,
 } as const;
 
+const DRIVE_SHAPE = {
+  SOFT: DRIVE_SOFT,
+  HARD: DRIVE_HARD,
+  DIODE: DRIVE_DIODE,
+  TUBE: DRIVE_TUBE,
+  FOLD: DRIVE_FOLD,
+} as const;
+
 export {
   LOOP_NONE,
   LOOP_LOOP,
@@ -68,7 +84,13 @@ export {
   LFO_SQUARE,
   LFO_SH,
   LFO_DRIFT,
+  DRIVE_SOFT,
+  DRIVE_HARD,
+  DRIVE_DIODE,
+  DRIVE_TUBE,
+  DRIVE_FOLD,
   LOOP_MODE,
   FILTER_MODE,
   LFO_SHAPE,
+  DRIVE_SHAPE,
 };

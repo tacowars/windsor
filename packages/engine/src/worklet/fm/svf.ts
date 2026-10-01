@@ -1,8 +1,9 @@
 /* eslint-disable no-magic-numbers -- DSP: the TPT filter's polynomial and clamps are the algorithm; the tunables are fmConstants.ts (#654) */
 /**
  * The per-voice filter (#644): a TPT state-variable filter (Simper topology)
- * giving lowpass, highpass, bandpass and notch from one structure, its
- * dormancy test (#547), and the soft clip its drive runs through. Invariant:
+ * giving lowpass, highpass, bandpass and notch from one structure, and its
+ * dormancy test (#547). Its drive left it for the voice's own drive stage,
+ * `voiceDrive.ts`, which kept the soft clip (windsor#300). Invariant:
  * `process` is the hot path — no allocation, coefficients only at control
  * rate. `setCoeffs` reads its cutoff and Q from `cutoffHz` and `q`, so no
  * double crosses the call (windsor#233: a double passed to a call V8 does not
@@ -90,11 +91,4 @@ class Svf {
   }
 }
 
-/** Cheap odd-symmetric saturator for filter drive. */
-function softClip(x: number): number {
-  if (x > 3) return 1;
-  if (x < -3) return -1;
-  return (x * (27 + x * x)) / (27 + 9 * x * x);
-}
-
-export { Svf, softClip };
+export { Svf };

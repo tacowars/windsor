@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "Width Sweep Lead",
   "category": "Leads",
   "tags": ["lead", "sync", "width", "sweep", "original"],
@@ -138,7 +138,6 @@
       "mode": 1,
       "cutoff": 3000,
       "resonance": 0.7,
-      "drive": 1,
       "slope24": true,
       "envAmount": 0.8,
       "modWheelDepth": 0,
@@ -199,6 +198,12 @@
       "modWheelDepth": 0,
       "toOp": [0, 0, 0, 0],
       "toWidth": [-0.8, 0, 0, 0]
+    },
+    "drive": {
+      "gain": 1,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

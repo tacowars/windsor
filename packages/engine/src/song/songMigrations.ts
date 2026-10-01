@@ -23,11 +23,29 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * No upgrades ship. Version 2 was retired by #705 and version 3 by windsor#238
- * (record `2026-10-01-retire-song-version-3`), each with no upgrade, so a
- * song saved at either is refused.
+ * Version 5 → 6 (windsor#300, record `2026-10-01-voice-drive-stage`): the
+ * snapshot's patches move from patch format 2 to 3 through the patch table's
+ * own step, so the song plays as it did. A patch that declares its own
+ * `format` is left for `upgradeSnapshot`, which reads that format instead.
  */
-export const SONG_MIGRATIONS: MigrationTable<RawDocument> = {};
+function snapshotToPatchFormatThree(doc: RawDocument): RawDocument {
+  const patches = doc['patches'];
+  const step = PATCH_MIGRATIONS[2];
+  if (!isRecord(patches) || !step) return doc;
+  const out: Record<string, unknown> = {};
+  for (const [id, entry] of Object.entries(patches)) {
+    out[id] = isRecord(entry) && !Object.hasOwn(entry, 'format') ? step(entry) : entry;
+  }
+  return { ...doc, patches: out };
+}
+
+/**
+ * One upgrade ships, 5 → 6. Version 2 was retired by #705, version 3 by
+ * windsor#238 (record `2026-10-01-retire-song-version-3`) and version 4 by
+ * windsor#224, each with no upgrade, so a song saved at any of them is
+ * refused.
+ */
+export const SONG_MIGRATIONS: MigrationTable<RawDocument> = { 5: snapshotToPatchFormatThree };
 
 /** The tables `upgradeSong` runs; a test hands its own. */
 export interface FormatMigrations {

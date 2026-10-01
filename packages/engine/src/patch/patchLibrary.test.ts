@@ -61,9 +61,9 @@ describe('the real library files', () => {
     expect(PRESETS[id]).toBe(PATCH_LIBRARY[id]?.patch);
   });
 
-  it.each(onDisk)('%s is format 2, with no retired key', (id) => {
+  it.each(onDisk)('%s is format 3, with no retired key', (id) => {
     const raw = fileOf(id);
-    expect(raw['format']).toBe(2);
+    expect(raw['format']).toBe(PATCH_FILE_FORMAT);
     expect(Object.keys(raw)).toEqual([
       'format',
       'name',
@@ -74,6 +74,8 @@ describe('the real library files', () => {
     ]);
     const patch = raw['patch'] as Patch;
     for (const op of patch.ops) expect(Object.keys(op)).not.toContain('userKey');
+    // windsor#300: the drive left the filter for the voice's drive stage.
+    expect(Object.keys(patch.filter)).not.toContain('drive');
     // The file on disk is the patch it plays wherever it speaks. A field added
     // after it was written is filled by the loader, not written into the bank
     // (record `2026-09-28-retire-the-headroom-record`, "Consequences").
@@ -198,12 +200,12 @@ describe('the loader rejects', () => {
   });
 
   it('a format it does not know, as a PatchFormatError naming both formats', () => {
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 3 })).toThrow(PatchFormatError);
-    expect(() => loadPatchFile('lead-bell', { ...real, format: 3 })).toThrow(
-      'patches/lead-bell.json: saved with patch format 3, this build reads 2',
+    expect(() => loadPatchFile('lead-bell', { ...real, format: 4 })).toThrow(PatchFormatError);
+    expect(() => loadPatchFile('lead-bell', { ...real, format: 4 })).toThrow(
+      'patches/lead-bell.json: saved with patch format 4, this build reads 3',
     );
-    expect(() => loadPatchFile('lead-bell', { ...real, format: '2' })).toThrow(
-      /format: expected 2, got 2/,
+    expect(() => loadPatchFile('lead-bell', { ...real, format: '3' })).toThrow(
+      /format: expected 3, got 3/,
     );
   });
 });

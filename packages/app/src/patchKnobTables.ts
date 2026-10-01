@@ -57,7 +57,7 @@ export const GLOBAL_KNOBS: PatchKnobTable = [
 export const FILTER_KNOBS: PatchKnobTable = [
   { f: 'filter.cutoff', label: 'Cutoff', o: { min: 30, max: 18000, curve: 'log', fmt: fmtHz } },
   { f: 'filter.resonance', label: 'Reso', o: { min: 0.5, max: 12, curve: 'log', fmt: fmt2 } },
-  { f: 'filter.drive', label: 'Drive', o: { min: 1, max: 6, fmt: fmt2 } },
+  { f: 'drive.gain', label: 'Drive', o: { min: 1, max: 6, fmt: fmt2 } },
   { f: 'filter.envAmount', label: 'Env Amt', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.modWheelDepth', label: 'Wheel', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.lfoAmount', label: 'LFO Amt', o: { min: -4, max: 4, fmt: fmtSigned } },

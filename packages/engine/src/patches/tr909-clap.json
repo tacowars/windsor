@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "909 Clap",
   "category": "Drums",
   "tags": ["909", "clap", "analog", "noise", "mono"],
@@ -144,7 +144,6 @@
       "mode": 3,
       "cutoff": 1140,
       "resonance": 1.95,
-      "drive": 1.6,
       "slope24": false,
       "envAmount": 0,
       "modWheelDepth": 0,
@@ -178,6 +177,12 @@
       "endLevel": 0,
       "loopMode": 2,
       "keyScale": 0
+    },
+    "drive": {
+      "gain": 1.6,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

@@ -28,8 +28,7 @@ import {
   MOD_INDEX_SCALE,
   TABLE_SIZE,
 } from './fmConstants';
-import { FILT_OFF } from './modeIds';
-import { softClip } from './svf';
+import { DRIVE_SOFT, FILT_OFF } from './modeIds';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
 
 /**
@@ -43,7 +42,7 @@ import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
  * loop would have stored. A noise operator is never skipped: its draws
  * advance the voice's shared noise generator.
  */
-// Four operators written out, then the carrier sum and the filter, over locals
+// Four operators written out, then the carrier sum, the drive and the filter, over locals
 // hoisted out of the loop. The fixed indices and the locals are the saving
 // (docs/research/2026-09-15-548-fm-voice-loop-specialisation); a helper per
 // operator would reload the state through `this` and give it back.
@@ -60,7 +59,16 @@ function renderVoiceKernel(
   const carGain = 1 / Math.sqrt(nCar);
   const f = patch.filter;
   const mode = f.mode;
-  const drive = f.drive;
+  // The drive stage (windsor#300), hoisted: `updateVoiceDrive` set it for this block.
+  const drive = voice.drive;
+  const driven = drive.on,
+    driveSoft = drive.shape === DRIVE_SOFT,
+    driveGain = drive.gain,
+    driveBias = drive.bias,
+    driveOffset = drive.offset,
+    driveToned = drive.toned,
+    driveCoef = drive.toneCoef;
+  let driveTone = drive.toneState;
   const slope24 = f.slope24;
   const gain = patch.volume * carGain;
   const panL = voice.panL,
@@ -370,8 +378,28 @@ function renderVoiceKernel(
     if (carD) sig += oD * aD;
     sig *= gain;
 
+    // The drive stage (windsor#300), before the filter and without it:
+    // shape(gain * x + bias) - shape(bias), then the tone pole. `soft` is
+    // written out, the filter's old soft clip operation for operation; any
+    // other shape is a call whose operand and result pass through `point`,
+    // so no double crosses it.
+    if (driven) {
+      let x = sig * driveGain + driveBias;
+      if (driveSoft) x = x > 3 ? 1 : x < -3 ? -1 : (x * (27 + x * x)) / (27 + 9 * x * x);
+      else {
+        drive.point = x;
+        drive.curve();
+        x = drive.point;
+      }
+      sig = x - driveOffset;
+      if (driveToned) {
+        const v = (sig - driveTone) * driveCoef;
+        sig = v + driveTone;
+        driveTone = sig + v;
+      }
+    }
+
     if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
       sig = voice.svfA.process(sig, mode);
       if (slope24) sig = voice.svfB.process(sig, mode);
     }
@@ -425,6 +453,7 @@ function renderVoiceKernel(
   settleSkipped(voice, C, liveC, n);
   settleSkipped(voice, D, liveD, n);
 
+  drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();

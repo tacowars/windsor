@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { makePatch } from '../../patch/patch';
 import type { PartialPatch, Patch } from '../../patch/patch';
 import { patchLeafDifferences } from '../../patch/patchLibrary';
-import { TONE_RANGE } from './patchDefaults';
+import { DRIVE_SHAPE } from './modeIds';
+import { DRIVE_BIAS_RANGE, DRIVE_GAIN_RANGE, DRIVE_TONE_RANGE, TONE_RANGE } from './patchDefaults';
 import { WAVE } from './waveIds';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
@@ -37,6 +38,8 @@ describe('the patch defaults (#670)', () => {
     ],
     ['LFO 2', { lfo2: { rate: 0.5, amount: 1, toOp: [0, 0, 0.2, 0], toWidth: [0.3, 0, 0, 0] } }],
     ["the filter's LFO 2 depth", { filter: { lfo2Amount: 2 } } as PartialPatch],
+    // windsor#300: the drive stage, inside its ranges.
+    ['the drive', { drive: { gain: 2, shape: 3, bias: 0.3 } }],
   ])('fills the rest of a partial naming %s identically', (_what, partial) => {
     expect(patchLeafDifferences(workletFill(partial), makePatch(partial), 'partial')).toEqual([]);
   });
@@ -46,5 +49,21 @@ describe('the patch defaults (#670)', () => {
     expect(patchLeafDifferences(workletFill({ tone: 0 }), makePatch({ tone: 0 }), 'p')).toEqual([
       `p.tone: ${TONE_RANGE.min} ≠ 0`,
     ]);
+  });
+
+  it('clamps the drive to its ranges and plays an unknown shape as soft (windsor#300)', () => {
+    const drive = workletFill({ drive: { gain: 3, shape: 9, bias: -4, tone: 2 } }).drive;
+    expect(drive).toEqual({
+      gain: 3,
+      shape: DRIVE_SHAPE.SOFT,
+      bias: DRIVE_BIAS_RANGE.min,
+      tone: DRIVE_TONE_RANGE.max,
+    });
+  });
+
+  it('clamps the drive gain to its range, so the shaper never sees an overflow (windsor#308)', () => {
+    expect(workletFill({ drive: { gain: 1e308 } }).drive.gain).toBe(DRIVE_GAIN_RANGE.max);
+    expect(workletFill({ drive: { gain: -3 } }).drive.gain).toBe(DRIVE_GAIN_RANGE.min);
+    expect(DRIVE_GAIN_RANGE.max).toBeGreaterThanOrEqual(6); // the console's Drive knob
   });
 });

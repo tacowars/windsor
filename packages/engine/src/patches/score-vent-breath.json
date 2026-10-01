@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "Vent Breath",
   "category": "Soundtrack FX",
   "tags": ["noise", "whoosh", "dark"],
@@ -158,7 +158,6 @@
       "mode": 3,
       "cutoff": 650,
       "resonance": 1.1,
-      "drive": 1,
       "slope24": false,
       "envAmount": 0.4,
       "modWheelDepth": 0,
@@ -178,6 +177,12 @@
         "loopMode": 0,
         "keyScale": 0
       }
+    },
+    "drive": {
+      "gain": 1,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

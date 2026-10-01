@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 3,
   "name": "808 Cymbal",
   "category": "Drums",
   "tags": ["808", "cymbal", "analog", "metal", "long", "mono"],
@@ -134,7 +134,6 @@
       "mode": 3,
       "cutoff": 3440,
       "resonance": 0.9,
-      "drive": 1.2,
       "slope24": false,
       "envAmount": 1.05,
       "modWheelDepth": 0,
@@ -178,6 +177,12 @@
       "toPitch": 0,
       "modWheelDepth": 1,
       "toOp": [0, 0, 0, 0]
+    },
+    "drive": {
+      "gain": 1.2,
+      "shape": 0,
+      "bias": 0,
+      "tone": 1
     }
   }
 }

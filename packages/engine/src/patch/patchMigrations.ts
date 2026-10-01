@@ -16,13 +16,16 @@
  */
 import type { FormatRefusal, MigrationTable } from '../song/formatUpgrade';
 import { declaredVersion, formatRefusal, runUpgrades } from '../song/formatUpgrade';
+import { DRIVE_SOFT, FILT_OFF } from '../worklet/fm/modeIds';
 
 /**
  * The patch file format this build reads and writes (#561). 2 retired the
  * headroom record and the operators' `userKey` (windsor#60, record
- * `2026-09-28-retire-the-headroom-record`).
+ * `2026-09-28-retire-the-headroom-record`); 3 moved the filter's drive into
+ * the voice's own drive stage (windsor#300, record
+ * `2026-10-01-voice-drive-stage`).
  */
-export const PATCH_FILE_FORMAT = 2;
+export const PATCH_FILE_FORMAT = 3;
 
 /** The format of a file that declares none: every file written before the check. */
 export const PATCH_FORMAT_ABSENT = 1;
@@ -52,7 +55,35 @@ function retireUserKey(patch: RawPatch): RawPatch {
   return { ...patch, ops: ops.map((op) => (isRecord(op) ? withoutKey(op, 'userKey') : op)) };
 }
 
-export const PATCH_MIGRATIONS: MigrationTable<RawPatch> = { 1: retireUserKey };
+/** The filter's mode as the worklet reads it (`num(mode, FILT_OFF) | 0`): on unless it is Off. */
+function filterIsOn(filter: Record<string, unknown>): boolean {
+  const mode = filter['mode'];
+  return typeof mode === 'number' && Number.isFinite(mode) && (mode | 0) !== FILT_OFF;
+}
+
+/**
+ * Format 2 → 3: `filter.drive` leaves the filter for the voice's drive stage
+ * (windsor#300), which no longer needs the filter. With the filter on, the
+ * stage takes its gain, soft shape, no bias and an open tone: the same
+ * arithmetic as before, bit for bit. With the filter Off the old drive was
+ * never heard, so the stage stays at unity gain, bypassed. A patch with no
+ * `filter.drive` (a partial one, at the default) is left as it is.
+ */
+function moveDriveOutOfFilter(patch: RawPatch): RawPatch {
+  const filter = patch['filter'];
+  if (!isRecord(filter) || !Object.hasOwn(filter, 'drive')) return patch;
+  const gain = filterIsOn(filter) ? filter['drive'] : 1;
+  return {
+    ...patch,
+    filter: withoutKey(filter, 'drive'),
+    drive: { gain, shape: DRIVE_SOFT, bias: 0, tone: 1 },
+  };
+}
+
+export const PATCH_MIGRATIONS: MigrationTable<RawPatch> = {
+  1: retireUserKey,
+  2: moveDriveOutOfFilter,
+};
 
 /**
  * The file around the patch, format `n` → `n + 1`, for the steps that retire
