@@ -674,9 +674,9 @@
       "noDormancy": "c5d367173940dd1e3c321719b45192c1aedd0b005220a376585edbed8145a07e"
     },
     "tr808-clave": {
-      "default": "b1f43842d97adda3c1f4c9e281457d17e9907622514ba9be12415935fbbadcfc",
-      "generic": "b1f43842d97adda3c1f4c9e281457d17e9907622514ba9be12415935fbbadcfc",
-      "noDormancy": "b1f43842d97adda3c1f4c9e281457d17e9907622514ba9be12415935fbbadcfc"
+      "default": "34fa013eb0af9e77ee7e8b6d1d148c95290a9eddebfd5e9b57b738a0588434a3",
+      "generic": "34fa013eb0af9e77ee7e8b6d1d148c95290a9eddebfd5e9b57b738a0588434a3",
+      "noDormancy": "34fa013eb0af9e77ee7e8b6d1d148c95290a9eddebfd5e9b57b738a0588434a3"
     },
     "tr808-conga": {
       "default": "044b2605c04ed4d7f53021f56edda9884e1fb29fc10b3d1f3294779151f7d9f9",
@@ -684,9 +684,9 @@
       "noDormancy": "044b2605c04ed4d7f53021f56edda9884e1fb29fc10b3d1f3294779151f7d9f9"
     },
     "tr808-cowbell": {
-      "default": "63d5cc4b1131210136d6546850bdf4edcb58d6d3968b2e19a65b2b394d3c68ff",
-      "generic": "63d5cc4b1131210136d6546850bdf4edcb58d6d3968b2e19a65b2b394d3c68ff",
-      "noDormancy": "63d5cc4b1131210136d6546850bdf4edcb58d6d3968b2e19a65b2b394d3c68ff"
+      "default": "ed56a68022d70c07400856f20fd3cf44cf6e5f7518c1435ca9e55dbbc4055eea",
+      "generic": "ed56a68022d70c07400856f20fd3cf44cf6e5f7518c1435ca9e55dbbc4055eea",
+      "noDormancy": "ed56a68022d70c07400856f20fd3cf44cf6e5f7518c1435ca9e55dbbc4055eea"
     },
     "tr808-cymbal": {
       "default": "f41c32cb22d057bd44b400865dd61d5ee9a754992facbf119dcf9b2855d8ff3a",
@@ -724,9 +724,9 @@
       "noDormancy": "cc988d42330ea31ee610aa522ec68c7e28346c418d4a5d35e6742668ee3ca784"
     },
     "tr808-rimshot": {
-      "default": "c133e5c25c7293c1173dfe15716b35e2596a92fb72f3e3ba5ec48a2db16198e8",
-      "generic": "c133e5c25c7293c1173dfe15716b35e2596a92fb72f3e3ba5ec48a2db16198e8",
-      "noDormancy": "c133e5c25c7293c1173dfe15716b35e2596a92fb72f3e3ba5ec48a2db16198e8"
+      "default": "58eeb224140ef8637239d1cd1c61fabd2bf1c824e645c14e83719974f92ae237",
+      "generic": "58eeb224140ef8637239d1cd1c61fabd2bf1c824e645c14e83719974f92ae237",
+      "noDormancy": "58eeb224140ef8637239d1cd1c61fabd2bf1c824e645c14e83719974f92ae237"
     },
     "tr808-snare": {
       "default": "c37db9d424be893f7629f41b827a8ce9cf546e0a89b63f8e7ac13bf43f1ab48e",
@@ -734,19 +734,19 @@
       "noDormancy": "c37db9d424be893f7629f41b827a8ce9cf546e0a89b63f8e7ac13bf43f1ab48e"
     },
     "tr808-tom-high": {
-      "default": "dd6b0dbe9ca4338d0b406145086ede3b4cb2c00c0044c85bc4e6650390f8b2a3",
-      "generic": "dd6b0dbe9ca4338d0b406145086ede3b4cb2c00c0044c85bc4e6650390f8b2a3",
-      "noDormancy": "dd6b0dbe9ca4338d0b406145086ede3b4cb2c00c0044c85bc4e6650390f8b2a3"
+      "default": "312e8069e475e073573d658664ac5c3dc0cb46501720a5d671f77a88debc439b",
+      "generic": "312e8069e475e073573d658664ac5c3dc0cb46501720a5d671f77a88debc439b",
+      "noDormancy": "312e8069e475e073573d658664ac5c3dc0cb46501720a5d671f77a88debc439b"
     },
     "tr808-tom-low": {
-      "default": "c2d53ed5a9a93626462a40b31538f8cb606d19ef3fb9dfa004248a8c6f6214bc",
-      "generic": "c2d53ed5a9a93626462a40b31538f8cb606d19ef3fb9dfa004248a8c6f6214bc",
-      "noDormancy": "c2d53ed5a9a93626462a40b31538f8cb606d19ef3fb9dfa004248a8c6f6214bc"
+      "default": "2106a096582c0647c14aef4a39cf6c914b7f0641b454b327778caf38c99a1847",
+      "generic": "2106a096582c0647c14aef4a39cf6c914b7f0641b454b327778caf38c99a1847",
+      "noDormancy": "2106a096582c0647c14aef4a39cf6c914b7f0641b454b327778caf38c99a1847"
     },
     "tr808-tom-mid": {
-      "default": "f41e016840af7ab345af5021cf019272dd8cfaf3a1ce08941e2143bd1689d552",
-      "generic": "f41e016840af7ab345af5021cf019272dd8cfaf3a1ce08941e2143bd1689d552",
-      "noDormancy": "f41e016840af7ab345af5021cf019272dd8cfaf3a1ce08941e2143bd1689d552"
+      "default": "5fbd0b96ef99552422617b53d3a313b17201cc613308a3f9f1ec8d3fdf808a0f",
+      "generic": "5fbd0b96ef99552422617b53d3a313b17201cc613308a3f9f1ec8d3fdf808a0f",
+      "noDormancy": "5fbd0b96ef99552422617b53d3a313b17201cc613308a3f9f1ec8d3fdf808a0f"
     },
     "tr909-clap": {
       "default": "181027ea3f263b1d8345da2fa1bf76f96cbcd6c52e75ac076d6d9f4f4172bc6c",
@@ -804,14 +804,19 @@
       "noDormancy": "865e53014f3649590c0e40d82504884e770059c127521d3d4ed665303b8c4bdd"
     },
     "tr909-tom-high": {
-      "default": "dfaac8e136cae577be56260e9483edd271f91f18fa6210c78234cc072fd11358",
-      "generic": "dfaac8e136cae577be56260e9483edd271f91f18fa6210c78234cc072fd11358",
-      "noDormancy": "dfaac8e136cae577be56260e9483edd271f91f18fa6210c78234cc072fd11358"
+      "default": "42200b25b753aa1704b3f9460faca174e0c8ac0977cefce3919cca75ab7be241",
+      "generic": "42200b25b753aa1704b3f9460faca174e0c8ac0977cefce3919cca75ab7be241",
+      "noDormancy": "42200b25b753aa1704b3f9460faca174e0c8ac0977cefce3919cca75ab7be241"
     },
     "tr909-tom-low": {
-      "default": "7b7e182992352edd6e7b666d6fced348367c4c70beef4bddb2321a801aae22df",
-      "generic": "7b7e182992352edd6e7b666d6fced348367c4c70beef4bddb2321a801aae22df",
-      "noDormancy": "7b7e182992352edd6e7b666d6fced348367c4c70beef4bddb2321a801aae22df"
+      "default": "84307ad3c9d47796a5bccc695cf0e96b11c0ce431f3d9e90f35fe2880bb45e12",
+      "generic": "84307ad3c9d47796a5bccc695cf0e96b11c0ce431f3d9e90f35fe2880bb45e12",
+      "noDormancy": "84307ad3c9d47796a5bccc695cf0e96b11c0ce431f3d9e90f35fe2880bb45e12"
+    },
+    "tr909-tom-mid": {
+      "default": "b9f3f82f1948541ba6eeda9967cf798aa03a1e5a3bbbfd9acbbf0096a5751c29",
+      "generic": "b9f3f82f1948541ba6eeda9967cf798aa03a1e5a3bbbfd9acbbf0096a5751c29",
+      "noDormancy": "b9f3f82f1948541ba6eeda9967cf798aa03a1e5a3bbbfd9acbbf0096a5751c29"
     },
     "weapon-zap": {
       "default": "a03c78701199ccff93c4eb79920d46cce3f02f58d4319a13ad4debad4f4af0c2",
