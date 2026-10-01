@@ -1,11 +1,12 @@
 /**
  * Runs `workletAllocationProbe.ts` for a test (windsor#198, windsor#214): a
  * Node of its own with `--expose-gc`, a 64 MB young generation (nothing the
- * run allocates is collected before it is counted) and
- * `--trace-generalization`, whose result it reads from a JSON file the child
- * writes into a temporary directory. Stdout carries the trace alone: on Linux
- * CI the trace ran into a result line written there. A heap reading inside
- * Vitest is not repeatable, since the runner shares the heap.
+ * run allocates is collected before it is counted), the heap swept on the
+ * main thread (`SETTLED_HEAP`) and `--trace-generalization`, whose result it
+ * reads from a JSON file the child writes into a temporary directory. Stdout
+ * carries the trace alone: on Linux CI the trace ran into a result line
+ * written there. A heap reading inside Vitest is not repeatable, since the
+ * runner shares the heap.
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -39,6 +40,20 @@ export function probeScenario(file: string): string {
  */
 export const SYNCHRONOUS_TIERING = ['--no-concurrent-recompilation'] as const;
 
+/**
+ * Every probe sweeps on the main thread (windsor#269). The probe reads the
+ * heap straight after two forced collections, and by default V8 sweeps what
+ * they freed on background threads. On a loaded machine that sweeping can
+ * still be running when the first reading is taken, and the bytes it settles
+ * land in the first measured tenth: from 3 to 8 KB over its usual 1.2 KB in
+ * the FM part's kernel run, or a large negative, the other nine tenths
+ * byte-identical, which pushed a clean run past its bound on CI. With the
+ * sweeping on the main thread no background sweeper is still at work when
+ * the first window is read, and a clean run reads the same bytes in every
+ * window as before (the measurements are in windsor#269's PR).
+ */
+const SETTLED_HEAP = ['--no-concurrent-sweeping'] as const;
+
 export interface ProbeRun extends ProbeResult {
   /** Each generalisation the bundle caused that changed a field's representation. */
   changes: string[];
@@ -58,6 +73,7 @@ export function runAllocationProbe(config: ProbeConfig, flags: readonly string[]
         '--expose-gc',
         '--min-semi-space-size=64',
         '--max-semi-space-size=64',
+        ...SETTLED_HEAP,
         '--trace-generalization',
         '--no-warnings',
         ...flags,
