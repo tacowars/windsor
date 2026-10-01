@@ -16,6 +16,8 @@ import type {
   SequencerSpec,
 } from '@windsor/engine';
 import {
+  ACCENT_MOD_DEFAULT,
+  ACCENT_VELOCITY_DEFAULT,
   ARP_OCTAVES_MAX,
   ARP_OCTAVES_MIN,
   ARP_STYLES,
@@ -35,10 +37,11 @@ import {
   LFO_BARS_MIN,
   LFO_HZ_DEFAULT,
   MIDI_MIDDLE_C,
+  MIDI_NOTE_MAX,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
 } from '@windsor/engine';
-import { fmt0, fmt2, fmtMs, noteName } from './consoleFormat';
+import { fmt0, fmt2, fmtMs } from './consoleFormat';
 import type { PulseField } from './euclidModel';
 import { GRID_ROTATE_MAX } from './gridConstants';
 import type { KnobSpec } from './knob';
@@ -79,25 +82,49 @@ export const VELOCITY_KNOB: SectionKnobEntry = {
   o: { min: 0, max: 1, def: VELOCITY_DEFAULT, fmt: fmt2 },
 };
 
-/** The Euclidean card's note range: two octaves under middle C to three above. */
-export const EUCLID_NOTE_MIN = 24;
-export const EUCLID_NOTE_MAX = 96;
+/**
+ * The Euclidean card's Note stepper (windsor#356): one semitone a press over
+ * the whole MIDI range the normaliser accepts, read as name and number.
+ */
+export const EUCLID_NOTE_STEPPER: CardKnobSpec = {
+  label: 'Note',
+  min: 0,
+  max: MIDI_NOTE_MAX,
+  def: MIDI_MIDDLE_C,
+  step: 1,
+};
 /** Its hold knob stops at two seconds; the engine accepts more from a file. */
 export const EUCLID_HOLD_MAX = 2;
 
+/** The Euclidean card's Play knobs; Note, Steps and Rotate are steppers beside them. */
 export const EUCLID_KNOBS: readonly SequencerKnobEntry[] = [
-  {
-    kind: 'driver',
-    f: 'note',
-    label: 'Note',
-    o: { min: EUCLID_NOTE_MIN, max: EUCLID_NOTE_MAX, def: MIDI_MIDDLE_C, step: 1, fmt: noteName },
-  },
   VELOCITY_KNOB,
   {
     kind: 'driver',
     f: 'hold',
     label: 'Hold',
     o: { min: HOLD_MIN, max: EUCLID_HOLD_MAX, def: HOLD_DEFAULT, curve: 'log', fmt: fmtMs },
+  },
+];
+
+/**
+ * The Euclid part's accent amounts (windsor#356): what an accented hit adds
+ * to the velocity and sends as mod. Absent from a part they read the
+ * engine's `ACCENT_VELOCITY_DEFAULT` and `ACCENT_MOD_DEFAULT`, which
+ * `DEFAULT_EUCLIDEAN_CONFIG` leaves out, so they are their own table.
+ */
+export const EUCLID_ACCENT_KNOBS: readonly DriverKnobEntry[] = [
+  {
+    kind: 'driver',
+    f: 'accentVelocity',
+    label: 'Acc vel',
+    o: { min: 0, max: 1, def: ACCENT_VELOCITY_DEFAULT, fmt: fmt2 },
+  },
+  {
+    kind: 'driver',
+    f: 'accentMod',
+    label: 'Acc mod',
+    o: { min: 0, max: 1, def: ACCENT_MOD_DEFAULT, fmt: fmt2 },
   },
 ];
 

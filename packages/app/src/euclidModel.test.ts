@@ -38,6 +38,16 @@ describe('stepsChange', () => {
     expect(stepsChange(SPEC, 20)).toEqual({ steps: 20 });
   });
 
+  it('resizes the ratchet row with the steps: padded with 1, or trimmed (windsor#356)', () => {
+    const ratchets = [1, 2, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1];
+    const longer = stepsChange({ ...SPEC, ratchets }, 18).ratchets;
+    expect(longer).toEqual([...ratchets, 1, 1]);
+    expect(stepsChange({ ...SPEC, ratchets }, 5).ratchets).toEqual([1, 2, 1, 1, 3]);
+    // No row stays no row, and a row already the right length is not sent.
+    expect(stepsChange(SPEC, 12)).not.toHaveProperty('ratchets');
+    expect(stepsChange({ ...SPEC, ratchets: [1, 2] }, 2)).not.toHaveProperty('ratchets');
+  });
+
   it('carries the pulse bounds and the rotation down with n', () => {
     expect(stepsChange(SPEC, 4)).toEqual({ steps: 4, pulses: { min: 3, max: 4, start: 4 } });
     expect(stepsChange(SPEC, 1)).toEqual({

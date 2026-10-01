@@ -154,6 +154,43 @@ export function paintSpan(
   return out;
 }
 
+/**
+ * A drag's move painted over cells that show lane values by index (the
+ * Euclid card's lanes, windsor#356): cell `i` shows `values[cells[i]]`, so a
+ * lane at its own length is the identity and one laid out under the hits
+ * repeats an index. The move paints in cell space as `paintSpan` does, and
+ * each painted cell writes its value index, in the drag's direction, so the
+ * cell nearest `to` wins where two cells share an index. With the identity
+ * over every value this is `paintSpan` exactly.
+ */
+export function paintCells(
+  values: readonly number[],
+  cells: readonly number[],
+  from: PaintPoint | null,
+  to: PaintPoint,
+  table: LanePaintTable = LANE_PAINT,
+): number[] {
+  const shown = paintSpan(
+    cells.map((v) => values[v] ?? 0),
+    from,
+    to,
+    table,
+  );
+  const out = [...values];
+  const write = (i: number): void => {
+    const v = cells[i];
+    const value = shown[i];
+    if (v !== undefined && value !== undefined && v >= 0 && v < out.length) out[v] = value;
+  };
+  if (!from || from.index === to.index) {
+    write(to.index);
+    return out;
+  }
+  const dir = Math.sign(to.index - from.index);
+  for (let i = from.index + dir; i !== to.index + dir; i += dir) write(i);
+  return out;
+}
+
 const rowOf = (param: StepModParam): StepModRow | undefined =>
   STEP_MOD_TABLE.find((row) => row.param === param);
 
