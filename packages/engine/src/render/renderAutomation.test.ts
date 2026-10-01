@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { lane, point } from '../__fixtures__/automationRig';
 import type { FakeContext } from '../__fixtures__/fakeAudioContext';
 import { FakeWorkletNode, installFakeAudioWorklet } from '../__fixtures__/fakeAudioContext';
-import type { FakeParam } from '../__fixtures__/fakeAudioNodes';
+import type { FakeNode, FakeParam } from '../__fixtures__/fakeAudioNodes';
 import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
 import { FULL_DOCUMENT, FULL_SLOT, withDocumentPart } from '../__fixtures__/fullArrangement';
 import { noteToneFeed } from '../__fixtures__/noteFeeds';
@@ -28,6 +28,7 @@ import { RENDER_QUANTUM_FRAMES } from './renderConstants';
 import { renderPass } from './renderPass';
 import { planFor } from './renderSong';
 import { renderStems } from './renderStems';
+import { attachStems } from './stemTaps';
 
 class TonePart extends FakeWorkletNode {
   constructor(context: FakeContext, name: string, options: { processorOptions?: unknown } = {}) {
@@ -134,5 +135,59 @@ describe('a level lane in an offline render', () => {
         .reduce((m, s) => Math.max(m, Math.abs(s)), 0);
     expect(peak(0, Math.round(bar * 0.7))).toBeGreaterThan(1e-3);
     expect(peak(Math.round(bar * 1.3), 2 * bar)).toBeLessThan(1e-9);
+  });
+});
+
+describe('a pan lane on a "Sidechain only" part exported as a stem', () => {
+  const SWEEP = lane('strip.pan', [point(0, -1, 0.4), point(192, 1)]);
+  const KEYS = ['ll', 'lr', 'rl', 'rr'] as const;
+  // A fake cancel records the value the param held, which is no event: compare the events.
+  const events = (calls: Call[]): object[] =>
+    calls.map(({ call, value, time }) =>
+      call === 'cancelScheduledValues' ? { call, time } : { call, value, time },
+    );
+
+  it("schedules the stem's rotation exactly as the strip's", async () => {
+    const document = withDocumentPart(TWO_BARS, 'hat', {
+      automation: [SWEEP],
+      strip: { ...TWO_BARS.parts[1]!.strip, output: 'sidechain' },
+    });
+    const plan = planFor(document, { sampleRate: RATE, tailSeconds: 0 });
+    let strip: FakeParam[] = [];
+    let stem: FakeParam[] = [];
+    let opening = 0;
+    await renderPass(
+      document,
+      plan,
+      { sampleRate: RATE, createContext: (init) => new FakeOfflineContext(init) },
+      {
+        channels: 4,
+        attach: (system) => {
+          const live = system.strip(musicPartName(hat))!;
+          strip = KEYS.map((k) => live.rotation.gains[k].gain as unknown as FakeParam);
+          opening = strip[0]!.automation.length;
+          const detach = attachStems(system, [
+            { kind: 'part', slot: hat, name: 'hat', muted: true },
+          ]);
+          // The stem's rotation: the splitter `head` was last connected to, and its four gains.
+          const head = live.head as unknown as FakeNode;
+          const input = head.outbound.at(-1)!.to as FakeNode;
+          stem = input.outbound.map(
+            (c) => (c.to as FakeNode as unknown as GainNode).gain as unknown as FakeParam,
+          );
+          return detach;
+        },
+      },
+    );
+    expect(stem).toHaveLength(4);
+    expect(stem[0]!.automation.length).toBeGreaterThan(150);
+    // From the resync the stem's tap asked for, both rotations got the same events.
+    stem.forEach((param, i) => {
+      expect(events(param.automation)).toEqual(events(strip[i]!.automation.slice(opening)));
+    });
+    // And the resync held where the strip's opening hold did.
+    expect(events(stem[0]!.automation.slice(0, 2))).toEqual(
+      events(strip[0]!.automation.slice(0, 2)),
+    );
   });
 });

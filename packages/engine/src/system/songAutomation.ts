@@ -80,6 +80,11 @@ export class SongAutomation {
     }
   }
 
+  /** Restart one part's lanes from now: their targets' params changed. */
+  resync(slot: number): void {
+    this.playerValue?.resync(slot);
+  }
+
   dispose(): void {
     this.playerValue?.dispose();
     this.playerValue = null;

@@ -407,6 +407,15 @@ export class AudioSystem {
     return this.parts.get(name);
   }
 
+  /**
+   * Hold a part's lanes where the playhead is and schedule them on again, so
+   * params added to a lane's handle since (a stem's rotation, windsor#344)
+   * hear it too. A no-op before `initMusic` or for a part with no lanes.
+   */
+  resyncAutomation(slot: number): void {
+    this.automation.resync(slot);
+  }
+
   /** A return by name, once `init()` has built them. */
   returnBus(name: string): ReturnBus | undefined {
     return this.graph.returnBus(name);
