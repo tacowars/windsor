@@ -4,8 +4,11 @@
  * giving lowpass, highpass, bandpass and notch from one structure, its
  * dormancy test (#547), and the soft clip its drive runs through. Invariant:
  * `process` is the hot path — no allocation, coefficients only at control
- * rate. `fmProcessorDormancy.test.ts` pins `Svf.quiet`; the golden test pins
- * the arithmetic.
+ * rate. `setCoeffs` reads its cutoff and Q from `cutoffHz` and `q`, so no
+ * double crosses the call (windsor#233: a double passed to a call V8 does not
+ * inline is a new heap number on the audio thread).
+ * `fmProcessorDormancy.test.ts` pins `Svf.quiet`; the golden test pins the
+ * arithmetic.
  */
 
 import { DORMANT_FILTER_STATE } from './fmConstants';
@@ -24,14 +27,21 @@ class Svf {
   a2: number;
   a3: number;
   k: number;
+  /** `setCoeffs`'s inputs. */
+  cutoffHz: number;
+  q: number;
 
   constructor() {
+    // Rule 7: each double field is born a double (NaN), before its start value (windsor#233).
+    this.ic1 = this.ic2 = this.a1 = this.a2 = this.a3 = this.k = this.cutoffHz = this.q = NaN;
     this.ic1 = 0;
     this.ic2 = 0;
     this.a1 = 0;
     this.a2 = 0;
     this.a3 = 0;
     this.k = 0;
+    this.cutoffHz = 0;
+    this.q = 0;
   }
 
   reset(): void {
@@ -44,10 +54,11 @@ class Svf {
     return Math.abs(svf.ic1) <= DORMANT_FILTER_STATE && Math.abs(svf.ic2) <= DORMANT_FILTER_STATE;
   }
 
-  /** Recompute coefficients. Called at control rate, not per sample. */
-  setCoeffs(cutoffHz: number, q: number, sampleRate: number): void {
+  /** Recompute coefficients for `cutoffHz` and `q`. Called at control rate, not per sample. */
+  setCoeffs(sampleRate: number): void {
+    const q = this.q;
     const nyq = sampleRate * 0.5;
-    let fc = cutoffHz;
+    let fc = this.cutoffHz;
     if (fc < 20) fc = 20;
     if (fc > nyq * 0.98) fc = nyq * 0.98;
     const g = Math.tan((Math.PI * fc) / sampleRate);

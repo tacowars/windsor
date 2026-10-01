@@ -400,10 +400,30 @@ function renderVoiceKernel(
   width[B] = wB;
   width[C] = wC;
   width[D] = wD;
-  storeOperator(voice, A, liveA, n, aA, oA, f1A, f2A);
-  storeOperator(voice, B, liveB, n, aB, oB, f1B, f2B);
-  storeOperator(voice, C, liveC, n, aC, oC, f1C, f2C);
-  storeOperator(voice, D, liveD, n, aD, oD, f1D, f2D);
+  // Every operator's locals go back, a skipped one's unchanged since it was
+  // read, so its stores are no-ops; then a skipped operator's history takes
+  // what the generic loop's `v * 0` stores would have left. No double is
+  // passed to a call (windsor#233).
+  amp[A] = aA;
+  amp[B] = aB;
+  amp[C] = aC;
+  amp[D] = aD;
+  out[A] = oA;
+  out[B] = oB;
+  out[C] = oC;
+  out[D] = oD;
+  fb1[A] = f1A;
+  fb1[B] = f1B;
+  fb1[C] = f1C;
+  fb1[D] = f1D;
+  fb2[A] = f2A;
+  fb2[B] = f2B;
+  fb2[C] = f2C;
+  fb2[D] = f2D;
+  settleSkipped(voice, A, liveA, n);
+  settleSkipped(voice, B, liveB, n);
+  settleSkipped(voice, C, liveC, n);
+  settleSkipped(voice, D, liveD, n);
 
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
@@ -412,28 +432,12 @@ function renderVoiceKernel(
 }
 
 /**
- * Write one operator's kernel locals back. A skipped operator keeps its
+ * A skipped operator's feedback history after the call. It keeps its
  * amplitude and output, which only ever meet its amplitude of 0; its history
  * is what the generic loop's `v * 0` stores would have left.
  */
-// eslint-disable-next-line max-params -- the kernel's locals for one operator, written back once per call
-function storeOperator(
-  voice: Voice,
-  i: number,
-  live: boolean,
-  n: number,
-  a: number,
-  o: number,
-  f1: number,
-  f2: number,
-): void {
-  if (live) {
-    voice.amp[i] = a;
-    voice.out[i] = o;
-    voice.fb1[i] = f1;
-    voice.fb2[i] = f2;
-    return;
-  }
+function settleSkipped(voice: Voice, i: number, live: boolean, n: number): void {
+  if (live) return;
   if (n > 1) voice.fb2[i] = 0;
   else voice.fb2[i] = voice.fb1[i];
   voice.fb1[i] = 0;

@@ -90,8 +90,8 @@ export interface EnvelopeLike {
   configure(params: unknown, sampleRate: number): void;
   noteOn(): void;
   noteOff(): void;
-  /** Advance by `n` samples and return the new value. */
-  advance(n: number): number;
+  /** Advance by `n` samples; the new value is `value` (windsor#233). */
+  advance(n: number): void;
 }
 
 export interface LoadedProcessor {

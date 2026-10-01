@@ -150,11 +150,26 @@ function getMips(
   return mips;
 }
 
-/** Which octave table to read for a given frequency. */
-function mipIndex(freq: number): number {
+/**
+ * Which octave table to read for the frequency `freqs[i]`. The frequency is
+ * read from an array rather than passed, so no double crosses the call
+ * (windsor#233): the control update calls this once per operator a block, and
+ * a double passed to a call V8 does not inline is a new heap number.
+ */
+function mipIndexAt(freqs: Float64Array, i: number): number {
+  const freq = freqs[i];
   if (freq <= MIP_BASE_HZ) return 0;
   const k = Math.floor(Math.log2(freq / MIP_BASE_HZ));
   return k < 0 ? 0 : k >= MIP_COUNT ? MIP_COUNT - 1 : k;
+}
+
+/** `mipIndex`'s one slot. */
+const MIP_FREQ = new Float64Array(1);
+
+/** Which octave table to read for a given frequency: `mipIndexAt`, for the tests. */
+function mipIndex(freq: number): number {
+  MIP_FREQ[0] = freq;
+  return mipIndexAt(MIP_FREQ, 0);
 }
 
 const KIND_TABLE = 0,
@@ -193,6 +208,7 @@ export {
   SIN_TAB,
   getMips,
   mipIndex,
+  mipIndexAt,
   KIND_TABLE,
   KIND_NOISE,
   KIND_SAW_D,

@@ -293,6 +293,53 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    per part, so a song's total grows with its part count (the dense song's
    eight parts made 11 381 bytes a quantum, more than one Tape).
 
+   **After windsor#233: 0 bytes a quantum while notes are held; what is
+   left falls on note-ons.** Same machine and headless Chrome 154, this
+   method, the worktree's dev server; the context opened at **48 kHz** this
+   time (2 667 µs a quantum; the analyser's budget column assumes 44.1 kHz,
+   so its over-budget counts here are against 2 902 µs).
+
+   - **One part** (`a-fm`, 30.7 s traced, load average 2.33 before and 2.51
+     after): the median call allocated 0 bytes, and 59 of the part's 11 498
+     calls allocated anything, every one at or just after a bar's chord (three
+     note-offs and three note-ons, six voices with `pad-drift`'s spread) or at
+     an envelope's first move to a new segment. The chord's quantum read
+     11 628 bytes in the first bars and 2 976 by the trace's end, as V8
+     optimised the note-on path; the quantum after it read up to 9 848 in
+     three bars and then nothing. Mean 11.5 bytes a quantum (8.8 in the
+     second half), against 2 909 before. The audio thread made **no minor
+     collection** in 30.7 s (1.24 a second before); it made two memory-reducer
+     mark-compacts (1 915 µs at the longest), outside any render call, which
+     the earlier exploratory run also saw. Median quantum span 123 µs. The
+     meter-on pass read 4–9 % with no underrun. Summary:
+     [`summaries/a-fm-after.json`](summaries/a-fm-after.json).
+   - **Eight parts** (`c-dense`, 24.0 s, load average 2.81 before and 3.90
+     after): the eight FM parts together read **6.5 bytes a quantum**
+     (11 381 before), 202 of their 70 361 calls allocating, the median 0 and
+     the second half's mean 0.8 bytes a call. The thread still collected 11.9
+     times a second, from the Delay (9 423 bytes a quantum), Phaser (18 541)
+     and Tape (27 655) instances, whose tickets are open; the Advanced Drive,
+     Compressor, Plate and Retro reverb instances read 0. The meter-on pass
+     read 43–45 % with no underrun. Summary:
+     [`summaries/c-dense-after.json`](summaries/c-dense-after.json).
+
+   What the source cannot remove, and why the note-on path still allocates:
+   a voice start draws from the part's random source up to five times (a
+   free-running phase for each operator, and the pan), and `Math.random`
+   returns each draw as a new heap number unless the caller is optimised
+   with it inlined; and the note-on path (`noteOn`, `Voice.start`, the step
+   offsets' bind) runs once a note, so V8 keeps it in its lower tiers
+   (Maglev, which inlines no function over 100 bytes of bytecode, such as
+   `stepModValue`) for thousands of notes, and those box what they pass.
+   In Node, with that path warm, the processor's scenario reads one heap
+   number a note-on or less (`synth/fmProcessorAllocation.test.ts`, which
+   swaps the random source for a constant). Before the fix the render
+   itself boxed: `Envelope.advance` and `Lfo.advance` returned their values
+   from calls V8 did not inline, the part's bend, wheel and cutoff were
+   passed to the control update, and double fields were first written as
+   small integers (the probe's trace named 21 representation changes) (V8's sampling heap profiler put 64 % of the bytes in the
+   envelope's `advance`, 24 % in the LFO's and 13 % in `renderBlock`).
+
 Not to fix for allocation: the output stage and the EQ (clean in Node; the
 EQ unmeasured here).
 
@@ -340,6 +387,7 @@ measured neither.
   `node --max-old-space-size=8192 analyse-trace.mjs <trace.json> <summary.json>`.
 - [`summaries/`](summaries/): one per traced run, with every collection's
   time, length and heap before and after. `b-plate-after.json` is the plate
-  scenario rerun after windsor#227, and `b-retro-reverb-after.json` the
-  Retro reverb's after windsor#230.
+  scenario rerun after windsor#227, `b-retro-reverb-after.json` the Retro
+  reverb's after windsor#230, and `a-fm-after.json` and `c-dense-after.json`
+  the FM part's after windsor#233.
 - [`tables.mjs`](tables.mjs) prints this README's tables from the summaries.

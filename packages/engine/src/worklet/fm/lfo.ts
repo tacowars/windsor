@@ -5,9 +5,13 @@
  * and unipolar modes. A voice runs two (`lfo`, `lfo2`); the second is seeded
  * from the first by `secondLfoSeed`, never from the part's random stream, so
  * adding it moved no other draw. Invariant: allocation free, and the sine
- * shape reads `SIN_TAB` so it is the operators' sine to the bit. `lfo.test.ts`,
- * `fmProcessorModWheel.test.ts`, `__fixtures__/lfo2Routes.test.ts` and the
- * golden test pin it.
+ * shape reads `SIN_TAB` so it is the operators' sine to the bit. `advance`
+ * leaves its result in `output` and `rand` its draw in `draw`, and every
+ * double field is first written as NaN (windsor#233): V8 does not inline
+ * `advance`, too large, and a double returned from a call it does not inline
+ * is a new heap number on the audio thread. `lfo.test.ts`,
+ * `fmProcessorModWheel.test.ts`, `__fixtures__/lfo2Routes.test.ts`, the
+ * golden test and `synth/fmProcessorAllocation.test.ts` pin it.
  */
 
 import type { LfoSettings } from '../../patch/patch';
@@ -26,18 +30,29 @@ class Lfo {
   target: number;
   fade: number;
   seed: number;
+  /** `advance`'s result. */
+  output: number;
+  /** `rand`'s draw. */
+  draw: number;
 
   /** `seed` is a non-zero xorshift32 state: `randomSeed32`, or `secondLfoSeed` of another LFO's. */
   constructor(seed: number) {
+    // Rule 7: each double field is born a double (NaN), before its start
+    // value; the seed is a uint32, past a small integer's range.
+    this.phase = this.value = this.held = this.target = this.fade = NaN;
+    this.seed = this.output = this.draw = NaN;
     this.phase = 0;
     this.value = 0;
     this.held = 0;
     this.target = 0;
     this.fade = 0;
     this.seed = seed;
+    this.output = 0;
+    this.draw = 0;
   }
 
-  rand(): number {
+  /** The next draw, 0..1, into `draw`. */
+  rand(): void {
     // xorshift32 — deterministic, allocation free
     let x = this.seed;
     x ^= x << 13;
@@ -46,23 +61,25 @@ class Lfo {
     x ^= x << 5;
     x >>>= 0;
     this.seed = x;
-    return x / 0xffffffff;
+    this.draw = x / 0xffffffff;
   }
 
   reset(retrigger: boolean): void {
     if (retrigger) this.phase = 0;
     this.fade = 0;
-    this.held = this.rand() * 2 - 1;
-    this.target = this.rand() * 2 - 1;
+    this.rand();
+    this.held = this.draw * 2 - 1;
+    this.rand();
+    this.target = this.draw * 2 - 1;
   }
 
   /**
-   * Advance by `n` samples and return the value, faded in. A one-shot LFO's
+   * Advance by `n` samples; the value, faded in, is `output`. A one-shot LFO's
    * phase stops at 1 and holds there, so it never wraps and every shape holds
    * its end value (#55); `start` resets it at note-on. Unipolar remaps the
    * shape's -1..1 to 0..1 before the fade, so the fade-in scales up from 0.
    */
-  advance(p: LfoSettings, n: number, sampleRate: number): number {
+  advance(p: LfoSettings, n: number, sampleRate: number): void {
     const prev = this.phase;
     this.phase += (p.rate * n) / sampleRate;
     let wrapped = false;
@@ -89,13 +106,17 @@ class Lfo {
         this.value = this.phase < 0.5 ? 1 : -1;
         break;
       case LFO_SH:
-        if (wrapped || this.phase < prev) this.held = this.rand() * 2 - 1;
+        if (wrapped || this.phase < prev) {
+          this.rand();
+          this.held = this.draw * 2 - 1;
+        }
         this.value = this.held;
         break;
       case LFO_DRIFT:
         if (wrapped || this.phase < prev) {
           this.held = this.target;
-          this.target = this.rand() * 2 - 1;
+          this.rand();
+          this.target = this.draw * 2 - 1;
         }
         this.value = this.held + (this.target - this.held) * this.phase;
         break;
@@ -109,8 +130,8 @@ class Lfo {
     } else {
       this.fade = 1;
     }
-    if (p.unipolar) return ((this.value + 1) / 2) * this.fade;
-    return this.value * this.fade;
+    if (p.unipolar) this.output = ((this.value + 1) / 2) * this.fade;
+    else this.output = this.value * this.fade;
   }
 }
 

@@ -9,8 +9,11 @@
  * `voiceRender.js` and `voiceKernel.js`; `render` and `updateControl` stay
  * methods because the part and the tests call them on the voice. Invariant:
  * every buffer is allocated here, once; nothing after construction allocates.
+ * Every double field is first written as NaN, then its start value, so V8
+ * never changes its representation (rule 7, windsor#233).
  * `fmProcessorDormancy.test.ts` pins `dormant` and the lifecycle;
- * `fmProcessor.test.ts` the stealing order.
+ * `fmProcessor.test.ts` the stealing order; `fmProcessorAllocation.test.ts`
+ * the allocation.
  */
 
 import type { Algorithm } from './algorithms';
@@ -67,7 +70,12 @@ class Voice {
   velocity: number;
   age: number;
   voiceId: number;
+  /** The part's note map holds this voice under `voiceId` (windsor#233: a flag, not a `Map`). */
+  keyed: boolean;
   detune: number;
+  /** The note's pan before the clamp, and the pitch a glide starts from (NaN: none): `start` reads both. */
+  pan: number;
+  glideFrom: number;
   panL: number;
   panR: number;
   pitchCur: number;
@@ -85,16 +93,35 @@ class Voice {
   detuneMul: Float64Array;
   levelKeyAmp: Float64Array;
   stepOffsets: Float64Array;
+  stepValues: Float64Array;
   envAmount: number;
   cutoff: number;
   resonance: number;
   opLevel: Float64Array;
   opFeedback: Float32Array;
   opWidth: Float64Array;
+  partControls: Float64Array;
+  opFreq: Float64Array;
+  lfoLevel: number;
+  lfo2Level: number;
 
-  constructor(sampleRate: number, random: () => number) {
+  /** `partControls` is the part's one array of k-rate controls (`PART_BEND`, …), shared by every voice. */
+  // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
+  constructor(sampleRate: number, random: () => number, partControls: Float64Array) {
+    // Rule 7: each double field is born a double (NaN), before its start
+    // value; the noise seed is a uint32, past a small integer's range.
+    this.noiseSeed = this.fade = this.fadeInc = this.velocity = this.detune = NaN;
+    this.pan = this.glideFrom = NaN;
+    this.panL = this.panR = this.pitchCur = this.pitchTarget = this.mod = NaN;
+    this.glideSeconds = this.envAmount = this.cutoff = this.resonance = NaN;
+    this.lfoLevel = this.lfo2Level = NaN;
     this.sr = sampleRate;
     this.random = random; // the processor's one source; see "Randomness" above
+    this.partControls = partControls;
+    // Control-rate scratch (windsor#233): each operator's frequency and the
+    // two LFO levels this block, which the width update reads.
+    this.opFreq = new Float64Array(4);
+    this.lfoLevel = this.lfo2Level = 0;
 
     // Per-operator running state
     this.phase = new Float64Array(4);
@@ -132,7 +159,10 @@ class Voice {
     this.velocity = 1;
     this.age = 0;
     this.voiceId = 0;
+    this.keyed = false;
     this.detune = 0; // semitones, for unison spread
+    this.pan = 0;
+    this.glideFrom = NaN;
     this.panL = 0.707;
     this.panR = 0.707;
 
@@ -164,6 +194,7 @@ class Voice {
     // filter's, then each operator's level, feedback (a Float32Array, as the
     // loops have always read it) and width. `bindStepMod` writes them.
     this.stepOffsets = new Float64Array(STEP_MOD_SLOT_COUNT);
+    this.stepValues = new Float64Array(STEP_MOD_SLOT_COUNT); // `bindStepMod`'s working values
     this.envAmount = 0;
     this.cutoff = 0;
     this.resonance = 0;
@@ -188,20 +219,17 @@ class Voice {
     return x / 0x7fffffff - 1;
   }
 
-  /** Bind a patch, its prebuilt wavetables and the step's offsets (windsor#17). Called on note-on. */
-  // Gathering these into an options object would allocate one per note-on, and
-  // this class exists to keep the audio thread allocation-free. They are also
-  // all primitives (or the message's own offset array) written straight into
-  // preallocated fields, so there is no cohesive sub-object to extract.
-  // eslint-disable-next-line max-params, max-lines-per-function -- allocation-free note-on, see above; one note's setup read top to bottom, 61 of 60 since the step offsets (windsor#17)
+  /**
+   * Bind a patch, its prebuilt wavetables and the step's offsets (windsor#17).
+   * Called on note-on, once the part has written the note's `velocity`,
+   * `detune`, `pan` and `glideFrom` into the voice: no double is passed to a
+   * call V8 may not inline (windsor#233), and an options object would
+   * allocate one per note-on.
+   */
   start(
     patch: WorkletPatch,
     waveSets: (Float32Array[] | null)[],
     note: number,
-    velocity: number,
-    detune: number,
-    pan: number,
-    glideFrom: number | null,
     voiceId: number,
     stepMod: ArrayLike<number> | null | undefined,
   ): void {
@@ -209,8 +237,6 @@ class Voice {
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
     this.note = note;
-    this.velocity = velocity;
-    this.detune = detune;
     this.voiceId = voiceId;
     this.active = true;
     this.gate = true;
@@ -222,9 +248,12 @@ class Voice {
     this.glideSeconds = 0;
 
     this.pitchTarget = note;
-    this.pitchCur = glideFrom == null ? note : glideFrom;
+    const glideFrom = this.glideFrom;
+    this.pitchCur = glideFrom === glideFrom ? glideFrom : note;
 
-    const p = Math.max(-1, Math.min(1, pan));
+    // Clamped to ±1, as `Math.max(-1, Math.min(1, pan))`, NaN and -0 alike.
+    const pan = this.pan;
+    const p = pan < -1 ? -1 : pan > 1 ? 1 : pan;
     const theta = ((p + 1) * Math.PI) / 4;
     this.panL = Math.cos(theta);
     this.panR = Math.sin(theta);
@@ -458,9 +487,12 @@ class Voice {
     return holds;
   }
 
-  /** Control-rate update, `voiceControl.js`: envelopes, LFOs, glide, ramps, filter coefficients. */
-  updateControl(n: number, bend: number, wheel: number, cutoffMod: number): void {
-    updateVoiceControl(this, n, bend, wheel, cutoffMod);
+  /**
+   * Control-rate update, `voiceControl.js`: envelopes, LFOs, glide, ramps,
+   * filter coefficients, from the part's controls in `partControls`.
+   */
+  updateControl(n: number): void {
+    updateVoiceControl(this, n);
   }
 
   /**

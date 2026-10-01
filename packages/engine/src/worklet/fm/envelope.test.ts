@@ -39,20 +39,26 @@ function make(o?: Partial<EnvelopeParams>): Envelope {
   return e;
 }
 
+/** Advance `e` by `n` samples and read its value, which `advance` leaves in `value` (windsor#233). */
+function advanced(e: Envelope, n: number): number {
+  e.advance(n);
+  return e.value;
+}
+
 describe('the envelope', () => {
   it('walks attack, decay, sustain, release and done at the configured times', () => {
     const e = make();
     expect(e.state).toBe(ST_IDLE);
     e.noteOn();
     expect(e.state).toBe(ST_ATTACK);
-    expect(e.advance(0.5 * SR)).toBe(1);
+    expect(advanced(e, 0.5 * SR)).toBe(1);
     expect(e.state).toBe(ST_DECAY);
-    expect(e.advance(0.25 * SR)).toBe(0.5);
+    expect(advanced(e, 0.25 * SR)).toBe(0.5);
     expect(e.state).toBe(ST_SUSTAIN);
-    expect(e.advance(1000)).toBe(0.5);
+    expect(advanced(e, 1000)).toBe(0.5);
     e.noteOff();
     expect(e.state).toBe(ST_RELEASE);
-    expect(e.advance(0.125 * SR)).toBe(0);
+    expect(advanced(e, 0.125 * SR)).toBe(0);
     expect(e.state).toBe(ST_DONE);
     expect(e.finished).toBe(true);
   });
@@ -60,7 +66,7 @@ describe('the envelope', () => {
   it('floors a segment at MIN_SEG_TIME and scales it by timeScale', () => {
     const e = make({ attackTime: 0 });
     e.noteOn();
-    expect(e.advance(MIN_SEG_TIME * SR)).toBe(1);
+    expect(advanced(e, MIN_SEG_TIME * SR)).toBe(1);
     const slow = make();
     slow.timeScale = 2;
     slow.noteOn();
@@ -82,6 +88,16 @@ describe('the envelope', () => {
     expect(segmentLevel(0, 1, 0.5, 1)).toBeLessThan(0.5);
     expect(segmentLevel(0, 1, 0.5, -1)).toBeGreaterThan(0.5);
     expect(segmentLevel(0.2, 0.8, 1, 0.3)).toBe(0.8);
+  });
+
+  it('is its two steps: the curve constant, then the shape unless the constant is 1', () => {
+    for (const curve of [-1, -0.3, 0, 0.5, 1]) {
+      for (const phase of [0, 0.1, 0.37, 0.5, 0.9, 1]) {
+        const k = curveConstant(curve);
+        const s = k === 1 ? phase : curveShape(phase, k);
+        expect(segmentLevel(0.2, 0.9, phase, curve)).toBe(0.2 + (0.9 - 0.2) * s);
+      }
+    }
   });
 
   it('bows the segment curve: 1 is linear, above bows down, below bows up', () => {
