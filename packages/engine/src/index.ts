@@ -88,6 +88,53 @@ export {
 } from './worklet/fm/stepModTables';
 export type { StepModCurve, StepModParam, StepModRow } from './worklet/fm/stepModTables';
 export { stepModValue } from './worklet/fm/stepModValue';
+// Song automation lanes (windsor#341, record `2026-10-01-song-automation-lanes`): the pure core.
+export type {
+  AutomationLane,
+  AutomationPoint,
+  AutomationScale,
+  AutomationTargetId,
+  AutomationTargetKind,
+  AutomationTargetRow,
+  InsertTargetId,
+  ParsedTarget,
+  StripTargetId,
+  VoiceTargetId,
+} from './automation/automationLane';
+export { pointsInOrder } from './automation/automationLane';
+export {
+  AUTOMATION_GRAIN_TICKS,
+  AUTOMATION_STEP_RAMP_SECONDS,
+} from './automation/automationConstants';
+export {
+  AUTOMATION_LEVEL_FLOOR_DB,
+  AUTOMATION_STRIP_LEVEL_MAX,
+  FM_LANES_MAX,
+  STRIP_AUTOMATION_ROWS,
+  VOICE_AUTOMATION_ROWS,
+} from './automation/automationTargetTables';
+export { INSERT_AUTOMATION_FIELDS } from './automation/automationInsertTables';
+export type { InsertFieldRow, InsertSpecOf } from './automation/automationInsertTables';
+export { automatableInsertFields } from './automation/automationInsertFields';
+export {
+  STRIP_TARGET_IDS,
+  VOICE_TARGET_IDS,
+  catalogRow,
+  formatTargetId,
+  insertTargetRow,
+  parseTargetId,
+  targetKind,
+  targetRow,
+} from './automation/automationTargets';
+export { DISPLAY_ROW, fromDisplay, toDisplay } from './automation/automationDisplay';
+export { bendCurve, rampsBetween, valueAt } from './automation/automationEvaluate';
+export type { AutomationRamp, RampWindow } from './automation/automationEvaluate';
+export { replaceRange, stampShape } from './automation/automationShapes';
+export type { AutomationShapeSpec } from './automation/automationShapes';
+export { AUTOMATION_SHAPE_KINDS } from './automation/automationShapeTables';
+export type { AutomationShapeKind } from './automation/automationShapeTables';
+// The automation player's writer interface (windsor#344); the system plays the lanes itself.
+export type { AutomationHandle, AutomationHow } from './automation/automationHandles';
 export {
   CHORD_STEP_KINDS,
   ChordSequencer,
@@ -303,8 +350,14 @@ export type { LibraryEntry, PatchFile } from './patch/patchLibrary';
 export { serialisePatchFile } from './patch/patchFileSerialise';
 export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
-// The operator width's bounds and the second LFO's defaults (windsor#54).
-export { LFO2_DEFAULTS, WIDTH_RANGE } from './worklet/fm/patchDefaults';
+// The operator width's bounds and the second LFO's defaults (windsor#54), and a
+// Noise operator's colour range and floor (windsor#362).
+export {
+  LFO2_DEFAULTS,
+  NOISE_COLOUR_FLOOR_HZ,
+  NOISE_COLOUR_RANGE,
+  WIDTH_RANGE,
+} from './worklet/fm/patchDefaults';
 export {
   BEATS_PER_BAR,
   DIVISORS,

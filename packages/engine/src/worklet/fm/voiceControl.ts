@@ -1,7 +1,8 @@
 /* eslint-disable no-magic-numbers -- DSP: MIDI 69/440, cents and octave scales are the pitch and level arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * The voice's control-rate work (#645): `bindVoiceConstants`, the routing
- * flags and per-note `Math.pow` results computed once per note (#548), and
+ * flags and per-note `Math.pow` results computed once per note (#548) and
+ * each Noise operator's colour (windsor#362), and
  * `updateVoiceControl`, which advances every envelope and both LFOs by
  * CTRL_INTERVAL samples, glides the pitch, refreshes the drive stage
  * (windsor#300) and the filter coefficients and sets the per-sample amplitude
@@ -27,6 +28,7 @@ import type { Voice } from './voice';
 import { ALGORITHMS, ALG_CARRIER_BITS, ALG_DESCENDING, ALG_EDGES } from './algorithms';
 import { WIDTH_SNAP } from './fmConstants';
 import { FILT_OFF } from './modeIds';
+import { bindNoiseColour } from './noiseColour';
 import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
@@ -44,7 +46,10 @@ const PART_BEND = 0,
 /**
  * Routing and per-note constants for the bound patch, after `kind` is set:
  * called by `start` and `rebind`, so a live retune of the algorithm, a wave
- * or a detune reaches the next control block. Allocates nothing.
+ * or a detune reaches the next control block. Each Noise operator's colour
+ * is tuned here too (windsor#362): the fields change only with the bound
+ * patch, so binding them is the per-block update at no per-block cost.
+ * Allocates nothing.
  */
 function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
   const algIndex = ALGORITHMS[patch.algorithm] ? patch.algorithm : 0;
@@ -55,6 +60,7 @@ function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
     voice.detuneMul[i] = Math.pow(2, op.detune / 1200);
     voice.levelKeyAmp[i] = Math.pow(2, -op.levelKeyScale * keyOffset);
     if (voice.kind[i] === KIND_NOISE) noiseOps++;
+    bindNoiseColour(voice, i);
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];

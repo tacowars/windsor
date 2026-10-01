@@ -14,14 +14,15 @@
  *
  * - A pad (`pad-drift`, its envelopes shortened so a cycle is about 500
  *   quanta, a pulse operator whose width a sample-and-hold LFO 2 moves, a
- *   noise modulator, a pitch envelope and a biased tube drive with its
+ *   noise modulator through its own lowpass and highpass (windsor#362), a
+ *   pitch envelope and a biased tube drive with its
  *   tone pole running, windsor#300) in the
  *   fixed-index kernel, the path live playback takes: a three-note chord
  *   held while notes come and go over it and an arpeggio runs, in a pool of
  *   eight voices, two voices a note, so the pool fills and steals, first
  *   the oldest held voices, then released ones.
  * - A pluck (`lead-bell`, its decay shortened, a squeezed saw, a noise
- *   operator, a biased diode drive, the filter at 24 dB, a triangle LFO and a drift
+ *   operator through its own highpass (windsor#362), a biased diode drive, the filter at 24 dB, a triangle LFO and a drift
  *   LFO 2) in the generic loop (`specialise: false`), whose carrier sustains
  *   at 0: four voices fall dormant, new notes take a full pool's dormant
  *   voices, a dormant voice's note-off ends it, and a run of short notes
@@ -194,8 +195,8 @@ const inOrder = (events: FmPartEvent[]): FmPartEvent[] => events.sort((a, b) => 
 
 /**
  * `pad-drift` with envelopes a cycle can play through, a pitch envelope, a
- * pulse whose width a sample-and-hold LFO 2 moves, a noise modulator and a
- * biased tube drive with its tone pole running.
+ * pulse whose width a sample-and-hold LFO 2 moves, a noise modulator with its
+ * own colour (windsor#362) and a biased tube drive with its tone pole running.
  */
 function pad(): Patch {
   const patch = structuredClone(PRESETS['pad-drift']!);
@@ -207,6 +208,9 @@ function pad(): Patch {
   patch.ops[1]!.wave = WAVE.PULSE;
   patch.ops[1]!.width = 0.3;
   patch.ops[3]!.wave = WAVE.NOISE;
+  // Its own two sections (windsor#362), at cutoffs that are not whole numbers.
+  patch.ops[3]!.noiseLp = 6100.5;
+  patch.ops[3]!.noiseHp = 1800.25;
   // The drive stage (windsor#300) with a bias and its tone pole running.
   patch.drive = { gain: 1.3, shape: DRIVE_SHAPE.TUBE, bias: 0.2, tone: 0.6, on: true };
   patch.filter.env.attackTime = 0.05;
@@ -227,7 +231,8 @@ function pad(): Patch {
 
 /**
  * `lead-bell` that falls dormant quickly, with a squeezed saw and a noise
- * operator, through a biased diode drive and a 24 dB filter and two LFOs.
+ * operator through its own highpass (windsor#362), through a biased diode
+ * drive and a 24 dB filter and two LFOs.
  */
 function pluck(): Patch {
   const patch = structuredClone(PRESETS['lead-bell']!);
@@ -235,6 +240,7 @@ function pluck(): Patch {
   patch.ops[2]!.wave = WAVE.SAW;
   patch.ops[2]!.width = 0.6;
   patch.ops[3]!.wave = WAVE.NOISE;
+  patch.ops[3]!.noiseHp = 950.75;
   patch.filter.slope24 = true;
   patch.drive = { gain: 1.4, shape: DRIVE_SHAPE.DIODE, bias: -0.1, tone: 0.8, on: true };
   patch.lfo = { ...patch.lfo, shape: 1, amount: 0.3, toPitch: 0.2 };

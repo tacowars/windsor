@@ -1,6 +1,7 @@
 /**
  * The patch defaults (#670): every value a patch may omit, and the bounds the
- * worklet clamps the tone, the feedback and the width to. Two readers fill a
+ * worklet clamps the tone, the feedback, the width and a Noise operator's
+ * colour (windsor#362) to. Two readers fill a
  * patch from this one table — `patchNormalise.ts` for the audio loop when a
  * `patch` message arrives, and `makePatch()` in the main thread's `patch/patch.ts` for the
  * editor, the tests and the console's knob defaults — so a knob cannot show
@@ -63,6 +64,12 @@ const OPERATOR_DEFAULTS = {
   levelKeyScale: 0,
   phase: 0,
   phaseFree: true,
+  /**
+   * A Noise operator's own two-pole lowpass and highpass on its noise, in Hz
+   * (windsor#362, `NOISE_COLOUR_RANGE`); 0 is off. Every other wave ignores them.
+   */
+  noiseLp: 0,
+  noiseHp: 0,
 };
 
 /** Operator A's level: the one operator an empty patch hears. */
@@ -183,6 +190,17 @@ const FEEDBACK_RANGE = { min: -1, max: 1 };
 /** Operator width is clamped here by the worklet: 1 is the plain wave, the floor keeps a sliver of it. */
 const WIDTH_RANGE = { min: 0.05, max: 1 };
 
+/**
+ * A Noise operator's `noiseLp` and `noiseHp`, clamped here by the worklet: 0
+ * is off, and any cutoff above 0 sounds at `NOISE_COLOUR_FLOOR_HZ` or more
+ * (windsor#362, the ranges of
+ * `docs/research/2026-10-01-tom-noise-colour-prototype/`).
+ */
+const NOISE_COLOUR_RANGE = { min: 0, max: 20000 };
+
+/** The lowest cutoff a noise filter that is on sounds at: the bottom of the knob's log sweep. */
+const NOISE_COLOUR_FLOOR_HZ = 20;
+
 export {
   DRIVE_BIAS_RANGE,
   DRIVE_DEFAULTS,
@@ -198,6 +216,8 @@ export {
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
   LFO_TO_WIDTH_DEFAULT,
+  NOISE_COLOUR_FLOOR_HZ,
+  NOISE_COLOUR_RANGE,
   OPERATOR_COUNT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,

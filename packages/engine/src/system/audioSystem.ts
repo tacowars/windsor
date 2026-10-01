@@ -15,6 +15,8 @@
  * - `MusicPlayback`: the player on the transport (start, stop, mute) and the
  *   position queries.
  * - `SystemLoadMeter`: which processors report their load, and the sum.
+ * - `SongAutomation`: the parts' automation lanes on the transport
+ *   (windsor#344), told of every partial after it has landed.
  *
  * What stays here is construction, the lifecycle (`init`, `update`,
  * `dispose`) and the two document transactions, which span them all.
@@ -28,6 +30,7 @@
  * part's `strip` and the `returns` onto the live desk (`deskApply.ts`).
  */
 import { MUSIC_PART_MAX_VOICES } from '../audioConstants';
+import type { AutomationLane } from '../automation/automationLane';
 import type { AudioLoadReadout } from '../cost/audioLoad';
 import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
@@ -51,11 +54,13 @@ import { PatchResolver } from '../song/arrangementValidate';
 import type { AudioPart } from '../synth/audioPart';
 import { FmEngine } from '../synth/fmEngine';
 import type { ScheduledMessage } from '../synth/workletMessages';
+import { withoutAutomation } from './automationPartial';
 import { GroupBuses } from './groupBuses';
 import type { PlaybackReadout } from './musicPlayback';
 import { MusicPlayback } from './musicPlayback';
 import { MusicRoster } from './musicRoster';
 import { PartStrips } from './partStrips';
+import { SongAutomation } from './songAutomation';
 import { StandingGraph } from './standingGraph';
 import { SystemLoadMeter } from './systemLoadMeter';
 
@@ -108,6 +113,7 @@ export class AudioSystem {
   private readonly roster: MusicRoster;
   private readonly sidechains: SidechainDesk;
   private readonly playback: MusicPlayback;
+  private readonly automation: SongAutomation;
   private started = false;
 
   constructor(engine?: FmEngine, options: AudioSystemOptions = {}) {
@@ -144,6 +150,9 @@ export class AudioSystem {
       () => graph.masterStrip,
     );
     this.playback = new MusicPlayback(this.scheduler, this.engine.context);
+    this.automation = new SongAutomation(this.scheduler, this.engine.context, (slot) =>
+      roster.strip(slot),
+    );
   }
 
   /** The song master, distinct from the engine-wide output stage and the channel faders. */
@@ -260,15 +269,17 @@ export class AudioSystem {
     applyMasterLive(this.masterStrip!, this.engine.outputStage, master);
     this.sidechains.commit(routing);
     if (returns) applyReturnsLive(this.graph.standing().returns, returns);
-    this.playback.load(
-      new ArrangementPlayer(
-        this.scheduler,
-        this.roster.host(),
-        arrangement,
-        resolver.table(),
-        onEvent,
-      ),
+    // On the transport before the arrangement player, so before every gate (windsor#344).
+    const lanes = this.automation.begin(document);
+    const player = new ArrangementPlayer(
+      this.scheduler,
+      this.roster.host(),
+      arrangement,
+      resolver.table(),
+      onEvent,
     );
+    this.automation.load(document);
+    this.playback.load(player, lanes);
   }
 
   /** Start (or resume) the transport. A no-op while muted or before `initMusic`. */
@@ -326,7 +337,8 @@ export class AudioSystem {
     // Read before anything changes: a ninth group refuses the whole partial (windsor#285).
     const groupPlan = this.groups.plan(groups);
     if (groupPlan.error) return { ok: false, ignored: [], error: groupPlan.error };
-    const { arrangementParts, strips } = splitStrips(parts);
+    // A part's lanes are the automation's, after everything else has landed (windsor#344).
+    const { arrangementParts, strips } = splitStrips(withoutAutomation(parts));
     this.sidechains.begin();
     const result = player.apply(
       arrangementParts === undefined
@@ -356,6 +368,7 @@ export class AudioSystem {
       ignored.push(...applyReturnsLive(this.graph.standing().returns, returns));
     }
     this.sidechains.commit(routing.graph);
+    this.automation.apply(partial, () => player.arrangement.transport.bars);
     return { ok: true, ignored };
   }
 
@@ -395,6 +408,20 @@ export class AudioSystem {
     return this.parts.get(name);
   }
 
+  /**
+   * Hold a part's lanes where the playhead is and schedule them on again, so
+   * params added to a lane's handle since (a stem's rotation, windsor#344)
+   * hear it too. A no-op before `initMusic` or for a part with no lanes.
+   */
+  resyncAutomation(slot: number): void {
+    this.automation.resync(slot);
+  }
+
+  /** The lanes a part plays now: its document's, normalised and fitted. None before `initMusic`. */
+  automationLanes(slot: number): readonly AutomationLane[] {
+    return this.automation.lanesOf(slot);
+  }
+
   /** A return by name, once `init()` has built them. */
   returnBus(name: string): ReturnBus | undefined {
     return this.graph.returnBus(name);
@@ -417,6 +444,7 @@ export class AudioSystem {
 
   dispose(): void {
     this.playback.dispose();
+    this.automation.dispose();
     this.sidechains.dispose();
     this.parts.dispose();
     this.groups.dispose();

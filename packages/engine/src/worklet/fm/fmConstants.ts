@@ -2,8 +2,9 @@
  * The FM worklet's tunables (#644): table size, mip count, the control-rate
  * interval, the dormancy floors, the modulation and feedback depths, the
  * shortest envelope segment, the amplitude envelope's breaks per block
- * (windsor#301), the width ramp's snap, and the drive stage's
- * shape constants and tone curve (windsor#300). Data, not logic: every
+ * (windsor#301), the width ramp's snap, the drive stage's
+ * shape constants and tone curve (windsor#300), and a Noise operator's
+ * colour filters' ceiling and damping (windsor#362). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
  * says so, and `fmProcessorKernel.test.ts` pins `MOD_INDEX_SCALE` against the
@@ -120,6 +121,16 @@ const DRIVE_DIODE_UNITY_FROM = 1048576; // 2^20
  */
 const DRIVE_TONE_MIN_HZ = 1000;
 const DRIVE_TONE_OCTAVES = 4.25;
+/*
+ * A Noise operator's colour (windsor#362): its two filters are two-pole TPT
+ * state-variable sections, Butterworth (damping k = sqrt 2, Q 0.707), tuned by
+ * g = tan(pi * fc / sampleRate) in portable arithmetic. A cutoff that is on is
+ * held between the patch's floor (`NOISE_COLOUR_FLOOR_HZ`) and this fraction of
+ * the sample rate, where tan stays finite and the prewarp well inside Nyquist
+ * (the windsor#361 prototype's ceiling).
+ */
+const NOISE_COLOUR_CEILING = 0.45;
+const NOISE_COLOUR_DAMPING = Math.SQRT2;
 
 export {
   TABLE_SIZE,
@@ -146,4 +157,6 @@ export {
   DRIVE_DIODE_UNITY_FROM,
   DRIVE_TONE_MIN_HZ,
   DRIVE_TONE_OCTAVES,
+  NOISE_COLOUR_CEILING,
+  NOISE_COLOUR_DAMPING,
 };

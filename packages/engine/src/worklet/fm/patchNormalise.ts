@@ -34,6 +34,7 @@ import {
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
   LFO_TO_WIDTH_DEFAULT,
+  NOISE_COLOUR_RANGE,
   OPERATOR_COUNT,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
@@ -101,6 +102,8 @@ function opDefaults(o: PartialOperator | null | undefined, index: number): Opera
     levelKeyScale: num(o.levelKeyScale, d.levelKeyScale),
     phase: num(o.phase, d.phase),
     phaseFree: o.phaseFree !== false, // free-running by default (OPERATOR_DEFAULTS.phaseFree)
+    noiseLp: clamp(num(o.noiseLp, d.noiseLp), NOISE_COLOUR_RANGE), // Hz, 0 off; Noise only (windsor#362)
+    noiseHp: clamp(num(o.noiseHp, d.noiseHp), NOISE_COLOUR_RANGE),
     env: envDefaults(o.env),
   };
 }

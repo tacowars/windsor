@@ -1,0 +1,138 @@
+{
+  "start": "../start/tr808-clap.init.json",
+  "params": [
+    {
+      "path": "filter.cutoff",
+      "min": 400,
+      "max": 3000,
+      "scale": "log"
+    },
+    {
+      "path": "filter.resonance",
+      "min": 0.5,
+      "max": 8,
+      "scale": "log"
+    },
+    {
+      "path": "filter.envAmount",
+      "min": -2,
+      "max": 2
+    },
+    {
+      "path": "filter.env.decayTime",
+      "min": 0.001,
+      "max": 0.5,
+      "scale": "log"
+    },
+    {
+      "path": "drive.gain",
+      "min": 1,
+      "max": 4,
+      "scale": "log"
+    },
+    {
+      "path": "drive.tone",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[3].level",
+      "min": 0.25,
+      "max": 0.5
+    },
+    {
+      "path": "ops[0].level",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "path": "ops[1].level",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "path": "ops[2].level",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.attackTime",
+      "min": 0.00969,
+      "max": 0.01209
+    },
+    {
+      "path": "ops[0].env.attackCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.sustainLevel",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.releaseTime",
+      "min": 0.002,
+      "max": 0.04,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.releaseCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[1].env.attackTime",
+      "min": 0.02217,
+      "max": 0.02457
+    },
+    {
+      "path": "ops[1].env.releaseTime",
+      "min": 0.002,
+      "max": 0.04,
+      "scale": "log"
+    },
+    {
+      "path": "ops[1].env.releaseCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[2].env.attackTime",
+      "min": 0.0293,
+      "max": 0.0317
+    },
+    {
+      "path": "ops[2].env.releaseTime",
+      "min": 0.05,
+      "max": 2.0,
+      "scale": "log"
+    },
+    {
+      "path": "ops[2].env.releaseCurve",
+      "min": -1,
+      "max": 1
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/Clap A 808.wav",
+      "weight": 1
+    },
+    {
+      "wav": "$SM_CLAP_HEADS/clap808-head.wav",
+      "weight": 1
+    }
+  ],
+  "defaults": {
+    "note": 60,
+    "velocity": 1,
+    "gate": null
+  },
+  "optimizer": {
+    "method": "cma",
+    "budget": 700,
+    "sigma0": 0.2,
+    "seed": 1
+  }
+}

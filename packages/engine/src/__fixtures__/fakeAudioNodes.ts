@@ -21,6 +21,8 @@
  * build (see packages/engine/tsconfig.json).
  */
 
+import { timelineValueAt } from './paramTimeline';
+
 export const BLOCK = 128;
 
 /** What a node needs from its context. `FakeContext` provides it. */
@@ -71,9 +73,22 @@ export class FakeParam {
 
   /** Logs the call and leaves `value` at what it names (a cancel names the current value). */
   private record(call: string, value: number, time?: number): this {
+    if (this.automation.length === 0) this.before = this.value;
     this.automation.push({ call, value, ...(time === undefined ? {} : { time }) });
     this.value = value;
     return this;
+  }
+
+  /** `value` when the first automation call came: where the timeline starts. */
+  private before = 0;
+
+  /** The value Web Audio's timeline gives at `time`, replayed from the log (`paramTimeline.ts`). */
+  valueAt(time: number): number {
+    return timelineValueAt(
+      this.automation,
+      this.automation.length > 0 ? this.before : this.value,
+      time,
+    );
   }
 
   /** The block's per-sample value: `value` plus every connected node's first channel. */

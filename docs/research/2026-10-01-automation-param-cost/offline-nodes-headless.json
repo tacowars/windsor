@@ -1,0 +1,19 @@
+{
+  "bench": "micro.js",
+  "browser": "HeadlessChrome/154.0.0.0 (Google Chrome 154.0.8037.92), chrome-devtools-mcp 1.10.1",
+  "machine": "Apple M1, 8 cores, 16 GB, macOS 26.5.1; load average about 8 to 10",
+  "backend": "OfflineAudioContext, 48 kHz stereo, 16 fm-part nodes with no notes, stops every 0.25 s",
+  "runs": 11,
+  "seconds": 20,
+  "parts": 16,
+  "cases": {
+    "a": { "medianMs": 504.1, "minMs": 443.9, "maxMs": 898.5, "overA": null, "runsMs": [898.5, 476.6, 443.9, 449.7, 444.6, 518.2, 504.1, 503.5, 589.3, 632.8, 543.9] },
+    "b": { "medianMs": 3011.7, "minMs": 2490.5, "maxMs": 4590.6, "overA": { "medianMs": 2455.7, "minMs": 2040.8, "maxMs": 4067.9, "msPerAudioSecond": 122.79 }, "runsMs": [4590.6, 4544.5, 2662.8, 2490.5, 2533.4, 2728.2, 2959.8, 3475.3, 3255.8, 3058.4, 3011.7] },
+    "c": { "medianMs": 1154.7, "minMs": 927.1, "maxMs": 1824.1, "overA": { "medianMs": 574.6, "minMs": 352.5, "maxMs": 1347.5, "msPerAudioSecond": 28.73 }, "runsMs": [1822.1, 1824.1, 946.5, 939.1, 927.1, 1000.1, 1210.2, 1311.3, 941.8, 1207.4, 1154.7] },
+    "d": { "medianMs": 1272, "minMs": 1033.8, "maxMs": 2129.1, "overA": { "medianMs": 728.1, "minMs": 451.3, "maxMs": 1346.5, "msPerAudioSecond": 36.4 }, "runsMs": [2129.1, 1823.1, 1080.6, 1112.9, 1033.8, 1129.7, 1413.1, 1341.7, 1040.6, 1448, 1272] },
+    "e": { "medianMs": 2716.1, "minMs": 2347.5, "maxMs": 4424.8, "overA": { "medianMs": 2197.9, "minMs": 1903.6, "maxMs": 3526.3, "msPerAudioSecond": 109.9 }, "runsMs": [4424.8, 2395.2, 2347.5, 2401.6, 2477.3, 2716.1, 3099.2, 2612.6, 2788.9, 3288.6, 2857.6] },
+    "f": { "medianMs": 996.9, "minMs": 883.1, "maxMs": 1762.7, "overA": { "medianMs": 532.3, "minMs": 414.4, "maxMs": 864.2, "msPerAudioSecond": 26.62 }, "runsMs": [1762.7, 891, 883.1, 990.1, 907.2, 962.5, 1265.3, 996.9, 1146.6, 1349.3, 1076.2] }
+  },
+  "usPerParamPerQuantum": { "b": 0.706, "c": 0.599, "e": 0.632, "f": 0.554 },
+  "lastD": { "calls": 128640, "schedMs": 56.2 }
+}

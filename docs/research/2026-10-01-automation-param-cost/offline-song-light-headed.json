@@ -1,0 +1,15 @@
+{
+  "browser": "Google Chrome 154.0.8037.92, headed (Chrome/154.0.0.0), own profile, --mute-audio, driven by cdp.mjs",
+  "machine": "Apple M1, 8 cores, 16 GB, macOS 26.5.1; load average 13 to 16.6 during the run",
+  "backend": "OfflineAudioContext, 48 kHz stereo, through the engine's renderSong",
+  "song": "sixteen-pads-light.json (30.968 s plus a 2 s tail)",
+  "runs": 7,
+  "order": "one warm-up render of a, then a, b, c, d interleaved, seven times",
+  "peaks": { "a": 0.8913, "b": 0.8913, "c": 0.8913, "d": 0.8913 },
+  "results": {
+    "a": { "medianMs": 27719.7, "minMs": 22179.6, "maxMs": 35690.2, "runsMs": [35690.2, 31719.8, 31025.2, 27719.7, 25091, 27688.1, 22179.6] },
+    "b": { "medianMs": 34253.2, "minMs": 25657.1, "maxMs": 40502.7, "runsMs": [40502.7, 36658.2, 38112, 31886.8, 31578.4, 34253.2, 25657.1] },
+    "c": { "medianMs": 29939, "minMs": 23538.1, "maxMs": 31161, "runsMs": [30925.7, 31161, 29939, 28998.6, 24625.5, 29987.3, 23538.1] },
+    "d": { "medianMs": 28428.2, "minMs": 23331, "maxMs": 40532.6, "runsMs": [40532.6, 31313.1, 28827.3, 28428.2, 27038.7, 25485.7, 23331], "lastRunScheduling": { "calls": 214528, "ms": 121.7 } }
+  }
+}

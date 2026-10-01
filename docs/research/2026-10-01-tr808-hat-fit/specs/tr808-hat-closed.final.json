@@ -1,0 +1,51 @@
+{
+  "start": "../start/tr808-hat-closed.final.json",
+  "params": [
+    {
+      "path": [
+        "ops[0].env.releaseTime",
+        "ops[1].env.releaseTime",
+        "ops[2].env.releaseTime",
+        "ops[3].env.releaseTime"
+      ],
+      "min": 0.04,
+      "max": 0.15,
+      "scale": "log"
+    },
+    {
+      "path": [
+        "ops[0].env.releaseCurve",
+        "ops[1].env.releaseCurve",
+        "ops[2].env.releaseCurve",
+        "ops[3].env.releaseCurve"
+      ],
+      "min": -1,
+      "max": 0
+    },
+    {
+      "path": "filter.resonance",
+      "min": 0.5,
+      "max": 1.2
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/CH A 808.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "seeds": 4,
+  "optimizer": {
+    "method": "cma",
+    "budget": 150,
+    "sigma0": 0.2,
+    "seed": 1
+  },
+  "weights": {
+    "stft": 1,
+    "band": 0.1,
+    "wave": 6
+  }
+}
