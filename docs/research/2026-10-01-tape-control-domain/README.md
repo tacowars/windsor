@@ -201,6 +201,15 @@ no expiry, no truncated tail, nothing missing. The trials used 2,610
 CPU-seconds in all. `evidence.mjs --check` passes all five of its checks:
 grid, derived, closure, clean closure and three spot re-renders, bit-equal.
 
+**Changed after the run, by #295.** `boxOf`, `boxTrials` and `runTrial`
+also accept a whole box, so
+[the 2× record](../2026-10-01-tape-control-domain-2x/README.md) can run a
+raised width minimum through this harness. A number still means width
+[0, wMax], and the three spot trials re-render bit-equal after the change.
+`measurement.json`'s `closure` carries the new hashes of `controlPaths.ts`
+and `program.ts`, and its `derived` gained `factorAgreement`; the trials
+are the run's, untouched.
+
 ## Results
 
 ### Part A: the width maximum is 0.62, set by drive 0
@@ -229,8 +238,12 @@ binding extreme is drive 0, at either saturation:
 
 So **w_max = 0.62**, bound by rule (i) at drive 0.
 
-**What the gain amplifies.** The rendered axis, at 2× (4× agrees within
-1% on every row shown). The conditioned field peaks at 2.5 in every trial (the guard's 4
+**What the gain amplifies.** The rendered axis, at 2×. 4× is within
+**1.91%** of 2× on every row shown. The largest differences are the peak
+out at 1/0/0 (1.91%) and the holds at 0/1/0 (1.72%) and 0/0.99/0 (1.54%);
+every remanence agrees within 0.06%. `evidence.mjs` computes these from the
+trials as `derived.factorAgreement` (corrected in #295; this sentence first
+said "within 1%"). The conditioned field peaks at 2.5 in every trial (the guard's 4
 through the knee). "Hold" is the mean output over the last 0.1 s of the
 `dc` segment, still inside the −4 hold, where the core's output should
 equal the conditioned field, −2.5. "Remanence" is the mean output over
@@ -339,9 +352,14 @@ and 1 s knob sweeps and under 50 ms and 1 s random walks with the stage's
 - **At 2×, at 44.1, 48 and 96 kHz: the same box is *not* qualified.** Every
   static point, every walk, and every sweep except one survives. The
   failure is the 1 s drive sweep at width 0 and saturation 0, which resets
-  twice at every rate. A narrower 2× box (for example a width minimum near
-  0.05, which the pole explanation above suggests) is unmeasured, so it is
-  not declared.
+  twice at every rate.
+- **Amended by #295: at both 2× and 4×, at 44.1, 48 and 96 kHz: drive
+  [0, 1], width [0.05, 0.62], saturation [0, 1]** is qualified on the same
+  criteria, all 1,878 trials surviving
+  ([the 2× record](../2026-10-01-tape-control-domain-2x/README.md)). Its
+  width-0 edge measurement fails only at width 0; widths 0.01, 0.02 and 0.05
+  survive, consistent with the pole explanation above. 0.05 is under 0.13,
+  the lowest width a shipped row uses.
 - **Width's maximum is 0.62**, set by the susceptibility margin at drive 0
   (2.02 × 10⁻³ ≥ 2 × 10⁻³; gain 494.7 ≤ 500). The relative-gain bound
   alone would allow 0.74. Raising drive's lower end would relax rule (i),
