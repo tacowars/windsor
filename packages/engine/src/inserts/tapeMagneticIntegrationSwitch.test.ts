@@ -13,9 +13,14 @@
  *   evaluates an esbuild bundle of `tapeMagneticStage.ts` as a script named
  *   `tape-magnetic-stage.js`, drives it as `TapeDsp` does — the pair's
  *   fields per sample, the dry ring in place, `select` and `configure` per
- *   block, the factor switched every fourth quantum — and reads the heap
- *   across 1000 quanta. The rest of `TapeDsp` still allocates, as it did
- *   before this change; that is windsor#228's.
+ *   block and `glide` per sample while it glides, the factor switched every
+ *   fourth quantum and the model every quantum — and reads the heap across
+ *   1000 quanta after 6000 of warm-up. Since windsor#289 the rows differ, so
+ *   the controls glide throughout and the active pair is retuned every
+ *   sample. When that was per block, V8 compiled it to its top tier only
+ *   after about 3000 quanta here (2000 left 453 KB boxed in the window, 3000
+ *   to 7000 read 600 bytes on Node 24, arm64), so the warm-up is 6000. The rest of
+ *   `TapeDsp` is windsor#228's (`tapeAllocation.test.ts`).
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -29,34 +34,49 @@ import { renderTape, tapeRig } from '../__fixtures__/tapeDspProbe';
 import { FieldNormaliser } from '../song/arrangementFields';
 import { TapeMagneticCore, originSusceptibility } from '../worklet/tape/tapeMagnetic';
 import { assertMagneticRows, magneticControls } from '../worklet/tape/tapeMagneticRows';
-import { TAPE_MODELS, TAPE_OVERSAMPLING } from './tapeConstants';
+import { TAPE_MODELS, TAPE_OVERSAMPLING, TAPE_TYPES } from './tapeConstants';
 import { TAPE_MAGNETIC } from './tapeMagneticConstants';
 import { sine } from './tapePortableMath';
 import { DEFAULT_TAPE, normaliseTape } from './tapeSpec';
 
 const RATE = 48000;
 const QUANTUM = 128;
-/** The research centre every model row sits at (decision 6). */
+/** The research centre, the row every model carried before windsor#289. */
 const CENTRE = { drive: 0.5, width: 0.5, saturation: 0.5 };
 const tone = (n: number): number => 0.8 * sine((2 * Math.PI * 220 * n) / RATE);
 
 describe('the model rows (decision 6)', () => {
-  it('maps every model to the research centre: Ms 1.25, a 1.25 / 3.01, c √½ − 0.01', () => {
+  it('maps the research centre exactly: Ms 1.25, a 1.25 / 3.01, c √½ − 0.01', () => {
     const c = Math.sqrt(0.5) - 0.01;
-    for (const { magnetic } of TAPE_MODELS) {
-      expect(magnetic).toEqual([CENTRE.drive, CENTRE.width, CENTRE.saturation]);
+    const core = new TapeMagneticCore(RATE, 2, CENTRE);
+    expect(core.ms).toBe(1.25);
+    expect(1 / core.invA).toBeCloseTo(1.25 / 3.01, 15);
+    expect(core.reversibleGain).toBeCloseTo(c * 3.01, 14);
+    expect(core.irreversible).toBeCloseTo(1 - c, 15);
+    expect(core.susceptibility).toBeCloseTo(0.700214, 6);
+    expect(core.susceptibility).toBeGreaterThan(TAPE_MAGNETIC.susceptibilityFloor);
+  });
+
+  it('maps every model’s own row (windsor#289): Ms 0.5 + 1.5 (1 − s), a Ms / (0.01 + 6 d), c √(1 − w) − 0.01', () => {
+    TAPE_MODELS.forEach(({ magnetic }, i) => {
+      const [drive, width, saturation] = magnetic;
+      const ms = 0.5 + 1.5 * (1 - saturation);
+      const a = ms / (0.01 + 6 * drive);
+      const c = Math.sqrt(1 - width) - 0.01;
+      const r = ms / a / 3;
       const controls = magneticControls(magnetic, { drive: 0, width: 0, saturation: 0 });
       const core = new TapeMagneticCore(RATE, 2, controls);
-      expect(core.ms).toBe(1.25);
-      expect(1 / core.invA).toBeCloseTo(1.25 / 3.01, 15);
-      expect(core.reversibleGain).toBeCloseTo(c * 3.01, 14);
+      expect(core.ms).toBe(ms);
+      expect(1 / core.invA).toBeCloseTo(a, 14);
+      expect(core.reversibleGain).toBeCloseTo(c * (ms / a), 14);
       expect(core.irreversible).toBeCloseTo(1 - c, 15);
-      expect(core.susceptibility).toBeCloseTo(0.700214, 6);
+      expect(core.susceptibility).toBeCloseTo((c * r) / (1 - 1.6e-3 * c * r), 14);
       expect(core.susceptibility).toBeGreaterThan(TAPE_MAGNETIC.susceptibilityFloor);
-    }
-    const shipped = tapeRig({ model: 'vhs' }).dsp.magnetic.active[0]!.core;
-    expect(shipped.ms).toBe(1.25);
-    expect(shipped.susceptibility).toBe(originSusceptibility(CENTRE));
+      // The shipped bundle configures its core from the same row.
+      const shipped = tapeRig({ model: TAPE_TYPES[i]! }).dsp.magnetic.active[0]!.core;
+      expect(shipped.ms).toBe(core.ms);
+      expect(shipped.susceptibility).toBe(originSusceptibility(controls));
+    });
   });
 
   it('accepts the shipped rows and refuses a row at the width endpoint or outside [0, 1]', () => {
@@ -144,13 +164,14 @@ const source = new Float64Array(QUANTUM * 64);
 for (let i = 0; i < source.length; i++) source[i] = 3.2 * Math.sin(i * 0.031) + 1.6 * Math.sin(i * 0.29);
 const output = new Float64Array(QUANTUM);
 const stage = new api.TapeMagneticStage(48000, 2, 0);
-// One quantum as TapeDsp runs it: select and configure, then each channel's pair and dry ring per sample.
+// One quantum as TapeDsp runs it: select and configure, then per sample the glide, each channel's pair and the dry ring.
 function quantum(q) {
   stage.select(q % 8 < 4 ? 2 : 4);
-  stage.configure(q % 7, QUANTUM);
+  stage.configure(q % 7);
   const base = (q % 64) * QUANTUM;
   for (let i = 0; i < QUANTUM; i++) {
     const x = source[base + i];
+    if (stage.gliding) stage.glide();
     for (let channel = 0; channel < 2; channel++) {
       const pair = stage.active[channel];
       pair.input = x;
@@ -218,7 +239,7 @@ function probe(): { result: ProbeResult; changes: string[] } {
         files.probe,
         files.bundle,
         out,
-        '2000',
+        '6000',
         '1000',
       ],
       { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },

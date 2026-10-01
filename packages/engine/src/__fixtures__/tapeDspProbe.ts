@@ -28,7 +28,11 @@ export interface ShippedOversampler {
     ms: number;
     invA: number;
     reversibleGain: number;
+    irreversible: number;
+    irreversibleK: number;
+    dt: number;
     susceptibility: number;
+    gain: number;
   };
 }
 
@@ -44,6 +48,8 @@ export interface ShippedTapeDsp {
     oversamplers: ShippedOversampler[];
     factor: number;
     latency: number;
+    /** True while a model switch glides the core's controls. */
+    gliding: boolean;
   };
   motion: { delay: number; dropout: number };
 }
