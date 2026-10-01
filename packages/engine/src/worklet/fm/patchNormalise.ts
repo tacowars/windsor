@@ -22,6 +22,7 @@ import { DRIVE_FOLD, DRIVE_SOFT } from './modeIds';
 import {
   DRIVE_BIAS_RANGE,
   DRIVE_DEFAULTS,
+  DRIVE_GAIN_RANGE,
   DRIVE_TONE_RANGE,
   ENVELOPE_DEFAULTS,
   FEEDBACK_RANGE,
@@ -133,15 +134,15 @@ function lfoDefaults(
 
 /**
  * The drive stage (windsor#300): a shape id outside the table plays `soft`,
- * the bias and tone are clamped to their ranges, and the gain is left as it
- * comes, as the filter's drive was.
+ * and the gain, bias and tone are clamped to their ranges (the gain's
+ * bound keeps the shaper's operand finite, windsor#308).
  */
 function driveDefaults(raw: Partial<DriveSettings> | null | undefined): DriveSettings {
   raw = raw || {};
   const d = DRIVE_DEFAULTS;
   const shape = num(raw.shape, d.shape) | 0;
   return {
-    gain: num(raw.gain, d.gain),
+    gain: clamp(num(raw.gain, d.gain), DRIVE_GAIN_RANGE),
     shape: shape < DRIVE_SOFT || shape > DRIVE_FOLD ? DRIVE_SOFT : shape,
     bias: clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE),
     tone: clamp(num(raw.tone, d.tone), DRIVE_TONE_RANGE),

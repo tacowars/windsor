@@ -22,7 +22,7 @@ as a synth improvement, not a drum fix.
 
 1. **The drive is its own patch block**, `patch.drive = { gain, shape,
    bias, tone }`, and `filter.drive` is retired. `gain` is the input gain
-   (1 is unity), `shape` an id from `DRIVE_SHAPE`, `bias` a DC offset
+   (1 is unity, clamped to 0..64 so `gain · x` stays finite), `shape` an id from `DRIVE_SHAPE`, `bias` a DC offset
    before the shaper (−1..1), `tone` a lowpass after it (0..1, 1 open).
 2. **Signal order:** carriers → drive → filter (if on) → steal fade. The
    drive no longer needs the filter. Unity gain with no bias bypasses the

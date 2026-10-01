@@ -132,7 +132,7 @@ const FILTER_DEFAULTS = {
  * defaults are no drive at all (record `2026-10-01-voice-drive-stage`).
  */
 const DRIVE_DEFAULTS = {
-  /** The input gain into the shaper; 1 is unity. */
+  /** The input gain into the shaper, `DRIVE_GAIN_RANGE`; 1 is unity. */
   gain: 1,
   shape: DRIVE_SOFT,
   /** A DC offset added before the shaper, `DRIVE_BIAS_RANGE`. */
@@ -140,6 +140,13 @@ const DRIVE_DEFAULTS = {
   /** The lowpass after the shaper, `DRIVE_TONE_RANGE`: 1 is open (bypassed). */
   tone: 1,
 };
+
+/**
+ * The drive's input gain, clamped here by the worklet: the console's knob
+ * reaches 6 and the library 1.6, so 64 is far past any musical use, and it
+ * keeps `gain · x` finite for every carrier sum the voice can make.
+ */
+const DRIVE_GAIN_RANGE = { min: 0, max: 64 };
 
 /** The drive's bias, clamped here by the worklet. */
 const DRIVE_BIAS_RANGE = { min: -1, max: 1 };
@@ -159,6 +166,7 @@ const WIDTH_RANGE = { min: 0.05, max: 1 };
 export {
   DRIVE_BIAS_RANGE,
   DRIVE_DEFAULTS,
+  DRIVE_GAIN_RANGE,
   DRIVE_TONE_RANGE,
   ENVELOPE_DEFAULTS,
   FEEDBACK_RANGE,

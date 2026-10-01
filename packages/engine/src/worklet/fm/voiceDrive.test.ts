@@ -13,6 +13,7 @@ import type { DriveSettings } from '../../patch/patch';
 import { DRIVE_DSP, DRIVE_SHAPERS } from '../../inserts/advancedDriveConstants';
 import { DriveShaper } from '../../inserts/advancedDriveCurves';
 import { DRIVE_DIODE_KNEE, DRIVE_TUBE_EVEN } from './fmConstants';
+import { DRIVE_GAIN_RANGE } from './patchDefaults';
 import { DRIVE_SHAPE } from './modeIds';
 import type { Voice } from './voice';
 import { VoiceDrive, updateVoiceDrive } from './voiceDrive';
@@ -78,6 +79,31 @@ describe('the drive shapes (windsor#300)', () => {
       }
     },
   );
+});
+
+describe('the drive stage at its bounds (windsor#308)', () => {
+  const INPUTS = [1, -1, 1e6, -1e6, 1e300, -1e300, Number.MAX_VALUE, -Number.MAX_VALUE];
+
+  it.each(SHAPES)(
+    'keeps %s finite at the largest gain, either bias, any finite input',
+    (_n, shape) => {
+      for (const bias of [-1, 1]) {
+        const drive = driveFor({ gain: DRIVE_GAIN_RANGE.max, shape, bias });
+        expect(Number.isFinite(drive.offset)).toBe(true);
+        for (const x of INPUTS) {
+          // What the loops compute: shape(x · gain + bias) − offset; past 1e306 the operand is ±∞.
+          const y = curveOf(shape, x * drive.gain + bias) - drive.offset;
+          expect(Number.isFinite(y), `x ${x}, bias ${bias}`).toBe(true);
+        }
+      }
+    },
+  );
+
+  it('folds an infinite operand to 0 and a huge finite one to a finite value', () => {
+    expect(curveOf(DRIVE_SHAPE.FOLD, Infinity)).toBe(0);
+    expect(curveOf(DRIVE_SHAPE.FOLD, -Infinity)).toBe(0);
+    expect(Number.isFinite(curveOf(DRIVE_SHAPE.FOLD, Number.MAX_VALUE))).toBe(true);
+  });
 });
 
 describe("the drive's control half (windsor#300)", () => {

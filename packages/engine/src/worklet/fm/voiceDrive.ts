@@ -104,6 +104,12 @@ class VoiceDrive {
       }
       case DRIVE_FOLD: {
         // A triangle of period 4 through (0, 0) and (1, 1): 2/π asin(sin(πx/2)).
+        // An infinite operand has no phase (∞ − ∞ is NaN): it folds to 0. No
+        // finite operand takes the branch, so their bits are unchanged.
+        if (x - x !== 0) {
+          this.point = 0;
+          return;
+        }
         let u = x + 1;
         u -= 4 * Math.floor(u * 0.25);
         this.point = 1 - Math.abs(u - 2);

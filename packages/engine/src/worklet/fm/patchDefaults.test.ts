@@ -4,7 +4,7 @@ import { makePatch } from '../../patch/patch';
 import type { PartialPatch, Patch } from '../../patch/patch';
 import { patchLeafDifferences } from '../../patch/patchLibrary';
 import { DRIVE_SHAPE } from './modeIds';
-import { DRIVE_BIAS_RANGE, DRIVE_TONE_RANGE, TONE_RANGE } from './patchDefaults';
+import { DRIVE_BIAS_RANGE, DRIVE_GAIN_RANGE, DRIVE_TONE_RANGE, TONE_RANGE } from './patchDefaults';
 import { WAVE } from './waveIds';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
@@ -59,5 +59,11 @@ describe('the patch defaults (#670)', () => {
       bias: DRIVE_BIAS_RANGE.min,
       tone: DRIVE_TONE_RANGE.max,
     });
+  });
+
+  it('clamps the drive gain to its range, so the shaper never sees an overflow (windsor#308)', () => {
+    expect(workletFill({ drive: { gain: 1e308 } }).drive.gain).toBe(DRIVE_GAIN_RANGE.max);
+    expect(workletFill({ drive: { gain: -3 } }).drive.gain).toBe(DRIVE_GAIN_RANGE.min);
+    expect(DRIVE_GAIN_RANGE.max).toBeGreaterThanOrEqual(6); // the console's Drive knob
   });
 });
