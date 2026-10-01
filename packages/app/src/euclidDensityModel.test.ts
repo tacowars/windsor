@@ -6,11 +6,25 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EuclideanSpec, TickEvent } from '@windsor/engine';
-import { DEFAULT_EUCLIDEAN_CONFIG, EuclideanSequencer, lfoValue } from '@windsor/engine';
+import {
+  DEFAULT_EUCLIDEAN_CONFIG,
+  EuclideanSequencer,
+  TICKS_PER_BAR,
+  lfoValue,
+} from '@windsor/engine';
+import {
+  FULL_DOCUMENT,
+  FULL_PARTS,
+  FULL_SLOT,
+  withDocumentPart,
+} from '@windsor/engine/__fixtures__/fullArrangement';
+import { rig } from '@windsor/engine/__fixtures__/playerRig';
+import { HALF, halves, patternOf } from '@windsor/engine/__fixtures__/regionPatternSongs';
 import {
   densityKindText,
   densityNote,
   lfoKs,
+  plotBar,
   plotPath,
   plotScale,
   plotY,
@@ -88,5 +102,39 @@ describe('the plot of k', () => {
     expect(plotPath([scale.hi, scale.lo], scale)).toBe(
       `M0.0 ${EUCLID_PLOT.pad.toFixed(1)}H100.0L100.0 ${(EUCLID_PLOT.height - EUCLID_PLOT.pad).toFixed(1)}H200.0`,
     );
+  });
+});
+
+describe("the plot's bar", () => {
+  const BAR = TICKS_PER_BAR;
+  const slot = FULL_SLOT.kick;
+  const kick = FULL_PARTS.kick.sequencer;
+  /** The kick in two regions, the second entered on bar 3 (`HALF`), played through. */
+  const played = () => {
+    const doc = withDocumentPart(FULL_DOCUMENT, 'kick', {
+      regions: halves(patternOf(kick), patternOf(kick)),
+    });
+    const r = rig(doc);
+    r.run((2 * HALF) / BAR);
+    return r.player;
+  };
+
+  it("starts a region entered after bar 1 on its own bar 0, as the sequencer's bar does", () => {
+    const player = played();
+    const { divisor } = kick;
+    // Region 2 begins on bar 3: at its entry the sequencer hears local bar 0, not song bar 2.
+    expect(plotBar(player.regionStepAt(slot, 1, HALF), divisor, HALF / BAR)).toBe(0);
+    expect(plotBar(player.regionStepAt(slot, 1, HALF + BAR), divisor, HALF / BAR + 1)).toBe(1);
+    // Out of region 2, on bar 1: its phase there, the bar its ghost playhead stands on.
+    const ghost = player.regionStepAt(slot, 1, 0);
+    expect(ghost?.live).toBe(false);
+    expect(ghost?.localStep).toBeTypeOf('number');
+    const want = Math.floor(((ghost?.localStep ?? Number.NaN) * divisor) / BAR);
+    expect(plotBar(ghost, divisor, 0)).toBe(want);
+  });
+
+  it("falls back to the song's bar with no region step", () => {
+    expect(plotBar(null, 6, 5)).toBe(5);
+    expect(plotBar({ step: 3, live: true }, 6, 5)).toBe(5);
   });
 });

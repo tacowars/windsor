@@ -165,11 +165,18 @@ function pitchCell(input: LaneRowsInput, index: number, value: number): HTMLElem
   return cell;
 }
 
-/** The step-mod lanes' host: the grid's lane cell and painting over this card's sound lanes. */
+/**
+ * The step-mod lanes' host: the grid's lane cell and painting over this
+ * card's sound lanes. Built afresh on every repaint, so its click gate is
+ * kept under the card (`gateKey`), and a double-click survives the repaint
+ * its first press's write brings.
+ */
 function soundHost(input: LaneRowsInput): LaneHost {
   const { card, spec } = input;
   const lengthOf = (k: number): number => spec.modLanes?.[k]?.values.length ?? 1;
   return {
+    // The rows repaint between a double-click's presses with a new host; the gate is the card's.
+    gateKey: card,
     scope: input.scope,
     lanes: () => card.spec()?.modLanes ?? null,
     base: (param: StepModParam) => patchBase(card.ctx, card.slot, param),

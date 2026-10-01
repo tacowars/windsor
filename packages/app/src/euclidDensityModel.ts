@@ -6,8 +6,8 @@
  * rounded); a walk is random, so its plot is the bounds band and the
  * current `k`. Pure: the card draws the path this returns.
  */
-import type { DensityMod, EuclideanSpec } from '@windsor/engine';
-import { lfoValue } from '@windsor/engine';
+import type { DensityMod, EuclideanSpec, RegionStep } from '@windsor/engine';
+import { TICKS_PER_BAR, lfoValue } from '@windsor/engine';
 import { EUCLID_PLOT } from './euclidConstants';
 
 /** The modulator in a few words: `tri · 8 bars`, `sine · 0.25 Hz`, `walk · 0.5`. */
@@ -28,6 +28,24 @@ export function densityNote(spec: EuclideanSpec, k: number): string {
 export interface PlotClock {
   readonly bar: number;
   readonly secondsPerBar: number;
+}
+
+/**
+ * The bar the plot starts on: the bar the sequencer is told, which the
+ * region gate rebases onto the region's own clock (`RegionGate.forward`),
+ * so a region entered on bar 3 plays its LFO from local bar 0. Read from
+ * the region's `localStep` at the part's divisor, live or, out of the
+ * region, at its phase, as the playhead's ghost is. With no local step (no
+ * region named), the song's bar `songBar`.
+ */
+export function plotBar(
+  at: RegionStep | null,
+  divisor: number,
+  songBar: number,
+  ticksPerBar = TICKS_PER_BAR,
+): number {
+  if (at?.localStep === undefined) return songBar;
+  return Math.floor((at.localStep * divisor) / ticksPerBar);
 }
 
 /** The `k` an LFO gives each of `count` bars from `clock.bar`; empty for a walk. */

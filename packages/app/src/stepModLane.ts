@@ -46,9 +46,9 @@ import {
   paintCells,
   removeLane,
   valueAtY,
-  withParamValues,
 } from './stepModLaneModel';
-import { LaneClickGate, isDrag } from './stepModLaneClicks';
+import { isDrag } from './stepModLaneClicks';
+import { gateOf } from './stepModLaneGates';
 
 /** What a lane needs of the card it sits on. */
 export interface LaneHost {
@@ -70,6 +70,11 @@ export interface LaneHost {
   valueIndex?(lane: number, cell: number): number;
   /** Where a hover's readout goes; absent, the lane's own `.mod-readout` line. Null clears it. */
   say?(lane: number, step: number, text: string | null): void;
+  /**
+   * What the card's click gate is kept under, for a card that builds a new
+   * host on every repaint; absent, the host itself (`stepModLaneGates.ts`).
+   */
+  readonly gateKey?: object;
 }
 
 /** The value index a cell shows: the host's mapping, else the cell's own index. */
@@ -82,26 +87,6 @@ export function patchBase(ctx: AppCtx, slot: number, param: StepModParam): numbe
   const part = partAt(doc, slot);
   const value = part ? getPath(doc.patches?.[part.preset], param) : undefined;
   return typeof value === 'number' ? value : undefined;
-}
-
-/** One click gate per card: its writes go through the host, its clock is the page's. */
-const gates = new WeakMap<LaneHost, LaneClickGate>();
-
-function gateOf(host: LaneHost): LaneClickGate {
-  let gate = gates.get(host);
-  if (!gate) {
-    gate = new LaneClickGate(
-      (param, values) => {
-        const lanes = host.lanes();
-        // The lane is named by its parameter: gone means no write.
-        const next = lanes && withParamValues(lanes, param, values);
-        if (next && !host.write(next)) host.repaint();
-      },
-      { now: () => performance.now() },
-    );
-    gates.set(host, gate);
-  }
-  return gate;
 }
 
 const cellsOf = (scope: HTMLElement, lane: number): HTMLElement[] =>
