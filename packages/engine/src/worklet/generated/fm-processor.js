@@ -17,6 +17,14 @@ var MIN_SEG_TIME = 5e-4;
 var ENVELOPE_CURVE_STEEPNESS = 3;
 var WIDTH_SNAP = 1e-5;
 var EVENT_QUEUE_CAPACITY = 128;
+var DRIVE_TUBE_EVEN = 0.18;
+var DRIVE_DIODE_KNEE = 0.65;
+var DRIVE_DIODE_ORDER = 2 / DRIVE_DIODE_KNEE;
+var DRIVE_DIODE_ROOT = DRIVE_DIODE_KNEE / 2;
+var DRIVE_DIODE_LINEAR_BELOW = 1 / 1048576;
+var DRIVE_DIODE_UNITY_FROM = 1048576;
+var DRIVE_TONE_MIN_HZ = 1e3;
+var DRIVE_TONE_OCTAVES = 4.25;
 
 // packages/engine/src/worklet/fm/eventQueue.ts
 function emptySlots(capacity) {
@@ -209,6 +217,7 @@ var ALG_DESCENDING = ALG_ORDER.map((o) => o[0] === D && o[1] === C && o[2] === B
 var LOOP_NONE = 0, LOOP_LOOP = 1, LOOP_TRIGGER = 2;
 var FILT_OFF = 0, FILT_LP = 1, FILT_HP = 2, FILT_BP = 3, FILT_NOTCH = 4;
 var LFO_SINE = 0, LFO_TRI = 1, LFO_SAW_UP = 2, LFO_SAW_DOWN = 3, LFO_SQUARE = 4, LFO_SH = 5, LFO_DRIFT = 6;
+var DRIVE_SOFT = 0, DRIVE_HARD = 1, DRIVE_DIODE = 2, DRIVE_TUBE = 3, DRIVE_FOLD = 4;
 var LOOP_MODE = { NONE: LOOP_NONE, LOOP: LOOP_LOOP, TRIGGER: LOOP_TRIGGER };
 var FILTER_MODE = {
   OFF: FILT_OFF,
@@ -225,6 +234,13 @@ var LFO_SHAPE = {
   SQUARE: LFO_SQUARE,
   SAMPLE_HOLD: LFO_SH,
   DRIFT: LFO_DRIFT
+};
+var DRIVE_SHAPE = {
+  SOFT: DRIVE_SOFT,
+  HARD: DRIVE_HARD,
+  DIODE: DRIVE_DIODE,
+  TUBE: DRIVE_TUBE,
+  FOLD: DRIVE_FOLD
 };
 
 // packages/engine/src/worklet/fm/waveIds.ts
@@ -314,7 +330,6 @@ var FILTER_DEFAULTS = {
   mode: FILT_OFF,
   cutoff: 8e3,
   resonance: 0.707,
-  drive: 1,
   slope24: false,
   envAmount: 0,
   modWheelDepth: 0,
@@ -322,6 +337,17 @@ var FILTER_DEFAULTS = {
   lfo2Amount: 0,
   keyTrack: 0
 };
+var DRIVE_DEFAULTS = {
+  /** The input gain into the shaper; 1 is unity. */
+  gain: 1,
+  shape: DRIVE_SOFT,
+  /** A DC offset added before the shaper, `DRIVE_BIAS_RANGE`. */
+  bias: 0,
+  /** The lowpass after the shaper, `DRIVE_TONE_RANGE`: 1 is open (bypassed). */
+  tone: 1
+};
+var DRIVE_BIAS_RANGE = { min: -1, max: 1 };
+var DRIVE_TONE_RANGE = { min: 0, max: 1 };
 var TONE_RANGE = { min: 0.02, max: 1 };
 var FEEDBACK_RANGE = { min: -1, max: 1 };
 var WIDTH_RANGE = { min: 0.05, max: 1 };
@@ -398,6 +424,17 @@ function lfoDefaults(raw, ld) {
     toWidth: perOperator(raw.toWidth, LFO_TO_WIDTH_DEFAULT)
   };
 }
+function driveDefaults(raw) {
+  raw = raw || {};
+  const d = DRIVE_DEFAULTS;
+  const shape = num(raw.shape, d.shape) | 0;
+  return {
+    gain: num(raw.gain, d.gain),
+    shape: shape < DRIVE_SOFT || shape > DRIVE_FOLD ? DRIVE_SOFT : shape,
+    bias: clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE),
+    tone: clamp(num(raw.tone, d.tone), DRIVE_TONE_RANGE)
+  };
+}
 function normalisePatch(raw) {
   raw = raw || {};
   const ops = [];
@@ -427,7 +464,6 @@ function normalisePatch(raw) {
       mode: num(filtRaw.mode, fd.mode) | 0,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
       resonance: num(filtRaw.resonance, fd.resonance),
-      drive: num(filtRaw.drive, fd.drive),
       slope24: !!filtRaw.slope24,
       envAmount: num(filtRaw.envAmount, fd.envAmount),
       // octaves
@@ -439,7 +475,8 @@ function normalisePatch(raw) {
       // octaves, from LFO 2
       keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS)
-    }
+    },
+    drive: driveDefaults(raw.drive)
   };
   return p;
 }
@@ -976,10 +1013,235 @@ var Svf = class {
     }
   }
 };
-function softClip(x) {
-  if (x > 3) return 1;
-  if (x < -3) return -1;
-  return x * (27 + x * x) / (27 + 9 * x * x);
+
+// packages/engine/src/inserts/tapePortableMathTables.ts
+function factorial(n) {
+  let f = 1;
+  for (let i = 2; i <= n; i++) f *= i;
+  return f;
+}
+function reciprocalFactorials(first, count, alternating) {
+  const terms = new Float64Array(count);
+  for (let i = 0; i < count; i++) {
+    const n = alternating ? first + 2 * i : first + i;
+    terms[i] = (alternating && i % 2 === 1 ? -1 : 1) / factorial(n);
+  }
+  return terms;
+}
+function split(value, residue) {
+  const scale = 4294967296;
+  const hi = Math.round(value * scale) / scale;
+  return [hi, value - hi, residue];
+}
+var POWER_REACH = 64;
+function powersOfTwo(reach) {
+  const powers = new Float64Array(2 * reach + 1);
+  powers[reach] = 1;
+  for (let k = 1; k <= reach; k++) {
+    powers[reach + k] = powers[reach + k - 1] * 2;
+    powers[reach - k] = powers[reach - k + 1] / 2;
+  }
+  return powers;
+}
+var TAPE_PORTABLE_MATH = {
+  /** π/2 as a double, and split: π/2 − Math.PI/2 = 6.123233995736766e-17. */
+  halfPi: Math.PI / 2,
+  halfPiParts: split(Math.PI / 2, 6123233995736766e-32),
+  /** k & this is the quadrant of k π/2 (two's complement, so negative k too). */
+  quadrantMask: 3,
+  /** ln 2 as a double, and split: ln 2 − Math.LN2 = 2.3190468138462996e-17. */
+  ln2: Math.LN2,
+  ln2Parts: split(Math.LN2, 23190468138462996e-33),
+  /**
+   * sin r = r Σ (−1)^i r^2i / (2i+1)! to r^19 and cos r = Σ (−1)^i r^2i / (2i)!
+   * to r^20: past them, on |r| ≤ π/4, a term is below 1e-19 of the sum.
+   */
+  sineTerms: reciprocalFactorials(1, 10, true),
+  cosineTerms: reciprocalFactorials(0, 11, true),
+  /** expm1 r = r Σ r^i / (i+1)! to r^13: past it, on |r| ≤ ln2/2, a term is below 1e-17 of r. */
+  expm1Terms: reciprocalFactorials(1, 13, false),
+  /** |x| from which tanh x is ±1 in a double: 1 − tanh 22 = 2e^-44/(1 + e^-44) < 2^-54. */
+  tanhUnity: 22,
+  powerReach: POWER_REACH,
+  powersOfTwo: powersOfTwo(POWER_REACH)
+};
+
+// packages/engine/src/worklet/fm/portablePowers.ts
+var LOG_TERM_COUNT = 12;
+var LOG_TERMS = new Float64Array(LOG_TERM_COUNT);
+for (let i = 0; i < LOG_TERM_COUNT; i++) LOG_TERMS[i] = 1 / (2 * i + 1);
+var BITS = new Float64Array(1);
+var WORDS = new Uint32Array(BITS.buffer);
+BITS[0] = 1;
+var HIGH_WORD = WORDS[1] === 1072693248 ? 1 : 0;
+var EXPONENT_BIAS = 1023;
+var MANTISSA_HIGH_MASK = 1048575;
+var EXPONENT_OF_ONE = 1072693248;
+function log2InPlace(values, at) {
+  BITS[0] = values[at];
+  const high = WORDS[HIGH_WORD];
+  let e = (high >>> 20) - EXPONENT_BIAS;
+  WORDS[HIGH_WORD] = high & MANTISSA_HIGH_MASK | EXPONENT_OF_ONE;
+  let m = BITS[0];
+  if (m > Math.SQRT2) {
+    m *= 0.5;
+    e += 1;
+  }
+  const s = (m - 1) / (m + 1);
+  const s2 = s * s;
+  let sum = LOG_TERMS[LOG_TERM_COUNT - 1];
+  for (let i = LOG_TERM_COUNT - 2; i >= 0; i--) sum = sum * s2 + LOG_TERMS[i];
+  values[at] = e + 2 * s * sum * Math.LOG2E;
+}
+function exp2InPlace(values, at) {
+  const table = TAPE_PORTABLE_MATH;
+  const x = values[at];
+  const k = Math.round(x);
+  const r = (x - k) * table.ln2;
+  const terms = table.expm1Terms;
+  let sum = terms[terms.length - 1];
+  for (let i = terms.length - 2; i >= 0; i--) sum = sum * r + terms[i];
+  values[at] = table.powersOfTwo[table.powerReach + k] * (1 + r * sum);
+}
+
+// packages/engine/src/inserts/tapePortableMath.ts
+function horner(terms, x) {
+  let sum = terms[terms.length - 1];
+  for (let i = terms.length - 2; i >= 0; i--) sum = sum * x + terms[i];
+  return sum;
+}
+function quadrantSine(r, quadrant, table) {
+  const r2 = r * r;
+  const value = quadrant & 1 ? horner(table.cosineTerms, r2) : r * horner(table.sineTerms, r2);
+  return quadrant & 2 ? -value : value;
+}
+function halfPiRemainder(x, k, table) {
+  const [hi, mid, lo] = table.halfPiParts;
+  return x - k * hi - k * mid - k * lo;
+}
+function sine(x, table = TAPE_PORTABLE_MATH) {
+  const k = Math.round(x / table.halfPi);
+  return quadrantSine(halfPiRemainder(x, k, table), k & table.quadrantMask, table);
+}
+function cosine(x, table = TAPE_PORTABLE_MATH) {
+  const k = Math.round(x / table.halfPi);
+  return quadrantSine(halfPiRemainder(x, k, table), k + 1 & table.quadrantMask, table);
+}
+function exp2(x, table = TAPE_PORTABLE_MATH) {
+  const k = Math.round(x);
+  if (!(Math.abs(k) <= table.powerReach)) throw new RangeError(`exp2: ${x} is out of range`);
+  const r = (x - k) * table.ln2;
+  return table.powersOfTwo[table.powerReach + k] * (1 + r * horner(table.expm1Terms, r));
+}
+function tanhInPlace(values, at, table = TAPE_PORTABLE_MATH) {
+  const x = values[at];
+  const magnitude = Math.abs(x);
+  if (!(magnitude < table.tanhUnity)) {
+    values[at] = x > 0 ? 1 : x < 0 ? -1 : x;
+    return;
+  }
+  const y = -(magnitude + magnitude);
+  const k = Math.round(y / table.ln2);
+  const parts = table.ln2Parts;
+  const r = y - k * parts[0] - k * parts[1] - k * parts[2];
+  const terms = table.expm1Terms;
+  let sum = terms[terms.length - 1];
+  for (let i = terms.length - 2; i >= 0; i--) sum = sum * r + terms[i];
+  const small = r * sum;
+  const scale = table.powersOfTwo[table.powerReach + k];
+  const t = k === 0 ? small : scale * small + (scale - 1);
+  const tanh = -t / (t + 2);
+  values[at] = x < 0 ? -tanh : tanh;
+}
+
+// packages/engine/src/worklet/fm/voiceDrive.ts
+var VoiceDrive = class {
+  constructor() {
+    this.gain = this.bias = this.offset = this.toneCoef = this.toneState = NaN;
+    this.point = NaN;
+    this.on = false;
+    this.toned = false;
+    this.shape = 0;
+    this.gain = 1;
+    this.bias = 0;
+    this.offset = 0;
+    this.toneCoef = 1;
+    this.toneState = 0;
+    this.point = 0;
+    this.slot = new Float64Array(1);
+  }
+  /** A new note: the tone pole starts from rest. */
+  reset() {
+    this.toneState = 0;
+  }
+  /** The curve at `point`, written back to `point`. */
+  curve() {
+    const x = this.point;
+    switch (this.shape) {
+      case DRIVE_HARD:
+        this.point = x > 1 ? 1 : x < -1 ? -1 : x;
+        return;
+      case DRIVE_DIODE:
+        this.diode();
+        return;
+      case DRIVE_TUBE: {
+        const slot = this.slot;
+        slot[0] = x;
+        tanhInPlace(slot, 0);
+        const t = slot[0];
+        this.point = t + DRIVE_TUBE_EVEN * t * t;
+        return;
+      }
+      case DRIVE_FOLD: {
+        let u = x + 1;
+        u -= 4 * Math.floor(u * 0.25);
+        this.point = 1 - Math.abs(u - 2);
+        return;
+      }
+      default:
+        this.point = x > 3 ? 1 : x < -3 ? -1 : x * (27 + x * x) / (27 + 9 * x * x);
+    }
+  }
+  /** x / (1 + |x|^order)^(1/order) at `point`, as x · 2^(−log2(1 + 2^(order · log2|x|)) / order). */
+  diode() {
+    const x = this.point;
+    const m = Math.abs(x);
+    if (!(m >= DRIVE_DIODE_LINEAR_BELOW)) return;
+    if (m >= DRIVE_DIODE_UNITY_FROM) {
+      this.point = x > 0 ? 1 : -1;
+      return;
+    }
+    const slot = this.slot;
+    slot[0] = m;
+    log2InPlace(slot, 0);
+    slot[0] *= DRIVE_DIODE_ORDER;
+    exp2InPlace(slot, 0);
+    slot[0] += 1;
+    log2InPlace(slot, 0);
+    slot[0] *= -DRIVE_DIODE_ROOT;
+    exp2InPlace(slot, 0);
+    this.point = x * slot[0];
+  }
+};
+function updateVoiceDrive(voice) {
+  const d = voice.patch.drive;
+  const drive = voice.drive;
+  drive.on = d.gain !== 1 || d.bias !== 0;
+  drive.toned = drive.on && d.tone < 1;
+  if (!drive.toned) drive.toneState = 0;
+  if (!drive.on) return;
+  drive.shape = d.shape;
+  drive.gain = d.gain;
+  drive.bias = d.bias;
+  drive.point = d.bias;
+  drive.curve();
+  drive.offset = drive.point;
+  if (!drive.toned) return;
+  const slot = drive.slot;
+  slot[0] = d.tone * DRIVE_TONE_OCTAVES;
+  exp2InPlace(slot, 0);
+  const g = Math.PI * DRIVE_TONE_MIN_HZ * slot[0] / voice.sr;
+  drive.toneCoef = g / (1 + g);
 }
 
 // packages/engine/src/worklet/fm/voiceControl.ts
@@ -1091,6 +1353,7 @@ function updateVoiceControl(voice, n) {
     const target = env * level * level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
     voice.ampInc[i] = (target - voice.amp[i]) / n;
   }
+  updateVoiceDrive(voice);
   updateVoiceFilter(voice, n);
   voice.age += n;
 }
@@ -1102,7 +1365,9 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const carGain = 1 / Math.sqrt(nCar);
   const f = patch.filter;
   const mode = f.mode;
-  const drive = f.drive;
+  const drive = voice.drive;
+  const driven = drive.on, driveSoft = drive.shape === DRIVE_SOFT, driveGain = drive.gain, driveBias = drive.bias, driveOffset = drive.offset, driveToned = drive.toned, driveCoef = drive.toneCoef;
+  let driveTone = drive.toneState;
   const slope24 = f.slope24;
   const gain = patch.volume * carGain;
   const panL = voice.panL, panR = voice.panR;
@@ -1347,8 +1612,22 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
     if (carC) sig += oC * aC;
     if (carD) sig += oD * aD;
     sig *= gain;
+    if (driven) {
+      let x = sig * driveGain + driveBias;
+      if (driveSoft) x = x > 3 ? 1 : x < -3 ? -1 : x * (27 + x * x) / (27 + 9 * x * x);
+      else {
+        drive.point = x;
+        drive.curve();
+        x = drive.point;
+      }
+      sig = x - driveOffset;
+      if (driveToned) {
+        const v = (sig - driveTone) * driveCoef;
+        sig = v + driveTone;
+        driveTone = sig + v;
+      }
+    }
     if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
       sig = voice.svfA.process(sig, mode);
       if (slope24) sig = voice.svfB.process(sig, mode);
     }
@@ -1391,6 +1670,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   settleSkipped(voice, B, liveB, n);
   settleSkipped(voice, C, liveC, n);
   settleSkipped(voice, D, liveD, n);
+  drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();
@@ -1413,7 +1693,9 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const carGain = 1 / Math.sqrt(nCar);
   const f = patch.filter;
   const mode = f.mode;
-  const drive = f.drive;
+  const drive = voice.drive;
+  const driven = drive.on, driveSoft = drive.shape === DRIVE_SOFT, driveGain = drive.gain, driveBias = drive.bias, driveOffset = drive.offset, driveToned = drive.toned, driveCoef = drive.toneCoef;
+  let driveTone = drive.toneState;
   const slope24 = f.slope24;
   const gain = patch.volume * carGain;
   let fade = voice.fade;
@@ -1515,8 +1797,22 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       sig += out[i] * amp[i];
     }
     sig *= gain;
+    if (driven) {
+      let x = sig * driveGain + driveBias;
+      if (driveSoft) x = x > 3 ? 1 : x < -3 ? -1 : x * (27 + x * x) / (27 + 9 * x * x);
+      else {
+        drive.point = x;
+        drive.curve();
+        x = drive.point;
+      }
+      sig = x - driveOffset;
+      if (driveToned) {
+        const v = (sig - driveTone) * driveCoef;
+        sig = v + driveTone;
+        driveTone = sig + v;
+      }
+    }
     if (mode !== FILT_OFF) {
-      if (drive !== 1) sig = softClip(sig * drive);
       sig = voice.svfA.process(sig, mode);
       if (slope24) sig = voice.svfB.process(sig, mode);
     }
@@ -1531,6 +1827,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
     outL[k] += sig * voice.panL;
     outR[k] += sig * voice.panR;
   }
+  drive.toneState = driveTone;
   voice.fade = fade;
   if (fadeInc !== 0 && fade <= 0) {
     voice.kill();
@@ -1636,6 +1933,7 @@ var Voice = class {
     this.lfo2 = new Lfo(secondLfoSeed(this.lfo.seed));
     this.svfA = new Svf();
     this.svfB = new Svf();
+    this.drive = new VoiceDrive();
     this.noiseSeed = randomSeed32(random);
     this.active = false;
     this.gate = false;
@@ -1744,6 +2042,7 @@ var Voice = class {
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
     this.svfA.reset();
     this.svfB.reset();
+    this.drive.reset();
     startStepMod(this, patch, stepMod);
   }
   /**
@@ -1856,8 +2155,13 @@ var Voice = class {
     }
     return this.filterQuiet;
   }
-  /** The filter is off, or has stopped ringing: both stages under the dormancy floor (#547). */
+  /**
+   * The filter is off, or has stopped ringing: both stages under the dormancy
+   * floor (#547), and the drive's tone pole too (windsor#300), which holds no
+   * state while it is not running.
+   */
   get filterQuiet() {
+    if (Math.abs(this.drive.toneState) > DORMANT_FILTER_STATE) return false;
     const f = this.patch.filter;
     if (f.mode === FILT_OFF) return true;
     if (!Svf.quiet(this.svfA)) return false;

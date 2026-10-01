@@ -18,7 +18,7 @@
  * change to a value here is a render change: `fmProcessorGolden.test.ts`.
  */
 
-import { FILT_OFF, LFO_SINE, LOOP_NONE } from './modeIds';
+import { DRIVE_SOFT, FILT_OFF, LFO_SINE, LOOP_NONE } from './modeIds';
 import { WAVE } from './waveIds';
 
 /** Operators per voice — the length of `ops`, `lfo.toOp`, `lfo.toWidth` and `OP_NAMES`. */
@@ -117,7 +117,6 @@ const FILTER_DEFAULTS = {
   mode: FILT_OFF,
   cutoff: 8000,
   resonance: 0.707,
-  drive: 1,
   slope24: false,
   envAmount: 0,
   modWheelDepth: 0,
@@ -125,6 +124,28 @@ const FILTER_DEFAULTS = {
   lfo2Amount: 0,
   keyTrack: 0,
 };
+
+/**
+ * The voice's drive stage (windsor#300), between the carriers and the filter:
+ * the input gain, the shape (`DRIVE_SHAPE`), a bias added before the shape and
+ * a one-pole tone after it. Unity gain and no bias bypass the stage, so the
+ * defaults are no drive at all (record `2026-10-01-voice-drive-stage`).
+ */
+const DRIVE_DEFAULTS = {
+  /** The input gain into the shaper; 1 is unity. */
+  gain: 1,
+  shape: DRIVE_SOFT,
+  /** A DC offset added before the shaper, `DRIVE_BIAS_RANGE`. */
+  bias: 0,
+  /** The lowpass after the shaper, `DRIVE_TONE_RANGE`: 1 is open (bypassed). */
+  tone: 1,
+};
+
+/** The drive's bias, clamped here by the worklet. */
+const DRIVE_BIAS_RANGE = { min: -1, max: 1 };
+
+/** The drive's tone, clamped here by the worklet: 0 is the darkest, 1 open. */
+const DRIVE_TONE_RANGE = { min: 0, max: 1 };
 
 /** `tone` is clamped here by the worklet: its floor keeps the anti-alias trim above silence. */
 const TONE_RANGE = { min: 0.02, max: 1 };
@@ -136,6 +157,9 @@ const FEEDBACK_RANGE = { min: -1, max: 1 };
 const WIDTH_RANGE = { min: 0.05, max: 1 };
 
 export {
+  DRIVE_BIAS_RANGE,
+  DRIVE_DEFAULTS,
+  DRIVE_TONE_RANGE,
   ENVELOPE_DEFAULTS,
   FEEDBACK_RANGE,
   FILTER_DEFAULTS,

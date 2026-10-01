@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { FILT_HP, FILT_LP } from './modeIds';
-import { softClip, Svf } from './svf';
+import { Svf } from './svf';
 
 const SR = 48000;
 
@@ -36,13 +36,5 @@ describe('the state-variable filter', () => {
     expect(Svf.quiet(svf)).toBe(false);
     svf.reset();
     expect(Svf.quiet(svf)).toBe(true);
-  });
-
-  it('soft clips: odd, bounded at ±1, identity near zero', () => {
-    expect(softClip(0.001)).toBeCloseTo(0.001, 6);
-    expect(softClip(-0.7)).toBe(-softClip(0.7));
-    expect(softClip(10)).toBe(1);
-    expect(softClip(-10)).toBe(-1);
-    expect(Math.abs(softClip(2.9))).toBeLessThanOrEqual(1);
   });
 });

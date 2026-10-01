@@ -1,7 +1,8 @@
 /**
  * The FM worklet's tunables (#644): table size, mip count, the control-rate
  * interval, the dormancy floors, the modulation and feedback depths, the
- * shortest envelope segment and the width ramp's snap. Data, not logic: every
+ * shortest envelope segment, the width ramp's snap, and the drive stage's
+ * shape constants and tone curve (windsor#300). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
  * says so, and `fmProcessorKernel.test.ts` pins `MOD_INDEX_SCALE` against the
@@ -79,6 +80,32 @@ const WIDTH_SNAP = 1e-5;
  * allocation on the audio thread, only at a new most events at once.
  */
 const EVENT_QUEUE_CAPACITY = 128;
+/*
+ * The voice drive's shapes (windsor#300, `voiceDrive.ts`). `tube` and `diode`
+ * are Advanced Drive's curves (`inserts/advancedDriveConstants.ts`'s
+ * `tubeEven` and `diodeKnee`, which `voiceDrive.test.ts` pins these to), in
+ * arithmetic that gives the same bits on every platform. The diode is
+ * x / (1 + |x|^order)^(1/order) with order = 2 / knee: below 2^-20 its
+ * denominator rounds to 1 in a double, and from 2^20 the quotient rounds to
+ * ±1, so the stage takes the shortcut either side and the portable powers
+ * only ever see exponents inside their table.
+ */
+const DRIVE_TUBE_EVEN = 0.18;
+const DRIVE_DIODE_KNEE = 0.65;
+const DRIVE_DIODE_ORDER = 2 / DRIVE_DIODE_KNEE;
+const DRIVE_DIODE_ROOT = DRIVE_DIODE_KNEE / 2;
+const DRIVE_DIODE_LINEAR_BELOW = 1 / 1048576; // 2^-20
+const DRIVE_DIODE_UNITY_FROM = 1048576; // 2^20
+/*
+ * The drive's tone: a one-pole lowpass after the shaper, its cutoff
+ * DRIVE_TONE_MIN_HZ * 2^(tone * DRIVE_TONE_OCTAVES), so about 1 kHz at 0 and
+ * about 19 kHz just below 1; at 1 exactly the pole is bypassed. The pole is
+ * the TPT (trapezoidal) form with g = pi * fc / sampleRate, not prewarped:
+ * within 0.2 % of the analog cutoff at 1 kHz, and the top of the knob is an
+ * air trim rather than a tuned corner. One coefficient per control block.
+ */
+const DRIVE_TONE_MIN_HZ = 1000;
+const DRIVE_TONE_OCTAVES = 4.25;
 
 export {
   TABLE_SIZE,
@@ -95,4 +122,12 @@ export {
   ENVELOPE_CURVE_STEEPNESS,
   WIDTH_SNAP,
   EVENT_QUEUE_CAPACITY,
+  DRIVE_TUBE_EVEN,
+  DRIVE_DIODE_KNEE,
+  DRIVE_DIODE_ORDER,
+  DRIVE_DIODE_ROOT,
+  DRIVE_DIODE_LINEAR_BELOW,
+  DRIVE_DIODE_UNITY_FROM,
+  DRIVE_TONE_MIN_HZ,
+  DRIVE_TONE_OCTAVES,
 };

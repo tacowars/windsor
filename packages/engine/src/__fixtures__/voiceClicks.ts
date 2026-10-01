@@ -109,7 +109,6 @@ export const CLICKS_PATCH: Patch = {
     mode: 1,
     cutoff: 30.000000000000004,
     resonance: 0.707,
-    drive: 1,
     slope24: false,
     envAmount: 1.1072368421052632,
     modWheelDepth: 0,
@@ -118,6 +117,8 @@ export const CLICKS_PATCH: Patch = {
     keyTrack: 0.522224506578947,
     env: env({ sustainLevel: 0 }),
   },
+  // The filter's drive of 1 before windsor#300: the drive stage bypassed.
+  drive: { gain: 1, shape: 0, bias: 0, tone: 1 },
 };
 
 /**

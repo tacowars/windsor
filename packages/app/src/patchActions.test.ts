@@ -191,7 +191,7 @@ describe('Save', () => {
       'patch',
     ]);
     const entry = loadPatchFile('kick', written);
-    expect(entry.format).toBe(2);
+    expect(entry.format).toBe(3);
     expect(entry.name).toBe('Kick Two');
     expect(entry.patch.name).toBe('Kick Two');
     expect(entry.patch.volume).toBe(0.5);
@@ -268,7 +268,7 @@ describe('Copy to new', () => {
     expect(partAt(scope.ctx.model.doc, FULL_SLOT.kick)?.preset).toBe('fm-kick-2');
     expect(scope.ctx.model.doc.patches?.['fm-kick-2']?.name).toBe('FM Kick');
     const written = JSON.parse(scope.folder.files.get('fm-kick-2.json')!);
-    expect(written.format).toBe(2);
+    expect(written.format).toBe(3);
     expect(loadPatchFile('fm-kick-2', written).name).toBe('FM Kick');
     expect(scope.library.entries['fm-kick-2']?.id).toBe('fm-kick-2');
   });
