@@ -39,17 +39,14 @@ function outOfRange(): string[] {
 
 /**
  * Known misses, each a follow-up of its own rather than this test's to fix:
- * the claps' LFO rates sit above the Rate knob's 40 Hz. Each is named by its
- * patch and path, not its value, so a refit that moves the value without
- * bringing it into range does not break the test (windsor#324 fix round 2).
- * An entry that no longer misses must leave this list, so it cannot hide a
- * later one.
+ * the EFM clap's LFO rate sits above the Rate knob's 40 Hz (the 808 and 909
+ * claps left the list when their bursts moved onto envelopes, windsor#352).
+ * Each is named by its patch and path, not its value, so a refit that moves
+ * the value without bringing it into range does not break the test
+ * (windsor#324 fix round 2). An entry that no longer misses must leave this
+ * list, so it cannot hide a later one.
  */
-const KNOWN_MISSES: readonly string[] = [
-  'efm-clap lfo.rate',
-  'tr808-clap lfo.rate',
-  'tr909-clap lfo.rate',
-];
+const KNOWN_MISSES: readonly string[] = ['efm-clap lfo.rate'];
 
 /** A miss's patch and path, without its value and range. */
 const missKey = (miss: string): string => miss.slice(0, miss.indexOf(' = '));

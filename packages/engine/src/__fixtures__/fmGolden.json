@@ -669,9 +669,9 @@
       "noDormancy": "6da66f289f00138fba3eb19628fde0045d5f14f6fdf5134598ff973e78636a08"
     },
     "tr808-clap": {
-      "default": "5d6263c678a98692716a8faa80e4998441bee39f78267afc49e58e421f8de34c",
-      "generic": "5d6263c678a98692716a8faa80e4998441bee39f78267afc49e58e421f8de34c",
-      "noDormancy": "5d6263c678a98692716a8faa80e4998441bee39f78267afc49e58e421f8de34c"
+      "default": "059e519005eb495a590229db597d4bad849f7e629efd92c99430dded68f4a21d",
+      "generic": "059e519005eb495a590229db597d4bad849f7e629efd92c99430dded68f4a21d",
+      "noDormancy": "059e519005eb495a590229db597d4bad849f7e629efd92c99430dded68f4a21d"
     },
     "tr808-clave": {
       "default": "e897f012e0ea6b858a37270fa8fc5c281a176936f60a054c33250e29442aa5b2",
@@ -749,9 +749,9 @@
       "noDormancy": "7360d4b39d198222979d08e65951232c097f7c6d77b031fea070d781e7fab37b"
     },
     "tr909-clap": {
-      "default": "802b898c0ccdcadea62cb8f6316cf15b34de2fac8587f0965972234edb69e0bf",
-      "generic": "802b898c0ccdcadea62cb8f6316cf15b34de2fac8587f0965972234edb69e0bf",
-      "noDormancy": "802b898c0ccdcadea62cb8f6316cf15b34de2fac8587f0965972234edb69e0bf"
+      "default": "5d539f5c7070ff770fa17b80a3dff2c3fcc130ca18c609241b3900f1702527c5",
+      "generic": "5d539f5c7070ff770fa17b80a3dff2c3fcc130ca18c609241b3900f1702527c5",
+      "noDormancy": "5d539f5c7070ff770fa17b80a3dff2c3fcc130ca18c609241b3900f1702527c5"
     },
     "tr909-crash": {
       "default": "78064795ff40888f248dd9f41c616b545d48336d0dcab92f492e73b23378c023",

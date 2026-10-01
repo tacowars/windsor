@@ -1,0 +1,99 @@
+{
+  "start": "tr808-clap",
+  "params": [
+    {
+      "path": "filter.cutoff",
+      "min": 400,
+      "max": 3000,
+      "scale": "log"
+    },
+    {
+      "path": "filter.resonance",
+      "min": 0.5,
+      "max": 8,
+      "scale": "log"
+    },
+    {
+      "path": "drive.gain",
+      "min": 1,
+      "max": 4,
+      "scale": "log"
+    },
+    {
+      "path": "lfo.rate",
+      "min": 70,
+      "max": 120,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].level",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "path": "ops[1].level",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.attackTime",
+      "min": 0.0005,
+      "max": 0.04,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.attackCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.decayTime",
+      "min": 0.05,
+      "max": 2.0,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.decayCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[1].env.decayTime",
+      "min": 0.01,
+      "max": 0.06,
+      "scale": "log"
+    },
+    {
+      "path": "ops[1].env.releaseTime",
+      "min": 0.002,
+      "max": 0.04,
+      "scale": "log"
+    },
+    {
+      "path": "ops[1].env.releaseCurve",
+      "min": -1,
+      "max": 1
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/Clap A 808.wav",
+      "weight": 1
+    },
+    {
+      "wav": "$SM_CLAP_HEADS/clap808-head.wav",
+      "weight": 1
+    }
+  ],
+  "defaults": {
+    "note": 60,
+    "velocity": 1,
+    "gate": null
+  },
+  "optimizer": {
+    "method": "cma",
+    "budget": 700,
+    "sigma0": 0.2,
+    "seed": 1
+  }
+}
