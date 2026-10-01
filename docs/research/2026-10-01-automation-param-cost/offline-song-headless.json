@@ -1,0 +1,15 @@
+{
+  "browser": "HeadlessChrome/154.0.0.0 (Google Chrome 154.0.8037.92), chrome-devtools-mcp 1.10.1",
+  "machine": "Apple M1, 8 cores, 16 GB, macOS 26.5.1; load average 6.7 to 10.2 during the run",
+  "backend": "OfflineAudioContext, 48 kHz stereo, through the engine's renderSong",
+  "song": "sixteen-pads.json (30.968 s plus a 2 s tail)",
+  "runs": 7,
+  "order": "one warm-up render of a, then a, b, c, d interleaved, seven times",
+  "peaks": { "a": 0.8913, "b": 0.8913, "c": 0.8913, "d": 0.8913 },
+  "results": {
+    "a": { "medianMs": 37268.9, "minMs": 31708.8, "maxMs": 49695.4, "runsMs": [37818.6, 33045.1, 31708.8, 38579.1, 37268.9, 32175.9, 49695.4] },
+    "b": { "medianMs": 43713.7, "minMs": 37405.6, "maxMs": 53632.3, "runsMs": [41514.5, 37405.6, 38522.8, 45559.1, 43713.7, 49567.6, 53632.3] },
+    "c": { "medianMs": 38061.3, "minMs": 32457.8, "maxMs": 45957.7, "runsMs": [38061.3, 32457.8, 36199.1, 39736.8, 37385.5, 45957.7, 43340.4] },
+    "d": { "medianMs": 36649.1, "minMs": 34606.6, "maxMs": 45863.5, "runsMs": [34606.6, 34808.5, 35129, 40755.3, 36649.1, 45863.5, 40713.4], "lastRunScheduling": { "calls": 214528, "ms": 140.1 } }
+  }
+}

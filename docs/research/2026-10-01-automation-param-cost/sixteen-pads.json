@@ -1,0 +1,791 @@
+{
+  "version": 6,
+  "transport": {
+    "bpm": 124,
+    "bars": 16
+  },
+  "harmony": {
+    "root": 0,
+    "scale": "naturalMinor",
+    "events": [
+      {
+        "start": 0,
+        "duration": 384,
+        "degree": 0,
+        "size": 3
+      },
+      {
+        "start": 384,
+        "duration": 384,
+        "degree": 5,
+        "size": 3
+      },
+      {
+        "start": 768,
+        "duration": 384,
+        "degree": 3,
+        "size": 3
+      },
+      {
+        "start": 1152,
+        "duration": 384,
+        "degree": 4,
+        "size": 3
+      }
+    ]
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Pad 1",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -1,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 2
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 1,
+      "name": "Pad 2",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -0.8666666666666667,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 3
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 2,
+      "name": "Pad 3",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -0.7333333333333334,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 4
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 3,
+      "name": "Pad 4",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -0.6,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 2
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 4,
+      "name": "Pad 5",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -0.4666666666666667,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 3
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 5,
+      "name": "Pad 6",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -0.33333333333333337,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 4
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 6,
+      "name": "Pad 7",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -0.19999999999999996,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 2
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 7,
+      "name": "Pad 8",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": -0.06666666666666665,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 3
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 8,
+      "name": "Pad 9",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 0.06666666666666665,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 4
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 9,
+      "name": "Pad 10",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 0.19999999999999996,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 2
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 10,
+      "name": "Pad 11",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 0.33333333333333326,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 3
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 11,
+      "name": "Pad 12",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 0.46666666666666656,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 4
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 12,
+      "name": "Pad 13",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 0.6000000000000001,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 2
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 13,
+      "name": "Pad 14",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 0.7333333333333334,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 3
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 14,
+      "name": "Pad 15",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 0.8666666666666667,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 4
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    },
+    {
+      "slot": 15,
+      "name": "Pad 16",
+      "preset": "pad-drift",
+      "velocity": 0.8,
+      "strip": {
+        "level": 0.25,
+        "pan": 1,
+        "lowCut": 20,
+        "sends": {},
+        "inserts": []
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "chord",
+        "divisor": 96,
+        "gate": 1,
+        "voicing": "close",
+        "register": {
+          "octave": 2
+        },
+        "steps": [
+          {
+            "kind": "hit",
+            "duration": 1,
+            "repeat": 1
+          }
+        ]
+      }
+    }
+  ],
+  "patches": {
+    "pad-drift": {
+      "name": "Drift Pad",
+      "algorithm": 4,
+      "volume": 0.44,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 0,
+      "pan": 0,
+      "panRandom": 0,
+      "panKey": 0,
+      "spread": 12,
+      "mono": false,
+      "ops": [
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.9,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 1.2,
+            "attackCurve": -0.3,
+            "peakLevel": 1,
+            "decayTime": 2,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.8,
+            "releaseTime": 2.4,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 3,
+          "userPartials": null,
+          "ratio": 2.01,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.4949747468305833,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 2.5,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 3,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.5,
+            "releaseTime": 2.4,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1.5,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.7,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 1.8,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 2,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.7,
+            "releaseTime": 2.4,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 4,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.3535533905932738,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 3.5,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 4,
+            "decayCurve": 0.5,
+            "sustainLevel": 0.4,
+            "releaseTime": 2.4,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        }
+      ],
+      "lfo": {
+        "shape": 6,
+        "rate": 0.18,
+        "amount": 1,
+        "delay": 0,
+        "retrigger": false,
+        "toPitch": 0.12,
+        "modWheelDepth": 1,
+        "toOp": [
+          0,
+          0.25,
+          0,
+          0.3
+        ]
+      },
+      "filter": {
+        "mode": 1,
+        "cutoff": 1400,
+        "resonance": 1.2,
+        "slope24": true,
+        "envAmount": 1.8,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "keyTrack": 0,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 3,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 5,
+          "decayCurve": 0.5,
+          "sustainLevel": 0.5,
+          "releaseTime": 3,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      },
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0.002,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.1,
+        "decayCurve": 0.5,
+        "sustainLevel": 0,
+        "releaseTime": 0.3,
+        "releaseCurve": 0.5,
+        "endLevel": 0,
+        "loopMode": 0,
+        "keyScale": 0
+      },
+      "drive": {
+        "gain": 1,
+        "shape": 0,
+        "bias": 0,
+        "tone": 1
+      }
+    }
+  },
+  "master": {
+    "level": 1,
+    "inserts": []
+  }
+}

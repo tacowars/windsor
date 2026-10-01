@@ -1,0 +1,44 @@
+{
+  "probe": "probe.js appRun(case, song, { warm: 8, seconds: 20 }); case d also schedulingOnly('points' | 'tick' | 'bent', 10)",
+  "browser": "Google Chrome 154.0.8037.92, headed (Chrome/154.0.0.0), own profile, --mute-audio, driven by cdp.mjs",
+  "machine": "Apple M1, 8 cores, 16 GB, macOS 26.5.1; load average about 11 to 13",
+  "backend": "AudioContext (live) on the machine's default output device: 48 kHz, baseLatency 5.3 ms, outputLatency 168 ms for runs 1 and 2 and run 3's c and d; the default device changed before run 3's a and b, which ran at 44.1 kHz, baseLatency 5.8 ms, outputLatency 40 ms",
+  "song": "sixteen-pads-light.json, from bar 1, 8 s warm-up then 20 one-second readouts",
+  "runs": {
+    "1": {
+      "a": { "clockRate": 1, "loadMedian": 61.1, "loadMin": 53.28, "loadMax": 72.37, "underrunsAdded": 0 },
+      "b": { "clockRate": 1, "loadMedian": 62.7, "loadMin": 55.27, "loadMax": 64.81, "underrunsAdded": 0 },
+      "c": { "clockRate": 1.001, "loadMedian": 59.35, "loadMin": 52.5, "loadMax": 72.43, "underrunsAdded": 0 },
+      "d": { "clockRate": 1.001, "loadMedian": 59.03, "loadMin": 51.8, "loadMax": 69.63, "underrunsAdded": 0, "sched": { "calls": 127744, "msTotal": 110.2, "msPerSongSecond": 5.51, "usPerCall": 0.863, "maxPumpMs": 1.3 } }
+    },
+    "2": {
+      "b": { "clockRate": 0.941, "loadMedian": 62.39, "loadMin": 59.82, "loadMax": 66.38, "underrunsAdded": 0 },
+      "c": { "clockRate": 1.001, "loadMedian": 65.9, "loadMin": 54.19, "loadMax": 74.26, "underrunsAdded": 1 },
+      "d": { "clockRate": 0.999, "loadMedian": 69.88, "loadMin": 63.69, "loadMax": 74.93, "underrunsAdded": 0, "sched": { "calls": 127744, "msTotal": 121.6, "msPerSongSecond": 6.08, "usPerCall": 0.952, "maxPumpMs": 0.9 } },
+      "a": { "clockRate": 1, "loadMedian": 53.22, "loadMin": 42.4, "loadMax": 70.56, "underrunsAdded": 0 }
+    },
+    "3": {
+      "c": { "clockRate": 1, "loadMedian": 51.92, "loadMin": 28.23, "loadMax": 66.13, "underrunsAdded": 0 },
+      "d": { "clockRate": 0.999, "loadMedian": 65.83, "loadMin": 54.51, "loadMax": 74.1, "underrunsAdded": 0, "sched": { "calls": 127616, "msTotal": 114.9, "msPerSongSecond": 5.745, "usPerCall": 0.9, "maxPumpMs": 0.9 } },
+      "a": { "clockRate": 1, "loadMedian": 61.12, "loadMin": 54.08, "loadMax": 71.17, "underrunsAdded": 0, "sampleRate": 44100 },
+      "b": { "clockRate": 0.942, "loadMedian": 61.73, "loadMin": 57.31, "loadMax": 65.37, "underrunsAdded": 0, "sampleRate": 44100 }
+    }
+  },
+  "scheduling": {
+    "points": [
+      { "run": 1, "calls": 2688, "msTotal": 3.7, "msPerSongSecond": 0.37, "usPerCall": 1.376, "maxPumpMs": 0.2, "seekCancelMs": 0.1, "seekRefillMs": 0 },
+      { "run": 2, "calls": 2688, "msTotal": 2.4, "msPerSongSecond": 0.24, "usPerCall": 0.893, "maxPumpMs": 0.2, "seekCancelMs": 0.1, "seekRefillMs": 0 },
+      { "run": 3, "calls": 2688, "msTotal": 2.8, "msPerSongSecond": 0.28, "usPerCall": 1.042, "maxPumpMs": 0.2, "seekCancelMs": 0.1, "seekRefillMs": 0 }
+    ],
+    "tick": [
+      { "run": 1, "calls": 64640, "msTotal": 46.7, "msPerSongSecond": 4.67, "usPerCall": 0.722, "maxPumpMs": 0.6, "seekCancelMs": 0.2, "seekRefillMs": 0.3 },
+      { "run": 2, "calls": 64640, "msTotal": 50.9, "msPerSongSecond": 5.09, "usPerCall": 0.787, "maxPumpMs": 0.5, "seekCancelMs": 0.3, "seekRefillMs": 0.4 },
+      { "run": 3, "calls": 64640, "msTotal": 53.7, "msPerSongSecond": 5.37, "usPerCall": 0.831, "maxPumpMs": 0.4, "seekCancelMs": 0.1, "seekRefillMs": 0.4 }
+    ],
+    "bent": [
+      { "run": 1, "calls": 64640, "msTotal": 56.7, "msPerSongSecond": 5.67, "usPerCall": 0.877, "maxPumpMs": 0.5, "seekCancelMs": 0.1, "seekRefillMs": 0.5 },
+      { "run": 2, "calls": 64640, "msTotal": 58.5, "msPerSongSecond": 5.85, "usPerCall": 0.905, "maxPumpMs": 0.4, "seekCancelMs": 0.1, "seekRefillMs": 0.4 },
+      { "run": 3, "calls": 64640, "msTotal": 63.9, "msPerSongSecond": 6.39, "usPerCall": 0.989, "maxPumpMs": 0.8, "seekCancelMs": 0.2, "seekRefillMs": 0.4 }
+    ]
+  }
+}
