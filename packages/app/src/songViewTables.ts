@@ -47,6 +47,10 @@ export interface SongViewScale {
   readonly mixerKnobColumnPx: number;
   /** The grid gap between two columns: the names, the mixer and the timeline. */
   readonly laneGapPx: number;
+  /** One automation lane's row under its part (windsor#348 decision 2): one fixed height. */
+  readonly automationLanePx: number;
+  /** The "+ Add lane" row after a part's lanes. */
+  readonly automationAddRowPx: number;
 }
 
 export const SONG_VIEW: SongViewScale = {
@@ -60,6 +64,8 @@ export const SONG_VIEW: SongViewScale = {
   mixerExpandedBasePx: 181,
   mixerKnobColumnPx: 70,
   laneGapPx: 8,
+  automationLanePx: 56,
+  automationAddRowPx: 30,
 };
 
 /**

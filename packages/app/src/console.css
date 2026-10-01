@@ -14,6 +14,8 @@
   --ink-faint: #5e6b70;
   --carrier: #e0a44e;
   --modulator: #5fa8a0;
+  /* The return buses, and the insert targets' automation lanes (windsor#348). */
+  --return: #9c7bd0;
   --hot: #d2643c;
 
   --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
@@ -2203,6 +2205,190 @@ select.field.compact {
 }
 .export-actions {
   margin-top: 12px;
+}
+
+/* ---------- the automation lanes (windsor#348): folded out under a part ---------- */
+
+/* The fold: a button now, where the ▸ span was. Its box is twice the
+   glyph's and pulled back by its margins, so the name stays put. The panel
+   face draws ▸ and ▾ as the same dot, so the fold uses the system face. */
+.lane-name button.tri {
+  width: 17px;
+  height: 18px;
+  margin: 0 -4px;
+  padding: 0;
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: none;
+  cursor: pointer;
+}
+.lane-name button.tri:hover,
+.lane-name button.tri:focus-visible {
+  border-color: var(--line-bright);
+  color: var(--ink);
+}
+.lane-name button.tri[aria-expanded='true'] {
+  color: var(--carrier);
+}
+/* A folded part's lane count, at the cell's right. */
+.lane-name .auto-badge {
+  flex: none;
+  margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid rgba(224, 164, 78, 0.45);
+  border-radius: 8px;
+  font-family: var(--f-num);
+  font-size: 9px;
+  line-height: 14px;
+  color: var(--carrier);
+  white-space: nowrap;
+}
+.lane-name.has-badge .nm b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A lane's rows take their colour from --lane-c (songAutomationTables.ts):
+   the mixer teal, the inserts violet, the voice amber. */
+.lanes > .auto-name,
+.lanes > .auto-add {
+  cursor: default;
+}
+.auto-name {
+  gap: 4px;
+  padding-left: 8px;
+}
+.auto-chip {
+  flex: none;
+  align-self: stretch;
+  width: 3px;
+  margin: 8px 2px;
+  border-radius: 2px;
+  background: var(--lane-c);
+}
+.auto-name b,
+.auto-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auto-name b {
+  font-size: 11px;
+}
+.auto-name small {
+  text-transform: uppercase;
+}
+.mix-cell.auto-mix {
+  gap: 4px;
+  padding: 0 4px;
+}
+.auto-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--f-num);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--lane-c);
+}
+.auto-mix.off .auto-value {
+  color: var(--ink-faint);
+}
+.auto-buttons {
+  display: flex;
+  flex: none;
+  gap: 3px;
+}
+.auto-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  background: var(--panel-hi);
+  color: var(--ink-dim);
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.auto-btn:hover,
+.auto-btn:focus-visible {
+  border-color: var(--ink-faint);
+  color: var(--ink);
+}
+.auto-btn.on {
+  background: var(--lane-c);
+  border-color: var(--lane-c);
+  color: #14181a;
+}
+/* The curve over the part's regions, ghosted, on the bar grid. */
+.auto-lane {
+  position: relative;
+  height: var(--auto-lane-h);
+  overflow: hidden;
+  border-radius: var(--r);
+  background-color: var(--inset);
+  background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar));
+  background-position: -1px 0;
+}
+.auto-ghost {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed var(--line-bright);
+  border-right: 1px dashed var(--line-bright);
+  background: rgba(220, 227, 227, 0.035);
+  pointer-events: none;
+}
+.auto-lane svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+}
+.auto-fill {
+  fill: var(--lane-c);
+  fill-opacity: 0.14;
+}
+.auto-line {
+  fill: none;
+  stroke: var(--lane-c);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.auto-dot {
+  fill: var(--inset);
+  stroke: var(--lane-c);
+  stroke-width: 1.6;
+}
+/* Off, or on a field its insert's settings leave unread: dimmed. */
+.auto-lane.off svg {
+  opacity: 0.32;
+}
+/* The "+ Add lane" row: the picker, the voice count, an empty timeline. */
+.auto-add {
+  padding-left: 8px;
+}
+select.field.auto-picker {
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+.mix-cell.auto-count {
+  justify-content: flex-start;
+  padding: 0 4px;
+  font-family: var(--f-num);
+  font-size: 9px;
+  color: var(--ink-faint);
+}
+.auto-add-lane {
+  height: var(--auto-add-h);
 }
 
 /* ---------- parts grid ---------- */
