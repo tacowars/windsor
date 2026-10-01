@@ -50,6 +50,14 @@ export interface ShippedTapeDsp {
     latency: number;
     /** True while a model switch glides the core's controls. */
     gliding: boolean;
+    /**
+     * The gliding core controls and their target. `configure` writes the
+     * model's row into `target` each block; a test that moves the controls
+     * itself (as the Advanced panel will) writes `target` after it and sets
+     * `gliding`.
+     */
+    controls: { drive: number; width: number; saturation: number };
+    target: { drive: number; width: number; saturation: number };
   };
   motion: { delay: number; dropout: number };
 }

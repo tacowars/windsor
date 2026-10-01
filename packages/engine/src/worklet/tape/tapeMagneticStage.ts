@@ -12,7 +12,8 @@
  *   moved; `glide` (per sample, only while gliding) steps the controls and
  *   retunes the active pair, so the core's coefficients and normalisation
  *   never step more than one sample's worth (the 2026-10-01 amendment to
- *   decision 6). Within `TAPE_DSP.magneticSnap` of the row the glide snaps
+ *   decision 6), and each retune rescales the magnetization so the core's
+ *   output, M × gain, is continuous (windsor#296). Within `TAPE_DSP.magneticSnap` of the row the glide snaps
  *   to it exactly, retunes all four cores and stops, so a settled render is
  *   the constant-control render, bit for bit. The idle pair is retuned
  *   there with the active one, so a factor switch only resets the pair it

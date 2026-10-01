@@ -8,7 +8,9 @@
   [the audition outcome](2026-10-01-tape-oversampling-audition.md#outcome-2026-10-01).
   Decision 6's model transitions are amended on 2026-10-01 (windsor#289):
   the glide retunes the core every sample, and the live-switch test
-  allows a measured tolerance past the envelope.
+  allows a measured tolerance past the envelope. Amended again on
+  2026-10-01 (windsor#296): a retune keeps the core's output, and the
+  tolerance narrows to the new measurement.
 - **Follows:** [greenfield direction](2026-09-30-tape-greenfield-direction.md),
   [static conditioning](2026-09-30-tape-static-conditioning.md),
   [candidate domain](2026-09-30-tape-candidate-domain.md),
@@ -210,6 +212,17 @@ the fastest honest path to a level-matched audition in the app.
      point: at most 1.0263 of the larger steady peak and no cycle peak
      below 0.9549 of the smaller. That is the tolerance this decision
      allows. A change that widens it is a change to this decision.
+
+   **Amendment, 2026-10-01 (windsor#296).** Each retune now rescales the
+   magnetization by the old gain over the new, so the core's output,
+   M × gain, is continuous while the controls move, and a held or
+   remanent M no longer meets a rising gain
+   ([the output continuity record](2026-10-01-tape-output-continuity.md)).
+   The same walk now measures a worst sample of 1.0189 of the larger
+   steady peak and a lowest cycle peak of 0.9862 of the smaller, and the
+   test allows a tenth of a point past each, since the core's arithmetic
+   is portable: at most 1.0199, and no cycle peak below 0.9852. That is
+   the tolerance this decision now allows.
 
 ## Consequences for E
 
