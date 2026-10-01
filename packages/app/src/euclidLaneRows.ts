@@ -47,6 +47,7 @@ import {
   laneHead,
   restartsAt,
 } from './euclidLaneView';
+import { ROW_KEY_ATTRIBUTE } from './euclidRowFocus';
 import { type RowHead, cellStrip, nameButton, row, rowName } from './euclidRowParts';
 import type { Figure } from './euclidModel';
 import { type LaneHost, laneCell, patchBase } from './stepModLane';
@@ -229,6 +230,7 @@ function laneRow(
     laneNameColumn(input, ref, values.length),
     ...parts,
   );
+  node.setAttribute(ROW_KEY_ATTRIBUTE, ref.kind === 'sound' ? `sound:${ref.param}` : ref.kind);
   return { row: node, cells, head: (at) => laneHead(at, layout) };
 }
 

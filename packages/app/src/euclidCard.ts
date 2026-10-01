@@ -28,12 +28,14 @@ import type { AppCtx } from './context';
 import { el } from './dom';
 import { type EuclidCard, setView, viewOf, writeRows } from './euclidCardState';
 import { EUCLID_PLOT_SECONDS_DIGITS, EUCLID_READOUT_HINT } from './euclidConstants';
-import { barLineSeconds, densityNote, plotBar } from './euclidDensityModel';
+import { BarLineWatch, plotSeconds } from './euclidBarLines';
+import { densityNote, plotBar } from './euclidDensityModel';
 import { type DensityPage, densityPage } from './euclidDensityPage';
 import { regionFigure } from './euclidFigure';
 import { laneChoices, laneLength, lanesOf } from './euclidLaneModel';
-import { cycleText, fullCycle, passOf } from './euclidLaneView';
+import { cycleText, fullCycle } from './euclidLaneView';
 import { type Figure, countOnsets, figureKey, stepsPerBeat } from './euclidModel';
+import { shownPass } from './euclidPass';
 import { type PatternPage, fillPicker, patternPage } from './euclidPatternPage';
 import { holdWhilePressed } from './euclidPressHold';
 import { euclidRail } from './euclidRail';
@@ -57,15 +59,21 @@ interface Live {
   /** Each row's lit playhead, so a frame relights only what moved. */
   lit: number[];
   plotKey: string;
+  /** The bar lines the scheduler issued while the card watched: the Hz plot's anchor. */
+  readonly bars: BarLineWatch;
 }
 
-/** The region's step at the audible tick: null while halted; the part's own step with no region named. */
-function readAt(ctx: AppCtx, slot: number, region: number | undefined): RegionStep | null {
-  if (!ctx.transport.running) return null;
+/** The region's step at the transport's tick; the part's own step with no region named. */
+function stepAtPosition(ctx: AppCtx, slot: number, region: number | undefined): RegionStep | null {
   const tick = ctx.transport.position();
   if (region !== undefined) return ctx.host.regionStepAt(slot, region, tick);
   const step = ctx.host.stepAt(slot, tick);
   return step < 0 ? null : { step, live: true };
+}
+
+/** The region's step at the audible tick: null while halted. */
+function readAt(ctx: AppCtx, slot: number, region: number | undefined): RegionStep | null {
+  return ctx.transport.running ? stepAtPosition(ctx, slot, region) : null;
 }
 
 function figureOf(ctx: AppCtx, slot: number, region: number | undefined): Figure {
@@ -100,8 +108,15 @@ function paintAll(live: Live, spec: EuclideanSpec, figure: Figure, pass: number)
 
 /** Rebuild the rows if what they show changed, unless a press is held on them. */
 function repaintRows(live: Live, spec: EuclideanSpec, figure: Figure): void {
-  const view = viewOf(live.card.slot).lanes;
-  const pass = view === 'hits' ? passOf(live.card.at, spec.steps) : 0;
+  const { ctx, slot, region, at } = live.card;
+  const view = viewOf(slot).lanes;
+  const pass = shownPass({
+    view,
+    steps: spec.steps,
+    at,
+    state: ctx.transport.state,
+    heldStep: () => stepAtPosition(ctx, slot, region),
+  });
   const key = rowsKeyOf(live, spec, figure, pass);
   if (key === live.rowsKey || live.card.pressing) return;
   live.rowsKey = key;
@@ -118,13 +133,28 @@ function lightRows(live: Live): void {
 }
 
 /**
- * The transport seconds on the audible bar's line, read from the engine's
- * clock (`barLineSeconds`): what an Hz LFO reads there, whether or not the
- * song is in the card's region. 0 before audio.
+ * Watch the scheduler's bar lines while it runs (`euclidBarLines.ts`);
+ * halted, the log is dropped, since a seek or a stop restamps the lines.
  */
-function transportSeconds(ctx: AppCtx): number {
+function followBars(live: Live): void {
+  const { ctx } = live.card;
   const system = ctx.host.system;
-  return system ? barLineSeconds(system.scheduler.transport, ctx.transport.position()) : 0;
+  live.bars.follow(system && ctx.transport.running ? system.scheduler : null);
+}
+
+/**
+ * The transport seconds on the audible bar's line: what an Hz LFO reads
+ * there, whether or not the song is in the card's region. The scheduler's
+ * own stamp on that line when the card saw it issued, so a tempo or swing
+ * edit with ticks queued cannot move it (windsor#383); otherwise the
+ * engine's clock wound back (`barLineSeconds`). 0 before audio.
+ */
+function transportSeconds(live: Live): number {
+  const { ctx } = live.card;
+  const system = ctx.host.system;
+  if (!system) return 0;
+  const at = { tick: ctx.transport.position(), now: system.engine.context.currentTime };
+  return plotSeconds(live.bars.log, system.scheduler.transport, at);
 }
 
 /** The tab row's note and, on the Density page, the plot of `k`. */
@@ -137,7 +167,7 @@ function paintDensity(live: Live, spec: EuclideanSpec, figure: Figure): void {
   const songBar = ctx.transport.running ? Math.floor(ctx.transport.position() / TICKS_PER_BAR) : 0;
   const bar = plotBar(at, spec.divisor, songBar);
   const bpm = ctx.model.doc.transport.bpm;
-  const seconds = transportSeconds(ctx);
+  const seconds = transportSeconds(live);
   const clock = { bar, seconds, secondsPerBar: (SECONDS_PER_MINUTE / bpm) * (TICKS_PER_BAR / PPQ) };
   const shown = spec.density.kind === 'lfoHz' ? seconds.toFixed(EUCLID_PLOT_SECONDS_DIGITS) : bar;
   const key = JSON.stringify([spec.pulses, spec.density, spec.steps, k, shown, bpm]);
@@ -150,7 +180,10 @@ function paintDensity(live: Live, spec: EuclideanSpec, figure: Figure): void {
 function watch(live: Live, root: HTMLElement): void {
   const { card } = live;
   watchPlayhead({
-    attached: () => root.isConnected,
+    attached: () => {
+      if (!root.isConnected) live.bars.close();
+      return root.isConnected;
+    },
     shown: () => root.closest('[hidden]') === null,
     // Each row lights its own ring in `repaintIf`, from the one step read there.
     playheadAt: () => 0,
@@ -162,6 +195,7 @@ function watch(live: Live, root: HTMLElement): void {
       const figure = card.figure();
       repaintRows(live, spec, figure);
       lightRows(live);
+      followBars(live);
       paintDensity(live, spec, figure);
     },
   });
@@ -224,6 +258,7 @@ export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElem
     heads: [],
     lit: [],
     plotKey: '',
+    bars: new BarLineWatch(),
   };
   ref.live = state;
   holdWhilePressed(card, pattern.rows, window);
