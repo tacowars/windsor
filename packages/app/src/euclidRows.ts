@@ -11,7 +11,9 @@
  *
  * The rows are built whole from the document and the player's figure; the
  * card rebuilds them when what they show changes and lights each row's
- * playhead every frame (`RowHead`).
+ * playhead every frame (`RowHead`). A control focused before a rebuild is
+ * focused again after it (`euclidRowFocus.ts`, windsor#383), so a second
+ * key press edits on.
  */
 import type { EuclideanSpec } from '@windsor/engine';
 import { el } from './dom';
@@ -20,6 +22,7 @@ import { cycleRatchet, ratchetAt } from './euclidRatchetModel';
 import { laneRows } from './euclidLaneRows';
 import { type LaneView, triggerHead } from './euclidLaneView';
 import { type Figure, countOnsets, toggleStep } from './euclidModel';
+import { type FocusAddress, ROW_KEY_ATTRIBUTE, focusAddress, nodeAt } from './euclidRowFocus';
 import { type RowHead, cellStrip, nameButton, row, rowName } from './euclidRowParts';
 
 /** What the rows are drawn from, as of one build. */
@@ -101,11 +104,21 @@ function lanesRule(): HTMLElement {
   return rule;
 }
 
+/** Put focus back on the control at `focus` in the rebuilt rows, without scrolling to it. */
+function refocus(scope: HTMLElement, focus: FocusAddress): void {
+  const node = nodeAt(scope, focus);
+  if (node instanceof HTMLElement) node.focus({ preventScroll: true });
+}
+
 /** Fill `scope` with every row, and return the playheads the loop lights. */
 export function paintRows(scope: HTMLElement, input: RowsInput): RowHead[] {
   const ratchet = ratchetRow(input);
   const trigger = triggerRow(input);
   const lanes = laneRows({ ...input, scope });
+  ratchet.row.setAttribute(ROW_KEY_ATTRIBUTE, 'ratchet');
+  trigger.row.setAttribute(ROW_KEY_ATTRIBUTE, 'trigger');
+  const focus = focusAddress(scope, document.activeElement);
   scope.replaceChildren(ratchet.row, trigger.row, lanesRule(), ...lanes.rows);
+  if (focus) refocus(scope, focus);
   return [ratchet, trigger, ...lanes.heads];
 }
