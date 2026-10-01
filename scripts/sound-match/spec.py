@@ -13,7 +13,7 @@
          "align": {"threshold_db": -6, "lead_ms": 1.5}}
       ],
       "weights": {"stft": 1, "band": 0.05, "harm": 0.02, "pitch": 0.2, "wave": 5},
-      "seeds": 4,
+      "seeds": 6,
       "optimizer": {"method": "cma", "budget": 300, "sigma0": 0.2, "seed": 1}
     }
 
@@ -22,6 +22,8 @@ patch. A parameter's `path` is a JSON path into the bare patch; a list of
 paths ties them to one value. `scale` is "linear" (default) or "log". WAV
 paths expand `$VARS` and `~`, so a spec need not carry a machine's folders.
 A reference's other fields default to the spec's `defaults` entry.
+`seeds` is optional: left out, the seed count is decided per patch (see
+`renderer.seed_list`); 1 forces a single seed and N > 1 forces N.
 The structure (algorithm, waves, routing) is the start patch's; a fit only
 moves the numbers the spec names.
 """
@@ -114,7 +116,7 @@ class Spec:
     params: list
     references: list
     weights: dict
-    seeds: int
+    seeds: int | None
     seed_base: int
     optimizer: dict
     candidate_align: object
@@ -133,7 +135,7 @@ def load(path):
         params=[Param.of(e) for e in raw["params"]],
         references=[comparison.Reference.from_spec(e, defaults) for e in raw["references"]],
         weights={**C.WEIGHTS, **raw.get("weights", {})},
-        seeds=int(raw.get("seeds", C.SEEDS)),
+        seeds=int(raw["seeds"]) if raw.get("seeds") is not None else None,
         seed_base=int(raw.get("seed_base", C.SEED_BASE)),
         optimizer={"method": "cma", "budget": 200, "sigma0": 0.2, "seed": 1, **raw.get("optimizer", {})},
         candidate_align=audio.Align.of(cand_align) if cand_align else None,

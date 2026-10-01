@@ -93,7 +93,7 @@ Prints a summary by region and writes every measurement as JSON.
 
 ```bash
 python compare.py REF.wav [REF.wav ...] CANDIDATE [--note 60] [--velocity 1] [--gate S]
-                  [--seeds 4] [--ref-threshold-db DB] [--ref-lead-ms MS]
+                  [--seeds N] [--ref-threshold-db DB] [--ref-lead-ms MS]
                   [--tonal auto|yes|no] [--weights stft=1,wave=2] [--json PATH] [--png [PREFIX]]
 ```
 
@@ -132,7 +132,7 @@ candidates are evaluated and the search stops without learning from them.
 ### Which control moves what: `sensitivity.py`
 
 ```bash
-python sensitivity.py specs/tr909-kick.json tr909-kick [--step 0.05] [--ref 0]
+python sensitivity.py specs/tr909-kick.json tr909-kick [--step 0.05] [--ref 0] [--seeds N]
 ```
 
 Moves each spec parameter by ±5 % of its range and tabulates how each
@@ -161,14 +161,18 @@ python renderer.py tr909-kick --seconds 1 --count 200
   render lasts the reference's length plus 50 ms, at most 4 s.
 - **Level.** Each side is normalised to its own peak (or RMS, `--norm rms`).
   The packs are normalised per voice, so absolute level means nothing.
-- **Seeds.** A patch with a Noise operator or a `phaseFree` operator
-  depends on its seed by its structure, whatever that operator's level, so a
-  fit that raises a silent noise level is still scored over every seed.
-  Any other patch is rendered with two seeds, and depends on its seed if
-  they differ by a sample (a random LFO, say). A seed-dependent patch is
-  scored over `--seeds` seeds (default 4, from `--seed-base` 1). The report shows the mean, and each score's standard
-  deviation, minimum and maximum. A fixed seed gives identical numbers on
-  every run.
+- **Seeds.** A patch with a Noise operator, a `phaseFree` operator, or an
+  `lfo` or `lfo2` with a random shape (S&H or Drift) depends on its seed by
+  its structure, whatever that operator's level or that LFO's amount and
+  routing, so a fit that raises a silent noise level or an LFO's depth is
+  still scored over every seed. Any other patch is rendered with two seeds,
+  and depends on its seed if they differ by a sample. A seed-dependent patch
+  is scored over 4 seeds (from `--seed-base` 1), any other over one. An
+  optional `"seeds": N` in a fit spec, or `--seeds N` on `compare.py` and
+  `sensitivity.py` (which overrides the spec's), skips that decision: `1`
+  forces a single seed, `N > 1` forces N. The report shows the mean, and
+  each score's standard deviation, minimum and maximum. A fixed seed gives
+  identical numbers on every run.
 
 ## What is measured
 

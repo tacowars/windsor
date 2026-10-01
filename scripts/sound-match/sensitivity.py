@@ -1,6 +1,6 @@
 """Which control moves which measurement: a sensitivity map.
 
-    python sensitivity.py spec.json PATCH [--step 0.05] [--ref 0] [--json out.json]
+    python sensitivity.py spec.json PATCH [--step 0.05] [--ref 0] [--seeds N] [--json out.json]
 
 Each of the spec's parameters is moved by ±step of its range (in its scale,
 linear or log) from its value in PATCH (a library id, a patch file or a fit's
@@ -80,6 +80,7 @@ def arguments():
     ap.add_argument("patch")
     ap.add_argument("--step", type=float, default=0.05, help="share of each parameter's range")
     ap.add_argument("--ref", type=int, default=0, help="which reference's note, velocity and gate to play")
+    ap.add_argument("--seeds", type=int, help="force this many seeds, over the spec's (default: automatic)")
     ap.add_argument("--json")
     return ap.parse_args()
 
@@ -156,7 +157,7 @@ def main():
     patch = R.load_patch(args.patch)
     values = S.start_values(patch, sp.params)
     with R.Renderer() as r:
-        seeds = R.seed_list(r, patch, ref.render_options, sp.seeds, sp.seed_base)
+        seeds = R.seed_list(r, patch, ref.render_options, args.seeds if args.seeds is not None else sp.seeds, sp.seed_base)
 
         def measure(p):
             return _mean_headline(comparison.render_candidates(r, p, ref, seeds, sp.candidate_align))

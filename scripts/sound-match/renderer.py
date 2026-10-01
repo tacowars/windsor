@@ -81,26 +81,31 @@ class Renderer:
 
 
 def seeded_structure(patch):
-    """True when any operator has the Noise wave or a free-running start phase."""
-    return any(op.get("wave") == C.NOISE_WAVE or op.get("phaseFree") for op in patch.get("ops", []))
+    """True when any operator has the Noise wave or a free-running start phase, or any LFO a random shape."""
+    if any(op.get("wave") == C.NOISE_WAVE or op.get("phaseFree") for op in patch.get("ops", [])):
+        return True
+    return any((patch.get(key) or {}).get("shape") in C.RANDOM_LFO_SHAPES for key in C.LFO_KEYS)
 
 
-def seed_list(renderer, patch, opts, count=C.SEEDS, base=C.SEED_BASE):
-    """The seeds to score `patch` over: `count` of them if its render depends on the seed, else one.
+def seed_list(renderer, patch, opts, count=None, base=C.SEED_BASE):
+    """The seeds to score `patch` over: `count` of them if given, else C.SEEDS if its render depends on the seed, else one.
 
-    A patch with a Noise operator or a `phaseFree` operator depends on the
-    seed by its structure, whatever that operator's level: a fit that raises
-    a silent noise level must still be scored over every seed. Otherwise two
-    renders with different seeds are compared sample for sample (a random
-    LFO, say, makes them differ).
+    A given `count` (a spec's "seeds", a tool's --seeds) forces that many
+    seeds, 1 included. Otherwise a patch with a Noise operator, a `phaseFree`
+    operator or an S&H or Drift LFO depends on the seed by its structure,
+    whatever that operator's level or that LFO's amount: a fit that raises a
+    silent noise level or an LFO's depth must still be scored over every
+    seed. Any other patch is rendered with two seeds, compared sample for
+    sample.
     """
-    if count <= 1:
-        return [base]
+    if count is not None:
+        return list(range(base, base + max(1, count)))
+    many = list(range(base, base + C.SEEDS))
     if seeded_structure(patch):
-        return list(range(base, base + count))
+        return many
     a = renderer.render(patch, seed=base, **opts)
     b = renderer.render(patch, seed=base + 1, **opts)
-    return list(range(base, base + count)) if not np.array_equal(a, b) else [base]
+    return many if not np.array_equal(a, b) else [base]
 
 
 def bench():

@@ -114,11 +114,16 @@ WAVE_MAX_LAG_MS = 2.0
 # overrides them.
 WEIGHTS = {"stft": 1.0, "band": 0.1, "harm": 0.04, "pitch": 0.2, "wave": 2.0}
 
-# Noise: renders that depend on the seed are scored over this many seeds.
+# Noise: renders that depend on the seed are scored over this many seeds,
+# unless a spec's "seeds" or a tool's --seeds forces a count.
 SEEDS = 4
 SEED_BASE = 1
 # The index of 'Noise' in the engine's WAVE_NAMES (packages/engine/src/patch/patch.ts).
 NOISE_WAVE = 4
+# The patch's LFOs, and the shapes that draw from the voice's random source:
+# LFO_SH (S&H) and LFO_DRIFT in packages/engine/src/worklet/fm/modeIds.ts.
+LFO_KEYS = ("lfo", "lfo2")
+RANDOM_LFO_SHAPES = (5, 6)
 
 # Render length when none is given: the reference's, plus this, capped.
 RENDER_MARGIN_S = 0.05
