@@ -10,10 +10,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
-import { makePatch } from '@windsor/engine';
+import { DRIVE_SHAPE, DRIVE_SHAPE_NAMES, makePatch } from '@windsor/engine';
+import { PRESETS } from '@windsor/engine/patch/presets';
 import { FILTER_KNOBS, lfoKnobs, patchKnobOpts } from './patchKnobTables';
 import {
   GLOBAL_TOGGLES,
+  driveShapeOptions,
   LFO_PHASE_NAMES,
   LFO_RANGE_NAMES,
   lfoPhaseIndex,
@@ -123,6 +125,33 @@ describe('the LFO Phase segment (windsor#56)', () => {
     lfo.oneShot = true;
     lfo.retrigger = false;
     expect(lfoPhaseIndex(lfo)).toBe(LFO_PHASE_NAMES.indexOf('One-shot'));
+  });
+});
+
+describe('the Drive section Shape picker (windsor#309)', () => {
+  it("offers Soft, Hard, Diode, Tube and Fold at the engine's DRIVE_SHAPE ids", () => {
+    expect(driveShapeOptions()).toEqual([
+      { value: DRIVE_SHAPE.SOFT, label: 'Soft' },
+      { value: DRIVE_SHAPE.HARD, label: 'Hard' },
+      { value: DRIVE_SHAPE.DIODE, label: 'Diode' },
+      { value: DRIVE_SHAPE.TUBE, label: 'Tube' },
+      { value: DRIVE_SHAPE.FOLD, label: 'Fold' },
+    ]);
+    expect(driveShapeOptions().map((o) => o.label)).toEqual([...DRIVE_SHAPE_NAMES]);
+  });
+
+  it('shows Soft on a fresh patch and on the 808 kick', () => {
+    const label = (shape: number): string | undefined =>
+      driveShapeOptions().find((o) => o.value === shape)?.label;
+    expect(label(makePatch().drive.shape)).toBe('Soft');
+    expect(label(PRESETS['tr808-kick']?.drive.shape ?? -1)).toBe('Soft');
+  });
+
+  it('writes drive.shape alone and survives the JSON round trip', () => {
+    const patch = makePatch();
+    setPath(patch, 'drive.shape', DRIVE_SHAPE.TUBE);
+    const imported = makePatch(JSON.parse(JSON.stringify(patch)) as Patch);
+    expect(imported.drive).toEqual({ ...makePatch().drive, shape: DRIVE_SHAPE.TUBE });
   });
 });
 
