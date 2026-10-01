@@ -41,6 +41,7 @@ import type { ReverbChangeConfig } from '../__fixtures__/reverbChangeScenario';
 import {
   probeScenario,
   runAllocationProbe,
+  SYNCHRONOUS_TIERING,
   workletBundle,
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
@@ -49,19 +50,22 @@ const TOLERANCE_BYTES = 16 * 1024;
 
 function probe(): ProbeRun {
   const scenarioConfig: ReverbChangeConfig = { period: 8, loud: 512, asleep: 64, quietDecay: 0.3 };
-  return runAllocationProbe({
-    bundle: workletBundle('reverb-processor.js'),
-    rate: 48000,
-    params: {},
-    options: {},
-    messages: [],
-    inputChannels: 2,
-    loadQuanta: 0,
-    warmup: 48000,
-    measure: 8000,
-    scenario: probeScenario('reverbChangeScenario.ts'),
-    scenarioConfig,
-  });
+  return runAllocationProbe(
+    {
+      bundle: workletBundle('reverb-processor.js'),
+      rate: 48000,
+      params: {},
+      options: {},
+      messages: [],
+      inputChannels: 2,
+      loadQuanta: 0,
+      warmup: 48000,
+      measure: 8000,
+      scenario: probeScenario('reverbChangeScenario.ts'),
+      scenarioConfig,
+    },
+    SYNCHRONOUS_TIERING,
+  );
 }
 
 describe('the plate on V8', () => {

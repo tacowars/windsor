@@ -42,6 +42,7 @@ import type {
 import {
   probeScenario,
   runAllocationProbe,
+  SYNCHRONOUS_TIERING,
   workletBundle,
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
@@ -93,19 +94,22 @@ function probe(): ProbeRun {
     period: PERIOD,
     quiet: QUIET,
   };
-  return runAllocationProbe({
-    bundle: workletBundle('delay-processor.js'),
-    rate: 48000,
-    params: {},
-    options: {},
-    messages: [],
-    inputChannels: 2,
-    loadQuanta: 0,
-    warmup: 4 * CYCLE,
-    measure: CYCLE,
-    scenario: probeScenario('delayChangeScenario.ts'),
-    scenarioConfig,
-  });
+  return runAllocationProbe(
+    {
+      bundle: workletBundle('delay-processor.js'),
+      rate: 48000,
+      params: {},
+      options: {},
+      messages: [],
+      inputChannels: 2,
+      loadQuanta: 0,
+      warmup: 4 * CYCLE,
+      measure: CYCLE,
+      scenario: probeScenario('delayChangeScenario.ts'),
+      scenarioConfig,
+    },
+    SYNCHRONOUS_TIERING,
+  );
 }
 
 describe('the Dub delay on V8', () => {

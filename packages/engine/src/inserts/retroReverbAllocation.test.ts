@@ -35,6 +35,7 @@ import type { RetroReverbChangeConfig } from '../__fixtures__/retroReverbChangeS
 import {
   probeScenario,
   runAllocationProbe,
+  SYNCHRONOUS_TIERING,
   workletBundle,
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
@@ -51,19 +52,22 @@ function probe(): ProbeRun {
     floor: RETRO_REVERB_DSP.silenceFloor,
     internalRate: RETRO_REVERB_DSP.rate,
   };
-  return runAllocationProbe({
-    bundle: workletBundle('retro-reverb-processor.js'),
-    rate: 48000,
-    params: {},
-    options: {},
-    messages: [],
-    inputChannels: 2,
-    loadQuanta: 0,
-    warmup: 48000,
-    measure: 8000,
-    scenario: probeScenario('retroReverbChangeScenario.ts'),
-    scenarioConfig,
-  });
+  return runAllocationProbe(
+    {
+      bundle: workletBundle('retro-reverb-processor.js'),
+      rate: 48000,
+      params: {},
+      options: {},
+      messages: [],
+      inputChannels: 2,
+      loadQuanta: 0,
+      warmup: 48000,
+      measure: 8000,
+      scenario: probeScenario('retroReverbChangeScenario.ts'),
+      scenarioConfig,
+    },
+    SYNCHRONOUS_TIERING,
+  );
 }
 
 describe('the Retro reverb on V8', () => {
