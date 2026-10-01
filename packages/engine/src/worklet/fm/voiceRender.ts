@@ -12,8 +12,11 @@
  * more than it saves. Width (#55): an operator whose width is exactly 1 and
  * still takes the old read, untouched; one squeezed reads its wave at
  * `phase / width` and holds 0 once that passes 1; a PULSE reads its saw
- * table twice. `fmProcessorKernel.test.ts` compares it with the kernel on
- * every preset; the golden test pins it.
+ * table twice. An operator envelope segment that ends inside the block
+ * (windsor#301) is a knot `updateOperatorAmp` set: the loop counts
+ * `ampBreak` down after each amplitude step and, at 0, lands on the knot's
+ * level and takes its ramp. `fmProcessorKernel.test.ts` compares it with the
+ * kernel on every preset; the golden test pins it.
  */
 
 import type { Voice } from './voice';
@@ -74,6 +77,11 @@ function renderVoiceGeneric(
     fb2 = voice.fb2,
     amp = voice.amp,
     ampInc = voice.ampInc;
+  const ampBreak = voice.ampBreak,
+    ampKnot = voice.ampKnot,
+    knotAmp = voice.knotAmp,
+    knotInc = voice.knotInc,
+    knotGap = voice.knotGap;
   const kind = voice.kind,
     tables = voice.tables;
   const width = voice.width,
@@ -182,6 +190,14 @@ function renderVoiceGeneric(
       if (phase[i] >= 1) phase[i] -= Math.floor(phase[i]);
       if ((ramping & (1 << i)) !== 0) width[i] += widthInc[i];
       amp[i] = a + ampInc[i];
+      // An envelope segment ends here (windsor#301): land on its level and
+      // take the next ramp.
+      if (ampBreak[i] !== 0 && --ampBreak[i] === 0) {
+        const j = ampKnot[i]++;
+        amp[i] = knotAmp[j];
+        ampInc[i] = knotInc[j];
+        ampBreak[i] = knotGap[j];
+      }
     }
 
     let sig = 0;

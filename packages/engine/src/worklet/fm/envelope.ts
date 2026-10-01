@@ -1,7 +1,9 @@
 /**
  * The envelope (#644): Init -> attack -> Peak -> decay -> Sustain -> held ->
  * release -> End, a curve per segment, three loop modes, advanced at control
- * rate. Invariant: `curveShape` and this state machine are the one curve the
+ * rate: `advance` for the filter and pitch envelopes, and `advanceExact` for
+ * an operator's, whose segment ends keep their own samples (windsor#301).
+ * Invariant: `curveShape` and this state machine are the one curve the
  * console draws with — `envelopeCurve.ts` mirrors them and
  * `envelopeCurve.test.ts` pins the two sample for sample (#620) until #656
  * shares the function. `patchLibraryEnvelope.test.ts` pins release completion.
@@ -16,12 +18,20 @@
  * `value`, the curve is `writeSegmentLevel`, which reads a segment from the
  * envelope's fields and writes its level to `value`, and `segmentLevel`, the
  * console's form, runs that same function over a scratch segment. Every
- * double field is first written as NaN (rule 7). `envelope.test.ts` pins
- * `curveConstant` and `curveShape` as the curve's two steps.
+ * double field is first written as NaN (rule 7), and `advanceExact` keeps
+ * its samples still to run in one (`rest`), never in a loop-carried local.
+ * `envelope.test.ts` pins `curveConstant` and `curveShape` as the curve's two
+ * steps, and `advanceExact`'s breaks, and its bits equal to `advance`'s while
+ * no segment ends inside the step.
  */
 
 import type { Envelope as EnvelopeParams } from '../../patch/patch';
-import { ENVELOPE_CURVE_STEEPNESS, MIN_SEG_TIME } from './fmConstants';
+import {
+  ENVELOPE_BREAKS_MAX,
+  ENVELOPE_CURVE_STEEPNESS,
+  ENVELOPE_PASSES_MAX,
+  MIN_SEG_TIME,
+} from './fmConstants';
 import { LOOP_LOOP, LOOP_TRIGGER } from './modeIds';
 
 /* ------------------------------------------------------------------ *
@@ -29,7 +39,8 @@ import { LOOP_LOOP, LOOP_TRIGGER } from './modeIds';
  *
  * Operator's shape: Init -> (attack) -> Peak -> (decay) -> Sustain -> held ->
  * (release) -> End, with a curve control per segment and three loop modes.
- * Advanced at control rate; the caller interpolates between control points.
+ * Advanced at control rate; the caller interpolates between control points,
+ * and an operator's ramp passes through the breaks `advanceExact` records.
  * ------------------------------------------------------------------ */
 
 const ST_IDLE = 0,
@@ -98,7 +109,8 @@ class Envelope {
   value: number;
   phase: number;
   segStart: number;
-  /** The running segment's target and curve control, for `writeSegmentLevel`. */
+  /** The running segment's time, target and curve control, for `writeSegmentLevel`. */
+  segTime: number;
   segTarget: number;
   segCurve: number;
   p: EnvelopeParams | null;
@@ -106,23 +118,33 @@ class Envelope {
   timeScale: number;
   decayTime: number;
   decayCurve: number;
+  /** `advanceExact`'s samples still to run, and its segment ends in its last step (windsor#301): how many, where and at what level. */
+  rest: number;
+  breaks: number;
+  breakAt: Float64Array;
+  breakLevel: Float64Array;
 
   constructor() {
     // Rule 7: each double field is born a double (NaN), before its start value.
-    this.value = this.phase = this.segStart = this.segTarget = this.segCurve = NaN;
-    this.timeScale = this.decayTime = this.decayCurve = NaN;
+    this.value = this.phase = this.segStart = this.segTarget = this.segCurve = this.segTime = NaN;
+    this.timeScale = this.decayTime = this.decayCurve = this.rest = NaN;
     this.state = ST_IDLE;
     this.value = 0;
     this.phase = 0;
     this.segStart = 0;
     this.segTarget = 0;
     this.segCurve = 0;
+    this.segTime = 0;
     this.p = null; // parameter block, owned by the voice's patch
     this.sr = 48000;
     this.timeScale = 1; // key tracking: >1 slower, <1 faster
     // The decay segment's, from `configure`; a step's offsets replace them per note (windsor#17).
     this.decayTime = 0;
     this.decayCurve = 0;
+    this.rest = 0;
+    this.breaks = 0;
+    this.breakAt = new Float64Array(ENVELOPE_BREAKS_MAX);
+    this.breakLevel = new Float64Array(ENVELOPE_BREAKS_MAX);
   }
 
   configure(params: EnvelopeParams, sampleRate: number): void {
@@ -153,64 +175,123 @@ class Envelope {
     return this.state === ST_DONE || this.state === ST_IDLE;
   }
 
-  /** Advance by `n` samples; the new value is `value`. */
+  /**
+   * Advance by `n` samples at control rate; the new value is `value`. A
+   * segment that ends inside the `n` lands on its target at the end of them
+   * and the next starts there, so a segment shorter than the step takes the
+   * whole step: the filter's and the pitch envelope's timing, which
+   * windsor#301 leaves at control rate.
+   */
   advance(n: number): void {
-    const p = this.p!;
     if (this.state === ST_IDLE || this.state === ST_DONE) return;
     if (this.state === ST_SUSTAIN) {
-      this.value = p.sustainLevel;
+      this.value = this.p!.sustainLevel;
       return;
     }
-
-    let time: number, target: number, curve: number;
-    switch (this.state) {
-      case ST_ATTACK:
-        time = p.attackTime;
-        target = p.peakLevel;
-        curve = p.attackCurve;
-        break;
-      case ST_DECAY:
-        time = this.decayTime;
-        target = p.sustainLevel;
-        curve = this.decayCurve;
-        break;
-      default:
-        time = p.releaseTime;
-        target = p.endLevel;
-        curve = p.releaseCurve;
-        break;
-    }
-    time *= this.timeScale;
+    this.loadSegment();
+    let time = this.segTime * this.timeScale;
     if (time < MIN_SEG_TIME) time = MIN_SEG_TIME;
 
     this.phase += n / (time * this.sr);
 
     if (this.phase >= 1) {
-      this.value = target;
-      this.phase = 0;
-      this.segStart = target;
-      switch (this.state) {
-        case ST_ATTACK:
-          this.state = ST_DECAY;
-          break;
-        case ST_DECAY:
-          if (p.loopMode === LOOP_LOOP) {
-            this.state = ST_ATTACK;
-            this.segStart = this.value;
-          } else if (p.loopMode === LOOP_TRIGGER) {
-            this.state = ST_RELEASE;
-          } else this.state = ST_SUSTAIN;
-          break;
-        default:
-          this.state = ST_DONE;
-          break;
-      }
+      this.endSegment();
       return;
     }
-
-    this.segTarget = target;
-    this.segCurve = curve;
     writeSegmentLevel(this);
+  }
+
+  /**
+   * Advance by `n` samples with every segment end at its own sample
+   * (windsor#301): an operator's amplitude envelope. A segment that ends
+   * inside the `n` hands what is left of them to the next, and each end is
+   * recorded as a break: `breakAt` its offset in samples from the start of
+   * the `n`, `breakLevel` the level it lands on, `breaks` how many (at most
+   * ENVELOPE_BREAKS_MAX; a later end is still timed). A segment time of 0
+   * ends on the sample it starts on. With no end inside the `n` this is
+   * `advance`'s arithmetic for a segment past MIN_SEG_TIME, to the bit: one
+   * phase step of `n / (time * sr)`, then the curve.
+   */
+  advanceExact(n: number): void {
+    this.breaks = 0;
+    // The samples still to run, a field: a loop-carried local born of the
+    // integer `n` was a tagged phi, and each pass boxed it (windsor#233).
+    this.rest = n;
+    for (let pass = 0; pass < ENVELOPE_PASSES_MAX; pass++) {
+      if (this.state === ST_IDLE || this.state === ST_DONE) return;
+      if (this.state === ST_SUSTAIN) {
+        this.value = this.p!.sustainLevel;
+        return;
+      }
+      this.loadSegment();
+      let time = this.segTime * this.timeScale;
+      if (!(time > 0)) time = 0;
+      const span = time * this.sr;
+      const phase = this.phase + this.rest / span;
+      if (phase < 1) {
+        this.phase = phase;
+        writeSegmentLevel(this);
+        return;
+      }
+      // The segment ends `(1 - phase) * span` samples into what is left.
+      this.rest -= (1 - this.phase) * span;
+      if (this.rest < 0) this.rest = 0;
+      const b = this.breaks;
+      if (b < ENVELOPE_BREAKS_MAX) {
+        this.breakAt[b] = n - this.rest;
+        this.breakLevel[b] = this.segTarget;
+        this.breaks = b + 1;
+      }
+      this.endSegment();
+      if (this.rest === 0) return;
+    }
+  }
+
+  /** The running segment's time (before key scaling), target and curve, into their fields. */
+  loadSegment(): void {
+    const p = this.p!;
+    switch (this.state) {
+      case ST_ATTACK:
+        this.segTime = p.attackTime;
+        this.segTarget = p.peakLevel;
+        this.segCurve = p.attackCurve;
+        break;
+      case ST_DECAY:
+        this.segTime = this.decayTime;
+        this.segTarget = p.sustainLevel;
+        this.segCurve = this.decayCurve;
+        break;
+      default:
+        this.segTime = p.releaseTime;
+        this.segTarget = p.endLevel;
+        this.segCurve = p.releaseCurve;
+        break;
+    }
+  }
+
+  /** The running segment has reached its target: land there and take the next stage. */
+  endSegment(): void {
+    const p = this.p!;
+    const target = this.segTarget;
+    this.value = target;
+    this.phase = 0;
+    this.segStart = target;
+    switch (this.state) {
+      case ST_ATTACK:
+        this.state = ST_DECAY;
+        break;
+      case ST_DECAY:
+        if (p.loopMode === LOOP_LOOP) {
+          this.state = ST_ATTACK;
+          this.segStart = this.value;
+        } else if (p.loopMode === LOOP_TRIGGER) {
+          this.state = ST_RELEASE;
+        } else this.state = ST_SUSTAIN;
+        break;
+      default:
+        this.state = ST_DONE;
+        break;
+    }
   }
 }
 

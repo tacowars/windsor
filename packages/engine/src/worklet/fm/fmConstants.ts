@@ -1,7 +1,8 @@
 /**
  * The FM worklet's tunables (#644): table size, mip count, the control-rate
  * interval, the dormancy floors, the modulation and feedback depths, the
- * shortest envelope segment, the width ramp's snap, and the drive stage's
+ * shortest envelope segment, the amplitude envelope's breaks per block
+ * (windsor#301), the width ramp's snap, and the drive stage's
  * shape constants and tone curve (windsor#300). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
@@ -51,7 +52,20 @@ const MOD_INDEX_SCALE = 4.0;
  */
 const FEEDBACK_SAW_CYCLES = 1.25 / (2 * Math.PI);
 const FEEDBACK_SQUARE_CYCLES = 2.0 / (2 * Math.PI);
-const MIN_SEG_TIME = 0.0005; // shortest envelope segment, seconds
+const MIN_SEG_TIME = 0.0005; // shortest filter or pitch envelope segment, seconds
+/*
+ * An operator's amplitude envelope keeps its segment ends at their own
+ * samples (windsor#301, `envelope.ts`'s `advanceExact`): a segment may end
+ * inside a control block, and the amplitude ramp turns there. A block records
+ * at most ENVELOPE_BREAKS_MAX of those ends, each a knot the ramp passes
+ * through; an end past that count is still timed, and the block's last ramp
+ * runs straight to the block-end level across it. Four holds an attack, a
+ * decay and a release in one block with one to spare. A block walks at most
+ * ENVELOPE_PASSES_MAX segments, so a looping envelope whose attack and decay
+ * are both 0 cannot spin: it stops where the count runs out.
+ */
+const ENVELOPE_BREAKS_MAX = 4;
+const ENVELOPE_PASSES_MAX = 64;
 /*
  * A segment's curve control of ±1 maps to a shaping constant of exp(±steepness)
  * (`envelope.ts`'s `segmentLevel`, which the console's display draws with): 0
@@ -119,6 +133,8 @@ export {
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MIN_SEG_TIME,
+  ENVELOPE_BREAKS_MAX,
+  ENVELOPE_PASSES_MAX,
   ENVELOPE_CURVE_STEEPNESS,
   WIDTH_SNAP,
   EVENT_QUEUE_CAPACITY,
