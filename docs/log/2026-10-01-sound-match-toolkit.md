@@ -28,6 +28,7 @@ toolkit only says where a render differs and in which direction.
    seeded) or else by comparing two seeds sample for sample. It is scored as
    the mean over N seeds (default 4), and the report gives the spread. A
    fit does not chase one noise draw.
+   (windsor#299: an S&H or Drift LFO or a non-zero `panRandom` counts as structural too, a fitted path that controls a random source keeps every seed for the whole fit, and a spec's `"seeds"` or `--seeds` forces the count.)
 4. **Both sides are aligned by the same rule and peak-normalised.** The
    onset is the first sample above a threshold relative to the peak, less a
    lead (default −40 dB, 0.05 ms; the 909 pack wants −6 dB and 1.5 ms for

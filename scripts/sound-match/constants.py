@@ -114,11 +114,45 @@ WAVE_MAX_LAG_MS = 2.0
 # overrides them.
 WEIGHTS = {"stft": 1.0, "band": 0.1, "harm": 0.04, "pitch": 0.2, "wave": 2.0}
 
-# Noise: renders that depend on the seed are scored over this many seeds.
+# Noise: renders that depend on the seed are scored over this many seeds,
+# unless a spec's "seeds" or a tool's --seeds forces a count.
 SEEDS = 4
 SEED_BASE = 1
+#
+# The worklet's random sources (`seeds.py` decides from these). The FM
+# processor has one source, `makeRandom(processorOptions.seed)` in
+# packages/engine/src/worklet/fm/prng.ts, built in fmProcessor.ts; every draw
+# below comes from it, so the harness seed pins them all:
+# - `panRandom` jitter: one draw per note, fmProcessor.ts (`p.panRandom *
+#   (this.random() * 2 - 1)`); it moves the render only when `panRandom` != 0.
+# - Free-running start phase: voice.ts at note-on, `op.phaseFree ?
+#   this.random() : op.phase`, per operator.
+# - The per-voice noise seed: voice.ts, `noiseSeed = randomSeed32(random)`;
+#   `voice.noise()` (voice.ts, voiceKernel.ts, voiceRender.ts) is heard only
+#   through an operator whose wave is Noise (`waveKind` in waveTables.ts).
+# - The LFO seeds: voice.ts, `new Lfo(randomSeed32(random))` for `lfo`, and
+#   `secondLfoSeed` of it for `lfo2` (lfo.ts); lfo.ts `rand()` draws only for
+#   the S&H and Drift shapes, and is heard only through an LFO depth.
+# Not sources for a patch render: retro/retroReflections.ts seeds its own
+# generator from a constant, and the Tape insert's seed is its spec's, not
+# the patch's (inserts/insertIds.ts, inserts/tapeRandomise.ts).
+#
 # The index of 'Noise' in the engine's WAVE_NAMES (packages/engine/src/patch/patch.ts).
 NOISE_WAVE = 4
+# The patch's LFOs, and the shapes that draw from the voice's random source:
+# LFO_SH (S&H) and LFO_DRIFT in packages/engine/src/worklet/fm/modeIds.ts.
+LFO_KEYS = ("lfo", "lfo2")
+RANDOM_LFO_SHAPES = (5, 6)
+# Fitted paths that control a random source whatever the rest of the patch
+# (as `spec.parse_path` tokens): the pan jitter, an operator's wave (it can
+# become Noise) and free-running phase, an LFO's shape (it can become random).
+SEEDED_PATCH_PATHS = (("panRandom",), ("lfo", "shape"), ("lfo2", "shape"))
+SEEDED_OP_KEYS = ("wave", "phaseFree")
+# Depths of an LFO that live outside it; every path under `lfo` / `lfo2`
+# (amount, toPitch, toOp, toWidth, rate…) is that LFO's too. They count when
+# that LFO's shape is random or fitted; anything of an operator counts when
+# its wave is Noise or fitted.
+LFO_DEPTH_PATHS = {("filter", "lfoAmount"): "lfo", ("filter", "lfo2Amount"): "lfo2"}
 
 # Render length when none is given: the reference's, plus this, capped.
 RENDER_MARGIN_S = 0.05

@@ -22,6 +22,5 @@
     }
   ],
   "weights": { "stft": 1, "band": 0.1, "harm": 0.04, "pitch": 0.2, "wave": 2 },
-  "seeds": 4,
   "optimizer": { "method": "cma", "budget": 600, "sigma0": 0.15, "seed": 1 }
 }
