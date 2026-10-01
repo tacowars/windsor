@@ -33,13 +33,19 @@ export interface ProbeRun extends ProbeResult {
   changes: string[];
 }
 
-export function runAllocationProbe(config: ProbeConfig): ProbeRun {
+/**
+ * Run the probe on `config`. `v8Flags` go to the child's Node before the
+ * probe's own (`--no-turbo-inlining`, to measure a path as if V8 declined to
+ * inline its calls, as it may in a larger render than the test's).
+ */
+export function runAllocationProbe(config: ProbeConfig, v8Flags: string[] = []): ProbeRun {
   const dir = mkdtempSync(join(tmpdir(), 'worklet-allocation-'));
   try {
     const resultFile = join(dir, 'result.json');
     const child = spawnSync(
       process.execPath,
       [
+        ...v8Flags,
         '--expose-gc',
         '--min-semi-space-size=64',
         '--max-semi-space-size=64',

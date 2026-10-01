@@ -5,7 +5,10 @@
  * ever queued at once. An event is inserted in place, by insertion sort from
  * the back (events usually arrive in order), and taken from the front by an
  * index; `splice` returned a new array for each insert, and `shift` trimmed
- * the array that the next insert then grew again. `fmProcessor.test.ts` pins
+ * the array that the next insert then grew again. The queue has no accessor
+ * for the first event's frame: past 2^31 a frame is a double, which a return
+ * from a call V8 does not inline boxes (rule 7), so the render reads
+ * `items[head]._frame` in place. `fmProcessor.test.ts` pins
  * the order, `synth/fmProcessorAllocation.test.ts` the allocation.
  */
 
@@ -28,11 +31,6 @@ class EventQueue {
 
   get empty(): boolean {
     return this.head === this.tail;
-  }
-
-  /** The first event's frame. The queue must not be empty. */
-  get firstFrame(): number {
-    return this.items[this.head]._frame;
   }
 
   /** Take the first event. The queue must not be empty. */

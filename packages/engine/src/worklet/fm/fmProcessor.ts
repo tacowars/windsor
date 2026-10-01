@@ -131,7 +131,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // asynchronously and can lose the race against OfflineAudioContext's
     // startRendering(), so offline renders must pass their notes this way.
     if (Array.isArray(opts.events)) {
-      for (const ev of opts.events) this.schedule(ev, ev.frame);
+      for (const ev of opts.events) this.schedule(ev);
     }
 
     this.port.onmessage = (e: MessageEvent<WorkletMessage>) => this.onMessage(e.data);
@@ -166,10 +166,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
         this.liveRetune = !!msg.enabled;
         break;
       case 'noteOn':
-        this.schedule(msg, msg.frame);
+        this.schedule(msg);
         break;
       case 'noteOff':
-        this.schedule(msg, msg.frame);
+        this.schedule(msg);
         break;
       case 'allNotesOff':
         // Queued future events are cancelled too: a mute or a live rebuild
@@ -194,9 +194,13 @@ class FmPartProcessor extends AudioWorkletProcessor {
     }
   }
 
-  schedule(ev: ScheduledMessage, frame: number | undefined): void {
+  /**
+   * Queue `ev` at its frame, or now without one. The frame is read here, not
+   * passed in: past 2^31 it is a double, which an argument can box (rule 7).
+   */
+  schedule(ev: ScheduledMessage): void {
     const queued = ev as QueuedEvent;
-    queued._frame = typeof frame === 'number' ? frame : currentFrame;
+    queued._frame = typeof ev.frame === 'number' ? ev.frame : currentFrame;
     this.events.insert(queued);
   }
 
@@ -444,7 +448,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
 
     while (cursor < n) {
       // Apply every event landing on this frame.
-      while (!q.empty && q.firstFrame <= blockStart + cursor) {
+      // The next event's frame is read in place, never returned from a call:
+      // past 2^31 it is a double, which a return can box (rule 7).
+      while (!q.empty && q.items[q.head]._frame <= blockStart + cursor) {
         const ev = q.take();
         if (ev.type === 'noteOn') this.noteOn(ev);
         else if (ev.type === 'noteOff') this.noteOffId(ev.id != null ? ev.id : ev.note!);
@@ -453,8 +459,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
       // Render up to the next event, the next control boundary, or block end.
       let seg = n - cursor;
       if (!q.empty) {
-        const untilEvent = q.firstFrame - (blockStart + cursor);
-        if (untilEvent > 0 && untilEvent < seg) seg = untilEvent;
+        const untilEvent = q.items[q.head]._frame - (blockStart + cursor);
+        // In (0, seg), so `| 0` is exact; it keeps `seg` a small integer when
+        // the frames are doubles (past 2^31), and `voice.age` with it.
+        if (untilEvent > 0 && untilEvent < seg) seg = untilEvent | 0;
       }
 
       for (let i = 0; i < this.voices.length; i++) {

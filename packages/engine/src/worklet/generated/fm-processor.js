@@ -11,10 +11,6 @@ var EventQueue = class {
   get empty() {
     return this.head === this.tail;
   }
-  /** The first event's frame. The queue must not be empty. */
-  get firstFrame() {
-    return this.items[this.head]._frame;
-  }
   /** Take the first event. The queue must not be empty. */
   take() {
     const event = this.items[this.head++];
@@ -1887,7 +1883,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     for (let i = 0; i < poolSize; i++) this.voices[i].specialise = specialise;
     this.load = new LoadSampler(sampleRate, this.port);
     if (Array.isArray(opts.events)) {
-      for (const ev of opts.events) this.schedule(ev, ev.frame);
+      for (const ev of opts.events) this.schedule(ev);
     }
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
@@ -1916,10 +1912,10 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.liveRetune = !!msg.enabled;
         break;
       case "noteOn":
-        this.schedule(msg, msg.frame);
+        this.schedule(msg);
         break;
       case "noteOff":
-        this.schedule(msg, msg.frame);
+        this.schedule(msg);
         break;
       case "allNotesOff":
         for (const v of this.voices) this.releaseVoice(v);
@@ -1939,9 +1935,13 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         break;
     }
   }
-  schedule(ev, frame) {
+  /**
+   * Queue `ev` at its frame, or now without one. The frame is read here, not
+   * passed in: past 2^31 it is a double, which an argument can box (rule 7).
+   */
+  schedule(ev) {
     const queued = ev;
-    queued._frame = typeof frame === "number" ? frame : currentFrame;
+    queued._frame = typeof ev.frame === "number" ? ev.frame : currentFrame;
     this.events.insert(queued);
   }
   /** Drop every voice from the note map: a later note-off for any of them finds nothing. */
@@ -2143,15 +2143,15 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     const q = this.events;
     let cursor = 0;
     while (cursor < n) {
-      while (!q.empty && q.firstFrame <= blockStart + cursor) {
+      while (!q.empty && q.items[q.head]._frame <= blockStart + cursor) {
         const ev = q.take();
         if (ev.type === "noteOn") this.noteOn(ev);
         else if (ev.type === "noteOff") this.noteOffId(ev.id != null ? ev.id : ev.note);
       }
       let seg = n - cursor;
       if (!q.empty) {
-        const untilEvent = q.firstFrame - (blockStart + cursor);
-        if (untilEvent > 0 && untilEvent < seg) seg = untilEvent;
+        const untilEvent = q.items[q.head]._frame - (blockStart + cursor);
+        if (untilEvent > 0 && untilEvent < seg) seg = untilEvent | 0;
       }
       for (let i = 0; i < this.voices.length; i++) {
         const v = this.voices[i];

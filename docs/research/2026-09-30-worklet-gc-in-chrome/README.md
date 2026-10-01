@@ -332,14 +332,18 @@ Worst first. The GC rate each adds is its scenario's rate less scenario a's
    so its over-budget counts here are against 2 902 µs).
 
    - **One part** (`a-fm`, 30.7 s traced, load average 2.33 before and 2.51
-     after): the median call allocated 0 bytes, and 59 of the part's 11 498
-     calls allocated anything, every one at or just after a bar's chord (three
-     note-offs and three note-ons, six voices with `pad-drift`'s spread) or at
-     an envelope's first move to a new segment. The chord's quantum read
-     11 628 bytes in the first bars and 2 976 by the trace's end, as V8
+     after): the median call allocated 0 bytes, and 46 of the part's 11 298
+     measured calls allocated anything (of 11 310, `analyse-trace.mjs`
+     excluded 12 for a collection or an interrupt inside the call, or a
+     counter blip), every one at or just after a bar's chord (three
+     note-offs and three note-ons, six voices with `pad-drift`'s spread) or
+     at an envelope's first move to a new segment. The chord's quantum read 11 628 bytes in the first bars
+     (the summary's largest call) and 2 976 by the trace's end, as V8
      optimised the note-on path; the quantum after it read up to 9 848 in
-     three bars and then nothing. Mean 11.5 bytes a quantum (8.8 in the
-     second half), against 2 909 before. The audio thread made **no minor
+     three bars and then nothing. Those two per-bar figures are read from the
+     calls in the trace itself (`w233-a-fm-after.trace.json`), which the
+     summary does not list. Mean 11.5 bytes a quantum (8.8 in the second
+     half), against 2 909 before. The audio thread made **no minor
      collection** in 30.7 s (1.24 a second before); it made two memory-reducer
      mark-compacts (1 915 µs at the longest), outside any render call, which
      the earlier exploratory run also saw. Median quantum span 123 µs. The

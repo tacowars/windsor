@@ -223,10 +223,14 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    reach the voices in `partControls`, the width update reads `opFreq` and
    the LFO levels from the voice, `Svf.setCoeffs` reads `cutoffHz` and `q`,
    and a note's velocity, detune, pan and glide go to `start` in the voice's
-   fields. The per-sample calls the kernel and the generic loop keep
-   (`Svf.process`, `softClip`, `noise`) are inlined first by frequency.
-   `synth/fmProcessorAllocation.test.ts` pins it through
-   `__fixtures__/fmPartChangeScenario.ts`; what the note-on path still
+   fields. A frame counts: past 2^31 (about 12 hours at 48 kHz) it is a
+   double, so the render reads the next event's frame in place
+   (`q.items[q.head]._frame`, no accessor) and `schedule` reads a message's
+   frame from the message. The per-sample calls the kernel and the generic
+   loop keep (`Svf.process`, `softClip`, `noise`) are inlined first by
+   frequency. `synth/fmProcessorAllocation.test.ts` pins it through
+   `__fixtures__/fmPartChangeScenario.ts`, one run at frames past 2^31 with
+   notes posted ahead and the queue's accessors kept from inlining; what the note-on path still
    allocates in V8's lower tiers is in
    `docs/research/2026-09-30-worklet-gc-in-chrome/README.md`.
 3. **Bit-identity by construction.** The fixed-index kernel (`renderKernel`,

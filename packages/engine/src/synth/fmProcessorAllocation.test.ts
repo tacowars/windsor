@@ -45,6 +45,16 @@
  * scenario throws, failing the child, unless the measured run took every
  * path.
  *
+ * A third run plays the pad as a context about 25 hours old does: every
+ * frame past 2^31, a double in V8, and each note posted 16 quanta ahead of
+ * where it lands, as the scheduler's look-ahead, so the next event's frame is
+ * read every quantum while it waits. The child keeps the event queue's
+ * accessors from being inlined (`%NeverOptimizeFunction`), as V8 may in a
+ * larger render than this one, so a frame returned from one is boxed. With
+ * the `firstFrame` accessor the render had read the frame through, the run
+ * read 143 KB, a heap number a quantum; with `schedule(msg, msg.frame)`, the
+ * frame passed as an argument, 21 KB with everything inlined.
+ *
  * Tolerance: 16 KiB over the 8 000 quanta; one boxed double a quantum would
  * read 128 KB. The runs read about 10 to 12 KB: the eleven readings' own
  * result objects, about 7 KB, and about one heap number a note-on. Before
@@ -65,6 +75,11 @@ import { WAVE } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
 
 const TOLERANCE_BYTES = 16 * 1024;
+
+/** A context about 25 hours old at 48 kHz: every frame a double in V8, whose small integers end at 2^31. */
+const LATE_FRAME = 2 ** 32;
+/** Quanta the notes are posted ahead of where they land, about 40 ms at 48 kHz, as the scheduler's look-ahead. */
+const LOOKAHEAD_QUANTA = 16;
 
 const TOGGLES: [string, number][] = [
   ['pitchBend', 2],
@@ -200,20 +215,25 @@ function probe(
   maxVoices: number,
   specialise: boolean,
   scenarioConfig: FmPartChangeConfig,
+  late?: { startFrame: number; v8Flags: string[] },
 ): ProbeRun {
-  return runAllocationProbe({
-    bundle: workletBundle('fm-processor.js'),
-    rate: 48000,
-    params: {},
-    options: { maxVoices, patch, seed: 0xa204, specialise },
-    messages: [],
-    inputChannels: 0,
-    loadQuanta: 0,
-    warmup: 96000,
-    measure: 8000,
-    scenario: probeScenario('fmPartChangeScenario.ts'),
-    scenarioConfig,
-  });
+  return runAllocationProbe(
+    {
+      startFrame: late?.startFrame ?? 0,
+      bundle: workletBundle('fm-processor.js'),
+      rate: 48000,
+      params: {},
+      options: { maxVoices, patch, seed: 0xa204, specialise },
+      messages: [],
+      inputChannels: 0,
+      loadQuanta: 0,
+      warmup: 96000,
+      measure: 8000,
+      scenario: probeScenario('fmPartChangeScenario.ts'),
+      scenarioConfig,
+    },
+    late?.v8Flags,
+  );
 }
 
 function expectClean(run: ProbeRun): void {
@@ -246,6 +266,27 @@ describe('the FM part on V8', () => {
         idStride: 64,
         paths: ['held', 'released', 'dormant', 'ended', 'silent'],
       }),
+    );
+  }, 120_000);
+
+  it('plays the chord with its notes posted ahead, at frames past 2^31, for 8 000 quanta without allocating or changing a field representation', () => {
+    expectClean(
+      probe(
+        pad(),
+        8,
+        true,
+        {
+          events: PAD_EVENTS,
+          period: 24,
+          toggles: TOGGLES,
+          rest: 16,
+          idStride: 64,
+          paths: ['held', 'stolen', 'released', 'ended', 'silent'],
+          lookahead: LOOKAHEAD_QUANTA,
+          outlineQueueAccessors: true,
+        },
+        { startFrame: LATE_FRAME, v8Flags: ['--allow-natives-syntax'] },
+      ),
     );
   }, 120_000);
 });

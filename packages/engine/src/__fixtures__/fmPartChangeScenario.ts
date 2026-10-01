@@ -73,6 +73,19 @@ export interface FmPartChangeConfig {
   idStride: number;
   /** The paths the measured run must take. */
   paths: FmPartPath[];
+  /**
+   * Quanta between an event's message and the quantum it lands in, as the
+   * scheduler posts ahead; omitted, 0 (it lands in the quantum it is sent
+   * before). Every event, and the cycle, moves this much later.
+   */
+  lookahead?: number;
+  /**
+   * Keep every accessor of the part's event queue from being optimised, and
+   * so from being inlined, as V8 may decline to inline a call in a larger
+   * render: whatever such an accessor returns then crosses a real return.
+   * The child needs `--allow-natives-syntax`.
+   */
+  outlineQueueAccessors?: boolean;
 }
 
 /** What the run reads of each voice: flags only, since reading a double field can box it here. */
@@ -94,6 +107,17 @@ interface RandomSource {
 /** Every draw from the part's random source, a literal: V8 returns it without allocating. */
 const constantDraw = (): number => 0.5;
 
+/** Mark each getter on the part's event queue's prototype never to be optimised (`%NeverOptimizeFunction`). */
+function outlineQueueAccessors(probe: ProbeRig): void {
+  const queue = (probe.processor as unknown as { events: object }).events;
+  // Natives syntax is not TypeScript, so the call is compiled at run time.
+  const neverOptimise = new Function('f', '%NeverOptimizeFunction(f);') as (f: unknown) => void;
+  const proto = Object.getPrototypeOf(queue) as object;
+  for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(proto))) {
+    if (descriptor.get) neverOptimise(descriptor.get);
+  }
+}
+
 function swapRandom(probe: ProbeRig): void {
   const part = probe.processor as unknown as RandomSource;
   part.random = constantDraw;
@@ -108,14 +132,23 @@ interface Message {
 }
 
 /** The cycle's messages, each in its event wrapper, built once. */
-function messages(events: FmPartEvent[]): { data: Message }[] {
+function messages(events: FmPartEvent[], startFrame: number): { data: Message }[] {
   return events.map(({ type, key, note, velocity, mod, stepMod }) => {
     const data =
       type === 'noteOn'
-        ? { type, id: key, note, velocity, frame: 0, mod: mod ?? 0, stepMod: stepMod ?? null }
-        : { type, id: key, frame: 0 };
+        ? {
+            type,
+            id: key,
+            note,
+            velocity,
+            frame: startFrame,
+            mod: mod ?? 0,
+            stepMod: stepMod ?? null,
+          }
+        : { type, id: key, frame: startFrame };
     // The processor stamps `_frame` on what it queues; a reused message already has it.
-    return { data: { ...data, _frame: 0 } as Message };
+    // Both start at the run's first frame, so a frame past 2^31 is a double from the start.
+    return { data: { ...data, _frame: startFrame } as Message };
   });
 }
 
@@ -135,8 +168,11 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
   const port = probe.processor.port;
   const voices = (probe.processor as unknown as { voices: VoiceState[] }).voices;
   const events = config.events;
-  const wrapped = messages(events);
-  const last = events[events.length - 1]!.at;
+  const startFrame = probe.config.startFrame ?? 0;
+  const lookahead = config.lookahead ?? 0;
+  const wrapped = messages(events, startFrame);
+  // Played out only once the last event has landed.
+  const last = events[events.length - 1]!.at + lookahead;
   const arrays = config.toggles.map(([name]) => params[name]!);
   // Float32, as the parameter arrays are, so a toggle compares like with like.
   const others = Float32Array.from(config.toggles, ([, value]) => value);
@@ -166,7 +202,7 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
     while (next < events.length && events[next]!.at === t) {
       const event = wrapped[next]!;
       event.data.id = events[next]!.key + cycle * config.idStride;
-      event.data.frame = q * QUANTUM + events[next]!.offset;
+      event.data.frame = startFrame + (q + lookahead) * QUANTUM + events[next]!.offset;
       port.onmessage!(event);
       next++;
     }
@@ -206,6 +242,7 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
 export default function fmPartChangeScenario(probe: ProbeRig): ProbeScenario {
   const config = probe.config.scenarioConfig as FmPartChangeConfig;
   swapRandom(probe);
+  if (config.outlineQueueAccessors) outlineQueueAccessors(probe);
   const { step, note, seen } = fmCycle(probe, config);
   const { warmup, measure } = probe.config;
   const none: Float32Array[][] = [];
