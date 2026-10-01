@@ -36,7 +36,10 @@
  *   - drive rising under a held field, the release peak stays within
  *     `BOUND.rise` of the same corner's release with no motion
  *     (`riseOverStill`), so the gate reads the motion and not the core's
- *     own overshoot at wide widths (windsor#319);
+ *     own overshoot at wide widths (windsor#319), and every sample from the
+ *     motion's start until it settles, before the release, stays within
+ *     `BOUND.motion` of the last output before the motion, so a thump that
+ *     settles while the field is still held is caught too;
  *   - under a tone, every sample stays within `BOUND.tone` of the larger of
  *     the steady peaks before and after the motion;
  *   - |M| stays within `BOUND.m`, against the state guard of 20.
@@ -75,16 +78,24 @@ const QUANTUM = 128;
  *   0 (0.776 and 1.017 at saturation 1), over the rates and factors. An
  *   absolute bound would gate that overshoot, which the motion does not
  *   cause, so this one is relative (windsor#319);
+ * - held with drive rising, the motion window, 0.99935 (96 kHz, 4×, width
+ *   0.85, saturation 0, the jump) over the last output before the motion,
+ *   and at most 0.1350 of the conditioned field. #307 keeps the output
+ *   continuous, so the window's peak is its first sample: the DC block's
+ *   decay from there only lowers it. With `retune`'s M rescale disabled it
+ *   read 9.74 at 44.1 kHz;
  * - tone, 1.0004 (1.0034);
  * - |M|, 4.97 with drive rising under the held field (1.67).
  *
  * Each ratio's gate is its measurement plus about half a point, except the
  * rise: 1.09 is its 1.0810 plus about a point, because the no-motion
  * reference shifts with the state the trials before leave (0.92 to 1.02 of
- * the field at one corner). M's, 5.5, is about a tenth over its measurement
+ * the field at one corner), and the motion window: 1.01 is its 0.99935 plus
+ * about a point, so any rise over the pre-motion output past that fails.
+ * M's, 5.5, is about a tenth over its measurement
  * and under a third of the state guard.
  */
-const BOUND = { silence: 0.085, fall: 0.892, rise: 1.09, tone: 1.005, m: 5.5 };
+const BOUND = { silence: 0.085, fall: 0.892, rise: 1.09, motion: 1.01, tone: 1.005, m: 5.5 };
 /** Seconds: a signal before the switch or the motion, the silence before either, and the hold after. */
 const SETTLE = 0.05;
 const QUIET = 0.02;
@@ -213,12 +224,18 @@ interface Trial {
 
 /**
  * What a trial measured: the worst sample over its reference, the largest
- * |M| on the left core, and for a held field the peak after its release.
+ * |M| on the left core, and for a held field the peak after its release and
+ * the motion window's peak.
  */
 interface Excursion {
   ratio: number;
   m: number;
   release: number;
+  /**
+   * A held field's peak from the motion's start until it settles, before
+   * the release, over the last output before the motion.
+   */
+  motion: number;
 }
 
 /** The song's `core` for this block, as the Advanced panel writes it: `drive`, and the trial's width and saturation. */
@@ -255,10 +272,11 @@ function sweepDrive(rig: TapeRig, rate: number, clock: Clock, trial: Trial): Exc
   let before = 0,
     after = 0,
     worst = 0,
-    m = 0;
+    m = 0,
+    last = 0;
   for (let i = 0; i < settle; i++) {
-    const y = tick(rig, clock, input(trial, rate, i), () => aim(rig, trial, trial.from));
-    if (i >= settle - 4 * period) before = Math.max(before, Math.abs(y));
+    last = tick(rig, clock, input(trial, rate, i), () => aim(rig, trial, trial.from));
+    if (i >= settle - 4 * period) before = Math.max(before, Math.abs(last));
   }
   const startFrame = clock.n,
     span = trial.to - trial.from;
@@ -271,7 +289,9 @@ function sweepDrive(rig: TapeRig, rate: number, clock: Clock, trial: Trial): Exc
     m = Math.max(m, Math.abs(core.m));
     if (i >= settle + sweep + hold - 4 * period) after = Math.max(after, Math.abs(y));
   }
-  if (trial.signal === 'tone') return { ratio: worst / Math.max(before, after), m, release: 0 };
+  if (trial.signal === 'tone')
+    return { ratio: worst / Math.max(before, after), m, release: 0, motion: 0 };
+  const motion = worst / Math.abs(last);
   let release = 0;
   for (let k = 0; k < edge + hold; k++) {
     const x = k < edge ? 0.5 + 0.5 * cosine((Math.PI * k) / edge) : 0;
@@ -279,7 +299,7 @@ function sweepDrive(rig: TapeRig, rate: number, clock: Clock, trial: Trial): Exc
     m = Math.max(m, Math.abs(core.m));
   }
   worst = Math.max(worst, release);
-  return { ratio: worst / conditioned(driveGain(trial.drive)), m, release };
+  return { ratio: worst / conditioned(driveGain(trial.drive)), m, release, motion };
 }
 
 /**
@@ -316,10 +336,11 @@ describe("moving the core drive across the shipped box's range (windsor#296, win
       for (const oversampling of TAPE_OVERSAMPLING) {
         rig.params.oversampling![0] = oversampling;
         for (const trial of TRIALS) {
-          const { ratio, m } = sweepDrive(rig, rate, clock, trial);
+          const { ratio, m, motion } = sweepDrive(rig, rate, clock, trial);
           const name = `${rate} Hz ${oversampling}× ${JSON.stringify(trial)}`;
           expect(m, name).toBeLessThanOrEqual(BOUND.m);
           if (trial.signal === 'held' && trial.to > trial.from) {
+            expect(motion, name).toBeLessThanOrEqual(BOUND.motion);
             expect(riseOverStill(rig, rate, clock, trial), name).toBeLessThanOrEqual(BOUND.rise);
             continue;
           }
