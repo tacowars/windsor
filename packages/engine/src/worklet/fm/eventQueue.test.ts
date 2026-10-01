@@ -1,0 +1,66 @@
+import { describe, expect, it } from 'vitest';
+
+import type { QueuedEvent } from './eventQueue';
+import { EventQueue } from './eventQueue';
+
+const event = (id: number): QueuedEvent => ({ type: 'noteOff', id, frame: 0 });
+
+function insert(q: EventQueue, id: number, frame: number): void {
+  q.incoming[0] = frame;
+  q.insert(event(id));
+}
+
+/** Take every event due at or before `frame`, as the render does, reading the frame in place. */
+function takeDue(q: EventQueue, frame: number): [number, number][] {
+  const taken: [number, number][] = [];
+  while (!q.empty && q.frames[q.head] <= frame) {
+    const at = q.frames[q.head];
+    taken.push([q.take().id, at]);
+  }
+  return taken;
+}
+
+describe('the FM part event queue', () => {
+  it('keeps events in frame order, a tie in arrival order, as it grows', () => {
+    const q = new EventQueue();
+    const frames = [40, 10, 30, 10, 50, 20, 30, 0, 60, 10];
+    frames.forEach((frame, id) => insert(q, id, frame));
+    const expected = frames
+      .map((frame, id): [number, number] => [id, frame])
+      .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+    expect(takeDue(q, Infinity)).toEqual(expected);
+    expect(q.empty).toBe(true);
+  });
+
+  it('moves the queue down when it reaches the end of its room, keeping each frame with its event', () => {
+    const q = new EventQueue();
+    for (let id = 0; id < 4; id++) insert(q, id, id * 10);
+    const room = q.frames.length;
+    expect(takeDue(q, 15)).toEqual([
+      [0, 0],
+      [1, 10],
+    ]);
+    insert(q, 4, 5);
+    insert(q, 5, 25);
+    expect(q.frames.length).toBe(room);
+    expect(takeDue(q, Infinity)).toEqual([
+      [4, 5],
+      [2, 20],
+      [5, 25],
+      [3, 30],
+    ]);
+  });
+
+  it('holds frames past 2^31 exactly', () => {
+    const q = new EventQueue();
+    const late = 2 ** 32 + 7;
+    insert(q, 0, late + 1);
+    insert(q, 1, late);
+    insert(q, 2, 2 ** 31 - 1);
+    expect(takeDue(q, late)).toEqual([
+      [2, 2 ** 31 - 1],
+      [1, late],
+    ]);
+    expect(takeDue(q, late + 1)).toEqual([[0, late + 1]]);
+  });
+});

@@ -1,0 +1,2494 @@
+{
+  "trace": "w233-c-dense-after.trace.json",
+  "audioThread": "Realtime AudioWorklet thread",
+  "seconds": 24.013,
+  "processCalls": 270718,
+  "callsNotAttributed": 5688,
+  "counterBlips": 1,
+  "messageCalls": {
+    "fm-processor.js FmPartProcessor.port.onmessage": 1164
+  },
+  "processUsPerSecond": 448469,
+  "collections": {
+    "minor": 285,
+    "major": 0,
+    "perSecond": 11.868,
+    "longestUs": 273,
+    "totalUs": 24681,
+    "insideProcess": 0,
+    "list": [
+      {
+        "name": "MinorGC",
+        "atS": 0.035,
+        "us": 273,
+        "insideProcessOf": null,
+        "usedBefore": 6869200,
+        "usedAfter": 5037076
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.086,
+        "us": 168,
+        "insideProcessOf": null,
+        "usedBefore": 6732088,
+        "usedAfter": 5044732
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.163,
+        "us": 108,
+        "insideProcessOf": null,
+        "usedBefore": 6731440,
+        "usedAfter": 5012516
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.243,
+        "us": 71,
+        "insideProcessOf": null,
+        "usedBefore": 6699248,
+        "usedAfter": 5012516
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.323,
+        "us": 86,
+        "insideProcessOf": null,
+        "usedBefore": 6745852,
+        "usedAfter": 5067520
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.408,
+        "us": 105,
+        "insideProcessOf": null,
+        "usedBefore": 6856680,
+        "usedAfter": 5080980
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.494,
+        "us": 113,
+        "insideProcessOf": null,
+        "usedBefore": 6867120,
+        "usedAfter": 5147476
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.574,
+        "us": 103,
+        "insideProcessOf": null,
+        "usedBefore": 6820696,
+        "usedAfter": 5094520
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.659,
+        "us": 101,
+        "insideProcessOf": null,
+        "usedBefore": 6872812,
+        "usedAfter": 5094520
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.745,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6870196,
+        "usedAfter": 5094520
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.83,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 6870292,
+        "usedAfter": 5094520
+      },
+      {
+        "name": "MinorGC",
+        "atS": 0.915,
+        "us": 64,
+        "insideProcessOf": null,
+        "usedBefore": 6870124,
+        "usedAfter": 5094520
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.001,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 6872908,
+        "usedAfter": 5160296
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.081,
+        "us": 147,
+        "insideProcessOf": null,
+        "usedBefore": 6824848,
+        "usedAfter": 5095720
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.166,
+        "us": 71,
+        "insideProcessOf": null,
+        "usedBefore": 6871864,
+        "usedAfter": 5095720
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.251,
+        "us": 62,
+        "insideProcessOf": null,
+        "usedBefore": 6871420,
+        "usedAfter": 5095720
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.337,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6871324,
+        "usedAfter": 5095720
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.422,
+        "us": 87,
+        "insideProcessOf": null,
+        "usedBefore": 6871420,
+        "usedAfter": 5095720
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.507,
+        "us": 106,
+        "insideProcessOf": null,
+        "usedBefore": 6877864,
+        "usedAfter": 5131008
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.588,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 6796912,
+        "usedAfter": 5098720
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.63,
+        "us": 115,
+        "insideProcessOf": null,
+        "usedBefore": 6886372,
+        "usedAfter": 5104504
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.699,
+        "us": 82,
+        "insideProcessOf": null,
+        "usedBefore": 6786868,
+        "usedAfter": 5104504
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.779,
+        "us": 76,
+        "insideProcessOf": null,
+        "usedBefore": 6818100,
+        "usedAfter": 5113620
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.864,
+        "us": 86,
+        "insideProcessOf": null,
+        "usedBefore": 6889320,
+        "usedAfter": 5113620
+      },
+      {
+        "name": "MinorGC",
+        "atS": 1.95,
+        "us": 84,
+        "insideProcessOf": null,
+        "usedBefore": 6889296,
+        "usedAfter": 5113620
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.035,
+        "us": 107,
+        "insideProcessOf": null,
+        "usedBefore": 6891840,
+        "usedAfter": 5179396
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.115,
+        "us": 94,
+        "insideProcessOf": null,
+        "usedBefore": 6844764,
+        "usedAfter": 5114820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.201,
+        "us": 91,
+        "insideProcessOf": null,
+        "usedBefore": 6890424,
+        "usedAfter": 5114820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.286,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6890340,
+        "usedAfter": 5114820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.372,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6890424,
+        "usedAfter": 5114820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.456,
+        "us": 78,
+        "insideProcessOf": null,
+        "usedBefore": 6890520,
+        "usedAfter": 5114820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.542,
+        "us": 118,
+        "insideProcessOf": null,
+        "usedBefore": 6906192,
+        "usedAfter": 5186192
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.623,
+        "us": 168,
+        "insideProcessOf": null,
+        "usedBefore": 6853368,
+        "usedAfter": 5124844
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.707,
+        "us": 62,
+        "insideProcessOf": null,
+        "usedBefore": 6900544,
+        "usedAfter": 5124844
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.792,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 6900268,
+        "usedAfter": 5124844
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.878,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6900616,
+        "usedAfter": 5124844
+      },
+      {
+        "name": "MinorGC",
+        "atS": 2.963,
+        "us": 79,
+        "insideProcessOf": null,
+        "usedBefore": 6900520,
+        "usedAfter": 5124844
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.048,
+        "us": 109,
+        "insideProcessOf": null,
+        "usedBefore": 6903160,
+        "usedAfter": 5190620
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.129,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 6855892,
+        "usedAfter": 5126044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.214,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6901648,
+        "usedAfter": 5126044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.299,
+        "us": 71,
+        "insideProcessOf": null,
+        "usedBefore": 6901744,
+        "usedAfter": 5126044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.385,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6901540,
+        "usedAfter": 5126044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.47,
+        "us": 102,
+        "insideProcessOf": null,
+        "usedBefore": 6908284,
+        "usedAfter": 5192180
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.55,
+        "us": 127,
+        "insideProcessOf": null,
+        "usedBefore": 6856912,
+        "usedAfter": 5129044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.636,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 6906112,
+        "usedAfter": 5129044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.721,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6904648,
+        "usedAfter": 5129044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.806,
+        "us": 70,
+        "insideProcessOf": null,
+        "usedBefore": 6904816,
+        "usedAfter": 5129044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.891,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 6904540,
+        "usedAfter": 5129044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 3.976,
+        "us": 80,
+        "insideProcessOf": null,
+        "usedBefore": 6904648,
+        "usedAfter": 5129044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.062,
+        "us": 111,
+        "insideProcessOf": null,
+        "usedBefore": 6907432,
+        "usedAfter": 5194820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.142,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 6860020,
+        "usedAfter": 5130244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.227,
+        "us": 74,
+        "insideProcessOf": null,
+        "usedBefore": 6906016,
+        "usedAfter": 5130244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.312,
+        "us": 62,
+        "insideProcessOf": null,
+        "usedBefore": 6905848,
+        "usedAfter": 5130244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.398,
+        "us": 63,
+        "insideProcessOf": null,
+        "usedBefore": 6905944,
+        "usedAfter": 5130244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.483,
+        "us": 110,
+        "insideProcessOf": null,
+        "usedBefore": 6916204,
+        "usedAfter": 5196740
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.563,
+        "us": 138,
+        "insideProcessOf": null,
+        "usedBefore": 6861472,
+        "usedAfter": 5135044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.649,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6913264,
+        "usedAfter": 5135044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.734,
+        "us": 77,
+        "insideProcessOf": null,
+        "usedBefore": 6910720,
+        "usedAfter": 5135044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.82,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 6910816,
+        "usedAfter": 5135044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.905,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6910648,
+        "usedAfter": 5135044
+      },
+      {
+        "name": "MinorGC",
+        "atS": 4.99,
+        "us": 120,
+        "insideProcessOf": null,
+        "usedBefore": 6913180,
+        "usedAfter": 5200820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.07,
+        "us": 99,
+        "insideProcessOf": null,
+        "usedBefore": 6865480,
+        "usedAfter": 5136244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.155,
+        "us": 64,
+        "insideProcessOf": null,
+        "usedBefore": 6912460,
+        "usedAfter": 5136244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.241,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 6912016,
+        "usedAfter": 5136244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.326,
+        "us": 76,
+        "insideProcessOf": null,
+        "usedBefore": 6911848,
+        "usedAfter": 5136244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.411,
+        "us": 63,
+        "insideProcessOf": null,
+        "usedBefore": 6912016,
+        "usedAfter": 5136244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.497,
+        "us": 104,
+        "insideProcessOf": null,
+        "usedBefore": 6918388,
+        "usedAfter": 5202380
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.576,
+        "us": 135,
+        "insideProcessOf": null,
+        "usedBefore": 6867028,
+        "usedAfter": 5139244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.662,
+        "us": 65,
+        "insideProcessOf": null,
+        "usedBefore": 6916144,
+        "usedAfter": 5139244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.747,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 6915016,
+        "usedAfter": 5139244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.833,
+        "us": 62,
+        "insideProcessOf": null,
+        "usedBefore": 6914848,
+        "usedAfter": 5139244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 5.918,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6914920,
+        "usedAfter": 5139244
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.003,
+        "us": 102,
+        "insideProcessOf": null,
+        "usedBefore": 6917560,
+        "usedAfter": 5205020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.084,
+        "us": 138,
+        "insideProcessOf": null,
+        "usedBefore": 6870112,
+        "usedAfter": 5140444
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.169,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6916144,
+        "usedAfter": 5140444
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.254,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 6916048,
+        "usedAfter": 5140444
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.339,
+        "us": 57,
+        "insideProcessOf": null,
+        "usedBefore": 6916144,
+        "usedAfter": 5140444
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.425,
+        "us": 79,
+        "insideProcessOf": null,
+        "usedBefore": 6916048,
+        "usedAfter": 5140444
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.51,
+        "us": 110,
+        "insideProcessOf": null,
+        "usedBefore": 6926608,
+        "usedAfter": 5206940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.59,
+        "us": 142,
+        "insideProcessOf": null,
+        "usedBefore": 6875772,
+        "usedAfter": 5147040
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.676,
+        "us": 109,
+        "insideProcessOf": null,
+        "usedBefore": 6922752,
+        "usedAfter": 5147040
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.761,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6922740,
+        "usedAfter": 5147040
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.846,
+        "us": 61,
+        "insideProcessOf": null,
+        "usedBefore": 6922644,
+        "usedAfter": 5147040
+      },
+      {
+        "name": "MinorGC",
+        "atS": 6.931,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 6922812,
+        "usedAfter": 5147040
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.017,
+        "us": 142,
+        "insideProcessOf": null,
+        "usedBefore": 6925260,
+        "usedAfter": 5212816
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.097,
+        "us": 118,
+        "insideProcessOf": null,
+        "usedBefore": 6878016,
+        "usedAfter": 5148240
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.182,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6923760,
+        "usedAfter": 5148240
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.267,
+        "us": 65,
+        "insideProcessOf": null,
+        "usedBefore": 6923844,
+        "usedAfter": 5148240
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.352,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 6923940,
+        "usedAfter": 5148240
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.438,
+        "us": 70,
+        "insideProcessOf": null,
+        "usedBefore": 6923916,
+        "usedAfter": 5148240
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.523,
+        "us": 115,
+        "insideProcessOf": null,
+        "usedBefore": 6934256,
+        "usedAfter": 5217992
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.603,
+        "us": 119,
+        "insideProcessOf": null,
+        "usedBefore": 6883940,
+        "usedAfter": 5154940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.689,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6930532,
+        "usedAfter": 5154940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.774,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6930544,
+        "usedAfter": 5154940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.859,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 6930544,
+        "usedAfter": 5154940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 7.944,
+        "us": 85,
+        "insideProcessOf": null,
+        "usedBefore": 6930640,
+        "usedAfter": 5154940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.03,
+        "us": 101,
+        "insideProcessOf": null,
+        "usedBefore": 6933232,
+        "usedAfter": 5220716
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.11,
+        "us": 104,
+        "insideProcessOf": null,
+        "usedBefore": 6886084,
+        "usedAfter": 5156140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.195,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6931744,
+        "usedAfter": 5156140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.281,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6931660,
+        "usedAfter": 5156140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.366,
+        "us": 76,
+        "insideProcessOf": null,
+        "usedBefore": 6931816,
+        "usedAfter": 5156140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.452,
+        "us": 94,
+        "insideProcessOf": null,
+        "usedBefore": 6931840,
+        "usedAfter": 5156140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.537,
+        "us": 107,
+        "insideProcessOf": null,
+        "usedBefore": 6942280,
+        "usedAfter": 5222636
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.617,
+        "us": 124,
+        "insideProcessOf": null,
+        "usedBefore": 6889888,
+        "usedAfter": 5160940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.702,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 6936640,
+        "usedAfter": 5160940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.788,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 6936436,
+        "usedAfter": 5160940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.873,
+        "us": 63,
+        "insideProcessOf": null,
+        "usedBefore": 6936712,
+        "usedAfter": 5160940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 8.958,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 6936544,
+        "usedAfter": 5160940
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.043,
+        "us": 93,
+        "insideProcessOf": null,
+        "usedBefore": 6939328,
+        "usedAfter": 5194716
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.123,
+        "us": 102,
+        "insideProcessOf": null,
+        "usedBefore": 6859912,
+        "usedAfter": 5162140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.208,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6937816,
+        "usedAfter": 5162140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.294,
+        "us": 74,
+        "insideProcessOf": null,
+        "usedBefore": 6937840,
+        "usedAfter": 5162140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.379,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6937564,
+        "usedAfter": 5162140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.465,
+        "us": 80,
+        "insideProcessOf": null,
+        "usedBefore": 6937912,
+        "usedAfter": 5162140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.55,
+        "us": 107,
+        "insideProcessOf": null,
+        "usedBefore": 6944284,
+        "usedAfter": 5197428
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.63,
+        "us": 101,
+        "insideProcessOf": null,
+        "usedBefore": 6863476,
+        "usedAfter": 5165140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.715,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 6940744,
+        "usedAfter": 5165140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.801,
+        "us": 63,
+        "insideProcessOf": null,
+        "usedBefore": 6940816,
+        "usedAfter": 5165140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.886,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6940660,
+        "usedAfter": 5165140
+      },
+      {
+        "name": "MinorGC",
+        "atS": 9.971,
+        "us": 101,
+        "insideProcessOf": null,
+        "usedBefore": 6943432,
+        "usedAfter": 5230916
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.052,
+        "us": 90,
+        "insideProcessOf": null,
+        "usedBefore": 6895672,
+        "usedAfter": 5166340
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.137,
+        "us": 65,
+        "insideProcessOf": null,
+        "usedBefore": 6942484,
+        "usedAfter": 5166340
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.222,
+        "us": 76,
+        "insideProcessOf": null,
+        "usedBefore": 6942040,
+        "usedAfter": 5166340
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.307,
+        "us": 94,
+        "insideProcessOf": null,
+        "usedBefore": 6944124,
+        "usedAfter": 5168448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.392,
+        "us": 112,
+        "insideProcessOf": null,
+        "usedBefore": 6943752,
+        "usedAfter": 5168448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.478,
+        "us": 122,
+        "insideProcessOf": null,
+        "usedBefore": 6954324,
+        "usedAfter": 5234944
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.558,
+        "us": 138,
+        "insideProcessOf": null,
+        "usedBefore": 6899484,
+        "usedAfter": 5173248
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.643,
+        "us": 74,
+        "insideProcessOf": null,
+        "usedBefore": 6951180,
+        "usedAfter": 5173248
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.729,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 6948660,
+        "usedAfter": 5173248
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.815,
+        "us": 89,
+        "insideProcessOf": null,
+        "usedBefore": 6948660,
+        "usedAfter": 5173248
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.9,
+        "us": 77,
+        "insideProcessOf": null,
+        "usedBefore": 6948732,
+        "usedAfter": 5173248
+      },
+      {
+        "name": "MinorGC",
+        "atS": 10.985,
+        "us": 109,
+        "insideProcessOf": null,
+        "usedBefore": 6951096,
+        "usedAfter": 5239024
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.065,
+        "us": 95,
+        "insideProcessOf": null,
+        "usedBefore": 6903564,
+        "usedAfter": 5174448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.15,
+        "us": 65,
+        "insideProcessOf": null,
+        "usedBefore": 6950400,
+        "usedAfter": 5174448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.235,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 6949860,
+        "usedAfter": 5174448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.321,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 6949860,
+        "usedAfter": 5174448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.406,
+        "us": 77,
+        "insideProcessOf": null,
+        "usedBefore": 6949932,
+        "usedAfter": 5174448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.491,
+        "us": 116,
+        "insideProcessOf": null,
+        "usedBefore": 6956292,
+        "usedAfter": 5242456
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.571,
+        "us": 100,
+        "insideProcessOf": null,
+        "usedBefore": 6906996,
+        "usedAfter": 5177448
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.657,
+        "us": 128,
+        "insideProcessOf": null,
+        "usedBefore": 6959996,
+        "usedAfter": 5215516
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.737,
+        "us": 105,
+        "insideProcessOf": null,
+        "usedBefore": 6880052,
+        "usedAfter": 5183288
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.822,
+        "us": 70,
+        "insideProcessOf": null,
+        "usedBefore": 6958700,
+        "usedAfter": 5183288
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.907,
+        "us": 80,
+        "insideProcessOf": null,
+        "usedBefore": 6958772,
+        "usedAfter": 5183288
+      },
+      {
+        "name": "MinorGC",
+        "atS": 11.993,
+        "us": 108,
+        "insideProcessOf": null,
+        "usedBefore": 6961136,
+        "usedAfter": 5217064
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.073,
+        "us": 105,
+        "insideProcessOf": null,
+        "usedBefore": 6881528,
+        "usedAfter": 5184488
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.158,
+        "us": 81,
+        "insideProcessOf": null,
+        "usedBefore": 6960512,
+        "usedAfter": 5184488
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.244,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 6959972,
+        "usedAfter": 5184488
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.329,
+        "us": 119,
+        "insideProcessOf": null,
+        "usedBefore": 6968516,
+        "usedAfter": 5225440
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.408,
+        "us": 99,
+        "insideProcessOf": null,
+        "usedBefore": 6889904,
+        "usedAfter": 5193032
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.494,
+        "us": 105,
+        "insideProcessOf": null,
+        "usedBefore": 6982968,
+        "usedAfter": 5263444
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.574,
+        "us": 140,
+        "insideProcessOf": null,
+        "usedBefore": 6927732,
+        "usedAfter": 5201820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.66,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 6979824,
+        "usedAfter": 5201820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.745,
+        "us": 70,
+        "insideProcessOf": null,
+        "usedBefore": 6977232,
+        "usedAfter": 5201820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.83,
+        "us": 71,
+        "insideProcessOf": null,
+        "usedBefore": 6977304,
+        "usedAfter": 5201820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 12.915,
+        "us": 74,
+        "insideProcessOf": null,
+        "usedBefore": 6977304,
+        "usedAfter": 5201820
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.001,
+        "us": 125,
+        "insideProcessOf": null,
+        "usedBefore": 6979920,
+        "usedAfter": 5267596
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.081,
+        "us": 139,
+        "insideProcessOf": null,
+        "usedBefore": 6931884,
+        "usedAfter": 5203020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.166,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 6978972,
+        "usedAfter": 5203020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.252,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6978504,
+        "usedAfter": 5203020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.337,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6978432,
+        "usedAfter": 5203020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.422,
+        "us": 78,
+        "insideProcessOf": null,
+        "usedBefore": 6978432,
+        "usedAfter": 5203020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.507,
+        "us": 140,
+        "insideProcessOf": null,
+        "usedBefore": 6985044,
+        "usedAfter": 5238308
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.588,
+        "us": 99,
+        "insideProcessOf": null,
+        "usedBefore": 6903852,
+        "usedAfter": 5206020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.673,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 6981540,
+        "usedAfter": 5206020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.758,
+        "us": 62,
+        "insideProcessOf": null,
+        "usedBefore": 6981504,
+        "usedAfter": 5206020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.843,
+        "us": 71,
+        "insideProcessOf": null,
+        "usedBefore": 6981432,
+        "usedAfter": 5206020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 13.928,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 6981504,
+        "usedAfter": 5206020
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.014,
+        "us": 103,
+        "insideProcessOf": null,
+        "usedBefore": 6984048,
+        "usedAfter": 5239796
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.094,
+        "us": 100,
+        "insideProcessOf": null,
+        "usedBefore": 6904872,
+        "usedAfter": 5207220
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.179,
+        "us": 70,
+        "insideProcessOf": null,
+        "usedBefore": 6982452,
+        "usedAfter": 5207220
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.264,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6982632,
+        "usedAfter": 5207220
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.35,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6984116,
+        "usedAfter": 5208632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.435,
+        "us": 78,
+        "insideProcessOf": null,
+        "usedBefore": 6984044,
+        "usedAfter": 5208632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.521,
+        "us": 109,
+        "insideProcessOf": null,
+        "usedBefore": 6994580,
+        "usedAfter": 5275128
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.601,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 6942116,
+        "usedAfter": 5213432
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.686,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6988736,
+        "usedAfter": 5213432
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.772,
+        "us": 77,
+        "insideProcessOf": null,
+        "usedBefore": 6988844,
+        "usedAfter": 5213432
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.857,
+        "us": 82,
+        "insideProcessOf": null,
+        "usedBefore": 6988916,
+        "usedAfter": 5213432
+      },
+      {
+        "name": "MinorGC",
+        "atS": 14.942,
+        "us": 85,
+        "insideProcessOf": null,
+        "usedBefore": 6988844,
+        "usedAfter": 5213432
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.027,
+        "us": 98,
+        "insideProcessOf": null,
+        "usedBefore": 6991532,
+        "usedAfter": 5247208
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.107,
+        "us": 86,
+        "insideProcessOf": null,
+        "usedBefore": 6912212,
+        "usedAfter": 5214632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.192,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6989936,
+        "usedAfter": 5214632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.278,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 6990044,
+        "usedAfter": 5214632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.363,
+        "us": 64,
+        "insideProcessOf": null,
+        "usedBefore": 6990116,
+        "usedAfter": 5214632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.448,
+        "us": 77,
+        "insideProcessOf": null,
+        "usedBefore": 6990044,
+        "usedAfter": 5214632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.534,
+        "us": 88,
+        "insideProcessOf": null,
+        "usedBefore": 6996584,
+        "usedAfter": 5249920
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.614,
+        "us": 98,
+        "insideProcessOf": null,
+        "usedBefore": 6915680,
+        "usedAfter": 5217632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.7,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 6993116,
+        "usedAfter": 5217632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.844,
+        "us": 86,
+        "insideProcessOf": null,
+        "usedBefore": 6992864,
+        "usedAfter": 5217632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 15.929,
+        "us": 82,
+        "insideProcessOf": null,
+        "usedBefore": 6993044,
+        "usedAfter": 5217632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.015,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 6993044,
+        "usedAfter": 5217632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.099,
+        "us": 104,
+        "insideProcessOf": null,
+        "usedBefore": 6995660,
+        "usedAfter": 5283408
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.179,
+        "us": 93,
+        "insideProcessOf": null,
+        "usedBefore": 6948416,
+        "usedAfter": 5218832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.264,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6994316,
+        "usedAfter": 5218832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.35,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 6994064,
+        "usedAfter": 5218832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.435,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 6994244,
+        "usedAfter": 5218832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.521,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 6994244,
+        "usedAfter": 5218832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.606,
+        "us": 95,
+        "insideProcessOf": null,
+        "usedBefore": 7004780,
+        "usedAfter": 5285328
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.686,
+        "us": 87,
+        "insideProcessOf": null,
+        "usedBefore": 6952316,
+        "usedAfter": 5223632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.771,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 6999116,
+        "usedAfter": 5223632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.856,
+        "us": 64,
+        "insideProcessOf": null,
+        "usedBefore": 6999116,
+        "usedAfter": 5223632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 16.942,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 6998936,
+        "usedAfter": 5223632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.027,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 6999044,
+        "usedAfter": 5223632
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.112,
+        "us": 82,
+        "insideProcessOf": null,
+        "usedBefore": 7001660,
+        "usedAfter": 5257408
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.193,
+        "us": 93,
+        "insideProcessOf": null,
+        "usedBefore": 6922484,
+        "usedAfter": 5224832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.278,
+        "us": 76,
+        "insideProcessOf": null,
+        "usedBefore": 7000244,
+        "usedAfter": 5224832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.363,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 7000316,
+        "usedAfter": 5224832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.449,
+        "us": 84,
+        "insideProcessOf": null,
+        "usedBefore": 7000064,
+        "usedAfter": 5224832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.534,
+        "us": 85,
+        "insideProcessOf": null,
+        "usedBefore": 7000316,
+        "usedAfter": 5224832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.62,
+        "us": 98,
+        "insideProcessOf": null,
+        "usedBefore": 7006784,
+        "usedAfter": 5290968
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.699,
+        "us": 96,
+        "insideProcessOf": null,
+        "usedBefore": 6956732,
+        "usedAfter": 5227832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.785,
+        "us": 86,
+        "insideProcessOf": null,
+        "usedBefore": 7003244,
+        "usedAfter": 5227832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.87,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 7003316,
+        "usedAfter": 5227832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 17.955,
+        "us": 81,
+        "insideProcessOf": null,
+        "usedBefore": 7003316,
+        "usedAfter": 5227832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.04,
+        "us": 65,
+        "insideProcessOf": null,
+        "usedBefore": 7003064,
+        "usedAfter": 5227832
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.126,
+        "us": 109,
+        "insideProcessOf": null,
+        "usedBefore": 7005860,
+        "usedAfter": 5261608
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.206,
+        "us": 94,
+        "insideProcessOf": null,
+        "usedBefore": 6928408,
+        "usedAfter": 5230828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.291,
+        "us": 88,
+        "insideProcessOf": null,
+        "usedBefore": 7006312,
+        "usedAfter": 5230828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.376,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 7006240,
+        "usedAfter": 5230828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.462,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 7006240,
+        "usedAfter": 5230828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.547,
+        "us": 104,
+        "insideProcessOf": null,
+        "usedBefore": 7016524,
+        "usedAfter": 5267628
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.627,
+        "us": 111,
+        "insideProcessOf": null,
+        "usedBefore": 6932164,
+        "usedAfter": 5235628
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.713,
+        "us": 79,
+        "insideProcessOf": null,
+        "usedBefore": 7013632,
+        "usedAfter": 5235628
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.798,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 7011040,
+        "usedAfter": 5235628
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.884,
+        "us": 65,
+        "insideProcessOf": null,
+        "usedBefore": 7011112,
+        "usedAfter": 5235628
+      },
+      {
+        "name": "MinorGC",
+        "atS": 18.969,
+        "us": 80,
+        "insideProcessOf": null,
+        "usedBefore": 7011112,
+        "usedAfter": 5235628
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.054,
+        "us": 114,
+        "insideProcessOf": null,
+        "usedBefore": 7013656,
+        "usedAfter": 5269404
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.134,
+        "us": 108,
+        "insideProcessOf": null,
+        "usedBefore": 6933688,
+        "usedAfter": 5236828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.219,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 7012780,
+        "usedAfter": 5236828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.305,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 7012240,
+        "usedAfter": 5236828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.39,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 7012312,
+        "usedAfter": 5236828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.475,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 7012240,
+        "usedAfter": 5236828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.56,
+        "us": 94,
+        "insideProcessOf": null,
+        "usedBefore": 7018852,
+        "usedAfter": 5272116
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.641,
+        "us": 96,
+        "insideProcessOf": null,
+        "usedBefore": 6937660,
+        "usedAfter": 5239828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.726,
+        "us": 71,
+        "insideProcessOf": null,
+        "usedBefore": 7015276,
+        "usedAfter": 5239828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.811,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 7015240,
+        "usedAfter": 5239828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.896,
+        "us": 64,
+        "insideProcessOf": null,
+        "usedBefore": 7015312,
+        "usedAfter": 5239828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 19.982,
+        "us": 108,
+        "insideProcessOf": null,
+        "usedBefore": 7015312,
+        "usedAfter": 5239828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.067,
+        "us": 97,
+        "insideProcessOf": null,
+        "usedBefore": 7017856,
+        "usedAfter": 5305604
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.147,
+        "us": 102,
+        "insideProcessOf": null,
+        "usedBefore": 6970432,
+        "usedAfter": 5241028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.232,
+        "us": 64,
+        "insideProcessOf": null,
+        "usedBefore": 7016512,
+        "usedAfter": 5241028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.318,
+        "us": 71,
+        "insideProcessOf": null,
+        "usedBefore": 7016512,
+        "usedAfter": 5241028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.403,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 7016440,
+        "usedAfter": 5241028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.488,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 7016440,
+        "usedAfter": 5241028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.574,
+        "us": 101,
+        "insideProcessOf": null,
+        "usedBefore": 7026904,
+        "usedAfter": 5307524
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.654,
+        "us": 99,
+        "insideProcessOf": null,
+        "usedBefore": 6974584,
+        "usedAfter": 5245828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.739,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 7021060,
+        "usedAfter": 5245828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.825,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 7021312,
+        "usedAfter": 5245828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.91,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 7021312,
+        "usedAfter": 5245828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 20.995,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 7021240,
+        "usedAfter": 5245828
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.081,
+        "us": 102,
+        "insideProcessOf": null,
+        "usedBefore": 7023856,
+        "usedAfter": 5279604
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.161,
+        "us": 118,
+        "insideProcessOf": null,
+        "usedBefore": 6944608,
+        "usedAfter": 5247028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.246,
+        "us": 82,
+        "insideProcessOf": null,
+        "usedBefore": 7022332,
+        "usedAfter": 5247028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.331,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 7022440,
+        "usedAfter": 5247028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.417,
+        "us": 63,
+        "insideProcessOf": null,
+        "usedBefore": 7022440,
+        "usedAfter": 5247028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.502,
+        "us": 80,
+        "insideProcessOf": null,
+        "usedBefore": 7022440,
+        "usedAfter": 5247028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.587,
+        "us": 90,
+        "insideProcessOf": null,
+        "usedBefore": 7029052,
+        "usedAfter": 5313164
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.667,
+        "us": 91,
+        "insideProcessOf": null,
+        "usedBefore": 6978928,
+        "usedAfter": 5250028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.753,
+        "us": 72,
+        "insideProcessOf": null,
+        "usedBefore": 7025512,
+        "usedAfter": 5250028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.838,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 7025260,
+        "usedAfter": 5250028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 21.924,
+        "us": 85,
+        "insideProcessOf": null,
+        "usedBefore": 7025440,
+        "usedAfter": 5250028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.008,
+        "us": 66,
+        "insideProcessOf": null,
+        "usedBefore": 7025440,
+        "usedAfter": 5250028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.094,
+        "us": 112,
+        "insideProcessOf": null,
+        "usedBefore": 7028128,
+        "usedAfter": 5315804
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.174,
+        "us": 106,
+        "insideProcessOf": null,
+        "usedBefore": 6980812,
+        "usedAfter": 5251228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.259,
+        "us": 82,
+        "insideProcessOf": null,
+        "usedBefore": 7026640,
+        "usedAfter": 5251228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.344,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 7026532,
+        "usedAfter": 5251228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.43,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 7026640,
+        "usedAfter": 5251228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.515,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 7026640,
+        "usedAfter": 5251228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.6,
+        "us": 92,
+        "insideProcessOf": null,
+        "usedBefore": 7037176,
+        "usedAfter": 5317724
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.681,
+        "us": 102,
+        "insideProcessOf": null,
+        "usedBefore": 6984712,
+        "usedAfter": 5256028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.766,
+        "us": 67,
+        "insideProcessOf": null,
+        "usedBefore": 7031512,
+        "usedAfter": 5256028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.852,
+        "us": 65,
+        "insideProcessOf": null,
+        "usedBefore": 7031260,
+        "usedAfter": 5256028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 22.936,
+        "us": 78,
+        "insideProcessOf": null,
+        "usedBefore": 7031512,
+        "usedAfter": 5256028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.022,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 7031440,
+        "usedAfter": 5256028
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.107,
+        "us": 104,
+        "insideProcessOf": null,
+        "usedBefore": 7034128,
+        "usedAfter": 5321804
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.187,
+        "us": 113,
+        "insideProcessOf": null,
+        "usedBefore": 6986812,
+        "usedAfter": 5257228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.272,
+        "us": 69,
+        "insideProcessOf": null,
+        "usedBefore": 7032712,
+        "usedAfter": 5257228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.358,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 7032712,
+        "usedAfter": 5257228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.443,
+        "us": 75,
+        "insideProcessOf": null,
+        "usedBefore": 7032460,
+        "usedAfter": 5257228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.528,
+        "us": 77,
+        "insideProcessOf": null,
+        "usedBefore": 7032712,
+        "usedAfter": 5257228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.614,
+        "us": 114,
+        "insideProcessOf": null,
+        "usedBefore": 7039180,
+        "usedAfter": 5323364
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.694,
+        "us": 134,
+        "insideProcessOf": null,
+        "usedBefore": 6989128,
+        "usedAfter": 5260228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.779,
+        "us": 68,
+        "insideProcessOf": null,
+        "usedBefore": 7035712,
+        "usedAfter": 5260228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.865,
+        "us": 73,
+        "insideProcessOf": null,
+        "usedBefore": 7035712,
+        "usedAfter": 5260228
+      },
+      {
+        "name": "MinorGC",
+        "atS": 23.95,
+        "us": 76,
+        "insideProcessOf": null,
+        "usedBefore": 7035460,
+        "usedAfter": 5260228
+      }
+    ]
+  },
+  "quantumBudgetUs": 2902.5,
+  "quantumSpans": {
+    "quanta": 8517,
+    "medianUs": 1636,
+    "p99Us": 2000,
+    "maxUs": 3283,
+    "overBudget": 1
+  },
+  "quantumSpansAfterGc": {
+    "quanta": 278,
+    "medianUs": 1791,
+    "p99Us": 2163,
+    "maxUs": 2186,
+    "overBudget": 0
+  },
+  "gcPhaseEvents": {
+    "V8.GC_TIME_TO_SAFEPOINT": 163,
+    "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED": 13,
+    "V8.GC_HEAP_EXTERNAL_PROLOGUE": 282,
+    "V8.GC_HEAP_PROLOGUE": 114,
+    "V8.GCScavenger": 285,
+    "V8.GC_SCAVENGER": 285,
+    "V8.GC_HEAP_PROLOGUE_SAFEPOINT": 93,
+    "V8.GC_SCAVENGER_SCAVENGE": 285,
+    "V8.GC_SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_IDENTIFY": 285,
+    "V8.GC_SCAVENGER_TRACED_HANDLES_COMPUTE_WEAKNESS_PARALLEL": 95,
+    "V8.GC_SCAVENGER_SCAVENGE_COLLECT_OLD_TO_NEW_PAGES": 285,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE": 285,
+    "V8.GC_SCAVENGER_SCAVENGE_ROOTS": 285,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL": 98,
+    "V8.GC_SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_PROCESS": 285,
+    "V8.GC_SCAVENGER_TRACED_HANDLES_RESET_PARALLEL": 76,
+    "V8.GC_SCAVENGER_SCAVENGE_FINALIZE": 285,
+    "V8.GC_SCAVENGER_SCAVENGE_RESTORE_AND_QUARANTINE_PINNED": 121,
+    "V8.GC_HEAP_EPILOGUE_SAFEPOINT": 273,
+    "V8.GC_HEAP_EPILOGUE": 281,
+    "V8.GC_HEAP_EXTERNAL_EPILOGUE": 285,
+    "V8.GC_SCAVENGER_FREE_REMEMBERED_SET": 127,
+    "V8.GC_SCAVENGER_RESIZE_NEW_SPACE": 106
+  },
+  "heapUsed": {
+    "first": 6618728,
+    "last": 6567220,
+    "min": 5012516,
+    "max": 8045096
+  },
+  "bundles": {
+    "fm-processor.js": {
+      "nodes": 8,
+      "bytesPerQuantum": 6.5,
+      "calls": 70365,
+      "callsMeasured": 70361,
+      "callsExcluded": 4,
+      "bytesPerCallMedian": 0,
+      "bytesPerCallMean": 0.8,
+      "bytesPerCallMeanSecondHalf": 0.8,
+      "bytesPerCallMin": 0,
+      "bytesPerCallMax": 504,
+      "callsAllocating": 202,
+      "callUsMedian": 37,
+      "callUsP99": 92,
+      "callUsMax": 462
+    },
+    "delay-processor.js": {
+      "nodes": 3,
+      "bytesPerQuantum": 9422.5,
+      "calls": 26388,
+      "callsMeasured": 26388,
+      "callsExcluded": 0,
+      "bytesPerCallMedian": 3096,
+      "bytesPerCallMean": 3140.5,
+      "bytesPerCallMeanSecondHalf": 3096,
+      "bytesPerCallMin": 3096,
+      "bytesPerCallMax": 198168,
+      "callsAllocating": 26388,
+      "callUsMedian": 13,
+      "callUsP99": 26,
+      "callUsMax": 995
+    },
+    "phaser-processor.js": {
+      "nodes": 3,
+      "bytesPerQuantum": 18541.4,
+      "calls": 26387,
+      "callsMeasured": 26387,
+      "callsExcluded": 0,
+      "bytesPerCallMedian": 6180,
+      "bytesPerCallMean": 6180,
+      "bytesPerCallMeanSecondHalf": 6180,
+      "bytesPerCallMin": 6180,
+      "bytesPerCallMax": 6188,
+      "callsAllocating": 26387,
+      "callUsMedian": 29,
+      "callUsP99": 39,
+      "callUsMax": 101
+    },
+    "retro-reverb-processor.js": {
+      "nodes": 2,
+      "bytesPerQuantum": 0,
+      "calls": 17591,
+      "callsMeasured": 17591,
+      "callsExcluded": 0,
+      "bytesPerCallMedian": 0,
+      "bytesPerCallMean": 0,
+      "bytesPerCallMeanSecondHalf": 0,
+      "bytesPerCallMin": 0,
+      "bytesPerCallMax": 0,
+      "callsAllocating": 0,
+      "callUsMedian": 14,
+      "callUsP99": 24,
+      "callUsMax": 80
+    },
+    "reverb-processor.js": {
+      "nodes": 3,
+      "bytesPerQuantum": 0,
+      "calls": 26386,
+      "callsMeasured": 26384,
+      "callsExcluded": 2,
+      "bytesPerCallMedian": 0,
+      "bytesPerCallMean": 0,
+      "bytesPerCallMeanSecondHalf": 0,
+      "bytesPerCallMin": 0,
+      "bytesPerCallMax": 0,
+      "callsAllocating": 0,
+      "callUsMedian": 49,
+      "callUsP99": 65,
+      "callUsMax": 177
+    },
+    "tape-processor.js": {
+      "nodes": 3,
+      "bytesPerQuantum": 27654.9,
+      "calls": 26386,
+      "callsMeasured": 26384,
+      "callsExcluded": 2,
+      "bytesPerCallMedian": 9216,
+      "bytesPerCallMean": 9218,
+      "bytesPerCallMeanSecondHalf": 9217.9,
+      "bytesPerCallMin": 9216,
+      "bytesPerCallMax": 9288,
+      "callsAllocating": 26384,
+      "callUsMedian": 37,
+      "callUsP99": 51,
+      "callUsMax": 393
+    },
+    "advanced-drive-processor.js": {
+      "nodes": 4,
+      "bytesPerQuantum": 0,
+      "calls": 35181,
+      "callsMeasured": 35176,
+      "callsExcluded": 5,
+      "bytesPerCallMedian": 0,
+      "bytesPerCallMean": 0,
+      "bytesPerCallMeanSecondHalf": 0,
+      "bytesPerCallMin": 0,
+      "bytesPerCallMax": 0,
+      "callsAllocating": 0,
+      "callUsMedian": 105,
+      "callUsP99": 121,
+      "callUsMax": 416
+    },
+    "compressor-processor.js": {
+      "nodes": 3,
+      "bytesPerQuantum": 0,
+      "calls": 26387,
+      "callsMeasured": 26387,
+      "callsExcluded": 0,
+      "bytesPerCallMedian": 0,
+      "bytesPerCallMean": 0,
+      "bytesPerCallMeanSecondHalf": 0,
+      "bytesPerCallMin": 0,
+      "bytesPerCallMax": 0,
+      "callsAllocating": 0,
+      "callUsMedian": 11,
+      "callUsP99": 18,
+      "callUsMax": 189
+    },
+    "output-stage-processor.js": {
+      "nodes": 1,
+      "bytesPerQuantum": 3.1,
+      "calls": 8795,
+      "callsMeasured": 8795,
+      "callsExcluded": 0,
+      "bytesPerCallMedian": 0,
+      "bytesPerCallMean": 3.1,
+      "bytesPerCallMeanSecondHalf": 0,
+      "bytesPerCallMin": 0,
+      "bytesPerCallMax": 96,
+      "callsAllocating": 283,
+      "callUsMedian": 5,
+      "callUsP99": 32,
+      "callUsMax": 52
+    }
+  }
+}

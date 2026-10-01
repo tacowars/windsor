@@ -164,7 +164,8 @@ build output. The map of `fm/` (#644):
 
 | Module | Owns |
 |---|---|
-| `fmProcessor.ts` | the entry: `FmPartProcessor` (the port, the event queue, voice allocation, `renderBlock`) and `registerProcessor` |
+| `fmProcessor.ts` | the entry: `FmPartProcessor` (the port, the note map as each voice's `keyed` flag, voice allocation, `renderBlock`) and `registerProcessor` |
+| `eventQueue.ts` | `EventQueue` (windsor#233): the note events in frame order, their frames in a `Float64Array` beside them, inserted in place and taken by an index, never `splice` or `shift` |
 | `voice.ts` | `Voice`: one note's state and lifecycle (`start`, `rebind`, `retarget`, `release`, `kill`, `steal`, `dormant`); `render` and `updateControl` stay methods and delegate |
 | `voiceControl.ts` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
 | `voiceRender.ts` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
@@ -174,7 +175,7 @@ build output. The map of `fm/` (#644):
 | `modeIds.ts` | the `LOOP_*`, `FILT_*` and `LFO_*` ids and the `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE` objects built from them, import-free: `patch.ts` re-exports the objects (#669) |
 | `waveTables.ts` | `SIN_TAB`, the mip tables and their cache, `waveKind`, the load-time warm-up |
 | `algorithms.ts` | `ALGORITHMS` with each topology's name and label, the topological order, the kernel's edge and carrier tables; the main thread's `audioConstants.ts` re-exports the table and its type (#656) |
-| `envelope.ts` | `Envelope`, the `ST_*` ids, and the one curve — `curveShape`, `curveConstant`, `segmentLevel` — that `advance` runs and the console's display draws with (#656) |
+| `envelope.ts` | `Envelope`, the `ST_*` ids, and the one curve — `writeSegmentLevel` over a segment's fields, which `advance` runs and the console's `segmentLevel` wraps, and its two steps `curveConstant` and `curveShape` (#656, windsor#233) |
 | `lfo.ts` | `Lfo` |
 | `svf.ts` | `Svf`, `softClip` |
 | `prng.ts` | `makeRandom`, `randomSeed32` |
@@ -214,6 +215,27 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
 2. **No allocation on the audio thread.** `process()` and everything it calls
    allocate nothing: no array, closure, spread, string or `Map` growth. A GC
    pause is an audible dropout. Preallocate in the constructor or `start`.
+   No double crosses a call on the render's path, as an argument or a return
+   (windsor#233): V8 inlines a call only where its budget and the call's
+   frequency allow, and a double passed to or returned from one it does not
+   inline is a new heap number. So `Envelope.advance` leaves its value in
+   `value`, `Lfo.advance` in `output`, the part's bend, wheel and cutoff
+   reach the voices in `partControls`, the width update reads `opFreq` and
+   the LFO levels from the voice, `Svf.setCoeffs` reads `cutoffHz` and `q`,
+   and a note's velocity, detune, pan and glide go to `start` in the voice's
+   fields. A frame counts: past 2^31 (about 12 hours at 48 kHz) it is a
+   double, so the queue keeps frames in a `Float64Array` (`q.frames`), never
+   in a field of the message, the render reads the next event's frame in
+   place (`q.frames[q.head]`, no accessor), and `schedule` reads a message's
+   frame from the message and hands it to `insert` in `q.incoming`. The
+   per-sample calls the kernel and the generic loop keep (`Svf.process`,
+   `softClip`, `noise`) are inlined first by frequency.
+   `synth/fmProcessorAllocation.test.ts` pins it through
+   `__fixtures__/fmPartChangeScenario.ts`, with one run at frames past 2^31
+   with notes posted ahead and the queue's accessors kept from inlining, one
+   whose frames cross 2^31, and two that hold a note while its `age`
+   crosses 2^31; what the note-on path still allocates in V8's lower tiers
+   is in `docs/research/2026-09-30-worklet-gc-in-chrome/README.md`.
 3. **Bit-identity by construction.** The fixed-index kernel (`renderKernel`,
    #548) and the generic loop (`specialise: false`) produce the same IEEE
    operations in the same order, and `fmProcessorKernel.test.ts` compares them
@@ -269,7 +291,10 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    move kept every method body byte for byte; turning them into functions
    over the plate rewrites every line and is its own change, with a bench.
 7. **Types erase; they never change the emitted code.** A class field is
-   declared (`ic1: number;`) and written by the constructor, never
+   declared (`ic1: number;`) and written by the constructor, a double field
+   first as NaN and then its start value (windsor#233: one first written as
+   a small integer is generalised by its first fraction, or by the first
+   count past 2^31, as a voice's `age` in frames is after about 12 hours), never
    initialised at the declaration: with define semantics a field would be
    emitted as `undefined` before the constructor writes a number, and V8
    then boxes every later double write to it (the #548 scenario read 336 ms

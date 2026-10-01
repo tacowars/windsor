@@ -5,12 +5,19 @@ import { softClip, Svf } from './svf';
 
 const SR = 48000;
 
+/** Set a filter's cutoff and Q, the fields `setCoeffs` reads (windsor#233), and its coefficients. */
+function tune(svf: Svf, cutoffHz: number, q: number): void {
+  svf.cutoffHz = cutoffHz;
+  svf.q = q;
+  svf.setCoeffs(SR);
+}
+
 describe('the state-variable filter', () => {
   it('passes DC through the lowpass and blocks it in the highpass', () => {
     const lp = new Svf();
     const hp = new Svf();
-    lp.setCoeffs(1000, 0.707, SR);
-    hp.setCoeffs(1000, 0.707, SR);
+    tune(lp, 1000, 0.707);
+    tune(hp, 1000, 0.707);
     let l = 0;
     let h = 0;
     for (let i = 0; i < 4000; i++) {
@@ -23,7 +30,7 @@ describe('the state-variable filter', () => {
 
   it('is quiet when fresh, ringing after input, and quiet again after reset', () => {
     const svf = new Svf();
-    svf.setCoeffs(1000, 0.707, SR);
+    tune(svf, 1000, 0.707);
     expect(Svf.quiet(svf)).toBe(true);
     svf.process(1, FILT_LP);
     expect(Svf.quiet(svf)).toBe(false);

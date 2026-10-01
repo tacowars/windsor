@@ -14,7 +14,11 @@
  * so each line V8 traces from it names that file and the line in it. Every
  * parameter the processor declares is fed its default unless the config names
  * a value. `currentFrame` advances a quantum at a time, as the real scope's
- * does, for the processors that read it (the FM part's event queue).
+ * does, for the processors that read it (the FM part's event queue). It is
+ * held in a `Float64Array` slot, the bundle's reads of the name rewritten to
+ * read the slot: a frame past 2^31 is a double, and storing one in a `let`
+ * would box it every quantum, which is the probe's cost, not the processor's
+ * (in Chrome the scope's own accessor supplies it).
  *
  * What the run does is the scenario's: by default a steady render of a noise
  * input (or of no input, for a source), with the load meter reporting every
@@ -43,6 +47,11 @@ export interface ProbeConfig {
   loadQuanta: number;
   /** Quanta of warm-up, then of the measured run. */
   warmup: number;
+  /**
+   * `currentFrame` at quantum 0; omitted, 0. Past 2^31 every frame is a
+   * double in V8, as in a context that has run for about 12 hours at 48 kHz.
+   */
+  startFrame?: number;
   measure: number;
   /** A module whose default export builds the run (`ProbeScenario`); omitted, a steady render. */
   scenario?: string;
@@ -101,25 +110,30 @@ interface ProcessorClass {
   parameterDescriptors?: Descriptor[];
 }
 
-/** The bundle evaluated as a script named `filename`: its processor class and a `currentFrame` setter. */
+/** The bundle evaluated as a script named `filename`: its processor class and the slot it reads `currentFrame` from. */
 function load(
   config: ProbeConfig,
   filename: string,
-): { ctor: ProcessorClass; setFrame: (f: number) => void } {
-  const bundle = readFileSync(config.bundle, 'utf8');
-  const source = `(function (AudioWorkletProcessor, sampleRate, registerProcessor) {\nlet currentFrame = 0;\n${bundle}\nreturn (frame) => { currentFrame = frame; };\n})`;
+): { ctor: ProcessorClass; frame: Float64Array } {
+  const bundle = readFileSync(config.bundle, 'utf8').replace(
+    /\bcurrentFrame\b/g,
+    'currentFrame[0]',
+  );
+  const source = `(function (AudioWorkletProcessor, sampleRate, registerProcessor, currentFrame) {\n${bundle}\n})`;
+  const frame = new Float64Array(1);
   let ctor: ProcessorClass | undefined;
   class Base {
     port = { onmessage: null, postMessage(): void {} };
   }
-  const setFrame = vm.runInThisContext(source, { filename })(
+  vm.runInThisContext(source, { filename })(
     Base,
     config.rate,
     (_name: string, value: ProcessorClass) => {
       ctor = value;
     },
-  ) as (frame: number) => void;
-  return { ctor: ctor!, setFrame };
+    frame,
+  );
+  return { ctor: ctor!, frame };
 }
 
 /**
@@ -150,7 +164,8 @@ function noise(channels: number): Float32Array[] {
 
 function rig(config: ProbeConfig): ProbeRig {
   const values = parameterValues(config);
-  const { ctor, setFrame } = load(config, basename(config.bundle));
+  const { ctor, frame } = load(config, basename(config.bundle));
+  const startFrame = config.startFrame ?? 0;
   const params: Record<string, Float32Array> = {};
   for (const [name, value] of Object.entries(values)) params[name] = new Float32Array([value]);
   const processor = new ctor({ processorOptions: config.options, parameterData: values });
@@ -167,7 +182,7 @@ function rig(config: ProbeConfig): ProbeRig {
     sound,
     quiet,
     render: (q, from) => {
-      setFrame(q * QUANTUM);
+      frame[0] = startFrame + q * QUANTUM;
       processor.process(from, outputs, params);
     },
     report: (quanta) => processor.port.onmessage!({ data: { type: 'reportLoad', quanta } }),
