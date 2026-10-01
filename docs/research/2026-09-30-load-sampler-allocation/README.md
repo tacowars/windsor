@@ -129,9 +129,9 @@ clean, and the test pins each one (windsor#261):
 | Phaser | windsor#248 |
 | Dub delay | windsor#249 |
 | FM part | windsor#257 |
+| Tape | windsor#265 |
 
-Tape still allocates (about 14 KB a quantum with the meter off) and is left
-out until windsor#228. The test's warm-up is 24000 quanta, not 16000: the
+The test's warm-up is 24000 quanta, not 16000: the
 probe's process allocates a one-off 3 to 17 KB about 18000 quanta in, in
 every bundle and whatever the measured length, which a 16000-quantum warm-up
 left inside the measured run. A build whose sampler

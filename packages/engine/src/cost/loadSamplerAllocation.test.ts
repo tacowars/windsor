@@ -91,6 +91,7 @@ const CLEAN = new Set([
   'phaser-processor.js', // windsor#248
   'delay-processor.js', // windsor#249
   'fm-processor.js', // windsor#257
+  'tape-processor.js', // windsor#265
 ]);
 
 function probe(bundle: string, loadQuanta: number): ProbeRun {
