@@ -64,7 +64,20 @@ three recordings from *808 From Mars* and wrote what each is for
    its peak on `main` (+0.29 to +0.69 dB). `volume` and `drive.gain` meet
    only as a product before the shaper, so level matching also set how
    hard each kick is driven.
-7. **No format bump.** A library edit with known fields (`drive.on`,
+7. **Every fitted value sits inside its editor knob** (fix round 1), so a
+   first touch never clamps it and changes the sound:
+   - the envelope Attack and Decay knobs reach exact 0 at the bottom of
+     their sweep (`logFloor` in `knob.ts`; the log sweep above it starts
+     at the old minima, 0.5 ms and 1 ms), since an envelope stage of 0
+     is a sound;
+   - the Fixed knob reaches down to 1 Hz, on its log curve, for a held
+     sub-audio operator like the 808 Kick's pulse;
+   - the Volume knob keeps its 1.5 maximum: the 808 Kick and the long
+     kick carry `volume` 1.5 and the rest of the product in `drive.gain`
+     (1.19753865 and 1.1581264226666665), which renders bit for bit as
+     the fitted volumes did.
+   `libraryKnobRanges.test.ts` walks the whole library against the knobs.
+8. **No format bump.** A library edit with known fields (`drive.on`,
    `width`); a song keeps its own patch snapshots until it is re-exported.
 
 ## Consequences

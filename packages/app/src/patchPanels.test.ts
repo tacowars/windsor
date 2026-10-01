@@ -142,11 +142,14 @@ describe('the Drive section Shape picker (windsor#309)', () => {
     expect(driveShapeOptions().map((o) => o.label)).toEqual([...DRIVE_SHAPE_NAMES]);
   });
 
-  it('shows Soft on a fresh patch and on the 808 kick', () => {
+  it("shows Soft on a fresh patch and a patch's own shape once it has one", () => {
     const label = (shape: number): string | undefined =>
       driveShapeOptions().find((o) => o.value === shape)?.label;
     expect(label(makePatch().drive.shape)).toBe('Soft');
-    expect(label(PRESETS['tr808-kick']?.drive.shape ?? -1)).toBe('Soft');
+    const diode = makePatch({
+      drive: { ...makePatch().drive, on: true, shape: DRIVE_SHAPE.DIODE },
+    });
+    expect(label(diode.drive.shape)).toBe('Diode');
   });
 
   it('writes drive.shape alone and survives the JSON round trip', () => {

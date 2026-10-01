@@ -11,6 +11,12 @@ export interface KnobSpec {
   def: number;
   step?: number;
   curve?: 'log';
+  /**
+   * A log knob whose `min` is 0: the smallest value above 0 its sweep
+   * reaches (default `LOG_FLOOR`). The sweep is logarithmic from here to
+   * `max`, and its bottom end is exact 0.
+   */
+  logFloor?: number;
   fmt?: (v: number) => string;
   color?: string;
   /**
@@ -133,15 +139,25 @@ export interface Scale {
 }
 
 /** The part of a spec that decides where a value or a key press lands. */
-export type KnobScaleSpec = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve'>;
+export type KnobScaleSpec = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'logFloor'>;
 
-function scaleFor(spec: KnobScaleSpec): Scale {
+/**
+ * The knob's value ↔ sweep mapping. A log knob whose `min` is 0 sweeps from
+ * its `logFloor` and gives the bottom of its sweep to exact 0, so a 0 that
+ * means something (an envelope stage that ends on its own sample,
+ * windsor#316) can be dialled, shown and committed; every value up to the
+ * floor sits there.
+ */
+export function scaleFor(spec: KnobScaleSpec): Scale {
   if (spec.curve === 'log') {
-    const lo = Math.log(Math.max(LOG_FLOOR, spec.min));
+    const zeroEnd = spec.min <= 0;
+    const floor = zeroEnd ? (spec.logFloor ?? LOG_FLOOR) : Math.max(LOG_FLOOR, spec.min);
+    const lo = Math.log(floor);
     const hi = Math.log(spec.max);
     return {
-      toNorm: (v) => (Math.log(Math.max(LOG_FLOOR, v)) - lo) / (hi - lo),
-      fromNorm: (n) => Math.exp(lo + Math.min(1, Math.max(0, n)) * (hi - lo)),
+      toNorm: (v) => (Math.log(Math.max(floor, v)) - lo) / (hi - lo),
+      fromNorm: (n) =>
+        zeroEnd && n <= 0 ? 0 : Math.exp(lo + Math.min(1, Math.max(0, n)) * (hi - lo)),
     };
   }
   return {

@@ -7,7 +7,7 @@
   "patch": {
     "name": "808 Kick",
     "algorithm": 4,
-    "volume": 1.7955,
+    "volume": 1.5,
     "tone": 1,
     "glide": 0,
     "pitchEnvAmount": 13.0261,
@@ -181,7 +181,7 @@
     },
     "drive": {
       "on": true,
-      "gain": 1.00045,
+      "gain": 1.19753865,
       "shape": 2,
       "bias": 0.0954331,
       "tone": 0.842453
