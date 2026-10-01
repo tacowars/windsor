@@ -3,6 +3,10 @@
  * → DC block → transport delay → hiss → dropouts → trim; Mix and bypass read the dry signal delayed by the
  * core's fixed latency (windsor#224). Max noise/filter primitives are adapted; seeded renders exercise the
  * shipped processor (`inserts/tapeDsp.test.ts`, `tapeMagneticIntegration.test.ts`).
+ * No double crosses a call on the render's path (worklet rule 2, windsor#228): the processor writes a
+ * frame to `input` and calls `step`, a channel leaves its sample in `sample`, the EQ and the motion read
+ * and write their own fields, and every double field (the controls' too) is first written as NaN
+ * (rule 7). Pinned by `inserts/tapeAllocation.test.ts`.
  */
 import {
   TAPE_BOUNDS,
@@ -18,11 +22,58 @@ import { TapeMotion } from './tapeMotion';
 type TapeParams = Record<string, Float32Array>;
 const KEYS = Object.keys(TAPE_DEFAULTS) as Array<keyof typeof TAPE_DEFAULTS>;
 type Controls = Record<(typeof KEYS)[number], number>;
+/**
+ * The controls, every one born a double (worklet rule 7). A class, not a literal: a literal with
+ * `TAPE_DEFAULTS`' names would share its map's transitions, born as small integers and booleans.
+ */
+class TapeControlValues implements Controls {
+  drive: number;
+  bias: number;
+  wear: number;
+  wow: number;
+  flutter: number;
+  dropouts: number;
+  wowRate: number;
+  flutterRate: number;
+  split: number;
+  hiss: number;
+  trim: number;
+  mix: number;
+  seed: number;
+  enabled: number;
+  oversampling: number;
+  constructor() {
+    this.drive = this.bias = this.wear = this.wow = this.flutter = this.dropouts = NaN;
+    this.wowRate = this.flutterRate = this.split = this.hiss = this.trim = this.mix = NaN;
+    this.seed = this.enabled = this.oversampling = NaN;
+  }
+  /**
+   * Each parameter's value, by name. Not a loop over `KEYS`: a store keyed by a name that changes
+   * is megamorphic, and V8 hands it each value boxed, a heap number per control per block.
+   */
+  read(params: TapeParams): void {
+    this.drive = params.drive[0];
+    this.bias = params.bias[0];
+    this.wear = params.wear[0];
+    this.wow = params.wow[0];
+    this.flutter = params.flutter[0];
+    this.dropouts = params.dropouts[0];
+    this.wowRate = params.wowRate[0];
+    this.flutterRate = params.flutterRate[0];
+    this.split = params.split[0];
+    this.hiss = params.hiss[0];
+    this.trim = params.trim[0];
+    this.mix = params.mix[0];
+    this.seed = params.seed[0];
+    this.enabled = params.enabled[0];
+    this.oversampling = params.oversampling[0];
+  }
+}
 // Refuse, when the bundle loads, a model row the core cannot normalise (design decision 6).
 assertMagneticRows();
 class TapeDsp {
-  controls: Controls;
-  targets: Controls;
+  controls: TapeControlValues;
+  targets: TapeControlValues;
   tones: TapeTone[];
   noiseTones: TapeTone[];
   weights: Float64Array;
@@ -30,7 +81,7 @@ class TapeDsp {
   lastDrive = NaN;
   lastTrim = NaN;
   lastHiss = NaN;
-  hissGain = 0;
+  hissGain = NaN;
   buffers: Float32Array[];
   dcInput = new Float64Array(2);
   dcOutput = new Float64Array(2);
@@ -42,28 +93,34 @@ class TapeDsp {
   dcPole: number;
   noiseHp: number;
   noiseLp: number;
-  noiseLow = 0;
-  noiseHigh = 0;
+  noiseLow = NaN;
+  noiseHigh = NaN;
   position = 0;
   model = 0;
-  left = 0;
-  right = 0;
-  gain = 1;
-  trim = 1;
-  noiseGain = 0;
-  noise = 0;
-  mix = 1;
+  /** The frame `step` reads, left and right. */
+  input = new Float64Array(2);
+  /** The frame `step` wrote. */
+  left = NaN;
+  right = NaN;
+  /** The sample `channel` wrote. */
+  sample = NaN;
+  gain = NaN;
+  trim = NaN;
+  noiseGain = NaN;
+  noise = NaN;
+  mix = NaN;
   constructor(
     readonly rate: number,
     params: TapeParams,
   ) {
-    this.controls = {
-      ...TAPE_DEFAULTS,
-      enabled: Number(TAPE_DEFAULTS.enabled),
-      split: Number(TAPE_DEFAULTS.split),
-    };
+    this.hissGain = this.noiseLow = this.noiseHigh = this.left = this.right = this.sample = 0;
+    this.noiseGain = this.noise = 0;
+    this.gain = this.trim = this.mix = 1;
+    this.controls = new TapeControlValues();
+    for (const key of KEYS) this.controls[key] = Number(TAPE_DEFAULTS[key]);
     for (const key of KEYS) this.controls[key] = params[key]?.[0] ?? this.controls[key];
-    this.targets = { ...this.controls };
+    this.targets = new TapeControlValues();
+    for (const key of KEYS) this.targets[key] = this.controls[key];
     this.model = Math.round(params.model?.[0] ?? 0);
     this.noiseOffsets = Float64Array.from(
       TAPE_MODELS,
@@ -87,7 +144,7 @@ class TapeDsp {
     this.configure(params, 0);
   }
   configure(params: TapeParams, frames: number): void {
-    for (const key of KEYS) this.targets[key] = params[key][0];
+    this.targets.read(params);
     // Preserve the running legacy macro when its dials are first separated.
     if (!this.controls.split && this.targets.split) {
       this.controls.wow = this.controls.wear;
@@ -113,12 +170,22 @@ class TapeDsp {
     if (Math.abs(this.targets.bias - this.controls.bias) < Number.EPSILON)
       this.controls.bias = this.targets.bias;
     for (let model = 0; model < TAPE_MODELS.length; model++) {
-      this.tones[model * 2].configure(model, this.controls.bias);
-      this.tones[model * 2 + 1].configure(model, this.controls.bias);
-      this.noiseTones[model].configure(model, 0);
+      this.tones[model * 2].targetBias = this.controls.bias;
+      this.tones[model * 2].configure(model);
+      this.tones[model * 2 + 1].targetBias = this.controls.bias;
+      this.tones[model * 2 + 1].configure(model);
+      this.noiseTones[model].targetBias = 0;
+      this.noiseTones[model].configure(model);
     }
   }
+  /** Test-only: one frame through `step`, which the processor calls with `input` written. */
   tick(left: number, right: number): void {
+    this.input[0] = left;
+    this.input[1] = right;
+    this.step();
+  }
+  /** One frame, from `input` to `left` and `right`. */
+  step(): void {
     const s = this.controls,
       t = this.targets,
       k = this.smooth;
@@ -135,13 +202,20 @@ class TapeDsp {
     s.enabled += k * (t.enabled - s.enabled);
     this.updateGains();
     this.mix = s.mix * s.enabled;
-    this.motion.wowRate = s.wowRate;
-    this.motion.flutterRate = s.flutterRate;
-    if (t.split) this.motion.tick(s.wow / C.percent, s.flutter / C.percent, s.dropouts / C.percent);
-    else this.motion.tick(s.wear / C.percent);
+    const motion = this.motion;
+    motion.wowRate = s.wowRate;
+    motion.flutterRate = s.flutterRate;
+    if (t.split) {
+      motion.wowAmount = s.wow / C.percent;
+      motion.flutterAmount = s.flutter / C.percent;
+      motion.dropoutAmount = s.dropouts / C.percent;
+    } else motion.wowAmount = motion.flutterAmount = motion.dropoutAmount = s.wear / C.percent;
+    motion.advance();
     this.tickNoise();
-    this.left = this.channel(left, 0);
-    this.right = this.channel(right, 1);
+    this.channel(0);
+    this.left = this.sample;
+    this.channel(1);
+    this.right = this.sample;
     this.position = (this.position + 1) % this.buffers[0].length;
     this.magnetic.dryAt =
       this.magnetic.dryAt + 1 === this.magnetic.latency ? 0 : this.magnetic.dryAt + 1;
@@ -166,7 +240,8 @@ class TapeDsp {
     }
   }
   tickNoise(): void {
-    const white = this.motion.random() * 2 - 1;
+    this.motion.draw();
+    const white = this.motion.drawn * 2 - 1;
     this.noiseLow += this.noiseHp * (white - this.noiseLow);
     this.noiseHigh += this.noiseLp * (white - this.noiseLow - this.noiseHigh);
     let noise = 0;
@@ -176,20 +251,25 @@ class TapeDsp {
       if (target === 0 && this.weights[model] < C.weightFloor) this.weights[model] = 0;
       if (target === 1 && 1 - this.weights[model] < C.weightFloor) this.weights[model] = 1;
       if (this.weights[model] === 0) continue;
-      noise +=
-        this.weights[model] *
-        this.noiseTones[model].tick(this.noiseHigh) *
-        this.noiseOffsets[model];
+      const tone = this.noiseTones[model];
+      tone.value = this.noiseHigh;
+      tone.advance();
+      noise += this.weights[model] * tone.value * this.noiseOffsets[model];
     }
     const targetGain = this.targets.hiss <= TAPE_BOUNDS.hiss[0] ? 0 : this.hissGain;
     this.noiseGain += this.smooth * (targetGain - this.noiseGain);
     this.noise = noise * this.noiseGain;
   }
-  channel(input: number, channel: number): number {
+  /** One channel's sample, from `input[channel]` into `sample`. */
+  channel(channel: number): void {
+    const input = this.input[channel];
     let tone = this.eqBypassed ? input : 0;
     for (let model = 0; model < TAPE_MODELS.length && !this.eqBypassed; model++) {
-      if (this.weights[model] !== 0)
-        tone += this.weights[model] * this.tones[model * 2 + channel].tick(input);
+      if (this.weights[model] === 0) continue;
+      const eq = this.tones[model * 2 + channel];
+      eq.value = input;
+      eq.advance();
+      tone += this.weights[model] * eq.value;
     }
     const core = this.magnetic.active[channel];
     core.input = tone * this.gain;
@@ -211,8 +291,7 @@ class TapeDsp {
     const dry = ring[at];
     ring[at] = input;
     // Exact delayed dry/bypass, then smooth changes; snap sub-ulp residue for settled transparency.
-    if (this.mix < Number.EPSILON) return dry;
-    return dry + this.mix * (wet - dry);
+    this.sample = this.mix < Number.EPSILON ? dry : dry + this.mix * (wet - dry);
   }
 }
 export { TapeDsp };

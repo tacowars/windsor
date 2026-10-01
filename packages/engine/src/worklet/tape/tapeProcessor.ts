@@ -70,11 +70,18 @@ class TapeProcessor extends AudioWorkletProcessor {
     const left = inputs[0]?.[0];
     const right = inputs[0]?.[1] ?? left;
     const frames = out[0].length;
-    this.dsp.configure(params, frames);
+    const dsp = this.dsp,
+      frame = dsp.input;
+    dsp.configure(params, frames);
+    // Each sample reaches the DSP in its `input` slots, never as an argument (worklet rule 2). An
+    // absent channel is tested apart from the read: `left?.[i]`, a sample or undefined, is a value V8
+    // can only hold boxed, a new heap number per sample even when it is stored straight to a slot.
     for (let i = 0; i < frames; i++) {
-      this.dsp.tick(left?.[i] ?? 0, right?.[i] ?? 0);
-      out[0][i] = this.dsp.left;
-      if (out[1]) out[1][i] = this.dsp.right;
+      frame[0] = left === undefined ? 0 : (left[i] ?? 0);
+      frame[1] = right === undefined ? 0 : (right[i] ?? 0);
+      dsp.step();
+      out[0][i] = dsp.left;
+      if (out[1]) out[1][i] = dsp.right;
     }
     this.load.end(frames);
     return true;
