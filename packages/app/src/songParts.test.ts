@@ -1,6 +1,6 @@
 /**
  * The console's part-list edits (#598) through the real document model: the
- * new song it opens on, adding parts up to eight, removing one (and the patch
+ * new song it opens on, adding parts up to `MUSIC_PARTS_MAX`, removing one (and the patch
  * only it played), choosing a sequencer kind, renaming, and a mixed-kind song
  * surviving export → import.
  */
@@ -11,6 +11,7 @@ import {
   ARRANGEMENT_VERSION,
   ArrangementPlayer,
   DEFAULT_EUCLIDEAN_CONFIG,
+  MUSIC_PARTS_MAX,
   TICKS_PER_BAR,
   TickTransport,
   isShippable,
@@ -62,20 +63,19 @@ describe('adding parts', () => {
     expect(nextFreeSlot(doc)).toBe(1);
   });
 
-  it('adds up to eight parts, each with its own Init patch, then stops', () => {
+  it('adds up to MUSIC_PARTS_MAX parts, each with its own Init patch, then stops', () => {
     const model = new DocumentModel(newSong());
-    for (let i = 1; i < 8; i++) {
+    const slots = Array.from({ length: MUSIC_PARTS_MAX }, (_, slot) => slot);
+    for (let i = 1; i < MUSIC_PARTS_MAX; i++) {
       const added = addPart(model.doc);
       expect(added?.slot).toBe(i);
       restructure(model, added!.doc);
     }
     expect(model.corrections).toEqual([]);
-    expect(model.doc.parts.map((p) => p.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
-    expect(model.doc.parts.map((p) => p.name)).toEqual(
-      [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Part ${n}`),
-    );
+    expect(model.doc.parts.map((p) => p.slot)).toEqual(slots);
+    expect(model.doc.parts.map((p) => p.name)).toEqual(slots.map((slot) => `Part ${slot + 1}`));
     const presets = new Set(model.doc.parts.map((p) => p.preset));
-    expect(presets.size).toBe(8);
+    expect(presets.size).toBe(MUSIC_PARTS_MAX);
     for (const preset of presets) expect(model.doc.patches?.[preset]).toBeDefined();
     expect(nextFreeSlot(model.doc)).toBeNull();
     expect(addPart(model.doc)).toBeNull();

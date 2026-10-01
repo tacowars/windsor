@@ -1,6 +1,6 @@
 /**
  * The part list through `makeArrangement` (#597; version 3 since #705): any sequencer kind
- * on any slot, slot identity and its corrections, the eight-part cap, the
+ * on any slot, slot identity and its corrections, the `MUSIC_PARTS_MAX` cap, the
  * version gate, and a song of inert `none` parts. The rest of the normaliser's
  * contract is `arrangementDocument.test.ts`.
  */
@@ -16,6 +16,8 @@ import {
   DEFAULT_BARS,
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
+  MUSIC_PARTS_MAX,
+  MUSIC_SLOT_MAX,
 } from '../audioConstants';
 import { DEFAULT_DRIVE } from '../inserts/driveInsert';
 import { DEFAULT_CHORUS } from '../inserts/chorusInsert';
@@ -105,21 +107,53 @@ describe('the part list (#597)', () => {
 
   it('drops a part with no slot or one out of range: identity has no default', () => {
     const result = makeArrangement(
-      song([KICK, { preset: 'hat' }, { slot: 8, preset: 'hat' }, { slot: 1.5, preset: 'hat' }]),
+      song([
+        KICK,
+        { preset: 'hat' },
+        { slot: MUSIC_PARTS_MAX, preset: 'hat' },
+        { slot: 1.5, preset: 'hat' },
+      ]),
     );
     expect(result.document.parts.map((p) => p.slot)).toEqual([0]);
     expect(result.corrections).toEqual([
-      'parts[1].slot: undefined is not a slot 0–7 — part dropped',
-      'parts[2].slot: 8 is not a slot 0–7 — part dropped',
-      'parts[3].slot: 1.5 is not a slot 0–7 — part dropped',
+      `parts[1].slot: undefined is not a slot 0–${MUSIC_SLOT_MAX} — part dropped`,
+      `parts[2].slot: ${MUSIC_PARTS_MAX} is not a slot 0–${MUSIC_SLOT_MAX} — part dropped`,
+      `parts[3].slot: 1.5 is not a slot 0–${MUSIC_SLOT_MAX} — part dropped`,
     ]);
   });
 
-  it('keeps at most eight parts', () => {
-    const nine = Array.from({ length: 9 }, (_, i) => ({ slot: i % 8, preset: 'kick' }));
-    const result = makeArrangement(song(nine));
-    expect(result.document.parts).toHaveLength(8);
-    expect(result.corrections[0]).toBe('parts: 9 parts — only the first 8 are kept');
+  it('keeps a full song: a part on every slot normalises with no correction and plays', () => {
+    const full = Array.from({ length: MUSIC_PARTS_MAX }, (_, slot) => ({ ...KICK, slot }));
+    const result = makeArrangement(song(full));
+    expect(result.corrections).toEqual([]);
+    expect(result.document.parts.map((p) => p.slot)).toEqual(
+      Array.from({ length: MUSIC_PARTS_MAX }, (_, slot) => slot),
+    );
+    expect(() => play(result.document)).not.toThrow();
+  });
+
+  it(`keeps at most MUSIC_PARTS_MAX (${MUSIC_PARTS_MAX}) parts`, () => {
+    const over = Array.from({ length: MUSIC_PARTS_MAX + 1 }, (_, i) => ({
+      slot: i % MUSIC_PARTS_MAX,
+      preset: 'kick',
+    }));
+    const result = makeArrangement(song(over));
+    expect(result.document.parts).toHaveLength(MUSIC_PARTS_MAX);
+    expect(result.corrections[0]).toBe(
+      `parts: ${MUSIC_PARTS_MAX + 1} parts — only the first ${MUSIC_PARTS_MAX} are kept`,
+    );
+  });
+
+  it('keys a compressor from the part on the highest slot', () => {
+    const full = Array.from({ length: MUSIC_PARTS_MAX }, (_, slot) => ({ ...KICK, slot }));
+    full[0] = {
+      ...KICK,
+      strip: { inserts: [{ kind: 'compressor', sidechain: { track: MUSIC_SLOT_MAX } }] },
+    } as typeof KICK;
+    const result = makeArrangement(song(full));
+    expect(result.corrections).toEqual([]);
+    const [comp] = result.document.parts[0]?.strip?.inserts ?? [];
+    expect(comp?.kind === 'compressor' && comp.sidechain).toEqual({ track: MUSIC_SLOT_MAX });
   });
 
   it('corrects a name that is not a string to "Part n"', () => {

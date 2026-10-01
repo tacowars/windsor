@@ -1,9 +1,9 @@
 /**
  * What a merged arrangement must satisfy before `ArrangementPlayer` commits
- * it: a positive tempo, 1–8 parts on unique slots 0–7, the same slots in the
- * same order as before (a live partial cannot add, remove or move a part —
- * #597), a preset every part can resolve, and finite velocities, notes and
- * holds. Throws — the player turns the throw into
+ * it: a positive tempo, 1 to `MUSIC_PARTS_MAX` parts on unique slots 0 to
+ * `MUSIC_SLOT_MAX`, the same slots in the same order as before (a live
+ * partial cannot add, remove or move a part — #597), a preset every part can
+ * resolve, and finite velocities, notes and holds. Throws — the player turns the throw into
  * `ApplyResult.error`, and a merged arrangement that fails here changes
  * nothing. The normaliser (`arrangementDocument.ts`) is what makes a
  * *committed* document satisfy this by construction; this is the guard for
