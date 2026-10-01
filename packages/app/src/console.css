@@ -1713,6 +1713,61 @@ body.chord-dragging {
   outline-offset: 1px;
 }
 
+/* The Pattern page's Play section: the mockup's .section and .sec-label,
+   then the row of value boxes (.kn with a .stepper) and knobs. */
+.euclid-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.euclid-sec-label {
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.knob-row.euclid-play {
+  align-items: center;
+  gap: 6px;
+}
+.euclid-play .capture-row {
+  margin-top: 0;
+}
+.euclid-kn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 60px;
+  padding: 3px 7px 4px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.euclid-kn-label {
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.euclid-kn-value {
+  align-items: center;
+  font-family: var(--f-num);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.euclid-kn-value output {
+  min-width: 3ch;
+  text-align: center;
+  white-space: nowrap;
+}
+
 /* The Density page: the modulator, the plot of k, the k bounds. */
 .euclid-density {
   flex-direction: row;
@@ -1754,10 +1809,12 @@ body.chord-dragging {
   fill: var(--ink-faint);
 }
 
-/* The rows: a sticky name column, then one --ecw cell per step. */
+/* The rows: a sticky name column, then one --ecw cell per step. The
+   scroller clips on both axes, so its padding leaves room for the 2 px
+   playhead ring on the first row, the last row and the last cell. */
 .euclid-scroll {
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 3px 3px 4px 0;
   scrollbar-width: thin;
 }
 .euclid-rows {
@@ -1814,6 +1871,7 @@ body.chord-dragging {
   gap: 2px;
 }
 .euclid-len,
+.euclid-step,
 .euclid-x {
   width: 18px;
   height: 18px;
@@ -1825,15 +1883,16 @@ body.chord-dragging {
   line-height: 1;
   cursor: pointer;
 }
-.euclid-len {
+.euclid-len,
+.euclid-step {
   background: var(--panel-hi);
   border: 1px solid var(--line-bright);
 }
-.euclid-len:disabled {
+:is(.euclid-len, .euclid-step):disabled {
   opacity: 0.35;
   cursor: default;
 }
-.euclid-len:hover:not(:disabled) {
+:is(.euclid-len, .euclid-step):hover:not(:disabled) {
   color: var(--ink);
 }
 .euclid-x {

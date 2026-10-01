@@ -31,6 +31,9 @@ export const EUCLID_PLOT = {
   labelX: 3,
 } as const;
 
+/** Decimals of the bar line's seconds an Hz plot is keyed by: it repaints when they move. */
+export const EUCLID_PLOT_SECONDS_DIGITS = 3;
+
 /** Decimals a fractional cycle in bars reads with. */
 export const EUCLID_CYCLE_BAR_DIGITS = 2;
 

@@ -3,10 +3,12 @@
  * the tab row's one-line note on the modulator, and the Density page's plot
  * of `k`. An LFO's plot is the `k` each of the next bars gets, read the way
  * the sequencer reads it on a bar line (`lfoValue` between the bounds,
- * rounded); a walk is random, so its plot is the bounds band and the
+ * rounded): an `lfoBars` LFO by the region's own bar, an `lfoHz` one by the
+ * transport's accumulated seconds, which the region gate passes on
+ * song-wide (`RegionGate.forward`); a walk is random, so its plot is the bounds band and the
  * current `k`. Pure: the card draws the path this returns.
  */
-import type { DensityMod, EuclideanSpec, RegionStep } from '@windsor/engine';
+import type { DensityMod, EuclideanSpec, RegionStep, TickLoop } from '@windsor/engine';
 import { TICKS_PER_BAR, lfoValue } from '@windsor/engine';
 import { EUCLID_PLOT } from './euclidConstants';
 
@@ -24,10 +26,51 @@ export function densityNote(spec: EuclideanSpec, k: number): string {
   return `k ${k} · ${min}–${max} · ${densityKindText(spec.density)}`;
 }
 
-/** Where the plot reads from: the bar it starts on and the seconds a bar lasts (for an Hz LFO). */
+/**
+ * Where the plot reads from: the region bar it starts on (an `lfoBars` LFO's
+ * clock), the transport seconds on that bar's line and the seconds a bar
+ * lasts (an `lfoHz` LFO's).
+ */
 export interface PlotClock {
   readonly bar: number;
+  readonly seconds: number;
   readonly secondsPerBar: number;
+}
+
+/** The slice of the engine's transport clock (`TickTransport`) the plot reads its seconds from. */
+export interface SecondsClock {
+  /** The tick the clock issues next: the look-ahead's, at or past the audible one. */
+  readonly currentTick: number;
+  /** The seconds on `currentTick`, accumulated at every tempo and swing played so far. */
+  readonly transportSeconds: number;
+  readonly secondsPerTick: number;
+  readonly loop: TickLoop | null;
+  swungTicks(tick: number): number;
+}
+
+/**
+ * The transport seconds on the line of the bar holding `tick` (the audible
+ * tick): what the sequencer's Hz LFO read there (`TickEvent.seconds`). The
+ * clock's accumulated seconds, wound back from the tick it issues next to
+ * that line; when the look-ahead has already jumped back to a loop's start,
+ * the wind back runs through the jump.
+ */
+export function barLineSeconds(
+  clock: SecondsClock,
+  tick: number,
+  ticksPerBar = TICKS_PER_BAR,
+): number {
+  const line = tick - (tick % ticksPerBar);
+  const next = clock.currentTick;
+  const { loop } = clock;
+  const swung = (from: number, to: number): number => clock.swungTicks(to) - clock.swungTicks(from);
+  if (next >= line || !loop)
+    return clock.transportSeconds - swung(line, next) * clock.secondsPerTick;
+  // The jump back comes at the first loop end at or past the line (`followingTick`).
+  const { start, end, songTicks } = loop;
+  const jump = line + ((((end - line) % songTicks) + songTicks) % songTicks);
+  const ticks = swung(line, jump) + swung(jump - (end - start), next);
+  return clock.transportSeconds - ticks * clock.secondsPerTick;
 }
 
 /**
@@ -48,7 +91,7 @@ export function plotBar(
   return Math.floor((at.localStep * divisor) / ticksPerBar);
 }
 
-/** The `k` an LFO gives each of `count` bars from `clock.bar`; empty for a walk. */
+/** The `k` an LFO gives each of `count` bars from the clock's; empty for a walk. */
 export function lfoKs(spec: EuclideanSpec, clock: PlotClock, count: number): number[] {
   const { density } = spec;
   if (density.kind === 'walk') return [];
@@ -56,7 +99,9 @@ export function lfoKs(spec: EuclideanSpec, clock: PlotClock, count: number): num
   return Array.from({ length: count }, (_, i) => {
     const bar = clock.bar + i;
     const phase =
-      density.kind === 'lfoBars' ? bar / density.bars : bar * clock.secondsPerBar * density.hz;
+      density.kind === 'lfoBars'
+        ? bar / density.bars
+        : (clock.seconds + i * clock.secondsPerBar) * density.hz;
     return min + Math.round(lfoValue(density.shape, phase) * (max - min));
   });
 }

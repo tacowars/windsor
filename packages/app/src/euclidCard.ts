@@ -27,14 +27,15 @@ import { PERC_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { type EuclidCard, setView, viewOf, writeRows } from './euclidCardState';
-import { EUCLID_READOUT_HINT } from './euclidConstants';
-import { densityNote, plotBar } from './euclidDensityModel';
+import { EUCLID_PLOT_SECONDS_DIGITS, EUCLID_READOUT_HINT } from './euclidConstants';
+import { barLineSeconds, densityNote, plotBar } from './euclidDensityModel';
 import { type DensityPage, densityPage } from './euclidDensityPage';
 import { regionFigure } from './euclidFigure';
 import { laneChoices, laneLength, lanesOf } from './euclidLaneModel';
 import { cycleText, fullCycle, passOf } from './euclidLaneView';
 import { type Figure, countOnsets, figureKey, stepsPerBeat } from './euclidModel';
 import { type PatternPage, fillPicker, patternPage } from './euclidPatternPage';
+import { holdWhilePressed } from './euclidPressHold';
 import { euclidRail } from './euclidRail';
 import type { RowHead } from './euclidRowParts';
 import { paintRows } from './euclidRows';
@@ -116,6 +117,16 @@ function lightRows(live: Live): void {
   });
 }
 
+/**
+ * The transport seconds on the audible bar's line, read from the engine's
+ * clock (`barLineSeconds`): what an Hz LFO reads there, whether or not the
+ * song is in the card's region. 0 before audio.
+ */
+function transportSeconds(ctx: AppCtx): number {
+  const system = ctx.host.system;
+  return system ? barLineSeconds(system.scheduler.transport, ctx.transport.position()) : 0;
+}
+
 /** The tab row's note and, on the Density page, the plot of `k`. */
 function paintDensity(live: Live, spec: EuclideanSpec, figure: Figure): void {
   const k = countOnsets(figure);
@@ -126,8 +137,10 @@ function paintDensity(live: Live, spec: EuclideanSpec, figure: Figure): void {
   const songBar = ctx.transport.running ? Math.floor(ctx.transport.position() / TICKS_PER_BAR) : 0;
   const bar = plotBar(at, spec.divisor, songBar);
   const bpm = ctx.model.doc.transport.bpm;
-  const clock = { bar, secondsPerBar: (SECONDS_PER_MINUTE / bpm) * (TICKS_PER_BAR / PPQ) };
-  const key = JSON.stringify([spec.pulses, spec.density, spec.steps, k, bar, bpm]);
+  const seconds = transportSeconds(ctx);
+  const clock = { bar, seconds, secondsPerBar: (SECONDS_PER_MINUTE / bpm) * (TICKS_PER_BAR / PPQ) };
+  const shown = spec.density.kind === 'lfoHz' ? seconds.toFixed(EUCLID_PLOT_SECONDS_DIGITS) : bar;
+  const key = JSON.stringify([spec.pulses, spec.density, spec.steps, k, shown, bpm]);
   if (key === live.plotKey) return;
   live.plotKey = key;
   live.density.paint(spec, k, clock);
@@ -191,18 +204,6 @@ function handle(
   return card;
 }
 
-/** A held press on the rows defers their rebuild until it ends. */
-function holdWhilePressed(card: EuclidCard, rows: HTMLElement): void {
-  rows.addEventListener('pointerdown', () => {
-    card.pressing = true;
-    const end = (): void => {
-      card.pressing = false;
-    };
-    window.addEventListener('pointerup', end, { once: true });
-    window.addEventListener('pointercancel', end, { once: true });
-  });
-}
-
 /** The card for a Euclidean part's region `region`: the rail, the tabs, the Pattern and Density pages. */
 export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
   const ref: { live: Live | null } = { live: null };
@@ -225,7 +226,7 @@ export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElem
     plotKey: '',
   };
   ref.live = state;
-  holdWhilePressed(card, pattern.rows);
+  holdWhilePressed(card, pattern.rows, window);
   const name = partAt(ctx.model.doc, slot)?.name ?? '';
   const rail = euclidRail(name, view.lanes, (lanes) => {
     setView(slot, { lanes });

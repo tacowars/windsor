@@ -10,6 +10,7 @@ import {
   DEFAULT_EUCLIDEAN_CONFIG,
   EuclideanSequencer,
   TICKS_PER_BAR,
+  TickTransport,
   lfoValue,
 } from '@windsor/engine';
 import {
@@ -21,6 +22,7 @@ import {
 import { rig } from '@windsor/engine/__fixtures__/playerRig';
 import { HALF, halves, patternOf } from '@windsor/engine/__fixtures__/regionPatternSongs';
 import {
+  barLineSeconds,
   densityKindText,
   densityNote,
   lfoKs,
@@ -30,6 +32,7 @@ import {
   plotY,
 } from './euclidDensityModel';
 import { EUCLID_PLOT } from './euclidConstants';
+import { countOnsets } from './euclidModel';
 
 const SPEC: EuclideanSpec = {
   ...DEFAULT_EUCLIDEAN_CONFIG,
@@ -55,7 +58,7 @@ describe('the tab row note', () => {
 
 describe('the plot of k', () => {
   it("gives each bar the k the sequencer cuts on that bar's line", () => {
-    const ks = lfoKs(SPEC, { bar: 0, secondsPerBar: 2 }, 16);
+    const ks = lfoKs(SPEC, { bar: 0, seconds: 0, secondsPerBar: 2 }, 16);
     const want = Array.from(
       { length: 16 },
       (_, bar) => 4 + Math.round(lfoValue('tri', bar / 8) * 5),
@@ -78,17 +81,18 @@ describe('the plot of k', () => {
     expect(sequencer.currentK).toBe(ks[4]);
   });
 
-  it('reads an Hz LFO by the seconds a bar lasts, from the current bar', () => {
+  it("reads an Hz LFO from the bar line's transport seconds, a bar's seconds apart", () => {
     const hz = { ...SPEC, density: { kind: 'lfoHz', hz: 0.25, shape: 'saw' } } as const;
-    const ks = lfoKs(hz, { bar: 2, secondsPerBar: 2 }, 2);
-    expect(ks).toEqual([0, 1].map((i) => 4 + Math.round(lfoValue('saw', (2 + i) * 2 * 0.25) * 5)));
+    // The region's own bar does not enter an Hz LFO: only the seconds do.
+    const ks = lfoKs(hz, { bar: 0, seconds: 5, secondsPerBar: 2 }, 2);
+    expect(ks).toEqual([0, 1].map((i) => 4 + Math.round(lfoValue('saw', (5 + i * 2) * 0.25) * 5)));
   });
 
   it('has no path for a walk', () => {
     expect(
       lfoKs(
         { ...SPEC, density: { kind: 'walk', stepChance: 0.5 } },
-        { bar: 0, secondsPerBar: 2 },
+        { bar: 0, seconds: 0, secondsPerBar: 2 },
         16,
       ),
     ).toEqual([]);
@@ -136,5 +140,57 @@ describe("the plot's bar", () => {
   it("falls back to the song's bar with no region step", () => {
     expect(plotBar(null, 6, 5)).toBe(5);
     expect(plotBar({ step: 3, live: true }, 6, 5)).toBe(5);
+  });
+});
+
+describe("the plot's transport seconds", () => {
+  const BAR = TICKS_PER_BAR;
+  const slot = FULL_SLOT.kick;
+  const kick = FULL_PARTS.kick.sequencer;
+
+  it('starts an Hz plot on the seconds a later region is entered at, as the sequencer reads them', () => {
+    // 0.1 Hz from bar 3 at the fixture's 96 BPM: the sequencer enters 5 s in, at phase 0.5,
+    // where the region's own bar 0 would say phase 0.
+    const hz: EuclideanSpec = {
+      ...kick,
+      pulses: { min: 1, max: 12, start: 4 },
+      density: { kind: 'lfoHz', hz: 0.1, shape: 'saw' },
+    };
+    const doc = withDocumentPart(FULL_DOCUMENT, 'kick', {
+      regions: halves(patternOf(kick), patternOf(hz)),
+    });
+    const r = rig(doc);
+    r.run(HALF / BAR);
+    // Region 2's first tick: the sequencer cuts its k on that bar line.
+    r.transport.advance(r.transport.transportSeconds);
+    const played = countOnsets(r.player.capturePattern(slot, 1) ?? []);
+    const at = r.player.regionStepAt(slot, 1, HALF);
+    const seconds = barLineSeconds(r.transport, HALF);
+    const secondsPerBar = BAR * r.transport.secondsPerTick;
+    const clock = { bar: plotBar(at, kick.divisor, HALF / BAR), seconds, secondsPerBar };
+    expect(seconds).toBeCloseTo(5, 9);
+    expect(lfoKs(hz, clock, 1)[0]).toBe(played);
+    // The region-local bar's seconds (bar 0, phase 0) would plot another k.
+    expect(clock.bar).toBe(0);
+    expect(lfoKs(hz, { ...clock, seconds: 0 }, 1)[0]).not.toBe(played);
+  });
+
+  it("winds the look-ahead's seconds back to the audible bar's line", () => {
+    const clock = new TickTransport(120);
+    for (let i = 0; i < BAR + 10; i++) clock.advance(0);
+    // The queue is 10 ticks into bar 2; the ear is still on bar 1's last tick.
+    expect(barLineSeconds(clock, BAR - 1)).toBeCloseTo(0, 9);
+    expect(barLineSeconds(clock, BAR + 3)).toBeCloseTo(2, 9);
+  });
+
+  it('winds back through a loop jump the look-ahead has already taken', () => {
+    const clock = new TickTransport(120);
+    clock.loop = { start: 0, end: 2 * BAR, songTicks: 4 * BAR };
+    for (let i = 0; i < 2 * BAR + 5; i++) clock.advance(0);
+    // The counter jumped from bar 2's end back to 0 and is 5 ticks on; the ear is on bar 2.
+    expect(clock.currentTick).toBe(5);
+    expect(barLineSeconds(clock, 2 * BAR - 1)).toBeCloseTo(2, 9);
+    // On the loop's first bar again: 4 s in, the seconds keep running across the jump.
+    expect(barLineSeconds(clock, 2)).toBeCloseTo(4, 9);
   });
 });

@@ -1,7 +1,8 @@
 /**
  * The Euclid card's Pattern page (windsor#356, decision 2 of the issue): the
- * Play knobs (Note, Vel, Hold, Steps, Rotate, the divisor and Capture /
- * Release as they were, and Acc vel and Acc mod for the accent amounts),
+ * Play section under its label (Note, Steps and Rotate as the mockup's value
+ * boxes, `euclidStepper.ts`; Vel and Hold as knobs; the divisor and Capture /
+ * Release as they were; and Acc vel and Acc mod for the accent amounts),
  * the stack of rows (`euclidRows.ts`) in a sideways scroller, and under it
  * the Add lane picker, the hover readout and the full cycle.
  */
@@ -10,12 +11,13 @@ import { el } from './dom';
 import type { EuclidCard } from './euclidCardState';
 import { EUCLID_READOUT_HINT } from './euclidConstants';
 import { type LaneChoice, addLaneRow, laneChoices } from './euclidLaneModel';
-import { rotateChange, stepsChange } from './euclidModel';
-import { makeKnob } from './knob';
+import { stepperBox } from './euclidStepper';
+import { EUCLID_STEPPERS } from './euclidStepperModel';
 import { divisorPicker, knobRow as tableKnobRow } from './seqFields';
 import {
   EUCLID_ACCENT_KNOBS,
   EUCLID_KNOBS,
+  EUCLID_NOTE_STEPPER,
   EUCLID_ROTATE_KNOB,
   EUCLID_STEPS_KNOB,
 } from './sequencerKnobTables';
@@ -31,30 +33,28 @@ export interface PatternPage {
   readonly captureButton: HTMLButtonElement;
 }
 
-function stepsKnob(card: EuclidCard): HTMLElement {
-  return makeKnob({
-    ...EUCLID_STEPS_KNOB,
-    color: PERC_COLOR,
-    get: () => card.spec()?.steps ?? EUCLID_STEPS_KNOB.def,
-    set: (v) => {
-      const spec = card.spec();
-      if (spec && card.write(stepsChange(spec, v))) card.dependents.forEach((k) => k.refresh());
-    },
-  });
-}
-
-function rotateKnob(card: EuclidCard): HTMLElement {
-  const knob = makeKnob({
-    ...EUCLID_ROTATE_KNOB,
-    color: PERC_COLOR,
-    get: () => card.spec()?.rotate ?? EUCLID_ROTATE_KNOB.def,
-    set: (v) => {
-      const spec = card.spec();
-      if (spec) card.write({ rotate: rotateChange(spec, v) });
-    },
-  });
-  card.dependents.push(knob);
-  return knob;
+/** Note, Steps and Rotate: the value boxes, each label from its table. */
+function steppers(card: EuclidCard): Record<keyof typeof EUCLID_STEPPERS, HTMLElement> {
+  return {
+    note: stepperBox(card, {
+      label: EUCLID_NOTE_STEPPER.label,
+      model: EUCLID_STEPPERS.note,
+      less: 'Note down a semitone',
+      more: 'Note up a semitone',
+    }),
+    steps: stepperBox(card, {
+      label: EUCLID_STEPS_KNOB.label,
+      model: EUCLID_STEPPERS.steps,
+      less: 'Fewer steps',
+      more: 'More steps',
+    }),
+    rotate: stepperBox(card, {
+      label: EUCLID_ROTATE_KNOB.label,
+      model: EUCLID_STEPPERS.rotate,
+      less: 'Rotate left',
+      more: 'Rotate right',
+    }),
+  };
 }
 
 function captureButton(card: EuclidCard): HTMLButtonElement {
@@ -66,16 +66,23 @@ function captureButton(card: EuclidCard): HTMLButtonElement {
   return node;
 }
 
-/** The Play knobs, the divisor and Capture, then the accent amounts. */
-function playKnobs(card: EuclidCard, capture: HTMLButtonElement): HTMLElement {
+/**
+ * The Play section in the mockup's order: its label, then Note, Vel, Hold,
+ * Steps, Rotate, the divisor and Capture, and the accent amounts.
+ */
+function playSection(card: EuclidCard, capture: HTMLButtonElement): HTMLElement {
   const { ctx, slot, region } = card;
-  const row = tableKnobRow(ctx, slot, EUCLID_KNOBS, PERC_COLOR, region);
-  row.append(stepsKnob(card), rotateKnob(card));
+  const boxes = steppers(card);
+  const row = el('div', 'knob-row euclid-play');
+  row.append(boxes.note, ...tableKnobRow(ctx, slot, EUCLID_KNOBS, PERC_COLOR, region).children);
+  row.append(boxes.steps, boxes.rotate);
   const fixed = el('div', 'capture-row');
   fixed.append(divisorPicker(ctx, slot, region), capture);
   row.appendChild(fixed);
   row.append(...tableKnobRow(ctx, slot, EUCLID_ACCENT_KNOBS, PERC_COLOR, region).children);
-  return row;
+  const section = el('div', 'euclid-section');
+  section.append(el('div', 'euclid-sec-label', 'Play'), row);
+  return section;
 }
 
 /** Refill the Add lane picker: Accent and Pitch once each, the sound lanes up to their limit. */
@@ -118,6 +125,6 @@ export function patternPage(card: EuclidCard): PatternPage {
   const cycle = el('div', 'euclid-cycle');
   const under = el('div', 'euclid-under');
   under.append(picker, readout, cycle);
-  root.append(playKnobs(card, capture), scroll, under);
+  root.append(playSection(card, capture), scroll, under);
   return { root, rows, readout, cycle, picker, captureButton: capture };
 }

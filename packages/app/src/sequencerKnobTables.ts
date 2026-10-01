@@ -37,10 +37,11 @@ import {
   LFO_BARS_MIN,
   LFO_HZ_DEFAULT,
   MIDI_MIDDLE_C,
+  MIDI_NOTE_MAX,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
 } from '@windsor/engine';
-import { fmt0, fmt2, fmtMs, noteName } from './consoleFormat';
+import { fmt0, fmt2, fmtMs } from './consoleFormat';
 import type { PulseField } from './euclidModel';
 import { GRID_ROTATE_MAX } from './gridConstants';
 import type { KnobSpec } from './knob';
@@ -81,19 +82,22 @@ export const VELOCITY_KNOB: SectionKnobEntry = {
   o: { min: 0, max: 1, def: VELOCITY_DEFAULT, fmt: fmt2 },
 };
 
-/** The Euclidean card's note range: two octaves under middle C to three above. */
-export const EUCLID_NOTE_MIN = 24;
-export const EUCLID_NOTE_MAX = 96;
+/**
+ * The Euclidean card's Note stepper (windsor#356): one semitone a press over
+ * the whole MIDI range the normaliser accepts, read as name and number.
+ */
+export const EUCLID_NOTE_STEPPER: CardKnobSpec = {
+  label: 'Note',
+  min: 0,
+  max: MIDI_NOTE_MAX,
+  def: MIDI_MIDDLE_C,
+  step: 1,
+};
 /** Its hold knob stops at two seconds; the engine accepts more from a file. */
 export const EUCLID_HOLD_MAX = 2;
 
+/** The Euclidean card's Play knobs; Note, Steps and Rotate are steppers beside them. */
 export const EUCLID_KNOBS: readonly SequencerKnobEntry[] = [
-  {
-    kind: 'driver',
-    f: 'note',
-    label: 'Note',
-    o: { min: EUCLID_NOTE_MIN, max: EUCLID_NOTE_MAX, def: MIDI_MIDDLE_C, step: 1, fmt: noteName },
-  },
   VELOCITY_KNOB,
   {
     kind: 'driver',
