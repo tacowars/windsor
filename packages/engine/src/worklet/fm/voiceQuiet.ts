@@ -35,6 +35,7 @@ function voiceDormant(voice: Voice): boolean {
     const env = voice.ampEnv[i];
     if (env.state !== ST_SUSTAIN || env.p!.sustainLevel !== 0) return false;
     if (env.p!.endLevel !== 0) return false;
+    if (voice.ampBreak[i] !== 0) return false; // a knot still ahead in this block
     if (Math.abs(voice.amp[i]) > DORMANT_AMP) return false;
   }
   return voiceFilterQuiet(voice);
@@ -55,16 +56,21 @@ function voiceFilterQuiet(voice: Voice): boolean {
 
 /**
  * Nothing left to hear: every carrier's envelope has ended, its amplitude
- * ramp has reached ~0 and the filter has stopped ringing. Ending a voice on
- * the envelopes alone skipped the last ramp and cut a resonant filter's
- * ring to 0 in one sample, the click at the end of a stop's release
- * (windsor#7).
+ * ramp has reached ~0 with no knot left ahead of it in this block, and the
+ * filter has stopped ringing. Ending a voice on the envelopes alone skipped
+ * the last ramp and cut a resonant filter's ring to 0 in one sample, the
+ * click at the end of a stop's release (windsor#7). An envelope that ran its
+ * whole course inside one block's `advanceExact` is finished while its ramp
+ * still has its knots to pass (windsor#301): a Trigger hit with a flat
+ * attack sits at 0 until its rise, and an event that splits the block there
+ * would otherwise end it unheard. The knot state decides, not the level.
  */
 function voiceFinished(voice: Voice): boolean {
   const carriers = voice.alg.carriers;
   for (let i = 0; i < carriers.length; i++) {
     const c = carriers[i];
     if (!voice.ampEnv[c].finished) return false;
+    if (voice.ampBreak[c] !== 0) return false;
     if (Math.abs(voice.amp[c]) > DORMANT_AMP) return false;
   }
   return voiceFilterQuiet(voice);

@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Envelope as EnvelopeParams } from '../patch/patch';
-import { makeEnvelope, makePatch, WAVE } from '../patch/patch';
+import { LOOP_MODE, makeEnvelope, makePatch, WAVE } from '../patch/patch';
 import type { ScheduledEvent } from '../__fixtures__/workletHarness';
 import { loadProcessor, render } from '../__fixtures__/workletHarness';
 
@@ -28,8 +28,12 @@ const NOTE_ON: ScheduledEvent[] = [{ type: 'noteOn', id: 1, note: 60, velocity: 
 /** A float32 sample's tolerance against the level it is scaled from. */
 const CLOSE = 1e-6;
 
-/** Operator A alone, a held digital square at phase 0, under `env`. */
+/**
+ * Operator A alone, a held digital square at phase 0, under `env`. The
+ * silent carriers B to D share it, so the voice ends when A's envelope does.
+ */
 function probePatch(env: Partial<EnvelopeParams>): unknown {
+  const silent = { level: 0, env: makeEnvelope(env) };
   return makePatch({
     algorithm: ALG_ADDITIVE,
     ops: [
@@ -43,17 +47,22 @@ function probePatch(env: Partial<EnvelopeParams>): unknown {
         velSens: 0,
         env: makeEnvelope(env),
       },
-      { level: 0 },
-      { level: 0 },
-      { level: 0 },
+      silent,
+      silent,
+      silent,
     ],
   });
 }
 
-/** The left channel of `blocks` render quanta of one note-on at frame 0. */
-function heard(env: Partial<EnvelopeParams>, blocks = BLOCKS, specialise = true): Float32Array {
+/** The left channel of `blocks` render quanta of `events`, by default one note-on at frame 0. */
+function heard(
+  env: Partial<EnvelopeParams>,
+  blocks = BLOCKS,
+  specialise = true,
+  events: ScheduledEvent[] = NOTE_ON,
+): Float32Array {
   const processor = loaded.create(probePatch(env), 1, undefined, { specialise });
-  const out = render(loaded, processor, blocks, NOTE_ON).samples;
+  const out = render(loaded, processor, blocks, events).samples;
   return out.filter((_, i) => i % 2 === 0);
 }
 
@@ -144,5 +153,39 @@ describe('an operator envelope edge inside a control block (windsor#301)', () =>
     const kernel = heard(env, BLOCKS, true);
     const generic = heard(env, BLOCKS, false);
     expect(Buffer.compare(Buffer.from(kernel.buffer), Buffer.from(generic.buffer))).toBe(0);
+  });
+
+  it('keeps a released Trigger hit alive while its knots are still ahead in the block', () => {
+    // A Trigger envelope runs its whole course inside the first block's
+    // advance: 10 flat samples at 0, a 10-sample rise to 1 and a 10-sample
+    // release to 0, so it has finished with three knots still ahead. A
+    // note-off at frame 1 and another event at frame 2 split the render
+    // there, while the ramp is still at 0: the hit must still play in full.
+    const env = {
+      initLevel: 0,
+      attackTime: 10 / SR,
+      peakLevel: 0,
+      decayTime: 10 / SR,
+      sustainLevel: 1,
+      releaseTime: 10 / SR,
+      endLevel: 0,
+      loopMode: LOOP_MODE.TRIGGER,
+    };
+    const split: ScheduledEvent[] = [
+      ...NOTE_ON,
+      { type: 'noteOff', id: 1, frame: 1 },
+      { type: 'noteOff', id: 2, frame: 2 },
+    ];
+    for (const specialise of [true, false]) {
+      const hit = heard(env, 1, specialise, split);
+      const xs = Array.from(hit, (s) => s / UNIT);
+      const peak = firstAt(xs, 1);
+      expect(Math.abs(peak - 20)).toBeLessThanOrEqual(1);
+      expect(xs[5]).toBeCloseTo(0, 6);
+      expect(Math.abs(firstAt(xs, 0, peak) - 30)).toBeLessThanOrEqual(1);
+      // The split changes nothing: the same bits as the unbroken hit.
+      const whole = heard(env, 1, specialise);
+      expect(Buffer.compare(Buffer.from(hit.buffer), Buffer.from(whole.buffer))).toBe(0);
+    }
   });
 });
