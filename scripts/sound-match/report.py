@@ -140,7 +140,17 @@ def _score_lines(stats):
             lines.append(f"  {key:6s} {s['mean']:.4f}")
         else:
             lines.append(f"  {key:6s} {s['mean']:.4f} ± {s['sd']:.4f} [{s['min']:.4f}, {s['max']:.4f}]")
-    return lines
+    return lines + _coverage_lines(stats)
+
+
+def _coverage_lines(stats):
+    """The tracks' coverage: shares of the reference's span, mean over seeds."""
+    parts = [
+        f"{name} missing {stats[f'{name}_missing']['mean']:.0%} extra {stats[f'{name}_extra']['mean']:.0%}"
+        for name in ("harm", "pitch")
+        if f"{name}_missing" in stats
+    ]
+    return ["  coverage (share of the reference's track span): " + "; ".join(parts)] if parts else []
 
 
 def _lag_note(lag):

@@ -4,7 +4,9 @@
  * (`packages/engine/src/worklet/generated/fm-processor.js`) under Node, the way
  * `__fixtures__/workletHarness.ts` does: the bundle's text evaluated with a
  * stand-in `AudioWorkletProcessor`, one note-on at frame 0, 128-frame blocks
- * at 48 kHz, the left channel kept.
+ * at 48 kHz, mixed to mono as (L + R) / 2. A centred mono patch has L == R, so
+ * its mono render is exactly either channel; a panned or spread patch keeps
+ * both sides of its image.
  *
  * Every render passes `processorOptions.seed`, so noise, free-running start
  * phases and random pan are reproducible here. Live playback passes none and
@@ -40,6 +42,8 @@ import { fileURLToPath } from 'node:url';
 const ENGINE = fileURLToPath(new URL('../../packages/engine/src/', import.meta.url));
 const SR = 48000;
 const BLOCK = 128;
+// The mono mix: (L + R) / 2, so a centred voice (L == R) renders unchanged.
+const MONO_GAIN = 0.5;
 const DEFAULTS = { note: 60, velocity: 1, seconds: 1, gate: null, seed: 1 };
 
 /** The processor class, from the shipped bundle evaluated once. */
@@ -79,7 +83,7 @@ export function resolvePatch(source) {
   return patchCache.get(source);
 }
 
-/** One note-on at frame 0 (and a note-off at `gate` seconds, if given); the left channel. */
+/** One note-on at frame 0 (and a note-off at `gate` seconds, if given); mono, (L + R) / 2. */
 export function renderNote(patch, options = {}) {
   const { note, velocity, seconds, gate, seed } = { ...DEFAULTS, ...options };
   const processor = new Processor({
@@ -106,7 +110,7 @@ export function renderNote(patch, options = {}) {
       processor.inbox({ type: 'noteOff', id: 1, note, frame: gateFrame });
     }
     processor.process([], [[left, right]], params);
-    out.set(left, start);
+    for (let i = 0; i < BLOCK; i++) out[start + i] = (left[i] + right[i]) * MONO_GAIN;
   }
   return out.subarray(0, frames);
 }

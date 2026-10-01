@@ -97,6 +97,14 @@ HARM_MIN_LEVEL_DB = -30.0
 PITCH_SCORE_MS = (2.0, 300.0)
 PITCH_MISSING_ST = 24.0
 HARM_MISSING_DB = 60.0
+# Coverage penalties: the harmonic and pitch scores compare only where the
+# candidate's track overlaps the reference's, and add this much per unit of
+# the reference's span the candidate misses (plus per unit of the candidate's
+# span past the reference's). A track ending at half the reference's span
+# adds half of it, so it scores clearly worse than a full-length track with
+# the same error; a track missing entirely costs the *_MISSING value.
+HARM_UNCOVERED_DB = HARM_MISSING_DB
+PITCH_UNCOVERED_ST = PITCH_MISSING_ST
 WAVE_WINDOW_MS = 30.0
 WAVE_MAX_LAG_MS = 2.0
 

@@ -6,10 +6,13 @@ Each of the spec's parameters is moved by ±step of its range (in its scale,
 linear or log) from its value in PATCH (a library id, a patch file or a fit's
 best.json), and the patch is rendered as the spec's reference --ref plays it.
 The table shows, per headline measurement, how far it moves per +step, from
-the values the parameter actually took: a central difference when both sides
-moved, a one-sided difference over the side that moved when a bound clipped
-the other, each divided by the real change (in the parameter's scale) and
-multiplied by the step. A parameter neither side could move shows "pinned".
+the values the parameter actually took, each side classified by its sign
+relative to the actual base value: a central difference only when one side
+moved above the base and the other below; a one-sided difference when only
+one side moved (a bound clipped the other) or both landed on the same side
+(a base outside the bounds), over the side further from the base; each
+divided by the real change (in the parameter's scale) and multiplied by the
+step. A parameter neither side could move shows "pinned".
 Seed-dependent renders use the same seeds on both sides and are averaged.
 The JSON (default <tmp>/sound-match/sensitivity-<spec>.json) holds both
 sides and which of them moved.
@@ -89,26 +92,41 @@ def _unit(prm, v):
 
 
 def side_moves(prm, base_value, plus_value, minus_value):
-    """Each side's real change in the parameter's unit scale; 0 for a side a bound clipped back."""
+    """Each side's signed real change from the actual base, in the parameter's unit scale; 0 for a side a bound clipped back."""
     u = _unit(prm, base_value)
     return _unit(prm, plus_value) - u, _unit(prm, minus_value) - u
 
 
 def mode(du_plus, du_minus):
+    """How to difference the two sides, from each side's sign relative to the actual base.
+
+    "central" only when one side moved above the base and the other below;
+    "+ side" / "− side" (one-sided, over that side) when only one moved, or when
+    both landed on the same side of the base (a base outside the bounds), then
+    over the side further from the base; "pinned" when neither moved.
+    """
     # A clipped side lands on the bound; under a log scale that can differ from the base by an ulp.
-    moved = (not abs(du_plus) < UNMOVED, not abs(du_minus) < UNMOVED)
-    return {(True, True): "central", (True, False): "+ only", (False, True): "− only"}.get(moved, "pinned")
+    moved_plus, moved_minus = not abs(du_plus) < UNMOVED, not abs(du_minus) < UNMOVED
+    if moved_plus and moved_minus:
+        if np.sign(du_plus) != np.sign(du_minus):
+            return "central"
+        return "+ side" if abs(du_plus) >= abs(du_minus) else "− side"
+    if moved_plus:
+        return "+ side"
+    if moved_minus:
+        return "− side"
+    return "pinned"
 
 
 def slope(d_plus, d_minus, move, step):
-    """The move per +step from the sides that moved, over their real change; None when pinned."""
+    """The move per +step from the sides used, over their real change; None when pinned."""
     du_plus, du_minus = move["du_plus"], move["du_minus"]
     m = mode(du_plus, du_minus)
     if m == "central":
         return (d_plus - d_minus) / (du_plus - du_minus) * step
-    if m == "+ only":
+    if m == "+ side":
         return d_plus / du_plus * step
-    if m == "− only":
+    if m == "− side":
         return d_minus / du_minus * step
     return None
 

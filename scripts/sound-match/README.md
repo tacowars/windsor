@@ -68,7 +68,8 @@ node render.mjs --server                          # JSON lines on stdin
 
 The patch is a library id, a library file (`{ format, …, patch }`) or a bare
 patch JSON. Without `--gate` no note-off is sent. The WAV is 32-bit float,
-mono, 48 kHz. `--out` defaults to `<tmp>/sound-match/render.wav`.
+mono (the worklet's two channels mixed as (L + R) / 2, which is exactly
+either channel for a centred patch), 48 kHz. `--out` defaults to `<tmp>/sound-match/render.wav`.
 
 Every render passes `processorOptions.seed` (default 1), so noise,
 free-running start phases and random pan are reproducible here. Live
@@ -137,8 +138,12 @@ python sensitivity.py specs/tr909-kick.json tr909-kick [--step 0.05] [--ref 0]
 Moves each spec parameter by ±5 % of its range and tabulates how each
 headline measurement moves per +step: decay times, click, pitch at 10 and
 40 ms, body H2 and H3, symmetry, and centroid and band levels per region.
-A parameter at a bound gets a one-sided difference over the side that moved,
-scaled by its real change; one that cannot move at all shows "pinned".
+Each side is classified by its sign relative to the actual base value. A
+central difference needs one side above the base and the other below. A
+parameter at a bound gets a one-sided difference over the side that moved,
+and one whose base is outside its range (both sides on the same side of it)
+over the side further from the base, scaled by its real change; one that
+cannot move at all shows "pinned".
 
 ### Render speed: `renderer.py`
 
@@ -202,9 +207,17 @@ Each is reported separately; lower is closer.
 |---|---|---|
 | `stft` | multi-resolution STFT loss: spectral convergence plus mean absolute log-magnitude difference, FFT sizes 256 / 1024 / 4096, hops at a quarter, floored 80 dB below the reference's loudest bin | 1 |
 | `band` | RMS dB difference of the band envelopes, floored at −60 dB | 0.1 |
-| `harm` | RMS dB difference of H2..H12 per reference cycle above −30 dB (tonal) | 0.04 |
-| `pitch` | RMS semitones per half-cycle step, 2–300 ms (tonal) | 0.2 |
+| `harm` | RMS dB difference of H2..H12 per reference cycle above −30 dB that the candidate's track covers, plus the coverage penalty (tonal) | 0.04 |
+| `pitch` | RMS semitones per half-cycle step, 2–300 ms, where the candidate's track covers it, plus the coverage penalty (tonal) | 0.2 |
 | `wave` | waveform MSE over 0–30 ms at the best lag within ±2 ms | 2 |
+
+`harm` and `pitch` never extrapolate a track past its end. They compare
+only where the candidate's track (its cycles above −30 dB, or its
+half-cycles in 2–300 ms) overlaps the reference's, and add 60 dB or 24 st
+(`HARM_UNCOVERED_DB`, `PITCH_UNCOVERED_ST`) per unit of the reference's span
+the candidate misses, and per unit of the candidate's span past the
+reference's. A track ending at half the reference's span adds 30 dB or
+12 st. The report's `coverage` line gives both shares.
 
 `wave` is the only score that sees polarity and where exactly a click
 lands. The weights put each term on the same order at a typical kick
