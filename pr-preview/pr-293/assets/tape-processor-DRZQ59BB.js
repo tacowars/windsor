@@ -57,6 +57,11 @@ var TAPE_DEFAULTS = {
 var TAPE_DSP = {
   weightFloor: 1e-12,
   smoothSeconds: 0.01,
+  /**
+   * The magnetic controls' glide (a model switch) ends this close to the row: about 16 time
+   * constants, and a final step that moves the core's output gain by about a millionth or less.
+   */
+  magneticSnap: 1e-7,
   toneSeconds: 0.03,
   dcHz: 10,
   dbScale: 20,
@@ -567,7 +572,8 @@ var TapeMagneticCore = class {
   /**
    * Maps the three controls to Ms, a and c, and recomputes the step, the
    * origin susceptibility and the output gain. Keeps the state. Off the
-   * per-sample path: E2 calls it per block from smoothed controls.
+   * per-sample path: the stage calls it at construction, and `retune` while
+   * a model switch glides.
    */
   configure(rate, factor, controls) {
     const t = this.table;
@@ -578,16 +584,29 @@ var TapeMagneticCore = class {
       throw new RangeError("tape core: saturation must be in [0, 1]");
     if (!t.factors.includes(factor) || !(rate > 0 && rate < Infinity))
       throw new RangeError(`tape core: no rate ${rate} at factor ${factor}`);
-    const ms = t.saturationFloor + t.saturationScale * (1 - saturation);
-    const a = ms / (t.driveFloor + t.driveScale * drive);
-    const c = Math.max(0, Math.sqrt(1 - width) - t.reversibleOffset);
+    this.dt = 1 / (rate * factor);
+    this.retune(controls);
+  }
+  /**
+   * `configure` without its checks or the step: Ms, a and c from `controls`,
+   * and the origin susceptibility and output gain, in exactly the operations
+   * of `originSusceptibility`, so the bits are the same. Keeps the state. The
+   * stage's per-sample entry while a model switch glides the controls
+   * (design decision 6); the controls are read in place, so no double
+   * crosses the call, and every row was checked at load.
+   */
+  retune(controls) {
+    const t = this.table;
+    const ms = t.saturationFloor + t.saturationScale * (1 - controls.saturation);
+    const a = ms / (t.driveFloor + t.driveScale * controls.drive);
+    const c = Math.max(0, Math.sqrt(1 - controls.width) - t.reversibleOffset);
+    const r = ms / a * t.langevinOriginSlope;
     this.ms = ms;
     this.invA = 1 / a;
     this.reversibleGain = c * (ms / a);
     this.irreversible = 1 - c;
     this.irreversibleK = (1 - c) * t.pinning;
-    this.dt = 1 / (rate * factor);
-    this.susceptibility = originSusceptibility(controls, t);
+    this.susceptibility = c * r / (1 - t.alpha * c * r);
     this.gain = 1 / Math.max(this.susceptibility, t.susceptibilityFloor);
   }
   /** Demagnetised: the state and the output to zero. The reset counter is kept. */
@@ -831,11 +850,13 @@ var TapeMagneticStage = class {
     this.dry = new Float64Array(CHANNELS * this.latency);
     this.dryAt = 0;
     this.smoothing = NaN;
-    this.smoothFrames = NaN;
+    this.smoothing = 1 - exp2(-1 / (rate * TAPE_DSP.smoothSeconds * TAPE_PORTABLE_MATH.ln2));
+    this.snap = NaN;
+    this.snap = TAPE_DSP.magneticSnap;
+    this.gliding = false;
     const row = TAPE_MODELS[model].magnetic;
     this.target = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     this.controls = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
-    this.configured = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
     for (let i = 0; i < this.oversamplers.length; i++)
       this.oversamplers[i].configure(this.controls);
     this.active = [this.oversamplers[0], this.oversamplers[TAPE_OVERSAMPLING.length]];
@@ -844,9 +865,10 @@ var TapeMagneticStage = class {
   }
   /**
    * The pair for `value`, the nearest of `TAPE_OVERSAMPLING`. A change resets
-   * the newly selected pair to zero state; it is already configured from the
-   * smoothed controls, as `configure` keeps both pairs. The pair it leaves
-   * keeps its state until it is selected again, when it too starts from zero.
+   * the newly selected pair to zero state; it is already tuned to the
+   * controls, as a settled glide retunes both pairs, or it is retuned by the
+   * next `glide`. The pair it leaves keeps its state until it is selected
+   * again, when it too starts from zero.
    */
   select(value) {
     const index = value >= (TAPE_OVERSAMPLING[0] + TAPE_OVERSAMPLING[1]) / 2 ? 1 : 0;
@@ -859,30 +881,28 @@ var TapeMagneticStage = class {
       this.active[channel] = next;
     }
   }
+  /** Once per block: `model`'s row becomes the target, and a glide starts when the controls are not on it. */
+  configure(model) {
+    const t = magneticControls(TAPE_MODELS[model].magnetic, this.target), s = this.controls;
+    if (s.drive !== t.drive || s.width !== t.width || s.saturation !== t.saturation)
+      this.gliding = true;
+  }
   /**
-   * Once per block: smooth the core's controls toward `model`'s row over
-   * `frames` samples with the 10 ms time constant, and reconfigure both pairs
-   * when they moved. While every row is equal this changes nothing.
+   * One sample of the glide: each control steps toward its target, snapping
+   * to it within `snap`, and the active pair's cores are retuned. When all
+   * three are on the target, every core is retuned to it and the glide ends.
    */
-  configure(model, frames) {
-    magneticControls(TAPE_MODELS[model].magnetic, this.target);
-    if (frames !== this.smoothFrames) {
-      this.smoothFrames = frames;
-      this.smoothing = 1 - exp2(-frames / (this.rate * TAPE_DSP.smoothSeconds * TAPE_PORTABLE_MATH.ln2));
-    }
-    const k = this.smoothing, s = this.controls, t = this.target, last = this.configured;
+  glide() {
+    const k = this.smoothing, snap = this.snap, s = this.controls, t = this.target;
     s.drive += k * (t.drive - s.drive);
-    if (Math.abs(t.drive - s.drive) < Number.EPSILON) s.drive = t.drive;
+    if (Math.abs(t.drive - s.drive) < snap) s.drive = t.drive;
     s.width += k * (t.width - s.width);
-    if (Math.abs(t.width - s.width) < Number.EPSILON) s.width = t.width;
+    if (Math.abs(t.width - s.width) < snap) s.width = t.width;
     s.saturation += k * (t.saturation - s.saturation);
-    if (Math.abs(t.saturation - s.saturation) < Number.EPSILON) s.saturation = t.saturation;
-    if (s.drive === last.drive && s.width === last.width && s.saturation === last.saturation)
-      return;
-    last.drive = s.drive;
-    last.width = s.width;
-    last.saturation = s.saturation;
-    for (let i = 0; i < this.oversamplers.length; i++) this.oversamplers[i].configure(s);
+    if (Math.abs(t.saturation - s.saturation) < snap) s.saturation = t.saturation;
+    this.gliding = s.drive !== t.drive || s.width !== t.width || s.saturation !== t.saturation;
+    const cores = this.gliding ? this.active : this.oversamplers;
+    for (let i = 0; i < cores.length; i++) cores[i].core.retune(s);
   }
 };
 
@@ -1074,7 +1094,7 @@ var TapeDsp = class {
     }
     this.model = model;
     this.magnetic.select(params.oversampling[0]);
-    this.magnetic.configure(model, frames);
+    this.magnetic.configure(model);
     const k = 1 - Math.exp(-frames / (this.rate * TAPE_DSP.toneSeconds));
     this.controls.bias += k * (this.targets.bias - this.controls.bias);
     if (Math.abs(this.targets.bias - this.controls.bias) < Number.EPSILON)
@@ -1120,6 +1140,7 @@ var TapeDsp = class {
     } else motion.wowAmount = motion.flutterAmount = motion.dropoutAmount = s.wear / TAPE_DSP.percent;
     motion.advance();
     this.tickNoise();
+    if (this.magnetic.gliding) this.magnetic.glide();
     this.channel(0);
     this.left = this.sample;
     this.channel(1);
