@@ -23,13 +23,15 @@ import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import type { Arrangement, PartRegion, SequencerKind } from './arrangement';
 import { FieldNormaliser, isRecord, show } from './arrangementFields';
 import { normaliseRegionPattern, sequencerKindOf } from './sequencerNormalise';
+import { withFittedAutomation } from './automationNormalise';
 
 /**
- * The arrangement with its regions and events re-fitted to its own
- * `transport.bars` — what the player runs over every merged live partial,
- * so a song shortened live sounds as its normalised document will after
- * export (Codex, #705). Idempotent on normalised data; a region or event
- * left outside the song is dropped exactly as `makeArrangement` drops it.
+ * The arrangement with its regions, events and any part's automation lanes
+ * re-fitted to its own `transport.bars` — what the player runs over every
+ * merged live partial, so a song shortened live sounds as its normalised
+ * document will after export (Codex, #705). Idempotent on normalised data;
+ * a region or event left outside the song is dropped exactly as
+ * `makeArrangement` drops it, and a lane is cut at the end as it cuts one.
  */
 export function fitTimelines(arrangement: Arrangement): Arrangement {
   const n = new FieldNormaliser();
@@ -40,16 +42,22 @@ export function fitTimelines(arrangement: Arrangement): Arrangement {
       ...arrangement.harmony,
       events: normaliseHarmonyEvents(arrangement.harmony.events, songTicks, 'harmony.events', n),
     },
-    parts: arrangement.parts.map((part) => ({
-      ...part,
-      regions: normaliseRegions(part.regions, {
+    parts: arrangement.parts.map((part) =>
+      // A part that carries automation lanes has them fitted too (windsor#342 decision 3).
+      withFittedAutomation(
+        {
+          ...part,
+          regions: normaliseRegions(part.regions, {
+            songTicks,
+            // Read tolerantly: the player fits a merged partial before it validates it.
+            kind: sequencerKindOf(part.sequencer),
+            path: `parts.${part.slot}.regions`,
+            n,
+          }),
+        },
         songTicks,
-        // Read tolerantly: the player fits a merged partial before it validates it.
-        kind: sequencerKindOf(part.sequencer),
-        path: `parts.${part.slot}.regions`,
-        n,
-      }),
-    })),
+      ),
+    ),
   };
 }
 

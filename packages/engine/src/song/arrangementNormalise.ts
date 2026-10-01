@@ -40,6 +40,7 @@ import {
 import { normaliseHarmonyEvents, normaliseRegions } from './timelineNormalise';
 import { normaliseLoop } from './songLoop';
 import { normaliseStrip } from './deskNormalise';
+import { normaliseAutomation } from './automationNormalise';
 import type { Patch } from '../patch/patch';
 import { clonePatch } from '../patch/patch';
 import { normalisePatches } from '../patch/patchNormalise';
@@ -157,12 +158,16 @@ export class ArrangementNormaliser extends FieldNormaliser {
     return [0];
   }
 
-  /** One part of the list (#597): identity, patch, strip, regions and sequencer. Null drops it, reported. */
+  /**
+   * One part of the list (#597): identity, patch, strip, regions, sequencer
+   * and automation lanes (windsor#342). Null drops it, reported. The lanes
+   * come after the strip, whose insert ids they name.
+   */
   part(raw: unknown, path: string, transport: Transport): DocumentPart | null {
     const o = this.section(raw, path);
     this.dropUnknown(
       o,
-      ['slot', 'name', 'preset', 'velocity', 'strip', 'regions', 'sequencer'],
+      ['slot', 'name', 'preset', 'velocity', 'strip', 'regions', 'sequencer', 'automation'],
       path,
     );
     const slot = this.slot(o.slot, path);
@@ -173,19 +178,29 @@ export class ArrangementNormaliser extends FieldNormaliser {
     if (o.name !== undefined && typeof o.name !== 'string') {
       this.correction(`${path}.name: ${show(o.name)} is not a name — using "${fallbackName}"`);
     }
+    const songTicks = transport.bars * TICKS_PER_BAR;
+    const strip = normaliseStrip(o.strip, `${path}.strip`, this);
+    const automation = normaliseAutomation(o.automation, {
+      songTicks,
+      inserts: strip.inserts,
+      path: `${path}.automation`,
+      n: this,
+    });
     return {
       slot,
       name: typeof o.name === 'string' ? o.name : fallbackName,
       preset,
       velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, `${path}.velocity`),
-      strip: normaliseStrip(o.strip, `${path}.strip`, this),
+      strip,
       regions: normaliseRegions(o.regions, {
-        songTicks: transport.bars * TICKS_PER_BAR,
+        songTicks,
         kind: sequencerKindOf(o.sequencer),
         path: `${path}.regions`,
         n: this,
       }),
       sequencer: normaliseSequencer(o.sequencer, `${path}.sequencer`, this),
+      // Absent stays absent: a song without lanes reads and exports as before (decision 15).
+      ...(automation && { automation }),
     };
   }
 

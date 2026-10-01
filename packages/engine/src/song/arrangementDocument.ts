@@ -38,6 +38,7 @@ import { normaliseReturns } from './deskNormalise';
 import { normaliseGroupOutputs, normaliseGroups } from './groupNormalise';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import type { ChannelStrip, GroupSpec, ReturnSpec } from '../mixer/mix';
+import type { AutomationLane } from '../automation/automationLane';
 import type { Patch } from '../patch/patch';
 import type { ResolveOptions } from './arrangementValidate';
 import type { FormatRefusal } from './formatUpgrade';
@@ -45,10 +46,17 @@ import { upgradeSong } from './songMigrations';
 
 export { FALLBACK_ARRANGEMENT };
 
-/** A part as the document holds it: the player's part plus its own strip (#597). */
+/** A part as the document holds it: the player's part plus its own strip (#597) and lanes. */
 export interface DocumentPart extends MusicPart {
   /** Level, pan and sends — owned by the part, not looked up by name. */
   readonly strip: ChannelStrip;
+  /**
+   * The part's automation lanes (windsor#342, record
+   * `2026-10-01-song-automation-lanes`): curves over song time on its strip,
+   * its inserts (by insert id) and its voice. Absent when it has none; a
+   * partial replaces the whole list. Nothing plays them yet.
+   */
+  readonly automation?: readonly AutomationLane[];
 }
 
 /**
