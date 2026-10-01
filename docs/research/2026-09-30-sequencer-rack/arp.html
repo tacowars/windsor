@@ -153,9 +153,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
 .gcell.rat.r2, .gcell.rat.r3, .gcell.rat.r4 { border-color: color-mix(in srgb, var(--carrier) 60%, var(--line)); }
 .gcell.rat .ticks { position: absolute; inset: 3px 4px; display: flex; justify-content: space-between; }
 .gcell.rat .ticks i { width: 2px; background: var(--carrier); border-radius: 1px; }
-.gcell.rat.idle .ticks i { background: var(--ink-faint); }
-.gcell.rat.idle.r2, .gcell.rat.idle.r3, .gcell.rat.idle.r4 { border-color: var(--line); }
-.gcell.rat.idle.r1 { visibility: hidden; }
+.gcell.rat.idle { opacity: 0.4; cursor: default; }
 .row-lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; text-align: right; order: 9; margin-top: 2px; }
 .new-tag { font: 600 7.5px var(--f-panel); letter-spacing: 0.1em; color: var(--inset); background: var(--carrier); border-radius: 2px; padding: 0 3px; margin-left: 4px; vertical-align: 1px; }
 </style>
@@ -210,7 +208,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
       <ul>
         <li><b>Style, Rate and Voicing</b> in the first column, where the Grid has Step. <b>Retrigger, Seed with Reseed, and Randomize</b> in the second.</li>
         <li><b>Its column is shorter:</b> no degree picker, because the chord gives the pitch. So the step rows are 22 px shorter than the Grid's, and the lanes get that room.</li>
-        <li><b>A ratchet row</b> <span class="new-tag">NEW</span> under S, as on the Grid and Basslead: click to cycle ×1 to ×4. A ratchet on a rest or a tie is grey.</li>
+        <li><b>A ratchet row</b> <span class="new-tag">NEW</span> under S, as on the Grid and Basslead: click to cycle ×1 to ×4. A rest or a tie has no ratchet: its cell is grey and does nothing.</li>
         <li><b>Its width moves with the cycle:</b> 6 cells for Up over Am in two octaves, 30 for Up-down over Am7 in four. Cells past the cycle stay written but aren't shown, as today.</li>
       </ul>
     </div>
@@ -276,7 +274,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
   const laneVal = (lane, i) => lane.v[i % lane.v.length];
 
 
-  const ratchetCell = (r, idle) => `<div class="gcell rat r${r}${idle ? ' idle' : ''}" title="Ratchet ×${r}: click for ×1 → ×2 → ×3 → ×4${idle ? '; waits for a note' : ''}">${r > 1 ? `<span class="ticks">${'<i></i>'.repeat(r)}</span>` : '×1'}</div>`;
+  const ratchetCell = (r, idle) => idle ? '<div class="gcell rat idle" title="A rest or a tie has no ratchet"></div>' : `<div class="gcell rat r${r}" title="Ratchet ×${r}: click for ×1 → ×2 → ×3 → ×4">${r > 1 ? `<span class="ticks">${'<i></i>'.repeat(r)}</span>` : '×1'}</div>`;
   const RAT = { 1: 2, 4: 3, 9: 2, 12: 4, 16: 2, 21: 3 };
   function controls() {
     const c = CYCLES[state.cycle];

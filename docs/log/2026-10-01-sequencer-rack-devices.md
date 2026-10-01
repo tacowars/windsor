@@ -57,8 +57,9 @@ around them. This record is that second round.
    while the lanes scroll vertically under them. Two lanes fit at 244 px.
 6. **A ratchet row on the Grid, the Arp and Basslead,** as Euclid's: one
    14 px cell per step under S. A click cycles ×1 → ×2 → ×3 → ×4 → ×1,
-   and ticks show the split. A ratchet on a rest or a tie is drawn grey
-   and plays nothing.
+   and ticks show the split. A rest or a tie has no ratchet: its cell is
+   grey and does nothing, and a note that becomes a rest or a tie loses
+   its ratchet, as a Grid note loses its Oct, accent and slide today.
    - A ratchet of `N` plays `N` hits of the step's note, spaced evenly in
      seconds across the step's swung span. A region end or a loop jump
      drops the hits past it, as a Euclid roll does (`rollSpan.ts`).
@@ -88,11 +89,12 @@ around them. This record is that second round.
    degree are greyed when the mode ignores them. Basslead gets no pitch
    lane; the per-step Oct row is its octave modifier.
 10. **The format change is additive.** A Grid or Arp note step gains
-    `ratchet`, where absent means one hit. Basslead gains `steps`,
-    `length`, `accentVelocity`, `accentMod` and `lanes`. A Basslead
-    without `steps` loads as one bar of plain notes, which plays exactly
-    as today, and keeps today's gate-1 tie rule. `ARRANGEMENT_VERSION`
-    does not change (`2026-09-28-format-versions-refuse-never-destroy`).
+    `ratchet`, where absent means one hit; rests and ties carry none.
+    Basslead gains `steps`, `length`, `accentVelocity`, `accentMod` and
+    `lanes`. A Basslead without `steps` loads as one bar of plain notes,
+    which plays exactly as today, and keeps today's gate-1 tie rule.
+    `ARRANGEMENT_VERSION` does not change
+    (`2026-09-28-format-versions-refuse-never-destroy`).
 11. **Euclid** keeps the design windsor#356 gives it, its pages included,
     and is fitted to the 244 px device afterwards.
 

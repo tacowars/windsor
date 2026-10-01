@@ -160,9 +160,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
 .gcell.rat.r2, .gcell.rat.r3, .gcell.rat.r4 { border-color: color-mix(in srgb, var(--carrier) 60%, var(--line)); }
 .gcell.rat .ticks { position: absolute; inset: 3px 4px; display: flex; justify-content: space-between; }
 .gcell.rat .ticks i { width: 2px; background: var(--carrier); border-radius: 1px; }
-.gcell.rat.idle .ticks i { background: var(--ink-faint); }
-.gcell.rat.idle.r2, .gcell.rat.idle.r3, .gcell.rat.idle.r4 { border-color: var(--line); }
-.gcell.rat.idle.r1 { visibility: hidden; }
+.gcell.rat.idle { opacity: 0.4; cursor: default; }
 .row-lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; text-align: right; order: 9; margin-top: 3px; }
 .corner { display: flex; flex-direction: column; gap: 3px; }
 </style>
@@ -217,7 +215,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
         <li><b>The Arp's top cell,</b> <code>♪ — ·</code>, because the pitch mode picks the note: Follow Root plays the chord's root, Follow Chord draws a chord tone, Fixed holds a degree.</li>
         <li><b>A tie</b> holds the note through the step, so a long note no longer depends on gate 1 and the same pitch twice.</li>
         <li><b>Oct, A and S</b> work as on the Grid: an octave jump, an accent (Acc vel and Acc mod), a slide into the next note.</li>
-        <li><b>Ratchet,</b> as Euclid's (#355): click to cycle ×1, ×2, ×3, ×4, and the ticks show the split. A ratchet on a rest or a tie is drawn grey.</li>
+        <li><b>Ratchet,</b> as Euclid's (#355): click to cycle ×1, ×2, ×3, ×4, and the ticks show the split. A rest or a tie has no ratchet: its cell is grey and does nothing.</li>
         <li><b>Lanes</b> as on the Grid, stacked under step rows that stay put.</li>
       </ul>
     </div>
@@ -296,9 +294,9 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
   }
 
   function ratchet(st) {
-    const idle = st.k !== 'n';
+    if (st.k !== 'n') return '<div class="gcell rat idle" title="A rest or a tie has no ratchet"></div>';
     const ticks = st.r > 1 ? `<span class="ticks">${'<i></i>'.repeat(st.r)}</span>` : '';
-    return `<div class="gcell rat r${st.r}${idle ? ' idle' : ''}" title="Ratchet ×${st.r}: click for ×1 → ×2 → ×3 → ×4${idle ? '; waits for a note' : ''}">${st.r > 1 ? '' : '×1'}${ticks}</div>`;
+    return `<div class="gcell rat r${st.r}" title="Ratchet ×${st.r}: click for ×1 → ×2 → ×3 → ×4">${st.r > 1 ? '' : '×1'}${ticks}</div>`;
   }
 
   function column(i, lanes) {
