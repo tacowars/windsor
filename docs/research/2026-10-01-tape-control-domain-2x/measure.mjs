@@ -1,27 +1,32 @@
 /* global process, console, setTimeout, clearTimeout */
-/** windsor#295 runner. Runs the width-edge trials, then each raised box in the ladder's
- * order, stopping at the first box in which every trial survives. Each set runs in
- * `BOX.workers` child processes, one journal each, under one hard wall-clock bound from the
- * start: at the bound every child is killed and the report is assembled from the journals
- * alone. Run from the repo root on Node 24:
- *   node docs/research/2026-10-01-tape-control-domain-2x/measure.mjs
+/** windsor#295 and windsor#315 runner. By default it runs windsor#295's experiment: the
+ * width-edge trials, then each raised box in the ladder's order. `--rows` runs windsor#315's:
+ * each candidate box that holds every shipped model row, in order. Either stops at the first
+ * box in which every trial survives. Each set runs in the table's `workers` child processes,
+ * one journal each, under one hard wall-clock bound from the start: at the bound every child
+ * is killed and the report is assembled from the journals alone. The exit code is nonzero
+ * unless the run is complete and a box qualified (`exitCode` in evidence.mjs). Run from the
+ * repo root on Node 24:
+ *   node docs/research/2026-10-01-tape-control-domain-2x/measure.mjs [--rows]
  * `--smoke <path>` runs two trials of each part per worker into <path>, not the measurement.
  */
 import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { basename } from 'node:path';
 import { cpus, loadavg, release } from 'node:os';
 import { URL } from 'node:url';
 import * as V from './evidence.mjs';
+import * as R from './rowsEvidence.mjs';
 
 const args = process.argv;
+const rows = args.includes('--rows');
+const E = rows ? R.experiment : V.experiment;
 const smokeAt = args.indexOf('--smoke'),
   smoke = smokeAt < 0 ? null : args[smokeAt + 1];
 const journal = (set, i) => {
-  const name = `.journal-${set.replace('/', '-')}-${i}.ndjson`;
+  const name = `.journal-${set.replaceAll('/', '-')}-${i}.ndjson`;
   return smoke ? `${smoke}${name}` : new URL(`./${name}`, import.meta.url).pathname;
 };
-const trialsOf = (S, set) =>
-  set === 'edge' ? S.edgeTrials() : S.ladderTrials(Number(set.slice('box/'.length)));
 
 /** The set's trials in cost order (rate x factor, highest first), dealt round-robin. */
 function share(trials, worker, workers) {
@@ -38,9 +43,9 @@ function share(trials, worker, workers) {
 async function worker() {
   const at = args.indexOf('--worker');
   const [set, index, workers] = args.slice(at + 1, at + 4);
-  const S = await V.loadProgram();
+  const S = await V.loadProgram(E.entry);
   const path = journal(set, index);
-  for (const trial of share(trialsOf(S, set), Number(index), Number(workers))) {
+  for (const trial of share(E.trialsOf(S, set), Number(index), Number(workers))) {
     const record = S.runTrial(trial, trial.box);
     appendFileSync(path, `${JSON.stringify(record)}\n`);
     if (record.resets || record.nonfinite) console.log('FAIL', record.id);
@@ -73,6 +78,7 @@ async function runSet(set, state) {
       [
         new URL(import.meta.url).pathname,
         ...['--worker', set, String(i), String(workers)],
+        ...(rows ? ['--rows'] : []),
         ...(smoke ? ['--smoke', smoke] : []),
       ],
       { stdio: 'inherit' },
@@ -101,34 +107,45 @@ async function runSet(set, state) {
 
 const empty = (set) => ({ set, exitCodes: [], trials: [], truncatedTails: [], elapsedMs: 0 });
 
-async function reproduce() {
-  const started = Date.now(),
-    loadBefore = loadavg();
-  const S = await V.loadProgram();
-  const state = { table: S.BOX, children: new Set(), expired: false };
-  const timer = setTimeout(() => {
-    state.expired = true;
-    for (const child of state.children) child.kill('SIGKILL');
-  }, S.BOX.budgetMs);
-  const sets = [await runSet('edge', state)];
-  for (const wMin of S.BOX.ladder) {
-    const set = `box/${wMin}`;
+/** The experiment's fixed sets, then its ladder up to the first box that survives whole. */
+async function runSets(S, state) {
+  const sets = [];
+  for (const set of E.fixed(S)) sets.push(state.expired ? empty(set) : await runSet(set, state));
+  for (const set of E.ladder(S)) {
     const result = state.expired ? empty(set) : await runSet(set, state);
     sets.push(result);
     if (!state.expired && result.trials.length && result.trials.every(V.survives)) break;
   }
+  return sets;
+}
+
+async function reproduce() {
+  const started = Date.now(),
+    loadBefore = loadavg();
+  const S = await V.loadProgram(E.entry);
+  const table = E.table(S);
+  const state = { table, children: new Set(), expired: false };
+  const timer = setTimeout(() => {
+    state.expired = true;
+    for (const child of state.children) child.kill('SIGKILL');
+  }, table.budgetMs);
+  const sets = await runSets(S, state);
   clearTimeout(timer);
   const exitCodes = sets.flatMap((s) => s.exitCodes);
   const truncatedTails = sets.flatMap((s) => s.truncatedTails);
-  const clean = !state.expired && exitCodes.every((c) => c === 0) && !truncatedTails.length;
+  const clean =
+    !state.expired &&
+    exitCodes.length > 0 &&
+    exitCodes.every((c) => c === 0) &&
+    !truncatedTails.length;
   const run = {
     status: clean ? 'complete' : 'incomplete',
     expired: state.expired,
     sets: sets.map(({ set, trials, elapsedMs }) => ({ set, trials: trials.length, elapsedMs })),
     exitCodes,
     truncatedTails,
-    budgetMs: S.BOX.budgetMs,
-    workers: S.BOX.workers,
+    budgetMs: table.budgetMs,
+    workers: table.workers,
     elapsedMs: Date.now() - started,
   };
   const trials = sets.flatMap((s) => s.trials);
@@ -146,13 +163,13 @@ async function reproduce() {
     commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     loadAverage: { before: loadBefore, after: loadavg() },
   };
-  const closure = V.importClosure();
-  const derived = V.derive(trials, run, S);
-  const output = smoke ? `${smoke}measurement.json` : V.report.pathname;
-  const settings = { box: S.BOX, control: S.CONTROL };
-  V.writeReport(output, { environment, run, closure, settings, derived, trials });
+  const closure = V.importClosure(E.entry);
+  const derived = E.derive(trials, run, S);
+  const output = smoke ? `${smoke}${basename(E.report.pathname)}` : E.report.pathname;
+  V.writeReport(output, { environment, run, closure, settings: E.settings(S), derived, trials });
   console.log(JSON.stringify({ run, status: derived.status, declaration: derived.declaration }));
-  if (!V.closureClean(closure)) process.exitCode = 1;
+  const closureOk = V.closureClean(closure);
+  process.exitCode = V.exitCode({ run, derived, closureOk, smoke: Boolean(smoke) });
 }
 
 if (args.includes('--worker')) await worker();
