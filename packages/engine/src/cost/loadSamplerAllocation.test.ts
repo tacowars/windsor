@@ -10,7 +10,12 @@
  * V8's `--trace-generalization`. An insert renders stereo noise at its
  * parameters' defaults; the FM part renders a held four-note chord of
  * `pad-drift`. The warm-up runs the sampler for its first half in both runs,
- * so its path is hot either way.
+ * so its path is hot either way. V8 compiles on the main thread
+ * (`SYNCHRONOUS_TIERING`), so the tier the render has reached when the heap is
+ * read does not depend on the machine's load: with the compiler on a
+ * background thread, the output stage's meter-off run read 182 bytes a
+ * quantum on a busy CI runner, the same on two branches, as a render still
+ * below its optimised tier does (windsor#256).
  *
  * What it pins:
  *
@@ -36,7 +41,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { runAllocationProbe, workletBundle } from '../__fixtures__/workletAllocation';
+import {
+  runAllocationProbe,
+  SYNCHRONOUS_TIERING,
+  workletBundle,
+} from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
 import { PRESETS } from '../patch/presets';
 
@@ -68,19 +77,22 @@ const CLEAN = new Set(['eq-processor.js', 'output-stage-processor.js']);
 
 function probe(bundle: string, loadQuanta: number, measure: number): ProbeRun {
   const fm = bundle === 'fm-processor.js';
-  return runAllocationProbe({
-    bundle: workletBundle(bundle),
-    rate: 48000,
-    params: {},
-    options: fm ? { maxVoices: 16, patch: PRESETS['pad-drift'], seed: 0xa204 } : {},
-    messages: fm
-      ? CHORD.map((note, id) => ({ type: 'noteOn', id, note, velocity: 0.8, frame: 0 }))
-      : [],
-    inputChannels: fm ? 0 : 2,
-    loadQuanta,
-    warmup: WARMUP,
-    measure,
-  });
+  return runAllocationProbe(
+    {
+      bundle: workletBundle(bundle),
+      rate: 48000,
+      params: {},
+      options: fm ? { maxVoices: 16, patch: PRESETS['pad-drift'], seed: 0xa204 } : {},
+      messages: fm
+        ? CHORD.map((note, id) => ({ type: 'noteOn', id, note, velocity: 0.8, frame: 0 }))
+        : [],
+      inputChannels: fm ? 0 : 2,
+      loadQuanta,
+      warmup: WARMUP,
+      measure,
+    },
+    SYNCHRONOUS_TIERING,
+  );
 }
 
 /** The bundle's lines that hold `class LoadSampler`, first to last. */
