@@ -44,6 +44,7 @@ const fmtSemitones = (v: number): string => `${v.toFixed(2)}st`;
 const fmtSignedSemitones = (v: number): string => `${fmtSigned(v)}st`;
 const PERCENT = 100;
 const fmtPercent = (v: number): string => `${(v * PERCENT).toFixed(0)}%`;
+const fmtTimes = (v: number): string => `×${v.toFixed(2)}`;
 
 export const GLOBAL_KNOBS: PatchKnobTable = [
   { f: 'volume', label: 'Volume', o: { min: 0, max: 1.5, fmt: fmt2 } },
@@ -54,10 +55,20 @@ export const GLOBAL_KNOBS: PatchKnobTable = [
   { f: 'panRandom', label: 'Pan Rnd', o: { min: 0, max: 1, fmt: fmt2 } },
 ];
 
+/**
+ * The voice's drive stage (windsor#300, windsor#309): its own section before
+ * the filter, since the signal runs carriers → drive → filter. The Shape
+ * picker beside these is the engine's `DRIVE_SHAPE_NAMES`, not a knob.
+ */
+export const DRIVE_KNOBS: PatchKnobTable = [
+  { f: 'drive.gain', label: 'Drive', o: { min: 1, max: 16, curve: 'log', fmt: fmtTimes } },
+  { f: 'drive.bias', label: 'Bias', o: { min: -1, max: 1, fmt: fmtSigned } },
+  { f: 'drive.tone', label: 'Tone', o: { min: 0, max: 1, fmt: fmtPercent } },
+];
+
 export const FILTER_KNOBS: PatchKnobTable = [
   { f: 'filter.cutoff', label: 'Cutoff', o: { min: 30, max: 18000, curve: 'log', fmt: fmtHz } },
   { f: 'filter.resonance', label: 'Reso', o: { min: 0.5, max: 12, curve: 'log', fmt: fmt2 } },
-  { f: 'drive.gain', label: 'Drive', o: { min: 1, max: 6, fmt: fmt2 } },
   { f: 'filter.envAmount', label: 'Env Amt', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.modWheelDepth', label: 'Wheel', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.lfoAmount', label: 'LFO Amt', o: { min: -4, max: 4, fmt: fmtSigned } },
@@ -177,6 +188,7 @@ export function allPatchKnobs(): PatchKnob[] {
     for (const entry of table) knobs.push({ path: `${base}.${entry.f}`, entry });
   };
   own(GLOBAL_KNOBS);
+  own(DRIVE_KNOBS);
   own(FILTER_KNOBS);
   for (const key of LFO_KEYS) {
     own(lfoKnobs(key));

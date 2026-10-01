@@ -11,7 +11,8 @@
  * rows: operator A (index 0) sounds at `LEAD_OPERATOR_LEVEL`, the others at
  * `OPERATOR_DEFAULTS.level` (`2026-09-23-670-one-patch-defaults-table`).
  *
- * Data only, like `modeIds.ts`: it imports the two import-free id modules and
+ * Data only, like `modeIds.ts`, but for `driveOnByDefault`, the one default
+ * that is read from other values (windsor#309): it imports the two import-free id modules and
  * nothing else, never touches the worklet scope or the wave cache, is listed
  * in the engine project's `files` and is on the generators' pure side
  * because `audioConstants.ts` re-exports `OPERATOR_COUNT` from here. A
@@ -130,6 +131,9 @@ const FILTER_DEFAULTS = {
  * the input gain, the shape (`DRIVE_SHAPE`), a bias added before the shape and
  * a one-pole tone after it. Unity gain and no bias bypass the stage, so the
  * defaults are no drive at all (record `2026-10-01-voice-drive-stage`).
+ * `on` is the console's switch (windsor#309): off, the stage costs nothing
+ * whatever the other four say; a patch that omits it takes
+ * `driveOnByDefault`, so a patch saved before the switch plays as it did.
  */
 const DRIVE_DEFAULTS = {
   /** The input gain into the shaper, `DRIVE_GAIN_RANGE`; 1 is unity. */
@@ -139,6 +143,12 @@ const DRIVE_DEFAULTS = {
   bias: 0,
   /** The lowpass after the shaper, `DRIVE_TONE_RANGE`: 1 is open (bypassed). */
   tone: 1,
+  /**
+   * The stage's switch; omitted, it is `driveOnByDefault` of the gain and
+   * bias. Last, here and in the worklet's fill (`patchNormalise.ts` says
+   * why), so the four numbers keep the object shape they had before it.
+   */
+  on: false,
 };
 
 /**
@@ -147,6 +157,16 @@ const DRIVE_DEFAULTS = {
  * keeps `gain · x` finite for every carrier sum the voice can make.
  */
 const DRIVE_GAIN_RANGE = { min: 0, max: 64 };
+
+/**
+ * The switch a patch that omits `drive.on` takes (windsor#309): on exactly
+ * when the stage did something before the switch existed, a gain off unity
+ * or a bias. Both fills call it with their own gain and bias, so the
+ * worklet and `makePatch()` agree, and an old patch keeps its sound.
+ */
+function driveOnByDefault(gain: number, bias: number): boolean {
+  return gain !== 1 || bias !== 0;
+}
 
 /** The drive's bias, clamped here by the worklet. */
 const DRIVE_BIAS_RANGE = { min: -1, max: 1 };
@@ -168,6 +188,7 @@ export {
   DRIVE_DEFAULTS,
   DRIVE_GAIN_RANGE,
   DRIVE_TONE_RANGE,
+  driveOnByDefault,
   ENVELOPE_DEFAULTS,
   FEEDBACK_RANGE,
   FILTER_DEFAULTS,

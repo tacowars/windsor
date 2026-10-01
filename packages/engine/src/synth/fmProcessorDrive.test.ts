@@ -3,7 +3,8 @@
  * longer needs the filter, both render paths agree to the bit for every
  * shape, bias and tone, silence stays silent at any bias, the bias makes even
  * harmonics, the tone is a lowpass from about 1 kHz to open, and a voice
- * whose tone pole has run still ends. The curves and the control half are
+ * whose tone pole has run still ends. Switched off (windsor#309) it is no
+ * drive at all, to the bit. The curves and the control half are
  * `worklet/fm/voiceDrive.test.ts`; that every library patch renders as
  * before is the golden test.
  */
@@ -89,6 +90,18 @@ describe('the voice drive stage (windsor#300)', () => {
     const clean = play(voicePatch({}));
     const driven = play(voicePatch({ gain: 2 }));
     expect(rms(difference(driven, clean)) / rms(clean)).toBeGreaterThan(0.1);
+  });
+
+  it('renders a drive switched off bit for bit as no drive, in both paths (windsor#309)', () => {
+    for (const filter of [{}, { mode: FILTER_MODE.LOWPASS, cutoff: 900 }]) {
+      for (const specialise of [true, false]) {
+        const none = play(voicePatch({}, filter), specialise);
+        for (const [, shape] of SHAPES) {
+          const off = voicePatch({ on: false, gain: 6, shape, bias: 0.4, tone: 0.2 }, filter);
+          expect(sameBits(play(off, specialise), none)).toBe(true);
+        }
+      }
+    }
   });
 
   it('renders Off as it rendered on at an open cutoff, give or take the filter', () => {

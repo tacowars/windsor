@@ -1,17 +1,24 @@
 /**
  * The Parts tab's rail and mod panels (#70, ported): algorithm picker,
- * global knobs, filter, LFO and pitch envelope. All of it edits the working
+ * global knobs, drive (windsor#309), filter, LFO and pitch envelope. All of it edits the working
  * patch (`partsSession`) and pushes it to the live part. The knob specs are
  * `patchKnobTables.ts`; the thumbnail geometry `patchPanelConstants.ts`.
  */
 import type { Algorithm } from '@windsor/engine';
-import { ALGORITHMS, FILTER_MODE_NAMES, LFO_SHAPE_NAMES, OP_NAMES } from '@windsor/engine';
+import {
+  ALGORITHMS,
+  DRIVE_SHAPE_NAMES,
+  FILTER_MODE_NAMES,
+  LFO_SHAPE_NAMES,
+  OP_NAMES,
+} from '@windsor/engine';
 import { ALG_LINK_COLOR, CARRIER_COLOR, INK_ON_ACCENT, MOD_COLOR } from './consoleColors';
 import { $, el, seg } from './dom';
 import { drawEnv } from './envCanvas';
 import { attachEnvelopeDrag } from './envelopeDrag';
 import { envAdvKnobs, envKnobs, envLoopPicker } from './envelopeKnobs';
 import {
+  DRIVE_KNOBS,
   FILTER_KNOBS,
   GLOBAL_KNOBS,
   PITCH_ENV_ADV_KNOBS,
@@ -190,6 +197,69 @@ export function buildGlobal(editor: PatchEditor): void {
       (i) => writeToggle(editor.patch, t.f, i),
     );
     row.appendChild(labelledSeg(t.label, segment));
+  }
+}
+
+/**
+ * The Drive section's switch (windsor#309): `drive.on`, a boolean path drawn
+ * as Off | On at the section's head, the way Filter's mode starts at Off.
+ * Off, the engine runs no drive at all, and the controls stay editable.
+ */
+export const DRIVE_SWITCH = { f: 'drive.on', off: 'Off', on: 'On' } as const;
+
+/** Whether the Drive section's controls show inactive: its switch is off. */
+export const driveInactive = (patch: Patch): boolean => toggleIndex(patch, DRIVE_SWITCH.f) === 0;
+
+/** The Drive section's Shape picker: the engine's labels, each at its `DRIVE_SHAPE` id. */
+export const driveShapeOptions = (): { value: number; label: string }[] =>
+  DRIVE_SHAPE_NAMES.map((label, value) => ({ value, label }));
+
+/** The Shape picker, a select the way an operator's Wave is (`patchBays.ts`). */
+function driveShapePicker(editor: PatchEditor): HTMLElement {
+  const wrap = el('div', 'grow');
+  wrap.appendChild(el('span', 'field-label', 'Shape'));
+  const select = document.createElement('select');
+  select.className = 'field';
+  select.name = 'drive-shape';
+  select.setAttribute('aria-label', 'Drive shape');
+  for (const { value, label } of driveShapeOptions()) select.add(new Option(label, String(value)));
+  select.value = String(editor.patch.drive.shape);
+  select.onchange = (): void => {
+    editor.patch.drive.shape = Number(select.value);
+    editor.push();
+  };
+  wrap.appendChild(select);
+  return wrap;
+}
+
+/**
+ * The voice's drive stage (windsor#300): after the carriers and before the
+ * filter, heard with the filter on or off, so its section stands before
+ * Filter's. The Off | On switch, then Shape and the Drive, Bias and Tone
+ * knobs, dimmed while the switch is off (windsor#309).
+ */
+export function buildDrive(editor: PatchEditor): void {
+  const body = $('driveBody');
+  const dim = (): void => {
+    body.classList.toggle('off', driveInactive(editor.patch));
+  };
+  $('driveSwitch').replaceChildren(
+    indexSeg(
+      editor,
+      [DRIVE_SWITCH.off, DRIVE_SWITCH.on],
+      () => toggleIndex(editor.patch, DRIVE_SWITCH.f),
+      (i) => {
+        writeToggle(editor.patch, DRIVE_SWITCH.f, i);
+        dim();
+      },
+    ),
+  );
+  dim();
+  $('driveShape').replaceChildren(driveShapePicker(editor));
+  const row = $('driveKnobs');
+  row.innerHTML = '';
+  for (const k of DRIVE_KNOBS) {
+    row.appendChild(pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
   }
 }
 

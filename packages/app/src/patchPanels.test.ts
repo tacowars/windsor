@@ -10,10 +10,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
-import { makePatch } from '@windsor/engine';
+import { DRIVE_SHAPE, DRIVE_SHAPE_NAMES, makePatch } from '@windsor/engine';
+import { PRESETS } from '@windsor/engine/patch/presets';
 import { FILTER_KNOBS, lfoKnobs, patchKnobOpts } from './patchKnobTables';
 import {
+  DRIVE_SWITCH,
   GLOBAL_TOGGLES,
+  driveInactive,
+  driveShapeOptions,
   LFO_PHASE_NAMES,
   LFO_RANGE_NAMES,
   lfoPhaseIndex,
@@ -123,6 +127,69 @@ describe('the LFO Phase segment (windsor#56)', () => {
     lfo.oneShot = true;
     lfo.retrigger = false;
     expect(lfoPhaseIndex(lfo)).toBe(LFO_PHASE_NAMES.indexOf('One-shot'));
+  });
+});
+
+describe('the Drive section Shape picker (windsor#309)', () => {
+  it("offers Soft, Hard, Diode, Tube and Fold at the engine's DRIVE_SHAPE ids", () => {
+    expect(driveShapeOptions()).toEqual([
+      { value: DRIVE_SHAPE.SOFT, label: 'Soft' },
+      { value: DRIVE_SHAPE.HARD, label: 'Hard' },
+      { value: DRIVE_SHAPE.DIODE, label: 'Diode' },
+      { value: DRIVE_SHAPE.TUBE, label: 'Tube' },
+      { value: DRIVE_SHAPE.FOLD, label: 'Fold' },
+    ]);
+    expect(driveShapeOptions().map((o) => o.label)).toEqual([...DRIVE_SHAPE_NAMES]);
+  });
+
+  it('shows Soft on a fresh patch and on the 808 kick', () => {
+    const label = (shape: number): string | undefined =>
+      driveShapeOptions().find((o) => o.value === shape)?.label;
+    expect(label(makePatch().drive.shape)).toBe('Soft');
+    expect(label(PRESETS['tr808-kick']?.drive.shape ?? -1)).toBe('Soft');
+  });
+
+  it('writes drive.shape alone and survives the JSON round trip', () => {
+    const patch = makePatch();
+    setPath(patch, 'drive.shape', DRIVE_SHAPE.TUBE);
+    const imported = makePatch(JSON.parse(JSON.stringify(patch)) as Patch);
+    expect(imported.drive).toEqual({ ...makePatch().drive, shape: DRIVE_SHAPE.TUBE });
+  });
+});
+
+describe('the Drive section switch (windsor#309)', () => {
+  it('reads Off | On over drive.on, a boolean the patch really has', () => {
+    expect([DRIVE_SWITCH.off, DRIVE_SWITCH.on]).toEqual(['Off', 'On']);
+    expect(typeof getPath(makePatch(), DRIVE_SWITCH.f)).toBe('boolean');
+  });
+
+  it('shows the 808 kick On and a pad with no drive Off, the pad dimmed', () => {
+    const kick = PRESETS['tr808-kick']!;
+    const pad = PRESETS['pad-drift']!;
+    expect(toggleIndex(kick, DRIVE_SWITCH.f)).toBe(1);
+    expect(driveInactive(kick)).toBe(false);
+    expect(toggleIndex(pad, DRIVE_SWITCH.f)).toBe(0);
+    expect(driveInactive(pad)).toBe(true);
+    expect(driveInactive(makePatch())).toBe(true);
+  });
+
+  it('switches drive.on alone, keeps the four controls, and survives the JSON round trip', () => {
+    const committed: string[] = [];
+    const editor: PatchEditor = {
+      patch: structuredClone(PRESETS['tr808-kick']!),
+      push: () => committed.push(JSON.stringify(editor.patch.drive)),
+      refresh: () => undefined,
+    };
+    const before = { ...editor.patch.drive };
+    writeToggle(editor.patch, DRIVE_SWITCH.f, 0);
+    editor.push();
+    expect(editor.patch.drive).toEqual({ ...before, on: false });
+    expect(driveInactive(editor.patch)).toBe(true);
+    const imported = makePatch({ drive: JSON.parse(committed.at(-1) ?? '{}') as Patch['drive'] });
+    expect(imported.drive).toEqual({ ...before, on: false });
+    writeToggle(editor.patch, DRIVE_SWITCH.f, 1);
+    editor.push();
+    expect(JSON.parse(committed.at(-1) ?? '{}')).toEqual(before);
   });
 });
 
