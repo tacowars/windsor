@@ -135,13 +135,15 @@ export function normaliseReturns(
  * what the bus plays without one; an empty list is kept, and passes the
  * sends through. A compressor keys from the bus's own input: an external
  * sidechain is not offered on a bus, so one in the document is corrected
- * to internal.
+ * to internal. `bus` names the kind of bus in that correction: a send bus,
+ * or a group (windsor#285).
  */
 export function normaliseBusInserts(
   raw: unknown,
   path: string,
   n: FieldNormaliser,
   base: readonly InsertSpec[],
+  bus = 'a send bus',
 ): InsertSpec[] {
   if (raw === undefined) return withInsertIds(base);
   if (!Array.isArray(raw)) {
@@ -151,7 +153,7 @@ export function normaliseBusInserts(
   return normaliseInserts(raw, path, n).map((spec, i) => {
     if (spec.kind !== 'compressor' || spec.sidechain === undefined) return spec;
     if (spec.sidechain === 'internal') return spec;
-    n.correction(`${path}[${i}].sidechain: a send bus keys from its own input — internal`);
+    n.correction(`${path}[${i}].sidechain: ${bus} keys from its own input — internal`);
     return { ...spec, sidechain: 'internal' };
   });
 }

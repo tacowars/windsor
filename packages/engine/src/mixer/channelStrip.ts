@@ -1,7 +1,7 @@
 /**
  * Wiring one part through its channel strip.
  *
- *   part.output ─▶ [low cut] ─▶ [insert …] ─▶ tail ─┬─ [rotate θ] ─▶ dry destination (a bus, or the master)
+ *   part.output ─▶ [low cut] ─▶ [insert …] ─▶ tail ─┬─ [rotate θ] ─▶ dry destination (the music bus, a group, or the aux fader)
  *                                                   ├─ send ─▶ Send A
  *                                                   └─ send ─▶ Send B   … one send per bus, at 0 unless the strip names it
  *
@@ -21,6 +21,11 @@
  * signal the dry destination hears, and only while something has made it
  * active.
  *
+ * A part's Output picks the dry destination (windsor#285): Master is the
+ * music bus, `{ group: id }` that group's input. Moving between them moves
+ * the one dry edge inside a gate fade (`createDryMover`); Sidechain only
+ * closes the gate and leaves the edge where it was.
+ *
  * The part must have been created unrouted (`destination: null`); connecting it
  * to the master as well would sum it twice.
  */
@@ -32,10 +37,11 @@ import { INSERT_KINDS } from '../inserts/insertRegistry';
 import type { LowCutStage } from './lowCutStage';
 import { createLowCutStage } from './lowCutStage';
 import type { ChannelStrip } from './mix';
+import { isGroupOutput } from './mix';
 import type { PeakMeter } from './peakMeter';
 import { createPeakMeter } from './peakMeter';
 import type { ReturnBus } from './returnBus';
-import { createTap } from './stripTap';
+import { createDryMover, createTap } from './stripTap';
 import type { StereoRotate } from './stereoRotate';
 
 /**
@@ -53,7 +59,16 @@ export interface StripStage {
 export interface PartStrip {
   readonly part: AudioPart;
   readonly insertSpecs: readonly InsertSpec[];
-  setOutput(output: ChannelStrip['output']): void;
+  /** The Output as it is set now (windsor#285): absent or Master, Sidechain, or a group. */
+  readonly output: ChannelStrip['output'];
+  /**
+   * Master or a group moves the dry edge there inside a gate fade, and
+   * Sidechain only closes the gate. False when `output` names a group the
+   * song lacks: the strip plays on Master instead, and the caller reports it.
+   */
+  setOutput(output: ChannelStrip['output']): boolean;
+  /** Where the dry edge connects now: the music bus, a group's input, or the aux fader. */
+  readonly destination: AudioNode;
   /** Mute (windsor#154): the audible gate closes, cutting the dry path and every send. */
   readonly mute: boolean;
   setMute(mute: boolean): void;
@@ -64,7 +79,10 @@ export interface PartStrip {
    */
   readonly solo: boolean;
   setSolo(solo: boolean): void;
-  /** Silenced by another part's solo: the audible gate closes, as for mute. */
+  /**
+   * Silenced by the solo rule (windsor#154) or by its group's mute or solo
+   * (windsor#285): the audible gate closes, as for mute.
+   */
   readonly soloedOut: boolean;
   /** `seconds` is the ramp, the insert fade by default; 0 sets it at once. */
   setSoloedOut(soloedOut: boolean, seconds?: number): void;
@@ -109,6 +127,18 @@ export interface PartStrip {
 }
 
 /**
+ * Where a music strip's dry edge may go (windsor#285): the music bus for
+ * Master, and a group's input by id, undefined for a group the song lacks.
+ * An aux strip is handed its one node, and has no groups.
+ */
+export interface DryTargets {
+  readonly master: AudioNode;
+  group(id: number): AudioNode | undefined;
+}
+
+const NO_GROUPS = (): undefined => undefined;
+
+/**
  * What a strip is built with beyond the mix data: the insert kinds it may
  * build (a test injects its own), and how it waits out the fade around a
  * structural insert edit (#652) — `setTimeout` in the browser, something
@@ -129,7 +159,7 @@ export function routePart(
   part: AudioPart,
   strip: ChannelStrip,
   returns: Readonly<Record<string, ReturnBus>>,
-  dry: AudioNode,
+  dry: AudioNode | DryTargets,
   options: RouteOptions = {},
 ): PartStrip {
   const registry = options.registry ?? INSERT_KINDS;
@@ -146,8 +176,12 @@ export function routePart(
   const lowCut = createLowCutStage(context, strip.lowCut);
   part.output.connect(lowCut.input);
   const inserts = createInsertChain(context, lowCut.output, strip.inserts, registry, part.name);
-  const tap = createTap(context, strip, returns, dry, inserts.tail);
+  const targets: DryTargets = 'master' in dry ? dry : { master: dry, group: NO_GROUPS };
+  const first = destinationOf(targets, strip.output);
+  let output = first.output;
+  const tap = createTap(context, strip, returns, first.node, inserts.tail);
   const updates = createInsertUpdater(inserts, tap, later, options.changed);
+  const mover = createDryMover(tap, later);
   const { rotation, sends, gate } = tap;
   const meter = createPeakMeter(context, rotation.output);
   let solo = strip.solo === true;
@@ -157,7 +191,19 @@ export function routePart(
     get insertSpecs(): readonly InsertSpec[] {
       return inserts.specs;
     },
-    setOutput: (output) => gate.setOutput(output),
+    get output(): ChannelStrip['output'] {
+      return output;
+    },
+    setOutput(next): boolean {
+      const target = destinationOf(targets, next);
+      output = target.output;
+      gate.setOutput(output);
+      if (output !== 'sidechain') mover.move(target.node);
+      return output === next;
+    },
+    get destination(): AudioNode {
+      return tap.destination;
+    },
     get mute(): boolean {
       return gate.mute;
     },
@@ -204,6 +250,7 @@ export function routePart(
     dispose(): void {
       // Before the graph goes, so a fade still waiting cannot re-wire it (#652).
       updates.cancel();
+      mover.cancel();
       // Before the tap, whose rotation output the meter's edge leaves from.
       meter.dispose();
       tap.dispose();
@@ -212,4 +259,18 @@ export function routePart(
       lowCut.dispose();
     },
   };
+}
+
+/**
+ * The dry destination for `output`, and the Output that reaches it: a group
+ * `targets` lacks plays on Master. Sidechain names the music bus, the
+ * destination a strip built on Sidechain starts at.
+ */
+function destinationOf(
+  targets: DryTargets,
+  output: ChannelStrip['output'],
+): { output: ChannelStrip['output']; node: AudioNode } {
+  if (!isGroupOutput(output)) return { output, node: targets.master };
+  const node = targets.group(output.group);
+  return node ? { output, node } : { output: 'master', node: targets.master };
 }

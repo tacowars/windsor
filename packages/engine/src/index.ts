@@ -215,6 +215,7 @@ export { groupOf, isGroupOpen, isHeard, isSoloing } from './mixer/soloRule';
 export type { GroupSwitches } from './mixer/soloRule';
 export { createReturn, createReturns, createSend } from './mixer/returnBus';
 export type { ReturnBus } from './mixer/returnBus';
+export type { GroupBus } from './mixer/groupBus';
 export { routePart } from './mixer/channelStrip';
 export type { PartStrip, StripStage } from './mixer/channelStrip';
 export { createLowCutStage } from './mixer/lowCutStage';

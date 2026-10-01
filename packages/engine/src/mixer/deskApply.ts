@@ -11,6 +11,7 @@ import { LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ, MIX_LEVEL_MAX, RETURN_LEVEL_MAX } from 
 import { FieldNormaliser } from '../song/arrangementFields';
 import { normaliseBusInserts } from '../song/deskNormalise';
 import type { PartStrip } from './channelStrip';
+import { isGroupOutput } from './mix';
 import { normaliseInserts } from '../inserts/insertRegistry';
 import type { InsertSpec } from '../inserts/insertRegistry';
 import type { ReturnBus } from './returnBus';
@@ -18,13 +19,13 @@ import type { ReturnBus } from './returnBus';
 const STRIP_KEYS = ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output', 'mute', 'solo'];
 const RETURN_KEYS = ['level', 'inserts'];
 
-const clamp = (value: number, min: number, max: number): number =>
+export const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
-const isNumber = (value: unknown): value is number =>
+export const isNumber = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value);
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** A part's `strip` partial onto its live strip (#597); `path` prefixes what is reported. */
@@ -40,8 +41,7 @@ export function applyStripLive(strip: PartStrip, raw: unknown, path: string): st
   else if (raw.pan !== undefined) ignored.push(`${path}.pan`);
   if (isNumber(raw.lowCut)) strip.setLowCut(clamp(raw.lowCut, LOW_CUT_MIN_HZ, LOW_CUT_MAX_HZ));
   else if (raw.lowCut !== undefined) ignored.push(`${path}.lowCut`);
-  if (raw.output === 'master' || raw.output === 'sidechain') strip.setOutput(raw.output);
-  else if (raw.output !== undefined) ignored.push(`${path}.output`);
+  applyOutput(strip, raw.output, path, ignored);
   // Solo lands as this strip's flag; the caller re-resolves the roster (windsor#154).
   if (typeof raw.mute === 'boolean') strip.setMute(raw.mute);
   else if (raw.mute !== undefined) ignored.push(`${path}.mute`);
@@ -56,13 +56,29 @@ export function applyStripLive(strip: PartStrip, raw: unknown, path: string): st
 }
 
 /**
+ * Master, Sidechain or a group (windsor#285). A group the live desk lacks
+ * once the partial has landed plays on Master, and is reported, as the
+ * normalised document would correct it.
+ */
+function applyOutput(strip: PartStrip, output: unknown, path: string, ignored: string[]): void {
+  if (output === undefined) return;
+  const next =
+    output === 'master' || output === 'sidechain'
+      ? output
+      : isGroupOutput(output)
+        ? { group: output.group }
+        : null;
+  if (next === null || !strip.setOutput(next)) ignored.push(`${path}.output`);
+}
+
+/**
  * A whole `inserts` list (#641; a list replaces wholesale, like every array
  * in a partial), read by the document's own normaliser `read`, so the live
  * chain and the committed one cannot disagree. A clamp is silent, as it is
  * for every live number; anything the normaliser dropped or replaced is
  * reported by its path. Null when `raw` is not a list: nothing lands.
  */
-function liveInserts(
+export function liveInserts(
   path: string,
   raw: unknown,
   ignored: string[],

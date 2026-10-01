@@ -68,9 +68,8 @@ export function stemSources(document: ArrangementDocument, choice: StemChoice = 
       muted: isSidechainOnly(part),
     }));
   // Sidechain only, mute and solo gate the sends with the dry path, so only a heard part feeds a return.
-  // Renders play what playback plays. The live roster (`MusicRoster.resolveSolo`) does not read
-  // groups yet, so neither does this: windsor#285 passes `document.groups` when it learns them.
-  const groups: readonly GroupSwitches[] = [];
+  // Renders play what playback plays: the live roster (`MusicRoster.resolveSolo`) reads the groups too.
+  const groups: readonly GroupSwitches[] = document.groups ?? [];
   const soloing = isSoloing(
     document.parts.map((part) => part.strip),
     groups,
