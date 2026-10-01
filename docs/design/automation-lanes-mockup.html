@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The automation lanes mockup tacowars reviewed on 2026-10-01 (windsor#339,
+     record 2026-10-01-song-automation-lanes). Static and self-contained: open
+     it in a browser. Chosen: the popover shape panel and the lit-ring knob. -->
+<title>Windsor Automation Lanes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: Windsor's Song tab, dark only (the app is dark only): a frozen
+   names + mixer column beside a scrolling timeline, lanes folding out under
+   each part, the knob gallery below. Tokens copied from console.css. */
+:root {
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --return: #9c7bd0;
+  --hot: #d2643c;
+  --on-accent: #14181a;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --names: 172px;
+  --mixer: 118px;
+  --gap: 8px;
+  color-scheme: dark;
+}
+@media (max-width: 640px) {
+  :root { --names: 118px; --mixer: 84px; --gap: 6px; }
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+button, select, input { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+
+.page { padding: 20px 16px 48px; max-width: 1280px; margin: 0 auto; display: grid; gap: 22px; }
+header.top { display: grid; gap: 6px; }
+.eyebrow { font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--carrier); }
+h1 { margin: 0; font-family: var(--f-panel); font-weight: 600; font-size: 26px; letter-spacing: .04em; text-wrap: balance; }
+h2 { margin: 0; font-family: var(--f-panel); font-weight: 600; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+.lede { margin: 0; max-width: 68ch; color: var(--ink-dim); line-height: 1.5; }
+.lede b { color: var(--ink); font-weight: 500; }
+
+/* ---------- toolbar ---------- */
+.toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+}
+.tgroup { display: flex; align-items: center; gap: 6px; }
+.tlabel { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-faint); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 28px; padding: 0 10px; border-radius: var(--r);
+  border: 1px solid var(--line-bright); background: var(--panel-hi); color: var(--ink);
+  font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--ink-faint); }
+.btn.primary { background: var(--carrier); border-color: var(--carrier); color: var(--on-accent); }
+.btn.icon { width: 30px; padding: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.seg button {
+  height: 28px; padding: 0 9px; border: 0; border-right: 1px solid var(--line-bright);
+  background: var(--panel-hi); color: var(--ink-dim); cursor: pointer;
+  font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--carrier); color: var(--on-accent); }
+.seg svg { width: 14px; height: 14px; }
+select.field {
+  height: 28px; padding: 0 6px; border-radius: var(--r); border: 1px solid var(--line-bright);
+  background: var(--inset); color: var(--ink); font-size: 12px;
+}
+.pos { font-family: var(--f-num); font-size: 13px; color: var(--carrier); min-width: 64px; font-variant-numeric: tabular-nums; }
+.hint {
+  font-size: 12px; color: var(--ink-dim); padding: 0 2px; line-height: 1.5;
+}
+.hint kbd { font-family: var(--f-num); font-size: 11px; color: var(--ink); background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: 2px; padding: 0 4px; }
+
+/* ---------- song view ---------- */
+.song-wrap { position: relative; }
+.song { overflow-x: auto; padding: 12px 14px 16px; background: var(--ground); border: 1px solid var(--line); border-radius: var(--r); scrollbar-width: thin; }
+.lanes {
+  position: relative; display: grid;
+  grid-template-columns: var(--names) var(--mixer) calc(var(--bars) * var(--bar));
+  gap: 4px var(--gap); width: max-content; align-items: stretch;
+}
+.lanes > .nm-cell, .lanes > .mx-cell { position: sticky; z-index: 3; background: var(--ground); }
+.lanes > .nm-cell { left: 0; box-shadow: -14px 0 0 var(--ground), -14px 4px 0 var(--ground), 0 4px 0 var(--ground); }
+.lanes > .mx-cell { left: calc(var(--names) + var(--gap)); box-shadow: calc(-1 * var(--gap)) 0 0 var(--ground), var(--gap) 0 0 var(--ground), calc(-1 * var(--gap)) 4px 0 var(--ground), 0 4px 0 var(--ground), var(--gap) 4px 0 var(--ground); }
+
+.nm-cell { display: flex; align-items: center; gap: 6px; padding: 0 6px; font-family: var(--f-panel); min-width: 0; border: 1px solid transparent; border-radius: 0; }
+.nm-cell .txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.nm-cell b { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nm-cell small { font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tri {
+  flex: none; width: 18px; height: 18px; padding: 0; border: 1px solid transparent; border-radius: var(--r);
+  background: none; color: var(--ink-dim); font-size: 10px; line-height: 1; cursor: pointer;
+}
+.tri:hover { border-color: var(--line-bright); color: var(--ink); }
+.tri[aria-expanded="true"] { color: var(--carrier); }
+.badge {
+  flex: none; margin-left: auto; font-family: var(--f-num); font-size: 9px; color: var(--carrier);
+  border: 1px solid rgba(224,164,78,.45); border-radius: 8px; padding: 0 5px; line-height: 14px;
+}
+.part-row { height: 40px; }
+.ruler-row { height: 22px; }
+.mx-cell { display: flex; align-items: center; gap: 6px; padding: 0 4px; min-width: 0; }
+.mx-head { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.mx-val { font-family: var(--f-num); font-size: 10px; color: var(--ink-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.knob-mini { flex: none; width: 28px; height: 28px; }
+
+.ruler { position: relative; display: flex; height: 22px; border-bottom: 1px solid var(--line-bright); cursor: pointer; user-select: none; }
+.ruler-bar { position: relative; flex: none; border-left: 1px solid var(--line-bright); font-family: var(--f-num); font-size: 10px; color: var(--ink-dim); }
+.ruler-bar span { position: absolute; left: 4px; top: 3px; }
+
+.tl { position: relative; background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar)); }
+.plane { height: 40px; }
+.reg {
+  position: absolute; top: 3px; bottom: 3px; display: flex; align-items: center; padding: 0 6px;
+  border-radius: var(--r); border: 1px solid var(--modulator); background-color: rgba(95,168,160,.2);
+  font-family: var(--f-panel); font-size: 10px; font-variant: small-caps; letter-spacing: .05em; white-space: nowrap; overflow: hidden;
+}
+.reg.perc { border-color: var(--carrier); background-color: rgba(224,164,78,.17); }
+.ph { position: absolute; top: 0; bottom: 0; width: 2px; left: 0; background: var(--carrier); box-shadow: 0 0 6px var(--carrier); pointer-events: none; z-index: 2; }
+.ph.dim { opacity: .45; box-shadow: none; }
+
+/* automation rows */
+.auto .nm-cell { padding-left: 10px; }
+.chip { flex: none; width: 3px; align-self: stretch; margin: 6px 2px 6px 6px; border-radius: 2px; background: var(--c); }
+.alane { background-color: var(--inset); border-radius: var(--r); overflow: hidden; touch-action: none; }
+.alane .ghost { position: absolute; top: 0; bottom: 0; background: rgba(220,227,227,.035); border-left: 1px dashed var(--line-bright); border-right: 1px dashed var(--line-bright); pointer-events: none; }
+.alane svg { position: absolute; inset: 0; display: block; }
+.alane.off svg { opacity: .32; }
+.alane[data-tool="edit"] { cursor: crosshair; }
+.alane[data-tool="draw"] { cursor: cell; }
+.alane[data-tool="shape"] { cursor: col-resize; }
+.amix { justify-content: space-between; }
+.amix .mx-val { color: var(--c); }
+.amix.off .mx-val { color: var(--ink-faint); }
+.mini {
+  flex: none; width: 20px; height: 20px; padding: 0; border-radius: var(--r); border: 1px solid var(--line-bright);
+  background: var(--panel-hi); color: var(--ink-dim); font-size: 10px; line-height: 1; cursor: pointer;
+}
+.mini:hover { color: var(--ink); border-color: var(--ink-faint); }
+.mini.on { background: var(--c); border-color: var(--c); color: var(--on-accent); }
+.mini-set { display: flex; gap: 3px; }
+.add-row .nm-cell { padding-left: 34px; }
+.add-row select.field { height: 24px; font-size: 11px; width: 100%; max-width: 150px; }
+.add-tl { height: 28px; background: none; }
+.vcount { font-family: var(--f-num); font-size: 9px; color: var(--ink-faint); }
+
+/* ---------- shape panel ---------- */
+.shape-panel {
+  width: min(360px, calc(100vw - 48px)); padding: 12px; display: grid; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r);
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+}
+.shape-panel.pop { position: absolute; z-index: 10; }
+.shape-panel.pane { width: auto; box-shadow: none; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) {
+  .shape-panel.pane { grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: 20px; }
+  .shape-panel.pane .sp-head { grid-column: 1 / -1; }
+}
+.sp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.sp-head h3 { margin: 0; font-family: var(--f-panel); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.sp-range { font-family: var(--f-num); font-size: 10px; color: var(--ink-dim); text-align: right; }
+.shapes { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.shape-btn {
+  display: grid; justify-items: center; gap: 2px; padding: 5px 2px 4px; border-radius: var(--r);
+  border: 1px solid var(--line-bright); background: var(--inset); color: var(--ink-dim); cursor: pointer;
+  font-size: 9px; font-family: var(--f-panel); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+}
+.shape-btn svg { width: 30px; height: 16px; }
+.shape-btn[aria-pressed="true"] { border-color: var(--carrier); color: var(--carrier); background: rgba(224,164,78,.08); }
+.sp-grid { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; align-items: center; gap: 6px 8px; }
+.sp-grid label { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+.sp-grid output { font-family: var(--f-num); font-size: 11px; text-align: right; font-variant-numeric: tabular-nums; }
+.sp-grid .dis { opacity: .35; }
+input[type="range"] { width: 100%; accent-color: var(--carrier); }
+.sp-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.sp-note { font-size: 11px; color: var(--ink-faint); margin-right: auto; }
+
+/* ---------- knob gallery ---------- */
+.gallery { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); }
+.kcard { padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); display: grid; gap: 12px; }
+.kcard[aria-current="true"] { border-color: var(--carrier); }
+.kcard-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.kcard h3 { margin: 0; font-family: var(--f-panel); font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+.kcard p { margin: 0; font-size: 12px; color: var(--ink-dim); line-height: 1.45; }
+.krow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.kn { display: grid; justify-items: center; gap: 4px; text-align: center; user-select: none; touch-action: none; }
+.kn svg { width: 52px; height: 52px; }
+.kn .kl { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-dim); }
+.kn .kv { font-family: var(--f-num); font-size: 10px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.kn .tag { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: .14em; padding: 0 5px; line-height: 14px; border-radius: 7px; }
+.kn.locked { cursor: not-allowed; }
+.kn.free { cursor: ns-resize; }
+.status { min-height: 18px; font-size: 12px; color: var(--carrier); }
+
+.choices { display: grid; gap: 8px; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+.choices ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--ink-dim); line-height: 1.5; max-width: 80ch; }
+.choices b { color: var(--ink); font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .ph { box-shadow: none; } }
+</style>
+
+<div class="page">
+  <header class="top">
+    <div class="eyebrow">Windsor · Song tab mockup</div>
+    <h1>Automation lanes</h1>
+    <p class="lede">Each part folds out lanes beneath it. A lane is a curve over song time that moves one of that part's parameters. <b>Try the three tools on any lane</b>, stamp a shape over a range, and press Play to watch the values and the locked knobs follow. Nothing here makes sound.</p>
+  </header>
+
+  <section style="display:grid;gap:10px" aria-label="Song view">
+    <div class="toolbar">
+      <div class="tgroup">
+        <button class="btn" id="play" aria-label="Play">▶ Play</button>
+        <span class="pos" id="pos">1.1</span>
+      </div>
+      <div class="tgroup">
+        <span class="tlabel">Tool</span>
+        <div class="seg" id="tools">
+          <button data-tool="edit" aria-pressed="true" title="Edit (E)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13 L6 6 L10 9 L14 3"/><circle cx="6" cy="6" r="1.6" fill="currentColor"/><circle cx="10" cy="9" r="1.6" fill="currentColor"/></svg>Edit</button>
+          <button data-tool="draw" aria-pressed="false" title="Draw (D)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13 L3.6 10.4 L11 3 L13 5 L5.6 12.4 Z"/></svg>Draw</button>
+          <button data-tool="shape" aria-pressed="false" title="Shape (S)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 11 L4 5 L7 11 L10 5 L13 11 L15 7"/></svg>Shape</button>
+        </div>
+      </div>
+      <div class="tgroup">
+        <label class="tlabel" for="snap">Snap</label>
+        <select class="field" id="snap">
+          <option value="96">Bar</option><option value="24">1/4</option><option value="12">1/8</option>
+          <option value="6" selected>1/16</option><option value="3">1/32</option><option value="1">Off</option>
+        </select>
+      </div>
+      <div class="tgroup">
+        <span class="tlabel">Zoom</span>
+        <button class="btn icon" id="zout" aria-label="Zoom out">−</button>
+        <button class="btn icon" id="zin" aria-label="Zoom in">+</button>
+      </div>
+      <div class="tgroup">
+        <span class="tlabel">Lane height</span>
+        <div class="seg" id="heights">
+          <button data-h="40" aria-pressed="false">S</button><button data-h="56" aria-pressed="true">M</button><button data-h="76" aria-pressed="false">L</button>
+        </div>
+      </div>
+      <div class="tgroup">
+        <span class="tlabel">Shape panel</span>
+        <div class="seg" id="placement">
+          <button data-p="pop" aria-pressed="true">A · Popover</button><button data-p="pane" aria-pressed="false">B · Pane</button>
+        </div>
+      </div>
+      <button class="btn" id="reset" style="margin-left:auto">Reset</button>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="song-wrap" id="wrap">
+      <div class="song" id="song"><div class="lanes" id="lanes"></div></div>
+    </div>
+    <div id="paneSlot"></div>
+  </section>
+
+  <section style="display:grid;gap:10px" aria-label="Knobs under automation">
+    <h2>Knobs under automation</h2>
+    <p class="lede">The Pad's Parts-tab knobs while the song plays. Cutoff and LFO 1 rate have lanes and are locked. Resonance has none and drags freely. Send A has a lane that is switched off, so it is free too. Two looks to choose from.</p>
+    <div class="gallery" id="gallery"></div>
+    <div class="status" id="status" role="status"></div>
+  </section>
+
+  <section class="choices" aria-label="Choices">
+    <h2>What to pick from this mockup</h2>
+    <ol>
+      <li><b>Shape panel:</b> A floats over the lane beside the selected range; B docks below the song like the detail pane.</li>
+      <li><b>Locked knob:</b> A lights the ring in the lane's colour with an AUTO tag; B dims the knob and adds a padlock.</li>
+      <li><b>Lane height:</b> S, M or L, and whether it is one height for every lane or each lane can be dragged taller.</li>
+      <li><b>Lane colour by kind:</b> teal for mixer, violet for inserts, amber for the voice, as drawn here. The alternative is the part's own colour.</li>
+      <li><b>Gestures:</b> click to add, drag a point to move it, drag the line to bend it, double-click a point to delete it, <kbd style="font-family:var(--f-num)">Alt</kbd>-click a line to straighten it.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(() => {
+const TPB = 96, BARS = 16, SONG = TPB * BARS, BPM = 124, PAD = 6;
+const COLORS = { mixer: 'var(--modulator)', insert: 'var(--return)', voice: 'var(--carrier)' };
+const HEX = { mixer: '#5fa8a0', insert: '#9c7bd0', voice: '#e0a44e' };
+
+const SCALES = {
+  db:  { def: 0.8, fmt: y => { if (y < 0.005) return '−∞ dB'; const d = -48 + 60 * y; return (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(1) + ' dB'; } },
+  hz:  { def: 0.55, fmt: y => { const h = 30 * Math.pow(600, y); return h >= 1000 ? (h / 1000).toFixed(h >= 10000 ? 1 : 2) + ' kHz' : Math.round(h) + ' Hz'; } },
+  lfo: { def: 0.4, fmt: y => { const h = 0.05 * Math.pow(800, y); return (h < 1 ? h.toFixed(2) : h.toFixed(1)) + ' Hz'; } },
+  pct: { def: 0.3, fmt: y => Math.round(y * 100) + '%' },
+  bip: { def: 0.5, fmt: y => { const p = Math.round((y - 0.5) * 200); return p === 0 ? 'C' : (p < 0 ? 'L' + -p : 'R' + p); } },
+  oct: { def: 0.5, fmt: y => { const o = (y - 0.5) * 12; return (o >= 0 ? '+' : '−') + Math.abs(o).toFixed(1) + ' oct'; } },
+  res: { def: 0.1, fmt: y => (0.5 + 11.5 * y).toFixed(1) },
+  sec: { def: 0.45, fmt: y => { const s = 0.001 * Math.pow(20000, y); return s < 1 ? Math.round(s * 1000) + ' ms' : s.toFixed(2) + ' s'; } },
+  sym: { def: 0.5, fmt: y => { const v = y * 2 - 1; return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); } },
+  width: { def: 1, fmt: y => (0.05 + 0.95 * y).toFixed(2) },
+  st:  { def: 0.5, fmt: y => { const s = (y - 0.5) * 48; return (s >= 0 ? '+' : '−') + Math.abs(s).toFixed(1) + ' st'; } },
+};
+
+const OP_ITEMS = [['Level', 'pct'], ['Env decay', 'sec'], ['Decay curve', 'sym'], ['Feedback', 'sym'], ['Width', 'width']];
+const VOICE_GROUPS = [
+  { group: 'Voice · Filter', items: [['Cutoff', 'hz'], ['Env amount', 'oct'], ['Resonance', 'res'], ['Env decay', 'sec']] },
+  ...['A', 'B', 'C', 'D'].map(o => ({ group: 'Voice · Op ' + o, items: OP_ITEMS })),
+  { group: 'Voice · LFO', items: [['LFO 1 amount', 'pct'], ['LFO 1 rate', 'lfo'], ['LFO 2 amount', 'pct'], ['LFO 2 rate', 'lfo']] },
+  { group: 'Voice · Pitch', items: [['Pitch env amount', 'st']] },
+];
+const MIXER_GROUP = { group: 'Mixer', items: [['Level', 'db'], ['Pan', 'bip'], ['Send A', 'pct'], ['Send B', 'pct']] };
+const INSERTS = {
+  kick: { group: 'Insert · Advanced drive', items: [['Drive', 'pct'], ['Tone', 'pct'], ['Mix', 'pct']] },
+  bass: { group: 'Insert · Dub delay', items: [['Feedback', 'pct'], ['Mix', 'pct'], ['Tone', 'pct']] },
+  pad: { group: 'Insert · Phaser', items: [['Rate', 'lfo'], ['Depth', 'pct'], ['Mix', 'pct']] },
+};
+const catOf = g => g.startsWith('Mixer') ? 'mixer' : g.startsWith('Insert') ? 'insert' : 'voice';
+const subOf = g => g.replace('Insert · ', '').replace('Voice · ', 'Voice · ').toUpperCase();
+
+const P = (bar, v, b = 0) => ({ t: bar * TPB, v, b });
+
+let state, lanes, parts;
+
+function seed() {
+  state = { tool: 'edit', snap: 6, playing: false, tick: 0, barPx: 64, laneH: 56, place: 'pop', knob: 'A', sel: null };
+  parts = [
+    { id: 'kick', name: 'Kick', sub: 'Euclid · TR-909', perc: true, open: false, regions: [[0, 16]] },
+    { id: 'bass', name: 'Bass', sub: 'Grid · Acid', open: true, regions: [[0, 4], [4, 8], [8, 12], [12, 16]] },
+    { id: 'pad', name: 'Pad', sub: 'Chords · Glass', open: true, regions: [[0, 8], [8, 16]] },
+  ];
+  lanes = [
+    { id: 'k1', part: 'kick', name: 'Level', group: 'Mixer', scale: 'db', on: true, points: [P(0, 0.8), P(14, 0.8, -0.5), P(16, 0.45)] },
+    { id: 'b1', part: 'bass', name: 'Level', group: 'Mixer', scale: 'db', on: true, points: [P(0, 0.8), P(16, 0.8)] },
+    { id: 'b2', part: 'bass', name: 'Feedback', group: 'Insert · Dub delay', scale: 'pct', on: true, points: [P(0, 0.22), P(12, 0.22, 0.6), P(16, 0.86)] },
+    { id: 'p1', part: 'pad', name: 'Cutoff', group: 'Voice · Filter', scale: 'hz', on: true, points: [P(0, 0.22, 0.55), P(6, 0.78), P(8, 0.78, -0.6), P(10, 0.38), P(14, 0.9, 0.3), P(16, 0.55)] },
+    { id: 'p2', part: 'pad', name: 'LFO 1 rate', group: 'Voice · LFO', scale: 'lfo', on: true, points: [P(0, 0.32), P(8, 0.32, -0.7), P(12, 0.78), P(12, 0.3), P(16, 0.3)] },
+    { id: 'p3', part: 'pad', name: 'Send A', group: 'Mixer', scale: 'pct', on: false, points: [P(0, 0.3), P(8, 0.3), P(16, 0.62)] },
+  ];
+  const b1 = lanes[1];
+  b1.points = splice(b1.points, 8 * TPB, 12 * TPB, generate({ kind: 'square', rate: 6, top: 0.8, bottom: 0.08, phase: 0, duty: 0.5 }, 8 * TPB, 12 * TPB));
+  state.shape = { kind: 'square', rate: 6, top: 0.8, bottom: 0.1, phase: 0, duty: 0.5 };
+}
+
+/* ---------- evaluator ---------- */
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+function bendCurve(u, b, dir) {
+  if (!b || !dir) return u;
+  return Math.pow(u, Math.pow(5, -b * Math.sign(dir)));
+}
+function valueAt(pts, t) {
+  if (!pts.length) return 0;
+  if (t <= pts[0].t) return pts[pts.length > 1 && pts[1].t === pts[0].t && t === pts[0].t ? 1 : 0].v;
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (pts[i].t <= t) {
+      const a = pts[i], c = pts[i + 1];
+      if (!c) return a.v;
+      if (c.t === a.t) return c.v;
+      const u = (t - a.t) / (c.t - a.t);
+      return a.v + (c.v - a.v) * bendCurve(u, a.b, c.v - a.v);
+    }
+  }
+  return pts[0].v;
+}
+function splice(pts, a, b, mid) {
+  const keepL = pts.filter(p => p.t < a), keepR = pts.filter(p => p.t > b);
+  return [...keepL, ...mid, ...keepR];
+}
+
+/* ---------- shapes ---------- */
+const SHAPES = {
+  triangle: { label: 'Tri', cyclic: true, keys: () => [{ u: 0, v: 0, b: 0 }, { u: 0.5, v: 1, b: 0 }] },
+  square: { label: 'Square', cyclic: true, keys: s => [{ u: 0, v: 1, b: 0 }, { u: s.duty, v: 1, b: 0 }, { u: s.duty, v: 0, b: 0 }, { u: 1, v: 0, b: 0 }] },
+  sawup: { label: 'Saw ↑', cyclic: true, keys: () => [{ u: 0, v: 0, b: 0 }, { u: 1, v: 1, b: 0 }] },
+  sawdown: { label: 'Saw ↓', cyclic: true, keys: () => [{ u: 0, v: 1, b: 0 }, { u: 1, v: 0, b: 0 }] },
+  sine: { label: 'Sine', cyclic: true, keys: () => [{ u: 0, v: 0.5, b: 0.5 }, { u: 0.25, v: 1, b: 0.5 }, { u: 0.5, v: 0.5, b: -0.5 }, { u: 0.75, v: 0, b: -0.5 }] },
+  ramp: { label: 'Ramp', cyclic: false },
+  scurve: { label: 'S-curve', cyclic: false },
+};
+const ICONS = {
+  triangle: 'M1 14 L8 2 L15 14 L22 2 L29 14',
+  square: 'M1 14 L1 2 L8 2 L8 14 L15 14 L15 2 L22 2 L22 14 L29 14',
+  sawup: 'M1 14 L10 2 L10 14 L19 2 L19 14 L28 2',
+  sawdown: 'M1 2 L10 14 L10 2 L19 14 L19 2 L28 14',
+  sine: 'M1 8 C4 0, 8 0, 8 8 S 12 16, 15 8 S 19 0, 22 8 S 26 16, 29 8',
+  ramp: 'M1 14 L29 2',
+  scurve: 'M1 14 C12 14, 18 2, 29 2',
+};
+function generate(s, a, b) {
+  const lo = s.bottom, hi = s.top, map = v => lo + (hi - lo) * v;
+  if (s.kind === 'ramp') return [{ t: a, v: lo, b: 0 }, { t: b, v: hi, b: 0 }];
+  if (s.kind === 'scurve') { const m = (a + b) / 2; return [{ t: a, v: lo, b: -0.6 }, { t: m, v: map(0.5), b: 0.6 }, { t: b, v: hi, b: 0 }]; }
+  const cyc = s.rate, keys = SHAPES[s.kind].keys(s), t0 = a - s.phase * cyc, gen = [];
+  for (let c = -1; t0 + c * cyc < b + cyc; c++) for (const k of keys) gen.push({ t: t0 + (c + k.u) * cyc, v: map(k.v), b: k.b });
+  const segB = t => { let bb = 0; for (const p of gen) if (p.t <= t) bb = p.b; return bb; };
+  const inner = gen.filter(p => p.t > a && p.t < b);
+  return [{ t: a, v: valueAt(gen, a), b: segB(a) }, ...inner, { t: b, v: valueAt(gen, b - 1e-6), b: 0 }];
+}
+
+/* ---------- dom helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const NS = 'http://www.w3.org/2000/svg';
+const xOf = t => t / TPB * state.barPx;
+const yOf = v => PAD + (1 - v) * (state.laneH - 2 * PAD);
+const tOf = x => clamp(x / state.barPx * TPB, 0, SONG);
+const vOf = y => clamp(1 - (y - PAD) / (state.laneH - 2 * PAD), 0, 1);
+const snapT = (t, e) => (e && e.shiftKey) || state.snap === 1 ? Math.round(t) : clamp(Math.round(t / state.snap) * state.snap, 0, SONG);
+const laneById = id => lanes.find(l => l.id === id);
+const colorOf = l => COLORS[catOf(l.group)];
+const hexOf = l => HEX[catOf(l.group)];
+
+/* ---------- knob svg ---------- */
+function arc(cx, cy, r, a0, a1) {
+  const p = a => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  const [x0, y0] = p(a0), [x1, y1] = p(a1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function knobSVG(v, o) {
+  const s = o.size, c = s / 2, r = s / 2 - 3, a0 = 0.75 * Math.PI, a1 = 2.25 * Math.PI, av = a0 + clamp(v, 0, 1) * 1.5 * Math.PI;
+  const col = o.color || '#dce3e3', track = '#2c3439';
+  const pr = r - 5, px = c + pr * Math.cos(av), py = c + pr * Math.sin(av);
+  let g = `<path d="${arc(c, c, r, a0, a1)}" stroke="${track}" stroke-width="${o.w}" fill="none" stroke-linecap="round"/>`;
+  if (v > 0.004) g += `<path d="${arc(c, c, r, a0, av)}" stroke="${col}" stroke-width="${o.w}" fill="none" stroke-linecap="round" ${o.dash ? 'stroke-dasharray="2 2.5"' : ''}/>`;
+  g += `<circle cx="${c}" cy="${c}" r="${r - o.w - 1.5}" fill="${o.dim ? '#1a1f22' : '#262d32'}" stroke="${o.ring || '#3d4950'}" stroke-width="1"/>`;
+  g += `<line x1="${c}" y1="${c}" x2="${px.toFixed(2)}" y2="${py.toFixed(2)}" stroke="${o.dim ? '#5e6b70' : col}" stroke-width="2" stroke-linecap="round"/>`;
+  if (o.lock) g += `<g transform="translate(${c - 4.5} ${c + r * 0.38})" fill="#8b9a9e"><rect x="0" y="3.5" width="9" height="6.5" rx="1"/><path d="M2 3.8 V2.4 a2.5 2.5 0 0 1 5 0 V3.8" stroke="#8b9a9e" stroke-width="1.4" fill="none"/></g>`;
+  return `<svg viewBox="0 0 ${s} ${s}" aria-hidden="true">${g}</svg>`;
+}
+
+/* ---------- song view ---------- */
+const refs = { ph: [], live: [] };
+function render() {
+  const L = $('#lanes');
+  L.style.setProperty('--bars', BARS);
+  L.style.setProperty('--bar', state.barPx + 'px');
+  $('#song').style.setProperty('--bar', state.barPx + 'px');
+  L.replaceChildren();
+  refs.ph = []; refs.live = []; refs.svgs = {};
+  // ruler
+  L.append(el('div', 'nm-cell ruler-row'), el('div', 'mx-cell mx-head ruler-row', 'Mix'));
+  const ruler = el('div', 'ruler tl');
+  for (let i = 0; i < BARS; i++) { const rb = el('div', 'ruler-bar', `<span>${i + 1}</span>`); rb.style.width = state.barPx + 'px'; ruler.append(rb); }
+  ruler.addEventListener('pointerdown', e => { const r = ruler.getBoundingClientRect(); state.tick = snapT(tOf(e.clientX - r.left), { shiftKey: false }); live(); });
+  addPh(ruler); L.append(ruler);
+
+  for (const part of parts) {
+    const pl = lanes.filter(l => l.part === part.id);
+    // part row
+    const nm = el('div', 'nm-cell part-row');
+    const tri = el('button', 'tri', part.open ? '▾' : '▸');
+    tri.setAttribute('aria-expanded', part.open); tri.setAttribute('aria-label', (part.open ? 'Hide' : 'Show') + ' automation for ' + part.name);
+    tri.onclick = () => { part.open = !part.open; render(); };
+    nm.append(tri, el('div', 'txt', `<b>${part.name}</b><small>${part.sub}</small>`));
+    if (pl.length) nm.append(el('span', 'badge', pl.length + (pl.length === 1 ? ' lane' : ' lanes')));
+    const mx = el('div', 'mx-cell part-row');
+    const lvl = pl.find(l => l.name === 'Level' && l.group === 'Mixer');
+    const kn = el('div', 'knob-mini'), kv = el('span', 'mx-val');
+    mx.append(kn, kv, el('span', 'mx-val', 'M S'));
+    refs.live.push(() => {
+      const on = lvl && lvl.on, v = on ? valueAt(lvl.points, state.tick) : 0.8;
+      kn.innerHTML = knobSVG(v, { size: 28, w: 2.5, color: on ? hexOf(lvl) : '#dce3e3', ring: on ? hexOf(lvl) : null });
+      kn.title = on ? 'Level is automated' : 'Level';
+      kv.textContent = SCALES.db.fmt(v);
+      kv.style.color = on ? hexOf(lvl) : '';
+    });
+    const tl = el('div', 'tl plane');
+    for (const [a, b] of part.regions) {
+      const r = el('div', 'reg' + (part.perc ? ' perc' : ''), `${part.name.toLowerCase()} ${a + 1}`);
+      r.style.left = xOf(a * TPB) + 2 + 'px'; r.style.width = xOf((b - a) * TPB) - 4 + 'px'; tl.append(r);
+    }
+    addPh(tl);
+    L.append(nm, mx, tl);
+    if (!part.open) continue;
+
+    for (const lane of pl) renderLane(L, lane, part);
+    renderAddRow(L, part, pl);
+  }
+  live();
+  placePanel();
+}
+function addPh(host) { const p = el('div', 'ph'); host.append(p); refs.ph.push(p); }
+
+function renderLane(L, lane, part) {
+  const c = colorOf(lane), h = state.laneH + 'px';
+  const nm = el('div', 'nm-cell auto');
+  nm.style.height = h; nm.style.setProperty('--c', c);
+  nm.append(el('span', 'chip'), el('div', 'txt', `<b>${lane.name}</b><small>${subOf(lane.group)}</small>`));
+  const mx = el('div', 'mx-cell amix' + (lane.on ? '' : ' off'));
+  mx.style.height = h; mx.style.setProperty('--c', c);
+  const val = el('span', 'mx-val');
+  const set = el('div', 'mini-set');
+  const onb = el('button', 'mini' + (lane.on ? ' on' : ''), '●');
+  onb.title = lane.on ? 'Turn lane off (unlocks the knob)' : 'Turn lane on';
+  onb.setAttribute('aria-pressed', lane.on); onb.setAttribute('aria-label', 'Lane on');
+  onb.onclick = () => { lane.on = !lane.on; render(); renderGallery(); };
+  const del = el('button', 'mini', '×');
+  del.title = 'Delete lane'; del.setAttribute('aria-label', 'Delete ' + lane.name + ' lane');
+  del.onclick = () => { lanes = lanes.filter(l => l !== lane); if (state.sel && state.sel.lane === lane.id) state.sel = null; render(); renderGallery(); };
+  set.append(onb, del); mx.append(val, set);
+  refs.live.push(() => { val.textContent = lane.on ? SCALES[lane.scale].fmt(valueAt(lane.points, state.tick)) : 'off'; });
+
+  const tl = el('div', 'tl alane' + (lane.on ? '' : ' off'));
+  tl.style.height = h; tl.dataset.lane = lane.id; tl.dataset.tool = state.tool;
+  for (const [a, b] of part.regions) {
+    const g = el('div', 'ghost'); g.style.left = xOf(a * TPB) + 'px'; g.style.width = xOf((b - a) * TPB) + 'px'; tl.append(g);
+  }
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('width', xOf(SONG)); svg.setAttribute('height', state.laneH);
+  tl.append(svg); addPh(tl);
+  refs.svgs[lane.id] = svg;
+  drawLane(lane);
+  wireLane(tl, svg, lane);
+  L.append(nm, mx, tl);
+}
+
+function renderAddRow(L, part, pl) {
+  const nm = el('div', 'nm-cell add-row');
+  nm.style.height = '30px';
+  const sel = el('select', 'field');
+  sel.id = 'add-' + part.id; sel.setAttribute('aria-label', 'Add an automation lane to ' + part.name);
+  const voiceN = pl.filter(l => catOf(l.group) === 'voice').length;
+  sel.append(new Option('+ Add lane', ''));
+  for (const g of [MIXER_GROUP, INSERTS[part.id], ...VOICE_GROUPS]) {
+    const og = document.createElement('optgroup'); og.label = g.group;
+    for (const [name, scale] of g.items) {
+      const used = pl.some(l => l.group === g.group && l.name === name);
+      const full = catOf(g.group) === 'voice' && voiceN >= 8;
+      const o = new Option(name, JSON.stringify([g.group, name, scale]));
+      o.disabled = used || full; og.append(o);
+    }
+    sel.append(og);
+  }
+  sel.onchange = () => {
+    if (!sel.value) return;
+    const [group, name, scale] = JSON.parse(sel.value);
+    const v = SCALES[scale].def;
+    lanes.push({ id: 'n' + Date.now(), part: part.id, name, group, scale, on: true, points: [{ t: 0, v, b: 0 }, { t: SONG, v, b: 0 }] });
+    render(); renderGallery();
+  };
+  nm.append(sel);
+  const mx = el('div', 'mx-cell'); mx.style.height = '30px';
+  mx.append(el('span', 'vcount', `Voice ${voiceN}/8`));
+  const tl = el('div', 'add-tl');
+  L.append(nm, mx, tl);
+}
+
+function drawLane(lane) {
+  const svg = refs.svgs[lane.id]; if (!svg) return;
+  const pts = lane.points, hex = hexOf(lane), W = xOf(SONG), H = state.laneH;
+  let d = '';
+  const seg = (a, c) => {
+    const x0 = xOf(a.t), x1 = xOf(c.t);
+    if (c.t === a.t) { d += ` L${x1.toFixed(1)} ${yOf(c.v).toFixed(1)}`; return; }
+    const n = Math.max(2, Math.ceil((x1 - x0) / 3));
+    for (let i = 1; i <= n; i++) { const u = i / n; d += ` L${(x0 + (x1 - x0) * u).toFixed(1)} ${yOf(a.v + (c.v - a.v) * bendCurve(u, a.b, c.v - a.v)).toFixed(1)}`; }
+  };
+  const path = list => {
+    d = `M0 ${yOf(list[0].v).toFixed(1)} L${xOf(list[0].t).toFixed(1)} ${yOf(list[0].v).toFixed(1)}`;
+    for (let i = 0; i < list.length - 1; i++) seg(list[i], list[i + 1]);
+    d += ` L${W} ${yOf(list[list.length - 1].v).toFixed(1)}`;
+    return d;
+  };
+  let html = '';
+  const sel = state.sel && state.sel.lane === lane.id ? state.sel : null;
+  if (sel && sel.b != null) {
+    const a = Math.min(sel.a, sel.b), b = Math.max(sel.a, sel.b);
+    html += `<rect x="${xOf(a)}" y="0" width="${Math.max(1, xOf(b) - xOf(a))}" height="${H}" fill="${hex}" fill-opacity=".12" stroke="${hex}" stroke-opacity=".6" stroke-dasharray="3 3"/>`;
+  }
+  const line = path(pts);
+  html += `<path d="${line} L${W} ${H} L0 ${H} Z" fill="${hex}" fill-opacity=".14"/>`;
+  html += `<path d="${line}" fill="none" stroke="${hex}" stroke-width="1.6" stroke-linejoin="round"/>`;
+  if (sel && sel.preview) {
+    const pv = splice(pts, sel.lo, sel.hi, sel.preview);
+    html += `<path d="${path(pv)}" fill="none" stroke="#dce3e3" stroke-width="1.4" stroke-dasharray="4 3"/>`;
+  }
+  const dense = pts.length > 2 * (W / 8);
+  pts.forEach((p, i) => {
+    if (dense && i > 0 && i < pts.length - 1) return;
+    html += `<circle cx="${xOf(p.t).toFixed(1)}" cy="${yOf(p.v).toFixed(1)}" r="${state.drag && state.drag.lane === lane.id && state.drag.idx === i ? 4.5 : 3.2}" fill="#121618" stroke="${hex}" stroke-width="1.6"/>`;
+  });
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.innerHTML = html;
+}
+
+/* ---------- gestures ---------- */
+function wireLane(tl, svg, lane) {
+  let g = null;
+  const at = e => { const r = svg.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  const hitPoint = (x, y) => {
+    let best = -1, bd = 8;
+    lane.points.forEach((p, i) => { const d = Math.hypot(xOf(p.t) - x, yOf(p.v) - y); if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
+  const segAt = t => { const p = lane.points; for (let i = p.length - 2; i >= 0; i--) if (p[i].t <= t && p[i + 1].t > t) return i; return -1; };
+
+  svg.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    const { x, y } = at(e), t = tOf(x);
+    svg.setPointerCapture(e.pointerId);
+    if (state.tool === 'edit') {
+      const idx = hitPoint(x, y);
+      if (idx >= 0) { g = { mode: 'point', idx, x, y, moved: false }; state.drag = { lane: lane.id, idx }; return; }
+      const near = Math.abs(yOf(valueAt(lane.points, t)) - y) < 10, s = segAt(t);
+      if (e.altKey && near && s >= 0) { lane.points[s].b = 0; drawLane(lane); g = null; return; }
+      g = { mode: near && s >= 0 ? 'bend?' : 'add', seg: s, b0: s >= 0 ? lane.points[s].b : 0, x, y, near, moved: false };
+    } else if (state.tool === 'draw') {
+      g = { mode: 'draw', orig: lane.points.map(p => ({ ...p })), drawn: new Map(), lo: Infinity, hi: -Infinity };
+      drawAt(g, x, y, e);
+    } else {
+      const a = snapT(t, e);
+      state.sel = { lane: lane.id, a, b: a, preview: null };
+      g = { mode: 'range' };
+      renderAllSelections();
+    }
+  });
+  svg.addEventListener('pointermove', e => {
+    if (!g) return;
+    const { x, y } = at(e);
+    if (g.mode === 'draw') { drawAt(g, x, y, e); return; }
+    if (g.mode === 'range') { state.sel.b = snapT(tOf(x), e); drawLane(lane); return; }
+    if (!g.moved && Math.hypot(x - g.x, y - g.y) < 3) return;
+    g.moved = true;
+    if (g.mode === 'point') {
+      const p = lane.points, i = g.idx;
+      const lo = i > 0 ? p[i - 1].t : 0, hi = i < p.length - 1 ? p[i + 1].t : SONG;
+      p[i].t = clamp(snapT(tOf(x), e), lo, hi); p[i].v = vOf(y);
+      drawLane(lane); live();
+    } else if (g.mode === 'bend?' || g.mode === 'bend') {
+      g.mode = 'bend';
+      let b = clamp(g.b0 - (y - g.y) / 45, -1, 1);
+      if (Math.abs(b) < 0.07) b = 0;
+      lane.points[g.seg].b = b; drawLane(lane); live();
+    }
+  });
+  const end = e => {
+    if (!g) return;
+    if (g.mode === 'range') {
+      const s = state.sel; let a = Math.min(s.a, s.b), b = Math.max(s.a, s.b);
+      if (b - a < Math.max(3, state.snap)) b = Math.min(SONG, a + TPB);
+      s.lo = a; s.hi = b; s.a = a; s.b = b;
+      preview(); placePanel();
+    } else if (!g.moved && (g.mode === 'add' || g.mode === 'bend?')) {
+      const { x, y } = at(e), t = snapT(tOf(x), e);
+      const v = g.near ? valueAt(lane.points, t) : vOf(y);
+      const p = lane.points; let i = p.findIndex(q => q.t > t); if (i < 0) i = p.length;
+      const prevB = i > 0 ? p[i - 1].b : 0;
+      p.splice(i, 0, { t, v, b: prevB });
+      drawLane(lane); live();
+    }
+    g = null; state.drag = null; drawLane(lane);
+  };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', () => { g = null; state.drag = null; });
+  svg.addEventListener('dblclick', e => {
+    if (state.tool !== 'edit') return;
+    const { x, y } = at(e), idx = hitPoint(x, y);
+    if (idx >= 0 && lane.points.length > 1) { lane.points.splice(idx, 1); drawLane(lane); live(); }
+  });
+
+  function drawAt(g, x, y, e) {
+    const grain = state.snap === 1 ? 3 : state.snap;
+    const t = clamp(Math.round(tOf(x) / grain) * grain, 0, SONG);
+    g.drawn.set(t, vOf(y)); g.lo = Math.min(g.lo, t); g.hi = Math.max(g.hi, t);
+    const mid = [...g.drawn.entries()].filter(([k]) => k >= g.lo && k <= g.hi).sort((a, b) => a[0] - b[0]).map(([t, v]) => ({ t, v, b: 0 }));
+    lane.points = splice(g.orig, g.lo, g.hi, mid);
+    drawLane(lane); live();
+  }
+}
+function renderAllSelections() { for (const l of lanes) drawLane(l); placePanel(); }
+function preview() {
+  const s = state.sel; if (!s || s.lo == null) return;
+  s.preview = generate(state.shape, s.lo, s.hi);
+  drawLane(laneById(s.lane)); syncPanel();
+}
+
+/* ---------- shape panel ---------- */
+const RATES = [[3, '1/32'], [6, '1/16'], [12, '1/8'], [24, '1/4'], [48, '1/2'], [96, '1 bar'], [192, '2 bars'], [384, '4 bars']];
+const panel = el('div', 'shape-panel');
+panel.innerHTML = `
+  <div class="sp-head"><h3>Shape</h3><div class="sp-range" id="spRange"></div></div>
+  <div class="shapes" id="spShapes" role="group" aria-label="Shape">${Object.entries(SHAPES).map(([k, s]) =>
+    `<button class="shape-btn" data-k="${k}" aria-pressed="false"><svg viewBox="0 0 30 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="${ICONS[k]}"/></svg>${s.label}</button>`).join('')}</div>
+  <div class="sp-grid">
+    <label for="spRate" data-r="rate">Rate</label><input type="range" id="spRate" min="0" max="${RATES.length - 1}" step="1"><output id="oRate"></output>
+    <label for="spTop">Top</label><input type="range" id="spTop" min="0" max="1" step="0.005"><output id="oTop"></output>
+    <label for="spBot">Bottom</label><input type="range" id="spBot" min="0" max="1" step="0.005"><output id="oBot"></output>
+    <label for="spPhase" data-r="phase">Phase</label><input type="range" id="spPhase" min="0" max="1" step="0.0625"><output id="oPhase"></output>
+    <label for="spDuty" data-r="duty">Duty</label><input type="range" id="spDuty" min="0.1" max="0.9" step="0.05"><output id="oDuty"></output>
+  </div>
+  <div class="sp-actions"><span class="sp-note">Square edges get a short de-click ramp.</span><button class="btn" id="spCancel">Cancel</button><button class="btn primary" id="spApply">Apply</button></div>`;
+panel.querySelectorAll('.shape-btn').forEach(b => b.onclick = () => { state.shape.kind = b.dataset.k; preview(); });
+const bindR = (id, fn) => panel.querySelector(id).addEventListener('input', e => { fn(+e.target.value); preview(); });
+bindR('#spRate', v => state.shape.rate = RATES[v][0]);
+bindR('#spTop', v => state.shape.top = v);
+bindR('#spBot', v => state.shape.bottom = v);
+bindR('#spPhase', v => state.shape.phase = v);
+bindR('#spDuty', v => state.shape.duty = v);
+panel.querySelector('#spCancel').onclick = () => closeSel();
+panel.querySelector('#spApply').onclick = () => {
+  const s = state.sel, lane = laneById(s.lane);
+  lane.points = splice(lane.points, s.lo, s.hi, s.preview);
+  closeSel(); live();
+};
+function closeSel() { const id = state.sel && state.sel.lane; state.sel = null; if (id && laneById(id)) drawLane(laneById(id)); placePanel(); }
+function syncPanel() {
+  const s = state.shape, sel = state.sel, lane = sel && laneById(sel.lane);
+  if (!lane) return;
+  const sc = SCALES[lane.scale], cyclic = SHAPES[s.kind].cyclic;
+  panel.querySelectorAll('.shape-btn').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === s.kind));
+  panel.querySelector('h3').textContent = 'Shape · ' + lane.name;
+  const ri = RATES.findIndex(r => r[0] === s.rate);
+  panel.querySelector('#spRate').value = ri; panel.querySelector('#oRate').textContent = cyclic ? RATES[ri][1] : '—';
+  panel.querySelector('#spTop').value = s.top; panel.querySelector('#oTop').textContent = sc.fmt(s.top);
+  panel.querySelector('#spBot').value = s.bottom; panel.querySelector('#oBot').textContent = sc.fmt(s.bottom);
+  panel.querySelector('#spPhase').value = s.phase; panel.querySelector('#oPhase').textContent = cyclic ? Math.round(s.phase * 360) + '°' : '—';
+  panel.querySelector('#spDuty').value = s.duty; panel.querySelector('#oDuty').textContent = s.kind === 'square' ? Math.round(s.duty * 100) + '%' : '—';
+  for (const k of ['rate', 'phase']) for (const n of [panel.querySelector(`[data-r="${k}"]`), panel.querySelector(`#sp${k[0].toUpperCase() + k.slice(1)}`)]) n.classList.toggle('dis', !cyclic), n.disabled = !cyclic;
+  for (const n of [panel.querySelector('[data-r="duty"]'), panel.querySelector('#spDuty')]) n.classList.toggle('dis', s.kind !== 'square'), n.disabled = s.kind !== 'square';
+  const bars = (sel.hi - sel.lo) / TPB, cycles = cyclic ? (sel.hi - sel.lo) / s.rate : 1;
+  const fmtPos = t => `${Math.floor(t / TPB) + 1}.${Math.floor((t % TPB) / 24) + 1}`;
+  panel.querySelector('#spRange').textContent = `${fmtPos(sel.lo)} → ${fmtPos(sel.hi)} · ${+bars.toFixed(2)} bar${bars === 1 ? '' : 's'} · ${+cycles.toFixed(2)} cycles · ${sel.preview ? sel.preview.length : 0} points`;
+}
+function placePanel() {
+  const sel = state.sel, wrap = $('#wrap');
+  if (!sel || sel.lo == null || !laneById(sel.lane)) { panel.remove(); return; }
+  syncPanel();
+  if (state.place === 'pane') {
+    panel.className = 'shape-panel pane'; panel.style.left = panel.style.top = '';
+    $('#paneSlot').append(panel); return;
+  }
+  panel.className = 'shape-panel pop';
+  wrap.append(panel);
+  const tl = document.querySelector(`.alane[data-lane="${sel.lane}"]`);
+  if (!tl) return;
+  const wr = wrap.getBoundingClientRect(), r = tl.getBoundingClientRect();
+  const x = r.left - wr.left + xOf(sel.lo);
+  const pw = panel.offsetWidth;
+  panel.style.left = clamp(x, 8, Math.max(8, wr.width - pw - 8)) + 'px';
+  panel.style.top = (r.bottom - wr.top + 6) + 'px';
+}
+
+/* ---------- knob gallery ---------- */
+const VARIANTS = {
+  A: { title: 'A · Lit ring', text: 'The arc and pointer take the lane’s colour and an AUTO tag sits under the value. The knob still reads as live.' },
+  B: { title: 'B · Padlock', text: 'The knob dims, its arc goes dashed and a padlock sits in the cap. The knob reads as unavailable.' },
+};
+let resonance = 0.18;
+function galleryKnobs() {
+  const cut = lanes.find(l => l.part === 'pad' && l.name === 'Cutoff');
+  const lfo = lanes.find(l => l.part === 'pad' && l.name === 'LFO 1 rate');
+  const send = lanes.find(l => l.part === 'pad' && l.name === 'Send A');
+  const k = (label, lane, scale, still) => ({ label, lane: lane && lane.on ? lane : null, scale, v: lane && lane.on ? valueAt(lane.points, state.tick) : still });
+  return [k('Cutoff', cut, 'hz', 0.55), k('LFO 1 rate', lfo, 'lfo', 0.32), { label: 'Resonance', lane: null, scale: 'res', v: resonance, drag: true }, k('Send A', send, 'pct', 0.3)];
+}
+const gRefs = [];
+function renderGallery() {
+  const G = $('#gallery'); G.replaceChildren(); gRefs.length = 0;
+  for (const key of ['A', 'B']) {
+    const card = el('div', 'kcard');
+    card.innerHTML = `<div class="kcard-head"><h3>${VARIANTS[key].title}</h3></div><p>${VARIANTS[key].text}</p>`;
+    const row = el('div', 'krow');
+    galleryKnobs().forEach((kd, i) => {
+      const n = el('div', 'kn');
+      n.setAttribute('role', 'slider'); n.tabIndex = 0;
+      row.append(n);
+      gRefs.push({ n, key, i });
+      n.addEventListener('pointerdown', e => {
+        const cur = galleryKnobs()[i];
+        if (cur.lane) { $('#status').textContent = `${cur.label} is automated in the song. Switch its lane off to edit it.`; return; }
+        if (!cur.drag) { $('#status').textContent = `${cur.label} has a lane, but it is switched off, so the knob is free.`; return; }
+        $('#status').textContent = '';
+        n.setPointerCapture(e.pointerId);
+        const y0 = e.clientY, v0 = resonance;
+        const mv = ev => { resonance = clamp(v0 - (ev.clientY - y0) / 150, 0, 1); liveGallery(); };
+        const up = () => { n.removeEventListener('pointermove', mv); n.removeEventListener('pointerup', up); };
+        n.addEventListener('pointermove', mv); n.addEventListener('pointerup', up);
+      });
+    });
+    card.append(row);
+    G.append(card);
+  }
+  liveGallery();
+}
+function liveGallery() {
+  const ks = galleryKnobs();
+  for (const { n, key, i } of gRefs) {
+    const kd = ks[i], locked = !!kd.lane, hex = locked ? hexOf(kd.lane) : null;
+    const opts = key === 'A'
+      ? { size: 52, w: 3.5, color: locked ? hex : '#dce3e3', ring: locked ? hex : null }
+      : { size: 52, w: 3.5, color: locked ? '#8b9a9e' : '#dce3e3', dim: locked, dash: locked, lock: locked };
+    const tag = locked ? (key === 'A' ? `<span class="tag" style="color:#14181a;background:${hex}">AUTO</span>` : `<span class="tag" style="color:#8b9a9e;border:1px solid #3d4950">LOCKED</span>`) : '<span class="tag">&nbsp;</span>';
+    n.className = 'kn ' + (locked ? 'locked' : 'free');
+    n.setAttribute('aria-label', kd.label + (locked ? ', automated' : ''));
+    n.setAttribute('aria-valuetext', SCALES[kd.scale].fmt(kd.v));
+    n.innerHTML = `${knobSVG(kd.v, opts)}<span class="kl">${kd.label}</span><span class="kv" style="${key === 'B' && locked ? 'color:#8b9a9e' : ''}">${SCALES[kd.scale].fmt(kd.v)}</span>${tag}`;
+  }
+}
+
+/* ---------- live / transport ---------- */
+function live() {
+  const x = xOf(state.tick);
+  for (const p of refs.ph) { p.style.transform = `translateX(${x}px)`; p.classList.toggle('dim', !state.playing); }
+  for (const f of refs.live) f();
+  liveGallery();
+  const bar = Math.floor(state.tick / TPB) + 1, beat = Math.floor((state.tick % TPB) / 24) + 1;
+  $('#pos').textContent = `${bar}.${beat}`;
+}
+let last = 0;
+function frame(ts) {
+  if (!state.playing) return;
+  const dt = last ? (ts - last) / 1000 : 0; last = ts;
+  state.tick = (state.tick + dt * BPM / 60 * 24) % SONG;
+  live();
+  requestAnimationFrame(frame);
+}
+function setPlay(on) {
+  state.playing = on; last = 0;
+  $('#play').innerHTML = on ? '■ Stop' : '▶ Play';
+  $('#play').setAttribute('aria-label', on ? 'Stop' : 'Play');
+  if (on) requestAnimationFrame(frame); else live();
+}
+
+const HINTS = {
+  edit: 'Click to add a point · drag a point to move it · drag the line to bend it (it clicks straight near the middle) · <kbd>Alt</kbd>-click a line to straighten · double-click a point to delete · <kbd>Shift</kbd> ignores snap',
+  draw: 'Drag across a lane to draw. Points land on the snap grid; Off draws at 1/32.',
+  shape: 'Drag across a lane to select a range, then pick a shape. The dashed line previews it; Apply writes ordinary points you can edit afterwards.',
+};
+function setTool(t) {
+  state.tool = t;
+  document.querySelectorAll('#tools button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t));
+  document.querySelectorAll('.alane').forEach(a => a.dataset.tool = t);
+  $('#hint').innerHTML = HINTS[t];
+  if (t !== 'shape' && state.sel) closeSel();
+}
+
+/* ---------- wiring ---------- */
+$('#play').onclick = () => setPlay(!state.playing);
+document.querySelectorAll('#tools button').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+$('#snap').onchange = e => state.snap = +e.target.value;
+$('#zin').onclick = () => { state.barPx = Math.min(192, state.barPx * 1.5); render(); };
+$('#zout').onclick = () => { state.barPx = Math.max(28, state.barPx / 1.5); render(); };
+document.querySelectorAll('#heights button').forEach(b => b.onclick = () => {
+  state.laneH = +b.dataset.h;
+  document.querySelectorAll('#heights button').forEach(x => x.setAttribute('aria-pressed', x === b)); render();
+});
+document.querySelectorAll('#placement button').forEach(b => b.onclick = () => {
+  state.place = b.dataset.p;
+  document.querySelectorAll('#placement button').forEach(x => x.setAttribute('aria-pressed', x === b)); placePanel();
+});
+$('#reset').onclick = () => { const was = state.playing; seed(); setPlay(false); syncControls(); render(); renderGallery(); setTool('edit'); if (was) setPlay(true); };
+$('#song').addEventListener('scroll', () => { if (state.place === 'pop') placePanel(); });
+window.addEventListener('resize', () => placePanel());
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input, select, textarea')) return;
+  if (e.code === 'Space') { e.preventDefault(); setPlay(!state.playing); }
+  else if (e.key === 'Escape' && state.sel) closeSel();
+  else if (e.key === 'e') setTool('edit');
+  else if (e.key === 'd') setTool('draw');
+  else if (e.key === 's') setTool('shape');
+});
+function syncControls() {
+  $('#snap').value = state.snap;
+  document.querySelectorAll('#heights button').forEach(x => x.setAttribute('aria-pressed', +x.dataset.h === state.laneH));
+  document.querySelectorAll('#placement button').forEach(x => x.setAttribute('aria-pressed', x.dataset.p === state.place));
+}
+
+seed(); syncControls(); render(); renderGallery(); setTool('edit');
+state.tick = 9 * TPB + 24; live();
+})();
+</script>
