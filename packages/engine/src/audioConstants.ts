@@ -64,6 +64,12 @@ export const HOLD_MIN = 0.005;
 export const HOLD_MAX = 10;
 /** A Euclidean driver's step count. */
 export const EUCLID_STEPS_MAX = 64;
+/** A Euclid lane's length in steps (windsor#355): each lane is 1 to this long, its own polymeter. */
+export const EUCLID_LANE_STEPS_MAX = 32;
+/** A Euclid pitch lane's reach, in semitones either way of the part's `note`. */
+export const EUCLID_PITCH_LANE_MAX = 24;
+/** A Euclid step's ratchet: the most hits one step's roll may split into (1 is a plain hit). */
+export const EUCLID_RATCHET_MAX = 4;
 /** Chance a `walk` density modulator steps at all on a given bar. */
 export const WALK_CHANCE = 0.5;
 /** A free-running density LFO's rate, in hertz. */

@@ -5,7 +5,13 @@
 import { describe, expect, it } from 'vitest';
 
 import { STEP_MOD_PARAMS, STEP_MOD_SLOT_COUNT } from '../worklet/fm/stepModTables';
-import { assertStepModLanes, isStepModParam, stepModAt, type StepModLane } from './stepModLanes';
+import {
+  assertStepModLanes,
+  isStepModParam,
+  stepModAt,
+  stepModAtCycle,
+  type StepModLane,
+} from './stepModLanes';
 
 const LANES: StepModLane[] = [
   { param: 'filter.cutoff', values: [0, 0.5, 0] },
@@ -26,6 +32,35 @@ describe('stepModAt', () => {
     expect(stepModAt([], 0)).toBeUndefined();
     expect(stepModAt(LANES, 0)).toBeUndefined();
     expect(stepModAt(LANES, 7)).toBeUndefined();
+  });
+});
+
+describe('stepModAtCycle (windsor#355)', () => {
+  const CYCLED: StepModLane[] = [
+    { param: 'ops.3.width', values: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0.75] },
+    { param: 'filter.cutoff', values: [0, 0.5, 0, 0, 0] },
+  ];
+
+  it('reads each lane at the local step mod its own length, in slot order', () => {
+    for (let local = 0; local < 50; local++) {
+      const at = stepModAtCycle(CYCLED, local);
+      const cutoff = CYCLED[1]!.values[local % 5]!;
+      const width = CYCLED[0]!.values[local % 10]!;
+      if (cutoff === 0 && width === 0) {
+        expect(at, `local ${local}`).toBeUndefined();
+        continue;
+      }
+      expect(at).toHaveLength(STEP_MOD_SLOT_COUNT);
+      expect(at?.[STEP_MOD_PARAMS.indexOf('filter.cutoff')]).toBe(cutoff);
+      expect(at?.[STEP_MOD_PARAMS.indexOf('ops.3.width')]).toBe(width);
+    }
+  });
+
+  it('is nothing for no lanes or an empty one, and the grid’s read is unchanged', () => {
+    expect(stepModAtCycle([], 3)).toBeUndefined();
+    expect(stepModAtCycle([{ param: 'filter.cutoff', values: [] }], 3)).toBeUndefined();
+    expect(stepModAt(LANES, 7)).toBeUndefined();
+    expect(stepModAtCycle(LANES, 7)).toEqual(stepModAt(LANES, 1));
   });
 });
 

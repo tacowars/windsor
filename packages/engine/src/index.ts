@@ -78,6 +78,7 @@ export type {
 } from './sequencing/gridSequencer';
 // Per-step parameter modulation (windsor#17): the lanes and the table behind them.
 export { isStepModParam, stepModAt } from './sequencing/stepModLanes';
+export { stepModAtCycle } from './sequencing/stepModLanes';
 export type { StepModLane } from './sequencing/stepModLanes';
 export {
   STEP_MOD_LANES_MAX,
@@ -157,6 +158,9 @@ export {
   VELOCITY_DEFAULT,
   WALK_CHANCE,
   EUCLID_STEPS_MAX,
+  EUCLID_LANE_STEPS_MAX,
+  EUCLID_PITCH_LANE_MAX,
+  EUCLID_RATCHET_MAX,
   GRID_DEGREE_MAX,
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
@@ -397,6 +401,8 @@ export type {
   OnsetEvent,
   OnsetHandler,
 } from './sequencing/euclideanSequencer';
+export { assertEuclidRows, euclidHitRead, laneStep } from './sequencing/euclidLanes';
+export type { EuclidHitRead, EuclidRows } from './sequencing/euclidLanes';
 
 export { HIDDEN_CATEGORY, filterPresets } from './patch/presetCatalog';
 // The envelope curve the worklet shapes segments with (#620 decision 4): the

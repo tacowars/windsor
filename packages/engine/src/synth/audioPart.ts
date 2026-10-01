@@ -155,10 +155,14 @@ export class AudioPart {
     if (ids.length === 0) this.heldByNote.delete(note);
   }
 
-  /** Fire and forget: a note of fixed length. The shape an audition or a one-shot wants. */
-  trigger(note: number, velocity = 1, duration = 0.25, time?: number): number {
+  /**
+   * Fire and forget: a note of fixed length. The shape an audition or a
+   * one-shot wants. `extras` ride on its note-on (a Euclid hit's accent and
+   * offsets, windsor#355); its note-off still releases only this note.
+   */
+  trigger(note: number, velocity = 1, duration = 0.25, time?: number, extras?: NoteExtras): number {
     const start = time ?? this.context.currentTime;
-    const id = this.noteOn(note, velocity, start);
+    const id = this.noteOn(note, velocity, start, extras);
     this.noteOff(id, start + duration);
     return id;
   }

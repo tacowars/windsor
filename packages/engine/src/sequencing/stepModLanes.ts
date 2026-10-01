@@ -47,6 +47,28 @@ export function stepModAt(lanes: readonly StepModLane[], step: number): number[]
   return offsets;
 }
 
+/**
+ * The offsets at a sequencer's local step when each lane runs at its own
+ * length (windsor#355's Euclid lanes): lane by lane, index `localStep mod`
+ * that lane's length, in `stepModAt`'s slot order, and undefined when every
+ * lane reads 0 there, so such a step allocates nothing. An empty lane reads 0.
+ */
+export function stepModAtCycle(
+  lanes: readonly StepModLane[],
+  localStep: number,
+): number[] | undefined {
+  let offsets: number[] | undefined;
+  for (const lane of lanes) {
+    const length = lane.values.length;
+    if (length === 0) continue;
+    const value = lane.values[((localStep % length) + length) % length] ?? 0;
+    if (value === 0) continue;
+    offsets ??= new Array<number>(STEP_MOD_SLOT_COUNT).fill(0);
+    offsets[STEP_MOD_PARAMS.indexOf(lane.param)] = value;
+  }
+  return offsets;
+}
+
 /** At most `STEP_MOD_LANES_MAX` lanes, each a known parameter once, every value finite in -1..1. */
 export function assertStepModLanes(lanes: readonly StepModLane[]): void {
   if (lanes.length > STEP_MOD_LANES_MAX) {

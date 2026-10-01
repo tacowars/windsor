@@ -16,6 +16,7 @@
  */
 import { WALK_DOWN_CHANCE } from '../audioConstants';
 import { euclid, type Pattern } from './euclid';
+import { assertEuclidRows, type EuclidRows } from './euclidLanes';
 import { streamRng, type Rng } from './generatorSeed';
 import { isBarDivisor, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
 
@@ -33,7 +34,12 @@ export type DensityMod =
 export const DENSITY_MOD_KINDS = ['lfoBars', 'lfoHz', 'walk'] as const;
 export type DensityModKind = (typeof DENSITY_MOD_KINDS)[number];
 
-export interface EuclideanConfig {
+/**
+ * The trigger row's fields, plus the ratchet row and the drawn lanes beside
+ * it (`EuclidRows`, windsor#355): all optional, absent being a plain hit, so
+ * on a part and on a region's pattern alike they leave today's figure alone.
+ */
+export interface EuclideanConfig extends EuclidRows {
   /** `n`: steps in the figure. Fixed; only `k` moves. */
   steps: number;
   /** Ticks per step. Must divide the bar (see `DIVISORS`). */
@@ -65,11 +71,18 @@ export const DEFAULT_EUCLIDEAN_CONFIG: EuclideanConfig = {
 export interface OnsetEvent {
   tick: number;
   time: number;
-  /** Index of the onset's step within the figure. */
+  /** Index of the onset's step within the figure: the ratchet row's key. */
   step: number;
   /** The figure the onset came from, for bindings that accent by density. */
   k: number;
   n: number;
+  /**
+   * Steps the trigger has counted since its region's entry (`TickEvent.step`):
+   * the lanes' clock (windsor#355), each lane reading it mod its own length.
+   */
+  localStep: number;
+  /** Seconds per straight tick at the tempo the step was issued under: a roll's span is read in it. */
+  secondsPerTick: number;
 }
 export type OnsetHandler = (event: OnsetEvent) => void;
 
@@ -115,6 +128,7 @@ export function assertEuclideanConfig(config: EuclideanConfig): void {
     throw new RangeError(`pulses bounds must satisfy 0 <= min <= max <= ${steps}`);
   }
   assertDensity(config.density);
+  assertEuclidRows(config);
   if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
   const { pattern } = config;
   if (pattern != null) {
@@ -169,8 +183,10 @@ export class EuclideanSequencer {
    * once from the new steps, rotation and that `k`, so a knob turned by hand
    * shows on the next step while the modulator still moves `k` only on a bar
    * line. A captured `pattern` swaps to the fixed figure; `null` returns to
-   * generative from the current `k`. The divisor is the subscription and the
-   * seed is the stream: both need a rebuild.
+   * generative from the current `k`. The ratchet row, the accent amounts and
+   * the lanes (windsor#355) are read at each hit, so an edit to them takes
+   * here too, the figure, `k` and the playhead carrying on. The divisor is
+   * the subscription and the seed is the stream: both need a rebuild.
    */
   reconfigure(config: EuclideanConfig): void {
     assertEuclideanConfig(config);
@@ -222,6 +238,8 @@ export class EuclideanSequencer {
       step,
       k: this.k,
       n: this.current.steps,
+      localStep: event.step,
+      secondsPerTick: event.secondsPerTick,
     };
     this.onOnset?.(onset);
     return onset;
