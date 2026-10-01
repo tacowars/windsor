@@ -116,7 +116,7 @@
       "scale": "log"
     },
     {
-      "path": "filter.drive",
+      "path": "drive.gain",
       "min": 1,
       "max": 2
     },

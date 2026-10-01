@@ -142,7 +142,6 @@
     "mode": 1,
     "cutoff": 8000,
     "resonance": 0.707,
-    "drive": 1.2,
     "slope24": false,
     "envAmount": 0,
     "modWheelDepth": 0,
@@ -177,5 +176,11 @@
       0,
       0
     ]
+  },
+  "drive": {
+    "gain": 1.2,
+    "shape": 0,
+    "bias": 0,
+    "tone": 1
   }
 }
