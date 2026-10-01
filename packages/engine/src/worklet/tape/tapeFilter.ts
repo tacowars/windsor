@@ -1,5 +1,8 @@
 /** Preallocated RBJ shelves/peak; REELS model data with browser-independent coefficients.
- * Q is used as RBJ damping, not a claim of filtergraph~ bit parity. Tape render tests pin behavior. */
+ * Q is used as RBJ damping, not a claim of filtergraph~ bit parity. Tape render tests pin behavior.
+ * The sample crosses no call as a double (worklet rule 2, windsor#228): a tone's `advance` runs its
+ * filters over its own `value` in place, and the DSP hands a tone its Bias in `targetBias`. Every
+ * double field is first written as NaN (rule 7). Pinned by `inserts/tapeAllocation.test.ts`. */
 import { TAPE_DSP as C, TAPE_MODELS } from '../../inserts/tapeConstants';
 type Shape = 'low' | 'high' | 'peak';
 interface FilterOptions {
@@ -10,15 +13,22 @@ interface FilterOptions {
   rate: number;
 }
 class TapeFilter {
-  b0 = 1;
-  b1 = 0;
-  b2 = 0;
-  a1 = 0;
-  a2 = 0;
-  x1 = 0;
-  x2 = 0;
-  y1 = 0;
-  y2 = 0;
+  b0: number;
+  b1: number;
+  b2: number;
+  a1: number;
+  a2: number;
+  x1: number;
+  x2: number;
+  y1: number;
+  y2: number;
+  constructor() {
+    this.b0 = this.b1 = this.b2 = this.a1 = this.a2 = NaN;
+    this.x1 = this.x2 = this.y1 = this.y2 = NaN;
+    this.b0 = 1;
+    this.b1 = this.b2 = this.a1 = this.a2 = 0;
+    this.x1 = this.x2 = this.y1 = this.y2 = 0;
+  }
   configure(o: FilterOptions): void {
     const a = Math.sqrt(o.gain);
     const w = (2 * Math.PI * Math.min(o.hz, o.rate * C.maxFrequencyRatio)) / o.rate;
@@ -57,25 +67,23 @@ class TapeFilter {
   reset(): void {
     this.x1 = this.x2 = this.y1 = this.y2 = 0;
   }
-  tick(x: number): number {
-    const y =
-      this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2;
-    this.x2 = this.x1;
-    this.x1 = x;
-    this.y2 = this.y1;
-    this.y1 = y;
-    return y;
-  }
 }
 class TapeTone {
   filters = Array.from({ length: C.toneFilters }, () => new TapeFilter());
   options: FilterOptions;
   model = -1;
+  /** The Bias last configured, and the one `configure` reads. */
   bias = NaN;
+  targetBias = NaN;
+  /** The sample `advance` filters in place. */
+  value = NaN;
   constructor(rate: number) {
-    this.options = { shape: 'low', hz: 1, gain: 1, q: 1, rate };
+    this.options = { shape: 'low', hz: NaN, gain: NaN, q: NaN, rate };
+    this.options.hz = this.options.gain = this.options.q = 1;
   }
-  configure(model: number, bias: number): void {
+  /** The filters for `model` at `targetBias`; nothing when neither changed. */
+  configure(model: number): void {
+    const bias = this.targetBias;
     if (model === this.model && bias === this.bias) return;
     this.model = model;
     this.bias = bias;
@@ -103,9 +111,30 @@ class TapeTone {
   reset(): void {
     for (let i = 0; i < this.filters.length; i++) this.filters[i].reset();
   }
+  /**
+   * `value` through every filter in turn, in place: the render's per-sample entry. Each filter's
+   * difference equation is written here, not called: with the sample passed through the tone's
+   * field to five calls, the render benched slower in Node than before windsor#228, and with the
+   * chain here, faster.
+   */
+  advance(): void {
+    let x = this.value;
+    for (let i = 0; i < this.filters.length; i++) {
+      const f = this.filters[i];
+      const y = f.b0 * x + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+      f.x2 = f.x1;
+      f.x1 = x;
+      f.y2 = f.y1;
+      f.y1 = y;
+      x = y;
+    }
+    this.value = x;
+  }
+  /** Test-only: `x` through `advance`. */
   tick(x: number): number {
-    for (let i = 0; i < this.filters.length; i++) x = this.filters[i].tick(x);
-    return x;
+    this.value = x;
+    this.advance();
+    return this.value;
   }
 }
 export { TapeTone };
