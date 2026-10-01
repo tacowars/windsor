@@ -1,11 +1,14 @@
 /**
  * The audition keyboard (#70): plays the Parts tab's selected part through
- * the real engine — `part.noteOn`/`noteOff`, nothing local.
+ * the real engine — `part.noteOn`/`noteOff`, nothing local. Its QWERTY keys
+ * play only while the Parts tab is shown (windsor#349), so another tab's own
+ * keys (the Song tab's E and D) never sound a note; MIDI input plays anywhere.
  */
 import type { AudioPart } from '@windsor/engine';
 import { SEMITONES_PER_OCTAVE } from '@windsor/engine';
 import { $, el } from './dom';
 import {
+  AUDITION_TAB,
   BLACK_KEYS,
   FIXED_VELOCITY,
   KEY_COUNT,
@@ -50,6 +53,10 @@ function releaseMousePickedDropdowns(): void {
   );
 }
 
+/** Whether the QWERTY keys play while `activeTab` is shown: only on the audition tab. */
+export const qwertyPlaysOn = (activeTab: string | null, auditionTab = AUDITION_TAB): boolean =>
+  activeTab === auditionTab;
+
 interface Held {
   id: number;
   part: AudioPart;
@@ -72,13 +79,16 @@ export class Keyboard {
    */
   private readonly sounded = new Set<AudioPart>();
   private readonly getPart: () => AudioPart | null;
+  /** Whether a QWERTY press plays now; a release always lifts its note. */
+  private readonly qwertyLive: () => boolean;
   /** The part carrying the controller's bend and wheel, and their positions. */
   private expressionPart: AudioPart | null = null;
   private bendSemitones = 0;
   private wheel = 0;
 
-  constructor(getPart: () => AudioPart | null) {
+  constructor(getPart: () => AudioPart | null, qwertyLive: () => boolean = () => true) {
     this.getPart = getPart;
+    this.qwertyLive = qwertyLive;
   }
 
   /** How many notes the keyboard is holding; what Panic must leave at zero. */
@@ -120,7 +130,7 @@ export class Keyboard {
    * on, and every later `a` returned early because the map still held it.
    */
   onKeyDown(e: KeyboardEvent): void {
-    if (e.repeat) return;
+    if (e.repeat || !this.qwertyLive()) return;
     const tag = (e.target instanceof HTMLElement ? e.target.tagName : '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
     // A modal's buttons are not keys either (#563): focus is trapped there until it closes.

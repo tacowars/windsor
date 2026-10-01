@@ -14,7 +14,8 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AudioPart } from '@windsor/engine';
-import { Keyboard } from './keyboard';
+import { AUDITION_TAB } from './keyboardConstants';
+import { Keyboard, qwertyPlaysOn } from './keyboard';
 
 /** Only what `keyboard.ts` touches: `#keys`, `#octLabel`, and Panic's sweep. */
 const keysBox = { children: [] as HTMLElement[] };
@@ -99,6 +100,26 @@ describe('the audition keyboard', () => {
     expect(log).toEqual([`p1 on ${keyboard.octave * 12}`]);
   });
 
+  it('plays its QWERTY keys only on the Parts tab, and still lifts a note held across a switch', () => {
+    let tab: string | null = 'song';
+    keyboard = new Keyboard(
+      () => selected,
+      () => qwertyPlaysOn(tab),
+    );
+    keyboard.onKeyDown(press('e', 'KeyE'));
+    keyboard.onKeyDown(press('d', 'KeyD'));
+    keyboard.onKeyDown(press('x', 'KeyX'));
+    expect(log).toEqual([]);
+    expect(keyboard.heldCount).toBe(0);
+    const octave = keyboard.octave;
+    tab = 'parts';
+    keyboard.onKeyDown(press('e', 'KeyE'));
+    expect(log).toEqual([`p1 on ${octave * 12 + 3}`]);
+    tab = 'song';
+    keyboard.onKeyUp(press('e', 'KeyE'));
+    expect(log.at(-1)).toBe('p1 off #1');
+  });
+
   it('leaves typing in a field and in an open dialog alone', () => {
     keyboard.onKeyDown(press('a', 'KeyA', new FakeElement('INPUT')));
     keyboard.onKeyDown(press('a', 'KeyA', new FakeElement('BUTTON', true)));
@@ -154,5 +175,14 @@ describe('the audition keyboard', () => {
     keyboard.onPanic = (): void => void told++;
     keyboard.panic();
     expect(told).toBe(1);
+  });
+});
+
+describe('which tab the QWERTY keys play on', () => {
+  it('is the Parts tab alone', () => {
+    expect(AUDITION_TAB).toBe('parts');
+    expect(qwertyPlaysOn('parts')).toBe(true);
+    for (const tab of ['song', 'mixer', 'arrangement', null])
+      expect(qwertyPlaysOn(tab)).toBe(false);
   });
 });

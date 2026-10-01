@@ -6,7 +6,8 @@
  *
  * - **A lane** is its colour chip, name and kind; its value at the playhead,
  *   an on/off ● and a delete ×; and its curve over the part's ghosted
- *   regions, read-only (editing is windsor#349, shapes windsor#350).
+ *   regions. The toolbar's Edit and Draw tools edit the curve in place
+ *   (windsor#349, `songAutomationGesture.ts`); shapes are windsor#350.
  * - **The add row** is the "+ Add lane" picker, the voice count against
  *   `FM_LANES_MAX`, and an empty stretch of timeline.
  *
@@ -16,11 +17,19 @@
  * follows the playhead without a repaint. The rules are
  * `songAutomationModel.ts`, the geometry `songAutomationCurve.ts`.
  */
-import type { AutomationLane, AutomationTargetId, DocumentPart } from '@windsor/engine';
+import type {
+  AutomationLane,
+  AutomationPoint,
+  AutomationTargetId,
+  AutomationTargetRow,
+  DocumentPart,
+} from '@windsor/engine';
 import { valueAt } from '@windsor/engine';
 import { el } from './dom';
 import { withGesture } from './gestureHooks';
 import { curveShape } from './songAutomationCurve';
+import { withPoints } from './songAutomationEdit';
+import { wireLaneEditing } from './songAutomationGesture';
 import {
   automationChange,
   currentValue,
@@ -76,11 +85,31 @@ function miniButton(text: string, label: string, focusKey: string): HTMLButtonEl
   return button;
 }
 
-/** The lane's curve over the part's regions, ghosted, at the view's zoom. */
-function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane): HTMLElement {
+/** Draw `points` into `box`: the fill, the line and the dots, at the view's zoom. */
+function paintCurve(
+  view: SongView,
+  box: SVGElement,
+  row: AutomationTargetRow,
+  points: readonly AutomationPoint[],
+): void {
   const px = view.state.pxPerBar;
   const widthPx = tickToPx(view.songTicks(), px);
   const heightPx = SONG_VIEW.automationLanePx;
+  const shape = curveShape(row, points, { widthPx, heightPx, pxPerBar: px });
+  box.setAttribute('width', String(widthPx));
+  box.setAttribute('height', String(heightPx));
+  box.replaceChildren(
+    svg('path', { class: 'auto-fill', d: shape.area }),
+    svg('path', { class: 'auto-line', d: shape.line }),
+    ...shape.dots.map((dot) =>
+      svg('circle', { class: 'auto-dot', cx: dot.x, cy: dot.y, r: AUTOMATION_DRAWING.dotRadiusPx }),
+    ),
+  );
+}
+
+/** The lane's curve over the part's regions, ghosted, at the view's zoom, under the toolbar's tools. */
+function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane): HTMLElement {
+  const px = view.state.pxPerBar;
   const timeline = el('div', 'auto-lane');
   for (const region of part.regions) {
     const ghost = el('div', 'auto-ghost');
@@ -90,16 +119,22 @@ function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane):
   }
   const row = laneRow(part, lane.target);
   if (!row) return timeline;
-  const shape = curveShape(row, lane.points, { widthPx, heightPx, pxPerBar: px });
-  const box = svg('svg', { width: widthPx, height: heightPx, 'aria-hidden': 'true' });
-  box.append(
-    svg('path', { class: 'auto-fill', d: shape.area }),
-    svg('path', { class: 'auto-line', d: shape.line }),
-    ...shape.dots.map((dot) =>
-      svg('circle', { class: 'auto-dot', cx: dot.x, cy: dot.y, r: AUTOMATION_DRAWING.dotRadiusPx }),
-    ),
-  );
+  const box = svg('svg', { 'aria-hidden': 'true' });
+  paintCurve(view, box, row, lane.points);
   timeline.appendChild(box);
+  wireLaneEditing({
+    view,
+    timeline,
+    row,
+    name: laneTitle(part, lane.target).name,
+    points: () =>
+      lanesOf(livePart(view, part)).find((l) => l.target === lane.target)?.points ?? lane.points,
+    draw: (next) => paintCurve(view, box, row, next),
+    commit: (label, next) => {
+      const live = livePart(view, part);
+      commitLanes(view, live, withPoints(lanesOf(live), lane.target, next), { label });
+    },
+  });
   return timeline;
 }
 

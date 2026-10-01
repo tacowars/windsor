@@ -17,7 +17,7 @@ import { $ } from './dom';
 import { DocumentModel } from './documentModel';
 import { EngineHost } from './host';
 import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
-import { Keyboard } from './keyboard';
+import { Keyboard, qwertyPlaysOn } from './keyboard';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
 import { renderPartsTab } from './partsTab';
@@ -35,8 +35,12 @@ mountToasts($('toasts'));
 const model = new DocumentModel(newSong());
 const host = new EngineHost((message) => notify(message, 'error'));
 const ctx = new AppContext<HTMLElement>({ host, model, notify });
-// The keyboard plays the Parts tab's selected part, once audio is enabled.
-const keyboard = new Keyboard(() => ctx.livePart());
+// The keyboard plays the Parts tab's selected part, once audio is enabled,
+// and its QWERTY keys only while the Parts tab is shown.
+const keyboard = new Keyboard(
+  () => ctx.livePart(),
+  () => qwertyPlaysOn(ctx.activeTab),
+);
 // A MIDI controller plays through the same keyboard (#523).
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
