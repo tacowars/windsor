@@ -62,31 +62,47 @@ function loadStepOffsets(
 /**
  * The per-voice values from the bound patch and the voice's offsets. Called
  * after the envelopes are configured (`configure` resets their decay to the
- * patch's), by `start`, `rebind` and `retarget`. Allocates nothing.
+ * patch's), by `start`, `rebind` and `retarget`. The patch's values are laid
+ * out in slot order in `voice.stepValues`, and each slot with an offset is
+ * put through the curve there, from one call site (windsor#233): two dozen
+ * call sites, one a value, ran past V8's inlining budget, and a double passed
+ * to or returned from a call it does not inline is a new heap number. A slot
+ * without one keeps the patch's value, which is what `stepModValue` returns
+ * for an offset of 0, so a note with no offsets makes no call at all.
  */
 function bindStepMod(voice: Voice, patch: WorkletPatch): void {
   const o = voice.stepOffsets;
   const t = STEP_MOD_TABLE;
+  const v = voice.stepValues;
   const f = patch.filter;
-  voice.envAmount = stepModValue(t[STEP_SLOT_ENV_AMOUNT], f.envAmount, o[STEP_SLOT_ENV_AMOUNT]);
-  voice.cutoff = stepModValue(t[STEP_SLOT_CUTOFF], f.cutoff, o[STEP_SLOT_CUTOFF]);
-  voice.resonance = stepModValue(t[STEP_SLOT_RESONANCE], f.resonance, o[STEP_SLOT_RESONANCE]);
-  const fd = STEP_SLOT_FILTER_DECAY;
-  voice.filtEnv.decayTime = stepModValue(t[fd], f.env.decayTime, o[fd]);
+  v[STEP_SLOT_ENV_AMOUNT] = f.envAmount;
+  v[STEP_SLOT_CUTOFF] = f.cutoff;
+  v[STEP_SLOT_RESONANCE] = f.resonance;
+  v[STEP_SLOT_FILTER_DECAY] = f.env.decayTime;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const op = patch.ops[i];
+    const b = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
+    v[b + STEP_OP_LEVEL] = op.level;
+    v[b + STEP_OP_DECAY] = op.env.decayTime;
+    v[b + STEP_OP_DECAY_CURVE] = op.env.decayCurve;
+    v[b + STEP_OP_FEEDBACK] = op.feedback;
+    v[b + STEP_OP_WIDTH] = op.width;
+  }
+  for (let s = 0; s < STEP_MOD_SLOT_COUNT; s++) {
+    if (o[s] !== 0) v[s] = stepModValue(t[s], v[s], o[s]);
+  }
+  voice.envAmount = v[STEP_SLOT_ENV_AMOUNT];
+  voice.cutoff = v[STEP_SLOT_CUTOFF];
+  voice.resonance = v[STEP_SLOT_RESONANCE];
+  voice.filtEnv.decayTime = v[STEP_SLOT_FILTER_DECAY];
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
     const env = voice.ampEnv[i];
     const b = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
-    const lv = b + STEP_OP_LEVEL,
-      dc = b + STEP_OP_DECAY,
-      cv = b + STEP_OP_DECAY_CURVE,
-      fb = b + STEP_OP_FEEDBACK,
-      wd = b + STEP_OP_WIDTH;
-    voice.opLevel[i] = stepModValue(t[lv], op.level, o[lv]);
-    env.decayTime = stepModValue(t[dc], op.env.decayTime, o[dc]);
-    env.decayCurve = stepModValue(t[cv], op.env.decayCurve, o[cv]);
-    voice.opFeedback[i] = stepModValue(t[fb], op.feedback, o[fb]);
-    voice.opWidth[i] = stepModValue(t[wd], op.width, o[wd]);
+    voice.opLevel[i] = v[b + STEP_OP_LEVEL];
+    env.decayTime = v[b + STEP_OP_DECAY];
+    env.decayCurve = v[b + STEP_OP_DECAY_CURVE];
+    voice.opFeedback[i] = v[b + STEP_OP_FEEDBACK];
+    voice.opWidth[i] = v[b + STEP_OP_WIDTH];
   }
 }
 

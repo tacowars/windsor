@@ -119,7 +119,8 @@ describe('width on a noise operator', () => {
 interface WidthVoice {
   active: boolean;
   tables: (Float32Array | null)[];
-  updateControl(n: number, bend: number, wheel: number, cutoffMod: number): void;
+  /** The part's bend, wheel and cutoff are the processor's, this quantum's (windsor#233). */
+  updateControl(n: number): void;
   render(outL: Float32Array, outR: Float32Array, off: number, n: number): void;
 }
 
@@ -147,10 +148,10 @@ describe('the mip table while width ramps', () => {
     const block = loaded.ctrlInterval;
     const outL = new Float32Array(block);
     const outR = new Float32Array(block);
-    voice.updateControl(block, 0, 0, 0);
+    voice.updateControl(block);
     expect(voice.tables[0]).toBe(narrowTable);
     voice.render(outL, outR, 0, block);
-    voice.updateControl(block, 0, 0, 0);
+    voice.updateControl(block);
     expect(voice.tables[0]).toBe(wideTable);
   });
 });
