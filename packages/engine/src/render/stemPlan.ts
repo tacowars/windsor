@@ -3,7 +3,7 @@
  * (windsor#41). Pure, so the rules are tested without an audio context.
  *
  * A stem is one part's strip, post-fader and pre-master with its sends
- * excluded, or one return (decision 1). A part whose strip is routed
+ * excluded, one group bus, or one return (decision 1). A part whose strip is routed
  * "Sidechain only" is silent in the master: it is the muted part decision 4
  * names (written before Windsor had mute and solo), skipped unless the
  * caller asks for it. A part muted, or soloed out by another's solo
@@ -11,14 +11,21 @@
  * return is exported when a part the master hears sends to it; with no send
  * it is silence, and no file.
  *
+ * A group bus (windsor#286; record `2026-10-01-group-buses` decision 9) is
+ * one stem, after its inserts, pan and level, and its members get none of
+ * their own, whatever `includeMuted` says: the members are heard only
+ * through the group, so the stems still add up to the master. A group with
+ * no member has no stem; a muted or soloed-out group's stem is listed, and
+ * silent, as a muted part's is. A part naming a group the song lacks plays
+ * on Master, as the live system plays it, and keeps its part stem.
+ *
  * A pass renders the master on channels 0–1 and its stems on the pairs after
  * (decision 2): as many as the channel limit allows, and fewer when the
  * song is long enough that a full-width context would hold more float
  * samples than `RENDER_STEM_PASS_MAX_SAMPLES`.
  */
 import { RETURN_NAMES } from '../mixer/mix';
-import type { GroupSwitches } from '../mixer/soloRule';
-import { isHeard, isSoloing } from '../mixer/soloRule';
+import { groupOf, isHeard, isSoloing } from '../mixer/soloRule';
 import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
 import {
   RENDER_CHANNELS,
@@ -44,7 +51,15 @@ export interface ReturnStem {
   readonly name: string;
 }
 
-export type StemSource = PartStem | ReturnStem;
+/** A group bus's stem: its id, its name, and its place in the song's group list, from 1. */
+export interface GroupStem {
+  readonly kind: 'group';
+  readonly id: number;
+  readonly name: string;
+  readonly position: number;
+}
+
+export type StemSource = PartStem | GroupStem | ReturnStem;
 
 /** What a stem render hands back: the master, then each stem. */
 export type Stem = { readonly kind: 'master' } | StemSource;
@@ -56,10 +71,15 @@ export interface StemChoice {
 
 export const isSidechainOnly = (part: DocumentPart): boolean => part.strip.output === 'sidechain';
 
-/** The stems of `document`, parts by slot, then the returns in the desk's order. */
+/**
+ * The stems of `document`: the ungrouped parts by slot, then the groups with
+ * a member in the song's order, then the returns in the desk's order.
+ */
 export function stemSources(document: ArrangementDocument, choice: StemChoice = {}): StemSource[] {
+  const groups = document.groups ?? [];
   const parts = [...document.parts]
     .sort((a, b) => a.slot - b.slot)
+    .filter((part) => groupOf(part.strip, groups) === undefined)
     .filter((part) => choice.includeMuted || !isSidechainOnly(part))
     .map<PartStem>((part) => ({
       kind: 'part',
@@ -67,9 +87,17 @@ export function stemSources(document: ArrangementDocument, choice: StemChoice = 
       name: part.name,
       muted: isSidechainOnly(part),
     }));
+  const members = new Set(document.parts.map((part) => groupOf(part.strip, groups)?.id));
+  const buses = groups
+    .map<GroupStem>((group, i) => ({
+      kind: 'group',
+      id: group.id,
+      name: group.name,
+      position: i + 1,
+    }))
+    .filter((stem) => members.has(stem.id));
   // Sidechain only, mute and solo gate the sends with the dry path, so only a heard part feeds a return.
   // Renders play what playback plays: the live roster (`MusicRoster.resolveSolo`) reads the groups too.
-  const groups: readonly GroupSwitches[] = document.groups ?? [];
   const soloing = isSoloing(
     document.parts.map((part) => part.strip),
     groups,
@@ -78,7 +106,7 @@ export function stemSources(document: ArrangementDocument, choice: StemChoice = 
   const returns = RETURN_NAMES.filter((name) =>
     heard.some((part) => (part.strip.sends[name] ?? 0) > 0),
   ).map<ReturnStem>((name) => ({ kind: 'return', name }));
-  return [...parts, ...returns];
+  return [...parts, ...buses, ...returns];
 }
 
 export interface StemPassLimits {

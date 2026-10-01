@@ -19,6 +19,7 @@ const MASTER: Stem = { kind: 'master' };
 const KICK: Stem = { kind: 'part', slot: 0, name: 'kick', muted: false };
 const SEND_A: Stem = { kind: 'return', name: 'a' };
 const SEND_B: Stem = { kind: 'return', name: 'b' };
+const DRUMS: Stem = { kind: 'group', id: 4, name: 'Drums', position: 1 };
 
 describe('stem file names', () => {
   it('names the master, each part by number and label, and each send bus', () => {
@@ -36,6 +37,20 @@ describe('stem file names', () => {
     expect(stemFileName('song', { ...KICK, name: 'a/b: c?' })).toBe('song-01-a-b- c-.wav');
     expect(stemFileName('song', { ...KICK, slot: 2, name: '  ' })).toBe('song-03.wav');
     expect(stemFileName('', SEND_A)).toBe('song-send-a.wav');
+  });
+
+  it('names a group bus by its place in the list and its name (windsor#286)', () => {
+    expect(stemFileName('my-song.json', DRUMS)).toBe('my-song-group-1-Drums.wav');
+    expect(stemFileName('song', { ...DRUMS, id: 0, position: 3, name: 'Keys' })).toBe(
+      'song-group-3-Keys.wav',
+    );
+  });
+
+  it("makes a group's name safe, and numbers a group with none", () => {
+    expect(stemFileName('song', { ...DRUMS, name: 'Dr/ums: *1*' })).toBe(
+      'song-group-1-Dr-ums- -1-.wav',
+    );
+    expect(stemFileName('song', { ...DRUMS, position: 2, name: ' ' })).toBe('song-group-2.wav');
   });
 });
 
