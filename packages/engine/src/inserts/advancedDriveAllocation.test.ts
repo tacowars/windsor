@@ -36,6 +36,7 @@ import { describe, expect, it } from 'vitest';
 import {
   probeScenario,
   runAllocationProbe,
+  SYNCHRONOUS_TIERING,
   workletBundle,
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
@@ -121,19 +122,22 @@ function probe(): ProbeRun {
     period: PERIOD,
     quiet: QUIET,
   };
-  return runAllocationProbe({
-    bundle: workletBundle('advanced-drive-processor.js'),
-    rate: 48000,
-    params: {},
-    options: {},
-    messages: [],
-    inputChannels: 2,
-    loadQuanta: 0,
-    warmup: 3 * CYCLE,
-    measure: CYCLE,
-    scenario: probeScenario('advancedDriveChangeScenario.ts'),
-    scenarioConfig,
-  });
+  return runAllocationProbe(
+    {
+      bundle: workletBundle('advanced-drive-processor.js'),
+      rate: 48000,
+      params: {},
+      options: {},
+      messages: [],
+      inputChannels: 2,
+      loadQuanta: 0,
+      warmup: 3 * CYCLE,
+      measure: CYCLE,
+      scenario: probeScenario('advancedDriveChangeScenario.ts'),
+      scenarioConfig,
+    },
+    SYNCHRONOUS_TIERING,
+  );
 }
 
 describe('Advanced Drive on V8', () => {

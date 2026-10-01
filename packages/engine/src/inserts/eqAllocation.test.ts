@@ -52,6 +52,7 @@ import { describe, expect, it } from 'vitest';
 import {
   probeScenario,
   runAllocationProbe,
+  SYNCHRONOUS_TIERING,
   workletBundle,
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
@@ -90,19 +91,22 @@ function probe(): ProbeRun {
     slopeCount: EQ_SLOPES.length,
     period: 8,
   };
-  return runAllocationProbe({
-    bundle: workletBundle('eq-processor.js'),
-    rate: 48000,
-    params: eqParameterValues(SPEC),
-    options: {},
-    messages: [],
-    inputChannels: 2,
-    loadQuanta: 0,
-    warmup: 48000,
-    measure: 40000,
-    scenario: probeScenario('eqToggleScenario.ts'),
-    scenarioConfig,
-  });
+  return runAllocationProbe(
+    {
+      bundle: workletBundle('eq-processor.js'),
+      rate: 48000,
+      params: eqParameterValues(SPEC),
+      options: {},
+      messages: [],
+      inputChannels: 2,
+      loadQuanta: 0,
+      warmup: 48000,
+      measure: 40000,
+      scenario: probeScenario('eqToggleScenario.ts'),
+      scenarioConfig,
+    },
+    SYNCHRONOUS_TIERING,
+  );
 }
 
 describe('the audio thread on V8', () => {
