@@ -1,0 +1,5 @@
+# The sound-match toolkit's Python dependencies (Python 3.12+). Licences in README.md.
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+cma>=3.3
