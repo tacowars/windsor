@@ -338,7 +338,7 @@ var FILTER_DEFAULTS = {
   keyTrack: 0
 };
 var DRIVE_DEFAULTS = {
-  /** The input gain into the shaper; 1 is unity. */
+  /** The input gain into the shaper, `DRIVE_GAIN_RANGE`; 1 is unity. */
   gain: 1,
   shape: DRIVE_SOFT,
   /** A DC offset added before the shaper, `DRIVE_BIAS_RANGE`. */
@@ -346,6 +346,7 @@ var DRIVE_DEFAULTS = {
   /** The lowpass after the shaper, `DRIVE_TONE_RANGE`: 1 is open (bypassed). */
   tone: 1
 };
+var DRIVE_GAIN_RANGE = { min: 0, max: 64 };
 var DRIVE_BIAS_RANGE = { min: -1, max: 1 };
 var DRIVE_TONE_RANGE = { min: 0, max: 1 };
 var TONE_RANGE = { min: 0.02, max: 1 };
@@ -429,7 +430,7 @@ function driveDefaults(raw) {
   const d = DRIVE_DEFAULTS;
   const shape = num(raw.shape, d.shape) | 0;
   return {
-    gain: num(raw.gain, d.gain),
+    gain: clamp(num(raw.gain, d.gain), DRIVE_GAIN_RANGE),
     shape: shape < DRIVE_SOFT || shape > DRIVE_FOLD ? DRIVE_SOFT : shape,
     bias: clamp(num(raw.bias, d.bias), DRIVE_BIAS_RANGE),
     tone: clamp(num(raw.tone, d.tone), DRIVE_TONE_RANGE)
@@ -1193,6 +1194,10 @@ var VoiceDrive = class {
         return;
       }
       case DRIVE_FOLD: {
+        if (x - x !== 0) {
+          this.point = 0;
+          return;
+        }
         let u = x + 1;
         u -= 4 * Math.floor(u * 0.25);
         this.point = 1 - Math.abs(u - 2);
