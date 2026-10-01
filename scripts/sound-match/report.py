@@ -159,14 +159,14 @@ def _lag_note(lag):
     return " (at the search limit: the onsets or the pitch disagree)"
 
 
-def build(ref, cands, label, weights=None):
-    """The report for one reference: a JSON-ready dict and its text."""
+def build(ref, cands, label, weights=None, forced=False):
+    """The report for one reference: a JSON-ready dict and its text; `forced` when --seeds set the count."""
     r = summary(ref.m)
     c = mean_tree([summary(x.m) for x in cands])
     stats = score.spread([x.scores for x in cands], weights)
     seeds = [x.seed for x in cands if x.seed is not None]
     seed_text = f"{len(seeds)} seeds ({', '.join(map(str, seeds))}), mean shown" if len(seeds) > 1 else (
-        f"seed {seeds[0]}; the render does not depend on the seed" if seeds else "a recording"
+        f"seed {seeds[0]}" + (" (one seed forced)" if forced else "; the render does not depend on the seed") if seeds else "a recording"
     )
     tonal = "tonal" if ref.is_tonal else "noise-like"
     head = [
