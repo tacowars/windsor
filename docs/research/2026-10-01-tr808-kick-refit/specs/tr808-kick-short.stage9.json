@@ -1,0 +1,95 @@
+{
+  "start": "../start/tr808-kick-short.stage9.json",
+  "params": [
+    {
+      "path": "ops[0].env.decayTime",
+      "min": 0.005,
+      "max": 0.4,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.decayCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.sustainLevel",
+      "min": 0,
+      "max": 0.9
+    },
+    {
+      "path": "ops[0].env.releaseTime",
+      "min": 0.01,
+      "max": 0.8,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.releaseCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[1].level",
+      "min": 0,
+      "max": 0.6
+    },
+    {
+      "path": "ops[1].env.decayTime",
+      "min": 0.001,
+      "max": 0.03,
+      "scale": "log"
+    },
+    {
+      "path": "pitchEnvAmount",
+      "min": 10,
+      "max": 36.0
+    },
+    {
+      "path": "pitchEnv.attackTime",
+      "min": 0.002,
+      "max": 0.008
+    },
+    {
+      "path": "pitchEnv.sustainLevel",
+      "min": 0.05,
+      "max": 0.9
+    },
+    {
+      "path": "pitchEnv.releaseTime",
+      "min": 0.008,
+      "max": 0.4,
+      "scale": "log"
+    },
+    {
+      "path": "pitchEnv.releaseCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "drive.bias",
+      "min": -0.6,
+      "max": 0.6
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/BD A 808 Decay A 03.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "weights": {
+    "stft": 1,
+    "band": 0.1,
+    "harm": 0.04,
+    "pitch": 2,
+    "wave": 6
+  },
+  "optimizer": {
+    "method": "cma",
+    "budget": 2500,
+    "sigma0": 0.15,
+    "seed": 1
+  }
+}
