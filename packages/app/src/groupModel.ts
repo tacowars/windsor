@@ -70,9 +70,17 @@ const routesTo = (output: ChannelStrip['output'], id: number): boolean =>
 /** Whether the song has room for another group. */
 export const canAddGroup = (doc: ArrangementDocument): boolean => groupsOf(doc).length < MAX_GROUPS;
 
-/** The next group's id: one more than the largest, or 1 in a song with none. */
-export const nextGroupId = (doc: ArrangementDocument): number =>
-  Math.max(0, ...groupsOf(doc).map((group) => group.id)) + 1;
+/**
+ * The next group's id: the lowest non-negative integer no group uses. With
+ * at most `MAX_GROUPS` groups one always exists, it stays a safe integer the
+ * normaliser keeps, and existing groups keep their ids.
+ */
+export function nextGroupId(doc: ArrangementDocument): number {
+  const used = new Set(groupsOf(doc).map((group) => group.id));
+  let id = 0;
+  while (used.has(id)) id++;
+  return id;
+}
 
 /** The next group's name: `Group <n>` at the lowest n no group's name uses. */
 export function nextGroupName(doc: ArrangementDocument): string {

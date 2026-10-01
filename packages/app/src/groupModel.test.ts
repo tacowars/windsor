@@ -63,18 +63,30 @@ const open = (groups: unknown[] = []) => openGestureConsole({ ...SONG, groups })
 const outputAt = (doc: ArrangementDocument, slot: number) => partAt(doc, slot)?.strip.output;
 
 describe('the next group', () => {
-  it('is named at the lowest free number and numbered one past the largest id', () => {
+  it('is named at the lowest free number and numbered at the lowest free id', () => {
     const ctx = open();
     expect(nextGroupName(ctx.model.doc)).toBe('Group 1');
-    expect(nextGroupId(ctx.model.doc)).toBe(1);
+    expect(nextGroupId(ctx.model.doc)).toBe(0);
     const gapped = open([group(7, 'Group 2'), group(2, 'Drums'), group(3, 'Group 1')]);
     expect(nextGroupName(gapped.model.doc)).toBe('Group 3');
-    expect(nextGroupId(gapped.model.doc)).toBe(8);
+    expect(nextGroupId(gapped.model.doc)).toBe(0);
+    const holed = open([group(0, 'A'), group(1, 'B'), group(3, 'C')]);
+    expect(nextGroupId(holed.model.doc)).toBe(2);
   });
 
-  it('is appended at the defaults, and refused once the song holds MAX_GROUPS', () => {
+  it('stays in range beside a group at the largest safe id, and keeps that id', () => {
+    const ctx = open([group(Number.MAX_SAFE_INTEGER, 'Drums')]);
+    expect(nextGroupId(ctx.model.doc)).toBe(0);
+    expect(addGroup(ctx)).toBe(true);
+    expect(groupsOf(ctx.model.doc).map((g) => g.id)).toEqual([Number.MAX_SAFE_INTEGER, 0]);
+  });
+
+  it('is appended at the defaults, level 1, and refused once the song holds MAX_GROUPS', () => {
     const ctx = open([group(4, 'Drums')]);
-    expect(addGroupChange(ctx.model.doc)).toEqual({ groups: { 5: group(5, 'Group 1') } });
+    expect(addGroupChange(ctx.model.doc)).toEqual({ groups: { 0: group(0, 'Group 1') } });
+    expect(addGroup(ctx)).toBe(true);
+    expect(groupsOf(ctx.model.doc).find((g) => g.id === 0)?.level).toBe(DEFAULT_GROUP.level);
+    expect(DEFAULT_GROUP.level).toBe(1);
     while (canAddGroup(ctx.model.doc)) expect(addGroup(ctx)).toBe(true);
     expect(groupsOf(ctx.model.doc)).toHaveLength(MAX_GROUPS);
     expect(addGroupChange(ctx.model.doc)).toBeNull();
@@ -160,13 +172,13 @@ describe('a drum bus, step by step', () => {
     const start = ctx.model.doc;
     expect(addGroup(ctx)).toBe(true);
     expect(ctx.undoLabel).toBe('Add Group 1');
-    expect(renameGroup(ctx, 1, 'Drums')).toBe(true);
-    expect(setStripOutput(ctx, 0, { group: 1 })).toBe(true);
-    expect(setStripOutput(ctx, 1, { group: 1 })).toBe(true);
-    expect(toggleGroupSwitch(ctx, 1, 'mute')).toBe(true);
+    expect(renameGroup(ctx, 0, 'Drums')).toBe(true);
+    expect(setStripOutput(ctx, 0, { group: 0 })).toBe(true);
+    expect(setStripOutput(ctx, 1, { group: 0 })).toBe(true);
+    expect(toggleGroupSwitch(ctx, 0, 'mute')).toBe(true);
     expect(ctx.undoLabel).toBe(groupSwitchLabel('mute', 'Drums'));
-    expect(ctx.model.doc.groups).toEqual([{ ...group(1, 'Drums'), mute: true }]);
-    expect(groupMembers(ctx.model.doc, 1)).toEqual(['Kick', 'Snare']);
+    expect(ctx.model.doc.groups).toEqual([{ ...group(0, 'Drums'), mute: true }]);
+    expect(groupMembers(ctx.model.doc, 0)).toEqual(['Kick', 'Snare']);
     const steps = [
       (doc: ArrangementDocument) => doc.groups?.[0]?.mute === undefined,
       (doc: ArrangementDocument) => outputAt(doc, 1) === undefined,
