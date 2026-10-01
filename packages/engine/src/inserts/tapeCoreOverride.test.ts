@@ -10,8 +10,9 @@
  * - The pure edits behave as the issue's decision 3 says: turning one control
  *   writes all three, a model change and Randomize keep `core`, a starting
  *   point clears it.
- * - The box the knobs reach is above the susceptibility floor everywhere, so
- *   the core can always normalise there.
+ * - The box the knobs reach (windsor#315's) holds every model row, and is
+ *   above the susceptibility floor everywhere, so the core can always
+ *   normalise there.
  * - The processor starts on a song's `core`, its cores tuned exactly as a
  *   core built at those controls.
  */
@@ -25,7 +26,7 @@ import { FieldNormaliser } from '../song/arrangementFields';
 import { mulberry32 } from '../sequencing/mulberry32';
 import { TapeMagneticCore } from '../worklet/tape/tapeMagnetic';
 import { magneticRowAboveFloor } from '../worklet/tape/tapeMagneticRows';
-import { TAPE_CORE_BOUNDS, TAPE_TYPES } from './tapeConstants';
+import { TAPE_CORE_BOUNDS, TAPE_CORE_CONTROLS, TAPE_MODELS, TAPE_TYPES } from './tapeConstants';
 import { clearTapeCore, setTapeCore, tapeCoreOf } from './tapeControls';
 import { tapeCoreParams } from './tapeInsert';
 import { applyTapePreset } from './tapePresets';
@@ -71,7 +72,11 @@ describe('the song format', () => {
       'fx',
       n,
     );
-    expect(clamped.core).toEqual({ drive: 0, width: TAPE_CORE_BOUNDS.width[1], saturation: 1 });
+    expect(clamped.core).toEqual({
+      drive: TAPE_CORE_BOUNDS.drive[0],
+      width: TAPE_CORE_BOUNDS.width[1],
+      saturation: 1,
+    });
     expect(n.corrections).toHaveLength(4);
     const partial = normaliseTape({ model: 'metal', core: { width: 0.04 } }, 'fx', n);
     expect(partial.core).toEqual({ ...tapeModelCore('metal'), width: TAPE_CORE_BOUNDS.width[0] });
@@ -86,13 +91,16 @@ describe('the song format', () => {
 describe("the Advanced section's edits (decision 3)", () => {
   it('shows the model row until a knob turns, then writes all three', () => {
     expect(tapeCoreOf(VINTAGE)).toEqual(tapeModelCore('vintage'));
-    // Vintage's width sits above the box: the first turn brings it to the box's edge.
+    // Vintage's row is inside the box (windsor#315): turning Bend leaves its Width as it was.
     const turned = setTapeCore(VINTAGE, 'drive', 0.25);
-    expect(turned.core).toEqual({
-      ...tapeModelCore('vintage'),
-      drive: 0.25,
-      width: TAPE_CORE_BOUNDS.width[1],
-    });
+    expect(turned.core).toEqual({ ...tapeModelCore('vintage'), drive: 0.25 });
+    for (const model of TAPE_TYPES) {
+      const row = tapeModelCore(model);
+      expect(setTapeCore({ ...DEFAULT_TAPE, model }, 'drive', 0.25).core, model).toEqual({
+        ...row,
+        drive: 0.25,
+      });
+    }
     const ferric = setTapeCore({ ...DEFAULT_TAPE, model: 'ferric' }, 'saturation', 1);
     expect(ferric.core).toEqual({ ...tapeModelCore('ferric'), saturation: 1 });
     expect(setTapeCore(ferric, 'width', 0.9).core!.width).toBe(TAPE_CORE_BOUNDS.width[1]);
@@ -122,21 +130,33 @@ describe("the Advanced section's edits (decision 3)", () => {
 });
 
 describe('the processor', () => {
-  it("writes the flag and the controls, and the model's row clamped into range while unset", () => {
+  it("writes the flag and the controls, and the model's row while unset", () => {
     expect(tapeCoreParams({ ...DEFAULT_TAPE, core: CORE })).toEqual({
       core: 1,
       coreDrive: CORE.drive,
       coreWidth: CORE.width,
       coreSaturation: CORE.saturation,
     });
-    const row = tapeModelCore('vintage');
-    expect(row.width).toBeGreaterThan(TAPE_CORE_BOUNDS.width[1]);
-    expect(tapeCoreParams(VINTAGE)).toEqual({
-      core: 0,
-      coreDrive: row.drive,
-      coreWidth: TAPE_CORE_BOUNDS.width[1],
-      coreSaturation: row.saturation,
-    });
+    for (const model of TAPE_TYPES) {
+      const row = tapeModelCore(model);
+      expect(tapeCoreParams({ ...DEFAULT_TAPE, model }), model).toEqual({
+        core: 0,
+        coreDrive: row.drive,
+        coreWidth: row.width,
+        coreSaturation: row.saturation,
+      });
+    }
+  });
+
+  it("holds every model's row inside the knob box (windsor#315)", () => {
+    expect(TAPE_CORE_BOUNDS).toEqual({ drive: [0.05, 1], width: [0.05, 0.85], saturation: [0, 1] });
+    for (const [i, { magnetic }] of TAPE_MODELS.entries())
+      for (const [c, control] of TAPE_CORE_CONTROLS.entries()) {
+        const [min, max] = TAPE_CORE_BOUNDS[control];
+        const label = `${TAPE_TYPES[i]} ${control}`;
+        expect(magnetic[c], label).toBeGreaterThanOrEqual(min);
+        expect(magnetic[c], label).toBeLessThanOrEqual(max);
+      }
   });
 
   it('keeps the susceptibility above the floor across the whole knob box', () => {
@@ -160,8 +180,8 @@ describe('the processor', () => {
     const plain = tapeRig({ model: 'ferric', drive: 9 });
     const ignored = tapeRig({ model: 'ferric', drive: 9 });
     for (const [name, value] of Object.entries({
-      coreDrive: 0,
-      coreWidth: 0.62,
+      coreDrive: 0.05,
+      coreWidth: 0.85,
       coreSaturation: 1,
     }))
       ignored.params[name]![0] = value;

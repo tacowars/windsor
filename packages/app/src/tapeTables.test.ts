@@ -66,10 +66,11 @@ it('names the core knobs Bend, Width and Saturation and reads each 0–100 % ove
     expect(tapeCoreReadout(f, (min + max) / 2)).toBe('50%');
     expect(tapeCoreReadout(f, max)).toBe('100%');
   }
-  expect(TAPE_CORE_BOUNDS).toEqual({ drive: [0, 1], width: [0.05, 0.62], saturation: [0, 1] });
-  // Vintage's row sits above the Width knob's box while the insert follows its model.
+  expect(TAPE_CORE_BOUNDS).toEqual({ drive: [0.05, 1], width: [0.05, 0.85], saturation: [0, 1] });
+  // Every model row is inside the box (windsor#315): Vintage's and VHS's Width read in range.
   expect(tapeCoreReadout('width', tapeCoreOf({ ...DEFAULT_TAPE, model: 'vintage' }).width)).toBe(
-    '137%',
+    '98%',
   );
+  expect(tapeCoreReadout('width', tapeCoreOf({ ...DEFAULT_TAPE, model: 'vhs' }).width)).toBe('90%');
   expect(TAPE_PAGES.filter((page) => page.advanced).map((page) => page.name)).toEqual(['Tape']);
 });

@@ -9,16 +9,19 @@
  * the whole path as heard: Bias and model EQ, the core, the DC block, Mix 1)
  * plays a full-scale 300 Hz sine with the song's `core` set, at Drive 0 (the
  * field at the knee) and at +32 dB (at the guard), at 2× and then at 4×. Each
- * knob is swept across its whole range in `TAPE_CORE_BOUNDS` and back, over
- * `SWEEP` each way, with the other two at each corner of theirs. Across every
- * sweep: no state reset on any core, no sample above `BOUND` times the
- * larger steady peak at the sweep's two ends, and no step from one sample to
- * the next above `BOUND` times the larger steady step there, so the motion
- * neither lifts the level nor jumps. `BOUND` is #307's tone bound
+ * knob is swept across its whole range in `TAPE_CORE_BOUNDS` (windsor#315's
+ * box, so Bend from 0.05 and Width to 0.85) and back, over `SWEEP` each way,
+ * with the other two at each corner of theirs. Across every sweep: no state
+ * reset on any core, no sample above `BOUND` times the larger steady peak at
+ * the sweep's two ends, and no step from one sample to the next above
+ * `BOUND` times the larger steady step there, so the motion neither lifts
+ * the level nor jumps. `BOUND` is #307's tone bound
  * (`tapeOutputContinuity.test.ts`, 1.005). Measured on Node 24 (arm64; the
  * core's arithmetic is portable), the worst sample was 1.00001 of its
- * reference and the worst step 1.0025, both at 44.1 kHz. The settle and the
- * hold are each over ten time constants, so both references are steady.
+ * reference (Saturation swept at Bend 0.05, Width 0.85) and the worst step
+ * 1.0024 (Bend swept at Width 0.05, Saturation 1), both at 44.1 kHz 2×. The
+ * settle and the hold are each over ten time constants, so both references
+ * are steady.
  *
  * Runs in about 45 s.
  */
@@ -151,6 +154,11 @@ function sweepBothWays(run: Run, knob: Control, at: Point, label: string): void 
 }
 
 describe('turning the Advanced knobs under a tone (windsor#291)', () => {
+  it("sweeps to windsor#315's box edges, Bend 0.05 and Width 0.85 among them", () => {
+    expect(TAPE_CORE_BOUNDS).toEqual({ drive: [0.05, 1], width: [0.05, 0.85], saturation: [0, 1] });
+    expect(corners('saturation')).toContainEqual({ drive: 0.05, width: 0.85, saturation: NaN });
+  });
+
   it.each(RATES)(
     'at %i Hz, Drive 0 and +32, 2× then 4×: no reset, no lift and no jump',
     (rate) => {

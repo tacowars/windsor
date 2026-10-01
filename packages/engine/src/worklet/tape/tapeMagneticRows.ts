@@ -12,9 +12,8 @@
  * `tapeDsp.ts` runs the assertion when the bundle loads.
  *
  * A song's own controls (windsor#291) are held to the smaller box the
- * research qualified for knobs, `TAPE_CORE_BOUNDS`, by the normaliser and
- * by the stage's clamp; two rows, Vintage and VHS, sit above its width
- * maximum, on sampled points of the dynamic-survival record.
+ * research qualified for knobs, `TAPE_CORE_BOUNDS` (windsor#315), by the
+ * normaliser and by each parameter's range; every row lies inside it.
  *
  * Invariant: nothing here is on the per-sample path. Pinned by
  * `inserts/tapeMagneticIntegration.test.ts` (the mapping at every model, the

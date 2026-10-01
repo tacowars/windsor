@@ -11,8 +11,9 @@ import type { TapeSpec } from './tapeSpec';
 
 /**
  * The processor's parameters for `spec.core` (windsor#291): its flag, and its three controls.
- * While it is absent the processor reads the model's row itself, and the three carry that row
- * clamped into each parameter's range, `TAPE_CORE_BOUNDS`, so no write is out of range.
+ * While it is absent the processor reads the model's row itself, and the three carry that row,
+ * which lies inside each parameter's range, `TAPE_CORE_BOUNDS` (windsor#315); the clamp keeps any
+ * write in range should a row ever leave it.
  */
 export function tapeCoreParams(spec: TapeSpec): Record<(typeof P)[keyof typeof P], number> {
   const controls = spec.core ?? tapeModelCore(spec.model);

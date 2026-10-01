@@ -33,8 +33,8 @@ export function tapeCoreOf(spec: TapeSpec): TapeCore {
 }
 /**
  * `spec` with one core control turned: all three are written into `core`, the others as they
- * play, each clamped into `TAPE_CORE_BOUNDS`. A model row can sit outside the box (Vintage's and
- * VHS's widths), and the first knob turned on such a model brings that control to the box's edge.
+ * play, each clamped into `TAPE_CORE_BOUNDS`. Every model row lies inside the box (windsor#315), so
+ * turning one knob leaves the other two where the model had them.
  */
 export function setTapeCore(spec: TapeSpec, field: keyof TapeCore, value: number): TapeSpec {
   const next = { ...tapeCoreOf(spec), [field]: value };

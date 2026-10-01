@@ -124,6 +124,7 @@ it("carries a song's core to the processor's four parameters, and the model's ro
   expect(read()).toEqual([1, 0.75, 0.6, 0.5]);
   stage.set({ ...DEFAULT_TAPE, model: 'vhs' });
   const [drive, width, saturation] = TAPE_MODELS[TAPE_TYPES.indexOf('vhs')]!.magnetic;
-  expect(read()).toEqual([0, drive, Math.min(width, TAPE_CORE_BOUNDS.width[1]), saturation]);
+  expect(width).toBeLessThanOrEqual(TAPE_CORE_BOUNDS.width[1]);
+  expect(read()).toEqual([0, drive, width, saturation]);
   stage.dispose();
 });

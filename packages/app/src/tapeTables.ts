@@ -85,8 +85,8 @@ const PERCENT = 100;
 
 /**
  * A core knob's readout (windsor#291 decision 2): 0–100 % over its
- * `TAPE_CORE_BOUNDS`, whole percent. A model row outside the box reads past
- * 100 % (Vintage's Width, 137 %) while the insert follows its model.
+ * `TAPE_CORE_BOUNDS`, whole percent. Every model row lies inside the box
+ * (windsor#315), so a model's own controls read inside 0–100 % too.
  */
 export function tapeCoreReadout(field: keyof TapeCore, v: number): string {
   const [min, max] = TAPE_CORE_BOUNDS[field];

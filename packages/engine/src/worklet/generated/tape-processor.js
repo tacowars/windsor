@@ -36,8 +36,8 @@ var TAPE_BOUNDS = {
   seed: [0, 16777215]
 };
 var TAPE_CORE_BOUNDS = {
-  drive: [0, 1],
-  width: [0.05, 0.62],
+  drive: [0.05, 1],
+  width: [0.05, 0.85],
   saturation: [0, 1]
 };
 var TAPE_CORE_CONTROLS = ["drive", "width", "saturation"];

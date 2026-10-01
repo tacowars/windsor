@@ -39,15 +39,15 @@ export const TAPE_BOUNDS = {
 } as const;
 /**
  * The magnetic core's three controls as a song may set them (windsor#291, the Tape card's Advanced
- * section): the box qualified at 2× and 4× and 44.1, 48 and 96 kHz, every trial without a reset
- * (`docs/research/2026-10-01-tape-control-domain/` and `…-control-domain-2x/`, windsor#290 and
- * #295). A song's `core` is clamped into it on load, and it is each core parameter's range. The
- * model rows lie inside it but for two widths, Vintage's 0.83 and VHS's 0.77, which are sampled
- * points of the dynamic-survival record (design decision 6) above the box's width maximum.
+ * section): the box qualified at 2× and 4× and 44.1, 48 and 96 kHz on the shipped core, every
+ * trial without a reset and with the controls moving (windsor#315,
+ * `docs/research/2026-10-01-tape-control-domain-2x/`, its rows declaration). A song's `core` is
+ * clamped into it on load, and it is each core parameter's range. Every model row lies inside it
+ * (`tapeCoreOverride.test.ts`), Vintage's width 0.831 and VHS's 0.769 included.
  */
 export const TAPE_CORE_BOUNDS = {
-  drive: [0, 1],
-  width: [0.05, 0.62],
+  drive: [0.05, 1],
+  width: [0.05, 0.85],
   saturation: [0, 1],
 } as const;
 /** The core's controls in `TAPE_CORE_BOUNDS`' order: drive, width, saturation, as a model row. */
