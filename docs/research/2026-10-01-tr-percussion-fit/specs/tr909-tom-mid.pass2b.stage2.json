@@ -1,0 +1,231 @@
+{
+  "start": "../start/tr909-tom-mid.pass2b.stage2.json",
+  "params": [
+    {
+      "path": "tone",
+      "min": 0.05,
+      "max": 1,
+      "scale": "log"
+    },
+    {
+      "path": "drive.gain",
+      "min": 1,
+      "max": 3
+    },
+    {
+      "path": "drive.bias",
+      "min": -0.6,
+      "max": 0.6
+    },
+    {
+      "path": "pitchEnvAmount",
+      "min": 0,
+      "max": 36
+    },
+    {
+      "path": "pitchEnv.decayTime",
+      "min": 0.0005,
+      "max": 0.05,
+      "scale": "log"
+    },
+    {
+      "path": "pitchEnv.decayCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "pitchEnv.sustainLevel",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "pitchEnv.releaseTime",
+      "min": 0.05,
+      "max": 1.5,
+      "scale": "log"
+    },
+    {
+      "path": "pitchEnv.releaseCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "ops[0].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[0].feedback",
+      "min": -0.8,
+      "max": 0.3
+    },
+    {
+      "path": "ops[0].env.attackTime",
+      "min": 0,
+      "max": 0.003
+    },
+    {
+      "path": "ops[0].env.decayTime",
+      "min": 0.01,
+      "max": 1,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[0].env.sustainLevel",
+      "min": 0,
+      "max": 0.9
+    },
+    {
+      "path": "ops[0].env.releaseTime",
+      "min": 0.05,
+      "max": 1.5,
+      "scale": "log"
+    },
+    {
+      "path": "ops[0].env.releaseCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[1].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[1].feedback",
+      "min": -0.8,
+      "max": 0.3
+    },
+    {
+      "path": "ops[1].env.attackTime",
+      "min": 0,
+      "max": 0.003
+    },
+    {
+      "path": "ops[1].env.decayTime",
+      "min": 0.01,
+      "max": 1,
+      "scale": "log"
+    },
+    {
+      "path": "ops[1].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[1].env.sustainLevel",
+      "min": 0,
+      "max": 0.9
+    },
+    {
+      "path": "ops[1].env.releaseTime",
+      "min": 0.05,
+      "max": 1.5,
+      "scale": "log"
+    },
+    {
+      "path": "ops[1].env.releaseCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[1].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[2].level",
+      "min": 0,
+      "max": 0.8
+    },
+    {
+      "path": "ops[2].env.attackTime",
+      "min": 0,
+      "max": 0.003
+    },
+    {
+      "path": "ops[2].env.decayTime",
+      "min": 0.002,
+      "max": 0.2,
+      "scale": "log"
+    },
+    {
+      "path": "ops[2].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[2].env.sustainLevel",
+      "min": 0,
+      "max": 0.9
+    },
+    {
+      "path": "ops[2].env.releaseTime",
+      "min": 0.005,
+      "max": 0.6,
+      "scale": "log"
+    },
+    {
+      "path": "ops[2].env.releaseCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[2].fixedHz",
+      "min": 1000,
+      "max": 12000,
+      "scale": "log"
+    },
+    {
+      "path": "ops[3].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[3].env.decayTime",
+      "min": 0.005,
+      "max": 0.5,
+      "scale": "log"
+    },
+    {
+      "path": "ops[3].env.sustainLevel",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "filter.cutoff",
+      "min": 1000,
+      "max": 16000,
+      "scale": "log"
+    },
+    {
+      "path": "drive.tone",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/Tom Mid 909 Clean 03.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "seeds": 4,
+  "optimizer": {
+    "method": "nelder-mead",
+    "budget": 1500,
+    "sigma0": 0.03,
+    "seed": 1
+  },
+  "weights": {
+    "pitch": 0,
+    "harm": 0
+  }
+}

@@ -17,7 +17,7 @@
     { "path": "ops[1].level", "min": 0, "max": 0.4 },
     { "path": "ops[1].env.decayTime", "min": 0.001, "max": 0.05, "scale": "log" },
     { "path": "filter.cutoff", "min": 300, "max": 6000, "scale": "log" },
-    { "path": "filter.drive", "min": 1, "max": 2 }
+    { "path": "drive.gain", "min": 1, "max": 2 }
   ],
   "references": [
     {

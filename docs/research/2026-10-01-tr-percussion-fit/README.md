@@ -282,7 +282,235 @@ significant figures, with `volume` (or, for the cowbell, the two carrier
 levels) set for the peak. CMA-ES with a fixed seed makes each run
 repeatable on the same machine.
 
+These specs and start patches were written at patch format 2, where the
+drive was `filter.drive`. Format 3 moved it to the voice's own stage
+(`2026-10-01-voice-drive-stage`), and a bare patch's `filter.drive` is no
+longer read, so the second pass (windsor#318, decision 5) points every spec
+here at `drive.gain` and moves each start patch's `filter.drive` into
+`drive` as the format's own upgrade does (the gain with the filter on, soft,
+no bias, an open tone; unity with the filter off). The first-pass stages
+above reproduce with them as they are now.
+
 ## Overlays
 
 The toolkit's six panels per sound, reference in black, render in red:
-`overlays/<patch>.png`.
+`overlays/<patch>.png`. The 808 toms' and the 909 mid tom's are the second
+pass's (below); the rest are the first pass's.
+
+## Second pass (windsor#318)
+
+tacowars's listen to the first pass: the cowbell good enough but missing a
+little attack and some complexity; the 808 toms close but missing timbre
+("more triangle wave than sine, or some air or noise that gives them the
+wooden tom sound"); the 909 tom the furthest off, in its noise, its pitch
+envelope and its timbre. Two engine changes had landed since the first
+pass: the voice drive stage with bias (windsor#300) and envelope edges at
+their own samples (windsor#301, so an attack of 0 is a step). Measured on
+the same Apple M1 (macOS 26.5), Node 24.21, Python 3.14.5, against
+`origin/main` at `66685a1`; the record is
+`docs/log/2026-10-01-tr-percussion-second-pass.md`.
+
+### Method
+
+Each sound starts from its shipped patch, with the structural change named
+below made by hand, and is then polished by Nelder–Mead (σ 0.03, seeds
+1–4), which steps one control at a time from the start. CMA-ES, as in the
+first pass, found nothing better than the start in 750–1100 evaluations at
+σ 0.06–0.2 on the 808 mid tom and the 909 tom: the shipped patches sit in narrow
+optima, and a whole-population step lands far outside them.
+
+A candidate ships only if **every** component of its score is at or below
+the shipped patch's (the first pass's rule). From each fit's log the
+lowest total that meets it is taken (`fit.py` keeps the lowest total
+alone), rounded to six significant figures and level-matched by `volume`
+to the shipped peak.
+
+### Scores, before and after
+
+"Before" is the patch on `main` at `66685a1` (the first pass's patches,
+moved a little by windsor#301's edges), "after" the library file in this
+change. Toolkit default weights; the 909 tom's fits zero `pitch` and
+`harm`, as the first pass did, since both read the beat of its two tones.
+
+| Patch | total | stft | band (dB) | harm (dB) | pitch (st) | wave |
+|---|---|---|---|---|---|---|
+| `tr808-tom-low` | 0.741 → **0.596** | 0.119 → 0.078 | 1.74 → 1.53 | 10.57 → 8.67 | 0.079 → 0.077 | 0.0046 → 0.0015 |
+| `tr808-tom-mid` | 0.650 → **0.444** | 0.155 → 0.093 | 1.46 → 0.86 | 7.81 → 6.00 | 0.128 → 0.108 | 0.0056 → 0.0017 |
+| `tr808-tom-high` | 0.766 → **0.606** | 0.121 → 0.103 | 1.87 → 1.79 | 10.63 → 7.36 | 0.1218 → 0.1217 | 0.0045 → 0.0028 |
+| `tr909-tom-mid` | 2.473 → **2.434** (fit weights 0.923 → 0.894) | 0.422 → 0.418 | 3.21 → 3.03 | 16.87 → 16.83 | 4.377 → 4.335 | 0.090 → 0.087 |
+| `tr808-cowbell` | 1.456, **unchanged** | | | | | |
+
+No component ends worse. `tr909-tom-low` and `-high` have no reference;
+they are derived from the new mid as before.
+
+### 808 toms
+
+The recordings rise to their crest in 0.25–0.3 ms and fall from it faster
+than a sine would: the first 0.3 ms is a strike. The first pass's 0.5 ms
+attack could not make it; with windsor#301, the body's attack is 0 (a step
+at the note-on sample, 0–44 µs after the polish), struck at about 0.32 of a
+cycle. That is where the "wood" was, by measurement:
+
+| Patch | above 2 kHz, 0–5 ms | click (>1 kHz) peak, re peak |
+|---|---|---|
+| `tr808-tom-low` | −10.9 → +1.5 dB | −16.4 → −12.6 dB (recording −12.5) |
+| `tr808-tom-mid` | −9.3 → +3.1 dB | −17.4 → −10.9 dB (recording −10.5) |
+| `tr808-tom-high` | −8.4 → +0.6 dB | −13.8 → −13.2 dB (recording −10.4) |
+
+The other two candidates tacowars named were measured against the
+recordings before they were used:
+
+- **Triangle against sine.** The mid tom's recording has odd harmonics, but
+  faint ones: H3 −42, H5 −49, H7 −60, H9 −66 dB re H1 over 30–200 ms (a
+  triangle's are −19, −28, −34, −38). They hold at every level, where the
+  drive's H3 fades with the level. The body is now a User wave with those
+  partials (H3 about −44 dB after the polish), and `harm` falls by 1.8–3.3
+  dB on all three. A triangle would put H3 23 dB above the recording.
+- **Air or noise.** Above 2 kHz after 5 ms the mid tom's recording sits
+  76–100 dB below its peak; there is no noise in the body to match. The fits kept
+  the first pass's faint noise tick (the mid's 11 dB lower).
+
+The low and high toms take the same two changes on their own shipped
+patches and their own polish (the first pass derived them from the mid,
+but the mid's polish does not transfer: the same change on the shipped
+low and high first made `stft` worse, 0.119 → 0.160 and 0.121 → 0.217,
+before their own polish brought it below the start). The low tom's polish
+lowered its peak 2.3 dB, which `volume` restores.
+
+Remaining: the mid tom's body H3 is still 11 dB high at 5–30 ms, the
+drive's level-dependent part; −40 dB lands 3–11 ms late on the low and mid.
+
+### 909 mid tom: the noise (decision 3)
+
+The first pass's noise was a burst that stopped at 64 ms through the tones'
+4.4 kHz lowpass: 5–6 dB hot at 30–60 ms, then 25–45 dB short after it, and
+dull above 6 kHz at the onset. The recording's noise falls smoothly (2–6
+kHz from −30 dB re peak at 0–5 ms to −50 at 50 ms and −80 at 190 ms), with
+a gentle tilt to past 16 kHz.
+
+Three structures were fitted with the tones held at the shipped patch's,
+the noise and what colours it free (CMA-ES, σ 0.15, 800 evaluations each);
+the prototype is in `docs/research/2026-10-01-tom-noise-colour-prototype/`:
+
+| Structure | objective (fit weights) | 2–6 kHz, 0–5 ms | 2–6 kHz, 30–150 ms |
+|---|---|---|---|
+| shipped | 0.9230 | −2.3 dB | +5.6 dB |
+| e: the shared lowpass, its envelope, the drive's tone | 0.8986 | +2.5 dB | +3.5 dB |
+| d: e plus the prototype's per-operator noise lowpass and highpass | 0.8989 | +2.5 dB | +2.1 dB |
+| **b: FM-coloured noise** | **0.8713** | **+0.3 dB** | **−0.3 dB** |
+
+What exists closes it: in b (algorithm 6) the lower tone moves to B, C is a
+sine fixed at 4.8 kHz and D a Noise operator modulating it, which spreads C
+into a band of noise around its frequency, with its own envelope and no
+use of the tones' filter (opened to 15.9 kHz). The prototype adds nothing
+over e on the objective and stays 2 dB further from the recording than b;
+its write-up is the proposed engine ticket, with the recommendation not to
+schedule it for this work. b was then polished whole (Nelder–Mead, 1500
+evaluations) and given a drive bias of +0.05 (below).
+
+The shipped patch, against the recording (seeds 1–4):
+
+| Reading | Before | After |
+|---|---|---|
+| 2–6 kHz, 0–5 ms | −2.3 dB | −0.3 dB |
+| 2–6 kHz, 30–150 ms | +5.6 dB | −1.1 dB |
+| above 6 kHz, 0–5 / 5–30 / 30–150 ms | −9.8 / −1.3 / +3.0 dB | −2.5 / −0.0 / −0.6 dB |
+
+### 909 mid tom: the glide (decision 4)
+
+Read by `tom909.py`: the strongest spectral peak between 40 and 300 Hz in a
+Hann window around each time (0–20, 20–40, 70–130 and 240–360 ms),
+zero-padded, against the recording's (111.4, 125.4, 99.7 and 94.4 Hz; the
+lower tone 63.0 and 58.0 Hz in the late windows). The 20 ms windows cannot
+part the two tones (93 and 57 Hz once settled), so the early readings are
+a blend of both; a matrix-pencil reading of the same windows put the
+recording's upper tone anywhere in 100–138 Hz there, depending on model
+order, against stable values at 100 and 300 ms.
+
+| Time | Before | After |
+|---|---|---|
+| 10 ms | +0.77 st | +0.72 st |
+| 30 ms | −3.30 st | −3.34 st |
+| 100 ms | +0.33 st (lower −0.09) | +0.32 st (lower −0.16) |
+| 300 ms | −0.17 st (lower −0.19) | −0.18 st (lower −0.21) |
+
+The glide is the first pass's: the polish left the pitch envelope where it
+was, and nothing tried moved the 30 ms reading without making `stft`,
+`band` and `wave` worse. A hand-shaped two-segment glide fitted to those
+readings (+16 semitones at 5 ms, +4.5 at 30) scores 2.99 against 2.43 on
+the shipped patch (`wave` 0.087 → 0.311): the
+energy the 20–40 ms window reads at 125 Hz is the beat and the upper tone's
+strong second harmonic (−12 dB in the recording's body), not a higher
+pitch. The tones share one glide in the recording (their ratio reads
+1.62–1.63 at 15–45, 70–130 and 240–360 ms), which the global pitch
+envelope models, so the per-operator pitch-envelope depth decision 3 also
+named was not prototyped.
+
+### 909 mid tom: the timbre
+
+The recording's cycles are lopsided, the negative half the larger
+(1.08 in the body, 1.18 at 30–150 ms). A drive bias makes that: +0.05 moves
+the body's reading from 1.01 to 1.05 and still beats the shipped patch in
+every component. At the polish's level the totals are 2.415 with no bias,
+2.430 at +0.05 and 2.447 at +0.1; the scores prefer −0.1 (2.404), which
+turns the cycles the other way (0.93), so it is not used. After the level
+match the shipped total is 2.434.
+
+Remaining: the attack is still the furthest-off part (150 Hz–2 kHz is 9 dB
+low at 5–30 ms, the >1 kHz click −15.9 against −11.7 dB re peak);
+the level peaks at 6 ms against 30.
+
+### 808 cowbell: unchanged
+
+No candidate the toolkit could find beats the shipped cowbell in every
+component by a margin worth a change:
+
+- The polish (Nelder–Mead from the shipped patch plus a silent noise strike,
+  900 evaluations) reached 1.401, but with `pitch` 2.19 against 2.15; only
+  2 of its 900 candidates beat the shipped patch everywhere, the best at
+  1.451.
+- A second stage with `pitch` weighted 1 (500 evaluations) found none.
+- By hand: an attack of 0.5 or 1.5 ms (the recording peaks at 2 ms, the
+  patch at 4) scores 1.539 and 1.501; a noise strike at level 0.15, 1.461;
+  a lower band-pass Q (resonance 1.0, 0.8, 0.6) 1.454–1.597 with `harm` up
+  0.4–2.2 dB.
+
+What tacowars hears missing is real in the measurements but not in the
+score: the recording's 540 Hz oscillator keeps its upper harmonics (H4–H13
+at −25 to −43 dB re the 818 Hz tone, where the patch's are 7–24 dB lower
+through its 860 Hz band-pass), and it has intermodulation products
+(1357.5 Hz = 540 + 817.6, −43 dB; 833 Hz, −32 dB) that a two-oscillator
+patch through a symmetric drive does not make. The cowbell is left for a
+pass with a measure of those, or for tacowars's hand.
+
+### Levels (decision 6)
+
+Peak at velocity 1 on C4, mean of the peaks over seeds 1–8, before and after:
+
+| Patch | Before | After |
+|---|---|---|
+| `tr808-tom-low` | −7.47 dBFS | −7.48 |
+| `tr808-tom-mid` | −8.01 | −7.77 |
+| `tr808-tom-high` | −7.96 | −7.91 |
+| `tr909-tom-low` | −6.15 | −6.15 |
+| `tr909-tom-mid` | −6.07 | −6.06 |
+| `tr909-tom-high` | −6.11 | −6.11 |
+
+### Reproducing the second pass
+
+As above, with `tom909.py` run from `scripts/sound-match/` as
+`python ../../docs/research/2026-10-01-tr-percussion-fit/tom909.py "$SM_TR_REFS/Tom Mid 909 Clean 03.wav" <patch>`.
+Each stage's start is in `start/`. A later stage starts from the previous
+stage's chosen candidate (the lowest total at or below the shipped patch in
+every component) for the 808 mid and low toms, and from the previous
+stage's `best.json` (its lowest total) where no candidate met the rule yet:
+the 808 high tom, the 909 tom and the cowbell.
+
+| Patch | Stages |
+|---|---|
+| `tr808-tom-mid` | `.pass2` → `.pass2.stage2` |
+| `tr808-tom-low`, `-high` | `.pass2` → `.pass2.stage2` → level match (the low tom only) |
+| `tr909-tom-mid` | `.pass2b-noise` → `.pass2b.stage2` → `drive.bias` +0.05 → level match |
+| `tr909-tom-low`, `-high` | the new mid a fourth below and above, tones' decay and release × √(10/7) and × √0.7, level match |
+| the noise experiment | `.pass2e-noise`, `.pass2b-noise`, and `.pass2d-noise` (prototype bundle) |
+| `tr808-cowbell` (not shipped) | `.pass2` → `.pass2.stage2` |

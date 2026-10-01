@@ -94,7 +94,7 @@
       "max": 3
     },
     {
-      "path": "filter.drive",
+      "path": "drive.gain",
       "min": 1,
       "max": 2.5
     }

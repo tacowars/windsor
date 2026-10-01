@@ -1,0 +1,89 @@
+{
+  "start": "../start/tr909-tom-mid.pass2b.json",
+  "params": [
+    {
+      "path": "ops[2].level",
+      "min": 0,
+      "max": 0.8
+    },
+    {
+      "path": "ops[2].env.decayTime",
+      "min": 0.002,
+      "max": 0.2,
+      "scale": "log"
+    },
+    {
+      "path": "ops[2].env.decayCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[2].env.sustainLevel",
+      "min": 0,
+      "max": 0.9
+    },
+    {
+      "path": "ops[2].env.releaseTime",
+      "min": 0.005,
+      "max": 0.6,
+      "scale": "log"
+    },
+    {
+      "path": "ops[2].env.releaseCurve",
+      "min": -1,
+      "max": 0.5
+    },
+    {
+      "path": "ops[2].fixedHz",
+      "min": 1000,
+      "max": 12000,
+      "scale": "log"
+    },
+    {
+      "path": "ops[3].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[3].env.decayTime",
+      "min": 0.005,
+      "max": 0.5,
+      "scale": "log"
+    },
+    {
+      "path": "ops[3].env.sustainLevel",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "filter.cutoff",
+      "min": 1000,
+      "max": 16000,
+      "scale": "log"
+    },
+    {
+      "path": "drive.tone",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/Tom Mid 909 Clean 03.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "seeds": 4,
+  "optimizer": {
+    "method": "cma",
+    "budget": 800,
+    "sigma0": 0.15,
+    "seed": 1
+  },
+  "weights": {
+    "pitch": 0,
+    "harm": 0
+  }
+}

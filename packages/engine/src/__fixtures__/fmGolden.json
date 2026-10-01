@@ -734,19 +734,19 @@
       "noDormancy": "8307bf5c8e52714ab12eaa7e3b2e31536207bd18290bad66d87f0ed35e831371"
     },
     "tr808-tom-high": {
-      "default": "5087750a1b67214faf67264a55aedc3c46318bb4242d13bc5e5c288f03ad90fa",
-      "generic": "5087750a1b67214faf67264a55aedc3c46318bb4242d13bc5e5c288f03ad90fa",
-      "noDormancy": "5087750a1b67214faf67264a55aedc3c46318bb4242d13bc5e5c288f03ad90fa"
+      "default": "6fabe131f57d12c0ceb4d68fb8d28952116f9d0ae089cb5a9bc6d54cb32872e1",
+      "generic": "6fabe131f57d12c0ceb4d68fb8d28952116f9d0ae089cb5a9bc6d54cb32872e1",
+      "noDormancy": "6fabe131f57d12c0ceb4d68fb8d28952116f9d0ae089cb5a9bc6d54cb32872e1"
     },
     "tr808-tom-low": {
-      "default": "db90e26cc5ce38de7085e187b7ff37f33c0b972fb32eff7229ca204c12011aca",
-      "generic": "db90e26cc5ce38de7085e187b7ff37f33c0b972fb32eff7229ca204c12011aca",
-      "noDormancy": "db90e26cc5ce38de7085e187b7ff37f33c0b972fb32eff7229ca204c12011aca"
+      "default": "f7c7d17fee3b82e547dc528b6a3fb4e472f8e5774cc6068bb1ee0dbfac3ad669",
+      "generic": "f7c7d17fee3b82e547dc528b6a3fb4e472f8e5774cc6068bb1ee0dbfac3ad669",
+      "noDormancy": "f7c7d17fee3b82e547dc528b6a3fb4e472f8e5774cc6068bb1ee0dbfac3ad669"
     },
     "tr808-tom-mid": {
-      "default": "4d7d0dbf9cc6e12eb78176dbae3a0d27e973574bbefbe9faffa6215e5adb5297",
-      "generic": "4d7d0dbf9cc6e12eb78176dbae3a0d27e973574bbefbe9faffa6215e5adb5297",
-      "noDormancy": "4d7d0dbf9cc6e12eb78176dbae3a0d27e973574bbefbe9faffa6215e5adb5297"
+      "default": "1c7597191c9ffd98bed24fd2d22a736d75c097fc58715efc31fe8c785649c8fc",
+      "generic": "1c7597191c9ffd98bed24fd2d22a736d75c097fc58715efc31fe8c785649c8fc",
+      "noDormancy": "1c7597191c9ffd98bed24fd2d22a736d75c097fc58715efc31fe8c785649c8fc"
     },
     "tr909-clap": {
       "default": "802b898c0ccdcadea62cb8f6316cf15b34de2fac8587f0965972234edb69e0bf",
@@ -804,19 +804,19 @@
       "noDormancy": "67b7498f487228048846e9ddf1813902ac8d3e9270ae7355d328c4bd9bfe129e"
     },
     "tr909-tom-high": {
-      "default": "ccf64a040e600dfd0c51504ee56ba635799f895d6c3a3948ca6d9a6a681bf1b8",
-      "generic": "ccf64a040e600dfd0c51504ee56ba635799f895d6c3a3948ca6d9a6a681bf1b8",
-      "noDormancy": "ccf64a040e600dfd0c51504ee56ba635799f895d6c3a3948ca6d9a6a681bf1b8"
+      "default": "90aa59ea1106c7a2f396f13ff78f2f0b5bfe5043224f419c1fc7397efa2a24cc",
+      "generic": "90aa59ea1106c7a2f396f13ff78f2f0b5bfe5043224f419c1fc7397efa2a24cc",
+      "noDormancy": "90aa59ea1106c7a2f396f13ff78f2f0b5bfe5043224f419c1fc7397efa2a24cc"
     },
     "tr909-tom-low": {
-      "default": "e4c831ca7bbb1b35f6e28dbceb6ce0f336e09d1a48985fe9fb221ee9f1ee152b",
-      "generic": "e4c831ca7bbb1b35f6e28dbceb6ce0f336e09d1a48985fe9fb221ee9f1ee152b",
-      "noDormancy": "e4c831ca7bbb1b35f6e28dbceb6ce0f336e09d1a48985fe9fb221ee9f1ee152b"
+      "default": "2478e159bd3d6b2a31967c4d50af797108e66ad07fe0ada6b75850698d38bef3",
+      "generic": "2478e159bd3d6b2a31967c4d50af797108e66ad07fe0ada6b75850698d38bef3",
+      "noDormancy": "2478e159bd3d6b2a31967c4d50af797108e66ad07fe0ada6b75850698d38bef3"
     },
     "tr909-tom-mid": {
-      "default": "bfca2564e276fd3296a0867e8d1ef74f7a8f72ffeb9d4a0fc65a3012cb24fa8c",
-      "generic": "bfca2564e276fd3296a0867e8d1ef74f7a8f72ffeb9d4a0fc65a3012cb24fa8c",
-      "noDormancy": "bfca2564e276fd3296a0867e8d1ef74f7a8f72ffeb9d4a0fc65a3012cb24fa8c"
+      "default": "c578376058822d14561881bf7edf8f7fea86687d06b39b5a912cc8b47d93cb7f",
+      "generic": "c578376058822d14561881bf7edf8f7fea86687d06b39b5a912cc8b47d93cb7f",
+      "noDormancy": "c578376058822d14561881bf7edf8f7fea86687d06b39b5a912cc8b47d93cb7f"
     },
     "weapon-zap": {
       "default": "926ca4d510e46d409ac3107537288ab1b7a11f24fae618939643e57f3d126993",
