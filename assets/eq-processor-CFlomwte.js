@@ -77,6 +77,19 @@ var EQ_DSP = {
   switchThreshold: 0.5,
   millisecondsPerSecond: 1e3
 };
+var EQ_LISTEN = {
+  /** `listen(off)`: the full EQ again. */
+  off: -1,
+  /** The band-pass's Q never falls below this, so a wide band still sounds like a band. */
+  minQ: 0.5,
+  /** Listening fades in, out, and from one band to the next over this long. */
+  fadeSeconds: 0.01
+};
+var EQ_SPECTRUM = {
+  fftSize: 4096,
+  /** The analyser's `smoothingTimeConstant`: how slowly a bin falls between reads. */
+  smoothing: 0.8
+};
 var EQ_SECTION = {
   b0: 0,
   b1: 1,
@@ -627,6 +640,140 @@ var EqBand = class {
   }
 };
 
+// packages/engine/src/worklet/eq/eqListen.ts
+var EqListen = class {
+  constructor(sampleRate2) {
+    this.sampleRate = sampleRate2;
+    this.nextBand = EQ_LISTEN.off;
+    this.band = EQ_LISTEN.off;
+    this.coeffs = new Float64Array(EQ_DSP.coefficientsPerSection);
+    this.from = new Float64Array(EQ_DSP.coefficientsPerSection);
+    this.state = new Float64Array(EQ_DSP.statePerSection);
+    this.logFreq = this.logQ = NaN;
+    this.logMinQ = Math.log(EQ_LISTEN.minQ);
+    this.snap = false;
+    this.mix = NaN;
+    this.mixDir = 0;
+    this.mixStep = 1 / (EQ_LISTEN.fadeSeconds * sampleRate2);
+  }
+  /** Apply the port's band: start one, fade back to the band held, or fade out. */
+  retarget() {
+    if (this.band < 0) {
+      if (this.nextBand >= 0) this.start();
+      return;
+    }
+    if (this.nextBand !== this.band) this.mixDir = -1;
+    else this.mixDir = this.mix < 1 ? 1 : 0;
+  }
+  /**
+   * Begin on `nextBand` from silence, the state cleared; the next `glide`
+   * snaps to the band's values. Nothing here computes a double: this runs
+   * once a listen, too seldom for V8 to optimise, and unoptimised code boxes
+   * every double it makes.
+   */
+  start() {
+    this.band = this.nextBand;
+    this.state.fill(0);
+    this.snap = true;
+    this.mix = 0;
+    this.mixDir = 1;
+  }
+  /**
+   * One quantum's glide toward `band`'s targets, `frames` long, and the
+   * coefficients at its end; the first quantum of a listen snaps to them.
+   */
+  glide(band, frames) {
+    this.from.set(this.coeffs);
+    const toFreq = Math.log(band.targetFreq);
+    const toQ = Math.max(Math.log(band.targetQ), this.logMinQ);
+    if (this.snap) {
+      this.snap = false;
+      this.logFreq = toFreq;
+      this.logQ = toQ;
+      this.design();
+      this.from.set(this.coeffs);
+      return;
+    }
+    if (Math.abs(toFreq - this.logFreq) <= EQ_DSP.settleLog && Math.abs(toQ - this.logQ) <= EQ_DSP.settleLog)
+      return;
+    const k = 1 - Math.exp(-frames / (EQ_DSP.smoothSeconds * this.sampleRate));
+    this.logFreq += k * (toFreq - this.logFreq);
+    this.logQ += k * (toQ - this.logQ);
+    this.design();
+  }
+  /** The band-pass at `logFreq` and `logQ` into `coeffs` (a0 = 1). */
+  design() {
+    const w = 2 * Math.PI * Math.exp(this.logFreq) / this.sampleRate;
+    const alpha = Math.sin(w) / (2 * Math.exp(this.logQ));
+    const a0 = 1 + alpha;
+    const c = this.coeffs;
+    c[EQ_SECTION.b0] = alpha / a0;
+    c[EQ_SECTION.b1] = 0;
+    c[EQ_SECTION.b2] = -alpha / a0;
+    c[EQ_SECTION.a1] = -(2 * Math.cos(w)) / a0;
+    c[EQ_SECTION.a2] = (1 - alpha) / a0;
+  }
+  /**
+   * Mix the band-pass of the input into the EQ's output, in place: the
+   * section runs over `inL` / `inR` with its coefficients ramped from `from`
+   * to `coeffs`, and the crossfade's gain follows a smoothstep of its phase.
+   */
+  process(bands, inL, inR, outL, outR) {
+    const frames = outL.length;
+    this.glide(bands[this.band], frames);
+    const c = this.coeffs;
+    const f = this.from;
+    const s = this.state;
+    const inv = 1 / frames;
+    const d0 = (c[EQ_SECTION.b0] - f[EQ_SECTION.b0]) * inv;
+    const d2 = (c[EQ_SECTION.b2] - f[EQ_SECTION.b2]) * inv;
+    const e1 = (c[EQ_SECTION.a1] - f[EQ_SECTION.a1]) * inv;
+    const e2 = (c[EQ_SECTION.a2] - f[EQ_SECTION.a2]) * inv;
+    let b0 = f[EQ_SECTION.b0];
+    let b2 = f[EQ_SECTION.b2];
+    let a1 = f[EQ_SECTION.a1];
+    let a2 = f[EQ_SECTION.a2];
+    let l1 = s[EQ_SECTION.left1];
+    let l2 = s[EQ_SECTION.left2];
+    let r1 = s[EQ_SECTION.right1];
+    let r2 = s[EQ_SECTION.right2];
+    const mix = this.mix;
+    const step = this.mixDir * this.mixStep;
+    for (let i = 0; i < frames; i++) {
+      b0 += d0;
+      b2 += d2;
+      a1 += e1;
+      a2 += e2;
+      const xl = inL[i];
+      const yl = b0 * xl + l1;
+      l1 = -a1 * yl + l2;
+      l2 = b2 * xl - a2 * yl;
+      const xr = inR[i];
+      const yr = b0 * xr + r1;
+      r1 = -a1 * yr + r2;
+      r2 = b2 * xr - a2 * yr;
+      const phase = mix + step * (i + 1);
+      const t = phase < 0 ? 0 : phase > 1 ? 1 : phase;
+      const g = t * t * (EQ_MATH.three - 2 * t);
+      outL[i] = outL[i] + g * (yl - outL[i]);
+      outR[i] = outR[i] + g * (yr - outR[i]);
+    }
+    s[EQ_SECTION.left1] = Math.abs(l1) < EQ_DSP.flushThreshold ? 0 : l1;
+    s[EQ_SECTION.left2] = Math.abs(l2) < EQ_DSP.flushThreshold ? 0 : l2;
+    s[EQ_SECTION.right1] = Math.abs(r1) < EQ_DSP.flushThreshold ? 0 : r1;
+    s[EQ_SECTION.right2] = Math.abs(r2) < EQ_DSP.flushThreshold ? 0 : r2;
+    this.mix = Math.min(1, Math.max(0, mix + step * frames));
+    if (this.mixDir > 0 && this.mix === 1) this.mixDir = 0;
+    if (this.mixDir < 0 && this.mix === 0) this.end();
+  }
+  /** Faded out: the listen ends, or the next band starts. */
+  end() {
+    this.band = EQ_LISTEN.off;
+    this.mixDir = 0;
+    if (this.nextBand >= 0) this.start();
+  }
+};
+
 // packages/engine/src/worklet/eq/eqSections.ts
 var PER3 = EQ_DSP.coefficientsPerSection;
 var ST2 = EQ_DSP.statePerSection;
@@ -725,6 +872,7 @@ var EqDsp = class {
   constructor(sampleRate2, bands) {
     this.bands = [];
     for (let b = 0; b < bands; b++) this.bands.push(new EqBand(sampleRate2));
+    this.listen = new EqListen(sampleRate2);
     this.workL = new Float64Array(EQ_DSP.blockFrames);
     this.workR = new Float64Array(EQ_DSP.blockFrames);
     this.dryL = new Float64Array(EQ_DSP.blockFrames);
@@ -762,8 +910,15 @@ var EqDsp = class {
       this.mixDir = this.enabled ? 1 : -1;
       this.bypassed = false;
     }
+    this.listen.retarget();
   }
+  /** One render quantum: the EQ's route, then Listen over it while a band is heard. */
   process(inL, inR, outL, outR) {
+    this.render(inL, inR, outL, outR);
+    if (this.listen.band >= 0) this.listen.process(this.bands, inL, inR, outL, outR);
+  }
+  /** The EQ's route: a copy, silence, or the bands in pieces (see the header). */
+  render(inL, inR, outL, outR) {
     const frames = outL.length;
     if (this.bypassed || this.quiet() && this.gain === 1) {
       for (let i = 0; i < frames; i++) {
@@ -918,6 +1073,9 @@ var SLOPE_IDS = [0, EQ_SLOPES.length - 1];
 function clamp(value, range) {
   return value < range[0] ? range[0] : value > range[1] ? range[1] : value;
 }
+function listenBand(band) {
+  return Number.isInteger(band) && band >= 0 && band < EQ_BAND_COUNT ? band : EQ_LISTEN.off;
+}
 var EqProcessor = class extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return eqParameterDescriptors();
@@ -934,6 +1092,7 @@ var EqProcessor = class extends AudioWorkletProcessor {
     this.port.onmessage = ({ data }) => {
       if (data.type === "stop") this.running = false;
       if (data.type === "reportLoad") this.load.start(data.quanta);
+      if (data.type === "listen") this.dsp.listen.nextBand = listenBand(data.band);
     };
   }
   /** Read every parameter into the DSP's `next*` values, then let it retarget. */
