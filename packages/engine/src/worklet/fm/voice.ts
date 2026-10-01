@@ -225,22 +225,21 @@ class Voice {
 
   /**
    * Bind a patch, its prebuilt wavetables and the step's offsets (windsor#17).
-   * Called on note-on, once the part has written the note's `velocity`,
-   * `detune`, `pan` and `glideFrom` into the voice: no double is passed to a
-   * call V8 may not inline (windsor#233), and an options object would
-   * allocate one per note-on.
+   * Called on note-on, once the part has written the note's `note`,
+   * `velocity`, `detune`, `pan` and `glideFrom` into the voice: no double is
+   * passed to a call V8 may not inline (windsor#233, windsor#270), and an
+   * options object would allocate one per note-on.
    */
   start(
     patch: WorkletPatch,
     waveSets: (Float32Array[] | null)[],
-    note: number,
     voiceId: number,
     stepMod: ArrayLike<number> | null | undefined,
   ): void {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
-    this.note = note;
+    const note = this.note;
     this.voiceId = voiceId;
     this.active = true;
     this.gate = true;
