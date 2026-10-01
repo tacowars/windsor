@@ -75,7 +75,9 @@ bands.
 python library_diff.py <before root> <after root> [out.json]
 ```
 
-163 patches: 118 changed, 45 bit-identical. Every change follows from
+164 patches: 119 changed, 45 bit-identical (rerun against `main` at
+`c84a7ef`, after the TR percussion refits of windsor#310, which added
+`tr909-tom-mid`). Every change follows from
 decision 1: an operator segment shorter than a block (the 0.5 ms default
 attack among them) now ends at its own sample, and a longer segment that
 ends inside a block lands there too, so the next one starts on time. The
@@ -113,7 +115,7 @@ block in this render.
 | `tr909-ride` | 0.1563 | -8.6 dB | +0.1 dB |
 | `score-shortwave-chord` | 0.1328 | -4.6 dB | +0.0 dB |
 | `score-tin-kalimba` | 0.1300 | -5.9 dB | +0.1 dB |
-| `tr909-tom-low` | 0.1076 | -12.6 dB | +8.8 dB |
+| `tr808-clave` | 0.1284 | -13.4 dB | -0.1 dB |
 | `tr808-conga` | 0.1032 | -14.7 dB | +1.2 dB |
 | `tr909-kick-short` | 0.1006 | -16.5 dB | -1.9 dB |
 | `tr909-kick-long` | 0.0976 | -16.6 dB | -2.2 dB |
@@ -122,18 +124,20 @@ block in this render.
 | `tr909-kick` | 0.0952 | -16.8 dB | -1.9 dB |
 | `score-wooden-pin` | 0.0946 | -8.3 dB | +0.3 dB |
 | `kick` | 0.0943 | -16.8 dB | +2.6 dB |
-| `tr808-clave` | 0.0839 | -17.5 dB | -0.0 dB |
+| `tr808-tom-high` | 0.0854 | -13.4 dB | +1.2 dB |
+| `tr808-tom-low` | 0.0839 | -13.5 dB | +1.2 dB |
 | `tr909-crash` | 0.0833 | -14.6 dB | +0.2 dB |
-| `tr909-tom-high` | 0.0832 | -15.2 dB | -0.9 dB |
+| `tr808-tom-mid` | 0.0741 | -14.7 dB | +0.3 dB |
 | `tr909-rimshot` | 0.0731 | -14.9 dB | -0.5 dB |
 | `score-glass-pebble` | 0.0711 | -10.8 dB | +0.2 dB |
-| `tr808-tom-high` | 0.0686 | -15.7 dB | +2.0 dB |
+| `tr909-tom-mid` | 0.0706 | -16.8 dB | +0.4 dB |
+| `tr909-tom-low` | 0.0690 | -17.0 dB | +0.4 dB |
 | `tr808-kick` | 0.0675 | -19.1 dB | +1.3 dB |
-| `tr808-rimshot` | 0.0585 | -14.5 dB | -0.2 dB |
-| `tr808-tom-mid` | 0.0568 | -17.1 dB | +2.0 dB |
+| `tr909-tom-high` | 0.0664 | -17.6 dB | +0.5 dB |
 | `tr808-kick-long` | 0.0565 | -20.7 dB | +0.5 dB |
 | `score-night-rubber` | 0.0561 | -12.2 dB | +0.0 dB |
 | `score-iron-root` | 0.0540 | -10.3 dB | +0.7 dB |
+| `tr808-rimshot` | 0.0537 | -16.1 dB | -0.1 dB |
 | `tr808-hat-closed` | 0.0528 | -12.7 dB | +0.2 dB |
 | `tr909-snare` | 0.0518 | -18.0 dB | +0.1 dB |
 | `tr808-snare` | 0.0517 | -18.1 dB | +0.0 dB |
@@ -142,7 +146,6 @@ block in this render.
 | `efm-cowbell` | 0.0447 | -20.0 dB | +0.1 dB |
 | `tr808-hat-open` | 0.0443 | -16.4 dB | +0.2 dB |
 | `saw-arp` | 0.0436 | -18.8 dB | +0.1 dB |
-| `tr808-tom-low` | 0.0434 | -19.4 dB | +1.6 dB |
 | `tr808-cymbal` | 0.0393 | -16.6 dB | +0.3 dB |
 | `score-concrete-chord` | 0.0384 | -14.7 dB | -0.0 dB |
 | `tr808-clap` | 0.0369 | -19.2 dB | +0.0 dB |
@@ -150,7 +153,6 @@ block in this render.
 | `ai-voice` | 0.0295 | -27.5 dB | +0.0 dB |
 | `score-copper-step` | 0.0271 | -17.1 dB | -0.2 dB |
 | `tr909-clap` | 0.0265 | -21.4 dB | +0.0 dB |
-| `tr808-cowbell` | 0.0236 | -21.2 dB | +0.0 dB |
 | `score-graphite-bass` | 0.0234 | -20.9 dB | -0.4 dB |
 | `score-amber-stab` | 0.0214 | -20.3 dB | +0.1 dB |
 | `drone-sqr` | 0.0145 | -30.8 dB | -0.0 dB |
@@ -160,6 +162,7 @@ block in this render.
 | `score-high-tremolo` | 0.0037 | -34.2 dB | +0.0 dB |
 | `score-quick-downwash` | 0.0034 | -32.0 dB | +0.0 dB |
 | `score-felt-circuit` | 0.0029 | -38.1 dB | -0.0 dB |
+| `tr808-cowbell` | 0.0023 | -41.0 dB | -0.0 dB |
 | `str-edm-stab` | 0.0017 | -42.4 dB | -0.0 dB |
 | `score-round-foundation` | 0.0012 | -46.2 dB | -0.0 dB |
 | `score-long-downwash` | 0.0011 | -40.3 dB | +0.0 dB |
