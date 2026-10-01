@@ -172,7 +172,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
         <button type="button" data-v="up">Up · Am · 2 oct</button>
         <button type="button" data-v="updown">Up-down · Am · 2 oct</button>
         <button type="button" data-v="seventh">Up-down · Am7 · 2 oct</button>
-        <button type="button" data-v="wide">Up · Am7 · 4 oct</button>
+        <button type="button" data-v="wide">Up-down · Am7 · 4 oct</button>
       </div>
     </div>
     <div class="opt"><span class="opt-label">Lanes</span>
@@ -211,7 +211,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
         <li><b>Style, Rate and Voicing</b> in the first column, where the Grid has Step. <b>Retrigger, Seed with Reseed, and Randomize</b> in the second.</li>
         <li><b>Its column is shorter:</b> no degree picker, because the chord gives the pitch. So the step rows are 22 px shorter than the Grid's, and the lanes get that room.</li>
         <li><b>A ratchet row</b> <span class="new-tag">NEW</span> under S, as on the Grid and Basslead: click to cycle ×1 to ×4. A ratchet on a rest or a tie is grey.</li>
-        <li><b>Its width moves with the cycle:</b> 6 cells for Up over Am in two octaves, 26 for Up over Am7 in four. Cells past the cycle stay written but aren't shown, as today.</li>
+        <li><b>Its width moves with the cycle:</b> 6 cells for Up over Am in two octaves, 30 for Up-down over Am7 in four. Cells past the cycle stay written but aren't shown, as today.</li>
       </ul>
     </div>
     <div>
@@ -259,7 +259,7 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
     up: { style: 'Up', octaves: 2, chord: 'Am', list: stack(AM, 2) },
     updown: { style: 'Up-down', octaves: 2, chord: 'Am', list: upDown(stack(AM, 2)) },
     seventh: { style: 'Up-down', octaves: 2, chord: 'Am7', list: upDown(stack(AM7, 2)) },
-    wide: { style: 'Up', octaves: 4, chord: 'Am7', list: stack(AM7, 4).slice(0, 26) },
+    wide: { style: 'Up-down', octaves: 4, chord: 'Am7', list: upDown(stack(AM7, 4)) },
   };
   // The written cells: 32 are stored, the cycle shows the first of them.
   const KINDS = 'nnnnntnrnnnnnntnnrnnnnnnntnn';
