@@ -14,10 +14,13 @@
  * A group bus (windsor#286; record `2026-10-01-group-buses` decision 9) is
  * one stem, after its inserts, pan and level, and its members get none of
  * their own, whatever `includeMuted` says: the members are heard only
- * through the group, so the stems still add up to the master. A group with
- * no member has no stem; a muted or soloed-out group's stem is listed, and
- * silent, as a muted part's is. A part naming a group the song lacks plays
- * on Master, as the live system plays it, and keeps its part stem.
+ * through the group, so the stems still add up to the master. Every group
+ * has a stem, members or not: an empty group stays on the music bus, and an
+ * insert audible from silence (Tape's hiss) reaches the master through it,
+ * so its stem carries that, and is silent when the chain makes nothing. A
+ * muted or soloed-out group's stem is listed, and silent, as a muted part's
+ * is. A part naming a group the song lacks plays on Master, as the live
+ * system plays it, and keeps its part stem.
  *
  * A pass renders the master on channels 0–1 and its stems on the pairs after
  * (decision 2): as many as the channel limit allows, and fewer when the
@@ -72,8 +75,8 @@ export interface StemChoice {
 export const isSidechainOnly = (part: DocumentPart): boolean => part.strip.output === 'sidechain';
 
 /**
- * The stems of `document`: the ungrouped parts by slot, then the groups with
- * a member in the song's order, then the returns in the desk's order.
+ * The stems of `document`: the ungrouped parts by slot, then every group in
+ * the song's order, then the returns in the desk's order.
  */
 export function stemSources(document: ArrangementDocument, choice: StemChoice = {}): StemSource[] {
   const groups = document.groups ?? [];
@@ -87,15 +90,12 @@ export function stemSources(document: ArrangementDocument, choice: StemChoice = 
       name: part.name,
       muted: isSidechainOnly(part),
     }));
-  const members = new Set(document.parts.map((part) => groupOf(part.strip, groups)?.id));
-  const buses = groups
-    .map<GroupStem>((group, i) => ({
-      kind: 'group',
-      id: group.id,
-      name: group.name,
-      position: i + 1,
-    }))
-    .filter((stem) => members.has(stem.id));
+  const buses = groups.map<GroupStem>((group, i) => ({
+    kind: 'group',
+    id: group.id,
+    name: group.name,
+    position: i + 1,
+  }));
   // Sidechain only, mute and solo gate the sends with the dry path, so only a heard part feeds a return.
   // Renders play what playback plays: the live roster (`MusicRoster.resolveSolo`) reads the groups too.
   const soloing = isSoloing(

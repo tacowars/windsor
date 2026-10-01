@@ -157,9 +157,10 @@ describe('stemSources with group buses (windsor#286)', () => {
     }
   });
 
-  it('gives an empty group no stem, and still counts its place', () => {
+  it('gives an empty group a stem in its place, as its inserts still reach the master', () => {
     const song = grouped([group(2, 'Empty'), DRUMS], { [FULL_SLOT.kick]: 4 });
     expect(stemSources(song).filter((s) => s.kind === 'group')).toEqual([
+      { kind: 'group', id: 2, name: 'Empty', position: 1 },
       { kind: 'group', id: 4, name: 'Drums', position: 2 },
     ]);
   });

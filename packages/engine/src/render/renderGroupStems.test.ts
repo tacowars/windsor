@@ -17,8 +17,11 @@ import { FakeWorkletNode } from '../__fixtures__/fakeAudioContext';
 import { FakeOfflineContext } from '../__fixtures__/fakeOfflineContext';
 import { BASS, DRUM_COMPRESSOR, KICK, SNARE, drumSong } from '../__fixtures__/groupRig';
 import { noteToneFeed } from '../__fixtures__/noteFeeds';
+import { TapeNode } from '../__fixtures__/groupRig';
 import { DetectorNode } from '../__fixtures__/sidechainRig';
 import { COMPRESSOR_NAME } from '../inserts/compressorConstants';
+import { TAPE_NAME } from '../inserts/tapeConstants';
+import { DEFAULT_TAPE } from '../inserts/tapeSpec';
 import type { ChannelStrip, GroupSpec } from '../mixer/mix';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import { PROCESSOR_NAME } from '../synth/workletMessages';
@@ -35,6 +38,7 @@ function workletNode(
   options: AudioWorkletNodeOptions = {},
 ): AudioNode {
   if (name === COMPRESSOR_NAME) return new DetectorNode(context, options) as unknown as AudioNode;
+  if (name === TAPE_NAME) return new TapeNode(context, options) as unknown as AudioNode;
   const node = new FakeWorkletNode(context, name, options);
   const probe = (context as Partial<FakeOfflineContext>).length === RENDER_QUANTUM_FRAMES;
   if (name === PROCESSOR_NAME && !probe) {
@@ -111,6 +115,25 @@ const label = (stem: Stem): string => {
 const peak = (channel: Float32Array): number =>
   channel.reduce((m, s) => Math.max(m, Math.abs(s)), 0);
 
+/**
+ * The largest gap between the master and the sum of the stems. The stem-sum
+ * test's tolerance (`renderStems.test.ts`) applies: float32 rounding of a sum
+ * taken in another order, each stem through its own highpass.
+ */
+function sumError(stems: Map<string, Float32Array[]>): number {
+  const [master, ...rest] = [...stems.values()];
+  let error = 0;
+  for (let c = 0; c < 2; c++) {
+    const want = master![c]!;
+    for (let i = 0; i < want.length; i++) {
+      let sum = 0;
+      for (const stem of rest) sum += stem[c]![i]!;
+      error = Math.max(error, Math.abs(sum - want[i]!));
+    }
+  }
+  return error;
+}
+
 /** Every stem handed on, by label, its channels copied. */
 async function collect(document: ArrangementDocument): Promise<Map<string, Float32Array[]>> {
   const stems = new Map<string, Float32Array[]>();
@@ -142,20 +165,8 @@ describe('renderStems with group buses (windsor#286)', () => {
 
   it('sums to the master with its dynamics bypassed, within 1e-6 of full scale', async () => {
     const stems = await collect(SONG);
-    const [master, ...rest] = [...stems.values()];
-    let error = 0;
-    for (let c = 0; c < 2; c++) {
-      const want = master![c]!;
-      for (let i = 0; i < want.length; i++) {
-        let sum = 0;
-        for (const stem of rest) sum += stem[c]![i]!;
-        error = Math.max(error, Math.abs(sum - want[i]!));
-      }
-    }
-    // The stem-sum test's tolerance (`renderStems.test.ts`): float32 rounding
-    // of a sum taken in another order, each stem through its own highpass.
-    expect(peak(master![0]!)).toBeGreaterThan(0.1);
-    expect(error).toBeLessThan(1e-6);
+    expect(peak(stems.get('master')![0]!)).toBeGreaterThan(0.1);
+    expect(sumError(stems)).toBeLessThan(1e-6);
   });
 
   it("takes the group's stem after its compressor, pan and level", async () => {
@@ -184,9 +195,30 @@ describe('renderStems with group buses (windsor#286)', () => {
     expect(peak(soloed.get(`part ${BASS}`)![0]!)).toBe(0);
   }, 30_000);
 
-  it('gives an empty group no stem', async () => {
+  it('gives an empty group a stem, silent when its chain makes nothing', async () => {
     const empty: GroupSpec = { id: 1, name: 'Empty', level: 1, pan: 0, inserts: [] };
     const stems = await collect({ ...SONG, groups: [empty, DRUMS] });
-    expect([...stems.keys()]).toEqual(['master', `part ${BASS}`, 'group 2 Drums', 'a']);
+    expect([...stems.keys()]).toEqual([
+      'master',
+      `part ${BASS}`,
+      'group 1 Empty',
+      'group 2 Drums',
+      'a',
+    ]);
+    expect(peak(stems.get('group 1 Empty')![0]!)).toBe(0);
+  });
+
+  it("puts an empty group's Tape hiss in its stem, and the stems still sum to the master", async () => {
+    const hiss: GroupSpec = {
+      id: 1,
+      name: 'Hiss',
+      level: 1,
+      pan: 0,
+      inserts: [{ ...DEFAULT_TAPE, hiss: -30 }],
+    };
+    const stems = await collect({ ...SONG, groups: [hiss, DRUMS] });
+    expect([...stems.keys()]).toContain('group 1 Hiss');
+    expect(peak(stems.get('group 1 Hiss')![0]!)).toBeGreaterThan(1e-4);
+    expect(sumError(stems)).toBeLessThan(1e-6);
   });
 });
