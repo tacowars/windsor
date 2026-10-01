@@ -1842,6 +1842,7 @@ function voiceDormant(voice) {
     const env = voice.ampEnv[i];
     if (env.state !== ST_SUSTAIN || env.p.sustainLevel !== 0) return false;
     if (env.p.endLevel !== 0) return false;
+    if (voice.ampBreak[i] !== 0) return false;
     if (Math.abs(voice.amp[i]) > DORMANT_AMP) return false;
   }
   return voiceFilterQuiet(voice);
@@ -1858,6 +1859,7 @@ function voiceFinished(voice) {
   for (let i = 0; i < carriers.length; i++) {
     const c = carriers[i];
     if (!voice.ampEnv[c].finished) return false;
+    if (voice.ampBreak[c] !== 0) return false;
     if (Math.abs(voice.amp[c]) > DORMANT_AMP) return false;
   }
   return voiceFilterQuiet(voice);
