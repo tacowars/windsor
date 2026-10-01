@@ -17,7 +17,7 @@
  * samples than `RENDER_STEM_PASS_MAX_SAMPLES`.
  */
 import { RETURN_NAMES } from '../mixer/mix';
-import { anySoloed, isHeard } from '../mixer/soloRule';
+import { isHeard, isSoloing } from '../mixer/soloRule';
 import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
 import {
   RENDER_CHANNELS,
@@ -67,8 +67,12 @@ export function stemSources(document: ArrangementDocument, choice: StemChoice = 
       muted: isSidechainOnly(part),
     }));
   // Sidechain only, mute and solo gate the sends with the dry path, so only a heard part feeds a return.
-  const soloing = anySoloed(document.parts.map((part) => part.strip));
-  const heard = document.parts.filter((part) => isHeard(part.strip, soloing));
+  const groups = document.groups ?? [];
+  const soloing = isSoloing(
+    document.parts.map((part) => part.strip),
+    groups,
+  );
+  const heard = document.parts.filter((part) => isHeard(part.strip, soloing, groups));
   const returns = RETURN_NAMES.filter((name) =>
     heard.some((part) => (part.strip.sends[name] ?? 0) > 0),
   ).map<ReturnStem>((name) => ({ kind: 'return', name }));

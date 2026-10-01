@@ -14,7 +14,7 @@ import type { InsertSpec } from '../inserts/insertRegistry';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { withInsertIds } from '../inserts/insertIds';
 import { normaliseInserts } from '../inserts/insertRegistry';
-import { DEFAULT_STRIP, RETURNS, isReturnName } from '../mixer/mix';
+import { DEFAULT_STRIP, RETURNS, isGroupOutput, isReturnName } from '../mixer/mix';
 
 /**
  * A part's own strip (#597): level, pan, low cut (#640), sends and inserts
@@ -25,12 +25,9 @@ export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): 
   const base = DEFAULT_STRIP;
   const o = n.section(raw, path);
   n.dropUnknown(o, ['level', 'pan', 'lowCut', 'sends', 'inserts', 'output', 'mute', 'solo'], path);
-  if (o.output !== undefined && o.output !== 'master' && o.output !== 'sidechain')
-    n.correction(`${path}.output: invalid output — Master`);
+  const output = stripOutput(o.output, `${path}.output`, n);
   return {
-    ...(o.output === undefined
-      ? {}
-      : { output: o.output === 'sidechain' ? ('sidechain' as const) : ('master' as const) }),
+    ...(output === undefined ? {} : { output }),
     ...switchedOn('mute', o.mute, path, n),
     ...switchedOn('solo', o.solo, path, n),
     level: n.num(o.level, base.level, 0, MIX_LEVEL_MAX, `${path}.level`),
@@ -42,6 +39,22 @@ export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): 
 }
 
 /**
+ * A strip's Output: absent stays absent, `'master'` and `'sidechain'` are
+ * kept, and so is `{ group: id }` with a non-negative integer id
+ * (windsor#284). Whether the song has that group is checked once every
+ * group is read (`normaliseGroupOutputs`). Anything else is Master.
+ */
+function stripOutput(raw: unknown, path: string, n: FieldNormaliser): ChannelStrip['output'] {
+  if (raw === undefined || raw === 'master' || raw === 'sidechain') return raw;
+  if (isGroupOutput(raw)) {
+    n.dropUnknown(raw as unknown as Record<string, unknown>, ['group'], path);
+    return { group: raw.group };
+  }
+  n.correction(`${path}: invalid output — Master`);
+  return 'master';
+}
+
+/**
  * `mute` or `solo` (windsor#154), kept exactly the way `output` is: an absent
  * key stays absent, and a `true` or a `false` that is present is kept as it
  * is, so normalising a normalised document changes nothing. A value that is
@@ -50,7 +63,7 @@ export function normaliseStrip(raw: unknown, path: string, n: FieldNormaliser): 
  * sends what comes back, and the engine skips an absent key, so undoing a
  * mute must read back as `false` to reach the live strip.
  */
-function switchedOn(
+export function switchedOn(
   key: 'mute' | 'solo',
   raw: unknown,
   path: string,

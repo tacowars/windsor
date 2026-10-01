@@ -191,16 +191,28 @@ export type { SchedulerOptions } from './sequencing/scheduler';
 export { createBus } from './mixer/audioBus';
 export type { AudioBus, BusOptions } from './mixer/audioBus';
 export {
+  DEFAULT_GROUP,
   DEFAULT_STRIP,
   MIX,
   RETURNS,
   RETURN_NAMES,
   SEND_BUS_WET_MIX,
+  isGroupOutput,
   isReturnName,
   onSendBus,
   stripFor,
 } from './mixer/mix';
-export type { ChannelStrip, PartName, ReturnName, ReturnSpec } from './mixer/mix';
+export type {
+  ChannelStrip,
+  GroupOutput,
+  GroupSpec,
+  PartName,
+  ReturnName,
+  ReturnSpec,
+} from './mixer/mix';
+// The solo rule over parts and group buses (windsor#284).
+export { groupOf, isGroupOpen, isHeard, isSoloing } from './mixer/soloRule';
+export type { GroupSwitches } from './mixer/soloRule';
 export { createReturn, createReturns, createSend } from './mixer/returnBus';
 export type { ReturnBus } from './mixer/returnBus';
 export { routePart } from './mixer/channelStrip';
@@ -245,6 +257,7 @@ export {
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
   ARRANGEMENT_VERSION,
+  MAX_GROUPS,
   MUSIC_PARTS_MAX,
   REVERB_SPACE_RANGES,
   SECONDS_PER_MINUTE,
