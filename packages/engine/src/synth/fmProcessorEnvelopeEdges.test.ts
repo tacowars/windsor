@@ -12,6 +12,8 @@
  * reaches at its knot `m` is heard at sample `m - 1`, as the old ramp's
  * block-end level was heard at the block's last sample.
  */
+import { readdirSync, readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import type { Envelope as EnvelopeParams } from '../patch/patch';
@@ -76,6 +78,42 @@ const levels = (env: Partial<EnvelopeParams>, blocks?: number): number[] =>
 /** The first sample at `level`, from sample `from`. */
 const firstAt = (xs: number[], level: number, from = 0): number =>
   xs.findIndex((x, s) => s >= from && Math.abs(x - level) < CLOSE);
+
+/**
+ * Trigger hits whose whole course fits inside one control block, so each
+ * envelope has finished in the block's first `advanceExact` with its knots
+ * still ahead (windsor#301): a flat start then a rise, a rising attack, and
+ * a step attack, each releasing to 0 and to a held End level. Times are in
+ * samples; every release ends past frame 5, the last event below.
+ */
+const TRIGGER_SHAPES = [
+  { attack: 10, peakLevel: 0, decay: 10, sustainLevel: 1, release: 10 },
+  { attack: 4, peakLevel: 1, decay: 6, sustainLevel: 0.5, release: 12 },
+  { attack: 0, peakLevel: 1, decay: 8, sustainLevel: 0.5, release: 14 },
+];
+const TRIGGER_HITS = TRIGGER_SHAPES.flatMap((shape) =>
+  [0, 0.4].map((endLevel) => ({
+    initLevel: 0,
+    attackTime: shape.attack / SR,
+    peakLevel: shape.peakLevel,
+    decayTime: shape.decay / SR,
+    sustainLevel: shape.sustainLevel,
+    releaseTime: shape.release / SR,
+    endLevel,
+    loopMode: LOOP_MODE.TRIGGER,
+  })),
+);
+/** The note-off's frames and the frames of a second event that only splits the render. */
+const NOTE_OFF_FRAMES = [0, 1, 2, 3];
+const SPLIT_FRAMES = [1, 2, 3, 4, 5];
+
+/** Two quanta of a Trigger hit released at `off`, and also split at `split` when given. */
+function released(env: Partial<EnvelopeParams>, specialise: boolean, off: number, split?: number) {
+  const events: ScheduledEvent[] = [...NOTE_ON, { type: 'noteOff', id: 1, frame: off }];
+  if (split !== undefined) events.push({ type: 'noteOff', id: 2, frame: split });
+  events.sort((a, b) => a.frame - b.frame);
+  return Buffer.from(heard(env, 2, specialise, events).buffer);
+}
 
 describe('an operator envelope edge inside a control block (windsor#301)', () => {
   it('steps to full level on the note-on sample with an attack of 0', () => {
@@ -187,5 +225,43 @@ describe('an operator envelope edge inside a control block (windsor#301)', () =>
       const whole = heard(env, 1, specialise);
       expect(Buffer.compare(Buffer.from(hit.buffer), Buffer.from(whole.buffer))).toBe(0);
     }
+  });
+
+  it('renders a released Trigger hit the same when another event splits the block before its knots', () => {
+    // Every reader of a voice's end state waits for the knots still ahead of
+    // the render (`heardStage`): a split render that ended or faded the hit
+    // there differs from the unsplit one. The kernel and the generic loop alike.
+    const cases = TRIGGER_HITS.flatMap((env) =>
+      [true, false].flatMap((specialise) =>
+        NOTE_OFF_FRAMES.map((off) => ({ env, specialise, off })),
+      ),
+    );
+    const failures: string[] = [];
+    for (const { env, specialise, off } of cases) {
+      const whole = released(env, specialise, off);
+      for (const split of SPLIT_FRAMES) {
+        if (Buffer.compare(released(env, specialise, off, split), whole) === 0) continue;
+        const shape = `end ${env.endLevel} attack ${env.attackTime * SR}`;
+        failures.push(`${shape} kernel ${specialise} off ${off} split ${split}`);
+      }
+    }
+    expect(cases).toHaveLength(48);
+    expect(failures).toEqual([]);
+  });
+
+  it("reads an envelope's stage for the voice only through heardStage", () => {
+    // `Envelope` reads its own stage; every voice-side reader asks
+    // `voiceQuiet.ts`'s `heardStage`, which waits for the knots ahead. An
+    // assignment (`kill`'s) is not a read.
+    const FM = new URL('../worklet/fm/', import.meta.url);
+    const READ = /\b(?:env|ampEnv\[[^\]]*\]|filtEnv|pitchEnv)\.(?:state|finished)\b(?!\s*=(?!=))/g;
+    const reads: string[] = [];
+    for (const file of readdirSync(FM)) {
+      if (!file.endsWith('.ts') || file.endsWith('.test.ts') || file === 'envelope.ts') continue;
+      for (const m of readFileSync(new URL(file, FM), 'utf8').matchAll(READ)) {
+        reads.push(`${file}: ${m[0]}`);
+      }
+    }
+    expect(reads).toEqual(['voiceQuiet.ts: ampEnv[i].state']);
   });
 });
