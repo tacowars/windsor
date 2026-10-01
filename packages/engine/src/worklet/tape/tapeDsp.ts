@@ -2,7 +2,8 @@
  * Per channel: Bias and model EQ → × driveGain(Drive) → the magnetic core at 2× or 4× (`tapeMagneticStage.ts`)
  * → DC block → transport delay → hiss → dropouts → trim; Mix and bypass read the dry signal delayed by the
  * core's fixed latency (windsor#224). Max noise/filter primitives are adapted; seeded renders exercise the
- * shipped processor (`inserts/tapeDsp.test.ts`, `tapeMagneticIntegration.test.ts`).
+ * shipped processor (`inserts/tapeDsp.test.ts`, `tapeMagneticIntegration.test.ts`). A song's `core`
+ * (windsor#291) arrives in four parameters, read each block into the stage's `custom` and its flag.
  * No double crosses a call on the render's path (worklet rule 2, windsor#228): the processor writes a
  * frame to `input` and calls `step`, a channel leaves its sample in `sample`, the EQ and the motion read
  * and write their own fields, and every double field (the controls' too) is first written as NaN
@@ -135,7 +136,19 @@ class TapeDsp {
       () => new Float32Array(Math.ceil(rate * C.maxDelaySeconds) + 2),
     );
     this.motion = new TapeMotion(rate, this.controls.seed);
-    this.magnetic = new TapeMagneticStage(rate, this.controls.oversampling, this.model);
+    const core = params.core?.[0] === 1;
+    this.magnetic = new TapeMagneticStage(
+      rate,
+      this.controls.oversampling,
+      this.model,
+      core
+        ? {
+            drive: params.coreDrive![0],
+            width: params.coreWidth![0],
+            saturation: params.coreSaturation![0],
+          }
+        : null,
+    );
     this.smooth = 1 - Math.exp(-1 / (rate * C.smoothSeconds));
     this.dcPole = Math.exp(-(2 * Math.PI * C.dcHz) / rate);
     this.noiseHp = 1 - Math.exp(-(2 * Math.PI * C.hissHighpassHz) / rate);
@@ -163,8 +176,14 @@ class TapeDsp {
       this.noiseTones[model].reset();
     }
     this.model = model;
-    this.magnetic.select(params.oversampling[0]);
-    this.magnetic.configure(model);
+    const magnetic = this.magnetic;
+    magnetic.select(params.oversampling[0]);
+    // The song's `core` in place of the model's row while its flag is set (windsor#291).
+    magnetic.overridden = params.core[0] === 1;
+    magnetic.custom.drive = params.coreDrive[0];
+    magnetic.custom.width = params.coreWidth[0];
+    magnetic.custom.saturation = params.coreSaturation[0];
+    magnetic.configure(model);
     const k = 1 - Math.exp(-frames / (this.rate * C.toneSeconds));
     this.controls.bias += k * (this.targets.bias - this.controls.bias);
     if (Math.abs(this.targets.bias - this.controls.bias) < Number.EPSILON)

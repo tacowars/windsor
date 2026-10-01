@@ -6,10 +6,12 @@
  * - Two `TapeOversampler`s per channel, one at 2× and one at 4× (decision
  *   1), built here; `select` picks the pair for the `oversampling`
  *   parameter and starts a newly selected pair from zero state.
- * - The core's three controls, glided toward the selected model's row with
- *   the insert's 10 ms time constant, the magnetization kept (decision 6).
- *   `configure` (per block) sets the target and starts a glide when it
- *   moved; `glide` (per sample, only while gliding) steps the controls and
+ * - The core's three controls, glided toward the selected model's row, or
+ *   toward the song's `core` while one is set (`overridden`, `custom`:
+ *   the Advanced section, windsor#291, inside `TAPE_CORE_BOUNDS`),
+ *   with the insert's 10 ms time constant, the magnetization kept
+ *   (decision 6). `configure` (per block) sets the target and starts a
+ *   glide when it moved; `glide` (per sample, only while gliding) steps the controls and
  *   retunes the active pair, so the core's coefficients and normalisation
  *   never step more than one sample's worth (the 2026-10-01 amendment to
  *   decision 6), and each retune rescales the magnetization so the core's
@@ -32,7 +34,9 @@
  * the same bits on arm64 and x64. Pinned by
  * `inserts/tapeMagneticIntegration.test.ts` (both factors, the switch from
  * zero state, allocation across a switch) and `inserts/tapeModelSwitch.test.ts`
- * (every model pair inside the steady envelope, and the settled glide).
+ * (every model pair inside the steady envelope, the settled glide, and a
+ * song's `core` held through a walk and cleared), with
+ * `inserts/tapeCoreSweep.test.ts` (each core knob swept under a tone).
  */
 import { TAPE_DSP as C, TAPE_MODELS, TAPE_OVERSAMPLING } from '../../inserts/tapeConstants';
 import { TAPE_MAGNETIC, type TapeMagneticControls } from '../../inserts/tapeMagneticConstants';
@@ -42,6 +46,23 @@ import { magneticControls } from './tapeMagneticRows';
 import { TapeOversampler } from './tapeOversample';
 
 const CHANNELS = 2;
+
+/**
+ * The core's three controls as the stage holds them, every one born a double
+ * (worklet rule 7). A class, not a literal: a literal's map is shared with
+ * every other `{ drive, width, saturation }` in the bundle, and
+ * `TAPE_CORE_BOUNDS` (arrays under those names) made its fields heap
+ * objects, so each write of a double took a new heap number, three a block
+ * (windsor#291).
+ */
+class TapeCoreControls implements TapeMagneticControls {
+  drive: number;
+  width: number;
+  saturation: number;
+  constructor() {
+    this.drive = this.width = this.saturation = NaN;
+  }
+}
 
 class TapeMagneticStage {
   rate: number;
@@ -55,16 +76,25 @@ class TapeMagneticStage {
   /** Channel-major dry history: `latency` samples of each channel. */
   dry: Float64Array;
   dryAt: number;
-  /** The gliding core controls and the selected model's row. */
-  controls: TapeMagneticControls;
-  target: TapeMagneticControls;
+  /** The gliding core controls and the selected model's row, or the song's `core`. */
+  controls: TapeCoreControls;
+  target: TapeCoreControls;
+  /** True while the song sets the core's controls (windsor#291); `custom` holds them. */
+  overridden: boolean;
+  custom: TapeCoreControls;
   /** True from a change of row until the controls reach it; `TapeDsp.step` calls `glide` only then. */
   gliding: boolean;
   /** One sample's glide coefficient for the 10 ms time constant, and the distance that ends a glide. */
   smoothing: number;
   snap: number;
 
-  constructor(rate: number, factor: number, model: number) {
+  /** `override`, when given, is the song's `core`: the cores start on it rather than the row. */
+  constructor(
+    rate: number,
+    factor: number,
+    model: number,
+    override: Readonly<TapeMagneticControls> | null = null,
+  ) {
     this.rate = rate;
     this.oversamplers = [];
     for (let channel = 0; channel < CHANNELS; channel++)
@@ -77,9 +107,19 @@ class TapeMagneticStage {
     this.snap = NaN;
     this.snap = C.magneticSnap;
     this.gliding = false;
-    const row = TAPE_MODELS[model].magnetic;
-    this.target = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
-    this.controls = magneticControls(row, { drive: NaN, width: NaN, saturation: NaN });
+    this.overridden = override !== null;
+    this.custom = new TapeCoreControls();
+    if (override !== null) {
+      this.custom.drive = override.drive;
+      this.custom.width = override.width;
+      this.custom.saturation = override.saturation;
+    }
+    this.target = new TapeCoreControls();
+    this.aim(model);
+    this.controls = new TapeCoreControls();
+    this.controls.drive = this.target.drive;
+    this.controls.width = this.target.width;
+    this.controls.saturation = this.target.saturation;
     for (let i = 0; i < this.oversamplers.length; i++)
       this.oversamplers[i].configure(this.controls);
     this.active = [this.oversamplers[0], this.oversamplers[TAPE_OVERSAMPLING.length]];
@@ -106,9 +146,30 @@ class TapeMagneticStage {
     }
   }
 
-  /** Once per block: `model`'s row becomes the target, and a glide starts when the controls are not on it. */
+  /**
+   * The target: `model`'s row, or while `overridden` the song's `custom`
+   * controls. Those are inside `TAPE_CORE_BOUNDS`, the box qualified for
+   * every rate and factor, twice over: the normaliser clamps a song's
+   * `core` into it, and each control's parameter has the box as its range,
+   * which the browser clamps to. No clamp here, whose constant ends are
+   * small integers V8's lower tiers would store into these double fields.
+   */
+  aim(model: number): void {
+    const t = this.target;
+    if (!this.overridden) {
+      magneticControls(TAPE_MODELS[model].magnetic, t);
+      return;
+    }
+    const c = this.custom;
+    t.drive = c.drive;
+    t.width = c.width;
+    t.saturation = c.saturation;
+  }
+
+  /** Once per block: the target is aimed (`aim`), and a glide starts when the controls are not on it. */
   configure(model: number): void {
-    const t = magneticControls(TAPE_MODELS[model].magnetic, this.target),
+    this.aim(model);
+    const t = this.target,
       s = this.controls;
     if (s.drive !== t.drive || s.width !== t.width || s.saturation !== t.saturation)
       this.gliding = true;

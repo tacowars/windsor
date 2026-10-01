@@ -42,7 +42,9 @@
  * per-block reconfiguration this replaced reached 1.075 here, and 1.093 with
  * the EQ bypassed. A last test holds a finished glide to the constant render:
  * once settled, every core is tuned exactly as a DSP started on the model.
- * Runs in about 6 s.
+ * The last two hold the song's `core` (windsor#291) through the same walk
+ * and clear it back to a model's row.
+ * Runs in about 25 s.
  */
 import { describe, expect, it } from 'vitest';
 import { tapeRig, type TapeRig } from '../__fixtures__/tapeDspProbe';
@@ -191,6 +193,56 @@ describe('switching tape models live (decision 6)', () => {
     expect(rig.dsp.magnetic.gliding).toBe(false);
     rig.dsp.magnetic.oversamplers.forEach(({ core }, i) => {
       for (const field of TUNING) expect(core[field], field).toBe(fresh[i]!.core[field]);
+    });
+  });
+});
+
+/**
+ * The song's `core` (windsor#291): while one is set the core plays it on
+ * every model, so a model switch moves the EQ alone, and clearing it (Use
+ * model, or a starting point) glides the core to the model's row with the
+ * same 10 ms time constant, ending on the row exactly as a DSP started there.
+ */
+describe("switching tape models live with the song's core set (windsor#291)", () => {
+  const core = { drive: 0.2, width: 0.55, saturation: 0.9 };
+
+  it.each(RATES)(
+    'at %i Hz, 2× then 4×: the core stays on its controls through every switch, with no reset',
+    (rate) => {
+      const walk = circuit(TAPE_TYPES.length);
+      const rig = tapeRig({ model: TAPE_TYPES[walk[0]!]!, core }, rate);
+      const held = { ...rig.dsp.magnetic.controls };
+      const hold = Math.round(rate * HOLD_SECONDS);
+      const at = { n: 0 };
+      for (const oversampling of TAPE_OVERSAMPLING) {
+        rig.params.oversampling![0] = oversampling;
+        for (const model of walk) {
+          rig.params.model![0] = model;
+          play(rig, rate, at.n, hold, () => {
+            expect(rig.dsp.magnetic.gliding).toBe(false);
+          });
+          at.n += hold;
+          expect({ ...rig.dsp.magnetic.controls }).toEqual(held);
+        }
+      }
+      expect(resets(rig)).toBe(0);
+    },
+    60_000,
+  );
+
+  it("clears to the model's row with a glide that ends as a DSP started there", () => {
+    const rate = 48000;
+    const rig = tapeRig({ model: TAPE_TYPES[1], core }, rate);
+    const fresh = tapeRig({ model: TAPE_TYPES[3] }, rate).dsp.magnetic.oversamplers;
+    rig.params.model![0] = 3;
+    rig.params.core![0] = 0;
+    let glided = 0;
+    play(rig, rate, 0, rate * SETTLE_SECONDS, () => (glided += rig.dsp.magnetic.gliding ? 1 : 0));
+    expect(glided).toBeGreaterThan(0);
+    expect(rig.dsp.magnetic.gliding).toBe(false);
+    expect(resets(rig)).toBe(0);
+    rig.dsp.magnetic.oversamplers.forEach(({ core: tuned }, i) => {
+      for (const field of TUNING) expect(tuned[field], field).toBe(fresh[i]!.core[field]);
     });
   });
 });

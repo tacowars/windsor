@@ -458,12 +458,24 @@ export type { EqBandType, EqSlope } from './inserts/eqConstants';
 export { eqResponseDb } from './inserts/eqCoefficients';
 export { EQ_INSERT } from './inserts/eqInsert';
 export { DEFAULT_TAPE } from './inserts/tapeSpec';
-export type { TapeSpec } from './inserts/tapeSpec';
-export { TAPE_BOUNDS, TAPE_TYPES, TAPE_LABELS, TAPE_OVERSAMPLING } from './inserts/tapeConstants';
+export type { TapeCore, TapeSpec } from './inserts/tapeSpec';
+export {
+  TAPE_BOUNDS,
+  TAPE_CORE_BOUNDS,
+  TAPE_TYPES,
+  TAPE_LABELS,
+  TAPE_OVERSAMPLING,
+} from './inserts/tapeConstants';
 export type { TapeOversampling } from './inserts/tapeConstants';
 export { driveGain } from './inserts/tapeMagneticConstants';
 export { randomiseTape } from './inserts/tapeRandomise';
-export { tapeControlValue, setTapeControl } from './inserts/tapeControls';
+export {
+  tapeControlValue,
+  setTapeControl,
+  tapeCoreOf,
+  setTapeCore,
+  clearTapeCore,
+} from './inserts/tapeControls';
 export type { TapeNumber } from './inserts/tapeControls';
 export { TAPE_PRESETS } from './inserts/tapePresetTables';
 export { applyTapePreset } from './inserts/tapePresets';

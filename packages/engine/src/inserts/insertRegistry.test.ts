@@ -28,6 +28,12 @@ function normalise(raw: unknown): { specs: unknown[]; ids: unknown[]; n: FieldNo
   };
 }
 
+/**
+ * The keys a kind's spec may carry but its defaults leave out: an additive field whose absence
+ * reproduces the old sound, so a fresh insert has none (Tape's `core`, windsor#291).
+ */
+const OPTIONAL_FIELDS: Readonly<Partial<Record<string, readonly string[]>>> = { tape: ['core'] };
+
 describe('INSERT_KINDS', () => {
   it('names every shipped kind, each with its fields, defaults, normaliser and factory', () => {
     expect(INSERT_KIND_NAMES).toEqual([
@@ -48,7 +54,14 @@ describe('INSERT_KINDS', () => {
       const kind = INSERT_KINDS[name];
       expect(kind.defaults.kind, name).toBe(name);
       expect(kind.fields, name).toContain('kind');
-      expect(Object.keys(kind.defaults).sort(), name).toEqual([...kind.fields].sort());
+      const optional = OPTIONAL_FIELDS[name] ?? [];
+      expect(Object.keys(kind.defaults).sort(), name).toEqual(
+        kind.fields.filter((f) => !optional.includes(f)).sort(),
+      );
+      for (const f of optional) {
+        expect(kind.fields, name).toContain(f);
+        expect(kind.defaults, name).not.toHaveProperty(f);
+      }
       expect(kind.normalise({ ...kind.defaults }, 'x', new FieldNormaliser()), name).toEqual(
         kind.defaults,
       );

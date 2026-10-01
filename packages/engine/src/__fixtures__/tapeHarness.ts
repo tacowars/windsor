@@ -1,14 +1,19 @@
 /** Runs the actual shipped tape processor with only browser globals shimmed. */
 import { readFileSync } from 'node:fs';
 import { TAPE_DEFAULTS, TAPE_TYPES } from '../inserts/tapeConstants';
-import type { TapeSpec } from '../inserts/tapeSpec';
+import { tapeCoreParams } from '../inserts/tapeInsert';
+import { DEFAULT_TAPE, type TapeSpec } from '../inserts/tapeSpec';
 
+/** The processor's parameters for `spec`, as the insert writes them: `core` as its four (windsor#291). */
 export function tapeParams(spec: Partial<TapeSpec> = {}): Record<string, Float32Array> {
+  const full: TapeSpec = { ...DEFAULT_TAPE, ...spec };
+  // The spec's `core` object is replaced by its four numbers, the flag named `core` among them.
   return Object.fromEntries(
     Object.entries({
       ...TAPE_DEFAULTS,
       ...spec,
       model: TAPE_TYPES.indexOf(spec.model ?? 'studio'),
+      ...tapeCoreParams(full),
     })
       .filter(([key]) => key !== 'kind')
       .map(([key, value]) => [key, new Float32Array([Number(value)])]),
