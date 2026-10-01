@@ -66,11 +66,12 @@ and the tone fall against the hits in polymeter.
      its slice of the step.
    - Every hit of a roll carries that step's accent, pitch and sound
      values. There is no roll shape (no ramp across the roll).
-7. **Euclid hits take the grid's note path.** The player sends a Euclid
-   hit through `partNoteOn` with its accent and step-mod extras, in place
-   of `trigger` at a fixed velocity, and schedules each hit's note-off at
-   its hold. A part with no lanes and no ratchets plays exactly what it
-   plays today.
+7. **Euclid hits carry the grid's extras.** A Euclid hit still reaches
+   the part through `trigger`, which now takes the same `NoteExtras` a
+   grid note-on carries (the accent's `mod` and the step-mod offsets), so
+   each hit's note-off releases only that hit. The accent's velocity rule
+   is `partNoteOn`'s. A part with no lanes and no ratchets plays exactly
+   what it plays today.
 8. **Format.** The new fields are additive on the Euclid part and on a
    region's Euclid pattern, which carries the kind's whole config:
    `ratchets` (one 1–4 per step), `accentVelocity`, `accentMod`, and the
