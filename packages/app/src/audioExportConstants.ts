@@ -23,6 +23,8 @@ export const STEMS_ZIP_SUFFIX = '-stems';
 export const STEM_NUMBER_DIGITS = 2;
 /** A send bus's stem: `<song>-send-<name>.wav` (windsor#172: `-send-a`, `-send-b`). */
 export const STEM_RETURN_WORD = 'send';
+/** A group bus's stem: `<song>-group-<position>-<name>.wav`, position from 1 (windsor#286). */
+export const STEM_GROUP_WORD = 'group';
 
 /** Characters no file system on the three desktop platforms accepts in a name. */
 export const FILE_NAME_FORBIDDEN = /[\\/:*?"<>|]+/g;
