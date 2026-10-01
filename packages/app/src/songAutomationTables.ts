@@ -128,8 +128,10 @@ function driveStageWhy(spec: InsertSpecOf<'advanced-drive'>, field: string): str
   const label = `stage ${i + 1}`;
   if (!stage?.enabled) return `${label} is off`;
   if (SHAPER_FIELDS.has(name) && !stage.shaping) return `${label} is not shaping`;
-  if (FILTER_FIELDS.has(name) && !stage.filtering) return `${label} is not filtering`;
-  if (name === 'peak') return `${label}'s filter is not a peak`;
+  if ((FILTER_FIELDS.has(name) || name === 'peak') && !stage.filtering) {
+    return `${label} is not filtering`;
+  }
+  if (name === 'peak' && stage.filter !== 'peak') return `${label}'s filter is not a peak`;
   return `the ${spec.route} route does not play ${label}`;
 }
 
