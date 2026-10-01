@@ -8,9 +8,9 @@
  * keeps what the code itself owns: the types and the apply-over-defaults
  * merge. The diagnostic fallback is `fallbackArrangement.ts`'s.
  *
- * Since #597 a song is a list of 1–8 parts, each identified by its `slot`
- * (0–7) and carrying any sequencer: a Euclidean fixed-note trigger, the
- * written grid (#602), the Chord Player (#606), the arpeggiator and bass
+ * Since #597 a song is a list of 1 to `MUSIC_PARTS_MAX` parts, each identified
+ * by its `slot` (0 to `MUSIC_SLOT_MAX`) and carrying any sequencer: a
+ * Euclidean fixed-note trigger, the written grid (#602), the Chord Player (#606), the arpeggiator and bass
  * (#706, #707), or `none` — an inert part the keyboard can still play but
  * nothing sequences. A part's name is a label and keys nothing (record
  * `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
@@ -103,7 +103,7 @@ export type PartRegion = Region & { readonly pattern?: RegionPattern };
 
 /** One part as the player sees it; the document adds its strip (`DocumentPart`). */
 export interface MusicPart {
-  /** 0–7, unique in the song: the part's identity. */
+  /** 0 to `MUSIC_SLOT_MAX`, unique in the song: the part's identity. */
   readonly slot: number;
   /** A display label only — never a key. */
   readonly name: string;
@@ -154,7 +154,7 @@ export interface Arrangement {
   readonly transport: Transport;
   /** The key and the chord timeline every pitched part draws from. */
   readonly harmony: Harmony;
-  /** 1–8 parts, in display and play order, each on a unique slot. */
+  /** 1 to `MUSIC_PARTS_MAX` parts, in display and play order, each on a unique slot. */
   readonly parts: readonly MusicPart[];
 }
 

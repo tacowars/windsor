@@ -23,7 +23,7 @@ function button(label: string, title: string, enabled: boolean): HTMLButtonEleme
   return node;
 }
 
-/** Add, and remove-with-confirm: the part count between 1 and 8. */
+/** Add, and remove-with-confirm: the part count between 1 and `MUSIC_PARTS_MAX`. */
 function addRemoveRow(ctx: AppCtx): HTMLElement {
   const row = el('div', 'bar-row');
   row.style.marginTop = '8px';
