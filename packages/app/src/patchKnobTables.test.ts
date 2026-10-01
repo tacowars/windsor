@@ -9,7 +9,6 @@ import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
 import { OP_NAMES, WIDTH_RANGE, makePatch } from '@windsor/engine';
-import { PRESETS } from '@windsor/engine/patch/presets';
 import {
   DRIVE_KNOBS,
   FILTER_KNOBS,
@@ -172,10 +171,9 @@ describe('the Drive section (windsor#309)', () => {
     expect(DRIVE_KNOBS.map((k) => patchKnobOpts(k).def)).toEqual([1, 0, 1]);
   });
 
-  it('reads the 808 kick as Drive ×1.50, Bias +0.00, Tone 100%', () => {
-    const kick = PRESETS['tr808-kick'];
-    expect(kick).toBeDefined();
-    const shown = DRIVE_KNOBS.map((k) => k.o.fmt?.(Number(getPath(kick, k.f))));
+  it('reads a driven patch as Drive ×1.50, Bias +0.00, Tone 100%', () => {
+    const driven = makePatch({ drive: { on: true, gain: 1.5, shape: 0, bias: 0, tone: 1 } });
+    const shown = DRIVE_KNOBS.map((k) => k.o.fmt?.(Number(getPath(driven, k.f))));
     expect(shown).toEqual(['×1.50', '+0.00', '100%']);
   });
 

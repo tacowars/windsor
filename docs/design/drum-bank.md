@@ -20,7 +20,7 @@ threads rather than measured in a paper.
 
 | Voice | Mechanism | Numbers |
 |---|---|---|
-| 808 bass drum | A 1 ms trigger pulse rings a bridged-T band-pass; for the first ~5 ms the centre frequency jumps by more than an octave (the "punch"); a slow leak drops the pitch a little over the body | body 45–56 Hz; punch ≈ +16 semitones for 4–6 ms; decay 50–800 ms |
+| 808 bass drum | A 1 ms trigger pulse rings a bridged-T band-pass; for the first ~5 ms the centre frequency jumps by more than an octave (the "punch"); a slow leak drops the pitch a little over the body. The output opens on a step, and at high Tone the trigger pulse leaks through as a flat ~1 ms pulse | measured at Decay A / C / D: body 49.6 / 51.2 / 52.3 Hz over 40–150 ms (lower at a short Decay, the pitch sagging as it fades); −40 dB at 80 / 556 / 1056 ms; opening step 0.4 / 0.85 / 0.4 of the peak at Tone 03 / 06 / 04 (write-ups: body 45–56 Hz, punch ≈ +16 semitones for 4–6 ms) |
 | 808 snare | Two bridged-T resonators plus white noise through a highpass; "snappy" is the noise decay | 180 and 330 Hz (1:1.83), body ~60–120 ms, noise 100–600 ms |
 | 808 handclap | White noise → band-pass → two VCAs: one driven by a sawtooth that restarts every 10 ms while a 30 ms pulse is high, so three ramps and a fourth uninterrupted discharge; the other a smooth 100 ms "reverb" decay | band-pass ≈ 1 kHz; 3 × 10 ms + 20 ms; tail 100 ms |
 | 808 hats and cymbal | Six square oscillators summed, band-passed in two bands, then highpassed per voice | 205.3, 304.4, 369.6, 522.7, 540, 800 Hz; bands 3440 and 7100 Hz; closed 50 ms, open 90–600 ms, cymbal 350–1200 ms |
@@ -79,18 +79,33 @@ leans on five of its features:
   at `RATIO_MIN`, which is 0.0625 since #618 (`ratioSplit.ts`, and its test
   round-trips every library ratio), and the engine is unclamped
   (`2026-10-01-kicks-tuned-to-c4`). The FM Kick (`kick`, ratio 1) is not a
-  machine voice and keeps its tuning.
+  machine voice and keeps its tuning. The 808 kicks have since moved to
+  their own recordings' pitch (below).
 - **The 808 and 909 kicks are fitted to recordings**
   (`docs/research/2026-09-30-kick-fit/`), three Decay settings each plus
-  the 909 at full Attack. The 808's punch is the pitch envelope starting at
-  its peak (Init 1) and holding +22 semitones for about 4.3 ms, so one fast
-  cycle sounds before the body, then a two-step fall over about 30 ms. The
+  the 909 at full Attack; the 808s were refitted (next point). The
   909's is a 32-semitone sweep over 45 ms at curve −0.32, which stays high
   for 10–20 ms; its body holds full level 50–80 ms before the tail. Each
   attack edge is a `Square D` operator at a fixed frequency and a locked
   phase, whose step lands after the operator's first 0.67 ms amplitude
   ramp. Every kick operator is phase-locked (`phaseFree: false`), as the
   circuits start the same way every hit.
+- **The 808 kicks are refitted click first**
+  (`docs/research/2026-10-01-tr808-kick-refit/`, record
+  `2026-10-01-tr808-kicks-refitted`), to tacowars's picks: Decay A Tone 03
+  (`tr808-kick-short`), Decay C Tone 06 (`tr808-kick`) and Decay D Tone 04
+  (`tr808-kick-long`). Algorithm 4: A the body sine and B a short FM knock
+  at the same ratio, both phase-locked; C the click; D silent. The body
+  starts at a locked phase with an attack of 0 to 1 ms, so the hit opens
+  on a step; on `tr808-kick` a `Square D` at 1 Hz with Init 1 holds a flat
+  1.9 ms pulse beside it (the trigger pulse the machine leaks at high
+  Tone), on the short kick a zero-attack `Square D` edge adds a 0.1 ms
+  tick, and on the long one C sits at level 0. The punch holds 13–18
+  semitones for 6–7 ms, drops to 3–7 and glides 100–200 ms onto the
+  recording's body pitch (body ratios 0.1876, 0.193888, 0.194085; 49–51 Hz
+  on C4 once settled, as the machine sags lower at a short Decay). The
+  filter is Off; the voice drive runs near unity gain with a small bias
+  (Diode on `tr808-kick`, Soft on the others).
 - **Diode rounding is negative feedback.** The 909 kicks carry `feedback`
   about −0.13 on the body operator: odd harmonics that fade as the level
   does, which is what the diodes do to the triangle. The fitted 909 toms

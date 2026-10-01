@@ -13,7 +13,7 @@ import type { KnobSpec } from './knob';
 import { getPath } from './patchPath';
 
 /** A table entry's options: the range and readout. The default is not the table's to state. */
-export type PatchKnobRange = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'fmt'>;
+export type PatchKnobRange = Pick<KnobSpec, 'min' | 'max' | 'step' | 'curve' | 'logFloor' | 'fmt'>;
 export interface PatchKnobEntry {
   /** A full patch path, or a sub-field of the group the table serves. */
   readonly f: string;
@@ -115,11 +115,13 @@ export const PITCH_ENV_AMOUNT_KNOB: PatchKnobEntry = {
  * The fixed-frequency half of an operator's pitch controls. Apart from
  * `OP_KNOBS` because the Pitch toggle swaps it against the Coarse / Fine pair
  * (#587), which is bound through `ratioSplit` rather than to a path of its own.
+ * It reaches down to 1 Hz: a sub-audio fixed operator is a technique, not a
+ * slip (a 1 Hz square is a held pulse, as the 808 Kick's click is).
  */
 export const FIXED_HZ_KNOB: PatchKnobEntry = {
   f: 'fixedHz',
   label: 'Fixed',
-  o: { min: 20, max: 8000, curve: 'log', fmt: fmtHz },
+  o: { min: 1, max: 8000, curve: 'log', fmt: fmtHz },
 };
 
 /**
@@ -145,10 +147,23 @@ export const OP_KNOBS: PatchKnobTable = [
   { f: 'velSens', label: 'Vel', o: { min: 0, max: 1, fmt: fmt2 } },
 ];
 
-/** The envelope row, by sub-field of any of the six envelope slots. */
+/**
+ * The envelope row, by sub-field of any of the six envelope slots. Since
+ * windsor#316 a stage ends on its own sample, so an attack or a decay of 0
+ * is a sound (a hit that opens on a step): the bottom of each sweep is exact
+ * 0, and the log sweep above it starts where it always did.
+ */
 export const ENVELOPE_KNOBS: PatchKnobTable = [
-  { f: 'attackTime', label: 'Attack', o: { min: 0.0005, max: 12, curve: 'log', fmt: fmtMs } },
-  { f: 'decayTime', label: 'Decay', o: { min: 0.001, max: 20, curve: 'log', fmt: fmtMs } },
+  {
+    f: 'attackTime',
+    label: 'Attack',
+    o: { min: 0, max: 12, curve: 'log', logFloor: 0.0005, fmt: fmtMs },
+  },
+  {
+    f: 'decayTime',
+    label: 'Decay',
+    o: { min: 0, max: 20, curve: 'log', logFloor: 0.001, fmt: fmtMs },
+  },
   { f: 'sustainLevel', label: 'Sustain', o: { min: 0, max: 1, fmt: fmt2 } },
   { f: 'releaseTime', label: 'Release', o: { min: 0.001, max: 20, curve: 'log', fmt: fmtMs } },
 ];

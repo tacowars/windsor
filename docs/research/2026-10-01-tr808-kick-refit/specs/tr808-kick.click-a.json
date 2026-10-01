@@ -1,0 +1,71 @@
+{
+  "start": "../start/tr808-kick.click-a.json",
+  "params": [
+    {
+      "path": "ops[0].phase",
+      "min": 0,
+      "max": 0.5
+    },
+    {
+      "path": "ops[1].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[0].env.attackTime",
+      "min": 0,
+      "max": 0.002
+    },
+    {
+      "path": "ops[0].env.attackCurve",
+      "min": -1,
+      "max": 1
+    },
+    {
+      "path": "drive.tone",
+      "min": 0.3,
+      "max": 1
+    },
+    {
+      "path": "ops[2].fixedHz",
+      "min": 5,
+      "max": 200,
+      "scale": "log"
+    },
+    {
+      "path": "ops[2].width",
+      "min": 0.05,
+      "max": 0.3
+    },
+    {
+      "path": "ops[2].phase",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[2].level",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "path": "ops[2].env.decayTime",
+      "min": 0.001,
+      "max": 0.1,
+      "scale": "log"
+    }
+  ],
+  "references": [
+    {
+      "wav": "$SM_TR_REFS/BD A 808 Decay C 06.wav",
+      "note": 60,
+      "velocity": 1,
+      "weight": 1
+    }
+  ],
+  "optimizer": {
+    "method": "cma",
+    "budget": 800,
+    "sigma0": 0.25,
+    "seed": 1
+  }
+}
