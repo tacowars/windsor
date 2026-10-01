@@ -51,6 +51,7 @@ import { PatchResolver } from '../song/arrangementValidate';
 import type { AudioPart } from '../synth/audioPart';
 import { FmEngine } from '../synth/fmEngine';
 import type { ScheduledMessage } from '../synth/workletMessages';
+import { withoutAutomation } from './automationPartial';
 import { GroupBuses } from './groupBuses';
 import type { PlaybackReadout } from './musicPlayback';
 import { MusicPlayback } from './musicPlayback';
@@ -326,7 +327,8 @@ export class AudioSystem {
     // Read before anything changes: a ninth group refuses the whole partial (windsor#285).
     const groupPlan = this.groups.plan(groups);
     if (groupPlan.error) return { ok: false, ignored: [], error: groupPlan.error };
-    const { arrangementParts, strips } = splitStrips(parts);
+    // A part's lanes are accepted and not played yet (windsor#342 decision 7).
+    const { arrangementParts, strips } = splitStrips(withoutAutomation(parts));
     this.sidechains.begin();
     const result = player.apply(
       arrangementParts === undefined
