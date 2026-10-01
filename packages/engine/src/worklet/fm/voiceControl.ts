@@ -4,9 +4,11 @@
  * flags and per-note `Math.pow` results computed once per note (#548), and
  * `updateVoiceControl`, which advances every envelope and both LFOs by
  * CTRL_INTERVAL samples, glides the pitch, refreshes the drive stage
- * (windsor#300) and the filter coefficients and sets the per-sample amplitude and width ramps the render
- * loops only add. Functions over the voice, called once per control block by
- * `Voice.bindConstants` and `Voice.updateControl`. Invariant: allocation
+ * (windsor#300) and the filter coefficients and sets the per-sample amplitude
+ * ramps (`voiceAmpRamp.ts`, with each envelope segment end at its own sample:
+ * windsor#301) and width ramps the render loops only add. Functions over the
+ * voice, called once per control block by `Voice.bindConstants` and
+ * `Voice.updateControl`. Invariant: allocation
  * free; `specialise` selects the precomputed constants or the inline
  * `Math.pow`, and both paths must yield the same bits
  * (`fmProcessorKernel.test.ts`). LFO 2's terms are appended to LFO 1's, so
@@ -26,6 +28,7 @@ import { ALGORITHMS, ALG_CARRIER_BITS, ALG_DESCENDING, ALG_EDGES } from './algor
 import { WIDTH_SNAP } from './fmConstants';
 import { FILT_OFF } from './modeIds';
 import { WIDTH_RANGE } from './patchDefaults';
+import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
 import { KIND_NOISE, KIND_PULSE, KIND_TABLE, mipIndexAt } from './waveTables';
 
@@ -150,10 +153,11 @@ function updateVoiceFilter(voice: Voice, n: number): void {
 
 /**
  * Control-rate update: advance every envelope and both LFOs by CTRL_INTERVAL
- * samples, then set up per-sample amplitude and width ramps so the audio loop
- * only does adds. Also refreshes filter coefficients. LFO 2 (#55) reaches
- * pitch, level, width and the filter through its own settings, with LFO 1's
- * wheel arithmetic.
+ * samples, then set up per-sample amplitude ramps (`updateOperatorAmp`,
+ * through each operator envelope's segment ends: windsor#301) and width ramps
+ * so the audio loop only does adds. Also refreshes filter coefficients. LFO 2
+ * (#55) reaches pitch, level, width and the filter through its own settings,
+ * with LFO 1's wheel arithmetic.
  */
 function updateVoiceControl(voice: Voice, n: number): void {
   const patch = voice.patch!;
@@ -185,9 +189,6 @@ function updateVoiceControl(voice: Voice, n: number): void {
     voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
 
-  const velCurve = voice.velocity;
-  const keyOffset = (voice.note - 60) / 12;
-
   const specialise = voice.specialise;
   for (let i = 0; i < 4; i++) {
     const op = patch.ops[i];
@@ -198,17 +199,7 @@ function updateVoiceControl(voice: Voice, n: number): void {
     voice.phaseInc[i] = freq / voice.sr;
     voice.opFreq[i] = freq;
     updateOperatorWidth(voice, i, n);
-
-    const ampEnv = voice.ampEnv[i];
-    ampEnv.advance(n);
-    const env = ampEnv.value;
-    const velAmp = 1 - op.velSens + op.velSens * velCurve;
-    const keyAmp = specialise ? voice.levelKeyAmp[i] : Math.pow(2, -op.levelKeyScale * keyOffset);
-    const lfoAmp = 1 + lfoVal * lfoP.toOp[i] + lfo2Val * lfo2P.toOp[i];
-    const level = voice.opLevel[i]; // the patch's, or the step's (windsor#17)
-    const target = env * level * level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
-
-    voice.ampInc[i] = (target - voice.amp[i]) / n;
+    updateOperatorAmp(voice, i, n);
   }
 
   updateVoiceDrive(voice);

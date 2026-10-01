@@ -14,6 +14,8 @@ var MOD_INDEX_SCALE = 4;
 var FEEDBACK_SAW_CYCLES = 1.25 / (2 * Math.PI);
 var FEEDBACK_SQUARE_CYCLES = 2 / (2 * Math.PI);
 var MIN_SEG_TIME = 5e-4;
+var ENVELOPE_BREAKS_MAX = 4;
+var ENVELOPE_PASSES_MAX = 64;
 var ENVELOPE_CURVE_STEEPNESS = 3;
 var WIDTH_SNAP = 1e-5;
 var EVENT_QUEUE_CAPACITY = 128;
@@ -592,19 +594,24 @@ function segmentLevel(from, to, phase, curve) {
 }
 var Envelope = class {
   constructor() {
-    this.value = this.phase = this.segStart = this.segTarget = this.segCurve = NaN;
-    this.timeScale = this.decayTime = this.decayCurve = NaN;
+    this.value = this.phase = this.segStart = this.segTarget = this.segCurve = this.segTime = NaN;
+    this.timeScale = this.decayTime = this.decayCurve = this.rest = NaN;
     this.state = ST_IDLE;
     this.value = 0;
     this.phase = 0;
     this.segStart = 0;
     this.segTarget = 0;
     this.segCurve = 0;
+    this.segTime = 0;
     this.p = null;
     this.sr = 48e3;
     this.timeScale = 1;
     this.decayTime = 0;
     this.decayCurve = 0;
+    this.rest = 0;
+    this.breaks = 0;
+    this.breakAt = new Float64Array(ENVELOPE_BREAKS_MAX);
+    this.breakLevel = new Float64Array(ENVELOPE_BREAKS_MAX);
   }
   configure(params, sampleRate2) {
     this.p = params;
@@ -630,60 +637,115 @@ var Envelope = class {
   get finished() {
     return this.state === ST_DONE || this.state === ST_IDLE;
   }
-  /** Advance by `n` samples; the new value is `value`. */
+  /**
+   * Advance by `n` samples at control rate; the new value is `value`. A
+   * segment that ends inside the `n` lands on its target at the end of them
+   * and the next starts there, so a segment shorter than the step takes the
+   * whole step: the filter's and the pitch envelope's timing, which
+   * windsor#301 leaves at control rate.
+   */
   advance(n) {
-    const p = this.p;
     if (this.state === ST_IDLE || this.state === ST_DONE) return;
     if (this.state === ST_SUSTAIN) {
-      this.value = p.sustainLevel;
+      this.value = this.p.sustainLevel;
       return;
     }
-    let time, target, curve;
-    switch (this.state) {
-      case ST_ATTACK:
-        time = p.attackTime;
-        target = p.peakLevel;
-        curve = p.attackCurve;
-        break;
-      case ST_DECAY:
-        time = this.decayTime;
-        target = p.sustainLevel;
-        curve = this.decayCurve;
-        break;
-      default:
-        time = p.releaseTime;
-        target = p.endLevel;
-        curve = p.releaseCurve;
-        break;
-    }
-    time *= this.timeScale;
+    this.loadSegment();
+    let time = this.segTime * this.timeScale;
     if (time < MIN_SEG_TIME) time = MIN_SEG_TIME;
     this.phase += n / (time * this.sr);
     if (this.phase >= 1) {
-      this.value = target;
-      this.phase = 0;
-      this.segStart = target;
-      switch (this.state) {
-        case ST_ATTACK:
-          this.state = ST_DECAY;
-          break;
-        case ST_DECAY:
-          if (p.loopMode === LOOP_LOOP) {
-            this.state = ST_ATTACK;
-            this.segStart = this.value;
-          } else if (p.loopMode === LOOP_TRIGGER) {
-            this.state = ST_RELEASE;
-          } else this.state = ST_SUSTAIN;
-          break;
-        default:
-          this.state = ST_DONE;
-          break;
-      }
+      this.endSegment();
       return;
     }
-    this.segTarget = target;
-    this.segCurve = curve;
     writeSegmentLevel(this);
+  }
+  /**
+   * Advance by `n` samples with every segment end at its own sample
+   * (windsor#301): an operator's amplitude envelope. A segment that ends
+   * inside the `n` hands what is left of them to the next, and each end is
+   * recorded as a break: `breakAt` its offset in samples from the start of
+   * the `n`, `breakLevel` the level it lands on, `breaks` how many (at most
+   * ENVELOPE_BREAKS_MAX; a later end is still timed). A segment time of 0
+   * ends on the sample it starts on. With no end inside the `n` this is
+   * `advance`'s arithmetic for a segment past MIN_SEG_TIME, to the bit: one
+   * phase step of `n / (time * sr)`, then the curve.
+   */
+  advanceExact(n) {
+    this.breaks = 0;
+    this.rest = n;
+    for (let pass = 0; pass < ENVELOPE_PASSES_MAX; pass++) {
+      if (this.state === ST_IDLE || this.state === ST_DONE) return;
+      if (this.state === ST_SUSTAIN) {
+        this.value = this.p.sustainLevel;
+        return;
+      }
+      this.loadSegment();
+      let time = this.segTime * this.timeScale;
+      if (!(time > 0)) time = 0;
+      const span = time * this.sr;
+      const phase = this.phase + this.rest / span;
+      if (phase < 1) {
+        this.phase = phase;
+        writeSegmentLevel(this);
+        return;
+      }
+      this.rest -= (1 - this.phase) * span;
+      if (this.rest < 0) this.rest = 0;
+      const b = this.breaks;
+      if (b < ENVELOPE_BREAKS_MAX) {
+        this.breakAt[b] = n - this.rest;
+        this.breakLevel[b] = this.segTarget;
+        this.breaks = b + 1;
+      }
+      this.endSegment();
+      if (this.rest === 0) return;
+    }
+  }
+  /** The running segment's time (before key scaling), target and curve, into their fields. */
+  loadSegment() {
+    const p = this.p;
+    switch (this.state) {
+      case ST_ATTACK:
+        this.segTime = p.attackTime;
+        this.segTarget = p.peakLevel;
+        this.segCurve = p.attackCurve;
+        break;
+      case ST_DECAY:
+        this.segTime = this.decayTime;
+        this.segTarget = p.sustainLevel;
+        this.segCurve = this.decayCurve;
+        break;
+      default:
+        this.segTime = p.releaseTime;
+        this.segTarget = p.endLevel;
+        this.segCurve = p.releaseCurve;
+        break;
+    }
+  }
+  /** The running segment has reached its target: land there and take the next stage. */
+  endSegment() {
+    const p = this.p;
+    const target = this.segTarget;
+    this.value = target;
+    this.phase = 0;
+    this.segStart = target;
+    switch (this.state) {
+      case ST_ATTACK:
+        this.state = ST_DECAY;
+        break;
+      case ST_DECAY:
+        if (p.loopMode === LOOP_LOOP) {
+          this.state = ST_ATTACK;
+          this.segStart = this.value;
+        } else if (p.loopMode === LOOP_TRIGGER) {
+          this.state = ST_RELEASE;
+        } else this.state = ST_SUSTAIN;
+        break;
+      default:
+        this.state = ST_DONE;
+        break;
+    }
   }
 };
 
@@ -1262,6 +1324,60 @@ function updateVoiceDrive(voice) {
   drive.toneCoef = g / (1 + g);
 }
 
+// packages/engine/src/worklet/fm/voiceAmpRamp.ts
+function updateOperatorAmp(voice, i, n) {
+  const patch = voice.patch;
+  const op = patch.ops[i];
+  const ampEnv = voice.ampEnv[i];
+  ampEnv.advanceExact(n);
+  const env = ampEnv.value;
+  const velAmp = 1 - op.velSens + op.velSens * voice.velocity;
+  const keyAmp = voice.specialise ? voice.levelKeyAmp[i] : Math.pow(2, -op.levelKeyScale * ((voice.note - 60) / 12));
+  const lfoAmp = 1 + voice.lfoLevel * patch.lfo.toOp[i] + voice.lfo2Level * patch.lfo2.toOp[i];
+  const lfo = lfoAmp < 0 ? 0 : lfoAmp;
+  const level = voice.opLevel[i];
+  const target = env * level * level * velAmp * keyAmp * lfo;
+  voice.ampBreak[i] = 0;
+  const base = i * ENVELOPE_BREAKS_MAX;
+  const knotAmp = voice.knotAmp, knotAt = voice.knotGap;
+  let count = 0;
+  for (let j = 0; j < ampEnv.breaks; j++) {
+    const at = Math.round(ampEnv.breakAt[j]);
+    if (at >= n) break;
+    const v = ampEnv.breakLevel[j] * level * level * velAmp * keyAmp * lfo;
+    if (at === 0) {
+      voice.amp[i] = v;
+    } else if (count > 0 && knotAt[base + count - 1] === at) {
+      knotAmp[base + count - 1] = v;
+    } else {
+      knotAt[base + count] = at;
+      knotAmp[base + count] = v;
+      count++;
+    }
+  }
+  let from = voice.amp[i], fromAt = 0;
+  for (let k = 0; k < count; k++) {
+    const to = knotAmp[base + k], toAt = knotAt[base + k];
+    const inc2 = (to - from) / (toAt - fromAt);
+    if (k === 0) {
+      voice.ampInc[i] = inc2;
+      voice.ampBreak[i] = toAt;
+    } else {
+      voice.knotInc[base + k - 1] = inc2;
+      knotAt[base + k - 1] = toAt - fromAt;
+    }
+    from = to;
+    fromAt = toAt;
+  }
+  const inc = (target - from) / (n - fromAt);
+  if (count === 0) voice.ampInc[i] = inc;
+  else {
+    voice.knotInc[base + count - 1] = inc;
+    knotAt[base + count - 1] = 0;
+    voice.ampKnot[i] = base;
+  }
+}
+
 // packages/engine/src/worklet/fm/voiceControl.ts
 var MIP_FREQ_SLOT = new Float64Array(1);
 var PART_BEND = 0, PART_WHEEL = 1, PART_CUTOFF_MOD = 2, PART_CONTROL_COUNT = 3;
@@ -1351,8 +1467,6 @@ function updateVoiceControl(voice, n) {
   const pEnv = voice.pitchEnv.value * patch.pitchEnvAmount;
   const semis = voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
-  const velCurve = voice.velocity;
-  const keyOffset = (voice.note - 60) / 12;
   const specialise = voice.specialise;
   for (let i = 0; i < 4; i++) {
     const op = patch.ops[i];
@@ -1361,15 +1475,7 @@ function updateVoiceControl(voice, n) {
     voice.phaseInc[i] = freq / voice.sr;
     voice.opFreq[i] = freq;
     updateOperatorWidth(voice, i, n);
-    const ampEnv = voice.ampEnv[i];
-    ampEnv.advance(n);
-    const env = ampEnv.value;
-    const velAmp = 1 - op.velSens + op.velSens * velCurve;
-    const keyAmp = specialise ? voice.levelKeyAmp[i] : Math.pow(2, -op.levelKeyScale * keyOffset);
-    const lfoAmp = 1 + lfoVal * lfoP.toOp[i] + lfo2Val * lfo2P.toOp[i];
-    const level = voice.opLevel[i];
-    const target = env * level * level * velAmp * keyAmp * (lfoAmp < 0 ? 0 : lfoAmp);
-    voice.ampInc[i] = (target - voice.amp[i]) / n;
+    updateOperatorAmp(voice, i, n);
   }
   updateVoiceDrive(voice);
   updateVoiceFilter(voice, n);
@@ -1393,14 +1499,15 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const fadeInc = voice.fadeInc;
   const phase = voice.phase, phaseInc = voice.phaseInc, out = voice.out;
   const fb1 = voice.fb1, fb2 = voice.fb2, amp = voice.amp, ampInc = voice.ampInc;
+  const ampBreak = voice.ampBreak, ampKnot = voice.ampKnot, knotAmp = voice.knotAmp, knotInc = voice.knotInc, knotGap = voice.knotGap;
   const kind = voice.kind, tables = voice.tables;
   const fbAmt = voice.opFeedback;
   const edges = voice.edges, carriers = voice.carrierBits;
   const kA = kind[A], kB = kind[B], kC = kind[C], kD = kind[D];
-  const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0;
-  const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0;
-  const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0;
-  const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0;
+  const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0 || ampBreak[A] !== 0;
+  const liveB = kB === KIND_NOISE || amp[B] !== 0 || ampInc[B] !== 0 || ampBreak[B] !== 0;
+  const liveC = kC === KIND_NOISE || amp[C] !== 0 || ampInc[C] !== 0 || ampBreak[C] !== 0;
+  const liveD = kD === KIND_NOISE || amp[D] !== 0 || ampInc[D] !== 0 || ampBreak[D] !== 0;
   const modBA = liveA && liveB && (edges & EDGE_BA) !== 0;
   const modCA = liveA && liveC && (edges & EDGE_CA) !== 0;
   const modDA = liveA && liveD && (edges & EDGE_DA) !== 0;
@@ -1411,7 +1518,9 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const tA = tables[A], tB = tables[B], tC = tables[C], tD = tables[D];
   const fbA = fbAmt[A], fbB = fbAmt[B], fbC = fbAmt[C], fbD = fbAmt[D];
   const incA = phaseInc[A], incB = phaseInc[B], incC = phaseInc[C], incD = phaseInc[D];
-  const aiA = ampInc[A], aiB = ampInc[B], aiC = ampInc[C], aiD = ampInc[D];
+  let aiA = ampInc[A], aiB = ampInc[B], aiC = ampInc[C], aiD = ampInc[D];
+  let brA = ampBreak[A], brB = ampBreak[B], brC = ampBreak[C], brD = ampBreak[D];
+  let knA = ampKnot[A], knB = ampKnot[B], knC = ampKnot[C], knD = ampKnot[D];
   let phA = phase[A], phB = phase[B], phC = phase[C], phD = phase[D];
   let aA = amp[A], aB = amp[B], aC = amp[C], aD = amp[D];
   let oA = out[A], oB = out[B], oC = out[C], oD = out[D];
@@ -1470,6 +1579,12 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       f1D = Math.fround(v * a);
       oD = Math.fround(v);
       aD = Math.fround(a + aiD);
+      if (brD !== 0 && --brD === 0) {
+        aD = knotAmp[knD];
+        aiD = knotInc[knD];
+        brD = knotGap[knD];
+        knD++;
+      }
     }
     phD += incD;
     if (phD >= 1) phD -= Math.floor(phD);
@@ -1519,6 +1634,12 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       f1C = Math.fround(v * a);
       oC = Math.fround(v);
       aC = Math.fround(a + aiC);
+      if (brC !== 0 && --brC === 0) {
+        aC = knotAmp[knC];
+        aiC = knotInc[knC];
+        brC = knotGap[knC];
+        knC++;
+      }
     }
     phC += incC;
     if (phC >= 1) phC -= Math.floor(phC);
@@ -1569,6 +1690,12 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       f1B = Math.fround(v * a);
       oB = Math.fround(v);
       aB = Math.fround(a + aiB);
+      if (brB !== 0 && --brB === 0) {
+        aB = knotAmp[knB];
+        aiB = knotInc[knB];
+        brB = knotGap[knB];
+        knB++;
+      }
     }
     phB += incB;
     if (phB >= 1) phB -= Math.floor(phB);
@@ -1620,6 +1747,12 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       f1A = Math.fround(v * a);
       oA = Math.fround(v);
       aA = Math.fround(a + aiA);
+      if (brA !== 0 && --brA === 0) {
+        aA = knotAmp[knA];
+        aiA = knotInc[knA];
+        brA = knotGap[knA];
+        knA++;
+      }
     }
     phA += incA;
     if (phA >= 1) phA -= Math.floor(phA);
@@ -1672,6 +1805,18 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   amp[B] = aB;
   amp[C] = aC;
   amp[D] = aD;
+  ampInc[A] = aiA;
+  ampInc[B] = aiB;
+  ampInc[C] = aiC;
+  ampInc[D] = aiD;
+  ampBreak[A] = brA;
+  ampBreak[B] = brB;
+  ampBreak[C] = brC;
+  ampBreak[D] = brD;
+  ampKnot[A] = knA;
+  ampKnot[B] = knB;
+  ampKnot[C] = knC;
+  ampKnot[D] = knD;
   out[A] = oA;
   out[B] = oB;
   out[C] = oC;
@@ -1701,6 +1846,55 @@ function settleSkipped(voice, i, live, n) {
   voice.fb1[i] = 0;
 }
 
+// packages/engine/src/worklet/fm/voiceQuiet.ts
+var ST_IN_FLIGHT = -1;
+function heardStage(voice, i) {
+  if (voice.ampBreak[i] !== 0) return ST_IN_FLIGHT;
+  return voice.ampEnv[i].state;
+}
+function envelopeAtRest(voice, i) {
+  const stage = heardStage(voice, i);
+  return stage === ST_DONE || stage === ST_IDLE;
+}
+function voiceDormant(voice) {
+  if (!voice.gate || voice.fadeInc !== 0) return false;
+  const carriers = voice.alg.carriers;
+  for (let c = 0; c < carriers.length; c++) {
+    const i = carriers[c];
+    const p = voice.ampEnv[i].p;
+    if (heardStage(voice, i) !== ST_SUSTAIN || p.sustainLevel !== 0) return false;
+    if (p.endLevel !== 0) return false;
+    if (Math.abs(voice.amp[i]) > DORMANT_AMP) return false;
+  }
+  return voiceFilterQuiet(voice);
+}
+function voiceFilterQuiet(voice) {
+  if (Math.abs(voice.drive.toneState) > DORMANT_FILTER_STATE) return false;
+  const f = voice.patch.filter;
+  if (f.mode === FILT_OFF) return true;
+  if (!Svf.quiet(voice.svfA)) return false;
+  return !f.slope24 || Svf.quiet(voice.svfB);
+}
+function voiceFinished(voice) {
+  const carriers = voice.alg.carriers;
+  for (let i = 0; i < carriers.length; i++) {
+    const c = carriers[i];
+    if (!envelopeAtRest(voice, c)) return false;
+    if (Math.abs(voice.amp[c]) > DORMANT_AMP) return false;
+  }
+  return voiceFilterQuiet(voice);
+}
+function voiceHoldsEndLevel(voice) {
+  const carriers = voice.alg.carriers;
+  let holds = false;
+  for (let i = 0; i < carriers.length; i++) {
+    const c = carriers[i];
+    if (!envelopeAtRest(voice, c)) return false;
+    if (Math.abs(voice.ampEnv[c].value) > DORMANT_AMP) holds = true;
+  }
+  return holds;
+}
+
 // packages/engine/src/worklet/fm/voiceRender.ts
 function renderVoiceGeneric(voice, outL, outR, off, n) {
   const patch = voice.patch;
@@ -1720,6 +1914,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const fadeInc = voice.fadeInc;
   const phase = voice.phase, phaseInc = voice.phaseInc, out = voice.out;
   const fb1 = voice.fb1, fb2 = voice.fb2, amp = voice.amp, ampInc = voice.ampInc;
+  const ampBreak = voice.ampBreak, ampKnot = voice.ampKnot, knotAmp = voice.knotAmp, knotInc = voice.knotInc, knotGap = voice.knotGap;
   const kind = voice.kind, tables = voice.tables;
   const width = voice.width, widthInc = voice.widthInc;
   const fbAmt = voice.opFeedback;
@@ -1808,6 +2003,12 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       if (phase[i] >= 1) phase[i] -= Math.floor(phase[i]);
       if ((ramping & 1 << i) !== 0) width[i] += widthInc[i];
       amp[i] = a + ampInc[i];
+      if (ampBreak[i] !== 0 && --ampBreak[i] === 0) {
+        const j = ampKnot[i]++;
+        amp[i] = knotAmp[j];
+        ampInc[i] = knotInc[j];
+        ampBreak[i] = knotGap[j];
+      }
     }
     let sig = 0;
     for (let c = 0; c < nCar; c++) {
@@ -1939,6 +2140,11 @@ var Voice = class {
     this.fb2 = new Float32Array(4);
     this.amp = new Float32Array(4);
     this.ampInc = new Float32Array(4);
+    this.ampBreak = new Int32Array(4);
+    this.ampKnot = new Int32Array(4);
+    this.knotAmp = new Float32Array(4 * ENVELOPE_BREAKS_MAX);
+    this.knotInc = new Float32Array(4 * ENVELOPE_BREAKS_MAX);
+    this.knotGap = new Int32Array(4 * ENVELOPE_BREAKS_MAX);
     this.width = new Float32Array(4).fill(1);
     this.widthInc = new Float32Array(4);
     this.kind = new Int32Array(4);
@@ -2042,6 +2248,7 @@ var Voice = class {
       this.fb2[i] = 0;
       this.amp[i] = 0;
       this.ampInc[i] = 0;
+      this.ampBreak[i] = 0;
       this.kind[i] = waveKind(op.wave);
       this.mips[i] = waveSets[i];
       this.tables[i] = waveSets[i] ? waveSets[i][0] : null;
@@ -2141,6 +2348,7 @@ var Voice = class {
       this.ampEnv[i].value = 0;
       this.amp[i] = 0;
       this.ampInc[i] = 0;
+      this.ampBreak[i] = 0;
     }
   }
   /** Graceful stealing: fade out over ~4 ms, then free the slot. */
@@ -2149,41 +2357,9 @@ var Voice = class {
     this.gate = false;
     this.fadeInc = -1 / (4e-3 * this.sr);
   }
-  /**
-   * Dormant (#547): gated, every carrier held in sustain at level 0 with an
-   * `endLevel` of 0, its amplitude ramp at ~0 and any filter no longer ringing.
-   * The part skips its control and render work; nothing it would have rendered
-   * is audible. Skipping freezes the pitch, filter and LFO state too, so the
-   * end-level condition matters: a release rising to a non-zero end level is
-   * sound, and would be heard from that frozen state. Excluding it means a
-   * dormant voice's note-off is silence, and the voice can simply end. Read at
-   * control boundaries, so a live retune that raises a sustain wakes the voice
-   * from its frozen state with the ordinary amplitude ramp up from ~0.
-   * Allocates nothing.
-   */
+  /** Dormant (#547): the part may skip this gated voice's work (`voiceQuiet.ts`). */
   get dormant() {
-    if (!this.gate || this.fadeInc !== 0) return false;
-    const carriers = this.alg.carriers;
-    for (let c = 0; c < carriers.length; c++) {
-      const i = carriers[c];
-      const env = this.ampEnv[i];
-      if (env.state !== ST_SUSTAIN || env.p.sustainLevel !== 0) return false;
-      if (env.p.endLevel !== 0) return false;
-      if (Math.abs(this.amp[i]) > DORMANT_AMP) return false;
-    }
-    return this.filterQuiet;
-  }
-  /**
-   * The filter is off, or has stopped ringing: both stages under the dormancy
-   * floor (#547), and the drive's tone pole too (windsor#300), which holds no
-   * state while it is not running.
-   */
-  get filterQuiet() {
-    if (Math.abs(this.drive.toneState) > DORMANT_FILTER_STATE) return false;
-    const f = this.patch.filter;
-    if (f.mode === FILT_OFF) return true;
-    if (!Svf.quiet(this.svfA)) return false;
-    return !f.slope24 || Svf.quiet(this.svfB);
+    return voiceDormant(this);
   }
   /**
    * After a render: a released voice ends once nothing is left to hear
@@ -2192,44 +2368,16 @@ var Voice = class {
    */
   settle() {
     if (this.gate || this.fadeInc !== 0) return;
-    if (this.finished) this.active = false;
-    else if (this.holdsEndLevel) this.steal();
+    if (voiceFinished(this)) this.active = false;
+    else if (voiceHoldsEndLevel(this)) this.steal();
   }
   /** A voice that is fading out is no longer available, but still sounding. */
   get fading() {
     return this.fadeInc !== 0;
   }
-  /**
-   * Nothing left to hear: every carrier's envelope has ended, its amplitude
-   * ramp has reached ~0 and the filter has stopped ringing. Ending a voice on
-   * the envelopes alone skipped the last ramp and cut a resonant filter's
-   * ring to 0 in one sample, the click at the end of a stop's release
-   * (windsor#7).
-   */
+  /** Nothing left to hear: carriers ended, ramps at ~0, filter quiet (`voiceQuiet.ts`, windsor#7). */
   get finished() {
-    const carriers = this.alg.carriers;
-    for (let i = 0; i < carriers.length; i++) {
-      const c = carriers[i];
-      if (!this.ampEnv[c].finished) return false;
-      if (Math.abs(this.amp[c]) > DORMANT_AMP) return false;
-    }
-    return this.filterQuiet;
-  }
-  /**
-   * Every carrier's envelope has ended, and at least one ended above 0 (an
-   * End level): the voice holds that level for good and never goes quiet, so
-   * the part fades it out with `steal` rather than waiting on it or cutting
-   * it (windsor#7). Reads the envelopes, not the amplitude ramps.
-   */
-  get holdsEndLevel() {
-    const carriers = this.alg.carriers;
-    let holds = false;
-    for (let i = 0; i < carriers.length; i++) {
-      const env = this.ampEnv[carriers[i]];
-      if (!env.finished) return false;
-      if (Math.abs(env.value) > DORMANT_AMP) holds = true;
-    }
-    return holds;
+    return voiceFinished(this);
   }
   /**
    * Control-rate update, `voiceControl.js`: envelopes, LFOs, glide, ramps,

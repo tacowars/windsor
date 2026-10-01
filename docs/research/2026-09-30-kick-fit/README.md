@@ -159,11 +159,18 @@ references.
 
 ## What the engine cannot match
 
-- **Edges sharper than 0.67 ms from an envelope.** An operator's amplitude
-  ramps linearly over each 32-sample control block, so the fastest attack
-  is about 0.67 ms at 48 kHz. The 808's onset click reaches about a sixth (0.02 against 0.12)
-  of the recording's level above 1 kHz. A square operator at a locked phase
+- **Edges sharper than 0.67 ms from an envelope** (when these patches were
+  fitted). An operator's amplitude ramped linearly over each 32-sample
+  control block, so the fastest attack was about 0.67 ms at 48 kHz. The
+  808's onset click reaches about a sixth (0.02 against 0.12) of the
+  recording's level above 1 kHz. A square operator at a locked phase
   places a sharp edge after the ramp instead; the 909's attack uses that.
+  Since windsor#301 (`2026-10-01-envelope-edges-at-sample-rate`) an
+  operator's segment ends at its own sample, so an attack of 0 is a step
+  and a 0.1 ms attack peaks about 5 samples in. The patches were not
+  refitted: `tr808-kick`'s first 5 ms above 2 kHz moved from −20.7 to
+  −18.9 dB against Decay C 06
+  (`docs/research/2026-10-01-fast-envelope-edges/README.md`).
 - **The 909's lopsided body.** The recording's positive half-cycles are
   about 0.55 of the peak and its negative ones about 0.75; ours are
   symmetric at about 0.75. A phase-locked second harmonic might close it;
@@ -252,12 +259,15 @@ Most promising first.
 For when a patch can go no further. Ranked by how much they would likely
 help these sounds.
 
-1. **Faster amplitude edges.** An operator's amplitude ramps linearly over
-   each 32-sample control block (`CTRL_INTERVAL`, `worklet/fm/fmConstants.ts`),
-   so no envelope edge is faster than about 0.67 ms. A per-sample attack
-   segment, or a per-sample first block, would bring the 808's onset click
-   (now about a sixth of the recording's) and the claps' and rims' edges
-   closer. It adds per-sample work to the hot path and moves the goldens.
+1. **Faster amplitude edges: done in windsor#301.** An operator's amplitude
+   ramped linearly over each 32-sample control block (`CTRL_INTERVAL`,
+   `worklet/fm/fmConstants.ts`), so no envelope edge was faster than about
+   0.67 ms. Now each operator envelope segment ends at its own sample inside
+   the block, the ramp turning there (`2026-10-01-envelope-edges-at-sample-rate`;
+   about 1.5 % on held notes and 4 % on drum hits, in
+   `docs/research/2026-10-01-fast-envelope-edges/`). What is left is the
+   patches: a refit of the 808's click with an attack of 0 and a
+   sub-millisecond decay, and the claps' and rims' edges.
 2. **Drive without the filter.** The soft clip runs only when the filter
    mode is not Off (`worklet/fm/voiceRender.ts`), so every kick keeps a
    wide-open lowpass just to get drive. A drive independent of the filter
