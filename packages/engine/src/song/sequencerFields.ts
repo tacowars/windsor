@@ -2,11 +2,17 @@
  * The fields more than one sequencer kind shares, normalised once: the
  * part's own `seed` (#705, decision 16) and its absolute register octave
  * (decision 11), and the step grid's note shape and modulation lanes, which
- * the grid and, since windsor#127, the arp both carry.
+ * the grid and, since windsor#127, the arp both carry, and the Euclid
+ * part's drawn lanes of their own length (windsor#355).
  * `sequencerNormalise.ts` and `performerNormalise.ts` both read them, so
  * neither imports the other.
  */
-import { GRID_STEP_OCTAVE_MAX, REGISTER_OCTAVE_MAX, REGISTER_OCTAVE_MIN } from '../audioConstants';
+import {
+  EUCLID_LANE_STEPS_MAX,
+  GRID_STEP_OCTAVE_MAX,
+  REGISTER_OCTAVE_MAX,
+  REGISTER_OCTAVE_MIN,
+} from '../audioConstants';
 import { isStepModParam, type StepModLane } from '../sequencing/stepModLanes';
 import { STEP_MOD_LANES_MAX, type StepModParam } from '../worklet/fm/stepModTables';
 import { show, type FieldNormaliser } from './arrangementFields';
@@ -63,10 +69,64 @@ export function stepModLanes(
   path: string,
   n: FieldNormaliser,
 ): StepModLane[] {
-  if (raw === undefined) return [];
+  return modLanes(raw, path, n, (values, at) => laneValues(values, steps, at, n)) ?? [];
+}
+
+/**
+ * A Euclid part's step modulation lanes (windsor#355), each its own length:
+ * absent stays absent. Parameters are checked as `stepModLanes` checks
+ * them; a lane whose values are empty or not a list is dropped, a longer
+ * one than `EUCLID_LANE_STEPS_MAX` trimmed, and each value clamped to
+ * -1..1, each reported.
+ */
+export function cycledStepModLanes(
+  raw: unknown,
+  path: string,
+  n: FieldNormaliser,
+): StepModLane[] | undefined {
+  return modLanes(raw, path, n, (values, at) =>
+    drawnLane(values, at, n, (v, i) => n.num(v, 0, -1, 1, `${at}[${i}]`)),
+  );
+}
+
+/**
+ * A drawn lane of 1–`EUCLID_LANE_STEPS_MAX` steps (windsor#355), each value
+ * through `value`: null, reported, for one that is empty or not a list, and
+ * a longer one trimmed, reported. A lane's length is its own.
+ */
+export function drawnLane<T>(
+  raw: unknown,
+  path: string,
+  n: FieldNormaliser,
+  value: (v: unknown, i: number) => T,
+): T[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    n.correction(
+      `${path}: ${show(raw)} is not a lane of 1–${EUCLID_LANE_STEPS_MAX} steps — dropped`,
+    );
+    return null;
+  }
+  if (raw.length > EUCLID_LANE_STEPS_MAX) {
+    n.correction(`${path}: ${raw.length} steps trimmed to ${EUCLID_LANE_STEPS_MAX}`);
+  }
+  return raw.slice(0, EUCLID_LANE_STEPS_MAX).map(value);
+}
+
+/**
+ * The lanes of `raw`, each through `values` (null drops the lane), with an
+ * unknown or repeated parameter and lanes past `STEP_MOD_LANES_MAX` dropped,
+ * each reported; undefined for absent, and for junk in place of a list.
+ */
+function modLanes(
+  raw: unknown,
+  path: string,
+  n: FieldNormaliser,
+  values: (raw: unknown, path: string) => number[] | null,
+): StepModLane[] | undefined {
+  if (raw === undefined) return undefined;
   if (!Array.isArray(raw)) {
     n.correction(`${path}: ${show(raw)} is not a list of lanes — no lanes`);
-    return [];
+    return undefined;
   }
   const lanes: StepModLane[] = [];
   const seen = new Set<StepModParam>();
@@ -80,8 +140,10 @@ export function stepModLanes(
       return drop(`${show(param)} is not a parameter a lane can modulate`);
     if (seen.has(param)) return drop(`${param} already has a lane`);
     if (lanes.length >= STEP_MOD_LANES_MAX) return drop(`more than ${STEP_MOD_LANES_MAX} lanes`);
+    const kept = values(o.values, `${at}.values`);
+    if (kept === null) return;
     seen.add(param);
-    lanes.push({ param, values: laneValues(o.values, steps, `${at}.values`, n) });
+    lanes.push({ param, values: kept });
   });
   return lanes;
 }

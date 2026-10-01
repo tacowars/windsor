@@ -15,10 +15,21 @@ import type {
   SequencerSpec,
 } from './arrangement';
 import { arpDriver, bassDriver } from './performerNormalise';
-import { registerOctave, seed, stepModLanes, stepNoteFields } from './sequencerFields';
+import {
+  cycledStepModLanes,
+  drawnLane,
+  registerOctave,
+  seed,
+  stepModLanes,
+  stepNoteFields,
+} from './sequencerFields';
 import { SEEDED_KINDS, SEQUENCER_KINDS } from './arrangement';
 import { isRecord, show, type FieldNormaliser } from './arrangementFields';
 import {
+  ACCENT_MOD_DEFAULT,
+  ACCENT_VELOCITY_DEFAULT,
+  EUCLID_PITCH_LANE_MAX,
+  EUCLID_RATCHET_MAX,
   EUCLID_STEPS_MAX,
   GRID_DEGREE_MAX,
   GRID_STEPS_MAX,
@@ -40,6 +51,7 @@ import {
   LFO_SHAPES,
   type DensityMod,
 } from '../sequencing/euclideanSequencer';
+import type { EuclidRows } from '../sequencing/euclidLanes';
 import {
   DEFAULT_GRID_CONFIG,
   GRID_STEP_KINDS,
@@ -126,9 +138,11 @@ export function normaliseRegionPattern(
 function euclideanDriver(raw: unknown, path: string, n: FieldNormaliser): EuclideanDriver {
   const d = DEFAULT_EUCLIDEAN_CONFIG;
   const o = n.section(raw, path);
-  n.dropUnknown(o, ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern', 'seed'], path);
+  const known = ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern', 'seed'];
+  n.dropUnknown(o, [...known, ...EUCLID_ROW_KEYS], path);
   const steps = n.int(o.steps, d.steps, 1, EUCLID_STEPS_MAX, `${path}.steps`);
   return {
+    ...euclidRows(o, steps, path, n),
     steps,
     seed: seed(o.seed, `${path}.seed`, n),
     divisor: n.divisor(o.divisor, d.divisor, `${path}.divisor`),
@@ -140,6 +154,78 @@ function euclideanDriver(raw: unknown, path: string, n: FieldNormaliser): Euclid
     // current arrangement has).
     pattern: n.stepPattern(o.pattern, steps, `${path}.pattern`),
   };
+}
+
+const EUCLID_ROW_KEYS = [
+  'ratchets',
+  'accentVelocity',
+  'accentMod',
+  'accentLane',
+  'pitchLane',
+  'modLanes',
+] as const satisfies ReadonlyArray<keyof EuclidRows>;
+
+/**
+ * The ratchet row and the drawn lanes (windsor#355): each absent stays
+ * absent, today's plain hit, so a song written before them round-trips
+ * unchanged. `ratchets` is fitted to the steps (padded with 1, trimmed),
+ * each a whole 1–`EUCLID_RATCHET_MAX`; the accent amounts are clamped to
+ * 0–1; a lane is 1–`EUCLID_LANE_STEPS_MAX` steps of its own (`drawnLane`),
+ * the pitch lane's semitones whole and within ±`EUCLID_PITCH_LANE_MAX`.
+ * Each fix is reported.
+ */
+function euclidRows(
+  o: Record<string, unknown>,
+  steps: number,
+  path: string,
+  n: FieldNormaliser,
+): EuclidRows {
+  const rows: EuclidRows = {};
+  const ratchetList = ratchets(o.ratchets, steps, `${path}.ratchets`, n);
+  if (ratchetList) rows.ratchets = ratchetList;
+  if (o.accentVelocity !== undefined) {
+    const at = `${path}.accentVelocity`;
+    rows.accentVelocity = n.num(o.accentVelocity, ACCENT_VELOCITY_DEFAULT, 0, 1, at);
+  }
+  if (o.accentMod !== undefined) {
+    rows.accentMod = n.num(o.accentMod, ACCENT_MOD_DEFAULT, 0, 1, `${path}.accentMod`);
+  }
+  const accent = optionalLane(o.accentLane, `${path}.accentLane`, n, (v, at) =>
+    n.bool(v, false, at),
+  );
+  if (accent) rows.accentLane = accent;
+  const pitch = optionalLane(o.pitchLane, `${path}.pitchLane`, n, (v, at) =>
+    n.int(v, 0, -EUCLID_PITCH_LANE_MAX, EUCLID_PITCH_LANE_MAX, at),
+  );
+  if (pitch) rows.pitchLane = pitch;
+  const mod = cycledStepModLanes(o.modLanes, `${path}.modLanes`, n);
+  if (mod) rows.modLanes = mod;
+  return rows;
+}
+
+/** A drawn lane, or null when absent or dropped; each value through `value` at its path. */
+function optionalLane<T>(
+  raw: unknown,
+  path: string,
+  n: FieldNormaliser,
+  value: (v: unknown, path: string) => T,
+): T[] | null {
+  if (raw === undefined) return null;
+  return drawnLane(raw, path, n, (v, i) => value(v, `${path}[${i}]`));
+}
+
+/** One whole 1–`EUCLID_RATCHET_MAX` per step, or null when absent or not a list. */
+function ratchets(raw: unknown, steps: number, path: string, n: FieldNormaliser): number[] | null {
+  if (raw === undefined) return null;
+  if (!Array.isArray(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a list of ratchets — every step a single hit`);
+    return null;
+  }
+  if (raw.length !== steps)
+    n.correction(`${path}: ${raw.length} ratchets for ${steps} steps — resized`);
+  return Array.from({ length: steps }, (_, i) =>
+    i < raw.length ? n.int(raw[i], 1, 1, EUCLID_RATCHET_MAX, `${path}[${i}]`) : 1,
+  );
 }
 
 function pulses(

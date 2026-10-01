@@ -66,6 +66,14 @@ export interface RegionStep {
   readonly step: number;
   /** True while the tick is inside the region: `step` is then what `stepAt` answers. */
   readonly live: boolean;
+  /**
+   * A Euclidean part's local step (windsor#355): the steps its trigger has
+   * counted since the region's entry, at the region's phase while it is not
+   * sounding. It is the lanes' clock, so a lane of length `L` is on
+   * `laneStep(localStep, L)` and the card draws each lane's playhead at its
+   * own length; `step` is `localStep mod steps`. Absent for every other kind.
+   */
+  readonly localStep?: number;
 }
 
 /** What `PartBinding.plan` hands the player: validated and built, committed later. */
@@ -208,10 +216,12 @@ export class PartBinding {
     if (!bound || local === null) return null;
     const state = this.gate.stateAt(tick);
     const live = state.live && state.index === index;
+    const { generator } = bound;
     const step = live
-      ? generatorStepAt(bound.generator, local)
-      : this.ghostStepAt(bound.generator, index, local);
-    return { step, live };
+      ? generatorStepAt(generator, local)
+      : this.ghostStepAt(generator, index, local);
+    if (!(generator instanceof EuclideanSequencer)) return { step, live };
+    return { step, live, localStep: Math.floor(local / generator.config.divisor) };
   }
 
   /**
