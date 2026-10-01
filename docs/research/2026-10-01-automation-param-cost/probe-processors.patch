@@ -1,0 +1,45 @@
+diff --git a/packages/engine/src/worklet/fm/fmProcessor.ts b/packages/engine/src/worklet/fm/fmProcessor.ts
+index e2d199c..70b90af 100644
+--- a/packages/engine/src/worklet/fm/fmProcessor.ts
++++ b/packages/engine/src/worklet/fm/fmProcessor.ts
+@@ -504,3 +504,40 @@ class FmPartProcessor extends AudioWorkletProcessor {
+ }
+ 
+ registerProcessor('fm-part', FmPartProcessor);
++
++/* PROBE windsor#343, never committed: the same part with N extra idle k-rate
++ * parameters, each read once per quantum into a scratch array, as an offset
++ * latch would read it. Registered beside `fm-part`, so a page can pick one by
++ * name. */
++function probeProcessor(prefix: string, count: number, read = true): typeof FmPartProcessor {
++  const names: string[] = [];
++  for (let i = 0; i < count; i++) names.push(`${prefix}${i}`);
++  return class extends FmPartProcessor {
++    probeIn = new Float64Array(count);
++    static override get parameterDescriptors(): AudioParamDescriptor[] {
++      return [
++        ...FmPartProcessor.parameterDescriptors,
++        ...names.map((name) => ({
++          name,
++          defaultValue: 0,
++          minValue: -100,
++          maxValue: 100,
++          automationRate: 'k-rate' as const,
++        })),
++      ];
++    }
++    override renderBlock(
++      inputs: Float32Array[][],
++      outputs: Float32Array[][],
++      params: Record<string, Float32Array>,
++    ): boolean {
++      const latch = this.probeIn;
++      if (read) for (let i = 0; i < count; i++) latch[i] = params[names[i]!]![0]!;
++      return super.renderBlock(inputs, outputs, params);
++    }
++  };
++}
++registerProcessor('fm-part-p29', probeProcessor('target', 29));
++registerProcessor('fm-part-p8', probeProcessor('slot', 8));
++registerProcessor('fm-part-p29-unread', probeProcessor('target', 29, false));
++registerProcessor('fm-part-p8-unread', probeProcessor('slot', 8, false));
