@@ -25,7 +25,7 @@
 
 import type { WorkletPatch } from './patchNormalise';
 import type { Voice } from './voice';
-import { ALGORITHMS, ALG_CARRIER_BITS, ALG_DESCENDING, ALG_EDGES } from './algorithms';
+import { ALGORITHMS, ALG_CARRIER_BITS, ALG_EDGES } from './algorithms';
 import { WIDTH_SNAP } from './fmConstants';
 import { FILT_OFF } from './modeIds';
 import { bindNoiseColour } from './noiseColour';
@@ -44,7 +44,32 @@ const PART_BEND = 0,
   PART_CONTROL_COUNT = 3;
 
 /**
- * Routing and per-note constants for the bound patch, after `kind` is set:
+ * Whether the voice's Noise operators draw from its one noise generator in
+ * the kernel's order (windsor#382). The kernel evaluates D, C, B, A and the
+ * generic loop the algorithm's topological order (`voice.order`); the draws
+ * are the only state operators share, so the two render the same bits when
+ * the Noise operators come in descending index order within the topological
+ * order, whatever the others do. One Noise operator or none always does.
+ * Before windsor#382 a second Noise operator needed the whole order to be
+ * D..A, which sent `D>C | B | A` with C and D both Noise to the generic loop
+ * at about twice the kernel's cost
+ * (`docs/research/2026-10-02-noise-operator-cost/`). Allocates nothing.
+ */
+function noiseDrawsDescend(voice: Voice): boolean {
+  const order = voice.order;
+  let last = 4;
+  for (let oi = 0; oi < 4; oi++) {
+    const i = order[oi];
+    if (voice.kind[i] !== KIND_NOISE) continue;
+    if (i > last) return false;
+    last = i;
+  }
+  return true;
+}
+
+/**
+ * Routing and per-note constants for the bound patch, after `kind` and
+ * `order` are set:
  * called by `start` and `rebind`, so a live retune of the algorithm, a wave
  * or a detune reaches the next control block. Each Noise operator's colour
  * is tuned here too (windsor#362): the fields change only with the bound
@@ -54,17 +79,15 @@ const PART_BEND = 0,
 function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
   const algIndex = ALGORITHMS[patch.algorithm] ? patch.algorithm : 0;
   const keyOffset = (voice.note - 60) / 12;
-  let noiseOps = 0;
   for (let i = 0; i < 4; i++) {
     const op = patch.ops[i];
     voice.detuneMul[i] = Math.pow(2, op.detune / 1200);
     voice.levelKeyAmp[i] = Math.pow(2, -op.levelKeyScale * keyOffset);
-    if (voice.kind[i] === KIND_NOISE) noiseOps++;
     bindNoiseColour(voice, i);
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
-  voice.kernel = voice.specialise && voice.edges >= 0 && (noiseOps < 2 || ALG_DESCENDING[algIndex]);
+  voice.kernel = voice.specialise && voice.edges >= 0 && noiseDrawsDescend(voice);
 }
 
 /**

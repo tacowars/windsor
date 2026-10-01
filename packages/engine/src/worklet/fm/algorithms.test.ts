@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   A,
   ALG_CARRIER_BITS,
-  ALG_DESCENDING,
   ALG_EDGES,
   ALG_ORDER,
   ALGORITHMS,
@@ -27,10 +26,9 @@ describe('the algorithm tables', () => {
     });
   });
 
-  it('gives every shipped algorithm a kernel edge set, with D..A for the series stack', () => {
+  it('gives every shipped algorithm a kernel edge set, with three edges for the series stack', () => {
     expect(ALG_EDGES.every((e) => e >= 0)).toBe(true);
     expect(ALG_EDGES[0]).toBe(EDGE_BA | EDGE_CB | EDGE_DC);
-    expect(ALG_DESCENDING[0]).toBe(true);
     expect(ALG_CARRIER_BITS[0]).toBe(1 << A);
     expect(ALG_CARRIER_BITS[7]).toBe(0b1111);
   });
