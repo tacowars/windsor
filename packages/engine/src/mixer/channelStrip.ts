@@ -31,6 +31,8 @@
  */
 import type { AudioPart } from '../synth/audioPart';
 import { MS_PER_SECOND } from '../audioConstants';
+import type { KnobHandle } from '../automation/automationHandles';
+import { knobHandle, sameValue } from '../automation/automationHandles';
 import { createInsertChain, createInsertUpdater } from './insertChain';
 import type { InsertRegistry, InsertSpec, InsertStage } from '../inserts/insertRegistry';
 import { INSERT_KINDS } from '../inserts/insertRegistry';
@@ -111,6 +113,11 @@ export interface PartStrip {
    * and the strip's `dispose` disposes it.
    */
   readonly meter: PeakMeter;
+  /**
+   * The fader. While the level lane's handle is engaged (windsor#344) the
+   * value is recorded and the param left to the lane, and releasing the
+   * handle restores it; the same holds for `setPan` and `setSend`.
+   */
   setLevel(level: number): void;
   setPan(pan: number): void;
   /** Hz; the caller clamps. */
@@ -123,7 +130,38 @@ export interface PartStrip {
   setInserts(specs: readonly InsertSpec[]): void;
   /** Throws for a return that does not exist; a typo must not be silent. */
   setSend(returnName: string, amount: number): void;
+  /**
+   * A strip target's lane handle (windsor#344): `level` (the part's `gain`),
+   * `pan` (the rotation's four gains) or `send.<return>` (that send's gain).
+   * Undefined for any other field. Never touches the audible gate.
+   */
+  automation(field: string): KnobHandle | undefined;
   dispose(): void;
+}
+
+/** What the strip's knobs last set, and the lane handles that lock them (windsor#344). */
+interface StripKnobs {
+  level: number;
+  readonly sends: Map<string, number>;
+  readonly handles: ReadonlyMap<string, KnobHandle>;
+}
+
+/** The fader's, the pan's and each send's handle, each restoring its knob's recorded value. */
+function stripKnobs(
+  part: AudioPart,
+  strip: ChannelStrip,
+  tap: { rotation: StereoRotate; sends: ReadonlyMap<string, GainNode> },
+): StripKnobs {
+  const sends = new Map([...tap.sends].map(([name, send]) => [name, send.gain.value]));
+  const handles = new Map<string, KnobHandle>([['pan', tap.rotation.automation]]);
+  const knobs: StripKnobs = { level: strip.level, sends, handles };
+  const level = (): number => knobs.level;
+  handles.set('level', knobHandle({ params: [part.gain], write: sameValue, resting: level }));
+  for (const [name, send] of tap.sends) {
+    const resting = (): number => sends.get(name) ?? 0;
+    handles.set(`send.${name}`, knobHandle({ params: [send.gain], write: sameValue, resting }));
+  }
+  return knobs;
 }
 
 /**
@@ -184,6 +222,7 @@ export function routePart(
   const mover = createDryMover(tap, later);
   const { rotation, sends, gate } = tap;
   const meter = createPeakMeter(context, rotation.output);
+  const knobs = stripKnobs(part, strip, tap);
   let solo = strip.solo === true;
 
   return {
@@ -233,7 +272,8 @@ export function routePart(
     sends,
     meter,
     setLevel(level: number): void {
-      part.gain.value = level;
+      knobs.level = level;
+      if (!knobs.handles.get('level')!.engaged) part.gain.value = level;
     },
     setPan(pan: number): void {
       rotation.setPan(pan);
@@ -245,8 +285,10 @@ export function routePart(
     setSend(returnName: string, amount: number): void {
       const send = sends.get(returnName);
       if (!send) throw new Error(`part "${part.name}" has no send to return "${returnName}"`);
-      send.gain.value = amount;
+      knobs.sends.set(returnName, amount);
+      if (!knobs.handles.get(`send.${returnName}`)!.engaged) send.gain.value = amount;
     },
+    automation: (field) => knobs.handles.get(field),
     dispose(): void {
       // Before the graph goes, so a fade still waiting cannot re-wire it (#652).
       updates.cancel();

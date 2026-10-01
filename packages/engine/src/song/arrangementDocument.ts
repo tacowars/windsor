@@ -54,7 +54,7 @@ export interface DocumentPart extends MusicPart {
    * The part's automation lanes (windsor#342, record
    * `2026-10-01-song-automation-lanes`): curves over song time on its strip,
    * its inserts (by insert id) and its voice. Absent when it has none; a
-   * partial replaces the whole list. Nothing plays them yet.
+   * partial replaces the whole list. `automation/automationPlayer.ts` plays them (windsor#344).
    */
   readonly automation?: readonly AutomationLane[];
 }

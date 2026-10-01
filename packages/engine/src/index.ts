@@ -133,6 +133,8 @@ export { replaceRange, stampShape } from './automation/automationShapes';
 export type { AutomationShapeSpec } from './automation/automationShapes';
 export { AUTOMATION_SHAPE_KINDS } from './automation/automationShapeTables';
 export type { AutomationShapeKind } from './automation/automationShapeTables';
+// The automation player's writer interface (windsor#344); the system plays the lanes itself.
+export type { AutomationHandle, AutomationHow } from './automation/automationHandles';
 export {
   CHORD_STEP_KINDS,
   ChordSequencer,
