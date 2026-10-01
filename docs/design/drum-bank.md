@@ -69,27 +69,37 @@ leans on five of its features:
   algorithm 8, Series + Tap, whose two carriers A and B are the burst and the
   tail with C and D silent; the 909 snare folds its fixed burst into the
   snappy's 24 ms hold so it needs one Noise operator.
-- **Kick bodies play the machine's pitch on C4.** The 808 and 909 kicks
-  and the EFM kick sit at body ratio 0.198425 (2^(−4/12) of the old 0.25),
-  so each plays 52 Hz on C4, the percussion note the sequencer defaults
-  to; the recordings the kicks were fitted to settle at 52 Hz. Every other
+- **Kick bodies play the machine's pitch on C4.** The 808 kicks and the
+  EFM kick sit at body ratio 0.198425 (2^(−4/12) of the old 0.25), so each
+  plays 52 Hz on C4, the percussion note the sequencer defaults to. The
+  909 kicks sit at 0.188819, 49.4 Hz on C4: the 909 recordings settle at
+  49.2–49.9 Hz by the sound-match toolkit and an FFT
+  (`2026-10-01-tr909-kicks-refitted`). Every other
   note-tracking ratio in those patches moved by the same factor, so the
   patch's internal ratios are unchanged. The old 0.25 followed the
   console's old ratio floor; the Coarse / Fine pair floors the stored ratio
   at `RATIO_MIN`, which is 0.0625 since #618 (`ratioSplit.ts`, and its test
   round-trips every library ratio), and the engine is unclamped
   (`2026-10-01-kicks-tuned-to-c4`). The FM Kick (`kick`, ratio 1) is not a
-  machine voice and keeps its tuning. The 808 kicks have since moved to
-  their own recordings' pitch (below).
+  machine voice and keeps its tuning. The 808 and 909 kicks have since
+  moved to their own recordings' pitch (below), which tacowars kept at the
+  listen.
 - **The 808 and 909 kicks are fitted to recordings**
-  (`docs/research/2026-09-30-kick-fit/`), three Decay settings each plus
-  the 909 at full Attack; the 808s were refitted (next point). The
-  909's is a 32-semitone sweep over 45 ms at curve −0.32, which stays high
-  for 10–20 ms; its body holds full level 50–80 ms before the tail. Each
-  attack edge is a `Square D` operator at a fixed frequency and a locked
-  phase, whose step lands after the operator's first 0.67 ms amplitude
-  ramp. Every kick operator is phase-locked (`phaseFree: false`), as the
-  circuits start the same way every hit.
+  (`docs/research/2026-09-30-kick-fit/`), and since refitted: the 808s
+  (next point) and the 909s (`docs/research/2026-10-01-tr909-kick-refit/`,
+  record `2026-10-01-tr909-kicks-refitted`). The 909s are fitted to Short
+  C 04, Medium C 03, Medium F 05 (the hard kick: Tune near the top) and
+  Long A 04: a 25–28 semitone sweep from its peak (Init 1), decaying to a
+  sustain level and then released to the base, so it keeps falling after
+  the punch; Tune is that sweep's length (at 20 ms, 96 Hz on C, 166 Hz on
+  F, 67 Hz on A). The body holds 56–69 ms before the tail. The 909's
+  lopsided body, its negative half-cycles taller (1.35 of the positive in
+  the first cycles on the machine), is the voice drive, `soft` with a bias
+  of 0.29–0.45 and its tone fitted; the filter is Off. Its edge is a
+  `Square D` with an attack of 0 and its locked phase in the square's
+  negative half, so the voice goes straight to a negative step as the
+  recordings do. Every kick operator is phase-locked (`phaseFree: false`),
+  as the circuits start the same way every hit.
 - **The 808 kicks are refitted click first**
   (`docs/research/2026-10-01-tr808-kick-refit/`, record
   `2026-10-01-tr808-kicks-refitted`), to tacowars's picks: Decay A Tone 03
@@ -106,9 +116,10 @@ leans on five of its features:
   on C4 once settled, as the machine sags lower at a short Decay). The
   filter is Off; the voice drive runs near unity gain with a small bias
   (Diode on `tr808-kick`, Soft on the others).
-- **Diode rounding is negative feedback.** The 909 kicks carry `feedback`
-  about −0.13 on the body operator: odd harmonics that fade as the level
-  does, which is what the diodes do to the triangle. The fitted 909 toms
+- **Diode rounding is negative feedback.** Three 909 kicks carry
+  `feedback` −0.18 to −0.22 on the body operator: odd harmonics that fade
+  as the level does, which is what the diodes do to the triangle (the
+  short kick's fit landed on +0.28). The fitted 909 toms
   round their two Triangle operators with `tone` 0.07 instead, the lower
   tone with feedback −0.79 and the upper +0.3.
 - **The tonal percussion is fitted to recordings**
@@ -137,7 +148,7 @@ leans on five of its features:
 
 Kicks, snares, toms, congas, cowbells, rims and the zap **track the key**
 with C4 (MIDI 60, the percussion note) as the reference tuning: on C4 the
-machine kicks play 52 Hz, as above. Hats,
+808 kicks play 52 Hz and the 909 kicks 49.4 Hz, as above. Hats,
 cymbals and claps are **fixed** or pitch-independent, as on the machines.
 Everything is `mono` with retrigger, so a closed hat on the same part chokes
 an open one.
