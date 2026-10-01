@@ -142,6 +142,7 @@ import patch_tr808_cymbal from './tr808-cymbal.json';
 import patch_tr808_hat_closed from './tr808-hat-closed.json';
 import patch_tr808_hat_open from './tr808-hat-open.json';
 import patch_tr808_kick_long from './tr808-kick-long.json';
+import patch_tr808_kick_short from './tr808-kick-short.json';
 import patch_tr808_kick from './tr808-kick.json';
 import patch_tr808_maracas from './tr808-maracas.json';
 import patch_tr808_rimshot from './tr808-rimshot.json';
@@ -154,6 +155,8 @@ import patch_tr909_crash from './tr909-crash.json';
 import patch_tr909_hat_closed from './tr909-hat-closed.json';
 import patch_tr909_hat_open from './tr909-hat-open.json';
 import patch_tr909_kick_hard from './tr909-kick-hard.json';
+import patch_tr909_kick_long from './tr909-kick-long.json';
+import patch_tr909_kick_short from './tr909-kick-short.json';
 import patch_tr909_kick from './tr909-kick.json';
 import patch_tr909_ride from './tr909-ride.json';
 import patch_tr909_rimshot from './tr909-rimshot.json';
@@ -305,6 +308,7 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'tr808-hat-closed': patch_tr808_hat_closed,
   'tr808-hat-open': patch_tr808_hat_open,
   'tr808-kick-long': patch_tr808_kick_long,
+  'tr808-kick-short': patch_tr808_kick_short,
   'tr808-kick': patch_tr808_kick,
   'tr808-maracas': patch_tr808_maracas,
   'tr808-rimshot': patch_tr808_rimshot,
@@ -317,6 +321,8 @@ export const PATCH_FILES: Readonly<Record<string, unknown>> = {
   'tr909-hat-closed': patch_tr909_hat_closed,
   'tr909-hat-open': patch_tr909_hat_open,
   'tr909-kick-hard': patch_tr909_kick_hard,
+  'tr909-kick-long': patch_tr909_kick_long,
+  'tr909-kick-short': patch_tr909_kick_short,
   'tr909-kick': patch_tr909_kick,
   'tr909-ride': patch_tr909_ride,
   'tr909-rimshot': patch_tr909_rimshot,

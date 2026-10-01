@@ -161,7 +161,7 @@ knows the one below it and nothing above.
    `euclidModel.ts`, `arpModel.ts`, `bassModel.ts`, `regionModel.ts`,
    `playheadDrag.ts`, `harmonyLaneModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
    `patchMetadata.ts`, `libraryModel.ts`, `ratioSplit.ts`,
-   `envelopeTransfer.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
+   `envelopeTransfer.ts`, `operatorStart.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
    `loudnessCheck.ts`, `songAutosave.ts`, `songRestore.ts`,
    `storagePersistence.ts`, `toastModel.ts` — take values and return values. **The tests run in
    Node with no DOM**, so a rule worth testing belongs in a model, a table or

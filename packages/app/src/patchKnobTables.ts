@@ -7,7 +7,7 @@
  * `knobDefaults.test.ts` walks `allPatchKnobs()`.
  */
 import { OP_NAMES, WIDTH_RANGE, makePatch } from '@windsor/engine';
-import { fmt2, fmtHz, fmtMs, fmtSigned } from './consoleFormat';
+import { fmt2, fmtCycleDegrees, fmtHz, fmtMs, fmtSigned } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';
 import { getPath } from './patchPath';
@@ -111,6 +111,16 @@ export const FIXED_HZ_KNOB: PatchKnobEntry = {
   o: { min: 20, max: 8000, curve: 'log', fmt: fmtHz },
 };
 
+/**
+ * An operator's start phase, in cycles: where its wave begins at note-on when
+ * the bay's Start segment is Locked (`phaseFree: false`). Free ignores it.
+ */
+export const OP_PHASE_KNOB: PatchKnobEntry = {
+  f: 'phase',
+  label: 'Phase',
+  o: { min: 0, max: 1, fmt: fmtCycleDegrees },
+};
+
 /** Per-operator knobs, by sub-field of `ops.<i>`; `level` gets the bay-fade hook. */
 export const OP_KNOBS: PatchKnobTable = [
   { f: 'detune', label: 'Detune', o: { min: -100, max: 100, step: 1, fmt: fmtCents } },
@@ -143,6 +153,14 @@ export const ENVELOPE_ADV_KNOBS: PatchKnobTable = [
   { f: 'keyScale', label: 'Key', o: { min: -1, max: 1, fmt: fmtSigned } },
 ];
 
+/**
+ * The pitch envelope's advanced row: `ENVELOPE_ADV_KNOBS` without Key, since
+ * the voice never key-scales the pitch envelope's times.
+ */
+export const PITCH_ENV_ADV_KNOBS: PatchKnobTable = ENVELOPE_ADV_KNOBS.filter(
+  (entry) => entry.f !== 'keyScale',
+);
+
 /** One knob the console builds over the working patch: its full path and its entry. */
 export interface PatchKnob {
   readonly path: string;
@@ -166,7 +184,10 @@ export function allPatchKnobs(): PatchKnob[] {
     own(lfoToWidthKnobs(key));
   }
   own([PITCH_ENV_AMOUNT_KNOB]);
-  OP_NAMES.forEach((_, i) => under(`ops.${i}`, [FIXED_HZ_KNOB, ...OP_KNOBS]));
-  for (const slot of ENVELOPE_SLOTS) under(slot, [...ENVELOPE_KNOBS, ...ENVELOPE_ADV_KNOBS]);
+  OP_NAMES.forEach((_, i) => under(`ops.${i}`, [FIXED_HZ_KNOB, ...OP_KNOBS, OP_PHASE_KNOB]));
+  for (const slot of ENVELOPE_SLOTS) {
+    const adv = slot === 'pitchEnv' ? PITCH_ENV_ADV_KNOBS : ENVELOPE_ADV_KNOBS;
+    under(slot, [...ENVELOPE_KNOBS, ...adv]);
+  }
   return knobs;
 }
