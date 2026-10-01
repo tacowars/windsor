@@ -12,6 +12,13 @@
  *   of its slice, so its note-off precedes the next hit's note-on;
  * - an open last hit is a plain `noteOn`, which the generator releases with
  *   its next note, rest or region end, as it would a plain note.
+ *
+ * Only the roll's requested final hit is open. When a boundary cuts it off,
+ * the last surviving hit keeps its gated hold, so a clipped Arp roll at gate
+ * 0.5 sounds nothing where its gate wants silence. At gate 1 that hold runs
+ * to the boundary anyway, so there the last surviving hit stays open and the
+ * boundary releases it as it releases a plain note: a clipped Grid roll
+ * plays like a plain note cut by a region end or a loop jump.
  */
 import type { NoteOnEvent, NoteRoll } from '../sequencing/noteEvent';
 import type { NoteExtras } from '../synth/audioPart';
@@ -50,11 +57,17 @@ export function playPitched(
 ): void {
   const first = partNoteOn(event, velocity);
   const later = hits.length > 1 ? partNoteOn({ ...event, slide: false }, velocity) : first;
-  const open = event.roll?.open ?? true;
+  const openLast = lastHitOpen(event.roll, hits.length);
   hits.forEach(({ offset, held }, j) => {
     const hit = j === 0 ? first : later;
     const time = event.time + offset;
-    if (open && j === hits.length - 1) part.noteOn(event.note, hit.velocity, time, hit.extras);
+    if (openLast && j === hits.length - 1) part.noteOn(event.note, hit.velocity, time, hit.extras);
     else part.trigger(event.note, hit.velocity, held, time, hit.extras);
   });
+}
+
+/** Whether the last of `surviving` hits is held open: the roll's final hit, or any at gate 1. */
+function lastHitOpen(roll: NoteRoll | undefined, surviving: number): boolean {
+  if (!roll) return true;
+  return roll.open && (surviving === roll.hits || roll.gate >= 1);
 }

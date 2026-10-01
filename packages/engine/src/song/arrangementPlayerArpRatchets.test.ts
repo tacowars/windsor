@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { FULL_ARRANGEMENT, withPart } from '../__fixtures__/fullArrangement';
 import { rig } from '../__fixtures__/playerRig';
 import type { Call } from '../__fixtures__/recordingPart';
-import type { Arrangement, ArpSpec, Harmony, PartRegion } from './arrangement';
+import type { Arrangement, ArpSpec, Harmony, PartRegion, Transport } from './arrangement';
 import { SECONDS_PER_MINUTE } from '../audioConstants';
 import { DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
 import { arpNote, type ArpStep } from '../sequencing/arpSteps';
@@ -35,11 +35,15 @@ const HARMONY: Harmony = {
 const steps = (...cells: ArpStep[]): ArpStep[] =>
   DEFAULT_ARP_CONFIG.steps.map((_, k) => cells[k % cells.length] as ArpStep);
 
-function song(over: Partial<ArpSpec>, regions?: readonly PartRegion[]): Arrangement {
+function song(
+  over: Partial<ArpSpec>,
+  regions?: readonly PartRegion[],
+  transport?: Partial<Transport>,
+): Arrangement {
   const sequencer: ArpSpec = { kind: 'arp', ...DEFAULT_ARP_CONFIG, divisor: SIXTEENTH, ...over };
   const base = {
     ...FULL_ARRANGEMENT,
-    transport: { ...FULL_ARRANGEMENT.transport, bpm: BPM },
+    transport: { ...FULL_ARRANGEMENT.transport, bpm: BPM, ...transport },
     harmony: HARMONY,
   };
   return withPart(base, 'arp', { sequencer, ...(regions ? { regions } : {}) });
@@ -88,6 +92,7 @@ describe('Arp ratchets through the player (windsor#366)', () => {
 
   it('at gate 1 the last hit runs to the next onset, which releases it', () => {
     const calls = play(song({ gate: 1, steps: steps(arpNote({ ratchet: 2 })) }));
+    console.log(JSON.stringify(calls.slice(0, 12).map(at)));
     expect(calls.slice(0, 4).map(at)).toEqual([
       ['trigger', 0, 3],
       ['noteOn', 3, undefined],
@@ -120,6 +125,36 @@ describe('Arp ratchets through the player (windsor#366)', () => {
       ['trigger', 4.5, 0.75],
       ['trigger', 6, 0.75],
       ['trigger', 7.5, 0.75],
+    ]);
+  });
+
+  // A ×4 roll a tie follows, so open, cut after two hits: neither is its final hit, so
+  // neither is held open; the arp's release at the boundary finds nothing left sounding.
+  it('a region end cutting an open roll keeps its surviving hits gated', () => {
+    const over = { gate: 0.5, steps: steps(arpNote({ ratchet: 4 }), TIE, REST) };
+    const calls = play(song(over, [{ start: 0, duration: 3 }]));
+    expect(calls.map(at)).toEqual([
+      ['trigger', 0, 0.75],
+      ['trigger', 1.5, 0.75],
+      ['noteOffByNote', 3, undefined],
+    ]);
+  });
+
+  it('a loop jump cutting an open roll keeps its surviving hits gated', () => {
+    // Steps at ticks 0 and 32; the loop's end at 48 cuts the second step's roll after two hits.
+    const loop = { start: 0, end: 48, on: true };
+    const over = { divisor: 32, gate: 0.5, steps: steps(arpNote(), arpNote({ ratchet: 4 }), TIE) };
+    const calls = play(song(over, undefined, { loop }));
+    expect(calls.slice(0, 4).map(at)).toEqual([
+      ['noteOn', 0, undefined],
+      ['noteOffByNote', 16, undefined],
+      ['trigger', 32, 4],
+      ['trigger', 40, 4],
+    ]);
+    // The jump's release finds nothing sounding; the loop's start plays step 0 afresh.
+    expect(calls.slice(4, 6).map(at)).toEqual([
+      ['noteOffByNote', 48, undefined],
+      ['noteOn', 48, undefined],
     ]);
   });
 });
