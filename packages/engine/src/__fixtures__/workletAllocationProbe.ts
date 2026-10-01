@@ -2,8 +2,9 @@
  * The child process of the worklet allocation tests (windsor#198,
  * windsor#214): it runs one shipped worklet bundle in a Node of its own, where
  * the test can set V8's flags (`--expose-gc`, the young generation's size,
- * `--trace-generalization`), and reports how many bytes the heap grew over a
- * measured run of render quanta, after a warm-up of every path the run takes.
+ * sweeping on the main thread, `--trace-generalization`), and reports how
+ * many bytes the heap grew over a measured run of render quanta, after a
+ * warm-up of every path the run takes.
  * Node runs it directly (its types are stripped), so it imports nothing but
  * Node's own modules; the test passes the config as one JSON argument, and a
  * file path the probe writes its result to as JSON. The result has a file of
@@ -223,6 +224,9 @@ async function run(config: ProbeConfig): Promise<ProbeResult> {
     : steady(probe);
   scenario.warm();
   // The measured run: the heap read after forced collections and at the end.
+  // The child sweeps on the main thread (`--no-concurrent-sweeping`, set by
+  // `workletAllocation.ts`), so no background sweeper is still settling what
+  // the collections freed while the first window is read (windsor#269).
   const gcs = new v8.GCProfiler();
   const gc = (globalThis as { gc?: () => void }).gc!;
   gc();
