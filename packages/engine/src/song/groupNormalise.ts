@@ -77,7 +77,7 @@ function normaliseGroup(
     ...switchedOn('mute', raw.mute, path, n),
     ...switchedOn('solo', raw.solo, path, n),
     // Read as a send bus's chain: a compressor keys from the group's own input.
-    inserts: normaliseBusInserts(raw.inserts, `${path}.inserts`, n, base.inserts),
+    inserts: normaliseBusInserts(raw.inserts, `${path}.inserts`, n, base.inserts, 'a group'),
   };
 }
 

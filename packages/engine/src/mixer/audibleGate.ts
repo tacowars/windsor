@@ -1,8 +1,9 @@
 /**
  * The strip's audible gate: the one gain after the tap's head that the dry
  * path and every send pass through (#667, windsor#154). It is open only
- * while the part is routed to the master, is not muted and is not soloed
- * out, so each of those cuts the dry signal and the sends together,
+ * while the part's Output isn't Sidechain, it is not muted, it is not
+ * soloed out (or silenced by its group, windsor#285) and its dry edge is not
+ * moving, so each of those cuts the dry signal and the sends together,
  * post-fader. The sidechain key is tapped at the head, before the gate, so
  * none of them changes what a detector hears.
  *
@@ -24,6 +25,12 @@ export interface AudibleGate {
   setMute(mute: boolean): void;
   /** `seconds` is the ramp; 0 sets the gain at once. */
   setSoloedOut(soloedOut: boolean, seconds?: number): void;
+  /**
+   * Held shut while the strip's dry edge moves to another destination
+   * (windsor#285): true ramps down, false ramps back to whatever the other
+   * flags say.
+   */
+  setMoving(moving: boolean): void;
 }
 
 export function createAudibleGate(context: BaseAudioContext, strip: ChannelStrip): AudibleGate {
@@ -31,7 +38,8 @@ export function createAudibleGate(context: BaseAudioContext, strip: ChannelStrip
   let sidechain = strip.output === 'sidechain';
   let mute = strip.mute === true;
   let soloedOut = false;
-  const target = (): number => (sidechain || mute || soloedOut ? 0 : 1);
+  let moving = false;
+  const target = (): number => (sidechain || mute || soloedOut || moving ? 0 : 1);
   node.gain.value = target();
   const ramp = (seconds: number): void => {
     const now = context.currentTime;
@@ -67,6 +75,11 @@ export function createAudibleGate(context: BaseAudioContext, strip: ChannelStrip
       soloedOut = next;
       ramp(seconds);
     },
+    setMoving(next): void {
+      if (next === moving) return;
+      moving = next;
+      ramp(INSERT_FADE_SECONDS);
+    },
   };
 }
 
@@ -75,7 +88,7 @@ export function createAudibleGate(context: BaseAudioContext, strip: ChannelStrip
  * reached there, so a new ramp starts from it. Where a param has no
  * `cancelAndHoldAtTime` (Firefox), the value read before cancelling is pinned.
  */
-function holdAt(param: AudioParam, now: number): void {
+export function holdAt(param: AudioParam, now: number): void {
   const { cancelAndHoldAtTime } = param as Partial<Pick<AudioParam, 'cancelAndHoldAtTime'>>;
   if (cancelAndHoldAtTime) {
     cancelAndHoldAtTime.call(param, now);

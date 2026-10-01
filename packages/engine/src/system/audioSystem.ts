@@ -8,6 +8,8 @@
  *
  * - `StandingGraph`: the music bus, the song master, the returns and the aux
  *   fader. Its header draws the signal chain.
+ * - `GroupBuses`: the song's group buses by id (windsor#285), and the order a
+ *   live `groups` partial lands in.
  * - `PartStrips`: every part created here, on its strip, by engine name.
  * - `MusicRoster`: the music parts by slot, the player's `PartHost`.
  * - `MusicPlayback`: the player on the transport (start, stop, mute) and the
@@ -31,6 +33,7 @@ import { tempoInsertRegistry } from '../inserts/tempoInsertRegistry';
 import type { PartStrip, RouteOptions } from '../mixer/channelStrip';
 import { applyReturnsLive, applyStripLive } from '../mixer/deskApply';
 import { splitStrips } from '../mixer/deskPartial';
+import type { GroupBus } from '../mixer/groupBus';
 import type { MasterStrip } from '../mixer/masterStrip';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { MIX, RETURNS } from '../mixer/mix';
@@ -48,6 +51,7 @@ import { PatchResolver } from '../song/arrangementValidate';
 import type { AudioPart } from '../synth/audioPart';
 import { FmEngine } from '../synth/fmEngine';
 import type { ScheduledMessage } from '../synth/workletMessages';
+import { GroupBuses } from './groupBuses';
 import type { PlaybackReadout } from './musicPlayback';
 import { MusicPlayback } from './musicPlayback';
 import { MusicRoster } from './musicRoster';
@@ -99,6 +103,7 @@ export class AudioSystem {
   private readonly meter: SystemLoadMeter;
   private readonly insertTempo: ReturnType<typeof tempoInsertRegistry>;
   private readonly graph: StandingGraph;
+  private readonly groups: GroupBuses;
   private readonly parts: PartStrips;
   private readonly roster: MusicRoster;
   private readonly sidechains: SidechainDesk;
@@ -118,6 +123,7 @@ export class AudioSystem {
       ...(options.defer ? { defer: options.defer } : {}),
     };
     const graph = new StandingGraph(this.engine, options.returns ?? RETURNS, routeOptions);
+    const groups = new GroupBuses({ context: this.engine.context, graph, routeOptions });
     const parts = new PartStrips({
       engine: this.engine,
       graph,
@@ -126,9 +132,11 @@ export class AudioSystem {
       routeOptions,
       partSeed: options.partSeed,
       partEvents: options.partEvents,
+      groupInput: (id) => groups.get(id)?.input,
     });
-    const roster = new MusicRoster(parts);
+    const roster = new MusicRoster(parts, () => groups.all());
     this.graph = graph;
+    this.groups = groups;
     this.parts = parts;
     this.roster = roster;
     this.sidechains = new SidechainDesk(
@@ -232,12 +240,14 @@ export class AudioSystem {
     if (this.playback.player) return;
     const routing = this.sidechains.check(document);
     this.sidechains.begin();
-    const { returns, patches, master, ...arrangement } = document;
+    const { returns, patches, master, groups, ...arrangement } = document;
     // The document and nothing else (#562): a song carries a snapshot of
     // every patch it plays, so the library is not a runtime import and a
     // name it does not embed is a load error, never a silent fallback.
     const resolver = new PatchResolver(patches ?? {});
     this.insertTempo.setTempo(arrangement.transport.bpm);
+    // Before the parts, so a part that starts on a group connects to it directly (windsor#285).
+    this.groups.build(groups ?? []);
     for (const part of arrangement.parts) {
       this.roster.add(
         part,
@@ -312,7 +322,10 @@ export class AudioSystem {
     if (!player) return { ok: false, ignored: [], error: 'music is not initialised' };
     const routing = this.sidechains.plan(partial);
     if (routing.error) return { ok: false, ignored: [], error: routing.error };
-    const { returns, patches, parts, master, ...rest } = partial;
+    const { returns, patches, parts, master, groups, ...rest } = partial;
+    // Read before anything changes: a ninth group refuses the whole partial (windsor#285).
+    const groupPlan = this.groups.plan(groups);
+    if (groupPlan.error) return { ok: false, ignored: [], error: groupPlan.error };
     const { arrangementParts, strips } = splitStrips(parts);
     this.sidechains.begin();
     const result = player.apply(
@@ -326,15 +339,19 @@ export class AudioSystem {
       return result;
     }
     this.insertTempo.setTempo(this.scheduler.bpm);
-    const ignored = [...result.ignored];
+    const ignored = [...result.ignored, ...groupPlan.ignored];
     ignored.push(...applyMasterLive(this.masterStrip!, this.engine.outputStage, master));
+    // `GroupBuses` draws the order: groups built and edited, strips, members released, solo, removals.
+    ignored.push(...this.groups.begin(groupPlan));
     for (const [slot, strip] of strips) {
       const live = this.roster.strip(Number(slot));
       // An absent slot was already reported by the player's merge.
       if (live) ignored.push(...applyStripLive(live, strip, `parts.${slot}.strip`));
     }
+    ignored.push(...this.groups.release(this.roster.tracks()));
     // After every strip's solo flag has landed, including a part added by this partial.
     this.roster.resolveSolo();
+    this.groups.finish();
     if (returns !== undefined) {
       ignored.push(...applyReturnsLive(this.graph.standing().returns, returns));
     }
@@ -383,6 +400,11 @@ export class AudioSystem {
     return this.graph.returnBus(name);
   }
 
+  /** A live group bus by id (windsor#285), once `initMusic` has built the song's. */
+  groupBus(id: number): GroupBus | undefined {
+    return this.groups.get(id);
+  }
+
   /**
    * Driven by the host's timer (the console's `HOST_PUMP_INTERVAL_MS`). Only
    * pumps the look-ahead queue -- the times it emits come from the audio
@@ -397,6 +419,7 @@ export class AudioSystem {
     this.playback.dispose();
     this.sidechains.dispose();
     this.parts.dispose();
+    this.groups.dispose();
     this.roster.clear();
     this.graph.dispose();
     this.meter.dispose();

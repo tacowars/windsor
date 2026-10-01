@@ -1,6 +1,7 @@
 /**
  * The audible gate (windsor#154): open only while the part is routed to the
- * master, unmuted and not soloed out; a change ramps like the output switch,
+ * master, unmuted, not soloed out and not moving its dry edge (windsor#285);
+ * a change ramps like the output switch,
  * a solo set before anything plays lands at once, and a repeat schedules
  * nothing.
  */
@@ -91,5 +92,22 @@ describe('the audible gate', () => {
     ]);
     g.setSoloedOut(true, 0);
     expect(gain.automation).toHaveLength(2);
+  });
+
+  it('holds shut while the dry edge moves, then opens to what the other flags say (windsor#285)', () => {
+    const { gate: g, gain } = gate();
+    g.setMoving(true);
+    expect(gain.automation.at(-1)).toEqual({
+      call: 'linearRampToValueAtTime',
+      value: 0,
+      time: 1 + INSERT_FADE_SECONDS,
+    });
+    g.setMoving(true);
+    expect(gain.automation).toHaveLength(2);
+    g.setMute(true);
+    g.setMoving(false);
+    expect(gain.value).toBe(0);
+    g.setMute(false);
+    expect(gain.value).toBe(1);
   });
 });
