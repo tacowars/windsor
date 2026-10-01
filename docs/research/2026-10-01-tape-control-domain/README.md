@@ -12,6 +12,36 @@ under knob motion, and ends in a declaration of the ranges the panel may
 offer. It is **survival, not accuracy**. It is research only and changes
 nothing under `packages/`.
 
+**Status (2026-10-01, windsor#320): historical.** This record measured the
+shipped core and stage as bundled at `3a21cde` (`origin/main` `ce20d2e`
+plus this folder's declaration). Its trials, derivations and declaration
+stay valid as a record of that code. They are not re-run and not changed.
+Three later commits changed files in its hashed import closure:
+
+- #293 (`634e717`) moved the control glide into the stage, per sample
+  (`tapeMagneticStage.ts`, `tapeMagnetic.ts`, `tapeConstants.ts`). Since
+  then, this harness's per-block `configure` no longer moves the controls
+  on today's stage, so its sweeps and walks would hold their start point.
+- #307 (`80b077a`) rescales M when the gain changes
+  (`tapeMagnetic.ts`, `tapeMagneticStage.ts`).
+- #314 (`6eca799`) added the Advanced controls' plumbing
+  (`tapeMagneticRows.ts`, `tapeMagneticStage.ts`, `tapeConstants.ts`).
+
+So `evidence.mjs --check` now **fails, and is expected to**: grid,
+derived and clean closure pass; closure fails (those four files' hashes
+changed); and of the three spot re-renders only the static one
+(`static/centre/48000/2`) is still bit-equal, while the sweep and the walk
+are not. `evidence.mjs --historical` is the passing check for this folder:
+it re-derives the width rule, completeness, the gates and the declaration
+from the saved trials and the saved grid, and checks that the saved closure
+was clean and that the run names its commit. It skips the closure re-hash,
+the grid recomputation and the spot re-renders.
+
+**Superseded for the shipped box** by windsor#315, the `rows*` files in
+[the 2× folder](../2026-10-01-tape-control-domain-2x/README.md#windsor315-a-box-that-holds-every-shipped-model-row)
+(merged as `074e599`), which ran on the core after #293 and #307 with every
+trial checked to have moved as commanded.
+
 ## What is measured, and what is not imported
 
 The core under test is the **shipped** one, unchanged:
@@ -183,6 +213,7 @@ packages linked:
 ```sh
 node docs/research/2026-10-01-tape-control-domain/measure.mjs
 node docs/research/2026-10-01-tape-control-domain/evidence.mjs --check
+node docs/research/2026-10-01-tape-control-domain/evidence.mjs --historical
 npx eslint docs/research/2026-10-01-tape-control-domain/
 npx tsc --noEmit --target esnext --module esnext --moduleResolution bundler --strict --skipLibCheck --types node docs/research/2026-10-01-tape-control-domain/*.ts
 ```

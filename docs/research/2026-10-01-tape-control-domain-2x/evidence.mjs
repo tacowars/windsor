@@ -2,8 +2,10 @@
 /** windsor#295 evidence: the width-edge table, each raised box's gates, the ladder's stopping
  * point and the declaration, all derived from saved raw trial records; and `--check`, which
  * re-derives them from measurement.json, re-hashes the import closure, re-renders the spot
- * trials and tests the runner's exit gate (windsor#315). Run from anywhere on Node 24:
+ * trials and tests the runner's exit gate (windsor#315); and `--historical` (windsor#320),
+ * which checks only the saved record's own consistency. Run from anywhere on Node 24:
  *   node docs/research/2026-10-01-tape-control-domain-2x/evidence.mjs --check
+ *   node docs/research/2026-10-01-tape-control-domain-2x/evidence.mjs --historical
  */
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
@@ -276,6 +278,27 @@ export async function check(path = report) {
   return Object.values(checks).every(Boolean);
 }
 
-const at = process.argv.indexOf('--check');
-if (process.argv[1] === new URL(import.meta.url).pathname && at > 0)
-  process.exitCode = (await check(process.argv[at + 1] ?? report)) ? 0 : 1;
+/** windsor#320: the record as a record of the code it ran on. Re-derives everything from the
+ * saved trials, checks that the saved closure was clean and the run names its commit, and
+ * runs the exit gate's cases. It does not re-hash today's closure or re-render the spot
+ * trials, because the shipped core changed after the run (#293, #307, #314). The harness is
+ * still bundled for its tables and the shipped core's constants (the pole thresholds). */
+export async function historical(path = report) {
+  const saved = JSON.parse(readFileSync(path, 'utf8'));
+  const S = await loadProgram();
+  const derived = derive(saved.trials, saved.run, S);
+  const checks = {
+    derived: isDeepStrictEqual(JSON.parse(JSON.stringify(derived)), saved.derived),
+    savedClosureClean: saved.closure.length > 0 && closureClean(saved.closure),
+    commit: /^[0-9a-f]{40}$/.test(saved.environment?.commit ?? ''),
+    exitGate: exitGateCases().every((c) => c.pass),
+  };
+  const commit = saved.environment?.commit;
+  console.log(JSON.stringify({ mode: 'historical', commit, checks }, null, 1));
+  return Object.values(checks).every(Boolean);
+}
+
+const modes = { '--check': check, '--historical': historical };
+const flag = process.argv.findIndex((a) => a in modes);
+if (process.argv[1] === new URL(import.meta.url).pathname && flag > 0)
+  process.exitCode = (await modes[process.argv[flag]](process.argv[flag + 1] ?? report)) ? 0 : 1;
