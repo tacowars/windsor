@@ -20,7 +20,14 @@ import { midiPanel } from './midiPanel';
 import { partListControls } from './partListControls';
 import { dropInit } from './patchActions';
 import { badgeText, libraryControls, presetPicker } from './patchLibrary';
-import { buildAlgPicker, buildFilter, buildGlobal, buildLfo, buildPitch } from './patchPanels';
+import {
+  buildAlgPicker,
+  buildDrive,
+  buildFilter,
+  buildGlobal,
+  buildLfo,
+  buildPitch,
+} from './patchPanels';
 import { buildBays } from './patchBays';
 import type { PatchEditor } from './partsSession';
 import { startScope } from './scope';
@@ -45,6 +52,14 @@ const GRID_HTML = `
     </aside>
     <main class="bays"><div class="bay-grid" id="bayGrid"></div></main>
     <aside class="mod">
+      <div class="section">
+        <div class="section-title"><span>Drive</span></div>
+        <div class="seg-slot" id="driveSwitch" style="margin-bottom: 8px"></div>
+        <div class="drive-body" id="driveBody">
+          <div class="bay-line" id="driveShape" style="margin-bottom: 8px"></div>
+          <div class="knob-row" id="driveKnobs"></div>
+        </div>
+      </div>
       <div class="section">
         <div class="section-title"><span>Filter</span></div>
         <div class="seg-slot" id="filterMode" style="margin-bottom: 8px"></div>
@@ -119,6 +134,7 @@ function refreshPatchUi(editor: PatchEditor): void {
   buildAlgPicker(editor);
   buildGlobal(editor);
   buildBays(editor);
+  buildDrive(editor);
   buildFilter(editor);
   buildLfo(editor, 'lfo');
   buildLfo(editor, 'lfo2');

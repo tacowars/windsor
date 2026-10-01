@@ -40,6 +40,9 @@ describe('the patch defaults (#670)', () => {
     ["the filter's LFO 2 depth", { filter: { lfo2Amount: 2 } } as PartialPatch],
     // windsor#300: the drive stage, inside its ranges.
     ['the drive', { drive: { gain: 2, shape: 3, bias: 0.3 } }],
+    // windsor#309: the switch written, and derived from a bias alone.
+    ['the drive switched off', { drive: { on: false, gain: 2 } }],
+    ['a drive biased with no switch', { drive: { bias: -0.4 } }],
   ])('fills the rest of a partial naming %s identically', (_what, partial) => {
     expect(patchLeafDifferences(workletFill(partial), makePatch(partial), 'partial')).toEqual([]);
   });
@@ -54,6 +57,7 @@ describe('the patch defaults (#670)', () => {
   it('clamps the drive to its ranges and plays an unknown shape as soft (windsor#300)', () => {
     const drive = workletFill({ drive: { gain: 3, shape: 9, bias: -4, tone: 2 } }).drive;
     expect(drive).toEqual({
+      on: true,
       gain: 3,
       shape: DRIVE_SHAPE.SOFT,
       bias: DRIVE_BIAS_RANGE.min,

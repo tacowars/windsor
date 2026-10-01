@@ -21,8 +21,8 @@
  * `portablePowers.ts`, the fold by a floor). No oversampling: `hard` and
  * `fold` alias, by design.
  *
- * Invariants: unity gain with no bias is bypassed, and the loops do no work
- * for it; `curve` takes its operand from `point` and leaves its result
+ * Invariants: a patch's `drive.on` false, or unity gain with no bias, is
+ * bypassed, and the loops do no work for it (windsor#309); `curve` takes its operand from `point` and leaves its result
  * there, so no double crosses a call, and allocates nothing (worklet rule 2);
  * every double field is born NaN (rule 7). `updateVoiceDrive` is the
  * control-rate half, once per control block. `voiceDrive.test.ts` pins the
@@ -46,7 +46,7 @@ import { exp2InPlace, log2InPlace } from './portablePowers';
 import { tanhInPlace } from '../../inserts/tapePortableMath';
 
 class VoiceDrive {
-  /** Unity gain and no bias: bypassed, and the loops do no work for it. */
+  /** The stage runs: the patch's switch is on and the gain or bias does something. Off, the loops do no work for it. */
   on: boolean;
   /** The tone below 1: the pole runs. */
   toned: boolean;
@@ -145,7 +145,8 @@ class VoiceDrive {
 }
 
 /**
- * The drive's control-rate half, once per control block: the bypass, the
+ * The drive's control-rate half, once per control block: the bypass (the
+ * patch's switch, or unity gain with no bias, windsor#309), the
  * curve's value at the bias, and the tone's coefficient from the patch's
  * `drive` block, so a live edit is heard on the next block. A pole that is
  * not running holds no state, so the voice's quiet test never waits on it.
@@ -154,7 +155,7 @@ class VoiceDrive {
 function updateVoiceDrive(voice: Voice): void {
   const d = voice.patch!.drive;
   const drive = voice.drive;
-  drive.on = d.gain !== 1 || d.bias !== 0;
+  drive.on = d.on && (d.gain !== 1 || d.bias !== 0);
   drive.toned = drive.on && d.tone < 1;
   if (!drive.toned) drive.toneState = 0;
   if (!drive.on) return;

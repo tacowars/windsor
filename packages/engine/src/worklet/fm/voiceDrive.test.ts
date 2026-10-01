@@ -24,7 +24,9 @@ const SHAPES = Object.entries(DRIVE_SHAPE);
 /** A voice as far as `updateVoiceDrive` reads one. */
 function driveFor(settings: Partial<DriveSettings>): VoiceDrive {
   const drive = new VoiceDrive();
-  const patch = { drive: { gain: 1, shape: DRIVE_SHAPE.SOFT, bias: 0, tone: 1, ...settings } };
+  const patch = {
+    drive: { on: true, gain: 1, shape: DRIVE_SHAPE.SOFT, bias: 0, tone: 1, ...settings },
+  };
   updateVoiceDrive({ patch, drive, sr: SR } as unknown as Voice);
   return drive;
 }
@@ -115,6 +117,15 @@ describe("the drive's control half (windsor#300)", () => {
     expect(driveFor({ gain: 2, tone: 0.5 }).toned).toBe(true);
   });
 
+  it("is bypassed when the patch's switch is off, whatever the gain, bias and tone (windsor#309)", () => {
+    const off = driveFor({ on: false, gain: 4, shape: DRIVE_SHAPE.TUBE, bias: 0.5, tone: 0.2 });
+    expect(off.on).toBe(false);
+    expect(off.toned).toBe(false);
+    expect(off.toneState).toBe(0);
+    // On at unity with no bias still does nothing, so it still costs nothing.
+    expect(driveFor({ on: true, tone: 0 }).on).toBe(false);
+  });
+
   it.each(SHAPES)(
     'takes its offset from the same curve at the bias for %s, so silence stays silent',
     (_n, shape) => {
@@ -138,7 +149,11 @@ describe("the drive's control half (windsor#300)", () => {
   it('keeps no tone state while the pole is not running', () => {
     const drive = driveFor({ gain: 2, tone: 0.2 });
     drive.toneState = 0.4;
-    const voice = { patch: { drive: { gain: 2, shape: 0, bias: 0, tone: 1 } }, drive, sr: SR };
+    const voice = {
+      patch: { drive: { on: true, gain: 2, shape: 0, bias: 0, tone: 1 } },
+      drive,
+      sr: SR,
+    };
     updateVoiceDrive(voice as unknown as Voice);
     expect(drive.toneState).toBe(0);
   });

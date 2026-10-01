@@ -317,6 +317,12 @@ input {
   order: 3;
 }
 
+/* The Drive section's controls while its switch is Off (windsor#309): still
+   editable, dimmed the way a bypassed insert's stack is. */
+.drive-body.off {
+  opacity: 0.4;
+}
+
 .knob-row {
   display: flex;
   flex-wrap: wrap;
