@@ -218,11 +218,11 @@ detail pane at the bottom. Its layers, top down:
    and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
    the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row,
    244 px high for a converted card (`fit: 'fixed'`) and at its natural
-   height for one not yet converted, whose rail (`sequencerRail.ts`) holds the accent dot, the kind's
-   name (a click folds it), the region `n/m`, and Split and Delete for the
-   selected region (`sequencerDeviceModel.ts`, which reads the part from
-   the document at the press). The pane has no region row and adds no
-   knob. For a chord, `harmonyCard.ts` — seven degree chips, Triad |
+   height for one not yet converted. Its rail (`sequencerRail.ts`) holds
+   the accent dot, the kind's name (a click folds it), the region `n/m`,
+   and Split and Delete for the selected region
+   (`sequencerDeviceModel.ts`, which reads the part from the document at
+   the press). The pane has no region row and adds no knob. For a chord, `harmonyCard.ts` — seven degree chips, Triad |
    Seventh, the Duration dial (bars; beats under Shift), Delete.
 6. **The pure models** — `regionModel.ts`, `harmonyLaneModel.ts`,
    `songViewTables.ts` (the px maths and the per-kind tables). The tests are
