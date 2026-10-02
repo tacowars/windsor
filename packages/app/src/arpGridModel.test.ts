@@ -9,6 +9,7 @@ import type { ArpSpec, ArpStep, Harmony, HarmonyChord, StepModLane } from '@wind
 import {
   ARP_STEPS_MAX,
   ARRANGEMENT_VERSION,
+  RATCHET_MAX,
   DEFAULT_ARP_CONFIG,
   STEP_MOD_PARAMS,
   arpCellPitch,
@@ -19,6 +20,7 @@ import {
 } from '@windsor/engine';
 import {
   arpCellCount,
+  arpCycleLabel,
   arpKindLabel,
   arpOctaveLabel,
   arpShownList,
@@ -30,6 +32,7 @@ import {
 import { ARP_RANDOM } from './arpGridConstants';
 import { DocumentModel } from './documentModel';
 import { cycleOctave, toggleFlag, withStep } from './gridModel';
+import { cycleStepRatchet, stepRatchet, takesRatchet } from './ratchetModel';
 import { ARP_GRID_KNOBS, ARP_ROTATE_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
 import { type StepSlide, heldBySlide } from './stepModLaneModel';
 import { loadBuiltIns } from './builtInLibrary';
@@ -88,6 +91,18 @@ describe('the shown cell count (windsor#137 decision 1)', () => {
   });
 });
 
+describe('the Cycle label (windsor#370)', () => {
+  it('names the count and the chord the card reads, in the key', () => {
+    expect(arpCycleLabel(6, HARMONY, TRIAD)).toBe('6 cells · C maj');
+    expect(arpCycleLabel(14, HARMONY, SEVENTH)).toBe('14 cells · G 7');
+  });
+
+  it('is the count alone with no chord, and one cell is a cell', () => {
+    expect(arpCycleLabel(0, HARMONY, null)).toBe('0 cells');
+    expect(arpCycleLabel(1, HARMONY, TRIAD)).toBe('1 cell · C maj');
+  });
+});
+
 describe('the cell edits (decision 2)', () => {
   it('cycles note → tie → rest → a plain note', () => {
     expect(nextArpKind(arpNote({ accent: true, octave: 1 }))).toEqual(TIE);
@@ -104,6 +119,32 @@ describe('the cell edits (decision 2)', () => {
     expect(toggleFlag(REST, 'accent')).toEqual(REST);
     expect(cycleOctave(TIE, 1)).toEqual(TIE);
     expect(withStep(defaultArpSteps(3), 1, REST)).toEqual([arpNote(), REST, arpNote()]);
+  });
+
+  it("drops a note's ratchet when it becomes a tie, and a rest becomes a plain note (decision 6)", () => {
+    expect(nextArpKind(arpNote({ ratchet: 3, accent: true }))).toEqual(TIE);
+    expect(nextArpKind(nextArpKind(TIE))).toEqual(arpNote());
+  });
+
+  it("cycles a note's ratchet ×1 → ×2 → ×3 → ×4 → ×1 and leaves a rest or a tie alone", () => {
+    const rolls: number[] = [];
+    let cell: ArpStep = arpNote({ accent: true });
+    for (let i = 0; i < RATCHET_MAX; i++) {
+      cell = cycleStepRatchet(cell);
+      rolls.push(stepRatchet(cell));
+    }
+    expect(rolls).toEqual([2, 3, 4, 1]);
+    expect(cell).toEqual(arpNote({ accent: true }));
+    expect([takesRatchet(REST), takesRatchet(TIE), takesRatchet(arpNote())]).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(cycleStepRatchet(REST)).toBe(REST);
+    expect(cycleStepRatchet(TIE)).toBe(TIE);
+    // Oct, accent and slide keep the roll.
+    const rolled = arpNote({ ratchet: 2 });
+    expect(stepRatchet(cycleOctave(toggleFlag(rolled, 'slide'), 1))).toBe(2);
   });
 
   it('labels a cell and its octave', () => {
@@ -132,6 +173,15 @@ describe('Rotate over the shown cells (decision 4)', () => {
     expect(turned.lanes[0]?.values.slice(6)).toEqual(lane.values.slice(6));
   });
 
+  it("carries each cell's ratchet with it (windsor#370)", () => {
+    const rolled = steps.map((cell, i) => (i === 2 ? arpNote({ ratchet: 3 }) : cell));
+    const turned = rotateArp({ steps: rolled, lanes: [] }, 1, 6);
+    expect(turned.steps[3]).toEqual(arpNote({ ratchet: 3 }));
+    expect(stepRatchet(turned.steps[3])).toBe(3);
+    expect(stepRatchet(turned.steps[2])).toBe(1);
+    expect(rotateArp(turned, -1, 6).steps).toEqual(rolled);
+  });
+
   it('goes back with the opposite turn, and does nothing with no cells shown', () => {
     const there = rotateArp({ steps, lanes: [lane] }, -4, 10);
     expect(rotateArp(there, 4, 10)).toEqual({ steps, lanes: [lane] });
@@ -153,25 +203,48 @@ describe('Randomize (decision 5)', () => {
     expect(rolled.slice(6)).toEqual(written.slice(6));
   });
 
-  it('draws a rest, a tie or a note with accent, slide and an octave, five draws a cell', () => {
-    const { rest, tie, flag, octave } = ARP_RANDOM;
+  it('draws a rest, a tie or a note with accent, slide, an octave and a roll, seven draws a cell', () => {
+    const { rest, tie, flag, octave, ratchet } = ARP_RANDOM;
     const miss = 0.99;
     const rolled = randomArpCells(
       written,
-      4,
+      5,
       scripted([
-        ...[rest / 2, miss, miss, miss, miss],
-        ...[rest + tie / 2, miss, miss, miss, miss],
-        ...[miss, flag / 2, miss, octave / 2, 0],
-        ...[miss, miss, flag / 2, octave / 2, miss],
+        ...[rest / 2, miss, miss, miss, miss, ratchet / 2, 0],
+        ...[rest + tie / 2, miss, miss, miss, miss, ratchet / 2, 0],
+        ...[miss, flag / 2, miss, octave / 2, 0, miss, 0],
+        ...[miss, miss, flag / 2, octave / 2, miss, miss, 0],
+        ...[miss, miss, miss, miss, miss, ratchet / 2, miss],
       ]),
     );
-    expect(rolled.slice(0, 4)).toEqual([
+    expect(rolled.slice(0, 5)).toEqual([
       REST,
       TIE,
       arpNote({ accent: true, octave: -1 }),
       arpNote({ slide: true, octave: 1 }),
+      arpNote({ ratchet: RATCHET_MAX }),
     ]);
+  });
+
+  it('rolls ×2 to ×RATCHET_MAX, each as likely, and never on a rest or a tie (windsor#370)', () => {
+    const { ratchet } = ARP_RANDOM;
+    const rollOf = (pick: number): ArpStep | undefined =>
+      randomArpCells(written, 1, scripted([0.99, 0.99, 0.99, 0.99, 0.99, ratchet / 2, pick]))[0];
+    expect(rollOf(0)).toEqual(arpNote({ ratchet: 2 }));
+    expect(rollOf(0.5)).toEqual(arpNote({ ratchet: 3 }));
+    expect(rollOf(0.999)).toEqual(arpNote({ ratchet: RATCHET_MAX }));
+    for (const cell of randomArpCells(written, ARP_STEPS_MAX, Math.random)) {
+      if (cell.kind !== 'note') expect(cell).not.toHaveProperty('ratchet');
+      else if (cell.ratchet !== undefined) {
+        expect(cell.ratchet).toBeGreaterThanOrEqual(2);
+        expect(cell.ratchet).toBeLessThanOrEqual(RATCHET_MAX);
+      }
+    }
+  });
+
+  it('keeps the ratchets past the shown cells', () => {
+    const rolledPast = written.map((cell, i) => (i >= 6 ? arpNote({ ratchet: 3 }) : cell));
+    expect(randomArpCells(rolledPast, 6, Math.random).slice(6)).toEqual(rolledPast.slice(6));
   });
 
   it('keeps every note within the ±1 octave the table allows', () => {
