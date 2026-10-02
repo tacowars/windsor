@@ -30,6 +30,9 @@ var DRIVE_TONE_MIN_HZ = 1e3;
 var DRIVE_TONE_OCTAVES = 4.25;
 var NOISE_COLOUR_CEILING = 0.45;
 var NOISE_COLOUR_DAMPING = Math.SQRT2;
+var FORMANT_Q_PER_RESONANCE = 8;
+var FORMANT_Q_MAX = 40;
+var FORMANT_MAKEUP = 1.787;
 
 // packages/engine/src/worklet/fm/eventQueue.ts
 function emptySlots(capacity) {
@@ -219,7 +222,7 @@ var ALG_CARRIER_BITS = ALGORITHMS.map((alg) => alg.carriers.reduce((b, c) => b |
 
 // packages/engine/src/worklet/fm/modeIds.ts
 var LOOP_NONE = 0, LOOP_LOOP = 1, LOOP_TRIGGER = 2;
-var FILT_OFF = 0, FILT_LP = 1, FILT_HP = 2, FILT_BP = 3, FILT_NOTCH = 4;
+var FILT_OFF = 0, FILT_LP = 1, FILT_HP = 2, FILT_BP = 3, FILT_NOTCH = 4, FILT_FORMANT = 5;
 var LFO_SINE = 0, LFO_TRI = 1, LFO_SAW_UP = 2, LFO_SAW_DOWN = 3, LFO_SQUARE = 4, LFO_SH = 5, LFO_DRIFT = 6;
 var DRIVE_SOFT = 0, DRIVE_HARD = 1, DRIVE_DIODE = 2, DRIVE_TUBE = 3, DRIVE_FOLD = 4;
 var LOOP_MODE = { NONE: LOOP_NONE, LOOP: LOOP_LOOP, TRIGGER: LOOP_TRIGGER };
@@ -228,7 +231,8 @@ var FILTER_MODE = {
   LOWPASS: FILT_LP,
   HIGHPASS: FILT_HP,
   BANDPASS: FILT_BP,
-  NOTCH: FILT_NOTCH
+  NOTCH: FILT_NOTCH,
+  FORMANT: FILT_FORMANT
 };
 var LFO_SHAPE = {
   SINE: LFO_SINE,
@@ -345,8 +349,11 @@ var FILTER_DEFAULTS = {
   modWheelDepth: 0,
   lfoAmount: 0,
   lfo2Amount: 0,
-  keyTrack: 0
+  keyTrack: 0,
+  /** The Formant mode's vowel (windsor#331), `VOWEL_RANGE`: 0 a, 1 e, 2 i, 3 o, 4 u. */
+  vowel: 0
 };
+var VOWEL_RANGE = { min: 0, max: 4 };
 var DRIVE_DEFAULTS = {
   /** The input gain into the shaper, `DRIVE_GAIN_RANGE`; 1 is unity. */
   gain: 1,
@@ -470,6 +477,7 @@ function normalisePatch(raw) {
   for (let i = 0; i < OPERATOR_COUNT; i++) ops.push(opDefaults(raw.ops && raw.ops[i], i));
   const filtRaw = raw.filter || {};
   const pd = PATCH_DEFAULTS, fd = FILTER_DEFAULTS;
+  const mode = num(filtRaw.mode, fd.mode) | 0;
   const p = {
     name: raw.name || pd.name,
     algorithm: Math.max(0, Math.min(ALGORITHMS.length - 1, num(raw.algorithm, pd.algorithm) | 0)),
@@ -490,7 +498,7 @@ function normalisePatch(raw) {
     lfo: lfoDefaults(raw.lfo, LFO_DEFAULTS),
     lfo2: lfoDefaults(raw.lfo2, LFO2_DEFAULTS),
     filter: {
-      mode: num(filtRaw.mode, fd.mode) | 0,
+      mode: mode < FILT_OFF || mode > FILT_FORMANT ? FILT_OFF : mode,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
       resonance: num(filtRaw.resonance, fd.resonance),
       slope24: !!filtRaw.slope24,
@@ -503,6 +511,8 @@ function normalisePatch(raw) {
       lfo2Amount: num(filtRaw.lfo2Amount, fd.lfo2Amount),
       // octaves, from LFO 2
       keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
+      vowel: clamp(num(filtRaw.vowel, fd.vowel), VOWEL_RANGE),
+      // Formant only (windsor#331)
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS)
     },
     drive: driveDefaults(raw.drive)
@@ -1216,6 +1226,7 @@ var STEP_OP_WIDTH = 4;
 var Svf = class {
   constructor() {
     this.ic1 = this.ic2 = this.a1 = this.a2 = this.a3 = this.k = this.cutoffHz = this.q = NaN;
+    this.gain = this.levelDb = this.level = NaN;
     this.ic1 = 0;
     this.ic2 = 0;
     this.a1 = 0;
@@ -1224,6 +1235,8 @@ var Svf = class {
     this.k = 0;
     this.cutoffHz = 0;
     this.q = 0;
+    this.gain = 0;
+    this.level = 0;
   }
   reset() {
     this.ic1 = 0;
@@ -1566,6 +1579,47 @@ function updateOperatorAmp(voice, i, n) {
   }
 }
 
+// packages/engine/src/worklet/fm/formantTables.ts
+var FORMANT_PEAKS = 3;
+var FORMANT_VOWELS = [
+  { name: "a", hz: [600, 1040, 2250], db: [0, -7, -9] },
+  { name: "e", hz: [400, 1620, 2400], db: [0, -12, -9] },
+  { name: "i", hz: [250, 1750, 2600], db: [0, -30, -16] },
+  { name: "o", hz: [400, 750, 2400], db: [0, -11, -21] },
+  { name: "u", hz: [350, 600, 2400], db: [0, -20, -32] }
+];
+
+// packages/engine/src/worklet/fm/voiceFormant.ts
+var FORMANT_LAST_FROM = FORMANT_VOWELS.length - 2;
+var FORMANT_SHIFT_SLOT = new Float64Array(1);
+function updateVoiceFormant(voice) {
+  const vowel = voice.patch.filter.vowel;
+  const whole = vowel | 0;
+  const from = whole > FORMANT_LAST_FROM ? FORMANT_LAST_FROM : whole;
+  const t = vowel - from;
+  const lo = FORMANT_VOWELS[from];
+  const hi = FORMANT_VOWELS[from + 1];
+  const shift = FORMANT_SHIFT_SLOT[0];
+  const scaled = voice.liveValues[VT_RESONANCE] * FORMANT_Q_PER_RESONANCE;
+  const q = scaled > FORMANT_Q_MAX ? FORMANT_Q_MAX : scaled;
+  for (let k = 0; k < FORMANT_PEAKS; k++) {
+    const svf = k === 0 ? voice.svfA : k === 1 ? voice.svfB : voice.svfC;
+    const hz = lo.hz[k] + (hi.hz[k] - lo.hz[k]) * t;
+    const cutoff = hz * shift;
+    if (svf.cutoffHz !== cutoff || svf.q !== q) {
+      svf.cutoffHz = cutoff;
+      svf.q = q;
+      svf.setCoeffs(voice.sr);
+    }
+    const db = lo.db[k] + (hi.db[k] - lo.db[k]) * t;
+    if (svf.levelDb !== db) {
+      svf.levelDb = db;
+      svf.level = Math.pow(10, db / 20);
+    }
+    svf.gain = svf.level * FORMANT_MAKEUP * svf.k;
+  }
+}
+
 // packages/engine/src/worklet/fm/voiceOffsets.ts
 function mapVoiceSlots(slotTargets, paths) {
   const list = Array.isArray(paths) ? paths : null;
@@ -1711,6 +1765,11 @@ function updateVoiceFilter(voice, n) {
   const live = voice.liveValues;
   const resonance = live[VT_RESONANCE];
   const octaves = fenv * (live[VT_ENV_AMOUNT] + modWheel * f.modWheelDepth) + voice.lfoLevel * f.lfoAmount + f.keyTrack * keyOffset + controls[PART_CUTOFF_MOD] + voice.lfo2Level * f.lfo2Amount;
+  if (f.mode === FILT_FORMANT) {
+    FORMANT_SHIFT_SLOT[0] = Math.pow(2, octaves);
+    updateVoiceFormant(voice);
+    return;
+  }
   const cutoff = voice.cutoff * Math.pow(2, octaves);
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
@@ -2096,8 +2155,33 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       }
     }
     if (mode !== FILT_OFF) {
-      sig = voice.svfA.process(sig, mode);
-      if (slope24) sig = voice.svfB.process(sig, mode);
+      if (mode === FILT_FORMANT) {
+        const x = sig;
+        let p = voice.svfA;
+        let v3 = x - p.ic2;
+        let v1 = p.a1 * p.ic1 + p.a2 * v3;
+        let v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig = p.gain * v1;
+        p = voice.svfB;
+        v3 = x - p.ic2;
+        v1 = p.a1 * p.ic1 + p.a2 * v3;
+        v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig += p.gain * v1;
+        p = voice.svfC;
+        v3 = x - p.ic2;
+        v1 = p.a1 * p.ic1 + p.a2 * v3;
+        v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig += p.gain * v1;
+      } else {
+        sig = voice.svfA.process(sig, mode);
+        if (slope24) sig = voice.svfB.process(sig, mode);
+      }
     }
     if (fadeInc !== 0) {
       fade += fadeInc;
@@ -2190,6 +2274,7 @@ function voiceFilterQuiet(voice) {
   const f = voice.patch.filter;
   if (f.mode === FILT_OFF) return true;
   if (!Svf.quiet(voice.svfA)) return false;
+  if (f.mode === FILT_FORMANT) return Svf.quiet(voice.svfB) && Svf.quiet(voice.svfC);
   return !f.slope24 || Svf.quiet(voice.svfB);
 }
 function voiceFinished(voice) {
@@ -2369,8 +2454,33 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       }
     }
     if (mode !== FILT_OFF) {
-      sig = voice.svfA.process(sig, mode);
-      if (slope24) sig = voice.svfB.process(sig, mode);
+      if (mode === FILT_FORMANT) {
+        const x = sig;
+        let p = voice.svfA;
+        let v3 = x - p.ic2;
+        let v1 = p.a1 * p.ic1 + p.a2 * v3;
+        let v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig = p.gain * v1;
+        p = voice.svfB;
+        v3 = x - p.ic2;
+        v1 = p.a1 * p.ic1 + p.a2 * v3;
+        v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig += p.gain * v1;
+        p = voice.svfC;
+        v3 = x - p.ic2;
+        v1 = p.a1 * p.ic1 + p.a2 * v3;
+        v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig += p.gain * v1;
+      } else {
+        sig = voice.svfA.process(sig, mode);
+        if (slope24) sig = voice.svfB.process(sig, mode);
+      }
     }
     if (fadeInc !== 0) {
       fade += fadeInc;
@@ -2510,6 +2620,7 @@ var Voice = class {
     this.lfo2 = new Lfo(secondLfoSeed(this.lfo.seed));
     this.svfA = new Svf();
     this.svfB = new Svf();
+    this.svfC = new Svf();
     this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
     this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
@@ -2628,6 +2739,7 @@ var Voice = class {
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
     this.svfA.reset();
     this.svfB.reset();
+    this.svfC.reset();
     this.drive.reset();
     startStepMod(this, patch, stepMod);
   }
