@@ -60,7 +60,8 @@ grouped by genre, with a place for templates. Storage stays in the browser.
 10. **The export file name follows the open song's name** (`<name>.json`,
     and Export audio's names follow it, since it reads that field). An
     untitled song exports as `untitled.json`. An imported song opens
-    untitled, and the file name it came from is offered as its name.
+    untitled with the `meta` it carries. Its own name and tags win, and
+    the file name stands in only when the song has no name.
 11. **Opening needs no question when the song you leave is named**, because
     it is saved. Leaving an untitled song that has changed asks first, as
     New song does: "Discard the changes to this untitled song? Save as…
@@ -109,11 +110,15 @@ Version 2 is additive: `patches` and `songs` are untouched.
 - **Autosave goes to the song it read.** Switching songs flushes the
   pending autosave into the song being left before the next one opens. A
   write never lands in the wrong record.
+- **The switch drains every edit.** An edit made while a write is in
+  flight is flushed too: the switch keeps flushing until nothing is
+  waiting, and only then replaces the document.
 - **A failed flush stops the switch.** Decision 11's "no question" holds
   only while the song being left is saved. When that flush fails (quota,
   for example), the switch is abandoned and reported, and the song being
   left stays open with its edits. The autosave reports the failure to its
-  caller rather than only to the status line.
+  caller rather than only to the status line, and a failed write stays
+  owed, so the next switch or flush tries it again even with no new edit.
 - **No IndexedDB.** In a browser without it, the Songs section says the
   library is unavailable here, and Document works as before.
 
