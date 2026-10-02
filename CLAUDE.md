@@ -127,7 +127,10 @@ bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (mai
 - **Commit style:** a sentence-case imperative subject, with a body that
   explains why.
 - **Branching:** work on a branch and open a PR against `main`. CI runs
-  `npm run verify`, and a ruleset on `main` requires that check and a PR.
+  `npm run verify`, with only the tests a PR's change can reach on a PR and
+  every test on a push to `main`
+  (`docs/log/2026-10-02-ci-runs-affected-tests-on-prs.md`), and a ruleset on
+  `main` requires that check and a PR.
 
 ## Working a ticket
 

@@ -1,5 +1,7 @@
 # Every pull request and every push to main runs the same gate as
-# `npm run verify` locally. The site is served by GitHub Pages from the
+# `npm run verify` locally, except that on a pull request vitest runs only
+# the test files the change can reach; a push to main runs every test
+# (docs/log/2026-10-02-ci-runs-affected-tests-on-prs.md). The site is served by GitHub Pages from the
 # `gh-pages` branch: a push to main that passes publishes the build to the
 # branch root, and a code PR from this repo publishes its build to
 # `pr-preview/pr-<N>/` (docs/log/2026-09-28-pr-previews-on-github-pages.md).
@@ -61,7 +63,10 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             base="${{ github.event.pull_request.base.sha }}"
-            git fetch --no-tags --depth=1 origin "$base"
+            # The history as well as the base: vitest's --changed diffs from
+            # the merge base of the PR's base and HEAD, which a shallow
+            # clone can't find.
+            git fetch --no-tags --unshallow origin "$base"
             if git diff --name-only "$base" HEAD | grep -Evq '^(docs/|\.claude/|.*\.md$)'; then
               echo "code=true" >> "$GITHUB_OUTPUT"
             else
@@ -78,7 +83,11 @@ jobs:
           cache: npm
       - if: steps.changes.outputs.code == 'true'
         run: npm ci --no-audit --fund=false
+      # On a pull request, the base sha puts vitest in vitest.config.ts's
+      # changed-files mode. On a push to main it is empty and every test runs.
       - if: steps.changes.outputs.code == 'true'
+        env:
+          VERIFY_CHANGED_SINCE: ${{ github.event.pull_request.base.sha }}
         run: npm run verify
       # verify ends with `vite build`; its relative base serves the same
       # dist/ from the site root and from any pr-preview/pr-<N>/ folder.
