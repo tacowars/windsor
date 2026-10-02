@@ -5,10 +5,12 @@
  * pane's frame (`sequencerDevice.ts`) puts beside the shared rail, at the
  * device's one height. Two sections: Play, the controls in columns — Base
  * step and Voicing; the Hit and Rest tiles and Delete last; Octave, Vel and
- * Gate — and Steps, the strip, labelled with its count and one pass in bars
- * (`chordDeviceModel.ts`).
+ * Gate in a strip behind a rule — and Steps, the strip, labelled with its
+ * count and one pass in bars (`chordDeviceModel.ts`). The sizes are the
+ * `--chord-*` entries of `SEQUENCER_DEVICE_PX`, measured off tacowars's
+ * mockup.
  *
- * The strip is one column per step, 48 px wide and grouped by four: the Hit
+ * The strip is one column per step, 42 px wide and grouped by four: the Hit
  * or Rest tile, taking the height the device has left so it is a large
  * target to press and to drop on, then the Oct, Inv, Dur and Rep dials
  * (click up, shift-click down; a rest has only Dur and Rep), and the +
@@ -261,11 +263,11 @@ function controls(strip: ChordStrip, picker: Picker): HTMLElement {
   );
   const body = el('div', 'seq-sec-body');
   body.append(
-    column('wide', [baseStep(strip), picker.voicing]),
+    column('wide chord-fields', [baseStep(strip), picker.voicing]),
     column('wide chord-sources', [picker.tiles, deleteLast(strip)]),
     column('k3', [octave(strip), ...knobs]),
   );
-  const section = el('div', 'seq-section');
+  const section = el('div', 'seq-section play');
   section.append(el('div', 'seq-sec-label', 'Play'), body);
   return section;
 }

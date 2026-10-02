@@ -39,11 +39,28 @@ describe('the Chord device’s Steps label (windsor#369)', () => {
 });
 
 describe('the Chord device’s sizes (windsor#369)', () => {
-  it('widens its steps to half again the Grid’s and gives the dials more height, at 244 px', () => {
+  it('keeps the device at 244 px and the Grid’s step at 32', () => {
     expect(SEQUENCER_DEVICE_PX['--seq-h']).toBe(244);
     expect(SEQUENCER_DEVICE_PX['--step-w']).toBe(32);
-    expect(SEQUENCER_DEVICE_PX['--chord-step-w']).toBe(48);
-    expect(SEQUENCER_DEVICE_PX['--chord-dial-h']).toBe(22);
-    expect(SEQUENCER_DEVICE_PX['--chord-col-gap']).toBe(10);
+  });
+
+  it('spaces its Play columns as the mockup draws them', () => {
+    expect(SEQUENCER_DEVICE_PX['--chord-inset']).toBe(12);
+    expect(SEQUENCER_DEVICE_PX['--chord-col-gap']).toBe(13);
+    expect(SEQUENCER_DEVICE_PX['--chord-field-w']).toBe(120);
+    expect(SEQUENCER_DEVICE_PX['--chord-tile-w']).toBe(110);
+    expect(SEQUENCER_DEVICE_PX['--chord-tile-gap']).toBe(10);
+    expect(SEQUENCER_DEVICE_PX['--chord-knob-pad']).toBe(9);
+  });
+
+  it('steps at a 48 px pitch with 21 px dials in 5 px rows', () => {
+    expect(SEQUENCER_DEVICE_PX['--chord-step-w']).toBe(42);
+    expect(SEQUENCER_DEVICE_PX['--chord-step-gap']).toBe(6);
+    expect(SEQUENCER_DEVICE_PX['--chord-step-w']! + SEQUENCER_DEVICE_PX['--chord-step-gap']!).toBe(
+      48,
+    );
+    expect(SEQUENCER_DEVICE_PX['--chord-dial-h']).toBe(21);
+    expect(SEQUENCER_DEVICE_PX['--chord-row-gap']).toBe(5);
+    expect(SEQUENCER_DEVICE_PX['--chord-strip-foot']).toBe(10);
   });
 });

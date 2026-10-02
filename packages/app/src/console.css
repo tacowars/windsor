@@ -1932,10 +1932,13 @@ input.field.group-name {
 /* Record `2026-10-01-sequencer-rack-devices` decisions 1–4 and 7; the look
    is docs/research/2026-09-30-sequencer-rack/chord.html. The frame, rail,
    sections and columns are the sequencer device's (above); this block is
-   the Chord's own: the Hit and Rest tiles to drag from, and the strip, a
-   column per step at --chord-step-w grouped by four, its dials
-   --chord-dial-h high, whose step tile takes the
-   height the device has left. Nothing scrolls. */
+   the Chord's own, sized to tacowars's mockup (the --chord-* properties,
+   `sequencerDeviceTables.ts`): Play, inset --chord-inset from the rail,
+   its columns --chord-col-gap apart and its knob strip behind a rule; and
+   the strip, a column per step at --chord-step-w, --chord-step-gap apart
+   and grouped by four, its dials --chord-dial-h high in --chord-row-gap
+   rows, whose step tile takes the height the device has left. Nothing
+   scrolls. */
 .chord-device {
   display: flex;
   min-height: 0;
@@ -1943,18 +1946,34 @@ input.field.group-name {
 .chord-picker {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--chord-tile-gap);
 }
-/* Play's columns stand --chord-col-gap apart, so Base step and Voicing
-   clear the tiles. */
-.chord-device .seq-section:first-child .seq-sec-body {
+/* Play: inset from the rail, its columns --chord-col-gap apart so Base
+   step and Voicing clear the tiles, and no padding after the knob strip,
+   whose own padding reaches the Steps border. */
+.chord-device .seq-section.play {
+  padding-right: 0;
+  padding-left: var(--chord-inset);
+}
+.chord-device .seq-section.play .seq-sec-body {
   gap: var(--chord-col-gap);
 }
-/* The tiles' column grows past --seq-wide-col rather than wrap or clip a
+/* Base step sits level with the Hit tile and Voicing with Delete last, as drawn. */
+.seq-col.chord-fields {
+  width: var(--chord-field-w);
+  justify-content: space-around;
+}
+/* The tiles' column grows past --chord-tile-w rather than wrap or clip a
    long chord name (windsor#332's `G# maj · ♭VI`). */
 .seq-col.chord-sources {
   width: auto;
-  min-width: var(--seq-wide-col);
+  min-width: var(--chord-tile-w);
+}
+/* Octave, Vel and Gate: one strip, parted from the Play columns by a rule
+   and from Steps by the section border. */
+.chord-device .seq-col.k3 {
+  padding: 0 var(--chord-knob-pad);
+  border-left: 1px solid var(--line);
 }
 .chip {
   display: flex;
@@ -2042,15 +2061,29 @@ body.chord-dragging {
   line-height: 13px;
   white-space: nowrap;
 }
+/* The Rest tile has no chord line, so it stands shorter than Hit, as drawn. */
+.chord-device .chip.rest {
+  padding-block: 10px;
+}
+.chord-device .chip.rest .chip-num {
+  display: none;
+}
+/* Steps: the strip's columns reach the device's edge, --chord-strip-foot
+   under the last dial. */
+.chord-device .seq-section.steps {
+  padding-right: 8px;
+  padding-bottom: var(--chord-strip-foot);
+}
 .chord-strip {
   flex: none;
   min-height: 0;
-  gap: 2px;
+  gap: var(--chord-step-gap);
   overflow: visible;
   padding: 0;
 }
 .chord-strip .grid-col {
   width: var(--chord-step-w);
+  gap: var(--chord-row-gap);
 }
 .chord-strip .grid-col:nth-child(4n + 1):not(:first-child) {
   margin-left: var(--beat-gap);
