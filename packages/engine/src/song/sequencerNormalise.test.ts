@@ -21,7 +21,11 @@ import { CHORD_VOICING_DEFAULT, CHORD_VOICING_IDS } from '../harmony/chordTables
 import { ARP_STYLES, DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
 import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
 import { defaultArpSteps } from '../sequencing/arpSteps';
-import { BASS_PITCH_MODES, DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
+import {
+  BASS_PITCH_MODES,
+  DEFAULT_BASS_CONFIG,
+  defaultBassSteps,
+} from '../sequencing/bassSequencer';
 import { DEFAULT_GRID_CONFIG, gridNote } from '../sequencing/gridSequencer';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { makePatch } from '../patch/patch';
@@ -287,7 +291,16 @@ describe('bass sequencer normalisation (#705)', () => {
     };
     const full = sequencer(written);
     expect(full.n.corrections).toEqual([]);
-    expect(full.spec).toStrictEqual(written);
+    // Written before the step strip (windsor#367): it gains one bar of plain notes at its divisor.
+    const strip = {
+      steps: defaultBassSteps(24),
+      length: 4,
+      accentVelocity: DEFAULT_BASS_CONFIG.accentVelocity,
+      accentMod: DEFAULT_BASS_CONFIG.accentMod,
+      lanes: [],
+    };
+    expect(full.spec).toStrictEqual({ ...written, ...strip });
+    expect(sequencer({ ...written, ...strip }).spec).toStrictEqual(full.spec);
   });
 
   it('clamps and reports every field by path', () => {
