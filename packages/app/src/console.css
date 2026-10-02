@@ -2988,13 +2988,24 @@ select.field.auto-snap {
   z-index: 4;
   box-sizing: border-box;
   width: min(384px, calc(100vw - 16px));
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   padding: 12px;
   background: var(--panel);
   border: 1px solid var(--line-bright);
   border-radius: var(--r);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+/* A window shorter than the panel caps it (an inline max-height); the body
+   scrolls and the actions below it stay on screen. */
+.shape-body {
+  display: grid;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .shape-head {
   display: flex;
@@ -3094,6 +3105,7 @@ select.field.auto-snap {
   opacity: 0.35;
 }
 .shape-actions {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;

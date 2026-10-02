@@ -260,7 +260,7 @@ describe('the popover’s place (decision 2)', () => {
   const { gapPx, marginPx } = SHAPE_POPOVER;
 
   it('opens below the lane at the range start', () => {
-    expect(popoverPlacement(frame)).toEqual({ left: 400, top: 256 + gapPx });
+    expect(popoverPlacement(frame)).toEqual({ left: 400, top: 256 + gapPx, maxHeight: null });
   });
 
   it('stays inside the view at either edge', () => {
@@ -277,8 +277,36 @@ describe('the popover’s place (decision 2)', () => {
   it('sits above the lane when the window has no room below and there is room above', () => {
     const low = { ...frame, laneTop: 700, laneBottom: 756 };
     expect(popoverPlacement(low).top).toBe(700 - gapPx - 260);
-    const cramped = { ...low, laneTop: 100, laneBottom: 156, viewportHeight: 300 };
-    expect(popoverPlacement(cramped).top).toBe(156 + gapPx);
+  });
+
+  it('where neither side fits, clamps inside the window so Apply and Cancel stay on screen', () => {
+    const cramped = { ...frame, laneTop: 100, laneBottom: 156, viewportHeight: 300 };
+    const at = popoverPlacement(cramped);
+    expect(at.top).toBe(300 - marginPx - 260);
+    expect(at.top).toBeGreaterThanOrEqual(marginPx);
+    expect(at.top + 260).toBeLessThanOrEqual(300 - marginPx);
+    expect(at.maxHeight).toBeNull();
+  });
+
+  it('caps a panel taller than the window at the window less both margins, from the top margin', () => {
+    const short = { ...frame, laneTop: 100, laneBottom: 156, viewportHeight: 200 };
+    expect(popoverPlacement(short)).toEqual({
+      left: 400,
+      top: marginPx,
+      maxHeight: 200 - 2 * marginPx,
+    });
+  });
+
+  it('stays inside the window when the lane itself is scrolled past either edge', () => {
+    const offBottom = { ...frame, laneTop: 298, laneBottom: 354, viewportHeight: 220 };
+    expect(popoverPlacement(offBottom).top).toBe(marginPx);
+    const offTop = { ...frame, laneTop: -120, laneBottom: -64 };
+    expect(popoverPlacement(offTop).top).toBe(marginPx);
+  });
+
+  it('never caps below zero in a window narrower than its margins', () => {
+    const tiny = { ...frame, viewportHeight: marginPx };
+    expect(popoverPlacement(tiny).maxHeight).toBe(0);
   });
 });
 

@@ -9,7 +9,10 @@
  * - **The popover** (`songShapePopover.ts`) opens below the lane at the
  *   range's start. It is fixed to the window and placed again on every
  *   scroll, resize and repaint, so it follows the lanes' horizontal scroll
- *   and stays inside the Song view.
+ *   and stays inside the Song view. While the Song tab is hidden nothing is
+ *   measured; it is placed on the first frame the tab shows
+ *   (`songShapePlacer.ts`). Too tall for the window, it is capped and its
+ *   body scrolls under the pinned Apply and Cancel.
  * - **The preview** is the lane's points with the range replaced by the
  *   engine's stamp (`songShapeModel.ts`), drawn dashed over the curve. The
  *   document is untouched until Apply, which commits the lane's whole list
@@ -36,6 +39,7 @@ import {
   stampedPoints,
   type ShapeRange,
 } from './songShapeModel';
+import { shapePlacer } from './songShapePlacer';
 import { shapePopover } from './songShapePopover';
 import type { SongView, SongViewState } from './songTab';
 import { SONG_VIEW, tickToPx } from './songViewTables';
@@ -126,13 +130,14 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
   const selectedLane = (): ShapeLane | undefined =>
     selection ? lanes.get(selection.key) : undefined;
 
-  const place = (): void => {
+  const layout = (): void => {
     const lane = selectedLane();
     const scroll = host.querySelector('.lanes-scroll');
     if (!selection || !lane || !scroll) return;
+    const node = popover.element;
+    node.style.maxHeight = '';
     const box = lane.timeline.getBoundingClientRect();
     const view = scroll.getBoundingClientRect();
-    const node = popover.element;
     const at = popoverPlacement({
       anchorX: box.left + tickToPx(selection.range.startTick, lane.view.state.pxPerBar),
       laneTop: box.top,
@@ -145,7 +150,16 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
     });
     node.style.left = `${at.left}px`;
     node.style.top = `${at.top}px`;
+    node.style.maxHeight = at.maxHeight === null ? '' : `${at.maxHeight}px`;
   };
+  // Hidden (another tab): nothing is measured; it is placed on the first frame the Song panel shows.
+  const placer = shapePlacer({
+    shown: () => host.closest('[hidden]') === null,
+    place: layout,
+    nextFrame: (cb) => window.requestAnimationFrame(cb),
+    cancelFrame: (handle) => window.cancelAnimationFrame(handle),
+  });
+  const place = (): void => placer.request();
 
   const show = (): void => {
     const lane = selectedLane();
@@ -183,6 +197,7 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
     const lane = selectedLane();
     if (lane) undecorate(lane);
     if (selection) listen(false);
+    placer.stop();
     selection = null;
     popover.element.remove();
   }

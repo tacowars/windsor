@@ -198,23 +198,38 @@ export interface PopoverFrame {
   readonly height: number;
 }
 
+/** Where the popover goes: its top-left, and a cap on its height when the window is too short for it. */
+export interface PopoverPlace {
+  readonly left: number;
+  readonly top: number;
+  /** The panel's `max-height` when it is taller than the window allows, else null (its own height). */
+  readonly maxHeight: number | null;
+}
+
 /**
- * The popover's top-left (decision 2): below the lane at the range's start,
+ * The popover's place (decision 2): below the lane at the range's start,
  * kept inside the view's edges. Where it would run off the bottom of the
- * window and there is room above the lane, it sits above it instead.
+ * window and there is room above the lane, it sits above it instead. Where
+ * neither side has room it is clamped inside the window, with the same
+ * margin as the sides; a panel taller than the window is capped to it and
+ * scrolls its body, so Apply and Cancel stay on screen.
  */
 export function popoverPlacement(
   frame: PopoverFrame,
   geometry: ShapePopoverGeometry = SHAPE_POPOVER,
-): { readonly left: number; readonly top: number } {
+): PopoverPlace {
   const { gapPx, marginPx } = geometry;
   const lo = frame.viewLeft + marginPx;
   const hi = Math.max(lo, frame.viewRight - frame.width - marginPx);
+  const room = Math.max(0, frame.viewportHeight - 2 * marginPx);
+  const height = Math.min(frame.height, room);
+  const bottomEdge = frame.viewportHeight - marginPx;
   const below = frame.laneBottom + gapPx;
-  const above = frame.laneTop - gapPx - frame.height;
-  const fitsBelow = below + frame.height <= frame.viewportHeight - marginPx;
+  const above = frame.laneTop - gapPx - height;
+  const side = below + height > bottomEdge && above >= marginPx ? above : below;
   return {
     left: clamp(frame.anchorX, lo, hi),
-    top: fitsBelow || above < marginPx ? below : above,
+    top: clamp(side, marginPx, bottomEdge - height),
+    maxHeight: frame.height > room ? room : null,
   };
 }

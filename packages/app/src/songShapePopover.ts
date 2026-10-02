@@ -119,7 +119,10 @@ export function shapePopover(handlers: ShapePopoverHandlers): ShapePopover {
     cancel,
     apply,
   );
-  root.append(head, kinds, grid, actions);
+  // The body scrolls when the panel is capped to a short window; the actions stay pinned below it.
+  const body = el('div', 'shape-body');
+  body.append(head, kinds, grid);
+  root.append(body, actions);
 
   let draft: AutomationShapeSpec | null = null;
   const report = (edit: Partial<AutomationShapeSpec>): void => {
