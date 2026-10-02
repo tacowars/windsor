@@ -1,0 +1,367 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windsor Arp Device</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Round two, the Arp: the agreed Grid device with the arp's own controls and cells. Single theme on purpose: Windsor's dark console tokens. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --kc: var(--modulator);
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --seq-h: 244px;
+  --step-w: 32px;
+  --names-w: 96px;
+  --lane-h: 42px;
+  --head-h: 112px;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 13px/1.5 var(--f-ui); padding-block: 20px 48px; padding-inline: 16px; margin: 0; }
+.wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1 { font: 600 17px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+p { margin: 0; max-width: 78ch; color: var(--ink-dim); }
+.lede { display: flex; flex-direction: column; gap: 6px; }
+.meas { font: 10px var(--f-num); color: var(--ink-faint); }
+code { font: 11.5px var(--f-num); color: var(--ink); }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; position: sticky; top: 0; z-index: 5; }
+.opt { display: flex; align-items: center; gap: 8px; }
+.opt-label { font: 600 10px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.segs { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.segs button { background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); padding: 4px 10px; font: 500 11px var(--f-ui); cursor: pointer; }
+.segs button:last-child { border-right: 0; }
+.segs button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.play-btn { background: var(--inset); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 4px 12px; font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; min-width: 74px; }
+.play-btn[aria-pressed="true"] { background: var(--carrier); color: var(--inset); border-color: var(--carrier); }
+.hint { font-size: 11px; color: var(--ink-faint); }
+
+/* Today's pane header, kept */
+.pane { display: flex; flex-direction: column; gap: 6px; }
+.pane-head { display: flex; align-items: baseline; gap: 10px; }
+.fold { background: var(--inset); border: 1px solid var(--line-bright); color: var(--ink-dim); border-radius: var(--r); width: 18px; height: 18px; font-size: 8px; display: inline-grid; place-items: center; align-self: center; }
+.pane-title { font: 600 12px var(--f-panel); letter-spacing: 0.07em; text-transform: uppercase; }
+.rack { display: flex; gap: 6px; overflow-x: auto; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; min-width: 0; scrollbar-color: var(--line-bright) var(--inset); overscroll-behavior: none; }
+
+/* The device, as the Grid's */
+.dev { flex: none; height: var(--seq-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.rail { width: 24px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; background: var(--panel-hi); border-right: 1px solid var(--line); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kc); margin-top: 3px; }
+.dev-name { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 10.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; padding: 4px 0; cursor: pointer; }
+.rail .spacer { flex: 1; }
+.ib { background: transparent; border: 1px solid transparent; color: var(--ink-faint); width: 18px; height: 18px; border-radius: var(--r); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.ib:hover { color: var(--ink); border-color: var(--line-bright); }
+.ib svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.ib.danger:hover { color: var(--hot); }
+.rail .rnum { font: 8.5px var(--f-num); color: var(--ink-faint); writing-mode: vertical-rl; transform: rotate(180deg); }
+.dev-body { flex: 1; min-width: 0; min-height: 0; display: flex; }
+.section { flex: none; display: flex; flex-direction: column; padding: 4px 8px 6px; min-height: 0; min-width: 0; }
+.section + .section { border-left: 1px solid var(--line); }
+.section.strip-sec { padding-right: 4px; }
+.sec-label { height: 14px; flex: none; font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+.sec-label em { font: 400 10px var(--f-num); letter-spacing: 0; text-transform: none; font-style: normal; color: var(--ink-dim); }
+.sec-body { flex: 1; min-height: 0; display: flex; gap: 2px; }
+.dev.folded .dev-body { display: none; }
+.dev.folded .rail { border-right: 0; }
+
+/* Controls */
+.col { display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; min-height: 0; }
+.col.wide { align-items: stretch; }
+.col.k3 { display: grid; grid-template-rows: repeat(3, 1fr); align-items: center; justify-items: center; }
+.knob { width: 52px; display: flex; flex-direction: column; align-items: center; padding: 1px 0; border-radius: var(--r); }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .face { fill: var(--inset); stroke: var(--line); }
+.knob .track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .arc { stroke: var(--kc); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 13px; }
+.knob .lab, .field .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; line-height: 11px; }
+.field { display: flex; flex-direction: column; gap: 2px; width: 100px; }
+.fake-select, .fake-input { background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); height: 22px; font-size: 11.5px; padding: 0 6px; display: flex; align-items: center; justify-content: space-between; color: var(--ink); white-space: nowrap; cursor: pointer; }
+.fake-select::after { content: '▾'; color: var(--ink-faint); font-size: 10px; margin-left: 6px; }
+.fake-input { font: 11px var(--f-num); cursor: text; flex: 1; min-width: 0; }
+.hseg { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; height: 22px; }
+.hseg span { flex: 1; text-align: center; background: var(--inset); color: var(--ink-dim); font: 500 11px/20px var(--f-ui); cursor: pointer; }
+.hseg span + span { border-left: 1px solid var(--line-bright); }
+.hseg span.on { background: var(--kc); color: var(--inset); }
+.btn-s { background: var(--inset); border: 1px solid var(--kc); border-radius: var(--r); color: var(--ink); font: 600 9.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 8px; text-align: center; cursor: pointer; white-space: nowrap; }
+.seed { display: flex; gap: 3px; }
+.seed .ib { width: 22px; height: 22px; border-color: var(--line-bright); flex: none; }
+
+/* The strip: the Grid's scroller, the step rows held at the top */
+.scroller { flex: none; min-height: 0; overflow-x: hidden; overflow-y: auto; display: flex; gap: 2px; scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--panel); scrollbar-gutter: stable; overscroll-behavior: none; }
+.col-steps, .names { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.names { width: var(--names-w); background: var(--panel); padding-right: 4px; }
+.col-steps { width: var(--step-w); }
+.col-steps.beat { margin-left: 4px; }
+.head { position: sticky; top: 0; z-index: 1; background: var(--panel); display: flex; flex-direction: column; gap: 2px; height: var(--head-h); flex: none; }
+.names .head { z-index: 3; justify-content: flex-end; padding-bottom: 4px; }
+.idx { font: 9px/12px var(--f-num); color: var(--ink-faint); text-align: center; border-radius: 2px; height: 12px; }
+.play .idx { background: var(--carrier); color: var(--inset); }
+.gcell { height: 20px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font: 600 9.5px/18px var(--f-panel); letter-spacing: 0.02em; text-align: center; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.gcell:hover { background: var(--panel-hi); color: var(--ink); }
+.gcell.note { color: var(--ink); border-color: var(--line-bright); }
+.gcell.flag, .gcell.oct { height: 18px; line-height: 16px; }
+.gcell.oct { font: 9px/16px var(--f-num); }
+.gcell.on { background: var(--kc); border-color: var(--kc); color: var(--inset); }
+.gcell.dim { color: var(--ink-faint); }
+.gcell.blank { visibility: hidden; }
+.play .gcell, .play .mcell { border-color: var(--carrier); }
+.corner { display: flex; flex-direction: column; gap: 3px; }
+.corner .fake-select { height: 20px; font-size: 10.5px; }
+.corner .meas { line-height: 1.2; }
+.mname { height: var(--lane-h); flex: none; border-left: 2px solid var(--kc); padding: 2px 0 0 6px; display: flex; flex-direction: column; }
+.mname .top { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.mname b { font: 600 10.5px var(--f-ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mname .x { color: var(--ink-faint); font-size: 11px; cursor: pointer; }
+.mname .x:hover { color: var(--hot); }
+.mname .read { font: 9px var(--f-num); color: var(--ink-faint); }
+.mcell { height: var(--lane-h); flex: none; position: relative; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); cursor: ns-resize; }
+.mcell::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
+.mcell i { position: absolute; left: 3px; right: 3px; background: var(--kc); opacity: 0.85; }
+.mcell.mute { opacity: 0.35; }
+.mcell.held { border-style: dashed; border-color: var(--line-bright); }
+.mcell.held i { background: var(--line-bright); }
+
+/* Notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.notes > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px; }
+.notes ul { margin: 0; padding-left: 18px; color: var(--ink-dim); display: flex; flex-direction: column; gap: 5px; }
+.notes li b { color: var(--ink); font-weight: 600; }
+
+/* The ratchet row, as Euclid's (#355): ticks show the split */
+.gcell.rat { height: 14px; position: relative; font: 8px/12px var(--f-num); color: var(--ink-faint); }
+.gcell.rat.r2, .gcell.rat.r3, .gcell.rat.r4 { border-color: color-mix(in srgb, var(--carrier) 60%, var(--line)); }
+.gcell.rat .ticks { position: absolute; inset: 3px 4px; display: flex; justify-content: space-between; }
+.gcell.rat .ticks i { width: 2px; background: var(--carrier); border-radius: 1px; }
+.gcell.rat.idle { opacity: 0.4; cursor: default; }
+.row-lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; text-align: right; order: 9; margin-top: 2px; }
+.new-tag { font: 600 7.5px var(--f-panel); letter-spacing: 0.1em; color: var(--inset); background: var(--carrier); border-radius: 2px; padding: 0 3px; margin-left: 4px; vertical-align: 1px; }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Windsor arp device, round two</h1>
+    <p>The agreed Grid device with the arp's own controls and cells. It is 244 px high with 32 px cells. The rail holds the region with Split and Delete. Lanes stack under step rows that stay put. The device grows and shrinks with the arp's cycle, which follows the chord, Style and Octaves. Every control is today's.</p>
+  </div>
+
+  <div class="toolbar" role="group" aria-label="Mockup options">
+    <div class="opt"><span class="opt-label">Cycle</span>
+      <div class="segs" id="opt-cycle">
+        <button type="button" data-v="up">Up · Am · 2 oct</button>
+        <button type="button" data-v="updown">Up-down · Am · 2 oct</button>
+        <button type="button" data-v="seventh">Up-down · Am7 · 2 oct</button>
+        <button type="button" data-v="wide">Up-down · Am7 · 4 oct</button>
+      </div>
+    </div>
+    <div class="opt"><span class="opt-label">Lanes</span>
+      <div class="segs" id="opt-lanes">
+        <button type="button" data-v="0">None</button>
+        <button type="button" data-v="2">2</button>
+        <button type="button" data-v="3">3</button>
+        <button type="button" data-v="4">4</button>
+      </div>
+    </div>
+    <button type="button" class="play-btn" id="play" aria-pressed="false">▶ Play</button>
+  </div>
+
+  <section class="pane">
+    <div class="pane-head">
+      <span class="fold">▼</span>
+      <span class="pane-title">Keys — Arp</span>
+      <span class="meas" id="pane-note"></span>
+    </div>
+    <div class="rack" id="rack"></div>
+    <span class="meas" id="measure"></span>
+  </section>
+
+  <section class="notes">
+    <div>
+      <h3>From the Grid</h3>
+      <ul>
+        <li><b>The same device:</b> 244 px, the rail with the region, Split and Delete, controls in columns, no hint paragraph.</li>
+        <li><b>The same strip:</b> 32 px cells grouped by four, lanes stacked at 42 px, lane names and + Lane at the left, step rows held while the lanes scroll.</li>
+        <li><b>The same knob order:</b> Octave over Octaves (the Grid's Length) and Rotate, then Vel, Acc vel and Acc mod, then Gate and Skip.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>The arp's own</h3>
+      <ul>
+        <li><b>Style, Rate and Voicing</b> in the first column, where the Grid has Step. <b>Retrigger, Seed with Reseed, and Randomize</b> in the second.</li>
+        <li><b>Its column is shorter:</b> no degree picker, because the chord gives the pitch. So the step rows are 22 px shorter than the Grid's, and the lanes get that room.</li>
+        <li><b>A ratchet row</b> <span class="new-tag">NEW</span> under S, as on the Grid and Basslead: click to cycle ×1 to ×4. A rest or a tie has no ratchet: its cell is grey and does nothing.</li>
+        <li><b>Its width moves with the cycle:</b> 6 cells for Up over Am in two octaves, 30 for Up-down over Am7 in four. Cells past the cycle stay written but aren't shown, as today.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Agreed</h3>
+      <ul>
+        <li><b>The top cell</b> keeps today's <code>♪ — ·</code>. The pitch is the chord's, so the cell names the kind, not the note.</li>
+        <li><b>Reseed is an icon</b> beside the seed field, which keeps the column narrow.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const state = { cycle: 'updown', lanes: 2, playing: false, tick: 0, folded: false };
+
+  const A0 = -0.75 * Math.PI, SPAN = 1.5 * Math.PI;
+  function arc(c, r, a0, a1) {
+    const pt = (a) => [(c + r * Math.sin(a)).toFixed(2), (c - r * Math.cos(a)).toFixed(2)];
+    const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+    return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`;
+  }
+  function knob(l, v, p) {
+    const size = 30, mid = size / 2, r = mid - 3, face = r - 4;
+    const a = A0 + Math.max(0.001, p) * SPAN;
+    const px = (mid + face * Math.sin(a)).toFixed(2), py = (mid - face * Math.cos(a)).toFixed(2);
+    return `<div class="knob" title="${l}"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+      <circle class="face" cx="${mid}" cy="${mid}" r="${face}"/><path class="track" d="${arc(mid, r, A0, A0 + SPAN)}"/>
+      <path class="arc" d="${arc(mid, r, A0, a)}"/><line class="pin" x1="${mid}" y1="${mid}" x2="${px}" y2="${py}"/>
+      </svg><span class="val">${v}</span><span class="lab">${l}</span></div>`;
+  }
+  const field = (l, inner) => `<div class="field"><span class="lab">${l}</span>${inner}</div>`;
+  const select = (v) => `<div class="fake-select">${v}</div>`;
+  const ICON_SPLIT = '<svg viewBox="0 0 12 12"><rect x="1" y="3" width="4" height="6" rx="1"/><rect x="7" y="3" width="4" height="6" rx="1"/><path d="M6 1v10" stroke-dasharray="1.5 1.5"/></svg>';
+  const ICON_DELETE = '<svg viewBox="0 0 12 12"><path d="M2 3h8M4.5 3V1.8h3V3M3 3l.6 7.2h4.8L9 3M5 5v3.5M7 5v3.5"/></svg>';
+  const ICON_RESEED = '<svg viewBox="0 0 12 12"><path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/></svg>';
+
+  // ── The cycle: the notes the walk lands on, per toolbar choice ──
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const name = (m) => `${NAMES[m % 12]}${Math.floor(m / 12) - 1}`;
+  const stack = (tones, octaves) => { const out = []; for (let o = 0; o < octaves; o++) for (const t of tones) out.push(t + 12 * o); return out; };
+  const AM = [57, 60, 64], AM7 = [57, 60, 64, 67];
+  const upDown = (list) => list.concat(list.slice(1, -1).reverse());
+  const CYCLES = {
+    up: { style: 'Up', octaves: 2, chord: 'Am', list: stack(AM, 2) },
+    updown: { style: 'Up-down', octaves: 2, chord: 'Am', list: upDown(stack(AM, 2)) },
+    seventh: { style: 'Up-down', octaves: 2, chord: 'Am7', list: upDown(stack(AM7, 2)) },
+    wide: { style: 'Up-down', octaves: 4, chord: 'Am7', list: upDown(stack(AM7, 4)) },
+  };
+  // The written cells: 32 are stored, the cycle shows the first of them.
+  const KINDS = 'nnnnntnrnnnnnntnnrnnnnnnntnn';
+  const ACC = new Set([0, 3, 6, 11, 16, 20, 24]);
+  const SLIDE = new Set([2, 8, 13, 19, 23]);
+  const OCT = { 4: 1, 8: -1, 17: 1, 22: -1 };
+  const cell = (i) => ({ k: KINDS[i % KINDS.length], a: ACC.has(i), s: SLIDE.has(i), o: OCT[i] ?? 0 });
+  const LANES = [
+    { name: 'Op A Level', read: '4: 0.84', v: [0.2, 0, -0.3, 0.3, 0.5, 0.5, 0.1, 0, -0.6, 0.2, 0.4, -0.2, 0.1] },
+    { name: 'Cutoff', read: '', v: [0.6, 0.6, 0.2, 0, 0.42, -0.2, -0.2, 0.3, 0.8, 0, -0.5, 0.1, 0.6, 0.6, -0.3] },
+    { name: 'Filter Decay', read: '', v: [0.3, 0.2, 0, 0.45, 0.2, 0.5, 0.05, 0.2, 0.25, 0.35, 0, 0.05, 0.2] },
+    { name: 'Op B Level', read: '', v: [0, 0.3, 0.5, 0, -0.6, -0.6, 0, 0.2, 0.4, 0, 0, 0.7] },
+  ];
+  const laneVal = (lane, i) => lane.v[i % lane.v.length];
+
+
+  const ratchetCell = (r, idle) => idle ? '<div class="gcell rat idle" title="A rest or a tie has no ratchet"></div>' : `<div class="gcell rat r${r}" title="Ratchet ×${r}: click for ×1 → ×2 → ×3 → ×4">${r > 1 ? `<span class="ticks">${'<i></i>'.repeat(r)}</span>` : '×1'}</div>`;
+  const RAT = { 1: 2, 4: 3, 9: 2, 12: 4, 16: 2, 21: 3 };
+  function controls() {
+    const c = CYCLES[state.cycle];
+    const seed = `<div class="seed"><div class="fake-input">48213</div><button type="button" class="ib" title="Reseed: a new seed, and the part restarts its random stream now" aria-label="Reseed">${ICON_RESEED}</button></div>`;
+    return `<div class="section"><div class="sec-label">Play</div><div class="sec-body">
+      <div class="col wide">${field('Style', select(c.style))}${field('Rate', select('1/16'))}${field('Voicing', select('Close'))}</div>
+      <div class="col wide">${field('Retrigger', '<div class="hseg"><span>off</span><span class="on">on</span></div>')}${field('Seed', seed)}<div class="btn-s" title="Reroll the shown cells: accent, slide, an octave now and then, a tie or rest">Randomize</div></div>
+      <div class="col k3">${knob('Octave', '3', 0.45)}${knob('Octaves', String(c.octaves), c.octaves / 4)}${knob('Rotate', '0', 0.5)}</div>
+      <div class="col k3">${knob('Vel', '0.75', 0.75)}${knob('Acc vel', '0.30', 0.3)}${knob('Acc mod', '0.40', 0.4)}</div>
+      <div class="col k3">${knob('Gate', '0.60', 0.6)}${knob('Skip', '0.10', 0.1)}</div>
+    </div></div>`;
+  }
+
+  function topCell(st, note) {
+    if (st.k === 'r') return '<div class="gcell" title="rest: click for note → tie → rest">·</div>';
+    if (st.k === 't') return '<div class="gcell" title="tie: click for note → tie → rest">—</div>';
+    const label = '♪';
+    return `<div class="gcell note" title="${name(note + 12 * st.o)}: click for note → tie → rest">${label}</div>`;
+  }
+
+  function column(i, note, lanes) {
+    const st = cell(i);
+    const isNote = st.k === 'n';
+    const beat = i > 0 && i % 4 === 0 ? ' beat' : '';
+    const oct = !isNote ? '<div class="gcell oct blank"></div>' : st.o === 0 ? '<div class="gcell oct dim">oct</div>' : `<div class="gcell oct">${st.o > 0 ? '+' : ''}${st.o}</div>`;
+    const flag = (on, l, t) => (isNote ? `<div class="gcell flag${on ? ' on' : ''}" title="${t}">${l}</div>` : '<div class="gcell flag blank"></div>');
+    const cells = lanes.map((lane) => {
+      const v = laneVal(lane, i);
+      const held = lane.name === 'Op A Level' && cell(i - 1).s && isNote;
+      const bar = v >= 0 ? `bottom:50%;height:${v * 50}%` : `top:50%;height:${-v * 50}%`;
+      return `<div class="mcell${isNote ? '' : ' mute'}${held ? ' held' : ''}"><i style="${bar}"></i></div>`;
+    }).join('');
+    return `<div class="col-steps${beat}" data-i="${i}">
+      <div class="head"><div class="idx">${i + 1}</div>${topCell(st, note)}${oct}${flag(st.a, 'A', 'accent')}${flag(st.s, 'S', 'slide')}${ratchetCell(RAT[i] ?? 1, !isNote)}</div>${cells}</div>`;
+  }
+
+  function strip() {
+    const c = CYCLES[state.cycle];
+    const lanes = LANES.slice(0, state.lanes);
+    const names = lanes.map((l) => `<div class="mname"><div class="top"><b>${l.name}</b><span class="x" title="Remove the ${l.name} lane">×</span></div><span class="read">${l.read}</span></div>`).join('');
+    const corner = `<div class="head"><div class="corner"><span class="row-lab">Ratchet<span class="new-tag">NEW</span></span><div class="fake-select" title="Add a modulation lane">+ Lane</div><span class="meas">${lanes.length} of 4 lanes</span></div></div>`;
+    const cols = c.list.map((note, i) => column(i, note, lanes)).join('');
+    return `<div class="section strip-sec"><div class="sec-label">Cycle <em>${c.list.length} cells · ${c.chord}</em></div><div class="sec-body"><div class="scroller" id="scroller"><div class="names">${corner}${names}</div>${cols}</div></div></div>`;
+  }
+
+  function render() {
+    const c = CYCLES[state.cycle];
+    const rail = `<div class="rail"><span class="dot"></span><span class="dev-name" data-fold title="Fold">Arp</span><span class="spacer"></span>
+      <span class="rnum" title="Region 1 of 1">1/1</span>
+      <button type="button" class="ib" title="Split the region in two" aria-label="Split region">${ICON_SPLIT}</button>
+      <button type="button" class="ib danger" title="Delete this region" aria-label="Delete region">${ICON_DELETE}</button></div>`;
+    document.getElementById('rack').innerHTML = `<div class="dev${state.folded ? ' folded' : ''}">${rail}<div class="dev-body">${controls()}${strip()}</div></div>`;
+    document.getElementById('pane-note').textContent = `arp · ${c.style.toLowerCase()} · 1/16 · 1 region`;
+    for (const [opt, key] of [['opt-cycle', 'cycle'], ['opt-lanes', 'lanes']]) {
+      for (const b of document.querySelectorAll(`#${opt} button`)) b.setAttribute('aria-pressed', String(String(state[key]) === b.dataset.v));
+    }
+    const dev = document.querySelector('.dev');
+    const sc = document.getElementById('scroller');
+    document.getElementById('measure').textContent = state.folded ? '' :
+      `Device ${dev.offsetWidth.toLocaleString('en')} px wide · strip shows ${sc.clientHeight} of ${sc.scrollHeight} px tall${sc.scrollHeight > sc.clientHeight ? ', so the lanes scroll' : ''}`;
+    light();
+  }
+
+  function light() {
+    const n = CYCLES[state.cycle].list.length;
+    const at = state.playing ? state.tick % n : -1;
+    for (const col of document.querySelectorAll('.col-steps')) col.classList.toggle('play', Number(col.dataset.i) === at);
+  }
+  let timer = null;
+  document.getElementById('play').addEventListener('click', (e) => {
+    state.playing = !state.playing;
+    e.currentTarget.setAttribute('aria-pressed', String(state.playing));
+    e.currentTarget.textContent = state.playing ? '■ Stop' : '▶ Play';
+    clearInterval(timer);
+    if (state.playing) { state.tick = 0; timer = setInterval(() => { state.tick++; light(); }, 125); }
+    light();
+  });
+  document.querySelector('.toolbar').addEventListener('click', (e) => {
+    const b = e.target.closest('.segs button[data-v]');
+    if (!b) return;
+    const key = { 'opt-cycle': 'cycle', 'opt-lanes': 'lanes' }[b.parentElement.id];
+    state[key] = key === 'lanes' ? Number(b.dataset.v) : b.dataset.v;
+    render();
+  });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-fold]') || (state.folded && e.target.closest('.dev'))) { state.folded = !state.folded; render(); }
+  });
+  render();
+})();
+</script>
