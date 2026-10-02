@@ -249,6 +249,8 @@ describe('an inactive insert field', () => {
 describe('the readout', () => {
   it('reads a level in dB, -∞ at the floor', () => {
     expect(readout(row('strip.level'), 1)).toBe('+0.0 dB');
+    // A gain a hair under 1, as a round trip through display space leaves it, still reads +0.0.
+    expect(readout(row('strip.level'), 0.9999999999999998)).toBe('+0.0 dB');
     expect(readout(row('strip.level'), 0.5)).toBe('-6.0 dB');
     expect(readout(row('strip.level'), 0)).toBe('-∞ dB');
   });
