@@ -82,6 +82,7 @@ export function wireLaneEditing(lane: LaneEditing): void {
   let live: Live | null = null;
   const frame = (): LaneFrame => ({
     pxPerBar: view.state.pxPerBar,
+    ticksPerBar: view.ticksPerBar(),
     heightPx: SONG_VIEW.automationLanePx,
     songTicks: view.songTicks(),
   });

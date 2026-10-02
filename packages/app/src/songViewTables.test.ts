@@ -18,6 +18,7 @@ import {
   SEQUENCER_KINDS,
   TICKS_PER_BAR,
   hitStep,
+  ticksPerBar,
 } from '@windsor/engine';
 import { snapTick, splitRegion } from './regionModel';
 import {
@@ -52,6 +53,11 @@ describe('the ruler scale', () => {
     expect(tickToPx(TICKS_PER_BAR, PX)).toBe(PX);
     expect(tickToPx(2.25 * TICKS_PER_BAR, PX)).toBe(2.25 * PX);
     expect(pxToTick(tickToPx(TICKS_PER_BAR + PPQ, PX), PX)).toBe(TICKS_PER_BAR + PPQ);
+    // A 7/8 bar is 84 ticks and spans the same px (windsor#430): its bar lines are the ruler's.
+    const seven = ticksPerBar('7/8');
+    expect(tickToPx(2 * seven, PX, seven)).toBe(2 * PX);
+    expect(pxToTick(PX, PX, seven)).toBe(seven);
+    expect(blockBox(seven, seven, PX, seven).leftPx).toBe(PX);
   });
 
   it('labels the bars 1..n and ticks the beats inside a bar', () => {

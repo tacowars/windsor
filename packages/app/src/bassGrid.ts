@@ -19,7 +19,7 @@
  * `regionPlayhead.ts`.
  */
 import type { BassSpec, BassStep } from '@windsor/engine';
-import { STEP_MOD_LANES_MAX } from '@windsor/engine';
+import { STEP_MOD_LANES_MAX, ticksPerBar } from '@windsor/engine';
 import { arpStepCells } from './arpStepCells';
 import {
   BASS_TURN_REBASED,
@@ -102,7 +102,8 @@ function repaint(strip: BassStripView): void {
   fillLanePicker(strip.picker, strip.lanes);
   const spec = strip.spec();
   strip.lanesCount.textContent = `${spec?.lanes.length ?? 0} of ${STEP_MOD_LANES_MAX} lanes`;
-  strip.label.textContent = spec ? bassStepsLabel(spec.length, spec.divisor) : '';
+  const bar = ticksPerBar(strip.ctx.model.doc.transport.meter);
+  strip.label.textContent = spec ? bassStepsLabel(spec.length, spec.divisor, bar) : '';
   strip.scroll.scrollTop = scrollTop;
 }
 

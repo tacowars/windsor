@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { PlayablePart } from '@windsor/engine';
+import type { Meter, PlayablePart } from '@windsor/engine';
 import {
   ARRANGEMENT_VERSION,
   ArrangementPlayer,
@@ -18,6 +18,7 @@ import {
   makeArrangement,
   partAt,
   removePart,
+  ticksPerBar,
 } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import { INIT_PATCH_NAME, initPresetId } from './libraryConstants';
@@ -79,6 +80,27 @@ describe('adding parts', () => {
     for (const preset of presets) expect(model.doc.patches?.[preset]).toBeDefined();
     expect(nextFreeSlot(model.doc)).toBeNull();
     expect(addPart(model.doc)).toBeNull();
+  });
+});
+
+describe("in the song's meter (windsor#430)", () => {
+  it('adds a part live for the whole 12/8 song: 576 ticks, not 384', () => {
+    const model = new DocumentModel(newSong('12/8'));
+    const added = addPart(model.doc)!;
+    const part = (added.doc.parts as Array<{ regions: unknown }>).at(-1);
+    expect(part?.regions).toEqual([{ start: 0, duration: 4 * ticksPerBar('12/8') }]);
+    expect(4 * ticksPerBar('12/8')).toBe(576);
+  });
+
+  it('starts a new Grid part one bar long: 14 sixteenths in 7/8, 16 in 4/4', () => {
+    const steps = (meter?: Meter): number => {
+      const model = new DocumentModel(newSong(meter));
+      restructure(model, setSequencerKind(model.doc, 0, 'grid'));
+      const sequencer = partAt(model.doc, 0)!.sequencer;
+      return sequencer.kind === 'grid' ? sequencer.steps.length : 0;
+    };
+    expect(steps('7/8')).toBe(14);
+    expect(steps()).toBe(16);
   });
 });
 

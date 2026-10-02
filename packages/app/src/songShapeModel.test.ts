@@ -9,6 +9,7 @@ import {
   PPQ,
   TICKS_PER_BAR,
   catalogRow,
+  ticksPerBar,
   toDisplay,
   valueAt,
   type ApplyResult,
@@ -47,6 +48,7 @@ import {
   SHAPE_CHOICES,
   SHAPE_POPOVER,
   SHAPE_RATES,
+  shapeRates,
 } from './songShapeTables';
 
 const BAR = TICKS_PER_BAR;
@@ -93,6 +95,20 @@ describe('the range (decision 1)', () => {
     expect(barAt(SONG, SONG)).toEqual(range(SONG - BAR, SONG));
     expect(barAt(0, SONG)).toEqual(range(0, BAR));
     expect(barAt(10, BAR / 2)).toEqual(range(0, BAR / 2));
+  });
+
+  it("selects, counts and rates in a 3/4 song's 72-tick bars (windsor#430)", () => {
+    const three = ticksPerBar('3/4');
+    const press = { pressTick: three + 5, fromTick: three, toTick: three, dragged: false };
+    expect(shapeRange(press, 8 * three, three)).toEqual(range(three, 2 * three));
+    expect(shapeReadout(range(0, 2 * three), draft({ kind: 'ramp' }), 2, three)).toContain(
+      ' · 2 bars · 1 cycle · 2 points',
+    );
+    expect(
+      shapeRates(three)
+        .map((r) => r.ticks)
+        .slice(-3),
+    ).toEqual([72, 144, 288]);
   });
 });
 

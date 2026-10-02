@@ -10,6 +10,11 @@
  * arrays replace wholesale. The names a block shows come from the engine's
  * `eventChord` / `chordName` / `romanNumeral`, never a second spelling.
  * `harmonyLaneModel.test.ts` pins the fixtures the ticket names.
+ *
+ * Bars and beats are the song's meter (windsor#430 decision 3): a bar is
+ * the sum of `meterBeats(meter)` and a beat is one of its counted beats, so
+ * 6/8 counts dotted quarters and 7/8 counts 2 + 2 + 3. Each function takes
+ * the meter's beats and defaults to 4/4's.
  */
 import type { ChordSize, Harmony, HarmonyEvent, NamedQuality } from '@windsor/engine';
 import {
@@ -17,37 +22,98 @@ import {
   CHORD_SIZE_TRIAD,
   PPQ,
   QUALITY_INTERVALS,
-  TICKS_PER_BAR,
   chordName,
   diatonicChords,
   eventChord,
   foldDegree,
+  meterBeats,
   pitchClassName,
   romanNumeral,
   scaleOffsets,
 } from '@windsor/engine';
 
-/** A duration as the card reads it: whole bars and the beats left over. */
-export function barsBeats(ticks: number): { bars: number; beats: number } {
-  const bars = Math.floor(ticks / TICKS_PER_BAR);
-  return { bars, beats: Math.floor((ticks - bars * TICKS_PER_BAR) / PPQ) };
+/** A meter's counted beats in ticks, in bar order (`meterBeats`). */
+export type Beats = readonly number[];
+
+const barOf = (beats: Beats): number => beats.reduce((sum, beat) => sum + beat, 0);
+
+/** Which beat point a snap takes: the one at or below, the one at or above, or the nearest (a tie goes up). */
+export type BeatSnap = 'floor' | 'ceil' | 'round';
+
+/**
+ * `ticks` on the beat grid: whole bars plus the beats counted from a bar's
+ * start — every 24 ticks in 4/4, every 36 in 6/8, and 24, 48 and 84 in 7/8.
+ */
+export function snapToBeats(
+  ticks: number,
+  beats: Beats = meterBeats(),
+  mode: BeatSnap = 'round',
+): number {
+  const bar = barOf(beats);
+  if (!(bar > 0)) return ticks;
+  const whole = Math.floor(ticks / bar) * bar;
+  const rest = ticks - whole;
+  let lo = 0;
+  for (const beat of beats) {
+    const hi = lo + beat;
+    if (rest < hi) {
+      if (mode === 'floor' || rest === lo) return whole + lo;
+      if (mode === 'ceil') return whole + hi;
+      return whole + (rest - lo < hi - rest ? lo : hi);
+    }
+    lo = hi;
+  }
+  return whole + bar;
 }
 
-export const toTicks = (bars: number, beats: number): number =>
-  Math.max(0, Math.trunc(bars)) * TICKS_PER_BAR + Math.max(0, Math.trunc(beats)) * PPQ;
+/**
+ * The Duration dial's value with Shift: `next` on the beat grid, moved off
+ * `current` toward where the dial turned, so a 7/8 dial steps 24 · 48 · 84 ·
+ * 108 and never rounds back to where it stood. In 4/4 and 6/8 the dial's
+ * own step already lands on a beat.
+ */
+export function dialBeat(next: number, current: number, beats: Beats = meterBeats()): number {
+  if (next === current) return current;
+  return snapToBeats(next, beats, next > current ? 'ceil' : 'floor');
+}
+
+/** A duration as the card reads it: whole bars and the counted beats left over. */
+export function barsBeats(
+  ticks: number,
+  beats: Beats = meterBeats(),
+): { bars: number; beats: number } {
+  const bar = barOf(beats);
+  const bars = Math.floor(ticks / bar);
+  let rest = ticks - bars * bar;
+  let counted = 0;
+  for (const beat of beats) {
+    if (rest < beat) break;
+    rest -= beat;
+    counted++;
+  }
+  return { bars, beats: counted };
+}
+
+/** `bars` bars and `count` counted beats, in ticks. */
+export function toTicks(bars: number, count: number, beats: Beats = meterBeats()): number {
+  const bar = barOf(beats);
+  const n = Math.max(0, Math.trunc(count));
+  const into = beats.slice(0, n % beats.length).reduce((sum, beat) => sum + beat, 0);
+  return (Math.max(0, Math.trunc(bars)) + Math.floor(n / beats.length)) * bar + into;
+}
 
 /** `2 bars · 1 beat`, `1 bar`, `3 beats` — the Duration dial's readout. */
-export function durationLabel(ticks: number): string {
-  const { bars, beats } = barsBeats(ticks);
+export function durationLabel(ticks: number, beats: Beats = meterBeats()): string {
+  const { bars, beats: counted } = barsBeats(ticks, beats);
   const parts: string[] = [];
   if (bars > 0) parts.push(`${bars} bar${bars === 1 ? '' : 's'}`);
-  if (beats > 0 || bars === 0) parts.push(`${beats} beat${beats === 1 ? '' : 's'}`);
+  if (counted > 0 || bars === 0) parts.push(`${counted} beat${counted === 1 ? '' : 's'}`);
   return parts.join(' · ');
 }
 
 /** The one-based bar an event starts on: the pane's "Harmony — bar 3". */
-export const eventBar = (event: HarmonyEvent): number =>
-  Math.floor(event.start / TICKS_PER_BAR) + 1;
+export const eventBar = (event: HarmonyEvent, beats: Beats = meterBeats()): number =>
+  Math.floor(event.start / barOf(beats)) + 1;
 
 /** Starts relaid from tick 0 out of the durations; the last event runs to the song end; events past it are dropped. */
 export function relay(events: readonly HarmonyEvent[], songTicks: number): HarmonyEvent[] {
@@ -203,14 +269,18 @@ export function removeEvent(
 /**
  * The `+` tile: a new event of the last one's chord, a bar long, taken from
  * the end of the last event when it has more than a bar — else half of it,
- * rounded down to a beat; nothing when a beat cannot be spared.
+ * rounded down to a counted beat; nothing when a beat cannot be spared.
  */
-export function appendEvent(events: readonly HarmonyEvent[], songTicks: number): HarmonyEvent[] {
+export function appendEvent(
+  events: readonly HarmonyEvent[],
+  songTicks: number,
+  beats: Beats = meterBeats(),
+): HarmonyEvent[] {
   const last = events[events.length - 1];
   if (!last) return relay([{ start: 0, duration: songTicks, degree: 0, size: 3 }], songTicks);
-  const taken =
-    last.duration > TICKS_PER_BAR ? TICKS_PER_BAR : Math.floor(last.duration / 2 / PPQ) * PPQ;
-  if (taken < PPQ) return [...events];
+  const bar = barOf(beats);
+  const taken = last.duration > bar ? bar : snapToBeats(last.duration / 2, beats, 'floor');
+  if (taken <= 0) return [...events];
   return relay(
     [
       ...events.slice(0, -1),

@@ -28,7 +28,7 @@
  * every row's ring on its own step.
  */
 import type { EuclideanSpec, RegionStep } from '@windsor/engine';
-import { PPQ, TICKS_PER_BAR } from '@windsor/engine';
+import { PPQ, ticksPerBar } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { type EuclidCard, setView, viewOf, writeRows } from './euclidCardState';
@@ -100,6 +100,9 @@ function rowsKeyOf(live: Live, spec: EuclideanSpec, figure: Figure, pass: number
   return JSON.stringify([shown, spec.pattern != null, figureKey(figure), view, pass]);
 }
 
+/** One bar of the song's meter, in ticks (windsor#430): the bar the scheduler counts and Euclid re-cuts on. */
+const songBarTicks = (ctx: AppCtx): number => ticksPerBar(ctx.model.doc.transport.meter);
+
 function paintAll(live: Live, spec: EuclideanSpec, figure: Figure, pass: number): void {
   const { card, pattern } = live;
   const view = viewOf(card.slot).lanes;
@@ -109,7 +112,8 @@ function paintAll(live: Live, spec: EuclideanSpec, figure: Figure, pass: number)
   fillPicker(pattern.picker, laneChoices(spec));
   const lanes = lanesOf(spec);
   const lengths = lanes.map((ref) => laneLength(spec, ref));
-  pattern.cycle.textContent = cycleText(fullCycle(spec.steps, lengths, spec.divisor));
+  const cycle = fullCycle(spec.steps, lengths, spec.divisor, songBarTicks(card.ctx));
+  pattern.cycle.textContent = cycleText(cycle);
   pattern.count.textContent = `${lanes.length} of ${EUCLID_LANES_MAX} lanes`;
   pattern.captureButton.textContent = spec.pattern ? 'Release' : 'Capture';
 }
@@ -147,7 +151,7 @@ function lightRows(live: Live): void {
 function followBars(live: Live): void {
   const { ctx } = live.card;
   const system = ctx.host.system;
-  live.bars.follow(system && ctx.transport.running ? system.scheduler : null);
+  live.bars.follow(system && ctx.transport.running ? system.scheduler : null, songBarTicks(ctx));
 }
 
 /**
@@ -162,7 +166,7 @@ function transportSeconds(live: Live): number {
   const system = ctx.host.system;
   if (!system) return 0;
   const at = { tick: ctx.transport.position(), now: system.engine.context.currentTime };
-  return plotSeconds(live.bars.log, system.scheduler.transport, at);
+  return plotSeconds(live.bars.log, system.scheduler.transport, at, songBarTicks(ctx));
 }
 
 /** The tab row's note and, on the Density page, the plot of `k`. */
@@ -172,11 +176,12 @@ function paintDensity(live: Live, spec: EuclideanSpec, figure: Figure): void {
   if (live.note.textContent !== note) live.note.textContent = note;
   if (viewOf(live.card.slot).page !== 'density') return;
   const { ctx, at } = live.card;
-  const songBar = ctx.transport.running ? Math.floor(ctx.transport.position() / TICKS_PER_BAR) : 0;
-  const bar = plotBar(at, spec.divisor, songBar);
+  const barTicks = songBarTicks(ctx);
+  const songBar = ctx.transport.running ? Math.floor(ctx.transport.position() / barTicks) : 0;
+  const bar = plotBar(at, spec.divisor, songBar, barTicks);
   const bpm = ctx.model.doc.transport.bpm;
   const seconds = transportSeconds(live);
-  const clock = { bar, seconds, secondsPerBar: (SECONDS_PER_MINUTE / bpm) * (TICKS_PER_BAR / PPQ) };
+  const clock = { bar, seconds, secondsPerBar: (SECONDS_PER_MINUTE / bpm) * (barTicks / PPQ) };
   const shown = spec.density.kind === 'lfoHz' ? seconds.toFixed(EUCLID_PLOT_SECONDS_DIGITS) : bar;
   const key = JSON.stringify([spec.pulses, spec.density, spec.steps, k, shown, bpm]);
   if (key === live.plotKey) return;

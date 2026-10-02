@@ -41,6 +41,7 @@ import {
 } from './songShapeModel';
 import { shapePlacer } from './songShapePlacer';
 import { shapePopover } from './songShapePopover';
+import { type ShapeRate, shapeRates } from './songShapeTables';
 import type { SongView, SongViewState } from './songTab';
 import { SONG_VIEW, tickToPx } from './songViewTables';
 
@@ -88,23 +89,33 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 const laneFrame = (view: SongView): LaneFrame => ({
   pxPerBar: view.state.pxPerBar,
+  ticksPerBar: view.ticksPerBar(),
   heightPx: SONG_VIEW.automationLanePx,
   songTicks: view.songTicks(),
 });
+
+/** The Rate stops in the lane's song's meter. */
+const ratesOf = (lane: ShapeLane): readonly ShapeRate[] => shapeRates(lane.view.ticksPerBar());
 
 /** Outline `range` on the lane, with `preview` dashed over its curve when given. */
 function decorate(lane: ShapeLane, range: ShapeRange, preview?: readonly AutomationPoint[]): void {
   undecorate(lane);
   const px = lane.view.state.pxPerBar;
+  const bar = lane.view.ticksPerBar();
   const box = document.createElement('div');
   box.className = 'auto-range';
-  box.style.left = `${tickToPx(range.startTick, px)}px`;
-  box.style.width = `${tickToPx(range.endTick - range.startTick, px)}px`;
+  box.style.left = `${tickToPx(range.startTick, px, bar)}px`;
+  box.style.width = `${tickToPx(range.endTick - range.startTick, px, bar)}px`;
   lane.timeline.appendChild(box);
   if (!preview) return;
-  const widthPx = tickToPx(lane.view.songTicks(), px);
+  const widthPx = tickToPx(lane.view.songTicks(), px, bar);
   const heightPx = SONG_VIEW.automationLanePx;
-  const shape = curveShape(lane.row, preview, { widthPx, heightPx, pxPerBar: px });
+  const shape = curveShape(lane.row, preview, {
+    widthPx,
+    heightPx,
+    pxPerBar: px,
+    ticksPerBar: bar,
+  });
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'auto-preview');
   svg.setAttribute('aria-hidden', 'true');
@@ -139,7 +150,9 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
     const box = lane.timeline.getBoundingClientRect();
     const view = scroll.getBoundingClientRect();
     const at = popoverPlacement({
-      anchorX: box.left + tickToPx(selection.range.startTick, lane.view.state.pxPerBar),
+      anchorX:
+        box.left +
+        tickToPx(selection.range.startTick, lane.view.state.pxPerBar, lane.view.ticksPerBar()),
       laneTop: box.top,
       laneBottom: box.bottom,
       viewLeft: Math.max(0, view.left),
@@ -167,8 +180,8 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
     const { range, draft } = selection;
     const stamp = stampedPoints(lane.row, range, draft);
     decorate(lane, range, shapedPoints(lane.points(), range, stamp));
-    const readout = shapeReadout(range, draft, stamp.length);
-    popover.show(draft, { name: lane.name, row: lane.row, readout });
+    const readout = shapeReadout(range, draft, stamp.length, lane.view.ticksPerBar());
+    popover.show(draft, { name: lane.name, row: lane.row, readout, rates: ratesOf(lane) });
     place();
   };
 
@@ -224,7 +237,7 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
     selection = {
       key: lane.key,
       range,
-      draft: shapeDraft(lane.row, lane.points(), range, state.shape),
+      draft: shapeDraft(lane.row, lane.points(), range, state.shape, ratesOf(lane)),
     };
     host.appendChild(popover.element);
     listen(true);
@@ -296,7 +309,7 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
     timeline.addEventListener('pointerup', (e) => {
       if (!drag || drag.lane !== lane || e.pointerId !== drag.pointerId) return;
       const ended = endDrag();
-      if (ended) open(lane, shapeRange(ended, lane.view.songTicks()));
+      if (ended) open(lane, shapeRange(ended, lane.view.songTicks(), lane.view.ticksPerBar()));
     });
     for (const type of ['pointercancel', 'lostpointercapture'] as const) {
       timeline.addEventListener(type, (e) => {

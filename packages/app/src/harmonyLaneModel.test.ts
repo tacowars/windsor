@@ -16,13 +16,16 @@ import {
   PPQ,
   TICKS_PER_BAR,
   chordAt,
+  meterBeats,
 } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
 import { DocumentModel } from './documentModel';
 import {
   appendEvent,
+  barsBeats,
   chipDegree,
   degreeChips,
+  dialBeat,
   durationLabel,
   eventBar,
   eventLabel,
@@ -34,6 +37,8 @@ import {
   setEventDuration,
   setQuality,
   setSize,
+  snapToBeats,
+  toTicks,
 } from './harmonyLaneModel';
 
 const BAR = TICKS_PER_BAR;
@@ -314,6 +319,41 @@ describe('labels', () => {
     expect(durationLabel(2 * BAR + PPQ)).toBe('2 bars · 1 beat');
     expect(durationLabel(BAR)).toBe('1 bar');
     expect(durationLabel(3 * PPQ)).toBe('3 beats');
+  });
+});
+
+describe("the song's beats (windsor#430 decision 3)", () => {
+  const SEVEN = meterBeats('7/8');
+  const SIX = meterBeats('6/8');
+
+  it('snaps 7/8 on 24 · 48 · 84 and 6/8 on dotted quarters', () => {
+    expect([30, 40, 60, 70, 90].map((t) => snapToBeats(t, SEVEN))).toEqual([24, 48, 48, 84, 84]);
+    expect(snapToBeats(60, SEVEN, 'ceil')).toBe(84);
+    expect(snapToBeats(110, SEVEN, 'floor')).toBe(108);
+    expect(snapToBeats(50, SIX)).toBe(36);
+    // The Duration dial with Shift steps off where it stands, onto the next beat each way.
+    expect([dialBeat(72, 84, SEVEN), dialBeat(96, 84, SEVEN), dialBeat(72, 48, SEVEN)]).toEqual([
+      48, 108, 84,
+    ]);
+  });
+
+  it('reads and writes bars and counted beats, and appends a bar or a beat-snapped half', () => {
+    expect(barsBeats(84 + 48, SEVEN)).toEqual({ bars: 1, beats: 2 });
+    expect(toTicks(1, 2, SEVEN)).toBe(84 + 48);
+    expect(durationLabel(84 + 24, SEVEN)).toBe('1 bar · 1 beat');
+    expect(durationLabel(36, SIX)).toBe('1 beat');
+    expect(eventBar(ev(168, 84, 0), SEVEN)).toBe(3);
+    const song = 4 * 84;
+    expect(spans(appendEvent([ev(0, song, 0)], song, SEVEN))).toEqual([
+      [0, 3 * 84],
+      [3 * 84, 84],
+    ]);
+    // A last event of one bar gives half of it, down to a beat: 42 → 24.
+    const short = [ev(0, 3 * 84, 0), ev(3 * 84, 84, 4)];
+    expect(spans(appendEvent(short, song, SEVEN)).slice(-2)).toEqual([
+      [3 * 84, 60],
+      [3 * 84 + 60, 24],
+    ]);
   });
 });
 

@@ -77,15 +77,18 @@ export interface SnapChoice {
 const SIXTEENTH_TICKS = PPQ / 4;
 const THIRTY_SECOND_TICKS = PPQ / 8;
 
-/** The Snap select (decision 1), coarse to fine. */
-export const SNAP_CHOICES: readonly SnapChoice[] = [
-  { label: 'Bar', ticks: TICKS_PER_BAR },
+/** The Snap select (decision 1), coarse to fine: Bar is the song's `bar` (`ticksPerBar(meter)`, windsor#430). */
+export const snapChoices = (bar: number = TICKS_PER_BAR): readonly SnapChoice[] => [
+  { label: 'Bar', ticks: bar },
   { label: '1/4', ticks: PPQ },
   { label: '1/8', ticks: PPQ / 2 },
   { label: '1/16', ticks: SIXTEENTH_TICKS },
   { label: '1/32', ticks: THIRTY_SECOND_TICKS },
   { label: 'Off', ticks: 0 },
 ];
+
+/** The Snap choices in 4/4. */
+export const SNAP_CHOICES: readonly SnapChoice[] = snapChoices();
 
 /** Where the session starts: the Edit tool, on 1/16. */
 export const DEFAULT_AUTOMATION_TOOL: AutomationTool = 'edit';

@@ -122,9 +122,10 @@ export function shapeDraft(
   points: readonly AutomationPoint[],
   range: ShapeRange,
   settings: ShapeSettings,
+  rates: readonly ShapeRate[] = SHAPE_RATES,
 ): AutomationShapeSpec {
   const top = points.length > 0 ? toDisplay(row, valueAt(row, points, range.startTick)) : 1;
-  return clampDraft({ ...settings, top, bottom: 0 });
+  return clampDraft({ ...settings, top, bottom: 0 }, SHAPE_LIMITS, rates);
 }
 
 /** What the session keeps of a draft: everything but Top and Bottom, which belong to the lane. */
