@@ -264,9 +264,16 @@ function groupOf(i, divisor) {
   return '';
 }
 
+/**
+ * A new part starts one bar long at its default step (1/16), which divides
+ * every meter's bar (epic decision 5). Changing Step afterwards keeps the
+ * step count, because a step is a note value, so any other Step shows that
+ * count running as a polymeter. No count is rounded.
+ */
+const DEFAULT_STEP = SIXTEENTH;
 function stepCount() {
   if (state.pattern === '16') return 16;
-  return Math.max(1, Math.round(barTicks() / state.divisor));
+  return barTicks() / DEFAULT_STEP;
 }
 
 function seg(id, items, key) {
@@ -349,7 +356,7 @@ function renderCard() {
       <span class="panel-label" style="grid-column:1/-1">Play</span>
       <div class="step-pick"><span class="panel-label">Step</span><select class="field" id="divisor" aria-label="Step">${options}</select></div>
       <div class="knobs">${knob(2, 'Octave')}${knob('0.80', 'Vel', true)}${knob('0.00', 'Skip')}${knob(n, 'Length', true, true)}${knob('0.20', 'Acc vel')}${knob(0, 'Rotate')}</div>
-      <div class="standin">Knobs drawn as stand-ins and unchanged. Length shows the new part's steps (one bar in the song's meter, an epic decision).</div>
+      <div class="standin">Knobs drawn as stand-ins and unchanged. Length shows the part's steps. A new part starts one bar long at 1/16, which divides every meter's bar; changing Step keeps the count (steps are note values), so another Step runs as a polymeter.</div>
     </div>
     <div class="steps ${state.barLine !== 'today' ? 'heavy' : ''}">
       <div class="steps-head"><span class="panel-label">Steps</span><b>${n}</b><span class="meas">${n} × ${divisorLabel(state.divisor)} = ${n * state.divisor} ticks · bar ${barTicks()}${n * state.divisor !== barTicks() ? ' · runs as a polymeter' : ''}</span></div>
@@ -392,7 +399,7 @@ function paintPlayhead() {
 function render() {
   state.divisor = Number(state.divisor);
   seg('tb-meter', METERS.map((m) => [m.id, m.id]), 'meter');
-  seg('tb-pattern', [['bar', 'New · one bar'], ['16', 'Kept · 16 steps']], 'pattern');
+  seg('tb-pattern', [['bar', 'New · one bar at 1/16'], ['16', 'Kept · 16 steps']], 'pattern');
   seg('tb-bar', [['today', 'As today'], ['strip', 'Strip gap'], ['heavier', 'Strip + ruler']], 'barLine');
   renderHeader(); renderSong(); renderCard(); renderCount(); paintPlayhead();
 }
