@@ -76,14 +76,15 @@ Version 2 is additive: `patches` and `songs` are untouched.
 | Store | Key | Value |
 |---|---|---|
 | `songDocs` | song id | the song's export text, exactly what Export writes, `meta` included |
-| `songIndex` | song id | `{ id, name, tags, created, updated, bpm, bars, key }`, a cache for the list |
+| `songIndex` | song id | `{ id, version, name, tags, created, updated, bpm, bars, key }`, a cache for the list |
 
 - **Why two stores.** The list reads only the small index records, so it
   never loads every song's patch snapshots to draw a table.
 - **One transaction.** A save writes both records in a single transaction,
   so an index entry never points at a missing document.
-- **The index is derived.** One pure function reads `name`, `tags`, `bpm`,
-  `bars` and `key` from the document text at each write. Only `id`,
+- **The index is derived.** One pure function reads the document's
+  declared `version`, plus `name`, `tags`, `bpm`, `bars` and `key`, from the
+  document text at each write. Only `id`,
   `created` and `updated` are the store's own. A missing index record is
   re-derived from its document, and an index record without a document is
   dropped.
@@ -97,7 +98,9 @@ Version 2 is additive: `patches` and `songs` are untouched.
 - **Refuse, never destroy**
   (`2026-09-28-format-versions-refuse-never-destroy.md`). A stored song in a
   format this build cannot read stays in the list, marked as unopenable,
-  and still offers Export .json and Delete. Opening it is refused with
+  and still offers Export .json and Delete. The list judges this from the
+  index's `version` alone, so a format bump marks old songs unopenable
+  without reading every document. Opening it is refused with
   Import's words, and nothing in it is rewritten.
 - **A repaired open is not written back** (`userSessionAutosave.ts`).
   Opening a named song that the normaliser corrected, left dangling or
@@ -106,6 +109,11 @@ Version 2 is additive: `patches` and `songs` are untouched.
 - **Autosave goes to the song it read.** Switching songs flushes the
   pending autosave into the song being left before the next one opens. A
   write never lands in the wrong record.
+- **A failed flush stops the switch.** Decision 11's "no question" holds
+  only while the song being left is saved. When that flush fails (quota,
+  for example), the switch is abandoned and reported, and the song being
+  left stays open with its edits. The autosave reports the failure to its
+  caller rather than only to the status line.
 - **No IndexedDB.** In a browser without it, the Songs section says the
   library is unavailable here, and Document works as before.
 
