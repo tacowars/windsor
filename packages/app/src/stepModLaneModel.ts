@@ -8,20 +8,22 @@
  * value is the engine's own curve (`stepModValue`), so the console and the
  * voice cannot disagree. `stepModLane.ts` draws it; any step card may.
  */
-import type { StepModLane, VoiceTargetPath, VoiceTargetRow } from '@windsor/engine';
+import type {
+  AutomationTargetRow,
+  StepModLane,
+  VoiceTargetPath,
+  VoiceTargetRow,
+} from '@windsor/engine';
 import {
   STEP_MOD_LANES_MAX,
   VOICE_TARGET_PATHS,
   VOICE_TARGET_TABLE,
+  catalogRow,
   stepModValue,
 } from '@windsor/engine';
+import { readout } from './automationReadout';
 import { fmtSigned } from './consoleFormat';
-import {
-  LANE_OCTAVE_DIGITS,
-  LANE_PAINT,
-  STEP_MOD_LANE_LABELS,
-  type LanePaintTable,
-} from './stepModLaneTables';
+import { LANE_OCTAVE_DIGITS, LANE_PAINT, type LanePaintTable } from './stepModLaneTables';
 
 /** The targets not yet on a lane, in the engine's code order: what the picker offers. */
 export function freeParams(lanes: readonly StepModLane[]): VoiceTargetPath[] {
@@ -256,10 +258,15 @@ const HOLD_NOTE: Record<StepSlide['when'], string> = {
 /** What a readout adds on a row that plays only if a drawn slide moves pitch. */
 const MOVES_NOTE = 'plays if the slide moves pitch';
 
+/** The automation catalog's row for `param`: its one name, scale and unit (windsor#424). */
+const catalogRowOf = (param: VoiceTargetPath): AutomationTargetRow | undefined =>
+  catalogRow(`voice.${param}`);
+
 /**
  * What a cell's readout says: the offset, and what the step plays through
- * the engine's curve when the patch's own value is known; or, when a slide
- * holds the row or may, that instead.
+ * the engine's curve when the patch's own value is known, read as a song
+ * lane reads it (`readout`); or, when a slide holds the row or may, that
+ * instead.
  */
 export function laneReadout(
   param: VoiceTargetPath,
@@ -272,9 +279,10 @@ export function laneReadout(
   const offset = offsetLabel(row, value);
   if (playsIfMoves(slide, param)) return `${offset} · ${MOVES_NOTE}`;
   if (heldBySlide(slide, param) !== 'plays') return `${offset} · ${HOLD_NOTE[slide.when]}`;
-  if (base === undefined) return offset;
-  return `${offset} → ${STEP_MOD_LANE_LABELS[param].fmt(stepModValue(row, base, value))}`;
+  const look = catalogRowOf(param);
+  if (base === undefined || !look) return offset;
+  return `${offset} → ${readout(look, stepModValue(row, base, value))}`;
 }
 
-/** The name a lane and the picker show. */
-export const laneLabel = (param: VoiceTargetPath): string => STEP_MOD_LANE_LABELS[param].label;
+/** The name a lane and the picker show: the catalog's, as a song lane's. */
+export const laneLabel = (param: VoiceTargetPath): string => catalogRowOf(param)?.label ?? param;

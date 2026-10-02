@@ -26,6 +26,7 @@ import type {
   DocumentPart,
 } from '@windsor/engine';
 import { valueAt } from '@windsor/engine';
+import { readout } from './automationReadout';
 import { el } from './dom';
 import { withGesture } from './gestureHooks';
 import { curveShape } from './songAutomationCurve';
@@ -40,7 +41,6 @@ import {
   lanesOf,
   newLane,
   pickerGroups,
-  readout,
   toggledLane,
   voiceCountLabel,
   withLane,
