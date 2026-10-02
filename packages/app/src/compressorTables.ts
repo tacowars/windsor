@@ -73,3 +73,9 @@ export const COMPRESSOR_SELECTS = [
     format: (v: number): string => (v === 0 ? 'Auto' : `${v} s`),
   },
 ] as const;
+
+/**
+ * The gain-reduction readout shows the mean of each window this long, so it
+ * changes about twice a second and can be read; the bar stays live.
+ */
+export const COMPRESSOR_READOUT_WINDOW_MS = 500;
