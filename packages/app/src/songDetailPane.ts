@@ -4,11 +4,11 @@
  * close ×. A selected part shows its card from `SEQUENCER_CARDS` as a
  * sequencer device (`sequencerDevice.ts`, windsor#368): the shared rail holds
  * the region as `n/m` with Split and Delete for the selected region, and the
- * pane has no region row. A kind whose card has no register knob yet
- * (`PANE_OCTAVE_KINDS`) gets the Octave knob above the device. A selected
- * chord shows `harmonyCard.ts`. One selection at a time.
+ * pane has no region row, and every device that has an Octave draws its own
+ * (the Chord's beside Vel and Gate). A selected chord shows `harmonyCard.ts`.
+ * One selection at a time.
  *
- * The card and the Octave knob edit the selected region's pattern
+ * The card edits the selected region's pattern
  * (windsor#75): a part selected without a region edits its first, and a
  * part with no regions shows a hint in place of the card.
  *
@@ -19,14 +19,10 @@
  */
 import type { MusicPart, PartRegion } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
-import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { harmonyCard } from './harmonyCard';
 import { insertPanel } from './songInsertPanel';
 import { foldButton } from './songPaneFold';
-import { octaveKnob } from './harmonyTables';
-import { makeKnob } from './knob';
-import { changePattern, patternOf } from './partEdits';
 import { SEQUENCER_CARDS } from './sequencerCards';
 import { sequencerDevice } from './sequencerDevice';
 import {
@@ -39,7 +35,6 @@ import type { RailRegion } from './sequencerRail';
 import type { SongView } from './songTab';
 import type { PaneHeadText } from './songPaneHead';
 import { editTarget, paneHeadText, partHeadText } from './songPaneHead';
-import { PANE_OCTAVE_KINDS } from './songViewTables';
 
 /** What `paintDetailPane` drew: its staleness check and its header's in-place refresh. */
 export interface DetailPane {
@@ -76,31 +71,6 @@ function head(
     if (note.textContent !== next.note) note.textContent = next.note;
   };
   return { row, write };
-}
-
-/** The Octave knob for a card without one: the edited pattern's absolute register (epic #703 decision 11). */
-function paneOctaveKnob(view: SongView, part: MusicPart, edited: number | undefined): HTMLElement {
-  const { ctx } = view;
-  const { slot } = part;
-  const octave = (): number => {
-    const sequencer = patternOf(ctx.model.doc, slot, edited);
-    return sequencer && 'register' in sequencer ? sequencer.register.octave : 0;
-  };
-  return makeKnob({
-    ...octaveKnob(part.sequencer.kind),
-    color: PITCH_COLOR,
-    get: octave,
-    set: (v) => {
-      if (changePattern(ctx, slot, edited, { register: { octave: v } })) ctx.invalidate();
-    },
-  });
-}
-
-/** The Octave knob above a card not yet converted that draws none (the Chord's, until windsor#369). */
-function octaveRow(view: SongView, part: MusicPart, edited: number | undefined): HTMLElement {
-  const row = el('div', 'bar-row pane-row');
-  row.appendChild(paneOctaveKnob(view, part, edited));
-  return row;
 }
 
 /**
@@ -155,9 +125,6 @@ function paintPart(
   );
   pane.appendChild(header.row);
   if (view.state.sequencerOpen) {
-    if (PANE_OCTAVE_KINDS.includes(kind) && edited !== null) {
-      pane.appendChild(octaveRow(view, part, edited));
-    }
     pane.appendChild(
       edited === null
         ? el(
