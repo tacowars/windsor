@@ -34,7 +34,7 @@
  * and Euclidean (#610) cards.
  */
 import type { ChordSpec, ChordStep, HarmonyChord } from '@windsor/engine';
-import { CHORD_DIVISORS } from '@windsor/engine';
+import { CHORD_DIVISORS, ticksPerBar } from '@windsor/engine';
 import { CHORD_AUDITION_VELOCITY } from './chordConstants';
 import { chordStepsLabel } from './chordDeviceModel';
 import { chordPicker, type Picker } from './chordPicker';
@@ -180,7 +180,8 @@ function repaint(strip: ChordStrip): void {
     ...appendColumn(strip, spec),
   ]);
   const spec = strip.spec();
-  strip.length.textContent = spec ? chordStepsLabel(spec) : '';
+  const bar = ticksPerBar(strip.ctx.model.doc.transport.meter);
+  strip.length.textContent = spec ? chordStepsLabel(spec, bar) : '';
   strip.picker?.repaint();
 }
 

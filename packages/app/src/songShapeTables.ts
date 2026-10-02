@@ -44,17 +44,23 @@ export interface ShapeRate {
   readonly ticks: number;
 }
 
-/** The Rate slider's stops (decision 3), fast to slow. */
-export const SHAPE_RATES: readonly ShapeRate[] = [
+/**
+ * The Rate slider's stops (decision 3), fast to slow: note values, then
+ * bars of the song's `bar` (`ticksPerBar(meter)`, windsor#430).
+ */
+export const shapeRates = (bar: number = TICKS_PER_BAR): readonly ShapeRate[] => [
   { label: '1/32', ticks: PPQ / 8 },
   { label: '1/16', ticks: PPQ / 4 },
   { label: '1/8', ticks: PPQ / 2 },
   { label: '1/4', ticks: PPQ },
   { label: '1/2', ticks: PPQ * 2 },
-  { label: '1 bar', ticks: TICKS_PER_BAR },
-  { label: '2 bars', ticks: TICKS_PER_BAR * 2 },
-  { label: '4 bars', ticks: TICKS_PER_BAR * 4 },
+  { label: '1 bar', ticks: bar },
+  { label: '2 bars', ticks: bar * 2 },
+  { label: '4 bars', ticks: bar * 4 },
 ];
+
+/** The Rate stops in 4/4. */
+export const SHAPE_RATES: readonly ShapeRate[] = shapeRates();
 
 /** The sliders' ranges and steps (decision 3). */
 export interface ShapeLimits {

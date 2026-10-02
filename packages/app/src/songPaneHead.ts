@@ -6,7 +6,7 @@
  * after a card's edit, never rebuilding the card under the pointer.
  */
 import type { ArrangementDocument, MusicPart } from '@windsor/engine';
-import { partAt, regionPattern } from '@windsor/engine';
+import { meterBeats, partAt, regionPattern } from '@windsor/engine';
 import { eventBar } from './harmonyLaneModel';
 import { editedRegion, keepsRegionPatterns } from './partEdits';
 import { KIND_LABELS } from './sequencerConstants';
@@ -50,5 +50,6 @@ export function paneHeadText(
   }
   const event = doc.harmony.events[selection.index];
   if (!event) return null;
-  return { title: `Harmony — bar ${eventBar(event)}`, note: `chord ${selection.index + 1}` };
+  const bar = eventBar(event, meterBeats(doc.transport.meter));
+  return { title: `Harmony — bar ${bar}`, note: `chord ${selection.index + 1}` };
 }

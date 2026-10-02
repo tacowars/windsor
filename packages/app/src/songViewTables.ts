@@ -20,7 +20,7 @@ import { DIVISOR_OPTIONS } from './sequencerConstants';
 import { ARP_STYLE_LABELS } from './sequencerKnobTables';
 
 export interface SongViewScale {
-  /** Px one bar of `TICKS_PER_BAR` ticks spans on the ruler and in every lane, before any zoom. */
+  /** Px one bar spans on the ruler and in every lane, before any zoom: the song's bar, whatever its meter. */
   readonly pxPerBar: number;
   /** The zoom's absolute floor, under the fit (windsor#21): below it a long song in a narrow window scrolls. */
   readonly minPxPerBar: number;
@@ -148,12 +148,17 @@ export const LOOP_BRACE: LoopBraceTable = {
   handleFraction: 0.25,
 };
 
-/** Px from the song start for a tick — the playhead line's, a block's left edge. */
-export const tickToPx = (tick: number, pxPerBar: number): number =>
-  (tick / TICKS_PER_BAR) * pxPerBar;
+/**
+ * Px from the song start for a tick — the playhead line's, a block's left
+ * edge — where a bar of `bar` ticks (the song's, `ticksPerBar(meter)`,
+ * windsor#430) spans `pxPerBar`.
+ */
+export const tickToPx = (tick: number, pxPerBar: number, bar: number = TICKS_PER_BAR): number =>
+  (tick / bar) * pxPerBar;
 
 /** The tick under a px offset from the song start (unsnapped; `regionModel.ts` snaps). */
-export const pxToTick = (px: number, pxPerBar: number): number => (px / pxPerBar) * TICKS_PER_BAR;
+export const pxToTick = (px: number, pxPerBar: number, bar: number = TICKS_PER_BAR): number =>
+  (px / pxPerBar) * bar;
 
 /** The ruler's bar labels: `1..bars`. */
 export const rulerLabels = (bars: number): string[] =>
@@ -186,10 +191,15 @@ export interface BlockBox {
  * (windsor#8: at the widest zoom-out a one-beat block would otherwise be
  * 0 px wide and unselectable).
  */
-export function blockBox(startTick: number, durationTicks: number, pxPerBar: number): BlockBox {
+export function blockBox(
+  startTick: number,
+  durationTicks: number,
+  pxPerBar: number,
+  bar: number = TICKS_PER_BAR,
+): BlockBox {
   return {
-    leftPx: tickToPx(startTick, pxPerBar),
-    widthPx: Math.max(MIN_BLOCK_PX, tickToPx(durationTicks, pxPerBar) - BLOCK_GAP_PX),
+    leftPx: tickToPx(startTick, pxPerBar, bar),
+    widthPx: Math.max(MIN_BLOCK_PX, tickToPx(durationTicks, pxPerBar, bar) - BLOCK_GAP_PX),
   };
 }
 
@@ -212,8 +222,9 @@ export function boxTick(
   px: number,
   span: { readonly startTick: number; readonly durationTicks: number },
   pxPerBar: number,
+  bar: number = TICKS_PER_BAR,
 ): number {
-  const spanPx = tickToPx(span.durationTicks, pxPerBar);
+  const spanPx = tickToPx(span.durationTicks, pxPerBar, bar);
   const share = Math.min(1, Math.max(0, (px - box.leftPx) / Math.max(box.widthPx, spanPx)));
   return span.startTick + share * span.durationTicks;
 }

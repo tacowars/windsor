@@ -8,12 +8,15 @@
  * A drag in empty strip space draws a new range over every bar it touches;
  * a handle moves its end and the body the whole range, each by the
  * pointer's travel from the press, so a press a few px off an edge never
- * jumps it. Every edit snaps to bars, or to beats with Shift (the region
- * drags' modifier), and every result is a range the engine keeps as it is
- * (`fitLoopRange`): on the beat grid, inside the song, at least a beat long.
+ * jumps it. Every edit snaps to bars, or to the loop's grid with Shift (the
+ * region drags' modifier), and every result is a range the engine keeps as
+ * it is (`fitLoopRange`): on the grid, inside the song, at least a grid step
+ * long. Both grains are the song's meter's (windsor#430): its bar,
+ * `ticksPerBar(meter)`, and its loop grid, `loopGridTicks(meter)` — the
+ * quarter in 3/4, 4/4 and 5/4, the 8th in 6/8, 7/8 and 12/8.
  */
-import type { DocumentPartial, SongLoop } from '@windsor/engine';
-import { LOOP_GRID_TICKS, TICKS_PER_BAR } from '@windsor/engine';
+import type { DocumentPartial, Meter, SongLoop } from '@windsor/engine';
+import { LOOP_GRID_TICKS, TICKS_PER_BAR, loopGridTicks, ticksPerBar } from '@windsor/engine';
 import type { BlockBox, LoopBraceTable } from './songViewTables';
 import { LOOP_BRACE, pxToTick, tickToPx } from './songViewTables';
 
@@ -35,24 +38,38 @@ export type BraceGesture =
 export interface BraceBounds {
   readonly grain: number;
   readonly songTicks: number;
+  /** The loop's grid, its shortest length (`loopGridTicks(meter)`); 4/4's quarter when absent. */
+  readonly grid?: number;
 }
 
 const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, value));
 const snapRound = (tick: number, grain: number): number => Math.round(tick / grain) * grain;
 
-/** The snap grain in ticks: a bar, or a beat with Shift (decision 3). */
-export const loopGrain = (shift: boolean): number => (shift ? LOOP_GRID_TICKS : TICKS_PER_BAR);
+/** The snap grain in ticks: the bar of `meter`, or its loop grid with Shift (decision 3). */
+export const loopGrain = (shift: boolean, meter?: Meter): number =>
+  shift ? loopGridTicks(meter) : ticksPerBar(meter);
 
-/** The range the loop button creates when the song has none (decision 1): bars 1–4, clamped to the song. */
-export const newLoopRange = (songTicks: number, table: LoopBraceTable = LOOP_BRACE): LoopRange => ({
+/**
+ * The range the loop button creates when the song has none (decision 1):
+ * bars 1–4 of the song's `bar`, clamped to the song.
+ */
+export const newLoopRange = (
+  songTicks: number,
+  bar: number = TICKS_PER_BAR,
+  table: LoopBraceTable = LOOP_BRACE,
+): LoopRange => ({
   start: 0,
-  end: Math.min(songTicks, table.newLoopBars * TICKS_PER_BAR),
+  end: Math.min(songTicks, table.newLoopBars * bar),
 });
 
-/** Where the brace draws on its strip, in px from the song start. */
-export const braceBox = (range: LoopRange, pxPerBar: number): BlockBox => ({
-  leftPx: tickToPx(range.start, pxPerBar),
-  widthPx: tickToPx(range.end - range.start, pxPerBar),
+/** Where the brace draws on its strip, in px from the song start, `pxPerBar` to a `bar` of ticks. */
+export const braceBox = (
+  range: LoopRange,
+  pxPerBar: number,
+  bar: number = TICKS_PER_BAR,
+): BlockBox => ({
+  leftPx: tickToPx(range.start, pxPerBar, bar),
+  widthPx: tickToPx(range.end - range.start, pxPerBar, bar),
 });
 
 /**
@@ -65,10 +82,11 @@ export function braceHitAt(
   range: LoopRange | undefined,
   px: number,
   pxPerBar: number,
+  bar: number = TICKS_PER_BAR,
   table: LoopBraceTable = LOOP_BRACE,
 ): BraceHit | null {
   if (!range) return null;
-  const { leftPx, widthPx } = braceBox(range, pxPerBar);
+  const { leftPx, widthPx } = braceBox(range, pxPerBar, bar);
   const rightPx = leftPx + widthPx;
   if (px < leftPx - table.handleOutsidePx || px > rightPx + table.handleOutsidePx) return null;
   const band = Math.min(table.handlePx, widthPx * table.handleFraction);
@@ -82,10 +100,11 @@ export function braceGestureAt(
   loop: LoopRange | undefined,
   px: number,
   pxPerBar: number,
+  bar: number = TICKS_PER_BAR,
   table: LoopBraceTable = LOOP_BRACE,
 ): BraceGesture {
-  const pressTick = pxToTick(px, pxPerBar);
-  const hit = braceHitAt(loop, px, pxPerBar, table);
+  const pressTick = pxToTick(px, pxPerBar, bar);
+  const hit = braceHitAt(loop, px, pxPerBar, bar, table);
   if (!hit || !loop) return { kind: 'draw', anchorTick: pressTick };
   return { kind: hit, range: { start: loop.start, end: loop.end }, pressTick };
 }
@@ -107,24 +126,24 @@ export function drawRange(anchorTick: number, tick: number, bounds: BraceBounds)
 /**
  * A drag of the brace to `tick`: the pressed handle or the body moves by the
  * pointer's travel from `pressTick`, snapped to the grain. A handle stops a
- * beat short of the other end and at the song's ends; the body keeps its
- * length and stays inside the song.
+ * grid step short of the other end and at the song's ends; the body keeps
+ * its length and stays inside the song.
  */
 export function dragBrace(gesture: BraceGesture, tick: number, bounds: BraceBounds): LoopRange {
   if (gesture.kind === 'draw') return drawRange(gesture.anchorTick, tick, bounds);
-  const { grain, songTicks } = bounds;
+  const { grain, songTicks, grid = LOOP_GRID_TICKS } = bounds;
   const { range, pressTick } = gesture;
   const delta = tick - pressTick;
   switch (gesture.kind) {
     case 'start':
       return {
-        start: clamp(snapRound(range.start + delta, grain), 0, range.end - LOOP_GRID_TICKS),
+        start: clamp(snapRound(range.start + delta, grain), 0, range.end - grid),
         end: range.end,
       };
     case 'end':
       return {
         start: range.start,
-        end: clamp(snapRound(range.end + delta, grain), range.start + LOOP_GRID_TICKS, songTicks),
+        end: clamp(snapRound(range.end + delta, grain), range.start + grid, songTicks),
       };
     case 'body': {
       const length = range.end - range.start;

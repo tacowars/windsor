@@ -94,9 +94,10 @@ function paintCurve(
   points: readonly AutomationPoint[],
 ): void {
   const px = view.state.pxPerBar;
-  const widthPx = tickToPx(view.songTicks(), px);
+  const bar = view.ticksPerBar();
+  const widthPx = tickToPx(view.songTicks(), px, bar);
   const heightPx = SONG_VIEW.automationLanePx;
-  const shape = curveShape(row, points, { widthPx, heightPx, pxPerBar: px });
+  const shape = curveShape(row, points, { widthPx, heightPx, pxPerBar: px, ticksPerBar: bar });
   box.setAttribute('width', String(widthPx));
   box.setAttribute('height', String(heightPx));
   box.replaceChildren(
@@ -111,11 +112,12 @@ function paintCurve(
 /** The lane's curve over the part's regions, ghosted, at the view's zoom, under the toolbar's tools. */
 function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane): HTMLElement {
   const px = view.state.pxPerBar;
+  const bar = view.ticksPerBar();
   const timeline = el('div', 'auto-lane');
   for (const region of part.regions) {
     const ghost = el('div', 'auto-ghost');
-    ghost.style.left = `${tickToPx(region.start, px)}px`;
-    ghost.style.width = `${tickToPx(region.duration, px)}px`;
+    ghost.style.left = `${tickToPx(region.start, px, bar)}px`;
+    ghost.style.width = `${tickToPx(region.duration, px, bar)}px`;
     timeline.appendChild(ghost);
   }
   const row = laneRow(part, lane.target);

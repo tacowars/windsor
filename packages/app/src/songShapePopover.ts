@@ -12,6 +12,7 @@
  * `songShapeRange.ts`.
  */
 import type { AutomationShapeSpec, AutomationTargetRow } from '@windsor/engine';
+import type { ShapeRate } from './songShapeTables';
 import { fromDisplay } from '@windsor/engine';
 import { el } from './dom';
 import { readout } from './automationReadout';
@@ -28,11 +29,13 @@ export interface ShapePopoverHandlers {
   cancel(): void;
 }
 
-/** What the popover shows besides the draft: the lane's name and row, and the readout. */
+/** What the popover shows besides the draft: the lane's name and row, the readout, and the song's Rate stops. */
 export interface ShapeShown {
   readonly name: string;
   readonly row: AutomationTargetRow;
   readonly readout: string;
+  /** The Rate stops in the song's meter (`shapeRates`, windsor#430); 4/4's when absent. */
+  readonly rates?: readonly ShapeRate[];
 }
 
 export interface ShapePopover {
@@ -125,8 +128,9 @@ export function shapePopover(handlers: ShapePopoverHandlers): ShapePopover {
   root.append(body, actions);
 
   let draft: AutomationShapeSpec | null = null;
+  let rates: readonly ShapeRate[] = SHAPE_RATES;
   const report = (edit: Partial<AutomationShapeSpec>): void => {
-    if (draft) handlers.change(clampDraft({ ...draft, ...edit }));
+    if (draft) handlers.change(clampDraft({ ...draft, ...edit }, SHAPE_LIMITS, rates));
   };
   for (const node of kindButtons) {
     node.onclick = (): void =>
@@ -134,7 +138,7 @@ export function shapePopover(handlers: ShapePopoverHandlers): ShapePopover {
   }
   const value = (field: Field): number => Number(sliders[field].input.value);
   sliders.rate.input.oninput = (): void =>
-    report({ rateTicks: SHAPE_RATES[value('rate')]?.ticks ?? draft?.rateTicks ?? 0 });
+    report({ rateTicks: rates[value('rate')]?.ticks ?? draft?.rateTicks ?? 0 });
   sliders.top.input.oninput = (): void => report({ top: value('top') });
   sliders.bottom.input.oninput = (): void => report({ bottom: value('bottom') });
   sliders.phase.input.oninput = (): void => report({ phase: value('phase') });
@@ -154,6 +158,7 @@ export function shapePopover(handlers: ShapePopoverHandlers): ShapePopover {
     element: root,
     show(next, shown) {
       draft = next;
+      rates = shown.rates ?? SHAPE_RATES;
       title.textContent = `Shape · ${shown.name}`;
       root.setAttribute('aria-label', `Shape · ${shown.name}`);
       range.textContent = shown.readout;
@@ -161,8 +166,8 @@ export function shapePopover(handlers: ShapePopoverHandlers): ShapePopover {
         node.setAttribute('aria-pressed', String(node.dataset['kind'] === next.kind));
       }
       const on = shapeControls(next.kind);
-      const rate = rateIndex(next.rateTicks);
-      set('rate', rate, SHAPE_RATES[rate]!.label, on.rate);
+      const rate = rateIndex(next.rateTicks, rates);
+      set('rate', rate, rates[rate]!.label, on.rate);
       set('top', next.top, readout(shown.row, fromDisplay(shown.row, next.top)));
       set('bottom', next.bottom, readout(shown.row, fromDisplay(shown.row, next.bottom)));
       set('phase', next.phase, phaseLabel(next.phase), on.phase);

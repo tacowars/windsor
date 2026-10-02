@@ -6,7 +6,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { LOOP_GRID_TICKS, PPQ, TICKS_PER_BAR, fitLoopRange } from '@windsor/engine';
+import {
+  LOOP_GRID_TICKS,
+  PPQ,
+  TICKS_PER_BAR,
+  fitLoopRange,
+  loopGridTicks,
+  ticksPerBar,
+} from '@windsor/engine';
 import type { BraceGesture, LoopRange } from './loopBraceModel';
 import {
   braceBox,
@@ -20,6 +27,7 @@ import {
   newLoopRange,
 } from './loopBraceModel';
 import { LOOP_BRACE, SONG_VIEW, tickToPx } from './songViewTables';
+import { loopToggle } from './transportModel';
 
 const BAR = TICKS_PER_BAR;
 const BEAT = PPQ;
@@ -39,6 +47,32 @@ describe('the snap (decision 3)', () => {
     expect(loopGrain(false)).toBe(BAR);
     expect(loopGrain(true)).toBe(BEAT);
     expect(LOOP_GRID_TICKS).toBe(BEAT);
+  });
+});
+
+describe("a 7/8 song's brace (windsor#430)", () => {
+  const SEVEN = ticksPerBar('7/8');
+  const EIGHTH = loopGridTicks('7/8');
+  const song = 8 * SEVEN;
+
+  it('snaps to its 84-tick bar, and to the 8th with Shift', () => {
+    expect([loopGrain(false, '7/8'), loopGrain(true, '7/8')]).toEqual([84, 12]);
+    const bounds = { grain: SEVEN, songTicks: song, grid: EIGHTH };
+    expect(drawRange(1.5 * SEVEN, 2.2 * SEVEN, bounds)).toEqual({ start: SEVEN, end: 3 * SEVEN });
+    expect(braceBox({ start: SEVEN, end: 3 * SEVEN }, PX, SEVEN)).toEqual({
+      leftPx: PX,
+      widthPx: 2 * PX,
+    });
+  });
+
+  it('stops a handle one 8th short of the other end, and creates bars 1–4 of the meter', () => {
+    const range = { start: SEVEN, end: 2 * SEVEN };
+    const end: BraceGesture = { kind: 'end', range, pressTick: 2 * SEVEN };
+    const bounds = { grain: EIGHTH, songTicks: song, grid: EIGHTH };
+    expect(dragBrace(end, 0, bounds)).toEqual({ start: SEVEN, end: SEVEN + EIGHTH });
+    expect(loopToggle({ bars: 8, meter: '7/8' })).toEqual(
+      loopChange({ start: 0, end: 4 * SEVEN }, true),
+    );
   });
 });
 

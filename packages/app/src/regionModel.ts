@@ -6,7 +6,9 @@
  * ticks, sorted and non-overlapping, inside the song — the shape the
  * normaliser keeps (`regionNormalise.ts`) — so every function returns a new
  * list in that shape for `ctx.change`, where arrays replace wholesale. The
- * snap grain is bars by default; the modifier snaps to the part's own step
+ * snap grain is bars by default — the song's bar, `ticksPerBar(meter)`
+ * (windsor#430), which every bar-grain function here takes as `bar` and
+ * which defaults to the 4/4 bar; the modifier snaps to the part's own step
  * (`divisor`) for grid / chord / euclidean and to the beat otherwise.
  * `regionModel.test.ts` pins the fixtures the ticket names.
  *
@@ -24,15 +26,19 @@ import type {
   RegionPattern,
   SequencerSpec,
 } from '@windsor/engine';
-import { PPQ, TICKS_PER_BAR, isInfiniteRegion } from '@windsor/engine';
+import { PPQ, TICKS_PER_BAR, isInfiniteRegion, songTicks as songLength } from '@windsor/engine';
 import { fitEvents } from './harmonyLaneModel';
 
 /** The kinds whose modifier snap is their own step; the rest snap to the beat. */
 const STEP_SNAPPED = new Set<SequencerSpec['kind']>(['grid', 'chord', 'euclidean']);
 
-/** The snap grain in ticks: a bar, or with the modifier the part's step (its `divisor`) or a beat. */
-export function snapGrain(spec: SequencerSpec | undefined, modifier: boolean): number {
-  if (!modifier) return TICKS_PER_BAR;
+/** The snap grain in ticks: a `bar`, or with the modifier the part's step (its `divisor`) or a beat. */
+export function snapGrain(
+  spec: SequencerSpec | undefined,
+  modifier: boolean,
+  bar: number = TICKS_PER_BAR,
+): number {
+  if (!modifier) return bar;
   if (spec && STEP_SNAPPED.has(spec.kind) && 'divisor' in spec && spec.divisor > 0) {
     return spec.divisor;
   }
@@ -64,7 +70,7 @@ function bounds(
 }
 
 /**
- * A click on an empty stretch: one bar-snapped region from the bar under
+ * A click on an empty stretch: one region from the start of the `bar` under
  * `tick`, a bar long or as long as the gap allows; null when the tick is
  * inside a region, past the song, or the gap has no room.
  */
@@ -72,12 +78,12 @@ export function addRegion(
   regions: readonly PartRegion[],
   tick: number,
   songTicks: number,
-  grain: number = TICKS_PER_BAR,
+  bar: number = TICKS_PER_BAR,
 ): PartRegion[] | null {
-  const start = Math.max(0, snapDown(tick, grain));
+  const start = Math.max(0, snapDown(tick, bar));
   if (start >= songTicks || regionAt(regions, start) >= 0) return null;
   const next = regions.find((r) => r.start > start);
-  const end = Math.min(start + TICKS_PER_BAR, next ? next.start : songTicks, songTicks);
+  const end = Math.min(start + bar, next ? next.start : songTicks, songTicks);
   if (end <= start) return null;
   return sorted<PartRegion>([...regions, { start, duration: end - start }]);
 }
@@ -259,7 +265,9 @@ const barsOf = (partial: DocumentPartial): number | null => {
  * partial gains every part's fitted regions and the fitted harmony events
  * where they change, and `report` names them. Any other partial comes back
  * as it was. `AppContext.change` applies this to every partial, so the
- * strip's Bars knob needs no knowledge of regions.
+ * strip's Bars knob needs no knowledge of regions. Both lengths are bars of
+ * the song's meter (windsor#430): the one the partial sets, else the
+ * document's.
  */
 export function followSongLength(
   doc: ArrangementDocument,
@@ -267,8 +275,9 @@ export function followSongLength(
 ): { partial: DocumentPartial; report: string[] } {
   const bars = barsOf(partial);
   if (bars === null || bars === doc.transport.bars || bars < 1) return { partial, report: [] };
-  const songTicks = bars * TICKS_PER_BAR;
-  const previous = doc.transport.bars * TICKS_PER_BAR;
+  const meter = partial.transport?.meter ?? doc.transport.meter;
+  const songTicks = songLength(bars, meter);
+  const previous = songLength(doc.transport.bars, doc.transport.meter);
   const report: string[] = [];
   const parts: Record<number, { regions: PartRegion[] }> = {};
   for (const part of doc.parts) {

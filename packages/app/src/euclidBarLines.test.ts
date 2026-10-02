@@ -11,6 +11,7 @@ import {
   EuclideanSequencer,
   TICKS_PER_BAR,
   TickTransport,
+  ticksPerBar,
 } from '@windsor/engine';
 import { BarLineLog, BarLineWatch, plotSeconds } from './euclidBarLines';
 import { barLineSeconds, lfoKs } from './euclidDensityModel';
@@ -55,6 +56,18 @@ describe('the Hz plot after a tempo change with ticks queued', () => {
     const rewound = barLineSeconds(clock, audible.tick);
     expect(rewound).toBeLessThan(2);
     expect(lfoKs(SPEC, { ...plot, seconds: rewound }, 1)[0]).not.toBe(played);
+  });
+
+  it("stamps a 7/8 song's lines every 84 ticks (windsor#430)", () => {
+    const clock = new TickTransport(120);
+    const bar = ticksPerBar('7/8');
+    const watch = new BarLineWatch();
+    watch.follow(clock, bar);
+    run(clock, bar + 10, { time: 0 });
+    const line = bar * clock.secondsPerTick;
+    expect(watch.log.secondsAt(bar, line)).toBeCloseTo(line, 9);
+    const audible = { tick: bar + 2, now: line + 2 * clock.secondsPerTick };
+    expect(plotSeconds(watch.log, clock, audible, bar)).toBeCloseTo(line, 9);
   });
 
   it('falls back to the rewind for a bar line it did not see issued', () => {

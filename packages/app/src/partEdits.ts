@@ -24,7 +24,14 @@ import type {
   SequencerKind,
   SequencerSpec,
 } from '@windsor/engine';
-import { partAt, regionPattern, removePartChange, songTicksOf } from '@windsor/engine';
+import {
+  TICKS_PER_BAR,
+  partAt,
+  regionPattern,
+  removePartChange,
+  songTicksOf,
+  ticksPerBar,
+} from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { deepMerge } from './documentModel';
@@ -141,15 +148,16 @@ export const splitFill = (part: Pick<MusicPart, 'sequencer'>): RegionPattern | u
 
 /**
  * The snap grain of a gesture on region `index` of `part` — a split, an
- * alt-click split, an edge or body drag: a bar, or with the modifier that
- * region's own step (`regionPattern`'s divisor), never the part's sequencer,
- * which a card edit no longer touches.
+ * alt-click split, an edge or body drag: the song's `bar`, or with the
+ * modifier that region's own step (`regionPattern`'s divisor), never the
+ * part's sequencer, which a card edit no longer touches.
  */
 export const regionGrain = (
   part: Pick<MusicPart, 'regions' | 'sequencer'>,
   index: number,
   modifier: boolean,
-): number => snapGrain(regionPattern(part, index), modifier);
+  bar: number = TICKS_PER_BAR,
+): number => snapGrain(regionPattern(part, index), modifier, bar);
 
 /**
  * Region `index` of `part` cut at `tick`, snapped to that region's own grain
@@ -161,9 +169,10 @@ export function splitPartRegion(
   index: number,
   tick: number,
   modifier: boolean,
+  bar: number = TICKS_PER_BAR,
 ): PartRegion[] | null {
   if (!part.regions[index]) return null;
-  const grain = regionGrain(part, index, modifier);
+  const grain = regionGrain(part, index, modifier, bar);
   const next = splitRegion(part.regions, index, tick, grain, splitFill(part));
   return next.length === part.regions.length ? null : next;
 }
@@ -253,7 +262,7 @@ function defaultPattern(
 
 /**
  * A region drawn on the lane of the part on `slot` at `tick`, and its index
- * (decision 4): it copies the pattern of the nearest region that starts
+ * (decision 4), one bar of the song's meter long: it copies the pattern of the nearest region that starts
  * before it, else of the nearest after it, and the first region of a part
  * with none starts from the kind's default pattern. A kind whose regions
  * carry no pattern draws a bare region. Null when there is no room.
@@ -265,7 +274,8 @@ export function drawRegionChange(
   preview: Preview,
 ): { regions: PartRegion[]; index: number } | null {
   const part = partAt(doc, slot);
-  const regions = part && addRegion(part.regions, tick, songTicksOf(doc));
+  const bar = ticksPerBar(doc.transport.meter);
+  const regions = part && addRegion(part.regions, tick, songTicksOf(doc), bar);
   if (!part || !regions) return null;
   const index = regions.findIndex((r) => !part.regions.includes(r));
   const added = regions[index];
