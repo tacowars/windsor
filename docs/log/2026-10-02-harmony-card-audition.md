@@ -57,3 +57,11 @@ console, and no chord could be heard without running the song.
    whose attack is about a quarter second and whose release is under a
    second, the quickest of the candidates, so a chord speaks at once and stops
    cleanly. tacowars judges it by ear on the preview.
+7. **The card is a sequencer device's height** (tacowars on the preview,
+   2026-10-02: "scale it up to where its the same height as the
+   sequencers"). The mockup's arrangement stands at a larger scale: 244 px
+   high, `--seq-h` from `SEQUENCER_DEVICE_PX`, with the chips about twice
+   as tall and their pitch names 12 px in `--ink-dim`. Every size is
+   `harmonyCardTables.ts`'s `HARMONY_CARD_PX`, set on the card as custom
+   properties. The pressed chip is the event's folded degree, as a ▶ reads
+   it.

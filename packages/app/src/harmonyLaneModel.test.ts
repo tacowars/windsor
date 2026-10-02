@@ -21,6 +21,7 @@ import { loadBuiltIns } from './builtInLibrary';
 import { DocumentModel } from './documentModel';
 import {
   appendEvent,
+  chipDegree,
   degreeChips,
   durationLabel,
   eventBar,
@@ -300,6 +301,12 @@ describe('labels', () => {
     expect(chips[0]).toEqual({ degree: 0, numeral: 'i', pitch: 'C' });
     expect(chips[2]?.pitch).toBe('D#');
     expect(chips[2]?.numeral).toBe('III');
+  });
+
+  it("presses the chip of an event's folded degree, octave carry and all", () => {
+    expect(chipDegree(key, ev(0, BAR, 3))).toBe(3);
+    expect(chipDegree(key, ev(0, BAR, 7))).toBe(0);
+    expect(chipDegree(key, ev(0, BAR, 16))).toBe(2);
   });
 
   it('reads a bar number, and a duration in bars and beats', () => {

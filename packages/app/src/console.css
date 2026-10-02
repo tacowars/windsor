@@ -3450,38 +3450,57 @@ select.field.compact {
 .pane-inserts .card-head:last-child {
   margin-bottom: 0;
 }
+/* The harmony card (windsor#332): a sequencer device's height, its sizes the
+   --harmony-* custom properties harmonyCard.ts sets on the card from
+   harmonyCardTables.ts. Three groups spread over the height: the Degree
+   block (the label, a ▶ over each chip, the chips), the Accidental / Size /
+   Quality row, and the info bubble / Duration / Delete row. Below its width
+   the rows wrap and the card grows rather than clip. */
+.harmony-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: var(--seq-h);
+  max-width: var(--harmony-w);
+}
+.harmony-card .field-label {
+  font-size: var(--harmony-label-text);
+}
 .degrees {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 2px;
-  max-width: 480px;
+  gap: var(--harmony-col-gap);
 }
 .dchip {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  justify-content: center;
+  gap: 4px;
   min-width: 0;
-  padding: 4px 0 3px;
+  height: var(--harmony-chip-h);
+  padding: 0;
   background: var(--inset);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  color: var(--ink-dim);
+  color: var(--ink);
   font-family: var(--f-panel);
   cursor: pointer;
 }
 .dchip b {
-  font-size: 10px;
+  font-size: var(--harmony-chip-numeral);
   font-weight: 600;
   letter-spacing: 0.04em;
 }
 .dchip small {
   font-family: var(--f-num);
-  font-size: 8.5px;
-  color: var(--ink-faint);
+  font-size: var(--harmony-chip-pitch);
+  color: var(--ink-dim);
 }
 .dchip:hover {
   background: var(--panel-hi);
+}
+.dchip:hover small {
   color: var(--ink);
 }
 .dchip[aria-pressed='true'] {
@@ -3492,49 +3511,49 @@ select.field.compact {
 .dchip[aria-pressed='true'] small {
   color: #111416;
 }
-/* The card keeps the chips' width, so Delete ends the bottom row under the last chip. */
-.harmony-card {
-  max-width: 480px;
-}
-.harmony-card .bar-row {
-  margin-top: 10px;
+.harmony-card .bar-row.center {
+  align-items: center;
+  min-height: var(--harmony-foot-h);
 }
 .harmony-card .seg button {
   flex: 1 0 auto;
-}
-.harmony-card .bar-row.center {
-  align-items: center;
+  min-width: var(--harmony-size-w);
+  height: var(--harmony-control-h);
+  padding: 0 6px;
+  font-size: var(--harmony-control-text);
 }
 .harmony-card .seg.acc button {
-  min-width: 28px;
-  padding: 3px 4px;
-  font-size: 12px;
+  min-width: var(--harmony-acc-w);
+  font-size: var(--harmony-acc-text);
   letter-spacing: 0;
   text-transform: none;
 }
 .harmony-card select.field {
-  width: auto;
-  min-width: 116px;
-  height: 24px;
+  width: var(--harmony-quality-w);
+  height: var(--harmony-control-h);
   padding-top: 0;
   padding-bottom: 0;
+  font-size: var(--harmony-control-text);
 }
 .harmony-card .push {
+  height: var(--harmony-control-h);
   margin-left: auto;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: var(--harmony-control-text);
 }
-/* A ▶ over each degree chip (windsor#332): hold to hear that degree's chord. */
+/* A ▶ over each degree chip: hold to hear that degree's chord. */
 .harmony-card .harmony-plays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 2px;
-  max-width: 480px;
-  margin-bottom: 2px;
+  gap: var(--harmony-col-gap);
+  margin-bottom: var(--harmony-play-gap);
 }
 .harmony-card .harmony-play {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 20px;
+  height: var(--harmony-play-h);
   padding: 0;
   background: var(--inset);
   border: 1px solid var(--line);
@@ -3544,7 +3563,9 @@ select.field.compact {
   touch-action: none;
 }
 .harmony-card .harmony-play svg {
-  fill: var(--ink-faint);
+  width: auto;
+  height: var(--harmony-play-icon);
+  fill: var(--ink-dim);
 }
 .harmony-card .harmony-play:hover {
   background: var(--panel-hi);
@@ -3564,23 +3585,23 @@ select.field.compact {
 .harmony-card .harmony-info {
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
-  min-width: 150px;
-  padding: 4px 12px;
+  gap: 10px;
+  min-width: var(--harmony-info-w);
+  padding: 5px 14px;
   background: var(--panel-hi);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   color: var(--ink);
 }
 .harmony-card .harmony-info b {
   font-family: var(--f-panel);
-  font-size: 12px;
+  font-size: var(--harmony-info-name);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 .harmony-card .harmony-info small {
   font-family: var(--f-num);
-  font-size: 10px;
+  font-size: var(--harmony-info-sub);
   color: var(--ink-dim);
 }
 .harmony-card .harmony-info.sounding {

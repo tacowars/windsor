@@ -28,7 +28,9 @@ import {
   type AuditionToken,
 } from './harmonyAuditionModel';
 import { HARMONY_AUDITION_VELOCITY } from './harmonyAuditionTables';
+import { HARMONY_CARD_PX } from './harmonyCardTables';
 import {
+  chipDegree,
   degreeChips,
   durationLabel,
   eventLabel,
@@ -77,17 +79,18 @@ const accidentalOf = (value: string): -1 | 0 | 1 => {
 const qualityOf = (value: string): NamedQuality | null =>
   NAMED_QUALITIES.find((q) => q === value) ?? null;
 
-/** The seven chips; the pressed one is the event's degree. */
+/** The seven chips; the pressed one is the event's degree, folded into the scale. */
 function chips(view: SongView, index: number): HTMLElement {
   const { harmony } = view.ctx.model.doc;
   const event = harmony.events[index];
+  const pressed = event ? chipDegree(harmony, event) : null;
   const row = el('div', 'degrees');
   for (const chip of degreeChips(harmony, event?.size ?? CHORD_SIZE_TRIAD)) {
     const b = el('button', 'dchip') as HTMLButtonElement;
     b.type = 'button';
     b.appendChild(el('b', '', chip.numeral));
     b.appendChild(el('small', '', chip.pitch));
-    b.setAttribute('aria-pressed', String(chip.degree === event?.degree));
+    b.setAttribute('aria-pressed', String(chip.degree === pressed));
     b.onclick = (): void => {
       const events = view.ctx.model.doc.harmony.events;
       view.commit({ harmony: { events: setDegree(events, index, chip.degree) } }, true);
@@ -340,16 +343,21 @@ function bottomRow(view: SongView, index: number, bubble: InfoBubble): HTMLEleme
   return row;
 }
 
-/** The card for the event at `index`. */
+/** The card for the event at `index`, a sequencer device's height, its sizes set from `HARMONY_CARD_PX`. */
 export function harmonyCard(view: SongView, index: number): HTMLElement {
   const root = el('div', 'harmony-card');
+  for (const [prop, px] of Object.entries(HARMONY_CARD_PX)) root.style.setProperty(prop, `${px}px`);
   const { harmony } = view.ctx.model.doc;
   const event = harmony.events[index];
   if (!event) return root;
   const bubble = infoBubble(eventLabel(harmony, event));
-  root.appendChild(el('span', 'field-label', 'Degree'));
-  root.appendChild(plays(view, index, bubble));
-  root.appendChild(chips(view, index));
+  const degree = el('div', 'harmony-degree');
+  degree.append(
+    el('span', 'field-label', 'Degree'),
+    plays(view, index, bubble),
+    chips(view, index),
+  );
+  root.appendChild(degree);
   root.appendChild(fieldRow(view, index));
   root.appendChild(bottomRow(view, index, bubble));
   return root;

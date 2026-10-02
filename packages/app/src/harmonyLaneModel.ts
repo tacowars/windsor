@@ -21,6 +21,7 @@ import {
   chordName,
   diatonicChords,
   eventChord,
+  foldDegree,
   pitchClassName,
   romanNumeral,
   scaleOffsets,
@@ -265,4 +266,12 @@ export function degreeChips(harmony: Harmony, size: ChordSize): DegreeChip[] {
     numeral: romanNumeral(degree, chord.quality, offsets.length),
     pitch: pitchClassName(harmony.root, offsets[degree] ?? 0),
   }));
+}
+
+/**
+ * The chip an event presses: its degree folded into the scale, as a ▶ reads
+ * it, so a degree past the top (an octave carry) still lights its chip.
+ */
+export function chipDegree(harmony: Harmony, event: HarmonyEvent): number {
+  return foldDegree(event.degree, scaleOffsets(harmony.scale).length).degree;
 }
