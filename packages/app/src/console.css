@@ -3081,6 +3081,60 @@ select.field.auto-snap {
   white-space: nowrap;
 }
 
+/* ---------- the locked knob (windsor#351) ---------- */
+/* Record `2026-10-01-song-automation-lanes` decision 6, the lit ring
+   tacowars chose in docs/design/automation-lanes-mockup.html: while a lane
+   that is on holds the knob (knobLock.ts sets .locked and --lock-color, the
+   lane's colour), its arc, pin and cap ring take that colour, an AUTO tag in
+   it sits under the value, and the cursor says the knob will not move. Kept
+   apart from the automation lanes above, and after the rack's arc rule,
+   which its arc overrides. */
+.knob.locked {
+  cursor: not-allowed;
+}
+.knob.locked .dial-arc {
+  stroke: var(--lock-color);
+}
+.knob.locked .dial-pin {
+  stroke: var(--lock-color);
+  stroke-width: 2;
+}
+.knob.locked .dial-face {
+  stroke: var(--lock-color);
+}
+.knob .knob-auto {
+  display: none;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--lock-color);
+  color: var(--ground);
+  font-family: var(--f-panel);
+  font-size: 7.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 11px;
+  pointer-events: none;
+}
+.knob.locked .knob-auto {
+  display: block;
+}
+/* The compact knob keeps its 40 px row: the dial spans two lines, the value
+   above the tag beside it. */
+.knob.compact.locked {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-items: start;
+  column-gap: 3px;
+  row-gap: 1px;
+}
+.knob.compact.locked svg {
+  grid-row: span 2;
+}
+.knob.compact.locked .knob-val {
+  line-height: 12px;
+}
+
 /* ---------- controls ---------- */
 
 .seg {

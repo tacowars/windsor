@@ -3,6 +3,7 @@ import { DEFAULT_TAPE, tapeControlValue, setTapeControl, type TapeNumber } from 
 import type { AppCtx } from './context';
 import type { InsertTarget } from './insertTarget';
 import { insertsOf, insertChange } from './insertTarget';
+import { insertFieldLock } from './insertKnobs';
 import { makeKnob } from './knob';
 import { STRIP_COLOR } from './consoleColors';
 import { TAPE_KNOBS } from './tapeTables';
@@ -21,6 +22,7 @@ export function tapeKnobs(
         ...entry.o,
         color: STRIP_COLOR,
         dial: 'rack',
+        ...insertFieldLock(ctx, target, index, field),
         get: () => {
           const spec = insertsOf(ctx, target)[index];
           return tapeControlValue(spec?.kind === 'tape' ? spec : DEFAULT_TAPE, field);

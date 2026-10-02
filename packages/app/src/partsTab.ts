@@ -12,6 +12,7 @@ import type { PartialPatch } from '@windsor/engine';
 import { clonePatch, makePatch, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { $, el, seg } from './dom';
+import { voiceKnobAutomation } from './knobAutomation';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, libraryActions, syncModifiedMarker } from './libraryActions';
 import { library, libraryPatch } from './libraryModel';
@@ -126,6 +127,12 @@ function patchEditor(ctx: AppCtx): PatchEditor {
       syncModifiedMarker(ctx);
     },
     refresh: () => refreshPatchUi(editor),
+    automation: (path) =>
+      voiceKnobAutomation(
+        partAt(ctx.model.doc, ctx.parts.selected),
+        path,
+        ctx.transport.position(),
+      ),
   };
   return editor;
 }
