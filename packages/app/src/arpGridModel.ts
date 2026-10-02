@@ -1,8 +1,9 @@
 /**
  * The Arp card's step grid without the DOM (windsor#137, epic windsor#126):
  * how many cells the strip shows, what Randomize, Rotate and a cell's slide
- * do over them, and the labels a cell reads. The cell edits themselves are
- * `gridModel.ts`'s, which take an arp cell as they take a grid step.
+ * do over them, and the labels a cell and the Cycle section read. The cell
+ * edits themselves are `gridModel.ts`'s, which take an arp cell as they take
+ * a grid step, and the ratchet's are `ratchetModel.ts`'s (windsor#370).
  *
  * **The shown count** is one cycle of the arp's style over the note list
  * the engine would walk: `arpCycleLength(style, L)`, `L` being the length
@@ -23,11 +24,15 @@ import type {
 } from '@windsor/engine';
 import {
   ARP_STEPS_MAX,
+  RATCHET_MAX,
   ScaleSampler,
   arpCellPitch,
   arpCycleLength,
   arpNote,
   arpNoteList,
+  chordName,
+  chordOf,
+  scaleOffsets,
 } from '@windsor/engine';
 import { ARP_RANDOM, type ArpRandomTable } from './arpGridConstants';
 import { type Draw, cycleKind, rotateLanes, rotateSteps } from './gridModel';
@@ -66,7 +71,22 @@ export function arpCellCount(
   return arpListCount(spec.style, arpShownList(spec, key, chord));
 }
 
-/** The top cell's cycle: note → tie → rest → a plain note. */
+/**
+ * The Cycle section's count (windsor#370): `6 cells · A min`, the chord the
+ * card reads named in the key; the count alone with no chord.
+ */
+export function arpCycleLabel(count: number, key: ArpKey, chord: HarmonyChord | null): string {
+  const cells = `${count} ${count === 1 ? 'cell' : 'cells'}`;
+  if (!chord) return cells;
+  const named = chordOf(scaleOffsets(key.scale), chord.event.degree, chord.event.size);
+  return `${cells} · ${chordName(key.root, named)}`;
+}
+
+/**
+ * The top cell's cycle: note → tie → rest → a plain note. A note that
+ * becomes a tie loses its octave, accent, slide and ratchet (record
+ * `2026-10-01-sequencer-rack-devices` decision 6).
+ */
 export const nextArpKind = (step: ArpStep): ArpStep => cycleKind(step, arpNote);
 
 /** What a cell's top reads: a note, a tie or a rest, as the grid's strip draws the last two. */
@@ -81,7 +101,10 @@ export function arpOctaveLabel(octave: number): string {
   return octave > 0 ? `+${octave}` : `${octave}`;
 }
 
-/** The cells and lanes after Rotate: the first `count` turned `by` places, the rest where they were. */
+/**
+ * The cells and lanes after Rotate: the first `count` turned `by` places,
+ * the rest where they were. A cell moves whole, its ratchet with it.
+ */
 export function rotateArp(
   spec: Pick<ArpSpec, 'steps' | 'lanes'>,
   by: number,
@@ -93,35 +116,40 @@ export function rotateArp(
 
 /**
  * One random cell (epic decision 8): a rest or a tie now and then, else a
- * note with accent and slide each at `flag` and an octave of ±`octaveSpan`
- * at `octave`, down at `octaveDown`. Five draws in that order, always, so
- * a test can script them.
+ * note with accent and slide each at `flag`, an octave of ±`octaveSpan` at
+ * `octave`, down at `octaveDown`, and a roll of ×2 to ×`max` at `ratchet`
+ * (windsor#370). Seven draws in that order, always, so a test can script
+ * them. A rest or a tie takes no roll.
  */
-function randomCell(draw: Draw, table: ArpRandomTable): ArpStep {
+function randomCell(draw: Draw, table: ArpRandomTable, max: number): ArpStep {
   const kind = draw();
   const accent = draw() < table.flag;
   const slide = draw() < table.flag;
   const shifted = draw() < table.octave;
   const down = draw() < table.octaveDown;
+  const rolls = draw() < table.ratchet;
+  const roll = Math.min(max, 2 + Math.floor(draw() * (max - 1)));
   const octave = shifted ? (down ? -table.octaveSpan : table.octaveSpan) : 0;
   if (kind < table.rest) return { kind: 'rest' };
   if (kind < table.rest + table.tie) return { kind: 'tie' };
-  return arpNote({ octave, accent, slide });
+  const note = arpNote({ octave, accent, slide });
+  return rolls && roll > 1 ? { ...note, ratchet: roll } : note;
 }
 
 /**
- * Randomize: the first `count` cells rerolled, every cell past them kept
- * (epic decision 8). The lanes, the style, the octaves and the seed are
- * not the cells', so nothing here reaches them.
+ * Randomize: the first `count` cells rerolled, ratchets included, every
+ * cell past them kept (epic decision 8, windsor#370). The lanes, the style,
+ * the octaves and the seed are not the cells', so nothing here reaches them.
  */
 export function randomArpCells(
   steps: readonly ArpStep[],
   count: number,
   draw: Draw,
   table: ArpRandomTable = ARP_RANDOM,
+  max = RATCHET_MAX,
 ): ArpStep[] {
   const shown = Math.max(0, Math.min(Math.trunc(count), steps.length));
-  return steps.map((step, i) => (i < shown ? randomCell(draw, table) : step));
+  return steps.map((step, i) => (i < shown ? randomCell(draw, table, max) : step));
 }
 
 /**
