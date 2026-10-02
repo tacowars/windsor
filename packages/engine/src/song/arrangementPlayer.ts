@@ -61,7 +61,8 @@ import type { Patch } from '../patch/patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from '../patch/patch';
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import type { TickEvent, TickLoop, TickSource, Unsubscribe } from '../sequencing/scheduler';
-import { TICKS_PER_BAR, isLoopJump } from '../sequencing/scheduler';
+import { songTicks } from '../sequencing/meter';
+import { isLoopJump } from '../sequencing/scheduler';
 import { STRAIGHT_SWING, type Swing } from '../sequencing/swingTables';
 import { playableSwing } from '../sequencing/swing';
 import type { RegionGateConfig } from '../sequencing/regionGate';
@@ -202,7 +203,7 @@ const withSwing = (arrangement: Arrangement): Arrangement =>
 
 /** The song's length in ticks, from its explicit `transport.bars` (decision 5). */
 export const songTicksOf = (arrangement: Arrangement): number =>
-  arrangement.transport.bars * TICKS_PER_BAR;
+  songTicks(arrangement.transport.bars);
 
 /** What a part's gate reads: its regions over the song's length and harmony. */
 function gateConfig(arrangement: Arrangement, part: MusicPart): RegionGateConfig {

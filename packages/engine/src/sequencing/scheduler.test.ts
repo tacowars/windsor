@@ -6,7 +6,8 @@ import {
   Scheduler,
   TICKS_PER_BAR,
   TickTransport,
-  isBarDivisor,
+  WHOLE_NOTE_TICKS,
+  isNoteDivisor,
   type TickEvent,
 } from './scheduler';
 
@@ -19,7 +20,7 @@ describe('the 24 PPQ grid', () => {
     expect(PPQ).toBe(24);
     expect(TICKS_PER_BAR).toBe(96);
     expect(DIVISORS).toEqual({
-      bar: 96,
+      whole: 96,
       half: 48,
       quarter: 24,
       eighth: 12,
@@ -29,11 +30,16 @@ describe('the 24 PPQ grid', () => {
   });
 
   it('leaves triplets expressible without touching the transport', () => {
-    expect(isBarDivisor(8)).toBe(true); // 1/8T
-    expect(isBarDivisor(4)).toBe(true); // 1/16T
-    expect(isBarDivisor(5)).toBe(false);
-    expect(isBarDivisor(0)).toBe(false);
-    expect(isBarDivisor(1.5)).toBe(false);
+    expect(isNoteDivisor(8)).toBe(true); // 1/8T
+    expect(isNoteDivisor(4)).toBe(true); // 1/16T
+    expect(isNoteDivisor(5)).toBe(false);
+    expect(isNoteDivisor(0)).toBe(false);
+    expect(isNoteDivisor(1.5)).toBe(false);
+  });
+
+  it('accepts exactly the divisors of the 96-tick whole note (windsor#428)', () => {
+    expect(DIVISORS.whole).toBe(WHOLE_NOTE_TICKS);
+    for (let d = -4; d <= 200; d++) expect(isNoteDivisor(d)).toBe(d > 0 && 96 % d === 0);
   });
 });
 

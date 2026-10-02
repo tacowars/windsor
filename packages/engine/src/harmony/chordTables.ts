@@ -14,7 +14,7 @@ import { DIVISORS } from '../sequencing/scheduler';
  * it is 3). A sixteenth would put ×0.25 on a tick and a half.
  */
 export const CHORD_DIVISORS: readonly number[] = [
-  DIVISORS.bar,
+  DIVISORS.whole,
   DIVISORS.half,
   DIVISORS.quarter,
   DIVISORS.eighth,

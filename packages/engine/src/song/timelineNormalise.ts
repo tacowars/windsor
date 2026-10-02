@@ -1,7 +1,7 @@
 /**
  * The song's two tick lists, normalised (#705): a part's `regions` and the
  * harmony's `events`. Both are integer ticks inside `songTicks`
- * (`transport.bars × TICKS_PER_BAR`), sorted by `start`, and reported
+ * (`songTicks(transport.bars)`), sorted by `start`, and reported
  * through the `arrangementFields` vocabulary like every other field.
  *
  * Regions (epic #703 decision 17): each end is clamped to the next region's
@@ -27,7 +27,7 @@ import {
   type ChordAccidental,
   type NamedQuality,
 } from '../harmony/chordTables';
-import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { songTicks } from '../sequencing/meter';
 import type { Arrangement, PartRegion, SequencerKind } from './arrangement';
 import { FieldNormaliser, isRecord, show } from './arrangementFields';
 import { normaliseRegionPattern, sequencerKindOf } from './sequencerNormalise';
@@ -43,12 +43,12 @@ import { withFittedAutomation } from './automationNormalise';
  */
 export function fitTimelines(arrangement: Arrangement): Arrangement {
   const n = new FieldNormaliser();
-  const songTicks = arrangement.transport.bars * TICKS_PER_BAR;
+  const ticks = songTicks(arrangement.transport.bars);
   return {
     ...arrangement,
     harmony: {
       ...arrangement.harmony,
-      events: normaliseHarmonyEvents(arrangement.harmony.events, songTicks, 'harmony.events', n),
+      events: normaliseHarmonyEvents(arrangement.harmony.events, ticks, 'harmony.events', n),
     },
     parts: arrangement.parts.map((part) =>
       // A part that carries automation lanes has them fitted too (windsor#342 decision 3).
@@ -56,14 +56,14 @@ export function fitTimelines(arrangement: Arrangement): Arrangement {
         {
           ...part,
           regions: normaliseRegions(part.regions, {
-            songTicks,
+            songTicks: ticks,
             // Read tolerantly: the player fits a merged partial before it validates it.
             kind: sequencerKindOf(part.sequencer),
             path: `parts.${part.slot}.regions`,
             n,
           }),
         },
-        songTicks,
+        ticks,
       ),
     ),
   };

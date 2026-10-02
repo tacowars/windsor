@@ -282,8 +282,8 @@ describe('a gesture snaps to the grain of the region it acts on (fix round 1)', 
 
   it("reads each region's own divisor under the modifier, a bar without it", () => {
     const part = part0(twoSteps().doc);
-    expect(part.sequencer).toMatchObject({ divisor: DIVISORS.bar });
-    expect(regionGrain(part, 0, true)).toBe(DIVISORS.bar);
+    expect(part.sequencer).toMatchObject({ divisor: DIVISORS.whole });
+    expect(regionGrain(part, 0, true)).toBe(DIVISORS.whole);
     expect(regionGrain(part, 1, true)).toBe(DIVISORS.eighth);
     expect(regionGrain(part, 1, false)).toBe(BAR);
   });

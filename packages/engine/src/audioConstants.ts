@@ -21,8 +21,12 @@ export const SECONDS_PER_MINUTE = 60;
 /** Milliseconds per second: the ramp and smoothing times are written in ms. */
 export const MS_PER_SECOND = 1000;
 
-/** Notes of each value in one bar — the denominators of `DIVISORS`. */
-export const NOTES_PER_BAR = {
+/**
+ * Notes of each value in one whole note — the denominators of `DIVISORS`.
+ * Step lengths are note values, not bars (windsor#428): a bar is the meter's.
+ */
+export const NOTES_PER_WHOLE = {
+  half: 2,
   quarter: 4,
   eighth: 8,
   sixteenth: 16,
@@ -143,7 +147,7 @@ export const CHORD_VOICING_NOTES_MAX = 6;
 export const CHORD_GATE_DEFAULT = 1;
 /* ------------- the song: transport bars, harmony timeline, regions (#705) ------------- */
 
-/** Song length in bars (`transport.bars`, epic #703 decision 5); `songTicks = bars × TICKS_PER_BAR`. */
+/** Song length in bars (`transport.bars`, epic #703 decision 5); `songTicks(bars, meter)` in ticks. */
 export const BARS_MIN = 1;
 export const BARS_MAX = 256;
 export const DEFAULT_BARS = 4;

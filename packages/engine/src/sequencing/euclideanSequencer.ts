@@ -18,7 +18,7 @@ import { WALK_DOWN_CHANCE } from '../audioConstants';
 import { euclid, type Pattern } from './euclid';
 import { assertEuclidRows, type EuclidRows } from './euclidLanes';
 import { streamRng, type Rng } from './generatorSeed';
-import { isBarDivisor, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
+import { isNoteDivisor, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
 
 export const LFO_SHAPES = ['tri', 'sine', 'saw'] as const;
 export type LfoShape = (typeof LFO_SHAPES)[number];
@@ -122,7 +122,7 @@ export function assertEuclideanConfig(config: EuclideanConfig): void {
   const { steps, divisor, pulses } = config;
   if (!Number.isInteger(steps) || steps < 1)
     throw new RangeError(`steps must be >= 1, got ${steps}`);
-  if (!isBarDivisor(divisor)) throw new RangeError(`divisor must divide the bar, got ${divisor}`);
+  if (!isNoteDivisor(divisor)) throw new RangeError(`divisor must divide the bar, got ${divisor}`);
   const inRange = (k: number) => Number.isInteger(k) && k >= 0 && k <= steps;
   if (!inRange(pulses.min) || !inRange(pulses.max) || pulses.min > pulses.max) {
     throw new RangeError(`pulses bounds must satisfy 0 <= min <= max <= ${steps}`);

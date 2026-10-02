@@ -15,12 +15,13 @@
  */
 import type { Arrangement, SongLoop, Transport } from './arrangement';
 import { FieldNormaliser } from './arrangementFields';
-import { PPQ, TICKS_PER_BAR, type TickLoop } from '../sequencing/scheduler';
+import { songTicks } from '../sequencing/meter';
+import { PPQ, type TickLoop } from '../sequencing/scheduler';
 
 /** The grid the loop's points snap to, and its shortest length: one beat. */
 export const LOOP_GRID_TICKS = PPQ;
 
-const ticksOf = (transport: Transport): number => transport.bars * TICKS_PER_BAR;
+const ticksOf = (transport: Transport): number => songTicks(transport.bars);
 
 const snap = (tick: number, grid: number): number => Math.round(tick / grid) * grid;
 
