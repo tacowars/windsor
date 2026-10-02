@@ -82,7 +82,18 @@ Version 2 is additive: `patches` and `songs` are untouched.
 - **Why two stores.** The list reads only the small index records, so it
   never loads every song's patch snapshots to draw a table.
 - **One transaction.** A save writes both records in a single transaction,
-  so an index entry never points at a missing document.
+  so an index entry never points at a missing document. Deleting the open
+  song writes its text into `songs/current` and deletes its two records in
+  one transaction across the three stores, so at least one committed copy
+  always survives.
+- **A stale tab is refused** (tacowars, 2026-10-02). Each index record
+  carries a `revision`, which every save bumps. A save names the revision
+  it was based on, and the transaction refuses it when the stored revision
+  has moved on, because another tab saved the song since. The refused tab
+  keeps its edits open and says: "This song was changed in another tab —
+  Save as copy… to keep these edits." The first save wins, and nothing is
+  overwritten silently. Single-writer locks were rejected because a
+  forgotten tab would block the song.
 - **The index is derived.** One pure function reads the document's
   declared `version`, plus `name`, `tags`, `bpm`, `meter` (absent is 4/4), `bars` and `key`, from the
   document text at each write. Only `id`,
@@ -110,6 +121,14 @@ Version 2 is additive: `patches` and `songs` are untouched.
 - **Autosave goes to the song it read.** Switching songs flushes the
   pending autosave into the song being left before the next one opens. A
   write never lands in the wrong record.
+- **One switch.** Every replacement of the open document goes through one
+  awaited switch: Open, New from, New song, Import, a delete of the open
+  song, and the boot's reopen. It drains, stops on a failure, and then
+  replaces. Nothing replaces the document or redirects the autosave around
+  it, and redirecting never drops a write that is still owed. The boot
+  checks for the user's touch immediately before it replaces the document,
+  and a document the user touched during a late boot is queued for saving
+  at once.
 - **The switch drains every edit.** An edit made while a write is in
   flight is flushed too: the switch keeps flushing until nothing is
   waiting, and only then replaces the document.
