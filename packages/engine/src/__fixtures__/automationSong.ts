@@ -8,7 +8,7 @@
  * field the insert does not read at the moment, which the song keeps.
  */
 import type { AutomationLane, AutomationTargetId } from '../automation/automationLane';
-import { formatTargetId } from '../automation/automationTargets';
+import { formatTargetId, voiceTargetId } from '../automation/automationTargets';
 import { DEFAULT_EQ } from '../inserts/eqSpec';
 import { DEFAULT_TAPE } from '../inserts/tapeSpec';
 import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
@@ -66,7 +66,7 @@ export const AUTOMATION_LANES: readonly AutomationLane[] = [
     ],
   },
   {
-    target: 'voice.filter.cutoff',
+    target: voiceTargetId('filter.cutoff'),
     on: true,
     points: [
       { tick: 0, value: 200, bend: 0.6 },
@@ -75,7 +75,7 @@ export const AUTOMATION_LANES: readonly AutomationLane[] = [
     ],
   },
   {
-    target: 'voice.ops.0.level',
+    target: voiceTargetId('ops.0.level'),
     on: true,
     points: [
       { tick: 0, value: 1, bend: 0 },

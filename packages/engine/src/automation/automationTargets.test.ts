@@ -9,6 +9,7 @@ import {
   formatTargetId,
   insertTargetRow,
   parseTargetId,
+  requireCatalogRow,
   targetKind,
   targetRow,
 } from './automationTargets';
@@ -160,6 +161,12 @@ describe('the row lookups', () => {
     expect(catalogRow('strip.pan')?.min).toBe(-1);
     expect(catalogRow('voice.filter.cutoff')?.scale).toBe('octaves');
     expect(catalogRow('insert.ab12cd34.mix')).toBeUndefined();
+  });
+
+  it('require a strip or voice row, throwing a RangeError that names a missing id', () => {
+    expect(requireCatalogRow('strip.pan')).toBe(catalogRow('strip.pan'));
+    expect(() => requireCatalogRow('voice.nothing')).toThrow(RangeError);
+    expect(() => requireCatalogRow('voice.nothing')).toThrow('"voice.nothing"');
   });
 
   it("find an insert row through its insert's kind", () => {

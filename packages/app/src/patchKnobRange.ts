@@ -6,7 +6,7 @@
  * what the catalog does not know: the label, the step and the readout.
  */
 import type { AutomationTargetRow, VoiceTargetPath } from '@windsor/engine';
-import { catalogRow, voiceTargetId } from '@windsor/engine';
+import { requireCatalogRow, voiceTargetId } from '@windsor/engine';
 import type { KnobSpec } from './knob';
 
 /** The part of a knob's spec a catalog row decides. */
@@ -27,7 +27,5 @@ export function knobRangeOf(row: AutomationTargetRow): CatalogKnobRange {
 
 /** The knob range of the voice target at `path`. Throws on a path the catalog has no row for. */
 export function voiceKnobRange(path: VoiceTargetPath): CatalogKnobRange {
-  const row = catalogRow(voiceTargetId(path));
-  if (!row) throw new Error(`patchKnobRange: no voice target at ${path}`);
-  return knobRangeOf(row);
+  return knobRangeOf(requireCatalogRow(voiceTargetId(path)));
 }

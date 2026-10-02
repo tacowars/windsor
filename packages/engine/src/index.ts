@@ -131,6 +131,7 @@ export {
   formatTargetId,
   insertTargetRow,
   parseTargetId,
+  requireCatalogRow,
   targetKind,
   targetRow,
   voicePathOf,
