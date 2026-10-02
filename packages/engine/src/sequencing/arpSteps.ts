@@ -65,7 +65,8 @@ export interface ArpGridFields {
   readonly skipChance: number;
 }
 
-function assertCell(step: ArpStep, index: number): void {
+/** One cell: a known kind, and a note's octave and ratchet in range. Basslead's steps share it (windsor#367). */
+export function assertCell(step: ArpStep, index: number): void {
   if (!(GRID_STEP_KINDS as readonly string[]).includes(step.kind)) {
     throw new RangeError(`steps[${index}].kind must be one of ${GRID_STEP_KINDS.join('|')}`);
   }

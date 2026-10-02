@@ -293,8 +293,9 @@ describe('the stream', () => {
   });
 });
 
-it('shows no playhead: the card has no strip', () => {
-  expect(bass().stepAt(3)).toBe(-1);
+it('its playhead is the strip step: the local step modulo the loop (windsor#367)', () => {
+  expect(bass().stepAt(3)).toBe(3);
+  expect(bass().stepAt(DEFAULT_BASS_CONFIG.length + 2)).toBe(2);
 });
 
 /** Seed 7's first four bars: one E♭ among the roots. A stream pin, not a tunable. */
