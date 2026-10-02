@@ -1634,6 +1634,27 @@ function primeVoiceOffsets(voice) {
   }
   voice.fbRamp = 0;
 }
+var keptValues = new Float64Array(VOICE_TARGET_COUNT);
+var keptTargets = new Uint8Array(VOICE_TARGET_COUNT);
+function rebindVoiceOffsets(voice, slotTargets) {
+  const v = voice.liveValues;
+  const kept = keptTargets;
+  keptValues.set(v);
+  kept.fill(0);
+  for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
+    const code = slotTargets[s];
+    if (code >= 0) kept[code] = 1;
+  }
+  bindLiveValues(voice);
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK;
+    if (kept[k] !== 0) continue;
+    voice.fbTo[i] = v[k];
+    voice.fbFrom[i] = voice.fbTo[i];
+    voice.fbRamp &= ~(1 << i);
+  }
+}
 
 // packages/engine/src/worklet/fm/voiceControl.ts
 var MIP_FREQ_SLOT = new Float64Array(1);
@@ -2438,9 +2459,9 @@ function startStepMod(voice, patch, stepMod) {
     voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
   }
 }
-function rebindStepMod(voice, patch, switched) {
+function rebindStepMod(voice, patch, switched, slotTargets) {
   bindStepMod(voice, patch);
-  primeVoiceOffsets(voice);
+  rebindVoiceOffsets(voice, slotTargets);
   const live = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     if ((switched & 1 << i) === 0) continue;
@@ -2620,8 +2641,10 @@ var Voice = class {
    * control block instead of the next note. A wave or algorithm switch steps
    * audibly -- acceptable while designing a sound, which is why `liveRetune`
    * is off by default and a part keeps the click-free note-on binding.
+   * `slotTargets` is the part's slot map: a target a song lane moves keeps
+   * the lane's value across the rebind (windsor#346).
    */
-  rebind(patch, waveSets) {
+  rebind(patch, waveSets, slotTargets) {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
@@ -2641,7 +2664,7 @@ var Voice = class {
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
-    rebindStepMod(this, patch, switched);
+    rebindStepMod(this, patch, switched, slotTargets);
   }
   /**
    * Legato slide (#602): re-point a sounding voice at a new note. The pitch
@@ -2855,7 +2878,8 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.patch = normalisePatch(msg.patch);
         this.rebuildWaves();
         if (this.liveRetune) {
-          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets);
+          const slots = this.slotTargets;
+          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets, slots);
         }
         break;
       }
