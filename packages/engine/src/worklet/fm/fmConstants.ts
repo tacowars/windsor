@@ -6,7 +6,8 @@
  * (windsor#346), the drive stage's
  * shape constants and tone curve (windsor#300), a Noise operator's
  * colour filters' ceiling and damping (windsor#362), and the Formant
- * filter's Q scale, cap and makeup (windsor#331). Data, not logic: every
+ * filter's Q scale, cap and makeup (windsor#331), and the steal fade and
+ * reserve (windsor#410). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
  * says so, and `fmProcessorKernel.test.ts` pins `MOD_INDEX_SCALE` against the
@@ -154,6 +155,22 @@ const FORMANT_Q_PER_RESONANCE = 8;
 const FORMANT_Q_MAX = 40;
 const FORMANT_MAKEUP = 1.787;
 
+/*
+ * Voice stealing (windsor#410, `voiceSteal.ts`). A voice a full part steals
+ * fades out over STEAL_FADE_SECONDS from the level it plays at: 4 ms popped
+ * on a loud pad tail, and 30 ms sits inside the 10 to 50 ms other synths use
+ * (`docs/research/2026-10-02-voice-stealing/`). The pool holds the sounding
+ * limit plus a reserve of at least the limit and at least STEAL_RESERVE_MIN,
+ * an eight-note chord with `spread`'s two voices a note, so a chord that
+ * steals every voice it plays still finds a free slot for each. The first
+ * STEAL_STREAMED_RESERVE reserve slots are the four the pool had before:
+ * they seed from the part's random stream, and the slots past them from a
+ * stream of their own, so every seeded render that never steals is unchanged.
+ */
+const STEAL_FADE_SECONDS = 0.03;
+const STEAL_RESERVE_MIN = 16;
+const STEAL_STREAMED_RESERVE = 4;
+
 export {
   TABLE_SIZE,
   TABLE_MASK,
@@ -185,4 +202,7 @@ export {
   FORMANT_Q_PER_RESONANCE,
   FORMANT_Q_MAX,
   FORMANT_MAKEUP,
+  STEAL_FADE_SECONDS,
+  STEAL_RESERVE_MIN,
+  STEAL_STREAMED_RESERVE,
 };

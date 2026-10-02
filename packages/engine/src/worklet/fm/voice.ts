@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- a few lines over 350 after windsor#347's decay lanes and their rebind hold; tacowars accepted that rather than a split */
-/* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
+/* eslint-disable no-magic-numbers -- DSP: the 4-ms cut fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history, amplitude ramps and their knots (windsor#301), width ramps, six
@@ -470,7 +470,10 @@ class Voice {
     }
   }
 
-  /** Graceful stealing: fade out over ~4 ms, then free the slot. */
+  /**
+   * A quick fade over ~4 ms, then free the slot: the mono cut and a held End
+   * level. A full pool's steal is `voiceSteal.ts`'s 30 ms (windsor#410).
+   */
   steal(): void {
     if (!this.active) return;
     this.gate = false;
