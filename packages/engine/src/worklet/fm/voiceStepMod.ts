@@ -7,7 +7,8 @@
  * amount, cutoff, resonance and envelope decay, and each operator's level,
  * decay, decay curve, feedback and width. The offsets are fixed at note-on
  * and held for the note's whole life (decision 1); a legato retarget takes
- * the new step's, except the rows marked `slideKeeps`.
+ * the new step's, except the rows marked `slideKeeps`, and keeps the decay
+ * curves its envelopes play (`retargetStepMod`, windsor#405).
  *
  * Invariant: an offset of exactly 0 hands back the patch's own value
  * untouched, neither clamped nor passed through a curve, so a note without
@@ -129,6 +130,34 @@ function startStepMod(
   }
 }
 
+/** The decay curves a slide keeps, one voice at a time (windsor#405). */
+const slideCurves = new Float64Array(OPERATOR_COUNT);
+
+/**
+ * A legato retarget's step, from `Voice.retarget` (#602): load the new
+ * step's offsets, but for the `slideKeeps` rows, and bind them over the
+ * patch. Each envelope keeps the decay curve it plays (windsor#405, as
+ * `keepVoiceOffsets` keeps it for a rebind): `bindStepMod` writes the step's
+ * curve, under the lane's where a lane holds one, and the next control block
+ * would put the lane's back as if the lane had moved, and start a running
+ * decay again from its level. The curve's step offset is kept and the patch
+ * is the same, so without a lane the curve kept is the one bound, to the
+ * bit; with one, only the lane's offset changing reshapes the decay. A
+ * decay time needs no keeping: the envelope reads it in the control block,
+ * after the lanes are back over it. Allocates nothing.
+ */
+function retargetStepMod(
+  voice: Voice,
+  patch: WorkletPatch,
+  stepMod: ArrayLike<number> | null | undefined,
+): void {
+  loadStepOffsets(voice, stepMod, true);
+  const env = voice.ampEnv;
+  for (let i = 0; i < OPERATOR_COUNT; i++) slideCurves[i] = env[i].decayCurve;
+  bindStepMod(voice, patch);
+  for (let i = 0; i < OPERATOR_COUNT; i++) env[i].decayCurve = slideCurves[i];
+}
+
 /**
  * A live retune's rebind, from `Voice.rebind` once its envelopes are
  * configured: what the voice plays is kept (`keepVoiceOffsets`), the note
@@ -158,4 +187,4 @@ function rebindStepMod(
   }
 }
 
-export { bindStepMod, loadStepOffsets, rebindStepMod, startStepMod };
+export { bindStepMod, loadStepOffsets, rebindStepMod, retargetStepMod, startStepMod };
