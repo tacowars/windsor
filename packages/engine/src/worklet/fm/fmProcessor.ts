@@ -1,4 +1,4 @@
-/* eslint-disable no-magic-numbers -- DSP: the parameter ranges, the reserve of four voices, the pan spread and the 128-frame budget are the part's contract; the tunables are fmConstants.ts (#654) */
+/* eslint-disable no-magic-numbers -- DSP: the parameter ranges, the pan spread and the 128-frame budget are the part's contract; the tunables are fmConstants.ts (#654) */
 /* global AudioWorkletProcessor, registerProcessor, sampleRate, currentFrame */
 /**
  * fmProcessor.js -- the FM part processor, the entry that
@@ -30,8 +30,9 @@ import { CTRL_INTERVAL } from './fmConstants';
 import { normalisePatch, num } from './patchNormalise';
 import { makeRandom } from './prng';
 import { LoadSampler } from '../loadSampler';
-import { Voice } from './voice';
+import type { Voice } from './voice';
 import { allocateVoice } from './voiceAllocation';
+import { buildVoicePool } from './voiceSteal';
 import { PART_BEND, PART_CONTROL_COUNT, PART_CUTOFF_MOD, PART_WHEEL } from './voiceControl';
 import {
   CUTOFF_MOD_RANGE,
@@ -140,14 +141,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
     this.slideIn = false;
     this.stepModIn = null;
 
-    // Four reserve slots above the sounding limit so a stolen voice can fade
-    // out while its replacement is already sounding.
-    const poolSize = maxVoices + 4;
-    this.voices = new Array(poolSize);
-    for (let i = 0; i < poolSize; i++) {
-      const { partControls, partOffsets, partFloors } = this;
-      this.voices[i] = new Voice(sampleRate, this.random, partControls, partOffsets, partFloors);
-    }
+    // Reserve slots above the sounding limit so a stolen voice can fade out
+    // while its replacement is already sounding (`voiceSteal.ts`, windsor#410).
+    this.voices = buildVoicePool(this, maxVoices, sampleRate);
 
     this.patch = normalisePatch(opts.patch);
     this.waveSets = [null, null, null, null];
@@ -170,7 +166,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // live playback; `specialise: false` renders every voice through the
     // generic loop, so a test can prove the two agree bit for bit.
     const specialise = opts.specialise !== false;
-    for (let i = 0; i < poolSize; i++) this.voices[i].specialise = specialise;
+    for (let i = 0; i < this.voices.length; i++) this.voices[i].specialise = specialise;
 
     // Audio-load sampler (#445, `../loadSampler.ts`), off until a `reportLoad`
     // message turns it on, so an offline render and the Node harness time
@@ -270,8 +266,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Mono (#453): fade out every voice the part has sounding -- the same 4 ms
-   * steal a full pool uses, so the cut never clicks -- and drop the note map
+   * Mono (#453): fade out every voice the part has sounding -- the 4 ms
+   * `Voice.steal`, so the cut never clicks -- and drop the note map
    * with them, so a later noteOff for a cut note finds nothing and cannot
    * release the note that replaced it. Allocates nothing.
    */
