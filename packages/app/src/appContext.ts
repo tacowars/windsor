@@ -29,6 +29,8 @@ import type { BuildOptions, EngineHost } from './host';
 import { loadRenames } from './partAutoName';
 import { PartsSession } from './partsSession';
 import { followSongLength } from './regionModel';
+import type { OpenAmend } from './songSession';
+import { SongSession } from './songSession';
 import type { ToastTone } from './toastModel';
 import { UndoHistory, stepLabel } from './undoHistory';
 
@@ -69,6 +71,8 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   readonly parts: PartsSession;
   readonly transport: ConsoleTransport;
   readonly notify: (message: string, tone?: ToastTone) => void;
+  /** The open-song session (windsor#433); its storage is attached at boot. */
+  readonly songs: SongSession;
 
   private readonly tabs = new Map<string, Tab<P>>();
   private active: string | null = null;
@@ -85,6 +89,13 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     this.notify = deps.notify;
     this.transport = deps.host.transport;
     this.parts = new PartsSession((patch) => this.commitPatch(patch));
+    this.songs = new SongSession({
+      model: this.model,
+      parts: this.parts,
+      replace: (raw, amend) => this.replaceDocument(raw, amend),
+      change: (partial, label) => this.change(partial, label),
+      notify: (message, tone) => this.notify(message, tone),
+    });
     setGestureHook({ begin: (label) => this.beginGesture(label), end: () => this.endGesture() });
   }
 
@@ -252,16 +263,36 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     return true;
   }
 
-  importDoc(raw: unknown): void {
-    // Through the model, never `makeArrangement` here: the model is what
-    // applies the editor's library fill to a pre-#562 song.
-    // A generic part already playing a patch takes its name now (windsor#103
-    // decision 4): a document edit like a typed rename, so it exports, made
-    // inside `open` so the import report stays the raw document's; the
-    // rebuild below builds from the renamed document. A restore autosaves it
-    // only when the report is clean (`startAutosave`); an import autosaves
-    // on open as it always has, and its file is left untouched.
-    this.model.open(raw, loadRenames);
+  /**
+   * Adopt an imported document as an untitled song (windsor#433 decision
+   * 5), through the session's one switch: the song being left is drained
+   * into its record first, and when that fails the import stops, reported,
+   * and resolves false. A song with no name takes `fileName`'s.
+   */
+  importDoc(raw: unknown, fileName?: string): Promise<boolean> {
+    return this.songs.adopt(raw, fileName === undefined ? {} : { fileName });
+  }
+
+  /**
+   * Replace the document — every switch of song takes this one path, from
+   * the session. Through the model, never `makeArrangement` here: the model
+   * is what applies the editor's library fill to a pre-#562 song.
+   *
+   * A generic part already playing a patch takes its name now (windsor#103
+   * decision 4): a document edit like a typed rename, so it exports, made
+   * inside `open` so the import report stays the raw document's; `amend` is
+   * the session's own edit of the open (an imported file's name), made the
+   * same way. The rebuild below builds from the amended document. A restore
+   * or a stored song autosaves it only when the report is clean
+   * (`saveOpenIfClean`); an import autosaves on open as it always has, and
+   * its file is left untouched.
+   */
+  private replaceDocument(raw: unknown, amend?: OpenAmend): void {
+    this.model.open(raw, (doc) => {
+      const renames = loadRenames(doc);
+      const own = amend?.(doc) ?? null;
+      return renames || own ? { ...renames, ...own } : null;
+    });
     // A new document starts a new history (decision 4). A gesture open
     // across it records nothing: its "before" belongs to the other song.
     this.history.clear();

@@ -3,30 +3,32 @@
  * decision 1): asked first, opened through `importDoc` like a file, and a
  * record that will not open is reported and left alone.
  */
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ARRANGEMENT_VERSION } from '@windsor/engine';
 import { FULL_ARRANGEMENT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { openSessionConsole, songText } from './__fixtures__/songSessionConsole';
 import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
 import { DocumentModel } from './documentModel';
 import type { ConfirmRequest } from './metadataModal';
-import type { StoredSong } from './songAutosave';
-import { importRefusedText, offerRestore, restoreRequest, songRefusal } from './songRestore';
-import { newSong } from './songParts';
+import type { SessionRecord, StoredSong } from './songAutosave';
+import {
+  bootSong,
+  importRefusedText,
+  offerRestore,
+  restoreRequest,
+  songRefusal,
+  touchWatch,
+} from './songRestore';
 
 beforeAll(() => loadBuiltIns());
 
+/** A real console with no IndexedDB, on its third part; `messages` are its toasts, as `tone: message`. */
 function context(): AppCtx & { messages: string[] } {
-  const model = new DocumentModel(newSong());
-  const messages: string[] = [];
-  return {
-    model,
-    messages,
-    parts: { selected: 2 },
-    importDoc: (raw: unknown) => model.open(raw),
-    notify: (message: string) => messages.push(message),
-  } as unknown as AppCtx & { messages: string[] };
+  const c = openSessionConsole(false);
+  c.ctx.parts.selected = 2;
+  return Object.assign(c.ctx, { messages: c.toasts });
 }
 
 const saved = (document: string): StoredSong => ({ updated: '2026-09-28T11:58:00.000Z', document });
@@ -64,7 +66,7 @@ describe('offerRestore', () => {
   it('reports a record that will not open', async () => {
     const ctx = context();
     expect(await offerRestore(ctx, saved('{not json'), () => Promise.resolve(true))).toBe(false);
-    expect(ctx.messages[0]).toMatch(/^restore failed: /);
+    expect(ctx.messages[0]).toMatch(/^error: restore failed: /);
   });
 
   it('says when the song was saved, and that declining keeps it', () => {
@@ -136,6 +138,123 @@ describe('offerRestore', () => {
       );
       expect(songRefusal(song())).toBeNull();
       expect(songRefusal('{not json')).toBeNull();
+    });
+  });
+});
+
+describe('bootSong, the reload (windsor#433 decision 9)', () => {
+  const STAMP = '2026-10-02T08:00:00.000Z';
+  const never = (): Promise<boolean> => {
+    throw new Error('asked a question');
+  };
+
+  it('reopens an openable named song with no question, and says so', async () => {
+    const c = openSessionConsole();
+    const text = songText({ name: 'Night Drive', tags: [] }, { bpm: 128 });
+    await c.library.write('n', text);
+    const asked = vi.fn(never);
+    expect(await bootSong(c.ctx, { updated: STAMP, songId: 'n' }, asked)).toBe('opened');
+    expect(asked).not.toHaveBeenCalled();
+    expect(c.ctx.songs.state).toEqual({ kind: 'named', id: 'n' });
+    expect(c.ctx.model.toJson()).toBe(text);
+    expect(c.toasts).toEqual(['success: reopened Night Drive']);
+  });
+
+  it('starts a new song, and says why, when the named song is missing', async () => {
+    const c = openSessionConsole();
+    const fresh = c.ctx.model.toJson();
+    const asked = vi.fn(never);
+    expect(await bootSong(c.ctx, { updated: STAMP, songId: 'gone' }, asked)).toBe('new');
+    expect(asked).not.toHaveBeenCalled();
+    expect(c.ctx.songs.state).toEqual({ kind: 'untitled' });
+    expect(c.ctx.model.toJson()).toBe(fresh);
+    expect(c.toasts).toEqual([
+      'warning: your last song is no longer in your songs — this is a new song',
+    ]);
+  });
+
+  it('starts a new song, and says why, when the named song is in a newer format', async () => {
+    const c = openSessionConsole();
+    const future = JSON.stringify({ version: 99, meta: { name: 'Later', tags: [] } });
+    await c.library.write('later', future);
+    expect(await bootSong(c.ctx, { updated: STAMP, songId: 'later' }, never)).toBe('new');
+    expect(c.toasts[0]).toMatch(/^warning: your last song, Later, was saved with song format 99/);
+    expect(c.records.docMap.get('later')).toBe(future);
+  });
+
+  it('offers an untitled record as before', async () => {
+    const ctx = context();
+    const asked: ConfirmRequest[] = [];
+    const answer = (request: ConfirmRequest): Promise<boolean> => {
+      asked.push(request);
+      return Promise.resolve(true);
+    };
+    expect(await bootSong(ctx, saved(song()), answer)).toBe('opened');
+    expect(asked.map((request) => request.ok)).toEqual(['Restore']);
+  });
+
+  describe('a boot delayed behind the database (an older tab blocking the upgrade)', () => {
+    it('neither reopens nor asks once the user has edited, and says where the last song is', async () => {
+      const c = openSessionConsole();
+      await c.library.write('n', songText({ name: 'Night Drive', tags: [] }));
+      const touched = touchWatch(c.ctx);
+      let resolve: (record: SessionRecord) => void = () => {};
+      const load = new Promise<SessionRecord>((done) => (resolve = done));
+      c.ctx.change({ transport: { bpm: 141 } });
+      const edited = c.ctx.model.toJson();
+      resolve({ updated: STAMP, songId: 'n' });
+      const asked = vi.fn(never);
+      expect(await bootSong(c.ctx, await load, asked, { touched })).toBe('kept');
+      expect(asked).not.toHaveBeenCalled();
+      expect(c.ctx.model.toJson()).toBe(edited);
+      expect(c.ctx.songs.state).toEqual({ kind: 'untitled' });
+      expect(c.toasts).toEqual(['info: your last song is in your songs — this song stays open']);
+    });
+
+    it('asks nothing about an untitled record once the document was replaced (Import)', async () => {
+      const c = openSessionConsole();
+      const touched = touchWatch(c.ctx);
+      await c.ctx.importDoc(JSON.parse(songText({ name: 'Imported', tags: [] })));
+      expect(c.ctx.model.changed).toBe(false);
+      const asked = vi.fn(never);
+      expect(await bootSong(c.ctx, saved(song()), asked, { touched })).toBe('kept');
+      expect(asked).not.toHaveBeenCalled();
+      expect(c.ctx.model.doc.meta?.name).toBe('Imported');
+      expect(c.toasts).toEqual([
+        'info: your last session is kept until your first edit — this song stays open',
+      ]);
+    });
+
+    it('replaces nothing when the user edits while the named song is being read', async () => {
+      const c = openSessionConsole();
+      await c.library.write('n', songText({ name: 'Night Drive', tags: [] }));
+      const touched = touchWatch(c.ctx);
+      const doc = c.records.doc;
+      let reached: () => void = () => {};
+      const reading = new Promise<void>((done) => (reached = done));
+      let release: () => void = () => {};
+      c.records.doc = (id) => {
+        reached();
+        return new Promise((done) => (release = (): void => void doc(id).then(done)));
+      };
+      const booting = bootSong(c.ctx, { updated: STAMP, songId: 'n' }, never, { touched });
+      await reading;
+      c.ctx.change({ transport: { bpm: 142 } });
+      const edited = c.ctx.model.toJson();
+      release();
+      expect(await booting).toBe('kept');
+      expect(c.ctx.model.toJson()).toBe(edited);
+      expect(c.ctx.songs.state).toEqual({ kind: 'untitled' });
+      expect(c.toasts).toEqual(['info: your last song is in your songs — this song stays open']);
+    });
+
+    it('boots as usual when nothing was touched', async () => {
+      const c = openSessionConsole();
+      await c.library.write('n', songText({ name: 'Night Drive', tags: [] }));
+      const touched = touchWatch(c.ctx);
+      expect(await bootSong(c.ctx, { updated: STAMP, songId: 'n' }, never, { touched })).toBe(
+        'opened',
+      );
     });
   });
 });

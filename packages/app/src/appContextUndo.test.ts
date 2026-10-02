@@ -264,13 +264,13 @@ describe('refusals and imports', () => {
     expect(c.ctx.canRedo).toBe(false);
   });
 
-  it('clears both stacks on an import, and a gesture open across it records nothing', () => {
+  it('clears both stacks on an import, and a gesture open across it records nothing', async () => {
     const c = openConsole();
     threeEdits(c);
     c.ctx.undo();
     c.ctx.beginGesture('Level');
     c.ctx.change(level(0.1));
-    c.ctx.importDoc(newSong());
+    await c.ctx.importDoc(newSong());
     expect([c.ctx.canUndo, c.ctx.canRedo]).toEqual([false, false]);
     c.ctx.endGesture();
     expect(c.ctx.canUndo).toBe(false);
@@ -330,9 +330,9 @@ describe('an undo is an ordinary live edit', () => {
 });
 
 describe('an undo restores the document exactly', () => {
-  it('brings a removed middle part back in its place, rebuilding the live system', () => {
+  it('brings a removed middle part back in its place, rebuilding the live system', async () => {
     const c = openConsole();
-    c.ctx.importDoc(FULL_DOCUMENT);
+    await c.ctx.importDoc(FULL_DOCUMENT);
     const start = c.model.doc;
     const slots = start.parts.map((part) => part.slot);
     expect(slots.indexOf(FULL_SLOT.hat)).toBeLessThan(slots.length - 1);
@@ -381,9 +381,9 @@ describe('an undo rebuild resumes from the bar (windsor#132)', () => {
   const BAR = TICKS_PER_BAR;
   const MID_BAR_3 = 2 * BAR + BAR / 2;
 
-  it('hands an undo or redo rebuild the song tick the transport was at, looped or not', () => {
+  it('hands an undo or redo rebuild the song tick the transport was at, looped or not', async () => {
     const c = openConsole();
-    c.ctx.importDoc(FULL_DOCUMENT);
+    await c.ctx.importDoc(FULL_DOCUMENT);
     expect(c.buildOptions).toEqual([{}]);
     expect(c.ctx.change(removePartChange(c.model.doc, FULL_SLOT.hat)!).ok).toBe(true);
     c.position = MID_BAR_3;
@@ -396,7 +396,7 @@ describe('an undo rebuild resumes from the bar (windsor#132)', () => {
     expect(c.ctx.redo()).toBe(true);
     expect(c.buildOptions.at(-1)).toEqual({ resumeAt: MID_BAR_3 });
     // New song, like Import and the restore on reload, builds from the top.
-    c.ctx.importDoc(newSong());
+    await c.ctx.importDoc(newSong());
     expect(c.buildOptions.at(-1)).toEqual({});
   });
 });

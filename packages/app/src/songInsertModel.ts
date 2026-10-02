@@ -44,7 +44,10 @@ export function songPaneCtx(ctx: AppCtx, edited: () => void): AppCtx {
       }
       return result;
     },
-    importDoc: (raw) => ctx.importDoc(raw),
+    get songs() {
+      return ctx.songs;
+    },
+    importDoc: (raw, fileName) => ctx.importDoc(raw, fileName),
     render: () => ctx.render(),
     refreshTabs: () => ctx.refreshTabs(),
     invalidate: () => ctx.invalidate(),
