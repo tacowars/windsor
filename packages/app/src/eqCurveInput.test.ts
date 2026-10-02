@@ -13,10 +13,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EqBand, EqSpec } from '@windsor/engine';
 import { DEFAULT_EQ, EQ_BOUNDS, EQ_DSP } from '@windsor/engine';
 
-import { openGestureConsole } from './__fixtures__/gestureConsole';
+import { FakeElement, openGestureConsole } from './__fixtures__/gestureConsole';
 import { partChange } from './context';
-import { bandWheelGesture, wheelCurve } from './eqCurveInput';
-import type { BandWheelGesture, EqWheel, EqWheelHost } from './eqCurveInput';
+import { bandWheelGesture, wheelCurve, wireEqCurve } from './eqCurveInput';
+import type { BandWheelGesture, EqCurveHost, EqWheel, EqWheelHost } from './eqCurveInput';
 import {
   WHEEL_DELTA_MODE,
   doubleClick,
@@ -226,5 +226,72 @@ describe('the plot at a 32 kHz sample rate', () => {
     const up = keyEdit(spec, 2, { key: 'ArrowUp', alt: false, shift: false }, PLOT);
     expect(up && 'band' in up && up.band.freq).toBe(20000);
     expect(drag(stored, -1).freq).toBeLessThanOrEqual(EDGE);
+  });
+});
+
+/**
+ * A curve whose band fields a lane holds (windsor#396): its `edit` refuses,
+ * as the EQ card's does, so the spec never moves, but the curve still takes
+ * the keys and the wheel it takes unlocked, so the page never scrolls.
+ */
+describe('the curve over a band a lane holds', () => {
+  const RATE = 48000;
+  const PLOT = eqPlot(12, RATE);
+  const BAND = 2;
+  const spec = specWith(BAND, { gain: 3 });
+
+  beforeEach(() => {
+    vi.stubGlobal('window', new EventTarget());
+  });
+  afterEach(() => {
+    settleGestures();
+    vi.unstubAllGlobals();
+  });
+
+  /** A wired curve on a stand-in canvas, every edit refused: the canvas and the refusal count. */
+  function heldCurve(): { canvas: FakeElement; refused: () => number } {
+    const canvas = new FakeElement();
+    let refused = 0;
+    const host: EqCurveHost = {
+      canvas: canvas as unknown as HTMLCanvasElement,
+      spec: () => spec,
+      plot: () => PLOT,
+      sampleRate: () => RATE,
+      selected: () => BAND,
+      select: () => undefined,
+      edit: () => void refused++,
+      full: () => undefined,
+    };
+    wireEqCurve(host);
+    return { canvas, refused: () => refused };
+  }
+
+  /** Dispatch a cancelable `type` on `canvas` carrying `fields`: whether the curve prevented it. */
+  function prevented(canvas: FakeElement, type: string, fields: Record<string, unknown>): boolean {
+    const e = Object.assign(new Event(type, { cancelable: true }), fields);
+    canvas.dispatchEvent(e);
+    return e.defaultPrevented;
+  }
+  const key = (k: string): Record<string, unknown> => ({ key: k, altKey: false, shiftKey: false });
+
+  it('takes the arrows, so none scrolls the page, and changes nothing', () => {
+    const { canvas, refused } = heldCurve();
+    for (const k of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
+      expect(prevented(canvas, 'keydown', key(k)), k).toBe(true);
+    expect(refused()).toBe(4);
+  });
+
+  it('leaves Tab to the page', () => {
+    const { canvas, refused } = heldCurve();
+    expect(prevented(canvas, 'keydown', key('Tab'))).toBe(false);
+    expect(refused()).toBe(0);
+  });
+
+  it('takes a wheel over the held point, so it never scrolls the page, and changes nothing', () => {
+    const { canvas, refused } = heldCurve();
+    const at = pointAt(spec, BAND, PLOT, RATE);
+    const wheel = { clientX: at.x, clientY: at.y, deltaX: 0, deltaY: -100, deltaMode: 0 };
+    expect(prevented(canvas, 'wheel', { ...wheel, shiftKey: false })).toBe(true);
+    expect(refused()).toBe(1);
   });
 });

@@ -4,7 +4,13 @@
  * list, which the engine takes as a param write when the kinds match. The
  * rack stands them in columns of two at its small dial, or one to a column
  * at its big dial (windsor#173 decision 5; the mockup's `.knob.big`).
+ *
+ * On a part's strip a knob is locked while a lane on its field is on
+ * (windsor#351, `knobAutomation.ts`). A lane on a field the insert's settings
+ * leave unread is inert and locks nothing; the send buses, the groups and
+ * the master carry no lanes.
  */
+import { partAt } from '@windsor/engine';
 import type { InsertTarget } from './insertTarget';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
@@ -13,7 +19,29 @@ export { insertsOf } from './insertTarget';
 import { setInsertField } from './insertEdits';
 import { insertColumn, knobColumns } from './insertLayout';
 import type { InsertKnobEntry } from './insertKnobTables';
-import { makeKnob } from './knob';
+import { makeKnob, type KnobSpec } from './knob';
+import { insertKnobAutomation, knobSongTick } from './knobAutomation';
+
+/**
+ * The lock on the knob over `field` of the insert at `index` in `target`'s
+ * chain, for a part's strip; nothing for a bus, a group or the master.
+ */
+export function insertFieldLock(
+  ctx: AppCtx,
+  target: InsertTarget,
+  index: number,
+  field: string,
+): Pick<KnobSpec, 'automation'> {
+  if (typeof target !== 'number') return {};
+  return {
+    automation: () => {
+      const part = partAt(ctx.model.doc, target);
+      const spec = part?.strip.inserts[index];
+      const tick = knobSongTick(ctx.model.doc, ctx.transport.position());
+      return insertKnobAutomation(part, spec, field, tick);
+    },
+  };
+}
 
 function rackKnob<S>(
   ctx: AppCtx,
@@ -27,6 +55,7 @@ function rackKnob<S>(
     ...o,
     color: STRIP_COLOR,
     dial: knob.dial,
+    ...insertFieldLock(ctx, slot, index, f),
     get: () => {
       const spec = insertsOf(ctx, slot)[index] as Record<string, unknown> | undefined;
       const value = spec?.[f];

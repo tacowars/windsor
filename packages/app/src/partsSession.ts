@@ -12,6 +12,7 @@
  */
 import type { Patch } from '@windsor/engine';
 import { makePatch } from '@windsor/engine';
+import type { KnobAutomation } from './knobAutomation';
 
 export class PartsSession {
   /** The selected part's slot (#597). */
@@ -37,4 +38,9 @@ export interface PatchEditor {
   push(): void;
   /** Rebuild the whole patch UI (an algorithm change recolours the bays). */
   refresh(): void;
+  /**
+   * The lock a lane of the selected part puts on the knob at `path`
+   * (windsor#351): null while none that is on holds it. Absent, nothing locks.
+   */
+  automation?(path: string): KnobAutomation | null;
 }

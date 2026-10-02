@@ -6,12 +6,18 @@
  * Type" over Type, Slope (a cut's only) and Listen on drag, then Freq, Gain
  * (a bell's or shelf's only) and Q (not a 6 dB cut's), a rule, and Scale and
  * Output. Built from `insertLayout.ts`'s columns and the rack's knobs.
+ *
+ * On a part's strip a band's Freq, Gain and Q lock while a lane on the field
+ * is on (windsor#397, `insertFieldLock` as every insert knob), as Scale and
+ * Output already do; an inert lane (an off band, a cut's gain) locks nothing.
  */
 import type { EqBand, EqBandType, EqSlope, EqSpec } from '@windsor/engine';
 import { EQ_BAND_TYPES, EQ_SLOPES } from '@windsor/engine';
 import { STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el, html } from './dom';
+import type { EqLanes } from './eqAutomation';
+import { eqBandField } from './eqAutomation';
 import type { EqPlot } from './eqCurveModel';
 import { hasQ, roleOf, withBand } from './eqCurveModel';
 import type { EqBandKnobField, EqView } from './eqTables';
@@ -26,7 +32,7 @@ import {
   eqSlopeLabel,
 } from './eqTables';
 import { withGesture } from './gestureHooks';
-import { insertKnob } from './insertKnobs';
+import { insertFieldLock, insertKnob } from './insertKnobs';
 import { insertColumn, insertRule, insertSelect, insertSwitch, wideColumn } from './insertLayout';
 import type { InsertTarget } from './insertTarget';
 import { makeKnob } from './knob';
@@ -40,6 +46,10 @@ export interface EqCardModel {
   commit(spec: EqSpec): boolean;
   sampleRate(): number;
   plot(): EqPlot;
+  /** Where the EQ's lanes are read, at the playhead (windsor#397). */
+  lanes(): EqLanes;
+  /** The spec as the curve draws it: each band field a lane holds at the lane's value. */
+  shown(): EqSpec;
 }
 
 /** The band at `field` of the selected band set to `value`, committed. */
@@ -133,10 +143,17 @@ export function eqRangeToggle(model: EqCardModel, changed: () => void): HTMLElem
   return row;
 }
 
+/** Where a band knob sits: its insert's chain and index, for the lane that may hold it. */
+interface EqKnobPlace {
+  readonly ctx: AppCtx;
+  readonly slot: InsertTarget;
+  readonly index: number;
+}
+
 function bandKnob(
   model: EqCardModel,
   field: EqBandKnobField,
-  o: { readonly off: boolean; readonly repaint: EqRepaint },
+  o: { readonly off: boolean; readonly repaint: EqRepaint; readonly place: EqKnobPlace },
 ): HTMLElement {
   const at = model.view().band;
   const spec = eqBandKnob(field, at);
@@ -147,6 +164,7 @@ function bandKnob(
     ...(o.off ? { fmt: () => EQ_KNOB_OFF_TEXT } : {}),
     color: STRIP_COLOR,
     dial: 'rack',
+    ...insertFieldLock(o.place.ctx, o.place.slot, o.place.index, eqBandField(at, field)),
     get: () => model.spec().bands[at]?.[field] ?? spec.def,
     set: (v) => void commitBandField(model, field, v),
     onChange: () => o.repaint('curve'),
@@ -203,7 +221,7 @@ export function eqPanel(
 ): HTMLElement[] {
   const band = model.spec().bands[model.view().band]!;
   const knob = (field: EqBandKnobField, off: boolean): HTMLElement =>
-    bandKnob(model, field, { off, repaint });
+    bandKnob(model, field, { off, repaint, place: { ctx, slot, index } });
   const [scale, output] = EQ_GLOBAL_KNOBS.map((entry) =>
     insertKnob(ctx, slot, index, entry, () => repaint('curve')),
   );
