@@ -80,6 +80,7 @@ export const CHORD_PATTERN_A = {
   kind: 'chord',
   divisor: TICKS_PER_BAR,
   gate: 1,
+  follow: false,
   voicing: 'close',
   register: { octave: 3 },
   steps: [{ kind: 'hit', duration: 1, repeat: 1, inversion: 0, octave: 0 }],
@@ -88,6 +89,7 @@ export const CHORD_PATTERN_B = {
   kind: 'chord',
   divisor: TICKS_PER_BAR / 8,
   gate: 0.5,
+  follow: false,
   voicing: 'spread',
   register: { octave: 4 },
   steps: [
@@ -113,6 +115,7 @@ export const REGION_PATTERN_CHORD = {
     kind: 'chord',
     divisor: TICKS_PER_BAR,
     gate: 1,
+    follow: false,
     voicing: 'close',
     register: { octave: 3 },
     steps: [],

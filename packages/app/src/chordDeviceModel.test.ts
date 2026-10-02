@@ -48,6 +48,7 @@ describe('the Chord device’s sizes (windsor#369)', () => {
     expect(SEQUENCER_DEVICE_PX['--chord-inset']).toBe(12);
     expect(SEQUENCER_DEVICE_PX['--chord-col-gap']).toBe(13);
     expect(SEQUENCER_DEVICE_PX['--chord-field-w']).toBe(120);
+    expect(SEQUENCER_DEVICE_PX['--chord-fields-pad']).toBe(33);
     expect(SEQUENCER_DEVICE_PX['--chord-tile-w']).toBe(110);
     expect(SEQUENCER_DEVICE_PX['--chord-tile-gap']).toBe(10);
     expect(SEQUENCER_DEVICE_PX['--chord-knob-pad']).toBe(9);

@@ -7,7 +7,8 @@
  * 0–32 steps each with a table duration, a repeat 1–8 and, for a hit, a
  * bounded inversion and octave — so building the generator cannot throw. A
  * step carries no pitch (epic #703 decision 15): the chord is the harmony
- * timeline's. An absent `steps` is empty: a chord part opens blank.
+ * timeline's. An absent `steps` is empty: a chord part opens blank. An
+ * absent `follow` is off (windsor#333), unreported; a junk one is off, reported.
  */
 import type { ChordDriver } from '../song/arrangement';
 import { show, type FieldNormaliser } from '../song/arrangementFields';
@@ -37,7 +38,7 @@ import {
 export function chordDriver(raw: unknown, path: string, n: FieldNormaliser): ChordDriver {
   const d = DEFAULT_CHORD_CONFIG;
   const o = n.section(raw, path);
-  n.dropUnknown(o, ['divisor', 'gate', 'voicing', 'register', 'steps'], path);
+  n.dropUnknown(o, ['divisor', 'gate', 'voicing', 'register', 'steps', 'follow'], path);
   const reg = n.section(o.register, `${path}.register`);
   n.dropUnknown(reg, ['octave'], `${path}.register`);
   return {
@@ -54,6 +55,8 @@ export function chordDriver(raw: unknown, path: string, n: FieldNormaliser): Cho
       ),
     },
     steps: steps(o.steps, `${path}.steps`, n),
+    // windsor#333: additive and off by default, so a document without it plays as before.
+    follow: n.bool(o.follow, d.follow, `${path}.follow`),
   };
 }
 

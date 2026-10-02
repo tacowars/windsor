@@ -14,7 +14,7 @@ import {
   type FullPartId,
 } from '../__fixtures__/fullArrangement';
 import { recordingPart, type RecordingPart } from '../__fixtures__/recordingPart';
-import type { Arrangement, MusicPart } from './arrangement';
+import type { Arrangement, ChordDriver, MusicPart } from './arrangement';
 import { ArrangementPlayer } from './arrangementPlayer';
 import { DEFAULT_CHORD_CONFIG, hitStep, restStep } from '../sequencing/chordSequencer';
 import { PRESETS } from '../patch/presets';
@@ -50,6 +50,7 @@ const PROGRESSION: Arrangement = {
             // C3 = 48.
             register: { octave: 3 },
             steps: [hitStep(), restStep(), hitStep({ duration: 0.5, repeat: 2 })],
+            follow: false,
           },
         }
       : part,
@@ -74,6 +75,18 @@ function rig(arrangement: Arrangement): {
     for (let i = 0; i < bars * TICKS_PER_BAR; i++) transport.advance(transport.transportSeconds);
   };
   return { transport, parts, player, run };
+}
+
+/** `base` with its drone's chord sequencer overridden (windsor#333). */
+function withDrone(base: Arrangement, over: Partial<ChordDriver>): Arrangement {
+  return {
+    ...base,
+    parts: base.parts.map((part): MusicPart =>
+      part.slot === drone && part.sequencer.kind === 'chord'
+        ? { ...part, sequencer: { ...part.sequencer, ...over } }
+        : part,
+    ),
+  };
 }
 
 const noteOns = (part: RecordingPart): number[] =>
@@ -202,6 +215,77 @@ describe('chord parts (#606)', () => {
       'noteOffByNote',
       'noteOffByNote',
       'allNotesOff',
+    ]);
+  });
+
+  it('a following hit moves its voices at the change and a region end releases the moved notes (windsor#333)', () => {
+    // One four-bar hit over i | VI in C minor, in a three-bar region: C E♭ G → C E♭ A♭.
+    const following = withDrone(PROGRESSION, {
+      steps: [hitStep({ duration: 4 })],
+      follow: true,
+    });
+    const arrangement: Arrangement = {
+      ...following,
+      parts: following.parts.map((part) =>
+        part.slot === drone
+          ? { ...part, regions: [{ start: 0, duration: 3 * TICKS_PER_BAR }] }
+          : part,
+      ),
+    };
+    const { parts, run } = rig(arrangement);
+    run(2);
+    const atChange = parts.drone.calls.length;
+    run(2);
+    const moves = parts.drone.calls.slice(atChange);
+    expect(moves.map((c) => `${c.kind} ${c.note}`)).toEqual([
+      'noteOffByNote 55',
+      'noteOn 56',
+      // The region ends at bar 3 with the moved chord held.
+      'noteOffByNote 48',
+      'noteOffByNote 51',
+      'noteOffByNote 56',
+    ]);
+  });
+
+  it('a key change moves a following hit on the next tick; without follow it waits for the onset', () => {
+    for (const follow of [true, false]) {
+      const { parts, player, transport } = rig(
+        withDrone(PROGRESSION, { steps: [hitStep({ duration: 4 })], follow }),
+      );
+      for (let i = 0; i <= TICKS_PER_BAR; i++) transport.advance(transport.transportSeconds);
+      const before = parts.drone.calls.length;
+      expect(player.apply({ harmony: { root: 2, scale: 'major' } }, {}).ok).toBe(true);
+      transport.advance(transport.transportSeconds);
+      const since = parts.drone.calls.slice(before).map((c) => `${c.kind} ${c.note}`);
+      // C E♭ G in D major's I (D F♯ A): every voice steps to its nearest free tone.
+      expect(since).toEqual(
+        follow
+          ? [
+              'noteOffByNote 48',
+              'noteOffByNote 51',
+              'noteOffByNote 55',
+              'noteOn 50',
+              'noteOn 54',
+              'noteOn 57',
+            ]
+          : [],
+      );
+    }
+  });
+
+  it('follow round-trips through a live edit and turning it on emits nothing by itself', () => {
+    const { parts, player, run } = rig(
+      withDrone(PROGRESSION, { steps: [hitStep({ duration: 4 })] }),
+    );
+    run(1);
+    const before = parts.drone.calls.length;
+    expect(player.apply({ parts: { [drone]: { sequencer: { follow: true } } } }, {}).ok).toBe(true);
+    expect(parts.drone.calls.length).toBe(before);
+    // Bar 3 is VI: the held i follows it now (G → A♭).
+    run(2);
+    expect(parts.drone.calls.slice(before).map((c) => `${c.kind} ${c.note}`)).toEqual([
+      'noteOffByNote 55',
+      'noteOn 56',
     ]);
   });
 

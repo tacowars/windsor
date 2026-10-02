@@ -306,6 +306,7 @@ describe('ChordSequencer', () => {
     expect(() => make([], { register: { octave: Number.NaN } })).toThrow(/register/);
     expect(() => make([], { register: { octave: REGISTER_OCTAVE_MAX + 1 } })).toThrow(/register/);
     expect(() => make([], { register: { octave: 0.5 } })).toThrow(/register/);
+    expect(() => make([], { follow: 'on' as unknown as boolean })).toThrow(/follow/);
     const seq = make([]);
     expect(() => seq.reconfigure({ ...seq.config, voicing: 'nope' as 'close' })).toThrow(/voicing/);
     expect(seq.config.voicing).toBe('close');

@@ -70,6 +70,8 @@ const PURE_FILES = [
   '../harmony/chordTables.ts',
   '../harmony/chordNames.ts',
   '../harmony/chordVoicing.ts',
+  // A held chord's minimal voice motion (windsor#333), which the Chord Player runs.
+  '../harmony/voiceLeading.ts',
   '../harmony/harmonyTimeline.ts',
   '../harmony/chordNormalise.ts',
   '../song/arrangementFields.ts',

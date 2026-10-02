@@ -4,9 +4,10 @@
  * `docs/research/2026-09-30-sequencer-rack/chord.html`): the body the Song
  * pane's frame (`sequencerDevice.ts`) puts beside the shared rail, at the
  * device's one height. Two sections: Play, the controls in columns — Base
- * step and Voicing; the Hit and Rest tiles and Delete last; Octave, Vel and
- * Gate in a strip behind a rule — and Steps, the strip, labelled with its
- * count and one pass in bars (`chordDeviceModel.ts`). The sizes are the
+ * step, Voicing and Follow (windsor#333); the Hit and Rest tiles and Delete
+ * last; Octave, Vel and Gate in a strip behind a rule — and Steps, the
+ * strip, labelled with its count and one pass in bars
+ * (`chordDeviceModel.ts`). The sizes are the
  * `--chord-*` entries of `SEQUENCER_DEVICE_PX`, measured off tacowars's
  * mockup.
  *
@@ -52,7 +53,7 @@ import {
 } from './chordStepModel';
 import type { AppCtx } from './context';
 import { PITCH_COLOR } from './consoleColors';
-import { el, select } from './dom';
+import { el, seg, select } from './dom';
 import { keySignature } from './gridModel';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
@@ -242,6 +243,28 @@ function baseStep(strip: ChordStrip): HTMLElement {
   );
 }
 
+/**
+ * Follow (windsor#333): an off/on switch, built as the Arp's Retrigger is. On,
+ * a held hit keeps the tones the next chord shares and steps the other
+ * voices to it.
+ */
+function follow(strip: ChordStrip): HTMLElement {
+  const wrap = el('div');
+  wrap.appendChild(el('span', 'field-label', 'Follow'));
+  const toggle = seg(
+    [
+      { value: 'off', label: 'off' },
+      { value: 'on', label: 'on' },
+    ],
+    () => (strip.spec()?.follow ? 'on' : 'off'),
+    (v) => writeField(strip, { follow: v === 'on' }),
+    PITCH_COLOR,
+  );
+  toggle.title = 'Hold the shared tones across a chord change, and move only the voices that must';
+  wrap.appendChild(toggle);
+  return wrap;
+}
+
 function deleteLast(strip: ChordStrip): HTMLElement {
   const button = el('button', 'btn seq-btn', 'Delete last') as HTMLButtonElement;
   button.type = 'button';
@@ -256,14 +279,14 @@ function column(className: string, nodes: readonly HTMLElement[]): HTMLElement {
   return col;
 }
 
-/** The Play section: Base step and Voicing; the tiles and Delete last; Octave, Vel and Gate. */
+/** The Play section: Base step, Voicing and Follow; the tiles and Delete last; Octave, Vel and Gate. */
 function controls(strip: ChordStrip, picker: Picker): HTMLElement {
   const knobs = CHORD_KNOBS.map((entry) =>
     tableKnob(strip.ctx, strip.slot, entry, PITCH_COLOR, strip.region),
   );
   const body = el('div', 'seq-sec-body');
   body.append(
-    column('wide chord-fields', [baseStep(strip), picker.voicing]),
+    column('wide chord-fields', [baseStep(strip), picker.voicing, follow(strip)]),
     column('wide chord-sources', [picker.tiles, deleteLast(strip)]),
     column('k3', [octave(strip), ...knobs]),
   );

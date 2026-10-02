@@ -116,6 +116,7 @@ const DRONE: MusicPart & { sequencer: ChordSpec } = {
     // D2 = 38: the octave below the grid line.
     register: { octave: 2 },
     steps: [hitStep(), hitStep()],
+    follow: false,
   },
 };
 

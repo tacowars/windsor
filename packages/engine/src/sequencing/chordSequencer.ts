@@ -18,7 +18,12 @@
  * `voicing`, above the key root at the part's absolute register octave. A
  * chord change never restarts anything: a hit sustaining across a harmony
  * boundary keeps its notes to its own end (decision 2 — only future onsets
- * change).
+ * change). With `follow` on (windsor#333, record
+ * `2026-10-02-chord-player-follow`) the held hit follows instead: on a tick
+ * whose chord stack or key root differs from the one the held notes were
+ * voiced from, the shared tones stay and only the voices that must move step
+ * to the nearest new chord tone (`followVoices`) — an off then an on per
+ * moved voice, nothing for a common tone.
  *
  * At an onset the notes still held are released on that tick, before the new
  * chord's note-ons; a rest's onset releases and plays nothing. With `gate`
@@ -52,9 +57,10 @@ import {
 } from '../harmony/chordTables';
 import { voiceChord } from '../harmony/chordVoicing';
 import type { HarmonyChord } from '../harmony/harmonyTimeline';
+import { followVoices } from '../harmony/voiceLeading';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
-import type { ScaleSampler } from './scaleSampler';
+import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
 import { DIVISORS, type Unsubscribe } from './scheduler';
 
 interface StepTiming {
@@ -93,6 +99,8 @@ export interface ChordSequencerConfig {
   register: { octave: number };
   /** 0–`CHORD_STEPS_MAX` steps; empty is silent. */
   steps: readonly ChordStep[];
+  /** A held hit follows a chord change with minimal voice motion (windsor#333); off keeps #705's rule. */
+  follow: boolean;
 }
 
 /** A hit of one base step, once, in root position at the register. */
@@ -118,6 +126,7 @@ export const DEFAULT_CHORD_CONFIG: ChordSequencerConfig = {
   voicing: CHORD_VOICING_DEFAULT,
   register: { octave: CHORD_REGISTER_OCTAVE_DEFAULT },
   steps: [],
+  follow: false,
 };
 
 function assertStep(step: ChordStep, index: number): void {
@@ -166,6 +175,9 @@ export function assertChordConfig(config: ChordSequencerConfig): void {
     );
   }
   config.steps.forEach(assertStep);
+  if (typeof config.follow !== 'boolean') {
+    throw new TypeError(`follow must be a boolean, got ${String(config.follow)}`);
+  }
 }
 
 /** One playing of one step: where it starts in the pattern and how long it lasts. */
@@ -197,7 +209,7 @@ export function layoutSegments(config: ChordSequencerConfig): ChordSegment[] {
  */
 export function voiceHit(
   sampler: ScaleSampler,
-  config: ChordSequencerConfig,
+  config: Pick<ChordSequencerConfig, 'voicing' | 'register'>,
   step: Pick<ChordHitStep, 'inversion' | 'octave'>,
   chord: HarmonyChord,
 ): number[] {
@@ -220,6 +232,14 @@ export class ChordSequencer {
   private held: number[] = [];
   /** The local tick a gated chord's offs go out on; null while the held chord runs to the next onset. */
   private releaseTick: number | null = null;
+  /**
+   * What the held notes were voiced from: the key root's pitch class and the
+   * chord's stack, as a string (the gate builds a fresh chord every tick, so
+   * the object never identifies it). Null while nothing is held.
+   */
+  private heldChord: string | null = null;
+  /** Set when `follow` turns on mid-hold: the next tick adopts the sounding chord without moving. */
+  private resync = false;
 
   constructor(sampler: ScaleSampler, config: ChordSequencerConfig) {
     assertChordConfig(config);
@@ -249,6 +269,8 @@ export class ChordSequencer {
    */
   reconfigure(config: ChordSequencerConfig, sampler: ScaleSampler = this.sampler): void {
     assertChordConfig(config);
+    // Follow takes effect at the next chord change, never at the toggle.
+    if (config.follow && !this.current.follow) this.resync = true;
     this.current = config;
     this.sampler = sampler;
     this.layout();
@@ -280,7 +302,7 @@ export class ChordSequencer {
       return this.held.length > 0 ? this.releaseHeld(event.tick, event.time) : [];
     }
     const segment = this.byStart.get(event.tick % this.length);
-    if (!segment) return gateEnded ? this.releaseHeld(event.tick, event.time) : [];
+    if (!segment) return gateEnded ? this.releaseHeld(event.tick, event.time) : this.follow(event);
     const step = this.current.steps[segment.step];
     const events = this.held.length > 0 ? this.releaseHeld(event.tick, event.time, false) : [];
     if (step && step.kind === 'hit' && event.chord) {
@@ -311,6 +333,8 @@ export class ChordSequencer {
     }));
     const gateTicks = Math.max(1, Math.round(this.current.gate * segment.ticks));
     this.held = notes;
+    this.heldChord = this.chordKey(chord);
+    this.resync = false;
     this.releaseTick = gateTicks >= segment.ticks ? null : event.tick + gateTicks;
     return events;
   }
@@ -319,8 +343,52 @@ export class ChordSequencer {
     const events: NoteEvent[] = this.held.map((note) => ({ kind: 'noteOff', tick, time, note }));
     this.held = [];
     this.releaseTick = null;
+    this.heldChord = null;
     if (emit) for (const e of events) this.onNote?.(e);
     return events;
+  }
+
+  /**
+   * A tick between onsets: with `follow` on and notes held, a chord whose
+   * stack or key root changed moves the voices that must move — offs for
+   * their old pitches, then ons for the new, on this tick. The release tick
+   * is unchanged. A null chord or an unchanged one emits nothing.
+   */
+  private follow(event: PartTickEvent): NoteEvent[] {
+    const chord = event.chord;
+    if (!this.current.follow || this.held.length === 0 || !chord) return [];
+    const key = this.chordKey(chord);
+    if (this.resync) {
+      this.resync = false;
+      this.heldChord = key;
+      return [];
+    }
+    if (key === this.heldChord) return [];
+    this.heldChord = key;
+    const moved = followVoices(this.held, chord.stack, this.sampler.rootNote(0));
+    const { tick, time } = event;
+    const steps = this.held.flatMap((from, i) => {
+      const to = moved[i] ?? from;
+      return to === from ? [] : [{ from, to }];
+    });
+    const events: NoteEvent[] = [
+      ...steps.map(({ from }): NoteEvent => ({ kind: 'noteOff', tick, time, note: from })),
+      ...steps.map(({ to }): NoteEvent => ({
+        kind: 'noteOn',
+        tick,
+        time,
+        note: to,
+        degree: chord.event.degree,
+      })),
+    ];
+    this.held = moved;
+    for (const e of events) this.onNote?.(e);
+    return events;
+  }
+
+  /** The held chord's identity: the key root's pitch class and the stack (decision 3). */
+  private chordKey(chord: HarmonyChord): string {
+    return `${this.sampler.rootNote(0) % SEMITONES_PER_OCTAVE}|${chord.stack.join(',')}`;
   }
 
   private layout(): void {

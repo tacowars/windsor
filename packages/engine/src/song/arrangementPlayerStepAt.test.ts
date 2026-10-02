@@ -79,6 +79,7 @@ const LADDER: Arrangement = {
 const CHORD_DRIVER = {
   divisor: DIVISORS.bar,
   gate: 1,
+  follow: false,
   voicing: 'close',
   register: { octave: 3 },
   steps: [
