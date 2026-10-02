@@ -9,7 +9,8 @@
  * leaves its result in `output` and `rand` its draw in `draw`, and every
  * double field is first written as NaN (windsor#233): V8 does not inline
  * `advance`, too large, and a double returned from a call it does not inline
- * is a new heap number on the audio thread. `lfo.test.ts`,
+ * is a new heap number on the audio thread. A song lane scales the rate
+ * through `rateMul` (windsor#346, `voiceOffsets.ts`). `lfo.test.ts`,
  * `fmProcessorModWheel.test.ts`, `__fixtures__/lfo2Routes.test.ts`, the
  * golden test and `synth/fmProcessorAllocation.test.ts` pin it.
  */
@@ -34,13 +35,19 @@ class Lfo {
   output: number;
   /** `rand`'s draw. */
   draw: number;
+  /**
+   * The rate's multiplier on the patch's (windsor#346): a song lane's ratio,
+   * which the voice writes each control block. Exactly 1 without one, and a
+   * product with 1 is exact, so the phase steps as it always has.
+   */
+  rateMul: number;
 
   /** `seed` is a non-zero xorshift32 state: `randomSeed32`, or `secondLfoSeed` of another LFO's. */
   constructor(seed: number) {
     // Rule 7: each double field is born a double (NaN), before its start
     // value; the seed is a uint32, past a small integer's range.
     this.phase = this.value = this.held = this.target = this.fade = NaN;
-    this.seed = this.output = this.draw = NaN;
+    this.seed = this.output = this.draw = this.rateMul = NaN;
     this.phase = 0;
     this.value = 0;
     this.held = 0;
@@ -49,6 +56,7 @@ class Lfo {
     this.seed = seed;
     this.output = 0;
     this.draw = 0;
+    this.rateMul = 1;
   }
 
   /** The next draw, 0..1, into `draw`. */
@@ -81,7 +89,7 @@ class Lfo {
    */
   advance(p: LfoSettings, n: number, sampleRate: number): void {
     const prev = this.phase;
-    this.phase += (p.rate * n) / sampleRate;
+    this.phase += (p.rate * this.rateMul * n) / sampleRate;
     let wrapped = false;
     if (this.phase >= 1) {
       if (p.oneShot) {

@@ -6,9 +6,18 @@
  * overhead, so 8-16 internally-polyphonic parts is the shape -- each with its
  * own native effect chain -- rather than a node per sounding note.
  */
+import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import type { Patch } from '../patch/patch';
-import type { NoteOnMessage, ScheduledMessage, WorkletMessage } from './workletMessages';
+import type {
+  NoteOnMessage,
+  ScheduledMessage,
+  VoiceSlotsMessage,
+  WorkletMessage,
+} from './workletMessages';
 import { frameForTime } from './workletMessages';
+
+/** The processor's slot parameter for slot `i` (`voiceSlot0` …, windsor#346). */
+export const voiceSlotParamName = (i: number): string => `voiceSlot${i}`;
 
 /** What a grid note carries beyond pitch and velocity (#602). */
 export interface NoteExtras {
@@ -31,8 +40,12 @@ export class AudioPart {
   readonly modWheel: AudioParam;
   readonly cutoffMod: AudioParam;
   readonly gain: AudioParam;
+  /** The song lanes' slots (windsor#346): each an offset on the voice target the slot map gives it. */
+  readonly voiceSlotParams: readonly AudioParam[];
 
   private patchValue: Patch;
+  /** Which voice target each slot moves, by patch path; null for a free slot. */
+  private readonly slotPaths: (string | null)[];
   private nextId = 1;
   /** note -> live handles, oldest first. Both maps are kept in step by forget(). */
   private readonly heldByNote = new Map<number, number[]>();
@@ -40,7 +53,13 @@ export class AudioPart {
   /** Note messages kept back instead of posted while held (`holdNotes`); null when not. */
   private held: ScheduledMessage[] | null = null;
 
-  constructor(name: string, node: AudioWorkletNode, patch: Patch) {
+  /** `voiceSlots` is the slot map the processor was built with (`ProcessorOptions.voiceSlots`). */
+  constructor(
+    name: string,
+    node: AudioWorkletNode,
+    patch: Patch,
+    voiceSlots?: readonly (string | null)[],
+  ) {
     this.name = name;
     this.node = node;
     this.output = node;
@@ -50,6 +69,10 @@ export class AudioPart {
     this.modWheel = requireParam(node, 'modWheel');
     this.cutoffMod = requireParam(node, 'cutoffMod');
     this.gain = requireParam(node, 'gain');
+    this.voiceSlotParams = Array.from({ length: FM_LANES_MAX }, (_, i) =>
+      requireParam(node, voiceSlotParamName(i)),
+    );
+    this.slotPaths = Array.from({ length: FM_LANES_MAX }, (_, i) => voiceSlots?.[i] ?? null);
   }
 
   get patch(): Patch {
@@ -74,10 +97,13 @@ export class AudioPart {
    * `takeHeldNotes`. An offline render plays its opening this way
    * (windsor#40): a port message is asynchronous and loses the race against
    * `OfflineAudioContext.startRendering()`, so the opening's notes go to the
-   * processor at construction instead (`PartOptions.events`).
+   * processor at construction instead (`PartOptions.events`). The slot map
+   * goes with them, first, when any slot is taken (windsor#346), so the
+   * render's voice lanes play from its first sample.
    */
   holdNotes(): void {
-    this.held ??= [];
+    if (this.held) return;
+    this.held = this.slotPaths.some((path) => path !== null) ? [this.slotMessage()] : [];
   }
 
   /** Stop holding and hand back the note messages held, oldest first. */
@@ -171,6 +197,39 @@ export class AudioPart {
     this.post({ type: 'allNotesOff' });
     this.heldByNote.clear();
     this.noteByHandle.clear();
+  }
+
+  /** The slot that moves the voice target at `path`, or undefined when it has none. */
+  voiceSlotOf(path: string): number | undefined {
+    const slot = this.slotPaths.indexOf(path);
+    return slot < 0 ? undefined : slot;
+  }
+
+  /**
+   * The slot that moves the voice target at `path` (windsor#346): the one it
+   * has, or the first free one, which the processor is told of. Undefined
+   * when every slot is taken; a song holds at most `FM_LANES_MAX` voice lanes.
+   */
+  takeVoiceSlot(path: string): number | undefined {
+    const held = this.voiceSlotOf(path);
+    if (held !== undefined) return held;
+    const free = this.slotPaths.indexOf(null);
+    if (free < 0) return undefined;
+    this.slotPaths[free] = path;
+    this.schedule(this.slotMessage());
+    return free;
+  }
+
+  /** Free the slot of the voice target at `path`, if it has one, and tell the processor. */
+  freeVoiceSlot(path: string): void {
+    const slot = this.voiceSlotOf(path);
+    if (slot === undefined) return;
+    this.slotPaths[slot] = null;
+    this.schedule(this.slotMessage());
+  }
+
+  private slotMessage(): VoiceSlotsMessage {
+    return { type: 'voiceSlots', slots: [...this.slotPaths] };
   }
 
   /** Hard stop with no release tails. Clicks; for teardown, not playback. */

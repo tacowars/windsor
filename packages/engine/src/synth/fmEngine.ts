@@ -29,7 +29,7 @@ import type { OutputStage } from '../mixer/outputStage';
 import { OUTPUT_STAGE_WORKLET_URL, createOutputStage } from '../mixer/outputStage';
 import type { Patch } from '../patch/patch';
 import { makePatch } from '../patch/patch';
-import type { ProcessorOptions, ScheduledMessage } from './workletMessages';
+import type { NoteMessage, ProcessorOptions, ScheduledMessage } from './workletMessages';
 import { PROCESSOR_NAME, REVERB_WORKLET_URL, WORKLET_URL } from './workletMessages';
 
 export interface PartOptions {
@@ -53,7 +53,9 @@ export interface PartOptions {
    * Notes the processor is built holding (`ProcessorOptions.events`). An
    * offline song render hands in its opening this way, because a port
    * message would reach the processor after rendering had begun
-   * (windsor#40). Live parts omit it.
+   * (windsor#40). Live parts omit it. A slot map among them (windsor#346)
+   * becomes the processor's `ProcessorOptions.voiceSlots`, the last one
+   * winning, as it would have on the port.
    */
   events?: ScheduledMessage[];
 }
@@ -149,7 +151,9 @@ export class FmEngine {
       slideSeconds: SLIDE_SECONDS_DEFAULT,
     };
     if (options.seed !== undefined) processorOptions.seed = options.seed;
-    if (options.events?.length) processorOptions.events = options.events;
+    const { notes, voiceSlots } = splitEvents(options.events ?? []);
+    if (notes.length) processorOptions.events = notes;
+    if (voiceSlots) processorOptions.voiceSlots = voiceSlots;
 
     const node = new AudioWorkletNode(this.context, PROCESSOR_NAME, {
       numberOfInputs: 0,
@@ -158,7 +162,7 @@ export class FmEngine {
       processorOptions,
     });
 
-    const part = new AudioPart(name, node, patch);
+    const part = new AudioPart(name, node, patch, voiceSlots);
     if (this.liveRetune) part.setLiveRetune(true);
     const destination = options.destination === undefined ? this.master : options.destination;
     if (destination) part.connect(destination);
@@ -211,4 +215,18 @@ export class FmEngine {
 
 function resolvePatch(options: PartOptions): Patch {
   return options.patch ?? makePatch();
+}
+
+/** A part's construction events as the processor takes them: the notes, and the last slot map. */
+function splitEvents(events: readonly ScheduledMessage[]): {
+  notes: NoteMessage[];
+  voiceSlots: (string | null)[] | undefined;
+} {
+  const notes: NoteMessage[] = [];
+  let voiceSlots: (string | null)[] | undefined;
+  for (const event of events) {
+    if (event.type === 'voiceSlots') voiceSlots = event.slots;
+    else notes.push(event);
+  }
+  return { notes, voiceSlots };
 }

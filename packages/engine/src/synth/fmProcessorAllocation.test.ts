@@ -164,6 +164,27 @@ const TOGGLES: [string, number][] = [
   ['gain', 0.5],
 ];
 
+/**
+ * Song lanes on every slot (windsor#346): the slot map, and each slot's
+ * offset toggled in turn with the part's own parameters, so a lane moves
+ * feedback (its ramp), level, width, the filter and both LFOs' amount and
+ * rate on ringing voices and new ones.
+ */
+const LANE_SLOTS = [
+  'ops.0.feedback',
+  'ops.1.level',
+  'ops.1.width',
+  'filter.resonance',
+  'lfo.rate',
+  'lfo2.amount',
+  'ops.2.feedback',
+  'pitchEnvAmount',
+];
+const LANE_TOGGLES: [string, number][] = [
+  ...TOGGLES,
+  ...LANE_SLOTS.map((_, i): [string, number] => [`voiceSlot${i}`, i % 2 === 0 ? 0.3 : -0.2]),
+];
+
 /** A step's offsets for the note that carries them: the filter's envelope amount, cutoff and resonance, and operator A's level. */
 const STEP_MOD = [0.3, 0.5, -0.4, 0, 0.25];
 
@@ -309,15 +330,22 @@ function probe(
   maxVoices: number,
   specialise: boolean,
   scenarioConfig: FmPartChangeConfig,
-  late?: { startFrame: number; v8Flags: readonly string[] },
+  late?: { startFrame?: number; v8Flags?: readonly string[]; voiceSlots?: string[] },
 ): ProbeRun {
+  const voiceSlots = late?.voiceSlots;
   return runAllocationProbe(
     {
       startFrame: late?.startFrame ?? 0,
       bundle: workletBundle('fm-processor.js'),
       rate: 48000,
       params: {},
-      options: { maxVoices, patch, seed: 0xa204, specialise },
+      options: {
+        maxVoices,
+        patch,
+        seed: 0xa204,
+        specialise,
+        ...(voiceSlots ? { voiceSlots } : {}),
+      },
       messages: [],
       inputChannels: 0,
       loadQuanta: 0,
@@ -430,6 +458,42 @@ describe('the FM part on V8', () => {
       }),
     );
   }, 120_000);
+
+  it('follows song lanes on every slot in the kernel and the generic loop for 8 000 quanta without allocating or changing a field representation (windsor#346)', () => {
+    const lanes = { voiceSlots: LANE_SLOTS };
+    expectClean(
+      probe(
+        pad(),
+        8,
+        true,
+        {
+          events: PAD_EVENTS,
+          period: 6,
+          toggles: LANE_TOGGLES,
+          rest: 16,
+          idStride: 64,
+          paths: ['held', 'stolen', 'released', 'ended', 'silent'],
+        },
+        lanes,
+      ),
+    );
+    expectClean(
+      probe(
+        pluck(),
+        4,
+        false,
+        {
+          events: PLUCK_EVENTS,
+          period: 6,
+          toggles: LANE_TOGGLES,
+          rest: 16,
+          idStride: 64,
+          paths: ['held', 'released', 'dormant', 'ended', 'silent'],
+        },
+        lanes,
+      ),
+    );
+  }, 240_000);
 
   it('holds a note in the kernel while its age passes 2^31, for 8 000 quanta without allocating or changing a field representation', () => {
     expectClean(probe(pad(), 8, true, drone(48, 'held')));

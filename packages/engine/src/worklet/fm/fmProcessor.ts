@@ -13,7 +13,8 @@
  *      order, on every path (#548). `fmProcessorGolden.test.ts` is the gate.
  *
  * What this file owns: the parameter descriptors, the message port (patch,
- * notes, live retune, load sampling), the frame-stamped event queue, the
+ * notes, live retune, load sampling, the song lanes' slot map), the
+ * fader's ramp across a quantum (windsor#346), the frame-stamped event queue, the
  * note map, and `renderBlock`, which admits the notes posted since the last
  * quantum, reads each message as it takes it (windsor#270), and walks each
  * active voice up to the next event or control boundary. Which voice a note
@@ -22,11 +23,7 @@
  * tables are mirrored in ../../patch.ts (`patch.test.ts`, until #656).
  */
 
-import type {
-  ProcessorOptions,
-  ScheduledMessage,
-  WorkletMessage,
-} from '../../synth/workletMessages';
+import type { NoteMessage, ProcessorOptions, WorkletMessage } from '../../synth/workletMessages';
 import type { WorkletPatch } from './patchNormalise';
 import { EventQueue } from './eventQueue';
 import { CTRL_INTERVAL } from './fmConstants';
@@ -36,6 +33,13 @@ import { LoadSampler } from '../loadSampler';
 import { Voice } from './voice';
 import { allocateVoice } from './voiceAllocation';
 import { PART_BEND, PART_CONTROL_COUNT, PART_CUTOFF_MOD, PART_WHEEL } from './voiceControl';
+import {
+  CUTOFF_MOD_RANGE,
+  VOICE_SLOT_COUNT,
+  VOICE_SLOT_PARAMS,
+  VOICE_TARGET_COUNT,
+} from './voiceOffsetTables';
+import { latchVoiceOffsets, mapVoiceSlots } from './voiceOffsets';
 import { WAVE } from './waveIds';
 import { getMips } from './waveTables';
 
@@ -67,6 +71,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
   waveSets: (Float32Array[] | null)[];
   events: EventQueue;
   partControls: Float64Array;
+  partOffsets: Float64Array;
+  slotTargets: Int32Array;
+  slotsMapped: boolean;
+  gainFrom: number;
   noteIn: Float64Array;
   slideIn: boolean;
   stepModIn: readonly number[] | null;
@@ -81,8 +89,18 @@ class FmPartProcessor extends AudioWorkletProcessor {
     return [
       { name: 'pitchBend', defaultValue: 0, minValue: -48, maxValue: 48, automationRate: 'k-rate' },
       { name: 'modWheel', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      { name: 'cutoffMod', defaultValue: 0, minValue: -8, maxValue: 8, automationRate: 'k-rate' },
+      // The cutoff lane's octaves span the catalog's whole cutoff ratio (windsor#346).
+      { name: 'cutoffMod', defaultValue: 0, ...CUTOFF_MOD_RANGE, automationRate: 'k-rate' },
       { name: 'gain', defaultValue: 1, minValue: 0, maxValue: 4, automationRate: 'k-rate' },
+      // The song lanes' slots (windsor#346, `voiceOffsets.ts`): each an offset
+      // on the target the slot map gives it, 0 for none. No declared range,
+      // so Web Audio's float32 bounds, which no offset between two catalog
+      // values reaches: the voice clamps the sum to the row's bounds.
+      ...VOICE_SLOT_PARAMS.map((name): AudioParamDescriptor => ({
+        name,
+        defaultValue: 0,
+        automationRate: 'k-rate',
+      })),
     ];
   }
 
@@ -96,13 +114,22 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // which is what live playback gets; see "Randomness" in `prng.ts`.
     this.random = makeRandom(opts.seed);
 
-    // Rule 7: each double field is born a double (NaN), before its start value (windsor#233).
-    this.lastNote = this.slideSeconds = NaN;
+    // Rule 7: each double field is born a double (NaN), before its start value
+    // (windsor#233). `gainFrom`, the last quantum's gain, stays NaN until the
+    // first quantum gives it one.
+    this.lastNote = this.slideSeconds = this.gainFrom = NaN;
 
     // The k-rate parameters for this quantum, one slot each (`PART_BEND`, …):
     // `renderBlock` writes them, and every voice's control update reads them,
     // so no double is passed to a call (windsor#233).
     this.partControls = new Float64Array(PART_CONTROL_COUNT);
+
+    // The song lanes' offsets by target code, which every voice reads, and
+    // the slot map, from construction so an offline render's lanes play from
+    // its first sample (windsor#346).
+    this.partOffsets = new Float64Array(VOICE_TARGET_COUNT);
+    this.slotTargets = new Int32Array(VOICE_SLOT_COUNT);
+    this.slotsMapped = mapVoiceSlots(this.slotTargets, opts.voiceSlots);
 
     // The note-on the render is starting (`NOTE_IN_*`), its slide flag and its
     // step's offsets, copied from the message as the render takes it (windsor#270).
@@ -115,7 +142,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const poolSize = maxVoices + 4;
     this.voices = new Array(poolSize);
     for (let i = 0; i < poolSize; i++) {
-      this.voices[i] = new Voice(sampleRate, this.random, this.partControls);
+      this.voices[i] = new Voice(sampleRate, this.random, this.partControls, this.partOffsets);
     }
 
     this.patch = normalisePatch(opts.patch);
@@ -178,7 +205,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
         // finish, which avoids clicks when a preset swaps under a ringing note.
         // The console opts into hearing the knob as it turns instead.
         if (this.liveRetune) {
-          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets);
+          const slots = this.slotTargets;
+          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets, slots);
         }
         break;
       }
@@ -211,6 +239,11 @@ class FmPartProcessor extends AudioWorkletProcessor {
         // #445: start (or restart) the duty-cycle sampler.
         this.load.start(msg.quanta);
         break;
+      case 'voiceSlots':
+        // windsor#346: a lane added, moved or removed. A free slot offsets nothing.
+        this.slotsMapped = mapVoiceSlots(this.slotTargets, msg.slots);
+        if (!this.slotsMapped) this.partOffsets.fill(0);
+        break;
     }
   }
 
@@ -222,7 +255,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
    * frame past 2^31 deprecates the message's map, and there it would box
    * the frame it read.
    */
-  schedule(ev: ScheduledMessage): void {
+  schedule(ev: NoteMessage): void {
     this.events.post(ev);
   }
 
@@ -379,15 +412,18 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * This quantum's bend, wheel and cutoff into `partControls`, where every
-   * voice's control update reads them. Passed to the update as arguments,
-   * each was a new heap number wherever V8 did not inline it (windsor#233).
+   * This quantum's bend, wheel and cutoff into `partControls`, and the song
+   * lanes' slots into `partOffsets` while any is mapped (windsor#346), where
+   * every voice's control update reads them. Passed to the update as
+   * arguments, each was a new heap number wherever V8 did not inline it
+   * (windsor#233).
    */
   latchControls(params: Record<string, Float32Array>): void {
     const controls = this.partControls;
     controls[PART_BEND] = params.pitchBend[0];
     controls[PART_WHEEL] = params.modWheel[0];
     controls[PART_CUTOFF_MOD] = params.cutoffMod[0];
+    if (this.slotsMapped) latchVoiceOffsets(this.partOffsets, this.slotTargets, params);
   }
 
   // One quantum read top to bottom: admit, apply the events due, render each
@@ -410,6 +446,10 @@ class FmPartProcessor extends AudioWorkletProcessor {
 
     this.latchControls(params);
     const gain = params.gain[0];
+    // The fader moves from the last quantum's gain to this one's across the
+    // block (windsor#346); NaN before the first quantum, which starts on its own.
+    const gainFrom = this.gainFrom;
+    this.gainFrom = gain;
 
     const blockStart = currentFrame;
     const dormancy = this.dormancy;
@@ -494,9 +534,16 @@ class FmPartProcessor extends AudioWorkletProcessor {
       cursor += seg;
     }
 
-    if (gain !== 1) {
-      for (let i = 0; i < n; i++) outL[i] *= gain;
-      if (outR !== outL) for (let i = 0; i < n; i++) outR[i] *= gain;
+    if (gainFrom === gain || gainFrom !== gainFrom) {
+      if (gain !== 1) {
+        for (let i = 0; i < n; i++) outL[i] *= gain;
+        if (outR !== outL) for (let i = 0; i < n; i++) outR[i] *= gain;
+      }
+    } else {
+      // `a + (b − a) · t`, reaching this quantum's gain on its last sample.
+      const span = gain - gainFrom;
+      for (let i = 0; i < n; i++) outL[i] *= gainFrom + span * ((i + 1) / n);
+      if (outR !== outL) for (let i = 0; i < n; i++) outR[i] *= gainFrom + span * ((i + 1) / n);
     }
 
     return this.running;

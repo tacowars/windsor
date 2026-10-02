@@ -80,6 +80,8 @@ export interface CreateOptions {
   slideSeconds?: number;
   /** Notes present before the first block (`ProcessorOptions.events`), as an offline render builds a part. */
   events?: ScheduledEvent[];
+  /** The automation slots' map from the first block (`ProcessorOptions.voiceSlots`, windsor#346). */
+  voiceSlots?: (string | null)[];
 }
 
 /** The worklet's own `Envelope`, for pinning a model of it (#620): the console's curve. */

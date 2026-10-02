@@ -43,7 +43,31 @@ export interface NoteOffMessage {
   frame: number;
 }
 
-export type ScheduledMessage = NoteOnMessage | NoteOffMessage;
+/** A note event: what the processor's event queue holds, at its frame. */
+export type NoteMessage = NoteOnMessage | NoteOffMessage;
+
+/**
+ * Which voice target each of the part's automation slots moves (windsor#346,
+ * record `2026-10-01-song-automation-lanes` decision 16): one entry per slot
+ * parameter (`voiceSlot0` …), a patch path (`ops.2.width`) or null for a free
+ * slot. The processor reads it on arrival and offsets each mapped target by
+ * its slot's value from then on.
+ *
+ * It travels with the notes (`ScheduledMessage`), because an offline render
+ * must hand it to the processor at construction as it does the opening's
+ * notes (`AudioPart.holdNotes`): `FmEngine.createPart` lifts it out of the
+ * events into `ProcessorOptions.voiceSlots`.
+ */
+export interface VoiceSlotsMessage {
+  type: 'voiceSlots';
+  slots: (string | null)[];
+}
+
+/**
+ * What a part posts in order, or holds back while it holds its notes: the
+ * notes, and its slot map.
+ */
+export type ScheduledMessage = NoteMessage | VoiceSlotsMessage;
 
 export interface PatchMessage {
   type: 'patch';
@@ -136,7 +160,13 @@ export interface ProcessorOptions {
    * rather than `postMessage`, which is asynchronous and loses the race against
    * `OfflineAudioContext.startRendering()`.
    */
-  events?: ScheduledMessage[];
+  events?: NoteMessage[];
+  /**
+   * The automation slots' map from the first block (windsor#346,
+   * `VoiceSlotsMessage`), for the same reason: an offline render's voice
+   * lanes play from its first sample. Absent, every slot is free.
+   */
+  voiceSlots?: (string | null)[];
   /**
    * Pins the processor's one random source — free-running operator phase, the
    * per-voice noise seed and `panRandom` jitter — so a render is reproducible.
