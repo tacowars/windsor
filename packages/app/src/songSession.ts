@@ -349,8 +349,17 @@ export class SongSession {
     return false;
   }
 
-  private async pointAt(storage: SessionStorage, id: string): Promise<void> {
-    this.fail(await pointCurrentAt(storage.store, id, this.now()));
+  /** Point `current` at named song `id`; true when it was written, a failure reported. */
+  private async pointAt(storage: SessionStorage, id: string): Promise<boolean> {
+    const failure = await pointCurrentAt(storage.store, id, this.now());
+    this.fail(failure);
+    return failure === null;
+  }
+
+  /** The owed repoint of `current` at `id`; it stays owed, for the next stored write, until it lands. */
+  private async repointAt(storage: SessionStorage, id: string): Promise<void> {
+    if (this.repoint !== id) return;
+    if ((await this.pointAt(storage, id)) && this.repoint === id) this.repoint = null;
   }
 
   /**
@@ -430,9 +439,7 @@ export class SongSession {
     const target = namedTarget(storage.library, record, {
       written: async () => {
         this.emit();
-        if (this.repoint !== id) return;
-        this.repoint = null;
-        await this.pointAt(storage, id);
+        await this.repointAt(storage, id);
       },
       stale: () => {
         this.host.notify(STALE_SONG_TEXT, 'error');
@@ -477,7 +484,8 @@ export class SongSession {
    * drain is owed to it, whether it waits or went to `current`, and the next
    * flush stores it there. When one of those writes landed in `current`,
    * `current` keeps that recovery copy until the owed write has landed in
-   * the song's record, and only then names the song again (`repoint`); with
+   * the song's record, and only then names the song again (`repoint`, which
+   * stays owed, retried by each stored write, until that pointer lands); with
    * nothing owed, it names the song at once.
    */
   private async keepOpen(

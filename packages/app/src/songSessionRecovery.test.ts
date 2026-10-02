@@ -111,6 +111,24 @@ describe('a failed delete of the open song after an edit landed in current', () 
     expect(storedBpm(a)).toBe(145);
     expect(c.store.record).toMatchObject({ songId: a });
   });
+
+  it('retries a failed repoint of current on the next stored write, so a reload reopens the song', async () => {
+    const a = (await c.ctx.songs.saveAs('A', []))!;
+    expect(await deleteWithEditLanded(a, 147, 'fail')).toBe(false);
+    // The owed write lands in the record, but the pointer write after it fails once.
+    c.store.failing = true;
+    await c.autosave.flush();
+    c.store.failing = false;
+    expect(storedBpm(a)).toBe(147);
+    expect(currentBpm()).toBe(147);
+    bpm(c, 148);
+    await vi.advanceTimersByTimeAsync(DELAY_MS);
+    expect(storedBpm(a)).toBe(148);
+    expect(c.store.record).toMatchObject({ songId: a });
+    const fresh = await reload();
+    expect(fresh.ctx.songs.state).toEqual({ kind: 'named', id: a });
+    expect(fresh.ctx.model.doc.transport.bpm).toBe(148);
+  });
 });
 
 describe('a stale delete of the open song after an edit landed in current', () => {
