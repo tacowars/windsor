@@ -65,7 +65,10 @@ song name one.
    ticks; only the bar lines move. The song becomes `bars ×` the new bar
    long. What falls past a shorter end is cut exactly as lowering Bars cuts
    it, one undo step back; switching back does not restore it. Nothing is
-   stretched.
+   stretched. A whole-song (∞) region is the exception that proves the
+   rule: it means "the whole song", so its end follows the song's end on a
+   meter change exactly as it does when Bars rises, and its start and
+   contents stay put (tacowars, 2026-10-02, on Codex's review of #449).
 8. **The clock counts the song's bars.** The scheduler's and each region
    gate's `bar` and `tickInBar` come from the meter, so Euclid's re-cut on
    the bar line and its bar-synced density LFO follow with no change of
