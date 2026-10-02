@@ -14,6 +14,7 @@ import {
   STEP_MOD_LANES_MAX,
   VOICE_TARGET_PATHS,
   partAt,
+  voiceTargetId,
 } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
 import { DocumentModel } from './documentModel';
@@ -134,13 +135,13 @@ describe('painting', () => {
 describe("a lane's name (windsor#424)", () => {
   it("is the automation catalog's, one per target", () => {
     for (const param of VOICE_TARGET_PATHS) {
-      expect(laneLabel(param), param).toBe(catalogRow(`voice.${param}`)!.label);
+      expect(laneLabel(param), param).toBe(catalogRow(voiceTargetId(param))!.label);
     }
     expect(new Set(VOICE_TARGET_PATHS.map(laneLabel)).size).toBe(VOICE_TARGET_PATHS.length);
   });
 
   it('fits the narrow lane header', () => {
-    expect(laneLabel('filter.envAmount')).toBe('Filter Env Amt');
+    expect(laneLabel('filter.envAmount')).toBe('Filt Env Amt');
     expect(laneLabel('ops.2.env.decayCurve')).toBe('Op C Decay Crv');
     expect(laneLabel('pitchEnvAmount')).toBe('Pitch Env Amt');
   });

@@ -15,9 +15,9 @@ import {
   AUTOMATION_TAPE_ID,
 } from '../__fixtures__/automationSong';
 import { FULL_DOCUMENT, FULL_SLOT, FULL_SONG_TICKS } from '../__fixtures__/fullArrangement';
-import { FM_LANES_MAX, VOICE_AUTOMATION_ROWS } from '../automation/automationTargetTables';
+import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import type { AutomationLane } from '../automation/automationLane';
-import { insertTargetRow } from '../automation/automationTargets';
+import { VOICE_AUTOMATION_ROWS, insertTargetRow } from '../automation/automationTargets';
 import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { DEFAULT_TAPE } from '../inserts/tapeSpec';
 import { mergeArrangement, type Arrangement } from './arrangement';

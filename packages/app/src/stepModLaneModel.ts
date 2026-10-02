@@ -17,9 +17,10 @@ import type {
 import {
   STEP_MOD_LANES_MAX,
   VOICE_TARGET_PATHS,
-  VOICE_TARGET_TABLE,
   catalogRow,
   stepModValue,
+  voiceTargetId,
+  voiceTargetRow,
 } from '@windsor/engine';
 import { readout } from './automationReadout';
 import { fmtSigned } from './consoleFormat';
@@ -198,9 +199,6 @@ export function paintCells(
   return out;
 }
 
-const rowOf = (param: VoiceTargetPath): VoiceTargetRow | undefined =>
-  VOICE_TARGET_TABLE.find((row) => row.path === param);
-
 /** The offset a value pushes, in the row's own terms: octaves on a ratio row, the knob's units on an add row. */
 export function offsetLabel(row: VoiceTargetRow, value: number): string {
   const offset = value * row.span;
@@ -238,7 +236,7 @@ export type LaneHold = 'plays' | 'held' | 'depends';
 
 export function heldBySlide(slide: StepSlide, param: VoiceTargetPath): LaneHold {
   if (slide.kind === 'none') return 'plays';
-  if (slide.kind !== 'same' && rowOf(param)?.slideKeeps !== true) {
+  if (slide.kind !== 'same' && voiceTargetRow(param)?.slideKeeps !== true) {
     return slide.kind === 'either' ? 'depends' : 'plays';
   }
   return slide.when === 'always' ? 'held' : 'depends';
@@ -246,7 +244,7 @@ export function heldBySlide(slide: StepSlide, param: VoiceTargetPath): LaneHold 
 
 /** Whether `param` on a step with `slide` plays only if the slide moves pitch (`either`, not a `slideKeeps` row). */
 const playsIfMoves = (slide: StepSlide, param: VoiceTargetPath): boolean =>
-  slide.kind === 'either' && rowOf(param)?.slideKeeps !== true;
+  slide.kind === 'either' && voiceTargetRow(param)?.slideKeeps !== true;
 
 /** What a readout adds after the offset when a slide holds the row, or may. */
 const HOLD_NOTE: Record<StepSlide['when'], string> = {
@@ -260,7 +258,7 @@ const MOVES_NOTE = 'plays if the slide moves pitch';
 
 /** The automation catalog's row for `param`: its one name, scale and unit (windsor#424). */
 const catalogRowOf = (param: VoiceTargetPath): AutomationTargetRow | undefined =>
-  catalogRow(`voice.${param}`);
+  catalogRow(voiceTargetId(param));
 
 /**
  * What a cell's readout says: the offset, and what the step plays through
@@ -274,7 +272,7 @@ export function laneReadout(
   base: number | undefined,
   slide: StepSlide = NO_SLIDE,
 ): string {
-  const row = rowOf(param);
+  const row = voiceTargetRow(param);
   if (!row) return fmtSigned(value);
   const offset = offsetLabel(row, value);
   if (playsIfMoves(slide, param)) return `${offset} · ${MOVES_NOTE}`;

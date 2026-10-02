@@ -6,6 +6,7 @@
  * tab (windsor#348) all build on these types. Pure: no Web Audio, no worklet
  * scope. `automationLane.test.ts` pins `pointsInOrder`.
  */
+import type { VOICE_PREFIX } from './automationTargets';
 
 /** A strip target: the part's fader, pan and two sends. */
 export type StripTargetId = 'strip.level' | 'strip.pan' | 'strip.send.a' | 'strip.send.b';
@@ -13,8 +14,11 @@ export type StripTargetId = 'strip.level' | 'strip.pan' | 'strip.send.a' | 'stri
 /** An insert target: the insert's stable id (`inserts/insertIds.ts`), then its field. */
 export type InsertTargetId = `insert.${string}.${string}`;
 
-/** A voice target: a patch path, as `voiceTargetTables.ts` spells it (`voice.ops.2.width`). */
-export type VoiceTargetId = `voice.${string}`;
+/**
+ * A voice target: a patch path, as `voiceTargetTables.ts` spells it
+ * (`voice.ops.2.width`), under the prefix `automationTargets.ts` owns.
+ */
+export type VoiceTargetId = `${typeof VOICE_PREFIX}${string}`;
 
 /** What a lane moves, relative to the part that owns it (decision 2). */
 export type AutomationTargetId = StripTargetId | InsertTargetId | VoiceTargetId;

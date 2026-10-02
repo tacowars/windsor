@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DISPLAY_ROW, fromDisplay, toDisplay } from './automationDisplay';
 import type { AutomationTargetRow } from './automationLane';
-import {
-  AUTOMATION_LEVEL_FLOOR_DB,
-  STRIP_AUTOMATION_ROWS,
-  VOICE_AUTOMATION_ROWS,
-} from './automationTargetTables';
+import { AUTOMATION_LEVEL_FLOOR_DB, STRIP_AUTOMATION_ROWS } from './automationTargetTables';
+import { VOICE_AUTOMATION_ROWS } from './automationTargets';
 
 const LEVEL = STRIP_AUTOMATION_ROWS.find((r) => r.target === 'strip.level')!;
 const CUTOFF = VOICE_AUTOMATION_ROWS.find((r) => r.target === 'voice.filter.cutoff')!;

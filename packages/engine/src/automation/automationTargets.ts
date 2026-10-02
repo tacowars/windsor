@@ -2,7 +2,8 @@
  * The automation catalog's lookups (windsor#341, record
  * `2026-10-01-song-automation-lanes` decision 2): target ids taken apart and
  * put together, and the row behind each one. The rows are data in
- * `automationTargetTables.ts` and `automationInsertTables.ts`.
+ * `automationTargetTables.ts` and `automationInsertTables.ts`; this file puts
+ * each voice look under its target id, so the id format is spelled here only.
  *
  * A target id is relative to the part that owns the lane:
  * - `strip.level`, `strip.pan`, `strip.send.a`, `strip.send.b`;
@@ -25,17 +26,40 @@
  */
 import type { InsertKindName } from '../inserts/insertRegistry';
 import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
+import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
 import type {
   AutomationTargetId,
   AutomationTargetKind,
   AutomationTargetRow,
   ParsedTarget,
+  VoiceTargetId,
 } from './automationLane';
-import { STRIP_AUTOMATION_ROWS, VOICE_AUTOMATION_ROWS } from './automationTargetTables';
+import { STRIP_AUTOMATION_ROWS, voiceRowLook } from './automationTargetTables';
 
 const STRIP_PREFIX = 'strip.';
 const INSERT_PREFIX = 'insert.';
-const VOICE_PREFIX = 'voice.';
+/** A voice target id's prefix; `VoiceTargetId` is typed from it. */
+export const VOICE_PREFIX = 'voice.';
+
+/** The voice target id of a patch path (`filter.cutoff` → `voice.filter.cutoff`), unchecked. */
+export function voiceTargetId(path: string): VoiceTargetId {
+  return `${VOICE_PREFIX}${path}`;
+}
+
+/** The patch path a voice target id names, or undefined for an id that is not a voice one. */
+export function voicePathOf(id: string): string | undefined {
+  return id.startsWith(VOICE_PREFIX) ? id.slice(VOICE_PREFIX.length) : undefined;
+}
+
+/**
+ * The voice's 30 rows (decision 2, windsor#406), one per row of the voice
+ * target table and in its order (windsor#419): the filter's four and the
+ * Formant vowel, each operator's five, LFO 1 and LFO 2 amount and rate, and
+ * the pitch-envelope amount.
+ */
+export const VOICE_AUTOMATION_ROWS: readonly AutomationTargetRow[] = VOICE_TARGET_TABLE.map(
+  (row) => ({ target: voiceTargetId(row.path), ...voiceRowLook(row) }),
+);
 
 const byTarget = (rows: readonly AutomationTargetRow[]): ReadonlyMap<string, AutomationTargetRow> =>
   new Map(rows.map((row) => [row.target, row]));
@@ -104,9 +128,8 @@ export function parseTargetId(id: string): ParsedTarget | undefined {
   if (id.startsWith(STRIP_PREFIX)) {
     return STRIP_ROWS.has(id) ? { kind: 'strip', field: id.slice(STRIP_PREFIX.length) } : undefined;
   }
-  if (id.startsWith(VOICE_PREFIX)) {
-    return VOICE_ROWS.has(id) ? { kind: 'voice', path: id.slice(VOICE_PREFIX.length) } : undefined;
-  }
+  const path = voicePathOf(id);
+  if (path !== undefined) return VOICE_ROWS.has(id) ? { kind: 'voice', path } : undefined;
   if (!id.startsWith(INSERT_PREFIX)) return undefined;
   const split = splitInsertTarget(id.slice(INSERT_PREFIX.length));
   if (!split) return undefined;
@@ -123,7 +146,7 @@ export function formatTargetId(target: ParsedTarget): AutomationTargetId {
     target.kind === 'strip'
       ? (`${STRIP_PREFIX}${target.field}` as AutomationTargetId)
       : target.kind === 'voice'
-        ? `${VOICE_PREFIX}${target.path}`
+        ? voiceTargetId(target.path)
         : target.insertId.length > 0 && INSERT_FIELDS.has(target.field)
           ? insertTargetId(target.insertId, target.field)
           : `${INSERT_PREFIX}${target.insertId}.${target.field}`;

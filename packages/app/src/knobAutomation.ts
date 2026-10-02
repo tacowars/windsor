@@ -31,6 +31,7 @@ import {
   formatTargetId,
   songTicksOf,
   valueAt,
+  voiceTargetId,
 } from '@windsor/engine';
 import { LANE_KIND_COLOR } from './songAutomationTables';
 import { songTickOf } from './transportModel';
@@ -90,7 +91,7 @@ const VOICE_TARGETS: ReadonlySet<string> = new Set(VOICE_TARGET_IDS);
 
 /** A patch path's voice target (`filter.cutoff` → `voice.filter.cutoff`), or null off the catalog. */
 export function voiceKnobTarget(path: string): AutomationTargetId | null {
-  const target = `voice.${path}` as const;
+  const target = voiceTargetId(path);
   return VOICE_TARGETS.has(target) ? target : null;
 }
 

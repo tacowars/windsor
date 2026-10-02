@@ -16,8 +16,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { ProcessorLike } from '../__fixtures__/workletHarness';
 import { loadProcessor } from '../__fixtures__/workletHarness';
-import { VOICE_AUTOMATION_ROWS } from '../automation/automationTargetTables';
-import { catalogRow } from '../automation/automationTargets';
+import {
+  VOICE_AUTOMATION_ROWS,
+  catalogRow,
+  voicePathOf,
+  voiceTargetId,
+} from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { voiceSlotParamName } from './audioPart';
 import { voiceOffset } from './voiceAutomation';
@@ -70,7 +74,7 @@ function moved(patch: Patch, path: string, value: number): Patch {
 }
 
 const offsetFor = (patch: Patch, path: string, value: number): number =>
-  voiceOffset(patch, path, catalogRow(`voice.${path}`)!, value);
+  voiceOffset(patch, path, catalogRow(voiceTargetId(path))!, value);
 
 function freshParams(): Record<string, Float32Array> {
   const params: Record<string, Float32Array> = {
@@ -123,7 +127,7 @@ const filtered = (cutoff: number): Patch =>
   });
 
 describe("the cutoff lane across the catalog's whole range (windsor#346)", () => {
-  const row = catalogRow(`voice.${CUTOFF}`)!;
+  const row = catalogRow(voiceTargetId(CUTOFF))!;
 
   it.each([
     [row.min, row.max],
@@ -153,14 +157,14 @@ describe("every voice lane's offset fits its parameter (windsor#346)", () => {
   // Each voice row a handle plays (the decay rows since windsor#347), and the
   // parameter its offsets go to: a slot, the cutoff's too (windsor#419).
   const rows = VOICE_AUTOMATION_ROWS.map((r): readonly [string, string] => [
-    r.target.slice('voice.'.length),
+    voicePathOf(r.target)!,
     voiceSlotParamName(0),
   ]);
 
   it.each(rows)(
     '%s: a lane from one end of its row to the other passes %s unclipped',
     (path, param) => {
-      const row = catalogRow(`voice.${path}`)!;
+      const row = catalogRow(voiceTargetId(path))!;
       for (const [from, to] of [
         [row.min, row.max],
         [row.max, row.min],
