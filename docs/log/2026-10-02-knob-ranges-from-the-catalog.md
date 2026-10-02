@@ -11,8 +11,8 @@
 The automation catalog (`VOICE_AUTOMATION_ROWS`) already gives each voice
 target its range, scale and name (`2026-10-02-voice-targets-named-in-the-catalog`).
 The app still stated two of those things again. `patchKnobTables.ts`
-repeated the min, max and curve of every knob over a voice target, and an
-app parity test kept the two in step. The song-lane picker
+repeated the min, max and curve of every knob over a voice target, and
+`automationTargetParity.test.ts` kept the two in step. The song-lane picker
 sorted voice rows into groups with prefix tests and a regex over each
 row's id.
 
@@ -36,6 +36,5 @@ row's id.
 
 - Adding a voice target no longer touches `patchKnobTables.ts` or
   `songAutomationTables.ts`, unless the target is a brand-new knob.
-- The voice half of the parity test is gone. The strip half went in
-  windsor#443, when the mixer knobs took their ranges from the strip rows
-  too, and the test file with it.
+- The voice half of `automationTargetParity.test.ts` is gone; the strip
+  half stays, since the mixer knobs still state their own ranges.
