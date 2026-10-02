@@ -11,8 +11,8 @@
  * `VOICE_AUTOMATION_ROWS`. The Parts tab's knob over a voice target takes
  * its range from that row (windsor#436, record
  * `2026-10-02-knob-ranges-from-the-catalog`), and the song-lane picker its
- * group from the section. The app's `automationTargetParity.test.ts` holds
- * every strip row to its mixer knob (`mixerTables.ts`). A lane is drawn in
+ * group from the section. The Song tab's mixer knobs take their range from
+ * the strip rows (windsor#443, the app's `mixerTables.ts`). A lane is drawn in
  * its knob's own scale (decision 5), so a decay time, whose knob ends on
  * exact 0 (windsor#316), is a log row from 0 with the table's 1 ms floor as
  * its display floor.

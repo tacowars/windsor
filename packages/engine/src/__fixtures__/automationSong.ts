@@ -7,7 +7,8 @@
  * round trip with them directly. Tape is unsplit, so its `wow` lane is on a
  * field the insert does not read at the moment, which the song keeps.
  */
-import type { AutomationLane } from '../automation/automationLane';
+import type { AutomationLane, AutomationTargetId } from '../automation/automationLane';
+import { formatTargetId } from '../automation/automationTargets';
 import { DEFAULT_EQ } from '../inserts/eqSpec';
 import { DEFAULT_TAPE } from '../inserts/tapeSpec';
 import type { ArrangementDocument, DocumentPart } from '../song/arrangementDocument';
@@ -19,6 +20,10 @@ export const AUTOMATION_TAPE_ID = 'tape1';
 export const AUTOMATION_EQ_ID = 'eq1';
 
 const BAR = TICKS_PER_BAR;
+
+/** The target id of an insert's field. */
+const insertTarget = (insertId: string, field: string): AutomationTargetId =>
+  formatTargetId({ kind: 'insert', insertId, field });
 
 /** The hat part's lanes, one per kind of target and more, in normalised form. */
 export const AUTOMATION_LANES: readonly AutomationLane[] = [
@@ -40,7 +45,7 @@ export const AUTOMATION_LANES: readonly AutomationLane[] = [
     ],
   },
   {
-    target: `insert.${AUTOMATION_TAPE_ID}.drive`,
+    target: insertTarget(AUTOMATION_TAPE_ID, 'drive'),
     on: true,
     points: [
       { tick: 0, value: -6, bend: 0 },
@@ -48,12 +53,12 @@ export const AUTOMATION_LANES: readonly AutomationLane[] = [
     ],
   },
   {
-    target: `insert.${AUTOMATION_TAPE_ID}.wow`,
+    target: insertTarget(AUTOMATION_TAPE_ID, 'wow'),
     on: true,
     points: [{ tick: BAR / 2, value: 25, bend: 0 }],
   },
   {
-    target: `insert.${AUTOMATION_EQ_ID}.bands.0.freq`,
+    target: insertTarget(AUTOMATION_EQ_ID, 'bands.0.freq'),
     on: false,
     points: [
       { tick: 0, value: 80, bend: 1 },
