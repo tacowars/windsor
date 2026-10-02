@@ -176,6 +176,13 @@ export function catalogRow(id: string): AutomationTargetRow | undefined {
   return STRIP_ROWS.get(id) ?? VOICE_ROWS.get(id);
 }
 
+/** A strip or voice target's row. Throws a `RangeError` naming `id` when the catalog holds none. */
+export function requireCatalogRow(id: string): AutomationTargetRow {
+  const row = catalogRow(id);
+  if (!row) throw new RangeError(`no strip or voice automation target ${JSON.stringify(id)}`);
+  return row;
+}
+
 /** An insert kind's row for `field`, or undefined when the kind does not automate it. */
 export function insertTargetRow(
   kind: InsertKindName,
