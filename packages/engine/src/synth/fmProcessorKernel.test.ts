@@ -101,18 +101,35 @@ describe('which voices take the kernel', () => {
     }
   });
 
-  it('takes two noise operators only where the topological order is D..A', () => {
+  it('takes two noise operators only where the generic loop draws them D..A', () => {
     // Algorithm 0 (D>C>B>A) evaluates D, C, B, A in both loops; algorithm 7
     // (A|B|C|D) evaluates A first in the generic loop, so its noise draws would
     // land on different operators.
     expect(boundVoice({ algorithm: 0, ops: [NOISE, NOISE] }).kernel).toBe(true);
     expect(boundVoice({ algorithm: 7, ops: [NOISE, NOISE] }).kernel).toBe(false);
+    expect(boundVoice({ algorithm: 7, ops: [{}, {}, NOISE, NOISE] }).kernel).toBe(false);
     expect(boundVoice({ algorithm: 7, ops: [NOISE] }).kernel).toBe(true);
+    // windsor#382: only the Noise operators' order counts. Algorithm 6
+    // (D>C | B | A) evaluates A, B, D, C, so C and D draw D first, as the
+    // kernel does; algorithm 9 (D>C>(B,A)) evaluates D, C, A, B.
+    expect(boundVoice({ algorithm: 6, ops: [{}, {}, NOISE, NOISE] }).kernel).toBe(true);
+    expect(boundVoice({ algorithm: 6, ops: [NOISE, {}, NOISE] }).kernel).toBe(false);
+    expect(boundVoice({ algorithm: 9, ops: [NOISE, {}, NOISE, NOISE] }).kernel).toBe(true);
+    expect(boundVoice({ algorithm: 9, ops: [NOISE, NOISE] }).kernel).toBe(false);
   });
 
   it.each([
     ['two noise operators, series', { algorithm: 0, ops: [NOISE, {}, {}, NOISE] }],
     ['two noise operators, additive (generic fallback)', { algorithm: 7, ops: [NOISE, NOISE] }],
+    ['two noise operators, a stack and two sines', { algorithm: 6, ops: [{}, {}, NOISE, NOISE] }],
+    [
+      'three noise operators, a split branch, one coloured',
+      { algorithm: 9, ops: [NOISE, {}, { ...NOISE, noiseHp: 2000 }, NOISE] },
+    ],
+    [
+      'a noise operator at level 0 beside a sounding one, one to three',
+      { algorithm: 5, ops: [NOISE, {}, {}, { ...NOISE, level: 0 }] },
+    ],
     [
       'a noise operator at level 0 beside a sounding one',
       { algorithm: 0, ops: [NOISE, {}, {}, { ...NOISE, level: 0 }] },

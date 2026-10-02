@@ -1,0 +1,54 @@
+== noise380 base
+ 74.3 %  renderVoiceGeneric
+  6.6 %  updateVoiceControl
+  4.1 %  buildMips
+  2.6 %  updateOperatorAmp
+  2.0 %  renderNote
+  1.9 %  (program)
+  1.8 %  advance
+  1.2 %  renderBlock
+== noise380 after
+ 79.3 %  renderVoiceGeneric
+  4.4 %  updateVoiceControl
+  3.7 %  buildMips
+  2.2 %  (program)
+  1.9 %  renderNote
+  1.4 %  updateOperatorAmp
+  1.0 %  advance
+  0.9 %  renderBlock
+== noise1 base
+ 47.6 %  renderVoiceKernel
+ 15.9 %  updateVoiceControl
+  7.1 %  buildMips
+  5.8 %  updateOperatorAmp
+  3.9 %  renderNote
+  3.6 %  (program)
+  3.3 %  render
+  3.3 %  renderBlock
+== noise1 after
+ 44.2 %  renderVoiceKernel
+ 19.0 %  updateVoiceControl
+  8.2 %  buildMips
+  5.2 %  updateOperatorAmp
+  4.5 %  renderNote
+  3.7 %  (program)
+  3.4 %  render
+  1.5 %  renderBlock
+== tomC base
+ 73.7 %  renderVoiceGeneric
+  9.7 %  updateVoiceControl
+  3.9 %  buildMips
+  2.5 %  renderNote
+  2.3 %  updateOperatorAmp
+  1.8 %  (program)
+  1.3 %  renderBlock
+  1.0 %  updateVoiceFilter
+== tomC after
+ 56.2 %  renderVoiceKernel
+  6.4 %  buildMips
+  5.5 %  updateVoiceControl
+  4.5 %  updateOperatorAmp
+  4.1 %  renderNote
+  3.3 %  (program)
+  3.2 %  renderBlock
+  3.1 %  render

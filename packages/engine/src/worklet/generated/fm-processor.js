@@ -215,7 +215,6 @@ function kernelEdges(alg) {
 }
 var ALG_EDGES = ALGORITHMS.map(kernelEdges);
 var ALG_CARRIER_BITS = ALGORITHMS.map((alg) => alg.carriers.reduce((b, c) => b | 1 << c, 0));
-var ALG_DESCENDING = ALG_ORDER.map((o) => o[0] === D && o[1] === C && o[2] === B && o[3] === A);
 
 // packages/engine/src/worklet/fm/modeIds.ts
 var LOOP_NONE = 0, LOOP_LOOP = 1, LOOP_TRIGGER = 2;
@@ -1506,20 +1505,29 @@ function updateOperatorAmp(voice, i, n) {
 // packages/engine/src/worklet/fm/voiceControl.ts
 var MIP_FREQ_SLOT = new Float64Array(1);
 var PART_BEND = 0, PART_WHEEL = 1, PART_CUTOFF_MOD = 2, PART_CONTROL_COUNT = 3;
+function noiseDrawsDescend(voice) {
+  const order = voice.order;
+  let last = 4;
+  for (let oi = 0; oi < 4; oi++) {
+    const i = order[oi];
+    if (voice.kind[i] !== KIND_NOISE) continue;
+    if (i > last) return false;
+    last = i;
+  }
+  return true;
+}
 function bindVoiceConstants(voice, patch) {
   const algIndex = ALGORITHMS[patch.algorithm] ? patch.algorithm : 0;
   const keyOffset = (voice.note - 60) / 12;
-  let noiseOps = 0;
   for (let i = 0; i < 4; i++) {
     const op = patch.ops[i];
     voice.detuneMul[i] = Math.pow(2, op.detune / 1200);
     voice.levelKeyAmp[i] = Math.pow(2, -op.levelKeyScale * keyOffset);
-    if (voice.kind[i] === KIND_NOISE) noiseOps++;
     bindNoiseColour(voice, i);
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
-  voice.kernel = voice.specialise && voice.edges >= 0 && (noiseOps < 2 || ALG_DESCENDING[algIndex]);
+  voice.kernel = voice.specialise && voice.edges >= 0 && noiseDrawsDescend(voice);
 }
 function restingWidth(kind, width) {
   return kind === KIND_PULSE ? width : 1 / width;
