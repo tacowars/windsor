@@ -78,7 +78,13 @@ export function setSize(
   index: number,
   size: ChordSize,
 ): HarmonyEvent[] {
-  return events.map((e, i) => (i === index ? { ...e, size } : e));
+  return events.map((e, i) => {
+    if (i !== index) return e;
+    // A seventh (or triad) asked for by Size is the scale's own, so a named quality goes.
+    const next: { -readonly [K in keyof HarmonyEvent]: HarmonyEvent[K] } = { ...e, size };
+    delete next.quality;
+    return next;
+  });
 }
 
 /**
