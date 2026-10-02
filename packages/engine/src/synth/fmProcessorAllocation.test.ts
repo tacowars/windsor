@@ -185,6 +185,22 @@ const LANE_TOGGLES: [string, number][] = [
   ...LANE_SLOTS.map((_, i): [string, number] => [`voiceSlot${i}`, i % 2 === 0 ? 0.3 : -0.2]),
 ];
 
+/**
+ * Song lanes on the decay targets (windsor#347): the filter's decay time and
+ * each operator's decay curve, and three operators' decay times, toggled so
+ * that a running decay changes its rate and is reshaped from its level.
+ */
+const DECAY_SLOTS = [
+  'filter.env.decayTime',
+  'ops.0.env.decayCurve',
+  'ops.1.env.decayCurve',
+  'ops.2.env.decayCurve',
+  'ops.3.env.decayCurve',
+  'ops.0.env.decayTime',
+  'ops.1.env.decayTime',
+  'ops.3.env.decayTime',
+];
+
 /** A step's offsets for the note that carries them: the filter's envelope amount, cutoff and resonance, and operator A's level. */
 const STEP_MOD = [0.3, 0.5, -0.4, 0, 0.25];
 
@@ -376,6 +392,24 @@ function expectClean(run: ProbeRun): void {
   expectAllocationFree(run, TOLERANCE_BYTES);
 }
 
+/** The pad in the kernel and the pluck in the generic loop, under lanes on `voiceSlots` that toggle. */
+function expectLanesClean(voiceSlots: string[]): void {
+  const lanes = { voiceSlots };
+  const scenario = { period: 6, toggles: LANE_TOGGLES, rest: 16, idStride: 64 };
+  const padPaths: FmPartChangeConfig['paths'] = ['held', 'stolen', 'released', 'ended', 'silent'];
+  const pluckPaths: FmPartChangeConfig['paths'] = [
+    'held',
+    'released',
+    'dormant',
+    'ended',
+    'silent',
+  ];
+  expectClean(probe(pad(), 8, true, { events: PAD_EVENTS, ...scenario, paths: padPaths }, lanes));
+  expectClean(
+    probe(pluck(), 4, false, { events: PLUCK_EVENTS, ...scenario, paths: pluckPaths }, lanes),
+  );
+}
+
 describe('the FM part on V8', () => {
   it('plays a held chord and changing notes in the kernel, stealing and releasing, for 8 000 quanta without allocating or changing a field representation', () => {
     expectClean(
@@ -460,39 +494,11 @@ describe('the FM part on V8', () => {
   }, 120_000);
 
   it('follows song lanes on every slot in the kernel and the generic loop for 8 000 quanta without allocating or changing a field representation (windsor#346)', () => {
-    const lanes = { voiceSlots: LANE_SLOTS };
-    expectClean(
-      probe(
-        pad(),
-        8,
-        true,
-        {
-          events: PAD_EVENTS,
-          period: 6,
-          toggles: LANE_TOGGLES,
-          rest: 16,
-          idStride: 64,
-          paths: ['held', 'stolen', 'released', 'ended', 'silent'],
-        },
-        lanes,
-      ),
-    );
-    expectClean(
-      probe(
-        pluck(),
-        4,
-        false,
-        {
-          events: PLUCK_EVENTS,
-          period: 6,
-          toggles: LANE_TOGGLES,
-          rest: 16,
-          idStride: 64,
-          paths: ['held', 'released', 'dormant', 'ended', 'silent'],
-        },
-        lanes,
-      ),
-    );
+    expectLanesClean(LANE_SLOTS);
+  }, 240_000);
+
+  it('follows decay lanes in the kernel and the generic loop for 8 000 quanta without allocating or changing a field representation (windsor#347)', () => {
+    expectLanesClean(DECAY_SLOTS);
   }, 240_000);
 
   it('holds a note in the kernel while its age passes 2^31, for 8 000 quanta without allocating or changing a field representation', () => {

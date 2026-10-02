@@ -193,3 +193,119 @@ describe('the envelope', () => {
     }
   });
 });
+
+/** `e` advanced by the exact path, `steps` steps of 32 samples. */
+function stepped(e: Envelope, steps: number): Envelope {
+  for (let k = 0; k < steps; k++) e.advanceExact(32);
+  return e;
+}
+
+/** How many steps of 32 `e` takes to reach sustain. */
+function stepsToSustain(e: Envelope): number {
+  let k = 0;
+  while (e.state !== ST_SUSTAIN && k < 100_000) {
+    e.advanceExact(32);
+    k++;
+  }
+  return k;
+}
+
+/** The envelope's fields, to compare one envelope's state before and after. */
+const fieldsOf = (e: Envelope): Record<string, unknown> => ({ ...e });
+
+describe('a decay moved while it runs (windsor#347)', () => {
+  // 0.25 s from 1 to 0.5 under a curve that bows down hard, 64 steps in.
+  const bowed = (): Envelope => {
+    const e = make({ attackTime: 0, decayTime: 0.25, decayCurve: 1 });
+    e.noteOn();
+    return stepped(e, 64);
+  };
+
+  it('keeps the phase on a new time, so the level runs on from where it is at the new rate', () => {
+    const e = bowed();
+    const { phase, value } = e;
+    expect(e.state).toBe(ST_DECAY);
+    e.decayTime = 0.125;
+    e.advanceExact(32);
+    expect(e.phase).toBeCloseTo(phase + 32 / (0.125 * SR), 12);
+    expect(e.value).toBeCloseTo(segmentLevel(1, 0.5, e.phase, 1), 12);
+    expect(Math.abs(e.value - value)).toBeLessThan(0.01);
+  });
+
+  it('starts what is left again from the level it is at under a new curve, and ends when it would have', () => {
+    const e = bowed();
+    const { phase, value } = e;
+    e.decayCurve = -1;
+    e.reshapeDecay();
+    expect([e.phase, e.segStart, e.value]).toEqual([0, value, value]);
+    expect(e.decayLeft).toBe(1 - phase);
+    e.advanceExact(32);
+    expect(e.value).toBeCloseTo(segmentLevel(value, 0.5, 32 / ((1 - phase) * 0.25 * SR), -1), 12);
+    // One step down the new curve's steep start, about what a whole decay
+    // under it takes in its first step (0.027); the same phase under the new
+    // curve would have jumped by ten times that.
+    expect(Math.abs(e.value - value)).toBeLessThan(0.04);
+    expect(Math.abs(segmentLevel(1, 0.5, phase, -1) - value)).toBeGreaterThan(0.3);
+    expect(stepsToSustain(e)).toBe(stepsToSustain(bowed()));
+  });
+
+  it('carries what was left through a later reshape and a later time', () => {
+    const e = bowed();
+    e.decayCurve = -1;
+    e.reshapeDecay();
+    stepped(e, 100);
+    const left = e.decayLeft * (1 - e.phase);
+    const value = e.value;
+    e.decayCurve = 0;
+    e.reshapeDecay();
+    expect(e.decayLeft).toBeCloseTo(left, 15);
+    expect(e.value).toBe(value);
+    e.decayTime = 0.5;
+    e.advanceExact(32);
+    expect(e.phase).toBeCloseTo(32 / (left * 0.5 * SR), 12);
+  });
+
+  it('leaves an attack alone, and its decay then runs whole under the new curve', () => {
+    const e = make({ attackTime: 0.25, decayCurve: 1 });
+    e.noteOn();
+    stepped(e, 10);
+    const before = fieldsOf(e);
+    e.decayCurve = -1;
+    e.reshapeDecay();
+    expect({ ...fieldsOf(e), decayCurve: 1 }).toEqual(before);
+    // The attack ends 0.25 s (375 steps) in; 64 steps into the decay.
+    stepped(e, 375 - 10 + 64);
+    expect(e.decayLeft).toBe(1);
+    expect(e.value).toBeCloseTo(segmentLevel(1, 0.5, (64 * 32) / (0.25 * SR), -1), 4);
+  });
+
+  it('leaves a sustain and a release alone', () => {
+    const e = make({ attackTime: 0, decayTime: 0.001 });
+    e.noteOn();
+    stepped(e, 4);
+    expect(e.state).toBe(ST_SUSTAIN);
+    e.decayCurve = 1;
+    e.reshapeDecay();
+    expect(stepped(e, 1).value).toBe(0.5);
+    e.noteOff();
+    stepped(e, 1);
+    const releasing = fieldsOf(e);
+    e.decayCurve = -1;
+    e.decayTime = 4;
+    e.reshapeDecay();
+    expect({ ...fieldsOf(e), decayCurve: 1, decayTime: 0.001 }).toEqual(releasing);
+  });
+
+  it('starts a looping decay whole again after a reshape', () => {
+    const e = make({ attackTime: 0.01, decayTime: 0.01, loopMode: LOOP_LOOP, decayCurve: 0.5 });
+    e.noteOn();
+    while (e.state !== ST_DECAY || e.phase === 0) e.advanceExact(32);
+    e.decayCurve = -0.5;
+    e.reshapeDecay();
+    expect(e.decayLeft).toBeLessThan(1);
+    while (e.state === ST_DECAY) e.advanceExact(32);
+    expect(e.state).toBe(ST_ATTACK);
+    while (e.state === ST_ATTACK) e.advanceExact(32);
+    expect(e.decayLeft).toBe(1);
+  });
+});

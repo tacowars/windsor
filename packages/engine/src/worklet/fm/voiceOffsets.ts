@@ -14,6 +14,11 @@
  *   with an offset by it, clamped to the row's bounds. The control update,
  *   the amplitude and width ramps, the filter and the LFOs read
  *   `liveValues`; the LFO rates reach the LFOs as `rateMul`.
+ * - The decay rows (windsor#347) reach the five envelopes as their decay
+ *   time and curve (`applyLiveDecays`). A time is read afresh by each step
+ *   of the envelope, which keeps its phase, so a running decay goes on from
+ *   its level at the new rate; a curve that changes starts what is left of
+ *   a running decay again from its level (`Envelope.reshapeDecay`).
  * - Feedback is read per sample, so it is ramped (decision 11): each block
  *   sets `fbFrom` to the last block's `fbTo` and `fbTo` to this one's, and
  *   the render loops read `fbFrom + (fbTo − fbFrom) · t` through the block
@@ -39,19 +44,30 @@
 import type { Voice } from './voice';
 import { OPERATOR_COUNT } from './patchDefaults';
 import {
+  STEP_OP_DECAY,
+  STEP_OP_DECAY_CURVE,
+  STEP_SLOT_FILTER_DECAY,
+  STEP_SLOT_OP_BASE,
+  STEP_SLOT_OP_STRIDE,
+} from './stepModTables';
+import {
   OFFSET_RATIO,
   VOICE_OFFSET_CURVE,
+  VOICE_OFFSET_FLOOR,
   VOICE_OFFSET_MAX,
   VOICE_OFFSET_MIN,
   VOICE_SLOT_COUNT,
   VOICE_SLOT_PARAMS,
   VOICE_TARGET_COUNT,
   VT_ENV_AMOUNT,
+  VT_FILTER_DECAY,
   VT_LFO2_AMOUNT,
   VT_LFO2_RATE,
   VT_LFO_AMOUNT,
   VT_LFO_RATE,
   VT_OP_BASE,
+  VT_OP_DECAY,
+  VT_OP_DECAY_CURVE,
   VT_OP_FEEDBACK,
   VT_OP_LEVEL,
   VT_OP_STRIDE,
@@ -96,17 +112,25 @@ function latchVoiceOffsets(
 /**
  * The values the voice plays, in `liveValues` by target code: its own, each
  * moved by its offset and clamped to the row's bounds. A target whose offset
- * is 0 keeps its own value exactly.
+ * is 0 keeps its own value exactly. A ratio scales the row's floor where its
+ * own value is below it (a decay time of 0: windsor#347), as the main thread
+ * reckons it. The decays' own values are the step's (`stepValues`), since
+ * the envelopes' copies carry the lanes.
  */
 function bindLiveValues(voice: Voice): void {
   const patch = voice.patch!;
   const v = voice.liveValues;
   const o = voice.partOffsets;
+  const own = voice.stepValues;
   v[VT_ENV_AMOUNT] = voice.envAmount;
   v[VT_RESONANCE] = voice.resonance;
+  v[VT_FILTER_DECAY] = own[STEP_SLOT_FILTER_DECAY];
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
     v[b + VT_OP_LEVEL] = voice.opLevel[i];
+    v[b + VT_OP_DECAY] = own[s + STEP_OP_DECAY];
+    v[b + VT_OP_DECAY_CURVE] = own[s + STEP_OP_DECAY_CURVE];
     v[b + VT_OP_FEEDBACK] = voice.opFeedback[i];
     v[b + VT_OP_WIDTH] = voice.opWidth[i];
   }
@@ -118,7 +142,11 @@ function bindLiveValues(voice: Voice): void {
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
     const off = o[k];
     if (off === 0) continue;
-    const x = VOICE_OFFSET_CURVE[k] === OFFSET_RATIO ? v[k] * Math.pow(2, off) : v[k] + off;
+    const floor = VOICE_OFFSET_FLOOR[k];
+    const x =
+      VOICE_OFFSET_CURVE[k] === OFFSET_RATIO
+        ? (v[k] < floor ? floor : v[k]) * Math.pow(2, off)
+        : v[k] + off;
     v[k] =
       x < VOICE_OFFSET_MIN[k]
         ? VOICE_OFFSET_MIN[k]
@@ -129,11 +157,39 @@ function bindLiveValues(voice: Voice): void {
 }
 
 /**
- * This block's values (`bindLiveValues`), then the feedback ramp's ends and
- * the LFOs' rate multipliers. The control update's first step.
+ * The decay rows' values into the envelopes (windsor#347): the filter's
+ * decay time, and each operator's decay time and curve. A time is written
+ * as it is; the envelope reads it at its next step, from the phase it is at.
+ * A curve is written only when it changed, and then `reshapeDecay` starts
+ * what is left of a running decay again from its level. Without an offset
+ * each is the step's value `bindStepMod` already wrote, so nothing moves; a
+ * live retune's new curve on a target no lane moves is that value too, and
+ * is heard as it always was. Allocates nothing; the curve reaches the
+ * envelope in its field, never as an argument.
+ */
+function applyLiveDecays(voice: Voice): void {
+  const v = voice.liveValues;
+  voice.filtEnv.decayTime = v[VT_FILTER_DECAY];
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const env = voice.ampEnv[i];
+    const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    env.decayTime = v[b + VT_OP_DECAY];
+    const curve = v[b + VT_OP_DECAY_CURVE];
+    if (curve !== env.decayCurve) {
+      env.decayCurve = curve;
+      env.reshapeDecay();
+    }
+  }
+}
+
+/**
+ * This block's values (`bindLiveValues`) and the envelopes' decays, then the
+ * feedback ramp's ends and the LFOs' rate multipliers. The control update's
+ * first step.
  */
 function applyVoiceOffsets(voice: Voice): void {
   bindLiveValues(voice);
+  applyLiveDecays(voice);
   const patch = voice.patch!;
   const v = voice.liveValues;
   const o = voice.partOffsets;
@@ -165,6 +221,7 @@ function applyVoiceOffsets(voice: Voice): void {
  */
 function primeVoiceOffsets(voice: Voice): void {
   bindLiveValues(voice);
+  applyLiveDecays(voice);
   const v = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     voice.fbTo[i] = v[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK];
@@ -201,6 +258,9 @@ function rebindVoiceOffsets(voice: Voice, slotTargets: Int32Array): void {
   }
   bindLiveValues(voice);
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
+  // A kept decay goes back to the envelope over the new patch's, which
+  // `bindStepMod` wrote: its running segment carries on as it was.
+  applyLiveDecays(voice);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK;
     if (kept[k] !== 0) continue;

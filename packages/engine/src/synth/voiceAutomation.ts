@@ -8,7 +8,11 @@
  * value, so an offset of 0 leaves it bit for bit as it was:
  * - the cutoff's lane writes octaves, `log2(value / patch)`, to the part's
  *   `cutoffMod`, which nothing else writes;
- * - the LFO rates' lanes write the same log2 ratio to a slot;
+ * - the LFO rates' and the decay times' lanes write the same log2 ratio to a
+ *   slot. A decay time's knob ends on exact 0, which no ratio scales, so
+ *   both its ends are taken from the row's `floor` (1 ms) where they are
+ *   below it, as the worklet takes its base (windsor#347): a lane at 0
+ *   plays 1 ms;
  * - every other lane writes `value − patch` to a slot.
  *
  * A slot is one of the part's `FM_LANES_MAX` k-rate parameters, taken by a
@@ -20,9 +24,10 @@
  * on new voices and on voices a live retune rebinds.
  *
  * A part hands out one handle per target, so a resync finds the same one.
- * The nine decay rows wait on windsor#347: they find no handle here, so the
- * player leaves them unplayed. `fmProcessorAutomation.test.ts` pins the
- * handles and the worklet together.
+ * The nine decay rows have handles too (windsor#347): the worklet reshapes a
+ * decay already running from its level. `fmProcessorAutomation.test.ts` and
+ * `fmProcessorAutomationDecay.test.ts` pin the handles and the worklet
+ * together.
  */
 import type { AutomationHandle, AutomationHow } from '../automation/automationHandles';
 import type { AutomationTargetRow } from '../automation/automationLane';
@@ -41,8 +46,8 @@ const CUTOFF_PATH = 'filter.cutoff';
 /** The rows whose offset is a log2 ratio of the patch's value (decision 2 of windsor#346). */
 const RATIO_PATHS: ReadonlySet<string> = new Set([CUTOFF_PATH, 'lfo.rate', 'lfo2.rate']);
 
-/** windsor#347's rows: a decay time or curve reshapes a segment already sounding. */
-const DECAY_PATH = /\.decay(Time|Curve)$/;
+/** The decay times' rows, a log2 ratio too (windsor#347 decision 3). */
+const DECAY_TIME_PATH = /\.decayTime$/;
 
 /** The number at `path` in `patch`, or NaN when there is none. */
 function patchValue(patch: Patch, path: string): number {
@@ -56,7 +61,8 @@ function patchValue(patch: Patch, path: string): number {
 /**
  * The offset that makes `value`, a lane value in the row's units, sound over
  * `patch`: its difference from the patch's value, or for a ratio row the
- * log2 of their ratio. 0 where the patch has no positive value to scale.
+ * log2 of their ratio, each end raised to the row's `floor` where it has
+ * one. 0 where the patch has no positive value to scale.
  */
 export function voiceOffset(
   patch: Patch,
@@ -67,8 +73,11 @@ export function voiceOffset(
   const base = patchValue(patch, path);
   const clamped = value < row.min ? row.min : value > row.max ? row.max : value;
   if (!Number.isFinite(base) || !Number.isFinite(clamped)) return 0;
-  if (!RATIO_PATHS.has(path)) return clamped - base;
-  return base > 0 && clamped > 0 ? Math.log2(clamped / base) : 0;
+  if (!RATIO_PATHS.has(path) && !DECAY_TIME_PATH.test(path)) return clamped - base;
+  const floor = row.floor ?? 0;
+  const from = base < floor ? floor : base;
+  const to = clamped < floor ? floor : clamped;
+  return from > 0 && to > 0 ? Math.log2(to / from) : 0;
 }
 
 /** Where a handle writes: the param, taking a slot when it needs one, and the param it has now. */
@@ -140,7 +149,6 @@ export function voiceAutomationHandle(
   row: AutomationTargetRow,
 ): AutomationHandle | undefined {
   const { path } = target;
-  if (DECAY_PATH.test(path)) return undefined;
   const part = strip.part;
   let byPath = handles.get(part);
   if (!byPath) handles.set(part, (byPath = new Map()));

@@ -11,10 +11,16 @@
  *   (`ProcessorOptions.voiceSlots`) and by a `voiceSlots` message; a slot
  *   maps to a code here.
  * - The main thread sends an offset from the patch's value (decision 10):
- *   added for most rows, a log2 ratio for the LFO rates (`OFFSET_RATIO`).
- *   The filter's cutoff is not here: its lane writes the part's `cutoffMod`,
- *   in octaves, whose range is `CUTOFF_MOD_OCTAVES` either way.
- * - The nine decay rows are windsor#347's and not here either.
+ *   added for most rows, a log2 ratio for the LFO rates and the decay times
+ *   (`OFFSET_RATIO`). The filter's cutoff is not here: its lane writes the
+ *   part's `cutoffMod`, in octaves, whose range is `CUTOFF_MOD_OCTAVES`
+ *   either way.
+ * - A ratio row may have a floor (`VOICE_OFFSET_FLOOR`): a decay time's knob
+ *   ends on exact 0, which no ratio scales, so its ratio is taken from the
+ *   step-mod table's 1 ms, on both threads (windsor#347).
+ * - The nine decay rows (windsor#347) reach the envelopes through
+ *   `applyLiveDecays` in `voiceOffsets.ts`, and `Envelope.reshapeDecay`
+ *   reshapes a segment already running.
  *
  * The bounds are the catalog's (`automation/automationTargetTables.ts`): the
  * step-mod rows' from `STEP_MOD_TABLE`, the LFO and pitch-envelope rows' the
@@ -45,16 +51,19 @@ const VOICE_SLOT_PARAMS: readonly string[] = [
   'voiceSlot7',
 ];
 
-/** The filter's two rows. */
+/** The filter's three rows, in the catalog's order. */
 const VT_ENV_AMOUNT = 0;
 const VT_RESONANCE = 1;
+const VT_FILTER_DECAY = 2;
 /** Operator `i`'s rows start at `VT_OP_BASE + i × VT_OP_STRIDE`. */
-const VT_OP_BASE = 2;
-const VT_OP_STRIDE = 3;
-/** An operator's rows, offset from its first. */
+const VT_OP_BASE = 3;
+const VT_OP_STRIDE = 5;
+/** An operator's rows, offset from its first, in the catalog's order. */
 const VT_OP_LEVEL = 0;
-const VT_OP_FEEDBACK = 1;
-const VT_OP_WIDTH = 2;
+const VT_OP_DECAY = 1;
+const VT_OP_DECAY_CURVE = 2;
+const VT_OP_FEEDBACK = 3;
+const VT_OP_WIDTH = 4;
 /** The LFOs' and the pitch envelope's rows, after the operators'. */
 const VT_LFO_AMOUNT = VT_OP_BASE + OPERATOR_COUNT * VT_OP_STRIDE;
 const VT_LFO_RATE = VT_LFO_AMOUNT + 1;
@@ -64,22 +73,35 @@ const VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
 const VOICE_TARGET_COUNT = VT_LFO_AMOUNT + 5;
 
 /** The bounds of the rows the step-mod table does not carry: the Parts tab's knobs. */
-const LFO_AMOUNT_BOUNDS = { min: 0, max: 1 };
-const LFO_RATE_BOUNDS = { min: 0.02, max: 40 };
-const PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48 };
+const LFO_AMOUNT_BOUNDS = { min: 0, max: 1, floor: 0 };
+const LFO_RATE_BOUNDS = { min: 0.02, max: 40, floor: 0 };
+const PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48, floor: 0 };
 
-/** One target: its patch path, how its offset applies, and its bounds. */
+/** One target: its patch path, how its offset applies, its bounds, and the floor a ratio is taken from. */
 interface VoiceOffsetRow {
   readonly path: string;
   readonly curve: number;
   readonly min: number;
   readonly max: number;
+  readonly floor: number;
 }
 
-/** A step-mod row's bounds, by its patch path. */
-function stepModBounds(path: string): { min: number; max: number } {
-  for (const row of STEP_MOD_TABLE) if (row.param === path) return { min: row.min, max: row.max };
+/** A step-mod row's bounds, by its patch path, with no floor. */
+function stepModBounds(path: string): { min: number; max: number; floor: number } {
+  for (const row of STEP_MOD_TABLE) {
+    if (row.param === path) return { min: row.min, max: row.max, floor: 0 };
+  }
   throw new Error(`voiceOffsetTables: no step-mod row for ${path}`);
+}
+
+/**
+ * A decay time's row: a log2 ratio, its knob from exact 0 (the catalog's
+ * `zeroEnd`) to the step-mod row's top, and the step-mod row's 1 ms as the
+ * floor its ratio is taken from.
+ */
+function decayTimeRow(path: string): VoiceOffsetRow {
+  const { min, max } = stepModBounds(path);
+  return { path, curve: OFFSET_RATIO, min: 0, max, floor: min };
 }
 
 /** The cutoff's bounds, which its lane's offset spans (it writes `cutoffMod`, not a slot). */
@@ -100,8 +122,15 @@ const CUTOFF_MOD_RANGE = { minValue: -CUTOFF_MOD_OCTAVES, maxValue: CUTOFF_MOD_O
 const VOICE_OFFSET_TABLE: readonly VoiceOffsetRow[] = [
   { path: 'filter.envAmount', curve: OFFSET_ADD, ...stepModBounds('filter.envAmount') },
   { path: 'filter.resonance', curve: OFFSET_ADD, ...stepModBounds('filter.resonance') },
+  decayTimeRow('filter.env.decayTime'),
   ...Array.from({ length: OPERATOR_COUNT }, (_, i) => [
     { path: `ops.${i}.level`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.level`) },
+    decayTimeRow(`ops.${i}.env.decayTime`),
+    {
+      path: `ops.${i}.env.decayCurve`,
+      curve: OFFSET_ADD,
+      ...stepModBounds(`ops.${i}.env.decayCurve`),
+    },
     { path: `ops.${i}.feedback`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.feedback`) },
     { path: `ops.${i}.width`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.width`) },
   ]).flat(),
@@ -116,6 +145,7 @@ const VOICE_OFFSET_TABLE: readonly VoiceOffsetRow[] = [
 const VOICE_OFFSET_CURVE = Int32Array.from(VOICE_OFFSET_TABLE, (row) => row.curve);
 const VOICE_OFFSET_MIN = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.min);
 const VOICE_OFFSET_MAX = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.max);
+const VOICE_OFFSET_FLOOR = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.floor);
 
 /** The code of the target at `path`, or -1 when no slot can carry it. Read at a message, never in the render. */
 function voiceTargetCode(path: unknown): number {
@@ -133,6 +163,7 @@ export {
   OFFSET_ADD,
   OFFSET_RATIO,
   VOICE_OFFSET_CURVE,
+  VOICE_OFFSET_FLOOR,
   VOICE_OFFSET_MAX,
   VOICE_OFFSET_MIN,
   VOICE_OFFSET_TABLE,
@@ -140,11 +171,14 @@ export {
   VOICE_SLOT_PARAMS,
   VOICE_TARGET_COUNT,
   VT_ENV_AMOUNT,
+  VT_FILTER_DECAY,
   VT_LFO2_AMOUNT,
   VT_LFO2_RATE,
   VT_LFO_AMOUNT,
   VT_LFO_RATE,
   VT_OP_BASE,
+  VT_OP_DECAY,
+  VT_OP_DECAY_CURVE,
   VT_OP_FEEDBACK,
   VT_OP_LEVEL,
   VT_OP_STRIDE,

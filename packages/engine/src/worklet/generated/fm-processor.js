@@ -608,7 +608,7 @@ function segmentLevel(from, to, phase, curve) {
 var Envelope = class {
   constructor() {
     this.value = this.phase = this.segStart = this.segTarget = this.segCurve = this.segTime = NaN;
-    this.timeScale = this.decayTime = this.decayCurve = this.rest = NaN;
+    this.timeScale = this.decayTime = this.decayCurve = this.decayLeft = this.rest = NaN;
     this.state = ST_IDLE;
     this.value = 0;
     this.phase = 0;
@@ -621,6 +621,7 @@ var Envelope = class {
     this.timeScale = 1;
     this.decayTime = 0;
     this.decayCurve = 0;
+    this.decayLeft = 1;
     this.rest = 0;
     this.breaks = 0;
     this.breakAt = new Float64Array(ENVELOPE_BREAKS_MAX);
@@ -638,6 +639,7 @@ var Envelope = class {
     this.phase = 0;
     this.value = p.initLevel;
     this.segStart = p.initLevel;
+    this.decayLeft = 1;
   }
   noteOff() {
     if (this.state === ST_DONE || this.state === ST_IDLE) return;
@@ -715,6 +717,23 @@ var Envelope = class {
       if (this.rest === 0) return;
     }
   }
+  /**
+   * `decayCurve` has just changed (windsor#347): a decay segment under way
+   * under another curve starts again from the level it is at, toward the
+   * same sustain, under the new curve and over the time it had left, so the
+   * level does not move and the segment still ends when it would have. A
+   * decay not yet begun (attack, or phase 0) takes the curve when it runs,
+   * and sustain and release do not read it. The caller writes the new curve
+   * to `decayCurve` first, so no double crosses the call.
+   */
+  reshapeDecay() {
+    if (this.state !== ST_DECAY || !(this.phase > 0)) return;
+    if (this.decayCurve === this.segCurve) return;
+    this.decayLeft *= 1 - this.phase;
+    this.segStart = this.value;
+    this.phase = 0;
+    this.segCurve = this.decayCurve;
+  }
   /** The running segment's time (before key scaling), target and curve, into their fields. */
   loadSegment() {
     const p = this.p;
@@ -725,7 +744,7 @@ var Envelope = class {
         this.segCurve = p.attackCurve;
         break;
       case ST_DECAY:
-        this.segTime = this.decayTime;
+        this.segTime = this.decayTime * this.decayLeft;
         this.segTarget = p.sustainLevel;
         this.segCurve = this.decayCurve;
         break;
@@ -746,6 +765,7 @@ var Envelope = class {
     switch (this.state) {
       case ST_ATTACK:
         this.state = ST_DECAY;
+        this.decayLeft = 1;
         break;
       case ST_DECAY:
         if (p.loopMode === LOOP_LOOP) {
@@ -1466,23 +1486,32 @@ var VOICE_SLOT_PARAMS = [
 ];
 var VT_ENV_AMOUNT = 0;
 var VT_RESONANCE = 1;
-var VT_OP_BASE = 2;
-var VT_OP_STRIDE = 3;
+var VT_FILTER_DECAY = 2;
+var VT_OP_BASE = 3;
+var VT_OP_STRIDE = 5;
 var VT_OP_LEVEL = 0;
-var VT_OP_FEEDBACK = 1;
-var VT_OP_WIDTH = 2;
+var VT_OP_DECAY = 1;
+var VT_OP_DECAY_CURVE = 2;
+var VT_OP_FEEDBACK = 3;
+var VT_OP_WIDTH = 4;
 var VT_LFO_AMOUNT = VT_OP_BASE + OPERATOR_COUNT * VT_OP_STRIDE;
 var VT_LFO_RATE = VT_LFO_AMOUNT + 1;
 var VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
 var VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
 var VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
 var VOICE_TARGET_COUNT = VT_LFO_AMOUNT + 5;
-var LFO_AMOUNT_BOUNDS = { min: 0, max: 1 };
-var LFO_RATE_BOUNDS = { min: 0.02, max: 40 };
-var PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48 };
+var LFO_AMOUNT_BOUNDS = { min: 0, max: 1, floor: 0 };
+var LFO_RATE_BOUNDS = { min: 0.02, max: 40, floor: 0 };
+var PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48, floor: 0 };
 function stepModBounds(path) {
-  for (const row of STEP_MOD_TABLE) if (row.param === path) return { min: row.min, max: row.max };
+  for (const row of STEP_MOD_TABLE) {
+    if (row.param === path) return { min: row.min, max: row.max, floor: 0 };
+  }
   throw new Error(`voiceOffsetTables: no step-mod row for ${path}`);
+}
+function decayTimeRow(path) {
+  const { min, max } = stepModBounds(path);
+  return { path, curve: OFFSET_RATIO, min: 0, max, floor: min };
 }
 var CUTOFF_BOUNDS = stepModBounds("filter.cutoff");
 var CUTOFF_MOD_OCTAVES = Math.log2(CUTOFF_BOUNDS.max / CUTOFF_BOUNDS.min);
@@ -1490,8 +1519,15 @@ var CUTOFF_MOD_RANGE = { minValue: -CUTOFF_MOD_OCTAVES, maxValue: CUTOFF_MOD_OCT
 var VOICE_OFFSET_TABLE = [
   { path: "filter.envAmount", curve: OFFSET_ADD, ...stepModBounds("filter.envAmount") },
   { path: "filter.resonance", curve: OFFSET_ADD, ...stepModBounds("filter.resonance") },
+  decayTimeRow("filter.env.decayTime"),
   ...Array.from({ length: OPERATOR_COUNT }, (_, i) => [
     { path: `ops.${i}.level`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.level`) },
+    decayTimeRow(`ops.${i}.env.decayTime`),
+    {
+      path: `ops.${i}.env.decayCurve`,
+      curve: OFFSET_ADD,
+      ...stepModBounds(`ops.${i}.env.decayCurve`)
+    },
     { path: `ops.${i}.feedback`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.feedback`) },
     { path: `ops.${i}.width`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.width`) }
   ]).flat(),
@@ -1504,6 +1540,7 @@ var VOICE_OFFSET_TABLE = [
 var VOICE_OFFSET_CURVE = Int32Array.from(VOICE_OFFSET_TABLE, (row) => row.curve);
 var VOICE_OFFSET_MIN = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.min);
 var VOICE_OFFSET_MAX = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.max);
+var VOICE_OFFSET_FLOOR = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.floor);
 function voiceTargetCode(path) {
   if (typeof path !== "string") return -1;
   for (let k = 0; k < VOICE_OFFSET_TABLE.length; k++) {
@@ -1588,11 +1625,16 @@ function bindLiveValues(voice) {
   const patch = voice.patch;
   const v = voice.liveValues;
   const o = voice.partOffsets;
+  const own = voice.stepValues;
   v[VT_ENV_AMOUNT] = voice.envAmount;
   v[VT_RESONANCE] = voice.resonance;
+  v[VT_FILTER_DECAY] = own[STEP_SLOT_FILTER_DECAY];
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
     v[b + VT_OP_LEVEL] = voice.opLevel[i];
+    v[b + VT_OP_DECAY] = own[s + STEP_OP_DECAY];
+    v[b + VT_OP_DECAY_CURVE] = own[s + STEP_OP_DECAY_CURVE];
     v[b + VT_OP_FEEDBACK] = voice.opFeedback[i];
     v[b + VT_OP_WIDTH] = voice.opWidth[i];
   }
@@ -1604,12 +1646,28 @@ function bindLiveValues(voice) {
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
     const off = o[k];
     if (off === 0) continue;
-    const x = VOICE_OFFSET_CURVE[k] === OFFSET_RATIO ? v[k] * Math.pow(2, off) : v[k] + off;
+    const floor = VOICE_OFFSET_FLOOR[k];
+    const x = VOICE_OFFSET_CURVE[k] === OFFSET_RATIO ? (v[k] < floor ? floor : v[k]) * Math.pow(2, off) : v[k] + off;
     v[k] = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
+  }
+}
+function applyLiveDecays(voice) {
+  const v = voice.liveValues;
+  voice.filtEnv.decayTime = v[VT_FILTER_DECAY];
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const env = voice.ampEnv[i];
+    const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    env.decayTime = v[b + VT_OP_DECAY];
+    const curve = v[b + VT_OP_DECAY_CURVE];
+    if (curve !== env.decayCurve) {
+      env.decayCurve = curve;
+      env.reshapeDecay();
+    }
   }
 }
 function applyVoiceOffsets(voice) {
   bindLiveValues(voice);
+  applyLiveDecays(voice);
   const patch = voice.patch;
   const v = voice.liveValues;
   const o = voice.partOffsets;
@@ -1627,6 +1685,7 @@ function applyVoiceOffsets(voice) {
 }
 function primeVoiceOffsets(voice) {
   bindLiveValues(voice);
+  applyLiveDecays(voice);
   const v = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     voice.fbTo[i] = v[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK];
@@ -1647,6 +1706,7 @@ function rebindVoiceOffsets(voice, slotTargets) {
   }
   bindLiveValues(voice);
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
+  applyLiveDecays(voice);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK;
     if (kept[k] !== 0) continue;
