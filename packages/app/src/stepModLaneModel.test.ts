@@ -9,6 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { GridSpec, GridStep, StepModLane, VoiceTargetPath } from '@windsor/engine';
 import {
   ARRANGEMENT_VERSION,
+  catalogRow,
   gridNote,
   STEP_MOD_LANES_MAX,
   VOICE_TARGET_PATHS,
@@ -24,6 +25,7 @@ import {
   freeParams,
   heldBySlide,
   type LaneHold,
+  laneLabel,
   laneReadout,
   lanesForSteps,
   offsetLabel,
@@ -129,15 +131,38 @@ describe('painting', () => {
   });
 });
 
+describe("a lane's name (windsor#424)", () => {
+  it("is the automation catalog's, one per target", () => {
+    for (const param of VOICE_TARGET_PATHS) {
+      expect(laneLabel(param), param).toBe(catalogRow(`voice.${param}`)!.label);
+    }
+    expect(new Set(VOICE_TARGET_PATHS.map(laneLabel)).size).toBe(VOICE_TARGET_PATHS.length);
+  });
+
+  it('fits the narrow lane header', () => {
+    expect(laneLabel('filter.envAmount')).toBe('Filter Env Amt');
+    expect(laneLabel('ops.2.env.decayCurve')).toBe('Op C Decay Crv');
+    expect(laneLabel('pitchEnvAmount')).toBe('Pitch Env Amt');
+  });
+});
+
 describe('the readout', () => {
   it('reads an octave row in octaves and plays through the engine curve', () => {
-    expect(laneReadout('filter.cutoff', 0.5, 1000)).toBe('+2.3 oct → 4.76k');
+    expect(laneReadout('filter.cutoff', 0.5, 1000)).toBe('+2.3 oct → 4.76 kHz');
     expect(laneReadout('filter.cutoff', -0.5, undefined)).toBe('-2.3 oct');
   });
 
   it('reads a linear row in its own units and clamps to its bounds', () => {
     expect(laneReadout('ops.1.level', 0.5, 0.8)).toBe('+0.25 → 1.00');
-    expect(laneReadout('filter.envAmount', -0.35, 0)).toBe('-2.10 → -2.10');
+    expect(laneReadout('filter.envAmount', -0.35, 0)).toBe('-2.10 → -2.1 oct');
+  });
+
+  it('reads the played value as a song lane does (windsor#424)', () => {
+    expect(laneReadout('ops.0.env.decayTime', 0, 0.12)).toBe('+0.0 oct → 120 ms');
+    expect(laneReadout('filter.env.decayTime', 0, 1.5)).toBe('+0.0 oct → 1.50 s');
+    expect(laneReadout('lfo.rate', 0, 2)).toBe('+0.0 oct → 2.00 Hz');
+    expect(laneReadout('filter.vowel', 0.25, 0)).toBe('+0.50 → a→e 50%');
+    expect(laneReadout('pitchEnvAmount', 0.25, 0)).toBe('+12.00 → +12.0 st');
   });
 
   it('reads a decay time, a ratio row, in octaves (windsor#419)', () => {
@@ -145,7 +170,7 @@ describe('the readout', () => {
   });
 
   it('shows the patch value itself at 0', () => {
-    expect(laneReadout('filter.cutoff', 0, 1200)).toBe('+0.0 oct → 1.20k');
+    expect(laneReadout('filter.cutoff', 0, 1200)).toBe('+0.0 oct → 1.20 kHz');
   });
 
   it('labels an offset for every curve', () => {
@@ -269,7 +294,7 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
   it('says so in the readout instead of a played value', () => {
     const always = { kind: 'retarget', when: 'always' } as const;
     expect(laneReadout('ops.0.feedback', 0.35, 0, always)).toBe('+0.35 · held by slide');
-    expect(laneReadout('filter.cutoff', 0.5, 1000, always)).toBe('+2.3 oct → 4.76k');
+    expect(laneReadout('filter.cutoff', 0.5, 1000, always)).toBe('+2.3 oct → 4.76 kHz');
     expect(laneReadout('filter.cutoff', 0.5, 1000, { kind: 'same', when: 'always' })).toBe(
       '+2.3 oct · held by slide',
     );

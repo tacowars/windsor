@@ -6,7 +6,7 @@
  * Every row's bounds and scale are its knob's: the voice rows are the voice
  * target table's (`worklet/fm/voiceTargetTables.ts`, windsor#419), one per
  * row with its bounds, and this file adds each one's look (label, scale,
- * unit) by path; the app's `automationTargetParity.test.ts` holds every
+ * unit) by path, the one place a voice target is named (windsor#424); the app's `automationTargetParity.test.ts` holds every
  * voice and strip row to its knob (`patchKnobTables.ts`, `mixerTables.ts`).
  * A lane is drawn in its knob's own scale (decision 5), so a decay time,
  * whose knob ends on exact 0 (windsor#316), is a log row from 0 with the
@@ -67,29 +67,44 @@ interface VoiceLook {
   readonly zeroEnd?: boolean;
 }
 
-/** The filter's, the LFOs' and the pitch envelope's looks, by path. */
-const VOICE_LOOKS: Readonly<Record<string, VoiceLook>> = {
+/** An operator's target, `ops.<i>.<field>`. */
+type OperatorPath = Extract<VoiceTargetPath, `ops.${string}`>;
+/** Every other target: the filter's, the LFOs' and the pitch envelope's. */
+type VoicePath = Exclude<VoiceTargetPath, OperatorPath>;
+/** The field an operator path names, `env.decayTime` of `ops.2.env.decayTime`. */
+type FieldOf<P> = P extends `ops.${number}.${infer F}` ? F : never;
+/** An operator's five fields. */
+type OperatorField = FieldOf<OperatorPath>;
+
+/**
+ * The filter's, the LFOs' and the pitch envelope's looks, by path, keyed by
+ * the target table's own path type so a target with no look fails
+ * typecheck. A label is the target's one name (windsor#424): the song-lane
+ * picker, a lane's mixer cell and a step lane all show it, so it fits a step
+ * lane's narrow header.
+ */
+const VOICE_LOOKS: Readonly<Record<VoicePath, VoiceLook>> = {
   'filter.cutoff': { label: 'Cutoff', scale: 'octaves', unit: 'Hz' },
-  'filter.envAmount': { label: 'Filter env amount', scale: 'linear', unit: 'oct' },
+  'filter.envAmount': { label: 'Filter Env Amt', scale: 'linear', unit: 'oct' },
   'filter.resonance': { label: 'Resonance', scale: 'log', unit: '' },
-  'filter.env.decayTime': { label: 'Filter env decay', scale: 'log', unit: 's', zeroEnd: true },
+  'filter.env.decayTime': { label: 'Filter Decay', scale: 'log', unit: 's', zeroEnd: true },
   // The Formant mode's vowel (windsor#406): the picker lists it whatever the
   // filter mode; a lane on a patch not in Formant is silent.
   'filter.vowel': { label: 'Vowel', scale: 'linear', unit: '' },
-  'lfo.amount': { label: 'LFO 1 amount', scale: 'linear', unit: '' },
-  'lfo.rate': { label: 'LFO 1 rate', scale: 'log', unit: 'Hz' },
-  'lfo2.amount': { label: 'LFO 2 amount', scale: 'linear', unit: '' },
-  'lfo2.rate': { label: 'LFO 2 rate', scale: 'log', unit: 'Hz' },
-  pitchEnvAmount: { label: 'Pitch env amount', scale: 'linear', unit: 'st' },
+  'lfo.amount': { label: 'LFO 1 Amount', scale: 'linear', unit: '' },
+  'lfo.rate': { label: 'LFO 1 Rate', scale: 'log', unit: 'Hz' },
+  'lfo2.amount': { label: 'LFO 2 Amount', scale: 'linear', unit: '' },
+  'lfo2.rate': { label: 'LFO 2 Rate', scale: 'log', unit: 'Hz' },
+  pitchEnvAmount: { label: 'Pitch Env Amt', scale: 'linear', unit: 'st' },
 };
 
 /** An operator's five fields' looks, under `ops.<i>`; the label follows `Op <name> `. */
-const OPERATOR_LOOKS: Readonly<Record<string, VoiceLook>> = {
-  level: { label: 'level', scale: 'linear', unit: '' },
-  'env.decayTime': { label: 'decay', scale: 'log', unit: 's', zeroEnd: true },
-  'env.decayCurve': { label: 'decay curve', scale: 'linear', unit: '' },
-  feedback: { label: 'feedback', scale: 'linear', unit: '' },
-  width: { label: 'width', scale: 'linear', unit: '' },
+const OPERATOR_LOOKS: Readonly<Record<OperatorField, VoiceLook>> = {
+  level: { label: 'Level', scale: 'linear', unit: '' },
+  'env.decayTime': { label: 'Decay', scale: 'log', unit: 's', zeroEnd: true },
+  'env.decayCurve': { label: 'Decay Crv', scale: 'linear', unit: '' },
+  feedback: { label: 'Feedback', scale: 'linear', unit: '' },
+  width: { label: 'Width', scale: 'linear', unit: '' },
 };
 
 /** An operator's path: its index and its field. */
@@ -98,9 +113,9 @@ const OPERATOR_PATH = /^ops\.(\d)\.(.+)$/;
 /** The look of the target at `path`, an operator's labelled with its name. */
 function lookOf(path: VoiceTargetPath): VoiceLook {
   const op = OPERATOR_PATH.exec(path);
-  const look = op ? OPERATOR_LOOKS[op[2]!] : VOICE_LOOKS[path];
-  if (!look) throw new Error(`automationTargetTables: no look for ${path}`);
-  return op ? { ...look, label: `Op ${OP_NAMES[Number(op[1])]} ${look.label}` } : look;
+  if (!op) return VOICE_LOOKS[path as VoicePath];
+  const look = OPERATOR_LOOKS[op[2] as OperatorField];
+  return { ...look, label: `Op ${OP_NAMES[Number(op[1])]} ${look.label}` };
 }
 
 /** A voice row from its target row's bounds and its look. */

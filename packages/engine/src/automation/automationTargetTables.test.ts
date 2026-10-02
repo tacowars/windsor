@@ -32,6 +32,24 @@ describe('the voice rows', () => {
     expect(new Set(VOICE_AUTOMATION_ROWS.map((r) => r.label)).size).toBe(30);
   });
 
+  it('name each target once, short enough for a step lane header (windsor#424)', () => {
+    const operator = (name: string): string[] =>
+      ['Level', 'Decay', 'Decay Crv', 'Feedback', 'Width'].map((f) => `Op ${name} ${f}`);
+    expect(VOICE_AUTOMATION_ROWS.map((r) => r.label)).toEqual([
+      'Cutoff',
+      'Filter Env Amt',
+      'Resonance',
+      'Filter Decay',
+      'Vowel',
+      ...['A', 'B', 'C', 'D'].flatMap(operator),
+      'LFO 1 Amount',
+      'LFO 1 Rate',
+      'LFO 2 Amount',
+      'LFO 2 Rate',
+      'Pitch Env Amt',
+    ]);
+  });
+
   it('carry the vowel as a linear 0–4 lane, the patch’s vowel range', () => {
     const vowel = VOICE_AUTOMATION_ROWS.find((r) => r.target === 'voice.filter.vowel')!;
     expect(vowel).toEqual({
