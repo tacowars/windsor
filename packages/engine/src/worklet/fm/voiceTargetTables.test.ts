@@ -34,6 +34,7 @@ import {
   VT_RESONANCE,
   VT_VOWEL,
   voiceTargetCode,
+  voiceTargetRow,
 } from './voiceTargetTables';
 
 const row = (path: string) => VOICE_TARGET_TABLE.find((r) => r.path === path);
@@ -133,6 +134,11 @@ describe('the voice target table (windsor#419)', () => {
   it('maps no code to a field no row carries, or to junk', () => {
     for (const path of ['ops.0.env.attackTime', 'volume', '', null, 3, 'voice.filter.cutoff']) {
       expect(voiceTargetCode(path)).toBe(-1);
+      expect(voiceTargetRow(path)).toBeUndefined();
     }
+  });
+
+  it('looks a row up by its path, as the table holds it', () => {
+    for (const r of VOICE_TARGET_TABLE) expect(voiceTargetRow(r.path)).toBe(r);
   });
 });

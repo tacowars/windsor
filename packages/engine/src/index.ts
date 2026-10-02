@@ -85,6 +85,7 @@ export {
   VOICE_TARGET_COUNT,
   VOICE_TARGET_PATHS,
   VOICE_TARGET_TABLE,
+  voiceTargetRow,
 } from './worklet/fm/voiceTargetTables';
 export type {
   VoiceTargetCurve,
@@ -115,13 +116,13 @@ export {
   AUTOMATION_STRIP_LEVEL_MAX,
   FM_LANES_MAX,
   STRIP_AUTOMATION_ROWS,
-  VOICE_AUTOMATION_ROWS,
 } from './automation/automationTargetTables';
 export { INSERT_AUTOMATION_FIELDS } from './automation/automationInsertTables';
 export type { InsertFieldRow, InsertSpecOf } from './automation/automationInsertTables';
 export { automatableInsertFields } from './automation/automationInsertFields';
 export {
   STRIP_TARGET_IDS,
+  VOICE_AUTOMATION_ROWS,
   VOICE_TARGET_IDS,
   catalogRow,
   formatTargetId,
@@ -129,6 +130,8 @@ export {
   parseTargetId,
   targetKind,
   targetRow,
+  voicePathOf,
+  voiceTargetId,
 } from './automation/automationTargets';
 export { DISPLAY_ROW, fromDisplay, toDisplay } from './automation/automationDisplay';
 export { bendCurve, rampsBetween, valueAt } from './automation/automationEvaluate';

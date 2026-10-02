@@ -7,10 +7,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { VoiceTargetRow } from './voiceTargetTables';
-import { VOICE_TARGET_TABLE } from './voiceTargetTables';
+import { VOICE_TARGET_TABLE, voiceTargetRow } from './voiceTargetTables';
 import { stepModValue, voiceTargetValue } from './voiceTargetValue';
 
-const row = (path: string): VoiceTargetRow => VOICE_TARGET_TABLE.find((r) => r.path === path)!;
+const row = (path: string): VoiceTargetRow => voiceTargetRow(path)!;
 const CUTOFF = row('filter.cutoff');
 const DECAY = row('ops.0.env.decayTime');
 const LEVEL = row('ops.1.level');

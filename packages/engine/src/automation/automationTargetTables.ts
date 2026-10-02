@@ -6,18 +6,16 @@
  * Every row's bounds and scale are its knob's: the voice rows are the voice
  * target table's (`worklet/fm/voiceTargetTables.ts`, windsor#419), one per
  * row with its bounds, and this file adds each one's look (label, scale,
- * unit) by path, the one place a voice target is named (windsor#424); the app's `automationTargetParity.test.ts` holds every
+ * unit) by path, the one place a voice target is named (windsor#424);
+ * `automationTargets.ts` puts each look under its target id as
+ * `VOICE_AUTOMATION_ROWS`. The app's `automationTargetParity.test.ts` holds every
  * voice and strip row to its knob (`patchKnobTables.ts`, `mixerTables.ts`).
  * A lane is drawn in its knob's own scale (decision 5), so a decay time,
  * whose knob ends on exact 0 (windsor#316), is a log row from 0 with the
  * table's 1 ms floor as its display floor.
  */
 import { OP_NAMES } from '../patch/patch';
-import {
-  VOICE_TARGET_TABLE,
-  type VoiceTargetPath,
-  type VoiceTargetRow,
-} from '../worklet/fm/voiceTargetTables';
+import type { VoiceTargetPath, VoiceTargetRow } from '../worklet/fm/voiceTargetTables';
 import type { AutomationScale, AutomationTargetRow, StripTargetId } from './automationLane';
 
 /** The most FM lanes one part carries (decision 3). Strip and insert lanes have no cap. */
@@ -85,7 +83,7 @@ type OperatorField = FieldOf<OperatorPath>;
  */
 const VOICE_LOOKS: Readonly<Record<VoicePath, VoiceLook>> = {
   'filter.cutoff': { label: 'Cutoff', scale: 'octaves', unit: 'Hz' },
-  'filter.envAmount': { label: 'Filter Env Amt', scale: 'linear', unit: 'oct' },
+  'filter.envAmount': { label: 'Filt Env Amt', scale: 'linear', unit: 'oct' },
   'filter.resonance': { label: 'Resonance', scale: 'log', unit: '' },
   'filter.env.decayTime': { label: 'Filter Decay', scale: 'log', unit: 's', zeroEnd: true },
   // The Formant mode's vowel (windsor#406): the picker lists it whatever the
@@ -118,20 +116,11 @@ function lookOf(path: VoiceTargetPath): VoiceLook {
   return { ...look, label: `Op ${OP_NAMES[Number(op[1])]} ${look.label}` };
 }
 
-/** A voice row from its target row's bounds and its look. */
-function voiceRow(row: VoiceTargetRow): AutomationTargetRow {
+/** A voice row without its target id: its target row's bounds and its look. */
+export function voiceRowLook(row: VoiceTargetRow): Omit<AutomationTargetRow, 'target'> {
   const { label, scale, unit, zeroEnd } = lookOf(row.path);
   const bounds = zeroEnd
     ? { min: 0, max: row.max, floor: row.floor }
     : { min: row.min, max: row.max };
-  return { target: `voice.${row.path}`, label, ...bounds, scale, unit };
+  return { label, ...bounds, scale, unit };
 }
-
-/**
- * The voice's 30 rows (decision 2, windsor#406), one per row of the voice
- * target table and in its order (windsor#419): the filter's four and the
- * Formant vowel, each operator's five, LFO 1 and LFO 2 amount and rate, and
- * the pitch-envelope amount.
- */
-export const VOICE_AUTOMATION_ROWS: readonly AutomationTargetRow[] =
-  VOICE_TARGET_TABLE.map(voiceRow);

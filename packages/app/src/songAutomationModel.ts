@@ -32,6 +32,7 @@ import {
   parseTargetId,
   targetKind,
   targetRow,
+  voicePathOf,
 } from '@windsor/engine';
 import { INSERT_LABELS } from './insertKnobTables';
 import { getPath } from './patchPath';
@@ -119,16 +120,13 @@ export function pickerGroups(part: DocumentPart): PickerGroup[] {
   });
   const voice = VOICE_GROUPS(OP_NAMES).map((group) => ({
     label: group.label,
-    options: VOICE_AUTOMATION_ROWS.filter((row) => group.claims(voicePath(row.target))).map((row) =>
-      option(row.target as AutomationTargetId, row.label, voiceFull),
+    options: VOICE_AUTOMATION_ROWS.filter((row) => group.claims(voicePathOf(row.target) ?? '')).map(
+      (row) => option(row.target as AutomationTargetId, row.label, voiceFull),
     ),
   }));
   const mixer = STRIP_AUTOMATION_ROWS.map((row) => option(row.target, row.label));
   return [{ label: MIXER_GROUP_LABEL, options: mixer }, ...inserts, ...voice];
 }
-
-const VOICE_PREFIX = 'voice.';
-const voicePath = (target: string): string => target.slice(VOICE_PREFIX.length);
 
 /** A lane's name and the kind line under it (decision 2): "Cutoff" over "Voice · Filter". */
 export interface LaneTitle {

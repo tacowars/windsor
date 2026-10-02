@@ -20,6 +20,7 @@ import {
   VOICE_TARGET_COUNT,
   VOICE_TARGET_PATHS,
   VOICE_TARGET_TABLE,
+  voiceTargetRow,
 } from '../worklet/fm/voiceTargetTables';
 import { stepModValue } from '../worklet/fm/voiceTargetValue';
 
@@ -133,7 +134,7 @@ describe('step offsets in the voice (windsor#17)', () => {
   });
 
   it.each(VOICE_TARGET_PATHS.map((p) => [p]))('%s moves its target and the render', (param) => {
-    const row = VOICE_TARGET_TABLE.find((r) => r.path === param)!;
+    const row = voiceTargetRow(param)!;
     const patch = patchFor(param);
     const plain = renderWith(undefined, true, patch);
     for (const value of [0.5, -0.5]) {
@@ -152,7 +153,7 @@ describe('step offsets in the voice (windsor#17)', () => {
   });
 
   it('a cutoff of +0.5 raises only its note by half the span in octaves', () => {
-    const span = VOICE_TARGET_TABLE.find((r) => r.path === 'filter.cutoff')!.span;
+    const span = voiceTargetRow('filter.cutoff')!.span;
     const processor = loaded.create(PATCH, 4);
     play(processor, noteOn(1, 0, { stepMod: offsets('filter.cutoff', 0.5) }));
     const cutoff = (id: number): number => played(voiceOf(processor, id), 'filter.cutoff');
@@ -193,7 +194,7 @@ describe('step offsets across a slide and a live retune (windsor#17)', () => {
     const retuned = { ...PATCH, filter: { ...PATCH.filter, cutoff: 600 } };
     processor.inbox({ type: 'patch', patch: retuned } as unknown as ScheduledEvent);
     play(processor);
-    const row = VOICE_TARGET_TABLE.find((r) => r.path === 'filter.cutoff')!;
+    const row = voiceTargetRow('filter.cutoff')!;
     expect(played(voiceOf(processor, 1), 'filter.cutoff')).toBe(stepModValue(row, 600, 0.5));
   });
 });

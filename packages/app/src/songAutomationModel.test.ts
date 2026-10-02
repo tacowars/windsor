@@ -20,6 +20,7 @@ import {
   TICKS_PER_BAR,
   VOICE_AUTOMATION_ROWS,
   catalogRow,
+  voicePathOf,
   type AutomationLane,
   type AutomationTargetId,
   type AutomationTargetRow,
@@ -48,6 +49,7 @@ const SLOT = AUTOMATION_PART.slot;
 const TAPE_DRIVE = `insert.${AUTOMATION_TAPE_ID}.drive` as AutomationTargetId;
 const TAPE_WEAR = `insert.${AUTOMATION_TAPE_ID}.wear` as AutomationTargetId;
 const TAPE_WOW = `insert.${AUTOMATION_TAPE_ID}.wow` as AutomationTargetId;
+const isVoice = (target: string): boolean => voicePathOf(target) !== undefined;
 
 /** `AUTOMATION_PART` with `inserts` on its strip and `lanes` as its automation. */
 const partWith = (
@@ -116,7 +118,7 @@ describe('the picker', () => {
     expect(mixer.find((o) => o.target === 'strip.level')?.disabled).toBe(true);
     expect(mixer.find((o) => o.target === 'strip.pan')?.disabled).toBe(true);
     expect(mixer.find((o) => o.target === 'strip.send.a')?.disabled).toBe(false);
-    const voice = groups.flatMap((g) => g.options).filter((o) => o.target.startsWith('voice.'));
+    const voice = groups.flatMap((g) => g.options).filter((o) => isVoice(o.target));
     expect(voice.find((o) => o.target === 'voice.filter.cutoff')?.disabled).toBe(true);
     expect(voice.find((o) => o.target === 'voice.filter.resonance')?.disabled).toBe(false);
   });
@@ -127,12 +129,8 @@ describe('the picker', () => {
     );
     const full = pickerGroups(partWith(AUTOMATION_PART.strip.inserts, lanes));
     const options = full.flatMap((g) => g.options);
-    expect(options.filter((o) => o.target.startsWith('voice.')).every((o) => o.disabled)).toBe(
-      true,
-    );
-    expect(options.filter((o) => !o.target.startsWith('voice.')).some((o) => o.disabled)).toBe(
-      false,
-    );
+    expect(options.filter((o) => isVoice(o.target)).every((o) => o.disabled)).toBe(true);
+    expect(options.filter((o) => !isVoice(o.target)).some((o) => o.disabled)).toBe(false);
     expect(voiceCountLabel(lanes)).toBe(`Voice ${FM_LANES_MAX}/${FM_LANES_MAX}`);
     expect(voiceCountLabel(lanesOf(AUTOMATION_PART))).toBe('Voice 2/8');
   });
