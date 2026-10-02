@@ -1,7 +1,7 @@
 # Your songs: a song library in the browser, with tags and templates
 
 - **Date:** 2026-10-02
-- **Status:** accepted; windsor#433 and windsor#434 build it. tacowars agreed the design and approved the mockup
+- **Status:** accepted; windsor#440, windsor#433 and windsor#434 build it. tacowars agreed the design and approved the mockup
   (`docs/design/song-library-mockup.html`) on 2026-10-02.
 - **Extends:** `2026-09-27-user-library-in-indexeddb.md`, whose first cut was
   autosave only and left named songs for later, as more records in the same
@@ -37,10 +37,21 @@ grouped by genre, with a place for templates. Storage stays in the browser.
 5. **A reload with a named song open reopens it straight away**, with a
    toast saying so, because nothing in it is at risk. An untitled song still
    asks before it restores.
-6. **The name and tags live on the stored record, not in the document.**
-   The song format does not change, so nothing bumps
-   `ARRANGEMENT_VERSION`, and old exports load as they do now. An exported
-   file carries no name or tags beyond its file name.
+6. **The name and tags live in the song document,** as a top-level
+   `meta: { name, tags }`. tacowars first agreed to keep them beside the
+   document, then chose this the same day, since no old songs need
+   protecting. It has four benefits:
+   - An exported file is the whole song, so Export then Import keeps its
+     name and tags, and a later backup is just the songs' files.
+   - The stored index is only a cache derived from the document.
+   - A rename or a tag edit is an ordinary document edit: it can be undone,
+     and the one autosave path stores it.
+   - The export file name comes from the song itself.
+
+   The storage id and the created and edited times stay out of the
+   document, because they belong to the browser's copy rather than the
+   song. `meta` is additive and absent when empty, so nothing bumps
+   `ARRANGEMENT_VERSION`.
 7. **Deleting the open song** leaves it open and playing as untitled, so
    Save as… can bring it back. Delete always asks first.
 8. **Names need not be unique.** Every song has its own id.
@@ -64,15 +75,18 @@ Version 2 is additive: `patches` and `songs` are untouched.
 
 | Store | Key | Value |
 |---|---|---|
-| `songIndex` | song id | `{ id, name, tags, created, updated, bpm, bars, key }` |
-| `songDocs` | song id | the song's export text, exactly what Export writes |
+| `songDocs` | song id | the song's export text, exactly what Export writes, `meta` included |
+| `songIndex` | song id | `{ id, name, tags, created, updated, bpm, bars, key }`, a cache for the list |
 
 - **Why two stores.** The list reads only the small index records, so it
   never loads every song's patch snapshots to draw a table.
 - **One transaction.** A save writes both records in a single transaction,
   so an index entry never points at a missing document.
-- **Song facts.** `bpm`, `bars` and `key` are copied from the document at
-  each write, for the table.
+- **The index is derived.** One pure function reads `name`, `tags`, `bpm`,
+  `bars` and `key` from the document text at each write. Only `id`,
+  `created` and `updated` are the store's own. A missing index record is
+  re-derived from its document, and an index record without a document is
+  dropped.
 - **The session record.** `songs/current` gains an optional `songId` naming
   the open named song. While a named song is open, its text is written into
   `songDocs` and is not copied into `current`. While an untitled song is
@@ -104,9 +118,11 @@ Version 2 is additive: `patches` and `songs` are untouched.
 
 ## Delivery
 
-Two tickets, sequenced:
+Three tickets, sequenced:
 
-1. **The model and storage** (windsor#433). The store, the open-song session, routing
+1. **`meta` in the song document** (windsor#440), in the engine. It waits
+   for the meter seam (PR #439), which edits the same normaliser.
+2. **The model and storage** (windsor#433). The store, the open-song session, routing
    autosave to the open song, and the reload rule. Nothing visible changes.
-2. **The Songs section** (windsor#434), built to the approved mockup, plus the export
+3. **The Songs section** (windsor#434), built to the approved mockup, plus the export
    file name.

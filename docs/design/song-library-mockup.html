@@ -272,7 +272,7 @@ dialog::backdrop { background: rgba(10, 13, 15, 0.72); }
     <h2>Decided (tacowars, 2026-10-02)</h2>
     <ol>
       <li><b>Reload with a named song open.</b> Reopen it straight away, with a toast saying so, because nothing in it is at risk. An untitled song still asks before it restores, as it does today.</li>
-      <li><b>Where a song's name lives.</b> On the stored record (name, tags, created, edited), not inside the song document. The song format doesn't change and old exports load as they do now. The cost: an exported file carries no name or tags, only its file name.</li>
+      <li><b>Where a song’s name lives.</b> In the song document, as <code>meta: { name, tags }</code> (changed the same day: an exported file then carries its name and tags, and renames can be undone).</li>
       <li><b>Deleting the open song.</b> It keeps playing and becomes untitled, so nothing stops and Save as… can bring it back.</li>
       <li><b>Duplicate names.</b> Allowed. Each song has its own id, and the Edited column tells two songs with the same name apart.</li>
       <li><b>Tag suggestions.</b> The Save-as dialog offers the tags already in use, with <span class="chip template" style="padding:0 6px">template</span> always among them. If a tag filter is on, it is preselected.</li>
