@@ -16,9 +16,9 @@
  * unshown. Nothing scrolls sideways; the lanes scroll vertically under the
  * step rows.
  *
- * It draws on the Grid device's machinery: `stepStrip.ts`'s cells, held
- * columns and playhead loop, `gridModel.ts`'s cell edits, the shared ratchet
- * (`ratchetCell.ts`, `ratchetModel.ts`; record
+ * It draws on the Grid device's machinery: `stepStrip.ts`'s held columns
+ * and playhead loop, the step cells of `arpStepCells.ts` (which Basslead
+ * shares, windsor#371) with the shared ratchet (record
  * `2026-10-01-sequencer-rack-devices` decision 6), the lanes of
  * `stepModLane.ts` through a `LaneHost` as `gridCard.ts` builds one, and the
  * region playhead (`regionPlayhead.ts`), the engine's `Arpeggiator.stepAt`.
@@ -29,24 +29,20 @@ import type { ArpSpec, ArpStep } from '@windsor/engine';
 import { ARP_STEPS_MAX, STEP_MOD_LANES_MAX } from '@windsor/engine';
 import {
   arpCycleLabel,
-  arpKindLabel,
   arpListCount,
-  arpOctaveLabel,
   arpShownList,
   arpSlideAt,
-  nextArpKind,
   randomArpCells,
   rotateArp,
 } from './arpGridModel';
+import { arpStepCells } from './arpStepCells';
 import { regionChord } from './chordRegionChord';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
-import { cycleOctave, toggleFlag, withStep } from './gridModel';
+import { withStep } from './gridModel';
 import { makeKnob } from './knob';
 import { changePattern } from './partEdits';
-import { ratchetCell } from './ratchetCell';
-import { cycleStepRatchet, stepRatchet, takesRatchet } from './ratchetModel';
 import { regionPlayheadAt } from './regionPlayhead';
 import { ARP_ROTATE_KNOB } from './sequencerKnobTables';
 import {
@@ -64,7 +60,6 @@ import {
   markStep,
   paintStrip,
   specOf,
-  stripCell as cell,
   stripHeadColumn,
   watchPlayhead,
 } from './stepStrip';
@@ -113,54 +108,8 @@ function editCell(strip: ArpStrip, index: number, edit: (step: ArpStep) => ArpSt
   });
 }
 
-function kindCell(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
-  const node = cell(arpKindLabel(step), step.kind === 'note' ? 'note' : '');
-  node.title = `${step.kind}: click for note → tie → rest`;
-  node.onclick = (): void => editCell(strip, index, nextArpKind);
-  return node;
-}
-
-function octaveCell(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
-  if (step.kind !== 'note') return cell('', 'blank');
-  const node = cell(arpOctaveLabel(step.octave), step.octave === 0 ? 'oct dim' : 'oct');
-  node.title = 'octave shift: click up, shift-click down';
-  node.onclick = (event: MouseEvent): void =>
-    editCell(strip, index, (s) => cycleOctave(s, event.shiftKey ? -1 : 1));
-  return node;
-}
-
-function flagCell(
-  strip: ArpStrip,
-  index: number,
-  step: ArpStep,
-  flag: 'accent' | 'slide',
-): HTMLElement {
-  if (step.kind !== 'note') return cell('', 'blank');
-  const node = cell(flag === 'accent' ? 'A' : 'S');
-  node.title = flag;
-  node.setAttribute('aria-pressed', String(step[flag]));
-  node.onclick = (): void => editCell(strip, index, (s) => toggleFlag(s, flag));
-  return node;
-}
-
-/** The cell's ratchet: ×1 or a tick per hit, cycled by a click; grey and inert on a rest or a tie. */
-function ratchet(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
-  return ratchetCell({
-    step: index,
-    roll: stepRatchet(step),
-    takes: takesRatchet(step),
-    cycle: () => editCell(strip, index, cycleStepRatchet),
-  });
-}
-
 function column(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
-  const head = [
-    kindCell(strip, index, step),
-    octaveCell(strip, index, step),
-    flagCell(strip, index, step, 'accent'),
-    flagCell(strip, index, step, 'slide'),
-    ratchet(strip, index, step),
-  ];
+  const head = arpStepCells(index, step, (edit) => editCell(strip, index, edit));
   return stripHeadColumn(index, true, head, laneCells(strip.lanes, index, step.kind === 'note'));
 }
 
