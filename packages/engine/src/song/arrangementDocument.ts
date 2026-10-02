@@ -28,7 +28,7 @@ import type {
   DeepPartial,
   Transport,
 } from './arrangement';
-import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { songTicks } from '../sequencing/meter';
 import { normaliseSongSidechains } from './sidechainNormalise';
 import { show } from './arrangementFields';
 import { ArrangementNormaliser } from './arrangementNormalise';
@@ -228,7 +228,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   const document: MutableDocument = {
     version: ARRANGEMENT_VERSION,
     transport,
-    harmony: n.harmony(o.harmony, transport.bars * TICKS_PER_BAR),
+    harmony: n.harmony(o.harmony, songTicks(transport.bars)),
     parts,
   };
   // A library fill is embedded here and nowhere else (#562): from this point

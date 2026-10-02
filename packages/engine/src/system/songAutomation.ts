@@ -30,7 +30,8 @@
  */
 import { AutomationPlayer } from '../automation/automationPlayer';
 import type { AutomationLane } from '../automation/automationLane';
-import { TICKS_PER_BAR, type Scheduler } from '../sequencing/scheduler';
+import { songTicks } from '../sequencing/meter';
+import type { Scheduler } from '../sequencing/scheduler';
 import { FieldNormaliser, isRecord } from '../song/arrangementFields';
 import type { MusicPart } from '../song/arrangement';
 import type {
@@ -58,7 +59,7 @@ export class SongAutomation {
    */
   begin(document: ArrangementDocument): AutomationPlayer {
     const { transport } = this.scheduler;
-    this.songTicks = document.transport.bars * TICKS_PER_BAR;
+    this.songTicks = songTicks(document.transport.bars);
     this.playerValue = new AutomationPlayer({
       transport,
       now: () => this.clock.currentTime,
@@ -84,7 +85,7 @@ export class SongAutomation {
     const parts = isRecord(partial.parts) ? Object.entries(partial.parts) : [];
     for (const [slot, part] of parts) if (part === null) player.removePart(Number(slot));
     if (isRecord(partial.transport) && partial.transport.bars !== undefined) {
-      this.songTicks = bars() * TICKS_PER_BAR;
+      this.songTicks = songTicks(bars());
       player.setSongTicks(this.songTicks);
       this.refit(player);
     }

@@ -77,7 +77,7 @@ import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
-import { DIVISORS, isBarDivisor, TICKS_PER_BAR, type Unsubscribe } from './scheduler';
+import { DIVISORS, isNoteDivisor, TICKS_PER_BAR, type Unsubscribe } from './scheduler';
 import { assertStepModLanes, stepModAt, type StepModLane } from './stepModLanes';
 
 export const BASS_PITCH_MODES = ['followRoot', 'followChord', 'fixed'] as const;
@@ -163,7 +163,7 @@ export function assertBassConfig(config: BassSequencerConfig): void {
   ) {
     throw new RangeError(`fixedDegree must be 0..${HARMONY_DEGREE_MAX}`);
   }
-  if (!isBarDivisor(config.divisor)) {
+  if (!isNoteDivisor(config.divisor)) {
     throw new RangeError(`divisor must divide the bar, got ${config.divisor}`);
   }
   if (!(config.gate > 0 && config.gate <= 1)) {

@@ -20,7 +20,7 @@ import {
   type ChordVoicingId,
 } from '../harmony/chordTables';
 import { assertArpGrid, defaultArpSteps, type ArpStep } from './arpSteps';
-import { DIVISORS, isBarDivisor } from './scheduler';
+import { DIVISORS, isNoteDivisor } from './scheduler';
 import type { StepModLane } from './stepModLanes';
 
 export const ARP_STYLES = [
@@ -88,7 +88,7 @@ export function assertArpConfig(config: ArpSequencerConfig): void {
   if (!ARP_STYLES.includes(config.style)) {
     throw new RangeError(`style must be one of ${ARP_STYLES.join('|')}`);
   }
-  if (!isBarDivisor(config.divisor)) {
+  if (!isNoteDivisor(config.divisor)) {
     throw new RangeError(`divisor must divide the bar, got ${config.divisor}`);
   }
   if (!(config.gate > 0 && config.gate <= 1)) {

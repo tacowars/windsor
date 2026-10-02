@@ -27,7 +27,8 @@
  * own seeds, so two renders of the same song are bit-identical.
  */
 import { SCHEDULER_START_DELAY_SECONDS, SECONDS_PER_MINUTE } from '../audioConstants';
-import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
+import { songTicks } from '../sequencing/meter';
+import { TickTransport } from '../sequencing/scheduler';
 import { playableSwing } from '../sequencing/swing';
 import { STRAIGHT_SWING } from '../sequencing/swingTables';
 import type { ArrangementDocument } from '../song/arrangementDocument';
@@ -87,11 +88,11 @@ export interface RenderedSong {
   songSeconds: number;
 }
 
-/** The song's length in seconds: its bars at its tempo (swing moves off-beats, never bar lines). */
+/** The song's length in seconds: its bars at its tempo (swing moves off-beats, never a beat). */
 export function songSeconds(document: ArrangementDocument): number {
   const { bpm, bars, swing } = document.transport;
   const clock = new TickTransport(bpm, playableSwing(swing ?? STRAIGHT_SWING));
-  return clock.swungTicks(bars * TICKS_PER_BAR) * clock.secondsPerTick;
+  return clock.swungTicks(songTicks(bars)) * clock.secondsPerTick;
 }
 
 /** The frame plan a render of `document` with `options` would take; allocates nothing. */

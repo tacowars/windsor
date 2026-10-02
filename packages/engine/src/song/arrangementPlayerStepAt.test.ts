@@ -77,7 +77,7 @@ const LADDER: Arrangement = {
 
 /** A progression whose three steps are of three different lengths, the last one twice. */
 const CHORD_DRIVER = {
-  divisor: DIVISORS.bar,
+  divisor: DIVISORS.whole,
   gate: 1,
   follow: false,
   voicing: 'close',

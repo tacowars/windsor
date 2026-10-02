@@ -18,7 +18,7 @@ import { RegionGate } from './regionGate';
 import { ScaleSampler } from './scaleSampler';
 import { DIVISORS, TickTransport } from './scheduler';
 
-const BAR = DIVISORS.bar;
+const BAR = DIVISORS.whole;
 const SONG_TICKS = 4 * BAR;
 const C_MAJOR: Omit<Harmony, 'events'> = { root: 0, scale: 'major' };
 

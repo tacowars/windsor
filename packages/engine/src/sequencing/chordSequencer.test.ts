@@ -27,7 +27,7 @@ const major = new ScaleSampler({ root: 0, scale: 'major' });
 const C4 = { octave: 4 };
 
 /** A bar per base step, so the fixture's tick numbers read straight off its durations. */
-const BAR = DIVISORS.bar;
+const BAR = DIVISORS.whole;
 
 /** A triad on `degree` from `start` for `duration` ticks. */
 const triad = (start: number, duration: number, degree: number): HarmonyEvent => ({
