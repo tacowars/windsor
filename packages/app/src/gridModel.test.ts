@@ -18,8 +18,11 @@ import {
   stepLabel,
   stepsForLength,
   toggleFlag,
+  turnGrid,
   withStep,
+  GRID_TURN_REBASED,
 } from './gridModel';
+import { lanesForSteps } from './stepModLaneModel';
 
 const MINOR: Key = { root: 0, scale: 'naturalMinor' };
 const PENTA: Key = { root: 0, scale: 'pentatonicMinor' };
@@ -131,6 +134,57 @@ describe('lanes turn with the steps (windsor#31)', () => {
       { param: 'filter.cutoff', values: [0.4, 0.1, 0.2, 0.3, 0.9] },
     ]);
     expect(rotateLanes(lanes, -1, 4)[0]!.values).toEqual([0.2, 0.3, 0.4, 0.1, 0.9]);
+  });
+});
+
+describe('the Rotate knob rebases when the pattern is replaced (windsor#414)', () => {
+  const degrees = (steps: readonly GridStep[]): number[] =>
+    steps.map((s) => (s.kind === 'note' ? s.degree : -1));
+  const lane = (values: number[]) => ({ param: 'filter.cutoff' as const, values });
+  // A…H as degrees 0…7, a ratchet on the first step, a lane value per step.
+  const pattern = {
+    length: 8,
+    steps: [gridNote(0, { ratchet: 3 }), ...[1, 2, 3, 4, 5, 6, 7].map((d) => gridNote(d))],
+    lanes: [lane([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])],
+  };
+
+  it('turns and turns back, ratchets and lanes with their steps, and writes nothing standing still', () => {
+    const first = turnGrid(pattern, 0, 1.4);
+    expect(first.turned).toBe(1);
+    expect(degrees(first.change!.steps)).toEqual([7, 0, 1, 2, 3, 4, 5, 6]);
+    expect(first.change!.steps[1]).toEqual(gridNote(0, { ratchet: 3 }));
+    expect(first.change!.lanes).toEqual([lane([0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])]);
+    const back = turnGrid({ ...pattern, ...first.change! }, first.turned, 0);
+    expect(back).toEqual({ turned: 0, change: { steps: pattern.steps, lanes: pattern.lanes } });
+    expect(turnGrid(pattern, 2, 2)).toEqual({ turned: 2, change: null });
+  });
+
+  it('rebases after Length, so back at zero is the lengthened pattern as it stands', () => {
+    const first = turnGrid(pattern, 0, 1);
+    const turned = { ...pattern, ...first.change! };
+    const steps = stepsForLength(turned.steps, 9);
+    const lengthened = { length: 9, steps, lanes: lanesForSteps(turned.lanes, steps.length) };
+    expect(degrees(lengthened.steps)).toEqual([7, 0, 1, 2, 3, 4, 5, 6, 0]);
+    // Rebased, zero is the lengthened pattern as it stands: nothing turns.
+    expect(turnGrid(lengthened, GRID_TURN_REBASED, 0)).toEqual({ turned: 0, change: null });
+    // Unrebased, zero would turn −1 over nine steps: A…G, N, H.
+    expect(degrees(turnGrid(lengthened, first.turned, 0).change!.steps)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 0, 7,
+    ]);
+    const again = turnGrid(lengthened, GRID_TURN_REBASED, 1);
+    expect(degrees(again.change!.steps)).toEqual([0, 7, 0, 1, 2, 3, 4, 5, 6]);
+    expect(again.change!.steps[2]).toEqual(gridNote(0, { ratchet: 3 }));
+    expect(again.change!.lanes).toEqual([lane([0, 0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])]);
+  });
+
+  it('rebases after Randomize, so back at zero keeps the rerolled steps where they fell', () => {
+    const first = turnGrid(pattern, 0, 1);
+    let i = 0;
+    const draw = (): number => (i++ * 0.37) % 1;
+    const rerolled = { ...pattern, ...first.change!, steps: randomSteps(8, 7, draw) };
+    expect(turnGrid(rerolled, GRID_TURN_REBASED, 0)).toEqual({ turned: 0, change: null });
+    const again = turnGrid(rerolled, GRID_TURN_REBASED, 1);
+    expect(again.change!.steps).toEqual(rotateSteps(rerolled.steps, 1, 8));
   });
 });
 
