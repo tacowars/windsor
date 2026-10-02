@@ -100,14 +100,34 @@ export function attachDelay(
   return line;
 }
 
+/** The loop's fields, in the order `writeDelay` writes them. */
+export const DELAY_LINE_FIELDS = ['delayTime', 'feedback', 'damp', 'resonance'] as const;
+
+/**
+ * One field's param on the loop and the value `writeDelay` gives it: the
+ * feedback clamped to `DELAY_FEEDBACK_MAX`, the rest as they are. The Echo
+ * insert's lanes (windsor#345) write through it too.
+ */
+export function delayLineParam(
+  line: DelayLine,
+  field: keyof DelayLineSettings,
+): { readonly param: AudioParam; readonly value: (v: number) => number } {
+  if (field === 'delayTime') return { param: line.effect.delayTime, value: (v) => v };
+  if (field === 'feedback') {
+    return { param: line.feedback.gain, value: (v) => Math.min(DELAY_FEEDBACK_MAX, v) };
+  }
+  if (field === 'damp') return { param: line.damp.frequency, value: (v) => v };
+  return { param: line.damp.Q, value: (v) => v };
+}
+
 /** Param writes onto the loop; an absent field is left as it is. */
 export function writeDelay(line: DelayLine, delay: Partial<DelayLineSettings>): void {
-  if (delay.delayTime !== undefined) line.effect.delayTime.value = delay.delayTime;
-  if (delay.feedback !== undefined) {
-    line.feedback.gain.value = Math.min(DELAY_FEEDBACK_MAX, delay.feedback);
+  for (const field of DELAY_LINE_FIELDS) {
+    const value = delay[field];
+    if (value === undefined) continue;
+    const target = delayLineParam(line, field);
+    target.param.value = target.value(value);
   }
-  if (delay.damp !== undefined) line.damp.frequency.value = delay.damp;
-  if (delay.resonance !== undefined) line.damp.Q.value = delay.resonance;
 }
 
 /** Disconnect every node of the loop, or the cycle stays wired after its owner goes. */

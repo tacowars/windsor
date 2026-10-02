@@ -1,9 +1,28 @@
 /** Fixed one-worklet graph: live edits preserve the insert and transport; disposal owns its node. */
+import { workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
-import { ADVANCED_DRIVE_NAME, DRIVE_DSP } from './advancedDriveConstants';
+import {
+  ADVANCED_DRIVE_BOUNDS,
+  ADVANCED_DRIVE_NAME,
+  DRIVE_DSP,
+  DRIVE_STAGE_BOUNDS,
+} from './advancedDriveConstants';
 import { DEFAULT_ADVANCED_DRIVE, normaliseAdvancedDrive } from './advancedDriveSpec';
 import type { AdvancedDriveSpec } from './advancedDriveSpec';
 import { advancedDriveParameters } from './advancedDriveParameters';
+
+/** A stage's field, `stages.<i>.<field>`, as the catalog spells it. */
+const STAGE_FIELD = /^stages\.(\d+)\.(\w+)$/;
+
+/** A lane field's param: `drive` itself, `stages.1.amount` as `s1_amount`. */
+function driveParamOf(field: string): string | undefined {
+  const stage = STAGE_FIELD.exec(field);
+  if (!stage) return Object.hasOwn(ADVANCED_DRIVE_BOUNDS, field) ? field : undefined;
+  const [, index, name] = stage;
+  const known = Number(index) < DRIVE_DSP.stages && Object.hasOwn(DRIVE_STAGE_BOUNDS, name!);
+  return known ? `s${index}_${name}` : undefined;
+}
+
 function create(
   context: BaseAudioContext,
   spec: AdvancedDriveSpec,
@@ -22,10 +41,14 @@ function create(
     output = context.createGain();
   input.connect(processor);
   processor.connect(output);
+  const params = workletFieldParams(
+    processor,
+    (name) => advancedDriveParameters(current, tempo)[name]!,
+    driveParamOf,
+  );
   const set = (next: AdvancedDriveSpec): void => {
     current = next;
-    for (const [key, value] of Object.entries(advancedDriveParameters(next, tempo)))
-      processor.parameters.get(key)!.value = value;
+    params.write(advancedDriveParameters(next, tempo));
   };
   return {
     kind: 'advanced-drive',
@@ -37,6 +60,7 @@ function create(
       tempo = bpm;
       set(current);
     },
+    param: (field) => params.param(field),
     dispose(): void {
       input.disconnect();
       processor.disconnect();

@@ -3,6 +3,7 @@
  * `insertRegistry.ts` meets. A kind is code-owned — its fields, their ranges,
  * its node graph — and a song names which kinds it uses and how they are set.
  */
+import type { AutomationHandle } from '../automation/automationHandles';
 import type { FieldNormaliser } from '../song/arrangementFields';
 import type { StripStage } from '../mixer/channelStrip';
 
@@ -24,10 +25,21 @@ export interface InsertStage<S extends { readonly kind: string }> extends StripS
   };
   /** Mixer-owned external detector routing, separate from program audio. */
   readonly detector?: { readonly input: AudioNode; setExternal(external: boolean): void };
-  /** Param writes only; the caller has normalised `spec`. */
+  /**
+   * Param writes only; the caller has normalised `spec`. A field a lane holds
+   * (`param`, windsor#345) is recorded, and its params are left to the lane.
+   */
   set(spec: S): void;
   /** Optional song tempo input; the registry initializes it and forwards live changes. */
   setTempo?(bpm: number): void;
+  /**
+   * A song lane's handle on `field` (windsor#345, record
+   * `2026-10-01-song-automation-lanes` decision 1): the param or params `set`
+   * writes for it, with `set`'s mapping at each breakpoint. While engaged it
+   * holds them and `set` leaves them alone; its release restores the spec's
+   * value. Undefined for a field the stage writes no param for.
+   */
+  param?(field: string): AutomationHandle | undefined;
   /**
    * Play only band `band` of the stage (windsor#200, the EQ's Listen on
    * drag), or everything again at −1. Live only: never in the spec or the song.
