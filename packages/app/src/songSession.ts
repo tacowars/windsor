@@ -32,6 +32,7 @@ import type { DocumentModel } from './documentModel';
 import type { AutosaveTarget } from './songAutosave';
 import { sessionTarget } from './songAutosave';
 import type { SongListEntry } from './songLibrary';
+import { NEW_SONG, StaleSongError } from './songLibrary';
 import { fileNameAmend, metaOf, templateCopy, withMeta } from './songMetaText';
 import { newSong } from './songParts';
 import { importRefusedText, songRefusal } from './songRestore';
@@ -39,13 +40,16 @@ import type { OpenProblem, OpenRecord, SessionStorage, StoredReadable } from './
 import {
   STALE_SONG_TEXT,
   errorText,
+  landedTarget,
   namedTarget,
   pointCurrentAt,
   problemText,
   readStored,
 } from './songSessionStorage';
+import type { SeenRevisions } from './songSessionRevisions';
+import { seenRevisions } from './songSessionRevisions';
 import type { StoredSongs } from './songSessionStored';
-import { duplicateSong, editMeta, exportSong } from './songSessionStored';
+import { duplicateSong, editMeta, exportSong, removeSong } from './songSessionStored';
 import type { ToastTone } from './toastModel';
 import { saveOpenIfClean } from './userSessionAutosave';
 
@@ -107,6 +111,7 @@ export const SONG_META_LABELS = { name: 'Song name', tags: 'Song tags' } as cons
 export class SongSession {
   private readonly host: SessionHost;
   private storage: SessionStorage | null = null;
+  private seen: SeenRevisions | null = null;
   private readonly now: () => Date;
   private readonly newId: () => string;
   private readonly ready: () => Promise<unknown>;
@@ -127,7 +132,8 @@ export class SongSession {
 
   /** Give the session the browser's storage (at boot, once IndexedDB has opened). */
   attach(storage: SessionStorage): void {
-    this.storage = storage;
+    this.seen = seenRevisions(storage.library);
+    this.storage = { ...storage, library: this.seen.library };
     this.emit();
   }
 
@@ -269,20 +275,18 @@ export class SongSession {
   }
 
   /**
-   * Delete stored song `id`. Deleting the open song leaves it open and
-   * playing, now untitled: see `removeOpen`.
+   * Delete stored song `id`, refused when another tab saved it since this
+   * tab saw it (windsor#452). Deleting the open song leaves it open and
+   * playing, now untitled: see `removeOpen`. Another song's delete is based
+   * on `revision`, the one the caller's list showed, or by default on the
+   * one this session last listed or wrote (`removeSong`).
    */
-  remove(id: string): Promise<boolean> {
-    return this.withStorage(false, async (storage) => {
-      if (this.named && this.isOpen(id)) return this.removeOpen(storage, this.named);
-      try {
-        await storage.library.remove(id);
-      } catch (error) {
-        return this.fail(`delete failed: ${errorText(error)}`);
-      }
-      this.emit();
-      return true;
-    });
+  remove(id: string, revision?: number): Promise<boolean> {
+    return this.withStored(false, (songs) =>
+      this.named && this.isOpen(id)
+        ? this.removeOpen(songs.storage, this.named)
+        : removeSong(songs, id, revision),
+    );
   }
 
   private isOpen(id: string): boolean {
@@ -318,6 +322,7 @@ export class SongSession {
         host: this.host,
         isOpen: (id) => this.isOpen(id),
         newId: this.newId,
+        seen: (id) => this.seen?.revision(id),
         emit: () => this.emit(),
       }),
     );
@@ -422,28 +427,51 @@ export class SongSession {
    * switch's drain runs first, so its pending change is in it (a failure
    * stops the delete, reported). Then one transaction deletes its records
    * and writes its text into `current`, so a committed copy survives either
-   * way. While that runs the autosave writes to `current`; when it fails the
-   * song's own record is the target again, with any write still owed.
+   * way; it is based on the revision the open text is, and refused when
+   * another tab saved the song since. While it runs the autosave writes to
+   * `current`; when it fails, `keepOpen` puts the song back.
    */
   private async removeOpen(storage: SessionStorage, open: NamedOpen): Promise<boolean> {
     if (!(await this.leave(storage))) return false;
     const session = sessionTarget(storage.store);
-    storage.autosave.retarget(session);
+    const away = landedTarget(session);
+    storage.autosave.retarget(away.target);
     const document = this.host.model.toJson();
+    const current = { updated: this.now().toISOString(), document };
     try {
-      await storage.library.removeOpen(open.record.id, {
-        updated: this.now().toISOString(),
-        document,
-      });
+      await storage.library.removeOpen(open.record.id, current, open.record.revision);
     } catch (error) {
-      storage.autosave.retarget(open.target);
-      return this.fail(`delete failed: ${errorText(error)}`);
+      return this.keepOpen(storage, open, { document, landed: away.landed }, error);
     }
     open.record.gone = true;
     this.named = null;
     storage.autosave.retarget(session, { written: document });
     this.become({ kind: 'untitled' });
     return true;
+  }
+
+  /**
+   * The open song's delete failed or was refused (windsor#452 decision 4):
+   * its own record is the autosave's target again. An edit made since the
+   * drain is owed to it, whether it waits or went to `current`, and the next
+   * flush stores it there. When one of those writes landed in `current`,
+   * `current` names the song again once it has.
+   */
+  private async keepOpen(
+    storage: SessionStorage,
+    open: NamedOpen,
+    away: { readonly document: string; landed(): boolean },
+    error: unknown,
+  ): Promise<false> {
+    const stale = error instanceof StaleSongError;
+    if (stale) open.record.stale = true;
+    storage.autosave.retarget(open.target, {
+      owed: this.host.model.toJson() !== away.document,
+    });
+    await storage.autosave.settle();
+    if (away.landed()) await this.pointAt(storage, open.record.id);
+    if (stale) this.emit();
+    return this.fail(stale ? STALE_SONG_TEXT : `delete failed: ${errorText(error)}`);
   }
 
   private replace(raw: unknown, amend?: OpenAmend): void {
@@ -457,7 +485,7 @@ export class SongSession {
     const id = this.newId();
     let revision: number;
     try {
-      revision = (await storage.library.write(id, text)).revision;
+      revision = (await storage.library.write(id, text, NEW_SONG)).revision;
     } catch (error) {
       this.fail(`save failed: ${errorText(error)}`);
       return null;

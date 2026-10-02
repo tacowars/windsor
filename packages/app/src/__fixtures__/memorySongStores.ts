@@ -4,10 +4,11 @@
  * what was read and written, and can be told to reject every write, as a
  * full disk would. The library's records share a session store, so the
  * open song's delete writes `current` and deletes its records together,
- * or not at all, as the one IndexedDB transaction does.
+ * or not at all, as the one IndexedDB transaction does. Every write and
+ * delete hands its check the song as stored, and a refusal changes nothing.
  */
 import type { SessionRecord, SongStore } from '../songAutosave';
-import type { SongIndexRecord, SongRecords } from '../songLibrary';
+import type { SongIndexRecord, SongRecords, StoredCheck } from '../songLibrary';
 
 export interface MemorySessionStore extends SongStore {
   record: SessionRecord | null;
@@ -28,6 +29,24 @@ export interface MemorySongRecords extends SongRecords {
 }
 
 const quota = (): Promise<never> => Promise.reject(new Error('quota'));
+
+const asError = (error: unknown): Error =>
+  error instanceof Error ? error : new Error(String(error));
+
+/** Why a write or delete of song `id` changes nothing (the stores failing, `check` refusing), or null. */
+function refusal(
+  records: MemorySongRecords,
+  id: string,
+  check: StoredCheck,
+): Promise<never> | null {
+  if (records.failing) return quota();
+  try {
+    check(records.indexMap.get(id) ?? null, records.docMap.has(id));
+    return null;
+  } catch (error) {
+    return Promise.reject(asError(error));
+  }
+}
 
 export function memorySessionStore(record: SessionRecord | null = null): MemorySessionStore {
   const store: MemorySessionStore = {
@@ -66,30 +85,34 @@ export function memorySongRecords(
       if (records.failing) return quota();
       let index: SongIndexRecord;
       try {
-        index = next(records.indexMap.get(id) ?? null);
+        index = next(records.indexMap.get(id) ?? null, records.docMap.has(id));
       } catch (error) {
-        return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+        return Promise.reject(asError(error));
       }
       records.writes++;
       records.indexMap.set(id, index);
       records.docMap.set(id, text);
       return Promise.resolve(index);
     },
-    putIndex: (index) => {
-      if (records.failing) return quota();
+    putIndex: (index, check) => {
+      const refused = refusal(records, index.id, check);
+      if (refused) return refused;
       records.writes++;
       records.indexMap.set(index.id, index);
       return Promise.resolve();
     },
-    delete: (id) => {
-      if (records.failing) return quota();
+    delete: (id, check) => {
+      const refused = refusal(records, id, check);
+      if (refused) return refused;
       records.writes++;
       records.indexMap.delete(id);
       records.docMap.delete(id);
       return Promise.resolve();
     },
-    deleteInto: (id, current) => {
-      if (records.failing || session.failing) return quota();
+    deleteInto: (id, current, check) => {
+      if (session.failing) return quota();
+      const refused = refusal(records, id, check);
+      if (refused) return refused;
       records.writes++;
       session.record = current;
       session.saves.push(current);

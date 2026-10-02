@@ -18,6 +18,11 @@
  *   index's `revision`. A save names the revision it was based on, and its
  *   transaction refuses it (`StaleSongError`) when the stored song has moved
  *   on, because another tab saved it since. Nothing is overwritten silently.
+ * - **Every write checks** (windsor#452). A save, a delete and an index
+ *   repair each read the stored song inside their own transaction and
+ *   refuse when it isn't what they were based on. A save to a song whose
+ *   document is gone is refused, so a stale tab never brings a deleted song
+ *   back; only `NEW_SONG`, the first write of a new id, creates one.
  * - **Refuse, never destroy** (`2026-09-28-format-versions-refuse-never-destroy`).
  *   `list()` marks a song this build cannot read from its index's `version`
  *   alone, without reading any document, and keeps it listed.
@@ -50,9 +55,26 @@ export class StaleSongError extends Error {
   }
 }
 
-/** The revision a stored song is at: no index record, or one written before revisions, is 0. */
+/**
+ * The revision a song with a document is at: no index record, or one
+ * written before revisions, is 0. A song with no document has none, and a
+ * save based on any revision is refused (windsor#452).
+ */
 export const revisionOf = (index: SongIndexRecord | null): number =>
   index !== null && typeof index.revision === 'number' ? index.revision : 0;
+
+/**
+ * The judgement of a write or delete on what is stored for its song, read
+ * inside its own transaction: the index record, and whether the document
+ * exists. It throws to refuse, and then nothing is written.
+ */
+export type StoredCheck = (stored: SongIndexRecord | null, documented: boolean) => void;
+
+/** The basis a write names for its first write of a new id: it creates the song, and is refused when the id is taken. */
+export const NEW_SONG = 'new';
+
+/** What a write is based on: the stored revision its text was edited from, or `NEW_SONG`. */
+export type SongWriteBasis = number | typeof NEW_SONG;
 
 /** The `songIndex` and `songDocs` stores, as records by song id. */
 export interface SongRecords {
@@ -63,21 +85,25 @@ export interface SongRecords {
   doc(id: string): Promise<string | null>;
   /**
    * Write song `id`'s index and document in one transaction. `next` is
-   * handed the stored index record, read inside that same transaction, and
-   * returns the record to write; when it throws, nothing is written and the
-   * write rejects with its error. Resolves the record written.
+   * handed the stored index record and whether the document exists, both
+   * read inside that same transaction, and returns the record to write;
+   * when it throws, nothing is written and the write rejects with its
+   * error. Resolves the record written.
    */
   put(
     id: string,
     text: string,
-    next: (stored: SongIndexRecord | null) => SongIndexRecord,
+    next: (stored: SongIndexRecord | null, documented: boolean) => SongIndexRecord,
   ): Promise<SongIndexRecord>;
-  /** Write an index record alone: the repair of a missing one. */
-  putIndex(index: SongIndexRecord): Promise<void>;
-  /** Remove a song's index and document in one transaction. */
-  delete(id: string): Promise<void>;
-  /** Remove a song's two records and write `session` as `songs/current`, in one transaction across the three stores. */
-  deleteInto(id: string, session: StoredSong): Promise<void>;
+  /** Write an index record alone, the repair of a missing one, when `check` passes in the same transaction. */
+  putIndex(index: SongIndexRecord, check: StoredCheck): Promise<void>;
+  /** Remove a song's index and document in one transaction, when `check` passes in it. */
+  delete(id: string, check: StoredCheck): Promise<void>;
+  /**
+   * Remove a song's two records and write `session` as `songs/current`, in
+   * one transaction across the three stores, when `check` passes in it.
+   */
+  deleteInto(id: string, session: StoredSong, check: StoredCheck): Promise<void>;
 }
 
 /** A stored song's text and the revision it was read at. */
@@ -95,20 +121,44 @@ export interface SongLibrary {
   load(id: string): Promise<LoadedSong | null>;
   /**
    * Store `text` as song `id`, its index derived from the text; `created` is
-   * kept and `revision` bumped. `basedOn`, when given, is the revision the
-   * text was edited from: when the stored song is at any other, the write
-   * rejects with `StaleSongError` and writes nothing.
+   * kept and `revision` bumped. `basedOn` is the revision the text was
+   * edited from: when the song's document is gone, or it is at any other
+   * revision, the write rejects with `StaleSongError` and writes nothing.
+   * `NEW_SONG` (the default) creates song `id`, and is refused the same way
+   * when `id` already has a document.
    */
-  write(id: string, text: string, basedOn?: number): Promise<SongIndexRecord>;
-  remove(id: string): Promise<void>;
-  /** Delete song `id` and make `session` the untitled `songs/current`, in one transaction: the open song's delete. */
-  removeOpen(id: string, session: StoredSong): Promise<void>;
+  write(id: string, text: string, basedOn?: SongWriteBasis): Promise<SongIndexRecord>;
+  /**
+   * Delete song `id`, based on revision `basedOn`: a song another tab saved
+   * since is refused with `StaleSongError`, and nothing changes. A song
+   * already gone deletes nothing more, and resolves.
+   */
+  remove(id: string, basedOn: number): Promise<void>;
+  /**
+   * Delete song `id` and make `session` the untitled `songs/current`, in one
+   * transaction: the open song's delete, refused the way `remove` is.
+   */
+  removeOpen(id: string, session: StoredSong, basedOn: number): Promise<void>;
 }
 
 /** Why a song declaring `version` can't be opened by this build, or null when it can. */
 export function versionRefusal(version: number | null): FormatRefusal | null {
   return version === null ? null : (upgradeSong({ version }).refused ?? null);
 }
+
+/** A delete's check: song `id` is gone, or still at `basedOn`. */
+const unchangedSince =
+  (id: string, basedOn: number): StoredCheck =>
+  (stored, documented) => {
+    if (documented && revisionOf(stored) !== basedOn) throw new StaleSongError(id);
+  };
+
+/** An index repair's check: song `id` has a document and still no index. */
+const unindexed =
+  (id: string): StoredCheck =>
+  (stored, documented) => {
+    if (stored !== null || !documented) throw new StaleSongError(id);
+  };
 
 const entry = (index: SongIndexRecord): SongListEntry => ({
   ...index,
@@ -132,7 +182,8 @@ export function songLibrary(records: SongRecords, now: () => Date = () => new Da
     if (text === null) return null;
     // Revision 0, the one a song with no index loads at, so a tab that opened it is not refused.
     const index = { ...derive(id, text, null), revision: 0 };
-    await records.putIndex(index).catch(() => undefined);
+    // Only while the song still has no index: a save since has written a newer one.
+    await records.putIndex(index, unindexed(id)).catch(() => undefined);
     return index;
   };
 
@@ -155,12 +206,18 @@ export function songLibrary(records: SongRecords, now: () => Date = () => new Da
       const text = await records.doc(id);
       return text === null ? null : { text, revision };
     },
-    write: (id, text, basedOn) =>
-      records.put(id, text, (stored) => {
-        if (basedOn !== undefined && revisionOf(stored) !== basedOn) throw new StaleSongError(id);
+    write: (id, text, basedOn = NEW_SONG) =>
+      records.put(id, text, (stored, documented) => {
+        if (basedOn === NEW_SONG) {
+          if (documented) throw new StaleSongError(id);
+          // A new song starts afresh, whatever index a lost document left behind.
+          return derive(id, text, null);
+        }
+        if (!documented || revisionOf(stored) !== basedOn) throw new StaleSongError(id);
         return derive(id, text, stored);
       }),
-    remove: (id) => records.delete(id),
-    removeOpen: (id, session) => records.deleteInto(id, session),
+    remove: (id, basedOn) => records.delete(id, unchangedSince(id, basedOn)),
+    removeOpen: (id, session, basedOn) =>
+      records.deleteInto(id, session, unchangedSince(id, basedOn)),
   };
 }

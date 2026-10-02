@@ -13,7 +13,7 @@
 import { USER_DB } from './libraryConstants';
 import type { PatchFolder } from './libraryFolder';
 import type { SessionRecord, SongStore } from './songAutosave';
-import type { SongIndexRecord, SongRecords } from './songLibrary';
+import type { SongIndexRecord, SongRecords, StoredCheck } from './songLibrary';
 
 export interface UserStores {
   patches: PatchFolder;
@@ -154,8 +154,50 @@ const asIndex = (value: unknown): SongIndexRecord | null =>
     : null;
 
 /**
+ * Read song `id`'s index record and whether its document exists, inside
+ * `tx`, and hand them to `then`: what a write or delete judges, so no other
+ * tab's write can fall between the judgement and the change. Requests in one
+ * transaction run in order, so the index has been read when the count lands.
+ */
+function readSong(
+  tx: IDBTransaction,
+  id: string,
+  then: (stored: SongIndexRecord | null, documented: boolean) => void,
+): void {
+  const index = tx.objectStore(USER_DB.songIndex).get(id);
+  const docs = tx.objectStore(USER_DB.songDocs).count(id);
+  docs.onsuccess = (): void => then(asIndex(index.result), docs.result > 0);
+}
+
+/**
+ * One transaction over `stores` that runs `change` only when `check`
+ * passes on song `id` as stored, read inside it; a refusal aborts it with
+ * the check's error, and nothing is written.
+ */
+function checked(
+  db: IDBDatabase,
+  stores: readonly string[],
+  id: string,
+  check: StoredCheck,
+  change: (tx: IDBTransaction) => void,
+): Promise<void> {
+  return transact(db, stores, (tx, abort) => {
+    readSong(tx, id, (stored, documented) => {
+      try {
+        check(stored, documented);
+      } catch (error) {
+        abort(error);
+        return;
+      }
+      change(tx);
+    });
+  });
+}
+
+/**
  * The named songs: `songIndex` and `songDocs`, both keyed by song id. The
  * open song's delete also writes `songs/current`, in the same transaction.
+ * Every write and delete reads the song first, in its own transaction.
  */
 function songRecords(db: IDBDatabase, beforeWrite: () => void): SongRecords {
   return {
@@ -177,37 +219,31 @@ function songRecords(db: IDBDatabase, beforeWrite: () => void): SongRecords {
     async put(id, text, next) {
       beforeWrite();
       const written: { index: SongIndexRecord | null } = { index: null };
-      // The stored index is read in the write's own transaction, so a check
-      // on it (a stale revision) and the write can't be split by another tab.
-      await transact(db, SONG_STORES, (tx, abort) => {
-        const indexStore = tx.objectStore(USER_DB.songIndex);
-        const stored = indexStore.get(id);
-        stored.onsuccess = (): void => {
-          try {
-            written.index = next(asIndex(stored.result));
-          } catch (error) {
-            abort(error);
-            return;
-          }
-          indexStore.put(written.index, id);
-          tx.objectStore(USER_DB.songDocs).put(text, id);
-        };
+      // `next` judges the song as stored, read in the write's own transaction.
+      const check: StoredCheck = (stored, documented) => {
+        written.index = next(stored, documented);
+      };
+      await checked(db, SONG_STORES, id, check, (tx) => {
+        tx.objectStore(USER_DB.songIndex).put(written.index, id);
+        tx.objectStore(USER_DB.songDocs).put(text, id);
       });
       if (!written.index) throw new Error('IndexedDB wrote no index record');
       return written.index;
     },
-    async putIndex(index) {
-      await run(db, USER_DB.songIndex, 'readwrite', (s) => s.put(index, index.id));
+    putIndex(index, check) {
+      return checked(db, SONG_STORES, index.id, check, (tx) => {
+        tx.objectStore(USER_DB.songIndex).put(index, index.id);
+      });
     },
-    delete(id) {
-      return transact(db, SONG_STORES, (tx) => {
+    delete(id, check) {
+      return checked(db, SONG_STORES, id, check, (tx) => {
         tx.objectStore(USER_DB.songIndex).delete(id);
         tx.objectStore(USER_DB.songDocs).delete(id);
       });
     },
-    deleteInto(id, session) {
+    deleteInto(id, session, check) {
       beforeWrite();
-      return transact(db, [USER_DB.songs, ...SONG_STORES], (tx) => {
+      return checked(db, [USER_DB.songs, ...SONG_STORES], id, check, (tx) => {
         tx.objectStore(USER_DB.songs).put(session, USER_DB.currentSong);
         tx.objectStore(USER_DB.songIndex).delete(id);
         tx.objectStore(USER_DB.songDocs).delete(id);

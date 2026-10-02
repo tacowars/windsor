@@ -131,6 +131,30 @@ export function namedTarget(
   };
 }
 
+/** A target that also says whether any write through it has landed. */
+export interface LandedTarget {
+  readonly target: AutosaveTarget;
+  landed(): boolean;
+}
+
+/**
+ * `target`, remembering whether a write through it landed: the open song's
+ * delete sends edits to `current` while it runs, and when it fails,
+ * `current` must name the song again only if one of them did.
+ */
+export function landedTarget(target: AutosaveTarget): LandedTarget {
+  let landed = false;
+  return {
+    target: {
+      save: async (text, updated) => {
+        await target.save(text, updated);
+        landed = true;
+      },
+    },
+    landed: () => landed,
+  };
+}
+
 /** Point `current` at named song `id`; resolves the failure's text, or null when it was written. */
 export async function pointCurrentAt(
   store: SongStore,
