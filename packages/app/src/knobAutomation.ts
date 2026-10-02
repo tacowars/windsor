@@ -30,6 +30,7 @@ import {
   catalogRow,
   formatTargetId,
   songTicksOf,
+  targetKind,
   valueAt,
   voiceTargetId,
 } from '@windsor/engine';
@@ -84,7 +85,7 @@ export function catalogKnobAutomation(
   const lane = onLane(part, target);
   const row = lane ? catalogRow(target) : undefined;
   if (!lane || !row) return null;
-  return lockOf(lane, row, target.startsWith('strip.') ? colors.strip : colors.voice, tick);
+  return lockOf(lane, row, targetKind(target) === 'strip' ? colors.strip : colors.voice, tick);
 }
 
 const VOICE_TARGETS: ReadonlySet<string> = new Set(VOICE_TARGET_IDS);

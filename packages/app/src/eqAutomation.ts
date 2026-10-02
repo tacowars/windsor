@@ -13,7 +13,7 @@
  * part and its insert, so a test needs no DOM.
  */
 import type { DocumentPart, EqBand, EqSpec, InsertSpec } from '@windsor/engine';
-import { automatableInsertFields } from '@windsor/engine';
+import { automatableInsertFields, parseTargetId } from '@windsor/engine';
 import type { KnobAutomation } from './knobAutomation';
 import { insertKnobAutomation } from './knobAutomation';
 
@@ -32,19 +32,32 @@ export interface EqLanes {
   readonly tick: number;
 }
 
+/** The prefix every band field shares. */
+const BAND_FIELD_PREFIX = 'bands.';
+
 /** Band `band`'s `field` as an insert field, `bands.3.freq`. */
-export const eqBandField = (band: number, field: EqLaneField): string => `bands.${band}.${field}`;
+export const eqBandField = (band: number, field: EqLaneField): string =>
+  `${BAND_FIELD_PREFIX}${band}.${field}`;
 
 /** The lock a lane puts on band `band`'s `field`, or null while none holds it. */
 export const eqFieldLock = (at: EqLanes, band: number, field: EqLaneField): KnobAutomation | null =>
   insertKnobAutomation(at.part, at.insert, eqBandField(band, field), at.tick);
 
 /** Whether any lane that is on targets this EQ's bands: the cheap test before the field-by-field one. */
-function bandLanesOn(at: EqLanes): boolean {
+export function bandLanesOn(at: EqLanes): boolean {
   const id = at.insert?.id;
   if (!id) return false;
-  const prefix = `insert.${id}.bands.`;
-  return at.part?.automation?.some((lane) => lane.on && lane.target.startsWith(prefix)) ?? false;
+  return (
+    at.part?.automation?.some((lane) => {
+      if (!lane.on) return false;
+      const target = parseTargetId(lane.target);
+      return (
+        target?.kind === 'insert' &&
+        target.insertId === id &&
+        target.field.startsWith(BAND_FIELD_PREFIX)
+      );
+    }) ?? false
+  );
 }
 
 /**
