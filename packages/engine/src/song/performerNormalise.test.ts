@@ -11,7 +11,7 @@ import { DEFAULT_ARP_CONFIG } from '../sequencing/arpSequencer';
 import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
 import { arpNote, defaultArpSteps, type ArpStep } from '../sequencing/arpSteps';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
-import { STEP_MOD_LANES_MAX } from '../worklet/fm/stepModTables';
+import { STEP_MOD_LANES_MAX } from '../sequencing/stepModLanes';
 import { song } from '../__fixtures__/documentCases';
 import { FieldNormaliser } from './arrangementFields';
 import { isShippable, makeArrangement } from './arrangementDocument';

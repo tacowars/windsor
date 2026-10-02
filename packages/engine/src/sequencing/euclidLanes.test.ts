@@ -11,7 +11,7 @@ import {
   EUCLID_LANE_STEPS_MAX,
   EUCLID_RATCHET_MAX,
 } from '../audioConstants';
-import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 import { assertEuclidRows, euclidHitRead, laneStep, rollSpanSeconds } from './euclidLanes';
 import {
   DEFAULT_EUCLIDEAN_CONFIG,
@@ -42,7 +42,7 @@ describe('euclidHitRead', () => {
       const read = euclidHitRead(rows, 0, local);
       expect(read.accent !== undefined).toBe(local % 3 === 1);
       expect(read.semitones).toBe(rows.pitchLane[local % 5]);
-      expect(read.stepMod?.[STEP_MOD_PARAMS.indexOf('filter.cutoff')]).toBe(
+      expect(read.stepMod?.[VOICE_TARGET_PATHS.indexOf('filter.cutoff')]).toBe(
         local % 2 === 1 ? 0.5 : undefined,
       );
     }

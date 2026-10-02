@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RETURN_NAMES } from '../mixer/mix';
 import { VOWEL_RANGE } from '../worklet/fm/patchDefaults';
-import { STEP_MOD_TABLE } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
 import {
   AUTOMATION_LEVEL_FLOOR_DB,
   FM_LANES_MAX,
@@ -45,16 +45,23 @@ describe('the voice rows', () => {
     expect([vowel.min, vowel.max]).toEqual([0, 4]);
   });
 
-  it('take the step-mod table bounds, a decay time from 0 with its minimum as the floor', () => {
-    for (const step of STEP_MOD_TABLE) {
-      const row = VOICE_AUTOMATION_ROWS.find((r) => r.target === `voice.${step.param}`)!;
-      expect(row.max, step.param).toBe(step.max);
-      if (step.param.endsWith('decayTime')) {
+  it('are the voice target table, in its order (windsor#419)', () => {
+    expect(VOICE_AUTOMATION_ROWS.map((r) => r.target)).toEqual(
+      VOICE_TARGET_TABLE.map((row) => `voice.${row.path}`),
+    );
+  });
+
+  it('take the target table bounds, a decay time from 0 with its floor as the display floor', () => {
+    for (const step of VOICE_TARGET_TABLE) {
+      const row = VOICE_AUTOMATION_ROWS.find((r) => r.target === `voice.${step.path}`)!;
+      expect(row.max, step.path).toBe(step.max);
+      if (step.path.endsWith('decayTime')) {
         expect(row.min).toBe(0);
-        expect(row.floor).toBe(step.min);
+        expect(row.floor).toBe(step.floor);
+        expect(row.floor).toBe(0.001);
         expect(row.scale).toBe('log');
       } else {
-        expect(row.min, step.param).toBe(step.min);
+        expect(row.min, step.path).toBe(step.min);
         expect(row.floor).toBeUndefined();
       }
     }

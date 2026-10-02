@@ -3,17 +3,21 @@
  * `2026-10-01-song-automation-lanes` decisions 2–5), as data. The insert rows
  * are `automationInsertTables.ts`; the lookups are `automationTargets.ts`.
  *
- * Every row's bounds and scale are its knob's: the voice rows take the
- * bounds `STEP_MOD_TABLE` holds and the five fields it lacks take the Parts
- * tab's, and the app's `automationTargetParity.test.ts` holds every voice and
- * strip row to its knob (`patchKnobTables.ts`, `mixerTables.ts`). A lane is
- * drawn in its knob's own scale (decision 5), so a decay time, whose knob
- * ends on exact 0 (windsor#316), is a log row from 0 with the step-mod
- * table's 1 ms as its display floor.
+ * Every row's bounds and scale are its knob's: the voice rows are the voice
+ * target table's (`worklet/fm/voiceTargetTables.ts`, windsor#419), one per
+ * row with its bounds, and this file adds each one's look (label, scale,
+ * unit) by path; the app's `automationTargetParity.test.ts` holds every
+ * voice and strip row to its knob (`patchKnobTables.ts`, `mixerTables.ts`).
+ * A lane is drawn in its knob's own scale (decision 5), so a decay time,
+ * whose knob ends on exact 0 (windsor#316), is a log row from 0 with the
+ * table's 1 ms floor as its display floor.
  */
 import { OP_NAMES } from '../patch/patch';
-import { VOWEL_RANGE } from '../worklet/fm/patchDefaults';
-import { STEP_MOD_TABLE, type StepModParam } from '../worklet/fm/stepModTables';
+import {
+  VOICE_TARGET_TABLE,
+  type VoiceTargetPath,
+  type VoiceTargetRow,
+} from '../worklet/fm/voiceTargetTables';
 import type { AutomationScale, AutomationTargetRow, StripTargetId } from './automationLane';
 
 /** The most FM lanes one part carries (decision 3). Strip and insert lanes have no cap. */
@@ -54,108 +58,65 @@ export const STRIP_AUTOMATION_ROWS: readonly (AutomationTargetRow & {
   { target: 'strip.send.b', label: 'Send B', ...SEND_RANGE, scale: 'linear', unit: '' },
 ];
 
-/** How a step-mod parameter reads as a lane: its label, its knob's scale, its unit. */
+/** How a voice target reads as a lane: its label, its knob's scale, its unit. */
 interface VoiceLook {
   readonly label: string;
   readonly scale: AutomationScale;
   readonly unit: string;
-  /** The knob ends on exact 0: the row's `min` is 0 and the step-mod minimum is its floor. */
+  /** The knob ends on exact 0: the lane's `min` is 0 and the table row's floor is its display floor. */
   readonly zeroEnd?: boolean;
 }
 
-const FILTER_LOOKS: readonly (readonly [StepModParam, VoiceLook])[] = [
-  ['filter.cutoff', { label: 'Cutoff', scale: 'octaves', unit: 'Hz' }],
-  ['filter.envAmount', { label: 'Filter env amount', scale: 'linear', unit: 'oct' }],
-  ['filter.resonance', { label: 'Resonance', scale: 'log', unit: '' }],
-  ['filter.env.decayTime', { label: 'Filter env decay', scale: 'log', unit: 's', zeroEnd: true }],
-];
-
-/** An operator's five step-mod fields, under `ops.<i>`. */
-const OPERATOR_LOOKS: readonly (readonly [string, VoiceLook])[] = [
-  ['level', { label: 'level', scale: 'linear', unit: '' }],
-  ['env.decayTime', { label: 'decay', scale: 'log', unit: 's', zeroEnd: true }],
-  ['env.decayCurve', { label: 'decay curve', scale: 'linear', unit: '' }],
-  ['feedback', { label: 'feedback', scale: 'linear', unit: '' }],
-  ['width', { label: 'width', scale: 'linear', unit: '' }],
-];
-
-/**
- * The five voice fields the step-mod table does not carry, beside the vowel.
- * The patch normaliser does not clamp them, so their bounds are the Parts
- * tab's knobs.
- */
-const LFO_AMOUNT_RANGE = { min: 0, max: 1 } as const;
-const LFO_RATE_RANGE = { min: 0.02, max: 40 } as const;
-const PITCH_ENV_AMOUNT_RANGE = { min: -48, max: 48 } as const;
-
-/** A voice row from its step-mod row's bounds. */
-function stepModRow(param: StepModParam, look: VoiceLook, label = look.label): AutomationTargetRow {
-  const row = STEP_MOD_TABLE.find((r) => r.param === param);
-  if (!row) throw new Error(`automationTargetTables: no step-mod row for ${param}`);
-  const { scale, unit } = look;
-  const bounds = look.zeroEnd
-    ? { min: 0, max: row.max, floor: row.min }
-    : { min: row.min, max: row.max };
-  return { target: `voice.${param}`, label, ...bounds, scale, unit };
-}
-
-/** LFO 1's and LFO 2's amount and rate. */
-function lfoRows(): AutomationTargetRow[] {
-  return (['lfo', 'lfo2'] as const).flatMap((key, i) => {
-    const name = `LFO ${i + 1}`;
-    return [
-      {
-        target: `voice.${key}.amount`,
-        label: `${name} amount`,
-        ...LFO_AMOUNT_RANGE,
-        scale: 'linear',
-        unit: '',
-      },
-      {
-        target: `voice.${key}.rate`,
-        label: `${name} rate`,
-        ...LFO_RATE_RANGE,
-        scale: 'log',
-        unit: 'Hz',
-      },
-    ] satisfies AutomationTargetRow[];
-  });
-}
-
-/**
- * The Formant mode's vowel (windsor#406), last of the filter's rows: not a
- * step-mod field, so its bounds are the patch's `VOWEL_RANGE`, which the
- * normaliser clamps to and the Parts tab's Vowel knob spans. The picker lists
- * it whatever the filter mode; a lane on a patch not in Formant is silent.
- */
-const VOWEL_ROW: AutomationTargetRow = {
-  target: 'voice.filter.vowel',
-  label: 'Vowel',
-  min: VOWEL_RANGE.min,
-  max: VOWEL_RANGE.max,
-  scale: 'linear',
-  unit: '',
+/** The filter's, the LFOs' and the pitch envelope's looks, by path. */
+const VOICE_LOOKS: Readonly<Record<string, VoiceLook>> = {
+  'filter.cutoff': { label: 'Cutoff', scale: 'octaves', unit: 'Hz' },
+  'filter.envAmount': { label: 'Filter env amount', scale: 'linear', unit: 'oct' },
+  'filter.resonance': { label: 'Resonance', scale: 'log', unit: '' },
+  'filter.env.decayTime': { label: 'Filter env decay', scale: 'log', unit: 's', zeroEnd: true },
+  // The Formant mode's vowel (windsor#406): the picker lists it whatever the
+  // filter mode; a lane on a patch not in Formant is silent.
+  'filter.vowel': { label: 'Vowel', scale: 'linear', unit: '' },
+  'lfo.amount': { label: 'LFO 1 amount', scale: 'linear', unit: '' },
+  'lfo.rate': { label: 'LFO 1 rate', scale: 'log', unit: 'Hz' },
+  'lfo2.amount': { label: 'LFO 2 amount', scale: 'linear', unit: '' },
+  'lfo2.rate': { label: 'LFO 2 rate', scale: 'log', unit: 'Hz' },
+  pitchEnvAmount: { label: 'Pitch env amount', scale: 'linear', unit: 'st' },
 };
 
+/** An operator's five fields' looks, under `ops.<i>`; the label follows `Op <name> `. */
+const OPERATOR_LOOKS: Readonly<Record<string, VoiceLook>> = {
+  level: { label: 'level', scale: 'linear', unit: '' },
+  'env.decayTime': { label: 'decay', scale: 'log', unit: 's', zeroEnd: true },
+  'env.decayCurve': { label: 'decay curve', scale: 'linear', unit: '' },
+  feedback: { label: 'feedback', scale: 'linear', unit: '' },
+  width: { label: 'width', scale: 'linear', unit: '' },
+};
+
+/** An operator's path: its index and its field. */
+const OPERATOR_PATH = /^ops\.(\d)\.(.+)$/;
+
+/** The look of the target at `path`, an operator's labelled with its name. */
+function lookOf(path: VoiceTargetPath): VoiceLook {
+  const op = OPERATOR_PATH.exec(path);
+  const look = op ? OPERATOR_LOOKS[op[2]!] : VOICE_LOOKS[path];
+  if (!look) throw new Error(`automationTargetTables: no look for ${path}`);
+  return op ? { ...look, label: `Op ${OP_NAMES[Number(op[1])]} ${look.label}` } : look;
+}
+
+/** A voice row from its target row's bounds and its look. */
+function voiceRow(row: VoiceTargetRow): AutomationTargetRow {
+  const { label, scale, unit, zeroEnd } = lookOf(row.path);
+  const bounds = zeroEnd
+    ? { min: 0, max: row.max, floor: row.floor }
+    : { min: row.min, max: row.max };
+  return { target: `voice.${row.path}`, label, ...bounds, scale, unit };
+}
+
 /**
- * The voice's 30 rows (decision 2): the filter's four and the Formant vowel,
- * each operator's five, LFO 1 and LFO 2 amount and rate, and the
- * pitch-envelope amount.
+ * The voice's 30 rows (decision 2, windsor#406), one per row of the voice
+ * target table and in its order (windsor#419): the filter's four and the
+ * Formant vowel, each operator's five, LFO 1 and LFO 2 amount and rate, and
+ * the pitch-envelope amount.
  */
-export const VOICE_AUTOMATION_ROWS: readonly AutomationTargetRow[] = [
-  ...FILTER_LOOKS.map(([param, look]) => stepModRow(param, look)),
-  VOWEL_ROW,
-  ...OP_NAMES.flatMap((name, i) =>
-    OPERATOR_LOOKS.map(([field, look]) =>
-      stepModRow(`ops.${i}.${field}` as StepModParam, look, `Op ${name} ${look.label}`),
-    ),
-  ),
-  ...lfoRows(),
-  {
-    target: 'voice.pitchEnvAmount',
-    label: 'Pitch env amount',
-    ...PITCH_ENV_AMOUNT_RANGE,
-    scale: 'linear',
-    unit: 'st',
-  },
-];
+export const VOICE_AUTOMATION_ROWS: readonly AutomationTargetRow[] =
+  VOICE_TARGET_TABLE.map(voiceRow);

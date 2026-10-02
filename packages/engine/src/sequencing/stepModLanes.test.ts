@@ -4,10 +4,10 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { STEP_MOD_PARAMS, STEP_MOD_SLOT_COUNT } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS, VOICE_TARGET_COUNT } from '../worklet/fm/voiceTargetTables';
 import {
   assertStepModLanes,
-  isStepModParam,
+  isVoiceTargetPath,
   stepModAt,
   stepModAtCycle,
   type StepModLane,
@@ -21,11 +21,11 @@ const LANES: StepModLane[] = [
 describe('stepModAt', () => {
   it('fills each lane’s slot with its value on the step, the rest 0', () => {
     const at = stepModAt(LANES, 1)!;
-    expect(at).toHaveLength(STEP_MOD_SLOT_COUNT);
-    expect(at[STEP_MOD_PARAMS.indexOf('filter.cutoff')]).toBe(0.5);
-    expect(at[STEP_MOD_PARAMS.indexOf('ops.3.width')]).toBe(-0.25);
+    expect(at).toHaveLength(VOICE_TARGET_COUNT);
+    expect(at[VOICE_TARGET_PATHS.indexOf('filter.cutoff')]).toBe(0.5);
+    expect(at[VOICE_TARGET_PATHS.indexOf('ops.3.width')]).toBe(-0.25);
     expect(at.filter((v) => v !== 0)).toHaveLength(2);
-    expect(stepModAt(LANES, 2)![STEP_MOD_PARAMS.indexOf('ops.3.width')]).toBe(1);
+    expect(stepModAt(LANES, 2)![VOICE_TARGET_PATHS.indexOf('ops.3.width')]).toBe(1);
   });
 
   it('is nothing for no lanes, a step every lane leaves at 0, or a step past a lane’s end', () => {
@@ -50,9 +50,9 @@ describe('stepModAtCycle (windsor#355)', () => {
         expect(at, `local ${local}`).toBeUndefined();
         continue;
       }
-      expect(at).toHaveLength(STEP_MOD_SLOT_COUNT);
-      expect(at?.[STEP_MOD_PARAMS.indexOf('filter.cutoff')]).toBe(cutoff);
-      expect(at?.[STEP_MOD_PARAMS.indexOf('ops.3.width')]).toBe(width);
+      expect(at).toHaveLength(VOICE_TARGET_COUNT);
+      expect(at?.[VOICE_TARGET_PATHS.indexOf('filter.cutoff')]).toBe(cutoff);
+      expect(at?.[VOICE_TARGET_PATHS.indexOf('ops.3.width')]).toBe(width);
     }
   });
 
@@ -66,9 +66,9 @@ describe('stepModAtCycle (windsor#355)', () => {
 
 describe('the lane checks', () => {
   it('knows the table’s parameters and nothing else', () => {
-    expect(STEP_MOD_PARAMS.every(isStepModParam)).toBe(true);
-    expect(isStepModParam('volume')).toBe(false);
-    expect(isStepModParam(undefined)).toBe(false);
+    expect(VOICE_TARGET_PATHS.every(isVoiceTargetPath)).toBe(true);
+    expect(isVoiceTargetPath('volume')).toBe(false);
+    expect(isVoiceTargetPath(undefined)).toBe(false);
   });
 
   it('accepts the lanes a normalised document carries', () => {

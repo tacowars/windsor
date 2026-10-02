@@ -12,10 +12,10 @@ import type { Arrangement, MusicPart } from './arrangement';
 import { DEFAULT_GRID_CONFIG, gridNote } from '../sequencing/gridSequencer';
 import type { StepModLane } from '../sequencing/stepModLanes';
 import { DIVISORS } from '../sequencing/scheduler';
-import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 
 const { drone } = FULL_SLOT;
-const CUTOFF = STEP_MOD_PARAMS.indexOf('filter.cutoff');
+const CUTOFF = VOICE_TARGET_PATHS.indexOf('filter.cutoff');
 
 /** The drone slot as a four-quarter line, every step a note, with `lanes`. */
 function line(lanes: readonly StepModLane[]): Arrangement {
@@ -70,7 +70,7 @@ describe('grid lanes through the player (windsor#17)', () => {
     run(1);
     const after = parts.drone.calls.slice(before);
     expect(after.filter((c) => c.kind === 'allNotesOff')).toEqual([]);
-    const width = STEP_MOD_PARAMS.indexOf('ops.2.width');
+    const width = VOICE_TARGET_PATHS.indexOf('ops.2.width');
     const on = after.find((c) => c.kind === 'noteOn');
     expect(on?.extras?.stepMod?.[width]).toBe(-0.5);
   });

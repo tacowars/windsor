@@ -25,7 +25,7 @@ export interface NoteExtras {
   mod?: number;
   /** Take over the held voice legato (mono patches); otherwise an ordinary note-on. */
   slide?: boolean;
-  /** A step's parameter offsets, one slot per `STEP_MOD_TABLE` row (windsor#17); absent for none. */
+  /** A step's parameter offsets, one slot per `VOICE_TARGET_TABLE` row in code order (windsor#17, windsor#419); absent for none. */
   stepMod?: readonly number[];
 }
 
@@ -38,7 +38,6 @@ export class AudioPart {
 
   readonly pitchBend: AudioParam;
   readonly modWheel: AudioParam;
-  readonly cutoffMod: AudioParam;
   readonly gain: AudioParam;
   /** The song lanes' slots (windsor#346): each an offset on the voice target the slot map gives it. */
   readonly voiceSlotParams: readonly AudioParam[];
@@ -67,7 +66,6 @@ export class AudioPart {
 
     this.pitchBend = requireParam(node, 'pitchBend');
     this.modWheel = requireParam(node, 'modWheel');
-    this.cutoffMod = requireParam(node, 'cutoffMod');
     this.gain = requireParam(node, 'gain');
     this.voiceSlotParams = Array.from({ length: FM_LANES_MAX }, (_, i) =>
       requireParam(node, voiceSlotParamName(i)),

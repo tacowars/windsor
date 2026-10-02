@@ -11,7 +11,7 @@ import {
   ARRANGEMENT_VERSION,
   RATCHET_MAX,
   DEFAULT_ARP_CONFIG,
-  STEP_MOD_PARAMS,
+  VOICE_TARGET_PATHS,
   arpCellPitch,
   arpNote,
   chordAt,
@@ -293,7 +293,7 @@ describe("a cell's slide over the shown cycle", () => {
     // Unshifted it moves up the octave: a retarget.
     expect(slideOf(withStep(steps, 2, arpNote()), 3)).toEqual({ kind: 'retarget', when: 'always' });
     // No lane value on that cell plays, as the engine sends it no note-on.
-    for (const param of STEP_MOD_PARAMS) {
+    for (const param of VOICE_TARGET_PATHS) {
       expect(heldBySlide(slideOf(steps, 3), param), param).toBe('held');
     }
   });

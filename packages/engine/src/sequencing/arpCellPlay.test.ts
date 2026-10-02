@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 import {
   arpCellIndex,
   arpSkipRng,
@@ -197,9 +197,9 @@ describe('playArpCell', () => {
     const values = Array.from({ length: 32 }, (_, k) => (k === 3 ? 0.5 : 0));
     const lanes = [{ param: 'filter.cutoff' as const, values }];
     const at3 = playArpCell(onset({ index: 3 }), { ...CONFIG, lanes }).events[0];
-    expect(at3?.kind === 'noteOn' && at3.stepMod?.[STEP_MOD_PARAMS.indexOf('filter.cutoff')]).toBe(
-      0.5,
-    );
+    expect(
+      at3?.kind === 'noteOn' && at3.stepMod?.[VOICE_TARGET_PATHS.indexOf('filter.cutoff')],
+    ).toBe(0.5);
     expect(playArpCell(onset({ index: 2 }), { ...CONFIG, lanes }).events[0]).not.toHaveProperty(
       'stepMod',
     );

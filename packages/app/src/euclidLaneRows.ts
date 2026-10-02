@@ -16,7 +16,7 @@
  *
  * Every edit writes the lane index the cell shows, through `card.write`.
  */
-import type { EuclideanSpec, StepModParam } from '@windsor/engine';
+import type { EuclideanSpec, VoiceTargetPath } from '@windsor/engine';
 import { EUCLID_LANE_STEPS_MAX, EUCLID_PITCH_LANE_MAX } from '@windsor/engine';
 import { el } from './dom';
 import type { EuclidCard } from './euclidCardState';
@@ -203,7 +203,7 @@ function soundHost(input: LaneRowsInput, readings: ReadonlyMap<number, Say>): La
     gateKey: card,
     scope: input.scope,
     lanes: () => card.spec()?.modLanes ?? null,
-    base: (param: StepModParam) => patchBase(card.ctx, card.slot, param),
+    base: (param: VoiceTargetPath) => patchBase(card.ctx, card.slot, param),
     write: (lanes) => card.write({ modLanes: lanes }),
     repaint: () => card.refresh(),
     stepCount: () => spec.steps,
@@ -213,7 +213,7 @@ function soundHost(input: LaneRowsInput, readings: ReadonlyMap<number, Say>): La
 }
 
 /** A sound lane's index in `modLanes`. */
-const soundAt = (spec: EuclideanSpec, param: StepModParam): number =>
+const soundAt = (spec: EuclideanSpec, param: VoiceTargetPath): number =>
   (spec.modLanes ?? []).findIndex((lane) => lane.param === param);
 
 /** One lane's row, its playhead and its reading line. */

@@ -22,7 +22,7 @@
 
 import type { Voice } from './voice';
 import { ENVELOPE_BREAKS_MAX } from './fmConstants';
-import { VT_OP_BASE, VT_OP_LEVEL, VT_OP_STRIDE } from './voiceOffsetTables';
+import { VT_OP_BASE, VT_OP_LEVEL, VT_OP_STRIDE } from './voiceTargetTables';
 
 /**
  * Advance operator `i`'s envelope by `n` samples and set its ramp: the

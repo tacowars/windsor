@@ -15,7 +15,8 @@ import {
   type BassStep,
 } from '../sequencing/bassSequencer';
 import { DIVISORS, TICKS_PER_BAR } from '../sequencing/scheduler';
-import { STEP_MOD_LANES_MAX, STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { STEP_MOD_LANES_MAX } from '../sequencing/stepModLanes';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 import { song } from '../__fixtures__/documentCases';
 import { FieldNormaliser } from './arrangementFields';
 import { isShippable, makeArrangement } from './arrangementDocument';
@@ -113,7 +114,7 @@ describe('the Basslead strip through the normaliser (windsor#367)', () => {
   });
 
   it('fits the lanes to the steps and caps their count, each reported', () => {
-    const tooMany = STEP_MOD_PARAMS.slice(0, STEP_MOD_LANES_MAX + 1).map((param) => ({
+    const tooMany = VOICE_TARGET_PATHS.slice(0, STEP_MOD_LANES_MAX + 1).map((param) => ({
       param,
       values: [0.5],
     }));

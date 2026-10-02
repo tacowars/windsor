@@ -13,7 +13,7 @@ export type StripTargetId = 'strip.level' | 'strip.pan' | 'strip.send.a' | 'stri
 /** An insert target: the insert's stable id (`inserts/insertIds.ts`), then its field. */
 export type InsertTargetId = `insert.${string}.${string}`;
 
-/** A voice target: a patch path, as `stepModTables.ts` spells it (`voice.ops.2.width`). */
+/** A voice target: a patch path, as `voiceTargetTables.ts` spells it (`voice.ops.2.width`). */
 export type VoiceTargetId = `voice.${string}`;
 
 /** What a lane moves, relative to the part that owns it (decision 2). */

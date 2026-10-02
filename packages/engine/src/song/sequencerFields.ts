@@ -15,8 +15,12 @@ import {
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
 } from '../audioConstants';
-import { isStepModParam, type StepModLane } from '../sequencing/stepModLanes';
-import { STEP_MOD_LANES_MAX, type StepModParam } from '../worklet/fm/stepModTables';
+import {
+  STEP_MOD_LANES_MAX,
+  isVoiceTargetPath,
+  type StepModLane,
+} from '../sequencing/stepModLanes';
+import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
 import { show, type FieldNormaliser } from './arrangementFields';
 
 /**
@@ -167,14 +171,14 @@ function modLanes(
     return undefined;
   }
   const lanes: StepModLane[] = [];
-  const seen = new Set<StepModParam>();
+  const seen = new Set<VoiceTargetPath>();
   raw.forEach((item, i) => {
     const at = `${path}[${i}]`;
     const o = n.section(item, at);
     n.dropUnknown(o, ['param', 'values'], at);
     const drop = (why: string): void => n.correction(`${at}: ${why} — lane dropped`);
     const param = o.param;
-    if (!isStepModParam(param))
+    if (!isVoiceTargetPath(param))
       return drop(`${show(param)} is not a parameter a lane can modulate`);
     if (seen.has(param)) return drop(`${param} already has a lane`);
     if (lanes.length >= STEP_MOD_LANES_MAX) return drop(`more than ${STEP_MOD_LANES_MAX} lanes`);

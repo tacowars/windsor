@@ -2,8 +2,8 @@
  * The Formant filter mode (windsor#331) through the shipped worklet: white
  * noise through a vowel shows its three formants where the table puts them
  * and at its levels, unmoved by the note; the vowel morphs and clamps; the
- * filter's modulation (envelope, key track, the part's cutoff control) moves
- * the three together; the resonance sets one Q, capped, and every peak keeps
+ * filter's modulation (envelope, key track) moves the three together, and a
+ * cutoff lane or step leaves them alone, as the knob does (windsor#419); the resonance sets one Q, capped, and every peak keeps
  * its level across it; `slope24` and `cutoff` are not heard in this mode;
  * and a Formant voice ends after its release as any filtered voice does,
  * its third section included. That the kernel and the generic loop sum the
@@ -20,6 +20,7 @@ import { FILTER_MODE, WAVE, makeEnvelope, makePatch } from '../patch/patch';
 import type { FilterSettings, Patch } from '../patch/patch';
 import { FORMANT_MAKEUP, FORMANT_Q_MAX, FORMANT_Q_PER_RESONANCE } from '../worklet/fm/fmConstants';
 import { FORMANT_VOWELS } from '../worklet/fm/formantTables';
+import { VOICE_TARGET_COUNT, VT_CUTOFF } from '../worklet/fm/voiceTargetTables';
 
 const loaded = loadProcessor();
 const SR = loaded.sampleRate;
@@ -52,7 +53,7 @@ interface FormantVoice {
 
 const held = { attackTime: 0, decayTime: 0.01, sustainLevel: 1, peakLevel: 1 };
 
-/** The part's k-rate parameters at rest; a test sets its own `cutoffMod`. */
+/** The part's k-rate parameters at rest. */
 const PARAMS = {
   pitchBend: new Float32Array([0]),
   modWheel: new Float32Array([0]),
@@ -75,16 +76,22 @@ interface Held {
   left: Float32Array;
 }
 
-/** One note held `seconds` with the part's cutoff control at `cutoffMod`; the left channel. */
-function hold(patch: Patch, seconds: number, note = 60, cutoffMod = 0): Held {
-  const processor = loaded.create(patch, 1);
+/**
+ * One note held `seconds`, with a song lane on the cutoff at `cutoffLane`
+ * octaves and the note's step on it at `cutoffStep` (windsor#419); the left
+ * channel.
+ */
+function hold(patch: Patch, seconds: number, note = 60, cutoffLane = 0, cutoffStep = 0): Held {
+  const processor = loaded.create(patch, 1, undefined, { voiceSlots: ['filter.cutoff'] });
   const blocks = Math.ceil((seconds * SR) / BLOCK);
   const left = new Float32Array(blocks * BLOCK);
   const outL = new Float32Array(BLOCK);
   const outR = new Float32Array(BLOCK);
-  const params = { ...PARAMS, cutoffMod: new Float32Array([cutoffMod]) };
+  const params = { ...PARAMS, voiceSlot0: new Float32Array([cutoffLane]) };
+  const stepMod = new Array<number>(VOICE_TARGET_COUNT).fill(0);
+  stepMod[VT_CUTOFF] = cutoffStep;
   loaded.setFrame(0);
-  processor.inbox({ type: 'noteOn', id: 1, note, velocity: 1, frame: 0 });
+  processor.inbox({ type: 'noteOn', id: 1, note, velocity: 1, frame: 0, stepMod });
   for (let b = 0; b < blocks; b++) {
     loaded.setFrame(b * BLOCK);
     processor.process([], [[outL, outR]], params);
@@ -198,8 +205,8 @@ describe('the Formant mode through white noise (windsor#331)', () => {
 });
 
 describe('the vowel and the modulation (windsor#331)', () => {
-  const tuned = (filter: Partial<FilterSettings>, note = 60, cutoffMod = 0): number[] =>
-    centres(hold(noisePatch(filter), 0.05, note, cutoffMod).voice);
+  const tuned = (filter: Partial<FilterSettings>, note = 60, lane = 0, step = 0): number[] =>
+    centres(hold(noisePatch(filter), 0.05, note, lane, step).voice);
 
   it('morphs between neighbours: vowel 0.5 puts F2 halfway between a and e', () => {
     const [f1, f2, f3] = tuned({ vowel: 0.5 });
@@ -215,13 +222,20 @@ describe('the vowel and the modulation (windsor#331)', () => {
     expect(tuned({ vowel: -1 })).toEqual([...FORMANT_VOWELS[0]!.hz]);
   });
 
-  it('moves the three together with the envelope, key track and the cutoff control', () => {
+  it('moves the three together with the envelope and key track', () => {
     const a = FORMANT_VOWELS[0]!.hz.map((f) => 2 * f);
     const near = (got: number[]): void => got.forEach((f, k) => expect(f).toBeCloseTo(a[k]!, 6));
     near(tuned({ envAmount: 1 }));
     near(tuned({ keyTrack: 1 }, 72));
-    near(tuned({}, 60, 1));
     expect(tuned({ keyTrack: 1 }, 48).map((f, k) => f / a[k]!)).toEqual([0.25, 0.25, 0.25]);
+  });
+
+  it('leaves the three alone under a cutoff lane or step, as the Cutoff knob does (windsor#419)', () => {
+    const plain = tuned({});
+    expect(tuned({}, 60, 1)).toEqual(plain);
+    expect(tuned({}, 60, -2)).toEqual(plain);
+    expect(tuned({}, 60, 0, 0.5)).toEqual(plain);
+    expect(tuned({}, 60, 1, -0.5)).toEqual(plain);
   });
 
   it('is not heard in the other five modes: a vowel renders as none, to the bit', () => {
@@ -242,7 +256,7 @@ describe('the vowel and the modulation (windsor#331)', () => {
     const fresh = tuning(hold(noisePatch({ vowel: 1.5, slope24: true }), 0.05).voice);
     const { processor, voice } = hold(noisePatch({ vowel: 1.5, slope24: true }), 0.05);
     const out = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
-    const params = { ...PARAMS, cutoffMod: new Float32Array([0]) };
+    const params = { ...PARAMS, voiceSlot0: new Float32Array([0]) };
     const edit = (filter: Partial<FilterSettings>): void => {
       processor.inbox({ type: 'patch', patch: noisePatch({ slope24: true, ...filter }) } as never);
       for (let b = 0; b < 4; b++) processor.process([], [out], params);
@@ -318,7 +332,7 @@ function blocksToEnd(patch: Patch): number {
   const { processor, voice } = hold(patch, 0.2);
   processor.inbox({ type: 'noteOff', id: 1, frame: 0 });
   const out = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
-  const params = { ...PARAMS, cutoffMod: new Float32Array([0]) };
+  const params = { ...PARAMS, voiceSlot0: new Float32Array([0]) };
   let blocks = 0;
   while (blocks < END_LIMIT && voice.active) {
     processor.process([], [out], params);

@@ -29,7 +29,7 @@ export interface NoteOnEvent {
   slide?: boolean;
   /**
    * Step modulation (windsor#17): the step's parameter offsets, one slot per
-   * `STEP_MOD_TABLE` row, held for the note's life. Absent when every lane
+   * `VOICE_TARGET_TABLE` row, held for the note's life. Absent when every lane
    * reads 0 on the step, or the generator has none.
    */
   stepMod?: readonly number[];

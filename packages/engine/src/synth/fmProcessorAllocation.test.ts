@@ -134,6 +134,7 @@ import type { Patch } from '../patch/patch';
 import { DRIVE_SHAPE, FILTER_MODE, WAVE } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
 import { EVENT_QUEUE_CAPACITY } from '../worklet/fm/fmConstants';
+import { VOICE_TARGET_PATHS, type VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
 
 const TOLERANCE_BYTES = 16 * 1024;
 
@@ -167,15 +168,16 @@ const CROSSING_FRAME = SMI_END - ((WARMUP_QUANTA * 3) / 4) * QUANTUM;
 const TOGGLES: [string, number][] = [
   ['pitchBend', 2],
   ['modWheel', 0.7],
-  ['cutoffMod', 1.5],
   ['gain', 0.5],
 ];
 
 /**
  * Song lanes on every slot (windsor#346): the slot map, and each slot's
  * offset toggled in turn with the part's own parameters, so a lane moves
- * feedback (its ramp), level, width, the filter and both LFOs' amount and
- * rate on ringing voices and new ones.
+ * feedback (its ramp), level, width, the cutoff and resonance (windsor#419:
+ * the cutoff through a slot), an LFO's rate, the other's amount and the
+ * pitch envelope on ringing voices and new ones, and a step's push stacks on
+ * four of them.
  */
 const LANE_SLOTS = [
   'ops.0.feedback',
@@ -184,7 +186,7 @@ const LANE_SLOTS = [
   'filter.resonance',
   'lfo.rate',
   'lfo2.amount',
-  'ops.2.feedback',
+  'filter.cutoff',
   'pitchEnvAmount',
 ];
 const LANE_TOGGLES: [string, number][] = [
@@ -208,8 +210,20 @@ const DECAY_SLOTS = [
   'ops.3.env.decayTime',
 ];
 
-/** A step's offsets for the note that carries them: the filter's envelope amount, cutoff and resonance, and operator A's level. */
-const STEP_MOD = [0.3, 0.5, -0.4, 0, 0.25];
+/**
+ * A step's offsets for the note that carries them, by target code: the
+ * filter's cutoff, envelope amount and resonance, operator A's level, an
+ * LFO's rate and the pitch envelope's amount (windsor#419).
+ */
+const STEP_PUSHES: Partial<Record<VoiceTargetPath, number>> = {
+  'filter.cutoff': 0.5,
+  'filter.envAmount': 0.3,
+  'filter.resonance': -0.4,
+  'ops.0.level': 0.25,
+  'lfo.rate': 0.4,
+  pitchEnvAmount: -0.2,
+};
+const STEP_MOD = VOICE_TARGET_PATHS.map((path) => STEP_PUSHES[path] ?? 0);
 
 const on = (at: number, offset: number, key: number, note: number): FmPartEvent => ({
   at,

@@ -2,9 +2,9 @@
  * The voice lanes' handles on the main thread (windsor#346, record
  * `2026-10-01-song-automation-lanes` decisions 2, 10 and 16): a lane takes
  * one of its part's slots on its first hold, tells the processor which
- * target the slot moves, writes offsets from the patch's value (octaves on
- * `cutoffMod` for the cutoff, a log2 ratio for the LFO rates and, from a
- * 1 ms floor, the decay times: windsor#347), recomputes
+ * target the slot moves, writes offsets from the patch's value (a log2
+ * ratio for the cutoff, the LFO rates and, from a 1 ms floor, the decay
+ * times: windsor#347, windsor#419), recomputes
  * them against an edited patch, and gives the slot back at its release. An
  * offline render builds each part with its slot map, so its lanes play from
  * the first sample. The worklet's side is `fmProcessorAutomation.test.ts`.
@@ -95,15 +95,15 @@ describe('a voice lane on its part (windsor#346)', () => {
     expect(part.voiceSlotOf('ops.3.width')).toBeUndefined();
   });
 
-  it("writes the cutoff in octaves to the part's cutoffMod, and takes no slot", async () => {
+  it('writes the cutoff in octaves to a slot, as any ratio row (windsor#419)', async () => {
     const { part } = await rig();
     handleFor(part, 'filter.cutoff').hold(part.patch.filter.cutoff / 4, 0);
-    expect(fake(part.cutoffMod).automation.at(-1)).toEqual({
+    expect(fake(part.voiceSlotParams[0]!).automation.at(-1)).toEqual({
       call: 'setValueAtTime',
       value: -2,
       time: 0,
     });
-    expect(nodeOf(part).posted).toEqual([]);
+    expect(lastPosted(part)).toEqual({ type: 'voiceSlots', slots: slotMap('filter.cutoff') });
   });
 
   it("writes an LFO's rate as a log2 ratio of the patch's", async () => {

@@ -5,7 +5,7 @@
  * themselves are `stepModLaneModel.ts`'s; `stepModLane.ts` feeds this its
  * pointer events.
  */
-import type { StepModParam } from '@windsor/engine';
+import type { VoiceTargetPath } from '@windsor/engine';
 import { resetCell } from './stepModLaneModel';
 import { LANE_CLICK_SLOP_PX, LANE_DOUBLE_CLICK_MS } from './stepModLaneTables';
 
@@ -20,13 +20,13 @@ export interface LaneClock {
 }
 
 /** Where a lane edit lands: one lane's whole value list, the lane named by its parameter. */
-export type LaneWrite = (lane: StepModParam, values: readonly number[]) => void;
+export type LaneWrite = (lane: VoiceTargetPath, values: readonly number[]) => void;
 
 /** What a release wrote: a double-click's reset to 0, which the card redraws, or anything else. */
 export type ReleaseKind = 'reset' | 'values';
 
 interface LastClick {
-  readonly lane: StepModParam;
+  readonly lane: VoiceTargetPath;
   readonly index: number;
   /** When the click was released. */
   readonly at: number;
@@ -62,7 +62,7 @@ export class LaneClickGate {
   ) {}
 
   /** A press on `lane`'s cell `index`; the card paints from it, whatever it turns out to be. */
-  press(lane: StepModParam, index: number): void {
+  press(lane: VoiceTargetPath, index: number): void {
     const last = this.last;
     this.second =
       last?.lane === lane && last.index === index && this.clock.now() - last.at <= this.windowMs;
@@ -73,7 +73,7 @@ export class LaneClickGate {
    * anything else its values.
    */
   release(
-    lane: StepModParam,
+    lane: VoiceTargetPath,
     index: number,
     values: readonly number[],
     dragged: boolean,

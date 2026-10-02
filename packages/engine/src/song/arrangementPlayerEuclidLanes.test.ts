@@ -21,7 +21,7 @@ import { ACCENT_MOD_DEFAULT, ACCENT_VELOCITY_DEFAULT } from '../audioConstants';
 import type { OnsetEvent } from '../sequencing/euclideanSequencer';
 import { ScaleSampler } from '../sequencing/scaleSampler';
 import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
-import { STEP_MOD_PARAMS, STEP_MOD_SLOT_COUNT } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS, VOICE_TARGET_COUNT } from '../worklet/fm/voiceTargetTables';
 import type { Arrangement, SequencerSpec } from './arrangement';
 import { PartBinding } from './partBinding';
 
@@ -154,9 +154,9 @@ describe('Euclid lanes at their own lengths (windsor#355)', () => {
         expect(hit.extras, `step ${hit.step}`).toBeUndefined();
         continue;
       }
-      const expected = new Array<number>(STEP_MOD_SLOT_COUNT).fill(0);
-      expected[STEP_MOD_PARAMS.indexOf('filter.cutoff')] = c;
-      expected[STEP_MOD_PARAMS.indexOf('ops.3.width')] = w;
+      const expected = new Array<number>(VOICE_TARGET_COUNT).fill(0);
+      expected[VOICE_TARGET_PATHS.indexOf('filter.cutoff')] = c;
+      expected[VOICE_TARGET_PATHS.indexOf('ops.3.width')] = w;
       expect(hit.extras, `step ${hit.step}`).toEqual({ mod: 0, slide: false, stepMod: expected });
     }
   });

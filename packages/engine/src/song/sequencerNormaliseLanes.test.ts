@@ -13,7 +13,8 @@ import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { gridNote } from '../sequencing/gridSequencer';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { makePatch } from '../patch/patch';
-import { STEP_MOD_LANES_MAX, STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { STEP_MOD_LANES_MAX } from '../sequencing/stepModLanes';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 import { normaliseSequencer } from './sequencerNormalise';
 
 const PATH = 'parts[0].sequencer';
@@ -76,7 +77,7 @@ describe('grid lanes through the normaliser (windsor#17)', () => {
   });
 
   it(`keeps at most ${STEP_MOD_LANES_MAX} lanes`, () => {
-    const raw = STEP_MOD_PARAMS.slice(0, STEP_MOD_LANES_MAX + 1).map((param) => ({
+    const raw = VOICE_TARGET_PATHS.slice(0, STEP_MOD_LANES_MAX + 1).map((param) => ({
       param,
       values: [0, 0, 0],
     }));

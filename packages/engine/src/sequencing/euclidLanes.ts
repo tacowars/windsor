@@ -47,7 +47,7 @@ export interface EuclidRows {
   accentLane?: readonly boolean[];
   /** Whole semitones per lane step, `±EUCLID_PITCH_LANE_MAX`, added to the part's `note`; absent is none. */
   pitchLane?: readonly number[];
-  /** At most `STEP_MOD_LANES_MAX` lanes, each `StepModParam` once, each its own length; absent is none. */
+  /** At most `STEP_MOD_LANES_MAX` lanes, each `VoiceTargetPath` once, each its own length; absent is none. */
   modLanes?: readonly StepModLane[];
 }
 

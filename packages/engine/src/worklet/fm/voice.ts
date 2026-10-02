@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- a few lines over 350 after windsor#347's decay lanes and their rebind hold; tacowars accepted that rather than a split */
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms cut fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
@@ -6,9 +5,9 @@
  * envelopes, two LFOs, each Noise operator's colour (windsor#362) and
  * the generic loop's noise draws (windsor#389), the
  * drive stage (windsor#300), three filter stages (the third for the Formant
- * mode's three peaks, windsor#331), the steal fade, a step's parameter offsets and the per-voice values they make
- * (windsor#17), the values a song's lanes move and the feedback ramp
- * (windsor#346) — and its lifecycle: `start`, `rebind`, `retarget`,
+ * mode's three peaks, windsor#331), the steal fade, a step's offsets and
+ * the voice's own and live values by target code (windsor#17, windsor#346,
+ * windsor#419) and the feedback ramp — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
  * the part polls, whose logic is `voiceQuiet.ts`. The hot paths are functions over the voice in `voiceControl.js`,
  * `voiceRender.js` and `voiceKernel.js`; `render` and `updateControl` stay
@@ -29,15 +28,14 @@ import { ENVELOPE_BREAKS_MAX } from './fmConstants';
 import { Lfo, secondLfoSeed } from './lfo';
 import { NoiseColour } from './noiseColour';
 import { randomSeed32 } from './prng';
-import { STEP_MOD_SLOT_COUNT } from './stepModTables';
 import { Svf } from './svf';
 import { VoiceDrive } from './voiceDrive';
 import { bindVoiceConstants, updateVoiceControl } from './voiceControl';
 import { renderVoiceKernel } from './voiceKernel';
-import { VOICE_TARGET_COUNT } from './voiceOffsetTables';
 import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
 import { rebindStepMod, retargetStepMod, startStepMod } from './voiceStepMod';
+import { VOICE_TARGET_COUNT } from './voiceTargetTables';
 import { KIND_PULSE, waveKind } from './waveTables';
 
 /* ------------------------------------------------------------------ *
@@ -113,13 +111,7 @@ class Voice {
   detuneMul: Float64Array;
   levelKeyAmp: Float64Array;
   stepOffsets: Float64Array;
-  stepValues: Float64Array;
-  envAmount: number;
-  cutoff: number;
-  resonance: number;
-  opLevel: Float64Array;
-  opFeedback: Float32Array;
-  opWidth: Float64Array;
+  ownValues: Float64Array;
   partControls: Float64Array;
   opFreq: Float64Array;
   lfoLevel: number;
@@ -155,7 +147,7 @@ class Voice {
     this.age = this.voiceId = this.note = NaN;
     this.pan = this.glideFrom = NaN;
     this.panL = this.panR = this.pitchCur = this.pitchTarget = this.mod = NaN;
-    this.glideSeconds = this.envAmount = this.cutoff = this.resonance = NaN;
+    this.glideSeconds = NaN;
     this.lfoLevel = this.lfo2Level = NaN;
     this.sr = sampleRate;
     this.random = random; // the processor's one source; see "Randomness" above
@@ -248,25 +240,19 @@ class Voice {
     this.detuneMul = new Float64Array(4); // Math.pow(2, detune / 1200)
     this.levelKeyAmp = new Float64Array(4); // Math.pow(2, -levelKeyScale * keyOffset)
 
-    // A step's parameter offsets (windsor#17), one slot per `stepModTables.ts`
-    // row, and the values they make, read in place of the patch's: the
-    // filter's, then each operator's level, feedback (a Float32Array, as the
-    // loops have always read it) and width. `bindStepMod` writes them.
-    this.stepOffsets = new Float64Array(STEP_MOD_SLOT_COUNT);
-    this.stepValues = new Float64Array(STEP_MOD_SLOT_COUNT); // `bindStepMod`'s working values
-    this.envAmount = 0;
-    this.cutoff = 0;
-    this.resonance = 0;
-    this.opLevel = new Float64Array(4);
-    this.opFeedback = new Float32Array(4);
-    this.opWidth = new Float64Array(4).fill(1);
+    // The voice's targets by code (windsor#419, `voiceTargetTables.ts`): a
+    // step's offsets (windsor#17), and the values the voice plays without and
+    // with the song's lanes. `ownValues` is the patch's with the step's
+    // (`bindOwnValues`), `liveValues` those with the part's lane offsets,
+    // each control block (`voiceOffsets.ts`), and every consumer reads it.
+    this.stepOffsets = new Float64Array(VOICE_TARGET_COUNT);
+    this.ownValues = new Float64Array(VOICE_TARGET_COUNT);
+    this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
 
-    // Song automation (windsor#346, `voiceOffsets.ts`): the part's offsets
-    // and floors, the values the voice plays with them this block, and each operator's
-    // feedback ramp across the block (`fbRamp`, a bit per ramping operator).
+    // Song automation (windsor#346): the part's offsets and floors, and each
+    // operator's feedback ramp across the block (`fbRamp`, a bit per ramping operator).
     this.partOffsets = partOffsets;
     this.partFloors = partFloors;
-    this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
     this.fbFrom = new Float32Array(4);
     this.fbTo = new Float32Array(4);
     this.fbRamp = 0;

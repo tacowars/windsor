@@ -14,7 +14,7 @@ import {
   EUCLID_LANE_STEPS_MAX,
   EUCLID_PITCH_LANE_MAX,
   STEP_MOD_LANES_MAX,
-  STEP_MOD_PARAMS,
+  VOICE_TARGET_PATHS,
   partAt,
   regionPattern,
 } from '@windsor/engine';
@@ -149,17 +149,17 @@ describe('Add lane', () => {
     expect(laneChoices(ROWS).find((c) => c.value === 'filter.cutoff')?.disabled).toBe(true);
     expect(addLaneRow(ROWS, 'filter.cutoff', 16)).toBeNull();
     const full: EuclidRows = {
-      modLanes: STEP_MOD_PARAMS.slice(0, STEP_MOD_LANES_MAX).map((param) => ({
+      modLanes: VOICE_TARGET_PATHS.slice(0, STEP_MOD_LANES_MAX).map((param) => ({
         param,
         values: [0],
       })),
     };
     const sounds = laneChoices(full).filter((c) => c.value !== 'accent' && c.value !== 'pitch');
-    expect(sounds).toHaveLength(STEP_MOD_PARAMS.length);
+    expect(sounds).toHaveLength(VOICE_TARGET_PATHS.length);
     expect(sounds.every((c) => c.disabled)).toBe(true);
     // The accent and pitch lanes do not count against the four.
     expect(addLaneRow(full, 'accent', 16)).not.toBeNull();
-    expect(addLaneRow(full, STEP_MOD_PARAMS[STEP_MOD_LANES_MAX]!, 16)).toBeNull();
+    expect(addLaneRow(full, VOICE_TARGET_PATHS[STEP_MOD_LANES_MAX]!, 16)).toBeNull();
     expect(addLaneRow(ROWS, 'nonsense', 16)).toBeNull();
   });
 });

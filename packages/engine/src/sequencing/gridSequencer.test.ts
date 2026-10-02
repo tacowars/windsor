@@ -12,7 +12,7 @@ import {
 import type { NoteEvent, NoteOnEvent } from './noteEvent';
 import { ScaleSampler } from './scaleSampler';
 import { DIVISORS, TICKS_PER_BAR, TickTransport } from './scheduler';
-import { STEP_MOD_PARAMS, STEP_MOD_SLOT_COUNT } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS, VOICE_TARGET_COUNT } from '../worklet/fm/voiceTargetTables';
 
 /** C minor (root pitch class 0); at register octave 3, degree 0 is C3 = 48, degree 2 is 51, degree 6 is 58. */
 const minor = new ScaleSampler({ root: 0, scale: 'naturalMinor' });
@@ -280,8 +280,8 @@ describe('GridSequencer', () => {
 });
 
 describe('GridSequencer step modulation lanes (windsor#17)', () => {
-  const CUTOFF = STEP_MOD_PARAMS.indexOf('filter.cutoff');
-  const LEVEL_B = STEP_MOD_PARAMS.indexOf('ops.1.level');
+  const CUTOFF = VOICE_TARGET_PATHS.indexOf('filter.cutoff');
+  const LEVEL_B = VOICE_TARGET_PATHS.indexOf('ops.1.level');
   const noteOns = (events: NoteEvent[]): NoteOnEvent[] =>
     events.filter((e): e is NoteOnEvent => e.kind === 'noteOn');
   const line = [gridNote(0), gridNote(2), gridNote(4), gridNote(6)];
@@ -294,7 +294,7 @@ describe('GridSequencer step modulation lanes (windsor#17)', () => {
     const on = noteOns(run(make(line, { lanes }), 1)).slice(0, 4);
     expect(on[0]).not.toHaveProperty('stepMod');
     expect(on[1]).not.toHaveProperty('stepMod');
-    expect(on[2]!.stepMod).toHaveLength(STEP_MOD_SLOT_COUNT);
+    expect(on[2]!.stepMod).toHaveLength(VOICE_TARGET_COUNT);
     expect(on[2]!.stepMod![CUTOFF]).toBe(0.5);
     expect(on[2]!.stepMod![LEVEL_B]).toBe(-1);
     expect(on[3]!.stepMod![CUTOFF]).toBe(0);
@@ -312,12 +312,12 @@ describe('GridSequencer step modulation lanes (windsor#17)', () => {
     const lanes = [{ param: 'filter.resonance' as const, values: [0, 0.75] }];
     const on = noteOns(run(make(slid, { lanes }), 1))[1]!;
     expect(on.slide).toBe(true);
-    expect(on.stepMod![STEP_MOD_PARAMS.indexOf('filter.resonance')]).toBe(0.75);
+    expect(on.stepMod![VOICE_TARGET_PATHS.indexOf('filter.resonance')]).toBe(0.75);
   });
 
   it('rejects lanes the normaliser should never hand it', () => {
     const param = 'filter.cutoff' as const;
-    const five = STEP_MOD_PARAMS.slice(0, 5).map((p) => ({ param: p, values: [0] }));
+    const five = VOICE_TARGET_PATHS.slice(0, 5).map((p) => ({ param: p, values: [0] }));
     expect(() => make([gridNote()], { lanes: five })).toThrow(RangeError);
     expect(() =>
       make([gridNote()], {
@@ -329,6 +329,6 @@ describe('GridSequencer step modulation lanes (windsor#17)', () => {
     ).toThrow(/repeats/);
     expect(() => make([gridNote()], { lanes: [{ param, values: [1.5] }] })).toThrow(RangeError);
     const unknown = [{ param: 'volume', values: [0] }] as unknown as GridSequencerConfig['lanes'];
-    expect(() => make([gridNote()], { lanes: unknown })).toThrow(/StepModParam/);
+    expect(() => make([gridNote()], { lanes: unknown })).toThrow(/VoiceTargetPath/);
   });
 });
