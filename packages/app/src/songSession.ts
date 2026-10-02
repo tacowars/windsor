@@ -122,6 +122,14 @@ export class SongSession {
   private chain: Promise<unknown> = Promise.resolve();
   /** How many times the document has been replaced, for a boot that must not replace a touched one. */
   private replaced = 0;
+  /** The text right after the session's last replacement, any open-time amend included (windsor#455). */
+  private openedText: string | null = null;
+  /**
+   * A named song whose `current` still holds the recovery copy of an edit
+   * owed to it (windsor#452): `current` names the song once that edit has
+   * landed in its record, never before.
+   */
+  private repoint: string | null = null;
 
   constructor(host: SessionHost, options: SessionOptions = {}) {
     this.host = host;
@@ -167,9 +175,15 @@ export class SongSession {
     return this.storage ? this.storage.library.list() : Promise.resolve([]);
   }
 
-  /** True only when leaving would lose something: the open song is untitled and has changed. */
+  /**
+   * True only when leaving would lose something: the open song is untitled
+   * and the user has edited it. An open-time amend (an import's file name)
+   * is not the user's edit, so the text is compared with the text right
+   * after the session's replacement (windsor#455).
+   */
   leaveNeedsConfirm(): boolean {
-    return this.current.kind === 'untitled' && this.host.model.changed;
+    const { model } = this.host;
+    return this.current.kind === 'untitled' && model.changed && model.toJson() !== this.openedText;
   }
 
   /**
@@ -295,6 +309,7 @@ export class SongSession {
 
   private become(state: SongSessionState): void {
     this.current = state;
+    this.repoint = null;
     this.emit();
   }
 
@@ -396,6 +411,7 @@ export class SongSession {
     const replace = (): void => this.replace(raw, amend);
     if (storage && source.quiet) storage.autosave.quietly(replace);
     else replace();
+    this.openedText = this.host.model.toJson();
     const { origin } = source;
     this.become(origin === undefined ? { kind: 'untitled' } : { kind: 'untitled', origin });
   }
@@ -412,7 +428,12 @@ export class SongSession {
   private openRecord(storage: SessionStorage, id: string, revision: number): AutosaveTarget {
     const record: OpenRecord = { id, revision, stale: false, gone: false };
     const target = namedTarget(storage.library, record, {
-      written: () => this.emit(),
+      written: async () => {
+        this.emit();
+        if (this.repoint !== id) return;
+        this.repoint = null;
+        await this.pointAt(storage, id);
+      },
       stale: () => {
         this.host.notify(STALE_SONG_TEXT, 'error');
         this.emit();
@@ -455,7 +476,9 @@ export class SongSession {
    * its own record is the autosave's target again. An edit made since the
    * drain is owed to it, whether it waits or went to `current`, and the next
    * flush stores it there. When one of those writes landed in `current`,
-   * `current` names the song again once it has.
+   * `current` keeps that recovery copy until the owed write has landed in
+   * the song's record, and only then names the song again (`repoint`); with
+   * nothing owed, it names the song at once.
    */
   private async keepOpen(
     storage: SessionStorage,
@@ -465,11 +488,13 @@ export class SongSession {
   ): Promise<false> {
     const stale = error instanceof StaleSongError;
     if (stale) open.record.stale = true;
-    storage.autosave.retarget(open.target, {
-      owed: this.host.model.toJson() !== away.document,
-    });
+    const owed = this.host.model.toJson() !== away.document;
+    // Set before the settle, so an owed write that lands while it waits repoints `current`.
+    if (owed) this.repoint = open.record.id;
+    storage.autosave.retarget(open.target, { owed });
     await storage.autosave.settle();
-    if (away.landed()) await this.pointAt(storage, open.record.id);
+    if (!away.landed()) this.repoint = null;
+    else if (!owed) await this.pointAt(storage, open.record.id);
     if (stale) this.emit();
     return this.fail(stale ? STALE_SONG_TEXT : `delete failed: ${errorText(error)}`);
   }
@@ -478,6 +503,8 @@ export class SongSession {
     this.replaced++;
     this.host.parts.selected = 0;
     this.host.replace(raw, amend);
+    // An untitled switch takes the text right after it; any other replacement compares as `changed` does.
+    this.openedText = null;
   }
 
   /** Store `text` under a new id and make it the open named song; null (reported) when the write failed. */

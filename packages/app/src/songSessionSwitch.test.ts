@@ -123,11 +123,12 @@ describe('a retarget never drops a write still owed', () => {
     expect(c.toasts.at(-1)).toBe('error: delete failed: quota');
     expect(c.ctx.songs.state).toEqual({ kind: 'named', id: a });
     expect(c.autosave.unsaved).toBe(true);
-    // current names the song again, so a reload reopens it rather than an untitled copy.
-    expect(c.store.record).toMatchObject({ songId: a });
+    // current keeps the edit until the song's record holds it, then names the song again.
     expect(storedBpm(a)).not.toBe(142);
+    expect((c.store.record as StoredSong).document).toBe(c.ctx.model.toJson());
     expect(await c.autosave.flush()).toBe(true);
     expect(storedBpm(a)).toBe(142);
+    expect(c.store.record).toMatchObject({ songId: a });
     expect(c.autosave.unsaved).toBe(false);
   });
 

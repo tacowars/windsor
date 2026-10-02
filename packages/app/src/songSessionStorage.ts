@@ -99,7 +99,8 @@ export function problemText(problem: OpenProblem): string | null {
 
 /** What the named target tells the session: a write stored, or the song found saved by another tab. */
 export interface TargetEvents {
-  written(): void;
+  /** Awaited before the save resolves, so what it writes has landed when a flush does. */
+  written(): void | Promise<void>;
   stale(): void;
 }
 
@@ -126,7 +127,7 @@ export function namedTarget(
         events.stale();
         throw new ReportedRefusal(STALE_SONG_TEXT);
       }
-      events.written();
+      await events.written();
     },
   };
 }
