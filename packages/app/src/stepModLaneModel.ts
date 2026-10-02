@@ -8,8 +8,13 @@
  * value is the engine's own curve (`stepModValue`), so the console and the
  * voice cannot disagree. `stepModLane.ts` draws it; any step card may.
  */
-import type { StepModLane, StepModParam, StepModRow } from '@windsor/engine';
-import { STEP_MOD_LANES_MAX, STEP_MOD_PARAMS, STEP_MOD_TABLE, stepModValue } from '@windsor/engine';
+import type { StepModLane, VoiceTargetPath, VoiceTargetRow } from '@windsor/engine';
+import {
+  STEP_MOD_LANES_MAX,
+  VOICE_TARGET_PATHS,
+  VOICE_TARGET_TABLE,
+  stepModValue,
+} from '@windsor/engine';
 import { fmtSigned } from './consoleFormat';
 import {
   LANE_OCTAVE_DIGITS,
@@ -18,10 +23,10 @@ import {
   type LanePaintTable,
 } from './stepModLaneTables';
 
-/** The parameters not yet on a lane, in the engine's slot order: what the picker offers. */
-export function freeParams(lanes: readonly StepModLane[]): StepModParam[] {
+/** The targets not yet on a lane, in the engine's code order: what the picker offers. */
+export function freeParams(lanes: readonly StepModLane[]): VoiceTargetPath[] {
   const taken = new Set(lanes.map((lane) => lane.param));
-  return STEP_MOD_PARAMS.filter((param) => !taken.has(param));
+  return VOICE_TARGET_PATHS.filter((param) => !taken.has(param));
 }
 
 /** Whether one more lane fits under the engine's limit. */
@@ -34,7 +39,7 @@ export const canAddLane = (lanes: readonly StepModLane[], max = STEP_MOD_LANES_M
  */
 export function addLane(
   lanes: readonly StepModLane[],
-  param: StepModParam,
+  param: VoiceTargetPath,
   steps: number,
   max = STEP_MOD_LANES_MAX,
 ): StepModLane[] | null {
@@ -63,7 +68,7 @@ export function withLaneValues(
  */
 export function withParamValues(
   lanes: readonly StepModLane[],
-  param: StepModParam,
+  param: VoiceTargetPath,
   values: readonly number[],
 ): StepModLane[] | null {
   const index = lanes.findIndex((lane) => lane.param === param);
@@ -191,16 +196,16 @@ export function paintCells(
   return out;
 }
 
-const rowOf = (param: StepModParam): StepModRow | undefined =>
-  STEP_MOD_TABLE.find((row) => row.param === param);
+const rowOf = (param: VoiceTargetPath): VoiceTargetRow | undefined =>
+  VOICE_TARGET_TABLE.find((row) => row.path === param);
 
-/** The offset a value pushes, in the row's own terms: octaves, the knob's units, or the lane value on a log row. */
-export function offsetLabel(row: StepModRow, value: number): string {
-  if (row.curve === 'octaves') {
-    const oct = value * row.span;
-    return `${oct >= 0 ? '+' : ''}${oct.toFixed(LANE_OCTAVE_DIGITS)} oct`;
+/** The offset a value pushes, in the row's own terms: octaves on a ratio row, the knob's units on an add row. */
+export function offsetLabel(row: VoiceTargetRow, value: number): string {
+  const offset = value * row.span;
+  if (row.curve === 'ratio') {
+    return `${offset >= 0 ? '+' : ''}${offset.toFixed(LANE_OCTAVE_DIGITS)} oct`;
   }
-  return fmtSigned(row.curve === 'linear' ? value * row.span : value);
+  return fmtSigned(offset);
 }
 
 /**
@@ -229,7 +234,7 @@ export const NO_SLIDE: StepSlide = { kind: 'none', when: 'always' };
 /** Whether a step's own value reaches the voice: it `plays`, a slide keeps the old one (`held`), or the run decides (`depends`). */
 export type LaneHold = 'plays' | 'held' | 'depends';
 
-export function heldBySlide(slide: StepSlide, param: StepModParam): LaneHold {
+export function heldBySlide(slide: StepSlide, param: VoiceTargetPath): LaneHold {
   if (slide.kind === 'none') return 'plays';
   if (slide.kind !== 'same' && rowOf(param)?.slideKeeps !== true) {
     return slide.kind === 'either' ? 'depends' : 'plays';
@@ -238,7 +243,7 @@ export function heldBySlide(slide: StepSlide, param: StepModParam): LaneHold {
 }
 
 /** Whether `param` on a step with `slide` plays only if the slide moves pitch (`either`, not a `slideKeeps` row). */
-const playsIfMoves = (slide: StepSlide, param: StepModParam): boolean =>
+const playsIfMoves = (slide: StepSlide, param: VoiceTargetPath): boolean =>
   slide.kind === 'either' && rowOf(param)?.slideKeeps !== true;
 
 /** What a readout adds after the offset when a slide holds the row, or may. */
@@ -257,7 +262,7 @@ const MOVES_NOTE = 'plays if the slide moves pitch';
  * holds the row or may, that instead.
  */
 export function laneReadout(
-  param: StepModParam,
+  param: VoiceTargetPath,
   value: number,
   base: number | undefined,
   slide: StepSlide = NO_SLIDE,
@@ -272,4 +277,4 @@ export function laneReadout(
 }
 
 /** The name a lane and the picker show. */
-export const laneLabel = (param: StepModParam): string => STEP_MOD_LANE_LABELS[param].label;
+export const laneLabel = (param: VoiceTargetPath): string => STEP_MOD_LANE_LABELS[param].label;

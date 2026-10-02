@@ -11,7 +11,7 @@ import { ALL_ON, KICK_SLOT, SECONDS_PER_TICK, figure, kickSong } from '../__fixt
 import { rig } from '../__fixtures__/playerRig';
 import type { Call } from '../__fixtures__/recordingPart';
 import { euclid } from '../sequencing/euclid';
-import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 import { FieldNormaliser } from './arrangementFields';
 import { normaliseSequencer } from './sequencerNormalise';
 
@@ -49,8 +49,8 @@ describe('Euclid ratchets (windsor#355)', () => {
     run(1);
     const byStep = rolls(parts.kick.calls);
     expect([...byStep.keys()]).toEqual([0, 4, 8, 12]);
-    const stepMod = new Array<number>(STEP_MOD_PARAMS.length).fill(0);
-    stepMod[STEP_MOD_PARAMS.indexOf('filter.cutoff')] = 0.5;
+    const stepMod = new Array<number>(VOICE_TARGET_PATHS.length).fill(0);
+    stepMod[VOICE_TARGET_PATHS.indexOf('filter.cutoff')] = 0.5;
     for (const [step, roll] of byStep) {
       const n = ratchets[step]!;
       expect(roll, `step ${step}`).toHaveLength(n);

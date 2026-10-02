@@ -27,7 +27,7 @@ export interface ScheduledEvent {
   /** Per-note mod and the legato slide flag (#602). */
   mod?: number;
   slide?: boolean;
-  /** A step's parameter offsets, one slot per `STEP_MOD_TABLE` row (windsor#17). */
+  /** A step's parameter offsets, one slot per `VOICE_TARGET_TABLE` row (windsor#17). */
   stepMod?: readonly number[];
 }
 
@@ -260,7 +260,6 @@ export function render(
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
 

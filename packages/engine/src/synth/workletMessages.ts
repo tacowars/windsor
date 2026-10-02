@@ -29,7 +29,7 @@ export interface NoteOnMessage {
   slide?: boolean;
   /**
    * A sequencer step's parameter offsets (windsor#17): one lane value in
-   * -1..1 per `STEP_MOD_TABLE` row, in its slot order, 0 for the patch's own
+   * -1..1 per `VOICE_TARGET_TABLE` row, in code order, 0 for the patch's own
    * setting. The voice copies them into its preallocated slots at note-on
    * and holds them for the note's life; a slide takes them too, but for the
    * rows marked `slideKeeps`. Absent means every offset is 0.

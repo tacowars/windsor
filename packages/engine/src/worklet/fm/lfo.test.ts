@@ -34,8 +34,13 @@ const settings = (o: Partial<LfoSettings> = {}): LfoSettings => ({
 
 type LfoInstance = InstanceType<typeof Lfo>;
 
-/** Advance `lfo` by `n` samples and read its value, which `advance` leaves in `output` (windsor#233). */
+/**
+ * Advance `lfo` at `p`'s rate by `n` samples and read its value, which
+ * `advance` leaves in `output` (windsor#233); the voice writes the rate the
+ * same way each control block (windsor#419).
+ */
 function advanced(lfo: LfoInstance, p: LfoSettings, n: number, rate: number): number {
+  lfo.rate = p.rate;
   lfo.advance(p, n, rate);
   return lfo.output;
 }

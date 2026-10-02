@@ -208,11 +208,11 @@ build output. The map of `fm/` (#644):
 | `prng.ts` | `makeRandom`, `randomSeed32` |
 | `patchDefaults.ts` | every default a patch may omit, the `tone` and feedback clamp bounds and `OPERATOR_COUNT`, import-free but for the two id modules: `normalisePatch` and the main thread's `makePatch()` both fill from it, and `audioConstants.ts` re-exports `OPERATOR_COUNT` (#670) |
 | `patchNormalise.ts` | `normalisePatch`, `num`: a partial patch to a full one, from `patchDefaults.ts` |
-| `stepModTables.ts` | `STEP_MOD_TABLE` (windsor#17): one row per `StepModParam` (bounds, span, curve, `slideKeeps`) and `STEP_MOD_LANES_MAX`; the main thread's sequencer, song normaliser and index read it |
-| `stepModValue.ts` | `stepModValue`: the one step modulation curve, a row and a lane value over the patch's own; 0 returns the base untouched. The voice binds with it and the index re-exports it |
-| `voiceStepMod.ts` | `loadStepOffsets` and `bindStepMod`: a note-on's offsets into the voice's preallocated slots, and the per-voice values the control update, envelopes and render loops read in place of the patch's |
-| `voiceOffsetTables.ts` | the song lanes' voice targets as data (windsor#346, windsor#347): `VOICE_SLOT_COUNT` and the slots' parameter names, one row per target in the catalog's order (the cutoff aside, which rides `cutoffMod`) with its curve (added, or a log2 ratio for the LFO rates and the decay times), bounds and ratio floor, the `VT_*` codes, and `CUTOFF_MOD_RANGE`. Import-light: `voiceOffsetTables.test.ts` pins it to the main thread's catalog |
-| `voiceOffsets.ts` | the song lanes on the voice (windsor#346, windsor#347): `mapVoiceSlots` (a slot map to target codes, at a message), `latchVoiceOffsets` (the slots into the part's offsets, each quantum), `applyVoiceOffsets` (each control block: the voice's values with their offsets in `liveValues`, the feedback ramp's ends, the LFOs' `rateMul`, and the decays into the envelopes, a changed curve through `Envelope.reshapeDecay`), and `primeVoiceOffsets` / `keepVoiceOffsets` + `rebindVoiceOffsets` for a note-on and a live retune. Only a lane's offset changing reshapes a decay, never a rebind: a curve a lane holds over an edited base stays as it plays until the lane resyncs (`decayRebound`). An offset of 0 changes nothing, to the bit, except that a decay time a slot maps plays at least its 1 ms floor (`partFloors`); a part with no slot mapped floors nothing |
+| `voiceTargetTables.ts` | the voice's modulation targets (windsor#419): one row per value a source may move on a sounding voice (path, curve `add` or `ratio`, bounds, ratio floor, step span, `slideKeeps`), in code order, the row's index its code everywhere (a song lane's slot, a note-on's step array, the voice's arrays); the `VT_*` codes and the rows as typed arrays. Data only: the main thread's catalog, sequencer, song normaliser, app and index read it. The extension point: a new target is a row, its look and label, its field in `layoutVoiceTargets`, and a read of `liveValues` where it applies |
+| `voiceTargetValue.ts` | `voiceTargetValue` and `stepModValue`: the one curve on the main thread, an offset (or a step value times its span) over the patch's own; 0 returns the base untouched. The voice writes the same arithmetic out in place, and the index re-exports it |
+| `voiceTargets.ts` | `layoutVoiceTargets` (windsor#419): the patch's value for every target, by code, into an array; the one place on the audio thread that maps a path to a code |
+| `voiceStepMod.ts` | `loadStepOffsets` and `bindOwnValues`: a note-on's step array (one value per target, 0 past its end, junk 0) into the voice's preallocated `stepOffsets`, and `ownValues`, the patch's values by code with each step value moved in its row's curve; the note-on, retarget and rebind entry points |
+| `voiceOffsets.ts` | the song lanes on the voice (windsor#346, windsor#347): `VOICE_SLOT_COUNT` and the slots' parameter names, `mapVoiceSlots` (a slot map to target codes, at a message; the cutoff is a slot like any other since windsor#419), `latchVoiceOffsets` (the slots into the part's offsets, each quantum), `applyVoiceOffsets` (each control block: `liveValues`, the own value where no lane moves a target and otherwise the lane's absolute value with the step's push over it, then the feedback ramp's ends, the LFOs' absolute `rate`, and the decays into the envelopes, a changed curve through `Envelope.reshapeDecay`), and `primeVoiceOffsets` / `keepVoiceOffsets` + `rebindVoiceOffsets` for a note-on and a live retune. Only a lane's offset changing reshapes a decay, never a rebind: a curve a lane holds over an edited base stays as it plays until the lane resyncs (`decayRebound`). An offset of 0 changes nothing, to the bit, except that a decay time or an LFO rate a slot maps plays at least its row's floor, 1 ms or 0.02 Hz (`partFloors`); a part with no slot mapped floors nothing |
 | `workletGlobals.d.ts` | the AudioWorkletGlobalScope names the DSP reads (`sampleRate`, `currentFrame`, `registerProcessor`, `AudioWorkletProcessor`), which `lib.dom` does not declare |
 | `tsconfig.json` | the folder's own `tsc -p` project (#654): the engine's settings with `noUncheckedIndexedAccess` and `useDefineForClassFields` off, and why |
 | `*.test.ts` | direct tests of the leaf modules (#654): a module that warms the wave cache at load needs `sampleRate` on `globalThis` before a dynamic import |
@@ -248,7 +248,7 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    (windsor#233): V8 inlines a call only where its budget and the call's
    frequency allow, and a double passed to or returned from one it does not
    inline is a new heap number. So `Envelope.advance` leaves its value in
-   `value`, `Lfo.advance` in `output`, the part's bend, wheel and cutoff
+   `value`, `Lfo.advance` in `output`, the part's bend and wheel
    reach the voices in `partControls`, the width update reads `opFreq` and
    the LFO levels from the voice, `Svf.setCoeffs` reads `cutoffHz` and `q`,
    and a note's pitch, velocity, detune, pan and glide go to `start` in the voice's
@@ -309,9 +309,10 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`),
    `patchDefaults.ts` (#670: `makePatch()` fills from it, and
    `patchDefaults.test.ts` pins its fill equal to `normalisePatch`'s), and
-   `stepModTables.ts` and `stepModValue.ts` (windsor#17: the sequencer and
-   the song normaliser read the table, and the index exports both, so a
-   console and the voice compute a step's value with one curve), and
+   `voiceTargetTables.ts` and `voiceTargetValue.ts` (windsor#419: the
+   catalog, the sequencer and the song normaliser read the table, and the
+   index exports both, so a console and the voice compute a step's value
+   with one curve), and
    `formantTables.ts` (windsor#331: the index exports the vowels the
    Formant mode reads). `audioConstants.ts` and
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`

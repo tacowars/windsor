@@ -26,7 +26,7 @@
  * the primary button up — a release it never saw — drops the preview (as PR
  * windsor#27's drags do) and writes nothing.
  */
-import type { StepModLane, StepModParam } from '@windsor/engine';
+import type { StepModLane, VoiceTargetPath } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
@@ -57,7 +57,7 @@ export interface LaneHost {
   /** The card's lanes, or null when the part is gone or re-kinded. */
   lanes(): readonly StepModLane[] | null;
   /** The patch's own value at `param`, when the document carries the part's patch. */
-  base(param: StepModParam): number | undefined;
+  base(param: VoiceTargetPath): number | undefined;
   /** Write a whole lane list through `ctx.change`; true when it took. */
   write(lanes: readonly StepModLane[]): boolean;
   /** Redraw the card from the document. */
@@ -82,7 +82,7 @@ const valueAt = (host: LaneHost, lane: number, cell: number): number =>
   host.valueIndex?.(lane, cell) ?? cell;
 
 /** The patch value of `param` for the part on `slot`: what a readout's played value starts from. */
-export function patchBase(ctx: AppCtx, slot: number, param: StepModParam): number | undefined {
+export function patchBase(ctx: AppCtx, slot: number, param: VoiceTargetPath): number | undefined {
   const doc = ctx.model.doc;
   const part = partAt(doc, slot);
   const value = part ? getPath(doc.patches?.[part.preset], param) : undefined;
@@ -249,7 +249,7 @@ export function lanePicker(host: LaneHost): HTMLSelectElement {
   select.setAttribute('aria-label', 'add a modulation lane');
   select.onchange = (): void => {
     const lanes = host.lanes();
-    const param = select.value as StepModParam;
+    const param = select.value as VoiceTargetPath;
     const next = lanes && addLane(lanes, param, host.stepCount());
     if (next && host.write(next)) host.repaint();
     else fillLanePicker(select, host);

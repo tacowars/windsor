@@ -5,12 +5,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import type { StepModLane, StepModParam } from '@windsor/engine';
+import type { StepModLane, VoiceTargetPath } from '@windsor/engine';
 import { LaneClickGate, type LaneClock, isDrag } from './stepModLaneClicks';
 import { withParamValues } from './stepModLaneModel';
 import { LANE_CLICK_SLOP_PX } from './stepModLaneTables';
 
-const lane = (param: StepModParam, values: number[]): StepModLane => ({ param, values });
+const lane = (param: VoiceTargetPath, values: number[]): StepModLane => ({ param, values });
 
 describe('clicks, drags and the double-click', () => {
   const CUT = 'filter.cutoff' as const;
@@ -26,7 +26,7 @@ describe('clicks, drags and the double-click', () => {
     };
   }
   const setup = () => {
-    const writes: [StepModParam, number[]][] = [];
+    const writes: [VoiceTargetPath, number[]][] = [];
     const clock = fakeClock();
     const gate = new LaneClickGate((lane, values) => writes.push([lane, [...values]]), clock, 250);
     return { writes, clock, gate };

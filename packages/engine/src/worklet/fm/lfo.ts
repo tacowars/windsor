@@ -9,8 +9,10 @@
  * leaves its result in `output` and `rand` its draw in `draw`, and every
  * double field is first written as NaN (windsor#233): V8 does not inline
  * `advance`, too large, and a double returned from a call it does not inline
- * is a new heap number on the audio thread. A song lane scales the rate
- * through `rateMul` (windsor#346, `voiceOffsets.ts`). `lfo.test.ts`,
+ * is a new heap number on the audio thread. The phase steps at `rate`, the
+ * absolute rate the voice writes from its `liveValues` each control block,
+ * so a song lane or a step moves it (windsor#346, windsor#419,
+ * `voiceOffsets.ts`). `lfo.test.ts`,
  * `fmProcessorModWheel.test.ts`, `__fixtures__/lfo2Routes.test.ts`, the
  * golden test and `synth/fmProcessorAllocation.test.ts` pin it.
  */
@@ -36,18 +38,19 @@ class Lfo {
   /** `rand`'s draw. */
   draw: number;
   /**
-   * The rate's multiplier on the patch's (windsor#346): a song lane's ratio,
-   * which the voice writes each control block. Exactly 1 without one, and a
-   * product with 1 is exact, so the phase steps as it always has.
+   * The rate in Hz the phase steps at (windsor#346, windsor#419): the voice
+   * writes its `liveValues` rate here each control block, before `advance`.
+   * Without a lane or a step it is the patch's own rate, the same number, so
+   * the phase steps as it always has.
    */
-  rateMul: number;
+  rate: number;
 
   /** `seed` is a non-zero xorshift32 state: `randomSeed32`, or `secondLfoSeed` of another LFO's. */
   constructor(seed: number) {
     // Rule 7: each double field is born a double (NaN), before its start
     // value; the seed is a uint32, past a small integer's range.
     this.phase = this.value = this.held = this.target = this.fade = NaN;
-    this.seed = this.output = this.draw = this.rateMul = NaN;
+    this.seed = this.output = this.draw = this.rate = NaN;
     this.phase = 0;
     this.value = 0;
     this.held = 0;
@@ -56,7 +59,7 @@ class Lfo {
     this.seed = seed;
     this.output = 0;
     this.draw = 0;
-    this.rateMul = 1;
+    this.rate = 0;
   }
 
   /** The next draw, 0..1, into `draw`. */
@@ -86,10 +89,11 @@ class Lfo {
    * phase stops at 1 and holds there, so it never wraps and every shape holds
    * its end value (#55); `start` resets it at note-on. Unipolar remaps the
    * shape's -1..1 to 0..1 before the fade, so the fade-in scales up from 0.
+   * The phase steps at `rate`, not `p.rate`: the caller writes it first.
    */
   advance(p: LfoSettings, n: number, sampleRate: number): void {
     const prev = this.phase;
-    this.phase += (p.rate * this.rateMul * n) / sampleRate;
+    this.phase += (this.rate * n) / sampleRate;
     let wrapped = false;
     if (this.phase >= 1) {
       if (p.oneShot) {

@@ -18,9 +18,13 @@ import { loadProcessor } from '../__fixtures__/workletHarness';
 import { catalogRow } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { ST_DECAY } from '../worklet/fm/envelope';
-import { STEP_MOD_PARAMS, STEP_MOD_SLOT_COUNT, STEP_MOD_TABLE } from '../worklet/fm/stepModTables';
-import type { StepModParam } from '../worklet/fm/stepModTables';
-import { stepModValue } from '../worklet/fm/stepModValue';
+import {
+  VOICE_TARGET_PATHS,
+  VOICE_TARGET_COUNT,
+  VOICE_TARGET_TABLE,
+} from '../worklet/fm/voiceTargetTables';
+import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
+import { stepModValue } from '../worklet/fm/voiceTargetValue';
 import { voiceSlotParamName } from './audioPart';
 import { voiceOffset } from './voiceAutomation';
 
@@ -63,18 +67,18 @@ const REBASED: Patch = (() => {
 const curveOffset = (patch: Patch, path: string, i: number): number =>
   voiceOffset(patch, path, catalogRow(`voice.${path}`)!, -MONO.ops[i]!.env.decayCurve);
 
-function stepMod(param: StepModParam, value: number): number[] {
-  const out = new Array<number>(STEP_MOD_SLOT_COUNT).fill(0);
-  out[STEP_MOD_PARAMS.indexOf(param)] = value;
+function stepMod(param: VoiceTargetPath, value: number): number[] {
+  const out = new Array<number>(VOICE_TARGET_COUNT).fill(0);
+  out[VOICE_TARGET_PATHS.indexOf(param)] = value;
   return out;
 }
 
 /** A step pushing every curve, which a slide keeps (`slideKeeps`), the slide's own ignored. */
 const curveSteps = (value: number): number[] =>
   CURVES.reduce((out, path) => {
-    out[STEP_MOD_PARAMS.indexOf(path as StepModParam)] = value;
+    out[VOICE_TARGET_PATHS.indexOf(path as VoiceTargetPath)] = value;
     return out;
-  }, new Array<number>(STEP_MOD_SLOT_COUNT).fill(0));
+  }, new Array<number>(VOICE_TARGET_COUNT).fill(0));
 
 interface EnvView {
   state: number;
@@ -98,7 +102,6 @@ const freshParams = (): Record<string, Float32Array> => {
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   for (let i = 0; i < SLOTS; i++) params[voiceSlotParamName(i)] = new Float32Array([0]);
@@ -198,7 +201,7 @@ function decayPlayed(path: string, lane: number, push: number): number {
   params.voiceSlot0![0] = voiceOffset(ZEROED, path, catalogRow(`voice.${path}`)!, lane);
   const left = new Float32Array(CTRL);
   const right = new Float32Array(CTRL);
-  const step = stepMod(path as StepModParam, push);
+  const step = stepMod(path as VoiceTargetPath, push);
   processor.inbox({ type: 'noteOn', id: 1, note: NOTE, velocity: 1, frame: 0, stepMod: step });
   for (let b = 0; b < 2; b++) {
     loaded.setFrame(b * CTRL);
@@ -215,7 +218,7 @@ function decayPlayed(path: string, lane: number, push: number): number {
 describe("a step's decay push over a decay lane on a zero-decay patch (windsor#405)", () => {
   const LANE = 0.5;
   it.each(DECAY_TIMES.map((path) => [path]))('%s stacks the step on the lane’s value', (path) => {
-    const row = STEP_MOD_TABLE[STEP_MOD_PARAMS.indexOf(path as StepModParam)]!;
+    const row = VOICE_TARGET_TABLE[VOICE_TARGET_PATHS.indexOf(path as VoiceTargetPath)]!;
     const alone = decayPlayed(path, LANE, 0);
     const offset = Math.fround(voiceOffset(ZEROED, path, catalogRow(`voice.${path}`)!, LANE));
     expect(alone).toBe(0.001 * Math.pow(2, offset));
@@ -233,11 +236,11 @@ describe("a step's decay push over a decay lane on a zero-decay patch (windsor#4
 
   it.each(DECAY_TIMES.map((path) => [path]))('%s without a lane plays the step alone', (path) => {
     const processor = loaded.create(ZEROED, 4);
-    const row = STEP_MOD_TABLE[STEP_MOD_PARAMS.indexOf(path as StepModParam)]!;
+    const row = VOICE_TARGET_TABLE[VOICE_TARGET_PATHS.indexOf(path as VoiceTargetPath)]!;
     const params = freshParams();
     const left = new Float32Array(CTRL);
     const right = new Float32Array(CTRL);
-    const step = stepMod(path as StepModParam, 0.25);
+    const step = stepMod(path as VoiceTargetPath, 0.25);
     processor.inbox({ type: 'noteOn', id: 1, note: NOTE, velocity: 1, frame: 0, stepMod: step });
     processor.process([], [[left, right]], params);
     const voice = processor.voices.find((v) => v.active) as unknown as {

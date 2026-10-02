@@ -6,12 +6,12 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { GridSpec, GridStep, StepModLane, StepModParam } from '@windsor/engine';
+import type { GridSpec, GridStep, StepModLane, VoiceTargetPath } from '@windsor/engine';
 import {
   ARRANGEMENT_VERSION,
   gridNote,
   STEP_MOD_LANES_MAX,
-  STEP_MOD_PARAMS,
+  VOICE_TARGET_PATHS,
   partAt,
 } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
@@ -45,7 +45,7 @@ describe('adding and removing lanes', () => {
     const lanes = addLane([], 'filter.cutoff', 16);
     expect(lanes).toEqual([lane('filter.cutoff', new Array<number>(16).fill(0))]);
     expect(freeParams(lanes!)).not.toContain('filter.cutoff');
-    expect(freeParams(lanes!)).toHaveLength(STEP_MOD_PARAMS.length - 1);
+    expect(freeParams(lanes!)).toHaveLength(VOICE_TARGET_PATHS.length - 1);
   });
 
   it('refuses the same parameter twice', () => {
@@ -55,12 +55,12 @@ describe('adding and removing lanes', () => {
 
   it('enforces the engine limit', () => {
     let lanes: StepModLane[] = [];
-    for (const param of STEP_MOD_PARAMS.slice(0, STEP_MOD_LANES_MAX)) {
+    for (const param of VOICE_TARGET_PATHS.slice(0, STEP_MOD_LANES_MAX)) {
       lanes = addLane(lanes, param, 2)!;
     }
     expect(lanes).toHaveLength(STEP_MOD_LANES_MAX);
     expect(canAddLane(lanes)).toBe(false);
-    expect(addLane(lanes, STEP_MOD_PARAMS[STEP_MOD_LANES_MAX]!, 2)).toBeNull();
+    expect(addLane(lanes, VOICE_TARGET_PATHS[STEP_MOD_LANES_MAX]!, 2)).toBeNull();
   });
 
   it('removes a lane and lets it be re-added, empty', () => {
@@ -140,8 +140,8 @@ describe('the readout', () => {
     expect(laneReadout('filter.envAmount', -0.35, 0)).toBe('-2.10 → -2.10');
   });
 
-  it('reads a log row as the lane value', () => {
-    expect(laneReadout('ops.0.env.decayTime', 0.35, undefined)).toBe('+0.35');
+  it('reads a decay time, a ratio row, in octaves (windsor#419)', () => {
+    expect(laneReadout('ops.0.env.decayTime', 0.35, undefined)).toBe('+2.5 oct');
   });
 
   it('shows the patch value itself at 0', () => {
@@ -149,8 +149,16 @@ describe('the readout', () => {
   });
 
   it('labels an offset for every curve', () => {
-    const row = { param: 'filter.cutoff', curve: 'octaves', span: 4, min: 1, max: 2 } as const;
-    expect(offsetLabel({ ...row, slideKeeps: false }, 0.25)).toBe('+1.0 oct');
+    const row = {
+      path: 'filter.cutoff' as const,
+      span: 4,
+      min: 1,
+      max: 2,
+      floor: 0,
+      slideKeeps: false,
+    };
+    expect(offsetLabel({ ...row, curve: 'ratio' }, 0.25)).toBe('+1.0 oct');
+    expect(offsetLabel({ ...row, curve: 'add' }, 0.25)).toBe('+1.00');
   });
 });
 
@@ -220,7 +228,12 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
   const KEY = { root: 0, scale: 'naturalMinor' } as const;
   const slide = (degree: number): GridStep => gridNote(degree, { slide: true });
   const line = [gridNote(0), slide(2), slide(2), gridNote(4)];
-  const hold = (steps: GridStep[], index: number, param: StepModParam, skipChance = 0): LaneHold =>
+  const hold = (
+    steps: GridStep[],
+    index: number,
+    param: VoiceTargetPath,
+    skipChance = 0,
+  ): LaneHold =>
     heldBySlide(slideAt({ steps, length: steps.length, skipChance }, index, KEY), param);
 
   it('holds feedback on a slide to a new pitch, but not the cutoff on the same step', () => {
@@ -231,12 +244,12 @@ describe('a slide holds what the voice keeps (windsor#31)', () => {
   });
 
   it('holds every lane on a slide to the held pitch, which sends no note-on', () => {
-    for (const param of STEP_MOD_PARAMS) expect(hold(line, 2, param), param).toBe('held');
+    for (const param of VOICE_TARGET_PATHS) expect(hold(line, 2, param), param).toBe('held');
   });
 
   it('never holds a step without a slide', () => {
     for (const index of [0, 3]) {
-      for (const param of STEP_MOD_PARAMS) expect(hold(line, index, param), param).toBe('plays');
+      for (const param of VOICE_TARGET_PATHS) expect(hold(line, index, param), param).toBe('plays');
     }
   });
 

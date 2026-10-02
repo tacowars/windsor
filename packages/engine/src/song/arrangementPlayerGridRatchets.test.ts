@@ -15,7 +15,7 @@ import type { Arrangement, GridSpec, PartRegion, Transport } from './arrangement
 import { SECONDS_PER_MINUTE } from '../audioConstants';
 import { gridNote, type GridStep } from '../sequencing/gridSequencer';
 import { DIVISORS, PPQ } from '../sequencing/scheduler';
-import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 
 const BPM = 120;
 const TICK = SECONDS_PER_MINUTE / BPM / PPQ;
@@ -111,8 +111,8 @@ describe('Grid ratchets through the player (windsor#366)', () => {
     const lanes = [{ param: 'filter.cutoff' as const, values: [0.5, 0] }];
     const grid = { lanes, accentVelocity: 0.2, accentMod: 0.5 };
     const calls = play(song([gridNote(0, { accent: true, ratchet: 4 }), REST], { grid }));
-    const stepMod = new Array<number>(STEP_MOD_PARAMS.length).fill(0);
-    stepMod[STEP_MOD_PARAMS.indexOf('filter.cutoff')] = 0.5;
+    const stepMod = new Array<number>(VOICE_TARGET_PATHS.length).fill(0);
+    stepMod[VOICE_TARGET_PATHS.indexOf('filter.cutoff')] = 0.5;
     const roll = sounding(calls).filter(inStep(0));
     expect(roll).toHaveLength(4);
     for (const hit of roll) {

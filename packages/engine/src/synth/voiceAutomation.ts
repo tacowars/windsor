@@ -5,18 +5,18 @@
  * moving every ringing voice and every new one.
  *
  * The lane holds absolute values; the worklet takes offsets from the patch's
- * value, so an offset of 0 leaves it bit for bit as it was:
- * - the cutoff's lane writes octaves, `log2(value / patch)`, to the part's
- *   `cutoffMod`, which nothing else writes;
- * - the LFO rates' and the decay times' lanes write the same log2 ratio to a
- *   slot. A decay time's knob ends on exact 0, which no ratio scales, so
- *   both its ends are taken from the row's `floor` (1 ms) where they are
- *   below it, as the worklet takes its base (windsor#347): a lane at 0
- *   plays 1 ms. Over a patch decay below the floor, a lane at or below it
+ * value, so an offset of 0 leaves it bit for bit as it was. How an offset is
+ * reckoned is the target's row in the voice target table (windsor#419,
+ * `worklet/fm/voiceTargetTables.ts`), the one the worklet applies it by:
+ * - a `ratio` row's lane (the cutoff, the LFO rates, the decay times) writes
+ *   octaves, `log2(value / patch)`, to a slot. A decay time's knob ends on
+ *   exact 0, which no ratio scales, so both its ends are taken from the
+ *   row's `floor` (1 ms) where they are below it, as the worklet takes its
+ *   base (windsor#347): a lane at 0 plays 1 ms. Over a patch decay below the floor, a lane at or below it
  *   is offset 0, and the worklet plays the floor for any decay time a slot
  *   maps (`partFloors` in `worklet/fm/voiceOffsets.ts`), while the same
  *   decay with no lane stays instant;
- * - every other lane writes `value − patch` to a slot.
+ * - an `add` row's lane writes `value − patch` to a slot.
  *
  * A slot is one of the part's `FM_LANES_MAX` k-rate parameters, taken by a
  * lane's first hold or schedule (`AudioPart.takeVoiceSlot`, which tells the
@@ -36,6 +36,7 @@ import type { AutomationHandle, AutomationHow } from '../automation/automationHa
 import type { AutomationTargetRow } from '../automation/automationLane';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { Patch } from '../patch/patch';
+import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
 import type { AudioPart } from './audioPart';
 
 /** Which voice field a lane moves: its patch path. */
@@ -43,14 +44,11 @@ export interface VoiceTarget {
   readonly path: string;
 }
 
-/** The cutoff's lane moves the part's `cutoffMod`, in octaves, rather than a slot. */
-const CUTOFF_PATH = 'filter.cutoff';
-
-/** The rows whose offset is a log2 ratio of the patch's value (decision 2 of windsor#346). */
-const RATIO_PATHS: ReadonlySet<string> = new Set([CUTOFF_PATH, 'lfo.rate', 'lfo2.rate']);
-
-/** The decay times' rows, a log2 ratio too (windsor#347 decision 3). */
-const DECAY_TIME_PATH = /\.decayTime$/;
+/** Each target's curve and ratio floor, by path: the rows the worklet applies an offset by. */
+const TARGET_ROWS: ReadonlyMap<string, { readonly ratio: boolean; readonly floor: number }> =
+  new Map(
+    VOICE_TARGET_TABLE.map((row) => [row.path, { ratio: row.curve === 'ratio', floor: row.floor }]),
+  );
 
 /** The number at `path` in `patch`, or NaN when there is none. */
 function patchValue(patch: Patch, path: string): number {
@@ -64,8 +62,9 @@ function patchValue(patch: Patch, path: string): number {
 /**
  * The offset that makes `value`, a lane value in the row's units, sound over
  * `patch`: its difference from the patch's value, or for a ratio row the
- * log2 of their ratio, each end raised to the row's `floor` where it has
- * one. 0 where the patch has no positive value to scale.
+ * log2 of their ratio, each end raised to the target row's `floor` where it
+ * has one. 0 where the patch has no positive value to scale, or for a path
+ * the table does not carry.
  */
 export function voiceOffset(
   patch: Patch,
@@ -74,10 +73,11 @@ export function voiceOffset(
   value: number,
 ): number {
   const base = patchValue(patch, path);
+  const target = TARGET_ROWS.get(path);
   const clamped = value < row.min ? row.min : value > row.max ? row.max : value;
-  if (!Number.isFinite(base) || !Number.isFinite(clamped)) return 0;
-  if (!RATIO_PATHS.has(path) && !DECAY_TIME_PATH.test(path)) return clamped - base;
-  const floor = row.floor ?? 0;
+  if (!target || !Number.isFinite(base) || !Number.isFinite(clamped)) return 0;
+  if (!target.ratio) return clamped - base;
+  const { floor } = target;
   const from = base < floor ? floor : base;
   const to = clamped < floor ? floor : clamped;
   return from > 0 && to > 0 ? Math.log2(to / from) : 0;
@@ -132,11 +132,6 @@ function slotTarget(part: AudioPart, path: string): OffsetTarget {
   };
 }
 
-/** The part's `cutoffMod`, which the cutoff's lane alone writes. */
-function cutoffTarget(part: AudioPart): OffsetTarget {
-  return { take: () => part.cutoffMod, held: () => part.cutoffMod, free: () => undefined };
-}
-
 /**
  * Each part's handles by patch path, so finding a lane's target again (a
  * resync) hands the player the handle it already holds, not a new one it
@@ -158,8 +153,7 @@ export function voiceAutomationHandle(
   const known = byPath.get(path);
   if (known) return known;
   const offsetOf = (value: number): number => voiceOffset(part.patch, path, row, value);
-  const where = path === CUTOFF_PATH ? cutoffTarget(part) : slotTarget(part, path);
-  const handle = offsetHandle(where, offsetOf);
+  const handle = offsetHandle(slotTarget(part, path), offsetOf);
   byPath.set(path, handle);
   return handle;
 }

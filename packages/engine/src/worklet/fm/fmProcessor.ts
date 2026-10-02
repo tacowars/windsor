@@ -33,14 +33,14 @@ import { LoadSampler } from '../loadSampler';
 import type { Voice } from './voice';
 import { allocateVoice } from './voiceAllocation';
 import { buildVoicePool } from './voiceSteal';
-import { PART_BEND, PART_CONTROL_COUNT, PART_CUTOFF_MOD, PART_WHEEL } from './voiceControl';
+import { PART_BEND, PART_CONTROL_COUNT, PART_WHEEL } from './voiceControl';
 import {
-  CUTOFF_MOD_RANGE,
   VOICE_SLOT_COUNT,
   VOICE_SLOT_PARAMS,
-  VOICE_TARGET_COUNT,
-} from './voiceOffsetTables';
-import { latchVoiceOffsets, mapVoiceSlots } from './voiceOffsets';
+  latchVoiceOffsets,
+  mapVoiceSlots,
+} from './voiceOffsets';
+import { VOICE_TARGET_COUNT } from './voiceTargetTables';
 import { WAVE } from './waveIds';
 import { getMips } from './waveTables';
 
@@ -91,8 +91,6 @@ class FmPartProcessor extends AudioWorkletProcessor {
     return [
       { name: 'pitchBend', defaultValue: 0, minValue: -48, maxValue: 48, automationRate: 'k-rate' },
       { name: 'modWheel', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      // The cutoff lane's octaves span the catalog's whole cutoff ratio (windsor#346).
-      { name: 'cutoffMod', defaultValue: 0, ...CUTOFF_MOD_RANGE, automationRate: 'k-rate' },
       { name: 'gain', defaultValue: 1, minValue: 0, maxValue: 4, automationRate: 'k-rate' },
       // The song lanes' slots (windsor#346, `voiceOffsets.ts`): each an offset
       // on the target the slot map gives it, 0 for none. No declared range,
@@ -412,7 +410,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * This quantum's bend, wheel and cutoff into `partControls`, and the song
+   * This quantum's bend and wheel into `partControls`, and the song
    * lanes' slots into `partOffsets` while any is mapped (windsor#346), where
    * every voice's control update reads them. Passed to the update as
    * arguments, each was a new heap number wherever V8 did not inline it
@@ -422,7 +420,6 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const controls = this.partControls;
     controls[PART_BEND] = params.pitchBend[0];
     controls[PART_WHEEL] = params.modWheel[0];
-    controls[PART_CUTOFF_MOD] = params.cutoffMod[0];
     if (this.slotsMapped) latchVoiceOffsets(this.partOffsets, this.slotTargets, params);
   }
 
