@@ -33,7 +33,10 @@ grouped by genre, with a place for templates. Storage stays in the browser.
    searches by name and sorts by last edited, name or created.
 4. **Templates are songs tagged `template`.** Their row action is **New
    from**, which opens a copy as a new untitled song. The template itself
-   is never written by that copy.
+   is never written by that copy. The copy's `meta` drops the name and the
+   `template` tag and keeps the other tags, so a template tagged
+   `template, techno` starts an untitled song tagged `techno`. The strip
+   shows it as "Untitled — from <template>".
 5. **A reload with a named song open reopens it straight away**, with a
    toast saying so, because nothing in it is at risk. An untitled song still
    asks before it restores.
@@ -93,7 +96,15 @@ Version 2 is additive: `patches` and `songs` are untouched.
   keeps its edits open and says: "This song was changed in another tab —
   Save as copy… to keep these edits." The first save wins, and nothing is
   overwritten silently. Single-writer locks were rejected because a
-  forgotten tab would block the song.
+  forgotten tab would block the song. Deleting a song checks its revision
+  the same way, in the delete's own transaction, and a stale tab's delete
+  is refused with the same words.
+- **Known limitation: untitled work across tabs** (tacowars, 2026-10-02).
+  `songs/current` is one record for the whole browser. A tab that switches
+  to a named song overwrites it, so untitled work autosaved there by
+  another tab can't be restored once that tab closes. A slot per tab was
+  considered and deferred. Name a song with Save as… before working on it
+  in two tabs.
 - **The index is derived.** One pure function reads the document's
   declared `version`, plus `name`, `tags`, `bpm`, `meter` (absent is 4/4), `bars` and `key`, from the
   document text at each write. Only `id`,
