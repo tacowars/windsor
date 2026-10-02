@@ -2,7 +2,7 @@
  * The Song view's automation lanes, as data (windsor#348; record
  * `2026-10-01-song-automation-lanes` decision 13): the curve's drawing
  * tunables, the lane toolbar's tools and Snap choices and the gestures'
- * px (windsor#349), the colour of each kind of target, the picker's voice groups,
+ * px (windsor#349, Shape from windsor#350), the colour of each kind of target, the picker's voice groups,
  * the readout's number rules and the reasons an insert field is inactive.
  * The rules over them are `songAutomationModel.ts`; the DOM is
  * `songAutomationLane.ts`. The lane's height is the Song view's
@@ -30,8 +30,8 @@ export const AUTOMATION_DRAWING: AutomationDrawing = {
   coordDecimals: 1,
 };
 
-/** The lane toolbar's tools (windsor#349 decision 1). windsor#350 adds Shape. */
-export type AutomationTool = 'edit' | 'draw';
+/** The lane toolbar's tools (windsor#349 decision 1, and Shape from windsor#350 decision 1). */
+export type AutomationTool = 'edit' | 'draw' | 'shape';
 
 export interface AutomationToolEntry {
   readonly tool: AutomationTool;
@@ -54,6 +54,12 @@ export const AUTOMATION_TOOLS: readonly AutomationToolEntry[] = [
     label: 'Draw',
     key: 'd',
     hint: 'Drag across a lane to draw. Points land on the snap grid; Off draws at 1/32.',
+  },
+  {
+    tool: 'shape',
+    label: 'Shape',
+    key: 's',
+    hint: 'Drag across a lane to select a range, then pick a shape. The dashed line previews it; Apply writes ordinary points you can edit afterwards.',
   },
 ];
 

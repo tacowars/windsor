@@ -251,8 +251,11 @@ export const automationChange = (slot: number, lanes: AutomationLane[]): Documen
 });
 
 /** A number signed: "+3.0", "-1.5". */
-const signed = (value: number, decimals: number): string =>
-  `${value >= 0 ? '+' : ''}${value.toFixed(decimals)}`;
+/** `value` with its sign, a value that rounds to zero as +0 (never "-0.0"). */
+const signed = (value: number, decimals: number): string => {
+  const shown = Number(value.toFixed(decimals)) || 0;
+  return `${shown >= 0 ? '+' : ''}${shown.toFixed(decimals)}`;
+};
 
 /** A plain number with fewer decimals as it grows. */
 function plain(value: number, n: ReadoutNumbers): string {
