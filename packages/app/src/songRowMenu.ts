@@ -64,6 +64,23 @@ function menuButton(item: MenuItem, act: () => void): HTMLElement {
 /** True while a row's menu is open: the clock's redraw waits rather than close it. */
 export const rowMenuOpen = (): boolean => closeOpenMenu !== null;
 
+/**
+ * Redraw `scope` without losing a focused ⋯ button: a redraw (the clock's
+ * tick, or the list after Rename… or Edit tags…) replaces every row, so the
+ * focus moves to the same song's new ⋯ button rather than to the page.
+ */
+export function keepRowFocus(scope: HTMLElement, redraw: () => void): void {
+  const active = document.activeElement;
+  const id =
+    active instanceof HTMLElement && scope.contains(active) ? active.dataset.songId : undefined;
+  redraw();
+  if (id === undefined) return;
+  const again = [...scope.querySelectorAll<HTMLElement>('[data-song-id]')].find(
+    (node) => node.dataset.songId === id,
+  );
+  again?.focus();
+}
+
 /** Place the menu under `more`, its right edge on the button's, in the viewport. */
 function place(menu: HTMLElement, more: HTMLElement): void {
   const rect = more.getBoundingClientRect();
@@ -82,6 +99,7 @@ export function rowMenuButton(row: SongRow, actions: RowActions): HTMLElement {
   more.setAttribute('aria-label', `More for ${row.name}`);
   more.setAttribute('aria-haspopup', 'menu');
   more.setAttribute('aria-expanded', 'false');
+  more.dataset.songId = row.id;
   more.onclick = (event): void => {
     event.stopPropagation();
     const wasOpen = more.getAttribute('aria-expanded') === 'true';

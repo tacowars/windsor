@@ -7,7 +7,7 @@
  */
 import type { AppCtx } from './context';
 import { el } from './dom';
-import { openConfirm } from './metadataModal';
+import { openConfirm, showTrapped } from './metadataModal';
 import { addTags, isTemplate } from './songListModel';
 
 /** What the name-and-tags dialog asks: a field is shown only when it is given. */
@@ -19,6 +19,11 @@ export interface SongMetaRequest {
   /** The tags offered under the field, given the ones chosen so far. */
   readonly suggest?: (chosen: readonly string[]) => string[];
   readonly hint?: string;
+  /**
+   * Where focus returns on close. A row menu passes the row's ⋯ button, since
+   * the menu item that was clicked is gone by the time the dialog closes.
+   */
+  readonly opener?: HTMLElement | null;
 }
 
 export interface SongMetaAnswer {
@@ -156,11 +161,9 @@ export function openSongMeta(request: SongMetaRequest): Promise<SongMetaAnswer |
     if (named()) answer = { name: name.value.trim(), tags: [...tags] };
   };
   cancel.onclick = (): void => dialog.close();
-  return new Promise((resolve) => {
-    dialog.addEventListener('close', () => resolve(answer), { once: true });
-    dialog.showModal();
-    (request.name !== undefined ? name : (form.querySelector('input') ?? ok)).focus();
-  });
+  const shown = showTrapped(dialog, request.opener ?? null);
+  (request.name !== undefined ? name : (form.querySelector('input') ?? ok)).focus();
+  return shown.then(() => answer);
 }
 
 /** Delete asks first, in the mockup's words; the OK button is drawn as a danger. */

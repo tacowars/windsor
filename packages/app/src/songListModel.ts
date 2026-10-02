@@ -243,7 +243,16 @@ export function tagSuggestions(
   return [...tagsInUse(entries), TEMPLATE_TAG].filter((tag) => !chosen.includes(tag));
 }
 
-/** The tags Save as… starts with: the song's own, plus the tag filter that is on. */
-export function initialTags(tags: readonly string[], filter: SongFilter): string[] {
-  return filter.kind === 'tag' ? addTags(tags, filter.tag) : [...tags];
+/**
+ * The tags Save as… starts with: the song's own, plus the tag filter that is
+ * on. The filter goes through `activeFilter` first, so a tag no song carries
+ * any more (its chip gone, `all` lit) is never preselected.
+ */
+export function initialTags(
+  tags: readonly string[],
+  entries: readonly SongListEntry[],
+  filter: SongFilter,
+): string[] {
+  const active = activeFilter(entries, filter);
+  return active.kind === 'tag' ? addTags(tags, active.tag) : [...tags];
 }

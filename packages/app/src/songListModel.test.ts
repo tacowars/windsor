@@ -270,11 +270,20 @@ describe('tags in Save as…', () => {
   });
 
   it('preselects the tag filter that is on', () => {
-    expect(initialTags(['acid'], tag('techno'))).toEqual(['acid', 'techno']);
-    expect(initialTags(['acid'], tag('acid'))).toEqual(['acid']);
-    expect(initialTags([], tag('template'))).toEqual(['template']);
-    expect(initialTags(['acid'], ALL_SONGS)).toEqual(['acid']);
-    expect(initialTags(['acid'], { kind: 'untagged' })).toEqual(['acid']);
+    expect(initialTags(['acid'], SONGS, tag('techno'))).toEqual(['acid', 'techno']);
+    expect(initialTags(['acid'], SONGS, tag('acid'))).toEqual(['acid']);
+    expect(initialTags([], SONGS, tag('template'))).toEqual(['template']);
+    expect(initialTags(['acid'], SONGS, ALL_SONGS)).toEqual(['acid']);
+    expect(initialTags(['acid'], SONGS, { kind: 'untagged' })).toEqual(['acid']);
+  });
+
+  it('never preselects a tag the last song carrying it has lost', () => {
+    // The filter still names `house`, but no song carries it: the chips fall
+    // back to `all`, and Save as… must not quietly bring the tag back.
+    const stale = tag('house');
+    expect(activeFilter(SONGS, stale)).toEqual(ALL_SONGS);
+    expect(initialTags(['acid'], SONGS, stale)).toEqual(['acid']);
+    expect(initialTags([], SONGS, stale)).toEqual([]);
   });
 
   it('adds typed tags trimmed, lowercased, once each, a comma parting several', () => {

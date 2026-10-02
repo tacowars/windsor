@@ -20,8 +20,12 @@ const patchControls = (): HTMLElement | null =>
 
 const focusReturn = new FocusReturn<HTMLElement>(patchControls);
 
-/** Open a dialog with the trap installed; resolves when it closes. */
-function showTrapped(dialog: HTMLDialogElement, opener: HTMLElement | null): Promise<void> {
+/**
+ * Open a dialog with the trap installed; resolves when it closes. Every modal
+ * in the console opens through here, so Tab wraps inside it and closing
+ * returns focus to `opener` (else the element that had focus).
+ */
+export function showTrapped(dialog: HTMLDialogElement, opener: HTMLElement | null): Promise<void> {
   focusReturn.open(opener ?? (document.activeElement as HTMLElement | null));
   const onKey = (event: KeyboardEvent): void => {
     if (event.key !== 'Tab') return;

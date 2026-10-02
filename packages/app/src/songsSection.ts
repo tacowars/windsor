@@ -35,7 +35,7 @@ import { copyName } from './songSessionStored';
 import { downloadSong } from './songDownload';
 import { confirmDelete, confirmLeave, openSongMeta } from './songsDialogs';
 import type { RowActions } from './songRowMenu';
-import { rowMenuOpen } from './songRowMenu';
+import { keepRowFocus, rowMenuOpen } from './songRowMenu';
 import { openSongStrip } from './songsStrip';
 import { songsTable } from './songsTable';
 
@@ -88,7 +88,7 @@ function saveDialog(ctx: AppCtx, lib: Library, copy: boolean): void {
     title: 'Save to your songs',
     ok: 'Save',
     name: copy ? copyName(meta.name) : meta.name,
-    tags: initialTags(meta.tags, lib.view.filter),
+    tags: initialTags(meta.tags, liveEntries(ctx, lib), lib.view.filter),
     suggest: (chosen) => tagSuggestions(lib.entries, chosen),
     hint: 'From now on it saves itself as you work.',
   }).then(async (answer) => {
@@ -109,15 +109,16 @@ function rowActions(ctx: AppCtx, lib: Library): RowActions {
   return {
     open: (row, opener) => leaveFor(ctx, opener, () => ctx.songs.open(row.id)),
     newFrom: (row, opener) => leaveFor(ctx, opener, () => ctx.songs.newFrom(row.id)),
-    rename: (row) =>
-      void openSongMeta({ title: 'Rename song', ok: 'Rename', name: row.name }).then(
+    rename: (row, opener) =>
+      void openSongMeta({ title: 'Rename song', ok: 'Rename', name: row.name, opener }).then(
         (answer) => answer && ctx.songs.rename(row.id, answer.name),
       ),
-    editTags: (row) =>
+    editTags: (row, opener) =>
       void openSongMeta({
         title: 'Edit tags',
         ok: 'Save',
         tags: row.tags,
+        opener,
         suggest: (chosen) => tagSuggestions(lib.entries, chosen),
       }).then((answer) => answer && ctx.songs.setTags(row.id, answer.tags)),
     duplicate: (row) =>
@@ -212,7 +213,7 @@ function librarySection(
     const list = songList(entries, lib.view, { openId: openId(ctx), now: new Date() });
     chips.replaceChildren(...chipButtons(entries, lib.view, paint));
     count.textContent = `${list.shown} of ${list.total}`;
-    table.replaceChildren(songsTable(list, actions));
+    keepRowFocus(table, () => table.replaceChildren(songsTable(list, actions)));
     table.classList.toggle('bare', list.total === 0);
   };
   const filters = el('div', 'filters');

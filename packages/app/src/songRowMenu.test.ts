@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SongRow } from './songListModel';
+import type { RowActions } from './songRowMenu';
 import { menuItems } from './songRowMenu';
 
 const row = (over: Partial<SongRow> = {}): SongRow => ({
@@ -43,5 +44,31 @@ describe('a row menu', () => {
       'Export .json',
       'Delete…',
     ]);
+  });
+});
+
+describe('a row menu item that opens a dialog', () => {
+  it('hands the dialog the row’s ⋯ button as its opener, since the item itself is removed', () => {
+    const more = { label: '⋯' } as unknown as HTMLElement;
+    const seen: Record<string, HTMLElement | undefined> = {};
+    const record =
+      (name: string) =>
+      (_row: SongRow, opener?: HTMLElement): void => {
+        seen[name] = opener;
+      };
+    const actions: RowActions = {
+      open: record('open'),
+      newFrom: record('newFrom'),
+      rename: record('rename'),
+      editTags: record('editTags'),
+      duplicate: record('duplicate'),
+      exportJson: record('exportJson'),
+      remove: record('remove'),
+    };
+    const { items, danger } = menuItems(row());
+    for (const item of [...items, danger]) item.run(actions, row(), more);
+    expect(seen.rename).toBe(more);
+    expect(seen.editTags).toBe(more);
+    expect(seen.remove).toBe(more);
   });
 });
