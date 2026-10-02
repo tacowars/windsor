@@ -245,7 +245,21 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
 
   // ── The pattern in the screenshot ───────────────────────────
   const k = () => Math.max(1, Math.round((5 * state.steps) / 16));
-  const hit = (i) => ((i * k()) % state.steps) < k();
+  // Bjorklund, as the engine's euclid(k, n): E(5,16) = x..x..x..x..x...
+  function figure(kk, n) {
+    let a = Array.from({ length: kk }, () => [true]);
+    let b = Array.from({ length: n - kk }, () => [false]);
+    while (b.length > 1) {
+      const pairs = Math.min(a.length, b.length);
+      const merged = [];
+      for (let i = 0; i < pairs; i++) merged.push([...a[i], ...b[i]]);
+      const rest = a.length > b.length ? a.slice(pairs) : b.slice(pairs);
+      a = merged;
+      b = rest;
+    }
+    return [...a, ...b].flat();
+  }
+  const hit = (i) => figure(k(), state.steps)[i] === true;
   const RAT = { 0: 2, 3: 3, 6: 4, 9: 2, 19: 3, 25: 2 };
   const LANES = [
     { name: 'Cutoff', read: '', v: [-0.05, 0.25, 0.45, 0.6, 0.55] },
@@ -262,11 +276,11 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
     if (state.view === 'own') {
       return lane.v.map((v, i) => `<div class="ecell mcell${beat(i)}">${bar(v)}</div>`).join('') + `<span class="loop">↺ ${lane.v.length}</span>`;
     }
-    let n = 0; // under the hits: the lane advances only when a hit sounds
+    // under the hits, as euclidLaneView.ts: cell i shows lane step (pass × steps + i) mod length,
+    // a notch where the lane starts over, and the cells over a rest dimmed (pass 0 here)
     return Array.from({ length: state.steps }, (_, i) => {
-      if (!hit(i)) return `<div class="ecell mcell idle${beat(i)}"></div>`;
-      const at = n++ % lane.v.length;
-      return `<div class="ecell mcell${at === 0 && n > 1 ? ' wrap' : ''}${beat(i)}" title="${lane.name} step ${at + 1}">${bar(lane.v[at])}</div>`;
+      const at = i % lane.v.length;
+      return `<div class="ecell mcell${hit(i) ? '' : ' idle'}${i > 0 && at === 0 ? ' wrap' : ''}${beat(i)}" title="${lane.name} step ${at + 1}">${bar(lane.v[at])}</div>`;
     }).join('');
   }
   function laneName(l) {
@@ -289,7 +303,11 @@ button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
       <div class="erow"><div class="addlane">${select('+ Lane')}</div><div class="rule"></div><span class="meas">${lanes.length} of 4 lanes</span></div>
     </div>`;
     const rows = lanes.map((l) => `<div class="erow">${laneName(l)}${laneCells(l)}</div>`).join('');
-    const cycle = lanes.some((l) => state.steps % l.v.length) ? 'rows line up every 5 bars' : 'rows line up every bar';
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    const span = lanes.reduce((m, l) => (m * l.v.length) / gcd(m, l.v.length), state.steps);
+    const bars = span / 16;
+    const every = bars === 1 ? 'bar' : Number.isInteger(bars) ? `${bars} bars` : `${span} steps`;
+    const cycle = `rows line up every ${every}${Number.isInteger(bars) ? ` (${span} steps)` : ''}`;
     return `${controls}<div class="section grow"><div class="sec-label">Rows <em>${cycle}</em></div><div class="sec-body"><div class="scroller" id="scroller">${head}<div class="erows" style="display:flex;flex-direction:column;gap:2px">${rows}</div></div></div></div>`;
   }
 
