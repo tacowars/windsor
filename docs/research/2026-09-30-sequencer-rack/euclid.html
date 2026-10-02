@@ -1,0 +1,364 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windsor Euclid Device</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* The Euclid card (#356) fitted to the 244 px sequencer device: today's pages, rows and cells in the Grid device's frame. Single theme on purpose: Windsor's dark console tokens. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --kc: var(--carrier);
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --seq-h: 244px;
+  --cell-w: 22px;
+  --names-w: 104px;
+  --lane-h: 42px;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 13px/1.5 var(--f-ui); padding-block: 20px 48px; padding-inline: 16px; margin: 0; }
+.wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+h1 { font: 600 17px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; margin: 0; }
+p { margin: 0; max-width: 78ch; color: var(--ink-dim); }
+.lede { display: flex; flex-direction: column; gap: 6px; }
+.meas { font: 10px var(--f-num); color: var(--ink-faint); }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; position: sticky; top: 0; z-index: 5; }
+.opt { display: flex; align-items: center; gap: 8px; }
+.opt-label { font: 600 10px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.segs { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.segs button { background: var(--inset); color: var(--ink-dim); border: 0; border-right: 1px solid var(--line-bright); padding: 4px 10px; font: 500 11px var(--f-ui); cursor: pointer; }
+.segs button:last-child { border-right: 0; }
+.segs button[aria-pressed="true"] { background: var(--modulator); color: var(--inset); }
+button:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.play-btn { background: var(--inset); color: var(--ink); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 4px 12px; font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; min-width: 74px; }
+.play-btn[aria-pressed="true"] { background: var(--carrier); color: var(--inset); border-color: var(--carrier); }
+.hint { font-size: 11px; color: var(--ink-faint); }
+
+/* Today's pane header, kept; the region row is gone */
+.pane { display: flex; flex-direction: column; gap: 6px; }
+.pane-head { display: flex; align-items: baseline; gap: 10px; }
+.fold { background: var(--inset); border: 1px solid var(--line-bright); color: var(--ink-dim); border-radius: var(--r); width: 18px; height: 18px; font-size: 8px; display: inline-grid; place-items: center; align-self: center; }
+.pane-title { font: 600 12px var(--f-panel); letter-spacing: 0.07em; text-transform: uppercase; }
+.rack { display: flex; gap: 6px; overflow-x: auto; padding: 6px; background: var(--inset); border: 1px solid var(--line); border-radius: 6px; min-width: 0; scrollbar-color: var(--line-bright) var(--inset); overscroll-behavior: none; }
+
+/* The device and its rail, as the Grid's */
+.dev { flex: none; height: var(--seq-h); display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.rail { width: 24px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0; background: var(--panel-hi); border-right: 1px solid var(--line); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kc); margin-top: 3px; }
+.dev-name { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 10.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; padding: 4px 0; cursor: pointer; }
+.rail .spacer { flex: 1; }
+.rail .gap { height: 6px; flex: none; }
+.ib { background: transparent; border: 1px solid transparent; color: var(--ink-faint); width: 18px; height: 18px; border-radius: var(--r); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.ib:hover { color: var(--ink); border-color: var(--line-bright); }
+.ib[aria-pressed="true"] { color: var(--carrier); border-color: var(--carrier); }
+.ib svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.ib.danger:hover { color: var(--hot); }
+.rail .rnum { font: 8.5px var(--f-num); color: var(--ink-faint); writing-mode: vertical-rl; transform: rotate(180deg); }
+.dev.folded .dev-body { display: none; }
+.dev.folded .rail { border-right: 0; }
+
+/* The body: today's page tabs on top, the page under them */
+.dev-body { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.tabs { height: 20px; flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); }
+.tab { background: transparent; border: 0; border-radius: var(--r) var(--r) 0 0; color: var(--ink-faint); font: 600 9px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; height: 17px; cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--carrier); color: var(--inset); }
+.tabs .meas { margin-left: auto; align-self: center; }
+.page { flex: 1; min-height: 0; display: flex; }
+.section { flex: none; display: flex; flex-direction: column; padding: 4px 8px 6px; min-height: 0; min-width: 0; }
+.section + .section { border-left: 1px solid var(--line); }
+.section.grow { flex: 1; padding-right: 4px; }
+.sec-label { height: 14px; flex: none; font: 600 8.5px var(--f-panel); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
+.sec-label em { font: 400 10px var(--f-num); letter-spacing: 0; text-transform: none; font-style: normal; color: var(--ink-dim); }
+.sec-body { flex: 1; min-height: 0; display: flex; gap: 4px; }
+
+/* Controls, as in the insert rack */
+.col { display: flex; flex-direction: column; justify-content: space-evenly; align-items: center; gap: 2px; min-height: 0; }
+.col.wide { align-items: stretch; }
+.knob { width: 52px; display: flex; flex-direction: column; align-items: center; padding: 1px 0; border-radius: var(--r); }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .face { fill: var(--inset); stroke: var(--line); }
+.knob .track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .arc { stroke: var(--kc); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); line-height: 13px; }
+.knob .lab, .field .lab { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; line-height: 11px; }
+.field { display: flex; flex-direction: column; gap: 2px; width: 96px; }
+.fake-select { background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); height: 22px; font-size: 11.5px; padding: 0 6px; display: flex; align-items: center; justify-content: space-between; color: var(--ink); white-space: nowrap; cursor: pointer; }
+.fake-select::after { content: '▾'; color: var(--ink-faint); font-size: 10px; margin-left: 6px; }
+.stepper { display: flex; align-items: center; height: 22px; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); font: 11px var(--f-num); color: var(--ink); }
+.stepper b { flex: 1; text-align: center; font-weight: 400; white-space: nowrap; }
+.stepper i { font-style: normal; width: 18px; height: 18px; margin: 1px; display: grid; place-items: center; color: var(--ink-dim); border: 1px solid var(--line); border-radius: 2px; cursor: pointer; }
+.btn-s { background: var(--inset); border: 1px solid var(--kc); border-radius: var(--r); color: var(--ink); font: 600 9.5px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 8px; text-align: center; cursor: pointer; white-space: nowrap; }
+.seg { display: flex; border: 1px solid var(--line-bright); border-radius: var(--r); overflow: hidden; }
+.seg span { flex: 1; text-align: center; padding: 2px 6px; font: 600 8.5px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); background: var(--inset); border-right: 1px solid var(--line-bright); white-space: nowrap; cursor: pointer; }
+.seg span:last-child { border-right: 0; }
+.seg span.on { background: var(--carrier); color: var(--inset); }
+
+/* The rows: today's, one scroller, the ratchet and trigger rows held at the top */
+.scroller { flex: none; min-height: 0; max-height: 100%; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--panel); scrollbar-gutter: stable; overscroll-behavior: none; }
+.ehead { position: sticky; top: 0; z-index: 2; background: var(--panel); display: flex; flex-direction: column; gap: 2px; padding-bottom: 2px; }
+.erow { display: flex; gap: 2px; align-items: center; }
+.rname { width: var(--names-w); flex: none; padding-right: 6px; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.rname b { font: 600 8.5px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
+.rname span { font: 8.5px var(--f-num); color: var(--ink-faint); }
+.ecell { width: var(--cell-w); flex: none; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; position: relative; }
+.ecell.beat { margin-left: 4px; }
+.ecell.trig { height: 22px; }
+.ecell.trig.on { background: var(--carrier); border-color: var(--carrier); }
+.ecell.now { box-shadow: 0 0 0 1px var(--ink); }
+.ecell.rat { height: 14px; font: 8px/12px var(--f-num); color: var(--ink-faint); text-align: center; }
+.ecell.rat.r2, .ecell.rat.r3, .ecell.rat.r4 { border-color: color-mix(in srgb, var(--carrier) 60%, var(--line)); }
+.ecell.rat .ticks { position: absolute; inset: 3px 4px; display: flex; justify-content: space-between; }
+.ecell.rat .ticks i { width: 2px; background: var(--carrier); border-radius: 1px; }
+.rule { flex: 1; border-top: 1px dashed var(--line-bright); align-self: center; }
+.addlane { width: var(--names-w); flex: none; padding-right: 6px; }
+.addlane .fake-select { height: 18px; font-size: 10px; }
+.mname { width: var(--names-w); height: var(--lane-h); flex: none; border-left: 2px solid var(--modulator); padding: 1px 4px 0 6px; display: flex; flex-direction: column; gap: 1px; }
+.mname .top { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.mname b { font: 600 10px var(--f-ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mname .x { color: var(--ink-faint); font-size: 11px; cursor: pointer; }
+.mname .x:hover { color: var(--hot); }
+.mname .len { display: flex; align-items: center; gap: 3px; font: 9px var(--f-num); color: var(--ink-faint); }
+.mname .len i { font-style: normal; width: 13px; height: 13px; display: grid; place-items: center; border: 1px solid var(--line-bright); border-radius: 2px; color: var(--ink-dim); cursor: pointer; }
+.mname .read { font: 9px var(--f-num); color: var(--ink-faint); min-height: 11px; }
+.mcell { height: var(--lane-h); }
+.mcell::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
+.mcell i { position: absolute; left: 3px; right: 3px; background: var(--modulator); opacity: 0.85; }
+.mcell.idle { opacity: 0.35; }
+.mcell.wrap { border-left: 2px solid var(--line-bright); }
+.loop { font: 9px var(--f-num); color: var(--ink-faint); margin-left: 4px; white-space: nowrap; }
+
+/* Density */
+.plot { flex: 1; min-width: 220px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); position: relative; }
+.plot svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.plot .meas { position: absolute; right: 6px; top: 2px; }
+
+/* Notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.notes > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; min-width: 0; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 6px; }
+.notes ul { margin: 0; padding-left: 18px; color: var(--ink-dim); display: flex; flex-direction: column; gap: 5px; }
+.notes li b { color: var(--ink); font-weight: 600; }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Windsor Euclid device</h1>
+    <p>The Euclid card from #356, fitted to the 244 px sequencer device the Grid, Chord, Arp and Basslead use. The pages, rows, cells and clicks are today's. What changes is the frame. The rail now holds the region number with Split and Delete, the controls sit in columns, and the hint, the readout line and the <b>?</b> are gone. The device grows with its longest row, and the rack scrolls sideways when it outgrows the pane. The pattern is the one in your screenshot: E(5,16) with a Cutoff lane of 5 steps and Op A Level at 16.</p>
+  </div>
+
+  <div class="toolbar" role="group" aria-label="Mockup options">
+    <div class="opt"><span class="opt-label">Page</span>
+      <div class="segs" id="opt-page"><button type="button" data-v="pattern">Pattern</button><button type="button" data-v="density">Density</button></div>
+    </div>
+    <div class="opt"><span class="opt-label">Lanes</span>
+      <div class="segs" id="opt-lanes"><button type="button" data-v="0">None</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button></div>
+    </div>
+    <div class="opt"><span class="opt-label">Steps</span>
+      <div class="segs" id="opt-steps"><button type="button" data-v="8">8</button><button type="button" data-v="16">16</button><button type="button" data-v="32">32</button></div>
+    </div>
+    <button type="button" class="play-btn" id="play" aria-pressed="false">▶ Play</button>
+    <span class="hint">Click EUCLID on the rail to fold it. The two lane-view icons on the rail work.</span>
+  </div>
+
+  <section class="pane">
+    <div class="pane-head">
+      <span class="fold">▼</span>
+      <span class="pane-title">Part 1 — Euclid</span>
+      <span class="meas" id="pane-note"></span>
+    </div>
+    <div class="rack" id="rack"></div>
+    <span class="meas" id="measure"></span>
+  </section>
+
+  <section class="notes">
+    <div>
+      <h3>What stays</h3>
+      <ul>
+        <li><b>The Pattern and Density tabs</b> along the top, with the summary (<code>k 5 · 3–9 · tri · 8 bars</code>) at their right.</li>
+        <li><b>The rows, cell for cell:</b> Ratchet, Trigger, then the lanes, at 22 px a step and grouped by four. Each lane keeps its − and + for its length, its ×, and its ↺ end mark.</li>
+        <li><b>The lane-view toggle</b> on the rail: lanes at their own length, or laid out under this pass of the hits.</li>
+        <li><b>Every control on both pages</b>, with today's labels and clicks.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>What changes</h3>
+      <ul>
+        <li><b>244 px high.</b> The Ratchet and Trigger rows stay put. Three lanes fit, and a fourth scrolls under them. Lanes are 42 px, down from 44.</li>
+        <li><b>The rail</b> gains the region number, Split and Delete, as on the other four devices. The pane loses its region row, and the rail drops the part name, which the pane header already shows.</li>
+        <li><b>No help.</b> The <b>?</b>, the "Hover a cell to read it" line and the hint paragraph go. Tooltips stay on the cells. A lane's hover reading sits under its name, as on the Grid.</li>
+        <li><b>Controls in columns</b>: Note, Steps and Rotate; then Step and Capture; then Vel, Acc vel and Acc mod; then Hold.</li>
+        <li><b>+ Lane</b> moves into the Lanes rule, left of its dashed line. The "rows line up every…" note joins the section label.</li>
+        <li><b>Density</b> keeps the device's width, and its plot takes the room left over. The modulator column is wide enough for <code>LFOBARS</code>, which today's card clips.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const state = { page: 'pattern', lanes: 2, steps: 16, view: 'own', playing: false, tick: 0, folded: false };
+
+  // ── Knobs, as the insert rack mockup draws them ─────────────
+  const A0 = -0.75 * Math.PI, SPAN = 1.5 * Math.PI;
+  function arc(c, r, a0, a1) {
+    const pt = (a) => [(c + r * Math.sin(a)).toFixed(2), (c - r * Math.cos(a)).toFixed(2)];
+    const [x0, y0] = pt(a0), [x1, y1] = pt(a1);
+    return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1} ${y1}`;
+  }
+  function knob(l, v, p) {
+    const size = 30, mid = size / 2, r = mid - 3, face = r - 4;
+    const a = A0 + Math.max(0.001, p) * SPAN;
+    const px = (mid + face * Math.sin(a)).toFixed(2), py = (mid - face * Math.cos(a)).toFixed(2);
+    return `<div class="knob" title="${l}"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
+      <circle class="face" cx="${mid}" cy="${mid}" r="${face}"/><path class="track" d="${arc(mid, r, A0, A0 + SPAN)}"/>
+      <path class="arc" d="${arc(mid, r, A0, a)}"/><line class="pin" x1="${mid}" y1="${mid}" x2="${px}" y2="${py}"/>
+      </svg><span class="val">${v}</span><span class="lab">${l}</span></div>`;
+  }
+  const field = (l, inner) => `<div class="field"><span class="lab">${l}</span>${inner}</div>`;
+  const select = (v) => `<div class="fake-select">${v}</div>`;
+  const stepper = (v) => `<div class="stepper"><i>−</i><b>${v}</b><i>+</i></div>`;
+  const seg = (opts, on) => `<div class="seg">${opts.map((o) => `<span class="${o === on ? 'on' : ''}">${o}</span>`).join('')}</div>`;
+  const svg = (d) => `<svg viewBox="0 0 12 12">${d}</svg>`;
+  const ICON_SPLIT = svg('<rect x="1" y="3" width="4" height="6" rx="1"/><rect x="7" y="3" width="4" height="6" rx="1"/><path d="M6 1v10" stroke-dasharray="1.5 1.5"/>');
+  const ICON_DELETE = svg('<path d="M2 3h8M4.5 3V1.8h3V3M3 3l.6 7.2h4.8L9 3M5 5v3.5M7 5v3.5"/>');
+  const ICON_OWN = svg('<path d="M1 2.5h10M1 6h5M1 9.5h7.5" stroke-width="1.6"/>');
+  const ICON_HITS = svg('<path d="M1 2.5h10M1 6h10M1 9.5h10" stroke-width="1.6"/><path d="M6.5 4.5v3" stroke-width="1.2"/>');
+
+  // ── The pattern in the screenshot ───────────────────────────
+  const k = () => Math.max(1, Math.round((5 * state.steps) / 16));
+  const hit = (i) => ((i * k()) % state.steps) < k();
+  const RAT = { 0: 2, 3: 3, 6: 4, 9: 2, 19: 3, 25: 2 };
+  const LANES = [
+    { name: 'Cutoff', read: '', v: [-0.05, 0.25, 0.45, 0.6, 0.55] },
+    { name: 'Op A Level', read: '7: 0.62', v: [-0.5, -0.15, 0.2, 0.55, -0.4, -0.15, 0.2, 0.55, -0.4, -0.15, 0.2, 0.55, -0.5, -0.15, 0.2, 0.55] },
+    { name: 'Resonance', read: '', v: [0.4, -0.2, 0.1, -0.4, 0.6, 0, -0.3, 0.2] },
+    { name: 'Op B Decay', read: '', v: [0.2, 0.5, -0.3, 0, 0.35, -0.5, 0.1, 0.4, -0.2, 0.3, 0, -0.4] },
+  ];
+  const beat = (i) => (i > 0 && i % 4 === 0 ? ' beat' : '');
+  const bar = (v) => `<i style="${v >= 0 ? `bottom:50%;height:${v * 50}%` : `top:50%;height:${-v * 50}%`}"></i>`;
+  const ratCell = (i) => { const r = RAT[i] ?? 1; return `<div class="ecell rat r${r}${beat(i)}" title="Ratchet ×${r}: click for ×1 → ×2 → ×3 → ×4">${r > 1 ? `<span class="ticks">${'<i></i>'.repeat(r)}</span>` : ''}</div>`; };
+  const trigCell = (i) => `<div class="ecell trig${hit(i) ? ' on' : ''}${beat(i)}" data-i="${i}" title="Step ${i + 1}: click to flip"></div>`;
+
+  function laneCells(lane) {
+    if (state.view === 'own') {
+      return lane.v.map((v, i) => `<div class="ecell mcell${beat(i)}">${bar(v)}</div>`).join('') + `<span class="loop">↺ ${lane.v.length}</span>`;
+    }
+    let n = 0; // under the hits: the lane advances only when a hit sounds
+    return Array.from({ length: state.steps }, (_, i) => {
+      if (!hit(i)) return `<div class="ecell mcell idle${beat(i)}"></div>`;
+      const at = n++ % lane.v.length;
+      return `<div class="ecell mcell${at === 0 && n > 1 ? ' wrap' : ''}${beat(i)}" title="${lane.name} step ${at + 1}">${bar(lane.v[at])}</div>`;
+    }).join('');
+  }
+  function laneName(l) {
+    return `<div class="mname"><div class="top"><b>${l.name}</b><span class="x" title="Remove the lane">×</span></div>
+      <span class="len"><i title="Shorten the lane">−</i>${l.v.length} steps<i title="Lengthen the lane">+</i></span><span class="read">${l.read}</span></div>`;
+  }
+
+  function patternPage() {
+    const lanes = LANES.slice(0, state.lanes);
+    const cells = (f) => Array.from({ length: state.steps }, (_, i) => f(i)).join('');
+    const controls = `<div class="section"><div class="sec-label">Play</div><div class="sec-body">
+      <div class="col wide">${field('Note', stepper('C4 · 60'))}${field('Steps n', stepper(String(state.steps)))}${field('Rotate', stepper('0'))}</div>
+      <div class="col wide">${field('Step', select('1/16'))}<div class="btn-s" title="Freeze the figure">Capture</div></div>
+      <div class="col">${knob('Vel', '0.80', 0.8)}${knob('Acc vel', '0.20', 0.2)}${knob('Acc mod', '1.00', 1)}</div>
+      <div class="col">${knob('Hold', '100m', 0.5)}</div>
+    </div></div>`;
+    const head = `<div class="ehead">
+      <div class="erow"><div class="rname"><b>Ratchet</b></div>${cells(ratCell)}</div>
+      <div class="erow"><div class="rname"><b>Trigger</b><span>E(${k()},${state.steps})</span></div>${cells(trigCell)}</div>
+      <div class="erow"><div class="addlane">${select('+ Lane')}</div><div class="rule"></div><span class="meas">${lanes.length} of 4 lanes</span></div>
+    </div>`;
+    const rows = lanes.map((l) => `<div class="erow">${laneName(l)}${laneCells(l)}</div>`).join('');
+    const cycle = lanes.some((l) => state.steps % l.v.length) ? 'rows line up every 5 bars' : 'rows line up every bar';
+    return `${controls}<div class="section grow"><div class="sec-label">Rows <em>${cycle}</em></div><div class="sec-body"><div class="scroller" id="scroller">${head}<div class="erows" style="display:flex;flex-direction:column;gap:2px">${rows}</div></div></div></div>`;
+  }
+
+  function densityPage() {
+    const ks = Array.from({ length: 16 }, (_, b) => Math.round(6 + 3 * (1 - Math.abs(((b / 8) % 2) - 1) * 2)));
+    const step = ks.map((v, b) => `${b ? 'L' : 'M'}${(b / 16) * 100} ${100 - ((v - 2) / 8) * 100}H${((b + 1) / 16) * 100}`).join('');
+    const plot = `<div class="plot"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <rect x="0" y="12.5" width="100" height="75" fill="color-mix(in srgb, var(--carrier) 8%, transparent)"/>
+      <path d="${step}" stroke="var(--carrier)" stroke-width="1.5" fill="none" vector-effect="non-scaling-stroke"/></svg><span class="meas">next 16 bars · 3–9</span></div>`;
+    return `<div class="section"><div class="sec-label">Density modulator</div><div class="sec-body">
+      <div class="col wide" style="width:150px">${seg(['lfoBars', 'lfoHz', 'walk'], 'lfoBars')}${knob('Bars', '8.00', 0.25)}${seg(['tri', 'sine', 'saw'], 'tri')}</div>
+    </div></div>
+    <div class="section grow"><div class="sec-label">Hits per pass <em>k 5 now</em></div><div class="sec-body">${plot}
+      <div class="col">${knob('k min', '3', 0.19)}${knob('k max', '9', 0.56)}${knob('k start', '5', 0.31)}</div></div></div>`;
+  }
+
+  let patternWidth = 0;
+  function render() {
+    const rail = `<div class="rail"><span class="dot"></span><span class="dev-name" data-fold title="Fold">Euclid</span><span class="spacer"></span>
+      <button type="button" class="ib" data-view="own" aria-pressed="${state.view === 'own'}" title="Lanes at their own length">${ICON_OWN}</button>
+      <button type="button" class="ib" data-view="hits" aria-pressed="${state.view === 'hits'}" title="Lanes under the hits">${ICON_HITS}</button>
+      <span class="gap"></span><span class="rnum" title="Region 1 of 1">1/1</span>
+      <button type="button" class="ib" title="Split the region in two" aria-label="Split region">${ICON_SPLIT}</button>
+      <button type="button" class="ib danger" title="Delete this region" aria-label="Delete region">${ICON_DELETE}</button></div>`;
+    const tabs = `<div class="tabs" role="tablist">${['pattern', 'density'].map((p) => `<button type="button" class="tab" role="tab" data-page="${p}" aria-selected="${state.page === p}">${p}</button>`).join('')}<span class="meas">k ${k()} · 3–9 · tri · 8 bars</span></div>`;
+    const page = state.page === 'pattern' ? patternPage() : densityPage();
+    const width = state.page === 'density' && patternWidth ? ` style="width:${patternWidth}px"` : '';
+    document.getElementById('rack').innerHTML = `<div class="dev${state.folded ? ' folded' : ''}"${width}>${rail}<div class="dev-body">${tabs}<div class="page">${page}</div></div></div>`;
+    document.getElementById('pane-note').textContent = `euclid ${k()}/${state.steps} · 1/16 · 1 region`;
+    for (const [opt, key] of [['opt-page', 'page'], ['opt-lanes', 'lanes'], ['opt-steps', 'steps']]) {
+      for (const b of document.querySelectorAll(`#${opt} button`)) b.setAttribute('aria-pressed', String(String(state[key]) === b.dataset.v));
+    }
+    const dev = document.querySelector('.dev');
+    if (state.page === 'pattern' && !state.folded) patternWidth = dev.offsetWidth;
+    const sc = document.getElementById('scroller');
+    document.getElementById('measure').textContent = state.folded ? '' : `Device ${dev.offsetWidth.toLocaleString('en')} × ${dev.offsetHeight} px` +
+      (sc ? ` · rows show ${sc.clientHeight} of ${sc.scrollHeight} px${sc.scrollHeight > sc.clientHeight ? ', so the lanes scroll' : ''}` : '');
+    light();
+  }
+
+  function light() {
+    const at = state.playing ? state.tick % state.steps : -1;
+    for (const c of document.querySelectorAll('.ecell.trig')) c.classList.toggle('now', Number(c.dataset.i) === at);
+  }
+  let timer = null;
+  document.getElementById('play').addEventListener('click', (e) => {
+    state.playing = !state.playing;
+    e.currentTarget.setAttribute('aria-pressed', String(state.playing));
+    e.currentTarget.textContent = state.playing ? '■ Stop' : '▶ Play';
+    clearInterval(timer);
+    if (state.playing) { state.tick = 0; timer = setInterval(() => { state.tick++; light(); }, 125); }
+    light();
+  });
+  document.querySelector('.toolbar').addEventListener('click', (e) => {
+    const b = e.target.closest('.segs button[data-v]');
+    if (!b) return;
+    const key = { 'opt-page': 'page', 'opt-lanes': 'lanes', 'opt-steps': 'steps' }[b.parentElement.id];
+    state[key] = key === 'page' ? b.dataset.v : Number(b.dataset.v);
+    if (key !== 'page') state.page = 'pattern';
+    render();
+    if (key !== 'page' && b.parentElement.id !== 'opt-page') render();
+  });
+  document.addEventListener('click', (e) => {
+    const view = e.target.closest('[data-view]');
+    const tab = e.target.closest('[data-page]');
+    if (view) { state.view = view.dataset.view; render(); return; }
+    if (tab) { state.page = tab.dataset.page; render(); return; }
+    if (e.target.closest('[data-fold]') || (state.folded && e.target.closest('.dev'))) { state.folded = !state.folded; render(); }
+  });
+  render();
+})();
+</script>
