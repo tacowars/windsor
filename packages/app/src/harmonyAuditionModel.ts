@@ -64,3 +64,49 @@ export function auditionChord(
     label: eventLabel(harmony, played),
   };
 }
+
+/** What started a ▶ hold: a pointer, by its id, or a key on the focused ▶. */
+export type AuditionSource =
+  { readonly kind: 'pointer'; readonly pointerId: number } | { readonly kind: 'key' };
+
+/** One press of a ▶. Identity is ownership, so tokens compare by reference. */
+export interface AuditionToken {
+  readonly source: AuditionSource;
+}
+
+/**
+ * Which press owns the one held chord. A new press supersedes the held one;
+ * an up event ends the hold only when it belongs to the press that still
+ * owns it, so a superseded pointer's up never stops a later press's chord.
+ */
+export class AuditionHold {
+  private current: AuditionToken | null = null;
+
+  /** Start a hold from `source`, superseding whichever press held before. */
+  press(source: AuditionSource): AuditionToken {
+    const token = { source };
+    this.current = token;
+    return token;
+  }
+
+  /** Whether `token` still owns the held chord. */
+  owns(token: AuditionToken): boolean {
+    return this.current === token;
+  }
+
+  /**
+   * Whether an up event ends `token`'s hold: a pointer up or cancel carrying
+   * the press's own `pointerId`, or (`pointerId` null) the key press's own
+   * keyup or blur — and only while `token` still owns the chord.
+   */
+  releases(token: AuditionToken, pointerId: number | null): boolean {
+    if (!this.owns(token)) return false;
+    const { source } = token;
+    return source.kind === 'pointer' ? source.pointerId === pointerId : pointerId === null;
+  }
+
+  /** Drop the held press, whichever it is. */
+  clear(): void {
+    this.current = null;
+  }
+}

@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Harmony, HarmonyEvent } from '@windsor/engine';
 import { CHORD_SIZE_SEVENTH, CHORD_SIZE_TRIAD, TICKS_PER_BAR } from '@windsor/engine';
-import { auditionChord, auditionEvent } from './harmonyAuditionModel';
+import { AuditionHold, auditionChord, auditionEvent } from './harmonyAuditionModel';
 
 const C_MAJOR: Harmony = { root: 0, scale: 'major', events: [] };
 const FLAT_SIX: HarmonyEvent = {
@@ -66,5 +66,34 @@ describe('the chord a ▶ plays', () => {
     expect(high.notes).toEqual([115, 127]);
     const low = auditionChord(C_MAJOR, FLAT_SIX, 0, { keyOctaveNote: 4, bassOctaves: 1 });
     expect(low.notes).toEqual([4, 8, 11]);
+  });
+});
+
+describe('which press owns the held chord', () => {
+  it("never lets a superseded pointer's up release the later press", () => {
+    const hold = new AuditionHold();
+    const a = hold.press({ kind: 'pointer', pointerId: 1 });
+    const b = hold.press({ kind: 'pointer', pointerId: 2 });
+    expect(hold.releases(a, 1)).toBe(false);
+    expect(hold.owns(b)).toBe(true);
+    expect(hold.releases(b, 2)).toBe(true);
+  });
+
+  it('releases nothing on an unrelated pointer up', () => {
+    const hold = new AuditionHold();
+    const a = hold.press({ kind: 'pointer', pointerId: 1 });
+    expect(hold.releases(a, 7)).toBe(false);
+    expect(hold.releases(a, null)).toBe(false);
+  });
+
+  it('ends a key press only on its own keyup or blur', () => {
+    const hold = new AuditionHold();
+    const pointer = hold.press({ kind: 'pointer', pointerId: 3 });
+    const key = hold.press({ kind: 'key' });
+    expect(hold.releases(pointer, 3)).toBe(false);
+    expect(hold.releases(key, 3)).toBe(false);
+    expect(hold.releases(key, null)).toBe(true);
+    hold.clear();
+    expect(hold.releases(key, null)).toBe(false);
   });
 });

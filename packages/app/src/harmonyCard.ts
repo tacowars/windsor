@@ -21,7 +21,12 @@ import {
 } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el, html, seg, select } from './dom';
-import { auditionChord } from './harmonyAuditionModel';
+import {
+  AuditionHold,
+  auditionChord,
+  type AuditionSource,
+  type AuditionToken,
+} from './harmonyAuditionModel';
 import { HARMONY_AUDITION_VELOCITY } from './harmonyAuditionTables';
 import {
   degreeChips,
@@ -115,32 +120,48 @@ function infoBubble(label: EventLabel): InfoBubble {
 
 /**
  * The one chord a ▶ holds, across every card: a second press releases the
- * first, and a card repainted mid-hold cannot strand it. `token` tells a
- * press whose part arrives after its release that it was let go.
+ * first, and a card repainted mid-hold cannot strand it. `hold` says which
+ * press owns it, so only that press's own up ends it, and a part arriving
+ * after its press was let go sounds nothing.
  */
-let held: { token: number; release(): void } | null = null;
-let presses = 0;
+const hold = new AuditionHold();
+let held: { release(): void } | null = null;
 
 function releaseHeld(): void {
   const was = held;
   held = null;
+  hold.clear();
   was?.release();
 }
 
-/** Sound degree `degree`'s chord until `releaseHeld`; nothing before audio, nothing committed. */
-function pressPlay(view: SongView, index: number, degree: number, ui: PlayUi): boolean {
+/** End the hold if this up event (a pointer's id, or null for a key) belongs to the press that owns it. */
+function endPress(token: AuditionToken | null, pointerId: number | null): void {
+  if (token && hold.releases(token, pointerId)) releaseHeld();
+}
+
+/**
+ * Sound degree `degree`'s chord until `releaseHeld`; nothing before audio,
+ * nothing committed. `detach` runs when the hold ends, superseded or not.
+ */
+function pressPlay(
+  view: SongView,
+  index: number,
+  degree: number,
+  ui: PlayUi,
+  press: { source: AuditionSource; detach?: () => void },
+): AuditionToken | null {
   releaseHeld();
   const { host, model } = view.ctx;
   const event = model.doc.harmony.events[index];
-  if (!host.enabled || !event) return false;
+  if (!host.enabled || !event) return null;
   const chord = auditionChord(model.doc.harmony, event, degree);
-  const token = ++presses;
+  const token = hold.press(press.source);
   let notes: { part: { noteOff(id: number): void }; ids: number[] } | null = null;
   ui.button.classList.add('on');
   ui.bubble.show(chord.label, true);
   held = {
-    token,
     release: (): void => {
+      press.detach?.();
       ui.button.classList.remove('on');
       const selected = view.ctx.model.doc.harmony.events[index];
       if (selected) ui.bubble.show(eventLabel(view.ctx.model.doc.harmony, selected), false);
@@ -151,11 +172,11 @@ function pressPlay(view: SongView, index: number, degree: number, ui: PlayUi): b
   void host
     .auditionPart()
     .then((part) => {
-      if (!part || held?.token !== token) return;
+      if (!part || !hold.owns(token)) return;
       notes = { part, ids: chord.notes.map((n) => part.noteOn(n, HARMONY_AUDITION_VELOCITY)) };
     })
     .catch(() => undefined);
-  return true;
+  return token;
 }
 
 interface PlayUi {
@@ -168,31 +189,39 @@ const ACTIVATE_KEYS = new Set([' ', 'Enter']);
 /** Hold to hear (decision 4): pointer down to up or cancel, with capture; Space or Enter held on focus. */
 function bindPlay(view: SongView, index: number, degree: number, ui: PlayUi): void {
   const { button } = ui;
-  const endOnWindow = (): void => {
-    window.removeEventListener('pointerup', endOnWindow);
-    window.removeEventListener('pointercancel', endOnWindow);
-    releaseHeld();
-  };
   button.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     e.preventDefault();
-    if (!pressPlay(view, index, degree, ui)) return;
+    let token: AuditionToken | null = null;
+    const onUp = (up: PointerEvent): void => endPress(token, up.pointerId);
+    const detach = (): void => {
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    const source = { kind: 'pointer', pointerId: e.pointerId } as const;
+    token = pressPlay(view, index, degree, ui, { source, detach });
+    if (!token) return;
     button.setPointerCapture(e.pointerId);
     // On the window too: a repaint mid-hold detaches the button, and its capture with it.
-    window.addEventListener('pointerup', endOnWindow);
-    window.addEventListener('pointercancel', endOnWindow);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   });
+  let keyToken: AuditionToken | null = null;
   button.addEventListener('keydown', (e) => {
     if (!ACTIVATE_KEYS.has(e.key)) return;
+    // Stopped here: the transport strip's window Space handler would also start or pause the song.
     e.preventDefault();
-    if (!e.repeat) pressPlay(view, index, degree, ui);
+    e.stopPropagation();
+    if (!e.repeat) keyToken = pressPlay(view, index, degree, ui, { source: { kind: 'key' } });
   });
   button.addEventListener('keyup', (e) => {
     if (!ACTIVATE_KEYS.has(e.key)) return;
+    // Stopped for the same reason as keydown: the key belongs to this ▶, not the transport.
     e.preventDefault();
-    releaseHeld();
+    e.stopPropagation();
+    endPress(keyToken, null);
   });
-  button.addEventListener('blur', releaseHeld);
+  button.addEventListener('blur', () => endPress(keyToken, null));
 }
 
 /** The play row: a ▶ over each chip, on the chips' grid. */
