@@ -1708,6 +1708,30 @@ function bindLiveValues(voice) {
     const x = VOICE_OFFSET_CURVE[k] === OFFSET_RATIO ? (v[k] < floor ? floor : v[k]) * Math.pow(2, off) : v[k] + off;
     v[k] = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
   }
+  stackStepDecays(voice);
+}
+function stackStepDecays(voice) {
+  const patch = voice.patch;
+  const v = voice.liveValues;
+  const o = voice.partOffsets;
+  const floors = voice.partFloors;
+  const pushes = voice.stepOffsets;
+  for (let i = -1; i < OPERATOR_COUNT; i++) {
+    const filter = i < 0;
+    const s = filter ? STEP_SLOT_FILTER_DECAY : STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE + STEP_OP_DECAY;
+    const push = pushes[s];
+    if (push === 0) continue;
+    const k = filter ? VT_FILTER_DECAY : VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY;
+    const base = filter ? patch.filter.env.decayTime : patch.ops[i].env.decayTime;
+    const off = o[k];
+    if (off === 0 && !(base < floors[k])) continue;
+    const floor = VOICE_OFFSET_FLOOR[k];
+    const x = (base < floor ? floor : base) * Math.pow(2, off);
+    const lane = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
+    const row = STEP_MOD_TABLE[s];
+    const y = lane * Math.pow(row.max / row.min, push * row.span);
+    v[k] = y < row.min ? row.min : y > row.max ? row.max : y;
+  }
 }
 function applyLiveDecays(voice, reshape) {
   const v = voice.liveValues;
@@ -2652,6 +2676,14 @@ function startStepMod(voice, patch, stepMod) {
     voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
   }
 }
+var slideCurves = new Float64Array(OPERATOR_COUNT);
+function retargetStepMod(voice, patch, stepMod) {
+  loadStepOffsets(voice, stepMod, true);
+  const env = voice.ampEnv;
+  for (let i = 0; i < OPERATOR_COUNT; i++) slideCurves[i] = env[i].decayCurve;
+  bindStepMod(voice, patch);
+  for (let i = 0; i < OPERATOR_COUNT; i++) env[i].decayCurve = slideCurves[i];
+}
 function rebindStepMod(voice, patch, switched, slotTargets) {
   keepVoiceOffsets(voice);
   bindStepMod(voice, patch);
@@ -2873,7 +2905,8 @@ var Voice = class {
    * the key offset are recomputed for the new note, as `rebind` does. The new
    * step's offsets apply from here, except the rows a sounding voice cannot
    * change without a click (`slideKeeps`: decay curve, feedback), which keep
-   * the old step's (windsor#17).
+   * the old step's (windsor#17), and each envelope keeps the decay curve it
+   * plays, a lane's too (`retargetStepMod`, windsor#405).
    */
   retarget(note, velocity, mod, glideSeconds, stepMod) {
     const patch = this.patch;
@@ -2888,8 +2921,7 @@ var Voice = class {
     }
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.bindConstants(patch);
-    loadStepOffsets(this, stepMod, true);
-    bindStepMod(this, patch);
+    retargetStepMod(this, patch, stepMod);
   }
   release() {
     if (!this.active) return;

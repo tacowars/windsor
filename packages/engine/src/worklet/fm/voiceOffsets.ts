@@ -18,7 +18,9 @@
  *   time and curve (`applyLiveDecays`). A time is read afresh by each step
  *   of the envelope, which keeps its phase, so a running decay goes on from
  *   its level at the new rate; a curve that changes starts what is left of
- *   a running decay again from its level (`Envelope.reshapeDecay`).
+ *   a running decay again from its level (`Envelope.reshapeDecay`). A step's
+ *   decay push stacks on a decay lane's absolute value (`stackStepDecays`,
+ *   windsor#405), so it is heard over a patch decay of 0 too.
  * - Feedback is read per sample, so it is ramped (decision 11): each block
  *   sets `fbFrom` to the last block's `fbTo` and `fbTo` to this one's, and
  *   the render loops read `fbFrom + (fbTo − fbFrom) · t` through the block
@@ -35,6 +37,8 @@
  *   keeps the value it plays until that lane's offset next changes, which is
  *   its resync, and then takes the resynced value without a reshape, since
  *   the float32 offset may land it an ulp from where it was (`decayRebound`).
+ *   Nor does a legato slide (windsor#405): `retargetStepMod` keeps the curve
+ *   each envelope plays across its bind.
  *
  * Invariant: an offset of exactly 0 leaves the value as it was, neither
  * clamped nor passed through a curve, except that a decay time a slot maps
@@ -51,6 +55,7 @@ import type { Voice } from './voice';
 import { OPERATOR_COUNT } from './patchDefaults';
 import {
   STEP_MOD_SLOT_COUNT,
+  STEP_MOD_TABLE,
   STEP_OP_DECAY,
   STEP_OP_DECAY_CURVE,
   STEP_SLOT_FILTER_DECAY,
@@ -130,7 +135,8 @@ function latchVoiceOffsets(
  * offset 0 (`partFloors`), which is the offset the main thread sends for a
  * lane at or below the floor over a patch below it; without a lane a decay
  * of 0 stays 0. The decays' own values are the step's (`stepValues`), since
- * the envelopes' copies carry the lanes.
+ * the envelopes' copies carry the lanes; a decay time with a lane and a step
+ * push takes the push over the lane's value (`stackStepDecays`).
  */
 function bindLiveValues(voice: Voice): void {
   const patch = voice.patch!;
@@ -169,6 +175,50 @@ function bindLiveValues(voice: Voice): void {
         : x > VOICE_OFFSET_MAX[k]
           ? VOICE_OFFSET_MAX[k]
           : x;
+  }
+  stackStepDecays(voice);
+}
+
+/**
+ * A step's decay push over a decay time a lane moves (windsor#405): the
+ * step's row (`stepModValue`'s log curve) over the lane's absolute value,
+ * the patch's decay from its floor moved by the offset and clamped, as the
+ * main thread reckons it, and clamped to the step row's range. Over a patch
+ * decay of 0 the step's own value is its row's 1 ms, which the lane's ratio
+ * would scale straight to the lane's value; so a lane and a push play
+ * longer than the lane alone. Only a decay time with both a push and a lane
+ * on it is written: one without a lane keeps the step's value, and one
+ * without a push the lane's, to the bit. The curve is written out, not
+ * called, since no double crosses a call each control block (rule 2).
+ */
+function stackStepDecays(voice: Voice): void {
+  const patch = voice.patch!;
+  const v = voice.liveValues;
+  const o = voice.partOffsets;
+  const floors = voice.partFloors;
+  const pushes = voice.stepOffsets;
+  for (let i = -1; i < OPERATOR_COUNT; i++) {
+    const filter = i < 0;
+    const s = filter
+      ? STEP_SLOT_FILTER_DECAY
+      : STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE + STEP_OP_DECAY;
+    const push = pushes[s];
+    if (push === 0) continue;
+    const k = filter ? VT_FILTER_DECAY : VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY;
+    const base = filter ? patch.filter.env.decayTime : patch.ops[i].env.decayTime;
+    const off = o[k];
+    if (off === 0 && !(base < floors[k])) continue;
+    const floor = VOICE_OFFSET_FLOOR[k];
+    const x = (base < floor ? floor : base) * Math.pow(2, off);
+    const lane =
+      x < VOICE_OFFSET_MIN[k]
+        ? VOICE_OFFSET_MIN[k]
+        : x > VOICE_OFFSET_MAX[k]
+          ? VOICE_OFFSET_MAX[k]
+          : x;
+    const row = STEP_MOD_TABLE[s];
+    const y = lane * Math.pow(row.max / row.min, push * row.span);
+    v[k] = y < row.min ? row.min : y > row.max ? row.max : y;
   }
 }
 
