@@ -138,6 +138,20 @@ describe('labels', () => {
     ).toBe('7th');
   });
 
+  it('names a chromatic event by its moved stack and flats or sharps its numeral (windsor#330)', () => {
+    const major: Harmony = { root: 0, scale: 'major', events: FOUR };
+    const flatVi = { ...(FOUR[1] as HarmonyEvent), accidental: -1 } as const;
+    expect(eventLabel(major, { ...flatVi, quality: 'maj' })).toEqual({
+      name: 'G# maj',
+      numeral: '♭VI',
+      sizeTag: 'triad',
+    });
+    expect(eventLabel(major, flatVi)).toMatchObject({ name: 'G# min', numeral: '♭vi' });
+    expect(
+      eventLabel(major, { ...(FOUR[0] as HarmonyEvent), quality: 'maj', accidental: -1 }),
+    ).toMatchObject({ name: 'B maj', numeral: '♭I' });
+  });
+
   it('offers one chip per scale degree with its numeral and pitch in the key', () => {
     const chips = degreeChips(key, CHORD_SIZE_TRIAD);
     expect(chips).toHaveLength(7);

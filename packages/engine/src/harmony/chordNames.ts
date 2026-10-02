@@ -5,9 +5,17 @@
  * augmented, lower for minor and diminished, the suffixes of
  * `QUALITY_LABELS`. An `other` chord is named by its notes and numbered by
  * its degree, since no numeral describes a stack the table does not know.
- * Spelling is sharps only (epic #605 decision 11).
+ * Spelling is sharps only (epic #605 decision 11). A chromatic event
+ * (windsor#330) is named by its moved stack (`D# maj`) and its numeral takes
+ * the accidental's glyph (`♭VI`).
  */
-import { CHORD_NOTE_NAMES, QUALITY_LABELS, ROMAN_GLYPHS, type ChordQuality } from './chordTables';
+import {
+  ACCIDENTAL_GLYPHS,
+  CHORD_NOTE_NAMES,
+  QUALITY_LABELS,
+  ROMAN_GLYPHS,
+  type ChordQuality,
+} from './chordTables';
 import type { Chord } from './chordTheory';
 import { SEMITONES_PER_OCTAVE, foldDegree } from '../sequencing/scaleSampler';
 
@@ -43,12 +51,19 @@ export function chordName(rootNote: number, chord: Chord): string {
 /**
  * The numeral for `degree` in a scale of `degreeCount` degrees: the degree is
  * folded first, so the eighth degree of a seven-note scale reads as the
- * first. An `other` quality reads as the plain one-based number.
+ * first. An `other` quality reads as the plain one-based number. A flat or
+ * sharp `accidental` prefixes its glyph: `♭VI`, `♯iv°`.
  */
-export function romanNumeral(degree: number, quality: ChordQuality, degreeCount: number): string {
+export function romanNumeral(
+  degree: number,
+  quality: ChordQuality,
+  degreeCount: number,
+  accidental = 0,
+): string {
   const folded = foldDegree(degree, degreeCount).degree + 1;
-  if (quality === 'other') return String(folded);
+  const glyph = accidental === -1 || accidental === 1 ? ACCIDENTAL_GLYPHS[accidental] : '';
+  if (quality === 'other') return `${glyph}${folded}`;
   const label = QUALITY_LABELS[quality];
   const numeral = toRoman(folded);
-  return `${label.upper ? numeral : numeral.toLowerCase()}${label.suffix}`;
+  return `${glyph}${label.upper ? numeral : numeral.toLowerCase()}${label.suffix}`;
 }

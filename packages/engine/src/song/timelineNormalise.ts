@@ -14,11 +14,19 @@
  * gap to the next start (the song end for the last), so the document holds
  * one canonical timeline and a console draws blocks that meet; a written
  * duration that says otherwise is corrected. Two events on one start keep
- * the later one. No events is the tonic triad for the whole song.
+ * the later one. No events is the tonic triad for the whole song. An event
+ * may name a `quality` and an `accidental` (windsor#330); a quality sets the
+ * size, and a natural accidental is the field's absence.
  */
 import { CHORD_SIZE_TRIAD, HARMONY_DEGREE_MAX } from '../audioConstants';
 import type { HarmonyEvent } from '../harmony/harmonyTimeline';
 import { isChordSize, type ChordSize } from '../harmony/chordTheory';
+import {
+  CHORD_ACCIDENTALS,
+  QUALITY_INTERVALS,
+  type ChordAccidental,
+  type NamedQuality,
+} from '../harmony/chordTables';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import type { Arrangement, PartRegion, SequencerKind } from './arrangement';
 import { FieldNormaliser, isRecord, show } from './arrangementFields';
@@ -154,6 +162,54 @@ function size(raw: unknown, path: string, n: FieldNormaliser): ChordSize {
   return CHORD_SIZE_TRIAD;
 }
 
+const isNamedQuality = (raw: unknown): raw is NamedQuality =>
+  typeof raw === 'string' && Object.hasOwn(QUALITY_INTERVALS, raw);
+
+/** A named table quality, or absent: `'other'` and anything unknown fall back to the scale's chord. */
+function quality(raw: unknown, path: string, n: FieldNormaliser): NamedQuality | undefined {
+  if (raw === undefined || isNamedQuality(raw)) return raw;
+  n.correction(`${path}: ${show(raw)} is not a chord quality — the scale's own chord`);
+  return undefined;
+}
+
+/** Flat or sharp, else absent; a written 0 is natural and needs no report. */
+function accidental(raw: unknown, path: string, n: FieldNormaliser): ChordAccidental | undefined {
+  if (raw === undefined || raw === 0) return undefined;
+  if ((CHORD_ACCIDENTALS as readonly unknown[]).includes(raw)) return raw as ChordAccidental;
+  n.correction(`${path}: ${show(raw)} is not a flat (-1) or a sharp (1) — natural`);
+  return undefined;
+}
+
+/**
+ * The event's chord fields in output order (windsor#330 decision 5): a
+ * quality sets the size — silently when none was written, with a report
+ * when it disagreed.
+ */
+function chordFields(
+  o: Record<string, unknown>,
+  path: string,
+  n: FieldNormaliser,
+): Pick<HarmonyEvent, 'size' | 'quality' | 'accidental'> {
+  const named = quality(o.quality, `${path}.quality`, n);
+  const flat = accidental(o.accidental, `${path}.accidental`, n);
+  let chordSize: ChordSize;
+  if (named === undefined) {
+    chordSize = size(o.size, `${path}.size`, n);
+  } else {
+    chordSize = (QUALITY_INTERVALS[named].length + 1) as ChordSize;
+    if (o.size !== undefined && o.size !== chordSize) {
+      n.correction(
+        `${path}.size: ${show(o.size)} is not ${named}'s ${chordSize} tones — corrected`,
+      );
+    }
+  }
+  return {
+    size: chordSize,
+    ...(named === undefined ? {} : { quality: named }),
+    ...(flat === undefined ? {} : { accidental: flat }),
+  };
+}
+
 /** The harmony's events: sorted, contiguous, one per start; none is the tonic. */
 export function normaliseHarmonyEvents(
   raw: unknown,
@@ -168,11 +224,12 @@ export function normaliseHarmonyEvents(
   }
   const entries = raw.map((entry, i) => {
     const o = n.section(entry, `${path}[${i}]`);
-    n.dropUnknown(o, ['start', 'duration', 'degree', 'size'], `${path}[${i}]`);
+    const fields = ['start', 'duration', 'degree', 'size', 'quality', 'accidental'];
+    n.dropUnknown(o, fields, `${path}[${i}]`);
     return {
       ...span(entry, songTicks, `${path}[${i}]`, n),
       degree: n.int(o.degree, 0, 0, HARMONY_DEGREE_MAX, `${path}[${i}].degree`),
-      size: size(o.size, `${path}[${i}].size`, n),
+      chord: chordFields(o, `${path}[${i}]`, n),
     };
   });
   entries.sort((a, b) => a.start - b.start);
@@ -191,7 +248,7 @@ export function normaliseHarmonyEvents(
         `${e.path}.duration: ${e.duration} is not the ${duration} ticks to the next event — corrected`,
       );
     }
-    out.push({ start: e.start, duration, degree: e.degree, size: e.size });
+    out.push({ start: e.start, duration, degree: e.degree, ...e.chord });
   });
   return out.length > 0 ? out : defaultHarmonyEvents(songTicks);
 }

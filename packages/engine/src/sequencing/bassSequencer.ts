@@ -365,19 +365,24 @@ export class BassSequencer {
     return note === null ? [] : [{ kind: 'noteOff', tick, time, note }];
   }
 
-  /** The step's note under the current chord; no timeline events reads as the tonic triad. */
+  /**
+   * The step's note under the current chord's stack (windsor#330: a chromatic
+   * chord's root and tones are already moved); no timeline events reads as
+   * the tonic triad. The reported degree stays the event's.
+   */
   private pitch(chord: HarmonyChord | null): BassPitch {
     const { pitchMode, fixedDegree, register } = this.current;
     if (pitchMode === 'fixed') return this.degreeAt(fixedDegree);
     const degree = chord?.event.degree ?? 0;
+    const stack = chord?.stack ?? chordTones(this.sampler.offsets, 0, CHORD_SIZE_TRIAD);
+    const root = this.sampler.rootNote(register.octave);
     if (pitchMode === 'followRoot' || this.rng() < this.current.rootBias) {
-      return this.degreeAt(degree);
+      return { note: root + (stack[0] ?? 0), degree };
     }
-    const size = chord?.event.size ?? CHORD_SIZE_TRIAD;
-    const others = chordTones(this.sampler.offsets, degree, size).slice(1);
+    const others = stack.slice(1);
     const pick = Math.min(others.length - 1, Math.floor(this.rng() * others.length));
     return {
-      note: this.sampler.rootNote(register.octave) + pitchClass(others[pick] ?? 0),
+      note: root + pitchClass(others[pick] ?? 0),
       degree: (degree + (pick + 1) * THIRD) % this.sampler.degreeCount,
     };
   }

@@ -63,6 +63,16 @@ describe('chordStepModel', () => {
     });
     expect(chordLabel(C_MINOR, chordIn(C_MINOR, 2 * BAR))).toBe('G# maj7 VImaj7');
     expect(chordLabel(C_MINOR, null)).toBe('');
+    // windsor#330: a major V named in the minor key, and a flattened VII.
+    const borrowed: Harmony = {
+      ...C_MINOR,
+      events: [
+        { start: 0, duration: 2 * BAR, degree: 4, size: 3, quality: 'maj' },
+        { start: 2 * BAR, duration: 2 * BAR, degree: 6, size: 3, accidental: -1 },
+      ],
+    };
+    expect(chordLabel(borrowed, chordIn(borrowed, 0))).toBe('G maj V');
+    expect(chordLabel(borrowed, chordIn(borrowed, 2 * BAR))).toBe('A maj ♭VII');
     expect(REST_CHIP).toEqual({ payload: { kind: 'rest' }, name: 'Rest', numeral: '' });
   });
 

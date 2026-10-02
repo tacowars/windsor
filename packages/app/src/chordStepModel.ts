@@ -20,7 +20,7 @@ import {
   ScaleSampler,
   chordAt,
   chordName,
-  chordOf,
+  eventChord,
   hitStep,
   restStep,
   romanNumeral,
@@ -56,8 +56,10 @@ export function currentChord(
 export function chordLabel(harmony: Harmony, chord: HarmonyChord | null): string {
   if (!chord) return '';
   const offsets = scaleOffsets(harmony.scale);
-  const named = chordOf(offsets, chord.event.degree, chord.event.size);
-  return `${chordName(harmony.root, named)} ${romanNumeral(chord.event.degree, named.quality, offsets.length)}`;
+  const { event } = chord;
+  const named = eventChord(offsets, event);
+  const numeral = romanNumeral(event.degree, named.quality, offsets.length, event.accidental);
+  return `${chordName(harmony.root, named)} ${numeral}`;
 }
 
 /** The Hit tile: named for the chord under the playhead now. */

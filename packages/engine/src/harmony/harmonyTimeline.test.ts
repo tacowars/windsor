@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { chordAt, eventBounds, type Harmony } from './harmonyTimeline';
+import { chordAt, chordIdentity, eventBounds, type Harmony } from './harmonyTimeline';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 
 const BAR = TICKS_PER_BAR;
@@ -66,6 +66,18 @@ describe('chordAt', () => {
     expect(chordAt(high, SONG, 0)?.tonesRoot).toBe(12);
   });
 
+  it('carries the event’s stack, chromatic fields included (windsor#330)', () => {
+    expect(chordAt(HARMONY, SONG, BAR)?.stack).toEqual([8, 12, 15]);
+    // A dominant seventh on degree 6 of C minor, flattened: B♭ down to A, so A C♯ E G.
+    const borrowed: Harmony = {
+      ...HARMONY,
+      events: [{ start: 0, duration: SONG, degree: 6, size: 4, quality: 'dom7', accidental: -1 }],
+    };
+    const chord = chordAt(borrowed, SONG, 0);
+    expect(chord?.stack).toEqual([9, 13, 16, 19]);
+    expect(chord?.tonesRoot).toBe(9);
+  });
+
   it('is null with no events or no song', () => {
     expect(chordAt({ ...HARMONY, events: [] }, SONG, 0)).toBeNull();
     expect(chordAt(HARMONY, 0, 0)).toBeNull();
@@ -90,5 +102,20 @@ describe('eventBounds', () => {
       { index: 0, start: BAR, end: SONG },
     ]);
     expect(eventBounds({ ...HARMONY, events: [] }, SONG)).toEqual([]);
+  });
+});
+
+describe('chordIdentity (windsor#330 decision 4)', () => {
+  const at = (event: Harmony['events'][number], harmony: Partial<Harmony> = {}): string =>
+    chordIdentity(chordAt({ ...HARMONY, ...harmony, events: [event] }, SONG, 0)!);
+  const ii = { start: 0, duration: SONG, degree: 1, size: 3 } as const;
+
+  it('names degree, size, quality and accidental, and not the key or the event', () => {
+    expect(at(ii)).toBe('1:3::0');
+    expect(at({ ...ii, quality: 'maj', accidental: 1 })).toBe('1:3:maj:1');
+    expect(at(ii, { root: 7, scale: 'major' })).toBe(at(ii));
+    expect(at({ ...ii, start: BAR })).toBe(at(ii));
+    expect(at({ ...ii, quality: 'min' })).not.toBe(at(ii));
+    expect(at({ ...ii, accidental: -1 })).not.toBe(at(ii));
   });
 });

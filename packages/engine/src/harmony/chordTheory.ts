@@ -12,6 +12,7 @@
  */
 import { CHORD_SIZE_SEVENTH, CHORD_SIZE_TRIAD } from '../audioConstants';
 import { QUALITY_INTERVALS, type ChordQuality } from './chordTables';
+import type { HarmonyEvent } from './harmonyTimeline';
 import { SEMITONES_PER_OCTAVE, foldDegree } from '../sequencing/scaleSampler';
 
 /** Triad or seventh: how many thirds are stacked. */
@@ -63,6 +64,36 @@ export function chordQuality(
 export function chordOf(offsets: readonly number[], degree: number, size: ChordSize): Chord {
   const stack = chordTones(offsets, degree, size);
   return { degree, size, stack, quality: chordQuality(stack) };
+}
+
+/** What an event's chord is spelt from: its degree and size, and the chromatic fields (windsor#330). */
+export type ChordSpelling = Pick<HarmonyEvent, 'degree' | 'size' | 'quality' | 'accidental'>;
+
+/**
+ * The one stack rule every performer and label reads (windsor#330 decision
+ * 2): the scale's own chord for the degree, or — when the event names a
+ * quality — that quality's intervals built on the degree's root (octave carry
+ * included); then the accidental added to every tone, so the whole chord
+ * moves. With neither field this is exactly `chordTones`.
+ */
+export function eventStack(offsets: readonly number[], event: ChordSpelling): number[] {
+  const shift = event.accidental ?? 0;
+  let stack: number[];
+  if (event.quality === undefined) {
+    stack = chordTones(offsets, event.degree, event.size);
+  } else {
+    const folded = foldDegree(event.degree, Math.max(1, offsets.length));
+    const root = (offsets[folded.degree] ?? 0) + folded.carry * SEMITONES_PER_OCTAVE;
+    stack = [root, ...QUALITY_INTERVALS[event.quality].map((interval) => root + interval)];
+  }
+  return shift === 0 ? stack : stack.map((tone) => tone + shift);
+}
+
+/** The `Chord` an event names: its stack, and the quality it asks for or the stack's own. */
+export function eventChord(offsets: readonly number[], event: ChordSpelling): Chord {
+  const stack = eventStack(offsets, event);
+  const quality = event.quality ?? chordQuality(stack);
+  return { degree: event.degree, size: event.size, stack, quality };
 }
 
 /** One chord per degree of the scale, in degree order — the picker's row. */

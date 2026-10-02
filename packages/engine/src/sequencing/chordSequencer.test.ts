@@ -225,12 +225,20 @@ describe('ChordSequencer', () => {
     const transport = new TickTransport(120);
     const events: NoteEvent[] = [];
     seq.onNote = (e) => events.push(e);
-    seq.attach(gate(transport));
+    const regionGate = gate(transport);
+    seq.attach(regionGate);
     for (let i = 0; i < 10; i++) transport.advance(0);
     // A minor at register octave 3 (A3 = 57); the harmony's i is now A minor.
     const minor = new ScaleSampler({
       root: 9,
       scale: 'naturalMinor',
+    });
+    // A key change reaches the gate's harmony with the sampler, as the player sends it: the
+    // chord's stack is the timeline's (windsor#330), the sampler only places it.
+    regionGate.reconfigure({
+      regions: [{ start: 0, duration: SONG_TICKS }],
+      songTicks: SONG_TICKS,
+      harmony: { root: 9, scale: 'naturalMinor', events: I_I_V },
     });
     seq.reconfigure(
       {

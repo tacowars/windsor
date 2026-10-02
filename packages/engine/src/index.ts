@@ -159,13 +159,17 @@ export {
   chordQuality,
   chordTones,
   diatonicChords,
+  eventChord,
+  eventStack,
   isChordSize,
 } from './harmony/chordTheory';
-export type { Chord, ChordSize } from './harmony/chordTheory';
+export type { Chord, ChordSize, ChordSpelling } from './harmony/chordTheory';
 export { chordName, pitchClassName, romanNumeral, toRoman } from './harmony/chordNames';
 export { invertStack, voiceChord } from './harmony/chordVoicing';
 export type { VoiceOptions } from './harmony/chordVoicing';
 export {
+  ACCIDENTAL_GLYPHS,
+  CHORD_ACCIDENTALS,
   CHORD_DIVISORS,
   CHORD_DURATIONS,
   CHORD_NOTE_NAMES,
@@ -173,12 +177,15 @@ export {
   CHORD_VOICINGS,
   CHORD_VOICING_DEFAULT,
   CHORD_VOICING_IDS,
+  QUALITY_INTERVALS,
   QUALITY_LABELS,
 } from './harmony/chordTables';
 export type {
+  ChordAccidental,
   ChordQuality,
   ChordVoicing,
   ChordVoicingId,
+  NamedQuality,
   QualityLabel,
 } from './harmony/chordTables';
 export { foldDegree } from './sequencing/scaleSampler';
@@ -416,7 +423,7 @@ export type {
   RegionGateConfig,
   RegionGateHooks,
 } from './sequencing/regionGate';
-export { chordAt, eventBounds } from './harmony/harmonyTimeline';
+export { chordAt, chordIdentity, eventBounds } from './harmony/harmonyTimeline';
 export type { EventBounds, Harmony, HarmonyChord, HarmonyEvent } from './harmony/harmonyTimeline';
 export { ARP_STYLES, DEFAULT_ARP_CONFIG, assertArpConfig } from './sequencing/arpSequencer';
 export { Arpeggiator, arpCellPitch, arpNoteList } from './sequencing/arpeggiator';

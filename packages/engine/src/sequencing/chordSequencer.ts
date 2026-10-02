@@ -13,7 +13,7 @@
  *
  * The chord itself is not in the step: the gate hands every tick the
  * `HarmonyChord` at the transport tick (`chordAt`), and a hit's onset takes
- * its degree and size from there, voices it through `chordTones` +
+ * its stack from there (`chord.stack`, windsor#330), voices it through
  * `voiceChord` with the step's `inversion` and `octave` and the part's
  * `voicing`, above the key root at the part's absolute register octave. A
  * chord change never restarts anything: a hit sustaining across a harmony
@@ -50,7 +50,6 @@ import {
   CHORD_VOICING_IDS,
   type ChordVoicingId,
 } from '../harmony/chordTables';
-import { chordTones } from '../harmony/chordTheory';
 import { voiceChord } from '../harmony/chordVoicing';
 import type { HarmonyChord } from '../harmony/harmonyTimeline';
 import type { NoteEvent, NoteHandler } from './noteEvent';
@@ -202,9 +201,8 @@ export function voiceHit(
   step: Pick<ChordHitStep, 'inversion' | 'octave'>,
   chord: HarmonyChord,
 ): number[] {
-  const stack = chordTones(sampler.offsets, chord.event.degree, chord.event.size);
   return voiceChord(
-    stack,
+    chord.stack,
     { inversion: step.inversion, voicing: config.voicing, octave: step.octave },
     sampler.rootNote(config.register.octave),
   );
