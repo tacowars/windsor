@@ -83,10 +83,31 @@ function liveEntries(ctx: AppCtx, lib: Library): ListEntries {
   return id === null ? lib.entries : withOpenFacts(lib.entries, id, songFacts(ctx.model.toJson()));
 }
 
+/** What the save path reads of the strip and of the button that opened its dialog. */
+export interface SaveFocus {
+  readonly opener: { readonly isConnected: boolean };
+  readonly strip: Pick<OpenSongStrip, 'update' | 'focusAction'>;
+}
+
 /**
- * Save as… or Save as copy…. A confirmed Save as… turns the strip named, which
- * swaps its button for Save as copy…, so focus goes to that replacement.
+ * Wait for a confirmed save, call `saved` when it stored, and keep focus on
+ * the strip either way. The save applies the name and tags to the song
+ * before it writes, so even a write that fails has redrawn the strip and
+ * detached the opener; focus then goes to the strip's button as drawn now
+ * (Save as copy… after a confirmed Save as…), never to the page.
  */
+export async function settleSave(
+  save: Promise<string | null>,
+  { opener, strip }: SaveFocus,
+  saved: () => void,
+): Promise<void> {
+  if ((await save) !== null) saved();
+  if (opener.isConnected) return;
+  strip.update();
+  strip.focusAction();
+}
+
+/** Save as… or Save as copy…, from the strip's button `opener`. */
 function saveDialog(
   ctx: AppCtx,
   lib: Library,
@@ -107,12 +128,9 @@ function saveDialog(
     const save = copy
       ? ctx.songs.saveAsCopy(answer.name, answer.tags)
       : ctx.songs.saveAs(answer.name, answer.tags);
-    if ((await save) === null) return;
-    ctx.notify(`saved ${answer.name} to your songs`, 'success');
-    if (!opener.isConnected) {
-      strip.update();
-      strip.focusAction();
-    }
+    await settleSave(save, { opener, strip }, () =>
+      ctx.notify(`saved ${answer.name} to your songs`, 'success'),
+    );
   });
 }
 

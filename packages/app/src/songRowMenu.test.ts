@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SongRow } from './songListModel';
 import type { RowActions } from './songRowMenu';
-import { liveRowButton, menuItems } from './songRowMenu';
+import { liveRowButton, menuItems, scrollCloses } from './songRowMenu';
 
 const row = (over: Partial<SongRow> = {}): SongRow => ({
   id: 'a',
@@ -102,5 +102,18 @@ describe('the ⋯ button a closing row dialog focuses', () => {
 
   it('is nothing when the song is gone from the table', () => {
     expect(liveRowButton(new Button('b', false), [new Button('a', true)])).toBeNull();
+  });
+});
+
+describe('a scroll while a row menu is open', () => {
+  const item = {} as EventTarget;
+  const menu = { contains: (node: Node | null): boolean => node === item };
+
+  it('keeps the menu open when the menu itself scrolls to Delete… in a short window', () => {
+    expect(scrollCloses(menu, item)).toBe(false);
+  });
+
+  it('closes the menu when the page or the table scrolls', () => {
+    expect(scrollCloses(menu, {} as EventTarget)).toBe(true);
   });
 });

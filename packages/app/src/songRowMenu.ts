@@ -112,9 +112,12 @@ export function refocusRow(scope: HTMLElement, opener: HTMLElement): void {
   liveRowButton(opener, rowButtons(scope))?.focus();
 }
 
-/** Place the menu under `more` (above it when there is no room below), inside the viewport. */
+/**
+ * Place the menu under `more` (above it when there is no room below), inside
+ * the viewport, capped to it so a short window scrolls the menu instead.
+ */
 function place(menu: HTMLElement, more: HTMLElement): void {
-  const { top, left } = rowMenuPlacement({
+  const { top, left, maxHeight, maxWidth } = rowMenuPlacement({
     opener: more.getBoundingClientRect(),
     menu: { width: menu.offsetWidth, height: menu.offsetHeight },
     viewport: {
@@ -124,11 +127,18 @@ function place(menu: HTMLElement, more: HTMLElement): void {
   });
   menu.style.top = `${top}px`;
   menu.style.left = `${left}px`;
+  menu.style.maxHeight = `${maxHeight}px`;
+  menu.style.maxWidth = `${maxWidth}px`;
+  menu.style.setProperty('--song-menu-cap', `${maxWidth}px`);
 }
+
+/** A scroll that closes the menu: the page's or the table's, never the menu's own. */
+export const scrollCloses = (menu: Pick<Node, 'contains'>, target: EventTarget | null): boolean =>
+  !menu.contains(target as Node | null);
 
 /**
  * The ⋯ button and, while it is open, its menu. The menu sits in the page
- * above everything, so the table's scroll box never clips it; a scroll, a
+ * above everything, so the table's scroll box never clips it; a scroll outside it, a
  * click elsewhere or Escape closes it.
  */
 export function rowMenuButton(row: SongRow, actions: RowActions): HTMLElement {
@@ -150,7 +160,7 @@ export function rowMenuButton(row: SongRow, actions: RowActions): HTMLElement {
       more.setAttribute('aria-expanded', 'false');
       document.removeEventListener('pointerdown', outside, true);
       document.removeEventListener('keydown', escape, true);
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', scrolled, true);
       if (closeOpenMenu === close) closeOpenMenu = null;
     };
     const outside = (e: PointerEvent): void => {
@@ -158,6 +168,9 @@ export function rowMenuButton(row: SongRow, actions: RowActions): HTMLElement {
     };
     const escape = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') close();
+    };
+    const scrolled = (e: Event): void => {
+      if (scrollCloses(menu, e.target)) close();
     };
     const { items, danger } = menuItems(row);
     const act = (item: MenuItem) => (): void => {
@@ -174,7 +187,7 @@ export function rowMenuButton(row: SongRow, actions: RowActions): HTMLElement {
     more.setAttribute('aria-expanded', 'true');
     document.addEventListener('pointerdown', outside, true);
     document.addEventListener('keydown', escape, true);
-    window.addEventListener('scroll', close, true);
+    window.addEventListener('scroll', scrolled, true);
     closeOpenMenu = close;
   };
   return more;
