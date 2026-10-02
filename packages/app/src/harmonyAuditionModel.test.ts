@@ -7,8 +7,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Harmony, HarmonyEvent } from '@windsor/engine';
-import { CHORD_SIZE_SEVENTH, CHORD_SIZE_TRIAD, TICKS_PER_BAR } from '@windsor/engine';
-import { HARMONY_DEGREE_MAX } from '@windsor/engine/audioConstants';
+import {
+  CHORD_SIZE_SEVENTH,
+  CHORD_SIZE_TRIAD,
+  HARMONY_DEGREE_MAX,
+  TICKS_PER_BAR,
+} from '@windsor/engine';
 import { AuditionHold, auditionChord, auditionEvent } from './harmonyAuditionModel';
 
 const C_MAJOR: Harmony = { root: 0, scale: 'major', events: [] };

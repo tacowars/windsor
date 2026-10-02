@@ -47,6 +47,10 @@ export const HARMONY_CARD_PX: Readonly<Record<string, number>> = {
   '--harmony-info-sub': 12,
   /** The bottom row's height: the Duration dial's, so the last chord's card, with a hint for a dial, lays out as every other. */
   '--harmony-foot-h': 72,
-  /** The info bubble's narrowest width. */
-  '--harmony-info-w': 170,
+  /**
+   * The info bubble's fixed width, so the Duration dial after it never moves:
+   * the longest label with the sounding ♪, `D# augMaj7  ♭III+maj7 · 7th`,
+   * measured 241 px in Chrome; longer labels clip with an ellipsis.
+   */
+  '--harmony-info-w': 244,
 };
