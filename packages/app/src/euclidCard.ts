@@ -39,7 +39,8 @@ import { type DensityPage, densityPage } from './euclidDensityPage';
 import { regionFigure } from './euclidFigure';
 import { laneChoices, laneLength, lanesOf } from './euclidLaneModel';
 import { cycleText, fullCycle } from './euclidLaneView';
-import { type Figure, countOnsets, figureKey, stepsPerBeat } from './euclidModel';
+import { type Figure, countOnsets, figureKey } from './euclidModel';
+import { stepGrouper } from './meterGrid';
 import { shownPass } from './euclidPass';
 import { type PatternPage, fillPicker, patternPage } from './euclidPatternPage';
 import { holdWhilePressed } from './euclidPressHold';
@@ -106,7 +107,7 @@ const songBarTicks = (ctx: AppCtx): number => ticksPerBar(ctx.model.doc.transpor
 function paintAll(live: Live, spec: EuclideanSpec, figure: Figure, pass: number): void {
   const { card, pattern } = live;
   const view = viewOf(card.slot).lanes;
-  const group = stepsPerBeat(spec.divisor);
+  const group = stepGrouper(spec.divisor, card.ctx.model.doc.transport.meter);
   live.heads = paintRows(pattern.rows, pattern.rule, { card, spec, figure, view, pass, group });
   live.lit = live.heads.map(() => Number.NaN);
   fillPicker(pattern.picker, laneChoices(spec));

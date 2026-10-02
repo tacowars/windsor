@@ -6,8 +6,9 @@
  * device's one height. Two sections: Play, the controls in columns
  * (`gridControls.ts`), and Steps, the strip.
  *
- * The strip is one column per written step, 32 px wide and grouped by four
- * (`gridCells.ts`): the note cell, the degree picker, Oct, A, S and the
+ * The strip is one column per written step, 32 px wide and grouped by the
+ * song's beats (`meterGrid.ts`, windsor#431), its cells `gridCells.ts`'s:
+ * the note cell, the degree picker, Oct, A, S and the
  * ratchet held at the top, and a cell per modulation lane (windsor#31)
  * under them. The device is as wide as its steps and never scrolls them
  * sideways; the lanes scroll vertically under the step rows, their names,
@@ -28,6 +29,7 @@ import { el } from './dom';
 import { gridColumn } from './gridCells';
 import { gridControls } from './gridControls';
 import { keySignature, slideAt } from './gridModel';
+import { groupColumns } from './meterGrid';
 import { changePattern } from './partEdits';
 import { regionPlayheadAt } from './regionPlayhead';
 import type { DeviceBody } from './sequencerDevice';
@@ -63,7 +65,11 @@ function repaint(strip: GridStrip): void {
   const scrollTop = strip.scroll.scrollTop;
   paintLaneNames(strip.names, strip.lanes);
   paintStrip(strip, (spec) =>
-    spec.steps.map((_, index) => gridColumn(strip, strip.lanes, index, spec)),
+    groupColumns(
+      spec.steps.map((_, index) => gridColumn(strip, strip.lanes, index, spec)),
+      spec.divisor,
+      strip.ctx.model.doc.transport.meter,
+    ),
   );
   fillLanePicker(strip.picker, strip.lanes);
   const spec = strip.spec();

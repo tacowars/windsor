@@ -261,23 +261,26 @@ const barsOf = (partial: DocumentPartial): number | null => {
 };
 
 /**
- * A `transport.bars` edit carried through the song (decision 4): the
- * partial gains every part's fitted regions and the fitted harmony events
- * where they change, and `report` names them. Any other partial comes back
- * as it was. `AppContext.change` applies this to every partial, so the
- * strip's Bars knob needs no knowledge of regions. Both lengths are bars of
- * the song's meter (windsor#430): the one the partial sets, else the
- * document's.
+ * A `transport.bars` or `transport.meter` edit carried through the song
+ * (decision 4): the partial gains every part's fitted regions and the
+ * fitted harmony events where they change, and `report` names them. Any
+ * other partial comes back as it was. `AppContext.change` applies this to
+ * every partial, so neither the strip's Bars knob nor its meter picker
+ * needs any knowledge of regions. Both lengths are bars of the song's meter
+ * (windsor#430): the one the partial sets, else the document's. A meter
+ * change keeps every tick and cuts what falls past a shorter song exactly
+ * as lowering Bars does (windsor#431).
  */
 export function followSongLength(
   doc: ArrangementDocument,
   partial: DocumentPartial,
 ): { partial: DocumentPartial; report: string[] } {
-  const bars = barsOf(partial);
-  if (bars === null || bars === doc.transport.bars || bars < 1) return { partial, report: [] };
+  const bars = barsOf(partial) ?? doc.transport.bars;
   const meter = partial.transport?.meter ?? doc.transport.meter;
+  if (bars < 1) return { partial, report: [] };
   const songTicks = songLength(bars, meter);
   const previous = songLength(doc.transport.bars, doc.transport.meter);
+  if (songTicks === previous) return { partial, report: [] };
   const report: string[] = [];
   const parts: Record<number, { regions: PartRegion[] }> = {};
   for (const part of doc.parts) {

@@ -121,9 +121,10 @@ knows the one below it and nothing above.
    operations every control calls — `change`, `importDoc`, `livePart()` (the
    Euclidean capture and release went with #705: the card commits
    `host.capturePattern` through `ctx.change` itself). `change` carries a
-   `transport.bars` edit through every whole-song region and the timeline's
-   tail (`regionModel.ts`'s `followSongLength`, #709 decision 4), so the
-   strip's Bars knob needs no knowledge of regions. `context.ts` is the interface the tabs
+   `transport.bars` or `transport.meter` edit through every whole-song
+   region and the timeline's tail (`regionModel.ts`'s `followSongLength`,
+   #709 decision 4, windsor#431), so neither the strip's Bars knob nor its
+   meter picker needs any knowledge of regions. `context.ts` is the interface the tabs
    import, so a card needs no import cycle back to the implementation. It
    knows no DOM beyond a panel's `hidden` flag, which is why
    `appContext.test.ts` drives it with fakes.
@@ -136,8 +137,9 @@ knows the one below it and nothing above.
      hidden and its render deferred.
 3. **`tabShell.ts`** builds the buttons and panels and registers each tab with
    the context; **`transportStrip.ts`** (#708) is the one piece of chrome
-   above every tab — BPM, Bars, 4/4, key, scale, the `bar.beat.sixteenth`
-   position and ▶ ■ ‖ — registered through `ctx.addChrome`, so it renders on
+   above every tab — BPM, Bars, the meter picker (windsor#431), key, scale,
+   the `bar.beat.sixteenth` position counted in the song's meter, and
+   ▶ ■ ‖ — registered through `ctx.addChrome`, so it renders on
    every `render()` and never on `invalidate()` or `refreshTabs()` (the Bars knob's, which re-renders the active tab under the strip). The buttons are
    `ctx.transport` (`host.ts`'s `HostTransport`: ▶ unmute + start, ‖
    `AudioSystem.setMuted(true)`, ■ `AudioSystem.stopMusic` — stop, release, rewind to tick 0

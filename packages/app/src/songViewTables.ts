@@ -13,10 +13,11 @@
  * floor is the scale that fits the whole song in the window;
  * `minPxPerBar` is only the absolute floor under it.
  */
-import type { SequencerKind, SequencerSpec } from '@windsor/engine';
-import { BEATS_PER_BAR, PPQ, TICKS_PER_BAR } from '@windsor/engine';
+import type { Meter, SequencerKind, SequencerSpec } from '@windsor/engine';
+import { TICKS_PER_BAR, meterBeats, ticksPerBar } from '@windsor/engine';
 import { BASS_MODE_OPTIONS } from './bassModel';
-import { DIVISOR_OPTIONS } from './sequencerConstants';
+import { divisorLabel } from './divisorLabels';
+import { beatStarts } from './meterGrid';
 import { ARP_STYLE_LABELS } from './sequencerKnobTables';
 
 export interface SongViewScale {
@@ -175,9 +176,15 @@ export function rulerLabelEvery(
   return every;
 }
 
-/** The px offsets of the beat ticks inside one bar (the first beat is the bar line itself). */
-export const beatTickPx = (pxPerBar: number): number[] =>
-  Array.from({ length: BEATS_PER_BAR - 1 }, (_, i) => tickToPx((i + 1) * PPQ, pxPerBar));
+/**
+ * The px offsets of the beat ticks inside one bar of `meter`, at its counted
+ * beats (windsor#431; the first beat is the bar line itself): 7/8's fall at
+ * ticks 24 and 48 of its 84.
+ */
+export const beatTickPx = (pxPerBar: number, meter?: Meter): number[] =>
+  beatStarts(meterBeats(meter))
+    .slice(1)
+    .map((tick) => tickToPx(tick, pxPerBar, ticksPerBar(meter)));
 
 /** Where a block draws on its lane, in px from the song start. */
 export interface BlockBox {
@@ -266,26 +273,30 @@ export const LANE_TONE: Readonly<Record<SequencerKind, LaneTone>> = {
   bass: 'pitch',
 };
 
-/** One function per kind over that kind's own spec — the lanes look a part up here, never branch. */
+/**
+ * One function per kind over that kind's own spec, and the song's meter for
+ * a table that names a step (windsor#431) — the lanes look a part up here,
+ * never branch.
+ */
 export type KindTable<T> = {
-  readonly [K in SequencerKind]: (spec: Extract<SequencerSpec, { kind: K }>) => T;
+  readonly [K in SequencerKind]: (spec: Extract<SequencerSpec, { kind: K }>, meter?: Meter) => T;
 };
 
 /** Apply a kind table to a spec; the cast is the discriminated union's, which TypeScript cannot correlate through an index. */
-export function forKind<T>(table: KindTable<T>, spec: SequencerSpec): T {
-  return (table[spec.kind] as (s: SequencerSpec) => T)(spec);
+export function forKind<T>(table: KindTable<T>, spec: SequencerSpec, meter?: Meter): T {
+  return (table[spec.kind] as (s: SequencerSpec, m?: Meter) => T)(spec, meter);
 }
 
-const divisorLabel = (divisor: number): string =>
-  DIVISOR_OPTIONS.find((o) => Number(o.value) === divisor)?.label ?? `${divisor}t`;
-
-/** The summary a region block shows in small caps, after the kind's name. */
+/** The summary a region block shows in small caps, after the kind's name, its step named in the song's meter. */
 export const REGION_SUMMARY: KindTable<string> = {
   none: () => 'no sequencer',
-  euclidean: (spec) => `euclid ${spec.pulses.start}/${spec.steps} · ${divisorLabel(spec.divisor)}`,
-  grid: (spec) => `grid · ${spec.length} steps · ${divisorLabel(spec.divisor)}`,
-  chord: (spec) => `chord · ${spec.steps.length} steps · ${divisorLabel(spec.divisor)}`,
-  arp: (spec) => `arp · ${ARP_STYLE_LABELS[spec.style]} ${divisorLabel(spec.divisor)}`,
+  euclidean: (spec, meter) =>
+    `euclid ${spec.pulses.start}/${spec.steps} · ${divisorLabel(spec.divisor, meter)}`,
+  grid: (spec, meter) => `grid · ${spec.length} steps · ${divisorLabel(spec.divisor, meter)}`,
+  chord: (spec, meter) =>
+    `chord · ${spec.steps.length} steps · ${divisorLabel(spec.divisor, meter)}`,
+  arp: (spec, meter) =>
+    `arp · ${ARP_STYLE_LABELS[spec.style]} ${divisorLabel(spec.divisor, meter)}`,
   bass: (spec) =>
     `bass · ${BASS_MODE_OPTIONS.find((o) => o.value === spec.pitchMode)?.label ?? spec.pitchMode}`,
 };

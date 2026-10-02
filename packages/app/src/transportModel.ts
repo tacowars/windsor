@@ -9,17 +9,22 @@
  *
  * windsor#12: the tempo and bars boxes' typed entry, their drag, and tap
  * tempo are rules here too, so the DOM file only wires them. windsor#29 adds
- * the swing box and its grid picker, windsor#30 the loop button.
+ * the swing box and its grid picker, windsor#30 the loop button, windsor#431
+ * the meter picker and the position in the song's meter.
  */
-import type { DocumentPartial, ScaleName, Swing, Transport } from '@windsor/engine';
+import type { DocumentPartial, Meter, ScaleName, Swing, Transport } from '@windsor/engine';
 import {
+  FOUR_FOUR,
+  METERS,
   SCALE_NAMES,
   STRAIGHT_SWING,
   SWING_GRIDS,
+  meterBeats,
   songTicks as songLength,
   ticksPerBar,
 } from '@windsor/engine';
 import { loopChange, newLoopRange } from './loopBraceModel';
+import { beatAt } from './meterGrid';
 import {
   BARS_DRAG_STEP,
   BARS_KNOB,
@@ -29,8 +34,7 @@ import {
   MS_PER_MINUTE,
   NUMBER_DRAG,
   NUMBER_DRAG_THRESHOLD_PX,
-  POSITION_GRID,
-  type PositionGrid,
+  POSITION_SIXTEENTH,
   SWING_KNOB,
   TAP_TEMPO,
   type TapTempo,
@@ -52,20 +56,37 @@ export function songTickOf(tick: number, songTicks: number): number {
 }
 
 /**
- * The song position of a transport tick, 1-based: tick 0 → `1.1.1`, tick 95
- * → `1.4.4`, tick 96 → `2.1.1`. The transport's tick never wraps; the song
- * does (`tick mod songTicks`, epic #703 decision 5), so the readout does too.
+ * The song position of a transport tick, `bar.beat.sixteenth`, 1-based, in
+ * the song's meter (windsor#431 decision 3): the beat is the counted beat
+ * and the third field counts 16ths inside it. In 4/4 tick 95 reads `1.4.4`;
+ * in 6/8 tick 36 reads `1.2.1` and a dotted-quarter beat counts 1–6. The
+ * transport's tick never wraps; the song does (`tick mod songTicks`, epic
+ * #703 decision 5), so the readout does too.
  */
 export function formatPosition(
   tick: number,
   songTicks: number,
-  grid: PositionGrid = POSITION_GRID,
+  meter?: Meter,
+  sixteenth: number = POSITION_SIXTEENTH,
 ): string {
   const t = songTickOf(tick, songTicks);
-  const bar = Math.floor(t / grid.bar) + 1;
-  const beat = Math.floor((t % grid.bar) / grid.beat) + 1;
-  const sixteenth = Math.floor((t % grid.beat) / grid.sixteenth) + 1;
-  return `${bar}.${beat}.${sixteenth}`;
+  const bar = ticksPerBar(meter);
+  const inBar = t % bar;
+  const { beat, start } = beatAt(inBar, meterBeats(meter));
+  return `${Math.floor(t / bar) + 1}.${beat + 1}.${Math.floor((inBar - start) / sixteenth) + 1}`;
+}
+
+/** The meter a transport plays: its own, or 4/4 when the song names none (windsor#429). */
+export const meterOf = (transport: Pick<Transport, 'meter'>): Meter => transport.meter ?? FOUR_FOUR;
+
+/**
+ * A meter pick as a live partial (windsor#431 decision 1), or null for a
+ * value that names no meter. `AppContext.change` cuts what falls past a
+ * shorter song as a Bars edit does (`followSongLength`), in the same step.
+ */
+export function meterChange(value: string): DocumentPartial | null {
+  const meter = METERS.find((known) => known === value);
+  return meter ? { transport: { meter } } : null;
 }
 
 /**

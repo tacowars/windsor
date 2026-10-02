@@ -1,8 +1,9 @@
 /**
  * The transport strip (#708, epic #703 decision 1), which sits in the header
  * row since windsor#11 beside the brand, the power button and the tabs — Tap,
- * BPM, Bars, swing and its grid (windsor#29), 4/4, key, scale, the `bar.beat.sixteenth` position, ▶ ■ ‖
- * and the loop button (windsor#30).
+ * BPM, Bars, swing and its grid (windsor#29), the meter (windsor#431), key,
+ * scale, the `bar.beat.sixteenth` position, ▶ ■ ‖ and the loop button
+ * (windsor#30).
  * Tempo and bars are number boxes that type and drag (`numberDrag.ts`,
  * windsor#12), laid out as Ableton Live's control bar: Tap, BPM, Bars. Every edit is a live `ctx.change`, never a rebuild;
  * the buttons are `ctx.transport` (`host.ts`'s `HostTransport`), and the
@@ -17,6 +18,7 @@
  * from the Song view's playhead (windsor#102) shows here at once.
  */
 import type { Swing } from '@windsor/engine';
+import { songTicksOf } from '@windsor/engine';
 import type { AppContext } from './appContext';
 import type { AppCtx } from './context';
 import { el, html, select } from './dom';
@@ -34,6 +36,8 @@ import {
   formatPosition,
   isStraight,
   keyChange,
+  meterChange,
+  meterOf,
   loopIsOn,
   loopToggle,
   parseBars,
@@ -52,7 +56,7 @@ import {
   CUSTOM_SCALE,
   KEY_OPTIONS,
   METER_LABEL,
-  POSITION_GRID,
+  METER_OPTIONS,
   SCALE_OPTIONS,
   SWING_GRID_LABEL,
   SWING_GRID_OPTIONS,
@@ -61,7 +65,9 @@ import {
   TAP_TEMPO,
 } from './transportTables';
 
-const songTicks = (ctx: AppCtx): number => ctx.model.doc.transport.bars * POSITION_GRID.bar;
+/** The audible tick's place in the song, read in the song's meter (windsor#431 decision 3). */
+const positionOf = (ctx: AppCtx, tick: number): string =>
+  formatPosition(tick, songTicksOf(ctx.model.doc), ctx.model.doc.transport.meter);
 
 /**
  * Tap, BPM, Bars (windsor#12). The song's length reshapes what every tab
@@ -167,6 +173,21 @@ function swingControls(ctx: AppCtx): HTMLElement[] {
   return [amount, headPicker(grid, SWING_GRID_LABEL)];
 }
 
+/**
+ * The meter picker (windsor#431 decision 1), where the fixed `4/4` sat: a
+ * select the swing grid's size, showing 4/4 for a song that names none. A
+ * pick is one undo step that moves every bar line and cuts what falls past
+ * a shorter song (`meterChange`), so every tab and the strip redraw.
+ */
+function meterPicker(ctx: AppCtx): HTMLElement {
+  const current = meterOf(ctx.model.doc.transport);
+  const pick = select(METER_LABEL, METER_OPTIONS, current, (value) => {
+    const partial = meterChange(value);
+    if (partial && ctx.change(partial).ok) ctx.render();
+  });
+  return headPicker(pick, METER_LABEL);
+}
+
 function keyPickers(ctx: AppCtx): HTMLElement[] {
   const { root, scale } = ctx.model.doc.harmony;
   const key = select('Key', KEY_OPTIONS, String(root), (value) => {
@@ -244,11 +265,7 @@ const STATE_ORDER = ['idle', 'playing', 'paused'] as const;
 
 /** ▶ ■ ‖ and the position they move. */
 function transportControls(ctx: AppCtx): HTMLElement[] {
-  const position = el(
-    'span',
-    'transport-position',
-    formatPosition(audibleTick(ctx), songTicks(ctx)),
-  );
+  const position = el('span', 'transport-position', positionOf(ctx, audibleTick(ctx)));
   position.setAttribute('aria-label', 'Position (bar.beat.sixteenth)');
   const play = button('▶', 'Play from the current position');
   const stop = button('■', 'Stop, release every voice and return to 1.1.1');
@@ -268,7 +285,7 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
   };
   stop.onclick = (): void => {
     ctx.transport.stop();
-    position.textContent = formatPosition(audibleTick(ctx), songTicks(ctx));
+    position.textContent = positionOf(ctx, audibleTick(ctx));
     sync();
   };
   sync();
@@ -282,7 +299,7 @@ function transportControls(ctx: AppCtx): HTMLElement[] {
     attached: () => position.isConnected,
     playheadAt: () => audibleTick(ctx),
     mark: (tick) => {
-      position.textContent = formatPosition(tick, songTicks(ctx));
+      position.textContent = positionOf(ctx, tick);
     },
   });
   return [position, play, stop, pause, loopButton(ctx)];
@@ -304,7 +321,7 @@ export function renderTransportStrip(root: HTMLElement, ctx: AppCtx): void {
   root.innerHTML = '';
   const row = el('div', 'transport-row');
   row.appendChild(group(tempoBoxes(ctx)));
-  row.appendChild(group([...swingControls(ctx), el('span', 'transport-meter', METER_LABEL)]));
+  row.appendChild(group([...swingControls(ctx), meterPicker(ctx)]));
   row.appendChild(group(keyPickers(ctx)));
   row.appendChild(group(transportControls(ctx)));
   root.appendChild(row);

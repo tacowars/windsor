@@ -25,7 +25,7 @@ import { partChange } from './context';
 import { el, seg, select } from './dom';
 import { makeKnob } from './knob';
 import { changePattern, patternOf } from './partEdits';
-import { DIVISOR_OPTIONS } from './sequencerConstants';
+import { divisorOptions } from './divisorLabels';
 import { DENSITY_DEFAULTS, DENSITY_KNOBS } from './sequencerKnobTables';
 import type { SequencerField, SequencerKnobEntry } from './sequencerKnobTables';
 
@@ -104,7 +104,7 @@ export function knobRow(
 export function divisorPicker(ctx: AppCtx, slot: number, region?: number): HTMLElement {
   const spec = driverOf(ctx.model.doc, slot, region);
   const divisor = spec && spec.kind !== 'none' ? spec.divisor : DEFAULT_EUCLIDEAN_CONFIG.divisor;
-  return select('Step', DIVISOR_OPTIONS, String(divisor), (v) => {
+  return select('Step', divisorOptions(ctx.model.doc.transport.meter), String(divisor), (v) => {
     if (changePattern(ctx, slot, region, { divisor: Number(v) })) ctx.render();
   });
 }

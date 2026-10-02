@@ -51,6 +51,7 @@ import {
 import { ROW_KEY_ATTRIBUTE } from './euclidRowFocus';
 import { type RowHead, cellStrip, nameButton, row } from './euclidRowParts';
 import type { Figure } from './euclidModel';
+import type { StepGroup } from './meterGrid';
 import { type LaneHost, laneCell, patchBase } from './stepModLane';
 
 /** What every lane row is drawn against: the card, the spec and figure as built, the view and pass. */
@@ -60,8 +61,8 @@ export interface LaneRowsInput {
   readonly figure: Figure;
   readonly view: LaneView;
   readonly pass: number;
-  /** Cells per beat, for the beat gap. */
-  readonly group: number;
+  /** The gap before each cell: the song's beat or bar line (windsor#431). */
+  readonly group: (index: number) => StepGroup;
   /** The element holding every row: where a sound lane's drag finds its cells. */
   readonly scope: HTMLElement;
 }

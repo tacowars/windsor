@@ -5,7 +5,7 @@
  * header from it and the view's repaint check rewrites that header in place
  * after a card's edit, never rebuilding the card under the pointer.
  */
-import type { ArrangementDocument, MusicPart } from '@windsor/engine';
+import type { ArrangementDocument, Meter, MusicPart } from '@windsor/engine';
 import { meterBeats, partAt, regionPattern } from '@windsor/engine';
 import { eventBar } from './harmonyLaneModel';
 import { editedRegion, keepsRegionPatterns } from './partEdits';
@@ -28,13 +28,13 @@ export function editTarget(part: MusicPart, region: number | null): number | nul
 }
 
 /** A part's header: its name and kind, over the edited pattern's summary and the region count. */
-export function partHeadText(part: MusicPart, region: number | null): PaneHeadText {
+export function partHeadText(part: MusicPart, region: number | null, meter?: Meter): PaneHeadText {
   const count = part.regions.length;
   const edited = editTarget(part, region);
   const shown = typeof edited === 'number' ? regionPattern(part, edited) : part.sequencer;
   return {
     title: `${part.name} — ${KIND_LABELS[part.sequencer.kind]}`,
-    note: `${forKind(REGION_SUMMARY, shown)} · ${count} region${count === 1 ? '' : 's'}`,
+    note: `${forKind(REGION_SUMMARY, shown, meter)} · ${count} region${count === 1 ? '' : 's'}`,
   };
 }
 
@@ -46,7 +46,7 @@ export function paneHeadText(
   if (!selection) return null;
   if (selection.kind === 'part') {
     const part = partAt(doc, selection.slot);
-    return part ? partHeadText(part, selection.region) : null;
+    return part ? partHeadText(part, selection.region, doc.transport.meter) : null;
   }
   const event = doc.harmony.events[selection.index];
   if (!event) return null;

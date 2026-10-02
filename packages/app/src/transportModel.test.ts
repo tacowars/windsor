@@ -1,9 +1,8 @@
 /**
  * The transport strip's pure rules (#708): the position readout and the
  * ▶ ■ ‖ state machine, plus the partials the strip writes. The tick fixtures
- * are the issue's; 4/4 at 24 PPQ is the engine's constant (epic #703
- * decision 7), not a tunable, and the injected-grid case shows the format
- * follows whatever grid it is handed.
+ * are the issues' (#708, windsor#431): 4/4 when the song names no meter,
+ * and the meter's counted beats when it does.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -12,10 +11,12 @@ import {
   BARS_MAX,
   BPM_MAX,
   BPM_MIN,
+  METERS,
   STRAIGHT_SWING,
   SWING_AMOUNT_MAX,
   SWING_AMOUNT_MIN,
   TICKS_PER_BAR,
+  ticksPerBar,
 } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
 import { DocumentModel } from './documentModel';
@@ -29,6 +30,8 @@ import {
   formatPosition,
   isStraight,
   keyChange,
+  meterChange,
+  meterOf,
   nextTransportState,
   parseBars,
   parseBpm,
@@ -49,7 +52,7 @@ import {
   KEY_OPTIONS,
   NUMBER_DRAG,
   NUMBER_DRAG_THRESHOLD_PX,
-  POSITION_GRID,
+  METER_OPTIONS,
   SCALE_OPTIONS,
   SWING_GRID_OPTIONS,
   SWING_KNOB,
@@ -78,10 +81,19 @@ describe('formatPosition', () => {
     expect(formatPosition(songTicks + TICKS_PER_BAR, songTicks)).toBe('2.1.1');
   });
 
-  it('follows the grid it is handed', () => {
-    const grid = { bar: 12, beat: 4, sixteenth: 1 };
-    expect(formatPosition(13, 48, grid)).toBe('2.1.2');
-    expect(POSITION_GRID.bar).toBe(TICKS_PER_BAR);
+  it("counts the meter's beats, with 16ths inside the counted beat (windsor#431)", () => {
+    const seven = ticksPerBar('7/8');
+    expect(formatPosition(2 * seven - 1, 4 * seven, '7/8')).toBe('2.3.6');
+    expect(formatPosition(36, 4 * ticksPerBar('6/8'), '6/8')).toBe('1.2.1');
+    expect(formatPosition(35, 4 * ticksPerBar('6/8'), '6/8')).toBe('1.1.6');
+    expect(formatPosition(4 * 36, 8 * ticksPerBar('12/8'), '12/8')).toBe('2.1.1');
+  });
+
+  it('reads 4/4 for a song with no meter, and writes a picked meter as named', () => {
+    expect(meterOf({})).toBe('4/4');
+    expect(meterOf({ meter: '5/4' })).toBe('5/4');
+    expect(meterChange('4/4')).toEqual({ transport: { meter: '4/4' } });
+    expect(METER_OPTIONS.map((o) => o.label)).toEqual([...METERS]);
   });
 });
 
