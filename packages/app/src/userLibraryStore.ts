@@ -28,9 +28,20 @@ const idOf = (name: string): string =>
 const refused = (request: IDBRequest | IDBOpenDBRequest): Error =>
   request.error ?? new Error('IndexedDB refused');
 
-function openDb(): Promise<IDBDatabase> {
+/**
+ * Open the database. An older tab still holding an earlier version blocks
+ * the upgrade (a build before version 2 never lets go): `onBlocked` hears
+ * it, once, and the open keeps waiting until that tab closes.
+ */
+function openDb(onBlocked: () => void): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(USER_DB.name, USER_DB.version);
+    let told = false;
+    request.onblocked = (): void => {
+      if (told) return;
+      told = true;
+      onBlocked();
+    };
     request.onupgradeneeded = (): void => {
       const db = request.result;
       // Version 2 is additive: the two song stores join, and nothing else changes.
@@ -40,7 +51,7 @@ function openDb(): Promise<IDBDatabase> {
     };
     request.onsuccess = (): void => {
       const db = request.result;
-      // Another tab's newer build upgrading the database waits for this one to let go.
+      // Every open lets go when another tab's newer build upgrades, so this build never blocks one.
       db.onversionchange = (): void => db.close();
       resolve(db);
     };
@@ -170,12 +181,16 @@ function songRecords(db: IDBDatabase, beforeWrite: () => void): SongRecords {
  * Open the database and hand back its stores, or null where the browser
  * has no usable IndexedDB (the console then falls back to downloads, and
  * nothing autosaves). `beforeWrite` runs before every write, unawaited: the
- * persistence request, which must never hold a save up.
+ * persistence request, which must never hold a save up. `onBlocked` hears,
+ * once, that an older tab is holding the upgrade up; the open waits for it.
  */
-export async function openUserStores(beforeWrite: () => void): Promise<UserStores | null> {
+export async function openUserStores(
+  beforeWrite: () => void,
+  onBlocked: () => void = () => {},
+): Promise<UserStores | null> {
   if (typeof indexedDB === 'undefined') return null;
   try {
-    const db = await openDb();
+    const db = await openDb(onBlocked);
     return {
       patches: patchStore(db, beforeWrite),
       songs: songStore(db, beforeWrite),

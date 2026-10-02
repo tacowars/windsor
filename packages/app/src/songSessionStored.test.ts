@@ -132,6 +132,31 @@ describe('remove', () => {
     expect(c.records.docMap.has(a)).toBe(false);
   });
 
+  it('waits for writes already captured for the open song, so none brings it back', async () => {
+    const a = (await c.ctx.songs.saveAs('Queued', []))!;
+    const put = c.records.put;
+    const held: (() => void)[] = [];
+    c.records.put = (index, text) =>
+      new Promise<void>((resolve, reject) => {
+        held.push(() => void put(index, text).then(resolve, reject));
+      });
+    bpm(118);
+    void c.autosave.flush();
+    bpm(119);
+    void c.autosave.flush();
+    const removed = c.ctx.songs.remove(a);
+    await vi.advanceTimersByTimeAsync(0);
+    while (held.length > 0) {
+      held.shift()!();
+      await vi.advanceTimersByTimeAsync(0);
+    }
+    expect(await removed).toBe(true);
+    await vi.advanceTimersByTimeAsync(DELAY_MS * 3);
+    expect((await c.ctx.songs.list()).map((entry) => entry.id)).not.toContain(a);
+    expect(await c.library.read(a)).toBeNull();
+    expect(c.ctx.songs.state).toEqual({ kind: 'untitled' });
+  });
+
   it('removes another song and leaves the open one alone', async () => {
     const a = (await c.ctx.songs.saveAs('Kept', []))!;
     await c.library.write('o', songText({ name: 'Gone', tags: [] }));

@@ -75,6 +75,8 @@ export class SongAutosave {
   private written: { text: string; target: AutosaveTarget } | null = null;
   /** The writes in order; each resolves true when it stored its text. */
   private queue: Promise<boolean> = Promise.resolve(true);
+  /** Writes captured and not yet settled. */
+  private inFlight = 0;
 
   constructor(deps: AutosaveDeps) {
     this.deps = deps;
@@ -90,6 +92,20 @@ export class SongAutosave {
 
   get pending(): boolean {
     return this.timer !== null;
+  }
+
+  /**
+   * True while leaving the page could lose an edit: a change is waiting
+   * (scheduled, or owed after a flush or a failed write) or a write is
+   * still under way. `beforeunload` asks the browser to confirm while it holds.
+   */
+  get unsaved(): boolean {
+    return this.timer !== null || this.owed || this.inFlight > 0;
+  }
+
+  /** Resolves once every write already captured has settled; captures nothing itself. */
+  settle(): Promise<void> {
+    return this.queue.then(() => undefined);
   }
 
   /**
@@ -109,7 +125,10 @@ export class SongAutosave {
     this.owed = false;
     const text = this.deps.read();
     const target = this.target;
-    this.queue = this.queue.then(() => this.write(target, text));
+    this.inFlight++;
+    this.queue = this.queue
+      .then(() => this.write(target, text))
+      .finally(() => void this.inFlight--);
     return this.queue;
   }
 

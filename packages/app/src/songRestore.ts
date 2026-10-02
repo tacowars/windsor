@@ -147,17 +147,47 @@ export async function reopenSong(ctx: AppCtx, id: string): Promise<boolean> {
   return outcome.ok;
 }
 
+/** How the boot's song went: a song opened, the new song stayed, or the stored one was kept unopened. */
+export type BootOutcome = 'opened' | 'new' | 'kept';
+
+/**
+ * Whether the user has touched the document since now: an edit, or any
+ * replacement (Import, New song, an open). Taken as the console boots, so
+ * a boot delayed behind the database (an older tab blocking its upgrade)
+ * never replaces what the user did meanwhile.
+ */
+export function touchWatch(ctx: AppCtx): () => boolean {
+  const replacements = ctx.songs.replacements;
+  return () => ctx.model.changed || ctx.songs.replacements !== replacements;
+}
+
+/** What the boot says when it leaves the stored song alone because the user has already started. */
+export function keptText(stored: SessionRecord): string {
+  return isNamedSession(stored)
+    ? 'your last song is in your songs — this song stays open'
+    : 'your last session is kept until your first edit — this song stays open';
+}
+
 /**
  * The reload (windsor#433 decision 9): the session record names a named
  * song, which reopens at once, or holds an untitled one, which is offered
- * as before. True when a song was opened.
+ * as before. When `touched` says the user has already edited or replaced
+ * the document, nothing is opened or asked: the stored song is kept and
+ * the reader told where it is.
  */
-export function bootSong(
+export async function bootSong(
   ctx: AppCtx,
   stored: SessionRecord | null,
   confirm: (request: ConfirmRequest) => Promise<boolean>,
-  download?: (text: string) => void,
-): Promise<boolean> {
-  if (stored && isNamedSession(stored)) return reopenSong(ctx, stored.songId);
-  return offerRestore(ctx, stored, confirm, download);
+  options: { download?: (text: string) => void; touched?: () => boolean } = {},
+): Promise<BootOutcome> {
+  if (options.touched?.()) {
+    if (stored) ctx.notify(keptText(stored));
+    return 'kept';
+  }
+  const opened =
+    stored && isNamedSession(stored)
+      ? await reopenSong(ctx, stored.songId)
+      : await offerRestore(ctx, stored, confirm, options.download);
+  return opened ? 'opened' : 'new';
 }

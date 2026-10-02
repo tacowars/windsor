@@ -166,4 +166,46 @@ describe('SongAutosave', () => {
       expect(a.texts).toEqual([]);
     });
   });
+
+  describe('unsaved, what beforeunload asks about', () => {
+    it('holds while a change waits, while a write is out, and after a failure; clears once written', async () => {
+      let release: () => void = () => {};
+      let fail = false;
+      const texts: string[] = [];
+      const slow: AutosaveTarget = {
+        save: (text) => {
+          if (fail) return Promise.reject(new Error('quota'));
+          return new Promise<void>((resolve) => {
+            release = (): void => {
+              texts.push(text);
+              resolve();
+            };
+          });
+        },
+      };
+      let text = 'a';
+      const autosave = new SongAutosave({
+        store: memoryStore(),
+        read: () => text,
+        report: () => {},
+        delayMs: 1000,
+      });
+      autosave.retarget(slow);
+      expect(autosave.unsaved).toBe(false);
+      autosave.schedule();
+      expect(autosave.unsaved).toBe(true);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(autosave.pending).toBe(false);
+      expect(autosave.unsaved).toBe(true);
+      release();
+      await autosave.settle();
+      expect(texts).toEqual(['a']);
+      expect(autosave.unsaved).toBe(false);
+      fail = true;
+      text = 'b';
+      autosave.schedule();
+      expect(await autosave.flush()).toBe(false);
+      expect(autosave.unsaved).toBe(true);
+    });
+  });
 });

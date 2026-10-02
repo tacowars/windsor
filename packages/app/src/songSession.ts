@@ -26,6 +26,7 @@
 import type { ApplyResult, ArrangementDocument, DocumentPartial } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
 import type { DocumentModel } from './documentModel';
+import type { AutosaveTarget } from './songAutosave';
 import { sessionTarget } from './songAutosave';
 import type { SongListEntry } from './songLibrary';
 import { fileNameAmend, metaOf, templateCopy, withMeta } from './songMetaText';
@@ -87,6 +88,10 @@ export class SongSession {
   private readonly listeners = new Set<() => void>();
   /** The session's operations, one after another, so two switches never interleave. */
   private chain: Promise<unknown> = Promise.resolve();
+  /** How many times the document has been replaced, for a boot that must not replace a touched one. */
+  private replaced = 0;
+  /** Songs deleted in this session: a write captured for one before it went never brings it back. */
+  private readonly removed = new Set<string>();
 
   constructor(host: SessionHost, options: SessionOptions = {}) {
     this.host = host;
@@ -104,6 +109,11 @@ export class SongSession {
   /** False where the browser offers no IndexedDB: the library is unavailable, Document works as before. */
   get available(): boolean {
     return this.storage !== null;
+  }
+
+  /** How many times the session has replaced the document (an open, New song, Import, a restore). */
+  get replacements(): number {
+    return this.replaced;
   }
 
   get state(): SongSessionState {
@@ -163,8 +173,7 @@ export class SongSession {
       if (!(await this.leave(storage))) return { ok: false, problem: 'unsaved' };
       await this.ready();
       storage.autosave.quietly(() => this.replace(song.raw));
-      const target = namedTarget(storage.library, id, () => this.emit());
-      storage.autosave.retarget(target, { written: song.text });
+      storage.autosave.retarget(this.targetOf(storage, id), { written: song.text });
       this.become({ kind: 'named', id });
       saveOpenIfClean(this.host.model, storage.autosave);
       await this.pointAt(storage, id);
@@ -253,18 +262,21 @@ export class SongSession {
   /**
    * Delete stored song `id`. Deleting the open song leaves it open and
    * playing, now untitled, and its text goes back into `current` at once.
-   * The autosave is pointed away first, so no late write brings it back.
+   * The autosave is pointed away first, and every write already captured
+   * for the song settles before the delete, so no late write brings it back.
    */
   remove(id: string): Promise<boolean> {
     return this.withStorage(false, async (storage) => {
       const open = this.isOpen(id);
       if (open) storage.autosave.retarget(sessionTarget(storage.store), { owed: true });
+      await storage.autosave.settle();
       try {
         await storage.library.remove(id);
       } catch (error) {
-        if (open) storage.autosave.retarget(namedTarget(storage.library, id, () => this.emit()));
+        if (open) storage.autosave.retarget(this.targetOf(storage, id));
         return this.fail(`delete failed: ${errorText(error)}`);
       }
+      this.removed.add(id);
       if (open) {
         this.become({ kind: 'untitled' });
         await storage.autosave.flush();
@@ -335,7 +347,17 @@ export class SongSession {
     return this.fail(`${name} stays open: its last changes couldn't be saved`);
   }
 
+  /** The record named song `id` autosaves into, which writes nothing once the song is deleted. */
+  private targetOf(storage: SessionStorage, id: string): AutosaveTarget {
+    const target = namedTarget(storage.library, id, () => this.emit());
+    return {
+      save: (text, updated) =>
+        this.removed.has(id) ? Promise.resolve() : target.save(text, updated),
+    };
+  }
+
   private replace(raw: unknown, amend?: OpenAmend): void {
+    this.replaced++;
     this.host.parts.selected = 0;
     this.host.replace(raw, amend);
   }
@@ -349,8 +371,7 @@ export class SongSession {
       this.fail(`save failed: ${errorText(error)}`);
       return null;
     }
-    const target = namedTarget(storage.library, id, () => this.emit());
-    storage.autosave.retarget(target, { written: text });
+    storage.autosave.retarget(this.targetOf(storage, id), { written: text });
     this.become({ kind: 'named', id });
     await this.pointAt(storage, id);
     return id;

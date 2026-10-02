@@ -63,6 +63,10 @@ export const USER_DB = {
 export const EVICTABLE_WARNING =
   'Your patches and autosaved song are kept in this browser, which may clear them if it runs short of space. Export a song to keep a copy.';
 
+/** The warning shown once while an older tab holds the database at an earlier version, blocking the upgrade. */
+export const BLOCKED_UPGRADE_WARNING =
+  'Windsor is open in another tab with an older version — close it to load your songs';
+
 /** IndexedDB home of the remembered directory handle (the developer's folder grant). */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;
 

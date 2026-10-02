@@ -11,20 +11,25 @@
  */
 import type { AppCtx } from './context';
 import { bootLibrary, reportLibraryProblems } from './libraryActions';
-import { EVICTABLE_WARNING } from './libraryConstants';
+import { BLOCKED_UPGRADE_WARNING, EVICTABLE_WARNING } from './libraryConstants';
 import { openConfirm } from './metadataModal';
 import { SongAutosave, isNamedSession } from './songAutosave';
 import { songLibrary } from './songLibrary';
-import { bootSong } from './songRestore';
+import { bootSong, touchWatch } from './songRestore';
 import { browserPersist, persistOnce } from './storagePersistence';
 import { openUserStores } from './userLibraryStore';
 import { followSong } from './userSessionAutosave';
 
 export async function bootUserState(ctx: AppCtx): Promise<void> {
+  // Taken first: the open below can wait on an older tab for as long as it stays open.
+  const touched = touchWatch(ctx);
   const ensurePersisted = persistOnce(browserPersist(), () =>
     ctx.notify(EVICTABLE_WARNING, 'warning'),
   );
-  const stores = await openUserStores(() => void ensurePersisted());
+  const stores = await openUserStores(
+    () => void ensurePersisted(),
+    () => ctx.notify(BLOCKED_UPGRADE_WARNING, 'warning'),
+  );
   const stored = stores ? await stores.songs.load().catch(() => null) : null;
   const autosave = stores
     ? new SongAutosave({
@@ -37,21 +42,31 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
     ctx.songs.attach({ library: songLibrary(stores.library), store: stores.songs, autosave });
   }
   // The question and the library load run together; an open waits for the built-ins itself.
-  const [, opened] = await Promise.all([
+  const [, outcome] = await Promise.all([
     bootLibrary(stores?.patches ?? null).then(() => {
       reportLibraryProblems(ctx);
       ctx.render();
     }),
-    bootSong(ctx, stored, openConfirm),
+    bootSong(ctx, stored, openConfirm, { touched }),
   ]);
-  if (!stored)
-    ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
-  else if (!opened && !isNamedSession(stored))
-    ctx.notify('new song — your last session is kept until your first edit');
+  // A boot that kept the stored song (the user had started) has said its word.
+  if (outcome !== 'kept') {
+    if (!stored)
+      ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
+    else if (outcome === 'new' && !isNamedSession(stored))
+      ctx.notify('new song — your last session is kept until your first edit');
+  }
   if (!autosave) return;
   // A clean open's load-time rename (windsor#103) saves now; a repaired one waits for an edit.
-  followSong(ctx.model, autosave, opened);
+  followSong(ctx.model, autosave, outcome === 'opened');
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void autosave.flush();
+  });
+  // A reload inside the quiet period, or before a write commits, is asked about first.
+  window.addEventListener('beforeunload', (event) => {
+    if (!autosave.unsaved) return;
+    void autosave.flush();
+    event.preventDefault();
+    event.returnValue = '';
   });
 }
