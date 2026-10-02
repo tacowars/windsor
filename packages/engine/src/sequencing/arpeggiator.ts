@@ -80,9 +80,8 @@
  * transport, and emits note events on the tick grid.
  */
 import { MIDI_NOTE_MAX } from '../audioConstants';
-import { chordTones } from '../harmony/chordTheory';
 import { voiceChord } from '../harmony/chordVoicing';
-import type { HarmonyChord } from '../harmony/harmonyTimeline';
+import { chordIdentity, type HarmonyChord } from '../harmony/harmonyTimeline';
 import {
   arpCellIndex,
   arpSkipRng,
@@ -114,12 +113,11 @@ export function arpNoteList(
   config: Pick<ArpSequencerConfig, 'voicing' | 'octaves' | 'register'>,
   chord: HarmonyChord,
 ): number[] {
-  const stack = chordTones(pitch.offsets, chord.event.degree, chord.event.size);
   // Voice unclipped at the real register — a folded degree carries octaves
   // and a downward voicing reaches below the root, so no single lift keeps the
   // stack in range — expand, then clip 0–127 once at the end (#714 review).
   const voiced = voiceChord(
-    stack,
+    chord.stack,
     {
       inversion: 0,
       voicing: config.voicing,
@@ -235,8 +233,8 @@ export function rollOutcome(
   return { events: outcome.events, held: open ? outcome.held : null, releaseTick: null };
 }
 
-/** What identifies "the chord changed" for a retrigger: its degree and size, not its event. */
-const chordKey = (chord: HarmonyChord): string => `${chord.event.degree}:${chord.event.size}`;
+/** What identifies "the chord changed" for a retrigger: the timeline's identity, not its event. */
+const chordKey = (chord: HarmonyChord): string => chordIdentity(chord);
 
 export class Arpeggiator {
   onNote: NoteHandler | null = null;

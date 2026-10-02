@@ -74,6 +74,23 @@ describe('the arp part in the player', () => {
     expect(onNotes(r.parts.arp)[firstVi]).toBe(listAt(2 * BAR)[0]);
   });
 
+  it('walks a chromatic event’s tones, and a quality change alone retriggers (windsor#330)', () => {
+    // i, then I: C minor turned major by its quality, same degree and size.
+    const picardy: Harmony = {
+      ...HARMONY,
+      events: [HARMONY.events[0]!, { ...HARMONY.events[0]!, start: 2 * BAR, quality: 'maj' }],
+    };
+    const major = arpNoteList(sampler, SPEC, chordAt(picardy, SONG, 2 * BAR)!);
+    expect(major.slice(0, 3).map((n) => n - major[0]!)).toEqual([0, 4, 7]);
+    const firstI = (2 * BAR) / QUARTER;
+    const on = rig({ ...arp({ retrigger: true }), harmony: picardy });
+    on.run(3);
+    expect(onNotes(on.parts.arp).slice(firstI, firstI + 2)).toEqual(major.slice(0, 2));
+    const off = rig({ ...arp(), harmony: picardy });
+    off.run(3);
+    expect(onNotes(off.parts.arp)[firstI]).toBe(major[firstI % major.length]);
+  });
+
   it('a second region restarts the line at its entry, and a region end releases the held note', () => {
     const halves: Region[] = [
       { start: 0, duration: BAR },

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { SCALES } from '../audioConstants';
 import { chordName, pitchClassName, romanNumeral, toRoman } from './chordNames';
-import { chordOf, diatonicChords } from './chordTheory';
+import { chordOf, diatonicChords, eventChord, type ChordSpelling } from './chordTheory';
 
 const labels = (root: number, scale: readonly number[], size: 3 | 4): string[] =>
   diatonicChords(scale, size).map(
@@ -65,5 +65,30 @@ describe('chordNames', () => {
       'XII',
       'XXIV',
     ]);
+  });
+});
+
+describe('chromatic events (windsor#330)', () => {
+  const label = (scale: readonly number[], event: ChordSpelling): string => {
+    const chord = eventChord(scale, event);
+    return `${chordName(60, chord)} ${romanNumeral(event.degree, chord.quality, scale.length, event.accidental)}`;
+  };
+
+  it('names the moved stack and prefixes the numeral with the accidental', () => {
+    expect(label(SCALES.major, { degree: 0, size: 3, quality: 'maj', accidental: -1 })).toBe(
+      'B maj ♭I',
+    );
+    expect(label(SCALES.major, { degree: 5, size: 3, quality: 'maj', accidental: -1 })).toBe(
+      'G# maj ♭VI',
+    );
+    expect(label(SCALES.major, { degree: 5, size: 3, accidental: -1 })).toBe('G# min ♭vi');
+    expect(label(SCALES.naturalMinor, { degree: 4, size: 4, quality: 'dom7' })).toBe('G 7 V7');
+  });
+
+  it('reads sharps, the `other` numbers and a natural as today', () => {
+    expect(romanNumeral(3, 'dim', 7, 1)).toBe('♯iv°');
+    expect(romanNumeral(5, 'other', 5, -1)).toBe('♭1');
+    expect(romanNumeral(4, 'dom7', 7, 0)).toBe('V7');
+    expect(romanNumeral(4, 'dom7', 7)).toBe('V7');
   });
 });

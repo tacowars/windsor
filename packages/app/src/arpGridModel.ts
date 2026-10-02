@@ -31,7 +31,7 @@ import {
   arpNote,
   arpNoteList,
   chordName,
-  chordOf,
+  eventChord,
   scaleOffsets,
 } from '@windsor/engine';
 import { ARP_RANDOM, type ArpRandomTable } from './arpGridConstants';
@@ -78,7 +78,7 @@ export function arpCellCount(
 export function arpCycleLabel(count: number, key: ArpKey, chord: HarmonyChord | null): string {
   const cells = `${count} ${count === 1 ? 'cell' : 'cells'}`;
   if (!chord) return cells;
-  const named = chordOf(scaleOffsets(key.scale), chord.event.degree, chord.event.size);
+  const named = eventChord(scaleOffsets(key.scale), chord.event);
   return `${cells} · ${chordName(key.root, named)}`;
 }
 

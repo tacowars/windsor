@@ -8,7 +8,7 @@
  * next), and appending takes a bar from the last. Every function relays the
  * starts from the durations and returns a new list for `ctx.change`, where
  * arrays replace wholesale. The names a block shows come from the engine's
- * `chordOf` / `chordName` / `romanNumeral`, never a second spelling.
+ * `eventChord` / `chordName` / `romanNumeral`, never a second spelling.
  * `harmonyLaneModel.test.ts` pins the fixtures the ticket names.
  */
 import type { ChordSize, Harmony, HarmonyEvent } from '@windsor/engine';
@@ -17,8 +17,8 @@ import {
   PPQ,
   TICKS_PER_BAR,
   chordName,
-  chordOf,
   diatonicChords,
+  eventChord,
   pitchClassName,
   romanNumeral,
   scaleOffsets,
@@ -78,7 +78,13 @@ export function setSize(
   index: number,
   size: ChordSize,
 ): HarmonyEvent[] {
-  return events.map((e, i) => (i === index ? { ...e, size } : e));
+  return events.map((e, i) => {
+    if (i !== index) return e;
+    // A seventh (or triad) asked for by Size is the scale's own, so a named quality goes.
+    const next: { -readonly [K in keyof HarmonyEvent]: HarmonyEvent[K] } = { ...e, size };
+    delete next.quality;
+    return next;
+  });
 }
 
 /**
@@ -191,10 +197,10 @@ export interface EventLabel {
 /** What a block shows for an event, in the song's key. */
 export function eventLabel(harmony: Harmony, event: HarmonyEvent): EventLabel {
   const offsets = scaleOffsets(harmony.scale);
-  const chord = chordOf(offsets, event.degree, event.size);
+  const chord = eventChord(offsets, event);
   return {
     name: chordName(harmony.root, chord),
-    numeral: romanNumeral(event.degree, chord.quality, offsets.length),
+    numeral: romanNumeral(event.degree, chord.quality, offsets.length, event.accidental),
     sizeTag: event.size === CHORD_SIZE_SEVENTH ? '7th' : 'triad',
   };
 }
