@@ -38,7 +38,7 @@ import type { DetailPane } from './songDetailPane';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
-import { adoptPartsPick, pickedSlot } from './partSelectionSync';
+import { adoptPartsPick, keepPartSelected, pickedSlot } from './partSelectionSync';
 import { selectPart } from './partsSession';
 import {
   EXPANDED_KNOB_COUNT,
@@ -211,7 +211,8 @@ function renderSongView(
   const pick = { slot: ctx.parts.selected, picks: ctx.parts.picks };
   const adopted = adoptPartsPick(state.selection, pick, state.picksSeen);
   state.picksSeen = adopted.seen;
-  state.selection = validSelection(ctx, adopted.selection);
+  const slots = ctx.model.doc.parts.map((p) => p.slot);
+  state.selection = validSelection(ctx, keepPartSelected(adopted.selection, pick.slot, slots));
   const scroll = el('div', 'lanes-scroll');
   const lanes = el('div', 'lanes');
   lanes.style.setProperty('--names', `${SONG_VIEW.laneNameWidthPx}px`);

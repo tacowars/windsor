@@ -3,7 +3,8 @@
  * shared slot is `ctx.parts.selected`; a pick goes through `selectPart`
  * (`partsSession.ts`), which counts it. The Song view writes a pick when it
  * selects a part or one of its regions (`pickedSlot`), and when it is shown
- * it adopts a pick it has not seen (`adoptPartsPick`). Both are pure, so the
+ * it adopts a pick it has not seen (`adoptPartsPick`) and trades a part that
+ * is gone for the one the Parts tab shows (`keepPartSelected`). All are pure, so the
  * rules are tested here and the tab only calls them.
  */
 import type { SongSelection } from './songTab';
@@ -44,3 +45,20 @@ export function adoptPartsPick(selection: SongSelection, pick: PartsPick, seen: 
  */
 export const pickedSlot = (selection: SongSelection): number | null =>
   selection?.kind === 'part' ? selection.slot : null;
+
+/**
+ * The Song view's part selection once its part is gone (an undo of the add,
+ * a delete on the Parts tab): the Parts selection when that part remains,
+ * else the first part, which is where the Parts tab falls back too, so both
+ * views land on the same remaining part, or on none. Any other selection,
+ * or one whose part remains, stays as it is.
+ */
+export function keepPartSelected(
+  selection: SongSelection,
+  partsSlot: number,
+  slots: readonly number[],
+): SongSelection {
+  if (selection?.kind !== 'part' || slots.includes(selection.slot)) return selection;
+  const slot = slots.includes(partsSlot) ? partsSlot : slots[0];
+  return slot === undefined ? null : { kind: 'part', slot, region: null };
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adoptPartsPick, pickedSlot } from './partSelectionSync';
+import { adoptPartsPick, keepPartSelected, pickedSlot } from './partSelectionSync';
 import type { SongSelection } from './songTab';
 
 const part = (slot: number, region: number | null): SongSelection => ({
@@ -39,5 +39,26 @@ describe('pickedSlot', () => {
     expect(pickedSlot(part(3, null))).toBe(3);
     expect(pickedSlot(event)).toBeNull();
     expect(pickedSlot(null)).toBeNull();
+  });
+});
+
+describe('keepPartSelected', () => {
+  it('follows the Parts tab when an undo removes the part the Song view adopted', () => {
+    // Parts adds slot 3 (a pick), the Song view adopts it, then Parts undoes the add
+    // and falls back to slot 0 without a pick.
+    const adopted = adoptPartsPick(part(0, 0), { slot: 3, picks: 1 }, 0);
+    const back = adoptPartsPick(adopted.selection, { slot: 0, picks: 1 }, adopted.seen);
+    expect(keepPartSelected(back.selection, 0, [0, 1])).toEqual(part(0, null));
+  });
+
+  it('falls back to the first part when the Parts slot is gone too, or to none', () => {
+    expect(keepPartSelected(part(3, 0), 3, [1, 2])).toEqual(part(1, null));
+    expect(keepPartSelected(part(3, 0), 3, [])).toBeNull();
+  });
+
+  it('keeps a selection whose part remains, an event, or none', () => {
+    for (const selection of [null, event, part(1, 0)]) {
+      expect(keepPartSelected(selection, 0, [0, 1])).toBe(selection);
+    }
   });
 });
