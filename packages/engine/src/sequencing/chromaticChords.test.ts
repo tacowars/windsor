@@ -181,6 +181,22 @@ describe('the Bass reads the stack (decision 3)', () => {
     expect(new Set(notes.map((e) => e.note))).toEqual(new Set([C2 + 3, C2 + 6]));
   });
 
+  it('followChord reports the event’s degree under a chromatic event', () => {
+    const notes = play(bass({ pitchMode: 'followChord', rootBias: 0 }), FLAT_ONE, 32);
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes.every((e) => e.degree === 0)).toBe(true);
+  });
+
+  it('followChord reports the chord tone’s degree under a diatonic event', () => {
+    const notes = play(
+      bass({ pitchMode: 'followChord', rootBias: 0 }),
+      holding(whole({ degree: 0 })),
+      32,
+    );
+    expect(new Set(notes.map((e) => e.degree))).toEqual(new Set([2, 4]));
+    for (const e of notes) expect(e.note).toBe(major.noteForFolded(e.degree, OCTAVE));
+  });
+
   it('followRoot under a diatonic event plays the scale degree as before', () => {
     const notes = play(bass({ pitchMode: 'followRoot' }), holding(whole({ degree: 5 })), 1);
     expect(notes.map((e) => e.note)).toEqual([major.noteForFolded(5, OCTAVE)]);

@@ -368,7 +368,10 @@ export class BassSequencer {
   /**
    * The step's note under the current chord's stack (windsor#330: a chromatic
    * chord's root and tones are already moved); no timeline events reads as
-   * the tonic triad. The reported degree stays the event's.
+   * the tonic triad. The root reports the event's degree. Another tone of a
+   * diatonic event reports that chord tone's degree, as before; another tone
+   * of a chromatic event (`quality` or `accidental` set) isn't a scale
+   * degree, so it reports the event's degree.
    */
   private pitch(chord: HarmonyChord | null): BassPitch {
     const { pitchMode, fixedDegree, register } = this.current;
@@ -383,11 +386,20 @@ export class BassSequencer {
     const pick = Math.min(others.length - 1, Math.floor(this.rng() * others.length));
     return {
       note: root + pitchClass(others[pick] ?? 0),
-      degree: (degree + (pick + 1) * THIRD) % this.sampler.degreeCount,
+      degree: isChromatic(chord)
+        ? degree
+        : (degree + (pick + 1) * THIRD) % this.sampler.degreeCount,
     };
   }
 
   private degreeAt(degree: number): BassPitch {
     return { note: this.sampler.noteForFolded(degree, this.current.register.octave), degree };
   }
+}
+
+/** Whether a chord's event names a quality or an accidental, so its tones aren't scale degrees. */
+function isChromatic(chord: HarmonyChord | null): boolean {
+  return (
+    chord !== null && (chord.event.quality !== undefined || chord.event.accidental !== undefined)
+  );
 }

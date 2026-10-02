@@ -38,7 +38,11 @@ diatonic chord; it cannot hold for a chord the scale does not spell.
    another quality is asked for with `quality`. `eventChord` builds the
    `Chord` the names read. The Chord Player, the Arpeggiator and the Bass
    all voice `chord.stack`; none rebuilds a chord from `degree` + `size`.
-   A note-on still reports the event's `degree`.
+   A root note-on reports the event's `degree`. For a diatonic event (no
+   `quality`, no `accidental`) the Bass's `followChord` still reports the
+   chord tone's degree, as before. Under a chromatic event (`quality` or
+   `accidental` set) a chord tone isn't a scale degree, so its note-on
+   reports the event's `degree`.
 3. **The arp's change identity is the timeline's**:
    `chordIdentity(chord)` is `degree:size:quality:accidental`. A change of
    quality or accidental alone is a chord change for `retrigger`; a key or
