@@ -2160,7 +2160,7 @@ body.chord-dragging {
   color: var(--carrier);
 }
 
-/* ---------- the arp device (#706; the device, windsor#370) ---------- */
+/* ---------- the arp and basslead devices (#706, #707; the devices, windsor#370, windsor#371) ---------- */
 /* Record `2026-10-01-sequencer-rack-devices` decisions 1–6 and 8; the look
    is docs/research/2026-09-30-sequencer-rack/arp.html. The frame, rail,
    sections, columns, held step rows, lanes and ratchet row are the
@@ -2168,25 +2168,32 @@ body.chord-dragging {
    --arp-* properties (`sequencerDeviceTables.ts`) and laid out as the
    Chord's: Play inset --arp-inset from the rail, its columns --arp-col-gap
    apart and its knob strip behind a rule; the strip's cells --arp-cell-h
-   high in --arp-row-gap rows, its columns --arp-step-gap apart. */
-.arp-device {
+   high in --arp-row-gap rows, its columns --arp-step-gap apart. Basslead
+   (windsor#371, decision 9, bass.html) draws the Arp's cells and is laid
+   out as the Arp, so it shares these rules and sizes; its own follow. */
+.arp-device,
+.bass-device {
   --strip-head-h: var(--arp-strip-head-h);
   display: flex;
   min-height: 0;
 }
-.arp-device .seq-section.play {
+.arp-device .seq-section.play,
+.bass-device .seq-section.play {
   padding-right: 0;
   padding-left: var(--arp-inset);
 }
-.arp-device .seq-section.play .seq-sec-body {
+.arp-device .seq-section.play .seq-sec-body,
+.bass-device .seq-section.play .seq-sec-body {
   gap: var(--arp-col-gap);
 }
-.seq-col.arp-fields {
+.seq-col.arp-fields,
+.seq-col.bass-fields {
   width: var(--arp-field-w);
 }
-/* Octave to Skip: one strip, parted from the Play columns by a rule and
-   from Cycle by the section border. */
-.arp-knobs {
+/* Octave to Skip (Basslead's Octave to Root bias): one strip, parted from
+   the Play columns by a rule and from the strip by the section border. */
+.arp-knobs,
+.bass-knobs {
   display: flex;
   gap: 2px;
   padding: 0 var(--arp-knob-pad);
@@ -2212,11 +2219,13 @@ body.chord-dragging {
 .arp-device .seg button + button {
   border-left: 1px solid var(--line-bright);
 }
-.arp-seed {
+.arp-seed,
+.bass-seed {
   display: flex;
   gap: 3px;
 }
-.arp-device input.field {
+.arp-device input.field,
+.bass-device input.field {
   flex: 1;
   min-width: 0;
   max-width: none;
@@ -2226,25 +2235,54 @@ body.chord-dragging {
   color: var(--ink);
   font-size: 11px;
 }
-.seq-icon.arp-reseed {
+.seq-icon.arp-reseed,
+.seq-icon.bass-reseed {
   width: var(--arp-reseed);
   height: var(--arp-reseed);
   border-color: var(--line-bright);
 }
 /* The strip: roomier cells than the Grid's, the ratchet row kept at its 14 px. */
-.arp-device .seq-strip > .grid-strip {
+.arp-device .seq-strip > .grid-strip,
+.bass-device .seq-strip > .grid-strip {
   gap: var(--arp-step-gap);
 }
-.arp-device .grid-col > .strip-head {
+.arp-device .grid-col > .strip-head,
+.bass-device .grid-col > .strip-head {
   gap: var(--arp-row-gap);
 }
-.arp-device .seq-strip .gcell:not(.ratchet) {
+.arp-device .seq-strip .gcell:not(.ratchet),
+.bass-device .seq-strip .gcell:not(.ratchet) {
   height: var(--arp-cell-h);
   line-height: calc(var(--arp-cell-h) - 2px);
 }
-.arp-device .seq-strip .gcell.note {
+.arp-device .seq-strip .gcell.note,
+.bass-device .seq-strip .gcell.note {
   border-color: var(--line-bright);
   color: var(--ink);
+}
+/* Basslead's own: Pitch mode as a stack of three, each 21 px and set off
+   by a rule, the chosen one in the part's accent. */
+.bass-device .seg.bass-modes {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 0;
+  border: 1px solid var(--line-bright);
+}
+.bass-device .seg.bass-modes button {
+  flex: none;
+  min-width: 0;
+  height: 20px;
+  padding: 0 8px;
+  font-family: var(--f-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 20px;
+  text-align: left;
+  text-transform: none;
+}
+.bass-device .seg.bass-modes button + button {
+  border-top: 1px solid var(--line-bright);
 }
 
 /* ---------- the Euclidean card (#610; the device, windsor#356) ---------- */

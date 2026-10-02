@@ -285,7 +285,7 @@ export const ARP_VOICING_OPTIONS: readonly { value: string; label: string }[] =
 /** Reseed draws from the 32-bit stream-seed space `hashSeed` folds every seed into. */
 export const ARP_RESEED_SPAN = 2 ** 32;
 
-/** The bass card (#707): Root bias is live for Follow Chord only; Reg is `octaveKnob('bass')`. */
+/** The bass card (#707): Root bias is live for Follow Chord only; Octave is `octaveKnob('bass')`. */
 export const BASS_ROOT_BIAS_KNOB: DriverKnobEntry = {
   kind: 'driver',
   f: 'rootBias',
@@ -293,6 +293,7 @@ export const BASS_ROOT_BIAS_KNOB: DriverKnobEntry = {
   o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.rootBias, fmt: fmt2 },
 };
 
+/** The Basslead device's table knobs: Gate, Density, Vel, and the strip's Acc vel and Acc mod (windsor#371). */
 export const BASS_KNOBS: readonly SequencerKnobEntry[] = [
   {
     kind: 'driver',
@@ -307,7 +308,28 @@ export const BASS_KNOBS: readonly SequencerKnobEntry[] = [
     o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.density, fmt: fmt2 },
   },
   VELOCITY_KNOB,
+  {
+    kind: 'driver',
+    f: 'accentVelocity',
+    label: 'Acc vel',
+    o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.accentVelocity, fmt: fmt2 },
+  },
+  {
+    kind: 'driver',
+    f: 'accentMod',
+    label: 'Acc mod',
+    o: { min: 0, max: 1, def: DEFAULT_BASS_CONFIG.accentMod, fmt: fmt2 },
+  },
 ];
+
+/** The Basslead strip's Length (windsor#371): the Grid's range over the bass's own default, one bar. */
+export const BASS_LENGTH_KNOB: CardKnobSpec = {
+  ...GRID_LENGTH_KNOB,
+  def: DEFAULT_BASS_CONFIG.length,
+};
+
+/** The Basslead strip's Rotate: the Grid's, and like it never stored. */
+export const BASS_ROTATE_KNOB: CardKnobSpec = GRID_ROTATE_KNOB;
 
 /** The density modulator's knob ranges: the console shows less than the engine accepts. */
 export const DENSITY_BARS_MAX = 64;

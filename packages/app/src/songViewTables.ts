@@ -281,9 +281,10 @@ export const REGION_SUMMARY: KindTable<string> = {
 
 /**
  * The pattern's cycle in ticks, for the faint ticks inside a block (decision
- * 1): the written length for a grid, the steps' durations and repeats for a
- * Chord Player, `steps` for a Euclidean line; null for the kinds that have
- * none (arp, bass) or a cycle with nothing in it.
+ * 1): the loop length for a grid and a Basslead strip (windsor#371; a part
+ * with no strip loads as one bar of plain notes), the steps' durations and
+ * repeats for a Chord Player, `steps` for a Euclidean line; null for the
+ * kind that has none (arp) or a cycle with nothing in it.
  */
 export const CYCLE_TICKS: KindTable<number | null> = {
   none: () => null,
@@ -294,5 +295,5 @@ export const CYCLE_TICKS: KindTable<number | null> = {
     return steps > 0 ? steps * spec.divisor : null;
   },
   arp: () => null,
-  bass: () => null,
+  bass: (spec) => (spec.length > 0 ? spec.length * spec.divisor : null),
 };
