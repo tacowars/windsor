@@ -5014,9 +5014,10 @@ input.song-name:focus {
 .song-menu {
   position: fixed;
   z-index: 50;
-  /* Never wider than the max-width the placement sets in a narrow window:
-     the viewport less both edge gaps (2 × SONG_MENU_EDGE_PX, songListTables.ts). */
-  min-width: min(170px, calc(100vw - 8px));
+  /* Never wider than the placement's own cap (`--song-menu-cap`, set by
+     `songRowMenu.ts` from the same viewport it measures), so the minimum
+     never beats the max-width in a narrow window or beside a scrollbar. */
+  min-width: min(170px, var(--song-menu-cap, 100%));
   /* In a window too short for every item, the menu scrolls inside itself (windsor#458). */
   overflow: auto;
   overscroll-behavior: contain;

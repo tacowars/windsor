@@ -129,6 +129,7 @@ function place(menu: HTMLElement, more: HTMLElement): void {
   menu.style.left = `${left}px`;
   menu.style.maxHeight = `${maxHeight}px`;
   menu.style.maxWidth = `${maxWidth}px`;
+  menu.style.setProperty('--song-menu-cap', `${maxWidth}px`);
 }
 
 /** A scroll that closes the menu: the page's or the table's, never the menu's own. */
