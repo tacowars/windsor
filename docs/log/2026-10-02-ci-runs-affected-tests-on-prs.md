@@ -87,3 +87,6 @@ that few PRs change.
   drops or renames it, vitest falls back to its own provider without a
   word: the scanning tests stop being added on PRs, and a git failure passes
   again. A vitest upgrade checks it.
+- `scripts/check-vitest-provider.mjs`, run in CI's `verify` job on every
+  code change, guards that experimental API: it fails the run when vitest
+  stops using the config's provider (windsor#456).

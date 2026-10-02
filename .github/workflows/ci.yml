@@ -83,6 +83,15 @@ jobs:
           cache: npm
       - if: steps.changes.outputs.code == 'true'
         run: npm ci --no-audit --fund=false
+      # A PR's test selection runs through the change provider in
+      # vitest.config.ts, set by vitest's experimental `vcsProvider` option.
+      # If an upgrade drops or renames it, vitest falls back to its own
+      # provider silently: the source-scanning tests stop running on PRs and
+      # a git failure passes. This probe fails if the config's provider is not
+      # the one in use (windsor#456). It takes seconds and runs no test.
+      - if: steps.changes.outputs.code == 'true'
+        name: Vitest uses the config's change provider
+        run: node scripts/check-vitest-provider.mjs
       # On a pull request, the base sha puts vitest in vitest.config.ts's
       # changed-files mode. On a push to main it is empty and every test runs.
       - if: steps.changes.outputs.code == 'true'
