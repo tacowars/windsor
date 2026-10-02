@@ -79,6 +79,26 @@ export function stripColumn(
   return col;
 }
 
+/**
+ * One `.grid-col` whose step number and step rows are held together in a
+ * `.strip-head`, which a device's strip keeps at its top while the cells
+ * under it (the lanes) scroll (windsor#368, the Grid first).
+ */
+export function stripHeadColumn(
+  index: number,
+  active: boolean,
+  head: readonly HTMLElement[],
+  under: readonly HTMLElement[],
+): HTMLElement {
+  const top = el('div', 'strip-head');
+  top.appendChild(el('div', 'grid-idx', String(index + 1)));
+  for (const node of head) top.appendChild(node);
+  const col = el('div', active ? 'grid-col' : 'grid-col off');
+  col.appendChild(top);
+  for (const node of under) col.appendChild(node);
+  return col;
+}
+
 /** Remember the playhead the card is on and light it: what a card hands the loop as `mark`. */
 export const markStep =
   (strip: PlayheadStrip) =>

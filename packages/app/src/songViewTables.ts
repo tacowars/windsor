@@ -259,9 +259,10 @@ export const LANE_TONE: Readonly<Record<SequencerKind, LaneTone>> = {
  * Kinds whose card has no register knob of its own, so the detail pane adds
  * the Octave knob above the card: the arp and bass cards carry Reg (#706,
  * #707) and a second control on the same field is what #713's review found
- * going stale.
+ * going stale. The Grid device draws its own Octave (windsor#368); the
+ * Chord's moves into its device with windsor#369.
  */
-export const PANE_OCTAVE_KINDS: readonly SequencerKind[] = ['grid', 'chord'];
+export const PANE_OCTAVE_KINDS: readonly SequencerKind[] = ['chord'];
 
 /** One function per kind over that kind's own spec — the lanes look a part up here, never branch. */
 export type KindTable<T> = {

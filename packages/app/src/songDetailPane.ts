@@ -1,11 +1,12 @@
 /**
  * The Song view's detail pane (#709 decision 2): a fixed pane under the
  * lanes with a rule, a header — "Lead — Grid", "Harmony — bar 3" — and a
- * close ×. A selected part shows its existing card from `SEQUENCER_CARDS`
- * (its own strip, knobs, Randomize, Reseed and cell playhead, untouched) with
- * a row for the selected region — Split, Delete — and, for the kinds whose
- * card has no register knob (`PANE_OCTAVE_KINDS`), the Octave knob. A
- * selected chord shows `harmonyCard.ts`. One selection at a time.
+ * close ×. A selected part shows its card from `SEQUENCER_CARDS` as a
+ * sequencer device (`sequencerDevice.ts`, windsor#368): the shared rail holds
+ * the region as `n/m` with Split and Delete for the selected region, and the
+ * pane has no region row. A kind whose card has no register knob yet
+ * (`PANE_OCTAVE_KINDS`) gets the Octave knob above the device. A selected
+ * chord shows `harmonyCard.ts`. One selection at a time.
  *
  * The card and the Octave knob edit the selected region's pattern
  * (windsor#75): a part selected without a region edits its first, and a
@@ -14,10 +15,10 @@
  * Under the card, a part's insert chain (`songInsertPanel.ts`, windsor#156).
  * The sequencer section and the insert panel each fold with an arrow
  * (`songPaneFold.ts`): folded, the sequencer keeps its header and hides the
- * region row and the card; the insert panel keeps only its header.
+ * device; the insert panel keeps only its header.
  */
 import type { MusicPart } from '@windsor/engine';
-import { TICKS_PER_BAR, partAt } from '@windsor/engine';
+import { partAt } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { harmonyCard } from './harmonyCard';
@@ -28,6 +29,9 @@ import { makeKnob } from './knob';
 import { changePattern, patternOf, splitPartRegion } from './partEdits';
 import { deleteRegion } from './regionModel';
 import { SEQUENCER_CARDS } from './sequencerCards';
+import { sequencerDevice } from './sequencerDevice';
+import { canSplitRegion, regionBadge } from './sequencerDeviceModel';
+import type { RailRegion } from './sequencerRail';
 import type { SongView } from './songTab';
 import type { PaneHeadText } from './songPaneHead';
 import { editTarget, paneHeadText, partHeadText } from './songPaneHead';
@@ -88,45 +92,37 @@ function paneOctaveKnob(view: SongView, part: MusicPart, edited: number | undefi
   });
 }
 
-/** Split and Delete for the selected region, and the Octave knob where the card lacks one. */
-function partRow(view: SongView, part: MusicPart, region: number | null): HTMLElement {
+/** The Octave knob above a card not yet converted that draws none (the Chord's, until windsor#369). */
+function octaveRow(view: SongView, part: MusicPart, edited: number | undefined): HTMLElement {
   const row = el('div', 'bar-row pane-row');
-  const edited = editTarget(part, region);
-  if (PANE_OCTAVE_KINDS.includes(part.sequencer.kind) && edited !== null) {
-    row.appendChild(paneOctaveKnob(view, part, edited));
-  }
+  row.appendChild(paneOctaveKnob(view, part, edited));
+  return row;
+}
+
+/**
+ * The rail's region section (windsor#368): the region as `n/m`, and Split
+ * and Delete acting on the selected region exactly as the pane's buttons did.
+ */
+function railRegion(view: SongView, part: MusicPart, region: number | null): RailRegion {
   const write = (regions: readonly MusicPart['regions'][number][], select: number | null): void => {
     if (view.commit({ parts: { [part.slot]: { regions: [...regions] } } })) {
       view.select({ kind: 'part', slot: part.slot, region: select });
     }
   };
-  const target = region === null ? null : part.regions[region];
-  const split = el('button', 'btn', 'Split') as HTMLButtonElement;
-  split.type = 'button';
-  split.title =
-    'cut the selected region in two at its middle bar (alt-click a region to cut it under the pointer)';
-  split.disabled = !target || target.duration < 2 * TICKS_PER_BAR;
-  split.onclick = (): void => {
-    if (region === null || !target) return;
+  const target = region === null ? undefined : part.regions[region];
+  if (region === null || !target) {
+    return { badge: regionBadge(region, part.regions.length), split: null, remove: null };
+  }
+  const split = (): void => {
     // At its middle bar: the modifier-free grain is a bar, whatever the region's own step.
-    const split = splitPartRegion(part, region, target.start + target.duration / 2, false);
-    if (split) write(split, region + 1);
+    const next = splitPartRegion(part, region, target.start + target.duration / 2, false);
+    if (next) write(next, region + 1);
   };
-  row.appendChild(split);
-  const remove = el('button', 'btn', 'Delete region') as HTMLButtonElement;
-  remove.type = 'button';
-  remove.title = 'remove the selected region, leaving a rest';
-  remove.disabled = !target;
-  remove.onclick = (): void => {
-    if (region !== null) write(deleteRegion(part.regions, region), null);
+  return {
+    badge: regionBadge(region, part.regions.length),
+    split: canSplitRegion(target) ? split : null,
+    remove: () => write(deleteRegion(part.regions, region), null),
   };
-  row.appendChild(remove);
-  const note = el('span', 'hint pane-note');
-  note.textContent = target
-    ? `region ${(region ?? 0) + 1} of ${part.regions.length} selected`
-    : 'click a region to split or delete it';
-  row.appendChild(note);
-  return row;
 }
 
 /** What a selection's painter hands back: the staleness check and the header writer. */
@@ -155,7 +151,9 @@ function paintPart(
   );
   pane.appendChild(header.row);
   if (view.state.sequencerOpen) {
-    pane.appendChild(partRow(view, part, region));
+    if (PANE_OCTAVE_KINDS.includes(kind) && edited !== null) {
+      pane.appendChild(octaveRow(view, part, edited));
+    }
     pane.appendChild(
       edited === null
         ? el(
@@ -163,7 +161,12 @@ function paintPart(
             'hint',
             'No regions: click an empty stretch of the lane to draw one, then edit it here.',
           )
-        : SEQUENCER_CARDS[kind](view.ctx, slot, edited),
+        : sequencerDevice({
+            kind,
+            slot,
+            card: SEQUENCER_CARDS[kind](view.ctx, slot, edited),
+            region: railRegion(view, part, region),
+          }),
     );
   }
   const inserts = insertPanel(view, slot);

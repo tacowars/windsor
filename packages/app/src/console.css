@@ -1195,6 +1195,478 @@ input.field.group-name {
   flex-wrap: wrap;
 }
 
+/* ---------- the sequencer device (windsor#368) ---------- */
+/* Record `2026-10-01-sequencer-rack-devices` decisions 1–6; the look is
+   docs/research/2026-09-30-sequencer-rack/grid.html. The Song pane's row
+   (.seq-rack) holds one device, drawn as the insert rack draws an insert;
+   the sizes are custom properties sequencerDevice.ts sets on the row from
+   sequencerDeviceTables.ts, and --kc is the part's accent. A converted
+   device (.fixed) is --seq-h high and as wide as its content, and the row
+   scrolls sideways when it is wider than the pane. A card not yet
+   converted (.natural) takes the pane's width at its own height, and its
+   strip scrolls as it did. Neither scroller bounces. */
+.seq-rack {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior: none;
+  padding: 6px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  scrollbar-color: var(--line-bright) var(--inset);
+}
+.seq-device {
+  display: flex;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.seq-device.fixed {
+  flex: none;
+  height: var(--seq-h);
+}
+.seq-device.natural {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.seq-device.folded {
+  flex: none;
+  cursor: pointer;
+}
+.seq-device.folded > :not(.seq-rail) {
+  display: none;
+}
+.seq-device.folded > .seq-rail {
+  border-right: 0;
+}
+.seq-device :focus-visible {
+  outline: 2px solid var(--carrier);
+  outline-offset: 1px;
+}
+.seq-device-body {
+  flex: 1;
+  min-width: 0;
+}
+.seq-device.natural > .seq-device-body {
+  padding: 10px 12px 12px;
+}
+
+/* The rail (the insert rack's .insert-rail, under the sequencer's names):
+   the dot, the vertical name that folds the device, the device's own
+   buttons, then the region and Split and Delete at the foot. */
+.seq-rail {
+  width: var(--seq-rail);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 0;
+  background: var(--panel-hi);
+  border-right: 1px solid var(--line);
+}
+.seq-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: var(--kc, var(--modulator));
+}
+.seq-name {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r);
+  color: var(--ink);
+  font-family: var(--f-panel);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.seq-name:hover {
+  background: var(--panel);
+}
+.seq-name-part {
+  margin-inline-start: 6px;
+  color: var(--ink-faint);
+}
+.seq-rail-spacer {
+  flex: 1;
+}
+.seq-rail-gap {
+  flex: none;
+  height: 6px;
+}
+.seq-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 0;
+  border-block: 1px solid var(--line);
+}
+.seq-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink-faint);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.seq-icon:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line-bright);
+}
+.seq-icon.danger:hover:not(:disabled) {
+  color: var(--hot);
+}
+.seq-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.seq-icon[aria-pressed='true'] {
+  color: var(--kc, var(--carrier));
+  border-color: var(--line-bright);
+  background: var(--inset);
+}
+.seq-icon-svg svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.seq-line-icon svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.seq-region {
+  flex: none;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 8.5px;
+  white-space: nowrap;
+}
+
+/* A converted device's body: sections side by side, each a label over its
+   controls (the mockup's .section, .sec-label and .col); knob columns are
+   three knobs high, at the insert rack's small dial. */
+.grid-device {
+  display: flex;
+  min-height: 0;
+}
+.seq-section {
+  flex: none;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px 6px;
+}
+.seq-section + .seq-section {
+  border-left: 1px solid var(--line);
+}
+.seq-section.steps {
+  padding-right: 4px;
+}
+.seq-sec-label {
+  flex: none;
+  height: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.seq-sec-label em {
+  color: var(--ink-dim);
+  font-family: var(--f-num);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.seq-sec-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 2px;
+}
+.seq-col {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  gap: 2px;
+}
+.seq-col.wide {
+  width: var(--seq-wide-col);
+  align-items: stretch;
+}
+.seq-col.k3 {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  align-items: center;
+  justify-items: center;
+}
+.seq-device.fixed .knob {
+  width: 52px;
+  gap: 0;
+  padding: 1px 0;
+}
+.seq-device.fixed .knob svg {
+  width: var(--seq-dial);
+  height: var(--seq-dial);
+}
+.seq-device.fixed .knob .knob-val {
+  line-height: 13px;
+}
+.seq-device.fixed .knob .knob-label {
+  line-height: 11px;
+}
+.seq-device.fixed .field-label {
+  margin: 0 0 2px;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  line-height: 11px;
+}
+.seq-device.fixed select.field {
+  appearance: none;
+  width: 100%;
+  max-width: none;
+  height: 22px;
+  padding: 0 16px 0 6px;
+  background: var(--inset)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E")
+    no-repeat right 6px center;
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 11.5px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.seq-device.fixed select.field:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.seq-device.fixed .btn.seq-btn {
+  padding: 4px 8px;
+  border-color: var(--kc);
+  color: var(--ink);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* The Grid's strip in the device (record decisions 4–6): today's column,
+   row for row, --step-w wide and grouped by four. The step rows sit in a
+   .strip-head held at the top of the one vertical scroller while the lanes
+   (--lane-h each) scroll under it; the names column beside them holds
+   + Lane and the lane count in a corner of the same height, so every name
+   stays level with its lane. Nothing scrolls sideways. */
+.seq-strip {
+  flex: none;
+  min-height: 0;
+  display: flex;
+  gap: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-bright) var(--panel);
+  scrollbar-gutter: stable;
+}
+.seq-strip > .grid-strip {
+  flex: none;
+  gap: 2px;
+  overflow: visible;
+  padding: 0;
+}
+.seq-strip .grid-col {
+  width: var(--step-w);
+}
+.seq-strip .grid-col:nth-child(4n + 1):not(:first-child) {
+  margin-left: var(--beat-gap);
+}
+.seq-strip .strip-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: none;
+  height: var(--strip-head-h);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel);
+}
+.seq-strip .grid-idx {
+  flex: none;
+  height: 12px;
+  padding: 0;
+  border-radius: 2px;
+  line-height: 12px;
+}
+.seq-strip .gcell {
+  flex: none;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.seq-strip .gcell.oct {
+  font-family: var(--f-num);
+  font-size: 9px;
+  font-weight: 400;
+}
+.seq-strip .gcell.oct.dim {
+  color: var(--ink-faint);
+}
+/* The degree picker drawn flat, its ▾ an SVG in --ink-faint, so "5 G" fits 32 px. */
+.seq-strip .grid-col select.gsel {
+  appearance: none;
+  flex: none;
+  height: 18px;
+  padding: 0 7px 0 2px;
+  background: var(--inset)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='3'%3E%3Cpath d='M0 0h5L2.5 3z' fill='%235e6b70'/%3E%3C/svg%3E")
+    no-repeat right 2px center;
+  font-size: 9px;
+  line-height: 16px;
+  text-align: center;
+  cursor: pointer;
+}
+.seq-strip .gcell[aria-pressed='true'] {
+  background: var(--kc);
+  border-color: var(--kc);
+}
+/* The ratchet row (decision 6), as the Euclid card's: ×1, or a tick per
+   hit; grey and inert on a rest or a tie. */
+.seq-strip .gcell.ratchet {
+  position: relative;
+  height: 14px;
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 12px;
+}
+.seq-strip .gcell.ratchet:is(.r2, .r3, .r4) {
+  border-color: color-mix(in srgb, var(--carrier) 60%, var(--line));
+}
+.seq-strip .gcell.ratchet.idle {
+  opacity: 0.4;
+  cursor: default;
+}
+.seq-strip .gcell.ratchet.idle:hover {
+  background: var(--inset);
+}
+.ratchet-ticks {
+  position: absolute;
+  inset: 3px 4px;
+  display: flex;
+  justify-content: space-between;
+}
+.ratchet-ticks i {
+  width: 2px;
+  border-radius: 1px;
+  background: var(--carrier);
+}
+.seq-strip .mod-cell {
+  height: var(--lane-h);
+}
+.seq-strip .mod-cell.first {
+  margin-top: 0;
+}
+.seq-names {
+  flex: none;
+  width: var(--names-w);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: 4px;
+  background: var(--panel);
+}
+.seq-names .seq-corner {
+  z-index: 2;
+  justify-content: flex-end;
+  gap: 3px;
+}
+.seq-corner select.field {
+  height: 20px;
+  font-size: 10.5px;
+}
+.seq-meas {
+  color: var(--ink-faint);
+  font-family: var(--f-num);
+  font-size: 10px;
+  line-height: 1.2;
+}
+.seq-row-label {
+  height: 14px;
+  margin-top: 2px;
+  color: var(--ink-faint);
+  font-family: var(--f-panel);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 14px;
+  text-align: right;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.seq-lane-names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.seq-lane-names[hidden] {
+  display: none;
+}
+.seq-lane-names .mod-name {
+  height: var(--lane-h);
+  flex: none;
+  justify-content: flex-start;
+  padding-top: 2px;
+  border-left-color: var(--kc);
+}
+
 /* ---------- the grid card (#603) ---------- */
 
 .grid-strip {
@@ -1429,25 +1901,31 @@ input.field.group-name {
    so it shows with no lanes added. Scoped to the grid card's scroller and
    the chord card's strip; the Euclidean cells draw the same two strengths
    as a ring (below, "the Euclidean card"). */
-:is(.grid-scroll, .chord-strip) .grid-col.playing {
+:is(.grid-scroll, .chord-strip, .seq-strip) .grid-col.playing {
   --head: var(--carrier);
   --head-tint: color-mix(in srgb, var(--carrier) 22%, transparent);
 }
-:is(.grid-scroll, .chord-strip) .grid-col.ghost {
+:is(.grid-scroll, .chord-strip, .seq-strip) .grid-col.ghost {
   --head: color-mix(in srgb, var(--carrier) 45%, var(--line));
   --head-tint: color-mix(in srgb, var(--carrier) 12%, transparent);
 }
-:is(.grid-scroll, .chord-strip) .grid-col:is(.playing, .ghost) {
+:is(.grid-scroll, .chord-strip, .seq-strip) .grid-col:is(.playing, .ghost) {
   background: var(--head-tint);
   border-radius: var(--r);
   box-shadow: 0 0 0 2px var(--head-tint);
 }
-:is(.grid-scroll, .chord-strip) .grid-col:is(.playing, .ghost) :is(.gcell, select.gsel, .mod-cell) {
+:is(.grid-scroll, .chord-strip, .seq-strip)
+  .grid-col:is(.playing, .ghost)
+  :is(.gcell, select.gsel, .mod-cell) {
   border-color: var(--head);
 }
-:is(.grid-scroll, .chord-strip) .grid-col:is(.playing, .ghost) .grid-idx {
+:is(.grid-scroll, .chord-strip, .seq-strip) .grid-col:is(.playing, .ghost) .grid-idx {
   background: var(--head);
   color: #111416;
+}
+/* The device's held step rows are opaque over the lanes, so they carry the tint themselves. */
+.seq-strip .grid-col:is(.playing, .ghost) .strip-head {
+  background: linear-gradient(var(--head-tint), var(--head-tint)), var(--panel);
 }
 
 /* ---------- the chord card (#607) ---------- */
@@ -1563,93 +2041,15 @@ body.chord-dragging {
 /* ---------- the Euclidean card (#610; the device, windsor#356) ---------- */
 /* Record `2026-10-01-euclid-lanes-and-ratchets` decisions 9 and 10; the look
    is the mockup's (docs/research/2026-10-01-euclid-lanes/mockup.html). The
-   rail and the tabs copy the insert rack's rules (.insert-rail,
-   .insert-tabs) under Euclid names; --kc is the part's accent. Every row's
-   cells are --ecw wide, so the rows line up step for step. */
+   tabs copy the insert rack's rules (.insert-tabs) under Euclid names; the
+   rail is every sequencer device's (.seq-rail, windsor#368), and --kc is
+   the part's accent. Every row's cells are --ecw wide, so the rows line up
+   step for step. The device (.seq-device.euclid-card) sits at its natural
+   height until windsor#393 fits it to --seq-h. */
 .euclid-card {
   --ecw: 22px;
   --egap: 3px;
   --ename-w: 172px;
-  display: flex;
-  min-width: 0;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  overflow: hidden;
-}
-.euclid-rail {
-  width: 24px;
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 0;
-  background: var(--panel-hi);
-  border-right: 1px solid var(--line);
-}
-.euclid-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  margin-top: 3px;
-  border-radius: 50%;
-  background: var(--kc, var(--carrier));
-}
-.euclid-name {
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  padding: 4px 0;
-  color: var(--ink);
-  font-family: var(--f-panel);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.euclid-name-part {
-  margin-inline-start: 6px;
-  color: var(--ink-faint);
-}
-.euclid-rail-spacer {
-  flex: 1;
-}
-.euclid-rail-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 3px 0;
-  border-block: 1px solid var(--line);
-}
-.euclid-icon {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--r);
-  color: var(--ink-faint);
-  font-size: 10px;
-  line-height: 1;
-  cursor: pointer;
-}
-.euclid-icon:hover {
-  color: var(--ink);
-  border-color: var(--line-bright);
-}
-.euclid-icon[aria-pressed='true'] {
-  color: var(--kc, var(--carrier));
-  border-color: var(--line-bright);
-  background: var(--inset);
-}
-.euclid-icon-svg svg {
-  display: block;
-  width: 12px;
-  height: 12px;
 }
 .euclid-body {
   flex: 1;
@@ -2634,9 +3034,6 @@ select.field.compact {
 .pane-row {
   margin: 0 0 10px;
   align-items: center;
-}
-.pane-note {
-  margin: 0;
 }
 .btn.fold {
   margin-right: 8px;

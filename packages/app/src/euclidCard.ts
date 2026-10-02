@@ -1,7 +1,8 @@
 /**
  * The Euclid card (#610; the device of windsor#356, record
  * `2026-10-01-euclid-lanes-and-ratchets` decisions 9 and 10, and its
- * mockup): a rail (`euclidRail.ts`) and two pages under tabs
+ * mockup): rail buttons (`euclidRail.ts`) for the sequencer device's shared
+ * rail (`sequencerDevice.ts`, windsor#368) and two pages under tabs
  * (`euclidTabs.ts`). **Pattern** (`euclidPatternPage.ts`) holds the Play
  * knobs and the stack of rows: the ratchet row over the trigger figure, and
  * the drawn lanes below it (`euclidRows.ts`, `euclidLaneRows.ts`).
@@ -38,11 +39,12 @@ import { type Figure, countOnsets, figureKey, stepsPerBeat } from './euclidModel
 import { shownPass } from './euclidPass';
 import { type PatternPage, fillPicker, patternPage } from './euclidPatternPage';
 import { holdWhilePressed } from './euclidPressHold';
-import { euclidRail } from './euclidRail';
+import { euclidRailTools } from './euclidRail';
 import type { RowHead } from './euclidRowParts';
 import { paintRows } from './euclidRows';
 import { euclidTabs } from './euclidTabs';
 import { lightPlayhead } from './regionPlayhead';
+import type { DeviceBody } from './sequencerDevice';
 import { specOf, watchPlayhead } from './stepStrip';
 
 const SECONDS_PER_MINUTE = 60;
@@ -238,8 +240,12 @@ function handle(
   return card;
 }
 
-/** The card for a Euclidean part's region `region`: the rail, the tabs, the Pattern and Density pages. */
-export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
+/**
+ * The card for a Euclidean part's region `region`: the tabs and the Pattern
+ * and Density pages as its device's body (`sequencerDevice.ts`,
+ * windsor#368), and the lane-view toggle and **?** for the shared rail.
+ */
+export function euclidCard(ctx: AppCtx, slot: number, region?: number): DeviceBody {
   const ref: { live: Live | null } = { live: null };
   const card = handle(ctx, slot, region, ref);
   const pattern = patternPage(card);
@@ -262,18 +268,16 @@ export function euclidCard(ctx: AppCtx, slot: number, region?: number): HTMLElem
   };
   ref.live = state;
   holdWhilePressed(card, pattern.rows, window);
-  const name = partAt(ctx.model.doc, slot)?.name ?? '';
-  const rail = euclidRail(name, view.lanes, (lanes) => {
+  const tools = euclidRailTools(view.lanes, (lanes) => {
     setView(slot, { lanes });
     card.refresh();
   });
   const body = el('div', 'euclid-body');
+  body.style.setProperty('--kc', PERC_COLOR);
   body.append(tabs.row, pattern.root, density.root);
-  const root = el('div', 'euclid-card');
-  root.style.setProperty('--kc', PERC_COLOR);
-  root.append(rail, body);
   const spec = card.spec();
   if (spec) repaintRows(state, spec, card.figure());
-  watch(state, root);
-  return root;
+  watch(state, body);
+  const note = partAt(ctx.model.doc, slot)?.name ?? '';
+  return { body, fit: 'natural', tools, note, className: 'euclid-card' };
 }
