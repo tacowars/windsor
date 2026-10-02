@@ -17,6 +17,8 @@ describe('rowMenuPlacement', () => {
     expect(rowMenuPlacement({ opener: opener(100), menu, viewport })).toEqual({
       top: 124 + SONG_MENU_GAP_PX,
       left: 1300 - menu.width,
+      maxHeight: viewport.height - 2 * SONG_MENU_EDGE_PX,
+      maxWidth: viewport.width - 2 * SONG_MENU_EDGE_PX,
     });
   });
 
@@ -46,5 +48,22 @@ describe('rowMenuPlacement', () => {
     const { top } = rowMenuPlacement({ opener: opener(110), menu, viewport: short });
     expect(top).toBe(short.height - SONG_MENU_EDGE_PX - menu.height);
     expect(top).toBeGreaterThanOrEqual(SONG_MENU_EDGE_PX);
+  });
+
+  it('caps a menu taller than the viewport to the room between the edges, from the top gap', () => {
+    // 190 px of menu in a 180 px window: it scrolls inside itself, Delete… still reachable.
+    const tiny = { width: 1400, height: 180 };
+    const placed = rowMenuPlacement({ opener: opener(40), menu, viewport: tiny });
+    expect(placed.maxHeight).toBe(180 - 2 * SONG_MENU_EDGE_PX);
+    expect(placed.top).toBe(SONG_MENU_EDGE_PX);
+    expect(placed.top + placed.maxHeight).toBe(tiny.height - SONG_MENU_EDGE_PX);
+  });
+
+  it('caps a menu wider than the viewport the same way, from the left gap', () => {
+    const narrow = { width: 160, height: 600 };
+    const placed = rowMenuPlacement({ opener: opener(100, 150), menu, viewport: narrow });
+    expect(placed.maxWidth).toBe(160 - 2 * SONG_MENU_EDGE_PX);
+    expect(placed.left).toBe(SONG_MENU_EDGE_PX);
+    expect(placed.left + placed.maxWidth).toBe(narrow.width - SONG_MENU_EDGE_PX);
   });
 });
