@@ -99,7 +99,8 @@ export function problemText(problem: OpenProblem): string | null {
 
 /** What the named target tells the session: a write stored, or the song found saved by another tab. */
 export interface TargetEvents {
-  written(): void;
+  /** Awaited before the save resolves, so what it writes has landed when a flush does. */
+  written(): void | Promise<void>;
   stale(): void;
 }
 
@@ -126,8 +127,32 @@ export function namedTarget(
         events.stale();
         throw new ReportedRefusal(STALE_SONG_TEXT);
       }
-      events.written();
+      await events.written();
     },
+  };
+}
+
+/** A target that also says whether any write through it has landed. */
+export interface LandedTarget {
+  readonly target: AutosaveTarget;
+  landed(): boolean;
+}
+
+/**
+ * `target`, remembering whether a write through it landed: the open song's
+ * delete sends edits to `current` while it runs, and when it fails,
+ * `current` must name the song again only if one of them did.
+ */
+export function landedTarget(target: AutosaveTarget): LandedTarget {
+  let landed = false;
+  return {
+    target: {
+      save: async (text, updated) => {
+        await target.save(text, updated);
+        landed = true;
+      },
+    },
+    landed: () => landed,
   };
 }
 
