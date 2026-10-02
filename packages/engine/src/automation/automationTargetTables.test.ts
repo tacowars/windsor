@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RETURN_NAMES } from '../mixer/mix';
+import { VOWEL_RANGE } from '../worklet/fm/patchDefaults';
 import { STEP_MOD_TABLE } from '../worklet/fm/stepModTables';
 import {
   AUTOMATION_LEVEL_FLOOR_DB,
@@ -15,6 +16,7 @@ const VOICE_IDS = [
   'voice.filter.envAmount',
   'voice.filter.resonance',
   'voice.filter.env.decayTime',
+  'voice.filter.vowel',
   ...[0, 1, 2, 3].flatMap((i) => OPERATOR_FIELDS.map((f) => `voice.ops.${i}.${f}`)),
   'voice.lfo.amount',
   'voice.lfo.rate',
@@ -24,10 +26,23 @@ const VOICE_IDS = [
 ];
 
 describe('the voice rows', () => {
-  it('are exactly the 29 targets of decision 2', () => {
-    expect(VOICE_AUTOMATION_ROWS).toHaveLength(29);
+  it('are exactly the 29 targets of decision 2 and the Formant vowel (windsor#406)', () => {
+    expect(VOICE_AUTOMATION_ROWS).toHaveLength(30);
     expect(VOICE_AUTOMATION_ROWS.map((r) => r.target)).toEqual(VOICE_IDS);
-    expect(new Set(VOICE_AUTOMATION_ROWS.map((r) => r.label)).size).toBe(29);
+    expect(new Set(VOICE_AUTOMATION_ROWS.map((r) => r.label)).size).toBe(30);
+  });
+
+  it('carry the vowel as a linear 0–4 lane, the patch’s vowel range', () => {
+    const vowel = VOICE_AUTOMATION_ROWS.find((r) => r.target === 'voice.filter.vowel')!;
+    expect(vowel).toEqual({
+      target: 'voice.filter.vowel',
+      label: 'Vowel',
+      min: VOWEL_RANGE.min,
+      max: VOWEL_RANGE.max,
+      scale: 'linear',
+      unit: '',
+    });
+    expect([vowel.min, vowel.max]).toEqual([0, 4]);
   });
 
   it('take the step-mod table bounds, a decay time from 0 with its minimum as the floor', () => {

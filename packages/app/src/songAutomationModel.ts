@@ -32,6 +32,7 @@ import {
   targetKind,
   targetRow,
 } from '@windsor/engine';
+import { fmtVowel } from './consoleFormat';
 import { INSERT_LABELS } from './insertKnobTables';
 import { getPath } from './patchPath';
 import {
@@ -281,6 +282,9 @@ function gainDb(row: AutomationTargetRow, value: number, n: ReadoutNumbers): str
   return `${signed(n.dbPerDecade * Math.log10(value), 1)} dB`;
 }
 
+/** The Formant vowel's lane, which reads as the Parts tab's Vowel knob. */
+const VOWEL_TARGET = 'voice.filter.vowel';
+
 /** What a lane's value reads in its mixer cell, in the row's units. */
 export function readout(
   row: AutomationTargetRow,
@@ -303,7 +307,9 @@ export function readout(
     case '°':
       return `${value.toFixed(0)}${row.unit}`;
     case '':
-      return row.target === 'strip.pan' ? pan(value, n) : plain(value, n);
+      if (row.target === 'strip.pan') return pan(value, n);
+      // The Formant vowel reads as its knob does (windsor#406): "a", "o→u 25%".
+      return row.target === VOWEL_TARGET ? fmtVowel(value) : plain(value, n);
     default:
       return `${plain(value, n)} ${row.unit}`;
   }

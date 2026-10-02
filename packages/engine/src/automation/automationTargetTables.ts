@@ -12,6 +12,7 @@
  * table's 1 ms as its display floor.
  */
 import { OP_NAMES } from '../patch/patch';
+import { VOWEL_RANGE } from '../worklet/fm/patchDefaults';
 import { STEP_MOD_TABLE, type StepModParam } from '../worklet/fm/stepModTables';
 import type { AutomationScale, AutomationTargetRow, StripTargetId } from './automationLane';
 
@@ -79,8 +80,9 @@ const OPERATOR_LOOKS: readonly (readonly [string, VoiceLook])[] = [
 ];
 
 /**
- * The five voice fields the step-mod table does not carry. The patch
- * normaliser does not clamp them, so their bounds are the Parts tab's knobs.
+ * The five voice fields the step-mod table does not carry, beside the vowel.
+ * The patch normaliser does not clamp them, so their bounds are the Parts
+ * tab's knobs.
  */
 const LFO_AMOUNT_RANGE = { min: 0, max: 1 } as const;
 const LFO_RATE_RANGE = { min: 0.02, max: 40 } as const;
@@ -121,11 +123,28 @@ function lfoRows(): AutomationTargetRow[] {
 }
 
 /**
- * The voice's 29 rows (decision 2): the filter's four, each operator's five,
- * LFO 1 and LFO 2 amount and rate, and the pitch-envelope amount.
+ * The Formant mode's vowel (windsor#406), last of the filter's rows: not a
+ * step-mod field, so its bounds are the patch's `VOWEL_RANGE`, which the
+ * normaliser clamps to and the Parts tab's Vowel knob spans. The picker lists
+ * it whatever the filter mode; a lane on a patch not in Formant is silent.
+ */
+const VOWEL_ROW: AutomationTargetRow = {
+  target: 'voice.filter.vowel',
+  label: 'Vowel',
+  min: VOWEL_RANGE.min,
+  max: VOWEL_RANGE.max,
+  scale: 'linear',
+  unit: '',
+};
+
+/**
+ * The voice's 30 rows (decision 2): the filter's four and the Formant vowel,
+ * each operator's five, LFO 1 and LFO 2 amount and rate, and the
+ * pitch-envelope amount.
  */
 export const VOICE_AUTOMATION_ROWS: readonly AutomationTargetRow[] = [
   ...FILTER_LOOKS.map(([param, look]) => stepModRow(param, look)),
+  VOWEL_ROW,
   ...OP_NAMES.flatMap((name, i) =>
     OPERATOR_LOOKS.map(([field, look]) =>
       stepModRow(`ops.${i}.${field}` as StepModParam, look, `Op ${name} ${look.label}`),
