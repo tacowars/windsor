@@ -273,6 +273,50 @@ describe('a knob a lane holds (windsor#351)', () => {
   });
 });
 
+/** Dispatch a cancelable `type` on `node` carrying `fields`: whether the knob prevented it. */
+function prevented(node: FakeElement, type: string, fields: Record<string, unknown>): boolean {
+  const e = Object.assign(new Event(type, { cancelable: true }), fields);
+  node.dispatchEvent(e);
+  return e.defaultPrevented;
+}
+
+describe('the page under a knob a lane holds (windsor#396)', () => {
+  const held = { color: 'var(--modulator)', value: 0.8 };
+  const KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+  it('takes every key an unlocked knob takes, so none scrolls the page, and changes nothing', () => {
+    const ctx = openGestureConsole();
+    const before = levelOf(ctx);
+    const locked = levelKnob(ctx, () => held);
+    const free = levelKnob(openGestureConsole());
+    for (const key of KEYS) {
+      expect(prevented(free, 'keydown', { key }), key).toBe(true);
+      expect(prevented(locked, 'keydown', { key }), key).toBe(true);
+    }
+    vi.advanceTimersByTime(600);
+    expect(levelOf(ctx)).toBe(before);
+    expect(ctx.canUndo).toBe(false);
+  });
+
+  it('leaves Tab to the page, locked or not', () => {
+    const locked = levelKnob(openGestureConsole(), () => held);
+    const free = levelKnob(openGestureConsole());
+    expect(prevented(locked, 'keydown', { key: 'Tab' })).toBe(false);
+    expect(prevented(free, 'keydown', { key: 'Tab' })).toBe(false);
+  });
+
+  it('treats the wheel as an unlocked knob does: the knob has no wheel, so it scrolls the page', () => {
+    const ctx = openGestureConsole();
+    const before = levelOf(ctx);
+    const locked = levelKnob(ctx, () => held);
+    const free = levelKnob(openGestureConsole());
+    expect(prevented(locked, 'wheel', { deltaY: -100 })).toBe(
+      prevented(free, 'wheel', { deltaY: -100 }),
+    );
+    expect(levelOf(ctx)).toBe(before);
+  });
+});
+
 describe('the compact knob (windsor#157)', () => {
   it('keeps the full dial as it was and draws a smaller one when compact', () => {
     expect(knobGeometry({})).toEqual({ r: KNOB_R, size: KNOB_R * 2 + KNOB_PAD_PX });

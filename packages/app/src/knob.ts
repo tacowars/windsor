@@ -393,9 +393,11 @@ export function attachKnobInput(
   node.addEventListener('blur', () => keys.close());
   node.addEventListener('keydown', (e) => {
     const dir = Object.hasOwn(ARROW_KEYS, e.key) ? ARROW_KEYS[e.key] : undefined;
-    if (dir === undefined || locked()) return;
+    if (dir === undefined) return;
+    // A locked knob still takes the arrows it would turn by, so they never scroll the page.
+    e.preventDefault();
+    if (locked()) return;
     keys.touch();
     commit(keyTarget(spec, spec.get(), dir, e.shiftKey));
-    e.preventDefault();
   });
 }
