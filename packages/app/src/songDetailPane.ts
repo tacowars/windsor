@@ -17,7 +17,7 @@
  * (`songPaneFold.ts`): folded, the sequencer keeps its header and hides the
  * device; the insert panel keeps only its header.
  */
-import type { MusicPart } from '@windsor/engine';
+import type { MusicPart, PartRegion } from '@windsor/engine';
 import { partAt } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
@@ -26,11 +26,15 @@ import { insertPanel } from './songInsertPanel';
 import { foldButton } from './songPaneFold';
 import { octaveKnob } from './harmonyTables';
 import { makeKnob } from './knob';
-import { changePattern, patternOf, splitPartRegion } from './partEdits';
-import { deleteRegion } from './regionModel';
+import { changePattern, patternOf } from './partEdits';
 import { SEQUENCER_CARDS } from './sequencerCards';
 import { sequencerDevice } from './sequencerDevice';
-import { canSplitRegion, regionBadge } from './sequencerDeviceModel';
+import {
+  canSplitRegion,
+  regionBadge,
+  removeRegionAt,
+  splitRegionAtMiddle,
+} from './sequencerDeviceModel';
 import type { RailRegion } from './sequencerRail';
 import type { SongView } from './songTab';
 import type { PaneHeadText } from './songPaneHead';
@@ -102,26 +106,26 @@ function octaveRow(view: SongView, part: MusicPart, edited: number | undefined):
 /**
  * The rail's region section (windsor#368): the region as `n/m`, and Split
  * and Delete acting on the selected region exactly as the pane's buttons did.
+ * Each reads the part from the document at the press: a card's edit never
+ * redraws the pane, so `part` is the part as the pane drew it, without the
+ * steps programmed since.
  */
 function railRegion(view: SongView, part: MusicPart, region: number | null): RailRegion {
-  const write = (regions: readonly MusicPart['regions'][number][], select: number | null): void => {
-    if (view.commit({ parts: { [part.slot]: { regions: [...regions] } } })) {
-      view.select({ kind: 'part', slot: part.slot, region: select });
+  const { slot } = part;
+  const badge = regionBadge(region, part.regions.length);
+  const target = region === null ? undefined : part.regions[region];
+  if (region === null || !target) return { badge, split: null, remove: null };
+  const write = (regions: readonly PartRegion[] | null, select: number | null): void => {
+    if (regions && view.commit({ parts: { [slot]: { regions: [...regions] } } })) {
+      view.select({ kind: 'part', slot, region: select });
     }
   };
-  const target = region === null ? undefined : part.regions[region];
-  if (region === null || !target) {
-    return { badge: regionBadge(region, part.regions.length), split: null, remove: null };
-  }
-  const split = (): void => {
-    // At its middle bar: the modifier-free grain is a bar, whatever the region's own step.
-    const next = splitPartRegion(part, region, target.start + target.duration / 2, false);
-    if (next) write(next, region + 1);
-  };
+  const split = (): void =>
+    write(splitRegionAtMiddle(view.ctx.model.doc, slot, region), region + 1);
   return {
-    badge: regionBadge(region, part.regions.length),
+    badge,
     split: canSplitRegion(target) ? split : null,
-    remove: () => write(deleteRegion(part.regions, region), null),
+    remove: () => write(removeRegionAt(view.ctx.model.doc, slot, region), null),
   };
 }
 
