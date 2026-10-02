@@ -101,26 +101,19 @@ describe('which voices take the kernel', () => {
     }
   });
 
-  it('takes two noise operators only where the generic loop draws them D..A', () => {
-    // Algorithm 0 (D>C>B>A) evaluates D, C, B, A in both loops; algorithm 7
-    // (A|B|C|D) evaluates A first in the generic loop, so its noise draws would
-    // land on different operators.
+  it('takes any number of noise operators on any algorithm', () => {
+    // windsor#389: both loops draw a sample's noise D..A, so Additive
+    // (A|B|C|D), which evaluates A first in the generic loop, takes the
+    // kernel with two Noise operators as Series (D>C>B>A) does.
     expect(boundVoice({ algorithm: 0, ops: [NOISE, NOISE] }).kernel).toBe(true);
-    expect(boundVoice({ algorithm: 7, ops: [NOISE, NOISE] }).kernel).toBe(false);
-    expect(boundVoice({ algorithm: 7, ops: [{}, {}, NOISE, NOISE] }).kernel).toBe(false);
-    expect(boundVoice({ algorithm: 7, ops: [NOISE] }).kernel).toBe(true);
-    // windsor#382: only the Noise operators' order counts. Algorithm 6
-    // (D>C | B | A) evaluates A, B, D, C, so C and D draw D first, as the
-    // kernel does; algorithm 9 (D>C>(B,A)) evaluates D, C, A, B.
-    expect(boundVoice({ algorithm: 6, ops: [{}, {}, NOISE, NOISE] }).kernel).toBe(true);
-    expect(boundVoice({ algorithm: 6, ops: [NOISE, {}, NOISE] }).kernel).toBe(false);
-    expect(boundVoice({ algorithm: 9, ops: [NOISE, {}, NOISE, NOISE] }).kernel).toBe(true);
-    expect(boundVoice({ algorithm: 9, ops: [NOISE, NOISE] }).kernel).toBe(false);
+    expect(boundVoice({ algorithm: 7, ops: [NOISE, NOISE] }).kernel).toBe(true);
+    expect(boundVoice({ algorithm: 7, ops: [NOISE, NOISE, NOISE, NOISE] }).kernel).toBe(true);
+    expect(boundVoice({ algorithm: 9, ops: [NOISE, NOISE] }).kernel).toBe(true);
   });
 
   it.each([
     ['two noise operators, series', { algorithm: 0, ops: [NOISE, {}, {}, NOISE] }],
-    ['two noise operators, additive (generic fallback)', { algorithm: 7, ops: [NOISE, NOISE] }],
+    ['two noise operators, additive', { algorithm: 7, ops: [NOISE, NOISE] }],
     ['two noise operators, a stack and two sines', { algorithm: 6, ops: [{}, {}, NOISE, NOISE] }],
     [
       'three noise operators, a split branch, one coloured',
@@ -206,6 +199,105 @@ describe('rebinding a sounding voice', () => {
       renders.push(render(loaded, p, 8).samples);
       return renders;
     });
+    expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
+  });
+});
+
+/**
+ * Operators A..D Noise where `mask` has their bit (A is 1), each at its own
+ * level, the others sines at 0.3. Two Noise carriers at one level sum to the
+ * same bits whichever draw each takes, so a swapped draw would go unseen;
+ * distinct levels put every draw where it is heard.
+ */
+function noiseOps(mask: number): NonNullable<PartialPatch['ops']> {
+  return [0, 1, 2, 3].map((i) =>
+    (mask & (1 << i)) !== 0 ? { wave: WAVE.NOISE, level: 0.35 + 0.15 * i } : { level: 0.3 },
+  );
+}
+
+const setName = (mask: number): string =>
+  [...'ABCD'].filter((_, i) => (mask & (1 << i)) !== 0).join('');
+/** Every algorithm with every set of two or more Noise operators: 11 x 11. */
+const NOISE_SETS: [string, number, number][] = [];
+for (let algorithm = 0; algorithm < loaded.algorithms.length; algorithm++) {
+  for (let mask = 3; mask < 16; mask++) {
+    if ((mask & (mask - 1)) === 0) continue;
+    NOISE_SETS.push([`${algorithm}, Noise on ${setName(mask)},`, algorithm, mask]);
+  }
+}
+
+const withOp = (ops: PartialPatch['ops'] & object, i: number, o: object) =>
+  ops.map((op, j) => (j === i ? { ...op, ...o } : op));
+
+describe('noise drawn D..A in both loops (windsor#389)', () => {
+  it('covers the 121 sets', () => {
+    expect(NOISE_SETS).toHaveLength(121);
+  });
+
+  it.each(NOISE_SETS)('algorithm %s takes the kernel, bit-identical', (_n, algorithm, mask) => {
+    const patch = makePatch({ algorithm, ops: noiseOps(mask) });
+    const generic = renderChord(patch, false);
+    const kernel = renderChord(patch, true);
+    expect(kernel.kernel).toBe(true);
+    expect(generic.samples.some((s) => s !== 0)).toBe(true);
+    expect(sameBits(kernel.samples, generic.samples)).toBe(true);
+  });
+
+  const allFour = noiseOps(15);
+  it.each([
+    ['no Noise operator, additive', { algorithm: 7, ops: noiseOps(0) }],
+    ['one Noise operator on A, additive', { algorithm: 7, ops: noiseOps(1) }],
+    ['one Noise operator on C, stack + two', { algorithm: 6, ops: noiseOps(4) }],
+    ['all four Noise, two stacks', { algorithm: 4, ops: allFour }],
+    [
+      'all four Noise, additive, two coloured',
+      { algorithm: 7, ops: withOp(withOp(allFour, 0, { noiseLp: 3000 }), 2, { noiseHp: 900 }) },
+    ],
+    [
+      'a Noise operator at level 0 between two, additive',
+      { algorithm: 7, ops: withOp(noiseOps(13), 2, { level: 0 }) },
+    ],
+  ] as [string, PartialPatch][])('%s renders bit-identical to the generic loop', (_n, o) => {
+    const patch = makePatch(o);
+    const kernel = renderChord(patch, true);
+    expect(kernel.kernel).toBe(true);
+    expect(sameBits(kernel.samples, renderChord(patch, false).samples)).toBe(true);
+  });
+
+  it('matches as a Noise operator falls to level 0 and comes back, on additive', () => {
+    const awake = { algorithm: 7, ops: noiseOps(5) };
+    const asleep = { algorithm: 7, ops: withOp(noiseOps(5), 2, { level: 0 }) };
+    const [generic, kernel] = inStep(makePatch(awake), (p) => {
+      const note: ScheduledEvent = { type: 'noteOn', id: 1, note: 48, velocity: 0.9, frame: 0 };
+      const renders = [render(loaded, p, 20, [note]).samples];
+      retune(p, asleep);
+      renders.push(render(loaded, p, 20).samples);
+      retune(p, awake);
+      renders.push(render(loaded, p, 20).samples);
+      return renders;
+    });
+    expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
+  });
+
+  it('matches as a two-Noise voice goes dormant, draws nothing, and wakes', () => {
+    // Every carrier decays to sustain 0, so the held voice goes dormant (#547)
+    // and the part skips it in both paths; a retune raising the sustain wakes it.
+    const shaped = (sustainLevel: number): PartialPatch => ({
+      algorithm: 7,
+      ops: noiseOps(6).map((op) => ({ ...op, env: { decayTime: 0.05, sustainLevel } })),
+    });
+    const dormant: boolean[] = [];
+    const [generic, kernel] = inStep(makePatch(shaped(0)), (p) => {
+      const note: ScheduledEvent = { type: 'noteOn', id: 1, note: 52, velocity: 1, frame: 0 };
+      const renders = [render(loaded, p, blocksFor(0.6), [note]).samples];
+      const voices = p.voices as unknown as { active: boolean; dormant: boolean }[];
+      dormant.push(voices.find((v) => v.active)!.dormant);
+      retune(p, shaped(0.6));
+      renders.push(render(loaded, p, blocksFor(0.3)).samples);
+      return renders;
+    });
+    expect(dormant).toEqual([true, true]);
+    expect(kernel[1]!.some((s) => s !== 0)).toBe(true);
     expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
   });
 });

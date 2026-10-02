@@ -44,7 +44,9 @@ import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
  * ahead (windsor#301) for the whole call contributes ±0 to every sum it is in, so its wave is not computed.
  * Its phase still runs, and its feedback history becomes the ±0 the generic
  * loop would have stored. A noise operator is never skipped: its draws
- * advance the voice's shared noise generator.
+ * advance the voice's shared noise generator. The operators run D..A, so
+ * the Noise operators draw D..A, the order the generic loop draws them in at
+ * the top of each sample (windsor#389), whatever the algorithm.
  */
 // Four operators written out, then the carrier sum, the drive and the filter, over locals
 // hoisted out of the loop. The fixed indices and the locals are the saving

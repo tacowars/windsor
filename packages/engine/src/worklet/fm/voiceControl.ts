@@ -32,7 +32,7 @@ import { bindNoiseColour } from './noiseColour';
 import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
-import { KIND_NOISE, KIND_PULSE, KIND_TABLE, mipIndexAt } from './waveTables';
+import { KIND_PULSE, KIND_TABLE, mipIndexAt } from './waveTables';
 
 /** The frequency a squeezed wave's table is chosen for, passed to `mipIndexAt` in place of an argument. */
 const MIP_FREQ_SLOT = new Float64Array(1);
@@ -42,30 +42,6 @@ const PART_BEND = 0,
   PART_WHEEL = 1,
   PART_CUTOFF_MOD = 2,
   PART_CONTROL_COUNT = 3;
-
-/**
- * Whether the voice's Noise operators draw from its one noise generator in
- * the kernel's order (windsor#382). The kernel evaluates D, C, B, A and the
- * generic loop the algorithm's topological order (`voice.order`); the draws
- * are the only state operators share, so the two render the same bits when
- * the Noise operators come in descending index order within the topological
- * order, whatever the others do. One Noise operator or none always does.
- * Before windsor#382 a second Noise operator needed the whole order to be
- * D..A, which sent `D>C | B | A` with C and D both Noise to the generic loop
- * at about twice the kernel's cost
- * (`docs/research/2026-10-02-noise-operator-cost/`). Allocates nothing.
- */
-function noiseDrawsDescend(voice: Voice): boolean {
-  const order = voice.order;
-  let last = 4;
-  for (let oi = 0; oi < 4; oi++) {
-    const i = order[oi];
-    if (voice.kind[i] !== KIND_NOISE) continue;
-    if (i > last) return false;
-    last = i;
-  }
-  return true;
-}
 
 /**
  * Routing and per-note constants for the bound patch, after `kind` and
@@ -87,7 +63,9 @@ function bindVoiceConstants(voice: Voice, patch: WorkletPatch): void {
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
-  voice.kernel = voice.specialise && voice.edges >= 0 && noiseDrawsDescend(voice);
+  // Any number of Noise operators takes the kernel (windsor#389): both
+  // loops draw a sample's noise D..A, so only the algorithm's edges decide.
+  voice.kernel = voice.specialise && voice.edges >= 0;
 }
 
 /**

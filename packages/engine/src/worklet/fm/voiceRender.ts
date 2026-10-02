@@ -16,7 +16,12 @@
  * (windsor#301) is a knot `updateOperatorAmp` set: the loop counts
  * `ampBreak` down after each amplitude step and, at 0, lands on the knot's
  * level and takes its ramp. `fmProcessorKernel.test.ts` compares it with the
- * kernel on every preset; the golden test pins it.
+ * kernel on every preset; the golden test pins it. Noise (windsor#389): a
+ * voice's Noise operators share one generator, and the draw order is D..A in
+ * both loops, so each sample opens with its Noise operators' draws, D first,
+ * into `voice.noiseDraw`, and a Noise operator reads its slot where the
+ * algorithm's order reaches it. The kernel evaluates D..A and so draws in
+ * that order where it stands; the draws are the same in number and order.
  */
 
 import type { Voice } from './voice';
@@ -88,27 +93,40 @@ function renderVoiceGeneric(
     widthInc = voice.widthInc;
   const fbAmt = voice.opFeedback; // Float32Array(4): the patch's, or the step's (windsor#17)
   const colours = voice.noiseColour;
+  const draws = voice.noiseDraw;
 
   // Width (#55), one bit per operator, hoisted: `ramping` advances its width
   // each sample, `squeezed` reads its wave compressed. Neither is set for a
   // width of exactly 1 that is not ramping, which is every patch before #55.
   // A Noise operator's colour (windsor#362), one bit per operator, hoisted:
   // `coloured` passes its noise through its own filters. Never set for an
-  // operator with neither field, or for any other wave.
+  // operator with neither field, or for any other wave. `noisy` marks the
+  // Noise operators, whose draws open each sample (windsor#389).
   let ramping = 0,
     squeezed = 0,
-    coloured = 0;
+    coloured = 0,
+    noisy = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
     if (widthInc[i] !== 0) ramping |= bit;
     if (colours[i].on) coloured |= bit;
     const k = kind[i];
+    if (k === KIND_NOISE) noisy |= bit;
     if (k !== KIND_NOISE && k !== KIND_PULSE && (width[i] !== 1 || widthInc[i] !== 0)) {
       squeezed |= bit;
     }
   }
 
   for (let s = 0; s < n; s++) {
+    // The sample's noise draws, D..A whatever the algorithm's order
+    // (windsor#389): the order the kernel draws in. Every Noise operator
+    // draws every sample, at any level, as the kernel never skips one.
+    if (noisy !== 0) {
+      for (let i = 3; i >= 0; i--) {
+        if ((noisy & (1 << i)) !== 0) draws[i] = voice.noise();
+      }
+    }
+
     for (let oi = 0; oi < 4; oi++) {
       const i = order[oi];
       const a = amp[i];
@@ -151,7 +169,7 @@ function renderVoiceGeneric(
       } else {
         switch (kind[i]) {
           case KIND_NOISE:
-            v = voice.noise();
+            v = draws[i];
             break;
           case KIND_SAW_D:
             v = ph * 2 - 1;
