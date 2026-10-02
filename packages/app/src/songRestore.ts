@@ -10,13 +10,19 @@
  * deleted (`2026-09-28-format-versions-refuse-never-destroy`): the question
  * says which format it is and offers the stored text as a download, as-is.
  * Import refuses such a file with the same words.
+ *
+ * A named song (windsor#433, record `2026-10-02-song-library`) is never
+ * asked about: nothing in it is at risk, so the reload reopens it at once
+ * and says so, or says why it couldn't and starts a new song.
  */
 import type { FormatRefusal } from '@windsor/engine';
 import { upgradeSong } from '@windsor/engine';
 import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
 import type { ConfirmRequest } from './metadataModal';
-import type { StoredSong } from './songAutosave';
+import type { SessionRecord, StoredSong } from './songAutosave';
+import { isNamedSession } from './songAutosave';
+import type { OpenProblem } from './songSessionStorage';
 
 /** The file name the refused record downloads as. */
 export const OLD_SONG_FILE = 'old-song.json';
@@ -116,4 +122,42 @@ export async function offerRestore(
     );
     return false;
   }
+}
+
+/** Why the named song the last session left open didn't reopen, ending in the new song it starts. */
+export function reopenFailedText(problem: OpenProblem): string {
+  switch (problem.problem) {
+    case 'refused':
+      return (
+        `your last song, ${problem.name || 'untitled'}, was ${problem.refusal.message}. ` +
+        'It stays in your songs, unchanged — this is a new song'
+      );
+    case 'failed':
+      return `your last song couldn't be reopened (${problem.message}) — this is a new song`;
+    default:
+      return 'your last song is no longer in your songs — this is a new song';
+  }
+}
+
+/** Reopen named song `id` at boot, with no question; true when it opened. */
+export async function reopenSong(ctx: AppCtx, id: string): Promise<boolean> {
+  const outcome = await ctx.songs.openSong(id);
+  if (outcome.ok) ctx.notify(`reopened ${outcome.name || 'your last song'}`, 'success');
+  else ctx.notify(reopenFailedText(outcome), 'warning');
+  return outcome.ok;
+}
+
+/**
+ * The reload (windsor#433 decision 9): the session record names a named
+ * song, which reopens at once, or holds an untitled one, which is offered
+ * as before. True when a song was opened.
+ */
+export function bootSong(
+  ctx: AppCtx,
+  stored: SessionRecord | null,
+  confirm: (request: ConfirmRequest) => Promise<boolean>,
+  download?: (text: string) => void,
+): Promise<boolean> {
+  if (stored && isNamedSession(stored)) return reopenSong(ctx, stored.songId);
+  return offerRestore(ctx, stored, confirm, download);
 }

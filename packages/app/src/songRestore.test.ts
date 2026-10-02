@@ -3,16 +3,23 @@
  * decision 1): asked first, opened through `importDoc` like a file, and a
  * record that will not open is reported and left alone.
  */
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { ARRANGEMENT_VERSION } from '@windsor/engine';
 import { FULL_ARRANGEMENT } from '@windsor/engine/__fixtures__/fullArrangement';
+import { openSessionConsole, songText } from './__fixtures__/songSessionConsole';
 import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
 import { DocumentModel } from './documentModel';
 import type { ConfirmRequest } from './metadataModal';
 import type { StoredSong } from './songAutosave';
-import { importRefusedText, offerRestore, restoreRequest, songRefusal } from './songRestore';
+import {
+  bootSong,
+  importRefusedText,
+  offerRestore,
+  restoreRequest,
+  songRefusal,
+} from './songRestore';
 import { newSong } from './songParts';
 
 beforeAll(() => loadBuiltIns());
@@ -137,5 +144,57 @@ describe('offerRestore', () => {
       expect(songRefusal(song())).toBeNull();
       expect(songRefusal('{not json')).toBeNull();
     });
+  });
+});
+
+describe('bootSong, the reload (windsor#433 decision 9)', () => {
+  const STAMP = '2026-10-02T08:00:00.000Z';
+  const never = (): Promise<boolean> => {
+    throw new Error('asked a question');
+  };
+
+  it('reopens an openable named song with no question, and says so', async () => {
+    const c = openSessionConsole();
+    const text = songText({ name: 'Night Drive', tags: [] }, { bpm: 128 });
+    await c.library.write('n', text);
+    const asked = vi.fn(never);
+    expect(await bootSong(c.ctx, { updated: STAMP, songId: 'n' }, asked)).toBe(true);
+    expect(asked).not.toHaveBeenCalled();
+    expect(c.ctx.songs.state).toEqual({ kind: 'named', id: 'n' });
+    expect(c.ctx.model.toJson()).toBe(text);
+    expect(c.toasts).toEqual(['success: reopened Night Drive']);
+  });
+
+  it('starts a new song, and says why, when the named song is missing', async () => {
+    const c = openSessionConsole();
+    const fresh = c.ctx.model.toJson();
+    const asked = vi.fn(never);
+    expect(await bootSong(c.ctx, { updated: STAMP, songId: 'gone' }, asked)).toBe(false);
+    expect(asked).not.toHaveBeenCalled();
+    expect(c.ctx.songs.state).toEqual({ kind: 'untitled' });
+    expect(c.ctx.model.toJson()).toBe(fresh);
+    expect(c.toasts).toEqual([
+      'warning: your last song is no longer in your songs — this is a new song',
+    ]);
+  });
+
+  it('starts a new song, and says why, when the named song is in a newer format', async () => {
+    const c = openSessionConsole();
+    const future = JSON.stringify({ version: 99, meta: { name: 'Later', tags: [] } });
+    await c.library.write('later', future);
+    expect(await bootSong(c.ctx, { updated: STAMP, songId: 'later' }, never)).toBe(false);
+    expect(c.toasts[0]).toMatch(/^warning: your last song, Later, was saved with song format 99/);
+    expect(c.records.docMap.get('later')).toBe(future);
+  });
+
+  it('offers an untitled record as before', async () => {
+    const ctx = context();
+    const asked: ConfirmRequest[] = [];
+    const answer = (request: ConfirmRequest): Promise<boolean> => {
+      asked.push(request);
+      return Promise.resolve(true);
+    };
+    expect(await bootSong(ctx, saved(song()), answer)).toBe(true);
+    expect(asked.map((request) => request.ok)).toEqual(['Restore']);
   });
 });

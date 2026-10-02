@@ -1,20 +1,24 @@
 /**
  * The user's own state at boot (`2026-09-27-user-library-in-indexeddb`):
  * open the `windsor` database, read the user's patches in beside the
- * built-ins, offer to restore the autosaved song, and from then on autosave
- * the open song after each change and whenever the page is hidden. Where the
- * browser has no IndexedDB, the library is the built-ins alone and Save
- * downloads, as before. It also says the console's first word: the new-song
- * hint, or what became of the last session.
+ * built-ins, give the open-song session its storage (windsor#433), bring
+ * back the last song — a named song reopens at once, an untitled one is
+ * offered as before (`bootSong`) — and from then on autosave the open song
+ * after each change and whenever the page is hidden. Where the browser has
+ * no IndexedDB, the library is the built-ins alone, Save downloads, and the
+ * session has no songs, as before. It also says the console's first word:
+ * the new-song hint, or what became of the last session.
  */
 import type { AppCtx } from './context';
 import { bootLibrary, reportLibraryProblems } from './libraryActions';
 import { EVICTABLE_WARNING } from './libraryConstants';
 import { openConfirm } from './metadataModal';
-import { offerRestore } from './songRestore';
+import { SongAutosave, isNamedSession } from './songAutosave';
+import { songLibrary } from './songLibrary';
+import { bootSong } from './songRestore';
 import { browserPersist, persistOnce } from './storagePersistence';
 import { openUserStores } from './userLibraryStore';
-import { startAutosave } from './userSessionAutosave';
+import { followSong } from './userSessionAutosave';
 
 export async function bootUserState(ctx: AppCtx): Promise<void> {
   const ensurePersisted = persistOnce(browserPersist(), () =>
@@ -22,24 +26,31 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
   );
   const stores = await openUserStores(() => void ensurePersisted());
   const stored = stores ? await stores.songs.load().catch(() => null) : null;
-  // The question and the library load run together; a restore waits for the built-ins itself.
-  const [, restored] = await Promise.all([
+  const autosave = stores
+    ? new SongAutosave({
+        store: stores.songs,
+        read: () => ctx.model.toJson(),
+        report: (message) => ctx.notify(message, 'error'),
+      })
+    : null;
+  if (stores && autosave) {
+    ctx.songs.attach({ library: songLibrary(stores.library), store: stores.songs, autosave });
+  }
+  // The question and the library load run together; an open waits for the built-ins itself.
+  const [, opened] = await Promise.all([
     bootLibrary(stores?.patches ?? null).then(() => {
       reportLibraryProblems(ctx);
       ctx.render();
     }),
-    offerRestore(ctx, stored, openConfirm),
+    bootSong(ctx, stored, openConfirm),
   ]);
   if (!stored)
     ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab, or import a song');
-  else if (!restored) ctx.notify('new song — your last session is kept until your first edit');
-  if (!stores) return;
-  // A clean restore's load-time rename (windsor#103) saves now; a repaired one waits for an edit.
-  const autosave = startAutosave(
-    ctx.model,
-    { store: stores.songs, report: (message) => ctx.notify(message, 'error') },
-    restored,
-  );
+  else if (!opened && !isNamedSession(stored))
+    ctx.notify('new song — your last session is kept until your first edit');
+  if (!autosave) return;
+  // A clean open's load-time rename (windsor#103) saves now; a repaired one waits for an edit.
+  followSong(ctx.model, autosave, opened);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void autosave.flush();
   });

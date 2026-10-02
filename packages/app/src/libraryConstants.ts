@@ -43,15 +43,20 @@ export const LIBRARY_FOLDER_PATH = 'packages/engine/src/patches';
 
 /**
  * The user's own state (`2026-09-27-user-library-in-indexeddb`): one
- * database, two stores. `patches` holds each patch file's text by id;
- * `songs` holds the autosaved open song under `current`.
+ * database. `patches` holds each patch file's text by id; `songs` holds the
+ * session record under `current`. Version 2 (windsor#433, record
+ * `2026-10-02-song-library`) adds the named songs, additively: `songDocs`
+ * holds each song's export text by song id, and `songIndex` the list's
+ * cache derived from it.
  */
 export const USER_DB = {
   name: 'windsor',
-  version: 1,
+  version: 2,
   patches: 'patches',
   songs: 'songs',
   currentSong: 'current',
+  songIndex: 'songIndex',
+  songDocs: 'songDocs',
 } as const;
 
 /** The warning shown once when the browser declines persistent storage (`storagePersistence.ts`). */

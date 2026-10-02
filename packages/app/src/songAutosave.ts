@@ -1,31 +1,63 @@
 /**
  * The open song's autosave (`2026-09-27-user-library-in-indexeddb`, decision
  * 3): a few seconds after the last change, the export text goes to the
- * `songs` store under `current`. The record is exactly the export, so a
- * restore reads it the way Import reads a file. `SongStore` is the whole of
- * what this needs from IndexedDB; the tests drive it with an in-memory fake
- * and fake timers, and only `userLibraryStore.ts` touches the browser.
+ * record the open song lives in. For an untitled song that is the `songs`
+ * store's `current`, exactly the export, so a restore reads it the way
+ * Import reads a file. For a named song (windsor#433, record
+ * `2026-10-02-song-library`) it is the song's own record in the library,
+ * and the session points the autosave there with `retarget`.
+ *
+ * **A write goes to the song it read.** `flush()` reads the text and the
+ * target together, synchronously, before anything is awaited, so a switch
+ * that flushes and then replaces the document can never send the old
+ * song's text to the new song's record. Writes run one after another.
+ *
+ * `SongStore` and `AutosaveTarget` are the whole of what this needs from
+ * IndexedDB; the tests drive it with in-memory fakes and fake timers, and
+ * only `userLibraryStore.ts` touches the browser.
  */
 import { AUTOSAVE_DELAY_MS } from './songAutosaveConstants';
 
-/** One stored song: when it was written, and the export text. */
+/** The untitled song's session record: when it was written, and the export text. */
 export interface StoredSong {
   /** ISO 8601 time of the write. */
   updated: string;
   document: string;
 }
 
-export interface SongStore {
-  /** The `current` record, or null when none was saved. */
-  load(): Promise<StoredSong | null>;
-  save(song: StoredSong): Promise<void>;
+/** The session record while a named song is open: only which song (windsor#433). */
+export interface NamedSession {
+  updated: string;
+  songId: string;
 }
 
+/** What `songs/current` holds. */
+export type SessionRecord = StoredSong | NamedSession;
+
+export const isNamedSession = (record: SessionRecord): record is NamedSession => 'songId' in record;
+
+export interface SongStore {
+  /** The `current` record, or null when none was saved. */
+  load(): Promise<SessionRecord | null>;
+  save(record: SessionRecord): Promise<void>;
+}
+
+/** Where the open song's text goes: `current`, or a named song's record. */
+export interface AutosaveTarget {
+  save(text: string, updated: string): Promise<void>;
+}
+
+/** The untitled song's target: `current` holds the whole text. */
+export const sessionTarget = (store: SongStore): AutosaveTarget => ({
+  save: (document, updated) => store.save({ updated, document }),
+});
+
 export interface AutosaveDeps {
+  /** The session store; the first target is its `current` record. */
   store: SongStore;
   /** The export text of the open song, read when the save runs. */
   read: () => string;
-  /** Where a failed write is reported (the status line). */
+  /** Where a failed write is reported (a toast). */
   report: (message: string) => void;
   delayMs?: number;
   now?: () => Date;
@@ -33,16 +65,25 @@ export interface AutosaveDeps {
 
 export class SongAutosave {
   private readonly deps: AutosaveDeps;
+  private target: AutosaveTarget;
   private timer: ReturnType<typeof setTimeout> | null = null;
-  /** The text last written, so a save that would write the same text is skipped. */
-  private written: string | null = null;
+  /** A change the target has not been sent: a flush, or a failed write, left it owed. */
+  private owed = false;
+  /** While above zero, a change schedules nothing (`quietly`). */
+  private quiet = 0;
+  /** The text and target last written, so a save that would write the same text is skipped. */
+  private written: { text: string; target: AutosaveTarget } | null = null;
+  /** The writes in order; each resolves true when it stored its text. */
+  private queue: Promise<boolean> = Promise.resolve(true);
 
   constructor(deps: AutosaveDeps) {
     this.deps = deps;
+    this.target = sessionTarget(deps.store);
   }
 
   /** A change landed: (re)start the quiet period. */
   schedule(): void {
+    if (this.quiet > 0) return;
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = setTimeout(() => void this.flush(), this.deps.delayMs ?? AUTOSAVE_DELAY_MS);
   }
@@ -51,21 +92,70 @@ export class SongAutosave {
     return this.timer !== null;
   }
 
-  /** Write now if a change is waiting (the page is being hidden, or the quiet period ended). */
-  async flush(): Promise<void> {
-    if (this.timer === null) return;
-    clearTimeout(this.timer);
+  /**
+   * Write now if a change is waiting (the page is being hidden, the quiet
+   * period ended, or the session is about to switch songs). Resolves true
+   * once the open song's text is stored, after any write already under way,
+   * and false when the write failed; the failure is also reported, and the
+   * change stays owed, so the next flush tries again.
+   */
+  flush(): Promise<boolean> {
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
+      this.owed = true;
+    }
+    if (!this.owed) return this.queue.then(() => !this.owed);
+    this.owed = false;
+    const text = this.deps.read();
+    const target = this.target;
+    this.queue = this.queue.then(() => this.write(target, text));
+    return this.queue;
+  }
+
+  /**
+   * Send the open song's changes to `target` from now on. `owed` says the
+   * target lacks the open text, so the next flush writes it even with no
+   * change; `written` names text it already holds, so an identical write is skipped.
+   */
+  retarget(target: AutosaveTarget, options: { owed?: boolean; written?: string } = {}): void {
+    this.target = target;
+    this.owed = options.owed ?? false;
+    if (options.written !== undefined) this.written = { text: options.written, target };
+  }
+
+  /** Drop a waiting change without writing it; true when one was waiting. */
+  cancel(): boolean {
+    const waiting = this.timer !== null || this.owed;
+    if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
-    const document = this.deps.read();
-    if (document === this.written) return;
+    this.owed = false;
+    return waiting;
+  }
+
+  /** Run `replace` with changes scheduling nothing: a session's open decides for itself. */
+  quietly(replace: () => void): void {
+    this.quiet++;
+    try {
+      replace();
+    } finally {
+      this.quiet--;
+    }
+  }
+
+  private async write(target: AutosaveTarget, text: string): Promise<boolean> {
+    if (this.written?.target === target && this.written.text === text) return true;
     const updated = (this.deps.now?.() ?? new Date()).toISOString();
     try {
-      await this.deps.store.save({ updated, document });
-      this.written = document;
+      await target.save(text, updated);
+      this.written = { text, target };
+      return true;
     } catch (error) {
+      if (this.target === target) this.owed = true;
       this.deps.report(
         `autosave failed: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return false;
     }
   }
 }

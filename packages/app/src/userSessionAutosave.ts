@@ -27,6 +27,22 @@ export function openRepaired(song: AutosavedSong): boolean {
   return song.corrections.length > 0 || song.dangling.length > 0 || song.filled.length > 0;
 }
 
+/**
+ * After a song was opened from a stored record (a restore, or a named song
+ * reopened or opened from the library): write it back at once only when the
+ * open changed it (the load-time rename) and repaired nothing. Otherwise the
+ * stored record stays as it was until the first edit.
+ */
+export function saveOpenIfClean(song: AutosavedSong, autosave: SongAutosave): void {
+  if (song.changed && !openRepaired(song)) autosave.schedule();
+}
+
+/** Every change to `song` schedules `autosave` from now on; `restored` says it was just opened from a stored record. */
+export function followSong(song: AutosavedSong, autosave: SongAutosave, restored: boolean): void {
+  song.onChange(() => autosave.schedule());
+  if (restored) saveOpenIfClean(song, autosave);
+}
+
 /** Autosave `song` from now on; `restored` says it was just restored from the stored record. */
 export function startAutosave(
   song: AutosavedSong,
@@ -34,7 +50,6 @@ export function startAutosave(
   restored: boolean,
 ): SongAutosave {
   const autosave = new SongAutosave({ ...deps, read: () => song.toJson() });
-  song.onChange(() => autosave.schedule());
-  if (restored && song.changed && !openRepaired(song)) autosave.schedule();
+  followSong(song, autosave, restored);
   return autosave;
 }

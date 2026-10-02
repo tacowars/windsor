@@ -9,6 +9,7 @@ import type { ApplyResult, DocumentPartial } from '@windsor/engine';
 import type { DocumentModel } from './documentModel';
 import type { EngineHost } from './host';
 import type { PartsSession } from './partsSession';
+import type { SongSession } from './songSession';
 import type { ToastTone } from './toastModel';
 import type { TransportState } from './transportModel';
 
@@ -47,8 +48,18 @@ export interface AppCtx {
    * removes it (#629) — `partEdits.ts` builds those.
    */
   change(partial: DocumentPartial): ApplyResult;
-  /** Adopt a freshly imported raw document: normalise, rebuild, re-render — the one rebuild the UI offers (#629; Restart went with #708, `restructure` with #709). */
-  importDoc(raw: unknown): void;
+  /**
+   * The open-song session (windsor#433): whether the open song is untitled
+   * or a named song stored in this browser, and the library's operations.
+   */
+  songs: SongSession;
+  /**
+   * Adopt a freshly imported raw document as an untitled song: normalise,
+   * rebuild, re-render — the one rebuild the UI offers (#629; Restart went
+   * with #708, `restructure` with #709). The session becomes untitled
+   * (windsor#433 decision 5); a song with no name takes `fileName`'s, less `.json`.
+   */
+  importDoc(raw: unknown, fileName?: string): void;
   /** Re-render the active tab from the current document; the rest render when shown (#620). */
   render(): void;
   /**
