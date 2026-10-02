@@ -75,9 +75,8 @@ leans on five of its features:
   The voice's one noise stream is drawn D..A at the top of each sample in
   both render loops, so a two-Noise voice on Additive takes the fixed-index
   kernel like any other (`2026-10-02-noise-draws-descend-in-both-loops`;
-  `fmProcessorKernel.test.ts` holds every factory patch to the kernel).
-  Before windsor#389 only algorithms 0, 3 and 8 qualified. The 909
-  snare folds its fixed burst into the snappy's opening so it needs one
+  `fmProcessorKernel.test.ts` holds every factory patch to the kernel). The
+  909 snare folds its fixed burst into the snappy's opening so it needs one
   Noise operator; the claps take one Noise modulator into three sine
   carriers instead (above).
 - **Kick bodies play the machine's pitch on C4.** The 808 kicks and the
