@@ -12,6 +12,7 @@ import {
   NOISE_COLOUR_FLOOR_HZ,
   NOISE_COLOUR_RANGE,
   OP_NAMES,
+  VOWEL_RANGE,
   WIDTH_RANGE,
   makePatch,
 } from '@windsor/engine';
@@ -137,6 +138,36 @@ describe('the filter LFO 2 amount', () => {
     expect(at).toBe(fields.indexOf('filter.lfoAmount') + 1);
     expect(FILTER_KNOBS[at]?.label).toBe('LFO 2 Amt');
     expect(FILTER_KNOBS[at]?.o).toEqual(FILTER_KNOBS[at - 1]?.o);
+  });
+});
+
+describe('the Formant Vowel knob (windsor#334)', () => {
+  const vowel = FILTER_KNOBS.find((k) => k.f === 'filter.vowel');
+
+  it('sits after Reso and spans 0 to 4 with the engine default', () => {
+    const fields = FILTER_KNOBS.map((k) => k.f);
+    expect(fields.indexOf('filter.vowel')).toBe(fields.indexOf('filter.resonance') + 1);
+    expect(vowel?.label).toBe('Vowel');
+    expect([vowel?.o.min, vowel?.o.max]).toEqual([0, 4]);
+    expect([vowel?.o.min, vowel?.o.max]).toEqual([VOWEL_RANGE.min, VOWEL_RANGE.max]);
+    expect(vowel && patchKnobOpts(vowel).def).toBe(makePatch().filter.vowel);
+  });
+
+  it('reads the letters on the integers and the morph between them', () => {
+    expect([0, 1, 2, 3, 4].map((v) => vowel?.o.fmt?.(v))).toEqual(['a', 'e', 'i', 'o', 'u']);
+    expect(vowel?.o.fmt?.(3.25)).toBe('o→u 25%');
+  });
+
+  it('writes filter.vowel and pushes it, so a ringing voice retunes', () => {
+    const pushed: number[] = [];
+    const editor: PatchEditor = {
+      patch: makePatch(),
+      push: () => pushed.push(editor.patch.filter.vowel),
+      refresh: () => undefined,
+    };
+    setPath(editor.patch, 'filter.vowel', 2.5);
+    editor.push();
+    expect(pushed).toEqual([2.5]);
   });
 });
 

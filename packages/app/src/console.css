@@ -2995,6 +2995,11 @@ select.field.auto-snap {
   touch-action: none;
   user-select: none;
 }
+
+/* A knob a mode has no use for (windsor#334: Cutoff in Formant) hides by its attribute. */
+.knob[hidden] {
+  display: none;
+}
 .knob:hover {
   background: var(--panel-hi);
 }
