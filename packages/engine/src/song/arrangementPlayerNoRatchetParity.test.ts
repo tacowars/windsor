@@ -104,7 +104,10 @@ function play(sequencer: GridSpec | ArpSpec): { count: number; digest: string } 
 
 describe('a song with no ratchet plays as before (windsor#366)', () => {
   it('a Grid part', () => {
-    expect(play(GRID)).toEqual({ count: 84, digest: '0afcaae4ab1a1b35' });
+    // Re-pinned for windsor#419: the cutoff lane's note-on step arrays moved
+    // from the 24-slot step layout to the 30-target table (cutoff from slot 1
+    // to code 0). Remapped onto the new codes, every call matched `main`'s.
+    expect(play(GRID)).toEqual({ count: 84, digest: '4152cb420eecc552' });
   });
 
   it('an Arp part', () => {

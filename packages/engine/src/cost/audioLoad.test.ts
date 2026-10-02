@@ -213,7 +213,6 @@ describe('the worklets report their own load', () => {
     const params = {
       pitchBend: new Float32Array([0]),
       modWheel: new Float32Array([0]),
-      cutoffMod: new Float32Array([0]),
       gain: new Float32Array([1]),
     };
     for (let i = 0; i < 10; i++) p.process(inputs, outputs, params);

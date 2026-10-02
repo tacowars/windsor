@@ -26,7 +26,7 @@ import { loadProcessor } from '../__fixtures__/workletHarness';
 import { AUTOMATION_STEP_RAMP_SECONDS } from '../automation/automationConstants';
 import { catalogRow } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
-import { STEP_MOD_PARAMS, STEP_MOD_SLOT_COUNT } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS, VOICE_TARGET_COUNT } from '../worklet/fm/voiceTargetTables';
 import { voiceSlotParamName } from './audioPart';
 import { voiceOffset } from './voiceAutomation';
 
@@ -65,8 +65,9 @@ const PATCH: Patch = makePatch({
   lfo2: { amount: 0.5, rate: 3, toWidth: [0.125, 0.125, 0.125, 0.125] },
 });
 
-/** Every target a slot carries, and a lane value whose offset is exact in binary. */
+/** Every target a slot carries but the decays and the vowel, and a lane value whose offset is exact in binary. */
 const TARGETS: readonly (readonly [string, number])[] = [
+  ['filter.cutoff', 2400],
   ['filter.envAmount', 2],
   ['filter.resonance', 3],
   ...[0, 1, 2, 3].flatMap((i): [string, number][] => [
@@ -115,7 +116,6 @@ function drive(d: Drive = {}): Float32Array {
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   for (let i = 0; i < SLOTS; i++) params[voiceSlotParamName(i)] = new Float32Array([0]);
@@ -176,17 +176,37 @@ describe('a voice lane on the FM part (windsor#346)', () => {
     }
   });
 
-  it.each([...PATHS, 'filter.cutoff'])('%s moves a held note while it rings', (path) => {
+  it('moves each of 8 targets on 8 slots at once, the cutoff among them (windsor#419)', () => {
+    const eight = TARGETS.slice(0, SLOTS);
+    const slots = eight.map(([path]) => path);
+    expect(slots).toContain('filter.cutoff');
+    const offsets = eight.map(([path, value]) => offsetFor(path, value));
+    /** The 8 slots at their offsets but slot `skip`; the patch moved likewise. */
+    const lanes = (skip: number, specialise = true): Float32Array =>
+      drive({
+        slots,
+        specialise,
+        each: (_b, params) =>
+          offsets.forEach((o, i) => (params[voiceSlotParamName(i)]![0] = i === skip ? 0 : o)),
+      });
+    const movedBut = (skip: number): Patch =>
+      eight.reduce(
+        (patch, [path, value], i) => (i === skip ? patch : moved(patch, path, value)),
+        PATCH,
+      );
+    for (const specialise of [true, false]) {
+      expect(lanes(-1, specialise)).toEqual(drive({ patch: movedBut(-1), specialise }));
+    }
+    // Each slot moves its own target and no other: without it, the rest play as the patch moved but that one.
+    for (let skip = 0; skip < SLOTS; skip++) {
+      expect(lanes(skip), slots[skip]!).toEqual(drive({ patch: movedBut(skip) }));
+    }
+  });
+
+  it.each(PATHS)('%s moves a held note while it rings', (path) => {
     const plain = drive();
-    const cutoff = path === 'filter.cutoff';
-    const offset = cutoff ? 1 : offsetFor(path, TARGETS.find(([p]) => p === path)![1]);
-    const lane = drive({
-      ...(cutoff ? {} : { slots: [path] }),
-      each: (b, params) => {
-        if (cutoff) params.cutoffMod![0] = b >= FROM ? offset : 0;
-        else slot0From(offset, FROM)(b, params);
-      },
-    });
+    const offset = offsetFor(path, TARGETS.find(([p]) => p === path)![1]);
+    const lane = drive({ slots: [path], each: slot0From(offset, FROM) });
     const at = FROM * BLOCK * 2;
     expect(lane.subarray(0, at)).toEqual(plain.subarray(0, at));
     expect(lane.subarray(at)).not.toEqual(plain.subarray(at));
@@ -199,8 +219,8 @@ describe('a voice lane on the FM part (windsor#346)', () => {
   });
 
   it("stacks a step's offset on the lane's value", () => {
-    const step = new Array<number>(STEP_MOD_SLOT_COUNT).fill(0);
-    step[STEP_MOD_PARAMS.indexOf('ops.0.level')] = 0.5; // 0.5 + 0.5 × span 0.5 = 0.75
+    const step = new Array<number>(VOICE_TARGET_COUNT).fill(0);
+    step[VOICE_TARGET_PATHS.indexOf('ops.0.level')] = 0.5; // 0.5 + 0.5 × span 0.5 = 0.75
     const events: ScheduledEvent[] = [{ ...held[0]!, stepMod: step }];
     const lane = drive({ slots: ['ops.0.level'], events, each: slot0From(0.125) });
     expect(lane).toEqual(drive({ patch: moved(PATCH, 'ops.0.level', 0.875) }));

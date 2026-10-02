@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { chordAt, type Harmony } from '../harmony/harmonyTimeline';
-import { STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 import { DEFAULT_ARP_CONFIG, type ArpSequencerConfig } from './arpSequencer';
 import { arpNote, defaultArpSteps, type ArpStep } from './arpSteps';
 import { Arpeggiator, arpNoteList } from './arpeggiator';
@@ -221,7 +221,7 @@ describe('lanes', () => {
   it('a lane value reaches the note-on’s stepMod for its cell, each time round the cycle', () => {
     const values = Array.from({ length: 32 }, (_, k) => (k === 2 ? -0.5 : 0));
     const ons = onsOf(run({ style: 'upDown', lanes: [{ param: 'filter.cutoff', values }] }));
-    const cutoff = STEP_MOD_PARAMS.indexOf('filter.cutoff');
+    const cutoff = VOICE_TARGET_PATHS.indexOf('filter.cutoff');
     expect(ons.filter((e) => e.stepMod).map((e) => e.tick / QUARTER)).toEqual([2, 6, 10]);
     expect(ons[2]!.stepMod![cutoff]).toBe(-0.5);
   });

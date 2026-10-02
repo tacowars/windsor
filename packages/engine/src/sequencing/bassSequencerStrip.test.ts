@@ -21,7 +21,7 @@ import type { NoteEvent, NoteOnEvent } from './noteEvent';
 import type { PartTickEvent } from './regionGate';
 import { ScaleSampler, SEMITONES_PER_OCTAVE } from './scaleSampler';
 import { DIVISORS, TICKS_PER_BAR } from './scheduler';
-import { STEP_MOD_PARAMS, STEP_MOD_SLOT_COUNT } from '../worklet/fm/stepModTables';
+import { VOICE_TARGET_PATHS, VOICE_TARGET_COUNT } from '../worklet/fm/voiceTargetTables';
 
 const BAR = TICKS_PER_BAR;
 const QUARTER = DIVISORS.quarter;
@@ -206,8 +206,8 @@ describe('a note step (windsor#367 decision 3)', () => {
     const steps = [bassNote(), bassNote(), bassNote()];
     const [first, second, third] = ons(drive(bass({ gate: 0.5, steps, lanes }), 3));
     const slots = (value: number): number[] => {
-      const offsets = new Array<number>(STEP_MOD_SLOT_COUNT).fill(0);
-      offsets[STEP_MOD_PARAMS.indexOf('filter.cutoff')] = value;
+      const offsets = new Array<number>(VOICE_TARGET_COUNT).fill(0);
+      offsets[VOICE_TARGET_PATHS.indexOf('filter.cutoff')] = value;
       return offsets;
     };
     expect(first?.stepMod).toEqual(slots(0.5));

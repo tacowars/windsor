@@ -68,7 +68,6 @@ function holdWithWheel(patch: unknown, wheel: number): WheelRender {
   const params = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([wheel]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   loaded.setFrame(0);

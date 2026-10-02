@@ -253,7 +253,6 @@ function renderVowelLane(patch: Patch, specialise: boolean): Float32Array {
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   for (let i = 0; i < 8; i++) params[voiceSlotParamName(i)] = new Float32Array([0]);

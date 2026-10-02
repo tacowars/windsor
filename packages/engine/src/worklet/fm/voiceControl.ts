@@ -15,15 +15,16 @@
  * (`fmProcessorKernel.test.ts`). LFO 2's terms are appended to LFO 1's, so
  * an inert LFO 2 adds exactly ±0 and a width of 1 ramps nowhere: the golden
  * test pins the whole update. No double crosses a call here as an argument
- * or a return (windsor#233): the part's bend, wheel and cutoff arrive in
+ * or a return (windsor#233): the part's bend and wheel arrive in
  * `voice.partControls`, the envelopes and LFOs leave their results in their
  * fields, and an operator's width reads its frequency and the LFO levels
  * from the voice, since V8 does not inline every call this update makes and
  * a double crossing one it does not inline is a new heap number on the audio
- * thread (`synth/fmProcessorAllocation.test.ts`). A song's lanes move the
- * values a ringing voice plays (windsor#346): the update starts by laying
- * them out in `liveValues` (`voiceOffsets.ts`), and every read below of a
- * value a lane can move reads it there.
+ * thread (`synth/fmProcessorAllocation.test.ts`). A song's lanes and a
+ * note's steps move the values a ringing voice plays (windsor#346,
+ * windsor#419): the update starts by laying them out in `liveValues` by
+ * target code (`voiceOffsets.ts`), and every read below of a value a lane or
+ * a step can move reads it there.
  */
 
 import type { WorkletPatch } from './patchNormalise';
@@ -36,7 +37,9 @@ import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
 import { FORMANT_SHIFT_SLOT, updateVoiceFormant } from './voiceFormant';
+import { applyVoiceOffsets } from './voiceOffsets';
 import {
+  VT_CUTOFF,
   VT_ENV_AMOUNT,
   VT_LFO2_AMOUNT,
   VT_LFO_AMOUNT,
@@ -45,8 +48,7 @@ import {
   VT_OP_WIDTH,
   VT_PITCH_ENV_AMOUNT,
   VT_RESONANCE,
-} from './voiceOffsetTables';
-import { applyVoiceOffsets } from './voiceOffsets';
+} from './voiceTargetTables';
 import { KIND_PULSE, KIND_TABLE, mipIndexAt } from './waveTables';
 
 /** The frequency a squeezed wave's table is chosen for, passed to `mipIndexAt` in place of an argument. */
@@ -55,8 +57,7 @@ const MIP_FREQ_SLOT = new Float64Array(1);
 /** `Voice.partControls`, the part's k-rate parameters for this quantum: one slot each. */
 const PART_BEND = 0,
   PART_WHEEL = 1,
-  PART_CUTOFF_MOD = 2,
-  PART_CONTROL_COUNT = 3;
+  PART_CONTROL_COUNT = 2;
 
 /**
  * Routing and per-note constants for the bound patch, after `kind` and
@@ -94,8 +95,8 @@ function restingWidth(kind: number, width: number): number {
 }
 
 /**
- * Operator `i`'s width for this block (#55): its effective width (the
- * patch's, or the step's — windsor#17), both LFOs
+ * Operator `i`'s width for this block (#55): its live width (the
+ * patch's, a step's or a lane's), both LFOs
  * added and clamped to WIDTH_RANGE, sets a per-sample ramp to the value the
  * loops read (`restingWidth`), and the mip table: a squeezed wave's segment
  * plays at `freq / width`, so the table is picked for the narrower of the
@@ -139,8 +140,8 @@ function updateOperatorWidth(voice: Voice, i: number, n: number): void {
 /**
  * The filter's part of the control update, after the operators': its
  * envelope, and each stage's coefficients for the voice's cutoff moved by
- * the envelope, the wheel, both LFOs, key tracking and the part's cutoff
- * control; in the Formant mode the same octaves shift its three peaks
+ * the envelope, the wheel, both LFOs and key tracking; a song lane or a step
+ * on the cutoff moves the cutoff itself, as the knob does; in the Formant mode the same octaves shift its three peaks
  * instead (`voiceFormant.ts`, windsor#331). The LFO levels are the voice's `lfoLevel` and `lfo2Level`, this
  * block's, and the wheel and key offset are worked out again as the update
  * works them, so no double is passed in (windsor#233). Allocates nothing.
@@ -155,15 +156,14 @@ function updateVoiceFilter(voice: Voice, n: number): void {
   const fenv = voice.filtEnv.value;
   // The wheel adds to the envelope amount the way it adds to the LFO's
   // (#586): depth 0 leaves the term exactly as it was. The amount, cutoff
-  // and resonance are the voice's: the patch's, or the step's (windsor#17),
-  // with a song lane's offset on the amount and resonance (windsor#346).
+  // and resonance are the voice's live values: the patch's, a step's
+  // (windsor#17) and a song lane's (windsor#346), all one layout (windsor#419).
   const live = voice.liveValues;
   const resonance = live[VT_RESONANCE];
   const octaves =
     fenv * (live[VT_ENV_AMOUNT] + modWheel * f.modWheelDepth) +
     voice.lfoLevel * f.lfoAmount +
     f.keyTrack * keyOffset +
-    controls[PART_CUTOFF_MOD] +
     voice.lfo2Level * f.lfo2Amount;
   // Formant (windsor#331): the same octaves move its three peaks, not `cutoff`.
   if (f.mode === FILT_FORMANT) {
@@ -171,7 +171,7 @@ function updateVoiceFilter(voice: Voice, n: number): void {
     updateVoiceFormant(voice);
     return;
   }
-  const cutoff = voice.cutoff * Math.pow(2, octaves);
+  const cutoff = live[VT_CUTOFF] * Math.pow(2, octaves);
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
   svfA.q = resonance;
@@ -248,7 +248,6 @@ function updateVoiceControl(voice: Voice, n: number): void {
 export {
   PART_BEND,
   PART_WHEEL,
-  PART_CUTOFF_MOD,
   PART_CONTROL_COUNT,
   bindVoiceConstants,
   restingWidth,

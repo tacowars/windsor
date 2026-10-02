@@ -11,8 +11,8 @@
   },
   // Nine worklet modules are read by the main thread too (#656): the algorithm
   // table, the wave ids, the envelope curve, the mode ids, the patch defaults,
-  // the constants they use, the step modulation table and curve
-  // (windsor#17), and the Formant vowels (windsor#331). They sit under `worklet/fm/`, which is
+  // the constants they use, the voice target table and curve
+  // (windsor#419), and the Formant vowels (windsor#331). They sit under `worklet/fm/`, which is
   // excluded below and checked by its own project, so they are listed here by
   // name and compiled by both — under this project's stricter flags as well.
   "files": [
@@ -22,8 +22,8 @@
     "src/worklet/fm/fmConstants.ts",
     "src/worklet/fm/modeIds.ts",
     "src/worklet/fm/patchDefaults.ts",
-    "src/worklet/fm/stepModTables.ts",
-    "src/worklet/fm/stepModValue.ts",
+    "src/worklet/fm/voiceTargetTables.ts",
+    "src/worklet/fm/voiceTargetValue.ts",
     "src/worklet/fm/formantTables.ts"
   ],
   "include": ["src", "src/**/*.json"],
