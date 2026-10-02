@@ -70,6 +70,20 @@ describe('the bass through the player', () => {
     expect(trace(r.parts.drone, 'noteOffByNote', song)).toEqual([[BAR, C2]]);
   });
 
+  it('follows a chromatic root: ♭VI major in C minor is G, a semitone under A♭ (windsor#330)', () => {
+    const flatVi: Harmony = {
+      ...HARMONY,
+      events: [HARMONY.events[0]!, { ...HARMONY.events[1]!, quality: 'maj', accidental: -1 }],
+    };
+    const song = bassSong({ gate: 1 }, [FULL_REGION], flatVi);
+    const r = rig(song);
+    r.run(2);
+    expect(trace(r.parts.drone, 'noteOn', song)).toEqual([
+      [0, C2],
+      [BAR, A_FLAT_2 - 1],
+    ]);
+  });
+
   it('a region re-entry restarts the density stream: the second pass repeats the first', () => {
     const firstBar: Region[] = [{ start: 0, duration: BAR }];
     const song = bassSong({ gate: 0.5, density: 0.5, seed: 9 }, firstBar);

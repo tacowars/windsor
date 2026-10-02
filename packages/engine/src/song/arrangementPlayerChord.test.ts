@@ -110,6 +110,29 @@ describe('chord parts (#606)', () => {
     ).toEqual([59, 62, 66]);
   });
 
+  it('voices a chromatic event, written or edited live (windsor#330)', () => {
+    // V7 in C minor, the major V a minor key borrows: G B D F above C3.
+    const v7 = {
+      start: 0,
+      duration: 2 * TICKS_PER_BAR,
+      degree: 4,
+      size: 4,
+      quality: 'dom7',
+    } as const;
+    const written: Arrangement = {
+      ...PROGRESSION,
+      harmony: { ...PROGRESSION.harmony, events: [v7, PROGRESSION.harmony.events[1]!] },
+    };
+    const { parts, player, run } = rig(written);
+    run(1);
+    expect(noteOns(parts.drone)).toEqual([55, 59, 62, 65]);
+    // A live edit flattens VI and names it major: A♭ down a semitone is G, so bar 3 plays G B D.
+    const flatVi = { ...PROGRESSION.harmony.events[1]!, quality: 'maj', accidental: -1 } as const;
+    expect(player.apply({ harmony: { events: [v7, flatVi] } }, {}).ok).toBe(true);
+    run(2);
+    expect(noteOns(parts.drone).slice(4, 7)).toEqual([55, 59, 62]);
+  });
+
   it('a step, voicing, gate or divisor edit reconfigures live: no all-notes-off, no restart', () => {
     const { parts, player, run } = rig(PROGRESSION);
     run(1);

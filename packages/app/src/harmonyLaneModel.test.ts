@@ -9,7 +9,16 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Harmony, HarmonyEvent } from '@windsor/engine';
-import { CHORD_SIZE_SEVENTH, CHORD_SIZE_TRIAD, PPQ, TICKS_PER_BAR, chordAt } from '@windsor/engine';
+import {
+  ARRANGEMENT_VERSION,
+  CHORD_SIZE_SEVENTH,
+  CHORD_SIZE_TRIAD,
+  PPQ,
+  TICKS_PER_BAR,
+  chordAt,
+} from '@windsor/engine';
+import { loadBuiltIns } from './builtInLibrary';
+import { DocumentModel } from './documentModel';
 import {
   appendEvent,
   degreeChips,
@@ -21,6 +30,7 @@ import {
   removeEvent,
   resizeEventBy,
   setEventDuration,
+  setSize,
 } from './harmonyLaneModel';
 
 const BAR = TICKS_PER_BAR;
@@ -63,6 +73,56 @@ describe('resizing an event', () => {
   it('never shortens an event under a beat, and never dials the last one', () => {
     expect(spans(setEventDuration(FOUR, 1, 0, SONG))[1]).toEqual([BAR, PPQ]);
     expect(setEventDuration(FOUR, 3, BAR, SONG)).toEqual(FOUR);
+  });
+});
+
+describe('Size on an event with a named quality (windsor#332 decision 1)', () => {
+  const maj: HarmonyEvent = { ...(FOUR[0] as HarmonyEvent), quality: 'maj', accidental: -1 };
+  const dom7: HarmonyEvent = {
+    ...(FOUR[0] as HarmonyEvent),
+    size: CHORD_SIZE_SEVENTH,
+    quality: 'dom7',
+  };
+
+  it("asks for the scale's own seventh, dropping the quality and keeping the accidental", () => {
+    const out = setSize([maj], 0, CHORD_SIZE_SEVENTH)[0];
+    expect(out).toEqual({ start: 0, duration: BAR, degree: 0, size: 4, accidental: -1 });
+    expect(out).not.toHaveProperty('quality');
+  });
+
+  it("asks for the scale's own triad from a dominant seventh", () => {
+    const out = setSize([dom7], 0, CHORD_SIZE_TRIAD)[0];
+    expect(out).toEqual({ start: 0, duration: BAR, degree: 0, size: 3 });
+    expect(out).not.toHaveProperty('quality');
+  });
+
+  it('keeps the new size and the accidental through the document merge, reporting nothing', async () => {
+    await loadBuiltIns();
+    const model = new DocumentModel({
+      version: ARRANGEMENT_VERSION,
+      transport: { bpm: 120, bars: 4 },
+      harmony: { root: 0, scale: 'major', events: [{ ...maj, duration: 4 * BAR }] },
+      parts: [
+        {
+          slot: 0,
+          name: 'kick',
+          preset: 'kick',
+          regions: [{ start: 0, duration: 4 * BAR }],
+          sequencer: { kind: 'euclidean', seed: 0, note: 36, hold: 0.2 },
+        },
+      ],
+    });
+    expect(model.corrections).toEqual([]);
+    const events = setSize(model.doc.harmony.events ?? [], 0, CHORD_SIZE_SEVENTH);
+    model.merge({ harmony: { events } });
+    expect(model.doc.harmony.events?.[0]).toEqual({
+      start: 0,
+      duration: 4 * BAR,
+      degree: 0,
+      size: CHORD_SIZE_SEVENTH,
+      accidental: -1,
+    });
+    expect(model.corrections).toEqual([]);
   });
 });
 
@@ -136,6 +196,20 @@ describe('labels', () => {
     expect(
       eventLabel(key, { ...(FOUR[3] as HarmonyEvent), size: CHORD_SIZE_SEVENTH }).sizeTag,
     ).toBe('7th');
+  });
+
+  it('names a chromatic event by its moved stack and flats or sharps its numeral (windsor#330)', () => {
+    const major: Harmony = { root: 0, scale: 'major', events: FOUR };
+    const flatVi = { ...(FOUR[1] as HarmonyEvent), accidental: -1 } as const;
+    expect(eventLabel(major, { ...flatVi, quality: 'maj' })).toEqual({
+      name: 'G# maj',
+      numeral: '♭VI',
+      sizeTag: 'triad',
+    });
+    expect(eventLabel(major, flatVi)).toMatchObject({ name: 'G# min', numeral: '♭vi' });
+    expect(
+      eventLabel(major, { ...(FOUR[0] as HarmonyEvent), quality: 'maj', accidental: -1 }),
+    ).toMatchObject({ name: 'B maj', numeral: '♭I' });
   });
 
   it('offers one chip per scale degree with its numeral and pitch in the key', () => {

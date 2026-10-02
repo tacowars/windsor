@@ -3,7 +3,8 @@
  * the song is on at a transport tick.
  *
  * A song's `harmony.events` is a sorted, contiguous list of
- * `{ start, duration, degree, size }` inside the song's `songTicks`. An
+ * `{ start, duration, degree, size, quality?, accidental? }` inside the
+ * song's `songTicks` (the chromatic fields are windsor#330's). An
  * event holds from its `start` to the next event's start; the last holds to
  * the song end; and the timeline is cyclic, so a first event starting after
  * tick 0 means the last event holds from tick 0 until it. Lookups are
@@ -12,8 +13,11 @@
  *
  * Pure: the document's harmony in, a chord out. Nothing here reaches the
  * audio graph, and the events arrive normalised (`arrangementNormalise.ts`).
+ * `chordAt` builds the chord's stack once (`eventStack`), and every
+ * performer voices that stack rather than rebuilding it from the degree.
  */
-import { chordTones, type ChordSize } from './chordTheory';
+import { eventStack, type ChordSize } from './chordTheory';
+import type { ChordAccidental, NamedQuality } from './chordTables';
 import { scaleOffsets } from '../sequencing/scaleSampler';
 import type { ScaleName } from '../sequencing/scaleSampler';
 
@@ -25,6 +29,10 @@ export interface HarmonyEvent {
   /** Scale degree of the chord root; past the scale it wraps with octave carry. */
   readonly degree: number;
   readonly size: ChordSize;
+  /** The tertian stack to build instead of the scale's own; absent is the diatonic chord. */
+  readonly quality?: NamedQuality;
+  /** Semitones added to the root and every tone: -1, 1, or absent (0). */
+  readonly accidental?: ChordAccidental;
 }
 
 /** The song's harmony: a key and the chord timeline over it. */
@@ -40,12 +48,19 @@ export interface HarmonyChord {
   readonly event: HarmonyEvent;
   /** Index into `harmony.events`. */
   readonly index: number;
-  /**
-   * Semitones from the key root to the chord's root, octave carry included —
-   * the first of `chordTones`, so a bass following the chord needs no second
-   * fold.
-   */
+  /** Semitones from the key root, root first, close-stacked, octave carry included. */
+  readonly stack: readonly number[];
+  /** `stack[0]`, kept for the tests and callers that read it. */
   readonly tonesRoot: number;
+}
+
+/**
+ * What identifies "the chord changed" for a performer that restarts on one:
+ * the degree, size, quality and accidental — not the event, and not the key.
+ */
+export function chordIdentity(chord: HarmonyChord): string {
+  const { degree, size, quality, accidental } = chord.event;
+  return `${degree}:${size}:${quality ?? ''}:${accidental ?? 0}`;
 }
 
 /** One drawn block of the timeline: `[start, end)` in song ticks and the event it shows. */
@@ -73,8 +88,8 @@ export function chordAt(harmony: Harmony, songTicks: number, tick: number): Harm
   const songTick = ((tick % songTicks) + songTicks) % songTicks;
   const index = indexAt(events, songTick);
   const event = events[index] as HarmonyEvent;
-  const tones = chordTones(scaleOffsets(harmony.scale), event.degree, event.size);
-  return { event, index, tonesRoot: tones[0] ?? 0 };
+  const stack = eventStack(scaleOffsets(harmony.scale), event);
+  return { event, index, stack, tonesRoot: stack[0] ?? 0 };
 }
 
 /**

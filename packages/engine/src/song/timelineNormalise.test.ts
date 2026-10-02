@@ -177,3 +177,94 @@ describe('region patterns in the song document (windsor#73)', () => {
     expect(result.document.parts[0]?.regions).toStrictEqual(ALL);
   });
 });
+
+/** A four-bar song in `key` with the given harmony events, normalised; its events and the report. */
+function eventsOf(
+  events: unknown[],
+  key: Record<string, unknown> = { root: 0, scale: 'major' },
+): { events: unknown; corrections: string[]; document: Arrangement } {
+  const result = makeArrangement(song([KICK], { harmony: { ...key, events } }));
+  return { ...result, events: result.document.harmony.events };
+}
+
+describe('chromatic harmony events (windsor#330 decision 5)', () => {
+  const at = (start: number, fields: Record<string, unknown>): Record<string, unknown> => ({
+    start,
+    duration: BAR,
+    degree: 0,
+    size: 3,
+    ...fields,
+  });
+
+  it('keeps a named quality and a flat or sharp, in the canonical field order', () => {
+    const { events, corrections, document } = eventsOf([
+      { accidental: -1, quality: 'maj', size: 3, degree: 5, duration: BAR, start: 0 },
+      at(BAR, { accidental: 1 }),
+      at(2 * BAR, { quality: 'dim7', size: 4 }),
+      at(3 * BAR, {}),
+    ]);
+    expect(corrections).toEqual([]);
+    expect(events).toStrictEqual([
+      { start: 0, duration: BAR, degree: 5, size: 3, quality: 'maj', accidental: -1 },
+      { start: BAR, duration: BAR, degree: 0, size: 3, accidental: 1 },
+      { start: 2 * BAR, duration: BAR, degree: 0, size: 4, quality: 'dim7' },
+      { start: 3 * BAR, duration: BAR, degree: 0, size: 3 },
+    ]);
+    const first = document.harmony.events[0] ?? {};
+    expect(Object.keys(first)).toEqual([
+      'start',
+      'duration',
+      'degree',
+      'size',
+      'quality',
+      'accidental',
+    ]);
+    // The export round-trips: normalising it again changes nothing, and the live fit agrees.
+    const again = makeArrangement(JSON.parse(JSON.stringify(document)));
+    expect(again.corrections).toEqual([]);
+    expect(again.document).toStrictEqual(document);
+    expect(fitTimelines(document)).toStrictEqual(document);
+  });
+
+  it('sets the size from the quality: silently when absent, reported when it disagrees', () => {
+    // V7 in A natural minor, written as a triad.
+    const minor = { root: 9, scale: 'naturalMinor' };
+    const absent = eventsOf([{ start: 0, duration: 4 * BAR, degree: 4, quality: 'dom7' }], minor);
+    expect(absent.corrections).toEqual([]);
+    expect(absent.events).toStrictEqual([
+      { start: 0, duration: 4 * BAR, degree: 4, size: 4, quality: 'dom7' },
+    ]);
+    const triad = eventsOf(
+      [at(0, { degree: 4, size: 3, quality: 'dom7', duration: 4 * BAR })],
+      minor,
+    );
+    expect(triad.events).toStrictEqual(absent.events);
+    expect(triad.corrections).toEqual([
+      "harmony.events[0].size: 3 is not dom7's 4 tones — corrected",
+    ]);
+  });
+
+  it('drops a quality or an accidental it does not know, reported; a natural 0 silently', () => {
+    const { events, corrections } = eventsOf([
+      at(0, { quality: 'other' }),
+      at(BAR, { quality: 'maj9' }),
+      at(2 * BAR, { accidental: 2 }),
+      at(3 * BAR, { accidental: 0.5, quality: 'min' }),
+    ]);
+    expect(events).toStrictEqual([
+      at(0, {}),
+      at(BAR, {}),
+      at(2 * BAR, {}),
+      at(3 * BAR, { quality: 'min' }),
+    ]);
+    expect(corrections).toEqual([
+      `harmony.events[0].quality: "other" is not a chord quality — the scale's own chord`,
+      `harmony.events[1].quality: "maj9" is not a chord quality — the scale's own chord`,
+      'harmony.events[2].accidental: 2 is not a flat (-1) or a sharp (1) — natural',
+      'harmony.events[3].accidental: 0.5 is not a flat (-1) or a sharp (1) — natural',
+    ]);
+    const natural = eventsOf([at(0, { accidental: 0, duration: 4 * BAR })]);
+    expect(natural.corrections).toEqual([]);
+    expect(natural.events).toStrictEqual([at(0, { duration: 4 * BAR })]);
+  });
+});

@@ -95,6 +95,10 @@ describe('the Cycle label (windsor#370)', () => {
   it('names the count and the chord the card reads, in the key', () => {
     expect(arpCycleLabel(6, HARMONY, TRIAD)).toBe('6 cells · C maj');
     expect(arpCycleLabel(14, HARMONY, SEVENTH)).toBe('14 cells · G 7');
+    // windsor#330: ♭VI major names its moved root.
+    const flatVi = { start: 0, duration: BAR, degree: 5, size: 3, quality: 'maj', accidental: -1 };
+    const chord = chordAt({ ...HARMONY, events: [flatVi] as Harmony['events'] }, BAR, 0);
+    expect(arpCycleLabel(6, HARMONY, chord)).toBe('6 cells · G# maj');
   });
 
   it('is the count alone with no chord, and one cell is a cell', () => {

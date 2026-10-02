@@ -45,6 +45,7 @@ export const CHORD_QUALITIES = [
 ] as const;
 export type ChordQuality = (typeof CHORD_QUALITIES)[number];
 
+/** A quality the table spells; what a harmony event may ask for (windsor#330). */
 export type NamedQuality = Exclude<ChordQuality, 'other'>;
 
 /** Interval sets keyed by quality; the theory looks a stack's intervals up here. */
@@ -95,6 +96,19 @@ export const ROMAN_GLYPHS: ReadonlyArray<readonly [number, string]> = [
   [4, 'IV'],
   [1, 'I'],
 ];
+
+/**
+ * A harmony event's accidental (windsor#330): semitones added to the root and
+ * every tone, flat or sharp. Natural is the field's absence, never 0.
+ */
+export type ChordAccidental = -1 | 1;
+export const CHORD_ACCIDENTALS: readonly ChordAccidental[] = [-1, 1];
+
+/** The glyph a numeral takes for its accidental: `♭VI`, `♯iv°`. */
+export const ACCIDENTAL_GLYPHS: Readonly<Record<ChordAccidental, string>> = {
+  [-1]: '♭',
+  1: '♯',
+};
 
 /** The console's note spelling: sharps only (epic #605 decision 11). */
 export const CHORD_NOTE_NAMES: readonly string[] = [
