@@ -1,13 +1,18 @@
 /**
  * The Euclid card (#610; the device of windsor#356, record
  * `2026-10-01-euclid-lanes-and-ratchets` decisions 9 and 10, and its
- * mockup): rail buttons (`euclidRail.ts`) for the sequencer device's shared
- * rail (`sequencerDevice.ts`, windsor#368) and two pages under tabs
+ * mockup), fitted to the 244 px sequencer device by windsor#393 (record
+ * `2026-10-01-sequencer-rack-devices` decision 11, look
+ * `docs/research/2026-09-30-sequencer-rack/euclid.html`): the lane-view
+ * toggle (`euclidRail.ts`) for the device's shared rail
+ * (`sequencerDevice.ts`, windsor#368) and two pages under tabs
  * (`euclidTabs.ts`). **Pattern** (`euclidPatternPage.ts`) holds the Play
- * knobs and the stack of rows: the ratchet row over the trigger figure, and
- * the drawn lanes below it (`euclidRows.ts`, `euclidLaneRows.ts`).
- * **Density** (`euclidDensityPage.ts`) holds the modulator, its plot of `k`
- * and the `k` bounds. The page and the lane view are the session's.
+ * controls in columns and the stack of rows: the ratchet row over the
+ * trigger figure, and the drawn lanes below it (`euclidRows.ts`,
+ * `euclidLaneRows.ts`). **Density** (`euclidDensityPage.ts`) holds the
+ * modulator, its plot of `k` and the `k` bounds. Both pages share one cell,
+ * so the device keeps the Pattern page's width on either. The page and the
+ * lane view are the session's.
  *
  * Every edit goes through `ctx.change` into the pane's selected region's
  * pattern (windsor#75, `changePattern`) and, since the engine reconfigures
@@ -23,12 +28,11 @@
  * every row's ring on its own step.
  */
 import type { EuclideanSpec, RegionStep } from '@windsor/engine';
-import { PPQ, TICKS_PER_BAR, partAt } from '@windsor/engine';
-import { PERC_COLOR } from './consoleColors';
+import { PPQ, TICKS_PER_BAR } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { type EuclidCard, setView, viewOf, writeRows } from './euclidCardState';
-import { EUCLID_PLOT_SECONDS_DIGITS, EUCLID_READOUT_HINT } from './euclidConstants';
+import { EUCLID_LANES_MAX, EUCLID_PLOT_SECONDS_DIGITS } from './euclidConstants';
 import { BarLineWatch, plotSeconds } from './euclidBarLines';
 import { densityNote, plotBar } from './euclidDensityModel';
 import { type DensityPage, densityPage } from './euclidDensityPage';
@@ -100,11 +104,13 @@ function paintAll(live: Live, spec: EuclideanSpec, figure: Figure, pass: number)
   const { card, pattern } = live;
   const view = viewOf(card.slot).lanes;
   const group = stepsPerBeat(spec.divisor);
-  live.heads = paintRows(pattern.rows, { card, spec, figure, view, pass, group });
+  live.heads = paintRows(pattern.rows, pattern.rule, { card, spec, figure, view, pass, group });
   live.lit = live.heads.map(() => Number.NaN);
   fillPicker(pattern.picker, laneChoices(spec));
-  const lengths = lanesOf(spec).map((ref) => laneLength(spec, ref));
+  const lanes = lanesOf(spec);
+  const lengths = lanes.map((ref) => laneLength(spec, ref));
   pattern.cycle.textContent = cycleText(fullCycle(spec.steps, lengths, spec.divisor));
+  pattern.count.textContent = `${lanes.length} of ${EUCLID_LANES_MAX} lanes`;
   pattern.captureButton.textContent = spec.pattern ? 'Release' : 'Capture';
 }
 
@@ -229,9 +235,6 @@ function handle(
     spec: () => specOf(ctx, slot, 'euclidean', region),
     figure: () => figureOf(ctx, slot, region),
     write: (fields) => writeRows(ctx, slot, region, fields),
-    say: (text) => {
-      if (ref.live) ref.live.pattern.readout.textContent = text ?? EUCLID_READOUT_HINT;
-    },
     capture: (pattern) => capture(card, pattern),
     refresh: () => {
       if (ref.live) ref.live.rowsKey = '';
@@ -243,7 +246,8 @@ function handle(
 /**
  * The card for a Euclidean part's region `region`: the tabs and the Pattern
  * and Density pages as its device's body (`sequencerDevice.ts`,
- * windsor#368), and the lane-view toggle and **?** for the shared rail.
+ * windsor#368), at the device's one height, and the lane-view toggle for
+ * the shared rail.
  */
 export function euclidCard(ctx: AppCtx, slot: number, region?: number): DeviceBody {
   const ref: { live: Live | null } = { live: null };
@@ -272,12 +276,12 @@ export function euclidCard(ctx: AppCtx, slot: number, region?: number): DeviceBo
     setView(slot, { lanes });
     card.refresh();
   });
-  const body = el('div', 'euclid-body');
-  body.style.setProperty('--kc', PERC_COLOR);
-  body.append(tabs.row, pattern.root, density.root);
+  const pages = el('div', 'euclid-pages');
+  pages.append(pattern.root, density.root);
+  const body = el('div', 'seq-device-body euclid-device');
+  body.append(tabs.row, pages);
   const spec = card.spec();
   if (spec) repaintRows(state, spec, card.figure());
   watch(state, body);
-  const note = partAt(ctx.model.doc, slot)?.name ?? '';
-  return { body, fit: 'natural', tools, note, className: 'euclid-card' };
+  return { body, fit: 'fixed', tools, className: 'euclid-card' };
 }

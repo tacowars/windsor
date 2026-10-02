@@ -1,8 +1,8 @@
 /**
  * The pieces every row of the Euclid card is built from (windsor#356): the
- * sticky name column on the left and the strip of cells beside it, each
- * cell at the trigger cells' width, with the beat gap where the step's
- * divisor groups a beat. A row hands the card's loop its playhead
+ * name column on the left and the strip of cells beside it, each cell at
+ * the trigger cells' width, with the beat gap where the step's divisor
+ * groups a beat. A row hands the card's loop its playhead
  * (`RowHead`), which lights one of its cells in `regionPlayhead.ts`'s two
  * strengths.
  */
@@ -15,12 +15,17 @@ export interface RowHead {
   head(at: RegionStep | null): number;
 }
 
-/** The name column: the title over its small line, then any controls. */
+/**
+ * The ratchet and trigger rows' name column, set to the right against the
+ * cells as the mockup draws it (windsor#393): any controls beside the
+ * title, then the small line under them (none when `sub` is empty).
+ */
 export function rowName(title: string, sub: string, ...controls: HTMLElement[]): HTMLElement {
   const name = el('div', 'euclid-row-name');
-  const text = el('div', 'euclid-row-text');
-  text.append(el('b', '', title), el('small', '', sub));
-  name.append(text, ...controls);
+  const line = el('div', 'euclid-row-title');
+  line.append(...controls, el('b', '', title));
+  name.appendChild(line);
+  if (sub) name.appendChild(el('small', '', sub));
   return name;
 }
 

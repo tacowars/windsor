@@ -1,13 +1,13 @@
 /**
  * The Euclid device's own rail buttons (windsor#356, decision 1 of the
- * issue): the lane-view toggle (own length above, under the hits below) and
- * a **?** whose title is the card's hint. Since windsor#368 the rail itself
- * is every sequencer device's (`sequencerRail.ts`: the dot, the name, the
- * region, Split and Delete); the Euclid card hands these buttons to it, to
- * sit between its name and the region.
+ * issue): the lane-view toggle, own length above and under the hits below.
+ * Since windsor#368 the rail itself is every sequencer device's
+ * (`sequencerRail.ts`: the dot, the name, the region, Split and Delete);
+ * the Euclid card hands the toggle to it, to sit between its name and the
+ * region. The **?** and its hint went with windsor#393: the cells keep
+ * their tooltips.
  */
 import { el } from './dom';
-import { EUCLID_HINT } from './euclidConstants';
 import type { LaneView } from './euclidLaneView';
 import { railIcon, railSvg } from './sequencerRail';
 
@@ -48,13 +48,10 @@ function viewToggle(shown: LaneView, pick: (view: LaneView) => void): HTMLElemen
   return group;
 }
 
-/** The Euclid card's rail buttons, its lane view `shown`: the toggle, then the **?**. */
+/** The Euclid card's rail buttons, its lane view `shown`: the toggle. */
 export function euclidRailTools(
   shown: LaneView,
   pick: (view: LaneView) => void,
 ): readonly HTMLElement[] {
-  const help = railIcon(EUCLID_HINT);
-  help.setAttribute('aria-label', 'How this works');
-  help.textContent = '?';
-  return [viewToggle(shown, pick), help];
+  return [viewToggle(shown, pick)];
 }

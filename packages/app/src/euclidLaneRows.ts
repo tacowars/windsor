@@ -1,7 +1,8 @@
 /**
  * The Euclid card's lane rows (windsor#356, decisions 5 and 6 of the issue):
  * one row per lane, accent, pitch, then the sound lanes, each with its name
- * column (the name, `N steps`, − + for its length 1–32, a remove ×) and its
+ * block (the name and a remove ×, then − `N steps` + for its length 1–32,
+ * then the hover reading, windsor#393, as the Grid's lanes read) and its
  * cells, laid out at the lane's own length or under the hits
  * (`euclidLaneView.ts`).
  *
@@ -48,7 +49,7 @@ import {
   restartsAt,
 } from './euclidLaneView';
 import { ROW_KEY_ATTRIBUTE } from './euclidRowFocus';
-import { type RowHead, cellStrip, nameButton, row, rowName } from './euclidRowParts';
+import { type RowHead, cellStrip, nameButton, row } from './euclidRowParts';
 import type { Figure } from './euclidModel';
 import { type LaneHost, laneCell, patchBase } from './stepModLane';
 
@@ -65,6 +66,9 @@ export interface LaneRowsInput {
   readonly scope: HTMLElement;
 }
 
+/** Where a lane's hover reading goes: the line under its name. Null clears it. */
+type Say = (text: string | null) => void;
+
 const layoutOf = (input: LaneRowsInput, length: number): LaneLayout => ({
   view: input.view,
   steps: input.spec.steps,
@@ -78,7 +82,12 @@ const edit = (card: EuclidCard, make: (spec: EuclideanSpec) => RowFields): void 
   if (spec) card.write(make(spec));
 };
 
-function laneNameColumn(input: LaneRowsInput, ref: EuclidLaneRef, length: number): HTMLElement {
+/** The lane's name block: the name and ×, − `N steps` +, and the hover reading line. */
+function laneNameBlock(
+  input: LaneRowsInput,
+  ref: EuclidLaneRef,
+  length: number,
+): { block: HTMLElement; say: Say } {
   const { card } = input;
   const title = laneName(ref);
   const shorter = nameButton('−', `Shorten the ${title} lane`, 'euclid-len');
@@ -91,9 +100,17 @@ function laneNameColumn(input: LaneRowsInput, ref: EuclidLaneRef, length: number
     edit(card, (spec) => resizeLane(spec, ref, clampLaneLength(laneLength(spec, ref) + 1)));
   const remove = nameButton('×', `Remove the ${title} lane`, 'euclid-x');
   remove.onclick = (): void => edit(card, (spec) => removeLane(spec, ref));
-  const stepper = el('span', 'euclid-stepper');
-  stepper.append(shorter, longer);
-  return rowName(title, `${length} steps`, stepper, remove);
+  const top = el('div', 'euclid-lane-top');
+  const name = el('b', '', title);
+  name.title = title;
+  top.append(name, remove);
+  const size = el('div', 'euclid-lane-len');
+  size.append(shorter, el('span', '', `${length} steps`), longer);
+  const reading = el('div', 'euclid-read');
+  reading.setAttribute('aria-live', 'polite');
+  const block = el('div', 'euclid-lane-name');
+  block.append(top, size, reading);
+  return { block, say: (text) => void (reading.textContent = text ?? '') };
 }
 
 const signed = (v: number): string => (v > 0 ? `+${v}` : String(v));
@@ -102,6 +119,12 @@ function describe(ref: EuclidLaneRef, index: number, length: number, value: numb
   const at = `${laneName(ref)} · step ${index + 1} of ${length}`;
   if (ref.kind === 'accent') return `${at} · ${value ? 'accent' : 'plain'}`;
   return `${at} · ${signed(value)} semitone${Math.abs(value) === 1 ? '' : 's'}`;
+}
+
+/** The reading under a lane's name, as the Grid's: the step, then its value. */
+function reading(ref: EuclidLaneRef, index: number, value: number): string {
+  if (ref.kind === 'accent') return `${index + 1}: ${value ? 'accent' : 'plain'}`;
+  return `${index + 1}: ${signed(value)} st`;
 }
 
 function accentCell(input: LaneRowsInput, index: number, value: number): HTMLElement {
@@ -124,7 +147,7 @@ function drawPitch(cell: HTMLElement, value: number): void {
 }
 
 /** A pitch cell: drag to set, double-click for 0, arrows to step; one write per gesture. */
-function pitchCell(input: LaneRowsInput, index: number, value: number): HTMLElement {
+function pitchCell(input: LaneRowsInput, index: number, value: number, say: Say): HTMLElement {
   const { card } = input;
   const cell = el('div', 'ecell euclid-pitch');
   cell.tabIndex = 0;
@@ -151,7 +174,7 @@ function pitchCell(input: LaneRowsInput, index: number, value: number): HTMLElem
     cell.onpointermove = (e): void => {
       v = pitchFromDrag(value, e.clientY - down.clientY, EUCLID_PX_PER_SEMITONE);
       drawPitch(cell, v);
-      card.say(describe({ kind: 'pitch' }, index, laneLength(input.spec, { kind: 'pitch' }), v));
+      say(reading({ kind: 'pitch' }, index, v));
     };
     const end = (write: boolean): void => {
       cell.onpointermove = null;
@@ -172,7 +195,7 @@ function pitchCell(input: LaneRowsInput, index: number, value: number): HTMLElem
  * kept under the card (`gateKey`), and a double-click survives the repaint
  * its first press's write brings.
  */
-function soundHost(input: LaneRowsInput): LaneHost {
+function soundHost(input: LaneRowsInput, readings: ReadonlyMap<number, Say>): LaneHost {
   const { card, spec } = input;
   const lengthOf = (k: number): number => spec.modLanes?.[k]?.values.length ?? 1;
   return {
@@ -185,25 +208,24 @@ function soundHost(input: LaneRowsInput): LaneHost {
     repaint: () => card.refresh(),
     stepCount: () => spec.steps,
     valueIndex: (k, cell) => cellLaneIndex(layoutOf(input, lengthOf(k)), cell),
-    say: (k, step, text) => {
-      const lane = spec.modLanes?.[k];
-      if (!lane || text === null) return card.say(null);
-      const name = laneName({ kind: 'sound', param: lane.param });
-      card.say(`${name} · step ${step + 1} of ${lengthOf(k)} · ${text}`);
-    },
+    say: (k, step, text) => readings.get(k)?.(text === null ? null : `${step + 1}: ${text}`),
   };
 }
 
-/** One lane's row and its playhead. */
+/** A sound lane's index in `modLanes`. */
+const soundAt = (spec: EuclideanSpec, param: StepModParam): number =>
+  (spec.modLanes ?? []).findIndex((lane) => lane.param === param);
+
+/** One lane's row, its playhead and its reading line. */
 function laneRow(
   input: LaneRowsInput,
   ref: EuclidLaneRef,
   host: LaneHost,
-): RowHead & { row: HTMLElement } {
+): RowHead & { row: HTMLElement; say: Say } {
   const values = laneValues(input.spec, ref);
   const layout = layoutOf(input, values.length);
-  const k =
-    ref.kind === 'sound' ? (input.spec.modLanes ?? []).findIndex((l) => l.param === ref.param) : -1;
+  const name = laneNameBlock(input, ref, values.length);
+  const k = ref.kind === 'sound' ? soundAt(input.spec, ref.param) : -1;
   const cells = cellStrip(cellCount(layout), input.group, (i) => {
     const at = cellLaneIndex(layout, i);
     const value = values[at] ?? 0;
@@ -212,31 +234,34 @@ function laneRow(
       ref.kind === 'accent'
         ? accentCell(input, at, value)
         : ref.kind === 'pitch'
-          ? pitchCell(input, at, value)
+          ? pitchCell(input, at, value, name.say)
           : laneCell(host, k, i, !dim);
     cell.classList.toggle('rest', dim);
     cell.classList.toggle('wrap', restartsAt(layout, i));
     if (ref.kind !== 'sound') {
       cell.setAttribute('aria-label', describe(ref, at, values.length, value));
-      cell.onpointerenter = (): void =>
-        input.card.say(describe(ref, at, values.length, values[at] ?? 0));
+      cell.title = describe(ref, at, values.length, value);
+      cell.onpointerenter = (): void => name.say(reading(ref, at, value));
+      cell.onpointerleave = (): void => name.say(null);
     }
     return cell;
   });
   const parts = [cells];
   if (input.view === 'own') parts.push(el('span', 'euclid-loop-end', `↺ ${values.length}`));
-  const node = row(
-    `euclid-lane euclid-lane-${ref.kind}`,
-    laneNameColumn(input, ref, values.length),
-    ...parts,
-  );
+  const node = row(`euclid-lane euclid-lane-${ref.kind}`, name.block, ...parts);
   node.setAttribute(ROW_KEY_ATTRIBUTE, ref.kind === 'sound' ? `sound:${ref.param}` : ref.kind);
-  return { row: node, cells, head: (at) => laneHead(at, layout) };
+  return { row: node, cells, head: (at) => laneHead(at, layout), say: name.say };
 }
 
 /** Every lane's row, in the card's order, with the playheads the loop lights. */
 export function laneRows(input: LaneRowsInput): { rows: HTMLElement[]; heads: RowHead[] } {
-  const host = soundHost(input);
-  const built = lanesOf(input.spec).map((ref) => laneRow(input, ref, host));
+  // Each sound lane's reading line, by its index in `modLanes`: filled as its row is built.
+  const readings = new Map<number, Say>();
+  const host = soundHost(input, readings);
+  const built = lanesOf(input.spec).map((ref) => {
+    const lane = laneRow(input, ref, host);
+    if (ref.kind === 'sound') readings.set(soundAt(input.spec, ref.param), lane.say);
+    return lane;
+  });
   return { rows: built.map((b) => b.row), heads: built };
 }
