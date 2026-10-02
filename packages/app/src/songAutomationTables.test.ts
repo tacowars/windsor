@@ -10,6 +10,7 @@ import {
   INSERT_AUTOMATION_FIELDS,
   OP_NAMES,
   VOICE_AUTOMATION_ROWS,
+  voicePathOf,
 } from '@windsor/engine';
 import { INACTIVE_WHY, VOICE_GROUPS } from './songAutomationTables';
 
@@ -17,7 +18,7 @@ describe('VOICE_GROUPS', () => {
   it('claims every voice row exactly once', () => {
     const groups = VOICE_GROUPS(OP_NAMES);
     for (const row of VOICE_AUTOMATION_ROWS) {
-      const path = row.target.slice('voice.'.length);
+      const path = voicePathOf(row.target)!;
       expect(groups.filter((g) => g.claims(path)).length, path).toBe(1);
     }
   });

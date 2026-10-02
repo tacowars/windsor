@@ -20,7 +20,7 @@ import { FULL_DOCUMENT, FULL_SLOT, withDocumentPart } from '../__fixtures__/full
 import { installWorklet, rig } from '../__fixtures__/stripRig';
 import type { AutomationHandle } from '../automation/automationHandles';
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
-import { VOICE_TARGET_IDS, catalogRow } from '../automation/automationTargets';
+import { VOICE_TARGET_IDS, catalogRow, voiceTargetId } from '../automation/automationTargets';
 import type { PartStrip } from '../mixer/channelStrip';
 import { makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { renderPass } from '../render/renderPass';
@@ -46,7 +46,7 @@ const slotMap = (...paths: string[]): (string | null)[] =>
 const lastPosted = (part: AudioPart): unknown => nodeOf(part).posted.at(-1);
 
 function handleFor(part: AudioPart, path: string): AutomationHandle {
-  const handle = voiceAutomationHandle(stripOf(part), { path }, catalogRow(`voice.${path}`)!);
+  const handle = voiceAutomationHandle(stripOf(part), { path }, catalogRow(voiceTargetId(path))!);
   if (!handle) throw new Error(`no handle for ${path}`);
   return handle;
 }
@@ -125,7 +125,7 @@ describe('a voice lane on its part (windsor#346)', () => {
 
   it("takes a decay time's ratio from its 1 ms floor at either end, where its knob reads 0 (windsor#347)", () => {
     const path = 'filter.env.decayTime';
-    const row = catalogRow(`voice.${path}`)!;
+    const row = catalogRow(voiceTargetId(path))!;
     expect([row.min, row.floor]).toEqual([0, 0.001]);
     const at = (decayTime: number): Patch =>
       makePatch({ filter: { env: makeEnvelope({ decayTime }) } });
@@ -138,7 +138,7 @@ describe('a voice lane on its part (windsor#346)', () => {
   it("takes an LFO rate's ratio from its 0.02 Hz floor over a patch rate of 0 (PR #421)", () => {
     for (const lfo of ['lfo', 'lfo2'] as const) {
       const path = `${lfo}.rate`;
-      const row = catalogRow(`voice.${path}`)!;
+      const row = catalogRow(voiceTargetId(path))!;
       const still = makePatch({ [lfo]: { rate: 0 } });
       expect(voiceOffset(still, path, row, 4)).toBe(Math.log2(4 / 0.02));
       expect(voiceOffset(still, path, row, row.min)).toBe(0);

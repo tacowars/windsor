@@ -6,8 +6,8 @@ import {
   AUTOMATION_LEVEL_FLOOR_DB,
   FM_LANES_MAX,
   STRIP_AUTOMATION_ROWS,
-  VOICE_AUTOMATION_ROWS,
 } from './automationTargetTables';
+import { VOICE_AUTOMATION_ROWS, voiceTargetId } from './automationTargets';
 
 const OPERATOR_FIELDS = ['level', 'env.decayTime', 'env.decayCurve', 'feedback', 'width'];
 
@@ -37,7 +37,7 @@ describe('the voice rows', () => {
       ['Level', 'Decay', 'Decay Crv', 'Feedback', 'Width'].map((f) => `Op ${name} ${f}`);
     expect(VOICE_AUTOMATION_ROWS.map((r) => r.label)).toEqual([
       'Cutoff',
-      'Filter Env Amt',
+      'Filt Env Amt',
       'Resonance',
       'Filter Decay',
       'Vowel',
@@ -65,13 +65,13 @@ describe('the voice rows', () => {
 
   it('are the voice target table, in its order (windsor#419)', () => {
     expect(VOICE_AUTOMATION_ROWS.map((r) => r.target)).toEqual(
-      VOICE_TARGET_TABLE.map((row) => `voice.${row.path}`),
+      VOICE_TARGET_TABLE.map((row) => voiceTargetId(row.path)),
     );
   });
 
   it('take the target table bounds, a decay time from 0 with its floor as the display floor', () => {
     for (const step of VOICE_TARGET_TABLE) {
-      const row = VOICE_AUTOMATION_ROWS.find((r) => r.target === `voice.${step.path}`)!;
+      const row = VOICE_AUTOMATION_ROWS.find((r) => r.target === voiceTargetId(step.path))!;
       expect(row.max, step.path).toBe(step.max);
       if (step.path.endsWith('decayTime')) {
         expect(row.min).toBe(0);

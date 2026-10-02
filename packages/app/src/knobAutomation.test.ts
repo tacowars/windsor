@@ -18,6 +18,7 @@ import {
   followingTick,
   partAt,
   songTicksOf,
+  voicePathOf,
   type AutomationLane,
   type DocumentPart,
   type InsertSpec,
@@ -156,7 +157,7 @@ describe('a patch knob', () => {
     expect(VOICE_TARGET_IDS).toHaveLength(30);
     expect(voiceKnobTarget('filter.vowel')).toBe('voice.filter.vowel');
     for (const id of VOICE_TARGET_IDS) {
-      expect(voiceKnobTarget(id.slice('voice.'.length))).toBe(id);
+      expect(voiceKnobTarget(voicePathOf(id)!)).toBe(id);
     }
   });
 

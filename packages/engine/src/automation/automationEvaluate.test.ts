@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { fromDisplay, toDisplay } from './automationDisplay';
 import { bendCurve, rampsBetween, valueAt } from './automationEvaluate';
 import type { AutomationPoint, AutomationTargetRow } from './automationLane';
-import { STRIP_AUTOMATION_ROWS, VOICE_AUTOMATION_ROWS } from './automationTargetTables';
+import { STRIP_AUTOMATION_ROWS } from './automationTargetTables';
+import { VOICE_AUTOMATION_ROWS } from './automationTargets';
 
 const PAN = STRIP_AUTOMATION_ROWS.find((r) => r.target === 'strip.pan')!;
 const LEVEL = STRIP_AUTOMATION_ROWS.find((r) => r.target === 'strip.level')!;

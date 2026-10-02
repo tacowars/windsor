@@ -216,6 +216,12 @@ function voiceTargetCode(path: unknown): number {
   return typeof path === 'string' ? (VOICE_TARGET_PATHS as readonly string[]).indexOf(path) : -1;
 }
 
+/** The row of the target at `path`, or undefined for none: the table's own row, so nothing is allocated. */
+function voiceTargetRow(path: unknown): VoiceTargetRow | undefined {
+  const code = voiceTargetCode(path);
+  return code < 0 ? undefined : VOICE_TARGET_TABLE[code];
+}
+
 export type { VoiceTargetCurve, VoiceTargetPath, VoiceTargetRow };
 export {
   VOICE_TARGET_COUNT,
@@ -245,4 +251,5 @@ export {
   VT_RESONANCE,
   VT_VOWEL,
   voiceTargetCode,
+  voiceTargetRow,
 };

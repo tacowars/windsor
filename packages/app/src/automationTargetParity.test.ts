@@ -11,6 +11,7 @@ import {
   RETURN_NAMES,
   STRIP_AUTOMATION_ROWS,
   VOICE_AUTOMATION_ROWS,
+  voicePathOf,
   type AutomationTargetRow,
 } from '@windsor/engine';
 import { STRIP_LEVEL_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
@@ -23,7 +24,7 @@ describe('the voice rows', () => {
 
   it("match the Parts tab's knob at the same path", () => {
     for (const row of VOICE_AUTOMATION_ROWS) {
-      const path = row.target.slice('voice.'.length);
+      const path = voicePathOf(row.target)!;
       const knob = knobs.get(path);
       expect(knob, path).toBeDefined();
       expect(row.min, path).toBe(knob!.min);
