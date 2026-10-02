@@ -71,6 +71,13 @@ describe('followVoices (windsor#333)', () => {
     expect(Math.max(...moved)).toBeLessThanOrEqual(127);
   });
 
+  it('a smaller reach keeps a voice the default would move', () => {
+    // I → V in C: C is a semitone from B and moves with a reach of 1, but E is
+    // a tone from D, out of reach, and stays.
+    expect(followVoices([60, 64, 67], [7, 11, 14], C, 1)).toEqual([59, 64, 67]);
+    expect(followVoices([60, 64, 67], [7, 11, 14], C)).toEqual([59, 62, 67]);
+  });
+
   it('a chord with the same tones moves nothing', () => {
     expect(followVoices([48, 64, 67, 72], MAJOR, C)).toEqual([48, 64, 67, 72]);
     expect(followVoices([], MAJOR, C)).toEqual([]);

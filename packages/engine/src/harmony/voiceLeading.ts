@@ -12,9 +12,7 @@
  */
 import { MIDI_NOTE_MAX } from '../audioConstants';
 import { SEMITONES_PER_OCTAVE } from '../sequencing/scaleSampler';
-
-/** How far a voice may step to reach a free chord tone, either way, in semitones. */
-export const FOLLOW_REACH_SEMITONES = 6;
+import { FOLLOW_REACH_SEMITONES } from './chordTables';
 
 const pitchClass = (note: number): number =>
   ((note % SEMITONES_PER_OCTAVE) + SEMITONES_PER_OCTAVE) % SEMITONES_PER_OCTAVE;
@@ -24,13 +22,14 @@ function nearestFree(
   note: number,
   targets: ReadonlySet<number>,
   taken: ReadonlySet<number>,
+  reach: number,
 ): number {
   const free = (candidate: number): boolean =>
     candidate >= 0 &&
     candidate <= MIDI_NOTE_MAX &&
     targets.has(pitchClass(candidate)) &&
     !taken.has(candidate);
-  for (let distance = 1; distance <= FOLLOW_REACH_SEMITONES; distance++) {
+  for (let distance = 1; distance <= reach; distance++) {
     if (free(note - distance)) return note - distance;
     if (free(note + distance)) return note + distance;
   }
@@ -43,7 +42,8 @@ function nearestFree(
  * (any MIDI note of the root; only its pitch class counts).
  *
  * Every held note whose pitch class is a chord tone stays. The others, lowest
- * first, each move to the nearest MIDI note within ±`FOLLOW_REACH_SEMITONES`
+ * first, each move to the nearest MIDI note within ±`reach` (the shipped
+ * `FOLLOW_REACH_SEMITONES` by default)
  * whose pitch class is a chord tone, that lies inside the MIDI range 0–127
  * (as `chordVoicing.ts` clips to) and that no voice has taken yet; on a tie
  * between up and down, down wins; with no free in-range target in reach, the
@@ -54,6 +54,7 @@ export function followVoices(
   held: readonly number[],
   stack: readonly number[],
   keyRootNote: number,
+  reach = FOLLOW_REACH_SEMITONES,
 ): number[] {
   const targets = new Set(stack.map((tone) => pitchClass(tone + keyRootNote)));
   const moved = [...held];
@@ -63,7 +64,7 @@ export function followVoices(
     .filter(({ note }) => !targets.has(pitchClass(note)))
     .sort((a, b) => a.note - b.note || a.index - b.index);
   for (const { note, index } of movers) {
-    const next = nearestFree(note, targets, taken);
+    const next = nearestFree(note, targets, taken, reach);
     moved[index] = next;
     taken.add(next);
   }

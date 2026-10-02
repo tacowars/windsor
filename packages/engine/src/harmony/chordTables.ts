@@ -20,6 +20,13 @@ export const CHORD_DIVISORS: readonly number[] = [
   DIVISORS.eighth,
 ];
 
+/**
+ * How far a followed voice may step to reach a free chord tone, either way, in
+ * semitones (windsor#333): `followVoices` in `voiceLeading.ts` takes it as a
+ * parameter defaulting to this.
+ */
+export const FOLLOW_REACH_SEMITONES = 6;
+
 /** A step's length as a multiple of the part's base step. */
 export const CHORD_DURATIONS: readonly number[] = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8];
 

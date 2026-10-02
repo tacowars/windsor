@@ -1960,7 +1960,7 @@ input.field.group-name {
 .seq-col.chord-fields {
   width: var(--chord-field-w);
   justify-content: space-between;
-  padding: 33px 0;
+  padding: var(--chord-fields-pad) 0;
 }
 /* Follow as a 22 px switch, level with the selects: the Arp's Retrigger. */
 .chord-device .seg {
