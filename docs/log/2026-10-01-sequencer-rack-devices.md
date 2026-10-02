@@ -70,6 +70,9 @@ around them. This record is that second round.
      the gate times its slice of the step, except the last where today's
      note would run on (a tie or a slide next, or Basslead's gate of 1):
      it is held as that note is, and the tie or the next note ends it.
+   - On Basslead at a gate of 1, a step that repeats the held pitch
+     ties as today, but a ratcheted one plays its hits (tacowars,
+     2026-10-02, windsor#367). A slide to the held pitch still ties.
    - A skip or a density draw is made once per step, before the roll. A
      step that is skipped plays no hit.
 7. **The Chord** keeps its strip and shows no progression; the chords are
