@@ -34,6 +34,18 @@ export type TransportState = 'idle' | 'playing' | 'paused';
 export type TransportAction = 'play' | 'pause' | 'stop';
 
 /**
+ * A transport tick's place in the song. The transport's tick never wraps;
+ * the song does (`tick mod songTicks`, epic #703 decision 5), as the engine's
+ * automation player folds it, so whatever reads the song at the playhead (the
+ * position, a locked knob, an EQ handle) starts again past the song's end. A
+ * loop brace needs nothing more: its clock already jumps back at the loop's
+ * end. A song of no length leaves the tick, floored at 0.
+ */
+export function songTickOf(tick: number, songTicks: number): number {
+  return songTicks > 0 ? ((tick % songTicks) + songTicks) % songTicks : Math.max(0, tick);
+}
+
+/**
  * The song position of a transport tick, 1-based: tick 0 → `1.1.1`, tick 95
  * → `1.4.4`, tick 96 → `2.1.1`. The transport's tick never wraps; the song
  * does (`tick mod songTicks`, epic #703 decision 5), so the readout does too.
@@ -43,7 +55,7 @@ export function formatPosition(
   songTicks: number,
   grid: PositionGrid = POSITION_GRID,
 ): string {
-  const t = songTicks > 0 ? ((tick % songTicks) + songTicks) % songTicks : Math.max(0, tick);
+  const t = songTickOf(tick, songTicks);
   const bar = Math.floor(t / grid.bar) + 1;
   const beat = Math.floor((t % grid.bar) / grid.beat) + 1;
   const sixteenth = Math.floor((t % grid.beat) / grid.sixteenth) + 1;
