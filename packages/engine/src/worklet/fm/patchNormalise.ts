@@ -18,7 +18,7 @@ import type {
   Patch,
 } from '../../patch/patch';
 import { ALGORITHMS } from './algorithms';
-import { DRIVE_FOLD, DRIVE_SOFT } from './modeIds';
+import { DRIVE_FOLD, DRIVE_SOFT, FILT_FORMANT, FILT_OFF } from './modeIds';
 import {
   DRIVE_BIAS_RANGE,
   DRIVE_DEFAULTS,
@@ -40,6 +40,7 @@ import {
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
   TONE_RANGE,
+  VOWEL_RANGE,
   WIDTH_RANGE,
 } from './patchDefaults';
 
@@ -170,6 +171,8 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
   const filtRaw = raw.filter || {};
   const pd = PATCH_DEFAULTS,
     fd = FILTER_DEFAULTS;
+  // A mode outside the table plays Off, as it always sounded (windsor#331).
+  const mode = num(filtRaw.mode, fd.mode) | 0;
 
   const p = {
     name: raw.name || pd.name,
@@ -188,7 +191,7 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
     lfo: lfoDefaults(raw.lfo, LFO_DEFAULTS),
     lfo2: lfoDefaults(raw.lfo2, LFO2_DEFAULTS),
     filter: {
-      mode: num(filtRaw.mode, fd.mode) | 0,
+      mode: mode < FILT_OFF || mode > FILT_FORMANT ? FILT_OFF : mode,
       cutoff: num(filtRaw.cutoff, fd.cutoff),
       resonance: num(filtRaw.resonance, fd.resonance),
       slope24: !!filtRaw.slope24,
@@ -197,6 +200,7 @@ function normalisePatch(raw: PartialPatch | null | undefined): WorkletPatch {
       lfoAmount: num(filtRaw.lfoAmount, fd.lfoAmount), // octaves
       lfo2Amount: num(filtRaw.lfo2Amount, fd.lfo2Amount), // octaves, from LFO 2
       keyTrack: num(filtRaw.keyTrack, fd.keyTrack),
+      vowel: clamp(num(filtRaw.vowel, fd.vowel), VOWEL_RANGE), // Formant only (windsor#331)
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS),
     },
     drive: driveDefaults(raw.drive),

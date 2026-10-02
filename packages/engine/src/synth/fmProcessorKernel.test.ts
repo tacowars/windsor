@@ -140,6 +140,22 @@ describe('which voices take the kernel', () => {
       },
     ],
     ['raw waves', { algorithm: 5, ops: [{ wave: WAVE.SAW_D }, { wave: WAVE.SQUARE_D }, {}, {}] }],
+    [
+      'the Formant filter, a vowel between two rows, swept by its envelope (windsor#331)',
+      {
+        algorithm: 4,
+        ops: [{ wave: WAVE.SAW, feedback: 0.3 }, { level: 0.5 }, { level: 0.7 }, NOISE],
+        filter: { mode: 5, vowel: 1.37, resonance: 1.3, envAmount: 0.8, keyTrack: 0.4 },
+      },
+    ],
+    [
+      'the Formant filter at its Q cap, slope24 set and ignored (windsor#331)',
+      {
+        algorithm: 7,
+        ops: [NOISE, {}],
+        filter: { mode: 5, vowel: 3, resonance: 9, slope24: true },
+      },
+    ],
   ] as [string, PartialPatch][])('%s renders bit-identical to the generic loop', (_name, o) => {
     const patch = makePatch(o);
     expect(sameBits(renderChord(patch, true).samples, renderChord(patch, false).samples)).toBe(
@@ -179,6 +195,25 @@ describe('rebinding a sounding voice', () => {
       renders.push(render(loaded, p, 20).samples);
       return renders;
     });
+    expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
+  });
+
+  it('matches the generic loop as live edits sweep the Formant vowel and switch the mode (windsor#331)', () => {
+    const formant = (vowel: number, mode = 5): PartialPatch => ({
+      algorithm: 1,
+      ops: [{}, { level: 0.6 }, { level: 0.4, ratio: 2 }],
+      filter: { mode, vowel, resonance: 0.9 },
+    });
+    const [generic, kernel] = inStep(makePatch(formant(0)), (p) => {
+      const note: ScheduledEvent = { type: 'noteOn', id: 1, note: 52, velocity: 0.9, frame: 0 };
+      const renders = [render(loaded, p, 10, [note]).samples];
+      for (const [vowel, mode] of [[0.6], [2.25], [4], [1.5, 1], [3.75]] as [number, number?][]) {
+        retune(p, formant(vowel, mode));
+        renders.push(render(loaded, p, 10).samples);
+      }
+      return renders;
+    });
+    expect(generic.flatMap((r) => [...r]).some((s) => s !== 0)).toBe(true);
     expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
   });
 
