@@ -7,7 +7,7 @@
  */
 import { el } from './dom';
 import type { SongRow } from './songListModel';
-import { SONG_MENU_GAP_PX } from './songListTables';
+import { rowMenuPlacement } from './songRowMenuPlacement';
 
 /** What a row's buttons do; the section implements them over `ctx.songs`. */
 export interface RowActions {
@@ -75,17 +75,55 @@ export function keepRowFocus(scope: HTMLElement, redraw: () => void): void {
     active instanceof HTMLElement && scope.contains(active) ? active.dataset.songId : undefined;
   redraw();
   if (id === undefined) return;
-  const again = [...scope.querySelectorAll<HTMLElement>('[data-song-id]')].find(
-    (node) => node.dataset.songId === id,
-  );
-  again?.focus();
+  rowWithId(rowButtons(scope), id)?.focus();
 }
 
-/** Place the menu under `more`, its right edge on the button's, in the viewport. */
+/** What the focus lookups read of a ⋯ button: the song it belongs to and whether it is in the page. */
+export interface RowFocusable {
+  readonly isConnected: boolean;
+  readonly dataset: { readonly songId?: string };
+  focus(): void;
+}
+
+const rowButtons = (scope: HTMLElement): HTMLElement[] => [
+  ...scope.querySelectorAll<HTMLElement>('[data-song-id]'),
+];
+
+function rowWithId<T extends RowFocusable>(rows: Iterable<T>, id: string): T | null {
+  for (const row of rows) if (row.dataset.songId === id) return row;
+  return null;
+}
+
+/**
+ * The ⋯ button a closing dialog should give focus back to: its opener while
+ * that is still in the page, else the same song's button in the redrawn
+ * table (the clock's redraw replaces every row while a dialog is up), else
+ * nothing, when the song itself is gone.
+ */
+export function liveRowButton<T extends RowFocusable>(opener: T, rows: Iterable<T>): T | null {
+  if (opener.isConnected) return opener;
+  const id = opener.dataset.songId;
+  return id === undefined ? null : rowWithId(rows, id);
+}
+
+/** After a row's dialog closes: focus the song's current ⋯ button when its opener was redrawn away. */
+export function refocusRow(scope: HTMLElement, opener: HTMLElement): void {
+  if (opener.isConnected) return;
+  liveRowButton(opener, rowButtons(scope))?.focus();
+}
+
+/** Place the menu under `more` (above it when there is no room below), inside the viewport. */
 function place(menu: HTMLElement, more: HTMLElement): void {
-  const rect = more.getBoundingClientRect();
-  menu.style.top = `${rect.bottom + SONG_MENU_GAP_PX}px`;
-  menu.style.right = `${document.documentElement.clientWidth - rect.right}px`;
+  const { top, left } = rowMenuPlacement({
+    opener: more.getBoundingClientRect(),
+    menu: { width: menu.offsetWidth, height: menu.offsetHeight },
+    viewport: {
+      width: document.documentElement.clientWidth,
+      height: document.documentElement.clientHeight,
+    },
+  });
+  menu.style.top = `${top}px`;
+  menu.style.left = `${left}px`;
 }
 
 /**

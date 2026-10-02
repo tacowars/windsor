@@ -35,7 +35,8 @@ import { copyName } from './songSessionStored';
 import { downloadSong } from './songDownload';
 import { confirmDelete, confirmLeave, openSongMeta } from './songsDialogs';
 import type { RowActions } from './songRowMenu';
-import { keepRowFocus, rowMenuOpen } from './songRowMenu';
+import { keepRowFocus, refocusRow, rowMenuOpen } from './songRowMenu';
+import type { OpenSongStrip } from './songsStrip';
 import { openSongStrip } from './songsStrip';
 import { songsTable } from './songsTable';
 
@@ -82,7 +83,16 @@ function liveEntries(ctx: AppCtx, lib: Library): ListEntries {
   return id === null ? lib.entries : withOpenFacts(lib.entries, id, songFacts(ctx.model.toJson()));
 }
 
-function saveDialog(ctx: AppCtx, lib: Library, copy: boolean): void {
+/**
+ * Save as… or Save as copy…. A confirmed Save as… turns the strip named, which
+ * swaps its button for Save as copy…, so focus goes to that replacement.
+ */
+function saveDialog(
+  ctx: AppCtx,
+  lib: Library,
+  strip: OpenSongStrip,
+  { copy, opener }: { copy: boolean; opener: HTMLElement },
+): void {
   const meta = metaOf(ctx.model.doc);
   void openSongMeta({
     title: 'Save to your songs',
@@ -91,12 +101,18 @@ function saveDialog(ctx: AppCtx, lib: Library, copy: boolean): void {
     tags: initialTags(meta.tags, liveEntries(ctx, lib), lib.view.filter),
     suggest: (chosen) => tagSuggestions(lib.entries, chosen),
     hint: 'From now on it saves itself as you work.',
+    opener,
   }).then(async (answer) => {
     if (!answer) return;
     const save = copy
       ? ctx.songs.saveAsCopy(answer.name, answer.tags)
       : ctx.songs.saveAs(answer.name, answer.tags);
-    if ((await save) !== null) ctx.notify(`saved ${answer.name} to your songs`, 'success');
+    if ((await save) === null) return;
+    ctx.notify(`saved ${answer.name} to your songs`, 'success');
+    if (!opener.isConnected) {
+      strip.update();
+      strip.focusAction();
+    }
   });
 }
 
@@ -105,14 +121,21 @@ function leaveFor(ctx: AppCtx, opener: HTMLElement, go: () => Promise<boolean>):
   void confirmLeave(ctx, opener).then((ok) => ok && go());
 }
 
-function rowActions(ctx: AppCtx, lib: Library): RowActions {
+function rowActions(ctx: AppCtx, lib: Library, table: HTMLElement): RowActions {
+  /** A row's dialog has closed: hand focus to the song's ⋯ button, even one the clock redrew. */
+  const back =
+    (opener: HTMLElement) =>
+    <T>(answer: T): T => {
+      refocusRow(table, opener);
+      return answer;
+    };
   return {
     open: (row, opener) => leaveFor(ctx, opener, () => ctx.songs.open(row.id)),
     newFrom: (row, opener) => leaveFor(ctx, opener, () => ctx.songs.newFrom(row.id)),
     rename: (row, opener) =>
-      void openSongMeta({ title: 'Rename song', ok: 'Rename', name: row.name, opener }).then(
-        (answer) => answer && ctx.songs.rename(row.id, answer.name),
-      ),
+      void openSongMeta({ title: 'Rename song', ok: 'Rename', name: row.name, opener })
+        .then(back(opener))
+        .then((answer) => answer && ctx.songs.rename(row.id, answer.name)),
     editTags: (row, opener) =>
       void openSongMeta({
         title: 'Edit tags',
@@ -120,7 +143,9 @@ function rowActions(ctx: AppCtx, lib: Library): RowActions {
         tags: row.tags,
         opener,
         suggest: (chosen) => tagSuggestions(lib.entries, chosen),
-      }).then((answer) => answer && ctx.songs.setTags(row.id, answer.tags)),
+      })
+        .then(back(opener))
+        .then((answer) => answer && ctx.songs.setTags(row.id, answer.tags)),
     duplicate: (row) =>
       void ctx.songs.duplicate(row.id).then((id) => {
         if (id !== null) ctx.notify(`duplicated ${row.name}`, 'success');
@@ -133,9 +158,11 @@ function rowActions(ctx: AppCtx, lib: Library): RowActions {
         ctx.notify(`exported ${fileName}`, 'success');
       }),
     remove: (row, opener) =>
-      void confirmDelete(row.name, opener).then(async (ok) => {
-        if (ok && (await ctx.songs.remove(row.id))) ctx.notify(`deleted ${row.name}`, 'success');
-      }),
+      void confirmDelete(row.name, opener)
+        .then(back(opener))
+        .then(async (ok) => {
+          if (ok && (await ctx.songs.remove(row.id))) ctx.notify(`deleted ${row.name}`, 'success');
+        }),
   };
 }
 
@@ -198,15 +225,19 @@ function librarySection(
   alive: () => boolean,
 ): { nodes: HTMLElement[]; refresh: () => void; tick: () => void; metaChanged: () => void } {
   const lib: Library = { entries: [], loaded: false, view: viewOf(ctx.songs) };
+  const save =
+    (copy: boolean) =>
+    (opener: HTMLElement): void =>
+      saveDialog(ctx, lib, strip, { copy, opener });
   const strip = openSongStrip(
     ctx,
-    { saveAs: () => saveDialog(ctx, lib, false), saveAsCopy: () => saveDialog(ctx, lib, true) },
+    { saveAs: save(false), saveAsCopy: save(true) },
     () => lib.entries.find((entry) => entry.id === openId(ctx))?.updated ?? null,
   );
   const chips = el('span', 'chips');
   const count = el('span', 'count');
   const table = el('div', 'table-wrap');
-  const actions = rowActions(ctx, lib);
+  const actions = rowActions(ctx, lib, table);
   const paint = (): void => {
     if (!lib.loaded) return;
     const entries = liveEntries(ctx, lib);

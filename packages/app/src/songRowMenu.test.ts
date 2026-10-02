@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SongRow } from './songListModel';
 import type { RowActions } from './songRowMenu';
-import { menuItems } from './songRowMenu';
+import { liveRowButton, menuItems } from './songRowMenu';
 
 const row = (over: Partial<SongRow> = {}): SongRow => ({
   id: 'a',
@@ -70,5 +70,37 @@ describe('a row menu item that opens a dialog', () => {
     expect(seen.rename).toBe(more);
     expect(seen.editTags).toBe(more);
     expect(seen.remove).toBe(more);
+  });
+});
+
+describe('the ⋯ button a closing row dialog focuses', () => {
+  class Button {
+    focused = 0;
+    readonly dataset: { songId?: string };
+    constructor(
+      songId: string,
+      public isConnected: boolean,
+    ) {
+      this.dataset = { songId };
+    }
+    focus(): void {
+      this.focused++;
+    }
+  }
+
+  it('is the opener while it is still in the page', () => {
+    const opener = new Button('a', true);
+    expect(liveRowButton(opener, [new Button('a', true)])).toBe(opener);
+  });
+
+  it('is the same song’s new button when the clock’s redraw detached the opener', () => {
+    // Rename… stayed open through the 10-second refresh, which replaced every row.
+    const opener = new Button('b', false);
+    const redrawn = [new Button('a', true), new Button('b', true), new Button('c', true)];
+    expect(liveRowButton(opener, redrawn)).toBe(redrawn[1]);
+  });
+
+  it('is nothing when the song is gone from the table', () => {
+    expect(liveRowButton(new Button('b', false), [new Button('a', true)])).toBeNull();
   });
 });

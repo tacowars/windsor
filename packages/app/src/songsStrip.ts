@@ -34,6 +34,8 @@ export interface OpenSongStrip {
   readonly root: HTMLElement;
   /** Draw what changed: the song, its name and tags, or only the status's clock. */
   update(): void;
+  /** Focus the strip's button as drawn now: Save as… or Save as copy…. */
+  focusAction(): void;
 }
 
 function statusLine(text: string, saved: boolean): HTMLElement {
@@ -158,6 +160,7 @@ export function openSongStrip(
   const root = el('div', 'open-song');
   let drawn = '';
   let line: HTMLElement = el('span');
+  let action: HTMLElement | null = null;
 
   const draw = (): void => {
     const { state } = ctx.songs;
@@ -169,7 +172,7 @@ export function openSongStrip(
     const parts = named
       ? namedParts(ctx, state.id, meta)
       : [el('span', 'song-name placeholder', untitledName(state))];
-    const action = named
+    action = named
       ? stripButton('Save as copy…', 'btn', (b) => actions.saveAsCopy(b))
       : stripButton('Save as…', 'btn primary', (b) => actions.saveAs(b));
     root.replaceChildren(label, ...parts, el('span', 'spacer'), line, action);
@@ -190,5 +193,5 @@ export function openSongStrip(
   };
 
   update();
-  return { root, update };
+  return { root, update, focusAction: () => action?.focus() };
 }

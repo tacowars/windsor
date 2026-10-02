@@ -60,5 +60,8 @@ export const SONG_TIME_REFRESH_MS = 10000;
 /** The row menu's gap below its ⋯ button, in px. */
 export const SONG_MENU_GAP_PX = 4;
 
+/** The least space the row menu keeps from each edge of the viewport, in px. */
+export const SONG_MENU_EDGE_PX = 4;
+
 /** What a missing number reads as in the table. */
 export const SONG_CELL_NONE = '—';
