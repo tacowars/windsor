@@ -14,7 +14,7 @@
 import type { AutomationShapeSpec, AutomationTargetRow } from '@windsor/engine';
 import { fromDisplay } from '@windsor/engine';
 import { el } from './dom';
-import { readout } from './songAutomationModel';
+import { readout } from './automationReadout';
 import { clampDraft, dutyLabel, phaseLabel, rateIndex, shapeControls } from './songShapeModel';
 import { SHAPE_CHOICES, SHAPE_LIMITS, SHAPE_RATES } from './songShapeTables';
 
