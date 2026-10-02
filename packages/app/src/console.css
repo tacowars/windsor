@@ -4767,6 +4767,345 @@ dialog select.field {
 .chip button:hover {
   color: var(--hot);
 }
+
+/* ---------- the Songs section (windsor#434) ----------
+   The gear tab's library, built to docs/design/song-library-mockup.html:
+   the open-song strip, the filter row, the table, the row menu and the
+   name-and-tags dialog. Tag chips here are the round tag chip, never the
+   chord chip that shares the class name. */
+.songs .chip,
+.song-dlg .chip {
+  flex-direction: row;
+  min-width: 0;
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-weight: 400;
+  line-height: 1.4;
+  cursor: default;
+  user-select: auto;
+  touch-action: auto;
+}
+.songs .chip:hover,
+.songs .chip:active,
+.song-dlg .chip:hover,
+.song-dlg .chip:active {
+  background: var(--inset);
+  border-color: var(--line);
+}
+.songs .chip.template,
+.song-dlg .chip.template {
+  border-color: var(--return);
+  color: #cbbfe6;
+}
+.songs .hint .chip,
+.songs .empty .chip {
+  padding: 0 6px;
+}
+.songs .chips {
+  display: inline-flex;
+  align-items: center;
+  min-height: 0;
+}
+.songs .chip.add {
+  border-style: dashed;
+  color: var(--ink-dim);
+  cursor: pointer;
+  padding-right: 8px;
+}
+.songs input.chip.add {
+  width: 96px;
+  font-size: 11.5px;
+  outline: none;
+  cursor: text;
+}
+.open-song {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--carrier);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  margin-bottom: 12px;
+}
+.open-song.untitled {
+  border-left-color: var(--line-bright);
+}
+.open-song .field-label {
+  margin: 0;
+}
+.open-song .spacer {
+  flex: 1;
+}
+.song-name {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  color: var(--ink);
+  font-family: var(--f-panel);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 6px;
+  min-width: 220px;
+}
+input.song-name:hover,
+input.song-name:focus {
+  border-color: var(--line-bright);
+  background: var(--inset);
+  outline: none;
+}
+.song-name.placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+  font-weight: 500;
+}
+.open-song .saved {
+  font-family: var(--f-num);
+  font-size: 11px;
+  color: var(--ink-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.open-song .saved .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--modulator);
+}
+.open-song .saved.unsaved .dot {
+  background: var(--line-bright);
+}
+.songs .filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.songs .filters .field.search {
+  width: 220px;
+  font-family: var(--f-ui);
+}
+.songs .filters select.field {
+  width: auto;
+}
+.songs .filter-chip {
+  cursor: pointer;
+  padding: 2px 9px;
+  font-size: 11.5px;
+}
+.songs .filter-chip.on,
+.songs .filter-chip.on:hover {
+  background: var(--modulator);
+  border-color: var(--modulator);
+  color: #111416;
+}
+.songs .filter-chip.template.on,
+.songs .filter-chip.template.on:hover {
+  background: var(--return);
+  border-color: var(--return);
+  color: #111416;
+}
+.songs .filters .count {
+  font-family: var(--f-num);
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-left: auto;
+}
+.songs .table-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--inset);
+  overflow-x: auto;
+}
+.song-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.song-table th {
+  text-align: left;
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--well);
+  white-space: nowrap;
+}
+.song-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.song-table tr:last-child td {
+  border-bottom: 0;
+}
+.song-table tbody tr:hover {
+  background: var(--panel);
+}
+.song-table tr.is-open {
+  background: rgba(224, 164, 78, 0.07);
+  box-shadow: inset 3px 0 0 var(--carrier);
+}
+.song-table .name {
+  font-weight: 600;
+  color: var(--ink);
+}
+.song-table .chips {
+  flex-wrap: nowrap;
+}
+.song-table .num {
+  font-family: var(--f-num);
+  color: var(--ink-dim);
+  font-size: 11.5px;
+}
+.song-table .when {
+  font-family: var(--f-num);
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.song-table .acts {
+  text-align: right;
+}
+.song-table .acts .wrap {
+  display: inline-flex;
+  gap: 6px;
+  position: relative;
+}
+.song-table .now-open {
+  font-family: var(--f-panel);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--carrier);
+  text-transform: uppercase;
+  margin-left: 8px;
+}
+.song-table .refused {
+  color: var(--hot);
+  font-size: 11px;
+  margin-left: 8px;
+}
+.songs .btn.small {
+  height: 23px;
+  padding: 3px 9px;
+  font-size: 10px;
+}
+/* In the page, placed under its ⋯ button by `songRowMenu.ts`. */
+.song-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 170px;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  padding: 4px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  text-align: left;
+}
+.song-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  padding: 6px 12px;
+  font-family: var(--f-ui);
+  font-size: 12px;
+  cursor: pointer;
+}
+.song-menu button:hover {
+  background: var(--panel-hi);
+}
+.song-menu button.danger {
+  color: var(--hot);
+}
+.song-menu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 0;
+}
+.songs .empty {
+  padding: 26px 14px;
+  text-align: center;
+  color: var(--ink-faint);
+  font-size: 12px;
+  white-space: normal;
+}
+.btn.primary.danger {
+  background: var(--hot);
+  border-color: var(--hot);
+}
+dialog.song-dlg {
+  max-width: min(460px, 92vw);
+}
+.song-dlg .dlg-title {
+  font-family: var(--f-panel);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.song-dlg label {
+  display: block;
+}
+.song-dlg .dlg-body .field {
+  max-width: none;
+  font-family: var(--f-ui);
+  font-size: 13px;
+}
+.song-dlg .hint {
+  margin: 0;
+}
+.song-dlg .dlg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.song-dlg .tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 4px 6px;
+  min-height: 32px;
+}
+.song-dlg .tag-input input {
+  flex: 1;
+  min-width: 90px;
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-size: 12px;
+  outline: none;
+}
+.song-dlg .suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.song-dlg .suggest .chip {
+  cursor: pointer;
+  color: var(--ink-dim);
+}
+.song-dlg .suggest .chip.template {
+  color: #cbbfe6;
+}
 .library-row {
   display: flex;
   flex-wrap: wrap;

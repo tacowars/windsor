@@ -1,41 +1,85 @@
 /**
- * Arrangement tab (#70, record §2; #435): the document itself — export downloads a file, import reads one back (record:
- * the console is a local tool, so a page-initiated download simply works).
+ * Arrangement tab (#70, record §2; #435), the Settings gear tab: your songs
+ * (windsor#434, `songsSection.ts`), then the document itself — export
+ * downloads a file, import reads one back (record: the console is a local
+ * tool, so a page-initiated download simply works).
  * New song starts over from one Init part with no sequencer (#598), asking
- * first when the document has changed since it was opened.
+ * first only when leaving would lose something (windsor#434 decision 8).
  * The exported file is the normalised document — patches, returns, each
  * part's strip, sequencers, harmony, all of it — self-contained (#562), so
- * Import on any machine plays it as exported. The transport, bpm and bars moved to the strip above every tab
- * (#708, `transportStrip.ts`); Mute became ‖ and Restart is gone — Import is
- * the rebuild left (#629).
+ * Import on any machine plays it as exported. Its file name follows the
+ * open song's name (windsor#434 decision 7). The transport, bpm and bars
+ * moved to the strip above every tab (#708, `transportStrip.ts`); Mute
+ * became ‖ and Restart is gone — Import is the rebuild left (#629).
  */
 import { audioExportSection } from './audioExport';
-import { EXPORT_URL_TTL_MS, READOUT_DEFER_MS, READOUT_POLL_MS } from './arrangementConstants';
+import { READOUT_DEFER_MS, READOUT_POLL_MS } from './arrangementConstants';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
-import { openConfirm } from './metadataModal';
+import { downloadSong } from './songDownload';
+import { ExportNameMemory, openSongKey, songFileName } from './songFileName';
+import { metaOf } from './songMetaText';
+import type { SongSession } from './songSession';
+import { confirmLeave } from './songsDialogs';
+import { songsSection } from './songsSection';
 
-/** Start over on a new song, asking first when this one has changed since it was opened (#598). */
+/**
+ * Start over on a new song, through the session's one switch (windsor#433).
+ * It asks first only when the open song is a changed untitled one, so
+ * leaving a named song, or an import whose only change is its file name,
+ * never asks.
+ */
 function newSongButton(ctx: AppCtx): HTMLElement {
   const fresh = el('button', 'btn', 'New song') as HTMLButtonElement;
   fresh.type = 'button';
   fresh.title = 'Start over: one part, the Init patch, no sequencer';
   fresh.onclick = (): void => {
-    // Through the session's one switch (windsor#433): false when the song
-    // being left couldn't be saved, which it has reported, and stays open.
-    const start = (): void =>
-      void ctx.songs.newSong().then((ok) => {
-        if (ok) ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab');
-      });
-    if (!ctx.model.changed) return start();
-    void openConfirm({
-      title: 'New song',
-      body: 'Discard the changes to this song? Export first to keep them.',
-      ok: 'Discard',
-      opener: fresh,
-    }).then((ok) => ok && start());
+    // `newSong` is false when the song being left couldn't be saved, which
+    // the session has reported, and it stays open.
+    void confirmLeave(ctx, fresh).then(async (ok) => {
+      if (ok && (await ctx.songs.newSong()))
+        ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab');
+    });
   };
   return fresh;
+}
+
+/** The typed export name, kept per session so a redraw of the tab keeps it. */
+const exportNames = new WeakMap<SongSession, ExportNameMemory>();
+
+function exportMemory(songs: SongSession): ExportNameMemory {
+  const found = exportNames.get(songs);
+  if (found) return found;
+  const memory = new ExportNameMemory();
+  exportNames.set(songs, memory);
+  return memory;
+}
+
+/**
+ * The export file name field (windsor#434 decision 7): the open song's name
+ * as a file name, following every switch and rename, until the user types
+ * one, which stays until the open song changes.
+ */
+function exportNameField(ctx: AppCtx): HTMLInputElement {
+  const memory = exportMemory(ctx.songs);
+  const name = document.createElement('input');
+  name.className = 'field';
+  name.name = 'export-name';
+  name.setAttribute('aria-label', 'Export file name');
+  const song = (): string => openSongKey(ctx.songs.state, ctx.songs.replacements);
+  const follow = (): void => {
+    if (document.activeElement !== name)
+      name.value = memory.value(song(), metaOf(ctx.model.doc).name);
+  };
+  name.oninput = (): void => memory.type(song(), name.value);
+  const stops: (() => void)[] = [];
+  const watch = (): void => {
+    if (name.isConnected) follow();
+    else stops.forEach((stop) => stop());
+  };
+  stops.push(ctx.songs.onChange(watch), ctx.model.onChange(watch));
+  follow();
+  return name;
 }
 
 function documentSection(ctx: AppCtx): HTMLElement {
@@ -47,22 +91,14 @@ function documentSection(ctx: AppCtx): HTMLElement {
   );
   const row = el('div', 'bar-row');
   row.appendChild(newSongButton(ctx));
-  const name = document.createElement('input');
-  name.className = 'field';
-  name.name = 'export-name';
-  name.value = 'song.json';
-  name.setAttribute('aria-label', 'Export file name');
+  const name = exportNameField(ctx);
   row.appendChild(name);
   const exportBtn = el('button', 'btn primary', 'Export') as HTMLButtonElement;
   exportBtn.type = 'button';
   exportBtn.onclick = (): void => {
-    const blob = new Blob([ctx.model.toJson()], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name.value || 'arrangement.json';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), EXPORT_URL_TTL_MS);
-    ctx.notify(`exported ${a.download}`, 'success');
+    const fileName = name.value || songFileName(metaOf(ctx.model.doc).name);
+    downloadSong(ctx.model.toJson(), fileName);
+    ctx.notify(`exported ${fileName}`, 'success');
   };
   row.appendChild(exportBtn);
   const file = document.createElement('input');
@@ -144,6 +180,7 @@ function readoutSection(ctx: AppCtx): HTMLElement {
 
 export function renderArrangementTab(body: HTMLElement, ctx: AppCtx): void {
   body.innerHTML = '';
+  body.appendChild(songsSection(ctx));
   body.appendChild(documentSection(ctx));
   body.appendChild(
     audioExportSection(
