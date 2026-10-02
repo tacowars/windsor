@@ -37,6 +37,7 @@ import type { MasterSpec } from '../mixer/masterSpec';
 import { normaliseReturns } from './deskNormalise';
 import { normaliseGroupOutputs, normaliseGroups } from './groupNormalise';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
+import { normaliseSongMeta } from './songMetaNormalise';
 import type { ChannelStrip, GroupSpec, ReturnSpec } from '../mixer/mix';
 import type { AutomationLane } from '../automation/automationLane';
 import type { Patch } from '../patch/patch';
@@ -85,18 +86,31 @@ export type ArrangementDocument = Omit<Arrangement, 'parts'> & {
    */
   readonly groups?: readonly GroupSpec[];
   readonly master?: MasterSpec;
+  /**
+   * The song's own name and tags (windsor#440), so an exported file is the
+   * whole song. Absent when the name is empty and there are no tags. The
+   * browser's storage id and times are never here: they belong to its copy.
+   */
+  readonly meta?: SongMeta;
 };
+
+/** A song's name and tags, normalised by `songMetaNormalise.ts`. */
+export interface SongMeta {
+  readonly name: string;
+  readonly tags: readonly string[];
+}
 
 /**
  * A live partial of a document: parts by slot, groups by id, patches and
  * returns by name. `null` at a slot, a group id or a patch id removes that
  * entry, a whole part at a free slot adds one (#629), and a whole group at
  * a free id adds one (windsor#284) — the same partial the engine's `apply`
- * takes.
+ * takes. A `meta` replaces the song's name and tags whole, and changes no audio.
  */
 export type DocumentPartial = DeepPartial<
-  Omit<ArrangementDocument, 'parts' | 'patches' | 'groups'>
+  Omit<ArrangementDocument, 'parts' | 'patches' | 'groups' | 'meta'>
 > & {
+  readonly meta?: SongMeta;
   readonly parts?: PartsPartial<DocumentPart>;
   readonly patches?: Readonly<Record<string, DeepPartial<Patch> | null>>;
   readonly groups?: PartsPartial<GroupSpec>;
@@ -186,6 +200,7 @@ const DOCUMENT_KEYS = [
   'returns',
   'groups',
   'master',
+  'meta',
 ];
 
 /** The top-level keys of the retired four-slot format, named in its correction. */
@@ -203,6 +218,7 @@ interface MutableDocument {
   returns?: Record<string, ReturnSpec>;
   groups?: GroupSpec[];
   master?: MasterSpec;
+  meta?: SongMeta;
 }
 
 function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument | null {
@@ -241,6 +257,8 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   const groups = normaliseGroups(o.groups, n);
   if (groups) document.groups = groups;
   if (o.master !== undefined) document.master = normaliseMaster(o.master, n);
+  const meta = normaliseSongMeta(o.meta, n);
+  if (meta) document.meta = meta;
   return normaliseSongSidechains(normaliseGroupOutputs(document, n), n);
 }
 
