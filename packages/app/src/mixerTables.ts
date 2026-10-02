@@ -3,25 +3,44 @@
  * groups over `DEFAULT_GROUP` (windsor#287), the send buses' names, and the plate and delay line's own ranges and tempo
  * divisions. The plate's ranges are the worklet's (`REVERB_SPACE_RANGES`);
  * the delay's are here.
+ *
+ * A strip knob that a song lane moves (level, pan, the sends) takes its
+ * `min` and `max` from the automation catalog's strip row (windsor#443,
+ * record `2026-10-02-knob-ranges-from-the-catalog`), so the knob and the
+ * lane that locks it cannot disagree. Only the bounds: the Level knob is
+ * linear in gain while its lane is drawn in dB.
  */
-import type { ReturnName } from '@windsor/engine';
-import { DEFAULT_GROUP, DEFAULT_STRIP, LOW_CUT_MAX_HZ, LOW_CUT_MIN_HZ } from '@windsor/engine';
+import type { AutomationTargetId, ReturnName } from '@windsor/engine';
+import {
+  AUTOMATION_STRIP_LEVEL_MAX,
+  DEFAULT_GROUP,
+  DEFAULT_STRIP,
+  LOW_CUT_MAX_HZ,
+  LOW_CUT_MIN_HZ,
+  catalogRow,
+  formatTargetId,
+} from '@windsor/engine';
 import { fmt2, fmtHz, fmtSigned } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
 
-/** A strip's level reaches +6 dB; the default is unity from the engine. */
-export const STRIP_LEVEL_MAX = 2;
+/** The `min` and `max` of a strip target's catalog row. Throws on a target the catalog has no row for. */
+function stripRange(target: AutomationTargetId): { readonly min: number; readonly max: number } {
+  const row = catalogRow(target);
+  if (!row) throw new Error(`mixerTables: no strip row for ${target}`);
+  return { min: row.min, max: row.max };
+}
+
+/** A strip's level reaches +6 dB, the catalog's level row's top; the default is unity from the engine. */
+export const STRIP_LEVEL_MAX = AUTOMATION_STRIP_LEVEL_MAX;
 export const STRIP_LEVEL_KNOB: CardKnobSpec = {
   label: 'Level',
-  min: 0,
-  max: STRIP_LEVEL_MAX,
+  ...stripRange('strip.level'),
   def: DEFAULT_STRIP.level,
   fmt: fmt2,
 };
 export const STRIP_PAN_KNOB: CardKnobSpec = {
   label: 'Pan',
-  min: -1,
-  max: 1,
+  ...stripRange('strip.pan'),
   def: DEFAULT_STRIP.pan,
   fmt: fmtSigned,
 };
@@ -48,8 +67,7 @@ export const SEND_DEFAULT = 0;
 /** A part's send to one bus, labelled with the bus's letter: `→ A`, `→ B`. */
 export const sendKnob = (ret: string): CardKnobSpec => ({
   label: `→ ${ret.toUpperCase()}`,
-  min: 0,
-  max: 1,
+  ...stripRange(formatTargetId({ kind: 'strip', field: `send.${ret}` })),
   def: DEFAULT_STRIP.sends[ret] ?? SEND_DEFAULT,
   fmt: fmt2,
 });

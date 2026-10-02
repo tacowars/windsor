@@ -16,8 +16,13 @@ import {
 } from '../__fixtures__/automationSong';
 import { FULL_DOCUMENT, FULL_SLOT, FULL_SONG_TICKS } from '../__fixtures__/fullArrangement';
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
-import type { AutomationLane } from '../automation/automationLane';
-import { VOICE_AUTOMATION_ROWS, insertTargetRow } from '../automation/automationTargets';
+import type { AutomationLane, AutomationTargetId } from '../automation/automationLane';
+import {
+  VOICE_AUTOMATION_ROWS,
+  formatTargetId,
+  insertTargetRow,
+  parseTargetId,
+} from '../automation/automationTargets';
 import { ARRANGEMENT_VERSION } from '../audioConstants';
 import { DEFAULT_TAPE } from '../inserts/tapeSpec';
 import { mergeArrangement, type Arrangement } from './arrangement';
@@ -28,6 +33,10 @@ import {
 } from './arrangementDocument';
 
 const { hat } = FULL_SLOT;
+
+/** The target id of an insert's field. */
+const insertTarget = (insertId: string, field: string): AutomationTargetId =>
+  formatTargetId({ kind: 'insert', insertId, field });
 
 const hatOf = (document: ArrangementDocument): DocumentPart =>
   document.parts.find((part) => part.slot === hat)!;
@@ -98,6 +107,7 @@ describe('the target', () => {
     ['a target that does not parse', 'strip.volume', /names no automation target/],
     ['a target that is not a string', 42, /names no automation target/],
     ['an insert id the strip does not have', 'insert.gone.drive', /no insert "gone"/],
+    // Built by hand: `formatTargetId` refuses a field the insert kind does not list.
     ['a field its kind does not list', `insert.${AUTOMATION_EQ_ID}.drive`, /eq has no .*"drive"/],
     ['a voice path the catalog lacks', 'voice.ops.0.ratio', /names no automation target/],
   ])('drops a lane on %s, reported', (_, target, message) => {
@@ -111,7 +121,7 @@ describe('the target', () => {
 
   it('keeps a lane on a field its kind lists but its settings leave unread', () => {
     // Unsplit Tape reads `wear`, not `wow`: the fixture's `wow` lane survives regardless.
-    const unsplit = withLanes([lane(`insert.${AUTOMATION_TAPE_ID}.wow`, [point(0, 25)])]);
+    const unsplit = withLanes([lane(insertTarget(AUTOMATION_TAPE_ID, 'wow'), [point(0, 25)])]);
     expect(unsplit.lanes).toHaveLength(1);
     expect(unsplit.corrections).toEqual([]);
     const split: ArrangementDocument = {
@@ -124,7 +134,7 @@ describe('the target', () => {
                 ...AUTOMATION_PART.strip,
                 inserts: [{ ...DEFAULT_TAPE, split: true, id: AUTOMATION_TAPE_ID }],
               },
-              automation: [lane(`insert.${AUTOMATION_TAPE_ID}.wear`, [point(0, 40)])],
+              automation: [lane(insertTarget(AUTOMATION_TAPE_ID, 'wear'), [point(0, 40)])],
             }
           : part,
       ),
@@ -132,7 +142,7 @@ describe('the target', () => {
     const result = makeArrangement(split);
     expect(result.corrections).toEqual([]);
     expect(hatOf(result.document).automation).toEqual([
-      lane(`insert.${AUTOMATION_TAPE_ID}.wear`, [point(0, 40)]),
+      lane(insertTarget(AUTOMATION_TAPE_ID, 'wear'), [point(0, 40)]),
     ]);
   });
 
@@ -151,7 +161,7 @@ describe('the target', () => {
     );
     const eqLanes = Array.from({ length: FM_LANES_MAX + 1 }, (_, band) => {
       const field = `bands.${band % FM_LANES_MAX}.${band < FM_LANES_MAX ? 'freq' : 'q'}`;
-      return lane(`insert.${AUTOMATION_EQ_ID}.${field}`, [
+      return lane(insertTarget(AUTOMATION_EQ_ID, field), [
         point(0, insertTargetRow('eq', field)!.min),
       ]);
     });
@@ -279,9 +289,10 @@ describe('edits through a partial', () => {
     const removed = merged({ parts: { [hat]: { strip: { inserts: eqOnly } } } });
     const lanes = hatOf(removed).automation!;
     expect(lanes.map((each) => each.target)).toEqual(
-      AUTOMATION_LANES.map((each) => each.target).filter(
-        (target) => !target.startsWith(`insert.${AUTOMATION_TAPE_ID}.`),
-      ),
+      AUTOMATION_LANES.map((each) => each.target).filter((target) => {
+        const parsed = parseTargetId(target);
+        return !(parsed?.kind === 'insert' && parsed.insertId === AUTOMATION_TAPE_ID);
+      }),
     );
     // Undo replaces the document with its snapshot: the insert and its lanes are both back.
     const undone = makeArrangement(opened);

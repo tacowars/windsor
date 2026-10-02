@@ -14,11 +14,11 @@ import {
 } from '@windsor/engine/__fixtures__/automationSong';
 import {
   TICKS_PER_BAR,
+  VOICE_AUTOMATION_ROWS,
   VOICE_TARGET_IDS,
   followingTick,
   partAt,
   songTicksOf,
-  voicePathOf,
   type AutomationLane,
   type DocumentPart,
   type InsertSpec,
@@ -156,8 +156,8 @@ describe('a patch knob', () => {
   it('knows the 30 voice targets and no more, the Formant vowel among them (windsor#406)', () => {
     expect(VOICE_TARGET_IDS).toHaveLength(30);
     expect(voiceKnobTarget('filter.vowel')).toBe('voice.filter.vowel');
-    for (const id of VOICE_TARGET_IDS) {
-      expect(voiceKnobTarget(voicePathOf(id)!)).toBe(id);
+    for (const row of VOICE_AUTOMATION_ROWS) {
+      expect(voiceKnobTarget(row.path)).toBe(row.target);
     }
   });
 

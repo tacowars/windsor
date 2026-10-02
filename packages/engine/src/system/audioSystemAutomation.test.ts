@@ -22,6 +22,7 @@ import {
 import { installSidechainWorklet, sidechainRig } from '../__fixtures__/sidechainRig';
 import { fake } from '../__fixtures__/stripRig';
 import type { AutomationLane } from '../automation/automationLane';
+import { targetKind } from '../automation/automationTargets';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { ArrangementDocument } from '../song/arrangementDocument';
 import { musicPartName } from '../song/documentParts';
@@ -52,7 +53,7 @@ const stripParams = (sys: AudioSystem, slot: number): FakeParam[] => {
  * Tape worklet to build its inserts with. Its level lane is on (0.5 at tick
  * 0), its pan lane off.
  */
-const STRIP_AND_VOICE = AUTOMATION_LANES.filter((l) => !l.target.startsWith('insert.'));
+const STRIP_AND_VOICE = AUTOMATION_LANES.filter((l) => targetKind(l.target) !== 'insert');
 const WITH_LANES = withDocumentPart(FULL_DOCUMENT, 'hat', { automation: STRIP_AND_VOICE });
 const FLAT_LEVEL = lane('strip.level', [point(0, 0.5)]);
 
