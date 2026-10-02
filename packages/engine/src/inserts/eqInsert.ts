@@ -10,9 +10,11 @@
  * the program path; and Listen on drag, a `listen` message naming the band
  * the processor plays alone. Pinned by `eqInsert.test.ts`.
  */
+import { workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
-import { EQ_LISTEN, EQ_NAME, EQ_SPECTRUM } from './eqConstants';
-import { eqParameterValues } from './eqParameters';
+import { EQ_BAND_COUNT, EQ_LISTEN, EQ_NAME, EQ_SPECTRUM } from './eqConstants';
+import type { EqBandParam } from './eqParameters';
+import { eqParamName, eqParameterValues } from './eqParameters';
 import { DEFAULT_EQ, EQ_FIELDS, normaliseEq } from './eqSpec';
 import type { EqSpec } from './eqSpec';
 
@@ -45,7 +47,20 @@ function spectrumTap(
   return { spectrum, dispose: () => spectrum.setActive(false) };
 }
 
+/** A band's lane fields, as the catalog spells them, and their params. */
+const BAND_FIELD = /^bands\.(\d+)\.(freq|gain|q)$/;
+const BAND_PARAM: Readonly<Record<string, EqBandParam>> = { freq: 'Freq', gain: 'Gain', q: 'Q' };
+
+/** A lane field's param: `bands.3.freq` as `b4Freq`, and `scale` and `output` themselves. */
+function eqParamOf(field: string): string | undefined {
+  if (field === 'scale' || field === 'output') return field;
+  const band = BAND_FIELD.exec(field);
+  if (!band || Number(band[1]) >= EQ_BAND_COUNT) return undefined;
+  return eqParamName(Number(band[1]), BAND_PARAM[band[2]!]!);
+}
+
 function create(context: BaseAudioContext, spec: EqSpec): InsertStage<EqSpec> {
+  let current = spec;
   const values = eqParameterValues(spec);
   const processor = new AudioWorkletNode(context, EQ_NAME, {
     numberOfInputs: 1,
@@ -60,6 +75,11 @@ function create(context: BaseAudioContext, spec: EqSpec): InsertStage<EqSpec> {
   input.connect(processor);
   processor.connect(output);
   const tap = spectrumTap(context, output);
+  const params = workletFieldParams(
+    processor,
+    (name) => eqParameterValues(current)[name]!,
+    eqParamOf,
+  );
   return {
     kind: 'eq',
     input,
@@ -67,9 +87,10 @@ function create(context: BaseAudioContext, spec: EqSpec): InsertStage<EqSpec> {
     processor,
     spectrum: tap.spectrum,
     set(next): void {
-      eqParameterValues(next, values);
-      for (const name in values) processor.parameters.get(name)!.value = values[name]!;
+      current = next;
+      params.write(eqParameterValues(next, values));
     },
+    param: (field) => params.param(field),
     listen(band): void {
       processor.port.postMessage({ type: 'listen', band: band >= 0 ? band : EQ_LISTEN.off });
     },

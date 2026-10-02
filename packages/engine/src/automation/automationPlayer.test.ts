@@ -16,8 +16,11 @@ import {
   lane,
   point,
 } from '../__fixtures__/automationRig';
+import { FakeParam } from '../__fixtures__/fakeAudioNodes';
 import { AUTOMATION_STEP_RAMP_SECONDS } from './automationConstants';
 import { valueAt } from './automationEvaluate';
+import { knobHandle, sameValue } from './automationHandles';
+import { AutomationPlayer } from './automationPlayer';
 import { catalogRow } from './automationTargets';
 
 const LEVEL = catalogRow('strip.level')!;
@@ -247,5 +250,59 @@ describe('lanes off and gone', () => {
     rig.player.dispose();
     rig.run(24);
     expect(rig.calls('strip.level', mark)).toEqual([]);
+  });
+});
+
+describe('a resync after the targets moved (windsor#345)', () => {
+  const knob = (param: FakeParam, resting: number) =>
+    knobHandle({
+      params: [param as unknown as AudioParam],
+      write: sameValue,
+      resting: () => resting,
+    });
+
+  it('gives back a handle no lane plays through any more, and holds the new one from now', () => {
+    const rig = automationRig();
+    const params = { a: new FakeParam(RIG_RESTING), b: new FakeParam(RIG_RESTING) };
+    const handles = { a: knob(params.a, 0.1), b: knob(params.b, 0.2) };
+    let on: 'a' | 'b' | null = 'a';
+    const player = new AutomationPlayer({
+      transport: rig.transport,
+      now: () => rig.now,
+      resolve: () => (on ? { handle: handles[on], row: LEVEL } : undefined),
+      songTicks: RIG_SONG_TICKS,
+      restTick: 0,
+    });
+    player.setLanes(RIG_SLOT, [FADE]);
+    rig.run(12);
+    rig.now = at(3);
+    const marks = [params.a.automation.length, params.b.automation.length] as const;
+    on = 'b';
+    player.resync(RIG_SLOT);
+    expect(params.a.automation.slice(marks[0])).toEqual([
+      { call: 'cancelScheduledValues', value: expect.any(Number), time: at(3) },
+      { call: 'setValueAtTime', value: 0.1, time: at(3) },
+    ]);
+    expect(handles.a.engaged).toBe(false);
+    expect(params.b.automation.slice(marks[1], marks[1] + 2)).toEqual([
+      { call: 'cancelScheduledValues', value: RIG_RESTING, time: at(3) },
+      { call: 'setValueAtTime', value: valueAt(LEVEL, FADE.points, 3), time: at(3) },
+    ]);
+    // The ticks already issued past now are scheduled again, on the new handle only.
+    expect(params.b.automation.length).toBeGreaterThan(marks[1] + 2);
+    const quiet = params.a.automation.length;
+    rig.run(12);
+    expect(params.a.automation.length).toBe(quiet);
+    // A target the graph no longer has: its handle is given back and nothing more is scheduled.
+    rig.now = at(15);
+    on = null;
+    player.resync(RIG_SLOT);
+    expect(params.b.automation.slice(-1)).toEqual([
+      { call: 'setValueAtTime', value: 0.2, time: at(15) },
+    ]);
+    const done = params.b.automation.length;
+    rig.run(12);
+    expect(params.b.automation.length).toBe(done);
+    player.dispose();
   });
 });

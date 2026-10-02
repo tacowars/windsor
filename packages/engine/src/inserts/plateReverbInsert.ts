@@ -17,6 +17,10 @@ import { createPlate, writePlate } from '../mixer/returnEffects';
 import type { ReverbSpace } from '../mixer/reverbSpace';
 import { SPACES } from '../mixer/reverbSpace';
 import type { FieldNormaliser } from '../song/arrangementFields';
+import type { KnobTarget } from '../automation/automationHandles';
+import { sameValue } from '../automation/automationHandles';
+import type { FieldHandles } from './insertFieldHandles';
+import { fieldHandles } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import { PLATE_REVERB_MIX_DEFAULT, PLATE_REVERB_SPACE_DEFAULT } from './plateReverbConstants';
 
@@ -69,6 +73,39 @@ function normalise(
   };
 }
 
+const isSpaceField = (field: string): field is keyof ReverbSpace =>
+  (PLATE_SPACE_FIELDS as readonly string[]).includes(field);
+
+/**
+ * Each knob's lane (windsor#345): a space field on the plate's param of its
+ * name, Mix on the plate's own `wet` and `dry`. The plate reads `decay` and
+ * `wet` once per block, unsmoothed, so a fast lane there steps every 128 samples.
+ */
+function plateHandles(plate: AudioWorkletNode, spec: () => PlateReverbSpec): FieldHandles {
+  return fieldHandles((field): KnobTarget | undefined => {
+    const resting = (): number => spec()[field as keyof ReverbSpace | 'mix'];
+    if (field === 'mix') {
+      const params = [plate.parameters.get('wet')!, plate.parameters.get('dry')!];
+      const write = (v: number) => {
+        const mix = plateMix({ ...spec(), mix: v });
+        return [mix.wet, mix.dry];
+      };
+      return { params, write, resting };
+    }
+    const param = isSpaceField(field) ? plate.parameters.get(field) : undefined;
+    return param && { params: [param], write: sameValue, resting };
+  });
+}
+
+/** The fields of `values` no lane holds. */
+function unheld<T extends object>(values: T, knobs: FieldHandles): Partial<T> {
+  const out: Partial<T> = {};
+  for (const key of Object.keys(values) as (keyof T & string)[]) {
+    if (!knobs.automated(key)) out[key] = values[key];
+  }
+  return out;
+}
+
 function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<PlateReverbSpec> {
   const input = context.createGain();
   const send = context.createGain();
@@ -84,9 +121,12 @@ function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<P
   input.connect(bypass);
   bypass.connect(output);
 
+  let current = spec;
+  const knobs = plateHandles(plate, () => current);
   const set = (next: PlateReverbSpec): void => {
-    writePlate(plate, plateSpace(next));
-    writePlate(plate, plateMix(next));
+    current = next;
+    writePlate(plate, unheld(plateSpace(next), knobs));
+    if (!knobs.automated('mix')) writePlate(plate, plateMix(next));
     send.gain.value = Number(next.enabled);
     gate.gain.value = Number(next.enabled);
     bypass.gain.value = Number(!next.enabled);
@@ -99,6 +139,7 @@ function create(context: BaseAudioContext, spec: PlateReverbSpec): InsertStage<P
     output,
     processor: plate,
     set,
+    param: (field) => knobs.param(field),
     // Everything this stage wired, and nothing out of `output`: the strip owns that edge.
     dispose(): void {
       for (const node of [input, send, plate, gate, bypass]) node.disconnect();

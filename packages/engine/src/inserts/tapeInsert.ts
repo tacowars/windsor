@@ -1,6 +1,8 @@
 /** Fixed insert graph; the stage owns DSP lifetime and the mixer owns output edges. */
+import { ownParam, workletFieldParams } from './insertFieldHandles';
 import type { InsertKind, InsertStage } from './insertKind';
 import {
+  TAPE_BOUNDS,
   TAPE_CORE_BOUNDS as B,
   TAPE_CORE_PARAMS as P,
   TAPE_NAME,
@@ -27,39 +29,45 @@ export function tapeCoreParams(spec: TapeSpec): Record<(typeof P)[keyof typeof P
   } as Record<(typeof P)[keyof typeof P], number>;
 }
 
+/** Every param `set` writes, by name, for `spec`. */
+function tapeValues(spec: TapeSpec): Record<string, number> {
+  const values: Record<string, number> = {};
+  for (const name of TAPE_NUMBERS) values[name] = spec[name];
+  values.enabled = Number(spec.enabled);
+  values.split = Number(spec.split);
+  values.model = TAPE_TYPES.indexOf(spec.model);
+  return { ...values, ...tapeCoreParams(spec) };
+}
+
 function create(context: BaseAudioContext, spec: TapeSpec): InsertStage<TapeSpec> {
-  const parameterData: Record<string, number> = {
-    enabled: Number(spec.enabled),
-    split: Number(spec.split),
-    model: TAPE_TYPES.indexOf(spec.model),
-    ...tapeCoreParams(spec),
-  };
-  for (const name of TAPE_NUMBERS) parameterData[name] = spec[name];
+  let current = spec;
   const processor = new AudioWorkletNode(context, TAPE_NAME, {
     numberOfInputs: 1,
     numberOfOutputs: 1,
     outputChannelCount: [2],
     channelCount: 2,
     channelCountMode: 'explicit',
-    parameterData,
+    parameterData: tapeValues(spec),
   });
   const input = context.createGain();
   const output = context.createGain();
   input.connect(processor);
   processor.connect(output);
+  const params = workletFieldParams(
+    processor,
+    (name) => tapeValues(current)[name]!,
+    ownParam(TAPE_BOUNDS),
+  );
   return {
     kind: 'tape',
     input,
     output,
     processor,
     set(next): void {
-      for (const name of TAPE_NUMBERS) processor.parameters.get(name)!.value = next[name];
-      processor.parameters.get('enabled')!.value = Number(next.enabled);
-      processor.parameters.get('split')!.value = Number(next.split);
-      processor.parameters.get('model')!.value = TAPE_TYPES.indexOf(next.model);
-      for (const [name, value] of Object.entries(tapeCoreParams(next)))
-        processor.parameters.get(name)!.value = value;
+      current = next;
+      params.write(tapeValues(next));
     },
+    param: (field) => params.param(field),
     dispose(): void {
       input.disconnect();
       processor.disconnect();

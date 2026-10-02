@@ -15,9 +15,18 @@
  *   document's own fit, so the engine's lanes stay the document's; a
  *   transport edit (tempo, swing, loop, length) or a patch edit restarts
  *   every lane from now; a part's `automation` replaces its lanes,
- *   normalised against its live inserts as the document normaliser would; a
- *   part's insert list changing restarts its lanes, so an insert lane finds
- *   its rebuilt stage.
+ *   normalised as the document normaliser would; a part's insert list
+ *   changing drops the lanes of an insert it no longer holds and restarts
+ *   the rest, so an insert lane plays or goes inert as its field is read or
+ *   not (windsor#345).
+ * - **Which inserts.** A part's lanes are normalised against its inserts as
+ *   this partial leaves them (`PartStrip.nextInsertSpecs`), never against
+ *   the chain still waiting out its fade: an undo that restores an insert and
+ *   its lane together keeps the lane. Until its stage exists the lane finds
+ *   no target and is inert (`automationResolver.ts`).
+ * - **Rebuild.** A structural insert edit re-wires the chain only once its
+ *   fade has landed; the strip's `insertsRebuilt` hook then restarts that
+ *   part's lanes from now, on the stages as they now stand (windsor#345).
  */
 import { AutomationPlayer } from '../automation/automationPlayer';
 import type { AutomationLane } from '../automation/automationLane';
@@ -83,14 +92,28 @@ export class SongAutomation {
     for (const [key, part] of parts) {
       if (!isRecord(part)) continue;
       const slot = Number(key);
-      if ('automation' in part) player.setLanes(slot, this.lanes(slot, part.automation));
-      else if (isRecord(part.strip) && part.strip.inserts !== undefined) player.resync(slot);
+      if ('automation' in part) {
+        player.setLanes(slot, this.lanes(slot, part.automation));
+      } else if (isRecord(part.strip) && part.strip.inserts !== undefined) {
+        this.reinsert(player, slot);
+      }
     }
   }
 
   /** Restart one part's lanes from now: their targets' params changed. */
   resync(slot: number): void {
     this.playerValue?.resync(slot);
+  }
+
+  /**
+   * `strip`'s insert chain was re-wired inside its fade (windsor#345): its
+   * part's lanes find their inserts' stages again and restart from now, so
+   * a reorder, an add or a remove re-attaches the lanes that remain.
+   */
+  insertsRebuilt(strip: PartStrip): void {
+    const player = this.playerValue;
+    if (!player) return;
+    for (const slot of player.slots()) if (this.stripOf(slot) === strip) player.resync(slot);
   }
 
   /** The lanes `slot` plays now; none before `begin` or for a part without lanes. */
@@ -112,7 +135,7 @@ export class SongAutomation {
   private refit(player: AutomationPlayer): void {
     for (const slot of player.slots()) {
       const lanes = player.lanesOf(slot);
-      const inserts = this.stripOf(slot)?.insertSpecs ?? [];
+      const inserts = this.stripOf(slot)?.nextInsertSpecs ?? [];
       const part = { automation: lanes, strip: { inserts } } as unknown as MusicPart;
       const fitted = (withFittedAutomation(part, this.songTicks) as Partial<DocumentPart>)
         .automation;
@@ -120,13 +143,28 @@ export class SongAutomation {
     }
   }
 
-  /** A part's lanes from a partial, normalised against its live inserts; none for null or junk. */
+  /**
+   * `slot`'s insert list changed and its lanes did not come with it: a lane
+   * on an insert the list no longer holds goes, as the document normaliser
+   * deletes it (decision 14), and the rest restart from now.
+   */
+  private reinsert(player: AutomationPlayer, slot: number): void {
+    const held = player.lanesOf(slot);
+    const kept = this.lanes(slot, held);
+    if (kept.length < held.length) player.setLanes(slot, kept);
+    else player.resync(slot);
+  }
+
+  /**
+   * A part's lanes, normalised against its inserts as this partial leaves
+   * them, not the chain still fading out; none for null or junk.
+   */
   private lanes(slot: number, raw: unknown): readonly AutomationLane[] {
     const strip = this.stripOf(slot);
     if (raw === null || !strip) return [];
     const context = {
       songTicks: this.songTicks,
-      inserts: strip.insertSpecs,
+      inserts: strip.nextInsertSpecs,
       path: `parts.${slot}.automation`,
       n: new FieldNormaliser(),
     };

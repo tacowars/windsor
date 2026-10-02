@@ -126,6 +126,7 @@ export class AudioSystem {
     const routeOptions: RouteOptions = {
       registry: this.meter.registry(this.insertTempo.registry),
       changed: () => this.sidechains.changed(),
+      insertsRebuilt: (strip) => this.automation.insertsRebuilt(strip),
       ...(options.defer ? { defer: options.defer } : {}),
     };
     const graph = new StandingGraph(this.engine, options.returns ?? RETURNS, routeOptions);
