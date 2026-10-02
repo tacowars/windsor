@@ -12,7 +12,13 @@
  * the swing box and its grid picker, windsor#30 the loop button.
  */
 import type { DocumentPartial, ScaleName, Swing, Transport } from '@windsor/engine';
-import { SCALE_NAMES, STRAIGHT_SWING, SWING_GRIDS, TICKS_PER_BAR } from '@windsor/engine';
+import {
+  SCALE_NAMES,
+  STRAIGHT_SWING,
+  SWING_GRIDS,
+  songTicks as songLength,
+  ticksPerBar,
+} from '@windsor/engine';
 import { loopChange, newLoopRange } from './loopBraceModel';
 import {
   BARS_DRAG_STEP,
@@ -123,12 +129,12 @@ export const loopIsOn = (transport: Pick<Transport, 'loop'>): boolean =>
 /**
  * The loop button (windsor#30 decision 1) as a live partial: it flips the
  * loop's `on` and keeps its range, and on a song with no loop yet it
- * creates one over bars 1–4 (clamped to the song), switched on.
+ * creates one over bars 1–4 of its meter (clamped to the song), switched on.
  */
-export function loopToggle(transport: Pick<Transport, 'bars' | 'loop'>): DocumentPartial {
-  const { loop } = transport;
+export function loopToggle(transport: Pick<Transport, 'bars' | 'loop' | 'meter'>): DocumentPartial {
+  const { loop, meter } = transport;
   if (loop) return loopChange(loop, !loop.on);
-  return loopChange(newLoopRange(transport.bars * TICKS_PER_BAR), true);
+  return loopChange(newLoopRange(songLength(transport.bars, meter), ticksPerBar(meter)), true);
 }
 
 /** At the bottom of its range the swing is straight, and the box reads dimmed. */

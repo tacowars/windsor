@@ -8,7 +8,7 @@
  * only: a rest is a gap in a part's regions (epic #703 decision 6).
  */
 import type { ArrangementDocument, HarmonyEvent } from '@windsor/engine';
-import { chordAt, eventBounds } from '@windsor/engine';
+import { chordAt, eventBounds, meterBeats } from '@windsor/engine';
 import { el } from './dom';
 import { appendEvent, eventLabel, resizeEventBy } from './harmonyLaneModel';
 import { pointerDrag } from './songLanes';
@@ -21,7 +21,7 @@ function block(view: SongView, index: number, start: number, end: number): HTMLE
   const event = doc.harmony.events[index];
   const node = el('div', 'hblk');
   node.dataset['event'] = String(index);
-  const box = blockBox(start, end - start, view.state.pxPerBar);
+  const box = blockBox(start, end - start, view.state.pxPerBar, view.ticksPerBar());
   node.style.left = `${box.leftPx}px`;
   node.style.width = `${box.widthPx}px`;
   node.classList.toggle('narrow', isNarrowBlock(box.widthPx));
@@ -52,6 +52,7 @@ function wireEdgeDrag(view: SongView, node: HTMLElement, bounds: EventSpan): voi
   const { index, start, end } = bounds;
   const laneLeft = (): number => (node.parentElement ?? node).getBoundingClientRect().left;
   const px = view.state.pxPerBar;
+  const bar = view.ticksPerBar();
   const pxAt = (e: PointerEvent): number => e.clientX - laneLeft();
   // A press anywhere on the block selects it on release; only a press on the right edge band resizes.
   let onEdge = false;
@@ -60,20 +61,20 @@ function wireEdgeDrag(view: SongView, node: HTMLElement, bounds: EventSpan): voi
     resizeEventBy(
       view.ctx.model.doc.harmony.events,
       index,
-      pxToTick(pxAt(e) - pressPx, px),
+      pxToTick(pxAt(e) - pressPx, px, bar),
       view.songTicks(),
     );
   pointerDrag(node, {
     accept: (e) => {
       pressPx = pxAt(e);
-      onEdge = blockHitAt(blockBox(start, end - start, px), pressPx) === 'end';
+      onEdge = blockHitAt(blockBox(start, end - start, px, bar), pressPx) === 'end';
       return true;
     },
     move: (e) => {
       if (!onEdge) return;
       const next = resized(e)[index];
       if (!next) return;
-      const width = blockBox(start, next.duration, px).widthPx;
+      const width = blockBox(start, next.duration, px, bar).widthPx;
       node.style.width = `${width}px`;
       node.classList.toggle('narrow', isNarrowBlock(width));
     },
@@ -106,7 +107,7 @@ export function harmonyLaneRow(view: SongView): [HTMLElement, HTMLElement] {
   add.type = 'button';
   add.title = 'append a chord: a bar of the last degree, taken from the last event';
   add.onclick = (): void => {
-    const events = appendEvent(doc.harmony.events, songTicks);
+    const events = appendEvent(doc.harmony.events, songTicks, meterBeats(doc.transport.meter));
     if (events.length === doc.harmony.events.length) return;
     if (view.commit({ harmony: { events } }, true)) {
       view.select({ kind: 'event', index: events.length - 1 });

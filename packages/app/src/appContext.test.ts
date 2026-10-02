@@ -11,7 +11,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { ApplyResult, AudioPart, DocumentPartial } from '@windsor/engine';
-import { TICKS_PER_BAR, clonePatch, makePatch, partAt } from '@windsor/engine';
+import { TICKS_PER_BAR, clonePatch, makePatch, partAt, ticksPerBar } from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
@@ -467,5 +467,18 @@ describe('the Song view (#709)', () => {
     expect(c.applied[0]?.parts?.[0]).toEqual({ regions: [{ start: 0, duration: grown * BAR }] });
     expect(c.status.at(-1)).toMatch(/^song length: .*refitted$/);
     expect(c.builds).toBe(0);
+  });
+
+  it("cuts a 12/8 song's whole-song region and harmony at its own bar (windsor#430)", () => {
+    const c = openConsole();
+    c.model.open(newSong('12/8'));
+    const bar = ticksPerBar('12/8');
+    expect(c.model.doc.transport.bars).toBe(4);
+    expect(partAt(c.model.doc, 0)?.regions).toEqual([{ start: 0, duration: 4 * bar }]);
+    expect(c.ctx.change(barsChange(3)).ok).toBe(true);
+    // Three 144-tick bars end at 432, not at three 4/4 bars' 288.
+    expect(partAt(c.model.doc, 0)?.regions).toEqual([{ start: 0, duration: 432 }]);
+    const last = c.model.doc.harmony.events.at(-1);
+    expect(last && last.start + last.duration).toBe(432);
   });
 });

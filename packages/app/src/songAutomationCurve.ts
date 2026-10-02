@@ -26,6 +26,8 @@ export interface CurveFrame {
   readonly widthPx: number;
   readonly heightPx: number;
   readonly pxPerBar: number;
+  /** The song's bar in ticks, which `pxPerBar` spans (windsor#430); 4/4's when absent. */
+  readonly ticksPerBar?: number;
   readonly drawing?: AutomationDrawing;
 }
 
@@ -54,12 +56,12 @@ export function curveShape(
   points: readonly AutomationPoint[],
   frame: CurveFrame,
 ): CurveShape {
-  const { widthPx: w, heightPx: h, pxPerBar, drawing = AUTOMATION_DRAWING } = frame;
+  const { widthPx: w, heightPx: h, pxPerBar, ticksPerBar, drawing = AUTOMATION_DRAWING } = frame;
   const first = points[0];
   const last = points[points.length - 1];
   if (!first || !last) return { line: '', area: '', dots: [] };
   const yAt = (display: number): number => laneY(display, h, drawing);
-  const xOf = (p: AutomationPoint): number => tickToPx(p.tick, pxPerBar);
+  const xOf = (p: AutomationPoint): number => tickToPx(p.tick, pxPerBar, ticksPerBar);
   const yOf = (p: AutomationPoint): number => yAt(toDisplay(row, p.value));
   const n = (v: number): string => v.toFixed(drawing.coordDecimals);
   const to = (x: number, y: number): string => `L${n(x)} ${n(y)}`;

@@ -40,6 +40,8 @@ import { pxToTick, tickToPx } from './songViewTables';
 /** Where a lane is drawn: the view's zoom, the lane's height and the song's length. */
 export interface LaneFrame {
   readonly pxPerBar: number;
+  /** The song's bar in ticks, which `pxPerBar` spans (windsor#430); 4/4's when absent. */
+  readonly ticksPerBar?: number;
   readonly heightPx: number;
   readonly songTicks: number;
   readonly drawing?: AutomationDrawing;
@@ -67,7 +69,7 @@ export const drawGrain = (
 
 /** The song tick at `x` px into the lane, inside the song. */
 export const tickAtPx = (x: number, frame: LaneFrame): number =>
-  clamp(pxToTick(x, frame.pxPerBar), 0, frame.songTicks);
+  clamp(pxToTick(x, frame.pxPerBar, frame.ticksPerBar), 0, frame.songTicks);
 
 /** The display height (0..1) at `y` px from the lane's top. */
 export function displayAtPx(y: number, frame: LaneFrame): number {
@@ -107,7 +109,7 @@ export function pressAt(
   let best = -1;
   let bestPx = gestures.pointHitPx;
   points.forEach((p, i) => {
-    const dx = tickToPx(p.tick, frame.pxPerBar) - at.x;
+    const dx = tickToPx(p.tick, frame.pxPerBar, frame.ticksPerBar) - at.x;
     const dy = pxOfValue(row, p.value, frame) - at.y;
     const d = Math.hypot(dx, dy);
     if (d < bestPx) {

@@ -6,37 +6,45 @@
  * a default the engine owns. Removing a part is the engine's `removePart`
  * (`documentParts.ts`), which prunes a patch only no other part plays.
  */
-import type { ArrangementDocument, DocumentPart, SequencerKind } from '@windsor/engine';
-import { ARRANGEMENT_VERSION, MUSIC_PARTS_MAX, SEEDED_KINDS, TICKS_PER_BAR } from '@windsor/engine';
+import type { ArrangementDocument, DocumentPart, Meter, SequencerKind } from '@windsor/engine';
+import { ARRANGEMENT_VERSION, MUSIC_PARTS_MAX, SEEDED_KINDS, songTicks } from '@windsor/engine';
 import { initPresetId } from './libraryConstants';
 import { initPatchDefaults } from './patchActions';
 import { NEW_SONG_BARS, NEW_SONG_BPM, NEW_SONG_HARMONY, partLabelFor } from './songConstants';
 
 type RawDocument = Record<string, unknown>;
 
-/** The one region a new part is live in (#705, epic #703 decision 17): the whole song. */
-export function wholeSongRegion(bars: number): { start: number; duration: number } {
-  return { start: 0, duration: bars * TICKS_PER_BAR };
+/**
+ * The one region a new part is live in (#705, epic #703 decision 17): the
+ * whole song, `bars` bars of its `meter` (4/4 when absent, windsor#430).
+ */
+export function wholeSongRegion(bars: number, meter?: Meter): { start: number; duration: number } {
+  return { start: 0, duration: songTicks(bars, meter) };
 }
 
 /** One part on `slot`: labelled, playing its own fresh Init patch, live for the whole song, no sequencer yet. */
-function initPart(slot: number, bars: number): RawDocument {
+function initPart(slot: number, bars: number, meter?: Meter): RawDocument {
   return {
     slot,
     name: partLabelFor(slot),
     preset: initPresetId(String(slot)),
-    regions: [wholeSongRegion(bars)],
+    regions: [wholeSongRegion(bars, meter)],
     sequencer: { kind: 'none' },
   };
 }
 
-/** The song the console opens on: one part on slot 0, the Init patch, no sequencer. */
-export function newSong(): RawDocument {
+/**
+ * The song the console opens on: one part on slot 0, the Init patch, no
+ * sequencer. It names no meter (4/4) unless given one, as a song before the
+ * meter did.
+ */
+export function newSong(meter?: Meter): RawDocument {
+  const transport = { bpm: NEW_SONG_BPM, bars: NEW_SONG_BARS };
   return {
     version: ARRANGEMENT_VERSION,
-    transport: { bpm: NEW_SONG_BPM, bars: NEW_SONG_BARS },
+    transport: meter === undefined ? transport : { ...transport, meter },
     harmony: NEW_SONG_HARMONY,
-    parts: [initPart(0, NEW_SONG_BARS)],
+    parts: [initPart(0, NEW_SONG_BARS, meter)],
     patches: { [initPresetId('0')]: initPatchDefaults() },
   };
 }
@@ -53,7 +61,7 @@ export function nextFreeSlot(doc: Pick<ArrangementDocument, 'parts'>): number | 
 export function addPart(doc: ArrangementDocument): { doc: RawDocument; slot: number } | null {
   const slot = nextFreeSlot(doc);
   if (slot === null) return null;
-  const part = initPart(slot, doc.transport.bars);
+  const part = initPart(slot, doc.transport.bars, doc.transport.meter);
   return {
     slot,
     doc: {

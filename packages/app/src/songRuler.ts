@@ -75,12 +75,18 @@ export function playheadLine(): HTMLElement {
 
 /**
  * Put the line on `tick`, past the name and mixer columns. Its px follow the lanes'
- * `--bar`, so a zoom moves the line with the regions even while the
- * transport stands still and the loop has no new tick to mark.
+ * `--bar`, one `bar` of ticks (the song's meter's, windsor#430), so a zoom
+ * moves the line with the regions even while the transport stands still
+ * and the loop has no new tick to mark.
  */
-export function placePlayhead(line: HTMLElement, tick: number, songTicks: number): void {
+export function placePlayhead(
+  line: HTMLElement,
+  tick: number,
+  songTicks: number,
+  bar: number = TICKS_PER_BAR,
+): void {
   const songTick = songTicks > 0 ? ((tick % songTicks) + songTicks) % songTicks : 0;
-  line.style.left = timelineLeftCss(songTick / TICKS_PER_BAR);
+  line.style.left = timelineLeftCss(songTick / bar);
   const label = line.firstChild;
   if (label) label.textContent = formatPosition(tick, songTicks);
 }
@@ -231,6 +237,8 @@ export interface PlayheadDragWire {
   pxPerBar(): number;
   bars(): number;
   songTicks(): number;
+  /** One bar of the song's meter, in ticks: where a bar line sits. */
+  ticksPerBar(): number;
   /** Called with the transport's position once a drag ends: the harmony lane lights its block. */
   onTick(tick: number): void;
 }
@@ -267,7 +275,7 @@ export function wirePlayheadDrag(wire: PlayheadDragWire): PlayheadDragHandle {
   const settle = (): void => {
     line.classList.remove('dragging');
     const tick = ctx.transport.position();
-    placePlayhead(line, tick, wire.songTicks());
+    placePlayhead(line, tick, wire.songTicks(), wire.ticksPerBar());
     wire.onTick(tick);
   };
   const onBlur = (): void => step({ type: 'cancel' });
@@ -275,11 +283,14 @@ export function wirePlayheadDrag(wire: PlayheadDragWire): PlayheadDragHandle {
     const was = drag;
     const next = stepPlayheadDrag(drag, event, { pxPerBar: wire.pxPerBar(), bars: wire.bars() });
     drag = next.drag;
-    if (next.preview !== null) placePlayhead(line, barTick(next.preview), wire.songTicks());
+    const bar = wire.ticksPerBar();
+    if (next.preview !== null) {
+      placePlayhead(line, barTick(next.preview, bar), wire.songTicks(), bar);
+    }
     if (!was || drag) return;
     window.removeEventListener('blur', onBlur);
     if (handle.hasPointerCapture(was.pointerId)) handle.releasePointerCapture(was.pointerId);
-    if (next.drop !== null) ctx.transport.seek(barTick(next.drop));
+    if (next.drop !== null) ctx.transport.seek(barTick(next.drop, bar));
     settle();
   };
   handle.addEventListener('pointerdown', (down) => {
@@ -320,6 +331,8 @@ export interface SongPlayheadWatch {
   lanes: HTMLElement;
   line: HTMLElement;
   songTicks(): number;
+  /** One bar of the song's meter, in ticks. */
+  ticksPerBar(): number;
   /** Called with the audible tick whenever it moved — the harmony lane lights its block. */
   onTick(tick: number): void;
   /** The lanes' own repaint check, run every shown frame before the playhead. */
@@ -335,7 +348,9 @@ export function watchSongPlayhead(watch: SongPlayheadWatch): void {
     shown: () => watch.lanes.closest('[hidden]') === null,
     playheadAt: () => watch.ctx.transport.position(),
     mark: (tick) => {
-      if (!watch.drag.dragging) placePlayhead(watch.line, tick, watch.songTicks());
+      if (!watch.drag.dragging) {
+        placePlayhead(watch.line, tick, watch.songTicks(), watch.ticksPerBar());
+      }
       watch.onTick(tick);
     },
     repaintIf: () => {

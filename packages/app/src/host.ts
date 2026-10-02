@@ -19,7 +19,14 @@ import type {
   RegionStep,
   WorkletUrls,
 } from '@windsor/engine';
-import { AudioSystem, FmEngine, TICKS_PER_BAR, musicPartName, songTicksOf } from '@windsor/engine';
+import {
+  AudioSystem,
+  FmEngine,
+  TICKS_PER_BAR,
+  musicPartName,
+  songTicksOf,
+  ticksPerBar,
+} from '@windsor/engine';
 
 import { loadBuiltIns } from './builtInLibrary';
 import type { ConsoleTransport } from './context';
@@ -47,14 +54,19 @@ export interface BuildOptions {
 
 /**
  * Where a rebuilt system resumes (windsor#132 decisions 2 and 3): the start of
- * the bar holding `resumeAt`, or the top of the song (0) when that bar is past
- * the end of the song being built. With no `resumeAt` there is no resume
- * (undefined): the build starts wherever a fresh system rests, as it always has.
+ * the bar holding `resumeAt`, a `barTicks` bar (the song's meter's,
+ * windsor#430), or the top of the song (0) when that bar is past the end of
+ * the song being built. With no `resumeAt` there is no resume (undefined):
+ * the build starts wherever a fresh system rests, as it always has.
  */
-export function resumeTick(resumeAt: number | undefined, songTicks: number): number | undefined {
+export function resumeTick(
+  resumeAt: number | undefined,
+  songTicks: number,
+  barTicks: number = TICKS_PER_BAR,
+): number | undefined {
   if (resumeAt === undefined) return undefined;
   if (!(resumeAt > 0)) return 0;
-  const bar = Math.floor(resumeAt / TICKS_PER_BAR) * TICKS_PER_BAR;
+  const bar = Math.floor(resumeAt / barTicks) * barTicks;
   return bar < songTicks ? bar : 0;
 }
 
@@ -275,7 +287,7 @@ export class EngineHost {
     this.latest = document;
     const generation = ++this.generation;
     const at = options.keepPendingResume ? this.transport.pendingResume : options.resumeAt;
-    const from = resumeTick(at, songTicksOf(document));
+    const from = resumeTick(at, songTicksOf(document), ticksPerBar(document.transport.meter));
     this.transport.buildPending(from);
     this.building = this.building
       .catch(() => undefined)

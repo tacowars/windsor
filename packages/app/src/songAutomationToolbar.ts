@@ -9,10 +9,11 @@
  * has focus. The audition keyboard plays on the Parts tab alone
  * (`keyboard.ts`'s `qwertyPlaysOn`), so a tool switch never sounds a note.
  */
+import { TICKS_PER_BAR } from '@windsor/engine';
 import { el } from './dom';
 import {
   AUTOMATION_TOOLS,
-  SNAP_CHOICES,
+  snapChoices,
   type AutomationTool,
   type AutomationToolEntry,
 } from './songAutomationTables';
@@ -52,12 +53,13 @@ export function syncAutomationTool(root: ParentNode, state: SongViewState): void
 /**
  * The toolbar's element; `root` is what `syncAutomationTool` updates when a
  * tool is picked, and `onPick` hears the pick (the Shape popover closes on
- * another tool, windsor#350).
+ * another tool, windsor#350). Snap's Bar is the song's bar, `barTicks` (windsor#430).
  */
 export function automationToolbar(
   state: SongViewState,
   root: () => ParentNode,
   onPick: () => void = () => undefined,
+  barTicks: number = TICKS_PER_BAR,
 ): HTMLElement {
   const bar = el('div', 'auto-toolbar');
   bar.setAttribute('role', 'toolbar');
@@ -81,7 +83,10 @@ export function automationToolbar(
   snap.className = 'field compact auto-snap';
   snap.name = 'automation-snap';
   snap.id = 'automation-snap';
-  for (const choice of SNAP_CHOICES) snap.add(new Option(choice.label, String(choice.ticks)));
+  const choices = snapChoices(barTicks);
+  // A grain no choice holds is the Bar of the meter the song had: it follows the song's bar.
+  if (!choices.some((c) => c.ticks === state.automationSnap)) state.automationSnap = barTicks;
+  for (const choice of choices) snap.add(new Option(choice.label, String(choice.ticks)));
   snap.value = String(state.automationSnap);
   snap.onchange = (): void => {
     state.automationSnap = Number(snap.value);

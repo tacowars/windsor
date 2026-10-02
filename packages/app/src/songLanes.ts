@@ -110,11 +110,12 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   const cycle = forKind(CYCLE_TICKS, pattern);
   const node = el('div', `reg${tone === 'perc' ? ' perc' : ''}${cycle ? ' cyc' : ''}`);
   const px = view.state.pxPerBar;
-  const box = blockBox(region.start, region.duration, px);
+  const bar = view.ticksPerBar();
+  const box = blockBox(region.start, region.duration, px, bar);
   node.style.left = `${box.leftPx}px`;
   node.style.width = `${box.widthPx}px`;
   node.classList.toggle('narrow', isNarrowBlock(box.widthPx));
-  if (cycle) node.style.setProperty('--cyc', `${tickToPx(cycle, px)}px`);
+  if (cycle) node.style.setProperty('--cyc', `${tickToPx(cycle, px, bar)}px`);
   const mark = regionMark(part.regions, view.songTicks());
   const glyph = el('span', 'gl', mark);
   glyph.title = mark === '∞' ? 'whole song: free-running' : 'restarts on entry';
@@ -133,18 +134,30 @@ type Gesture = { kind: 'add' } | { kind: RegionDrag; index: number; pressTick: n
 
 const HIT_GESTURE = { start: 'resizeStart', end: 'resizeEnd', body: 'move' } as const;
 
-const boxesOf = (regions: readonly Region[], pxPerBar: number): BlockBox[] =>
-  regions.map((r) => blockBox(r.start, r.duration, pxPerBar));
+/** The lane's scale: px per bar at the view's zoom, and the song's bar in ticks. */
+interface LaneScale {
+  readonly pxPerBar: number;
+  readonly bar: number;
+}
+
+const scaleOf = (view: SongView): LaneScale => ({
+  pxPerBar: view.state.pxPerBar,
+  bar: view.ticksPerBar(),
+});
+
+const boxesOf = (regions: readonly Region[], scale: LaneScale): BlockBox[] =>
+  regions.map((r) => blockBox(r.start, r.duration, scale.pxPerBar, scale.bar));
 
 /**
  * What a press `px` into the lane starts: a new region in a gap, or an edge
  * or body drag of the drawn block under it — classified on the drawn boxes
  * (`hitBlocks`), so a block widened to its minimum is hit where it shows.
  */
-function gestureAt(regions: readonly Region[], px: number, pxPerBar: number): Gesture {
-  const found = hitBlocks(boxesOf(regions, pxPerBar), px);
+function gestureAt(regions: readonly Region[], px: number, scale: LaneScale): Gesture {
+  const found = hitBlocks(boxesOf(regions, scale), px);
   if (!found || !regions[found.index]) return { kind: 'add' };
-  return { kind: HIT_GESTURE[found.hit], index: found.index, pressTick: pxToTick(px, pxPerBar) };
+  const pressTick = pxToTick(px, scale.pxPerBar, scale.bar);
+  return { kind: HIT_GESTURE[found.hit], index: found.index, pressTick };
 }
 
 /**
@@ -157,16 +170,17 @@ function gestureAt(regions: readonly Region[], px: number, pxPerBar: number): Ge
 function splitAt(
   part: MusicPart,
   px: number,
-  pxPerBar: number,
+  scale: LaneScale,
   modifier: boolean,
 ): { regions: PartRegion[]; index: number } | null {
-  const boxes = boxesOf(part.regions, pxPerBar);
+  const boxes = boxesOf(part.regions, scale);
   const found = hitBlocks(boxes, px);
   const region = found ? part.regions[found.index] : undefined;
   const box = found ? boxes[found.index] : undefined;
   if (!found || !region || !box) return null;
   const span = { startTick: region.start, durationTicks: region.duration };
-  const next = splitPartRegion(part, found.index, boxTick(box, px, span, pxPerBar), modifier);
+  const tick = boxTick(box, px, span, scale.pxPerBar, scale.bar);
+  const next = splitPartRegion(part, found.index, tick, modifier, scale.bar);
   return next ? { regions: next, index: found.index } : null;
 }
 
@@ -184,14 +198,15 @@ function paintRegions(
 
 function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   const pxAt = (e: PointerEvent): number => e.clientX - lane.getBoundingClientRect().left;
-  const tickAt = (e: PointerEvent): number => pxToTick(pxAt(e), view.state.pxPerBar);
+  const tickAt = (e: PointerEvent): number =>
+    pxToTick(pxAt(e), view.state.pxPerBar, view.ticksPerBar());
   const current = (): MusicPart =>
     view.ctx.model.doc.parts.find((p) => p.slot === part.slot) ?? part;
   let gesture: Gesture = { kind: 'add' };
   let draft: PartRegion[] | null = null;
   lane.addEventListener('pointerdown', (down) => {
     if (down.button !== 0 || !down.altKey) return;
-    const split = splitAt(current(), pxAt(down), view.state.pxPerBar, down.shiftKey);
+    const split = splitAt(current(), pxAt(down), scaleOf(view), down.shiftKey);
     if (!split) return;
     down.stopPropagation();
     if (view.commit({ parts: { [part.slot]: { regions: split.regions } } })) {
@@ -201,14 +216,14 @@ function wireLane(view: SongView, lane: HTMLElement, part: MusicPart): void {
   pointerDrag(lane, {
     accept: (e) => {
       if (e.altKey) return false;
-      gesture = gestureAt(current().regions, pxAt(e), view.state.pxPerBar);
+      gesture = gestureAt(current().regions, pxAt(e), scaleOf(view));
       draft = null;
       return true;
     },
     move: (e) => {
       if (gesture.kind === 'add') return;
       const live = current();
-      const grain = regionGrain(live, gesture.index, e.shiftKey);
+      const grain = regionGrain(live, gesture.index, e.shiftKey, view.ticksPerBar());
       const deltaTicks = tickAt(e) - gesture.pressTick;
       const drag = { kind: gesture.kind, index: gesture.index, deltaTicks };
       draft = dragRegion(live.regions, drag, view.songTicks(), grain);

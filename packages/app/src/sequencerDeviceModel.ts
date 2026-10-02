@@ -12,7 +12,7 @@
  * both halves the stale pattern (windsor#368 fix round 1).
  */
 import type { ArrangementDocument, PartRegion } from '@windsor/engine';
-import { TICKS_PER_BAR, partAt } from '@windsor/engine';
+import { TICKS_PER_BAR, partAt, ticksPerBar } from '@windsor/engine';
 import { splitPartRegion } from './partEdits';
 import { deleteRegion } from './regionModel';
 
@@ -39,13 +39,15 @@ export function regionBadge(selected: number | null, count: number): RegionBadge
   };
 }
 
-/** Whether Split can cut `region` in two at its middle bar: it must be two bars or longer. */
-export const canSplitRegion = (region: Pick<PartRegion, 'duration'> | null | undefined): boolean =>
-  region != null && region.duration >= 2 * TICKS_PER_BAR;
+/** Whether Split can cut `region` in two at its middle bar: it must be two `bar`s or longer. */
+export const canSplitRegion = (
+  region: Pick<PartRegion, 'duration'> | null | undefined,
+  bar: number = TICKS_PER_BAR,
+): boolean => region != null && region.duration >= 2 * bar;
 
 /**
  * Split on the rail: region `region` of the part on `slot`, as `doc` holds
- * it now, cut at its middle bar (the modifier-free grain is a bar, whatever
+ * it now, cut at its middle bar (the modifier-free grain is the song's bar, whatever
  * the region's own step), both halves holding its pattern. Null when the
  * part or the region is gone or is shorter than two bars.
  */
@@ -56,8 +58,9 @@ export function splitRegionAtMiddle(
 ): PartRegion[] | null {
   const part = partAt(doc, slot);
   const target = part?.regions[region];
-  if (!part || !target || !canSplitRegion(target)) return null;
-  return splitPartRegion(part, region, target.start + target.duration / 2, false);
+  const bar = ticksPerBar(doc.transport.meter);
+  if (!part || !target || !canSplitRegion(target, bar)) return null;
+  return splitPartRegion(part, region, target.start + target.duration / 2, false, bar);
 }
 
 /** Delete on the rail: the part's regions as `doc` holds them now, less region `region`; null when it is gone. */

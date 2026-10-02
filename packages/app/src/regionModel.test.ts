@@ -3,7 +3,8 @@
  * bar, resize into a neighbour and past the song, move, split, delete, the
  * ∞ / ⟲ mark, the modifier snap per kind, and a song-length change carrying
  * the whole-song regions and the timeline along (decision 4). Every
- * expectation is an expression of the engine's tick constants.
+ * expectation is an expression of the engine's tick constants. A 7/8 song
+ * snaps and draws on its 84-tick bar (windsor#430).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -15,8 +16,10 @@ import {
   PPQ,
   TICKS_PER_BAR,
   partAt,
+  ticksPerBar,
 } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
+import { drawRegionChange } from './partEdits';
 import {
   addRegion,
   deleteRegion,
@@ -38,11 +41,21 @@ import { barsChange } from './transportModel';
 
 const BAR = TICKS_PER_BAR;
 const SONG = 4 * BAR;
+/** One bar of 7/8: 84 ticks. */
+const SEVEN = ticksPerBar('7/8');
 const region = (start: number, duration: number): Region => ({ start, duration });
 
 describe('regions on a lane', () => {
   it('adds a bar-snapped region on an empty lane at bar 3', () => {
     expect(addRegion([], 2 * BAR + PPQ, SONG)).toEqual([region(2 * BAR, BAR)]);
+  });
+
+  it("draws a 7/8 song's region on its 84-tick bar, a bar long", () => {
+    expect(SEVEN).toBe(84);
+    const model = new DocumentModel(newSong('7/8'));
+    model.merge({ parts: { 0: { regions: [] } } });
+    const drawn = drawRegionChange(model.doc, 0, 2 * SEVEN + PPQ, (raw) => model.preview(raw));
+    expect(drawn?.regions).toEqual([region(2 * SEVEN, SEVEN)]);
   });
 
   it('adds nothing inside a region, past the song, or in a gap with no room', () => {
@@ -105,9 +118,18 @@ describe('regions on a lane', () => {
 describe('the snap grain', () => {
   const grid7 = { ...DEFAULT_GRID_CONFIG, kind: 'grid' as const, length: 7 };
 
-  it('is a bar without the modifier, whatever the kind', () => {
+  it("is a bar without the modifier, whatever the kind: the song's bar", () => {
     expect(snapGrain(grid7, false)).toBe(TICKS_PER_BAR);
     expect(snapGrain(undefined, false)).toBe(TICKS_PER_BAR);
+    expect(snapGrain(grid7, false, SEVEN)).toBe(SEVEN);
+    const lane = [region(0, SEVEN), region(2 * SEVEN, SEVEN)];
+    const moved = dragRegion(
+      lane,
+      { kind: 'move', index: 1, deltaTicks: 0.6 * SEVEN },
+      8 * SEVEN,
+      SEVEN,
+    );
+    expect(moved[1]).toEqual(region(3 * SEVEN, SEVEN));
   });
 
   it('puts an edge of a 7-step 1/16 grid on a step: 42 ticks', () => {

@@ -94,7 +94,7 @@ function railRegion(view: SongView, part: MusicPart, region: number | null): Rai
     write(splitRegionAtMiddle(view.ctx.model.doc, slot, region), region + 1);
   return {
     badge,
-    split: canSplitRegion(target) ? split : null,
+    split: canSplitRegion(target, view.ticksPerBar()) ? split : null,
     remove: () => write(removeRegionAt(view.ctx.model.doc, slot, region), null),
   };
 }

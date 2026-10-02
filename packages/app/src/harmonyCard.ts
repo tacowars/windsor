@@ -17,7 +17,7 @@ import {
   CHORD_SIZE_TRIAD,
   PPQ,
   QUALITY_LABELS,
-  TICKS_PER_BAR,
+  meterBeats,
 } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el, html, seg, select } from './dom';
@@ -30,8 +30,10 @@ import {
 import { HARMONY_AUDITION_VELOCITY } from './harmonyAuditionTables';
 import { HARMONY_CARD_PX } from './harmonyCardTables';
 import {
+  type Beats,
   chipDegree,
   degreeChips,
+  dialBeat,
   durationLabel,
   eventLabel,
   maxEventDuration,
@@ -243,29 +245,32 @@ function plays(view: SongView, index: number, bubble: InfoBubble): HTMLElement {
 }
 
 /**
- * The Duration dial: a bar per step, a beat with Shift. The grain is the
- * knob's own `step`, read live off the modifier the gesture started with, so
- * the knob quantizes from its press origin (a drag never reverses) and a
- * keyboard nudge moves one grain. The last event holds to the song end and
- * has no dial.
+ * The Duration dial: a bar per step, a beat with Shift — the song's bar and
+ * its counted beats (windsor#430), so 6/8 steps by dotted quarters and 7/8
+ * lands on 2 + 2 + 3 (`dialBeat`). The grain is the knob's own `step`, read
+ * live off the modifier the gesture started with, so the knob quantizes
+ * from its press origin (a drag never reverses) and a keyboard nudge moves
+ * one grain. The last event holds to the song end and has no dial.
  */
 function durationDial(view: SongView, index: number): HTMLElement {
   const events = (): readonly { duration: number }[] => view.ctx.model.doc.harmony.events;
+  const beats = (): Beats => meterBeats(view.ctx.model.doc.transport.meter);
   let fine = false;
   const knob = makeKnob({
     label: 'Duration',
-    min: PPQ,
+    min: Math.min(...beats()),
     max: maxEventDuration(view.ctx.model.doc.harmony.events, index, view.songTicks()),
-    def: TICKS_PER_BAR,
+    def: view.ticksPerBar(),
     get step(): number {
-      return fine ? PPQ : TICKS_PER_BAR;
+      return fine ? Math.min(...beats()) : view.ticksPerBar();
     },
-    fmt: durationLabel,
+    fmt: (v) => durationLabel(v, beats()),
     color: PITCH_COLOR,
     get: () => events()[index]?.duration ?? 0,
     set: (v) => {
-      const next = Math.max(PPQ, v);
-      if (next === (events()[index]?.duration ?? 0)) return;
+      const current = events()[index]?.duration ?? 0;
+      const next = Math.max(PPQ, fine ? dialBeat(v, current, beats()) : v);
+      if (next === current) return;
       const list = view.ctx.model.doc.harmony.events;
       view.commit({ harmony: { events: setEventDuration(list, index, next, view.songTicks()) } });
     },
@@ -327,7 +332,8 @@ function bottomRow(view: SongView, index: number, bubble: InfoBubble): HTMLEleme
   const event = doc.harmony.events[index];
   if (index < doc.harmony.events.length - 1) row.appendChild(durationDial(view, index));
   else if (event) {
-    row.appendChild(el('span', 'hint', `holds to the song end · ${durationLabel(event.duration)}`));
+    const held = durationLabel(event.duration, meterBeats(doc.transport.meter));
+    row.appendChild(el('span', 'hint', `holds to the song end · ${held}`));
   }
   const remove = el('button', 'btn push', 'Delete') as HTMLButtonElement;
   remove.type = 'button';

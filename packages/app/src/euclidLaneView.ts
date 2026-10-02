@@ -75,14 +75,19 @@ export function laneHead(at: RegionStep | null, layout: LaneLayout): number {
 const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
 const lcm = (a: number, b: number): number => (a / gcd(a, b)) * b;
 
-/** The full cycle: the least common multiple of the trigger's steps and every lane's length, in steps and bars. */
+/**
+ * The full cycle: the least common multiple of the trigger's steps and every
+ * lane's length, in steps and in bars of `bar` ticks (the song's meter's,
+ * windsor#430).
+ */
 export function fullCycle(
   steps: number,
   lengths: readonly number[],
   divisor: number,
+  bar: number = TICKS_PER_BAR,
 ): { steps: number; bars: number } {
   const cycle = lengths.reduce((acc, n) => (n > 0 ? lcm(acc, n) : acc), Math.max(1, steps));
-  return { steps: cycle, bars: (cycle * divisor) / TICKS_PER_BAR };
+  return { steps: cycle, bars: (cycle * divisor) / bar };
 }
 
 /** The cycle's line: `Rows line up every 35 bars (560 steps)`. */

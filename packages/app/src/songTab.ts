@@ -26,7 +26,7 @@
  * windsor#350), whose popover lives for one render.
  */
 import type { DocumentPartial } from '@windsor/engine';
-import { regionPattern, songTicksOf } from '@windsor/engine';
+import { regionPattern, songTicksOf, ticksPerBar } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { loopBraceRow } from './loopBrace';
@@ -128,6 +128,8 @@ export interface SongView {
   /** The Shape tool's range and popover (windsor#350), for this render. */
   readonly shape: ShapeTool;
   songTicks(): number;
+  /** One bar of the song's meter, in ticks (windsor#430): what a bar's px on the ruler and in every lane hold. */
+  ticksPerBar(): number;
   /**
    * Write a partial live and, when it took, mark the other tabs stale and
    * repaint the lanes — and the pane when `pane` is set. False when refused.
@@ -217,6 +219,7 @@ function renderSongView(
     state,
     () => body,
     () => shape.toolChanged(),
+    ticksPerBar(ctx.model.doc.transport.meter),
   );
   scroll.appendChild(lanes);
   body.appendChild(toolbar);
@@ -259,6 +262,7 @@ function renderSongView(
     state,
     shape,
     songTicks: () => songTicksOf(ctx.model.doc),
+    ticksPerBar: () => ticksPerBar(ctx.model.doc.transport.meter),
     commit(partial, paintPane = false) {
       if (!ctx.change(partial).ok) return false;
       ctx.invalidate();
@@ -328,6 +332,7 @@ function renderSongView(
     pxPerBar: () => state.pxPerBar,
     bars: () => ctx.model.doc.transport.bars,
     songTicks: view.songTicks,
+    ticksPerBar: view.ticksPerBar,
     onTick,
   });
   watchSongPlayhead({
@@ -335,6 +340,7 @@ function renderSongView(
     lanes,
     line,
     songTicks: view.songTicks,
+    ticksPerBar: view.ticksPerBar,
     onTick,
     drag,
     repaintIf: () => {
