@@ -34,7 +34,11 @@ import type {
   ParsedTarget,
   VoiceTargetId,
 } from './automationLane';
-import { STRIP_AUTOMATION_ROWS, voiceRowLook } from './automationTargetTables';
+import {
+  STRIP_AUTOMATION_ROWS,
+  voiceRowOf,
+  type VoiceAutomationRow,
+} from './automationTargetTables';
 
 const STRIP_PREFIX = 'strip.';
 const INSERT_PREFIX = 'insert.';
@@ -55,10 +59,11 @@ export function voicePathOf(id: string): string | undefined {
  * The voice's 30 rows (decision 2, windsor#406), one per row of the voice
  * target table and in its order (windsor#419): the filter's four and the
  * Formant vowel, each operator's five, LFO 1 and LFO 2 amount and rate, and
- * the pitch-envelope amount.
+ * the pitch-envelope amount. Each carries its patch path and its section
+ * (windsor#436).
  */
-export const VOICE_AUTOMATION_ROWS: readonly AutomationTargetRow[] = VOICE_TARGET_TABLE.map(
-  (row) => ({ target: voiceTargetId(row.path), ...voiceRowLook(row) }),
+export const VOICE_AUTOMATION_ROWS: readonly VoiceAutomationRow[] = VOICE_TARGET_TABLE.map(
+  (row, code) => ({ target: voiceTargetId(row.path), ...voiceRowOf(row, code) }),
 );
 
 const byTarget = (rows: readonly AutomationTargetRow[]): ReadonlyMap<string, AutomationTargetRow> =>
@@ -92,7 +97,7 @@ export const STRIP_TARGET_IDS: readonly AutomationTargetId[] = STRIP_AUTOMATION_
 
 /** Every voice target id, in the catalog's order. */
 export const VOICE_TARGET_IDS: readonly AutomationTargetId[] = VOICE_AUTOMATION_ROWS.map(
-  (row) => row.target as AutomationTargetId,
+  (row) => row.target,
 );
 
 /** Which family a target belongs to, by its prefix. */

@@ -142,8 +142,11 @@ describe("a lane's name (windsor#424)", () => {
 
   it('fits the narrow lane header', () => {
     expect(laneLabel('filter.envAmount')).toBe('Filt Env Amt');
-    expect(laneLabel('ops.2.env.decayCurve')).toBe('Op C Decay Crv');
-    expect(laneLabel('pitchEnvAmount')).toBe('Pitch Env Amt');
+    expect(laneLabel('ops.2.env.decayCurve')).toBe('Op C Dcy Crv');
+    expect(laneLabel('ops.0.feedback')).toBe('Op A Fdbk');
+    expect(laneLabel('lfo.amount')).toBe('LFO 1 Amt');
+    expect(laneLabel('lfo2.amount')).toBe('LFO 2 Amt');
+    expect(laneLabel('pitchEnvAmount')).toBe('Pitch Env');
   });
 });
 

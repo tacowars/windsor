@@ -5,18 +5,20 @@
  * never a default: `patchKnobOpts` reads that from `makePatch()` at the path,
  * so a schema-default change in `patch.ts` moves double-click reset with it.
  * `knobDefaults.test.ts` walks `allPatchKnobs()`.
+ *
+ * A knob over a voice target states no range of its own: it spreads
+ * `voiceKnobRange(path)`, the target's catalog row (windsor#436, record
+ * `2026-10-02-knob-ranges-from-the-catalog`), and adds only its step and
+ * readout. An entry that serves every operator or every envelope slot takes
+ * operator A's row: the target table builds each operator's rows from one,
+ * and `patchKnobRange.test.ts` holds every knob to its own path's row and
+ * pins every range.
  */
-import {
-  NOISE_COLOUR_FLOOR_HZ,
-  NOISE_COLOUR_RANGE,
-  OP_NAMES,
-  VOWEL_RANGE,
-  WIDTH_RANGE,
-  makePatch,
-} from '@windsor/engine';
+import { NOISE_COLOUR_FLOOR_HZ, NOISE_COLOUR_RANGE, OP_NAMES, makePatch } from '@windsor/engine';
 import { fmt2, fmtCycleDegrees, fmtHz, fmtMs, fmtSigned, fmtVowel } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';
+import { voiceKnobRange } from './patchKnobRange';
 import { getPath } from './patchPath';
 
 /** A table entry's options: the range and readout. The default is not the table's to state. */
@@ -75,11 +77,15 @@ export const DRIVE_KNOBS: PatchKnobTable = [
 ];
 
 export const FILTER_KNOBS: PatchKnobTable = [
-  { f: 'filter.cutoff', label: 'Cutoff', o: { min: 30, max: 18000, curve: 'log', fmt: fmtHz } },
-  { f: 'filter.resonance', label: 'Reso', o: { min: 0.5, max: 12, curve: 'log', fmt: fmt2 } },
+  { f: 'filter.cutoff', label: 'Cutoff', o: { ...voiceKnobRange('filter.cutoff'), fmt: fmtHz } },
+  { f: 'filter.resonance', label: 'Reso', o: { ...voiceKnobRange('filter.resonance'), fmt: fmt2 } },
   // The Formant mode's vowel (windsor#334); `buildFilter` shows it in that mode only.
-  { f: 'filter.vowel', label: 'Vowel', o: { ...VOWEL_RANGE, fmt: fmtVowel } },
-  { f: 'filter.envAmount', label: 'Env Amt', o: { min: -6, max: 6, fmt: fmtSigned } },
+  { f: 'filter.vowel', label: 'Vowel', o: { ...voiceKnobRange('filter.vowel'), fmt: fmtVowel } },
+  {
+    f: 'filter.envAmount',
+    label: 'Env Amt',
+    o: { ...voiceKnobRange('filter.envAmount'), fmt: fmtSigned },
+  },
   { f: 'filter.modWheelDepth', label: 'Wheel', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.lfoAmount', label: 'LFO Amt', o: { min: -4, max: 4, fmt: fmtSigned } },
   { f: 'filter.lfo2Amount', label: 'LFO 2 Amt', o: { min: -4, max: 4, fmt: fmtSigned } },
@@ -92,8 +98,8 @@ export const LFO_KEYS: readonly LfoKey[] = ['lfo', 'lfo2'];
 
 /** An LFO's own knobs: rate, depth, the wheel, the fade-in and the pitch depth. */
 export const lfoKnobs = (key: LfoKey): PatchKnobTable => [
-  { f: `${key}.rate`, label: 'Rate', o: { min: 0.02, max: 40, curve: 'log', fmt: fmtHzRate } },
-  { f: `${key}.amount`, label: 'Amount', o: { min: 0, max: 1, fmt: fmt2 } },
+  { f: `${key}.rate`, label: 'Rate', o: { ...voiceKnobRange(`${key}.rate`), fmt: fmtHzRate } },
+  { f: `${key}.amount`, label: 'Amount', o: { ...voiceKnobRange(`${key}.amount`), fmt: fmt2 } },
   { f: `${key}.modWheelDepth`, label: 'Wheel', o: { min: 0, max: 1, fmt: fmt2 } },
   { f: `${key}.delay`, label: 'Fade In', o: { min: 0, max: 6, curve: 'log', fmt: fmtMs } },
   { f: `${key}.toPitch`, label: 'To Pitch', o: { min: 0, max: 12, fmt: fmtSemitones } },
@@ -118,7 +124,7 @@ export const lfoToWidthKnobs = (key: LfoKey): PatchKnobTable =>
 export const PITCH_ENV_AMOUNT_KNOB: PatchKnobEntry = {
   f: 'pitchEnvAmount',
   label: 'Amount',
-  o: { min: -48, max: 48, step: 0.5, fmt: fmtSignedSemitones },
+  o: { ...voiceKnobRange('pitchEnvAmount'), step: 0.5, fmt: fmtSignedSemitones },
 };
 
 /**
@@ -147,13 +153,9 @@ export const OP_PHASE_KNOB: PatchKnobEntry = {
 /** Per-operator knobs, by sub-field of `ops.<i>`; `level` gets the bay-fade hook. */
 export const OP_KNOBS: PatchKnobTable = [
   { f: 'detune', label: 'Detune', o: { min: -100, max: 100, step: 1, fmt: fmtCents } },
-  { f: 'level', label: 'Level', o: { min: 0, max: 1, fmt: fmt2 } },
-  { f: 'feedback', label: 'Fdbk', o: { min: -1, max: 1, fmt: fmtSigned } },
-  {
-    f: 'width',
-    label: 'Width',
-    o: { min: WIDTH_RANGE.min, max: WIDTH_RANGE.max, fmt: fmtPercent },
-  },
+  { f: 'level', label: 'Level', o: { ...voiceKnobRange('ops.0.level'), fmt: fmt2 } },
+  { f: 'feedback', label: 'Fdbk', o: { ...voiceKnobRange('ops.0.feedback'), fmt: fmtSigned } },
+  { f: 'width', label: 'Width', o: { ...voiceKnobRange('ops.0.width'), fmt: fmtPercent } },
   { f: 'velSens', label: 'Vel', o: { min: 0, max: 1, fmt: fmt2 } },
 ];
 
@@ -181,7 +183,10 @@ export const NOISE_COLOUR_KNOBS: PatchKnobTable = [
  * The envelope row, by sub-field of any of the six envelope slots. Since
  * windsor#316 a stage ends on its own sample, so an attack or a decay of 0
  * is a sound (a hit that opens on a step): the bottom of each sweep is exact
- * 0, and the log sweep above it starts where it always did.
+ * 0, and the log sweep above it starts where it always did. Decay is a voice
+ * target on the operators' and the filter's envelopes, so the row's Decay is
+ * the catalog's, the pitch envelope's included; the advanced row's D Crv is
+ * the operators' decay-curve target's the same way.
  */
 export const ENVELOPE_KNOBS: PatchKnobTable = [
   {
@@ -189,11 +194,7 @@ export const ENVELOPE_KNOBS: PatchKnobTable = [
     label: 'Attack',
     o: { min: 0, max: 12, curve: 'log', logFloor: 0.0005, fmt: fmtMs },
   },
-  {
-    f: 'decayTime',
-    label: 'Decay',
-    o: { min: 0, max: 20, curve: 'log', logFloor: 0.001, fmt: fmtMs },
-  },
+  { f: 'decayTime', label: 'Decay', o: { ...voiceKnobRange('ops.0.env.decayTime'), fmt: fmtMs } },
   { f: 'sustainLevel', label: 'Sustain', o: { min: 0, max: 1, fmt: fmt2 } },
   { f: 'releaseTime', label: 'Release', o: { min: 0.001, max: 20, curve: 'log', fmt: fmtMs } },
 ];
@@ -204,7 +205,11 @@ export const ENVELOPE_ADV_KNOBS: PatchKnobTable = [
   { f: 'peakLevel', label: 'Peak', o: { min: 0, max: 1, fmt: fmt2 } },
   { f: 'endLevel', label: 'End', o: { min: 0, max: 1, fmt: fmt2 } },
   { f: 'attackCurve', label: 'A Crv', o: { min: -1, max: 1, fmt: fmtSigned } },
-  { f: 'decayCurve', label: 'D Crv', o: { min: -1, max: 1, fmt: fmtSigned } },
+  {
+    f: 'decayCurve',
+    label: 'D Crv',
+    o: { ...voiceKnobRange('ops.0.env.decayCurve'), fmt: fmtSigned },
+  },
   { f: 'releaseCurve', label: 'R Crv', o: { min: -1, max: 1, fmt: fmtSigned } },
   { f: 'keyScale', label: 'Key', o: { min: -1, max: 1, fmt: fmtSigned } },
 ];
