@@ -1,0 +1,311 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windsor Harmony Card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* The Song tab's harmony card: today's controls, plus Accidental, Quality (windsor#332) and an audition button. Single theme on purpose: Windsor's dark console tokens. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--f-ui); font-size: 13px; -webkit-font-smoothing: antialiased; }
+button, select { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+
+.wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+.lede h1 { font-family: var(--f-panel); font-size: 18px; font-weight: 600; letter-spacing: 0.02em; margin: 0 0 6px; }
+.lede p { color: var(--ink-dim); margin: 0 0 20px; max-width: 70ch; line-height: 1.5; }
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; align-items: start; }
+.cap { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 8px; }
+.new-tag { font-family: var(--f-num); font-size: 9px; color: var(--carrier); border: 1px solid color-mix(in srgb, var(--carrier) 50%, transparent); border-radius: 2px; padding: 0 3px; margin-left: 4px; letter-spacing: 0; vertical-align: 1px; text-transform: none; }
+
+/* The pane as today: a head line, then the card. */
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px 12px; max-width: 520px; }
+.pane-head { font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 10px; }
+.pane-head small { font-family: var(--f-num); font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ink-faint); margin-left: 6px; }
+
+.field-label { font-family: var(--f-panel); font-size: 9px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 3px; }
+.degrees { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; max-width: 480px; }
+.dchip { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 4px 0 3px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font-family: var(--f-panel); cursor: pointer; }
+.dchip b { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+.dchip small { font-family: var(--f-num); font-size: 8.5px; color: var(--ink-faint); }
+.dchip:hover { background: var(--panel-hi); color: var(--ink); }
+.dchip[aria-pressed='true'] { background: var(--modulator); border-color: var(--modulator); color: #111416; }
+.dchip[aria-pressed='true'] small { color: #111416; }
+
+.bar-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.bar-row.center { align-items: center; }
+.seg { display: flex; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { flex: 1; min-width: 44px; background: var(--inset); border: 0; padding: 5px 4px; cursor: pointer; font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-dim); }
+.seg button:hover { background: var(--panel-hi); color: var(--ink); }
+.seg button[aria-pressed='true'] { background: var(--modulator); color: #111416; }
+.seg.acc button { min-width: 28px; font-size: 12px; letter-spacing: 0; text-transform: none; padding: 3px 4px; }
+select.field { appearance: none; height: 24px; min-width: 116px; padding: 0 18px 0 7px; background: var(--inset) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='4'%3E%3Cpath d='M0 0h6L3 4z' fill='%235e6b70'/%3E%3C/svg%3E") no-repeat right 7px center; border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink); font-size: 12px; cursor: pointer; }
+.btn { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 12px; cursor: pointer; color: var(--ink-dim); font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.btn:hover { background: var(--panel-hi); color: var(--ink); border-color: var(--line-bright); }
+.hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.5; margin: 0; }
+.push { margin-left: auto; }
+
+/* A play button over each degree chip: hold to hear that degree's chord, so a progression can be tried by pressing along the row. */
+.plays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; max-width: 480px; margin-bottom: 2px; }
+.play { display: flex; align-items: center; justify-content: center; height: 20px; padding: 0; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); cursor: pointer; user-select: none; touch-action: none; }
+.play svg { fill: var(--ink-faint); }
+.play:hover { background: var(--panel-hi); border-color: var(--line-bright); }
+.play:hover svg { fill: var(--modulator); }
+.play.on { background: var(--modulator); border-color: var(--modulator); }
+.play.on svg { fill: #111416; }
+
+/* The info bubble: the selected block's chord, or the one sounding while a play button is held. Read only. */
+.info { display: inline-flex; align-items: baseline; gap: 8px; min-width: 150px; padding: 4px 12px; background: var(--panel-hi); border: 1px solid var(--line); border-radius: 12px; color: var(--ink); }
+.info b { font-family: var(--f-panel); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+.info small { font-family: var(--f-num); font-size: 10px; color: var(--ink-dim); }
+.info.sounding { border-color: var(--modulator); }
+.info.sounding b::before { content: '♪ '; color: var(--modulator); }
+
+.notes { margin-top: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.notes h3 { font-family: var(--f-panel); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 8px; }
+.notes ul { margin: 0; padding-left: 18px; color: var(--ink-dim); line-height: 1.55; }
+.notes li { margin-bottom: 6px; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes code { font-family: var(--f-num); font-size: 11.5px; color: var(--ink); }
+.stand-in { color: var(--carrier); }
+@media (max-width: 560px) { .pane { padding: 10px; } .info { min-width: 0; } }
+</style>
+
+<div class="wrap">
+  <div class="lede">
+    <h1>Windsor harmony card</h1>
+    <p>Today's card on the left; the same card with windsor#332's two fields and a play button over each degree on the right. Hold any ▶ to hear that degree's chord; press along the row to try a progression. Pick a degree, then ♭/♯ or a Quality, and its ▶ plays the result. <span class="stand-in">The mockup's sound is a simple stand-in pad; the app plays a soft FM pad.</span></p>
+  </div>
+
+  <div class="compare">
+    <div>
+      <p class="cap">Today</p>
+      <div class="pane">
+        <p class="pane-head">Harmony — Bar 1<small>chord 1</small></p>
+        <span class="field-label">Degree</span>
+        <div class="degrees" id="old-chips"></div>
+        <div class="bar-row center">
+          <div><span class="field-label">Size</span>
+            <div class="seg"><button aria-pressed="true">Triad</button><button>Seventh</button></div></div>
+          <span class="hint">holds to the song end · 4 bars</span>
+          <button class="btn">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="cap">Proposed</p>
+      <div class="pane">
+        <p class="pane-head">Harmony — Bar 1<small>chord 1</small></p>
+        <span class="field-label">Degree</span>
+        <div class="plays" id="plays"></div>
+        <div class="degrees" id="chips"></div>
+        <div class="bar-row">
+          <div><span class="field-label">Accidental<span class="new-tag">#332</span></span>
+            <div class="seg acc" id="acc"></div></div>
+          <div><span class="field-label">Size</span>
+            <div class="seg" id="size"></div></div>
+          <div><span class="field-label">Quality<span class="new-tag">#332</span></span>
+            <select class="field" id="quality"></select></div>
+        </div>
+        <div class="bar-row center">
+          <span class="info" id="info" title="The selected block's chord, or the one sounding"><b id="info-name">C min</b><small id="info-sub">i · triad</small></span>
+          <span class="hint">holds to the song end · 4 bars</span>
+          <button class="btn push">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="notes">
+    <div>
+      <h3>What changes</h3>
+      <ul>
+        <li><b>Accidental</b> (♭ ♮ ♯) moves the whole chord a semitone. ♮ is today's chord.</li>
+        <li><b>Quality</b> is <code>Scale's own</code> (today) or one of the twelve named qualities. Picking one sets Size to match; pressing Triad or Seventh goes back to the scale's own chord.</li>
+        <li><b>The degree chips</b> still show the scale's own chords. The pressed chip stays the degree when ♭/♯ or a quality is set.</li>
+        <li><b>Delete</b> moves to the bottom row's right end, away from the info bubble.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Play buttons and the info bubble<span class="new-tag">new</span></h3>
+      <ul>
+        <li><b>Hold a ▶</b> to hear its degree's chord; it stops on release. It doesn't select the degree or change the song, so you can press along the row to try a progression.</li>
+        <li><b>Which chord:</b> the selected degree's ▶ plays the block as written, ♭/♯ and quality included. The others play the scale's own chord at the current Size.</li>
+        <li><b>The info bubble</b> names the selected block's chord (<code>G# maj</code>, <code>♭VI · triad</code>). While you hold a ▶ it names the chord sounding instead.</li>
+        <li><b>The voice</b> is one fixed soft FM pad from the library on the unused <code>audition</code> aux strip. It skips the song master and the song's mixer, so mute, solo and the faders never touch it.</li>
+        <li><b>The voicing</b> is close, around middle C, with the root an octave below, so the quality is easy to hear whatever the song's parts do.</li>
+        <li>It plays with the transport stopped or running.</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const SCALE = [0, 2, 3, 5, 7, 8, 10]; // C natural minor, as in today's screenshot
+  const QUALITIES = {
+    maj: [4, 7], min: [3, 7], dim: [3, 6], aug: [4, 8],
+    maj7: [4, 7, 11], '7': [4, 7, 10], min7: [3, 7, 10], mMaj7: [3, 7, 11],
+    m7b5: [3, 6, 10], dim7: [3, 6, 9], augMaj7: [4, 8, 11], aug7: [4, 8, 10],
+  };
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+  const state = { degree: 0, size: 3, quality: '', acc: 0 };
+
+  const tone = (d) => SCALE[d % 7] + 12 * Math.floor(d / 7);
+  function diatonic(d, size) {
+    const out = [tone(d), tone(d + 2), tone(d + 4)];
+    if (size === 4) out.push(tone(d + 6));
+    return out;
+  }
+  function stack() {
+    const root = tone(state.degree);
+    const base = state.quality ? [root, ...QUALITIES[state.quality].map((i) => root + i)] : diatonic(state.degree, state.size);
+    return base.map((t) => t + state.acc);
+  }
+  function qualityOf(s) {
+    const iv = s.slice(1).map((t) => t - s[0]).join(',');
+    for (const [q, ints] of Object.entries(QUALITIES)) if (ints.join(',') === iv) return q;
+    return '?';
+  }
+  function numeral(d, q, acc) {
+    const minorish = /^(min|dim|m7b5|mMaj7)/.test(q);
+    let n = ROMAN[d];
+    if (minorish) n = n.toLowerCase();
+    if (q === 'dim' || q === 'dim7') n += '°';
+    if (q === 'm7b5') n += 'ø';
+    if (q.startsWith('aug')) n += '+';
+    return (acc < 0 ? '♭' : acc > 0 ? '♯' : '') + n;
+  }
+  const nameOf = (s) => `${NAMES[((s[0] % 12) + 12) % 12]} ${qualityOf(s)}`;
+
+  function chips(host, live) {
+    host.innerHTML = '';
+    for (let d = 0; d < 7; d++) {
+      const s = diatonic(d, live ? state.size : 3);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dchip';
+      b.setAttribute('aria-pressed', String(d === (live ? state.degree : 0)));
+      b.innerHTML = `<b>${numeral(d, qualityOf(s), 0)}</b><small>${NAMES[s[0] % 12]}</small>`;
+      if (live) b.onclick = () => { state.degree = d; render(); };
+      host.appendChild(b);
+    }
+  }
+  function seg(host, options, current, write) {
+    host.innerHTML = '';
+    for (const [value, label] of options) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.setAttribute('aria-pressed', String(value === current));
+      b.onclick = () => { write(value); render(); };
+      host.appendChild(b);
+    }
+  }
+  const quality = document.getElementById('quality');
+  quality.innerHTML = `<option value="">Scale's own</option>` + Object.keys(QUALITIES).map((q) => `<option value="${q}">${q}</option>`).join('');
+  quality.onchange = () => {
+    state.quality = quality.value;
+    if (state.quality) state.size = QUALITIES[state.quality].length + 1;
+    render();
+  };
+
+  function render() {
+    chips(document.getElementById('chips'), true);
+    seg(document.getElementById('acc'), [[-1, '♭'], [0, '♮'], [1, '♯']], state.acc, (v) => { state.acc = v; });
+    seg(document.getElementById('size'), [[3, 'Triad'], [4, 'Seventh']], state.size, (v) => { state.size = v; state.quality = ''; });
+    quality.value = state.quality;
+    const s = stack();
+    plays();
+    if (!sounding) showInfo(s, state.degree, state.acc, false);
+  }
+  chips(document.getElementById('old-chips'), false);
+
+  function showInfo(s, degree, acc, live) {
+    document.getElementById('info-name').textContent = nameOf(s);
+    document.getElementById('info-sub').textContent = `${numeral(degree, qualityOf(s), acc)} · ${s.length === 4 ? 'seventh' : 'triad'}`;
+    document.getElementById('info').classList.toggle('sounding', live);
+  }
+  // What a degree's play button sounds: the selected block as written, any other degree as the scale's own chord.
+  const chordFor = (d) => (d === state.degree ? { s: stack(), acc: state.acc } : { s: diatonic(d, state.size), acc: 0 });
+
+  // Stand-in audition: a soft triangle pad, close voiced from C4 with the root an octave down.
+  let ctx = null, voices = null, sounding = null;
+  function start(e, d, btn) {
+    if (e.button !== undefined && e.button !== 0) return;
+    stop();
+    try { ctx = ctx || new AudioContext(); } catch (_) { return; }
+    const { s, acc } = chordFor(d);
+    const midi = [60 + s[0] - 12, ...s.map((t) => 60 + t)];
+    const t0 = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(0.16 / Math.sqrt(midi.length), t0 + 0.12);
+    out.connect(ctx.destination);
+    const oscs = midi.map((m) => {
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = 440 * Math.pow(2, (m - 69) / 12);
+      o.connect(out);
+      o.start(t0);
+      return o;
+    });
+    voices = { out, oscs };
+    sounding = btn;
+    btn.classList.add('on');
+    showInfo(s, d, acc, true);
+    if (btn.setPointerCapture && e.pointerId !== undefined) btn.setPointerCapture(e.pointerId);
+  }
+  function stop() {
+    if (sounding) sounding.classList.remove('on');
+    sounding = null;
+    showInfo(stack(), state.degree, state.acc, false);
+    if (!voices || !ctx) return;
+    const t = ctx.currentTime;
+    voices.out.gain.cancelScheduledValues(t);
+    voices.out.gain.setValueAtTime(voices.out.gain.value, t);
+    voices.out.gain.linearRampToValueAtTime(0, t + 0.4);
+    for (const o of voices.oscs) o.stop(t + 0.45);
+    voices = null;
+  }
+  function plays() {
+    const host = document.getElementById('plays');
+    if (host.childElementCount) return;
+    for (let d = 0; d < 7; d++) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'play';
+      b.title = `Hold to hear ${ROMAN[d]}'s chord`;
+      b.setAttribute('aria-label', `Play degree ${d + 1}`);
+      b.innerHTML = '<svg width="8" height="10" viewBox="0 0 8 10" aria-hidden="true"><path d="M0 0l8 5-8 5z"/></svg>';
+      b.addEventListener('pointerdown', (e) => start(e, d, b));
+      b.addEventListener('pointerup', stop);
+      b.addEventListener('pointercancel', stop);
+      b.addEventListener('keydown', (e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); start(e, d, b); } });
+      b.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') stop(); });
+      host.appendChild(b);
+    }
+  }
+  render();
+})();
+</script>

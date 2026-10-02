@@ -53,10 +53,13 @@ export const EUCLID_RULE_PX = 18;
 export const euclidHeadPx = (gap = EUCLID_ROW_GAP_PX): number =>
   EUCLID_ROW_PX.ratchet + EUCLID_ROW_PX.trigger + EUCLID_RULE_PX + 3 * gap;
 
+/** A converted device's height (the insert rack's `--rack-h` is 196); the harmony card matches it. */
+export const SEQUENCER_DEVICE_H_PX = 244;
+
 /** Custom property → px. */
 export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
-  /** A converted device's height (the insert rack's `--rack-h` is 196). */
-  '--seq-h': 244,
+  /** A converted device's height. */
+  '--seq-h': SEQUENCER_DEVICE_H_PX,
   /** The side rail: dot, name, the device's own buttons, the region, Split and Delete. */
   '--seq-rail': 24,
   /** A step column's width. */

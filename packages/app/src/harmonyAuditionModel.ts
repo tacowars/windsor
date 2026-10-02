@@ -1,0 +1,123 @@
+/**
+ * Which chord a harmony card ▶ sounds, and its notes (windsor#332 decision
+ * 5). The selected degree's ▶ plays the selected block as written — degree,
+ * size, quality and accidental; every other ▶ plays the scale's own chord at
+ * its degree, at the selected block's size. The stack is the engine's
+ * `eventStack`, the rule every performer reads, voiced close in root position
+ * from the key root in octave 4, with the stack's root doubled an octave
+ * below. A note outside MIDI is dropped, never clamped, as `voiceChord` does.
+ */
+import type { Harmony, HarmonyEvent } from '@windsor/engine';
+import {
+  MIDI_NOTE_MAX,
+  SEMITONES_PER_OCTAVE,
+  eventStack,
+  foldDegree,
+  scaleOffsets,
+  voiceChord,
+} from '@windsor/engine';
+import {
+  HARMONY_AUDITION_BASS_OCTAVES,
+  HARMONY_AUDITION_KEY_OCTAVE_NOTE,
+} from './harmonyAuditionTables';
+import { eventLabel, type EventLabel } from './harmonyLaneModel';
+
+export interface AuditionChord {
+  /** MIDI notes, ascending, without duplicates. */
+  readonly notes: number[];
+  /** What the info bubble shows while the chord sounds. */
+  readonly label: EventLabel;
+}
+
+export interface AuditionVoicing {
+  /** The MIDI note the key root's octave starts at. */
+  readonly keyOctaveNote: number;
+  /** Octaves below the close chord the root is doubled. */
+  readonly bassOctaves: number;
+}
+
+const SHIPPED_VOICING: AuditionVoicing = {
+  keyOctaveNote: HARMONY_AUDITION_KEY_OCTAVE_NOTE,
+  bassOctaves: HARMONY_AUDITION_BASS_OCTAVES,
+};
+
+/**
+ * The chord degree `degree`'s ▶ plays, in a scale of `degreeCount` degrees:
+ * `event` itself, octave carry included, when `degree` is its folded degree
+ * (degree 7 of a seven-degree scale is the tonic's ▶), else the scale's own
+ * chord at its size.
+ */
+export function auditionEvent(
+  event: HarmonyEvent,
+  degree: number,
+  degreeCount: number,
+): HarmonyEvent {
+  if (degree === foldDegree(event.degree, degreeCount).degree) return event;
+  return { start: event.start, duration: event.duration, degree, size: event.size };
+}
+
+/** The notes and label of degree `degree`'s ▶, with `event` the selected block. */
+export function auditionChord(
+  harmony: Harmony,
+  event: HarmonyEvent,
+  degree: number,
+  voicing: AuditionVoicing = SHIPPED_VOICING,
+): AuditionChord {
+  const offsets = scaleOffsets(harmony.scale);
+  const played = auditionEvent(event, degree, offsets.length);
+  const stack = eventStack(offsets, played);
+  const rootNote = voicing.keyOctaveNote + harmony.root;
+  const close = voiceChord(stack, { inversion: 0, voicing: 'close', octave: 0 }, rootNote);
+  const bass = rootNote + (stack[0] ?? 0) - voicing.bassOctaves * SEMITONES_PER_OCTAVE;
+  const notes = bass >= 0 && bass <= MIDI_NOTE_MAX ? [bass, ...close] : close;
+  return {
+    notes: [...new Set(notes)].sort((a, b) => a - b),
+    label: eventLabel(harmony, played),
+  };
+}
+
+/** What started a ▶ hold: a pointer, by its id, or a key on the focused ▶. */
+export type AuditionSource =
+  { readonly kind: 'pointer'; readonly pointerId: number } | { readonly kind: 'key' };
+
+/** One press of a ▶. Identity is ownership, so tokens compare by reference. */
+export interface AuditionToken {
+  readonly source: AuditionSource;
+}
+
+/**
+ * Which press owns the one held chord. A new press supersedes the held one;
+ * an up event ends the hold only when it belongs to the press that still
+ * owns it, so a superseded pointer's up never stops a later press's chord.
+ */
+export class AuditionHold {
+  private current: AuditionToken | null = null;
+
+  /** Start a hold from `source`, superseding whichever press held before. */
+  press(source: AuditionSource): AuditionToken {
+    const token = { source };
+    this.current = token;
+    return token;
+  }
+
+  /** Whether `token` still owns the held chord. */
+  owns(token: AuditionToken): boolean {
+    return this.current === token;
+  }
+
+  /**
+   * Whether an up event ends `token`'s hold: a pointer up or cancel carrying
+   * the press's own `pointerId`, or (`pointerId` null) the key press's own
+   * keyup or blur — and only while `token` still owns the chord.
+   */
+  releases(token: AuditionToken, pointerId: number | null): boolean {
+    if (!this.owns(token)) return false;
+    const { source } = token;
+    return source.kind === 'pointer' ? source.pointerId === pointerId : pointerId === null;
+  }
+
+  /** Drop the held press, whichever it is. */
+  clear(): void {
+    this.current = null;
+  }
+}

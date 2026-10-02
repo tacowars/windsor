@@ -21,7 +21,9 @@ import type {
 } from '@windsor/engine';
 import { AudioSystem, FmEngine, TICKS_PER_BAR, musicPartName, songTicksOf } from '@windsor/engine';
 
+import { loadBuiltIns } from './builtInLibrary';
 import type { ConsoleTransport } from './context';
+import { HARMONY_AUDITION_PATCH } from './harmonyAuditionTables';
 import { nextTransportState, type TransportState } from './transportModel';
 
 export type HostLog = (message: string) => void;
@@ -181,6 +183,8 @@ export class EngineHost {
   private generation = 0;
   /** The most recent document handed to build(); what a retry must install. */
   private latest: ArrangementDocument | null = null;
+  /** The harmony card's audition part (windsor#332), made on the first press; dropped with its system. */
+  private audition: { system: AudioSystem; part: Promise<AudioPart | null> } | null = null;
   private readonly log: HostLog;
 
   constructor(log: HostLog) {
@@ -312,6 +316,7 @@ export class EngineHost {
     // and `part` would otherwise go on calling into a disposed system.
     this.system?.dispose();
     this.system = null;
+    this.audition = null;
     const engine = new FmEngine(this.context);
     await engine.init(this.urls);
     this.system = new AudioSystem(engine);
@@ -355,6 +360,27 @@ export class EngineHost {
   /** The engine part on a slot, for the Parts tab and keyboard (#597: never by label). */
   part(slot: number): AudioPart | null {
     return this.system?.engine.getPart(musicPartName(slot)) ?? null;
+  }
+
+  /**
+   * The harmony card's audition voice (windsor#332 decision 7): one part of
+   * the built-in `HARMONY_AUDITION_PATCH` on the `audition` aux strip, dry
+   * into the aux fader, so the song's master, mixer, mute and solo never
+   * reach it. Made on the first call and kept for the live system; null
+   * before audio, or when the system was replaced while the library loaded.
+   */
+  auditionPart(): Promise<AudioPart | null> {
+    const system = this.system;
+    if (!system) return Promise.resolve(null);
+    if (this.audition?.system !== system) {
+      const part = loadBuiltIns().then((library) => {
+        const entry = library[HARMONY_AUDITION_PATCH];
+        if (!entry || this.system !== system) return null;
+        return system.createAuxPart('audition', entry.patch);
+      });
+      this.audition = { system, part };
+    }
+    return this.audition.part;
   }
 
   /** Pump the look-ahead scheduler; driven by the page's interval timer. */
