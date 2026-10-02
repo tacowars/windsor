@@ -11,6 +11,7 @@ import { isShippable, makeArrangement } from './arrangementDocument';
 import { FALLBACK_ARRANGEMENT } from './fallbackArrangement';
 import { ARP_STEPS_MAX } from '../sequencing/arpStepConstants';
 import { defaultArpSteps } from '../sequencing/arpSteps';
+import { bassNote } from '../sequencing/bassSequencer';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { ALL, KICK, PATCHES, play, song } from '../__fixtures__/documentCases';
 
@@ -78,6 +79,17 @@ describe('the version-3 document (#705)', () => {
       register: { octave: 1 },
       density: 0.7,
       seed: 32,
+      // Basslead's step strip (windsor#367).
+      steps: [
+        bassNote({ accent: true, ratchet: 3 }),
+        { kind: 'tie' },
+        { kind: 'rest' },
+        bassNote({ octave: -1, slide: true }),
+      ],
+      length: 3,
+      accentVelocity: 0.4,
+      accentMod: 0.5,
+      lanes: [{ param: 'filter.cutoff', values: [0.5, 0, 0, -0.5] }],
     };
     const regions = [{ start: 0, duration: 2 * TICKS_PER_BAR }];
     const written = song([

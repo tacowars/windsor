@@ -426,8 +426,16 @@ export {
   BassSequencer,
   DEFAULT_BASS_CONFIG,
   assertBassConfig,
+  bassBarSteps,
+  bassNote,
+  defaultBassSteps,
 } from './sequencing/bassSequencer';
-export type { BassPitchMode, BassSequencerConfig } from './sequencing/bassSequencer';
+export type {
+  BassNoteStep,
+  BassPitchMode,
+  BassSequencerConfig,
+  BassStep,
+} from './sequencing/bassSequencer';
 export { songTicksOf } from './song/arrangementPlayer';
 export { defaultHarmonyEvents } from './song/timelineNormalise';
 export type { Rng } from './sequencing/generatorSeed';
