@@ -22,6 +22,7 @@
 
 import type { Voice } from './voice';
 import { ENVELOPE_BREAKS_MAX } from './fmConstants';
+import { VT_OP_BASE, VT_OP_LEVEL, VT_OP_STRIDE } from './voiceOffsetTables';
 
 /**
  * Advance operator `i`'s envelope by `n` samples and set its ramp: the
@@ -41,7 +42,8 @@ function updateOperatorAmp(voice: Voice, i: number, n: number): void {
     : Math.pow(2, -op.levelKeyScale * ((voice.note - 60) / 12));
   const lfoAmp = 1 + voice.lfoLevel * patch.lfo.toOp[i] + voice.lfo2Level * patch.lfo2.toOp[i];
   const lfo = lfoAmp < 0 ? 0 : lfoAmp;
-  const level = voice.opLevel[i]; // the patch's, or the step's (windsor#17)
+  // The patch's, or the step's (windsor#17), with a song lane's offset (windsor#346).
+  const level = voice.liveValues[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_LEVEL];
   const target = env * level * level * velAmp * keyAmp * lfo;
 
   voice.ampBreak[i] = 0;

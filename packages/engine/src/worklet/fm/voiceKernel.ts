@@ -27,6 +27,8 @@
 import type { Voice } from './voice';
 import { A, B, C, D, EDGE_BA, EDGE_CA, EDGE_CB, EDGE_DA, EDGE_DB, EDGE_DC } from './algorithms';
 import {
+  CTRL_INTERVAL,
+  FEEDBACK_RAMP_STEP,
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MOD_INDEX_SCALE,
@@ -97,7 +99,13 @@ function renderVoiceKernel(
     knotGap = voice.knotGap;
   const kind = voice.kind,
     tables = voice.tables;
-  const fbAmt = voice.opFeedback;
+  // Feedback, ramped from `fbFrom` across the control block while the two
+  // differ (windsor#346), as the generic loop reads it: `at` is how far into
+  // the block this call starts.
+  const fbTo = voice.fbTo,
+    fbFrom = voice.fbFrom,
+    fbRamp = voice.fbRamp;
+  const at = CTRL_INTERVAL - voice.ctrlCount;
   const edges = voice.edges,
     carriers = voice.carrierBits;
 
@@ -124,10 +132,22 @@ function renderVoiceKernel(
     tB = tables[B]!,
     tC = tables[C]!,
     tD = tables[D]!;
-  const fbA = fbAmt[A],
-    fbB = fbAmt[B],
-    fbC = fbAmt[C],
-    fbD = fbAmt[D];
+  const fbA1 = fbTo[A],
+    fbB1 = fbTo[B],
+    fbC1 = fbTo[C],
+    fbD1 = fbTo[D];
+  const fbA0 = fbFrom[A],
+    fbB0 = fbFrom[B],
+    fbC0 = fbFrom[C],
+    fbD0 = fbFrom[D];
+  const fbRampA = (fbRamp & (1 << A)) !== 0,
+    fbRampB = (fbRamp & (1 << B)) !== 0,
+    fbRampC = (fbRamp & (1 << C)) !== 0,
+    fbRampD = (fbRamp & (1 << D)) !== 0;
+  let fbA = fbA1,
+    fbB = fbB1,
+    fbC = fbC1,
+    fbD = fbD1;
   const incA = phaseInc[A],
     incB = phaseInc[B],
     incC = phaseInc[C],
@@ -207,6 +227,7 @@ function renderVoiceKernel(
       const a = aD;
       let mod = 0;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampD) fbD = fbD0 + (fbD1 - fbD0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbD !== 0) {
         const y = (f1D + f2D) * 0.5;
         mod += fbD > 0 ? y * fbD * FEEDBACK_SAW_CYCLES : -y * y * fbD * FEEDBACK_SQUARE_CYCLES;
@@ -269,6 +290,7 @@ function renderVoiceKernel(
       let mod = 0;
       if (modDC) mod += oD * aD;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampC) fbC = fbC0 + (fbC1 - fbC0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbC !== 0) {
         const y = (f1C + f2C) * 0.5;
         mod += fbC > 0 ? y * fbC * FEEDBACK_SAW_CYCLES : -y * y * fbC * FEEDBACK_SQUARE_CYCLES;
@@ -332,6 +354,7 @@ function renderVoiceKernel(
       if (modCB) mod += oC * aC;
       if (modDB) mod += oD * aD;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampB) fbB = fbB0 + (fbB1 - fbB0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbB !== 0) {
         const y = (f1B + f2B) * 0.5;
         mod += fbB > 0 ? y * fbB * FEEDBACK_SAW_CYCLES : -y * y * fbB * FEEDBACK_SQUARE_CYCLES;
@@ -396,6 +419,7 @@ function renderVoiceKernel(
       if (modCA) mod += oC * aC;
       if (modDA) mod += oD * aD;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampA) fbA = fbA0 + (fbA1 - fbA0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbA !== 0) {
         const y = (f1A + f2A) * 0.5;
         mod += fbA > 0 ? y * fbA * FEEDBACK_SAW_CYCLES : -y * y * fbA * FEEDBACK_SQUARE_CYCLES;

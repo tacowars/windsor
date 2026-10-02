@@ -129,10 +129,12 @@ describe('AudioPart held notes (windsor#40)', () => {
     const held = part.takeHeldNotes();
     // Only the notes are held: a control message is not a frame-stamped note.
     expect(sent.map((m) => m.type)).toEqual(['allNotesOff']);
-    expect(held.map((m) => [m.type, m.id, m.frame])).toEqual([
-      ['noteOn', id, 0],
-      ['noteOff', id, 12000],
-    ]);
+    expect(held.map((m) => (m.type === 'voiceSlots' ? [m.type] : [m.type, m.id, m.frame]))).toEqual(
+      [
+        ['noteOn', id, 0],
+        ['noteOff', id, 12000],
+      ],
+    );
     part.noteOn(62);
     expect(sent.map((m) => m.type)).toEqual(['allNotesOff', 'noteOn']);
     expect(part.takeHeldNotes()).toEqual([]);

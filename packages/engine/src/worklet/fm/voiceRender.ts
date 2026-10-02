@@ -26,6 +26,8 @@
 
 import type { Voice } from './voice';
 import {
+  CTRL_INTERVAL,
+  FEEDBACK_RAMP_STEP,
   FEEDBACK_SAW_CYCLES,
   FEEDBACK_SQUARE_CYCLES,
   MOD_INDEX_SCALE,
@@ -91,7 +93,13 @@ function renderVoiceGeneric(
     tables = voice.tables;
   const width = voice.width,
     widthInc = voice.widthInc;
-  const fbAmt = voice.opFeedback; // Float32Array(4): the patch's, or the step's (windsor#17)
+  // Float32Array(4): the patch's, or the step's (windsor#17), with a song
+  // lane's offset, ramped from `fbFrom` across the control block while the
+  // two differ (windsor#346): `at` is how far into the block this call starts.
+  const fbAmt = voice.fbTo,
+    fbFrom = voice.fbFrom,
+    fbRamp = voice.fbRamp;
+  const at = CTRL_INTERVAL - voice.ctrlCount;
   const colours = voice.noiseColour;
   const draws = voice.noiseDraw;
 
@@ -140,7 +148,11 @@ function renderVoiceGeneric(
         mod += out[src] * amp[src];
       }
       mod *= MOD_INDEX_SCALE;
-      const fb = fbAmt[i];
+      let fb = fbAmt[i];
+      if ((fbRamp & (1 << i)) !== 0) {
+        const f0 = fbFrom[i];
+        fb = f0 + (fb - f0) * ((at + s) * FEEDBACK_RAMP_STEP);
+      }
       if (fb !== 0) {
         const y = (fb1[i] + fb2[i]) * 0.5;
         mod += fb > 0 ? y * fb * FEEDBACK_SAW_CYCLES : -y * y * fb * FEEDBACK_SQUARE_CYCLES;

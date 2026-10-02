@@ -8,6 +8,7 @@ var TABLE_MASK = TABLE_SIZE - 1;
 var MIP_COUNT = 12;
 var MIP_BASE_HZ = 16.352;
 var CTRL_INTERVAL = 32;
+var FEEDBACK_RAMP_STEP = 1 / CTRL_INTERVAL;
 var DORMANT_AMP = 1e-9;
 var DORMANT_FILTER_STATE = 1e-9;
 var MOD_INDEX_SCALE = 4;
@@ -888,7 +889,7 @@ var Lfo = class {
   /** `seed` is a non-zero xorshift32 state: `randomSeed32`, or `secondLfoSeed` of another LFO's. */
   constructor(seed) {
     this.phase = this.value = this.held = this.target = this.fade = NaN;
-    this.seed = this.output = this.draw = NaN;
+    this.seed = this.output = this.draw = this.rateMul = NaN;
     this.phase = 0;
     this.value = 0;
     this.held = 0;
@@ -897,6 +898,7 @@ var Lfo = class {
     this.seed = seed;
     this.output = 0;
     this.draw = 0;
+    this.rateMul = 1;
   }
   /** The next draw, 0..1, into `draw`. */
   rand() {
@@ -925,7 +927,7 @@ var Lfo = class {
    */
   advance(p, n, sampleRate2) {
     const prev = this.phase;
-    this.phase += p.rate * n / sampleRate2;
+    this.phase += p.rate * this.rateMul * n / sampleRate2;
     let wrapped = false;
     if (this.phase >= 1) {
       if (p.oneShot) {
@@ -1448,6 +1450,68 @@ function updateVoiceDrive(voice) {
   drive.toneCoef = g / (1 + g);
 }
 
+// packages/engine/src/worklet/fm/voiceOffsetTables.ts
+var OFFSET_ADD = 0;
+var OFFSET_RATIO = 1;
+var VOICE_SLOT_COUNT = 8;
+var VOICE_SLOT_PARAMS = [
+  "voiceSlot0",
+  "voiceSlot1",
+  "voiceSlot2",
+  "voiceSlot3",
+  "voiceSlot4",
+  "voiceSlot5",
+  "voiceSlot6",
+  "voiceSlot7"
+];
+var VT_ENV_AMOUNT = 0;
+var VT_RESONANCE = 1;
+var VT_OP_BASE = 2;
+var VT_OP_STRIDE = 3;
+var VT_OP_LEVEL = 0;
+var VT_OP_FEEDBACK = 1;
+var VT_OP_WIDTH = 2;
+var VT_LFO_AMOUNT = VT_OP_BASE + OPERATOR_COUNT * VT_OP_STRIDE;
+var VT_LFO_RATE = VT_LFO_AMOUNT + 1;
+var VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
+var VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
+var VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
+var VOICE_TARGET_COUNT = VT_LFO_AMOUNT + 5;
+var LFO_AMOUNT_BOUNDS = { min: 0, max: 1 };
+var LFO_RATE_BOUNDS = { min: 0.02, max: 40 };
+var PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48 };
+function stepModBounds(path) {
+  for (const row of STEP_MOD_TABLE) if (row.param === path) return { min: row.min, max: row.max };
+  throw new Error(`voiceOffsetTables: no step-mod row for ${path}`);
+}
+var CUTOFF_BOUNDS = stepModBounds("filter.cutoff");
+var CUTOFF_MOD_OCTAVES = Math.log2(CUTOFF_BOUNDS.max / CUTOFF_BOUNDS.min);
+var CUTOFF_MOD_RANGE = { minValue: -CUTOFF_MOD_OCTAVES, maxValue: CUTOFF_MOD_OCTAVES };
+var VOICE_OFFSET_TABLE = [
+  { path: "filter.envAmount", curve: OFFSET_ADD, ...stepModBounds("filter.envAmount") },
+  { path: "filter.resonance", curve: OFFSET_ADD, ...stepModBounds("filter.resonance") },
+  ...Array.from({ length: OPERATOR_COUNT }, (_, i) => [
+    { path: `ops.${i}.level`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.level`) },
+    { path: `ops.${i}.feedback`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.feedback`) },
+    { path: `ops.${i}.width`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.width`) }
+  ]).flat(),
+  { path: "lfo.amount", curve: OFFSET_ADD, ...LFO_AMOUNT_BOUNDS },
+  { path: "lfo.rate", curve: OFFSET_RATIO, ...LFO_RATE_BOUNDS },
+  { path: "lfo2.amount", curve: OFFSET_ADD, ...LFO_AMOUNT_BOUNDS },
+  { path: "lfo2.rate", curve: OFFSET_RATIO, ...LFO_RATE_BOUNDS },
+  { path: "pitchEnvAmount", curve: OFFSET_ADD, ...PITCH_ENV_AMOUNT_BOUNDS }
+];
+var VOICE_OFFSET_CURVE = Int32Array.from(VOICE_OFFSET_TABLE, (row) => row.curve);
+var VOICE_OFFSET_MIN = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.min);
+var VOICE_OFFSET_MAX = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.max);
+function voiceTargetCode(path) {
+  if (typeof path !== "string") return -1;
+  for (let k = 0; k < VOICE_OFFSET_TABLE.length; k++) {
+    if (VOICE_OFFSET_TABLE[k].path === path) return k;
+  }
+  return -1;
+}
+
 // packages/engine/src/worklet/fm/voiceAmpRamp.ts
 function updateOperatorAmp(voice, i, n) {
   const patch = voice.patch;
@@ -1459,7 +1523,7 @@ function updateOperatorAmp(voice, i, n) {
   const keyAmp = voice.specialise ? voice.levelKeyAmp[i] : Math.pow(2, -op.levelKeyScale * ((voice.note - 60) / 12));
   const lfoAmp = 1 + voice.lfoLevel * patch.lfo.toOp[i] + voice.lfo2Level * patch.lfo2.toOp[i];
   const lfo = lfoAmp < 0 ? 0 : lfoAmp;
-  const level = voice.opLevel[i];
+  const level = voice.liveValues[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_LEVEL];
   const target = env * level * level * velAmp * keyAmp * lfo;
   voice.ampBreak[i] = 0;
   const base = i * ENVELOPE_BREAKS_MAX;
@@ -1502,6 +1566,96 @@ function updateOperatorAmp(voice, i, n) {
   }
 }
 
+// packages/engine/src/worklet/fm/voiceOffsets.ts
+function mapVoiceSlots(slotTargets, paths) {
+  const list = Array.isArray(paths) ? paths : null;
+  let mapped = false;
+  for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
+    const code = list && s < list.length ? voiceTargetCode(list[s]) : -1;
+    slotTargets[s] = code;
+    if (code >= 0) mapped = true;
+  }
+  return mapped;
+}
+function latchVoiceOffsets(offsets, slotTargets, params) {
+  offsets.fill(0);
+  for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
+    const code = slotTargets[s];
+    if (code >= 0) offsets[code] += params[VOICE_SLOT_PARAMS[s]][0];
+  }
+}
+function bindLiveValues(voice) {
+  const patch = voice.patch;
+  const v = voice.liveValues;
+  const o = voice.partOffsets;
+  v[VT_ENV_AMOUNT] = voice.envAmount;
+  v[VT_RESONANCE] = voice.resonance;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    v[b + VT_OP_LEVEL] = voice.opLevel[i];
+    v[b + VT_OP_FEEDBACK] = voice.opFeedback[i];
+    v[b + VT_OP_WIDTH] = voice.opWidth[i];
+  }
+  v[VT_LFO_AMOUNT] = patch.lfo.amount;
+  v[VT_LFO_RATE] = patch.lfo.rate;
+  v[VT_LFO2_AMOUNT] = patch.lfo2.amount;
+  v[VT_LFO2_RATE] = patch.lfo2.rate;
+  v[VT_PITCH_ENV_AMOUNT] = patch.pitchEnvAmount;
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
+    const off = o[k];
+    if (off === 0) continue;
+    const x = VOICE_OFFSET_CURVE[k] === OFFSET_RATIO ? v[k] * Math.pow(2, off) : v[k] + off;
+    v[k] = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
+  }
+}
+function applyVoiceOffsets(voice) {
+  bindLiveValues(voice);
+  const patch = voice.patch;
+  const v = voice.liveValues;
+  const o = voice.partOffsets;
+  let ramp = 0;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    voice.fbFrom[i] = voice.fbTo[i];
+    voice.fbTo[i] = v[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK];
+    if (voice.fbFrom[i] !== voice.fbTo[i]) ramp |= 1 << i;
+  }
+  voice.fbRamp = ramp;
+  const rate = patch.lfo.rate;
+  voice.lfo.rateMul = o[VT_LFO_RATE] === 0 || !(rate > 0) ? 1 : v[VT_LFO_RATE] / rate;
+  const rate2 = patch.lfo2.rate;
+  voice.lfo2.rateMul = o[VT_LFO2_RATE] === 0 || !(rate2 > 0) ? 1 : v[VT_LFO2_RATE] / rate2;
+}
+function primeVoiceOffsets(voice) {
+  bindLiveValues(voice);
+  const v = voice.liveValues;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    voice.fbTo[i] = v[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK];
+    voice.fbFrom[i] = voice.fbTo[i];
+  }
+  voice.fbRamp = 0;
+}
+var keptValues = new Float64Array(VOICE_TARGET_COUNT);
+var keptTargets = new Uint8Array(VOICE_TARGET_COUNT);
+function rebindVoiceOffsets(voice, slotTargets) {
+  const v = voice.liveValues;
+  const kept = keptTargets;
+  keptValues.set(v);
+  kept.fill(0);
+  for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
+    const code = slotTargets[s];
+    if (code >= 0) kept[code] = 1;
+  }
+  bindLiveValues(voice);
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK;
+    if (kept[k] !== 0) continue;
+    voice.fbTo[i] = v[k];
+    voice.fbFrom[i] = voice.fbTo[i];
+    voice.fbRamp &= ~(1 << i);
+  }
+}
+
 // packages/engine/src/worklet/fm/voiceControl.ts
 var MIP_FREQ_SLOT = new Float64Array(1);
 var PART_BEND = 0, PART_WHEEL = 1, PART_CUTOFF_MOD = 2, PART_CONTROL_COUNT = 3;
@@ -1526,7 +1680,8 @@ function updateOperatorWidth(voice, i, n) {
   const freq = voice.opFreq[i];
   const lfoVal = voice.lfoLevel;
   const lfo2Val = voice.lfo2Level;
-  const raw = voice.opWidth[i] + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
+  const own = voice.liveValues[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH];
+  const raw = own + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
   const width = raw < WIDTH_RANGE.min ? WIDTH_RANGE.min : raw > WIDTH_RANGE.max ? WIDTH_RANGE.max : raw;
   const kind = voice.kind[i];
   if (kind === KIND_TABLE && voice.mips[i]) {
@@ -1553,16 +1708,18 @@ function updateVoiceFilter(voice, n) {
   const keyOffset = (voice.note - 60) / 12;
   voice.filtEnv.advance(n);
   const fenv = voice.filtEnv.value;
-  const octaves = fenv * (voice.envAmount + modWheel * f.modWheelDepth) + voice.lfoLevel * f.lfoAmount + f.keyTrack * keyOffset + controls[PART_CUTOFF_MOD] + voice.lfo2Level * f.lfo2Amount;
+  const live = voice.liveValues;
+  const resonance = live[VT_RESONANCE];
+  const octaves = fenv * (live[VT_ENV_AMOUNT] + modWheel * f.modWheelDepth) + voice.lfoLevel * f.lfoAmount + f.keyTrack * keyOffset + controls[PART_CUTOFF_MOD] + voice.lfo2Level * f.lfo2Amount;
   const cutoff = voice.cutoff * Math.pow(2, octaves);
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
-  svfA.q = voice.resonance;
+  svfA.q = resonance;
   svfA.setCoeffs(voice.sr);
   if (f.slope24) {
     const svfB = voice.svfB;
     svfB.cutoffHz = cutoff;
-    svfB.q = voice.resonance;
+    svfB.q = resonance;
     svfB.setCoeffs(voice.sr);
   }
 }
@@ -1572,11 +1729,13 @@ function updateVoiceControl(voice, n) {
   const lfo2P = patch.lfo2;
   const controls = voice.partControls;
   const bend = controls[PART_BEND];
+  applyVoiceOffsets(voice);
+  const live = voice.liveValues;
   const modWheel = controls[PART_WHEEL] + voice.mod;
   voice.lfo.advance(lfoP, n, voice.sr);
-  const lfoVal = voice.lfo.output * (lfoP.amount + modWheel * lfoP.modWheelDepth);
+  const lfoVal = voice.lfo.output * (live[VT_LFO_AMOUNT] + modWheel * lfoP.modWheelDepth);
   voice.lfo2.advance(lfo2P, n, voice.sr);
-  const lfo2Val = voice.lfo2.output * (lfo2P.amount + modWheel * lfo2P.modWheelDepth);
+  const lfo2Val = voice.lfo2.output * (live[VT_LFO2_AMOUNT] + modWheel * lfo2P.modWheelDepth);
   voice.lfoLevel = lfoVal;
   voice.lfo2Level = lfo2Val;
   const glide = voice.glideSeconds > 0 ? voice.glideSeconds : patch.glide;
@@ -1587,7 +1746,7 @@ function updateVoiceControl(voice, n) {
     voice.pitchCur = voice.pitchTarget;
   }
   voice.pitchEnv.advance(n);
-  const pEnv = voice.pitchEnv.value * patch.pitchEnvAmount;
+  const pEnv = voice.pitchEnv.value * live[VT_PITCH_ENV_AMOUNT];
   const semis = voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
   const specialise = voice.specialise;
@@ -1624,7 +1783,8 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const fb1 = voice.fb1, fb2 = voice.fb2, amp = voice.amp, ampInc = voice.ampInc;
   const ampBreak = voice.ampBreak, ampKnot = voice.ampKnot, knotAmp = voice.knotAmp, knotInc = voice.knotInc, knotGap = voice.knotGap;
   const kind = voice.kind, tables = voice.tables;
-  const fbAmt = voice.opFeedback;
+  const fbTo = voice.fbTo, fbFrom = voice.fbFrom, fbRamp = voice.fbRamp;
+  const at = CTRL_INTERVAL - voice.ctrlCount;
   const edges = voice.edges, carriers = voice.carrierBits;
   const kA = kind[A], kB = kind[B], kC = kind[C], kD = kind[D];
   const liveA = kA === KIND_NOISE || amp[A] !== 0 || ampInc[A] !== 0 || ampBreak[A] !== 0;
@@ -1639,7 +1799,10 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
   const modDC = liveC && liveD && (edges & EDGE_DC) !== 0;
   const carA = (carriers & 1) !== 0, carB = (carriers & 2) !== 0, carC = (carriers & 4) !== 0, carD = (carriers & 8) !== 0;
   const tA = tables[A], tB = tables[B], tC = tables[C], tD = tables[D];
-  const fbA = fbAmt[A], fbB = fbAmt[B], fbC = fbAmt[C], fbD = fbAmt[D];
+  const fbA1 = fbTo[A], fbB1 = fbTo[B], fbC1 = fbTo[C], fbD1 = fbTo[D];
+  const fbA0 = fbFrom[A], fbB0 = fbFrom[B], fbC0 = fbFrom[C], fbD0 = fbFrom[D];
+  const fbRampA = (fbRamp & 1 << A) !== 0, fbRampB = (fbRamp & 1 << B) !== 0, fbRampC = (fbRamp & 1 << C) !== 0, fbRampD = (fbRamp & 1 << D) !== 0;
+  let fbA = fbA1, fbB = fbB1, fbC = fbC1, fbD = fbD1;
   const incA = phaseInc[A], incB = phaseInc[B], incC = phaseInc[C], incD = phaseInc[D];
   let aiA = ampInc[A], aiB = ampInc[B], aiC = ampInc[C], aiD = ampInc[D];
   let brA = ampBreak[A], brB = ampBreak[B], brC = ampBreak[C], brD = ampBreak[D];
@@ -1665,6 +1828,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       const a = aD;
       let mod = 0;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampD) fbD = fbD0 + (fbD1 - fbD0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbD !== 0) {
         const y = (f1D + f2D) * 0.5;
         mod += fbD > 0 ? y * fbD * FEEDBACK_SAW_CYCLES : -y * y * fbD * FEEDBACK_SQUARE_CYCLES;
@@ -1726,6 +1890,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       let mod = 0;
       if (modDC) mod += oD * aD;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampC) fbC = fbC0 + (fbC1 - fbC0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbC !== 0) {
         const y = (f1C + f2C) * 0.5;
         mod += fbC > 0 ? y * fbC * FEEDBACK_SAW_CYCLES : -y * y * fbC * FEEDBACK_SQUARE_CYCLES;
@@ -1788,6 +1953,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       if (modCB) mod += oC * aC;
       if (modDB) mod += oD * aD;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampB) fbB = fbB0 + (fbB1 - fbB0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbB !== 0) {
         const y = (f1B + f2B) * 0.5;
         mod += fbB > 0 ? y * fbB * FEEDBACK_SAW_CYCLES : -y * y * fbB * FEEDBACK_SQUARE_CYCLES;
@@ -1851,6 +2017,7 @@ function renderVoiceKernel(voice, outL, outR, off, n) {
       if (modCA) mod += oC * aC;
       if (modDA) mod += oD * aD;
       mod *= MOD_INDEX_SCALE;
+      if (fbRampA) fbA = fbA0 + (fbA1 - fbA0) * ((at + s) * FEEDBACK_RAMP_STEP);
       if (fbA !== 0) {
         const y = (f1A + f2A) * 0.5;
         mod += fbA > 0 ? y * fbA * FEEDBACK_SAW_CYCLES : -y * y * fbA * FEEDBACK_SQUARE_CYCLES;
@@ -2067,7 +2234,8 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const ampBreak = voice.ampBreak, ampKnot = voice.ampKnot, knotAmp = voice.knotAmp, knotInc = voice.knotInc, knotGap = voice.knotGap;
   const kind = voice.kind, tables = voice.tables;
   const width = voice.width, widthInc = voice.widthInc;
-  const fbAmt = voice.opFeedback;
+  const fbAmt = voice.fbTo, fbFrom = voice.fbFrom, fbRamp = voice.fbRamp;
+  const at = CTRL_INTERVAL - voice.ctrlCount;
   const colours = voice.noiseColour;
   const draws = voice.noiseDraw;
   let ramping = 0, squeezed = 0, coloured = 0, noisy = 0;
@@ -2097,7 +2265,11 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
         mod += out[src] * amp[src];
       }
       mod *= MOD_INDEX_SCALE;
-      const fb = fbAmt[i];
+      let fb = fbAmt[i];
+      if ((fbRamp & 1 << i) !== 0) {
+        const f0 = fbFrom[i];
+        fb = f0 + (fb - f0) * ((at + s) * FEEDBACK_RAMP_STEP);
+      }
       if (fb !== 0) {
         const y = (fb1[i] + fb2[i]) * 0.5;
         mod += fb > 0 ? y * fb * FEEDBACK_SAW_CYCLES : -y * y * fb * FEEDBACK_SQUARE_CYCLES;
@@ -2277,16 +2449,32 @@ function bindStepMod(voice, patch) {
 function startStepMod(voice, patch, stepMod) {
   loadStepOffsets(voice, stepMod, false);
   bindStepMod(voice, patch);
+  primeVoiceOffsets(voice);
+  const live = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
-    voice.width[i] = restingWidth(voice.kind[i], voice.opWidth[i]);
+    voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
+  }
+}
+function rebindStepMod(voice, patch, switched, slotTargets) {
+  bindStepMod(voice, patch);
+  rebindVoiceOffsets(voice, slotTargets);
+  const live = voice.liveValues;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((switched & 1 << i) === 0) continue;
+    voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
+    voice.widthInc[i] = 0;
   }
 }
 
 // packages/engine/src/worklet/fm/voice.ts
 var Voice = class {
-  /** `partControls` is the part's one array of k-rate controls (`PART_BEND`, …), shared by every voice. */
+  /**
+   * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
+   * …), and `partOffsets` its song lanes' offsets by target code
+   * (windsor#346), both shared by every voice.
+   */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
-  constructor(sampleRate2, random, partControls) {
+  constructor(sampleRate2, random, partControls, partOffsets) {
     this.noiseSeed = this.fade = this.fadeInc = this.velocity = this.detune = NaN;
     this.age = this.voiceId = this.note = NaN;
     this.pan = this.glideFrom = NaN;
@@ -2362,6 +2550,11 @@ var Voice = class {
     this.opLevel = new Float64Array(4);
     this.opFeedback = new Float32Array(4);
     this.opWidth = new Float64Array(4).fill(1);
+    this.partOffsets = partOffsets;
+    this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
+    this.fbFrom = new Float32Array(4);
+    this.fbTo = new Float32Array(4);
+    this.fbRamp = 0;
   }
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */
   bindConstants(patch) {
@@ -2445,8 +2638,10 @@ var Voice = class {
    * control block instead of the next note. A wave or algorithm switch steps
    * audibly -- acceptable while designing a sound, which is why `liveRetune`
    * is off by default and a part keeps the click-free note-on binding.
+   * `slotTargets` is the part's slot map: a target a song lane moves keeps
+   * the lane's value across the rebind (windsor#346).
    */
-  rebind(patch, waveSets) {
+  rebind(patch, waveSets, slotTargets) {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
@@ -2466,12 +2661,7 @@ var Voice = class {
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
-    bindStepMod(this, patch);
-    for (let i = 0; i < 4; i++) {
-      if ((switched & 1 << i) === 0) continue;
-      this.width[i] = restingWidth(this.kind[i], this.opWidth[i]);
-      this.widthInc[i] = 0;
-    }
+    rebindStepMod(this, patch, switched, slotTargets);
   }
   /**
    * Legato slide (#602): re-point a sounding voice at a new note. The pitch
@@ -2618,8 +2808,18 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     return [
       { name: "pitchBend", defaultValue: 0, minValue: -48, maxValue: 48, automationRate: "k-rate" },
       { name: "modWheel", defaultValue: 0, minValue: 0, maxValue: 1, automationRate: "k-rate" },
-      { name: "cutoffMod", defaultValue: 0, minValue: -8, maxValue: 8, automationRate: "k-rate" },
-      { name: "gain", defaultValue: 1, minValue: 0, maxValue: 4, automationRate: "k-rate" }
+      // The cutoff lane's octaves span the catalog's whole cutoff ratio (windsor#346).
+      { name: "cutoffMod", defaultValue: 0, ...CUTOFF_MOD_RANGE, automationRate: "k-rate" },
+      { name: "gain", defaultValue: 1, minValue: 0, maxValue: 4, automationRate: "k-rate" },
+      // The song lanes' slots (windsor#346, `voiceOffsets.ts`): each an offset
+      // on the target the slot map gives it, 0 for none. No declared range,
+      // so Web Audio's float32 bounds, which no offset between two catalog
+      // values reaches: the voice clamps the sum to the row's bounds.
+      ...VOICE_SLOT_PARAMS.map((name) => ({
+        name,
+        defaultValue: 0,
+        automationRate: "k-rate"
+      }))
     ];
   }
   constructor(options) {
@@ -2628,15 +2828,18 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     const maxVoices = Math.max(1, Math.min(128, opts.maxVoices || 16));
     this.maxVoices = maxVoices;
     this.random = makeRandom(opts.seed);
-    this.lastNote = this.slideSeconds = NaN;
+    this.lastNote = this.slideSeconds = this.gainFrom = NaN;
     this.partControls = new Float64Array(PART_CONTROL_COUNT);
+    this.partOffsets = new Float64Array(VOICE_TARGET_COUNT);
+    this.slotTargets = new Int32Array(VOICE_SLOT_COUNT);
+    this.slotsMapped = mapVoiceSlots(this.slotTargets, opts.voiceSlots);
     this.noteIn = new Float64Array(NOTE_IN_COUNT);
     this.slideIn = false;
     this.stepModIn = null;
     const poolSize = maxVoices + 4;
     this.voices = new Array(poolSize);
     for (let i = 0; i < poolSize; i++) {
-      this.voices[i] = new Voice(sampleRate, this.random, this.partControls);
+      this.voices[i] = new Voice(sampleRate, this.random, this.partControls, this.partOffsets);
     }
     this.patch = normalisePatch(opts.patch);
     this.waveSets = [null, null, null, null];
@@ -2672,7 +2875,8 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.patch = normalisePatch(msg.patch);
         this.rebuildWaves();
         if (this.liveRetune) {
-          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets);
+          const slots = this.slotTargets;
+          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets, slots);
         }
         break;
       }
@@ -2700,6 +2904,10 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         break;
       case "reportLoad":
         this.load.start(msg.quanta);
+        break;
+      case "voiceSlots":
+        this.slotsMapped = mapVoiceSlots(this.slotTargets, msg.slots);
+        if (!this.slotsMapped) this.partOffsets.fill(0);
         break;
     }
   }
@@ -2841,15 +3049,18 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     return running;
   }
   /**
-   * This quantum's bend, wheel and cutoff into `partControls`, where every
-   * voice's control update reads them. Passed to the update as arguments,
-   * each was a new heap number wherever V8 did not inline it (windsor#233).
+   * This quantum's bend, wheel and cutoff into `partControls`, and the song
+   * lanes' slots into `partOffsets` while any is mapped (windsor#346), where
+   * every voice's control update reads them. Passed to the update as
+   * arguments, each was a new heap number wherever V8 did not inline it
+   * (windsor#233).
    */
   latchControls(params) {
     const controls = this.partControls;
     controls[PART_BEND] = params.pitchBend[0];
     controls[PART_WHEEL] = params.modWheel[0];
     controls[PART_CUTOFF_MOD] = params.cutoffMod[0];
+    if (this.slotsMapped) latchVoiceOffsets(this.partOffsets, this.slotTargets, params);
   }
   // One quantum read top to bottom: admit, apply the events due, render each
   // segment. The message reads stay in it because it runs every quantum
@@ -2865,6 +3076,8 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     if (outR !== outL) outR.fill(0);
     this.latchControls(params);
     const gain = params.gain[0];
+    const gainFrom = this.gainFrom;
+    this.gainFrom = gain;
     const blockStart = currentFrame;
     const dormancy = this.dormancy;
     const q = this.events;
@@ -2920,9 +3133,15 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
       }
       cursor += seg;
     }
-    if (gain !== 1) {
-      for (let i = 0; i < n; i++) outL[i] *= gain;
-      if (outR !== outL) for (let i = 0; i < n; i++) outR[i] *= gain;
+    if (gainFrom === gain || gainFrom !== gainFrom) {
+      if (gain !== 1) {
+        for (let i = 0; i < n; i++) outL[i] *= gain;
+        if (outR !== outL) for (let i = 0; i < n; i++) outR[i] *= gain;
+      }
+    } else {
+      const span = gain - gainFrom;
+      for (let i = 0; i < n; i++) outL[i] *= gainFrom + span * ((i + 1) / n);
+      if (outR !== outL) for (let i = 0; i < n; i++) outR[i] *= gainFrom + span * ((i + 1) / n);
     }
     return this.running;
   }

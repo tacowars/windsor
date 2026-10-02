@@ -38,6 +38,8 @@ import {
 } from './stepModTables';
 import { stepModValue } from './stepModValue';
 import { restingWidth } from './voiceControl';
+import { VT_OP_BASE, VT_OP_STRIDE, VT_OP_WIDTH } from './voiceOffsetTables';
+import { primeVoiceOffsets, rebindVoiceOffsets } from './voiceOffsets';
 
 /**
  * Copy a note-on's offsets into the voice, each clamped to -1..1; absent or
@@ -108,8 +110,10 @@ function bindStepMod(voice: Voice, patch: WorkletPatch): void {
 
 /**
  * A note-on's offsets, from `Voice.start` once its envelopes are configured:
- * load them, bind the values, and start each width ramp from the note's own
- * width, so a step's width is there from the first sample. Allocates nothing.
+ * load them, bind the values, put the song's lanes over them
+ * (`primeVoiceOffsets`, windsor#346), and start each width ramp from the
+ * width the note plays, so a step's or a lane's width is there from the
+ * first sample. Allocates nothing.
  */
 function startStepMod(
   voice: Voice,
@@ -118,9 +122,38 @@ function startStepMod(
 ): void {
   loadStepOffsets(voice, stepMod, false);
   bindStepMod(voice, patch);
+  primeVoiceOffsets(voice);
+  const live = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
-    voice.width[i] = restingWidth(voice.kind[i], voice.opWidth[i]);
+    voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
   }
 }
 
-export { bindStepMod, loadStepOffsets, startStepMod };
+/**
+ * A live retune's rebind, from `Voice.rebind` once its envelopes are
+ * configured: the note keeps its step's offsets over the new patch's values,
+ * the song's lanes go over them (`rebindVoiceOffsets`: a target a slot in
+ * `slotTargets` moves keeps the lane's value it plays), and each operator in
+ * `switched` (a bit per operator whose wave moved between PULSE and the
+ * rest, where width changes meaning from a duty to a phase scale) restarts
+ * its width ramp, with no ramp, from the width it plays: the lane's, not the
+ * patch's or the step's, as `startStepMod` seeds it (windsor#346). Allocates
+ * nothing.
+ */
+function rebindStepMod(
+  voice: Voice,
+  patch: WorkletPatch,
+  switched: number,
+  slotTargets: Int32Array,
+): void {
+  bindStepMod(voice, patch);
+  rebindVoiceOffsets(voice, slotTargets);
+  const live = voice.liveValues;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((switched & (1 << i)) === 0) continue;
+    voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
+    voice.widthInc[i] = 0;
+  }
+}
+
+export { bindStepMod, loadStepOffsets, rebindStepMod, startStepMod };

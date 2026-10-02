@@ -20,7 +20,10 @@
  * fields, and an operator's width reads its frequency and the LFO levels
  * from the voice, since V8 does not inline every call this update makes and
  * a double crossing one it does not inline is a new heap number on the audio
- * thread (`synth/fmProcessorAllocation.test.ts`).
+ * thread (`synth/fmProcessorAllocation.test.ts`). A song's lanes move the
+ * values a ringing voice plays (windsor#346): the update starts by laying
+ * them out in `liveValues` (`voiceOffsets.ts`), and every read below of a
+ * value a lane can move reads it there.
  */
 
 import type { WorkletPatch } from './patchNormalise';
@@ -32,6 +35,17 @@ import { bindNoiseColour } from './noiseColour';
 import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
+import {
+  VT_ENV_AMOUNT,
+  VT_LFO2_AMOUNT,
+  VT_LFO_AMOUNT,
+  VT_OP_BASE,
+  VT_OP_STRIDE,
+  VT_OP_WIDTH,
+  VT_PITCH_ENV_AMOUNT,
+  VT_RESONANCE,
+} from './voiceOffsetTables';
+import { applyVoiceOffsets } from './voiceOffsets';
 import { KIND_PULSE, KIND_TABLE, mipIndexAt } from './waveTables';
 
 /** The frequency a squeezed wave's table is chosen for, passed to `mipIndexAt` in place of an argument. */
@@ -96,7 +110,8 @@ function updateOperatorWidth(voice: Voice, i: number, n: number): void {
   const freq = voice.opFreq[i];
   const lfoVal = voice.lfoLevel;
   const lfo2Val = voice.lfo2Level;
-  const raw = voice.opWidth[i] + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
+  const own = voice.liveValues[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH];
+  const raw = own + lfoVal * patch.lfo.toWidth[i] + lfo2Val * patch.lfo2.toWidth[i];
   const width =
     raw < WIDTH_RANGE.min ? WIDTH_RANGE.min : raw > WIDTH_RANGE.max ? WIDTH_RANGE.max : raw;
   const kind = voice.kind[i];
@@ -138,9 +153,12 @@ function updateVoiceFilter(voice: Voice, n: number): void {
   const fenv = voice.filtEnv.value;
   // The wheel adds to the envelope amount the way it adds to the LFO's
   // (#586): depth 0 leaves the term exactly as it was. The amount, cutoff
-  // and resonance are the voice's: the patch's, or the step's (windsor#17).
+  // and resonance are the voice's: the patch's, or the step's (windsor#17),
+  // with a song lane's offset on the amount and resonance (windsor#346).
+  const live = voice.liveValues;
+  const resonance = live[VT_RESONANCE];
   const octaves =
-    fenv * (voice.envAmount + modWheel * f.modWheelDepth) +
+    fenv * (live[VT_ENV_AMOUNT] + modWheel * f.modWheelDepth) +
     voice.lfoLevel * f.lfoAmount +
     f.keyTrack * keyOffset +
     controls[PART_CUTOFF_MOD] +
@@ -148,12 +166,12 @@ function updateVoiceFilter(voice: Voice, n: number): void {
   const cutoff = voice.cutoff * Math.pow(2, octaves);
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
-  svfA.q = voice.resonance;
+  svfA.q = resonance;
   svfA.setCoeffs(voice.sr);
   if (f.slope24) {
     const svfB = voice.svfB;
     svfB.cutoffHz = cutoff;
-    svfB.q = voice.resonance;
+    svfB.q = resonance;
     svfB.setCoeffs(voice.sr);
   }
 }
@@ -172,12 +190,16 @@ function updateVoiceControl(voice: Voice, n: number): void {
   const lfo2P = patch.lfo2;
   const controls = voice.partControls;
   const bend = controls[PART_BEND];
+  // The values this block plays, with the song's lanes on them (windsor#346):
+  // without an offset, each is the voice's own exactly.
+  applyVoiceOffsets(voice);
+  const live = voice.liveValues;
   // The part's wheel plus this note's accent (#602); adding 0 is exact.
   const modWheel = controls[PART_WHEEL] + voice.mod;
   voice.lfo.advance(lfoP, n, voice.sr);
-  const lfoVal = voice.lfo.output * (lfoP.amount + modWheel * lfoP.modWheelDepth);
+  const lfoVal = voice.lfo.output * (live[VT_LFO_AMOUNT] + modWheel * lfoP.modWheelDepth);
   voice.lfo2.advance(lfo2P, n, voice.sr);
-  const lfo2Val = voice.lfo2.output * (lfo2P.amount + modWheel * lfo2P.modWheelDepth);
+  const lfo2Val = voice.lfo2.output * (live[VT_LFO2_AMOUNT] + modWheel * lfo2P.modWheelDepth);
   voice.lfoLevel = lfoVal;
   voice.lfo2Level = lfo2Val;
 
@@ -191,7 +213,7 @@ function updateVoiceControl(voice: Voice, n: number): void {
   }
 
   voice.pitchEnv.advance(n);
-  const pEnv = voice.pitchEnv.value * patch.pitchEnvAmount;
+  const pEnv = voice.pitchEnv.value * live[VT_PITCH_ENV_AMOUNT];
   const semis =
     voice.pitchCur + voice.detune + bend + pEnv + lfoVal * lfoP.toPitch + lfo2Val * lfo2P.toPitch;
   const baseFreq = 440 * Math.pow(2, (semis - 69) / 12);
