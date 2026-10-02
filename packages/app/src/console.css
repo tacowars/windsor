@@ -1092,6 +1092,11 @@ input {
   letter-spacing: 0.1em;
   color: var(--ink-faint);
   white-space: nowrap;
+  /* Chakra Petch has no tabular digits, so the reading's width moves with
+     every frame; hold the widest ("GR 00.0 dB", about 6.25em) so the rack
+     to its right stays still. */
+  min-width: 6.4em;
+  text-align: center;
 }
 /* A send bus (windsor#172; the mockup's .rack-line and .bus-head): its head
    (name, Level, who sends to it) beside its rack. */
