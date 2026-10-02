@@ -30,6 +30,7 @@ import { type LaneView, triggerHead } from './euclidLaneView';
 import { type Figure, countOnsets, toggleStep } from './euclidModel';
 import { type FocusAddress, ROW_KEY_ATTRIBUTE, focusAddress, nodeAt } from './euclidRowFocus';
 import { type RowHead, cellStrip, nameButton, row, rowName } from './euclidRowParts';
+import type { StepGroup } from './meterGrid';
 
 /** What the rows are drawn from, as of one build. */
 export interface RowsInput {
@@ -38,7 +39,7 @@ export interface RowsInput {
   readonly figure: Figure;
   readonly view: LaneView;
   readonly pass: number;
-  readonly group: number;
+  readonly group: (index: number) => StepGroup;
 }
 
 function ratchetText(step: number, roll: number, hit: boolean): string {

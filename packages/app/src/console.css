@@ -122,7 +122,6 @@ input {
   gap: 8px;
   flex: none;
 }
-.transport-meter,
 .transport-position {
   font-family: var(--f-num);
   font-size: 13px;
@@ -145,7 +144,6 @@ input {
    as Ableton Live's control bar draws them, one row at the tab bar's height.
    A vertical drag moves the number, so the cursor says so until it types. */
 .transport-group > .transport-btn,
-.transport-group > .transport-meter,
 .transport-group > .transport-position {
   height: var(--head-control-h);
   padding-top: 0;
@@ -154,8 +152,9 @@ input {
   align-items: center;
   justify-content: center;
 }
-/* Key and scale without their visible labels (tacowars's request on windsor#12):
-   one select each, at the same height as the boxes and the tab bar. */
+/* The swing grid, the meter (windsor#431), key and scale without their visible
+   labels (tacowars's request on windsor#12): one select each, at the same height
+   as the boxes and the tab bar. */
 .transport-picker select.field {
   width: auto;
   height: var(--head-control-h);
@@ -1514,8 +1513,13 @@ input.field.group-name {
 .seq-strip .grid-col {
   width: var(--step-w);
 }
-.seq-strip .grid-col:nth-child(4n + 1):not(:first-child) {
+/* Steps grouped by the song's meter (windsor#431, meterGrid.ts): a beat gap
+   before a step that starts a counted beat, a wider bar gap before a new bar. */
+.seq-strip .grid-col.beat {
   margin-left: var(--beat-gap);
+}
+.seq-strip .grid-col.bar {
+  margin-left: var(--bar-gap);
 }
 .seq-strip .strip-head {
   position: sticky;
@@ -2104,8 +2108,11 @@ body.chord-dragging {
   width: var(--chord-step-w);
   gap: var(--chord-row-gap);
 }
-.chord-strip .grid-col:nth-child(4n + 1):not(:first-child) {
+.chord-strip .grid-col.beat {
   margin-left: var(--beat-gap);
+}
+.chord-strip .grid-col.bar {
+  margin-left: var(--bar-gap);
 }
 .chord-strip .grid-idx {
   flex: none;
@@ -2779,6 +2786,9 @@ body.chord-dragging {
 }
 .euclid-cells > .beat {
   margin-left: var(--beat-gap);
+}
+.euclid-cells > .bar {
+  margin-left: var(--bar-gap);
 }
 .ecell:hover {
   border-color: var(--line-bright);

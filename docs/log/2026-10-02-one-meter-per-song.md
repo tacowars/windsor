@@ -65,7 +65,10 @@ song name one.
    ticks; only the bar lines move. The song becomes `bars ×` the new bar
    long. What falls past a shorter end is cut exactly as lowering Bars cuts
    it, one undo step back; switching back does not restore it. Nothing is
-   stretched.
+   stretched. A whole-song (∞) region is the exception that proves the
+   rule: it means "the whole song", so its end follows the song's end on a
+   meter change exactly as it does when Bars rises, and its start and
+   contents stay put (tacowars, 2026-10-02, on Codex's review of #449).
 8. **The clock counts the song's bars.** The scheduler's and each region
    gate's `bar` and `tickInBar` come from the meter, so Euclid's re-cut on
    the bar line and its bar-synced density LFO follow with no change of
@@ -89,5 +92,42 @@ song name one.
 
 ## UI
 
-windsor#431 records the meter picker's decisions here, from the mockup
-`docs/research/2026-10-02-time-signatures/mockup.html`.
+windsor#431's decisions (tacowars, 2026-10-02), settled on the approved
+mockup `docs/research/2026-10-02-time-signatures/mockup.html`. The app
+reads every beat from the engine's `meterBeats`, never a copy
+(`packages/app/src/meterGrid.ts`).
+
+1. **The picker** is a plain select in the header's swing group, where the
+   fixed `4/4` box sat, the same size and style as the swing grid's `1/16`
+   select. It lists the engine's `METERS` in order by their bare ids (`7/8`,
+   not `7/8 (2+2+3)`), shows 4/4 for a song that names none, and writes
+   `transport.meter` through `ctx.change` as one undo step. A shorter meter
+   cuts what falls past the new end on the Bars path (`followSongLength`),
+   in the same step.
+2. **Bar lines.** The Song ruler stays as it was: a full-height bar line and
+   a 6px tick at each counted beat. In a step strip, a step that starts a
+   new bar gets a wider gap, `--bar-gap` (10px, beside `--beat-gap`'s 4px in
+   `sequencerDeviceTables.ts`).
+3. **7/8's long beat** is just a longer group, with no tint or label.
+4. **Grouping at every step length**, one rule shared by the Grid, Chord and
+   Euclid strips: a beat gap before each step that starts a counted beat
+   when every beat holds two steps or more; otherwise a bar gap before each
+   step that starts a bar; and when a step is a bar or longer, groups of
+   four with the beat gap, never the bar gap. A beat or bar line no step
+   lands on exactly goes before the first step past it, and a bar line wins
+   when one step spans both, so 7/8 at 1/2T still groups by bar. Every
+   meter at every step draws one bar gap per bar line crossed. 4/4 at 1/8
+   groups 2 · 2 · 2 · 2 (it was 4 · 4) and at 1/32 in eights. Steps past
+   the first bar keep the bar's beats: a 16-step 1/16 pattern in 7/8 groups
+   4 · 4 · 6 | 2. The Chord strip groups its columns at the base step.
+5. **The position readout** is `bar.beat.sixteenth` with the beat the
+   counted beat (6/8 has 2, 7/8 has 3, 12/8 has 4) and the third field
+   16ths inside it, 1–6 in a dotted-quarter beat, in every meter: 6/8 tick
+   36 reads `1.2.1`, and 7/8's last 16th of bar 2 reads `2.3.6`. Not 8ths in
+   the /8 meters, which would lose the 16th.
+6. **The step pickers' 96** reads `1 bar` where the bar is a whole note
+   (4/4) and `1/1` in every other meter; its value is unchanged. A region's
+   summary on the Song lanes names it the same way.
+
+The mockup's teal beat numbers, its toolbar and its "4/4 end" marker were
+aids for the review, not product UI.

@@ -11,7 +11,8 @@
  * `--chord-*` entries of `SEQUENCER_DEVICE_PX`, measured off tacowars's
  * mockup.
  *
- * The strip is one column per step, 42 px wide and grouped by four: the Hit
+ * The strip is one column per step, 42 px wide and grouped by the song's
+ * beats at the base step (`meterGrid.ts`, windsor#431): the Hit
  * or Rest tile, taking the height the device has left so it is a large
  * target to press and to drop on, then the Oct, Inv, Dur and Rep dials
  * (click up, shift-click down; a rest has only Dur and Rep), and the +
@@ -61,7 +62,8 @@ import { changePattern } from './partEdits';
 import { regionPlayheadAt } from './regionPlayhead';
 import { tableKnob } from './seqFields';
 import type { DeviceBody } from './sequencerDevice';
-import { DIVISOR_OPTIONS } from './sequencerConstants';
+import { divisorOptions } from './divisorLabels';
+import { groupColumns } from './meterGrid';
 import { CHORD_KNOBS } from './sequencerKnobTables';
 import {
   type Strip,
@@ -175,12 +177,20 @@ function appendColumn(strip: ChordStrip, spec: ChordSpec): HTMLElement[] {
 
 /** Redraw every column from the document, then the append column, the Steps count and the picker. */
 function repaint(strip: ChordStrip): void {
-  paintStrip(strip, (spec) => [
-    ...spec.steps.map((_, index) => stepColumn(strip, index, spec)),
-    ...appendColumn(strip, spec),
-  ]);
+  const { meter } = strip.ctx.model.doc.transport;
+  // Columns group by the song's beats at the base step (windsor#431), as the Grid's do.
+  paintStrip(strip, (spec) =>
+    groupColumns(
+      [
+        ...spec.steps.map((_, index) => stepColumn(strip, index, spec)),
+        ...appendColumn(strip, spec),
+      ],
+      spec.divisor,
+      meter,
+    ),
+  );
   const spec = strip.spec();
-  const bar = ticksPerBar(strip.ctx.model.doc.transport.meter);
+  const bar = ticksPerBar(meter);
   strip.length.textContent = spec ? chordStepsLabel(spec, bar) : '';
   strip.picker?.repaint();
 }
@@ -217,8 +227,6 @@ function watch(strip: ChordStrip): void {
   });
 }
 
-const BASE_STEP_OPTIONS = DIVISOR_OPTIONS.filter((o) => CHORD_DIVISORS.includes(Number(o.value)));
-
 /** The pattern’s register octave (epic #703 decision 11), above Vel and Gate. */
 function octave(strip: ChordStrip): HTMLElement {
   return makeKnob({
@@ -239,7 +247,10 @@ function writeField(strip: ChordStrip, fields: Record<string, unknown>): void {
 }
 
 function baseStep(strip: ChordStrip): HTMLElement {
-  return select('Base step', BASE_STEP_OPTIONS, String(strip.spec()?.divisor ?? ''), (v) =>
+  const options = divisorOptions(strip.ctx.model.doc.transport.meter).filter((o) =>
+    CHORD_DIVISORS.includes(Number(o.value)),
+  );
+  return select('Base step', options, String(strip.spec()?.divisor ?? ''), (v) =>
     writeField(strip, { divisor: Number(v) }),
   );
 }

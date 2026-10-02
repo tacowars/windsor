@@ -120,7 +120,9 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   const glyph = el('span', 'gl', mark);
   glyph.title = mark === '∞' ? 'whole song: free-running' : 'restarts on entry';
   node.appendChild(glyph);
-  node.appendChild(el('span', 'lb', forKind(REGION_SUMMARY, pattern)));
+  node.appendChild(
+    el('span', 'lb', forKind(REGION_SUMMARY, pattern, view.ctx.model.doc.transport.meter)),
+  );
   const selected = view.state.selection;
   node.classList.toggle(
     'selected',

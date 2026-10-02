@@ -180,7 +180,8 @@ export function shapeTool(host: HTMLElement, state: SongViewState): ShapeTool {
     const { range, draft } = selection;
     const stamp = stampedPoints(lane.row, range, draft);
     decorate(lane, range, shapedPoints(lane.points(), range, stamp));
-    const readout = shapeReadout(range, draft, stamp.length, lane.view.ticksPerBar());
+    const meter = lane.view.ctx.model.doc.transport.meter;
+    const readout = shapeReadout(range, draft, stamp.length, meter);
     popover.show(draft, { name: lane.name, row: lane.row, readout, rates: ratesOf(lane) });
     place();
   };

@@ -101,7 +101,7 @@ describe('the range (decision 1)', () => {
     const three = ticksPerBar('3/4');
     const press = { pressTick: three + 5, fromTick: three, toTick: three, dragged: false };
     expect(shapeRange(press, 8 * three, three)).toEqual(range(three, 2 * three));
-    expect(shapeReadout(range(0, 2 * three), draft({ kind: 'ramp' }), 2, three)).toContain(
+    expect(shapeReadout(range(0, 2 * three), draft({ kind: 'ramp' }), 2, '3/4')).toContain(
       ' · 2 bars · 1 cycle · 2 points',
     );
     expect(

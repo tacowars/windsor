@@ -11,7 +11,14 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { ApplyResult, AudioPart, DocumentPartial } from '@windsor/engine';
-import { TICKS_PER_BAR, clonePatch, makePatch, partAt, ticksPerBar } from '@windsor/engine';
+import {
+  TICKS_PER_BAR,
+  clonePatch,
+  makePatch,
+  partAt,
+  songTicksOf,
+  ticksPerBar,
+} from '@windsor/engine';
 import { PRESETS } from '@windsor/engine/patch/presets';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
@@ -23,7 +30,7 @@ import { dropInit } from './patchActions';
 import { addPartLive, removePartLive, setSequencerKindLive } from './partEdits';
 import { renamePatch, revertPatch } from './patchLibrary';
 import { newSong } from './songParts';
-import { barsChange, bpmChange, keyChange, scaleChange } from './transportModel';
+import { barsChange, bpmChange, keyChange, meterChange, scaleChange } from './transportModel';
 import { library, loadPageLibrary } from './libraryModel';
 
 // The built-in library loads on demand in the page; these tests read it
@@ -482,5 +489,29 @@ describe('the Song view (#709)', () => {
     expect(partAt(c.model.doc, 0)?.regions).toEqual([{ start: 0, duration: 432 }]);
     const last = c.model.doc.harmony.events.at(-1);
     expect(last && last.start + last.duration).toBe(432);
+  });
+
+  it('cuts a meter change like a Bars edit, one undo step back (windsor#431)', () => {
+    const c = openConsole();
+    const regions = [
+      { start: 0, duration: BAR },
+      { start: 3 * BAR, duration: BAR },
+    ];
+    c.ctx.change(partChange(0, { regions }));
+    const harmony = c.model.doc.harmony.events;
+    expect(c.model.doc.transport.meter).toBeUndefined();
+    const pick = meterChange('7/8');
+    expect(pick && c.ctx.change(pick).ok).toBe(true);
+    expect(c.model.doc.transport.meter).toBe('7/8');
+    // Four 84-tick bars: every tick stays, and the last region is cut at 336.
+    expect(songTicksOf(c.model.doc)).toBe(336);
+    expect(partAt(c.model.doc, 0)?.regions).toEqual([regions[0], { start: 3 * BAR, duration: 48 }]);
+    const last = c.model.doc.harmony.events.at(-1);
+    expect(last && last.start + last.duration).toBe(336);
+    expect(c.ctx.undo()).toBe(true);
+    expect(c.model.doc.transport.meter).toBeUndefined();
+    expect(partAt(c.model.doc, 0)?.regions).toEqual(regions);
+    expect(c.model.doc.harmony.events).toEqual(harmony);
+    expect(meterChange('9/8')).toBeNull();
   });
 });

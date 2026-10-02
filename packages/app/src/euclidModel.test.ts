@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { EuclideanSpec } from '@windsor/engine';
-import {
-  DEFAULT_EUCLIDEAN_CONFIG,
-  DIVISORS,
-  PPQ,
-  euclid,
-  patternFromString,
-} from '@windsor/engine';
+import { DEFAULT_EUCLIDEAN_CONFIG, DIVISORS, euclid, patternFromString } from '@windsor/engine';
 import { pulseDefault } from './sequencerKnobTables';
 import {
   EUCLID_STEPS_MAX,
@@ -16,7 +10,6 @@ import {
   pulsesChange,
   rotateChange,
   stepsChange,
-  stepsPerBeat,
   toggleStep,
 } from './euclidModel';
 
@@ -112,13 +105,6 @@ describe('the preview and the readout', () => {
     const fixed = patternFromString('x.x.x.x.');
     expect(previewFigure({ ...SPEC, steps: 8, pattern: fixed })).toBe(fixed);
     expect(countOnsets(fixed)).toBe(4);
-  });
-
-  it('groups the strip by the beat only where the step divides it', () => {
-    expect(stepsPerBeat(DIVISORS.sixteenth)).toBe(PPQ / DIVISORS.sixteenth);
-    expect(stepsPerBeat(DIVISORS.quarter)).toBe(1);
-    expect(stepsPerBeat(DIVISORS.whole)).toBe(0);
-    expect(stepsPerBeat(0)).toBe(0);
   });
 });
 

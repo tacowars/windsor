@@ -1,8 +1,8 @@
 /**
  * The transport strip's tables (#708, epic #703 decision 1): the tempo and
  * bars boxes' ranges and drag feel (windsor#12), tap tempo, the swing box and
- * its grid picker (windsor#29), the key and scale options, and the position
- * readout's grid. Every range is the engine's or
+ * its grid picker (windsor#29), the meter picker (windsor#431), the key and
+ * scale options, and the position readout's sixteenth. Every range is the engine's or
  * the new song's; nothing is restated.
  */
 import {
@@ -11,14 +11,14 @@ import {
   BPM_MAX,
   BPM_MIN,
   CHORD_NOTE_NAMES,
+  DIVISORS,
+  METERS,
   PITCH_CLASS_MAX,
-  PPQ,
   SCALE_NAMES,
   STRAIGHT_SWING,
   SWING_AMOUNT_MAX,
   SWING_AMOUNT_MIN,
   type SwingGrid,
-  TICKS_PER_BAR,
 } from '@windsor/engine';
 import { fmt0, fmt2 } from './consoleFormat';
 import type { KnobSpec } from './knob';
@@ -104,8 +104,15 @@ export interface TapTempo {
 export const TAP_TEMPO: TapTempo = { intervals: 4, resetMs: 2000 };
 export const MS_PER_MINUTE = 60_000;
 
-/** 4/4 is the engine's constant (epic #703 decision 7): a readout, not a control. */
-export const METER_LABEL = '4/4';
+/**
+ * The meter picker (windsor#431 decision 1): the engine's meters in its
+ * order, each named by its bare time signature (`7/8`, not `7/8 (2+2+3)`).
+ */
+export const METER_LABEL = 'Meter';
+export const METER_OPTIONS: readonly { value: string; label: string }[] = METERS.map((meter) => ({
+  value: meter,
+  label: meter,
+}));
 
 /** The twelve pitch classes, spelt as `chordNames.ts` prints them (sharps). */
 export const KEY_OPTIONS: readonly { value: string; label: string }[] = CHORD_NOTE_NAMES.slice(
@@ -119,15 +126,8 @@ export const SCALE_OPTIONS: readonly { value: string; label: string }[] = SCALE_
   (name) => ({ value: name, label: name }),
 );
 
-/** The position readout's grid: ticks per bar, per beat and per sixteenth. */
-export const SIXTEENTHS_PER_BEAT = 4;
-export interface PositionGrid {
-  readonly bar: number;
-  readonly beat: number;
-  readonly sixteenth: number;
-}
-export const POSITION_GRID: PositionGrid = {
-  bar: TICKS_PER_BAR,
-  beat: PPQ,
-  sixteenth: PPQ / SIXTEENTHS_PER_BEAT,
-};
+/**
+ * The position readout's third field (windsor#431 decision 3): 16ths inside
+ * the counted beat in every meter, 1–6 in a dotted-quarter beat.
+ */
+export const POSITION_SIXTEENTH = DIVISORS.sixteenth;

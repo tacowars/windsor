@@ -39,7 +39,7 @@ import { makeKnob } from './knob';
 import { changePattern, patternOf } from './partEdits';
 import { tableKnob } from './seqFields';
 import type { DeviceBody } from './sequencerDevice';
-import { DIVISOR_OPTIONS } from './sequencerConstants';
+import { divisorOptions } from './divisorLabels';
 import { BASS_KNOBS, BASS_ROOT_BIAS_KNOB } from './sequencerKnobTables';
 import { railIcon, railSvg } from './sequencerRail';
 
@@ -96,7 +96,8 @@ function fixedDegreePicker(target: BassTarget): HTMLElement {
 }
 
 function ratePicker(target: BassTarget): HTMLElement {
-  return select('Rate', DIVISOR_OPTIONS, String(specOf(target).divisor), (v) => {
+  const options = divisorOptions(target.ctx.model.doc.transport.meter);
+  return select('Rate', options, String(specOf(target).divisor), (v) => {
     if (send(target, { divisor: Number(v) })) target.ctx.render();
   });
 }
