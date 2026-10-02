@@ -1954,10 +1954,33 @@ input.field.group-name {
 .chord-device .seq-section.play .seq-sec-body {
   gap: var(--chord-col-gap);
 }
-/* Base step sits level with the Hit tile and Voicing with Delete last, as drawn. */
+/* Base step, Voicing and Follow (windsor#333) sit evenly down the column,
+   Follow's switch level with Delete last and Base step's label with the Hit
+   tile's top, as drawn: the padding is the tiles column's even gap. */
 .seq-col.chord-fields {
   width: var(--chord-field-w);
-  justify-content: space-around;
+  justify-content: space-between;
+  padding: 33px 0;
+}
+/* Follow as a 22 px switch, level with the selects: the Arp's Retrigger. */
+.chord-device .seg {
+  flex-wrap: nowrap;
+  height: 22px;
+  gap: 0;
+  border: 1px solid var(--line-bright);
+}
+.chord-device .seg button {
+  min-width: 0;
+  padding: 0;
+  font-family: var(--f-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 20px;
+  text-transform: none;
+}
+.chord-device .seg button + button {
+  border-left: 1px solid var(--line-bright);
 }
 /* The tiles' column grows past --chord-tile-w rather than wrap or clip a
    long chord name (windsor#332's `G# maj · ♭VI`). */

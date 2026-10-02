@@ -61,6 +61,7 @@ describe('chord sequencer normalisation (#606)', () => {
       gate: 0.5,
       voicing: 'drop2',
       register: { octave: 5 },
+      follow: true,
     });
     expect(n.corrections).toEqual([]);
     expect(spec).toEqual({
@@ -70,7 +71,20 @@ describe('chord sequencer normalisation (#606)', () => {
       voicing: 'drop2',
       register: { octave: 5 },
       steps,
+      follow: true,
     });
+  });
+
+  it('follow (windsor#333): absent is off with no report, junk is off with a report', () => {
+    const absent = chord({ steps: [hitStep()] });
+    expect(absent.n.corrections).toEqual([]);
+    expect(absent.spec.kind === 'chord' && absent.spec.follow).toBe(false);
+    const junk = chord({ follow: 'yes' });
+    expect(junk.n.corrections).toEqual([`${PATH}.follow: "yes" is not a boolean — using false`]);
+    expect(junk.spec.kind === 'chord' && junk.spec.follow).toBe(false);
+    expect(chord({ follow: 1 }).n.corrections).toEqual([
+      `${PATH}.follow: 1 is not a boolean — using false`,
+    ]);
   });
 
   it('a step with only a kind takes the step defaults', () => {
@@ -160,6 +174,7 @@ describe('chord sequencer normalisation (#606)', () => {
           sequencer: {
             kind: 'chord',
             voicing: 'spread',
+            follow: true,
             steps: [
               hitStep({ inversion: 1 }),
               hitStep({ duration: 2 }),
@@ -176,6 +191,7 @@ describe('chord sequencer normalisation (#606)', () => {
     const second = makeArrangement(JSON.parse(JSON.stringify(first.document)));
     expect(second.corrections).toEqual([]);
     expect(second.document).toEqual(first.document);
+    expect(second.document.parts[0]?.sequencer).toMatchObject({ kind: 'chord', follow: true });
     expect(second.document.parts[1]?.sequencer).toStrictEqual({
       kind: 'chord',
       ...DEFAULT_CHORD_CONFIG,
