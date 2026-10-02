@@ -224,12 +224,23 @@ detail pane at the bottom. Its layers, top down:
    accent dot, the kind's name (a click folds it), the region `n/m`, and
    Split and Delete for the selected region (`sequencerDeviceModel.ts`,
    which reads the part from the document at the press). The pane has no
-   region row and adds no knob. For a chord, `harmonyCard.ts` — seven
-   degree chips, Triad | Seventh, the Duration dial (bars; beats under
-   Shift), Delete.
+   region row and adds no knob. For a chord, `harmonyCard.ts` (windsor#332,
+   record `2026-10-02-harmony-card-audition`), a device's 244 px high: a ▶
+   over each of the seven degree chips (numeral and pitch name in the key;
+   the pressed chip is the event's folded degree), Accidental ♭ ♮ ♯,
+   Triad | Seventh and Quality, then the info bubble (the selected chord, or
+   the one a held ▶ sounds), the Duration dial (bars; beats under Shift) and
+   Delete. A held ▶ sounds `harmonyAuditionModel.ts`'s chord, with its
+   voice in `harmonyAuditionTables.ts`, on `host.auditionPart()`: one part
+   on the engine's `audition` aux strip, outside the song's mix, and it
+   writes nothing. The card's sizes are `harmonyCardTables.ts`'s
+   `HARMONY_CARD_PX`, set on the card as custom properties the way
+   `sequencerDevice.ts` sets `SEQUENCER_DEVICE_PX`; its `--seq-h` is that
+   table's.
 6. **The pure models** — `regionModel.ts`, `harmonyLaneModel.ts`,
-   `songViewTables.ts` (the px maths and the per-kind tables). The tests are
-   theirs; the DOM files hold no rule worth testing.
+   `harmonyAuditionModel.ts`, `songViewTables.ts` (the px maths and the
+   per-kind tables). The tests are theirs; the DOM files hold no rule worth
+   testing.
 
 ## Extension checklists
 
