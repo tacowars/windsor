@@ -32,8 +32,6 @@ const READ_BY_PATH = [
   // Goldens, reference JSON, saved songs, and the allocation probe and its
   // scenarios, which run in a child process.
   'packages/engine/src/__fixtures__/**',
-  // The stylesheet the app's table and boundary tests read.
-  'packages/app/src/*.css',
   // The Tape research folders: saved measurements, and the sources whose
   // hashes those measurements record.
   'docs/research/*-tape-*/**',
@@ -78,6 +76,18 @@ const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
   [
     'packages/app/{index.html,src/*.ts}',
     ['packages/app/src/consoleBoundary.test.ts', 'packages/app/src/transportStrip.test.ts'],
+  ],
+  // The stylesheet: its brace balance, and the colours, tokens and sizes the
+  // table tests pin against their copies in TypeScript.
+  [
+    'packages/app/src/*.css',
+    [
+      'packages/app/src/consoleBoundary.test.ts',
+      'packages/app/src/consoleColors.test.ts',
+      'packages/app/src/harmonyCardTables.test.ts',
+      'packages/app/src/masterColumnTables.test.ts',
+      'packages/app/src/songViewTables.test.ts',
+    ],
   ],
 ];
 
