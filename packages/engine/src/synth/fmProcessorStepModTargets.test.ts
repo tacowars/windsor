@@ -4,7 +4,8 @@
  * envelope's amount moves only the note that carries it, from its first
  * control block to its last, while a note beside it without one plays the
  * patch; and the move reaches its application point (the Formant peaks, the
- * LFO's `rateMul`, the pitch).
+ * LFO's `rate`, the pitch). A rate step over a patch rate of 0 scales from
+ * the row's 0.02 Hz floor, and the LFO it moves is heard (PR #421).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -28,7 +29,8 @@ interface VoiceView {
   active: boolean;
   voiceId: number;
   liveValues: Float64Array;
-  lfo: { rateMul: number };
+  lfo: { rate: number; phase: number };
+  lfo2: { rate: number; phase: number };
   svfA: { cutoffHz: number };
 }
 
@@ -141,11 +143,60 @@ describe('a step lane on a target the table opened (windsor#419)', () => {
     expect(plainPeak).toEqual(unstepped);
   });
 
-  it('reaches the LFO: a rate step scales only its note’s rateMul', () => {
+  it('reaches the LFO: a rate step sets only its note’s rate', () => {
     const row = VOICE_TARGET_TABLE[code('lfo.rate')]!;
     twoNotes('lfo.rate', 0.5, (stepped, plain) => {
-      expect(stepped.lfo.rateMul).toBeCloseTo(stepModValue(row, 2, 0.5) / 2, 12);
-      expect(plain.lfo.rateMul).toBe(1);
+      expect(stepped.lfo.rate).toBe(stepModValue(row, 2, 0.5));
+      expect(plain.lfo.rate).toBe(2);
     });
   });
+
+  it.each(['lfo', 'lfo2'] as const)(
+    'moves %s from a patch rate of 0: the step scales from the floor and is heard',
+    (lfo) => {
+      const path = `${lfo}.rate` as const;
+      const row = VOICE_TARGET_TABLE[code(path)]!;
+      const want = stepModValue(row, 0, 0.5);
+      expect(want).toBeCloseTo(row.floor * 2 ** (0.5 * row.span), 12);
+      const plain = stillLfoNote(lfo);
+      const stepped = stillLfoNote(lfo, stepAt(path, 0.5));
+      expect([plain.voice[lfo].rate, plain.voice[lfo].phase]).toEqual([0, 0]);
+      expect(stepped.voice[lfo].rate).toBe(want);
+      expect(stepped.voice.liveValues[code(path)]).toBe(want);
+      expect(stepped.voice[lfo].phase).toBeGreaterThan(0);
+      expect(stepped.out).not.toEqual(plain.out);
+    },
+  );
 });
+
+/** The patch with both LFOs still (rate 0) and `lfo` alone on the pitch. */
+function stillLfoPatch(lfo: 'lfo' | 'lfo2'): Patch {
+  const still = { amount: 0, rate: 0, toPitch: 0 };
+  return makePatch({
+    ...PATCH,
+    lfo: { ...PATCH.lfo, ...still, ...(lfo === 'lfo' ? { amount: 0.5, toPitch: 0.5 } : {}) },
+    lfo2: { ...PATCH.lfo2, ...still, ...(lfo === 'lfo2' ? { amount: 0.5, toPitch: 0.5 } : {}) },
+  });
+}
+
+/** One held note on `stillLfoPatch(lfo)`, with `stepMod` if given: its output and its voice at the end. */
+function stillLfoNote(
+  lfo: 'lfo' | 'lfo2',
+  stepMod?: number[],
+): { out: number[]; voice: VoiceView } {
+  const processor = loaded.create(stillLfoPatch(lfo), 4);
+  const params: Record<string, Float32Array> = {
+    pitchBend: new Float32Array([0]),
+    modWheel: new Float32Array([0]),
+    gain: new Float32Array([1]),
+  };
+  const block = [new Float32Array(BLOCK), new Float32Array(BLOCK)];
+  const out: number[] = [];
+  processor.inbox(noteOn(1, 57, stepMod));
+  for (let b = 0; b < BLOCKS; b++) {
+    loaded.setFrame(b * BLOCK);
+    processor.process([], [block], params);
+    out.push(...block[0]!);
+  }
+  return { out, voice: voiceOf(processor, 1) };
+}

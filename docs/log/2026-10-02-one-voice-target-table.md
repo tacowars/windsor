@@ -52,8 +52,12 @@ anything else) need one set of target codes to address.
    control block), both `Float64Array`s by code. `layoutVoiceTargets`
    (`voiceTargets.ts`) is the one place on the audio thread that maps a
    path to a code. Every consumer reads `liveValues`. The envelopes' decay
-   time and curve, the feedback ramp and the LFOs' `rateMul` stay the
-   special application points they were, driven from `liveValues`.
+   time and curve, the feedback ramp and the LFOs' rates stay the
+   special application points they were, driven from `liveValues`. An LFO
+   steps at an absolute `rate` the voice writes from `liveValues`, not the
+   patch's rate times a multiplier, and its rate rows take a ratio from a
+   0.02 Hz floor, so a lane or step moves an LFO whose patch rate is 0
+   (PR #421 fix round 1).
 5. **A step pushes from where a lane holds the value.** Where a lane moves
    a target, `liveValues` is the lane's absolute value (the patch's value
    moved by the offset and clamped, as the main thread reckons it), with

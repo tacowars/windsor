@@ -14,7 +14,8 @@
  * - `add`: `base + offset`;
  * - `ratio`: `max(base, floor) × 2^offset`, the offset in octaves. A decay
  *   time's knob ends on exact 0, which no ratio scales, so its ratio is taken
- *   from its 1 ms floor (windsor#347);
+ *   from its 1 ms floor (windsor#347); an LFO rate a patch sets to 0 is
+ *   taken from the knob's 0.02 Hz bottom the same way (windsor#419);
  *
  * then clamped to `min..max`. An offset of exactly 0 leaves the base as it
  * is, neither clamped nor floored. A step value `v` in -1..1 is the offset
@@ -111,7 +112,7 @@ const VOICE_TARGET_OPERATOR_ROWS = [
   },
 ] as const;
 
-/** The LFO rate knob's ends. */
+/** The LFO rate knob's ends; the bottom is also its floor, so a ratio over a patch rate of 0 scales from it. */
 const LFO_RATE_MIN = 0.02;
 const LFO_RATE_MAX = 40;
 
@@ -123,7 +124,7 @@ const VOICE_TARGET_MOD_ROWS = [
     curve: 'ratio',
     min: LFO_RATE_MIN,
     max: LFO_RATE_MAX,
-    floor: 0,
+    floor: LFO_RATE_MIN,
     span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX),
   },
   { path: 'lfo2.amount', curve: 'add', min: 0, max: 1, floor: 0, span: 0.5 },
@@ -132,7 +133,7 @@ const VOICE_TARGET_MOD_ROWS = [
     curve: 'ratio',
     min: LFO_RATE_MIN,
     max: LFO_RATE_MAX,
-    floor: 0,
+    floor: LFO_RATE_MIN,
     span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX),
   },
   { path: 'pitchEnvAmount', curve: 'add', min: -48, max: 48, floor: 0, span: 48 },

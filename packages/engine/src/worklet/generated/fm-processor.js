@@ -922,7 +922,7 @@ var Lfo = class {
   /** `seed` is a non-zero xorshift32 state: `randomSeed32`, or `secondLfoSeed` of another LFO's. */
   constructor(seed) {
     this.phase = this.value = this.held = this.target = this.fade = NaN;
-    this.seed = this.output = this.draw = this.rateMul = NaN;
+    this.seed = this.output = this.draw = this.rate = NaN;
     this.phase = 0;
     this.value = 0;
     this.held = 0;
@@ -931,7 +931,7 @@ var Lfo = class {
     this.seed = seed;
     this.output = 0;
     this.draw = 0;
-    this.rateMul = 1;
+    this.rate = 0;
   }
   /** The next draw, 0..1, into `draw`. */
   rand() {
@@ -957,10 +957,11 @@ var Lfo = class {
    * phase stops at 1 and holds there, so it never wraps and every shape holds
    * its end value (#55); `start` resets it at note-on. Unipolar remaps the
    * shape's -1..1 to 0..1 before the fade, so the fade-in scales up from 0.
+   * The phase steps at `rate`, not `p.rate`: the caller writes it first.
    */
   advance(p, n, sampleRate2) {
     const prev = this.phase;
-    this.phase += p.rate * this.rateMul * n / sampleRate2;
+    this.phase += this.rate * n / sampleRate2;
     let wrapped = false;
     if (this.phase >= 1) {
       if (p.oneShot) {
@@ -1491,7 +1492,7 @@ var VOICE_TARGET_MOD_ROWS = [
     curve: "ratio",
     min: LFO_RATE_MIN,
     max: LFO_RATE_MAX,
-    floor: 0,
+    floor: LFO_RATE_MIN,
     span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
   },
   { path: "lfo2.amount", curve: "add", min: 0, max: 1, floor: 0, span: 0.5 },
@@ -1500,7 +1501,7 @@ var VOICE_TARGET_MOD_ROWS = [
     curve: "ratio",
     min: LFO_RATE_MIN,
     max: LFO_RATE_MAX,
-    floor: 0,
+    floor: LFO_RATE_MIN,
     span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
   },
   { path: "pitchEnvAmount", curve: "add", min: -48, max: 48, floor: 0, span: 48 }
@@ -1764,7 +1765,6 @@ function applyLiveDecays(voice, reshape) {
 function applyVoiceOffsets(voice) {
   bindLiveValues(voice);
   applyLiveDecays(voice, true);
-  const patch = voice.patch;
   const v = voice.liveValues;
   let ramp = 0;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
@@ -1773,12 +1773,8 @@ function applyVoiceOffsets(voice) {
     if (voice.fbFrom[i] !== voice.fbTo[i]) ramp |= 1 << i;
   }
   voice.fbRamp = ramp;
-  const rate = patch.lfo.rate;
-  const live = v[VT_LFO_RATE];
-  voice.lfo.rateMul = live === rate || !(rate > 0) ? 1 : live / rate;
-  const rate2 = patch.lfo2.rate;
-  const live2 = v[VT_LFO2_RATE];
-  voice.lfo2.rateMul = live2 === rate2 || !(rate2 > 0) ? 1 : live2 / rate2;
+  voice.lfo.rate = v[VT_LFO_RATE];
+  voice.lfo2.rate = v[VT_LFO2_RATE];
 }
 function primeVoiceOffsets(voice) {
   bindLiveValues(voice);
@@ -2670,7 +2666,8 @@ var Voice = class {
    * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
    * …), `partOffsets` its song lanes' offsets by target code
    * (windsor#346), and `partFloors` the floor each target a lane moves
-   * plays at least (windsor#347), all shared by every voice.
+   * plays at least (a decay time's, windsor#347; an LFO rate's,
+   * windsor#419), all shared by every voice.
    */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
   constructor(sampleRate2, random, partControls, partOffsets, partFloors) {

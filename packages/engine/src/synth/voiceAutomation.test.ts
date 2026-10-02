@@ -135,6 +135,16 @@ describe('a voice lane on its part (windsor#346)', () => {
     expect(voiceOffset(at(0.0005), path, row, 0.001)).toBe(0);
   });
 
+  it("takes an LFO rate's ratio from its 0.02 Hz floor over a patch rate of 0 (PR #421)", () => {
+    for (const lfo of ['lfo', 'lfo2'] as const) {
+      const path = `${lfo}.rate`;
+      const row = catalogRow(`voice.${path}`)!;
+      const still = makePatch({ [lfo]: { rate: 0 } });
+      expect(voiceOffset(still, path, row, 4)).toBe(Math.log2(4 / 0.02));
+      expect(voiceOffset(still, path, row, row.min)).toBe(0);
+    }
+  });
+
   it('recomputes the offset against an edited patch, so the lane value still wins', async () => {
     const { part } = await rig();
     const handle = handleFor(part, 'ops.0.feedback');

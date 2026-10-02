@@ -128,7 +128,8 @@ class Voice {
    * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
    * …), `partOffsets` its song lanes' offsets by target code
    * (windsor#346), and `partFloors` the floor each target a lane moves
-   * plays at least (windsor#347), all shared by every voice.
+   * plays at least (a decay time's, windsor#347; an LFO rate's,
+   * windsor#419), all shared by every voice.
    */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
   constructor(

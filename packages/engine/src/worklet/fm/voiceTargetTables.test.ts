@@ -97,11 +97,13 @@ describe('the voice target table (windsor#419)', () => {
     expect(ratio).toHaveLength(8);
   });
 
-  it('takes a decay time’s ratio from its 1 ms floor, and no other row’s from one', () => {
+  it('takes a decay time’s ratio from its 1 ms floor, an LFO rate’s from 0.02 Hz, and no other row’s from one', () => {
     for (const r of VOICE_TARGET_TABLE) {
       const decay = DECAY_TIME.test(r.path);
-      expect(r.floor, r.path).toBe(decay ? 0.001 : 0);
+      const lfoRate = r.path === 'lfo.rate' || r.path === 'lfo2.rate';
+      expect(r.floor, r.path).toBe(decay ? 0.001 : lfoRate ? 0.02 : 0);
       if (decay) expect([r.min, r.max], r.path).toEqual([0.001, 20]);
+      if (lfoRate) expect(r.floor, r.path).toBe(r.min);
     }
   });
 

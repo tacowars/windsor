@@ -97,7 +97,6 @@ export function renderNote(patch, options = {}) {
   const params = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   const gateFrame = gate == null ? -1 : Math.round(gate * SR);

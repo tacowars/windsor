@@ -16,7 +16,7 @@
  *   lane moves it, and otherwise the lane's absolute value, the patch's
  *   value moved by the offset in the row's curve and clamped, with the
  *   step's push over it (windsor#405). Every consumer reads `liveValues`;
- *   the LFO rates reach the LFOs as `rateMul`.
+ *   the LFO rates reach the LFOs as their absolute `rate`.
  * - The decay rows (windsor#347) reach the five envelopes as their decay
  *   time and curve (`applyLiveDecays`). A time is read afresh by each step
  *   of the envelope, which keeps its phase, so a running decay goes on from
@@ -42,8 +42,9 @@
  *   envelopes' curves as they play.
  *
  * Invariant: an offset of exactly 0 leaves the value as it was, neither
- * clamped nor passed through a curve, except that a decay time a slot maps
- * plays at least its 1 ms floor (`partFloors`, windsor#347); and a part
+ * clamped nor passed through a curve, except that a decay time or an LFO
+ * rate a slot maps plays at least its row's floor (1 ms, 0.02 Hz:
+ * `partFloors`, windsor#347, windsor#419); and a part
  * with no slot mapped reads no slot and floors nothing, so a song without
  * voice lanes renders bit for bit as before (`fmProcessorGolden.test.ts`,
  * `fmProcessorKernel.test.ts`). Functions over the voice, one call a control
@@ -92,9 +93,10 @@ const VOICE_SLOT_PARAMS: readonly string[] = [
 /**
  * Map each slot to the code of the target its path names, -1 for none or a
  * path no row carries, and set `floors` to the row floor of each mapped
- * target that has one (a decay time's 1 ms), −Infinity for every other
- * target, which no value is below. True when any slot is mapped. Allocates
- * nothing; run at construction and at a message, never in the render.
+ * target that has one (a decay time's 1 ms, an LFO rate's 0.02 Hz),
+ * −Infinity for every other target, which no value is below. True when any
+ * slot is mapped. Allocates nothing; run at construction and at a message,
+ * never in the render.
  */
 function mapVoiceSlots(slotTargets: Int32Array, floors: Float64Array, paths: unknown): boolean {
   const list = Array.isArray(paths) ? (paths as unknown[]) : null;
@@ -134,14 +136,15 @@ const patchValues = new Float64Array(VOICE_TARGET_COUNT);
  * lane moves keeps its own value exactly. One a lane moves plays the lane's
  * absolute value, as the main thread reckons it: the patch's value moved by
  * the offset in the row's curve (a ratio from the row's floor where the
- * value is below it: a decay time of 0, windsor#347) and clamped; and a
- * step's push goes over that in the same curve and clamps again, so a step
- * pushes from where the lane holds the value (windsor#405), and is heard
- * over a patch decay of 0 too. A decay time a lane moves plays at least its
- * floor even at offset 0 (`partFloors`), which is the offset the main
- * thread sends for a lane at or below the floor over a patch below it;
- * without a lane a decay of 0 stays 0. The curve is written out, not
- * called, since no double crosses a call each control block (rule 2).
+ * value is below it: a decay time or an LFO rate of 0, windsor#347) and
+ * clamped; and a step's push goes over that in the same curve and clamps
+ * again, so a step pushes from where the lane holds the value (windsor#405),
+ * and is heard over a patch decay of 0 too. A decay time or LFO rate a lane
+ * moves plays at least its floor even at offset 0 (`partFloors`), which is
+ * the offset the main thread sends for a lane at or below the floor over a
+ * patch below it; without a lane a decay or rate of 0 stays 0. The curve is
+ * written out, not called, since no double crosses a call each control
+ * block (rule 2).
  */
 function bindLiveValues(voice: Voice): void {
   const live = voice.liveValues;
@@ -221,13 +224,11 @@ function applyLiveDecays(voice: Voice, reshape: boolean): void {
 
 /**
  * This block's values (`bindLiveValues`) and the envelopes' decays, then the
- * feedback ramp's ends and the LFOs' rate multipliers. The control update's
- * first step.
+ * feedback ramp's ends and the LFOs' rates. The control update's first step.
  */
 function applyVoiceOffsets(voice: Voice): void {
   bindLiveValues(voice);
   applyLiveDecays(voice, true);
-  const patch = voice.patch!;
   const v = voice.liveValues;
 
   // The feedback ramp's ends: a Float32Array store, as the loops have always read it.
@@ -239,14 +240,11 @@ function applyVoiceOffsets(voice: Voice): void {
   }
   voice.fbRamp = ramp;
 
-  // An LFO's rate as a multiplier on its patch's, exactly 1 while it plays
-  // the patch's rate; a rate of 0 has no ratio to scale, and stays still.
-  const rate = patch.lfo.rate;
-  const live = v[VT_LFO_RATE];
-  voice.lfo.rateMul = live === rate || !(rate > 0) ? 1 : live / rate;
-  const rate2 = patch.lfo2.rate;
-  const live2 = v[VT_LFO2_RATE];
-  voice.lfo2.rateMul = live2 === rate2 || !(rate2 > 0) ? 1 : live2 / rate2;
+  // Each LFO steps at the rate the voice plays: the patch's own number
+  // without a lane or a step, so its phase steps as it always has. A ratio
+  // over a patch rate of 0 is taken from the row's 0.02 Hz floor.
+  voice.lfo.rate = v[VT_LFO_RATE];
+  voice.lfo2.rate = v[VT_LFO2_RATE];
 }
 
 /**
