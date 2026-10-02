@@ -10,13 +10,10 @@
  * the rebuild left (#629).
  */
 import { audioExportSection } from './audioExport';
-import { loadBuiltIns } from './builtInLibrary';
 import { EXPORT_URL_TTL_MS, READOUT_DEFER_MS, READOUT_POLL_MS } from './arrangementConstants';
 import type { AppCtx } from './context';
 import { el, section } from './dom';
 import { openConfirm } from './metadataModal';
-import { newSong } from './songParts';
-import { importRefusedText, songRefusal } from './songRestore';
 
 /** Start over on a new song, asking first when this one has changed since it was opened (#598). */
 function newSongButton(ctx: AppCtx): HTMLElement {
@@ -24,11 +21,12 @@ function newSongButton(ctx: AppCtx): HTMLElement {
   fresh.type = 'button';
   fresh.title = 'Start over: one part, the Init patch, no sequencer';
   fresh.onclick = (): void => {
-    const start = (): void => {
-      ctx.parts.selected = 0;
-      ctx.importDoc(newSong());
-      ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab');
-    };
+    // Through the session's one switch (windsor#433): false when the song
+    // being left couldn't be saved, which it has reported, and stays open.
+    const start = (): void =>
+      void ctx.songs.newSong().then((ok) => {
+        if (ok) ctx.notify('new song — pick a sequencer for Part 1 in the Parts tab');
+      });
     if (!ctx.model.changed) return start();
     void openConfirm({
       title: 'New song',
@@ -76,16 +74,16 @@ function documentSection(ctx: AppCtx): HTMLElement {
   file.onchange = (): void => {
     const chosen = file.files?.[0];
     if (!chosen) return;
-    // An older song's names resolve against the built-ins (#562), so they
-    // must have arrived before the document is normalised.
-    Promise.all([chosen.text(), loadBuiltIns()])
-      .then(([text]) => {
-        // A song format this build cannot read is refused before anything is
-        // replaced (`2026-09-28-format-versions-refuse-never-destroy`).
-        const refusal = songRefusal(text);
-        if (refusal) return ctx.notify(importRefusedText(chosen.name, refusal), 'error');
-        ctx.importDoc(JSON.parse(text) as unknown);
-        ctx.notify(`imported ${chosen.name}`, 'success');
+    // Through the session's one switch (windsor#433), which waits for the
+    // built-ins an older song's names resolve against (#562), refuses a song
+    // format this build cannot read before anything is replaced
+    // (`2026-09-28-format-versions-refuse-never-destroy`), and saves the
+    // song being left first. False means it said why, and nothing changed.
+    chosen
+      .text()
+      .then((text) => ctx.songs.importText(text, chosen.name))
+      .then((ok) => {
+        if (ok) ctx.notify(`imported ${chosen.name}`, 'success');
       })
       .catch((error: unknown) => ctx.notify(`import failed: ${String(error)}`, 'error'));
   };
