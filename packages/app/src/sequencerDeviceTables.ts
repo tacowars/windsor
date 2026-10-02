@@ -79,6 +79,8 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--chord-col-gap': 13,
   /** The Base step and Voicing selects' width. */
   '--chord-field-w': 120,
+  /** Base step's and Follow's inset from the column's ends, so the three fields sit level with the Hit tile and Delete last. */
+  '--chord-fields-pad': 33,
   /** The Hit and Rest tiles' and Delete last's width; a longer chord name widens the column. */
   '--chord-tile-w': 110,
   /** The space between the Hit and Rest tiles. */
