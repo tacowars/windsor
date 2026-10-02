@@ -35,6 +35,7 @@ import {
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { deepMerge } from './documentModel';
+import { selectPart } from './partsSession';
 import { addRegion, neighbourIndex, snapGrain, splitRegion } from './regionModel';
 import { addPart, freshSequencer, setSequencerKind } from './songParts';
 
@@ -79,7 +80,7 @@ export function sequencerKindChange(
 export function addPartLive(ctx: AppCtx): number | null {
   const change = addPartChange(ctx.model.doc, (raw) => ctx.model.preview(raw));
   if (!change || !ctx.change(change.partial).ok) return null;
-  ctx.parts.selected = change.slot;
+  selectPart(ctx, change.slot);
   ctx.render();
   ctx.notify(`added ${partAt(ctx.model.doc, change.slot)?.name ?? 'a part'} — pick its sequencer`);
   return change.slot;
@@ -95,7 +96,7 @@ export function removePartLive(ctx: AppCtx, slot: number): boolean {
   const { parts } = ctx.model.doc;
   // The nearest remaining part: the one that took this index, else the last.
   const neighbour = parts[Math.min(index, parts.length - 1)];
-  ctx.parts.selected = neighbour?.slot ?? 0;
+  selectPart(ctx, neighbour?.slot ?? 0);
   ctx.render();
   ctx.notify(`removed ${part.name}`);
   return true;
