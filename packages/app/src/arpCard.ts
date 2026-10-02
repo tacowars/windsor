@@ -41,7 +41,7 @@ import { railIcon, railSvg } from './sequencerRail';
 import { specOf } from './stepStrip';
 
 /** Reseed's icon: a circling arrow. */
-const ICON_RESEED = '<path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/>';
+export const ICON_RESEED = '<path d="M10 6a4 4 0 1 1-1.2-2.85M10 1.5v2.5H7.5"/>';
 
 /** The part on `slot`, and the region whose pattern the card edits (windsor#75). */
 interface ArpTarget {
