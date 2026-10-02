@@ -76,14 +76,14 @@ Version 2 is additive: `patches` and `songs` are untouched.
 | Store | Key | Value |
 |---|---|---|
 | `songDocs` | song id | the song's export text, exactly what Export writes, `meta` included |
-| `songIndex` | song id | `{ id, version, name, tags, created, updated, bpm, bars, key }`, a cache for the list |
+| `songIndex` | song id | `{ id, version, name, tags, created, updated, bpm, meter, bars, key }`, a cache for the list |
 
 - **Why two stores.** The list reads only the small index records, so it
   never loads every song's patch snapshots to draw a table.
 - **One transaction.** A save writes both records in a single transaction,
   so an index entry never points at a missing document.
 - **The index is derived.** One pure function reads the document's
-  declared `version`, plus `name`, `tags`, `bpm`, `bars` and `key`, from the
+  declared `version`, plus `name`, `tags`, `bpm`, `meter` (absent is 4/4), `bars` and `key`, from the
   document text at each write. Only `id`,
   `created` and `updated` are the store's own. A missing index record is
   re-derived from its document, and an index record without a document is
