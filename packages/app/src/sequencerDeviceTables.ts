@@ -29,6 +29,30 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--seq-rail': 24,
   /** A step column's width. */
   '--step-w': 32,
+  /* The Chord's own sizes (windsor#369), measured off tacowars's mockup of
+     the device at 244 px: its Play section and its strip, never the Grid's. */
+  /** A Chord step column's width: the Grid's and a third, for its bigger dials. */
+  '--chord-step-w': 42,
+  /** The space between two Chord step columns; with the width, a 48 px step pitch. */
+  '--chord-step-gap': 6,
+  /** A Chord step's Oct, Inv, Dur and Rep dial height; the Hit or Rest tile takes what is left. */
+  '--chord-dial-h': 21,
+  /** The space between a Chord step's tile and its dials, and between the dials. */
+  '--chord-row-gap': 5,
+  /** The space under a Chord step's last dial, to the device's edge. */
+  '--chord-strip-foot': 10,
+  /** The Chord's Play section's inset from the rail. */
+  '--chord-inset': 12,
+  /** The space between the Chord's Play columns, so Base step and Voicing clear the tiles. */
+  '--chord-col-gap': 13,
+  /** The Base step and Voicing selects' width. */
+  '--chord-field-w': 120,
+  /** The Hit and Rest tiles' and Delete last's width; a longer chord name widens the column. */
+  '--chord-tile-w': 110,
+  /** The space between the Hit and Rest tiles. */
+  '--chord-tile-gap': 10,
+  /** The knob strip's padding either side of its knobs, behind the rule that parts it from the Play columns. */
+  '--chord-knob-pad': 9,
   /** The extra space before each group of four steps. */
   '--beat-gap': 4,
   /** One modulation lane's height. */

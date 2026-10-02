@@ -1928,20 +1928,52 @@ input.field.group-name {
   background: linear-gradient(var(--head-tint), var(--head-tint)), var(--panel);
 }
 
-/* ---------- the chord card (#607) ---------- */
-
-.chord-picker-controls {
+/* ---------- the chord card (#607; the device, windsor#369) ---------- */
+/* Record `2026-10-01-sequencer-rack-devices` decisions 1–4 and 7; the look
+   is docs/research/2026-09-30-sequencer-rack/chord.html. The frame, rail,
+   sections and columns are the sequencer device's (above); this block is
+   the Chord's own, sized to tacowars's mockup (the --chord-* properties,
+   `sequencerDeviceTables.ts`): Play, inset --chord-inset from the rail,
+   its columns --chord-col-gap apart and its knob strip behind a rule; and
+   the strip, a column per step at --chord-step-w, --chord-step-gap apart
+   and grouped by four, its dials --chord-dial-h high in --chord-row-gap
+   rows, whose step tile takes the height the device has left. Nothing
+   scrolls. */
+.chord-device {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 8px;
+  min-height: 0;
 }
 .chord-picker {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 0 4px;
+  flex-direction: column;
+  gap: var(--chord-tile-gap);
+}
+/* Play: inset from the rail, its columns --chord-col-gap apart so Base
+   step and Voicing clear the tiles, and no padding after the knob strip,
+   whose own padding reaches the Steps border. */
+.chord-device .seq-section.play {
+  padding-right: 0;
+  padding-left: var(--chord-inset);
+}
+.chord-device .seq-section.play .seq-sec-body {
+  gap: var(--chord-col-gap);
+}
+/* Base step sits level with the Hit tile and Voicing with Delete last, as drawn. */
+.seq-col.chord-fields {
+  width: var(--chord-field-w);
+  justify-content: space-around;
+}
+/* The tiles' column grows past --chord-tile-w rather than wrap or clip a
+   long chord name (windsor#332's `G# maj · ♭VI`). */
+.seq-col.chord-sources {
+  width: auto;
+  min-width: var(--chord-tile-w);
+}
+/* Octave, Vel and Gate: one strip, parted from the Play columns by a rule
+   and from Steps by the section border. */
+.chord-device .seq-col.k3 {
+  padding: 0 var(--chord-knob-pad);
+  border-left: 1px solid var(--line);
 }
 .chip {
   display: flex;
@@ -1999,36 +2031,126 @@ input.field.group-name {
 body.chord-dragging {
   cursor: grabbing;
 }
-.chord-strip .grid-col {
-  width: 58px;
+/* The Hit and Rest tiles in the device (the mockup's .source): the name
+   over the region's chord, on one line. */
+.chord-device .chip {
+  align-items: flex-start;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: 5px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-align: left;
 }
-.chord-strip .gcell.chord,
-.chord-strip .gcell.rest {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  min-height: 34px;
+.chord-device .chip:not(.rest) {
+  border-color: var(--kc);
+  background: color-mix(in srgb, var(--kc) 16%, var(--inset));
+}
+.chord-device .chip:hover {
+  filter: brightness(1.15);
+}
+.chord-device .chip:active {
+  border-color: var(--carrier);
+}
+.chord-device .chip .chip-num {
+  min-height: 13px;
+  color: var(--ink-dim);
+  font-size: 10px;
+  letter-spacing: 0;
+  line-height: 13px;
+  white-space: nowrap;
+}
+/* The Rest tile has no chord line, so it stands shorter than Hit, as drawn. */
+.chord-device .chip.rest {
+  padding-block: 10px;
+}
+.chord-device .chip.rest .chip-num {
+  display: none;
+}
+/* Steps: the strip's columns reach the device's edge, --chord-strip-foot
+   under the last dial. */
+.chord-device .seq-section.steps {
+  padding-right: 8px;
+  padding-bottom: var(--chord-strip-foot);
+}
+.chord-strip {
+  flex: none;
+  min-height: 0;
+  gap: var(--chord-step-gap);
+  overflow: visible;
+  padding: 0;
+}
+.chord-strip .grid-col {
+  width: var(--chord-step-w);
+  gap: var(--chord-row-gap);
+}
+.chord-strip .grid-col:nth-child(4n + 1):not(:first-child) {
+  margin-left: var(--beat-gap);
+}
+.chord-strip .grid-idx {
+  flex: none;
+  height: 12px;
+  padding: 0;
+  border-radius: 2px;
+  line-height: 12px;
+}
+.chord-strip .gcell {
+  flex: none;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.chord-strip .gcell.dial,
+.chord-strip .gcell.blank {
+  height: var(--chord-dial-h);
+}
+.chord-strip .gcell.dial {
   color: var(--ink);
-  border-color: var(--line-bright);
+  font-family: var(--f-num);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: calc(var(--chord-dial-h) - 2px);
+}
+.chord-strip .gcell.dial.dim {
+  color: var(--ink-faint);
+}
+.chord-strip .gcell:is(.chord, .rest, .append) {
+  flex: 1;
+  height: auto;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
   touch-action: none;
   user-select: none;
+}
+.chord-strip .gcell.chord {
+  color: var(--ink);
+  border-color: var(--kc);
+  background: color-mix(in srgb, var(--kc) 16%, var(--inset));
 }
 .chord-strip .gcell.rest {
   color: var(--ink-dim);
   border-color: var(--line);
 }
-.chord-strip .gcell small {
-  font-family: var(--f-num);
-  font-size: 9px;
-  font-weight: 400;
-  color: var(--ink-faint);
-  letter-spacing: 0.06em;
+.chord-strip .gcell:is(.chord, .rest):hover {
+  filter: brightness(1.2);
 }
-.chord-strip .grid-col.append .gcell.append {
-  border-style: dashed;
-  font-size: 14px;
-  min-height: 34px;
+.chord-strip .grid-col.playing .gcell.chord {
+  background: color-mix(in srgb, var(--carrier) 25%, var(--inset));
+}
+.chord-strip .gcell.append {
+  background: transparent;
+  border: 1px dashed var(--line-bright);
+  color: var(--ink-faint);
+  font-size: 15px;
+}
+.chord-strip .gcell.append:hover {
+  border-color: var(--ink-faint);
+  color: var(--ink);
 }
 .chord-strip .grid-col.drop-target .gcell {
   border-color: var(--carrier);

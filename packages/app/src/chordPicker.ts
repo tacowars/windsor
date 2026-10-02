@@ -4,7 +4,9 @@
  * voicing. Pressing the Hit tile sounds that chord through the chord
  * part the card belongs to (epic #605 decision 8); dragging it, or the Rest
  * tile, carries a ghost onto a step of the card's strip. The press-and-drag
- * behaviour is `chordDrag.ts`'s state machine; this file is its DOM.
+ * behaviour is `chordDrag.ts`'s state machine; this file is its DOM. The
+ * device (windsor#369) stands the voicing and the tiles in different
+ * columns, so the picker hands them back apart.
  */
 import type { AudioPart, ChordSpec, ChordVoicingId, Harmony, HarmonyChord } from '@windsor/engine';
 import { CHORD_VOICINGS, CHORD_VOICING_IDS } from '@windsor/engine';
@@ -34,7 +36,10 @@ export interface PickerHost {
 }
 
 export interface Picker {
-  readonly root: HTMLElement;
+  /** The Voicing select, labelled. */
+  readonly voicing: HTMLElement;
+  /** The Hit and Rest tiles, stacked. */
+  readonly tiles: HTMLElement;
   /** Redraw the tiles for the current chord; the voicing control stays. */
   repaint(): void;
 }
@@ -143,8 +148,6 @@ function bindChip(node: HTMLElement, payload: ChordPayload, drag: ChordDragContr
 }
 
 export function chordPicker(host: PickerHost): Picker {
-  const root = el('div', 'chord-picker-wrap');
-
   const drag = createChordDrag({
     ...auditionHost(host),
     targetAt: (x, y) => host.targetAt(x, y),
@@ -174,14 +177,12 @@ export function chordPicker(host: PickerHost): Picker {
     if (numeral) numeral.textContent = chip.numeral;
   };
 
-  const controls = el('div', 'chord-picker-controls');
-  controls.appendChild(
-    select('Voicing', VOICING_OPTIONS, host.spec()?.voicing ?? CHORD_VOICING_IDS[0]!, (value) =>
-      host.setVoicing(value as ChordVoicingId),
-    ),
+  const voicing = select(
+    'Voicing',
+    VOICING_OPTIONS,
+    host.spec()?.voicing ?? CHORD_VOICING_IDS[0]!,
+    (value) => host.setVoicing(value as ChordVoicingId),
   );
-  root.appendChild(controls);
-  root.appendChild(chipRow);
   repaint();
-  return { root, repaint };
+  return { voicing, tiles: chipRow, repaint };
 }
