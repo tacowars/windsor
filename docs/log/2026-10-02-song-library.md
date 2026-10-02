@@ -119,6 +119,14 @@ Version 2 is additive: `patches` and `songs` are untouched.
   left stays open with its edits. The autosave reports the failure to its
   caller rather than only to the status line, and a failed write stays
   owed, so the next switch or flush tries it again even with no new edit.
+- **Leaving with an unsaved change asks first.** While a change is
+  waiting, a write is in flight, or a write has failed, leaving the page
+  asks the browser's "Leave site?" question and starts the flush at once.
+  So a reload never silently reopens an older text of a named song.
+- **A late boot never replaces a touched song.** If the database opens
+  late (another tab holding an older version blocks the upgrade), a song
+  the user has already edited, imported or started is left alone. The
+  boot only says where the last song is.
 - **No IndexedDB.** In a browser without it, the Songs section says the
   library is unavailable here, and Document works as before.
 
