@@ -1,10 +1,11 @@
 /**
  * The Euclid card's tunables (windsor#356, record
  * `2026-10-01-euclid-lanes-and-ratchets`): the pitch lane's drag rate, the
- * density plot's size and reach, and the card's words. The limits on the
- * rows themselves are the engine's (`EUCLID_LANE_STEPS_MAX`,
- * `EUCLID_PITCH_LANE_MAX`, `EUCLID_RATCHET_MAX`).
+ * density plot's size and reach, the Play section's knob columns and the
+ * lane count. The limits on the rows themselves are the engine's
+ * (`EUCLID_LANE_STEPS_MAX`, `EUCLID_PITCH_LANE_MAX`, `EUCLID_RATCHET_MAX`).
  */
+import { STEP_MOD_LANES_MAX } from '@windsor/engine';
 
 /** A pitch cell's vertical drag: pixels per semitone. */
 export const EUCLID_PX_PER_SEMITONE = 6;
@@ -37,13 +38,17 @@ export const EUCLID_PLOT_SECONDS_DIGITS = 3;
 /** Decimals a fractional cycle in bars reads with. */
 export const EUCLID_CYCLE_BAR_DIGITS = 2;
 
-/** The card's hint, on the rail's ? (decision 1). */
-export const EUCLID_HINT =
-  'Lit cells are hits; the ring on each row is its playhead. Click a trigger cell to flip it: ' +
-  'the figure freezes and the row reads Release, which lets the modulator back in. Ratchets ' +
-  'split a hit into 2, 3 or 4. Lanes are read when a hit sounds, each at its own length. ' +
-  'The toggle above shows lanes at their own length or laid out under this pass of the hits. ' +
-  'Nothing here restarts the sequencer; only the divisor rebuilds it.';
+/**
+ * The Play section's knob strip (windsor#393 decision 4), column by column
+ * in the mockup's order: Vel, Acc vel and Acc mod, then Hold.
+ */
+export const EUCLID_KNOB_COLUMNS: readonly (readonly string[])[] = [
+  ['velocity', 'accentVelocity', 'accentMod'],
+  ['hold'],
+];
 
-/** The readout line's resting text. */
-export const EUCLID_READOUT_HINT = 'Hover a cell to read it. The ring on each row is its playhead.';
+/** A share as a CSS percentage: the density plot's labels sit on its lines. */
+export const EUCLID_PERCENT = 100;
+
+/** The most lanes a part carries: Accent and Pitch once each, then the sound lanes. */
+export const EUCLID_LANES_MAX = 2 + STEP_MOD_LANES_MAX;

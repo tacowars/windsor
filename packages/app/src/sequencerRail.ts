@@ -3,8 +3,8 @@
  * `2026-10-01-sequencer-rack-devices` decision 2; generalised from the
  * Euclid card's rail, windsor#356). Top down: the part's accent dot, the
  * kind's name written vertically (a click folds the device to its rail),
- * then at the foot the device's own buttons (Euclid's lane-view toggle and
- * **?**), the region as `n/m`, and Split and Delete region as icon buttons.
+ * then at the foot the device's own buttons (Euclid's lane-view toggle),
+ * the region as `n/m`, and Split and Delete region as icon buttons.
  * The insert rack's rail (`.insert-rail`) is the look; the classes are the
  * sequencer's own, sharing its tokens.
  */
@@ -40,8 +40,6 @@ export interface RailRegion {
 export interface RailSpec {
   /** The kind's name, read bottom to top. */
   readonly name: string;
-  /** A smaller note after it (Euclid's part name). */
-  readonly note?: string | undefined;
   /** The device's own buttons, between the name and the region. */
   readonly tools?: readonly HTMLElement[] | undefined;
   readonly region: RailRegion;
@@ -83,7 +81,6 @@ export function sequencerRail(spec: RailSpec): HTMLElement {
   const name = el('button', 'seq-name', spec.name) as HTMLButtonElement;
   name.type = 'button';
   name.title = `Fold the ${spec.name} device to its rail, or open it`;
-  if (spec.note) name.appendChild(el('span', 'seq-name-part', spec.note));
   name.onclick = spec.fold;
   rail.append(dot, name, el('span', 'seq-rail-spacer'), ...(spec.tools ?? []));
   const region = regionTools(spec.region);

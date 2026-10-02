@@ -8,11 +8,10 @@
  *
  * A converted card hands back a `DeviceBody` with `fit: 'fixed'`: the device
  * is `--seq-h` high and as wide as its content, never scrolls its steps
- * sideways, and the row scrolls when it is wider than the pane. A card not
- * yet converted (Chord, Arp, Basslead) hands back its element as it was,
- * and sits in the frame at its natural height and the pane's width, its own
- * strip scrolling as before; so does the Euclid card, which adds its own
- * rail buttons (windsor#393 fits it to the height).
+ * sideways, and the row scrolls when it is wider than the pane. Every
+ * sequencer card is converted (the Euclid last, windsor#393, which adds its
+ * lane-view toggle to the rail); a card that hands back a plain element
+ * sits in the frame at its natural height and the pane's width.
  *
  * A click on the rail's name folds the device to the rail, and a click on a
  * folded device opens it. The fold is the session's (`DEVICE_FOLDS`), kept
@@ -34,8 +33,6 @@ export interface DeviceBody {
   readonly fit: 'fixed' | 'natural';
   /** The card's own rail buttons, between the name and the region. */
   readonly tools?: readonly HTMLElement[];
-  /** A smaller note after the kind's name on the rail. */
-  readonly note?: string;
   /** A class of the card's own on the device, for its custom properties. */
   readonly className?: string;
 }
@@ -72,7 +69,6 @@ export function sequencerDevice(frame: DeviceFrame): HTMLElement {
   device.style.setProperty('--kc', DEVICE_ACCENT[LANE_TONE[frame.kind]]);
   const rail = sequencerRail({
     name: KIND_LABELS[frame.kind],
-    note: content.note,
     tools: content.tools,
     region: frame.region,
     fold: () => setFolded(device, name, DEVICE_FOLDS.toggle(frame.slot)),
