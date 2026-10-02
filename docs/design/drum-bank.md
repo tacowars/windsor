@@ -71,10 +71,12 @@ leans on five of its features:
   1720 Hz carrier four times while a 1900 Hz carrier decays smoothly, both
   under two fed-back inharmonic modulators dense enough to read as noise;
   its rate is still above the Rate knob's 40 Hz.
-- **Two Noise operators need an algorithm that evaluates D..A.** The voice's
-  one noise stream is drawn in evaluation order, and the fixed-index kernel
-  only takes a two-noise voice on algorithms 0, 3 and 8 (`fmProcessorKernel.test.ts`
-  holds every factory patch to the kernel), at most two carriers. The 909
+- **Any number of Noise operators runs on the kernel, on any algorithm.**
+  The voice's one noise stream is drawn D..A at the top of each sample in
+  both render loops, so a two-Noise voice on Additive takes the fixed-index
+  kernel like any other (`2026-10-02-noise-draws-descend-in-both-loops`;
+  `fmProcessorKernel.test.ts` holds every factory patch to the kernel).
+  Before windsor#389 only algorithms 0, 3 and 8 qualified. The 909
   snare folds its fixed burst into the snappy's opening so it needs one
   Noise operator; the claps take one Noise modulator into three sine
   carriers instead (above).
