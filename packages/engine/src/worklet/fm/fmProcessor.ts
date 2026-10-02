@@ -205,7 +205,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
         // finish, which avoids clicks when a preset swaps under a ringing note.
         // The console opts into hearing the knob as it turns instead.
         if (this.liveRetune) {
-          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets);
+          const slots = this.slotTargets;
+          for (const v of this.voices) if (v.active) v.rebind(this.patch, this.waveSets, slots);
         }
         break;
       }

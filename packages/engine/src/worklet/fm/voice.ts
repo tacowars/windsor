@@ -365,8 +365,10 @@ class Voice {
    * control block instead of the next note. A wave or algorithm switch steps
    * audibly -- acceptable while designing a sound, which is why `liveRetune`
    * is off by default and a part keeps the click-free note-on binding.
+   * `slotTargets` is the part's slot map: a target a song lane moves keeps
+   * the lane's value across the rebind (windsor#346).
    */
-  rebind(patch: WorkletPatch, waveSets: (Float32Array[] | null)[]): void {
+  rebind(patch: WorkletPatch, waveSets: (Float32Array[] | null)[], slotTargets: Int32Array): void {
     this.patch = patch;
     this.alg = ALGORITHMS[patch.algorithm] || ALGORITHMS[0];
     this.order = ALG_ORDER[patch.algorithm] || ALG_ORDER[0];
@@ -390,7 +392,7 @@ class Voice {
     // The note keeps its step's offsets and its lanes over the new patch's
     // values (windsor#17, windsor#346), and a wave switch between PULSE and
     // the rest restarts that operator's width ramp from the width it plays.
-    rebindStepMod(this, patch, switched);
+    rebindStepMod(this, patch, switched, slotTargets);
   }
 
   /**

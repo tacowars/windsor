@@ -18,9 +18,13 @@
  *   sets `fbFrom` to the last block's `fbTo` and `fbTo` to this one's, and
  *   the render loops read `fbFrom + (fbTo − fbFrom) · t` through the block
  *   while the two differ (`fbRamp`, a bit per operator).
- * - `primeVoiceOffsets` binds the values at a note-on or a rebind and starts
- *   both ends of the ramp there, so a new note plays its lanes from its
- *   first sample and a live retune's feedback is heard at once, as before.
+ * - `primeVoiceOffsets` binds the values at a note-on and starts both ends
+ *   of the ramp there, so a new note plays its lanes from its first sample.
+ * - `rebindVoiceOffsets` does the same at a live retune's rebind, except for
+ *   a target a slot is mapped to: that keeps what it plays, the lane's value,
+ *   until the next control block reads the offsets against the new patch.
+ *   The patch message arrives before the lanes' resync (`AudioSystem.apply`),
+ *   so the offsets then are still the old patch's (PR #385 fix round 2).
  *
  * Invariant: an offset of exactly 0 leaves the value as it was, neither
  * clamped nor passed through a curve, and a part with no slot mapped reads
@@ -153,11 +157,11 @@ function applyVoiceOffsets(voice: Voice): void {
 
 /**
  * The voice's values with the part's offsets (`bindLiveValues`), and both
- * ends of every feedback ramp at its feedback, with no ramp: from `start`
- * and `rebind`, once the voice's own values are bound, so a note starts on
- * its lanes' values (`start` reads its width ramp's start here too) and a
- * live retune's feedback is heard from the next sample, as it was before
- * the ramp. A slide keeps its feedback (`slideKeeps`), and its ramp.
+ * ends of every feedback ramp at its feedback, with no ramp: from `start`,
+ * once the voice's own values are bound, so a note starts on its lanes'
+ * values (`start` reads its width ramp's start here too). A rebind is
+ * `rebindVoiceOffsets`. A slide keeps its feedback (`slideKeeps`), and its
+ * ramp.
  */
 function primeVoiceOffsets(voice: Voice): void {
   bindLiveValues(voice);
@@ -169,4 +173,47 @@ function primeVoiceOffsets(voice: Voice): void {
   voice.fbRamp = 0;
 }
 
-export { applyVoiceOffsets, latchVoiceOffsets, mapVoiceSlots, primeVoiceOffsets };
+/**
+ * What a rebind keeps, one voice at a time on the patch message: the values
+ * the voice played, and the targets a slot is mapped to.
+ */
+const keptValues = new Float64Array(VOICE_TARGET_COUNT);
+const keptTargets = new Uint8Array(VOICE_TARGET_COUNT);
+
+/**
+ * `primeVoiceOffsets` for a live retune's rebind, once the new patch's own
+ * values are bound: a target a slot is mapped to keeps the value it played,
+ * and an operator whose feedback has a lane keeps its ramp, so a rebound
+ * voice stays on the lane's absolute value with no transient. The offsets
+ * here were worked out against the old patch, since the patch message comes
+ * before the lanes' resync; the next control block reads them against the
+ * new one. A target no lane moves takes the new patch's value at once, as
+ * before. Allocates nothing.
+ */
+function rebindVoiceOffsets(voice: Voice, slotTargets: Int32Array): void {
+  const v = voice.liveValues;
+  const kept = keptTargets;
+  keptValues.set(v);
+  kept.fill(0);
+  for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
+    const code = slotTargets[s];
+    if (code >= 0) kept[code] = 1;
+  }
+  bindLiveValues(voice);
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK;
+    if (kept[k] !== 0) continue;
+    voice.fbTo[i] = v[k];
+    voice.fbFrom[i] = voice.fbTo[i];
+    voice.fbRamp &= ~(1 << i);
+  }
+}
+
+export {
+  applyVoiceOffsets,
+  latchVoiceOffsets,
+  mapVoiceSlots,
+  primeVoiceOffsets,
+  rebindVoiceOffsets,
+};
