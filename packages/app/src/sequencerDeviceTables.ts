@@ -21,6 +21,22 @@ export const stripHeadPx = (
   gap = STRIP_ROW_GAP_PX,
 ): number => rows.reduce((sum, row) => sum + row, 0) + gap * Math.max(0, rows.length - 1);
 
+/** The Arp's step cells' height (windsor#370): roomier than the Grid's 18, as tacowars asked of the Chord. */
+export const ARP_CELL_PX = 20;
+
+/** The gap between an Arp step column's held rows, in px. */
+export const ARP_ROW_GAP_PX = 4;
+
+/** The Arp's step rows, top down, in px: the step number, `♪ — ·`, Oct, A, S, ratchet. */
+export const ARP_HEAD_ROWS_PX: readonly number[] = [
+  12,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  ARP_CELL_PX,
+  14,
+];
+
 /** Custom property → px. */
 export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   /** A converted device's height (the insert rack's `--rack-h` is 196). */
@@ -53,6 +69,26 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--chord-tile-gap': 10,
   /** The knob strip's padding either side of its knobs, behind the rule that parts it from the Play columns. */
   '--chord-knob-pad': 9,
+  /* The Arp's own sizes (windsor#370), its Play section laid out as the
+     Chord's: inset from the rail, columns apart, a knob strip behind a rule. */
+  /** The Arp's Play section's inset from the rail. */
+  '--arp-inset': 12,
+  /** The space between the Arp's Play columns. */
+  '--arp-col-gap': 13,
+  /** The Style, Rate, Voicing, Retrigger and Seed fields' width. */
+  '--arp-field-w': 112,
+  /** The knob strip's padding either side of its knobs, behind its rule. */
+  '--arp-knob-pad': 9,
+  /** The Reseed icon button beside the seed field, square. */
+  '--arp-reseed': 22,
+  /** An Arp step cell's height: `♪ — ·`, Oct, A and S. */
+  '--arp-cell-h': ARP_CELL_PX,
+  /** The space between an Arp step's held rows. */
+  '--arp-row-gap': ARP_ROW_GAP_PX,
+  /** The space between two Arp step columns. */
+  '--arp-step-gap': 6,
+  /** The Arp's held step rows, which its lane names' corner matches. */
+  '--arp-strip-head-h': stripHeadPx(ARP_HEAD_ROWS_PX, ARP_ROW_GAP_PX),
   /** The extra space before each group of four steps. */
   '--beat-gap': 4,
   /** One modulation lane's height. */

@@ -1,26 +1,34 @@
 /**
- * The Arp card's step strip (windsor#137, epic windsor#126): one column per
- * cell of the arp's cycle, each a note, tie or rest with its octave shift,
- * accent and slide, the modulation lanes under them, the Rotate knob, the
- * Randomize button and a playhead. `arpCard.ts` places the pieces.
+ * The Arp device's Cycle section (windsor#137, epic windsor#126; the device,
+ * windsor#370, look `docs/research/2026-09-30-sequencer-rack/arp.html`):
+ * one column per cell of the arp's cycle, each a note, tie or rest with its
+ * octave shift, accent, slide and ratchet held at the top of the strip, the
+ * modulation lanes under them, their names, × and readout in a column at the
+ * left with **+ Lane** in its corner, the Rotate knob, the Randomize button
+ * and a playhead. `arpCard.ts` places the pieces.
  *
- * The strip shows `arpCellCount` cells (`arpGridModel.ts`): one cycle of the
- * style over the chord the card reads, so it grows and shrinks with the
- * chord, Octaves, Voicing, Reg and Style. The count is re-read every frame
- * the card is on screen, and the strip repaints when it moves, so a picker,
- * a knob or the playhead crossing into a chord of another size redraws it
- * without a render. The cells past it stay in the document, unshown.
+ * The strip shows `arpListCount` cells (`arpGridModel.ts`): one cycle of the
+ * style over the chord the card reads, so the device grows and shrinks with
+ * the chord, Octaves, Voicing, Octave and Style. The count is re-read every
+ * frame the card is on screen, and the strip repaints when it moves, so a
+ * picker, a knob or the playhead crossing into a chord of another size
+ * redraws it without a render. The cells past it stay in the document,
+ * unshown. Nothing scrolls sideways; the lanes scroll vertically under the
+ * step rows.
  *
- * It draws on the grid card's machinery: `stepStrip.ts`'s cells, columns
- * and playhead loop, `gridModel.ts`'s cell edits, the lanes of
- * `stepModLane.ts` through a `LaneHost` as `gridCard.ts` builds one, and
- * the region playhead (`regionPlayhead.ts`), the engine's
- * `Arpeggiator.stepAt`. Every edit writes the selected region's pattern
- * (`changePattern`), so each region keeps its own cells.
+ * It draws on the Grid device's machinery: `stepStrip.ts`'s cells, held
+ * columns and playhead loop, `gridModel.ts`'s cell edits, the shared ratchet
+ * (`ratchetCell.ts`, `ratchetModel.ts`; record
+ * `2026-10-01-sequencer-rack-devices` decision 6), the lanes of
+ * `stepModLane.ts` through a `LaneHost` as `gridCard.ts` builds one, and the
+ * region playhead (`regionPlayhead.ts`), the engine's `Arpeggiator.stepAt`.
+ * Every edit writes the selected region's pattern (`changePattern`), so each
+ * region keeps its own cells.
  */
 import type { ArpSpec, ArpStep } from '@windsor/engine';
-import { ARP_STEPS_MAX } from '@windsor/engine';
+import { ARP_STEPS_MAX, STEP_MOD_LANES_MAX } from '@windsor/engine';
 import {
+  arpCycleLabel,
   arpKindLabel,
   arpListCount,
   arpOctaveLabel,
@@ -37,6 +45,8 @@ import { el } from './dom';
 import { cycleOctave, toggleFlag, withStep } from './gridModel';
 import { makeKnob } from './knob';
 import { changePattern } from './partEdits';
+import { ratchetCell } from './ratchetCell';
+import { cycleStepRatchet, stepRatchet, takesRatchet } from './ratchetModel';
 import { regionPlayheadAt } from './regionPlayhead';
 import { ARP_ROTATE_KNOB } from './sequencerKnobTables';
 import {
@@ -54,29 +64,32 @@ import {
   markStep,
   paintStrip,
   specOf,
-  stripCell,
-  stripColumn,
+  stripCell as cell,
+  stripHeadColumn,
   watchPlayhead,
 } from './stepStrip';
 
-/** The arp's strip: its scroller, lane names and picker, and the note list and cell count it last drew. */
+/** The arp's strip: its scroller, lane names, corner and label, and the note list and cell count it last drew. */
 interface ArpStrip extends Strip<ArpSpec> {
+  /** The vertical scroller holding the lane names and the columns. */
   scroll: HTMLElement;
   names: HTMLElement;
-  picker: HTMLSelectElement | null;
+  picker: HTMLSelectElement;
+  /** The corner's "n of 4 lanes". */
+  lanesCount: HTMLElement;
+  /** The Cycle label's count and chord. */
+  label: HTMLElement;
   lanes: LaneHost;
   list: readonly number[];
   count: number;
 }
 
-/** The pieces `arpCard.ts` places: Rotate in the knob row, the tools row, the strip. */
+/** The pieces `arpCard.ts` places: Rotate and Randomize in the controls, the Cycle section. */
 export interface ArpGridParts {
   rotate: HTMLElement;
-  tools: HTMLElement;
-  strip: HTMLElement;
+  randomize: HTMLElement;
+  section: HTMLElement;
 }
-
-const cell = stripCell;
 
 /** The notes the arp walks over the chord the card reads now; empty with no spec or chord. */
 function listOf(strip: Strip<ArpSpec>): number[] {
@@ -109,7 +122,7 @@ function kindCell(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
 
 function octaveCell(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
   if (step.kind !== 'note') return cell('', 'blank');
-  const node = cell(arpOctaveLabel(step.octave));
+  const node = cell(arpOctaveLabel(step.octave), step.octave === 0 ? 'oct dim' : 'oct');
   node.title = 'octave shift: click up, shift-click down';
   node.onclick = (event: MouseEvent): void =>
     editCell(strip, index, (s) => cycleOctave(s, event.shiftKey ? -1 : 1));
@@ -130,19 +143,30 @@ function flagCell(
   return node;
 }
 
+/** The cell's ratchet: ×1 or a tick per hit, cycled by a click; grey and inert on a rest or a tie. */
+function ratchet(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
+  return ratchetCell({
+    step: index,
+    roll: stepRatchet(step),
+    takes: takesRatchet(step),
+    cycle: () => editCell(strip, index, cycleStepRatchet),
+  });
+}
+
 function column(strip: ArpStrip, index: number, step: ArpStep): HTMLElement {
-  return stripColumn(index, true, [
+  const head = [
     kindCell(strip, index, step),
     octaveCell(strip, index, step),
     flagCell(strip, index, step, 'accent'),
     flagCell(strip, index, step, 'slide'),
-    ...laneCells(strip.lanes, index, step.kind === 'note'),
-  ]);
+    ratchet(strip, index, step),
+  ];
+  return stripHeadColumn(index, true, head, laneCells(strip.lanes, index, step.kind === 'note'));
 }
 
-/** Redraw the shown cells, the lane names and the picker from the document, keeping the scroll. */
+/** Redraw the shown cells, the lane names, the corner and the label from the document, keeping the scroll. */
 function repaint(strip: ArpStrip): void {
-  const scrollLeft = strip.scroll.scrollLeft;
+  const scrollTop = strip.scroll.scrollTop;
   const spec = strip.spec();
   strip.list = listOf(strip);
   strip.count = spec ? arpListCount(spec.style, strip.list) : 0;
@@ -150,16 +174,19 @@ function repaint(strip: ArpStrip): void {
   paintStrip(strip, (spec) =>
     spec.steps.slice(0, strip.count).map((step, index) => column(strip, index, step)),
   );
-  if (strip.picker) fillLanePicker(strip.picker, strip.lanes);
-  strip.scroll.scrollLeft = scrollLeft;
+  fillLanePicker(strip.picker, strip.lanes);
+  strip.lanesCount.textContent = `${spec?.lanes.length ?? 0} of ${STEP_MOD_LANES_MAX} lanes`;
+  const chord = regionChord(strip.ctx, strip.slot, strip.region);
+  strip.label.textContent = arpCycleLabel(strip.count, strip.ctx.model.doc.harmony, chord);
+  strip.scroll.scrollTop = scrollTop;
 }
 
 /**
  * Per frame while the card is on screen: a repaint when the style or the
- * notes it walks have moved (a Style, Octaves, Voicing or Reg edit, or the
- * playhead in another chord), which move the shown count and which slides
- * land on the held pitch, or Skip has moved to or from 0, which decides
- * whether a slide's hold on a lane is certain; then the playhead.
+ * notes it walks have moved (a Style, Octaves, Voicing or Octave edit, or
+ * the playhead in another chord), which move the shown count, the label and
+ * which slides land on the held pitch, or Skip has moved to or from 0, which
+ * decides whether a slide's hold on a lane is certain; then the playhead.
  */
 function watch(strip: ArpStrip): void {
   const signature = (): string => {
@@ -202,10 +229,9 @@ function rotateKnob(strip: ArpStrip): HTMLElement {
 }
 
 function randomizeButton(strip: ArpStrip): HTMLElement {
-  const button = el('button', 'btn', 'Randomize') as HTMLButtonElement;
+  const button = el('button', 'btn seq-btn', 'Randomize') as HTMLButtonElement;
   button.type = 'button';
-  button.style.borderColor = PITCH_COLOR;
-  button.title = 'The shown cells: accent, slide, an octave now and then, a tie or rest';
+  button.title = 'The shown cells: accent, slide, an octave now and then, a tie or rest, a ratchet';
   button.onclick = (): void =>
     commitSteps(strip, (spec) => randomArpCells(spec.steps, countOf(strip), Math.random));
   return button;
@@ -239,9 +265,30 @@ function laneHost(
   };
 }
 
+/** The lane names' column: + Lane and the lane count in the corner, level with the step rows, then a row per lane. */
+function namesColumn(strip: ArpStrip): HTMLElement {
+  const corner = el('div', 'strip-head seq-corner');
+  corner.append(strip.picker, strip.lanesCount, el('span', 'seq-row-label', 'Ratchet'));
+  const column = el('div', 'seq-names');
+  column.append(corner, strip.names);
+  return column;
+}
+
+/** The Cycle section: its label with the count and chord, then the strip. */
+function cycleSection(strip: ArpStrip): HTMLElement {
+  const label = el('div', 'seq-sec-label', 'Cycle');
+  label.appendChild(strip.label);
+  strip.scroll.append(namesColumn(strip), strip.root);
+  const body = el('div', 'seq-sec-body');
+  body.appendChild(strip.scroll);
+  const section = el('div', 'seq-section steps');
+  section.append(label, body);
+  return section;
+}
+
 /** The arp's step grid for region `region` of the part on `slot` (the part's sequencer with none). */
 export function arpGrid(ctx: AppCtx, slot: number, region: number | undefined): ArpGridParts {
-  const scroll = el('div', 'grid-scroll');
+  const scroll = el('div', 'seq-strip');
   const base: Strip<ArpSpec> = {
     ctx,
     slot,
@@ -251,23 +298,20 @@ export function arpGrid(ctx: AppCtx, slot: number, region: number | undefined): 
     spec: () => specOf(ctx, slot, 'arp', region),
     repaint: () => repaint(strip),
   };
+  const lanes = laneHost(base, scroll, () => strip.list);
   const strip: ArpStrip = {
     ...base,
     scroll,
-    names: el('div', 'mod-names'),
-    picker: null,
+    names: el('div', 'seq-lane-names'),
+    picker: lanePicker(lanes),
+    lanesCount: el('span', 'seq-meas'),
+    label: el('em'),
+    lanes,
     list: [],
     count: 0,
-    lanes: laneHost(base, scroll, () => strip.list),
   };
-  const tools = el('div', 'capture-row');
-  tools.appendChild(randomizeButton(strip));
-  strip.picker = lanePicker(strip.lanes);
-  const lanes = el('div');
-  lanes.append(el('span', 'field-label', 'Lanes'), strip.picker);
-  tools.appendChild(lanes);
-  strip.scroll.append(strip.names, strip.root);
+  const section = cycleSection(strip);
   repaint(strip);
   watch(strip);
-  return { rotate: rotateKnob(strip), tools, strip: strip.scroll };
+  return { rotate: rotateKnob(strip), randomize: randomizeButton(strip), section };
 }
