@@ -122,6 +122,40 @@ export function rotateLanes(
   return lanes.map((lane) => ({ ...lane, values: rotateSteps(lane.values, by, length) }));
 }
 
+/** The pattern Rotate turns: the loop length, its steps and their lanes. */
+type GridTurnable = Pick<GridSpec, 'length' | 'steps' | 'lanes'>;
+
+/** The Rotate knob after a move: its new value, and the write the move makes (null when nothing turns). */
+export interface GridTurn {
+  turned: number;
+  change: { steps: GridStep[]; lanes: StepModLane[] } | null;
+}
+
+/**
+ * The Rotate knob's move from `turned` to `target`, as the Basslead's
+ * `turnBass`: the difference, turned over the pattern the document holds
+ * now, ratchets and lane values with their steps. `turned` is an offset
+ * from the pattern the knob last turned, so Length and Randomize, which
+ * replace that pattern, rebase it to `GRID_TURN_REBASED`: back at zero then
+ * means the new pattern as it stands, not a turn back over steps it never
+ * held.
+ */
+export function turnGrid(spec: GridTurnable, turned: number, target: number): GridTurn {
+  const to = Math.round(target);
+  const by = to - turned;
+  if (by === 0) return { turned: to, change: null };
+  return {
+    turned: to,
+    change: {
+      steps: rotateSteps(spec.steps, by, spec.length),
+      lanes: rotateLanes(spec.lanes, by, spec.length),
+    },
+  };
+}
+
+/** Rotate's value once Length or Randomize has replaced the pattern it turned. */
+export const GRID_TURN_REBASED = 0;
+
 /** A uniform draw in [0, 1); the card passes `Math.random`, a test passes its own. */
 export type Draw = () => number;
 

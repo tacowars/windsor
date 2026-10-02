@@ -10,9 +10,9 @@ import { scaleOffsets } from '@windsor/engine';
 import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
 import { GRID_KNOB_COLUMNS } from './gridDeviceTables';
-import { randomSteps, rotateLanes, rotateSteps, stepsForLength } from './gridModel';
+import { GRID_TURN_REBASED, randomSteps, stepsForLength, turnGrid } from './gridModel';
 import { octaveKnob } from './harmonyTables';
-import { makeKnob } from './knob';
+import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
 import { divisorPicker, tableKnob } from './seqFields';
 import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
@@ -35,7 +35,22 @@ function octave(strip: GridStrip): HTMLElement {
   });
 }
 
-function lengthKnob(strip: GridStrip): HTMLElement {
+/**
+ * Rotate's offset from the pattern it last turned, and its knob. Length
+ * and Randomize replace that pattern, so they rebase the offset
+ * (`turnGrid`) and redraw the knob at zero.
+ */
+interface GridRotor {
+  turned: number;
+  knob: KnobElement | null;
+}
+
+function rebase(rotor: GridRotor): void {
+  rotor.turned = GRID_TURN_REBASED;
+  rotor.knob?.refresh();
+}
+
+function lengthKnob(strip: GridStrip, rotor: GridRotor): HTMLElement {
   return makeKnob({
     ...GRID_LENGTH_KNOB,
     color: PITCH_COLOR,
@@ -44,6 +59,8 @@ function lengthKnob(strip: GridStrip): HTMLElement {
       const spec = strip.spec();
       if (!spec) return;
       const length = Math.round(v);
+      if (length === spec.length) return;
+      rebase(rotor);
       const steps = stepsForLength(spec.steps, length);
       const lanes = lanesForSteps(spec.lanes, steps.length);
       if (changePattern(strip.ctx, strip.slot, strip.region, { length, steps, lanes }))
@@ -56,31 +73,30 @@ function lengthKnob(strip: GridStrip): HTMLElement {
  * Rotate applies the turn since its last value, so the document holds the
  * rotated steps (their ratchets with them) and lanes, and no offset.
  */
-function rotateKnob(strip: GridStrip): HTMLElement {
-  let turned = 0;
-  return makeKnob({
+function rotateKnob(strip: GridStrip, rotor: GridRotor): KnobElement {
+  const knob = makeKnob({
     ...GRID_ROTATE_KNOB,
     color: PITCH_COLOR,
-    get: () => turned,
+    get: () => rotor.turned,
     set: (v) => {
-      const target = Math.round(v);
-      const by = target - turned;
-      if (by === 0) return;
-      turned = target;
       const spec = strip.spec();
       if (!spec) return;
-      const steps = rotateSteps(spec.steps, by, spec.length);
-      const lanes = rotateLanes(spec.lanes, by, spec.length);
-      if (changePattern(strip.ctx, strip.slot, strip.region, { steps, lanes })) strip.repaint();
+      const turn = turnGrid(spec, rotor.turned, v);
+      rotor.turned = turn.turned;
+      if (turn.change && changePattern(strip.ctx, strip.slot, strip.region, { ...turn.change }))
+        strip.repaint();
     },
   });
+  rotor.knob = knob;
+  return knob;
 }
 
-function randomizeButton(strip: GridStrip): HTMLElement {
+function randomizeButton(strip: GridStrip, rotor: GridRotor): HTMLElement {
   const button = el('button', 'btn seq-btn', 'Randomize') as HTMLButtonElement;
   button.type = 'button';
   button.title = 'Every step: a random degree from the key, octave, accent and slide';
-  button.onclick = (): void =>
+  button.onclick = (): void => {
+    rebase(rotor);
     commitSteps(strip, (spec) =>
       randomSteps(
         spec.steps.length,
@@ -88,6 +104,7 @@ function randomizeButton(strip: GridStrip): HTMLElement {
         Math.random,
       ),
     );
+  };
   return button;
 }
 
@@ -104,10 +121,11 @@ export function gridControls(strip: GridStrip): HTMLElement {
     const entry = GRID_KNOBS.find((e) => e.f === field);
     return entry ? [tableKnob(ctx, slot, entry, PITCH_COLOR, region)] : [];
   };
+  const rotor: GridRotor = { turned: GRID_TURN_REBASED, knob: null };
   const body = el('div', 'seq-sec-body');
   body.append(
-    column('wide', [divisorPicker(ctx, slot, region), randomizeButton(strip)]),
-    column('k3', [octave(strip), lengthKnob(strip), rotateKnob(strip)]),
+    column('wide', [divisorPicker(ctx, slot, region), randomizeButton(strip, rotor)]),
+    column('k3', [octave(strip), lengthKnob(strip, rotor), rotateKnob(strip, rotor)]),
     ...GRID_KNOB_COLUMNS.map((fields) => column('k3', fields.flatMap(knob))),
   );
   const section = el('div', 'seq-section');
