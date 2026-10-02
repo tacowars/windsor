@@ -2,7 +2,8 @@
  * The fields more than one sequencer kind shares, normalised once: the
  * part's own `seed` (#705, decision 16) and its absolute register octave
  * (decision 11), and the step grid's note shape and modulation lanes, which
- * the grid and, since windsor#127, the arp both carry, and the Euclid
+ * the grid and, since windsor#127, the arp both carry (since windsor#366
+ * with a ratchet), and the Euclid
  * part's drawn lanes of their own length (windsor#355).
  * `sequencerNormalise.ts` and `performerNormalise.ts` both read them, so
  * neither imports the other.
@@ -10,6 +11,7 @@
 import {
   EUCLID_LANE_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
+  RATCHET_MAX,
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
 } from '../audioConstants';
@@ -44,17 +46,53 @@ export function registerOctave(
   };
 }
 
-/** A note step's octave (±`GRID_STEP_OCTAVE_MAX`), accent and slide: the shape a grid step and an arp cell share. */
+/** The keys a note step carries beyond `kind` (and the grid's `degree`). */
+export const STEP_NOTE_KEYS = ['octave', 'accent', 'slide', 'ratchet'] as const;
+
+/**
+ * A note step's octave (±`GRID_STEP_OCTAVE_MAX`), accent, slide and ratchet:
+ * the shape a grid step and an arp cell share.
+ */
 export function stepNoteFields(
   o: Record<string, unknown>,
   path: string,
   n: FieldNormaliser,
-): { octave: number; accent: boolean; slide: boolean } {
+): { octave: number; accent: boolean; slide: boolean; ratchet?: number } {
   return {
     octave: n.int(o.octave, 0, -GRID_STEP_OCTAVE_MAX, GRID_STEP_OCTAVE_MAX, `${path}.octave`),
     accent: n.bool(o.accent, false, `${path}.accent`),
     slide: n.bool(o.slide, false, `${path}.slide`),
+    ...stepRatchet(o.ratchet, `${path}.ratchet`, n),
   };
+}
+
+/**
+ * A note step's ratchet (windsor#366): absent or 1 is one hit and leaves no
+ * key, so an export carries no default. Anything else is a whole
+ * 1–`RATCHET_MAX`, clamped or rounded with a report, and junk is one hit,
+ * reported.
+ */
+function stepRatchet(raw: unknown, path: string, n: FieldNormaliser): { ratchet?: number } {
+  if (raw === undefined) return {};
+  const ratchet = n.int(raw, 1, 1, RATCHET_MAX, path);
+  return ratchet > 1 ? { ratchet } : {};
+}
+
+/**
+ * A rest or a tie: its `kind` alone. A ratchet on it plays nothing and is
+ * dropped with its own report (windsor#366); any other key is unknown.
+ */
+export function unpitchedStep<K extends 'rest' | 'tie'>(
+  o: Record<string, unknown>,
+  kind: K,
+  path: string,
+  n: FieldNormaliser,
+): { kind: K } {
+  if (o.ratchet !== undefined) {
+    n.correction(`${path}.ratchet: a ${kind} plays no hit — ratchet dropped`);
+  }
+  n.dropUnknown(o, ['kind', 'ratchet'], path);
+  return { kind };
 }
 
 /**

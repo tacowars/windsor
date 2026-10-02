@@ -64,6 +64,18 @@
  * new arp's cells are all plain notes, so it plays exactly as it did before
  * the grid.
  *
+ * **Ratchets** (windsor#366, record `2026-10-01-sequencer-rack-devices`
+ * decision 6): a note cell's `ratchet` of 2 to `RATCHET_MAX` plays that many
+ * hits of its note, spaced evenly across the step's swung span. The cell's
+ * note-on is hit 0, as a plain cell plays it, and carries a `roll` the
+ * player spends on the later hits (`rollSpan.ts`), each with the cell's
+ * accent and offsets and no slide, and each held `gate` of its slice. Where
+ * a plain note would run to the next onset (a tie or slide next, or a gate
+ * covering the step), the last hit is held open and the next onset releases
+ * it; otherwise the roll leaves nothing held. The walk and the skip draw
+ * once per onset, before the roll, so a skipped cell plays no hit. A slide
+ * to the pitch held is still a tie, its ratchet unheard.
+ *
  * Pure: it reads the chord and local tick the gate forwards, never the
  * transport, and emits note events on the tick grid.
  */
@@ -74,6 +86,7 @@ import type { HarmonyChord } from '../harmony/harmonyTimeline';
 import {
   arpCellIndex,
   arpSkipRng,
+  type ArpCellOutcome,
   holdsToNext,
   playArpCell,
   shiftOctave,
@@ -83,7 +96,7 @@ import {
 import { assertArpConfig, type ArpSequencerConfig, type ArpStyle } from './arpSequencer';
 import { arpCycleLength, arpNote } from './arpSteps';
 import { streamRng, type Rng } from './generatorSeed';
-import type { NoteEvent, NoteHandler } from './noteEvent';
+import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
 import type { Unsubscribe } from './scheduler';
@@ -201,6 +214,26 @@ export function otherIndex(list: readonly number[], previous: number | null, rng
 }
 
 const PLAIN_CELL = arpNote();
+
+/**
+ * A ratcheted cell's outcome (windsor#366): its note-on, if it struck one,
+ * carries the roll, each hit held `gate` of its slice. The last hit is open,
+ * the arp's to release at the next onset, only where the plain note would
+ * have run there; otherwise the player holds every hit and nothing is left.
+ */
+export function rollOutcome(
+  outcome: ArpCellOutcome,
+  hits: number,
+  config: Pick<ArpSequencerConfig, 'divisor' | 'gate'>,
+  clock: { readonly secondsPerTick: number },
+): ArpCellOutcome {
+  const on = outcome.events.find((e): e is NoteOnEvent => e.kind === 'noteOn');
+  if (!on) return outcome;
+  const open = outcome.releaseTick === null;
+  const { divisor: ticks, gate } = config;
+  on.roll = { hits, ticks, secondsPerTick: clock.secondsPerTick, gate, open };
+  return { events: outcome.events, held: open ? outcome.held : null, releaseTick: null };
+}
 
 /** What identifies "the chord changed" for a retrigger: its degree and size, not its event. */
 const chordKey = (chord: HarmonyChord): string => `${chord.event.degree}:${chord.event.size}`;
@@ -331,13 +364,14 @@ export class Arpeggiator {
     // Every cycle fits the stored cells (`ARP_STEPS_MAX`); a plain note stands in for safety.
     const written = steps[index] ?? PLAIN_CELL;
     const played = skipCell(written, skipChance, this.skipRng);
+    // A retrigger reset starts on a sounding note: a tie or slide on cell 0 strikes plain.
+    const cell = reset ? strikeCell(played) : played;
     const outcome = playArpCell(
       {
         tick: event.tick,
         time: event.time,
         degree: chord.event.degree,
-        // A retrigger reset starts on a sounding note: a tie or slide on cell 0 strikes plain.
-        cell: reset ? strikeCell(played) : played,
+        cell,
         index,
         pitch,
         held: this.held,
@@ -345,6 +379,12 @@ export class Arpeggiator {
       },
       this.current,
     );
+    const hits = cell.kind === 'note' ? (cell.ratchet ?? 1) : 1;
+    return this.settle(hits > 1 ? rollOutcome(outcome, hits, this.current, event) : outcome);
+  }
+
+  /** Keep what an onset leaves sounding, and hand back what it emitted. */
+  private settle(outcome: ArpCellOutcome): NoteEvent[] {
     this.held = outcome.held;
     this.releaseTick = outcome.releaseTick;
     return outcome.events;

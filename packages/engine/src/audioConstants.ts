@@ -68,8 +68,13 @@ export const EUCLID_STEPS_MAX = 64;
 export const EUCLID_LANE_STEPS_MAX = 32;
 /** A Euclid pitch lane's reach, in semitones either way of the part's `note`. */
 export const EUCLID_PITCH_LANE_MAX = 24;
-/** A Euclid step's ratchet: the most hits one step's roll may split into (1 is a plain hit). */
-export const EUCLID_RATCHET_MAX = 4;
+/**
+ * A step's ratchet: the most hits one step's roll may split into (1 is a
+ * plain hit). Euclid, Grid and Arp steps share it (windsor#355, windsor#366).
+ */
+export const RATCHET_MAX = 4;
+/** A Euclid step's ratchet ceiling: `RATCHET_MAX`, aliased so the two cannot drift. */
+export const EUCLID_RATCHET_MAX = RATCHET_MAX;
 /** Chance a `walk` density modulator steps at all on a given bar. */
 export const WALK_CHANCE = 0.5;
 /** A free-running density LFO's rate, in hertz. */

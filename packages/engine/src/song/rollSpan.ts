@@ -1,6 +1,8 @@
 /**
- * A Euclid ratchet's roll (windsor#355). Its hits are queued at once, spaced
- * evenly across the step's whole swung span (decision 6 of
+ * A ratchet's roll: a Euclid step's (windsor#355), and since windsor#366 a
+ * Grid or Arp note step's (decision 6 of
+ * `docs/log/2026-10-01-sequencer-rack-devices.md`). Its hits are queued at
+ * once, spaced evenly across the step's whole swung span (decision 6 of
  * `docs/log/2026-10-01-euclid-lanes-and-ratchets.md`). Where the onset's own
  * region ends or the loop jumps back inside that span, the roll keeps its
  * spacing and drops the hits that would start at or past the boundary, and
@@ -33,6 +35,8 @@ export interface RollShape {
   readonly ratchet: number;
   /** The part's hold, in seconds. */
   readonly hold: number;
+  /** The fraction of its spacing a hit may be held: an Arp's gate (windsor#366). Absent is 1. */
+  readonly gate?: number;
 }
 
 export interface RollInput extends RollBoundInput, RollShape {
@@ -49,18 +53,20 @@ export interface RollHit {
 /**
  * The hits a roll plays. Hit `j` starts at `j × spacing`, the spacing being
  * the whole step's swung span over `N`, and sounds only if it starts before
- * the bound. Each is held for `min(hold, spacing, time left to the bound)`.
+ * the bound. Each is held for `min(hold, gate × spacing, time left to the
+ * bound)`, the gate 1 unless the shape names one.
  * The first always sounds: the onset itself is inside its region.
  */
 export function rollHits(input: RollInput): RollHit[] {
-  const { tick, divisor, secondsPerTick, swing, ratchet, hold } = input;
+  const { tick, divisor, secondsPerTick, swing, ratchet, hold, gate = 1 } = input;
   const spacing = rollSpanSeconds({ tick, ticks: divisor, secondsPerTick, swing }) / ratchet;
+  const slice = spacing * gate;
   const reach = rollReachSeconds(input);
   const hits: RollHit[] = [];
   for (let j = 0; j < ratchet; j++) {
     const offset = j * spacing;
     if (j > 0 && offset >= reach - ON_BOUNDARY_SECONDS) break;
-    hits.push({ offset, held: Math.min(hold, spacing, reach - offset) });
+    hits.push({ offset, held: Math.min(hold, slice, reach - offset) });
   }
   return hits;
 }

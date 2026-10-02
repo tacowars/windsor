@@ -5,7 +5,7 @@
  * know nothing about audio, and everything that does know lives here.
  *
  *   transport ─▶ RegionGate ─▶ EuclideanSequencer ─ onset ─▶ part.trigger (× its ratchet)
- *                          ─▶ GridSequencer      ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
+ *                          ─▶ GridSequencer      ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote (a roll × its ratchet)
  *                          ─▶ ChordSequencer     ─ noteOn/noteOff ─▶ part.noteOn / noteOffByNote
  *                          ─▶ Arp / Bass (#706, #707)
  *
@@ -48,7 +48,7 @@
 import type { Arrangement, ArrangementPartial, MusicPart, SequencerSpec } from './arrangement';
 import { mergeArrangement } from './arrangement';
 import type { OnsetEvent } from '../sequencing/euclideanSequencer';
-import type { NoteEvent } from '../sequencing/noteEvent';
+import type { NoteEvent, NoteRoll } from '../sequencing/noteEvent';
 import type { PresetTable } from './arrangementValidate';
 import {
   lookupPreset,
@@ -66,7 +66,8 @@ import { STRAIGHT_SWING, type Swing } from '../sequencing/swingTables';
 import { playableSwing } from '../sequencing/swing';
 import type { RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
-import { euclidNoteOn, partNoteOn } from './partNoteOn';
+import { euclidNoteOn } from './partNoteOn';
+import { PLAIN_HIT, pitchedRollShape, playPitched } from './pitchedRoll';
 import { euclidHitRead } from '../sequencing/euclidLanes';
 import { rollHits, type RollHit, type RollShape } from './rollSpan';
 import { fitTimelines } from './timelineNormalise';
@@ -511,39 +512,41 @@ export class ArrangementPlayer {
   }
 
   /**
-   * A roll's hits, cut where the part's region ends or the loop jumps
-   * inside the step (`rollSpan.ts`). The swing's phase is the transport
-   * tick's and the gate hands a generator only its local tick, so the tick
-   * read is `follow`'s, which hears every tick first.
+   * A roll's hits, Euclid's, Grid's or Arp's, cut where the part's region
+   * ends or the loop jumps inside the step (`rollSpan.ts`). The swing's
+   * phase is the transport tick's and the gate hands a generator only its
+   * local tick, so the tick read is `follow`'s, which hears every tick first.
    */
-  private rollHits(part: MusicPart, roll: RollShape, event: OnsetEvent): RollHit[] {
+  private rollHits(part: MusicPart, roll: RollShape, clock: OnsetEvent | NoteRoll): RollHit[] {
     return rollHits({
       ...roll,
       tick: this.lastTick ?? 0,
       regions: part.regions,
       songTicks: songTicksOf(this.current),
       loop: this.transport.loop ?? null,
-      secondsPerTick: event.secondsPerTick,
+      secondsPerTick: clock.secondsPerTick,
       swing: playableSwing(this.transport.swing),
     });
   }
 
+  /**
+   * A pitched note-on, its accent, slide (#602) and step's offsets
+   * (windsor#17) riding in as extras; a ratcheted Grid or Arp step's rolls
+   * across the step (windsor#366, `pitchedRoll.ts`).
+   */
   private pitched(slot: number, event: NoteEvent): void {
     const config = this.bySlot.get(slot);
     const part = this.parts.get(slot);
     if (!config || !part) return;
-    if (event.kind === 'noteOn') {
-      // A grid accent, slide (#602) or step's offsets (windsor#17) ride in as extras.
-      const { velocity, extras } = partNoteOn(event, config.velocity);
-      part.noteOn(event.note, velocity, event.time, extras);
-      this.count(config, event.tick);
-    } else {
-      part.noteOffByNote(event.note, event.time);
-    }
+    if (event.kind === 'noteOff') return part.noteOffByNote(event.note, event.time);
+    const { roll } = event;
+    const hits = roll ? this.rollHits(config, pitchedRollShape(roll), roll) : PLAIN_HIT;
+    playPitched(part, event, hits, config.velocity);
+    this.count(config, event.tick, hits.length);
   }
 
-  private count(part: MusicPart, tick: number): void {
-    this.counters.set(part.slot, (this.counters.get(part.slot) ?? 0) + 1);
+  private count(part: MusicPart, tick: number, notes = 1): void {
+    this.counters.set(part.slot, (this.counters.get(part.slot) ?? 0) + notes);
     if (this.announced.has(part.slot)) return;
     this.announced.add(part.slot);
     this.onEvent?.(part, tick);

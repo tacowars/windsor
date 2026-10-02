@@ -6,7 +6,7 @@
  * / `assertBassConfig` by construction.
  *
  * The arp's step grid (windsor#127) takes the grid's rules: a cell as a grid
- * step without its degree, the grid's lanes, accent and skip ranges. Its
+ * step without its degree, its ratchet included (windsor#366), the grid's lanes, accent and skip ranges. Its
  * cells are always exactly `ARP_STEPS_MAX`: an absent list is every cell a
  * plain note, silently; a short, long or junk one is padded with plain notes
  * or trimmed, reported.
@@ -20,7 +20,14 @@ import { BASS_PITCH_MODES, DEFAULT_BASS_CONFIG } from '../sequencing/bassSequenc
 import type { ArpDriver, BassDriver } from './arrangement';
 import { GRID_STEP_KINDS } from '../sequencing/gridSequencer';
 import { show, type FieldNormaliser } from './arrangementFields';
-import { registerOctave, seed, stepModLanes, stepNoteFields } from './sequencerFields';
+import {
+  registerOctave,
+  seed,
+  STEP_NOTE_KEYS,
+  stepModLanes,
+  stepNoteFields,
+  unpitchedStep,
+} from './sequencerFields';
 
 const ARP_KEYS = [
   'style',
@@ -74,15 +81,12 @@ function arpSteps(raw: unknown, path: string, n: FieldNormaliser): ArpStep[] {
   );
 }
 
-/** A grid step without its degree: a rest, a tie, or a note with octave, accent and slide. */
+/** A grid step without its degree: a rest, a tie, or a note with octave, accent, slide and ratchet. */
 function arpStep(raw: unknown, path: string, n: FieldNormaliser): ArpStep {
   const o = n.section(raw, path);
   const kind = n.pick(o.kind, GRID_STEP_KINDS, 'note', `${path}.kind`);
-  if (kind !== 'note') {
-    n.dropUnknown(o, ['kind'], path);
-    return { kind };
-  }
-  n.dropUnknown(o, ['kind', 'octave', 'accent', 'slide'], path);
+  if (kind !== 'note') return unpitchedStep(o, kind, path, n);
+  n.dropUnknown(o, ['kind', ...STEP_NOTE_KEYS], path);
   return arpNote(stepNoteFields(o, path, n));
 }
 

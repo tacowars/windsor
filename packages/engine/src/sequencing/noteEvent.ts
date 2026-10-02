@@ -33,6 +33,35 @@ export interface NoteOnEvent {
    * reads 0 on the step, or the generator has none.
    */
   stepMod?: readonly number[];
+  /**
+   * A ratcheted Grid or Arp step (windsor#366): the note is the roll's first
+   * hit, and the binding plays the rest across the step (`rollSpan.ts`).
+   * Absent on a plain note, which is one hit.
+   */
+  roll?: NoteRoll;
+}
+
+/**
+ * What a ratcheted step asks of its roll: `hits` evenly spaced in seconds
+ * across the step's swung span, each later hit the previous one's note-off
+ * then a note-on of the same pitch with the step's accent and offsets and
+ * no slide. Each hit but an open last one is held `gate` of its slice.
+ */
+export interface NoteRoll {
+  /** Hits in the roll, 2 to `RATCHET_MAX`. */
+  readonly hits: number;
+  /** The step's length in ticks: the span the hits divide. */
+  readonly ticks: number;
+  /** Seconds per straight tick at the tempo the step was issued under. */
+  readonly secondsPerTick: number;
+  /** The fraction of its slice a closed hit is held, in (0, 1]. */
+  readonly gate: number;
+  /**
+   * The last hit is held open, as a plain note is, and the generator
+   * releases it with its next note, rest or region end; otherwise it is
+   * held `gate` of its slice like the others.
+   */
+  readonly open: boolean;
 }
 
 export interface NoteOffEvent {

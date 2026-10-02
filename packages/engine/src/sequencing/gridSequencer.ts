@@ -31,6 +31,17 @@
  * note-on carries the lanes' offsets at that step, held for the note's life;
  * a slide hands them to the retargeted voice. No lanes, or lanes at 0 on a
  * step, send nothing, and the note-on is what it was.
+ *
+ * Ratchets (windsor#366, record `2026-10-01-sequencer-rack-devices`
+ * decision 6): a note step's `ratchet` of 2 to `RATCHET_MAX` plays that
+ * many hits of its note, spaced evenly across the step's swung span. The
+ * step's note-on is hit 0, exactly as a plain step plays it, slide and all,
+ * and carries a `roll` the player spends on the later hits (`rollSpan.ts`),
+ * each the previous hit's note-off then a note-on with the step's accent and
+ * offsets and no slide. The last hit is held as a plain note is, until the
+ * next note or rest and through a tie. The skip draw is made once, before
+ * the roll, so a skipped step plays no hit and the stream never moves. A
+ * slide to the pitch held is still a tie, its ratchet unheard.
  */
 import {
   ACCENT_MOD_DEFAULT,
@@ -39,6 +50,7 @@ import {
   GRID_REGISTER_OCTAVE_DEFAULT,
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
+  RATCHET_MAX,
 } from '../audioConstants';
 import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
@@ -60,6 +72,8 @@ export interface GridNoteStep {
   readonly octave: number;
   readonly accent: boolean;
   readonly slide: boolean;
+  /** Hits the step's roll plays, 1 to `RATCHET_MAX` (windsor#366); absent is one. */
+  readonly ratchet?: number;
 }
 
 export type GridStep = { readonly kind: 'rest' } | { readonly kind: 'tie' } | GridNoteStep;
@@ -126,6 +140,15 @@ function assertStep(step: GridStep, index: number): void {
   }
   if (!Number.isInteger(step.octave) || Math.abs(step.octave) > GRID_STEP_OCTAVE_MAX) {
     throw new RangeError(`steps[${index}].octave must be within ±${GRID_STEP_OCTAVE_MAX}`);
+  }
+  assertRatchet(step.ratchet, `steps[${index}]`);
+}
+
+/** A note step's ratchet, when it has one: a whole 1 to `RATCHET_MAX` (windsor#366). The Arp's cells share it. */
+export function assertRatchet(ratchet: number | undefined, path: string): void {
+  if (ratchet === undefined) return;
+  if (!Number.isInteger(ratchet) || ratchet < 1 || ratchet > RATCHET_MAX) {
+    throw new RangeError(`${path}.ratchet must be an integer 1–${RATCHET_MAX}, got ${ratchet}`);
   }
 }
 
@@ -260,6 +283,12 @@ export class GridSequencer {
     if (slide) on.slide = true;
     const stepMod = stepModAt(this.current.lanes, index);
     if (stepMod) on.stepMod = stepMod;
+    const hits = step.ratchet ?? 1;
+    if (hits > 1) {
+      // Every hit but the last runs to the next; the last is held as a plain note.
+      const { divisor } = this.current;
+      on.roll = { hits, ticks: divisor, secondsPerTick: event.secondsPerTick, gate: 1, open: true };
+    }
 
     const events: NoteEvent[] = [];
     const off: NoteEvent | null =

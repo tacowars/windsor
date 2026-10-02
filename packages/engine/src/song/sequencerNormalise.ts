@@ -20,8 +20,10 @@ import {
   drawnLane,
   registerOctave,
   seed,
+  STEP_NOTE_KEYS,
   stepModLanes,
   stepNoteFields,
+  unpitchedStep,
 } from './sequencerFields';
 import { SEEDED_KINDS, SEQUENCER_KINDS } from './arrangement';
 import { isRecord, show, type FieldNormaliser } from './arrangementFields';
@@ -311,11 +313,8 @@ function gridSteps(raw: unknown, path: string, n: FieldNormaliser): GridStep[] {
 function gridStep(raw: unknown, path: string, n: FieldNormaliser): GridStep {
   const o = n.section(raw, path);
   const kind = n.pick(o.kind, GRID_STEP_KINDS, 'note', `${path}.kind`);
-  if (kind !== 'note') {
-    n.dropUnknown(o, ['kind'], path);
-    return { kind };
-  }
-  n.dropUnknown(o, ['kind', 'degree', 'octave', 'accent', 'slide'], path);
+  if (kind !== 'note') return unpitchedStep(o, kind, path, n);
+  n.dropUnknown(o, ['kind', 'degree', ...STEP_NOTE_KEYS], path);
   return gridNote(
     n.int(o.degree, 0, 0, GRID_DEGREE_MAX, `${path}.degree`),
     stepNoteFields(o, path, n),
