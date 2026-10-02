@@ -228,7 +228,7 @@ function normalise(raw: unknown, n: ArrangementNormaliser): ArrangementDocument 
   const document: MutableDocument = {
     version: ARRANGEMENT_VERSION,
     transport,
-    harmony: n.harmony(o.harmony, songTicks(transport.bars)),
+    harmony: n.harmony(o.harmony, songTicks(transport.bars, transport.meter)),
     parts,
   };
   // A library fill is embedded here and nowhere else (#562): from this point

@@ -53,6 +53,7 @@ import {
   LFO_SHAPES,
   type DensityMod,
 } from '../sequencing/euclideanSequencer';
+import { defaultStepCount } from '../sequencing/meter';
 import { EUCLID_ROW_KEYS, type EuclidRows } from '../sequencing/euclidLanes';
 import {
   DEFAULT_GRID_CONFIG,
@@ -142,7 +143,9 @@ function euclideanDriver(raw: unknown, path: string, n: FieldNormaliser): Euclid
   const o = n.section(raw, path);
   const known = ['steps', 'divisor', 'pulses', 'rotate', 'density', 'pattern', 'seed'];
   n.dropUnknown(o, [...known, ...EUCLID_ROW_KEYS], path);
-  const steps = n.int(o.steps, d.steps, 1, EUCLID_STEPS_MAX, `${path}.steps`);
+  // A part written without steps (a new one) is one bar of the default step in the song's meter (windsor#429).
+  const barSteps = defaultStepCount(n.meter, d.divisor, EUCLID_STEPS_MAX);
+  const steps = n.int(o.steps, barSteps, 1, EUCLID_STEPS_MAX, `${path}.steps`);
   return {
     ...euclidRows(o, steps, path, n),
     steps,
@@ -298,10 +301,10 @@ function gridDriver(raw: unknown, path: string, n: FieldNormaliser): GridDriver 
 
 /** 1–32 steps. An absent or junk list is the default bar; an over-long one is capped, reported. */
 function gridSteps(raw: unknown, path: string, n: FieldNormaliser): GridStep[] {
-  if (raw === undefined) return defaultGridSteps();
+  if (raw === undefined) return defaultGridSteps(n.meter);
   if (!Array.isArray(raw) || raw.length === 0) {
     n.correction(`${path}: ${show(raw)} is not a list of steps — using the default bar`);
-    return defaultGridSteps();
+    return defaultGridSteps(n.meter);
   }
   const capped: unknown[] = raw.length > GRID_STEPS_MAX ? raw.slice(0, GRID_STEPS_MAX) : raw;
   if (capped.length !== raw.length) {

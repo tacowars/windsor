@@ -14,7 +14,11 @@ import { ARRANGEMENT_VERSION, CHORD_SIZE_TRIAD } from '../audioConstants';
 import { FALLBACK_PATCH, FALLBACK_PATCH_ID } from '../patch/fallbackPatch';
 import { DEFAULT_STRIP } from '../mixer/mix';
 import type { Patch } from '../patch/patch';
-import { DIVISORS, TICKS_PER_BAR } from '../sequencing/scheduler';
+import { defaultStepCount, ticksPerBar } from '../sequencing/meter';
+import { DIVISORS } from '../sequencing/scheduler';
+
+/** The click's one bar, in the 4/4 a song without a meter plays (windsor#429). */
+const BAR = ticksPerBar();
 
 /** The narrow type is the "one part" guarantee: exactly one Euclidean part, so no pitched generator exists. */
 export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
@@ -32,7 +36,7 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
   harmony: {
     root: 0,
     scale: [0],
-    events: [{ start: 0, duration: TICKS_PER_BAR, degree: 0, size: CHORD_SIZE_TRIAD }],
+    events: [{ start: 0, duration: BAR, degree: 0, size: CHORD_SIZE_TRIAD }],
   },
   parts: [
     {
@@ -43,13 +47,14 @@ export const FALLBACK_ARRANGEMENT: ArrangementDocument & {
       // Unity, centred, and with no sends — whatever a song's strips say.
       strip: DEFAULT_STRIP,
       // Live for the whole one-bar song: the ∞ region, entered once.
-      regions: [{ start: 0, duration: TICKS_PER_BAR }],
+      regions: [{ start: 0, duration: BAR }],
       sequencer: {
         kind: 'euclidean',
         seed: 0,
         note: 76,
         hold: 0.05,
-        steps: 4,
+        // One bar of quarters (`defaultStepCount`, windsor#429 decision 5).
+        steps: defaultStepCount(undefined, DIVISORS.quarter),
         divisor: DIVISORS.quarter,
         // min === max: E(4,4) fires every step and the density LFO has nothing
         // to modulate, so the pulse never varies and no RNG is consumed — the

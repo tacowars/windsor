@@ -5,6 +5,7 @@
  * (`TICKS_PER_BAR`, `bars * TICKS_PER_BAR`). Pure; the table is a parameter
  * defaulting to the shipped one (`meterTables.ts`).
  */
+import { GRID_STEPS_MAX } from '../audioConstants';
 import {
   FOUR_FOUR,
   METER_TABLE,
@@ -48,4 +49,20 @@ export function songTicks(
   table: MeterTable = METER_TABLE,
 ): number {
   return bars * ticksPerBar(meter, table);
+}
+
+/**
+ * The steps in one bar of `meter` at `divisor`, 1 to `max` (windsor#429,
+ * decision 5): what a new Grid, Bass or Euclid part starts with. A step
+ * that does not tile the bar rounds down (7/8 at 1/4 is 3 steps). 4/4 at
+ * 1/16 is 16, 7/8 at 1/16 is 14, 6/8 at 1/8 is 6, 12/8 at 1/16 is 24.
+ * An absent meter is 4/4, as a song without one plays.
+ */
+export function defaultStepCount(
+  meter: Meter | undefined,
+  divisor: number,
+  max: number = GRID_STEPS_MAX,
+  table: MeterTable = METER_TABLE,
+): number {
+  return Math.max(1, Math.min(max, Math.floor(ticksPerBar(meter, table) / divisor)));
 }

@@ -111,7 +111,9 @@ describe('corrections are reported', () => {
     const result = makeArrangement(
       song([{ slot: 3, preset: 'drone-sqr', sequencer: { kind: 'grid', divisor: 7 } }]),
     );
-    expect(result.corrections.join('\n')).toMatch(/divisor: 7 does not divide the 96-tick bar/);
+    expect(result.corrections.join('\n')).toMatch(
+      /divisor: 7 does not divide the 96-tick whole note/,
+    );
     const sequencer = result.document.parts[0]?.sequencer;
     expect(sequencer?.kind === 'grid' && sequencer.divisor).toBe(DEFAULT_GRID_CONFIG.divisor);
   });

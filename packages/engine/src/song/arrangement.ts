@@ -29,6 +29,7 @@ import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import { EUCLID_ROW_KEYS } from '../sequencing/euclidLanes';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
 import type { Harmony } from '../harmony/harmonyTimeline';
+import type { Meter } from '../sequencing/meterTables';
 import type { Region } from '../sequencing/regionClock';
 import type { Swing } from '../sequencing/swingTables';
 
@@ -130,11 +131,22 @@ export interface SongLoop {
   readonly on: boolean;
 }
 
-/** The song's clock: its tempo, its explicit length (decision 5), its swing and its loop. */
+/** The song's clock: its tempo, its explicit length (decision 5), its meter, its swing and its loop. */
 export interface Transport {
   readonly bpm: number;
-  /** 1–`BARS_MAX` bars of `TICKS_PER_BAR` ticks; every region and event sits inside. */
+  /**
+   * 1–`BARS_MAX` bars of the meter's bar (`ticksPerBar(meter)`); every region
+   * and event sits inside `songTicks(bars, meter)`.
+   */
   readonly bars: number;
+  /**
+   * The song's one meter (windsor#429, record `2026-10-02-one-meter-per-song`),
+   * from the fixed list `METERS`. Absent is 4/4: a song written before the
+   * meter carries none, plays as it did, and its export stays without one.
+   * It sets the bar (the clock's `bar`, the song's length) and swing's beats;
+   * step lengths are note values and do not follow it.
+   */
+  readonly meter?: Meter;
   /**
    * One swing for every part (windsor#14, record
    * `2026-09-28-song-swing-in-the-transport`): the off-beat 8th or 16th of each

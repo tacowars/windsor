@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { barTicks, isMeter, meterBeats, songTicks, ticksPerBar } from './meter';
+import { barTicks, defaultStepCount, isMeter, meterBeats, songTicks, ticksPerBar } from './meter';
 import { FOUR_FOUR, METERS, METER_TABLE, type Meter } from './meterTables';
 import { DIVISORS, PPQ, TICKS_PER_BAR } from './scheduler';
 
@@ -62,5 +62,20 @@ describe('ticksPerBar and songTicks', () => {
     const table = { ...METER_TABLE, '4/4': [48, 48] };
     expect(ticksPerBar(FOUR_FOUR, table)).toBe(96);
     expect(meterBeats(FOUR_FOUR, table)).toEqual([48, 48]);
+  });
+});
+
+describe('defaultStepCount (windsor#429)', () => {
+  it('counts one bar of the step, rounding down, 1 to the cap', () => {
+    const { sixteenth, eighth, quarter, thirtySecond } = DIVISORS;
+    expect(defaultStepCount('4/4', sixteenth)).toBe(16);
+    expect(defaultStepCount(undefined, sixteenth)).toBe(16);
+    expect(defaultStepCount('3/4', sixteenth)).toBe(12);
+    expect(defaultStepCount('7/8', sixteenth)).toBe(14);
+    expect(defaultStepCount('12/8', sixteenth)).toBe(24);
+    expect(defaultStepCount('6/8', eighth)).toBe(6);
+    expect(defaultStepCount('7/8', quarter)).toBe(3);
+    expect(defaultStepCount('12/8', thirtySecond)).toBe(32);
+    expect(defaultStepCount('3/4', DIVISORS.whole)).toBe(1);
   });
 });

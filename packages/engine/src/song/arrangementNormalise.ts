@@ -30,6 +30,7 @@ import {
   VELOCITY_DEFAULT,
 } from '../audioConstants';
 import { songTicks } from '../sequencing/meter';
+import { FOUR_FOUR, METERS } from '../sequencing/meterTables';
 import {
   STRAIGHT_SWING,
   SWING_AMOUNT_MAX,
@@ -38,7 +39,7 @@ import {
   type SwingGrid,
 } from '../sequencing/swingTables';
 import { normaliseHarmonyEvents, normaliseRegions } from './timelineNormalise';
-import { normaliseLoop } from './songLoop';
+import { loopGridTicks, normaliseLoop } from './songLoop';
 import { normaliseStrip } from './deskNormalise';
 import { normaliseAutomation } from './automationNormalise';
 import type { Patch } from '../patch/patch';
@@ -89,19 +90,33 @@ export class ArrangementNormaliser extends FieldNormaliser {
     return this.resolver.filled;
   }
 
-  /** The clock (#705): tempo, the song's explicit length in bars (decision 5), its swing and loop. */
+  /**
+   * The clock (#705): tempo, the song's explicit length in bars (decision 5),
+   * its meter (windsor#429), swing and loop. The meter is read before
+   * anything that measures the song, and kept for the parts read after it.
+   */
   transport(raw: unknown): Transport {
     const o = this.section(raw, 'transport');
-    this.dropUnknown(o, ['bpm', 'bars', 'swing', 'loop'], 'transport');
-    const transport = {
+    this.dropUnknown(o, ['bpm', 'bars', 'meter', 'swing', 'loop'], 'transport');
+    const timed: Transport = {
       bpm: this.num(o.bpm, DEFAULT_BPM, BPM_MIN, BPM_MAX, 'transport.bpm'),
       bars: this.int(o.bars, DEFAULT_BARS, BARS_MIN, BARS_MAX, 'transport.bars'),
     };
-    // Absent stays absent: a song from before swing or the loop plays as it
-    // did and exports byte for byte as it came (records
-    // `2026-09-28-song-swing-in-the-transport`, `2026-09-28-song-loop-in-the-transport`).
-    const swung = o.swing === undefined ? transport : { ...transport, swing: this.swing(o.swing) };
-    const loop = normaliseLoop(o.loop, songTicks(transport.bars), this);
+    // Absent stays absent: a song from before the meter, swing or the loop
+    // plays as it did and exports byte for byte as it came (records
+    // `2026-10-02-one-meter-per-song`, `2026-09-28-song-swing-in-the-transport`,
+    // `2026-09-28-song-loop-in-the-transport`). A meter written, 4/4 included, stays.
+    const metered =
+      o.meter === undefined
+        ? timed
+        : { ...timed, meter: this.pick(o.meter, METERS, FOUR_FOUR, 'transport.meter') };
+    this.meter = metered.meter ?? FOUR_FOUR;
+    const swung = o.swing === undefined ? metered : { ...metered, swing: this.swing(o.swing) };
+    const song = {
+      songTicks: songTicks(metered.bars, this.meter),
+      grid: loopGridTicks(this.meter),
+    };
+    const loop = normaliseLoop(o.loop, song, this);
     return loop === undefined ? swung : { ...swung, loop };
   }
 
@@ -178,7 +193,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     if (o.name !== undefined && typeof o.name !== 'string') {
       this.correction(`${path}.name: ${show(o.name)} is not a name — using "${fallbackName}"`);
     }
-    const ticks = songTicks(transport.bars);
+    const ticks = songTicks(transport.bars, transport.meter);
     const strip = normaliseStrip(o.strip, `${path}.strip`, this);
     const automation = normaliseAutomation(o.automation, {
       songTicks: ticks,

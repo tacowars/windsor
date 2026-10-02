@@ -169,10 +169,10 @@ function bassStrip(
 
 /** 1–`GRID_STEPS_MAX` Arp cells. Absent is a bar of plain notes; junk is too, reported; an over-long list is capped, reported. */
 function bassSteps(raw: unknown, divisor: number, path: string, n: FieldNormaliser): BassStep[] {
-  if (raw === undefined) return defaultBassSteps(divisor);
+  if (raw === undefined) return defaultBassSteps(divisor, n.meter);
   if (!Array.isArray(raw) || raw.length === 0) {
     n.correction(`${path}: ${show(raw)} is not a list of steps — using a bar of plain notes`);
-    return defaultBassSteps(divisor);
+    return defaultBassSteps(divisor, n.meter);
   }
   const capped: unknown[] = raw.length > GRID_STEPS_MAX ? raw.slice(0, GRID_STEPS_MAX) : raw;
   if (capped.length !== raw.length) {

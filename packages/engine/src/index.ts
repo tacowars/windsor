@@ -148,6 +148,7 @@ export {
   ChordSequencer,
   DEFAULT_CHORD_CONFIG,
   assertChordConfig,
+  defaultChordDivisor,
   hitStep,
   layoutSegments,
   restStep,
@@ -397,12 +398,15 @@ export type {
   Unsubscribe,
 } from './sequencing/scheduler';
 /**
- * The meter (windsor#428): each meter's counted beats, its bar and a song's
- * length in ticks. Every song plays 4/4 until the song document names one.
+ * The meter (windsor#428, windsor#429): each meter's counted beats, its bar,
+ * a song's length in ticks and the steps in one bar (`defaultStepCount`, what
+ * a new Grid, Bass or Euclid part starts with). A song names its meter in
+ * `transport.meter`; absent is 4/4. A live edit is
+ * `ctx.change({ transport: { meter } })`: every tick stays, the bar lines move.
  */
 export { FOUR_FOUR, METERS, METER_TABLE } from './sequencing/meterTables';
 export type { Meter } from './sequencing/meterTables';
-export { meterBeats, songTicks, ticksPerBar } from './sequencing/meter';
+export { defaultStepCount, meterBeats, songTicks, ticksPerBar } from './sequencing/meter';
 /**
  * Song swing (windsor#14): the bounds and grids of `transport.swing`. A live
  * edit is `ctx.change({ transport: { swing: { amount, grid } } })`, either
@@ -416,13 +420,19 @@ export {
 } from './sequencing/swingTables';
 /**
  * The song loop (windsor#15): `transport.loop = { start, end, on }` in ticks,
- * snapped to `LOOP_GRID_TICKS`. A live edit is
+ * snapped to `loopGridTicks(meter)` (`LOOP_GRID_TICKS` in 4/4). A live edit is
  * `ctx.change({ transport: { loop: { start, end, on } } })`, any field alone.
  * The clock itself jumps back at the loop's end, so `audibleTick` already
  * reads inside the loop and the playhead's `tick mod songTicks` stays the
  * rule; ▶ from rest and ■ land on `playStartTick`.
  */
-export { LOOP_GRID_TICKS, fitLoopRange, playStartTick, tickLoopOf } from './song/songLoop';
+export {
+  LOOP_GRID_TICKS,
+  fitLoopRange,
+  loopGridTicks,
+  playStartTick,
+  tickLoopOf,
+} from './song/songLoop';
 export type { SongLoop } from './song/arrangement';
 export { followingTick, isLoopJump } from './sequencing/scheduler';
 export type { TickLoop } from './sequencing/scheduler';
@@ -463,7 +473,7 @@ export type {
   BassSequencerConfig,
   BassStep,
 } from './sequencing/bassSequencer';
-export { songTicksOf } from './song/arrangementPlayer';
+export { songTicksOf } from './song/songClock';
 export { defaultHarmonyEvents } from './song/timelineNormalise';
 export type { Rng } from './sequencing/generatorSeed';
 export type { NoteEvent, NoteHandler, NoteOffEvent, NoteOnEvent } from './sequencing/noteEvent';

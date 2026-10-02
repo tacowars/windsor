@@ -12,6 +12,7 @@
  */
 import { rollSpanSeconds } from '../sequencing/euclidLanes';
 import { isInfiniteRegion, regionState, type Region } from '../sequencing/regionClock';
+import type { MeterBeats } from '../sequencing/meterTables';
 import type { TickLoop } from '../sequencing/scheduler';
 import type { Swing } from '../sequencing/swingTables';
 
@@ -42,6 +43,8 @@ export interface RollShape {
 export interface RollInput extends RollBoundInput, RollShape {
   readonly secondsPerTick: number;
   readonly swing: Swing;
+  /** The song's meter's beats (windsor#429), as the clock swings them; 4/4's when absent. */
+  readonly beats?: MeterBeats | undefined;
 }
 
 /** One hit of a roll: seconds after the step's swung time, and seconds held. */
@@ -58,8 +61,8 @@ export interface RollHit {
  * The first always sounds: the onset itself is inside its region.
  */
 export function rollHits(input: RollInput): RollHit[] {
-  const { tick, divisor, secondsPerTick, swing, ratchet, hold, gate = 1 } = input;
-  const spacing = rollSpanSeconds({ tick, ticks: divisor, secondsPerTick, swing }) / ratchet;
+  const { tick, divisor, secondsPerTick, swing, beats, ratchet, hold, gate = 1 } = input;
+  const spacing = rollSpanSeconds({ tick, ticks: divisor, secondsPerTick, swing, beats }) / ratchet;
   const slice = spacing * gate;
   const reach = rollReachSeconds(input);
   const hits: RollHit[] = [];
@@ -73,10 +76,10 @@ export function rollHits(input: RollInput): RollHit[] {
 
 /** Seconds from the onset's swung time to its bound; Infinity where none falls inside the step. */
 export function rollReachSeconds(input: RollInput): number {
-  const { tick, divisor, secondsPerTick, swing } = input;
+  const { tick, divisor, secondsPerTick, swing, beats } = input;
   const ticks = rollBoundTicks(input);
   if (ticks >= divisor) return Infinity;
-  return rollSpanSeconds({ tick, ticks, secondsPerTick, swing });
+  return rollSpanSeconds({ tick, ticks, secondsPerTick, swing, beats });
 }
 
 /** Ticks from the onset's tick to the first one its roll must not reach; Infinity with no bound. */

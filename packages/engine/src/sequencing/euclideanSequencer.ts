@@ -42,7 +42,7 @@ export type DensityModKind = (typeof DENSITY_MOD_KINDS)[number];
 export interface EuclideanConfig extends EuclidRows {
   /** `n`: steps in the figure. Fixed; only `k` moves. */
   steps: number;
-  /** Ticks per step. Must divide the bar (see `DIVISORS`). */
+  /** Ticks per step: a note value that divides the whole note (see `DIVISORS`). */
   divisor: number;
   /** Inclusive bounds `k` moves within; `start` is where a walk begins. */
   pulses: { min: number; max: number; start: number };
