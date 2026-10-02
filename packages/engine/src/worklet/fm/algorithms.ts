@@ -2,7 +2,7 @@
 /**
  * The eleven operator topologies (#644) and the tables derived from them: the
  * topological evaluation order, and for the fixed-index kernel (#548) each
- * algorithm's modulation edges, carrier bits and whether its order is D..A.
+ * algorithm's modulation edges and carrier bits.
  * Invariant: bit-identity by construction — a modulator list of three must
  * be ascending, and `kernelEdges` refuses one that is not, because a
  * three-term sum's order is the bits. `ALGORITHMS` mirrors `patch.ts`
@@ -92,7 +92,9 @@ const ALG_ORDER = ALGORITHMS.map(topoOrder);
  *   - a modulator list of three is ascending (two terms commute exactly), and
  *     so is a carrier list of three or more.
  * The only state operators share is the voice's noise generator, so a voice
- * with two noise operators also needs its topological order to be D..A.
+ * with two noise operators also needs them to draw in D..A order within the
+ * topological order; `voiceControl.ts` checks that per voice at bind time
+ * (windsor#382), since it depends on which operators are Noise.
  */
 const EDGE_BA = 1,
   EDGE_CA = 2,
@@ -129,7 +131,6 @@ function kernelEdges(alg: Algorithm): number {
 
 const ALG_EDGES = ALGORITHMS.map(kernelEdges);
 const ALG_CARRIER_BITS = ALGORITHMS.map((alg) => alg.carriers.reduce((b, c) => b | (1 << c), 0));
-const ALG_DESCENDING = ALG_ORDER.map((o) => o[0] === D && o[1] === C && o[2] === B && o[3] === A);
 
 export type { Algorithm };
 export {
@@ -147,5 +148,4 @@ export {
   EDGE_DC,
   ALG_EDGES,
   ALG_CARRIER_BITS,
-  ALG_DESCENDING,
 };
