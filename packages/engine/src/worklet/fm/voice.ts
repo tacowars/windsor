@@ -30,13 +30,12 @@ import { randomSeed32 } from './prng';
 import { STEP_MOD_SLOT_COUNT } from './stepModTables';
 import { Svf } from './svf';
 import { VoiceDrive } from './voiceDrive';
-import { bindVoiceConstants, restingWidth, updateVoiceControl } from './voiceControl';
+import { bindVoiceConstants, updateVoiceControl } from './voiceControl';
 import { renderVoiceKernel } from './voiceKernel';
 import { VOICE_TARGET_COUNT } from './voiceOffsetTables';
-import { primeVoiceOffsets } from './voiceOffsets';
 import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
-import { bindStepMod, loadStepOffsets, startStepMod } from './voiceStepMod';
+import { bindStepMod, loadStepOffsets, rebindStepMod, startStepMod } from './voiceStepMod';
 import { KIND_PULSE, waveKind } from './waveTables';
 
 /* ------------------------------------------------------------------ *
@@ -388,16 +387,10 @@ class Voice {
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
-    // The note keeps its step's offsets over the new patch's values (windsor#17).
-    bindStepMod(this, patch);
-    primeVoiceOffsets(this);
-    // Width means a duty on PULSE and a phase scale elsewhere: a switch
-    // between the two restarts the ramp from the new meaning's value.
-    for (let i = 0; i < 4; i++) {
-      if ((switched & (1 << i)) === 0) continue;
-      this.width[i] = restingWidth(this.kind[i], this.opWidth[i]);
-      this.widthInc[i] = 0;
-    }
+    // The note keeps its step's offsets and its lanes over the new patch's
+    // values (windsor#17, windsor#346), and a wave switch between PULSE and
+    // the rest restarts that operator's width ramp from the width it plays.
+    rebindStepMod(this, patch, switched);
   }
 
   /**

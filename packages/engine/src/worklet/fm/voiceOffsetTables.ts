@@ -12,7 +12,8 @@
  *   maps to a code here.
  * - The main thread sends an offset from the patch's value (decision 10):
  *   added for most rows, a log2 ratio for the LFO rates (`OFFSET_RATIO`).
- *   The filter's cutoff is not here: its lane writes the part's `cutoffMod`.
+ *   The filter's cutoff is not here: its lane writes the part's `cutoffMod`,
+ *   in octaves, whose range is `CUTOFF_MOD_OCTAVES` either way.
  * - The nine decay rows are windsor#347's and not here either.
  *
  * The bounds are the catalog's (`automation/automationTargetTables.ts`): the
@@ -81,6 +82,20 @@ function stepModBounds(path: string): { min: number; max: number } {
   throw new Error(`voiceOffsetTables: no step-mod row for ${path}`);
 }
 
+/** The cutoff's bounds, which its lane's offset spans (it writes `cutoffMod`, not a slot). */
+const CUTOFF_BOUNDS = stepModBounds('filter.cutoff');
+
+/**
+ * `cutoffMod`'s range, in octaves either way: the catalog's whole cutoff
+ * ratio, `log2(max / min)`, so a lane from a patch at one end of the knob to
+ * the other end is not clipped by the parameter's declared range. The final
+ * cutoff stays clamped where it always was, in `Svf.setCoeffs`.
+ */
+const CUTOFF_MOD_OCTAVES = Math.log2(CUTOFF_BOUNDS.max / CUTOFF_BOUNDS.min);
+
+/** `cutoffMod`'s descriptor range, `±CUTOFF_MOD_OCTAVES`. */
+const CUTOFF_MOD_RANGE = { minValue: -CUTOFF_MOD_OCTAVES, maxValue: CUTOFF_MOD_OCTAVES };
+
 /** Every row, in code order. */
 const VOICE_OFFSET_TABLE: readonly VoiceOffsetRow[] = [
   { path: 'filter.envAmount', curve: OFFSET_ADD, ...stepModBounds('filter.envAmount') },
@@ -113,6 +128,8 @@ function voiceTargetCode(path: unknown): number {
 
 export type { VoiceOffsetRow };
 export {
+  CUTOFF_MOD_OCTAVES,
+  CUTOFF_MOD_RANGE,
   OFFSET_ADD,
   OFFSET_RATIO,
   VOICE_OFFSET_CURVE,

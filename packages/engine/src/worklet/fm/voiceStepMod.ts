@@ -129,4 +129,25 @@ function startStepMod(
   }
 }
 
-export { bindStepMod, loadStepOffsets, startStepMod };
+/**
+ * A live retune's rebind, from `Voice.rebind` once its envelopes are
+ * configured: the note keeps its step's offsets over the new patch's values,
+ * the song's lanes go over them (`primeVoiceOffsets`), and each operator in
+ * `switched` (a bit per operator whose wave moved between PULSE and the
+ * rest, where width changes meaning from a duty to a phase scale) restarts
+ * its width ramp, with no ramp, from the width it plays: the lane's, not the
+ * patch's or the step's, as `startStepMod` seeds it (windsor#346). Allocates
+ * nothing.
+ */
+function rebindStepMod(voice: Voice, patch: WorkletPatch, switched: number): void {
+  bindStepMod(voice, patch);
+  primeVoiceOffsets(voice);
+  const live = voice.liveValues;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((switched & (1 << i)) === 0) continue;
+    voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
+    voice.widthInc[i] = 0;
+  }
+}
+
+export { bindStepMod, loadStepOffsets, rebindStepMod, startStepMod };

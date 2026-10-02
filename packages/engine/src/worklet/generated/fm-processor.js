@@ -1484,6 +1484,9 @@ function stepModBounds(path) {
   for (const row of STEP_MOD_TABLE) if (row.param === path) return { min: row.min, max: row.max };
   throw new Error(`voiceOffsetTables: no step-mod row for ${path}`);
 }
+var CUTOFF_BOUNDS = stepModBounds("filter.cutoff");
+var CUTOFF_MOD_OCTAVES = Math.log2(CUTOFF_BOUNDS.max / CUTOFF_BOUNDS.min);
+var CUTOFF_MOD_RANGE = { minValue: -CUTOFF_MOD_OCTAVES, maxValue: CUTOFF_MOD_OCTAVES };
 var VOICE_OFFSET_TABLE = [
   { path: "filter.envAmount", curve: OFFSET_ADD, ...stepModBounds("filter.envAmount") },
   { path: "filter.resonance", curve: OFFSET_ADD, ...stepModBounds("filter.resonance") },
@@ -2431,6 +2434,16 @@ function startStepMod(voice, patch, stepMod) {
     voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
   }
 }
+function rebindStepMod(voice, patch, switched) {
+  bindStepMod(voice, patch);
+  primeVoiceOffsets(voice);
+  const live = voice.liveValues;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    if ((switched & 1 << i) === 0) continue;
+    voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
+    voice.widthInc[i] = 0;
+  }
+}
 
 // packages/engine/src/worklet/fm/voice.ts
 var Voice = class {
@@ -2625,13 +2638,7 @@ var Voice = class {
     this.filtEnv.configure(patch.filter.env, this.sr);
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.pitchEnv.configure(patch.pitchEnv, this.sr);
-    bindStepMod(this, patch);
-    primeVoiceOffsets(this);
-    for (let i = 0; i < 4; i++) {
-      if ((switched & 1 << i) === 0) continue;
-      this.width[i] = restingWidth(this.kind[i], this.opWidth[i]);
-      this.widthInc[i] = 0;
-    }
+    rebindStepMod(this, patch, switched);
   }
   /**
    * Legato slide (#602): re-point a sounding voice at a new note. The pitch
@@ -2778,10 +2785,13 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     return [
       { name: "pitchBend", defaultValue: 0, minValue: -48, maxValue: 48, automationRate: "k-rate" },
       { name: "modWheel", defaultValue: 0, minValue: 0, maxValue: 1, automationRate: "k-rate" },
-      { name: "cutoffMod", defaultValue: 0, minValue: -8, maxValue: 8, automationRate: "k-rate" },
+      // The cutoff lane's octaves span the catalog's whole cutoff ratio (windsor#346).
+      { name: "cutoffMod", defaultValue: 0, ...CUTOFF_MOD_RANGE, automationRate: "k-rate" },
       { name: "gain", defaultValue: 1, minValue: 0, maxValue: 4, automationRate: "k-rate" },
       // The song lanes' slots (windsor#346, `voiceOffsets.ts`): each an offset
-      // on the target the slot map gives it, 0 for none.
+      // on the target the slot map gives it, 0 for none. No declared range,
+      // so Web Audio's float32 bounds, which no offset between two catalog
+      // values reaches: the voice clamps the sum to the row's bounds.
       ...VOICE_SLOT_PARAMS.map((name) => ({
         name,
         defaultValue: 0,

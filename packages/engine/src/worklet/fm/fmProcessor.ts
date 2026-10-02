@@ -33,7 +33,12 @@ import { LoadSampler } from '../loadSampler';
 import { Voice } from './voice';
 import { allocateVoice } from './voiceAllocation';
 import { PART_BEND, PART_CONTROL_COUNT, PART_CUTOFF_MOD, PART_WHEEL } from './voiceControl';
-import { VOICE_SLOT_COUNT, VOICE_SLOT_PARAMS, VOICE_TARGET_COUNT } from './voiceOffsetTables';
+import {
+  CUTOFF_MOD_RANGE,
+  VOICE_SLOT_COUNT,
+  VOICE_SLOT_PARAMS,
+  VOICE_TARGET_COUNT,
+} from './voiceOffsetTables';
 import { latchVoiceOffsets, mapVoiceSlots } from './voiceOffsets';
 import { WAVE } from './waveIds';
 import { getMips } from './waveTables';
@@ -84,10 +89,13 @@ class FmPartProcessor extends AudioWorkletProcessor {
     return [
       { name: 'pitchBend', defaultValue: 0, minValue: -48, maxValue: 48, automationRate: 'k-rate' },
       { name: 'modWheel', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
-      { name: 'cutoffMod', defaultValue: 0, minValue: -8, maxValue: 8, automationRate: 'k-rate' },
+      // The cutoff lane's octaves span the catalog's whole cutoff ratio (windsor#346).
+      { name: 'cutoffMod', defaultValue: 0, ...CUTOFF_MOD_RANGE, automationRate: 'k-rate' },
       { name: 'gain', defaultValue: 1, minValue: 0, maxValue: 4, automationRate: 'k-rate' },
       // The song lanes' slots (windsor#346, `voiceOffsets.ts`): each an offset
-      // on the target the slot map gives it, 0 for none.
+      // on the target the slot map gives it, 0 for none. No declared range,
+      // so Web Audio's float32 bounds, which no offset between two catalog
+      // values reaches: the voice clamps the sum to the row's bounds.
       ...VOICE_SLOT_PARAMS.map((name): AudioParamDescriptor => ({
         name,
         defaultValue: 0,
