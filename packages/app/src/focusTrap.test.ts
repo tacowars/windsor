@@ -60,3 +60,17 @@ describe('FocusReturn', () => {
     expect(gone.focused).toBe(1);
   });
 });
+
+describe('a dialog opened from a row menu', () => {
+  it('returns focus to the row’s ⋯ button, which outlives the removed menu item', () => {
+    // Rename… and Edit tags… close their menu before the dialog opens, so the
+    // element that had focus is gone; the dialog is given the ⋯ button instead.
+    const more = new Fake('⋯');
+    const fallback = new Fake('Load patch');
+    const ret = new FocusReturn(() => fallback);
+    ret.open(more);
+    expect(ret.close()).toBe(more);
+    expect(more.focused).toBe(1);
+    expect(fallback.focused).toBe(0);
+  });
+});
