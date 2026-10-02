@@ -15,7 +15,9 @@ import {
 import {
   TICKS_PER_BAR,
   VOICE_TARGET_IDS,
+  followingTick,
   partAt,
+  songTicksOf,
   type AutomationLane,
   type DocumentPart,
   type InsertSpec,
@@ -24,6 +26,7 @@ import {
   automatedValueText,
   catalogKnobAutomation,
   insertKnobAutomation,
+  knobSongTick,
   lockedKnobNotice,
   sameKnobAutomation,
   voiceKnobAutomation,
@@ -180,5 +183,41 @@ describe('the lock’s wording and change check', () => {
     expect(sameKnobAutomation(a, null)).toBe(false);
     expect(sameKnobAutomation(a, { ...a, value: 0.6 })).toBe(false);
     expect(sameKnobAutomation(a, { ...a, color: 'amber' })).toBe(false);
+  });
+});
+
+describe('the playhead past the song’s end', () => {
+  const doc = AUTOMATION_DOCUMENT;
+  const songTicks = songTicksOf(doc);
+  /** Where the hat's Level knob stands at the transport's `position`. */
+  const levelAt = (position: number): number | undefined =>
+    catalogKnobAutomation(AUTOMATION_PART, 'strip.level', knobSongTick(doc, position))?.value;
+
+  it('folds the transport’s tick by the song’s length, as the engine plays it', () => {
+    expect(knobSongTick(doc, BAR)).toBe(BAR);
+    expect(knobSongTick(doc, songTicks)).toBe(0);
+    expect(knobSongTick(doc, 2 * songTicks + BAR)).toBe(BAR);
+  });
+
+  it('starts a locked knob’s lane again after the song wraps', () => {
+    expect(levelAt(songTicks - 1)).toBe(1);
+    expect(levelAt(songTicks)).toBe(0.5);
+    expect(levelAt(songTicks + BAR)).toBe(levelAt(BAR));
+    expect(levelAt(songTicks + BAR)).toBeLessThan(1);
+  });
+
+  it('reads inside a loop brace whose clock jumped back on a later pass', () => {
+    const loop = { start: BAR, end: 2 * BAR, songTicks };
+    const jumped = followingTick(songTicks + 2 * BAR - 1, loop);
+    expect(jumped).toBe(songTicks + BAR);
+    expect(levelAt(jumped)).toBe(levelAt(BAR));
+  });
+
+  it('folds an insert knob’s tick the same way', () => {
+    const tape = insertAt(AUTOMATION_PART, AUTOMATION_TAPE_ID);
+    const at = (position: number): number | undefined =>
+      insertKnobAutomation(AUTOMATION_PART, tape, 'drive', knobSongTick(doc, position))?.value;
+    expect(at(songTicks)).toBe(-6);
+    expect(at(songTicks + 2 * BAR)).toBe(at(2 * BAR));
   });
 });

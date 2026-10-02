@@ -20,7 +20,7 @@ import { setInsertField } from './insertEdits';
 import { insertColumn, knobColumns } from './insertLayout';
 import type { InsertKnobEntry } from './insertKnobTables';
 import { makeKnob, type KnobSpec } from './knob';
-import { insertKnobAutomation } from './knobAutomation';
+import { insertKnobAutomation, knobSongTick } from './knobAutomation';
 
 /**
  * The lock on the knob over `field` of the insert at `index` in `target`'s
@@ -37,7 +37,8 @@ export function insertFieldLock(
     automation: () => {
       const part = partAt(ctx.model.doc, target);
       const spec = part?.strip.inserts[index];
-      return insertKnobAutomation(part, spec, field, ctx.transport.position());
+      const tick = knobSongTick(ctx.model.doc, ctx.transport.position());
+      return insertKnobAutomation(part, spec, field, tick);
     },
   };
 }

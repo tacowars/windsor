@@ -28,7 +28,7 @@ import type { AppCtx } from './context';
 import { el } from './dom';
 import type { KnobElement, KnobSpec } from './knob';
 import { makeKnob } from './knob';
-import { catalogKnobAutomation } from './knobAutomation';
+import { catalogKnobAutomation, knobSongTick } from './knobAutomation';
 import {
   SEND_DEFAULT,
   STRIP_LEVEL_KNOB,
@@ -161,7 +161,11 @@ const stripKnob = (
 const stripLock =
   (ctx: AppCtx, slot: number, target: StripTargetId): NonNullable<KnobSpec['automation']> =>
   () =>
-    catalogKnobAutomation(partAt(ctx.model.doc, slot), target, ctx.transport.position());
+    catalogKnobAutomation(
+      partAt(ctx.model.doc, slot),
+      target,
+      knobSongTick(ctx.model.doc, ctx.transport.position()),
+    );
 
 /** The part's knobs: Level alone collapsed; expanded, Level, Pan, Low cut and a send per return. */
 function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[] {

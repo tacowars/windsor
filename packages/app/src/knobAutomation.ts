@@ -16,6 +16,7 @@
  * lane holds. The knob's look and input are `knob.ts` and `knobLock.ts`.
  */
 import type {
+  Arrangement,
   AutomationLane,
   AutomationTargetId,
   AutomationTargetKind,
@@ -28,9 +29,11 @@ import {
   automatableInsertFields,
   catalogRow,
   formatTargetId,
+  songTicksOf,
   valueAt,
 } from '@windsor/engine';
 import { LANE_KIND_COLOR } from './songAutomationTables';
+import { songTickOf } from './transportModel';
 
 /** What a locked knob shows: its lane's colour and the lane's value at the playhead. */
 export interface KnobAutomation {
@@ -41,6 +44,15 @@ export interface KnobAutomation {
 /** Each kind's colour, as `LANE_KIND_COLOR` holds it. */
 export type KnobLockColors = Readonly<Record<AutomationTargetKind, string>>;
 
+/**
+ * The song tick a knob reads its lane at: the transport's `position`, which
+ * counts on past the song's end, folded by the song's length as the engine's
+ * automation player folds it. Every resolver below takes this tick, so a
+ * knob starts its lane again where the sound does.
+ */
+export const knobSongTick = (doc: Arrangement, position: number): number =>
+  songTickOf(position, songTicksOf(doc));
+
 /** The part's lane on `target` while it is on, else undefined. */
 function onLane(
   part: DocumentPart | undefined,
@@ -50,7 +62,7 @@ function onLane(
   return lane?.on === true && lane.points.length > 0 ? lane : undefined;
 }
 
-/** The lock a lane on `row` puts on its knob at `tick`. */
+/** The lock a lane on `row` puts on its knob at `tick`, a song tick (`knobSongTick`). */
 const lockOf = (
   lane: AutomationLane,
   row: AutomationTargetRow,
