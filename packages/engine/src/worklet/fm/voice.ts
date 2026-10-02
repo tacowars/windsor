@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- a few lines over 350 after windsor#347's decay lanes and their rebind hold; tacowars accepted that rather than a split */
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
@@ -124,15 +125,18 @@ class Voice {
   lfoLevel: number;
   lfo2Level: number;
   partOffsets: Float64Array;
+  partFloors: Float64Array;
   liveValues: Float64Array;
   fbFrom: Float32Array;
   fbTo: Float32Array;
   fbRamp: number;
+  decayRebound: Float64Array;
 
   /**
    * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
-   * …), and `partOffsets` its song lanes' offsets by target code
-   * (windsor#346), both shared by every voice.
+   * …), `partOffsets` its song lanes' offsets by target code
+   * (windsor#346), and `partFloors` the floor each target a lane moves
+   * plays at least (windsor#347), all shared by every voice.
    */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
   constructor(
@@ -140,6 +144,7 @@ class Voice {
     random: () => number,
     partControls: Float64Array,
     partOffsets: Float64Array,
+    partFloors: Float64Array,
   ) {
     // Rule 7: each double field is born a double (NaN), before its start
     // value; the noise seed is a uint32, past a small integer's range. `age`
@@ -256,14 +261,17 @@ class Voice {
     this.opFeedback = new Float32Array(4);
     this.opWidth = new Float64Array(4).fill(1);
 
-    // Song automation (windsor#346, `voiceOffsets.ts`): the part's offsets,
-    // the values the voice plays with them this block, and each operator's
+    // Song automation (windsor#346, `voiceOffsets.ts`): the part's offsets
+    // and floors, the values the voice plays with them this block, and each operator's
     // feedback ramp across the block (`fbRamp`, a bit per ramping operator).
     this.partOffsets = partOffsets;
+    this.partFloors = partFloors;
     this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
     this.fbFrom = new Float32Array(4);
     this.fbTo = new Float32Array(4);
     this.fbRamp = 0;
+    // Each operator's decay curve a rebind holds until its lane resyncs (windsor#347): the offset then, NaN for none.
+    this.decayRebound = new Float64Array(4).fill(NaN);
   }
 
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */
