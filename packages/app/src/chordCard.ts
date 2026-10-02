@@ -2,8 +2,9 @@
  * The Sequencers tab's chord card (#607, #705): the Hit and Rest tiles above,
  * the rhythm below as one column per step — Hit or Rest, then the Oct, Inv,
  * Dur and Rep dials (click up, shift-click down) — an append column that
- * takes a drop or a click, a delete-last-step button, the part velocity, gate
- * and base-step controls, and the region's playhead (`regionPlayhead.ts`,
+ * takes a drop or a click, a delete-last-step button, the part velocity, gate,
+ * the pattern's Octave (beside Vel and Gate, tacowars's call on windsor#368's
+ * review) and base-step controls, and the region's playhead (`regionPlayhead.ts`,
  * windsor#101): bright on the step sounding while the song is inside the
  * region, a ghost on the step it would be on elsewhere. A hit's chord
  * is the harmony timeline's (epic #703 decision 15): the Hit tile names and
@@ -38,6 +39,8 @@ import type { AppCtx } from './context';
 import { PITCH_COLOR } from './consoleColors';
 import { el, select } from './dom';
 import { keySignature } from './gridModel';
+import { octaveKnob } from './harmonyTables';
+import { makeKnob } from './knob';
 import { changePattern } from './partEdits';
 import { regionPlayheadAt } from './regionPlayhead';
 import { knobRow } from './seqFields';
@@ -193,8 +196,24 @@ function watch(strip: ChordStrip): void {
 
 const BASE_STEP_OPTIONS = DIVISOR_OPTIONS.filter((o) => CHORD_DIVISORS.includes(Number(o.value)));
 
+/** The pattern's register octave (epic #703 decision 11), after Vel and Gate. */
+function octave(strip: ChordStrip): HTMLElement {
+  return makeKnob({
+    ...octaveKnob('chord'),
+    color: PITCH_COLOR,
+    get: () => strip.spec()?.register.octave ?? octaveKnob('chord').def,
+    set: (v) => {
+      if (changePattern(strip.ctx, strip.slot, strip.region, { register: { octave: v } })) {
+        strip.ctx.invalidate();
+      }
+    },
+  });
+}
+
 function controls(strip: ChordStrip): HTMLElement {
-  return knobRow(strip.ctx, strip.slot, CHORD_KNOBS, PITCH_COLOR, strip.region);
+  const row = knobRow(strip.ctx, strip.slot, CHORD_KNOBS, PITCH_COLOR, strip.region);
+  row.appendChild(octave(strip));
+  return row;
 }
 
 /** Write one field of the strip's region's pattern, and redraw if it took. */
