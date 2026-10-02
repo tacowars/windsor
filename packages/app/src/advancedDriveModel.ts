@@ -8,6 +8,10 @@ import {
   DRIVE_STAGE_PAGE,
 } from './advancedDriveTables';
 
+/** Stage `index`'s `key` as an insert field, #341's spelling: `stages.0.amount`. */
+export const driveStageField = (index: number, key: keyof DriveStageSpec): string =>
+  `stages.${index}.${key}`;
+
 export function editDriveStage<K extends keyof DriveStageSpec>(
   spec: AdvancedDriveSpec,
   index: number,

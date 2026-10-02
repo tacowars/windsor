@@ -1,6 +1,6 @@
 /** Editor widgets share the rack's controls, the console knob, palette, and engine ranges/defaults. */
 import { insertSelect, insertSwitch } from './insertLayout';
-import { makeKnob } from './knob';
+import { makeKnob, type KnobSpec } from './knob';
 import { STRIP_COLOR } from './consoleColors';
 import { fmt2, fmtHz } from './consoleFormat';
 export function driveSelect(
@@ -27,6 +27,8 @@ interface NumericControl {
   hz?: boolean;
   /** The rack's big dial, standing alone in its column. */
   big?: boolean | undefined;
+  /** The lane that holds the knob, if any (windsor#397, `insertFieldLock`). */
+  automation?: KnobSpec['automation'];
 }
 export function driveKnob(o: NumericControl): HTMLElement {
   return makeKnob({
@@ -40,5 +42,6 @@ export function driveKnob(o: NumericControl): HTMLElement {
     dial: o.big ? 'rack-big' : 'rack',
     fmt: o.hz ? fmtHz : fmt2,
     ...(o.hz ? { curve: 'log' as const } : {}),
+    ...(o.automation ? { automation: o.automation } : {}),
   });
 }

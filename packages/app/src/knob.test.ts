@@ -3,6 +3,7 @@
  * `attachKnobInput` over a stand-in element and window: a drag is one step
  * from press to release, it still closes when the knob never hears the
  * release, and arrow presses less than `UNDO_MERGE_MS` apart are one step.
+ * A knob a lane holds (windsor#351) takes none of them, and a press says why.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,7 +14,11 @@ import { settleGestures } from './gestureHooks';
 import { KNOB_PAD_PX, KNOB_R } from './knobConstants';
 import { attachKnobInput, continuesKeySteps, knobGeometry, scaleFor } from './knob';
 import type { KnobSpec, Scale } from './knob';
+import type { KnobAutomation } from './knobAutomation';
 import { ENVELOPE_KNOBS } from './patchKnobTables';
+import { notify } from './toast';
+
+vi.mock('./toast', () => ({ notify: vi.fn() }));
 
 const level = (value: number): DocumentPartial => partChange(0, { strip: { level: value } });
 const LINEAR: Scale = { toNorm: (v) => v, fromNorm: (n) => Math.min(1, Math.max(0, n)) };
@@ -33,8 +38,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-/** A Level knob on part 0's strip, attached to a stand-in element. */
-function levelKnob(ctx: Ctx): FakeElement {
+/** A Level knob on part 0's strip, attached to a stand-in element; `lock` says what holds it. */
+function levelKnob(ctx: Ctx, lock?: () => KnobAutomation | null): FakeElement {
   const node = new FakeElement();
   const spec: KnobSpec = {
     label: 'Level',
@@ -44,6 +49,7 @@ function levelKnob(ctx: Ctx): FakeElement {
     step: 0.01,
     get: () => levelOf(ctx),
     set: (v) => void ctx.change(level(v)),
+    ...(lock ? { automation: lock } : {}),
   };
   attachKnobInput(node as unknown as HTMLElement, spec, LINEAR, (v) => spec.set(v));
   return node;
@@ -228,6 +234,86 @@ describe('arrow keys on a knob', () => {
     expect(seen(other, 'keydown', 'ArrowLeft')).toBe(false);
     expect(seen(node, 'keydown', 'z')).toBe(false);
     expect(seen(node, 'pointerdown')).toBe(false);
+  });
+});
+
+describe('a knob a lane holds (windsor#351)', () => {
+  const held = { color: 'var(--modulator)', value: 0.8 };
+
+  it('ignores a drag, the keys and a double-click, and a press says why', () => {
+    const ctx = openGestureConsole();
+    const before = levelOf(ctx);
+    vi.mocked(notify).mockClear();
+    const node = levelKnob(ctx, () => held);
+    dragDown(node, 6);
+    fire(node, 'pointerup');
+    fire(node, 'keydown', { key: 'ArrowUp' });
+    fire(node, 'dblclick');
+    vi.advanceTimersByTime(600);
+    expect(levelOf(ctx)).toBe(before);
+    expect(ctx.canUndo).toBe(false);
+    expect(notify).toHaveBeenCalledWith(
+      'Level is automated in the song. Switch its lane off to edit it.',
+    );
+  });
+
+  it('moves again once the lane lets go', () => {
+    const ctx = openGestureConsole();
+    const before = levelOf(ctx);
+    let lock: KnobAutomation | null = held;
+    const node = levelKnob(ctx, () => lock);
+    fire(node, 'keydown', { key: 'ArrowDown' });
+    expect(levelOf(ctx)).toBe(before);
+    lock = null;
+    vi.mocked(notify).mockClear();
+    dragDown(node, 4);
+    fire(node, 'pointerup');
+    expect(levelOf(ctx)).not.toBe(before);
+    expect(notify).not.toHaveBeenCalled();
+  });
+});
+
+/** Dispatch a cancelable `type` on `node` carrying `fields`: whether the knob prevented it. */
+function prevented(node: FakeElement, type: string, fields: Record<string, unknown>): boolean {
+  const e = Object.assign(new Event(type, { cancelable: true }), fields);
+  node.dispatchEvent(e);
+  return e.defaultPrevented;
+}
+
+describe('the page under a knob a lane holds (windsor#396)', () => {
+  const held = { color: 'var(--modulator)', value: 0.8 };
+  const KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+  it('takes every key an unlocked knob takes, so none scrolls the page, and changes nothing', () => {
+    const ctx = openGestureConsole();
+    const before = levelOf(ctx);
+    const locked = levelKnob(ctx, () => held);
+    const free = levelKnob(openGestureConsole());
+    for (const key of KEYS) {
+      expect(prevented(free, 'keydown', { key }), key).toBe(true);
+      expect(prevented(locked, 'keydown', { key }), key).toBe(true);
+    }
+    vi.advanceTimersByTime(600);
+    expect(levelOf(ctx)).toBe(before);
+    expect(ctx.canUndo).toBe(false);
+  });
+
+  it('leaves Tab to the page, locked or not', () => {
+    const locked = levelKnob(openGestureConsole(), () => held);
+    const free = levelKnob(openGestureConsole());
+    expect(prevented(locked, 'keydown', { key: 'Tab' })).toBe(false);
+    expect(prevented(free, 'keydown', { key: 'Tab' })).toBe(false);
+  });
+
+  it('treats the wheel as an unlocked knob does: the knob has no wheel, so it scrolls the page', () => {
+    const ctx = openGestureConsole();
+    const before = levelOf(ctx);
+    const locked = levelKnob(ctx, () => held);
+    const free = levelKnob(openGestureConsole());
+    expect(prevented(locked, 'wheel', { deltaY: -100 })).toBe(
+      prevented(free, 'wheel', { deltaY: -100 }),
+    );
+    expect(levelOf(ctx)).toBe(before);
   });
 });
 

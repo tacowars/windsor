@@ -10,13 +10,20 @@
 import { describe, expect, it } from 'vitest';
 
 import type { Patch } from '@windsor/engine';
-import { DRIVE_SHAPE, DRIVE_SHAPE_NAMES, makePatch } from '@windsor/engine';
+import {
+  DRIVE_SHAPE,
+  DRIVE_SHAPE_NAMES,
+  FILTER_MODE,
+  FILTER_MODE_NAMES,
+  makePatch,
+} from '@windsor/engine';
 import { FILTER_KNOBS, lfoKnobs, patchKnobOpts } from './patchKnobTables';
 import {
   DRIVE_SWITCH,
   GLOBAL_TOGGLES,
   driveInactive,
   driveShapeOptions,
+  filterModeShows,
   LFO_PHASE_NAMES,
   LFO_RANGE_NAMES,
   lfoPhaseIndex,
@@ -208,5 +215,48 @@ describe('the LFO Range segment (windsor#56)', () => {
     expect(patch.lfo2.unipolar).toBe(true);
     expect(patch.lfo.unipolar).toBe(false);
     expect(toggleIndex(patch, 'lfo2.unipolar')).toBe(1);
+  });
+});
+
+describe('the filter section in Formant mode (windsor#334)', () => {
+  it('offers Off, LP, HP, BP, Notch and Formant, the sixth writing mode 5 through a push', () => {
+    expect(FILTER_MODE_NAMES).toEqual(['Off', 'LP', 'HP', 'BP', 'Notch', 'Formant']);
+    expect(FILTER_MODE_NAMES.indexOf('Formant')).toBe(FILTER_MODE.FORMANT);
+    const pushed: number[] = [];
+    const editor: PatchEditor = {
+      patch: makePatch(),
+      push: () => pushed.push(editor.patch.filter.mode),
+      refresh: () => undefined,
+    };
+    // What the picker's sixth button does: write the index, then push.
+    editor.patch.filter.mode = FILTER_MODE_NAMES.indexOf('Formant');
+    editor.push();
+    expect(pushed).toEqual([5]);
+    const imported = makePatch(JSON.parse(JSON.stringify(editor.patch)) as Partial<Patch>);
+    expect(imported.filter.mode).toBe(5);
+  });
+
+  it('shows Vowel and hides Cutoff and Slope in Formant, and the reverse in every other mode', () => {
+    expect(filterModeShows(FILTER_MODE.FORMANT)).toEqual({
+      cutoff: false,
+      slope: false,
+      vowel: true,
+    });
+    FILTER_MODE_NAMES.forEach((name, mode) => {
+      if (mode === FILTER_MODE.FORMANT) return;
+      expect(filterModeShows(mode), name).toEqual({ cutoff: true, slope: true, vowel: false });
+    });
+  });
+
+  it('keeps every other filter knob in Formant mode, since they shift the formants', () => {
+    const toggled = new Set(['filter.cutoff', 'filter.vowel']);
+    expect(FILTER_KNOBS.filter((k) => !toggled.has(k.f)).map((k) => k.label)).toEqual([
+      'Reso',
+      'Env Amt',
+      'Wheel',
+      'LFO Amt',
+      'LFO 2 Amt',
+      'Key Trk',
+    ]);
   });
 });

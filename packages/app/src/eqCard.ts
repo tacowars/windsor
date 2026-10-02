@@ -16,11 +16,24 @@
  * Listen switch on, holding a point plays only that band (`eqListen.ts`),
  * with the "Listening" pill over the curve (windsor#200). Both are live
  * only: the stage's analyser tap and `listen`, never the spec.
+ *
+ * On a part's strip a band field a lane holds (windsor#397,
+ * `eqAutomation.ts`) is drawn at the lane's value, so its point and the
+ * curve follow the lane on the console's frame loop without a rebuild; a
+ * drag on that point, or any curve edit of a held field, is refused with the
+ * locked knob's notice.
  */
-import { DEFAULT_EQ, EQ_SPECTRUM } from '@windsor/engine';
-import type { InsertSpec, InsertStage } from '@windsor/engine';
+import { DEFAULT_EQ, EQ_SPECTRUM, partAt } from '@windsor/engine';
+import type { EqSpec, InsertSpec, InsertStage } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import {
+  EQ_DRAG_FIELDS,
+  eqEditRefusal,
+  eqHeldName,
+  eqShownSpec,
+  sameLaneFields,
+} from './eqAutomation';
 import { drawEqCurve, eqCanvasContext, eqPalette } from './eqCurve';
 import type { EqPalette } from './eqCurve';
 import { wireEqCurve } from './eqCurveInput';
@@ -42,6 +55,8 @@ import { insertPage } from './insertLayout';
 import { insertIdAt, rackKey } from './insertRackModel';
 import type { InsertTarget } from './insertTarget';
 import { insertChange, insertsOf, liveInsert } from './insertTarget';
+import { knobSongTick, lockedKnobNotice } from './knobAutomation';
+import { watchPlayhead } from './stepStrip';
 
 /** Every EQ's view for this session, by `rackKey`: never in the song. */
 const views = new Map<string, EqView>();
@@ -63,6 +78,12 @@ function cardModel(ctx: AppCtx, slot: InsertTarget, index: number): EqCardModel 
     },
     sampleRate: () => ctx.host.system?.engine.context.sampleRate ?? EQ_FALLBACK_SAMPLE_RATE,
     plot: () => eqPlot(model.view().range, model.sampleRate()),
+    lanes: () => ({
+      part: typeof slot === 'number' ? partAt(ctx.model.doc, slot) : undefined,
+      insert: insertsOf(ctx, slot)[index],
+      tick: knobSongTick(ctx.model.doc, ctx.transport.position()),
+    }),
+    shown: () => eqShownSpec(model.lanes(), model.spec()),
   };
   return model;
 }
@@ -103,7 +124,7 @@ function curveCanvas(model: EqCardModel): CurveCanvas {
     if (!g || !canvas.isConnected) return;
     palette ??= eqPalette(canvas);
     drawEqCurve(g, {
-      spec: model.spec(),
+      spec: model.shown(),
       selected: model.view().band,
       plot: model.plot(),
       sampleRate: model.sampleRate(),
@@ -137,7 +158,7 @@ function liveExtras(
     canvas: curve.canvas,
     pill,
     enabled: () => model.view().listen,
-    spec: model.spec,
+    spec: model.shown,
     plot: model.plot,
     sampleRate: model.sampleRate,
     stage,
@@ -151,6 +172,60 @@ function liveExtras(
     draw: curve.spectrum,
   });
   return { pill, listen };
+}
+
+/**
+ * Redraw the curve each frame a lane moves a band field it holds, until the
+ * canvas leaves the page; a frame its tab is hidden does nothing.
+ */
+function followLanes(canvas: HTMLElement, model: EqCardModel, draw: () => void): void {
+  let last: EqSpec = model.shown();
+  watchPlayhead({
+    attached: () => canvas.isConnected,
+    shown: () => canvas.closest('[hidden]') === null,
+    playheadAt: () => 0,
+    mark: () => undefined,
+    repaintIf: () => {
+      const now = model.shown();
+      if (sameLaneFields(now, last)) return;
+      last = now;
+      draw();
+    },
+  });
+}
+
+/** What the curve's edits repaint beyond the curve: the band row, the knobs, the Listen pill. */
+interface CurveRepaint {
+  readonly select: (band: number) => void;
+  readonly edited: () => void;
+}
+
+/** The curve's gestures over the card's model: a held field's edit is refused with the notice. */
+function wireCurve(
+  ctx: AppCtx,
+  model: EqCardModel,
+  canvas: HTMLCanvasElement,
+  on: CurveRepaint,
+): void {
+  const refuse = (name: string | null): boolean => {
+    if (name) ctx.notify(lockedKnobNotice(name), 'info');
+    return name !== null;
+  };
+  wireEqCurve({
+    canvas,
+    spec: model.spec,
+    shown: model.shown,
+    plot: model.plot,
+    sampleRate: model.sampleRate,
+    selected: () => model.view().band,
+    select: on.select,
+    edit: (spec) => {
+      if (refuse(eqEditRefusal(model.lanes(), model.spec(), spec))) return;
+      if (model.commit(spec)) on.edited();
+    },
+    full: () => ctx.notify(EQ_FULL_MESSAGE, 'info'),
+    refuseDrag: (band) => refuse(eqHeldName(model.lanes(), band, EQ_DRAG_FIELDS)),
+  });
 }
 
 function eqPage(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
@@ -172,23 +247,16 @@ function eqPage(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
     panel.querySelectorAll<HTMLElement & { refresh?: () => void }>('.knob').forEach((knob) => {
       knob.refresh?.();
     });
-  wireEqCurve({
-    canvas,
-    spec: model.spec,
-    plot: model.plot,
-    sampleRate: model.sampleRate,
-    selected: () => model.view().band,
+  wireCurve(ctx, model, canvas, {
     select: (band) => {
       model.setView({ band });
       repaint('all');
     },
-    edit: (spec) => {
-      if (!model.commit(spec)) return;
+    edited: () => {
       knobs();
       repaint('band');
       extras.listen.refresh();
     },
-    full: () => ctx.notify(EQ_FULL_MESSAGE, 'info'),
   });
   const extras = liveExtras(ctx, slot, index, model, curve);
   const wrap = el('div', 'eq-plot-wrap');
@@ -201,6 +269,7 @@ function eqPage(ctx: AppCtx, slot: InsertTarget, index: number): HTMLElement {
   graph.append(chips, wrap);
   paint.chips();
   paint.panel();
+  followLanes(canvas, model, draw);
   // The canvas reads the rack's accent once it is in the page.
   requestAnimationFrame(draw);
   const page = insertPage(graph, panel);

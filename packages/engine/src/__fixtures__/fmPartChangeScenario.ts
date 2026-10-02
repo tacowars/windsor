@@ -101,6 +101,15 @@ export interface FmPartChangeConfig {
    * it. The queue must be empty when the warm-up ends.
    */
   freshQueue?: boolean;
+  /**
+   * The Formant filter's vowel (windsor#331): each parameter change also
+   * writes the next of these into the part's bound patch, `filter.vowel`,
+   * which every voice reads each control block, as a live edit of the vowel
+   * reaches them. Written in place rather than posted: a posted patch is
+   * normalised into a new object on the message path, by design, and that
+   * allocation would swamp what the run measures, the render's.
+   */
+  vowels?: number[];
 }
 
 /** What the run reads of each voice: flags only, since reading a double field can box it here. */
@@ -284,8 +293,12 @@ function fmCycle(probe: ProbeRig, config: FmPartChangeConfig): Cycle {
   let resting = -1;
   let change = 0;
   let peak = 0;
+  const filter = (probe.processor as unknown as { patch: { filter: { vowel: number } } }).patch
+    .filter;
+  const vowels = config.vowels ?? [];
 
   const toggle = (): void => {
+    if (vowels.length > 0) filter.vowel = vowels[change % vowels.length]!;
     const k = change++ % arrays.length;
     const values = arrays[k]!;
     values[0] = values[0] === others[k] ? defaults[k]! : others[k]!;

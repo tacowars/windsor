@@ -7,7 +7,8 @@
  * - **A lane** is its colour chip, name and kind; its value at the playhead,
  *   an on/off ● and a delete ×; and its curve over the part's ghosted
  *   regions. The toolbar's Edit and Draw tools edit the curve in place
- *   (windsor#349, `songAutomationGesture.ts`); shapes are windsor#350.
+ *   (windsor#349, `songAutomationGesture.ts`), and its Shape tool stamps a
+ *   shape over a range (windsor#350, `songShapeRange.ts`).
  * - **The add row** is the "+ Add lane" picker, the voice count against
  *   `FM_LANES_MAX`, and an empty stretch of timeline.
  *
@@ -122,18 +123,31 @@ function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane):
   const box = svg('svg', { 'aria-hidden': 'true' });
   paintCurve(view, box, row, lane.points);
   timeline.appendChild(box);
+  const name = laneTitle(part, lane.target).name;
+  const points = (): readonly AutomationPoint[] =>
+    lanesOf(livePart(view, part)).find((l) => l.target === lane.target)?.points ?? lane.points;
+  const commit = (label: string, next: readonly AutomationPoint[]): void => {
+    const live = livePart(view, part);
+    commitLanes(view, live, withPoints(lanesOf(live), lane.target, next), { label });
+  };
   wireLaneEditing({
     view,
     timeline,
     row,
-    name: laneTitle(part, lane.target).name,
-    points: () =>
-      lanesOf(livePart(view, part)).find((l) => l.target === lane.target)?.points ?? lane.points,
+    name,
+    points,
     draw: (next) => paintCurve(view, box, row, next),
-    commit: (label, next) => {
-      const live = livePart(view, part);
-      commitLanes(view, live, withPoints(lanesOf(live), lane.target, next), { label });
-    },
+    commit,
+  });
+  // The Shape tool's range (windsor#350): a drag selects a range, and the popover stamps it.
+  view.shape.attach({
+    view,
+    key: `${part.slot}:${lane.target}`,
+    timeline,
+    row,
+    name,
+    points,
+    commit,
   });
   return timeline;
 }

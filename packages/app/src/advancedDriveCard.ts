@@ -7,6 +7,11 @@
  * amounts), and Mod (the modulation sources). The on/off switch is the
  * rack's rail. A routing or starting-point change renders the rack, so the
  * Stage pages follow it; every other edit keeps the page as it is.
+ *
+ * On a part's strip each knob is locked while a lane on its field is on
+ * (windsor#397, as `insertKnobs.ts` locks the rack's): the globals by their
+ * own name, a stage's as `stages.<i>.<field>`. A lane on a field the route
+ * leaves unread (a stage it skips, the split off multiband) locks nothing.
  */
 import {
   DEFAULT_ADVANCED_DRIVE,
@@ -26,10 +31,17 @@ import type { AppCtx } from './context';
 import type { InsertCard, InsertPage } from './insertCards';
 import type { InsertTarget } from './insertTarget';
 import { insertChange, insertsOf } from './insertTarget';
+import { insertFieldLock } from './insertKnobs';
+import type { KnobSpec } from './knob';
 import { driveSelect, driveToggle, driveKnob } from './advancedDriveControls';
 import { drivePlots } from './advancedDrivePlots';
 import type { DrivePage } from './advancedDriveModel';
-import { drivePages, driveStartingPoint, editDriveStage } from './advancedDriveModel';
+import {
+  drivePages,
+  driveStageField,
+  driveStartingPoint,
+  editDriveStage,
+} from './advancedDriveModel';
 import {
   DRIVE_GLOBAL_FIELDS,
   DRIVE_STAGE_FIELDS,
@@ -63,6 +75,8 @@ interface DriveView {
   commit(spec: AdvancedDriveSpec, render?: boolean): void;
   /** Set by the Main page: refreshes its Starting point after every commit, from any control. */
   afterCommit?: () => void;
+  /** The lock a lane puts on the knob over `field` (`stages.0.amount`, `drive`). */
+  lock(field: string): Pick<KnobSpec, 'automation'>;
 }
 
 const HZ_FIELDS: ReadonlySet<string> = new Set(['pivot', 'low', 'high', 'rate', 'frequency']);
@@ -81,6 +95,7 @@ function globalKnob(
     set: (value) => view.commit({ ...view.current(), [key]: value }),
     hz: HZ_FIELDS.has(key),
     big: o.big,
+    ...view.lock(key),
   });
 }
 
@@ -102,6 +117,7 @@ function stageKnobs(
         onKnob?.();
       },
       hz: HZ_FIELDS.has(key),
+      ...view.lock(driveStageField(stage, key)),
     }),
   );
   return knobColumns(knobs);
@@ -226,6 +242,7 @@ export const advancedDriveCard: InsertCard = (ctx: AppCtx, target: InsertTarget,
       view.afterCommit?.();
       if (render) ctx.render();
     },
+    lock: (field) => insertFieldLock(ctx, target, index, field),
   };
   return drivePages(view.current().route).map((page): InsertPage => ({
     name: page.name,

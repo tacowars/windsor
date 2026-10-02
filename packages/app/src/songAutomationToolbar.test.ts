@@ -1,5 +1,5 @@
 /**
- * The lane toolbar's keys (windsor#349 decision 6): E and D pick the tools on
+ * The lane toolbar's keys (windsor#349 decision 6, windsor#350 decision 1): E, D and S pick the tools on
  * a plain press, and a modified press is left to the browser.
  */
 import { describe, expect, it } from 'vitest';
@@ -19,13 +19,15 @@ const press = (
 });
 
 describe('toolForKey', () => {
-  it('picks Edit on E and Draw on D, either case', () => {
+  it('picks Edit on E, Draw on D and Shape on S, either case', () => {
     expect(toolForKey(press('e'))).toBe('edit');
     expect(toolForKey(press('D'))).toBe('draw');
+    expect(toolForKey(press('s'))).toBe('shape');
   });
 
   it('leaves other keys and modified presses alone', () => {
-    expect(toolForKey(press('s'))).toBeNull();
+    expect(toolForKey(press('x'))).toBeNull();
+    expect(toolForKey(press('s', { metaKey: true }))).toBeNull();
     expect(toolForKey(press('e', { metaKey: true }))).toBeNull();
     expect(toolForKey(press('d', { ctrlKey: true }))).toBeNull();
     expect(toolForKey(press('e', { altKey: true }))).toBeNull();

@@ -19,6 +19,7 @@ import {
   DRIVE_FOLD,
   DRIVE_SHAPE,
   DRIVE_SOFT,
+  FILT_FORMANT,
   FILT_NOTCH,
   FILT_OFF,
   FILTER_MODE,
@@ -41,6 +42,9 @@ describe('mode ids', () => {
   it('builds each object from the scalars the DSP switches on', () => {
     expect([LOOP_MODE.NONE, LOOP_MODE.TRIGGER]).toEqual([LOOP_NONE, LOOP_TRIGGER]);
     expect([FILTER_MODE.OFF, FILTER_MODE.NOTCH]).toEqual([FILT_OFF, FILT_NOTCH]);
+    // windsor#331: Formant is the sixth mode, last in the console's list.
+    expect(FILTER_MODE.FORMANT).toBe(FILT_FORMANT);
+    expect(FILTER_MODE_NAMES[FILT_FORMANT]).toBe('Formant');
     expect([LFO_SHAPE.SINE, LFO_SHAPE.DRIFT]).toEqual([LFO_SINE, LFO_DRIFT]);
     expect([DRIVE_SHAPE.SOFT, DRIVE_SHAPE.FOLD]).toEqual([DRIVE_SOFT, DRIVE_FOLD]);
   });

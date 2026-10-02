@@ -22,7 +22,8 @@
  * values follow the playhead from that same loop, without a repaint. While
  * any part is open, the lane toolbar sits above the lanes
  * (`songAutomationToolbar.ts`, windsor#349): its tool and snap are view
- * state too.
+ * state too, as are the Shape tool's last settings (`songShapeRange.ts`,
+ * windsor#350), whose popover lives for one render.
  */
 import type { DocumentPartial } from '@windsor/engine';
 import { regionPattern, songTicksOf } from '@windsor/engine';
@@ -48,6 +49,8 @@ import {
   type AutomationTool,
 } from './songAutomationTables';
 import { automationToolbar, syncAutomationTool, wireToolKeys } from './songAutomationToolbar';
+import { shapeTool, type ShapeTool } from './songShapeRange';
+import { DEFAULT_SHAPE_SETTINGS, type ShapeSettings } from './songShapeTables';
 import { songMixerLights } from './songMixerLights';
 import type { MixerLights } from './songMixerLights';
 import { stripSignature } from './songMixerModel';
@@ -114,12 +117,16 @@ export interface SongViewState {
   /** The lane toolbar's tool and Snap grain in ticks, 0 for Off (windsor#349 decision 1). Kept for the session. */
   automationTool: AutomationTool;
   automationSnap: number;
+  /** The Shape tool's last shape, rate, phase and duty (windsor#350 decision 4). Kept for the session. */
+  shape: ShapeSettings;
 }
 
 /** What the lanes, the pane and the cards they host are handed. */
 export interface SongView {
   readonly ctx: AppCtx;
   readonly state: SongViewState;
+  /** The Shape tool's range and popover (windsor#350), for this render. */
+  readonly shape: ShapeTool;
   songTicks(): number;
   /**
    * Write a partial live and, when it took, mark the other tabs stale and
@@ -184,7 +191,7 @@ function renderSongView(
   ctx: AppCtx,
   state: SongViewState,
   lights: MixerLights,
-): void {
+): ShapeTool {
   body.innerHTML = '';
   state.selection = validSelection(ctx, state.selection);
   const scroll = el('div', 'lanes-scroll');
@@ -203,8 +210,14 @@ function renderSongView(
   guardFrozenColumns(lanes, SONG_VIEW.laneGapPx);
   const line = playheadLine();
   const pane = el('div', 'detail-pane');
+  // The Shape tool's range and popover (windsor#350): the popover sits in the tab's body.
+  const shape = shapeTool(body, state);
   // The lane toolbar (windsor#349): shown while any part is folded open.
-  const toolbar = automationToolbar(state, () => body);
+  const toolbar = automationToolbar(
+    state,
+    () => body,
+    () => shape.toolChanged(),
+  );
   scroll.appendChild(lanes);
   body.appendChild(toolbar);
   body.appendChild(scroll);
@@ -244,6 +257,7 @@ function renderSongView(
   const view: SongView = {
     ctx,
     state,
+    shape,
     songTicks: () => songTicksOf(ctx.model.doc),
     commit(partial, paintPane = false) {
       if (!ctx.change(partial).ok) return false;
@@ -284,6 +298,8 @@ function renderSongView(
       readValues(ctx.transport.position());
       // The new blocks start unlit, and the loop marks only a moved tick: light the playing chord now, paused or not.
       markPlayingBlock(lanes, doc, view.songTicks(), ctx.transport.position());
+      // The Shape selection on its new lane, or closed when the lane went with the repaint.
+      shape.refresh();
     },
     paintPane() {
       paneDrawn = paintDetailPane(pane, view);
@@ -340,6 +356,7 @@ function renderSongView(
       zoom.refit();
     },
   });
+  return shape;
 }
 
 /** The tab's renderer, keeping its selection across renders — what `main.ts` registers as Song. */
@@ -356,14 +373,18 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     openParts: new Set(),
     automationTool: DEFAULT_AUTOMATION_TOOL,
     automationSnap: DEFAULT_SNAP_TICKS,
+    shape: DEFAULT_SHAPE_SETTINGS,
   };
   // The mixer column's lights (windsor#159): one poller for the view, outliving each render's cells.
   const lights = songMixerLights(ctx);
   // The tool keys (windsor#349): once, on the tab's body, which outlives its renders.
   let keyed: HTMLElement | null = null;
+  // The Shape tool of the current render (windsor#350): a render closes the last one's popover.
+  let shape: ShapeTool | null = null;
   return (body) => {
-    if (keyed !== body) wireToolKeys(body, state);
+    if (keyed !== body) wireToolKeys(body, state, () => shape?.toolChanged());
     keyed = body;
-    renderSongView(body, ctx, state, lights);
+    shape?.close();
+    shape = renderSongView(body, ctx, state, lights);
   };
 }

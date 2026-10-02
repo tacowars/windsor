@@ -7,9 +7,13 @@
  * brackets the edits in undo steps, the way a knob does (`knob.ts`): a drag
  * from press to release, wheel turns and key presses a moment apart, a
  * double-click on its own.
+ *
+ * A point stands where the curve draws it (`shown`), at its lanes' values
+ * while lanes hold its band (windsor#397), and a press on a point whose
+ * frequency or gain a lane holds selects the band but refuses the drag.
  */
 import type { EqSpec } from '@windsor/engine';
-import type { EqDragStart, EqPlot } from './eqCurveModel';
+import type { EqDoubleClick, EqDragStart, EqPlot } from './eqCurveModel';
 import {
   doubleClick,
   dragBand,
@@ -39,7 +43,18 @@ export interface EqCurveHost {
   edit(spec: EqSpec): void;
   /** A double-click found every band on. */
   full(): void;
+  /** The spec as drawn, held fields at their lanes' values; `spec` when absent. */
+  shown?(): EqSpec;
+  /**
+   * A press on `band`'s point: true, having said why, when a lane holds the
+   * frequency or gain a drag would move (windsor#397). Absent, every drag goes.
+   */
+  refuseDrag?(band: number): boolean;
 }
+
+/** Where the points stand: as drawn. */
+const drawnSpec = (host: Pick<EqCurveHost, 'spec' | 'shown'>): EqSpec =>
+  host.shown?.() ?? host.spec();
 
 /** The undo step's name for an edit of band `band` (0-based). */
 const stepName = (band: number): string => `EQ band ${band + 1}`;
@@ -67,7 +82,7 @@ function wirePointer(host: EqCurveHost): void {
   const { canvas } = host;
   let drag: Drag | null = null;
   const hit = (e: MouseEvent): number =>
-    hitBand(host.spec(), local(canvas, e), host.plot(), host.sampleRate());
+    hitBand(drawnSpec(host), local(canvas, e), host.plot(), host.sampleRate());
   const startAt = (band: number, e: MouseEvent): EqDragStart => {
     const spec = host.spec();
     return { band: spec.bands[band]!, scale: spec.scale, ...local(canvas, e) };
@@ -85,6 +100,7 @@ function wirePointer(host: EqCurveHost): void {
     e.preventDefault();
     drag?.gesture.close();
     if (band !== host.selected()) host.select(band);
+    if (host.refuseDrag?.(band)) return;
     drag = { band, start: startAt(band, e), mods: modsOf(e), gesture: dragGesture(stepName(band)) };
     canvas.setPointerCapture(e.pointerId);
   });
@@ -107,9 +123,27 @@ function wirePointer(host: EqCurveHost): void {
   canvas.addEventListener('lostpointercapture', stop);
 }
 
+/**
+ * A double-click's edit, found on the points as drawn and made on the stored
+ * spec: only the band it touched changes, so a lane's value on another band
+ * never lands in the song. An added bell takes an off band, which no lane
+ * holds, so it is drawn where it is stored.
+ */
+export function doubleClickEdit(
+  host: Pick<EqCurveHost, 'spec' | 'shown' | 'plot' | 'sampleRate'>,
+  at: { readonly x: number; readonly y: number },
+): EqDoubleClick {
+  const done = doubleClick(drawnSpec(host), at, host.plot(), host.sampleRate());
+  if (done.kind === 'full') return done;
+  const spec = host.spec();
+  const band =
+    done.kind === 'reset' ? { ...spec.bands[done.band]!, gain: 0 } : done.spec.bands[done.band]!;
+  return { ...done, spec: withBand(spec, done.band, band) };
+}
+
 function wireDoubleClick(host: EqCurveHost): void {
   host.canvas.addEventListener('dblclick', (e) => {
-    const done = doubleClick(host.spec(), local(host.canvas, e), host.plot(), host.sampleRate());
+    const done = doubleClickEdit(host, local(host.canvas, e));
     if (done.kind === 'full') return host.full();
     withGesture(stepName(done.band), () => host.edit(done.spec));
     host.select(done.band);
@@ -156,7 +190,7 @@ export type EqWheelHost = Omit<EqCurveHost, 'canvas'> & { readonly canvas: Boxed
 export function wheelCurve(host: EqWheelHost, turns: BandWheelGesture, e: EqWheel): void {
   const spec = host.spec();
   const plot = host.plot();
-  const band = hitBand(spec, local(host.canvas, e), plot, host.sampleRate());
+  const band = hitBand(drawnSpec(host), local(host.canvas, e), plot, host.sampleRate());
   if (band < 0) return;
   e.preventDefault();
   if (band !== host.selected()) host.select(band);

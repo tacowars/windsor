@@ -34,6 +34,13 @@ export interface KnobSpec {
   get: () => number;
   set: (v: number) => void;
   onChange?: () => void;
+  /**
+   * Which lane holds the knob (windsor#351): null while none that is on does,
+   * else the lane's colour and its value at the playhead. A held knob is
+   * locked: drawn in the lane's colour with an AUTO tag, following the lane,
+   * deaf to drags, keys and resets (`knobAutomation.ts`, `knobLock.ts`).
+   */
+  automation?: () => KnobAutomation | null;
 }
 
 /**
@@ -47,6 +54,10 @@ export interface KnobElement extends HTMLElement {
 
 import { dragGesture, isModifierKey, mergedGesture, withGesture } from './gestureHooks';
 import type { OpenGesture } from './gestureHooks';
+import type { KnobAutomation } from './knobAutomation';
+import { automatedValueText, lockedKnobNotice } from './knobAutomation';
+import { AUTO_TAG_TEXT, followAutomation, paintLock } from './knobLock';
+import { notify } from './toast';
 import {
   ARC_END,
   ARC_MIN_DEGREES,
@@ -122,6 +133,7 @@ function knobDom(spec: KnobSpec): HTMLElement {
   const { r, size } = knobGeometry(spec);
   const c = size / 2;
   const label = spec.compact ? '' : `<span class="knob-label">${spec.label}</span>`;
+  const auto = spec.automation ? `<span class="knob-auto">${AUTO_TAG_TEXT}</span>` : '';
   node.innerHTML =
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">` +
     `<circle class="dial-face" cx="${c}" cy="${c}" r="${r - FACE_INSET}"></circle>` +
@@ -129,7 +141,7 @@ function knobDom(spec: KnobSpec): HTMLElement {
     `<path class="dial-arc" d=""></path>` +
     `<line class="dial-pin" x1="${c}" y1="${c}" x2="${c}" y2="${c - r + PIN_INSET}"></line>` +
     `</svg>` +
-    `<span class="knob-val"></span>${label}`;
+    `<span class="knob-val"></span>${auto}${label}`;
   node.title = `${spec.label} - drag, shift-drag for fine, double-click to reset`;
   return node;
 }
@@ -265,7 +277,8 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   const { toNorm, fromNorm } = scaleFor(spec);
 
   const render = (): void => {
-    const v = spec.get();
+    const lock = spec.automation?.() ?? null;
+    const v = lock ? lock.value : spec.get();
     const n = Math.min(1, Math.max(0, toNorm(v)));
     const ang = ARC_START + n * (ARC_END - ARC_START);
     const zeroN = spec.min < 0 && spec.max > 0 ? toNorm(0) : 0;
@@ -277,7 +290,8 @@ export function makeKnob(spec: KnobSpec): KnobElement {
     const aria = knobAria(spec, v);
     out.textContent = aria.valuetext;
     node.setAttribute('aria-valuenow', aria.valuenow);
-    node.setAttribute('aria-valuetext', aria.valuetext);
+    node.setAttribute('aria-valuetext', lock ? automatedValueText(aria.valuetext) : aria.valuetext);
+    if (spec.automation) paintLock(node, lock);
   };
 
   const commit = (raw: number): void => {
@@ -292,6 +306,7 @@ export function makeKnob(spec: KnobSpec): KnobElement {
   attachKnobInput(node, spec, { toNorm, fromNorm }, commit);
   node.refresh = render;
   render();
+  if (spec.automation) followAutomation(node, spec.automation, render);
   return node;
 }
 
@@ -327,8 +342,14 @@ export function attachKnobInput(
   let startY = 0;
   let startN = 0;
   let startV = 0;
+  const locked = (): boolean => (spec.automation?.() ?? null) !== null;
   node.addEventListener('pointerdown', (e) => {
     drag?.close();
+    drag = null;
+    if (locked()) {
+      notify(lockedKnobNotice(spec.label));
+      return;
+    }
     drag = dragGesture(spec.label);
     startY = e.clientY;
     startV = spec.get();
@@ -362,7 +383,9 @@ export function attachKnobInput(
   node.addEventListener('lostpointercapture', stop);
   // Each click's release has already closed its own (empty) drag step, so the
   // reset opens a step of its own under the knob's label.
-  node.addEventListener('dblclick', () => withGesture(spec.label, () => commit(spec.def)));
+  node.addEventListener('dblclick', () => {
+    if (!locked()) withGesture(spec.label, () => commit(spec.def));
+  });
   const keys = mergedGesture({
     label: spec.label,
     continues: (e) => continuesKeySteps(e, node),
@@ -371,8 +394,10 @@ export function attachKnobInput(
   node.addEventListener('keydown', (e) => {
     const dir = Object.hasOwn(ARROW_KEYS, e.key) ? ARROW_KEYS[e.key] : undefined;
     if (dir === undefined) return;
+    // A locked knob still takes the arrows it would turn by, so they never scroll the page.
+    e.preventDefault();
+    if (locked()) return;
     keys.touch();
     commit(keyTarget(spec, spec.get(), dir, e.shiftKey));
-    e.preventDefault();
   });
 }

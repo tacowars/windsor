@@ -1,7 +1,7 @@
 /**
  * The patch defaults (#670): every value a patch may omit, and the bounds the
- * worklet clamps the tone, the feedback, the width and a Noise operator's
- * colour (windsor#362) to. Two readers fill a
+ * worklet clamps the tone, the feedback, the width, a Noise operator's
+ * colour (windsor#362) and the Formant vowel (windsor#331) to. Two readers fill a
  * patch from this one table — `patchNormalise.ts` for the audio loop when a
  * `patch` message arrives, and `makePatch()` in the main thread's `patch/patch.ts` for the
  * editor, the tests and the console's knob defaults — so a knob cannot show
@@ -131,7 +131,16 @@ const FILTER_DEFAULTS = {
   lfoAmount: 0,
   lfo2Amount: 0,
   keyTrack: 0,
+  /** The Formant mode's vowel (windsor#331), `VOWEL_RANGE`: 0 a, 1 e, 2 i, 3 o, 4 u. */
+  vowel: 0,
 };
+
+/**
+ * The Formant mode's vowel, clamped here by the worklet: one unit per row of
+ * `formantTables.ts`'s `FORMANT_VOWELS` (a to u), a fraction between two
+ * rows. `patchDefaults.test.ts` pins the top to the table's last row.
+ */
+const VOWEL_RANGE = { min: 0, max: 4 };
 
 /**
  * The voice's drive stage (windsor#300), between the carriers and the filter:
@@ -223,5 +232,6 @@ export {
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
   TONE_RANGE,
+  VOWEL_RANGE,
   WIDTH_RANGE,
 };

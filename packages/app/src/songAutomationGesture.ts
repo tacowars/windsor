@@ -146,7 +146,8 @@ export function wireLaneEditing(lane: LaneEditing): void {
   };
 
   timeline.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
+    // The Shape tool's range gesture is its own (`songShapeRange.ts`, windsor#350).
+    if (e.button !== 0 || view.state.automationTool === 'shape') return;
     e.preventDefault();
     e.stopPropagation();
     cancel();

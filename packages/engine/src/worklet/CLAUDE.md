@@ -197,7 +197,9 @@ build output. The map of `fm/` (#644):
 | `algorithms.ts` | `ALGORITHMS` with each topology's name and label, the topological order, the kernel's edge and carrier tables; the main thread's `audioConstants.ts` re-exports the table and its type (#656) |
 | `envelope.ts` | `Envelope`, the `ST_*` ids, and the one curve — `writeSegmentLevel` over a segment's fields, which `advance` runs and the console's `segmentLevel` wraps, and its two steps `curveConstant` and `curveShape` (#656, windsor#233) |
 | `lfo.ts` | `Lfo` |
-| `svf.ts` | `Svf` |
+| `svf.ts` | `Svf`, the TPT state-variable section (the soft clip it once held is the drive's `soft` since windsor#300); the voice holds three, `svfA`, `svfB` and `svfC`, the third for the Formant mode alone, and a section keeps its Formant peak's `gain` and level beside its coefficients (windsor#331) |
+| `voiceFormant.ts` | `updateVoiceFormant` and `FORMANT_SHIFT_SLOT` (windsor#331): the Formant mode's control-rate half, the three peaks' centres from the vowel's row morph times the filter modulation's `2^octaves`, one Q from the resonance, and each peak's gain, its level over that Q. A section whose inputs are unchanged keeps its coefficients, and an unchanged level its power of ten. Both render loops write the three bandpasses out in parallel and sum them A, B, C, with no call |
+| `formantTables.ts` | `FORMANT_VOWELS` (windsor#331): a, e, i, o, u, each three formant centres (Hz) and levels (dB), the Csound Manual's bass voice; import-free, the index exports it |
 | `voiceDrive.ts` | `VoiceDrive` and `updateVoiceDrive` (windsor#300): the voice's drive stage between the carriers and the filter, heard with the filter on or off. Its state, its five curves by `DRIVE_SHAPE` id (`soft`, the filter's former soft clip to the bit, then Advanced Drive's `hard`, `diode`, `tube` and `fold` in portable arithmetic) and its control-rate half (the bypass, which is the patch's `drive.on` switch or unity gain with no bias, windsor#309; the bias's offset; the tone pole's coefficient). Both render loops write the per-sample stage out, `soft` and the tone inline. |
 | `portablePowers.ts` | `log2InPlace` and `exp2InPlace` (windsor#300): base-2 log and power in place, from `+ − × ÷` and a double's bits, so the diode curve and the tone's cutoff give the same bits on arm64 and x64 |
 | `noiseColour.ts` | `NoiseColour` and `bindNoiseColour` (windsor#362): a Noise operator's own two-pole Butterworth lowpass and highpass on its noise, from its `noiseLp` and `noiseHp` (0 off), before its level. Four to a voice; `bindVoiceConstants` tunes them when the voice binds a patch, the only time the fields change, retuning a section only when its field did. Both render loops call `process` on a Noise operator's sample, through `point`, only while one is on, so an operator without the fields does no per-sample work |
@@ -263,9 +265,14 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    of every function that read a message; one run per message then stayed
    in V8's baseline tier, boxing, for tens of thousands of quanta, where
    the render, run every quantum, is optimised again within a few hundred.
-   The per-sample calls the kernel and the generic loop keep (`Svf.process`,
-   `VoiceDrive.curve` for every drive shape but `soft`, `noise`,
-   `NoiseColour.process`) are inlined first by frequency.
+   The per-sample calls the kernel and the generic loop keep (`Svf.process`
+   on `svfA` and `svfB`, `VoiceDrive.curve` for every drive shape but
+   `soft`, `noise`, `NoiseColour.process`) are inlined first by frequency.
+   The Formant mode's three sections (`svfA`, `svfB`, `svfC`, windsor#331)
+   are `Svf.process`'s bandpass written out in both loops, not called:
+   three more inlined calls spent the kernel's inlining budget, and with a
+   Formant voice anywhere in the bundle every other mode, Off included,
+   ran about 25 % slower (`docs/research/2026-10-02-formant-filter/`).
    `synth/fmProcessorAllocation.test.ts` pins it through
    `__fixtures__/fmPartChangeScenario.ts`, with one run at frames past 2^31
    with notes posted ahead and the queue's accessors kept from inlining, one
@@ -296,17 +303,19 @@ reliably read the records (`2026-09-23-638-worklet-refactor-optimised-for-agents
    under Node 22, nine pad and score presets hash differently because `Math`
    differs between V8 versions. A run on the wrong Node is not a render change,
    and the test's guard says so in one failure before it renders (windsor#6).
-5. **Eight modules are read by the main thread too** (#656): `algorithms.ts`,
+5. **Nine modules are read by the main thread too** (#656): `algorithms.ts`,
    `waveIds.ts`, `envelope.ts`, `fmConstants.ts`, `modeIds.ts` (#669:
    `patch.ts` re-exports `LOOP_MODE`, `FILTER_MODE` and `LFO_SHAPE`),
    `patchDefaults.ts` (#670: `makePatch()` fills from it, and
    `patchDefaults.test.ts` pins its fill equal to `normalisePatch`'s), and
    `stepModTables.ts` and `stepModValue.ts` (windsor#17: the sequencer and
    the song normaliser read the table, and the index exports both, so a
-   console and the voice compute a step's value with one curve). `audioConstants.ts` and
+   console and the voice compute a step's value with one curve), and
+   `formantTables.ts` (windsor#331: the index exports the vowels the
+   Formant mode reads). `audioConstants.ts` and
    `patch.ts` re-export `ALGORITHMS`, `WAVE` and `ENVELOPE_CURVE_STEEPNESS`
    from them, and the console draws envelopes with `segmentLevel`, so there
-   is one table and one curve, and no pin test. The eight are listed in the
+   is one table and one curve, and no pin test. The nine are listed in the
    engine project's `files` (`packages/engine/tsconfig.json`) and compile
    under its stricter flags as well:
    an indexed read in one of them takes a `!`, and none of them may touch

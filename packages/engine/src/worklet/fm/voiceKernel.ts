@@ -34,7 +34,7 @@ import {
   MOD_INDEX_SCALE,
   TABLE_SIZE,
 } from './fmConstants';
-import { DRIVE_SOFT, FILT_OFF } from './modeIds';
+import { DRIVE_SOFT, FILT_FORMANT, FILT_OFF } from './modeIds';
 import { KIND_NOISE, KIND_PULSE, KIND_SAW_D, KIND_TABLE } from './waveTables';
 
 /**
@@ -506,8 +506,36 @@ function renderVoiceKernel(
     }
 
     if (mode !== FILT_OFF) {
-      sig = voice.svfA.process(sig, mode);
-      if (slope24) sig = voice.svfB.process(sig, mode);
+      if (mode === FILT_FORMANT) {
+        // Three bandpass peaks from the same input, summed A, B, C by their
+        // gains (windsor#331): the generic loop's lines, `Svf.process`'s
+        // bandpass written out for each, so no call is inlined for them.
+        const x = sig;
+        let p = voice.svfA;
+        let v3 = x - p.ic2;
+        let v1 = p.a1 * p.ic1 + p.a2 * v3;
+        let v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig = p.gain * v1;
+        p = voice.svfB;
+        v3 = x - p.ic2;
+        v1 = p.a1 * p.ic1 + p.a2 * v3;
+        v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig += p.gain * v1;
+        p = voice.svfC;
+        v3 = x - p.ic2;
+        v1 = p.a1 * p.ic1 + p.a2 * v3;
+        v2 = p.ic2 + p.a2 * p.ic1 + p.a3 * v3;
+        p.ic1 = 2 * v1 - p.ic1;
+        p.ic2 = 2 * v2 - p.ic2;
+        sig += p.gain * v1;
+      } else {
+        sig = voice.svfA.process(sig, mode);
+        if (slope24) sig = voice.svfB.process(sig, mode);
+      }
     }
 
     // The steal fade comes after the filter, so the voice reaches 0 at the

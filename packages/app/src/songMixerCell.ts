@@ -21,13 +21,14 @@
  * cell only places them: the column's one poller (`songMixerLights.ts`)
  * owns their meters and the clip latch, so a redrawn cell keeps both.
  */
-import type { MusicPart } from '@windsor/engine';
-import { RETURN_NAMES } from '@windsor/engine';
+import type { MusicPart, StripTargetId } from '@windsor/engine';
+import { RETURN_NAMES, partAt } from '@windsor/engine';
 import { RETURN_COLOR, STRIP_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { KnobElement, KnobSpec } from './knob';
 import { makeKnob } from './knob';
+import { catalogKnobAutomation, knobSongTick } from './knobAutomation';
 import {
   SEND_DEFAULT,
   STRIP_LEVEL_KNOB,
@@ -156,11 +157,21 @@ const stripKnob = (
   set: (v: number) => void,
 ): KnobElement => makeKnob({ color: STRIP_COLOR, ...spec, compact: true, get, set });
 
+/** The lock a lane on `target` puts on the part's knob (windsor#351), at the playhead. */
+const stripLock =
+  (ctx: AppCtx, slot: number, target: StripTargetId): NonNullable<KnobSpec['automation']> =>
+  () =>
+    catalogKnobAutomation(
+      partAt(ctx.model.doc, slot),
+      target,
+      knobSongTick(ctx.model.doc, ctx.transport.position()),
+    );
+
 /** The part's knobs: Level alone collapsed; expanded, Level, Pan, Low cut and a send per return. */
 function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[] {
   const strip = (): ReturnType<typeof stripOf> => stripOf(ctx, slot);
   const level = stripKnob(
-    STRIP_LEVEL_KNOB,
+    { ...STRIP_LEVEL_KNOB, automation: stripLock(ctx, slot, 'strip.level') },
     () => strip().level,
     (v) => setStripLevel(ctx, slot, v),
   );
@@ -168,7 +179,7 @@ function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[]
   return [
     level,
     stripKnob(
-      STRIP_PAN_KNOB,
+      { ...STRIP_PAN_KNOB, automation: stripLock(ctx, slot, 'strip.pan') },
       () => strip().pan,
       (v) => setStripPan(ctx, slot, v),
     ),
@@ -179,7 +190,11 @@ function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[]
     ),
     ...RETURN_NAMES.map((ret) =>
       stripKnob(
-        { ...sendKnob(ret), color: RETURN_COLOR },
+        {
+          ...sendKnob(ret),
+          color: RETURN_COLOR,
+          automation: stripLock(ctx, slot, `strip.send.${ret}` as StripTargetId),
+        },
         () => strip().sends[ret] ?? SEND_DEFAULT,
         (v) => setStripSend(ctx, slot, ret, v),
       ),
