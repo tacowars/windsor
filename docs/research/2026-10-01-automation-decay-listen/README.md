@@ -19,17 +19,17 @@ code.
 
 ## Playing them
 
-Each file is 6 seconds, mono, 16-bit, 48 kHz, 576 KB. On the Mac, from the
-repository root:
+The WAVs are not in git: tacowars keeps audio out of the repository. Render
+them first (see "Regenerating" below); by default they land in
+`windsor-decay-listen` in the system temp folder. Each file is 6 seconds,
+mono, 16-bit, 48 kHz, 576 KB. On the Mac:
 
 ```bash
-cd docs/research/2026-10-01-automation-decay-listen
+node docs/research/2026-10-01-automation-decay-listen/render.mjs --out ~/Desktop/windsor-decay-listen
+cd ~/Desktop/windsor-decay-listen
 for f in pad-*.wav bass-*.wav; do echo "$f"; afplay "$f"; done   # all eight, in order
 open pad-plain.wav pad-decay-square.wav                          # or any pair, in QuickTime
 ```
-
-On GitHub, open a file in the PR's "Files changed" tab and use "View raw" to
-download it.
 
 Listen to each `*-plain.wav` first: it is the same music with no lane.
 Every render of one instrument has the same gain, so a level change you hear
@@ -95,14 +95,14 @@ for that.
 ## Regenerating
 
 ```bash
-node docs/research/2026-10-01-automation-decay-listen/render.mjs             # writes the WAVs here
-node docs/research/2026-10-01-automation-decay-listen/render.mjs --out /tmp/x  # or elsewhere
+node docs/research/2026-10-01-automation-decay-listen/render.mjs             # into <tmp>/windsor-decay-listen
+node docs/research/2026-10-01-automation-decay-listen/render.mjs --out /tmp/x  # or elsewhere (never this folder)
 ```
 
 It renders through the shipped bundle,
 `packages/engine/src/worklet/generated/fm-processor.js`, so rebuild that first
 (`node scripts/build-worklets.mjs`) after any change under `worklet/fm/`. The
-render is seeded and repeats bit for bit on one machine. These files were
-rendered on an Apple M1, under Node 24.21.0, from the PR's branch. V8's
+render is seeded and repeats bit for bit on one machine. The step table above was
+measured on an Apple M1, under Node 24.21.0, from the PR's branch. V8's
 `Math.pow` and `Math.exp` can differ by an ulp between arm64 and x64, so
 another machine may differ in the last bit.

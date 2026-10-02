@@ -9,16 +9,17 @@
  *
  *   node docs/research/2026-10-01-automation-decay-listen/render.mjs [--out <dir>]
  *
- * writes the eight WAVs (16-bit PCM, mono as (L + R) / 2, 48 kHz) beside
- * this file, or into `--out`, and prints each render's largest
+ * writes the eight WAVs (16-bit PCM, mono as (L + R) / 2, 48 kHz) into
+ * `--out`, or `windsor-decay-listen` in the system temp folder, never into
+ * the repository (tacowars keeps audio out of git), and prints each render's largest
  * sample-to-sample step, the click measure of `__fixtures__/voiceClicks.ts`.
  * Each instrument's renders share one gain, so they compare level for level.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const HERE = fileURLToPath(new URL('.', import.meta.url));
 const ENGINE = fileURLToPath(new URL('../../../packages/engine/src/', import.meta.url));
 const SR = 48000;
 const BLOCK = 128;
@@ -223,7 +224,7 @@ function largestStep(s) {
 
 function main() {
   const at = process.argv.indexOf('--out');
-  const dir = at > 0 ? process.argv[at + 1] : HERE;
+  const dir = at > 0 ? process.argv[at + 1] : join(tmpdir(), 'windsor-decay-listen');
   mkdirSync(dir, { recursive: true });
   const rendered = RENDERS.map(([name, make, lanes]) => {
     const { patch, events } = make();
