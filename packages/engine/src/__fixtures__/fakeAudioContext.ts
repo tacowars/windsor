@@ -219,7 +219,6 @@ export class FakeWorkletNode extends FakeNode {
     } else if (name === PROCESSOR_NAME) {
       this.parameters.set('pitchBend', new FakeParam(0, -24, 24));
       this.parameters.set('modWheel', new FakeParam(0, 0, 1));
-      this.parameters.set('cutoffMod', new FakeParam(0, -1, 1));
       this.parameters.set('gain', new FakeParam(1, 0, 4));
       // The song lanes' slots (windsor#346).
       for (let i = 0; i < FM_LANES_MAX; i++) {

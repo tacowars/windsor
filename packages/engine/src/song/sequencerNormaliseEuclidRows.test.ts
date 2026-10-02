@@ -13,7 +13,8 @@ import { isShippable, makeArrangement } from './arrangementDocument';
 import { ARRANGEMENT_VERSION, EUCLID_LANE_STEPS_MAX } from '../audioConstants';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { makePatch } from '../patch/patch';
-import { STEP_MOD_LANES_MAX, STEP_MOD_PARAMS } from '../worklet/fm/stepModTables';
+import { STEP_MOD_LANES_MAX } from '../sequencing/stepModLanes';
+import { VOICE_TARGET_PATHS } from '../worklet/fm/voiceTargetTables';
 import { normaliseSequencer } from './sequencerNormalise';
 
 const PATH = 'parts[0].sequencer';
@@ -128,7 +129,7 @@ describe('Euclid rows through the normaliser (windsor#355)', () => {
   });
 
   it('drops an unknown or repeated parameter and a fifth mod lane, each reported', () => {
-    const fifth = STEP_MOD_PARAMS.slice(0, STEP_MOD_LANES_MAX + 1).map((param) => ({
+    const fifth = VOICE_TARGET_PATHS.slice(0, STEP_MOD_LANES_MAX + 1).map((param) => ({
       param,
       values: [0.5],
     }));

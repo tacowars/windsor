@@ -76,18 +76,22 @@ export type {
   GridStep,
   GridStepKind,
 } from './sequencing/gridSequencer';
-// Per-step parameter modulation (windsor#17): the lanes and the table behind them.
-export { isStepModParam, stepModAt } from './sequencing/stepModLanes';
+// Per-step parameter modulation (windsor#17): the lanes, over the voice target table.
+export { STEP_MOD_LANES_MAX, isVoiceTargetPath, stepModAt } from './sequencing/stepModLanes';
 export { stepModAtCycle } from './sequencing/stepModLanes';
 export type { StepModLane } from './sequencing/stepModLanes';
+// The voice's modulation targets (windsor#419): one table for song lanes and step lanes.
 export {
-  STEP_MOD_LANES_MAX,
-  STEP_MOD_PARAMS,
-  STEP_MOD_SLOT_COUNT,
-  STEP_MOD_TABLE,
-} from './worklet/fm/stepModTables';
-export type { StepModCurve, StepModParam, StepModRow } from './worklet/fm/stepModTables';
-export { stepModValue } from './worklet/fm/stepModValue';
+  VOICE_TARGET_COUNT,
+  VOICE_TARGET_PATHS,
+  VOICE_TARGET_TABLE,
+} from './worklet/fm/voiceTargetTables';
+export type {
+  VoiceTargetCurve,
+  VoiceTargetPath,
+  VoiceTargetRow,
+} from './worklet/fm/voiceTargetTables';
+export { stepModValue, voiceTargetValue } from './worklet/fm/voiceTargetValue';
 // Song automation lanes (windsor#341, record `2026-10-01-song-automation-lanes`): the pure core.
 export type {
   AutomationLane,

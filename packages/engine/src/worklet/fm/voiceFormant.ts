@@ -6,12 +6,12 @@
  * on the voice's `svfA`, `svfB` and `svfC` and sum by each section's `gain`.
  *
  * `updateVoiceFilter` (`voiceControl.ts`) works out the filter's modulation
- * as it does for every mode (envelope, wheel, both LFOs, key track, the
- * part's cutoff control) and, in this mode, leaves its `2^octaves` in
- * `FORMANT_SHIFT_SLOT` in place of moving `cutoff`, which the mode does not
- * use. This sets each peak's centre to its formant, read from
+ * as it does for every mode (envelope, wheel, both LFOs, key track) and, in
+ * this mode, leaves its `2^octaves` in `FORMANT_SHIFT_SLOT` in place of
+ * moving `cutoff`, which the mode does not use: a cutoff lane or step leaves
+ * the peaks alone, as the Cutoff knob does (windsor#419). This sets each peak's centre to its formant, read from
  * `FORMANT_VOWELS` with the voice's vowel (the patch's `filter.vowel`, moved
- * by a song lane: windsor#406) morphing linearly between two rows by its
+ * by a song lane or a step: windsor#406, windsor#419) morphing linearly between two rows by its
  * fraction, times that shift, so the three move together; each shares one Q,
  * `resonance × FORMANT_Q_PER_RESONANCE` capped at `FORMANT_Q_MAX`; and each
  * gain is its level (the rows' decibels morphed, then to a gain) times
@@ -30,8 +30,8 @@
  * Invariants: called once per control block, never per sample; allocates
  * nothing, and no double crosses a call (worklet rule 2): the shift arrives
  * in `FORMANT_SHIFT_SLOT`, the resonance is the voice's live value
- * (`liveValues`, with a song lane's offset, windsor#346), the vowel too
- * (`VT_VOWEL`, windsor#406: the bound patch's exactly without a lane), and
+ * (`liveValues`, with a lane's or a step's offset), the vowel too
+ * (`VT_VOWEL`, windsor#406: the bound patch's exactly without one), and
  * `Svf.setCoeffs` reads its fields.
  * `synth/fmProcessorFilterFormant.test.ts` pins the peaks, the morph, the
  * modulation, the Q and the levels through the shipped bundle;
@@ -41,7 +41,7 @@
 import type { Voice } from './voice';
 import { FORMANT_MAKEUP, FORMANT_Q_MAX, FORMANT_Q_PER_RESONANCE } from './fmConstants';
 import { FORMANT_PEAKS, FORMANT_VOWELS } from './formantTables';
-import { VT_RESONANCE, VT_VOWEL } from './voiceOffsetTables';
+import { VT_RESONANCE, VT_VOWEL } from './voiceTargetTables';
 
 /** The last row a morph starts from: a vowel at the table's top morphs from the row below at t = 1. */
 const FORMANT_LAST_FROM = FORMANT_VOWELS.length - 2;

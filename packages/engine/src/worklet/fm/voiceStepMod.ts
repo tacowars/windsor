@@ -1,20 +1,21 @@
 /**
- * Per-step parameter modulation on the voice (windsor#17): a note-on's
- * offsets, one slot per `stepModTables.ts` row, copied into the voice's
- * preallocated `stepOffsets` (`loadStepOffsets`) and turned into the
- * per-voice values the control update, the envelopes and the render loops
- * read in place of the patch's (`bindStepMod`): the filter's envelope
- * amount, cutoff, resonance and envelope decay, and each operator's level,
- * decay, decay curve, feedback and width. The offsets are fixed at note-on
- * and held for the note's whole life (decision 1); a legato retarget takes
- * the new step's, except the rows marked `slideKeeps`, and keeps the decay
- * curves its envelopes play (`retargetStepMod`, windsor#405).
+ * Per-step modulation on the voice (windsor#17, windsor#419): a note-on's
+ * step array, one value per `voiceTargetTables.ts` row, copied into the
+ * voice's preallocated `stepOffsets` (`loadStepOffsets`), and the voice's
+ * `ownValues`, the bound patch's values by target code with each step value
+ * moved in its row's curve (`bindOwnValues`). Every target a song lane can
+ * move, a step can move too. The offsets are fixed at note-on and held for
+ * the note's whole life; a legato retarget takes the new step's, except the
+ * rows marked `slideKeeps`, and keeps the decay curves its envelopes play
+ * (windsor#405). The song's lanes go over `ownValues` into `liveValues`
+ * (`voiceOffsets.ts`), which every consumer reads.
  *
- * Invariant: an offset of exactly 0 hands back the patch's own value
- * untouched, neither clamped nor passed through a curve, so a note without
- * offsets renders bit for bit as before (`fmProcessorGolden.test.ts`).
- * Functions over the voice, called once per note-on, rebind or retarget;
- * allocation free. The arithmetic is `stepModValue.ts`;
+ * Invariant: a step value of exactly 0 leaves the patch's value untouched,
+ * neither floored nor clamped, so a note without step offsets renders bit
+ * for bit as before (`fmProcessorGolden.test.ts`). Functions over the voice,
+ * called once per note-on, rebind or retarget; allocation free, and the
+ * curve is written out, so no double crosses a call (windsor#233). The
+ * main thread's copy of the curve is `voiceTargetValue.ts`;
  * `voiceStepMod.test.ts` pins the loading, `fmProcessorStepMod.test.ts` the
  * voice.
  */
@@ -22,30 +23,27 @@
 import type { WorkletPatch } from './patchNormalise';
 import type { Voice } from './voice';
 import { OPERATOR_COUNT } from './patchDefaults';
-import {
-  STEP_MOD_SLOT_COUNT,
-  STEP_MOD_TABLE,
-  STEP_OP_DECAY,
-  STEP_OP_DECAY_CURVE,
-  STEP_OP_FEEDBACK,
-  STEP_OP_LEVEL,
-  STEP_OP_WIDTH,
-  STEP_SLOT_CUTOFF,
-  STEP_SLOT_ENV_AMOUNT,
-  STEP_SLOT_FILTER_DECAY,
-  STEP_SLOT_OP_BASE,
-  STEP_SLOT_OP_STRIDE,
-  STEP_SLOT_RESONANCE,
-} from './stepModTables';
-import { stepModValue } from './stepModValue';
 import { restingWidth } from './voiceControl';
-import { VT_OP_BASE, VT_OP_STRIDE, VT_OP_WIDTH } from './voiceOffsetTables';
 import { keepVoiceOffsets, primeVoiceOffsets, rebindVoiceOffsets } from './voiceOffsets';
+import {
+  VOICE_TARGET_COUNT,
+  VOICE_TARGET_FLOOR,
+  VOICE_TARGET_MAX,
+  VOICE_TARGET_MIN,
+  VOICE_TARGET_RATIO,
+  VOICE_TARGET_SLIDE_KEEPS,
+  VOICE_TARGET_SPAN,
+  VT_OP_BASE,
+  VT_OP_STRIDE,
+  VT_OP_WIDTH,
+} from './voiceTargetTables';
+import { layoutVoiceTargets } from './voiceTargets';
 
 /**
- * Copy a note-on's offsets into the voice, each clamped to -1..1; absent or
- * junk is 0. On a legato retarget (`slide`), a `slideKeeps` row keeps the
- * offset the voice already has. Allocates nothing.
+ * Copy a note-on's step array into the voice, each value clamped to -1..1;
+ * a slot past the array's end, junk or NaN is 0. On a legato retarget
+ * (`slide`), a `slideKeeps` row keeps the offset the voice already has.
+ * Allocates nothing.
  */
 function loadStepOffsets(
   voice: Voice,
@@ -54,64 +52,44 @@ function loadStepOffsets(
 ): void {
   const dst = voice.stepOffsets;
   const n = src ? src.length : 0;
-  for (let s = 0; s < STEP_MOD_SLOT_COUNT; s++) {
-    if (slide && STEP_MOD_TABLE[s].slideKeeps) continue;
-    const raw = s < n ? src![s] : 0;
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
+    if (slide && VOICE_TARGET_SLIDE_KEEPS[k] !== 0) continue;
+    const raw = k < n ? src![k] : 0;
     const v = typeof raw === 'number' && raw === raw ? raw : 0;
-    dst[s] = v < -1 ? -1 : v > 1 ? 1 : v;
+    dst[k] = v < -1 ? -1 : v > 1 ? 1 : v;
   }
 }
 
 /**
- * The per-voice values from the bound patch and the voice's offsets. Called
- * after the envelopes are configured (`configure` resets their decay to the
- * patch's), by `start`, `rebind` and `retarget`. The patch's values are laid
- * out in slot order in `voice.stepValues`, and each slot with an offset is
- * put through the curve there, from one call site (windsor#233): two dozen
- * call sites, one a value, ran past V8's inlining budget, and a double passed
- * to or returned from a call it does not inline is a new heap number. A slot
- * without one keeps the patch's value, which is what `stepModValue` returns
- * for an offset of 0, so a note with no offsets makes no call at all.
+ * The voice's own values: the bound patch's, by code, and each target with a
+ * step offset moved by `offset × span` in its row's curve, clamped to its
+ * bounds. A target without one keeps the patch's value. Called by `start`,
+ * `rebind` and `retarget`.
  */
-function bindStepMod(voice: Voice, patch: WorkletPatch): void {
+function bindOwnValues(voice: Voice, patch: WorkletPatch): void {
+  const own = voice.ownValues;
   const o = voice.stepOffsets;
-  const t = STEP_MOD_TABLE;
-  const v = voice.stepValues;
-  const f = patch.filter;
-  v[STEP_SLOT_ENV_AMOUNT] = f.envAmount;
-  v[STEP_SLOT_CUTOFF] = f.cutoff;
-  v[STEP_SLOT_RESONANCE] = f.resonance;
-  v[STEP_SLOT_FILTER_DECAY] = f.env.decayTime;
-  for (let i = 0; i < OPERATOR_COUNT; i++) {
-    const op = patch.ops[i];
-    const b = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
-    v[b + STEP_OP_LEVEL] = op.level;
-    v[b + STEP_OP_DECAY] = op.env.decayTime;
-    v[b + STEP_OP_DECAY_CURVE] = op.env.decayCurve;
-    v[b + STEP_OP_FEEDBACK] = op.feedback;
-    v[b + STEP_OP_WIDTH] = op.width;
-  }
-  for (let s = 0; s < STEP_MOD_SLOT_COUNT; s++) {
-    if (o[s] !== 0) v[s] = stepModValue(t[s], v[s], o[s]);
-  }
-  voice.envAmount = v[STEP_SLOT_ENV_AMOUNT];
-  voice.cutoff = v[STEP_SLOT_CUTOFF];
-  voice.resonance = v[STEP_SLOT_RESONANCE];
-  voice.filtEnv.decayTime = v[STEP_SLOT_FILTER_DECAY];
-  for (let i = 0; i < OPERATOR_COUNT; i++) {
-    const env = voice.ampEnv[i];
-    const b = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
-    voice.opLevel[i] = v[b + STEP_OP_LEVEL];
-    env.decayTime = v[b + STEP_OP_DECAY];
-    env.decayCurve = v[b + STEP_OP_DECAY_CURVE];
-    voice.opFeedback[i] = v[b + STEP_OP_FEEDBACK];
-    voice.opWidth[i] = v[b + STEP_OP_WIDTH];
+  layoutVoiceTargets(patch, own);
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
+    const v = o[k];
+    if (v === 0) continue;
+    const d = v * VOICE_TARGET_SPAN[k];
+    const base = own[k];
+    const floor = VOICE_TARGET_FLOOR[k];
+    const x =
+      VOICE_TARGET_RATIO[k] !== 0 ? (base < floor ? floor : base) * Math.pow(2, d) : base + d;
+    own[k] =
+      x < VOICE_TARGET_MIN[k]
+        ? VOICE_TARGET_MIN[k]
+        : x > VOICE_TARGET_MAX[k]
+          ? VOICE_TARGET_MAX[k]
+          : x;
   }
 }
 
 /**
  * A note-on's offsets, from `Voice.start` once its envelopes are configured:
- * load them, bind the values, put the song's lanes over them
+ * load them, bind the own values, put the song's lanes over them
  * (`primeVoiceOffsets`, windsor#346), and start each width ramp from the
  * width the note plays, so a step's or a lane's width is there from the
  * first sample. Allocates nothing.
@@ -122,7 +100,7 @@ function startStepMod(
   stepMod: ArrayLike<number> | null | undefined,
 ): void {
   loadStepOffsets(voice, stepMod, false);
-  bindStepMod(voice, patch);
+  bindOwnValues(voice, patch);
   primeVoiceOffsets(voice);
   const live = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
@@ -130,21 +108,14 @@ function startStepMod(
   }
 }
 
-/** The decay curves a slide keeps, one voice at a time (windsor#405). */
-const slideCurves = new Float64Array(OPERATOR_COUNT);
-
 /**
  * A legato retarget's step, from `Voice.retarget` (#602): load the new
  * step's offsets, but for the `slideKeeps` rows, and bind them over the
- * patch. Each envelope keeps the decay curve it plays (windsor#405, as
- * `keepVoiceOffsets` keeps it for a rebind): `bindStepMod` writes the step's
- * curve, under the lane's where a lane holds one, and the next control block
- * would put the lane's back as if the lane had moved, and start a running
- * decay again from its level. The curve's step offset is kept and the patch
- * is the same, so without a lane the curve kept is the one bound, to the
- * bit; with one, only the lane's offset changing reshapes the decay. A
- * decay time needs no keeping: the envelope reads it in the control block,
- * after the lanes are back over it. Allocates nothing.
+ * patch. The envelopes are not touched here: each keeps the decay curve it
+ * plays (windsor#405), since the curve's step offset is kept and the patch
+ * is the same, and a lane's curve reaches it only when the lane's offset
+ * changes. A decay time is read by the envelope in the control block, after
+ * the lanes are back over the new own value. Allocates nothing.
  */
 function retargetStepMod(
   voice: Voice,
@@ -152,23 +123,19 @@ function retargetStepMod(
   stepMod: ArrayLike<number> | null | undefined,
 ): void {
   loadStepOffsets(voice, stepMod, true);
-  const env = voice.ampEnv;
-  for (let i = 0; i < OPERATOR_COUNT; i++) slideCurves[i] = env[i].decayCurve;
-  bindStepMod(voice, patch);
-  for (let i = 0; i < OPERATOR_COUNT; i++) env[i].decayCurve = slideCurves[i];
+  bindOwnValues(voice, patch);
 }
 
 /**
  * A live retune's rebind, from `Voice.rebind` once its envelopes are
  * configured: what the voice plays is kept (`keepVoiceOffsets`), the note
- * keeps its step's offsets over the new patch's values,
- * the song's lanes go over them (`rebindVoiceOffsets`: a target a slot in
- * `slotTargets` moves keeps the lane's value it plays), and each operator in
- * `switched` (a bit per operator whose wave moved between PULSE and the
- * rest, where width changes meaning from a duty to a phase scale) restarts
- * its width ramp, with no ramp, from the width it plays: the lane's, not the
- * patch's or the step's, as `startStepMod` seeds it (windsor#346). Allocates
- * nothing.
+ * keeps its step's offsets over the new patch's values, the song's lanes go
+ * over them (`rebindVoiceOffsets`: a target a slot in `slotTargets` moves
+ * keeps the lane's value it plays), and each operator in `switched` (a bit
+ * per operator whose wave moved between PULSE and the rest, where width
+ * changes meaning from a duty to a phase scale) restarts its width ramp,
+ * with no ramp, from the width it plays: the lane's, not the patch's or the
+ * step's, as `startStepMod` seeds it (windsor#346). Allocates nothing.
  */
 function rebindStepMod(
   voice: Voice,
@@ -177,7 +144,7 @@ function rebindStepMod(
   slotTargets: Int32Array,
 ): void {
   keepVoiceOffsets(voice);
-  bindStepMod(voice, patch);
+  bindOwnValues(voice, patch);
   rebindVoiceOffsets(voice, slotTargets);
   const live = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
@@ -187,4 +154,4 @@ function rebindStepMod(
   }
 }
 
-export { bindStepMod, loadStepOffsets, rebindStepMod, retargetStepMod, startStepMod };
+export { bindOwnValues, loadStepOffsets, rebindStepMod, retargetStepMod, startStepMod };

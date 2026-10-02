@@ -9,13 +9,13 @@
  * row, since arrays replace wholesale. A row set to `undefined` is removed
  * from the pattern (`withRows`), which a merge cannot say.
  */
-import type { EuclidRows, StepModLane, StepModParam } from '@windsor/engine';
+import type { EuclidRows, StepModLane, VoiceTargetPath } from '@windsor/engine';
 import {
   EUCLID_LANE_STEPS_MAX,
   EUCLID_PITCH_LANE_MAX,
   STEP_MOD_LANES_MAX,
-  STEP_MOD_PARAMS,
-  isStepModParam,
+  VOICE_TARGET_PATHS,
+  isVoiceTargetPath,
 } from '@windsor/engine';
 import { addLane, laneLabel } from './stepModLaneModel';
 
@@ -23,7 +23,7 @@ import { addLane, laneLabel } from './stepModLaneModel';
 export type EuclidLaneRef =
   | { readonly kind: 'accent' }
   | { readonly kind: 'pitch' }
-  | { readonly kind: 'sound'; readonly param: StepModParam };
+  | { readonly kind: 'sound'; readonly param: VoiceTargetPath };
 
 /** A sequencer partial the card writes; a row set to `undefined` is removed. */
 export type RowFields = Readonly<Record<string, unknown>>;
@@ -48,7 +48,7 @@ export function lanesOf(rows: EuclidRows): EuclidLaneRef[] {
   return lanes;
 }
 
-const soundIndex = (rows: EuclidRows, param: StepModParam): number =>
+const soundIndex = (rows: EuclidRows, param: VoiceTargetPath): number =>
   (rows.modLanes ?? []).findIndex((lane) => lane.param === param);
 
 /** A lane's values, numbers for every kind (an accent's on is 1); empty when the lane is gone. */
@@ -75,7 +75,7 @@ const fit = <T>(values: readonly T[], length: number, fill: T): T[] =>
 /** The sound lanes with the one for `param` given `values`. */
 const withSound = (
   rows: EuclidRows,
-  param: StepModParam,
+  param: VoiceTargetPath,
   values: readonly number[],
 ): StepModLane[] =>
   (rows.modLanes ?? []).map((lane) => (lane.param === param ? { ...lane, values } : lane));
@@ -130,7 +130,7 @@ export function laneChoices(rows: EuclidRows, max = STEP_MOD_LANES_MAX): LaneCho
   return [
     { value: 'accent', label: 'Accent', disabled: rows.accentLane !== undefined },
     { value: 'pitch', label: 'Pitch', disabled: rows.pitchLane !== undefined },
-    ...STEP_MOD_PARAMS.map((param) => ({
+    ...VOICE_TARGET_PATHS.map((param) => ({
       value: param,
       label: laneLabel(param),
       disabled: full || sound.some((lane) => lane.param === param),
@@ -149,7 +149,7 @@ export function addLaneRow(rows: EuclidRows, choice: string, steps: number): Row
   if (!open || open.disabled) return null;
   if (choice === 'accent') return { accentLane: new Array<boolean>(length).fill(false) };
   if (choice === 'pitch') return { pitchLane: new Array<number>(length).fill(0) };
-  if (!isStepModParam(choice)) return null;
+  if (!isVoiceTargetPath(choice)) return null;
   const next = addLane(rows.modLanes ?? [], choice, length);
   return next && { modLanes: next };
 }

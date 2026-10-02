@@ -85,7 +85,6 @@ function renderWatched(
   const params = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   const samples = new Float32Array(blocks * BLOCK * 2);

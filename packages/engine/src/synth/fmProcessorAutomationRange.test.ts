@@ -1,11 +1,13 @@
 /**
  * The FM part's lane offsets at the ends of their range (windsor#346, fix
- * round 1 of PR #385): the cutoff lane's octaves reach from one end of the
- * catalog's cutoff to the other without Web Audio clipping them at
- * `cutoffMod`'s declared range, every voice lane's widest offset fits the
- * parameter it is written to, and
+ * round 1 of PR #385): the cutoff lane's octaves, through a slot since
+ * windsor#419, reach from one end of the catalog's cutoff to the other
+ * without clipping short, every voice lane's widest offset fits the slot it
+ * is written to, and
  * a live retune that switches an operator between PULSE and another wave
- * keeps the width its lane sets, with no ramp from the patch's width.
+ * keeps the width its lane sets, with no ramp from the patch's width. An
+ * LFO rate lane over a patch rate of 0 scales from the row's 0.02 Hz floor
+ * and moves the LFO (PR #421).
  *
  * Web Audio clamps a k-rate value to its descriptor's range before the
  * processor reads it; the harness does not, so `clipped` does it here.
@@ -34,6 +36,8 @@ interface VoiceView {
   width: Float32Array | Float64Array;
   widthInc: Float32Array | Float64Array;
   svfA: { cutoffHz: number };
+  lfo: { rate: number; phase: number };
+  lfo2: { rate: number; phase: number };
 }
 
 /** The part of an `AudioParamDescriptor` Web Audio clamps by. */
@@ -72,7 +76,6 @@ function freshParams(): Record<string, Float32Array> {
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   for (let i = 0; i < SLOTS; i++) params[voiceSlotParamName(i)] = new Float32Array([0]);
@@ -130,11 +133,13 @@ describe("the cutoff lane across the catalog's whole range (windsor#346)", () =>
     const offset = offsetFor(patch, CUTOFF, to);
     expect(Math.abs(offset)).toBeCloseTo(Math.log2(row.max / row.min), 12);
     const seen: number[] = [];
+    const slot = voiceSlotParamName(0);
     run({
       patch,
+      slots: [CUTOFF],
       blocks: 12,
       each: (b, params, processor) => {
-        params.cutoffMod![0] = b >= 6 ? clipped(processor, 'cutoffMod', offset) : 0;
+        params[slot]![0] = b >= 6 ? clipped(processor, slot, offset) : 0;
       },
       after: (b, voice) => void seen.push(voice.svfA.cutoffHz),
     });
@@ -146,11 +151,11 @@ describe("the cutoff lane across the catalog's whole range (windsor#346)", () =>
 describe("every voice lane's offset fits its parameter (windsor#346)", () => {
   const processor = loaded.create(makePatch(), 4);
   // Each voice row a handle plays (the decay rows since windsor#347), and the
-  // parameter its offsets go to: the cutoff's `cutoffMod`, the rest a slot.
-  const rows = VOICE_AUTOMATION_ROWS.map((r): readonly [string, string] => {
-    const path = r.target.slice('voice.'.length);
-    return [path, path === CUTOFF ? 'cutoffMod' : voiceSlotParamName(0)];
-  });
+  // parameter its offsets go to: a slot, the cutoff's too (windsor#419).
+  const rows = VOICE_AUTOMATION_ROWS.map((r): readonly [string, string] => [
+    r.target.slice('voice.'.length),
+    voiceSlotParamName(0),
+  ]);
 
   it.each(rows)(
     '%s: a lane from one end of its row to the other passes %s unclipped',
@@ -168,6 +173,43 @@ describe("every voice lane's offset fits its parameter (windsor#346)", () => {
       }
     },
   );
+});
+
+describe('an LFO rate lane over a patch rate of 0 (PR #421)', () => {
+  /** One sine carrier, both LFOs still (rate 0) and on the pitch. */
+  const still = makePatch({
+    algorithm: 7,
+    ops: [{ wave: WAVE.SINE, level: 0.5, env: held() }],
+    lfo: { amount: 0.5, rate: 0, toPitch: 0.5 },
+    lfo2: { amount: 0.5, rate: 0, toPitch: 0.5 },
+  });
+
+  it.each([
+    ['lfo', 4],
+    ['lfo2', 4],
+    ['lfo', 0.02],
+    ['lfo2', 0.02],
+  ] as const)('%s at %s Hz plays the lane, the ratio taken from the floor', (lfo, lane) => {
+    const path = `${lfo}.rate`;
+    const offset = offsetFor(still, path, lane);
+    expect(offset).toBe(Math.log2(lane / 0.02));
+    const rates: number[] = [];
+    let phase = 0;
+    run({
+      patch: still,
+      slots: [path],
+      blocks: 12,
+      each: (_b, params, processor) => {
+        params.voiceSlot0![0] = clipped(processor, voiceSlotParamName(0), offset);
+      },
+      after: (_b, voice) => {
+        rates.push(voice[lfo].rate);
+        phase = voice[lfo].phase;
+      },
+    });
+    for (const rate of rates) expect(rate / lane).toBeCloseTo(1, 6);
+    expect(phase).toBeGreaterThan(0);
+  });
 });
 
 describe('a wave switch under a width lane (windsor#346)', () => {

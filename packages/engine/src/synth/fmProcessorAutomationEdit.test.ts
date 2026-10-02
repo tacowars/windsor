@@ -80,12 +80,11 @@ interface Edit {
 
 /** A held note with its lanes, the patch edited before block `EDIT` with the offsets resynced. */
 function editUnderLanes(e: Edit): void {
-  const slots = e.lanes.map(([path]) => (path === 'filter.cutoff' ? null : path));
+  const slots = e.lanes.map(([path]) => path);
   const processor = loaded.create(base, 4, undefined, { voiceSlots: slots });
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
-    cutoffMod: new Float32Array([0]),
     gain: new Float32Array([1]),
   };
   for (let i = 0; i < SLOTS; i++) params[voiceSlotParamName(i)] = new Float32Array([0]);
@@ -104,8 +103,7 @@ function editUnderLanes(e: Edit): void {
     }
     const patch = b >= EDIT ? e.to : base;
     e.lanes.forEach(([path, value], i) => {
-      const param = path === 'filter.cutoff' ? 'cutoffMod' : voiceSlotParamName(i);
-      params[param]![0] = offsetFor(patch, path, value);
+      params[voiceSlotParamName(i)]![0] = offsetFor(patch, path, value);
     });
     processor.process([], [[left, right]], params);
     e.after(b, voiceOf(processor));
