@@ -107,8 +107,11 @@ describe('the target', () => {
     ['a target that does not parse', 'strip.volume', /names no automation target/],
     ['a target that is not a string', 42, /names no automation target/],
     ['an insert id the strip does not have', 'insert.gone.drive', /no insert "gone"/],
-    // Built by hand: `formatTargetId` refuses a field the insert kind does not list.
-    ['a field its kind does not list', `insert.${AUTOMATION_EQ_ID}.drive`, /eq has no .*"drive"/],
+    [
+      'a field its kind does not list',
+      formatTargetId({ kind: 'insert', insertId: AUTOMATION_EQ_ID, field: 'drive' }),
+      /eq has no .*"drive"/,
+    ],
     ['a voice path the catalog lacks', 'voice.ops.0.ratio', /names no automation target/],
   ])('drops a lane on %s, reported', (_, target, message) => {
     const { lanes, corrections } = withLanes([
