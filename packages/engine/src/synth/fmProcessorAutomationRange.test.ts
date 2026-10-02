@@ -16,12 +16,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ProcessorLike } from '../__fixtures__/workletHarness';
 import { loadProcessor } from '../__fixtures__/workletHarness';
-import {
-  VOICE_AUTOMATION_ROWS,
-  catalogRow,
-  voicePathOf,
-  voiceTargetId,
-} from '../automation/automationTargets';
+import { VOICE_AUTOMATION_ROWS, catalogRow, voiceTargetId } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { voiceSlotParamName } from './audioPart';
 import { voiceOffset } from './voiceAutomation';
@@ -157,7 +152,7 @@ describe("every voice lane's offset fits its parameter (windsor#346)", () => {
   // Each voice row a handle plays (the decay rows since windsor#347), and the
   // parameter its offsets go to: a slot, the cutoff's too (windsor#419).
   const rows = VOICE_AUTOMATION_ROWS.map((r): readonly [string, string] => [
-    voicePathOf(r.target)!,
+    r.path,
     voiceSlotParamName(0),
   ]);
 
