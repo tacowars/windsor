@@ -16,6 +16,7 @@ import { bassCard } from './bassCard';
 import { chordCard } from './chordCard';
 import type { AppCtx } from './context';
 import { el } from './dom';
+import type { CardBody } from './sequencerDevice';
 import { euclidCard } from './euclidCard';
 import { gridCard } from './gridCard';
 
@@ -23,9 +24,11 @@ import { gridCard } from './gridCard';
  * What every card is: the body of one part's section, built from the
  * document. `region` names the region whose pattern the card edits
  * (windsor#75, the grid card since windsor#76); absent, the card edits the
- * part's sequencer.
+ * part's sequencer. The Song pane frames it as a device
+ * (`sequencerDevice.ts`, windsor#368): a converted card returns a
+ * `DeviceBody`, one not yet converted its element.
  */
-export type SequencerCard = (ctx: AppCtx, slot: number, region?: number) => HTMLElement;
+export type SequencerCard = (ctx: AppCtx, slot: number, region?: number) => CardBody;
 
 /** A part with no sequencer: keyboard and MIDI only, so there is nothing to lay out. */
 const noneCard: SequencerCard = () =>

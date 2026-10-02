@@ -1,79 +1,45 @@
 /**
- * The Sequencers tab's grid card (#603): one column per written step of a
- * `grid` part — the top cell cycles note → tie → rest, a note's degree comes
- * from a picker holding only the current scale, Oct cycles the step octave,
- * A and S toggle accent and slide — plus the loop length, the divisor, skip
- * and the two accent knobs, and a playhead that follows the audible tick.
+ * The Grid device (#603; a rack device since windsor#368, record
+ * `2026-10-01-sequencer-rack-devices`, look
+ * `docs/research/2026-09-30-sequencer-rack/grid.html`): the body the Song
+ * pane's frame (`sequencerDevice.ts`) puts beside the shared rail, at the
+ * device's one height. Two sections: Play, the controls in columns
+ * (`gridControls.ts`), and Steps, the strip.
+ *
+ * The strip is one column per written step, 32 px wide and grouped by four
+ * (`gridCells.ts`): the note cell, the degree picker, Oct, A, S and the
+ * ratchet held at the top, and a cell per modulation lane (windsor#31)
+ * under them. The device is as wide as its steps and never scrolls them
+ * sideways; the lanes scroll vertically under the step rows, their names,
+ * × and readout in a column at the left with **+ Lane** in its corner.
+ * Length pads the lanes with the steps, and Rotate turns them, and the
+ * ratchets, with the steps. A lane click writes on its release, so every
+ * edit here reads lanes the document already holds.
+ *
  * Every edit writes a full copy of the selected region's pattern
  * (windsor#76, `changePattern`), never `part.sequencer`, so two regions of
- * one part keep their own steps and lanes; the step operations are
- * `gridModel.ts`.
- *
- * The strip itself — its cells and columns, the lighting, the playhead loop
- * and where the playhead is — is `stepStrip.ts` (#619), shared with the chord
- * (#607) and Euclidean (#610) cards.
- *
- * Modulation lanes (windsor#31) sit under the flags: each step's column ends
- * in one `stepModLane.ts` cell per lane, so a lane lines up with the steps at
- * any step count, and the lanes' names stand in a sticky column at the left
- * of the same scroller. Length pads the lanes with the steps, and Rotate
- * turns them with the steps. A lane click writes on its release, so every
- * edit here reads lanes the document already holds.
+ * one part keep their own steps and lanes. The cells keep their tooltips;
+ * the hint paragraph went with windsor#368.
  */
 import type { GridSpec } from '@windsor/engine';
-import { scaleOffsets } from '@windsor/engine';
+import { STEP_MOD_LANES_MAX } from '@windsor/engine';
 import type { AppCtx } from './context';
-import { PITCH_COLOR } from './consoleColors';
 import { el } from './dom';
+import { gridColumn } from './gridCells';
+import { gridControls } from './gridControls';
+import { keySignature, slideAt } from './gridModel';
+import { changePattern } from './partEdits';
+import { regionPlayheadAt } from './regionPlayhead';
+import type { DeviceBody } from './sequencerDevice';
 import {
   type LaneHost,
   fillLanePicker,
-  laneCells,
   lanePicker,
   paintLaneNames,
   patchBase,
 } from './stepModLane';
-import { NO_SLIDE, lanesForSteps } from './stepModLaneModel';
-import {
-  cycleKind,
-  cycleOctave,
-  degreeOptions,
-  foldedView,
-  keySignature,
-  randomSteps,
-  rotateLanes,
-  rotateSteps,
-  setDegree,
-  slideAt,
-  stepLabel,
-  stepsForLength,
-  toggleFlag,
-  withStep,
-} from './gridModel';
-import { makeKnob } from './knob';
-import { changePattern } from './partEdits';
-import { regionPlayheadAt } from './regionPlayhead';
-import { divisorPicker, tableKnob } from './seqFields';
-import { GRID_KNOBS, GRID_LENGTH_KNOB, GRID_ROTATE_KNOB } from './sequencerKnobTables';
-import {
-  type Strip,
-  commitSteps,
-  markStep,
-  paintStrip,
-  specOf,
-  stripCell,
-  stripColumn,
-  watchPlayhead,
-} from './stepStrip';
-
-const HINT =
-  'Top cell cycles note → tie → rest. Pick the degree from the key — a red border means the ' +
-  'written degree folded into the current scale. Oct: click up, shift-click down. ' +
-  'A accent, S slide. Steps past Length stay written, greyed. Randomize rewrites every step; ' +
-  'Rotate turns the loop. + Lane adds a modulation lane: drag a bar up or down, across steps ' +
-  'to paint; double-click resets a step to the patch value. A dashed cell is held by a slide: ' +
-  'set, but the step plays the previous offset. A dotted one is held only when the loop wraps ' +
-  'into it, or unless Skip drops the note before it.';
+import { NO_SLIDE } from './stepModLaneModel';
+import { type Strip, markStep, paintStrip, specOf, watchPlayhead } from './stepStrip';
 
 /**
  * This card's strip: one column per written step of a `grid` spec, and its
@@ -81,107 +47,38 @@ const HINT =
  * ghost step or dark, which `paintStrip` relights after every repaint.
  */
 interface GridStrip extends Strip<GridSpec> {
-  /** The scroller holding the lane names and the strip. */
+  /** The vertical scroller holding the lane names and the columns. */
   scroll: HTMLElement;
   names: HTMLElement;
-  picker: HTMLSelectElement | null;
+  picker: HTMLSelectElement;
+  /** The corner's "n of 4 lanes". */
+  count: HTMLElement;
+  /** The Steps label's count. */
+  length: HTMLElement;
   lanes: LaneHost;
 }
 
-const cell = stripCell;
-
-function kindCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
-  const step = spec.steps[index];
-  if (!step) return cell('', 'blank');
-  const key = strip.ctx.model.doc.harmony;
-  const folded = step.kind === 'note' && foldedView(step.degree, key).folded;
-  const node = cell(stepLabel(step, key), step.kind === 'note' ? 'note' : '');
-  if (folded) node.classList.add('folded');
-  node.title = step.kind === 'note' ? `degree ${step.degree + 1}` : step.kind;
-  node.onclick = (): void =>
-    commitSteps(strip, (s) => withStep(s.steps, index, cycleKind(s.steps[index] ?? step)));
-  return node;
-}
-
-function degreeSelect(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
-  const step = spec.steps[index];
-  if (!step || step.kind !== 'note') return cell('', 'blank');
-  const key = strip.ctx.model.doc.harmony;
-  const sel = document.createElement('select');
-  sel.className = 'gsel';
-  sel.setAttribute('aria-label', `step ${index + 1} degree`);
-  for (const option of degreeOptions(key)) sel.add(new Option(option.label, option.value));
-  const view = foldedView(step.degree, key);
-  if (view.folded) {
-    // The stored degree is past the scale: show it folded, and keep it as written.
-    const shown = degreeOptions(key)[view.degree]?.label ?? '?';
-    sel.add(new Option(`${step.degree + 1} → ${shown} ↑${view.carry}`, String(step.degree)));
-    sel.classList.add('folded');
-  }
-  sel.value = String(step.degree);
-  sel.onchange = (): void =>
-    commitSteps(strip, (s) =>
-      withStep(s.steps, index, setDegree(s.steps[index] ?? step, Number(sel.value))),
-    );
-  return sel;
-}
-
-function octaveCell(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
-  const step = spec.steps[index];
-  if (!step || step.kind !== 'note') return cell('', 'blank');
-  const label = step.octave === 0 ? 'oct' : step.octave > 0 ? `+${step.octave}` : `${step.octave}`;
-  const node = cell(label);
-  node.title = 'octave: click up, shift-click down';
-  node.onclick = (event: MouseEvent): void =>
-    commitSteps(strip, (s) =>
-      withStep(s.steps, index, cycleOctave(s.steps[index] ?? step, event.shiftKey ? -1 : 1)),
-    );
-  return node;
-}
-
-function flagCell(
-  strip: GridStrip,
-  index: number,
-  spec: GridSpec,
-  flag: 'accent' | 'slide',
-): HTMLElement {
-  const step = spec.steps[index];
-  if (!step || step.kind !== 'note') return cell('', 'blank');
-  const node = cell(flag === 'accent' ? 'A' : 'S');
-  node.title = flag;
-  node.setAttribute('aria-pressed', String(step[flag]));
-  node.onclick = (): void =>
-    commitSteps(strip, (s) => withStep(s.steps, index, toggleFlag(s.steps[index] ?? step, flag)));
-  return node;
-}
-
-function column(strip: GridStrip, index: number, spec: GridSpec): HTMLElement {
-  return stripColumn(index, index < spec.length, [
-    kindCell(strip, index, spec),
-    degreeSelect(strip, index, spec),
-    octaveCell(strip, index, spec),
-    flagCell(strip, index, spec, 'accent'),
-    flagCell(strip, index, spec, 'slide'),
-    ...laneCells(strip.lanes, index, spec.steps[index]?.kind === 'note'),
-  ]);
-}
-
-/** Redraw every column, the lane names and the picker from the document, keeping the scroll. */
+/** Redraw every column, the lane names, the corner and the label from the document, keeping the scroll. */
 function repaint(strip: GridStrip): void {
-  const scrollLeft = strip.scroll.scrollLeft;
+  const scrollTop = strip.scroll.scrollTop;
   paintLaneNames(strip.names, strip.lanes);
-  paintStrip(strip, (spec) => spec.steps.map((_, index) => column(strip, index, spec)));
-  if (strip.picker) fillLanePicker(strip.picker, strip.lanes);
-  strip.scroll.scrollLeft = scrollLeft;
+  paintStrip(strip, (spec) =>
+    spec.steps.map((_, index) => gridColumn(strip, strip.lanes, index, spec)),
+  );
+  fillLanePicker(strip.picker, strip.lanes);
+  const spec = strip.spec();
+  strip.count.textContent = `${spec?.lanes.length ?? 0} of ${STEP_MOD_LANES_MAX} lanes`;
+  strip.length.textContent = String(spec?.length ?? '');
+  strip.scroll.scrollTop = scrollTop;
 }
 
 /**
  * Per frame while the card is on screen: the playhead (the engine's own step
  * for the audible tick, bright in the region and a ghost outside it —
- * `regionPlayhead.ts`, windsor#97), and a repaint when the Harmony tab's root or scale
- * has changed since the labels were drawn — a root knob goes through
- * `ctx.change` alone, which re-renders nothing — or Skip has moved to or
- * from 0, which decides whether a slide's hold on a lane is certain.
+ * `regionPlayhead.ts`, windsor#97), and a repaint when the transport strip's
+ * root or scale has changed since the labels were drawn — a root knob goes
+ * through `ctx.change` alone, which re-renders nothing — or Skip has moved to
+ * or from 0, which decides whether a slide's hold on a lane is certain.
  */
 function watch(strip: GridStrip): void {
   const signature = (): string =>
@@ -199,72 +96,6 @@ function watch(strip: GridStrip): void {
       strip.repaint();
     },
   });
-}
-
-function lengthKnob(strip: GridStrip): HTMLElement {
-  return makeKnob({
-    ...GRID_LENGTH_KNOB,
-    color: PITCH_COLOR,
-    get: () => strip.spec()?.length ?? 1,
-    set: (v) => {
-      const spec = strip.spec();
-      if (!spec) return;
-      const length = Math.round(v);
-      const steps = stepsForLength(spec.steps, length);
-      const lanes = lanesForSteps(spec.lanes, steps.length);
-      if (changePattern(strip.ctx, strip.slot, strip.region, { length, steps, lanes }))
-        strip.repaint();
-    },
-  });
-}
-
-/** Rotate applies the turn since its last value, so the document holds the rotated steps and no offset. */
-function rotateKnob(strip: GridStrip): HTMLElement {
-  let turned = 0;
-  return makeKnob({
-    ...GRID_ROTATE_KNOB,
-    color: PITCH_COLOR,
-    get: () => turned,
-    set: (v) => {
-      const target = Math.round(v);
-      const by = target - turned;
-      if (by === 0) return;
-      turned = target;
-      const spec = strip.spec();
-      if (!spec) return;
-      const steps = rotateSteps(spec.steps, by, spec.length);
-      const lanes = rotateLanes(spec.lanes, by, spec.length);
-      if (changePattern(strip.ctx, strip.slot, strip.region, { steps, lanes })) strip.repaint();
-    },
-  });
-}
-
-function randomizeButton(strip: GridStrip): HTMLElement {
-  const button = el('button', 'btn', 'Randomize') as HTMLButtonElement;
-  button.type = 'button';
-  button.style.borderColor = PITCH_COLOR;
-  button.title = 'Every step: a random degree from the key, octave, accent and slide';
-  button.onclick = (): void =>
-    commitSteps(strip, (spec) =>
-      randomSteps(
-        spec.steps.length,
-        scaleOffsets(strip.ctx.model.doc.harmony.scale).length,
-        Math.random,
-      ),
-    );
-  return button;
-}
-
-/** Vel first, Length second, then the rest of the table, then Rotate: the row order the card had. */
-function controls(strip: GridStrip): HTMLElement {
-  const { ctx, slot, region } = strip;
-  const [velocity, ...rest] = GRID_KNOBS;
-  const row = el('div', 'knob-row');
-  if (velocity) row.appendChild(tableKnob(ctx, slot, velocity, PITCH_COLOR, region));
-  row.appendChild(lengthKnob(strip));
-  for (const entry of rest) row.appendChild(tableKnob(ctx, slot, entry, PITCH_COLOR, region));
-  row.appendChild(rotateKnob(strip));
-  return row;
 }
 
 /**
@@ -289,14 +120,34 @@ function laneHost(strip: Strip<GridSpec>, scope: HTMLElement): LaneHost {
   };
 }
 
+/** The lane names' column: + Lane and the lane count in the corner, level with the step rows, then a row per lane. */
+function namesColumn(strip: GridStrip): HTMLElement {
+  const corner = el('div', 'strip-head seq-corner');
+  corner.append(strip.picker, strip.count, el('span', 'seq-row-label', 'Ratchet'));
+  const column = el('div', 'seq-names');
+  column.append(corner, strip.names);
+  return column;
+}
+
+/** The Steps section: its label and count, then the strip. */
+function stepsSection(strip: GridStrip): HTMLElement {
+  const label = el('div', 'seq-sec-label', 'Steps');
+  label.appendChild(strip.length);
+  strip.scroll.append(namesColumn(strip), strip.root);
+  const body = el('div', 'seq-sec-body');
+  body.appendChild(strip.scroll);
+  const section = el('div', 'seq-section steps');
+  section.append(label, body);
+  return section;
+}
+
 /**
- * The card body for a `grid` part's region `region` (windsor#76): controls,
- * the step strip with its lanes, the hint. With no region named it edits the
+ * The device body for a `grid` part's region `region` (windsor#76): the
+ * controls and the strip with its lanes. With no region named it edits the
  * part's sequencer.
  */
-export function gridCard(ctx: AppCtx, slot: number, region?: number): HTMLElement {
-  const body = el('div');
-  const scroll = el('div', 'grid-scroll');
+export function gridCard(ctx: AppCtx, slot: number, region?: number): DeviceBody {
+  const scroll = el('div', 'seq-strip');
   const base: Strip<GridSpec> = {
     ctx,
     slot,
@@ -306,26 +157,19 @@ export function gridCard(ctx: AppCtx, slot: number, region?: number): HTMLElemen
     spec: () => specOf(ctx, slot, 'grid', region),
     repaint: () => repaint(strip),
   };
+  const lanes = laneHost(base, scroll);
   const strip: GridStrip = {
     ...base,
     scroll,
-    names: el('div', 'mod-names'),
-    picker: null,
-    lanes: laneHost(base, scroll),
+    names: el('div', 'seq-lane-names'),
+    picker: lanePicker(lanes),
+    count: el('span', 'seq-meas'),
+    length: el('em'),
+    lanes,
   };
-  body.appendChild(controls(strip));
-  const tools = el('div', 'capture-row');
-  tools.appendChild(divisorPicker(ctx, slot, region));
-  tools.appendChild(randomizeButton(strip));
-  strip.picker = lanePicker(strip.lanes);
-  const lanes = el('div');
-  lanes.append(el('span', 'field-label', 'Lanes'), strip.picker);
-  tools.appendChild(lanes);
-  body.appendChild(tools);
-  strip.scroll.append(strip.names, strip.root);
-  body.appendChild(strip.scroll);
-  body.appendChild(el('p', 'hint', HINT));
+  const body = el('div', 'seq-device-body grid-device');
+  body.append(gridControls(strip), stepsSection(strip));
   repaint(strip);
   watch(strip);
-  return body;
+  return { body, fit: 'fixed' };
 }
