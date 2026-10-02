@@ -18,6 +18,7 @@ import { FULL_DOCUMENT, FULL_SLOT, FULL_SONG_TICKS } from '../__fixtures__/fullA
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import type { AutomationLane, AutomationTargetId } from '../automation/automationLane';
 import {
+  STRIP_TARGET_IDS,
   VOICE_AUTOMATION_ROWS,
   formatTargetId,
   insertTargetRow,
@@ -168,9 +169,7 @@ describe('the target', () => {
         point(0, insertTargetRow('eq', field)!.min),
       ]);
     });
-    const strip = ['strip.level', 'strip.pan', 'strip.send.a', 'strip.send.b'].map((target) =>
-      lane(target, [point(0, 0)]),
-    );
+    const strip = STRIP_TARGET_IDS.map((target) => lane(target, [point(0, 0)]));
     const { lanes, corrections } = withLanes([...voice, ...eqLanes, ...strip]);
     expect(lanes).toEqual([...voice.slice(0, FM_LANES_MAX), ...eqLanes, ...strip]);
     expect(corrections).toEqual([

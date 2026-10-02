@@ -39,7 +39,7 @@ import type {
   AutomationTargetRow,
 } from '../automation/automationLane';
 import {
-  catalogRow,
+  requireCatalogRow,
   insertTargetRow,
   parseTargetId,
   targetKind,
@@ -145,7 +145,7 @@ function laneTarget(
     return undefined;
   }
   const id = raw as AutomationTargetId;
-  if (parsed.kind !== 'insert') return { id, row: catalogRow(raw)! };
+  if (parsed.kind !== 'insert') return { id, row: requireCatalogRow(raw) };
   const kind = kindOf(parsed.insertId);
   if (kind === undefined) {
     n.correction(`${path}: the strip has no insert "${parsed.insertId}" — lane dropped`);

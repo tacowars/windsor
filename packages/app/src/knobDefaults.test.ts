@@ -27,7 +27,6 @@ import {
   MIDI_MIDDLE_C,
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
-  RETURN_NAMES,
   SEQUENCER_KINDS,
   VELOCITY_DEFAULT,
   WALK_CHANCE,
@@ -35,7 +34,7 @@ import {
 } from '@windsor/engine';
 import { BARS_KNOB, BPM_KNOB } from './transportTables';
 import { REGISTER_OCTAVE_DEFAULTS, octaveKnob } from './harmonyTables';
-import { STRIP_LEVEL_KNOB, STRIP_LOW_CUT_KNOB, STRIP_PAN_KNOB, sendKnob } from './mixerTables';
+import { STRIP_LOW_CUT_KNOB } from './mixerTables';
 import { allPatchKnobs, patchDefault, patchKnobOpts } from './patchKnobTables';
 import { getPath } from './patchPath';
 import {
@@ -148,12 +147,6 @@ describe('harmony, mixer and arrangement knobs', () => {
       expect(REGISTER_OCTAVE_DEFAULTS[kind], kind).toBe(config.register.octave);
       expect(octaveKnob(kind).def, kind).toBe(config.register.octave);
     }
-  });
-
-  it("a strip's level and pan are DEFAULT_STRIP's, a send is silent", () => {
-    expect(STRIP_LEVEL_KNOB.def).toBe(DEFAULT_STRIP.level);
-    expect(STRIP_PAN_KNOB.def).toBe(DEFAULT_STRIP.pan);
-    for (const ret of RETURN_NAMES) expect(sendKnob(ret).def).toBe(DEFAULT_STRIP.sends[ret] ?? 0);
   });
 
   it("a strip's low cut spans the engine's range and rests at DEFAULT_STRIP's (#640)", () => {

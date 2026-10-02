@@ -149,26 +149,22 @@ describe("the cutoff lane across the catalog's whole range (windsor#346)", () =>
 
 describe("every voice lane's offset fits its parameter (windsor#346)", () => {
   const processor = loaded.create(makePatch(), 4);
-  // Each voice row a handle plays (the decay rows since windsor#347), and the
-  // parameter its offsets go to: a slot, the cutoff's too (windsor#419).
-  const rows = VOICE_AUTOMATION_ROWS.map((r): readonly [string, string] => [
-    r.path,
-    voiceSlotParamName(0),
-  ]);
+  // Each voice row a handle plays (the decay rows since windsor#347); every
+  // row's offsets go to a slot, the cutoff's too (windsor#419).
+  const slot = voiceSlotParamName(0);
 
-  it.each(rows)(
-    '%s: a lane from one end of its row to the other passes %s unclipped',
-    (path, param) => {
-      const row = catalogRow(voiceTargetId(path))!;
+  it.each(VOICE_AUTOMATION_ROWS)(
+    '$path: a lane from one end of its row to the other passes a slot unclipped',
+    (row) => {
       for (const [from, to] of [
         [row.min, row.max],
         [row.max, row.min],
       ] as const) {
         // The patch at one end, the lane at the other: the widest offset the
         // main thread sends for this row.
-        const offset = offsetFor(moved(makePatch(), path, from), path, to);
+        const offset = voiceOffset(moved(makePatch(), row.path, from), row.path, row, to);
         expect(offset).not.toBe(0);
-        expect(clipped(processor, param, offset)).toBe(Math.fround(offset));
+        expect(clipped(processor, slot, offset)).toBe(Math.fround(offset));
       }
     },
   );

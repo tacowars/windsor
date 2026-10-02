@@ -17,17 +17,16 @@ import {
   DEFAULT_STRIP,
   LOW_CUT_MAX_HZ,
   LOW_CUT_MIN_HZ,
-  catalogRow,
   formatTargetId,
+  requireCatalogRow,
 } from '@windsor/engine';
 import { fmt2, fmtHz, fmtSigned } from './consoleFormat';
 import type { CardKnobSpec } from './sequencerKnobTables';
 
 /** The `min` and `max` of a strip target's catalog row. Throws on a target the catalog has no row for. */
 function stripRange(target: AutomationTargetId): { readonly min: number; readonly max: number } {
-  const row = catalogRow(target);
-  if (!row) throw new Error(`mixerTables: no strip row for ${target}`);
-  return { min: row.min, max: row.max };
+  const { min, max } = requireCatalogRow(target);
+  return { min, max };
 }
 
 /** A strip's level reaches +6 dB, the catalog's level row's top; the default is unity from the engine. */
