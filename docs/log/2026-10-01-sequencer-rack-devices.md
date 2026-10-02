@@ -67,7 +67,9 @@ around them. This record is that second round.
      applies to the first hit only, and each later hit retriggers.
    - On the Grid, the last hit is held as the step's note is today, until
      the next note or rest. On the Arp and Basslead, each hit is held for
-     the gate times its slice of the step.
+     the gate times its slice of the step, except the last where today's
+     note would run on (a tie or a slide next, or Basslead's gate of 1):
+     it is held as that note is, and the tie or the next note ends it.
    - A skip or a density draw is made once per step, before the roll. A
      step that is skipped plays no hit.
 7. **The Chord** keeps its strip and shows no progression; the chords are
