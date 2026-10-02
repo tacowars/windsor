@@ -5,11 +5,11 @@
  * dropped to follow the documents.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { memorySongRecords } from './__fixtures__/memorySongStores';
+import { memorySessionStore, memorySongRecords } from './__fixtures__/memorySongStores';
 import { songText } from './__fixtures__/songSessionConsole';
 import { loadBuiltIns } from './builtInLibrary';
 import { songFacts } from './songFacts';
-import { songLibrary, versionRefusal } from './songLibrary';
+import { StaleSongError, songLibrary, versionRefusal } from './songLibrary';
 
 const T0 = new Date('2026-10-02T09:00:00.000Z');
 const FUTURE = JSON.stringify({ version: 99, meta: { name: 'From later', tags: [] } }, null, 2);
@@ -32,6 +32,7 @@ describe('songLibrary', () => {
       id: 'a',
       created: T0.toISOString(),
       updated: T0.toISOString(),
+      revision: 1,
     });
     expect(await library.read('a')).toBe(text);
   });
@@ -88,5 +89,70 @@ describe('songLibrary', () => {
     expect(records.docMap.size).toBe(0);
     expect(records.indexMap.size).toBe(0);
     expect(await library.list()).toEqual([]);
+  });
+
+  describe('revisions: a stale save is refused (tacowars, 2026-10-02)', () => {
+    it('bumps the revision on every write and loads the text with it', async () => {
+      const library = songLibrary(memorySongRecords());
+      expect((await library.write('a', songText())).revision).toBe(1);
+      const text = songText({ name: 'Two', tags: [] });
+      expect((await library.write('a', text, 1)).revision).toBe(2);
+      expect(await library.load('a')).toEqual({ text, revision: 2 });
+      expect(await library.load('none')).toBeNull();
+    });
+
+    it('refuses a save based on a revision the song has moved on from, writing nothing', async () => {
+      const records = memorySongRecords();
+      const library = songLibrary(records);
+      await library.write('a', songText({ name: 'One', tags: [] }));
+      const theirs = songText({ name: 'Theirs', tags: [] });
+      await library.write('a', theirs, 1);
+      const stored = records.indexMap.get('a');
+      await expect(library.write('a', songText({ name: 'Mine', tags: [] }), 1)).rejects.toThrow(
+        StaleSongError,
+      );
+      expect(records.docMap.get('a')).toBe(theirs);
+      expect(records.indexMap.get('a')).toBe(stored);
+    });
+
+    it('refuses a save to a song deleted since it was read, and indexes a repaired song at 0', async () => {
+      const records = memorySongRecords();
+      const library = songLibrary(records);
+      await library.write('a', songText());
+      await library.remove('a');
+      await expect(library.write('a', songText(), 1)).rejects.toThrow(StaleSongError);
+      records.docMap.set('o', songText());
+      expect((await library.load('o'))?.revision).toBe(0);
+      await library.list();
+      expect(records.indexMap.get('o')?.revision).toBe(0);
+      expect((await library.write('o', songText(), 0)).revision).toBe(1);
+    });
+  });
+
+  describe("the open song's delete", () => {
+    it('deletes both records and writes current in one transaction', async () => {
+      const session = memorySessionStore();
+      const records = memorySongRecords(session);
+      const library = songLibrary(records);
+      await library.write('a', songText());
+      const current = { updated: T0.toISOString(), document: songText() };
+      await library.removeOpen('a', current);
+      expect(session.record).toBe(current);
+      expect(records.docMap.has('a')).toBe(false);
+    });
+
+    it('changes nothing when the write to current is refused', async () => {
+      const session = memorySessionStore({ updated: T0.toISOString(), songId: 'a' });
+      const records = memorySongRecords(session);
+      const library = songLibrary(records);
+      await library.write('a', songText());
+      session.failing = true;
+      await expect(
+        library.removeOpen('a', { updated: T0.toISOString(), document: '{}' }),
+      ).rejects.toThrow('quota');
+      expect(session.record).toEqual({ updated: T0.toISOString(), songId: 'a' });
+      expect(records.docMap.has('a')).toBe(true);
+      expect(records.indexMap.has('a')).toBe(true);
+    });
   });
 });

@@ -47,6 +47,17 @@ export interface AutosaveTarget {
   save(text: string, updated: string): Promise<void>;
 }
 
+/**
+ * A write the target refused and has already told the reader about (a song
+ * another tab saved since): the change stays owed, and is not reported again.
+ */
+export class ReportedRefusal extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ReportedRefusal';
+  }
+}
+
 /** The untitled song's target: `current` holds the whole text. */
 export const sessionTarget = (store: SongStore): AutosaveTarget => ({
   save: (document, updated) => store.save({ updated, document }),
@@ -133,14 +144,23 @@ export class SongAutosave {
   }
 
   /**
-   * Send the open song's changes to `target` from now on. `owed` says the
-   * target lacks the open text, so the next flush writes it even with no
-   * change; `written` names text it already holds, so an identical write is skipped.
+   * Send the open song's changes to `target` from now on.
+   *
+   * - `owed` given says whether `target` lacks the open text: a switch that
+   *   has just replaced the document knows, since the drain wrote the song
+   *   it left.
+   * - Left out, **a retarget never drops a write still owed**: a change the
+   *   last target was never sent is sent to this one. The one exception is
+   *   `written` naming exactly the open text, because then it was written.
+   * - `written` names text `target` already holds, so an identical write is
+   *   skipped.
    */
   retarget(target: AutosaveTarget, options: { owed?: boolean; written?: string } = {}): void {
     this.target = target;
-    this.owed = options.owed ?? false;
-    if (options.written !== undefined) this.written = { text: options.written, target };
+    const { owed, written } = options;
+    if (written !== undefined) this.written = { text: written, target };
+    if (owed !== undefined) this.owed = owed;
+    else if (this.owed && written !== undefined && this.deps.read() === written) this.owed = false;
   }
 
   /** Drop a waiting change without writing it; true when one was waiting. */
@@ -171,6 +191,7 @@ export class SongAutosave {
       return true;
     } catch (error) {
       if (this.target === target) this.owed = true;
+      if (error instanceof ReportedRefusal) return false;
       this.deps.report(
         `autosave failed: ${error instanceof Error ? error.message : String(error)}`,
       );

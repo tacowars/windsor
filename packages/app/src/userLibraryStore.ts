@@ -121,26 +121,42 @@ function songStore(db: IDBDatabase, beforeWrite: () => void): SongStore {
   };
 }
 
-/** Writes to both song stores in one transaction, resolved when it commits. */
-function both(
+/**
+ * One read-write transaction over `stores`, resolved when it commits. `body`
+ * queues its requests, and may abort the transaction with a reason, which
+ * the promise then rejects with.
+ */
+function transact(
   db: IDBDatabase,
-  write: (index: IDBObjectStore, docs: IDBObjectStore) => void,
+  stores: readonly string[],
+  body: (tx: IDBTransaction, abort: (reason: unknown) => void) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([USER_DB.songIndex, USER_DB.songDocs], 'readwrite');
-    write(tx.objectStore(USER_DB.songIndex), tx.objectStore(USER_DB.songDocs));
+    const tx = db.transaction([...stores], 'readwrite');
+    let reason: unknown = null;
+    const fail = (fallback: string) => (): void =>
+      reject(reason ?? tx.error ?? new Error(fallback));
     tx.oncomplete = (): void => resolve();
-    tx.onerror = (): void => reject(tx.error ?? new Error('IndexedDB refused'));
-    tx.onabort = (): void => reject(tx.error ?? new Error('IndexedDB transaction aborted'));
+    tx.onerror = fail('IndexedDB refused');
+    tx.onabort = fail('IndexedDB transaction aborted');
+    body(tx, (why) => {
+      reason = why;
+      tx.abort();
+    });
   });
 }
+
+const SONG_STORES = [USER_DB.songIndex, USER_DB.songDocs] as const;
 
 const asIndex = (value: unknown): SongIndexRecord | null =>
   typeof value === 'object' && value !== null && typeof (value as SongIndexRecord).id === 'string'
     ? (value as SongIndexRecord)
     : null;
 
-/** The named songs: `songIndex` and `songDocs`, both keyed by song id. */
+/**
+ * The named songs: `songIndex` and `songDocs`, both keyed by song id. The
+ * open song's delete also writes `songs/current`, in the same transaction.
+ */
 function songRecords(db: IDBDatabase, beforeWrite: () => void): SongRecords {
   return {
     async indexes() {
@@ -158,20 +174,43 @@ function songRecords(db: IDBDatabase, beforeWrite: () => void): SongRecords {
       const text = await run<unknown>(db, USER_DB.songDocs, 'readonly', (s) => s.get(id));
       return typeof text === 'string' ? text : null;
     },
-    put(index, text) {
+    async put(id, text, next) {
       beforeWrite();
-      return both(db, (indexStore, docs) => {
-        indexStore.put(index, index.id);
-        docs.put(text, index.id);
+      const written: { index: SongIndexRecord | null } = { index: null };
+      // The stored index is read in the write's own transaction, so a check
+      // on it (a stale revision) and the write can't be split by another tab.
+      await transact(db, SONG_STORES, (tx, abort) => {
+        const indexStore = tx.objectStore(USER_DB.songIndex);
+        const stored = indexStore.get(id);
+        stored.onsuccess = (): void => {
+          try {
+            written.index = next(asIndex(stored.result));
+          } catch (error) {
+            abort(error);
+            return;
+          }
+          indexStore.put(written.index, id);
+          tx.objectStore(USER_DB.songDocs).put(text, id);
+        };
       });
+      if (!written.index) throw new Error('IndexedDB wrote no index record');
+      return written.index;
     },
     async putIndex(index) {
       await run(db, USER_DB.songIndex, 'readwrite', (s) => s.put(index, index.id));
     },
     delete(id) {
-      return both(db, (indexStore, docs) => {
-        indexStore.delete(id);
-        docs.delete(id);
+      return transact(db, SONG_STORES, (tx) => {
+        tx.objectStore(USER_DB.songIndex).delete(id);
+        tx.objectStore(USER_DB.songDocs).delete(id);
+      });
+    },
+    deleteInto(id, session) {
+      beforeWrite();
+      return transact(db, [USER_DB.songs, ...SONG_STORES], (tx) => {
+        tx.objectStore(USER_DB.songs).put(session, USER_DB.currentSong);
+        tx.objectStore(USER_DB.songIndex).delete(id);
+        tx.objectStore(USER_DB.songDocs).delete(id);
       });
     },
   };

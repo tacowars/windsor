@@ -4,11 +4,19 @@
  * build can open it, point `current` at the open named song, and give the
  * autosave a named song's record as its target. It also words the problems
  * a reader is told about.
+ *
+ * **A stale tab is refused** (tacowars, 2026-10-02): the named target saves
+ * on the revision the open text was read at. When another tab has saved the
+ * song since, the save is refused, the reader is told once, and from then
+ * on the target writes nothing to that song; the edits stay open, and Save
+ * as copy… keeps them.
  */
 import type { FormatRefusal } from '@windsor/engine';
 import type { AutosaveTarget, SongAutosave, SongStore } from './songAutosave';
+import { ReportedRefusal } from './songAutosave';
 import { songFacts } from './songFacts';
 import type { SongLibrary } from './songLibrary';
+import { StaleSongError } from './songLibrary';
 import { importRefusedText, songRefusal } from './songRestore';
 
 /** The browser's storage, attached at boot; absent where there is no IndexedDB. */
@@ -21,14 +29,36 @@ export interface SessionStorage {
 
 /** Why a stored song did not open. */
 export type OpenProblem =
-  | { readonly problem: 'unavailable' | 'missing' | 'unsaved' }
+  | { readonly problem: 'unavailable' | 'missing' | 'unsaved' | 'touched' }
   | { readonly problem: 'refused'; readonly name: string; readonly refusal: FormatRefusal }
   | { readonly problem: 'failed'; readonly message: string };
 
-/** A stored song read for a switch: its text, raw document and name, or why it can't be opened. */
-export type Readable =
-  | { readonly ok: true; readonly text: string; readonly raw: unknown; readonly name: string }
-  | ({ readonly ok: false } & OpenProblem);
+/** A stored song read for a switch: its text, raw document, name and revision. */
+export interface StoredReadable {
+  readonly ok: true;
+  readonly text: string;
+  readonly raw: unknown;
+  readonly name: string;
+  readonly revision: number;
+}
+
+/** A stored song read for a switch, or why it can't be opened. */
+export type Readable = StoredReadable | ({ readonly ok: false } & OpenProblem);
+
+/** What the refused tab is told when another tab saved its song since. */
+export const STALE_SONG_TEXT =
+  'This song was changed in another tab — Save as copy… to keep these edits.';
+
+/** The open named song's record: its id, the revision its text is based on, and what became of it. */
+export interface OpenRecord {
+  readonly id: string;
+  /** The stored revision the open text descends from; each save names it, and moves it on. */
+  revision: number;
+  /** Another tab saved the song since: this tab's saves to it are refused. */
+  stale: boolean;
+  /** Deleted in this session: a write captured before the delete writes nothing. */
+  gone: boolean;
+}
 
 export const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -40,13 +70,14 @@ export const errorText = (error: unknown): string =>
  */
 export async function readStored(library: SongLibrary, id: string): Promise<Readable> {
   try {
-    const text = await library.read(id);
-    if (text === null) return { ok: false, problem: 'missing' };
+    const song = await library.load(id);
+    if (song === null) return { ok: false, problem: 'missing' };
+    const { text, revision } = song;
     const raw: unknown = JSON.parse(text);
     const { name } = songFacts(text);
     const refusal = songRefusal(text);
     if (refusal) return { ok: false, problem: 'refused', name, refusal };
-    return { ok: true, text, raw, name };
+    return { ok: true, text, raw, name, revision };
   } catch (error) {
     return { ok: false, problem: 'failed', message: errorText(error) };
   }
@@ -66,12 +97,36 @@ export function problemText(problem: OpenProblem): string | null {
   }
 }
 
-/** The record named song `id` autosaves into; `written` hears each stored write (the "saved" time). */
-export function namedTarget(library: SongLibrary, id: string, written: () => void): AutosaveTarget {
+/** What the named target tells the session: a write stored, or the song found saved by another tab. */
+export interface TargetEvents {
+  written(): void;
+  stale(): void;
+}
+
+/**
+ * The record the open named song autosaves into. Each save names the
+ * revision `open` is at and moves it on; a save refused as stale marks
+ * `open` stale and tells `events`, once, and every later save is refused
+ * without touching the store. A deleted song's target writes nothing.
+ */
+export function namedTarget(
+  library: SongLibrary,
+  open: OpenRecord,
+  events: TargetEvents,
+): AutosaveTarget {
   return {
     save: async (text) => {
-      await library.write(id, text);
-      written();
+      if (open.gone) return;
+      if (open.stale) throw new ReportedRefusal(STALE_SONG_TEXT);
+      try {
+        open.revision = (await library.write(open.id, text, open.revision)).revision;
+      } catch (error) {
+        if (!(error instanceof StaleSongError)) throw error;
+        open.stale = true;
+        events.stale();
+        throw new ReportedRefusal(STALE_SONG_TEXT);
+      }
+      events.written();
     },
   };
 }

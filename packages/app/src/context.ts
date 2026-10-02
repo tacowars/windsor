@@ -56,10 +56,12 @@ export interface AppCtx {
   /**
    * Adopt a freshly imported raw document as an untitled song: normalise,
    * rebuild, re-render — the one rebuild the UI offers (#629; Restart went
-   * with #708, `restructure` with #709). The session becomes untitled
-   * (windsor#433 decision 5); a song with no name takes `fileName`'s, less `.json`.
+   * with #708, `restructure` with #709). It goes through the session's one
+   * switch (windsor#433): the song being left is saved first, and the
+   * promise resolves false, reported, when that failed and it stayed open.
+   * A song with no name takes `fileName`'s, less `.json`.
    */
-  importDoc(raw: unknown, fileName?: string): void;
+  importDoc(raw: unknown, fileName?: string): Promise<boolean>;
   /** Re-render the active tab from the current document; the rest render when shown (#620). */
   render(): void;
   /**

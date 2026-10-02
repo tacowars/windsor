@@ -2,10 +2,19 @@
  * In-memory stand-ins for the song stores IndexedDB keeps (windsor#433):
  * the session record `current` and the library's two stores. Each counts
  * what was read and written, and can be told to reject every write, as a
- * full disk would.
+ * full disk would. The library's records share a session store, so the
+ * open song's delete writes `current` and deletes its records together,
+ * or not at all, as the one IndexedDB transaction does.
  */
 import type { SessionRecord, SongStore } from '../songAutosave';
 import type { SongIndexRecord, SongRecords } from '../songLibrary';
+
+export interface MemorySessionStore extends SongStore {
+  record: SessionRecord | null;
+  /** Every record written, in order. */
+  readonly saves: SessionRecord[];
+  failing: boolean;
+}
 
 export interface MemorySongRecords extends SongRecords {
   readonly indexMap: Map<string, SongIndexRecord>;
@@ -19,51 +28,6 @@ export interface MemorySongRecords extends SongRecords {
 }
 
 const quota = (): Promise<never> => Promise.reject(new Error('quota'));
-
-export function memorySongRecords(): MemorySongRecords {
-  const records: MemorySongRecords = {
-    indexMap: new Map(),
-    docMap: new Map(),
-    docReads: [],
-    writes: 0,
-    failing: false,
-    indexes: () => Promise.resolve([...records.indexMap.values()]),
-    docIds: () => Promise.resolve([...records.docMap.keys()]),
-    index: (id) => Promise.resolve(records.indexMap.get(id) ?? null),
-    doc: (id) => {
-      records.docReads.push(id);
-      return Promise.resolve(records.docMap.get(id) ?? null);
-    },
-    put: (index, text) => {
-      if (records.failing) return quota();
-      records.writes++;
-      records.indexMap.set(index.id, index);
-      records.docMap.set(index.id, text);
-      return Promise.resolve();
-    },
-    putIndex: (index) => {
-      if (records.failing) return quota();
-      records.writes++;
-      records.indexMap.set(index.id, index);
-      return Promise.resolve();
-    },
-    delete: (id) => {
-      if (records.failing) return quota();
-      records.writes++;
-      records.indexMap.delete(id);
-      records.docMap.delete(id);
-      return Promise.resolve();
-    },
-  };
-  return records;
-}
-
-export interface MemorySessionStore extends SongStore {
-  record: SessionRecord | null;
-  /** Every record written, in order. */
-  readonly saves: SessionRecord[];
-  failing: boolean;
-}
 
 export function memorySessionStore(record: SessionRecord | null = null): MemorySessionStore {
   const store: MemorySessionStore = {
@@ -79,4 +43,60 @@ export function memorySessionStore(record: SessionRecord | null = null): MemoryS
     },
   };
   return store;
+}
+
+/** The library's two stores, beside `session` (a fresh one when none is given). */
+export function memorySongRecords(
+  session: MemorySessionStore = memorySessionStore(),
+): MemorySongRecords {
+  const records: MemorySongRecords = {
+    indexMap: new Map(),
+    docMap: new Map(),
+    docReads: [],
+    writes: 0,
+    failing: false,
+    indexes: () => Promise.resolve([...records.indexMap.values()]),
+    docIds: () => Promise.resolve([...records.docMap.keys()]),
+    index: (id) => Promise.resolve(records.indexMap.get(id) ?? null),
+    doc: (id) => {
+      records.docReads.push(id);
+      return Promise.resolve(records.docMap.get(id) ?? null);
+    },
+    put: (id, text, next) => {
+      if (records.failing) return quota();
+      let index: SongIndexRecord;
+      try {
+        index = next(records.indexMap.get(id) ?? null);
+      } catch (error) {
+        return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+      }
+      records.writes++;
+      records.indexMap.set(id, index);
+      records.docMap.set(id, text);
+      return Promise.resolve(index);
+    },
+    putIndex: (index) => {
+      if (records.failing) return quota();
+      records.writes++;
+      records.indexMap.set(index.id, index);
+      return Promise.resolve();
+    },
+    delete: (id) => {
+      if (records.failing) return quota();
+      records.writes++;
+      records.indexMap.delete(id);
+      records.docMap.delete(id);
+      return Promise.resolve();
+    },
+    deleteInto: (id, current) => {
+      if (records.failing || session.failing) return quota();
+      records.writes++;
+      session.record = current;
+      session.saves.push(current);
+      records.indexMap.delete(id);
+      records.docMap.delete(id);
+      return Promise.resolve();
+    },
+  };
+  return records;
 }

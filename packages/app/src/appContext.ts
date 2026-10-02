@@ -265,12 +265,12 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
 
   /**
    * Adopt an imported document as an untitled song (windsor#433 decision
-   * 5): through the session, so the song being left keeps its pending
-   * autosave and no caller can leave the session believing a named song is
-   * open. A song with no name takes `fileName`'s.
+   * 5), through the session's one switch: the song being left is drained
+   * into its record first, and when that fails the import stops, reported,
+   * and resolves false. A song with no name takes `fileName`'s.
    */
-  importDoc(raw: unknown, fileName?: string): void {
-    this.songs.adoptUntitled(raw, fileName === undefined ? {} : { fileName });
+  importDoc(raw: unknown, fileName?: string): Promise<boolean> {
+    return this.songs.adopt(raw, fileName === undefined ? {} : { fileName });
   }
 
   /**

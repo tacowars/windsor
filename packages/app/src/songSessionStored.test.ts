@@ -8,6 +8,7 @@ import type { SessionConsole } from './__fixtures__/songSessionConsole';
 import { DELAY_MS, openSessionConsole, songText } from './__fixtures__/songSessionConsole';
 import { loadBuiltIns } from './builtInLibrary';
 import type { StoredSong } from './songAutosave';
+import type { SongIndexRecord } from './songLibrary';
 
 beforeAll(() => loadBuiltIns());
 
@@ -136,9 +137,9 @@ describe('remove', () => {
     const a = (await c.ctx.songs.saveAs('Queued', []))!;
     const put = c.records.put;
     const held: (() => void)[] = [];
-    c.records.put = (index, text) =>
-      new Promise<void>((resolve, reject) => {
-        held.push(() => void put(index, text).then(resolve, reject));
+    c.records.put = (id, text, next) =>
+      new Promise<SongIndexRecord>((resolve, reject) => {
+        held.push(() => void put(id, text, next).then(resolve, reject));
       });
     bpm(118);
     void c.autosave.flush();

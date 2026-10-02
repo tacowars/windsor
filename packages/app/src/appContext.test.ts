@@ -112,7 +112,7 @@ describe('AppContext rendering', () => {
   it('renders only the active tab on a change after an import', async () => {
     const c = openConsole();
     c.ctx.render();
-    c.ctx.importDoc(newSong());
+    await c.ctx.importDoc(newSong());
     await flush();
     // Once for the adopted document, once when the live rebuild landed — the active tab only.
     expect(c.builds).toBe(1);
@@ -171,7 +171,7 @@ describe('AppContext rendering', () => {
     for (const id of TAB_IDS) c.ctx.activate(id);
     c.ctx.activate('song');
     const before = { ...c.renders };
-    c.ctx.importDoc(newSong());
+    await c.ctx.importDoc(newSong());
     await flush();
     expect(c.renders['song']).toBe((before['song'] ?? 0) + 2);
     for (const id of TAB_IDS) {
@@ -314,7 +314,7 @@ describe('structural edits stay live (#629)', () => {
 
   it('Import still rebuilds from the document — the one rebuild left since #709', async () => {
     const c = openConsole();
-    c.ctx.importDoc(newSong());
+    await c.ctx.importDoc(newSong());
     await flush();
     expect(c.builds).toBe(1);
     expect(c.applied).toHaveLength(0);
@@ -333,7 +333,7 @@ describe('a change landing while the system is being built (#629 review)', () =>
     expect(c.builds).toBe(1);
   });
 
-  it("keeps the pending build's resume, where an import starts from the top (windsor#141)", () => {
+  it("keeps the pending build's resume, where an import starts from the top (windsor#141)", async () => {
     const c = openConsole();
     c.host.enabled = false;
     c.host.building = true;
@@ -342,7 +342,7 @@ describe('a change landing while the system is being built (#629 review)', () =>
     expect(c.ctx.change({ transport: { bpm: 100 } } as DocumentPartial).ok).toBe(true);
     expect(c.buildOptions).toEqual([{ keepPendingResume: true }]);
     // A fresh document replaces the pending resume with none.
-    c.ctx.importDoc(newSong());
+    await c.ctx.importDoc(newSong());
     expect(c.buildOptions.at(-1)).toEqual({});
   });
 
@@ -380,7 +380,7 @@ describe('the transport strip (#708)', () => {
     expect(c.builds).toBe(0);
   });
 
-  it('renders the chrome on every render, whichever tab is active, and never on invalidate', () => {
+  it('renders the chrome on every render, whichever tab is active, and never on invalidate', async () => {
     const c = openConsole();
     let strips = 0;
     c.ctx.addChrome(() => strips++);
@@ -391,8 +391,10 @@ describe('the transport strip (#708)', () => {
     expect(strips).toBe(2);
     c.ctx.invalidate();
     expect(strips).toBe(2);
-    c.ctx.importDoc(newSong());
-    expect(strips).toBe(3);
+    // Once for the adopted document and once when its live rebuild landed:
+    // the import is awaited through the session's switch.
+    await c.ctx.importDoc(newSong());
+    expect(strips).toBe(4);
   });
 
   it('refreshTabs re-renders the active tab (a Bars edit) and leaves the chrome alone', () => {
@@ -439,7 +441,7 @@ describe('the Song view (#709)', () => {
     expect(c.builds).toBe(0);
   });
 
-  it('round-trips a song edited only through the view: export, import, export byte-equal', () => {
+  it('round-trips a song edited only through the view: export, import, export byte-equal', async () => {
     const c = openConsole();
     const songTicks = c.model.doc.transport.bars * BAR;
     c.ctx.change({ harmony: { events: appendEvent(c.model.doc.harmony.events, songTicks) } });
@@ -452,7 +454,7 @@ describe('the Song view (#709)', () => {
       }),
     );
     const exported = c.model.toJson();
-    c.ctx.importDoc(JSON.parse(exported));
+    await c.ctx.importDoc(JSON.parse(exported));
     expect(c.model.toJson()).toBe(exported);
     expect(c.model.corrections).toEqual([]);
   });

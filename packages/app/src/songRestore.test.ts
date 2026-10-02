@@ -21,20 +21,14 @@ import {
   songRefusal,
   touchWatch,
 } from './songRestore';
-import { newSong } from './songParts';
 
 beforeAll(() => loadBuiltIns());
 
+/** A real console with no IndexedDB, on its third part; `messages` are its toasts, as `tone: message`. */
 function context(): AppCtx & { messages: string[] } {
-  const model = new DocumentModel(newSong());
-  const messages: string[] = [];
-  return {
-    model,
-    messages,
-    parts: { selected: 2 },
-    importDoc: (raw: unknown) => model.open(raw),
-    notify: (message: string) => messages.push(message),
-  } as unknown as AppCtx & { messages: string[] };
+  const c = openSessionConsole(false);
+  c.ctx.parts.selected = 2;
+  return Object.assign(c.ctx, { messages: c.toasts });
 }
 
 const saved = (document: string): StoredSong => ({ updated: '2026-09-28T11:58:00.000Z', document });
@@ -72,7 +66,7 @@ describe('offerRestore', () => {
   it('reports a record that will not open', async () => {
     const ctx = context();
     expect(await offerRestore(ctx, saved('{not json'), () => Promise.resolve(true))).toBe(false);
-    expect(ctx.messages[0]).toMatch(/^restore failed: /);
+    expect(ctx.messages[0]).toMatch(/^error: restore failed: /);
   });
 
   it('says when the song was saved, and that declining keeps it', () => {
@@ -220,7 +214,7 @@ describe('bootSong, the reload (windsor#433 decision 9)', () => {
     it('asks nothing about an untitled record once the document was replaced (Import)', async () => {
       const c = openSessionConsole();
       const touched = touchWatch(c.ctx);
-      c.ctx.importDoc(JSON.parse(songText({ name: 'Imported', tags: [] })));
+      await c.ctx.importDoc(JSON.parse(songText({ name: 'Imported', tags: [] })));
       expect(c.ctx.model.changed).toBe(false);
       const asked = vi.fn(never);
       expect(await bootSong(c.ctx, saved(song()), asked, { touched })).toBe('kept');
@@ -229,6 +223,29 @@ describe('bootSong, the reload (windsor#433 decision 9)', () => {
       expect(c.toasts).toEqual([
         'info: your last session is kept until your first edit — this song stays open',
       ]);
+    });
+
+    it('replaces nothing when the user edits while the named song is being read', async () => {
+      const c = openSessionConsole();
+      await c.library.write('n', songText({ name: 'Night Drive', tags: [] }));
+      const touched = touchWatch(c.ctx);
+      const doc = c.records.doc;
+      let reached: () => void = () => {};
+      const reading = new Promise<void>((done) => (reached = done));
+      let release: () => void = () => {};
+      c.records.doc = (id) => {
+        reached();
+        return new Promise((done) => (release = (): void => void doc(id).then(done)));
+      };
+      const booting = bootSong(c.ctx, { updated: STAMP, songId: 'n' }, never, { touched });
+      await reading;
+      c.ctx.change({ transport: { bpm: 142 } });
+      const edited = c.ctx.model.toJson();
+      release();
+      expect(await booting).toBe('kept');
+      expect(c.ctx.model.toJson()).toBe(edited);
+      expect(c.ctx.songs.state).toEqual({ kind: 'untitled' });
+      expect(c.toasts).toEqual(['info: your last song is in your songs — this song stays open']);
     });
 
     it('boots as usual when nothing was touched', async () => {

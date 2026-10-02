@@ -1,24 +1,26 @@
 /**
  * The user's own state at boot (`2026-09-27-user-library-in-indexeddb`):
  * open the `windsor` database, read the user's patches in beside the
- * built-ins, give the open-song session its storage (windsor#433), bring
- * back the last song — a named song reopens at once, an untitled one is
- * offered as before (`bootSong`) — and from then on autosave the open song
- * after each change and whenever the page is hidden. Where the browser has
- * no IndexedDB, the library is the built-ins alone, Save downloads, and the
- * session has no songs, as before. It also says the console's first word:
- * the new-song hint, or what became of the last session.
+ * built-ins, and hand the song half (`userSessionSongs.ts`, windsor#433) its
+ * stores: it attaches the open-song session, brings back the last song — a
+ * named song reopens at once, an untitled one is offered as before — and
+ * autosaves the open song after each change. This file adds the page's
+ * hooks: a flush whenever the page is hidden, and a "Leave site?" question
+ * while a change is unsaved. Where the browser has no IndexedDB, the library
+ * is the built-ins alone, Save downloads, and the session has no songs, as
+ * before. It also says the console's first word: the new-song hint, or what
+ * became of the last session.
  */
 import type { AppCtx } from './context';
 import { bootLibrary, reportLibraryProblems } from './libraryActions';
 import { BLOCKED_UPGRADE_WARNING, EVICTABLE_WARNING } from './libraryConstants';
 import { openConfirm } from './metadataModal';
-import { SongAutosave, isNamedSession } from './songAutosave';
-import { songLibrary } from './songLibrary';
-import { bootSong, touchWatch } from './songRestore';
+import type { SongAutosave } from './songAutosave';
+import { isNamedSession } from './songAutosave';
+import { touchWatch } from './songRestore';
 import { browserPersist, persistOnce } from './storagePersistence';
 import { openUserStores } from './userLibraryStore';
-import { followSong } from './userSessionAutosave';
+import { bootSongs } from './userSessionSongs';
 
 export async function bootUserState(ctx: AppCtx): Promise<void> {
   // Taken first: the open below can wait on an older tab for as long as it stays open.
@@ -30,24 +32,13 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
     () => void ensurePersisted(),
     () => ctx.notify(BLOCKED_UPGRADE_WARNING, 'warning'),
   );
-  const stored = stores ? await stores.songs.load().catch(() => null) : null;
-  const autosave = stores
-    ? new SongAutosave({
-        store: stores.songs,
-        read: () => ctx.model.toJson(),
-        report: (message) => ctx.notify(message, 'error'),
-      })
-    : null;
-  if (stores && autosave) {
-    ctx.songs.attach({ library: songLibrary(stores.library), store: stores.songs, autosave });
-  }
   // The question and the library load run together; an open waits for the built-ins itself.
-  const [, outcome] = await Promise.all([
+  const [, { stored, outcome, autosave }] = await Promise.all([
     bootLibrary(stores?.patches ?? null).then(() => {
       reportLibraryProblems(ctx);
       ctx.render();
     }),
-    bootSong(ctx, stored, openConfirm, { touched }),
+    bootSongs(ctx, stores, { touched, confirm: openConfirm }),
   ]);
   // A boot that kept the stored song (the user had started) has said its word.
   if (outcome !== 'kept') {
@@ -56,13 +47,14 @@ export async function bootUserState(ctx: AppCtx): Promise<void> {
     else if (outcome === 'new' && !isNamedSession(stored))
       ctx.notify('new song — your last session is kept until your first edit');
   }
-  if (!autosave) return;
-  // A clean open's load-time rename (windsor#103) saves now; a repaired one waits for an edit.
-  followSong(ctx.model, autosave, outcome === 'opened');
+  if (autosave) hookPage(autosave);
+}
+
+/** Flush when the page is hidden; ask before leaving while a change is unsaved, and start its flush. */
+function hookPage(autosave: SongAutosave): void {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void autosave.flush();
   });
-  // A reload inside the quiet period, or before a write commits, is asked about first.
   window.addEventListener('beforeunload', (event) => {
     if (!autosave.unsaved) return;
     void autosave.flush();

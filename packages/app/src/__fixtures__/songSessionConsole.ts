@@ -37,8 +37,17 @@ export function songText(meta?: SongMeta, transport: Record<string, unknown> = {
   return new DocumentModel({ ...raw, transport: { ...base, ...transport }, meta }).toJson();
 }
 
-/** A console on a new untitled song, its library holding nothing; `attach` false leaves it without IndexedDB. */
-export function openSessionConsole(attach = true): SessionConsole {
+/** Stores another console already uses: a second tab over the same browser storage. */
+export interface SharedStores {
+  records: MemorySongRecords;
+  store: MemorySessionStore;
+}
+
+/**
+ * A console on a new untitled song, its library holding nothing, or the
+ * `shared` stores of another console; `attach` false leaves it without IndexedDB.
+ */
+export function openSessionConsole(attach = true, shared?: SharedStores): SessionConsole {
   const toasts: string[] = [];
   const host: ContextHost = {
     apply: (): ApplyResult => ({ ok: true, ignored: [] }),
@@ -53,8 +62,8 @@ export function openSessionConsole(attach = true): SessionConsole {
     notify: (message, tone = 'info') => toasts.push(`${tone}: ${message}`),
   });
   ctx.addTab('parts', { hidden: false }, () => {});
-  const records = memorySongRecords();
-  const store = memorySessionStore();
+  const store = shared?.store ?? memorySessionStore();
+  const records = shared?.records ?? memorySongRecords(store);
   const library = songLibrary(records);
   const autosave = new SongAutosave({
     store,

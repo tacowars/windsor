@@ -17,7 +17,6 @@
  */
 import type { FormatRefusal } from '@windsor/engine';
 import { upgradeSong } from '@windsor/engine';
-import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
 import type { ConfirmRequest } from './metadataModal';
 import type { SessionRecord, StoredSong } from './songAutosave';
@@ -74,12 +73,21 @@ export function refusedRequest(stored: StoredSong, refusal: FormatRefusal): Conf
 export const importRefusedText = (fileName: string, refusal: FormatRefusal): string =>
   `import refused: ${fileName} was ${refusal.message}. The file is unchanged.`;
 
-/** Open the stored song the way Import opens a file: after the built-ins, for an older song's library fill (#562). */
-export async function restoreSong(ctx: AppCtx, stored: StoredSong): Promise<void> {
-  await loadBuiltIns();
-  ctx.parts.selected = 0;
-  ctx.importDoc(JSON.parse(stored.document) as unknown);
-  ctx.notify(`restored the song saved ${savedWhen(stored)}`, 'success');
+/**
+ * Open the stored song the way Import opens a file, through the session's
+ * one switch (which waits for the built-ins, for an older song's library
+ * fill, #562), but quietly: nothing is written back until the first edit.
+ * `unless` is asked immediately before the replacement; true when it opened.
+ */
+export async function restoreSong(
+  ctx: AppCtx,
+  stored: StoredSong,
+  unless?: () => boolean,
+): Promise<boolean> {
+  const raw = JSON.parse(stored.document) as unknown;
+  const restored = await ctx.songs.adopt(raw, unless ? { quiet: true, unless } : { quiet: true });
+  if (restored) ctx.notify(`restored the song saved ${savedWhen(stored)}`, 'success');
+  return restored;
 }
 
 /** Hand the stored text to the browser's download path, byte for byte. */
@@ -98,12 +106,14 @@ export function downloadSongText(text: string): void {
  * Ask, and restore on yes; a record that fails to open is reported and left
  * in place. A record this build cannot read is offered as a download instead
  * and is never opened: the answer is always false, since nothing was restored.
+ * `unless` is the boot's touch check, asked again right before the restore.
  */
 export async function offerRestore(
   ctx: AppCtx,
   stored: StoredSong | null,
   confirm: (request: ConfirmRequest) => Promise<boolean>,
   download: (text: string) => void = downloadSongText,
+  unless?: () => boolean,
 ): Promise<boolean> {
   if (!stored) return false;
   const refusal = songRefusal(stored.document);
@@ -113,8 +123,7 @@ export async function offerRestore(
   }
   if (!(await confirm(restoreRequest(stored)))) return false;
   try {
-    await restoreSong(ctx, stored);
-    return true;
+    return await restoreSong(ctx, stored, unless);
   } catch (error) {
     ctx.notify(
       `restore failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -139,12 +148,24 @@ export function reopenFailedText(problem: OpenProblem): string {
   }
 }
 
-/** Reopen named song `id` at boot, with no question; true when it opened. */
-export async function reopenSong(ctx: AppCtx, id: string): Promise<boolean> {
-  const outcome = await ctx.songs.openSong(id);
-  if (outcome.ok) ctx.notify(`reopened ${outcome.name || 'your last song'}`, 'success');
-  else ctx.notify(reopenFailedText(outcome), 'warning');
-  return outcome.ok;
+/**
+ * Reopen named song `id` at boot, with no question. `unless` is asked
+ * immediately before the document is replaced; when it holds, the song is
+ * left alone (`kept`) and nothing is said here.
+ */
+export async function reopenSong(
+  ctx: AppCtx,
+  id: string,
+  unless?: () => boolean,
+): Promise<BootOutcome> {
+  const outcome = await ctx.songs.openSong(id, unless ? { unless } : {});
+  if (outcome.ok) {
+    ctx.notify(`reopened ${outcome.name || 'your last song'}`, 'success');
+    return 'opened';
+  }
+  if (outcome.problem === 'touched') return 'kept';
+  ctx.notify(reopenFailedText(outcome), 'warning');
+  return 'new';
 }
 
 /** How the boot's song went: a song opened, the new song stayed, or the stored one was kept unopened. */
@@ -168,12 +189,19 @@ export function keptText(stored: SessionRecord): string {
     : 'your last session is kept until your first edit — this song stays open';
 }
 
+function kept(ctx: AppCtx, stored: SessionRecord | null): 'kept' {
+  if (stored) ctx.notify(keptText(stored));
+  return 'kept';
+}
+
 /**
  * The reload (windsor#433 decision 9): the session record names a named
  * song, which reopens at once, or holds an untitled one, which is offered
  * as before. When `touched` says the user has already edited or replaced
  * the document, nothing is opened or asked: the stored song is kept and
- * the reader told where it is.
+ * the reader told where it is. It is asked first, and again by the switch
+ * immediately before it would replace the document, after every read it
+ * waited on.
  */
 export async function bootSong(
   ctx: AppCtx,
@@ -181,13 +209,12 @@ export async function bootSong(
   confirm: (request: ConfirmRequest) => Promise<boolean>,
   options: { download?: (text: string) => void; touched?: () => boolean } = {},
 ): Promise<BootOutcome> {
-  if (options.touched?.()) {
-    if (stored) ctx.notify(keptText(stored));
-    return 'kept';
+  const { touched } = options;
+  if (touched?.()) return kept(ctx, stored);
+  if (stored && isNamedSession(stored)) {
+    const outcome = await reopenSong(ctx, stored.songId, touched);
+    return outcome === 'kept' ? kept(ctx, stored) : outcome;
   }
-  const opened =
-    stored && isNamedSession(stored)
-      ? await reopenSong(ctx, stored.songId)
-      : await offerRestore(ctx, stored, confirm, options.download);
-  return opened ? 'opened' : 'new';
+  if (await offerRestore(ctx, stored, confirm, options.download, touched)) return 'opened';
+  return touched?.() ? kept(ctx, stored) : 'new';
 }

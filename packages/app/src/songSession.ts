@@ -11,14 +11,17 @@
  *
  * Only `open`, `saveAs` and `saveAsCopy` make the song named. Every other
  * replacement of the document — New song, Import, a restore, New from — is
- * untitled, through `adoptUntitled`, which `ctx.importDoc` calls, so no
- * caller can forget it.
+ * untitled.
  *
- * **Autosave goes to the song it read.** A switch first flushes the pending
- * autosave into the record being left, and when that write fails the switch
- * is abandoned and reported, and the song stays open with its edits.
- * Opening a stored song writes nothing back until the first edit, unless the
- * open was clean and renamed a part (`saveOpenIfClean`).
+ * **One switch.** Every replacement of the open document goes through
+ * `switchTo`, awaited, one operation at a time: Open, New from, New song,
+ * Import (`ctx.importDoc` too), the boot's reopen and restore. It drains the
+ * song being left into its record, stops and reports when that fails (the
+ * song stays open with its edits), and only then replaces. Nothing else
+ * replaces the document or points the autosave elsewhere around it.
+ * Deleting the open song drains the same way first. Opening a stored song
+ * writes nothing back until the first edit, unless the open was clean and
+ * renamed a part (`saveOpenIfClean`).
  *
  * Storage reads and writes are `songSessionStorage.ts`; the edits to stored
  * songs by id are `songSessionStored.ts`.
@@ -32,8 +35,9 @@ import type { SongListEntry } from './songLibrary';
 import { fileNameAmend, metaOf, templateCopy, withMeta } from './songMetaText';
 import { newSong } from './songParts';
 import { importRefusedText, songRefusal } from './songRestore';
-import type { OpenProblem, SessionStorage } from './songSessionStorage';
+import type { OpenProblem, OpenRecord, SessionStorage, StoredReadable } from './songSessionStorage';
 import {
+  STALE_SONG_TEXT,
   errorText,
   namedTarget,
   pointCurrentAt,
@@ -75,6 +79,28 @@ export interface SessionOptions {
 export type OpenOutcome =
   { readonly ok: true; readonly name: string } | ({ readonly ok: false } & OpenProblem);
 
+/**
+ * Where an untitled song comes from: an imported file's name (a song with
+ * no name takes it), the template it was made from, and, for the boot,
+ * `unless` (asked immediately before replacing; true leaves the document
+ * alone) and `quiet` (a restore writes nothing back until the first edit).
+ */
+export interface UntitledSource {
+  readonly fileName?: string;
+  readonly origin?: string;
+  readonly unless?: () => boolean;
+  readonly quiet?: boolean;
+}
+
+/** How a switch went: done, stopped because the song being left couldn't be saved, or left alone (`unless`). */
+type Switched = 'done' | 'unsaved' | 'touched';
+
+/** The open named song: its record and the autosave target writing it. */
+interface NamedOpen {
+  readonly record: OpenRecord;
+  readonly target: AutosaveTarget;
+}
+
 /** The undo steps the session's own edits are named. */
 export const SONG_META_LABELS = { name: 'Song name', tags: 'Song tags' } as const;
 
@@ -85,13 +111,12 @@ export class SongSession {
   private readonly newId: () => string;
   private readonly ready: () => Promise<unknown>;
   private current: SongSessionState = { kind: 'untitled' };
+  private named: NamedOpen | null = null;
   private readonly listeners = new Set<() => void>();
   /** The session's operations, one after another, so two switches never interleave. */
   private chain: Promise<unknown> = Promise.resolve();
   /** How many times the document has been replaced, for a boot that must not replace a touched one. */
   private replaced = 0;
-  /** Songs deleted in this session: a write captured for one before it went never brings it back. */
-  private readonly removed = new Set<string>();
 
   constructor(host: SessionHost, options: SessionOptions = {}) {
     this.host = host;
@@ -118,6 +143,11 @@ export class SongSession {
 
   get state(): SongSessionState {
     return this.current;
+  }
+
+  /** True once another tab saved the open named song: its autosave is refused, and Save as copy… keeps the edits. */
+  get stale(): boolean {
+    return this.named?.record.stale ?? false;
   }
 
   /** Hear every change of state, and every write to a stored song; returns the unsubscribe. */
@@ -152,7 +182,7 @@ export class SongSession {
   /**
    * A new named song from the open one, under `name` and `tags`; it becomes
    * the open song, and the original's records are not written. On an
-   * untitled song this is `saveAs`.
+   * untitled song this is `saveAs`. It is also the way out of a stale song.
    */
   saveAsCopy(name: string, tags: readonly string[]): Promise<string | null> {
     return this.saveAs(name, tags);
@@ -164,17 +194,18 @@ export class SongSession {
     return outcome.ok || this.fail(problemText(outcome));
   }
 
-  /** Open stored song `id`, reporting nothing: the reload says it its own way. */
-  openSong(id: string): Promise<OpenOutcome> {
+  /**
+   * Open stored song `id`, reporting nothing: the reload says it its own
+   * way. `unless` is the boot's: asked immediately before the document is
+   * replaced, and true leaves it alone (`touched`).
+   */
+  openSong(id: string, options: { unless?: () => boolean } = {}): Promise<OpenOutcome> {
     return this.withStorage<OpenOutcome>({ ok: false, problem: 'unavailable' }, async (storage) => {
       if (this.isOpen(id)) return { ok: true, name: metaOf(this.host.model.doc).name };
       const song = await readStored(storage.library, id);
       if (!song.ok) return song;
-      if (!(await this.leave(storage))) return { ok: false, problem: 'unsaved' };
-      await this.ready();
-      storage.autosave.quietly(() => this.replace(song.raw));
-      storage.autosave.retarget(this.targetOf(storage, id), { written: song.text });
-      this.become({ kind: 'named', id });
+      const switched = await this.switchTo(() => this.openNamed(storage, id, song), options.unless);
+      if (switched !== 'done') return { ok: false, problem: switched };
       saveOpenIfClean(this.host.model, storage.autosave);
       await this.pointAt(storage, id);
       return { ok: true, name: song.name };
@@ -186,53 +217,31 @@ export class SongSession {
     return this.withStorage(false, async (storage) => {
       const song = await readStored(storage.library, id);
       if (!song.ok) return this.fail(problemText(song));
-      if (!(await this.leave(storage))) return false;
-      await this.ready();
-      this.adoptUntitled(templateCopy(song.raw), { origin: song.name });
-      return true;
+      return this.adoptNow(templateCopy(song.raw), { origin: song.name });
     });
   }
 
-  /** New song, the song being left flushed first; false when that failed and it stayed open. */
+  /** New song; false when the song being left couldn't be saved (reported) and stayed open. */
   newSong(): Promise<boolean> {
-    return this.run(async () => {
-      if (this.storage && !(await this.leave(this.storage))) return false;
-      this.adoptUntitled(newSong());
-      return true;
-    });
+    return this.run(() => this.adoptNow(newSong()));
   }
 
-  /** Import a file's text as an untitled song, the song being left flushed first; false when it did not open. */
+  /** Import a file's text as an untitled song; false when it was refused or the song being left stayed open. */
   importText(text: string, fileName: string): Promise<boolean> {
-    return this.run(async () => {
+    return this.run(() => {
       const refusal = songRefusal(text);
-      if (refusal) return this.fail(importRefusedText(fileName, refusal));
-      if (this.storage && !(await this.leave(this.storage))) return false;
-      await this.ready();
-      this.adoptUntitled(JSON.parse(text) as unknown, { fileName });
-      return true;
+      if (refusal) return Promise.resolve(this.fail(importRefusedText(fileName, refusal)));
+      return this.adoptNow(JSON.parse(text) as unknown, { fileName });
     });
   }
 
   /**
-   * Replace the document with `raw` as an untitled song: `ctx.importDoc`'s
-   * path, and every untitled switch's. The pending autosave of the song
-   * being left is sent to its own record first (read now, written in
-   * order), so none of it reaches the new song's. An imported song with no
-   * name takes `fileName`'s, as an edit the open makes.
+   * Replace the document with `raw` as an untitled song, through the one
+   * switch: `ctx.importDoc`'s path and the boot's restore. Resolves false
+   * when the switch stopped (reported) or `unless` held.
    */
-  adoptUntitled(raw: unknown, source: { fileName?: string; origin?: string } = {}): void {
-    const storage = this.storage;
-    const leftNamed = this.current.kind === 'named';
-    if (storage) {
-      void storage.autosave.flush();
-      storage.autosave.retarget(sessionTarget(storage.store), { owed: leftNamed });
-    }
-    const { fileName, origin } = source;
-    this.replace(raw, fileName === undefined ? undefined : fileNameAmend(fileName));
-    this.become(origin === undefined ? { kind: 'untitled' } : { kind: 'untitled', origin });
-    // `current` still names the song just left: it takes this one's text now.
-    if (storage && leftNamed) void storage.autosave.flush();
+  adopt(raw: unknown, source: UntitledSource = {}): Promise<boolean> {
+    return this.run(() => this.adoptNow(raw, source));
   }
 
   /** Rename song `id`: the open one as an undoable edit, another as a write. Which song is open doesn't change. */
@@ -261,26 +270,17 @@ export class SongSession {
 
   /**
    * Delete stored song `id`. Deleting the open song leaves it open and
-   * playing, now untitled, and its text goes back into `current` at once.
-   * The autosave is pointed away first, and every write already captured
-   * for the song settles before the delete, so no late write brings it back.
+   * playing, now untitled: see `removeOpen`.
    */
   remove(id: string): Promise<boolean> {
     return this.withStorage(false, async (storage) => {
-      const open = this.isOpen(id);
-      if (open) storage.autosave.retarget(sessionTarget(storage.store), { owed: true });
-      await storage.autosave.settle();
+      if (this.named && this.isOpen(id)) return this.removeOpen(storage, this.named);
       try {
         await storage.library.remove(id);
       } catch (error) {
-        if (open) storage.autosave.retarget(this.targetOf(storage, id));
         return this.fail(`delete failed: ${errorText(error)}`);
       }
-      this.removed.add(id);
-      if (open) {
-        this.become({ kind: 'untitled' });
-        await storage.autosave.flush();
-      } else this.emit();
+      this.emit();
       return true;
     });
   }
@@ -334,26 +334,116 @@ export class SongSession {
   }
 
   /**
+   * The one switch (record `2026-10-02-song-library`, "One switch"), run
+   * inside `run`. The built-ins arrive first. Then the song being left is
+   * drained, and a failure stops the switch, reported, with that song still
+   * open. Then `unless` is asked, and `replace` runs at once: nothing is
+   * awaited between the drain, the check and the replacement, so no edit
+   * can fall between them. The storage is read after the wait, so a switch
+   * queued before the boot attached it drains with it.
+   */
+  private async switchTo(
+    replace: (storage: SessionStorage | null) => void,
+    unless?: () => boolean,
+  ): Promise<Switched> {
+    await this.ready();
+    const storage = this.storage;
+    if (storage && !(await this.leave(storage))) return 'unsaved';
+    if (unless?.()) return 'touched';
+    replace(storage);
+    return 'done';
+  }
+
+  /**
    * Flush the song being left into its record, and anything edited while
-   * that ran. Leaving a named song that can't be saved stops the switch,
-   * reported, with the song still open. An untitled song's `current` is
-   * about to be replaced, so its flush never stops one.
+   * that ran, until nothing is waiting. Leaving a named song that can't be
+   * saved stops the switch, reported. An untitled song's `current` is about
+   * to be replaced, so its flush never stops one.
    */
   private async leave(storage: SessionStorage): Promise<boolean> {
     let ok = await storage.autosave.flush();
     while (ok && storage.autosave.pending) ok = await storage.autosave.flush();
     if (ok || this.current.kind === 'untitled') return true;
+    if (this.stale) return this.fail(STALE_SONG_TEXT);
     const name = metaOf(this.host.model.doc).name || 'this song';
     return this.fail(`${name} stays open: its last changes couldn't be saved`);
   }
 
-  /** The record named song `id` autosaves into, which writes nothing once the song is deleted. */
-  private targetOf(storage: SessionStorage, id: string): AutosaveTarget {
-    const target = namedTarget(storage.library, id, () => this.emit());
-    return {
-      save: (text, updated) =>
-        this.removed.has(id) ? Promise.resolve() : target.save(text, updated),
-    };
+  /** The switch to `raw` as an untitled song; `current` takes its text at once when a named song was left. */
+  private async adoptNow(raw: unknown, source: UntitledSource = {}): Promise<boolean> {
+    const leftNamed = this.current.kind === 'named';
+    const switched = await this.switchTo(
+      (storage) => this.openUntitled(storage, raw, source),
+      source.unless,
+    );
+    if (switched !== 'done') return false;
+    // `current` still names the song just left: it takes this one's text now.
+    if (leftNamed && this.storage) await this.storage.autosave.flush();
+    return true;
+  }
+
+  /** The replacement of an untitled switch; what was owed was the left song's, and the drain wrote it. */
+  private openUntitled(storage: SessionStorage | null, raw: unknown, source: UntitledSource): void {
+    const leftNamed = this.current.kind === 'named';
+    storage?.autosave.retarget(sessionTarget(storage.store), { owed: leftNamed });
+    this.named = null;
+    const amend = source.fileName === undefined ? undefined : fileNameAmend(source.fileName);
+    const replace = (): void => this.replace(raw, amend);
+    if (storage && source.quiet) storage.autosave.quietly(replace);
+    else replace();
+    const { origin } = source;
+    this.become(origin === undefined ? { kind: 'untitled' } : { kind: 'untitled', origin });
+  }
+
+  /** The replacement of an open: stored song `id`, quietly, its record already holding its text. */
+  private openNamed(storage: SessionStorage, id: string, song: StoredReadable): void {
+    storage.autosave.quietly(() => this.replace(song.raw));
+    const target = this.openRecord(storage, id, song.revision);
+    storage.autosave.retarget(target, { owed: false, written: song.text });
+    this.become({ kind: 'named', id });
+  }
+
+  /** Make named song `id`, at `revision`, the open record; resolves the target its autosave writes. */
+  private openRecord(storage: SessionStorage, id: string, revision: number): AutosaveTarget {
+    const record: OpenRecord = { id, revision, stale: false, gone: false };
+    const target = namedTarget(storage.library, record, {
+      written: () => this.emit(),
+      stale: () => {
+        this.host.notify(STALE_SONG_TEXT, 'error');
+        this.emit();
+      },
+    });
+    this.named = { record, target };
+    return target;
+  }
+
+  /**
+   * Delete the open song, which stays open and playing as untitled. The
+   * switch's drain runs first, so its pending change is in it (a failure
+   * stops the delete, reported). Then one transaction deletes its records
+   * and writes its text into `current`, so a committed copy survives either
+   * way. While that runs the autosave writes to `current`; when it fails the
+   * song's own record is the target again, with any write still owed.
+   */
+  private async removeOpen(storage: SessionStorage, open: NamedOpen): Promise<boolean> {
+    if (!(await this.leave(storage))) return false;
+    const session = sessionTarget(storage.store);
+    storage.autosave.retarget(session);
+    const document = this.host.model.toJson();
+    try {
+      await storage.library.removeOpen(open.record.id, {
+        updated: this.now().toISOString(),
+        document,
+      });
+    } catch (error) {
+      storage.autosave.retarget(open.target);
+      return this.fail(`delete failed: ${errorText(error)}`);
+    }
+    open.record.gone = true;
+    this.named = null;
+    storage.autosave.retarget(session, { written: document });
+    this.become({ kind: 'untitled' });
+    return true;
   }
 
   private replace(raw: unknown, amend?: OpenAmend): void {
@@ -365,13 +455,14 @@ export class SongSession {
   /** Store `text` under a new id and make it the open named song; null (reported) when the write failed. */
   private async storeAsNew(storage: SessionStorage, text: string): Promise<string | null> {
     const id = this.newId();
+    let revision: number;
     try {
-      await storage.library.write(id, text);
+      revision = (await storage.library.write(id, text)).revision;
     } catch (error) {
       this.fail(`save failed: ${errorText(error)}`);
       return null;
     }
-    storage.autosave.retarget(this.targetOf(storage, id), { written: text });
+    storage.autosave.retarget(this.openRecord(storage, id, revision), { written: text });
     this.become({ kind: 'named', id });
     await this.pointAt(storage, id);
     return id;

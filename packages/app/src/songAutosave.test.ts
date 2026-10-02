@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AutosaveTarget, SessionRecord, SongStore } from './songAutosave';
-import { SongAutosave } from './songAutosave';
+import { ReportedRefusal, SongAutosave } from './songAutosave';
 
 function memoryStore(): SongStore & { saves: SessionRecord[] } {
   const saves: SessionRecord[] = [];
@@ -150,6 +150,34 @@ describe('SongAutosave', () => {
       expect(a.texts).toEqual([]);
       autosave.quietly(() => autosave.schedule());
       expect(autosave.pending).toBe(false);
+    });
+
+    it('never drops a write still owed on a retarget, unless the target holds the open text', async () => {
+      const a = target();
+      const b = target();
+      const reports: string[] = [];
+      const autosave = new SongAutosave({
+        store: memoryStore(),
+        read: () => 'open',
+        report: (m) => reports.push(m),
+      });
+      autosave.retarget(a);
+      a.fail = true;
+      autosave.schedule();
+      expect(await autosave.flush()).toBe(false);
+      autosave.retarget(b);
+      expect(autosave.unsaved).toBe(true);
+      expect(await autosave.flush()).toBe(true);
+      expect(b.texts).toEqual(['open']);
+      a.fail = false;
+      autosave.retarget(a, { written: 'open' });
+      expect(autosave.unsaved).toBe(false);
+      // A refusal the target already reported stays owed and is not reported again.
+      const refusing: AutosaveTarget = { save: () => Promise.reject(new ReportedRefusal('told')) };
+      autosave.retarget(refusing, { owed: true });
+      expect(await autosave.flush()).toBe(false);
+      expect(autosave.unsaved).toBe(true);
+      expect(reports).toEqual(['autosave failed: quota']);
     });
 
     it('drops a waiting change on cancel', async () => {

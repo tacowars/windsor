@@ -142,7 +142,7 @@ describe('open', () => {
 describe('the untitled switches', () => {
   it('sets the session untitled on New song, and on an import', async () => {
     await c.ctx.songs.saveAs('A', []);
-    c.ctx.importDoc(newSong());
+    await c.ctx.importDoc(newSong());
     expect(c.ctx.songs.state).toEqual({ kind: 'untitled' });
     await c.ctx.songs.saveAs('B', []);
     expect(await c.ctx.songs.newSong()).toBe(true);
@@ -150,11 +150,11 @@ describe('the untitled switches', () => {
     expect(c.ctx.model.doc.meta).toBeUndefined();
   });
 
-  it('names an imported song with no name after its file, as an edit of the open', () => {
-    c.ctx.importDoc(newSong(), 'Warehouse Jam.json');
+  it('names an imported song with no name after its file, as an edit of the open', async () => {
+    await c.ctx.importDoc(newSong(), 'Warehouse Jam.json');
     expect(c.ctx.model.doc.meta).toEqual({ name: 'Warehouse Jam', tags: [] });
     expect(c.ctx.model.changed).toBe(true);
-    c.ctx.importDoc(JSON.parse(songText({ name: 'Own', tags: ['x'] })), 'other.json');
+    await c.ctx.importDoc(JSON.parse(songText({ name: 'Own', tags: ['x'] })), 'other.json');
     expect(c.ctx.model.doc.meta).toEqual({ name: 'Own', tags: ['x'] });
   });
 
@@ -171,7 +171,7 @@ describe('the untitled switches', () => {
 
   it("points current at the new untitled song's text at once when a named song is left", async () => {
     await c.ctx.songs.saveAs('A', []);
-    c.ctx.importDoc(newSong(), 'next.json');
+    await c.ctx.importDoc(newSong(), 'next.json');
     await vi.advanceTimersByTimeAsync(0);
     expect((c.store.record as StoredSong).document).toBe(c.ctx.model.toJson());
   });
@@ -201,7 +201,7 @@ describe('without IndexedDB', () => {
     expect(bare.ctx.songs.available).toBe(false);
     expect(await bare.ctx.songs.list()).toEqual([]);
     expect(await bare.ctx.songs.saveAs('A', [])).toBeNull();
-    bare.ctx.importDoc(JSON.parse(songText(undefined, { bpm: 97 })));
+    await bare.ctx.importDoc(JSON.parse(songText(undefined, { bpm: 97 })));
     expect(bare.ctx.model.doc.transport.bpm).toBe(97);
     expect(bare.ctx.songs.state).toEqual({ kind: 'untitled' });
   });
