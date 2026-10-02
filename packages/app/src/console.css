@@ -1928,20 +1928,27 @@ input.field.group-name {
   background: linear-gradient(var(--head-tint), var(--head-tint)), var(--panel);
 }
 
-/* ---------- the chord card (#607) ---------- */
-
-.chord-picker-controls {
+/* ---------- the chord card (#607; the device, windsor#369) ---------- */
+/* Record `2026-10-01-sequencer-rack-devices` decisions 1–4 and 7; the look
+   is docs/research/2026-09-30-sequencer-rack/chord.html. The frame, rail,
+   sections and columns are the sequencer device's (above); this block is
+   the Chord's own: the Hit and Rest tiles to drag from, and the strip, a
+   column per step at --step-w grouped by four, whose step tile takes the
+   height the device has left. Nothing scrolls. */
+.chord-device {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 8px;
+  min-height: 0;
 }
 .chord-picker {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
-  padding: 8px 0 4px;
+}
+/* The tiles' column grows past --seq-wide-col rather than wrap or clip a
+   long chord name (windsor#332's `G# maj · ♭VI`). */
+.seq-col.chord-sources {
+  width: auto;
+  min-width: var(--seq-wide-col);
 }
 .chip {
   display: flex;
@@ -1999,36 +2006,108 @@ input.field.group-name {
 body.chord-dragging {
   cursor: grabbing;
 }
-.chord-strip .grid-col {
-  width: 58px;
+/* The Hit and Rest tiles in the device (the mockup's .source): the name
+   over the region's chord, on one line. */
+.chord-device .chip {
+  align-items: flex-start;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line-bright);
+  border-radius: 5px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-align: left;
 }
-.chord-strip .gcell.chord,
-.chord-strip .gcell.rest {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  min-height: 34px;
+.chord-device .chip:not(.rest) {
+  border-color: var(--kc);
+  background: color-mix(in srgb, var(--kc) 16%, var(--inset));
+}
+.chord-device .chip:hover {
+  filter: brightness(1.15);
+}
+.chord-device .chip:active {
+  border-color: var(--carrier);
+}
+.chord-device .chip .chip-num {
+  min-height: 13px;
+  color: var(--ink-dim);
+  font-size: 10px;
+  letter-spacing: 0;
+  line-height: 13px;
+  white-space: nowrap;
+}
+.chord-strip {
+  flex: none;
+  min-height: 0;
+  gap: 2px;
+  overflow: visible;
+  padding: 0;
+}
+.chord-strip .grid-col {
+  width: var(--step-w);
+}
+.chord-strip .grid-col:nth-child(4n + 1):not(:first-child) {
+  margin-left: var(--beat-gap);
+}
+.chord-strip .grid-idx {
+  flex: none;
+  height: 12px;
+  padding: 0;
+  border-radius: 2px;
+  line-height: 12px;
+}
+.chord-strip .gcell {
+  flex: none;
+  height: 18px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.chord-strip .gcell.dial {
   color: var(--ink);
-  border-color: var(--line-bright);
+  font-family: var(--f-num);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 16px;
+}
+.chord-strip .gcell.dial.dim {
+  color: var(--ink-faint);
+}
+.chord-strip .gcell:is(.chord, .rest, .append) {
+  flex: 1;
+  height: auto;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
   touch-action: none;
   user-select: none;
+}
+.chord-strip .gcell.chord {
+  color: var(--ink);
+  border-color: var(--kc);
+  background: color-mix(in srgb, var(--kc) 16%, var(--inset));
 }
 .chord-strip .gcell.rest {
   color: var(--ink-dim);
   border-color: var(--line);
 }
-.chord-strip .gcell small {
-  font-family: var(--f-num);
-  font-size: 9px;
-  font-weight: 400;
-  color: var(--ink-faint);
-  letter-spacing: 0.06em;
+.chord-strip .gcell:is(.chord, .rest):hover {
+  filter: brightness(1.2);
 }
-.chord-strip .grid-col.append .gcell.append {
-  border-style: dashed;
-  font-size: 14px;
-  min-height: 34px;
+.chord-strip .grid-col.playing .gcell.chord {
+  background: color-mix(in srgb, var(--carrier) 25%, var(--inset));
+}
+.chord-strip .gcell.append {
+  background: transparent;
+  border: 1px dashed var(--line-bright);
+  color: var(--ink-faint);
+  font-size: 15px;
+}
+.chord-strip .gcell.append:hover {
+  border-color: var(--ink-faint);
+  color: var(--ink);
 }
 .chord-strip .grid-col.drop-target .gcell {
   border-color: var(--carrier);
