@@ -185,7 +185,8 @@ build output. The map of `fm/` (#644):
 |---|---|
 | `fmProcessor.ts` | the entry: `FmPartProcessor` (the port, the note map as each voice's `keyed` flag, `renderBlock`, which admits posted notes and reads each message) and `registerProcessor` |
 | `eventQueue.ts` | `EventQueue` (windsor#233): the note events in frame order, their frames in a `Float64Array` beside them, inserted in place and taken by an index, never `splice` or `shift`; and the messages `post`ed since the last quantum, unread until the render admits them (windsor#270) |
-| `voiceAllocation.ts` | `allocateVoice`: which voice of the pool a note takes, and the stealing order (dormant, released, oldest) |
+| `voiceAllocation.ts` | `allocateVoice`: which voice of the pool a note takes, and the stealing order (dormant, then the quietest released, then the oldest held; windsor#410) |
+| `voiceSteal.ts` | what a steal does (windsor#410): the pool's size and its reserve slots' seeds, the 30 ms fade from the voice's current level, the quietest released voice, and the fading voice an exhausted pool cuts |
 | `voice.ts` | `Voice`: one note's state and lifecycle (`start`, `rebind`, `retarget`, `release`, `kill`, `steal`, `dormant`); `render` and `updateControl` stay methods and delegate |
 | `voiceControl.ts` | `bindVoiceConstants` and `updateVoiceControl`: the per-note constants and the control-rate update, functions over the voice |
 | `voiceRender.ts` | `renderVoiceGeneric`: the generic sample loop, the reference the kernel matches |
