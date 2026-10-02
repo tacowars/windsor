@@ -11,10 +11,12 @@
  * `eventChord` / `chordName` / `romanNumeral`, never a second spelling.
  * `harmonyLaneModel.test.ts` pins the fixtures the ticket names.
  */
-import type { ChordSize, Harmony, HarmonyEvent } from '@windsor/engine';
+import type { ChordSize, Harmony, HarmonyEvent, NamedQuality } from '@windsor/engine';
 import {
   CHORD_SIZE_SEVENTH,
+  CHORD_SIZE_TRIAD,
   PPQ,
+  QUALITY_INTERVALS,
   TICKS_PER_BAR,
   chordName,
   diatonicChords,
@@ -65,6 +67,9 @@ export function relay(events: readonly HarmonyEvent[], songTicks: number): Harmo
   return out;
 }
 
+/** An event copy an edit may write or `delete` a field on: a default is a removed key, so an export carries none. */
+type MutableEvent = { -readonly [K in keyof HarmonyEvent]: HarmonyEvent[K] };
+
 export function setDegree(
   events: readonly HarmonyEvent[],
   index: number,
@@ -81,8 +86,49 @@ export function setSize(
   return events.map((e, i) => {
     if (i !== index) return e;
     // A seventh (or triad) asked for by Size is the scale's own, so a named quality goes.
-    const next: { -readonly [K in keyof HarmonyEvent]: HarmonyEvent[K] } = { ...e, size };
+    const next: MutableEvent = { ...e, size };
     delete next.quality;
+    return next;
+  });
+}
+
+/**
+ * A named quality, or the scale's own chord (`null`, the key removed)
+ * (windsor#332 decision 1). A quality also sets the size it spells — two
+ * intervals a triad, three a seventh — so the Size segment and the event
+ * agree before the normaliser runs.
+ */
+export function setQuality(
+  events: readonly HarmonyEvent[],
+  index: number,
+  quality: NamedQuality | null,
+): HarmonyEvent[] {
+  return events.map((e, i) => {
+    if (i !== index) return e;
+    const next: MutableEvent = { ...e };
+    if (quality === null) {
+      delete next.quality;
+      return next;
+    }
+    next.quality = quality;
+    // The root plus each interval: two make a triad, three a seventh.
+    const tones = QUALITY_INTERVALS[quality].length + 1;
+    next.size = tones === CHORD_SIZE_SEVENTH ? CHORD_SIZE_SEVENTH : CHORD_SIZE_TRIAD;
+    return next;
+  });
+}
+
+/** Flat (-1), natural (0, the key removed) or sharp (1) (windsor#332 decision 1). */
+export function setAccidental(
+  events: readonly HarmonyEvent[],
+  index: number,
+  accidental: -1 | 0 | 1,
+): HarmonyEvent[] {
+  return events.map((e, i) => {
+    if (i !== index) return e;
+    const next: MutableEvent = { ...e };
+    if (accidental === 0) delete next.accidental;
+    else next.accidental = accidental;
     return next;
   });
 }

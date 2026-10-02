@@ -3492,8 +3492,108 @@ select.field.compact {
 .dchip[aria-pressed='true'] small {
   color: #111416;
 }
+/* The card keeps the chips' width, so Delete ends the bottom row under the last chip. */
+.harmony-card {
+  max-width: 480px;
+}
 .harmony-card .bar-row {
+  margin-top: 10px;
+}
+.harmony-card .seg button {
+  flex: 1 0 auto;
+}
+.harmony-card .bar-row.center {
   align-items: center;
+}
+.harmony-card .seg.acc button {
+  min-width: 28px;
+  padding: 3px 4px;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.harmony-card select.field {
+  width: auto;
+  min-width: 116px;
+  height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.harmony-card .push {
+  margin-left: auto;
+}
+/* A ▶ over each degree chip (windsor#332): hold to hear that degree's chord. */
+.plays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  max-width: 480px;
+  margin-bottom: 2px;
+}
+.play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  padding: 0;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+.play svg {
+  fill: var(--ink-faint);
+}
+.play:hover {
+  background: var(--panel-hi);
+  border-color: var(--line-bright);
+}
+.play:hover svg {
+  fill: var(--modulator);
+}
+.play.on {
+  background: var(--modulator);
+  border-color: var(--modulator);
+}
+.play.on svg {
+  fill: #111416;
+}
+/* The info bubble: the selected block's chord, or the one a held ▶ sounds. Read only. */
+.info {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 150px;
+  padding: 4px 12px;
+  background: var(--panel-hi);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+}
+.info b {
+  font-family: var(--f-panel);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.info small {
+  font-family: var(--f-num);
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+.info.sounding {
+  border-color: var(--modulator);
+}
+.info.sounding b::before {
+  content: '♪ ';
+  color: var(--modulator);
+}
+@media (max-width: 560px) {
+  .info {
+    min-width: 0;
+  }
 }
 
 /* Export Audio (Settings): formats, the tail knob, then the actions below. */

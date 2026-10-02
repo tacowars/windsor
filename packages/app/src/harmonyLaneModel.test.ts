@@ -29,7 +29,9 @@ import {
   maxEventDuration,
   removeEvent,
   resizeEventBy,
+  setAccidental,
   setEventDuration,
+  setQuality,
   setSize,
 } from './harmonyLaneModel';
 
@@ -123,6 +125,86 @@ describe('Size on an event with a named quality (windsor#332 decision 1)', () =>
       accidental: -1,
     });
     expect(model.corrections).toEqual([]);
+  });
+});
+
+describe('Accidental and Quality (windsor#332 decision 1)', () => {
+  const first = FOUR[0] as HarmonyEvent;
+
+  it('writes a flat major on the first degree, reading B maj / ♭I in C minor', () => {
+    const key: Harmony = { root: 0, scale: 'naturalMinor', events: FOUR };
+    const flat = setAccidental(FOUR, 0, -1);
+    const out = setQuality(flat, 0, 'maj');
+    expect(out[0]).toEqual({ ...first, accidental: -1, quality: 'maj', size: CHORD_SIZE_TRIAD });
+    expect(out.slice(1)).toEqual(FOUR.slice(1));
+    expect(eventLabel(key, out[0] as HarmonyEvent)).toEqual({
+      name: 'B maj',
+      numeral: '♭I',
+      sizeTag: 'triad',
+    });
+  });
+
+  it('removes both keys for natural and the scale’s own chord, never writing 0 or null', () => {
+    const chromatic = setQuality(setAccidental(FOUR, 0, 1), 0, 'aug');
+    const plain = setQuality(setAccidental(chromatic, 0, 0), 0, null);
+    expect(plain[0]).toEqual(first);
+    expect(plain[0]).not.toHaveProperty('accidental');
+    expect(plain[0]).not.toHaveProperty('quality');
+  });
+
+  it('sets the size a quality spells, and Size then goes back to the scale’s own', () => {
+    const dom7 = setQuality(FOUR, 0, 'dom7');
+    expect(dom7[0]).toMatchObject({ quality: 'dom7', size: CHORD_SIZE_SEVENTH });
+    expect(setQuality(dom7, 0, 'min')[0]).toMatchObject({ quality: 'min', size: CHORD_SIZE_TRIAD });
+    const triad = setSize(dom7, 0, CHORD_SIZE_TRIAD)[0];
+    expect(triad).toEqual(first);
+  });
+
+  it('keeps an edit through the document merge, reporting nothing', async () => {
+    await loadBuiltIns();
+    const model = new DocumentModel({
+      version: ARRANGEMENT_VERSION,
+      transport: { bpm: 120, bars: 4 },
+      harmony: { root: 0, scale: 'naturalMinor', events: [{ ...first, duration: 4 * BAR }] },
+      parts: [
+        {
+          slot: 0,
+          name: 'kick',
+          preset: 'kick',
+          regions: [{ start: 0, duration: 4 * BAR }],
+          sequencer: { kind: 'euclidean', seed: 0, note: 36, hold: 0.2 },
+        },
+      ],
+    });
+    const events = setQuality(setAccidental(model.doc.harmony.events, 0, -1), 0, 'maj');
+    model.merge({ harmony: { events } });
+    expect(model.doc.harmony.events[0]).toEqual({
+      start: 0,
+      duration: 4 * BAR,
+      degree: 0,
+      size: CHORD_SIZE_TRIAD,
+      quality: 'maj',
+      accidental: -1,
+    });
+    model.merge({ harmony: { events: setQuality(setAccidental(events, 0, 0), 0, null) } });
+    expect(model.doc.harmony.events[0]).toEqual({
+      start: 0,
+      duration: 4 * BAR,
+      degree: 0,
+      size: CHORD_SIZE_TRIAD,
+    });
+    expect(model.corrections).toEqual([]);
+  });
+
+  it('carries the quality and accidental into an appended event', () => {
+    const chromatic = setQuality(setAccidental(FOUR, 3, 1), 3, 'maj7');
+    const out = appendEvent(chromatic, SONG);
+    expect(out[out.length - 1]).toMatchObject({
+      degree: 6,
+      size: CHORD_SIZE_SEVENTH,
+      quality: 'maj7',
+      accidental: 1,
+    });
   });
 });
 

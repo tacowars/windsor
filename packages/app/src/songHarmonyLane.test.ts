@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { ArrangementDocument, Harmony, HarmonyEvent } from '@windsor/engine';
 import { CHORD_SIZE_TRIAD, TICKS_PER_BAR } from '@windsor/engine';
+import { eventLabel } from './harmonyLaneModel';
 import { markPlayingBlock } from './songHarmonyLane';
 
 const BAR = TICKS_PER_BAR;
@@ -59,5 +60,14 @@ describe('the playing chord across a repaint', () => {
     expect(after.blocks.some((b) => b.lit())).toBe(false);
     markPlayingBlock(after.lanes, doc, SONG, tick);
     expect(after.blocks.map((b) => b.lit())).toEqual([false, true, false]);
+  });
+});
+
+describe("a chromatic block's label (windsor#332 decision 8)", () => {
+  it('reads G# maj / ♭VI · triad for a flat-six major in C major', () => {
+    const major: Harmony = { root: 0, scale: 'major', events: [] };
+    const label = eventLabel(major, { ...ev(0, BAR, 5), quality: 'maj', accidental: -1 });
+    // The two lines a `.hblk` draws: the name, then numeral · size.
+    expect([label.name, `${label.numeral} · ${label.sizeTag}`]).toEqual(['G# maj', '♭VI · triad']);
   });
 });
