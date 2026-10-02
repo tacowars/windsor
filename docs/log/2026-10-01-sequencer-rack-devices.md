@@ -3,14 +3,14 @@
 - **Date:** 2026-10-01
 - **Status:** accepted (tacowars, 2026-10-01)
 - **Links:** the mockups in `docs/research/2026-09-30-sequencer-rack/`
-  (`grid.html`, `chord.html`, `arp.html`, `bass.html`) · the insert rack
-  (windsor#173) · Euclid lanes and ratchets
+  (`grid.html`, `chord.html`, `arp.html`, `bass.html`, `euclid.html`) ·
+  the insert rack (windsor#173) · Euclid lanes and ratchets
   (`2026-10-01-euclid-lanes-and-ratchets`, windsor#355, windsor#356) ·
   Chord Player follow (windsor#333) · harmony quality and accidental
   (windsor#332) · the issues: windsor#366 (Grid and Arp
   ratchets), windsor#367 (Basslead's strip), windsor#368 (the frame and
   the Grid), windsor#369 (Chord), windsor#370 (Arp), windsor#371
-  (Basslead)
+  (Basslead), windsor#393 (Euclid)
 
 ## Context
 
@@ -70,6 +70,9 @@ around them. This record is that second round.
      the gate times its slice of the step, except the last where today's
      note would run on (a tie or a slide next, or Basslead's gate of 1):
      it is held as that note is, and the tie or the next note ends it.
+   - On Basslead at a gate of 1, a step that repeats the held pitch
+     ties as today, but a ratcheted one plays its hits (tacowars,
+     2026-10-02, windsor#367). A slide to the held pitch still ties.
    - A skip or a density draw is made once per step, before the roll. A
      step that is skipped plays no hit.
 7. **The Chord** keeps its strip and shows no progression; the chords are
@@ -98,7 +101,21 @@ around them. This record is that second round.
     `ARRANGEMENT_VERSION` does not change
     (`2026-09-28-format-versions-refuse-never-destroy`).
 11. **Euclid** keeps the design windsor#356 gives it, its pages included,
-    and is fitted to the 244 px device afterwards.
+    and is fitted to the 244 px device afterwards. tacowars approved that
+    fit on 2026-10-02 (`euclid.html`, windsor#393):
+    - The rail holds the accent dot, the name, the lane-view toggle, the
+      region `n/m`, then Split and Delete. The part name leaves the rail,
+      because the pane header shows it.
+    - The **?**, the hint and the "Hover a cell to read it" line go. A
+      lane's hover reading sits under its name, as on the Grid.
+    - The Pattern page's controls go in four columns: Note, Steps and
+      Rotate; Step and Capture; Vel, Acc vel and Acc mod; Hold.
+    - The Ratchet and Trigger rows stay put while the lanes scroll. The
+      cells stay 22 px. Lanes are 42 px; three fit and a fourth scrolls.
+      **+ Lane** sits in the Lanes rule, and the "rows line up every…"
+      note joins the section label.
+    - The Density page keeps the device's width, and its plot takes the
+      room left over.
 
 ## Not now
 
