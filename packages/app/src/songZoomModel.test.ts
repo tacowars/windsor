@@ -15,6 +15,7 @@ import {
   followFit,
   maxScroll,
   stepRulerDrag,
+  clickedBar,
   zoomForDrag,
   zoomToFit,
 } from './songZoomModel';
@@ -182,11 +183,19 @@ describe('the ruler drag (a missed release never leaves a hover zooming)', () =>
   const dragging = stepRulerDrag(pressed, move(0, -60)).drag as RulerDrag;
 
   it('zooms only while the pressing pointer holds the primary button past the threshold', () => {
-    expect(stepRulerDrag(pressed, move(1, 1))).toEqual({ drag: pressed, view: null });
+    expect(stepRulerDrag(pressed, move(1, 1))).toEqual({
+      drag: pressed,
+      view: null,
+      clickPx: null,
+    });
     const step = stepRulerDrag(pressed, move(0, -60));
     expect(step.drag?.moved).toBe(true);
     expect(step.view).toEqual(dragZoom(pressed.start, { dx: 0, dy: -60 }, b));
-    expect(stepRulerDrag(dragging, move(-80, 0, 1, 2))).toEqual({ drag: dragging, view: null });
+    expect(stepRulerDrag(dragging, move(-80, 0, 1, 2))).toEqual({
+      drag: dragging,
+      view: null,
+      clickPx: null,
+    });
   });
 
   it('ends on a move with the button up, a release, a cancel, a lost capture or a blur, with no view change', () => {
@@ -200,14 +209,26 @@ describe('the ruler drag (a missed release never leaves a hover zooming)', () =>
     ];
     for (const event of endings) {
       for (const drag of [pressed, dragging]) {
-        expect(stepRulerDrag(drag, event)).toEqual({ drag: null, view: null });
+        if (event.type === 'up' && !drag.moved) continue;
+        expect(stepRulerDrag(drag, event)).toEqual({ drag: null, view: null, clickPx: null });
       }
     }
   });
 
+  it('reads a release without moving as a click at the pressed px, never after a drag or a cancel', () => {
+    const up: RulerDragEvent = { type: 'up', pointerId: 1 };
+    expect(stepRulerDrag(pressed, up)).toEqual({
+      drag: null,
+      view: null,
+      clickPx: pressed.start.pointerPx,
+    });
+    expect(stepRulerDrag(dragging, up).clickPx).toBeNull();
+    expect(stepRulerDrag(pressed, { type: 'cancel', pointerId: 1 }).clickPx).toBeNull();
+  });
+
   it('never changes the view on a hover with no drag live, button held or not', () => {
     for (const event of [move(0, -600), move(400, 0, 0), move(SONG_DRAG_THRESHOLD_PX * 10, 0)]) {
-      expect(stepRulerDrag(null, event)).toEqual({ drag: null, view: null });
+      expect(stepRulerDrag(null, event)).toEqual({ drag: null, view: null, clickPx: null });
     }
     // The double-click after two still presses: each release ended its press, so nothing is left live.
     let drag: RulerDrag | null = pressed;
@@ -216,5 +237,18 @@ describe('the ruler drag (a missed release never leaves a hover zooming)', () =>
     }
     expect(drag).toBeNull();
     expect(stepRulerDrag(drag, move(0, 300)).view).toBeNull();
+  });
+});
+
+describe('clickedBar', () => {
+  it('is the bar the pointer is inside, not the nearest line, clamped to the song', () => {
+    expect(clickedBar(0, 100, 8)).toBe(0);
+    expect(clickedBar(499, 100, 8)).toBe(4);
+    expect(clickedBar(599, 100, 8)).toBe(5);
+    expect(clickedBar(-30, 100, 8)).toBe(0);
+    expect(clickedBar(5000, 100, 8)).toBe(7);
+    expect(clickedBar(Number.NaN, 100, 8)).toBe(0);
+    expect(clickedBar(50, 0, 8)).toBe(0);
+    expect(clickedBar(50, 100, 0)).toBe(0);
   });
 });
