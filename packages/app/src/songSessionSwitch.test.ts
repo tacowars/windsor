@@ -102,6 +102,43 @@ describe('a retarget never drops a write still owed', () => {
     expect(await c.autosave.flush()).toBe(true);
     expect(storedBpm(a)).toBe(141);
   });
+
+  it('a delete that fails while its edit lands in current keeps the edit owed to the song (windsor#452)', async () => {
+    const a = (await c.ctx.songs.saveAs('A', []))!;
+    const deleteInto = c.records.deleteInto;
+    let fail: () => void = () => {};
+    c.records.deleteInto = (): Promise<void> =>
+      new Promise<void>((_, reject) => {
+        fail = (): void => reject(new Error('quota'));
+      });
+    const removed = c.ctx.songs.remove(a);
+    await vi.advanceTimersByTimeAsync(0);
+    // The edit's write to current succeeds while the delete's transaction is still running.
+    bpm(142);
+    expect(await c.autosave.flush()).toBe(true);
+    expect((c.store.record as StoredSong).document).toBe(c.ctx.model.toJson());
+    fail();
+    expect(await removed).toBe(false);
+    c.records.deleteInto = deleteInto;
+    expect(c.toasts.at(-1)).toBe('error: delete failed: quota');
+    expect(c.ctx.songs.state).toEqual({ kind: 'named', id: a });
+    expect(c.autosave.unsaved).toBe(true);
+    // current keeps the edit until the song's record holds it, then names the song again.
+    expect(storedBpm(a)).not.toBe(142);
+    expect((c.store.record as StoredSong).document).toBe(c.ctx.model.toJson());
+    expect(await c.autosave.flush()).toBe(true);
+    expect(storedBpm(a)).toBe(142);
+    expect(c.store.record).toMatchObject({ songId: a });
+    expect(c.autosave.unsaved).toBe(false);
+  });
+
+  it('a delete that fails with nothing edited meanwhile owes nothing', async () => {
+    const a = (await c.ctx.songs.saveAs('A', []))!;
+    c.store.failing = true;
+    expect(await c.ctx.songs.remove(a)).toBe(false);
+    expect(c.ctx.songs.state).toEqual({ kind: 'named', id: a });
+    expect(c.autosave.unsaved).toBe(false);
+  });
 });
 
 describe('deleting the open song is one transaction', () => {
