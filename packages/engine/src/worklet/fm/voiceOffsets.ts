@@ -30,6 +30,11 @@
  *   until the next control block reads the offsets against the new patch.
  *   The patch message arrives before the lanes' resync (`AudioSystem.apply`),
  *   so the offsets then are still the old patch's (PR #385 fix round 2).
+ *   A rebind never reshapes a decay (PR #400 fix round 2): only a change in
+ *   a lane's offset does. A decay curve a lane holds over an edited base
+ *   keeps the value it plays until that lane's offset next changes, which is
+ *   its resync, and then takes the resynced value without a reshape, since
+ *   the float32 offset may land it an ulp from where it was (`decayRebound`).
  *
  * Invariant: an offset of exactly 0 leaves the value as it was, neither
  * clamped nor passed through a curve, except that a decay time a slot maps
@@ -45,6 +50,7 @@
 import type { Voice } from './voice';
 import { OPERATOR_COUNT } from './patchDefaults';
 import {
+  STEP_MOD_SLOT_COUNT,
   STEP_OP_DECAY,
   STEP_OP_DECAY_CURVE,
   STEP_SLOT_FILTER_DECAY,
@@ -170,24 +176,40 @@ function bindLiveValues(voice: Voice): void {
  * The decay rows' values into the envelopes (windsor#347): the filter's
  * decay time, and each operator's decay time and curve. A time is written
  * as it is; the envelope reads it at its next step, from the phase it is at.
- * A curve is written only when it changed, and then `reshapeDecay` starts
- * what is left of a running decay again from its level. Without an offset
- * each is the step's value `bindStepMod` already wrote, so nothing moves; a
- * live retune's new curve on a target no lane moves is that value too, and
- * is heard as it always was. Allocates nothing; the curve reaches the
- * envelope in its field, never as an argument.
+ * A curve is written only when it changed, and then, if `reshape`,
+ * `reshapeDecay` starts what is left of a running decay again from its
+ * level; a note-on and a rebind pass false, and write every curve as
+ * `liveValues` has it. Without an offset each is the step's value
+ * `bindStepMod` already wrote, so nothing moves; a live retune's new curve
+ * on a target no lane moves is that value too, and is heard as it always
+ * was. In a control block, a curve a rebind holds (`decayRebound`, the
+ * offset then) stays as it plays, and `liveValues` with it, while the offset
+ * is that one; the first other offset is the lane's resync, written without
+ * a reshape. Allocates nothing; the curve reaches the envelope in its field,
+ * never as an argument.
  */
-function applyLiveDecays(voice: Voice): void {
+function applyLiveDecays(voice: Voice, reshape: boolean): void {
   const v = voice.liveValues;
+  const o = voice.partOffsets;
+  const rebound = voice.decayRebound;
   voice.filtEnv.decayTime = v[VT_FILTER_DECAY];
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const env = voice.ampEnv[i];
     const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    const k = b + VT_OP_DECAY_CURVE;
     env.decayTime = v[b + VT_OP_DECAY];
-    const curve = v[b + VT_OP_DECAY_CURVE];
+    const held = rebound[i];
+    if (reshape) {
+      if (held === held && o[k] === held) {
+        v[k] = env.decayCurve;
+        continue;
+      }
+      rebound[i] = NaN;
+    }
+    const curve = v[k];
     if (curve !== env.decayCurve) {
       env.decayCurve = curve;
-      env.reshapeDecay();
+      if (reshape && held !== held) env.reshapeDecay();
     }
   }
 }
@@ -199,7 +221,7 @@ function applyLiveDecays(voice: Voice): void {
  */
 function applyVoiceOffsets(voice: Voice): void {
   bindLiveValues(voice);
-  applyLiveDecays(voice);
+  applyLiveDecays(voice, true);
   const patch = voice.patch!;
   const v = voice.liveValues;
   const o = voice.partOffsets;
@@ -231,7 +253,8 @@ function applyVoiceOffsets(voice: Voice): void {
  */
 function primeVoiceOffsets(voice: Voice): void {
   bindLiveValues(voice);
-  applyLiveDecays(voice);
+  voice.decayRebound.fill(NaN);
+  applyLiveDecays(voice, false);
   const v = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     voice.fbTo[i] = v[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK];
@@ -242,10 +265,22 @@ function primeVoiceOffsets(voice: Voice): void {
 
 /**
  * What a rebind keeps, one voice at a time on the patch message: the values
- * the voice played, and the targets a slot is mapped to.
+ * the voice played, its step's values under the old patch, and the targets
+ * a slot is mapped to.
  */
 const keptValues = new Float64Array(VOICE_TARGET_COUNT);
+const keptSteps = new Float64Array(STEP_MOD_SLOT_COUNT);
 const keptTargets = new Uint8Array(VOICE_TARGET_COUNT);
+
+/**
+ * A live retune's first step, before `bindStepMod` binds the new patch:
+ * what the voice plays and its step's values under the old one, for
+ * `rebindVoiceOffsets`. Allocates nothing.
+ */
+function keepVoiceOffsets(voice: Voice): void {
+  keptValues.set(voice.liveValues);
+  keptSteps.set(voice.stepValues);
+}
 
 /**
  * `primeVoiceOffsets` for a live retune's rebind, once the new patch's own
@@ -254,13 +289,15 @@ const keptTargets = new Uint8Array(VOICE_TARGET_COUNT);
  * voice stays on the lane's absolute value with no transient. The offsets
  * here were worked out against the old patch, since the patch message comes
  * before the lanes' resync; the next control block reads them against the
- * new one. A target no lane moves takes the new patch's value at once, as
+ * new one, except a decay curve a lane holds over a base the edit moved,
+ * which holds until its lane's offset changes (`decayRebound`), so a
+ * resync's rounding never starts the decay again. Nothing here reshapes a
+ * decay. A target no lane moves takes the new patch's value at once, as
  * before. Allocates nothing.
  */
 function rebindVoiceOffsets(voice: Voice, slotTargets: Int32Array): void {
   const v = voice.liveValues;
   const kept = keptTargets;
-  keptValues.set(v);
   kept.fill(0);
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
     const code = slotTargets[s];
@@ -270,7 +307,14 @@ function rebindVoiceOffsets(voice: Voice, slotTargets: Int32Array): void {
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
   // A kept decay goes back to the envelope over the new patch's, which
   // `bindStepMod` wrote: its running segment carries on as it was.
-  applyLiveDecays(voice);
+  applyLiveDecays(voice, false);
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY_CURVE;
+    const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE + STEP_OP_DECAY_CURVE;
+    if (kept[k] !== 0 && keptSteps[s] !== voice.stepValues[s]) {
+      voice.decayRebound[i] = voice.partOffsets[k];
+    }
+  }
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK;
     if (kept[k] !== 0) continue;
@@ -282,6 +326,7 @@ function rebindVoiceOffsets(voice: Voice, slotTargets: Int32Array): void {
 
 export {
   applyVoiceOffsets,
+  keepVoiceOffsets,
   latchVoiceOffsets,
   mapVoiceSlots,
   primeVoiceOffsets,

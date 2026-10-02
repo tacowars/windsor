@@ -34,6 +34,9 @@ const KEY_SCALE = 0.5;
 const SUSTAIN = 0.5;
 /** The control block a lane changes on: 133 ms in, inside every decay here. */
 const CHANGE = 200;
+/** The block a held lane moves on, and the block a patch edit lands before: inside every decay. */
+const LANE_MOVES = 20;
+const EDIT_AT = 40;
 /** The register's ends: A0 and C8. */
 const NOTES = [21, 108] as const;
 
@@ -96,9 +99,23 @@ function laneValue(path: string): number {
 const offsetFor = (path: string): number =>
   voiceOffset(PATCH, path, catalogRow(`voice.${path}`)!, laneValue(path));
 
-/** Each control block's copy of the envelope `path` moves, a note held, slot 0 at `offset` from block `from`. */
-function trace(note: number, path: string, offset: number, from: number): EnvView[] {
+/**
+ * Each control block's copy of the envelope `path` moves, a note held, slot 0
+ * at `offset` from block `from`. With `edit`, live retune is on and the
+ * patch becomes `edit.to` before block `edit.at`, as a console knob sends it,
+ * and from that block (or from `edit.resyncAt`) the slot carries
+ * `edit.offset` where it carried `offset`: the lane's value resynced against
+ * the new patch.
+ */
+function trace(
+  note: number,
+  path: string,
+  offset: number,
+  from: number,
+  edit?: { at: number; to: Patch; offset: number; resyncAt?: number },
+): EnvView[] {
   const processor = loaded.create(PATCH, 4, undefined, { voiceSlots: [path] });
+  if (edit) processor.inbox({ type: 'liveRetune', enabled: true } as never);
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
     modWheel: new Float32Array([0]),
@@ -112,7 +129,9 @@ function trace(note: number, path: string, offset: number, from: number): EnvVie
   const seen: EnvView[] = [];
   for (let b = 0; b < 20_000; b++) {
     loaded.setFrame(b * CTRL);
-    params.voiceSlot0![0] = b >= from ? offset : 0;
+    if (b === edit?.at) processor.inbox({ type: 'patch', patch: edit.to } as never);
+    const lane = edit && b >= (edit.resyncAt ?? edit.at) ? edit.offset : offset;
+    params.voiceSlot0![0] = b >= from ? lane : 0;
     processor.process([], [[left, right]], params);
     const voice = (processor.voices as unknown as VoiceView[]).find((v) => v.active)!;
     const e = envOf(voice, path);
@@ -163,5 +182,87 @@ describe('a decay lane on a running decay, at the register ends (windsor#347)', 
     const steady = trace(note, path, offset, 0);
     expect(Math.abs(at.value - before.value)).toBeLessThanOrEqual(2 * largestStep(steady));
     expect(moved.at(-1)!.value).toBe(target);
+  });
+});
+
+/** An edit no lane moves: operator 0's level, half again. */
+const UNRELATED: Patch = (() => {
+  const to = structuredClone(PATCH);
+  to.ops[0]!.level = 0.75;
+  return to;
+})();
+
+/**
+ * Codex P1 on PR #400: a rebind configures each envelope from the new patch
+ * and binds the step's values before the lane's go back over them, so the
+ * decay's fields hold the patch's for a moment. Only a change in the lane's
+ * own value reshapes a running decay; a rebind that leaves it where it was
+ * leaves the decay's level, phase and rate as they were, to the bit, whether
+ * the lane has held its value since the note began or moved during the decay.
+ */
+describe('a held decay lane through a live patch edit (windsor#347)', () => {
+  const held = NOTES.flatMap((note) =>
+    DECAYS.flatMap((path) => [[path, note, 0] as const, [path, note, LANE_MOVES] as const]),
+  );
+  it.each(held)('%s at note %i, moved at block %i, keeps its decay', (path, note, from) => {
+    const offset = offsetFor(path);
+    const plain = trace(note, path, offset, from);
+    const edited = trace(note, path, offset, from, { at: EDIT_AT, to: UNRELATED, offset });
+    expect(plain[EDIT_AT]!.state).toBe(ST_DECAY);
+    expect(plain[EDIT_AT]!.phase).toBeGreaterThan(0);
+    if (from > 0 && !isTime(path)) expect(plain[EDIT_AT]!.decayLeft).toBeLessThan(1);
+    expect(edited).toEqual(plain);
+  });
+});
+
+const BASE_CURVE = 0.3;
+
+/** `PATCH` with the base under `path` moved, to values whose offsets a float32 slot rounds. */
+function baseMoved(path: string): Patch {
+  const to = structuredClone(PATCH);
+  const e = path.startsWith('filter.') ? to.filter.env : to.ops[Number(path.split('.')[1])]!.env;
+  if (isTime(path)) e.decayTime = 1.7 * DECAY;
+  else e.decayCurve = BASE_CURVE;
+  return to;
+}
+
+/**
+ * An edit of the very value a held lane moves, its offset resynced against
+ * the new patch as the main thread sends it (`AudioSystem.apply`, in the
+ * edit's quantum), or for a curve a block late: the lane's value has not
+ * moved, so the decay is not started again. Until the resync the voice holds
+ * the curve it plays. The offset rides a float32 slot, so the value after
+ * the resync may lie an ulp from the one before; a curve then runs on from
+ * its phase over the time it had left, and a time at its phase within that
+ * rounding, which may end the decay a block apart. A time is not held: a
+ * resync a block late would play that block at the old offset over the new
+ * base, as every other lane target does (windsor#346).
+ */
+describe('a held decay lane through an edit of its own base (windsor#347)', () => {
+  const held = NOTES.flatMap((note) =>
+    DECAYS.flatMap((path) =>
+      [0, LANE_MOVES].flatMap((from) =>
+        (isTime(path) ? [0] : [0, 1]).map((late) => [path, note, from, late] as const),
+      ),
+    ),
+  );
+  it.each(held)('%s at note %i, moved at block %i, resynced %i late', (path, note, from, late) => {
+    const offset = offsetFor(path);
+    const to = baseMoved(path);
+    const resynced = voiceOffset(to, path, catalogRow(`voice.${path}`)!, laneValue(path));
+    const plain = trace(note, path, offset, from);
+    const resyncAt = EDIT_AT + late;
+    const edit = { at: EDIT_AT, to, offset: resynced, resyncAt };
+    const edited = trace(note, path, offset, from, edit);
+    expect(Math.abs(edited.length - plain.length)).toBeLessThanOrEqual(isTime(path) ? 1 : 0);
+    expect(edited.slice(0, resyncAt)).toEqual(plain.slice(0, resyncAt));
+    // The hold ends at the resync: the curve is then the new base's, offset.
+    if (!isTime(path)) expect(edited[resyncAt]!.segCurve).toBe(BASE_CURVE + Math.fround(resynced));
+    const n = Math.min(edited.length, plain.length) - 1;
+    for (let b = resyncAt; b < n; b++) {
+      expect(edited[b]!.state).toBe(plain[b]!.state);
+      expect(edited[b]!.decayLeft).toBe(plain[b]!.decayLeft);
+      expect(edited[b]!.value).toBeCloseTo(plain[b]!.value, isTime(path) ? 5 : 7);
+    }
   });
 });

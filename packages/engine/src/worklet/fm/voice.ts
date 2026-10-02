@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- a few lines over 350 after windsor#347's decay lanes and their rebind hold; tacowars accepted that rather than a split */
 /* eslint-disable no-magic-numbers -- DSP: the 4-ms steal fade, MIDI 60 and the pan law are the voice's lifecycle arithmetic; the tunables are fmConstants.ts (#654) */
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
@@ -129,6 +130,7 @@ class Voice {
   fbFrom: Float32Array;
   fbTo: Float32Array;
   fbRamp: number;
+  decayRebound: Float64Array;
 
   /**
    * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
@@ -268,6 +270,8 @@ class Voice {
     this.fbFrom = new Float32Array(4);
     this.fbTo = new Float32Array(4);
     this.fbRamp = 0;
+    // Each operator's decay curve a rebind holds until its lane resyncs (windsor#347): the offset then, NaN for none.
+    this.decayRebound = new Float64Array(4).fill(NaN);
   }
 
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */

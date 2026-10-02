@@ -39,7 +39,7 @@ import {
 import { stepModValue } from './stepModValue';
 import { restingWidth } from './voiceControl';
 import { VT_OP_BASE, VT_OP_STRIDE, VT_OP_WIDTH } from './voiceOffsetTables';
-import { primeVoiceOffsets, rebindVoiceOffsets } from './voiceOffsets';
+import { keepVoiceOffsets, primeVoiceOffsets, rebindVoiceOffsets } from './voiceOffsets';
 
 /**
  * Copy a note-on's offsets into the voice, each clamped to -1..1; absent or
@@ -131,7 +131,8 @@ function startStepMod(
 
 /**
  * A live retune's rebind, from `Voice.rebind` once its envelopes are
- * configured: the note keeps its step's offsets over the new patch's values,
+ * configured: what the voice plays is kept (`keepVoiceOffsets`), the note
+ * keeps its step's offsets over the new patch's values,
  * the song's lanes go over them (`rebindVoiceOffsets`: a target a slot in
  * `slotTargets` moves keeps the lane's value it plays), and each operator in
  * `switched` (a bit per operator whose wave moved between PULSE and the
@@ -146,6 +147,7 @@ function rebindStepMod(
   switched: number,
   slotTargets: Int32Array,
 ): void {
+  keepVoiceOffsets(voice);
   bindStepMod(voice, patch);
   rebindVoiceOffsets(voice, slotTargets);
   const live = voice.liveValues;

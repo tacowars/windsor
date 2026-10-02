@@ -1709,23 +1709,34 @@ function bindLiveValues(voice) {
     v[k] = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
   }
 }
-function applyLiveDecays(voice) {
+function applyLiveDecays(voice, reshape) {
   const v = voice.liveValues;
+  const o = voice.partOffsets;
+  const rebound = voice.decayRebound;
   voice.filtEnv.decayTime = v[VT_FILTER_DECAY];
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const env = voice.ampEnv[i];
     const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    const k = b + VT_OP_DECAY_CURVE;
     env.decayTime = v[b + VT_OP_DECAY];
-    const curve = v[b + VT_OP_DECAY_CURVE];
+    const held = rebound[i];
+    if (reshape) {
+      if (held === held && o[k] === held) {
+        v[k] = env.decayCurve;
+        continue;
+      }
+      rebound[i] = NaN;
+    }
+    const curve = v[k];
     if (curve !== env.decayCurve) {
       env.decayCurve = curve;
-      env.reshapeDecay();
+      if (reshape && held !== held) env.reshapeDecay();
     }
   }
 }
 function applyVoiceOffsets(voice) {
   bindLiveValues(voice);
-  applyLiveDecays(voice);
+  applyLiveDecays(voice, true);
   const patch = voice.patch;
   const v = voice.liveValues;
   const o = voice.partOffsets;
@@ -1743,7 +1754,8 @@ function applyVoiceOffsets(voice) {
 }
 function primeVoiceOffsets(voice) {
   bindLiveValues(voice);
-  applyLiveDecays(voice);
+  voice.decayRebound.fill(NaN);
+  applyLiveDecays(voice, false);
   const v = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     voice.fbTo[i] = v[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK];
@@ -1752,11 +1764,15 @@ function primeVoiceOffsets(voice) {
   voice.fbRamp = 0;
 }
 var keptValues = new Float64Array(VOICE_TARGET_COUNT);
+var keptSteps = new Float64Array(STEP_MOD_SLOT_COUNT);
 var keptTargets = new Uint8Array(VOICE_TARGET_COUNT);
+function keepVoiceOffsets(voice) {
+  keptValues.set(voice.liveValues);
+  keptSteps.set(voice.stepValues);
+}
 function rebindVoiceOffsets(voice, slotTargets) {
   const v = voice.liveValues;
   const kept = keptTargets;
-  keptValues.set(v);
   kept.fill(0);
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
     const code = slotTargets[s];
@@ -1764,7 +1780,14 @@ function rebindVoiceOffsets(voice, slotTargets) {
   }
   bindLiveValues(voice);
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) if (kept[k] !== 0) v[k] = keptValues[k];
-  applyLiveDecays(voice);
+  applyLiveDecays(voice, false);
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY_CURVE;
+    const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE + STEP_OP_DECAY_CURVE;
+    if (kept[k] !== 0 && keptSteps[s] !== voice.stepValues[s]) {
+      voice.decayRebound[i] = voice.partOffsets[k];
+    }
+  }
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_FEEDBACK;
     if (kept[k] !== 0) continue;
@@ -2630,6 +2653,7 @@ function startStepMod(voice, patch, stepMod) {
   }
 }
 function rebindStepMod(voice, patch, switched, slotTargets) {
+  keepVoiceOffsets(voice);
   bindStepMod(voice, patch);
   rebindVoiceOffsets(voice, slotTargets);
   const live = voice.liveValues;
@@ -2732,6 +2756,7 @@ var Voice = class {
     this.fbFrom = new Float32Array(4);
     this.fbTo = new Float32Array(4);
     this.fbRamp = 0;
+    this.decayRebound = new Float64Array(4).fill(NaN);
   }
   /** Routing and per-note constants for the bound patch, `voiceControl.js`; `start`, `rebind` and `retarget` call it. */
   bindConstants(patch) {
