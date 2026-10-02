@@ -99,6 +99,23 @@ const laneAt = (l: AutomationLane, kind: 'tape' | 'phaser', time: number): numbe
 
 const ramps = (p: FakeParam) => p.automation.filter((e) => e.call === 'linearRampToValueAtTime');
 
+/** What a param logged since the re-wire: a hold at `at`, at the lane's value there, then ramps. */
+function expectReattached(
+  logged: FakeParam['automation'],
+  l: AutomationLane,
+  kind: 'tape' | 'phaser',
+  at: number,
+) {
+  expect(logged.slice(0, 2).map((e) => [e.call, e.time])).toEqual([
+    ['cancelScheduledValues', at],
+    ['setValueAtTime', at],
+  ]);
+  expect(logged[1]!.value).toBeCloseTo(laneAt(l, kind, at), 6);
+  const after = logged.slice(2);
+  expect(after.length).toBeGreaterThan(10);
+  for (const e of after) expect(e.call).toBe('linearRampToValueAtTime');
+}
+
 describe('insert lanes, playing', () => {
   it("schedules each lane on its stage's param, tracing the curve", async () => {
     const { sys, stage, play } = await rig([TAPE, PHASER], [DRIVE, RATE]);
@@ -117,23 +134,6 @@ describe('insert lanes, playing', () => {
 });
 
 describe('a chain rebuild re-attaches the lanes', () => {
-  /** What a param logged since the re-wire: a hold at `at`, at the lane's value there, then ramps. */
-  function expectReattached(
-    logged: FakeParam['automation'],
-    l: AutomationLane,
-    kind: 'tape' | 'phaser',
-    at: number,
-  ) {
-    expect(logged.slice(0, 2).map((e) => [e.call, e.time])).toEqual([
-      ['cancelScheduledValues', at],
-      ['setValueAtTime', at],
-    ]);
-    expect(logged[1]!.value).toBeCloseTo(laneAt(l, kind, at), 6);
-    const after = logged.slice(2);
-    expect(after.length).toBeGreaterThan(10);
-    for (const e of after) expect(e.call).toBe('linearRampToValueAtTime');
-  }
-
   it('adding an insert moves the lanes to the new stages, from the re-wire on', async () => {
     const { sys, stage, play, settle } = await rig([TAPE, PHASER], [DRIVE, RATE]);
     sys.startMusic();
@@ -195,20 +195,38 @@ describe('a chain rebuild re-attaches the lanes', () => {
     expectReattached(now.automation.slice(marks[1]), DRIVE, 'tape', 1);
   });
 
-  it('removing an insert re-attaches the rest, and a lane on the removed one stops', async () => {
+  it('removing an insert re-attaches the rest, and drops the lane on the removed one', async () => {
     const { sys, stage, play, settle } = await rig([TAPE, PHASER], [DRIVE, RATE]);
     sys.startMusic();
     play(1);
     const drive = param(stage('tape'), 'drive');
-    expect(setInserts(sys, [PHASER]).ok).toBe(true);
     const mark = drive.automation.length;
+    // The list alone, as an API caller sends it: its lane goes, as the document's would.
+    expect(setInserts(sys, [PHASER]).ok).toBe(true);
+    expect(sys.automationLanes(hat).map((l) => l.target)).toEqual([RATE.target]);
     settle(1.02);
     expect(stage('tape')).toBeUndefined();
     play(1.5);
     expectReattached(param(stage('phaser'), 'rate').automation, RATE, 'phaser', 1.02);
     expect(drive.automation.slice(mark)).toEqual([
-      { call: 'cancelScheduledValues', value: expect.any(Number), time: 1.02 },
-      { call: 'setValueAtTime', value: DEFAULT_TAPE.drive, time: 1.02 },
+      { call: 'cancelScheduledValues', value: expect.any(Number), time: 1 },
+      { call: 'setValueAtTime', value: DEFAULT_TAPE.drive, time: 1 },
+    ]);
+  });
+
+  it('drops a lane the partial carries for an insert the same partial removes', async () => {
+    const { sys, stage, play } = await rig([TAPE, PHASER], [DRIVE, RATE]);
+    sys.startMusic();
+    play(1);
+    const drive = param(stage('tape'), 'drive');
+    const mark = drive.automation.length;
+    // The old chain still holds Tape while it fades, but the merged state does not.
+    const partial = { strip: { inserts: [PHASER] }, automation: [DRIVE, RATE] };
+    expect(sys.apply({ parts: { [hat]: partial } }).ok).toBe(true);
+    expect(sys.automationLanes(hat).map((l) => l.target)).toEqual([RATE.target]);
+    expect(drive.automation.slice(mark)).toEqual([
+      { call: 'cancelScheduledValues', value: expect.any(Number), time: 1 },
+      { call: 'setValueAtTime', value: DEFAULT_TAPE.drive, time: 1 },
     ]);
   });
 
@@ -227,6 +245,73 @@ describe('a chain rebuild re-attaches the lanes', () => {
       { call: 'cancelScheduledValues', value: expect.any(Number), time: 1 },
       { call: 'setValueAtTime', value: DEFAULT_TAPE.drive, time: 1 },
     ]);
+  });
+});
+
+describe('a lane arriving with its insert waits for the stage', () => {
+  /** A removal and its undo through the app's `documentDiffLive`: both fields at once. */
+  const REMOVE = { strip: { inserts: [PHASER] }, automation: [RATE] };
+  const RESTORE = { strip: { inserts: [TAPE, PHASER] }, automation: [DRIVE, RATE] };
+  const targets = (sys: AudioSystem) => sys.automationLanes(hat).map((l) => l.target);
+
+  it('an undo after the removal has settled plays the lane on the rebuilt stage', async () => {
+    const { sys, stage, play, settle } = await rig([TAPE, PHASER], [DRIVE, RATE]);
+    sys.startMusic();
+    play(1);
+    expect(sys.apply({ parts: { [hat]: REMOVE } }).ok).toBe(true);
+    settle(1.02);
+    expect(stage('tape')).toBeUndefined();
+    play(1.5);
+    expect(sys.apply({ parts: { [hat]: RESTORE } }).ok).toBe(true);
+    // Kept, though the chain has no Tape until the fade lands.
+    expect(targets(sys)).toEqual([DRIVE.target, RATE.target]);
+    expect(stage('tape')).toBeUndefined();
+    settle(1.52);
+    play(2);
+    expectReattached(param(stage('tape'), 'drive').automation, DRIVE, 'tape', 1.52);
+  });
+
+  it("an undo inside the removal's fade keeps the lane on the stage that stays", async () => {
+    const { sys, stage, play, settle } = await rig([TAPE, PHASER], [DRIVE, RATE]);
+    sys.startMusic();
+    play(1);
+    const tape = stage('tape');
+    const drive = param(tape, 'drive');
+    expect(sys.apply({ parts: { [hat]: REMOVE } }).ok).toBe(true);
+    play(1.01);
+    expect(sys.apply({ parts: { [hat]: RESTORE } }).ok).toBe(true);
+    expect(targets(sys)).toEqual([DRIVE.target, RATE.target]);
+    const mark = drive.automation.length;
+    settle(1.02);
+    expect(stage('tape')).toBe(tape);
+    play(1.5);
+    expectReattached(drive.automation.slice(mark), DRIVE, 'tape', 1.02);
+  });
+
+  it('a lane in the same partial as a brand-new insert plays once the stage exists', async () => {
+    const { sys, stage, play, settle } = await rig([TAPE], [DRIVE]);
+    sys.startMusic();
+    play(1);
+    const partial = { strip: { inserts: [TAPE, PHASER] }, automation: [DRIVE, RATE] };
+    expect(sys.apply({ parts: { [hat]: partial } }).ok).toBe(true);
+    expect(targets(sys)).toEqual([DRIVE.target, RATE.target]);
+    expect(stage('phaser')).toBeUndefined();
+    settle(1.02);
+    play(1.5);
+    expectReattached(param(stage('phaser'), 'rate').automation, RATE, 'phaser', 1.02);
+  });
+
+  it('a lane sent while a new insert is still fading in plays once the stage exists', async () => {
+    const { sys, stage, play, settle } = await rig([TAPE], [DRIVE]);
+    sys.startMusic();
+    play(1);
+    expect(setInserts(sys, [TAPE, PHASER]).ok).toBe(true);
+    play(1.01);
+    expect(sys.apply({ parts: { [hat]: { automation: [DRIVE, RATE] } } }).ok).toBe(true);
+    expect(targets(sys)).toEqual([DRIVE.target, RATE.target]);
+    settle(1.02);
+    play(1.5);
+    expectReattached(param(stage('phaser'), 'rate').automation, RATE, 'phaser', 1.02);
   });
 });
 

@@ -173,6 +173,13 @@ export function createInsertChain(
 export interface InsertUpdater {
   set(specs: readonly InsertSpec[]): void;
   /**
+   * The list the chain holds once a re-wire in flight has landed: the last
+   * one `set` was given, or the chain's own when no fade is running
+   * (windsor#345). A song lane on an insert this list holds is the
+   * document's, even while its stage does not exist yet.
+   */
+  readonly next: readonly InsertSpec[];
+  /**
    * Drop a re-wire that has not run yet. The strip calls this when it is
    * disposed: the deferred callback would otherwise build stages onto a graph
    * that has gone, leaving their oscillators running, and then throw on the
@@ -219,6 +226,7 @@ export function createInsertUpdater(
       return;
     }
     fading = true;
+    pending = specs;
     tap.fadeTo(0, INSERT_FADE_SECONDS);
     later(() => {
       if (cancelled) return;
@@ -232,6 +240,9 @@ export function createInsertUpdater(
   };
   return {
     set,
+    get next(): readonly InsertSpec[] {
+      return pending ?? inserts.specs;
+    },
     cancel(): void {
       cancelled = true;
       pending = null;

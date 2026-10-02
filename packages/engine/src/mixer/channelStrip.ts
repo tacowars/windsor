@@ -61,6 +61,12 @@ export interface StripStage {
 export interface PartStrip {
   readonly part: AudioPart;
   readonly insertSpecs: readonly InsertSpec[];
+  /**
+   * The inserts as they stand once a re-wire waiting out its fade has
+   * landed; `insertSpecs` when none is (windsor#345). A part's song lanes are
+   * kept against this list, and find their stages in `insertSpecs`.
+   */
+  readonly nextInsertSpecs: readonly InsertSpec[];
   /** The Output as it is set now (windsor#285): absent or Master, Sidechain, or a group. */
   readonly output: ChannelStrip['output'];
   /**
@@ -237,6 +243,9 @@ export function routePart(
     part,
     get insertSpecs(): readonly InsertSpec[] {
       return inserts.specs;
+    },
+    get nextInsertSpecs(): readonly InsertSpec[] {
+      return updates.next;
     },
     get output(): ChannelStrip['output'] {
       return output;
