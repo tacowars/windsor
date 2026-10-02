@@ -15,6 +15,7 @@ import {
 import {
   INSERT_AUTOMATION_FIELDS,
   TICKS_PER_BAR,
+  formatTargetId,
   songTicksOf,
   type ArrangementDocument,
   type AutomationLane,
@@ -27,6 +28,7 @@ import type { EqLanes } from './eqAutomation';
 import {
   EQ_DRAG_FIELDS,
   EQ_LANE_FIELDS,
+  bandLanesOn,
   eqBandField,
   eqChangedFields,
   eqEditRefusal,
@@ -44,7 +46,7 @@ const SAMPLE_RATE = 48000;
 
 /** A lane on `field` of the hat's EQ, `from` at tick 0 to `to` at bar 3. */
 const lane = (field: string, from: number, to: number, on = true): AutomationLane => ({
-  target: `insert.${AUTOMATION_EQ_ID}.${field}`,
+  target: formatTargetId({ kind: 'insert', insertId: AUTOMATION_EQ_ID, field }),
   on,
   points: [
     { tick: 0, value: from, bend: 0 },
@@ -73,6 +75,30 @@ const lanesAt = (part: DocumentPart, tick = 0): EqLanes => ({
 /** Band 3 (index 2) is an on bell in the fixture's EQ; band 8 (index 7) is an off high cut. */
 const BELL = 2;
 const OFF_CUT = 7;
+
+describe('bandLanesOn', () => {
+  const on = (lanes: readonly AutomationLane[]): boolean =>
+    bandLanesOn({ part: withLanes(lanes), insert: eqOf(AUTOMATION_PART), tick: 0 });
+
+  it('is false with no lanes', () => {
+    const bare: DocumentPart = { ...AUTOMATION_PART, automation: [] };
+    expect(bandLanesOn(lanesAt(bare))).toBe(false);
+  });
+
+  it('is false for a lane on another insert’s bands, a non-band field, or a lane that is off', () => {
+    const other: AutomationLane = {
+      ...lane(eqBandField(BELL, 'freq'), 300, 1200),
+      target: formatTargetId({ kind: 'insert', insertId: 'eq2', field: eqBandField(BELL, 'freq') }),
+    };
+    expect(on([other])).toBe(false);
+    expect(on([lane('output', -3, 3)])).toBe(false);
+    expect(on([lane(eqBandField(BELL, 'freq'), 300, 1200, false)])).toBe(false);
+  });
+
+  it('is true for a lane that is on, on one of this EQ’s bands', () => {
+    expect(on([lane(eqBandField(BELL, 'gain'), -3, 3)])).toBe(true);
+  });
+});
 
 describe('an EQ band knob', () => {
   const part = withLanes([lane(eqBandField(BELL, 'freq'), 300, 1200)]);

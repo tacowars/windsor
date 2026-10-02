@@ -13,6 +13,7 @@ import {
   DRIVE_ROUTES,
   INSERT_AUTOMATION_FIELDS,
   TICKS_PER_BAR,
+  formatTargetId,
   songTicksOf,
   type ArrangementDocument,
   type AutomationLane,
@@ -54,7 +55,7 @@ const consoleAt = (doc: ArrangementDocument, position = 0): AppCtx =>
   ({ model: { doc }, transport: { position: () => position } }) as unknown as AppCtx;
 
 const lane = (field: string, from: number, to: number): AutomationLane => ({
-  target: `insert.${DRIVE_ID}.${field}`,
+  target: formatTargetId({ kind: 'insert', insertId: DRIVE_ID, field }),
   on: true,
   points: [
     { tick: 0, value: from, bend: 0 },
