@@ -37,6 +37,22 @@ export const ARP_HEAD_ROWS_PX: readonly number[] = [
   14,
 ];
 
+/** The Euclid's row cells' heights (windsor#393): the ratchet and trigger rows, and the accent lane's cell. */
+export const EUCLID_ROW_PX = { ratchet: 14, trigger: 22, accent: 16 } as const;
+
+/** The space between the Euclid's rows, which also leaves the 2 px playhead ring room at the scroller's edges. */
+export const EUCLID_ROW_GAP_PX = 2;
+
+/** The Euclid's Lanes rule: the + Lane picker's height. */
+export const EUCLID_RULE_PX = 18;
+
+/**
+ * The Euclid's rows held at the top of its scroller, each with the row gap
+ * above it: the ratchet row, the trigger row and the Lanes rule.
+ */
+export const euclidHeadPx = (gap = EUCLID_ROW_GAP_PX): number =>
+  EUCLID_ROW_PX.ratchet + EUCLID_ROW_PX.trigger + EUCLID_RULE_PX + 3 * gap;
+
 /** Custom property → px. */
 export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   /** A converted device's height (the insert rack's `--rack-h` is 196). */
@@ -89,6 +105,37 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--arp-step-gap': 6,
   /** The Arp's held step rows, which its lane names' corner matches. */
   '--arp-strip-head-h': stripHeadPx(ARP_HEAD_ROWS_PX, ARP_ROW_GAP_PX),
+  /* The Euclid's own sizes (windsor#393), off tacowars's mockup
+     (euclid.html) and laid out as the Arp's: Play inset from the rail, its
+     columns apart, a knob strip behind a rule; the rows' cells 22 px. */
+  /** The Euclid's Play section's inset from the rail. */
+  '--euclid-inset': 12,
+  /** The space between the Euclid's Play columns. */
+  '--euclid-col-gap': 13,
+  /** The Note, Steps and Rotate boxes', the Step select's and Capture's width. */
+  '--euclid-field-w': 96,
+  /** The knob strip's padding either side of its knobs, behind its rule. */
+  '--euclid-knob-pad': 9,
+  /** A row cell's width, every row's, so the rows line up step for step. */
+  '--euclid-cell-w': 22,
+  /** The space between two cells of a row. */
+  '--euclid-cell-gap': 2,
+  /** The trigger row's cell height. */
+  '--euclid-trigger-h': EUCLID_ROW_PX.trigger,
+  /** The ratchet row's cell height. */
+  '--euclid-ratchet-h': EUCLID_ROW_PX.ratchet,
+  /** The accent lane's on/off cell height, centred in its --lane-h row. */
+  '--euclid-accent-h': EUCLID_ROW_PX.accent,
+  /** The row names' column: a lane's name, ×, − length + and hover reading. */
+  '--euclid-names-w': 104,
+  /** The + Lane picker and the Lanes rule's height. */
+  '--euclid-rule-h': EUCLID_RULE_PX,
+  /** The space between rows, and around the playhead ring at the scroller's edges. */
+  '--euclid-row-gap': EUCLID_ROW_GAP_PX,
+  /** The Density page's modulator column: wide enough for LFOBARS · LFOHZ · WALK. */
+  '--euclid-mod-w': 150,
+  /** The Density plot's narrowest width; it takes the room the Pattern page leaves. */
+  '--euclid-plot-min-w': 160,
   /** The extra space before each group of four steps. */
   '--beat-gap': 4,
   /** One modulation lane's height. */

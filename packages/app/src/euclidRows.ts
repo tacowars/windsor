@@ -1,6 +1,6 @@
 /**
  * The Euclid card's stack of rows (windsor#356, decisions 3–6 of the issue):
- * the ratchet row directly over the trigger row, then a "Lanes" rule and a
+ * the ratchet row directly over the trigger row, then the Lanes rule and a
  * row per lane (`euclidLaneRows.ts`).
  *
  * - **Ratchet**: one thin cell per trigger step drawing its roll's `N`
@@ -8,6 +8,12 @@
  *   grey: it waits for a hit to land there.
  * - **Trigger**: the figure strip as it was: the hits, the playhead ring, a
  *   click to flip a step (which captures the figure) and Release.
+ *
+ * Since windsor#393 the ratchet row, the trigger row and the Lanes rule are
+ * held at the top of the device's one rows scroller while the lanes scroll
+ * under them, and each cell's reading is its tooltip. The rule is the
+ * Pattern page's, built once with its + Lane picker: a rebuild puts the
+ * rows either side of it and never moves it, so an open picker stays open.
  *
  * The rows are built whole from the document and the player's figure; the
  * card rebuilds them when what they show changes and lights each row's
@@ -51,14 +57,14 @@ function ratchetRow(input: RowsInput): RowHead & { row: HTMLElement } {
     for (let t = 0; t < roll; t++) ticks.appendChild(el('i'));
     cell.appendChild(ticks);
     cell.setAttribute('aria-label', `Ratchet step ${i + 1}: times ${roll}`);
-    cell.onpointerenter = (): void => card.say(ratchetText(i, roll, hit));
+    cell.title = ratchetText(i, roll, hit);
     cell.onclick = (): void => {
       const now = card.spec();
       if (now) card.write({ ratchets: cycleRatchet(now.ratchets, now.steps, i) });
     };
     return cell;
   });
-  const node = row('euclid-row-ratchet', rowName('Ratchet', 'per step'), cells);
+  const node = row('euclid-row-ratchet', rowName('Ratchet', ''), cells);
   return { row: node, cells, head: triggerHead };
 }
 
@@ -78,8 +84,7 @@ function triggerRow(input: RowsInput): RowHead & { row: HTMLElement } {
     cell.classList.toggle('on', hit);
     cell.setAttribute('aria-pressed', String(hit));
     cell.setAttribute('aria-label', `Trigger step ${i + 1}: ${hit ? 'hit' : 'rest'}`);
-    cell.onpointerenter = (): void =>
-      card.say(`Trigger · step ${i + 1} of ${figure.length} · ${hit ? 'hit' : 'rest'}`);
+    cell.title = `Trigger · step ${i + 1} of ${figure.length} · ${hit ? 'hit' : 'rest'}`;
     cell.onclick = (): void => card.capture(toggleStep(card.figure(), i));
     return cell;
   });
@@ -97,28 +102,27 @@ function triggerRow(input: RowsInput): RowHead & { row: HTMLElement } {
   return { row: node, cells, head: triggerHead };
 }
 
-/** The "Lanes" rule between the trigger and the lanes. */
-function lanesRule(): HTMLElement {
-  const rule = el('div', 'euclid-lanes-rule');
-  rule.append(el('span', '', 'Lanes'), el('hr'));
-  return rule;
-}
-
 /** Put focus back on the control at `focus` in the rebuilt rows, without scrolling to it. */
 function refocus(scope: HTMLElement, focus: FocusAddress): void {
   const node = nodeAt(scope, focus);
   if (node instanceof HTMLElement) node.focus({ preventScroll: true });
 }
 
-/** Fill `scope` with every row, and return the playheads the loop lights. */
-export function paintRows(scope: HTMLElement, input: RowsInput): RowHead[] {
+/**
+ * Fill `scope` with every row either side of the Lanes `rule`, which stays
+ * where it is, and return the playheads the loop lights.
+ */
+export function paintRows(scope: HTMLElement, rule: HTMLElement, input: RowsInput): RowHead[] {
   const ratchet = ratchetRow(input);
   const trigger = triggerRow(input);
   const lanes = laneRows({ ...input, scope });
   ratchet.row.setAttribute(ROW_KEY_ATTRIBUTE, 'ratchet');
   trigger.row.setAttribute(ROW_KEY_ATTRIBUTE, 'trigger');
   const focus = focusAddress(scope, document.activeElement);
-  scope.replaceChildren(ratchet.row, trigger.row, lanesRule(), ...lanes.rows);
+  for (const child of Array.from(scope.children)) if (child !== rule) child.remove();
+  if (rule.parentElement !== scope) scope.appendChild(rule);
+  rule.before(ratchet.row, trigger.row);
+  rule.after(...lanes.rows);
   if (focus) refocus(scope, focus);
   return [ratchet, trigger, ...lanes.heads];
 }

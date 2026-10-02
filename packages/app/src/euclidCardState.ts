@@ -55,8 +55,6 @@ export interface EuclidCard {
   at: RegionStep | null;
   /** Write row fields; true when it took. The card repaints from the document on its next frame. */
   write(fields: RowFields): boolean;
-  /** Put a line in the readout; null puts back the resting hint. */
-  say(text: string | null): void;
   /** Freeze `pattern` into the document (a capture), or let the modulator back in (null). */
   capture(pattern: Figure | null): void;
   /** The knobs a Steps or bound turn can move (the `k` bounds, Rotate): re-read after it commits. */
