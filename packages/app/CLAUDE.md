@@ -216,8 +216,9 @@ detail pane at the bottom. Its layers, top down:
    helper (capture, threshold), the way `chordDrag.ts` does it.
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
    and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
-   the sequencer device (`sequencerDevice.ts`, windsor#368): a 244 px rack
-   row whose rail (`sequencerRail.ts`) holds the accent dot, the kind's
+   the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row,
+   244 px high for a converted card (`fit: 'fixed'`) and at its natural
+   height for one not yet converted, whose rail (`sequencerRail.ts`) holds the accent dot, the kind's
    name (a click folds it), the region `n/m`, and Split and Delete for the
    selected region (`sequencerDeviceModel.ts`, which reads the part from
    the document at the press). The pane has no region row and adds no
