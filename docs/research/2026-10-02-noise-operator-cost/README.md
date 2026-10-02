@@ -177,6 +177,66 @@ Option 1 is the recommendation. Until then, the windsor-engine skill
 (`references/synth-behavior.md`) tells sound design to keep a drum patch
 to one Noise operator or to pick an algorithm that draws them D..A.
 
+tacowars chose option 2 on 2026-10-02; windsor#389 built it (below).
+
+## windsor#389: draws descend in both loops
+
+The generic loop now draws a sample's noise D..A at the top of the sample,
+into the voice's preallocated `noiseDraw` slots, and each Noise operator
+reads its slot where the algorithm's order reaches it. The kernel is
+unchanged. `noiseDrawsDescend` is gone, so all 121 multi-Noise sets take the
+kernel; `fmProcessorKernel.test.ts` renders each against the generic loop to
+the bit, every operator at its own level so a swapped draw is heard. With
+the old generic draw order put back (and the kernel's refusal still gone),
+50 of the 60 newly admitted sets fail that comparison; the other 10 render
+the same bits either way, because the operators whose draws swap reach the
+output only through a Noise operator, which ignores its phase. The FM
+golden does not move. Record:
+`docs/log/2026-10-02-noise-draws-descend-in-both-loops.md`.
+
+Measured as above (same machine, Node 24.21.0), `base` `origin/main` at
+`8a0dc4e` (windsor#382 and #386 merged), `after` this branch's bundle and
+`control` a byte copy of `base`, interleaved in each process. Run 1 shared
+the machine with another worker's tests (load 10–13), so its absolute
+numbers read 25–55 % high; run 2 reversed the variant order at load
+about 4; run 3 repeated the scenarios a one-Noise voice or a voice with no
+Noise operator plays three times on the live path alone, 60 rounds each.
+Raw: `results/2026-10-02-draws-descend.txt`.
+
+ns/sample, median [IQR], run 2 (load about 4):
+
+| scenario | what it covers | base | after | control | kernel, after |
+|---|---|---|---|---|---|
+| `snare7` | two Noise carriers on Additive, the snare shape | 74.47 [69.57, 77.39] | **31.72** [28.84, 33.28] | 73.42 | yes (was no) |
+| `noise380` | windsor#380's lone carrier, a silent second Noise operator | 63.70 [62.32, 65.07] | **26.59** [25.71, 27.16] | 64.00 | yes (was no) |
+| `tomC` | the tom with C switched to Noise (on the kernel since windsor#382) | 37.48 | 37.34 | 37.12 | yes |
+| `noise1` | one Noise carrier | 26.17 | 27.60 | 26.85 | yes |
+| `tom` | the held 909 tom, one Noise modulator | 31.38 | 32.06 | 30.81 | yes |
+| `sine1` | no Noise operator | 25.01 | 25.01 | 25.70 | yes |
+
+Run 1, under heavy load, reads the same way: `snare7` 97.2 to 39.5 and
+`noise380` 84.6 to 35.8, the rest within their spread.
+
+**One Noise operator or none, run 3**, after minus base in each of three
+processes, against control minus base for the spread of two identical
+bundles:
+
+| scenario | after − base | control − base |
+|---|---|---|
+| `noise1` | −0.09, +0.15, +0.06 | −0.17, +0.31, +0.29 |
+| `sine1` | +0.51, −0.22, +0.32 | 0.00, −0.40, +0.47 |
+| `tom` | +0.01, +0.34, −0.31 | −0.43, +0.65, −0.02 |
+
+The changes sit inside the A/A spread: the kernel's code did not change, and
+a voice with one Noise operator or none costs what it did. Run 2's
+`noise1` gap (+1.4) did not repeat in run 3.
+
+**The generic loop** now opens each sample with the draws, behind a check
+hoisted per call. It is the reference for `specialise: false`; no live voice
+takes it, since the kernel takes every algorithm. Its rows read the same as
+before within their spread (run 2: `sine1` 71.0 against 71.3, `noise1` 68.8
+against 68.1, `snare7` 76.2 against 74.4).
+
 ## Reproduce
 
 ```bash
