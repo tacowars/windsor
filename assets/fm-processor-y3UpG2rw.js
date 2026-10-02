@@ -1551,10 +1551,6 @@ var VOICE_TARGET_SLIDE_KEEPS = Uint8Array.from(
 function voiceTargetCode(path) {
   return typeof path === "string" ? VOICE_TARGET_PATHS.indexOf(path) : -1;
 }
-function voiceTargetRow(path) {
-  const code = voiceTargetCode(path);
-  return code < 0 ? void 0 : VOICE_TARGET_TABLE[code];
-}
 
 // packages/engine/src/worklet/fm/voiceAmpRamp.ts
 function updateOperatorAmp(voice, i, n) {
