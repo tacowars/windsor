@@ -304,13 +304,13 @@ dialog::backdrop { background: rgba(10, 13, 15, 0.72); }
 
 <script>
 const SONGS = [
-  { name: 'Acid sketch 3', tags: ['techno', 'acid'], bpm: 132, bars: 16, key: 'A naturalMinor', edited: '12 s ago', open: true },
-  { name: 'Warehouse 0400', tags: ['techno'], bpm: 128, bars: 64, key: 'F naturalMinor', edited: 'yesterday 23:41' },
-  { name: 'Kick study', tags: [], bpm: 125, bars: 4, key: 'C naturalMinor', edited: '28 Sep' },
-  { name: 'Dub chords', tags: ['dub', 'ambient'], bpm: 118, bars: 32, key: 'D dorian', edited: '27 Sep' },
-  { name: 'Slow tide', tags: ['ambient'], bpm: 84, bars: 48, key: 'E♭ major', edited: '22 Sep' },
-  { name: 'Techno starter', tags: ['template', 'techno'], bpm: 130, bars: 16, key: 'C naturalMinor', edited: '20 Sep' },
-  { name: 'Ambient bed', tags: ['template', 'ambient'], bpm: 90, bars: 8, key: 'C major', edited: '20 Sep' },
+  { name: 'Acid sketch 3', tags: ['techno', 'acid'], bpm: 132, meter: '4/4', bars: 16, key: 'A naturalMinor', edited: '12 s ago', open: true },
+  { name: 'Warehouse 0400', tags: ['techno'], bpm: 128, meter: '4/4', bars: 64, key: 'F naturalMinor', edited: 'yesterday 23:41' },
+  { name: 'Kick study', tags: [], bpm: 125, meter: '7/8', bars: 4, key: 'C naturalMinor', edited: '28 Sep' },
+  { name: 'Dub chords', tags: ['dub', 'ambient'], bpm: 118, meter: '6/8', bars: 32, key: 'D dorian', edited: '27 Sep' },
+  { name: 'Slow tide', tags: ['ambient'], bpm: 84, meter: '3/4', bars: 48, key: 'E♭ major', edited: '22 Sep' },
+  { name: 'Techno starter', tags: ['template', 'techno'], bpm: 130, meter: '4/4', bars: 16, key: 'C naturalMinor', edited: '20 Sep' },
+  { name: 'Ambient bed', tags: ['template', 'ambient'], bpm: 90, meter: '12/8', bars: 8, key: 'C major', edited: '20 Sep' },
 ];
 const state = { open: 'named', lib: 'some', show: '', filter: 'all', query: '' };
 const $ = (id) => document.getElementById(id);
@@ -384,14 +384,14 @@ function renderTable() {
     return `<tr class="${isOpen ? 'is-open' : ''}">
       <td><span class="name">${s.name}</span>${isOpen ? '<span class="now-open">open</span>' : ''}</td>
       <td><span class="chips">${s.tags.map((t) => chip(t)).join('')}</span></td>
-      <td class="num">${s.bpm}</td><td class="num">${s.bars}</td><td class="num">${s.key}</td>
+      <td class="num">${s.bpm}</td><td class="num">${s.meter}</td><td class="num">${s.bars}</td><td class="num">${s.key}</td>
       <td class="when">${isOpen ? '12 s ago' : s.edited}</td>
       <td class="acts"><span class="wrap">${main}<button class="btn small" type="button" aria-label="More for ${s.name}">⋯</button>${menu}</span></td>
     </tr>`;
   }).join('');
   wrap.innerHTML = `<table class="song-table">
-    <thead><tr><th>Name</th><th>Tags</th><th>BPM</th><th>Bars</th><th>Key</th><th>Edited</th><th></th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="7" class="empty">No song matches.</td></tr>'}</tbody></table>`;
+    <thead><tr><th>Name</th><th>Tags</th><th>BPM</th><th>Meter</th><th>Bars</th><th>Key</th><th>Edited</th><th></th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="8" class="empty">No song matches.</td></tr>'}</tbody></table>`;
 }
 
 function render() {
