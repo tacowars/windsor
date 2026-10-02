@@ -1,11 +1,11 @@
 /**
  * The lane toolbar (windsor#349 decisions 1 and 6; the mockup
  * `docs/design/automation-lanes-mockup.html`): above the Song lanes while any
- * part is folded open, the Edit and Draw tools, the Snap select and the
+ * part is folded open, the Edit, Draw and Shape tools, the Snap select and the
  * tool's hint. The tool and the snap are the view's state, kept for the
  * session and never written to the document.
  *
- * E and D pick the tools while the Song tab shows the toolbar and no field
+ * E, D and S pick the tools while the Song tab shows the toolbar and no field
  * has focus. The audition keyboard plays on the Parts tab alone
  * (`keyboard.ts`'s `qwertyPlaysOn`), so a tool switch never sounds a note.
  */
@@ -49,8 +49,16 @@ export function syncAutomationTool(root: ParentNode, state: SongViewState): void
   if (lanes) lanes.dataset['autoTool'] = state.automationTool;
 }
 
-/** The toolbar's element; `root` is what `syncAutomationTool` updates when a tool is picked. */
-export function automationToolbar(state: SongViewState, root: () => ParentNode): HTMLElement {
+/**
+ * The toolbar's element; `root` is what `syncAutomationTool` updates when a
+ * tool is picked, and `onPick` hears the pick (the Shape popover closes on
+ * another tool, windsor#350).
+ */
+export function automationToolbar(
+  state: SongViewState,
+  root: () => ParentNode,
+  onPick: () => void = () => undefined,
+): HTMLElement {
   const bar = el('div', 'auto-toolbar');
   bar.setAttribute('role', 'toolbar');
   bar.setAttribute('aria-label', 'Automation tools');
@@ -65,6 +73,7 @@ export function automationToolbar(state: SongViewState, root: () => ParentNode):
     button.onclick = (): void => {
       state.automationTool = entry.tool;
       syncAutomationTool(root(), state);
+      onPick();
     };
     tools.appendChild(button);
   }
@@ -93,11 +102,15 @@ export function automationToolbar(state: SongViewState, root: () => ParentNode):
 }
 
 /**
- * E and D on the window: they pick a tool while `body` is shown with its
- * toolbar and no field has focus. Wired once per tab, since the tab's body
- * outlives its renders.
+ * E, D and S on the window: they pick a tool while `body` is shown with its
+ * toolbar and no field has focus, and `onPick` hears it. Wired once per tab,
+ * since the tab's body outlives its renders.
  */
-export function wireToolKeys(body: HTMLElement, state: SongViewState): void {
+export function wireToolKeys(
+  body: HTMLElement,
+  state: SongViewState,
+  onPick: () => void = () => undefined,
+): void {
   window.addEventListener('keydown', (e) => {
     const tool = toolForKey(e);
     if (!tool || isFieldFocused(e) || body.closest('[hidden]') !== null) return;
@@ -106,5 +119,6 @@ export function wireToolKeys(body: HTMLElement, state: SongViewState): void {
     if (e.repeat) return;
     state.automationTool = tool;
     syncAutomationTool(body, state);
+    onPick();
   });
 }
