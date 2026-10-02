@@ -27,7 +27,7 @@ import {
   defaultBassSteps,
 } from '../sequencing/bassSequencer';
 import { DEFAULT_GRID_CONFIG, gridNote } from '../sequencing/gridSequencer';
-import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { TICKS_PER_BAR, WHOLE_NOTE_TICKS } from '../sequencing/scheduler';
 import { makePatch } from '../patch/patch';
 import { normaliseSequencer } from './sequencerNormalise';
 
@@ -254,7 +254,7 @@ describe('arp sequencer normalisation (#705)', () => {
     expect(n.corrections).toEqual([
       `${PATH}.swing: unknown key dropped`,
       `${PATH}.style: "sideways" is not one of ${ARP_STYLES.join('|')} — using ${DEFAULT_ARP_CONFIG.style}`,
-      `${PATH}.divisor: 5 does not divide the ${TICKS_PER_BAR}-tick bar — using ${DEFAULT_ARP_CONFIG.divisor}`,
+      `${PATH}.divisor: 5 does not divide the ${WHOLE_NOTE_TICKS}-tick whole note — using ${DEFAULT_ARP_CONFIG.divisor}`,
       `${PATH}.gate: clamped 0 to ${GATE_MIN}`,
       `${PATH}.octaves: clamped 9 to ${ARP_OCTAVES_MAX}`,
       `${PATH}.voicing: "wide" is not one of ${CHORD_VOICING_IDS.join('|')} — using ${CHORD_VOICING_DEFAULT}`,
@@ -319,7 +319,7 @@ describe('bass sequencer normalisation (#705)', () => {
       `${PATH}.pitchMode: "walking" is not one of ${BASS_PITCH_MODES.join('|')} — using ${DEFAULT_BASS_CONFIG.pitchMode}`,
       `${PATH}.rootBias: clamped 2 to 1`,
       `${PATH}.fixedDegree: clamped 99 to ${HARMONY_DEGREE_MAX}`,
-      `${PATH}.divisor: 7 does not divide the ${TICKS_PER_BAR}-tick bar — using ${DEFAULT_BASS_CONFIG.divisor}`,
+      `${PATH}.divisor: 7 does not divide the ${WHOLE_NOTE_TICKS}-tick whole note — using ${DEFAULT_BASS_CONFIG.divisor}`,
       `${PATH}.gate: clamped 3 to 1`,
       `${PATH}.register.octave: clamped -3 to ${REGISTER_OCTAVE_MIN}`,
       `${PATH}.density: clamped -1 to 0`,

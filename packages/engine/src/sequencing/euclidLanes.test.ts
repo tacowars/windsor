@@ -19,6 +19,7 @@ import {
   type OnsetEvent,
 } from './euclideanSequencer';
 import { TICKS_PER_BAR, TickTransport } from './scheduler';
+import { METER_TABLE } from './meterTables';
 import { swingTicks } from './swing';
 import { STRAIGHT_SWING } from './swingTables';
 
@@ -86,6 +87,13 @@ describe('rollSpanSeconds', () => {
     expect(at(6)).toBeLessThan(0.06);
     expect(at(0) + at(6)).toBeCloseTo(0.12, 12);
     expect(at(90)).toBeCloseTo(at(6), 15);
+  });
+
+  it("swings on the song's beats: 7/8's last 8th is straight where 4/4 swings it", () => {
+    const swing = { amount: 75, grid: 8 as const };
+    const clock = { tick: 72, ticks: 12, secondsPerTick: 0.01, swing };
+    expect(rollSpanSeconds(clock)).toBeCloseTo(0.18, 12);
+    expect(rollSpanSeconds({ ...clock, beats: METER_TABLE['7/8'] })).toBeCloseTo(0.12, 12);
   });
 });
 

@@ -29,7 +29,8 @@ import {
 } from '../audioConstants';
 import { assertStepModLanes, stepModAtCycle, type StepModLane } from './stepModLanes';
 import { swingTicks } from './swing';
-import type { Swing } from './swingTables';
+import { SWING_TABLE, type Swing } from './swingTables';
+import type { MeterBeats } from './meterTables';
 
 /** The rows a Euclid config carries beside its trigger; each absent is today's plain hit. */
 export interface EuclidRows {
@@ -104,7 +105,10 @@ export function euclidHitRead(rows: EuclidRows, step: number, localStep: number)
   };
 }
 
-/** Where a roll is on the transport: the step's transport tick, the ticks it spans, the tempo and the swing. */
+/**
+ * Where a roll is on the transport: the step's transport tick, the ticks it
+ * spans, the tempo, the swing and the song's beats the swing restarts on.
+ */
 export interface RollClock {
   /** The step's transport tick (the swing's phase), never a region's local tick. */
   readonly tick: number;
@@ -112,6 +116,8 @@ export interface RollClock {
   readonly ticks: number;
   readonly secondsPerTick: number;
   readonly swing: Swing;
+  /** The song's meter's beats (windsor#429), as the clock swings them; 4/4's when absent. */
+  readonly beats?: MeterBeats | undefined;
 }
 
 /**
@@ -119,8 +125,10 @@ export interface RollClock {
  * the span a ratchet's roll divides evenly. Over a whole step it ends at the
  * next step's swung time; straight, it is the ticks at the tempo.
  */
-export function rollSpanSeconds({ tick, ticks, secondsPerTick, swing }: RollClock): number {
-  return (swingTicks(tick + ticks, swing) - swingTicks(tick, swing)) * secondsPerTick;
+export function rollSpanSeconds(clock: RollClock): number {
+  const { tick, ticks, secondsPerTick, swing, beats } = clock;
+  const warp = (at: number): number => swingTicks(at, swing, SWING_TABLE, beats);
+  return (warp(tick + ticks) - warp(tick)) * secondsPerTick;
 }
 
 const isLaneLength = (lane: readonly unknown[]): boolean =>

@@ -12,7 +12,8 @@
  * `ArrangementNormaliser` (`arrangementNormalise.ts`) builds the document
  * sections on top of this vocabulary.
  */
-import { isNoteDivisor, TICKS_PER_BAR } from '../sequencing/scheduler';
+import { FOUR_FOUR, type Meter } from '../sequencing/meterTables';
+import { isNoteDivisor, WHOLE_NOTE_TICKS } from '../sequencing/scheduler';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -32,6 +33,12 @@ export const show = (value: unknown): string => {
 export class FieldNormaliser {
   readonly corrections: string[] = [];
   readonly dangling: string[] = [];
+  /**
+   * The song's meter (windsor#429), once the transport is read: what a part
+   * written without steps (a new one) fills one bar of, and what picks the
+   * Chord Player's default base step. 4/4 until set, and outside a song.
+   */
+  meter: Meter = FOUR_FOUR;
 
   correction(message: string): void {
     this.corrections.push(message);
@@ -93,12 +100,15 @@ export class FieldNormaliser {
     return fallback;
   }
 
-  /** A step divisor: a positive integer that divides the 96-tick bar. */
+  /**
+   * A step divisor: a note value, a positive integer that divides the
+   * 96-tick whole note (windsor#428), whatever the song's meter.
+   */
   divisor(raw: unknown, fallback: number, path: string): number {
-    const value = this.int(raw, fallback, 1, TICKS_PER_BAR, path);
+    const value = this.int(raw, fallback, 1, WHOLE_NOTE_TICKS, path);
     if (isNoteDivisor(value)) return value;
     this.correction(
-      `${path}: ${value} does not divide the ${TICKS_PER_BAR}-tick bar — using ${fallback}`,
+      `${path}: ${value} does not divide the ${WHOLE_NOTE_TICKS}-tick whole note — using ${fallback}`,
     );
     return fallback;
   }

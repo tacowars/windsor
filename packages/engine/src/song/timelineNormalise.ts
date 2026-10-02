@@ -1,7 +1,7 @@
 /**
  * The song's two tick lists, normalised (#705): a part's `regions` and the
  * harmony's `events`. Both are integer ticks inside `songTicks`
- * (`songTicks(transport.bars)`), sorted by `start`, and reported
+ * (`songTicks(transport.bars, transport.meter)`), sorted by `start`, and reported
  * through the `arrangementFields` vocabulary like every other field.
  *
  * Regions (epic #703 decision 17): each end is clamped to the next region's
@@ -35,15 +35,18 @@ import { withFittedAutomation } from './automationNormalise';
 
 /**
  * The arrangement with its regions, events and any part's automation lanes
- * re-fitted to its own `transport.bars` — what the player runs over every
- * merged live partial, so a song shortened live sounds as its normalised
+ * re-fitted to its own length, `transport.bars` bars of its meter — what
+ * the player runs over every merged live partial, so a song shortened live
+ * (fewer bars, or a shorter meter: windsor#429) sounds as its normalised
  * document will after export (Codex, #705). Idempotent on normalised data;
  * a region or event left outside the song is dropped exactly as
  * `makeArrangement` drops it, and a lane is cut at the end as it cuts one.
  */
 export function fitTimelines(arrangement: Arrangement): Arrangement {
   const n = new FieldNormaliser();
-  const ticks = songTicks(arrangement.transport.bars);
+  const { bars, meter } = arrangement.transport;
+  if (meter !== undefined) n.meter = meter;
+  const ticks = songTicks(bars, meter);
   return {
     ...arrangement,
     harmony: {

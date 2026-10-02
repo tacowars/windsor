@@ -15,7 +15,8 @@
  *   first live tick, and never again;
  * - a live tick is forwarded with `tick`, `step`, `bar` and `tickInBar`
  *   rebased onto `localTick` (ticks since the entry) at the subscriber's
- *   divisor, the clock's `time` and `seconds` untouched, plus the chord the
+ *   divisor, the bar the song's meter's (windsor#429), the clock's `time`
+ *   and `seconds` untouched, plus the chord the
  *   harmony timeline holds at the transport tick (`chordAt`) — so a chord
  *   change never restarts anything and a hit voices whatever is current.
  *
@@ -27,12 +28,14 @@
  * holds one subscription on the transport however many it serves, so each
  * tick reads the regions once and the entry and leave hooks fire once,
  * before any subscriber hears the tick. `reconfigure` swaps regions, song
- * length and harmony live; the next tick re-evaluates. Pure: no audio
+ * length, harmony and meter live; the next tick re-evaluates. Pure: no audio
  * graph, no clock of its own.
  */
 import { chordAt, type Harmony, type HarmonyChord } from '../harmony/harmonyTimeline';
 import { regionPhase, regionState, type Region, type RegionState } from './regionClock';
-import { TICKS_PER_BAR, type TickEvent, type TickSource, type Unsubscribe } from './scheduler';
+import { ticksPerBar } from './meter';
+import type { Meter } from './meterTables';
+import type { TickEvent, TickSource, Unsubscribe } from './scheduler';
 
 /** A transport tick as a part's generator sees it: local position plus the current chord. */
 export interface PartTickEvent extends TickEvent {
@@ -62,6 +65,8 @@ export interface RegionGateConfig {
   readonly regions: readonly Region[];
   readonly songTicks: number;
   readonly harmony: Harmony;
+  /** The song's meter (windsor#429): the bar `bar` and `tickInBar` count. 4/4 when absent. */
+  readonly meter?: Meter | undefined;
 }
 
 export interface RegionGateHooks {
@@ -73,6 +78,8 @@ export interface RegionGateHooks {
 
 export class RegionGate implements PartTickSource {
   private config: RegionGateConfig;
+  /** The meter's bar in ticks, read once per config rather than per tick. */
+  private barLength: number;
   /** The entry tick of the region the last forwarded tick was in; null while silent. */
   private entryTick: number | null = null;
   /** Replaced, never mutated, on (un)subscribe, so a tick in flight walks a stable list. */
@@ -86,11 +93,13 @@ export class RegionGate implements PartTickSource {
     private readonly hooks: RegionGateHooks = {},
   ) {
     this.config = config;
+    this.barLength = ticksPerBar(config.meter);
   }
 
-  /** Regions, song length and harmony take effect on the next tick; nothing restarts. */
+  /** Regions, song length, harmony and meter take effect on the next tick; nothing restarts. */
   reconfigure(config: RegionGateConfig): void {
     this.config = config;
+    this.barLength = ticksPerBar(config.meter);
   }
 
   /** Forget the region the last tick was in (#708's ■): the next live tick is an entry, so the stream restarts. */
@@ -159,8 +168,8 @@ export class RegionGate implements PartTickSource {
         ...event,
         tick: localTick,
         step: localTick / divisor,
-        bar: Math.floor(localTick / TICKS_PER_BAR),
-        tickInBar: localTick % TICKS_PER_BAR,
+        bar: Math.floor(localTick / this.barLength),
+        tickInBar: localTick % this.barLength,
         chord: this.chordAt(event.tick),
         regionIndex: index,
       });

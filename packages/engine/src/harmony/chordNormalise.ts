@@ -30,6 +30,7 @@ import {
 import {
   CHORD_STEP_KINDS,
   DEFAULT_CHORD_CONFIG,
+  defaultChordDivisor,
   hitStep,
   restStep,
   type ChordStep,
@@ -60,9 +61,12 @@ export function chordDriver(raw: unknown, path: string, n: FieldNormaliser): Cho
   };
 }
 
-/** One of `CHORD_DIVISORS`; anything else takes the default base step, reported. */
+/**
+ * One of `CHORD_DIVISORS`; anything else takes the default base step for the
+ * song's meter (windsor#429: the whole note in 4/4, else the quarter), reported.
+ */
 function divisor(raw: unknown, path: string, n: FieldNormaliser): number {
-  const fallback = DEFAULT_CHORD_CONFIG.divisor;
+  const fallback = defaultChordDivisor(n.meter);
   if (raw === undefined) return fallback;
   if (typeof raw === 'number' && CHORD_DIVISORS.includes(raw)) return raw;
   n.correction(

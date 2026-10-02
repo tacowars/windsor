@@ -77,7 +77,9 @@ import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
-import { DIVISORS, isNoteDivisor, TICKS_PER_BAR, type Unsubscribe } from './scheduler';
+import { defaultStepCount } from './meter';
+import type { Meter } from './meterTables';
+import { DIVISORS, isNoteDivisor, type Unsubscribe } from './scheduler';
 import { assertStepModLanes, stepModAt, type StepModLane } from './stepModLanes';
 
 export const BASS_PITCH_MODES = ['followRoot', 'followChord', 'fixed'] as const;
@@ -91,18 +93,19 @@ export type BassStep = ArpStep;
 /** A plain note step: the mode's pitch, unshifted, unaccented, no slide, one hit. */
 export const bassNote: (over?: Partial<Omit<BassNoteStep, 'kind'>>) => BassNoteStep = arpNote;
 
-/** The steps in one bar at `divisor`, 1 to `max`. */
-export function bassBarSteps(divisor: number, max = GRID_STEPS_MAX): number {
-  return Math.max(1, Math.min(max, Math.floor(TICKS_PER_BAR / divisor)));
+/** The steps in one bar of `meter` (4/4 when absent) at `divisor`, 1 to `max` (`defaultStepCount`). */
+export function bassBarSteps(divisor: number, meter?: Meter, max = GRID_STEPS_MAX): number {
+  return defaultStepCount(meter, divisor, max);
 }
 
 /**
  * The strip a Basslead without one plays (decision 6): one bar of plain
- * notes at `divisor`, at most `GRID_STEPS_MAX`. It plays exactly what the
- * Basslead played before the strip.
+ * notes at `divisor`, at most `GRID_STEPS_MAX`, in the song's meter
+ * (windsor#429; 4/4 when absent). It plays exactly what the Basslead played
+ * before the strip.
  */
-export function defaultBassSteps(divisor: number): BassStep[] {
-  return defaultArpSteps(bassBarSteps(divisor));
+export function defaultBassSteps(divisor: number, meter?: Meter): BassStep[] {
+  return defaultArpSteps(bassBarSteps(divisor, meter));
 }
 
 export interface BassSequencerConfig {
@@ -111,7 +114,7 @@ export interface BassSequencerConfig {
   rootBias: number;
   /** The scale degree a `fixed` bass plays, at the part's octave. */
   fixedDegree: number;
-  /** Ticks per step. Must divide the bar. */
+  /** Ticks per step: a note value that divides the whole note (see `DIVISORS`). */
   divisor: number;
   /** A note's length as a fraction of its step, in (0, 1]; at 1 a repeated note ties. */
   gate: number;

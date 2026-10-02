@@ -61,6 +61,7 @@ import { followVoices } from '../harmony/voiceLeading';
 import type { NoteEvent, NoteHandler } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
+import { FOUR_FOUR, type Meter } from './meterTables';
 import { DIVISORS, type Unsubscribe } from './scheduler';
 
 interface StepTiming {
@@ -128,6 +129,15 @@ export const DEFAULT_CHORD_CONFIG: ChordSequencerConfig = {
   steps: [],
   follow: false,
 };
+
+/**
+ * The base step a Chord Player starts with in `meter` (windsor#429, decision
+ * 6): the whole note in 4/4 (or with no meter), where it is a bar, and the
+ * quarter in any other meter, where a whole note is not.
+ */
+export function defaultChordDivisor(meter: Meter = FOUR_FOUR): number {
+  return meter === FOUR_FOUR ? DEFAULT_CHORD_CONFIG.divisor : DIVISORS.quarter;
+}
 
 function assertStep(step: ChordStep, index: number): void {
   const where = `steps[${index}]`;

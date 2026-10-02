@@ -33,10 +33,10 @@
  * merged over the current arrangement, validated, and committed — bpm straight
  * to the transport, a preset change via `setPatch`, and only the generators
  * whose kind, divisor or seed changed are rebuilt (`generatorSig`), region
- * by region (`PartBinding.plan`); a `regions`, `transport.bars` or harmony
- * edit reaches every gate live, and a key change re-pitches through the
- * sampler. A merged arrangement that fails validation changes nothing and
- * is reported, never half-applied.
+ * by region (`PartBinding.plan`); a `regions`, `transport.bars`,
+ * `transport.meter` or harmony edit reaches every gate live, and a key
+ * change re-pitches through the sampler. A merged arrangement that fails
+ * validation changes nothing and is reported, never half-applied.
  *
  * The loop (windsor#15) is the clock's: the player hands it the song's
  * `TickLoop` at build and on every partial, and the counter jumps back from
@@ -60,10 +60,9 @@ import {
 import type { Patch } from '../patch/patch';
 import { clonePatch, makePatch, mergePatch, type PartialPatch } from '../patch/patch';
 import { ScaleSampler } from '../sequencing/scaleSampler';
-import type { TickEvent, TickLoop, TickSource, Unsubscribe } from '../sequencing/scheduler';
-import { songTicks } from '../sequencing/meter';
+import type { TickEvent, TickSource, Unsubscribe } from '../sequencing/scheduler';
+import { meterBeats } from '../sequencing/meter';
 import { isLoopJump } from '../sequencing/scheduler';
-import { STRAIGHT_SWING, type Swing } from '../sequencing/swingTables';
 import { playableSwing } from '../sequencing/swing';
 import type { RegionGateConfig } from '../sequencing/regionGate';
 import type { NoteExtras } from '../synth/audioPart';
@@ -72,7 +71,8 @@ import { PLAIN_HIT, pitchedRollShape, playPitched } from './pitchedRoll';
 import { euclidHitRead } from '../sequencing/euclidLanes';
 import { rollHits, type RollHit, type RollShape } from './rollSpan';
 import { fitTimelines } from './timelineNormalise';
-import { tickLoopOf, withFittedLoop } from './songLoop';
+import { withFittedLoop } from './songLoop';
+import { setSongClock, songTicksOf, withClockFields, type SongClock } from './songClock';
 import { PartBinding, type BindingChange, type RegionStep } from './partBinding';
 
 export type { RegionStep } from './partBinding';
@@ -109,13 +109,7 @@ export interface PartHost {
 }
 
 /** What the player needs from the transport. `Scheduler` and `TickTransport` both satisfy it. */
-export interface MusicTransport extends TickSource {
-  bpm: number;
-  /** The song's swing (windsor#14). Optional: a transport without it plays straight. */
-  swing?: Swing;
-  /** The loop the clock wraps (windsor#15). Optional: a transport without it plays through. */
-  loop?: TickLoop | null;
-}
+export interface MusicTransport extends TickSource, SongClock {}
 
 /** Fired once per part, on its first note — the "it is audible" console evidence. */
 export type MusicEventHandler = (part: MusicPart, tick: number) => void;
@@ -191,26 +185,13 @@ function stagePatches(
 
 const sig = (value: unknown): string => JSON.stringify(value) ?? 'absent';
 
-/**
- * The arrangement with its swing written out (windsor#14): a document may
- * leave it absent (straight), but the live copy carries it so a partial like
- * `{ transport: { swing: { amount: 60 } } }` has a field to merge into.
- */
-const withSwing = (arrangement: Arrangement): Arrangement =>
-  arrangement.transport.swing
-    ? arrangement
-    : { ...arrangement, transport: { ...arrangement.transport, swing: STRAIGHT_SWING } };
-
-/** The song's length in ticks, from its explicit `transport.bars` (decision 5). */
-export const songTicksOf = (arrangement: Arrangement): number =>
-  songTicks(arrangement.transport.bars);
-
-/** What a part's gate reads: its regions over the song's length and harmony. */
+/** What a part's gate reads: its regions over the song's length, harmony and meter. */
 function gateConfig(arrangement: Arrangement, part: MusicPart): RegionGateConfig {
   return {
     regions: part.regions,
     songTicks: songTicksOf(arrangement),
     harmony: arrangement.harmony,
+    meter: arrangement.transport.meter,
   };
 }
 
@@ -237,13 +218,11 @@ export class ArrangementPlayer {
     private readonly onEvent?: MusicEventHandler,
   ) {
     this.presets = { ...presets };
-    this.current = withFittedLoop(withSwing(structuredClone(arrangement)));
+    this.current = withFittedLoop(withClockFields(structuredClone(arrangement)));
     validateArrangement(this.current, this.presets);
     this.index();
     this.built = this.buildAll(this.current);
-    this.transport.bpm = this.current.transport.bpm;
-    this.transport.swing = playableSwing(this.current.transport.swing);
-    this.transport.loop = tickLoopOf(this.current.transport);
+    setSongClock(this.transport, this.current);
     // Subscribed before any gate, so a jump is seen before a part hears the tick.
     this.unfollow = this.transport.subscribe(1, (event) => this.follow(event));
     for (const binding of this.built.bindings.values()) binding?.attach();
@@ -319,9 +298,7 @@ export class ArrangementPlayer {
     } catch (error) {
       return { ok: false, ignored, error: error instanceof Error ? error.message : String(error) };
     }
-    this.transport.bpm = merged.transport.bpm;
-    this.transport.swing = playableSwing(merged.transport.swing);
-    this.transport.loop = tickLoopOf(merged.transport);
+    setSongClock(this.transport, merged);
     this.presets = plan.presets;
     for (const [slot, patch] of plan.patchChanges) this.parts.get(slot)?.setPatch(patch);
     for (const slot of plan.removed) this.detach(slot);
@@ -527,6 +504,7 @@ export class ArrangementPlayer {
       loop: this.transport.loop ?? null,
       secondsPerTick: clock.secondsPerTick,
       swing: playableSwing(this.transport.swing),
+      beats: meterBeats(this.current.transport.meter),
     });
   }
 

@@ -54,6 +54,8 @@ import {
 } from '../audioConstants';
 import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler } from './noteEvent';
+import { defaultStepCount } from './meter';
+import type { Meter } from './meterTables';
 import type { ScaleSampler } from './scaleSampler';
 import { assertStepModLanes, stepModAt, type StepModLane } from './stepModLanes';
 import {
@@ -82,7 +84,7 @@ export const GRID_STEP_KINDS = ['rest', 'tie', 'note'] as const;
 export type GridStepKind = (typeof GRID_STEP_KINDS)[number];
 
 export interface GridSequencerConfig {
-  /** Ticks per step. Must divide the bar (see `DIVISORS`). */
+  /** Ticks per step: a note value that divides the whole note (see `DIVISORS`). */
   divisor: number;
   /** 1–`GRID_STEPS_MAX` written steps; the line loops over the first `length` of them. */
   steps: readonly GridStep[];
@@ -114,9 +116,13 @@ export function gridNote(degree = 0, over: Partial<Omit<GridNoteStep, 'kind'>> =
   return { kind: 'note', degree, octave: 0, accent: false, slide: false, ...over };
 }
 
-/** The line a part starts with when its kind becomes `grid`: a bar of sixteenths on the root. */
-export function defaultGridSteps(): GridStep[] {
-  return Array.from({ length: GRID_DEFAULT_STEP_COUNT }, () => gridNote());
+/**
+ * The line a part starts with when its kind becomes `grid`: a bar of
+ * sixteenths on the root, in the song's meter (windsor#429; 4/4's 16 when
+ * absent, 14 in 7/8, 24 in 12/8).
+ */
+export function defaultGridSteps(meter?: Meter): GridStep[] {
+  return Array.from({ length: defaultStepCount(meter, DIVISORS.sixteenth) }, () => gridNote());
 }
 
 export const DEFAULT_GRID_CONFIG: GridSequencerConfig = {

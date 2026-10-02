@@ -88,11 +88,15 @@ export interface RenderedSong {
   songSeconds: number;
 }
 
-/** The song's length in seconds: its bars at its tempo (swing moves off-beats, never a beat). */
+/**
+ * The song's length in seconds: its bars of its meter at its tempo (swing
+ * moves off-beats, never a beat).
+ */
 export function songSeconds(document: ArrangementDocument): number {
-  const { bpm, bars, swing } = document.transport;
+  const { bpm, bars, meter, swing } = document.transport;
   const clock = new TickTransport(bpm, playableSwing(swing ?? STRAIGHT_SWING));
-  return clock.swungTicks(songTicks(bars)) * clock.secondsPerTick;
+  if (meter !== undefined) clock.meter = meter;
+  return clock.swungTicks(songTicks(bars, meter)) * clock.secondsPerTick;
 }
 
 /** The frame plan a render of `document` with `options` would take; allocates nothing. */
