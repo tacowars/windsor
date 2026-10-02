@@ -104,7 +104,7 @@ interface InfoBubble {
 }
 
 function infoBubble(label: EventLabel): InfoBubble {
-  const node = el('span', 'info');
+  const node = el('span', 'harmony-info');
   node.title = "the selected block's chord, or the one sounding";
   const name = el('b');
   const sub = el('small');
@@ -227,9 +227,9 @@ function bindPlay(view: SongView, index: number, degree: number, ui: PlayUi): vo
 /** The play row: a ▶ over each chip, on the chips' grid. */
 function plays(view: SongView, index: number, bubble: InfoBubble): HTMLElement {
   const { harmony } = view.ctx.model.doc;
-  const row = el('div', 'plays');
+  const row = el('div', 'harmony-plays');
   for (const chip of degreeChips(harmony, CHORD_SIZE_TRIAD)) {
-    const button = html('button', 'play', PLAY_ICON) as HTMLButtonElement;
+    const button = html('button', 'harmony-play', PLAY_ICON) as HTMLButtonElement;
     button.type = 'button';
     button.title = `hold to hear ${chip.numeral}'s chord`;
     button.setAttribute('aria-label', `Play degree ${chip.degree + 1}`);

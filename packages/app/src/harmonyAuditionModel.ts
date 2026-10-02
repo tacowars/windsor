@@ -12,6 +12,7 @@ import {
   MIDI_NOTE_MAX,
   SEMITONES_PER_OCTAVE,
   eventStack,
+  foldDegree,
   scaleOffsets,
   voiceChord,
 } from '@windsor/engine';
@@ -40,9 +41,18 @@ const SHIPPED_VOICING: AuditionVoicing = {
   bassOctaves: HARMONY_AUDITION_BASS_OCTAVES,
 };
 
-/** The chord degree `degree`'s ▶ plays: `event` itself on its own degree, else the scale's own chord at its size. */
-export function auditionEvent(event: HarmonyEvent, degree: number): HarmonyEvent {
-  if (degree === event.degree) return event;
+/**
+ * The chord degree `degree`'s ▶ plays, in a scale of `degreeCount` degrees:
+ * `event` itself, octave carry included, when `degree` is its folded degree
+ * (degree 7 of a seven-degree scale is the tonic's ▶), else the scale's own
+ * chord at its size.
+ */
+export function auditionEvent(
+  event: HarmonyEvent,
+  degree: number,
+  degreeCount: number,
+): HarmonyEvent {
+  if (degree === foldDegree(event.degree, degreeCount).degree) return event;
   return { start: event.start, duration: event.duration, degree, size: event.size };
 }
 
@@ -53,8 +63,9 @@ export function auditionChord(
   degree: number,
   voicing: AuditionVoicing = SHIPPED_VOICING,
 ): AuditionChord {
-  const played = auditionEvent(event, degree);
-  const stack = eventStack(scaleOffsets(harmony.scale), played);
+  const offsets = scaleOffsets(harmony.scale);
+  const played = auditionEvent(event, degree, offsets.length);
+  const stack = eventStack(offsets, played);
   const rootNote = voicing.keyOctaveNote + harmony.root;
   const close = voiceChord(stack, { inversion: 0, voicing: 'close', octave: 0 }, rootNote);
   const bass = rootNote + (stack[0] ?? 0) - voicing.bassOctaves * SEMITONES_PER_OCTAVE;

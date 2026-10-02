@@ -3523,14 +3523,14 @@ select.field.compact {
   margin-left: auto;
 }
 /* A ▶ over each degree chip (windsor#332): hold to hear that degree's chord. */
-.plays {
+.harmony-card .harmony-plays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
   max-width: 480px;
   margin-bottom: 2px;
 }
-.play {
+.harmony-card .harmony-play {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3543,25 +3543,25 @@ select.field.compact {
   user-select: none;
   touch-action: none;
 }
-.play svg {
+.harmony-card .harmony-play svg {
   fill: var(--ink-faint);
 }
-.play:hover {
+.harmony-card .harmony-play:hover {
   background: var(--panel-hi);
   border-color: var(--line-bright);
 }
-.play:hover svg {
+.harmony-card .harmony-play:hover svg {
   fill: var(--modulator);
 }
-.play.on {
+.harmony-card .harmony-play.on {
   background: var(--modulator);
   border-color: var(--modulator);
 }
-.play.on svg {
+.harmony-card .harmony-play.on svg {
   fill: #111416;
 }
 /* The info bubble: the selected block's chord, or the one a held ▶ sounds. Read only. */
-.info {
+.harmony-card .harmony-info {
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
@@ -3572,26 +3572,26 @@ select.field.compact {
   border-radius: 12px;
   color: var(--ink);
 }
-.info b {
+.harmony-card .harmony-info b {
   font-family: var(--f-panel);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-.info small {
+.harmony-card .harmony-info small {
   font-family: var(--f-num);
   font-size: 10px;
   color: var(--ink-dim);
 }
-.info.sounding {
+.harmony-card .harmony-info.sounding {
   border-color: var(--modulator);
 }
-.info.sounding b::before {
+.harmony-card .harmony-info.sounding b::before {
   content: '♪ ';
   color: var(--modulator);
 }
 @media (max-width: 560px) {
-  .info {
+  .harmony-card .harmony-info {
     min-width: 0;
   }
 }

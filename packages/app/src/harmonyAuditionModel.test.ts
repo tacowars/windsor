@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { Harmony, HarmonyEvent } from '@windsor/engine';
 import { CHORD_SIZE_SEVENTH, CHORD_SIZE_TRIAD, TICKS_PER_BAR } from '@windsor/engine';
+import { HARMONY_DEGREE_MAX } from '@windsor/engine/audioConstants';
 import { AuditionHold, auditionChord, auditionEvent } from './harmonyAuditionModel';
 
 const C_MAJOR: Harmony = { root: 0, scale: 'major', events: [] };
@@ -33,8 +34,8 @@ describe('the chord a ▶ plays', () => {
       notes: [48, 60, 64, 67],
       label: { name: 'C maj', numeral: 'I', sizeTag: 'triad' },
     });
-    expect(auditionEvent(FLAT_SIX, 0)).not.toHaveProperty('quality');
-    expect(auditionEvent(FLAT_SIX, 0)).not.toHaveProperty('accidental');
+    expect(auditionEvent(FLAT_SIX, 0, 7)).not.toHaveProperty('quality');
+    expect(auditionEvent(FLAT_SIX, 0, 7)).not.toHaveProperty('accidental');
   });
 
   it('makes every other degree a seventh under a seventh block', () => {
@@ -47,6 +48,33 @@ describe('the chord a ▶ plays', () => {
     expect(auditionChord(C_MAJOR, seventh, 4)).toEqual({
       notes: [55, 67, 71, 74, 77],
       label: { name: 'G 7', numeral: 'V7', sizeTag: '7th' },
+    });
+  });
+
+  it("plays a degree past the scale on its folded degree's ▶, octave carry included", () => {
+    // Degree 7 in C major is the tonic one octave up (foldDegree): the I ▶ plays it there.
+    const plain: HarmonyEvent = {
+      start: 0,
+      duration: TICKS_PER_BAR,
+      degree: 7,
+      size: CHORD_SIZE_TRIAD,
+    };
+    expect(auditionEvent(plain, 0, 7)).toBe(plain);
+    expect(auditionChord(C_MAJOR, plain, 0).notes).toEqual([60, 72, 76, 79]);
+    expect(auditionChord(C_MAJOR, { ...plain, degree: 0 }, 0).notes).toEqual([48, 60, 64, 67]);
+  });
+
+  it('keeps the quality and accidental of the highest degree on its folded ▶', () => {
+    const top: HarmonyEvent = { ...FLAT_SIX, degree: HARMONY_DEGREE_MAX };
+    const folded = HARMONY_DEGREE_MAX % 7;
+    const carry = Math.floor(HARMONY_DEGREE_MAX / 7);
+    expect(auditionEvent(top, folded, 7)).toBe(top);
+    // From C at MIDI 0 so the carried chord stays inside MIDI: ♭VII major, Bb D F.
+    const low = { keyOctaveNote: 0, bassOctaves: 1 };
+    const flatSeven = carry * 12 + 10;
+    expect(auditionChord(C_MAJOR, top, folded, low)).toEqual({
+      notes: [flatSeven - 12, flatSeven, flatSeven + 4, flatSeven + 7],
+      label: { name: 'A# maj', numeral: '♭VII', sizeTag: 'triad' },
     });
   });
 
