@@ -33,6 +33,9 @@ var NOISE_COLOUR_DAMPING = Math.SQRT2;
 var FORMANT_Q_PER_RESONANCE = 8;
 var FORMANT_Q_MAX = 40;
 var FORMANT_MAKEUP = 1.787;
+var STEAL_FADE_SECONDS = 0.03;
+var STEAL_RESERVE_MIN = 16;
+var STEAL_STREAMED_RESERVE = 4;
 
 // packages/engine/src/worklet/fm/eventQueue.ts
 function emptySlots(capacity) {
@@ -2944,7 +2947,10 @@ var Voice = class {
       this.ampBreak[i] = 0;
     }
   }
-  /** Graceful stealing: fade out over ~4 ms, then free the slot. */
+  /**
+   * A quick fade over ~4 ms, then free the slot: the mono cut and a held End
+   * level. A full pool's steal is `voiceSteal.ts`'s 30 ms (windsor#410).
+   */
   steal() {
     if (!this.active) return;
     this.gate = false;
@@ -2991,13 +2997,75 @@ var Voice = class {
   }
 };
 
+// packages/engine/src/worklet/fm/voiceSteal.ts
+function stealPoolSize(maxVoices) {
+  return maxVoices + Math.max(maxVoices, STEAL_RESERVE_MIN);
+}
+function streamedPoolSize(maxVoices) {
+  return maxVoices + STEAL_STREAMED_RESERVE;
+}
+function reserveRandom(lastStreamed) {
+  return makeRandom(lastStreamed.noiseSeed);
+}
+function buildVoicePool(part, maxVoices, sampleRate2) {
+  const poolSize = stealPoolSize(maxVoices);
+  const streamed = streamedPoolSize(maxVoices);
+  const voices = new Array(poolSize);
+  let seeds = part.random;
+  for (let i = 0; i < poolSize; i++) {
+    if (i === streamed) seeds = reserveRandom(voices[i - 1]);
+    const { partControls, partOffsets, partFloors } = part;
+    voices[i] = new Voice(sampleRate2, seeds, partControls, partOffsets, partFloors);
+    voices[i].random = part.random;
+  }
+  return voices;
+}
+function stealVoice(voice) {
+  if (!voice.active) return;
+  voice.gate = false;
+  voice.fadeInc = -1 / (STEAL_FADE_SECONDS * voice.sr);
+}
+function quietestReleased(voices) {
+  let best = null;
+  let bestLevel = Infinity;
+  let bestAge = -1;
+  for (let i = 0; i < voices.length; i++) {
+    const v = voices[i];
+    if (!v.active || v.gate || v.fading) continue;
+    const carriers = v.alg.carriers;
+    let level = 0;
+    for (let c = 0; c < carriers.length; c++) level += Math.abs(v.amp[carriers[c]]);
+    if (level < bestLevel || level === bestLevel && v.age > bestAge) {
+      best = v;
+      bestLevel = level;
+      bestAge = v.age;
+    }
+  }
+  return best;
+}
+function nearestFadeEnd(voices) {
+  let best = voices[0];
+  let bestLeft = Infinity;
+  for (let i = 0; i < voices.length; i++) {
+    const v = voices[i];
+    if (!v.fading) continue;
+    const left = v.fade / -v.fadeInc;
+    if (left < bestLeft) {
+      best = v;
+      bestLeft = left;
+    }
+  }
+  if (bestLeft !== Infinity) return best;
+  for (let i = 1; i < voices.length; i++) if (voices[i].age > best.age) best = voices[i];
+  return best;
+}
+
 // packages/engine/src/worklet/fm/voiceAllocation.ts
 function allocateVoice(voices, maxVoices, dormancy) {
   const vs = voices;
   let free = null;
   let sounding = 0;
   let bestDormant = null, bestDormantAge = -1;
-  let bestReleased = null, bestReleasedAge = -1;
   let bestAny = null, bestAnyAge = -1;
   for (let i = 0; i < vs.length; i++) {
     const v = vs[i];
@@ -3012,10 +3080,6 @@ function allocateVoice(voices, maxVoices, dormancy) {
       bestDormantAge = v.age;
       bestDormant = v;
     }
-    if (!v.gate && v.age > bestReleasedAge) {
-      bestReleasedAge = v.age;
-      bestReleased = v;
-    }
     if (v.age > bestAnyAge) {
       bestAnyAge = v.age;
       bestAny = v;
@@ -3026,14 +3090,13 @@ function allocateVoice(voices, maxVoices, dormancy) {
       bestDormant.kill();
       return bestDormant;
     }
-    const victim = bestReleased || bestAny;
-    if (victim) victim.steal();
+    const victim = quietestReleased(vs) || bestAny;
+    if (victim) stealVoice(victim);
   }
   if (free) return free;
-  let oldest = vs[0];
-  for (let i = 1; i < vs.length; i++) if (vs[i].age > oldest.age) oldest = vs[i];
-  oldest.kill();
-  return oldest;
+  const last = nearestFadeEnd(vs);
+  last.kill();
+  return last;
 }
 
 // packages/engine/src/worklet/fm/fmProcessor.ts
@@ -3072,12 +3135,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.noteIn = new Float64Array(NOTE_IN_COUNT);
     this.slideIn = false;
     this.stepModIn = null;
-    const poolSize = maxVoices + 4;
-    this.voices = new Array(poolSize);
-    for (let i = 0; i < poolSize; i++) {
-      const { partControls, partOffsets, partFloors } = this;
-      this.voices[i] = new Voice(sampleRate, this.random, partControls, partOffsets, partFloors);
-    }
+    this.voices = buildVoicePool(this, maxVoices, sampleRate);
     this.patch = normalisePatch(opts.patch);
     this.waveSets = [null, null, null, null];
     this.rebuildWaves();
@@ -3088,7 +3146,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.slideSeconds = num(opts.slideSeconds, 0);
     this.dormancy = opts.dormancy !== false;
     const specialise = opts.specialise !== false;
-    for (let i = 0; i < poolSize; i++) this.voices[i].specialise = specialise;
+    for (let i = 0; i < this.voices.length; i++) this.voices[i].specialise = specialise;
     this.load = new LoadSampler(sampleRate, this.port);
     if (Array.isArray(opts.events)) {
       for (const ev of opts.events) this.schedule(ev);
@@ -3165,8 +3223,8 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     for (let i = 0; i < vs.length; i++) vs[i].keyed = false;
   }
   /**
-   * Mono (#453): fade out every voice the part has sounding -- the same 4 ms
-   * steal a full pool uses, so the cut never clicks -- and drop the note map
+   * Mono (#453): fade out every voice the part has sounding -- the 4 ms
+   * `Voice.steal`, so the cut never clicks -- and drop the note map
    * with them, so a later noteOff for a cut note finds nothing and cannot
    * release the note that replaced it. Allocates nothing.
    */
