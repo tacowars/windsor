@@ -37,7 +37,7 @@ import { renderVoiceKernel } from './voiceKernel';
 import { VOICE_TARGET_COUNT } from './voiceOffsetTables';
 import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
-import { bindStepMod, loadStepOffsets, rebindStepMod, startStepMod } from './voiceStepMod';
+import { rebindStepMod, retargetStepMod, startStepMod } from './voiceStepMod';
 import { KIND_PULSE, waveKind } from './waveTables';
 
 /* ------------------------------------------------------------------ *
@@ -416,7 +416,8 @@ class Voice {
    * the key offset are recomputed for the new note, as `rebind` does. The new
    * step's offsets apply from here, except the rows a sounding voice cannot
    * change without a click (`slideKeeps`: decay curve, feedback), which keep
-   * the old step's (windsor#17).
+   * the old step's (windsor#17), and each envelope keeps the decay curve it
+   * plays, a lane's too (`retargetStepMod`, windsor#405).
    */
   retarget(
     note: number,
@@ -437,8 +438,7 @@ class Voice {
     }
     this.filtEnv.timeScale = Math.pow(2, -patch.filter.env.keyScale * keyOffset);
     this.bindConstants(patch);
-    loadStepOffsets(this, stepMod, true);
-    bindStepMod(this, patch);
+    retargetStepMod(this, patch, stepMod);
   }
 
   release(): void {
