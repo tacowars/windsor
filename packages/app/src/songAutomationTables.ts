@@ -8,7 +8,12 @@
  * `songAutomationLane.ts`. The lane's height is the Song view's
  * (`songViewTables.ts`'s `SONG_VIEW.automationLanePx`).
  */
-import type { AutomationTargetKind, InsertKindName, InsertSpecOf } from '@windsor/engine';
+import type {
+  AutomationTargetKind,
+  InsertKindName,
+  InsertSpecOf,
+  VoiceSection,
+} from '@windsor/engine';
 import { PPQ, TICKS_PER_BAR } from '@windsor/engine';
 
 /** How a lane's curve is drawn inside its row. */
@@ -141,26 +146,22 @@ export const MIXER_GROUP_LABEL = 'Mixer';
 export const insertGroupLabel = (insertLabel: string): string => `Insert · ${insertLabel}`;
 
 /**
- * The voice's groups in the picker, in order (decision 4), each claiming the
- * patch paths it starts with. An operator's group is named by its letter.
+ * The voice's group labels in the picker (decision 4), by the catalog's
+ * section (windsor#436); the groups come in the catalog's order. An
+ * operator's group is this label and the operator's letter.
  */
-export interface VoiceGroup {
-  readonly label: string;
-  readonly claims: (path: string) => boolean;
-}
+export const VOICE_GROUPS: Readonly<Record<VoiceSection['kind'], string>> = {
+  filter: 'Voice · Filter',
+  operator: 'Voice · Op',
+  lfo: 'Voice · LFO',
+  pitch: 'Voice · Pitch',
+};
 
-/** The operator index in a voice path (`ops.2.width`), or undefined. */
-export const OPERATOR_PATH = /^ops\.(\d+)\./;
-
-export const VOICE_GROUPS = (opNames: readonly string[]): readonly VoiceGroup[] => [
-  { label: 'Voice · Filter', claims: (path) => path.startsWith('filter.') },
-  ...opNames.map((name, i) => ({
-    label: `Voice · Op ${name}`,
-    claims: (path: string) => OPERATOR_PATH.exec(path)?.[1] === String(i),
-  })),
-  { label: 'Voice · LFO', claims: (path) => /^lfo2?\./.test(path) },
-  { label: 'Voice · Pitch', claims: (path) => path.startsWith('pitchEnv') },
-];
+/** A voice section's group label: `Voice · Filter`, `Voice · Op B`. */
+export const voiceGroupLabel = (section: VoiceSection, opNames: readonly string[]): string =>
+  section.kind === 'operator'
+    ? `${VOICE_GROUPS.operator} ${opNames[section.op] ?? ''}`
+    : VOICE_GROUPS[section.kind];
 
 /** How a readout prints a number: the thresholds where it drops a decimal. */
 export interface ReadoutNumbers {

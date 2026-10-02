@@ -3,20 +3,35 @@
  * `2026-10-01-song-automation-lanes` decisions 2–5), as data. The insert rows
  * are `automationInsertTables.ts`; the lookups are `automationTargets.ts`.
  *
- * Every row's bounds and scale are its knob's: the voice rows are the voice
- * target table's (`worklet/fm/voiceTargetTables.ts`, windsor#419), one per
- * row with its bounds, and this file adds each one's look (label, scale,
- * unit) by path, the one place a voice target is named (windsor#424);
- * `automationTargets.ts` puts each look under its target id as
- * `VOICE_AUTOMATION_ROWS`. The app's `automationTargetParity.test.ts` holds every
- * voice and strip row to its knob (`patchKnobTables.ts`, `mixerTables.ts`).
- * A lane is drawn in its knob's own scale (decision 5), so a decay time,
- * whose knob ends on exact 0 (windsor#316), is a log row from 0 with the
- * table's 1 ms floor as its display floor.
+ * The voice rows are the voice target table's (`worklet/fm/voiceTargetTables.ts`,
+ * windsor#419), one per row with its bounds, and this file adds each one's
+ * look (label, scale, unit) by path, the one place a voice target is named
+ * (windsor#424), and its section, from the table's layout;
+ * `automationTargets.ts` puts each under its target id as
+ * `VOICE_AUTOMATION_ROWS`. The Parts tab's knob over a voice target takes
+ * its range from that row (windsor#436, record
+ * `2026-10-02-knob-ranges-from-the-catalog`), and the song-lane picker its
+ * group from the section. The app's `automationTargetParity.test.ts` holds
+ * every strip row to its mixer knob (`mixerTables.ts`). A lane is drawn in
+ * its knob's own scale (decision 5), so a decay time, whose knob ends on
+ * exact 0 (windsor#316), is a log row from 0 with the table's 1 ms floor as
+ * its display floor.
  */
 import { OP_NAMES } from '../patch/patch';
-import type { VoiceTargetPath, VoiceTargetRow } from '../worklet/fm/voiceTargetTables';
-import type { AutomationScale, AutomationTargetRow, StripTargetId } from './automationLane';
+import {
+  VT_LFO_AMOUNT,
+  VT_OP_BASE,
+  VT_OP_STRIDE,
+  VT_PITCH_ENV_AMOUNT,
+  type VoiceTargetPath,
+  type VoiceTargetRow,
+} from '../worklet/fm/voiceTargetTables';
+import type {
+  AutomationScale,
+  AutomationTargetRow,
+  StripTargetId,
+  VoiceTargetId,
+} from './automationLane';
 
 /** The most FM lanes one part carries (decision 3). Strip and insert lanes have no cap. */
 export const FM_LANES_MAX = 8;
@@ -89,38 +104,71 @@ const VOICE_LOOKS: Readonly<Record<VoicePath, VoiceLook>> = {
   // The Formant mode's vowel (windsor#406): the picker lists it whatever the
   // filter mode; a lane on a patch not in Formant is silent.
   'filter.vowel': { label: 'Vowel', scale: 'linear', unit: '' },
-  'lfo.amount': { label: 'LFO 1 Amount', scale: 'linear', unit: '' },
+  'lfo.amount': { label: 'LFO 1 Amt', scale: 'linear', unit: '' },
   'lfo.rate': { label: 'LFO 1 Rate', scale: 'log', unit: 'Hz' },
-  'lfo2.amount': { label: 'LFO 2 Amount', scale: 'linear', unit: '' },
+  'lfo2.amount': { label: 'LFO 2 Amt', scale: 'linear', unit: '' },
   'lfo2.rate': { label: 'LFO 2 Rate', scale: 'log', unit: 'Hz' },
-  pitchEnvAmount: { label: 'Pitch Env Amt', scale: 'linear', unit: 'st' },
+  pitchEnvAmount: { label: 'Pitch Env', scale: 'linear', unit: 'st' },
 };
 
 /** An operator's five fields' looks, under `ops.<i>`; the label follows `Op <name> `. */
 const OPERATOR_LOOKS: Readonly<Record<OperatorField, VoiceLook>> = {
   level: { label: 'Level', scale: 'linear', unit: '' },
   'env.decayTime': { label: 'Decay', scale: 'log', unit: 's', zeroEnd: true },
-  'env.decayCurve': { label: 'Decay Crv', scale: 'linear', unit: '' },
-  feedback: { label: 'Feedback', scale: 'linear', unit: '' },
+  'env.decayCurve': { label: 'Dcy Crv', scale: 'linear', unit: '' },
+  feedback: { label: 'Fdbk', scale: 'linear', unit: '' },
   width: { label: 'Width', scale: 'linear', unit: '' },
 };
 
-/** An operator's path: its index and its field. */
-const OPERATOR_PATH = /^ops\.(\d)\.(.+)$/;
+/**
+ * The part of the voice a target sits in, which the song-lane picker groups
+ * its rows by: the filter, one operator (its index), the LFOs or the pitch
+ * envelope.
+ */
+export type VoiceSection =
+  | { readonly kind: 'filter' | 'lfo' | 'pitch' }
+  | { readonly kind: 'operator'; readonly op: number };
 
-/** The look of the target at `path`, an operator's labelled with its name. */
-function lookOf(path: VoiceTargetPath): VoiceLook {
-  const op = OPERATOR_PATH.exec(path);
-  if (!op) return VOICE_LOOKS[path as VoicePath];
-  const look = OPERATOR_LOOKS[op[2] as OperatorField];
-  return { ...look, label: `Op ${OP_NAMES[Number(op[1])]} ${look.label}` };
+/**
+ * A voice row: one voice target's catalog row, with the target's patch path
+ * and its section, so no reader takes the id apart to find either.
+ */
+export interface VoiceAutomationRow extends AutomationTargetRow {
+  readonly target: VoiceTargetId;
+  readonly path: VoiceTargetPath;
+  readonly section: VoiceSection;
 }
 
-/** A voice row without its target id: its target row's bounds and its look. */
-export function voiceRowLook(row: VoiceTargetRow): Omit<AutomationTargetRow, 'target'> {
-  const { label, scale, unit, zeroEnd } = lookOf(row.path);
+/**
+ * The section of the target with code `code`, from the target table's own
+ * layout: the filter's rows, then `VT_OP_STRIDE` rows per operator from
+ * `VT_OP_BASE`, then the LFOs' from `VT_LFO_AMOUNT`, and the pitch
+ * envelope's from `VT_PITCH_ENV_AMOUNT`.
+ */
+export function voiceSectionOf(code: number): VoiceSection {
+  if (code < VT_OP_BASE) return { kind: 'filter' };
+  if (code < VT_LFO_AMOUNT) {
+    return { kind: 'operator', op: Math.floor((code - VT_OP_BASE) / VT_OP_STRIDE) };
+  }
+  return { kind: code < VT_PITCH_ENV_AMOUNT ? 'lfo' : 'pitch' };
+}
+
+/** The look of the target at `path` in `section`, an operator's labelled with its name. */
+function lookOf(path: VoiceTargetPath, section: VoiceSection): VoiceLook {
+  if (section.kind !== 'operator') return VOICE_LOOKS[path as VoicePath];
+  const look = OPERATOR_LOOKS[path.slice(`ops.${section.op}.`.length) as OperatorField];
+  return { ...look, label: `Op ${OP_NAMES[section.op]} ${look.label}` };
+}
+
+/**
+ * The voice row of the target table's row at `code`, without its target id:
+ * its path and section, its target row's bounds and its look.
+ */
+export function voiceRowOf(row: VoiceTargetRow, code: number): Omit<VoiceAutomationRow, 'target'> {
+  const section = voiceSectionOf(code);
+  const { label, scale, unit, zeroEnd } = lookOf(row.path, section);
   const bounds = zeroEnd
     ? { min: 0, max: row.max, floor: row.floor }
     : { min: row.min, max: row.max };
-  return { label, ...bounds, scale, unit };
+  return { label, ...bounds, scale, unit, path: row.path, section };
 }
