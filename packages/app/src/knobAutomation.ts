@@ -9,7 +9,7 @@
  * - an insert knob by its insert's stable id and its field. A lane on a field
  *   its insert's settings leave unread (`automatableInsertFields`) is inert,
  *   so the knob stays free: it drives the field once the field is read again;
- * - a patch knob by its path, for the 29 voice targets only, against the
+ * - a patch knob by its path, for the 30 voice targets only, against the
  *   selected part's lanes, so two parts sharing a patch lock independently.
  *
  * The lock is the console's: the engine already ignores a write to a field a

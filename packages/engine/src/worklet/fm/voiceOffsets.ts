@@ -12,8 +12,9 @@
  * - `applyVoiceOffsets` lays out what the voice already plays (the patch's
  *   value, or its step's: windsor#17) in `liveValues`, and moves each target
  *   with an offset by it, clamped to the row's bounds. The control update,
- *   the amplitude and width ramps, the filter and the LFOs read
- *   `liveValues`; the LFO rates reach the LFOs as `rateMul`.
+ *   the amplitude and width ramps, the filter, the Formant peaks (the
+ *   vowel, windsor#406) and the LFOs read `liveValues`; the LFO rates reach
+ *   the LFOs as `rateMul`.
  * - The decay rows (windsor#347) reach the five envelopes as their decay
  *   time and curve (`applyLiveDecays`). A time is read afresh by each step
  *   of the envelope, which keeps its phase, so a running decay goes on from
@@ -86,6 +87,7 @@ import {
   VT_OP_WIDTH,
   VT_PITCH_ENV_AMOUNT,
   VT_RESONANCE,
+  VT_VOWEL,
   voiceTargetCode,
 } from './voiceOffsetTables';
 
@@ -146,6 +148,7 @@ function bindLiveValues(voice: Voice): void {
   v[VT_ENV_AMOUNT] = voice.envAmount;
   v[VT_RESONANCE] = voice.resonance;
   v[VT_FILTER_DECAY] = own[STEP_SLOT_FILTER_DECAY];
+  v[VT_VOWEL] = patch.filter.vowel;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const b = VT_OP_BASE + i * VT_OP_STRIDE;
     const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;

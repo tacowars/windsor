@@ -92,6 +92,15 @@ describe('the picker', () => {
     }
   });
 
+  it('lists Vowel last in Voice · Filter, whatever the filter mode (windsor#406)', () => {
+    const filter = groups.find((g) => g.label === 'Voice · Filter')!.options;
+    expect(filter.at(-1)).toEqual({
+      target: 'voice.filter.vowel',
+      label: 'Vowel',
+      disabled: false,
+    });
+  });
+
   it("lists only the fields an insert's settings leave read", () => {
     const tape = groups.find((g) => g.label === 'Insert · Tape')!.options.map((o) => o.target);
     expect(tape).toContain(TAPE_DRIVE);
@@ -269,6 +278,10 @@ describe('the readout', () => {
     expect(readout(row('voice.filter.env.decayTime'), 1.5)).toBe('1.50 s');
     expect(readout(row('voice.filter.envAmount'), 1.5)).toBe('+1.5 oct');
     expect(readout(row('voice.pitchEnvAmount'), -12)).toBe('-12.0 st');
+    expect(readout(row('voice.filter.vowel'), 0)).toBe('a');
+    expect(readout(row('voice.filter.vowel'), 0.5)).toBe('a→e 50%');
+    expect(readout(row('voice.filter.vowel'), 3.25)).toBe('o→u 25%');
+    expect(readout(row('voice.filter.vowel'), 4)).toBe('u');
     expect(readout(row('strip.send.a'), 0.3)).toBe('0.30');
     expect(readout({ ...row('strip.send.a'), unit: '%' }, 25)).toBe('25%');
   });

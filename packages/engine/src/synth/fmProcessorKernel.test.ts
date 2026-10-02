@@ -11,6 +11,7 @@ import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarne
 import { makePatch, WAVE } from '../patch/patch';
 import type { PartialPatch, Patch } from '../patch/patch';
 import { PRESET_NAMES, PRESETS } from '../patch/presets';
+import { voiceSlotParamName } from './audioPart';
 
 const loaded = loadProcessor();
 const SR = loaded.sampleRate;
@@ -235,6 +236,59 @@ describe('rebinding a sounding voice', () => {
       return renders;
     });
     expect(kernel.every((r, i) => sameBits(r, generic[i]!))).toBe(true);
+  });
+});
+
+/**
+ * The chord on a Formant patch with a song lane on its vowel (windsor#406):
+ * slot 0 mapped to `filter.vowel`, its offset ramping from 0 to 4 a step a
+ * block, so the peaks retune on ringing voices every block; held, then
+ * released through its tail.
+ */
+function renderVowelLane(patch: Patch, specialise: boolean): Float32Array {
+  const processor = loaded.create(patch, 16, undefined, {
+    specialise,
+    voiceSlots: ['filter.vowel'],
+  });
+  const params: Record<string, Float32Array> = {
+    pitchBend: new Float32Array([0]),
+    modWheel: new Float32Array([0]),
+    cutoffMod: new Float32Array([0]),
+    gain: new Float32Array([1]),
+  };
+  for (let i = 0; i < 8; i++) params[voiceSlotParamName(i)] = new Float32Array([0]);
+  const blocks = blocksFor(HOLD_S + TAIL_S);
+  const events = [
+    ...CHORD,
+    ...RELEASE.map((e) => ({ ...e, frame: e.frame + blocksFor(HOLD_S) * BLOCK_FRAMES })),
+  ];
+  const outL = new Float32Array(BLOCK_FRAMES);
+  const outR = new Float32Array(BLOCK_FRAMES);
+  const out = new Float32Array(blocks * BLOCK_FRAMES * 2);
+  let pending = 0;
+  for (let b = 0; b < blocks; b++) {
+    loaded.setFrame(b * BLOCK_FRAMES);
+    while (pending < events.length && events[pending]!.frame < (b + 1) * BLOCK_FRAMES) {
+      processor.inbox(events[pending++]!);
+    }
+    params.voiceSlot0![0] = Math.min(4, (4 * b) / blocksFor(HOLD_S));
+    processor.process([], [[outL, outR]], params);
+    out.set(outL, b * BLOCK_FRAMES * 2);
+    out.set(outR, b * BLOCK_FRAMES * 2 + BLOCK_FRAMES);
+  }
+  return out;
+}
+
+describe('a vowel lane moving (windsor#406)', () => {
+  it('renders bit-identical to the generic loop as the lane sweeps a to u', () => {
+    const patch = makePatch({
+      algorithm: 4,
+      ops: [{ wave: WAVE.SAW, feedback: 0.3 }, { level: 0.5 }, { level: 0.7 }, NOISE],
+      filter: { mode: 5, vowel: 0, resonance: 1.3, envAmount: 0.8, keyTrack: 0.4 },
+    });
+    const kernel = renderVowelLane(patch, true);
+    expect(kernel.some((s) => s !== 0)).toBe(true);
+    expect(sameBits(kernel, renderVowelLane(patch, false))).toBe(true);
   });
 });
 
