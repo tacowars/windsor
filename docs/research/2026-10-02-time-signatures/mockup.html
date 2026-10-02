@@ -1,0 +1,436 @@
+<title>Windsor Meter Picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a mockup toolbar, then today's header with the meter picker in place of the 4/4 box, the Song ruler and lanes, the Grid card's step strip, the position count, and the open questions. Single theme on purpose: Windsor's dark console tokens (console.css), as in the earlier mockups. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e;
+  --panel: #1f2529;
+  --panel-hi: #262d32;
+  --inset: #121618;
+  --line: #2c3439;
+  --line-bright: #3d4950;
+  --ink: #dce3e3;
+  --ink-dim: #8b9a9e;
+  --ink-faint: #5e6b70;
+  --carrier: #e0a44e;
+  --modulator: #5fa8a0;
+  --hot: #d2643c;
+  --on-accent: #111416;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  --head-control-h: 28px;
+  --step-w: 32px;
+  --beat-gap: 4px;
+  --bar-gap: 10px;
+  --px-per-tick: 1.9px;
+  --name-w: 260px;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 13px/1.5 var(--f-ui); padding-block: 20px 48px; padding-inline: 16px; margin: 0; }
+.wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1, h2 { font-family: var(--f-panel); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+h1 { font-size: 17px; }
+h2 { font-size: 12px; color: var(--ink-dim); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h2 small, .meas { font-family: var(--f-num); font-size: 10px; letter-spacing: 0; text-transform: none; color: var(--ink-faint); font-weight: 400; }
+p { margin: 0; max-width: 76ch; color: var(--ink-dim); }
+.lede { display: flex; flex-direction: column; gap: 6px; }
+section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.scroll { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--line-bright) var(--panel); }
+
+/* Mockup toolbar (not product UI) */
+.toolbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding: 10px 12px; background: var(--panel); border: 1px dashed var(--line-bright); border-radius: 6px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; }
+.opt { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.opt-label { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { background: var(--inset); border: 0; border-left: 1px solid var(--line); color: var(--ink-dim); font: 500 11px var(--f-num); padding: 4px 9px; cursor: pointer; }
+.seg button:first-child { border-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--panel-hi); color: var(--carrier); }
+.toolbar .tag { font: 10px var(--f-num); color: var(--ink-faint); }
+
+/* Today's header */
+.header { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; }
+.transport-row { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.transport-group { display: flex; align-items: flex-end; gap: 8px; flex: none; }
+.brand { font: 600 15px var(--f-panel); letter-spacing: 0.12em; color: var(--ink); }
+.btn { height: var(--head-control-h); min-width: 34px; padding: 0 10px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: var(--r); color: var(--ink); font: 600 11px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.btn.audio { background: var(--carrier); border-color: var(--carrier); color: var(--on-accent); }
+.btn.ghost { color: var(--ink-faint); background: transparent; border-color: var(--line); }
+.btn[aria-pressed="true"] { background: var(--carrier); border-color: var(--carrier); color: var(--on-accent); }
+.box { height: var(--head-control-h); display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); font: 13px var(--f-num); color: var(--ink); font-variant-numeric: tabular-nums; }
+.box .unit { font-size: 9px; letter-spacing: 0.08em; color: var(--ink-faint); text-transform: uppercase; }
+.box.dim { color: var(--ink-dim); }
+.box.right { justify-content: flex-end; }
+.position { min-width: 7ch; justify-content: center; }
+select.field { height: var(--head-control-h); background: var(--inset); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r); font: 13px var(--f-num); padding: 0 6px; }
+select.field option { background: var(--panel); color: var(--ink); }
+.changed { position: relative; outline: 1px solid var(--carrier); outline-offset: 2px; border-radius: var(--r); }
+.tabs { display: flex; gap: 0; }
+.tabs span { font: 600 11px var(--f-panel); letter-spacing: 0.08em; padding: 5px 14px; border: 1px solid var(--line); color: var(--ink-dim); background: var(--inset); }
+.tabs span.on { background: var(--carrier); border-color: var(--carrier); color: var(--on-accent); }
+.callouts { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 12px; color: var(--ink-dim); }
+.callouts b { color: var(--carrier); font-weight: 500; font-family: var(--f-num); }
+
+/* Song ruler and lanes */
+.song { background: var(--ground); border: 1px solid var(--line); border-radius: 4px; padding-block: 6px 10px; min-width: 0; }
+.song-grid { display: grid; grid-template-columns: var(--name-w) max-content; row-gap: 6px; }
+.names { display: contents; }
+.name { padding: 2px 14px; display: flex; flex-direction: column; justify-content: center; }
+.name.ruler-name { align-items: flex-end; justify-content: flex-start; font: 10px var(--f-num); color: var(--ink-faint); padding-top: 4px; }
+.name strong { font: 600 13px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; }
+.name small { font: 10px var(--f-num); color: var(--ink-faint); }
+.timeline { position: relative; }
+.ruler { display: flex; border-bottom: 1px solid var(--line-bright); height: 22px; }
+.ruler-bar { position: relative; flex: none; border-left: 1px solid var(--line-bright); font: 10px var(--f-num); color: var(--ink-dim); }
+.ruler-bar span { position: absolute; left: 4px; top: 2px; }
+.ruler-bar i { position: absolute; bottom: 0; width: 1px; height: 6px; background: var(--line-bright); }
+.heavy .ruler-bar { border-left: 2px solid var(--ink-faint); }
+.heavy .ruler-bar span { color: var(--ink); }
+.lane { position: relative; height: 38px; }
+.region { position: absolute; inset: 0; border: 1px solid var(--carrier); border-radius: var(--r); background: color-mix(in srgb, var(--modulator) 16%, var(--inset)); display: flex; align-items: center; padding: 0 6px; font: 600 11px var(--f-panel); letter-spacing: 0.04em; overflow: hidden; white-space: nowrap; }
+.region.harmony { background: var(--panel-hi); border-color: var(--carrier); border-top: 2px solid var(--modulator); flex-direction: column; align-items: flex-start; justify-content: center; line-height: 1.2; }
+.region.harmony small { font: 9px var(--f-num); color: var(--ink-faint); font-weight: 400; }
+.region .loop { color: var(--carrier); margin-right: 6px; }
+.region .what { color: var(--ink); font-size: 10px; }
+.lane-line { position: absolute; top: 0; bottom: 0; width: 1px; background: color-mix(in srgb, var(--line-bright) 70%, transparent); pointer-events: none; }
+.heavy .lane-line { width: 2px; background: var(--line-bright); }
+.playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--carrier); pointer-events: none; z-index: 2; }
+.playhead span { position: absolute; top: 0; left: 3px; font: 10px var(--f-num); color: var(--carrier); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.song-end { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--ink-faint); pointer-events: none; }
+.song-end span { position: absolute; bottom: -1px; left: 4px; font: 9px var(--f-num); color: var(--ink-faint); white-space: nowrap; }
+
+/* Grid card */
+.card { width: max-content; min-width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; display: flex; min-width: 0; }
+.card-rail { width: 24px; flex: none; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 10px; }
+.card-rail .lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--modulator); }
+.card-rail .vname { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 11px var(--f-panel); letter-spacing: 0.1em; }
+.play { flex: none; width: 270px; border-right: 1px solid var(--line); padding: 8px 10px; display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; align-content: start; }
+.panel-label { font: 600 10px var(--f-panel); letter-spacing: 0.1em; color: var(--ink-faint); text-transform: uppercase; }
+.play .step-pick { display: flex; flex-direction: column; gap: 4px; grid-row: span 2; justify-content: center; }
+.play select.field { width: 100%; font-size: 12px; }
+.knobs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 4px; }
+.knob { display: flex; flex-direction: column; align-items: center; gap: 2px; font: 10px var(--f-num); color: var(--ink); }
+.knob i { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line-bright); background: var(--inset); }
+.knob i.teal { border-color: var(--modulator); }
+.knob em { font: 600 9px var(--f-panel); font-style: normal; letter-spacing: 0.08em; color: var(--ink-faint); text-transform: uppercase; }
+.knob.hl { color: var(--carrier); }
+.standin { grid-column: 1 / -1; font: 10px var(--f-num); color: var(--ink-faint); border-top: 1px dashed var(--line); padding-top: 6px; }
+.steps { flex: 1; min-width: 0; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.steps-head { display: flex; gap: 10px; align-items: baseline; }
+.steps-head b { font: 500 11px var(--f-num); color: var(--ink); }
+.strip { display: flex; gap: 2px; padding-bottom: 6px; }
+.grid-col { width: var(--step-w); flex: none; display: flex; flex-direction: column; gap: 2px; }
+.grid-col.beat { margin-left: var(--beat-gap); }
+.grid-col.bar { margin-left: var(--beat-gap); }
+.heavy .grid-col.bar { margin-left: var(--bar-gap); }
+.grid-idx { font: 9px var(--f-num); color: var(--ink-faint); text-align: center; border-radius: var(--r); padding: 1px 0; }
+.grid-col.playing .grid-idx { background: var(--carrier); color: var(--on-accent); }
+.gcell { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font: 600 10px var(--f-panel); letter-spacing: 0.04em; text-align: center; min-height: 22px; display: flex; align-items: center; justify-content: center; }
+.gcell.note { color: var(--ink); border-color: var(--line-bright); font-size: 11px; }
+.gcell.deg { font: 9px var(--f-num); color: var(--ink); justify-content: space-between; padding: 0 3px; }
+.gcell.blank { visibility: hidden; }
+.gcell.small { min-height: 14px; font: 8px var(--f-num); }
+.beatnums { display: flex; gap: 2px; }
+.beatnums .bn { width: var(--step-w); flex: none; font: 9px var(--f-num); color: var(--modulator); text-align: center; }
+.beatnums .bn.beat { margin-left: var(--beat-gap); }
+.beatnums .bn.bar { margin-left: var(--beat-gap); }
+.heavy .beatnums .bn.bar { margin-left: var(--bar-gap); }
+
+/* Count table */
+.count { display: flex; flex-direction: column; gap: 6px; }
+.count-row { display: flex; align-items: center; gap: 10px; }
+.count-row .label { width: 150px; flex: none; font-size: 12px; color: var(--ink-dim); }
+.count-row .label b { color: var(--ink); font-weight: 500; }
+.count-cells { display: flex; gap: 2px; }
+.cc { width: 46px; flex: none; height: 24px; display: flex; align-items: center; justify-content: center; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); font: 11px var(--f-num); color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.cc.beat { margin-left: var(--beat-gap); }
+.cc.first { color: var(--ink); border-color: var(--line-bright); }
+.cc.cur { border-color: var(--carrier); color: var(--carrier); }
+.pick { font: 9px var(--f-panel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--carrier); border: 1px solid var(--carrier); border-radius: var(--r); padding: 0 4px; margin-left: 6px; }
+
+/* Decisions */
+.decide { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 12px; }
+.q { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.q h3 { margin: 0; font: 600 12px var(--f-panel); letter-spacing: 0.06em; text-transform: uppercase; }
+.q p { font-size: 12.5px; }
+.q .rec { color: var(--ink); }
+.q .rec b { color: var(--carrier); font-weight: 600; }
+code { font: 11.5px var(--f-num); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--carrier); outline-offset: 2px; }
+@media (max-width: 640px) { :root { --name-w: 120px; } .play { width: 200px; grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap" id="root">
+  <div class="lede">
+    <h1>Windsor · Meter picker <span class="meas">mockup for windsor#431 · approved 2026-10-02</span></h1>
+    <p>Today's header, Song ruler and Grid card, redrawn with the song's meter. The only new control is the picker in place of the fixed <code>4/4</code> box (outlined in amber). Everything else keeps today's cells and draws the meter's beats. Pick a meter in the header or the toolbar, change the card's Step, and press ▶ to watch the count.</p>
+  </div>
+
+  <div class="toolbar" aria-label="Mockup controls (not product UI)">
+    <span class="tag">mockup only</span>
+    <div class="opt"><span class="opt-label">Meter</span><div class="seg" id="tb-meter"></div></div>
+    <div class="opt"><span class="opt-label">Grid part</span><div class="seg" id="tb-pattern"></div></div>
+    <div class="opt"><span class="opt-label">Bar line</span><div class="seg" id="tb-bar"></div></div>
+  </div>
+
+  <section>
+    <h2>Header <small>the 4/4 box becomes a select, the same size as the swing grid's</small></h2>
+    <div class="header scroll">
+      <div class="transport-row">
+        <div class="transport-group"><span class="brand">WINDSOR</span><button class="btn audio" type="button">Enable audio</button><button class="btn ghost" type="button" aria-label="Undo">↶</button><button class="btn ghost" type="button" aria-label="Redo">↷</button></div>
+        <div class="transport-group"><button class="btn" type="button">Tap</button><span class="box right" style="width:96px">120.00<span class="unit">bpm</span></span><span class="box right" style="width:76px" id="bars-box">4<span class="unit">bars</span></span></div>
+        <div class="transport-group"><span class="box dim right" style="width:62px">50<span class="unit">%</span></span><select class="field" id="swing-grid" aria-label="Swing grid"><option>1/16</option><option>1/8</option></select><select class="field changed" id="meter" aria-label="Meter"></select></div>
+        <div class="transport-group"><select class="field" aria-label="Key"><option>C</option></select><select class="field" aria-label="Scale" style="width:136px"><option>naturalMinor</option></select></div>
+        <div class="transport-group"><span class="box position" id="pos">1.1.1</span><button class="btn" type="button" id="play" aria-label="Play">▶</button><button class="btn" type="button" id="stop" aria-label="Stop">■</button><button class="btn" type="button" id="pause" aria-label="Pause">‖</button><button class="btn" type="button" aria-label="Loop">⇄</button></div>
+      </div>
+      <div class="tabs"><span>Parts</span><span>Mixer</span><span class="on">Song</span></div>
+    </div>
+    <div class="callouts" id="header-notes"></div>
+  </section>
+
+  <section>
+    <h2>Song ruler <small>bar lines move, a tick at every counted beat, and the song grows or shrinks</small></h2>
+    <div class="song scroll" id="song"></div>
+  </section>
+
+  <section>
+    <h2>Grid card <small>step cells grouped by the meter's beats (teal numbers count beats; they are only in the mockup)</small></h2>
+    <div class="scroll"><div class="card" id="card"></div></div>
+  </section>
+
+  <section>
+    <h2>Position readout <small>bar.beat.sixteenth, with the beat the meter's counted beat</small></h2>
+    <p id="count-intro"></p>
+    <div class="scroll"><div class="count" id="count"></div></div>
+  </section>
+
+  <section>
+    <h2>Decided <small>tacowars, 2026-10-02: each as drawn and recommended here</small></h2>
+    <div class="decide">
+      <div class="q"><h3>1 · The picker</h3><p>A plain select in the swing group, where <code>4/4</code> sits today, with the six meters in the engine's order. It's one step on undo. Options read the bare meter, so 7/8 doesn't say 2+2+3 until a grouping can be chosen.</p><p class="rec"><b>Decided:</b> as drawn.</p></div>
+      <div class="q"><h3>2 · Bar line heavier?</h3><p>Today a bar is a full-height line and a beat is a 6px tick, so the ruler already tells them apart. In a step strip a bar shows only when the part runs past one bar (a 16-step pattern kept in 7/8 groups 4·4·6 | 2). Try it with the <i>Bar line</i> switch.</p><p class="rec"><b>Decided:</b> ruler as today; in step strips, a wider gap (10px) before a new bar. The toolbar's <i>Strip + ruler</i> also draws the ruler's bar lines heavier, for comparison.</p></div>
+      <div class="q"><h3>3 · 7/8's long beat</h3><p>The third beat is just a longer group (6 cells at 1/16, 3 at 1/8), with no tint or label. The ruler's ticks fall at 24 and 48, so the last gap is visibly longer.</p><p class="rec"><b>Decided:</b> as drawn, no extra mark.</p></div>
+      <div class="q"><h3>4 · Grouping at other step lengths</h3><p>Today the Grid strip groups every 4 steps at any step length, and Euclid already groups by the beat. The beat rule changes 4/4 at 1/8 to 2·2·2·2 (today 4·4) and at 1/32 to groups of 8.</p><p class="rec"><b>Decided:</b> group by beat when a beat holds 2+ steps; otherwise a gap at each bar; when a step is a bar or longer, groups of 4 with today's 4px gap. A beat or bar line that no step lands on goes before the first step past it (7/8 at 1/2T still groups by bar). Grid and Euclid share the rule.</p></div>
+      <div class="q"><h3>5 · Counting the /8 meters</h3><p>The third field counts 16ths inside the counted beat (1–6 in a dotted-quarter beat), so 6/8 tick 36 reads <code>1.2.1</code> and 7/8's last 16th of bar 2 reads <code>2.3.6</code>. The other option counts 8ths in /8 meters (1–3), which loses the 16th.</p><p class="rec"><b>Decided:</b> 16ths, as the issue proposes. Both rows are drawn above.</p></div>
+      <div class="q"><h3>6 · Step picker's 96</h3><p>Reads <code>1 bar</code> in 4/4 and <code>1/1</code> in every other meter. Open the card's Step select to see it.</p><p class="rec"><b>Decided:</b> as the issue decides. The Euclid card's cells take the same beat rule and aren't drawn here.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const PPQ = 24, SIXTEENTH = 6, EIGHTH = 12, BARS = 4, BPM = 120;
+const METERS = [
+  { id: '3/4', beats: [24, 24, 24] },
+  { id: '4/4', beats: [24, 24, 24, 24] },
+  { id: '5/4', beats: [24, 24, 24, 24, 24] },
+  { id: '6/8', beats: [36, 36] },
+  { id: '7/8', beats: [24, 24, 36] },
+  { id: '12/8', beats: [36, 36, 36, 36] },
+];
+const DIVISORS = [
+  [96, '1 bar'], [48, '1/2'], [32, '1/2T'], [24, '1/4'], [16, '1/4T'],
+  [12, '1/8'], [8, '1/8T'], [6, '1/16'], [4, '1/16T'], [3, '1/32'],
+];
+const REST_STEPS = new Set([1, 2, 5, 9]); // the screenshot's rests (steps 2, 3, 6, 10)
+
+const state = { meter: '7/8', divisor: 6, pattern: 'bar', barLine: 'strip', tick: 0, playing: false };
+const meterOf = () => METERS.find((m) => m.id === state.meter);
+const barTicks = (m = meterOf()) => m.beats.reduce((a, b) => a + b, 0);
+const beatStarts = (m = meterOf()) => m.beats.reduce((acc, b, i) => (acc.push(i ? acc[i - 1] + m.beats[i - 1] : 0), acc), []);
+const songTicks = () => BARS * barTicks();
+const divisorLabel = (d) => (d === 96 && state.meter !== '4/4' ? '1/1' : DIVISORS.find(([v]) => v === d)[1]);
+
+function position(tick, unit = SIXTEENTH) {
+  const bar = barTicks(), starts = beatStarts();
+  const t = ((tick % songTicks()) + songTicks()) % songTicks();
+  const within = t % bar;
+  let beat = 0;
+  while (beat + 1 < starts.length && starts[beat + 1] <= within) beat++;
+  return `${Math.floor(t / bar) + 1}.${beat + 1}.${Math.floor((within - starts[beat]) / unit) + 1}`;
+}
+
+/**
+ * The counted beat (0-based, 0 = the bar line) that falls inside step i's
+ * span (step i-1's start, step i's start], or -1. A line no step lands on
+ * belongs to the first step past it, so steps that never meet a bar or beat
+ * line exactly still group.
+ */
+function lineInto(i, divisor) {
+  if (i === 0) return 0;
+  const bar = barTicks(), starts = beatStarts();
+  const lo = (i - 1) * divisor, hi = i * divisor;
+  if (Math.floor(hi / bar) > Math.floor(lo / bar)) return 0; // a bar line wins over a beat line
+  for (let k = 1; k < starts.length; k++) {
+    const at = Math.floor(lo / bar) * bar + starts[k];
+    if (at > lo && at <= hi) return k;
+  }
+  return -1;
+}
+
+/** 'bar', 'beat' or '' before step i, by decision 4. */
+function groupOf(i, divisor) {
+  if (i === 0) return '';
+  const bar = barTicks();
+  // A bar or longer per step: groups of 4 at today's beat gap, not a bar gap.
+  if (divisor >= bar) return i % 4 === 0 ? 'beat' : '';
+  const line = lineInto(i, divisor);
+  if (line === 0) return 'bar';
+  const minBeat = Math.min(...meterOf().beats);
+  if (line > 0 && minBeat / divisor >= 2) return 'beat';
+  return '';
+}
+
+/**
+ * A new part starts one bar long at its default step (1/16), which divides
+ * every meter's bar (epic decision 5). Changing Step afterwards keeps the
+ * step count, because a step is a note value, so any other Step shows that
+ * count running as a polymeter. No count is rounded.
+ */
+const DEFAULT_STEP = SIXTEENTH;
+function stepCount() {
+  if (state.pattern === '16') return 16;
+  return barTicks() / DEFAULT_STEP;
+}
+
+function seg(id, items, key) {
+  const node = document.getElementById(id);
+  node.innerHTML = items.map(([v, label]) => `<button type="button" data-v="${v}" aria-pressed="${String(state[key]) === String(v)}">${label}</button>`).join('');
+  node.onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    state[key] = b.dataset.v;
+    if (key === 'meter') state.tick = restTick();
+    render();
+  };
+}
+
+const restTick = () => barTicks() * 2 - SIXTEENTH; // the last 16th of bar 2
+
+function renderHeader() {
+  const sel = document.getElementById('meter');
+  sel.innerHTML = METERS.map((m) => `<option value="${m.id}"${m.id === state.meter ? ' selected' : ''}>${m.id}</option>`).join('');
+  sel.onchange = () => { state.meter = sel.value; state.tick = restTick(); render(); };
+  const m = meterOf();
+  document.getElementById('header-notes').innerHTML =
+    `<span><b>${m.id}</b> · ${m.beats.length} counted beats of ${m.beats.join(' · ')} ticks</span>` +
+    `<span>bar <b>${barTicks()}</b> ticks · 4 bars = <b>${songTicks()}</b> ticks (4/4: 384)</span>` +
+    `<span>the Bars box still reads 4</span>`;
+}
+
+function renderSong() {
+  const bar = barTicks();
+  const px = (t) => `calc(${t} * var(--px-per-tick))`;
+  const starts = beatStarts().slice(1);
+  let ruler = '';
+  for (let b = 0; b < BARS; b++) {
+    ruler += `<div class="ruler-bar" style="width:${px(bar)}"><span>${b + 1}</span>${starts.map((s) => `<i style="left:${px(s)}"></i>`).join('')}</div>`;
+  }
+  const lines = Array.from({ length: BARS - 1 }, (_, b) => `<div class="lane-line" style="left:${px((b + 1) * bar)}"></div>`).join('');
+  const steps = stepCount();
+  const end4 = state.meter === '4/4' ? '' : `<div class="song-end" style="left:${px(BARS * 96)};height:calc(100% + 96px)"><span>4/4 end</span></div>`;
+  document.getElementById('song').innerHTML = `
+    <div class="song-grid ${state.barLine === 'heavier' ? 'heavy' : ''}">
+      <div class="name ruler-name">bar · beat<br>loop</div>
+      <div class="timeline" style="width:calc(${Math.max(BARS * 96, songTicks())} * var(--px-per-tick) + 2px)">
+        <div class="ruler" style="width:${px(songTicks())}">${ruler}</div>
+        <div style="height:12px"></div>
+        <div class="playhead" id="ph" style="height:calc(100% + 96px)"><span id="ph-label"></span></div>
+        ${end4}
+      </div>
+      <div class="name"><strong>Harmony</strong><small>chords</small></div>
+      <div class="lane" style="width:${px(songTicks())}"><div class="region harmony">C min<small>i · triad</small></div>${lines}</div>
+      <div class="name"><strong>Part 1</strong><small>grid</small></div>
+      <div class="lane" style="width:${px(songTicks())}"><div class="region"><span class="loop">∞</span><span class="what">GRID · ${steps} STEPS · ${divisorLabel(state.divisor)}</span></div>${lines}</div>
+    </div>`;
+}
+
+function renderCard() {
+  const n = stepCount();
+  const groups = Array.from({ length: n }, (_, i) => groupOf(i, state.divisor));
+  const beatNum = (i) => (groups[i] || i === 0) && state.divisor < barTicks() ? `${lineInto(i, state.divisor) + 1}` : '';
+  const cols = groups.map((g, i) => {
+    const rest = REST_STEPS.has(i % 16);
+    return `<div class="grid-col ${g}" data-i="${i}">
+      <div class="grid-idx">${i + 1}</div>
+      <div class="gcell${rest ? '' : ' note'}">${rest ? '—' : 'C'}</div>
+      ${rest ? '<div class="gcell blank">.</div><div class="gcell blank">.</div>' : '<div class="gcell deg"><span>1 C</span><span>▾</span></div><div class="gcell small">oct</div>'}
+      <div class="gcell${rest ? ' blank' : ''}">A</div>
+      <div class="gcell${rest ? ' blank' : ''}">S</div>
+      <div class="gcell small">${rest ? '' : '×1'}</div>
+    </div>`;
+  }).join('');
+  const nums = groups.map((g, i) => `<div class="bn ${g}">${beatNum(i)}</div>`).join('');
+  const options = DIVISORS.map(([v]) => `<option value="${v}"${v === Number(state.divisor) ? ' selected' : ''}>${divisorLabel(v)}</option>`).join('');
+  const knob = (v, label, teal, hl) => `<div class="knob${hl ? ' hl' : ''}"><i class="${teal ? 'teal' : ''}"></i>${v}<em>${label}</em></div>`;
+  document.getElementById('card').innerHTML = `
+    <div class="card-rail"><span class="lamp"></span><span class="vname">GRID</span></div>
+    <div class="play">
+      <span class="panel-label" style="grid-column:1/-1">Play</span>
+      <div class="step-pick"><span class="panel-label">Step</span><select class="field" id="divisor" aria-label="Step">${options}</select></div>
+      <div class="knobs">${knob(2, 'Octave')}${knob('0.80', 'Vel', true)}${knob('0.00', 'Skip')}${knob(n, 'Length', true, true)}${knob('0.20', 'Acc vel')}${knob(0, 'Rotate')}</div>
+      <div class="standin">Knobs drawn as stand-ins and unchanged. Length shows the part's steps. A new part starts one bar long at 1/16, which divides every meter's bar; changing Step keeps the count (steps are note values), so another Step runs as a polymeter.</div>
+    </div>
+    <div class="steps ${state.barLine !== 'today' ? 'heavy' : ''}">
+      <div class="steps-head"><span class="panel-label">Steps</span><b>${n}</b><span class="meas">${n} × ${divisorLabel(state.divisor)} = ${n * state.divisor} ticks · bar ${barTicks()}${n * state.divisor !== barTicks() ? ' · runs as a polymeter' : ''}</span></div>
+      <div class="beatnums">${nums}</div>
+      <div class="strip" id="strip">${cols}</div>
+    </div>`;
+  document.getElementById('divisor').onchange = (e) => { state.divisor = Number(e.target.value); render(); };
+}
+
+function renderCount() {
+  const m = meterOf();
+  const bar = barTicks();
+  const starts = beatStarts();
+  const isEighth = m.id.endsWith('/8');
+  const ticks = Array.from({ length: bar / SIXTEENTH }, (_, i) => i * SIXTEENTH);
+  const row = (label, unit, pick) => {
+    const cells = ticks.filter((t) => (t - starts.filter((s) => s <= t).pop()) % unit === 0)
+      .map((t) => `<div class="cc${starts.includes(t) && t ? ' beat' : ''}${starts.includes(t) ? ' first' : ''}" data-t="${t + bar}">${position(t + bar, unit)}</div>`).join('');
+    return `<div class="count-row"><span class="label">${label}${pick ? '<span class="pick">pick</span>' : ''}</span><div class="count-cells">${cells}</div></div>`;
+  };
+  document.getElementById('count-intro').textContent =
+    `Bar 2 of ${m.id}, every 16th, with a gap at each counted beat. The header's readout follows the playhead.`;
+  document.getElementById('count').innerHTML =
+    row('<b>16ths</b> in the beat', SIXTEENTH, true) + (isEighth ? row('<b>8ths</b> in the beat', EIGHTH, false) : '');
+}
+
+function paintPlayhead() {
+  const t = state.tick;
+  document.getElementById('pos').textContent = position(t);
+  const ph = document.getElementById('ph');
+  ph.style.left = `calc(${t} * var(--px-per-tick))`;
+  document.getElementById('ph-label').textContent = position(t);
+  const steps = stepCount(), div = Number(state.divisor);
+  const cur = Math.floor(t / div) % steps;
+  document.querySelectorAll('#strip .grid-col').forEach((c) => c.classList.toggle('playing', Number(c.dataset.i) === cur));
+  const sixteenth = Math.floor(t / SIXTEENTH) * SIXTEENTH;
+  document.querySelectorAll('#count .cc').forEach((c) => c.classList.toggle('cur', Number(c.dataset.t) === sixteenth));
+}
+
+function render() {
+  state.divisor = Number(state.divisor);
+  seg('tb-meter', METERS.map((m) => [m.id, m.id]), 'meter');
+  seg('tb-pattern', [['bar', 'New · one bar at 1/16'], ['16', 'Kept · 16 steps']], 'pattern');
+  seg('tb-bar', [['today', 'As today'], ['strip', 'Strip gap'], ['heavier', 'Strip + ruler']], 'barLine');
+  renderHeader(); renderSong(); renderCard(); renderCount(); paintPlayhead();
+}
+
+let last = 0;
+function frame(now) {
+  if (!state.playing) return;
+  if (last) state.tick = (state.tick + ((now - last) / 1000) * (BPM / 60) * PPQ) % songTicks();
+  last = now;
+  paintPlayhead();
+  requestAnimationFrame(frame);
+}
+document.getElementById('play').onclick = () => { if (state.playing) return; state.playing = true; last = 0; document.getElementById('play').setAttribute('aria-pressed', 'true'); requestAnimationFrame(frame); };
+document.getElementById('pause').onclick = () => { state.playing = false; document.getElementById('play').setAttribute('aria-pressed', 'false'); };
+document.getElementById('stop').onclick = () => { state.playing = false; state.tick = 0; document.getElementById('play').setAttribute('aria-pressed', 'false'); paintPlayhead(); };
+
+state.tick = restTick();
+render();
+</script>
