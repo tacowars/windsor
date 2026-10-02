@@ -90,3 +90,9 @@ that few PRs change.
 - `scripts/check-vitest-provider.mjs`, run in CI's `verify` job on every
   code change, guards that experimental API: it fails the run when vitest
   stops using the config's provider (windsor#456).
+- The app's CSS moved from `READ_BY_PATH` to `SCANNED_BY` (windsor#465): a
+  stylesheet change reruns only the five tests that read it by path, not
+  the whole suite. Before, a PR that edited `console.css` took 325–423 s in
+  CI's `verify` step (windsor#454, windsor#459, windsor#460), against
+  37–70 s for PRs that left CSS alone (windsor#457, windsor#463,
+  windsor#464), all on GitHub-hosted Ubuntu runners.
