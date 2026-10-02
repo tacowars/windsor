@@ -113,15 +113,15 @@ and out, and never under HOLD.
 Every voice renders through one fixed-index kernel for all eleven algorithms
 (#548): silent operators are skipped and the per-note `Math.pow` values are
 precomputed. The older generic loop is kept as the bit-identical reference
-behind the engine option `specialise: false`, and is also the path taken when
-two or more Noise operators would draw out of D..A order in the algorithm's
-evaluation order (windsor#382), because noise draws from one shared
-per-voice stream in evaluation order. The series shapes (0, 3, 8) take any
-set on the kernel and Additive (7) none; the rest take some (C and D on
-Stack + Two, 6, for one). A Noise operator at level 0 still counts. The generic loop costs about 2.5× the kernel for the same
-voice (`docs/research/2026-10-02-noise-operator-cost/`), so keep a drum
-patch to one Noise operator, or pick an algorithm that draws them D..A.
-A DSP change is proved against that reference, not against a recording.
+behind the engine option `specialise: false`. A voice's Noise operators
+share one noise stream, and both loops draw a sample's noise D..A
+(windsor#389, `2026-10-02-noise-draws-descend-in-both-loops`), so any number
+of Noise operators on any algorithm, Additive (7) included, takes the
+kernel: a two-Noise snare costs about what a one-Noise voice does
+(`docs/research/2026-10-02-noise-operator-cost/`). A Noise operator draws
+every sample at any level, 0 included, so a silent one still moves the
+others' noise. A DSP change is proved against that reference, not against a
+recording.
 
 A part playing the chord sequencer is handed whole chords, not single notes
 (#606, record `2026-09-17-606-chord-sequencer-degrees-per-part-voicing`): the

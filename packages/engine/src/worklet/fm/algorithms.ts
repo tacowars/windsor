@@ -91,10 +91,10 @@ const ALG_ORDER = ALGORITHMS.map(topoOrder);
  *     each modulator before it is read, as the topological order does;
  *   - a modulator list of three is ascending (two terms commute exactly), and
  *     so is a carrier list of three or more.
- * The only state operators share is the voice's noise generator, so a voice
- * with two noise operators also needs them to draw in D..A order within the
- * topological order; `voiceControl.ts` checks that per voice at bind time
- * (windsor#382), since it depends on which operators are Noise.
+ * The only state operators share is the voice's noise generator, and both
+ * loops draw a sample's noise D..A (windsor#389): the generic loop draws its
+ * Noise operators' values at the top of each sample, so a voice with any
+ * number of Noise operators qualifies on its algorithm alone.
  */
 const EDGE_BA = 1,
   EDGE_CA = 2,

@@ -2,7 +2,8 @@
 /**
  * `Voice` (#645): one note's state — four operators' phase, output, feedback
  * history, amplitude ramps and their knots (windsor#301), width ramps, six
- * envelopes, two LFOs, each Noise operator's colour (windsor#362), the
+ * envelopes, two LFOs, each Noise operator's colour (windsor#362) and
+ * the generic loop's noise draws (windsor#389), the
  * drive stage (windsor#300), two filter stages, the steal fade, a step's parameter offsets and the per-voice values they make
  * (windsor#17) — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
@@ -71,6 +72,8 @@ class Voice {
   svfB: Svf;
   /** Each operator's noise colour (windsor#362): run only for a Noise operator with a field set. */
   noiseColour: NoiseColour[];
+  /** Each Noise operator's draw this sample in the generic loop, drawn D..A at its top (windsor#389). */
+  noiseDraw: Float64Array;
   drive: VoiceDrive;
   noiseSeed: number;
   active: boolean;
@@ -174,6 +177,9 @@ class Voice {
     this.svfA = new Svf();
     this.svfB = new Svf();
     this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
+    // The generic loop's noise draws (windsor#389): a double store and load
+    // are exact, so a Noise operator reads the value `noise()` returned.
+    this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
 
     this.noiseSeed = randomSeed32(random);

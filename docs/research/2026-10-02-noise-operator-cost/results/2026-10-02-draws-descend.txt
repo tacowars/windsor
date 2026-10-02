@@ -1,0 +1,161 @@
+# windsor#389, draws descend in both loops.
+# base = origin/main 8a0dc4e's generated/fm-processor.js; after = this branch's;
+# control = a byte copy of base (an A/A pair, for the spread).
+# Apple M1 (8 cores, macOS 26.5.1), Node 24.21.0. Each block is `uptime`, then
+# one `bench.mjs --only <scenario>` process.
+
+## Run 1: base, after (load 10-13 from another worker's tests)
+ 2:07  up 110 days,  6:15, 9 users, load averages: 13.22 7.22 5.52
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+noise380  base      live     false     84.57 [81.70, 93.47]
+noise380  base      generic  false     85.94 [82.97, 94.89]
+noise380  after     live     true      35.80 [34.29, 39.18]
+noise380  after     generic  false     88.43 [83.42, 98.11]
+ 2:08  up 110 days,  6:15, 9 users, load averages: 11.95 7.14 5.51
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+noise1    base      live     true      33.77 [33.53, 36.04]
+noise1    base      generic  false     85.77 [84.69, 88.87]
+noise1    after     live     true      34.26 [33.52, 36.86]
+noise1    after     generic  false     89.56 [88.13, 94.57]
+ 2:08  up 110 days,  6:15, 9 users, load averages: 11.39 7.11 5.51
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+sine1     base      live     true      38.61 [35.89, 45.64]
+sine1     base      generic  false    113.89 [103.34, 128.26]
+sine1     after     live     true      40.23 [36.38, 46.78]
+sine1     after     generic  false    112.43 [103.74, 126.19]
+ 2:08  up 110 days,  6:16, 9 users, load averages: 11.44 7.19 5.54
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+tom       base      live     true      43.83 [41.81, 48.59]
+tom       base      generic  false    130.16 [121.31, 139.36]
+tom       after     live     true      44.35 [42.18, 46.60]
+tom       after     generic  false    131.93 [124.64, 140.07]
+ 2:08  up 110 days,  6:16, 9 users, load averages: 11.00 7.17 5.55
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+tomC      base      live     true      45.01 [41.45, 50.21]
+tomC      base      generic  false     97.50 [89.24, 104.88]
+tomC      after     live     true      43.66 [40.40, 47.55]
+tomC      after     generic  false     99.27 [91.05, 109.80]
+ 2:08  up 110 days,  6:16, 9 users, load averages: 10.16 7.11 5.54
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+snare7    base      live     false     97.16 [87.83, 112.56]
+snare7    base      generic  false     96.32 [85.24, 122.79]
+snare7    after     live     true      39.49 [35.92, 47.89]
+snare7    after     generic  false     95.58 [87.71, 113.15]
+
+## Run 2: after, base, control (the variant order reversed; load about 4)
+ 2:11  up 110 days,  6:19, 9 users, load averages: 4.64 6.13 5.43
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+noise380  after     live     true      26.59 [25.71, 27.16]
+noise380  after     generic  false     64.70 [63.30, 66.90]
+noise380  base      live     false     63.70 [62.32, 65.07]
+noise380  base      generic  false     63.73 [61.92, 66.08]
+noise380  control   live     false     64.00 [61.35, 66.14]
+noise380  control   generic  false     63.73 [62.31, 66.20]
+ 2:11  up 110 days,  6:19, 9 users, load averages: 4.24 5.99 5.39
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+noise1    after     live     true      27.60 [26.44, 31.50]
+noise1    after     generic  false     68.83 [66.77, 78.56]
+noise1    base      live     true      26.17 [25.57, 30.36]
+noise1    base      generic  false     68.08 [65.07, 78.90]
+noise1    control   live     true      26.85 [25.58, 31.21]
+noise1    control   generic  false     67.79 [65.22, 78.78]
+ 2:11  up 110 days,  6:19, 9 users, load averages: 4.38 5.99 5.39
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+sine1     after     live     true      25.01 [23.99, 26.80]
+sine1     after     generic  false     71.02 [68.15, 75.97]
+sine1     base      live     true      25.01 [23.77, 26.71]
+sine1     base      generic  false     71.32 [68.13, 75.28]
+sine1     control   live     true      25.70 [24.34, 26.76]
+sine1     control   generic  false     71.92 [68.93, 75.46]
+ 2:11  up 110 days,  6:19, 9 users, load averages: 4.19 5.92 5.37
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+tom       after     live     true      32.06 [29.85, 33.00]
+tom       after     generic  false     90.24 [84.31, 96.65]
+tom       base      live     true      31.38 [29.17, 32.96]
+tom       base      generic  false     89.10 [81.46, 94.47]
+tom       control   live     true      30.81 [29.28, 33.03]
+tom       control   generic  false     87.89 [83.94, 94.85]
+ 2:11  up 110 days,  6:19, 9 users, load averages: 3.86 5.79 5.33
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+tomC      after     live     true      37.34 [36.75, 39.22]
+tomC      after     generic  false     84.45 [82.26, 87.03]
+tomC      base      live     true      37.48 [36.80, 39.16]
+tomC      base      generic  false     83.23 [82.23, 85.74]
+tomC      control   live     true      37.12 [36.58, 39.11]
+tomC      control   generic  false     83.55 [81.59, 85.37]
+ 2:11  up 110 days,  6:19, 9 users, load averages: 4.27 5.85 5.35
+node v24.21.0, 40 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+snare7    after     live     true      31.72 [28.84, 33.28]
+snare7    after     generic  false     76.23 [70.49, 79.88]
+snare7    base      live     false     74.47 [69.57, 77.39]
+snare7    base      generic  false     74.44 [68.29, 77.74]
+snare7    control   live     false     73.42 [68.66, 78.86]
+snare7    control   generic  false     74.76 [68.77, 78.68]
+
+## Run 3: the one-Noise and no-Noise scenarios three times, live path only (--generic 0), 60 rounds
+ 2:12  up 110 days,  6:19, 9 users, load averages: 4.13 5.71 5.32
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+noise1    base      live     true      26.44 [25.54, 26.87]
+noise1    after     live     true      26.35 [25.59, 26.87]
+noise1    control   live     true      26.27 [25.78, 27.06]
+ 2:12  up 110 days,  6:19, 9 users, load averages: 4.13 5.71 5.32
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+sine1     base      live     true      24.31 [23.88, 25.24]
+sine1     after     live     true      24.82 [23.94, 25.68]
+sine1     control   live     true      24.31 [23.78, 25.50]
+ 2:12  up 110 days,  6:20, 9 users, load averages: 3.96 5.65 5.30
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+tom       base      live     true      29.27 [27.62, 30.46]
+tom       after     live     true      29.28 [27.42, 30.42]
+tom       control   live     true      28.84 [27.54, 30.20]
+ 2:12  up 110 days,  6:20, 9 users, load averages: 3.96 5.65 5.30
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+noise1    base      live     true      26.49 [25.49, 27.59]
+noise1    after     live     true      26.64 [25.85, 27.84]
+noise1    control   live     true      26.80 [25.63, 28.05]
+ 2:12  up 110 days,  6:20, 9 users, load averages: 3.88 5.60 5.28
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+sine1     base      live     true      29.99 [28.79, 31.22]
+sine1     after     live     true      29.77 [28.81, 31.07]
+sine1     control   live     true      29.59 [28.80, 30.75]
+ 2:12  up 110 days,  6:20, 9 users, load averages: 3.89 5.58 5.28
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+tom       base      live     true      34.04 [33.32, 35.68]
+tom       after     live     true      34.38 [33.43, 35.52]
+tom       control   live     true      34.69 [33.78, 36.26]
+ 2:12  up 110 days,  6:20, 9 users, load averages: 3.89 5.58 5.28
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+noise1    base      live     true      31.88 [30.77, 33.71]
+noise1    after     live     true      31.94 [30.77, 33.46]
+noise1    control   live     true      32.17 [31.06, 33.11]
+ 2:12  up 110 days,  6:20, 9 users, load averages: 3.98 5.57 5.27
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+sine1     base      live     true      29.34 [28.55, 30.62]
+sine1     after     live     true      29.66 [28.48, 31.42]
+sine1     control   live     true      29.81 [28.65, 31.35]
+ 2:12  up 110 days,  6:20, 9 users, load averages: 3.98 5.57 5.27
+node v24.21.0, 60 rounds of 10 s per variant
+scenario  bundle    path     kernel  ns/sample median [IQR]
+tom       base      live     true      35.53 [34.43, 37.56]
+tom       after     live     true      35.22 [34.49, 36.30]
+tom       control   live     true      35.51 [34.60, 37.63]
