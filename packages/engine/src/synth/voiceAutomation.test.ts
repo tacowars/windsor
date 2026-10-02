@@ -3,7 +3,8 @@
  * `2026-10-01-song-automation-lanes` decisions 2, 10 and 16): a lane takes
  * one of its part's slots on its first hold, tells the processor which
  * target the slot moves, writes offsets from the patch's value (octaves on
- * `cutoffMod` for the cutoff, a log2 ratio for the LFO rates), recomputes
+ * `cutoffMod` for the cutoff, a log2 ratio for the LFO rates and, from a
+ * 1 ms floor, the decay times: windsor#347), recomputes
  * them against an edited patch, and gives the slot back at its release. An
  * offline render builds each part with its slot map, so its lanes play from
  * the first sample. The worklet's side is `fmProcessorAutomation.test.ts`.
@@ -21,6 +22,7 @@ import type { AutomationHandle } from '../automation/automationHandles';
 import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import { VOICE_TARGET_IDS, catalogRow } from '../automation/automationTargets';
 import type { PartStrip } from '../mixer/channelStrip';
+import { makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { renderPass } from '../render/renderPass';
 import { planFor } from '../render/renderSong';
 import type { ArrangementDocument } from '../song/arrangementDocument';
@@ -28,7 +30,7 @@ import { musicPartName } from '../song/documentParts';
 import { automationResolver } from '../system/automationResolver';
 import type { AudioPart } from './audioPart';
 import { FmEngine } from './fmEngine';
-import { voiceAutomationHandle } from './voiceAutomation';
+import { voiceAutomationHandle, voiceOffset } from './voiceAutomation';
 
 let restore: () => void = () => {};
 beforeAll(() => {
@@ -110,6 +112,29 @@ describe('a voice lane on its part (windsor#346)', () => {
     expect(fake(part.voiceSlotParams[0]!).automation.at(-1)!.value).toBeCloseTo(-1, 12);
   });
 
+  it('writes a decay time as a log2 ratio, and a decay curve as value − patch (windsor#347)', async () => {
+    const { part } = await rig();
+    const time = part.patch.ops[2]!.env.decayTime;
+    handleFor(part, 'ops.2.env.decayTime').hold(time / 4, 0);
+    handleFor(part, 'ops.2.env.decayCurve').hold(0.75, 0);
+    expect(fake(part.voiceSlotParams[0]!).automation.at(-1)!.value).toBeCloseTo(-2, 12);
+    expect(fake(part.voiceSlotParams[1]!).automation.at(-1)!.value).toBe(
+      0.75 - part.patch.ops[2]!.env.decayCurve,
+    );
+  });
+
+  it("takes a decay time's ratio from its 1 ms floor at either end, where its knob reads 0 (windsor#347)", () => {
+    const path = 'filter.env.decayTime';
+    const row = catalogRow(`voice.${path}`)!;
+    expect([row.min, row.floor]).toEqual([0, 0.001]);
+    const at = (decayTime: number): Patch =>
+      makePatch({ filter: { env: makeEnvelope({ decayTime }) } });
+    expect(voiceOffset(at(0), path, row, 0.5)).toBeCloseTo(Math.log2(500), 12);
+    expect(voiceOffset(at(0.5), path, row, 0)).toBeCloseTo(-Math.log2(500), 12);
+    expect(voiceOffset(at(0), path, row, 0)).toBe(0);
+    expect(voiceOffset(at(0.0005), path, row, 0.001)).toBe(0);
+  });
+
   it('recomputes the offset against an edited patch, so the lane value still wins', async () => {
     const { part } = await rig();
     const handle = handleFor(part, 'ops.0.feedback');
@@ -150,13 +175,14 @@ describe('a voice lane on its part (windsor#346)', () => {
     );
   });
 
-  it('has a handle for every voice row but the nine decay rows (windsor#347)', async () => {
+  it('has a handle for every voice row, the nine decay rows included (windsor#347)', async () => {
     const { part } = await rig();
     const resolve = automationResolver(() => stripOf(part));
     const resolved = VOICE_TARGET_IDS.filter((target) => resolve(0, target) !== undefined);
-    const decays = VOICE_TARGET_IDS.filter((target) => /\.decay(Time|Curve)$/.test(target));
-    expect(decays).toHaveLength(9);
-    expect(resolved).toEqual(VOICE_TARGET_IDS.filter((target) => !decays.includes(target)));
+    expect(VOICE_TARGET_IDS.filter((target) => /\.decay(Time|Curve)$/.test(target))).toHaveLength(
+      9,
+    );
+    expect(resolved).toEqual(VOICE_TARGET_IDS);
   });
 });
 

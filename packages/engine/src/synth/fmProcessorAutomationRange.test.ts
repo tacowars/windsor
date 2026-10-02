@@ -145,14 +145,12 @@ describe("the cutoff lane across the catalog's whole range (windsor#346)", () =>
 
 describe("every voice lane's offset fits its parameter (windsor#346)", () => {
   const processor = loaded.create(makePatch(), 4);
-  // Each voice row a handle plays (the decay rows are windsor#347's), and the
+  // Each voice row a handle plays (the decay rows since windsor#347), and the
   // parameter its offsets go to: the cutoff's `cutoffMod`, the rest a slot.
-  const rows = VOICE_AUTOMATION_ROWS.filter((r) => !/\.decay(Time|Curve)$/.test(r.target)).map(
-    (r): readonly [string, string] => {
-      const path = r.target.slice('voice.'.length);
-      return [path, path === CUTOFF ? 'cutoffMod' : voiceSlotParamName(0)];
-    },
-  );
+  const rows = VOICE_AUTOMATION_ROWS.map((r): readonly [string, string] => {
+    const path = r.target.slice('voice.'.length);
+    return [path, path === CUTOFF ? 'cutoffMod' : voiceSlotParamName(0)];
+  });
 
   it.each(rows)(
     '%s: a lane from one end of its row to the other passes %s unclipped',

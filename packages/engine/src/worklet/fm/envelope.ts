@@ -9,7 +9,13 @@
  * shares the function. `patchLibraryEnvelope.test.ts` pins release completion.
  * The decay's time and curve are the envelope's own copies, which `configure`
  * takes from the parameter block and a step's offsets may then replace for
- * one note (windsor#17, `voiceStepMod.ts`).
+ * one note (windsor#17, `voiceStepMod.ts`). A song lane moves them on a
+ * ringing voice (windsor#347, `voiceOffsets.ts`), each from the level the
+ * envelope is at: a new time keeps the running decay's phase and so runs
+ * what is left of it at the new rate, and a new curve starts what is left
+ * again from the current level (`reshapeDecay`), over the time that was left,
+ * which `decayLeft` carries. Neither moves the level, and with `decayLeft` at
+ * 1 the decay is the one it always was, to the bit.
  *
  * No double crosses a call on the envelope's path (windsor#233): V8 inlines a
  * call only where it judges it worth it, and a double passed to or returned
@@ -118,6 +124,12 @@ class Envelope {
   timeScale: number;
   decayTime: number;
   decayCurve: number;
+  /**
+   * The share of `decayTime` the running decay segment spans: 1 from its
+   * start, and what was left of it each time `reshapeDecay` started it again
+   * from its current level (windsor#347).
+   */
+  decayLeft: number;
   /** `advanceExact`'s samples still to run, and its segment ends in its last step (windsor#301): how many, where and at what level. */
   rest: number;
   breaks: number;
@@ -127,7 +139,7 @@ class Envelope {
   constructor() {
     // Rule 7: each double field is born a double (NaN), before its start value.
     this.value = this.phase = this.segStart = this.segTarget = this.segCurve = this.segTime = NaN;
-    this.timeScale = this.decayTime = this.decayCurve = this.rest = NaN;
+    this.timeScale = this.decayTime = this.decayCurve = this.decayLeft = this.rest = NaN;
     this.state = ST_IDLE;
     this.value = 0;
     this.phase = 0;
@@ -141,6 +153,7 @@ class Envelope {
     // The decay segment's, from `configure`; a step's offsets replace them per note (windsor#17).
     this.decayTime = 0;
     this.decayCurve = 0;
+    this.decayLeft = 1;
     this.rest = 0;
     this.breaks = 0;
     this.breakAt = new Float64Array(ENVELOPE_BREAKS_MAX);
@@ -160,6 +173,7 @@ class Envelope {
     this.phase = 0;
     this.value = p.initLevel;
     this.segStart = p.initLevel;
+    this.decayLeft = 1;
   }
 
   noteOff(): void {
@@ -247,6 +261,24 @@ class Envelope {
     }
   }
 
+  /**
+   * `decayCurve` has just changed (windsor#347): a decay segment under way
+   * under another curve starts again from the level it is at, toward the
+   * same sustain, under the new curve and over the time it had left, so the
+   * level does not move and the segment still ends when it would have. A
+   * decay not yet begun (attack, or phase 0) takes the curve when it runs,
+   * and sustain and release do not read it. The caller writes the new curve
+   * to `decayCurve` first, so no double crosses the call.
+   */
+  reshapeDecay(): void {
+    if (this.state !== ST_DECAY || !(this.phase > 0)) return;
+    if (this.decayCurve === this.segCurve) return;
+    this.decayLeft *= 1 - this.phase;
+    this.segStart = this.value;
+    this.phase = 0;
+    this.segCurve = this.decayCurve;
+  }
+
   /** The running segment's time (before key scaling), target and curve, into their fields. */
   loadSegment(): void {
     const p = this.p!;
@@ -257,7 +289,8 @@ class Envelope {
         this.segCurve = p.attackCurve;
         break;
       case ST_DECAY:
-        this.segTime = this.decayTime;
+        // `decayLeft` is 1 unless a lane reshaped the segment (windsor#347): × 1 is exact.
+        this.segTime = this.decayTime * this.decayLeft;
         this.segTarget = p.sustainLevel;
         this.segCurve = this.decayCurve;
         break;
@@ -279,6 +312,7 @@ class Envelope {
     switch (this.state) {
       case ST_ATTACK:
         this.state = ST_DECAY;
+        this.decayLeft = 1;
         break;
       case ST_DECAY:
         if (p.loopMode === LOOP_LOOP) {
