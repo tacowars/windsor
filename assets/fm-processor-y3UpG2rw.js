@@ -922,7 +922,7 @@ var Lfo = class {
   /** `seed` is a non-zero xorshift32 state: `randomSeed32`, or `secondLfoSeed` of another LFO's. */
   constructor(seed) {
     this.phase = this.value = this.held = this.target = this.fade = NaN;
-    this.seed = this.output = this.draw = this.rateMul = NaN;
+    this.seed = this.output = this.draw = this.rate = NaN;
     this.phase = 0;
     this.value = 0;
     this.held = 0;
@@ -931,7 +931,7 @@ var Lfo = class {
     this.seed = seed;
     this.output = 0;
     this.draw = 0;
-    this.rateMul = 1;
+    this.rate = 0;
   }
   /** The next draw, 0..1, into `draw`. */
   rand() {
@@ -957,10 +957,11 @@ var Lfo = class {
    * phase stops at 1 and holds there, so it never wraps and every shape holds
    * its end value (#55); `start` resets it at note-on. Unipolar remaps the
    * shape's -1..1 to 0..1 before the fade, so the fade-in scales up from 0.
+   * The phase steps at `rate`, not `p.rate`: the caller writes it first.
    */
   advance(p, n, sampleRate2) {
     const prev = this.phase;
-    this.phase += p.rate * this.rateMul * n / sampleRate2;
+    this.phase += this.rate * n / sampleRate2;
     let wrapped = false;
     if (this.phase >= 1) {
       if (p.oneShot) {
@@ -1184,66 +1185,6 @@ function bindNoiseColour(voice, i) {
   }
   colour.on = colour.lpOn || colour.hpOn;
 }
-
-// packages/engine/src/worklet/fm/stepModTables.ts
-var STEP_MOD_FILTER_ROWS = [
-  { param: "filter.envAmount", curve: "linear", span: 6, min: -6, max: 6, slideKeeps: false },
-  { param: "filter.cutoff", curve: "octaves", span: 4.5, min: 30, max: 18e3, slideKeeps: false },
-  { param: "filter.resonance", curve: "linear", span: 6, min: 0.5, max: 12, slideKeeps: false },
-  {
-    param: "filter.env.decayTime",
-    curve: "log",
-    span: 0.5,
-    min: 1e-3,
-    max: 20,
-    slideKeeps: false
-  }
-];
-var STEP_MOD_OPERATOR_ROWS = [
-  { field: "level", curve: "linear", span: 0.5, min: 0, max: 1, slideKeeps: false },
-  { field: "env.decayTime", curve: "log", span: 0.5, min: 1e-3, max: 20, slideKeeps: false },
-  { field: "env.decayCurve", curve: "linear", span: 1, min: -1, max: 1, slideKeeps: true },
-  {
-    field: "feedback",
-    curve: "linear",
-    span: 1,
-    min: FEEDBACK_RANGE.min,
-    max: FEEDBACK_RANGE.max,
-    slideKeeps: true
-  },
-  {
-    field: "width",
-    curve: "linear",
-    span: 0.5,
-    min: WIDTH_RANGE.min,
-    max: WIDTH_RANGE.max,
-    slideKeeps: false
-  }
-];
-var STEP_MOD_TABLE = [
-  ...STEP_MOD_FILTER_ROWS,
-  ...Array.from(
-    { length: OPERATOR_COUNT },
-    (_, i) => STEP_MOD_OPERATOR_ROWS.map(({ field, ...row }) => ({
-      param: `ops.${i}.${field}`,
-      ...row
-    }))
-  ).flat()
-];
-var STEP_MOD_PARAMS = STEP_MOD_TABLE.map((row) => row.param);
-var STEP_MOD_SLOT_COUNT = STEP_MOD_TABLE.length;
-var STEP_MOD_LANES_MAX = 4;
-var STEP_SLOT_ENV_AMOUNT = 0;
-var STEP_SLOT_CUTOFF = 1;
-var STEP_SLOT_RESONANCE = 2;
-var STEP_SLOT_FILTER_DECAY = 3;
-var STEP_SLOT_OP_BASE = STEP_MOD_FILTER_ROWS.length;
-var STEP_SLOT_OP_STRIDE = STEP_MOD_OPERATOR_ROWS.length;
-var STEP_OP_LEVEL = 0;
-var STEP_OP_DECAY = 1;
-var STEP_OP_DECAY_CURVE = 2;
-var STEP_OP_FEEDBACK = 3;
-var STEP_OP_WIDTH = 4;
 
 // packages/engine/src/worklet/fm/svf.ts
 var Svf = class {
@@ -1486,26 +1427,105 @@ function updateVoiceDrive(voice) {
   drive.toneCoef = g / (1 + g);
 }
 
-// packages/engine/src/worklet/fm/voiceOffsetTables.ts
-var OFFSET_ADD = 0;
-var OFFSET_RATIO = 1;
-var VOICE_SLOT_COUNT = 8;
-var VOICE_SLOT_PARAMS = [
-  "voiceSlot0",
-  "voiceSlot1",
-  "voiceSlot2",
-  "voiceSlot3",
-  "voiceSlot4",
-  "voiceSlot5",
-  "voiceSlot6",
-  "voiceSlot7"
+// packages/engine/src/worklet/fm/voiceTargetTables.ts
+var DECAY_FLOOR = 1e-3;
+var DECAY_MAX = 20;
+var halfTravel = (min, max) => 0.5 * Math.log2(max / min);
+var VOICE_TARGET_FILTER_ROWS = [
+  { path: "filter.cutoff", curve: "ratio", min: 30, max: 18e3, floor: 0, span: 4.5 },
+  { path: "filter.envAmount", curve: "add", min: -6, max: 6, floor: 0, span: 6 },
+  { path: "filter.resonance", curve: "add", min: 0.5, max: 12, floor: 0, span: 6 },
+  {
+    path: "filter.env.decayTime",
+    curve: "ratio",
+    min: DECAY_FLOOR,
+    max: DECAY_MAX,
+    floor: DECAY_FLOOR,
+    span: halfTravel(DECAY_FLOOR, DECAY_MAX)
+  },
+  {
+    path: "filter.vowel",
+    curve: "add",
+    min: VOWEL_RANGE.min,
+    max: VOWEL_RANGE.max,
+    floor: 0,
+    span: 2
+  }
 ];
-var VT_ENV_AMOUNT = 0;
-var VT_RESONANCE = 1;
-var VT_FILTER_DECAY = 2;
-var VT_VOWEL = 3;
-var VT_OP_BASE = 4;
-var VT_OP_STRIDE = 5;
+var VOICE_TARGET_OPERATOR_ROWS = [
+  { field: "level", curve: "add", min: 0, max: 1, floor: 0, span: 0.5, slideKeeps: false },
+  {
+    field: "env.decayTime",
+    curve: "ratio",
+    min: DECAY_FLOOR,
+    max: DECAY_MAX,
+    floor: DECAY_FLOOR,
+    span: halfTravel(DECAY_FLOOR, DECAY_MAX),
+    slideKeeps: false
+  },
+  { field: "env.decayCurve", curve: "add", min: -1, max: 1, floor: 0, span: 1, slideKeeps: true },
+  {
+    field: "feedback",
+    curve: "add",
+    min: FEEDBACK_RANGE.min,
+    max: FEEDBACK_RANGE.max,
+    floor: 0,
+    span: 1,
+    slideKeeps: true
+  },
+  {
+    field: "width",
+    curve: "add",
+    min: WIDTH_RANGE.min,
+    max: WIDTH_RANGE.max,
+    floor: 0,
+    span: 0.5,
+    slideKeeps: false
+  }
+];
+var LFO_RATE_MIN = 0.02;
+var LFO_RATE_MAX = 40;
+var VOICE_TARGET_MOD_ROWS = [
+  { path: "lfo.amount", curve: "add", min: 0, max: 1, floor: 0, span: 0.5 },
+  {
+    path: "lfo.rate",
+    curve: "ratio",
+    min: LFO_RATE_MIN,
+    max: LFO_RATE_MAX,
+    floor: LFO_RATE_MIN,
+    span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
+  },
+  { path: "lfo2.amount", curve: "add", min: 0, max: 1, floor: 0, span: 0.5 },
+  {
+    path: "lfo2.rate",
+    curve: "ratio",
+    min: LFO_RATE_MIN,
+    max: LFO_RATE_MAX,
+    floor: LFO_RATE_MIN,
+    span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
+  },
+  { path: "pitchEnvAmount", curve: "add", min: -48, max: 48, floor: 0, span: 48 }
+];
+var VOICE_TARGET_TABLE = [
+  ...VOICE_TARGET_FILTER_ROWS.map((row) => ({ ...row, slideKeeps: false })),
+  ...Array.from(
+    { length: OPERATOR_COUNT },
+    (_, i) => VOICE_TARGET_OPERATOR_ROWS.map(({ field, ...row }) => ({
+      path: `ops.${i}.${field}`,
+      ...row
+    }))
+  ).flat(),
+  ...VOICE_TARGET_MOD_ROWS.map((row) => ({ ...row, slideKeeps: false }))
+];
+var VOICE_TARGET_PATHS = VOICE_TARGET_TABLE.map((row) => row.path);
+var VOICE_TARGET_COUNT = VOICE_TARGET_TABLE.length;
+var VT_CUTOFF = 0;
+var VT_ENV_AMOUNT = 1;
+var VT_RESONANCE = 2;
+var VT_FILTER_DECAY = 3;
+var VT_VOWEL = 4;
+var VT_OP_BASE = VOICE_TARGET_FILTER_ROWS.length;
+var VT_OP_STRIDE = VOICE_TARGET_OPERATOR_ROWS.length;
 var VT_OP_LEVEL = 0;
 var VT_OP_DECAY = 1;
 var VT_OP_DECAY_CURVE = 2;
@@ -1516,56 +1536,20 @@ var VT_LFO_RATE = VT_LFO_AMOUNT + 1;
 var VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
 var VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
 var VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
-var VOICE_TARGET_COUNT = VT_LFO_AMOUNT + 5;
-var VOWEL_BOUNDS = { min: VOWEL_RANGE.min, max: VOWEL_RANGE.max, floor: 0 };
-var LFO_AMOUNT_BOUNDS = { min: 0, max: 1, floor: 0 };
-var LFO_RATE_BOUNDS = { min: 0.02, max: 40, floor: 0 };
-var PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48, floor: 0 };
-function stepModBounds(path) {
-  for (const row of STEP_MOD_TABLE) {
-    if (row.param === path) return { min: row.min, max: row.max, floor: 0 };
-  }
-  throw new Error(`voiceOffsetTables: no step-mod row for ${path}`);
-}
-function decayTimeRow(path) {
-  const { min, max } = stepModBounds(path);
-  return { path, curve: OFFSET_RATIO, min: 0, max, floor: min };
-}
-var CUTOFF_BOUNDS = stepModBounds("filter.cutoff");
-var CUTOFF_MOD_OCTAVES = Math.log2(CUTOFF_BOUNDS.max / CUTOFF_BOUNDS.min);
-var CUTOFF_MOD_RANGE = { minValue: -CUTOFF_MOD_OCTAVES, maxValue: CUTOFF_MOD_OCTAVES };
-var VOICE_OFFSET_TABLE = [
-  { path: "filter.envAmount", curve: OFFSET_ADD, ...stepModBounds("filter.envAmount") },
-  { path: "filter.resonance", curve: OFFSET_ADD, ...stepModBounds("filter.resonance") },
-  decayTimeRow("filter.env.decayTime"),
-  { path: "filter.vowel", curve: OFFSET_ADD, ...VOWEL_BOUNDS },
-  ...Array.from({ length: OPERATOR_COUNT }, (_, i) => [
-    { path: `ops.${i}.level`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.level`) },
-    decayTimeRow(`ops.${i}.env.decayTime`),
-    {
-      path: `ops.${i}.env.decayCurve`,
-      curve: OFFSET_ADD,
-      ...stepModBounds(`ops.${i}.env.decayCurve`)
-    },
-    { path: `ops.${i}.feedback`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.feedback`) },
-    { path: `ops.${i}.width`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.width`) }
-  ]).flat(),
-  { path: "lfo.amount", curve: OFFSET_ADD, ...LFO_AMOUNT_BOUNDS },
-  { path: "lfo.rate", curve: OFFSET_RATIO, ...LFO_RATE_BOUNDS },
-  { path: "lfo2.amount", curve: OFFSET_ADD, ...LFO_AMOUNT_BOUNDS },
-  { path: "lfo2.rate", curve: OFFSET_RATIO, ...LFO_RATE_BOUNDS },
-  { path: "pitchEnvAmount", curve: OFFSET_ADD, ...PITCH_ENV_AMOUNT_BOUNDS }
-];
-var VOICE_OFFSET_CURVE = Int32Array.from(VOICE_OFFSET_TABLE, (row) => row.curve);
-var VOICE_OFFSET_MIN = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.min);
-var VOICE_OFFSET_MAX = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.max);
-var VOICE_OFFSET_FLOOR = Float64Array.from(VOICE_OFFSET_TABLE, (row) => row.floor);
+var VOICE_TARGET_RATIO = Uint8Array.from(
+  VOICE_TARGET_TABLE,
+  (row) => row.curve === "ratio" ? 1 : 0
+);
+var VOICE_TARGET_MIN = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.min);
+var VOICE_TARGET_MAX = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.max);
+var VOICE_TARGET_FLOOR = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.floor);
+var VOICE_TARGET_SPAN = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.span);
+var VOICE_TARGET_SLIDE_KEEPS = Uint8Array.from(
+  VOICE_TARGET_TABLE,
+  (row) => row.slideKeeps ? 1 : 0
+);
 function voiceTargetCode(path) {
-  if (typeof path !== "string") return -1;
-  for (let k = 0; k < VOICE_OFFSET_TABLE.length; k++) {
-    if (VOICE_OFFSET_TABLE[k].path === path) return k;
-  }
-  return -1;
+  return typeof path === "string" ? VOICE_TARGET_PATHS.indexOf(path) : -1;
 }
 
 // packages/engine/src/worklet/fm/voiceAmpRamp.ts
@@ -1663,7 +1647,42 @@ function updateVoiceFormant(voice) {
   }
 }
 
+// packages/engine/src/worklet/fm/voiceTargets.ts
+function layoutVoiceTargets(patch, out) {
+  const f = patch.filter;
+  out[VT_CUTOFF] = f.cutoff;
+  out[VT_ENV_AMOUNT] = f.envAmount;
+  out[VT_RESONANCE] = f.resonance;
+  out[VT_FILTER_DECAY] = f.env.decayTime;
+  out[VT_VOWEL] = f.vowel;
+  for (let i = 0; i < OPERATOR_COUNT; i++) {
+    const op = patch.ops[i];
+    const b = VT_OP_BASE + i * VT_OP_STRIDE;
+    out[b + VT_OP_LEVEL] = op.level;
+    out[b + VT_OP_DECAY] = op.env.decayTime;
+    out[b + VT_OP_DECAY_CURVE] = op.env.decayCurve;
+    out[b + VT_OP_FEEDBACK] = op.feedback;
+    out[b + VT_OP_WIDTH] = op.width;
+  }
+  out[VT_LFO_AMOUNT] = patch.lfo.amount;
+  out[VT_LFO_RATE] = patch.lfo.rate;
+  out[VT_LFO2_AMOUNT] = patch.lfo2.amount;
+  out[VT_LFO2_RATE] = patch.lfo2.rate;
+  out[VT_PITCH_ENV_AMOUNT] = patch.pitchEnvAmount;
+}
+
 // packages/engine/src/worklet/fm/voiceOffsets.ts
+var VOICE_SLOT_COUNT = 8;
+var VOICE_SLOT_PARAMS = [
+  "voiceSlot0",
+  "voiceSlot1",
+  "voiceSlot2",
+  "voiceSlot3",
+  "voiceSlot4",
+  "voiceSlot5",
+  "voiceSlot6",
+  "voiceSlot7"
+];
 function mapVoiceSlots(slotTargets, floors, paths) {
   const list = Array.isArray(paths) ? paths : null;
   let mapped = false;
@@ -1673,7 +1692,7 @@ function mapVoiceSlots(slotTargets, floors, paths) {
     slotTargets[s] = code;
     if (code < 0) continue;
     mapped = true;
-    if (VOICE_OFFSET_FLOOR[code] > 0) floors[code] = VOICE_OFFSET_FLOOR[code];
+    if (VOICE_TARGET_FLOOR[code] > 0) floors[code] = VOICE_TARGET_FLOOR[code];
   }
   return mapped;
 }
@@ -1684,60 +1703,38 @@ function latchVoiceOffsets(offsets, slotTargets, params) {
     if (code >= 0) offsets[code] += params[VOICE_SLOT_PARAMS[s]][0];
   }
 }
+var patchValues = new Float64Array(VOICE_TARGET_COUNT);
 function bindLiveValues(voice) {
-  const patch = voice.patch;
-  const v = voice.liveValues;
-  const o = voice.partOffsets;
-  const own = voice.stepValues;
-  v[VT_ENV_AMOUNT] = voice.envAmount;
-  v[VT_RESONANCE] = voice.resonance;
-  v[VT_FILTER_DECAY] = own[STEP_SLOT_FILTER_DECAY];
-  v[VT_VOWEL] = patch.filter.vowel;
-  for (let i = 0; i < OPERATOR_COUNT; i++) {
-    const b = VT_OP_BASE + i * VT_OP_STRIDE;
-    const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
-    v[b + VT_OP_LEVEL] = voice.opLevel[i];
-    v[b + VT_OP_DECAY] = own[s + STEP_OP_DECAY];
-    v[b + VT_OP_DECAY_CURVE] = own[s + STEP_OP_DECAY_CURVE];
-    v[b + VT_OP_FEEDBACK] = voice.opFeedback[i];
-    v[b + VT_OP_WIDTH] = voice.opWidth[i];
-  }
-  v[VT_LFO_AMOUNT] = patch.lfo.amount;
-  v[VT_LFO_RATE] = patch.lfo.rate;
-  v[VT_LFO2_AMOUNT] = patch.lfo2.amount;
-  v[VT_LFO2_RATE] = patch.lfo2.rate;
-  v[VT_PITCH_ENV_AMOUNT] = patch.pitchEnvAmount;
-  const floors = voice.partFloors;
-  for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
-    const off = o[k];
-    if (off === 0 && !(v[k] < floors[k])) continue;
-    const floor = VOICE_OFFSET_FLOOR[k];
-    const x = VOICE_OFFSET_CURVE[k] === OFFSET_RATIO ? (v[k] < floor ? floor : v[k]) * Math.pow(2, off) : v[k] + off;
-    v[k] = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
-  }
-  stackStepDecays(voice);
-}
-function stackStepDecays(voice) {
-  const patch = voice.patch;
-  const v = voice.liveValues;
+  const live = voice.liveValues;
+  const own = voice.ownValues;
   const o = voice.partOffsets;
   const floors = voice.partFloors;
   const pushes = voice.stepOffsets;
-  for (let i = -1; i < OPERATOR_COUNT; i++) {
-    const filter = i < 0;
-    const s = filter ? STEP_SLOT_FILTER_DECAY : STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE + STEP_OP_DECAY;
-    const push = pushes[s];
-    if (push === 0) continue;
-    const k = filter ? VT_FILTER_DECAY : VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY;
-    const base = filter ? patch.filter.env.decayTime : patch.ops[i].env.decayTime;
+  let laid = false;
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
     const off = o[k];
-    if (off === 0 && !(base < floors[k])) continue;
-    const floor = VOICE_OFFSET_FLOOR[k];
-    const x = (base < floor ? floor : base) * Math.pow(2, off);
-    const lane = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
-    const row = STEP_MOD_TABLE[s];
-    const y = lane * Math.pow(row.max / row.min, push * row.span);
-    v[k] = y < row.min ? row.min : y > row.max ? row.max : y;
+    if (off === 0 && !(own[k] < floors[k])) {
+      live[k] = own[k];
+      continue;
+    }
+    if (!laid) {
+      layoutVoiceTargets(voice.patch, patchValues);
+      laid = true;
+    }
+    const ratio = VOICE_TARGET_RATIO[k] !== 0;
+    const floor = VOICE_TARGET_FLOOR[k];
+    const min = VOICE_TARGET_MIN[k];
+    const max = VOICE_TARGET_MAX[k];
+    const base = patchValues[k];
+    const x = ratio ? (base < floor ? floor : base) * Math.pow(2, off) : base + off;
+    let y = x < min ? min : x > max ? max : x;
+    const push = pushes[k];
+    if (push !== 0) {
+      const d = push * VOICE_TARGET_SPAN[k];
+      const z = ratio ? (y < floor ? floor : y) * Math.pow(2, d) : y + d;
+      y = z < min ? min : z > max ? max : z;
+    }
+    live[k] = y;
   }
 }
 function applyLiveDecays(voice, reshape) {
@@ -1768,9 +1765,7 @@ function applyLiveDecays(voice, reshape) {
 function applyVoiceOffsets(voice) {
   bindLiveValues(voice);
   applyLiveDecays(voice, true);
-  const patch = voice.patch;
   const v = voice.liveValues;
-  const o = voice.partOffsets;
   let ramp = 0;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     voice.fbFrom[i] = voice.fbTo[i];
@@ -1778,10 +1773,8 @@ function applyVoiceOffsets(voice) {
     if (voice.fbFrom[i] !== voice.fbTo[i]) ramp |= 1 << i;
   }
   voice.fbRamp = ramp;
-  const rate = patch.lfo.rate;
-  voice.lfo.rateMul = o[VT_LFO_RATE] === 0 || !(rate > 0) ? 1 : v[VT_LFO_RATE] / rate;
-  const rate2 = patch.lfo2.rate;
-  voice.lfo2.rateMul = o[VT_LFO2_RATE] === 0 || !(rate2 > 0) ? 1 : v[VT_LFO2_RATE] / rate2;
+  voice.lfo.rate = v[VT_LFO_RATE];
+  voice.lfo2.rate = v[VT_LFO2_RATE];
 }
 function primeVoiceOffsets(voice) {
   bindLiveValues(voice);
@@ -1795,11 +1788,11 @@ function primeVoiceOffsets(voice) {
   voice.fbRamp = 0;
 }
 var keptValues = new Float64Array(VOICE_TARGET_COUNT);
-var keptSteps = new Float64Array(STEP_MOD_SLOT_COUNT);
+var keptOwn = new Float64Array(VOICE_TARGET_COUNT);
 var keptTargets = new Uint8Array(VOICE_TARGET_COUNT);
 function keepVoiceOffsets(voice) {
   keptValues.set(voice.liveValues);
-  keptSteps.set(voice.stepValues);
+  keptOwn.set(voice.ownValues);
 }
 function rebindVoiceOffsets(voice, slotTargets) {
   const v = voice.liveValues;
@@ -1814,8 +1807,7 @@ function rebindVoiceOffsets(voice, slotTargets) {
   applyLiveDecays(voice, false);
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const k = VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_DECAY_CURVE;
-    const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE + STEP_OP_DECAY_CURVE;
-    if (kept[k] !== 0 && keptSteps[s] !== voice.stepValues[s]) {
+    if (kept[k] !== 0 && keptOwn[k] !== voice.ownValues[k]) {
       voice.decayRebound[i] = voice.partOffsets[k];
     }
   }
@@ -1830,7 +1822,7 @@ function rebindVoiceOffsets(voice, slotTargets) {
 
 // packages/engine/src/worklet/fm/voiceControl.ts
 var MIP_FREQ_SLOT = new Float64Array(1);
-var PART_BEND = 0, PART_WHEEL = 1, PART_CUTOFF_MOD = 2, PART_CONTROL_COUNT = 3;
+var PART_BEND = 0, PART_WHEEL = 1, PART_CONTROL_COUNT = 2;
 function bindVoiceConstants(voice, patch) {
   const algIndex = ALGORITHMS[patch.algorithm] ? patch.algorithm : 0;
   const keyOffset = (voice.note - 60) / 12;
@@ -1882,13 +1874,13 @@ function updateVoiceFilter(voice, n) {
   const fenv = voice.filtEnv.value;
   const live = voice.liveValues;
   const resonance = live[VT_RESONANCE];
-  const octaves = fenv * (live[VT_ENV_AMOUNT] + modWheel * f.modWheelDepth) + voice.lfoLevel * f.lfoAmount + f.keyTrack * keyOffset + controls[PART_CUTOFF_MOD] + voice.lfo2Level * f.lfo2Amount;
+  const octaves = fenv * (live[VT_ENV_AMOUNT] + modWheel * f.modWheelDepth) + voice.lfoLevel * f.lfoAmount + f.keyTrack * keyOffset + voice.lfo2Level * f.lfo2Amount;
   if (f.mode === FILT_FORMANT) {
     FORMANT_SHIFT_SLOT[0] = Math.pow(2, octaves);
     updateVoiceFormant(voice);
     return;
   }
-  const cutoff = voice.cutoff * Math.pow(2, octaves);
+  const cutoff = live[VT_CUTOFF] * Math.pow(2, octaves);
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;
   svfA.q = resonance;
@@ -2618,82 +2610,47 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   }
 }
 
-// packages/engine/src/worklet/fm/stepModValue.ts
-function stepModValue(row, base, v) {
-  if (v === 0) return base;
-  let x;
-  if (row.curve === "octaves") x = base * Math.pow(2, v * row.span);
-  else if (row.curve === "log") x = base * Math.pow(row.max / row.min, v * row.span);
-  else x = base + v * row.span;
-  return x < row.min ? row.min : x > row.max ? row.max : x;
-}
-
 // packages/engine/src/worklet/fm/voiceStepMod.ts
 function loadStepOffsets(voice, src, slide) {
   const dst = voice.stepOffsets;
   const n = src ? src.length : 0;
-  for (let s = 0; s < STEP_MOD_SLOT_COUNT; s++) {
-    if (slide && STEP_MOD_TABLE[s].slideKeeps) continue;
-    const raw = s < n ? src[s] : 0;
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
+    if (slide && VOICE_TARGET_SLIDE_KEEPS[k] !== 0) continue;
+    const raw = k < n ? src[k] : 0;
     const v = typeof raw === "number" && raw === raw ? raw : 0;
-    dst[s] = v < -1 ? -1 : v > 1 ? 1 : v;
+    dst[k] = v < -1 ? -1 : v > 1 ? 1 : v;
   }
 }
-function bindStepMod(voice, patch) {
+function bindOwnValues(voice, patch) {
+  const own = voice.ownValues;
   const o = voice.stepOffsets;
-  const t = STEP_MOD_TABLE;
-  const v = voice.stepValues;
-  const f = patch.filter;
-  v[STEP_SLOT_ENV_AMOUNT] = f.envAmount;
-  v[STEP_SLOT_CUTOFF] = f.cutoff;
-  v[STEP_SLOT_RESONANCE] = f.resonance;
-  v[STEP_SLOT_FILTER_DECAY] = f.env.decayTime;
-  for (let i = 0; i < OPERATOR_COUNT; i++) {
-    const op = patch.ops[i];
-    const b = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
-    v[b + STEP_OP_LEVEL] = op.level;
-    v[b + STEP_OP_DECAY] = op.env.decayTime;
-    v[b + STEP_OP_DECAY_CURVE] = op.env.decayCurve;
-    v[b + STEP_OP_FEEDBACK] = op.feedback;
-    v[b + STEP_OP_WIDTH] = op.width;
-  }
-  for (let s = 0; s < STEP_MOD_SLOT_COUNT; s++) {
-    if (o[s] !== 0) v[s] = stepModValue(t[s], v[s], o[s]);
-  }
-  voice.envAmount = v[STEP_SLOT_ENV_AMOUNT];
-  voice.cutoff = v[STEP_SLOT_CUTOFF];
-  voice.resonance = v[STEP_SLOT_RESONANCE];
-  voice.filtEnv.decayTime = v[STEP_SLOT_FILTER_DECAY];
-  for (let i = 0; i < OPERATOR_COUNT; i++) {
-    const env = voice.ampEnv[i];
-    const b = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;
-    voice.opLevel[i] = v[b + STEP_OP_LEVEL];
-    env.decayTime = v[b + STEP_OP_DECAY];
-    env.decayCurve = v[b + STEP_OP_DECAY_CURVE];
-    voice.opFeedback[i] = v[b + STEP_OP_FEEDBACK];
-    voice.opWidth[i] = v[b + STEP_OP_WIDTH];
+  layoutVoiceTargets(patch, own);
+  for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
+    const v = o[k];
+    if (v === 0) continue;
+    const d = v * VOICE_TARGET_SPAN[k];
+    const base = own[k];
+    const floor = VOICE_TARGET_FLOOR[k];
+    const x = VOICE_TARGET_RATIO[k] !== 0 ? (base < floor ? floor : base) * Math.pow(2, d) : base + d;
+    own[k] = x < VOICE_TARGET_MIN[k] ? VOICE_TARGET_MIN[k] : x > VOICE_TARGET_MAX[k] ? VOICE_TARGET_MAX[k] : x;
   }
 }
 function startStepMod(voice, patch, stepMod) {
   loadStepOffsets(voice, stepMod, false);
-  bindStepMod(voice, patch);
+  bindOwnValues(voice, patch);
   primeVoiceOffsets(voice);
   const live = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     voice.width[i] = restingWidth(voice.kind[i], live[VT_OP_BASE + i * VT_OP_STRIDE + VT_OP_WIDTH]);
   }
 }
-var slideCurves = new Float64Array(OPERATOR_COUNT);
 function retargetStepMod(voice, patch, stepMod) {
   loadStepOffsets(voice, stepMod, true);
-  const env = voice.ampEnv;
-  for (let i = 0; i < OPERATOR_COUNT; i++) slideCurves[i] = env[i].decayCurve;
-  bindStepMod(voice, patch);
-  for (let i = 0; i < OPERATOR_COUNT; i++) env[i].decayCurve = slideCurves[i];
+  bindOwnValues(voice, patch);
 }
 function rebindStepMod(voice, patch, switched, slotTargets) {
   keepVoiceOffsets(voice);
-  bindStepMod(voice, patch);
+  bindOwnValues(voice, patch);
   rebindVoiceOffsets(voice, slotTargets);
   const live = voice.liveValues;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
@@ -2709,7 +2666,8 @@ var Voice = class {
    * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
    * …), `partOffsets` its song lanes' offsets by target code
    * (windsor#346), and `partFloors` the floor each target a lane moves
-   * plays at least (windsor#347), all shared by every voice.
+   * plays at least (a decay time's, windsor#347; an LFO rate's,
+   * windsor#419), all shared by every voice.
    */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
   constructor(sampleRate2, random, partControls, partOffsets, partFloors) {
@@ -2717,7 +2675,7 @@ var Voice = class {
     this.age = this.voiceId = this.note = NaN;
     this.pan = this.glideFrom = NaN;
     this.panL = this.panR = this.pitchCur = this.pitchTarget = this.mod = NaN;
-    this.glideSeconds = this.envAmount = this.cutoff = this.resonance = NaN;
+    this.glideSeconds = NaN;
     this.lfoLevel = this.lfo2Level = NaN;
     this.sr = sampleRate2;
     this.random = random;
@@ -2781,17 +2739,11 @@ var Voice = class {
     this.carrierBits = 0;
     this.detuneMul = new Float64Array(4);
     this.levelKeyAmp = new Float64Array(4);
-    this.stepOffsets = new Float64Array(STEP_MOD_SLOT_COUNT);
-    this.stepValues = new Float64Array(STEP_MOD_SLOT_COUNT);
-    this.envAmount = 0;
-    this.cutoff = 0;
-    this.resonance = 0;
-    this.opLevel = new Float64Array(4);
-    this.opFeedback = new Float32Array(4);
-    this.opWidth = new Float64Array(4).fill(1);
+    this.stepOffsets = new Float64Array(VOICE_TARGET_COUNT);
+    this.ownValues = new Float64Array(VOICE_TARGET_COUNT);
+    this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
     this.partOffsets = partOffsets;
     this.partFloors = partFloors;
-    this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
     this.fbFrom = new Float32Array(4);
     this.fbTo = new Float32Array(4);
     this.fbRamp = 0;
@@ -3110,8 +3062,6 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     return [
       { name: "pitchBend", defaultValue: 0, minValue: -48, maxValue: 48, automationRate: "k-rate" },
       { name: "modWheel", defaultValue: 0, minValue: 0, maxValue: 1, automationRate: "k-rate" },
-      // The cutoff lane's octaves span the catalog's whole cutoff ratio (windsor#346).
-      { name: "cutoffMod", defaultValue: 0, ...CUTOFF_MOD_RANGE, automationRate: "k-rate" },
       { name: "gain", defaultValue: 1, minValue: 0, maxValue: 4, automationRate: "k-rate" },
       // The song lanes' slots (windsor#346, `voiceOffsets.ts`): each an offset
       // on the target the slot map gives it, 0 for none. No declared range,
@@ -3348,7 +3298,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     return running;
   }
   /**
-   * This quantum's bend, wheel and cutoff into `partControls`, and the song
+   * This quantum's bend and wheel into `partControls`, and the song
    * lanes' slots into `partOffsets` while any is mapped (windsor#346), where
    * every voice's control update reads them. Passed to the update as
    * arguments, each was a new heap number wherever V8 did not inline it
@@ -3358,7 +3308,6 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     const controls = this.partControls;
     controls[PART_BEND] = params.pitchBend[0];
     controls[PART_WHEEL] = params.modWheel[0];
-    controls[PART_CUTOFF_MOD] = params.cutoffMod[0];
     if (this.slotsMapped) latchVoiceOffsets(this.partOffsets, this.slotTargets, params);
   }
   // One quantum read top to bottom: admit, apply the events due, render each
