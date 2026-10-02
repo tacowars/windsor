@@ -215,11 +215,14 @@ detail pane at the bottom. Its layers, top down:
    and commits once on release. `pointerDrag` is the shared press-or-drag
    helper (capture, threshold), the way `chordDrag.ts` does it.
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
-   and close ×; for a part, a row with Split / Delete for the selected
-   region and the Octave knob for `PANE_OCTAVE_KINDS` (the kinds whose card
-   has no Reg), then the part's card from `SEQUENCER_CARDS` **as is**; for
-   a chord, `harmonyCard.ts` — seven degree chips, Triad | Seventh, the
-   Duration dial (bars; beats under Shift), Delete.
+   and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
+   the sequencer device (`sequencerDevice.ts`, windsor#368): a 244 px rack
+   row whose rail (`sequencerRail.ts`) holds the accent dot, the kind's
+   name (a click folds it), the region `n/m`, and Split and Delete for the
+   selected region (`sequencerDeviceModel.ts`, which reads the part from
+   the document at the press). The pane has no region row and adds no
+   knob. For a chord, `harmonyCard.ts` — seven degree chips, Triad |
+   Seventh, the Duration dial (bars; beats under Shift), Delete.
 6. **The pure models** — `regionModel.ts`, `harmonyLaneModel.ts`,
    `songViewTables.ts` (the px maths and the per-kind tables). The tests are
    theirs; the DOM files hold no rule worth testing.
@@ -244,8 +247,7 @@ Each is the whole list; a step skipped here is what a later ticket finds.
    (`sequencerConstants.ts`); knob specs in `sequencerKnobTables.ts` reading
    the kind's `DEFAULT_*_CONFIG`; a register default in
    `harmonyTables.ts`'s `REGISTER_OCTAVE_DEFAULTS` if the kind is pitched,
-   and the kind in `PANE_OCTAVE_KINDS` if its card draws no Reg knob; its
-   lane in `songViewTables.ts` — `LANE_TONE`, `REGION_SUMMARY`,
+   with an Octave knob in its own card; its lane in `songViewTables.ts` — `LANE_TONE`, `REGION_SUMMARY`,
    `CYCLE_TICKS` (`songViewTables.test.ts` fails without all three); any
    tunable of its own in a `<kind>Constants.ts`.
 3. A row in the `windsor-engine` skill's console table.
