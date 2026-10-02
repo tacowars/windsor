@@ -216,14 +216,17 @@ detail pane at the bottom. Its layers, top down:
    helper (capture, threshold), the way `chordDrag.ts` does it.
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
    and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
-   the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row,
-   244 px high for a converted card (`fit: 'fixed'`) and at its natural
-   height for one not yet converted. Its rail (`sequencerRail.ts`) holds
-   the accent dot, the kind's name (a click folds it), the region `n/m`,
-   and Split and Delete for the selected region
-   (`sequencerDeviceModel.ts`, which reads the part from the document at
-   the press). The pane has no region row and adds no knob. For a chord, `harmonyCard.ts` — seven degree chips, Triad |
-   Seventh, the Duration dial (bars; beats under Shift), Delete.
+   the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row
+   244 px high and as wide as its content. All five cards (Grid, Chord,
+   Arp, Basslead, Euclid) hand back a `DeviceBody` with `fit: 'fixed'`
+   and size themselves from `SEQUENCER_DEVICE_PX`
+   (`sequencerDeviceTables.ts`). Its rail (`sequencerRail.ts`) holds the
+   accent dot, the kind's name (a click folds it), the region `n/m`, and
+   Split and Delete for the selected region (`sequencerDeviceModel.ts`,
+   which reads the part from the document at the press). The pane has no
+   region row and adds no knob. For a chord, `harmonyCard.ts` — seven
+   degree chips, Triad | Seventh, the Duration dial (bars; beats under
+   Shift), Delete.
 6. **The pure models** — `regionModel.ts`, `harmonyLaneModel.ts`,
    `songViewTables.ts` (the px maths and the per-kind tables). The tests are
    theirs; the DOM files hold no rule worth testing.
@@ -248,8 +251,11 @@ Each is the whole list; a step skipped here is what a later ticket finds.
    (`sequencerConstants.ts`); knob specs in `sequencerKnobTables.ts` reading
    the kind's `DEFAULT_*_CONFIG`; a register default in
    `harmonyTables.ts`'s `REGISTER_OCTAVE_DEFAULTS` if the kind is pitched,
-   with an Octave knob in its own card; its lane in `songViewTables.ts` — `LANE_TONE`, `REGION_SUMMARY`,
-   `CYCLE_TICKS` (`songViewTables.test.ts` fails without all three); any
+   with an Octave knob in its own card; the card returns a `DeviceBody`
+   with `fit: 'fixed'`, its sizes as `--<kind>-*` entries in
+   `SEQUENCER_DEVICE_PX`, laid out to a mockup tacowars approved; its lane
+   in `songViewTables.ts` — `LANE_TONE`, `REGION_SUMMARY`, `CYCLE_TICKS`
+   (`songViewTables.test.ts` fails without all three); any
    tunable of its own in a `<kind>Constants.ts`.
 3. A row in the `windsor-engine` skill's console table.
 
