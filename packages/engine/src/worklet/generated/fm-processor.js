@@ -1604,13 +1604,16 @@ function updateOperatorAmp(voice, i, n) {
 }
 
 // packages/engine/src/worklet/fm/voiceOffsets.ts
-function mapVoiceSlots(slotTargets, paths) {
+function mapVoiceSlots(slotTargets, floors, paths) {
   const list = Array.isArray(paths) ? paths : null;
   let mapped = false;
+  floors.fill(-Infinity);
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
     const code = list && s < list.length ? voiceTargetCode(list[s]) : -1;
     slotTargets[s] = code;
-    if (code >= 0) mapped = true;
+    if (code < 0) continue;
+    mapped = true;
+    if (VOICE_OFFSET_FLOOR[code] > 0) floors[code] = VOICE_OFFSET_FLOOR[code];
   }
   return mapped;
 }
@@ -1643,9 +1646,10 @@ function bindLiveValues(voice) {
   v[VT_LFO2_AMOUNT] = patch.lfo2.amount;
   v[VT_LFO2_RATE] = patch.lfo2.rate;
   v[VT_PITCH_ENV_AMOUNT] = patch.pitchEnvAmount;
+  const floors = voice.partFloors;
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
     const off = o[k];
-    if (off === 0) continue;
+    if (off === 0 && !(v[k] < floors[k])) continue;
     const floor = VOICE_OFFSET_FLOOR[k];
     const x = VOICE_OFFSET_CURVE[k] === OFFSET_RATIO ? (v[k] < floor ? floor : v[k]) * Math.pow(2, off) : v[k] + off;
     v[k] = x < VOICE_OFFSET_MIN[k] ? VOICE_OFFSET_MIN[k] : x > VOICE_OFFSET_MAX[k] ? VOICE_OFFSET_MAX[k] : x;
@@ -2530,11 +2534,12 @@ function rebindStepMod(voice, patch, switched, slotTargets) {
 var Voice = class {
   /**
    * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
-   * …), and `partOffsets` its song lanes' offsets by target code
-   * (windsor#346), both shared by every voice.
+   * …), `partOffsets` its song lanes' offsets by target code
+   * (windsor#346), and `partFloors` the floor each target a lane moves
+   * plays at least (windsor#347), all shared by every voice.
    */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
-  constructor(sampleRate2, random, partControls, partOffsets) {
+  constructor(sampleRate2, random, partControls, partOffsets, partFloors) {
     this.noiseSeed = this.fade = this.fadeInc = this.velocity = this.detune = NaN;
     this.age = this.voiceId = this.note = NaN;
     this.pan = this.glideFrom = NaN;
@@ -2611,6 +2616,7 @@ var Voice = class {
     this.opFeedback = new Float32Array(4);
     this.opWidth = new Float64Array(4).fill(1);
     this.partOffsets = partOffsets;
+    this.partFloors = partFloors;
     this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
     this.fbFrom = new Float32Array(4);
     this.fbTo = new Float32Array(4);
@@ -2891,15 +2897,17 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.lastNote = this.slideSeconds = this.gainFrom = NaN;
     this.partControls = new Float64Array(PART_CONTROL_COUNT);
     this.partOffsets = new Float64Array(VOICE_TARGET_COUNT);
+    this.partFloors = new Float64Array(VOICE_TARGET_COUNT);
     this.slotTargets = new Int32Array(VOICE_SLOT_COUNT);
-    this.slotsMapped = mapVoiceSlots(this.slotTargets, opts.voiceSlots);
+    this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, opts.voiceSlots);
     this.noteIn = new Float64Array(NOTE_IN_COUNT);
     this.slideIn = false;
     this.stepModIn = null;
     const poolSize = maxVoices + 4;
     this.voices = new Array(poolSize);
     for (let i = 0; i < poolSize; i++) {
-      this.voices[i] = new Voice(sampleRate, this.random, this.partControls, this.partOffsets);
+      const { partControls, partOffsets, partFloors } = this;
+      this.voices[i] = new Voice(sampleRate, this.random, partControls, partOffsets, partFloors);
     }
     this.patch = normalisePatch(opts.patch);
     this.waveSets = [null, null, null, null];
@@ -2966,7 +2974,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
         this.load.start(msg.quanta);
         break;
       case "voiceSlots":
-        this.slotsMapped = mapVoiceSlots(this.slotTargets, msg.slots);
+        this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, msg.slots);
         if (!this.slotsMapped) this.partOffsets.fill(0);
         break;
     }

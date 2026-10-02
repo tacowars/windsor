@@ -233,6 +233,51 @@ describe('a decay lane on the FM part (windsor#347)', () => {
     expect(decays[1]).toBeCloseTo(0.5, 5);
   });
 
+  // PR #400 round 1: a lane at or below the floor over a patch decay of 0 is
+  // offset 0 on the main thread, and still plays the 1 ms floor.
+  const DECAY_TIMES = DECAYS.filter((path) => path.endsWith('decayTime'));
+  const zeroed = (): Patch => DECAY_TIMES.reduce((p, path) => moved(p, path, 0), PATCH);
+  /** The decay time the envelope `path` names plays, after the second block. */
+  function decayPlayed(path: string, slots: string[] | undefined, offset: number): number {
+    let decay = NaN;
+    drive({
+      patch: zeroed(),
+      ...(slots ? { slots } : {}),
+      blocks: 2,
+      each: slot0From(offset),
+      after: (_b, processor) => {
+        const voice = processor.voices[0] as unknown as {
+          ampEnv: { decayTime: number }[];
+          filtEnv: { decayTime: number };
+        };
+        const op = path.startsWith('filter.') ? -1 : Number(path.split('.')[1]);
+        decay = op < 0 ? voice.filtEnv.decayTime : voice.ampEnv[op]!.decayTime;
+      },
+    });
+    return decay;
+  }
+
+  it.each(DECAY_TIMES.flatMap((path) => [0, 0.001].map((lane) => [path, lane] as const)))(
+    '%s held at %f over a patch decay of 0 plays the 1 ms floor',
+    (path, lane) => {
+      const offset = offsetFor(path, lane, zeroed());
+      expect(offset).toBe(0);
+      expect(decayPlayed(path, [path], offset)).toBe(0.001);
+    },
+  );
+
+  /** A lane on a target with no floor, held at its patch's value. */
+  const CURVE = 'ops.0.env.decayCurve';
+
+  it.each(DECAY_TIMES)('%s of 0 still decays instantly with no lane on it', (path) => {
+    expect(decayPlayed(path, undefined, 0)).toBe(0);
+    expect(decayPlayed(path, [CURVE], 0)).toBe(0);
+  });
+
+  it('renders decays of 0 bit for bit with a lane on another target at offset 0', () => {
+    expect(drive({ patch: zeroed(), slots: [CURVE] })).toEqual(drive({ patch: zeroed() }));
+  });
+
   it('renders moving decay lanes the same in the kernel and the generic loop', () => {
     const slots = DECAYS.slice(0, SLOTS);
     const each = (b: number, params: Record<string, Float32Array>): void => {

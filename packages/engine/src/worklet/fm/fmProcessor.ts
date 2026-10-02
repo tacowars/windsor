@@ -72,6 +72,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
   events: EventQueue;
   partControls: Float64Array;
   partOffsets: Float64Array;
+  partFloors: Float64Array;
   slotTargets: Int32Array;
   slotsMapped: boolean;
   gainFrom: number;
@@ -124,12 +125,14 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // so no double is passed to a call (windsor#233).
     this.partControls = new Float64Array(PART_CONTROL_COUNT);
 
-    // The song lanes' offsets by target code, which every voice reads, and
-    // the slot map, from construction so an offline render's lanes play from
-    // its first sample (windsor#346).
+    // The song lanes' offsets by target code, which every voice reads, the
+    // floors a mapped decay time plays at least (windsor#347), and the slot
+    // map, from construction so an offline render's lanes play from its first
+    // sample (windsor#346).
     this.partOffsets = new Float64Array(VOICE_TARGET_COUNT);
+    this.partFloors = new Float64Array(VOICE_TARGET_COUNT);
     this.slotTargets = new Int32Array(VOICE_SLOT_COUNT);
-    this.slotsMapped = mapVoiceSlots(this.slotTargets, opts.voiceSlots);
+    this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, opts.voiceSlots);
 
     // The note-on the render is starting (`NOTE_IN_*`), its slide flag and its
     // step's offsets, copied from the message as the render takes it (windsor#270).
@@ -142,7 +145,8 @@ class FmPartProcessor extends AudioWorkletProcessor {
     const poolSize = maxVoices + 4;
     this.voices = new Array(poolSize);
     for (let i = 0; i < poolSize; i++) {
-      this.voices[i] = new Voice(sampleRate, this.random, this.partControls, this.partOffsets);
+      const { partControls, partOffsets, partFloors } = this;
+      this.voices[i] = new Voice(sampleRate, this.random, partControls, partOffsets, partFloors);
     }
 
     this.patch = normalisePatch(opts.patch);
@@ -241,7 +245,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
         break;
       case 'voiceSlots':
         // windsor#346: a lane added, moved or removed. A free slot offsets nothing.
-        this.slotsMapped = mapVoiceSlots(this.slotTargets, msg.slots);
+        this.slotsMapped = mapVoiceSlots(this.slotTargets, this.partFloors, msg.slots);
         if (!this.slotsMapped) this.partOffsets.fill(0);
         break;
     }

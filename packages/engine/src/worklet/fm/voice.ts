@@ -121,6 +121,7 @@ class Voice {
   lfoLevel: number;
   lfo2Level: number;
   partOffsets: Float64Array;
+  partFloors: Float64Array;
   liveValues: Float64Array;
   fbFrom: Float32Array;
   fbTo: Float32Array;
@@ -128,8 +129,9 @@ class Voice {
 
   /**
    * `partControls` is the part's one array of k-rate controls (`PART_BEND`,
-   * …), and `partOffsets` its song lanes' offsets by target code
-   * (windsor#346), both shared by every voice.
+   * …), `partOffsets` its song lanes' offsets by target code
+   * (windsor#346), and `partFloors` the floor each target a lane moves
+   * plays at least (windsor#347), all shared by every voice.
    */
   // eslint-disable-next-line max-lines-per-function -- every field written once, the doubles NaN first (rule 7): the voice's whole state, read top to bottom
   constructor(
@@ -137,6 +139,7 @@ class Voice {
     random: () => number,
     partControls: Float64Array,
     partOffsets: Float64Array,
+    partFloors: Float64Array,
   ) {
     // Rule 7: each double field is born a double (NaN), before its start
     // value; the noise seed is a uint32, past a small integer's range. `age`
@@ -251,10 +254,11 @@ class Voice {
     this.opFeedback = new Float32Array(4);
     this.opWidth = new Float64Array(4).fill(1);
 
-    // Song automation (windsor#346, `voiceOffsets.ts`): the part's offsets,
-    // the values the voice plays with them this block, and each operator's
+    // Song automation (windsor#346, `voiceOffsets.ts`): the part's offsets
+    // and floors, the values the voice plays with them this block, and each operator's
     // feedback ramp across the block (`fbRamp`, a bit per ramping operator).
     this.partOffsets = partOffsets;
+    this.partFloors = partFloors;
     this.liveValues = new Float64Array(VOICE_TARGET_COUNT);
     this.fbFrom = new Float32Array(4);
     this.fbTo = new Float32Array(4);

@@ -32,12 +32,13 @@
  *   so the offsets then are still the old patch's (PR #385 fix round 2).
  *
  * Invariant: an offset of exactly 0 leaves the value as it was, neither
- * clamped nor passed through a curve, and a part with no slot mapped reads
- * no slot, so a song without voice lanes renders bit for bit as before
- * (`fmProcessorGolden.test.ts`, `fmProcessorKernel.test.ts`). Functions over
- * the voice, one call a control block; allocation free, and no double
- * crosses a call (windsor#233): every value passes through the voice's or
- * the part's arrays. `synth/fmProcessorAutomation.test.ts` pins the targets,
+ * clamped nor passed through a curve, except that a decay time a slot maps
+ * plays at least its 1 ms floor (`partFloors`, windsor#347); and a part
+ * with no slot mapped reads no slot and floors nothing, so a song without
+ * voice lanes renders bit for bit as before (`fmProcessorGolden.test.ts`,
+ * `fmProcessorKernel.test.ts`). Functions over the voice, one call a control
+ * block; allocation free, and no double crosses a call (windsor#233): every
+ * value passes through the voice's or the part's arrays. `synth/fmProcessorAutomation.test.ts` pins the targets,
  * `synth/fmProcessorAllocation.test.ts` the allocation.
  */
 
@@ -79,16 +80,21 @@ import {
 
 /**
  * Map each slot to the code of the target its path names, -1 for none or a
- * path no slot carries. True when any slot is mapped. Allocates nothing; run
- * at construction and at a message, never in the render.
+ * path no slot carries, and set `floors` to the row floor of each mapped
+ * target that has one (a decay time's 1 ms), −Infinity for every other
+ * target, which no value is below. True when any slot is mapped. Allocates
+ * nothing; run at construction and at a message, never in the render.
  */
-function mapVoiceSlots(slotTargets: Int32Array, paths: unknown): boolean {
+function mapVoiceSlots(slotTargets: Int32Array, floors: Float64Array, paths: unknown): boolean {
   const list = Array.isArray(paths) ? (paths as unknown[]) : null;
   let mapped = false;
+  floors.fill(-Infinity);
   for (let s = 0; s < VOICE_SLOT_COUNT; s++) {
     const code = list && s < list.length ? voiceTargetCode(list[s]) : -1;
     slotTargets[s] = code;
-    if (code >= 0) mapped = true;
+    if (code < 0) continue;
+    mapped = true;
+    if (VOICE_OFFSET_FLOOR[code] > 0) floors[code] = VOICE_OFFSET_FLOOR[code];
   }
   return mapped;
 }
@@ -114,7 +120,10 @@ function latchVoiceOffsets(
  * moved by its offset and clamped to the row's bounds. A target whose offset
  * is 0 keeps its own value exactly. A ratio scales the row's floor where its
  * own value is below it (a decay time of 0: windsor#347), as the main thread
- * reckons it. The decays' own values are the step's (`stepValues`), since
+ * reckons it. A decay time a lane moves plays at least its floor even at
+ * offset 0 (`partFloors`), which is the offset the main thread sends for a
+ * lane at or below the floor over a patch below it; without a lane a decay
+ * of 0 stays 0. The decays' own values are the step's (`stepValues`), since
  * the envelopes' copies carry the lanes.
  */
 function bindLiveValues(voice: Voice): void {
@@ -139,9 +148,10 @@ function bindLiveValues(voice: Voice): void {
   v[VT_LFO2_AMOUNT] = patch.lfo2.amount;
   v[VT_LFO2_RATE] = patch.lfo2.rate;
   v[VT_PITCH_ENV_AMOUNT] = patch.pitchEnvAmount;
+  const floors = voice.partFloors;
   for (let k = 0; k < VOICE_TARGET_COUNT; k++) {
     const off = o[k];
-    if (off === 0) continue;
+    if (off === 0 && !(v[k] < floors[k])) continue;
     const floor = VOICE_OFFSET_FLOOR[k];
     const x =
       VOICE_OFFSET_CURVE[k] === OFFSET_RATIO

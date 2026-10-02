@@ -12,7 +12,10 @@
  *   slot. A decay time's knob ends on exact 0, which no ratio scales, so
  *   both its ends are taken from the row's `floor` (1 ms) where they are
  *   below it, as the worklet takes its base (windsor#347): a lane at 0
- *   plays 1 ms;
+ *   plays 1 ms. Over a patch decay below the floor, a lane at or below it
+ *   is offset 0, and the worklet plays the floor for any decay time a slot
+ *   maps (`partFloors` in `worklet/fm/voiceOffsets.ts`), while the same
+ *   decay with no lane stays instant;
  * - every other lane writes `value − patch` to a slot.
  *
  * A slot is one of the part's `FM_LANES_MAX` k-rate parameters, taken by a
