@@ -26,13 +26,14 @@
  *
  * The bounds are the Parts tab's knobs, the patch's own ranges where it
  * clamps (`patchDefaults.ts`). Display data (label, scale, unit) is not here:
- * the automation catalog (`automation/automationTargetTables.ts`) and the
- * app's step-lane labels key it by path, and their parity tests keep them in
- * step with these rows.
+ * it is one look per path in the automation catalog
+ * (`automation/automationTargetTables.ts`, record
+ * `2026-10-02-voice-targets-named-in-the-catalog`), which song lanes, step
+ * lanes and the knobs over these targets all read.
  *
- * Adding a target: a row here, its look and label in the catalog and the
- * app, its field in `layoutVoiceTargets` (`voiceTargets.ts`), and a read of
- * `liveValues` at its application point.
+ * Adding a target: a row here, its look in the catalog, its field in
+ * `layoutVoiceTargets` (`voiceTargets.ts`), and a read of `liveValues` at its
+ * application point.
  *
  * Data only: it imports `patchDefaults.ts` and nothing else, never touches
  * the worklet scope, and the main thread reads it through `index.ts`, so it

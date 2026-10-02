@@ -20,7 +20,8 @@ import {
   TICKS_PER_BAR,
   VOICE_AUTOMATION_ROWS,
   catalogRow,
-  voicePathOf,
+  formatTargetId,
+  targetKind,
   type AutomationLane,
   type AutomationTargetId,
   type AutomationTargetRow,
@@ -46,10 +47,12 @@ import {
 } from './songAutomationModel';
 
 const SLOT = AUTOMATION_PART.slot;
-const TAPE_DRIVE = `insert.${AUTOMATION_TAPE_ID}.drive` as AutomationTargetId;
-const TAPE_WEAR = `insert.${AUTOMATION_TAPE_ID}.wear` as AutomationTargetId;
-const TAPE_WOW = `insert.${AUTOMATION_TAPE_ID}.wow` as AutomationTargetId;
-const isVoice = (target: string): boolean => voicePathOf(target) !== undefined;
+const tapeTarget = (field: string): AutomationTargetId =>
+  formatTargetId({ kind: 'insert', insertId: AUTOMATION_TAPE_ID, field });
+const TAPE_DRIVE = tapeTarget('drive');
+const TAPE_WEAR = tapeTarget('wear');
+const TAPE_WOW = tapeTarget('wow');
+const isVoice = (target: AutomationTargetId): boolean => targetKind(target) === 'voice';
 
 /** `AUTOMATION_PART` with `inserts` on its strip and `lanes` as its automation. */
 const partWith = (
@@ -102,6 +105,25 @@ describe('the picker', () => {
     });
   });
 
+  it("groups the voice's options by the catalog's section, in its order (windsor#436)", () => {
+    const operator = (name: string): readonly [string, string[]] => [
+      `Voice · Op ${name}`,
+      ['Level', 'Decay', 'Dcy Crv', 'Fdbk', 'Width'].map((f) => `Op ${name} ${f}`),
+    ];
+    const bare = pickerGroups(partWith([]));
+    expect(bare.map((g) => [g.label, g.options.map((o) => o.label)])).toEqual([
+      ['Mixer', ['Level', 'Pan', 'Send A', 'Send B']],
+      ['Voice · Filter', ['Cutoff', 'Filt Env Amt', 'Resonance', 'Filter Decay', 'Vowel']],
+      ...['A', 'B', 'C', 'D'].map(operator),
+      ['Voice · LFO', ['LFO 1 Amt', 'LFO 1 Rate', 'LFO 2 Amt', 'LFO 2 Rate']],
+      ['Voice · Pitch', ['Pitch Env']],
+    ]);
+    expect(bare.flatMap((g) => g.options.map((o) => o.target))).toEqual([
+      ...STRIP_AUTOMATION_ROWS.map((r) => r.target),
+      ...VOICE_AUTOMATION_ROWS.map((r) => r.target),
+    ]);
+  });
+
   it("lists only the fields an insert's settings leave read", () => {
     const tape = groups.find((g) => g.label === 'Insert · Tape')!.options.map((o) => o.target);
     expect(tape).toContain(TAPE_DRIVE);
@@ -124,9 +146,7 @@ describe('the picker', () => {
   });
 
   it(`disables every voice target at ${FM_LANES_MAX} voice lanes, and nothing else`, () => {
-    const lanes = VOICE_AUTOMATION_ROWS.slice(0, FM_LANES_MAX).map((r) =>
-      flat(r.target as AutomationTargetId),
-    );
+    const lanes = VOICE_AUTOMATION_ROWS.slice(0, FM_LANES_MAX).map((r) => flat(r.target));
     const full = pickerGroups(partWith(AUTOMATION_PART.strip.inserts, lanes));
     const options = full.flatMap((g) => g.options);
     expect(options.filter((o) => isVoice(o.target)).every((o) => o.disabled)).toBe(true);
@@ -158,7 +178,11 @@ describe('a lane', () => {
       kindLine: 'Tape',
       kind: 'insert',
     });
-    const eq = `insert.${AUTOMATION_EQ_ID}.bands.0.freq` as AutomationTargetId;
+    const eq = formatTargetId({
+      kind: 'insert',
+      insertId: AUTOMATION_EQ_ID,
+      field: 'bands.0.freq',
+    });
     expect(laneTitle(AUTOMATION_PART, eq).kindLine).toBe('Parametric EQ');
     expect(laneTitle(AUTOMATION_PART, 'voice.filter.cutoff')).toEqual({
       name: 'Cutoff',
@@ -166,6 +190,17 @@ describe('a lane', () => {
       kind: 'voice',
     });
     expect(laneTitle(AUTOMATION_PART, 'voice.ops.1.width').kindLine).toBe('Voice · Op B');
+    expect(laneTitle(AUTOMATION_PART, 'voice.ops.3.feedback')).toEqual({
+      name: 'Op D Fdbk',
+      kindLine: 'Voice · Op D',
+      kind: 'voice',
+    });
+    expect(laneTitle(AUTOMATION_PART, 'voice.lfo2.amount').kindLine).toBe('Voice · LFO');
+    expect(laneTitle(AUTOMATION_PART, 'voice.pitchEnvAmount')).toEqual({
+      name: 'Pitch Env',
+      kindLine: 'Voice · Pitch',
+      kind: 'voice',
+    });
   });
 
   it('starts flat at the value from tick 0 to the song end, on (decision 4)', () => {

@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { RETURN_NAMES } from '../mixer/mix';
 import { VOWEL_RANGE } from '../worklet/fm/patchDefaults';
-import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
+import {
+  VOICE_TARGET_TABLE,
+  VT_LFO2_RATE,
+  VT_OP_BASE,
+  VT_OP_STRIDE,
+  VT_OP_WIDTH,
+  VT_PITCH_ENV_AMOUNT,
+  VT_VOWEL,
+} from '../worklet/fm/voiceTargetTables';
 import {
   AUTOMATION_LEVEL_FLOOR_DB,
   FM_LANES_MAX,
   STRIP_AUTOMATION_ROWS,
+  voiceSectionOf,
+  type VoiceSection,
 } from './automationTargetTables';
 import { VOICE_AUTOMATION_ROWS, voiceTargetId } from './automationTargets';
 
@@ -34,7 +44,7 @@ describe('the voice rows', () => {
 
   it('name each target once, short enough for a step lane header (windsor#424)', () => {
     const operator = (name: string): string[] =>
-      ['Level', 'Decay', 'Decay Crv', 'Feedback', 'Width'].map((f) => `Op ${name} ${f}`);
+      ['Level', 'Decay', 'Dcy Crv', 'Fdbk', 'Width'].map((f) => `Op ${name} ${f}`);
     expect(VOICE_AUTOMATION_ROWS.map((r) => r.label)).toEqual([
       'Cutoff',
       'Filt Env Amt',
@@ -42,11 +52,11 @@ describe('the voice rows', () => {
       'Filter Decay',
       'Vowel',
       ...['A', 'B', 'C', 'D'].flatMap(operator),
-      'LFO 1 Amount',
+      'LFO 1 Amt',
       'LFO 1 Rate',
-      'LFO 2 Amount',
+      'LFO 2 Amt',
       'LFO 2 Rate',
-      'Pitch Env Amt',
+      'Pitch Env',
     ]);
   });
 
@@ -59,8 +69,38 @@ describe('the voice rows', () => {
       max: VOWEL_RANGE.max,
       scale: 'linear',
       unit: '',
+      path: 'filter.vowel',
+      section: { kind: 'filter' },
     });
     expect([vowel.min, vowel.max]).toEqual([0, 4]);
+  });
+
+  it('carry their patch path (windsor#436)', () => {
+    expect(VOICE_AUTOMATION_ROWS.map((r) => r.path)).toEqual(
+      VOICE_TARGET_TABLE.map((row) => row.path),
+    );
+  });
+
+  it('carry their section: the filter, operator i, the LFOs or the pitch envelope', () => {
+    const section = (r: { section: VoiceSection }): string =>
+      r.section.kind === 'operator' ? `op ${r.section.op}` : r.section.kind;
+    const operator = (i: number): string[] => OPERATOR_FIELDS.map(() => `op ${i}`);
+    expect(VOICE_AUTOMATION_ROWS.map(section)).toEqual([
+      ...Array<string>(5).fill('filter'),
+      ...[0, 1, 2, 3].flatMap(operator),
+      ...Array<string>(4).fill('lfo'),
+      'pitch',
+    ]);
+  });
+
+  it('read a section from the code alone', () => {
+    expect(voiceSectionOf(VT_VOWEL)).toEqual({ kind: 'filter' });
+    expect(voiceSectionOf(VT_OP_BASE + 2 * VT_OP_STRIDE + VT_OP_WIDTH)).toEqual({
+      kind: 'operator',
+      op: 2,
+    });
+    expect(voiceSectionOf(VT_LFO2_RATE)).toEqual({ kind: 'lfo' });
+    expect(voiceSectionOf(VT_PITCH_ENV_AMOUNT)).toEqual({ kind: 'pitch' });
   });
 
   it('are the voice target table, in its order (windsor#419)', () => {

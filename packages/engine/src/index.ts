@@ -117,6 +117,7 @@ export {
   FM_LANES_MAX,
   STRIP_AUTOMATION_ROWS,
 } from './automation/automationTargetTables';
+export type { VoiceAutomationRow, VoiceSection } from './automation/automationTargetTables';
 export { INSERT_AUTOMATION_FIELDS } from './automation/automationInsertTables';
 export type { InsertFieldRow, InsertSpecOf } from './automation/automationInsertTables';
 export { automatableInsertFields } from './automation/automationInsertFields';

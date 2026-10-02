@@ -1,6 +1,6 @@
 /**
- * The automation lanes' tables (windsor#348): every voice row in exactly one
- * picker group, a reason for every kind whose fields can be unread, and the
+ * The automation lanes' tables (windsor#348): the picker's voice group
+ * labels, a reason for every kind whose fields can be unread, and the
  * reasons the stage and band kinds give.
  */
 import { describe, expect, it } from 'vitest';
@@ -10,17 +10,26 @@ import {
   INSERT_AUTOMATION_FIELDS,
   OP_NAMES,
   VOICE_AUTOMATION_ROWS,
-  voicePathOf,
 } from '@windsor/engine';
-import { INACTIVE_WHY, VOICE_GROUPS } from './songAutomationTables';
+import { INACTIVE_WHY, voiceGroupLabel } from './songAutomationTables';
 
-describe('VOICE_GROUPS', () => {
-  it('claims every voice row exactly once', () => {
-    const groups = VOICE_GROUPS(OP_NAMES);
-    for (const row of VOICE_AUTOMATION_ROWS) {
-      const path = voicePathOf(row.target)!;
-      expect(groups.filter((g) => g.claims(path)).length, path).toBe(1);
-    }
+describe('voiceGroupLabel', () => {
+  it('names each section, an operator by its letter (windsor#436)', () => {
+    expect(voiceGroupLabel({ kind: 'filter' }, OP_NAMES)).toBe('Voice · Filter');
+    expect(voiceGroupLabel({ kind: 'operator', op: 2 }, OP_NAMES)).toBe('Voice · Op C');
+    expect(voiceGroupLabel({ kind: 'lfo' }, OP_NAMES)).toBe('Voice · LFO');
+    expect(voiceGroupLabel({ kind: 'pitch' }, OP_NAMES)).toBe('Voice · Pitch');
+  });
+
+  it('gives the voice rows seven groups, each one run of the catalog', () => {
+    const labels = VOICE_AUTOMATION_ROWS.map((row) => voiceGroupLabel(row.section, OP_NAMES));
+    const runs = labels.filter((label, i) => label !== labels[i - 1]);
+    expect(runs).toEqual([
+      'Voice · Filter',
+      ...OP_NAMES.map((name) => `Voice · Op ${name}`),
+      'Voice · LFO',
+      'Voice · Pitch',
+    ]);
   });
 });
 

@@ -21,6 +21,7 @@ import type {
   InsertKindName,
   InsertSpec,
   Patch,
+  VoiceAutomationRow,
 } from '@windsor/engine';
 import {
   FM_LANES_MAX,
@@ -32,15 +33,14 @@ import {
   parseTargetId,
   targetKind,
   targetRow,
-  voicePathOf,
 } from '@windsor/engine';
 import { INSERT_LABELS } from './insertKnobTables';
 import { getPath } from './patchPath';
 import {
   INACTIVE_WHY,
   MIXER_GROUP_LABEL,
-  VOICE_GROUPS,
   insertGroupLabel,
+  voiceGroupLabel,
 } from './songAutomationTables';
 
 /** One target the picker lists: disabled when it already has a lane, or the voice is full. */
@@ -118,15 +118,23 @@ export function pickerGroups(part: DocumentPart): PickerGroup[] {
     );
     return [{ label: insertGroupLabel(labels.get(insertId) ?? ''), options }];
   });
-  const voice = VOICE_GROUPS(OP_NAMES).map((group) => ({
-    label: group.label,
-    options: VOICE_AUTOMATION_ROWS.filter((row) => group.claims(voicePathOf(row.target) ?? '')).map(
-      (row) => option(row.target as AutomationTargetId, row.label, voiceFull),
-    ),
-  }));
+  const voice = new Map<string, PickerOption[]>();
+  for (const row of VOICE_AUTOMATION_ROWS) {
+    const label = voiceGroupLabel(row.section, OP_NAMES);
+    voice.set(label, [...(voice.get(label) ?? []), option(row.target, row.label, voiceFull)]);
+  }
   const mixer = STRIP_AUTOMATION_ROWS.map((row) => option(row.target, row.label));
-  return [{ label: MIXER_GROUP_LABEL, options: mixer }, ...inserts, ...voice];
+  return [
+    { label: MIXER_GROUP_LABEL, options: mixer },
+    ...inserts,
+    ...[...voice].map(([label, options]) => ({ label, options })),
+  ];
 }
+
+/** Each voice row by its target id, for the section a lane's kind line names. */
+const VOICE_ROWS = new Map<string, VoiceAutomationRow>(
+  VOICE_AUTOMATION_ROWS.map((row) => [row.target, row]),
+);
 
 /** A lane's name and the kind line under it (decision 2): "Cutoff" over "Voice · Filter". */
 export interface LaneTitle {
@@ -144,8 +152,8 @@ export function laneTitle(part: DocumentPart, target: AutomationTargetId): LaneT
     return { name, kindLine, kind };
   }
   if (parsed?.kind === 'voice') {
-    const group = VOICE_GROUPS(OP_NAMES).find((g) => g.claims(parsed.path));
-    return { name, kindLine: group?.label ?? '', kind };
+    const row = VOICE_ROWS.get(target);
+    return { name, kindLine: row ? voiceGroupLabel(row.section, OP_NAMES) : '', kind };
   }
   return { name, kindLine: MIXER_GROUP_LABEL, kind };
 }
