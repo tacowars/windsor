@@ -44,7 +44,7 @@ const PROGRESSION: Arrangement = {
           velocity: 0.6,
           sequencer: {
             kind: 'chord',
-            divisor: DIVISORS.bar,
+            divisor: DIVISORS.whole,
             gate: 1,
             voicing: 'close',
             // C3 = 48.

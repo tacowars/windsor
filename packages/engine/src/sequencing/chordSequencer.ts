@@ -121,7 +121,7 @@ export function restStep(over: Partial<StepTiming> = {}): ChordRestStep {
 }
 
 export const DEFAULT_CHORD_CONFIG: ChordSequencerConfig = {
-  divisor: DIVISORS.bar,
+  divisor: DIVISORS.whole,
   gate: CHORD_GATE_DEFAULT,
   voicing: CHORD_VOICING_DEFAULT,
   register: { octave: CHORD_REGISTER_OCTAVE_DEFAULT },

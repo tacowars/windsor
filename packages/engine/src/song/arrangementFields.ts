@@ -12,7 +12,7 @@
  * `ArrangementNormaliser` (`arrangementNormalise.ts`) builds the document
  * sections on top of this vocabulary.
  */
-import { isBarDivisor, TICKS_PER_BAR } from '../sequencing/scheduler';
+import { isNoteDivisor, TICKS_PER_BAR } from '../sequencing/scheduler';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -96,7 +96,7 @@ export class FieldNormaliser {
   /** A step divisor: a positive integer that divides the 96-tick bar. */
   divisor(raw: unknown, fallback: number, path: string): number {
     const value = this.int(raw, fallback, 1, TICKS_PER_BAR, path);
-    if (isBarDivisor(value)) return value;
+    if (isNoteDivisor(value)) return value;
     this.correction(
       `${path}: ${value} does not divide the ${TICKS_PER_BAR}-tick bar — using ${fallback}`,
     );

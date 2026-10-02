@@ -37,6 +37,9 @@ const PURE_FILES = [
   // Swing (windsor#14): the clock's time warp and its table.
   'swing.ts',
   'swingTables.ts',
+  // The meter (windsor#428): its beats, its bar and a song's length.
+  'meter.ts',
+  'meterTables.ts',
   // The issued stamps `audibleTick` reads, and the ring's size.
   'tickStamps.ts',
   'schedulerConstants.ts',

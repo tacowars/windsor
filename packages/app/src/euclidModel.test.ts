@@ -117,7 +117,7 @@ describe('the preview and the readout', () => {
   it('groups the strip by the beat only where the step divides it', () => {
     expect(stepsPerBeat(DIVISORS.sixteenth)).toBe(PPQ / DIVISORS.sixteenth);
     expect(stepsPerBeat(DIVISORS.quarter)).toBe(1);
-    expect(stepsPerBeat(DIVISORS.bar)).toBe(0);
+    expect(stepsPerBeat(DIVISORS.whole)).toBe(0);
     expect(stepsPerBeat(0)).toBe(0);
   });
 });

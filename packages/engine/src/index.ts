@@ -385,7 +385,7 @@ export {
   PPQ,
   TICKS_PER_BAR,
   TickTransport,
-  isBarDivisor,
+  isNoteDivisor,
 } from './sequencing/scheduler';
 export type {
   AudioClock,
@@ -395,6 +395,13 @@ export type {
   TickSource,
   Unsubscribe,
 } from './sequencing/scheduler';
+/**
+ * The meter (windsor#428): each meter's counted beats, its bar and a song's
+ * length in ticks. Every song plays 4/4 until the song document names one.
+ */
+export { FOUR_FOUR, METERS, METER_TABLE } from './sequencing/meterTables';
+export type { Meter } from './sequencing/meterTables';
+export { meterBeats, songTicks, ticksPerBar } from './sequencing/meter';
 /**
  * Song swing (windsor#14): the bounds and grids of `transport.swing`. A live
  * edit is `ctx.change({ transport: { swing: { amount, grid } } })`, either

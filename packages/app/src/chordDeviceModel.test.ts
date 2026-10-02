@@ -30,7 +30,7 @@ describe('the Chord device’s Steps label (windsor#369)', () => {
   });
 
   it('reads a whole number of bars without places', () => {
-    expect(chordStepsLabel(spec([hitStep(), hitStep()], DIVISORS.bar))).toBe('2 · 2 bars');
+    expect(chordStepsLabel(spec([hitStep(), hitStep()], DIVISORS.whole))).toBe('2 · 2 bars');
   });
 
   it('reads an empty pattern as no bars', () => {

@@ -29,7 +29,7 @@ import {
   SCALE_OFFSET_MAX,
   VELOCITY_DEFAULT,
 } from '../audioConstants';
-import { TICKS_PER_BAR } from '../sequencing/scheduler';
+import { songTicks } from '../sequencing/meter';
 import {
   STRAIGHT_SWING,
   SWING_AMOUNT_MAX,
@@ -101,7 +101,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
     // did and exports byte for byte as it came (records
     // `2026-09-28-song-swing-in-the-transport`, `2026-09-28-song-loop-in-the-transport`).
     const swung = o.swing === undefined ? transport : { ...transport, swing: this.swing(o.swing) };
-    const loop = normaliseLoop(o.loop, transport.bars * TICKS_PER_BAR, this);
+    const loop = normaliseLoop(o.loop, songTicks(transport.bars), this);
     return loop === undefined ? swung : { ...swung, loop };
   }
 
@@ -178,10 +178,10 @@ export class ArrangementNormaliser extends FieldNormaliser {
     if (o.name !== undefined && typeof o.name !== 'string') {
       this.correction(`${path}.name: ${show(o.name)} is not a name — using "${fallbackName}"`);
     }
-    const songTicks = transport.bars * TICKS_PER_BAR;
+    const ticks = songTicks(transport.bars);
     const strip = normaliseStrip(o.strip, `${path}.strip`, this);
     const automation = normaliseAutomation(o.automation, {
-      songTicks,
+      songTicks: ticks,
       inserts: strip.inserts,
       path: `${path}.automation`,
       n: this,
@@ -193,7 +193,7 @@ export class ArrangementNormaliser extends FieldNormaliser {
       velocity: this.num(o.velocity, VELOCITY_DEFAULT, 0, 1, `${path}.velocity`),
       strip,
       regions: normaliseRegions(o.regions, {
-        songTicks,
+        songTicks: ticks,
         kind: sequencerKindOf(o.sequencer),
         path: `${path}.regions`,
         n: this,

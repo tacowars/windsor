@@ -58,7 +58,7 @@ import type { ScaleSampler } from './scaleSampler';
 import { assertStepModLanes, stepModAt, type StepModLane } from './stepModLanes';
 import {
   DIVISORS,
-  isBarDivisor,
+  isNoteDivisor,
   type TickEvent,
   type TickSource,
   type Unsubscribe,
@@ -154,7 +154,7 @@ export function assertRatchet(ratchet: number | undefined, path: string): void {
 
 /** Every constructor and `reconfigure` check; the player runs it inside `plan` so a bad live edit is refused before anything commits (#603). */
 export function assertGridConfig(config: GridSequencerConfig): void {
-  if (!isBarDivisor(config.divisor)) {
+  if (!isNoteDivisor(config.divisor)) {
     throw new RangeError(`divisor must divide the bar, got ${config.divisor}`);
   }
   if (config.steps.length < 1 || config.steps.length > GRID_STEPS_MAX) {

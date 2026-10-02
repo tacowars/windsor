@@ -33,39 +33,54 @@
 
 import {
   DEFAULT_BPM,
-  NOTES_PER_BAR,
+  NOTES_PER_WHOLE,
   SCHEDULER_LOOK_AHEAD_SECONDS,
   SCHEDULER_START_DELAY_SECONDS,
   SECONDS_PER_MINUTE,
   TICK_STAMP_EPSILON,
 } from '../audioConstants';
+import { barTicks, isMeter, meterBeats } from './meter';
+import { FOUR_FOUR, type Meter, type MeterBeats } from './meterTables';
 import { playableSwing, swingSlope, swingTicks, unswingTicks } from './swing';
 import { TickStamps } from './tickStamps';
 import { STRAIGHT_SWING, SWING_TABLE, type Swing, type SwingTable } from './swingTables';
 
 /** Pulses per quarter note -- the MIDI-clock grid. */
 export const PPQ = 24;
+/**
+ * The 4/4 bar, in beats and ticks: what every song plays until the song
+ * document names a meter (windsor#428). The app reads these until its own
+ * meter seam lands; the engine reads a bar from the meter (`meter.ts`).
+ */
 export const BEATS_PER_BAR = 4;
 export const TICKS_PER_BAR = PPQ * BEATS_PER_BAR;
 
+/** The whole note, in ticks: what a step length is measured against, whatever the meter. */
+export const WHOLE_NOTE_TICKS = PPQ * NOTES_PER_WHOLE.quarter;
+
 /**
- * Step lengths as divisors in ticks. Every scale the design asks for is an
- * exact integer on the 24 PPQ grid; triplets (1/8T = 8, 1/16T = 4) fit too.
+ * Step lengths as divisors in ticks: note values, not bars (windsor#428).
+ * Every scale the design asks for is an exact integer on the 24 PPQ grid;
+ * triplets (1/8T = 8, 1/16T = 4) fit too.
  */
 export const DIVISORS = {
-  bar: TICKS_PER_BAR,
-  half: TICKS_PER_BAR / 2,
-  quarter: TICKS_PER_BAR / NOTES_PER_BAR.quarter,
-  eighth: TICKS_PER_BAR / NOTES_PER_BAR.eighth,
-  sixteenth: TICKS_PER_BAR / NOTES_PER_BAR.sixteenth,
-  thirtySecond: TICKS_PER_BAR / NOTES_PER_BAR.thirtySecond,
+  whole: WHOLE_NOTE_TICKS,
+  half: WHOLE_NOTE_TICKS / NOTES_PER_WHOLE.half,
+  quarter: WHOLE_NOTE_TICKS / NOTES_PER_WHOLE.quarter,
+  eighth: WHOLE_NOTE_TICKS / NOTES_PER_WHOLE.eighth,
+  sixteenth: WHOLE_NOTE_TICKS / NOTES_PER_WHOLE.sixteenth,
+  thirtySecond: WHOLE_NOTE_TICKS / NOTES_PER_WHOLE.thirtySecond,
 } as const;
 export type DivisorName = keyof typeof DIVISORS;
 export const DIVISOR_NAMES = Object.keys(DIVISORS) as readonly DivisorName[];
 
-/** A divisor a bar-aligned generator may use: a positive integer that divides the bar. */
-export function isBarDivisor(divisor: number): boolean {
-  return Number.isInteger(divisor) && divisor > 0 && TICKS_PER_BAR % divisor === 0;
+/**
+ * A divisor a generator may step at: a positive integer that divides the
+ * whole note. A bar-long step in another meter is a step count (a Grid or
+ * Bass length, a Chord duration), not a divisor.
+ */
+export function isNoteDivisor(divisor: number): boolean {
+  return Number.isInteger(divisor) && divisor > 0 && WHOLE_NOTE_TICKS % divisor === 0;
 }
 
 /**
@@ -137,6 +152,10 @@ export class TickTransport implements TickSource {
   /** The loop the counter wraps (windsor#15); null plays through, today's rule. */
   loop: TickLoop | null = null;
   private playing: Swing;
+  private playingMeter: Meter = FOUR_FOUR;
+  /** The meter's counted beats and its bar, in ticks: what the warp and `TickEvent.bar` read. */
+  private beats: MeterBeats = meterBeats(FOUR_FOUR);
+  private barLength = barTicks(this.beats);
   private tick = 0;
   private seconds = 0;
   private subscribers: Subscriber[] = [];
@@ -148,6 +167,21 @@ export class TickTransport implements TickSource {
   ) {
     this.bpm = bpm;
     this.playing = playableSwing(swing, swingTable);
+  }
+
+  /**
+   * The song's meter (windsor#428): its bar is `TickEvent.bar`'s, and swing's
+   * pairs restart at each of its beats. Read per tick, like the swing. 4/4
+   * until set; nothing sets it yet. A meter the table does not name plays 4/4.
+   */
+  get meter(): Meter {
+    return this.playingMeter;
+  }
+
+  set meter(value: Meter) {
+    this.playingMeter = isMeter(value) ? value : FOUR_FOUR;
+    this.beats = meterBeats(this.playingMeter);
+    this.barLength = barTicks(this.beats);
   }
 
   /**
@@ -169,17 +203,17 @@ export class TickTransport implements TickSource {
 
   /** Seconds from `tick` to `tick + 1` at the running tempo and swing. */
   intervalSeconds(tick: number): number {
-    return this.secondsPerTick * swingSlope(tick, this.swing, this.swingTable);
+    return this.secondsPerTick * swingSlope(tick, this.swing, this.swingTable, this.beats);
   }
 
   /** Where tick position `tick` sounds, in straight ticks from 0 (`swing.ts`). */
   swungTicks(tick: number): number {
-    return swingTicks(tick, this.swing, this.swingTable);
+    return swingTicks(tick, this.swing, this.swingTable, this.beats);
   }
 
   /** The inverse of `swungTicks`. */
   unswungTicks(warped: number): number {
-    return unswingTicks(warped, this.swing, this.swingTable);
+    return unswingTicks(warped, this.swing, this.swingTable, this.beats);
   }
 
   /** The tick `advance()` will issue next. */
@@ -213,8 +247,8 @@ export class TickTransport implements TickSource {
     const secondsPerTick = this.secondsPerTick;
     const base = {
       tick,
-      bar: Math.floor(tick / TICKS_PER_BAR),
-      tickInBar: tick % TICKS_PER_BAR,
+      bar: Math.floor(tick / this.barLength),
+      tickInBar: tick % this.barLength,
       seconds: this.seconds,
       secondsPerTick,
       time,
@@ -241,6 +275,8 @@ export interface SchedulerOptions {
   swing?: Swing;
   /** The warp's table; the shipped one when absent. */
   swingTable?: SwingTable;
+  /** The song's meter (windsor#428); 4/4 when absent. */
+  meter?: Meter;
 }
 
 /** Look-ahead driver for a `TickTransport` against a real clock. */
@@ -266,6 +302,7 @@ export class Scheduler implements TickSource {
       options.swing ?? STRAIGHT_SWING,
       options.swingTable ?? SWING_TABLE,
     );
+    this.transport.meter = options.meter ?? FOUR_FOUR;
   }
 
   get bpm(): number {
@@ -282,6 +319,15 @@ export class Scheduler implements TickSource {
 
   set swing(value: Swing) {
     this.transport.swing = value;
+  }
+
+  /** The song's meter (windsor#428), live like the swing: the next tick reads it. */
+  get meter(): Meter {
+    return this.transport.meter;
+  }
+
+  set meter(value: Meter) {
+    this.transport.meter = value;
   }
 
   get loop(): TickLoop | null {
