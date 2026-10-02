@@ -8,7 +8,7 @@
  * Gate — and Steps, the strip, labelled with its count and one pass in bars
  * (`chordDeviceModel.ts`).
  *
- * The strip is one column per step, 32 px wide and grouped by four: the Hit
+ * The strip is one column per step, 48 px wide and grouped by four: the Hit
  * or Rest tile, taking the height the device has left so it is a large
  * target to press and to drop on, then the Oct, Inv, Dur and Rep dials
  * (click up, shift-click down; a rest has only Dur and Rep), and the +

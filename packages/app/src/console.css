@@ -1933,7 +1933,8 @@ input.field.group-name {
    is docs/research/2026-09-30-sequencer-rack/chord.html. The frame, rail,
    sections and columns are the sequencer device's (above); this block is
    the Chord's own: the Hit and Rest tiles to drag from, and the strip, a
-   column per step at --step-w grouped by four, whose step tile takes the
+   column per step at --chord-step-w grouped by four, its dials
+   --chord-dial-h high, whose step tile takes the
    height the device has left. Nothing scrolls. */
 .chord-device {
   display: flex;
@@ -1943,6 +1944,11 @@ input.field.group-name {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+/* Play's columns stand --chord-col-gap apart, so Base step and Voicing
+   clear the tiles. */
+.chord-device .seq-section:first-child .seq-sec-body {
+  gap: var(--chord-col-gap);
 }
 /* The tiles' column grows past --seq-wide-col rather than wrap or clip a
    long chord name (windsor#332's `G# maj · ♭VI`). */
@@ -2044,7 +2050,7 @@ body.chord-dragging {
   padding: 0;
 }
 .chord-strip .grid-col {
-  width: var(--step-w);
+  width: var(--chord-step-w);
 }
 .chord-strip .grid-col:nth-child(4n + 1):not(:first-child) {
   margin-left: var(--beat-gap);
@@ -2064,13 +2070,17 @@ body.chord-dragging {
   overflow: hidden;
   white-space: nowrap;
 }
+.chord-strip .gcell.dial,
+.chord-strip .gcell.blank {
+  height: var(--chord-dial-h);
+}
 .chord-strip .gcell.dial {
   color: var(--ink);
   font-family: var(--f-num);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 16px;
+  line-height: calc(var(--chord-dial-h) - 2px);
 }
 .chord-strip .gcell.dial.dim {
   color: var(--ink-faint);

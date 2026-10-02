@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { ChordSpec, ChordStep } from '@windsor/engine';
 import { DEFAULT_CHORD_CONFIG, DIVISORS, hitStep, restStep } from '@windsor/engine';
 import { chordBars, chordStepsLabel } from './chordDeviceModel';
+import { SEQUENCER_DEVICE_PX } from './sequencerDeviceTables';
 
 const spec = (steps: ChordStep[], divisor: number = DIVISORS.eighth): ChordSpec => ({
   kind: 'chord',
@@ -34,5 +35,15 @@ describe('the Chord device’s Steps label (windsor#369)', () => {
 
   it('reads an empty pattern as no bars', () => {
     expect(chordStepsLabel(spec([]))).toBe('0 · 0 bars');
+  });
+});
+
+describe('the Chord device’s sizes (windsor#369)', () => {
+  it('widens its steps to half again the Grid’s and gives the dials more height, at 244 px', () => {
+    expect(SEQUENCER_DEVICE_PX['--seq-h']).toBe(244);
+    expect(SEQUENCER_DEVICE_PX['--step-w']).toBe(32);
+    expect(SEQUENCER_DEVICE_PX['--chord-step-w']).toBe(48);
+    expect(SEQUENCER_DEVICE_PX['--chord-dial-h']).toBe(22);
+    expect(SEQUENCER_DEVICE_PX['--chord-col-gap']).toBe(10);
   });
 });

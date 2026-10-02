@@ -29,6 +29,12 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--seq-rail': 24,
   /** A step column's width. */
   '--step-w': 32,
+  /** A Chord step column's width: half again the Grid's, for its bigger dials (windsor#369). */
+  '--chord-step-w': 48,
+  /** A Chord step's Oct, Inv, Dur and Rep dial height; the Hit or Rest tile takes what is left. */
+  '--chord-dial-h': 22,
+  /** The space between the Chord's Play columns, so Base step and Voicing clear the tiles. */
+  '--chord-col-gap': 10,
   /** The extra space before each group of four steps. */
   '--beat-gap': 4,
   /** One modulation lane's height. */
