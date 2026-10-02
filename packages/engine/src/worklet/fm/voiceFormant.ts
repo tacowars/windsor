@@ -10,8 +10,9 @@
  * part's cutoff control) and, in this mode, leaves its `2^octaves` in
  * `FORMANT_SHIFT_SLOT` in place of moving `cutoff`, which the mode does not
  * use. This sets each peak's centre to its formant, read from
- * `FORMANT_VOWELS` with `filter.vowel`'s fraction morphing linearly between
- * two rows, times that shift, so the three move together; each shares one Q,
+ * `FORMANT_VOWELS` with the voice's vowel (the patch's `filter.vowel`, moved
+ * by a song lane: windsor#406) morphing linearly between two rows by its
+ * fraction, times that shift, so the three move together; each shares one Q,
  * `resonance × FORMANT_Q_PER_RESONANCE` capped at `FORMANT_Q_MAX`; and each
  * gain is its level (the rows' decibels morphed, then to a gain) times
  * `FORMANT_MAKEUP` over the Q its section was tuned at (the section's `k`,
@@ -20,7 +21,8 @@
  * and Q are what it was last tuned to keeps its coefficients, and a peak
  * whose level in dB is unchanged keeps its gain's power of ten, so a held
  * vowel with nothing moving it does no transcendental work a block
- * (`docs/research/2026-10-02-formant-filter/`). `cutoffHz` and `q` are
+ * (`docs/research/2026-10-02-formant-filter/`), and a moving one retunes at
+ * most the three sections a block (`docs/research/2026-10-02-vowel-automation/`). `cutoffHz` and `q` are
  * written only beside a `setCoeffs`, here and in the serial path, so a
  * section's coefficients always answer to them, across a live switch of
  * the mode too.
@@ -28,8 +30,9 @@
  * Invariants: called once per control block, never per sample; allocates
  * nothing, and no double crosses a call (worklet rule 2): the shift arrives
  * in `FORMANT_SHIFT_SLOT`, the resonance is the voice's live value
- * (`liveValues`, with a song lane's offset, windsor#346), the vowel the
- * bound patch's, and `Svf.setCoeffs` reads its fields.
+ * (`liveValues`, with a song lane's offset, windsor#346), the vowel too
+ * (`VT_VOWEL`, windsor#406: the bound patch's exactly without a lane), and
+ * `Svf.setCoeffs` reads its fields.
  * `synth/fmProcessorFilterFormant.test.ts` pins the peaks, the morph, the
  * modulation, the Q and the levels through the shipped bundle;
  * `fmProcessorKernel.test.ts` that both render loops sum them to the bit.
@@ -38,7 +41,7 @@
 import type { Voice } from './voice';
 import { FORMANT_MAKEUP, FORMANT_Q_MAX, FORMANT_Q_PER_RESONANCE } from './fmConstants';
 import { FORMANT_PEAKS, FORMANT_VOWELS } from './formantTables';
-import { VT_RESONANCE } from './voiceOffsetTables';
+import { VT_RESONANCE, VT_VOWEL } from './voiceOffsetTables';
 
 /** The last row a morph starts from: a vowel at the table's top morphs from the row below at t = 1. */
 const FORMANT_LAST_FROM = FORMANT_VOWELS.length - 2;
@@ -52,11 +55,11 @@ const FORMANT_LAST_FROM = FORMANT_VOWELS.length - 2;
 const FORMANT_SHIFT_SLOT = new Float64Array(1);
 
 /**
- * Tune the three peaks for this block from the patch's vowel, the voice's
+ * Tune the three peaks for this block from the voice's live vowel, its
  * resonance and the shift in `FORMANT_SHIFT_SLOT`. Allocates nothing.
  */
 function updateVoiceFormant(voice: Voice): void {
-  const vowel = voice.patch!.filter.vowel;
+  const vowel = voice.liveValues[VT_VOWEL];
   const whole = vowel | 0;
   const from = whole > FORMANT_LAST_FROM ? FORMANT_LAST_FROM : whole;
   const t = vowel - from;

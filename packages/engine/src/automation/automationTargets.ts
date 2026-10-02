@@ -8,7 +8,7 @@
  * - `strip.level`, `strip.pan`, `strip.send.a`, `strip.send.b`;
  * - `insert.<insertId>.<field>`, the insert's stable id (`inserts/insertIds.ts`)
  *   and a field one of the kinds automates, `bands.3.freq` among them;
- * - `voice.<patch path>`, one of the 29 voice rows.
+ * - `voice.<patch path>`, one of the 30 voice rows.
  *
  * An insert id is any non-empty string, dots included, so an insert target is
  * read from its end: the field is the longest field some kind automates that

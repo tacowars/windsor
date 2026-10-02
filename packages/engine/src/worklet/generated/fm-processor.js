@@ -1500,7 +1500,8 @@ var VOICE_SLOT_PARAMS = [
 var VT_ENV_AMOUNT = 0;
 var VT_RESONANCE = 1;
 var VT_FILTER_DECAY = 2;
-var VT_OP_BASE = 3;
+var VT_VOWEL = 3;
+var VT_OP_BASE = 4;
 var VT_OP_STRIDE = 5;
 var VT_OP_LEVEL = 0;
 var VT_OP_DECAY = 1;
@@ -1513,6 +1514,7 @@ var VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
 var VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
 var VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
 var VOICE_TARGET_COUNT = VT_LFO_AMOUNT + 5;
+var VOWEL_BOUNDS = { min: VOWEL_RANGE.min, max: VOWEL_RANGE.max, floor: 0 };
 var LFO_AMOUNT_BOUNDS = { min: 0, max: 1, floor: 0 };
 var LFO_RATE_BOUNDS = { min: 0.02, max: 40, floor: 0 };
 var PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48, floor: 0 };
@@ -1533,6 +1535,7 @@ var VOICE_OFFSET_TABLE = [
   { path: "filter.envAmount", curve: OFFSET_ADD, ...stepModBounds("filter.envAmount") },
   { path: "filter.resonance", curve: OFFSET_ADD, ...stepModBounds("filter.resonance") },
   decayTimeRow("filter.env.decayTime"),
+  { path: "filter.vowel", curve: OFFSET_ADD, ...VOWEL_BOUNDS },
   ...Array.from({ length: OPERATOR_COUNT }, (_, i) => [
     { path: `ops.${i}.level`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.level`) },
     decayTimeRow(`ops.${i}.env.decayTime`),
@@ -1630,7 +1633,7 @@ var FORMANT_VOWELS = [
 var FORMANT_LAST_FROM = FORMANT_VOWELS.length - 2;
 var FORMANT_SHIFT_SLOT = new Float64Array(1);
 function updateVoiceFormant(voice) {
-  const vowel = voice.patch.filter.vowel;
+  const vowel = voice.liveValues[VT_VOWEL];
   const whole = vowel | 0;
   const from = whole > FORMANT_LAST_FROM ? FORMANT_LAST_FROM : whole;
   const t = vowel - from;
@@ -1686,6 +1689,7 @@ function bindLiveValues(voice) {
   v[VT_ENV_AMOUNT] = voice.envAmount;
   v[VT_RESONANCE] = voice.resonance;
   v[VT_FILTER_DECAY] = own[STEP_SLOT_FILTER_DECAY];
+  v[VT_VOWEL] = patch.filter.vowel;
   for (let i = 0; i < OPERATOR_COUNT; i++) {
     const b = VT_OP_BASE + i * VT_OP_STRIDE;
     const s = STEP_SLOT_OP_BASE + i * STEP_SLOT_OP_STRIDE;

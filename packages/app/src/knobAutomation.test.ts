@@ -152,8 +152,9 @@ describe('a patch knob', () => {
     expect(voiceKnobAutomation(AUTOMATION_PART, 'filter.resonance', 0)).toBeNull();
   });
 
-  it('knows the 29 voice targets and no more', () => {
-    expect(VOICE_TARGET_IDS).toHaveLength(29);
+  it('knows the 30 voice targets and no more, the Formant vowel among them (windsor#406)', () => {
+    expect(VOICE_TARGET_IDS).toHaveLength(30);
+    expect(voiceKnobTarget('filter.vowel')).toBe('voice.filter.vowel');
     for (const id of VOICE_TARGET_IDS) {
       expect(voiceKnobTarget(id.slice('voice.'.length))).toBe(id);
     }

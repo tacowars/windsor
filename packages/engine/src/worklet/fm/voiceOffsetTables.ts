@@ -23,13 +23,13 @@
  *   reshapes a segment already running.
  *
  * The bounds are the catalog's (`automation/automationTargetTables.ts`): the
- * step-mod rows' from `STEP_MOD_TABLE`, the LFO and pitch-envelope rows' the
- * Parts tab's knobs. `voiceOffsetTables.test.ts` pins every row against the
+ * step-mod rows' from `STEP_MOD_TABLE`, the vowel's `VOWEL_RANGE`
+ * (windsor#406), the LFO and pitch-envelope rows' the Parts tab's knobs. `voiceOffsetTables.test.ts` pins every row against the
  * catalog. Data only, imports two data modules, never touches the worklet
  * scope; `voiceOffsets.ts` is the logic over it.
  */
 
-import { OPERATOR_COUNT } from './patchDefaults';
+import { OPERATOR_COUNT, VOWEL_RANGE } from './patchDefaults';
 import { STEP_MOD_TABLE } from './stepModTables';
 
 /** How an offset meets its base: added, or as a log2 ratio, `base × 2^offset`. */
@@ -51,12 +51,13 @@ const VOICE_SLOT_PARAMS: readonly string[] = [
   'voiceSlot7',
 ];
 
-/** The filter's three rows, in the catalog's order. */
+/** The filter's four rows, in the catalog's order: the Formant vowel last (windsor#406). */
 const VT_ENV_AMOUNT = 0;
 const VT_RESONANCE = 1;
 const VT_FILTER_DECAY = 2;
+const VT_VOWEL = 3;
 /** Operator `i`'s rows start at `VT_OP_BASE + i × VT_OP_STRIDE`. */
-const VT_OP_BASE = 3;
+const VT_OP_BASE = 4;
 const VT_OP_STRIDE = 5;
 /** An operator's rows, offset from its first, in the catalog's order. */
 const VT_OP_LEVEL = 0;
@@ -72,7 +73,11 @@ const VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
 const VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
 const VOICE_TARGET_COUNT = VT_LFO_AMOUNT + 5;
 
-/** The bounds of the rows the step-mod table does not carry: the Parts tab's knobs. */
+/**
+ * The bounds of the rows the step-mod table does not carry: the Parts tab's
+ * knobs, and the vowel's the patch's own range.
+ */
+const VOWEL_BOUNDS = { min: VOWEL_RANGE.min, max: VOWEL_RANGE.max, floor: 0 };
 const LFO_AMOUNT_BOUNDS = { min: 0, max: 1, floor: 0 };
 const LFO_RATE_BOUNDS = { min: 0.02, max: 40, floor: 0 };
 const PITCH_ENV_AMOUNT_BOUNDS = { min: -48, max: 48, floor: 0 };
@@ -123,6 +128,7 @@ const VOICE_OFFSET_TABLE: readonly VoiceOffsetRow[] = [
   { path: 'filter.envAmount', curve: OFFSET_ADD, ...stepModBounds('filter.envAmount') },
   { path: 'filter.resonance', curve: OFFSET_ADD, ...stepModBounds('filter.resonance') },
   decayTimeRow('filter.env.decayTime'),
+  { path: 'filter.vowel', curve: OFFSET_ADD, ...VOWEL_BOUNDS },
   ...Array.from({ length: OPERATOR_COUNT }, (_, i) => [
     { path: `ops.${i}.level`, curve: OFFSET_ADD, ...stepModBounds(`ops.${i}.level`) },
     decayTimeRow(`ops.${i}.env.decayTime`),
@@ -185,5 +191,6 @@ export {
   VT_OP_WIDTH,
   VT_PITCH_ENV_AMOUNT,
   VT_RESONANCE,
+  VT_VOWEL,
   voiceTargetCode,
 };

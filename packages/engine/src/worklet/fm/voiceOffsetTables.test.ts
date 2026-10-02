@@ -29,6 +29,7 @@ import {
   VT_OP_LEVEL,
   VT_OP_STRIDE,
   VT_OP_WIDTH,
+  VT_VOWEL,
   voiceTargetCode,
 } from './voiceOffsetTables';
 
@@ -38,7 +39,7 @@ const DECAY_TIME = /\.decayTime$/;
 
 describe('the voice offset table (windsor#346)', () => {
   it("carries every slot target of the catalog, in the catalog's order", () => {
-    expect(slotRows).toHaveLength(28);
+    expect(slotRows).toHaveLength(29);
     expect(VOICE_OFFSET_TABLE.map((row) => `${VOICE}${row.path}`)).toEqual(
       slotRows.map((row) => row.target),
     );
@@ -73,6 +74,14 @@ describe('the voice offset table (windsor#346)', () => {
       expect(voiceTargetCode(`ops.${i}.width`)).toBe(b + VT_OP_WIDTH);
     }
     expect(voiceTargetCode('filter.env.decayTime')).toBe(VT_FILTER_DECAY);
+  });
+
+  it('adds the Formant vowel after the filter decay, over 0–4 (windsor#406)', () => {
+    expect(voiceTargetCode('filter.vowel')).toBe(VT_VOWEL);
+    expect(VT_VOWEL).toBe(VT_FILTER_DECAY + 1);
+    expect(VOICE_OFFSET_CURVE[VT_VOWEL]).toBe(OFFSET_ADD);
+    expect([VOICE_OFFSET_MIN[VT_VOWEL], VOICE_OFFSET_MAX[VT_VOWEL]]).toEqual([0, 4]);
+    expect(VOICE_OFFSET_FLOOR[VT_VOWEL]).toBe(0);
   });
 
   it('maps no slot to the cutoff, a field no lane moves, or junk', () => {
