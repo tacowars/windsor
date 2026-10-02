@@ -9,7 +9,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_ARP_CONFIG,
+  DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
+  DIVISORS,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_GRID_CONFIG,
   PPQ,
@@ -169,6 +171,14 @@ describe('the per-kind tables', () => {
     const two = { ...chord, steps: [hitStep({ duration: 2, repeat: 2 }), hitStep()] };
     expect(forKind(CYCLE_TICKS, two)).toBe(5 * chord.divisor);
     expect(forKind(CYCLE_TICKS, { ...DEFAULT_ARP_CONFIG, kind: 'arp' })).toBeNull();
+  });
+
+  it('gives a Basslead its loop, and one bar for a part with no strip', () => {
+    const bass = { ...DEFAULT_BASS_CONFIG, kind: 'bass' as const };
+    expect(forKind(CYCLE_TICKS, bass)).toBe(TICKS_PER_BAR);
+    const eight = { ...bass, length: 8, divisor: DIVISORS.eighth };
+    expect(forKind(CYCLE_TICKS, eight)).toBe(8 * DIVISORS.eighth);
+    expect(forKind(CYCLE_TICKS, { ...eight, length: 5 })).toBe(5 * DIVISORS.eighth);
   });
 
   it('summarises a region from the spec, naming the step count and the rate', () => {

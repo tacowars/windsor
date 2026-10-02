@@ -22,17 +22,18 @@ import type { BassSpec, BassStep } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX } from '@windsor/engine';
 import { arpStepCells } from './arpStepCells';
 import {
+  BASS_TURN_REBASED,
   bassLengthChange,
   bassSlideAt,
   bassStepsLabel,
   randomBassSteps,
-  rotateBass,
+  turnBass,
 } from './bassGridModel';
 import { PITCH_COLOR } from './consoleColors';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { withStep } from './gridModel';
-import { makeKnob } from './knob';
+import { type KnobElement, makeKnob } from './knob';
 import { changePattern } from './partEdits';
 import { regionPlayheadAt } from './regionPlayhead';
 import { BASS_LENGTH_KNOB, BASS_ROTATE_KNOB } from './sequencerKnobTables';
@@ -135,44 +136,63 @@ const write = (strip: Strip<BassSpec>, fields: Record<string, unknown>): void =>
   if (changePattern(strip.ctx, strip.slot, strip.region, fields)) strip.repaint();
 };
 
+/**
+ * Rotate's offset from the pattern it last turned, and its knob. Length
+ * and Randomize replace that pattern, so they rebase the offset
+ * (`turnBass`) and redraw the knob at zero.
+ */
+interface BassRotor {
+  turned: number;
+  knob: KnobElement | null;
+}
+
+function rebase(rotor: BassRotor): void {
+  rotor.turned = BASS_TURN_REBASED;
+  rotor.knob?.refresh();
+}
+
 /** Length pads the steps and lanes past the written ones, and greys the steps past a shorter loop. */
-function lengthKnob(strip: Strip<BassSpec>): HTMLElement {
+function lengthKnob(strip: Strip<BassSpec>, rotor: BassRotor): HTMLElement {
   return makeKnob({
     ...BASS_LENGTH_KNOB,
     color: PITCH_COLOR,
     get: () => strip.spec()?.length ?? BASS_LENGTH_KNOB.def,
     set: (v) => {
       const spec = strip.spec();
-      if (spec && Math.round(v) !== spec.length) write(strip, { ...bassLengthChange(spec, v) });
+      if (!spec || Math.round(v) === spec.length) return;
+      rebase(rotor);
+      write(strip, { ...bassLengthChange(spec, v) });
     },
   });
 }
 
 /** Rotate applies the turn since its last value, so the document holds the turned steps and lanes. */
-function rotateKnob(strip: Strip<BassSpec>): HTMLElement {
-  let turned = 0;
-  return makeKnob({
+function rotateKnob(strip: Strip<BassSpec>, rotor: BassRotor): KnobElement {
+  const knob = makeKnob({
     ...BASS_ROTATE_KNOB,
     color: PITCH_COLOR,
-    get: () => turned,
+    get: () => rotor.turned,
     set: (v) => {
-      const target = Math.round(v);
-      const by = target - turned;
-      if (by === 0) return;
-      turned = target;
       const spec = strip.spec();
-      if (spec) write(strip, { ...rotateBass(spec, by) });
+      if (!spec) return;
+      const turn = turnBass(spec, rotor.turned, v);
+      rotor.turned = turn.turned;
+      if (turn.change) write(strip, { ...turn.change });
     },
   });
+  rotor.knob = knob;
+  return knob;
 }
 
-function randomizeButton(strip: Strip<BassSpec>): HTMLElement {
+function randomizeButton(strip: Strip<BassSpec>, rotor: BassRotor): HTMLElement {
   const button = el('button', 'btn seq-btn', 'Randomize') as HTMLButtonElement;
   button.type = 'button';
   button.title =
     'Reroll the rhythm: notes, ties, rests, octaves, accents, slides and ratchets. The pitch mode keeps the pitch';
-  button.onclick = (): void =>
+  button.onclick = (): void => {
+    rebase(rotor);
     commitSteps(strip, (spec) => randomBassSteps(spec.steps, Math.random));
+  };
   return button;
 }
 
@@ -244,10 +264,11 @@ export function bassGrid(ctx: AppCtx, slot: number, region: number | undefined):
   const section = stepsSection(strip);
   repaint(strip);
   watch(strip);
+  const rotor: BassRotor = { turned: BASS_TURN_REBASED, knob: null };
   return {
-    length: lengthKnob(strip),
-    rotate: rotateKnob(strip),
-    randomize: randomizeButton(strip),
+    length: lengthKnob(strip, rotor),
+    rotate: rotateKnob(strip, rotor),
+    randomize: randomizeButton(strip, rotor),
     section,
   };
 }

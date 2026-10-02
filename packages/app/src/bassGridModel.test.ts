@@ -20,11 +20,13 @@ import {
 import { nextArpKind } from './arpGridModel';
 import { BASS_RANDOM } from './bassGridConstants';
 import {
+  BASS_TURN_REBASED,
   bassLengthChange,
   bassSlideAt,
   bassStepsLabel,
   randomBassSteps,
   rotateBass,
+  turnBass,
 } from './bassGridModel';
 import { DocumentModel } from './documentModel';
 import { cycleOctave, toggleFlag } from './gridModel';
@@ -119,6 +121,44 @@ describe('Rotate', () => {
     expect(turned.steps).toEqual([TIE, N({ ratchet: 2 }), REST, N({ octave: 1 }), steps[4]]);
     expect(turned.lanes).toEqual([lane([0.4, 0.1, 0.2, 0.3, 0.5])]);
     expect(rotateBass({ ...spec, ...turned }, -1)).toEqual({ steps, lanes: spec.lanes });
+  });
+
+  // Eight steps tagged A…H by their lane value, so a turn shows in the lane.
+  const tagged = {
+    steps: Array.from({ length: 8 }, () => N()),
+    length: 8,
+    lanes: [lane([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])],
+  };
+
+  it('moves the knob by the difference from its last value, and writes nothing standing still', () => {
+    const first = turnBass(tagged, 0, 1.4);
+    expect(first.turned).toBe(1);
+    expect(first.change?.lanes).toEqual([lane([0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])]);
+    const back = turnBass({ ...tagged, ...first.change! }, first.turned, 0);
+    expect(back).toEqual({ turned: 0, change: { steps: tagged.steps, lanes: tagged.lanes } });
+    expect(turnBass(tagged, 2, 2)).toEqual({ turned: 2, change: null });
+  });
+
+  it('rebases after Length, so back at zero is the lengthened pattern as it stands', () => {
+    const first = turnBass(tagged, 0, 1);
+    const lengthened = bassLengthChange({ ...tagged, ...first.change! }, 9);
+    const rotated = [0.8, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0];
+    expect(lengthened.lanes).toEqual([lane(rotated)]);
+    expect(turnBass(lengthened, BASS_TURN_REBASED, 0)).toEqual({ turned: 0, change: null });
+    // Unrebased, zero would turn −1 over nine steps: A…G, N, H.
+    expect(turnBass(lengthened, first.turned, 0).change?.lanes).not.toEqual([lane(rotated)]);
+    const again = turnBass(lengthened, BASS_TURN_REBASED, 1);
+    expect(again.change?.lanes).toEqual([lane([0, ...rotated.slice(0, 8)])]);
+  });
+
+  it('rebases after Randomize, so back at zero keeps the rerolled steps where they fell', () => {
+    const first = turnBass(tagged, 0, 1);
+    const turned = { ...tagged, ...first.change! };
+    const steps = randomBassSteps(turned.steps, script([0, 0.9, 0.5]));
+    const rerolled = { ...turned, steps };
+    expect(turnBass(rerolled, BASS_TURN_REBASED, 0)).toEqual({ turned: 0, change: null });
+    const after = turnBass(rerolled, BASS_TURN_REBASED, -1);
+    expect(after.change).toEqual(rotateBass(rerolled, -1));
   });
 });
 

@@ -53,6 +53,28 @@ export function rotateBass(
   return rotateArp(spec, by, spec.length);
 }
 
+/** The Rotate knob after a move: its new value, and the write the move makes (null when nothing turns). */
+export interface BassTurn {
+  turned: number;
+  change: { steps: BassStep[]; lanes: StepModLane[] } | null;
+}
+
+/**
+ * The Rotate knob's move from `turned` to `target`: the difference, turned
+ * over the pattern the document holds now. `turned` is an offset from the
+ * pattern the knob last turned, so Length and Randomize, which replace
+ * that pattern, rebase it to `BASS_TURN_REBASED`: back at zero then means
+ * the new pattern as it stands, not a turn back over steps it never held.
+ */
+export function turnBass(spec: BassStrip, turned: number, target: number): BassTurn {
+  const to = Math.round(target);
+  const by = to - turned;
+  return { turned: to, change: by === 0 ? null : rotateBass(spec, by) };
+}
+
+/** Rotate's value once Length or Randomize has replaced the pattern it turned. */
+export const BASS_TURN_REBASED = 0;
+
 /**
  * Randomize, as the Grid's over every written step: each a rest, a tie or
  * a note with its octave, accent, slide and ratchet rerolled from `table`
