@@ -9,7 +9,9 @@
  * double crosses the call (windsor#233: a double passed to a call V8 does not
  * inline is a new heap number on the audio thread).
  * `fmProcessorDormancy.test.ts` pins `Svf.quiet`; the golden test pins the
- * arithmetic.
+ * arithmetic. The Formant mode (windsor#331) runs three of these as bandpass
+ * peaks, `process`'s bandpass written out in both render loops, and keeps
+ * each peak's gain and level here beside its coefficients.
  */
 
 import { DORMANT_FILTER_STATE } from './fmConstants';
@@ -31,10 +33,18 @@ class Svf {
   /** `setCoeffs`'s inputs. */
   cutoffHz: number;
   q: number;
+  /**
+   * As one of the Formant mode's three peaks (windsor#331, `voiceFormant.ts`):
+   * its gain into the sum, and its level, in dB and as a gain, as last tuned.
+   */
+  gain: number;
+  levelDb: number;
+  level: number;
 
   constructor() {
     // Rule 7: each double field is born a double (NaN), before its start value (windsor#233).
     this.ic1 = this.ic2 = this.a1 = this.a2 = this.a3 = this.k = this.cutoffHz = this.q = NaN;
+    this.gain = this.levelDb = this.level = NaN;
     this.ic1 = 0;
     this.ic2 = 0;
     this.a1 = 0;
@@ -43,6 +53,8 @@ class Svf {
     this.k = 0;
     this.cutoffHz = 0;
     this.q = 0;
+    this.gain = 0;
+    this.level = 0;
   }
 
   reset(): void {

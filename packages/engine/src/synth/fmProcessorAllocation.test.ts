@@ -105,6 +105,13 @@
  * first other write deoptimises the render that read it, which read 2 MB
  * when it fell in the measured run.
  *
+ * Two more play the pad through the Formant filter (windsor#331), in the
+ * kernel and in the generic loop, its three sections running in parallel,
+ * while every parameter change also writes the next of seven vowels into
+ * the bound patch, across all five rows and between them, as a live edit of
+ * the vowel reaches ringing voices (written in place: a posted patch is
+ * normalised into a new object on the message path, by design).
+ *
  * Tolerance: 16 KiB over the 8 000 quanta; one boxed double a quantum would
  * read 128 KB. The runs read about 6 KB, the eleven readings' own result
  * objects (616 bytes a tenth); with the note-on's message read in `noteOn`
@@ -124,7 +131,7 @@ import {
 } from '../__fixtures__/workletAllocation';
 import type { ProbeRun } from '../__fixtures__/workletAllocation';
 import type { Patch } from '../patch/patch';
-import { DRIVE_SHAPE, WAVE } from '../patch/patch';
+import { DRIVE_SHAPE, FILTER_MODE, WAVE } from '../patch/patch';
 import { PRESETS } from '../patch/presets';
 import { EVENT_QUEUE_CAPACITY } from '../worklet/fm/fmConstants';
 
@@ -249,6 +256,21 @@ function pad(): Patch {
   };
   return patch;
 }
+
+/**
+ * The pad through the Formant filter (windsor#331), its vowel born between
+ * two rows, so the field is a double from the first patch, as a live edit
+ * of the console's knob leaves it.
+ */
+function formantPad(): Patch {
+  const patch = pad();
+  patch.filter.mode = FILTER_MODE.FORMANT;
+  patch.filter.vowel = 0.5;
+  return patch;
+}
+
+/** The vowels a live edit sweeps the Formant pad through: across every row, both ends and between. */
+const VOWEL_SWEEP = [0.5, 1.75, 3.25, 4, 2.5, 0, 1.125];
 
 /**
  * `lead-bell` that falls dormant quickly, with a squeezed saw and a noise
@@ -493,6 +515,22 @@ describe('the FM part on V8', () => {
         lanes,
       ),
     );
+  }, 240_000);
+
+  it('plays the Formant pad while live edits sweep its vowel, in the kernel and the generic loop, for 8 000 quanta without allocating or changing a field representation (windsor#331)', () => {
+    for (const specialise of [true, false]) {
+      expectClean(
+        probe(formantPad(), 8, specialise, {
+          events: PAD_EVENTS,
+          period: 24,
+          toggles: TOGGLES,
+          rest: 16,
+          idStride: 64,
+          paths: ['held', 'stolen', 'released', 'ended', 'silent'],
+          vowels: VOWEL_SWEEP,
+        }),
+      );
+    }
   }, 240_000);
 
   it('holds a note in the kernel while its age passes 2^31, for 8 000 quanta without allocating or changing a field representation', () => {

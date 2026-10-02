@@ -4,7 +4,8 @@
  * history, amplitude ramps and their knots (windsor#301), width ramps, six
  * envelopes, two LFOs, each Noise operator's colour (windsor#362) and
  * the generic loop's noise draws (windsor#389), the
- * drive stage (windsor#300), two filter stages, the steal fade, a step's parameter offsets and the per-voice values they make
+ * drive stage (windsor#300), three filter stages (the third for the Formant
+ * mode's three peaks, windsor#331), the steal fade, a step's parameter offsets and the per-voice values they make
  * (windsor#17), the values a song's lanes move and the feedback ramp
  * (windsor#346) — and its lifecycle: `start`, `rebind`, `retarget`,
  * `release`, `kill`, `steal`, and the `dormant` / `fading` / `finished` reads
@@ -72,6 +73,8 @@ class Voice {
   lfo2: Lfo;
   svfA: Svf;
   svfB: Svf;
+  /** The Formant mode's third peak (windsor#331); A and B are its first two. */
+  svfC: Svf;
   /** Each operator's noise colour (windsor#362): run only for a Noise operator with a field set. */
   noiseColour: NoiseColour[];
   /** Each Noise operator's draw this sample in the generic loop, drawn D..A at its top (windsor#389). */
@@ -192,6 +195,8 @@ class Voice {
     this.lfo2 = new Lfo(secondLfoSeed(this.lfo.seed));
     this.svfA = new Svf();
     this.svfB = new Svf();
+    // Formant (windsor#331): three peaks in parallel, A, B and C.
+    this.svfC = new Svf();
     this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
     // The generic loop's noise draws (windsor#389): a double store and load
     // are exact, so a Noise operator reads the value `noise()` returned.
@@ -351,6 +356,7 @@ class Voice {
     this.lfo2.reset(patch.lfo2.retrigger || patch.lfo2.oneShot);
     this.svfA.reset();
     this.svfB.reset();
+    this.svfC.reset();
     this.drive.reset();
 
     // The step's offsets (windsor#17) and the song's lanes (windsor#346), and

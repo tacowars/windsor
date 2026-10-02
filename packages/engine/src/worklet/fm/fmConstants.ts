@@ -4,8 +4,9 @@
  * shortest envelope segment, the amplitude envelope's breaks per block
  * (windsor#301), the width ramp's snap, the feedback ramp's step
  * (windsor#346), the drive stage's
- * shape constants and tone curve (windsor#300), and a Noise operator's
- * colour filters' ceiling and damping (windsor#362). Data, not logic: every
+ * shape constants and tone curve (windsor#300), a Noise operator's
+ * colour filters' ceiling and damping (windsor#362), and the Formant
+ * filter's Q scale, cap and makeup (windsor#331). Data, not logic: every
  * other module under `fm/` imports what it needs from here, and none of these
  * is read by the main thread. A change here changes every render; `fmProcessorGolden.test.ts`
  * says so, and `fmProcessorKernel.test.ts` pins `MOD_INDEX_SCALE` against the
@@ -138,6 +139,20 @@ const DRIVE_TONE_OCTAVES = 4.25;
  */
 const NOISE_COLOUR_CEILING = 0.45;
 const NOISE_COLOUR_DAMPING = Math.SQRT2;
+/*
+ * The Formant filter mode (windsor#331, `voiceFormant.ts`): three bandpass
+ * peaks share one Q, FORMANT_Q_PER_RESONANCE per unit of the patch's
+ * `resonance` (the default 0.707 is Q 5.66), capped at FORMANT_Q_MAX (reached
+ * at resonance 5). Each peak's gain is its vowel level x FORMANT_MAKEUP / Q,
+ * so it peaks at its level whatever the Q (an SVF bandpass peaks at Q).
+ * FORMANT_MAKEUP is measured, not chosen: white noise through the vowel "a"
+ * at the default resonance sits at the RMS of white noise through the
+ * Bandpass mode at the same resonance and a 1 kHz cutoff
+ * (`docs/research/2026-10-02-formant-filter/`, `makeup.mjs`).
+ */
+const FORMANT_Q_PER_RESONANCE = 8;
+const FORMANT_Q_MAX = 40;
+const FORMANT_MAKEUP = 1.787;
 
 export {
   TABLE_SIZE,
@@ -167,4 +182,7 @@ export {
   DRIVE_TONE_OCTAVES,
   NOISE_COLOUR_CEILING,
   NOISE_COLOUR_DAMPING,
+  FORMANT_Q_PER_RESONANCE,
+  FORMANT_Q_MAX,
+  FORMANT_MAKEUP,
 };

@@ -17,7 +17,7 @@
 import type { Voice } from './voice';
 import { ST_DONE, ST_IDLE, ST_SUSTAIN } from './envelope';
 import { DORMANT_AMP, DORMANT_FILTER_STATE } from './fmConstants';
-import { FILT_OFF } from './modeIds';
+import { FILT_FORMANT, FILT_OFF } from './modeIds';
 import { Svf } from './svf';
 
 /** `heardStage` while a knot of this block is still ahead of the render: no stage of the envelope's. */
@@ -72,7 +72,8 @@ function voiceDormant(voice: Voice): boolean {
 }
 
 /**
- * The filter is off, or has stopped ringing: both stages under the dormancy
+ * The filter is off, or has stopped ringing: every stage it runs (one or two,
+ * or the Formant mode's three) under the dormancy
  * floor (#547), and the drive's tone pole too (windsor#300), which holds no
  * state while it is not running.
  */
@@ -81,6 +82,8 @@ function voiceFilterQuiet(voice: Voice): boolean {
   const f = voice.patch!.filter;
   if (f.mode === FILT_OFF) return true;
   if (!Svf.quiet(voice.svfA)) return false;
+  // Formant's three peaks all run, whatever `slope24` says (windsor#331).
+  if (f.mode === FILT_FORMANT) return Svf.quiet(voice.svfB) && Svf.quiet(voice.svfC);
   return !f.slope24 || Svf.quiet(voice.svfB);
 }
 

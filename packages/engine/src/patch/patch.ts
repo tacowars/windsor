@@ -60,7 +60,7 @@ export const LFO_SHAPE_NAMES = [
   'Drift',
 ] as const;
 
-export const FILTER_MODE_NAMES = ['Off', 'LP', 'HP', 'BP', 'Notch'] as const;
+export const FILTER_MODE_NAMES = ['Off', 'LP', 'HP', 'BP', 'Notch', 'Formant'] as const;
 
 export const LOOP_MODE_NAMES = ['None', 'Loop', 'Trigger'] as const;
 
@@ -165,6 +165,12 @@ export interface FilterSettings {
   /** Octaves, from the second LFO. */
   lfo2Amount: number;
   keyTrack: number;
+  /**
+   * The vowel the Formant mode sounds (windsor#331), 0–4: 0 a, 1 e, 2 i, 3 o,
+   * 4 u, a fraction morphing between neighbours (`FORMANT_VOWELS`). The other
+   * modes ignore it.
+   */
+  vowel: number;
   env: Envelope;
 }
 

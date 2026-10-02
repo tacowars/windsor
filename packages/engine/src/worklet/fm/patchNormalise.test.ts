@@ -78,6 +78,22 @@ describe('patch normalisation', () => {
     expect(set.lfo2.toWidth).toEqual([0.3, 0, 0, 0]);
   });
 
+  it('keeps the six filter modes and plays any other as Off (windsor#331)', () => {
+    const mode = (m: unknown): number =>
+      normalisePatch({ filter: { mode: m } } as unknown as Parameters<typeof normalisePatch>[0])
+        .filter.mode;
+    expect([0, 1, 2, 3, 4, 5].map(mode)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect([9, 6, -1, 'lp', undefined].map(mode)).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it('fills the Formant vowel with 0 (a), keeps a fraction and clamps it into 0..4 (windsor#331)', () => {
+    const vowel = (v: unknown): number =>
+      normalisePatch({ filter: { vowel: v } } as unknown as Parameters<typeof normalisePatch>[0])
+        .filter.vowel;
+    expect(normalisePatch({}).filter.vowel).toBe(0);
+    expect([0.5, 3.25, 4, 4.5, -1, 'o', NaN].map(vowel)).toEqual([0.5, 3.25, 4, 4, 0, 0, 0]);
+  });
+
   it('keeps a finite number and replaces anything else', () => {
     expect(num(3, 1)).toBe(3);
     expect(num('3', 1)).toBe(1);
