@@ -22,7 +22,9 @@ export type {
   DocumentPart,
   DocumentPartial,
   MakeArrangementResult,
+  SongMeta,
 } from './song/arrangementDocument';
+export { TEMPLATE_TAG } from './song/songMetaTables';
 export { musicPartName, partAt, removePart, removePartChange } from './song/documentParts';
 export type {
   Arrangement,

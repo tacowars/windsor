@@ -332,9 +332,15 @@ export class AudioSystem {
   apply(partial: DocumentPartial): ApplyResult {
     const { player } = this.playback;
     if (!player) return { ok: false, ignored: [], error: 'music is not initialised' };
+    // The song's name and tags are the document's, not the audio's (windsor#440):
+    // a partial of only `meta` rebuilds and regates nothing.
+    const keys = Object.keys(partial);
+    if (keys.length === 1 && keys[0] === 'meta') return { ok: true, ignored: [] };
     const routing = this.sidechains.plan(partial);
     if (routing.error) return { ok: false, ignored: [], error: routing.error };
-    const { returns, patches, parts, master, groups, ...rest } = partial;
+    // `meta` is taken out so the player never reports it as an unknown field.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- held back from `rest`, read nowhere
+    const { returns, patches, parts, master, groups, meta, ...rest } = partial;
     // Read before anything changes: a ninth group refuses the whole partial (windsor#285).
     const groupPlan = this.groups.plan(groups);
     if (groupPlan.error) return { ok: false, ignored: [], error: groupPlan.error };
