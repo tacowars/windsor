@@ -55,6 +55,22 @@ describe('followVoices (windsor#333)', () => {
     expect(followVoices([62, 61], [0, 4], C)).toEqual([64, 60]);
   });
 
+  it('never moves a voice below MIDI note 0', () => {
+    // C major at register −1, I → V: C would step down to −1 (B). It takes D at 2
+    // instead, and E, with D taken and no other in-range target within six, stays.
+    const moved = followVoices([0, 4, 7], [7, 11, 14], 0);
+    expect(moved).toEqual([2, 4, 7]);
+    expect(Math.min(...moved)).toBeGreaterThanOrEqual(0);
+  });
+
+  it('never moves a voice above MIDI note 127', () => {
+    // C major at register 9, I → IV: E takes F at 125, and G, whose only free
+    // target within six is A at 129, keeps its note.
+    const moved = followVoices([120, 124, 127], [5, 9, 12], 0);
+    expect(moved).toEqual([120, 125, 127]);
+    expect(Math.max(...moved)).toBeLessThanOrEqual(127);
+  });
+
   it('a chord with the same tones moves nothing', () => {
     expect(followVoices([48, 64, 67, 72], MAJOR, C)).toEqual([48, 64, 67, 72]);
     expect(followVoices([], MAJOR, C)).toEqual([]);

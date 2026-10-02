@@ -54,9 +54,11 @@ do.
    - Every held note whose pitch class is a target stays as it is (a common
      tone).
    - The other held notes, lowest first, each move to the nearest MIDI note
-     (within ±6 semitones) whose pitch class is a target and that no voice
-     has taken yet; on a tie between up and down, down wins. If every target
-     within ±6 is taken, the voice keeps its note.
+     (within ±6 semitones) whose pitch class is a target, that lies inside
+     the MIDI range 0–127 (the range `chordVoicing.ts` clips to), and that
+     no voice has taken yet; on a tie between up and down, down wins. If no
+     free in-range target lies within ±6, the voice keeps its note, so a
+     follow at an extreme register never leaves the MIDI range.
    - The voice count is the hit's: a chord with more tones than voices
      leaves tones unsounded, and one with fewer lets two voices share a
      pitch class on different octaves. A follow adds no note and drops none.

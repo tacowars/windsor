@@ -10,6 +10,7 @@
  * unsounded, one with fewer lets two voices share a pitch class on different
  * octaves.
  */
+import { MIDI_NOTE_MAX } from '../audioConstants';
 import { SEMITONES_PER_OCTAVE } from '../sequencing/scaleSampler';
 
 /** How far a voice may step to reach a free chord tone, either way, in semitones. */
@@ -18,14 +19,17 @@ export const FOLLOW_REACH_SEMITONES = 6;
 const pitchClass = (note: number): number =>
   ((note % SEMITONES_PER_OCTAVE) + SEMITONES_PER_OCTAVE) % SEMITONES_PER_OCTAVE;
 
-/** The nearest free target within the reach, down first on a tie; the note itself when none is free. */
+/** The nearest free in-range target within the reach, down first on a tie; the note itself when none is free. */
 function nearestFree(
   note: number,
   targets: ReadonlySet<number>,
   taken: ReadonlySet<number>,
 ): number {
   const free = (candidate: number): boolean =>
-    targets.has(pitchClass(candidate)) && !taken.has(candidate);
+    candidate >= 0 &&
+    candidate <= MIDI_NOTE_MAX &&
+    targets.has(pitchClass(candidate)) &&
+    !taken.has(candidate);
   for (let distance = 1; distance <= FOLLOW_REACH_SEMITONES; distance++) {
     if (free(note - distance)) return note - distance;
     if (free(note + distance)) return note + distance;
@@ -40,9 +44,10 @@ function nearestFree(
  *
  * Every held note whose pitch class is a chord tone stays. The others, lowest
  * first, each move to the nearest MIDI note within ±`FOLLOW_REACH_SEMITONES`
- * whose pitch class is a chord tone and that no voice has taken yet; on a tie
- * between up and down, down wins; with every target in reach taken, the voice
- * keeps its note. The result is in the held notes' order, so a caller can
+ * whose pitch class is a chord tone, that lies inside the MIDI range 0–127
+ * (as `chordVoicing.ts` clips to) and that no voice has taken yet; on a tie
+ * between up and down, down wins; with no free in-range target in reach, the
+ * voice keeps its note. The result is in the held notes' order, so a caller can
  * tell which voice moved where.
  */
 export function followVoices(
