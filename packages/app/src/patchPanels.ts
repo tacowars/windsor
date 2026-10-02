@@ -8,6 +8,7 @@ import type { Algorithm } from '@windsor/engine';
 import {
   ALGORITHMS,
   DRIVE_SHAPE_NAMES,
+  FILTER_MODE,
   FILTER_MODE_NAMES,
   LFO_SHAPE_NAMES,
   OP_NAMES,
@@ -263,10 +264,28 @@ export function buildDrive(editor: PatchEditor): void {
   }
 }
 
+/**
+ * What the filter section shows in a mode (windsor#334): Formant tunes its
+ * peaks from the vowel, so Cutoff and Slope do nothing there and give way to
+ * Vowel; every other mode is the reverse. The modulation amounts stay in all.
+ */
+export const filterModeShows = (
+  mode: number,
+): { cutoff: boolean; slope: boolean; vowel: boolean } => {
+  const formant = mode === FILTER_MODE.FORMANT;
+  return { cutoff: !formant, slope: !formant, vowel: formant };
+};
+
 export function buildFilter(editor: PatchEditor): void {
   const segBox = $('filterMode');
   segBox.innerHTML = '';
   const filter = (): { mode: number; slope24: boolean } => editor.patch.filter;
+  const shown: Partial<Record<'cutoff' | 'slope' | 'vowel', HTMLElement>> = {};
+  const showMode = (): void => {
+    const shows = filterModeShows(filter().mode);
+    for (const [key, node] of Object.entries(shown))
+      node.hidden = !shows[key as keyof typeof shows];
+  };
   segBox.appendChild(
     indexSeg(
       editor,
@@ -274,6 +293,7 @@ export function buildFilter(editor: PatchEditor): void {
       () => filter().mode,
       (i) => {
         filter().mode = i;
+        showMode();
       },
     ),
   );
@@ -283,7 +303,10 @@ export function buildFilter(editor: PatchEditor): void {
   const row = $('filterKnobs');
   row.innerHTML = '';
   for (const k of FILTER_KNOBS) {
-    row.appendChild(pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR }));
+    const knob = pathKnob(editor, k.f, k.label, { ...patchKnobOpts(k), color: MOD_COLOR });
+    if (k.f === 'filter.cutoff') shown.cutoff = knob;
+    if (k.f === 'filter.vowel') shown.vowel = knob;
+    row.appendChild(knob);
   }
   const slopeSeg = indexSeg(
     editor,
@@ -293,7 +316,8 @@ export function buildFilter(editor: PatchEditor): void {
       filter().slope24 = i === 1;
     },
   );
-  row.appendChild(labelledSeg('Slope', slopeSeg));
+  shown.slope = row.appendChild(labelledSeg('Slope', slopeSeg));
+  showMode();
   const envRow = $('filterEnvKnobs');
   envRow.innerHTML = '';
   envRow.appendChild(envKnobs(editor, 'filter.env', MOD_COLOR, redraw));

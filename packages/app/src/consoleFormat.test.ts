@@ -5,7 +5,16 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { fmt0, fmt2, fmtHz, fmtMs, fmtSigned, noteName, pitchClass } from './consoleFormat';
+import {
+  fmt0,
+  fmt2,
+  fmtHz,
+  fmtMs,
+  fmtSigned,
+  fmtVowel,
+  noteName,
+  pitchClass,
+} from './consoleFormat';
 
 describe('console formatters', () => {
   it('print seconds as milliseconds under one second and as seconds above', () => {
@@ -35,5 +44,13 @@ describe('console formatters', () => {
     expect(noteName(59)).toBe('B3');
     expect(noteName(0)).toBe('C-1');
     expect(pitchClass(-1)).toBe(11);
+  });
+
+  it('print the vowel as a letter on the integers and the morph between them (windsor#334)', () => {
+    expect([0, 1, 2, 3, 4].map(fmtVowel)).toEqual(['a', 'e', 'i', 'o', 'u']);
+    expect(fmtVowel(3.25)).toBe('o→u 25%');
+    expect(fmtVowel(0.5)).toBe('a→e 50%');
+    expect(fmtVowel(3.999)).toBe('u');
+    expect(fmtVowel(1.001)).toBe('e');
   });
 });

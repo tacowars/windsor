@@ -10,10 +10,11 @@ import {
   NOISE_COLOUR_FLOOR_HZ,
   NOISE_COLOUR_RANGE,
   OP_NAMES,
+  VOWEL_RANGE,
   WIDTH_RANGE,
   makePatch,
 } from '@windsor/engine';
-import { fmt2, fmtCycleDegrees, fmtHz, fmtMs, fmtSigned } from './consoleFormat';
+import { fmt2, fmtCycleDegrees, fmtHz, fmtMs, fmtSigned, fmtVowel } from './consoleFormat';
 import { ENVELOPE_SLOTS } from './envelopeTransfer';
 import type { KnobSpec } from './knob';
 import { getPath } from './patchPath';
@@ -76,6 +77,8 @@ export const DRIVE_KNOBS: PatchKnobTable = [
 export const FILTER_KNOBS: PatchKnobTable = [
   { f: 'filter.cutoff', label: 'Cutoff', o: { min: 30, max: 18000, curve: 'log', fmt: fmtHz } },
   { f: 'filter.resonance', label: 'Reso', o: { min: 0.5, max: 12, curve: 'log', fmt: fmt2 } },
+  // The Formant mode's vowel (windsor#334); `buildFilter` shows it in that mode only.
+  { f: 'filter.vowel', label: 'Vowel', o: { ...VOWEL_RANGE, fmt: fmtVowel } },
   { f: 'filter.envAmount', label: 'Env Amt', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.modWheelDepth', label: 'Wheel', o: { min: -6, max: 6, fmt: fmtSigned } },
   { f: 'filter.lfoAmount', label: 'LFO Amt', o: { min: -4, max: 4, fmt: fmtSigned } },
