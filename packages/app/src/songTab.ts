@@ -285,7 +285,10 @@ function renderSongView(
       const brace = loopBraceRow(view);
       const fresh: Readout[] = [];
       const rows: HTMLElement[] = [
-        ...withMixer(rulerRow(doc.transport.bars, state.pxPerBar), mixerHeaderCell(mixer)),
+        ...withMixer(
+          rulerRow(doc.transport.bars, state.pxPerBar, doc.transport.meter),
+          mixerHeaderCell(mixer),
+        ),
         ...withMixer(brace.row, emptyMixerCell()),
         ...withMixer(harmonyLaneRow(view), emptyMixerCell()),
         ...doc.parts.flatMap((part) => [
@@ -340,7 +343,6 @@ function renderSongView(
     lanes,
     line,
     songTicks: view.songTicks,
-    ticksPerBar: view.ticksPerBar,
     onTick,
     drag,
     repaintIf: () => {

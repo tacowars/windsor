@@ -19,7 +19,11 @@ export const KIND_LABELS: Readonly<Record<SequencerKind, string>> = {
 /** The twelve pitch classes, sharps: the engine's own list, not a copy. */
 export const NOTE_NAMES: readonly string[] = CHORD_NOTE_NAMES;
 
-/** Step divisors of the 96-tick bar, longest first, with musician-facing names. */
+/**
+ * Step divisors of the 96-tick whole note, longest first, with
+ * musician-facing names as 4/4 reads them; `divisorOptions` (`divisorLabels.ts`)
+ * names them in the song's meter.
+ */
 export const DIVISOR_OPTIONS: readonly { value: string; label: string }[] = [
   { value: '96', label: '1 bar' },
   { value: '48', label: '1/2' },
@@ -32,3 +36,9 @@ export const DIVISOR_OPTIONS: readonly { value: string; label: string }[] = [
   { value: '4', label: '1/16T' },
   { value: '3', label: '1/32' },
 ];
+
+/**
+ * What the whole-note step reads in a meter whose bar is not a whole note
+ * (windsor#431 decision 4): "1 bar" only where the bar is 96 ticks.
+ */
+export const WHOLE_NOTE_LABEL = '1/1';

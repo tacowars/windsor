@@ -172,10 +172,11 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   change(edit: DocumentPartial, label?: string): ApplyResult {
     const before = this.model.doc;
     const tab = this.active;
-    // A Bars edit carries every whole-song region and the timeline's tail
-    // with it (#709 decision 4), so the strip's knob and the document agree
-    // on what ∞ means; any other partial passes through unchanged. The refit
-    // folds into this edit's step (epic windsor#112 decision 7).
+    // A Bars or meter edit carries every whole-song region and the timeline's
+    // tail with it (#709 decision 4, windsor#431), so the strip and the
+    // document agree on what ∞ means; any other partial passes through
+    // unchanged. The refit folds into this edit's step (epic windsor#112
+    // decision 7).
     const { partial, report } = followSongLength(before, edit);
     const result = this.commit(partial, report);
     if (result.ok) this.remember(before, label ?? stepLabel(edit), tab);

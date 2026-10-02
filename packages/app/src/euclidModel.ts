@@ -8,7 +8,7 @@
  * through `ctx.change`, where a `pattern` array replaces wholesale.
  */
 import type { EuclideanSpec } from '@windsor/engine';
-import { EUCLID_STEPS_MAX, PPQ, euclid, patternToString } from '@windsor/engine';
+import { EUCLID_STEPS_MAX, euclid, patternToString } from '@windsor/engine';
 import { ratchetsForSteps } from './euclidRatchetModel';
 
 export { EUCLID_STEPS_MAX };
@@ -85,8 +85,3 @@ export const countOnsets = (figure: Figure): number => figure.filter(Boolean).le
 
 /** The strip's change key — the figure as `x.` text; the card repaints only when it differs. */
 export const figureKey = patternToString;
-
-/** Steps per beat, for the strip's grouping gap; 0 when the step does not divide the beat. */
-export function stepsPerBeat(divisor: number): number {
-  return divisor > 0 && PPQ % divisor === 0 ? PPQ / divisor : 0;
-}

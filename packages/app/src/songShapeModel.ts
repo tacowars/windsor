@@ -20,8 +20,16 @@ import type {
   AutomationShapeKind,
   AutomationShapeSpec,
   AutomationTargetRow,
+  Meter,
 } from '@windsor/engine';
-import { TICKS_PER_BAR, replaceRange, stampShape, toDisplay, valueAt } from '@windsor/engine';
+import {
+  TICKS_PER_BAR,
+  replaceRange,
+  stampShape,
+  ticksPerBar,
+  toDisplay,
+  valueAt,
+} from '@windsor/engine';
 import {
   ONCE_SHAPES,
   SHAPE_CHOICES,
@@ -159,16 +167,19 @@ const amount = (n: number, one: string, many: string): string => {
   return `${shown} ${shown === 1 ? one : many}`;
 };
 
-/** The readout (decision 3): the range, its length in bars, the cycles and the points stamped. */
+/**
+ * The readout (decision 3): the range, its length in bars, the cycles and
+ * the points stamped, counted in the song's `meter` (windsor#431).
+ */
 export function shapeReadout(
   range: ShapeRange,
   draft: AutomationShapeSpec,
   pointCount: number,
-  barTicks = TICKS_PER_BAR,
+  meter?: Meter,
 ): string {
-  const from = formatPosition(range.startTick, 0);
-  const to = formatPosition(range.endTick, 0);
-  const bars = amount((range.endTick - range.startTick) / barTicks, 'bar', 'bars');
+  const from = formatPosition(range.startTick, 0, meter);
+  const to = formatPosition(range.endTick, 0, meter);
+  const bars = amount((range.endTick - range.startTick) / ticksPerBar(meter), 'bar', 'bars');
   const cycles = amount(cycleCount(range, draft), 'cycle', 'cycles');
   return `${from} → ${to} · ${bars} · ${cycles} · ${amount(pointCount, 'point', 'points')}`;
 }

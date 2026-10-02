@@ -120,7 +120,7 @@ function paintPart(
   const edited = editTarget(part, region);
   const header = head(
     view,
-    partHeadText(part, region),
+    partHeadText(part, region, view.ctx.model.doc.transport.meter),
     foldButton(view, 'sequencerOpen', 'Sequencer'),
   );
   pane.appendChild(header.row);

@@ -66,6 +66,11 @@ describe('the ruler scale', () => {
     expect(beatTickPx(SONG_VIEW.pxPerBar)).toEqual(
       [1, 2, 3].map((b) => tickToPx(b * PPQ, SONG_VIEW.pxPerBar)),
     );
+    // 7/8's counted beats fall at ticks 24 and 48 of its 84 (windsor#431).
+    const seven = ticksPerBar('7/8');
+    expect(beatTickPx(SONG_VIEW.pxPerBar, '7/8')).toEqual(
+      [24, 48].map((t) => tickToPx(t, SONG_VIEW.pxPerBar, seven)),
+    );
   });
 
   it('keeps a tick and its px paired at every zoom', () => {
@@ -190,6 +195,10 @@ describe('the per-kind tables', () => {
   it('summarises a region from the spec, naming the step count and the rate', () => {
     const grid = { ...DEFAULT_GRID_CONFIG, kind: 'grid' as const, length: 7, divisor: 6 };
     expect(forKind(REGION_SUMMARY, grid)).toBe('grid · 7 steps · 1/16');
+    // The whole note is "1 bar" only where it is one (windsor#431 decision 4).
+    const whole = { ...grid, divisor: DIVISORS.whole };
+    expect(forKind(REGION_SUMMARY, whole)).toBe('grid · 7 steps · 1 bar');
+    expect(forKind(REGION_SUMMARY, whole, '3/4')).toBe('grid · 7 steps · 1/1');
     expect(
       forKind(REGION_SUMMARY, {
         ...DEFAULT_EUCLIDEAN_CONFIG,

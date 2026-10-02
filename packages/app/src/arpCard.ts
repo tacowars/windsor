@@ -30,7 +30,7 @@ import { makeKnob } from './knob';
 import { changePattern } from './partEdits';
 import { tableKnob } from './seqFields';
 import type { DeviceBody } from './sequencerDevice';
-import { DIVISOR_OPTIONS } from './sequencerConstants';
+import { divisorOptions } from './divisorLabels';
 import {
   ARP_GRID_KNOBS,
   ARP_KNOBS,
@@ -68,7 +68,7 @@ function pickers(target: ArpTarget): HTMLElement[] {
   const current = spec(target);
   return [
     select('Style', ARP_STYLE_OPTIONS, current.style, (style) => write(target, { style })),
-    select('Rate', DIVISOR_OPTIONS, String(current.divisor), (v) => {
+    select('Rate', divisorOptions(ctx.model.doc.transport.meter), String(current.divisor), (v) => {
       if (write(target, { divisor: Number(v) })) ctx.render();
     }),
     select('Voicing', ARP_VOICING_OPTIONS, current.voicing, (voicing) =>

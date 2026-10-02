@@ -23,7 +23,8 @@
  * While it plays the label takes no press, so the ruler under it zooms as
  * before.
  */
-import { TICKS_PER_BAR } from '@windsor/engine';
+import type { Meter } from '@windsor/engine';
+import { ticksPerBar } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { PlayheadDrag, PlayheadDragEvent } from './playheadDrag';
@@ -41,17 +42,22 @@ import type {
 import { clampScroll, fittedScale, followFit, stepRulerDrag, zoomToFit } from './songZoomModel';
 
 /**
- * The name-column cell and the ruler for `bars` bars at `pxPerBar`: one
- * `.ruler-bar` per bar, labelled (every n-th bar once the bars are too narrow
- * for every label), with three beat ticks while every bar is labelled.
+ * The name-column cell and the ruler for `bars` bars of `meter` at
+ * `pxPerBar`: one `.ruler-bar` per bar, labelled (every n-th bar once the
+ * bars are too narrow for every label), with a tick at each of the meter's
+ * counted beats after the first (windsor#431) while every bar is labelled.
  */
-export function rulerRow(bars: number, pxPerBar: number): [HTMLElement, HTMLElement] {
+export function rulerRow(
+  bars: number,
+  pxPerBar: number,
+  meter?: Meter,
+): [HTMLElement, HTMLElement] {
   const name = el('div', 'lane-name ruler-name');
   name.appendChild(el('small', '', 'bar · beat'));
   const ruler = el('div', 'ruler');
   ruler.title = 'drag up or down to zoom, left or right to scroll · double-click to fit the song';
   const every = rulerLabelEvery(pxPerBar);
-  const beats = every === 1 ? beatTickPx(pxPerBar) : [];
+  const beats = every === 1 ? beatTickPx(pxPerBar, meter) : [];
   rulerLabels(bars).forEach((label, i) => {
     const bar = el('div', 'ruler-bar');
     bar.style.width = `${pxPerBar}px`;
@@ -74,21 +80,21 @@ export function playheadLine(): HTMLElement {
 }
 
 /**
- * Put the line on `tick`, past the name and mixer columns. Its px follow the lanes'
- * `--bar`, one `bar` of ticks (the song's meter's, windsor#430), so a zoom
- * moves the line with the regions even while the transport stands still
- * and the loop has no new tick to mark.
+ * Put the line on `tick`, past the name and mixer columns, labelled in the
+ * song's `meter` (windsor#431). Its px follow the lanes' `--bar`, one bar of
+ * the meter (windsor#430), so a zoom moves the line with the regions even
+ * while the transport stands still and the loop has no new tick to mark.
  */
 export function placePlayhead(
   line: HTMLElement,
   tick: number,
   songTicks: number,
-  bar: number = TICKS_PER_BAR,
+  meter?: Meter,
 ): void {
   const songTick = songTicks > 0 ? ((tick % songTicks) + songTicks) % songTicks : 0;
-  line.style.left = timelineLeftCss(songTick / bar);
+  line.style.left = timelineLeftCss(songTick / ticksPerBar(meter));
   const label = line.firstChild;
-  if (label) label.textContent = formatPosition(tick, songTicks);
+  if (label) label.textContent = formatPosition(tick, songTicks, meter);
 }
 
 export interface RulerZoom {
@@ -272,10 +278,12 @@ export function wirePlayheadDrag(wire: PlayheadDragWire): PlayheadDragHandle {
   if (!(handle instanceof HTMLElement)) throw new Error('the playhead line has no label');
   let drag: PlayheadDrag | null = null;
   const grabState = () => ({ enabled: ctx.host.enabled, running: ctx.transport.running });
+  const place = (tick: number): void =>
+    placePlayhead(line, tick, wire.songTicks(), ctx.model.doc.transport.meter);
   const settle = (): void => {
     line.classList.remove('dragging');
     const tick = ctx.transport.position();
-    placePlayhead(line, tick, wire.songTicks(), wire.ticksPerBar());
+    place(tick);
     wire.onTick(tick);
   };
   const onBlur = (): void => step({ type: 'cancel' });
@@ -284,9 +292,7 @@ export function wirePlayheadDrag(wire: PlayheadDragWire): PlayheadDragHandle {
     const next = stepPlayheadDrag(drag, event, { pxPerBar: wire.pxPerBar(), bars: wire.bars() });
     drag = next.drag;
     const bar = wire.ticksPerBar();
-    if (next.preview !== null) {
-      placePlayhead(line, barTick(next.preview, bar), wire.songTicks(), bar);
-    }
+    if (next.preview !== null) place(barTick(next.preview, bar));
     if (!was || drag) return;
     window.removeEventListener('blur', onBlur);
     if (handle.hasPointerCapture(was.pointerId)) handle.releasePointerCapture(was.pointerId);
@@ -331,8 +337,6 @@ export interface SongPlayheadWatch {
   lanes: HTMLElement;
   line: HTMLElement;
   songTicks(): number;
-  /** One bar of the song's meter, in ticks. */
-  ticksPerBar(): number;
   /** Called with the audible tick whenever it moved — the harmony lane lights its block. */
   onTick(tick: number): void;
   /** The lanes' own repaint check, run every shown frame before the playhead. */
@@ -349,7 +353,7 @@ export function watchSongPlayhead(watch: SongPlayheadWatch): void {
     playheadAt: () => watch.ctx.transport.position(),
     mark: (tick) => {
       if (!watch.drag.dragging) {
-        placePlayhead(watch.line, tick, watch.songTicks(), watch.ticksPerBar());
+        placePlayhead(watch.line, tick, watch.songTicks(), watch.ctx.model.doc.transport.meter);
       }
       watch.onTick(tick);
     },

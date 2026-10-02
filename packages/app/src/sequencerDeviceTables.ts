@@ -141,8 +141,10 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--euclid-mod-w': 150,
   /** The Density plot's narrowest width; it takes the room the Pattern page leaves. */
   '--euclid-plot-min-w': 160,
-  /** The extra space before each group of four steps. */
+  /** The extra space before a step that starts a counted beat (windsor#431, `meterGrid.ts`). */
   '--beat-gap': 4,
+  /** The wider space before a step that starts a new bar, in the Grid, Chord and Euclid strips. */
+  '--bar-gap': 10,
   /** One modulation lane's height. */
   '--lane-h': 42,
   /** The lane names' column, with + Lane in its corner. */
