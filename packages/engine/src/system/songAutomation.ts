@@ -11,9 +11,10 @@
  *   transport rests. On an offline context that is time 0, before
  *   `startRendering`: the render's opening values (`render/renderSystem.ts`).
  * - **Apply.** After a partial has landed on the strips: a part removed is
- *   forgotten; a length edit first refits every part's held lanes with the
- *   document's own fit, so the engine's lanes stay the document's; a
- *   transport edit (tempo, swing, loop, length) or a patch edit restarts
+ *   forgotten; a length edit (bars or meter) first refits every part's held
+ *   lanes with the document's own fit, so the engine's lanes stay the
+ *   document's; a transport edit (tempo, meter, swing, loop, length) or a
+ *   patch edit restarts
  *   every lane from now; a part's `automation` replaces its lanes,
  *   normalised as the document normaliser would; a part's insert list
  *   changing drops the lanes of an insert it no longer holds and restarts
@@ -33,7 +34,7 @@ import type { AutomationLane } from '../automation/automationLane';
 import { songTicks } from '../sequencing/meter';
 import type { Scheduler } from '../sequencing/scheduler';
 import { FieldNormaliser, isRecord } from '../song/arrangementFields';
-import type { MusicPart } from '../song/arrangement';
+import type { MusicPart, Transport } from '../song/arrangement';
 import type {
   ArrangementDocument,
   DocumentPart,
@@ -59,7 +60,7 @@ export class SongAutomation {
    */
   begin(document: ArrangementDocument): AutomationPlayer {
     const { transport } = this.scheduler;
-    this.songTicks = songTicks(document.transport.bars);
+    this.songTicks = songTicks(document.transport.bars, document.transport.meter);
     this.playerValue = new AutomationPlayer({
       transport,
       now: () => this.clock.currentTime,
@@ -78,14 +79,19 @@ export class SongAutomation {
     for (const part of document.parts) player.setLanes(part.slot, part.automation ?? []);
   }
 
-  /** A partial that has landed; `bars` reads the merged song length when it changed. */
-  apply(partial: DocumentPartial, bars: () => number): void {
+  /**
+   * A partial that has landed; `clock` reads the merged bars and meter when
+   * either changed, the song's length (windsor#429).
+   */
+  apply(partial: DocumentPartial, clock: () => Pick<Transport, 'bars' | 'meter'>): void {
     const player = this.playerValue;
     if (!player) return;
     const parts = isRecord(partial.parts) ? Object.entries(partial.parts) : [];
     for (const [slot, part] of parts) if (part === null) player.removePart(Number(slot));
-    if (isRecord(partial.transport) && partial.transport.bars !== undefined) {
-      this.songTicks = songTicks(bars());
+    const { transport } = partial;
+    if (isRecord(transport) && (transport.bars !== undefined || transport.meter !== undefined)) {
+      const { bars, meter } = clock();
+      this.songTicks = songTicks(bars, meter);
       player.setSongTicks(this.songTicks);
       this.refit(player);
     }

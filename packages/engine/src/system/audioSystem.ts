@@ -369,7 +369,7 @@ export class AudioSystem {
       ignored.push(...applyReturnsLive(this.graph.standing().returns, returns));
     }
     this.sidechains.commit(routing.graph);
-    this.automation.apply(partial, () => player.arrangement.transport.bars);
+    this.automation.apply(partial, () => player.arrangement.transport);
     return { ok: true, ignored };
   }
 

@@ -200,30 +200,36 @@ describe('discontinuities on the live transport', () => {
     }
   });
 
-  it("refits the held lanes on a shortened song, so growing it again plays the document's cut", async () => {
-    const SHORT = 2;
-    const cut = SHORT * TICKS_PER_BAR;
-    const ramp = lane('strip.level', [point(0, 0.1), point(FULL_BARS * TICKS_PER_BAR, 1)]);
-    const { sys, play } = await rig([ramp]);
-    sys.startMusic();
-    play(0.5);
-    expect(sys.apply({ transport: { bars: SHORT } }).ok).toBe(true);
-    expect(sys.apply({ transport: { bars: FULL_BARS } }).ok).toBe(true);
-    // The document the console holds: shortened, normalised, lengthened, normalised again.
-    const doc = withDocumentPart(FULL_DOCUMENT, 'hat', { automation: [ramp] });
-    const shortened = makeArrangement({ ...doc, transport: { ...doc.transport, bars: SHORT } });
-    const regrown = makeArrangement({
-      ...shortened.document,
-      transport: { ...shortened.document.transport, bars: FULL_BARS },
-    }).document;
-    const expected = regrown.parts.find((p) => p.slot === hat)!.automation;
-    expect(expected![0]!.points.at(-1)!.tick).toBe(cut);
-    expect(sys.automationLanes(hat)).toEqual(expected);
-    // Past the old cut the level holds its value there: nothing of the old ramp is scheduled.
-    const end = valueAt(LEVEL, ramp.points, cut);
-    play(FIRST + (cut + 60) * TICK);
-    for (let tick = cut; tick < cut + 60; tick++) {
-      expect(levelOf(sys).valueAt(FIRST + tick * TICK)).toBeCloseTo(end, 12);
-    }
-  });
+  // Fewer bars, or a shorter meter (windsor#429): both cut the 4-bar 4/4 song at 3 of its bars.
+  it.each([
+    ['fewer bars', { bars: 3 }, { bars: FULL_BARS }],
+    ['a shorter meter', { meter: '3/4' }, { meter: '4/4' }],
+  ] as const)(
+    "refits the held lanes on a song shortened by %s, so growing it again plays the document's cut",
+    async (_, shorten, regrow) => {
+      const cut = 3 * TICKS_PER_BAR;
+      const ramp = lane('strip.level', [point(0, 0.1), point(FULL_BARS * TICKS_PER_BAR, 1)]);
+      const { sys, play } = await rig([ramp]);
+      sys.startMusic();
+      play(0.5);
+      expect(sys.apply({ transport: shorten }).ok).toBe(true);
+      expect(sys.apply({ transport: regrow }).ok).toBe(true);
+      // The document the console holds: shortened, normalised, lengthened, normalised again.
+      const doc = withDocumentPart(FULL_DOCUMENT, 'hat', { automation: [ramp] });
+      const shortened = makeArrangement({ ...doc, transport: { ...doc.transport, ...shorten } });
+      const regrown = makeArrangement({
+        ...shortened.document,
+        transport: { ...shortened.document.transport, ...regrow },
+      }).document;
+      const expected = regrown.parts.find((p) => p.slot === hat)!.automation;
+      expect(expected![0]!.points.at(-1)!.tick).toBe(cut);
+      expect(sys.automationLanes(hat)).toEqual(expected);
+      // Past the old cut the level holds its value there: nothing of the old ramp is scheduled.
+      const end = valueAt(LEVEL, ramp.points, cut);
+      play(FIRST + (cut + 60) * TICK);
+      for (let tick = cut; tick < cut + 60; tick++) {
+        expect(levelOf(sys).valueAt(FIRST + tick * TICK)).toBeCloseTo(end, 12);
+      }
+    },
+  );
 });

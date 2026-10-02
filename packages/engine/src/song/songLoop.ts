@@ -15,20 +15,35 @@
  */
 import type { Arrangement, SongLoop, Transport } from './arrangement';
 import { FieldNormaliser } from './arrangementFields';
-import { songTicks } from '../sequencing/meter';
+import { meterBeats, songTicks } from '../sequencing/meter';
+import type { Meter } from '../sequencing/meterTables';
 import { PPQ, type TickLoop } from '../sequencing/scheduler';
 
-/** The grid the loop's points snap to, and its shortest length: one beat. */
+/** The grid the loop's points snap to in 4/4, and its shortest length: one beat. */
 export const LOOP_GRID_TICKS = PPQ;
 
-const ticksOf = (transport: Transport): number => songTicks(transport.bars);
+const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+
+/**
+ * The loop's grid in `meter` (windsor#429): the largest step that every
+ * quarter beat and every one of the meter's beats is a whole number of.
+ * A quarter-note meter keeps `LOOP_GRID_TICKS`; an 8th-note one (6/8, 7/8,
+ * 12/8) halves it, so its bar lines and dotted beats are loop points and a
+ * loop written in 4/4 keeps its ticks across a meter change (decision 3).
+ */
+export function loopGridTicks(meter?: Meter): number {
+  return meterBeats(meter).reduce(gcd, LOOP_GRID_TICKS);
+}
+
+const ticksOf = (transport: Transport): number => songTicks(transport.bars, transport.meter);
 
 const snap = (tick: number, grid: number): number => Math.round(tick / grid) * grid;
 
 /**
  * A range fitted into a song of `songTicks`: ordered, snapped to `grid`, at
  * least one `grid` long, clamped inside. Null when it starts at or past the
- * song's end. `songTicks` is a whole number of bars, so of grid steps too.
+ * song's end. `songTicks` is a whole number of bars, so of the meter's grid
+ * steps too.
  */
 export function fitLoopRange(
   start: number,
@@ -49,17 +64,18 @@ export function fitLoopRange(
  */
 export function normaliseLoop(
   raw: unknown,
-  songTicks: number,
+  song: { readonly songTicks: number; readonly grid: number },
   n: FieldNormaliser,
   path = 'transport.loop',
 ): SongLoop | undefined {
+  const { songTicks, grid } = song;
   if (raw === undefined) return undefined;
   const o = n.section(raw, path);
   n.dropUnknown(o, ['start', 'end', 'on'], path);
   const start = n.num(o.start, 0, 0, Number.MAX_SAFE_INTEGER, `${path}.start`);
   const end = n.num(o.end, songTicks, 0, Number.MAX_SAFE_INTEGER, `${path}.end`);
   const on = n.bool(o.on, false, `${path}.on`);
-  const fitted = fitLoopRange(start, end, songTicks);
+  const fitted = fitLoopRange(start, end, songTicks, grid);
   if (!fitted) {
     n.correction(`${path}: starts at or past the song's end (${songTicks}) — loop off`);
     return undefined;
@@ -77,13 +93,15 @@ export function normaliseLoop(
  * An absent or emptied loop is the whole song, off.
  */
 export function withFittedLoop(arrangement: Arrangement): Arrangement {
-  const songTicks = ticksOf(arrangement.transport);
-  const loop = normaliseLoop(arrangement.transport.loop, songTicks, new FieldNormaliser()) ?? {
+  const { transport } = arrangement;
+  const songTicks = ticksOf(transport);
+  const song = { songTicks, grid: loopGridTicks(transport.meter) };
+  const loop = normaliseLoop(transport.loop, song, new FieldNormaliser()) ?? {
     start: 0,
     end: songTicks,
     on: false,
   };
-  return { ...arrangement, transport: { ...arrangement.transport, loop } };
+  return { ...arrangement, transport: { ...transport, loop } };
 }
 
 /**
