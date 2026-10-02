@@ -17,12 +17,13 @@ const LOOP_NONE = 0,
   LOOP_LOOP = 1,
   LOOP_TRIGGER = 2;
 
-/** Filter modes (`svf.ts`). */
+/** Filter modes (`svf.ts`); Formant runs three bandpass peaks in parallel (`voiceFormant.ts`, windsor#331). */
 const FILT_OFF = 0,
   FILT_LP = 1,
   FILT_HP = 2,
   FILT_BP = 3,
-  FILT_NOTCH = 4;
+  FILT_NOTCH = 4,
+  FILT_FORMANT = 5;
 
 /** LFO shapes (`lfo.ts`). */
 const LFO_SINE = 0,
@@ -48,6 +49,7 @@ const FILTER_MODE = {
   HIGHPASS: FILT_HP,
   BANDPASS: FILT_BP,
   NOTCH: FILT_NOTCH,
+  FORMANT: FILT_FORMANT,
 } as const;
 
 const LFO_SHAPE = {
@@ -77,6 +79,7 @@ export {
   FILT_HP,
   FILT_BP,
   FILT_NOTCH,
+  FILT_FORMANT,
   LFO_SINE,
   LFO_TRI,
   LFO_SAW_UP,

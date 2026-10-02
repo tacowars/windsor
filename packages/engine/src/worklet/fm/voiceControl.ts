@@ -30,11 +30,12 @@ import type { WorkletPatch } from './patchNormalise';
 import type { Voice } from './voice';
 import { ALGORITHMS, ALG_CARRIER_BITS, ALG_EDGES } from './algorithms';
 import { WIDTH_SNAP } from './fmConstants';
-import { FILT_OFF } from './modeIds';
+import { FILT_FORMANT, FILT_OFF } from './modeIds';
 import { bindNoiseColour } from './noiseColour';
 import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
+import { FORMANT_SHIFT_SLOT, updateVoiceFormant } from './voiceFormant';
 import {
   VT_ENV_AMOUNT,
   VT_LFO2_AMOUNT,
@@ -139,7 +140,8 @@ function updateOperatorWidth(voice: Voice, i: number, n: number): void {
  * The filter's part of the control update, after the operators': its
  * envelope, and each stage's coefficients for the voice's cutoff moved by
  * the envelope, the wheel, both LFOs, key tracking and the part's cutoff
- * control. The LFO levels are the voice's `lfoLevel` and `lfo2Level`, this
+ * control; in the Formant mode the same octaves shift its three peaks
+ * instead (`voiceFormant.ts`, windsor#331). The LFO levels are the voice's `lfoLevel` and `lfo2Level`, this
  * block's, and the wheel and key offset are worked out again as the update
  * works them, so no double is passed in (windsor#233). Allocates nothing.
  */
@@ -163,6 +165,12 @@ function updateVoiceFilter(voice: Voice, n: number): void {
     f.keyTrack * keyOffset +
     controls[PART_CUTOFF_MOD] +
     voice.lfo2Level * f.lfo2Amount;
+  // Formant (windsor#331): the same octaves move its three peaks, not `cutoff`.
+  if (f.mode === FILT_FORMANT) {
+    FORMANT_SHIFT_SLOT[0] = Math.pow(2, octaves);
+    updateVoiceFormant(voice);
+    return;
+  }
   const cutoff = voice.cutoff * Math.pow(2, octaves);
   const svfA = voice.svfA;
   svfA.cutoffHz = cutoff;

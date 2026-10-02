@@ -117,6 +117,7 @@ export const CLICKS_PATCH: Patch = {
     lfoAmount: 4,
     lfo2Amount: 0,
     keyTrack: 0.522224506578947,
+    vowel: 0,
     env: env({ sustainLevel: 0 }),
   },
   // The filter's drive of 1 before windsor#300: the drive stage bypassed.

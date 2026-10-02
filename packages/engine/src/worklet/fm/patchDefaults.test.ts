@@ -4,7 +4,14 @@ import { makePatch } from '../../patch/patch';
 import type { PartialPatch, Patch } from '../../patch/patch';
 import { patchLeafDifferences } from '../../patch/patchLibrary';
 import { DRIVE_SHAPE } from './modeIds';
-import { DRIVE_BIAS_RANGE, DRIVE_GAIN_RANGE, DRIVE_TONE_RANGE, TONE_RANGE } from './patchDefaults';
+import { FORMANT_VOWELS } from './formantTables';
+import {
+  DRIVE_BIAS_RANGE,
+  DRIVE_GAIN_RANGE,
+  DRIVE_TONE_RANGE,
+  TONE_RANGE,
+  VOWEL_RANGE,
+} from './patchDefaults';
 import { WAVE } from './waveIds';
 
 // `waveTables` warms the wave cache at load and reads the scope's sample rate.
@@ -43,6 +50,8 @@ describe('the patch defaults (#670)', () => {
     // windsor#309: the switch written, and derived from a bias alone.
     ['the drive switched off', { drive: { on: false, gain: 2 } }],
     ['a drive biased with no switch', { drive: { bias: -0.4 } }],
+    // windsor#331: the Formant mode and its vowel, inside its range.
+    ['the Formant vowel', { filter: { mode: 5, vowel: 2.5 } } as PartialPatch],
   ])('fills the rest of a partial naming %s identically', (_what, partial) => {
     expect(patchLeafDifferences(workletFill(partial), makePatch(partial), 'partial')).toEqual([]);
   });
@@ -63,6 +72,11 @@ describe('the patch defaults (#670)', () => {
       bias: DRIVE_BIAS_RANGE.min,
       tone: DRIVE_TONE_RANGE.max,
     });
+  });
+
+  it('ranges the Formant vowel over the vowel table, one unit a row (windsor#331)', () => {
+    expect(VOWEL_RANGE).toEqual({ min: 0, max: FORMANT_VOWELS.length - 1 });
+    expect(FORMANT_VOWELS.map((v) => v.name)).toEqual(['a', 'e', 'i', 'o', 'u']);
   });
 
   it('clamps the drive gain to its range, so the shaper never sees an overflow (windsor#308)', () => {

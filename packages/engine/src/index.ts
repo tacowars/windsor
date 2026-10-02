@@ -357,8 +357,12 @@ export {
   LFO2_DEFAULTS,
   NOISE_COLOUR_FLOOR_HZ,
   NOISE_COLOUR_RANGE,
+  VOWEL_RANGE,
   WIDTH_RANGE,
 } from './worklet/fm/patchDefaults';
+// The Formant filter's vowels (windsor#331): the table the voice reads, for the editor's display.
+export { FORMANT_PEAKS, FORMANT_VOWELS } from './worklet/fm/formantTables';
+export type { FormantVowel } from './worklet/fm/formantTables';
 export {
   BEATS_PER_BAR,
   DIVISORS,
