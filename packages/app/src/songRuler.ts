@@ -10,7 +10,10 @@
  * The ruler is also the view's zoom and scroll handle (windsor#8): press
  * and drag, up to zoom in and down to zoom out around the pressed bar, left
  * and right to drag the arrangement — the maths is `songZoomModel.ts`. A
- * press released without moving changes nothing. The loop has its own
+ * press released without moving is a click: while the transport is halted it
+ * seeks to the start of the clicked bar (`RULER_CLICK_EVENT`, heard by
+ * `wirePlayheadDrag`, which holds the transport), and otherwise changes
+ * nothing. The loop has its own
  * strip under the ruler (`loopBrace.ts`, windsor#30), so no press on the
  * ruler ever edits it. The zoom stops at the fit, the
  * scale at which the whole song fills the window (windsor#21), and a
@@ -27,7 +30,7 @@ import type { Meter } from '@windsor/engine';
 import { ticksPerBar } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
-import type { PlayheadDrag, PlayheadDragEvent } from './playheadDrag';
+import type { PlayheadDrag, PlayheadDragEvent, PlayheadGrabState } from './playheadDrag';
 import { barTick, canDragPlayhead, pressStartsDrag, stepPlayheadDrag } from './playheadDrag';
 import { watchPlayhead } from './stepStrip';
 import { formatPosition } from './transportModel';
@@ -39,7 +42,17 @@ import type {
   ZoomBounds,
   ZoomDragStart,
 } from './songZoomModel';
-import { clampScroll, fittedScale, followFit, stepRulerDrag, zoomToFit } from './songZoomModel';
+import {
+  clampScroll,
+  clickedBar,
+  fittedScale,
+  followFit,
+  stepRulerDrag,
+  zoomToFit,
+} from './songZoomModel';
+
+/** Fired on the lanes when a ruler press is released without moving; `detail` is the click's px from bar 1's line. */
+const RULER_CLICK_EVENT = 'ruler-click';
 
 /**
  * The name-column cell and the ruler for `bars` bars of `meter` at
@@ -55,7 +68,8 @@ export function rulerRow(
   const name = el('div', 'lane-name ruler-name');
   name.appendChild(el('small', '', 'bar · beat'));
   const ruler = el('div', 'ruler');
-  ruler.title = 'drag up or down to zoom, left or right to scroll · double-click to fit the song';
+  ruler.title =
+    'click to move the playhead · drag up or down to zoom, left or right to scroll · double-click to fit the song';
   const every = rulerLabelEvery(pxPerBar);
   const beats = every === 1 ? beatTickPx(pxPerBar, meter) : [];
   rulerLabels(bars).forEach((label, i) => {
@@ -178,6 +192,9 @@ export function wireRulerZoom(zoom: RulerZoom): RulerZoomHandle {
     const next = stepRulerDrag(drag, event);
     drag = next.drag;
     if (next.view) applyZoom(zoom, next.view);
+    if (next.clickPx !== null) {
+      lanes.dispatchEvent(new CustomEvent<number>(RULER_CLICK_EVENT, { detail: next.clickPx }));
+    }
     if (was && !drag) release(was.pointerId);
   };
   lanes.addEventListener('pointerdown', (down) => {
@@ -264,6 +281,24 @@ function rulerPx(lanes: HTMLElement, clientX: number): number {
 }
 
 /**
+ * A ruler click (the zoom drag's `RULER_CLICK_EVENT`) seeks to the start of
+ * the clicked bar while the transport is halted with audio on, the rule the
+ * handle's drag follows; while it plays, or before audio, it does nothing.
+ */
+function wireRulerClick(
+  wire: PlayheadDragWire,
+  grabState: () => PlayheadGrabState,
+  settle: () => void,
+): void {
+  wire.lanes.addEventListener(RULER_CLICK_EVENT, (e) => {
+    if (!canDragPlayhead(grabState()) || !(e instanceof CustomEvent)) return;
+    const bar = clickedBar(Number(e.detail), wire.pxPerBar(), wire.bars());
+    wire.ctx.transport.seek(barTick(bar, wire.ticksPerBar()));
+    settle();
+  });
+}
+
+/**
  * Wire the playhead's handle (windsor#102): a press on the label while the
  * transport is halted captures the pointer, every move previews the line on
  * the snapped bar, and the release seeks there through `ctx.transport.seek`,
@@ -319,6 +354,7 @@ export function wirePlayheadDrag(wire: PlayheadDragWire): PlayheadDragHandle {
   handle.addEventListener('pointerup', (e) => step({ type: 'up', pointerId: e.pointerId }));
   handle.addEventListener('pointercancel', () => step({ type: 'cancel' }));
   handle.addEventListener('lostpointercapture', () => step({ type: 'cancel' }));
+  wireRulerClick(wire, grabState, settle);
   return {
     get dragging() {
       return drag !== null;

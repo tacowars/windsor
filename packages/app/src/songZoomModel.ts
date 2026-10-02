@@ -150,6 +150,8 @@ export type RulerDragEvent =
 export interface RulerDragStep {
   readonly drag: RulerDrag | null;
   readonly view: SongZoom | null;
+  /** The ruler's px from bar 1's line where a press was released without moving: a click. Null otherwise. */
+  readonly clickPx: number | null;
 }
 
 /**
@@ -164,21 +166,38 @@ export function stepRulerDrag(
   event: RulerDragEvent,
   thresholdPx: number = SONG_DRAG_THRESHOLD_PX,
 ): RulerDragStep {
-  if (!drag || event.type === 'blur') return { drag: null, view: null };
-  if (event.pointerId !== drag.pointerId) return { drag, view: null };
-  if (event.type !== 'move' || !primaryHeld(event.buttons)) return { drag: null, view: null };
+  if (!drag || event.type === 'blur') return { drag: null, view: null, clickPx: null };
+  if (event.pointerId !== drag.pointerId) return { drag, view: null, clickPx: null };
+  if (event.type === 'up' && !drag.moved) {
+    return { drag: null, view: null, clickPx: drag.start.pointerPx };
+  }
+  if (event.type !== 'move' || !primaryHeld(event.buttons)) {
+    return { drag: null, view: null, clickPx: null };
+  }
   const dx = event.clientX - drag.originX;
   const dy = event.clientY - drag.originY;
   if (!drag.moved && Math.max(Math.abs(dx), Math.abs(dy)) < thresholdPx) {
-    return { drag, view: null };
+    return { drag, view: null, clickPx: null };
   }
   return {
     drag: drag.moved ? drag : { ...drag, moved: true },
     view: dragZoom(drag.start, { dx, dy }, drag.bounds, drag.scale),
+    clickPx: null,
   };
 }
 
 /** A double-click on the ruler: the fit, from bar 1. */
 export function zoomToFit(bounds: ZoomBounds, scale: SongViewScale = SONG_VIEW): SongZoom {
   return { pxPerBar: fittedScale(bounds, scale).minPxPerBar, scrollPx: 0 };
+}
+
+/**
+ * The 0-based bar under a click `px` from bar 1's line (a ruler click seeks
+ * to its start, so a click anywhere in bar 5 is bar 5), clamped to the song's
+ * bars: before bar 1 is bar 1, past the end the last bar. A song with no
+ * bars, or a ruler with no width, answers bar 1.
+ */
+export function clickedBar(px: number, pxPerBar: number, bars: number): number {
+  if (!(bars > 0) || !(pxPerBar > 0) || !Number.isFinite(px)) return 0;
+  return Math.min(Math.floor(bars) - 1, Math.max(0, Math.floor(px / pxPerBar)));
 }
