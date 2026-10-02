@@ -1659,17 +1659,6 @@ function rebindVoiceOffsets(voice, slotTargets) {
 // packages/engine/src/worklet/fm/voiceControl.ts
 var MIP_FREQ_SLOT = new Float64Array(1);
 var PART_BEND = 0, PART_WHEEL = 1, PART_CUTOFF_MOD = 2, PART_CONTROL_COUNT = 3;
-function noiseDrawsDescend(voice) {
-  const order = voice.order;
-  let last = 4;
-  for (let oi = 0; oi < 4; oi++) {
-    const i = order[oi];
-    if (voice.kind[i] !== KIND_NOISE) continue;
-    if (i > last) return false;
-    last = i;
-  }
-  return true;
-}
 function bindVoiceConstants(voice, patch) {
   const algIndex = ALGORITHMS[patch.algorithm] ? patch.algorithm : 0;
   const keyOffset = (voice.note - 60) / 12;
@@ -1681,7 +1670,7 @@ function bindVoiceConstants(voice, patch) {
   }
   voice.edges = ALG_EDGES[algIndex];
   voice.carrierBits = ALG_CARRIER_BITS[algIndex];
-  voice.kernel = voice.specialise && voice.edges >= 0 && noiseDrawsDescend(voice);
+  voice.kernel = voice.specialise && voice.edges >= 0;
 }
 function restingWidth(kind, width) {
   return kind === KIND_PULSE ? width : 1 / width;
@@ -2248,17 +2237,24 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
   const fbAmt = voice.fbTo, fbFrom = voice.fbFrom, fbRamp = voice.fbRamp;
   const at = CTRL_INTERVAL - voice.ctrlCount;
   const colours = voice.noiseColour;
-  let ramping = 0, squeezed = 0, coloured = 0;
+  const draws = voice.noiseDraw;
+  let ramping = 0, squeezed = 0, coloured = 0, noisy = 0;
   for (let i = 0; i < 4; i++) {
     const bit = 1 << i;
     if (widthInc[i] !== 0) ramping |= bit;
     if (colours[i].on) coloured |= bit;
     const k = kind[i];
+    if (k === KIND_NOISE) noisy |= bit;
     if (k !== KIND_NOISE && k !== KIND_PULSE && (width[i] !== 1 || widthInc[i] !== 0)) {
       squeezed |= bit;
     }
   }
   for (let s = 0; s < n; s++) {
+    if (noisy !== 0) {
+      for (let i = 3; i >= 0; i--) {
+        if ((noisy & 1 << i) !== 0) draws[i] = voice.noise();
+      }
+    }
     for (let oi = 0; oi < 4; oi++) {
       const i = order[oi];
       const a = amp[i];
@@ -2297,7 +2293,7 @@ function renderVoiceGeneric(voice, outL, outR, off, n) {
       } else {
         switch (kind[i]) {
           case KIND_NOISE:
-            v = voice.noise();
+            v = draws[i];
             break;
           case KIND_SAW_D:
             v = ph * 2 - 1;
@@ -2515,6 +2511,7 @@ var Voice = class {
     this.svfA = new Svf();
     this.svfB = new Svf();
     this.noiseColour = [new NoiseColour(), new NoiseColour(), new NoiseColour(), new NoiseColour()];
+    this.noiseDraw = new Float64Array(4);
     this.drive = new VoiceDrive();
     this.noiseSeed = randomSeed32(random);
     this.active = false;
