@@ -213,7 +213,7 @@ code { font: 11.5px var(--f-num); color: var(--ink); }
       <div class="q"><h3>1 · The picker</h3><p>A plain select in the swing group, where <code>4/4</code> sits today, with the six meters in the engine's order. It's one step on undo. Options read the bare meter, so 7/8 doesn't say 2+2+3 until a grouping can be chosen.</p><p class="rec"><b>Decided:</b> as drawn.</p></div>
       <div class="q"><h3>2 · Bar line heavier?</h3><p>Today a bar is a full-height line and a beat is a 6px tick, so the ruler already tells them apart. In a step strip a bar shows only when the part runs past one bar (a 16-step pattern kept in 7/8 groups 4·4·6 | 2). Try it with the <i>Bar line</i> switch.</p><p class="rec"><b>Decided:</b> ruler as today; in step strips, a wider gap (10px) before a new bar. The toolbar's <i>Strip + ruler</i> also draws the ruler's bar lines heavier, for comparison.</p></div>
       <div class="q"><h3>3 · 7/8's long beat</h3><p>The third beat is just a longer group (6 cells at 1/16, 3 at 1/8), with no tint or label. The ruler's ticks fall at 24 and 48, so the last gap is visibly longer.</p><p class="rec"><b>Decided:</b> as drawn, no extra mark.</p></div>
-      <div class="q"><h3>4 · Grouping at other step lengths</h3><p>Today the Grid strip groups every 4 steps at any step length, and Euclid already groups by the beat. The beat rule changes 4/4 at 1/8 to 2·2·2·2 (today 4·4) and at 1/32 to groups of 8.</p><p class="rec"><b>Decided:</b> group by beat when a beat holds 2+ steps; otherwise a gap at each bar; when a step is a bar or longer, groups of 4 as today. Grid and Euclid share the rule.</p></div>
+      <div class="q"><h3>4 · Grouping at other step lengths</h3><p>Today the Grid strip groups every 4 steps at any step length, and Euclid already groups by the beat. The beat rule changes 4/4 at 1/8 to 2·2·2·2 (today 4·4) and at 1/32 to groups of 8.</p><p class="rec"><b>Decided:</b> group by beat when a beat holds 2+ steps; otherwise a gap at each bar; when a step is a bar or longer, groups of 4 with today's 4px gap. A beat or bar line that no step lands on goes before the first step past it (7/8 at 1/2T still groups by bar). Grid and Euclid share the rule.</p></div>
       <div class="q"><h3>5 · Counting the /8 meters</h3><p>The third field counts 16ths inside the counted beat (1–6 in a dotted-quarter beat), so 6/8 tick 36 reads <code>1.2.1</code> and 7/8's last 16th of bar 2 reads <code>2.3.6</code>. The other option counts 8ths in /8 meters (1–3), which loses the 16th.</p><p class="rec"><b>Decided:</b> 16ths, as the issue proposes. Both rows are drawn above.</p></div>
       <div class="q"><h3>6 · Step picker's 96</h3><p>Reads <code>1 bar</code> in 4/4 and <code>1/1</code> in every other meter. Open the card's Step select to see it.</p><p class="rec"><b>Decided:</b> as the issue decides. The Euclid card's cells take the same beat rule and aren't drawn here.</p></div>
     </div>
@@ -252,15 +252,34 @@ function position(tick, unit = SIXTEENTH) {
   return `${Math.floor(t / bar) + 1}.${beat + 1}.${Math.floor((within - starts[beat]) / unit) + 1}`;
 }
 
+/**
+ * The counted beat (0-based, 0 = the bar line) that falls inside step i's
+ * span (step i-1's start, step i's start], or -1. A line no step lands on
+ * belongs to the first step past it, so steps that never meet a bar or beat
+ * line exactly still group.
+ */
+function lineInto(i, divisor) {
+  if (i === 0) return 0;
+  const bar = barTicks(), starts = beatStarts();
+  const lo = (i - 1) * divisor, hi = i * divisor;
+  if (Math.floor(hi / bar) > Math.floor(lo / bar)) return 0; // a bar line wins over a beat line
+  for (let k = 1; k < starts.length; k++) {
+    const at = Math.floor(lo / bar) * bar + starts[k];
+    if (at > lo && at <= hi) return k;
+  }
+  return -1;
+}
+
 /** 'bar', 'beat' or '' before step i, by decision 4. */
 function groupOf(i, divisor) {
   if (i === 0) return '';
-  const bar = barTicks(), m = meterOf();
-  const tick = i * divisor, within = tick % bar;
-  if (divisor >= bar) return i % 4 === 0 ? 'bar' : '';
-  if (within === 0) return 'bar';
-  const minBeat = Math.min(...m.beats);
-  if (minBeat / divisor >= 2 && beatStarts().includes(within)) return 'beat';
+  const bar = barTicks();
+  // A bar or longer per step: groups of 4 at today's beat gap, not a bar gap.
+  if (divisor >= bar) return i % 4 === 0 ? 'beat' : '';
+  const line = lineInto(i, divisor);
+  if (line === 0) return 'bar';
+  const minBeat = Math.min(...meterOf().beats);
+  if (line > 0 && minBeat / divisor >= 2) return 'beat';
   return '';
 }
 
@@ -331,11 +350,7 @@ function renderSong() {
 function renderCard() {
   const n = stepCount();
   const groups = Array.from({ length: n }, (_, i) => groupOf(i, state.divisor));
-  const beatNum = (i) => {
-    const within = (i * state.divisor) % barTicks();
-    const idx = beatStarts().indexOf(within);
-    return idx >= 0 ? `${idx + 1}` : '';
-  };
+  const beatNum = (i) => (groups[i] || i === 0) && state.divisor < barTicks() ? `${lineInto(i, state.divisor) + 1}` : '';
   const cols = groups.map((g, i) => {
     const rest = REST_STEPS.has(i % 16);
     return `<div class="grid-col ${g}" data-i="${i}">
