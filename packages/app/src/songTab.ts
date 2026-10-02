@@ -24,6 +24,10 @@
  * (`songAutomationToolbar.ts`, windsor#349): its tool and snap are view
  * state too, as are the Shape tool's last settings (`songShapeRange.ts`,
  * windsor#350), whose popover lives for one render.
+ *
+ * The selected part is the Parts tab's too (windsor#462): selecting a part or
+ * one of its regions picks it there (`selectPart`), and a render follows the
+ * shared selection, picked or reset elsewhere (`partSelectionSync.ts`).
  */
 import type { DocumentPartial } from '@windsor/engine';
 import { regionPattern, songTicksOf, ticksPerBar } from '@windsor/engine';
@@ -34,6 +38,8 @@ import type { DetailPane } from './songDetailPane';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
+import { pickedSlot, syncSongSelection } from './partSelectionSync';
+import { selectPart } from './partsSession';
 import {
   EXPANDED_KNOB_COUNT,
   emptyMixerCell,
@@ -79,6 +85,12 @@ export type SongSelection =
 
 export interface SongViewState {
   selection: SongSelection;
+  /**
+   * The Parts selection's pick count (`ctx.parts.picks`) this view last wrote
+   * or adopted (windsor#462): a render adopts a pick past it. Seeded when the
+   * tab is built, so the first render selects nothing.
+   */
+  picksSeen: number;
   /**
    * The zoom (windsor#8): px one bar spans, set by the ruler drag within
    * `SONG_VIEW`'s bounds. View state, like the scroll below: kept across
@@ -195,7 +207,12 @@ function renderSongView(
   lights: MixerLights,
 ): ShapeTool {
   body.innerHTML = '';
-  state.selection = validSelection(ctx, state.selection);
+  // The shared part selection, picked or reset since this view last looked (windsor#462 decisions 3, 4 and 6).
+  const pick = { slot: ctx.parts.selected, picks: ctx.parts.picks };
+  const slots = ctx.model.doc.parts.map((p) => p.slot);
+  const synced = syncSongSelection(state.selection, pick, state.picksSeen, slots);
+  state.picksSeen = synced.seen;
+  state.selection = validSelection(ctx, synced.selection);
   const scroll = el('div', 'lanes-scroll');
   const lanes = el('div', 'lanes');
   lanes.style.setProperty('--names', `${SONG_VIEW.laneNameWidthPx}px`);
@@ -273,6 +290,11 @@ function renderSongView(
     },
     select(selection) {
       state.selection = validSelection(ctx, selection);
+      const slot = pickedSlot(state.selection);
+      if (slot !== null) {
+        selectPart(ctx, slot);
+        state.picksSeen = ctx.parts.picks;
+      }
       view.paintLanes();
       view.paintPane();
     },
@@ -371,6 +393,7 @@ function renderSongView(
 export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
   const state: SongViewState = {
     selection: null,
+    picksSeen: ctx.parts.picks,
     pxPerBar: SONG_VIEW.pxPerBar,
     scrollPx: 0,
     floorPxPerBar: null,

@@ -9,13 +9,12 @@
  * once per render, whose push also keeps the rail's picker and marker honest.
  */
 import type { PartialPatch } from '@windsor/engine';
-import { clonePatch, makePatch, partAt } from '@windsor/engine';
+import { makePatch, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { $, el, seg } from './dom';
 import { knobSongTick, voiceKnobAutomation } from './knobAutomation';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, libraryActions, syncModifiedMarker } from './libraryActions';
-import { library, libraryPatch } from './libraryModel';
 import type { MidiAccessor } from './midiAccess';
 import { midiPanel } from './midiPanel';
 import { partListControls } from './partListControls';
@@ -31,6 +30,7 @@ import {
 } from './patchPanels';
 import { buildBays } from './patchBays';
 import type { PatchEditor } from './partsSession';
+import { loadWorkingPatch, selectPart } from './partsSession';
 import { startScope } from './scope';
 
 const GRID_HTML = `
@@ -99,15 +99,6 @@ const GRID_HTML = `
     <div id="midiSlot"></div>
   </div>`;
 
-/** Reload the working patch: the document's patch, else the built-in the part plays. */
-export function loadWorkingPatch(ctx: AppCtx): void {
-  const part = partAt(ctx.model.doc, ctx.parts.selected);
-  const patch = part
-    ? (ctx.model.doc.patches?.[part.preset] ?? libraryPatch(library, part.preset))
-    : undefined;
-  ctx.parts.patch = patch ? clonePatch(patch) : makePatch();
-}
-
 /**
  * The editor every control on this tab is handed: the session's working patch,
  * a push that commits it through the context and then keeps the rail honest —
@@ -161,8 +152,7 @@ function partPicker(ctx: AppCtx, editor: PatchEditor, onSwitch: () => void): HTM
       })),
       () => String(ctx.parts.selected),
       (slot) => {
-        ctx.parts.selected = Number(slot);
-        loadWorkingPatch(ctx);
+        selectPart(ctx, Number(slot));
         onSwitch();
         refreshPatchUi(editor);
         syncPresetAndBadge(ctx, editor);
