@@ -152,7 +152,7 @@ knows the one below it and nothing above.
    `songTab.ts` is the Song view's composition (#709): its one piece of state
    (the selection), the lanes and the pane — see "The Song view" below.
 5. **The cards and panels** — `gridCard.ts`, `chordCard.ts`, `euclidCard.ts`,
-   `arpCard.ts`, `bassCard.ts`, `harmonyCard.ts`, `songDetailPane.ts`,
+   `arpCard.ts`, `bassCard.ts`, `figureCard.ts`, `harmonyCard.ts`, `songDetailPane.ts`,
    `songRuler.ts`, `songHarmonyLane.ts`, `songLanes.ts`, `patchBays.ts`, `patchPanels.ts`,
    `returnsPanel.ts`, `envCanvas.ts` / `envelopeKnobs.ts`,
    `harmonicEditor.ts`, `presetBrowser.ts`, `libraryActions.ts`,
@@ -160,7 +160,7 @@ knows the one below it and nothing above.
    shared machinery they draw on is `stepStrip.ts`, `regionPlayhead.ts`, `knob.ts`,
    `patchPath.ts`, `seqFields.ts` and `dom.ts`.
 6. **The pure models** — `gridModel.ts`, `chordStepModel.ts`,
-   `euclidModel.ts`, `arpModel.ts`, `bassModel.ts`, `regionModel.ts`,
+   `euclidModel.ts`, `arpModel.ts`, `bassModel.ts`, `figureModel.ts`, `regionModel.ts`,
    `playheadDrag.ts`, `harmonyLaneModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
    `patchMetadata.ts`, `libraryModel.ts`, `ratioSplit.ts`,
    `envelopeTransfer.ts`, `operatorStart.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
@@ -219,8 +219,8 @@ detail pane at the bottom. Its layers, top down:
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
    and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
    the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row
-   244 px high and as wide as its content. All five cards (Grid, Chord,
-   Arp, Basslead, Euclid) hand back a `DeviceBody` with `fit: 'fixed'`
+   244 px high and as wide as its content. All six cards (Grid, Chord,
+   Arp, Basslead, Euclid, Figure) hand back a `DeviceBody` with `fit: 'fixed'`
    and size themselves from `SEQUENCER_DEVICE_PX`
    (`sequencerDeviceTables.ts`). Its rail (`sequencerRail.ts`) holds the
    accent dot, the kind's name (a click folds it), the region `n/m`, and

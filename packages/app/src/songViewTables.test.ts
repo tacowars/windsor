@@ -11,6 +11,7 @@ import {
   DEFAULT_CHORD_CONFIG,
   DIVISORS,
   DEFAULT_EUCLIDEAN_CONFIG,
+  DEFAULT_FIGURE_CONFIG,
   DEFAULT_GRID_CONFIG,
   PPQ,
   SEQUENCER_KINDS,
@@ -180,6 +181,39 @@ describe('the per-kind tables', () => {
     const eight = { ...bass, length: 8, divisor: DIVISORS.eighth };
     expect(forKind(CYCLE_TICKS, eight)).toBe(8 * DIVISORS.eighth);
     expect(forKind(CYCLE_TICKS, { ...eight, length: 5 })).toBe(5 * DIVISORS.eighth);
+  });
+
+  it("gives a Figure its schedule's bars, else its line, and a canon none (windsor#490)", () => {
+    const figure = { ...DEFAULT_FIGURE_CONFIG, kind: 'figure' as const };
+    expect(forKind(CYCLE_TICKS, figure)).toBe(16 * DIVISORS.sixteenth);
+    const scheduled = {
+      ...figure,
+      schedule: [
+        { length: 4, bars: 2 },
+        { length: 6, bars: 3 },
+      ],
+    };
+    expect(forKind(CYCLE_TICKS, scheduled)).toBe(5 * TICKS_PER_BAR);
+    expect(forKind(CYCLE_TICKS, scheduled, '7/8')).toBe(5 * 84);
+    expect(
+      forKind(CYCLE_TICKS, { ...figure, source: { slot: 1, offset: 3, transpose: 0 } }),
+    ).toBeNull();
+  });
+
+  it("summarises a Figure by its first cells and rate, or a canon by its leader's name", () => {
+    const figure = { ...DEFAULT_FIGURE_CONFIG, kind: 'figure' as const };
+    expect(forKind(REGION_SUMMARY, figure)).toBe('figure · R 3 5 3 1/16');
+    const canon = { ...figure, source: { slot: 2, offset: 3, transpose: 12 } };
+    const names = (slot: number): string | undefined => (slot === 2 ? 'Mallets I' : undefined);
+    expect(forKind(REGION_SUMMARY, canon, undefined, names)).toBe('figure ← Mallets I +3');
+    expect(
+      forKind(
+        REGION_SUMMARY,
+        { ...canon, source: { ...canon.source, offset: -2 } },
+        undefined,
+        names,
+      ),
+    ).toBe('figure ← Mallets I -2');
   });
 
   it('summarises a region from the spec, naming the step count and the rate', () => {

@@ -56,6 +56,12 @@ export const euclidHeadPx = (gap = EUCLID_ROW_GAP_PX): number =>
 /** A converted device's height (the insert rack's `--rack-h` is 196); the harmony card matches it. */
 export const SEQUENCER_DEVICE_H_PX = 244;
 
+/** The Figure's held rows (windsor#490, figure.html): the cell number, tone, Oct, Vel, A, S, ratchet. */
+export const FIGURE_HEAD_ROWS_PX: readonly number[] = [12, 18, 18, 18, 18, 18, 14];
+
+/** The gap between a Figure step column's held rows: 1 px, so two lanes still fit under the tabs. */
+export const FIGURE_ROW_GAP_PX = 1;
+
 /** Custom property → px. */
 export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   /** A converted device's height. */
@@ -155,6 +161,25 @@ export const SEQUENCER_DEVICE_PX: Readonly<Record<string, number>> = {
   '--seq-wide-col': 96,
   /** A knob's dial in the device, the insert rack's small dial. */
   '--seq-dial': 30,
+  /* The Figure's own sizes (windsor#490), off tacowars's mockup
+     (figure.html): the Arp's Play columns and the Grid's 32 px strip under
+     the Euclid's 20 px page tabs. */
+  /** The page tabs' row, as the Euclid's. */
+  '--figure-tabs-h': 20,
+  /** The Rate, Seed and Randomize column's width. */
+  '--figure-field-w': 100,
+  /** The space between a Figure step's held rows. */
+  '--figure-row-gap': FIGURE_ROW_GAP_PX,
+  /** The Figure's held step rows, which its lane names' corner matches. */
+  '--figure-strip-head-h': stripHeadPx(FIGURE_HEAD_ROWS_PX, FIGURE_ROW_GAP_PX),
+  /** A schedule stage chip's height. */
+  '--figure-chip-h': 26,
+  /** The Source picker's width. */
+  '--figure-source-w': 140,
+  /** A Process knob's width in its row of two. */
+  '--figure-row-knob-w': 56,
+  /** One choice in the tone picker, square. */
+  '--figure-pick': 30,
 };
 
 /** A part's accent on its device (the mockup's `--kc`): the dot, the knob arcs, the lit cells. */

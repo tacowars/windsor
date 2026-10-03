@@ -35,6 +35,7 @@ import type { RailRegion } from './sequencerRail';
 import type { SongView } from './songTab';
 import type { PaneHeadText } from './songPaneHead';
 import { editTarget, paneHeadText, partHeadText } from './songPaneHead';
+import { partNames } from './songViewTables';
 
 /** What `paintDetailPane` drew: its staleness check and its header's in-place refresh. */
 export interface DetailPane {
@@ -120,7 +121,7 @@ function paintPart(
   const edited = editTarget(part, region);
   const header = head(
     view,
-    partHeadText(part, region, view.ctx.model.doc.transport.meter),
+    partHeadText(part, region, view.ctx.model.doc.transport.meter, partNames(view.ctx.model.doc)),
     foldButton(view, 'sequencerOpen', 'Sequencer'),
   );
   pane.appendChild(header.row);
