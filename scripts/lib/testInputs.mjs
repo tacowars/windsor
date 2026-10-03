@@ -43,11 +43,15 @@ const SOURCE_EXTENSION = /\.(ts|mjs|js)$/;
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** The read calls `text` makes, as `name` strings; empty when it makes none. */
+/**
+ * The read calls `text` makes, as `name` strings; empty when it makes none.
+ * A call imported under another name (`as`) counts too.
+ */
 export function readCallsIn(text, readCalls = READ_CALLS) {
   return readCalls.flatMap(({ modules, calls }) => {
     const named = modules.some((m) => new RegExp(`['"]${escape(m)}['"]`).test(text));
-    return named ? calls.filter((call) => new RegExp(`\\b${call}\\s*\\(`).test(text)) : [];
+    const made = (call) => new RegExp(`\\b${call}\\s*\\(|\\b${call}\\s+as\\b`).test(text);
+    return named ? calls.filter(made) : [];
   });
 }
 
@@ -79,6 +83,30 @@ export function importedModules(path, text) {
   });
 }
 
+/**
+ * For a module's path, the tests whose imports reach it, directly or through
+ * other modules among `files`.
+ */
+function testsReaching(files) {
+  const importers = new Map();
+  for (const file of files) {
+    for (const module of importedModules(file.path, file.text)) {
+      importers.set(module, [...(importers.get(module) ?? []), file.path]);
+    }
+  }
+  return (path) => {
+    const seen = new Set([path]);
+    const queue = [path];
+    while (queue.length > 0) {
+      const bare = queue.shift().replace(SOURCE_EXTENSION, '');
+      const next = (importers.get(bare) ?? []).filter((p) => !seen.has(p));
+      next.forEach((p) => seen.add(p));
+      queue.push(...next);
+    }
+    return [...seen].filter((p) => TEST_FILE.test(p));
+  };
+}
+
 /** Problems with one file's marker against the tables; checks (a) to (d). */
 function fileProblems(file, context) {
   const { readCalls, readByPath, scannedBy, importersOf } = context;
@@ -103,7 +131,7 @@ function fileProblems(file, context) {
     const listed = new Set(entries.flatMap(([, tests]) => tests));
     const needed = isTest ? [file.path] : importersOf(file.path);
     for (const test of needed.filter((t) => !listed.has(t))) {
-      const why = isTest ? 'reads it' : `imports ${file.path}, which reads it`;
+      const why = isTest ? 'reads it' : `reaches ${file.path} through its imports, which reads it`;
       problems.push(`SCANNED_BY "${glob}" does not list ${test}, which ${why}`);
     }
   }
@@ -115,16 +143,12 @@ function fileProblems(file, context) {
  * (a) a file that makes a read call has a marker;
  * (b) each marker glob is a `READ_BY_PATH` entry or a `SCANNED_BY` glob;
  * (c) a test whose marker names a `SCANNED_BY` glob is listed by that entry;
- * (d) a module whose marker names one has every test that imports it listed;
+ * (d) a module whose marker names one has listed every test that imports it,
+ *     directly or through other modules;
  * (e) every test a `SCANNED_BY` entry names exists among `files`.
  */
 export function checkTestInputs({ files, readByPath, scannedBy, readCalls = READ_CALLS }) {
-  const tests = files.filter((f) => TEST_FILE.test(f.path));
-  const imports = new Map(tests.map((t) => [t.path, importedModules(t.path, t.text)]));
-  const importersOf = (path) => {
-    const bare = path.replace(SOURCE_EXTENSION, '');
-    return tests.filter((t) => imports.get(t.path).includes(bare)).map((t) => t.path);
-  };
+  const importersOf = testsReaching(files);
   const context = { readCalls, readByPath, scannedBy, importersOf };
   const known = new Set(files.map((f) => f.path));
   const missing = scannedBy.flatMap(([glob, listed]) =>

@@ -73,10 +73,14 @@ describe('checkTestInputs', () => {
       { path: 'src/b.test.ts', text: marked('src/*.css') },
       { path: 'src/sheet.ts', text: marked('src/*.css') },
       { path: 'src/c.test.ts', text: "import { css } from './sheet';\n" },
+      { path: 'src/middle.ts', text: "export { css } from './sheet';\n" },
+      { path: 'src/d.test.ts', text: "import { css } from './middle';\n" },
     ];
+    const reaches = 'through its imports, which reads it';
     expect(run(files)).toEqual([
       'SCANNED_BY "src/*.css" does not list src/b.test.ts, which reads it',
-      'SCANNED_BY "src/*.css" does not list src/c.test.ts, which imports src/sheet.ts, which reads it',
+      `SCANNED_BY "src/*.css" does not list src/c.test.ts, which reaches src/sheet.ts ${reaches}`,
+      `SCANNED_BY "src/*.css" does not list src/d.test.ts, which reaches src/sheet.ts ${reaches}`,
     ]);
   });
 
@@ -95,6 +99,9 @@ describe('checkTestInputs', () => {
     expect(parseMarker('const x = 1;\n')).toBeNull();
     expect(readCallsIn("import { build } from 'esbuild';\nawait build(o);\n")).toEqual(['build']);
     expect(readCallsIn("import { readFileSync } from 'node:fs';\n")).toEqual([]);
+    expect(readCallsIn("import { readFileSync as read } from 'node:fs';\n")).toEqual([
+      'readFileSync',
+    ]);
     const text = "import { a } from '../x/y.ts';\nimport b from '@windsor/engine/patch/presets';\n";
     expect(importedModules('packages/app/src/z.test.ts', text)).toEqual([
       'packages/app/x/y',
