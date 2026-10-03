@@ -50,7 +50,10 @@ const GRID_HTML = `
         <canvas class="scope" id="scope" width="420" height="124"></canvas>
       </div>
     </aside>
-    <main class="bays"><div class="bay-grid" id="bayGrid"></div></main>
+    <main class="bays">
+      <div class="section-title"><span>Operators</span></div>
+      <div class="op-rows" id="bayGrid"></div>
+    </main>
     <aside class="mod">
       <div class="section">
         <div class="section-title"><span>Drive</span></div>

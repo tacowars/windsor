@@ -19,7 +19,10 @@ export function drawEnv(canvas: HTMLCanvasElement, env: Envelope, color: string)
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth || canvas.width;
   const h = canvas.clientHeight || canvas.height;
-  if (canvas.width !== Math.round(w * dpr)) {
+  // The backing store follows the box × devicePixelRatio, so a canvas whose
+  // box or zoom changed redraws sharp (record `2026-10-03-parts-tab-layout`
+  // decision 9).
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
