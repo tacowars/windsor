@@ -8,6 +8,7 @@
  * QWERTY plays straight away.
  */
 import { $, el } from './dom';
+import type { Focusable } from './focusTrap';
 import { FocusReturn } from './focusTrap';
 import { NEW_CATEGORY, VOLUME_DIGITS } from './libraryConstants';
 import type { LoudnessResult } from './loudnessCheck';
@@ -17,15 +18,32 @@ import { categoriesOf, nameProblem, normaliseTags, suggestTags } from './patchMe
 /** Where focus lands after a modal whose opener has gone: the patch bar's patch box (windsor#521). */
 const patchControls = (): HTMLElement | null => document.getElementById('patchBox');
 
-const focusReturn = new FocusReturn<HTMLElement>(patchControls);
+const focusReturn = new FocusReturn<Focusable>(patchControls);
+
+/**
+ * Where focus goes back to for `opener` (windsor#537 decision 2): never the
+ * page body or an element already removed — a popover result's confirm opens
+ * after the popover has gone — so those take the fallback. An opener the bar
+ * rebuilt while the dialog was up is found again by its id.
+ */
+function returnTarget(opener: HTMLElement | null): Focusable | null {
+  if (opener === null || opener === document.body || !opener.isConnected) return null;
+  return {
+    focus: (): void => {
+      let live: HTMLElement | null = opener;
+      if (!opener.isConnected) live = opener.id ? document.getElementById(opener.id) : null;
+      (live ?? patchControls())?.focus();
+    },
+  };
+}
 
 /**
  * Open a dialog modally; resolves when it closes. Every modal in the console
  * opens through here, so closing returns focus to `opener` (else the element
- * that had focus).
+ * that had focus, else the patch box).
  */
 export function showTrapped(dialog: HTMLDialogElement, opener: HTMLElement | null): Promise<void> {
-  focusReturn.open(opener ?? (document.activeElement as HTMLElement | null));
+  focusReturn.open(returnTarget(opener ?? (document.activeElement as HTMLElement | null)));
   return new Promise((resolve) => {
     dialog.addEventListener(
       'close',
