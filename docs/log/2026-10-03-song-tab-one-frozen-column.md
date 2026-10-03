@@ -64,5 +64,5 @@ chips on every tab.
 - The Song tab no longer names a part anywhere in its lanes. Reading which
   part a lane belongs to relies on the number tab, its colour, and the
   strip's highlight for the selected part.
-- With Meters on, the chips' two lights take width, and at 1366 three more
-  chip names end in "…".
+- With Meters on, the chips' two lights take width, so long names end in
+  "…" sooner. Whoever builds the lights measures it with 16 parts.

@@ -295,6 +295,7 @@ const PARTS = [
   P('Marimba', 'euclid', .20, [R(26, 64, 'Euclid 12/12 · 1/8', 13.25)], [L('Level', 'strip', '−12.0 dB', flat(.5, 26), [1])]),
   P('Tap', 'chord', 1.00, [R(0, 8, 'Chord · 1 steps · 1/1', 0), R(8, 64, 'Chord · 2 steps · 1/1', 0)], [L('Level', 'strip', '0.0 dB', flat(.85), [1]), L('Pan', 'strip', 'L12', flat(.42), [1])]),
   P('Mallet', 'figure', .32, [R(40, 64, 'Figure · R 5 3 5 1/8', 0)], [L('Level', 'strip', '−9.0 dB', flat(.6, 40), [1]), L('Skip', 'seq', '0.50', flat(.5, 40), [1])]),
+  P('Kick', 'euclid', .55, [R(8, 64, 'Euclid 4/16 · 1/16', 13.25)], [L('Level', 'strip', '−4.0 dB', flat(.7, 8), [1])]),
 ];
 const toneOf = (p) => p.k === 'euclid' ? 'var(--carrier)' : 'var(--modulator)'; // partStripModel.ts REGION_TONE
 const CHORDS1 = [['D maj', 'IVmaj · triad'], ['C# min', 'iii · triad'], ['B min', 'ii · triad'], ['A maj', 'Imaj · triad'], ['F# min7', 'vi7 · 7th'], ['D maj', 'IVmaj · triad'], ['E min', 'v · triad'], ['F# min7', 'vi7 · 7th']];
