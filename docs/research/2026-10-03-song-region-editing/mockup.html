@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Song Region Editing</title>
+<!-- Mockup only: how regions are made, sized, moved and split on the Song
+     tab's timeline, for the harmony track and the part lanes. "Proposed" is
+     the change; "Today" redraws the behaviour on main (songLanes.ts,
+     regionModel.ts, songHarmonyLane.ts, harmonyLaneModel.ts) for comparison.
+     The blocks, lanes and colours are today's, from console.css. The song is
+     an example: 16 bars of 4/4 in A major, a Bass (grid), a Pad (chord) and
+     Drums (euclid). -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+<style>
+/* Layout: mockup chrome on top, the console's timeline in a sideways-scrolling stage, notes below. */
+:root {
+  color-scheme: dark;
+  --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10;
+  --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70;
+  --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --r: 3px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #0b0d0e; color: var(--ink); font-family: var(--f-ui); font-size: 13px; -webkit-font-smoothing: antialiased; }
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.tb { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px; background: #0b0d0e; border-bottom: 1px solid var(--line); }
+.tb .grp { display: flex; align-items: center; }
+.tb .lbl { font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-right: 8px; }
+.tb button { font: 600 11px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; margin-left: -1px; }
+.tb .grp button:first-of-type { border-radius: var(--r) 0 0 var(--r); }
+.tb .grp button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.tb .grp.solo button { border-radius: var(--r); margin-left: 0; }
+.tb button.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.tb button:disabled { opacity: .4; cursor: default; }
+.tb button:focus-visible, .btn:focus-visible { outline: 2px solid var(--carrier); outline-offset: 1px; }
+.stand-in { outline: 1px dashed var(--return); outline-offset: 2px; }
+.rules { margin: 12px 16px 0; font: 11px var(--f-num); color: var(--ink-dim); line-height: 1.6; }
+.rules b { color: var(--carrier); font-weight: 500; }
+.notes { max-width: 980px; margin: 14px 16px 40px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); line-height: 1.55; color: var(--ink-dim); }
+.notes h2 { font: 700 15px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes h3 { font: 600 11px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); margin: 14px 0 4px; }
+.notes p { margin: 0 0 6px; max-width: 70ch; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes ol, .notes ul { margin: 4px 0 0; padding-left: 20px; max-width: 76ch; }
+.notes li { margin-bottom: 4px; }
+.notes .todo { color: var(--carrier); }
+.notes code { font: 11px var(--f-num); color: var(--ink); }
+.notes kbd { font: 11px var(--f-num); color: var(--ink); background: var(--inset); border: 1px solid var(--line); border-radius: 2px; padding: 0 4px; }
+
+/* ---------- console pieces (as today) ---------- */
+.stage { overflow-x: auto; margin: 12px 16px 0; padding: 30px 14px 16px; background: var(--ground); outline: 1px solid var(--line-bright); }
+#tl { display: flex; flex-direction: column; gap: 4px; width: max-content; padding-right: 48px; }
+.row { display: flex; gap: 8px; align-items: stretch; }
+.lane-name { flex: none; width: 112px; display: flex; align-items: center; gap: 6px; padding: 0 6px; font-family: var(--f-panel); }
+.lane-name .nm { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.lane-name b { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.lane-name small { font: 9px var(--f-num); color: var(--ink-faint); letter-spacing: .04em; }
+.lane-name.ruler-name { justify-content: flex-end; height: 22px; }
+.ptab { flex: none; width: 20px; height: 28px; display: grid; place-items: center; border-radius: var(--r); background: var(--modulator); color: #0d1716; font: 700 11px var(--f-panel); }
+.ruler { display: flex; height: 22px; border-bottom: 1px solid var(--line-bright); }
+.ruler-bar { position: relative; flex: none; border-left: 1px solid var(--line-bright); font: 10px var(--f-num); color: var(--ink-dim); }
+.ruler-bar span { position: absolute; left: 4px; top: 3px; }
+.lane { position: relative; flex: none; height: 40px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar)); background-position: -1px 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+.lane.selected { border-color: var(--carrier); }
+.hblk { position: absolute; top: 3px; bottom: 3px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-top: 3px solid var(--modulator); border-radius: var(--r); padding: 2px 6px; font-family: var(--f-panel); display: flex; flex-direction: column; line-height: 1.15; overflow: hidden; }
+.hblk b { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.hblk small { font: 8.5px var(--f-num); color: var(--ink-faint); white-space: nowrap; }
+.hblk.selected { border-color: var(--carrier); box-shadow: 0 0 0 1px var(--carrier); }
+.hblk.narrow { padding: 0; }
+.btn { font: 600 12px var(--f-panel); color: var(--ink); background: var(--panel); border: 1px solid var(--line-bright); border-radius: var(--r); cursor: pointer; }
+.btn:disabled { opacity: .4; cursor: default; }
+.hadd { position: absolute; top: 6px; left: calc(100% + 6px); width: 26px; height: 26px; padding: 0; }
+.reg { position: absolute; top: 3px; bottom: 3px; display: flex; align-items: center; gap: 5px; padding: 0 6px; border-radius: var(--r); border: 1px solid var(--modulator); background-color: rgba(95, 168, 160, .2); color: var(--ink); font: 10px var(--f-panel); font-variant: small-caps; letter-spacing: .05em; white-space: nowrap; overflow: hidden; }
+.reg.narrow { padding: 0; }
+.reg.perc { border-color: var(--carrier); background-color: rgba(224, 164, 78, .17); }
+.reg.selected { box-shadow: 0 0 0 1px var(--carrier); border-color: var(--carrier); }
+.reg .gl { flex: none; font: 11px var(--f-ui); line-height: 1; color: var(--carrier); font-variant: normal; }
+
+/* ---------- new in this proposal ---------- */
+.hdl { position: absolute; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; background: var(--carrier); opacity: 0; pointer-events: none; }
+.hdl.s { left: 2px; }
+.hdl.e { right: 2px; }
+.hdl.faint { opacity: .45; }
+.hdl.on { opacity: 1; }
+.seam { position: absolute; top: -3px; bottom: -3px; width: 12px; margin-left: -7px; pointer-events: none; display: flex; justify-content: center; z-index: 2; }
+.seam i { width: 2px; background: var(--carrier); border-radius: 1px; box-shadow: 0 0 0 1px var(--well); }
+.seam b { position: absolute; top: 50%; left: 2px; width: 8px; height: 14px; margin-top: -7px; border-radius: 2px; background: linear-gradient(90deg, var(--carrier) 0 3px, var(--well) 3px 5px, var(--carrier) 5px); }
+.seam.faint { opacity: .45; }
+.reg.drawing { border-style: dashed; }
+.readout { position: absolute; top: -25px; transform: translateX(-50%); z-index: 6; pointer-events: none; white-space: nowrap; font: 10px var(--f-num); color: var(--ink); background: var(--well); border: 1px solid var(--carrier); border-radius: var(--r); padding: 2px 6px; }
+@media (prefers-reduced-motion: no-preference) { .hdl, .seam { transition: opacity .08s; } }
+</style>
+</head>
+<body>
+<div class="tb">
+  <div class="grp"><span class="lbl">Behaviour</span><button type="button" id="m-new">Proposed</button><button type="button" id="m-today">Today</button></div>
+  <div class="grp"><span class="lbl">Zoom</span><button type="button" data-z="40">S</button><button type="button" data-z="64">M</button><button type="button" data-z="96">L</button></div>
+  <div class="grp"><span class="lbl">Harmony</span><button type="button" id="h-one">One chord</button><button type="button" id="h-prog">Progression</button></div>
+  <div class="grp solo"><button type="button" id="b-del" class="stand-in" title="Stands in for the harmony card's Delete and the rail's Delete">Delete</button></div>
+  <div class="grp solo"><button type="button" id="b-undo" class="stand-in" title="Stands in for Cmd+Z">Undo</button></div>
+</div>
+
+<div class="stage"><div id="tl"></div></div>
+<div class="rules" id="rules"></div>
+
+<div class="notes">
+  <h2>Song region editing</h2>
+  <p>The Song tab's timeline: the harmony track and three part lanes, 16 bars of 4/4. <b>Proposed</b> is the change; <b>Today</b> is how it works on main, for comparison. Mouse and touch both work. <kbd>Alt</kbd>-click splits, and <kbd>Shift</kbd> while dragging snaps to the finer grid.</p>
+  <h3>Proposed</h3>
+  <ol>
+    <li><b>+ halves the selected chord</b>: the middle, rounded down to the song's bar lines, or to a beat line when no bar line leaves a beat on each side. With no chord selected it halves the rightmost chord, so on a new song the first + splits the song 50/50. The new half copies the chord and is selected, ready for the harmony card.</li>
+    <li><b>The line between two chords drags.</b> One chord grows and the other shrinks; nothing else moves. Today a drag on a chord's right edge pushes every later chord along, and the last chord takes the difference.</li>
+    <li><b>Chord boundaries snap to bars</b>, <kbd>Shift</kbd> for beats, as part regions do. A chord is at least a beat. <kbd>Alt</kbd>-click splits a chord where you click.</li>
+    <li><b>Edges show themselves.</b> Over an edge the cursor becomes a resize arrow and an amber bar lights on the edge you'll grab. The grab zone is 10 px, at most a third of the block (8 px and a quarter today). A selected block keeps its handles faintly lit, so a touch screen shows where to grab.</li>
+    <li><b>Where two part regions touch, the seam drags both.</b> Today that drag can only shrink one of them. Try Bass at bar 5 or Pad at bar 9.</li>
+    <li><b>A readout while dragging</b>: the start and end as bar.beat, and the length.</li>
+    <li><b>Drag across an empty stretch to draw a region</b> of that length. A click still makes one bar.</li>
+  </ol>
+  <h3>Decided (tacowars, 2026-10-03)</h3>
+  <p>Approved as drawn, layout Proposed. Record <code>2026-10-03-song-region-editing</code>.</p>
+  <ul>
+    <li>+ with no chord selected halves the rightmost chord.</li>
+    <li>The new half copies the chord, as + does today.</li>
+    <li>Part seams drag both regions by default, as drawn. No modifier.</li>
+    <li>The song's first and last bar fix the outer edges of the harmony track. Song length stays its own setting.</li>
+  </ul>
+  <h3>Stand-ins</h3>
+  <p>Delete and Undo in the toolbar (dashed) stand in for the harmony card's and the rail's Delete and for <kbd>Cmd</kbd>+<kbd>Z</kbd>, which also works here. Region labels are examples.</p>
+</div>
+
+<script>
+const BEAT = 24, BAR = 96, BARS = 16, END = BAR * BARS, STEP16 = 6;
+const KEY = [['A', 'I'], ['Bm', 'ii'], ['C♯m', 'iii'], ['D', 'IV'], ['E', 'V'], ['F♯m', 'vi']];
+const oneChord = () => [{ c: 0, a: 0, b: END }];
+const progression = () => {
+  const out = [];
+  for (const [c, bars] of [[0, 4], [5, 4], [3, 4], [4, 4]]) {
+    const a = out.length ? out[out.length - 1].b : 0;
+    out.push({ c, a, b: a + bars * BAR });
+  }
+  return out;
+};
+const parts = () => [
+  { name: 'Bass', kind: 'grid', lb: 'grid · 1/16', step: STEP16, perc: false, regions: [[0, 4], [4, 8], [10, 14]] },
+  { name: 'Pad', kind: 'chord', lb: 'chord · 1/4', step: BEAT, perc: false, regions: [[0, 8], [8, 16]] },
+  { name: 'Drums', kind: 'euclid', lb: 'euclid · 1/16', step: STEP16, perc: true, regions: [[2, 6], [8, 12]] },
+].map((p) => ({ ...p, regions: p.regions.map(([a, b]) => ({ a: a * BAR, b: b * BAR })) }));
+
+const S = { mode: 'new', ppb: 64, chords: oneChord(), parts: parts(), sel: null, hover: null, drag: null, undo: [] };
+const tl = document.getElementById('tl');
+
+const px = (t) => (t / BAR) * S.ppb;
+const tk = (x) => (x * BAR) / S.ppb;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const isNew = () => S.mode === 'new';
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function fmtPos(t) {
+  const bar = Math.floor(t / BAR) + 1, beat = Math.floor((t % BAR) / BEAT) + 1, st = Math.floor((t % BEAT) / STEP16);
+  return st ? `${bar}.${beat}.${st + 1}` : `${bar}.${beat}`;
+}
+function fmtLen(n) {
+  const bars = Math.floor(n / BAR), beats = Math.floor((n % BAR) / BEAT), st = Math.round((n % BEAT) / STEP16);
+  const out = [];
+  if (bars) out.push(`${bars} ${bars === 1 ? 'bar' : 'bars'}`);
+  if (beats) out.push(`${beats} ${beats === 1 ? 'beat' : 'beats'}`);
+  if (st) out.push(`${st} ${st === 1 ? 'step' : 'steps'}`);
+  return out.join(' ') || '0';
+}
+
+function snapshot() {
+  return JSON.stringify({ chords: S.chords, regions: S.parts.map((p) => p.regions), sel: S.sel });
+}
+function restore(json) {
+  const s = JSON.parse(json);
+  S.chords = s.chords;
+  s.regions.forEach((r, k) => { S.parts[k].regions = r; });
+  S.sel = s.sel;
+}
+
+/* ---------- hit testing ---------- */
+const edgeOf = (w) => (isNew() ? Math.min(10, w / 3) : Math.min(8, w / 4));
+// A seam's zone: 6 px each side, never more than a third of either block, so a short block keeps its body.
+const seamOf = (l, r) => Math.min(6, px(l.b - l.a) / 3, px(r.b - r.a) / 3);
+function hitPart(p, x) {
+  const R = p.regions;
+  if (isNew()) {
+    for (let i = 0; i < R.length - 1; i++) {
+      if (R[i].b === R[i + 1].a && Math.abs(x - px(R[i].b)) <= seamOf(R[i], R[i + 1])) return { t: 'seam', i };
+    }
+  }
+  for (let i = 0; i < R.length; i++) {
+    // The drawn block stops 2 px short of its end tick; that gutter still belongs to it.
+    const a = px(R[i].a), b = px(R[i].b), drawn = b - 2;
+    if (x >= a && x < b) {
+      const e = edgeOf(drawn - a);
+      if (x < a + e) return { t: 'start', i };
+      if (x >= drawn - e) return { t: 'end', i };
+      return { t: 'body', i };
+    }
+  }
+  return { t: 'gap' };
+}
+function hitHarm(x) {
+  const C = S.chords;
+  if (isNew()) {
+    for (let i = 0; i < C.length - 1; i++) if (Math.abs(x - px(C[i].b)) <= seamOf(C[i], C[i + 1])) return { t: 'seam', i };
+  }
+  for (let i = 0; i < C.length; i++) {
+    const a = px(C[i].a), b = px(C[i].b);
+    if (x >= a && x < b) {
+      if (!isNew() && i < C.length - 1 && x >= b - 2 - edgeOf(b - 2 - a)) return { t: 'end', i };
+      return { t: 'body', i };
+    }
+  }
+  return null;
+}
+function cursorFor(lane, hit, dragging) {
+  if (!hit) return '';
+  if (isNew()) {
+    if (hit.t === 'seam') return 'col-resize';
+    if (hit.t === 'start' || hit.t === 'end') return 'ew-resize';
+    if (lane === 'h') return 'pointer';
+    if (hit.t === 'body') return dragging ? 'grabbing' : 'grab';
+    return 'crosshair';
+  }
+  if (lane === 'h') return 'pointer';
+  return hit.t === 'gap' ? '' : 'grab';
+}
+function setCursor(c) {
+  tl.style.cursor = c;
+  document.documentElement.style.cursor = S.drag ? c : '';
+}
+
+/* ---------- drags ---------- */
+function dragPart(d, x, shift) {
+  const p = S.parts[d.lane];
+  const g = shift ? p.step : BAR;
+  const sn = (t) => Math.round(t / g) * g;
+  const R = d.orig.map((r) => ({ ...r }));
+  const n = R.length, i = d.hit.i;
+  let ro = null;
+  d.newSel = null;
+  if (d.hit.t === 'body') {
+    const r = R[i], len = r.b - r.a, lo = i > 0 ? R[i - 1].b : 0, hi = i < n - 1 ? R[i + 1].a : END;
+    r.a = clamp(sn(r.a + tk(x - d.x0)), lo, hi - len);
+    r.b = r.a + len;
+    ro = { x: px(r.a + len / 2), txt: `${fmtPos(r.a)} → ${fmtPos(r.b)} · ${fmtLen(len)}` };
+  } else if (d.hit.t === 'start') {
+    // A region shorter than the grid can grow on it but not shrink.
+    const r = R[i];
+    r.a = clamp(sn(tk(x)), i > 0 ? R[i - 1].b : 0, r.b - Math.min(g, r.b - r.a));
+    ro = { x: px(r.a), txt: `${fmtPos(r.a)} → ${fmtPos(r.b)} · ${fmtLen(r.b - r.a)}` };
+  } else if (d.hit.t === 'end') {
+    const r = R[i];
+    r.b = clamp(sn(tk(x)), r.a + Math.min(g, r.b - r.a), i < n - 1 ? R[i + 1].a : END);
+    ro = { x: px(r.b), txt: `${fmtPos(r.a)} → ${fmtPos(r.b)} · ${fmtLen(r.b - r.a)}` };
+  } else if (d.hit.t === 'seam') {
+    const L = R[i], Q = R[i + 1];
+    // Two regions too short to keep a whole grid step each roll on the part's step.
+    const gg = Q.b - L.a >= 2 * g ? g : p.step;
+    if (Q.b - L.a < 2 * gg) return;
+    const t = clamp(Math.round(tk(x) / gg) * gg, L.a + gg, Q.b - gg);
+    L.b = Q.a = t;
+    ro = { x: px(t), txt: `${fmtPos(t)} · ${fmtLen(L.b - L.a)} | ${fmtLen(Q.b - Q.a)}` };
+  } else if (d.hit.t === 'gap') {
+    if (!isNew()) return;
+    const t0 = tk(d.x0), t1 = clamp(tk(x), 0, END);
+    let lo = 0, hi = END;
+    for (const r of R) {
+      if (r.b <= t0) lo = Math.max(lo, r.b);
+      if (r.a >= t0) hi = Math.min(hi, r.a);
+    }
+    let a = Math.max(lo, Math.floor(Math.min(t0, t1) / g) * g);
+    let b = Math.min(hi, Math.ceil(Math.max(t0, t1) / g) * g);
+    if (b - a < g) b = Math.min(hi, a + g);
+    if (b <= a) return;
+    const drawn = { a, b, draw: true };
+    R.push(drawn);
+    R.sort((u, v) => u.a - v.a);
+    d.newSel = { lane: d.lane, i: R.indexOf(drawn) };
+    ro = { x: px((a + b) / 2), txt: `${fmtPos(a)} → ${fmtPos(b)} · ${fmtLen(b - a)}` };
+  }
+  p.regions = R;
+  d.readout = isNew() ? ro : null;
+}
+
+function dragHarm(d, x, shift) {
+  const C = d.orig.map((c) => ({ ...c }));
+  const i = d.hit.i;
+  if (d.hit.t === 'seam') {
+    const g = shift ? BEAT : BAR;
+    const L = C[i], Q = C[i + 1];
+    const t = clamp(Math.round(tk(x) / g) * g, L.a + BEAT, Q.b - BEAT);
+    L.b = Q.a = t;
+    S.chords = C;
+    d.readout = { x: px(t), txt: `${fmtPos(t)} · ${fmtLen(L.b - L.a)} | ${fmtLen(Q.b - Q.a)}` };
+  } else if (d.hit.t === 'end') {
+    // Today: the chord's length changes unsnapped, every later chord keeps its
+    // length and moves, and the last chord takes the difference. Until release
+    // only the dragged block redraws, so it overlaps the next.
+    const lens = C.map((c) => c.b - c.a);
+    const fixed = lens.slice(i + 1, -1).reduce((s, v) => s + v, 0);
+    const nl = clamp(lens[i] + Math.round(tk(x - d.x0)), BEAT, END - C[i].a - fixed - BEAT);
+    lens[i] = nl;
+    let a = 0;
+    const out = C.map((c, k) => {
+      const len = k === C.length - 1 ? END - a : lens[k];
+      const r = { c: c.c, a, b: a + len };
+      a += len;
+      return r;
+    });
+    d.preview = { i, end: C[i].a + nl, commit: out };
+  }
+}
+
+/* ---------- clicks ---------- */
+function click(d, shift) {
+  const x = d.x0;
+  if (d.lane === 'h') {
+    if (d.hit.t === 'seam') return;
+    const i = d.hit.i, C = S.chords, c = C[i];
+    if (d.alt && isNew()) {
+      const g = shift ? BEAT : BAR;
+      const t = Math.round(tk(x) / g) * g;
+      if (t - c.a >= BEAT && c.b - t >= BEAT) {
+        S.undo.push(d.before);
+        C.splice(i + 1, 0, { c: c.c, a: t, b: c.b });
+        c.b = t;
+        S.sel = { lane: 'h', i: i + 1 };
+        return;
+      }
+    }
+    S.sel = { lane: 'h', i };
+    return;
+  }
+  const p = S.parts[d.lane], R = p.regions;
+  if (d.hit.t === 'gap') {
+    const t = tk(x);
+    let lo = 0, hi = END;
+    for (const r of R) {
+      if (r.b <= t) lo = Math.max(lo, r.b);
+      if (r.a >= t) hi = Math.min(hi, r.a);
+    }
+    const a = Math.max(lo, Math.floor(t / BAR) * BAR), b = Math.min(hi, a + BAR);
+    if (b <= a) return;
+    S.undo.push(d.before);
+    R.push({ a, b });
+    R.sort((u, v) => u.a - v.a);
+    S.sel = { lane: d.lane, i: R.findIndex((r) => r.a === a) };
+    return;
+  }
+  if (d.hit.t === 'seam') return;
+  const i = d.hit.i;
+  if (d.alt) {
+    const g = shift ? p.step : BAR;
+    const t = Math.round(tk(x) / g) * g, r = R[i];
+    if (t > r.a && t < r.b) {
+      S.undo.push(d.before);
+      R.splice(i + 1, 0, { a: t, b: r.b });
+      r.b = t;
+      S.sel = { lane: d.lane, i: i + 1 };
+      return;
+    }
+  }
+  S.sel = { lane: d.lane, i };
+}
+
+/* ---------- + and the stand-ins ---------- */
+function plusInfo() {
+  const C = S.chords;
+  if (!isNew()) {
+    const last = C[C.length - 1], len = last.b - last.a;
+    const take = len > BAR ? BAR : Math.floor(len / 2 / BEAT) * BEAT;
+    return take >= BEAT ? { kind: 'append', take } : null;
+  }
+  const i = S.sel && S.sel.lane === 'h' ? S.sel.i : C.length - 1;
+  // The middle, rounded down to the song's bar lines; to a beat line when no
+  // bar line leaves a beat on each side.
+  const c = C[i], mid = (c.a + c.b) / 2;
+  for (const g of [BAR, BEAT]) {
+    const t = Math.floor(mid / g) * g;
+    if (t - c.a >= BEAT && c.b - t >= BEAT) return { kind: 'split', i, t };
+  }
+  return null;
+}
+function plus() {
+  const info = plusInfo();
+  if (!info) return;
+  S.undo.push(snapshot());
+  const C = S.chords;
+  if (info.kind === 'append') {
+    const last = C[C.length - 1], a = last.b - info.take;
+    last.b = a;
+    C.push({ c: last.c, a, b: END });
+    S.sel = { lane: 'h', i: C.length - 1 };
+  } else {
+    const c = C[info.i];
+    C.splice(info.i + 1, 0, { c: c.c, a: info.t, b: c.b });
+    c.b = info.t;
+    S.sel = { lane: 'h', i: info.i + 1 };
+  }
+  render();
+}
+function canDelete() {
+  return !!S.sel && (S.sel.lane !== 'h' || S.chords.length > 1);
+}
+function del() {
+  if (!canDelete()) return;
+  S.undo.push(snapshot());
+  const s = S.sel;
+  if (s.lane === 'h') {
+    const C = S.chords;
+    if (s.i > 0) C[s.i - 1].b = C[s.i].b;
+    else C[1].a = 0;
+    C.splice(s.i, 1);
+    S.sel = { lane: 'h', i: Math.max(0, s.i - 1) };
+  } else {
+    S.parts[s.lane].regions.splice(s.i, 1);
+    S.sel = null;
+  }
+  render();
+}
+function undo() {
+  const prev = S.undo.pop();
+  if (!prev) return;
+  restore(prev);
+  render();
+}
+
+/* ---------- drawing ---------- */
+const readout = (ro) => (ro ? `<div class="readout" style="left:${ro.x}px">${ro.txt}</div>` : '');
+function seamMarks(blocks, lane, sel, touching) {
+  if (!isNew()) return '';
+  const d = S.drag, hv = S.hover;
+  let out = '';
+  for (let i = 0; i < blocks.length - 1; i++) {
+    if (!touching(i)) continue;
+    const on = d ? d.lane === lane && d.hit.t === 'seam' && d.hit.i === i : !!hv && hv.lane === lane && hv.t === 'seam' && hv.i === i;
+    const faint = !on && (i === sel || i + 1 === sel);
+    if (on || faint) out += `<div class="seam${on ? '' : ' faint'}" style="left:${px(blocks[i].b)}px"><i></i><b></b></div>`;
+  }
+  return out;
+}
+function harmRow(W) {
+  const d = S.drag, C = S.chords;
+  const sel = S.sel && S.sel.lane === 'h' ? S.sel.i : -1;
+  const blocks = C.map((c, i) => {
+    const b = d && d.lane === 'h' && d.preview && d.preview.i === i ? d.preview.end : c.b;
+    const w = px(b - c.a) - 2;
+    const [nm, deg] = KEY[c.c];
+    return `<div class="hblk${w < 40 ? ' narrow' : ''}${i === sel ? ' selected' : ''}" style="left:${px(c.a)}px;width:${w}px${d && d.preview && d.preview.i === i ? ';z-index:3' : ''}"><b>${nm}</b><small>${deg} · ${fmtLen(b - c.a)}</small></div>`;
+  }).join('');
+  const seams = seamMarks(C, 'h', sel, () => true);
+  const ro = d && d.lane === 'h' ? readout(d.readout) : '';
+  const title = isNew() ? 'Split the selected chord at its middle bar' : 'Add a chord after the last one';
+  return `<div class="row"><div class="lane-name"><span class="nm"><b>Harmony</b><small>chords</small></span></div>` +
+    `<div class="lane${sel >= 0 ? ' selected' : ''}" data-lane="h" style="width:${W}px">${blocks}${seams}${ro}` +
+    `<button class="btn hadd" id="hadd" type="button" title="${title}" aria-label="${title}"${plusInfo() ? '' : ' disabled'}>+</button></div></div>`;
+}
+function partRow(p, k, W) {
+  const d = S.drag, hv = S.hover, R = p.regions;
+  const sel = S.sel && S.sel.lane === k ? S.sel.i : -1;
+  const active = (t, i) => (d ? d.lane === k && d.hit.t === t && d.hit.i === i : !!hv && hv.lane === k && hv.t === t && hv.i === i);
+  const blocks = R.map((r, i) => {
+    const w = px(r.b - r.a) - 2;
+    let handles = '';
+    if (isNew()) {
+      const lit = (t) => (active(t, i) ? ' on' : i === sel ? ' faint' : '');
+      handles = `<i class="hdl s${lit('start')}"></i><i class="hdl e${lit('end')}"></i>`;
+    }
+    return `<div class="reg${p.perc ? ' perc' : ''}${i === sel ? ' selected' : ''}${r.draw ? ' drawing' : ''}${w < 14 ? ' narrow' : ''}" style="left:${px(r.a)}px;width:${w}px"><span class="gl">⟲</span><span class="lb">${p.lb}</span>${handles}</div>`;
+  }).join('');
+  const seams = seamMarks(R, k, sel, (i) => R[i].b === R[i + 1].a);
+  const ro = d && d.lane === k ? readout(d.readout) : '';
+  return `<div class="row"><div class="lane-name"><span class="ptab">${k + 1}</span><span class="nm"><b>${p.name}</b><small>${p.kind}</small></span></div>` +
+    `<div class="lane${sel >= 0 ? ' selected' : ''}" data-lane="${k}" style="width:${W}px">${blocks}${seams}${ro}</div></div>`;
+}
+const RULES = {
+  new: '<b>Proposed.</b> Harmony: + halves the selected chord · drag the line between chords · Alt-click splits. Parts: drag an edge, a seam where two regions touch, or the body · drag in empty space to draw · Alt-click splits. Shift: the finer grid.',
+  today: '<b>Today.</b> Harmony: + takes a bar from the last chord · drag a chord\'s right edge and the later chords shift, the last one absorbing it. Parts: drag an edge (8 px, no cursor change) or the body · click empty space for one bar · Alt-click splits.',
+};
+function render() {
+  const W = px(END);
+  tl.style.setProperty('--bar', `${S.ppb}px`);
+  let h = `<div class="row"><div class="lane-name ruler-name"><small>bar</small></div><div class="ruler" style="width:${W}px">` +
+    Array.from({ length: BARS }, (_, k) => `<div class="ruler-bar" style="width:${S.ppb}px"><span>${k + 1}</span></div>`).join('') + '</div></div>';
+  h += harmRow(W);
+  S.parts.forEach((p, k) => { h += partRow(p, k, W); });
+  tl.innerHTML = h;
+  document.getElementById('m-new').classList.toggle('on', isNew());
+  document.getElementById('m-today').classList.toggle('on', !isNew());
+  document.querySelectorAll('[data-z]').forEach((b) => b.classList.toggle('on', +b.dataset.z === S.ppb));
+  document.getElementById('b-del').disabled = !canDelete();
+  document.getElementById('b-undo').disabled = !S.undo.length;
+  document.getElementById('rules').innerHTML = RULES[S.mode];
+}
+
+/* ---------- pointer ---------- */
+function laneAt(e) {
+  if (!e.target.closest || e.target.closest('button')) return null;
+  const el = e.target.closest('.lane');
+  if (!el) return null;
+  const lane = el.dataset.lane === 'h' ? 'h' : +el.dataset.lane;
+  const left = el.getBoundingClientRect().left;
+  const x = e.clientX - left;
+  const hit = lane === 'h' ? hitHarm(x) : hitPart(S.parts[lane], x);
+  return hit ? { lane, left, x, hit } : null;
+}
+function hover(e) {
+  const at = laneAt(e);
+  const h = at ? { lane: at.lane, ...at.hit } : null;
+  setCursor(at ? cursorFor(at.lane, at.hit, false) : '');
+  if (!same(h, S.hover)) { S.hover = h; render(); }
+}
+tl.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const at = laneAt(e);
+  if (!at) return;
+  const orig = at.lane === 'h' ? S.chords : S.parts[at.lane].regions;
+  S.drag = { lane: at.lane, hit: at.hit, x0: at.x, left: at.left, moved: false, alt: e.altKey, before: snapshot(), orig: orig.map((r) => ({ ...r })), readout: null, preview: null, newSel: null };
+  tl.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+tl.addEventListener('pointermove', (e) => {
+  const d = S.drag;
+  if (!d) { hover(e); return; }
+  const x = e.clientX - d.left;
+  if (!d.moved && Math.abs(x - d.x0) < 4) return;
+  d.moved = true;
+  if (d.lane === 'h') dragHarm(d, x, e.shiftKey);
+  else dragPart(d, x, e.shiftKey);
+  setCursor(cursorFor(d.lane, d.hit, true));
+  render();
+});
+tl.addEventListener('pointerup', (e) => {
+  const d = S.drag;
+  if (!d) return;
+  S.drag = null;
+  if (d.moved) {
+    if (d.lane === 'h' && d.preview) S.chords = d.preview.commit;
+    if (d.lane !== 'h') S.parts[d.lane].regions.forEach((r) => { delete r.draw; });
+    if (snapshot() !== d.before) {
+      S.undo.push(d.before);
+      if (d.newSel) S.sel = d.newSel;
+      else if (d.hit.t !== 'seam' && d.hit.t !== 'gap') S.sel = { lane: d.lane, i: d.hit.i };
+    } else if (d.hit.t !== 'seam' && d.hit.t !== 'gap') {
+      S.sel = { lane: d.lane, i: d.hit.i };
+    }
+  } else {
+    click(d, e.shiftKey);
+  }
+  S.hover = null;
+  setCursor('');
+  render();
+});
+tl.addEventListener('pointercancel', () => {
+  const d = S.drag;
+  if (!d) return;
+  if (d.lane === 'h') S.chords = d.orig;
+  else S.parts[d.lane].regions = d.orig;
+  S.drag = null;
+  setCursor('');
+  render();
+});
+tl.addEventListener('pointerleave', () => {
+  if (!S.drag && S.hover) { S.hover = null; setCursor(''); render(); }
+});
+tl.addEventListener('click', (e) => { if (e.target.closest('#hadd')) plus(); });
+
+/* ---------- toolbar ---------- */
+const setMode = (m) => { S.mode = m; S.hover = null; render(); };
+document.getElementById('m-new').onclick = () => setMode('new');
+document.getElementById('m-today').onclick = () => setMode('today');
+document.querySelectorAll('[data-z]').forEach((b) => { b.onclick = () => { S.ppb = +b.dataset.z; render(); }; });
+document.getElementById('h-one').onclick = () => { S.undo.push(snapshot()); S.chords = oneChord(); S.sel = null; render(); };
+document.getElementById('h-prog').onclick = () => { S.undo.push(snapshot()); S.chords = progression(); S.sel = null; render(); };
+document.getElementById('b-del').onclick = del;
+document.getElementById('b-undo').onclick = undo;
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+});
+render();
+</script>
+</body>
+</html>
