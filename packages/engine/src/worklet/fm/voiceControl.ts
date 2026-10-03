@@ -4,7 +4,8 @@
  * flags and per-note `Math.pow` results computed once per note (#548) and
  * each Noise operator's colour (windsor#362), and
  * `updateVoiceControl`, which advances every envelope and both LFOs by
- * CTRL_INTERVAL samples, glides the pitch, refreshes the drive stage
+ * the voice's control interval (`updateVoiceControlBlock` asks the voice for
+ * it, 32 or 128 samples: windsor#326), glides the pitch, refreshes the drive stage
  * (windsor#300) and the filter coefficients and sets the per-sample amplitude
  * ramps (`voiceAmpRamp.ts`, with each envelope segment end at its own sample:
  * windsor#301) and width ramps the render loops only add. Functions over the
@@ -37,6 +38,8 @@ import { WIDTH_RANGE } from './patchDefaults';
 import { updateOperatorAmp } from './voiceAmpRamp';
 import { updateVoiceDrive } from './voiceDrive';
 import { FORMANT_SHIFT_SLOT, updateVoiceFormant } from './voiceFormant';
+import type { ControlIntervalTable } from './voiceControlInterval';
+import { controlInterval } from './voiceControlInterval';
 import { applyVoiceOffsets } from './voiceOffsets';
 import {
   VT_CUTOFF,
@@ -185,22 +188,45 @@ function updateVoiceFilter(voice: Voice, n: number): void {
 }
 
 /**
- * Control-rate update: advance every envelope and both LFOs by CTRL_INTERVAL
- * samples, then set up per-sample amplitude ramps (`updateOperatorAmp`,
- * through each operator envelope's segment ends: windsor#301) and width ramps
- * so the audio loop only does adds. Also refreshes filter coefficients. LFO 2
- * (#55) reaches pitch, level, width and the filter through its own settings,
- * with LFO 1's wheel arithmetic.
+ * Control-rate update over `n` samples: the song's lanes onto the voice
+ * (`applyVoiceOffsets`), then `advanceVoiceControl`.
  */
 function updateVoiceControl(voice: Voice, n: number): void {
+  applyVoiceOffsets(voice);
+  advanceVoiceControl(voice, n);
+}
+
+/**
+ * A control boundary as the part runs it (windsor#326): the song's lanes
+ * onto the voice, the interval the voice's state asks for under `table`
+ * (`voiceControlInterval.ts`), and the update over that interval, which it
+ * returns, a small integer, for the part's `ctrlCount`. With the table's
+ * `long` equal to its `fine` this is `updateVoiceControl(voice,
+ * CTRL_INTERVAL)`, operation for operation.
+ */
+function updateVoiceControlBlock(voice: Voice, table: ControlIntervalTable): number {
+  applyVoiceOffsets(voice);
+  const n = controlInterval(voice, table);
+  advanceVoiceControl(voice, n);
+  return n;
+}
+
+/**
+ * The control-rate update once the lanes are on the voice: advance every
+ * envelope and both LFOs by `n` samples, then set up per-sample amplitude
+ * ramps (`updateOperatorAmp`, through each operator envelope's segment ends:
+ * windsor#301) and width ramps so the audio loop only does adds. Also
+ * refreshes filter coefficients. LFO 2 (#55) reaches pitch, level, width and
+ * the filter through its own settings, with LFO 1's wheel arithmetic.
+ */
+function advanceVoiceControl(voice: Voice, n: number): void {
   const patch = voice.patch!;
   const lfoP = patch.lfo;
   const lfo2P = patch.lfo2;
   const controls = voice.partControls;
   const bend = controls[PART_BEND];
-  // The values this block plays, with the song's lanes on them (windsor#346):
-  // without an offset, each is the voice's own exactly.
-  applyVoiceOffsets(voice);
+  // The values this block plays, the song's lanes on them by
+  // `applyVoiceOffsets` (windsor#346): without an offset, the voice's own.
   const live = voice.liveValues;
   // The part's wheel plus this note's accent (#602); adding 0 is exact.
   const modWheel = controls[PART_WHEEL] + voice.mod;
@@ -252,4 +278,5 @@ export {
   bindVoiceConstants,
   restingWidth,
   updateVoiceControl,
+  updateVoiceControlBlock,
 };

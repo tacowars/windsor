@@ -17,7 +17,8 @@
  * fader's ramp across a quantum (windsor#346), the frame-stamped event queue, the
  * note map, and `renderBlock`, which admits the notes posted since the last
  * quantum, reads each message as it takes it (windsor#270), and walks each
- * active voice up to the next event or control boundary. Which voice a note
+ * active voice up to the next event or control boundary, each voice's
+ * control interval its own (windsor#326). Which voice a note
  * takes is `voiceAllocation.ts`. Everything a voice does is
  * `voice.js` and the modules beside it; the patch schema and algorithm
  * tables are mirrored in ../../patch.ts (`patch.test.ts`, until #656).
@@ -26,13 +27,14 @@
 import type { NoteMessage, ProcessorOptions, WorkletMessage } from '../../synth/workletMessages';
 import type { WorkletPatch } from './patchNormalise';
 import { EventQueue } from './eventQueue';
-import { CTRL_INTERVAL } from './fmConstants';
 import { normalisePatch, num } from './patchNormalise';
 import { makeRandom } from './prng';
 import { LoadSampler } from '../loadSampler';
 import type { Voice } from './voice';
 import { allocateVoice } from './voiceAllocation';
 import { buildVoicePool } from './voiceSteal';
+import type { ControlIntervalOverrides, ControlIntervalTable } from './voiceControlInterval';
+import { controlIntervalTable } from './voiceControlInterval';
 import { PART_BEND, PART_CONTROL_COUNT, PART_WHEEL } from './voiceControl';
 import {
   VOICE_SLOT_COUNT,
@@ -44,10 +46,12 @@ import { VOICE_TARGET_COUNT } from './voiceTargetTables';
 import { WAVE } from './waveIds';
 import { getMips } from './waveTables';
 
-/** `processorOptions` as the part reads them: the contract's, plus the two harness-only switches (#547, #548). */
+/** `processorOptions` as the part reads them: the contract's, plus the harness-only switches (#547, #548, windsor#326). */
 interface FmProcessorOptions extends Partial<ProcessorOptions> {
   dormancy?: boolean;
   specialise?: boolean;
+  /** The control intervals' table over the shipped one (windsor#326): a test sets `long` to 32 to render as before. */
+  controlIntervals?: ControlIntervalOverrides;
 }
 
 /**
@@ -85,6 +89,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
   liveRetune: boolean;
   slideSeconds: number;
   dormancy: boolean;
+  intervals: ControlIntervalTable;
   load: LoadSampler;
 
   static get parameterDescriptors(): AudioParamDescriptor[] {
@@ -165,6 +170,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
     // generic loop, so a test can prove the two agree bit for bit.
     const specialise = opts.specialise !== false;
     for (let i = 0; i < this.voices.length; i++) this.voices[i].specialise = specialise;
+    // Each voice's control interval, 32 or 128 samples, chosen from its state
+    // at each control boundary (windsor#326); a test may set the table.
+    this.intervals = controlIntervalTable(opts.controlIntervals);
 
     // Audio-load sampler (#445, `../loadSampler.ts`), off until a `reportLoad`
     // message turns it on, so an offline render and the Node harness time
@@ -450,6 +458,7 @@ class FmPartProcessor extends AudioWorkletProcessor {
 
     const blockStart = currentFrame;
     const dormancy = this.dormancy;
+    const intervals = this.intervals;
     const q = this.events;
     let cursor = 0;
 
@@ -515,10 +524,9 @@ class FmPartProcessor extends AudioWorkletProcessor {
             v.age += seg - done;
             break;
           }
-          if (v.ctrlCount === 0) {
-            v.updateControl(CTRL_INTERVAL);
-            v.ctrlCount = CTRL_INTERVAL;
-          }
+          // Each voice's interval from its state (windsor#326): 32 while
+          // anything fast is happening, 128 while nothing is.
+          if (v.ctrlCount === 0) v.ctrlCount = v.updateControlBlock(intervals);
           const chunk = Math.min(seg - done, v.ctrlCount);
           v.render(outL, outR, cursor + done, chunk);
           v.ctrlCount -= chunk;
