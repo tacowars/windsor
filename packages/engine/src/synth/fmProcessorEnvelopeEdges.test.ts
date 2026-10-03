@@ -84,13 +84,23 @@ const firstAt = (xs: number[], level: number, from = 0): number =>
  * Trigger hits whose whole course fits inside one control block, so each
  * envelope has finished in the block's first `advanceExact` with its knots
  * still ahead (windsor#301): a flat start then a rise, a rising attack, and
- * a step attack, each releasing to 0 and to a held End level. Times are in
- * samples; every release ends past frame 5, the last event below.
+ * a step attack, each releasing to 0 and to a held End level. Then steps to
+ * full level whose release ends one sample before, on and one after the
+ * first control block's end (windsor#323): an end on the boundary is no knot
+ * of that block, and the render reaches it only at the block's last sample.
+ * Times are in samples.
  */
 const TRIGGER_SHAPES = [
   { attack: 10, peakLevel: 0, decay: 10, sustainLevel: 1, release: 10 },
   { attack: 4, peakLevel: 1, decay: 6, sustainLevel: 0.5, release: 12 },
   { attack: 0, peakLevel: 1, decay: 8, sustainLevel: 0.5, release: 14 },
+  ...[BLOCK - 1, BLOCK, BLOCK + 1].map((release) => ({
+    attack: 0,
+    peakLevel: 1,
+    decay: 0,
+    sustainLevel: 1,
+    release,
+  })),
 ];
 const TRIGGER_HITS = TRIGGER_SHAPES.flatMap((shape) =>
   [0, 0.4].map((endLevel) => ({
@@ -104,9 +114,14 @@ const TRIGGER_HITS = TRIGGER_SHAPES.flatMap((shape) =>
     loopMode: LOOP_MODE.TRIGGER,
   })),
 );
-/** The note-off's frames and the frames of a second event that only splits the render. */
+/**
+ * The note-off's frames, and the frames of a second event that only splits
+ * the render: before the first hits' knots, then after every hit's last
+ * knot, around the first control block's end and on to the quantum's last
+ * frame (windsor#323).
+ */
 const NOTE_OFF_FRAMES = [0, 1, 2, 3];
-const SPLIT_FRAMES = [1, 2, 3, 4, 5];
+const SPLIT_FRAMES = [1, 2, 3, 4, 5, 22, 23, 30, 31, BLOCK, BLOCK + 1, 2 * BLOCK, 127];
 
 /** Two quanta of a Trigger hit released at `off`, and also split at `split` when given. */
 function released(env: Partial<EnvelopeParams>, specialise: boolean, off: number, split?: number) {
@@ -228,10 +243,12 @@ describe('an operator envelope edge inside a control block (windsor#301)', () =>
     }
   });
 
-  it('renders a released Trigger hit the same when another event splits the block before its knots', () => {
+  it('renders a released Trigger hit the same wherever another event splits the quantum', () => {
     // Every reader of a voice's end state waits for the knots still ahead of
-    // the render (`heardStage`): a split render that ended or faded the hit
-    // there differs from the unsplit one. The kernel and the generic loop alike.
+    // the render (`heardStage`), and a held End level fades from the
+    // quantum's end (windsor#323): a split render that ended or faded the hit
+    // at the split differs from the unsplit one. The kernel and the generic
+    // loop alike.
     const cases = TRIGGER_HITS.flatMap((env) =>
       [true, false].flatMap((specialise) =>
         NOTE_OFF_FRAMES.map((off) => ({ env, specialise, off })),
@@ -242,11 +259,11 @@ describe('an operator envelope edge inside a control block (windsor#301)', () =>
       const whole = released(env, specialise, off);
       for (const split of SPLIT_FRAMES) {
         if (Buffer.compare(released(env, specialise, off, split), whole) === 0) continue;
-        const shape = `end ${env.endLevel} attack ${env.attackTime * SR}`;
+        const shape = `end ${env.endLevel} attack ${env.attackTime * SR} release ${env.releaseTime * SR}`;
         failures.push(`${shape} kernel ${specialise} off ${off} split ${split}`);
       }
     }
-    expect(cases).toHaveLength(48);
+    expect(cases).toHaveLength(96);
     expect(failures).toEqual([]);
   });
 
