@@ -64,6 +64,9 @@ const PURE_FILES = [
   // The arpeggiator (#706): the chord the gate hands it, voiced and walked.
   'arpeggiator.ts',
   'bassSequencer.ts',
+  // The Figure's config (windsor#484): its cells and processes, and its chord-tone rule.
+  'figureSequencer.ts',
+  '../harmony/figureTones.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',
   'regionGate.ts',

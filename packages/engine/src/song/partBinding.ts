@@ -40,6 +40,7 @@ import type { ScaleSampler } from '../sequencing/scaleSampler';
 import type { TickSource, Unsubscribe } from '../sequencing/scheduler';
 import {
   buildGenerator,
+  buildsNoGenerator,
   generatorSig,
   generatorStepAt,
   isPitched,
@@ -116,7 +117,7 @@ export class PartBinding {
   private active: Bound | null = null;
   private activeIndex: number | null = null;
 
-  /** The part's binding, or null for a `none` part. Builds and validates; subscribes nothing until `attach`. */
+  /** The part's binding, or null for a kind that builds no generator. Builds and validates; subscribes nothing until `attach`. */
   static create(
     source: TickSource,
     part: MusicPart,
@@ -124,7 +125,7 @@ export class PartBinding {
     sampler: ScaleSampler,
     output: PartOutput,
   ): PartBinding | null {
-    return part.sequencer.kind === 'none'
+    return buildsNoGenerator(part.sequencer.kind)
       ? null
       : new PartBinding(source, part, config, sampler, output);
   }

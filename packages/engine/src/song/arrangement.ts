@@ -11,7 +11,7 @@
  * Since #597 a song is a list of 1 to `MUSIC_PARTS_MAX` parts, each identified
  * by its `slot` (0 to `MUSIC_SLOT_MAX`) and carrying any sequencer: a
  * Euclidean fixed-note trigger, the written grid (#602), the Chord Player (#606), the arpeggiator and bass
- * (#706, #707), or `none` — an inert part the keyboard can still play but
+ * (#706, #707), the Figure (windsor#484), or `none` — an inert part the keyboard can still play but
  * nothing sequences. A part's name is a label and keys nothing (record
  * `2026-09-17-music-parts-are-a-slot-list-with-a-sequencer-kind`).
  *
@@ -27,6 +27,7 @@ import type { BassSequencerConfig } from '../sequencing/bassSequencer';
 import type { ChordSequencerConfig } from '../sequencing/chordSequencer';
 import type { EuclideanConfig } from '../sequencing/euclideanSequencer';
 import { EUCLID_ROW_KEYS } from '../sequencing/euclidLanes';
+import { FIGURE_OPTIONAL_KEYS, type FigureSequencerConfig } from '../sequencing/figureSequencer';
 import type { GridSequencerConfig } from '../sequencing/gridSequencer';
 import type { Harmony } from '../harmony/harmonyTimeline';
 import type { Meter } from '../sequencing/meterTables';
@@ -47,17 +48,33 @@ export type GridDriver = GridSequencerConfig;
 export type ChordDriver = ChordSequencerConfig;
 export type ArpDriver = ArpSequencerConfig;
 export type BassDriver = BassSequencerConfig;
+export type FigureDriver = FigureSequencerConfig;
 
 /**
  * What may drive a part (#597, #705). `none` is inert: allowed anywhere,
  * skipped by every sequencing path. `arp` and `bass` are normalised in full
- * here and performed by #706 / #707.
+ * here and performed by #706 / #707. `figure` (windsor#484) is normalised in
+ * full and builds no generator until its performer lands (windsor#485).
  */
-export const SEQUENCER_KINDS = ['none', 'euclidean', 'grid', 'chord', 'arp', 'bass'] as const;
+export const SEQUENCER_KINDS = [
+  'none',
+  'euclidean',
+  'grid',
+  'chord',
+  'arp',
+  'bass',
+  'figure',
+] as const;
 export type SequencerKind = (typeof SEQUENCER_KINDS)[number];
 
 /** The kinds that draw from a stream and so carry a `seed` (decision 16); the Chord Player draws nothing. */
-export const SEEDED_KINDS: readonly SequencerKind[] = ['euclidean', 'grid', 'arp', 'bass'];
+export const SEEDED_KINDS: readonly SequencerKind[] = [
+  'euclidean',
+  'grid',
+  'arp',
+  'bass',
+  'figure',
+];
 
 export interface NoSequencer {
   readonly kind: 'none';
@@ -79,8 +96,11 @@ export type ChordSpec = { readonly kind: 'chord' } & ChordDriver;
 export type ArpSpec = { readonly kind: 'arp' } & ArpDriver;
 /** The bass (#707): root, chord tone or fixed degree per step. */
 export type BassSpec = { readonly kind: 'bass' } & BassDriver;
+/** The Figure (windsor#484): a written line of chord-tone cells with a schedule, a drift and a source. */
+export type FigureSpec = { readonly kind: 'figure' } & FigureDriver;
 
-export type SequencerSpec = NoSequencer | EuclideanSpec | GridSpec | ChordSpec | ArpSpec | BassSpec;
+export type SequencerSpec =
+  NoSequencer | EuclideanSpec | GridSpec | ChordSpec | ArpSpec | BassSpec | FigureSpec;
 
 /** `Omit` applied to each member of a union, so the kind still discriminates. */
 type WithoutSeed<S> = S extends unknown ? Omit<S, 'seed'> : never;
@@ -219,12 +239,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 /**
  * A key the current object may lack and a partial still reaches: a Euclid
- * sequencer's optional rows (windsor#355). A normalised song omits a row it
+ * sequencer's optional rows (windsor#355) and a Figure's schedule, drift and
+ * source (windsor#484). A normalised song omits a row it
  * does not use, so the first lane or ratchet a live edit draws arrives here
  * with nothing to merge into; the player's validation still judges it.
  */
 const OPTIONAL_KEYS: ReadonlyMap<unknown, ReadonlySet<string>> = new Map([
   ['euclidean', new Set<string>(EUCLID_ROW_KEYS)],
+  ['figure', new Set<string>(FIGURE_OPTIONAL_KEYS)],
 ]);
 
 const reaches = (current: Record<string, unknown>, key: string): boolean =>

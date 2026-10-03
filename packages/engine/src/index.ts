@@ -32,6 +32,8 @@ export type {
   ArpSpec,
   BassDriver,
   BassSpec,
+  FigureDriver,
+  FigureSpec,
   Transport,
   ArrangementPartial,
   DeepPartial,
@@ -245,6 +247,10 @@ export {
   HARMONY_DEGREE_MAX,
   ARP_OCTAVES_MAX,
   ARP_OCTAVES_MIN,
+  FIGURE_DRIFT_STEPS_MAX,
+  FIGURE_SCHEDULE_BARS_MAX,
+  FIGURE_TONE_MAX,
+  FIGURE_TRANSPOSE_MAX,
 } from './audioConstants';
 export type {
   ApplyResult,
@@ -476,6 +482,22 @@ export type {
   BassSequencerConfig,
   BassStep,
 } from './sequencing/bassSequencer';
+// The Figure (windsor#484): its config, defaults and check, and the chord-tone rule its cells label with.
+export {
+  DEFAULT_FIGURE_CONFIG,
+  assertFigureConfig,
+  defaultFigureCells,
+  figureNoteCell,
+} from './sequencing/figureSequencer';
+export type {
+  FigureCell,
+  FigureDrift,
+  FigureNoteCell,
+  FigureSequencerConfig,
+  FigureSource,
+  FigureStage,
+} from './sequencing/figureSequencer';
+export { figureNote } from './harmony/figureTones';
 export { songTicksOf } from './song/songClock';
 export { defaultHarmonyEvents } from './song/timelineNormalise';
 export type { Rng } from './sequencing/generatorSeed';

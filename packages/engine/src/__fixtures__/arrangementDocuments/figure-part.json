@@ -1,0 +1,155 @@
+{
+  "transport": {
+    "bpm": 120,
+    "bars": 4
+  },
+  "harmony": {
+    "root": 0,
+    "scale": "major"
+  },
+  "patches": {
+    "init-0": {}
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Figure",
+      "preset": "init-0",
+      "velocity": 0.8,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "figure",
+        "divisor": 6,
+        "cells": [
+          {
+            "kind": "note",
+            "tone": 0,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 2,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 0,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 2,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 0,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 2,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 0,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 2,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          }
+        ],
+        "length": 16,
+        "gate": 0.5,
+        "register": {
+          "octave": 4
+        },
+        "skipChance": 0,
+        "accentVelocity": 0.2,
+        "accentMod": 1,
+        "lanes": [],
+        "seed": 0
+      }
+    }
+  ]
+}
