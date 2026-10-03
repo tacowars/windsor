@@ -3465,81 +3465,179 @@ body.chord-dragging {
   padding: var(--pad-top) var(--pad-x) 16px;
   scrollbar-width: thin;
 }
+/* The lanes (windsor#534): a stack of row groups, each a block of the one
+   frozen column beside its rows of timeline. songLaneColumn.ts sets the
+   column's sizes (--tab, --fold, --lead, --mixer, --frozen, the gaps and
+   the row heights) from songViewTables.ts. */
 .lanes {
-  --row-gap: 4px;
   position: relative;
-  display: grid;
-  grid-template-columns: var(--names) var(--mixer) calc(var(--bars) * var(--bar));
-  gap: var(--row-gap) var(--gap);
-  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--row-gap);
   width: max-content;
 }
-/* The frozen columns (windsor#157): the names and the mixer stay put while
-   the timeline scrolls under them, over the loop lines (z 1) and the
-   playhead (z 2) and under the detail pane (z 4). Each cell is opaque, and
-   its shadows fill the gaps beside and below it, which a line or a region
-   passing under would otherwise show through. An outer shadow never covers
-   its own cell, and the next row's cells paint over the one below them. */
-.lanes > .lane-name,
-.lanes > .mix-cell {
-  position: sticky;
-  z-index: 3;
-  background: var(--ground);
+.lane-group {
+  display: flex;
+  gap: var(--gap);
+  align-items: stretch;
 }
-.lanes > .lane-name {
+.lane-timeline {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--row-gap);
+  width: calc(var(--bars) * var(--bar));
+}
+/* The frozen column (windsor#157, windsor#534): each block stays put while
+   the timeline scrolls under it, over the loop lines (z 1) and the playhead
+   (z 2) and under the detail pane (z 4). Each block is opaque, and its
+   shadows fill the scroll's padding left of it, the gap after it and the
+   gap below it, which a line or a region passing under would otherwise
+   show through. An outer shadow never covers its own block, and the next
+   group's block paints over the one above it. Square: a shadow follows the
+   corners, and a rounded one leaves a gap. */
+.lane-frozen {
+  position: sticky;
   left: 0;
-  /* Square, selected or not: a shadow follows the corners, and a rounded one leaves a gap. */
+  z-index: 3;
+  flex: none;
+  width: var(--frozen);
   border-radius: 0;
+  background: var(--ground);
   box-shadow:
     calc(-1 * var(--pad-x)) 0 0 var(--ground),
+    var(--gap) 0 0 var(--ground),
     calc(-1 * var(--pad-x)) var(--row-gap) 0 var(--ground),
+    var(--gap) var(--row-gap) 0 var(--ground),
     0 var(--row-gap) 0 var(--ground);
 }
-.lanes > .mix-cell {
-  left: calc(var(--names) + var(--gap));
-  box-shadow:
-    calc(-1 * var(--gap)) 0 0 var(--ground),
-    var(--gap) 0 0 var(--ground),
-    calc(-1 * var(--gap)) var(--row-gap) 0 var(--ground),
-    0 var(--row-gap) 0 var(--ground),
-    var(--gap) var(--row-gap) 0 var(--ground);
+.lane-frozen.lane-name {
+  border-radius: 0;
+  cursor: default;
 }
-/* Above the header row, the scroll's top padding: the playhead's label
-   reaches up into it, so the frozen columns cover it there too. */
-.lanes > .ruler-name:first-child::before,
-.lanes > .mix-head::before {
+/* The head: the mixer's header (22 px, the ruler's height) over "loop"
+   (12 px, the loop strip's). */
+.lane-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--row-gap);
+}
+.lane-head > .ruler-name {
+  height: 12px;
+}
+.lanes .ruler-name {
+  padding: 0 4px;
+  white-space: nowrap;
+}
+/* Above the head, the scroll's top padding: the playhead's label reaches
+   up into it, so the column covers it there too. */
+.lane-head::before {
   content: '';
   position: absolute;
   bottom: 100%;
+  left: calc(-1 * var(--pad-x));
+  right: calc(-1 * var(--gap));
   height: var(--pad-top);
   background: var(--ground);
 }
-.lanes > .ruler-name:first-child::before {
-  left: calc(-1 * var(--pad-x));
-  right: 0;
+/* A part's block (windsor#534 decisions 2 and 8): the number tab down every
+   row, then the part's row, its open lanes' labels and its add row. */
+.lane-col {
+  display: grid;
+  grid-template-columns: var(--tab) minmax(0, 1fr);
+  align-content: start;
+  column-gap: var(--tab-gap);
+  row-gap: var(--row-gap);
 }
-.lanes > .mix-head::before {
-  left: calc(-1 * var(--gap));
-  right: calc(-1 * var(--gap));
+.lane-col > :not(.lane-tab) {
+  grid-column: 2;
+}
+/* The selected part: one outline around its row, its open lanes and its add row. */
+.lane-col.selected {
+  outline: 1px solid var(--carrier);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.lane-col.selected .lane-part {
+  background: var(--panel-hi);
+}
+/* The number tab: the part's colour behind its number on the part's row,
+   and a tint of it down the open lanes, so they read as one block. */
+.lane-tab {
+  grid-column: 1;
+  display: flex;
+  justify-content: center;
+  border-radius: 2px;
+  background: linear-gradient(
+    var(--pc) 0 var(--lane-h),
+    color-mix(in srgb, var(--pc) 15%, var(--ground)) var(--lane-h)
+  );
+  cursor: pointer;
+}
+.lane-tab b {
+  font-family: var(--f-num);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: var(--lane-h);
+  color: #14181a;
+}
+/* A part's row: ▸ over the lane badge, then its mixer strip. */
+.lane-part {
+  display: grid;
+  grid-template-columns: var(--fold) minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--fold-gap);
+  height: var(--lane-h);
+  padding: 0 var(--row-pad);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.lane-fold {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
 }
 /* A part's collapsed strip: the compact Level knob and its value, M and S
-   on one line, sized for a 40 px row. */
+   and the lights on one line, sized for a 40 px row. */
 .mix-cell {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  padding: 0 2px;
+  min-width: 0;
 }
-.mix-cell.mix-head {
-  justify-content: flex-start;
-  gap: 6px;
+/* The header: the arrow and "Mixer" over the number tabs and ▸, then over
+   the strips their column labels (expanded) and the ruler's "bar · beat". */
+.mix-head {
+  display: grid;
+  grid-template-columns: var(--lead) minmax(0, 1fr);
+  align-items: center;
+  height: 22px;
+  padding-right: var(--row-pad);
   font-family: var(--f-panel);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-dim);
+}
+.mix-lead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: var(--row-pad);
+}
+.mix-labels {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.mix-labels.expanded > .ruler-name {
+  grid-column: span 2;
 }
 /* The arrow that expands every strip (windsor#158), first in the header;
    it keeps its place in both states, so a second press lands on it. */
@@ -3561,18 +3659,16 @@ body.chord-dragging {
   color: var(--ink);
   border-color: var(--line);
 }
-/* Expanded, the header and every part cell share one grid: the arrow's
-   gutter, a column a knob (--mix-knobs, split evenly), Output, then M and
-   S. The column's width is songViewTables.ts's mixerColumnPx, whose base
-   is the fixed tracks, the gaps and the padding here. */
+/* Expanded, the header's labels and every part's strip share one grid: a
+   column a knob (--mix-knobs, split evenly), Output, M and S, then the
+   lights. The strip's width is songViewTables.ts's mixerColumnPx, whose
+   base is the fixed tracks and the gaps here. */
+.mix-labels.expanded,
 .mix-cell.expanded {
   display: grid;
-  grid-template-columns: 22px repeat(var(--mix-knobs), minmax(0, 1fr)) 84px 47px 12px;
+  grid-template-columns: repeat(var(--mix-knobs), minmax(0, 1fr)) 84px 47px 12px;
   column-gap: 4px;
   justify-content: stretch;
-}
-.mix-cell.expanded:not(.mix-head) > :first-child {
-  grid-column-start: 2;
 }
 .mix-cell.expanded .knob.compact {
   justify-self: start;
@@ -3675,25 +3771,11 @@ select.field.compact {
   color: var(--ink-faint);
   letter-spacing: 0.04em;
 }
-.lane-name .tri {
-  flex: none;
-  width: 9px;
-  font-size: 9px;
-  line-height: 1;
-  color: var(--ink-faint);
-}
 .lane-name .nm {
   display: flex;
   flex-direction: column;
   min-width: 0;
   line-height: 1.15;
-}
-.lane-name.selected {
-  border-color: var(--carrier);
-  background: var(--panel-hi);
-}
-.lane-name.selected .tri {
-  color: var(--carrier);
 }
 .lane-name.ruler-name {
   justify-content: flex-end;
@@ -4182,33 +4264,33 @@ select.field.compact {
 
 /* ---------- the automation lanes (windsor#348): folded out under a part ---------- */
 
-/* The fold: a button now, where the ▸ span was. Its box is twice the
-   glyph's and pulled back by its margins, so the name stays put. The panel
-   face draws ▸ and ▾ as the same dot, so the fold uses the system face. */
-.lane-name button.tri {
+/* The fold, at the top of a part's row with the lane count under it. The
+   panel face draws ▸ and ▾ as the same dot, so the fold uses the system face. */
+.lane-fold button.tri {
+  flex: none;
   width: 17px;
   height: 18px;
-  margin: 0 -4px;
   padding: 0;
   font-family: system-ui, sans-serif;
   font-size: 10px;
+  line-height: 1;
+  color: var(--ink-faint);
   border: 1px solid transparent;
   border-radius: var(--r);
   background: none;
   cursor: pointer;
 }
-.lane-name button.tri:hover,
-.lane-name button.tri:focus-visible {
+.lane-fold button.tri:hover,
+.lane-fold button.tri:focus-visible {
   border-color: var(--line-bright);
   color: var(--ink);
 }
-.lane-name button.tri[aria-expanded='true'] {
+.lane-fold button.tri[aria-expanded='true'] {
   color: var(--carrier);
 }
-/* A folded part's lane count, at the cell's right. */
-.lane-name .auto-badge {
+/* A folded part's lane count. */
+.lane-fold .auto-badge {
   flex: none;
-  margin-left: auto;
   padding: 0 5px;
   border: 1px solid rgba(224, 164, 78, 0.45);
   border-radius: 8px;
@@ -4218,44 +4300,56 @@ select.field.compact {
   color: var(--carrier);
   white-space: nowrap;
 }
-.lane-name.has-badge .nm b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* A lane's rows take their colour from --lane-c (songAutomationTables.ts):
-   the mixer teal, the inserts violet, the voice amber. */
-.lanes > .auto-name,
-.lanes > .auto-add {
-  cursor: default;
-}
-.auto-name {
-  gap: 4px;
-  padding-left: 8px;
+/* A lane's label (windsor#534 decision 3): its chip, its name over its
+   kind, and beside them its value over ● and ×. Its colour is --lane-c
+   (songAutomationTables.ts): the mixer teal, the inserts violet, the voice
+   amber. */
+.lane-auto {
+  display: grid;
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  height: var(--auto-lane-h);
+  padding: 0 var(--row-pad) 0 4px;
 }
 .auto-chip {
-  flex: none;
   align-self: stretch;
   width: 3px;
-  margin: 8px 2px;
+  margin: 8px 0;
   border-radius: 2px;
   background: var(--lane-c);
 }
-.auto-name b,
-.auto-name small {
+.lane-auto .nm {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+  font-family: var(--f-panel);
+}
+.lane-auto .nm b,
+.lane-auto .nm small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.auto-name b {
-  font-size: 11px;
-}
-.auto-name small {
   text-transform: uppercase;
 }
-.mix-cell.auto-mix {
-  gap: 4px;
-  padding: 0 4px;
+.lane-auto .nm b {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.lane-auto .nm small {
+  font-family: var(--f-num);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+.auto-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  min-width: 0;
 }
 .auto-value {
   min-width: 0;
@@ -4267,7 +4361,7 @@ select.field.compact {
   font-variant-numeric: tabular-nums;
   color: var(--lane-c);
 }
-.auto-mix.off .auto-value {
+.lane-auto.off .auto-value {
   color: var(--ink-faint);
 }
 .auto-buttons {
@@ -4354,22 +4448,27 @@ select.field.compact {
 .auto-lane.off svg {
   opacity: 0.32;
 }
-/* The "+ Add lane" row: the picker, the voice count, an empty timeline. */
-.auto-add {
-  padding-left: 8px;
+/* The "+ Add lane" row: the picker and the voice count side by side, over
+   an empty timeline. */
+.lane-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--auto-add-h);
+  padding: 0 var(--row-pad) 0 4px;
 }
 select.field.auto-picker {
-  width: 100%;
+  flex: none;
+  width: 104px;
   min-width: 0;
   height: 22px;
   padding: 0 4px;
   font-size: 11px;
 }
-.mix-cell.auto-count {
-  justify-content: flex-start;
-  padding: 0 4px;
+.auto-count {
   font-family: var(--f-num);
   font-size: 9px;
+  white-space: nowrap;
   color: var(--ink-faint);
 }
 .auto-add-lane {
