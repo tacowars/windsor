@@ -10,7 +10,7 @@
  * This file is the field set, its defaults, the check every constructor
  * and live edit runs, and the performer (windsor#485); the normaliser is
  * `song/figureNormalise.ts`. The schedule and the drift (windsor#486) are
- * `figureLine.ts`; the canon source arrives with windsor#487.
+ * `figureLine.ts`.
  *
  * **The performer.** `FigureSequencer` hears its region gate at every local
  * tick and plays one cell per `divisor` ticks: `cellAt(step)`, the cell the
@@ -38,6 +38,21 @@
  * cell, before the roll, from the part's stream per region
  * (`hashSeed(seed, regionIndex)`). A skipped cell, a cell at velocity 0 and
  * a dropped note are rests that still advance the stream.
+ *
+ * **The canon** (windsor#487). With a `source`, the part plays its leader's
+ * resolved cell at `step − offset`: the leader's `cellAt` over the leader's
+ * own cells, so a chain resolves one level and a negative step reads the
+ * line cyclically. The step is the follower's own, counted from its own
+ * region's entry; the leader's clock and regions play no part. The
+ * follower's `cells`, `length`, `schedule` and `drift` are ignored; its
+ * divisor, gate, register, `skipChance` and stream are its own. The note is
+ * the leader's cell over the chord at the follower's onset, at the
+ * follower's register, plus `transpose` semitones. The leader is found at
+ * every onset by slot through the player's resolver (`figureOf`), so a
+ * leader's live edit is heard on the next step, and a slot that holds no
+ * Figure (an empty slot, a kind changed live) plays a rest: the follower
+ * goes silent at once, as the next normalise will make it. `stepAt` is the
+ * leader's cell the follower plays, -1 with no leader.
  */
 import {
   ACCENT_MOD_DEFAULT,
@@ -135,6 +150,11 @@ export interface FigureSequencerConfig {
   /** The canon source; absent plays the part's own cells. */
   source?: FigureSource;
 }
+
+/** Finds the live Figure on a slot, which a canon reads at each onset; null when the slot holds none. */
+export type FigureResolver = (slot: number) => FigureSequencer | null;
+
+const NO_FIGURE: FigureResolver = () => null;
 
 /** The optional keys, which a live edit may add to a Figure that lacks them. */
 export const FIGURE_OPTIONAL_KEYS = ['schedule', 'drift', 'source'] as const;
@@ -260,21 +280,34 @@ export type FigurePitchSource = Pick<ScaleSampler, 'rootNote'>;
 /** A rest, a Figure cell and an Arp cell alike: what a skipped, silent or dropped note plays. */
 const REST = { kind: 'rest' } as const;
 
-/** The MIDI note `cell` names over `chord`, or null outside 0–`MIDI_NOTE_MAX` (dropped, not clamped). */
+/**
+ * The MIDI note `cell` names over `chord`, `transpose` semitones away (a
+ * canon's), or null outside 0–`MIDI_NOTE_MAX` (dropped, not clamped).
+ */
 export function figureCellNote(
   cell: FigureNoteCell,
   chord: HarmonyChord,
   rootNote: number,
+  transpose = 0,
 ): number | null {
   const tone = figureNote(chord.stack, cell.tone, rootNote);
   if (tone === null) return null;
-  const note = tone + SEMITONES_PER_OCTAVE * cell.octave;
+  const note = tone + SEMITONES_PER_OCTAVE * cell.octave + transpose;
   return note >= 0 && note <= MIDI_NOTE_MAX ? note : null;
 }
 
 /** Whether a note held into `cell` runs on to its onset: a tie or a slide. */
 const holdsInto = (cell: FigureCell | undefined): boolean =>
   cell?.kind === 'tie' || (cell?.kind === 'note' && cell.slide);
+
+/** The cell a step reads, and its index in the line it comes from: the part's own, or its leader's. */
+interface ReadCell {
+  readonly index: number;
+  readonly cell: FigureCell;
+}
+
+/** What a canon whose source slot holds no Figure reads: a rest, at no position. */
+const NO_CELL: ReadCell = { index: -1, cell: REST };
 
 /** A cell's velocity onto the note-on it struck, when it is not the full 1. */
 function markVelocity(outcome: ArpCellOutcome, velocity: number | undefined): void {
@@ -300,13 +333,22 @@ export class FigureSequencer {
   /** The last local tick heard since the entry; null before the first. Its bar is read in the current meter. */
   private heardTick: number | null = null;
 
-  constructor(pitch: FigurePitchSource, config: FigureSequencerConfig, barTicks = TICKS_PER_BAR) {
+  /** Where a canon finds its leader, by slot, at every onset. */
+  private readonly figureOf: FigureResolver;
+
+  constructor(
+    pitch: FigurePitchSource,
+    config: FigureSequencerConfig,
+    barTicks = TICKS_PER_BAR,
+    figureOf: FigureResolver = NO_FIGURE,
+  ) {
     assertFigureConfig(config);
     this.pitch = pitch;
     this.current = config;
     this.rng = streamRng(config.seed, 0);
     this.line = new FigureLine(config);
     this.barTicks = barTicks;
+    this.figureOf = figureOf;
   }
 
   get config(): FigureSequencerConfig {
@@ -346,15 +388,19 @@ export class FigureSequencer {
     this.barTicks = barTicks;
   }
 
-  /** The cell a local step (since the region entry) sounds, after the stage and the rotation. */
+  /** The cell a local step (since the region entry) sounds, after the stage and the rotation; a canon's is its leader's. */
   stepAt(localStep: number): number {
-    return this.cellAt(localStep);
+    return this.read(localStep).index;
   }
 
-  /** The written cell a local step resolves to, which a canon of this part reads (windsor#487). */
+  /**
+   * The written cell of this part's own line a local step resolves to,
+   * which a canon of this part reads (windsor#487). A negative step, a
+   * canon's before its offset is used up, reads the line the entry plays,
+   * cyclically: no stage or rotation runs before the entry.
+   */
   cellAt(localStep: number): number {
-    const bar = Math.floor((localStep * this.current.divisor) / this.barTicks);
-    return this.lineCell(localStep, bar);
+    return this.lineCell(localStep, Math.max(0, this.barOf(localStep)));
   }
 
   attach(source: PartTickSource): Unsubscribe {
@@ -381,9 +427,8 @@ export class FigureSequencer {
   }
 
   private onset(event: PartTickEvent, step: number): NoteEvent[] {
-    const { cells, skipChance } = this.current;
-    const index = this.lineCell(step, event.bar);
-    const written: FigureCell = cells[index] ?? REST;
+    const { skipChance } = this.current;
+    const { index, cell: written } = this.read(step, event.bar);
     // One draw per note cell, whatever it plays, so neither a rest nor the chord moves the stream.
     const skipped = written.kind === 'note' && skipChance > 0 && this.rng() < skipChance;
     const { chord } = event;
@@ -398,7 +443,7 @@ export class FigureSequencer {
         index,
         pitch,
         held: this.held,
-        holdsOn: holdsInto(cells[this.cellAt(step + 1)]),
+        holdsOn: holdsInto(this.read(step + 1).cell),
       },
       this.current,
     );
@@ -417,15 +462,40 @@ export class FigureSequencer {
     chord: HarmonyChord,
   ): { cell: ArpStep; pitch: number } {
     if (written.kind !== 'note') return { cell: written, pitch: 0 };
-    const root = this.pitch.rootNote(this.current.register.octave);
-    const note = skipped || written.velocity === 0 ? null : figureCellNote(written, chord, root);
+    const { register, source } = this.current;
+    const root = this.pitch.rootNote(register.octave);
+    const note =
+      skipped || written.velocity === 0
+        ? null
+        : figureCellNote(written, chord, root, source?.transpose);
     // The pitch carries the cell's octave already, so the Arp's rule shifts it by none.
     return note === null
       ? { cell: REST, pitch: 0 }
       : { cell: { ...written, octave: 0 }, pitch: note };
   }
 
-  /** The cell local `step` in local `bar` sounds. */
+  /**
+   * The cell local `step`, in local `bar`, reads: the part's own line's, or
+   * with a source its leader's at `step − offset`, the leader looked up now.
+   */
+  private read(step: number, bar = this.barOf(step)): ReadCell {
+    const { source, cells } = this.current;
+    if (!source) {
+      const index = this.lineCell(step, bar);
+      return { index, cell: cells[index] ?? REST };
+    }
+    const leader = this.figureOf(source.slot);
+    if (!leader) return NO_CELL;
+    const index = leader.cellAt(step - source.offset);
+    return { index, cell: leader.config.cells[index] ?? REST };
+  }
+
+  /** The local bar a local step's onset falls in, in the song's meter. */
+  private barOf(step: number): number {
+    return Math.floor((step * this.current.divisor) / this.barTicks);
+  }
+
+  /** The cell of the part's own line local `step` in local `bar` sounds. */
   private lineCell(step: number, bar: number): number {
     const { cells, length, divisor } = this.current;
     return this.line.cellAt(step, bar, {
