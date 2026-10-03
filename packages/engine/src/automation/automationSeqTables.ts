@@ -8,12 +8,10 @@
  * The Grid offers `skipChance` alone: it has no gate (a Grid note holds to
  * the next note or rest), so a gate lane would have nothing to move.
  */
+import { GATE_MIN } from '../audioConstants';
 import type { SequencerKind } from '../song/arrangement';
 import type { SeqField } from '../sequencing/regionGate';
 import type { AutomationTargetRow, SeqTargetId } from './automationLane';
-
-/** The shortest gate a lane reaches: the note's share of its step. */
-const SEQ_GATE_MIN = 0.05;
 
 /** The three sequencer rows, each a field the generators read on their onset. */
 export const SEQ_AUTOMATION_ROWS: readonly (AutomationTargetRow & {
@@ -24,7 +22,8 @@ export const SEQ_AUTOMATION_ROWS: readonly (AutomationTargetRow & {
     target: 'seq.gate',
     field: 'gate',
     label: 'Gate',
-    min: SEQ_GATE_MIN,
+    // The Gate knob's floor (windsor#514), so a lane reaches every value the knob does.
+    min: GATE_MIN,
     max: 1,
     scale: 'linear',
     unit: '',
