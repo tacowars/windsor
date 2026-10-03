@@ -55,7 +55,7 @@ import {
 const RULER_CLICK_EVENT = 'ruler-click';
 
 /**
- * The name-column cell and the ruler for `bars` bars of `meter` at
+ * The frozen column's "bar · beat" and the ruler for `bars` bars of `meter` at
  * `pxPerBar`: one `.ruler-bar` per bar, labelled (every n-th bar once the
  * bars are too narrow for every label), with a tick at each of the meter's
  * counted beats after the first (windsor#431) while every bar is labelled.
@@ -94,7 +94,7 @@ export function playheadLine(): HTMLElement {
 }
 
 /**
- * Put the line on `tick`, past the name and mixer columns, labelled in the
+ * Put the line on `tick`, past the frozen column, labelled in the
  * song's `meter` (windsor#431). Its px follow the lanes' `--bar`, one bar of
  * the meter (windsor#430), so a zoom moves the line with the regions even
  * while the transport stands still and the loop has no new tick to mark.
@@ -126,7 +126,7 @@ export interface RulerZoom {
   repaint(): void;
 }
 
-/** What the scroll clamps against, measured at the press: the content besides the bars is padding, names, gap and the `+` tile. */
+/** What the scroll clamps against, measured at the press: the content besides the bars is padding, the frozen column, its gap and the `+` tile. */
 function measureBounds(zoom: RulerZoom, pxPerBar: number): ZoomBounds {
   const style = getComputedStyle(zoom.scroll);
   const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
