@@ -12,7 +12,10 @@
  * `paintStrip` and the one playhead loop, the lanes of `stepModLane.ts`
  * through a `LaneHost`, and the region playhead (`regionPlayhead.ts`), the
  * engine's `regionStepAt`: the cell sounding after the schedule and the
- * drift, or for a canon its leader's cell. Every edit writes the selected
+ * drift, or for a canon its leader's cell. The stage and rotation in play
+ * are the same step's (`RegionStep.stage` and `rotation`, windsor#508): a
+ * canon's are its leader's as the engine reads them, and the ghost's while
+ * the song is outside the region or stopped. Every edit writes the selected
  * region's pattern (`changePattern`).
  *
  * A tone reads over the chord under the playhead (`chordRegionChord.ts`),
@@ -23,13 +26,13 @@
  * the card's own per-frame paint (`onFrame`) in the same loop.
  */
 import type { FigureCell, FigureSpec } from '@windsor/engine';
-import { STEP_MOD_LANES_MAX, partAt, songTicksOf, ticksPerBar } from '@windsor/engine';
+import { STEP_MOD_LANES_MAX } from '@windsor/engine';
 import { regionChord } from './chordRegionChord';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import { figureColumn } from './figureCells';
 import { FIGURE_SUMMARY_STACK } from './figureConstants';
-import { leaderOf, regionBar, stageIndexAt } from './figureProcessModel';
+import { leaderOf } from './figureProcessModel';
 import { withStep } from './gridModel';
 import { groupColumns } from './meterGrid';
 import { changePattern } from './partEdits';
@@ -56,10 +59,10 @@ export interface FigureView {
   readonly stack: readonly number[];
   /** The chord, or null with none. */
   readonly chord: ReturnType<typeof regionChord>;
-  /** The region's local bar while the song is in it, else null. */
-  readonly bar: number | null;
-  /** The stage in play on the drawn line, -1 with no schedule. */
+  /** The stage in play on the drawn line, the engine's, -1 with no schedule. */
   readonly stage: number;
+  /** The rotation the engine plays the drawn line under; 0 with no region named. */
+  readonly rotation: number;
 }
 
 /** The Figure's strip and what it last drew. */
@@ -83,24 +86,17 @@ export function figureView(ctx: AppCtx, slot: number, region: number | undefined
   const lead = own?.source ? leaderOf(ctx.model.doc, own.source) : null;
   const line = own?.source ? (lead?.spec ?? null) : own;
   const chord = regionChord(ctx, slot, region);
-  const doc = ctx.model.doc;
-  const bar = ctx.transport.running
-    ? regionBar({
-        regions: partAt(doc, slot)?.regions ?? [],
-        songTicks: songTicksOf(doc),
-        tick: ctx.transport.position(),
-        region,
-        barTicks: ticksPerBar(doc.transport.meter),
-      })
-    : null;
+  // The engine's step, live or the ghost, at the transport's tick, running or not.
+  const at =
+    region === undefined ? null : ctx.host.regionStepAt(slot, region, ctx.transport.position());
   return {
     line,
     borrowed: own?.source !== undefined,
     leader: lead?.name ?? null,
     stack: chord?.stack ?? FIGURE_SUMMARY_STACK,
     chord,
-    bar,
-    stage: line?.schedule?.length ? Math.max(0, stageIndexAt(line.schedule, bar ?? 0)) : -1,
+    stage: line?.schedule?.length ? Math.max(0, at?.stage ?? 0) : -1,
+    rotation: at?.rotation ?? 0,
   };
 }
 

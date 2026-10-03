@@ -23,7 +23,7 @@ import type { AppCtx } from './context';
 import { el } from './dom';
 import { figureControls } from './figureControls';
 import { type FigureView, figureGrid } from './figureGrid';
-import { driftRotation, figureSummary } from './figureProcessModel';
+import { figureSummary } from './figureProcessModel';
 import { figureProcessPage } from './figureProcessPage';
 import type { DeviceBody } from './sequencerDevice';
 import { specOf } from './stepStrip';
@@ -88,7 +88,7 @@ function summaryOf(
     stages: line?.schedule,
     stage: view.stage,
     drift: line?.drift,
-    rotation: driftRotation(line?.drift, view.bar ?? 0),
+    rotation: view.rotation,
     source: own?.source,
     leader: view.leader,
   });
