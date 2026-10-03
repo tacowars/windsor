@@ -26,7 +26,7 @@ import { PRESETS } from '@windsor/engine/patch/presets';
 import { partChange } from './context';
 import { deepEqual, documentDiff, documentDiffLive } from './documentDiff';
 import { mergeDocument } from './documentModel';
-import { appendEvent } from './harmonyLaneModel';
+import { halveEvent } from './harmonyLaneEdits';
 import { addPartChange, sequencerKindChange } from './partEdits';
 import { followSongLength } from './regionModel';
 import { newSong } from './songParts';
@@ -144,7 +144,7 @@ const PAIRS: ReadonlyArray<readonly [string, ArrangementDocument, ArrangementDoc
   [
     'a harmony edit',
     FULL,
-    after(FULL, { harmony: { events: appendEvent(FULL.harmony.events, 4 * TICKS_PER_BAR) } }),
+    after(FULL, { harmony: { events: halveEvent(FULL.harmony.events, 0)?.events ?? [] } }),
   ],
   ['a key and a scale', FULL, after(FULL, { harmony: { root: 7, scale: [0, 3, 7] } })],
   [

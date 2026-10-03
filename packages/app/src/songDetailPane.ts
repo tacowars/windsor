@@ -164,7 +164,7 @@ function paintSelection(pane: HTMLElement, view: SongView): Painted {
       'p',
       'hint',
       'Select a region to edit its part, or a chord to edit the harmony. ' +
-        'Click an empty stretch of a lane to add a region; + after the last chord appends one.',
+        'Click an empty stretch of a lane to add a region; + halves the selected chord.',
     ),
   );
   return NOTHING;

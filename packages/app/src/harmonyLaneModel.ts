@@ -2,10 +2,11 @@
  * The harmony lane's edits and labels (#709 decision 4; epic #703 decisions
  * 6, 10), pure: what the harmony card and the lane do to the song's
  * `harmony.events`. Events are contiguous from tick 0 — the shape the
- * normaliser keeps (`timelineNormalise.ts`) — so resizing one shifts every
- * following event and the last absorbs the difference at the song end,
- * deleting one merges its span into the previous (the first's into the
- * next), and appending takes a bar from the last. Every function relays the
+ * normaliser keeps (`timelineNormalise.ts`) — so the card's Duration dial
+ * shifts every following event and the last absorbs the difference at the
+ * song end, and deleting one merges its span into the previous (the first's
+ * into the next). The lane's own edits — `+`, the seam drag and Alt-click —
+ * are `harmonyLaneEdits.ts` (windsor#550). Every function here relays the
  * starts from the durations and returns a new list for `ctx.change`, where
  * arrays replace wholesale. The names a block shows come from the engine's
  * `eventChord` / `chordName` / `romanNumeral`, never a second spelling.
@@ -234,23 +235,6 @@ export function setEventDuration(
   );
 }
 
-/**
- * A drag of event `index`'s right edge by `deltaTicks` (windsor#21): its
- * duration grows or shrinks by the pointer's travel, never jumps to the
- * pointer's absolute tick, so a block widened past its span resizes by what
- * the pointer moved.
- */
-export function resizeEventBy(
-  events: readonly HarmonyEvent[],
-  index: number,
-  deltaTicks: number,
-  songTicks: number,
-): HarmonyEvent[] {
-  const event = events[index];
-  if (!event) return [...events];
-  return setEventDuration(events, index, event.duration + deltaTicks, songTicks);
-}
-
 /** The event removed; its span goes to the one before it (the one after, for the first), so nothing later moves; the only event stays. */
 export function removeEvent(
   events: readonly HarmonyEvent[],
@@ -264,31 +248,6 @@ export function removeEvent(
   const neighbour = rest[absorb] as HarmonyEvent;
   rest[absorb] = { ...neighbour, duration: neighbour.duration + removed.duration };
   return relay(rest, songTicks);
-}
-
-/**
- * The `+` tile: a new event of the last one's chord, a bar long, taken from
- * the end of the last event when it has more than a bar — else half of it,
- * rounded down to a counted beat; nothing when a beat cannot be spared.
- */
-export function appendEvent(
-  events: readonly HarmonyEvent[],
-  songTicks: number,
-  beats: Beats = meterBeats(),
-): HarmonyEvent[] {
-  const last = events[events.length - 1];
-  if (!last) return relay([{ start: 0, duration: songTicks, degree: 0, size: 3 }], songTicks);
-  const bar = barOf(beats);
-  const taken = last.duration > bar ? bar : snapToBeats(last.duration / 2, beats, 'floor');
-  if (taken <= 0) return [...events];
-  return relay(
-    [
-      ...events.slice(0, -1),
-      { ...last, duration: last.duration - taken },
-      { ...last, duration: taken },
-    ],
-    songTicks,
-  );
 }
 
 /** The timeline after a song-length change: the last event extends or the tail is clamped; `changed` says whether anything moved. */

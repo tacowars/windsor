@@ -23,7 +23,7 @@ import { PRESETS } from '@windsor/engine/patch/presets';
 import { AppContext, type ContextHost, type TabPanel } from './appContext';
 import { partChange } from './context';
 import { DocumentModel } from './documentModel';
-import { appendEvent } from './harmonyLaneModel';
+import { halveEvent } from './harmonyLaneEdits';
 import type { BuildOptions, EngineHost } from './host';
 import { initPresetId } from './libraryConstants';
 import { dropInit } from './patchActions';
@@ -449,8 +449,8 @@ describe('the Song view (#709)', () => {
   it('writes a harmony edit as a live partial, the timeline kept contiguous by the normaliser', () => {
     const c = openConsole();
     c.ctx.render();
-    const songTicks = c.model.doc.transport.bars * BAR;
-    const events = appendEvent(c.model.doc.harmony.events, songTicks);
+    const before = c.model.doc.harmony.events;
+    const events = halveEvent(before, before.length - 1)?.events ?? [];
     expect(events.length).toBe(c.model.doc.harmony.events.length + 1);
     expect(c.ctx.change({ harmony: { events } }).ok).toBe(true);
     expect(c.applied).toEqual([{ harmony: { events } }]);
@@ -460,8 +460,8 @@ describe('the Song view (#709)', () => {
 
   it('round-trips a song edited only through the view: export, import, export byte-equal', async () => {
     const c = openConsole();
-    const songTicks = c.model.doc.transport.bars * BAR;
-    c.ctx.change({ harmony: { events: appendEvent(c.model.doc.harmony.events, songTicks) } });
+    const before = c.model.doc.harmony.events;
+    c.ctx.change({ harmony: { events: halveEvent(before, before.length - 1)?.events ?? before } });
     c.ctx.change(
       partChange(0, {
         regions: [

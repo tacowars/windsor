@@ -2,8 +2,8 @@
  * The harmony lane's edits over the ticket's fixtures (#709 decision 4): a
  * resize shifts what follows and the last event absorbs it at the song end,
  * a resize past what it can absorb is clamped, a delete merges into the
- * previous event (the first into the next), an append takes a bar of the
- * last degree, and a song-length change extends or clamps the tail. Every
+ * previous event (the first into the next), and a song-length change
+ * extends or clamps the tail. Every
  * expectation is an expression of the engine's tick constants.
  */
 import { describe, expect, it } from 'vitest';
@@ -21,7 +21,6 @@ import {
 import { loadBuiltIns } from './builtInLibrary';
 import { DocumentModel } from './documentModel';
 import {
-  appendEvent,
   barsBeats,
   chipDegree,
   degreeChips,
@@ -32,7 +31,6 @@ import {
   fitEvents,
   maxEventDuration,
   removeEvent,
-  resizeEventBy,
   setAccidental,
   setEventDuration,
   setQuality,
@@ -201,20 +199,9 @@ describe('Accidental and Quality (windsor#332 decision 1)', () => {
     });
     expect(model.corrections).toEqual([]);
   });
-
-  it('carries the quality and accidental into an appended event', () => {
-    const chromatic = setQuality(setAccidental(FOUR, 3, 1), 3, 'maj7');
-    const out = appendEvent(chromatic, SONG);
-    expect(out[out.length - 1]).toMatchObject({
-      degree: 6,
-      size: CHORD_SIZE_SEVENTH,
-      quality: 'maj7',
-      accidental: 1,
-    });
-  });
 });
 
-describe('deleting and appending', () => {
+describe('deleting', () => {
   it('deletes event 3 into event 2, which absorbs its bar', () => {
     expect(spans(removeEvent(FOUR, 2, SONG))).toEqual([
       [0, BAR],
@@ -227,25 +214,6 @@ describe('deleting and appending', () => {
     const out = removeEvent(FOUR, 0, SONG);
     expect(spans(out)[0]).toEqual([0, 2 * BAR]);
     expect(out[0]?.degree).toBe(5);
-  });
-
-  it('appends a bar of the last degree, taken from the last event', () => {
-    const out = appendEvent(FOUR, SONG);
-    expect(spans(out).slice(-2)).toEqual([
-      [3 * BAR, 2 * BAR],
-      [5 * BAR, BAR],
-    ]);
-    expect(out[out.length - 1]?.degree).toBe(6);
-  });
-
-  it('appends half a short last event, down to a beat, and nothing when none can be spared', () => {
-    const short = [ev(0, SONG - PPQ, 0), ev(SONG - PPQ, PPQ, 3)];
-    expect(appendEvent(short, SONG)).toEqual(short);
-    const twoBeats = [ev(0, SONG - 2 * PPQ, 0), ev(SONG - 2 * PPQ, 2 * PPQ, 3)];
-    expect(spans(appendEvent(twoBeats, SONG)).slice(-2)).toEqual([
-      [SONG - 2 * PPQ, PPQ],
-      [SONG - PPQ, PPQ],
-    ]);
   });
 });
 
@@ -337,38 +305,11 @@ describe("the song's beats (windsor#430 decision 3)", () => {
     ]);
   });
 
-  it('reads and writes bars and counted beats, and appends a bar or a beat-snapped half', () => {
+  it('reads and writes bars and counted beats', () => {
     expect(barsBeats(84 + 48, SEVEN)).toEqual({ bars: 1, beats: 2 });
     expect(toTicks(1, 2, SEVEN)).toBe(84 + 48);
     expect(durationLabel(84 + 24, SEVEN)).toBe('1 bar · 1 beat');
     expect(durationLabel(36, SIX)).toBe('1 beat');
     expect(eventBar(ev(168, 84, 0), SEVEN)).toBe(3);
-    const song = 4 * 84;
-    expect(spans(appendEvent([ev(0, song, 0)], song, SEVEN))).toEqual([
-      [0, 3 * 84],
-      [3 * 84, 84],
-    ]);
-    // A last event of one bar gives half of it, down to a beat: 42 → 24.
-    const short = [ev(0, 3 * 84, 0), ev(3 * 84, 84, 4)];
-    expect(spans(appendEvent(short, song, SEVEN)).slice(-2)).toEqual([
-      [3 * 84, 60],
-      [3 * 84 + 60, 24],
-    ]);
-  });
-});
-
-describe("an edge drag by the pointer's travel (windsor#21)", () => {
-  it("changes the duration by the travel from the event's own length", () => {
-    expect(resizeEventBy(FOUR, 1, BAR, SONG)).toEqual(setEventDuration(FOUR, 1, 2 * BAR, SONG));
-    expect(resizeEventBy(FOUR, 1, 0, SONG)).toEqual(FOUR);
-  });
-
-  it('lengthens a one-beat event by a beat, not to where its widened edge was drawn', () => {
-    const events = [ev(0, PPQ, 0), ev(PPQ, SONG - PPQ, 4)];
-    expect(spans(resizeEventBy(events, 0, PPQ, SONG))).toEqual([
-      [0, 2 * PPQ],
-      [2 * PPQ, SONG - 2 * PPQ],
-    ]);
-    expect(resizeEventBy(events, 5, PPQ, SONG)).toEqual(events);
   });
 });

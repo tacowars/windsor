@@ -207,8 +207,12 @@ detail pane at the bottom. Its layers, top down:
    (`canDragPlayhead`, `snapBar`, `stepPlayheadDrag`).
 3. **`songHarmonyLane.ts`** — blocks from the engine's `eventBounds`, named
    by `harmonyLaneModel.ts` (`eventLabel` over `chordOf` / `chordName` /
-   `romanNumeral`), a right-edge drag that resizes the event and shifts the
-   rest, the `+` tile that appends a bar of the last degree.
+   `romanNumeral`), a seam drag between two chords that moves that boundary
+   only (snapped to the bar, a beat with Shift), Alt-click to split, and
+   the `+` tile that halves the selected chord (`harmonyLaneEdits.ts`,
+   windsor#550). Its hit testing, cursors, seam marks and drag readout are
+   the lanes' shared `laneEditModel.ts` / `laneEditTables.ts` /
+   `laneEditMarks.ts`.
 4. **`songLanes.ts`** — `.reg` blocks per region (tone, summary and cycle
    ticks from `songViewTables.ts`; ⟲ or ∞ from `regionMark`), and the
    pointer gestures over `regionModel.ts`: click a gap to add, drag an edge
@@ -240,8 +244,8 @@ detail pane at the bottom. Its layers, top down:
    `sequencerDevice.ts` sets `SEQUENCER_DEVICE_PX`; its `--seq-h` is that
    table's.
 6. **The pure models** — `regionModel.ts`, `harmonyLaneModel.ts`,
-   `harmonyAuditionModel.ts`, `songViewTables.ts` (the px maths and the
-   per-kind tables). The tests are theirs; the DOM files hold no rule worth
+   `harmonyLaneEdits.ts`, `harmonyLaneGeometry.ts`, `laneEditModel.ts`, `harmonyAuditionModel.ts`,
+   `songViewTables.ts` (the px maths and the per-kind tables). The tests are theirs; the DOM files hold no rule worth
    testing.
 
 ## Extension checklists

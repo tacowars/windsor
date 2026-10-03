@@ -3911,7 +3911,6 @@ select.field.compact {
   flex-direction: column;
   line-height: 1.15;
   overflow: hidden;
-  cursor: pointer;
 }
 .hblk b {
   font-size: 11px;
@@ -3939,6 +3938,87 @@ select.field.compact {
   position: absolute;
   top: 6px;
   left: calc(100% + 6px);
+  cursor: pointer;
+}
+.hadd:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Region editing (windsor#550, record 2026-10-03-song-region-editing): the
+   edge handle, the seam mark where two blocks meet, and the drag readout,
+   as the approved mockup draws them. The lane sets the cursor per hit. */
+.hdl {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--carrier);
+  opacity: 0;
+  pointer-events: none;
+}
+.hdl.s {
+  left: 2px;
+}
+.hdl.e {
+  right: 2px;
+}
+.hdl.faint {
+  opacity: 0.45;
+}
+.hdl.on {
+  opacity: 1;
+}
+.seam {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 12px;
+  margin-left: -7px;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  z-index: 2;
+}
+.seam i {
+  width: 2px;
+  background: var(--carrier);
+  border-radius: 1px;
+  box-shadow: 0 0 0 1px var(--well);
+}
+.seam b {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 8px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--carrier) 0 3px, var(--well) 3px 5px, var(--carrier) 5px);
+}
+.seam.faint {
+  opacity: 0.45;
+}
+.readout {
+  position: absolute;
+  top: -25px;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--f-num);
+  font-size: 10px;
+  color: var(--ink);
+  background: var(--well);
+  border: 1px solid var(--carrier);
+  border-radius: var(--r);
+  padding: 2px 6px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hdl,
+  .seam {
+    transition: opacity 0.08s;
+  }
 }
 .reg {
   position: absolute;
