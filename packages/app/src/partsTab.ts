@@ -37,6 +37,10 @@ const GRID_HTML = `
   <div class="parts-grid">
     <aside class="rail">
       <div class="section">
+        <div class="section-title"><span>Output</span></div>
+        <canvas class="scope" id="scope" width="420" height="124"></canvas>
+      </div>
+      <div class="section">
         <div class="section-title"><span>Algorithm</span></div>
         <div class="alg-grid" id="algGrid"></div>
         <p class="hint" style="margin: 9px 0 0" id="algName"></p>
@@ -45,48 +49,45 @@ const GRID_HTML = `
         <div class="section-title"><span>Global</span></div>
         <div class="knob-row" id="globalKnobs"></div>
       </div>
-      <div class="section">
-        <div class="section-title"><span>Output</span></div>
-        <canvas class="scope" id="scope" width="420" height="124"></canvas>
-      </div>
     </aside>
     <main class="bays">
       <div class="section-title"><span>Operators</span></div>
       <div class="op-rows" id="bayGrid"></div>
+      <div class="section-title deck-title"><span>Shape &amp; modulation</span></div>
+      <div class="deck">
+        <section class="deck-card deck-filter">
+          <div class="section-title"><span>Filter</span></div>
+          <div class="seg-slot" id="filterMode" style="margin-bottom: 8px"></div>
+          <div class="knob-row" id="filterKnobs"></div>
+          <div class="section-title" style="margin-top: 11px"><span>Filter Env</span></div>
+          <canvas class="env-canvas" id="filtEnvCanvas" width="500" height="92"></canvas>
+          <div class="knob-row" id="filterEnvKnobs" style="margin-top: 6px"></div>
+        </section>
+        <section class="deck-card deck-lfo">
+          <div class="section-title"><span>LFO</span></div>
+          <div class="seg-slot" id="lfoShape" style="margin-bottom: 8px"></div>
+          <div class="knob-row" id="lfoKnobs"></div>
+        </section>
+        <section class="deck-card deck-lfo">
+          <div class="section-title"><span>LFO 2</span></div>
+          <div class="seg-slot" id="lfo2Shape" style="margin-bottom: 8px"></div>
+          <div class="knob-row" id="lfo2Knobs"></div>
+        </section>
+        <section class="deck-card deck-lfo">
+          <div class="section-title"><span>Pitch Env</span></div>
+          <canvas class="env-canvas" id="pitchEnvCanvas" width="500" height="92"></canvas>
+          <div class="knob-row" id="pitchKnobs" style="margin-top: 6px"></div>
+        </section>
+        <section class="deck-card deck-drive">
+          <div class="section-title"><span>Drive</span></div>
+          <div class="seg-slot" id="driveSwitch" style="margin-bottom: 8px"></div>
+          <div class="drive-body" id="driveBody">
+            <div class="bay-line" id="driveShape" style="margin-bottom: 8px"></div>
+            <div class="knob-row" id="driveKnobs"></div>
+          </div>
+        </section>
+      </div>
     </main>
-    <aside class="mod">
-      <div class="section">
-        <div class="section-title"><span>Drive</span></div>
-        <div class="seg-slot" id="driveSwitch" style="margin-bottom: 8px"></div>
-        <div class="drive-body" id="driveBody">
-          <div class="bay-line" id="driveShape" style="margin-bottom: 8px"></div>
-          <div class="knob-row" id="driveKnobs"></div>
-        </div>
-      </div>
-      <div class="section">
-        <div class="section-title"><span>Filter</span></div>
-        <div class="seg-slot" id="filterMode" style="margin-bottom: 8px"></div>
-        <div class="knob-row" id="filterKnobs"></div>
-        <div class="section-title" style="margin-top: 11px"><span>Filter Env</span></div>
-        <canvas class="env-canvas" id="filtEnvCanvas" width="500" height="92"></canvas>
-        <div class="knob-row" id="filterEnvKnobs" style="margin-top: 6px"></div>
-      </div>
-      <div class="section">
-        <div class="section-title"><span>LFO</span></div>
-        <div class="seg-slot" id="lfoShape" style="margin-bottom: 8px"></div>
-        <div class="knob-row" id="lfoKnobs"></div>
-      </div>
-      <div class="section">
-        <div class="section-title"><span>LFO 2</span></div>
-        <div class="seg-slot" id="lfo2Shape" style="margin-bottom: 8px"></div>
-        <div class="knob-row" id="lfo2Knobs"></div>
-      </div>
-      <div class="section">
-        <div class="section-title"><span>Pitch Env</span></div>
-        <canvas class="env-canvas" id="pitchEnvCanvas" width="500" height="92"></canvas>
-        <div class="knob-row" id="pitchKnobs" style="margin-top: 6px"></div>
-      </div>
-    </aside>
   </div>
   <div class="section keys-row">
     <div class="keys" id="keys"></div>
