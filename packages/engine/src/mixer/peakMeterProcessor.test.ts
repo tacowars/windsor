@@ -2,6 +2,7 @@
 // reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import { PEAK_METER_NAME } from './peakMeterConstants';
 import type { PeakReport } from './peakMeterConstants';
 interface Processor {
   port: { postMessage(data: PeakReport): void; onmessage(event: { data: { type: string } }): void };
@@ -23,8 +24,9 @@ function rig(rate = 48000) {
   new Function('AudioWorkletProcessor', 'sampleRate', 'registerProcessor', script)(
     Base,
     rate,
-    (_name: string, value: typeof ctor) => {
-      ctor = value;
+    // The bundle registers the part meter bank too (windsor#540).
+    (name: string, value: typeof ctor) => {
+      if (name === PEAK_METER_NAME) ctor = value;
     },
   );
   const processor = new ctor();
