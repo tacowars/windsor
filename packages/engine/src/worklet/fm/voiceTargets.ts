@@ -11,11 +11,12 @@
  * offsets plays exactly what it did when it read the patch's fields
  * (`fmProcessorGolden.test.ts`). A field written as a literal, not looked up
  * by path, so it allocates nothing and passes no double across a call;
- * `voiceTargets.test.ts` pins every code to its row's path.
+ * `voiceTargets.test.ts` pins every code to its row's path. A macro slot
+ * the patch does not define reads the macro default's value (windsor#559).
  */
 
 import type { WorkletPatch } from './patchNormalise';
-import { OPERATOR_COUNT } from './patchDefaults';
+import { MACRO_DEFAULTS, MACROS_MAX, OPERATOR_COUNT } from './patchDefaults';
 import {
   VT_CUTOFF,
   VT_ENV_AMOUNT,
@@ -24,6 +25,7 @@ import {
   VT_LFO2_RATE,
   VT_LFO_AMOUNT,
   VT_LFO_RATE,
+  VT_MACRO_BASE,
   VT_OP_BASE,
   VT_OP_DECAY,
   VT_OP_DECAY_CURVE,
@@ -58,6 +60,10 @@ function layoutVoiceTargets(patch: WorkletPatch, out: Float64Array): void {
   out[VT_LFO2_AMOUNT] = patch.lfo2.amount;
   out[VT_LFO2_RATE] = patch.lfo2.rate;
   out[VT_PITCH_ENV_AMOUNT] = patch.pitchEnvAmount;
+  const macros = patch.macros;
+  for (let i = 0; i < MACROS_MAX; i++) {
+    out[VT_MACRO_BASE + i] = i < macros.length ? macros[i].value : MACRO_DEFAULTS.value;
+  }
 }
 
 export { layoutVoiceTargets };

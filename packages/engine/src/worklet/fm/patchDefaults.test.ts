@@ -52,6 +52,19 @@ describe('the patch defaults (#670)', () => {
     ['a drive biased with no switch', { drive: { bias: -0.4 } }],
     // windsor#331: the Formant mode and its vowel, inside its range.
     ['the Formant vowel', { filter: { mode: 5, vowel: 2.5 } } as PartialPatch],
+    // windsor#559: a macro and its mapping, inside their ranges.
+    [
+      'a macro',
+      {
+        macros: [
+          {
+            name: 'Accent',
+            value: 0.5,
+            mappings: [{ target: 'filter.cutoff', min: 200, max: 900 }],
+          },
+        ],
+      },
+    ],
   ])('fills the rest of a partial naming %s identically', (_what, partial) => {
     expect(patchLeafDifferences(workletFill(partial), makePatch(partial), 'partial')).toEqual([]);
   });

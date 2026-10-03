@@ -4,6 +4,7 @@ import { VOWEL_RANGE } from '../worklet/fm/patchDefaults';
 import {
   VOICE_TARGET_TABLE,
   VT_LFO2_RATE,
+  VT_MACRO_BASE,
   VT_OP_BASE,
   VT_OP_STRIDE,
   VT_OP_WIDTH,
@@ -20,6 +21,7 @@ import {
 import { VOICE_AUTOMATION_ROWS, voiceTargetId } from './automationTargets';
 
 const OPERATOR_FIELDS = ['level', 'env.decayTime', 'env.decayCurve', 'feedback', 'width'];
+const MACROS = [0, 1, 2, 3, 4, 5, 6, 7];
 
 const VOICE_IDS = [
   'voice.filter.cutoff',
@@ -33,13 +35,14 @@ const VOICE_IDS = [
   'voice.lfo2.amount',
   'voice.lfo2.rate',
   'voice.pitchEnvAmount',
+  ...MACROS.map((i) => `voice.macros.${i}.value`),
 ];
 
 describe('the voice rows', () => {
-  it('are exactly the 29 targets of decision 2 and the Formant vowel (windsor#406)', () => {
-    expect(VOICE_AUTOMATION_ROWS).toHaveLength(30);
+  it('are the 29 targets of decision 2, the Formant vowel (windsor#406) and eight macros (windsor#559)', () => {
+    expect(VOICE_AUTOMATION_ROWS).toHaveLength(38);
     expect(VOICE_AUTOMATION_ROWS.map((r) => r.target)).toEqual(VOICE_IDS);
-    expect(new Set(VOICE_AUTOMATION_ROWS.map((r) => r.label)).size).toBe(30);
+    expect(new Set(VOICE_AUTOMATION_ROWS.map((r) => r.label)).size).toBe(38);
   });
 
   it('name each target once, short enough for a step lane header (windsor#424)', () => {
@@ -57,7 +60,21 @@ describe('the voice rows', () => {
       'LFO 2 Amt',
       'LFO 2 Rate',
       'Pitch Env',
+      ...MACROS.map((i) => `Macro ${i + 1}`),
     ]);
+  });
+
+  it('carry a macro as a linear 0–1 lane in its own section', () => {
+    expect(VOICE_AUTOMATION_ROWS.find((r) => r.target === 'voice.macros.2.value')).toEqual({
+      target: 'voice.macros.2.value',
+      label: 'Macro 3',
+      min: 0,
+      max: 1,
+      scale: 'linear',
+      unit: '',
+      path: 'macros.2.value',
+      section: { kind: 'macro', index: 2 },
+    });
   });
 
   it('carry the vowel as a linear 0–4 lane, the patch’s vowel range', () => {
@@ -81,15 +98,20 @@ describe('the voice rows', () => {
     );
   });
 
-  it('carry their section: the filter, operator i, the LFOs or the pitch envelope', () => {
+  it('carry their section: the filter, operator i, the LFOs, the pitch envelope or macro i', () => {
     const section = (r: { section: VoiceSection }): string =>
-      r.section.kind === 'operator' ? `op ${r.section.op}` : r.section.kind;
+      r.section.kind === 'operator'
+        ? `op ${r.section.op}`
+        : r.section.kind === 'macro'
+          ? `macro ${r.section.index}`
+          : r.section.kind;
     const operator = (i: number): string[] => OPERATOR_FIELDS.map(() => `op ${i}`);
     expect(VOICE_AUTOMATION_ROWS.map(section)).toEqual([
       ...Array<string>(5).fill('filter'),
       ...[0, 1, 2, 3].flatMap(operator),
       ...Array<string>(4).fill('lfo'),
       'pitch',
+      ...MACROS.map((i) => `macro ${i}`),
     ]);
   });
 
@@ -101,6 +123,7 @@ describe('the voice rows', () => {
     });
     expect(voiceSectionOf(VT_LFO2_RATE)).toEqual({ kind: 'lfo' });
     expect(voiceSectionOf(VT_PITCH_ENV_AMOUNT)).toEqual({ kind: 'pitch' });
+    expect(voiceSectionOf(VT_MACRO_BASE + 7)).toEqual({ kind: 'macro', index: 7 });
   });
 
   it('are the voice target table, in its order (windsor#419)', () => {

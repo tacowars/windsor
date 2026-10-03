@@ -20,7 +20,7 @@
  * change to a value here is a render change: `fmProcessorGolden.test.ts`.
  */
 
-import { DRIVE_SOFT, FILT_OFF, LFO_SINE, LOOP_NONE } from './modeIds';
+import { DRIVE_SOFT, FILT_OFF, LFO_SINE, LOOP_NONE, MACRO_LINEAR } from './modeIds';
 import { WAVE } from './waveIds';
 
 /** Operators per voice — the length of `ops`, `lfo.toOp`, `lfo.toWidth` and `OP_NAMES`. */
@@ -210,6 +210,29 @@ const NOISE_COLOUR_RANGE = { min: 0, max: 20000 };
 /** The lowest cutoff a noise filter that is on sounds at: the bottom of the knob's log sweep. */
 const NOISE_COLOUR_FLOOR_HZ = 20;
 
+/**
+ * The patch's macros (windsor#559, record `2026-10-04-patch-macro-knobs`
+ * decision 2): at most `MACROS_MAX`, each with at most `MACRO_MAPPINGS_MAX`
+ * mappings. A patch has none by default, and a patch with none plays as it
+ * did before macros. The voice target table gives each macro a row, so
+ * `MACROS_MAX` is also the number of macro rows there.
+ */
+const MACROS_MAX = 8;
+const MACRO_MAPPINGS_MAX = 8;
+
+/** A macro's value, clamped here by the worklet: the macro row's own bounds. */
+const MACRO_VALUE_RANGE = { min: 0, max: 1 };
+
+/** A macro's own fields; its mappings default to none. */
+const MACRO_DEFAULTS = { name: 'Macro', value: 0 };
+
+/**
+ * A mapping's fields but its `target`, which has no default: a mapping with
+ * none is dropped. `min` and `max` are in the target's own units and are
+ * clamped to its row's bounds by the worklet.
+ */
+const MACRO_MAPPING_DEFAULTS = { min: 0, max: 1, curve: MACRO_LINEAR, inverted: false };
+
 export {
   DRIVE_BIAS_RANGE,
   DRIVE_DEFAULTS,
@@ -225,6 +248,11 @@ export {
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
   LFO_TO_WIDTH_DEFAULT,
+  MACRO_DEFAULTS,
+  MACRO_MAPPING_DEFAULTS,
+  MACRO_MAPPINGS_MAX,
+  MACRO_VALUE_RANGE,
+  MACROS_MAX,
   NOISE_COLOUR_FLOOR_HZ,
   NOISE_COLOUR_RANGE,
   OPERATOR_COUNT,

@@ -36,6 +36,11 @@ describe('grid lanes through the normaliser (windsor#17)', () => {
     expect(lanes([lane])).toEqual({ lanes: [lane], corrections: [] });
   });
 
+  it('keeps a lane on a macro, a voice target like any other (windsor#559)', () => {
+    const lane = { param: 'macros.0.value', values: [1, 0, -0.5] };
+    expect(lanes([lane])).toEqual({ lanes: [lane], corrections: [] });
+  });
+
   it('drops an unknown parameter and a repeated one, and reports each', () => {
     const { lanes: kept, corrections } = lanes([
       { param: 'volume', values: [0, 0, 0] },

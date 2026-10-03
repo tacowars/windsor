@@ -6,7 +6,9 @@
  * one value per row in this order, and the voice keeps its `ownValues` and
  * `liveValues` by it (`voiceTargets.ts`). Today's sources are a song's
  * automation lanes (windsor#346) and a sequencer's step lanes (windsor#17);
- * a later source addresses the same codes.
+ * a later source addresses the same codes. A patch's macros (windsor#559,
+ * record `2026-10-04-patch-macro-knobs`) are rows too, the last
+ * `MACROS_MAX`: a source moves a macro's value as it moves any other row.
  *
  * A row carries the target's patch path, its curve, its bounds, the floor a
  * ratio is taken from, a step's span and whether a slide keeps it:
@@ -41,7 +43,14 @@
  * `voiceTargetTables.test.ts` pins the codes against the rows.
  */
 
-import { FEEDBACK_RANGE, OPERATOR_COUNT, VOWEL_RANGE, WIDTH_RANGE } from './patchDefaults';
+import {
+  FEEDBACK_RANGE,
+  MACRO_VALUE_RANGE,
+  MACROS_MAX,
+  OPERATOR_COUNT,
+  VOWEL_RANGE,
+  WIDTH_RANGE,
+} from './patchDefaults';
 
 /** How an offset meets its base: added, or a ratio in octaves over the base raised to the floor. */
 type VoiceTargetCurve = 'add' | 'ratio';
@@ -140,14 +149,31 @@ const VOICE_TARGET_MOD_ROWS = [
   { path: 'pitchEnvAmount', curve: 'add', min: -48, max: 48, floor: 0, span: 48 },
 ] as const;
 
+/**
+ * A macro's row, one per macro slot after the pitch envelope's (windsor#559):
+ * its value over the whole 0..1, which one step sweeps. A slide does not
+ * keep it (record decision 8).
+ */
+const VOICE_TARGET_MACRO_ROW = {
+  curve: 'add',
+  min: MACRO_VALUE_RANGE.min,
+  max: MACRO_VALUE_RANGE.max,
+  floor: 0,
+  span: 1,
+  slideKeeps: false,
+} as const;
+
 type VoiceTargetOperatorField = (typeof VOICE_TARGET_OPERATOR_ROWS)[number]['field'];
 type VoiceTargetOperator = 0 | 1 | 2 | 3;
+/** A macro slot's index, below `MACROS_MAX`. */
+type VoiceTargetMacro = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 /** A target's patch path: what a song lane and a step lane name. */
 type VoiceTargetPath =
   | (typeof VOICE_TARGET_FILTER_ROWS)[number]['path']
   | `ops.${VoiceTargetOperator}.${VoiceTargetOperatorField}`
-  | (typeof VOICE_TARGET_MOD_ROWS)[number]['path'];
+  | (typeof VOICE_TARGET_MOD_ROWS)[number]['path']
+  | `macros.${VoiceTargetMacro}.value`;
 
 /** One target: its path, its curve, its bounds, its ratio floor, a step's span, and whether a slide keeps it. */
 interface VoiceTargetRow {
@@ -160,7 +186,10 @@ interface VoiceTargetRow {
   readonly slideKeeps: boolean;
 }
 
-/** Every row, in code order: the filter's five, operator A's five, B's, C's and D's, then the LFOs' and the pitch envelope's. */
+/**
+ * Every row, in code order: the filter's five, operator A's five, B's, C's
+ * and D's, the LFOs' and the pitch envelope's, then the eight macros'.
+ */
 const VOICE_TARGET_TABLE: readonly VoiceTargetRow[] = [
   ...VOICE_TARGET_FILTER_ROWS.map((row): VoiceTargetRow => ({ ...row, slideKeeps: false })),
   ...Array.from({ length: OPERATOR_COUNT }, (_, i) =>
@@ -170,6 +199,10 @@ const VOICE_TARGET_TABLE: readonly VoiceTargetRow[] = [
     })),
   ).flat(),
   ...VOICE_TARGET_MOD_ROWS.map((row): VoiceTargetRow => ({ ...row, slideKeeps: false })),
+  ...Array.from({ length: MACROS_MAX }, (_, i): VoiceTargetRow => ({
+    path: `macros.${i as VoiceTargetMacro}.value`,
+    ...VOICE_TARGET_MACRO_ROW,
+  })),
 ];
 
 /** Every path, in code order. */
@@ -199,6 +232,13 @@ const VT_LFO_RATE = VT_LFO_AMOUNT + 1;
 const VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
 const VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
 const VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
+/** Macro `i`'s code is `VT_MACRO_BASE + i`, for `i` below `MACROS_MAX`: the table's last rows. */
+const VT_MACRO_BASE = VT_PITCH_ENV_AMOUNT + 1;
+
+/** Whether `code` is a macro's row. */
+function isMacroCode(code: number): boolean {
+  return code >= VT_MACRO_BASE && code < VT_MACRO_BASE + MACROS_MAX;
+}
 
 /** The rows by code, as typed arrays the voice indexes: 1 for a ratio row, its bounds, floor, span and slide. */
 const VOICE_TARGET_RATIO = Uint8Array.from(VOICE_TARGET_TABLE, (row) =>
@@ -223,8 +263,31 @@ function voiceTargetRow(path: unknown): VoiceTargetRow | undefined {
   return code < 0 ? undefined : VOICE_TARGET_TABLE[code];
 }
 
+/** The macro slot the target at `path` is the row of, or -1 for a path that is not a macro's. */
+function macroIndexOf(path: unknown): number {
+  const code = voiceTargetCode(path);
+  return isMacroCode(code) ? code - VT_MACRO_BASE : -1;
+}
+
+/**
+ * Why `target` cannot be a macro mapping's target (windsor#559, record
+ * `2026-10-04-patch-macro-knobs` decision 5), or undefined when it can: it
+ * must be a row here, not a macro's own, and not one `taken` (the targets
+ * this and the earlier macros already map) holds. The worklet's normaliser
+ * drops such a mapping, the song normaliser reports and drops it, and the
+ * library loader refuses the file. Read at a message, never in the render.
+ */
+function macroTargetProblem(target: unknown, taken: ReadonlySet<string>): string | undefined {
+  const code = voiceTargetCode(target);
+  if (code < 0) return `${JSON.stringify(target) ?? 'undefined'} is not a voice target`;
+  if (isMacroCode(code)) return `${String(target)} is a macro`;
+  if (taken.has(String(target))) return `${String(target)} is already mapped`;
+  return undefined;
+}
+
 export type { VoiceTargetCurve, VoiceTargetPath, VoiceTargetRow };
 export {
+  MACROS_MAX,
   VOICE_TARGET_COUNT,
   VOICE_TARGET_FLOOR,
   VOICE_TARGET_MAX,
@@ -241,6 +304,7 @@ export {
   VT_LFO2_RATE,
   VT_LFO_AMOUNT,
   VT_LFO_RATE,
+  VT_MACRO_BASE,
   VT_OP_BASE,
   VT_OP_DECAY,
   VT_OP_DECAY_CURVE,
@@ -251,6 +315,9 @@ export {
   VT_PITCH_ENV_AMOUNT,
   VT_RESONANCE,
   VT_VOWEL,
+  isMacroCode,
+  macroIndexOf,
+  macroTargetProblem,
   voiceTargetCode,
   voiceTargetRow,
 };

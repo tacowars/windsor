@@ -9,7 +9,7 @@
  * row, since arrays replace wholesale. A row set to `undefined` is removed
  * from the pattern (`withRows`), which a merge cannot say.
  */
-import type { EuclidRows, StepModLane, VoiceTargetPath } from '@windsor/engine';
+import type { EuclidRows, Patch, StepModLane, VoiceTargetPath } from '@windsor/engine';
 import {
   EUCLID_LANE_STEPS_MAX,
   EUCLID_PITCH_LANE_MAX,
@@ -17,6 +17,7 @@ import {
   VOICE_TARGET_PATHS,
   isVoiceTargetPath,
 } from '@windsor/engine';
+import { offersVoicePath } from './macroTargets';
 import { addLane, laneLabel } from './stepModLaneModel';
 
 /** A lane by what it is: the one accent lane, the one pitch lane, or the sound lane for a parameter. */
@@ -61,11 +62,11 @@ export function laneValues(rows: EuclidRows, ref: EuclidLaneRef): readonly numbe
 export const laneLength = (rows: EuclidRows, ref: EuclidLaneRef): number =>
   laneValues(rows, ref).length;
 
-/** The name a lane's row shows. */
-export function laneName(ref: EuclidLaneRef): string {
+/** The name a lane's row shows; a macro's is the name `patch` (the part's) gives it. */
+export function laneName(ref: EuclidLaneRef, patch?: Patch): string {
   if (ref.kind === 'accent') return 'Accent';
   if (ref.kind === 'pitch') return 'Pitch';
-  return laneLabel(ref.param);
+  return laneLabel(ref.param, patch);
 }
 
 /** A list padded with `fill` or trimmed to `length`. */
@@ -123,16 +124,24 @@ export interface LaneChoice {
   readonly disabled: boolean;
 }
 
-/** Accent and Pitch once each, then every sound parameter once, up to `STEP_MOD_LANES_MAX` sound lanes. */
-export function laneChoices(rows: EuclidRows, max = STEP_MOD_LANES_MAX): LaneChoice[] {
+/**
+ * Accent and Pitch once each, then every sound parameter once, up to
+ * `STEP_MOD_LANES_MAX` sound lanes; a macro only where `patch` (the part's)
+ * defines it, under its name (windsor#559).
+ */
+export function laneChoices(
+  rows: EuclidRows,
+  patch?: Patch,
+  max = STEP_MOD_LANES_MAX,
+): LaneChoice[] {
   const sound = rows.modLanes ?? [];
   const full = sound.length >= max;
   return [
     { value: 'accent', label: 'Accent', disabled: rows.accentLane !== undefined },
     { value: 'pitch', label: 'Pitch', disabled: rows.pitchLane !== undefined },
-    ...VOICE_TARGET_PATHS.map((param) => ({
+    ...VOICE_TARGET_PATHS.filter((param) => offersVoicePath(patch, param)).map((param) => ({
       value: param,
-      label: laneLabel(param),
+      label: laneLabel(param, patch),
       disabled: full || sound.some((lane) => lane.param === param),
     })),
   ];
@@ -140,12 +149,17 @@ export function laneChoices(rows: EuclidRows, max = STEP_MOD_LANES_MAX): LaneCho
 
 /**
  * The lane a picker choice adds, `min(steps, 32)` long with every value at
- * 0 (an accent off); null when the choice is taken, unknown or the sound
- * lanes are full.
+ * 0 (an accent off); null when the choice is taken, unknown, a macro
+ * `patch` does not define, or the sound lanes are full.
  */
-export function addLaneRow(rows: EuclidRows, choice: string, steps: number): RowFields | null {
+export function addLaneRow(
+  rows: EuclidRows,
+  choice: string,
+  steps: number,
+  patch?: Patch,
+): RowFields | null {
   const length = clampLaneLength(Math.min(steps, EUCLID_LANE_STEPS_MAX));
-  const open = laneChoices(rows).find((c) => c.value === choice);
+  const open = laneChoices(rows, patch).find((c) => c.value === choice);
   if (!open || open.disabled) return null;
   if (choice === 'accent') return { accentLane: new Array<boolean>(length).fill(false) };
   if (choice === 'pitch') return { pitchLane: new Array<number>(length).fill(0) };

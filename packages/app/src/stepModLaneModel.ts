@@ -6,10 +6,13 @@
  * where arrays replace wholesale; the lane shape and its limits are the
  * engine's (`StepModLane`, `STEP_MOD_LANES_MAX`), and a readout's played
  * value is the engine's own curve (`stepModValue`), so the console and the
- * voice cannot disagree. `stepModLane.ts` draws it; any step card may.
+ * voice cannot disagree. `stepModLane.ts` draws it; any step card may. The
+ * picker and a lane's name take the part's patch, so a macro is offered and
+ * named only as the patch defines it (windsor#559, `macroTargets.ts`).
  */
 import type {
   AutomationTargetRow,
+  Patch,
   StepModLane,
   VoiceTargetPath,
   VoiceTargetRow,
@@ -24,12 +27,16 @@ import {
 } from '@windsor/engine';
 import { readout } from './automationReadout';
 import { fmtSigned } from './consoleFormat';
+import { macroName, offersVoicePath } from './macroTargets';
 import { LANE_OCTAVE_DIGITS, LANE_PAINT, type LanePaintTable } from './stepModLaneTables';
 
-/** The targets not yet on a lane, in the engine's code order: what the picker offers. */
-export function freeParams(lanes: readonly StepModLane[]): VoiceTargetPath[] {
+/**
+ * The targets not yet on a lane, in the engine's code order: what the picker
+ * offers a part playing `patch`, a macro only where the patch defines it.
+ */
+export function freeParams(lanes: readonly StepModLane[], patch?: Patch): VoiceTargetPath[] {
   const taken = new Set(lanes.map((lane) => lane.param));
-  return VOICE_TARGET_PATHS.filter((param) => !taken.has(param));
+  return VOICE_TARGET_PATHS.filter((param) => !taken.has(param) && offersVoicePath(patch, param));
 }
 
 /** Whether one more lane fits under the engine's limit. */
@@ -282,5 +289,6 @@ export function laneReadout(
   return `${offset} → ${readout(look, stepModValue(row, base, value))}`;
 }
 
-/** The name a lane and the picker show: the catalog's, as a song lane's. */
-export const laneLabel = (param: VoiceTargetPath): string => voiceRowOf(param)?.label ?? param;
+/** The name a lane and the picker show: the catalog's, as a song lane's, or the macro's in `patch`. */
+export const laneLabel = (param: VoiceTargetPath, patch?: Patch): string =>
+  macroName(patch, param) ?? voiceRowOf(param)?.label ?? param;

@@ -1,12 +1,20 @@
 /**
- * The one voice target table (windsor#419): thirty rows in code order, the
- * codes the voice addresses them by, bounds that mirror the patch's clamps
- * and the knobs, the two curves, and the spans a step pushes by.
+ * The one voice target table (windsor#419): thirty-eight rows in code order,
+ * the last eight the macros' (windsor#559), the codes the voice addresses
+ * them by, bounds that mirror the patch's clamps and the knobs, the two
+ * curves, and the spans a step pushes by.
  */
 import { describe, expect, it } from 'vitest';
 
-import { FEEDBACK_RANGE, OPERATOR_COUNT, VOWEL_RANGE, WIDTH_RANGE } from './patchDefaults';
 import {
+  FEEDBACK_RANGE,
+  MACRO_VALUE_RANGE,
+  OPERATOR_COUNT,
+  VOWEL_RANGE,
+  WIDTH_RANGE,
+} from './patchDefaults';
+import {
+  MACROS_MAX,
   VOICE_TARGET_COUNT,
   VOICE_TARGET_FLOOR,
   VOICE_TARGET_MAX,
@@ -23,6 +31,7 @@ import {
   VT_LFO2_RATE,
   VT_LFO_AMOUNT,
   VT_LFO_RATE,
+  VT_MACRO_BASE,
   VT_OP_BASE,
   VT_OP_DECAY,
   VT_OP_DECAY_CURVE,
@@ -33,6 +42,9 @@ import {
   VT_PITCH_ENV_AMOUNT,
   VT_RESONANCE,
   VT_VOWEL,
+  isMacroCode,
+  macroIndexOf,
+  macroTargetProblem,
   voiceTargetCode,
   voiceTargetRow,
 } from './voiceTargetTables';
@@ -41,8 +53,9 @@ const row = (path: string) => VOICE_TARGET_TABLE.find((r) => r.path === path);
 const DECAY_TIME = /\.decayTime$/;
 
 describe('the voice target table (windsor#419)', () => {
-  it('has five filter rows, five per operator and five more, each path once', () => {
-    expect(VOICE_TARGET_COUNT).toBe(30);
+  it('has five filter rows, five per operator, five more and eight macros, each path once', () => {
+    expect(VOICE_TARGET_COUNT).toBe(38);
+    expect(MACROS_MAX).toBe(8);
     expect(VOICE_TARGET_PATHS).toHaveLength(VOICE_TARGET_COUNT);
     expect(new Set(VOICE_TARGET_PATHS).size).toBe(VOICE_TARGET_COUNT);
   });
@@ -66,6 +79,11 @@ describe('the voice target table (windsor#419)', () => {
     expect(VOICE_TARGET_PATHS[VT_LFO2_AMOUNT]).toBe('lfo2.amount');
     expect(VOICE_TARGET_PATHS[VT_LFO2_RATE]).toBe('lfo2.rate');
     expect(VOICE_TARGET_PATHS[VT_PITCH_ENV_AMOUNT]).toBe('pitchEnvAmount');
+    // The first 30 codes did not move when the macros came (windsor#559).
+    expect([VT_PITCH_ENV_AMOUNT, VT_MACRO_BASE]).toEqual([29, 30]);
+    for (let i = 0; i < MACROS_MAX; i++) {
+      expect(VOICE_TARGET_PATHS[VT_MACRO_BASE + i]).toBe(`macros.${i}.value`);
+    }
     VOICE_TARGET_PATHS.forEach((path, k) => expect(voiceTargetCode(path)).toBe(k));
   });
 
@@ -120,6 +138,40 @@ describe('the voice target table (windsor#419)', () => {
       expect(row(`ops.${i}.width`)).toMatchObject({ curve: 'add', span: 0.5, ...WIDTH_RANGE });
     }
     expect(row('filter.vowel')).toMatchObject({ curve: 'add', span: 2, ...VOWEL_RANGE });
+  });
+
+  it('gives each macro an add row over 0..1 that one step sweeps (windsor#559)', () => {
+    expect(MACRO_VALUE_RANGE).toEqual({ min: 0, max: 1 });
+    for (let i = 0; i < MACROS_MAX; i++) {
+      expect(VOICE_TARGET_TABLE[VT_MACRO_BASE + i]).toEqual({
+        path: `macros.${i}.value`,
+        curve: 'add',
+        min: 0,
+        max: 1,
+        floor: 0,
+        span: 1,
+        slideKeeps: false,
+      });
+    }
+  });
+
+  it('tells a macro row by its code and its path', () => {
+    const macros = VOICE_TARGET_PATHS.filter((_, k) => isMacroCode(k));
+    expect(macros).toEqual(VOICE_TARGET_PATHS.slice(VT_MACRO_BASE));
+    expect(isMacroCode(-1)).toBe(false);
+    expect(isMacroCode(VOICE_TARGET_COUNT)).toBe(false);
+    expect(macroIndexOf('macros.3.value')).toBe(3);
+    expect(macroIndexOf('filter.cutoff')).toBe(-1);
+    expect(macroIndexOf('macros.8.value')).toBe(-1);
+  });
+
+  it('lets a macro map any other row once, and no macro row (record decision 5)', () => {
+    const taken = new Set(['ops.0.level']);
+    expect(macroTargetProblem('filter.cutoff', taken)).toBeUndefined();
+    expect(macroTargetProblem('ops.0.level', taken)).toBe('ops.0.level is already mapped');
+    expect(macroTargetProblem('macros.1.value', taken)).toBe('macros.1.value is a macro');
+    expect(macroTargetProblem('volume', taken)).toBe('"volume" is not a voice target');
+    expect(macroTargetProblem(undefined, taken)).toBe('undefined is not a voice target');
   });
 
   it('keeps the old offsets on a slide only for the decay curve and feedback', () => {

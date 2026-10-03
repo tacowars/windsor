@@ -18,6 +18,7 @@ import { el } from './dom';
 import type { EuclidCard } from './euclidCardState';
 import { EUCLID_KNOB_COLUMNS } from './euclidConstants';
 import { type LaneChoice, addLaneRow, laneChoices } from './euclidLaneModel';
+import { partPatch } from './stepModLane';
 import { stepperBox } from './euclidStepper';
 import { EUCLID_STEPPERS } from './euclidStepperModel';
 import { divisorPicker, tableKnob } from './seqFields';
@@ -127,11 +128,12 @@ function lanePicker(card: EuclidCard): HTMLSelectElement {
   picker.setAttribute('aria-label', 'Add a lane');
   picker.onchange = (): void => {
     const spec = card.spec();
-    const fields = spec && addLaneRow(spec, picker.value, spec.steps);
+    const patch = partPatch(card.ctx, card.slot);
+    const fields = spec && addLaneRow(spec, picker.value, spec.steps, patch);
     if (!fields || !card.write(fields)) card.refresh();
   };
   const spec = card.spec();
-  if (spec) fillPicker(picker, laneChoices(spec));
+  if (spec) fillPicker(picker, laneChoices(spec, partPatch(card.ctx, card.slot)));
   return picker;
 }
 

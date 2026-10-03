@@ -56,6 +56,8 @@ const TAPE_DRIVE = tapeTarget('drive');
 const TAPE_WEAR = tapeTarget('wear');
 const TAPE_WOW = tapeTarget('wow');
 const isVoice = (target: AutomationTargetId): boolean => targetKind(target) === 'voice';
+/** The voice rows a part whose patch defines no macro is offered: all but the macros (windsor#559). */
+const UNMACROED = VOICE_AUTOMATION_ROWS.filter((r) => r.section.kind !== 'macro');
 
 /** `AUTOMATION_PART` with `inserts` on its strip and `lanes` as its automation. */
 const partWith = (
@@ -95,7 +97,7 @@ describe('the picker', () => {
 
   it('offers every strip and voice target once', () => {
     const targets = groups.flatMap((g) => g.options.map((o) => o.target));
-    for (const r of [...STRIP_AUTOMATION_ROWS, ...VOICE_AUTOMATION_ROWS]) {
+    for (const r of [...STRIP_AUTOMATION_ROWS, ...UNMACROED]) {
       expect(
         targets.filter((t) => t === r.target),
         r.target,
@@ -127,7 +129,7 @@ describe('the picker', () => {
     ]);
     expect(bare.flatMap((g) => g.options.map((o) => o.target))).toEqual([
       ...STRIP_AUTOMATION_ROWS.map((r) => r.target),
-      ...VOICE_AUTOMATION_ROWS.map((r) => r.target),
+      ...UNMACROED.map((r) => r.target),
     ]);
   });
 

@@ -25,6 +25,7 @@ import type {
   AutomationTargetId,
   AutomationTargetRow,
   DocumentPart,
+  Patch,
 } from '@windsor/engine';
 import { valueAt } from '@windsor/engine';
 import { readout } from './automationReadout';
@@ -65,6 +66,10 @@ function svg(tag: string, attrs: Readonly<Record<string, string | number>>): SVG
 /** The part as the document holds it now, so an edit never builds on a stale list. */
 const livePart = (view: SongView, part: DocumentPart): DocumentPart =>
   view.ctx.model.doc.parts.find((p) => p.slot === part.slot) ?? part;
+
+/** The patch `part` plays, from the document: what names its macros (windsor#559). */
+const patchOf = (view: SongView, part: DocumentPart): Patch | undefined =>
+  view.ctx.model.doc.patches?.[part.preset];
 
 /** Set `slot`'s lanes as one undo step named `label`, then put the focus back on `focusKey`. */
 function commitLanes(
@@ -121,12 +126,12 @@ function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane):
     ghost.style.width = `${tickToPx(region.duration, px, bar)}px`;
     timeline.appendChild(ghost);
   }
-  const row = laneRow(part, lane.target);
+  const row = laneRow(part, lane.target, patchOf(view, part));
   if (!row) return timeline;
   const box = svg('svg', { 'aria-hidden': 'true' });
   paintCurve(view, box, row, lane.points);
   timeline.appendChild(box);
-  const name = laneTitle(part, lane.target).name;
+  const name = row.label;
   const points = (): readonly AutomationPoint[] =>
     lanesOf(livePart(view, part)).find((l) => l.target === lane.target)?.points ?? lane.points;
   const commit = (label: string, next: readonly AutomationPoint[]): void => {
@@ -172,7 +177,7 @@ function laneCells(
   lane: AutomationLane,
   readouts: Readout[],
 ): LaneRowCells {
-  const title = laneTitle(part, lane.target);
+  const title = laneTitle(part, lane.target, patchOf(view, part));
   const activity = laneActivity(part, lane.target);
   const dim = !lane.on || !activity.active;
   const color = LANE_KIND_COLOR[title.kind];
@@ -203,7 +208,7 @@ function laneCells(
   const buttons = el('span', 'auto-buttons');
   buttons.append(on, del);
   side.append(value, buttons);
-  const row = laneRow(part, lane.target);
+  const row = laneRow(part, lane.target, patchOf(view, part));
   if (!activity.active) {
     value.textContent = 'inactive';
     value.title = activity.why;
@@ -225,7 +230,7 @@ function lanePicker(view: SongView, part: DocumentPart): HTMLSelectElement {
   picker.setAttribute('aria-label', `Add an automation lane to ${part.name}`);
   picker.dataset['focus'] = `add:${part.slot}`;
   picker.add(new Option('+ Add lane', ''));
-  for (const group of pickerGroups(part)) {
+  for (const group of pickerGroups(part, patchOf(view, part))) {
     const optgroup = document.createElement('optgroup');
     optgroup.label = group.label;
     for (const option of group.options) {
@@ -239,9 +244,9 @@ function lanePicker(view: SongView, part: DocumentPart): HTMLSelectElement {
     if (picker.value === '') return;
     const target = picker.value as AutomationTargetId;
     const live = livePart(view, part);
-    const patch = view.ctx.model.doc.patches?.[live.preset];
+    const patch = patchOf(view, live);
     const lane = newLane(target, currentValue(live, patch, target), view.songTicks());
-    const label = `Add ${laneTitle(live, target).name} lane`;
+    const label = `Add ${laneTitle(live, target, patch).name} lane`;
     commitLanes(view, live, withLane(lanesOf(live), lane), { label, focus: picker });
   };
   return picker;

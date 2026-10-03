@@ -86,11 +86,17 @@ export { stepModAtCycle } from './sequencing/stepModLanes';
 export type { StepModLane } from './sequencing/stepModLanes';
 // The voice's modulation targets (windsor#419): one table for song lanes and step lanes.
 export {
+  MACROS_MAX,
   VOICE_TARGET_COUNT,
   VOICE_TARGET_PATHS,
   VOICE_TARGET_TABLE,
+  VT_MACRO_BASE,
+  isMacroCode,
+  macroIndexOf,
+  macroTargetProblem,
   voiceTargetRow,
 } from './worklet/fm/voiceTargetTables';
+
 export type {
   VoiceTargetCurve,
   VoiceTargetPath,
@@ -382,9 +388,11 @@ export { serialisePatchFile } from './patch/patchFileSerialise';
 export { FALLBACK_PATCH, FALLBACK_PATCH_ID } from './patch/fallbackPatch';
 export * from './patch/patch';
 // The operator width's bounds and the second LFO's defaults (windsor#54), and a
-// Noise operator's colour range and floor (windsor#362).
+// Noise operator's colour range and floor (windsor#362), and a macro's bounds (windsor#559).
 export {
   LFO2_DEFAULTS,
+  MACRO_MAPPINGS_MAX,
+  MACRO_VALUE_RANGE,
   NOISE_COLOUR_FLOOR_HZ,
   NOISE_COLOUR_RANGE,
   VOWEL_RANGE,

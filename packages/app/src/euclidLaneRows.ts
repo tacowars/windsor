@@ -52,7 +52,7 @@ import { ROW_KEY_ATTRIBUTE } from './euclidRowFocus';
 import { type RowHead, cellStrip, nameButton, row } from './euclidRowParts';
 import type { Figure } from './euclidModel';
 import type { StepGroup } from './meterGrid';
-import { type LaneHost, laneCell, patchBase } from './stepModLane';
+import { type LaneHost, laneCell, partPatch, patchBase } from './stepModLane';
 
 /** What every lane row is drawn against: the card, the spec and figure as built, the view and pass. */
 export interface LaneRowsInput {
@@ -90,7 +90,7 @@ function laneNameBlock(
   length: number,
 ): { block: HTMLElement; say: Say } {
   const { card } = input;
-  const title = laneName(ref);
+  const title = laneName(ref, partPatch(card.ctx, card.slot));
   const shorter = nameButton('−', `Shorten the ${title} lane`, 'euclid-len');
   shorter.disabled = length <= 1;
   shorter.onclick = (): void =>
@@ -205,6 +205,7 @@ function soundHost(input: LaneRowsInput, readings: ReadonlyMap<number, Say>): La
     scope: input.scope,
     lanes: () => card.spec()?.modLanes ?? null,
     base: (param: VoiceTargetPath) => patchBase(card.ctx, card.slot, param),
+    patch: () => partPatch(card.ctx, card.slot),
     write: (lanes) => card.write({ modLanes: lanes }),
     repaint: () => card.refresh(),
     stepCount: () => spec.steps,

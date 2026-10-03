@@ -5,7 +5,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { normalisePatch } from './patchNormalise';
-import { VOICE_TARGET_COUNT, VOICE_TARGET_PATHS } from './voiceTargetTables';
+import {
+  MACROS_MAX,
+  VOICE_TARGET_COUNT,
+  VOICE_TARGET_PATHS,
+  VT_MACRO_BASE,
+} from './voiceTargetTables';
 import { layoutVoiceTargets } from './voiceTargets';
 
 /** The value at a dotted path. */
@@ -38,6 +43,7 @@ describe('layoutVoiceTargets', () => {
       lfo: { amount: next(), rate: 3.3 },
       lfo2: { amount: next(), rate: 7.7 },
       pitchEnvAmount: -12.5,
+      macros: Array.from({ length: MACROS_MAX }, () => ({ value: next() })),
     } as never);
     const out = new Float64Array(VOICE_TARGET_COUNT).fill(Number.NaN);
     layoutVoiceTargets(patch, out);
@@ -45,5 +51,12 @@ describe('layoutVoiceTargets', () => {
       expect(out[k], path).toBe(at(patch, path));
     });
     expect(new Set(out).size).toBe(VOICE_TARGET_COUNT);
+  });
+
+  it("writes a defined macro's value and 0 for a slot the patch does not define (windsor#559)", () => {
+    const patch = normalisePatch({ macros: [{ value: 0.25 }, { value: 0.75 }] });
+    const out = new Float64Array(VOICE_TARGET_COUNT).fill(Number.NaN);
+    layoutVoiceTargets(patch, out);
+    expect(Array.from(out.subarray(VT_MACRO_BASE))).toEqual([0.25, 0.75, 0, 0, 0, 0, 0, 0]);
   });
 });

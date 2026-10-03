@@ -11,8 +11,10 @@ import {
   ARRANGEMENT_VERSION,
   requireCatalogRow,
   gridNote,
+  MACROS_MAX,
   STEP_MOD_LANES_MAX,
   VOICE_TARGET_PATHS,
+  makePatch,
   partAt,
   voiceTargetId,
 } from '@windsor/engine';
@@ -48,7 +50,20 @@ describe('adding and removing lanes', () => {
     const lanes = addLane([], 'filter.cutoff', 16);
     expect(lanes).toEqual([lane('filter.cutoff', new Array<number>(16).fill(0))]);
     expect(freeParams(lanes!)).not.toContain('filter.cutoff');
-    expect(freeParams(lanes!)).toHaveLength(VOICE_TARGET_PATHS.length - 1);
+    // A part whose patch defines no macro is offered none (windsor#559).
+    expect(freeParams(lanes!)).toHaveLength(VOICE_TARGET_PATHS.length - 1 - MACROS_MAX);
+  });
+
+  it("offers the macros the part's patch defines, under its names (windsor#559)", () => {
+    const patch = makePatch({ macros: [{ name: 'Accent' }, { name: 'Wobble' }] });
+    const lanes = addLane([], 'macros.0.value', 4)!;
+    const macros = freeParams(lanes, patch).filter((p) => p.startsWith('macros.'));
+    expect(macros).toEqual(['macros.1.value']);
+    expect(laneLabel('macros.0.value', patch)).toBe('Accent');
+    expect(laneLabel('macros.1.value', patch)).toBe('Wobble');
+    // A lane on a macro the patch does not define keeps the catalog's label.
+    expect(laneLabel('macros.2.value', patch)).toBe('Macro 3');
+    expect(laneLabel('filter.cutoff', patch)).toBe('Cutoff');
   });
 
   it('refuses the same parameter twice', () => {
@@ -137,7 +152,9 @@ describe("a lane's name (windsor#424)", () => {
     for (const param of VOICE_TARGET_PATHS) {
       expect(laneLabel(param), param).toBe(requireCatalogRow(voiceTargetId(param)).label);
     }
-    expect(new Set(VOICE_TARGET_PATHS.map(laneLabel)).size).toBe(VOICE_TARGET_PATHS.length);
+    expect(new Set(VOICE_TARGET_PATHS.map((p) => laneLabel(p))).size).toBe(
+      VOICE_TARGET_PATHS.length,
+    );
   });
 
   it('fits the narrow lane header', () => {

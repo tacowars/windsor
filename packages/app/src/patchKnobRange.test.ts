@@ -57,8 +57,10 @@ describe('voiceKnobRange', () => {
 describe('the Parts tab knobs over voice targets', () => {
   const knobs = new Map(allPatchKnobs().map((knob) => [knob.path, knob.entry.o]));
 
-  it('cover every voice target', () => {
-    for (const row of VOICE_AUTOMATION_ROWS) expect(knobs.has(row.path), row.path).toBe(true);
+  it('cover every voice target but the macros, whose knobs are the Macros card’s (windsor#558)', () => {
+    for (const row of VOICE_AUTOMATION_ROWS) {
+      expect(knobs.has(row.path), row.path).toBe(row.section.kind !== 'macro');
+    }
   });
 
   it("take each one's own catalog row, on every operator and envelope slot", () => {

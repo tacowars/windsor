@@ -26,7 +26,7 @@
  * the primary button up — a release it never saw — drops the preview (as PR
  * windsor#27's drags do) and writes nothing.
  */
-import type { StepModLane, VoiceTargetPath } from '@windsor/engine';
+import type { Patch, StepModLane, VoiceTargetPath } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
@@ -58,6 +58,8 @@ export interface LaneHost {
   lanes(): readonly StepModLane[] | null;
   /** The patch's own value at `param`, when the document carries the part's patch. */
   base(param: VoiceTargetPath): number | undefined;
+  /** The part's patch, when the document carries it: which macros the picker offers, and their names. */
+  patch(): Patch | undefined;
   /** Write a whole lane list through `ctx.change`; true when it took. */
   write(lanes: readonly StepModLane[]): boolean;
   /** Redraw the card from the document. */
@@ -81,11 +83,16 @@ export interface LaneHost {
 const valueAt = (host: LaneHost, lane: number, cell: number): number =>
   host.valueIndex?.(lane, cell) ?? cell;
 
-/** The patch value of `param` for the part on `slot`: what a readout's played value starts from. */
-export function patchBase(ctx: AppCtx, slot: number, param: VoiceTargetPath): number | undefined {
+/** The patch the part on `slot` plays, when the document carries it. */
+export function partPatch(ctx: AppCtx, slot: number): Patch | undefined {
   const doc = ctx.model.doc;
   const part = partAt(doc, slot);
-  const value = part ? getPath(doc.patches?.[part.preset], param) : undefined;
+  return part ? doc.patches?.[part.preset] : undefined;
+}
+
+/** The patch value of `param` for the part on `slot`: what a readout's played value starts from. */
+export function patchBase(ctx: AppCtx, slot: number, param: VoiceTargetPath): number | undefined {
+  const value = getPath(partPatch(ctx, slot), param);
   return typeof value === 'number' ? value : undefined;
 }
 
@@ -206,7 +213,7 @@ export function laneCell(host: LaneHost, k: number, index: number, sounds = true
   const hold = heldBySlide(host.slide?.(index) ?? NO_SLIDE, lane.param);
   cell.classList.toggle('held', hold === 'held');
   cell.classList.toggle('depends', hold === 'depends');
-  cell.setAttribute('aria-label', `${laneLabel(lane.param)} step ${at + 1}`);
+  cell.setAttribute('aria-label', `${laneLabel(lane.param, host.patch())} step ${at + 1}`);
   cell.appendChild(el('div', 'mod-bar'));
   drawCell(cell, lane.values[at] ?? 0);
   cell.addEventListener('pointerdown', (e) => pressCell(host, k, index, e));
@@ -222,13 +229,15 @@ export function paintLaneNames(names: HTMLElement, host: LaneHost): void {
   names.innerHTML = '';
   const lanes = host.lanes() ?? [];
   names.hidden = lanes.length === 0;
+  const patch = host.patch();
   lanes.forEach((lane, k) => {
     const row = el('div', 'mod-name');
     const head = el('div', 'mod-head');
-    head.appendChild(el('span', 'mod-title', laneLabel(lane.param)));
+    const label = laneLabel(lane.param, patch);
+    head.appendChild(el('span', 'mod-title', label));
     const remove = el('button', 'mod-x', '×') as HTMLButtonElement;
     remove.type = 'button';
-    remove.title = `Remove the ${laneLabel(lane.param)} lane`;
+    remove.title = `Remove the ${label} lane`;
     remove.onclick = (): void => {
       const now = host.lanes();
       if (now && host.write(removeLane(now, k))) host.repaint();
@@ -263,7 +272,12 @@ export function fillLanePicker(select: HTMLSelectElement, host: LaneHost): void 
   const open = canAddLane(lanes);
   select.innerHTML = '';
   select.add(new Option(open ? '+ Lane' : `Lanes full (${STEP_MOD_LANES_MAX})`, ''));
-  if (open) for (const param of freeParams(lanes)) select.add(new Option(laneLabel(param), param));
+  const patch = host.patch();
+  if (open) {
+    for (const param of freeParams(lanes, patch)) {
+      select.add(new Option(laneLabel(param, patch), param));
+    }
+  }
   select.value = '';
   select.disabled = !open;
 }

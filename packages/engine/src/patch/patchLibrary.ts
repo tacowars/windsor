@@ -20,13 +20,20 @@
  *   the patch completed, so a field added with a default costs no rewrite of
  *   the bank. A key it does not know, at any level, and a leaf of the wrong
  *   type are refused (record `2026-09-28-retire-the-headroom-record`).
+ *   `macros` is a list of up to `MACROS_MAX` records, each checked against
+ *   `makeMacro()`, its `mappings` up to `MACRO_MAPPINGS_MAX` against
+ *   `makeMacroMapping()`; a mapping whose target the voice target table
+ *   does not hold, is a macro, or is already mapped is refused (windsor#559,
+ *   record `2026-10-04-patch-macro-knobs` decision 9).
  *
  * Browser-safe: no Node, no DOM. `presets.ts` builds the whole-bank table from
  * the generated `patches/index.ts`; `fallbackPatch.ts` reads its single file
  * by id, so the playback path needs none of the rest.
  */
+import { MACRO_MAPPINGS_MAX, MACROS_MAX } from '../worklet/fm/patchDefaults';
+import { VOICE_TARGET_PATHS, macroTargetProblem } from '../worklet/fm/voiceTargetTables';
 import type { PartialPatch, Patch } from './patch';
-import { makePatch } from './patch';
+import { makeMacro, makeMacroMapping, makePatch } from './patch';
 import { PATCH_FILE_FORMAT, PatchFormatError, upgradePatchFile } from './patchMigrations';
 
 export { PATCH_FILE_FORMAT };
@@ -101,20 +108,61 @@ function keyDifference(
     .join('; ');
 }
 
+/** A variable-length list in a template: up to `max` records, each against `item`. */
+class RecordList {
+  constructor(
+    readonly item: object,
+    readonly max: number,
+  ) {}
+}
+
+/** The template a mapping is checked against; its `target` is a string like any path. */
+const MAPPING_TEMPLATE = makeMacroMapping({ target: VOICE_TARGET_PATHS[0]! });
+
+/** The patch template with its macro list as a `RecordList` of macros, each mapping list one too. */
+function patchTemplate(): Record<string, unknown> {
+  const macro = { ...makeMacro(), mappings: new RecordList(MAPPING_TEMPLATE, MACRO_MAPPINGS_MAX) };
+  return { ...makePatch(), macros: new RecordList(macro, MACROS_MAX) };
+}
+
 /**
  * The patch section against the default patch: no key it does not know at
  * any level, each present leaf of the template's type, and each array the
- * template's length (four operators, four LFO depths). A missing key is not
+ * template's length (four operators, four LFO depths), or for a list of
+ * records (`macros`, a macro's `mappings`) at most its bound. A missing key is not
  * a problem: `makePatch` fills it. Never checked against `makePatch(raw)`,
- * which would carry an unknown field straight through.
+ * which would carry an unknown field straight through. Then every mapping's
+ * target, in order, against the voice target table.
  */
 function patchProblems(raw: unknown): string[] {
   if (!isRecord(raw)) return ['patch: expected an object'];
-  return shapeDifferences(raw, makePatch(), 'patch');
+  const shape = shapeDifferences(raw, patchTemplate(), 'patch');
+  return shape.length ? shape : mappingTargetProblems(raw['macros']);
+}
+
+/** Each mapping whose target is not one a macro may map (`macroTargetProblem`), by path. */
+function mappingTargetProblems(macros: unknown): string[] {
+  const taken = new Set<string>();
+  const problems: string[] = [];
+  (Array.isArray(macros) ? macros : []).forEach((macro: Record<string, unknown>, i) => {
+    const mappings = Array.isArray(macro['mappings']) ? macro['mappings'] : [];
+    mappings.forEach((mapping: Record<string, unknown>, k) => {
+      const problem = macroTargetProblem(mapping['target'], taken);
+      if (problem) problems.push(`patch.macros[${i}].mappings[${k}].target: ${problem}`);
+      else taken.add(String(mapping['target']));
+    });
+  });
+  return problems;
 }
 
 /** Keys and leaf types of `actual` against the normalised `template`, by path; absent keys pass. */
 function shapeDifferences(actual: unknown, template: unknown, path: string): string[] {
+  if (template instanceof RecordList) {
+    if (!Array.isArray(actual)) return [`${path}: expected an array`];
+    if (actual.length > template.max)
+      return [`${path}: length ${actual.length}, at most ${template.max}`];
+    return actual.flatMap((item, i) => shapeDifferences(item, template.item, `${path}[${i}]`));
+  }
   if (Array.isArray(template)) {
     if (!Array.isArray(actual)) return [`${path}: expected an array`];
     if (actual.length !== template.length)

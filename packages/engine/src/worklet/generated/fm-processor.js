@@ -231,6 +231,7 @@ var LOOP_NONE = 0, LOOP_LOOP = 1, LOOP_TRIGGER = 2;
 var FILT_OFF = 0, FILT_LP = 1, FILT_HP = 2, FILT_BP = 3, FILT_NOTCH = 4, FILT_FORMANT = 5;
 var LFO_SINE = 0, LFO_TRI = 1, LFO_SAW_UP = 2, LFO_SAW_DOWN = 3, LFO_SQUARE = 4, LFO_SH = 5, LFO_DRIFT = 6;
 var DRIVE_SOFT = 0, DRIVE_HARD = 1, DRIVE_DIODE = 2, DRIVE_TUBE = 3, DRIVE_FOLD = 4;
+var MACRO_LINEAR = 0, MACRO_EXP = 1, MACRO_LOG = 2, MACRO_S = 3;
 var LOOP_MODE = { NONE: LOOP_NONE, LOOP: LOOP_LOOP, TRIGGER: LOOP_TRIGGER };
 var FILTER_MODE = {
   OFF: FILT_OFF,
@@ -255,6 +256,12 @@ var DRIVE_SHAPE = {
   DIODE: DRIVE_DIODE,
   TUBE: DRIVE_TUBE,
   FOLD: DRIVE_FOLD
+};
+var MACRO_CURVE = {
+  LINEAR: MACRO_LINEAR,
+  EXP: MACRO_EXP,
+  LOG: MACRO_LOG,
+  S: MACRO_S
 };
 
 // packages/engine/src/worklet/fm/waveIds.ts
@@ -386,6 +393,167 @@ var FEEDBACK_RANGE = { min: -1, max: 1 };
 var WIDTH_RANGE = { min: 0.05, max: 1 };
 var NOISE_COLOUR_RANGE = { min: 0, max: 2e4 };
 var NOISE_COLOUR_FLOOR_HZ = 20;
+var MACROS_MAX = 8;
+var MACRO_MAPPINGS_MAX = 8;
+var MACRO_VALUE_RANGE = { min: 0, max: 1 };
+var MACRO_DEFAULTS = { name: "Macro", value: 0 };
+var MACRO_MAPPING_DEFAULTS = { min: 0, max: 1, curve: MACRO_LINEAR, inverted: false };
+
+// packages/engine/src/worklet/fm/voiceTargetTables.ts
+var DECAY_FLOOR = 1e-3;
+var DECAY_MAX = 20;
+var halfTravel = (min, max) => 0.5 * Math.log2(max / min);
+var VOICE_TARGET_FILTER_ROWS = [
+  { path: "filter.cutoff", curve: "ratio", min: 30, max: 18e3, floor: 0, span: 4.5 },
+  { path: "filter.envAmount", curve: "add", min: -6, max: 6, floor: 0, span: 6 },
+  { path: "filter.resonance", curve: "add", min: 0.5, max: 12, floor: 0, span: 6 },
+  {
+    path: "filter.env.decayTime",
+    curve: "ratio",
+    min: DECAY_FLOOR,
+    max: DECAY_MAX,
+    floor: DECAY_FLOOR,
+    span: halfTravel(DECAY_FLOOR, DECAY_MAX)
+  },
+  {
+    path: "filter.vowel",
+    curve: "add",
+    min: VOWEL_RANGE.min,
+    max: VOWEL_RANGE.max,
+    floor: 0,
+    span: 2
+  }
+];
+var VOICE_TARGET_OPERATOR_ROWS = [
+  { field: "level", curve: "add", min: 0, max: 1, floor: 0, span: 0.5, slideKeeps: false },
+  {
+    field: "env.decayTime",
+    curve: "ratio",
+    min: DECAY_FLOOR,
+    max: DECAY_MAX,
+    floor: DECAY_FLOOR,
+    span: halfTravel(DECAY_FLOOR, DECAY_MAX),
+    slideKeeps: false
+  },
+  { field: "env.decayCurve", curve: "add", min: -1, max: 1, floor: 0, span: 1, slideKeeps: true },
+  {
+    field: "feedback",
+    curve: "add",
+    min: FEEDBACK_RANGE.min,
+    max: FEEDBACK_RANGE.max,
+    floor: 0,
+    span: 1,
+    slideKeeps: true
+  },
+  {
+    field: "width",
+    curve: "add",
+    min: WIDTH_RANGE.min,
+    max: WIDTH_RANGE.max,
+    floor: 0,
+    span: 0.5,
+    slideKeeps: false
+  }
+];
+var LFO_RATE_MIN = 0.02;
+var LFO_RATE_MAX = 40;
+var VOICE_TARGET_MOD_ROWS = [
+  { path: "lfo.amount", curve: "add", min: 0, max: 1, floor: 0, span: 0.5 },
+  {
+    path: "lfo.rate",
+    curve: "ratio",
+    min: LFO_RATE_MIN,
+    max: LFO_RATE_MAX,
+    floor: LFO_RATE_MIN,
+    span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
+  },
+  { path: "lfo2.amount", curve: "add", min: 0, max: 1, floor: 0, span: 0.5 },
+  {
+    path: "lfo2.rate",
+    curve: "ratio",
+    min: LFO_RATE_MIN,
+    max: LFO_RATE_MAX,
+    floor: LFO_RATE_MIN,
+    span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
+  },
+  { path: "pitchEnvAmount", curve: "add", min: -48, max: 48, floor: 0, span: 48 }
+];
+var VOICE_TARGET_MACRO_ROW = {
+  curve: "add",
+  min: MACRO_VALUE_RANGE.min,
+  max: MACRO_VALUE_RANGE.max,
+  floor: 0,
+  span: 1,
+  slideKeeps: false
+};
+var VOICE_TARGET_TABLE = [
+  ...VOICE_TARGET_FILTER_ROWS.map((row) => ({ ...row, slideKeeps: false })),
+  ...Array.from(
+    { length: OPERATOR_COUNT },
+    (_, i) => VOICE_TARGET_OPERATOR_ROWS.map(({ field, ...row }) => ({
+      path: `ops.${i}.${field}`,
+      ...row
+    }))
+  ).flat(),
+  ...VOICE_TARGET_MOD_ROWS.map((row) => ({ ...row, slideKeeps: false })),
+  ...Array.from({ length: MACROS_MAX }, (_, i) => ({
+    path: `macros.${i}.value`,
+    ...VOICE_TARGET_MACRO_ROW
+  }))
+];
+var VOICE_TARGET_PATHS = VOICE_TARGET_TABLE.map((row) => row.path);
+var VOICE_TARGET_COUNT = VOICE_TARGET_TABLE.length;
+var VT_CUTOFF = 0;
+var VT_ENV_AMOUNT = 1;
+var VT_RESONANCE = 2;
+var VT_FILTER_DECAY = 3;
+var VT_VOWEL = 4;
+var VT_OP_BASE = VOICE_TARGET_FILTER_ROWS.length;
+var VT_OP_STRIDE = VOICE_TARGET_OPERATOR_ROWS.length;
+var VT_OP_LEVEL = 0;
+var VT_OP_DECAY = 1;
+var VT_OP_DECAY_CURVE = 2;
+var VT_OP_FEEDBACK = 3;
+var VT_OP_WIDTH = 4;
+var VT_LFO_AMOUNT = VT_OP_BASE + OPERATOR_COUNT * VT_OP_STRIDE;
+var VT_LFO_RATE = VT_LFO_AMOUNT + 1;
+var VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
+var VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
+var VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
+var VT_MACRO_BASE = VT_PITCH_ENV_AMOUNT + 1;
+function isMacroCode(code) {
+  return code >= VT_MACRO_BASE && code < VT_MACRO_BASE + MACROS_MAX;
+}
+var VOICE_TARGET_RATIO = Uint8Array.from(
+  VOICE_TARGET_TABLE,
+  (row) => row.curve === "ratio" ? 1 : 0
+);
+var VOICE_TARGET_MIN = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.min);
+var VOICE_TARGET_MAX = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.max);
+var VOICE_TARGET_FLOOR = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.floor);
+var VOICE_TARGET_SPAN = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.span);
+var VOICE_TARGET_SLIDE_KEEPS = Uint8Array.from(
+  VOICE_TARGET_TABLE,
+  (row) => row.slideKeeps ? 1 : 0
+);
+function voiceTargetCode(path) {
+  return typeof path === "string" ? VOICE_TARGET_PATHS.indexOf(path) : -1;
+}
+function voiceTargetRow(path) {
+  const code = voiceTargetCode(path);
+  return code < 0 ? void 0 : VOICE_TARGET_TABLE[code];
+}
+function macroIndexOf(path) {
+  const code = voiceTargetCode(path);
+  return isMacroCode(code) ? code - VT_MACRO_BASE : -1;
+}
+function macroTargetProblem(target, taken) {
+  const code = voiceTargetCode(target);
+  if (code < 0) return `${JSON.stringify(target) ?? "undefined"} is not a voice target`;
+  if (isMacroCode(code)) return `${String(target)} is a macro`;
+  if (taken.has(String(target))) return `${String(target)} is already mapped`;
+  return void 0;
+}
 
 // packages/engine/src/worklet/fm/patchNormalise.ts
 function envDefaults(o, d = ENVELOPE_DEFAULTS) {
@@ -477,6 +645,41 @@ function driveDefaults(raw) {
   drive.on = typeof raw.on === "boolean" ? raw.on : driveOnByDefault(gain, bias);
   return drive;
 }
+function macroMappingDefaults(raw, taken) {
+  const o = raw || {};
+  const row = voiceTargetRow(o.target);
+  if (!row || macroTargetProblem(o.target, taken) !== void 0) return null;
+  taken.add(row.path);
+  const d = MACRO_MAPPING_DEFAULTS;
+  const curve = num(o.curve, d.curve) | 0;
+  return {
+    target: row.path,
+    min: clamp(num(o.min, d.min), row),
+    max: clamp(num(o.max, d.max), row),
+    curve: curve < MACRO_LINEAR || curve > MACRO_S ? MACRO_LINEAR : curve,
+    inverted: !!o.inverted
+  };
+}
+function macrosDefaults(raw) {
+  const list = Array.isArray(raw) ? raw : [];
+  const taken = /* @__PURE__ */ new Set();
+  const out = [];
+  for (let i = 0; i < list.length && i < MACROS_MAX; i++) {
+    const o = list[i] || {};
+    const rawMappings = Array.isArray(o.mappings) ? o.mappings : [];
+    const mappings = [];
+    for (let k = 0; k < rawMappings.length && k < MACRO_MAPPINGS_MAX; k++) {
+      const mapping = macroMappingDefaults(rawMappings[k], taken);
+      if (mapping) mappings.push(mapping);
+    }
+    out.push({
+      name: typeof o.name === "string" ? o.name : MACRO_DEFAULTS.name,
+      value: clamp(num(o.value, MACRO_DEFAULTS.value), MACRO_VALUE_RANGE),
+      mappings
+    });
+  }
+  return out;
+}
 function normalisePatch(raw) {
   raw = raw || {};
   const ops = [];
@@ -521,7 +724,8 @@ function normalisePatch(raw) {
       // Formant only (windsor#331)
       env: envDefaults(filtRaw.env, FILTER_ENV_DEFAULTS)
     },
-    drive: driveDefaults(raw.drive)
+    drive: driveDefaults(raw.drive),
+    macros: macrosDefaults(raw.macros)
   };
   return p;
 }
@@ -1430,135 +1634,6 @@ function updateVoiceDrive(voice) {
   drive.toneCoef = g / (1 + g);
 }
 
-// packages/engine/src/worklet/fm/voiceTargetTables.ts
-var DECAY_FLOOR = 1e-3;
-var DECAY_MAX = 20;
-var halfTravel = (min, max) => 0.5 * Math.log2(max / min);
-var VOICE_TARGET_FILTER_ROWS = [
-  { path: "filter.cutoff", curve: "ratio", min: 30, max: 18e3, floor: 0, span: 4.5 },
-  { path: "filter.envAmount", curve: "add", min: -6, max: 6, floor: 0, span: 6 },
-  { path: "filter.resonance", curve: "add", min: 0.5, max: 12, floor: 0, span: 6 },
-  {
-    path: "filter.env.decayTime",
-    curve: "ratio",
-    min: DECAY_FLOOR,
-    max: DECAY_MAX,
-    floor: DECAY_FLOOR,
-    span: halfTravel(DECAY_FLOOR, DECAY_MAX)
-  },
-  {
-    path: "filter.vowel",
-    curve: "add",
-    min: VOWEL_RANGE.min,
-    max: VOWEL_RANGE.max,
-    floor: 0,
-    span: 2
-  }
-];
-var VOICE_TARGET_OPERATOR_ROWS = [
-  { field: "level", curve: "add", min: 0, max: 1, floor: 0, span: 0.5, slideKeeps: false },
-  {
-    field: "env.decayTime",
-    curve: "ratio",
-    min: DECAY_FLOOR,
-    max: DECAY_MAX,
-    floor: DECAY_FLOOR,
-    span: halfTravel(DECAY_FLOOR, DECAY_MAX),
-    slideKeeps: false
-  },
-  { field: "env.decayCurve", curve: "add", min: -1, max: 1, floor: 0, span: 1, slideKeeps: true },
-  {
-    field: "feedback",
-    curve: "add",
-    min: FEEDBACK_RANGE.min,
-    max: FEEDBACK_RANGE.max,
-    floor: 0,
-    span: 1,
-    slideKeeps: true
-  },
-  {
-    field: "width",
-    curve: "add",
-    min: WIDTH_RANGE.min,
-    max: WIDTH_RANGE.max,
-    floor: 0,
-    span: 0.5,
-    slideKeeps: false
-  }
-];
-var LFO_RATE_MIN = 0.02;
-var LFO_RATE_MAX = 40;
-var VOICE_TARGET_MOD_ROWS = [
-  { path: "lfo.amount", curve: "add", min: 0, max: 1, floor: 0, span: 0.5 },
-  {
-    path: "lfo.rate",
-    curve: "ratio",
-    min: LFO_RATE_MIN,
-    max: LFO_RATE_MAX,
-    floor: LFO_RATE_MIN,
-    span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
-  },
-  { path: "lfo2.amount", curve: "add", min: 0, max: 1, floor: 0, span: 0.5 },
-  {
-    path: "lfo2.rate",
-    curve: "ratio",
-    min: LFO_RATE_MIN,
-    max: LFO_RATE_MAX,
-    floor: LFO_RATE_MIN,
-    span: halfTravel(LFO_RATE_MIN, LFO_RATE_MAX)
-  },
-  { path: "pitchEnvAmount", curve: "add", min: -48, max: 48, floor: 0, span: 48 }
-];
-var VOICE_TARGET_TABLE = [
-  ...VOICE_TARGET_FILTER_ROWS.map((row) => ({ ...row, slideKeeps: false })),
-  ...Array.from(
-    { length: OPERATOR_COUNT },
-    (_, i) => VOICE_TARGET_OPERATOR_ROWS.map(({ field, ...row }) => ({
-      path: `ops.${i}.${field}`,
-      ...row
-    }))
-  ).flat(),
-  ...VOICE_TARGET_MOD_ROWS.map((row) => ({ ...row, slideKeeps: false }))
-];
-var VOICE_TARGET_PATHS = VOICE_TARGET_TABLE.map((row) => row.path);
-var VOICE_TARGET_COUNT = VOICE_TARGET_TABLE.length;
-var VT_CUTOFF = 0;
-var VT_ENV_AMOUNT = 1;
-var VT_RESONANCE = 2;
-var VT_FILTER_DECAY = 3;
-var VT_VOWEL = 4;
-var VT_OP_BASE = VOICE_TARGET_FILTER_ROWS.length;
-var VT_OP_STRIDE = VOICE_TARGET_OPERATOR_ROWS.length;
-var VT_OP_LEVEL = 0;
-var VT_OP_DECAY = 1;
-var VT_OP_DECAY_CURVE = 2;
-var VT_OP_FEEDBACK = 3;
-var VT_OP_WIDTH = 4;
-var VT_LFO_AMOUNT = VT_OP_BASE + OPERATOR_COUNT * VT_OP_STRIDE;
-var VT_LFO_RATE = VT_LFO_AMOUNT + 1;
-var VT_LFO2_AMOUNT = VT_LFO_AMOUNT + 2;
-var VT_LFO2_RATE = VT_LFO_AMOUNT + 3;
-var VT_PITCH_ENV_AMOUNT = VT_LFO_AMOUNT + 4;
-var VOICE_TARGET_RATIO = Uint8Array.from(
-  VOICE_TARGET_TABLE,
-  (row) => row.curve === "ratio" ? 1 : 0
-);
-var VOICE_TARGET_MIN = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.min);
-var VOICE_TARGET_MAX = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.max);
-var VOICE_TARGET_FLOOR = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.floor);
-var VOICE_TARGET_SPAN = Float64Array.from(VOICE_TARGET_TABLE, (row) => row.span);
-var VOICE_TARGET_SLIDE_KEEPS = Uint8Array.from(
-  VOICE_TARGET_TABLE,
-  (row) => row.slideKeeps ? 1 : 0
-);
-function voiceTargetCode(path) {
-  return typeof path === "string" ? VOICE_TARGET_PATHS.indexOf(path) : -1;
-}
-function voiceTargetRow(path) {
-  const code = voiceTargetCode(path);
-  return code < 0 ? void 0 : VOICE_TARGET_TABLE[code];
-}
-
 // packages/engine/src/worklet/fm/voiceAmpRamp.ts
 function updateOperatorAmp(voice, i, n) {
   const patch = voice.patch;
@@ -1736,6 +1811,10 @@ function layoutVoiceTargets(patch, out) {
   out[VT_LFO2_AMOUNT] = patch.lfo2.amount;
   out[VT_LFO2_RATE] = patch.lfo2.rate;
   out[VT_PITCH_ENV_AMOUNT] = patch.pitchEnvAmount;
+  const macros = patch.macros;
+  for (let i = 0; i < MACROS_MAX; i++) {
+    out[VT_MACRO_BASE + i] = i < macros.length ? macros[i].value : MACRO_DEFAULTS.value;
+  }
 }
 
 // packages/engine/src/worklet/fm/voiceOffsets.ts

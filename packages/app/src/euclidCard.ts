@@ -50,6 +50,7 @@ import { paintRows } from './euclidRows';
 import { euclidTabs } from './euclidTabs';
 import { lightPlayhead } from './regionPlayhead';
 import type { DeviceBody } from './sequencerDevice';
+import { partPatch } from './stepModLane';
 import { specOf, watchPlayhead } from './stepStrip';
 
 const SECONDS_PER_MINUTE = 60;
@@ -110,7 +111,7 @@ function paintAll(live: Live, spec: EuclideanSpec, figure: Figure, pass: number)
   const group = stepGrouper(spec.divisor, card.ctx.model.doc.transport.meter);
   live.heads = paintRows(pattern.rows, pattern.rule, { card, spec, figure, view, pass, group });
   live.lit = live.heads.map(() => Number.NaN);
-  fillPicker(pattern.picker, laneChoices(spec));
+  fillPicker(pattern.picker, laneChoices(spec, partPatch(card.ctx, card.slot)));
   const lanes = lanesOf(spec);
   const lengths = lanes.map((ref) => laneLength(spec, ref));
   const cycle = fullCycle(spec.steps, lengths, spec.divisor, songBarTicks(card.ctx));

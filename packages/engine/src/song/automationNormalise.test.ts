@@ -151,6 +151,15 @@ describe('the target', () => {
     ]);
   });
 
+  it("keeps a lane on a macro, though the part's patch defines none (windsor#559)", () => {
+    // Record `2026-10-04-patch-macro-knobs` decision 7: the lane stays, and plays silent.
+    const macros = [
+      lane('voice.macros.0.value', [point(0, 0.5)]),
+      lane('voice.macros.7.value', [point(0, 1)]),
+    ];
+    expect(withLanes(macros)).toEqual({ lanes: macros, corrections: [] });
+  });
+
   it('keeps the first of two lanes on one target', () => {
     const { lanes, corrections } = withLanes([
       lane('strip.level', [point(0, 0.5)]),

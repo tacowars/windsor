@@ -12,12 +12,17 @@
  * with a correction otherwise; unknown keys are reported and dropped. Ranges
  * are the worklet's business — `fm-processor.js` clamps every patch value it
  * reads (`num(raw.volume, 0.8)`) — so a number here is only ever checked for
- * being one.
+ * being one. `macros` (windsor#559) is the one list of any length: up to
+ * `MACROS_MAX` macros, each against `makeMacro()`, and up to
+ * `MACRO_MAPPINGS_MAX` mappings each against `makeMacroMapping()`; a mapping
+ * whose target no macro may map (`macroTargetProblem`) is reported and dropped.
  */
 import type { FieldNormaliser } from '../song/arrangementFields';
 import { isRecord, show } from '../song/arrangementFields';
-import type { Patch } from './patch';
-import { driveOnByDefault, makePatch } from './patch';
+import { MACRO_MAPPINGS_MAX, MACROS_MAX } from '../worklet/fm/patchDefaults';
+import { macroTargetProblem } from '../worklet/fm/voiceTargetTables';
+import type { Macro, MacroMapping, Patch } from './patch';
+import { driveOnByDefault, makeMacro, makeMacroMapping, makePatch } from './patch';
 
 /** The `patches` section: a record of name → patch, junk entries dropped. */
 export function normalisePatches(
@@ -53,12 +58,58 @@ export function normalisePatch(
   path: string,
 ): Patch {
   const template = makePatch({ name: path.slice(path.lastIndexOf('.') + 1) });
-  const patch = walk(template, raw, n, path) as Patch;
+  const patch = walk(template, { ...raw, macros: undefined }, n, path) as Patch;
+  patch.macros = normaliseMacros(raw['macros'], n, `${path}.macros`);
   const drive = raw['drive'];
   if (!isRecord(drive) || typeof drive['on'] !== 'boolean') {
     patch.drive.on = driveOnByDefault(patch.drive.gain, patch.drive.bias);
   }
   return patch;
+}
+
+/** A list's items, the first `max` of them, with a correction for the rest; none for a non-list. */
+function boundedList(raw: unknown, max: number, n: FieldNormaliser, path: string): unknown[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    n.correction(`${path}: ${show(raw)} is not a list — using none`);
+    return [];
+  }
+  if (raw.length > max)
+    n.correction(`${path}: ${raw.length} entries, at most ${max} — the rest dropped`);
+  return raw.slice(0, max);
+}
+
+/** The patch's macros, each walked against `makeMacro()` with its mappings on their own. */
+function normaliseMacros(raw: unknown, n: FieldNormaliser, path: string): Macro[] {
+  const taken = new Set<string>();
+  return boundedList(raw, MACROS_MAX, n, path).map((item, i) => {
+    const at = `${path}[${i}]`;
+    const fields = isRecord(item) ? { ...item, mappings: undefined } : item;
+    const macro = walk(makeMacro(), fields, n, at) as Macro;
+    const mappings = isRecord(item) ? item['mappings'] : undefined;
+    macro.mappings = normaliseMappings(mappings, n, `${at}.mappings`, taken);
+    return macro;
+  });
+}
+
+/** A macro's mappings: one whose target no macro may map is reported and dropped. */
+function normaliseMappings(
+  raw: unknown,
+  n: FieldNormaliser,
+  path: string,
+  taken: Set<string>,
+): MacroMapping[] {
+  const out: MacroMapping[] = [];
+  boundedList(raw, MACRO_MAPPINGS_MAX, n, path).forEach((item, k) => {
+    const at = `${path}[${k}]`;
+    const target = isRecord(item) ? item['target'] : undefined;
+    const problem = isRecord(item) ? macroTargetProblem(target, taken) : 'not a mapping';
+    if (problem) return n.correction(`${at}: ${problem} — dropped`);
+    const template = makeMacroMapping({ target: target as MacroMapping['target'] });
+    out.push(walk(template, item, n, at) as MacroMapping);
+    taken.add(String(target));
+  });
+  return out;
 }
 
 function walk(template: unknown, raw: unknown, n: FieldNormaliser, path: string): unknown {

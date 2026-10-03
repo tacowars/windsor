@@ -23,6 +23,7 @@ import {
   voiceTargetId,
 } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
+import { MACROS_MAX } from '../worklet/fm/patchDefaults';
 import { voiceSlotParamName } from './audioPart';
 import { voiceOffset } from './voiceAutomation';
 
@@ -149,6 +150,9 @@ describe("the cutoff lane across the catalog's whole range (windsor#346)", () =>
   });
 });
 
+/** A patch that defines every macro, so each macro row has a value to move (windsor#559). */
+const EVERY_MACRO = makePatch({ macros: Array.from({ length: MACROS_MAX }, () => ({})) });
+
 describe("every voice lane's offset fits its parameter (windsor#346)", () => {
   const processor = loaded.create(makePatch(), 4);
   // Each voice row a handle plays (the decay rows since windsor#347); every
@@ -164,7 +168,7 @@ describe("every voice lane's offset fits its parameter (windsor#346)", () => {
       ] as const) {
         // The patch at one end, the lane at the other: the widest offset the
         // main thread sends for this row.
-        const offset = voiceOffset(moved(makePatch(), row.path, from), row.path, row, to);
+        const offset = voiceOffset(moved(EVERY_MACRO, row.path, from), row.path, row, to);
         expect(offset).not.toBe(0);
         expect(clipped(processor, slot, offset)).toBe(Math.fround(offset));
       }

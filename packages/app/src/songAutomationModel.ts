@@ -9,7 +9,9 @@
  * Every edit returns the part's whole new list, since a merge replaces an
  * array wholesale, and `automationChange` wraps it as the partial the view
  * commits. The catalog, the display space and the evaluator are the
- * engine's; the curve's geometry is `songAutomationCurve.ts`.
+ * engine's; the curve's geometry is `songAutomationCurve.ts`. The picker,
+ * a lane's row and its title take the part's patch, so a macro is offered
+ * and named only as the patch defines it (windsor#559, `macroTargets.ts`).
  */
 import type {
   AutomationLane,
@@ -37,6 +39,7 @@ import {
   targetRow,
 } from '@windsor/engine';
 import { INSERT_LABELS } from './insertKnobTables';
+import { macroName, offersVoicePath } from './macroTargets';
 import { getPath } from './patchPath';
 import {
   INACTIVE_WHY,
@@ -93,18 +96,30 @@ export function insertLabels(inserts: readonly InsertSpec[]): ReadonlyMap<string
 const insertOf = (part: DocumentPart, insertId: string): InsertSpec | undefined =>
   part.strip.inserts.find((spec) => spec.id === insertId);
 
-/** The row behind `target` on `part`: its bounds, scale and label. */
-export function laneRow(part: DocumentPart, target: string): AutomationTargetRow | undefined {
-  return targetRow(target, (insertId) => insertOf(part, insertId)?.kind);
+/**
+ * The row behind `target` on `part`: its bounds, scale and label, a macro's
+ * label the name `patch` (the part's) gives it.
+ */
+export function laneRow(
+  part: DocumentPart,
+  target: string,
+  patch?: Patch,
+): AutomationTargetRow | undefined {
+  const row = targetRow(target, (insertId) => insertOf(part, insertId)?.kind);
+  const parsed = parseTargetId(target);
+  const name = parsed?.kind === 'voice' ? macroName(patch, parsed.path) : undefined;
+  return row && name !== undefined ? { ...row, label: name } : row;
 }
 
 /**
  * The picker's groups (decision 4): Mixer, one group per insert in the chain
  * listing the fields its settings leave read (`automatableInsertFields`),
- * then the voice's groups, then Sequencer with the fields the part's
- * sequencer kind offers (windsor#491), left out when it offers none.
+ * then the voice's groups, then Macros with each macro `patch` (the part's)
+ * defines, under its name (windsor#559), then Sequencer with the fields the
+ * part's sequencer kind offers (windsor#491); a group with nothing in it is
+ * left out.
  */
-export function pickerGroups(part: DocumentPart): PickerGroup[] {
+export function pickerGroups(part: DocumentPart, patch?: Patch): PickerGroup[] {
   const lanes = lanesOf(part);
   const used = new Set<string>(lanes.map((lane) => lane.target));
   const voiceFull = voiceLaneCount(lanes) >= FM_LANES_MAX;
@@ -124,8 +139,10 @@ export function pickerGroups(part: DocumentPart): PickerGroup[] {
   });
   const voice = new Map<string, PickerOption[]>();
   for (const row of VOICE_AUTOMATION_ROWS) {
+    if (!offersVoicePath(patch, row.path)) continue;
     const label = voiceGroupLabel(row.section, OP_NAMES);
-    voice.set(label, [...(voice.get(label) ?? []), option(row.target, row.label, voiceFull)]);
+    const name = macroName(patch, row.path) ?? row.label;
+    voice.set(label, [...(voice.get(label) ?? []), option(row.target, name, voiceFull)]);
   }
   const mixer = STRIP_AUTOMATION_ROWS.map((row) => option(row.target, row.label));
   const seq = seqTargetIds(part.sequencer.kind).map((target) =>
@@ -151,9 +168,13 @@ export interface LaneTitle {
   readonly kind: AutomationTargetKind;
 }
 
-export function laneTitle(part: DocumentPart, target: AutomationTargetId): LaneTitle {
+export function laneTitle(
+  part: DocumentPart,
+  target: AutomationTargetId,
+  patch?: Patch,
+): LaneTitle {
   const kind = targetKind(target);
-  const name = laneRow(part, target)?.label ?? target;
+  const name = laneRow(part, target, patch)?.label ?? target;
   const parsed = parseTargetId(target);
   if (parsed?.kind === 'insert') {
     const kindLine = insertLabels(part.strip.inserts).get(parsed.insertId) ?? '';

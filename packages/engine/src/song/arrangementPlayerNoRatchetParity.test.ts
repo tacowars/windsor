@@ -107,7 +107,10 @@ describe('a song with no ratchet plays as before (windsor#366)', () => {
     // Re-pinned for windsor#419: the cutoff lane's note-on step arrays moved
     // from the 24-slot step layout to the 30-target table (cutoff from slot 1
     // to code 0). Remapped onto the new codes, every call matched `main`'s.
-    expect(play(GRID)).toEqual({ count: 84, digest: '4152cb420eecc552' });
+    // Re-pinned for windsor#559: the table grew to 38 rows, so a note-on's
+    // step array carries eight trailing zeros for the macro rows; every call
+    // otherwise matched.
+    expect(play(GRID)).toEqual({ count: 84, digest: 'd00c74d8db900434' });
   });
 
   it('an Arp part', () => {

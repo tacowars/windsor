@@ -9,7 +9,7 @@
  * - `strip.level`, `strip.pan`, `strip.send.a`, `strip.send.b`;
  * - `insert.<insertId>.<field>`, the insert's stable id (`inserts/insertIds.ts`)
  *   and a field one of the kinds automates, `bands.3.freq` among them;
- * - `voice.<patch path>`, one of the 30 voice rows;
+ * - `voice.<patch path>`, one of the 38 voice rows;
  * - `seq.<field>`, a field of the part's sequencer (windsor#488), offered by
  *   kind (`SEQ_AUTOMATION_FIELDS`); the region gate reads it, not the graph.
  *
@@ -63,10 +63,10 @@ export function voicePathOf(id: string): string | undefined {
 }
 
 /**
- * The voice's 30 rows (decision 2, windsor#406), one per row of the voice
+ * The voice's 38 rows (decision 2, windsor#406), one per row of the voice
  * target table and in its order (windsor#419): the filter's four and the
- * Formant vowel, each operator's five, LFO 1 and LFO 2 amount and rate, and
- * the pitch-envelope amount. Each carries its patch path and its section
+ * Formant vowel, each operator's five, LFO 1 and LFO 2 amount and rate, the
+ * pitch-envelope amount, and the eight macros' values (windsor#559). Each carries its patch path and its section
  * (windsor#436).
  */
 export const VOICE_AUTOMATION_ROWS: readonly VoiceAutomationRow[] = VOICE_TARGET_TABLE.map(

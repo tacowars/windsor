@@ -20,6 +20,7 @@ import {
   VOICE_TARGET_COUNT,
   VOICE_TARGET_PATHS,
   VOICE_TARGET_TABLE,
+  macroIndexOf,
   voiceTargetRow,
 } from '../worklet/fm/voiceTargetTables';
 import { stepModValue } from '../worklet/fm/voiceTargetValue';
@@ -82,11 +83,11 @@ const FORMANT: Patch = {
 /** The patch a parameter is heard on. */
 const patchFor = (param: VoiceTargetPath): Patch => (param === 'filter.vowel' ? FORMANT : PATCH);
 
-/** The patch's own value at a parameter's path. */
+/** The patch's own value at a parameter's path; a macro the patch does not define is at 0 (windsor#559). */
 function base(patch: Patch, param: VoiceTargetPath): number {
   let at: unknown = patch;
-  for (const key of param.split('.')) at = (at as Record<string, unknown>)[key];
-  return at as number;
+  for (const key of param.split('.')) at = (at as Record<string, unknown> | undefined)?.[key];
+  return (at as number | undefined) ?? 0;
 }
 
 /** The voice's value for a parameter: what the control update, the envelopes and the loops read. */
@@ -133,7 +134,9 @@ describe('step offsets in the voice (windsor#17)', () => {
     expect(renderWith(new Array<number>(VOICE_TARGET_COUNT).fill(0))).toEqual(renderWith());
   });
 
-  it.each(VOICE_TARGET_PATHS.map((p) => [p]))('%s moves its target and the render', (param) => {
+  // A macro moves nothing audible until the voice resolves its mappings (windsor#558).
+  const audible = VOICE_TARGET_PATHS.filter((p) => macroIndexOf(p) < 0);
+  it.each(audible.map((p) => [p]))('%s moves its target and the render', (param) => {
     const row = voiceTargetRow(param)!;
     const patch = patchFor(param);
     const plain = renderWith(undefined, true, patch);

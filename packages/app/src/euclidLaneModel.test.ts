@@ -13,8 +13,10 @@ import {
   ARRANGEMENT_VERSION,
   EUCLID_LANE_STEPS_MAX,
   EUCLID_PITCH_LANE_MAX,
+  MACROS_MAX,
   STEP_MOD_LANES_MAX,
   VOICE_TARGET_PATHS,
+  makePatch,
   partAt,
   regionPattern,
 } from '@windsor/engine';
@@ -145,6 +147,19 @@ describe('Add lane', () => {
     expect(addLaneRow(ROWS, 'pitch', 16)).toBeNull();
   });
 
+  it("offers the macros the part's patch defines, by name, and adds one (windsor#559)", () => {
+    const patch = makePatch({ macros: [{ name: 'Accent' }, { name: 'Wobble' }] });
+    const macros = laneChoices({}, patch).filter((c) => c.value.startsWith('macros.'));
+    expect(macros.map((c) => [c.value, c.label])).toEqual([
+      ['macros.0.value', 'Accent'],
+      ['macros.1.value', 'Wobble'],
+    ]);
+    expect(addLaneRow({}, 'macros.1.value', 4, patch)).toEqual({
+      modLanes: [{ param: 'macros.1.value', values: [0, 0, 0, 0] }],
+    });
+    expect(addLaneRow({}, 'macros.2.value', 4, patch)).toBeNull();
+  });
+
   it('offers each sound parameter once, and none at four sound lanes', () => {
     expect(laneChoices(ROWS).find((c) => c.value === 'filter.cutoff')?.disabled).toBe(true);
     expect(addLaneRow(ROWS, 'filter.cutoff', 16)).toBeNull();
@@ -155,7 +170,7 @@ describe('Add lane', () => {
       })),
     };
     const sounds = laneChoices(full).filter((c) => c.value !== 'accent' && c.value !== 'pitch');
-    expect(sounds).toHaveLength(VOICE_TARGET_PATHS.length);
+    expect(sounds).toHaveLength(VOICE_TARGET_PATHS.length - MACROS_MAX);
     expect(sounds.every((c) => c.disabled)).toBe(true);
     // The accent and pitch lanes do not count against the four.
     expect(addLaneRow(full, 'accent', 16)).not.toBeNull();

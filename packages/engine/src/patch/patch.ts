@@ -26,10 +26,13 @@ import {
   LFO_DEFAULTS,
   LFO_TO_OP_DEFAULT,
   LFO_TO_WIDTH_DEFAULT,
+  MACRO_DEFAULTS,
+  MACRO_MAPPING_DEFAULTS,
   OPERATOR_DEFAULTS,
   PATCH_DEFAULTS,
   PITCH_ENV_DEFAULTS,
 } from '../worklet/fm/patchDefaults';
+import type { VoiceTargetPath } from '../worklet/fm/voiceTargetTables';
 
 export const WAVE_NAMES = [
   'Sine',
@@ -46,7 +49,7 @@ export const WAVE_NAMES = [
 ] as const;
 
 /** The mode ids live with the worklet that switches on them (`worklet/fm/modeIds.ts`, #669). */
-export { DRIVE_SHAPE, FILTER_MODE, LFO_SHAPE, LOOP_MODE } from '../worklet/fm/modeIds';
+export { DRIVE_SHAPE, FILTER_MODE, LFO_SHAPE, LOOP_MODE, MACRO_CURVE } from '../worklet/fm/modeIds';
 /** The drive switch a patch that omits it takes (windsor#309), from the table both fills read. */
 export { driveOnByDefault };
 
@@ -66,6 +69,9 @@ export const LOOP_MODE_NAMES = ['None', 'Loop', 'Trigger'] as const;
 
 /** The voice drive's shapes, by `DRIVE_SHAPE` id (windsor#300). */
 export const DRIVE_SHAPE_NAMES = ['Soft', 'Hard', 'Diode', 'Tube', 'Fold'] as const;
+
+/** A macro mapping's curves, by `MACRO_CURVE` id (windsor#559). */
+export const MACRO_CURVE_NAMES = ['Linear', 'Exp', 'Log', 'S'] as const;
 
 /** Operators are labelled A B C D, with A nearest the output. */
 export const OP_NAMES = ['A', 'B', 'C', 'D'] as const;
@@ -196,6 +202,33 @@ export interface DriveSettings {
   tone: number;
 }
 
+/**
+ * One parameter a macro moves (windsor#559, record
+ * `2026-10-04-patch-macro-knobs` decisions 2–5): its voice target (never a
+ * macro's own row, and one mapping per target across the patch), the
+ * target's value at the macro's 0 and 1 in the target's own units, a
+ * `MACRO_CURVE` id the macro's travel is shaped by, and whether the travel
+ * runs the other way.
+ */
+export interface MacroMapping {
+  target: VoiceTargetPath;
+  min: number;
+  max: number;
+  curve: number;
+  inverted: boolean;
+}
+
+/**
+ * One macro knob: its name, its value 0..1 (what the Parts tab's knob sets
+ * and a lane overrides live, through the voice target row
+ * `macros.<i>.value`) and up to `MACRO_MAPPINGS_MAX` mappings.
+ */
+export interface Macro {
+  name: string;
+  value: number;
+  mappings: MacroMapping[];
+}
+
 export interface Patch {
   name: string;
   algorithm: number;
@@ -224,18 +257,28 @@ export interface Patch {
   lfo2: LfoSettings;
   filter: FilterSettings;
   drive: DriveSettings;
+  /** Up to `MACROS_MAX` macros (windsor#559); none by default. */
+  macros: Macro[];
 }
 
 /** An operator with every field optional, its envelope included; `makeOperator` completes it. */
 export type PartialOperator = Partial<Omit<Operator, 'env'>> & { env?: Partial<Envelope> };
 
+/** A mapping with every field but its `target` optional; `makeMacroMapping` completes it. */
+export type PartialMacroMapping = Partial<MacroMapping> & Pick<MacroMapping, 'target'>;
+
+/** A macro with every field optional, its mappings partial; `makeMacro` completes it. */
+export type PartialMacro = Partial<Omit<Macro, 'mappings'>> & { mappings?: PartialMacroMapping[] };
+
 /** Every field optional, recursively -- what an editor or a preset supplies. */
 export type PartialPatch = {
   [K in keyof Patch]?: K extends 'ops'
     ? PartialOperator[]
-    : Patch[K] extends object
-      ? Partial<Patch[K]>
-      : Patch[K];
+    : K extends 'macros'
+      ? PartialMacro[]
+      : Patch[K] extends object
+        ? Partial<Patch[K]>
+        : Patch[K];
 };
 
 export function makeEnvelope(
@@ -251,6 +294,17 @@ export function makeOperator(o: PartialOperator = {}): Operator {
     ...o,
     env: makeEnvelope(o.env),
   };
+}
+
+/** A mapping over its defaults; its `target` is its own, since it has none. */
+export function makeMacroMapping(o: PartialMacroMapping): MacroMapping {
+  return { ...MACRO_MAPPING_DEFAULTS, ...o };
+}
+
+/** A macro over its defaults, each mapping completed and one with no `target` dropped. */
+export function makeMacro(o: PartialMacro = {}): Macro {
+  const mappings = (o.mappings ?? []).filter((m) => m.target !== undefined);
+  return { ...MACRO_DEFAULTS, ...o, mappings: mappings.map(makeMacroMapping) };
 }
 
 /** An LFO over its defaults, its per-operator depths filled when the partial names none. */
@@ -282,6 +336,7 @@ export function makePatch(o: PartialPatch = {}): Patch {
       env: makeEnvelope(o.filter?.env ?? {}, FILTER_ENV_DEFAULTS),
     },
     drive: makeDrive(o.drive),
+    macros: (o.macros ?? []).map(makeMacro),
   };
 }
 
@@ -310,7 +365,7 @@ function mergeInto(current: unknown, partial: unknown): unknown {
 
 /**
  * A partial patch over a complete one, then completed again: objects recurse,
- * arrays (`ops`, `toOp`, `toWidth`, `userPartials`) are replaced wholesale. The live
+ * arrays (`ops`, `toOp`, `toWidth`, `userPartials`, `macros`) are replaced wholesale. The live
  * `patches` path of `AudioSystem.apply` merges a document's patch edit over
  * the part's current patch with this, so a partial names only what changes.
  */

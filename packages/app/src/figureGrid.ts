@@ -43,6 +43,7 @@ import {
   laneCells,
   lanePicker,
   paintLaneNames,
+  partPatch,
   patchBase,
 } from './stepModLane';
 import { NO_SLIDE } from './stepModLaneModel';
@@ -210,6 +211,7 @@ function laneHost(strip: Strip<FigureSpec>, scope: HTMLElement): LaneHost {
     scope,
     lanes: () => strip.spec()?.lanes ?? null,
     base: (param) => patchBase(ctx, slot, param),
+    patch: () => partPatch(ctx, slot),
     write: (lanes) => changePattern(ctx, slot, region, { lanes }),
     repaint: () => strip.repaint(),
     stepCount: () => strip.spec()?.cells.length ?? 0,

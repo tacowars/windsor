@@ -14,6 +14,8 @@ import {
   LFO_SHAPE_NAMES,
   LOOP_MODE as MAIN_LOOP_MODE,
   LOOP_MODE_NAMES,
+  MACRO_CURVE as MAIN_MACRO_CURVE,
+  MACRO_CURVE_NAMES,
 } from '../../patch/patch';
 import {
   DRIVE_FOLD,
@@ -29,6 +31,9 @@ import {
   LOOP_MODE,
   LOOP_NONE,
   LOOP_TRIGGER,
+  MACRO_CURVE,
+  MACRO_LINEAR,
+  MACRO_S,
 } from './modeIds';
 
 describe('mode ids', () => {
@@ -37,6 +42,7 @@ describe('mode ids', () => {
     expect(MAIN_FILTER_MODE).toBe(FILTER_MODE);
     expect(MAIN_LFO_SHAPE).toBe(LFO_SHAPE);
     expect(MAIN_DRIVE_SHAPE).toBe(DRIVE_SHAPE);
+    expect(MAIN_MACRO_CURVE).toBe(MACRO_CURVE);
   });
 
   it('builds each object from the scalars the DSP switches on', () => {
@@ -47,6 +53,7 @@ describe('mode ids', () => {
     expect(FILTER_MODE_NAMES[FILT_FORMANT]).toBe('Formant');
     expect([LFO_SHAPE.SINE, LFO_SHAPE.DRIFT]).toEqual([LFO_SINE, LFO_DRIFT]);
     expect([DRIVE_SHAPE.SOFT, DRIVE_SHAPE.FOLD]).toEqual([DRIVE_SOFT, DRIVE_FOLD]);
+    expect([MACRO_CURVE.LINEAR, MACRO_CURVE.S]).toEqual([MACRO_LINEAR, MACRO_S]);
   });
 
   it('numbers each set densely from zero, one console name per id', () => {
@@ -55,6 +62,7 @@ describe('mode ids', () => {
       [FILTER_MODE, FILTER_MODE_NAMES],
       [LFO_SHAPE, LFO_SHAPE_NAMES],
       [DRIVE_SHAPE, DRIVE_SHAPE_NAMES],
+      [MACRO_CURVE, MACRO_CURVE_NAMES],
     ];
     for (const [ids, names] of sets) {
       const values = Object.values(ids);

@@ -122,6 +122,7 @@ export const CLICKS_PATCH: Patch = {
   },
   // The filter's drive of 1 before windsor#300: the drive stage bypassed.
   drive: { gain: 1, shape: 0, bias: 0, tone: 1, on: false },
+  macros: [],
 };
 
 /**

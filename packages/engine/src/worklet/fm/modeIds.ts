@@ -1,8 +1,9 @@
 /**
  * The patch's mode ids (#669): the envelope loop modes, the filter modes,
- * the LFO shapes and the voice drive's shapes (windsor#300) — the numbers the
- * worklet switches on and the main thread's `patch.ts` re-exports as
- * `LOOP_MODE`, `FILTER_MODE`, `LFO_SHAPE` and `DRIVE_SHAPE`, so a
+ * the LFO shapes, the voice drive's shapes (windsor#300) and a macro
+ * mapping's curves (windsor#559) — the numbers the worklet switches on and
+ * the main thread's `patch.ts` re-exports as `LOOP_MODE`, `FILTER_MODE`,
+ * `LFO_SHAPE`, `DRIVE_SHAPE` and `MACRO_CURVE`, so a
  * patch, a preset, the console and the DSP name a mode the same way. The
  * scalars are what the hot paths compare against (a module constant, never a
  * property load); the objects are built from them, so each number is written
@@ -41,6 +42,15 @@ const DRIVE_SOFT = 0,
   DRIVE_TUBE = 3,
   DRIVE_FOLD = 4;
 
+/**
+ * A macro mapping's curves (windsor#559, record `2026-10-04-patch-macro-knobs`
+ * decision 4): Linear `x`, Exp `x³`, Log `1 − (1 − x)³`, S `x²(3 − 2x)`.
+ */
+const MACRO_LINEAR = 0,
+  MACRO_EXP = 1,
+  MACRO_LOG = 2,
+  MACRO_S = 3;
+
 const LOOP_MODE = { NONE: LOOP_NONE, LOOP: LOOP_LOOP, TRIGGER: LOOP_TRIGGER } as const;
 
 const FILTER_MODE = {
@@ -70,6 +80,13 @@ const DRIVE_SHAPE = {
   FOLD: DRIVE_FOLD,
 } as const;
 
+const MACRO_CURVE = {
+  LINEAR: MACRO_LINEAR,
+  EXP: MACRO_EXP,
+  LOG: MACRO_LOG,
+  S: MACRO_S,
+} as const;
+
 export {
   LOOP_NONE,
   LOOP_LOOP,
@@ -92,8 +109,13 @@ export {
   DRIVE_DIODE,
   DRIVE_TUBE,
   DRIVE_FOLD,
+  MACRO_LINEAR,
+  MACRO_EXP,
+  MACRO_LOG,
+  MACRO_S,
   LOOP_MODE,
   FILTER_MODE,
   LFO_SHAPE,
   DRIVE_SHAPE,
+  MACRO_CURVE,
 };

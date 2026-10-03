@@ -38,6 +38,7 @@ import {
   fillLanePicker,
   lanePicker,
   paintLaneNames,
+  partPatch,
   patchBase,
 } from './stepModLane';
 import { NO_SLIDE } from './stepModLaneModel';
@@ -116,6 +117,7 @@ function laneHost(strip: Strip<GridSpec>, scope: HTMLElement): LaneHost {
     scope,
     lanes: () => spec()?.lanes ?? null,
     base: (param) => patchBase(ctx, slot, param),
+    patch: () => partPatch(ctx, slot),
     write: (lanes) => changePattern(ctx, slot, region, { lanes }),
     repaint: () => strip.repaint(),
     stepCount: () => spec()?.steps.length ?? 0,

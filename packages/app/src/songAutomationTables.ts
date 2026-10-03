@@ -159,13 +159,15 @@ export const insertGroupLabel = (insertLabel: string): string => `Insert · ${in
 /**
  * The voice's group labels in the picker (decision 4), by the catalog's
  * section (windsor#436); the groups come in the catalog's order. An
- * operator's group is this label and the operator's letter.
+ * operator's group is this label and the operator's letter. The macros are
+ * one group, after the voice's (windsor#559).
  */
 export const VOICE_GROUPS: Readonly<Record<VoiceSection['kind'], string>> = {
   filter: 'Voice · Filter',
   operator: 'Voice · Op',
   lfo: 'Voice · LFO',
   pitch: 'Voice · Pitch',
+  macro: 'Macros',
 };
 
 /** A voice section's group label: `Voice · Filter`, `Voice · Op B`. */

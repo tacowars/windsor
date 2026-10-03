@@ -20,6 +20,7 @@
 import { OP_NAMES } from '../patch/patch';
 import {
   VT_LFO_AMOUNT,
+  VT_MACRO_BASE,
   VT_OP_BASE,
   VT_OP_STRIDE,
   VT_PITCH_ENV_AMOUNT,
@@ -82,8 +83,10 @@ interface VoiceLook {
 
 /** An operator's target, `ops.<i>.<field>`. */
 type OperatorPath = Extract<VoiceTargetPath, `ops.${string}`>;
+/** A macro's target, `macros.<i>.value` (windsor#559). */
+type MacroPath = Extract<VoiceTargetPath, `macros.${string}`>;
 /** Every other target: the filter's, the LFOs' and the pitch envelope's. */
-type VoicePath = Exclude<VoiceTargetPath, OperatorPath>;
+type VoicePath = Exclude<VoiceTargetPath, OperatorPath | MacroPath>;
 /** The field an operator path names, `env.decayTime` of `ops.2.env.decayTime`. */
 type FieldOf<P> = P extends `ops.${number}.${infer F}` ? F : never;
 /** An operator's five fields. */
@@ -121,13 +124,21 @@ const OPERATOR_LOOKS: Readonly<Record<OperatorField, VoiceLook>> = {
 };
 
 /**
+ * A macro's look (windsor#559, record `2026-10-04-patch-macro-knobs`
+ * decision 10): `Macro <i + 1>` is the fallback a lane on a macro the patch
+ * does not define shows; the pickers and lane titles read the patch's name.
+ */
+const MACRO_LOOK: VoiceLook = { label: 'Macro', scale: 'linear', unit: '' };
+
+/**
  * The part of the voice a target sits in, which the song-lane picker groups
- * its rows by: the filter, one operator (its index), the LFOs or the pitch
- * envelope.
+ * its rows by: the filter, one operator (its index), the LFOs, the pitch
+ * envelope or one macro (its index).
  */
 export type VoiceSection =
   | { readonly kind: 'filter' | 'lfo' | 'pitch' }
-  | { readonly kind: 'operator'; readonly op: number };
+  | { readonly kind: 'operator'; readonly op: number }
+  | { readonly kind: 'macro'; readonly index: number };
 
 /**
  * A voice row: one voice target's catalog row, with the target's patch path
@@ -142,19 +153,21 @@ export interface VoiceAutomationRow extends AutomationTargetRow {
 /**
  * The section of the target with code `code`, from the target table's own
  * layout: the filter's rows, then `VT_OP_STRIDE` rows per operator from
- * `VT_OP_BASE`, then the LFOs' from `VT_LFO_AMOUNT`, and the pitch
- * envelope's from `VT_PITCH_ENV_AMOUNT`.
+ * `VT_OP_BASE`, then the LFOs' from `VT_LFO_AMOUNT`, the pitch
+ * envelope's from `VT_PITCH_ENV_AMOUNT`, and the macros' from `VT_MACRO_BASE`.
  */
 export function voiceSectionOf(code: number): VoiceSection {
   if (code < VT_OP_BASE) return { kind: 'filter' };
   if (code < VT_LFO_AMOUNT) {
     return { kind: 'operator', op: Math.floor((code - VT_OP_BASE) / VT_OP_STRIDE) };
   }
+  if (code >= VT_MACRO_BASE) return { kind: 'macro', index: code - VT_MACRO_BASE };
   return { kind: code < VT_PITCH_ENV_AMOUNT ? 'lfo' : 'pitch' };
 }
 
-/** The look of the target at `path` in `section`, an operator's labelled with its name. */
+/** The look of the target at `path` in `section`, an operator's labelled with its name, a macro's numbered. */
 function lookOf(path: VoiceTargetPath, section: VoiceSection): VoiceLook {
+  if (section.kind === 'macro') return { ...MACRO_LOOK, label: `Macro ${section.index + 1}` };
   if (section.kind !== 'operator') return VOICE_LOOKS[path as VoicePath];
   const look = OPERATOR_LOOKS[path.slice(`ops.${section.op}.`.length) as OperatorField];
   return { ...look, label: `Op ${OP_NAMES[section.op]} ${look.label}` };

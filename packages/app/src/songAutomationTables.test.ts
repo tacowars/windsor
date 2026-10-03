@@ -19,9 +19,10 @@ describe('voiceGroupLabel', () => {
     expect(voiceGroupLabel({ kind: 'operator', op: 2 }, OP_NAMES)).toBe('Voice · Op C');
     expect(voiceGroupLabel({ kind: 'lfo' }, OP_NAMES)).toBe('Voice · LFO');
     expect(voiceGroupLabel({ kind: 'pitch' }, OP_NAMES)).toBe('Voice · Pitch');
+    expect(voiceGroupLabel({ kind: 'macro', index: 3 }, OP_NAMES)).toBe('Macros');
   });
 
-  it('gives the voice rows seven groups, each one run of the catalog', () => {
+  it('gives the voice rows eight groups, each one run of the catalog, the macros last', () => {
     const labels = VOICE_AUTOMATION_ROWS.map((row) => voiceGroupLabel(row.section, OP_NAMES));
     const runs = labels.filter((label, i) => label !== labels[i - 1]);
     expect(runs).toEqual([
@@ -29,6 +30,7 @@ describe('voiceGroupLabel', () => {
       ...OP_NAMES.map((name) => `Voice · Op ${name}`),
       'Voice · LFO',
       'Voice · Pitch',
+      'Macros',
     ]);
   });
 });
