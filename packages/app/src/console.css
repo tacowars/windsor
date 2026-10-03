@@ -4685,17 +4685,47 @@ select.field.auto-snap {
 
 .parts-grid {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) 272px;
+  grid-template-columns: 230px minmax(0, 1fr);
   gap: 1px;
   background: var(--line);
 }
-.parts-grid .rail,
-.parts-grid .mod {
+.parts-grid .rail {
   background: var(--panel);
 }
 .parts-grid .bays {
   background: var(--ground);
   padding: 12px;
+  min-width: 0;
+}
+
+/* The Shape & modulation deck under the operator rows (record
+   `2026-10-03-parts-tab-layout` decision 8): one card per section, wrapping
+   by the deck's own width, with the mockup's flex-grow weights. No
+   screen-width query (decision 9). */
+.deck-title {
+  margin-top: 14px;
+}
+.deck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.deck-card {
+  flex: 1.2 1 340px;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px 12px;
+}
+.deck-card.deck-filter {
+  flex-grow: 1.3;
+}
+.deck-card.deck-drive {
+  flex-grow: 0.6;
+}
+.deck .env-canvas {
+  height: 48px;
 }
 .keys-row {
   display: flex;
@@ -6149,6 +6179,252 @@ dialog.song-dlg {
   gap: 6px;
   padding: 4px 6px;
   max-width: 360px;
+}
+/* The popover's footer: the count and the keys, then ⤢ Browse all (windsor#522). */
+.patch-pop-foot {
+  align-items: center;
+}
+.patch-pop-foot .btn {
+  flex: none;
+}
+
+/* ---------- the full-pane patch browser (windsor#522; record
+   2026-10-03-parts-tab-layout decisions 5 and 9; the mockup's layout B,
+   "Full browser", .browser) ---------- */
+.patch-bar .patch-browse[aria-pressed='true'] {
+  background: var(--carrier);
+  border-color: var(--carrier);
+  color: #111416;
+}
+/* While the browser shows, the page is one screen high and the browser
+   takes the Parts tab's body under the bar: the operators and the keys stay
+   laid out under it, out of sight, so nothing redraws on close. */
+.console:has(> .tab-root > .tab-panel:not([hidden]) > .patch-browser) {
+  height: 100vh;
+  height: 100dvh;
+}
+.tab-root:has(> .tab-panel:not([hidden]) > .patch-browser) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tab-panel:not([hidden]):has(> .patch-browser) {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  /* clip, not hidden: a hidden box still scrolls, and a row's scrollIntoView would scroll the bar away. */
+  overflow: clip;
+}
+.tab-panel > .patch-browser,
+.tab-panel > .patch-browser ~ * {
+  grid-row: 2;
+  grid-column: 1;
+}
+.tab-panel > .patch-browser ~ * {
+  visibility: hidden;
+}
+.patch-browser {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 340px;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: var(--ground);
+  border-top: 1px solid var(--line-bright);
+}
+.pb-head {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 16px;
+  background: var(--panel-hi);
+  border-bottom: 1px solid var(--line);
+}
+.pb-title {
+  font: 700 14px var(--f-panel);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.pb-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 0 4px;
+}
+.pb-head input.pb-search {
+  flex: 0 1 380px;
+  min-width: 160px;
+  max-width: none;
+  font-family: var(--f-ui);
+  font-size: 13px;
+  padding: 5px 8px;
+}
+.pb-head .pb-hint {
+  margin: 0;
+}
+.pb-part {
+  color: var(--carrier);
+}
+.pb-grow {
+  flex: 1;
+}
+.pb-folder {
+  display: flex;
+  gap: 8px;
+}
+.pb-facets,
+.pb-results,
+.pb-info {
+  min-height: 0;
+  overflow-y: auto;
+}
+.pb-facets {
+  border-right: 1px solid var(--line);
+}
+.pb-facets .section {
+  padding: 12px 14px;
+}
+.pb-facet {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  text-align: left;
+  cursor: pointer;
+}
+.pb-facet:hover {
+  color: var(--ink);
+}
+.pb-facet[aria-pressed='true'] {
+  background: #2f3a40;
+  color: var(--ink);
+}
+.pb-count {
+  font: 11px var(--f-num);
+  color: var(--ink-faint);
+}
+.pb-tags,
+.pb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pb-tag,
+.pb-chips span {
+  font-size: 11px;
+  color: var(--ink-dim);
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+.pb-tag {
+  cursor: pointer;
+}
+.pb-tag[aria-pressed='true'] {
+  border-color: var(--modulator);
+  color: var(--modulator);
+}
+.pb-results:focus-visible {
+  outline-offset: -2px;
+}
+.pb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.pb-table th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  font: 600 9.5px var(--f-panel);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--ground);
+}
+.pb-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #1d2326;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pb-table td:first-child {
+  color: var(--ink);
+}
+.pb-table tbody tr:hover td {
+  background: var(--panel-hi);
+}
+.pb-table tr.hl td {
+  background: #2f3a40;
+}
+.pb-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-left: 1px solid var(--line);
+}
+.pb-info .hint {
+  margin: 0;
+}
+.pb-name {
+  font: 700 18px var(--f-panel);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+.pb-desc {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+.pb-desc:empty {
+  display: none;
+}
+/* Sized by its box; `drawEnv` sets the backing store from it × devicePixelRatio. */
+.pb-env {
+  display: block;
+  flex: none;
+  width: 100%;
+  height: 50px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.pb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pb-actions .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pb-info .btn.ghost {
+  background: transparent;
+}
+.pb-rename {
+  display: flex;
+  gap: 6px;
+}
+.pb-rename input.field {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
 }
 
 .hint {

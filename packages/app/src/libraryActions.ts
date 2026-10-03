@@ -140,7 +140,7 @@ async function forgetFolder(ctx: AppCtx): Promise<void> {
 const loudnessFor = (ctx: AppCtx): Promise<LoudnessResult> => checkLoudness(ctx.parts.patch);
 
 /** The save toast, naming where the write went. */
-function writtenText(model: LibraryModel, id: string): string {
+export function writtenText(model: LibraryModel, id: string): string {
   if (model.folder) return `wrote ${id}.json to the folder`;
   if (model.user) return `saved ${id} to your library`;
   return `downloaded ${id}.json`;
@@ -311,8 +311,8 @@ export function libraryButtons(ctx: AppCtx, refresh: () => void): HTMLButtonElem
   return [save, copy, init];
 }
 
-/** The folder grant (the developer mode): connect or change, then re-read and forget. */
-function folderEntries(ctx: AppCtx): MenuItem[] {
+/** The folder grant (the developer mode): connect or change, then re-read and forget; the ⋯ menu and the browser's header. */
+export function libraryFolderEntries(ctx: AppCtx): MenuItem[] {
   if (!folderApiAvailable()) {
     if (library.user) return [];
     const note = el('p', 'hint', 'This browser cannot store patches: Save downloads <id>.json.');
@@ -359,7 +359,7 @@ export function libraryMenuEntries(ctx: AppCtx, refresh: () => void): MenuItem[]
       run: (opener) => run(runDelete, opener),
     },
   ];
-  const folder = folderEntries(ctx);
+  const folder = libraryFolderEntries(ctx);
   if (folder.length) items.push(SEPARATOR, ...folder);
   if (library.oldFormat.length)
     items.push(SEPARATOR, { kind: 'node', node: oldFormatList(ctx, library, refresh) });

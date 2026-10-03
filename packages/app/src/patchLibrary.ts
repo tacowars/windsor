@@ -41,22 +41,36 @@ export function badgeText(ctx: AppCtx, slot: number): string {
  * Rename the document patch the part plays, and every part playing it — one
  * live partial (#629): the patch under its new id, `null` under the old, and
  * each playing part's `preset` switched, so the engine validates the three
- * together and no part is ever left naming a patch that has gone.
+ * together and no part is ever left naming a patch that has gone. `name` is
+ * the browser's (windsor#522): the display name to give it, else the name
+ * follows the id only where the two were the same.
  */
-export function renamePatch(ctx: AppCtx, from: string, to: string): void {
-  if (to === '' || to === from) return;
+export function renamePatch(ctx: AppCtx, from: string, to: string, name?: string): void {
+  const patch = ctx.model.doc.patches?.[from];
+  if (!patch || to === '') return;
+  const shown = name ?? (patch.name === from ? to : patch.name);
+  if (to === from) {
+    // The browser's rename of a name whose id stays (windsor#522): the name alone.
+    if (shown === patch.name) return;
+    if (!ctx.change({ patches: { [from]: { ...patch, name: shown } } }).ok) return;
+    ctx.render();
+    return ctx.notify(`renamed "${patch.name}" to "${shown}"`, 'success');
+  }
   if (ctx.model.doc.patches?.[to])
     return ctx.notify(`a document patch "${to}" already exists`, 'warning');
-  const patch = ctx.model.doc.patches?.[from];
-  if (!patch) return;
   const parts: Record<number, { preset: string }> = {};
   for (const part of ctx.model.doc.parts)
     if (part.preset === from) parts[part.slot] = { preset: to };
-  const renamed: Patch = { ...patch, name: patch.name === from ? to : patch.name };
+  const renamed: Patch = { ...patch, name: shown };
   const result = ctx.change({ patches: { [from]: null, [to]: renamed }, parts });
   if (!result.ok) return;
   ctx.render();
-  ctx.notify(`renamed document patch "${from}" to "${to}"`, 'success');
+  ctx.notify(
+    name === undefined
+      ? `renamed document patch "${from}" to "${to}"`
+      : `renamed "${patch.name}" to "${shown}"`,
+    'success',
+  );
 }
 
 /**
@@ -79,6 +93,13 @@ export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = lib
     'success',
   );
 }
+
+/** A result row's source, capitalised as the approved mockup shows it: the popover's rows and the browser's. */
+export const ROW_SOURCE_LABELS: Readonly<Record<PresetListing['source'], string>> = {
+  document: 'This song',
+  library: 'Library',
+  'built-in': 'Built-in',
+};
 
 /** The patch box's source words (windsor#521), one per listing source. */
 export const PATCH_SOURCE_LABELS: Readonly<Record<PresetListing['source'], string>> = {

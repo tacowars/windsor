@@ -103,6 +103,8 @@ interface Drive {
   each?: (b: number, params: Record<string, Float32Array>) => void;
   /** After block `b` renders. */
   after?: (b: number, processor: ProcessorLike) => void;
+  /** Every control block at the fine interval, as before windsor#326. */
+  fine?: boolean;
 }
 
 const held: ScheduledEvent[] = [{ type: 'noteOn', id: 1, note: NOTE, velocity: 1, frame: 0 }];
@@ -112,6 +114,7 @@ function drive(d: Drive = {}): Float32Array {
   const processor = loaded.create(d.patch ?? PATCH, 4, undefined, {
     specialise: d.specialise ?? true,
     ...(d.slots ? { voiceSlots: d.slots } : {}),
+    ...(d.fine ? { controlIntervals: { long: loaded.ctrlInterval } } : {}),
   });
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),
@@ -293,7 +296,10 @@ describe('a square on each decay target without a click (windsor#347)', () => {
   // square at a sixteenth's rate on top: at the far end for half a step, back
   // for the other half, each edge the player's 4 ms ramp or, harsher, none.
   // No sample steps past the click threshold, nor further than the line's own
-  // largest with the lane held at either end.
+  // largest with the lane held at either end. That bound is tight: it holds
+  // with every control block fine, and a lane that moves a voice between the
+  // fine and the long interval (windsor#326) steps up to 0.1 % past it, so
+  // the bound is read with every block fine and the threshold with both.
   const patch: Patch = {
     ...CLICKS_PATCH,
     algorithm: ADDITIVE,
@@ -303,7 +309,7 @@ describe('a square on each decay target without a click (windsor#347)', () => {
   };
   const line = lineEvents(CLICKS_LINE, 2);
   const blocks = blocksFor(CLICKS_LINE.length * 2);
-  const plain = drive({ patch, events: line, blocks });
+  const plain = drive({ patch, events: line, blocks, fine: true });
   const low = (frame: number, ramp: number): number => {
     const into = frame % STEP_FRAMES;
     const half = STEP_FRAMES / 2;
@@ -326,18 +332,23 @@ describe('a square on each decay target without a click (windsor#347)', () => {
       blocks,
       slots: [path],
       each: (_b, params) => void (params.voiceSlot0![0] = depth),
+      fine: true,
     });
     for (const ramp of [RAMP_FRAMES, 0]) {
-      const lane = drive({
-        patch,
-        events: line,
-        blocks,
-        slots: [path],
-        each: (b, params) => void (params.voiceSlot0![0] = depth * low(b * BLOCK, ramp)),
-      });
+      const square = (fine: boolean): Float32Array =>
+        drive({
+          patch,
+          events: line,
+          blocks,
+          slots: [path],
+          each: (b, params) => void (params.voiceSlot0![0] = depth * low(b * BLOCK, ramp)),
+          fine,
+        });
+      const lane = square(true);
       expect(lane).not.toEqual(plain);
       expect(maxStep(lane)).toBeLessThan(CLICK_THRESHOLD);
       expect(maxStep(lane)).toBeLessThanOrEqual(Math.max(maxStep(plain), maxStep(atFar)));
+      expect(maxStep(square(false))).toBeLessThan(CLICK_THRESHOLD);
     }
   });
 });
