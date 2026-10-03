@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickedSlot, syncSongSelection } from './partSelectionSync';
+import { pickedSlot, resolveSlot, syncSongSelection } from './partSelectionSync';
 import type { SongSelection } from './songTab';
 
 const part = (slot: number, region: number | null): SongSelection => ({
@@ -9,6 +9,14 @@ const part = (slot: number, region: number | null): SongSelection => ({
 });
 const event: SongSelection = { kind: 'event', index: 2 };
 const slots = [0, 1, 2, 4];
+
+describe('resolveSlot', () => {
+  it('keeps a slot the song has, else takes the first part, else 0', () => {
+    expect(resolveSlot([1, 3], 3)).toBe(3);
+    expect(resolveSlot([1, 3], 0)).toBe(1);
+    expect(resolveSlot([], 2)).toBe(0);
+  });
+});
 
 describe('syncSongSelection', () => {
   it('selects a newly picked part, over an event, none or another part', () => {

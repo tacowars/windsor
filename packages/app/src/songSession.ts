@@ -64,7 +64,6 @@ export type OpenAmend = (doc: ArrangementDocument) => DocumentPartial | null;
 /** What the session needs of the console: the document, and the one way to replace it. */
 export interface SessionHost {
   readonly model: DocumentModel;
-  readonly parts: { selected: number };
   /** Replace the document: normalise it, start a new undo history, rebuild the live system. */
   replace(raw: unknown, amend?: OpenAmend): void;
   /** A document edit: applied live and recorded as one undo step named `label`. */
@@ -509,7 +508,6 @@ export class SongSession {
 
   private replace(raw: unknown, amend?: OpenAmend): void {
     this.replaced++;
-    this.host.parts.selected = 0;
     this.host.replace(raw, amend);
     // An untitled switch takes the text right after it; any other replacement compares as `changed` does.
     this.openedText = null;

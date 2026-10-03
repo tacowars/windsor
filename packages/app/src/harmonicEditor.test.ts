@@ -27,7 +27,6 @@ const documentPatch = (ctx: Ctx): Patch | undefined => {
 
 /** Operator A on a User wave, and a stroke attached to a stand-in bars canvas. */
 function paintable(ctx: Ctx): FakeElement {
-  ctx.parts.selected = 0;
   ctx.parts.patch = makePatch({ ops: [{ wave: WAVE.USER }] });
   const editor: PatchEditor = {
     get patch() {

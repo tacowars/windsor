@@ -44,6 +44,8 @@ const keyboard = new Keyboard(
 // A MIDI controller plays through the same keyboard (#523).
 const midi = new MidiAccessor((inputId) => keyboard.midiSink(inputId));
 keyboard.onPanic = (): void => midi.forgetNotes();
+// The bend and the mod wheel follow the selected part, whichever view picked it.
+ctx.parts.onSelect(() => keyboard.followPart());
 
 mountUndoControls(ctx, $('undoControls'));
 mountTransportStrip(ctx, $('transportStrip'));

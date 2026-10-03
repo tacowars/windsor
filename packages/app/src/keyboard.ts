@@ -175,7 +175,9 @@ export class Keyboard {
   /**
    * Hand the controller's bend and wheel to the selected part: the part that
    * had them returns to rest, the new one takes the current positions. The
-   * part picker calls this on a switch; every expression change does too.
+   * selection's listener calls this on every switch, from either view
+   * (`ctx.parts.onSelect`, wired in `main.ts`); every expression change
+   * does too.
    */
   followPart(): void {
     const part = this.getPart();

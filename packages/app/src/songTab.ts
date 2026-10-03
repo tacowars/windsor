@@ -26,8 +26,8 @@
  * windsor#350), whose popover lives for one render.
  *
  * The selected part is the Parts tab's too (windsor#462): selecting a part or
- * one of its regions picks it there (`selectPart`), and a render follows the
- * shared selection, picked or reset elsewhere (`partSelectionSync.ts`).
+ * one of its regions picks it there (`ctx.parts.pick`), and a render follows
+ * the shared selection, picked or reset elsewhere (`partSelectionSync.ts`).
  */
 import type { DocumentPartial } from '@windsor/engine';
 import { regionPattern, songTicksOf, ticksPerBar } from '@windsor/engine';
@@ -39,7 +39,6 @@ import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
 import { partLaneRow } from './songLanes';
 import { pickedSlot, syncSongSelection } from './partSelectionSync';
-import { selectPart } from './partsSession';
 import {
   EXPANDED_KNOB_COUNT,
   emptyMixerCell,
@@ -292,7 +291,7 @@ function renderSongView(
       state.selection = validSelection(ctx, selection);
       const slot = pickedSlot(state.selection);
       if (slot !== null) {
-        selectPart(ctx, slot);
+        ctx.parts.pick(slot);
         state.picksSeen = ctx.parts.picks;
       }
       view.paintLanes();

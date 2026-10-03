@@ -11,6 +11,7 @@ import { openSessionConsole, songText } from './__fixtures__/songSessionConsole'
 import { loadBuiltIns } from './builtInLibrary';
 import type { AppCtx } from './context';
 import { DocumentModel } from './documentModel';
+import { addPartLive } from './partEdits';
 import type { ConfirmRequest } from './metadataModal';
 import type { SessionRecord, StoredSong } from './songAutosave';
 import {
@@ -27,7 +28,9 @@ beforeAll(() => loadBuiltIns());
 /** A real console with no IndexedDB, on its third part; `messages` are its toasts, as `tone: message`. */
 function context(): AppCtx & { messages: string[] } {
   const c = openSessionConsole(false);
-  c.ctx.parts.selected = 2;
+  addPartLive(c.ctx);
+  addPartLive(c.ctx);
+  c.toasts.length = 0;
   return Object.assign(c.ctx, { messages: c.toasts });
 }
 
