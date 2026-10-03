@@ -1,14 +1,13 @@
 /**
- * The part strip's chip lights (windsor#528): the Song mixer's two lights
- * drawn small at each chip's top right, the red clip latch over the green
- * activity light, on every tab (the Song lanes mockup's Meters state). They
- * read the part lights (`partLights.ts`), so the chips and the Song mixer
- * show one set of meters, the part meter bank, and one latch per part.
+ * The part strip's chip lights (windsor#528): each part's two lights drawn
+ * small at its chip's top right, the red clip latch over the green activity
+ * light, on every tab (the Song lanes mockup's Meters state). They are the
+ * only per-part lights (windsor#554), read from the part lights
+ * (`partLights.ts`): the part meter bank, with one latch per part.
  *
- * A click on a lit red light clears it, in the mixer too, and does not pick
- * the part; a click on a dark one is the chip's. The chip is a button, so
- * the light is a plain element, out of the accessibility tree: the Song
- * mixer's clip button is the keyboard's way to clear it.
+ * A click on a lit red light clears it and does not pick the part; a click
+ * on a dark one is the chip's. The chip is a button, so the light is a
+ * plain element, out of the accessibility tree.
  *
  * The loop is the console's one frame request (`watchPlayhead`), which also
  * keeps the bank switched on while audio is on, and a light is touched only

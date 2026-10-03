@@ -18,9 +18,9 @@
  * A press on one of its controls leaves the selection alone; a press on the
  * rest of the part's row selects the part (`songLaneColumn.ts`).
  *
- * After M and S sit the part's activity and clip lights (windsor#159). The
- * cell only places them: the column's one poller (`songMixerLights.ts`)
- * owns their meters and the clip latch, so a redrawn cell keeps both.
+ * M and S end the cell. A part's activity and clip lights are the part
+ * strip's chips' (windsor#528, `partStripLights.ts`), so the row draws none
+ * (windsor#554).
  */
 import type { MusicPart, StripTargetId } from '@windsor/engine';
 import { RETURN_NAMES, partAt } from '@windsor/engine';
@@ -51,7 +51,6 @@ import {
   switchOn,
   toggleStripSwitch,
 } from './songMixerModel';
-import type { MixerLights } from './songMixerLights';
 import { outputSelect } from './trackOutput';
 
 /** The letter each switch shows. */
@@ -207,17 +206,11 @@ function stripKnobs(ctx: AppCtx, slot: number, expanded: boolean): KnobElement[]
 
 /**
  * A part's strip: collapsed, Level and its value, M, S; expanded, every
- * knob, the Output select, M, S; then the lights either way, placed here
- * and polled by `lights`. Its redraw re-reads every control; an
+ * knob, the Output select, M, S. Its redraw re-reads every control; an
  * Output change re-syncs M and S at once, since whether they apply follows
  * it (windsor#157's rule as amended on PR #168).
  */
-export function partMixerCell(
-  ctx: AppCtx,
-  part: MusicPart,
-  expanded: boolean,
-  lights: MixerLights,
-): HTMLElement {
+export function partMixerCell(ctx: AppCtx, part: MusicPart, expanded: boolean): HTMLElement {
   const { slot } = part;
   const cell = el('div', expanded ? 'mix-cell expanded' : 'mix-cell');
   const knobs = stripKnobs(ctx, slot, expanded);
@@ -242,7 +235,6 @@ export function partMixerCell(
   switches.appendChild(mute.button);
   switches.appendChild(solo.button);
   cell.appendChild(switches);
-  cell.appendChild(lights.lightsFor(slot, part.name));
   REFRESH.set(cell, () => {
     for (const knob of knobs) knob.refresh();
     output?.sync();

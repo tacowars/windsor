@@ -37,7 +37,7 @@ import {
 } from './songViewTables';
 
 /** A press on one of these acts on its own and leaves the selection alone. */
-const CONTROLS = 'button, select, input, .knob, .mix-lights';
+const CONTROLS = 'button, select, input, .knob';
 
 /**
  * Set the column's sizes on the lanes as custom properties, from the

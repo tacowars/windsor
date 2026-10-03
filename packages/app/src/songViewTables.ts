@@ -47,13 +47,14 @@ export interface SongViewScale {
   /** The gap between that column and the mixer strip. */
   readonly partFoldGapPx: number;
   /**
-   * The part's mixer strip in its row (windsor#157): Level and its value, M,
-   * S and the lights on one line, collapsed.
+   * The part's mixer strip in its row (windsor#157): Level and its value, M
+   * and S on one line, collapsed, with S at the strip's right edge
+   * (windsor#554, measured in Chrome).
    */
   readonly mixerWidthPx: number;
   /**
    * The expanded strip (windsor#158) besides its knobs: the Output select,
-   * M and S, the lights track (windsor#159) and the gaps between them, as
+   * M and S and the gap between them, as
    * `console.css`'s `.mix-cell.expanded` sizes them.
    */
   readonly mixerExpandedBasePx: number;
@@ -82,8 +83,8 @@ export const SONG_VIEW: SongViewScale = {
   partRowPadPx: 2,
   partFoldPx: 50,
   partFoldGapPx: 4,
-  mixerWidthPx: 132,
-  mixerExpandedBasePx: 151,
+  mixerWidthPx: 114,
+  mixerExpandedBasePx: 135,
   mixerKnobColumnPx: 70,
   laneGapPx: 8,
   partLanePx: 40,

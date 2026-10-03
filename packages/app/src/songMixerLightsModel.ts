@@ -1,9 +1,9 @@
 /**
  * The rules behind the mixer lights (windsor#159), pure so they are tested
  * in Node: the green light's brightness from a peak, the colours it is drawn
- * at, and the red light's latch. The Song mixer and the part strip's chips
- * (windsor#528) read every part's lights from the part meter bank through
- * one `BankLights`; the Mixer tab's group lights read strip meters.
+ * at, and the red light's latch. The part strip's chips (windsor#528) read
+ * every part's lights from the part meter bank through one `BankLights`;
+ * the Mixer tab's group lights read strip meters.
  *
  * The latch is the app's, not the meter's. A meter's `setActive(false)`
  * zeroes its report, overload included, so the red light keeps its own

@@ -222,11 +222,16 @@ describe('the one frozen column (windsor#534)', () => {
     expect(timelineLeftCss(2.5)).toBe('calc(var(--frozen) + var(--gap) + var(--bar) * 2.5)');
   });
 
-  it('is the tab, ▸ and the strip, and gives the timeline back 46 px', () => {
+  it('is the tab, ▸ and the strip, and gives the timeline back 64 px', () => {
     expect(mixerLeadPx()).toBe(80);
-    expect(frozenColumnPx(false, KNOBS)).toBe(214);
+    expect(frozenColumnPx(false, KNOBS)).toBe(196);
     const left = frozenColumnPx(false, KNOBS) + SONG_VIEW.laneGapPx;
-    expect(TWO_COLUMNS_LEFT_PX - left).toBe(46);
+    expect(TWO_COLUMNS_LEFT_PX - left).toBe(64);
+  });
+
+  it('ends the strip at S, with no lights after it (windsor#554)', () => {
+    expect(SONG_VIEW.mixerWidthPx).toBe(114);
+    expect(SONG_VIEW.mixerExpandedBasePx).toBe(135);
   });
 
   it('grows by the strip’s knob columns when ▸ Mixer expands it (windsor#158)', () => {
@@ -270,7 +275,7 @@ const blockFramePx = (selector: string): number =>
 
 /**
  * The expanded mixer cell's base, as its CSS grid sizes it. The px tracks are
- * Output, M and S, and the lights; the knobs' are fractions, and each knob
+ * Output, and M and S; the knobs' are fractions, and each knob
  * column carries its own gap (mixerKnobColumnPx), so the base holds one gap
  * fewer than it has fixed tracks.
  */

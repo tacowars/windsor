@@ -391,10 +391,10 @@ input {
   color: #1a1408;
 }
 /* The chip's two lights (windsor#528; the Song lanes mockup's Meters state):
-   the Song mixer's red clip latch over its green activity light, small at the
+   the part's red clip latch over its green activity light, small at the
    top right. partStripLights.ts paints the green a step at a time from
-   songMixerLightsTables.ts, as the mixer's; the lights' width comes out of
-   the name, which truncates sooner. */
+   songMixerLightsTables.ts, as the Groups section's; the lights' width comes
+   out of the name, which truncates sooner. */
 .pchip .cl {
   position: absolute;
   right: 3px;
@@ -1422,9 +1422,6 @@ input.field.group-name {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.group-switches .mix-lights {
-  flex-direction: row;
 }
 .btn.group-remove {
   padding: 2px 8px;
@@ -3620,8 +3617,8 @@ body.chord-dragging {
   justify-content: center;
   gap: 2px;
 }
-/* A part's collapsed strip: the compact Level knob and its value, M and S
-   and the lights on one line, sized for a 40 px row. */
+/* A part's collapsed strip: the compact Level knob and its value, then M
+   and S, on one line, sized for a 40 px row. */
 .mix-cell {
   display: flex;
   align-items: center;
@@ -3656,9 +3653,6 @@ body.chord-dragging {
   justify-content: flex-end;
   min-width: 0;
 }
-.mix-labels.expanded > .ruler-name {
-  grid-column: span 2;
-}
 /* The arrow that expands every strip (windsor#158), first in the header;
    it keeps its place in both states, so a second press lands on it. */
 .mix-toggle {
@@ -3680,13 +3674,15 @@ body.chord-dragging {
   border-color: var(--line);
 }
 /* Expanded, the header's labels and every part's strip share one grid: a
-   column a knob (--mix-knobs, split evenly), Output, M and S, then the
-   lights. The strip's width is songViewTables.ts's mixerColumnPx, whose
+   column a knob (--mix-knobs, split evenly), Output, then M and S. The
+   header's "bar · beat" takes the M and S track and, right-aligned, runs
+   left into the Out track past its short label (windsor#554). The
+   strip's width is songViewTables.ts's mixerColumnPx, whose
    base is the fixed tracks and the gaps here. */
 .mix-labels.expanded,
 .mix-cell.expanded {
   display: grid;
-  grid-template-columns: repeat(var(--mix-knobs), minmax(0, 1fr)) 84px 47px 12px;
+  grid-template-columns: repeat(var(--mix-knobs), minmax(0, 1fr)) 84px 47px;
   column-gap: 4px;
   justify-content: stretch;
 }
@@ -3732,14 +3728,14 @@ select.field.compact {
   color: var(--ink-dim);
   border-color: var(--line);
 }
-/* A part's lights (windsor#159), after M and S: the red clip light over the
-   green activity light, stacked in the 40 px row. songMixerLights.ts sets
-   the green's colour a step at a time from songMixerLightsTables.ts; the red
-   is dark or lit in --hot, and a press on it clears the latch. */
+/* A group row's lights (windsor#159, windsor#287), after M and S: the red
+   clip light and the green activity light, side by side in the row
+   (.group-switches). songMixerLights.ts sets the green's colour a step at a
+   time from songMixerLightsTables.ts; the red is dark or lit in --hot, and a
+   press on it clears the latch. */
 .mix-lights {
   display: flex;
   flex: none;
-  flex-direction: column;
   align-items: center;
   gap: 4px;
 }

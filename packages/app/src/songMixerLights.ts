@@ -1,17 +1,16 @@
 /**
- * The Song tab's mixer lights (windsor#159): a green activity light and a
- * red clip light in each part's strip cell. Since windsor#528 they read the
- * part meter bank through `partLights.ts`, the lights the part strip's chips
- * show on every tab, so one set of meters runs and a clear on either view
- * puts out both; no per-row strip meter is switched on. The Mixer tab's
- * Groups section keys a poller of its own on group ids, over each group
- * bus's strip meter (`songMixerLightsSource.ts`'s `meterLights`).
+ * The mixer lights' poller (windsor#159): a green activity light and a red
+ * clip light in each row of the Mixer tab's Groups section (windsor#287),
+ * keyed on group ids over each group bus's strip meter
+ * (`songMixerLightsSource.ts`'s `meterLights`). The Song tab's part rows
+ * lost theirs to the part strip's chips (windsor#554), which paint with
+ * `paintLights` here over the part meter bank (`partStripLights.ts`).
  *
- * One poller owns a view's lights, not one per cell (the issue's amendment
- * after PR #170): the Song tab draws every cell again on the arrow, an undo
- * or a region drag, so the cells only hand their light elements to
- * `lightsFor`, and the poller asks its source for the rows attached, on
- * screen and with the tab shown, keyed by slot, never by cell.
+ * One poller owns a view's lights, not one per row (the issue's amendment
+ * after PR #170): a view may draw its rows again on any render, so the rows
+ * only hand their light elements to `lightsFor`, and the poller asks its
+ * source for the rows attached, on screen and with the tab shown, keyed by
+ * id, never by row.
  *
  * It runs on the shared frame driver (`watchPlayhead`), touches a light only
  * when its step or its latch changes, and releases its source on hide once,
@@ -19,22 +18,21 @@
  */
 import type { AppCtx } from './context';
 import { el } from './dom';
-import { partLights } from './partLights';
 import { lightRamp } from './songMixerLightsModel';
-import type { LightMeters, LightSource } from './songMixerLightsSource';
+import type { LightMeters } from './songMixerLightsSource';
 import { meterLights } from './songMixerLightsSource';
 import { CLIP_TITLES } from './songMixerLightsTables';
 import { watchPlayhead } from './stepStrip';
 
 export type { LightMeters } from './songMixerLightsSource';
 
-/** What a part cell asks the column's poller for. */
+/** What a row asks its view's poller for. */
 export interface MixerLights {
-  /** The part's two lights, registered with the poller by slot; the cell places the element. */
-  lightsFor(slot: number, name: string): HTMLElement;
+  /** The row's two lights, registered with the poller by key; the row places the element. */
+  lightsFor(key: number, name: string): HTMLElement;
 }
 
-/** A pair of lights as drawn: the Song mixer's rows' and the part strip's chips'. */
+/** A pair of lights as drawn: the Groups section's rows' and the part strip's chips'. */
 export interface DrawnLights {
   readonly clip: HTMLElement;
   readonly activity: HTMLElement;
@@ -63,21 +61,16 @@ export function paintLights(lights: DrawnLights, step: number, clipped: boolean)
 }
 
 interface LightRow extends DrawnLights {
-  readonly slot: number;
+  readonly key: number;
   readonly root: HTMLElement;
   /** The row is inside the scroll's view, as the `IntersectionObserver` last said. */
   onScreen: boolean;
 }
 
-/**
- * The poller over a view's rows. The Song tab keys its rows on part slots
- * and reads the part lights; the Mixer tab's Groups section (windsor#287)
- * passes `meters`, its group buses' strip meters by id, with the same rules
- * and the same latch.
- */
+/** The poller over a view's rows, reading `meters`: the Groups section's group buses' strip meters by id. */
 // eslint-disable-next-line max-lines-per-function -- one owner's closure: its rows, the frame poll and the release rules share the same state
-export function songMixerLights(ctx: AppCtx, meters?: LightMeters): MixerLights {
-  const source: LightSource = meters ? meterLights(ctx, meters) : partLights(ctx);
+export function songMixerLights(ctx: AppCtx, meters: LightMeters): MixerLights {
+  const source = meterLights(ctx, meters);
   const rows = new Set<LightRow>();
   const byElement = new WeakMap<Element, LightRow>();
   const wanted = new Set<number>();
@@ -102,8 +95,8 @@ export function songMixerLights(ctx: AppCtx, meters?: LightMeters): MixerLights 
       removed = true;
     }
     if (!removed) return;
-    const slots = new Set([...rows].map((row) => row.slot));
-    source.retain((slot) => slots.has(slot));
+    const shown = new Set([...rows].map((row) => row.key));
+    source.retain((key) => shown.has(key));
   };
 
   const start = (): void => {
@@ -126,32 +119,32 @@ export function songMixerLights(ctx: AppCtx, meters?: LightMeters): MixerLights 
       },
       playheadAt: () => {
         wanted.clear();
-        for (const row of rows) if (row.onScreen) wanted.add(row.slot);
+        for (const row of rows) if (row.onScreen) wanted.add(row.key);
         return source.poll(wanted);
       },
       mark: () => {
-        for (const row of rows) paintLights(row, source.step(row.slot), source.lit(row.slot));
+        for (const row of rows) paintLights(row, source.step(row.key), source.lit(row.key));
       },
     });
   };
 
-  const clear = (slot: number): void => {
-    source.clear(slot);
-    for (const row of rows) if (row.slot === slot) paintLights(row, row.drawnStep, false);
+  const clear = (key: number): void => {
+    source.clear(key);
+    for (const row of rows) if (row.key === key) paintLights(row, row.drawnStep, false);
   };
 
   return {
-    lightsFor(slot, name) {
+    lightsFor(key, name) {
       const root = el('div', 'mix-lights');
       const clip = el('button', 'mix-clip') as HTMLButtonElement;
       clip.type = 'button';
       clip.setAttribute('aria-label', `${name} clip`);
-      clip.onclick = () => clear(slot);
+      clip.onclick = () => clear(key);
       const activity = el('span', 'mix-activity');
       activity.setAttribute('aria-hidden', 'true');
       root.append(clip, activity);
       const row: LightRow = {
-        slot,
+        key,
         root,
         clip,
         activity,
@@ -159,7 +152,7 @@ export function songMixerLights(ctx: AppCtx, meters?: LightMeters): MixerLights 
         drawnStep: -1,
         drawnClip: null,
       };
-      paintLights(row, source.step(slot), source.lit(slot));
+      paintLights(row, source.step(key), source.lit(key));
       rows.add(row);
       byElement.set(root, row);
       observer?.observe(root);

@@ -1,8 +1,7 @@
 /**
  * Every part's two lights, read from the part meter bank (windsor#528): the
- * one set of meters the part strip's chips and the Song mixer both show.
- * One per context, so a red latch is one per part, and a clear on a chip
- * puts out the mixer's light as well.
+ * meters the part strip's chips show. One per context, so a red latch is
+ * one per part.
  *
  * The bank is `AudioSystem.partMeters` (windsor#540): one node metering
  * every part, which `MusicRoster` attaches each part to on its slot. While
@@ -19,7 +18,7 @@ import type { AppCtx } from './context';
 import { BankLights } from './songMixerLightsModel';
 import type { LightSource } from './songMixerLightsSource';
 
-/** The part lights as both views read them: a `LightSource` keyed on part slots. */
+/** The part lights as the chips read them: a `LightSource` keyed on part slots. */
 export interface PartLights extends LightSource {
   /** Switch the live system's bank on and read it if it moved; a count that moves when a light changed. */
   sync(): number;

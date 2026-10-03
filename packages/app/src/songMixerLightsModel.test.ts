@@ -1,9 +1,9 @@
 /**
- * The Song tab's mixer lights (windsor#159): the green light's brightness
+ * The mixer lights (windsor#159): the green light's brightness
  * from a peak, at the floor, between, at 0 dBFS and above; its colour ramp;
  * and the red light's latch, set on an overload, kept across a release,
  * cleared on a click and dropped on a new meter; and every part's lights
- * from the part meter bank as the part strip and the Song mixer share them
+ * from the part meter bank as the part strip's chips read them
  * (windsor#528): a step change, the latch and its clear.
  */
 import { describe, expect, it } from 'vitest';
@@ -126,7 +126,7 @@ describe('ClipLatches', () => {
   });
 });
 
-describe('BankLights, as the part strip and the Song mixer read the bank', () => {
+describe('BankLights, as the part strip reads the bank', () => {
   /** A part meter bank in miniature: a report per slot and a revision that moves with each. */
   class FakeBank {
     revision = 0;

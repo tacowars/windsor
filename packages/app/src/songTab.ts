@@ -51,8 +51,6 @@ import {
 import { automationToolbar, syncAutomationTool, wireToolKeys } from './songAutomationToolbar';
 import { shapeTool, type ShapeTool } from './songShapeRange';
 import { DEFAULT_SHAPE_SETTINGS, type ShapeSettings } from './songShapeTables';
-import { songMixerLights } from './songMixerLights';
-import type { MixerLights } from './songMixerLights';
 import { stripSignature } from './songMixerModel';
 import { guardFrozenColumns } from './songFrozenColumns';
 import {
@@ -187,12 +185,7 @@ function validSelection(ctx: AppCtx, selection: SongSelection): SongSelection {
 }
 
 // eslint-disable-next-line max-lines-per-function -- the view's one composition: the lanes, the pane, the watch and the SongView the lanes call back into read as one sequence
-function renderSongView(
-  body: HTMLElement,
-  ctx: AppCtx,
-  state: SongViewState,
-  lights: MixerLights,
-): ShapeTool {
+function renderSongView(body: HTMLElement, ctx: AppCtx, state: SongViewState): ShapeTool {
   body.innerHTML = '';
   // The shared part selection, picked or reset since this view last looked (windsor#462 decisions 3, 4 and 6).
   const pick = { slot: ctx.parts.selected, picks: ctx.parts.picks };
@@ -287,13 +280,7 @@ function renderSongView(
         headGroup(mixer, rulerRow(doc.transport.bars, state.pxPerBar, doc.transport.meter), brace),
         harmonyGroup(harmonyLaneRow(view)),
         ...doc.parts.map((part, index) =>
-          partGroup(
-            view,
-            part,
-            index,
-            partMixerCell(ctx, part, state.mixerExpanded, lights),
-            fresh,
-          ),
+          partGroup(view, part, index, partMixerCell(ctx, part, state.mixerExpanded), fresh),
         ),
       ];
       readouts = fresh;
@@ -381,8 +368,6 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     automationSnap: DEFAULT_SNAP_TICKS,
     shape: DEFAULT_SHAPE_SETTINGS,
   };
-  // The mixer column's lights (windsor#159): one poller for the view, outliving each render's cells.
-  const lights = songMixerLights(ctx);
   // The tool keys (windsor#349): once, on the tab's body, which outlives its renders.
   let keyed: HTMLElement | null = null;
   // The Shape tool of the current render (windsor#350): a render closes the last one's popover.
@@ -391,6 +376,6 @@ export function songTab(ctx: AppCtx): (body: HTMLElement) => void {
     if (keyed !== body) wireToolKeys(body, state, () => shape?.toolChanged());
     keyed = body;
     shape?.close();
-    shape = renderSongView(body, ctx, state, lights);
+    shape = renderSongView(body, ctx, state);
   };
 }

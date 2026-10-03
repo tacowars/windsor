@@ -1,9 +1,9 @@
 /**
- * Where a mixer lights poller's lights come from (windsor#159, windsor#528).
- * The Song mixer's part rows read the part meter bank through `partLights.ts`,
- * which the part strip's chips share. The Mixer tab's Groups section
- * (windsor#287) reads each group bus's strip meter through `meterLights`
- * here: the meters of the rows on screen switched on, the rest released.
+ * Where lights come from (windsor#159, windsor#528). The part strip's chips
+ * read the part meter bank through `partLights.ts`. The Mixer tab's Groups
+ * section (windsor#287) reads each group bus's strip meter through
+ * `meterLights` here: the meters of the rows on screen switched on, the
+ * rest released.
  *
  * A strip meter's `setActive(false)` is a full stop, not a pause, so the
  * source keeps its meters by key, never by row: a re-render that replaces a
