@@ -36,6 +36,7 @@ import { Arpeggiator } from '../sequencing/arpeggiator';
 import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
 import { FigureSequencer, type FigureResolver } from '../sequencing/figureSequencer';
 import { ticksPerBar } from '../sequencing/meter';
+import type { Meter } from '../sequencing/meterTables';
 import type { NoteEvent } from '../sequencing/noteEvent';
 import { RegionGate, type PartTickSource, type RegionGateConfig } from '../sequencing/regionGate';
 import type { ScaleSampler } from '../sequencing/scaleSampler';
@@ -171,8 +172,17 @@ export class PartBinding {
 
   /** Regions, song length, harmony and meter take effect on the next tick; a Figure's bar length at once. */
   reconfigureGate(config: RegionGateConfig): void {
-    this.barTicks = ticksPerBar(config.meter);
     this.gate.reconfigure(config);
+    this.setMeter(config.meter);
+  }
+
+  /**
+   * The song's meter, pushed to every Figure at once. The player calls it
+   * before a part edit commits too, so a schedule or drift edit arriving
+   * with a meter change lands on the new meter's bar line.
+   */
+  setMeter(meter: Meter | undefined): void {
+    this.barTicks = ticksPerBar(meter);
     for (const { generator } of this.bounds()) {
       if (generator instanceof FigureSequencer) generator.setBarTicks(this.barTicks);
     }

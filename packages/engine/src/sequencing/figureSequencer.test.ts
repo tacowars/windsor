@@ -110,4 +110,17 @@ describe('a backward drift (windsor#486)', () => {
     expect(figure.stepAt(16)).toBe(16); // tick 96, inside the 84–167 bar: unedited
     expect(figure.stepAt(28)).toBeLessThan(4); // tick 168: the 4-cell stage
   });
+
+  it('keeps the original process for the heard bar across edits in consecutive scheduler bars', () => {
+    const line = Array.from({ length: 32 }, () => figureNoteCell());
+    const config = { ...SPEC, divisor: 12, cells: line, length: 32 };
+    const figure = new FigureSequencer(SAMPLER, config);
+    const edit = (length: number): void =>
+      liveReconfiguration(figure, { ...config, schedule: [{ length, bars: 1 }] }, SAMPLER)?.();
+    figure.handleTick(tick(0, C_MAJOR));
+    edit(4); // from bar 1
+    figure.handleTick(tick(TICKS_PER_BAR, C_MAJOR)); // the scheduler in bar 1, the audible clock in bar 0
+    edit(3); // from bar 2
+    expect([5, 9, 17].map((step) => figure.stepAt(step))).toEqual([5, 1, 1]);
+  });
 });
