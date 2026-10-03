@@ -66,6 +66,8 @@ const PURE_FILES = [
   'bassSequencer.ts',
   // The Figure's config (windsor#484): its cells and processes, and its chord-tone rule.
   'figureSequencer.ts',
+  // Where the schedule and the drift put its line (windsor#486).
+  'figureLine.ts',
   '../harmony/figureTones.ts',
   // The determinism-critical pair (#705): the position rule and the gate.
   'regionClock.ts',
