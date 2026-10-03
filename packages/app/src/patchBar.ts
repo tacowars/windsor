@@ -116,7 +116,19 @@ function menuItems(ctx: AppCtx, actions: PatchBarActions): MenuItem[] {
   ];
 }
 
-/** The bar for the selected part; rebuilt whole after a pick, a library action or a part switch. */
+/** Save, Save as… and Init with ids, so focus finds them again in a rebuilt bar (windsor#537). */
+function libraryRow(ctx: AppCtx, actions: PatchBarActions): HTMLButtonElement[] {
+  const buttons = libraryButtons(ctx, actions.refresh);
+  const ids = ['patchSave', 'patchSaveAs', 'patchInit'];
+  buttons.forEach((button, i) => (button.id = ids[i] ?? ''));
+  return buttons;
+}
+
+/**
+ * The bar for the selected part; rebuilt whole after a pick, a library action
+ * or a part switch. Each control has an id, so the rebuild can hand focus to
+ * the new copy of the control that had it (`keepBarFocus`).
+ */
 export function patchBar(ctx: AppCtx, actions: PatchBarActions): HTMLElement[] {
   wirePatchSearchKey();
   const browse = el('button', 'btn patch-browse', '⤢ Browse patches') as HTMLButtonElement;
@@ -134,9 +146,23 @@ export function patchBar(ctx: AppCtx, actions: PatchBarActions): HTMLElement[] {
     stepButton(ctx, -1, actions),
     stepButton(ctx, 1, actions),
     patchBox(ctx, actions),
-    ...libraryButtons(ctx, actions.refresh),
+    ...libraryRow(ctx, actions),
     patchMenu('Rename, delete, library folder, patch JSON', () => menuItems(ctx, actions)),
     el('span', 'bar-grow'),
     browse,
   ];
+}
+
+/**
+ * Rebuild the bar with `build`, and give focus back to the rebuilt copy of
+ * the control that had it (windsor#537 decision 2): a library action that
+ * ends in a refresh would otherwise leave focus on the page body, and Tab is
+ * the tab switch, so the keyboard could not come back.
+ */
+export function keepBarFocus(bar: HTMLElement, build: () => void): void {
+  const active = document.activeElement;
+  const id = active instanceof HTMLElement && bar.contains(active) ? active.id : '';
+  build();
+  if (!id || document.activeElement !== document.body) return;
+  document.getElementById(id)?.focus();
 }

@@ -19,7 +19,7 @@ import type { MidiAccessor } from './midiAccess';
 import { showTrapped } from './metadataModal';
 import { midiPanel } from './midiPanel';
 import { dropInit } from './patchActions';
-import { patchBar } from './patchBar';
+import { keepBarFocus, patchBar } from './patchBar';
 import {
   buildAlgPicker,
   buildDrive,
@@ -157,23 +157,26 @@ function openJsonDialog(ctx: AppCtx, opener: HTMLElement): void {
 
 /** The part + patch bar (windsor#521) for the selected part, rebuilt whole. */
 function syncPresetAndBadge(ctx: AppCtx, editor: PatchEditor): void {
-  $('patchBar').replaceChildren(
-    ...patchBar(ctx, {
-      onPick: () => {
-        reloadRail(ctx, editor);
-        // An Init no part plays any more is discarded, never exported (#563).
-        dropInit(ctx);
-      },
-      guard: (proceed) => {
-        confirmUnsaved(ctx).then(
-          (ok) => ok && proceed(),
-          (error: unknown) => ctx.notify(String(error), 'error'),
-        );
-      },
-      refresh: () => reloadRail(ctx, editor),
-      openJson: (opener) => openJsonDialog(ctx, opener),
-    }),
-  );
+  const bar = $('patchBar');
+  keepBarFocus(bar, () => bar.replaceChildren(...barControls(ctx, editor)));
+}
+
+function barControls(ctx: AppCtx, editor: PatchEditor): HTMLElement[] {
+  return patchBar(ctx, {
+    onPick: () => {
+      reloadRail(ctx, editor);
+      // An Init no part plays any more is discarded, never exported (#563).
+      dropInit(ctx);
+    },
+    guard: (proceed) => {
+      confirmUnsaved(ctx).then(
+        (ok) => ok && proceed(),
+        (error: unknown) => ctx.notify(String(error), 'error'),
+      );
+    },
+    refresh: () => reloadRail(ctx, editor),
+    openJson: (opener) => openJsonDialog(ctx, opener),
+  });
 }
 
 function wireJsonDialog(ctx: AppCtx, editor: PatchEditor): void {

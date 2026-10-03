@@ -20,6 +20,7 @@ import { el } from './dom';
 import { libraryFolderEntries } from './libraryActions';
 import type { PatchBarActions } from './patchBar';
 import { browserInfo } from './patchBrowserInfo';
+import { paneKeys } from './patchBrowserKeys';
 import type { FacetField } from './patchBrowserModel';
 import { browserRows, facets, keepSelection, pickFacet } from './patchBrowserModel';
 import { ROW_SOURCE_LABELS } from './patchLibrary';
@@ -71,9 +72,19 @@ export function togglePatchBrowser(ctx: AppCtx, actions: PatchBarActions): void 
   else openPatchBrowser(ctx, actions);
 }
 
-function facetRow(label: string, count: string, on: boolean, pick: () => void): HTMLElement {
+/** A facet's key, so a pick that redraws the column focuses the facet's new copy. */
+const facetKey = (field: FacetField, value: string): string => `${field}:${value}`;
+
+function facetRow(
+  key: string,
+  label: string,
+  count: string,
+  on: boolean,
+  pick: () => void,
+): HTMLElement {
   const row = el('button', 'pb-facet') as HTMLButtonElement;
   row.type = 'button';
+  row.dataset.facet = key;
   row.setAttribute('aria-pressed', String(on));
   row.append(el('span', '', label), el('span', 'pb-count', count));
   row.onclick = pick;
@@ -92,14 +103,19 @@ function facetSection(title: string): HTMLElement {
 function facetColumn(entries: readonly PresetListing[], refresh: () => void): HTMLElement {
   const column = el('div', 'pb-facets');
   const shown = facets(entries, patchFilter);
-  const pick = (field: FacetField, value: string) => (): void => {
-    patchFilter[field] = pickFacet(patchFilter, field, value);
-    refresh();
-  };
+  const pick =
+    (field: FacetField, value: string, key = facetKey(field, value)) =>
+    (): void => {
+      patchFilter[field] = pickFacet(patchFilter, field, value);
+      refresh();
+      // The column was redrawn: the keyboard stays on the facet it pressed.
+      document.querySelector<HTMLElement>(`.pb-facets [data-facet="${CSS.escape(key)}"]`)?.focus();
+    };
   const source = facetSection('Source');
   for (const row of shown.source)
     source.appendChild(
       facetRow(
+        facetKey('source', row.value),
         row.label,
         String(row.count),
         patchFilter.source === row.value,
@@ -110,11 +126,14 @@ function facetColumn(entries: readonly PresetListing[], refresh: () => void): HT
   for (const row of shown.category)
     category.appendChild(
       facetRow(
+        facetKey('category', row.value),
         row.label,
         String(row.count),
         patchFilter.category === row.value,
         // All is never a toggle: it clears the category.
-        row.value === '' ? pick('category', patchFilter.category) : pick('category', row.value),
+        row.value === ''
+          ? pick('category', patchFilter.category, facetKey('category', ''))
+          : pick('category', row.value),
       ),
     );
   const tags = facetSection('Tags');
@@ -122,6 +141,7 @@ function facetColumn(entries: readonly PresetListing[], refresh: () => void): HT
   for (const tag of shown.tags) {
     const chip = el('button', 'pb-tag', tag) as HTMLButtonElement;
     chip.type = 'button';
+    chip.dataset.facet = facetKey('tag', tag);
     chip.setAttribute('aria-pressed', String(patchFilter.tag === tag));
     chip.onclick = pick('tag', tag);
     chips.appendChild(chip);
@@ -180,6 +200,7 @@ function paneShell(): HTMLElement {
     el('span', 'pb-folder'),
   );
   pane.append(head, el('div', 'pb-facets'), results, el('div', 'pb-info'));
+  pane.addEventListener('keydown', (event) => paneKeys(pane, event));
   return pane;
 }
 
@@ -263,7 +284,7 @@ function folderButtons(ctx: AppCtx): HTMLElement[] {
     button.type = 'button';
     button.title = item.title;
     button.disabled = !item.enabled;
-    button.onclick = (): void => item.run(button);
+    button.onclick = (): void => void item.run(button);
     return [button];
   });
 }

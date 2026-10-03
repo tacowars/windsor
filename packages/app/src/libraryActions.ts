@@ -260,9 +260,8 @@ type LibraryAction = (ctx: AppCtx, opener: HTMLElement, refresh: () => void) => 
 
 /** Runs an action and reports its failure as an error toast. */
 function runner(ctx: AppCtx, refresh: () => void) {
-  return (action: LibraryAction, opener: HTMLElement): void => {
+  return (action: LibraryAction, opener: HTMLElement): Promise<void> =>
     action(ctx, opener, refresh).catch((error: unknown) => ctx.notify(String(error), 'error'));
-  };
 }
 
 /** A menu entry whose async action reports its failure as an error toast. */
@@ -277,9 +276,8 @@ function menuAction(
     label,
     title,
     enabled: true,
-    run: () => {
-      action().catch((error: unknown) => ctx.notify(String(error), 'error'));
-    },
+    // The menu restores focus once the returned promise settles (windsor#537).
+    run: () => action().catch((error: unknown) => ctx.notify(String(error), 'error')),
   };
 }
 
@@ -299,11 +297,11 @@ export function libraryButtons(ctx: AppCtx, refresh: () => void): HTMLButtonElem
       : 'Save over this patch',
     canSave(origin),
   );
-  save.onclick = (): void => run(runSave, save);
+  save.onclick = (): void => void run(runSave, save);
   const copy = button('Save as…', 'Save as a new patch in your library', canCopy(origin));
-  copy.onclick = (): void => run(runCopy, copy);
+  copy.onclick = (): void => void run(runCopy, copy);
   const init = button('Init', 'makePatch() defaults; not in the library until Save as…', true);
-  init.onclick = (): void => run(runInit, init);
+  init.onclick = (): void => void run(runInit, init);
   queueMicrotask(() => {
     syncModifiedMarker(ctx);
     reportLibraryProblems(ctx);
