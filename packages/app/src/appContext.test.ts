@@ -51,6 +51,8 @@ interface Console {
   buildOptions: BuildOptions[];
   /** The live parts the fake host hands out by slot, once "enabled". */
   liveParts: Map<number, AudioPart>;
+  /** What a build does to the live parts as its system installs; nothing by default. */
+  install: () => void;
   /** The fake host's state: `null` from `apply` while unenabled or building; `building` says which. */
   host: { enabled: boolean; building: boolean };
 }
@@ -69,6 +71,7 @@ function openConsole(refuse = false): Console {
     builds: 0,
     buildOptions: [],
     liveParts: new Map(),
+    install: () => undefined,
     host: { enabled: true, building: false },
   };
   const host: ContextHost = {
@@ -80,7 +83,7 @@ function openConsole(refuse = false): Console {
     build: (_document, options = {}) => {
       console.builds++;
       console.buildOptions.push(options);
-      return Promise.resolve();
+      return Promise.resolve().then(() => console.install());
     },
     get isBuilding(): boolean {
       return console.host.building;
@@ -217,6 +220,20 @@ describe('AppContext changes and the parts session', () => {
     const rebuilt = { slot: 0 } as unknown as AudioPart;
     c.liveParts.set(0, rebuilt);
     expect(c.ctx.livePart()).toBe(rebuilt);
+  });
+
+  it('tells the selection listeners once a rebuild installs new parts, whichever tab shows (windsor#470)', async () => {
+    const c = openConsole();
+    c.ctx.activate('song');
+    c.liveParts.set(0, { slot: 0 } as unknown as AudioPart);
+    const rebuilt = { slot: 0 } as unknown as AudioPart;
+    c.install = (): void => void c.liveParts.set(0, rebuilt);
+    // The keyboard's followPart, which hands the bend and wheel to this part.
+    const followed: Array<AudioPart | null> = [];
+    c.ctx.parts.onSelect(() => followed.push(c.ctx.livePart()));
+    await c.ctx.importDoc(newSong());
+    await flush();
+    expect(followed.at(-1)).toBe(rebuilt);
   });
 
   it("commits the working patch under the selected part's preset", () => {

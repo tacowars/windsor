@@ -424,14 +424,21 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
   }
 
   /**
-   * The live system rebuilt from the document, and every tab drawn again once
-   * it stands. `EngineHost.build` rebuilds at tick 0: a transport playing
+   * The live system rebuilt from the document; once it stands, the
+   * selection's listeners told and every tab drawn again. `EngineHost.build` rebuilds at tick 0: a transport playing
    * across it plays on from the top of the song (`HostTransport.adopt`), or,
    * for an undo or redo, from the bar `options.resumeAt` names.
    */
   private buildLive(options: BuildOptions = {}): void {
     void this.host.build(this.model.doc, options).then(
-      () => this.render(),
+      () => {
+        // The selection's listeners hear it once the parts `livePart()`
+        // returns are the new system's, not before the build replaces them
+        // (windsor#470 fix round 1): the keyboard hands its bend and wheel to
+        // the rebuilt part whichever tab is shown.
+        this.parts.announce();
+        this.render();
+      },
       (error: unknown) => this.notify(String(error), 'error'),
     );
   }

@@ -76,6 +76,16 @@ export class PartsSession {
     return () => void this.listeners.delete(listener);
   }
 
+  /**
+   * Tell the listeners the selection again, unmoved: the context calls this
+   * once a rebuilt live system stands, because the selected slot now plays a
+   * new `AudioPart` and the keyboard's bend and wheel must reach it, whichever
+   * tab is shown (windsor#470 fix round 1).
+   */
+  announce(): void {
+    for (const listener of this.listeners) listener();
+  }
+
   /** Reload the working patch: the document's patch, else the built-in the part plays. */
   reload(): void {
     const doc = this.deps.doc();
@@ -107,7 +117,7 @@ export class PartsSession {
     if (pick && moved) this.picked++;
     this.reload();
     if (moved) this.deps.invalidate();
-    for (const listener of this.listeners) listener();
+    this.announce();
     return moved;
   }
 }
