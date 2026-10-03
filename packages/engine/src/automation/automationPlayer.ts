@@ -22,6 +22,9 @@
  * - **Lane off or deleted.** Its handle is released: the target goes back to
  *   its owner's value now.
  *
+ * - **Sequencer lanes** (`seq.`, windsor#488) have no handle on the graph:
+ *   the region gate reads them, and this player passes them by.
+ *
  * Offline render pumps the same clock, so it gets the same events
  * (`render/renderPass.ts`). The worklets never learn song time.
  */
@@ -36,6 +39,7 @@ import type {
   AutomationTargetId,
   AutomationTargetRow,
 } from './automationLane';
+import { targetKind } from './automationTargets';
 
 /** A lane's target, found on the live graph: its writer and its row. */
 export interface ResolvedTarget {
@@ -255,7 +259,7 @@ export class AutomationPlayer {
   private resolvePart(slot: number): Playing[] {
     const out: Playing[] = [];
     for (const lane of this.lanes.get(slot) ?? []) {
-      if (!lane.on || lane.points.length === 0) continue;
+      if (!lane.on || lane.points.length === 0 || targetKind(lane.target) === 'seq') continue;
       const resolved = this.options.resolve(slot, lane.target);
       if (resolved) out.push({ target: lane.target, points: lane.points, ...resolved, last: 0 });
     }

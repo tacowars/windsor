@@ -104,24 +104,48 @@ async function liveRender(document: ArrangementDocument, seconds: number): Promi
   return capture.left;
 }
 
+/** Render `document` live and offline, and expect the two bit-identical: the same notes on the same frames. */
+async function expectLiveMatch(document: ArrangementDocument): Promise<void> {
+  const song = songSeconds(document);
+  const lead = Math.round(SCHEDULER_START_DELAY_SECONDS * RATE);
+  const frames = Math.round(song * RATE);
+  const live = await liveRender(document, song + 2 * SCHEDULER_START_DELAY_SECONDS);
+  const { render } = offline(document, { tailSeconds: 0 });
+  const rendered = await render;
+  const left = rendered.channels[0]!;
+  expect(left.length).toBe(frames);
+  let energy = 0;
+  for (const sample of left) energy += sample * sample;
+  expect(energy).toBeGreaterThan(1);
+  // Tolerance: none. The same ticks land on the same frames through the same graph.
+  const reference = live.subarray(lead, lead + frames);
+  let firstDiff = -1;
+  for (let i = 0; i < frames && firstDiff < 0; i++) if (left[i] !== reference[i]) firstDiff = i;
+  expect(firstDiff).toBe(-1);
+}
+
 describe('renderSong', () => {
   it('renders a 4-bar song bit-identical to the live pump', async () => {
-    const song = songSeconds(FULL_DOCUMENT);
-    const lead = Math.round(SCHEDULER_START_DELAY_SECONDS * RATE);
-    const frames = Math.round(song * RATE);
-    const live = await liveRender(FULL_DOCUMENT, song + 2 * SCHEDULER_START_DELAY_SECONDS);
-    const { render } = offline(FULL_DOCUMENT, { tailSeconds: 0 });
-    const rendered = await render;
-    const left = rendered.channels[0]!;
-    expect(left.length).toBe(frames);
-    let energy = 0;
-    for (const sample of left) energy += sample * sample;
-    expect(energy).toBeGreaterThan(1);
-    // Tolerance: none. The same ticks land on the same frames through the same graph.
-    const reference = live.subarray(lead, lead + frames);
-    let firstDiff = -1;
-    for (let i = 0; i < frames && firstDiff < 0; i++) if (left[i] !== reference[i]) firstDiff = i;
-    expect(firstDiff).toBe(-1);
+    await expectLiveMatch(FULL_DOCUMENT);
+  });
+
+  it('renders a seq. lane as the live pump plays it (windsor#488)', async () => {
+    // The grid's skip chance held at 1 by its lane: offline and live, it never plays.
+    const skipAll = {
+      target: 'seq.skipChance',
+      on: true,
+      points: [{ tick: 0, value: 1, bend: 0 }],
+    };
+    const laned: ArrangementDocument = {
+      ...FULL_DOCUMENT,
+      parts: FULL_DOCUMENT.parts.map((part) =>
+        part.slot === FULL_SLOT.arp ? { ...part, automation: [skipAll] } : part,
+      ),
+    } as ArrangementDocument;
+    await expectLiveMatch(laned);
+    const grid = built[FULL_DOCUMENT.parts.findIndex((part) => part.slot === FULL_SLOT.arp)]!;
+    const noteOns = [...(grid.options.events ?? []), ...(grid.node.posted as { type?: string }[])];
+    expect(noteOns.filter((m) => m.type === 'noteOn')).toEqual([]);
   });
 
   it('renders the same song twice bit-identically, each part on its own fixed seed', async () => {

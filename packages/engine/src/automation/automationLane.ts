@@ -6,6 +6,7 @@
  * tab (windsor#348) all build on these types. Pure: no Web Audio, no worklet
  * scope. `automationLane.test.ts` pins `pointsInOrder`.
  */
+import type { SeqField } from '../sequencing/regionGate';
 import type { VOICE_PREFIX } from './automationTargets';
 
 /** A strip target: the part's fader, pan and two sends. */
@@ -20,17 +21,24 @@ export type InsertTargetId = `insert.${string}.${string}`;
  */
 export type VoiceTargetId = `${typeof VOICE_PREFIX}${string}`;
 
-/** What a lane moves, relative to the part that owns it (decision 2). */
-export type AutomationTargetId = StripTargetId | InsertTargetId | VoiceTargetId;
+/**
+ * A sequencer target (windsor#488): a field the part's generators read on
+ * their onset, which the region gate hands them from the lane.
+ */
+export type SeqTargetId = `seq.${SeqField}`;
 
-/** The three families of target. */
-export type AutomationTargetKind = 'strip' | 'insert' | 'voice';
+/** What a lane moves, relative to the part that owns it (decision 2). */
+export type AutomationTargetId = StripTargetId | InsertTargetId | VoiceTargetId | SeqTargetId;
+
+/** The four families of target. */
+export type AutomationTargetKind = 'strip' | 'insert' | 'voice' | 'seq';
 
 /** A target id taken apart. */
 export type ParsedTarget =
   | { readonly kind: 'strip'; readonly field: string }
   | { readonly kind: 'insert'; readonly insertId: string; readonly field: string }
-  | { readonly kind: 'voice'; readonly path: string };
+  | { readonly kind: 'voice'; readonly path: string }
+  | { readonly kind: 'seq'; readonly field: SeqField };
 
 /**
  * How a target's value maps onto the lane's height (decision 5):

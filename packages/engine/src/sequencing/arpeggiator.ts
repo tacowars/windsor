@@ -96,7 +96,7 @@ import { assertArpConfig, type ArpSequencerConfig, type ArpStyle } from './arpSe
 import { arpCycleLength, arpNote } from './arpSteps';
 import { streamRng, type Rng } from './generatorSeed';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
-import type { PartTickEvent, PartTickSource } from './regionGate';
+import { withSeqOverrides, type PartTickEvent, type PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
 import type { Unsubscribe } from './scheduler';
 
@@ -344,8 +344,13 @@ export class Arpeggiator {
     return events;
   }
 
-  /** One onset: walk the list, then play the cell for this step over what is held. */
+  /**
+   * One onset: walk the list, then play the cell for this step over what is
+   * held, at the gate and skip chance the part's lanes hold on this tick
+   * (windsor#488), the config's where none does.
+   */
   private onset(event: PartTickEvent, step: number): NoteEvent[] {
+    const config = withSeqOverrides(this.current, event.overrides);
     const { chord } = event;
     const list = chord ? arpNoteList(this.pitch, this.current, chord) : [];
     // Track before the empty-pool return: a chord clipped to nothing is still a chord change (#714 review).
@@ -356,8 +361,8 @@ export class Arpeggiator {
     // The walk draws whatever the cell plays, so a rest never moves a later pitch.
     const pitch = list[this.pick(i, list)] as number;
     this.previous = pitch;
-    const { steps, skipChance } = this.current;
-    const cycle = arpCycleLength(this.current.style, list.length);
+    const { steps, skipChance } = config;
+    const cycle = arpCycleLength(config.style, list.length);
     const index = arpCellIndex(i, cycle);
     // Every cycle fits the stored cells (`ARP_STEPS_MAX`); a plain note stands in for safety.
     const written = steps[index] ?? PLAIN_CELL;
@@ -375,10 +380,10 @@ export class Arpeggiator {
         held: this.held,
         holdsOn: holdsToNext(steps, i, cycle),
       },
-      this.current,
+      config,
     );
     const hits = cell.kind === 'note' ? (cell.ratchet ?? 1) : 1;
-    return this.settle(hits > 1 ? rollOutcome(outcome, hits, this.current, event) : outcome);
+    return this.settle(hits > 1 ? rollOutcome(outcome, hits, config, event) : outcome);
   }
 
   /** Keep what an onset leaves sounding, and hand back what it emitted. */

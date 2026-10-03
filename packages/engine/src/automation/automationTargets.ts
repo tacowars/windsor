@@ -9,7 +9,9 @@
  * - `strip.level`, `strip.pan`, `strip.send.a`, `strip.send.b`;
  * - `insert.<insertId>.<field>`, the insert's stable id (`inserts/insertIds.ts`)
  *   and a field one of the kinds automates, `bands.3.freq` among them;
- * - `voice.<patch path>`, one of the 30 voice rows.
+ * - `voice.<patch path>`, one of the 30 voice rows;
+ * - `seq.<field>`, a field of the part's sequencer (windsor#488), offered by
+ *   kind (`SEQ_AUTOMATION_FIELDS`); the region gate reads it, not the graph.
  *
  * An insert id is any non-empty string, dots included, so an insert target is
  * read from its end: the field is the longest field some kind automates that
@@ -25,13 +27,17 @@
  * round-trips every id.
  */
 import type { InsertKindName } from '../inserts/insertRegistry';
+import type { SequencerKind } from '../song/arrangement';
+import type { SeqField } from '../sequencing/regionGate';
 import { INSERT_AUTOMATION_FIELDS } from './automationInsertTables';
+import { SEQ_AUTOMATION_FIELDS, SEQ_AUTOMATION_ROWS } from './automationSeqTables';
 import { VOICE_TARGET_TABLE } from '../worklet/fm/voiceTargetTables';
 import type {
   AutomationTargetId,
   AutomationTargetKind,
   AutomationTargetRow,
   ParsedTarget,
+  SeqTargetId,
   VoiceTargetId,
 } from './automationLane';
 import {
@@ -42,6 +48,7 @@ import {
 
 const STRIP_PREFIX = 'strip.';
 const INSERT_PREFIX = 'insert.';
+const SEQ_PREFIX = 'seq.';
 /** A voice target id's prefix; `VoiceTargetId` is typed from it. */
 export const VOICE_PREFIX = 'voice.';
 
@@ -71,6 +78,10 @@ const byTarget = (rows: readonly AutomationTargetRow[]): ReadonlyMap<string, Aut
 
 const STRIP_ROWS = byTarget(STRIP_AUTOMATION_ROWS);
 const VOICE_ROWS = byTarget(VOICE_AUTOMATION_ROWS);
+const SEQ_ROWS = byTarget(SEQ_AUTOMATION_ROWS);
+const SEQ_FIELDS: ReadonlyMap<string, SeqField> = new Map(
+  SEQ_AUTOMATION_ROWS.map((row) => [row.target, row.field]),
+);
 const INSERT_ROWS = new Map(
   Object.entries(INSERT_AUTOMATION_FIELDS).map(([kind, rows]) => [kind, byTarget(rows)]),
 );
@@ -100,10 +111,24 @@ export const VOICE_TARGET_IDS: readonly AutomationTargetId[] = VOICE_AUTOMATION_
   (row) => row.target,
 );
 
+/** The sequencer target id of a field (`gate` → `seq.gate`). */
+export function seqTargetId(field: SeqField): SeqTargetId {
+  return `${SEQ_PREFIX}${field}`;
+}
+
+/** The sequencer target ids a part of `kind` offers (windsor#488), in the picker's order. */
+export function seqTargetIds(
+  kind: SequencerKind,
+  fields = SEQ_AUTOMATION_FIELDS,
+): readonly SeqTargetId[] {
+  return (fields[kind] ?? []).map(seqTargetId);
+}
+
 /** Which family a target belongs to, by its prefix. */
 export function targetKind(id: AutomationTargetId): AutomationTargetKind {
   if (id.startsWith(STRIP_PREFIX)) return 'strip';
   if (id.startsWith(INSERT_PREFIX)) return 'insert';
+  if (id.startsWith(SEQ_PREFIX)) return 'seq';
   return 'voice';
 }
 
@@ -135,6 +160,8 @@ export function parseTargetId(id: string): ParsedTarget | undefined {
   }
   const path = voicePathOf(id);
   if (path !== undefined) return VOICE_ROWS.has(id) ? { kind: 'voice', path } : undefined;
+  const seqField = SEQ_FIELDS.get(id);
+  if (seqField !== undefined) return { kind: 'seq', field: seqField };
   if (!id.startsWith(INSERT_PREFIX)) return undefined;
   const split = splitInsertTarget(id.slice(INSERT_PREFIX.length));
   if (!split) return undefined;
@@ -152,9 +179,11 @@ export function formatTargetId(target: ParsedTarget): AutomationTargetId {
       ? (`${STRIP_PREFIX}${target.field}` as AutomationTargetId)
       : target.kind === 'voice'
         ? voiceTargetId(target.path)
-        : target.insertId.length > 0 && INSERT_FIELDS.has(target.field)
-          ? insertTargetId(target.insertId, target.field)
-          : `${INSERT_PREFIX}${target.insertId}.${target.field}`;
+        : target.kind === 'seq'
+          ? seqTargetId(target.field)
+          : target.insertId.length > 0 && INSERT_FIELDS.has(target.field)
+            ? insertTargetId(target.insertId, target.field)
+            : `${INSERT_PREFIX}${target.insertId}.${target.field}`;
   const back = parseTargetId(id);
   if (!back || !sameTarget(back, target)) {
     throw new RangeError(`formatTargetId: no automation target ${JSON.stringify(target)}`);
@@ -164,6 +193,7 @@ export function formatTargetId(target: ParsedTarget): AutomationTargetId {
 
 function sameTarget(a: ParsedTarget, b: ParsedTarget): boolean {
   if (a.kind === 'strip' && b.kind === 'strip') return a.field === b.field;
+  if (a.kind === 'seq' && b.kind === 'seq') return a.field === b.field;
   if (a.kind === 'voice' && b.kind === 'voice') return a.path === b.path;
   if (a.kind === 'insert' && b.kind === 'insert') {
     return a.insertId === b.insertId && a.field === b.field;
@@ -171,15 +201,15 @@ function sameTarget(a: ParsedTarget, b: ParsedTarget): boolean {
   return false;
 }
 
-/** A strip or voice target's row. */
+/** A strip, voice or sequencer target's row. */
 export function catalogRow(id: string): AutomationTargetRow | undefined {
-  return STRIP_ROWS.get(id) ?? VOICE_ROWS.get(id);
+  return STRIP_ROWS.get(id) ?? VOICE_ROWS.get(id) ?? SEQ_ROWS.get(id);
 }
 
-/** A strip or voice target's row. Throws a `RangeError` naming `id` when the catalog holds none. */
+/** A strip, voice or sequencer target's row. Throws a `RangeError` naming `id` when the catalog holds none. */
 export function requireCatalogRow(id: string): AutomationTargetRow {
   const row = catalogRow(id);
-  if (!row) throw new RangeError(`no strip or voice automation target ${JSON.stringify(id)}`);
+  if (!row) throw new RangeError(`no strip, voice or seq automation target ${JSON.stringify(id)}`);
   return row;
 }
 

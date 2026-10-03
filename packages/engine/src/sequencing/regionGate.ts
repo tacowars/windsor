@@ -20,6 +20,13 @@
  *   harmony timeline holds at the transport tick (`chordAt`) — so a chord
  *   change never restarts anything and a hit voices whatever is current.
  *
+ * Since windsor#488 a gate may carry the part's sequencer lanes as
+ * `overridesAt`, read at the song position of the tick it issues (the
+ * transport tick folded by the song's length, as the regions read it):
+ * every forwarded tick then carries `overrides`, the fields a lane moves there,
+ * which a generator reads in place of its config's on that tick. A gate
+ * without lanes hands none, and a generator reads its config as before.
+ *
  * One gate serves one part: its entry tracking is per gate, not per
  * subscription. Since windsor#74 a part may hold one generator per region
  * (each region playing its own pattern), all behind the part's one gate:
@@ -37,12 +44,42 @@ import { ticksPerBar } from './meter';
 import type { Meter } from './meterTables';
 import type { TickEvent, TickSource, Unsubscribe } from './scheduler';
 
+/** A sequencer field a song lane may move (windsor#488). */
+export type SeqField = 'gate' | 'skipChance' | 'density';
+
+/** The sequencer fields the part's lanes hold at a tick; a field no lane moves is absent. */
+export type SeqOverrides = { readonly [F in SeqField]?: number };
+
+const SEQ_FIELDS: readonly SeqField[] = ['gate', 'skipChance', 'density'];
+
+/**
+ * `config` with each field `overrides` moves that the config has, or
+ * `config` itself when none moves: what a generator reads on the onset of a
+ * tick (windsor#488). A field the config lacks is never added.
+ */
+export function withSeqOverrides<C extends object>(
+  config: C,
+  overrides: SeqOverrides | undefined,
+): C {
+  if (overrides === undefined) return config;
+  let out: Record<string, unknown> | null = null;
+  for (const field of SEQ_FIELDS) {
+    const value = overrides[field];
+    if (value === undefined || !(field in config)) continue;
+    out ??= { ...(config as Record<string, unknown>) };
+    out[field] = value;
+  }
+  return (out as C | null) ?? config;
+}
+
 /** A transport tick as a part's generator sees it: local position plus the current chord. */
 export interface PartTickEvent extends TickEvent {
   /** The chord the harmony timeline holds at this transport tick; null with no events. */
   readonly chord: HarmonyChord | null;
   /** The region the part is live in. */
   readonly regionIndex: number;
+  /** What the part's sequencer lanes hold at this transport tick; absent with none on. */
+  readonly overrides?: SeqOverrides | undefined;
 }
 
 export type PartTickHandler = (event: PartTickEvent) => void;
@@ -67,6 +104,8 @@ export interface RegionGateConfig {
   readonly harmony: Harmony;
   /** The song's meter (windsor#429): the bar `bar` and `tickInBar` count. 4/4 when absent. */
   readonly meter?: Meter | undefined;
+  /** The part's sequencer lanes read at a transport tick (windsor#488); absent with none on. */
+  readonly overridesAt?: ((tick: number) => SeqOverrides) | undefined;
 }
 
 export interface RegionGateHooks {
@@ -96,7 +135,7 @@ export class RegionGate implements PartTickSource {
     this.barLength = ticksPerBar(config.meter);
   }
 
-  /** Regions, song length, harmony and meter take effect on the next tick; nothing restarts. */
+  /** Regions, song length, harmony, meter and lanes take effect on the next tick; nothing restarts. */
   reconfigure(config: RegionGateConfig): void {
     this.config = config;
     this.barLength = ticksPerBar(config.meter);
@@ -145,6 +184,13 @@ export class RegionGate implements PartTickSource {
     };
   }
 
+  /** The part's lanes at the song position of transport tick `tick`, folded as the regions are. */
+  private overridesAt(tick: number): SeqOverrides | undefined {
+    const { overridesAt, songTicks } = this.config;
+    if (!overridesAt) return undefined;
+    return overridesAt(((tick % songTicks) + songTicks) % songTicks);
+  }
+
   private forward(event: TickEvent): void {
     const state = this.stateAt(event.tick);
     if (!state.live) {
@@ -160,6 +206,7 @@ export class RegionGate implements PartTickSource {
       this.hooks.onEnter?.(state.index, state.entryTick);
     }
     const { localTick, index } = state;
+    const overrides = this.overridesAt(event.tick);
     const subscribers = this.subscribers;
     for (let i = 0; i < subscribers.length; i++) {
       const { divisor, handler, accepts } = subscribers[i] as GateSubscriber;
@@ -172,6 +219,7 @@ export class RegionGate implements PartTickSource {
         tickInBar: localTick % this.barLength,
         chord: this.chordAt(event.tick),
         regionIndex: index,
+        overrides,
       });
     }
   }
