@@ -38,6 +38,11 @@
  * change re-pitches through the sampler. A merged arrangement that fails
  * validation changes nothing and is reported, never half-applied.
  *
+ * A Figure's canon (windsor#487) finds its leader by slot through the
+ * bindings in force at each onset: the leader part's base generator when it
+ * is a Figure, so a leader's live edit, rebuild or kind change is read on
+ * the follower's next step, and a slot without a Figure leaves it silent.
+ *
  * The loop (windsor#15) is the clock's: the player hands it the song's
  * `TickLoop` at build and on every partial, and the counter jumps back from
  * the loop's end to its start. The player follows the tick, and on any jump
@@ -394,6 +399,7 @@ export class ArrangementPlayer {
     return PartBinding.create(this.transport, part, gateConfig(arrangement, part), sampler, {
       note: (event) => this.pitched(slot, event),
       onset: (event, spec) => this.percussion(slot, spec, event),
+      figureOf: (leader) => this.built.bindings.get(leader)?.figure() ?? null,
     });
   }
 

@@ -1,0 +1,642 @@
+{
+  "version": 6,
+  "transport": {
+    "bpm": 132,
+    "bars": 16
+  },
+  "harmony": {
+    "root": 0,
+    "scale": "major",
+    "events": [
+      {
+        "start": 0,
+        "duration": 384,
+        "degree": 0,
+        "size": 3
+      },
+      {
+        "start": 384,
+        "duration": 384,
+        "degree": 5,
+        "size": 3
+      },
+      {
+        "start": 768,
+        "duration": 384,
+        "degree": 3,
+        "size": 3
+      },
+      {
+        "start": 1152,
+        "duration": 384,
+        "degree": 4,
+        "size": 3
+      }
+    ]
+  },
+  "patches": {
+    "score-wooden-pin": {
+      "name": "Wooden Pin",
+      "algorithm": 0,
+      "volume": 0.45,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 0,
+      "pan": 0,
+      "panRandom": 0.08,
+      "panKey": 0,
+      "spread": 0,
+      "mono": false,
+      "ops": [
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.85,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.24,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.12,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 2,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.39597979746446665,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.096,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.12,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 2.01,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.17819090885901,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.156,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.12,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 3,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.07919595949289333,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.048,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.12,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        }
+      ],
+      "lfo": {
+        "shape": 0,
+        "rate": 0.2,
+        "amount": 1,
+        "delay": 0,
+        "retrigger": false,
+        "toPitch": 0,
+        "modWheelDepth": 1,
+        "toOp": [0, 0.12, 0, 0]
+      },
+      "filter": {
+        "mode": 1,
+        "cutoff": 1800,
+        "resonance": 0.8,
+        "slope24": false,
+        "envAmount": 0.8,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "keyTrack": 0.3,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.001,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.132,
+          "decayCurve": 0.5,
+          "sustainLevel": 0,
+          "releaseTime": 0.12,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      },
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0.002,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.1,
+        "decayCurve": 0.5,
+        "sustainLevel": 0,
+        "releaseTime": 0.3,
+        "releaseCurve": 0.5,
+        "endLevel": 0,
+        "loopMode": 0,
+        "keyScale": 0
+      },
+      "drive": {
+        "gain": 1,
+        "shape": 0,
+        "bias": 0,
+        "tone": 1
+      }
+    },
+    "score-glass-pebble": {
+      "name": "Glass Pebble",
+      "algorithm": 0,
+      "volume": 0.45,
+      "tone": 1,
+      "glide": 0,
+      "pitchEnvAmount": 0,
+      "pan": 0,
+      "panRandom": 0.08,
+      "panKey": 0,
+      "spread": 0,
+      "mono": false,
+      "ops": [
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 1,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.85,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.32,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.16,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 5.5,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.3535533905932738,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.128,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.16,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 2.01,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.1590990257669732,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.20800000000000002,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.16,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        },
+        {
+          "wave": 0,
+          "userPartials": null,
+          "ratio": 3,
+          "fixed": false,
+          "fixedHz": 100,
+          "detune": 0,
+          "level": 0.07071067811865477,
+          "feedback": 0,
+          "velSens": 0.4,
+          "levelKeyScale": 0,
+          "phase": 0,
+          "phaseFree": true,
+          "env": {
+            "initLevel": 0,
+            "attackTime": 0.001,
+            "attackCurve": 0,
+            "peakLevel": 1,
+            "decayTime": 0.064,
+            "decayCurve": 0.65,
+            "sustainLevel": 0,
+            "releaseTime": 0.16,
+            "releaseCurve": 0.5,
+            "endLevel": 0,
+            "loopMode": 0,
+            "keyScale": 0
+          }
+        }
+      ],
+      "lfo": {
+        "shape": 0,
+        "rate": 0.21,
+        "amount": 1,
+        "delay": 0,
+        "retrigger": false,
+        "toPitch": 0,
+        "modWheelDepth": 1,
+        "toOp": [0, 0.12, 0, 0]
+      },
+      "filter": {
+        "mode": 1,
+        "cutoff": 5200,
+        "resonance": 0.8,
+        "slope24": false,
+        "envAmount": 0.8,
+        "modWheelDepth": 0,
+        "lfoAmount": 0,
+        "keyTrack": 0.3,
+        "env": {
+          "initLevel": 0,
+          "attackTime": 0.001,
+          "attackCurve": 0,
+          "peakLevel": 1,
+          "decayTime": 0.17600000000000002,
+          "decayCurve": 0.5,
+          "sustainLevel": 0,
+          "releaseTime": 0.16,
+          "releaseCurve": 0.5,
+          "endLevel": 0,
+          "loopMode": 0,
+          "keyScale": 0
+        }
+      },
+      "pitchEnv": {
+        "initLevel": 0,
+        "attackTime": 0.002,
+        "attackCurve": 0,
+        "peakLevel": 1,
+        "decayTime": 0.1,
+        "decayCurve": 0.5,
+        "sustainLevel": 0,
+        "releaseTime": 0.3,
+        "releaseCurve": 0.5,
+        "endLevel": 0,
+        "loopMode": 0,
+        "keyScale": 0
+      },
+      "drive": {
+        "gain": 1,
+        "shape": 0,
+        "bias": 0,
+        "tone": 1
+      }
+    }
+  },
+  "parts": [
+    {
+      "slot": 0,
+      "name": "Leader",
+      "preset": "score-wooden-pin",
+      "velocity": 0.8,
+      "strip": {
+        "pan": -0.6
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 768
+        },
+        {
+          "start": 1152,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "figure",
+        "divisor": 6,
+        "gate": 0.5,
+        "register": {
+          "octave": 4
+        },
+        "skipChance": 0,
+        "accentVelocity": 0.2,
+        "accentMod": 1,
+        "lanes": [],
+        "seed": 0,
+        "cells": [
+          {
+            "kind": "note",
+            "tone": 0,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 2,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false,
+            "velocity": 0.6
+          },
+          {
+            "kind": "rest"
+          },
+          {
+            "kind": "note",
+            "tone": 3,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 2,
+            "octave": 0,
+            "accent": false,
+            "slide": false,
+            "velocity": 0.6
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false,
+            "ratchet": 2
+          },
+          {
+            "kind": "rest"
+          },
+          {
+            "kind": "note",
+            "tone": 0,
+            "octave": 0,
+            "accent": false,
+            "slide": false,
+            "velocity": 0.6
+          },
+          {
+            "kind": "note",
+            "tone": 2,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 4,
+            "octave": 0,
+            "accent": false,
+            "slide": false
+          },
+          {
+            "kind": "note",
+            "tone": 1,
+            "octave": 0,
+            "accent": false,
+            "slide": false,
+            "velocity": 0.5
+          }
+        ],
+        "length": 12,
+        "drift": {
+          "steps": 1,
+          "everyBars": 4
+        }
+      }
+    },
+    {
+      "slot": 1,
+      "name": "Canon",
+      "preset": "score-wooden-pin",
+      "velocity": 0.8,
+      "strip": {
+        "pan": 0.6
+      },
+      "regions": [
+        {
+          "start": 0,
+          "duration": 1536
+        }
+      ],
+      "sequencer": {
+        "kind": "figure",
+        "divisor": 6,
+        "gate": 0.5,
+        "register": {
+          "octave": 4
+        },
+        "skipChance": 0,
+        "accentVelocity": 0.2,
+        "accentMod": 1,
+        "lanes": [],
+        "seed": 0,
+        "cells": [
+          {
+            "kind": "rest"
+          }
+        ],
+        "length": 1,
+        "source": {
+          "slot": 0,
+          "offset": 3,
+          "transpose": 0
+        }
+      }
+    },
+    {
+      "slot": 2,
+      "name": "Octave",
+      "preset": "score-glass-pebble",
+      "velocity": 0.4,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 768
+        },
+        {
+          "start": 1152,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "figure",
+        "divisor": 6,
+        "gate": 0.5,
+        "register": {
+          "octave": 4
+        },
+        "skipChance": 0,
+        "accentVelocity": 0.2,
+        "accentMod": 1,
+        "lanes": [],
+        "seed": 0,
+        "cells": [
+          {
+            "kind": "rest"
+          }
+        ],
+        "length": 1,
+        "source": {
+          "slot": 0,
+          "offset": 0,
+          "transpose": 12
+        }
+      }
+    },
+    {
+      "slot": 3,
+      "name": "Half",
+      "preset": "score-wooden-pin",
+      "velocity": 0.7,
+      "regions": [
+        {
+          "start": 0,
+          "duration": 768
+        },
+        {
+          "start": 1152,
+          "duration": 384
+        }
+      ],
+      "sequencer": {
+        "kind": "figure",
+        "divisor": 12,
+        "gate": 0.5,
+        "register": {
+          "octave": 4
+        },
+        "skipChance": 0,
+        "accentVelocity": 0.2,
+        "accentMod": 1,
+        "lanes": [],
+        "seed": 0,
+        "cells": [
+          {
+            "kind": "rest"
+          }
+        ],
+        "length": 1,
+        "source": {
+          "slot": 0,
+          "offset": 0,
+          "transpose": -12
+        }
+      }
+    }
+  ]
+}

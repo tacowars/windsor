@@ -34,7 +34,7 @@
 import type { MusicPart, SequencerSpec } from './arrangement';
 import { Arpeggiator } from '../sequencing/arpeggiator';
 import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
-import { FigureSequencer } from '../sequencing/figureSequencer';
+import { FigureSequencer, type FigureResolver } from '../sequencing/figureSequencer';
 import { ticksPerBar } from '../sequencing/meter';
 import type { NoteEvent } from '../sequencing/noteEvent';
 import { RegionGate, type PartTickSource, type RegionGateConfig } from '../sequencing/regionGate';
@@ -51,12 +51,14 @@ import {
 } from './partGenerators';
 import { regionPattern } from './regionPattern';
 
-/** Where a part's generators send what they play. */
+/** Where a part's generators send what they play, and where a canon finds its leader. */
 export interface PartOutput {
   /** A pitched generator's note-on or note-off. */
   note(event: NoteEvent): void;
   /** A Euclidean onset, with the spec that played it (its `note` and `hold`). */
   onset(event: OnsetEvent, spec: SequencerSpec): void;
+  /** The live Figure on a slot, which a Figure's canon reads (windsor#487); absent finds none. */
+  figureOf?: FigureResolver;
 }
 
 /**
@@ -248,6 +250,12 @@ export class PartBinding {
     return generator.entryStepAt(Math.floor(local / generator.config.divisor), chord);
   }
 
+  /** The base generator when it is a Figure, the line a canon of this part reads (windsor#487); null otherwise. */
+  figure(): FigureSequencer | null {
+    const { generator } = this.base;
+    return generator instanceof FigureSequencer ? generator : null;
+  }
+
   /**
    * The Euclidean figure region `regionIndex` sounds (the base's with no
    * index, or an index naming no region); null for another kind.
@@ -353,7 +361,7 @@ export class PartBinding {
   }
 
   private build(spec: SequencerSpec, sampler: ScaleSampler): Bound {
-    const generator = buildGenerator(spec, sampler, this.barTicks);
+    const generator = buildGenerator(spec, sampler, this.barTicks, this.output.figureOf);
     if (!generator) throw new Error(`a ${spec.kind} spec builds no generator`);
     const bound: Bound = { generator, spec, unsubscribe: null };
     if (generator instanceof EuclideanSequencer) {
