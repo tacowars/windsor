@@ -39,7 +39,13 @@
  * graph, no clock of its own.
  */
 import { chordAt, type Harmony, type HarmonyChord } from '../harmony/harmonyTimeline';
-import { regionPhase, regionState, type Region, type RegionState } from './regionClock';
+import {
+  lastStartedRegion,
+  regionPhase,
+  regionState,
+  type Region,
+  type RegionState,
+} from './regionClock';
 import { ticksPerBar } from './meter';
 import type { Meter } from './meterTables';
 import type { TickEvent, TickSource, Unsubscribe } from './scheduler';
@@ -154,6 +160,11 @@ export class RegionGate implements PartTickSource {
   /** Region `index`'s own local tick at a transport tick, live or not (`regionPhase`, windsor#97). */
   phaseAt(index: number, tick: number): number | null {
     return regionPhase(this.config.regions, this.config.songTicks, index, tick);
+  }
+
+  /** The region that started last on or before a transport tick (`lastStartedRegion`); -1 with none. */
+  lastStartedAt(tick: number): number {
+    return lastStartedRegion(this.config.regions, this.config.songTicks, tick);
   }
 
   /** The chord at a transport tick, for a caller auditioning the current harmony. */

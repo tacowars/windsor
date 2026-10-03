@@ -223,6 +223,12 @@ describe('a canon of a leader whose regions play their own patterns (windsor#508
     expect(canon(song, 12, 16)).toEqual(canon(second, 12, 16));
     expect(canon(first, 12, 16)).not.toEqual(canon(second, 12, 16));
   });
+
+  it('reports the tick it resolves the leader at: the step’s first, not the tick asked (windsor#518)', () => {
+    const { player } = rig();
+    expect(player.regionStepAt(3, 0, 5 * EIGHTH + 7)?.leaderTick).toBe(5 * EIGHTH);
+    expect(player.regionStepAt(0, 0, 5 * EIGHTH + 7)).not.toHaveProperty('leaderTick');
+  });
 });
 
 describe('a Figure without a source (windsor#487)', () => {
