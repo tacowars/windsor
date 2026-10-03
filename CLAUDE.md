@@ -99,6 +99,7 @@ npm run build              # static site into packages/app/dist/
 npm run preview            # serve the built dist/ (e.g. -- --port 4199)
 npm run verify             # the PR gate: typecheck, lint, format, test, worklets, patch index, build
 npm run verify:quick       # typecheck, lint, format, test
+npm run test:research      # the finished Tape research's tests, on request only (never in CI)
 npm run format             # prettier --write (code only; prose is hand-formatted)
 bash scripts/overlap.sh <paths>   # what in-flight work touches these paths (main session, before a launch)
 ```
