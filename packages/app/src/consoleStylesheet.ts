@@ -39,6 +39,19 @@ export function cssValue(body: string, property: string): string {
   return new RegExp(`\\n\\s*${escape(property)}: ([^;]*);`).exec(body)?.[1] ?? '';
 }
 
+/**
+ * Opening braces less closing ones, comments and strings aside: 0 for a
+ * balanced sheet. #610's Euclidean block once lost its closing brace and every
+ * later rule became a nested selector matching nothing, so the console
+ * rendered unstyled while everything stayed green.
+ */
+export function braceBalance(css = CONSOLE_CSS): number {
+  const code = css
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '');
+  return code.split('{').length - code.split('}').length;
+}
+
 function escape(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

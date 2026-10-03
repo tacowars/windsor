@@ -82,8 +82,8 @@ const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
   [
     'packages/app/src/*.css',
     [
-      'packages/app/src/consoleBoundary.test.ts',
       'packages/app/src/consoleColors.test.ts',
+      'packages/app/src/consoleStylesheet.test.ts',
       'packages/app/src/harmonyCardTables.test.ts',
       'packages/app/src/masterColumnTables.test.ts',
       'packages/app/src/songViewTables.test.ts',
