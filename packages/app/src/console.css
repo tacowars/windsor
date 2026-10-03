@@ -3944,9 +3944,10 @@ select.field.compact {
   opacity: 0.4;
   cursor: default;
 }
-/* Region editing (windsor#550, record 2026-10-03-song-region-editing): the
-   edge handle, the seam mark where two blocks meet, and the drag readout,
-   as the approved mockup draws them. The lane sets the cursor per hit. */
+/* Region editing (windsor#550 and windsor#551, record
+   2026-10-03-song-region-editing): the edge handle, the seam mark where two
+   blocks meet, and the drag readout, as the approved mockup draws them.
+   The lane sets the cursor per hit, so a .reg sets none of its own. */
 .hdl {
   position: absolute;
   top: 4px;
@@ -4038,7 +4039,6 @@ select.field.compact {
   letter-spacing: 0.05em;
   white-space: nowrap;
   overflow: hidden;
-  cursor: grab;
 }
 .reg.narrow {
   padding: 0;
@@ -4057,6 +4057,10 @@ select.field.compact {
 .reg.selected {
   box-shadow: 0 0 0 1px var(--carrier);
   border-color: var(--carrier);
+}
+/* A region a drag across an empty stretch is drawing (windsor#551), before release. */
+.reg.drawing {
+  border-style: dashed;
 }
 .reg .gl {
   flex: none;

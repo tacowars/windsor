@@ -12,8 +12,8 @@
  * `2026-09-29-each-region-plays-its-own-pattern`): a card reads the selected
  * region's pattern (`patternOf`) and writes a full copy of it back into that
  * region (`regionPatternChange`), never into `part.sequencer`; a drawn region
- * copies its neighbour (`drawRegionChange`); a kind change clears every
- * region's pattern.
+ * copies its neighbour (`drawRegionChange`, or `drawStrokeChange` for a
+ * drag); a kind change clears every region's pattern.
  */
 import type {
   ArrangementDocument,
@@ -35,7 +35,7 @@ import {
 import type { AppCtx } from './context';
 import { partChange } from './context';
 import { deepMerge } from './documentModel';
-import { addRegion, neighbourIndex, snapGrain, splitRegion } from './regionModel';
+import { addRegion, drawRegion, neighbourIndex, snapGrain, splitRegion } from './regionModel';
 import { addPart, freshSequencer, setSequencerKind } from './songParts';
 
 /** A raw document normalised without being adopted — `DocumentModel.preview`. */
@@ -262,11 +262,31 @@ function defaultPattern(
 }
 
 /**
- * A region drawn on the lane of the part on `slot` at `tick`, and its index
- * (decision 4), one bar of the song's meter long: it copies the pattern of the nearest region that starts
- * before it, else of the nearest after it, and the first region of a part
- * with none starts from the kind's default pattern. A kind whose regions
- * carry no pattern draws a bare region. Null when there is no room.
+ * `regions` — the part's own with one region added — and the added one's
+ * index, the new region holding a copy of the pattern of the nearest region
+ * that starts before it, else of the nearest after it (decision 4); the
+ * first region of a part with none starts from the kind's default pattern,
+ * and a kind whose regions carry no pattern draws a bare region.
+ */
+function withNeighbourPattern(
+  doc: ArrangementDocument,
+  part: MusicPart,
+  regions: PartRegion[],
+  preview: Preview,
+): { regions: PartRegion[]; index: number } {
+  const index = regions.findIndex((r) => !part.regions.includes(r));
+  const added = regions[index];
+  if (!added || !keepsRegionPatterns(part)) return { regions, index };
+  const from = neighbourIndex(part.regions, added.start);
+  const pattern = from >= 0 ? patternCopy(part, from) : defaultPattern(doc, part.slot, preview);
+  if (!pattern) return { regions, index };
+  return { regions: regions.map((r, i) => (i === index ? { ...r, pattern } : r)), index };
+}
+
+/**
+ * A region a click draws on the lane of the part on `slot` at `tick`, and
+ * its index: one bar of the song's meter long, its pattern copied from its
+ * neighbour (`withNeighbourPattern`). Null when there is no room.
  */
 export function drawRegionChange(
   doc: ArrangementDocument,
@@ -277,12 +297,34 @@ export function drawRegionChange(
   const part = partAt(doc, slot);
   const bar = ticksPerBar(doc.transport.meter);
   const regions = part && addRegion(part.regions, tick, songTicksOf(doc), bar);
-  if (!part || !regions) return null;
-  const index = regions.findIndex((r) => !part.regions.includes(r));
-  const added = regions[index];
-  if (!added || !keepsRegionPatterns(part)) return { regions, index };
-  const from = neighbourIndex(part.regions, added.start);
-  const pattern = from >= 0 ? patternCopy(part, from) : defaultPattern(doc, slot, preview);
-  if (!pattern) return { regions, index };
-  return { regions: regions.map((r, i) => (i === index ? { ...r, pattern } : r)), index };
+  return part && regions ? withNeighbourPattern(doc, part, regions, preview) : null;
+}
+
+/** A drag across an empty stretch of a lane: from the press tick to the pointer's, Shift held or not. */
+export interface DrawStroke {
+  readonly from: number;
+  readonly to: number;
+  readonly modifier: boolean;
+}
+
+/**
+ * A region a drag draws on the lane of the part on `slot` (windsor#551
+ * decision 4), and its index: `stroke` snapped outward and clamped to its
+ * gap (`drawRegion`) on the song's bar, or with the modifier on the step of
+ * the region it copies, its pattern copied as a click's is. Null when the
+ * press is not in a gap.
+ */
+export function drawStrokeChange(
+  doc: ArrangementDocument,
+  slot: number,
+  stroke: DrawStroke,
+  preview: Preview,
+): { regions: PartRegion[]; index: number } | null {
+  const part = partAt(doc, slot);
+  if (!part) return null;
+  const bar = ticksPerBar(doc.transport.meter);
+  const copied = neighbourIndex(part.regions, stroke.from);
+  const grain = regionGrain(part, copied, stroke.modifier, bar);
+  const regions = drawRegion(part.regions, stroke.from, stroke.to, songTicksOf(doc), grain);
+  return regions ? withNeighbourPattern(doc, part, regions, preview) : null;
 }

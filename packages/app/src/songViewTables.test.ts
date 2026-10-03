@@ -20,23 +20,18 @@ import {
   ticksPerBar,
 } from '@windsor/engine';
 import { cssRule, cssValue } from './consoleStylesheet';
-import { snapTick, splitRegion } from './regionModel';
 import {
   CYCLE_TICKS,
   LANE_TONE,
   REGION_SUMMARY,
   MIN_BLOCK_PX,
   NARROW_BLOCK_PX,
-  REGION_EDGE_PX,
   SONG_VIEW,
   beatTickPx,
   blockBox,
-  blockHitAt,
   boxTick,
-  edgeBandPx,
   forKind,
   frozenColumnPx,
-  hitBlocks,
   isNarrowBlock,
   mixerColumnPx,
   mixerLeadPx,
@@ -97,46 +92,10 @@ describe('the ruler scale', () => {
 describe('a block at the widest zoom-out (minPxPerBar)', () => {
   const MIN = SONG_VIEW.minPxPerBar;
 
-  it('keeps a one-beat event visible and hittable', () => {
+  it('keeps a one-beat event visible', () => {
     const beat = blockBox(3 * TICKS_PER_BAR, PPQ, MIN);
     expect(beat.widthPx).toBe(MIN_BLOCK_PX);
     expect(beat.leftPx).toBe(3 * MIN);
-    expect(blockHitAt(beat, beat.leftPx + beat.widthPx / 2)).toBe('body');
-    expect(blockHitAt(beat, beat.leftPx)).toBe('start');
-    expect(blockHitAt(beat, beat.leftPx + beat.widthPx)).toBe('end');
-  });
-
-  it('gives a one-bar region a movable centre between its two edge bands', () => {
-    const bar = blockBox(TICKS_PER_BAR, TICKS_PER_BAR, MIN);
-    const { leftPx, widthPx } = bar;
-    expect(edgeBandPx(widthPx)).toBeLessThan(widthPx / 2);
-    expect(blockHitAt(bar, leftPx)).toBe('start');
-    expect(blockHitAt(bar, leftPx + widthPx / 2)).toBe('body');
-    expect(blockHitAt(bar, leftPx + widthPx)).toBe('end');
-    expect(blockHitAt(bar, leftPx - 1)).toBeNull();
-    expect(blockHitAt(bar, leftPx + widthPx + 1)).toBeNull();
-  });
-
-  it('picks the block drawn on top where a widened block overlaps the next', () => {
-    const boxes = [blockBox(0, PPQ, MIN), blockBox(PPQ, PPQ, MIN)];
-    const second = boxes[1];
-    expect(second).toBeDefined();
-    expect(hitBlocks(boxes, (second?.leftPx ?? 0) + 1)?.index).toBe(1);
-    expect(hitBlocks(boxes, 0.5)?.index).toBe(0);
-    expect(hitBlocks(boxes, 100)).toBeNull();
-  });
-
-  it('hits a one-beat region and a one-beat harmony block at their drawn right edge, for resize', () => {
-    // Both lanes draw through blockBox; a narrow block drops its padding, so it is drawn exactly this wide.
-    const region = blockBox(2 * TICKS_PER_BAR, PPQ, MIN);
-    const chord = blockBox(5 * TICKS_PER_BAR + PPQ, PPQ, MIN);
-    for (const box of [region, chord]) {
-      expect(isNarrowBlock(box.widthPx)).toBe(true);
-      const right = box.leftPx + box.widthPx;
-      expect(blockHitAt(box, right)).toBe('end');
-      expect(blockHitAt(box, right - 0.5)).toBe('end');
-      expect(hitBlocks([box], right)).toEqual({ index: 0, hit: 'end' });
-    }
   });
 
   it('draws a narrow block without the padding the CSS gives a full one', () => {
@@ -146,13 +105,6 @@ describe('a block at the widest zoom-out (minPxPerBar)', () => {
     }
     expect(MIN_BLOCK_PX).toBeLessThan(NARROW_BLOCK_PX);
     expect(isNarrowBlock(blockBox(0, TICKS_PER_BAR, SONG_VIEW.pxPerBar).widthPx)).toBe(false);
-  });
-
-  it('keeps the full edge band on a wide block at the default zoom', () => {
-    const bar = blockBox(0, TICKS_PER_BAR, SONG_VIEW.pxPerBar);
-    expect(edgeBandPx(bar.widthPx)).toBe(REGION_EDGE_PX);
-    expect(blockHitAt(bar, REGION_EDGE_PX - 1)).toBe('start');
-    expect(blockHitAt(bar, REGION_EDGE_PX + 1)).toBe('body');
   });
 });
 
@@ -258,29 +210,6 @@ describe('the tick under a drawn block (windsor#21)', () => {
     expect(boxTick(box, box.leftPx + box.widthPx / 2, span, MIN)).toBe(span.startTick + PPQ / 2);
     expect(boxTick(box, box.leftPx + box.widthPx, span, MIN)).toBe(span.startTick + PPQ);
     expect(boxTick(box, box.leftPx + 99, span, MIN)).toBe(span.startTick + PPQ);
-  });
-
-  it('lets an alt-click anywhere on a widened region split that region', () => {
-    const regions = [
-      { start: 0, duration: TICKS_PER_BAR },
-      { start: 2 * TICKS_PER_BAR, duration: PPQ },
-    ];
-    const boxes = regions.map((r) => blockBox(r.start, r.duration, MIN));
-    const box = boxes[1];
-    const grain = PPQ / 4;
-    expect(box).toBeDefined();
-    if (!box) return;
-    // Off the region's own span (past `tickToPx(PPQ)`) but on its drawn box.
-    const px = box.leftPx + box.widthPx * 0.6;
-    expect(px - box.leftPx).toBeGreaterThan(tickToPx(PPQ, MIN) * 0.5);
-    const found = hitBlocks(boxes, px);
-    expect(found?.index).toBe(1);
-    const span = { startTick: 2 * TICKS_PER_BAR, durationTicks: PPQ };
-    const cut = snapTick(boxTick(box, px, span, MIN), grain);
-    const split = splitRegion(regions, 1, cut, grain);
-    expect(split).toHaveLength(3);
-    expect(split[1]?.start).toBe(2 * TICKS_PER_BAR);
-    expect((split[2]?.start ?? 0) + (split[2]?.duration ?? 0)).toBe(2 * TICKS_PER_BAR + PPQ);
   });
 });
 

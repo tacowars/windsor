@@ -15,6 +15,7 @@ import { DIVISORS, TICKS_PER_BAR, partAt, regionPattern } from '@windsor/engine'
 import { DocumentModel } from './documentModel';
 import {
   drawRegionChange,
+  drawStrokeChange,
   editedRegion,
   patternOf,
   regionGrain,
@@ -227,6 +228,31 @@ describe('a split, a draw, a move and a kind change', () => {
     expect(first?.index).toBe(0);
     expect(first?.regions[0]?.pattern).toMatchObject({ steps: [hit(1, 0)] });
     expect(drawRegionChange(model.doc, 0, BAR, preview)).toBeNull();
+  });
+
+  const region = (start: number, duration: number): { start: number; duration: number } => ({
+    start,
+    duration,
+  });
+
+  it("draws a dragged stretch either way, copying its neighbour and snapping on that region's step (windsor#551)", () => {
+    const model = songWith('chord', []);
+    model.merge({ transport: { bars: 8 } });
+    model.merge({ parts: { 0: { regions: [region(0, BAR), region(5 * BAR, BAR)] } } });
+    expect(part0(model.doc).regions).toHaveLength(2);
+    const eighth = DIVISORS.eighth;
+    edit(model, 0, { divisor: eighth, steps: [hit(1, 0)] });
+    const preview = (raw: unknown): ArrangementDocument => model.preview(raw);
+    const stroke = { from: 3 * BAR + eighth, to: BAR + eighth, modifier: false };
+    const leftward = drawStrokeChange(model.doc, 0, stroke, preview);
+    expect(leftward?.index).toBe(1);
+    expect(leftward?.regions).toHaveLength(3);
+    expect(leftward?.regions[1]).toMatchObject({ start: BAR, duration: 3 * BAR });
+    expect(leftward?.regions[1]?.pattern).toMatchObject({ divisor: eighth, steps: [hit(1, 0)] });
+    const fine = { from: BAR + 1.5 * eighth, to: BAR + 3.5 * eighth, modifier: true };
+    const drawn = drawStrokeChange(model.doc, 0, fine, preview)?.regions[1];
+    expect(drawn).toMatchObject({ start: BAR + eighth, duration: 3 * eighth });
+    expect(drawStrokeChange(model.doc, 0, { ...stroke, from: BAR / 2 }, preview)).toBeNull();
   });
 
   it("starts a part's first region from the kind's default pattern", () => {

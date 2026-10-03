@@ -1,8 +1,9 @@
 /**
  * The Song view's region edits (#709 decision 3; epic #703 decisions 2, 9,
- * 17), pure: what a click, an edge drag, a body drag, a split and a delete
- * do to one part's `regions`, and how a song-length change carries every
- * whole-song region along (decision 4's last line). Regions are integer
+ * 17), pure: what a click, an edge drag, a body drag, a seam roll, a drawn
+ * stretch (windsor#551), a split and a delete do to one part's `regions`,
+ * and how a song-length change carries every whole-song region along
+ * (decision 4's last line). Regions are integer
  * ticks, sorted and non-overlapping, inside the song — the shape the
  * normaliser keeps (`regionNormalise.ts`) — so every function returns a new
  * list in that shape for `ctx.change`, where arrays replace wholesale. The
@@ -52,6 +53,12 @@ const clamp = (value: number, lo: number, hi: number): number => Math.min(hi, Ma
 const endOf = (region: Region): number => region.start + region.duration;
 const sorted = <R extends Region>(regions: readonly R[]): R[] =>
   [...regions].sort((a, b) => a.start - b.start);
+/**
+ * The least an edge or a seam drag on `grain` leaves `region` (windsor#551):
+ * a grain, or its own length when it is shorter, so a short region can grow
+ * on the grid but never shrink.
+ */
+const floorOf = (region: Region, grain: number): number => Math.min(grain, region.duration);
 
 /** The index of the region holding `tick`, or -1 in a gap. */
 export function regionAt(regions: readonly Region[], tick: number): number {
@@ -103,7 +110,7 @@ export function neighbourIndex(regions: readonly Region[], start: number): numbe
   return before >= 0 ? before : after;
 }
 
-/** The region's end dragged to `tick`, snapped, kept at least a grain long and short of the next region and the song end. */
+/** The region's end dragged to `tick`, snapped, kept at least a grain long (or as long as it was) and short of the next region and the song end. */
 export function resizeRegionEnd<R extends Region>(
   regions: readonly R[],
   index: number,
@@ -114,13 +121,13 @@ export function resizeRegionEnd<R extends Region>(
   const region = regions[index];
   if (!region) return [...regions];
   const { hi } = bounds(regions, index, songTicks);
-  const lo = region.start + grain;
+  const lo = region.start + floorOf(region, grain);
   if (lo > hi) return [...regions];
   const end = clamp(snapTick(tick, grain), lo, hi);
   return regions.map((r, i) => (i === index ? { ...r, duration: end - r.start } : r));
 }
 
-/** The region's start dragged to `tick`, snapped, kept after the previous region and at least a grain before its end. */
+/** The region's start dragged to `tick`, snapped, kept after the previous region and at least a grain (or its length) before its end. */
 export function resizeRegionStart<R extends Region>(
   regions: readonly R[],
   index: number,
@@ -130,7 +137,7 @@ export function resizeRegionStart<R extends Region>(
   const region = regions[index];
   if (!region) return [...regions];
   const { lo } = bounds(regions, index, Number.POSITIVE_INFINITY);
-  const hi = endOf(region) - grain;
+  const hi = endOf(region) - floorOf(region, grain);
   if (lo > hi) return [...regions];
   const start = clamp(snapTick(tick, grain), lo, hi);
   return regions.map((r, i) => (i === index ? { ...r, start, duration: endOf(r) - start } : r));
@@ -184,6 +191,67 @@ export function dragRegion<R extends Region>(
     case 'move':
       return moveRegion(regions, drag.index, region.start + drag.deltaTicks, songTicks, grain);
   }
+}
+
+/** The grains a seam roll snaps on: the drag's own, and the part's step for a pair too short for two of it. */
+export interface SeamGrains {
+  readonly grain: number;
+  readonly step: number;
+}
+
+/**
+ * The seam where region `index` ends and the next begins rolled to `tick`
+ * (windsor#551; record `2026-10-03-song-region-editing` decision 5): one
+ * region grows and the other shrinks, and nothing else moves. The boundary
+ * snaps to `grain`, or to the part's `step` when the two together are
+ * shorter than two grains; each keeps at least one of that snap step (or
+ * its own length, when shorter). Unchanged when the two do not touch or
+ * are shorter than two steps.
+ */
+export function rollRegionSeam<R extends Region>(
+  regions: readonly R[],
+  index: number,
+  tick: number,
+  grains: SeamGrains,
+): R[] {
+  const left = regions[index];
+  const right = regions[index + 1];
+  if (!left || !right || endOf(left) !== right.start) return [...regions];
+  const span = endOf(right) - left.start;
+  const grain = span >= 2 * grains.grain ? grains.grain : grains.step;
+  if (span < 2 * grain) return [...regions];
+  const lo = left.start + floorOf(left, grain);
+  const hi = endOf(right) - floorOf(right, grain);
+  const at = clamp(snapTick(tick, grain), lo, hi);
+  return regions.map((r, i) => {
+    if (i === index) return { ...r, duration: at - r.start };
+    return i === index + 1 ? { ...r, start: at, duration: endOf(r) - at } : r;
+  });
+}
+
+/**
+ * A region drawn by a drag across an empty stretch from `from` to `to`
+ * (windsor#551 decision 4), either way: snapped outward to `grain`, clamped
+ * to the gap `from` is in, and at least a grain long where the gap has
+ * room. The list with it, sorted; null when `from` is inside a region or
+ * outside the song.
+ */
+export function drawRegion(
+  regions: readonly PartRegion[],
+  from: number,
+  to: number,
+  songTicks: number,
+  grain: number = TICKS_PER_BAR,
+): PartRegion[] | null {
+  if (from < 0 || from >= songTicks || regionAt(regions, from) >= 0) return null;
+  const lo = Math.max(0, ...regions.filter((r) => endOf(r) <= from).map(endOf));
+  const hi = Math.min(songTicks, ...regions.filter((r) => r.start > from).map((r) => r.start));
+  const pointer = clamp(to, 0, songTicks);
+  const start = Math.max(lo, snapDown(Math.min(from, pointer), grain));
+  const reach = Math.min(hi, Math.ceil(Math.max(from, pointer) / grain) * grain);
+  const end = reach - start < grain ? Math.min(hi, start + grain) : reach;
+  if (end <= start) return null;
+  return sorted<PartRegion>([...regions, { start, duration: end - start }]);
 }
 
 /**

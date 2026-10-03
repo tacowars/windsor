@@ -213,13 +213,18 @@ detail pane at the bottom. Its layers, top down:
    windsor#550). Its hit testing, cursors, seam marks and drag readout are
    the lanes' shared `laneEditModel.ts` / `laneEditTables.ts` /
    `laneEditMarks.ts`.
-4. **`songLanes.ts`** — `.reg` blocks per region (tone, summary and cycle
-   ticks from `songViewTables.ts`; ⟲ or ∞ from `regionMark`), and the
-   pointer gestures over `regionModel.ts`: click a gap to add, drag an edge
-   to resize, the body to move, alt-click to split, Shift for the modifier
-   snap (the part's `divisor`, else the beat). A drag previews on the lane
-   and commits once on release. `pointerDrag` is the shared press-or-drag
-   helper (capture, threshold), the way `chordDrag.ts` does it.
+4. **`songLanes.ts`** — a part's lane and its row in the frozen column.
+   `partLaneBlocks.ts` draws the `.reg` blocks per region (tone, summary
+   and cycle ticks from `songViewTables.ts`; ⟲ or ∞ from `regionMark`) and
+   the editing marks; `partLaneGestures.ts` is the pointer (windsor#551)
+   over `partLaneModel.ts` and `regionModel.ts`, with the harmony lane's
+   shared hit test, cursors and readout: click a gap to add a bar, drag
+   across it to draw, drag an edge to trim up to the neighbour, a seam
+   where two regions touch to roll both, the body to move, alt-click to
+   split, Shift for the modifier snap (the region's `divisor`, else the
+   beat). A drag previews on the lane with its readout and commits once on
+   release. `pointerDrag.ts` is the shared press-or-drag helper (capture,
+   threshold), the way `chordDrag.ts` does it.
 5. **`songDetailPane.ts`** — the header ("Lead — Grid", "Harmony — bar 3")
    and close ×; for a part, the part's card from `SEQUENCER_CARDS` inside
    the sequencer device (`sequencerDevice.ts`, windsor#368): a rack row
@@ -244,7 +249,7 @@ detail pane at the bottom. Its layers, top down:
    `sequencerDevice.ts` sets `SEQUENCER_DEVICE_PX`; its `--seq-h` is that
    table's.
 6. **The pure models** — `regionModel.ts`, `harmonyLaneModel.ts`,
-   `harmonyLaneEdits.ts`, `harmonyLaneGeometry.ts`, `laneEditModel.ts`, `harmonyAuditionModel.ts`,
+   `harmonyLaneEdits.ts`, `harmonyLaneGeometry.ts`, `laneEditModel.ts`, `partLaneModel.ts`, `harmonyAuditionModel.ts`,
    `songViewTables.ts` (the px maths and the per-kind tables). The tests are theirs; the DOM files hold no rule worth
    testing.
 

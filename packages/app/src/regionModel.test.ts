@@ -24,6 +24,7 @@ import {
   addRegion,
   deleteRegion,
   dragRegion,
+  drawRegion,
   fitRegions,
   followSongLength,
   moveRegion,
@@ -31,6 +32,7 @@ import {
   regionMark,
   resizeRegionEnd,
   resizeRegionStart,
+  rollRegionSeam,
   snapGrain,
   snapTick,
   splitRegion,
@@ -279,5 +281,63 @@ describe('a region carries its pattern through every edit (windsor#75)', () => {
     expect(neighbourIndex(lane, 0)).toBe(0);
     expect(neighbourIndex(lane.slice(1), 0)).toBe(0);
     expect(neighbourIndex([], 0)).toBe(-1);
+  });
+});
+
+describe('a seam, a short region and a drawn stretch (windsor#551)', () => {
+  const LONG = 16 * BAR;
+  const grains = { grain: BAR, step: PPQ };
+
+  it('rolls a seam: one region grows, the other shrinks, the ones beyond stay', () => {
+    const lane = [region(0, 4 * BAR), region(4 * BAR, 4 * BAR), region(10 * BAR, 4 * BAR)];
+    expect(rollRegionSeam(lane, 0, 5 * BAR + PPQ, grains)).toEqual([
+      region(0, 5 * BAR),
+      region(5 * BAR, 3 * BAR),
+      region(10 * BAR, 4 * BAR),
+    ]);
+    expect(rollRegionSeam(lane, 0, 0, grains)[0]).toEqual(region(0, BAR));
+    expect(rollRegionSeam(lane, 0, LONG, grains)[1]).toEqual(region(7 * BAR, BAR));
+    expect(rollRegionSeam(lane, 1, 9 * BAR, grains)).toEqual(lane);
+  });
+
+  it("rolls a pair shorter than two bars on the part's step, and not below two steps", () => {
+    const pair = [region(0, BAR / 2), region(BAR / 2, BAR / 2)];
+    expect(rollRegionSeam(pair, 0, PPQ / 3, grains)).toEqual([
+      region(0, PPQ),
+      region(PPQ, 3 * PPQ),
+    ]);
+    const tiny = [region(0, PPQ / 2), region(PPQ / 2, PPQ / 2)];
+    expect(rollRegionSeam(tiny, 0, PPQ, grains)).toEqual(tiny);
+  });
+
+  it('never trims or rolls a region shorter than the grain smaller, but grows it on the grid', () => {
+    const beat = [region(BAR, PPQ)];
+    expect(resizeRegionEnd(beat, 0, BAR + PPQ / 2, LONG)).toEqual(beat);
+    expect(resizeRegionEnd(beat, 0, 1.6 * BAR, LONG)).toEqual([region(BAR, BAR)]);
+    expect(resizeRegionStart(beat, 0, BAR + PPQ)).toEqual(beat);
+    expect(resizeRegionStart(beat, 0, 0.4 * BAR)).toEqual([region(0, BAR + PPQ)]);
+    const pair = [region(0, PPQ), region(PPQ, 4 * BAR)];
+    expect(rollRegionSeam(pair, 0, 0, grains)).toEqual(pair);
+    expect(rollRegionSeam(pair, 0, BAR + 1, grains)[0]).toEqual(region(0, BAR));
+  });
+
+  it('draws from the press to the pointer either way, snapped outward to the grain', () => {
+    expect(drawRegion([], BAR + PPQ, 3 * BAR + PPQ, LONG)).toEqual([region(BAR, 3 * BAR)]);
+    expect(drawRegion([], 3 * BAR + PPQ, BAR + PPQ, LONG)).toEqual([region(BAR, 3 * BAR)]);
+    expect(drawRegion([], 2 * BAR + PPQ, 2 * BAR + PPQ + 1, LONG)).toEqual([region(2 * BAR, BAR)]);
+    expect(drawRegion([], BAR + PPQ, BAR + 2.5 * PPQ, LONG, PPQ)).toEqual([
+      region(BAR + PPQ, 2 * PPQ),
+    ]);
+  });
+
+  it('clamps a drawn region to its gap, a gap under a bar and the last gap to the song end', () => {
+    const lane = [region(0, BAR), region(3 * BAR, BAR)];
+    expect(drawRegion(lane, 1.5 * BAR, 10 * BAR, LONG)?.[1]).toEqual(region(BAR, 2 * BAR));
+    expect(drawRegion(lane, 1.5 * BAR, -BAR, LONG)?.[1]).toEqual(region(BAR, BAR));
+    expect(drawRegion(lane, 4 * BAR + PPQ, 99 * BAR, LONG)?.[2]).toEqual(region(4 * BAR, 12 * BAR));
+    const narrow = [region(0, BAR), region(BAR + 2 * PPQ, BAR)];
+    expect(drawRegion(narrow, BAR + PPQ, BAR + PPQ + 1, LONG)?.[1]).toEqual(region(BAR, 2 * PPQ));
+    expect(drawRegion(lane, BAR / 2, 2 * BAR, LONG)).toBeNull();
+    expect(drawRegion(lane, LONG, 2 * LONG, LONG)).toBeNull();
   });
 });
