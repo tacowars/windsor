@@ -11,7 +11,7 @@
 import type { PartialPatch } from '@windsor/engine';
 import { makePatch, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
-import { $, el, seg } from './dom';
+import { $, el } from './dom';
 import { knobSongTick, voiceKnobAutomation } from './knobAutomation';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, libraryActions, syncModifiedMarker } from './libraryActions';
@@ -138,25 +138,12 @@ function refreshPatchUi(editor: PatchEditor): void {
   buildPitch(editor);
 }
 
-function partPicker(ctx: AppCtx, editor: PatchEditor): HTMLElement {
+function partSection(): HTMLElement {
   const box = el('div');
   const head = el('div', 'section-title');
   head.appendChild(el('span', '', 'Part'));
   box.appendChild(head);
-  box.appendChild(
-    seg(
-      ctx.model.doc.parts.map((part) => ({
-        value: String(part.slot),
-        label: part.name,
-      })),
-      () => String(ctx.parts.selected),
-      (slot) => {
-        ctx.parts.pick(Number(slot));
-        refreshPatchUi(editor);
-        syncPresetAndBadge(ctx, editor);
-      },
-    ),
-  );
+  // The part buttons and Add/Remove moved to the header's part strip (windsor#520, `partStrip.ts`).
   const listSlot = el('div');
   listSlot.id = 'partListSlot';
   box.appendChild(listSlot);
@@ -243,7 +230,7 @@ export function renderPartsTab(
   const editor = patchEditor(ctx);
   ctx.parts.reload();
   keyboard.followPart();
-  $('partPick').appendChild(partPicker(ctx, editor));
+  $('partPick').appendChild(partSection());
   $('midiSlot').appendChild(midiPanel(midi));
   syncPresetAndBadge(ctx, editor);
   refreshPatchUi(editor);

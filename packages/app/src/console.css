@@ -61,9 +61,10 @@ input {
   min-height: 100vh;
 }
 
-/* The header (#708, windsor#11): one sticky row above every tab holding the
-   brand, the power button, the transport and the tabs. It wraps on a narrow
-   display, a transport group at a time, and never scrolls sideways. */
+/* The header (#708, windsor#11, windsor#520): sticky above every tab. Its
+   first row holds the tabs, the power button, undo and the transport; it
+   wraps on a narrow display, a transport group at a time, and is never
+   clipped or scrolled sideways. Its second row is the part strip. */
 .chrome {
   position: sticky;
   top: 0;
@@ -76,19 +77,34 @@ input {
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   display: flex;
-  align-items: center;
-  gap: 8px 16px;
+  flex-direction: column;
+  gap: 6px;
   padding: 6px 16px;
+}
+.head-row {
+  /* 12px between groups (16px before windsor#520), so the tabs, the power
+     button's CPU meter and the whole transport fit one row at 1366 px. */
+  --head-gap: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px var(--head-gap);
   flex-wrap: wrap;
+  min-width: 0;
+}
+/* The output light beside the CPU meter (windsor#94): centred on the first
+   row's controls, 8px from the meter, however the row wraps. */
+.head-row > .output-light {
+  margin-top: calc((var(--head-control-h) - 10px) / 2);
+  margin-left: calc(8px - var(--head-gap));
 }
 /* Undo and Redo (windsor#131): a pair of icon buttons tucked against the
-   power button (the negative margin halves the header's 16px gap), dimmed
+   power button (the negative margin halves the header's gap), dimmed
    with nothing to take back or make again. */
 .undo-controls {
   display: flex;
   gap: 4px;
   flex: none;
-  margin-left: -8px;
+  margin-left: calc(var(--head-gap) / -2);
 }
 .undo-controls .btn {
   height: var(--head-control-h);
@@ -108,14 +124,17 @@ input {
   color: var(--ink-dim);
   border-color: var(--line);
 }
+/* It takes what the tabs, power and undo leave on the first row, and its
+   groups wrap inside it (windsor#520), so a narrow row wraps a group at a
+   time rather than dropping the whole transport under the tabs. */
 .transport-strip {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
 }
 .transport-row {
   display: flex;
   align-items: center;
-  gap: 8px 16px;
+  gap: 8px var(--head-gap);
   flex-wrap: wrap;
 }
 .transport-group {
@@ -229,19 +248,9 @@ input {
   color: var(--ink-faint);
 }
 
-.brand {
-  font-family: var(--f-panel);
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-}
-
 .tabs {
   display: flex;
+  flex: none;
   gap: 1px;
   background: var(--line);
   border-radius: var(--r);
@@ -276,6 +285,217 @@ input {
 }
 .tab-icon {
   display: block;
+}
+
+/* ---------- the part strip (windsor#520; record 2026-10-03-parts-tab-layout,
+   decisions 2, 3 and 9) ---------- */
+
+/* The header's second row: the chips share what + and − leave, 70 to 150 px
+   each, and past that the row scrolls sideways with its scrollbar hidden.
+   Laid out by the row's own width, with no screen-width query, so a UI zoom
+   reflows it; partStrip.ts measures the overflow and sets .over. */
+.part-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+.pscroll {
+  position: relative;
+  display: flex;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+.pscroll::-webkit-scrollbar {
+  display: none;
+}
+.part-strip.over .pscroll {
+  /* The end chips can scroll clear of the fades, as any other chip can. */
+  padding-inline: var(--pfade);
+  scroll-padding-inline: var(--pfade);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--pfade),
+    #000 calc(100% - var(--pfade)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--pfade),
+    #000 calc(100% - var(--pfade)),
+    transparent 100%
+  );
+}
+.pchip {
+  flex: 1 0 70px;
+  min-width: 70px;
+  max-width: 150px;
+  scroll-snap-align: start;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--tone, var(--line-bright));
+  border-radius: var(--r);
+  padding: 4px 12px 3px 7px;
+  line-height: 1.15;
+  cursor: pointer;
+}
+.pchip:hover {
+  background: var(--panel-hi);
+}
+.pchip .n {
+  display: block;
+  max-width: 100%;
+  font-family: var(--f-panel);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pchip .k {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.pchip[aria-pressed='true'] {
+  background: var(--carrier);
+  border-color: var(--carrier);
+}
+.pchip[aria-pressed='true'] .n,
+.pchip[aria-pressed='true'] .k {
+  color: #1a1408;
+}
+/* The activity dot: its opacity is the part's meter step (partStripDots.ts). */
+.pchip .dot {
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--modulator);
+  opacity: 0;
+}
+.pchip[aria-pressed='true'] .dot {
+  background: #1a1408;
+}
+/* ‹ › and ▾ show only while the row overflows. */
+.pnav,
+.plist {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  padding: 0;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  color: var(--ink-dim);
+  font-family: var(--f-panel);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.plist {
+  width: 26px;
+  font-family: var(--f-ui);
+  font-size: 12px;
+}
+.pnav:hover,
+.plist:hover {
+  color: var(--ink);
+  border-color: var(--line-bright);
+}
+.part-strip.over .pnav,
+.part-strip.over .plist {
+  display: flex;
+}
+/* + and − at the right end, outside the scroll, so they never scroll away. */
+.pm {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+.pm .pm-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  padding: 0 10px;
+  font-size: 15px;
+  color: var(--ink);
+}
+.pm .pm-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* ▾'s list of every part: a native popover, placed under ▾ by partStripList.ts. */
+.part-list {
+  position: fixed;
+  inset: auto;
+  margin: 4px 0 0;
+  padding: 4px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.part-list-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-width: 200px;
+  padding: 5px 8px;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid var(--tone, var(--line-bright));
+  border-radius: 2px;
+  text-align: left;
+  cursor: pointer;
+}
+.part-list-row + .part-list-row {
+  margin-top: 2px;
+}
+.part-list-row:hover {
+  background: var(--panel-hi);
+}
+.part-list-row[aria-current='true'] {
+  background: var(--carrier);
+  color: #1a1408;
+}
+.part-list-row .n {
+  font-family: var(--f-panel);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.part-list-row .k {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.part-list-row[aria-current='true'] .k {
+  color: #1a1408;
 }
 
 .tab-root {

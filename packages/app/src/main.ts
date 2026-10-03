@@ -20,6 +20,7 @@ import { HOST_PUMP_INTERVAL_MS } from './hostConstants';
 import { Keyboard, qwertyPlaysOn } from './keyboard';
 import { MidiAccessor } from './midiAccess';
 import { renderMixerTab } from './mixerTab';
+import { mountPartStrip } from './partStrip';
 import { renderPartsTab } from './partsTab';
 import { wirePowerButton } from './powerButton';
 import { newSong } from './songParts';
@@ -49,6 +50,7 @@ ctx.parts.onSelect(() => keyboard.followPart());
 
 mountUndoControls(ctx, $('undoControls'));
 mountTransportStrip(ctx, $('transportStrip'));
+mountPartStrip(ctx, $('partStrip'));
 mountTabShell(
   ctx,
   [
