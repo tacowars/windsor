@@ -8,14 +8,9 @@
  *
  * Node-only, by design: excluded from the engine's tsc build.
  */
-// reads-by-path: packages/engine/src/worklet/generated/**
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { PeakReport } from '../mixer/peakMeterConstants';
+import { generatedProcessor } from './generatedProcessor';
 import type { ReverbProcessorLike } from './reverbHarness';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
 
 export interface LoadedPeakMeter {
   create(onPost: (report: PeakReport) => void): ReverbProcessorLike;
@@ -27,8 +22,6 @@ const scripts = new Map<number, LoadedPeakMeter>();
 export function loadPeakMeter(sampleRate = 48000): LoadedPeakMeter {
   const cached = scripts.get(sampleRate);
   if (cached) return cached;
-  const source = readFileSync(join(HERE, '../worklet/generated/peak-meter-processor.js'), 'utf8');
-  let registered: (new () => ReverbProcessorLike) | null = null;
   let deliver: ((report: PeakReport) => void) | null = null;
   class AudioWorkletProcessorShim {
     port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
@@ -51,14 +44,11 @@ export function loadPeakMeter(sampleRate = 48000): LoadedPeakMeter {
       return this.posted;
     }
   }
-  new Function('AudioWorkletProcessor', 'sampleRate', 'registerProcessor', source)(
-    AudioWorkletProcessorShim,
+  const { Processor: ctor } = generatedProcessor<new () => ReverbProcessorLike>({
+    file: 'peak-meter-processor.js',
     sampleRate,
-    (_name: string, ctor: new () => ReverbProcessorLike) => {
-      registered = ctor;
-    },
-  );
-  const ctor = registered as unknown as new () => ReverbProcessorLike;
+    base: AudioWorkletProcessorShim,
+  });
   const loaded: LoadedPeakMeter = {
     create(onPost) {
       deliver = onPost;

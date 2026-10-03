@@ -6,15 +6,11 @@
  *
  * Node-only, by design: excluded from the engine's tsc build.
  */
-// reads-by-path: packages/engine/src/worklet/generated/**
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { OutputStageReport } from '../mixer/outputStageConstants';
 import { OUTPUT_STAGE_MODES } from '../mixer/outputStageConstants';
 import type { OutputStageMode } from '../mixer/outputStageConstants';
+import { generatedProcessor } from './generatedProcessor';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 export const BLOCK = 128;
 
 export interface StageDescriptor {
@@ -47,8 +43,6 @@ const scripts = new Map<number, LoadedStage>();
 export function loadOutputStage(sampleRate = 48000): LoadedStage {
   const cached = scripts.get(sampleRate);
   if (cached) return cached;
-  const source = readFileSync(join(HERE, '../worklet/generated/output-stage-processor.js'), 'utf8');
-  let registered: (new () => StageProcessorLike) | null = null;
   let deliver: ((report: OutputStageReport) => void) | null = null;
   class AudioWorkletProcessorShim {
     port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
@@ -71,16 +65,9 @@ export function loadOutputStage(sampleRate = 48000): LoadedStage {
       return this.posted;
     }
   }
-  new Function('AudioWorkletProcessor', 'sampleRate', 'registerProcessor', source)(
-    AudioWorkletProcessorShim,
-    sampleRate,
-    (_name: string, ctor: new () => StageProcessorLike) => {
-      registered = ctor;
-    },
-  );
-  const ctor = registered as unknown as (new () => StageProcessorLike) & {
-    parameterDescriptors: StageDescriptor[];
-  };
+  const { Processor: ctor } = generatedProcessor<
+    (new () => StageProcessorLike) & { parameterDescriptors: StageDescriptor[] }
+  >({ file: 'output-stage-processor.js', sampleRate, base: AudioWorkletProcessorShim });
   const loaded: LoadedStage = {
     descriptors: ctor.parameterDescriptors,
     create(onPost) {

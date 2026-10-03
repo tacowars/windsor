@@ -1,9 +1,8 @@
 /** Runs the shipped Parametric EQ processor (windsor#198) with only the worklet globals shimmed. */
-// reads-by-path: packages/engine/src/worklet/generated/**
-import { readFileSync } from 'node:fs';
 import { eqParameterValues } from '../inserts/eqParameters';
 import { DEFAULT_EQ } from '../inserts/eqSpec';
 import type { EqSpec } from '../inserts/eqSpec';
+import { generatedProcessor } from './generatedProcessor';
 
 export const QUANTUM = 128;
 
@@ -26,30 +25,14 @@ export interface EqProcessorLike {
   process(inputs: Float32Array[][], outputs: Float32Array[][], params: EqParams): boolean;
 }
 
-const SOURCE = readFileSync(
-  new URL('../worklet/generated/eq-processor.js', import.meta.url),
-  'utf8',
-);
+const FILE = 'eq-processor.js';
 
 export function loadEq(rate = 48000): EqProcessorLike {
-  let ctor: (new (options: unknown) => EqProcessorLike) | undefined;
-  class Base {
-    port = {
-      posted: [] as unknown[],
-      onmessage: null,
-      postMessage(message: unknown): void {
-        this.posted.push(structuredClone(message));
-      },
-    };
-  }
-  new Function('AudioWorkletProcessor', 'sampleRate', 'registerProcessor', SOURCE)(
-    Base,
-    rate,
-    (_name: string, value: typeof ctor) => {
-      ctor = value;
-    },
-  );
-  return new ctor!({});
+  const { Processor } = generatedProcessor<new (options: unknown) => EqProcessorLike>({
+    file: FILE,
+    sampleRate: rate,
+  });
+  return new Processor({});
 }
 
 /** The bundle's top-level functions the audio thread runs, by the names the harness reaches them by. */
@@ -88,12 +71,12 @@ export interface EqInternals extends Record<string, unknown> {
 /** The bundle's classes and hot functions, reached by their top-level names. */
 export function eqInternals(rate = 48000): EqInternals {
   const names = ['EqProcessor', 'EqDsp', 'EqBand', 'EqListen', ...HOT_FUNCTIONS];
-  return new Function(
-    'AudioWorkletProcessor',
-    'sampleRate',
-    'registerProcessor',
-    `${SOURCE}\nreturn { ${names.join(', ')} };`,
-  )(class {}, rate, () => {}) as EqInternals;
+  return generatedProcessor<unknown, EqInternals>({
+    file: FILE,
+    sampleRate: rate,
+    base: class {},
+    epilogue: `return { ${names.join(', ')} };`,
+  }).exports;
 }
 
 /**

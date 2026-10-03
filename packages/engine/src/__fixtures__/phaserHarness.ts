@@ -1,8 +1,7 @@
 /** Runs the actual shipped phaser processor with only browser globals shimmed. */
-// reads-by-path: packages/engine/src/worklet/generated/**
-import { readFileSync } from 'node:fs';
 import { PHASER_DEFAULTS } from '../inserts/phaserConstants';
 import type { PhaserSpec } from '../inserts/phaserSpec';
+import { generatedProcessor } from './generatedProcessor';
 
 export function phaserParams(spec: Partial<PhaserSpec> = {}): Record<string, Float32Array> {
   return Object.fromEntries(
@@ -23,28 +22,11 @@ export interface PhaserProcessorLike {
   ): boolean;
 }
 export function loadPhaser(rate = 48000, params = phaserParams()): PhaserProcessorLike {
-  const source = readFileSync(
-    new URL('../worklet/generated/phaser-processor.js', import.meta.url),
-    'utf8',
-  );
-  let ctor: (new (options: unknown) => PhaserProcessorLike) | undefined;
-  class Base {
-    port = {
-      posted: [] as unknown[],
-      onmessage: null,
-      postMessage(message: unknown): void {
-        this.posted.push(structuredClone(message));
-      },
-    };
-  }
-  new Function('AudioWorkletProcessor', 'sampleRate', 'registerProcessor', source)(
-    Base,
-    rate,
-    (_name: string, value: typeof ctor) => {
-      ctor = value;
-    },
-  );
-  return new ctor!({
+  const { Processor } = generatedProcessor<new (options: unknown) => PhaserProcessorLike>({
+    file: 'phaser-processor.js',
+    sampleRate: rate,
+  });
+  return new Processor({
     parameterData: Object.fromEntries(
       Object.entries(params).map(([key, value]) => [key, value[0]]),
     ),
