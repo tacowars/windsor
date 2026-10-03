@@ -24,8 +24,8 @@ import { filteredListing, loadPreset, presetListing } from './presetBrowser';
 export interface PatchBarActions extends PatchLoader {
   /** Reload the working patch and rebuild the bar and the editor: after a library action. */
   readonly refresh: () => void;
-  /** Open the Patch JSON dialog. */
-  readonly openJson: () => void;
+  /** Open the Patch JSON dialog; closing it hands focus back to `opener`. */
+  readonly openJson: (opener: HTMLElement) => void;
 }
 
 const STEP_LABELS: Readonly<Record<StepDirection, string>> = {
@@ -99,7 +99,7 @@ function menuItems(ctx: AppCtx, actions: PatchBarActions): MenuItem[] {
       label: 'Patch JSON',
       title: 'View, copy or paste the working patch as JSON',
       enabled: true,
-      run: () => actions.openJson(),
+      run: (opener) => actions.openJson(opener),
     },
   ];
 }

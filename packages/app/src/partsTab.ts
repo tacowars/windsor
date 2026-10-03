@@ -16,6 +16,7 @@ import { knobSongTick, voiceKnobAutomation } from './knobAutomation';
 import type { Keyboard } from './keyboard';
 import { confirmUnsaved, syncModifiedMarker } from './libraryActions';
 import type { MidiAccessor } from './midiAccess';
+import { showTrapped } from './metadataModal';
 import { midiPanel } from './midiPanel';
 import { dropInit } from './patchActions';
 import { patchBar } from './patchBar';
@@ -144,10 +145,10 @@ function reloadRail(ctx: AppCtx, editor: PatchEditor): void {
 }
 
 /** Open the Patch JSON dialog on the working patch (the bar's ⋯ menu). */
-function openJsonDialog(ctx: AppCtx): void {
+function openJsonDialog(ctx: AppCtx, opener: HTMLElement): void {
   ($('jsonText') as HTMLTextAreaElement).value = JSON.stringify(ctx.parts.patch, null, 2);
   $('jsonStatus').textContent = '';
-  ($('jsonDlg') as HTMLDialogElement).showModal();
+  void showTrapped($('jsonDlg') as HTMLDialogElement, opener);
 }
 
 /** The part + patch bar (windsor#521) for the selected part, rebuilt whole. */
@@ -166,7 +167,7 @@ function syncPresetAndBadge(ctx: AppCtx, editor: PatchEditor): void {
         );
       },
       refresh: () => reloadRail(ctx, editor),
-      openJson: () => openJsonDialog(ctx),
+      openJson: (opener) => openJsonDialog(ctx, opener),
     }),
   );
 }

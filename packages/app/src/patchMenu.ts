@@ -83,6 +83,9 @@ export function patchMenu(title: string, items: () => readonly MenuItem[]): HTML
     menu = el('div', 'patch-menu');
     menu.setAttribute('role', 'menu');
     menu.onkeydown = (event): void => {
+      // Tab leaves the menu (and may switch tabs, `tabShell.ts`): close it so a
+      // hidden tab never keeps it open. Let the key through.
+      if (event.key === 'Tab') return close();
       if (event.key !== 'Escape') return;
       event.stopPropagation();
       close();
