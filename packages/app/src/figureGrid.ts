@@ -25,7 +25,7 @@
  * chord, the stage, the leader's line or Skip's zero has moved, and runs
  * the card's own per-frame paint (`onFrame`) in the same loop.
  */
-import type { FigureCell, FigureSpec } from '@windsor/engine';
+import type { FigureCell, FigureSpec, RegionStep } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX } from '@windsor/engine';
 import { regionChord } from './chordRegionChord';
 import type { AppCtx } from './context';
@@ -36,7 +36,7 @@ import { leaderOf } from './figureProcessModel';
 import { withStep } from './gridModel';
 import { groupColumns } from './meterGrid';
 import { changePattern } from './partEdits';
-import { regionPlayheadAt } from './regionPlayhead';
+import { regionReadAt } from './regionPlayhead';
 import {
   type LaneHost,
   fillLanePicker,
@@ -80,15 +80,17 @@ export interface FigureStrip extends Strip<FigureSpec> {
   view: FigureView;
 }
 
-/** What the strip shows now, read from the document and the transport. */
-export function figureView(ctx: AppCtx, slot: number, region: number | undefined): FigureView {
+/** What the strip shows with the engine's step `at` (`regionReadAt`), read from the document. */
+export function figureView(
+  ctx: AppCtx,
+  slot: number,
+  region: number | undefined,
+  at: RegionStep | null,
+): FigureView {
   const own = specOf(ctx, slot, 'figure', region);
   const lead = own?.source ? leaderOf(ctx.model.doc, own.source) : null;
   const line = own?.source ? (lead?.spec ?? null) : own;
   const chord = regionChord(ctx, slot, region);
-  // The engine's step, live or the ghost, at the transport's tick, running or not.
-  const at =
-    region === undefined ? null : ctx.host.regionStepAt(slot, region, ctx.transport.position());
   return {
     line,
     borrowed: own?.source !== undefined,
@@ -136,10 +138,18 @@ function columns(strip: FigureStrip, view: FigureView): HTMLElement[] {
   );
 }
 
+/** What the strip shows now, from its own read of the engine's step (an edit, a first paint). */
+const viewNow = (strip: Strip<FigureSpec>): FigureView =>
+  figureView(
+    strip.ctx,
+    strip.slot,
+    strip.region,
+    regionReadAt(strip.ctx, strip.slot, strip.region).at,
+  );
+
 /** Redraw the columns, the lane names and the corner from the document, keeping the scroll. */
-function repaint(strip: FigureStrip): void {
+function repaint(strip: FigureStrip, view: FigureView = viewNow(strip)): void {
   const scrollTop = strip.scroll.scrollTop;
-  const view = figureView(strip.ctx, strip.slot, strip.region);
   strip.view = view;
   strip.section.classList.toggle('figure-borrowed', view.borrowed);
   paintLaneNames(strip.names, strip.lanes);
@@ -160,21 +170,28 @@ function repaint(strip: FigureStrip): void {
   strip.scroll.scrollTop = scrollTop;
 }
 
-/** The one loop: a repaint when what the strip shows has moved, the card's own paint, then the playhead. */
+/**
+ * The one loop: a repaint when what the strip shows has moved, the card's own
+ * paint, then the playhead. A frame reads the engine's step once
+ * (`regionReadAt`) in `repaintIf`, which `watchPlayhead` runs before
+ * `playheadAt`, so the summary, the dimming and the playhead describe one step.
+ */
 function watch(strip: FigureStrip, hooks: FigureGridHooks): void {
   let drawn = signature(strip, strip.view);
+  let read = regionReadAt(strip.ctx, strip.slot, strip.region);
   watchPlayhead({
     attached: () => strip.root.isConnected,
     // The device, not the strip: the strip's page hides while Process shows, and the loop still paints it.
     shown: () => (hooks.device() ?? strip.root).closest('[hidden]') === null,
-    playheadAt: () => regionPlayheadAt(strip.ctx, strip.slot, strip.region),
+    playheadAt: () => read.playhead,
     mark: markStep(strip),
     repaintIf: () => {
-      const view = figureView(strip.ctx, strip.slot, strip.region);
+      read = regionReadAt(strip.ctx, strip.slot, strip.region);
+      const view = figureView(strip.ctx, strip.slot, strip.region, read.at);
       const now = signature(strip, view);
       if (now !== drawn) {
         drawn = now;
-        strip.repaint();
+        repaint(strip, view);
       }
       hooks.onFrame(view);
     },
@@ -238,7 +255,7 @@ export function figureGrid(
     lanesCount: el('span', 'seq-meas'),
     lanes,
     section: el('div', 'seq-section steps figure-strip'),
-    view: figureView(ctx, slot, region),
+    view: viewNow(base),
   };
   scroll.append(namesColumn(strip), strip.root);
   const body = el('div', 'seq-sec-body');
