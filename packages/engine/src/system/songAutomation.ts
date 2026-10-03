@@ -27,7 +27,9 @@
  *   no target and is inert (`automationResolver.ts`).
  * - **Sequencer lanes** (windsor#488). The automation player passes `seq.`
  *   lanes by; after every partial each part's lanes go to the arrangement
- *   player too (`SeqLaneSink`), whose gates read them on the tick.
+ *   player too (`SeqLaneSink`), whose gates read them on the tick. A part
+ *   whose kind changes drops the `seq.` lanes the new kind does not offer,
+ *   by the normaliser's own rule, as its document does.
  * - **Rebuild.** A structural insert edit re-wires the chain only once its
  *   fade has landed; the strip's `insertsRebuilt` hook then restarts that
  *   part's lanes from now, on the stages as they now stand (windsor#345).
@@ -37,7 +39,7 @@ import type { AutomationLane } from '../automation/automationLane';
 import { songTicks } from '../sequencing/meter';
 import type { Scheduler } from '../sequencing/scheduler';
 import { FieldNormaliser, isRecord } from '../song/arrangementFields';
-import type { MusicPart, Transport } from '../song/arrangement';
+import type { Arrangement, MusicPart, SequencerKind } from '../song/arrangement';
 import type {
   ArrangementDocument,
   DocumentPart,
@@ -51,6 +53,9 @@ import { automationResolver } from './automationResolver';
 export interface SeqLaneSink {
   setLanes(slot: number, lanes: readonly AutomationLane[]): void;
 }
+
+/** What `apply` reads of the merged arrangement. */
+export type MergedSong = Pick<Arrangement, 'transport' | 'parts'>;
 
 export class SongAutomation {
   private playerValue: AutomationPlayer | null = null;
@@ -88,22 +93,23 @@ export class SongAutomation {
   }
 
   /**
-   * A partial that has landed; `clock` reads the merged bars and meter when
-   * either changed, the song's length (windsor#429). Every part's lanes then
-   * go to `gates`, so its sequencer lanes play as these do.
+   * A partial that has landed; `merged` reads the merged arrangement: its
+   * bars and meter when either changed, the song's length (windsor#429), and
+   * a part's sequencer kind when its sequencer or lanes changed. Every part's
+   * lanes then go to `gates`, so its sequencer lanes play as these do.
    */
-  apply(
-    partial: DocumentPartial,
-    clock: () => Pick<Transport, 'bars' | 'meter'>,
-    gates?: SeqLaneSink,
-  ): void {
+  apply(partial: DocumentPartial, merged: () => MergedSong, gates?: SeqLaneSink): void {
     const player = this.playerValue;
     if (!player) return;
+    let song: MergedSong | undefined;
+    const read = (): MergedSong => (song ??= merged());
+    const kind = (slot: number): SequencerKind | undefined =>
+      read().parts.find((p) => p.slot === slot)?.sequencer.kind;
     const parts = isRecord(partial.parts) ? Object.entries(partial.parts) : [];
     for (const [slot, part] of parts) if (part === null) player.removePart(Number(slot));
     const { transport } = partial;
     if (isRecord(transport) && (transport.bars !== undefined || transport.meter !== undefined)) {
-      const { bars, meter } = clock();
+      const { bars, meter } = read().transport;
       this.songTicks = songTicks(bars, meter);
       player.setSongTicks(this.songTicks);
       this.refit(player);
@@ -113,9 +119,13 @@ export class SongAutomation {
       if (!isRecord(part)) continue;
       const slot = Number(key);
       if ('automation' in part) {
-        player.setLanes(slot, this.lanes(slot, part.automation));
-      } else if (isRecord(part.strip) && part.strip.inserts !== undefined) {
-        this.reinsert(player, slot);
+        player.setLanes(slot, this.lanes(slot, part.automation, kind(slot)));
+      } else if (
+        (isRecord(part.sequencer) && part.sequencer.kind !== undefined) ||
+        (isRecord(part.strip) && part.strip.inserts !== undefined)
+      ) {
+        // A kind change drops the sequencer lanes the new kind does not offer, as the document does.
+        this.reinsert(player, slot, kind(slot));
       }
     }
     for (const slot of player.slots()) gates?.setLanes(slot, player.lanesOf(slot));
@@ -165,27 +175,34 @@ export class SongAutomation {
   }
 
   /**
-   * `slot`'s insert list changed and its lanes did not come with it: a lane
-   * on an insert the list no longer holds goes, as the document normaliser
-   * deletes it (decision 14), and the rest restart from now.
+   * `slot`'s insert list or sequencer changed and its lanes did not come
+   * with it: a lane on an insert the list no longer holds, or on a sequencer
+   * field its kind does not offer, goes, as the document normaliser deletes
+   * it (decision 14, windsor#488), and the rest restart from now.
    */
-  private reinsert(player: AutomationPlayer, slot: number): void {
+  private reinsert(player: AutomationPlayer, slot: number, kind: SequencerKind | undefined): void {
     const held = player.lanesOf(slot);
-    const kept = this.lanes(slot, held);
+    const kept = this.lanes(slot, held, kind);
     if (kept.length < held.length) player.setLanes(slot, kept);
     else player.resync(slot);
   }
 
   /**
    * A part's lanes, normalised against its inserts as this partial leaves
-   * them, not the chain still fading out; none for null or junk.
+   * them, not the chain still fading out, and its sequencer kind; none for
+   * null or junk.
    */
-  private lanes(slot: number, raw: unknown): readonly AutomationLane[] {
+  private lanes(
+    slot: number,
+    raw: unknown,
+    kind: SequencerKind | undefined,
+  ): readonly AutomationLane[] {
     const strip = this.stripOf(slot);
     if (raw === null || !strip) return [];
     const context = {
       songTicks: this.songTicks,
       inserts: strip.nextInsertSpecs,
+      ...(kind === undefined ? {} : { kind }),
       path: `parts.${slot}.automation`,
       n: new FieldNormaliser(),
     };

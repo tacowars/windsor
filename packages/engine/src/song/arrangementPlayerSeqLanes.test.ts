@@ -3,8 +3,9 @@
  * read by the part's region gate on the tick it issues and handed to the
  * generator's onset. A falling skip lane on a Grid draws the unlaned stream,
  * a gate lane on an Arp sets each note's length from its onset, a lane
- * turned off or deleted hands the config back on the next tick, and a lane
- * flat at the config's value plays exactly what no lane plays.
+ * turned off or deleted hands the config back on the next tick, a lane flat
+ * at the config's value plays exactly what no lane plays, and a kind change
+ * drops the lanes the new kind does not offer, live as in the document.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -20,8 +21,12 @@ import { DEFAULT_BASS_CONFIG } from '../sequencing/bassSequencer';
 import { DEFAULT_FIGURE_CONFIG } from '../sequencing/figureSequencer';
 import { streamRng } from '../sequencing/generatorSeed';
 import { gridNote } from '../sequencing/gridSequencer';
-import { DIVISORS, PPQ, TICKS_PER_BAR } from '../sequencing/scheduler';
+import { DEFAULT_CHORD_CONFIG } from '../sequencing/chordSequencer';
+import { DIVISORS, PPQ, TICKS_PER_BAR, type Scheduler } from '../sequencing/scheduler';
+import type { PartStrip } from '../mixer/channelStrip';
+import { SongAutomation } from '../system/songAutomation';
 import type { Arrangement, MusicPart, SequencerSpec } from './arrangement';
+import type { ArrangementDocument, DocumentPartial } from './arrangementDocument';
 
 const BAR = TICKS_PER_BAR;
 const EIGHTH = DIVISORS.eighth;
@@ -139,5 +144,30 @@ describe('sequencer lanes in the player', () => {
       expect(bare.parts.arp.calls.length).toBeGreaterThan(0);
       expect(laned.parts.arp.calls).toEqual(bare.parts.arp.calls);
     }
+  });
+
+  it('drops a lane live on a kind change that does not offer it: Grid to Chord to Figure', () => {
+    const grid = FULL_ARRANGEMENT.parts[2]!.sequencer;
+    expect(grid.kind).toBe('grid');
+    const r = rig(song(grid, [lane('seq.skipChance', [point(0, 1)])], 2));
+    const document = r.player.arrangement as unknown as ArrangementDocument;
+    const slot = document.parts.find((p) => p.sequencer.kind === 'grid')!.slot;
+    const strip = { nextInsertSpecs: [] } as unknown as PartStrip;
+    const scheduler = { transport: r.transport } as Scheduler;
+    const live = new SongAutomation(scheduler, { currentTime: 0 }, () => strip);
+    live.begin(document);
+    live.load(document);
+    const change = (sequencer: SequencerSpec): void => {
+      const partial = { parts: { [slot]: { sequencer } } } as unknown as DocumentPartial;
+      expect(r.player.apply(partial as never).ok).toBe(true);
+      live.apply(partial, () => r.player.arrangement, r.player);
+    };
+    r.run(1);
+    change({ kind: 'chord', ...DEFAULT_CHORD_CONFIG });
+    change({ kind: 'figure', ...DEFAULT_FIGURE_CONFIG });
+    expect(onTicks(r.parts.arp)).toEqual([]);
+    expect(live.lanesOf(slot)).toEqual([]);
+    r.run(1);
+    expect(onTicks(r.parts.arp).length).toBeGreaterThan(0);
   });
 });
