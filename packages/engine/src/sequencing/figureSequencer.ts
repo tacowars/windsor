@@ -7,10 +7,30 @@
  * growth), a rotation `drift`, and a canon `source` (another Figure part's
  * cells, late and transposed).
  *
- * This file is the field set, its defaults and the check every constructor
- * and live edit runs; the normaliser is `song/figureNormalise.ts`. The
- * performer arrives with windsor#485, the processes with windsor#486 and
- * windsor#487.
+ * This file is the field set, its defaults, the check every constructor
+ * and live edit runs, and the performer (windsor#485); the normaliser is
+ * `song/figureNormalise.ts`. The processes arrive with windsor#486 and
+ * windsor#487: until then the performer loops `cells[0..length)`.
+ *
+ * **The performer.** `FigureSequencer` hears its region gate at every local
+ * tick and plays one cell per `divisor` ticks, cell `step mod length`. A
+ * note cell voices the chord the gate hands over at the cell's onset:
+ * `figureNote(chord.stack, tone, rootNote(register)) + 12·octave`, dropped
+ * outside MIDI 0–127 (it plays as a rest), never clamped. A sounding note
+ * never moves on a chord change, so a tie across one keeps its pitch. A
+ * tick with no chord plays nothing and releases nothing.
+ *
+ * What a cell does to the note held into it is the Arp's cell rule
+ * (`arpCellPlay.ts`: the Grid's slide, tie and rest, plus a gate). A note
+ * releases at `gate` of its cell unless a tie or slide follows; at gate 1
+ * it runs to the next onset, as a Grid note does. Accents, step-mod lanes
+ * and ratchets ride on the note-on as the Grid's do, and the player rolls
+ * them through `rollSpan.ts` and `pitchedRoll.ts`. A cell's `velocity`
+ * rides on the note-on too and scales the part's velocity before the
+ * accent adds its bump (`partNoteOn`). `skipChance` draws once per note
+ * cell, before the roll, from the part's stream per region
+ * (`hashSeed(seed, regionIndex)`). A skipped cell, a cell at velocity 0 and
+ * a dropped note are rests that still advance the stream.
  */
 import {
   ACCENT_MOD_DEFAULT,
@@ -24,14 +44,24 @@ import {
   GRID_DEFAULT_STEP_COUNT,
   GRID_STEPS_MAX,
   GRID_STEP_OCTAVE_MAX,
+  MIDI_NOTE_MAX,
   MUSIC_SLOT_MAX,
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
 } from '../audioConstants';
+import { figureNote } from '../harmony/figureTones';
+import type { HarmonyChord } from '../harmony/harmonyTimeline';
+import { holdsToNext, playArpCell, type ArpCellOutcome } from './arpCellPlay';
+import { rollOutcome } from './arpeggiator';
+import type { ArpStep } from './arpSteps';
+import { streamRng, type Rng } from './generatorSeed';
 import { assertRatchet } from './gridSequencer';
 import { defaultStepCount } from './meter';
 import type { Meter } from './meterTables';
-import { DIVISORS, isNoteDivisor } from './scheduler';
+import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
+import type { PartTickEvent, PartTickSource } from './regionGate';
+import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
+import { DIVISORS, isNoteDivisor, type Unsubscribe } from './scheduler';
 import { assertStepModLanes, type StepModLane } from './stepModLanes';
 
 export interface FigureNoteCell {
@@ -214,4 +244,163 @@ export function assertFigureConfig(config: FigureSequencerConfig): void {
   if (!Number.isSafeInteger(config.seed)) throw new RangeError('seed must be a safe integer');
   assertStepModLanes(config.lanes);
   assertProcesses(config);
+}
+
+/** What a Figure voices its cells with: the key's root note at a register. */
+export type FigurePitchSource = Pick<ScaleSampler, 'rootNote'>;
+
+/** A rest, a Figure cell and an Arp cell alike: what a skipped, silent or dropped note plays. */
+const REST = { kind: 'rest' } as const;
+
+/** The MIDI note `cell` names over `chord`, or null outside 0–`MIDI_NOTE_MAX` (dropped, not clamped). */
+export function figureCellNote(
+  cell: FigureNoteCell,
+  chord: HarmonyChord,
+  rootNote: number,
+): number | null {
+  const tone = figureNote(chord.stack, cell.tone, rootNote);
+  if (tone === null) return null;
+  const note = tone + SEMITONES_PER_OCTAVE * cell.octave;
+  return note >= 0 && note <= MIDI_NOTE_MAX ? note : null;
+}
+
+/** A cell's velocity onto the note-on it struck, when it is not the full 1. */
+function markVelocity(outcome: ArpCellOutcome, velocity: number | undefined): void {
+  if (velocity === undefined || velocity === 1) return;
+  const on = outcome.events.find((e): e is NoteOnEvent => e.kind === 'noteOn');
+  if (on) on.velocity = velocity;
+}
+
+export class FigureSequencer {
+  onNote: NoteHandler | null = null;
+
+  private current: FigureSequencerConfig;
+  private pitch: FigurePitchSource;
+  private rng: Rng;
+  /** The note sounding into the next onset, if any. */
+  private held: number | null = null;
+  /** The local tick a gated note's off goes out on; null while it runs to the next onset. */
+  private releaseTick: number | null = null;
+
+  constructor(pitch: FigurePitchSource, config: FigureSequencerConfig) {
+    assertFigureConfig(config);
+    this.pitch = pitch;
+    this.current = config;
+    this.rng = streamRng(config.seed, 0);
+  }
+
+  get config(): FigureSequencerConfig {
+    return this.current;
+  }
+
+  get heldNote(): number | null {
+    return this.held;
+  }
+
+  /** The region gate entered `regionIndex` from outside: the skip stream restarts. */
+  enter(regionIndex: number): void {
+    this.rng = streamRng(this.current.seed, regionIndex);
+  }
+
+  /**
+   * Take every field but the divisor and the seed live, and optionally a new
+   * key: the held note plays on and the stream carries on. A divisor or seed
+   * change rebuilds the part, as the Grid's does.
+   */
+  reconfigure(config: FigureSequencerConfig, pitch: FigurePitchSource = this.pitch): void {
+    assertFigureConfig(config);
+    if (config.divisor !== this.current.divisor || config.seed !== this.current.seed) {
+      throw new RangeError('a divisor or seed change rebuilds the sequencer, not a live edit');
+    }
+    this.current = config;
+    this.pitch = pitch;
+  }
+
+  /** The cell a local step (since the region entry) sounds: the step mod `length`. */
+  stepAt(localStep: number): number {
+    const { length } = this.current;
+    return ((localStep % length) + length) % length;
+  }
+
+  attach(source: PartTickSource): Unsubscribe {
+    return source.subscribe(1, (event) => this.handleTick(event));
+  }
+
+  /** One local tick: the gate's release when due, then the cell on an onset. A chordless tick releases nothing. */
+  handleTick(event: PartTickEvent): NoteEvent[] {
+    const { divisor } = this.current;
+    const due = this.releaseTick !== null && event.tick >= this.releaseTick;
+    const gateEnded = due && event.chord !== null;
+    const events = gateEnded ? this.releaseHeld(event.tick, event.time) : [];
+    if (event.tick % divisor === 0) events.push(...this.onset(event, event.tick / divisor));
+    for (const e of events) this.onNote?.(e);
+    return events;
+  }
+
+  /** Release the held note at the given tick: a transport stop or a region end. */
+  release(tick: number, time: number): NoteEvent[] {
+    const events = this.releaseHeld(tick, time);
+    for (const e of events) this.onNote?.(e);
+    return events;
+  }
+
+  private onset(event: PartTickEvent, step: number): NoteEvent[] {
+    const { cells, length, skipChance } = this.current;
+    const index = this.stepAt(step);
+    const written: FigureCell = cells[index] ?? REST;
+    // One draw per note cell, whatever it plays, so neither a rest nor the chord moves the stream.
+    const skipped = written.kind === 'note' && skipChance > 0 && this.rng() < skipChance;
+    const { chord } = event;
+    if (!chord) return [];
+    const { cell, pitch } = this.played(written, skipped, chord);
+    const outcome = playArpCell(
+      {
+        tick: event.tick,
+        time: event.time,
+        degree: chord.event.degree,
+        cell,
+        index,
+        pitch,
+        held: this.held,
+        holdsOn: holdsToNext(cells, step, length),
+      },
+      this.current,
+    );
+    // A tie holds the voice to the next non-tie onset, as the Grid's does, whatever the gate.
+    if (cell.kind === 'tie') return this.settle({ ...outcome, releaseTick: null });
+    if (cell.kind !== 'note' || written.kind !== 'note') return this.settle(outcome);
+    markVelocity(outcome, written.velocity);
+    const hits = cell.ratchet ?? 1;
+    return this.settle(hits > 1 ? rollOutcome(outcome, hits, this.current, event) : outcome);
+  }
+
+  /** The cell as it plays: a note at its pitch over `chord`, or a rest when skipped, silent or dropped. */
+  private played(
+    written: FigureCell,
+    skipped: boolean,
+    chord: HarmonyChord,
+  ): { cell: ArpStep; pitch: number } {
+    if (written.kind !== 'note') return { cell: written, pitch: 0 };
+    const root = this.pitch.rootNote(this.current.register.octave);
+    const note = skipped || written.velocity === 0 ? null : figureCellNote(written, chord, root);
+    // The pitch carries the cell's octave already, so the Arp's rule shifts it by none.
+    return note === null
+      ? { cell: REST, pitch: 0 }
+      : { cell: { ...written, octave: 0 }, pitch: note };
+  }
+
+  /** Keep what an onset leaves sounding, and hand back what it emitted. */
+  private settle(outcome: ArpCellOutcome): NoteEvent[] {
+    this.held = outcome.held;
+    this.releaseTick = outcome.releaseTick;
+    return outcome.events;
+  }
+
+  private releaseHeld(tick: number, time: number): NoteEvent[] {
+    this.releaseTick = null;
+    if (this.held === null) return [];
+    const off: NoteEvent = { kind: 'noteOff', tick, time, note: this.held };
+    this.held = null;
+    return [off];
+  }
 }

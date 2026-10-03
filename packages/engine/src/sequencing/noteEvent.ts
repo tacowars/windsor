@@ -18,6 +18,12 @@ export interface NoteOnEvent {
   /** Scale degree the note was drawn from, for bindings that want it. */
   degree: number;
   /**
+   * A Figure cell's velocity (windsor#485): the fraction of the part's
+   * velocity the note plays at, before an accent's bump. Absent is 1, which
+   * every other generator sends.
+   */
+  velocity?: number;
+  /**
    * A grid accent (#602): the bump to add to the part's velocity, and the
    * per-note mod value the voice adds to the wheel. Absent on a plain note.
    */

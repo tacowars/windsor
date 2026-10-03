@@ -20,13 +20,18 @@ export interface PartNoteOn {
 
 /** What a note-on carries beyond its pitch: a `NoteOnEvent` is one, a Euclid hit's read another. */
 export type NoteOnMarks = {
-  readonly [K in 'accent' | 'slide' | 'stepMod']?: NoteOnEvent[K] | undefined;
+  readonly [K in 'accent' | 'slide' | 'stepMod' | 'velocity']?: NoteOnEvent[K] | undefined;
 };
 
-/** `event` as its part plays it, over the part's own `velocity`. */
+/**
+ * `event` as its part plays it, over the part's own `velocity`: scaled by
+ * the event's own velocity when it carries one (a Figure cell's,
+ * windsor#485), then the accent's bump, at most 1.
+ */
 export function partNoteOn(event: NoteOnMarks, velocity: number): PartNoteOn {
   const { accent, slide, stepMod } = event;
-  const played = accent ? Math.min(1, velocity + accent.velocity) : velocity;
+  const scaled = event.velocity === undefined ? velocity : velocity * event.velocity;
+  const played = accent ? Math.min(1, scaled + accent.velocity) : scaled;
   if (!accent && !slide && !stepMod) return { velocity: played, extras: undefined };
   const extras: NoteExtras = { mod: accent?.mod ?? 0, slide: slide === true };
   if (stepMod) extras.stepMod = stepMod;

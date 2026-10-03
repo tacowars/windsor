@@ -482,17 +482,21 @@ export type {
   BassSequencerConfig,
   BassStep,
 } from './sequencing/bassSequencer';
-// The Figure (windsor#484): its config, defaults and check, and the chord-tone rule its cells label with.
+// The Figure (windsor#484): its config, defaults and check, and the chord-tone rule its cells label with;
+// its performer and the note a cell plays over a chord (windsor#485).
 export {
   DEFAULT_FIGURE_CONFIG,
+  FigureSequencer,
   assertFigureConfig,
   defaultFigureCells,
+  figureCellNote,
   figureNoteCell,
 } from './sequencing/figureSequencer';
 export type {
   FigureCell,
   FigureDrift,
   FigureNoteCell,
+  FigurePitchSource,
   FigureSequencerConfig,
   FigureSource,
   FigureStage,
