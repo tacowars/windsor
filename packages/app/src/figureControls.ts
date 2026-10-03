@@ -12,7 +12,8 @@
  * Reverse mirrors them, lanes with them (windsor#548). Length, Randomize and
  * Reverse replace what Rotate turned, so they rebase it. With a source those
  * four act on cells the part does not play, so the device greys them
- * (`.figure-own`).
+ * (`.figure-own`) and `holdOwnControls` takes them out of reach: the buttons
+ * disabled, the knobs inert, so neither Tab nor a key edits the hidden cells.
  */
 import type { FigureSpec } from '@windsor/engine';
 import { DEFAULT_FIGURE_CONFIG } from '@windsor/engine';
@@ -188,6 +189,18 @@ function rotateKnob(target: FigureTarget, rotor: Rotor): KnobElement {
   knob.classList.add('figure-own');
   rotor.knob = knob;
   return knob;
+}
+
+/**
+ * Disable the own-cell controls while the line is borrowed, as the strip
+ * disables a borrowed column's cells (`figureCells.ts`), and enable them
+ * again on Own cells. The greying is CSS; this keeps Tab and the keys off them.
+ */
+export function holdOwnControls(root: HTMLElement, borrowed: boolean): void {
+  for (const node of root.querySelectorAll<HTMLElement>('.figure-own')) {
+    if (node instanceof HTMLButtonElement) node.disabled = borrowed;
+    else node.inert = borrowed;
+  }
 }
 
 /** The Play columns, with no section label: the page tabs name the page. */

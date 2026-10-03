@@ -21,7 +21,7 @@
 import { chordName, eventChord, scaleOffsets } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { el } from './dom';
-import { figureControls } from './figureControls';
+import { figureControls, holdOwnControls } from './figureControls';
 import { type FigureView, figureGrid } from './figureGrid';
 import { figureSummary } from './figureProcessModel';
 import { figureProcessPage } from './figureProcessPage';
@@ -99,17 +99,31 @@ export function figureCard(ctx: AppCtx, slot: number, region?: number): DeviceBo
   const cells = el('div', 'figure-page figure-cells');
   let paintProcess: (stage: number) => void = () => undefined;
   let note: HTMLElement | null = null;
+  let controls: HTMLElement | null = null;
+  let held: boolean | null = null;
+  const hold = (borrowed: boolean): void => {
+    if (!controls || borrowed === held) return;
+    held = borrowed;
+    holdOwnControls(controls, borrowed);
+  };
   const body = el('div', 'seq-device-body figure-device');
   const strip = figureGrid(ctx, slot, region, {
     onFrame: (view) => {
       const text = summaryOf(ctx, slot, region, view);
       if (note && note.textContent !== text) note.textContent = text;
       paintProcess(view.borrowed ? -1 : view.stage);
+      hold(view.borrowed);
     },
     device: () => body,
   });
-  const repaint = (): void => strip.repaint();
-  cells.append(figureControls({ ctx, slot, region, repaint }), strip.section);
+  // An edit (Source among them) repaints at once; the frame catches undo and the rest.
+  const repaint = (): void => {
+    strip.repaint();
+    hold(strip.view.borrowed);
+  };
+  controls = figureControls({ ctx, slot, region, repaint });
+  hold(strip.view.borrowed);
+  cells.append(controls, strip.section);
   const process = figureProcessPage(ctx, slot, region, repaint);
   paintProcess = process.paint;
   const row = tabs(slot, { cells, process: process.root });
