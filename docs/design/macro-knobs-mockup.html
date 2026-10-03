@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The Macros card mockup for epic windsor#558 (record
+     2026-10-04-patch-macro-knobs, decision 11; ticket windsor#561). Static and
+     self-contained: open it in a browser. The Shape & modulation deck is
+     reproduced from a screenshot of the Parts tab on 2026-10-04 so the card
+     sits in its real frame; the operator rows above it are a placeholder
+     band. The strip at the very top is the mockup's own state switcher, not
+     part of the console. tacowars chose layout A (tiles + list) on 2026-10-04;
+     B stays as the alternative it was chosen over. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<title>Windsor Macro Knobs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Tokens copied from console.css. Dark only, as the app is. */
+:root {
+  --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618;
+  --well: #0c0f10; --line: #2c3439; --line-bright: #3d4950;
+  --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70;
+  --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --seq: #cc7a9c; --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ground); color: var(--ink); font: 13px/1.35 var(--f-ui); }
+
+/* ---- the mockup's own switcher ---- */
+.mock-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  padding: 8px 16px; background: #0c0f10; border-bottom: 1px solid #2c3439; font-family: var(--f-num); font-size: 11px; color: var(--ink-dim); }
+.mock-bar b { color: var(--ink); font-weight: 500; }
+.mock-bar label { display: inline-flex; gap: 5px; align-items: center; cursor: pointer; }
+.mock-note { padding: 12px 16px 0; max-width: 1180px; color: var(--ink-dim); font-size: 12px; }
+.mock-note h2 { font: 600 12px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--ink); margin: 0 0 4px; }
+.mock-note p { margin: 0 0 6px; }
+.mock-note b { color: var(--ink); font-weight: 500; }
+
+/* ---- console frame ---- */
+.console { padding: 12px 16px 40px; }
+.zoomed .console { zoom: 1.25; }
+.band { height: 87px; margin-bottom: 6px; border: 1px dashed var(--line-bright); border-radius: var(--r);
+  display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font: 600 10px var(--f-panel); letter-spacing: .17em; text-transform: uppercase; }
+
+.section-title { font-family: var(--f-panel); font-size: 10px; font-weight: 600; letter-spacing: .17em; text-transform: uppercase;
+  color: var(--ink-dim); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--line); margin-left: 2px; }
+.section-title > span { flex: none; }
+.section-title > .after { order: 3; flex: none; display: flex; gap: 6px; align-items: center; }
+.deck-title { margin-top: 14px; }
+.deck { display: flex; flex-wrap: wrap; gap: 8px; }
+.deck-card { flex: 1.2 1 340px; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.deck-card.deck-filter { flex-grow: 1.3; }
+.deck-card.deck-drive { flex-grow: .6; }
+.deck-card.deck-macros { flex: 1 1 100%; }
+.knob-row { display: flex; flex-wrap: wrap; gap: 4px 2px; align-items: flex-end; }
+.env { height: 48px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); margin-bottom: 6px; position: relative; overflow: hidden; }
+.env svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* ---- controls, as console.css draws them ---- */
+.seg { display: flex; flex-wrap: wrap; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { flex: 1; min-width: 44px; background: var(--inset); border: 0; padding: 5px 4px; cursor: pointer; font-family: var(--f-panel);
+  font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-dim); }
+.seg button:hover { background: var(--panel-hi); color: var(--ink); }
+.seg button[aria-pressed='true'] { background: var(--seg-color, var(--modulator)); color: #111416; }
+.seg.tight button { min-width: 34px; padding: 4px 3px; }
+.btn { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 12px; cursor: pointer; color: var(--ink-dim);
+  font-family: var(--f-panel); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.btn:hover { background: var(--panel-hi); color: var(--ink); border-color: var(--line-bright); }
+.btn.small { padding: 3px 8px; font-size: 10px; }
+.btn.icon { width: 22px; height: 22px; padding: 0; font-size: 12px; letter-spacing: 0; line-height: 1; }
+.btn[aria-pressed='true'] { background: var(--inset); border-color: var(--carrier); color: var(--carrier); box-shadow: 0 0 5px rgba(224,164,78,.35); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+input.field, select.field { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 7px; font-size: 12px; color: var(--ink); font-family: var(--f-ui); }
+.label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+
+/* the console's knob (knob.ts, 38 px) */
+.knob { width: 54px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 0 4px; border-radius: var(--r); cursor: ns-resize; user-select: none; }
+.knob:hover { background: var(--panel-hi); }
+.knob svg { display: block; }
+.knob .dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-arc { stroke: var(--knob-color, var(--ink-dim)); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-pin { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+.knob .dial-face { fill: var(--inset); stroke: var(--line); }
+.knob .knob-label { font-family: var(--f-panel); font-size: 8.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.knob .knob-val { font-family: var(--f-num); font-size: 10px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.knob .knob-auto { display: none; padding: 0 4px; border-radius: 6px; background: var(--lock-color); color: var(--ground); font-family: var(--f-panel); font-size: 7.5px; font-weight: 600; letter-spacing: .14em; line-height: 11px; }
+.knob.locked { cursor: not-allowed; }
+.knob.locked .dial-arc { stroke: var(--lock-color); }
+.knob.locked .dial-pin { stroke: var(--lock-color); stroke-width: 2; }
+.knob.locked .dial-face { stroke: var(--lock-color); }
+.knob.locked .knob-auto { display: block; }
+.knob.dim { opacity: .35; }
+
+/* ---- the Macros card, layout A: tiles + list ---- */
+.macro-tiles { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin-bottom: 10px; }
+.macro-tile { width: 132px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; position: relative; }
+.macro-tile:hover { border-color: var(--line-bright); }
+.macro-tile.selected { border-color: var(--carrier); box-shadow: inset 0 2px 0 var(--carrier); }
+.macro-tile input.field { width: 100%; text-align: center; padding: 3px 4px; font-size: 12px; background: transparent; border-color: transparent; }
+.macro-tile input.field:hover, .macro-tile input.field:focus { border-color: var(--line); background: var(--panel); outline: 0; }
+.macro-tile .knob { padding-top: 0; }
+.macro-tile .count { font: 500 9.5px var(--f-num); color: var(--ink-faint); }
+.macro-tile .x { position: absolute; top: 4px; right: 4px; width: 16px; height: 16px; border: 0; background: transparent; color: var(--ink-faint); font-size: 12px; line-height: 1; cursor: pointer; border-radius: var(--r); }
+.macro-tile .x:hover { color: var(--hot); background: var(--panel-hi); }
+.macro-tile.add { justify-content: center; border-style: dashed; color: var(--ink-dim); font: 600 10px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; }
+.macro-tile.add:hover { color: var(--ink); }
+
+.map-head { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; }
+.map-head .who { font: 600 10px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--carrier); }
+.map-head .n { font: 500 10px var(--f-num); color: var(--ink-faint); }
+.map-head .grow { flex: 1; }
+.map-list { display: flex; flex-direction: column; gap: 4px; }
+.map-row { display: grid; grid-template-columns: 180px 54px 54px 1fr auto auto; align-items: center; gap: 2px 10px; padding: 4px 8px 4px 10px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); }
+.map-row .target { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.map-row .target .name { font: 500 12.5px var(--f-ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-row .target .kind { font: 600 8.5px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.map-row .target .plays { font: 500 10px var(--f-num); color: var(--carrier); }
+.map-row .curve { display: flex; align-items: center; gap: 8px; }
+.map-row .glyph { width: 28px; height: 20px; flex: none; }
+.map-row .glyph path { fill: none; stroke: var(--carrier); stroke-width: 1.6; stroke-linecap: round; }
+.map-row .glyph line { stroke: var(--line-bright); stroke-width: 1; }
+.map-row .seg { max-width: 190px; flex: 1; }
+.map-add { margin-top: 6px; display: flex; gap: 8px; align-items: center; position: relative; }
+.map-add .hint { font-size: 11px; color: var(--ink-faint); }
+
+/* the target picker, as the Song tab's lane picker groups it */
+.picker { display: none; position: absolute; left: 0; top: 30px; z-index: 4; width: 560px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: var(--r);
+  box-shadow: 0 10px 28px rgba(0,0,0,.5); padding: 8px 10px 10px; }
+.picker-open .picker { display: block; }
+.picker .groups { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 14px; }
+.picker .g h4 { margin: 0 0 3px; font: 600 9px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); }
+.picker .g button { display: block; width: 100%; text-align: left; background: transparent; border: 0; color: var(--ink); font: 400 12px var(--f-ui); padding: 2px 4px; border-radius: var(--r); cursor: pointer; }
+.picker .g button:hover { background: var(--panel); }
+.picker .g button.taken { color: var(--ink-faint); cursor: not-allowed; }
+.picker .g button.taken small { color: var(--carrier); font-size: 9px; font-family: var(--f-panel); letter-spacing: .08em; text-transform: uppercase; margin-left: 4px; }
+
+/* ---- layout B: one row per macro, mappings as chips ---- */
+.b-rows { display: flex; flex-direction: column; gap: 6px; }
+.b-row { display: grid; grid-template-columns: 120px 54px 1fr; align-items: center; gap: 10px; padding: 4px 8px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); }
+.b-row input.field { background: transparent; border-color: transparent; padding: 3px 4px; }
+.b-row input.field:hover { border-color: var(--line); background: var(--panel); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 7px 3px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font-size: 11.5px; }
+.chip:hover { border-color: var(--line-bright); }
+.chip.open { border-color: var(--carrier); }
+.chip .nm { color: var(--ink); }
+.chip .rng { font-family: var(--f-num); font-size: 10px; color: var(--ink-dim); }
+.chip .cv { font: 600 8px var(--f-panel); letter-spacing: .1em; color: var(--carrier); }
+.chip.add { border-style: dashed; color: var(--ink-dim); font: 600 10px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; }
+.chip-pop { position: absolute; z-index: 4; margin-top: 6px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 10px 28px rgba(0,0,0,.5); padding: 8px 10px; display: flex; align-items: center; gap: 10px; }
+.chip-pop .seg { width: 180px; }
+.b-wrap { position: relative; }
+
+.only-a, .only-b { display: none; }
+.layout-a .only-a { display: block; }
+.layout-b .only-b { display: block; }
+</style>
+<body class="layout-a">
+
+<div class="mock-bar">
+  <b>Macros card mockup</b>
+  <span>Layout
+    <label><input type="radio" name="layout" value="a" checked> A · tiles + list</label>
+    <label><input type="radio" name="layout" value="b"> B · rows + chips</label>
+  </span>
+  <label><input type="checkbox" id="pickerToggle"> target picker open</label>
+  <label><input type="checkbox" id="zoomToggle"> zoom 125%</label>
+  <span>windsor#558 · decision 11 of 2026-10-04-patch-macro-knobs</span>
+</div>
+
+<div class="mock-note">
+  <h2>What this shows</h2>
+  <p>The patch has two macros. <b>Accent</b> is selected: it maps Op A Level, Cutoff and Op A Decay, which is the 303's accent in one knob. <b>Wobble</b> is held by a song lane (the AUTO ring). In the Filter card above, <b>Cutoff</b> is locked under Accent's name: turning it would do nothing audible while the mapping exists, and the dial shows the value Accent plays at its current position. Every mapping row reads what it plays now in amber. The Macros card is the deck's last card and takes the full width, so a mapping row has room for its two knobs, its curve and its readout.</p>
+  <p><b>A</b> keeps the macros as tiles with one list of mappings for the selected one; it reads like the LFO cards. <b>B</b> gives every macro a row with its mappings as chips, so all mappings show at once and a chip opens a small popover to edit. A is the recommendation: the min and max knobs stay visible, and a 303 accent is edited by ear, knob under hand.</p>
+</div>
+
+<div class="console">
+  <div class="section-title"><span>Operators</span></div>
+  <div class="band">Operator rows A – D, as today</div>
+  <div class="band" style="opacity:.55"></div>
+
+  <div class="section-title deck-title"><span>Shape &amp; modulation</span></div>
+  <div class="deck">
+    <section class="deck-card deck-filter">
+      <div class="section-title"><span>Filter</span></div>
+      <div class="seg" style="margin-bottom:8px"><button>Off</button><button aria-pressed="true">LP</button><button>HP</button><button>BP</button><button>Notch</button><button>Formant</button></div>
+      <div class="knob-row" id="filterKnobs"></div>
+      <div class="section-title" style="margin-top:11px"><span>Filter Env</span></div>
+      <div class="env"><svg viewBox="0 0 500 48" preserveAspectRatio="none"><path d="M0 46 L40 4 L220 40 L500 46" fill="none" stroke="#5fa8a0" stroke-width="1.5"/></svg></div>
+      <div class="knob-row" id="filterEnvKnobs"></div>
+    </section>
+    <section class="deck-card deck-lfo">
+      <div class="section-title"><span>LFO</span></div>
+      <div class="seg" style="margin-bottom:8px"><button aria-pressed="true">Sine</button><button>Tri</button><button>Saw up</button><button>Saw down</button><button>Square</button><button>S&amp;H</button><button>Drift</button></div>
+      <div class="knob-row" id="lfoKnobs"></div>
+    </section>
+    <section class="deck-card deck-lfo">
+      <div class="section-title"><span>LFO 2</span></div>
+      <div class="seg" style="margin-bottom:8px"><button aria-pressed="true">Sine</button><button>Tri</button><button>Saw up</button><button>Saw down</button><button>Square</button><button>S&amp;H</button><button>Drift</button></div>
+      <div class="knob-row" id="lfo2Knobs"></div>
+    </section>
+    <section class="deck-card deck-lfo">
+      <div class="section-title"><span>Pitch Env</span></div>
+      <div class="env"><svg viewBox="0 0 500 48" preserveAspectRatio="none"><path d="M0 44 L30 6 L120 44 L500 44" fill="none" stroke="#e0a44e" stroke-width="1.5"/></svg></div>
+      <div class="knob-row" id="pitchKnobs"></div>
+    </section>
+    <section class="deck-card deck-drive">
+      <div class="section-title"><span>Drive</span></div>
+      <div class="seg" style="margin-bottom:8px"><button aria-pressed="true">Off</button><button>On</button></div>
+      <div class="label" style="margin-bottom:4px">Shape</div>
+      <select class="field" style="width:260px;margin-bottom:8px"><option>Soft</option></select>
+      <div class="knob-row" id="driveKnobs" style="opacity:.4"></div>
+    </section>
+
+    <!-- ======= the new card ======= -->
+    <section class="deck-card deck-macros">
+      <div class="section-title"><span>Macros</span><span class="after"><span class="label" style="font-size:9.5px;color:var(--ink-dim)">2 / 8</span><button class="btn small">+ Macro</button></span></div>
+
+      <!-- Layout A -->
+      <div class="only-a">
+        <div class="macro-tiles">
+          <div class="macro-tile selected">
+            <button class="x" title="Remove macro">×</button>
+            <input class="field" value="Accent">
+            <div id="kAccent"></div>
+            <div class="count">3 mappings</div>
+          </div>
+          <div class="macro-tile">
+            <button class="x" title="Remove macro">×</button>
+            <input class="field" value="Wobble">
+            <div id="kWobble"></div>
+            <div class="count">2 mappings</div>
+          </div>
+          <div class="macro-tile add">+ Macro</div>
+        </div>
+
+        <div class="map-head"><span class="who">Accent</span><span class="n">· 3 of 8 mappings · macro at 0.35</span><span class="grow"></span></div>
+        <div class="map-list" id="mapList"></div>
+        <div class="map-add">
+          <button class="btn small" id="addMap">+ Add mapping</button>
+          <span class="hint">A new mapping starts with Min and Max at the target's current value, so nothing changes until a knob moves.</span>
+          <div class="picker">
+            <div class="groups">
+              <div class="g"><h4>Filter</h4><button class="taken">Cutoff<small>Accent</small></button><button>Filt Env Amt</button><button>Resonance</button><button class="taken">Filter Decay<small>Wobble</small></button><button>Vowel</button></div>
+              <div class="g"><h4>Op A</h4><button class="taken">Level<small>Accent</small></button><button class="taken">Decay<small>Accent</small></button><button>Dcy Crv</button><button>Fdbk</button><button>Width</button></div>
+              <div class="g"><h4>Op B</h4><button>Level</button><button>Decay</button><button>Dcy Crv</button><button>Fdbk</button><button>Width</button></div>
+              <div class="g"><h4>Op C</h4><button>Level</button><button>Decay</button><button>Dcy Crv</button><button>Fdbk</button><button>Width</button></div>
+              <div class="g"><h4>Op D</h4><button>Level</button><button>Decay</button><button>Dcy Crv</button><button>Fdbk</button><button>Width</button></div>
+              <div class="g"><h4>LFO</h4><button>LFO 1 Amt</button><button>LFO 1 Rate</button><button class="taken">LFO 2 Amt<small>Wobble</small></button><button>LFO 2 Rate</button></div>
+              <div class="g"><h4>Pitch</h4><button>Pitch Env</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layout B -->
+      <div class="only-b b-wrap">
+        <div class="b-rows">
+          <div class="b-row">
+            <input class="field" value="Accent">
+            <div id="kAccentB"></div>
+            <div class="chips">
+              <span class="chip"><span class="nm">Op A Level</span><span class="rng">0.40 → 0.90</span><span class="cv">LIN</span></span>
+              <span class="chip open"><span class="nm">Cutoff</span><span class="rng">400 → 3.2k Hz</span><span class="cv">EXP</span></span>
+              <span class="chip"><span class="nm">Op A Decay</span><span class="rng">120m → 45m</span><span class="cv">LIN · INV</span></span>
+              <span class="chip add">+ mapping</span>
+            </div>
+          </div>
+          <div class="b-row">
+            <input class="field" value="Wobble">
+            <div id="kWobbleB"></div>
+            <div class="chips">
+              <span class="chip"><span class="nm">LFO 2 Amt</span><span class="rng">0.00 → 0.60</span><span class="cv">S</span></span>
+              <span class="chip"><span class="nm">Filter Decay</span><span class="rng">200m → 1.2s</span><span class="cv">LOG</span></span>
+              <span class="chip add">+ mapping</span>
+            </div>
+          </div>
+        </div>
+        <div class="chip-pop" style="left:280px">
+          <div id="kBMin"></div><div id="kBMax"></div>
+          <div class="seg tight"><button>Lin</button><button aria-pressed="true">Exp</button><button>Log</button><button>S</button></div>
+          <button class="btn small">Inv</button>
+          <button class="btn icon" title="Remove mapping">×</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+// The console's knob markup (knob.ts): a 38 px dial, r 15, arc −135..135.
+const R = 15, SIZE = 38, C = 19, FACE = 3.5, PIN = 5, A0 = -135, A1 = 135;
+const polar = (r, a) => [C + r * Math.cos((a - 90) * Math.PI / 180), C + r * Math.sin((a - 90) * Math.PI / 180)];
+const arc = (a0, a1) => { const [x0, y0] = polar(R, a0), [x1, y1] = polar(R, a1); return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${R} ${R} 0 ${Math.abs(a1 - a0) > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`; };
+function knob(label, val, norm, o = {}) {
+  const a = A0 + (A1 - A0) * Math.max(0, Math.min(1, norm));
+  const [px, py] = polar(R - PIN, a);
+  const cls = ['knob', o.lock ? 'locked' : '', o.dim ? 'dim' : ''].join(' ');
+  const style = [o.color ? `--knob-color:${o.color}` : '', o.lock ? `--lock-color:${o.lockColor || '#e0a44e'}` : ''].filter(Boolean).join(';');
+  return `<div class="${cls}" style="${style}" title="${label}"><svg width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">
+    <circle class="dial-face" cx="${C}" cy="${C}" r="${R - FACE}"></circle>
+    <path class="dial-track" d="${arc(A0, A1)}"></path>
+    <path class="dial-arc" d="${norm > 0.004 ? arc(A0, a) : ''}"></path>
+    <line class="dial-pin" x1="${C}" y1="${C}" x2="${px.toFixed(2)}" y2="${py.toFixed(2)}"></line>
+  </svg><span class="knob-val">${val}</span>${o.lock ? `<span class="knob-auto">${o.lock}</span>` : ''}${label ? `<span class="knob-label">${label}</span>` : ''}</div>`;
+}
+const T = '#5fa8a0', AMB = '#e0a44e';
+const row = (id, knobs) => document.getElementById(id).innerHTML = knobs.join('');
+
+// The deck as it stands (values from the screenshot), with Cutoff locked under Accent.
+row('filterKnobs', [knob('Cutoff', '437', 0.42, { color: T, lock: 'Accent' }), knob('Reso', '0.71', 0.1, { color: T }), knob('Env Amt', '+0.00', 0.5, { color: T }),
+  knob('Wheel', '+0.00', 0.5, { color: T }), knob('LFO Amt', '+0.00', 0.5, { color: T }), knob('LFO 2 Amt', '+0.00', 0.5, { color: T }), knob('Key Trk', '+0.00', 0.5, { color: T })]);
+row('filterEnvKnobs', [knob('Attack', '2m', 0.05, { color: T }), knob('Decay', '1.09s', 0.71, { color: T, lock: 'Wobble' }), knob('Sustain', '0.00', 0, { color: T }), knob('Release', '300m', 0.5, { color: T }),
+  knob('Init', '0.00', 0, { color: T }), knob('Peak', '1.00', 1, { color: T }), knob('End', '0.00', 0, { color: T }), knob('A Crv', '+0.00', 0.5, { color: T }), knob('D Crv', '+0.50', 0.75, { color: T }), knob('R Crv', '+0.50', 0.75, { color: T }), knob('Key', '0.00', 0, { color: T })]);
+const lfo = (k) => [knob('Rate', '5.00H', 0.6, { color: T }), knob('Amount', k, 0.0, { color: T }), knob('Wheel', '1.00', 1, { color: T }), knob('Fade In', '0m', 0, { color: T }), knob('To Pitch', '0.00st', 0, { color: T }),
+  ...['A', 'B', 'C', 'D'].map((n) => knob(`To ${n}`, '+0.00', 0.5, { color: T })), ...['A', 'B', 'C', 'D'].map((n) => knob(`Width ${n}`, '+0.00', 0.5, { color: T }))];
+row('lfoKnobs', lfo('0.00'));
+// Wobble at 0.62 maps LFO 2 Amount 0..0.60 with the S shape (x²(3 − 2x) = 0.68, so 0.41)
+// and Filter Decay 200 ms..1.2 s with Log (1 − (1 − x)³ = 0.945, geometric: about 1.09 s).
+const lfo2 = lfo('0.00'); lfo2[1] = knob('Amount', '0.41', 0.41, { color: T, lock: 'Wobble' });
+row('lfo2Knobs', lfo2);
+row('pitchKnobs', [knob('Amount', '+0.00st', 0.5, { color: AMB }), knob('Attack', '2m', 0.05, { color: AMB }), knob('Decay', '100m', 0.35, { color: AMB }), knob('Sustain', '0.00', 0, { color: AMB }), knob('Release', '300m', 0.5, { color: AMB }),
+  knob('Init', '0.00', 0, { color: AMB }), knob('Peak', '1.00', 1, { color: AMB }), knob('End', '0.00', 0, { color: AMB }), knob('A Crv', '+0.00', 0.5, { color: AMB }), knob('D Crv', '+0.50', 0.75, { color: AMB }), knob('R Crv', '+0.50', 0.75, { color: AMB })]);
+row('driveKnobs', [knob('Drive', '×1.00', 0, { color: T }), knob('Bias', '+0.00', 0.5, { color: T }), knob('Tone', '100%', 1, { color: T })]);
+
+// The macros' own knobs: a knob over `macros.<i>.value`, 0..1; Wobble is held by a song lane.
+row('kAccent', [knob('', '0.35', 0.35, { color: AMB })]);
+row('kWobble', [knob('', '0.62', 0.62, { color: AMB, lock: 'AUTO' })]);
+row('kAccentB', [knob('', '0.35', 0.35, { color: AMB })]);
+row('kWobbleB', [knob('', '0.62', 0.62, { color: AMB, lock: 'AUTO' })]);
+row('kBMin', [knob('Min', '400', 0.42, { color: AMB })]);
+row('kBMax', [knob('Max', '3.20k', 0.75, { color: AMB })]);
+
+// Accent's three mappings. `plays` is the value at macro 0.35 through the curve
+// (record decision 4: Exp is x³; the cutoff and the decay are ratio rows, so their
+// min..max interpolates geometrically: inverted Lin at 0.35 is x = 0.65 and the
+// decay plays 45 × (120 / 45)^0.65 ≈ 85 ms).
+const shapes = { Lin: 'M2 18 L26 2', Exp: 'M2 18 C 14 18 20 14 26 2', Log: 'M2 18 C 8 6 14 2 26 2', S: 'M2 18 C 14 18 14 2 26 2' };
+const glyph = (c, inv) => `<svg class="glyph" viewBox="0 0 28 20"><line x1="2" y1="18" x2="26" y2="18"/><line x1="2" y1="2" x2="2" y2="18"/><path d="${shapes[c]}" ${inv ? 'transform="translate(28 0) scale(-1 1)"' : ''}/></svg>`;
+const maps = [
+  { name: 'Op A Level', kind: 'Voice · Op A', min: ['0.40', 0.4], max: ['0.90', 0.9], plays: '0.58', curve: 'Lin', inv: false },
+  { name: 'Cutoff', kind: 'Voice · Filter', min: ['400', 0.42], max: ['3.20k', 0.75], plays: '437 Hz', curve: 'Exp', inv: false },
+  { name: 'Op A Decay', kind: 'Voice · Op A', min: ['45m', 0.3], max: ['120m', 0.45], plays: '85m', curve: 'Lin', inv: true },
+];
+document.getElementById('mapList').innerHTML = maps.map((m) => `<div class="map-row">
+  <div class="target"><span class="name">${m.name}</span><span class="kind">${m.kind}</span><span class="plays">plays ${m.plays}</span></div>
+  ${knob('Min', m.min[0], m.min[1], { color: AMB })}${knob('Max', m.max[0], m.max[1], { color: AMB })}
+  <div class="curve">${glyph(m.curve, m.inv)}<div class="seg tight">${['Lin', 'Exp', 'Log', 'S'].map((c) => `<button ${c === m.curve ? 'aria-pressed="true"' : ''}>${c}</button>`).join('')}</div></div>
+  <button class="btn small" ${m.inv ? 'aria-pressed="true"' : ''}>Inv</button>
+  <button class="btn icon" title="Remove mapping">×</button>
+</div>`).join('');
+
+// The mockup's switcher.
+document.querySelectorAll('input[name=layout]').forEach((r) => r.addEventListener('change', () => { document.body.classList.toggle('layout-a', r.value === 'a'); document.body.classList.toggle('layout-b', r.value === 'b'); }));
+document.getElementById('pickerToggle').addEventListener('change', (e) => document.body.classList.toggle('picker-open', e.target.checked));
+document.getElementById('addMap').addEventListener('click', () => { const t = document.getElementById('pickerToggle'); t.checked = !t.checked; document.body.classList.toggle('picker-open', t.checked); });
+document.getElementById('zoomToggle').addEventListener('change', (e) => document.body.classList.toggle('zoomed', e.target.checked));
+</script>
+</body>
+</html>

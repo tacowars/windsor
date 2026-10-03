@@ -3,6 +3,8 @@
 - **Date:** 2026-10-04
 - **Status:** accepted; the epic builds it (the engine seam, the voice's
   resolution, then the Parts tab's Macros card).
+- **Mockup:** `docs/design/macro-knobs-mockup.html`, layout A (tiles + list)
+  chosen by tacowars on 2026-10-04; B is the alternative it was chosen over.
 - **Builds on:** `2026-10-02-one-voice-target-table`,
   `2026-10-01-song-automation-lanes`, `2026-10-02-knob-ranges-from-the-catalog`
 
