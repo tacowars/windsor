@@ -2,6 +2,7 @@
  * The shared esbuild prelude's pure half (#620 decision 5): the options every
  * console script bundles with, checked without running esbuild.
  */
+// reads-by-path: packages/engine/src/patch/patchLibrary.ts, packages/engine/src/__fixtures__/**
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';

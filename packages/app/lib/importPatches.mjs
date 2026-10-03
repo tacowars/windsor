@@ -5,6 +5,7 @@
  * `loadPatchFile` with esbuild, the test imports it straight from the
  * TypeScript source — so this file needs no bundler of its own.
  */
+// reads-by-path: none (reads the folder its caller passes)
 import { copyFileSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 

@@ -1,4 +1,5 @@
 /** Independent reconstruction, timestamps and qualification checks for Windsor #150. */
+// reads-by-path: docs/research/*-tape-*/**
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';

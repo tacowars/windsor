@@ -5,6 +5,7 @@
  * without a browser. This test reads the sources and fails the moment one of
  * them reaches the audio graph or a Web Audio type.
  */
+// reads-by-path: packages/engine/src/**/*.ts
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

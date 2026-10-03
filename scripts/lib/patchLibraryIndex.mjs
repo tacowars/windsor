@@ -6,6 +6,7 @@
  * share — `import.meta.glob` is Vite-only — so the index is generated and
  * `npm run verify` refuses a stale one, the way `client-dir-table.mjs` does.
  */
+// reads-by-path: none (reads the folder its caller passes)
 import { readdirSync } from 'node:fs';
 
 /** A filename slug — the same rule `patchLibrary.ts` enforces on load. */

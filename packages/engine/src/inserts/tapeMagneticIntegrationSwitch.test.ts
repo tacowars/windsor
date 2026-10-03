@@ -22,6 +22,7 @@
  *   to 7000 read 600 bytes on Node 24, arm64), so the warm-up is 6000. The rest of
  *   `TapeDsp` is windsor#228's (`tapeAllocation.test.ts`).
  */
+// reads-by-path: packages/engine/src/worklet/tape/**
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

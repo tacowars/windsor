@@ -1,4 +1,5 @@
 /** Runs the actual shipped retro processor with only browser globals shimmed. */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { RETRO_REVERB_DEFAULTS, RETRO_REVERB_MODES } from '../inserts/retroReverbConstants';
 import type { RetroReverbSpec } from '../inserts/retroReverbSpec';

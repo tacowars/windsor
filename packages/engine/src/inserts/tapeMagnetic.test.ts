@@ -11,6 +11,7 @@
  * and the knee's chain derivative on purpose and expect the comparison to
  * fail, so a tolerance that passes anything cannot hide.
  */
+// reads-by-path: packages/engine/src/__fixtures__/**
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {

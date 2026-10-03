@@ -1,4 +1,5 @@
 /** Verification fixtures for windsor#207; not additional resampler measurements. */
+// reads-by-path: docs/research/*-tape-*/**
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';

@@ -1,4 +1,5 @@
 /** Headless harness for the shipped Advanced Drive worklet, with browser globals shimmed. */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { DEFAULT_ADVANCED_DRIVE } from '../inserts/advancedDriveSpec';
 import type { AdvancedDriveSpec } from '../inserts/advancedDriveSpec';

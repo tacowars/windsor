@@ -1,4 +1,5 @@
 /** Verification fixtures for windsor#211; not additional browser measurements. */
+// reads-by-path: docs/research/*-tape-*/**
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';

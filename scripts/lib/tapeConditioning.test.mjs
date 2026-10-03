@@ -1,4 +1,5 @@
 /** Independent static-conditioning, falsification and report-contract checks. */
+// reads-by-path: docs/research/*-tape-*/**
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';

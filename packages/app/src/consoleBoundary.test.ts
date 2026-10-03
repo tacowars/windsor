@@ -7,6 +7,7 @@
  * `consoleStylesheet.test.ts` (windsor#477).
  */
 /// <reference types="node" />
+// reads-by-path: packages/app/{index.html,src/*.ts}
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 

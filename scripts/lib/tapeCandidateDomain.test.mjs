@@ -1,4 +1,5 @@
 /** Verification fixtures for windsor#197; not additional candidate experiments. */
+// reads-by-path: docs/research/*-tape-*/**
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';

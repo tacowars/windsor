@@ -5,6 +5,7 @@
  * (record `2026-10-01-retire-song-version-3`). `rawDocument` reads a file as
  * it is, for a retired shape such as `retired-four-slot`.
  */
+// reads-by-path: packages/engine/src/__fixtures__/**
 import { readFileSync } from 'node:fs';
 
 import { ARRANGEMENT_VERSION } from '../audioConstants';

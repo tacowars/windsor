@@ -18,13 +18,16 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 /**
  * Files tests read by path (`readFileSync`, `readdirSync`, `existsSync`, an
  * esbuild bundle or a child process), which the import graph can't see. A
- * change to one runs the whole suite. A new test that reads a file by path
- * adds its path here, or to SCANNED_BY when the input is source the test reads
- * as text. Repo-relative; anchored to ROOT for vitest, which matches them
- * against absolute paths and whose `**` never crosses a dot folder such as a
- * worktree under `.claude/`.
+ * change to one runs the whole suite. A file that reads by path, a test or a
+ * module a test imports, says what it reads in one comment line near its top,
+ * `// reads-by-path: <glob>[, <glob>…]`, each glob an entry here or a glob of
+ * SCANNED_BY (the one to use when the input is source the test reads as text).
+ * `scripts/lib/testInputs.test.mjs` fails on a reader without that marker or
+ * a glob neither list has (windsor#498). Repo-relative; anchored to ROOT for
+ * vitest, which matches them against absolute paths and whose `**` never
+ * crosses a dot folder such as a worktree under `.claude/`.
  */
-const READ_BY_PATH = [
+export const READ_BY_PATH = [
   // The worklet bundles every harness, golden and allocation probe loads.
   'packages/engine/src/worklet/generated/**',
   // The patch library files, which the patch and index tests list and read.
@@ -50,7 +53,7 @@ const READ_BY_PATH = [
  * A change there reruns only the tests named, not the whole suite: a full run
  * here would make every app or engine change run everything. Repo-relative.
  */
-const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
+export const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
   // No preset literal outside fallbackPatch.ts; the pure generator modules'
   // imports; each worklet bundle rebuilt from its sources.
   [
@@ -71,6 +74,15 @@ const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
     'packages/engine/src/worklet/tape/**',
     ['packages/engine/src/inserts/tapeMagneticIntegrationSwitch.test.ts'],
   ],
+  // Bundled with esbuild and run in a child process. The test also imports it,
+  // so the import graph already reaches it; named so the marker can say so.
+  [
+    'packages/engine/src/worklet/tape/tapeOversample.ts',
+    ['packages/engine/src/inserts/tapeMagneticGolden.test.ts'],
+  ],
+  // Hashed against the saved measurement's sources. Its research program
+  // imports it too; named so the marker can say so.
+  ['packages/engine/src/sequencing/mulberry32.ts', ['scripts/lib/tapeDynamicSurvival.test.mjs']],
   ['packages/engine/src/patch/patchLibrary.ts', ['packages/app/lib/audioBundle.test.mjs']],
   // The console builds no Web Audio node of its own; the transport strip's markup and wiring.
   [
@@ -89,6 +101,9 @@ const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
       'packages/app/src/songViewTables.test.ts',
     ],
   ],
+  // Every reads-by-path marker under vitest's include roots, checked against
+  // these two lists.
+  ['{packages/*/{src,lib},scripts/lib}/**', ['scripts/lib/testInputs.test.mjs']],
 ];
 
 const git = (cwd: string, args: string[]): string[] =>

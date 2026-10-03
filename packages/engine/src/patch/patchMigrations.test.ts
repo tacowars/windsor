@@ -7,6 +7,7 @@
  * into the voice's drive stage (windsor#300, record
  * `2026-10-01-voice-drive-stage`).
  */
+// reads-by-path: packages/engine/src/patches/**
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
