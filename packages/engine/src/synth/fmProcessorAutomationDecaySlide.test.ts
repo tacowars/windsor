@@ -15,6 +15,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { voiceLaneOffset } from '../__fixtures__/voiceLaneOffset';
+import type { CreateOptions } from '../__fixtures__/workletHarness';
 import { loadProcessor } from '../__fixtures__/workletHarness';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { ST_DECAY } from '../worklet/fm/envelope';
@@ -29,6 +30,8 @@ import { voiceSlotParamName } from './audioPart';
 
 const loaded = loadProcessor();
 const CTRL = loaded.ctrlInterval;
+/** The part's table with its long control interval at the fine one (windsor#326): one control block a call. */
+const FINE: CreateOptions = { controlIntervals: { long: CTRL } };
 const SLOTS = 8;
 const ADDITIVE = 7;
 const NOTE = 57;
@@ -107,9 +110,17 @@ const freshParams = (): Record<string, Float32Array> => {
   return params;
 };
 
-/** The four operators' envelopes after each control block, a curve lane on each. */
+/**
+ * The four operators' envelopes after each control block, a curve lane on
+ * each. Every block is the fine one, one a call (`FINE`): the slide's glide
+ * keeps a voice fine where the unslid run's is long (windsor#326).
+ */
 function trace(run: Run): EnvView[][] {
-  const processor = loaded.create(MONO, 4, undefined, { voiceSlots: CURVES, slideSeconds: 0.05 });
+  const processor = loaded.create(MONO, 4, undefined, {
+    voiceSlots: CURVES,
+    slideSeconds: 0.05,
+    ...FINE,
+  });
   if (run.edit) processor.inbox({ type: 'liveRetune', enabled: true } as never);
   const params = freshParams();
   const left = new Float32Array(CTRL);

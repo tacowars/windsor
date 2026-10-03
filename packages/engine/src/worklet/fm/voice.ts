@@ -30,7 +30,8 @@ import { NoiseColour } from './noiseColour';
 import { randomSeed32 } from './prng';
 import { Svf } from './svf';
 import { VoiceDrive } from './voiceDrive';
-import { bindVoiceConstants, updateVoiceControl } from './voiceControl';
+import { bindVoiceConstants, updateVoiceControl, updateVoiceControlBlock } from './voiceControl';
+import type { ControlIntervalTable } from './voiceControlInterval';
 import { renderVoiceKernel } from './voiceKernel';
 import { voiceDormant, voiceFinished, voiceHoldsEndLevel } from './voiceQuiet';
 import { renderVoiceGeneric } from './voiceRender';
@@ -502,6 +503,15 @@ class Voice {
    */
   updateControl(n: number): void {
     updateVoiceControl(this, n);
+  }
+
+  /**
+   * A control boundary in the part's render (windsor#326): the update over
+   * the interval the voice's state asks for under `table`, 32 or 128
+   * samples (`voiceControlInterval.ts`), which it returns for `ctrlCount`.
+   */
+  updateControlBlock(table: ControlIntervalTable): number {
+    return updateVoiceControlBlock(this, table);
   }
 
   /**

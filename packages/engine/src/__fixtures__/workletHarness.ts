@@ -73,6 +73,12 @@ export interface CreateOptions {
   dormancy?: boolean;
   /** `false` renders every voice through the generic loop, as the part did before #548. */
   specialise?: boolean;
+  /**
+   * The control intervals over the shipped table (windsor#326,
+   * `voiceControlInterval.ts`): `long: ctrlInterval` renders every block at
+   * the fine interval, as the part did before.
+   */
+  controlIntervals?: { long?: number; minSegmentSeconds?: number; maxLfoHz?: number };
   /** Seconds a slid note glides when the patch's `glide` is 0 (#602); the engine passes its default. */
   slideSeconds?: number;
   /** Notes present before the first block (`ProcessorOptions.events`), as an offline render builds a part. */
