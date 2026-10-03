@@ -73,6 +73,34 @@ function withLeader(raw: Raw, over: Raw): Raw {
 const within = (played: Played[], fromBar: number, toBar: number): Played[] =>
   played.filter((c) => c.tick >= fromBar * TICKS_PER_BAR && c.tick < toBar * TICKS_PER_BAR);
 
+/** Each note-on as `tick:note`, `late` ticks later and `up` semitones higher. */
+const heard = (played: Played[], late = 0, up = 0): string[] =>
+  played.map((c) => `${c.tick + late}:${(c.note ?? 0) + up}`);
+
+const leaderPart = (raw: Raw): Raw => (raw['parts'] as Raw[])[0] as Raw;
+const leaderSequencer = (raw: Raw): Raw => leaderPart(raw)['sequencer'] as Raw;
+
+/** Two lines the leader's own sequencer never plays: its cells reversed, and turned by four. */
+const REVERSED = (raw: Raw): Raw[] => [...(leaderSequencer(raw)['cells'] as Raw[])].reverse();
+const TURNED = (raw: Raw): Raw[] => {
+  const cells = leaderSequencer(raw)['cells'] as Raw[];
+  return [...cells.slice(4), ...cells.slice(0, 4)];
+};
+
+/** The song with the leader's region `i` playing a pattern of `lines[i]`, as the console writes an edit. */
+function withPatterns(raw: Raw, ...lines: Raw[][]): Raw {
+  const pattern: Raw = { ...leaderSequencer(raw) };
+  delete pattern['seed'];
+  const regions = (leaderPart(raw)['regions'] as Raw[]).map((region, i) =>
+    lines[i] ? { ...region, pattern: { ...pattern, cells: lines[i] } } : region,
+  );
+  return withLeader(raw, { regions });
+}
+
+/** The song with the leader's own sequencer playing `cells`. */
+const withCells = (raw: Raw, cells: Raw[]): Raw =>
+  withLeader(raw, { sequencer: { ...leaderSequencer(raw), cells } });
+
 describe('a canon (windsor#487)', () => {
   it('at offset 3 of a 12-cell leader plays the leader’s cell 9 on its step 0 and cell 0 on step 3', () => {
     const song = rig();
@@ -169,6 +197,31 @@ describe('a canon (windsor#487)', () => {
     expect(within(gap.ons(1), 8, 16).length).toBeGreaterThan(0);
     // The leader's re-entry at bar 13 restarts its own line, not the line its canon reads.
     expect(within(gap.ons(1), 6, 16)).toEqual(within(whole.ons(1), 6, 16));
+  });
+});
+
+describe('a canon of a leader whose regions play their own patterns (windsor#508)', () => {
+  it('plays the pattern’s cells at step − offset, transposed, not the leader’s unedited line', () => {
+    const song = rig('figure-canon', (raw) => withPatterns(raw, REVERSED(raw)));
+    song.run(4 * TICKS_PER_BAR);
+    const leader = within(song.ons(0), 0, 4);
+    const late = within(song.ons(1), 0, 4).filter((c) => c.tick >= 3 * SIXTEENTH);
+    const echoed = leader.filter((c) => c.tick < 4 * TICKS_PER_BAR - 3 * SIXTEENTH);
+    expect(heard(late)).toEqual(heard(echoed, 3 * SIXTEENTH));
+    expect(heard(within(song.ons(2), 0, 4))).toEqual(heard(leader, 0, 12));
+  });
+
+  it('switches lines where the leader’s regions change, and reads the region before the gap through it', () => {
+    const song = rig('figure-canon', (raw) => withPatterns(raw, REVERSED(raw), TURNED(raw)));
+    const first = rig('figure-canon', (raw) => withCells(raw, REVERSED(raw)));
+    const second = rig('figure-canon', (raw) => withCells(raw, TURNED(raw)));
+    for (const each of [song, first, second]) each.run(16 * TICKS_PER_BAR);
+    const canon = (each: Rig, fromBar: number, toBar: number): string[] =>
+      heard(within(each.ons(1), fromBar, toBar));
+    // Bars 1–8 are region 0, bars 9–12 the leader's gap after it, bars 13–16 region 1.
+    expect(canon(song, 0, 12)).toEqual(canon(first, 0, 12));
+    expect(canon(song, 12, 16)).toEqual(canon(second, 12, 16));
+    expect(canon(first, 12, 16)).not.toEqual(canon(second, 12, 16));
   });
 });
 
