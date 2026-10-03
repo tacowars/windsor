@@ -135,13 +135,8 @@ describe('a block at the widest zoom-out (minPxPerBar)', () => {
   });
 
   it('draws a narrow block without the padding the CSS gives a full one', () => {
-    const values = (body: string, prop: string): string[] => cssValue(body, prop).split(/\s+/);
+    // NARROW_BLOCK_PX against the full block's padding is a row of TS_PX_IN_CSS.
     for (const block of ['.reg', '.hblk']) {
-      const full = cssRule(block);
-      // `padding: <vertical> <horizontal>`, `border: <width> solid <colour>`.
-      const padding = parseFloat(values(full, 'padding')[1] ?? '');
-      const border = parseFloat(values(full, 'border')[0] ?? '');
-      expect(2 * padding + 2 * border, block).toBe(NARROW_BLOCK_PX);
       expect(cssRule(`${block}.narrow`), block).toMatch(/padding: 0;/);
     }
     expect(MIN_BLOCK_PX).toBeLessThan(NARROW_BLOCK_PX);
@@ -276,20 +271,40 @@ describe('the mixer column (windsor#157)', () => {
     expect(mixerColumnPx(true, 6) - mixerColumnPx(true, 5)).toBe(SONG_VIEW.mixerKnobColumnPx);
     expect(mixerColumnPx(true, 5)).toBeGreaterThan(mixerColumnPx(false, 5));
   });
+});
 
-  it('sizes the expanded base as the CSS grid does: its fixed tracks, the gaps between them and the padding', () => {
-    const expanded = cssRule('.mix-cell.expanded');
-    const template = cssValue(expanded, 'grid-template-columns');
-    // The px tracks: the gutter, Output, M, S and the lights; the knobs' are
-    // fractions, and each knob column carries its own gap (mixerKnobColumnPx),
-    // so the base holds one gap fewer than it has fixed tracks.
-    const tracks = [...template.matchAll(/(\d+)px/g)].map((m) => Number(m[1]));
-    const fixed = tracks.reduce((a, b) => a + b, 0);
-    const gaps = tracks.length - 1;
-    const gap = parseFloat(cssValue(expanded, 'column-gap'));
-    // `padding: 0 <horizontal>`.
-    const padX = parseFloat(cssValue(cssRule('.mix-cell'), 'padding').split(/\s+/)[1] ?? '');
-    expect(fixed + gaps * gap + 2 * padX).toBe(SONG_VIEW.mixerExpandedBasePx);
+/** The `index`-th space-separated word of a property's value, as px. */
+const cssWordPx = (selector: string, property: string, index: number): number =>
+  parseFloat(cssValue(cssRule(selector), property).split(/\s+/)[index] ?? '');
+
+/** A full block's width with no content: `padding: <vertical> <horizontal>`, `border: <width> solid <colour>`. */
+const blockFramePx = (selector: string): number =>
+  2 * cssWordPx(selector, 'padding', 1) + 2 * cssWordPx(selector, 'border', 0);
+
+/**
+ * The expanded mixer cell's base, as its CSS grid sizes it. The px tracks are
+ * the gutter, Output, M, S and the lights; the knobs' are fractions, and each
+ * knob column carries its own gap (mixerKnobColumnPx), so the base holds one
+ * gap fewer than it has fixed tracks. `.mix-cell`'s `padding: 0 <horizontal>`
+ * adds both sides.
+ */
+const expandedMixerBasePx = (selector: string): number => {
+  const tracks = [...cssValue(cssRule(selector), 'grid-template-columns').matchAll(/(\d+)px/g)];
+  const fixed = tracks.reduce((sum, m) => sum + Number(m[1]), 0);
+  const gaps = (tracks.length - 1) * cssWordPx(selector, 'column-gap', 0);
+  return fixed + gaps + 2 * cssWordPx('.mix-cell', 'padding', 1);
+};
+
+/** Each TS px constant the Song view draws with, and how its CSS value is read: [constant, TS px, selector, read]. */
+const TS_PX_IN_CSS: readonly (readonly [string, number, string, (selector: string) => number])[] = [
+  ['NARROW_BLOCK_PX', NARROW_BLOCK_PX, '.reg', blockFramePx],
+  ['NARROW_BLOCK_PX', NARROW_BLOCK_PX, '.hblk', blockFramePx],
+  ['mixerExpandedBasePx', SONG_VIEW.mixerExpandedBasePx, '.mix-cell.expanded', expandedMixerBasePx],
+];
+
+describe('the TS px the Song view draws with', () => {
+  it.each(TS_PX_IN_CSS)('%s (%d) matches %s in the CSS', (_name, px, selector, read) => {
+    expect(read(selector)).toBe(px);
   });
 });
 
