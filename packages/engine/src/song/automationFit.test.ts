@@ -11,7 +11,7 @@ import { AUTOMATION_DOCUMENT, AUTOMATION_PART } from '../__fixtures__/automation
 import { FULL_SLOT } from '../__fixtures__/fullArrangement';
 import { valueAt } from '../automation/automationEvaluate';
 import type { AutomationLane, AutomationPoint } from '../automation/automationLane';
-import { catalogRow } from '../automation/automationTargets';
+import { requireCatalogRow } from '../automation/automationTargets';
 import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import type { Arrangement } from './arrangement';
 import {
@@ -40,8 +40,8 @@ function song(bars: number, lanes?: readonly AutomationLane[]): ArrangementDocum
 }
 
 const point = (tick: number, value: number, bend = 0): AutomationPoint => ({ tick, value, bend });
-const level = catalogRow('strip.level')!;
-const cutoff = catalogRow('voice.filter.cutoff')!;
+const level = requireCatalogRow('strip.level');
+const cutoff = requireCatalogRow('voice.filter.cutoff');
 
 /** A level fade bent hard over four bars, and a cutoff sweep up and down. */
 const BENT: readonly AutomationLane[] = [
@@ -83,7 +83,7 @@ describe('a shorter song', () => {
 
   it('adds no point where one already sits on the end, a step included', () => {
     const points = [point(0, 0), point(BAR, -1), point(BAR, 1), point(2 * BAR, 0.5)];
-    expect(fitPoints(catalogRow('strip.pan')!, points, BAR)).toEqual([
+    expect(fitPoints(requireCatalogRow('strip.pan'), points, BAR)).toEqual([
       point(0, 0),
       point(BAR, -1),
       point(BAR, 1),

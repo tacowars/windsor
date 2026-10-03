@@ -14,6 +14,7 @@ import {
   INSERT_KINDS,
   INSERT_KIND_NAMES,
   MAX_INSERTS,
+  RETURN_NAMES,
   createInsertIdSource,
   isInsertId,
   withInsertIds,
@@ -63,7 +64,7 @@ describe('insert edits', () => {
   });
 
   it('starts a Plate reverb or an Echo at Mix 1.00 on a send bus, and at its default elsewhere (windsor#172)', () => {
-    for (const bus of ['a', 'b'] as const) {
+    for (const bus of RETURN_NAMES) {
       expect(bare(addInsert([], 'plate', bus))).toEqual([{ ...DEFAULT_PLATE_REVERB, mix: 1 }]);
       expect(bare(addInsert([], 'echo', bus))).toEqual([{ ...DEFAULT_ECHO, mix: 1 }]);
       expect(bare(addInsert([], 'drive', bus))).toEqual([DEFAULT_DRIVE]);
@@ -138,7 +139,7 @@ describe('addInsertAtFront (windsor#173)', () => {
 
   it('starts a Plate reverb or an Echo at Mix 1.00 at the front of a send bus (windsor#172)', () => {
     const drive = { ...DEFAULT_DRIVE, drive: 3, id: 'd' };
-    for (const bus of ['a', 'b'] as const) {
+    for (const bus of RETURN_NAMES) {
       expect(bare(addInsertAtFront([drive], 'plate', bus))).toEqual(
         bare([{ ...DEFAULT_PLATE_REVERB, mix: 1 }, drive]),
       );

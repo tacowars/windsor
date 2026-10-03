@@ -19,12 +19,11 @@ import {
   STRIP_AUTOMATION_ROWS,
   TICKS_PER_BAR,
   VOICE_AUTOMATION_ROWS,
-  catalogRow,
+  requireCatalogRow,
   formatTargetId,
   targetKind,
   type AutomationLane,
   type AutomationTargetId,
-  type AutomationTargetRow,
   type DocumentPart,
   type InsertSpec,
 } from '@windsor/engine';
@@ -65,7 +64,6 @@ const partWith = (
 });
 
 const flat = (target: AutomationTargetId): AutomationLane => newLane(target, 0, TICKS_PER_BAR);
-const row = (target: string): AutomationTargetRow => catalogRow(target)!;
 
 describe('the picker', () => {
   const groups = pickerGroups(AUTOMATION_PART);
@@ -227,7 +225,7 @@ describe("a parameter's current value", () => {
 
   it("clamps to the lane's range: a level past the knob's +6 dB reads the top", () => {
     const loud = { ...AUTOMATION_PART, strip: { ...AUTOMATION_PART.strip, level: 3 } };
-    expect(currentValue(loud, patch, 'strip.level')).toBe(row('strip.level').max);
+    expect(currentValue(loud, patch, 'strip.level')).toBe(requireCatalogRow('strip.level').max);
   });
 
   it("reads the insert's spec and the part's patch", () => {
