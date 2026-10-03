@@ -16,6 +16,7 @@ import type {
   BassDriver,
   ChordDriver,
   EuclideanDriver,
+  FigureDriver,
   GridDriver,
   SequencerKind,
   SequencerSpec,
@@ -26,11 +27,17 @@ import { Arpeggiator } from '../sequencing/arpeggiator';
 import { BassSequencer, assertBassConfig } from '../sequencing/bassSequencer';
 import { ChordSequencer, assertChordConfig } from '../sequencing/chordSequencer';
 import { EuclideanSequencer, assertEuclideanConfig } from '../sequencing/euclideanSequencer';
+import { FigureSequencer, assertFigureConfig } from '../sequencing/figureSequencer';
 import { GridSequencer, assertGridConfig } from '../sequencing/gridSequencer';
 import type { ScaleSampler } from '../sequencing/scaleSampler';
 
 export type Generator =
-  EuclideanSequencer | GridSequencer | ChordSequencer | Arpeggiator | BassSequencer;
+  | EuclideanSequencer
+  | GridSequencer
+  | ChordSequencer
+  | Arpeggiator
+  | BassSequencer
+  | FigureSequencer;
 
 /** A generator emitting note events, whose held notes a region end releases. */
 export type PitchedGenerator = Exclude<Generator, EuclideanSequencer>;
@@ -57,17 +64,12 @@ export function generatorSig(spec: SequencerSpec): string {
   return sig([spec.kind, spec.divisor, spec.seed]);
 }
 
-/**
- * The kinds that build no generator, so a part of one has no binding: `none`,
- * and `figure` until its performer lands (windsor#485), so a Figure part
- * loads and plays nothing (windsor#484).
- */
-export const buildsNoGenerator = (kind: SequencerKind): boolean =>
-  kind === 'none' || kind === 'figure';
+/** The kinds that build no generator, so a part of one has no binding: `none` alone. */
+export const buildsNoGenerator = (kind: SequencerKind): boolean => kind === 'none';
 
 /**
  * The generator a spec builds — a part's `sequencer`, or one region's
- * pattern (`regionPattern`, windsor#74) — or null for `none` and `figure`.
+ * pattern (`regionPattern`, windsor#74) — or null for `none`.
  */
 export function buildGenerator(spec: SequencerSpec, sampler: ScaleSampler): Generator | null {
   const driver: unknown = driverOf(spec);
@@ -83,7 +85,7 @@ export function buildGenerator(spec: SequencerSpec, sampler: ScaleSampler): Gene
     case 'bass':
       return new BassSequencer(sampler, driver as BassDriver);
     case 'figure':
-      return null;
+      return new FigureSequencer(sampler, driver as FigureDriver);
     default:
       return null;
   }
@@ -125,6 +127,11 @@ export function liveReconfiguration(
   if (spec.kind === 'bass' && generator instanceof BassSequencer) {
     const config = driver as BassDriver;
     assertBassConfig(config);
+    return () => generator.reconfigure(config, sampler);
+  }
+  if (spec.kind === 'figure' && generator instanceof FigureSequencer) {
+    const config = driver as FigureDriver;
+    assertFigureConfig(config);
     return () => generator.reconfigure(config, sampler);
   }
   return null;

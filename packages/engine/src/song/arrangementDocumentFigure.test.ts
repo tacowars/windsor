@@ -1,15 +1,14 @@
 /**
- * A Figure part in a document (windsor#484): at its defaults it loads clean,
- * round-trips byte for byte and plays nothing; a canon `source`, on the part
- * or on a region's pattern, survives only when it names another Figure part.
+ * A Figure part in a document (windsor#484): at its defaults it loads clean
+ * and round-trips byte for byte; a canon `source`, on the part or on a
+ * region's pattern, survives only when it names another Figure part. How it
+ * plays is `arrangementPlayerFigure.test.ts` (windsor#485).
  */
 import { describe, expect, it } from 'vitest';
 
 import { currentDocument } from '../__fixtures__/arrangementDocumentFiles';
-import { silentPart } from '../__fixtures__/documentCases';
-import { TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
 import { makeArrangement } from './arrangementDocument';
-import { ArrangementPlayer } from './arrangementPlayer';
 
 const BAR = TICKS_PER_BAR;
 
@@ -30,21 +29,12 @@ const other = (slot: number, kind: string): object => ({
 });
 
 describe('a Figure part (windsor#484)', () => {
-  it('at its defaults loads with no correction, round-trips byte for byte and plays nothing', () => {
+  it('at its defaults loads with no correction and round-trips byte for byte', () => {
     const first = makeArrangement(currentDocument('figure-part'));
     expect(first.corrections).toEqual([]);
     expect(JSON.stringify(first.document.parts[0]?.sequencer)).toBe(JSON.stringify(DEFAULT));
     const text = JSON.stringify(first.document);
     expect(JSON.stringify(makeArrangement(JSON.parse(text)).document)).toBe(text);
-
-    let played = 0;
-    const part = { ...silentPart(), noteOn: () => ++played, trigger: () => ++played };
-    const transport = new TickTransport();
-    const doc = first.document;
-    const player = new ArrangementPlayer(transport, new Map([[0, part]]), doc, doc.patches ?? {});
-    for (let i = 0; i < 4 * BAR; i++) transport.advance(0);
-    player.dispose();
-    expect(played).toBe(0);
   });
 
   it('drops a source naming its own slot, an empty slot or a Grid, and keeps one naming a Figure', () => {
