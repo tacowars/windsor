@@ -39,6 +39,7 @@ import {
   forKind,
   hitBlocks,
   isNarrowBlock,
+  outlinedSlot,
   primaryHeld,
   pxToTick,
   tickToPx,
@@ -290,11 +291,16 @@ function foldButton(view: SongView, part: DocumentPart): HTMLButtonElement {
   return button;
 }
 
-/** Whether the view's selection is `part` or one of its regions. */
-export const partSelected = (view: SongView, part: DocumentPart): boolean => {
-  const selected = view.state.selection;
-  return selected?.kind === 'part' && selected.slot === part.slot;
-};
+/**
+ * Whether `part` is the shared part selection (windsor#534 decision 8), the
+ * one the strip highlights: its block is outlined and its lane bordered
+ * whether or not the detail pane is open.
+ */
+export const partSelected = (view: SongView, part: DocumentPart): boolean =>
+  outlinedSlot(
+    view.ctx.parts.selected,
+    view.ctx.model.doc.parts.map((p) => p.slot),
+  ) === part.slot;
 
 /**
  * The part's row in the frozen column (windsor#534 decision 2): `▸` with a

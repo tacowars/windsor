@@ -165,6 +165,16 @@ export const partBlockRows = (open: boolean, lanes: number): PartBlockRow[] =>
   open ? ['part', ...Array.from({ length: lanes }, (): PartBlockRow => 'lane'), 'add'] : ['part'];
 
 /**
+ * The slot whose block the outline wraps (windsor#534 decision 8): the
+ * shared part selection (`ctx.parts.selected`), which the part strip
+ * highlights too, whether or not the detail pane is open, so closing the
+ * pane hides the pane and never the selection. Null when the document has
+ * no such part.
+ */
+export const outlinedSlot = (shared: number, slots: readonly number[]): number | null =>
+  slots.includes(shared) ? shared : null;
+
+/**
  * How near the fit a zoom may be and still count as fitted (windsor#21): a
  * view at the fit follows it when the window or the song length changes it.
  */

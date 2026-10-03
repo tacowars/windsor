@@ -40,6 +40,7 @@ import {
   isNarrowBlock,
   mixerColumnPx,
   mixerLeadPx,
+  outlinedSlot,
   partBlockRows,
   pxToTick,
   rulerLabelEvery,
@@ -316,6 +317,11 @@ describe('the one frozen column (windsor#534)', () => {
     expect(partBlockRows(false, 3)).toEqual(['part']);
     expect(partBlockRows(true, 3)).toEqual(['part', 'lane', 'lane', 'lane', 'add']);
     expect(partBlockRows(true, 0)).toEqual(['part', 'add']);
+  });
+
+  it('outlines the shared part selection, the one the strip highlights, or none without it', () => {
+    expect(outlinedSlot(2, [0, 2, 5])).toBe(2);
+    expect(outlinedSlot(0, [])).toBeNull();
   });
 
   it('makes the Harmony lane as tall as a part row, and fits the compact knob in one', () => {
