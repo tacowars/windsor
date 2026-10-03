@@ -10,7 +10,10 @@
  *   its insert's settings leave unread (`automatableInsertFields`) is inert,
  *   so the knob stays free: it drives the field once the field is read again;
  * - a patch knob by its path, for the 30 voice targets only, against the
- *   selected part's lanes, so two parts sharing a patch lock independently.
+ *   selected part's lanes, so two parts sharing a patch lock independently;
+ * - a sequencer knob (Gate, Skip, Density) by its field, while the part's
+ *   sequencer kind offers that field a lane (windsor#491). Changing the kind
+ *   drops the lane in the engine, so the knob frees on the next read.
  *
  * The lock is the console's: the engine already ignores a write to a field a
  * lane holds. The knob's look and input are `knob.ts` and `knobLock.ts`.
@@ -23,12 +26,16 @@ import type {
   AutomationTargetRow,
   DocumentPart,
   InsertSpec,
+  SeqField,
 } from '@windsor/engine';
 import {
+  SEQ_AUTOMATION_FIELDS,
+  SEQ_AUTOMATION_ROWS,
   VOICE_TARGET_IDS,
   automatableInsertFields,
   catalogRow,
   formatTargetId,
+  seqTargetId,
   songTicksOf,
   targetKind,
   valueAt,
@@ -43,11 +50,8 @@ export interface KnobAutomation {
   readonly value: number;
 }
 
-/**
- * The colours of the kinds a knob locks under, as `LANE_KIND_COLOR` holds
- * them. A sequencer lane (windsor#488) locks no knob yet (windsor#491).
- */
-export type KnobLockColors = Readonly<Record<Exclude<AutomationTargetKind, 'seq'>, string>>;
+/** The colours of the kinds a knob locks under, as `LANE_KIND_COLOR` holds them. */
+export type KnobLockColors = Readonly<Record<AutomationTargetKind, string>>;
 
 /**
  * The song tick a knob reads its lane at: the transport's `position`, which
@@ -76,8 +80,8 @@ const lockOf = (
 ): KnobAutomation => ({ color, value: valueAt(row, lane.points, tick) });
 
 /**
- * A strip or voice knob's lock at `tick`: null unless `part` has a lane on
- * `target` that is on.
+ * A strip, voice or sequencer knob's lock at `tick`: null unless `part` has a
+ * lane on `target` that is on.
  */
 export function catalogKnobAutomation(
   part: DocumentPart | undefined,
@@ -88,7 +92,7 @@ export function catalogKnobAutomation(
   const lane = onLane(part, target);
   const row = lane ? catalogRow(target) : undefined;
   if (!lane || !row) return null;
-  return lockOf(lane, row, targetKind(target) === 'strip' ? colors.strip : colors.voice, tick);
+  return lockOf(lane, row, colors[targetKind(target)], tick);
 }
 
 const VOICE_TARGETS: ReadonlySet<string> = new Set(VOICE_TARGET_IDS);
@@ -109,6 +113,26 @@ export function voiceKnobAutomation(
   const target = voiceKnobTarget(path);
   return target ? catalogKnobAutomation(part, target, tick, colors) : null;
 }
+
+/**
+ * A sequencer knob's lock at `tick`: the knob over `field` of `part`'s
+ * sequencer. Null when the part's kind offers `field` no lane (a Chord's
+ * Gate), or no lane on it is on.
+ */
+export function seqKnobAutomation(
+  part: DocumentPart | undefined,
+  field: SeqField,
+  tick: number,
+  colors: KnobLockColors = LANE_KIND_COLOR,
+  fields = SEQ_AUTOMATION_FIELDS,
+): KnobAutomation | null {
+  if (!part || !(fields[part.sequencer.kind] ?? []).includes(field)) return null;
+  return catalogKnobAutomation(part, seqTargetId(field), tick, colors);
+}
+
+/** Whether a sequencer knob's field is one a lane can hold (`gate`, `skipChance`, `density`). */
+export const isSeqField = (field: string): field is SeqField =>
+  SEQ_AUTOMATION_ROWS.some((row) => row.field === field);
 
 /**
  * An insert knob's lock at `tick`: the knob over `field` of `spec`, an insert
