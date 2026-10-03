@@ -452,7 +452,12 @@ export type { TickLoop } from './sequencing/scheduler';
 export { euclid, patternFromString, patternToString, rotatePattern } from './sequencing/euclid';
 export type { Pattern } from './sequencing/euclid';
 export { GENERATOR_SEED_STRIDE, hashSeed, streamRng } from './sequencing/generatorSeed';
-export { NOT_LIVE, isInfiniteRegion, regionState } from './sequencing/regionClock';
+export {
+  NOT_LIVE,
+  isInfiniteRegion,
+  lastStartedRegion,
+  regionState,
+} from './sequencing/regionClock';
 export type { Region, RegionState } from './sequencing/regionClock';
 export { RegionGate } from './sequencing/regionGate';
 export type {

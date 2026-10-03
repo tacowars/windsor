@@ -43,11 +43,16 @@ export function chordForRegion(input: RegionChordInput): HarmonyChord | null {
   return currentChord(input.harmony, input.songTicks, regionChordTick(input));
 }
 
-/** The chord the card for `slot`'s region `region` names and sounds now. */
+/**
+ * The chord the card for `slot`'s region `region` names and sounds at
+ * `tick`, the audible tick by default; a card that has read the transport
+ * this frame passes that read's tick, so its chord and its step agree.
+ */
 export function regionChord(
   ctx: AppCtx,
   slot: number,
   region: number | undefined,
+  tick: number = audibleTick(ctx),
 ): HarmonyChord | null {
   const { doc } = ctx.model;
   return chordForRegion({
@@ -55,6 +60,6 @@ export function regionChord(
     songTicks: songTicksOf(doc),
     regions: partAt(doc, slot)?.regions ?? [],
     region,
-    tick: audibleTick(ctx),
+    tick,
   });
 }

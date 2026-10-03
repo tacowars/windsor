@@ -89,3 +89,28 @@ export function regionPhase(
   if (isInfiniteRegion(regions, songTicks)) return tick;
   return (((tick - region.start) % songTicks) + songTicks) % songTicks;
 }
+
+/**
+ * The region that started last on or before `tick` on the song's cycle
+ * (windsor#508, windsor#518): the smallest `regionPhase` wins, the first on
+ * a tie, so it is the region holding the tick while one does and, in a gap,
+ * the one before it. -1 with no region, or a song of no length. A canon
+ * reads its leader's line from this region (`PartBinding.figureAt`), and
+ * the Figure device shows the same one.
+ */
+export function lastStartedRegion(
+  regions: readonly Region[],
+  songTicks: number,
+  tick: number,
+): number {
+  let last = -1;
+  let since = Infinity;
+  for (let index = 0; index < regions.length; index++) {
+    const phase = regionPhase(regions, songTicks, index, tick);
+    if (phase !== null && phase < since) {
+      since = phase;
+      last = index;
+    }
+  }
+  return last;
+}
