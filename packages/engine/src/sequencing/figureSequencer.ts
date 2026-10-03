@@ -43,7 +43,10 @@
  * resolved cell at `step − offset`: the leader's `cellAt` over the leader's
  * own cells, so a chain resolves one level and a negative step reads the
  * line cyclically. The step is the follower's own, counted from its own
- * region's entry; the leader's clock and regions play no part. The
+ * region's entry; the leader's clock, regions and edit history play no
+ * part: the leader's current schedule and drift run from the follower's
+ * bar 0, so a live drift edit on the leader moves the follower at once, as
+ * if it had always been in force, and the leader's re-entry moves nothing. The
  * follower's `cells`, `length`, `schedule` and `drift` are ignored; its
  * divisor, gate, register, `skipChance` and stream are its own. The note is
  * the leader's cell over the chord at the follower's onset, at the
@@ -301,10 +304,7 @@ const holdsInto = (cell: FigureCell | undefined): boolean =>
   cell?.kind === 'tie' || (cell?.kind === 'note' && cell.slide);
 
 /** The cell a step reads, and its index in the line it comes from: the part's own, or its leader's. */
-interface ReadCell {
-  readonly index: number;
-  readonly cell: FigureCell;
-}
+type ReadCell = { readonly index: number; readonly cell: FigureCell };
 
 /** What a canon whose source slot holds no Figure reads: a rest, at no position. */
 const NO_CELL: ReadCell = { index: -1, cell: REST };
@@ -328,6 +328,12 @@ export class FigureSequencer {
   private releaseTick: number | null = null;
   /** Where the schedule and the drift put the line. */
   private readonly line: FigureLine;
+  /**
+   * The line a canon of this part reads: the current schedule and drift as
+   * one epoch from bar 0, restarted at every config change and at nothing
+   * else, so neither this part's entries nor its edit history reach a follower.
+   */
+  private readonly canonLine: FigureLine;
   /** The song meter's bar in ticks: handed at build, pushed again on a live meter change. */
   private barTicks: number;
   /** The last local tick heard since the entry; null before the first. Its bar is read in the current meter. */
@@ -347,6 +353,7 @@ export class FigureSequencer {
     this.current = config;
     this.rng = streamRng(config.seed, 0);
     this.line = new FigureLine(config);
+    this.canonLine = new FigureLine(config);
     this.barTicks = barTicks;
     this.figureOf = figureOf;
   }
@@ -381,6 +388,7 @@ export class FigureSequencer {
     this.pitch = pitch;
     const nextBar = this.heardTick === null ? 0 : Math.floor(this.heardTick / this.barTicks) + 1;
     this.line.edit(config, nextBar);
+    this.canonLine.restart(config);
   }
 
   /** The song's meter changed live: the stage and the rotation count bars of `barTicks` from now. */
@@ -394,13 +402,15 @@ export class FigureSequencer {
   }
 
   /**
-   * The written cell of this part's own line a local step resolves to,
-   * which a canon of this part reads (windsor#487). A negative step, a
-   * canon's before its offset is used up, reads the line the entry plays,
-   * cyclically: no stage or rotation runs before the entry.
+   * The written cell of this part's own line a follower's local step
+   * resolves to, which a canon of this part reads (windsor#487): the
+   * current schedule and drift run from the follower's bar 0, whatever this
+   * part's own regions and edit history. A negative step, a canon's before
+   * its offset is used up, reads the line at bar 0, cyclically: no stage or
+   * rotation runs before the entry.
    */
   cellAt(localStep: number): number {
-    return this.lineCell(localStep, Math.max(0, this.barOf(localStep)));
+    return this.lineCell(localStep, Math.max(0, this.barOf(localStep)), this.canonLine);
   }
 
   attach(source: PartTickSource): Unsubscribe {
@@ -495,10 +505,10 @@ export class FigureSequencer {
     return Math.floor((step * this.current.divisor) / this.barTicks);
   }
 
-  /** The cell of the part's own line local `step` in local `bar` sounds. */
-  private lineCell(step: number, bar: number): number {
+  /** The cell of the part's own line local `step` in local `bar` sounds, on `line` (the played one by default). */
+  private lineCell(step: number, bar: number, line = this.line): number {
     const { cells, length, divisor } = this.current;
-    return this.line.cellAt(step, bar, {
+    return line.cellAt(step, bar, {
       cells: cells.length,
       length,
       divisor,

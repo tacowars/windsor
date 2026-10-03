@@ -153,16 +153,22 @@ describe('a canon (windsor#487)', () => {
     expect(song.player.stepAt(1, TICKS_PER_BAR)).toBe(-1);
   });
 
-  it('keeps playing through a gap in the leader’s regions, as if the leader had none', () => {
+  it('keeps playing through a gap in the leader’s regions, as if the leader had none, through its re-entry after a live drift edit', () => {
     const gap = rig();
     const whole = rig('figure-canon', (raw) =>
       withLeader(raw, { regions: [{ start: 0, duration: 16 * TICKS_PER_BAR }] }),
     );
-    gap.run(12 * TICKS_PER_BAR);
-    whole.run(12 * TICKS_PER_BAR);
+    const drift = { parts: { 0: { sequencer: { drift: { steps: -1, everyBars: 2 } } } } };
+    for (const song of [gap, whole]) {
+      song.run(6 * TICKS_PER_BAR + SIXTEENTH);
+      expect(song.player.apply(drift as unknown as ArrangementPartial).ok).toBe(true);
+      song.run(10 * TICKS_PER_BAR - SIXTEENTH);
+    }
     expect(within(gap.ons(0), 8, 12)).toEqual([]);
-    expect(within(gap.ons(1), 8, 12).length).toBeGreaterThan(0);
-    expect(within(gap.ons(1), 8, 12)).toEqual(within(whole.ons(1), 8, 12));
+    expect(within(gap.ons(0), 12, 16).length).toBeGreaterThan(0);
+    expect(within(gap.ons(1), 8, 16).length).toBeGreaterThan(0);
+    // The leader's re-entry at bar 13 restarts its own line, not the line its canon reads.
+    expect(within(gap.ons(1), 6, 16)).toEqual(within(whole.ons(1), 6, 16));
   });
 });
 
