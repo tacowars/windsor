@@ -19,6 +19,7 @@
  * one child of a strip — a grid or chord column, a Euclidean cell — and each
  * card's CSS draws the two strengths on whatever marks its step.
  */
+import type { RegionStep } from '@windsor/engine';
 import type { AppCtx } from './context';
 
 /** Nothing lit. */
@@ -34,6 +35,12 @@ export function readPlayhead(playhead: number): { step: number; ghost: boolean }
   return { step: DARK - 1 - playhead, ghost: true };
 }
 
+/** The playhead a region step lights: bright when live, its ghost when not, `DARK` halted or with none. */
+function playheadOf(running: boolean, at: RegionStep | null): number {
+  if (!running || !at || at.step < 0) return DARK;
+  return at.live ? at.step : ghostOf(at.step);
+}
+
 /**
  * The playhead for region `region` of the part on `slot`: the step bright
  * while the audible tick is in the region, its ghost while it is not, `DARK`
@@ -42,11 +49,32 @@ export function readPlayhead(playhead: number): { step: number; ghost: boolean }
  */
 export function regionPlayheadAt(ctx: AppCtx, slot: number, region?: number): number {
   if (!ctx.transport.running) return DARK;
+  return regionReadAt(ctx, slot, region).playhead;
+}
+
+/** One reading of a region: the engine's step at the audible tick, and the playhead it lights. */
+export interface RegionRead {
+  /** The engine's step, live or the ghost, read running or not; null with no region named. */
+  readonly at: RegionStep | null;
+  /** What `regionPlayheadAt` returns for the same tick. */
+  readonly playhead: number;
+  /** The audible transport tick both were read at. */
+  readonly tick: number;
+}
+
+/**
+ * The region's step and its playhead from one transport read and one
+ * `regionStepAt` call, for a card that shows more of the step than the
+ * playhead (the Figure's stage and rotation, windsor#510): both describe the
+ * same step even when the tick moves between frames' reads.
+ */
+export function regionReadAt(ctx: AppCtx, slot: number, region?: number): RegionRead {
+  const { running } = ctx.transport;
   const tick = ctx.transport.position();
-  if (region === undefined) return ctx.host.stepAt(slot, tick);
+  if (region === undefined)
+    return { at: null, playhead: running ? ctx.host.stepAt(slot, tick) : DARK, tick };
   const at = ctx.host.regionStepAt(slot, region, tick);
-  if (!at || at.step < 0) return DARK;
-  return at.live ? at.step : ghostOf(at.step);
+  return { at, playhead: playheadOf(running, at), tick };
 }
 
 /**
