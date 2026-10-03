@@ -11,6 +11,7 @@ import {
   DEFAULT_ARP_CONFIG,
   DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
+  DEFAULT_FIGURE_CONFIG,
   DEFAULT_GRID_CONFIG,
   REGISTER_OCTAVE_MAX,
   REGISTER_OCTAVE_MIN,
@@ -24,6 +25,7 @@ export const REGISTER_OCTAVE_DEFAULTS: Readonly<Partial<Record<SequencerKind, nu
   chord: DEFAULT_CHORD_CONFIG.register.octave,
   arp: DEFAULT_ARP_CONFIG.register.octave,
   bass: DEFAULT_BASS_CONFIG.register.octave,
+  figure: DEFAULT_FIGURE_CONFIG.register.octave,
 };
 
 /** The Octave knob for a part of `kind`: absolute MIDI octaves, defaulting to where the engine puts that kind. */

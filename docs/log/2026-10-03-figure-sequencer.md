@@ -74,8 +74,32 @@ process controls those composers use built in.
    AudioParam and no worklet change, so offline render is identical by
    construction. Beat substitution becomes one region and one curve
    instead of eight regions.
-8. *(The device: its section is added by windsor#490 from the approved
-   mockup, windsor#489.)*
+8. **The device** (windsor#490, built to the mockup tacowars approved in
+   windsor#489, `docs/research/2026-10-03-figure-sequencer/figure.html`) is
+   the 244 px sequencer device with two page tabs, as the Euclid device
+   has them. The tabs take the 20 px a section label would, so the pages
+   carry no section labels; the summary at the tabs' right names the
+   cells, the chord, the stage, the rotation and the leader in play.
+   - **Cells** holds the Arp's Play columns (Rate, Seed with Reseed and
+     Randomize; Octave, Length and Rotate; Vel, Acc vel and Acc mod; Gate
+     and Skip) and the Grid's 32 px strip: per cell the tone, Oct, a Vel
+     bar, A, S and the ratchet, held at the top while the lanes scroll
+     under them. A click on the tone cycles note, tie and rest, and a
+     right-click opens a picker of the seventeen tones. Its label is the
+     chord degree of the tone over the chord under the playhead (`R 3 5 7`,
+     a prime per octave up, a minus per octave down, so a sus chord reads
+     `R 4 5`), which tacowars chose over stack positions. Vel is a bar the
+     user drags, 0 to 1, faint at 1. Cells past the stage in play are
+     dimmed, not hidden, and the playhead is the engine's `regionStepAt`.
+   - **Process** holds the Schedule (a chip per stage, `length × bars`:
+     drag to reorder, × to remove, + to add one a cell longer than the
+     last; the stage in play outlined), the Drift (Steps and Every) and the
+     Source (the song's other Figure parts by name, Offset and Transpose,
+     and the hint that a chain follows one level). With a source the Cells
+     strip draws the leader's cells greyed and read-only under the
+     follower's playhead.
+   - Every edit writes the selected region's pattern, the seed the part's.
+     The page shown is the session's.
 9. **Position.** `stepAt` is the cell that sounds after rotation and the
    stage, so the strip lights what is heard.
 

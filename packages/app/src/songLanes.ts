@@ -32,6 +32,7 @@ import {
   CYCLE_TICKS,
   LANE_TONE,
   REGION_SUMMARY,
+  partNames,
   SONG_DRAG_THRESHOLD_PX,
   blockBox,
   boxTick,
@@ -121,7 +122,16 @@ function regionBlock(view: SongView, part: MusicPart, index: number, region: Reg
   glyph.title = mark === '∞' ? 'whole song: free-running' : 'restarts on entry';
   node.appendChild(glyph);
   node.appendChild(
-    el('span', 'lb', forKind(REGION_SUMMARY, pattern, view.ctx.model.doc.transport.meter)),
+    el(
+      'span',
+      'lb',
+      forKind(
+        REGION_SUMMARY,
+        pattern,
+        view.ctx.model.doc.transport.meter,
+        partNames(view.ctx.model.doc),
+      ),
+    ),
   );
   const selected = view.state.selection;
   node.classList.toggle(

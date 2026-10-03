@@ -111,7 +111,7 @@ export function setSequencerKindLive(ctx: AppCtx, slot: number, kind: SequencerK
 
 /**
  * The kinds whose card edits the selected region's pattern (windsor#75; the
- * grid, lanes included, since windsor#76).
+ * grid, lanes included, since windsor#76; the Figure since windsor#490).
  */
 export const REGION_PATTERN_KINDS: ReadonlySet<SequencerKind> = new Set<SequencerKind>([
   'grid',
@@ -119,6 +119,7 @@ export const REGION_PATTERN_KINDS: ReadonlySet<SequencerKind> = new Set<Sequence
   'arp',
   'bass',
   'euclidean',
+  'figure',
 ]);
 
 /** True when `part`'s regions each carry their own pattern. */

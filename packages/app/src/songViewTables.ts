@@ -17,6 +17,8 @@ import type { Meter, SequencerKind, SequencerSpec } from '@windsor/engine';
 import { TICKS_PER_BAR, meterBeats, ticksPerBar } from '@windsor/engine';
 import { BASS_MODE_OPTIONS } from './bassModel';
 import { divisorLabel } from './divisorLabels';
+import { lineSummary } from './figureModel';
+import { scheduleBars } from './figureProcessModel';
 import { beatStarts } from './meterGrid';
 import { ARP_STYLE_LABELS } from './sequencerKnobTables';
 
@@ -274,19 +276,45 @@ export const LANE_TONE: Readonly<Record<SequencerKind, LaneTone>> = {
   figure: 'pitch',
 };
 
+/** A part's name by slot, for a table that names another part (a Figure's leader, windsor#490). */
+export type PartNames = (slot: number) => string | undefined;
+
+/** The song's part names by slot. */
+export const partNames =
+  (doc: {
+    readonly parts: readonly { readonly slot: number; readonly name: string }[];
+  }): PartNames =>
+  (slot) =>
+    doc.parts.find((p) => p.slot === slot)?.name;
+
 /**
- * One function per kind over that kind's own spec, and the song's meter for
- * a table that names a step (windsor#431) — the lanes look a part up here,
- * never branch.
+ * One function per kind over that kind's own spec, the song's meter for a
+ * table that names a step (windsor#431), and the parts' names for one that
+ * names a part — the lanes look a part up here, never branch.
  */
 export type KindTable<T> = {
-  readonly [K in SequencerKind]: (spec: Extract<SequencerSpec, { kind: K }>, meter?: Meter) => T;
+  readonly [K in SequencerKind]: (
+    spec: Extract<SequencerSpec, { kind: K }>,
+    meter?: Meter,
+    names?: PartNames,
+  ) => T;
 };
 
 /** Apply a kind table to a spec; the cast is the discriminated union's, which TypeScript cannot correlate through an index. */
-export function forKind<T>(table: KindTable<T>, spec: SequencerSpec, meter?: Meter): T {
-  return (table[spec.kind] as (s: SequencerSpec, m?: Meter) => T)(spec, meter);
+export function forKind<T>(
+  table: KindTable<T>,
+  spec: SequencerSpec,
+  meter?: Meter,
+  names?: PartNames,
+): T {
+  return (table[spec.kind] as (s: SequencerSpec, m?: Meter, n?: PartNames) => T)(
+    spec,
+    meter,
+    names,
+  );
 }
+
+const signedOffset = (n: number): string => (n > 0 ? `+${n}` : String(n));
 
 /** The summary a region block shows in small caps, after the kind's name, its step named in the song's meter. */
 export const REGION_SUMMARY: KindTable<string> = {
@@ -300,15 +328,19 @@ export const REGION_SUMMARY: KindTable<string> = {
     `arp · ${ARP_STYLE_LABELS[spec.style]} ${divisorLabel(spec.divisor, meter)}`,
   bass: (spec) =>
     `bass · ${BASS_MODE_OPTIONS.find((o) => o.value === spec.pitchMode)?.label ?? spec.pitchMode}`,
-  figure: (spec, meter) => `figure · ${spec.length} cells · ${divisorLabel(spec.divisor, meter)}`,
+  figure: (spec, meter, names) =>
+    spec.source
+      ? `figure ← ${names?.(spec.source.slot) ?? `slot ${spec.source.slot}`} ${signedOffset(spec.source.offset)}`
+      : `figure · ${lineSummary(spec.cells, spec.length)} ${divisorLabel(spec.divisor, meter)}`,
 };
 
 /**
  * The pattern's cycle in ticks, for the faint ticks inside a block (decision
  * 1): the loop length for a grid and a Basslead strip (windsor#371; a part
  * with no strip loads as one bar of plain notes), the steps' durations and
- * repeats for a Chord Player, `steps` for a Euclidean line; null for the
- * kind that has none (arp) or a cycle with nothing in it.
+ * repeats for a Chord Player, `steps` for a Euclidean line, a Figure's
+ * schedule in bars or else its line (windsor#490); null for the kind that
+ * has none (arp, a Figure canon) or a cycle with nothing in it.
  */
 export const CYCLE_TICKS: KindTable<number | null> = {
   none: () => null,
@@ -320,5 +352,11 @@ export const CYCLE_TICKS: KindTable<number | null> = {
   },
   arp: () => null,
   bass: (spec) => (spec.length > 0 ? spec.length * spec.divisor : null),
-  figure: (spec) => (spec.length > 0 ? spec.length * spec.divisor : null),
+  figure: (spec, meter) => {
+    // A canon plays its leader's line, so it has no cycle of its own to draw.
+    if (spec.source) return null;
+    const bars = scheduleBars(spec.schedule);
+    if (bars > 0) return bars * ticksPerBar(meter);
+    return spec.length > 0 ? spec.length * spec.divisor : null;
+  },
 };
