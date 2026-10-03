@@ -1,4 +1,5 @@
 {
+  "version": 6,
   "transport": {
     "bpm": 104,
     "bars": 4
