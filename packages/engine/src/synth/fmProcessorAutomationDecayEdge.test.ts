@@ -4,8 +4,8 @@
  * ends of the register, where key scaling makes the decay four times shorter
  * and three times longer.
  *
- * Each run renders one control block a call and reads the envelope the lane
- * moves after each. At the block the lane changes:
+ * Each run renders one control block a call, every block the fine one
+ * (windsor#326), and reads the envelope the lane moves after each. At the block the lane changes:
  * - a new time keeps the decay's phase and runs on at the new rate, so the
  *   level is the one the old segment's curve gives at the advanced phase;
  * - a new curve starts what is left again from the level it was at, over the
@@ -17,6 +17,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { voiceLaneOffset } from '../__fixtures__/voiceLaneOffset';
+import type { CreateOptions } from '../__fixtures__/workletHarness';
 import { loadProcessor } from '../__fixtures__/workletHarness';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { ST_DECAY, ST_SUSTAIN, segmentLevel } from '../worklet/fm/envelope';
@@ -25,6 +26,8 @@ import { voiceSlotParamName } from './audioPart';
 const loaded = loadProcessor();
 const SR = loaded.sampleRate;
 const CTRL = loaded.ctrlInterval;
+/** The part's table with its long control interval at the fine one (windsor#326): one control block a call. */
+const FINE: CreateOptions = { controlIntervals: { long: CTRL } };
 const SLOTS = 8;
 const ADDITIVE = 7;
 /** The decay's time and key scaling: 1 s at middle C, 0.25 s at C8 and 3.1 s at A0. */
@@ -112,7 +115,7 @@ function trace(
   from: number,
   edit?: { at: number; to: Patch; offset: number; resyncAt?: number },
 ): EnvView[] {
-  const processor = loaded.create(PATCH, 4, undefined, { voiceSlots: [path] });
+  const processor = loaded.create(PATCH, 4, undefined, { voiceSlots: [path], ...FINE });
   if (edit) processor.inbox({ type: 'liveRetune', enabled: true } as never);
   const params: Record<string, Float32Array> = {
     pitchBend: new Float32Array([0]),

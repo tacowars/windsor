@@ -1,6 +1,6 @@
 /**
  * The FM worklet's tunables (#644): table size, mip count, the control-rate
- * interval, the dormancy floors, the modulation and feedback depths, the
+ * intervals and when a voice takes the long one (windsor#326), the dormancy floors, the modulation and feedback depths, the
  * shortest envelope segment, the amplitude envelope's breaks per block
  * (windsor#301), the width ramp's snap, the feedback ramp's step
  * (windsor#346), the drive stage's
@@ -25,11 +25,30 @@ const TABLE_MASK = TABLE_SIZE - 1;
 const MIP_COUNT = 12; // one per octave from MIP_BASE_HZ
 const MIP_BASE_HZ = 16.352; // C0
 
-const CTRL_INTERVAL = 32; // samples between control-rate updates
+const CTRL_INTERVAL = 32; // samples between control-rate updates: the fine interval
+/*
+ * Each voice chooses its control interval at each control boundary
+ * (windsor#326, `voiceControlInterval.ts`): CTRL_INTERVAL while anything
+ * fast is happening, CTRL_INTERVAL_LONG while nothing is. Fast is a running
+ * envelope segment shorter than CTRL_LONG_MIN_SEGMENT_SECONDS (after key
+ * scaling), a looping amplitude envelope, a glide under that time, an
+ * LFO that reaches anything at CTRL_LONG_MAX_LFO_HZ or faster (or at any
+ * rate in a shape that jumps), or a song
+ * lane ramping an operator's feedback, which the render loops time in fine
+ * blocks (FEEDBACK_RAMP_STEP). 128 is one
+ * render quantum: the control update and the kernel's prologue run once
+ * where they ran four times. The record is
+ * `docs/log/2026-10-03-adaptive-control-interval.md`.
+ */
+const CTRL_INTERVAL_LONG = 128;
+const CTRL_LONG_MIN_SEGMENT_SECONDS = 0.1;
+const CTRL_LONG_MAX_LFO_HZ = 8;
 /*
  * A song lane's feedback is ramped across each control block (windsor#346,
  * `voiceOffsets.ts`): sample `s` of the block reads `from + (to − from) · t`
- * with `t = s × FEEDBACK_RAMP_STEP`, exact for a power-of-two block.
+ * with `t = s × FEEDBACK_RAMP_STEP`, exact for a power-of-two block. The
+ * loops count `s` from CTRL_INTERVAL, so a voice whose feedback ramps keeps
+ * the fine interval (windsor#326).
  */
 const FEEDBACK_RAMP_STEP = 1 / CTRL_INTERVAL;
 /*
@@ -177,6 +196,9 @@ export {
   MIP_COUNT,
   MIP_BASE_HZ,
   CTRL_INTERVAL,
+  CTRL_INTERVAL_LONG,
+  CTRL_LONG_MIN_SEGMENT_SECONDS,
+  CTRL_LONG_MAX_LFO_HZ,
   FEEDBACK_RAMP_STEP,
   DORMANT_AMP,
   DORMANT_FILTER_STATE,

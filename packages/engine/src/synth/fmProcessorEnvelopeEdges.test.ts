@@ -25,6 +25,8 @@ import { loadProcessor, render } from '../__fixtures__/workletHarness';
 const loaded = loadProcessor();
 const SR = loaded.sampleRate;
 const BLOCK = loaded.ctrlInterval;
+/** The long control interval a held voice takes once nothing on it is fast (windsor#326). */
+const LONG_BLOCK = 128;
 const ALG_ADDITIVE = 7;
 const BLOCKS = 4;
 const NOTE_ON: ScheduledEvent[] = [{ type: 'noteOn', id: 1, note: 60, velocity: 1, frame: 0 }];
@@ -131,6 +133,46 @@ function released(env: Partial<EnvelopeParams>, specialise: boolean, off: number
   return Buffer.from(heard(env, 2, specialise, events).buffer);
 }
 
+/**
+ * Held notes whose control blocks are long (windsor#326), released at `off`
+ * into a slow or a fast release, each to 0 and to a held End level: long
+ * throughout (a slow attack, a slow release); long, then fine from the
+ * quantum's end (the slow attack, a 10-sample release); fine, then long
+ * from frame 32 in a block that runs to 160 (a step attack, a slow release);
+ * and fine, long, then fine again from 160 (the step, the fast release).
+ * Split before, on and after each of those boundaries. Times are in samples.
+ */
+const LONG_SHAPES = [
+  { attack: 0.15 * SR, release: 0.2 * SR, off: 50 },
+  { attack: 0.15 * SR, release: 10, off: 50 },
+  { attack: 0, release: 0.2 * SR, off: 100 },
+  { attack: 0, release: 10, off: 100 },
+];
+const LONG_SPLIT_FRAMES = [...SPLIT_FRAMES, 129, 159, LONG_BLOCK + BLOCK, 161, 200, 255, 300];
+const LONG_QUANTA = 3;
+
+/** `LONG_QUANTA` quanta of `shape` released at its `off`, and also split at `split` when given. */
+function releasedLong(
+  shape: (typeof LONG_SHAPES)[number],
+  endLevel: number,
+  specialise: boolean,
+  split?: number,
+): Buffer {
+  const env = {
+    initLevel: 0,
+    attackTime: shape.attack / SR,
+    peakLevel: 1,
+    decayTime: 0,
+    sustainLevel: 0.5,
+    releaseTime: shape.release / SR,
+    endLevel,
+  };
+  const events: ScheduledEvent[] = [...NOTE_ON, { type: 'noteOff', id: 1, frame: shape.off }];
+  if (split !== undefined) events.push({ type: 'noteOff', id: 2, frame: split });
+  events.sort((a, b) => a.frame - b.frame);
+  return Buffer.from(heard(env, LONG_QUANTA, specialise, events).buffer);
+}
+
 describe('an operator envelope edge inside a control block (windsor#301)', () => {
   it('steps to full level on the note-on sample with an attack of 0', () => {
     const xs = levels({ attackTime: 0, peakLevel: 1, decayTime: 1, sustainLevel: 1 });
@@ -169,14 +211,12 @@ describe('an operator envelope edge inside a control block (windsor#301)', () =>
       probePatch({ attackTime: 0, sustainLevel: 1, releaseTime: 0.0002 }),
       1,
     );
-    const off: ScheduledEvent[] = [
-      ...NOTE_ON,
-      // On a control block boundary, so the release starts there.
-      { type: 'noteOff', id: 1, frame: 4 * BLOCK },
-    ];
+    // On a control block boundary, so the release starts there: the step
+    // attack's block is fine, and the held note's after it long (windsor#326).
+    const start = BLOCK + LONG_BLOCK;
+    const off: ScheduledEvent[] = [...NOTE_ON, { type: 'noteOff', id: 1, frame: start }];
     const out = render(loaded, processor, BLOCKS, off).samples.filter((_, i) => i % 2 === 0);
     const xs = Array.from(out, (s) => s / UNIT);
-    const start = 4 * BLOCK;
     const silent = xs.findIndex((x, s) => s >= start && Math.abs(x) < CLOSE);
     expect(Math.abs(silent - start - 10)).toBeLessThanOrEqual(1);
   });
@@ -267,10 +307,34 @@ describe('an operator envelope edge inside a control block (windsor#301)', () =>
     expect(failures).toEqual([]);
   });
 
+  it('renders a held note the same wherever another event splits it, in long blocks and across a change of interval (windsor#326)', () => {
+    // A voice's control blocks run across the part's splits whatever their
+    // length, so a split render is the unsplit one's bits, in the kernel and
+    // the generic loop alike.
+    const cases = LONG_SHAPES.flatMap((shape) =>
+      [0, 0.4].flatMap((endLevel) =>
+        [true, false].map((specialise) => ({ shape, endLevel, specialise })),
+      ),
+    );
+    const failures: string[] = [];
+    for (const { shape, endLevel, specialise } of cases) {
+      const whole = releasedLong(shape, endLevel, specialise);
+      for (const split of LONG_SPLIT_FRAMES) {
+        if (Buffer.compare(releasedLong(shape, endLevel, specialise, split), whole) === 0) continue;
+        failures.push(
+          `${JSON.stringify(shape)} end ${endLevel} kernel ${specialise} split ${split}`,
+        );
+      }
+    }
+    expect(cases).toHaveLength(16);
+    expect(failures).toEqual([]);
+  });
+
   it("reads an envelope's stage for the voice only through heardStage", () => {
     // `Envelope` reads its own stage; every voice-side reader asks
     // `voiceQuiet.ts`'s `heardStage`, which waits for the knots ahead. An
-    // assignment (`kill`'s) is not a read.
+    // assignment (`kill`'s) is not a read. The control interval reads the
+    // stage at a control boundary, where no knot is ahead (windsor#326).
     const FM = new URL('../worklet/fm/', import.meta.url);
     const READ = /\b(?:env|ampEnv\[[^\]]*\]|filtEnv|pitchEnv)\.(?:state|finished)\b(?!\s*=(?!=))/g;
     const reads: string[] = [];
@@ -280,6 +344,9 @@ describe('an operator envelope edge inside a control block (windsor#301)', () =>
         reads.push(`${file}: ${m[0]}`);
       }
     }
-    expect(reads).toEqual(['voiceQuiet.ts: ampEnv[i].state']);
+    expect(reads.sort()).toEqual([
+      'voiceControlInterval.ts: env.state',
+      'voiceQuiet.ts: ampEnv[i].state',
+    ]);
   });
 });
