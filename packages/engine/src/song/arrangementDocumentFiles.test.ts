@@ -17,6 +17,7 @@ import { isShippable, makeArrangement } from './arrangementDocument';
 const CURRENT: readonly CurrentDocumentFile[] = [
   'dangling-preset',
   'dangling-return',
+  'figure-part',
   'nothing-usable',
   'silent-song',
 ];

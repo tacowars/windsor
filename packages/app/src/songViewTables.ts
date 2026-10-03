@@ -271,6 +271,7 @@ export const LANE_TONE: Readonly<Record<SequencerKind, LaneTone>> = {
   chord: 'pitch',
   arp: 'pitch',
   bass: 'pitch',
+  figure: 'pitch',
 };
 
 /**
@@ -299,6 +300,7 @@ export const REGION_SUMMARY: KindTable<string> = {
     `arp · ${ARP_STYLE_LABELS[spec.style]} ${divisorLabel(spec.divisor, meter)}`,
   bass: (spec) =>
     `bass · ${BASS_MODE_OPTIONS.find((o) => o.value === spec.pitchMode)?.label ?? spec.pitchMode}`,
+  figure: (spec, meter) => `figure · ${spec.length} cells · ${divisorLabel(spec.divisor, meter)}`,
 };
 
 /**
@@ -318,4 +320,5 @@ export const CYCLE_TICKS: KindTable<number | null> = {
   },
   arp: () => null,
   bass: (spec) => (spec.length > 0 ? spec.length * spec.divisor : null),
+  figure: (spec) => (spec.length > 0 ? spec.length * spec.divisor : null),
 };

@@ -176,6 +176,16 @@ export const BASS_DENSITY_DEFAULT = 1;
 export const BASS_ROOT_BIAS_DEFAULT = 0.7;
 export const BASS_GATE_DEFAULT = 0.8;
 /**
+ * The Figure (windsor#484, record `2026-10-03-figure-sequencer`): a cell's
+ * chord tone reaches this far either way of the root (octave carry past the
+ * stack); a schedule stage and a drift step every 1–64 bars; drift moves at
+ * most this many cells a step; a canon transposes within two octaves.
+ */
+export const FIGURE_TONE_MAX = 8;
+export const FIGURE_SCHEDULE_BARS_MAX = 64;
+export const FIGURE_DRIFT_STEPS_MAX = 4;
+export const FIGURE_TRANSPOSE_MAX = 24;
+/**
  * A document's document-format version: 6 since windsor#300 (the embedded
  * patches are patch format 3, the drive out of the filter). Version 5
  * (windsor#224: Tape's Drive feeds the magnetic core) upgrades to 6 through
