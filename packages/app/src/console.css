@@ -4586,17 +4586,47 @@ select.field.auto-snap {
 
 .parts-grid {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) 272px;
+  grid-template-columns: 230px minmax(0, 1fr);
   gap: 1px;
   background: var(--line);
 }
-.parts-grid .rail,
-.parts-grid .mod {
+.parts-grid .rail {
   background: var(--panel);
 }
 .parts-grid .bays {
   background: var(--ground);
   padding: 12px;
+  min-width: 0;
+}
+
+/* The Shape & modulation deck under the operator rows (record
+   `2026-10-03-parts-tab-layout` decision 8): one card per section, wrapping
+   by the deck's own width, with the mockup's flex-grow weights. No
+   screen-width query (decision 9). */
+.deck-title {
+  margin-top: 14px;
+}
+.deck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.deck-card {
+  flex: 1.2 1 340px;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px 12px;
+}
+.deck-card.deck-filter {
+  flex-grow: 1.3;
+}
+.deck-card.deck-drive {
+  flex-grow: 0.6;
+}
+.deck .env-canvas {
+  height: 48px;
 }
 .keys-row {
   display: flex;

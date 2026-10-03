@@ -1,5 +1,5 @@
 /**
- * The Parts tab's rail and mod panels (#70, ported): algorithm picker,
+ * The Parts tab's rail and its Shape & modulation deck (#70, ported): algorithm picker,
  * global knobs, drive (windsor#309), filter, LFO and pitch envelope. All of it edits the working
  * patch (`partsSession`) and pushes it to the live part. The knob specs are
  * `patchKnobTables.ts`; the thumbnail geometry `patchPanelConstants.ts`.
@@ -276,6 +276,27 @@ export const filterModeShows = (
   return { cutoff: !formant, slope: !formant, vowel: formant };
 };
 
+/** The latest redraw of each deck envelope canvas, read by its one observer. */
+const deckRedraws = new WeakMap<HTMLCanvasElement, () => void>();
+
+/**
+ * Redraw a deck envelope whenever its box changes size: the deck's wrap, a
+ * window resize or a zoom changes its width with no patch change (record
+ * `2026-10-03-parts-tab-layout` decision 9). The canvas outlives a rebuild,
+ * so it gets one observer, which calls the newest redraw; it stops once the
+ * tab is re-rendered and the canvas has left the document.
+ */
+function redrawOnResize(canvas: HTMLCanvasElement, redraw: () => void): void {
+  const watched = deckRedraws.has(canvas);
+  deckRedraws.set(canvas, redraw);
+  if (watched) return;
+  const resized = new ResizeObserver(() => {
+    if (!canvas.isConnected) return resized.disconnect();
+    if (canvas.clientWidth > 0) deckRedraws.get(canvas)?.();
+  });
+  resized.observe(canvas);
+}
+
 export function buildFilter(editor: PatchEditor): void {
   const segBox = $('filterMode');
   segBox.innerHTML = '';
@@ -300,6 +321,7 @@ export function buildFilter(editor: PatchEditor): void {
   const canvas = $('filtEnvCanvas') as HTMLCanvasElement;
   attachEnvelopeDrag(editor, canvas, 'filter.env', MOD_COLOR);
   const redraw = (): void => drawEnv(canvas, editor.patch.filter.env, MOD_COLOR);
+  redrawOnResize(canvas, redraw);
   const row = $('filterKnobs');
   row.innerHTML = '';
   for (const k of FILTER_KNOBS) {
@@ -365,6 +387,7 @@ export function buildPitch(editor: PatchEditor): void {
   const canvas = $('pitchEnvCanvas') as HTMLCanvasElement;
   attachEnvelopeDrag(editor, canvas, 'pitchEnv', CARRIER_COLOR);
   const redraw = (): void => drawEnv(canvas, editor.patch.pitchEnv, CARRIER_COLOR);
+  redrawOnResize(canvas, redraw);
   const row = $('pitchKnobs');
   row.innerHTML = '';
   const amount = PITCH_ENV_AMOUNT_KNOB;
