@@ -30,6 +30,7 @@ import { EuclideanSequencer, assertEuclideanConfig } from '../sequencing/euclide
 import { FigureSequencer, assertFigureConfig } from '../sequencing/figureSequencer';
 import { GridSequencer, assertGridConfig } from '../sequencing/gridSequencer';
 import type { ScaleSampler } from '../sequencing/scaleSampler';
+import { TICKS_PER_BAR } from '../sequencing/scheduler';
 
 export type Generator =
   | EuclideanSequencer
@@ -69,9 +70,14 @@ export const buildsNoGenerator = (kind: SequencerKind): boolean => kind === 'non
 
 /**
  * The generator a spec builds — a part's `sequencer`, or one region's
- * pattern (`regionPattern`, windsor#74) — or null for `none`.
+ * pattern (`regionPattern`, windsor#74) — or null for `none`. A Figure
+ * counts its schedule and drift in bars of `barTicks`, the song meter's bar.
  */
-export function buildGenerator(spec: SequencerSpec, sampler: ScaleSampler): Generator | null {
+export function buildGenerator(
+  spec: SequencerSpec,
+  sampler: ScaleSampler,
+  barTicks = TICKS_PER_BAR,
+): Generator | null {
   const driver: unknown = driverOf(spec);
   switch (spec.kind) {
     case 'euclidean':
@@ -85,7 +91,7 @@ export function buildGenerator(spec: SequencerSpec, sampler: ScaleSampler): Gene
     case 'bass':
       return new BassSequencer(sampler, driver as BassDriver);
     case 'figure':
-      return new FigureSequencer(sampler, driver as FigureDriver);
+      return new FigureSequencer(sampler, driver as FigureDriver, barTicks);
     default:
       return null;
   }

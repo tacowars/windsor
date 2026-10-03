@@ -15,6 +15,7 @@ export type CurrentDocumentFile =
   | 'dangling-return'
   | 'figure-listen'
   | 'figure-part'
+  | 'figure-process'
   | 'nothing-usable'
   | 'silent-song';
 

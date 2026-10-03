@@ -1,8 +1,9 @@
 /**
  * The Figure's defaults (windsor#484), and the performer at the generator
  * (windsor#485): a tick with no chord plays nothing, and `stepAt` is the cell
- * sounding, through a live `length` edit. Through the player:
- * `song/arrangementPlayerFigure.test.ts`.
+ * sounding, through a live `length` edit; a backward drift (windsor#486).
+ * Through the player: `song/arrangementPlayerFigure.test.ts` and, for the
+ * schedule and the drift, `song/arrangementPlayerFigureProcess.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -79,5 +80,34 @@ describe('the Figure performer (windsor#485)', () => {
     ]);
     liveReconfiguration(figure, { ...SPEC, cells: line, length: 7 }, SAMPLER)?.();
     expect(at(figure)).toEqual([0, 6, 0, 3, 4]);
+  });
+});
+
+describe('a backward drift (windsor#486)', () => {
+  it('slips back a cell every bar, and the cell index never goes negative', () => {
+    const eighths = { ...SPEC, divisor: 12, drift: { steps: -1, everyBars: 1 } };
+    const firstOfBars = (figure: FigureSequencer): number[] =>
+      [0, 1, 2, 3].map((bar) => figure.stepAt(bar * 8));
+    const line = Array.from({ length: 12 }, () => figureNoteCell());
+    expect(
+      firstOfBars(new FigureSequencer(SAMPLER, { ...eighths, cells: line, length: 12 })),
+    ).toEqual([0, 7, 2, 9]);
+    // A stage restarting at cell 0 on every bar line puts step − bar below 0: it wraps.
+    const restarting = { ...eighths, schedule: [{ length: 4, bars: 1 }] };
+    expect(firstOfBars(new FigureSequencer(SAMPLER, restarting))).toEqual([0, 3, 2, 1]);
+  });
+
+  it('takes an edit after a live meter change at the next bar line in the new meter', () => {
+    const line = Array.from({ length: 32 }, () => figureNoteCell());
+    const figure = new FigureSequencer(SAMPLER, { ...SPEC, divisor: 6, cells: line, length: 32 });
+    figure.handleTick(tick(90, C_MAJOR)); // bar 0 of 4/4, bar 1 of 7/8
+    figure.setBarTicks(84);
+    liveReconfiguration(
+      figure,
+      { ...SPEC, divisor: 6, cells: line, length: 32, schedule: [{ length: 4, bars: 1 }] },
+      SAMPLER,
+    )?.();
+    expect(figure.stepAt(16)).toBe(16); // tick 96, inside the 84–167 bar: unedited
+    expect(figure.stepAt(28)).toBeLessThan(4); // tick 168: the 4-cell stage
   });
 });

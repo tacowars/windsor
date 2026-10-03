@@ -34,6 +34,8 @@
 import type { MusicPart, SequencerSpec } from './arrangement';
 import { Arpeggiator } from '../sequencing/arpeggiator';
 import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
+import { FigureSequencer } from '../sequencing/figureSequencer';
+import { ticksPerBar } from '../sequencing/meter';
 import type { NoteEvent } from '../sequencing/noteEvent';
 import { RegionGate, type PartTickSource, type RegionGateConfig } from '../sequencing/regionGate';
 import type { ScaleSampler } from '../sequencing/scaleSampler';
@@ -116,6 +118,8 @@ export class PartBinding {
   /** The generator the gate last entered, which a region end releases; null while silent. */
   private active: Bound | null = null;
   private activeIndex: number | null = null;
+  /** The song meter's bar in ticks, which a Figure counts its schedule and drift in (windsor#486). */
+  private barTicks: number;
 
   /** The part's binding, or null for a kind that builds no generator. Builds and validates; subscribes nothing until `attach`. */
   static create(
@@ -137,6 +141,7 @@ export class PartBinding {
     sampler: ScaleSampler,
     private readonly output: PartOutput,
   ) {
+    this.barTicks = ticksPerBar(config.meter);
     this.gate = new RegionGate(source, config, {
       onEnter: (index) => this.enter(index),
       onLeave: (tick, time) => this.leave(tick, time),
@@ -162,9 +167,13 @@ export class PartBinding {
     }
   }
 
-  /** Regions, song length and harmony take effect on the next tick. */
+  /** Regions, song length, harmony and meter take effect on the next tick; a Figure's bar length at once. */
   reconfigureGate(config: RegionGateConfig): void {
+    this.barTicks = ticksPerBar(config.meter);
     this.gate.reconfigure(config);
+    for (const { generator } of this.bounds()) {
+      if (generator instanceof FigureSequencer) generator.setBarTicks(this.barTicks);
+    }
   }
 
   /**
@@ -344,7 +353,7 @@ export class PartBinding {
   }
 
   private build(spec: SequencerSpec, sampler: ScaleSampler): Bound {
-    const generator = buildGenerator(spec, sampler);
+    const generator = buildGenerator(spec, sampler, this.barTicks);
     if (!generator) throw new Error(`a ${spec.kind} spec builds no generator`);
     const bound: Bound = { generator, spec, unsubscribe: null };
     if (generator instanceof EuclideanSequencer) {

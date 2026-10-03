@@ -9,12 +9,19 @@
  *
  * This file is the field set, its defaults, the check every constructor
  * and live edit runs, and the performer (windsor#485); the normaliser is
- * `song/figureNormalise.ts`. The processes arrive with windsor#486 and
- * windsor#487: until then the performer loops `cells[0..length)`.
+ * `song/figureNormalise.ts`. The schedule and the drift (windsor#486) are
+ * `figureLine.ts`; the canon source arrives with windsor#487.
  *
  * **The performer.** `FigureSequencer` hears its region gate at every local
- * tick and plays one cell per `divisor` ticks, cell `step mod length`. A
- * note cell voices the chord the gate hands over at the cell's onset:
+ * tick and plays one cell per `divisor` ticks: `cellAt(step)`, the cell the
+ * line's stage and rotation put at that step (`figureLine.ts`), which is
+ * `step mod length` with neither process. The bar it counts in is the
+ * gate's local bar in the song's meter; the meter's bar length is handed at
+ * build and read again off every tick past the first bar, so a live meter
+ * edit reaches the playhead too. A schedule or drift edit takes effect at
+ * the next bar line after the last tick heard.
+ *
+ * A note cell voices the chord the gate hands over at the cell's onset:
  * `figureNote(chord.stack, tone, rootNote(register)) + 12·octave`, dropped
  * outside MIDI 0–127 (it plays as a rest), never clamped. A sounding note
  * never moves on a chord change, so a tie across one keeps its pitch. A
@@ -51,9 +58,10 @@ import {
 } from '../audioConstants';
 import { figureNote } from '../harmony/figureTones';
 import type { HarmonyChord } from '../harmony/harmonyTimeline';
-import { holdsToNext, playArpCell, type ArpCellOutcome } from './arpCellPlay';
+import { playArpCell, type ArpCellOutcome } from './arpCellPlay';
 import { rollOutcome } from './arpeggiator';
 import type { ArpStep } from './arpSteps';
+import { FigureLine } from './figureLine';
 import { streamRng, type Rng } from './generatorSeed';
 import { assertRatchet } from './gridSequencer';
 import { defaultStepCount } from './meter';
@@ -61,7 +69,7 @@ import type { Meter } from './meterTables';
 import type { NoteEvent, NoteHandler, NoteOnEvent } from './noteEvent';
 import type { PartTickEvent, PartTickSource } from './regionGate';
 import { SEMITONES_PER_OCTAVE, type ScaleSampler } from './scaleSampler';
-import { DIVISORS, isNoteDivisor, type Unsubscribe } from './scheduler';
+import { DIVISORS, TICKS_PER_BAR, isNoteDivisor, type Unsubscribe } from './scheduler';
 import { assertStepModLanes, type StepModLane } from './stepModLanes';
 
 export interface FigureNoteCell {
@@ -264,6 +272,10 @@ export function figureCellNote(
   return note >= 0 && note <= MIDI_NOTE_MAX ? note : null;
 }
 
+/** Whether a note held into `cell` runs on to its onset: a tie or a slide. */
+const holdsInto = (cell: FigureCell | undefined): boolean =>
+  cell?.kind === 'tie' || (cell?.kind === 'note' && cell.slide);
+
 /** A cell's velocity onto the note-on it struck, when it is not the full 1. */
 function markVelocity(outcome: ArpCellOutcome, velocity: number | undefined): void {
   if (velocity === undefined || velocity === 1) return;
@@ -281,12 +293,20 @@ export class FigureSequencer {
   private held: number | null = null;
   /** The local tick a gated note's off goes out on; null while it runs to the next onset. */
   private releaseTick: number | null = null;
+  /** Where the schedule and the drift put the line. */
+  private readonly line: FigureLine;
+  /** The song meter's bar in ticks: handed at build, pushed again on a live meter change. */
+  private barTicks: number;
+  /** The last local tick heard since the entry; null before the first. Its bar is read in the current meter. */
+  private heardTick: number | null = null;
 
-  constructor(pitch: FigurePitchSource, config: FigureSequencerConfig) {
+  constructor(pitch: FigurePitchSource, config: FigureSequencerConfig, barTicks = TICKS_PER_BAR) {
     assertFigureConfig(config);
     this.pitch = pitch;
     this.current = config;
     this.rng = streamRng(config.seed, 0);
+    this.line = new FigureLine(config);
+    this.barTicks = barTicks;
   }
 
   get config(): FigureSequencerConfig {
@@ -297,15 +317,18 @@ export class FigureSequencer {
     return this.held;
   }
 
-  /** The region gate entered `regionIndex` from outside: the skip stream restarts. */
+  /** The region gate entered `regionIndex` from outside: the skip stream and both counters restart. */
   enter(regionIndex: number): void {
     this.rng = streamRng(this.current.seed, regionIndex);
+    this.line.restart(this.current);
+    this.heardTick = null;
   }
 
   /**
    * Take every field but the divisor and the seed live, and optionally a new
-   * key: the held note plays on and the stream carries on. A divisor or seed
-   * change rebuilds the part, as the Grid's does.
+   * key: the held note plays on and the stream carries on. A schedule or
+   * drift edit takes effect at the next bar line, its counters carried on. A
+   * divisor or seed change rebuilds the part, as the Grid's does.
    */
   reconfigure(config: FigureSequencerConfig, pitch: FigurePitchSource = this.pitch): void {
     assertFigureConfig(config);
@@ -314,12 +337,24 @@ export class FigureSequencer {
     }
     this.current = config;
     this.pitch = pitch;
+    const nextBar = this.heardTick === null ? 0 : Math.floor(this.heardTick / this.barTicks) + 1;
+    this.line.edit(config, nextBar);
   }
 
-  /** The cell a local step (since the region entry) sounds: the step mod `length`. */
+  /** The song's meter changed live: the stage and the rotation count bars of `barTicks` from now. */
+  setBarTicks(barTicks: number): void {
+    this.barTicks = barTicks;
+  }
+
+  /** The cell a local step (since the region entry) sounds, after the stage and the rotation. */
   stepAt(localStep: number): number {
-    const { length } = this.current;
-    return ((localStep % length) + length) % length;
+    return this.cellAt(localStep);
+  }
+
+  /** The written cell a local step resolves to, which a canon of this part reads (windsor#487). */
+  cellAt(localStep: number): number {
+    const bar = Math.floor((localStep * this.current.divisor) / this.barTicks);
+    return this.lineCell(localStep, bar);
   }
 
   attach(source: PartTickSource): Unsubscribe {
@@ -329,6 +364,7 @@ export class FigureSequencer {
   /** One local tick: the gate's release when due, then the cell on an onset. A chordless tick releases nothing. */
   handleTick(event: PartTickEvent): NoteEvent[] {
     const { divisor } = this.current;
+    this.heardTick = event.tick;
     const due = this.releaseTick !== null && event.tick >= this.releaseTick;
     const gateEnded = due && event.chord !== null;
     const events = gateEnded ? this.releaseHeld(event.tick, event.time) : [];
@@ -345,8 +381,8 @@ export class FigureSequencer {
   }
 
   private onset(event: PartTickEvent, step: number): NoteEvent[] {
-    const { cells, length, skipChance } = this.current;
-    const index = this.stepAt(step);
+    const { cells, skipChance } = this.current;
+    const index = this.lineCell(step, event.bar);
     const written: FigureCell = cells[index] ?? REST;
     // One draw per note cell, whatever it plays, so neither a rest nor the chord moves the stream.
     const skipped = written.kind === 'note' && skipChance > 0 && this.rng() < skipChance;
@@ -362,7 +398,7 @@ export class FigureSequencer {
         index,
         pitch,
         held: this.held,
-        holdsOn: holdsToNext(cells, step, length),
+        holdsOn: holdsInto(cells[this.cellAt(step + 1)]),
       },
       this.current,
     );
@@ -387,6 +423,17 @@ export class FigureSequencer {
     return note === null
       ? { cell: REST, pitch: 0 }
       : { cell: { ...written, octave: 0 }, pitch: note };
+  }
+
+  /** The cell local `step` in local `bar` sounds. */
+  private lineCell(step: number, bar: number): number {
+    const { cells, length, divisor } = this.current;
+    return this.line.cellAt(step, bar, {
+      cells: cells.length,
+      length,
+      divisor,
+      barTicks: this.barTicks,
+    });
   }
 
   /** Keep what an onset leaves sounding, and hand back what it emitted. */
