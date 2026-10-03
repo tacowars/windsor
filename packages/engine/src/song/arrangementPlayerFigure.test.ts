@@ -70,7 +70,7 @@ describe('a Figure through the player (windsor#485)', () => {
     const played = play(cells([note(1), TIE, note(1)]));
     expect(onsAt(played, [90, 96, 102])).toEqual([52, undefined, 51]);
     const off = played.find((c) => c.kind === 'noteOffByNote' && c.note === 52 && c.tick >= 90);
-    expect(off?.tick).toBe(99); // half of the tied cell, after the change
+    expect(off?.tick).toBe(102); // the tie holds to the next non-tie onset, as the Grid's does
   });
 
   it("scales the part's velocity by the cell's, then adds the accent", () => {

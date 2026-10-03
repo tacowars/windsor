@@ -326,10 +326,11 @@ export class FigureSequencer {
     return source.subscribe(1, (event) => this.handleTick(event));
   }
 
-  /** One local tick: the gate's release when due, then the cell on an onset. */
+  /** One local tick: the gate's release when due, then the cell on an onset. A chordless tick releases nothing. */
   handleTick(event: PartTickEvent): NoteEvent[] {
     const { divisor } = this.current;
-    const gateEnded = this.releaseTick !== null && event.tick >= this.releaseTick;
+    const due = this.releaseTick !== null && event.tick >= this.releaseTick;
+    const gateEnded = due && event.chord !== null;
     const events = gateEnded ? this.releaseHeld(event.tick, event.time) : [];
     if (event.tick % divisor === 0) events.push(...this.onset(event, event.tick / divisor));
     for (const e of events) this.onNote?.(e);
@@ -365,6 +366,8 @@ export class FigureSequencer {
       },
       this.current,
     );
+    // A tie holds the voice to the next non-tie onset, as the Grid's does, whatever the gate.
+    if (cell.kind === 'tie') return this.settle({ ...outcome, releaseTick: null });
     if (cell.kind !== 'note' || written.kind !== 'note') return this.settle(outcome);
     markVelocity(outcome, written.velocity);
     const hits = cell.ratchet ?? 1;

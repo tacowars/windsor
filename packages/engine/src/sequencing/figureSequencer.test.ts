@@ -53,8 +53,9 @@ describe('the default Figure (windsor#484)', () => {
 
 describe('the Figure performer (windsor#485)', () => {
   it('plays nothing and releases nothing on a tick with no chord; the first cell after one arrives plays it', () => {
-    const figure = new FigureSequencer(SAMPLER, { ...SPEC, gate: 1 });
+    const figure = new FigureSequencer(SAMPLER, { ...SPEC, gate: 0.5 });
     expect(figure.handleTick(tick(0, C_MAJOR)).map((e) => e.kind)).toEqual(['noteOn']);
+    expect(figure.handleTick(tick(SPEC.divisor / 2, null))).toEqual([]); // the gate's due tick
     expect(figure.handleTick(tick(SPEC.divisor, null))).toEqual([]);
     expect(figure.heldNote).toBe(48);
     const next = figure.handleTick(tick(2 * SPEC.divisor, C_MAJOR));
