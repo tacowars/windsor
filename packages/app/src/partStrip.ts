@@ -5,7 +5,9 @@
  * click picks that part as the shared selection (`ctx.parts.pick`) and
  * re-renders the shown tab, so the Parts tab's editor and the Song view's
  * lane follow it. + adds a part and − removes the selected one, with the
- * confirm the Parts tab's rail used to ask.
+ * confirm the Parts tab's rail used to ask. Each chip carries its part's
+ * two mixer lights, from the part meter bank (`partStripLights.ts`,
+ * windsor#528).
  *
  * The chips share the row, 70 to 150 px each (`console.css`). When they
  * don't fit, which is measured and never assumed from the window, the row
@@ -23,7 +25,7 @@ import { el } from './dom';
 import { openConfirm } from './metadataModal';
 import { addPartLive, removePartLive } from './partEdits';
 import { partListPopover } from './partStripList';
-import { watchStripDots } from './partStripDots';
+import { watchStripLights } from './partStripLights';
 import {
   addPartTitle,
   canAddPart,
@@ -48,18 +50,18 @@ export function pickPart(ctx: AppCtx, slot: number): void {
   if (ctx.parts.pick(slot)) ctx.refreshTabs();
 }
 
-function chip(ctx: AppCtx, index: number, slot: number): { node: HTMLElement; dot: HTMLElement } {
+function chip(ctx: AppCtx, index: number, lights: HTMLElement | undefined): HTMLElement {
   const part = ctx.model.doc.parts[index]!;
+  const { slot } = part;
   const label = chipLabel(part, index);
   const node = stripButton('pchip', '', part.name);
   node.style.setProperty('--tone', label.tone);
   node.setAttribute('aria-pressed', String(slot === ctx.parts.selected));
   node.dataset.slot = String(slot);
-  const dot = el('i', 'dot');
-  dot.setAttribute('aria-hidden', 'true');
-  node.append(el('span', 'n', label.name), el('span', 'k', label.meta), dot);
+  node.append(el('span', 'n', label.name), el('span', 'k', label.meta));
+  if (lights) node.append(lights);
   node.onclick = (): void => pickPart(ctx, slot);
-  return { node, dot };
+  return node;
 }
 
 /** − : remove the selected part after today's confirm; the selection then resolves to a neighbour. */
@@ -165,17 +167,17 @@ function revealSelected(frame: StripFrame): void {
 
 export function mountPartStrip(ctx: AppContext<HTMLElement>, root: HTMLElement): void {
   const frame = buildFrame(ctx, root);
-  const dots = watchStripDots(ctx, root);
+  const lights = watchStripLights(ctx, root);
   const draw = (): void => {
     const { parts } = ctx.model.doc;
     const focused = focusedSlot(frame);
-    const chips = parts.map((part, index) => chip(ctx, index, part.slot));
-    frame.scroll.replaceChildren(...chips.map((c) => c.node));
+    const drawn = lights.draw(parts.map((part) => part.slot));
+    const chips = parts.map((part, index) => chip(ctx, index, drawn.get(part.slot)));
+    frame.scroll.replaceChildren(...chips);
     // A keyboard pick redraws the chip it was made on; the focus stays with it.
     if (focused !== undefined) {
       frame.scroll.querySelector<HTMLElement>(`.pchip[data-slot="${focused}"]`)?.focus();
     }
-    dots.set(new Map(parts.map((part, index) => [part.slot, chips[index]!.dot])));
     frame.add.disabled = !canAddPart(parts.length);
     frame.add.title = addPartTitle(parts.length);
     frame.remove.disabled = !canRemovePart(parts.length);
