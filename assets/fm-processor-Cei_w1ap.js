@@ -2924,11 +2924,14 @@ var Voice = class {
    * After a render: a released voice ends once nothing is left to hear
    * (`finished`), and one whose envelopes ended at a held End level fades out
    * with `steal` instead (windsor#7). A gated or fading voice is left alone.
+   * The fade starts only at the quantum's end (`quantumEnd`), never where
+   * another event split the quantum, so a split render is the unsplit one's
+   * bits (windsor#323).
    */
-  settle() {
+  settle(quantumEnd) {
     if (this.gate || this.fadeInc !== 0) return;
     if (voiceFinished(this)) this.active = false;
-    else if (voiceHoldsEndLevel(this)) this.steal();
+    else if (quantumEnd && voiceHoldsEndLevel(this)) this.steal();
   }
   /** A voice that is fading out is no longer available, but still sounding. */
   get fading() {
@@ -3381,7 +3384,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
           v.ctrlCount -= chunk;
           done += chunk;
         }
-        v.settle();
+        v.settle(cursor + seg === n);
       }
       cursor += seg;
     }
