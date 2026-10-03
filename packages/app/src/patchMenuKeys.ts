@@ -50,3 +50,15 @@ export function moveMenuFocus(items: readonly HTMLButtonElement[], event: Keyboa
   items[to]?.focus();
   return true;
 }
+
+/**
+ * The row that takes focus after the row at `removed` leaves a list of
+ * `count` rows (an old-format patch deleted from the ⋯ menu): the next row,
+ * else the previous one, as an index into the list before the removal; null
+ * when none is left, and focus goes back to ⋯.
+ */
+export function rowAfterRemoval(count: number, removed: number): number | null {
+  if (removed < 0 || removed >= count) return null;
+  if (removed + 1 < count) return removed + 1;
+  return removed > 0 ? removed - 1 : null;
+}

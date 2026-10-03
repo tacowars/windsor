@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { menuTarget } from './patchMenuKeys';
+import { menuTarget, rowAfterRemoval } from './patchMenuKeys';
 
 // A document patch's ⋯ menu with Delete disabled (a song-only patch):
 // Rename…, Revert, Delete, Library folder…, Patch JSON.
@@ -28,5 +28,14 @@ describe('the ⋯ menu’s arrow keys', () => {
     expect(menuTarget(MENU, 0, 'Tab')).toBeNull();
     expect(menuTarget([], -1, 'ArrowDown')).toBeNull();
     expect(menuTarget([false, false], 0, 'End')).toBeNull();
+  });
+});
+
+describe('focus after an old-format row is deleted', () => {
+  it('goes to the next row, else the previous one, else back to ⋯', () => {
+    expect(rowAfterRemoval(3, 0)).toBe(1);
+    expect(rowAfterRemoval(3, 2)).toBe(1);
+    expect(rowAfterRemoval(1, 0)).toBeNull();
+    expect(rowAfterRemoval(2, -1)).toBeNull();
   });
 });

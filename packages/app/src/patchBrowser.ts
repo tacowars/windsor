@@ -284,7 +284,7 @@ function folderButtons(ctx: AppCtx): HTMLElement[] {
     button.type = 'button';
     button.title = item.title;
     button.disabled = !item.enabled;
-    button.onclick = (): void => item.run(button);
+    button.onclick = (): void => void item.run(button);
     return [button];
   });
 }

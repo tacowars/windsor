@@ -9,8 +9,10 @@
  * on ⋯ opens it on the first enabled item, ↑ ↓ Home End move
  * (`patchMenuKeys.ts`), Esc closes it back to ⋯, and Tab closes it and lets
  * the tab switch through. A pick hands focus to ⋯ before its action runs, so
- * a dialog it opens returns there; when the action rebuilt the bar, the new
- * ⋯ (found by its id) takes focus instead of the page body.
+ * a dialog it opens returns there; once the action settles (an async one
+ * included, whether it finished, failed or was cancelled) and focus fell to
+ * the page body, ⋯ takes it back, or the new ⋯ (found by its id) when the
+ * action rebuilt the bar.
  */
 import { el } from './dom';
 import { moveMenuFocus } from './patchMenuKeys';
@@ -23,8 +25,12 @@ export interface MenuAction {
   readonly label: string;
   readonly title: string;
   readonly enabled: boolean;
-  /** `opener` is the ⋯ button, where a modal hands focus back. */
-  readonly run: (opener: HTMLElement) => void;
+  /**
+   * `opener` is the ⋯ button, where a modal hands focus back. An async action
+   * returns its promise, so the menu restores focus after it settles; the
+   * action reports its own failure.
+   */
+  readonly run: (opener: HTMLElement) => void | Promise<void>;
 }
 
 export interface MenuForm {
@@ -53,16 +59,28 @@ function itemButton(label: string, title: string, enabled: boolean): HTMLButtonE
 }
 
 /**
- * After an entry's action: if it rebuilt the bar and focus fell to the page,
- * focus the new ⋯, so the keyboard still has a control. An action that opened
- * a dialog leaves focus in it, and the dialog hands it back on close.
+ * After an entry's action: if focus fell to the page, focus ⋯, or the new ⋯
+ * when the action rebuilt the bar, so the keyboard still has a control. An
+ * action that opened a dialog leaves focus in it, and the dialog hands it
+ * back on close.
  */
-function refocusRebuilt(toggle: HTMLElement): void {
+export function refocusMenu(toggle: HTMLElement): void {
   queueMicrotask(() => {
-    if (toggle.isConnected) return;
     const active = document.activeElement;
-    if (active === null || active === document.body) document.getElementById(toggle.id)?.focus();
+    if (active !== null && active !== document.body) return;
+    (toggle.isConnected ? toggle : document.getElementById(toggle.id))?.focus();
   });
+}
+
+/** Run a pick's action, then restore focus once it settles, success or not. */
+function runAction(item: MenuAction, toggle: HTMLElement): void {
+  const restore = (): void => refocusMenu(toggle);
+  try {
+    Promise.resolve(item.run(toggle)).then(restore, restore);
+  } catch (error) {
+    restore();
+    throw error;
+  }
 }
 
 /** The ⋯ button and its menu, built on each open from `items`. */
@@ -95,7 +113,7 @@ export function patchMenu(title: string, items: () => readonly MenuItem[]): HTML
         button.onclick = (): void => {
           box.replaceChildren(item.form(close));
           // A submitted form may rebuild the bar (Rename re-renders the tab).
-          box.addEventListener('submit', () => refocusRebuilt(toggle));
+          box.addEventListener('submit', () => refocusMenu(toggle));
         };
         box.appendChild(button);
       } else {
@@ -103,8 +121,7 @@ export function patchMenu(title: string, items: () => readonly MenuItem[]): HTML
         button.onclick = (): void => {
           close();
           toggle.focus();
-          item.run(toggle);
-          refocusRebuilt(toggle);
+          runAction(item, toggle);
         };
         box.appendChild(button);
       }
