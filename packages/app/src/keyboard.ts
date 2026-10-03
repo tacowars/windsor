@@ -57,6 +57,16 @@ function releaseMousePickedDropdowns(): void {
 export const qwertyPlaysOn = (activeTab: string | null, auditionTab = AUDITION_TAB): boolean =>
   activeTab === auditionTab;
 
+/**
+ * Whether a press is a shortcut rather than a note: anything held with Ctrl,
+ * Meta or Alt. ⌘K opening the patch search used to strike the `k` key's C
+ * as well (windsor#521), and Ctrl+Z shifted the octave; no chord plays.
+ * Shift is left alone: it changes `e.key`, and a shifted letter maps to no key.
+ */
+export const isShortcutPress = (
+  e: Pick<KeyboardEvent, 'ctrlKey' | 'metaKey' | 'altKey'>,
+): boolean => e.ctrlKey || e.metaKey || e.altKey;
+
 interface Held {
   id: number;
   part: AudioPart;
@@ -130,7 +140,7 @@ export class Keyboard {
    * on, and every later `a` returned early because the map still held it.
    */
   onKeyDown(e: KeyboardEvent): void {
-    if (e.repeat || !this.qwertyLive()) return;
+    if (e.repeat || isShortcutPress(e) || !this.qwertyLive()) return;
     const tag = (e.target instanceof HTMLElement ? e.target.tagName : '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
     // A modal's buttons are not keys either (#563): focus is trapped there until it closes.

@@ -160,7 +160,9 @@ export function wirePatchSearchKey(): void {
     if (event.altKey || event.shiftKey || document.querySelector('dialog:modal')) return;
     const box = document.getElementById('patchBox');
     if (!box || box.closest('[hidden]')) return;
+    // Handled: the window's audition keyboard must not read the `k` as well.
     event.preventDefault();
+    event.stopPropagation();
     if (!box.parentElement?.querySelector('.patch-pop')) box.click();
     else box.parentElement.querySelector<HTMLInputElement>('.patch-pop input')?.focus();
   });
