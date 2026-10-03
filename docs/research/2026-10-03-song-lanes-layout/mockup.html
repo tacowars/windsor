@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Song Lanes Layout</title>
+<!-- Mockup only: Windsor's Song tab with the part strip above it, re-framed so
+     the lanes' left columns stop repeating what the strip already says. The
+     song is the 16-part screenshot tacowars sent (100 BPM, 64 bars, 12/8,
+     A major). The cells (compact Level knob with AUTO, M, S, the two lights,
+     the lane value with ● ×, "+ Add lane", "Voice n/8", region and chord
+     blocks) are today's, from songMixerCell.ts, songAutomationLane.ts,
+     songLanes.ts and console.css; the frame is new. Layout "Today" redraws
+     the left columns as they are now, for comparison. -->
+<!-- Fonts, as the console loads them: Chakra Petch (Cadson Demak) and IBM Plex
+     Sans and Mono (IBM), both under the SIL Open Font License 1.1, served by
+     Google Fonts (fonts.google.com/specimen/Chakra+Petch,
+     github.com/IBM/plex). The OFL permits use with AGPL-3.0 software. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+<style>
+:root {
+  --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10;
+  --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70;
+  --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --seq: #cc7a9c; --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --r: 3px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #0b0d0e; color: var(--ink); font-family: var(--f-ui); font-size: 13px; -webkit-font-smoothing: antialiased; }
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.tb { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 16px; background: #0b0d0e; border-bottom: 1px solid var(--line); }
+.tb .grp { display: flex; gap: 0; align-items: center; }
+.tb .lbl { font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-right: 8px; }
+.tb button { font: 600 11px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; margin-left: -1px; }
+.tb button:first-of-type { border-radius: var(--r) 0 0 var(--r); }
+.tb button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.tb button.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.tb button .rec { font-size: 9px; letter-spacing: .1em; opacity: .75; }
+.tb .scale { font: 11px var(--f-num); color: var(--ink-faint); }
+.notes { max-width: 1180px; margin: 14px 16px 4px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); line-height: 1.5; color: var(--ink-dim); }
+.notes h2 { font: 700 15px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes ol, .notes ul { margin: 6px 0 0; padding-left: 20px; }
+.notes li { margin-bottom: 3px; }
+.notes .todo { color: var(--carrier); }
+.stage-wrap { padding: 14px 16px 40px; }
+.stage { position: relative; transform-origin: 0 0; }
+.screen-cap { font: 11px var(--f-num); color: var(--ink-faint); margin: 0 0 6px; }
+.screen-cap b { color: var(--carrier); font-weight: 500; }
+.screen { position: relative; overflow-y: auto; overflow-x: hidden; background: var(--ground); outline: 1px solid var(--line-bright); }
+body.solo .tb, body.solo .notes, body.solo .screen-cap { display: none; }
+body.solo .stage-wrap { padding: 0; }
+body.solo .screen { outline: none; }
+.stand-in { outline: 1px dashed var(--return); outline-offset: 2px; }
+.tag-new { font: 700 8.5px var(--f-panel); letter-spacing: .12em; color: var(--return); text-transform: uppercase; }
+
+/* ---------- console pieces (as today) ---------- */
+.btn { font: 600 11px var(--f-panel); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 6px 11px; white-space: nowrap; }
+.sel { font: 13px var(--f-ui); color: var(--ink); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 26px 5px 8px; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sel::after { content: '▾'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--ink-dim); font-size: 11px; }
+.hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.45; margin: 0; }
+.seg { display: flex; gap: 1px; background: var(--line); border-radius: var(--r); overflow: hidden; }
+.seg span { min-width: 44px; text-align: center; background: var(--inset); padding: 5px 8px; font: 600 10px var(--f-panel); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-dim); }
+.seg span.on { background: var(--carrier); color: #1a1408; }
+
+/* header: tabs in the transport row, the part strip on its own row (#527) */
+.head { display: flex; flex-direction: column; gap: 8px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.head .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip { font: 12px var(--f-num); color: var(--ink); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 10px; white-space: nowrap; }
+.chip small { font: 600 9px var(--f-panel); letter-spacing: .1em; color: var(--ink-faint); margin-left: 4px; }
+.chip.on { background: var(--modulator); color: #0d1716; border-color: var(--modulator); }
+.cpu { display: flex; align-items: center; gap: 8px; }
+.cpu i { display: block; width: 46px; height: 5px; background: var(--line); border-radius: 2px; position: relative; overflow: hidden; }
+.cpu i::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 22%; background: var(--modulator); }
+.recdot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-bright); }
+.tabs { display: flex; }
+.tabs span { font: 600 11px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); background: var(--inset); border: 1px solid var(--line); padding: 7px 14px; margin-left: -1px; }
+.tabs span.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+
+/* the part strip (console.css, windsor#520) */
+.pstrip { display: flex; align-items: stretch; gap: 4px; flex: 1; min-width: 0; }
+.pscroll { display: flex; gap: 3px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.pscroll::-webkit-scrollbar { display: none; }
+.pstrip.over .pscroll { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); }
+.pnav, .plist { display: none; align-items: center; justify-content: center; width: 22px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font: 600 14px var(--f-panel); }
+.plist { width: 26px; font-size: 11px; }
+.pstrip.over .pnav, .pstrip.over .plist { display: flex; }
+.pm { display: flex; gap: 3px; }
+.pm .btn { display: flex; align-items: center; padding: 0 10px; font-size: 15px; }
+.pchip { flex: 1 0 70px; min-width: 70px; max-width: 150px; position: relative; background: var(--inset); border: 1px solid var(--line); border-left: 3px solid var(--tone); border-radius: var(--r); padding: 4px 7px 3px; line-height: 1.15; cursor: pointer; }
+.pchip:hover { background: var(--panel-hi); }
+.pchip .n { display: block; font: 600 11px var(--f-panel); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pchip .k { font: 500 9.5px var(--f-ui); color: var(--ink-faint); white-space: nowrap; }
+.pchip.on { background: var(--carrier); border-color: var(--carrier); }
+.pchip.on .n, .pchip.on .k { color: #1a1408; }
+.pchip .dot { position: absolute; right: 5px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--modulator); opacity: 0; }
+.pchip.on .dot { background: #1a1408; }
+/* proposal: the Song mixer's two lights at chip size */
+.pchip.mt { padding-right: 12px; }
+.pchip .cl { position: absolute; right: 3px; top: 5px; display: flex; flex-direction: column; gap: 3px; }
+.pchip .cl i { display: block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line); }
+.pchip .cl .clip { background: color-mix(in srgb, var(--hot) 16%, var(--inset)); cursor: default; }
+.pchip .cl .clip.lit { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 5px rgba(210,100,60,.7); cursor: pointer; }
+.pchip .cl .act { background: rgb(30,40,34); }
+.pchip.on .cl i { border-color: rgba(26,20,8,.55); }
+
+/* the lane toolbar (windsor#349) */
+.atb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 14px 0; }
+.atb .tg { display: flex; align-items: center; gap: 6px; }
+.atb .tl { font: 600 9px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint); }
+.atb .sel { font-size: 11px; padding: 3px 22px 3px 6px; }
+
+/* ---------- the Song view ---------- */
+.lanes-scroll { overflow-x: auto; padding: 12px 14px 16px; scrollbar-width: thin; }
+.lanes { position: relative; display: flex; flex-direction: column; gap: 4px; width: max-content; }
+.grow { display: flex; gap: 8px; align-items: flex-start; }
+.fz { position: sticky; left: 0; z-index: 3; background: var(--ground); flex: none; width: var(--fz);
+  box-shadow: -14px 0 0 var(--ground), 8px 0 0 var(--ground), -14px 4px 0 var(--ground), 8px 4px 0 var(--ground), 0 4px 0 var(--ground); }
+.tls { display: flex; flex-direction: column; gap: 4px; flex: none; width: var(--tlw); }
+
+/* timeline cells (as today) */
+.ruler { display: flex; height: 22px; border-bottom: 1px solid var(--line-bright); position: relative; }
+.ruler-bar { position: relative; flex: none; border-left: 1px solid var(--line-bright); font: 10px var(--f-num); color: var(--ink-dim); }
+.ruler-bar span { position: absolute; left: 4px; top: 2px; }
+.loop-strip { height: 12px; }
+.lane { position: relative; height: 40px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar)); background-position: -1px 0; cursor: pointer; }
+.lane.selected { border-color: var(--carrier); }
+.hblk { position: absolute; top: 3px; bottom: 3px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-top: 3px solid var(--modulator); border-radius: var(--r); padding: 2px 6px; font-family: var(--f-panel); display: flex; flex-direction: column; line-height: 1.15; overflow: hidden; }
+.hblk b { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.hblk small { font: 8.5px var(--f-num); color: var(--ink-faint); white-space: nowrap; }
+.hblk.narrow { padding: 0 2px; }
+.hblk.playing { border-color: var(--carrier); border-top-color: var(--modulator); }
+.reg { position: absolute; top: 3px; bottom: 3px; display: flex; align-items: center; gap: 5px; padding: 0 6px; border-radius: var(--r); border: 1px solid var(--modulator); background-color: rgba(95,168,160,.2); color: var(--ink); font: 10px var(--f-panel); font-variant: small-caps; letter-spacing: .05em; white-space: nowrap; overflow: hidden; }
+.reg.perc { border-color: var(--carrier); background-color: rgba(224,164,78,.17); }
+.reg.cyc { background-image: repeating-linear-gradient(90deg, rgba(220,227,227,.22) 0 1px, transparent 1px var(--cyc)); }
+.reg.selected { box-shadow: 0 0 0 1px var(--carrier); border-color: var(--carrier); }
+.reg .gl { flex: none; font: 11px var(--f-ui); line-height: 1; color: var(--carrier); font-variant: normal; }
+.auto-lane { position: relative; height: 56px; overflow: hidden; border-radius: var(--r); background-color: var(--inset); background-image: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px var(--bar)); background-position: -1px 0; }
+.auto-ghost { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--line-bright); border-right: 1px dashed var(--line-bright); background: rgba(220,227,227,.035); }
+.auto-lane svg { position: absolute; top: 0; left: 0; display: block; }
+.auto-fill { fill: var(--lane-c); fill-opacity: .14; }
+.auto-line { fill: none; stroke: var(--lane-c); stroke-width: 1.6; stroke-linejoin: round; }
+.auto-dot { fill: var(--inset); stroke: var(--lane-c); stroke-width: 1.6; }
+.auto-add-lane { height: 30px; }
+.ph-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--carrier); box-shadow: 0 0 6px var(--carrier); z-index: 2; pointer-events: none; }
+.ph-label { position: absolute; top: 1px; font: 9px var(--f-num); color: var(--carrier); z-index: 2; }
+
+/* frozen cells (as today) */
+.lane-name { display: flex; align-items: center; gap: 6px; padding: 0 6px; border-radius: var(--r); border: 1px solid transparent; font-family: var(--f-panel); cursor: pointer; min-width: 0; }
+.lane-name b { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.lane-name small { font: 9px var(--f-num); color: var(--ink-faint); letter-spacing: .04em; }
+.lane-name .nm { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.lane-name.selected { border-color: var(--carrier); background: var(--panel-hi); }
+.lane-name.ruler-name { justify-content: flex-end; cursor: default; }
+.lane-name.ruler-name small { font-size: 9px; }
+button.tri { flex: none; width: 17px; height: 18px; margin: 0 -4px; padding: 0; font: 10px system-ui, sans-serif; line-height: 1; color: var(--ink-faint); border: 1px solid transparent; border-radius: var(--r); background: none; cursor: pointer; }
+button.tri:hover { border-color: var(--line-bright); color: var(--ink); }
+button.tri.open { color: var(--carrier); }
+.auto-badge { flex: none; margin-left: auto; padding: 0 5px; border: 1px solid rgba(224,164,78,.45); border-radius: 8px; font: 9px var(--f-num); line-height: 14px; color: var(--carrier); white-space: nowrap; }
+.lane-name.has-badge .nm b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mix-cell { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px; min-width: 0; }
+.mix-head { justify-content: flex-start; gap: 6px; font: 600 10px var(--f-panel); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); }
+.mix-toggle { flex: none; width: 22px; height: 22px; padding: 0; border: 1px solid transparent; border-radius: var(--r); background: none; color: var(--ink-dim); font-size: 12px; line-height: 1; }
+.mix-switches { display: flex; gap: 3px; }
+.mix-btn { width: 22px; height: 22px; padding: 0; display: flex; align-items: center; justify-content: center; font: 600 10px var(--f-panel); color: var(--ink); background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); }
+.mix-lights { display: flex; flex: none; flex-direction: column; align-items: center; gap: 4px; }
+.mix-clip, .mix-activity { display: block; width: 10px; height: 10px; border: 1px solid var(--line); border-radius: 50%; }
+.mix-clip { background: color-mix(in srgb, var(--hot) 16%, var(--inset)); }
+.mix-clip.lit { background: var(--hot); border-color: var(--hot); box-shadow: 0 0 6px rgba(210,100,60,.7); cursor: pointer; }
+.mix-activity { background: rgb(30,40,34); }
+.knob.compact { display: grid; grid-template-columns: auto auto; align-items: center; justify-items: start; column-gap: 3px; row-gap: 1px; padding: 2px 4px 2px 2px; border-radius: var(--r); flex: none; }
+.knob.compact svg { grid-row: span 2; display: block; }
+.knob .dial-face { fill: var(--inset); stroke: var(--lock-color); }
+.knob .dial-track { stroke: var(--line-bright); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-arc { stroke: var(--lock-color); stroke-width: 3; fill: none; stroke-linecap: round; }
+.knob .dial-pin { stroke: var(--lock-color); stroke-width: 2; stroke-linecap: round; }
+.knob .knob-val { font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 4ch; line-height: 12px; }
+.knob .knob-auto { padding: 0 4px; border-radius: 6px; background: var(--lock-color); color: var(--ground); font: 600 7.5px var(--f-panel); letter-spacing: .14em; line-height: 11px; }
+.auto-chip { flex: none; align-self: stretch; width: 3px; margin: 8px 2px; border-radius: 2px; background: var(--lane-c); }
+.auto-name { gap: 4px; padding-left: 8px; cursor: default; }
+.auto-name b, .auto-name small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auto-name b { font-size: 11px; }
+.auto-name small { text-transform: uppercase; }
+.auto-mix { gap: 4px; padding: 0 4px; }
+.auto-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 10px var(--f-num); font-variant-numeric: tabular-nums; color: var(--lane-c); }
+.auto-buttons { display: flex; flex: none; gap: 3px; }
+.auto-btn { width: 20px; height: 20px; padding: 0; border: 1px solid var(--line-bright); border-radius: var(--r); background: var(--panel-hi); color: var(--ink-dim); font: 10px system-ui, sans-serif; line-height: 1; }
+.auto-btn.on { background: var(--lane-c); border-color: var(--lane-c); color: #14181a; }
+.auto-picker { font: 11px var(--f-ui); color: var(--ink); background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); height: 22px; padding: 0 20px 0 6px; display: flex; align-items: center; position: relative; white-space: nowrap; }
+.auto-picker::after { content: '⌄'; position: absolute; right: 6px; top: 1px; font-size: 11px; color: var(--ink-dim); }
+.auto-count { font: 9px var(--f-num); color: var(--ink-faint); white-space: nowrap; }
+
+/* Today: two frozen columns, names then mixer */
+.t-fz { display: flex; flex-direction: column; gap: 4px; }
+.t-row { display: grid; grid-template-columns: 120px 132px; column-gap: 8px; }
+.t-row > .lane-name { overflow: hidden; }
+.t-row > .auto-add { padding-left: 8px; }
+.t-row > .auto-add .auto-picker { width: 100%; }
+.t-row > .auto-count-cell { display: flex; align-items: center; padding: 0 4px; }
+
+/* ---------- Proposal: one frozen column per part ---------- */
+.p-fz { display: grid; grid-template-columns: var(--tabw) minmax(0, 1fr); column-gap: 4px; row-gap: 4px; }
+.p-fz.psel { outline: 1px solid var(--carrier); outline-offset: 2px; border-radius: 2px; }
+.p-fz > :not(.ptab) { grid-column: 2; }
+.ptab { grid-column: 1; border-radius: 2px; background: linear-gradient(var(--pc) 0 40px, color-mix(in srgb, var(--pc) 15%, var(--ground)) 40px); display: flex; justify-content: center; cursor: pointer; }
+.ptab b { font: 600 11px var(--f-num); color: #14181a; line-height: 40px; letter-spacing: -.02em; }
+.idc .ptab { background: var(--pc); }
+.idc .ptab b { display: none; }
+.p-part { display: grid; grid-template-columns: 50px auto auto auto; align-items: center; justify-content: space-between; gap: 4px; padding: 0 2px; height: 40px; border-radius: var(--r); cursor: pointer; }
+.p-fz.psel .p-part { background: var(--panel-hi); }
+.p-fold { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.p-fold button.tri { margin: 0; }
+.p-fold .auto-badge { margin: 0; }
+.p-lane { display: grid; grid-template-columns: 3px minmax(0, 1fr) auto; column-gap: 6px; align-items: center; height: 56px; padding: 0 2px 0 4px; }
+.p-lane .auto-chip { margin: 8px 0; }
+.p-lane .nm { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; font-family: var(--f-panel); }
+.p-lane .nm b { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-lane .nm small { font: 9px var(--f-num); color: var(--ink-faint); letter-spacing: .04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-lane .rt { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.p-add { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 2px 0 4px; }
+.p-add .auto-picker { width: 104px; }
+.p-cell { display: flex; align-items: center; height: 100%; padding: 0 6px; font-family: var(--f-panel); }
+.p-head { justify-content: space-between; padding: 0 2px; }
+</style>
+</head>
+<body>
+<div class="tb" id="tb"></div>
+<div class="notes" id="notes"></div>
+<div class="stage-wrap"><div class="screen-cap" id="cap"></div><div class="stage" id="stage"><div class="screen" id="screen"></div></div></div>
+<script>
+'use strict';
+// ---------------------------------------------------------------- state
+const SCREENS = {
+  '1366': { w: 1366, h: 960, label: 'iPad Pro 12.9″ (1366×960)' },
+  '1440': { w: 1440, h: 800, label: 'MacBook Air (1440×800)' },
+  '2560': { w: 2560, h: 1300, label: '27″ 4K (2560×1300)' },
+};
+const S = { layout: 'prop', id: 'num', lights: 'dot', screen: '1440', zoom: 1, sel: 0, fit: true, notes: true, solo: false, full: false };
+(function readHash() {
+  for (const p of location.hash.slice(1).split('&')) {
+    if (p === 'today') S.layout = 'today';
+    if (p === 'colour') S.id = 'colour';
+    if (p === 'meters') S.lights = 'meters';
+    if (SCREENS[p]) S.screen = p;
+    if (/^sel\d+$/.test(p)) S.sel = Number(p.slice(3));
+    if (/^z\d+$/.test(p)) S.zoom = Number(p.slice(1)) / 100;
+    if (p === 'solo') { S.solo = true; S.fit = false; }
+    if (p === 'full') S.full = true;
+  }
+})();
+
+// ---------------------------------------------------------------- data: the screenshot's song
+const BAR = 26.5, BARS = 64;          // px per bar as the screenshot's zoom; 64 bars
+const PART_ROW = 190;                  // the proposal's row content: ▸ + badge 50, knob 66, M S 47, lights 10, gaps, padding
+const TODAY_LEFT = 120 + 8 + 132 + 8;  // names, gap, mixer, gap (songViewTables.ts SONG_VIEW)
+const KINDS = { chord: 'Chord', figure: 'Figure', basslead: 'Basslead', arp: 'Arp', euclid: 'Euclid' };
+const LANE_C = { strip: 'var(--modulator)', seq: 'var(--seq)', voice: 'var(--carrier)', insert: 'var(--return)' };
+const KIND_LINE = { strip: 'mixer', seq: 'sequencer', voice: 'voice · filter', insert: 'retro reverb' };
+const wave = (from, to, base, amp, period, step) => {
+  const pts = [];
+  for (let b = from; b <= to + 1e-6; b += step) pts.push([b, base + amp * Math.sin(2 * Math.PI * (b - from) / period)]);
+  return pts;
+};
+const ease = (b0, v0, b1, v1, n = 8) => Array.from({ length: n + 1 }, (_, i) => { const t = i / n; return [b0 + (b1 - b0) * t, v0 + (v1 - v0) * (1 - (1 - t) ** 2)]; });
+// [name, target kind, value at the playhead, points [bar, 0..1], dot indices or 'all']
+const L = (name, t, val, pts, dots = 'all') => ({ name, t, val, pts, dots });
+const flat = (v, at = 8) => [[0, v], [at, v], [BARS, v]];
+const P = (n, k, lvl, regs, lanes, open = false) => ({ n, k, lvl, regs, lanes, open });
+const R = (a, b, lb, cyc) => ({ a, b, lb, cyc });
+const PARTS = [
+  P('Pulse I', 'chord', .12, [R(0, 8, 'Chord · 2 steps · 1/8', 13.25), R(8, 64, 'Chord · 2 steps · 1/8', 13.25)], [L('Level', 'strip', '−4.0 dB', flat(.55), [1])]),
+  P('Pulse II', 'chord', .69, [R(0, 8, 'Chord · 2 steps · 1/8', 13.25), R(10, 64, 'Chord · 2 steps · 1/8', 13.25)], [L('Level', 'strip', '−3.2 dB', wave(0, 64, .62, .14, 3.5, .5))], true),
+  P('Mallet I', 'figure', .50, [R(8, 64, 'Figure · R 5 3 5 1/8', 0)], [
+    L('Skip', 'seq', '0.92', [[0, .82], ...ease(8, .82, 18, .14), [BARS, .14]], [1, 9]),
+    L('Level', 'strip', '−6.0 dB', [[0, .7], [8, .7], [12, .74], [50, .74], [BARS, .74]], [1, 2, 3]),
+    L('Cutoff', 'voice', '1.20 kHz', [[0, .5], [8, .5], [50, .54], [BARS, .54]], [1, 2])], true),
+  P('Mallet II', 'figure', .45, [R(12, 64, 'Figure ← Mallet I +3', 0)], [L('Skip', 'seq', '0.80', flat(.8, 12), [1]), L('Level', 'strip', '−7.0 dB', flat(.65, 12), [1]), L('Cutoff', 'voice', '1.40 kHz', flat(.55, 12), [1])]),
+  P('Mallet III', 'figure', .40, [R(24, 64, "Figure · 5 3' R' 3' 1/8", 0)], [L('Skip', 'seq', '0.70', flat(.7, 24), [1]), L('Level', 'strip', '−8.0 dB', flat(.62, 24), [1]), L('Cutoff', 'voice', '1.10 kHz', flat(.5, 24), [1])]),
+  P('Mallet IV', 'figure', .40, [R(28, 64, "Figure · 5 3' R' 3' 1/8", 0)], [L('Skip', 'seq', '0.70', flat(.7, 28), [1]), L('Level', 'strip', '−8.0 dB', flat(.62, 28), [1]), L('Cutoff', 'voice', '1.10 kHz', flat(.5, 28), [1])]),
+  P('Piano', 'figure', .25, [R(24, 64, "Figure · R 3 5 R' 1/4", 0)], [L('Level', 'strip', '−9.0 dB', flat(.6, 24), [1]), L('Cutoff', 'voice', '2.40 kHz', flat(.62, 24), [1])]),
+  P('Vibes', 'figure', .20, [R(16, 64, 'Figure · 3 – – R 1/4', 0)], [L('Level', 'strip', '−10.0 dB', flat(.55, 16), [1])]),
+  P('Choir', 'chord', .47, [R(0, 8, 'Chord · 1 steps · 1/1', 0), R(8, 64, 'Chord · 2 steps · 1/1', 0)], [L('Level', 'strip', '−5.0 dB', flat(.66), [1]), L('Mix', 'insert', '0.35', flat(.4), [1])]),
+  P('Bass Clarinet', 'basslead', .78, [R(0, 8, 'Bass · Follow Root', 0)], [L('Level', 'strip', '−2.0 dB', flat(.8), [1])]),
+  P('Reed Bass', 'basslead', .40, [R(8, 64, 'Bass · Follow Chord', 0)], [L('Level', 'strip', '−6.0 dB', flat(.65), [1]), L('Cutoff', 'voice', '600 Hz', flat(.4), [1])]),
+  P('Rust Arp', 'arp', .32, [R(24, 64, 'Arp · Con & Diverge 1/16', 0)], [
+    L('Gate', 'seq', '0.20', [[0, .22], [24, .22], [50, .34], [BARS, .36]], [1, 2]),
+    L('Skip', 'seq', '0.60', [[0, .7], ...ease(24, .7, 32, .32, 6), [BARS, .3]], [1, 7]),
+    L('Level', 'strip', '−10.0 dB', [[0, .55], [24, .55], [28, .63], [BARS, .63]], [1, 2]),
+    L('Cutoff', 'voice', '900 Hz', [[0, .5], [24, .5], [BARS, .58]], [1]),
+    L('Pan', 'strip', 'C', [[0, .5], ...wave(24, 64, .5, .2, 5, .75)], 'all'),
+    L('Mix', 'insert', '0.25', [[0, .3], [24, .3], [BARS, .5]], [1])], true),
+  P('Marimba', 'euclid', .20, [R(26, 64, 'Euclid 12/12 · 1/8', 13.25)], [L('Level', 'strip', '−12.0 dB', flat(.5, 26), [1])]),
+  P('Tap', 'chord', 1.00, [R(0, 8, 'Chord · 1 steps · 1/1', 0), R(8, 64, 'Chord · 2 steps · 1/1', 0)], [L('Level', 'strip', '0.0 dB', flat(.85), [1]), L('Pan', 'strip', 'L12', flat(.42), [1])]),
+  P('Mallet', 'figure', .32, [R(40, 64, 'Figure · R 5 3 5 1/8', 0)], [L('Level', 'strip', '−9.0 dB', flat(.6, 40), [1]), L('Skip', 'seq', '0.50', flat(.5, 40), [1])]),
+  P('Kick', 'euclid', .55, [R(8, 64, 'Euclid 4/16 · 1/16', 13.25)], [L('Level', 'strip', '−4.0 dB', flat(.7, 8), [1])]),
+];
+const toneOf = (p) => p.k === 'euclid' ? 'var(--carrier)' : 'var(--modulator)'; // partStripModel.ts REGION_TONE
+const CHORDS1 = [['D maj', 'IVmaj · triad'], ['C# min', 'iii · triad'], ['B min', 'ii · triad'], ['A maj', 'Imaj · triad'], ['F# min7', 'vi7 · 7th'], ['D maj', 'IVmaj · triad'], ['E min', 'v · triad'], ['F# min7', 'vi7 · 7th']];
+const CHORDS2 = [['D maj7', 'IVmaj7 · 7th'], ['C# min7', 'iii7 · 7th'], ['B min7', 'ii7 · 7th'], ['A maj7', 'Imaj7 · 7th'], ['F# min7', 'vi7 · 7th'], ['D maj7', 'IVmaj7 · 7th'], ['E maj', 'V · triad'], ['F# min7', 'vi7 · 7th'], ['D maj7', 'IVmaj7 · 7th'], ['D min', 'iv · triad'], ['A maj7', 'Imaj7 · 7th'], ['F maj7', '♭VImaj7 · 7th'], ['E 7', 'V7 · 7th'], ['C# maj', 'III · triad'], ['F# min7', 'vi7 · 7th'], ['G maj', '♭VII · triad'], ['D maj', 'IVmaj · triad']];
+
+// ---------------------------------------------------------------- meters (animated so the page reads as playing)
+const PLAYING = { 0: 4, 1: 4, 8: 0, 9: 12, 13: 6 }; // slot → frames between hits (0 = sustained)
+const level = {}, clip = { 13: true };
+const RAMP = Array.from({ length: 17 }, (_, s) => { const t = s / 16, m = (a, b) => Math.round(a + (b - a) * t); return `rgb(${m(30, 96)},${m(40, 214)},${m(34, 120)})`; });
+let frame = 0;
+function tickMeters() {
+  frame++;
+  for (const k of Object.keys(PLAYING)) {
+    const every = PLAYING[k], prev = level[k] || 0;
+    if (every === 0) level[k] = .58 + .08 * Math.sin(frame / 7) + .04 * Math.random();
+    else level[k] = frame % every === 0 ? .7 + .3 * Math.random() : prev * .8;
+  }
+  const scr = document.getElementById('screen');
+  for (const node of scr.querySelectorAll('[data-meter]')) {
+    const s = node.dataset.meter, step = Math.round(Math.min(1, level[s] || 0) * 16);
+    if (node.classList.contains('dot')) node.style.opacity = (step / 16 * .9).toFixed(2);
+    else node.style.background = RAMP[step];
+  }
+}
+setInterval(tickMeters, 60);
+
+// ---------------------------------------------------------------- cells (today's)
+function pt(cx, cy, r, a) { const t = a * Math.PI / 180; return [cx + r * Math.sin(t), cy - r * Math.cos(t)]; }
+function arc(cx, cy, r, a0, a1) {
+  if (Math.abs(a1 - a0) < .5) return '';
+  const [x0, y0] = pt(cx, cy, r, Math.min(a0, a1)), [x1, y1] = pt(cx, cy, r, Math.max(a0, a1));
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 ${Math.abs(a1 - a0) > 180 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+/** The compact Level knob, locked by its LEVEL lane: dial, value over the AUTO tag (knob.ts, console.css). */
+function knob(v) {
+  const c = 13, r = 10, a = -135 + 270 * v, [px, py] = pt(c, c, r - 5, a);
+  return `<div class="knob compact" style="--lock-color:var(--modulator)" title="Level - drag, shift-drag for fine, double-click to reset"><svg width="26" height="26" viewBox="0 0 26 26">
+    <circle class="dial-face" cx="13" cy="13" r="6.5"/><path class="dial-track" d="${arc(c, c, r, -135, 135)}"/><path class="dial-arc" d="${arc(c, c, r, -135, a)}"/>
+    <line class="dial-pin" x1="13" y1="13" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}"/></svg><span class="knob-val">${v.toFixed(2)}</span><span class="knob-auto">AUTO</span></div>`;
+}
+const ms = (p) => `<div class="mix-switches"><span class="mix-btn" title="Mute ${p.n}">M</span><span class="mix-btn" title="Solo ${p.n}">S</span></div>`;
+const lights = (i) => `<div class="mix-lights"><i class="mix-clip${clip[i] ? ' lit' : ''}" data-clip="${i}" title="${clip[i] ? 'Clipped: click to clear' : 'Not clipped'}"></i><i class="mix-activity" data-meter="${i}"></i></div>`;
+const fold = (p, i) => `<button class="tri${p.open ? ' open' : ''}" data-fold="${i}" title="${p.open ? 'Hide' : 'Show'} automation for ${p.n}">${p.open ? '▾' : '▸'}</button>`;
+const badge = (p) => !p.open && p.lanes.length ? `<span class="auto-badge">${p.lanes.length} lane${p.lanes.length === 1 ? '' : 's'}</span>` : '';
+const voiceCount = (p) => `Voice ${p.lanes.filter((l) => l.t === 'voice').length}/8`;
+const autoBtns = (l) => `<span class="auto-buttons"><span class="auto-btn on" title="Turn the lane off">●</span><span class="auto-btn" title="Delete the lane">×</span></span>`;
+
+// timeline cells
+function partLane(p, i) {
+  const selected = i === S.sel;
+  return `<div class="lane${selected ? ' selected' : ''}" data-sel="${i}">${p.regs.map((g, gi) => `<div class="reg${p.k === 'euclid' ? ' perc' : ''}${g.cyc ? ' cyc' : ''}${selected && gi === 0 ? ' selected' : ''}" style="left:${g.a * BAR}px;width:${(g.b - g.a) * BAR - 2}px;${g.cyc ? `--cyc:${g.cyc}px` : ''}"><span class="gl">⟲</span><span class="lb">${g.lb}</span></div>`).join('')}</div>`;
+}
+function autoLane(p, l) {
+  const W = BARS * BAR, H = 56, pad = 6, y = (v) => (pad + (1 - v) * (H - 2 * pad)).toFixed(1), x = (b) => (b * BAR).toFixed(1);
+  const line = l.pts.map(([b, v], k) => `${k ? 'L' : 'M'}${x(b)} ${y(v)}`).join('');
+  const dots = (l.dots === 'all' ? l.pts.slice(1) : l.dots.map((k) => l.pts[k])).map(([b, v]) => `<circle class="auto-dot" cx="${x(b)}" cy="${y(v)}" r="3.2"/>`).join('');
+  const ghosts = p.regs.map((g) => `<div class="auto-ghost" style="left:${g.a * BAR}px;width:${(g.b - g.a) * BAR}px"></div>`).join('');
+  return `<div class="auto-lane" style="--lane-c:${LANE_C[l.t]}">${ghosts}<svg width="${W}" height="${H}"><path class="auto-fill" d="${line}L${W} ${H}L0 ${H}Z"/><path class="auto-line" d="${line}"/>${dots}</svg></div>`;
+}
+function harmonyLane() {
+  let out = '', b = 0;
+  CHORDS1.forEach(([n, s], k) => { out += hblk(b, 1, n, s, k === 0); b += 1; });
+  for (let k = 0; b < BARS; k++, b += 2) { const [n, s] = CHORDS2[k % CHORDS2.length]; out += hblk(b, 2, n, s, false); }
+  return `<div class="lane" style="cursor:default">${out}</div>`;
+}
+const hblk = (b, len, n, s, playing) => `<div class="hblk${len * BAR < 40 ? ' narrow' : ''}${playing ? ' playing' : ''}" style="left:${b * BAR}px;width:${len * BAR - 2}px"><b>${n}</b><small>${s}</small></div>`;
+function ruler() {
+  let bars = '';
+  for (let b = 0; b < BARS; b++) bars += `<div class="ruler-bar" style="width:${BAR}px;${b % 2 ? 'border-left-color:var(--line)' : ''}">${b % 2 === 0 && b > 0 ? `<span>${b + 1}</span>` : ''}</div>`;
+  return `<div class="ruler">${bars}<span class="ph-label" style="left:4px">1.1.2</span></div>`;
+}
+function timelines(p, i) {
+  const rows = [partLane(p, i)];
+  if (p.open) { for (const l of p.lanes) rows.push(autoLane(p, l)); rows.push('<div class="auto-add-lane"></div>'); }
+  return `<div class="tls">${rows.join('')}</div>`;
+}
+
+// ---------------------------------------------------------------- frozen columns: today
+function todayGroup(p, i) {
+  const selected = i === S.sel;
+  const rows = [`<div class="t-row" style="height:40px">
+    <div class="lane-name${selected ? ' selected' : ''}${badge(p) ? ' has-badge' : ''}" data-sel="${i}">${fold(p, i)}<span class="nm"><b>${p.n}</b><small>${p.k}</small></span>${badge(p)}</div>
+    <div class="mix-cell">${knob(p.lvl)}${ms(p)}${lights(i)}</div></div>`];
+  if (p.open) {
+    for (const l of p.lanes) rows.push(`<div class="t-row" style="height:56px;--lane-c:${LANE_C[l.t]}">
+      <div class="lane-name auto-name"><span class="auto-chip"></span><span class="nm"><b>${l.name}</b><small>${KIND_LINE[l.t]}</small></span></div>
+      <div class="mix-cell auto-mix"><span class="auto-value">${l.val}</span>${autoBtns(l)}</div></div>`);
+    rows.push(`<div class="t-row" style="height:30px"><div class="lane-name auto-add"><span class="auto-picker">+ Add lane</span></div><div class="auto-count-cell"><span class="auto-count">${voiceCount(p)}</span></div></div>`);
+  }
+  return `<div class="grow"><div class="fz t-fz">${rows.join('')}</div>${timelines(p, i)}</div>`;
+}
+function todayTop() {
+  return `<div class="grow"><div class="fz t-fz">
+      <div class="t-row" style="height:22px"><div class="lane-name ruler-name"><small>bar · beat</small></div><div class="mix-cell mix-head"><span class="mix-toggle">▸</span><span>Mixer</span></div></div>
+      <div class="t-row" style="height:12px"><div class="lane-name ruler-name"><small>loop</small></div><div></div></div></div>
+    <div class="tls">${ruler()}<div class="loop-strip"></div></div></div>
+    <div class="grow"><div class="fz t-fz"><div class="t-row" style="height:40px"><div class="lane-name" style="cursor:default"><span class="nm"><b>Harmony</b><small>chords</small></span></div><div></div></div></div>
+    <div class="tls">${harmonyLane()}</div></div>`;
+}
+
+// ---------------------------------------------------------------- frozen column: the proposal
+function propGroup(p, i) {
+  const selected = i === S.sel;
+  const cells = [`<div class="ptab" style="--pc:${toneOf(p)}" data-sel="${i}" title="${i + 1} · ${KINDS[p.k]} · ${p.n}"><b>${i + 1}</b></div>`,
+    `<div class="p-part" data-sel="${i}" title="${p.n}"><div class="p-fold">${fold(p, i)}${badge(p)}</div>${knob(p.lvl)}${ms(p)}${lights(i)}</div>`];
+  if (p.open) {
+    for (const l of p.lanes) cells.push(`<div class="p-lane" style="--lane-c:${LANE_C[l.t]}" title="${l.name} · ${KIND_LINE[l.t]}"><span class="auto-chip"></span>
+      <span class="nm"><b>${l.name}</b><small>${KIND_LINE[l.t]}</small></span><span class="rt"><span class="auto-value">${l.val}</span>${autoBtns(l)}</span></div>`);
+    cells.push(`<div class="p-add"><span class="auto-picker">+ Add lane</span><span class="auto-count">${voiceCount(p)}</span></div>`);
+  }
+  cells[0] = cells[0].replace('class="ptab"', `class="ptab" style="grid-row:1 / span ${cells.length - 1};--pc:${toneOf(p)}"`).replace(` style="--pc:${toneOf(p)}" data-sel`, ' data-sel');
+  return `<div class="grow"><div class="fz p-fz${selected ? ' psel' : ''}">${cells.join('')}</div>${timelines(p, i)}</div>`;
+}
+function propTop() {
+  return `<div class="grow"><div class="fz" style="display:flex;flex-direction:column;gap:4px">
+      <div class="mix-cell mix-head p-head" style="height:22px"><span style="display:flex;align-items:center;gap:6px"><span class="mix-toggle" title="Expand every strip to Level, Pan, Low cut, the sends and Output">▸</span>Mixer</span><span class="lane-name ruler-name" style="padding:0 4px"><small>bar · beat</small></span></div>
+      <div class="lane-name ruler-name" style="height:12px;padding:0 4px"><small>loop</small></div></div>
+    <div class="tls">${ruler()}<div class="loop-strip"></div></div></div>
+    <div class="grow"><div class="fz"><div class="lane-name" style="height:40px;cursor:default"><span class="nm"><b>Harmony</b><small>chords</small></span></div></div>
+    <div class="tls">${harmonyLane()}</div></div>`;
+}
+
+// ---------------------------------------------------------------- header, part strip, lane toolbar
+function header() {
+  const tools = `<div class="tabs"><span>Parts</span><span>Mixer</span><span class="on">Song</span><span>⚙</span></div>
+    <span class="chip cpu stand-in" title="CPU meter (drawn approximately)"><i></i>22%</span><span class="recdot"></span><span class="chip">↶</span><span class="chip">↷</span>
+    <span class="chip" style="margin-left:6px">TAP</span><span class="chip">100.00<small>BPM</small></span><span class="chip">64<small>BARS</small></span>
+    <span class="chip" style="margin-left:6px">50 %</span><span class="chip">1/16 ▾</span><span class="chip">12/8 ▾</span><span class="chip" style="margin-left:6px">A ▾</span><span class="chip">major ▾</span>
+    <span class="chip" style="margin-left:6px">1.1.2</span><span class="chip">▶</span><span class="chip">■</span><span class="chip on">‖</span><span class="chip">⟲</span>`;
+  return `<div class="head"><div class="row">${tools}</div><div class="row">${partStrip()}</div></div>`;
+}
+function partStrip() {
+  const meters = S.lights === 'meters';
+  const chips = PARTS.map((p, i) => {
+    const light = meters
+      ? `<span class="cl"><i class="clip${clip[i] ? ' lit' : ''}" data-clip="${i}" title="${clip[i] ? 'Clipped: click to clear' : 'Not clipped'}"></i><i class="act" data-meter="${i}"></i></span>`
+      : `<i class="dot" data-meter="${i}"></i>`;
+    return `<div class="pchip${i === S.sel ? ' on' : ''}${meters ? ' mt' : ''}" data-chip="${i}" title="${p.n}" style="--tone:${toneOf(p)}"><span class="n">${p.n}</span><span class="k">${i + 1} · ${KINDS[p.k]}</span>${light}</div>`;
+  }).join('');
+  return `<div class="pstrip"><span class="pnav">‹</span><div class="pscroll">${chips}</div><span class="pnav">›</span><span class="plist">▾</span>
+    <span class="pm"><span class="btn" title="Add a part (${PARTS.length} of 16)">+</span><span class="btn" title="Remove ${PARTS[S.sel].n}…">−</span></span></div>`;
+}
+const laneToolbar = () => `<div class="atb"><div class="tg"><span class="tl">Tool</span><div class="seg"><span class="on">Edit</span><span>Draw</span><span>Shape</span></div></div>
+  <div class="tg"><span class="tl">Snap</span><span class="sel">1/16</span></div>
+  <span class="hint">Click to add a point · drag a point to move it · drag the line to bend it · Alt-click a line to straighten it · double-click a point to delete it · Shift ignores snap</span></div>`;
+
+function song() {
+  const prop = S.layout === 'prop';
+  const tabw = S.id === 'num' ? 20 : 3;
+  const fz = prop ? tabw + 4 + PART_ROW : 260;
+  const ph = fz + 8 + 1;
+  const body = prop ? propTop() + PARTS.map(propGroup).join('') : todayTop() + PARTS.map(todayGroup).join('');
+  return `${laneToolbar()}<div class="lanes-scroll"><div class="lanes${S.id === 'colour' ? ' idc' : ''}" style="--fz:${fz}px;--tabw:${tabw}px;--bar:${BAR}px;--tlw:${BARS * BAR}px">${body}<div class="ph-line" style="left:${ph}px"></div></div></div>`;
+}
+
+// ---------------------------------------------------------------- notes
+function notesHtml(saved) {
+  return `<h2>Song lanes · one frozen column</h2>
+  <b style="color:var(--carrier)">Approved by tacowars on 2026-10-03</b>: layout Proposed with the number tab (record 2026-10-03-song-tab-one-frozen-column, windsor#534). Chip lights wait on windsor#533's measurement.
+  The part strip above every tab already says each part's name and sequencer, so the Song tab stops repeating them. Its two frozen columns (names 120 px, mixer 132 px) become <b>one column</b>, and the timeline gets the width back: <b>timeline +${saved.num} px</b> with the number tab, <b>+${saved.colour} px</b> with the colour edge alone.
+  <ol>
+  <li><b>One column.</b> A part's row holds its identity tab, then <b>▸</b> with today's <b>"n lanes"</b> badge stacked under it, then the Level knob with AUTO, M, S and the two lights, unchanged. An automation lane's label (LEVEL · mixer, CUTOFF · voice · filter…) moves <b>beside its value and ● ×</b>. The 56 px lane row has room to stack the value over the buttons. <b>+ Add lane</b> and <b>Voice n/8</b> share the add row, and HARMONY, <i>bar · beat</i> and <i>loop</i> move into the same column. Every control stays where you can reach it.</li>
+  <li><b>Part identity</b> (toolbar). <b>Number tab</b> (recommended): a 20 px tab in the part's colour with its 1-based number, matching the chip's <i>n · kind</i>. It runs down the part's open lanes too, so a part's lanes read as one block. <b>Colour only</b>: just the edge. Today there are only two part colours (teal for pitched, amber for Euclid), so in a long song colour alone can't tell lanes apart. That's why the number is recommended.</li>
+  <li><b>Selection wraps the whole part.</b> In the frozen column, one amber outline goes around the part's row, all its open lanes and its "+ Add lane" row. Click a chip or a part row (or its lane) and the selection moves. The chip's highlight follows. Try Pulse I (folded) and Mallet I (open), or ▸ on any part.</li>
+  <li><b>Chip lights</b> (toolbar). <b>Note dot</b>: one dot, top right, as built. <b>Meters</b>: the Song mixer's green activity light and red clip latch drawn small on every chip, so you can see them on every tab. A click on a lit red light clears it, as in the mixer. <span class="todo">Proposal pending a measurement: on the Parts and Mixer tabs this polls every part's meter, where today only the Song tab's visible rows are polled.</span></li>
+  <li><b>Today</b> (Layout) redraws the left columns as they are now, for comparison.</li></ol>
+  <ul><li><b>Moved:</b> the "n lanes" badge now sits under ▸ instead of right of the name. Each lane's name and kind sit beside their value. The part's kind line (<i>chord</i>, <i>figure</i>…) is dropped here, because the chip shows it. Nothing I couldn't place.</li>
+  <li><b>Unchanged:</b> <b>▸ Mixer</b> still expands every strip, and the column grows by its knob columns as today. The rows keep their heights (40 / 56 / 30 px), and the timeline, regions and harmony lane are today's.</li>
+  <li><b>Decided:</b> a click on the number tab selects the part and does not fold it (▸ folds). Colour only was not chosen, so it needs no more colours.</li></ul>
+  <p class="hint" style="margin-top:8px">The frame shows the screen at its real CSS size and scrolls inside, so what you see without scrolling is what fits. The data is the screenshot's song at its zoom (26.5 px a bar). Lanes the screenshot shows folded are invented so ▸ can open them, and the curves are simple polylines. <span style="outline:1px dashed var(--return);padding:0 4px">Dashed purple</span> marks a stand-in.</p>`;
+}
+
+// ---------------------------------------------------------------- render
+function toolbar() {
+  const b = (on, txt, act) => `<button class="${on ? 'on' : ''}" data-act="${act}">${txt}</button>`;
+  return `<div class="grp"><span class="lbl">Layout</span>${b(S.layout === 'prop', 'Proposed', 'layout:prop')}${b(S.layout === 'today', 'Today', 'layout:today')}</div>
+    <div class="grp"><span class="lbl">Identity</span>${b(S.id === 'num', 'Number tab <span class="rec">· rec.</span>', 'id:num')}${b(S.id === 'colour', 'Colour only', 'id:colour')}</div>
+    <div class="grp"><span class="lbl">Chip lights</span>${b(S.lights === 'dot', 'Note dot', 'lights:dot')}${b(S.lights === 'meters', 'Meters', 'lights:meters')}</div>
+    <div class="grp"><span class="lbl">Select</span>${b(S.sel === 0, 'Pulse I · folded', 'sel:0')}${b(S.sel === 2, 'Mallet I · open', 'sel:2')}</div>
+    <div class="grp"><span class="lbl">Screen</span>${Object.entries(SCREENS).map(([k, v]) => b(S.screen === k, v.label, 'screen:' + k)).join('')}</div>
+    <div class="grp"><span class="lbl">UI zoom</span>${[1, 1.25, 1.5].map((z) => b(S.zoom === z, Math.round(z * 100) + '%', 'zoom:' + z)).join('')}</div>
+    <div class="grp"><span class="lbl">View</span>${b(S.fit, 'Fit', 'fit')}${b(!S.fit, '1:1', 'fit')}${b(S.notes, 'Notes', 'notes')}</div><span class="scale" id="scale"></span>`;
+}
+function render() {
+  document.body.classList.toggle('solo', S.solo);
+  const sc = SCREENS[S.screen];
+  document.getElementById('tb').innerHTML = toolbar();
+  const saved = { num: TODAY_LEFT - (20 + 4 + PART_ROW + 8), colour: TODAY_LEFT - (3 + 4 + PART_ROW + 8) };
+  const notes = document.getElementById('notes');
+  notes.innerHTML = notesHtml(saved);
+  notes.style.display = S.notes ? '' : 'none';
+  const screen = document.getElementById('screen');
+  const keep = screen.querySelector('.lanes-scroll')?.scrollLeft ?? 0, keepY = screen.scrollTop;
+  screen.style.width = sc.w + 'px'; screen.style.height = sc.h + 'px';
+  const cssW = Math.round(sc.w / S.zoom), cssH = Math.round(sc.h / S.zoom);
+  screen.innerHTML = `<div class="z" style="zoom:${S.zoom};width:${cssW}px;min-height:${cssH}px">${header()}${song()}</div>`;
+  const ls = screen.querySelector('.lanes-scroll'); ls.scrollLeft = keep; screen.scrollTop = keepY;
+  for (const strip of screen.querySelectorAll('.pstrip')) {
+    const s2 = strip.querySelector('.pscroll');
+    strip.classList.toggle('over', s2.scrollWidth > s2.clientWidth + 1);
+  }
+  if (S.full) screen.style.height = screen.scrollHeight + 'px';
+  fit();
+  tickMeters();
+  const lanes = screen.querySelector('.lanes'), tl = lanes.querySelector('.tls');
+  const left = tl.getBoundingClientRect().left - lanes.getBoundingClientRect().left;
+  const leftCss = Math.round(left / (S.zoom * stageScale()));
+  const gain = TODAY_LEFT - leftCss;
+  document.getElementById('cap').innerHTML = `${sc.label} · zoom ${Math.round(S.zoom * 100)}% (${cssW}×${cssH} CSS px) · ${S.layout === 'prop' ? 'Proposed, ' + (S.id === 'num' ? 'number tab' : 'colour only') : 'Today'} · timeline starts ${leftCss} px in (today ${TODAY_LEFT}) · <b>timeline +${gain} px</b> (≈ ${(gain / BAR).toFixed(1)} bars at this zoom) · content height ${screen.scrollHeight}px`;
+}
+function stageScale() { const sc = SCREENS[S.screen]; return S.fit ? Math.min(1, (window.innerWidth - 32) / sc.w) : 1; }
+function fit() {
+  const sc = SCREENS[S.screen], stage = document.getElementById('stage'), s = stageScale();
+  stage.style.transform = `scale(${s})`; stage.style.width = sc.w + 'px'; stage.style.height = sc.h * s + 'px';
+  if (S.full) stage.style.height = document.getElementById('screen').offsetHeight * s + 'px';
+  const el = document.getElementById('scale'); if (el) el.textContent = `shown at ${Math.round(s * 100)}%`;
+}
+document.getElementById('tb').addEventListener('click', (e) => {
+  const a = e.target.closest('button')?.dataset.act; if (!a) return;
+  const [k, v] = a.split(':');
+  if (k === 'layout') S.layout = v; else if (k === 'id') S.id = v; else if (k === 'lights') S.lights = v;
+  else if (k === 'sel') S.sel = Number(v); else if (k === 'screen') S.screen = v; else if (k === 'zoom') S.zoom = Number(v);
+  else if (k === 'fit') S.fit = !S.fit; else if (k === 'notes') S.notes = !S.notes;
+  render();
+});
+// Live in the frame: ▸ folds, a chip / part row / lane selects, a lit red light clears.
+document.getElementById('screen').addEventListener('click', (e) => {
+  const t = e.target;
+  const f = t.closest('[data-fold]');
+  if (f) { const p = PARTS[Number(f.dataset.fold)]; p.open = !p.open; render(); return; }
+  const c = t.closest('[data-clip]');
+  if (c && clip[c.dataset.clip]) { delete clip[c.dataset.clip]; render(); return; }
+  const s = t.closest('[data-chip]') || t.closest('[data-sel]');
+  if (s) { S.sel = Number(s.dataset.chip ?? s.dataset.sel); render(); }
+});
+window.addEventListener('resize', () => { fit(); });
+document.fonts.ready.then(render); render();
+</script>
+</body>
+</html>
