@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_ARP_CONFIG,
   DEFAULT_BASS_CONFIG,
+  DEFAULT_FIGURE_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
   DEFAULT_GRID_CONFIG,
@@ -40,6 +41,8 @@ import { getPath } from './patchPath';
 import {
   BASS_KNOBS,
   BASS_ROOT_BIAS_KNOB,
+  FIGURE_KNOBS,
+  FIGURE_LENGTH_KNOB,
   CHORD_KNOBS,
   DENSITY_DEFAULTS,
   DENSITY_KNOBS,
@@ -95,6 +98,7 @@ describe('sequencer knobs', () => {
     ['grid', GRID_KNOBS, DEFAULT_GRID_CONFIG],
     ['chord', CHORD_KNOBS, DEFAULT_CHORD_CONFIG],
     ['bass', [...BASS_KNOBS, BASS_ROOT_BIAS_KNOB], DEFAULT_BASS_CONFIG],
+    ['figure', FIGURE_KNOBS, DEFAULT_FIGURE_CONFIG],
   ];
 
   it.each(tables)(
@@ -117,8 +121,9 @@ describe('sequencer knobs', () => {
     }
   });
 
-  it('the grid Length knob reads the engine config', () => {
+  it('the grid and Figure Length knobs read the engine config', () => {
     expect(GRID_LENGTH_KNOB.def).toBe(DEFAULT_GRID_CONFIG.length);
+    expect(FIGURE_LENGTH_KNOB.def).toBe(DEFAULT_FIGURE_CONFIG.length);
   });
 
   it('the density modulator writes and defaults to the engine modulator of each kind', () => {
@@ -138,6 +143,7 @@ describe('harmony, mixer and arrangement knobs', () => {
       chord: DEFAULT_CHORD_CONFIG,
       arp: DEFAULT_ARP_CONFIG,
       bass: DEFAULT_BASS_CONFIG,
+      figure: DEFAULT_FIGURE_CONFIG,
     };
     expect(octaveKnob('grid').min).toBe(REGISTER_OCTAVE_MIN);
     expect(octaveKnob('grid').max).toBe(REGISTER_OCTAVE_MAX);

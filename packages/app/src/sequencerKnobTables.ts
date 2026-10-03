@@ -27,8 +27,12 @@ import {
   DEFAULT_BASS_CONFIG,
   DEFAULT_CHORD_CONFIG,
   DEFAULT_EUCLIDEAN_CONFIG,
+  DEFAULT_FIGURE_CONFIG,
   DEFAULT_GRID_CONFIG,
   EUCLID_STEPS_MAX,
+  FIGURE_DRIFT_STEPS_MAX,
+  FIGURE_SCHEDULE_BARS_MAX,
+  FIGURE_TRANSPOSE_MAX,
   GATE_MIN,
   GRID_STEPS_MAX,
   HOLD_DEFAULT,
@@ -43,6 +47,7 @@ import {
 } from '@windsor/engine';
 import { fmt0, fmt2, fmtMs } from './consoleFormat';
 import type { PulseField } from './euclidModel';
+import { FIGURE_DRIFT_EVERY_DEFAULT } from './figureConstants';
 import { GRID_ROTATE_MAX } from './gridConstants';
 import type { KnobSpec } from './knob';
 
@@ -330,6 +335,51 @@ export const BASS_LENGTH_KNOB: CardKnobSpec = {
 
 /** The Basslead strip's Rotate: the Grid's, and like it never stored. */
 export const BASS_ROTATE_KNOB: CardKnobSpec = GRID_ROTATE_KNOB;
+
+/** The Figure device's table knobs (windsor#490): Vel, then Gate, Skip, Acc vel and Acc mod over its own defaults. */
+export const FIGURE_KNOBS: readonly SequencerKnobEntry[] = [
+  VELOCITY_KNOB,
+  ...(['gate', 'skipChance', 'accentVelocity', 'accentMod'] as const).map((f): DriverKnobEntry => ({
+    kind: 'driver',
+    f,
+    label: { gate: 'Gate', skipChance: 'Skip', accentVelocity: 'Acc vel', accentMod: 'Acc mod' }[f],
+    o: { min: f === 'gate' ? GATE_MIN : 0, max: 1, def: DEFAULT_FIGURE_CONFIG[f], fmt: fmt2 },
+  })),
+];
+
+/** The Figure's Length: the Grid's range over the Figure's own default, one bar. */
+export const FIGURE_LENGTH_KNOB: CardKnobSpec = {
+  ...GRID_LENGTH_KNOB,
+  def: DEFAULT_FIGURE_CONFIG.length,
+};
+
+/** The Figure's Rotate: the Grid's, and like it never stored. */
+export const FIGURE_ROTATE_KNOB: CardKnobSpec = GRID_ROTATE_KNOB;
+
+/** A signed whole-number knob from `-max` to `max`, at home on 0: the Figure's Process knobs. */
+const signedKnob = (label: string, max: number): CardKnobSpec => ({
+  label,
+  min: -max,
+  max,
+  def: 0,
+  step: 1,
+  fmt: fmtSignedInt,
+});
+
+/** The Process page's knobs (decisions 5 and 6 of the record): the drift's and the source's. */
+export const FIGURE_PROCESS_KNOBS = {
+  steps: signedKnob('Steps', FIGURE_DRIFT_STEPS_MAX),
+  every: {
+    label: 'Every',
+    min: 1,
+    max: FIGURE_SCHEDULE_BARS_MAX,
+    def: FIGURE_DRIFT_EVERY_DEFAULT,
+    step: 1,
+    fmt: (v: number): string => `${v.toFixed(0)} bar`,
+  },
+  offset: signedKnob('Offset', GRID_STEPS_MAX),
+  transpose: signedKnob('Transpose', FIGURE_TRANSPOSE_MAX),
+} as const satisfies Record<string, CardKnobSpec>;
 
 /** The density modulator's knob ranges: the console shows less than the engine accepts. */
 export const DENSITY_BARS_MAX = 64;
