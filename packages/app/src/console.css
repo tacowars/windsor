@@ -5789,15 +5789,267 @@ dialog.song-dlg {
 .song-dlg .suggest .chip.template {
   color: #cbbfe6;
 }
-.library-row {
+/* ---------- the part + patch bar (windsor#521; record 2026-10-03-parts-tab-layout,
+   decisions 4–5 and 9; docs/research/2026-10-03-parts-page-layout/mockup.html,
+   layout B's .bar, .patchbox and .pop) ---------- */
+/* A flex row that wraps by its own width: no screen-width query (zoom-safe). */
+.patch-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
   align-items: center;
-  margin-top: 8px;
+  gap: 6px 8px;
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
 }
-.library-row .bar-row {
-  flex-basis: 100%;
+.patch-bar .bar-label {
+  margin: 0;
+}
+.patch-bar input.field,
+.patch-bar select.field {
+  font-family: var(--f-ui);
+  font-size: 13px;
+  padding: 5px 8px;
+}
+.patch-bar .bar-name {
+  width: 120px;
+}
+.patch-bar .bar-seq {
+  width: auto;
+  min-width: 110px;
+}
+.patch-bar .bar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 0 4px;
+}
+.patch-bar .bar-grow {
+  flex: 1;
+}
+.patch-bar .btn {
+  white-space: nowrap;
+}
+.patch-bar .btn.icon {
+  padding: 6px 8px;
+}
+.patch-bar .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: var(--inset);
+  color: var(--ink-dim);
+  border-color: var(--line);
+}
+.patch-box-wrap {
+  position: relative;
+  flex: 1 1 300px;
+  min-width: 300px;
+  max-width: 420px;
+}
+.patch-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--inset);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  padding: 5px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.patch-box:hover,
+.patch-box-wrap.open .patch-box {
+  border-color: var(--ink-faint);
+}
+.patch-box-name {
+  font-family: var(--f-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.patch-box-mod {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--carrier);
+}
+.patch-box-mod[hidden] {
+  display: none;
+}
+.patch-box-src {
+  font-family: var(--f-ui);
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.patch-box-search {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.patch-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -1px;
+  z-index: 20;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  padding: 10px;
+  background: var(--panel-hi);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.patch-pop-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 0 8px 0 0;
+}
+.patch-pop-search:focus-within {
+  border-color: var(--carrier);
+}
+.patch-pop-search input.field {
+  flex: 1;
+  max-width: none;
+  border: 0;
+  background: transparent;
+  font-family: var(--f-ui);
+  font-size: 13px;
+  padding: 5px 8px;
+  outline: none;
+}
+.patch-pop-key {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.patch-pop-filters {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0;
+}
+.patch-pop-filters select.field {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  font-family: var(--f-ui);
+}
+.patch-pop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Eight rows before it scrolls, as the approved mockup shows; the 2px is
+     the list's own top and bottom border (border-box). */
+  --patch-pop-row-h: 29px;
+  max-height: calc(8 * var(--patch-pop-row-h) + 2px);
+  overflow-y: auto;
+  background: var(--inset);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+.patch-pop-row {
+  display: flex;
+  gap: 10px;
+  box-sizing: border-box;
+  height: var(--patch-pop-row-h);
+  align-items: center;
+  padding: 0 9px;
+  font-size: 12.5px;
+  border-bottom: 1px solid #1a2023;
+  cursor: pointer;
+}
+.patch-pop-row:hover {
+  background: var(--panel-hi);
+}
+.patch-pop-row.hl {
+  background: #2f3a40;
+}
+.patch-pop-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.patch-pop-detail {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.patch-pop-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+/* The ⋯ menu: today's rail actions under the button, right-aligned to it. */
+.patch-menu-wrap {
+  position: relative;
+}
+.patch-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-width: calc(100vw - 32px);
+  padding: 4px;
+  background: var(--panel-hi);
+  border: 1px solid var(--line-bright);
+  border-radius: var(--r);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+.patch-menu-item {
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  padding: 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.patch-menu-item:hover:not(:disabled) {
+  background: #2f3a40;
+}
+.patch-menu-item:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+.patch-menu-sep {
+  width: 100%;
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.patch-menu .hint {
+  margin: 4px 10px;
+  max-width: 260px;
+}
+.patch-menu-form {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+}
+.patch-menu .old-format .bar-row {
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  max-width: 360px;
 }
 
 .hint {
@@ -5826,20 +6078,6 @@ dialog.song-dlg {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
-}
-.preset-filters {
-  display: grid;
-  gap: 6px;
-}
-.preset-browser .field {
-  width: 100%;
-  min-width: 0;
-}
-.preset-results {
-  min-height: 150px;
-}
-.preset-results option {
-  padding: 5px 7px;
 }
 /* The Mixer tab's two columns (windsor#194; record
    2026-09-30-master-column-and-meters, decision 1; the mockup's option B,

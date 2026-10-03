@@ -15,7 +15,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { AudioPart } from '@windsor/engine';
 import { AUDITION_TAB } from './keyboardConstants';
-import { Keyboard, qwertyPlaysOn } from './keyboard';
+import { Keyboard, isShortcutPress, qwertyPlaysOn } from './keyboard';
 
 /** Only what `keyboard.ts` touches: `#keys`, `#octLabel`, and Panic's sweep. */
 const keysBox = { children: [] as HTMLElement[] };
@@ -62,7 +62,15 @@ function fakePart(name: string, log: string[]): AudioPart {
 }
 
 const press = (key: string, code: string, target: unknown = null): KeyboardEvent =>
-  ({ key, code, repeat: false, target }) as unknown as KeyboardEvent;
+  ({
+    key,
+    code,
+    repeat: false,
+    target,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+  }) as unknown as KeyboardEvent;
 
 describe('the audition keyboard', () => {
   let log: string[];
@@ -91,6 +99,20 @@ describe('the audition keyboard', () => {
     keyboard.onKeyDown(press('a', 'KeyA'));
     expect(log.at(-1)).toBe(`p1 on ${note}`);
     expect(keyboard.heldCount).toBe(1);
+  });
+
+  it('plays nothing and keeps its octave for a key held with Ctrl, Meta or Alt', () => {
+    const octave = keyboard.octave;
+    for (const mod of ['ctrlKey', 'metaKey', 'altKey']) {
+      const chord = (key: string, code: string): KeyboardEvent =>
+        ({ ...press(key, code), [mod]: true }) as unknown as KeyboardEvent;
+      expect(isShortcutPress(chord('k', 'KeyK'))).toBe(true);
+      keyboard.onKeyDown(chord('k', 'KeyK'));
+      keyboard.onKeyDown(chord('z', 'KeyZ'));
+    }
+    expect(isShortcutPress(press('k', 'KeyK'))).toBe(false);
+    expect(log).toEqual([]);
+    expect(keyboard.octave).toBe(octave);
   });
 
   it('ignores a repeat and a second press of a key already down', () => {
