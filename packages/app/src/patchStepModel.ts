@@ -35,20 +35,42 @@ export function stepListing(
 
 /**
  * The patch ◀ or ▶ loads: the neighbour of `current` in `order`, wrapping at
- * the ends. A `current` the filter hides (or an Init) steps to the first
- * entry going forward and the last going back. Null when there is nothing
- * else to load: an empty order, or one entry that is already playing.
+ * the ends. A `current` the filter hides steps from its place in `all` (the
+ * unfiltered listing) to the next entry the filter shows — so a pick under
+ * Source = built-in, which turns the patch into the song's, walks on from
+ * there. One `all` does not hold (an Init) steps to the first entry going
+ * forward and the last going back. Null when there is nothing else to load:
+ * an empty order, or one entry that is already playing.
  */
 export function stepPatch(
   order: readonly string[],
   current: string,
   by: StepDirection,
+  all: readonly string[] = order,
 ): string | null {
   if (order.length === 0) return null;
   const at = order.indexOf(current);
   const next =
-    at < 0 ? order[by > 0 ? 0 : order.length - 1] : order[(at + by + order.length) % order.length];
+    at < 0 ? enterOrder(order, all, current, by) : order[(at + by + order.length) % order.length];
   return next === undefined || next === current ? null : next;
+}
+
+/** The first entry of `order` met walking `all` from `current` in `by`'s direction. */
+function enterOrder(
+  order: readonly string[],
+  all: readonly string[],
+  current: string,
+  by: StepDirection,
+): string | undefined {
+  const from = all.indexOf(current);
+  if (from >= 0) {
+    const shown = new Set(order);
+    for (let step = 1; step < all.length; step++) {
+      const id = all[(((from + by * step) % all.length) + all.length) % all.length];
+      if (id !== undefined && shown.has(id)) return id;
+    }
+  }
+  return order[by > 0 ? 0 : order.length - 1];
 }
 
 /** The popover's highlight after ↑ or ↓ over `count` results; -1 when there are none. */

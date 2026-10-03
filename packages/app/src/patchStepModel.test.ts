@@ -39,6 +39,18 @@ describe('◀ ▶ over the filtered order', () => {
     expect(stepPatch(order, '(init:lead)', -1)).toBe('c');
   });
 
+  it('walks on from a pick its filter now hides, in the full listing’s order', () => {
+    const builtIn = { query: '', category: 'Plucks', tag: '', source: 'built-in' };
+    const all = stepListing(library.entries).map((entry) => entry.id);
+    const before = filterPresets(stepListing(library.entries), builtIn).map((entry) => entry.id);
+    const picked = before[1]!;
+    const song = { [picked]: library.entries[picked]!.patch };
+    const after = filterPresets(stepListing(library.entries, song), builtIn).map((e) => e.id);
+    expect(after).not.toContain(picked);
+    expect(stepPatch(after, picked, 1, all)).toBe(before[2]);
+    expect(stepPatch(after, picked, -1, all)).toBe(before[0]);
+  });
+
   it('with one entry, loads it only when it is not already playing', () => {
     expect(stepPatch(['a'], 'a', 1)).toBeNull();
     expect(stepPatch(['a'], 'a', -1)).toBeNull();

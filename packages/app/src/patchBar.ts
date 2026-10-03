@@ -43,8 +43,14 @@ function stepButton(ctx: AppCtx, by: StepDirection, actions: PatchBarActions): H
   node.setAttribute('aria-label', STEP_LABELS[by]);
   node.onclick = (): void => {
     const current = partAt(ctx.model.doc, ctx.parts.selected)?.preset ?? '';
-    const order = filteredListing(presetListing(ctx)).map((entry) => entry.id);
-    const next = stepPatch(order, current, by);
+    const listing = presetListing(ctx);
+    const order = filteredListing(listing).map((entry) => entry.id);
+    const next = stepPatch(
+      order,
+      current,
+      by,
+      listing.map((entry) => entry.id),
+    );
     if (next !== null) loadPreset(ctx, next, actions, focusById(node.id));
   };
   return node;
