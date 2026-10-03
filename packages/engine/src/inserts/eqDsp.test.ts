@@ -3,6 +3,7 @@
  * the curve it plays against `eqResponseDb`, bit-for-bit transparency, the
  * silent path, clicks and stability at the corners of every range.
  */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { describe, expect, it } from 'vitest';
 import {
   eqInternals,

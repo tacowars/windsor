@@ -1,4 +1,5 @@
 /** Runs the shipped Parametric EQ processor (windsor#198) with only the worklet globals shimmed. */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { eqParameterValues } from '../inserts/eqParameters';
 import { DEFAULT_EQ } from '../inserts/eqSpec';

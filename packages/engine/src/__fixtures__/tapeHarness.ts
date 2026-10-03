@@ -1,4 +1,5 @@
 /** Runs the actual shipped tape processor with only browser globals shimmed. */
+// reads-by-path: packages/engine/src/worklet/generated/**
 import { readFileSync } from 'node:fs';
 import { TAPE_DEFAULTS, TAPE_TYPES } from '../inserts/tapeConstants';
 import { tapeCoreParams } from '../inserts/tapeInsert';

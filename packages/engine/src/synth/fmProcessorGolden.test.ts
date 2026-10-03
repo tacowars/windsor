@@ -21,6 +21,7 @@
  * fails once, before rendering, and names the fix rather than failing nine
  * presets that did not change.
  */
+// reads-by-path: packages/engine/src/__fixtures__/**, .nvmrc
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

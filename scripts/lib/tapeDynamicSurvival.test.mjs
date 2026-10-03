@@ -1,4 +1,5 @@
 /** Verification fixtures for windsor#204; not additional survival experiments. */
+// reads-by-path: docs/research/*-tape-*/**, packages/engine/src/sequencing/mulberry32.ts
 import { beforeAll, describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';

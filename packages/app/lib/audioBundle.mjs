@@ -8,6 +8,7 @@
  * harness (which reads `../worklet/generated/fm-processor.js` relative to itself)
  * resolves from inside the bundle; a source that never reads it is unaffected.
  */
+// reads-by-path: none (bundles the exports its caller names; the test runs no build)
 import { build } from 'esbuild';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

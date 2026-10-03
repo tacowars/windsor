@@ -1,4 +1,5 @@
 /** windsor#215: declared matrix, the span pairs, the candidate gate and the report contract. */
+// reads-by-path: docs/research/*-tape-*/**
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { URL } from 'node:url';

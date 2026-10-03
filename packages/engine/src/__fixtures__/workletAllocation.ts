@@ -8,6 +8,7 @@
  * written there. A heap reading inside Vitest is not repeatable, since the
  * runner shares the heap.
  */
+// reads-by-path: packages/engine/src/worklet/generated/**, packages/engine/src/__fixtures__/**
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

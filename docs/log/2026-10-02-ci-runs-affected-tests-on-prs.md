@@ -78,6 +78,10 @@ that few PRs change.
   The risk accepted: a break that both the PR's selection and review miss
   turns `main` red after the merge, not the PR. The full run on `main` is
   where it shows.
+- The blind spot is now guarded (windsor#498): every file that reads by path
+  names its inputs in a `// reads-by-path:` marker, and
+  `scripts/lib/testInputs.test.mjs` fails on a reader without one or an
+  input neither list names.
 - `vitest.config.ts`'s default trigger for its own file
   (`**/{vitest,vite}.config.*/**`) does not match the file itself with
   picomatch 4, and `**` in vitest's triggers never crosses a dot folder such

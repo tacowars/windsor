@@ -15,6 +15,7 @@
  * broken build, not a smaller one. `fmProcessorGolden.test.ts` is the gate.
  */
 /* global URL */
+// reads-by-path: packages/engine/src/**/*.ts
 import { build } from 'esbuild';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

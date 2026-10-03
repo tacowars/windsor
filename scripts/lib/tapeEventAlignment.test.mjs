@@ -1,5 +1,6 @@
 /* global structuredClone */
 /** Verification fixtures for windsor#192; not additional reference experiments. */
+// reads-by-path: docs/research/*-tape-*/**
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { URL } from 'node:url';
