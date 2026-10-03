@@ -30,17 +30,13 @@
  * writes may change its representation (`__fixtures__/generalizationTrace.ts`).
  */
 // reads-by-path: packages/engine/src/__fixtures__/**, .nvmrc, packages/engine/src/worklet/tape/tapeOversample.ts
-import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { buildSync } from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import golden from '../__fixtures__/tapeMagneticGolden.json';
 import samples from '../__fixtures__/tapeMagneticGoldenSamples.json';
-import { representationChanges } from '../__fixtures__/generalizationTrace';
+import { v8Probe } from '../__fixtures__/v8Probe';
 import { TapeOversampler } from '../worklet/tape/tapeOversample';
 import { TAPE_DRIVE_GAIN, TAPE_MAGNETIC, driveGain } from './tapeMagneticConstants';
 import { sine } from './tapePortableMath';
@@ -269,47 +265,13 @@ interface ProbeFactor {
 }
 
 function probe(): { result: Record<string, ProbeFactor>; changes: string[] } {
-  const entry = fileURLToPath(new URL('../worklet/tape/tapeOversample.ts', import.meta.url));
-  const bundled = buildSync({
-    entryPoints: [entry],
-    bundle: true,
-    write: false,
-    format: 'iife',
+  return v8Probe<Record<string, ProbeFactor>>({
+    entry: fileURLToPath(new URL('../worklet/tape/tapeOversample.ts', import.meta.url)),
     globalName: 'tapeMagnetic',
-    platform: 'neutral',
-    target: 'esnext',
-    minify: false,
-    tsconfigRaw: { compilerOptions: { useDefineForClassFields: false } },
+    bundleName: 'tape-magnetic.js',
+    probe: PROBE,
+    args: ['2000', '2000'],
   });
-  const dir = mkdtempSync(join(tmpdir(), 'tape-magnetic-'));
-  try {
-    const files = { bundle: join(dir, 'tape-magnetic.js'), probe: join(dir, 'probe.cjs') };
-    writeFileSync(files.bundle, bundled.outputFiles[0]!.text);
-    writeFileSync(files.probe, PROBE);
-    const out = join(dir, 'result.json');
-    const flags = ['--expose-gc', '--min-semi-space-size=64', '--max-semi-space-size=64'];
-    const child = spawnSync(
-      process.execPath,
-      [
-        ...flags,
-        '--trace-generalization',
-        '--no-warnings',
-        files.probe,
-        files.bundle,
-        out,
-        '2000',
-        '2000',
-      ],
-      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-    );
-    expect(child.status, child.stderr).toBe(0);
-    return {
-      result: JSON.parse(readFileSync(out, 'utf8')) as Record<string, ProbeFactor>,
-      changes: representationChanges(child.stdout, 'tape-magnetic.js'),
-    };
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 }
 
 describe('the per-sample path on V8', () => {

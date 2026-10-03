@@ -10,12 +10,8 @@
  * Node-only, by design: excluded from the engine's tsc build (see
  * packages/engine/tsconfig.json) so browser code cannot reach it.
  */
-// reads-by-path: packages/engine/src/worklet/generated/**
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { generatedProcessor } from './generatedProcessor';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 const SAMPLE_RATE = 48000;
 const BLOCK = 128;
 
@@ -65,10 +61,6 @@ export interface LoadedReverb {
 
 /** Load and evaluate the worklet with a stand-in global scope. */
 export function loadReverb(): LoadedReverb {
-  const source = readFileSync(join(HERE, '../worklet/generated/reverb-processor.js'), 'utf8');
-
-  let registered: (new (options: unknown) => ReverbProcessorLike) | null = null;
-
   // The real scope gives every processor a port; the plate uses it for the
   // audio-load sampler (#445), so the stand-in has to have one too.
   class AudioWorkletProcessorShim {
@@ -92,35 +84,21 @@ export function loadReverb(): LoadedReverb {
     }
   }
 
-  const registerProcessor = (_name: string, cls: unknown): void => {
-    registered = cls as new (options: unknown) => ReverbProcessorLike;
-  };
-
-  const factory = new Function(
-    'sampleRate',
-    'AudioWorkletProcessor',
-    'registerProcessor',
-    `${source}
-     return {
-       maxSize: MAX_SIZE,
-       tankDelays: TANK_DELAYS,
-       maxPreDelay: MAX_PRE_DELAY,
-       sleepInputFloor: SLEEP_INPUT_FLOOR,
-       sleepOutputFloor: SLEEP_OUTPUT_FLOOR,
-     };`,
-  ) as (
-    sampleRate: number,
-    base: unknown,
-    register: (name: string, cls: unknown) => void,
-  ) => ReverbTopology;
-
-  const topology = factory(SAMPLE_RATE, AudioWorkletProcessorShim, registerProcessor);
-  if (!registered) throw new Error('worklet did not call registerProcessor');
-
-  const Processor = registered as unknown as {
-    new (options: unknown): ReverbProcessorLike;
-    parameterDescriptors: ParameterDescriptor[];
-  };
+  const { Processor, exports: topology } = generatedProcessor<
+    { new (options: unknown): ReverbProcessorLike; parameterDescriptors: ParameterDescriptor[] },
+    ReverbTopology
+  >({
+    file: 'reverb-processor.js',
+    sampleRate: SAMPLE_RATE,
+    base: AudioWorkletProcessorShim,
+    epilogue: `return {
+      maxSize: MAX_SIZE,
+      tankDelays: TANK_DELAYS,
+      maxPreDelay: MAX_PRE_DELAY,
+      sleepInputFloor: SLEEP_INPUT_FLOOR,
+      sleepOutputFloor: SLEEP_OUTPUT_FLOOR,
+    };`,
+  });
 
   return {
     descriptors: Processor.parameterDescriptors,

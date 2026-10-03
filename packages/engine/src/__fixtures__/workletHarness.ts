@@ -9,12 +9,8 @@
  * Node-only, by design: excluded from the engine's tsc build (see
  * packages/engine/tsconfig.json) so browser code cannot reach it.
  */
-// reads-by-path: packages/engine/src/worklet/generated/**
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { generatedProcessor } from './generatedProcessor';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
 const SAMPLE_RATE = 48000;
 const BLOCK = 128;
 
@@ -139,12 +135,8 @@ interface WorkletHandle {
 }
 
 /** Load and evaluate the worklet with a stand-in global scope. */
-// eslint-disable-next-line max-lines-per-function -- one evaluation of the worklet, read top to bottom: shim, eval, then the handle it returns (70 of 60, #225 decision 4; #620 added the envelope handle)
+// eslint-disable-next-line max-lines-per-function -- one evaluation of the worklet, read top to bottom: shim, eval, then the handle it returns (65 of 60, #225 decision 4; #620 added the envelope handle)
 export function loadProcessor(): LoadedProcessor {
-  const source = readFileSync(join(HERE, '../worklet/generated/fm-processor.js'), 'utf8');
-
-  let registered: (new (options: { processorOptions: unknown }) => ProcessorLike) | null = null;
-
   class AudioWorkletProcessorShim {
     port: { postMessage(m: unknown): void; onmessage: ((e: { data: unknown }) => void) | null };
     private readonly posted: unknown[] = [];
@@ -166,37 +158,27 @@ export function loadProcessor(): LoadedProcessor {
     }
   }
 
-  const registerProcessor = (_name: string, cls: unknown): void => {
-    registered = cls as new (options: { processorOptions: unknown }) => ProcessorLike;
-  };
-
-  const factory = new Function(
-    'sampleRate',
-    'AudioWorkletProcessor',
-    'registerProcessor',
-    `let currentFrame = 0;
-     ${source}
-     return {
-       setFrame: (f) => { currentFrame = f; },
-       ALGORITHMS,
-       WAVE,
-       MOD_INDEX_SCALE,
-       CTRL_INTERVAL,
-       ST_SUSTAIN,
-       DORMANT_AMP,
-       DORMANT_FILTER_STATE,
-       Envelope,
-       MIN_SEG_TIME,
-     };`,
-  ) as (
-    sampleRate: number,
-    base: unknown,
-    register: (name: string, cls: unknown) => void,
-  ) => WorkletHandle;
-
-  const handle = factory(SAMPLE_RATE, AudioWorkletProcessorShim, registerProcessor);
-  if (!registered) throw new Error('worklet did not call registerProcessor');
-  const Processor = registered as new (options: { processorOptions: unknown }) => ProcessorLike;
+  const { Processor, exports: handle } = generatedProcessor<
+    new (options: { processorOptions: unknown }) => ProcessorLike,
+    WorkletHandle
+  >({
+    file: 'fm-processor.js',
+    sampleRate: SAMPLE_RATE,
+    base: AudioWorkletProcessorShim,
+    prologue: 'let currentFrame = 0;',
+    epilogue: `return {
+      setFrame: (f) => { currentFrame = f; },
+      ALGORITHMS,
+      WAVE,
+      MOD_INDEX_SCALE,
+      CTRL_INTERVAL,
+      ST_SUSTAIN,
+      DORMANT_AMP,
+      DORMANT_FILTER_STATE,
+      Envelope,
+      MIN_SEG_TIME,
+    };`,
+  });
 
   return {
     create: (patch, maxVoices = 16, seed = DEFAULT_SEED, options = {}) =>
