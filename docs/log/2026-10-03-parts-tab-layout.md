@@ -102,11 +102,9 @@ out of scope.
 - **Chip lights:** each chip shows the Song mixer's two lights, a red clip
   latch over a green activity light, on every tab. One engine node meters
   every part (windsor#540, PR #544), and the chips and the Song mixer both
-  read it (windsor#528, PR #546). At 16 parts the research's prototype
-  measured about 3.3 % of the audio budget
-  (`docs/research/2026-10-03-always-on-part-meters/`), and the shipped node
-  1.5 % in one short round on an Apple M1 in headless Chrome 154 at
-  44.1 kHz (PR #544).
+  read it (windsor#528, PR #546). At 16 parts the research's multi-input
+  prototype measured about 3.3 % of the audio budget
+  (`docs/research/2026-10-03-always-on-part-meters/`).
 - **Keyboard:** windsor#537 (PR #545) did the keyboard pass for the bar,
   the ⋯ menu, the popover and the browser, instead of more fix rounds on
   PR #532.
