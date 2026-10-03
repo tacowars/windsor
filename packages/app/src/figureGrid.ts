@@ -25,7 +25,7 @@
  * chord, the stage, the leader's line or Skip's zero has moved, and runs
  * the card's own per-frame paint (`onFrame`) in the same loop.
  */
-import type { FigureCell, FigureSpec, RegionStep } from '@windsor/engine';
+import type { FigureCell, FigureSpec } from '@windsor/engine';
 import { STEP_MOD_LANES_MAX } from '@windsor/engine';
 import { regionChord } from './chordRegionChord';
 import type { AppCtx } from './context';
@@ -36,7 +36,7 @@ import { leaderOf } from './figureProcessModel';
 import { withStep } from './gridModel';
 import { groupColumns } from './meterGrid';
 import { changePattern } from './partEdits';
-import { regionReadAt } from './regionPlayhead';
+import { regionReadAt, type RegionRead } from './regionPlayhead';
 import {
   type LaneHost,
   fillLanePicker,
@@ -80,15 +80,19 @@ export interface FigureStrip extends Strip<FigureSpec> {
   view: FigureView;
 }
 
-/** What the strip shows with the engine's step `at` (`regionReadAt`), read from the document. */
+/**
+ * What the strip shows with one `regionReadAt` read, from the document: the
+ * engine's step, and a canon's leader line at the same tick, the leader
+ * region's pattern the engine reads there.
+ */
 export function figureView(
   ctx: AppCtx,
   slot: number,
   region: number | undefined,
-  at: RegionStep | null,
+  { at, tick }: RegionRead,
 ): FigureView {
   const own = specOf(ctx, slot, 'figure', region);
-  const lead = own?.source ? leaderOf(ctx.model.doc, own.source) : null;
+  const lead = own?.source ? leaderOf(ctx.model.doc, own.source, tick) : null;
   const line = own?.source ? (lead?.spec ?? null) : own;
   const chord = regionChord(ctx, slot, region);
   return {
@@ -144,7 +148,7 @@ const viewNow = (strip: Strip<FigureSpec>): FigureView =>
     strip.ctx,
     strip.slot,
     strip.region,
-    regionReadAt(strip.ctx, strip.slot, strip.region).at,
+    regionReadAt(strip.ctx, strip.slot, strip.region),
   );
 
 /** Redraw the columns, the lane names and the corner from the document, keeping the scroll. */
@@ -187,7 +191,7 @@ function watch(strip: FigureStrip, hooks: FigureGridHooks): void {
     mark: markStep(strip),
     repaintIf: () => {
       read = regionReadAt(strip.ctx, strip.slot, strip.region);
-      const view = figureView(strip.ctx, strip.slot, strip.region, read.at);
+      const view = figureView(strip.ctx, strip.slot, strip.region, read);
       const now = signature(strip, view);
       if (now !== drawn) {
         drawn = now;

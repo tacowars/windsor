@@ -14,6 +14,7 @@ import {
   driftChange,
   driftReadout,
   figureSummary,
+  leaderOf,
   moveStage,
   removeStage,
   scheduleReadout,
@@ -129,6 +130,17 @@ describe('the processes write the region pattern', () => {
     expect(choice).toEqual({ slot: 0, offset: 3, transpose: 12 });
     write(model, { source: choice });
     expect(pattern(model)).toMatchObject({ source: { slot: 0, offset: 3, transpose: 12 } });
+    // The leader's base has no schedule and its region 0 plays two stages: a
+    // canon reads the region holding its tick, and the base past the last start.
+    const two = GLASS.slice(0, 2);
+    const lead = regionPatternChange(model.doc, 0, 0, { schedule: two });
+    if (!lead || !choice) throw new Error('the leader edit was refused');
+    model.merge(lead);
+    expect(partAt(model.doc, 0)?.sequencer).not.toHaveProperty('schedule');
+    expect(leaderOf(model.doc, choice, TICKS_PER_BAR / 2)?.spec.schedule).toEqual(two);
+    expect(leaderOf(model.doc, choice, TICKS_PER_BAR * 1.5)?.spec.schedule).toBeUndefined();
+    const end = model.doc.transport.bars * TICKS_PER_BAR - 1;
+    expect(leaderOf(model.doc, choice, end)?.spec.schedule).toBeUndefined();
     expect(sourceChoice('', choice ?? undefined)).toBeNull();
     const part = partAt(model.doc, 2);
     if (!part) throw new Error('part 2 is gone');

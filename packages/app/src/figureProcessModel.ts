@@ -16,6 +16,7 @@ import type {
   FigureSource,
   FigureSpec,
   FigureStage,
+  MusicPart,
   RegionPattern,
 } from '@windsor/engine';
 import {
@@ -24,6 +25,8 @@ import {
   FIGURE_TRANSPOSE_MAX,
   GRID_STEPS_MAX,
   partAt,
+  regionPattern,
+  songTicks,
 } from '@windsor/engine';
 import { FIGURE_DRIFT_EVERY_DEFAULT, FIGURE_FIRST_STAGE } from './figureConstants';
 
@@ -77,17 +80,47 @@ export const scheduleBars = (stages: readonly FigureStage[] | undefined): number
   (stages ?? []).reduce((sum, stage) => sum + stage.bars, 0);
 
 /**
- * The leader a canon on `source` plays, and its name: the part's own
- * sequencer, which is the line the engine's canon reads (its base
- * generator, windsor#487); null when the slot holds no Figure.
+ * The leader region the engine's canon reads at `tick`
+ * (`PartBinding.figureAt`, windsor#512): the one that started last on the
+ * song's cycle, which is the one holding the tick while one does; -1 with
+ * no region, where the leader plays its base. The engine's index exports
+ * neither `regionPhase` nor the binding's choice, so its rule is restated
+ * here: `(tick - start) mod songTicks`, the smallest wins, the first on a tie.
+ */
+function leaderRegionAt(
+  doc: Pick<ArrangementDocument, 'transport'>,
+  part: Pick<MusicPart, 'regions'>,
+  tick: number,
+): number {
+  const cycle = songTicks(doc.transport.bars, doc.transport.meter);
+  if (!(cycle > 0)) return -1;
+  let last = -1;
+  let since = Infinity;
+  part.regions.forEach((region, index) => {
+    const phase = (((tick - region.start) % cycle) + cycle) % cycle;
+    if (phase < since) {
+      since = phase;
+      last = index;
+    }
+  });
+  return last;
+}
+
+/**
+ * The leader a canon on `source` plays at the follower's `tick`, and its
+ * name: the pattern of the leader region the engine's canon reads there
+ * (`regionPattern`; the base with no region), so the stage the engine
+ * reports indexes the schedule shown; null when the slot holds no Figure.
  */
 export function leaderOf(
-  doc: Pick<ArrangementDocument, 'parts'>,
+  doc: Pick<ArrangementDocument, 'parts' | 'transport'>,
   source: FigureSource,
+  tick: number,
 ): { spec: FigureSpec; name: string } | null {
   const part = partAt(doc, source.slot);
   if (!part || part.sequencer.kind !== 'figure') return null;
-  return { spec: part.sequencer, name: part.name };
+  const spec = regionPattern(part, leaderRegionAt(doc, part, tick));
+  return spec.kind === 'figure' ? { spec, name: part.name } : null;
 }
 
 /** The Schedule readout: the full cycle, or that every cell of the line plays. */

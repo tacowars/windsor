@@ -58,6 +58,8 @@ export interface RegionRead {
   readonly at: RegionStep | null;
   /** What `regionPlayheadAt` returns for the same tick. */
   readonly playhead: number;
+  /** The audible transport tick both were read at. */
+  readonly tick: number;
 }
 
 /**
@@ -70,9 +72,9 @@ export function regionReadAt(ctx: AppCtx, slot: number, region?: number): Region
   const { running } = ctx.transport;
   const tick = ctx.transport.position();
   if (region === undefined)
-    return { at: null, playhead: running ? ctx.host.stepAt(slot, tick) : DARK };
+    return { at: null, playhead: running ? ctx.host.stepAt(slot, tick) : DARK, tick };
   const at = ctx.host.regionStepAt(slot, region, tick);
-  return { at, playhead: playheadOf(running, at) };
+  return { at, playhead: playheadOf(running, at), tick };
 }
 
 /**
