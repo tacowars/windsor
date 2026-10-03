@@ -6,20 +6,19 @@
  * `ctx.change` pushes it to the live part through `AudioSystem.apply`, so the
  * export carries the sound itself. The working patch is `ctx.parts` (#620
  * decision 3); every control here is handed a `PatchEditor` over it, built
- * once per render, whose push also keeps the rail's picker and marker honest.
+ * once per render, whose push also keeps the patch bar (`patchBar.ts`) honest.
  */
 import type { PartialPatch } from '@windsor/engine';
 import { makePatch, partAt } from '@windsor/engine';
 import type { AppCtx } from './context';
-import { $, el } from './dom';
+import { $ } from './dom';
 import { knobSongTick, voiceKnobAutomation } from './knobAutomation';
 import type { Keyboard } from './keyboard';
-import { confirmUnsaved, libraryActions, syncModifiedMarker } from './libraryActions';
+import { confirmUnsaved, syncModifiedMarker } from './libraryActions';
 import type { MidiAccessor } from './midiAccess';
 import { midiPanel } from './midiPanel';
-import { partListControls } from './partListControls';
 import { dropInit } from './patchActions';
-import { badgeText, libraryControls, presetPicker } from './patchLibrary';
+import { patchBar } from './patchBar';
 import {
   buildAlgPicker,
   buildDrive,
@@ -33,9 +32,9 @@ import type { PatchEditor } from './partsSession';
 import { startScope } from './scope';
 
 const GRID_HTML = `
+  <div class="patch-bar" id="patchBar"></div>
   <div class="parts-grid">
     <aside class="rail">
-      <div class="section" id="partPick"></div>
       <div class="section">
         <div class="section-title"><span>Algorithm</span></div>
         <div class="alg-grid" id="algGrid"></div>
@@ -93,16 +92,15 @@ const GRID_HTML = `
       <button class="btn" id="octUp" type="button">Oct +</button>
       <button class="btn" id="holdBtn" type="button" aria-pressed="false">Hold</button>
       <button class="btn" id="panicBtn" type="button">Panic</button>
-      <button class="btn" id="jsonBtn" type="button">Patch JSON</button>
     </div>
     <div id="midiSlot"></div>
   </div>`;
 
 /**
  * The editor every control on this tab is handed: the session's working patch,
- * a push that commits it through the context and then keeps the rail honest —
- * a built-in that just forked into the document changes the picker and badge
- * (#563), and the library row re-reads its unsaved marker — and the rail rebuild.
+ * a push that commits it through the context and then keeps the patch bar
+ * honest — a built-in that just forked into the document changes the patch
+ * box's source (#563), and the box re-reads its unsaved dot — and the rebuild.
  */
 function patchEditor(ctx: AppCtx): PatchEditor {
   const editor: PatchEditor = {
@@ -138,68 +136,45 @@ function refreshPatchUi(editor: PatchEditor): void {
   buildPitch(editor);
 }
 
-function partSection(): HTMLElement {
-  const box = el('div');
-  const head = el('div', 'section-title');
-  head.appendChild(el('span', '', 'Part'));
-  box.appendChild(head);
-  // The part buttons and Add/Remove moved to the header's part strip (windsor#520, `partStrip.ts`).
-  const listSlot = el('div');
-  listSlot.id = 'partListSlot';
-  box.appendChild(listSlot);
-  const presetSlot = el('div');
-  presetSlot.id = 'presetSlot';
-  presetSlot.style.marginTop = '8px';
-  box.appendChild(presetSlot);
-  const badge = el('p', 'hint');
-  badge.id = 'patchBadge';
-  box.appendChild(badge);
-  return box;
-}
-
-/** Reload the working patch and rebuild the rail: after a load, a library action or a part switch. */
+/** Reload the working patch and rebuild the bar and the editor: after a load, a library action or a part switch. */
 function reloadRail(ctx: AppCtx, editor: PatchEditor): void {
   ctx.parts.reload();
   refreshPatchUi(editor);
   syncPresetAndBadge(ctx, editor);
 }
 
+/** Open the Patch JSON dialog on the working patch (the bar's ⋯ menu). */
+function openJsonDialog(ctx: AppCtx): void {
+  ($('jsonText') as HTMLTextAreaElement).value = JSON.stringify(ctx.parts.patch, null, 2);
+  $('jsonStatus').textContent = '';
+  ($('jsonDlg') as HTMLDialogElement).showModal();
+}
+
+/** The part + patch bar (windsor#521) for the selected part, rebuilt whole. */
 function syncPresetAndBadge(ctx: AppCtx, editor: PatchEditor): void {
-  // The part list controls follow the selection: name and sequencer are the selected part's.
-  $('partListSlot').replaceChildren(partListControls(ctx));
-  const presetSlot = $('presetSlot');
-  presetSlot.innerHTML = '';
-  presetSlot.appendChild(
-    presetPicker(
-      ctx,
-      ctx.parts.selected,
-      () => {
+  $('patchBar').replaceChildren(
+    ...patchBar(ctx, {
+      onPick: () => {
         reloadRail(ctx, editor);
         // An Init no part plays any more is discarded, never exported (#563).
         dropInit(ctx);
       },
-      (proceed) => {
+      guard: (proceed) => {
         confirmUnsaved(ctx).then(
           (ok) => ok && proceed(),
           (error: unknown) => ctx.notify(String(error), 'error'),
         );
       },
-    ),
+      refresh: () => reloadRail(ctx, editor),
+      openJson: () => openJsonDialog(ctx),
+    }),
   );
-  presetSlot.appendChild(libraryControls(ctx, ctx.parts.selected));
-  presetSlot.appendChild(libraryActions(ctx, () => reloadRail(ctx, editor)));
-  $('patchBadge').textContent = badgeText(ctx, ctx.parts.selected);
 }
 
 function wireJsonDialog(ctx: AppCtx, editor: PatchEditor): void {
   const dlg = $('jsonDlg') as HTMLDialogElement;
   const text = $('jsonText') as HTMLTextAreaElement;
   const status = $('jsonStatus');
-  $('jsonBtn').onclick = (): void => {
-    text.value = JSON.stringify(ctx.parts.patch, null, 2);
-    status.textContent = '';
-    dlg.showModal();
-  };
   $('jsonClose').onclick = (): void => dlg.close();
   $('jsonCopy').onclick = (): void => {
     navigator.clipboard
@@ -230,7 +205,6 @@ export function renderPartsTab(
   const editor = patchEditor(ctx);
   ctx.parts.reload();
   keyboard.followPart();
-  $('partPick').appendChild(partSection());
   $('midiSlot').appendChild(midiPanel(midi));
   syncPresetAndBadge(ctx, editor);
   refreshPatchUi(editor);

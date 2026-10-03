@@ -1,15 +1,21 @@
-/** Native keyboard-accessible browsing; filtering never changes the song. */
+/**
+ * Choosing a patch for a part, and the retained filter the patch bar's ◀ ▶
+ * and its search popover share (windsor#521). Filtering never changes the
+ * song; a pick copies the patch into it.
+ */
 import { clonePatch, filterPresets, partAt } from '@windsor/engine';
 import type { PresetFilter, PresetListing } from '@windsor/engine';
 import type { AppCtx } from './context';
 import { partChange } from './context';
-import { el, select } from './dom';
+import { el } from './dom';
 import { withGesture } from './gestureHooks';
-import { library, libraryPatch, listLibrary } from './libraryModel';
+import { library, libraryPatch } from './libraryModel';
 import { assignPatchFields } from './partAutoName';
+import { PATCH_SOURCE_LABELS } from './patchLibrary';
+import { stepListing } from './patchStepModel';
 
-// Retain filters when a patch selection rebuilds the Parts rail, or when changing parts.
-const filter: PresetFilter = { query: '', category: '', tag: '', source: '' };
+/** Retained across a rail rebuild, a part switch and the popover closing. */
+export const patchFilter: PresetFilter = { query: '', category: '', tag: '', source: '' };
 
 /** Copy on selection: the exported song owns the sound even before its first knob edit. */
 export function choosePreset(ctx: AppCtx, slot: number, name: string): boolean {
@@ -36,111 +42,68 @@ export function pickPreset(ctx: AppCtx, slot: number, name: string, onPick: () =
   });
 }
 
-function filterControls(entries: PresetListing[], refresh: () => void): HTMLElement {
-  const box = el('div', 'preset-filters');
-  const search = document.createElement('input');
-  search.type = 'search';
-  search.className = 'field';
-  search.placeholder = 'Search sounds or tags…';
-  search.setAttribute('aria-label', 'Search presets');
-  search.value = filter.query;
-  search.oninput = (): void => {
-    filter.query = search.value;
-    refresh();
-  };
-  box.appendChild(search);
+/** Runs before a load lands: the unsaved-changes guard (#563) calls `proceed` or drops the pick. */
+export type PickGuard = (proceed: () => void) => void;
+
+/** How the bar loads a patch: the guard, the pick and its reload, then where focus lands. */
+export interface PatchLoader {
+  readonly onPick: () => void;
+  readonly guard: PickGuard;
+}
+
+/**
+ * Load `id` into the selected part the way a pick always has: the guard
+ * first, then one undo step, then `focus` on the rebuilt bar so the QWERTY
+ * keys play the new sound.
+ */
+export function loadPreset(ctx: AppCtx, id: string, loader: PatchLoader, focus: () => void): void {
+  const slot = ctx.parts.selected;
+  loader.guard(() => {
+    const named = partAt(ctx.model.doc, slot)?.name;
+    if (!pickPreset(ctx, slot, id, loader.onPick)) return;
+    // A generic part just took its patch's name (windsor#103): the strip and the bar show it too.
+    if (partAt(ctx.model.doc, slot)?.name !== named) ctx.render();
+    focus();
+  });
+}
+
+/** Every patch a part can load: the song's, the user's library and the built-ins. */
+export const presetListing = (ctx: AppCtx): PresetListing[] =>
+  stepListing(library.entries, ctx.model.doc.patches, library.userIds);
+
+/** The ids ◀ ▶ walk and the popover lists, in the listing's order, under the retained filter. */
+export const filteredListing = (entries: readonly PresetListing[]): PresetListing[] =>
+  filterPresets(entries, patchFilter);
+
+const ALL_LABELS = { category: 'All categories', tag: 'All tags', source: 'All sources' };
+
+/** The Category, Tag and Source selects, in one row; each change refilters. */
+export function filterSelects(entries: readonly PresetListing[], refresh: () => void): HTMLElement {
+  const box = el('div', 'patch-pop-filters');
   for (const field of ['category', 'tag', 'source'] as const) {
     const values = [
       ...new Set(entries.flatMap((entry) => (field === 'tag' ? entry.tags : [entry[field]]))),
     ].sort();
     // Keep an active filter visible after an import/revert removes its last entry.
-    if (filter[field] && !values.includes(filter[field])) values.push(filter[field]);
-    box.appendChild(
-      select(
-        `Preset ${field}`,
-        [
-          { value: '', label: field === 'category' ? 'All musical sounds' : `All ${field}s` },
-          ...values.map((value) => ({ value, label: value })),
-        ],
-        filter[field],
-        (value) => {
-          filter[field] = value;
-          refresh();
-        },
-      ),
-    );
-  }
-  return box;
-}
-
-/** Runs before a load lands: the unsaved-changes guard (#563) calls `proceed` or drops the pick. */
-export type PickGuard = (proceed: () => void) => void;
-
-// eslint-disable-next-line max-lines-per-function -- one browser: the list, its filters and the load path, wired in order
-export function presetBrowser(
-  ctx: AppCtx,
-  slot: number,
-  onPick: () => void,
-  guard: PickGuard = (proceed) => proceed(),
-): HTMLElement {
-  const box = el('div', 'preset-browser');
-  const entries = listLibrary(library.entries, ctx.model.doc.patches, library.userIds);
-  const selected = partAt(ctx.model.doc, slot)?.preset ?? '';
-  const current = el('p', 'hint');
-  current.textContent = `Current: ${entries.find((entry) => entry.id === selected)?.name ?? selected}`;
-  const results = document.createElement('select');
-  results.className = 'field preset-results';
-  results.size = 7;
-  results.setAttribute('aria-label', 'Preset results');
-  const count = el('p', 'hint');
-  count.setAttribute('role', 'status');
-  const description = el('p', 'hint');
-  const load = el('button', 'btn', 'Load patch') as HTMLButtonElement;
-  load.type = 'button';
-  const describe = (): void => {
-    const entry = entries.find((candidate) => candidate.id === results.value);
-    description.textContent = entry ? `${entry.tags.join(' · ')} — ${entry.description}` : '';
-    load.disabled = !entry;
-  };
-  const refresh = (): void => {
-    const previous = results.value || selected;
-    const matches = filterPresets(entries, filter);
-    results.replaceChildren(
-      ...matches.map((entry) => new Option(`${entry.name} · ${entry.source}`, entry.id)),
-    );
-    results.value = matches.some((entry) => entry.id === previous)
-      ? previous
-      : (matches[0]?.id ?? '');
-    count.textContent = matches.length
-      ? `${matches.length} patches`
-      : 'No matches. Clear a filter or change your search.';
-    results.disabled = matches.length === 0;
-    describe();
-  };
-  load.setAttribute('aria-label', 'Load patch');
-  // onPick rebuilds the rail, so focus is restored by label onto the new elements. A
-  // keyboard load stays in the list to keep browsing; a mouse load lands on the button,
-  // where the QWERTY keys play the new sound (they are ignored inside a select).
-  const apply = (focusLabel: string): void => {
-    guard(() => {
-      const named = partAt(ctx.model.doc, slot)?.name;
-      if (pickPreset(ctx, slot, results.value, onPick)) {
-        // A generic part just took its patch's name (windsor#103): the part picker shows it too.
-        if (partAt(ctx.model.doc, slot)?.name !== named) ctx.render();
-        document.querySelector<HTMLElement>(`[aria-label="${focusLabel}"]`)?.focus();
-      }
-    });
-  };
-  results.onchange = describe;
-  results.ondblclick = (): void => apply('Load patch');
-  results.onkeydown = (event): void => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      apply('Preset results');
+    if (patchFilter[field] && !values.includes(patchFilter[field])) values.push(patchFilter[field]);
+    const node = document.createElement('select');
+    node.className = 'field';
+    node.name = `preset-${field}`;
+    node.setAttribute('aria-label', `Preset ${field}`);
+    node.add(new Option(ALL_LABELS[field], ''));
+    for (const value of values) {
+      const label =
+        field === 'source'
+          ? (PATCH_SOURCE_LABELS[value as PresetListing['source']] ?? value)
+          : value;
+      node.add(new Option(label, value));
     }
-  };
-  load.onclick = (): void => apply('Load patch');
-  box.append(current, filterControls(entries, refresh), count, results, description, load);
-  refresh();
+    node.value = patchFilter[field];
+    node.onchange = (): void => {
+      patchFilter[field] = node.value;
+      refresh();
+    };
+    box.appendChild(node);
+  }
   return box;
 }

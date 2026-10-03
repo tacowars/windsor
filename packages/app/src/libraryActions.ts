@@ -1,6 +1,7 @@
 /**
- * The Parts tab's library row (#563): Init, Save, Copy to new, Delete, the
- * folder grant (the developer mode) and the unsaved marker, over
+ * The patch bar's library actions (#563; the bar, windsor#521): Save, Save
+ * as… (the old Copy to new) and Init as buttons, then Delete and the folder
+ * grant (the developer mode) for the ⋯ menu, and the unsaved dot, over
  * `patchActions.ts` and the modals. Writes go to the user's library in this
  * browser (`2026-09-27-user-library-in-indexeddb`), or to the folder while
  * one is connected.
@@ -53,6 +54,8 @@ import {
   savePatch,
   unsavedQuestion,
 } from './patchActions';
+import type { MenuItem } from './patchMenu';
+import { SEPARATOR } from './patchMenu';
 import { slugify, uniqueId } from './patchMetadata';
 
 /** A handle recalled from IndexedDB whose grant the browser dropped; the button re-requests it. */
@@ -105,13 +108,11 @@ export async function confirmUnsaved(ctx: AppCtx, opener?: HTMLElement): Promise
   return true;
 }
 
-/** The marker beside the buttons; the Parts tab's editor calls this after every push. */
+/** The patch box's unsaved dot; the Parts tab's editor calls this after every push. */
 export function syncModifiedMarker(ctx: AppCtx): void {
   const marker = document.getElementById('patchModified');
   if (!marker) return;
-  const modified = isModified(scopeFor(ctx), ctx.parts.patch);
-  marker.textContent = modified ? '● unsaved edits' : '';
-  marker.hidden = !modified;
+  marker.hidden = !isModified(scopeFor(ctx), ctx.parts.patch);
 }
 
 async function connectFolder(ctx: AppCtx): Promise<void> {
@@ -151,7 +152,7 @@ interface CopyWording {
 }
 
 const COPY_WORDING: CopyWording = {
-  title: 'Copy to new',
+  title: 'Save as…',
   hint: 'Saves the working patch as a new patch in your library and switches this part to it.',
 };
 
@@ -243,7 +244,7 @@ async function runDelete(ctx: AppCtx, opener: HTMLElement, refresh: () => void):
 async function runInit(ctx: AppCtx, opener: HTMLElement, refresh: () => void): Promise<void> {
   if (!(await confirmUnsaved(ctx, opener))) return;
   initPatch(scopeFor(ctx));
-  ctx.notify('Init loaded — Copy to new keeps it; loading another patch discards it');
+  ctx.notify('Init loaded — Save as… keeps it; loading another patch discards it');
   refresh();
 }
 
@@ -255,20 +256,42 @@ function button(label: string, title: string, enabled: boolean): HTMLButtonEleme
   return node;
 }
 
-/** The row under the preset browser; `refresh` reloads the working patch and rebuilds the rail. */
-// eslint-disable-next-line max-lines-per-function -- one row of five buttons, each wired to its action
-export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
-  const box = el('div', 'library-row');
-  const scope = scopeFor(ctx);
-  const origin = patchOrigin(scope);
-  const run = (
-    action: (ctx: AppCtx, opener: HTMLElement, refresh: () => void) => Promise<void>,
-    opener: HTMLElement,
-  ): void => {
+type LibraryAction = (ctx: AppCtx, opener: HTMLElement, refresh: () => void) => Promise<void>;
+
+/** Runs an action and reports its failure as an error toast. */
+function runner(ctx: AppCtx, refresh: () => void) {
+  return (action: LibraryAction, opener: HTMLElement): void => {
     action(ctx, opener, refresh).catch((error: unknown) => ctx.notify(String(error), 'error'));
   };
-  const init = button('Init', 'makePatch() defaults; not in the library until Copy to new', true);
-  init.onclick = (): void => run(runInit, init);
+}
+
+/** A menu entry whose async action reports its failure as an error toast. */
+function menuAction(
+  ctx: AppCtx,
+  label: string,
+  title: string,
+  action: () => Promise<void>,
+): MenuItem {
+  return {
+    kind: 'action',
+    label,
+    title,
+    enabled: true,
+    run: () => {
+      action().catch((error: unknown) => ctx.notify(String(error), 'error'));
+    },
+  };
+}
+
+/**
+ * The bar's Save, Save as… and Init (windsor#521 decision 2); `refresh`
+ * reloads the working patch and rebuilds the bar. Save as… is the old Copy to
+ * new. Also syncs the unsaved dot and reports a refused library read.
+ */
+export function libraryButtons(ctx: AppCtx, refresh: () => void): HTMLButtonElement[] {
+  const scope = scopeFor(ctx);
+  const origin = patchOrigin(scope);
+  const run = runner(ctx, refresh);
   const save = button(
     'Save',
     saveForks(scope)
@@ -277,61 +300,68 @@ export function libraryActions(ctx: AppCtx, refresh: () => void): HTMLElement {
     canSave(origin),
   );
   save.onclick = (): void => run(runSave, save);
-  const copy = button('Copy to new', 'Save as a new patch in your library', canCopy(origin));
+  const copy = button('Save as…', 'Save as a new patch in your library', canCopy(origin));
   copy.onclick = (): void => run(runCopy, copy);
-  const del = button(
-    'Delete',
-    library.folder
-      ? 'Remove the file from the library folder'
-      : 'Remove from your library; built-ins stay',
-    canDelete(origin, library),
-  );
-  del.onclick = (): void => run(runDelete, del);
-  const marker = el('span', 'status hot');
-  marker.id = 'patchModified';
-  box.append(init, save, copy, del, marker);
-
-  const folderRow = el('div', 'bar-row');
-  if (folderApiAvailable()) {
-    let label = 'Library folder…';
-    if (library.folder) label = 'Change folder…';
-    else if (remembered) label = 'Re-grant folder';
-    const connect = button(
-      label,
-      `Developer mode: grant access to ${LIBRARY_FOLDER_PATH} in a Windsor checkout so Save writes the file there`,
-      true,
-    );
-    connect.onclick = (): void => {
-      connectFolder(ctx).catch((error: unknown) => ctx.notify(String(error), 'error'));
-    };
-    folderRow.appendChild(connect);
-    if (library.folder) {
-      const forget = button('Forget folder', 'Back to your library in this browser', true);
-      forget.onclick = (): void => {
-        forgetFolder(ctx).catch((error: unknown) => ctx.notify(String(error), 'error'));
-      };
-      const reread = button('Re-read folder', 'Read the folder again', true);
-      reread.onclick = (): void => {
-        refreshLibrary(library)
-          .then(() => {
-            // An explicit re-read says a refusal again, even one dismissed and unchanged.
-            reportLibraryProblems(ctx, true);
-            ctx.render();
-          })
-          .catch((error: unknown) => ctx.notify(String(error), 'error'));
-      };
-      folderRow.append(reread, forget);
-    }
-  } else if (!library.user) {
-    folderRow.appendChild(
-      el('p', 'hint', 'This browser cannot store patches: Save downloads <id>.json.'),
-    );
-  }
-  box.appendChild(folderRow);
-  box.appendChild(oldFormatList(ctx, library, refresh));
+  const init = button('Init', 'makePatch() defaults; not in the library until Save as…', true);
+  init.onclick = (): void => run(runInit, init);
   queueMicrotask(() => {
     syncModifiedMarker(ctx);
     reportLibraryProblems(ctx);
   });
-  return box;
+  return [save, copy, init];
+}
+
+/** The folder grant (the developer mode): connect or change, then re-read and forget. */
+function folderEntries(ctx: AppCtx): MenuItem[] {
+  if (!folderApiAvailable()) {
+    if (library.user) return [];
+    const note = el('p', 'hint', 'This browser cannot store patches: Save downloads <id>.json.');
+    return [{ kind: 'node', node: note }];
+  }
+  let label = 'Library folder…';
+  if (library.folder) label = 'Change folder…';
+  else if (remembered) label = 'Re-grant folder';
+  const items = [
+    menuAction(
+      ctx,
+      label,
+      `Developer mode: grant access to ${LIBRARY_FOLDER_PATH} in a Windsor checkout so Save writes the file there`,
+      () => connectFolder(ctx),
+    ),
+  ];
+  if (!library.folder) return items;
+  return [
+    ...items,
+    menuAction(ctx, 'Re-read folder', 'Read the folder again', async () => {
+      await refreshLibrary(library);
+      // An explicit re-read says a refusal again, even one dismissed and unchanged.
+      reportLibraryProblems(ctx, true);
+      ctx.render();
+    }),
+    menuAction(ctx, 'Forget folder', 'Back to your library in this browser', () =>
+      forgetFolder(ctx),
+    ),
+  ];
+}
+
+/** The ⋯ menu's library entries: Delete, the folder actions, and any old-format patches. */
+export function libraryMenuEntries(ctx: AppCtx, refresh: () => void): MenuItem[] {
+  const origin = patchOrigin(scopeFor(ctx));
+  const run = runner(ctx, refresh);
+  const items: MenuItem[] = [
+    {
+      kind: 'action',
+      label: 'Delete',
+      title: library.folder
+        ? 'Remove the file from the library folder'
+        : 'Remove from your library; built-ins stay',
+      enabled: canDelete(origin, library),
+      run: (opener) => run(runDelete, opener),
+    },
+  ];
+  const folder = folderEntries(ctx);
+  if (folder.length) items.push(SEPARATOR, ...folder);
+  if (library.oldFormat.length)
+    items.push(SEPARATOR, { kind: 'node', node: oldFormatList(ctx, library, refresh) });
+  return items;
 }
