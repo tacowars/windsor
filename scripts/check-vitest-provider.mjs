@@ -12,14 +12,19 @@
  *
  * The probe checks the provider by its behaviour, through vitest itself:
  * `vitest list` against a base ref that does not exist. The config's provider
- * throws git's error, so vitest exits non-zero naming the ref. Vitest's own
- * provider swallows git's exit status, lists nothing and exits 0.
+ * rethrows git's error behind the `windsor-change-provider:` prefix, so vitest
+ * exits non-zero with that prefix and the ref. Vitest's own provider swallows
+ * git's exit status, lists nothing and exits 0. A pass needs both the prefix
+ * and the ref, so a future vitest that fails on a bad ref by itself, naming
+ * the ref in its own message, can't pass for the config's provider.
  */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const PROBE_REF = 'windsor-vitest-provider-probe-no-such-ref';
+// The prefix vitest.config.ts puts on every git failure its provider rethrows.
+const PROVIDER_ERROR_PREFIX = 'windsor-change-provider:';
 
 const result = spawnSync('npx', ['vitest', 'list', '--filesOnly'], {
   cwd: root,
@@ -32,9 +37,14 @@ if (result.error) {
 }
 const output = `${result.stdout}${result.stderr}`;
 
-// Our provider's own failure: non-zero exit, with git's complaint about the
-// probe ref. Any other non-zero exit is a broken run, not a pass.
-if (result.status !== 0 && output.includes(`${PROBE_REF}...HEAD`)) {
+// Our provider's own failure: non-zero exit, with its prefix and git's
+// complaint about the probe ref. Any other non-zero exit is a broken run, not
+// a pass.
+if (
+  result.status !== 0 &&
+  output.includes(PROVIDER_ERROR_PREFIX) &&
+  output.includes(`${PROBE_REF}...HEAD`)
+) {
   console.log('check-vitest-provider: vitest uses the config change provider');
   process.exit(0);
 }
@@ -49,7 +59,7 @@ if (result.status === 0) {
 } else {
   console.error(output);
   console.error(
-    `check-vitest-provider: vitest exited ${result.status} without the provider's git error.`,
+    `check-vitest-provider: vitest exited ${result.status} without the provider's prefixed git error.`,
   );
 }
 process.exit(1);

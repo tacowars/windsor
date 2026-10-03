@@ -20,6 +20,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:research": "vitest run --config vitest.research.config.ts",
     "worklets": "node scripts/build-worklets.mjs --check",
     "patch-index": "node scripts/patch-library-index.mjs --check",
     "verify:quick": "npm run typecheck && npm run lint && npm run format:check && npm run test",

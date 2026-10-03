@@ -35,9 +35,6 @@ export const READ_BY_PATH = [
   // Goldens, reference JSON, saved songs, and the allocation probe and its
   // scenarios, which run in a child process.
   'packages/engine/src/__fixtures__/**',
-  // The Tape research folders: saved measurements, and the sources whose
-  // hashes those measurements record.
-  'docs/research/*-tape-*/**',
   // The goldens pin the Node major they were recorded on.
   '.nvmrc',
   'package-lock.json',
@@ -80,9 +77,6 @@ export const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
     'packages/engine/src/worklet/tape/tapeOversample.ts',
     ['packages/engine/src/inserts/tapeMagneticGolden.test.ts'],
   ],
-  // Hashed against the saved measurement's sources. Its research program
-  // imports it too; named so the marker can say so.
-  ['packages/engine/src/sequencing/mulberry32.ts', ['scripts/lib/tapeDynamicSurvival.test.mjs']],
   ['packages/engine/src/patch/patchLibrary.ts', ['packages/app/lib/audioBundle.test.mjs']],
   // The console builds no Web Audio node of its own; the transport strip's markup and wiring.
   [
@@ -106,14 +100,28 @@ export const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
   ['{packages/*/{src,lib},scripts/lib}/**', ['scripts/lib/testInputs.test.mjs']],
 ];
 
-const git = (cwd: string, args: string[]): string[] =>
-  execFileSync('git', args, { cwd, encoding: 'utf8' }).split('\n').filter(Boolean);
+/**
+ * Starts the message of every git failure the change provider rethrows, so
+ * `scripts/check-vitest-provider.mjs` can tell this provider's failure from
+ * any other vitest error.
+ */
+const PROVIDER_ERROR_PREFIX = 'windsor-change-provider:';
+
+const git = (cwd: string, args: string[]): string[] => {
+  try {
+    return execFileSync('git', args, { cwd, encoding: 'utf8' }).split('\n').filter(Boolean);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${PROVIDER_ERROR_PREFIX} ${message}`, { cause: error });
+  }
+};
 
 /**
  * Git's changed files, as vitest's own provider finds them, plus the tests
  * that scan any of them. Vitest's provider also returns nothing when git
  * fails (an unknown base, or a shallow clone with no merge base), which with
- * `--passWithNoTests` would pass a PR that ran no test. This one throws.
+ * `--passWithNoTests` would pass a PR that ran no test. This one throws git's
+ * error behind `PROVIDER_ERROR_PREFIX`.
  */
 const changedFiles = {
   async findChangedFiles(options: { root: string; changedSince?: string | boolean }) {
