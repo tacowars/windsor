@@ -15,11 +15,10 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ProcessorLike } from '../__fixtures__/workletHarness';
+import { voiceLaneOffset } from '../__fixtures__/voiceLaneOffset';
 import { loadProcessor } from '../__fixtures__/workletHarness';
-import { requireCatalogRow, voiceTargetId } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { voiceSlotParamName } from './audioPart';
-import { voiceOffset } from './voiceAutomation';
 
 const loaded = loadProcessor();
 const SLOTS = 8;
@@ -64,9 +63,6 @@ function edited(patch: Patch, values: Record<string, number>): Patch {
   return copy;
 }
 
-const offsetFor = (patch: Patch, path: string, value: number): number =>
-  voiceOffset(patch, path, requireCatalogRow(voiceTargetId(path)), value);
-
 interface Edit {
   /** The lanes, by slot, and their absolute values. */
   lanes: readonly (readonly [string, number])[];
@@ -103,7 +99,7 @@ function editUnderLanes(e: Edit): void {
     }
     const patch = b >= EDIT ? e.to : base;
     e.lanes.forEach(([path, value], i) => {
-      params[voiceSlotParamName(i)]![0] = offsetFor(patch, path, value);
+      params[voiceSlotParamName(i)]![0] = voiceLaneOffset(patch, path, value);
     });
     processor.process([], [[left, right]], params);
     e.after(b, voiceOf(processor));

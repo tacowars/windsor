@@ -15,6 +15,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ProcessorLike } from '../__fixtures__/workletHarness';
+import { voiceLaneOffset } from '../__fixtures__/voiceLaneOffset';
 import { loadProcessor } from '../__fixtures__/workletHarness';
 import {
   VOICE_AUTOMATION_ROWS,
@@ -71,9 +72,6 @@ function moved(patch: Patch, path: string, value: number): Patch {
   at[keys.at(-1)!] = value;
   return copy;
 }
-
-const offsetFor = (patch: Patch, path: string, value: number): number =>
-  voiceOffset(patch, path, requireCatalogRow(voiceTargetId(path)), value);
 
 function freshParams(): Record<string, Float32Array> {
   const params: Record<string, Float32Array> = {
@@ -133,7 +131,7 @@ describe("the cutoff lane across the catalog's whole range (windsor#346)", () =>
     [row.max, row.min],
   ])('takes a %s Hz patch to %s Hz on a held voice', (from, to) => {
     const patch = filtered(from);
-    const offset = offsetFor(patch, CUTOFF, to);
+    const offset = voiceLaneOffset(patch, CUTOFF, to);
     expect(Math.abs(offset)).toBeCloseTo(Math.log2(row.max / row.min), 12);
     const seen: number[] = [];
     const slot = voiceSlotParamName(0);
@@ -190,7 +188,7 @@ describe('an LFO rate lane over a patch rate of 0 (PR #421)', () => {
     ['lfo2', 0.02],
   ] as const)('%s at %s Hz plays the lane, the ratio taken from the floor', (lfo, lane) => {
     const path = `${lfo}.rate`;
-    const offset = offsetFor(still, path, lane);
+    const offset = voiceLaneOffset(still, path, lane);
     expect(offset).toBe(Math.log2(lane / 0.02));
     const rates: number[] = [];
     let phase = 0;
@@ -221,8 +219,8 @@ describe('a wave switch under a width lane (windsor#346)', () => {
   it('holds the lane width across PULSE and sine, with no ramp from the patch width', () => {
     const sine = base(WAVE.SINE);
     const pulse = base(WAVE.PULSE);
-    const offset = offsetFor(sine, WIDTH, LANE);
-    expect(offset).toBe(offsetFor(pulse, WIDTH, LANE));
+    const offset = voiceLaneOffset(sine, WIDTH, LANE);
+    expect(offset).toBe(voiceLaneOffset(pulse, WIDTH, LANE));
     const toPulse = 4;
     const toSine = 8;
     run({
