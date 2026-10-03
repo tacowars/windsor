@@ -71,15 +71,18 @@ input {
   z-index: 5;
 }
 .head {
-  /* The tab bar's height (.tab-btn: 7px padding around an 11px line), which
-     Tap, the tempo and bars boxes and the readouts share (windsor#12). */
+  /* A tab's height (.tab-btn: 7px padding around an 11px line), which Tap,
+     the tempo and bars boxes and the readouts share (windsor#12). The tab
+     bar's 1px frame makes it 30px, as in the approved mockup. */
   --head-control-h: 28px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px 16px;
+  /* The approved mockup's rows (record 2026-10-03-parts-tab-layout): 8px
+     around and between the transport row and the part strip. */
+  gap: 8px;
+  padding: 8px 16px;
 }
 .head-row {
   /* 12px between groups (16px before windsor#520), so the tabs, the power
@@ -252,6 +255,8 @@ input {
   display: flex;
   flex: none;
   gap: 1px;
+  /* The line between and around the tabs, as the mockup's bordered tabs. */
+  padding: 1px;
   background: var(--line);
   border-radius: var(--r);
   overflow: hidden;
@@ -338,15 +343,17 @@ input {
   max-width: 150px;
   scroll-snap-align: start;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  /* A block, as the mockup's chip: the second line sits in a 13px line box,
+     which gives the chip its 38px height. */
+  display: block;
+  font-family: var(--f-ui);
+  font-size: 13px;
   text-align: left;
   background: var(--inset);
   border: 1px solid var(--line);
   border-left: 3px solid var(--tone, var(--line-bright));
   border-radius: var(--r);
-  padding: 4px 12px 3px 7px;
+  padding: 4px 7px 3px;
   line-height: 1.15;
   cursor: pointer;
 }
@@ -359,6 +366,7 @@ input {
   font-family: var(--f-panel);
   font-size: 11px;
   font-weight: 600;
+  line-height: normal;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink);
@@ -369,6 +377,7 @@ input {
 .pchip .k {
   font-size: 9.5px;
   font-weight: 500;
+  line-height: normal;
   color: var(--ink-faint);
   white-space: nowrap;
 }

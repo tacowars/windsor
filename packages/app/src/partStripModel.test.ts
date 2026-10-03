@@ -6,7 +6,7 @@ import {
   canAddPart,
   canRemovePart,
   chipLabel,
-  overflows,
+  chipsOverflow,
   pageScrollTarget,
   removePartTitle,
   revealScrollLeft,
@@ -52,9 +52,14 @@ describe('the chip row’s scroll', () => {
   const fade = 22;
   const box = { scrollLeft: 0, clientWidth: 500, scrollWidth: 1200 };
 
-  it('overflows only when the chips are wider than the box', () => {
-    expect(overflows(box)).toBe(true);
-    expect(overflows({ clientWidth: 500, scrollWidth: 500 })).toBe(false);
+  it('overflows when the chips at 70 px outgrow the strip, and fits again when they no longer do', () => {
+    const fit = { count: 12, chipMinPx: 70, gapPx: 3, availablePx: 1000 };
+    expect(chipsOverflow(fit)).toBe(false); // 12 × 70 + 11 × 3 = 873
+    expect(chipsOverflow({ ...fit, count: 14 })).toBe(true); // 1019
+    expect(chipsOverflow(fit)).toBe(false); // a part removed again
+    expect(chipsOverflow({ ...fit, availablePx: 800 })).toBe(true); // the window narrowed
+    expect(chipsOverflow(fit)).toBe(false); // and widened back
+    expect(chipsOverflow({ ...fit, availablePx: 873 })).toBe(false);
   });
 
   it('pages by the box less both fades, clamped to the ends', () => {

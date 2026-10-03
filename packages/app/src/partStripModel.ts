@@ -56,9 +56,28 @@ export interface ScrollBox {
   readonly scrollWidth: number;
 }
 
-/** The row overflows: its chips are wider than the box. Measured, never assumed (record decision 9). */
-export const overflows = (box: Pick<ScrollBox, 'clientWidth' | 'scrollWidth'>): boolean =>
-  box.scrollWidth > box.clientWidth + 1;
+/** What decides whether the chips fit, as the DOM measures it. */
+export interface StripFit {
+  /** How many chips the row holds. */
+  readonly count: number;
+  /** One chip's minimum width (`.pchip`'s `min-width`), in CSS px. */
+  readonly chipMinPx: number;
+  /** The gap between two chips (`.pscroll`'s `column-gap`), in CSS px. */
+  readonly gapPx: number;
+  /** The width the chips have with no overflow chrome shown: the strip less + and − and their gap. */
+  readonly availablePx: number;
+}
+
+/**
+ * The row overflows: its chips at their minimum width are wider than the
+ * strip leaves them without ‹ › ▾ and the fades. Measured, never assumed
+ * (record decision 9), and against the fitting layout rather than the
+ * current one, so showing the overflow chrome never keeps it shown.
+ */
+export function chipsOverflow(fit: StripFit): boolean {
+  const natural = fit.count * fit.chipMinPx + Math.max(0, fit.count - 1) * fit.gapPx;
+  return natural > fit.availablePx + 1;
+}
 
 const clampScroll = (box: ScrollBox, left: number): number =>
   Math.min(Math.max(0, box.scrollWidth - box.clientWidth), Math.max(0, left));

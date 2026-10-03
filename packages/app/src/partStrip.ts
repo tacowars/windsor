@@ -29,7 +29,7 @@ import {
   canAddPart,
   canRemovePart,
   chipLabel,
-  overflows,
+  chipsOverflow,
   pageScrollTarget,
   removePartTitle,
   revealScrollLeft,
@@ -94,6 +94,7 @@ function wireWheel(scroll: HTMLElement): void {
 interface StripFrame {
   readonly root: HTMLElement;
   readonly scroll: HTMLElement;
+  readonly pm: HTMLElement;
   readonly add: HTMLButtonElement;
   readonly remove: HTMLButtonElement;
 }
@@ -119,12 +120,36 @@ function buildFrame(ctx: AppCtx, root: HTMLElement): StripFrame {
   pm.append(add, remove);
   wireWheel(scroll);
   root.replaceChildren(prev, scroll, next, list.button, list.popover, pm);
-  return { root, scroll, add, remove };
+  return { root, scroll, pm, add, remove };
 }
 
-/** Show the overflow controls only while the chips overflow, measured on the row itself. */
+const px = (value: string): number => parseFloat(value) || 0;
+
+/**
+ * Show the overflow controls only while the chips overflow: measured on the
+ * strip, against the room the chips have with ‹ › ▾ hidden, so the
+ * controls' own width never holds them on.
+ */
 function fitOverflow(frame: StripFrame): void {
-  frame.root.classList.toggle('over', overflows(frame.scroll));
+  const first = frame.scroll.firstElementChild;
+  const over =
+    first !== null &&
+    chipsOverflow({
+      count: frame.scroll.childElementCount,
+      chipMinPx: px(getComputedStyle(first).minWidth),
+      gapPx: px(getComputedStyle(frame.scroll).columnGap),
+      availablePx:
+        frame.root.clientWidth - frame.pm.offsetWidth - px(getComputedStyle(frame.root).columnGap),
+    });
+  frame.root.classList.toggle('over', over);
+}
+
+/** The slot of the chip holding the keyboard focus, if one does. */
+function focusedSlot(frame: StripFrame): string | undefined {
+  const active = document.activeElement;
+  return active instanceof HTMLElement && frame.scroll.contains(active)
+    ? active.dataset.slot
+    : undefined;
 }
 
 /** The selected chip clear of the faded edges. */
@@ -143,8 +168,13 @@ export function mountPartStrip(ctx: AppContext<HTMLElement>, root: HTMLElement):
   const dots = watchStripDots(ctx, root);
   const draw = (): void => {
     const { parts } = ctx.model.doc;
+    const focused = focusedSlot(frame);
     const chips = parts.map((part, index) => chip(ctx, index, part.slot));
     frame.scroll.replaceChildren(...chips.map((c) => c.node));
+    // A keyboard pick redraws the chip it was made on; the focus stays with it.
+    if (focused !== undefined) {
+      frame.scroll.querySelector<HTMLElement>(`.pchip[data-slot="${focused}"]`)?.focus();
+    }
     dots.set(new Map(parts.map((part, index) => [part.slot, chips[index]!.dot])));
     frame.add.disabled = !canAddPart(parts.length);
     frame.add.title = addPartTitle(parts.length);
@@ -154,7 +184,7 @@ export function mountPartStrip(ctx: AppContext<HTMLElement>, root: HTMLElement):
     revealSelected(frame);
   };
   if (typeof ResizeObserver !== 'undefined') {
-    new ResizeObserver(() => fitOverflow(frame)).observe(frame.scroll);
+    new ResizeObserver(() => fitOverflow(frame)).observe(frame.root);
   }
   ctx.addChrome(draw);
   ctx.parts.onSelect(draw);
