@@ -96,4 +96,18 @@ describe('a backward drift (windsor#486)', () => {
     const restarting = { ...eighths, schedule: [{ length: 4, bars: 1 }] };
     expect(firstOfBars(new FigureSequencer(SAMPLER, restarting))).toEqual([0, 3, 2, 1]);
   });
+
+  it('takes an edit after a live meter change at the next bar line in the new meter', () => {
+    const line = Array.from({ length: 32 }, () => figureNoteCell());
+    const figure = new FigureSequencer(SAMPLER, { ...SPEC, divisor: 6, cells: line, length: 32 });
+    figure.handleTick(tick(90, C_MAJOR)); // bar 0 of 4/4, bar 1 of 7/8
+    figure.setBarTicks(84);
+    liveReconfiguration(
+      figure,
+      { ...SPEC, divisor: 6, cells: line, length: 32, schedule: [{ length: 4, bars: 1 }] },
+      SAMPLER,
+    )?.();
+    expect(figure.stepAt(16)).toBe(16); // tick 96, inside the 84–167 bar: unedited
+    expect(figure.stepAt(28)).toBeLessThan(4); // tick 168: the 4-cell stage
+  });
 });

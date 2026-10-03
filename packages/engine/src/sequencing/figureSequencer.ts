@@ -297,8 +297,8 @@ export class FigureSequencer {
   private readonly line: FigureLine;
   /** The song meter's bar in ticks: handed at build, pushed again on a live meter change. */
   private barTicks: number;
-  /** The local bar of the last tick heard since the entry; null before the first. */
-  private heardBar: number | null = null;
+  /** The last local tick heard since the entry; null before the first. Its bar is read in the current meter. */
+  private heardTick: number | null = null;
 
   constructor(pitch: FigurePitchSource, config: FigureSequencerConfig, barTicks = TICKS_PER_BAR) {
     assertFigureConfig(config);
@@ -321,7 +321,7 @@ export class FigureSequencer {
   enter(regionIndex: number): void {
     this.rng = streamRng(this.current.seed, regionIndex);
     this.line.restart(this.current);
-    this.heardBar = null;
+    this.heardTick = null;
   }
 
   /**
@@ -337,7 +337,8 @@ export class FigureSequencer {
     }
     this.current = config;
     this.pitch = pitch;
-    this.line.edit(config, this.heardBar === null ? 0 : this.heardBar + 1);
+    const nextBar = this.heardTick === null ? 0 : Math.floor(this.heardTick / this.barTicks) + 1;
+    this.line.edit(config, nextBar);
   }
 
   /** The song's meter changed live: the stage and the rotation count bars of `barTicks` from now. */
@@ -363,7 +364,7 @@ export class FigureSequencer {
   /** One local tick: the gate's release when due, then the cell on an onset. A chordless tick releases nothing. */
   handleTick(event: PartTickEvent): NoteEvent[] {
     const { divisor } = this.current;
-    this.heardBar = event.bar;
+    this.heardTick = event.tick;
     const due = this.releaseTick !== null && event.tick >= this.releaseTick;
     const gateEnded = due && event.chord !== null;
     const events = gateEnded ? this.releaseHeld(event.tick, event.time) : [];
