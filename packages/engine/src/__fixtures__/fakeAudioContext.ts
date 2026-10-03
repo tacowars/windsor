@@ -20,6 +20,7 @@ import { FM_LANES_MAX } from '../automation/automationTargetTables';
 import { voiceSlotParamName } from '../synth/audioPart';
 import { PROCESSOR_NAME, REVERB_PROCESSOR_NAME } from '../synth/workletMessages';
 import { OUTPUT_STAGE_NAME } from '../mixer/outputStageConstants';
+import { PART_METER_BANK_NAME } from '../mixer/partMeterBankConstants';
 import { PEAK_METER_NAME } from '../mixer/peakMeterConstants';
 import { loadOutputStage } from './outputStageHarness';
 import { loadPeakMeter } from './peakMeterHarness';
@@ -64,7 +65,11 @@ export class FakeContext implements FakeHost {
       if (text.includes('fm-processor')) this.registered.add(PROCESSOR_NAME);
       if (text.includes('reverb-processor')) this.registered.add(REVERB_PROCESSOR_NAME);
       if (text.includes('output-stage-processor')) this.registered.add(OUTPUT_STAGE_NAME);
-      if (text.includes('peak-meter-processor')) this.registered.add(PEAK_METER_NAME);
+      if (text.includes('peak-meter-processor')) {
+        // The meter bundle registers both meters (windsor#540).
+        this.registered.add(PEAK_METER_NAME);
+        this.registered.add(PART_METER_BANK_NAME);
+      }
     },
   };
 
@@ -216,6 +221,9 @@ export class FakeWorkletNode extends FakeNode {
       this.processor = loadPeakMeter(context.sampleRate).create((report) => {
         this.port.onmessage?.({ data: report });
       });
+    } else if (name === PART_METER_BANK_NAME) {
+      // Its edges and posts alone: the generated processor's render is
+      // `partMeterBankProcessor.test.ts`'s (windsor#540).
     } else if (name === PROCESSOR_NAME) {
       this.parameters.set('pitchBend', new FakeParam(0, -24, 24));
       this.parameters.set('modWheel', new FakeParam(0, 0, 1));

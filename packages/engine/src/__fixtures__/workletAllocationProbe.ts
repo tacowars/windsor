@@ -36,6 +36,14 @@ import vm from 'node:vm';
 
 export interface ProbeConfig {
   bundle: string;
+  /**
+   * The processor to run, by its registered name, for a bundle that
+   * registers more than one (the meter bundle, windsor#540); omitted, the
+   * last registered.
+   */
+  processor?: string;
+  /** The node's input count, handed to the constructor as the browser does; omitted, none is. */
+  numberOfInputs?: number;
   rate: number;
   /** Parameter values by name; a parameter this omits takes its descriptor's default. */
   params: Record<string, number>;
@@ -130,8 +138,8 @@ function load(
   vm.runInThisContext(source, { filename })(
     Base,
     config.rate,
-    (_name: string, value: ProcessorClass) => {
-      ctor = value;
+    (name: string, value: ProcessorClass) => {
+      if (config.processor === undefined || config.processor === name) ctor = value;
     },
     frame,
   );
@@ -170,7 +178,11 @@ function rig(config: ProbeConfig): ProbeRig {
   const startFrame = config.startFrame ?? 0;
   const params: Record<string, Float32Array> = {};
   for (const [name, value] of Object.entries(values)) params[name] = new Float32Array([value]);
-  const processor = new ctor({ processorOptions: config.options, parameterData: values });
+  const processor = new ctor({
+    processorOptions: config.options,
+    parameterData: values,
+    ...(config.numberOfInputs === undefined ? {} : { numberOfInputs: config.numberOfInputs }),
+  });
   for (const data of config.messages) processor.port.onmessage?.({ data });
   const inputs = config.inputChannels > 0;
   const silence = new Float32Array(QUANTUM);

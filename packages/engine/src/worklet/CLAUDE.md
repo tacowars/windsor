@@ -136,11 +136,21 @@ each network's `input`, each line's `delay`/`output`/`input`, each filter's
 first written as NaN. `inserts/retroReverbAllocation.test.ts` pins it on V8
 through `__fixtures__/retroReverbChangeScenario.ts`.
 
-`meter/peakMeterProcessor.ts` is the opt-in stereo sample meter (#666),
-bundled to `generated/peak-meter-processor.js` and checked by its own
-`meter/tsconfig.json`. It samples every quantum on a silent, view-owned tap;
-`mixer/peakMeterProcessor.test.ts` runs the generated processor and
-`mixer/peakMeter.test.ts` checks its main-thread lifetime.
+`meter/` holds the two sample meters, bundled together from
+`meter/meterProcessors.ts` to `generated/peak-meter-processor.js` (so the
+engine's one `addModule` loads both, and a harness picks one by its
+registered name) and checked by its own `meter/tsconfig.json`.
+`peakMeterProcessor.ts` is the opt-in stereo meter on a silent, view-owned
+tap (#666); `partMeterBankProcessor.ts` is the part meter bank (windsor#540):
+one node with an input per music part, posting one packed `Float32Array` of
+every part's report, its layout in `mixer/partMeterBankConstants.ts`. Both
+run each channel through `channelPeak.ts`, the one copy of the ballistics,
+whose silence (a missing channel) has a loop of its own: merging
+`samples?.[i] ?? 0` boxed every sample on V8. `mixer/peakMeterProcessor.test.ts`
+and `mixer/partMeterBankProcessor.test.ts` run the generated processors,
+`mixer/partMeterBankAllocation.test.ts` reads the bank's heap through
+`__fixtures__/partMeterBankScenario.ts`, and `mixer/peakMeter.test.ts` and
+`mixer/partMeterBank.test.ts` check the main-thread lifetimes.
 
 `outputStage/outputStageProcessor.ts` is the output stage's worklet adapter
 (windsor#93), bundled to `generated/output-stage-processor.js`: the last node
