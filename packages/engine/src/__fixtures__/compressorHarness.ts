@@ -1,9 +1,8 @@
 /** The shipped compressor worklet, evaluated with only its browser globals shimmed. */
-// reads-by-path: packages/engine/src/worklet/generated/**
-import { readFileSync } from 'node:fs';
 import { COMPRESSOR_DEFAULTS } from '../inserts/compressorConstants';
 import type { CompressorSpec } from '../inserts/compressorSpec';
 import type { CompressorDsp, CompressorParams } from '../inserts/compressorDsp';
+import { generatedProcessor } from './generatedProcessor';
 
 export function compressorParams(spec: Partial<CompressorSpec> = {}): CompressorParams {
   return Object.fromEntries(
@@ -18,28 +17,11 @@ export interface CompressorProcessorLike {
   process(inputs: Float32Array[][], outputs: Float32Array[][], params: CompressorParams): boolean;
 }
 export function loadCompressor(rate = 48000, params = compressorParams()): CompressorProcessorLike {
-  const source = readFileSync(
-    new URL('../worklet/generated/compressor-processor.js', import.meta.url),
-    'utf8',
-  );
-  let ctor: (new (options: unknown) => CompressorProcessorLike) | undefined;
-  class Base {
-    port = {
-      posted: [] as unknown[],
-      onmessage: null,
-      postMessage(message: unknown): void {
-        this.posted.push(structuredClone(message));
-      },
-    };
-  }
-  new Function('AudioWorkletProcessor', 'sampleRate', 'registerProcessor', source)(
-    Base,
-    rate,
-    (_name: string, value: typeof ctor) => {
-      ctor = value;
-    },
-  );
-  return new ctor!({
+  const { Processor } = generatedProcessor<new (options: unknown) => CompressorProcessorLike>({
+    file: 'compressor-processor.js',
+    sampleRate: rate,
+  });
+  return new Processor({
     parameterData: Object.fromEntries(Object.entries(params).map(([k, v]) => [k, v[0]])),
   });
 }

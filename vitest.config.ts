@@ -77,7 +77,6 @@ export const SCANNED_BY: readonly (readonly [string, readonly string[]])[] = [
     'packages/engine/src/worklet/tape/tapeOversample.ts',
     ['packages/engine/src/inserts/tapeMagneticGolden.test.ts'],
   ],
-  ['packages/engine/src/patch/patchLibrary.ts', ['packages/app/lib/audioBundle.test.mjs']],
   // The console builds no Web Audio node of its own; the transport strip's markup and wiring.
   [
     'packages/app/{index.html,src/*.ts}',
