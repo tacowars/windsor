@@ -4,8 +4,10 @@
  * only the active tab is rendered, the rest are marked dirty and render when
  * shown, and a structural change or an import invalidates every tab through
  * one path (`rebuild`) — and the Parts tab's `PartsSession`, whose commit is
- * this context's document write. It knows no DOM beyond a panel's `hidden`
- * flag, so `appContext.test.ts` drives it with fakes.
+ * this context's document write and whose selection this context resolves
+ * whenever the document is replaced or restored (windsor#470). It knows no
+ * DOM beyond a panel's `hidden` flag, so `appContext.test.ts` drives it with
+ * fakes.
  *
  * It also keeps the song's undo history (windsor#124; epic windsor#112;
  * record `2026-09-29-undo-history`): every song edit comes through `change`
@@ -88,10 +90,15 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     this.model = deps.model;
     this.notify = deps.notify;
     this.transport = deps.host.transport;
-    this.parts = new PartsSession((patch) => this.commitPatch(patch));
+    this.parts = new PartsSession({
+      commit: (patch) => this.commitPatch(patch),
+      doc: () => this.model.doc,
+      invalidate: () => this.invalidate(),
+    });
+    // The opening document's first part, should it lack slot 0.
+    this.parts.resolve(0);
     this.songs = new SongSession({
       model: this.model,
-      parts: this.parts,
       replace: (raw, amend) => this.replaceDocument(raw, amend),
       change: (partial, label) => this.change(partial, label),
       notify: (message, tone) => this.notify(message, tone),
@@ -298,6 +305,9 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
     // across it records nothing: its "before" belongs to the other song.
     this.history.clear();
     if (this.gesture) this.gesture.before = null;
+    // A new song opens on its first part (windsor#470 decision 6): slot 0,
+    // or the first slot it has, before anything draws or plays it.
+    this.parts.resolve(0);
     this.rebuild();
   }
 
@@ -371,6 +381,9 @@ export class AppContext<P extends TabPanel = HTMLElement> implements AppCtx {
       return null;
     }
     this.model.replace(target);
+    // A step that took the selected part away moves the selection to a part
+    // that exists now, not at the Parts tab's next render (windsor#470).
+    this.parts.resolve();
     // With no system to apply to, a build in flight took an older document
     // and must be followed, as in `commit`; with audio never enabled there is
     // nothing to build.

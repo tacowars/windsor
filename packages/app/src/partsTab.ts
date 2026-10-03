@@ -30,7 +30,6 @@ import {
 } from './patchPanels';
 import { buildBays } from './patchBays';
 import type { PatchEditor } from './partsSession';
-import { loadWorkingPatch, selectPart } from './partsSession';
 import { startScope } from './scope';
 
 const GRID_HTML = `
@@ -139,7 +138,7 @@ function refreshPatchUi(editor: PatchEditor): void {
   buildPitch(editor);
 }
 
-function partPicker(ctx: AppCtx, editor: PatchEditor, onSwitch: () => void): HTMLElement {
+function partPicker(ctx: AppCtx, editor: PatchEditor): HTMLElement {
   const box = el('div');
   const head = el('div', 'section-title');
   head.appendChild(el('span', '', 'Part'));
@@ -152,8 +151,7 @@ function partPicker(ctx: AppCtx, editor: PatchEditor, onSwitch: () => void): HTM
       })),
       () => String(ctx.parts.selected),
       (slot) => {
-        selectPart(ctx, Number(slot));
-        onSwitch();
+        ctx.parts.pick(Number(slot));
         refreshPatchUi(editor);
         syncPresetAndBadge(ctx, editor);
       },
@@ -174,7 +172,7 @@ function partPicker(ctx: AppCtx, editor: PatchEditor, onSwitch: () => void): HTM
 
 /** Reload the working patch and rebuild the rail: after a load, a library action or a part switch. */
 function reloadRail(ctx: AppCtx, editor: PatchEditor): void {
-  loadWorkingPatch(ctx);
+  ctx.parts.reload();
   refreshPatchUi(editor);
   syncPresetAndBadge(ctx, editor);
 }
@@ -242,13 +240,10 @@ export function renderPartsTab(
   midi: MidiAccessor,
 ): void {
   body.innerHTML = GRID_HTML;
-  if (!partAt(ctx.model.doc, ctx.parts.selected)) {
-    ctx.parts.selected = ctx.model.doc.parts[0]?.slot ?? 0;
-  }
   const editor = patchEditor(ctx);
-  loadWorkingPatch(ctx);
+  ctx.parts.reload();
   keyboard.followPart();
-  $('partPick').appendChild(partPicker(ctx, editor, () => keyboard.followPart()));
+  $('partPick').appendChild(partPicker(ctx, editor));
   $('midiSlot').appendChild(midiPanel(midi));
   syncPresetAndBadge(ctx, editor);
   refreshPatchUi(editor);

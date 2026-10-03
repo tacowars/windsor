@@ -217,11 +217,9 @@ describe('AppContext changes and the parts session', () => {
     const rebuilt = { slot: 0 } as unknown as AudioPart;
     c.liveParts.set(0, rebuilt);
     expect(c.ctx.livePart()).toBe(rebuilt);
-    c.ctx.parts.selected = 99;
-    expect(c.ctx.livePart()).toBeNull();
   });
 
-  it("commits the working patch under the selected part's preset, and nowhere without a part", () => {
+  it("commits the working patch under the selected part's preset", () => {
     const c = openConsole();
     const part = partAt(c.model.doc, c.ctx.parts.selected);
     if (!part) throw new Error('a new song has a part on slot 0');
@@ -229,11 +227,6 @@ describe('AppContext changes and the parts session', () => {
     expect(c.ctx.parts.push()).toBe(true);
     expect(c.model.doc.patches?.[part.preset]?.name).toBe('Edited');
     expect(c.applied.at(-1)).toEqual({ patches: { [part.preset]: c.ctx.parts.patch } });
-
-    c.ctx.parts.selected = 99;
-    const applied = c.applied.length;
-    expect(c.ctx.parts.push()).toBe(false);
-    expect(c.applied).toHaveLength(applied);
   });
 });
 
