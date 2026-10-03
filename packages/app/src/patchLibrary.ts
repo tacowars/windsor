@@ -8,13 +8,14 @@
  * plays it; revert puts the library's version back under the same id. Both
  * are live edits (#629): nothing here rebuilds the system.
  */
-import type { Patch } from '@windsor/engine';
+import type { Patch, PresetListing } from '@windsor/engine';
 import { clonePatch, partAt } from '@windsor/engine';
 import { builtInPresets } from './builtInLibrary';
 import type { AppCtx } from './context';
 import { el } from './dom';
 import type { LibraryModel } from './libraryModel';
 import { library, libraryPatch } from './libraryModel';
+import type { MenuItem } from './patchMenu';
 
 /** Where the selected part's patch lives, for the badge and the controls. */
 export function patchHome(ctx: AppCtx, slot: number): 'document' | 'built-in' | 'none' {
@@ -23,8 +24,6 @@ export function patchHome(ctx: AppCtx, slot: number): 'document' | 'built-in' | 
   if (ctx.model.doc.patches?.[part.preset]) return 'document';
   return libraryPatch(library, part.preset) ? 'built-in' : 'none';
 }
-
-export { presetBrowser as presetPicker } from './presetBrowser';
 
 export function badgeText(ctx: AppCtx, slot: number): string {
   const preset = partAt(ctx.model.doc, slot)?.preset ?? '';
@@ -81,28 +80,67 @@ export function revertPatch(ctx: AppCtx, name: string, model: LibraryModel = lib
   );
 }
 
-/** Rename and revert, shown only for a document patch. */
-export function libraryControls(ctx: AppCtx, slot: number): HTMLElement {
-  const box = el('div', 'bar-row');
-  box.style.marginTop = '8px';
-  const preset = partAt(ctx.model.doc, slot)?.preset;
-  if (preset === undefined || patchHome(ctx, slot) !== 'document') return box;
+/** The patch box's source words (windsor#521), one per listing source. */
+export const PATCH_SOURCE_LABELS: Readonly<Record<PresetListing['source'], string>> = {
+  document: 'this song',
+  library: 'library',
+  'built-in': 'built-in',
+};
+
+/** What the patch box shows for the part's patch: its name, and `<category> · <source>`. */
+export function patchSummary(
+  ctx: AppCtx,
+  slot: number,
+  entries: readonly PresetListing[],
+): { name: string; detail: string } {
+  const preset = partAt(ctx.model.doc, slot)?.preset ?? '';
+  const listed = entries.find((entry) => entry.id === preset);
+  const name = ctx.model.doc.patches?.[preset]?.name ?? listed?.name ?? preset;
+  const source =
+    patchHome(ctx, slot) === 'document'
+      ? PATCH_SOURCE_LABELS.document
+      : listed && PATCH_SOURCE_LABELS[listed.source];
+  return { name, detail: [listed?.category, source].filter(Boolean).join(' · ') };
+}
+
+/** Rename's field in the ⋯ menu: the document patch's id, committed on Enter or the button. */
+function renameForm(ctx: AppCtx, preset: string): HTMLElement {
+  const form = el('form', 'patch-menu-form') as HTMLFormElement;
   const name = document.createElement('input');
   name.className = 'field';
   name.name = 'patch-name';
   name.value = preset;
   name.setAttribute('aria-label', 'Document patch name');
-  box.appendChild(name);
   const rename = el('button', 'btn', 'Rename') as HTMLButtonElement;
-  rename.type = 'button';
-  rename.onclick = (): void => renamePatch(ctx, preset, name.value.trim());
-  box.appendChild(rename);
-  if (libraryPatch(library, preset)) {
-    const revert = el('button', 'btn', 'Revert to library') as HTMLButtonElement;
-    revert.type = 'button';
-    revert.title = 'Back to the library file; parts playing this patch follow';
-    revert.onclick = (): void => revertPatch(ctx, preset);
-    box.appendChild(revert);
-  }
-  return box;
+  rename.type = 'submit';
+  form.onsubmit = (event): void => {
+    event.preventDefault();
+    renamePatch(ctx, preset, name.value.trim());
+  };
+  form.append(name, rename);
+  queueMicrotask(() => name.select());
+  return form;
+}
+
+/** Rename and Revert to library for the ⋯ menu, offered only for a document patch. */
+export function patchMenuEntries(ctx: AppCtx, slot: number): MenuItem[] {
+  const preset = partAt(ctx.model.doc, slot)?.preset;
+  if (preset === undefined || patchHome(ctx, slot) !== 'document') return [];
+  const items: MenuItem[] = [
+    {
+      kind: 'form',
+      label: 'Rename…',
+      title: "Rename the song's copy of this patch; parts playing it follow",
+      form: () => renameForm(ctx, preset),
+    },
+  ];
+  if (libraryPatch(library, preset))
+    items.push({
+      kind: 'action',
+      label: 'Revert to library',
+      title: 'Back to the library file; parts playing this patch follow',
+      enabled: true,
+      run: () => revertPatch(ctx, preset),
+    });
+  return items;
 }

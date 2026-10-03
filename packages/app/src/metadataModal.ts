@@ -14,10 +14,8 @@ import type { LoudnessResult } from './loudnessCheck';
 import type { LibraryEntries, PatchMetadata } from './patchMetadata';
 import { categoriesOf, nameProblem, normaliseTags, suggestTags } from './patchMetadata';
 
-/** Where focus lands after any modal: the patch controls' Load button, else the Parts rail. */
-const patchControls = (): HTMLElement | null =>
-  document.querySelector<HTMLElement>('[aria-label="Load patch"]') ??
-  document.querySelector<HTMLElement>('#presetSlot button');
+/** Where focus lands after a modal whose opener has gone: the patch bar's patch box (windsor#521). */
+const patchControls = (): HTMLElement | null => document.getElementById('patchBox');
 
 const focusReturn = new FocusReturn<HTMLElement>(patchControls);
 

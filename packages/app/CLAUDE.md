@@ -155,14 +155,14 @@ knows the one below it and nothing above.
    `arpCard.ts`, `bassCard.ts`, `figureCard.ts`, `harmonyCard.ts`, `songDetailPane.ts`,
    `songRuler.ts`, `songHarmonyLane.ts`, `songLanes.ts`, `patchBays.ts`, `patchPanels.ts`,
    `returnsPanel.ts`, `envCanvas.ts` / `envelopeKnobs.ts`,
-   `harmonicEditor.ts`, `presetBrowser.ts`, `libraryActions.ts`,
-   `metadataModal.ts`, `midiPanel.ts` — draw DOM and call the context. The
+   `harmonicEditor.ts`, `patchBar.ts`, `patchPopover.ts`, `patchMenu.ts`,
+   `presetBrowser.ts`, `libraryActions.ts`, `metadataModal.ts`, `midiPanel.ts` — draw DOM and call the context. The
    shared machinery they draw on is `stepStrip.ts`, `regionPlayhead.ts`, `knob.ts`,
    `patchPath.ts`, `seqFields.ts` and `dom.ts`.
 6. **The pure models** — `gridModel.ts`, `chordStepModel.ts`,
    `euclidModel.ts`, `arpModel.ts`, `bassModel.ts`, `figureModel.ts`, `regionModel.ts`,
    `playheadDrag.ts`, `harmonyLaneModel.ts`, `harmonicModel.ts`, `songParts.ts`, `patchActions.ts`,
-   `patchMetadata.ts`, `libraryModel.ts`, `ratioSplit.ts`,
+   `patchMetadata.ts`, `patchStepModel.ts`, `libraryModel.ts`, `ratioSplit.ts`,
    `envelopeTransfer.ts`, `operatorStart.ts`, `midiMessage.ts`, `midiInputs.ts`, `focusTrap.ts`,
    `loudnessCheck.ts`, `songAutosave.ts`, `songRestore.ts`,
    `storagePersistence.ts`, `toastModel.ts` — take values and return values. **The tests run in
@@ -396,7 +396,8 @@ Output (`{ group: id }`), not a send.
 
 1. The rule goes in `patchActions.ts`, pure, over `libraryModel.ts` and the
    open document, with a test; metadata rules in `patchMetadata.ts`.
-2. The button goes in `libraryActions.ts`'s row; a modal is an
+2. The button goes in `libraryActions.ts`: `libraryButtons` for the patch
+   bar's row, or `libraryMenuEntries` for its ⋯ menu (windsor#521); a modal is an
    `index.html` `<dialog>` through `metadataModal.ts` (never `window.confirm`), focus
    trapped by `focusTrap.ts`.
 3. A write goes through `patchFileWriter.ts` and `libraryModel.ts`'s
