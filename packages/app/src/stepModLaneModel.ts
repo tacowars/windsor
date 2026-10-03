@@ -257,7 +257,7 @@ const HOLD_NOTE: Record<StepSlide['when'], string> = {
 const MOVES_NOTE = 'plays if the slide moves pitch';
 
 /** The automation catalog's row for `param`: its one name, scale and unit (windsor#424). */
-const catalogRowOf = (param: VoiceTargetPath): AutomationTargetRow | undefined =>
+const voiceRowOf = (param: VoiceTargetPath): AutomationTargetRow | undefined =>
   catalogRow(voiceTargetId(param));
 
 /**
@@ -277,10 +277,10 @@ export function laneReadout(
   const offset = offsetLabel(row, value);
   if (playsIfMoves(slide, param)) return `${offset} · ${MOVES_NOTE}`;
   if (heldBySlide(slide, param) !== 'plays') return `${offset} · ${HOLD_NOTE[slide.when]}`;
-  const look = catalogRowOf(param);
+  const look = voiceRowOf(param);
   if (base === undefined || !look) return offset;
   return `${offset} → ${readout(look, stepModValue(row, base, value))}`;
 }
 
 /** The name a lane and the picker show: the catalog's, as a song lane's. */
-export const laneLabel = (param: VoiceTargetPath): string => catalogRowOf(param)?.label ?? param;
+export const laneLabel = (param: VoiceTargetPath): string => voiceRowOf(param)?.label ?? param;

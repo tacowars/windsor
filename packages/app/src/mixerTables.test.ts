@@ -4,6 +4,7 @@
  * pins every range and default where a row edit would show.
  */
 import { describe, expect, it } from 'vitest';
+import { RETURN_NAMES } from '@windsor/engine';
 import {
   GROUP_LEVEL_KNOB,
   GROUP_PAN_KNOB,
@@ -21,8 +22,7 @@ describe('the mixer knobs', () => {
     expect(STRIP_LEVEL_MAX).toBe(2);
     expect(range(STRIP_LEVEL_KNOB)).toEqual([0, 2, 1]);
     expect(range(STRIP_PAN_KNOB)).toEqual([-1, 1, 0]);
-    expect(range(sendKnob('a'))).toEqual([0, 1, 0]);
-    expect(range(sendKnob('b'))).toEqual([0, 1, 0]);
+    for (const ret of RETURN_NAMES) expect(range(sendKnob(ret))).toEqual([0, 1, 0]);
     expect(range(GROUP_LEVEL_KNOB)).toEqual([0, 2, 1]);
     expect(range(GROUP_PAN_KNOB)).toEqual([-1, 1, 0]);
   });
