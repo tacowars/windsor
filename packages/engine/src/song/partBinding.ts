@@ -34,6 +34,7 @@
 import type { MusicPart, SequencerSpec } from './arrangement';
 import { Arpeggiator } from '../sequencing/arpeggiator';
 import { EuclideanSequencer, type OnsetEvent } from '../sequencing/euclideanSequencer';
+import { FigureSequencer } from '../sequencing/figureSequencer';
 import { ticksPerBar } from '../sequencing/meter';
 import type { NoteEvent } from '../sequencing/noteEvent';
 import { RegionGate, type PartTickSource, type RegionGateConfig } from '../sequencing/regionGate';
@@ -166,10 +167,13 @@ export class PartBinding {
     }
   }
 
-  /** Regions, song length, harmony and meter take effect on the next tick. */
+  /** Regions, song length, harmony and meter take effect on the next tick; a Figure's bar length at once. */
   reconfigureGate(config: RegionGateConfig): void {
     this.barTicks = ticksPerBar(config.meter);
     this.gate.reconfigure(config);
+    for (const { generator } of this.bounds()) {
+      if (generator instanceof FigureSequencer) generator.setBarTicks(this.barTicks);
+    }
   }
 
   /**

@@ -162,6 +162,19 @@ describe('the rotation drift (windsor#486)', () => {
     expect([hits(11), hits(12)]).toEqual(['x.x.xx.', 'xx.xx.x']);
     expect(song.steps).toEqual([1]); // the bar length handed at build, before a tick is heard
   });
+
+  it('takes a live meter change at once: stepAt on the first moved bar line, before a tick', () => {
+    const { document } = makeArrangement(SONG);
+    const recorders = new Map(document.parts.map((part) => [part.slot, recordingPart()]));
+    const patches = document.patches ?? {};
+    const player = new ArrangementPlayer(new TickTransport(), recorders, document, patches);
+    expect(player.apply({ transport: { meter: '7/8' } })).toEqual({ ok: true, ignored: [] });
+    // Bar 12 of 7/8 starts on tick 1008, mid bar 10 of 4/4: slot 1 slips a cell on that line.
+    expect([player.stepAt(1, 12 * BAR_7_8 - EIGHTH), player.stepAt(1, 12 * BAR_7_8)]).toEqual([
+      11, 1,
+    ]);
+    player.dispose();
+  });
 });
 
 describe('a Figure with neither process (windsor#486)', () => {

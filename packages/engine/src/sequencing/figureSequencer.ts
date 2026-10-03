@@ -295,7 +295,7 @@ export class FigureSequencer {
   private releaseTick: number | null = null;
   /** Where the schedule and the drift put the line. */
   private readonly line: FigureLine;
-  /** The song meter's bar in ticks: handed at build, read again off the gate's ticks. */
+  /** The song meter's bar in ticks: handed at build, pushed again on a live meter change. */
   private barTicks: number;
   /** The local bar of the last tick heard since the entry; null before the first. */
   private heardBar: number | null = null;
@@ -340,6 +340,11 @@ export class FigureSequencer {
     this.line.edit(config, this.heardBar === null ? 0 : this.heardBar + 1);
   }
 
+  /** The song's meter changed live: the stage and the rotation count bars of `barTicks` from now. */
+  setBarTicks(barTicks: number): void {
+    this.barTicks = barTicks;
+  }
+
   /** The cell a local step (since the region entry) sounds, after the stage and the rotation. */
   stepAt(localStep: number): number {
     return this.cellAt(localStep);
@@ -358,7 +363,6 @@ export class FigureSequencer {
   /** One local tick: the gate's release when due, then the cell on an onset. A chordless tick releases nothing. */
   handleTick(event: PartTickEvent): NoteEvent[] {
     const { divisor } = this.current;
-    if (event.bar > 0) this.barTicks = (event.tick - event.tickInBar) / event.bar;
     this.heardBar = event.bar;
     const due = this.releaseTick !== null && event.tick >= this.releaseTick;
     const gateEnded = due && event.chord !== null;
