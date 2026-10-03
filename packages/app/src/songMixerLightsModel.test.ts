@@ -2,11 +2,20 @@
  * The Song tab's mixer lights (windsor#159): the green light's brightness
  * from a peak, at the floor, between, at 0 dBFS and above; its colour ramp;
  * and the red light's latch, set on an overload, kept across a release,
- * cleared on a click and dropped on a new meter.
+ * cleared on a click and dropped on a new meter; and every part's lights
+ * from the part meter bank as the part strip and the Song mixer share them
+ * (windsor#528): a step change, the latch and its clear.
  */
 import { describe, expect, it } from 'vitest';
 
-import { ClipLatches, lightRamp, lightStep, peakBrightness } from './songMixerLightsModel';
+import type { LightReport } from './songMixerLightsModel';
+import {
+  BankLights,
+  ClipLatches,
+  lightRamp,
+  lightStep,
+  peakBrightness,
+} from './songMixerLightsModel';
 import type { MixerLightTable } from './songMixerLightsTables';
 import { MIXER_LIGHTS } from './songMixerLightsTables';
 
@@ -114,5 +123,76 @@ describe('ClipLatches', () => {
     expect(latches.lit(2)).toBe(true);
     // A part added back at the slot starts dark, even on the same meter object.
     expect(latches.observe(1, meterA, quiet(2))).toBe(false);
+  });
+});
+
+describe('BankLights, as the part strip and the Song mixer read the bank', () => {
+  /** A part meter bank in miniature: a report per slot and a revision that moves with each. */
+  class FakeBank {
+    revision = 0;
+    private readonly reports = new Map<number, LightReport>();
+    read(slot: number): LightReport {
+      return this.reports.get(slot) ?? { left: 0, right: 0, overload: false };
+    }
+    report(slot: number, peak: number, overload = false): void {
+      this.reports.set(slot, { left: peak, right: peak / 2, overload });
+      this.revision++;
+    }
+  }
+  const parts = [{ slot: 0 }, { slot: 3 }];
+
+  it('moves a step, and its change count, only when the bank reports a new level', () => {
+    const bank = new FakeBank();
+    const lights = new BankLights<FakeBank>();
+    lights.update(bank, parts);
+    expect(lights.step(3)).toBe(0);
+    const before = lights.changes;
+    bank.report(3, dbToAmp(-30));
+    lights.update(bank, parts);
+    expect(lights.step(3)).toBe(lightStep(peakBrightness(dbToAmp(-30))));
+    expect(lights.step(0)).toBe(0);
+    expect(lights.changes).toBe(before + 1);
+    // No new report, or one that leaves every step where it was: nothing to repaint.
+    lights.update(bank, parts);
+    bank.report(3, dbToAmp(-30));
+    lights.update(bank, parts);
+    expect(lights.changes).toBe(before + 1);
+  });
+
+  it('latches an overload until a clear, and keeps it when the peak falls', () => {
+    const bank = new FakeBank();
+    const lights = new BankLights<FakeBank>();
+    bank.report(0, 1.4, true);
+    lights.update(bank, parts);
+    expect(lights.lit(0)).toBe(true);
+    expect(lights.step(0)).toBe(MIXER_LIGHTS.steps);
+    bank.report(0, 0);
+    lights.update(bank, parts);
+    expect(lights.lit(0)).toBe(true);
+    const before = lights.changes;
+    lights.clear(0);
+    expect(lights.lit(0)).toBe(false);
+    expect(lights.changes).toBe(before + 1);
+    // An overload after the reset lights it again.
+    bank.report(0, 0);
+    bank.report(0, 1.2, true);
+    lights.update(bank, parts);
+    expect(lights.lit(0)).toBe(true);
+  });
+
+  it('starts dark on a rebuilt system’s bank, with audio off, and for a removed part', () => {
+    const bank = new FakeBank();
+    const lights = new BankLights<FakeBank>();
+    bank.report(3, 1.4, true);
+    lights.update(bank, parts);
+    lights.update(new FakeBank(), parts);
+    expect(lights.lit(3)).toBe(false);
+    expect(lights.step(3)).toBe(0);
+    lights.update(bank, parts);
+    lights.update(undefined, parts);
+    expect(lights.lit(3)).toBe(false);
+    lights.update(bank, parts);
+    lights.update(bank, [{ slot: 0 }]);
+    expect(lights.lit(3)).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * The Song tab's mixer lights (windsor#159): how a part strip's meter
+ * The mixer lights (windsor#159, windsor#528): how a part's meter
  * becomes the green activity light's brightness, the two colours that light
  * runs between, and how many meter reports a clear waits out. The logic is
  * `songMixerLightsModel.ts`; the red clip light's colour is the stylesheet's
@@ -42,3 +42,9 @@ export const MIXER_LIGHTS: MixerLightTable = {
   litColor: [96, 214, 120],
   staleReports: 1,
 };
+
+/** The red light's title, lit and dark, as windsor#159 words it: the mixer's and the chips'. */
+export const CLIP_TITLES = {
+  lit: 'Clipped: click to clear',
+  dark: 'Not clipped',
+} as const;

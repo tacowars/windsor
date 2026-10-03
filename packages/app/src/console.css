@@ -353,7 +353,8 @@ input {
   border: 1px solid var(--line);
   border-left: 3px solid var(--tone, var(--line-bright));
   border-radius: var(--r);
-  padding: 4px 7px 3px;
+  /* The right 12px holds the two lights (.cl below). */
+  padding: 4px 12px 3px 7px;
   line-height: 1.15;
   cursor: pointer;
 }
@@ -389,19 +390,38 @@ input {
 .pchip[aria-pressed='true'] .k {
   color: #1a1408;
 }
-/* The activity dot: its opacity is the part's meter step (partStripDots.ts). */
-.pchip .dot {
+/* The chip's two lights (windsor#528; the Song lanes mockup's Meters state):
+   the Song mixer's red clip latch over its green activity light, small at the
+   top right. partStripLights.ts paints the green a step at a time from
+   songMixerLightsTables.ts, as the mixer's; the lights' width comes out of
+   the name, which truncates sooner. */
+.pchip .cl {
   position: absolute;
-  right: 5px;
+  right: 3px;
   top: 5px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--modulator);
-  opacity: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.pchip[aria-pressed='true'] .dot {
-  background: #1a1408;
+.pchip .cl i {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+.pchip .cl .clip {
+  background: color-mix(in srgb, var(--hot) 16%, var(--inset));
+  cursor: default;
+}
+.pchip .cl .clip.lit {
+  background: var(--hot);
+  border-color: var(--hot);
+  box-shadow: 0 0 5px rgba(210, 100, 60, 0.7);
+  cursor: pointer;
+}
+.pchip[aria-pressed='true'] .cl i {
+  border-color: rgba(26, 20, 8, 0.55);
 }
 /* ‹ › and ▾ show only while the row overflows. */
 .pnav,
