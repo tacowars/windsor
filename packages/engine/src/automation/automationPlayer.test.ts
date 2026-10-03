@@ -21,10 +21,10 @@ import { AUTOMATION_STEP_RAMP_SECONDS } from './automationConstants';
 import { valueAt } from './automationEvaluate';
 import { knobHandle, sameValue } from './automationHandles';
 import { AutomationPlayer } from './automationPlayer';
-import { catalogRow } from './automationTargets';
+import { requireCatalogRow } from './automationTargets';
 
-const LEVEL = catalogRow('strip.level')!;
-const PAN = catalogRow('strip.pan')!;
+const LEVEL = requireCatalogRow('strip.level');
+const PAN = requireCatalogRow('strip.pan');
 /** 120 BPM straight. */
 const TICK = 1 / 48;
 const at = (tick: number): number => RIG_START + tick * TICK;

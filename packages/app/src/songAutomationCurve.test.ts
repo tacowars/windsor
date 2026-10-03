@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TICKS_PER_BAR,
-  catalogRow,
+  requireCatalogRow,
   toDisplay,
   valueAt,
   type AutomationPoint,
@@ -29,9 +29,9 @@ const yOf = (row: AutomationTargetRow, value: number): number =>
 const coords = (d: string): [number, number][] =>
   [...d.matchAll(/[ML](-?[\d.]+) (-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
 
-const pan = catalogRow('strip.pan')!;
-const cutoff = catalogRow('voice.filter.cutoff')!;
-const level = catalogRow('strip.level')!;
+const pan = requireCatalogRow('strip.pan');
+const cutoff = requireCatalogRow('voice.filter.cutoff');
+const level = requireCatalogRow('strip.level');
 
 describe('curveShape', () => {
   it('draws a flat lane edge to edge, holding before the first point and after the last', () => {

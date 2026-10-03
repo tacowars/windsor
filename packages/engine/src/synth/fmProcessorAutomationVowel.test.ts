@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { peakNear, transfer } from '../__fixtures__/powerSpectrum';
 import { loadProcessor } from '../__fixtures__/workletHarness';
 import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarness';
-import { catalogRow, voiceTargetId } from '../automation/automationTargets';
+import { requireCatalogRow, voiceTargetId } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch } from '../patch/patch';
 import type { Patch } from '../patch/patch';
 import { FORMANT_VOWELS } from '../worklet/fm/formantTables';
@@ -27,7 +27,7 @@ const SR = loaded.sampleRate;
 const BLOCK = 128;
 const SLOTS = 8;
 const VOWEL = 'filter.vowel';
-const ROW = catalogRow(voiceTargetId(VOWEL))!;
+const ROW = requireCatalogRow(voiceTargetId(VOWEL));
 const [A, E, , O, U] = FORMANT_VOWELS.map((v) => v.hz);
 
 interface SectionLike {

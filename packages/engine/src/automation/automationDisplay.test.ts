@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { DISPLAY_ROW, fromDisplay, toDisplay } from './automationDisplay';
 import type { AutomationTargetRow } from './automationLane';
 import { AUTOMATION_LEVEL_FLOOR_DB } from './automationTargetTables';
-import { catalogRow, voiceTargetId } from './automationTargets';
+import { requireCatalogRow, voiceTargetId } from './automationTargets';
 
-const LEVEL = catalogRow('strip.level')!;
-const CUTOFF = catalogRow(voiceTargetId('filter.cutoff'))!;
-const DECAY = catalogRow(voiceTargetId('ops.0.env.decayTime'))!;
-const PAN = catalogRow('strip.pan')!;
-const RES = catalogRow(voiceTargetId('filter.resonance'))!;
+const LEVEL = requireCatalogRow('strip.level');
+const CUTOFF = requireCatalogRow(voiceTargetId('filter.cutoff'));
+const DECAY = requireCatalogRow(voiceTargetId('ops.0.env.decayTime'));
+const PAN = requireCatalogRow('strip.pan');
+const RES = requireCatalogRow(voiceTargetId('filter.resonance'));
 
 const ROWS: readonly AutomationTargetRow[] = [LEVEL, CUTOFF, DECAY, PAN, RES, DISPLAY_ROW];
 const HEIGHTS = Array.from({ length: 41 }, (_, i) => i / 40);

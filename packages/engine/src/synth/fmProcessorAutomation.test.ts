@@ -24,7 +24,7 @@ import {
 import type { ProcessorLike, ScheduledEvent } from '../__fixtures__/workletHarness';
 import { loadProcessor } from '../__fixtures__/workletHarness';
 import { AUTOMATION_STEP_RAMP_SECONDS } from '../automation/automationConstants';
-import { catalogRow, voiceTargetId } from '../automation/automationTargets';
+import { requireCatalogRow, voiceTargetId } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { VOICE_TARGET_PATHS, VOICE_TARGET_COUNT } from '../worklet/fm/voiceTargetTables';
 import { voiceSlotParamName } from './audioPart';
@@ -93,7 +93,7 @@ function moved(patch: Patch, path: string, value: number): Patch {
 }
 
 const offsetFor = (path: string, value: number, patch: Patch = PATCH): number =>
-  voiceOffset(patch, path, catalogRow(voiceTargetId(path))!, value);
+  voiceOffset(patch, path, requireCatalogRow(voiceTargetId(path)), value);
 
 interface Drive {
   patch?: Patch;

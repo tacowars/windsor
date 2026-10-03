@@ -15,7 +15,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { loadProcessor } from '../__fixtures__/workletHarness';
-import { catalogRow, voiceTargetId } from '../automation/automationTargets';
+import { requireCatalogRow, voiceTargetId } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { ST_DECAY } from '../worklet/fm/envelope';
 import {
@@ -65,7 +65,7 @@ const REBASED: Patch = (() => {
 
 /** Each curve's lane, flipped from its patch's, as an offset against `patch`. */
 const curveOffset = (patch: Patch, path: string, i: number): number =>
-  voiceOffset(patch, path, catalogRow(voiceTargetId(path))!, -MONO.ops[i]!.env.decayCurve);
+  voiceOffset(patch, path, requireCatalogRow(voiceTargetId(path)), -MONO.ops[i]!.env.decayCurve);
 
 function stepMod(param: VoiceTargetPath, value: number): number[] {
   const out = new Array<number>(VOICE_TARGET_COUNT).fill(0);
@@ -198,7 +198,7 @@ const ZEROED: Patch = (() => {
 function decayPlayed(path: string, lane: number, push: number): number {
   const processor = loaded.create(ZEROED, 4, undefined, { voiceSlots: [path] });
   const params = freshParams();
-  params.voiceSlot0![0] = voiceOffset(ZEROED, path, catalogRow(voiceTargetId(path))!, lane);
+  params.voiceSlot0![0] = voiceOffset(ZEROED, path, requireCatalogRow(voiceTargetId(path)), lane);
   const left = new Float32Array(CTRL);
   const right = new Float32Array(CTRL);
   const step = stepMod(path as VoiceTargetPath, push);
@@ -220,7 +220,9 @@ describe("a step's decay push over a decay lane on a zero-decay patch (windsor#4
   it.each(DECAY_TIMES.map((path) => [path]))('%s stacks the step on the lane’s value', (path) => {
     const row = VOICE_TARGET_TABLE[VOICE_TARGET_PATHS.indexOf(path as VoiceTargetPath)]!;
     const alone = decayPlayed(path, LANE, 0);
-    const offset = Math.fround(voiceOffset(ZEROED, path, catalogRow(voiceTargetId(path))!, LANE));
+    const offset = Math.fround(
+      voiceOffset(ZEROED, path, requireCatalogRow(voiceTargetId(path)), LANE),
+    );
     expect(alone).toBe(0.001 * Math.pow(2, offset));
     expect(alone).toBeCloseTo(LANE, 6);
     const longer = decayPlayed(path, LANE, 0.25);

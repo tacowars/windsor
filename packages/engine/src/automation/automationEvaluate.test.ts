@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { fromDisplay, toDisplay } from './automationDisplay';
 import { bendCurve, rampsBetween, valueAt } from './automationEvaluate';
 import type { AutomationPoint, AutomationTargetRow } from './automationLane';
-import { catalogRow, voiceTargetId } from './automationTargets';
+import { requireCatalogRow, voiceTargetId } from './automationTargets';
 
-const PAN = catalogRow('strip.pan')!;
-const LEVEL = catalogRow('strip.level')!;
-const CUTOFF = catalogRow(voiceTargetId('filter.cutoff'))!;
+const PAN = requireCatalogRow('strip.pan');
+const LEVEL = requireCatalogRow('strip.level');
+const CUTOFF = requireCatalogRow(voiceTargetId('filter.cutoff'));
 
 const p = (tick: number, value: number, bend = 0): AutomationPoint => ({ tick, value, bend });
 

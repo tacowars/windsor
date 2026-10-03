@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PPQ,
   TICKS_PER_BAR,
-  catalogRow,
+  requireCatalogRow,
   ticksPerBar,
   toDisplay,
   valueAt,
@@ -54,9 +54,9 @@ import {
 const BAR = TICKS_PER_BAR;
 const SIXTEENTH = PPQ / 4;
 const SONG = 16 * BAR;
-const level = catalogRow('strip.level')!;
-const pan = catalogRow('strip.pan')!;
-const cutoff = catalogRow('voice.filter.cutoff')!;
+const level = requireCatalogRow('strip.level');
+const pan = requireCatalogRow('strip.pan');
+const cutoff = requireCatalogRow('voice.filter.cutoff');
 const P = (tick: number, value: number, bend = 0): AutomationPoint => ({ tick, value, bend });
 const draft = (edit: Partial<AutomationShapeSpec> = {}): AutomationShapeSpec => ({
   ...DEFAULT_SHAPE_SETTINGS,

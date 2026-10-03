@@ -9,7 +9,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { GridSpec, GridStep, StepModLane, VoiceTargetPath } from '@windsor/engine';
 import {
   ARRANGEMENT_VERSION,
-  catalogRow,
+  requireCatalogRow,
   gridNote,
   STEP_MOD_LANES_MAX,
   VOICE_TARGET_PATHS,
@@ -135,7 +135,7 @@ describe('painting', () => {
 describe("a lane's name (windsor#424)", () => {
   it("is the automation catalog's, one per target", () => {
     for (const param of VOICE_TARGET_PATHS) {
-      expect(laneLabel(param), param).toBe(catalogRow(voiceTargetId(param))!.label);
+      expect(laneLabel(param), param).toBe(requireCatalogRow(voiceTargetId(param)).label);
     }
     expect(new Set(VOICE_TARGET_PATHS.map(laneLabel)).size).toBe(VOICE_TARGET_PATHS.length);
   });

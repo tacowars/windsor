@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PPQ,
   TICKS_PER_BAR,
-  catalogRow,
+  requireCatalogRow,
   toDisplay,
   valueAt,
   type AutomationPoint,
@@ -47,8 +47,8 @@ const BAR = TICKS_PER_BAR;
 const SIXTEENTH = PPQ / 4;
 const H = 56;
 const frame: LaneFrame = { pxPerBar: 96, heightPx: H, songTicks: 4 * BAR };
-const pan = catalogRow('strip.pan')!;
-const level = catalogRow('strip.level')!;
+const pan = requireCatalogRow('strip.pan');
+const level = requireCatalogRow('strip.level');
 const P = (tick: number, value: number, bend = 0): AutomationPoint => ({ tick, value, bend });
 /** Pan from hard left at bar 1 to hard right at bar 3, then held. */
 const ramp: AutomationPoint[] = [P(0, -1), P(2 * BAR, 1), P(3 * BAR, 1)];
@@ -143,7 +143,7 @@ describe('the Edit gestures', () => {
 
   it('adds a point on a bent line without moving the curve', () => {
     const lane = AUTOMATION_PART.automation!.find((l) => l.target === 'voice.filter.cutoff')!;
-    const cutoff = catalogRow('voice.filter.cutoff')!;
+    const cutoff = requireCatalogRow('voice.filter.cutoff');
     const original = lane.points;
     const shown = (points: readonly AutomationPoint[], t: number): number =>
       toDisplay(cutoff, valueAt(cutoff, points, t));

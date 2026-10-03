@@ -17,7 +17,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { loadProcessor } from '../__fixtures__/workletHarness';
-import { catalogRow, voiceTargetId } from '../automation/automationTargets';
+import { requireCatalogRow, voiceTargetId } from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { ST_DECAY, ST_SUSTAIN, segmentLevel } from '../worklet/fm/envelope';
 import { voiceSlotParamName } from './audioPart';
@@ -97,7 +97,7 @@ function laneValue(path: string): number {
 }
 
 const offsetFor = (path: string): number =>
-  voiceOffset(PATCH, path, catalogRow(voiceTargetId(path))!, laneValue(path));
+  voiceOffset(PATCH, path, requireCatalogRow(voiceTargetId(path)), laneValue(path));
 
 /**
  * Each control block's copy of the envelope `path` moves, a note held, slot 0
@@ -248,7 +248,7 @@ describe('a held decay lane through an edit of its own base (windsor#347)', () =
   it.each(held)('%s at note %i, moved at block %i, resynced %i late', (path, note, from, late) => {
     const offset = offsetFor(path);
     const to = baseMoved(path);
-    const resynced = voiceOffset(to, path, catalogRow(voiceTargetId(path))!, laneValue(path));
+    const resynced = voiceOffset(to, path, requireCatalogRow(voiceTargetId(path)), laneValue(path));
     const plain = trace(note, path, offset, from);
     const resyncAt = EDIT_AT + late;
     const edit = { at: EDIT_AT, to, offset: resynced, resyncAt };

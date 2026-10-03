@@ -6,7 +6,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InsertSpec } from '@windsor/engine';
-import { DEFAULT_ADVANCED_DRIVE, RETURNS, createInsertIdSource } from '@windsor/engine';
+import {
+  DEFAULT_ADVANCED_DRIVE,
+  RETURNS,
+  RETURN_NAMES,
+  createInsertIdSource,
+} from '@windsor/engine';
 import { FieldNormaliser } from '@windsor/engine/song/arrangementFields';
 import { normaliseInserts } from '@windsor/engine/inserts/insertRegistry';
 import { addInsert, addInsertAtFront, moveInsert, removeInsert } from './insertEdits';
@@ -80,7 +85,7 @@ describe('insertIdAt', () => {
   });
 
   it('gives a send bus default chain the ids normalising gives it, so a save keeps its state', () => {
-    for (const bus of ['a', 'b'] as const) {
+    for (const bus of RETURN_NAMES) {
       const code = RETURNS[bus].inserts;
       const saved = normaliseInserts(code, `returns.${bus}.inserts`, new FieldNormaliser());
       expect(insertIdAt(code, 0), bus).toBe(saved[0]!.id);
@@ -138,7 +143,7 @@ describe('the view follows each insert through edits, undo and redo', () => {
     'remove the second': [FIRST],
   };
 
-  for (const chain of ['1', 'master', 'a', 'b']) {
+  for (const chain of ['1', 'master', ...RETURN_NAMES]) {
     for (const [name, edit] of Object.entries(edits)) {
       it(`${name}, then undo, then redo, on chain ${chain}`, () => {
         const { list: before, view } = setUp(chain);

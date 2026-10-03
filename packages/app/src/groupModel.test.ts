@@ -7,7 +7,13 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { ArrangementDocument } from '@windsor/engine';
-import { ARRANGEMENT_VERSION, DEFAULT_GROUP, MAX_GROUPS, partAt } from '@windsor/engine';
+import {
+  ARRANGEMENT_VERSION,
+  DEFAULT_GROUP,
+  MAX_GROUPS,
+  RETURN_NAMES,
+  partAt,
+} from '@windsor/engine';
 import { openGestureConsole } from './__fixtures__/gestureConsole';
 import { loadBuiltIns } from './builtInLibrary';
 import { settleGestures } from './gestureHooks';
@@ -200,7 +206,8 @@ describe('a group’s chain as an insert target', () => {
     const target = groupKey(2);
     expect(isGroupTarget(target)).toBe(true);
     expect(isBusTarget(target)).toBe(false);
-    for (const other of [0, 'master', 'a', 'b'] as const) expect(isGroupTarget(other)).toBe(false);
+    for (const other of [0, 'master', ...RETURN_NAMES] as const)
+      expect(isGroupTarget(other)).toBe(false);
     const chain = addInsert(addInsert([], 'compressor', target), 'tape', target);
     expect(insertChange(target, chain)).toEqual({ groups: { 2: { inserts: chain } } });
     expect(ctx.change(insertChange(target, chain)).ok).toBe(true);
