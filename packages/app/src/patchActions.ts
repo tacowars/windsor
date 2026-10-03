@@ -207,3 +207,52 @@ export function unsavedQuestion(scope: PatchScope, working: Patch): string | nul
   const what = origin.kind === 'init' ? 'the Init patch' : `"${working.name}"`;
   return `Discard the unsaved edits to ${what}? Save or Copy to new keeps them in the library.`;
 }
+
+/**
+ * The browser's Save as… (windsor#522): `patch` — the selected row's, not
+ * the part's — as a new entry in the user's library (or the folder) under
+ * `meta`. No part switches to it. `taken` adds the song's ids, so the new
+ * id never lands under a song copy. Returns the new id.
+ */
+export async function copyToLibrary(
+  library: LibraryModel,
+  patch: Patch,
+  meta: PatchMetadata,
+  taken: readonly string[] = [],
+): Promise<string> {
+  const id = uniqueId(slugify(meta.name), [...Object.keys(library.entries), ...taken]);
+  await writeLibraryFile(library, id, patchFileText(buildPatchFile(meta, patch)));
+  return id;
+}
+
+/**
+ * The browser's Rename of a library patch no song copy shadows (windsor#522):
+ * the file keeps its id and takes `name` as its display name. Refused for a
+ * patch the library may not write: a built-in in this browser.
+ */
+export async function renameLibraryPatch(
+  library: LibraryModel,
+  id: string,
+  name: string,
+): Promise<void> {
+  const entry = Object.hasOwn(library.entries, id) ? library.entries[id] : undefined;
+  if (!entry || !isWritable(library, id))
+    throw new Error(`"${id}" is a built-in patch and stays read-only.`);
+  const meta: PatchMetadata = {
+    name,
+    category: entry.category,
+    tags: [...entry.tags],
+    description: entry.description,
+  };
+  await writeLibraryFile(library, id, patchFileText(buildPatchFile(meta, entry.patch)));
+}
+
+/**
+ * The browser's Delete of a song patch no part plays (windsor#522): the copy
+ * leaves the song as one undo step. Refused while a part plays it, which
+ * would leave that part naming a patch that has gone. True when it went.
+ */
+export function deleteSongPatch(ctx: AppCtx, id: string): boolean {
+  if (!ctx.model.doc.patches?.[id] || playedPresets(ctx).has(id)) return false;
+  return withGesture('Delete song patch', () => ctx.change({ patches: { [id]: null } }).ok);
+}
