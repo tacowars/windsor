@@ -35,9 +35,12 @@ import {
   boxTick,
   edgeBandPx,
   forKind,
+  frozenColumnPx,
   hitBlocks,
   isNarrowBlock,
   mixerColumnPx,
+  mixerLeadPx,
+  partBlockRows,
   pxToTick,
   rulerLabelEvery,
   rulerLabels,
@@ -280,29 +283,45 @@ describe('the tick under a drawn block (windsor#21)', () => {
   });
 });
 
-describe('the mixer column (windsor#157)', () => {
-  it('puts the timeline past the names, the mixer and the gap after each', () => {
-    expect(timelineLeftCss(2.5)).toBe(
-      'calc(var(--names) + var(--mixer) + 2 * var(--gap) + var(--bar) * 2.5)',
+describe('the one frozen column (windsor#534)', () => {
+  /** Where the timeline started before windsor#534: names 120, gap 8, mixer 132, gap 8. */
+  const TWO_COLUMNS_LEFT_PX = 268;
+  const KNOBS = 5;
+
+  it('puts the timeline past the column and its gap', () => {
+    expect(timelineLeftCss(2.5)).toBe('calc(var(--frozen) + var(--gap) + var(--bar) * 2.5)');
+  });
+
+  it('is the tab, ▸ and the strip, and gives the timeline back 46 px', () => {
+    expect(mixerLeadPx()).toBe(80);
+    expect(frozenColumnPx(false, KNOBS)).toBe(214);
+    const left = frozenColumnPx(false, KNOBS) + SONG_VIEW.laneGapPx;
+    expect(TWO_COLUMNS_LEFT_PX - left).toBe(46);
+  });
+
+  it('grows by the strip’s knob columns when ▸ Mixer expands it (windsor#158)', () => {
+    expect(mixerColumnPx(false, KNOBS)).toBe(SONG_VIEW.mixerWidthPx);
+    expect(mixerColumnPx(true, KNOBS)).toBe(
+      SONG_VIEW.mixerExpandedBasePx + KNOBS * SONG_VIEW.mixerKnobColumnPx,
     );
-    expect(cssRule('.lanes')).toMatch(
-      /grid-template-columns: var\(--names\) var\(--mixer\) calc\(var\(--bars\) \* var\(--bar\)\);/,
+    expect(frozenColumnPx(true, KNOBS) - frozenColumnPx(false, KNOBS)).toBe(
+      mixerColumnPx(true, KNOBS) - mixerColumnPx(false, KNOBS),
     );
+    expect(frozenColumnPx(true, KNOBS + 1) - frozenColumnPx(true, KNOBS)).toBe(
+      SONG_VIEW.mixerKnobColumnPx,
+    );
+  });
+
+  it('wraps a folded part’s row alone, and an open part from its row to its add row', () => {
+    expect(partBlockRows(false, 3)).toEqual(['part']);
+    expect(partBlockRows(true, 3)).toEqual(['part', 'lane', 'lane', 'lane', 'add']);
+    expect(partBlockRows(true, 0)).toEqual(['part', 'add']);
   });
 
   it('makes the Harmony lane as tall as a part row, and fits the compact knob in one', () => {
     const height = (selector: string): number => parseFloat(cssValue(cssRule(selector), 'height'));
     expect(height('.lane.lane-harm')).toBe(height('.lane'));
     expect(knobGeometry({ compact: true }).size).toBeLessThan(height('.lane'));
-  });
-
-  it('widens the column when expanded, by one column a knob (windsor#158)', () => {
-    expect(mixerColumnPx(false, 5)).toBe(SONG_VIEW.mixerWidthPx);
-    expect(mixerColumnPx(true, 5)).toBe(
-      SONG_VIEW.mixerExpandedBasePx + 5 * SONG_VIEW.mixerKnobColumnPx,
-    );
-    expect(mixerColumnPx(true, 6) - mixerColumnPx(true, 5)).toBe(SONG_VIEW.mixerKnobColumnPx);
-    expect(mixerColumnPx(true, 5)).toBeGreaterThan(mixerColumnPx(false, 5));
   });
 });
 
@@ -316,23 +335,25 @@ const blockFramePx = (selector: string): number =>
 
 /**
  * The expanded mixer cell's base, as its CSS grid sizes it. The px tracks are
- * the gutter, Output, M, S and the lights; the knobs' are fractions, and each
- * knob column carries its own gap (mixerKnobColumnPx), so the base holds one
- * gap fewer than it has fixed tracks. `.mix-cell`'s `padding: 0 <horizontal>`
- * adds both sides.
+ * Output, M and S, and the lights; the knobs' are fractions, and each knob
+ * column carries its own gap (mixerKnobColumnPx), so the base holds one gap
+ * fewer than it has fixed tracks.
  */
 const expandedMixerBasePx = (selector: string): number => {
   const tracks = [...cssValue(cssRule(selector), 'grid-template-columns').matchAll(/(\d+)px/g)];
   const fixed = tracks.reduce((sum, m) => sum + Number(m[1]), 0);
-  const gaps = (tracks.length - 1) * cssWordPx(selector, 'column-gap', 0);
-  return fixed + gaps + 2 * cssWordPx('.mix-cell', 'padding', 1);
+  return fixed + (tracks.length - 1) * cssWordPx(selector, 'column-gap', 0);
 };
+
+/** A rule's `height`, as px. */
+const heightPx = (selector: string): number => cssWordPx(selector, 'height', 0);
 
 /** Each TS px constant the Song view draws with, and how its CSS value is read: [constant, TS px, selector, read]. */
 const TS_PX_IN_CSS: readonly (readonly [string, number, string, (selector: string) => number])[] = [
   ['NARROW_BLOCK_PX', NARROW_BLOCK_PX, '.reg', blockFramePx],
   ['NARROW_BLOCK_PX', NARROW_BLOCK_PX, '.hblk', blockFramePx],
   ['mixerExpandedBasePx', SONG_VIEW.mixerExpandedBasePx, '.mix-cell.expanded', expandedMixerBasePx],
+  ['partLanePx', SONG_VIEW.partLanePx, '.lane', heightPx],
 ];
 
 describe('the TS px the Song view draws with', () => {

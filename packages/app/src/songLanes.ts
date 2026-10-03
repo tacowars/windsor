@@ -15,9 +15,10 @@
  * the pattern, a split gives both halves a copy, and a drawn region copies
  * its neighbour's (`partEdits.ts`'s `drawRegionChange`).
  *
- * The name cell's `▸` folds the part's automation lanes out beneath it
- * (windsor#348; `songAutomationLane.ts` draws them), and a folded part with
- * lanes shows their count.
+ * The part's row in the frozen column holds its `▸`, which folds its
+ * automation lanes out beneath it (windsor#348; `songAutomationLane.ts`
+ * draws them), a folded part's lane count under it, and its mixer strip
+ * (windsor#534; `songLaneColumn.ts` puts the row in the part's block).
  */
 import type { DocumentPart, MusicPart, PartRegion, Region } from '@windsor/engine';
 import { regionPattern } from '@windsor/engine';
@@ -25,7 +26,6 @@ import { el } from './dom';
 import { drawRegionChange, regionGrain, splitPartRegion } from './partEdits';
 import type { RegionDrag } from './regionModel';
 import { dragRegion, regionMark } from './regionModel';
-import { KIND_LABELS } from './sequencerConstants';
 import { laneCountLabel } from './songAutomationModel';
 import type { SongView } from './songTab';
 import {
@@ -290,27 +290,37 @@ function foldButton(view: SongView, part: DocumentPart): HTMLButtonElement {
   return button;
 }
 
-/** The name-column cell and the lane of regions for `part`. */
-export function partLaneRow(view: SongView, part: DocumentPart): [HTMLElement, HTMLElement] {
+/** Whether the view's selection is `part` or one of its regions. */
+export const partSelected = (view: SongView, part: DocumentPart): boolean => {
   const selected = view.state.selection;
-  const isSelected = selected?.kind === 'part' && selected.slot === part.slot;
-  const name = el('div', `lane-name${isSelected ? ' selected' : ''}`);
-  name.appendChild(foldButton(view, part));
-  const nm = el('span', 'nm');
-  nm.appendChild(el('b', '', part.name));
-  nm.appendChild(el('small', '', KIND_LABELS[part.sequencer.kind].toLowerCase()));
-  name.appendChild(nm);
+  return selected?.kind === 'part' && selected.slot === part.slot;
+};
+
+/**
+ * The part's row in the frozen column (windsor#534 decision 2): `▸` with a
+ * folded part's lane count stacked under it, then `strip`, its mixer strip.
+ * The strip shows the part's name and kind, so the row repeats neither.
+ */
+export function partRow(view: SongView, part: DocumentPart, strip: HTMLElement): HTMLElement {
+  const row = el('div', 'lane-part');
+  row.title = part.name;
+  const fold = el('div', 'lane-fold');
+  fold.appendChild(foldButton(view, part));
   const lanes = part.automation?.length ?? 0;
   if (lanes > 0 && !view.state.openParts.has(part.slot)) {
-    name.classList.add('has-badge');
-    name.appendChild(el('span', 'auto-badge', laneCountLabel(lanes)));
+    fold.appendChild(el('span', 'auto-badge', laneCountLabel(lanes)));
   }
-  name.onclick = (): void => view.select({ kind: 'part', slot: part.slot, region: null });
-  const lane = el('div', `lane${isSelected ? ' selected' : ''}`);
+  row.append(fold, strip);
+  return row;
+}
+
+/** The lane of regions for `part`. */
+export function partLane(view: SongView, part: DocumentPart): HTMLElement {
+  const lane = el('div', `lane${partSelected(view, part) ? ' selected' : ''}`);
   lane.title =
     'click an empty stretch to add a bar · drag an edge to resize, the body to move · ' +
     'shift snaps to the step · alt-click splits';
   paintRegions(view, lane, part, part.regions);
   wireLane(view, lane, part);
-  return [name, lane];
+  return lane;
 }

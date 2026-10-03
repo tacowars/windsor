@@ -2,15 +2,16 @@
  * A part's automation lanes on the Song view (windsor#348; record
  * `2026-10-01-song-automation-lanes` decision 13; the mockup
  * `docs/design/automation-lanes-mockup.html`): the rows a part's `▸` folds
- * out beneath it, each in the grid's three columns.
+ * out beneath it, each a label in the frozen column and a stretch of
+ * timeline (windsor#534).
  *
- * - **A lane** is its colour chip, name and kind; its value at the playhead,
- *   an on/off ● and a delete ×; and its curve over the part's ghosted
- *   regions. The toolbar's Edit and Draw tools edit the curve in place
+ * - **A lane** is its colour chip, name and kind, beside its value at the
+ *   playhead over an on/off ● and a delete ×; and its curve over the part's
+ *   ghosted regions. The toolbar's Edit and Draw tools edit the curve in place
  *   (windsor#349, `songAutomationGesture.ts`), and its Shape tool stamps a
  *   shape over a range (windsor#350, `songShapeRange.ts`).
- * - **The add row** is the "+ Add lane" picker, the voice count against
- *   `FM_LANES_MAX`, and an empty stretch of timeline.
+ * - **The add row** is the "+ Add lane" picker beside the voice count
+ *   against `FM_LANES_MAX`, and an empty stretch of timeline.
  *
  * Every edit is one `view.commit` inside a named gesture, so it is one undo
  * step. The value readouts are handed back as `Readout`s, which the view's
@@ -154,24 +155,33 @@ function laneTimeline(view: SongView, part: DocumentPart, lane: AutomationLane):
   return timeline;
 }
 
-/** One lane's three cells: the name, the mixer column's value and buttons, the curve. */
+/** A row in the frozen column and its stretch of timeline. */
+export interface LaneRowCells {
+  readonly label: HTMLElement;
+  readonly timeline: HTMLElement;
+}
+
+/**
+ * One lane's label and curve. The label (windsor#534 decision 3) is its
+ * colour chip, its name over its kind, and beside them its value at the
+ * playhead over ● and ×.
+ */
 function laneCells(
   view: SongView,
   part: DocumentPart,
   lane: AutomationLane,
   readouts: Readout[],
-): HTMLElement[] {
+): LaneRowCells {
   const title = laneTitle(part, lane.target);
   const activity = laneActivity(part, lane.target);
   const dim = !lane.on || !activity.active;
   const color = LANE_KIND_COLOR[title.kind];
-  const name = el('div', 'lane-name auto-name');
-  name.title = `${title.name} · ${title.kindLine}`;
+  const label = el('div', `lane-auto${dim ? ' off' : ''}`);
+  label.title = `${title.name} · ${title.kindLine}`;
   const text = el('span', 'nm');
   text.append(el('b', '', title.name), el('small', '', title.kindLine));
-  name.append(el('span', 'auto-chip'), text);
-
-  const mix = el('div', `mix-cell auto-mix${dim ? ' off' : ''}`);
+  const side = el('span', 'auto-side');
+  label.append(el('span', 'auto-chip'), text, side);
   const value = el('span', 'auto-value');
   const key = `${part.slot}:${lane.target}`;
   const on = miniButton('●', `${title.name} lane on`, `on:${key}`);
@@ -192,7 +202,7 @@ function laneCells(
   };
   const buttons = el('span', 'auto-buttons');
   buttons.append(on, del);
-  mix.append(value, buttons);
+  side.append(value, buttons);
   const row = laneRow(part, lane.target);
   if (!activity.active) {
     value.textContent = 'inactive';
@@ -203,8 +213,8 @@ function laneCells(
 
   const timeline = laneTimeline(view, part, lane);
   timeline.classList.toggle('off', dim);
-  for (const cell of [name, mix, timeline]) cell.style.setProperty('--lane-c', color);
-  return [name, mix, timeline];
+  for (const cell of [label, timeline]) cell.style.setProperty('--lane-c', color);
+  return { label, timeline };
 }
 
 /** The picker over `pickerGroups`: a pick adds that target's lane, flat at its current value. */
@@ -237,12 +247,11 @@ function lanePicker(view: SongView, part: DocumentPart): HTMLSelectElement {
   return picker;
 }
 
-/** The "+ Add lane" row: the picker, the voice count, an empty timeline. */
-function addRowCells(view: SongView, part: DocumentPart): HTMLElement[] {
-  const name = el('div', 'lane-name auto-add');
-  name.appendChild(lanePicker(view, part));
-  const count = el('div', 'mix-cell auto-count', voiceCountLabel(lanesOf(part)));
-  return [name, count, el('div', 'auto-add-lane')];
+/** The "+ Add lane" row: the picker and the voice count side by side, over an empty timeline. */
+function addRowCells(view: SongView, part: DocumentPart): LaneRowCells {
+  const label = el('div', 'lane-add');
+  label.append(lanePicker(view, part), el('span', 'auto-count', voiceCountLabel(lanesOf(part))));
+  return { label, timeline: el('div', 'auto-add-lane') };
 }
 
 /**
@@ -253,9 +262,9 @@ export function automationRows(
   view: SongView,
   part: DocumentPart,
   readouts: Readout[],
-): HTMLElement[] {
+): LaneRowCells[] {
   return [
-    ...lanesOf(part).flatMap((lane) => laneCells(view, part, lane, readouts)),
-    ...addRowCells(view, part),
+    ...lanesOf(part).map((lane) => laneCells(view, part, lane, readouts)),
+    addRowCells(view, part),
   ];
 }
