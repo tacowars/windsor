@@ -284,8 +284,11 @@ function operatorRow(editor: PatchEditor, i: number, isCar: boolean): HTMLElemen
   const { canvas, redraw } = envelopeCanvas(editor, i, color);
   const adsr = el('div', 'op-group');
   adsr.appendChild(envKnobs(editor, `ops.${i}.env`, color, redraw));
+  // Coarse through Release are one unit that never wraps apart.
+  const knobLine = el('div', 'op-knobs');
+  knobLine.append(knobs.root, adsr);
   const core = el('div', 'op-core');
-  core.append(knobs.root, adsr, canvas);
+  core.append(knobLine, canvas);
   const body = el('div', 'op-body');
   body.appendChild(core);
 

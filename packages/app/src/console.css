@@ -4973,8 +4973,8 @@ input.field {
   --op-core-gap: 14px;
   --op-env: 560px;
   --op-env-min: 140px;
-  --op-main: calc(7 * var(--op-cell) + var(--op-readout) + 7 * var(--op-gap));
-  --op-adsr: calc(4 * var(--op-cell) + 3 * var(--op-gap));
+  --op-cols: 7;
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -5042,6 +5042,10 @@ input.field {
   font-size: 11.5px;
 }
 .op-body {
+  /* Declared here, not on .op-rows, so the narrow-row query below can
+     tighten the gaps they are built from. */
+  --op-main: calc(var(--op-cols) * (var(--op-cell) + var(--op-gap)) + var(--op-readout));
+  --op-adsr: calc(4 * var(--op-cell) + 3 * var(--op-gap));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -5049,7 +5053,22 @@ input.field {
   min-width: 0;
 }
 .op-rows:has(.op-noise) {
-  --op-main: calc(9 * var(--op-cell) + var(--op-readout) + 9 * var(--op-gap));
+  --op-cols: 9;
+}
+/* Narrow rows (a 1366 px window, with the right column still beside the
+   deck) can't hold a Noise operator's knobs at the full gaps: they need
+   about 864 px. There the frame closes up instead (the knob gaps, the gap
+   between the knob groups and the identity column's gap), so Coarse through
+   Release stay on one line and the knob cells keep their size. This queries
+   the rows' own width, not the screen. */
+@container (width < 880px) {
+  .op-row {
+    column-gap: 8px;
+  }
+  .op-body {
+    --op-gap: 2px;
+    --op-core-gap: 8px;
+  }
 }
 /* The core's basis is its knobs plus a 560 px envelope, and it grows to fill
    the row. The envelope is laid out from its 140 px floor, so the core wraps
@@ -5062,6 +5081,12 @@ input.field {
   gap: 6px var(--op-core-gap);
   flex: 1 1 calc(var(--op-main) + var(--op-adsr) + 2 * var(--op-core-gap) + var(--op-env));
   min-width: 0;
+}
+.op-knobs {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--op-core-gap);
 }
 .op-group {
   display: flex;
