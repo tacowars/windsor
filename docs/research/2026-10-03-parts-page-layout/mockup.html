@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Parts Page Layouts</title>
+<!-- Mockup only: Windsor's Parts tab re-framed three ways. Values are the "Organ"
+     part of life-out-of-balance.json (algorithm 08, KQ Cathedral Organ). The cells
+     (knobs, segments, envelope canvases, operator cards) are today's; the frame is new. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+<style>
+:root {
+  --ground: #171b1e; --panel: #1f2529; --panel-hi: #262d32; --inset: #121618; --well: #0c0f10;
+  --line: #2c3439; --line-bright: #3d4950; --ink: #dce3e3; --ink-dim: #8b9a9e; --ink-faint: #5e6b70;
+  --carrier: #e0a44e; --modulator: #5fa8a0; --return: #9c7bd0; --hot: #d2643c;
+  --f-panel: 'Chakra Petch', 'IBM Plex Sans', system-ui, sans-serif;
+  --f-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --f-num: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --r: 3px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #0b0d0e; color: var(--ink); font-family: var(--f-ui); font-size: 13px; -webkit-font-smoothing: antialiased; }
+
+/* ---------- mockup chrome (not part of the design) ---------- */
+.tb { position: sticky; top: 0; z-index: 50; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 10px 16px; background: #0b0d0e; border-bottom: 1px solid var(--line); }
+.tb .grp { display: flex; gap: 0; align-items: center; }
+.tb .lbl { font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin-right: 8px; }
+.tb button { font: 600 11px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-dim); background: var(--panel); border: 1px solid var(--line); padding: 6px 10px; cursor: pointer; margin-left: -1px; }
+.tb button:first-of-type { border-radius: var(--r) 0 0 var(--r); }
+.tb button:last-child { border-radius: 0 var(--r) var(--r) 0; }
+.tb button.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.tb .scale { font: 11px var(--f-num); color: var(--ink-faint); }
+.notes { max-width: 1180px; margin: 14px 16px 4px; padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); line-height: 1.5; color: var(--ink-dim); }
+.notes h2 { font: 700 15px var(--f-panel); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 0 0 6px; }
+.notes b { color: var(--ink); font-weight: 600; }
+.notes ul { margin: 6px 0 0; padding-left: 18px; }
+.notes .todo { color: var(--carrier); }
+.stage-wrap { padding: 14px 16px 40px; }
+.stage { position: relative; transform-origin: 0 0; }
+.screen-cap { font: 11px var(--f-num); color: var(--ink-faint); margin: 0 0 6px; }
+.screen { position: relative; overflow-y: auto; overflow-x: hidden; background: var(--ground); outline: 1px solid var(--line-bright); }
+body.solo .tb, body.solo .notes, body.solo .screen-cap { display: none; }
+body.solo .stage-wrap { padding: 0; }
+body.solo .screen { outline: none; }
+
+/* ---------- console cells (as today) ---------- */
+.section { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.section-title { display: flex; align-items: center; gap: 10px; font: 600 10.5px var(--f-panel); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-dim); margin: 0 0 9px; }
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.section-title .x { color: var(--ink-faint); letter-spacing: .08em; }
+.btn { font: 600 11px var(--f-panel); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 6px 11px; white-space: nowrap; }
+.btn.primary { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.btn.ghost { background: transparent; }
+.btn.icon { padding: 6px 8px; }
+.field { font: 13px var(--f-ui); color: var(--ink); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 8px; }
+.sel { font: 13px var(--f-ui); color: var(--ink); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 26px 5px 8px; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sel::after { content: '▾'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--ink-dim); font-size: 11px; }
+.field-label { display: block; font: 600 9.5px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); margin: 0 0 4px; }
+.hint { color: var(--ink-faint); font-size: 11.5px; line-height: 1.45; margin: 6px 0 0; }
+.seg { display: flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--inset); }
+.seg span { flex: 1 1 auto; text-align: center; font: 600 10.5px var(--f-panel); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); padding: 6px 7px; border-right: 1px solid var(--line); white-space: nowrap; }
+.seg span:last-child { border-right: 0; }
+.seg span.on { background: var(--modulator); color: #0d1716; }
+.seg.amber span.on { background: var(--carrier); color: #1a1408; }
+.knob-row { display: flex; flex-wrap: wrap; gap: 6px 4px; }
+.knob { width: 52px; display: flex; flex-direction: column; align-items: center; }
+.knob svg { display: block; }
+.knob .v { font: 10.5px var(--f-num); color: var(--ink); margin-top: 2px; white-space: nowrap; }
+.knob .l { font: 600 8.5px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.knob.dis { opacity: .45; }
+.knob.sm { width: 44px; }
+.readout { width: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.readout .big { font: 500 15px var(--f-num); color: var(--ink); }
+.readout .l { font: 600 8.5px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+.env { display: block; width: 100%; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); }
+.badge { font: 700 9.5px var(--f-panel); letter-spacing: .12em; text-transform: uppercase; padding: 2px 6px; border-radius: 2px; }
+.badge.car { background: rgba(224,164,78,.16); color: var(--carrier); }
+.badge.mod { background: rgba(95,168,160,.16); color: var(--modulator); }
+.stand-in { outline: 1px dashed var(--return); outline-offset: 2px; }
+.tag-new { font: 700 8.5px var(--f-panel); letter-spacing: .12em; color: var(--return); text-transform: uppercase; }
+
+/* header (as today) */
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--ground); border-bottom: 1px solid var(--line); }
+.head .row { display: flex; align-items: center; gap: 8px; width: 100%; }
+.head.one .row { width: auto; }
+.brand { font: 700 15px var(--f-panel); letter-spacing: .14em; margin-right: 10px; }
+.chip { font: 12px var(--f-num); color: var(--ink); background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 10px; white-space: nowrap; }
+.chip small { font: 600 9px var(--f-panel); letter-spacing: .1em; color: var(--ink-faint); margin-left: 4px; }
+.tabs { display: flex; }
+.tabs span { font: 600 11px var(--f-panel); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-dim); background: var(--inset); border: 1px solid var(--line); padding: 7px 14px; margin-left: -1px; }
+.tabs span.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+
+/* ---------- new frame pieces ---------- */
+.z { position: relative; }
+.pstrip { display: flex; align-items: stretch; gap: 4px; flex: 1; min-width: 0; }
+.pscroll { display: flex; gap: 3px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; }
+.pscroll::-webkit-scrollbar { display: none; }
+.pstrip.over .pscroll { -webkit-mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); mask-image: linear-gradient(to right, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); }
+.pnav, .plist { display: none; align-items: center; justify-content: center; width: 22px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); color: var(--ink-dim); font: 600 14px var(--f-panel); }
+.plist { width: 26px; font-size: 11px; }
+.pstrip.over .pnav, .pstrip.over .plist { display: flex; }
+.pm { display: flex; gap: 3px; }
+.pm .btn { display: flex; align-items: center; padding: 0 10px; font-size: 15px; }
+.pchip { scroll-snap-align: start; }
+.ob { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+.ob .core { display: flex; flex-wrap: nowrap; align-items: center; gap: 14px; flex: 1 1 1190px; min-width: 0; } /* basis: knobs + a 560px envelope; grows to fill the row */
+.ob .grp { display: flex; gap: 4px; flex: none; }
+.ob .envbox { flex: 1 1 560px; min-width: 140px; }
+.ob .advgrp { display: flex; gap: 4px; flex: none; align-items: center; padding-left: 12px; border-left: 1px solid var(--line); }
+.ob .advgrp .gl { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 8.5px var(--f-panel); letter-spacing: .16em; color: var(--ink-faint); margin-right: 4px; }
+.btn.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
+.partstrip { display: flex; gap: 3px; flex: 1; min-width: 0; align-items: stretch; }
+.pchip { flex: 1 1 0; min-width: 0; max-width: 132px; background: var(--inset); border: 1px solid var(--line); border-left: 3px solid var(--line-bright); border-radius: var(--r); padding: 4px 7px 3px; line-height: 1.15; position: relative; }
+.pchip .n { font: 600 11px var(--f-panel); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.pchip .k { font: 500 9.5px var(--f-ui); color: var(--ink-faint); }
+.pchip.on { background: var(--carrier); border-color: var(--carrier); }
+.pchip.on .n, .pchip.on .k { color: #1a1408; }
+.pchip .dot { position: absolute; right: 5px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--modulator); opacity: .8; }
+.pchip.on .dot { background: #1a1408; }
+.pchip.add { flex: 0 0 auto; border-left-width: 1px; color: var(--ink-dim); font: 600 11px var(--f-panel); letter-spacing: .08em; display: flex; align-items: center; padding: 0 10px; }
+.bar { display: flex; align-items: center; gap: 8px; padding: 7px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: relative; }
+.bar .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.bar .grow { flex: 1; }
+.patchbox { display: flex; align-items: center; gap: 8px; min-width: 300px; max-width: 420px; flex: 1; background: var(--inset); border: 1px solid var(--line-bright); border-radius: var(--r); padding: 5px 10px; position: relative; }
+.patchbox .nm { font: 600 13px var(--f-ui); color: var(--ink); white-space: nowrap; }
+.patchbox .src { font: 11px var(--f-ui); color: var(--ink-faint); white-space: nowrap; }
+.patchbox .mod { width: 6px; height: 6px; border-radius: 50%; background: var(--carrier); }
+.patchbox .srch { margin-left: auto; color: var(--ink-faint); font-size: 12px; }
+.pop { position: absolute; top: calc(100% + 4px); width: 560px; background: var(--panel-hi); border: 1px solid var(--line-bright); border-radius: var(--r); box-shadow: 0 14px 40px rgba(0,0,0,.55); z-index: 20; padding: 10px; }
+.pop .filters { display: flex; gap: 6px; margin: 8px 0; }
+.pop .filters .sel { flex: 1; font-size: 12px; }
+.pop ul { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r); background: var(--inset); max-height: 300px; overflow: hidden; }
+.pop li { display: flex; gap: 10px; padding: 5px 9px; font-size: 12.5px; border-bottom: 1px solid #1a2023; }
+.pop li .c { color: var(--ink-faint); font-size: 11px; margin-left: auto; }
+.pop li.hl { background: #2f3a40; }
+.pop .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--ink-faint); }
+
+/* algorithm tiles (diagrams approximate) */
+.alg-grid { display: grid; grid-template-columns: repeat(var(--alg-cols, 3), 1fr); gap: 5px; }
+.alg { background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); padding: 6px 4px 3px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.alg.on { border-color: var(--carrier); background: #2a2216; }
+.alg .rw { display: flex; gap: 2px; }
+.alg .o { width: 9px; height: 8px; border-radius: 1px; background: #2d5551; }
+.alg .o.c { background: #b9853f; }
+.alg .num { font: 9px var(--f-num); color: var(--ink-faint); margin-top: 2px; }
+
+.scope { height: 74px; background: var(--inset); border: 1px solid var(--line); border-radius: var(--r); position: relative; }
+.scope::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed #26302f; }
+
+/* operator card (as today) */
+.opcard { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--carrier); border-radius: var(--r); }
+.opcard.m { border-left-color: var(--modulator); }
+.opcard .hd { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-hi); }
+.opcard .letter { font: 700 15px var(--f-panel); color: var(--carrier); }
+.opcard.m .letter { color: var(--modulator); }
+.opcard .bd { padding: 10px 12px; }
+.wp { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 8px; }
+.wp .sel { flex: 1; }
+
+/* operator row (layout B) */
+.oprow { display: grid; grid-template-columns: 138px minmax(0, 1fr); gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--carrier); border-radius: var(--r); padding: 7px 10px; }
+.oprow .id { display: flex; flex-direction: column; gap: 5px; }
+.oprow .id .t { display: flex; align-items: center; gap: 8px; }
+.oprow .id .letter { font: 700 17px var(--f-panel); color: var(--carrier); }
+.oprow .id .ln { display: flex; gap: 4px; }
+.oprow .id .sel { font-size: 11.5px; padding: 3px 20px 3px 6px; flex: 1; }
+.oprow .id .btn { padding: 3px 6px; font-size: 10px; }
+.colhead { display: grid; grid-template-columns: 138px auto minmax(140px, 1fr) auto auto; gap: 12px; padding: 0 13px; font: 600 9px var(--f-panel); letter-spacing: .14em; color: var(--ink-faint); text-transform: uppercase; }
+
+/* mini cells (layout C) */
+.mini { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--line-bright); border-radius: var(--r); padding: 6px 8px 7px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mini.car { border-top-color: var(--carrier); }
+.mini.modc { border-top-color: var(--modulator); }
+.mini.focus { background: #2a2216; border-color: var(--carrier); }
+.mini.focus2 { background: #18292a; border-color: var(--modulator); }
+.mini .mt { display: flex; justify-content: space-between; align-items: baseline; font: 600 10px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+.mini .mt b { font: 700 13px var(--f-panel); color: var(--ink); letter-spacing: .08em; }
+.mini .kv { display: flex; gap: 2px; justify-content: space-between; }
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+.pane .ph { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel-hi); font: 600 11px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim); }
+.pane .ph .ttl { font: 700 14px var(--f-panel); color: var(--ink); letter-spacing: .1em; }
+
+/* modules in a deck */
+.deck { display: flex; flex-wrap: wrap; gap: 8px; }
+.mod-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; flex: 1 1 var(--mod-basis, 300px); min-width: 0; }
+
+/* keyboard */
+.keys-row { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--ground); }
+.keys { flex: 1; height: 44px; display: flex; position: relative; min-width: 0; }
+.keys i { flex: 1; background: #20272b; border: 1px solid #12171a; border-radius: 0 0 2px 2px; }
+.keys i.b { background: #0d1012; flex: .7; margin: 0 -1px; height: 60%; z-index: 1; }
+.keys-row .btns { display: flex; gap: 6px; }
+
+/* full browser */
+.browser { position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--ground); display: grid; grid-template-columns: 230px minmax(0, 1fr) 340px; grid-template-rows: auto minmax(0, 1fr); border-top: 1px solid var(--line-bright); }
+.browser .bh { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; padding: 10px 16px; background: var(--panel-hi); border-bottom: 1px solid var(--line); }
+.browser .facets { border-right: 1px solid var(--line); overflow: hidden; }
+.browser .fl { display: flex; justify-content: space-between; padding: 4px 8px; border-radius: 2px; font-size: 12.5px; color: var(--ink-dim); }
+.browser .fl.on { background: #2f3a40; color: var(--ink); }
+.browser .fl span:last-child { font: 11px var(--f-num); color: var(--ink-faint); }
+.tagc { display: flex; flex-wrap: wrap; gap: 4px; }
+.tagc span { font-size: 11px; color: var(--ink-dim); background: var(--inset); border: 1px solid var(--line); border-radius: 10px; padding: 2px 8px; }
+.tagc span.on { border-color: var(--modulator); color: var(--modulator); }
+.browser table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.browser th { text-align: left; font: 600 9.5px var(--f-panel); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-faint); padding: 8px 10px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--ground); }
+.browser td { padding: 6px 10px; border-bottom: 1px solid #1d2326; color: var(--ink-dim); white-space: nowrap; }
+.browser td:first-child { color: var(--ink); }
+.browser tr.hl td { background: #2f3a40; }
+.browser .info { border-left: 1px solid var(--line); padding: 14px 16px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+</style>
+</head>
+<body>
+<div class="tb" id="tb"></div>
+<div class="notes" id="notes"></div>
+<div class="stage-wrap"><div class="screen-cap" id="cap"></div><div class="stage" id="stage"><div class="screen" id="screen"></div></div></div>
+<script>
+'use strict';
+// ---------------------------------------------------------------- state
+const SCREENS = {
+  '2560': { w: 2560, h: 1300, label: '27″ 4K (2560×1300)' },
+  '1440': { w: 1440, h: 800, label: 'MacBook Air (1440×800)' },
+  '1366': { w: 1366, h: 960, label: 'iPad Pro 12.9″ (1366×960)' },
+};
+const LAYOUTS = { A: 'A · Top bars', B: 'B · Operator rows', C: 'C · Overview + focus' };
+const S = { layout: 'B', screen: '1440', zoom: 1, parts: 16, adv: 'A', pop: false, browser: false, fit: true, notes: true, solo: false };
+(function readHash() {
+  for (const part of location.hash.slice(1).split('&')) {
+    if (LAYOUTS[part]) S.layout = part;
+    if (SCREENS[part]) S.screen = part;
+    if (part === 'pop') S.pop = true;
+    if (part === 'browser') S.browser = true;
+    if (part === 'solo') { S.solo = true; S.fit = false; }
+    if (part === 'full') S.full = true;
+    if (/^z\d+$/.test(part)) S.zoom = Number(part.slice(1)) / 100;
+    if (part === 'p8') S.parts = 8;
+    if (part === 'advall') S.adv = 'all';
+    if (part === 'advnone') S.adv = 'none';
+  }
+})();
+
+// ---------------------------------------------------------------- data (Organ, life-out-of-balance)
+const ALL_PARTS = [
+  ['Organ', 'Chord'], ['Basso', 'Grid'], ['Strings', 'Chord'], ['Wind', 'Arp'],
+  ['Grid', 'Arp'], ['Reactor', 'Basslead'], ['Brass', 'Chord'], ['Machine', 'Euclid'],
+  ['Kick', 'Euclid'], ['Snare', 'Euclid'], ['Closed Hat', 'Euclid'], ['Open Hat', 'Euclid'],
+  ['Clap', 'Grid'], ['Rim Shot', 'Euclid'], ['Pad Swell', 'None'], ['Lead Line', 'Arp'],
+];
+const parts = () => ALL_PARTS.slice(0, S.parts);
+const advOn = (k) => S.adv === 'all' || (S.adv === 'A' && k === 'A');
+const OPS = [
+  { k: 'A', car: true, wave: 'Sine', main: [['1', 'Coarse', .08], ['0.000', 'Fine', .5], ['R', '1.000'], ['0c', 'Detune', .5, 1], ['0.75', 'Level', .7], ['+0.00', 'Fdbk', .5, 1], ['65%', 'Width', .65], ['0.40', 'Vel', .4]], adsr: [['300m', .35], ['500m', .45], ['1.00', 1], ['1.10s', .55]], env: [.16, .5, .98, .35] },
+  { k: 'B', car: true, wave: 'Sine', main: [['2', 'Coarse', .14], ['0.000', 'Fine', .5], ['R', '2.000'], ['6c', 'Detune', .53, 1], ['0.45', 'Level', .45], ['+0.00', 'Fdbk', .5, 1], ['100%', 'Width', 1], ['0.40', 'Vel', .4]], adsr: [['450m', .4], ['500m', .45], ['1.00', 1], ['1.00s', .52]], env: [.22, .5, .98, .3] },
+  { k: 'C', car: true, wave: 'Sine', main: [['3', 'Coarse', .2], ['0.000', 'Fine', .5], ['R', '3.000'], ['0c', 'Detune', .5, 1], ['0.26', 'Level', .26], ['+0.00', 'Fdbk', .5, 1], ['100%', 'Width', 1], ['0.40', 'Vel', .4]], adsr: [['600m', .45], ['500m', .45], ['1.00', 1], ['900m', .5]], env: [.27, .5, .98, .28] },
+  { k: 'D', car: true, wave: 'Sine', main: [['sub', 'Coarse', .02], ['0.500', 'Fine', .75], ['R', '0.500'], ['-5c', 'Detune', .48, 1], ['0.55', 'Level', .55], ['+0.00', 'Fdbk', .5, 1], ['100%', 'Width', 1], ['0.40', 'Vel', .4]], adsr: [['250m', .32], ['500m', .45], ['1.00', 1], ['1.30s', .58]], env: [.12, .5, .98, .38] },
+];
+const ADV = [['0.00', 'Init', 0], ['1.00', 'Peak', 1], ['0.00', 'End', 0], ['+0.00', 'A Crv', .5, 1], ['+0.50', 'D Crv', .75, 1], ['+0.50', 'R Crv', .75, 1], ['+0.00', 'Key', .5, 1]];
+const ALGS = [ // top row first; the last row are carriers. Diagrams approximate.
+  [['D'], ['C'], ['B'], ['A']], [['C', 'D'], ['B'], ['A']], [['D'], ['C', 'B'], ['A']],
+  [['D'], ['B', 'C'], ['A']], [['B', 'D'], ['A', 'C']], [['D'], ['A', 'B', 'C']],
+  [['C'], ['A', 'B', 'D']], [['A', 'B', 'C', 'D']], [['D'], ['C'], ['B', 'A']],
+  [['D'], ['C'], ['A', 'B']], [['B', 'C', 'D'], ['A']],
+];
+const PATCHES = [
+  ['KQ Cathedral Organ', 'Pads', 'organ, warm, long', 'This song'], ['KQ Glass Strings', 'Strings', 'glass, bowed', 'This song'],
+  ['KQ Grid Pluck', 'Plucks', 'short, digital', 'This song'], ['KQ Reactor Bass', 'Basses', 'mono, dark', 'This song'],
+  ['Hollow Droplet', 'Plucks', 'hollow, bell, soft', 'Built-in'], ['Glass Pebble', 'Plucks', 'glass, short, high', 'Built-in'],
+  ['Silver Dust', 'Pads', 'airy, high, glass', 'Built-in'], ['Drone SQR', 'Pads', 'drone, authored', 'Built-in'],
+  ['Warm Pressure', 'Basses', 'warm, soft, long', 'Built-in'], ['Carbon Reed', 'Basses', 'reedy, dark, mono', 'Built-in'],
+  ['Rust Ensemble', 'Strings', 'rough, bowed, tension', 'Built-in'], ['Wire Harmonics', 'Strings', 'harmonics, thin, cold', 'Built-in'],
+  ['909 Kick Hard', 'Drums', '909, kick, analog', 'Built-in'], ['808 Kick', 'Drums', '808, kick, analog', 'Built-in'],
+  ['909 Clap', 'Drums', '909, clap, analog', 'Built-in'], ['808 Closed Hat', 'Drums', '808, hat, analog', 'Built-in'],
+  ['909 Open Hat', 'Drums', '909, hat, metal', 'Built-in'], ['808 Cowbell', 'Drums', '808, perc, analog', 'Built-in'],
+  ['FM Open Hat', 'Drums', 'fm, hat, metal', 'Built-in'], ['Granular Hiss', 'Soundtrack FX', 'noise, static, restless', 'Built-in'],
+  ['Bright Air Riser', 'Soundtrack FX', 'noise, riser, bright', 'Built-in'], ['Dry Ticker', 'Soundtrack FX', 'ticker, rhythmic', 'Built-in'],
+];
+
+// ---------------------------------------------------------------- cells
+const COL = { car: 'var(--carrier)', mod: 'var(--modulator)', ink: 'var(--ink-dim)' };
+function pt(cx, cy, r, a) { const t = a * Math.PI / 180; return [cx + r * Math.sin(t), cy - r * Math.cos(t)]; }
+function arc(cx, cy, r, a0, a1) {
+  if (Math.abs(a1 - a0) < .5) return '';
+  const [x0, y0] = pt(cx, cy, r, Math.min(a0, a1)), [x1, y1] = pt(cx, cy, r, Math.max(a0, a1));
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)}A${r} ${r} 0 ${Math.abs(a1 - a0) > 180 ? 1 : 0} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+function knob(val, label, frac = .5, opt = {}) {
+  const size = opt.size || 30, c = size / 2, r = c - 3, col = COL[opt.c || 'mod'];
+  const a = -135 + 270 * frac, a0 = opt.bi ? 0 : -135;
+  const [px, py] = pt(c, c, r - 4, a);
+  return `<div class="knob${opt.dis ? ' dis' : ''}${opt.sm ? ' sm' : ''}"><svg width="${size}" height="${size}">
+    <circle cx="${c}" cy="${c}" r="${r - 1}" fill="#252c31" stroke="#11161a" stroke-width="2"/>
+    <path d="${arc(c, c, r + 1, -135, 135)}" stroke="#2c3439" stroke-width="2.5" fill="none"/>
+    <path d="${arc(c, c, r + 1, a0, a)}" stroke="${col}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <line x1="${c}" y1="${c}" x2="${px.toFixed(1)}" y2="${py.toFixed(1)}" stroke="#dce3e3" stroke-width="1.6" stroke-linecap="round"/>
+  </svg><span class="v">${val}</span><span class="l">${label}</span></div>`;
+}
+function knobs(list, c, extra = {}) {
+  return list.map((k) => k[0] === 'R' ? readout(k[1]) : knob(k[0], k[1], k[2], { c, bi: k[3], ...extra })).join('');
+}
+function readout(v) { return `<div class="readout"><span class="big">${v}</span><span class="l">Ratio</span></div>`; }
+function seg(opts, on, amber) { return `<div class="seg${amber ? ' amber' : ''}">${opts.map((o, i) => `<span class="${i === on ? 'on' : ''}">${o}</span>`).join('')}</div>`; }
+function title(t, x = '') { return `<div class="section-title"><span>${t}</span>${x ? `<span class="x">${x}</span>` : ''}</div>`; }
+function env(h, [a, d, s, r], c = 'car', mark = true) {
+  const W = 500, H = 100, p = 6;
+  const xa = p + (W - 2 * p) * a, xd = xa + (W - 2 * p) * .18, xr = W - p - (W - 2 * p) * r;
+  const ys = p + (H - 2 * p) * (1 - s), yb = H - p, yt = p;
+  const path = `M${p} ${yb} Q${p + (xa - p) * .45} ${yt} ${xa} ${yt} Q${xa + (xd - xa) * .3} ${ys} ${xd} ${ys} L${xr} ${ys} Q${xr + (W - p - xr) * .7} ${ys} ${W - p} ${yb}`;
+  return `<svg class="env" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${h}px">
+    ${[.25, .5, .75].map((f) => `<line x1="0" x2="${W}" y1="${H * f}" y2="${H * f}" stroke="#1d2427" stroke-dasharray="2 4"/>`).join('')}
+    ${mark ? `<line x1="${xr}" x2="${xr}" y1="${p}" y2="${yb}" stroke="#3d4950"/>` : ''}
+    <path d="${path}" stroke="${COL[c]}" stroke-width="2" fill="none" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function algTile(i, on) {
+  const rows = ALGS[i], last = rows.length - 1;
+  return `<div class="alg${on ? ' on' : ''}">${rows.map((row, ri) => `<div class="rw">${row.map(() => `<i class="o${ri === last ? ' c' : ''}"></i>`).join('')}</div>`).join('')}<span class="num">${String(i + 1).padStart(2, '0')}</span></div>`;
+}
+
+// ---------------------------------------------------------------- modules (today's contents)
+function algorithm(cols = 3) {
+  return title('Algorithm') + `<div class="alg-grid" style="--alg-cols:${cols}">${ALGS.map((_, i) => algTile(i, i === 7)).join('')}</div>
+    <p class="hint" style="margin-top:7px"><b style="color:var(--ink)">Additive</b> · A|B|C|D <span class="tag-new">diagrams approximate</span></p>`;
+}
+function global() {
+  return title('Global') + `<div class="knob-row">${knobs([['0.62', 'Volume', .5], ['0.85', 'Tone', .85], ['0m', 'Glide', 0], ['0c', 'Spread', 0], ['+0.00', 'Pan', .5, 1], ['0.00', 'Pan Rnd', 0]], 'ink')}</div>
+    <span class="field-label" style="margin-top:8px">Voicing</span>${seg(['Poly', 'Mono'], 0)}`;
+}
+function output() { return title('Output') + `<div class="scope"></div>`; }
+function drive() {
+  return title('Drive') + seg(['Off', 'On'], 0) + `<div style="margin:8px 0" class="sel" >Soft</div>
+    <div class="knob-row">${knobs([['×1.00', 'Drive', 0], ['+0.00', 'Bias', .5, 1], ['100%', 'Tone', 1]], 'mod', { dis: true })}</div>`;
+}
+function filter() {
+  return title('Filter') + seg(['Off', 'LP', 'HP', 'BP', 'Notch', 'Formant'], 1) +
+    `<div class="knob-row" style="margin-top:8px">${knobs([['3.20k', 'Cutoff', .62], ['0.70', 'Reso', .2], ['+0.00', 'Env Amt', .5, 1], ['+0.00', 'Wheel', .5, 1], ['+0.00', 'LFO Amt', .5, 1], ['+0.00', 'LFO 2 Amt', .5, 1], ['+0.30', 'Key Trk', .43, 1]], 'mod')}</div>
+    <span class="field-label" style="margin-top:8px">Slope</span>${seg(['12 dB', '24 dB'], 0)}`;
+}
+const ENV_KNOBS = (amt) => [...(amt ? [['+0.00st', 'Amount', .5, 1]] : []), ['2m', 'Attack', .05], [amt ? '100m' : '400m', 'Decay', .4], ['0.00', 'Sustain', 0], ['300m', 'Release', .35], ['0.00', 'Init', 0], ['1.00', 'Peak', 1], ['0.00', 'End', 0], ['+0.00', 'A Crv', .5, 1], ['+0.50', 'D Crv', .75, 1], ['+0.50', 'R Crv', .75, 1], ...(amt ? [] : [['+0.00', 'Key', .5, 1]])];
+function filterEnv(h = 60) { return title('Filter Env') + env(h, [.02, .5, .02, .2], 'mod') + `<div class="knob-row" style="margin-top:6px">${knobs(ENV_KNOBS(false), 'mod')}</div>`; }
+function pitchEnv(h = 60) {
+  return title('Pitch Env') + env(h, [.02, .5, .02, .2], 'car') + `<div class="knob-row" style="margin-top:6px">${knobs(ENV_KNOBS(true), 'car')}</div>
+    <span class="field-label" style="margin-top:8px">Envelope loop</span>${seg(['None', 'Loop', 'Trigger'], 0, true)}`;
+}
+function lfo(n) {
+  const one = n === 1;
+  return title(one ? 'LFO' : 'LFO 2') + seg(['Sine', 'Tri', 'Saw up', 'Saw down', 'Square', 'S&H', 'Drift'], one ? 0 : 6) +
+    `<div class="knob-row" style="margin-top:8px">${knobs([[one ? '6.10Hz' : '0.18Hz', 'Rate', one ? .7 : .2], ['1.00', 'Amount', 1], ['0.00', 'Wheel', 0], ['0m', 'Fade In', 0], [one ? '0.00st' : '0.04st', 'To Pitch', 0],
+      ...['A', 'B', 'C', 'D'].map((o) => [one ? (o === 'D' ? '+0.05' : '+0.07') : '+0.00', 'To ' + o, one ? .53 : .5, 1]),
+      ...['A', 'B', 'C', 'D'].map((o) => ['+0.00', 'Width ' + o, .5, 1])], 'mod')}</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><div style="flex:3"><span class="field-label">Phase</span>${seg(['Free', 'Retrigger', 'One-shot'], 0)}</div><div style="flex:2"><span class="field-label">Range</span>${seg(['Bipolar', 'Unipolar'], 0)}</div></div>`;
+}
+
+// ---------------------------------------------------------------- operators: card, row, mini
+function opCard(o, adv) {
+  return `<div class="opcard${o.car ? '' : ' m'}"><div class="hd"><span class="letter">${o.k}</span><span class="badge ${o.car ? 'car' : 'mod'}">${o.car ? 'Carrier' : 'Modulator'}</span><span style="flex:1"></span><span class="btn ghost">Adv</span></div>
+    <div class="bd"><div class="wp"><div style="flex:1"><span class="field-label">Wave</span><div class="sel">${o.wave}</div></div><div><span class="field-label">Pitch</span><span class="btn">Ratio</span></div></div>
+    <div class="knob-row">${knobs(o.main, 'car')}</div>
+    <div style="margin:8px 0">${env(56, o.env)}</div>
+    <div class="knob-row">${knobs(o.adsr.map((v, i) => [v[0], ['Attack', 'Decay', 'Sustain', 'Release'][i], v[1]]), 'car')}${adv ? knobs(ADV, 'car') : ''}</div></div></div>`;
+}
+function opRow(o) {
+  const adv = advOn(o.k);
+  return `<div class="oprow"><div class="id"><div class="t"><span class="letter">${o.k}</span><span class="badge ${o.car ? 'car' : 'mod'}">${o.car ? 'Carrier' : 'Mod'}</span><span style="flex:1"></span><span class="btn ghost${adv ? ' on' : ''}">Adv</span></div>
+      <div class="ln"><div class="sel">${o.wave}</div><span class="btn">Ratio</span></div></div>
+    <div class="ob"><div class="core"><div class="grp">${knobs(o.main, 'car', { sm: true })}</div>
+      <div class="grp">${knobs(o.adsr.map((v, i) => [v[0], ['Attack', 'Decay', 'Sustain', 'Release'][i], v[1]]), 'car', { sm: true })}</div>
+      <div class="envbox">${env(54, o.env)}</div></div>
+      ${adv ? `<div class="advgrp"><span class="gl">ADV ENV</span>${knobs(ADV, 'car', { sm: true })}</div>` : ''}</div></div>`;
+}
+function opMini(o, cls = '') {
+  return `<div class="mini car ${cls}"><div class="mt"><b>${o.k}</b><span>${o.wave} · ${o.main[2][1]}</span></div>
+    <div class="kv">${knob(o.main[4][0], 'Level', o.main[4][2], { c: 'car', sm: true, size: 26 })}${knob(o.main[3][0], 'Detune', o.main[3][2], { c: 'car', sm: true, size: 26, bi: 1 })}${knob(o.main[5][0], 'Fdbk', .5, { c: 'car', sm: true, size: 26, bi: 1 })}</div>
+    ${env(26, o.env, 'car', false)}</div>`;
+}
+
+// ---------------------------------------------------------------- frame: header, part strip, patch bar, keys
+function header(W) {
+  // No brand: the tabs take its place at the left of the first row; the part strip gets the whole second row.
+  const one = W >= 2900; // only past any target screen: 16 chips need the full second row
+  const tools = `<span class="btn primary">Enable audio</span><span class="chip">↶</span><span class="chip">↷</span>
+    <span class="chip" style="margin-left:6px">TAP</span><span class="chip">120.00<small>BPM</small></span><span class="chip">136<small>BARS</small></span>
+    <span class="chip" style="margin-left:6px">50 %</span><span class="chip">1/16 ▾</span><span class="chip">4/4 ▾</span><span class="chip" style="margin-left:6px">E ▾</span><span class="chip">naturalMinor ▾</span>
+    <span class="chip" style="margin-left:6px">1.1.1</span><span class="chip">▶</span><span class="chip">■</span><span class="chip">‖</span><span class="chip">⟲</span>`;
+  const tabs = `<div class="tabs" style="margin-right:6px"><span class="on">Parts</span><span>Mixer</span><span>Song</span><span>⚙</span></div>`;
+  if (one) return `<div class="head"><div class="row" style="flex-wrap:nowrap">${tabs}${tools}<span style="width:14px"></span>${partStrip()}</div></div>`;
+  return `<div class="head"><div class="row" style="flex-wrap:wrap">${tabs}${tools}</div><div class="row">${partStrip()}</div></div>`;
+}
+function partStrip() {
+  const ps = parts();
+  const chips = ps.map(([n, k], i) => `<div class="pchip${i === 0 ? ' on' : ''}" title="${n}" style="flex:1 0 70px;max-width:150px;border-left-color:${i === 0 ? 'var(--carrier)' : k === 'Euclid' ? 'var(--carrier)' : 'var(--modulator)'}"><span class="n">${n}</span><span class="k">${i + 1} · ${k}</span>${i % 3 !== 2 ? '<i class="dot"></i>' : ''}</div>`).join('');
+  return `<div class="pstrip"><span class="pnav" title="Scroll parts left">‹</span><div class="pscroll">${chips}</div><span class="pnav" title="Scroll parts right">›</span>
+    <span class="plist" title="All parts: a list to jump to any part">▾</span>
+    <span class="pm"><span class="btn" title="Add a part (${ps.length} of 16)" style="${ps.length >= 16 ? 'opacity:.4' : ''}">+</span><span class="btn" title="Remove Organ…">−</span></span></div>`;
+}
+function patchBar(W) {
+  const pop = S.pop ? popover() : '';
+  return `<div class="bar">
+    <span class="field-label" style="margin:0">Part</span><div class="field" style="width:120px">Organ</div>
+    <div class="sel" style="width:110px" title="Sequencer">Seq: Chord</div>
+    <span class="btn icon" title="Duplicate, move left or right">⋯</span>
+    <span class="sep"></span>
+    <span class="field-label" style="margin:0">Patch</span>
+    <span class="btn icon">◀</span><span class="btn icon">▶</span>
+    <div class="patchbox"><span class="nm">KQ Cathedral Organ</span><i class="mod" title="Edited since saved"></i><span class="src">Pads · this song</span><span class="srch">⌕ search</span>${pop}</div>
+    <span class="btn">Save</span><span class="btn">Save as…</span><span class="btn">Init</span><span class="btn icon" title="Rename, delete, library folder, patch JSON">⋯</span>
+    <span class="grow"></span><span class="btn${S.browser ? ' primary' : ''}">⤢ Browse patches</span></div>`;
+}
+function popover() {
+  return `<div class="pop" style="left:-1px"><div class="field" style="display:flex;justify-content:space-between"><span>pluck<span style="color:var(--carrier)">|</span></span><span style="color:var(--ink-faint);font-size:11px">⌘K</span></div>
+    <div class="filters"><div class="sel">All categories</div><div class="sel">All tags</div><div class="sel">All sources</div></div>
+    <ul>${PATCHES.filter((p) => p[1] === 'Plucks').concat(PATCHES.filter((p) => p[1] !== 'Plucks').slice(4, 9)).slice(0, 8).map((p, i) => `<li class="${i === 1 ? 'hl' : ''}"><span>${p[0]}</span><span class="c">${p[1]} · ${p[3]}</span></li>`).join('')}</ul>
+    <div class="foot"><span>22 of 170 · ↑↓ move · ⏎ load · Esc closes</span><span class="btn">⤢ Browse all</span></div></div>`;
+}
+function keysRow() {
+  const pat = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+  let k = ''; for (let i = 0; i < 37; i++) k += `<i class="${pat[i % 12] ? 'b' : ''}"></i>`;
+  return `<div class="keys-row"><div class="keys">${k}</div><div class="btns"><span class="btn">Oct −</span><span class="chip">C4</span><span class="btn">Oct +</span><span class="btn">Hold</span><span class="btn">Panic</span><span class="btn">Enable MIDI</span></div></div>`;
+}
+function browser(top) {
+  const cats = [['All', 170], ['Drums', 46], ['Pads', 27], ['Strings', 24], ['Soundtrack FX', 24], ['Plucks', 22], ['Basses', 18], ['Legacy FX', 4], ['Leads', 1]];
+  const tags = [['mono', 52], ['analog', 26], ['short', 23], ['noise', 20], ['dark', 19], ['metal', 18], ['dub', 16], ['808', 16], ['soft', 15], ['digital', 15], ['warm', 14], ['909', 14], ['sub', 13], ['tension', 12], ['long', 12], ['glass', 9], ['bell', 8]];
+  return `<div class="browser" style="top:${top}px">
+    <div class="bh"><span style="font:700 14px var(--f-panel);letter-spacing:.14em">PATCHES</span><span class="sep"></span><div class="field" style="width:380px">Search sounds or tags…</div>
+      <span class="hint" style="margin:0">Loading into <b style="color:var(--carrier)">Organ</b> · picking a row auditions it on the keyboard</span><span style="flex:1"></span><span class="btn">Import…</span><span class="btn">Library folder…</span><span class="btn">✕ Close</span></div>
+    <div class="facets"><div class="section">${title('Source')}${[['This song', 8], ['Built-in', 162], ['Library folder', '—']].map((f, i) => `<div class="fl${i === 1 ? '' : ''}"><span>${f[0]}</span><span>${f[1]}</span></div>`).join('')}</div>
+      <div class="section">${title('Category')}${cats.map((c, i) => `<div class="fl${i === 5 ? ' on' : ''}"><span>${c[0]}</span><span>${c[1]}</span></div>`).join('')}</div>
+      <div class="section">${title('Tags')}<div class="tagc">${tags.map((t, i) => `<span class="${i === 9 ? '' : ''}">${t[0]}</span>`).join('')}</div></div></div>
+    <div style="overflow:hidden"><table><thead><tr><th>Name</th><th>Category</th><th>Tags</th><th>Source</th><th>★</th></tr></thead><tbody>
+      ${PATCHES.filter((p) => p[1] === 'Plucks').concat(PATCHES.filter((p) => p[1] !== 'Plucks')).map((p, i) => `<tr class="${i === 1 ? 'hl' : ''}"><td>${p[0]}</td><td>${p[1]}</td><td>${p[2]}</td><td>${p[3]}</td><td style="color:${i < 2 ? 'var(--carrier)' : 'var(--ink-faint)'}">${i < 2 ? '★' : '☆'}</td></tr>`).join('')}</tbody></table></div>
+    <div class="info"><div style="font:700 18px var(--f-panel);letter-spacing:.06em">Hollow Droplet</div><div class="hint" style="margin:0">Plucks · Built-in</div>
+      <div class="tagc"><span>hollow</span><span>bell</span><span>soft</span></div>
+      <p style="margin:0;color:var(--ink-dim);line-height:1.5">Play C4–C5; single notes over a sustained drone.</p>
+      <div style="display:flex;gap:10px;align-items:center">${algTile(4, true)}<span class="hint" style="margin:0">Algorithm 05 · 2 carriers · Filter LP · Drive off</span></div>
+      ${env(50, [.01, .4, .1, .5])}
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="btn primary">Load into Organ</span><span class="btn">Copy to new</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="btn ghost">Rename</span><span class="btn ghost">Delete</span><span class="btn ghost">Show in folder</span></div>
+      <p class="hint">Built-ins are read-only; Rename and Delete act on your library and song patches. Loading copies the patch into the song (invariant 3).</p></div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- layouts
+function layoutA(W) {
+  const one = W >= 1900;
+  const right = one ? 600 : 300;
+  return `${header(W)}${patchBar(W)}
+  <div style="display:grid;grid-template-columns:230px minmax(0,1fr) ${right}px;align-items:start">
+    <aside style="border-right:1px solid var(--line)"><div class="section">${algorithm(3)}</div><div class="section">${global()}</div><div class="section">${output()}</div></aside>
+    <main style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(${one ? 400 : 330}px,1fr));gap:12px">${OPS.map((o) => opCard(o, advOn(o.k))).join('')}</main>
+    <aside style="border-left:1px solid var(--line);${one ? 'column-count:2;column-gap:0;' : ''}">
+      ${[drive(), filter() + '<div style="height:11px"></div>' + filterEnv(), lfo(1), lfo(2), pitchEnv()].map((m) => `<div class="section" style="break-inside:avoid">${m}</div>`).join('')}</aside>
+  </div>${keysRow()}`;
+}
+function layoutB(W) {
+  const one = W >= 1900;
+  return `${header(W)}${patchBar(W)}
+  <div style="display:grid;grid-template-columns:230px minmax(0,1fr);align-items:start">
+    <aside style="border-right:1px solid var(--line)"><div class="section">${output()}</div><div class="section">${algorithm(3)}</div><div class="section">${global()}</div></aside>
+    <main style="padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+      ${title('Operators', 'Adv opens to the right when it fits, below when it doesn’t')}
+      ${OPS.map(opRow).join('')}
+      <div style="height:6px"></div>${title('Shape &amp; modulation')}
+      <div class="deck" style="--mod-basis:${one ? 260 : 340}px">
+        <div class="mod-card" style="flex-grow:1.3">${filter()}<div style="height:10px"></div>${filterEnv(48)}</div>
+        <div class="mod-card" style="flex-grow:1.2">${lfo(1)}</div>
+        <div class="mod-card" style="flex-grow:1.2">${lfo(2)}</div>
+        <div class="mod-card" style="flex-grow:1.2">${pitchEnv(48)}</div>
+        <div class="mod-card" style="flex-grow:.6">${drive()}</div>
+      </div></main>
+  </div>${keysRow()}`;
+}
+function layoutC(W) {
+  const one = W >= 1900;
+  const minis = `
+    <div class="mini" style="min-width:150px"><div class="mt"><b>Alg 08</b><span>Additive</span></div><div style="display:flex;justify-content:center;padding:4px 0">${algTile(7, true)}</div><span class="hint" style="margin:0;text-align:center">click to change</span></div>
+    ${OPS.map((o, i) => opMini(o, i === 0 ? 'focus' : '')).join('')}
+    <div class="mini modc"><div class="mt"><b>Drive</b><span>off</span></div><div class="kv">${knob('×1.00', 'Drive', 0, { sm: true, size: 26, dis: true })}${knob('100%', 'Tone', 1, { sm: true, size: 26, dis: true })}</div></div>
+    <div class="mini modc focus2"><div class="mt"><b>Filter</b><span>LP 12</span></div><div class="kv">${knob('3.20k', 'Cutoff', .62, { sm: true, size: 26 })}${knob('0.70', 'Reso', .2, { sm: true, size: 26 })}</div>${env(26, [.02, .5, .02, .2], 'mod', false)}</div>
+    <div class="mini modc"><div class="mt"><b>LFO</b><span>sine</span></div><div class="kv">${knob('6.10Hz', 'Rate', .7, { sm: true, size: 26 })}${knob('1.00', 'Amount', 1, { sm: true, size: 26 })}</div></div>
+    <div class="mini modc"><div class="mt"><b>LFO 2</b><span>drift</span></div><div class="kv">${knob('0.18Hz', 'Rate', .2, { sm: true, size: 26 })}${knob('1.00', 'Amount', 1, { sm: true, size: 26 })}</div></div>
+    <div class="mini car"><div class="mt"><b>Pitch</b><span>env</span></div><div class="kv">${knob('+0.00st', 'Amount', .5, { sm: true, size: 26, c: 'car', bi: 1 })}${knob('100m', 'Decay', .4, { sm: true, size: 26, c: 'car' })}</div>${env(26, [.02, .5, .02, .2], 'car', false)}</div>
+    <div class="mini"><div class="mt"><b>Global</b><span>poly</span></div><div class="kv">${knob('0.62', 'Volume', .5, { sm: true, size: 26, c: 'ink' })}${knob('0m', 'Glide', 0, { sm: true, size: 26, c: 'ink' })}</div></div>
+    <div class="mini" style="min-width:${one ? 260 : 120}px"><div class="mt"><b>Out</b></div><div class="scope" style="height:58px"></div></div>`;
+  const opDetail = `<div class="pane"><div class="ph"><span class="ttl" style="color:var(--carrier)">Operator A</span><span class="badge car">Carrier</span><span style="flex:1"></span><span>◀ D</span><span>B ▶</span></div>
+    <div style="padding:12px 14px"><div class="wp"><div style="flex:1;max-width:280px"><span class="field-label">Wave</span><div class="sel">Sine</div></div><div><span class="field-label">Pitch</span><span class="btn">Ratio</span></div></div>
+    <div class="knob-row">${knobs(OPS[0].main, 'car')}</div><div style="margin:10px 0">${env(one ? 150 : 96, OPS[0].env)}</div>
+    <div class="knob-row">${knobs(OPS[0].adsr.map((v, i) => [v[0], ['Attack', 'Decay', 'Sustain', 'Release'][i], v[1]]), 'car')}<span style="width:14px"></span>${knobs(ADV, 'car')}</div>
+    <p class="hint">The advanced envelope row is always shown here: the focus pane has the room, so ADV goes away.</p></div></div>`;
+  const filtDetail = `<div class="pane"><div class="ph"><span class="ttl" style="color:var(--modulator)">Filter</span><span style="flex:1"></span><span>shift-click a cell to pin it here</span></div>
+    <div style="padding:12px 14px">${filter()}<div style="height:10px"></div>${filterEnv(one ? 110 : 60)}</div></div>`;
+  return `${header(W)}${patchBar(W)}
+    <div style="padding:10px 12px 0;display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr)) repeat(6,minmax(0,.8fr)) auto;gap:6px">${minis}</div>
+    <div style="padding:10px 12px;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)${one ? ' minmax(0,1fr)' : ''};gap:10px;align-items:start">${opDetail}${filtDetail}${one ? `<div class="pane"><div class="ph"><span class="ttl" style="color:var(--modulator)">LFO</span><span style="flex:1"></span><span>third pane at 4K</span></div><div style="padding:12px 14px">${lfo(1)}</div></div>` : ''}</div>${keysRow()}`;
+}
+
+// ---------------------------------------------------------------- notes
+const NOTES = {
+  A: `<h2>A · Top bars</h2>Your ideas 1–3 together. <b>Part strip</b> sits beside the tabs (on its own row at 4K): the Song tab's lanes in the same order, the sequencer kind under each name, and an activity dot. Under it, one <b>part + patch bar</b>: the selected part's name, sequencer and a ⋯ menu (duplicate, remove), then the patch with ◀ ▶, a search box that drops a popover with the three filters, Save / Save as / Init, and ⤢ <b>Browse patches</b> for the full-pane browser. The left rail keeps only Algorithm, Global and the scope, now visible without scrolling. The right column stays but is wider (300px, two columns at 4K).
+  <ul><li><b>Keeps:</b> the operator cards exactly as they are, so it is the smallest change and the easiest to build first.</li>
+  <li><b>Doesn't fix:</b> the right column is still about 2,000px tall at 1440 and 1366; widening it only shortens it a little. At 4K, half the centre is still empty below the cards.</li>
+  <li class="todo">To decide: does the sequencer picker belong in this bar, or only on the Song tab?</li></ul>`,
+  B: `<h2>B · Operator rows</h2><b style="color:var(--carrier)">Approved by tacowars on 2026-10-03.</b> Four operator rows, then Filter + Filter Env, both LFOs, the Pitch Env and Drive (last) as a deck that wraps to the width. The left rail runs Output (scope) at the top, then Algorithm, then Global. <b>Adv</b> on a row adds its advanced envelope knobs (Init, Peak, End, the three curves, Key) as one group: <b>to the right of Attack–Release when the row has room, on a second line under the row when it doesn't</b>. Coarse to Release stay together as one unit and only the Adv group moves. Attack–Release sit before the envelope, so every knob column lines up across A–D whether or not a row has Adv open: only the envelope's width changes. It's a flex row that wraps, with no breakpoint, so it works the same at every screen size and zoom. The envelope takes whatever width is left once the knobs and Adv are placed, so it's widest at 4K, where fine adjustments benefit.
+  <ul><li><b>Try:</b> 4K at 100% and 125% with Adv = All (inline), then MacBook Air (Adv drops below).</li>
+  <li><b>Decided:</b> Adv stays per operator, with no Adv-all switch.</li>
+  <li><b>Decided:</b> on wide screens the envelope grows to fill the row, with no cap.</li></ul>`,
+  C: `<h2>C · Overview + focus</h2>The strikingly different one. One row of <b>small cells</b> shows the whole patch: algorithm, the four operators (level, detune, feedback, a mini envelope), Drive, Filter, both LFOs, Pitch Env, Global and the scope. Click a cell to open it in the large <b>left focus pane</b>; shift-click pins one in the <b>right pane</b>. So you can edit Operator B against the Filter, or LFO 2 against Operator D. Same knobs, but only two modules are full size at once.
+  <ul><li><b>Wins:</b> fits 1440×800 and 1366×960 with no page scroll at all. At 4K the panes get big envelope canvases. The overview row shows the whole patch at a glance.</li>
+  <li><b>Costs:</b> you get to most knobs with a click first. It's the biggest change in muscle memory, and the mini cells are new controls.</li>
+  <li class="todo">To decide: whether the mini knobs edit directly or only open a module, and whether the panes split 50/50 or follow what they hold.</li></ul>`,
+};
+
+// ---------------------------------------------------------------- render
+function toolbar() {
+  const b = (on, txt, act) => `<button class="${on ? 'on' : ''}" data-act="${act}">${txt}</button>`;
+  return `<div class="grp"><span class="lbl">Layout</span>${Object.entries(LAYOUTS).map(([k, v]) => b(S.layout === k, v, 'layout:' + k)).join('')}</div>
+    <div class="grp"><span class="lbl">Screen</span>${Object.entries(SCREENS).map(([k, v]) => b(S.screen === k, v.label, 'screen:' + k)).join('')}</div>
+    <div class="grp"><span class="lbl">UI zoom</span>${[1, 1.25, 1.5].map((z) => b(S.zoom === z, Math.round(z * 100) + '%', 'zoom:' + z)).join('')}</div>
+    <div class="grp"><span class="lbl">Parts</span>${b(S.parts === 8, '8', 'parts:8')}${b(S.parts === 16, '16', 'parts:16')}</div>
+    <div class="grp"><span class="lbl">Adv</span>${b(S.adv === 'none', 'None', 'adv:none')}${b(S.adv === 'A', 'A only', 'adv:A')}${b(S.adv === 'all', 'All', 'adv:all')}</div>
+    <div class="grp"><span class="lbl">Patch</span>${b(S.pop, 'Search popover', 'pop')}${b(S.browser, 'Full browser', 'browser')}</div>
+    <div class="grp"><span class="lbl">View</span>${b(S.fit, 'Fit', 'fit')}${b(!S.fit, '1:1', 'fit')}${b(S.notes, 'Notes', 'notes')}</div><span class="scale" id="scale"></span>`;
+}
+function render() {
+  document.body.classList.toggle('solo', S.solo);
+  const sc = SCREENS[S.screen];
+  document.getElementById('tb').innerHTML = toolbar();
+  const notes = document.getElementById('notes');
+  notes.innerHTML = NOTES[S.layout] + `<p><b>Top bars (all layouts).</b> The WINDSOR label is gone and the tabs take its place, so the transport row holds the tabs too. The part strip gets the whole second row. Parts keep the Song tab's order and are numbered, and <b>+ / −</b> add a part and remove the selected one. All 16 fit without scrolling on every target screen at 100%. When they don't (try 4K at 150% or the Air at 125%), the strip <b>scrolls the way browser tabs do</b>: ‹ › arrows and fading edges appear, a trackpad swipe or shift-wheel scrolls it, the selected part scrolls into view, and ▾ lists every part to jump to. Patch: quick ◀ ▶, the search popover, then ⤢ the full browser.</p>` + `<p class="hint">The frame shows the screen at its real CSS size and scrolls inside, so what you see without scrolling is what fits. The values come from the Organ part of <i>life-out-of-balance</i>. <span style="outline:1px dashed var(--return);padding:0 4px">Dashed purple</span> marks a stand-in.</p>`;
+  notes.style.display = S.notes ? '' : 'none';
+  const screen = document.getElementById('screen');
+  screen.style.width = sc.w + 'px'; screen.style.height = sc.h + 'px';
+  const cssW = Math.round(sc.w / S.zoom), cssH = Math.round(sc.h / S.zoom);
+  screen.innerHTML = `<div class="z" style="zoom:${S.zoom};width:${cssW}px;min-height:${cssH}px">${({ A: layoutA, B: layoutB, C: layoutC })[S.layout](cssW)}</div>`;
+  const z = screen.firstElementChild;
+  if (S.browser) {
+    const bars = z.querySelectorAll('.bar'); const last = bars[bars.length - 1];
+    z.style.height = cssH + 'px'; z.style.overflow = 'hidden';
+    z.insertAdjacentHTML('beforeend', browser(last.offsetTop + last.offsetHeight));
+  }
+  for (const strip of z.querySelectorAll('.pstrip')) {
+    const sc2 = strip.querySelector('.pscroll');
+    strip.classList.toggle('over', sc2.scrollWidth > sc2.clientWidth + 1);
+  }
+  if (S.full) screen.style.height = screen.scrollHeight + 'px';
+  fit();
+  document.getElementById('cap').textContent = `${sc.label} · zoom ${Math.round(S.zoom * 100)}% (${Math.round(sc.w / S.zoom)}×${Math.round(sc.h / S.zoom)} CSS px) · ${LAYOUTS[S.layout]} · content height ${screen.scrollHeight}px (${screen.scrollHeight > sc.h ? (screen.scrollHeight - sc.h) + 'px below the fold' : 'fits, no scroll'})`;
+}
+function fit() {
+  const sc = SCREENS[S.screen], stage = document.getElementById('stage');
+  const s = S.fit ? Math.min(1, (window.innerWidth - 32) / sc.w) : 1;
+  stage.style.transform = `scale(${s})`; stage.style.width = sc.w + 'px'; stage.style.height = sc.h * s + 'px';
+  const el = document.getElementById('scale'); if (el) el.textContent = `shown at ${Math.round(s * 100)}%`;
+}
+document.getElementById('tb').addEventListener('click', (e) => {
+  const a = e.target.closest('button')?.dataset.act; if (!a) return;
+  const [k, v] = a.split(':');
+  if (k === 'layout') S.layout = v; else if (k === 'screen') S.screen = v;
+  else if (k === 'zoom') S.zoom = Number(v); else if (k === 'parts') S.parts = Number(v); else if (k === 'adv') S.adv = v;
+  else if (k === 'pop') { S.pop = !S.pop; if (S.pop) S.browser = false; }
+  else if (k === 'browser') { S.browser = !S.browser; if (S.browser) S.pop = false; }
+  else if (k === 'fit') S.fit = !S.fit; else if (k === 'notes') S.notes = !S.notes;
+  render();
+});
+window.addEventListener('resize', fit);
+document.fonts.ready.then(render); render();
+</script>
+</body>
+</html>
