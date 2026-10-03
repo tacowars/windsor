@@ -16,7 +16,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { ProcessorLike } from '../__fixtures__/workletHarness';
 import { loadProcessor } from '../__fixtures__/workletHarness';
-import { VOICE_AUTOMATION_ROWS, catalogRow, voiceTargetId } from '../automation/automationTargets';
+import {
+  VOICE_AUTOMATION_ROWS,
+  requireCatalogRow,
+  voiceTargetId,
+} from '../automation/automationTargets';
 import { FILTER_MODE, WAVE, makeEnvelope, makePatch, type Patch } from '../patch/patch';
 import { voiceSlotParamName } from './audioPart';
 import { voiceOffset } from './voiceAutomation';
@@ -69,7 +73,7 @@ function moved(patch: Patch, path: string, value: number): Patch {
 }
 
 const offsetFor = (patch: Patch, path: string, value: number): number =>
-  voiceOffset(patch, path, catalogRow(voiceTargetId(path))!, value);
+  voiceOffset(patch, path, requireCatalogRow(voiceTargetId(path)), value);
 
 function freshParams(): Record<string, Float32Array> {
   const params: Record<string, Float32Array> = {
@@ -122,7 +126,7 @@ const filtered = (cutoff: number): Patch =>
   });
 
 describe("the cutoff lane across the catalog's whole range (windsor#346)", () => {
-  const row = catalogRow(voiceTargetId(CUTOFF))!;
+  const row = requireCatalogRow(voiceTargetId(CUTOFF));
 
   it.each([
     [row.min, row.max],
