@@ -12,6 +12,8 @@ export const CARRIER_COLOR = '#E0A44E';
 export const MOD_COLOR = '#5FA8A0';
 /** The return buses, in the mixer and the returns panel; the insert targets' automation lanes; the Euclid card's pitch lane. */
 export const RETURN_COLOR = '#9C7BD0';
+/** The sequencer targets' automation lanes and the knobs they lock (windsor#491). */
+export const SEQ_LANE_COLOR = '#CC7A9C';
 /** Clipping, and anything hot. */
 export const HOT_COLOR = '#D2643C';
 /** The panel rule: baselines, sustain guides, the scope's centre line. */
@@ -44,6 +46,7 @@ export const CSS_VARIABLE_OF: Readonly<Record<string, string>> = {
   '--carrier': CARRIER_COLOR,
   '--modulator': MOD_COLOR,
   '--return': RETURN_COLOR,
+  '--seq': SEQ_LANE_COLOR,
   '--hot': HOT_COLOR,
   '--line': LINE_COLOR,
   '--line-bright': LINE_BRIGHT_COLOR,

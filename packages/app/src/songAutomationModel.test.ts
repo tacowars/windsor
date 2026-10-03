@@ -13,7 +13,10 @@ import {
   AUTOMATION_TAPE_ID,
 } from '@windsor/engine/__fixtures__/automationSong';
 import {
+  DEFAULT_BASS_CONFIG,
+  DEFAULT_CHORD_CONFIG,
   DEFAULT_DELAY,
+  DEFAULT_GRID_CONFIG,
   DEFAULT_TAPE,
   FM_LANES_MAX,
   STRIP_AUTOMATION_ROWS,
@@ -26,6 +29,7 @@ import {
   type AutomationTargetId,
   type DocumentPart,
   type InsertSpec,
+  type SequencerSpec,
 } from '@windsor/engine';
 import { DocumentModel } from './documentModel';
 import {
@@ -62,6 +66,11 @@ const partWith = (
   strip: { ...AUTOMATION_PART.strip, inserts },
   automation: lanes,
 });
+
+/** `AUTOMATION_PART` playing `sequencer`. */
+const playing = (sequencer: SequencerSpec): DocumentPart => ({ ...AUTOMATION_PART, sequencer });
+const GRID_PART = playing({ kind: 'grid', ...DEFAULT_GRID_CONFIG });
+const BASS_PART = playing({ kind: 'bass', ...DEFAULT_BASS_CONFIG });
 
 const flat = (target: AutomationTargetId): AutomationLane => newLane(target, 0, TICKS_PER_BAR);
 
@@ -164,8 +173,32 @@ describe('the picker', () => {
   });
 });
 
+describe("the picker's Sequencer group (windsor#491)", () => {
+  const seqGroup = (part: DocumentPart) => pickerGroups(part).at(-1);
+
+  it("comes after the voice's, with the fields the part's kind offers", () => {
+    expect(seqGroup(GRID_PART)).toEqual({
+      label: 'Sequencer',
+      options: [{ target: 'seq.skipChance', label: 'Skip', disabled: false }],
+    });
+    expect(seqGroup(BASS_PART)?.options.map((o) => o.label)).toEqual(['Gate', 'Density']);
+  });
+
+  it('is left out for a kind that offers none', () => {
+    const chord = playing({ kind: 'chord', ...DEFAULT_CHORD_CONFIG });
+    for (const part of [AUTOMATION_PART, chord]) {
+      expect(pickerGroups(part).map((g) => g.label)).not.toContain('Sequencer');
+    }
+  });
+
+  it('disables a field that already has a lane', () => {
+    const part = { ...GRID_PART, automation: [flat('seq.skipChance')] };
+    expect(seqGroup(part)?.options[0]?.disabled).toBe(true);
+  });
+});
+
 describe('a lane', () => {
-  it('is named with its kind line: Mixer, the insert, the voice group', () => {
+  it('is named with its kind line: Mixer, the insert, the voice group, Sequencer', () => {
     expect(laneTitle(AUTOMATION_PART, 'strip.level')).toEqual({
       name: 'Level',
       kindLine: 'Mixer',
@@ -198,6 +231,11 @@ describe('a lane', () => {
       name: 'Pitch Env',
       kindLine: 'Voice · Pitch',
       kind: 'voice',
+    });
+    expect(laneTitle(AUTOMATION_PART, 'seq.gate')).toEqual({
+      name: 'Gate',
+      kindLine: 'Sequencer',
+      kind: 'seq',
     });
   });
 

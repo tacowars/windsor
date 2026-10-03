@@ -29,8 +29,10 @@ import {
   STRIP_AUTOMATION_ROWS,
   VOICE_AUTOMATION_ROWS,
   automatableInsertFields,
+  catalogRow,
   formatTargetId,
   parseTargetId,
+  seqTargetIds,
   targetKind,
   targetRow,
 } from '@windsor/engine';
@@ -39,6 +41,7 @@ import { getPath } from './patchPath';
 import {
   INACTIVE_WHY,
   MIXER_GROUP_LABEL,
+  SEQ_GROUP_LABEL,
   insertGroupLabel,
   voiceGroupLabel,
 } from './songAutomationTables';
@@ -98,7 +101,8 @@ export function laneRow(part: DocumentPart, target: string): AutomationTargetRow
 /**
  * The picker's groups (decision 4): Mixer, one group per insert in the chain
  * listing the fields its settings leave read (`automatableInsertFields`),
- * then the voice's groups.
+ * then the voice's groups, then Sequencer with the fields the part's
+ * sequencer kind offers (windsor#491), left out when it offers none.
  */
 export function pickerGroups(part: DocumentPart): PickerGroup[] {
   const lanes = lanesOf(part);
@@ -124,10 +128,14 @@ export function pickerGroups(part: DocumentPart): PickerGroup[] {
     voice.set(label, [...(voice.get(label) ?? []), option(row.target, row.label, voiceFull)]);
   }
   const mixer = STRIP_AUTOMATION_ROWS.map((row) => option(row.target, row.label));
+  const seq = seqTargetIds(part.sequencer.kind).map((target) =>
+    option(target, catalogRow(target)?.label ?? target),
+  );
   return [
     { label: MIXER_GROUP_LABEL, options: mixer },
     ...inserts,
     ...[...voice].map(([label, options]) => ({ label, options })),
+    ...(seq.length > 0 ? [{ label: SEQ_GROUP_LABEL, options: seq }] : []),
   ];
 }
 
@@ -155,6 +163,7 @@ export function laneTitle(part: DocumentPart, target: AutomationTargetId): LaneT
     const row = VOICE_ROWS.get(target);
     return { name, kindLine: row ? voiceGroupLabel(row.section, OP_NAMES) : '', kind };
   }
+  if (parsed?.kind === 'seq') return { name, kindLine: SEQ_GROUP_LABEL, kind };
   return { name, kindLine: MIXER_GROUP_LABEL, kind };
 }
 
