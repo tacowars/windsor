@@ -70,7 +70,6 @@ export const BLOCKED_UPGRADE_WARNING =
 /** IndexedDB home of the remembered directory handle (the developer's folder grant). */
 export const HANDLE_DB = { name: 'a204-patch-editor', store: 'handles', key: 'patches' } as const;
 
-/** The metadata modal (#563, #620 decision 7): its category sentinel, focus-trap query and readout precision. */
+/** The metadata modal (#563, #620 decision 7): its category sentinel and readout precision. */
 export const NEW_CATEGORY = '__new__';
-export const FOCUSABLE = 'button, input, select, textarea, [tabindex]';
 export const VOLUME_DIGITS = 3;
