@@ -13,16 +13,14 @@ import {
   addStage,
   driftChange,
   driftReadout,
-  driftRotation,
   figureSummary,
+  leaderOf,
   moveStage,
-  regionBar,
   removeStage,
   scheduleReadout,
   setStage,
   sourceChoice,
   sourceOptions,
-  stageIndexAt,
   withoutSource,
 } from './figureProcessModel';
 import { addPartChange, patternCopy, regionPatternChange, sequencerKindChange } from './partEdits';
@@ -49,9 +47,7 @@ describe('the schedule', () => {
     expect(setStage(GLASS, 1, 'bars', 99, 8)[1]).toEqual({ length: 5, bars: 64 });
   });
 
-  it('finds the stage in play at a local bar, cycling, and reads the cycle', () => {
-    expect([0, 1, 2, 5, 6, 13].map((bar) => stageIndexAt(GLASS, bar))).toEqual([0, 0, 1, 2, 0, 0]);
-    expect(stageIndexAt(undefined, 3)).toBe(-1);
+  it('reads the cycle', () => {
     expect(scheduleReadout(GLASS, 8)).toBe('cycle 6 bars · 3 stages · restarts at cell 1');
     expect(scheduleReadout(undefined, 8)).toBe('no schedule · all 8 cells');
   });
@@ -67,9 +63,7 @@ describe('the drift', () => {
     expect(driftChange(undefined, 'steps', -9)).toEqual({ steps: -4, everyBars: 4 });
   });
 
-  it('reads the rotation at a bar and when the line comes back round', () => {
-    expect(driftRotation({ steps: 1, everyBars: 12 }, 25)).toBe(2);
-    expect(driftRotation(undefined, 25)).toBe(0);
+  it('reads when the line comes back round', () => {
     expect(driftReadout({ steps: 1, everyBars: 12 }, 12)).toBe(
       '+1 step / 12 bars · back in 144 bars',
     );
@@ -136,6 +130,17 @@ describe('the processes write the region pattern', () => {
     expect(choice).toEqual({ slot: 0, offset: 3, transpose: 12 });
     write(model, { source: choice });
     expect(pattern(model)).toMatchObject({ source: { slot: 0, offset: 3, transpose: 12 } });
+    // The leader's base has no schedule and its region 0 plays two stages: a
+    // canon reads the region holding its tick, and the base past the last start.
+    const two = GLASS.slice(0, 2);
+    const lead = regionPatternChange(model.doc, 0, 0, { schedule: two });
+    if (!lead || !choice) throw new Error('the leader edit was refused');
+    model.merge(lead);
+    expect(partAt(model.doc, 0)?.sequencer).not.toHaveProperty('schedule');
+    expect(leaderOf(model.doc, choice, TICKS_PER_BAR / 2)?.spec.schedule).toEqual(two);
+    expect(leaderOf(model.doc, choice, TICKS_PER_BAR * 1.5)?.spec.schedule).toBeUndefined();
+    const end = model.doc.transport.bars * TICKS_PER_BAR - 1;
+    expect(leaderOf(model.doc, choice, end)?.spec.schedule).toBeUndefined();
     expect(sourceChoice('', choice ?? undefined)).toBeNull();
     const part = partAt(model.doc, 2);
     if (!part) throw new Error('part 2 is gone');
@@ -155,16 +160,6 @@ describe('the processes write the region pattern', () => {
 });
 
 describe('the summary', () => {
-  it("reads the region's local bar only while the tick is inside it", () => {
-    const regions = [
-      { start: 0, duration: 2 * TICKS_PER_BAR },
-      { start: 4 * TICKS_PER_BAR, duration: 4 * TICKS_PER_BAR },
-    ];
-    const input = { regions, songTicks: 16 * TICKS_PER_BAR, barTicks: TICKS_PER_BAR };
-    expect(regionBar({ ...input, tick: 6 * TICKS_PER_BAR + 5, region: 1 })).toBe(2);
-    expect(regionBar({ ...input, tick: TICKS_PER_BAR, region: 1 })).toBeNull();
-  });
-
   it('names the cells, the chord, the stage, the rotation and the leader', () => {
     expect(
       figureSummary({

@@ -6,11 +6,9 @@
  * new value; the card writes schedule, drift and source as pattern fields
  * through `changePattern`, and the source's removal as a whole pattern.
  *
- * Where the summary names the stage in play and the rotation, it reads them
- * at the region's local bar (the engine's `regionState`, never a fold here)
- * with the rule `figureLine.ts` states: the stage whose cumulative bars hold
- * the bar, cycling, and the drift's steps per `everyBars`-th bar line. The
- * playhead itself is the engine's `regionStepAt`.
+ * The stage in play and the rotation the summary names are the engine's
+ * (`RegionStep.stage` and `rotation`, windsor#508), never a rule restated
+ * here.
  */
 import type {
   ArrangementDocument,
@@ -18,7 +16,7 @@ import type {
   FigureSource,
   FigureSpec,
   FigureStage,
-  Region,
+  MusicPart,
   RegionPattern,
 } from '@windsor/engine';
 import {
@@ -27,7 +25,8 @@ import {
   FIGURE_TRANSPOSE_MAX,
   GRID_STEPS_MAX,
   partAt,
-  regionState,
+  regionPattern,
+  songTicks,
 } from '@windsor/engine';
 import { FIGURE_DRIFT_EVERY_DEFAULT, FIGURE_FIRST_STAGE } from './figureConstants';
 
@@ -80,60 +79,48 @@ export function setStage(
 export const scheduleBars = (stages: readonly FigureStage[] | undefined): number =>
   (stages ?? []).reduce((sum, stage) => sum + stage.bars, 0);
 
-/** The stage holding local `bar`, cycling over the schedule; -1 with no schedule. */
-export function stageIndexAt(stages: readonly FigureStage[] | undefined, bar: number): number {
-  const total = scheduleBars(stages);
-  if (!stages || total <= 0) return -1;
-  let at = ((Math.floor(bar) % total) + total) % total;
-  for (let i = 0; i < stages.length; i++) {
-    const stage = stages[i];
-    if (!stage) break;
-    if (at < stage.bars) return i;
-    at -= stage.bars;
-  }
-  return -1;
-}
-
-/** Where the region's local bar is read from: its part's regions, the song's length, the tick and the bar. */
-export interface RegionBarInput {
-  readonly regions: readonly Region[];
-  readonly songTicks: number;
-  readonly tick: number;
-  /** The card's region; undefined for the part's own sequencer, which counts from the song's start. */
-  readonly region: number | undefined;
-  readonly barTicks: number;
-}
-
 /**
- * The card's region's local bar while the audible tick is inside it (the
- * engine's `regionState`), else null: the stage and rotation the summary
- * names are the ones sounding, and the first stage's while it is not.
+ * The leader region the engine's canon reads at `tick`
+ * (`PartBinding.figureAt`, windsor#512): the one that started last on the
+ * song's cycle, which is the one holding the tick while one does; -1 with
+ * no region, where the leader plays its base. The engine's index exports
+ * neither `regionPhase` nor the binding's choice, so its rule is restated
+ * here: `(tick - start) mod songTicks`, the smallest wins, the first on a tie.
  */
-export function regionBar(input: RegionBarInput): number | null {
-  const state = regionState(input.regions, input.songTicks, input.tick);
-  if (!state.live || input.barTicks <= 0) return null;
-  if (input.region !== undefined && state.index !== input.region) return null;
-  return Math.floor(state.localTick / input.barTicks);
+function leaderRegionAt(
+  doc: Pick<ArrangementDocument, 'transport'>,
+  part: Pick<MusicPart, 'regions'>,
+  tick: number,
+): number {
+  const cycle = songTicks(doc.transport.bars, doc.transport.meter);
+  if (!(cycle > 0)) return -1;
+  let last = -1;
+  let since = Infinity;
+  part.regions.forEach((region, index) => {
+    const phase = (((tick - region.start) % cycle) + cycle) % cycle;
+    if (phase < since) {
+      since = phase;
+      last = index;
+    }
+  });
+  return last;
 }
 
 /**
- * The leader a canon on `source` plays, and its name: the part's own
- * sequencer, which is the line the engine's canon reads (its base
- * generator, windsor#487); null when the slot holds no Figure.
+ * The leader a canon on `source` plays at the follower's `tick`, and its
+ * name: the pattern of the leader region the engine's canon reads there
+ * (`regionPattern`; the base with no region), so the stage the engine
+ * reports indexes the schedule shown; null when the slot holds no Figure.
  */
 export function leaderOf(
-  doc: Pick<ArrangementDocument, 'parts'>,
+  doc: Pick<ArrangementDocument, 'parts' | 'transport'>,
   source: FigureSource,
+  tick: number,
 ): { spec: FigureSpec; name: string } | null {
   const part = partAt(doc, source.slot);
   if (!part || part.sequencer.kind !== 'figure') return null;
-  return { spec: part.sequencer, name: part.name };
-}
-
-/** The rotation the drift has reached at local `bar`: `steps` per `everyBars`-th bar line. */
-export function driftRotation(drift: FigureDrift | undefined, bar: number): number {
-  if (!drift || drift.steps === 0) return 0;
-  return drift.steps * Math.floor(Math.max(0, bar) / drift.everyBars);
+  const spec = regionPattern(part, leaderRegionAt(doc, part, tick));
+  return spec.kind === 'figure' ? { spec, name: part.name } : null;
 }
 
 /** The Schedule readout: the full cycle, or that every cell of the line plays. */
