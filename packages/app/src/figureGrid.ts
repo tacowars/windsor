@@ -82,8 +82,9 @@ export interface FigureStrip extends Strip<FigureSpec> {
 
 /**
  * What the strip shows with one `regionReadAt` read, from the document: the
- * engine's step, and a canon's leader line at the same tick, the leader
- * region's pattern the engine reads there.
+ * engine's step, a canon's leader line at the tick the engine resolved the
+ * leader at for that step (`RegionStep.leaderTick`), the leader region's
+ * pattern there, and the chord at the read's tick.
  */
 export function figureView(
   ctx: AppCtx,
@@ -92,9 +93,9 @@ export function figureView(
   { at, tick }: RegionRead,
 ): FigureView {
   const own = specOf(ctx, slot, 'figure', region);
-  const lead = own?.source ? leaderOf(ctx.model.doc, own.source, tick) : null;
+  const lead = own?.source ? leaderOf(ctx.model.doc, own.source, at?.leaderTick ?? tick) : null;
   const line = own?.source ? (lead?.spec ?? null) : own;
-  const chord = regionChord(ctx, slot, region);
+  const chord = regionChord(ctx, slot, region, tick);
   return {
     line,
     borrowed: own?.source !== undefined,

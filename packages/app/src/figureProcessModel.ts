@@ -16,7 +16,6 @@ import type {
   FigureSource,
   FigureSpec,
   FigureStage,
-  MusicPart,
   RegionPattern,
 } from '@windsor/engine';
 import {
@@ -24,6 +23,7 @@ import {
   FIGURE_SCHEDULE_BARS_MAX,
   FIGURE_TRANSPOSE_MAX,
   GRID_STEPS_MAX,
+  lastStartedRegion,
   partAt,
   regionPattern,
   songTicks,
@@ -80,37 +80,12 @@ export const scheduleBars = (stages: readonly FigureStage[] | undefined): number
   (stages ?? []).reduce((sum, stage) => sum + stage.bars, 0);
 
 /**
- * The leader region the engine's canon reads at `tick`
- * (`PartBinding.figureAt`, windsor#512): the one that started last on the
- * song's cycle, which is the one holding the tick while one does; -1 with
- * no region, where the leader plays its base. The engine's index exports
- * neither `regionPhase` nor the binding's choice, so its rule is restated
- * here: `(tick - start) mod songTicks`, the smallest wins, the first on a tie.
- */
-function leaderRegionAt(
-  doc: Pick<ArrangementDocument, 'transport'>,
-  part: Pick<MusicPart, 'regions'>,
-  tick: number,
-): number {
-  const cycle = songTicks(doc.transport.bars, doc.transport.meter);
-  if (!(cycle > 0)) return -1;
-  let last = -1;
-  let since = Infinity;
-  part.regions.forEach((region, index) => {
-    const phase = (((tick - region.start) % cycle) + cycle) % cycle;
-    if (phase < since) {
-      since = phase;
-      last = index;
-    }
-  });
-  return last;
-}
-
-/**
- * The leader a canon on `source` plays at the follower's `tick`, and its
+ * The leader a canon on `source` plays at transport tick `tick`, and its
  * name: the pattern of the leader region the engine's canon reads there
- * (`regionPattern`; the base with no region), so the stage the engine
- * reports indexes the schedule shown; null when the slot holds no Figure.
+ * (`lastStartedRegion`, `regionPattern`; the base with no region), so the
+ * stage the engine reports indexes the schedule shown; null when the slot
+ * holds no Figure. The caller passes the engine's `RegionStep.leaderTick`
+ * when it has one.
  */
 export function leaderOf(
   doc: Pick<ArrangementDocument, 'parts' | 'transport'>,
@@ -119,7 +94,8 @@ export function leaderOf(
 ): { spec: FigureSpec; name: string } | null {
   const part = partAt(doc, source.slot);
   if (!part || part.sequencer.kind !== 'figure') return null;
-  const spec = regionPattern(part, leaderRegionAt(doc, part, tick));
+  const cycle = songTicks(doc.transport.bars, doc.transport.meter);
+  const spec = regionPattern(part, lastStartedRegion(part.regions, cycle, tick));
   return spec.kind === 'figure' ? { spec, name: part.name } : null;
 }
 

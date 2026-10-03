@@ -91,6 +91,13 @@ export interface RegionStep {
    */
   readonly stage?: number;
   readonly rotation?: number;
+  /**
+   * A canon's: the transport tick its leader is resolved at for the step,
+   * the step's first tick, not the tick asked (windsor#518). The leader's
+   * line is its pattern in the region `lastStartedRegion` finds there.
+   * Absent without a source.
+   */
+  readonly leaderTick?: number;
 }
 
 /** What `PartBinding.plan` hands the player: validated and built, committed later. */
@@ -264,9 +271,24 @@ export class PartBinding {
         return { step, live, localStep: Math.floor(local / generator.config.divisor) };
       }
       if (!(generator instanceof FigureSequencer)) return { step, live };
-      const position = generator.positionAt(Math.floor(local / generator.config.divisor));
-      return position ? { step, live, ...position } : { step, live };
+      return { step, live, ...this.figurePositionAt(generator, tick - local, local) };
     });
+  }
+
+  /**
+   * A Figure's stage and rotation at local tick `local` of a region entered
+   * on transport tick `origin`, and for a canon the tick its leader is
+   * resolved at: the step's first, as `positionAt` asks for it.
+   */
+  private figurePositionAt(
+    generator: FigureSequencer,
+    origin: number,
+    local: number,
+  ): Partial<RegionStep> {
+    const { divisor, source } = generator.config;
+    const localStep = Math.floor(local / divisor);
+    const position = generator.positionAt(localStep) ?? {};
+    return source ? { ...position, leaderTick: origin + localStep * divisor } : position;
   }
 
   /** `read` with a generator's local tick 0 on transport tick `origin`: a playhead query's region. */
@@ -303,22 +325,8 @@ export class PartBinding {
    * kind.
    */
   figureAt(tick: number): FigureSequencer | null {
-    const { generator } = this.byRegion[this.lastStartedAt(tick)] ?? this.base;
+    const { generator } = this.byRegion[this.gate.lastStartedAt(tick)] ?? this.base;
     return generator instanceof FigureSequencer ? generator : null;
-  }
-
-  /** The region that started last on or before `tick` on the song's cycle; -1 with none. */
-  private lastStartedAt(tick: number): number {
-    let last = -1;
-    let since = Infinity;
-    for (let index = 0; index < this.byRegion.length; index++) {
-      const phase = this.gate.phaseAt(index, tick);
-      if (phase !== null && phase < since) {
-        since = phase;
-        last = index;
-      }
-    }
-    return last;
   }
 
   /**

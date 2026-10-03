@@ -1,13 +1,15 @@
 # The Figure sequencer
 
 - **Date:** 2026-10-03
-- **Status:** accepted, being built
+- **Status:** accepted, built (2026-10-03)
 - **Links:** the epic, windsor#483 · this record's issue, windsor#484 (the
   kind in the song format) · the performer windsor#485, the schedule and
   drift windsor#486, the canon source windsor#487, sequencer parameters as
-  lane targets windsor#488, the device windsor#489 / windsor#490 · the
-  rack-device record `2026-10-01-sequencer-rack-devices` · format rules in
-  `2026-09-28-format-versions-refuse-never-destroy`
+  lane targets windsor#488, the device windsor#489 / windsor#490 · the PRs
+  windsor#493, windsor#494, windsor#497, windsor#501, windsor#505,
+  windsor#507, windsor#509, windsor#512, windsor#513, windsor#516,
+  windsor#517, windsor#526 · the rack-device record
+  `2026-10-01-sequencer-rack-devices` · format rules in `2026-09-28-format-versions-refuse-never-destroy`
 
 ## Context
 
