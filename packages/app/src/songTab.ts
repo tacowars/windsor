@@ -8,8 +8,9 @@
  * This file is the view's composition and its one piece of state — the
  * selection — plus the two repaints every edit ends in. The lanes are
  * `songRuler.ts`, the loop brace under it (`loopBrace.ts`, windsor#30),
- * `songHarmonyLane.ts` and `songLanes.ts`, with the mixer column's cell
- * between each row's name and lane (`songMixerCell.ts`, windsor#157); the pane is
+ * `songHarmonyLane.ts` and `songLanes.ts`, each beside its block of the one
+ * frozen column (`songLaneColumn.ts`, windsor#534), which holds the parts'
+ * mixer strips (`songMixerCell.ts`, windsor#157); the pane is
  * `songDetailPane.ts`; the edits themselves are the pure `regionModel.ts` and
  * `harmonyLaneModel.ts`. Every edit is one `ctx.change` live partial, never
  * a rebuild; the lanes repaint from the document, so a card's knob in the
@@ -37,16 +38,10 @@ import { loopBraceRow } from './loopBrace';
 import type { DetailPane } from './songDetailPane';
 import { paintDetailPane } from './songDetailPane';
 import { harmonyLaneRow, markPlayingBlock } from './songHarmonyLane';
-import { partLaneRow } from './songLanes';
+import { harmonyGroup, headGroup, partGroup, sizeLaneColumn } from './songLaneColumn';
 import { pickedSlot, syncSongSelection } from './partSelectionSync';
-import {
-  EXPANDED_KNOB_COUNT,
-  emptyMixerCell,
-  mixerHeaderCell,
-  partMixerCell,
-  refreshMixerCells,
-} from './songMixerCell';
-import { automationRows, type Readout } from './songAutomationLane';
+import { partMixerCell, refreshMixerCells } from './songMixerCell';
+import type { Readout } from './songAutomationLane';
 import { automationSignature } from './songAutomationModel';
 import {
   DEFAULT_AUTOMATION_TOOL,
@@ -67,14 +62,7 @@ import {
   wirePlayheadDrag,
   wireRulerZoom,
 } from './songRuler';
-import { CYCLE_TICKS, REGION_SUMMARY, SONG_VIEW, forKind, mixerColumnPx } from './songViewTables';
-
-/** A row's name cell and lane with the mixer column's cell between them (windsor#157). */
-const withMixer = ([name, lane]: [HTMLElement, HTMLElement], cell: HTMLElement): HTMLElement[] => [
-  name,
-  cell,
-  lane,
-];
+import { CYCLE_TICKS, REGION_SUMMARY, SONG_VIEW, forKind } from './songViewTables';
 
 /** What the pane shows: a part (and, when a block was clicked, which of its regions), a chord event, or nothing. */
 export type SongSelection =
@@ -214,17 +202,7 @@ function renderSongView(
   state.selection = validSelection(ctx, synced.selection);
   const scroll = el('div', 'lanes-scroll');
   const lanes = el('div', 'lanes');
-  lanes.style.setProperty('--names', `${SONG_VIEW.laneNameWidthPx}px`);
-  const sizeMixer = (): void =>
-    lanes.style.setProperty(
-      '--mixer',
-      `${mixerColumnPx(state.mixerExpanded, EXPANDED_KNOB_COUNT)}px`,
-    );
-  sizeMixer();
-  lanes.style.setProperty('--mix-knobs', String(EXPANDED_KNOB_COUNT));
-  lanes.style.setProperty('--gap', `${SONG_VIEW.laneGapPx}px`);
-  lanes.style.setProperty('--auto-lane-h', `${SONG_VIEW.automationLanePx}px`);
-  lanes.style.setProperty('--auto-add-h', `${SONG_VIEW.automationAddRowPx}px`);
+  sizeLaneColumn(lanes, state.mixerExpanded);
   guardFrozenColumns(lanes, SONG_VIEW.laneGapPx);
   const line = playheadLine();
   const pane = el('div', 'detail-pane');
@@ -265,7 +243,7 @@ function renderSongView(
     },
     toggle(): void {
       state.mixerExpanded = !state.mixerExpanded;
-      sizeMixer();
+      sizeLaneColumn(lanes, state.mixerExpanded);
       view.paintLanes();
       // The fit reads the grid's width, so it is measured on the new cells.
       refit();
@@ -306,19 +284,17 @@ function renderSongView(
       const brace = loopBraceRow(view);
       const fresh: Readout[] = [];
       const rows: HTMLElement[] = [
-        ...withMixer(
-          rulerRow(doc.transport.bars, state.pxPerBar, doc.transport.meter),
-          mixerHeaderCell(mixer),
-        ),
-        ...withMixer(brace.row, emptyMixerCell()),
-        ...withMixer(harmonyLaneRow(view), emptyMixerCell()),
-        ...doc.parts.flatMap((part) => [
-          ...withMixer(
-            partLaneRow(view, part),
+        headGroup(mixer, rulerRow(doc.transport.bars, state.pxPerBar, doc.transport.meter), brace),
+        harmonyGroup(harmonyLaneRow(view)),
+        ...doc.parts.map((part, index) =>
+          partGroup(
+            view,
+            part,
+            index,
             partMixerCell(ctx, part, state.mixerExpanded, lights),
+            fresh,
           ),
-          ...(state.openParts.has(part.slot) ? automationRows(view, part, fresh) : []),
-        ]),
+        ),
       ];
       readouts = fresh;
       lanes.replaceChildren(...rows, ...brace.lines, line);

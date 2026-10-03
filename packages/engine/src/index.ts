@@ -563,6 +563,15 @@ export { DEFAULT_MASTER, masterOutput, normaliseMaster } from './mixer/masterSpe
 export type { MasterSpec } from './mixer/masterSpec';
 export { PEAK_METER } from './mixer/peakMeterConstants';
 export type { PeakMeter } from './mixer/peakMeter';
+export type { PeakReport } from './mixer/peakMeterConstants';
+// The part meter bank (windsor#540): one node metering every music part, `AudioSystem.partMeters`.
+export { createPartMeterBank } from './mixer/partMeterBank';
+export type { PartMeterBank } from './mixer/partMeterBank';
+export {
+  PART_METER_BANK_NAME,
+  PART_METER_FIELD,
+  PART_METER_FIELDS,
+} from './mixer/partMeterBankConstants';
 
 // The engine's output stage (windsor#93): `FmEngine.outputStage` is the live
 // one; the song's settings are `master.output`.

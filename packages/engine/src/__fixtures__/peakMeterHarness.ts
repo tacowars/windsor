@@ -8,6 +8,7 @@
  *
  * Node-only, by design: excluded from the engine's tsc build.
  */
+import { PEAK_METER_NAME } from '../mixer/peakMeterConstants';
 import type { PeakReport } from '../mixer/peakMeterConstants';
 import { generatedProcessor, inboxProcessor } from './generatedProcessor';
 import type { ReverbProcessorLike } from './reverbHarness';
@@ -25,6 +26,7 @@ export function loadPeakMeter(sampleRate = 48000): LoadedPeakMeter {
   let deliver: ((report: PeakReport) => void) | null = null;
   const { Processor: ctor } = generatedProcessor<new () => ReverbProcessorLike>({
     file: 'peak-meter-processor.js',
+    processor: PEAK_METER_NAME,
     sampleRate,
     base: inboxProcessor<PeakReport>(() => deliver),
   });

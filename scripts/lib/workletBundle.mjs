@@ -41,7 +41,7 @@ export const WORKLETS = [
   },
   {
     name: 'meter',
-    entry: 'meter/peakMeterProcessor.ts',
+    entry: 'meter/meterProcessors.ts',
     output: 'generated/peak-meter-processor.js',
   },
   {

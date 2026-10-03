@@ -7,10 +7,14 @@
  * is the one place solo resolves (windsor#154): the aux strips are never in
  * it, so solo never touches them. It reads the live group buses too
  * (windsor#285), and sets their gates by the same rule (`soloRule.ts`).
+ * It attaches each part's tap to the part meter bank on its slot as the part
+ * comes and detaches it as it goes (windsor#540), where the strip's own meter
+ * taps: the rotation's output.
  */
 import { MUSIC_PART_MAX_VOICES } from '../audioConstants';
 import type { PartStrip } from '../mixer/channelStrip';
 import type { GroupBus } from '../mixer/groupBus';
+import type { PartMeterBank } from '../mixer/partMeterBank';
 import type { ChannelStrip } from '../mixer/mix';
 import { DEFAULT_STRIP, isGroupOutput } from '../mixer/mix';
 import type { GroupSwitches } from '../mixer/soloRule';
@@ -37,11 +41,13 @@ export class MusicRoster {
 
   /**
    * `strips` builds and disposes each slot's engine part and strip; `groups`
-   * are the live group buses (windsor#285), none by default.
+   * are the live group buses (windsor#285), none by default; `meters` is the
+   * part meter bank each slot's tap is attached to (windsor#540), if any.
    */
   constructor(
     private readonly strips: PartStrips,
     private readonly groups: () => readonly GroupBus[] = () => [],
+    private readonly meters?: PartMeterBank,
   ) {}
 
   /**
@@ -62,6 +68,7 @@ export class MusicRoster {
     this.parts.set(part.slot, audio);
     const added = this.strip(part.slot);
     if (added) {
+      this.meters?.attach(part.slot, added.rotation.output);
       const switches = this.groups().map((group) => group.spec);
       const soloing = isSoloing([...this.tracks().values()], switches);
       added.setSoloedOut(!isHeard(soloView(added), soloing, switches), 0);
@@ -70,11 +77,13 @@ export class MusicRoster {
   }
 
   /**
-   * Dispose the `music-<slot>` part, its strip and its load meter entry, and
-   * nothing else (#629 decision 1). Removing the only soloed part brings the
-   * rest back.
+   * Detach the `music-<slot>` part from the part meter bank and dispose it,
+   * its strip and its load meter entry, and nothing else (#629 decision 1).
+   * Removing the only soloed part brings the rest back.
    */
   remove(slot: number): void {
+    // Before the strip, whose rotation output the bank's edge leaves from.
+    this.meters?.detach(slot);
     this.strips.remove(musicPartName(slot));
     this.parts.delete(slot);
     this.resolveSolo();

@@ -1,12 +1,12 @@
 /**
- * The Song tab's mixer column (windsor#157, windsor#158; record
- * `2026-09-30-mixer-on-the-song-tab` decisions 1 to 3): one cell a row
- * between the lane names and the timeline, frozen with the names while the
- * timeline scrolls. The ruler row's cell is the column's header, led by the
- * arrow that expands every strip at once; the loop and Harmony rows' are
- * empty. A part's is its strip: collapsed, a compact Level knob with its
- * value, then M and S; expanded, Level, Pan, Low cut, a send per return, the
- * Output select, M and S, under the header's column labels. The arrow's
+ * The Song tab's mixer strips (windsor#157, windsor#158; record
+ * `2026-09-30-mixer-on-the-song-tab` decisions 1 to 3): one a part, in its
+ * row of the one frozen column (windsor#534), which stays put while the
+ * timeline scrolls. The ruler row holds the column's header, led by the
+ * arrow that expands every strip at once. A part's strip, collapsed, is a
+ * compact Level knob with its value, then M and S; expanded, Level, Pan,
+ * Low cut, a send per return, the Output select, M and S, under the
+ * header's column labels. The arrow's
  * state is the view's (`SongViewState.mixerExpanded`), and a toggle draws
  * the cells again, so one set of strip controls exists at a time.
  *
@@ -15,7 +15,8 @@
  * of the lanes' signature, so a Level drag never repaints its own row. An
  * undo, a redo or an import renders the tab, which draws the cell again; a
  * strip edited on the Mixer tab redraws it in place (`refreshMixerCells`).
- * A press on the cell leaves the selection alone; the name cell selects.
+ * A press on one of its controls leaves the selection alone; a press on the
+ * rest of the part's row selects the part (`songLaneColumn.ts`).
  *
  * After M and S sit the part's activity and clip lights (windsor#159). The
  * cell only places them: the column's one poller (`songMixerLights.ts`)
@@ -90,24 +91,26 @@ function toggleButton({ expanded, toggle }: MixerToggle): HTMLButtonElement {
 }
 
 /**
- * The column's header, in the ruler row: the arrow, then "Mixer" collapsed
- * or, expanded, each column's label over its control (decision 3).
+ * The column's header, in the ruler row (windsor#534 decision 5): the
+ * arrow, then "Mixer" collapsed, over the parts' number tabs and `▸`; over
+ * the strips, expanded, each column's label over its control (windsor#158
+ * decision 3); and `corner`, the ruler's "bar · beat", at the right.
  */
-export function mixerHeaderCell(toggle: MixerToggle): HTMLElement {
-  const cell = el('div', toggle.expanded ? 'mix-cell mix-head expanded' : 'mix-cell mix-head');
-  cell.appendChild(toggleButton(toggle));
-  if (!toggle.expanded) {
-    cell.appendChild(el('span', '', 'Mixer'));
-    return cell;
+export function mixerHeaderCell(toggle: MixerToggle, corner: HTMLElement): HTMLElement {
+  const cell = el('div', 'mix-head');
+  const lead = el('div', 'mix-lead');
+  lead.appendChild(toggleButton(toggle));
+  if (!toggle.expanded) lead.appendChild(el('span', '', 'Mixer'));
+  const labels = el('div', toggle.expanded ? 'mix-labels expanded' : 'mix-labels');
+  if (toggle.expanded) {
+    for (const label of [...EXPANDED_KNOBS, OUTPUT_HEADING]) {
+      labels.appendChild(el('span', 'mix-label', label));
+    }
   }
-  for (const label of [...EXPANDED_KNOBS, OUTPUT_HEADING]) {
-    cell.appendChild(el('span', 'mix-label', label));
-  }
+  labels.appendChild(corner);
+  cell.append(lead, labels);
   return cell;
 }
-
-/** The cell a row with no strip holds (the loop brace, the Harmony lane), so the column stays opaque. */
-export const emptyMixerCell = (): HTMLElement => el('div', 'mix-cell');
 
 /** Each drawn part cell's redraw from the document, found by its element. */
 const REFRESH = new WeakMap<Element, () => void>();

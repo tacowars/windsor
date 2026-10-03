@@ -88,7 +88,7 @@ function wireEdgeDrag(view: SongView, node: HTMLElement, bounds: EventSpan): voi
   });
 }
 
-/** The name-column cell and the harmony lane, blocks and the `+` tile included. */
+/** HARMONY · chords for the frozen column, and the harmony lane, blocks and the `+` tile included. */
 export function harmonyLaneRow(view: SongView): [HTMLElement, HTMLElement] {
   const name = el('div', 'lane-name');
   const nm = el('span', 'nm');
