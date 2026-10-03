@@ -8,6 +8,9 @@ var TABLE_MASK = TABLE_SIZE - 1;
 var MIP_COUNT = 12;
 var MIP_BASE_HZ = 16.352;
 var CTRL_INTERVAL = 32;
+var CTRL_INTERVAL_LONG = 128;
+var CTRL_LONG_MIN_SEGMENT_SECONDS = 0.1;
+var CTRL_LONG_MAX_LFO_HZ = 8;
 var FEEDBACK_RAMP_STEP = 1 / CTRL_INTERVAL;
 var DORMANT_AMP = 1e-9;
 var DORMANT_FILTER_STATE = 1e-9;
@@ -1651,6 +1654,66 @@ function updateVoiceFormant(voice) {
   }
 }
 
+// packages/engine/src/worklet/fm/voiceControlInterval.ts
+var CONTROL_INTERVALS = {
+  fine: CTRL_INTERVAL,
+  long: CTRL_INTERVAL_LONG,
+  minSegmentSeconds: CTRL_LONG_MIN_SEGMENT_SECONDS,
+  maxLfoHz: CTRL_LONG_MAX_LFO_HZ
+};
+function controlIntervalTable(overrides) {
+  return { ...CONTROL_INTERVALS, ...overrides, fine: CTRL_INTERVAL };
+}
+function envelopeFast(env, looping, table) {
+  const state = env.state;
+  if (state === ST_IDLE || state === ST_DONE) return false;
+  const p = env.p;
+  if (looping && (p.loopMode === LOOP_LOOP || p.loopMode === LOOP_TRIGGER)) return true;
+  let time;
+  if (state === ST_ATTACK) time = p.attackTime;
+  else if (state === ST_DECAY) time = env.decayTime * env.decayLeft;
+  else if (state === ST_RELEASE) time = p.releaseTime;
+  else return false;
+  return time * env.timeScale < table.minSegmentSeconds;
+}
+function lfoShapeJumps(shape) {
+  return shape === LFO_SQUARE || shape === LFO_SH || shape === LFO_SAW_UP || shape === LFO_SAW_DOWN;
+}
+function lfoFast(voice, second, table) {
+  const patch = voice.patch;
+  const p = second ? patch.lfo2 : patch.lfo;
+  const lfo = second ? voice.lfo2 : voice.lfo;
+  if (!(lfo.rate >= table.maxLfoHz) && !lfoShapeJumps(p.shape)) return false;
+  const amount = voice.liveValues[second ? VT_LFO2_AMOUNT : VT_LFO_AMOUNT];
+  if (amount === 0 && p.modWheelDepth === 0) return false;
+  if (p.toPitch !== 0) return true;
+  for (let i = 0; i < p.toOp.length; i++) {
+    if (p.toOp[i] !== 0 || p.toWidth[i] !== 0) return true;
+  }
+  const f = patch.filter;
+  return f.mode !== FILT_OFF && (second ? f.lfo2Amount : f.lfoAmount) !== 0;
+}
+function controlInterval(voice, table = CONTROL_INTERVALS) {
+  if (voice.fbRamp !== 0) return table.fine;
+  for (let i = 0; i < voice.ampEnv.length; i++) {
+    if (envelopeFast(voice.ampEnv[i], true, table)) return table.fine;
+  }
+  const patch = voice.patch;
+  const live = voice.liveValues;
+  if (live[VT_PITCH_ENV_AMOUNT] !== 0 && envelopeFast(voice.pitchEnv, false, table)) {
+    return table.fine;
+  }
+  const f = patch.filter;
+  const filterEnv = f.mode !== FILT_OFF && (live[VT_ENV_AMOUNT] !== 0 || f.modWheelDepth !== 0);
+  if (filterEnv && envelopeFast(voice.filtEnv, false, table)) return table.fine;
+  if (voice.pitchCur !== voice.pitchTarget) {
+    const glide = voice.glideSeconds > 0 ? voice.glideSeconds : patch.glide;
+    if (glide < table.minSegmentSeconds) return table.fine;
+  }
+  if (lfoFast(voice, false, table) || lfoFast(voice, true, table)) return table.fine;
+  return table.long;
+}
+
 // packages/engine/src/worklet/fm/voiceTargets.ts
 function layoutVoiceTargets(patch, out) {
   const f = patch.filter;
@@ -1897,12 +1960,21 @@ function updateVoiceFilter(voice, n) {
   }
 }
 function updateVoiceControl(voice, n) {
+  applyVoiceOffsets(voice);
+  advanceVoiceControl(voice, n);
+}
+function updateVoiceControlBlock(voice, table) {
+  applyVoiceOffsets(voice);
+  const n = controlInterval(voice, table);
+  advanceVoiceControl(voice, n);
+  return n;
+}
+function advanceVoiceControl(voice, n) {
   const patch = voice.patch;
   const lfoP = patch.lfo;
   const lfo2P = patch.lfo2;
   const controls = voice.partControls;
   const bend = controls[PART_BEND];
-  applyVoiceOffsets(voice);
   const live = voice.liveValues;
   const modWheel = controls[PART_WHEEL] + voice.mod;
   voice.lfo.advance(lfoP, n, voice.sr);
@@ -2949,6 +3021,14 @@ var Voice = class {
     updateVoiceControl(this, n);
   }
   /**
+   * A control boundary in the part's render (windsor#326): the update over
+   * the interval the voice's state asks for under `table`, 32 or 128
+   * samples (`voiceControlInterval.ts`), which it returns for `ctrlCount`.
+   */
+  updateControlBlock(table) {
+    return updateVoiceControlBlock(this, table);
+  }
+  /**
    * Render `n` samples into the part's stereo accumulators starting at `off`:
    * the fixed-index kernel (`voiceKernel.js`) when the bound patch can take it
    * exactly, else the generic loop (`voiceRender.js`). Both are the same
@@ -3108,6 +3188,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.dormancy = opts.dormancy !== false;
     const specialise = opts.specialise !== false;
     for (let i = 0; i < this.voices.length; i++) this.voices[i].specialise = specialise;
+    this.intervals = controlIntervalTable(opts.controlIntervals);
     this.load = new LoadSampler(sampleRate, this.port);
     if (Array.isArray(opts.events)) {
       for (const ev of opts.events) this.schedule(ev);
@@ -3335,6 +3416,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
     this.gainFrom = gain;
     const blockStart = currentFrame;
     const dormancy = this.dormancy;
+    const intervals = this.intervals;
     const q = this.events;
     let cursor = 0;
     const posted = q.posted;
@@ -3375,10 +3457,7 @@ var FmPartProcessor = class extends AudioWorkletProcessor {
             v.age += seg - done;
             break;
           }
-          if (v.ctrlCount === 0) {
-            v.updateControl(CTRL_INTERVAL);
-            v.ctrlCount = CTRL_INTERVAL;
-          }
+          if (v.ctrlCount === 0) v.ctrlCount = v.updateControlBlock(intervals);
           const chunk = Math.min(seg - done, v.ctrlCount);
           v.render(outL, outR, cursor + done, chunk);
           v.ctrlCount -= chunk;
