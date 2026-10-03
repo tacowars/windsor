@@ -16,6 +16,7 @@ import {
   lineSummary,
   nextFigureKind,
   randomFigureCells,
+  reverseFigure,
   rotateFigure,
   setTone,
   setVelocity,
@@ -120,7 +121,7 @@ describe("a cell edit writes the region's pattern", () => {
   });
 });
 
-describe('Length, Rotate and Randomize', () => {
+describe('Length, Rotate, Reverse and Randomize', () => {
   const line: FigureCell[] = [
     figureNoteCell(0, { velocity: 0.5 }),
     figureNoteCell(1, { ratchet: 3 }),
@@ -138,6 +139,14 @@ describe('Length, Rotate and Randomize', () => {
     const turned = rotateFigure({ cells: line, length: 3, lanes }, 1);
     expect(turned.cells).toEqual([line[2], line[0], line[1], line[3]]);
     expect(turned.lanes[0]?.values).toEqual([0.3, 0.1, 0.2, 0.4]);
+  });
+
+  it('mirrors whole cells over the line, lanes with them, and back again (windsor#548)', () => {
+    const lanes = [{ param: 'filter.cutoff' as const, values: [0.1, 0.2, 0.3, 0.4] }];
+    const reversed = reverseFigure({ cells: line, length: 3, lanes });
+    expect(reversed.cells).toEqual([line[2], line[1], line[0], line[3]]);
+    expect(reversed.lanes[0]?.values).toEqual([0.3, 0.2, 0.1, 0.4]);
+    expect(reverseFigure({ ...reversed, length: 3 })).toEqual({ cells: line, lanes });
   });
 
   it('rerolls the line over the chord tones and keeps the cells past it', () => {

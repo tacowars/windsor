@@ -6,7 +6,7 @@
  * at the device's one height, laid out as the Arp's. Two sections:
  *
  * - **Play**, the controls in columns: Pitch mode as a stack of three, then
- *   Fixed degree; Rate, Seed with Reseed as an icon, and Randomize; then,
+ *   Fixed degree; Rate, Seed with Reseed as an icon, Randomize and Reverse; then,
  *   behind a rule, Octave, Length and Rotate, Vel, Acc vel and Acc mod, and
  *   Gate, Density and Root bias. Root bias is greyed and inert unless
  *   Follow Chord is on, and Fixed degree unless Fixed is on.
@@ -186,7 +186,12 @@ function controls(target: BassTarget, grid: ReturnType<typeof bassGrid>): HTMLEl
   const body = el('div', 'seq-sec-body');
   body.append(
     column('wide bass-fields', [pitchMode(target, sync), fixedDegree]),
-    column('wide bass-fields', [ratePicker(target), seedField(target), grid.randomize]),
+    column('wide bass-fields', [
+      ratePicker(target),
+      seedField(target),
+      grid.randomize,
+      grid.reverse,
+    ]),
     knobStrip(target, grid, rootBias),
   );
   sync(specOf(target).pitchMode);

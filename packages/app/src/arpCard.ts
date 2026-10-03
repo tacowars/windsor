@@ -4,8 +4,8 @@
  * `docs/research/2026-09-30-sequencer-rack/arp.html`): the body the Song
  * pane's frame (`sequencerDevice.ts`) puts beside the shared rail, at the
  * device's one height. Two sections: Play, the controls in columns — Style,
- * Rate and Voicing; Retrigger, Seed with Reseed as an icon beside it, and
- * Randomize; then, behind a rule, Octave, Octaves and Rotate, Vel, Acc vel
+ * Rate and Voicing; Retrigger, Seed with Reseed as an icon beside it,
+ * Randomize and Reverse; then, behind a rule, Octave, Octaves and Rotate, Vel, Acc vel
  * and Acc mod, Gate and Skip — and Cycle, the strip (`arpGrid.ts`), as wide
  * as the arp's cycle. The sizes are the `--arp-*` entries of
  * `SEQUENCER_DEVICE_PX`; the hint paragraph went with windsor#370, and the
@@ -162,7 +162,7 @@ function controls(target: ArpTarget, grid: ReturnType<typeof arpGrid>): HTMLElem
   const body = el('div', 'seq-sec-body');
   body.append(
     column('wide arp-fields', pickers(target)),
-    column('wide arp-fields', [retrigger(target), seedField(target), grid.randomize]),
+    column('wide arp-fields', [retrigger(target), seedField(target), grid.randomize, grid.reverse]),
     knobStrip(target, grid.rotate),
   );
   const section = el('div', 'seq-section play');
