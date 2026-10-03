@@ -112,6 +112,8 @@ body.solo .screen { outline: none; }
 .ob .envbox { flex: 1 1 560px; min-width: 140px; }
 .ob .advgrp { display: flex; gap: 4px; flex: none; align-items: center; padding-left: 12px; border-left: 1px solid var(--line); }
 .ob .advgrp .gl { writing-mode: vertical-rl; transform: rotate(180deg); font: 600 8.5px var(--f-panel); letter-spacing: .16em; color: var(--ink-faint); margin-right: 4px; }
+.ob .advgrp .advx { display: flex; flex-direction: column; gap: 4px; margin-left: 6px; }
+.ob .advgrp .advs { display: flex; gap: 4px; align-items: flex-end; }
 .btn.on { background: var(--carrier); color: #1a1408; border-color: var(--carrier); }
 .partstrip { display: flex; gap: 3px; flex: 1; min-width: 0; align-items: stretch; }
 .pchip { flex: 1 1 0; min-width: 0; max-width: 132px; background: var(--inset); border: 1px solid var(--line); border-left: 3px solid var(--line-bright); border-radius: var(--r); padding: 4px 7px 3px; line-height: 1.15; position: relative; }
@@ -258,6 +260,12 @@ const OPS = [
   { k: 'D', car: true, wave: 'Sine', main: [['sub', 'Coarse', .02], ['0.500', 'Fine', .75], ['R', '0.500'], ['-5c', 'Detune', .48, 1], ['0.55', 'Level', .55], ['+0.00', 'Fdbk', .5, 1], ['100%', 'Width', 1], ['0.40', 'Vel', .4]], adsr: [['250m', .32], ['500m', .45], ['1.00', 1], ['1.30s', .58]], env: [.12, .5, .98, .38] },
 ];
 const ADV = [['0.00', 'Init', 0], ['1.00', 'Peak', 1], ['0.00', 'End', 0], ['+0.00', 'A Crv', .5, 1], ['+0.50', 'D Crv', .75, 1], ['+0.50', 'R Crv', .75, 1], ['+0.00', 'Key', .5, 1]];
+// The rest of today's Adv group (patchBays.ts): Envelope Loop, Start, and Phase while Start is Locked.
+function advExtra(o) {
+  const locked = o.k === 'D';
+  return `<div class="advx"><div><span class="field-label">Envelope Loop</span>${seg(['None', 'Loop', 'Trigger'], 0)}</div>
+    <div class="advs"><div><span class="field-label">Start</span>${seg(['Free', 'Locked'], locked ? 1 : 0)}</div>${locked ? knob('0.00', 'Phase', 0, { c: 'car', sm: true }) : ''}</div></div>`;
+}
 const ALGS = [ // top row first; the last row are carriers. Diagrams approximate.
   [['D'], ['C'], ['B'], ['A']], [['C', 'D'], ['B'], ['A']], [['D'], ['C', 'B'], ['A']],
   [['D'], ['B', 'C'], ['A']], [['B', 'D'], ['A', 'C']], [['D'], ['A', 'B', 'C']],
@@ -367,7 +375,7 @@ function opRow(o) {
     <div class="ob"><div class="core"><div class="grp">${knobs(o.main, 'car', { sm: true })}</div>
       <div class="grp">${knobs(o.adsr.map((v, i) => [v[0], ['Attack', 'Decay', 'Sustain', 'Release'][i], v[1]]), 'car', { sm: true })}</div>
       <div class="envbox">${env(54, o.env)}</div></div>
-      ${adv ? `<div class="advgrp"><span class="gl">ADV ENV</span>${knobs(ADV, 'car', { sm: true })}</div>` : ''}</div></div>`;
+      ${adv ? `<div class="advgrp"><span class="gl">ADV ENV</span>${knobs(ADV, 'car', { sm: true })}${advExtra(o)}</div>` : ''}</div></div>`;
 }
 function opMini(o, cls = '') {
   return `<div class="mini car ${cls}"><div class="mt"><b>${o.k}</b><span>${o.wave} · ${o.main[2][1]}</span></div>
@@ -500,7 +508,7 @@ const NOTES = {
   <ul><li><b>Keeps:</b> the operator cards exactly as they are, so it is the smallest change and the easiest to build first.</li>
   <li><b>Doesn't fix:</b> the right column is still about 2,000px tall at 1440 and 1366; widening it only shortens it a little. At 4K, half the centre is still empty below the cards.</li>
   <li class="todo">To decide: does the sequencer picker belong in this bar, or only on the Song tab?</li></ul>`,
-  B: `<h2>B · Operator rows</h2><b style="color:var(--carrier)">Approved by tacowars on 2026-10-03.</b> Four operator rows, then Filter + Filter Env, both LFOs, the Pitch Env and Drive (last) as a deck that wraps to the width. The left rail runs Output (scope) at the top, then Algorithm, then Global. <b>Adv</b> on a row adds its advanced envelope knobs (Init, Peak, End, the three curves, Key) as one group: <b>to the right of Attack–Release when the row has room, on a second line under the row when it doesn't</b>. Coarse to Release stay together as one unit and only the Adv group moves. Attack–Release sit before the envelope, so every knob column lines up across A–D whether or not a row has Adv open: only the envelope's width changes. It's a flex row that wraps, with no breakpoint, so it works the same at every screen size and zoom. The envelope takes whatever width is left once the knobs and Adv are placed, so it's widest at 4K, where fine adjustments benefit.
+  B: `<h2>B · Operator rows</h2><b style="color:var(--carrier)">Approved by tacowars on 2026-10-03.</b> Four operator rows, then Filter + Filter Env, both LFOs, the Pitch Env and Drive (last) as a deck that wraps to the width. The left rail runs Output (scope) at the top, then Algorithm, then Global. <b>Adv</b> on a row adds today's advanced group (the envelope knobs Init, Peak, End, the three curves and Key, then Envelope Loop, Start, and Phase while Start is Locked) as one block: <b>to the right of Attack–Release when the row has room, on a second line under the row when it doesn't</b>. Coarse to Release stay together as one unit and only the Adv group moves. Attack–Release sit before the envelope, so every knob column lines up across A–D whether or not a row has Adv open: only the envelope's width changes. It's a flex row that wraps, with no breakpoint, so it works the same at every screen size and zoom. The envelope takes whatever width is left once the knobs and Adv are placed, so it's widest at 4K, where fine adjustments benefit.
   <ul><li><b>Try:</b> 4K at 100% and 125% with Adv = All (inline), then MacBook Air (Adv drops below).</li>
   <li><b>Decided:</b> Adv stays per operator, with no Adv-all switch.</li>
   <li><b>Decided:</b> on wide screens the envelope grows to fill the row, with no cap.</li></ul>`,
