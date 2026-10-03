@@ -51,16 +51,22 @@ const mod = (n: number, m: number): number => ((n % m) + m) % m;
 const sig = ({ schedule, drift }: FigureProcesses): string =>
   JSON.stringify([schedule?.length ? schedule : null, drift ?? null]);
 
-/** The stage holding local `bar`: its length and its first bar; null without a schedule. */
+/** The processes' position at a bar: the schedule's stage index (-1 without one) and the rotation counter. */
+export interface FigureLinePosition {
+  readonly stage: number;
+  readonly rotation: number;
+}
+
+/** The stage holding local `bar`: its index, its length and its first bar; null without a schedule. */
 export function stageAt(
   schedule: readonly FigureStage[] | undefined,
   bar: number,
-): { length: number; startBar: number } | null {
+): { index: number; length: number; startBar: number } | null {
   if (!schedule?.length) return null;
   const total = schedule.reduce((sum, stage) => sum + stage.bars, 0);
   let startBar = bar - mod(bar, total);
-  for (const stage of schedule) {
-    if (bar < startBar + stage.bars) return { length: stage.length, startBar };
+  for (const [index, stage] of schedule.entries()) {
+    if (bar < startBar + stage.bars) return { index, length: stage.length, startBar };
     startBar += stage.bars;
   }
   return null;
@@ -124,10 +130,23 @@ export class FigureLine {
 
   /** The written cell local `step`, in local `bar`, sounds. */
   cellAt(step: number, bar: number, frame: FigureFrame): number {
-    const epoch = this.epochs[epochIndexAt(this.epochs, bar)] ?? entry({});
+    const epoch = this.epochAt(bar);
     const stage = stageAt(epoch.schedule, bar);
     const length = Math.min(stage?.length ?? frame.length, frame.cells);
     const start = stage ? Math.ceil((stage.startBar * frame.barTicks) / frame.divisor) : 0;
     return mod(step - start + rotationAt(epoch, bar), length);
+  }
+
+  /**
+   * The stage and the rotation `cellAt` plays local `bar` under (windsor#508),
+   * from the epoch in force there, so a live edit's epoch is read as heard.
+   */
+  positionAt(bar: number): FigureLinePosition {
+    const epoch = this.epochAt(bar);
+    return { stage: stageAt(epoch.schedule, bar)?.index ?? -1, rotation: rotationAt(epoch, bar) };
+  }
+
+  private epochAt(bar: number): Epoch {
+    return this.epochs[epochIndexAt(this.epochs, bar)] ?? entry({});
   }
 }

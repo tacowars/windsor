@@ -192,6 +192,49 @@ describe('the rotation drift (windsor#486)', () => {
   });
 });
 
+describe('the stage and rotation a region step reports (windsor#508)', () => {
+  it('reads the epoch the engine plays, before and after a live drift edit', () => {
+    const parts = (SONG['parts'] as Array<Record<string, unknown>>).map((part) =>
+      part['slot'] === 2
+        ? {
+            ...part,
+            sequencer: { ...(part['sequencer'] as object), drift: { steps: 1, everyBars: 2 } },
+          }
+        : part,
+    );
+    const { document } = makeArrangement({ ...SONG, parts });
+    const recorders = new Map(document.parts.map((part) => [part.slot, recordingPart()]));
+    const transport = new TickTransport();
+    const player = new ArrangementPlayer(transport, recorders, document, document.patches ?? {});
+    const entry = 36 * TICKS_PER_BAR;
+    const positions = (): Array<[number, number]> =>
+      [1, 2, 3, 4].map((bar) => {
+        const at = player.regionStepAt(2, 0, entry + bar * TICKS_PER_BAR);
+        return [at?.stage ?? NaN, at?.rotation ?? NaN];
+      });
+    for (let i = 0; i <= entry + TICKS_PER_BAR + EIGHTH; i++) {
+      transport.advance(transport.transportSeconds);
+    }
+    // Stages of 2, 2 and 2 bars; a cell every 2 bars.
+    expect(positions()).toEqual([
+      [0, 0],
+      [1, 1],
+      [1, 1],
+      [2, 2],
+    ]);
+    const drift = { parts: { 2: { sequencer: { drift: { steps: -1, everyBars: 1 } } } } };
+    expect(player.apply(drift as unknown as ArrangementPartial).ok).toBe(true);
+    // From local bar 2, the bar after the one heard: the counter's 1 carried, then back a cell a bar.
+    expect(positions()).toEqual([
+      [0, 0],
+      [1, 1],
+      [1, 0],
+      [2, -1],
+    ]);
+    player.dispose();
+  });
+});
+
 describe('a Figure with neither process (windsor#486)', () => {
   it('emits exactly what windsor#485 emitted', () => {
     const played = run('figure-listen', 4 * TICKS_PER_BAR).played(0);
