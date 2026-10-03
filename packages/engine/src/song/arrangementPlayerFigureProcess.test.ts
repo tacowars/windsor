@@ -18,6 +18,7 @@ import {
 import { recordingPart, type Call } from '../__fixtures__/recordingPart';
 import { SECONDS_PER_MINUTE } from '../audioConstants';
 import { PPQ, TICKS_PER_BAR, TickTransport } from '../sequencing/scheduler';
+import type { ArrangementPartial } from './arrangement';
 import { makeArrangement } from './arrangementDocument';
 import { ArrangementPlayer } from './arrangementPlayer';
 
@@ -173,6 +174,20 @@ describe('the rotation drift (windsor#486)', () => {
     expect([player.stepAt(1, 12 * BAR_7_8 - EIGHTH), player.stepAt(1, 12 * BAR_7_8)]).toEqual([
       11, 1,
     ]);
+    player.dispose();
+  });
+
+  it('counts a schedule edit in the same partial as a meter change in the new meter (windsor#499)', () => {
+    const { document } = makeArrangement(SONG);
+    const recorders = new Map(document.parts.map((part) => [part.slot, recordingPart()]));
+    const transport = new TickTransport();
+    const player = new ArrangementPlayer(transport, recorders, document, document.patches ?? {});
+    for (let i = 0; i <= 90; i++) transport.advance(transport.transportSeconds);
+    const schedule = [{ length: 4, bars: 1 }];
+    const partial = { transport: { meter: '7/8' }, parts: { 0: { sequencer: { schedule } } } };
+    expect(player.apply(partial as ArrangementPartial).ok).toBe(true);
+    // Tick 96 is in the 84–167 bar heard at tick 90: unedited cell 8. Tick 168 starts the stage.
+    expect([player.stepAt(0, 96), player.stepAt(0, 168)]).toEqual([8, 0]);
     player.dispose();
   });
 });
