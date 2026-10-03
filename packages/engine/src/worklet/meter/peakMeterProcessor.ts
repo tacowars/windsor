@@ -1,26 +1,29 @@
 /** Stereo sample peaks over every render quantum, on an opt-in silent tap (#666).
- * Scalar state and one reused report; no render-loop allocation. The real
- * generated processor is exercised by peakMeterProcessor.test.ts.
+ * Each side's ballistics are a `ChannelPeak` (windsor#540, shared with the
+ * part meter bank), and one reused report; no render-loop allocation. The
+ * real generated processor is exercised by peakMeterProcessor.test.ts.
  */
 import { PEAK_METER_NAME, PEAK_METER } from '../../mixer/peakMeterConstants';
 import type { PeakReport } from '../../mixer/peakMeterConstants';
+import { ChannelPeak } from './channelPeak';
 class PeakMeterProcessor extends AudioWorkletProcessor {
   running: boolean;
   frames: number;
-  holdL: number;
-  holdR: number;
+  left: ChannelPeak;
+  right: ChannelPeak;
   report: PeakReport;
   constructor() {
     super();
     this.running = true;
-    this.frames = this.holdL = this.holdR = 0;
+    this.frames = 0;
+    this.left = new ChannelPeak(sampleRate * PEAK_METER.holdSeconds);
+    this.right = new ChannelPeak(sampleRate * PEAK_METER.holdSeconds);
     this.report = { type: 'peaks', left: 0, right: 0, holdLeft: 0, holdRight: 0, overload: false };
     this.port.onmessage = ({ data }: MessageEvent<{ type: 'stop' | 'reset' }>) => {
       if (data.type === 'stop') this.running = false;
       if (data.type === 'reset') {
-        this.report.overload = false;
-        this.report.holdLeft = this.report.holdRight = 0;
-        this.holdL = this.holdR = 0;
+        this.left.resetLatch();
+        this.right.resetLatch();
       }
     };
   }
@@ -29,28 +32,22 @@ class PeakMeterProcessor extends AudioWorkletProcessor {
     const count = outputs[0]?.[0]?.length ?? 0;
     const l = inputs[0]?.[0];
     const r = inputs[0]?.[1] ?? l;
-    const p = this.report;
-    for (let i = 0; i < count; i++) {
-      const left = Math.abs(l?.[i] ?? 0);
-      const right = Math.abs(r?.[i] ?? 0);
-      p.left = Math.max(p.left, left);
-      p.right = Math.max(p.right, right);
-      if (--this.holdL <= 0 || left >= p.holdLeft) {
-        p.holdLeft = left;
-        this.holdL = sampleRate * PEAK_METER.holdSeconds;
-      }
-      if (--this.holdR <= 0 || right >= p.holdRight) {
-        p.holdRight = right;
-        this.holdR = sampleRate * PEAK_METER.holdSeconds;
-      }
-      if (left >= PEAK_METER.overload || right >= PEAK_METER.overload) p.overload = true;
-    }
+    const left = this.left;
+    const right = this.right;
+    left.scan(l, count);
+    right.scan(r, count);
     // Outputs are the platform's zero-filled buffers: this tap is never audible.
     this.frames += count;
     if (this.frames >= sampleRate / PEAK_METER.reportHz) {
+      const p = this.report;
+      p.left = left.peak;
+      p.right = right.peak;
+      p.holdLeft = left.hold;
+      p.holdRight = right.hold;
+      p.overload = left.overload || right.overload;
       this.port.postMessage(p);
       this.frames = 0;
-      p.left = p.right = 0;
+      left.peak = right.peak = 0;
     }
     return true;
   }

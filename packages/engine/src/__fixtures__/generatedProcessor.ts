@@ -77,6 +77,11 @@ export interface GeneratedProcessorOptions {
   prologue?: string;
   /** Source run after the bundle in its scope; what its `return` gives comes back as `exports`. */
   epilogue?: string;
+  /**
+   * The registered name to return, for a bundle that registers more than one
+   * processor (the meter bundle, windsor#540); omitted, the last registered.
+   */
+  processor?: string;
 }
 
 export interface GeneratedProcessor<P, E> {
@@ -103,8 +108,8 @@ export function generatedProcessor<P, E = undefined>(
 ): GeneratedProcessor<P, E> {
   const { file, sampleRate, base = PortedProcessor, prologue = '', epilogue = '' } = options;
   let registered: P | undefined;
-  const registerProcessor = (_name: string, cls: P): void => {
-    registered = cls;
+  const registerProcessor = (name: string, cls: P): void => {
+    if (options.processor === undefined || options.processor === name) registered = cls;
   };
   const evaluate = new Function(
     'AudioWorkletProcessor',
@@ -113,6 +118,8 @@ export function generatedProcessor<P, E = undefined>(
     `${prologue}\n${bundleSource(file)}\n${epilogue}`,
   ) as (base: unknown, rate: number, register: typeof registerProcessor) => E;
   const exports = evaluate(base, sampleRate, registerProcessor);
-  if (registered === undefined) throw new Error(`${file} did not call registerProcessor`);
+  if (registered === undefined) {
+    throw new Error(`${file} did not register ${options.processor ?? 'a processor'}`);
+  }
   return { Processor: registered, exports };
 }

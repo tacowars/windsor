@@ -11,7 +11,8 @@
  * - `GroupBuses`: the song's group buses by id (windsor#285), and the order a
  *   live `groups` partial lands in.
  * - `PartStrips`: every part created here, on its strip, by engine name.
- * - `MusicRoster`: the music parts by slot, the player's `PartHost`.
+ * - `MusicRoster`: the music parts by slot, the player's `PartHost`; it
+ *   attaches each to the part meter bank (`partMeters`, windsor#540).
  * - `MusicPlayback`: the player on the transport (start, stop, mute) and the
  *   position queries.
  * - `SystemLoadMeter`: which processors report their load, and the sum.
@@ -38,6 +39,8 @@ import { applyReturnsLive, applyStripLive } from '../mixer/deskApply';
 import { splitStrips } from '../mixer/deskPartial';
 import type { GroupBus } from '../mixer/groupBus';
 import type { MasterStrip } from '../mixer/masterStrip';
+import type { PartMeterBank } from '../mixer/partMeterBank';
+import { createPartMeterBank } from '../mixer/partMeterBank';
 import type { ChannelStrip, ReturnSpec } from '../mixer/mix';
 import { MIX, RETURNS } from '../mixer/mix';
 import { applyMasterLive } from '../mixer/outputStageMaster';
@@ -104,6 +107,11 @@ export interface MusicReadout extends PlaybackReadout {
 export class AudioSystem {
   readonly engine: FmEngine;
   readonly scheduler: Scheduler;
+  /**
+   * One meter for every music part, on its slot (windsor#540): lazy, so
+   * nothing runs until the console calls `setActive(true)`.
+   */
+  readonly partMeters: PartMeterBank;
 
   private readonly meter: SystemLoadMeter;
   private readonly insertTempo: ReturnType<typeof tempoInsertRegistry>;
@@ -141,7 +149,8 @@ export class AudioSystem {
       partEvents: options.partEvents,
       groupInput: (id) => groups.get(id)?.input,
     });
-    const roster = new MusicRoster(parts, () => groups.all());
+    this.partMeters = createPartMeterBank(this.engine.context);
+    const roster = new MusicRoster(parts, () => groups.all(), this.partMeters);
     this.graph = graph;
     this.groups = groups;
     this.parts = parts;
@@ -453,6 +462,8 @@ export class AudioSystem {
     this.playback.dispose();
     this.automation.dispose();
     this.sidechains.dispose();
+    // Before the strips, whose rotation outputs the bank's edges leave from.
+    this.partMeters.dispose();
     this.parts.dispose();
     this.groups.dispose();
     this.roster.clear();
