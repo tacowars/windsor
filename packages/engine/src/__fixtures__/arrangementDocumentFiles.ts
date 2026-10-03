@@ -11,7 +11,7 @@ import { ARRANGEMENT_VERSION } from '../audioConstants';
 
 /** The files in the current format, which load through `currentDocument`. */
 export type CurrentDocumentFile =
-  'dangling-preset' | 'dangling-return' | 'nothing-usable' | 'silent-song';
+  'dangling-preset' | 'dangling-return' | 'figure-part' | 'nothing-usable' | 'silent-song';
 
 /** A file under `arrangementDocuments/`, parsed and otherwise untouched. */
 export function rawDocument(name: string): Record<string, unknown> {

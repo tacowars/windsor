@@ -17,6 +17,7 @@ import type {
   ChordDriver,
   EuclideanDriver,
   GridDriver,
+  SequencerKind,
   SequencerSpec,
 } from './arrangement';
 import { driverOf } from './arrangement';
@@ -57,8 +58,16 @@ export function generatorSig(spec: SequencerSpec): string {
 }
 
 /**
+ * The kinds that build no generator, so a part of one has no binding: `none`,
+ * and `figure` until its performer lands (windsor#485), so a Figure part
+ * loads and plays nothing (windsor#484).
+ */
+export const buildsNoGenerator = (kind: SequencerKind): boolean =>
+  kind === 'none' || kind === 'figure';
+
+/**
  * The generator a spec builds — a part's `sequencer`, or one region's
- * pattern (`regionPattern`, windsor#74) — or null for `none`.
+ * pattern (`regionPattern`, windsor#74) — or null for `none` and `figure`.
  */
 export function buildGenerator(spec: SequencerSpec, sampler: ScaleSampler): Generator | null {
   const driver: unknown = driverOf(spec);
@@ -73,6 +82,8 @@ export function buildGenerator(spec: SequencerSpec, sampler: ScaleSampler): Gene
       return new Arpeggiator(sampler, driver as ArpDriver);
     case 'bass':
       return new BassSequencer(sampler, driver as BassDriver);
+    case 'figure':
+      return null;
     default:
       return null;
   }

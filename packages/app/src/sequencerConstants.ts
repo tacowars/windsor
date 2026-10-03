@@ -14,6 +14,7 @@ export const KIND_LABELS: Readonly<Record<SequencerKind, string>> = {
   chord: 'Chord',
   arp: 'Arp',
   bass: 'Basslead',
+  figure: 'Figure',
 };
 
 /** The twelve pitch classes, sharps: the engine's own list, not a copy. */

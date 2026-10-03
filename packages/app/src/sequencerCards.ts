@@ -34,6 +34,10 @@ export type SequencerCard = (ctx: AppCtx, slot: number, region?: number) => Card
 const noneCard: SequencerCard = () =>
   el('p', 'hint', 'No sequencer: this part plays only from the keyboard.');
 
+/** A Figure part until its device lands (windsor#490): the engine loads it and plays nothing yet (windsor#484). */
+const figureStandIn: SequencerCard = () =>
+  el('p', 'hint', 'Figure: this part plays nothing until the Figure device lands.');
+
 /** One card per kind. A kind added to the engine is an appended entry here. */
 export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   none: noneCard,
@@ -42,4 +46,5 @@ export const SEQUENCER_CARDS: Readonly<Record<SequencerKind, SequencerCard>> = {
   chord: chordCard,
   arp: arpCard,
   bass: bassCard,
+  figure: figureStandIn,
 };

@@ -14,7 +14,7 @@
  * exactly the invisible musical stand-in the record's §4 rejects). An absent
  * sequencer, by contrast, is `none` — inert, never a musical guess (#597).
  */
-import type { Harmony, Swing, Transport } from './arrangement';
+import type { Harmony, SequencerKind, Swing, Transport } from './arrangement';
 import type { DocumentPart } from './arrangementDocument';
 import { FieldNormaliser, show } from './arrangementFields';
 import {
@@ -48,6 +48,8 @@ import { normalisePatches } from '../patch/patchNormalise';
 import { PatchResolver, type ResolveOptions } from './arrangementValidate';
 import { SCALES, type ScaleName } from '../sequencing/scaleSampler';
 import { normaliseSequencer, sequencerKindOf } from './sequencerNormalise';
+import { figureSourceFault } from './figureNormalise';
+import type { FigureSource } from '../sequencing/figureSequencer';
 
 export class ArrangementNormaliser extends FieldNormaliser {
   /**
@@ -217,6 +219,51 @@ export class ArrangementNormaliser extends FieldNormaliser {
       // Absent stays absent: a song without lanes reads and exports as before (decision 15).
       ...(automation && { automation }),
     };
+  }
+
+  /**
+   * The parts pass's source check (windsor#484): a Figure's canon `source`,
+   * on the part's sequencer or on a region's pattern, must name another
+   * Figure part of the song. One naming the part itself, an empty slot or a
+   * part of another kind is dropped, reported. It runs once the whole list
+   * is known, so a kind change elsewhere silences a canon on the next
+   * normalise.
+   */
+  figureSources(entries: readonly { part: DocumentPart; path: string }[]): DocumentPart[] {
+    const kinds = new Map<number, SequencerKind>(
+      entries.map(({ part }) => [part.slot, part.sequencer.kind]),
+    );
+    return entries.map(({ part, path }) => {
+      const check = <S extends { readonly kind: string }>(spec: S, at: string): S =>
+        this.sourceChecked(spec, at, part.slot, kinds);
+      const sequencer = check(part.sequencer, `${path}.sequencer`);
+      const regions = part.regions.map((region, j) =>
+        region.pattern === undefined
+          ? region
+          : { ...region, pattern: check(region.pattern, `${path}.regions[${j}].pattern`) },
+      );
+      const same =
+        sequencer === part.sequencer &&
+        regions.every((region, j) => region.pattern === part.regions[j]?.pattern);
+      return same ? part : { ...part, sequencer, regions };
+    });
+  }
+
+  /** `spec` itself, or a copy without its `source` when that source cannot play, reported. */
+  private sourceChecked<S extends { readonly kind: string }>(
+    spec: S,
+    at: string,
+    slot: number,
+    kinds: ReadonlyMap<number, SequencerKind>,
+  ): S {
+    const { source } = spec as { source?: FigureSource };
+    if (spec.kind !== 'figure' || source === undefined) return spec;
+    const fault = figureSourceFault(source, slot, kinds);
+    if (fault === null) return spec;
+    this.correction(`${at}.source: ${fault} — source dropped`);
+    const kept: Record<string, unknown> = { ...spec };
+    delete kept.source;
+    return kept as S;
   }
 
   /** A part's identity has no default: a missing or out-of-range slot drops the part. */

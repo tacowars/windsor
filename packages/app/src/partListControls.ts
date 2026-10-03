@@ -61,7 +61,11 @@ function kindPicker(ctx: AppCtx, slot: number): HTMLElement {
   box.appendChild(el('span', 'field-label', 'Sequencer'));
   box.appendChild(
     seg(
-      SEQUENCER_KINDS.map((kind) => ({ value: kind, label: KIND_LABELS[kind] })),
+      // The Figure is offered once its device lands (windsor#490); the engine carries it since windsor#484.
+      SEQUENCER_KINDS.filter((kind) => kind !== 'figure').map((kind) => ({
+        value: kind,
+        label: KIND_LABELS[kind],
+      })),
       () => partAt(ctx.model.doc, slot)?.sequencer.kind ?? 'none',
       (value) => {
         setSequencerKindLive(ctx, slot, value as SequencerKind);

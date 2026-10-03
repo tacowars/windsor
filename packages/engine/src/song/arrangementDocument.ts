@@ -275,7 +275,8 @@ function versionReason(o: Record<string, unknown>): string {
  * The part list: at most eight, each on a unique slot. Two parts on one slot
  * would fight over one engine part and one generator stream — the later
  * creation replaces the earlier, leaving the first uncontrollable and
- * undisposed — so the later part drops, reported.
+ * undisposed — so the later part drops, reported. A Figure's canon source is
+ * checked against the list that survives (windsor#484).
  */
 function normaliseParts(
   raw: unknown,
@@ -289,7 +290,7 @@ function normaliseParts(
   if (raw.length > MUSIC_PARTS_MAX) {
     n.correction(`parts: ${raw.length} parts — only the first ${MUSIC_PARTS_MAX} are kept`);
   }
-  const out: DocumentPart[] = [];
+  const out: { part: DocumentPart; path: string }[] = [];
   const used = new Set<number>();
   raw.slice(0, MUSIC_PARTS_MAX).forEach((entry, i) => {
     const part = n.part(entry, `parts[${i}]`, transport);
@@ -299,7 +300,7 @@ function normaliseParts(
       return;
     }
     used.add(part.slot);
-    out.push(part);
+    out.push({ part, path: `parts[${i}]` });
   });
-  return out;
+  return n.figureSources(out);
 }
