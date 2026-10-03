@@ -9,7 +9,7 @@ import {
   PPQ,
   TICKS_PER_BAR,
   bendCurve,
-  catalogRow,
+  requireCatalogRow,
   toDisplay,
   type AutomationPoint,
   type AutomationTargetRow,
@@ -18,8 +18,8 @@ import { AUTOMATION_PART } from '@windsor/engine/__fixtures__/automationSong';
 import { rightHalfBend } from './songAutomationSplit';
 
 const P = (tick: number, value: number, bend = 0): AutomationPoint => ({ tick, value, bend });
-const pan = catalogRow('strip.pan')!;
-const cutoff = catalogRow('voice.filter.cutoff')!;
+const pan = requireCatalogRow('strip.pan');
+const cutoff = requireCatalogRow('voice.filter.cutoff');
 const SIXTEENTH = PPQ / 4;
 const BAR = TICKS_PER_BAR;
 

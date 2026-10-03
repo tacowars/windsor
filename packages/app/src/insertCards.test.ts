@@ -26,6 +26,7 @@ import {
   ENSEMBLE_BOUNDS,
   INSERT_KINDS,
   INSERT_KIND_NAMES,
+  RETURN_NAMES,
   REVERB_SPACE_RANGES,
   eqResponseDb,
 } from '@windsor/engine';
@@ -75,7 +76,7 @@ describe('INSERT_CARDS', () => {
   });
 
   it('adds a flat EQ with bands 2–7 on, on a part, the master and both send buses', () => {
-    for (const target of [0, 'master', 'a', 'b'] as const) {
+    for (const target of [0, 'master', ...RETURN_NAMES] as const) {
       const [added] = addInsert([], 'eq', target);
       expect(withoutInsertIds([added!]), String(target)).toEqual([DEFAULT_EQ]);
       if (added?.kind !== 'eq') throw new Error('not an EQ');

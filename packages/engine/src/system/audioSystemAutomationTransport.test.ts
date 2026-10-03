@@ -22,7 +22,7 @@ import { SCHEDULER_START_DELAY_SECONDS } from '../audioConstants';
 import { AUTOMATION_STEP_RAMP_SECONDS } from '../automation/automationConstants';
 import { valueAt } from '../automation/automationEvaluate';
 import type { AutomationLane } from '../automation/automationLane';
-import { catalogRow } from '../automation/automationTargets';
+import { requireCatalogRow } from '../automation/automationTargets';
 import { PAN_ANGLE_MAX } from '../mixer/stereoRotate';
 import { PPQ, TICKS_PER_BAR } from '../sequencing/scheduler';
 import { type ArrangementDocument, makeArrangement } from '../song/arrangementDocument';
@@ -33,9 +33,9 @@ const restore = installSidechainWorklet();
 afterAll(() => restore());
 
 const { hat } = FULL_SLOT;
-const LEVEL = catalogRow('strip.level')!;
-const PAN = catalogRow('strip.pan')!;
-const SEND = catalogRow('strip.send.a')!;
+const LEVEL = requireCatalogRow('strip.level');
+const PAN = requireCatalogRow('strip.pan');
+const SEND = requireCatalogRow('strip.send.a');
 /** The fixture's 96 BPM. */
 const TICK = 60 / FULL_DOCUMENT.transport.bpm / PPQ;
 /** A transport started at time 0 issues its first tick here. */
